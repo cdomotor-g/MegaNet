@@ -141,6 +141,19 @@ camera's heading and tilt, not the aircraft's.
 
 A fix of (0, 0) is no fix, and a latitude without a longitude is no position.
 
+**One app leaves the ± out of the file and prints it on the picture:
+Solocator.** Its EXIF has the position, altitude and heading and no
+`GPSHPositioningError`, while its overlay reads `±13m`. So a photo whose EXIF
+is signed `Solocator` and says nothing of the ± is read by the OCR below for
+that one number — the file's position, time and heading still win — and the
+overlay's ± is taken only when the overlay's own position, where it could be
+read, is the same fix (within 50 m, which forgives a misread last digit): an
+overlay printing somewhere else printed that place's ±. `meta.accuracy` says
+`{"source": "ocr"}` when that is where the number came from. Photos stored
+before this was read say so in the viewer and offer to read it (*Seeing
+them*, below). Another app with the same gap is one word in
+`PhotoMeta.printsAccuracy`.
+
 ### 2. The overlay on the picture — `ocr`
 
 A photo that has been through Messages, WhatsApp, an email or most chat apps
@@ -200,6 +213,23 @@ afterwards (*Move…*, or *Place it…* for an unplaced one); or a station, whic
 puts an unplaced photo at the station's own position (`station`) and files a
 placed one under it without moving it.
 
+**Moving a photo's pin** is what *Move…* is for when the GPS was loose and you
+know where you stood. It opens a small map of the imagery under the viewer's
+buttons (Esri's, as the Stations map's Satellite base, zoomable two levels past
+where its tiles stop): the photo's pin where it is now, the ring the GPS's ±
+draws round that fix — red when it is wider than 7 m — the way the camera
+looked, and a dot for every other photo taken at the same spot. Drag the pin,
+or click the map, to where the photo was taken; the coordinates box follows,
+and the line under the map says how far and which way that is from where the
+GPS put it. Typing in the box moves the pin too. **Save** writes it as placed
+by hand, which drops the ± — the place is somebody's word now, not the GPS's.
+Photos taken at the same spot were fixed by the same GPS within the minute and
+share its error, so **they move with it by the same offset**, one patch each,
+unless *Move the other n photos taken here with it* is unticked. Escape or
+*Cancel* puts it away unsaved. *Place it…* is the same map for a photo with no
+position yet, opened on its station, the carousel's other photos or the
+Stations map's view.
+
 ### The station it is filed under
 
 The nearest station with a position within **1 km**, worked out by the
@@ -258,6 +288,32 @@ just hides it, and keeps a tombstone so the Dropbox sync never brings it back.
 twin on its station, the camera standing behind the photographer looking the
 way they looked), and *🔎 Read equipment labels* (see *Reading equipment
 labels*, below).
+
+**The ±** follows the coordinates, to the metre, and is **red when it is wider
+than 7 m** (`ROUGH_M` in `field-photos.js`) — a fix that loose may be well
+away from where the photo was taken, and *Move…* is how to put it right. It is
+judged on the number shown, so `±7 m` is never the red one, and the words say
+"a rough fix" too for a reader who does not see colour. A Solocator photo
+stored before its ± was read off the picture says *No ± in the file* and
+offers **Read it off the photo** (or *the n photos taken here*): the stored
+picture read by the same OCR as an upload, one photo at a time, and the ±
+saved on its own (`update_field_photo` with `accuracy_m` alone).
+
+**The compass**, at the foot of the side panel, is the photo's direction and
+field of view as a wedge, with every other photo taken at the same spot (the
+3 m rule the map's pins use) drawn the same way, dimmed; a lens whose width
+the file did not give is drawn 60° wide and dashed. **Click a direction** and
+the photo facing it comes up. Where several photos' wedges take in that
+direction, **all of them are boxed in gold** — on the strip and on the dial,
+in the search-hit amber — and the one looking most nearly that way comes up;
+clicking there again steps to the next. A direction nobody faced clears the
+boxes and says so. Each wedge is also a button: Tab to it and press Enter.
+
+**A spot's photos are in compass order** — opened from a pin on the map or a
+marker in the twin, the carousel runs N → E → S → W by the way each photo
+looked, spot by spot, so the strip reads round the dial the way its wedges
+do; a photo with no heading comes after the ones with. The library's
+carousel keeps the library's order, newest first.
 
 ### On the Stations map
 
@@ -837,7 +893,8 @@ the migration, like 0010's.
 
 | Host | For | Notes |
 |---|---|---|
-| `unpkg.com` | the OCR engine, once a session, only for a photo with no GPS; the HEIC decoder, once a session, only for a HEIC the browser cannot draw | already allowed for Leaflet, MapLibre and three.js |
+| `unpkg.com` | the OCR engine, once a session, only for a photo with no GPS (or a Solocator photo's ±); the HEIC decoder, once a session, only for a HEIC the browser cannot draw | already allowed for Leaflet, MapLibre and three.js |
+| `server.arcgisonline.com` | the imagery under the viewer's *Move…* map | already allowed for the Stations map's Satellite base |
 | `*.supabase.co` (or the `/api/db` proxy) | the rows, the bucket, the signed links | already allowed |
 | `www.dropbox.com`, `api.dropboxapi.com` | linking Dropbox, once, from the tab | only for whoever sets it up; the sync itself runs on GitHub |
 | `oauth2.googleapis.com`, `www.googleapis.com` | the Google Drive sync: its hour's token, and the folder's listing and files | from GitHub's runners only — nothing in the browser talks to Google |
@@ -852,9 +909,16 @@ the migration, like 0010's.
   and records, the same photo refused three ways with its bytes taken back
   down, the library, the carousel by keyboard, Dropbox's PKCE link end to end,
   the map's pins and cones, the same pins tilted into 3-D and pressed there,
-  the twin's markers on the ground, clicked and walked up to — and a real HEIC,
-  which Chromium cannot draw, decoded, placed from its EXIF and uploaded as a
-  JPEG whose pixels are the picture.
+  the twin's markers on the ground, clicked and walked up to; the viewer's side
+  on a spot of five — opened in compass order, a rough ±13 m in the `--bad`
+  red, the compass's wedges clicked (one photo alone, two boxed in gold and
+  stepped through, a direction nobody faced), a wedge pressed with Enter, a
+  stored Solocator photo's ± read off its picture by the real OCR and saved
+  alone, and a pin dragged on the move map with the four others going by the
+  same offset, then clicked, typed and saved alone — and a real HEIC, which
+  Chromium cannot draw, decoded, placed from its EXIF and uploaded as a JPEG
+  whose pixels are the picture. Under Node, a Solocator file's missing ±
+  taken from its overlay, and only for the same fix.
 - **`npm run photozip`** (test/) — `photo-zip.js` under Node against zips
   built byte by byte (stored and deflated entries, a folder, `__MACOSX` junk,
   UTF-8 and CP437 names, a data descriptor, something in front of the zip),

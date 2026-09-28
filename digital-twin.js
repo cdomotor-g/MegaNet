@@ -3103,7 +3103,8 @@ void main() {
     if (!sp || typeof FieldPhotos === 'undefined') return;
     const st = currentStation();
     const where = spotWhere(sp);
-    FieldPhotos.openSpot(sp.ids, sp.ids[0],
+    // In the viewer's compass order, from the first (FieldPhotos.openSpot).
+    FieldPhotos.openSpot(sp.ids, null,
       `Photos taken ${where === 'at the station' ? 'at ' : `${where} of `}${st ? st.name : 'the station'}`);
   }
 
@@ -3112,7 +3113,7 @@ void main() {
     if (!P || !P.spots.length || typeof FieldPhotos === 'undefined') return;
     const st = currentStation();
     const ids = P.spots.flatMap(sp => sp.ids);
-    FieldPhotos.openSpot(ids, ids[0], `Photos around ${st ? st.name : 'the station'}`);
+    FieldPhotos.openSpot(ids, null, `Photos around ${st ? st.name : 'the station'}`);
   }
 
   // From the viewer's "In the twin": once the markers are up, stand the orbit

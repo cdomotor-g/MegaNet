@@ -13071,7 +13071,15 @@ code {
 .fp-v-prev { left: var(--sp-2); }
 .fp-v-next { right: var(--sp-2); }
 
-.fp-v-side { min-height: 0; overflow: auto; font-size: var(--fs-sm); }
+/* The side: the facts and buttons, the mover under them while Move… is open,
+   and the compass pushed to the foot — the viewer's bottom right. */
+.fp-v-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  font-size: var(--fs-sm);
+}
 .fp-v-facts {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -13107,6 +13115,82 @@ code {
   background: var(--subtle);
 }
 .fp-v-thumb.is-here { border-color: var(--accent); }
+/* Boxed by the compass: every photo facing the direction clicked, in the
+   search-hit amber — the same "this matches" the station table and the map's
+   pin ring say it in. The one on screen keeps its own border inside the box. */
+.fp-v-thumb.is-gold { border-color: var(--hit-ring); box-shadow: 0 0 0 1px var(--hit-ring), 0 0 6px 1px var(--hit-glow); }
+.fp-v-thumb.is-here.is-gold { border-color: var(--accent); box-shadow: 0 0 0 2px var(--hit-ring), 0 0 7px 2px var(--hit-glow); }
+
+/* A fix's ±, and the red of a rough one (wider than 7 m, field-photos.js
+   ROUGH_M) — the words say "a rough fix" too, off screen, for a reader who
+   does not see the red. */
+.fp-acc { white-space: nowrap; }
+.fp-acc-rough { color: var(--bad); font-weight: 600; }
+
+/* The mover (Move… / Place it…): a map of the imagery with the photo's pin on
+   it, then the coordinates and the stations. */
+.fp-v-move { margin-bottom: var(--sp-2); }
+.fp-v-move-lead, .fp-v-moved { margin: 0; }
+.fp-v-moved { color: var(--muted); min-height: 1.2em; }
+.fp-v-map {
+  height: 15rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--subtle);
+}
+.fp-v-map .leaflet-control-attribution { font-size: 9px; }
+.fp-v-with { display: flex; gap: var(--sp-2); align-items: baseline; color: var(--text); }
+/* The pin: a camera-yellow dot on the exact point with a halo that reads on
+   any imagery, in a 28 px box so a finger can take hold of it. */
+.fp-mm-pin-icon { background: none; border: 0; }
+.fp-mm-pin { position: absolute; inset: 0; display: grid; place-items: center; cursor: grab; }
+.fp-mm-pin::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--photo);
+  border: 2px solid var(--photo-ink);
+  box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(0, 0, 0, .55);
+}
+.leaflet-dragging .fp-mm-pin { cursor: grabbing; }
+/* Paths on the move map, coloured here over Leaflet's own attributes. The
+   ring is the GPS's ±, round where the GPS put the photo (the grey dot); the
+   dashed leader runs from there to the pin. */
+.fp-mm-ring { stroke: var(--accent); stroke-width: 1.5; fill: var(--accent); fill-opacity: .12; }
+.fp-mm-ring.is-rough { stroke: var(--bad); fill: var(--bad); }
+.fp-mm-ghost { stroke: #fff; stroke-width: 1.5; fill: var(--muted); fill-opacity: 1; }
+.fp-mm-leader { stroke: #fff; stroke-width: 1.5; stroke-dasharray: 4 4; fill: none; }
+.fp-mm-cone { stroke: var(--photo-ink); stroke-width: 1; fill: var(--photo); fill-opacity: .35; }
+.fp-mm-other { stroke: var(--photo-ink); stroke-width: 1; fill: var(--photo); fill-opacity: .85; }
+
+/* The compass at the foot of the side. A wedge per photo taken at the spot,
+   as wide as its lens saw: the one on screen strong with its needle, the
+   rest dimmed, a width the file did not give dashed, and the ones the last
+   click picked out ringed in the same amber as their boxes on the strip. */
+.fp-v-compass {
+  margin-top: auto;
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-1);
+  padding-top: var(--sp-2);
+}
+.fp-v-compass:empty { display: none; }
+.fp-cmp { width: min(100%, 12.5rem); height: auto; overflow: visible; cursor: crosshair; }
+.fp-cmp-face { fill: var(--subtle); stroke: var(--border); stroke-width: 2; }
+.fp-cmp-tick { stroke: var(--muted); stroke-width: 1.5; }
+.fp-cmp-tick.is-major { stroke: var(--text); stroke-width: 2.5; }
+.fp-cmp-label { fill: var(--muted); font-size: 17px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.fp-cmp-label.is-north { fill: var(--text); }
+.fp-cmp-wedge { fill: var(--accent); fill-opacity: .16; stroke: var(--accent); stroke-opacity: .5; stroke-width: 1.5; cursor: pointer; }
+.fp-cmp-wedge:hover { fill-opacity: .3; }
+.fp-cmp-wedge.is-assumed { stroke-dasharray: 5 4; }
+.fp-cmp-wedge.is-here { fill-opacity: .55; stroke-opacity: 1; stroke-width: 2; }
+.fp-cmp-wedge.is-gold { stroke: var(--hit-ring); stroke-opacity: 1; stroke-width: 3.5; }
+.fp-cmp-wedge:focus-visible { stroke: var(--text); stroke-opacity: 1; stroke-width: 3.5; }
+.fp-cmp-needle { stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; pointer-events: none; }
+.fp-cmp-hub { fill: var(--text); pointer-events: none; }
+.fp-cmp-note { margin: 0; max-width: 18rem; text-align: center; color: var(--muted); font-size: var(--fs-xs); }
 
 @media (max-width: 900px) {
   .fp-v-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr); }

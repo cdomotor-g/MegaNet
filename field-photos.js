@@ -8,16 +8,17 @@
 // After core.js, photo-meta.js, photo-zip.js, photo-equipment.js and
 // datastore.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, announce,
-// registerTabTeardown, KM_PER_DEG_LAT, kmPerDegLon, bearingDeg and fmtKm; to
-// photo-meta.js for PhotoMeta; to photo-zip.js for PhotoZip; to datastore.js
-// for dbSelect, dbRpc, dbCanWrite, dbUploadObject, dbSignedUrl, dbSignedUrls
-// and dbRemoveObject; to auth.js for Auth; to places.js for Places.parse; and
-// to app.js for switchTab, showStationCard, prepareSearch and
-// stationMatchesSearch. Across to digital-twin.js and map-photos.js, which draw
-// what this file holds and are told when it changes, and to photo-review.js,
-// whose Review panel is drawn on this tab and reads this file's queue. Every
-// one of those is a runtime call from inside a function here; nothing executes
-// at load (`npm run toplevel`).
+// registerTabTeardown, registerLiveMap, removeMap, KM_PER_DEG_LAT, kmPerDegLon,
+// bearingDeg and fmtKm; to photo-meta.js for PhotoMeta; to photo-zip.js for
+// PhotoZip; to datastore.js for dbSelect, dbRpc, dbCanWrite, dbUploadObject,
+// dbSignedUrl, dbSignedUrls and dbRemoveObject; to auth.js for Auth; to
+// places.js for Places.parse; to map-controls.js for makeBaseLayers (the
+// viewer's move map, on Leaflet's `L`); and to app.js for switchTab,
+// showStationCard, prepareSearch and stationMatchesSearch. Across to
+// digital-twin.js and map-photos.js, which draw what this file holds and are
+// told when it changes, and to photo-review.js, whose Review panel is drawn on
+// this tab and reads this file's queue. Every one of those is a runtime call
+// from inside a function here; nothing executes at load (`npm run toplevel`).
 //
 // ── Where a photo goes ───────────────────────────────────────────────────────
 //
@@ -89,14 +90,21 @@ const FieldPhotos = (function () {
   const AT_ONCE = 2;               // uploads in flight
   const PAGE = 60;                 // photos in one page of the library
   const SPOT_M = 3;                // photos this close are "taken there", one marker
+  const ROUGH_M = 7;               // a fix whose ± is wider than this is flagged, in red
+  const FOV_ASSUMED = 60;          // a compass wedge's width when the lens did not say
+  const CONE_M = 20;               // the view cone's length on the move map, metres
 
   // What the library, the twin and the map ask for — everything but `meta`,
   // which holds the OCR's raw readings and is the viewer's to fetch, not a
-  // grid's. The two things from it that are shown everywhere come out by path.
+  // grid's. The three things from it that are needed everywhere come out by
+  // path — the camera app among them, since whether a photo's ± can be read
+  // off its overlay (PhotoMeta.printsAccuracy) is asked of every photo at a
+  // spot, not only the one on screen.
   const COLS = 'id,storage_path,thumb_path,content_type,byte_size,width,height,title,caption,'
              + 'taken_at,taken_local,taken_source,lat,lon,placement,accuracy_m,altitude_m,altitude_ref,'
              + 'heading_deg,heading_ref,pitch_deg,fov_deg,station_id,station_auto,origin,uploaded_by,'
-             + 'created_at,updated_at,ocr_confidence:meta->ocr->>confidence,zone_source:meta->taken->>zone_source';
+             + 'created_at,updated_at,ocr_confidence:meta->ocr->>confidence,zone_source:meta->taken->>zone_source,'
+             + 'camera_software:meta->camera->>software';
 
   const PLACEMENT = {
     exif:    { chip: 'camera GPS',        long: 'the camera\'s own GPS, written into the file' },
@@ -176,6 +184,23 @@ const FieldPhotos = (function () {
     if (!known(deg)) return '';
     return `${Math.round(deg)}° ${compass(deg)}${ref === 'M' ? ' (magnetic)' : ref === 'T' ? ' (true)' : ''}`;
   }
+  // Degrees between two headings, the short way round.
+  function angleOff(a, b) { const d = Math.abs((((a - b) % 360) + 360) % 360); return d > 180 ? 360 - d : d; }
+
+  // A fix's ±, as the viewer and the queue say it: to the metre, and red when
+  // it is wider than ROUGH_M — judged on the number shown, so a fix that
+  // reads ±7 m is never the red one. The words say it too, for a reader who
+  // does not see the red.
+  function rough(m) { return known(m) && Math.round(+m) > ROUGH_M; }
+  function accHtml(m) {
+    if (!known(m)) return '';
+    const n = Math.round(+m);
+    return rough(m)
+      ? ` <span class="fp-acc fp-acc-rough" title="A rough fix: the GPS said ±${n} m, wider than ${ROUGH_M} m, so the photo may have been taken well away from this point. Move… puts it where it was taken.">±${n} m<span class="sr-only"> — a rough fix, wider than ${ROUGH_M} m</span></span>`
+      : ` <span class="fp-acc">±${n} m</span>`;
+  }
+  // Time order, the one spots() and the twin's query keep.
+  function byTaken(a, b) { return String(a.taken_at || a.created_at).localeCompare(String(b.taken_at || b.created_at)); }
 
   // A time as the camera's own clock read, with its zone — the photo's local
   // time, not the viewer's. `local` is YYYY-MM-DDTHH:MM:SS.
@@ -508,7 +533,7 @@ const FieldPhotos = (function () {
       spot.rows.push(r);
     }
     for (const g of out) {
-      g.rows.sort((a, b) => String(a.taken_at || a.created_at).localeCompare(String(b.taken_at || b.created_at)));
+      g.rows.sort(byTaken);
       // Every way the camera faced from here — two photos a few seconds apart,
       // one up the reach and one down it, are one spot with two views — each
       // once, to the nearest five degrees.
@@ -738,10 +763,12 @@ const FieldPhotos = (function () {
 
       // Where, when and which way: the file's own facts, and the overlay's
       // where the file is silent — PhotoMeta.reconcile, the same rules the
-      // Dropbox sync places a photo by.
+      // Dropbox sync places a photo by. A file that places the photo and
+      // leaves out a ± its app printed is read for the ± alone.
       let ocr = null;
       if (PhotoMeta.needsOcr(meta)) {
-        const want = meta.gps ? 'the time printed on the photo' : 'the position printed on the photo';
+        const want = !meta.gps ? 'the position printed on the photo'
+                   : !meta.taken ? 'the time printed on the photo' : 'the ± printed on the photo';
         item.status = 'ocr';
         item.note = meta.gps ? `Reading ${want}…` : `No GPS in the file — reading ${want}…`;
         repaintQueue();
@@ -1221,7 +1248,7 @@ const FieldPhotos = (function () {
     const st = item.station ? stationById(item.station.id) : null;
     const pos = item.pos;
     const where = pos
-      ? `<span class="fp-coord">${esc(fmtCoord(pos.lat, pos.lon))}</span>${known(pos.accuracy) ? ` <span class="small">±${esc(String(Math.round(pos.accuracy)))} m</span>` : ''}
+      ? `<span class="fp-coord">${esc(fmtCoord(pos.lat, pos.lon))}</span>${known(pos.accuracy) ? `<span class="small">${accHtml(pos.accuracy)}</span>` : ''}
          <span class="fp-chip fp-chip-${esc(pos.placement)}">${esc(PLACEMENT[pos.placement].chip)}</span>
          ${pos.placement === 'ocr' && pos.confidence !== 'high' ? '<span class="fp-chip fp-chip-warn">read once — check it</span>' : ''}
          ${item.heading ? `<span class="small fp-heading">facing ${esc(headingText(item.heading.deg, item.heading.ref))}</span>` : ''}`
@@ -1618,13 +1645,17 @@ const FieldPhotos = (function () {
   // Tab kept inside, focus handed back to whatever opened it — Modal's rules —
   // and ← → to walk the photos, swipe on a touch screen.
 
-  let v = null;             // { ids, i, title, opener, editing, onKey }
+  let v = null;             // { ids, i, title, opener, editing, onKey, gold, goldSay, readingAcc }
 
   function view(ids, startId, { title = '' } = {}) {
     ids = (ids || []).filter(id => S().byId[id]);
     if (!ids.length) return;
     const opener = document.activeElement;
-    v = { ids, i: Math.max(0, ids.indexOf(startId)), title, opener, editing: false };
+    unmountMoveMap();
+    // `gold`: the photos the compass last picked out — every one facing the
+    // direction clicked, boxed on the strip — or null; `goldSay`, what the
+    // note under the dial says about them.
+    v = { ids, i: Math.max(0, ids.indexOf(startId)), title, opener, editing: false, gold: null, goldSay: '', readingAcc: false };
     let el = document.getElementById('fp-viewer');
     if (!el) {
       el = document.createElement('div');
@@ -1643,6 +1674,7 @@ const FieldPhotos = (function () {
   }
 
   function close() {
+    unmountMoveMap();
     const el = document.getElementById('fp-viewer');
     if (el) { el.hidden = true; el.innerHTML = ''; }
     if (v) {
@@ -1670,18 +1702,20 @@ const FieldPhotos = (function () {
     const card = document.querySelector('#fp-viewer .fp-v-card');
     if (card && !card.contains(document.activeElement)) card.focus();
   }
-  function goTo(i) { if (v) { v.i = i; v.editing = false; paintViewer(); fetchMeta(v.ids[v.i]); } }
+  function goTo(i) { if (v) { v.i = i; v.editing = false; paintViewer(); fetchMeta(v.ids[v.i]); keepFocus(); } }
 
   function onKey(e) {
     if (!v) return;
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '');
     if (e.key === 'Escape') {
       e.preventDefault(); e.stopPropagation();
-      if (v.editing) { v.editing = false; paintViewer(); return; }
+      if (v.editing) { editPlace(); return; }
       close();
       return;
     }
     if (typing) return;
+    // The move map's own keys — arrows pan it, Home and End are its too.
+    if (e.target && e.target.closest && e.target.closest('.fp-v-map') && e.key !== 'Tab') return;
     if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
     else if (e.key === 'Home') { e.preventDefault(); goTo(0); }
@@ -1708,8 +1742,12 @@ const FieldPhotos = (function () {
   function paintViewer() {
     const el = document.getElementById('fp-viewer');
     if (!el || !v) return;
+    unmountMoveMap();
     const r = S().byId[v.ids[v.i]];
     const n = v.ids.length;
+    // The gold is about one spot's photos; walked on to another spot, it goes.
+    if (v.gold && !spotRows(r).some(x => v.gold.has(x.id))) v.gold = null;
+    const gold = v.gold || new Set();
     el.innerHTML = `
       <div class="fp-v-card" role="dialog" aria-modal="true" aria-labelledby="fp-v-title" tabindex="-1">
         <div class="fp-v-head">
@@ -1722,17 +1760,22 @@ const FieldPhotos = (function () {
             ${n > 1 ? `<button type="button" class="fp-v-nav fp-v-prev" onclick="FieldPhotos.go(-1)" aria-label="Previous photo">‹</button>
                        <button type="button" class="fp-v-nav fp-v-next" onclick="FieldPhotos.go(1)" aria-label="Next photo">›</button>` : ''}
           </div>
-          <div class="fp-v-side" id="fp-v-details">${detailsHtml(r)}</div>
+          <div class="fp-v-side">
+            <div id="fp-v-details">${detailsHtml(r)}</div>
+            <div id="fp-v-place"></div>
+            <div class="fp-v-compass" id="fp-v-compass">${compassHtml(r)}</div>
+          </div>
         </div>
         ${n > 1 ? `<div class="fp-v-strip" role="group" aria-label="All ${n} photos">
           ${v.ids.map((id, i) => {
             const x = S().byId[id];
-            return `<button type="button" class="fp-v-thumb${i === v.i ? ' is-here' : ''}" onclick="FieldPhotos.goTo(${i})"
-                            aria-label="Photo ${i + 1}${whenText(x) ? `, ${escAttr(whenText(x))}` : ''}" ${i === v.i ? 'aria-current="true"' : ''}>
+            return `<button type="button" class="fp-v-thumb${i === v.i ? ' is-here' : ''}${gold.has(id) ? ' is-gold' : ''}" onclick="FieldPhotos.goTo(${i})"
+                            aria-label="${escAttr(thumbLabel(x, i))}" ${i === v.i ? 'aria-current="true"' : ''}>
                       <img data-fp-src="${escAttr(thumbOf(x))}" alt=""></button>`;
           }).join('')}
         </div>` : ''}
       </div>`;
+    paintPlace();
     // The picture: its thumbnail at once (already signed, often already
     // loaded), the full size when it arrives.
     const img = el.querySelector('#fp-v-img');
@@ -1758,6 +1801,14 @@ const FieldPhotos = (function () {
     if (whenText(r)) bits.push(whenText(r));
     return bits.join(', ');
   }
+  // A thumbnail on the strip, in words: which, the way it looks, when — and
+  // whether the compass boxed it.
+  function thumbLabel(x, i) {
+    const bits = [`Photo ${i + 1}`];
+    if (known(x.heading_deg)) bits.push(`facing ${headingText(+x.heading_deg, x.heading_ref)}`);
+    if (whenText(x)) bits.push(whenText(x));
+    return bits.join(', ') + (v && v.gold && v.gold.has(x.id) ? ' — faces the direction picked on the compass' : '');
+  }
 
   function swipe(stage) {
     if (!stage) return;
@@ -1772,9 +1823,32 @@ const FieldPhotos = (function () {
     stage.addEventListener('pointercancel', () => { x0 = null; });
   }
 
+  // The side, in its three parts, each painted on its own: the facts and the
+  // buttons (redrawn when the full row arrives), the mover under them while
+  // Move… is open (a map that must survive the facts being redrawn), and the
+  // compass at the foot.
   function paintDetails() {
     const el = document.getElementById('fp-v-details');
     if (el && v) el.innerHTML = detailsHtml(S().byId[v.ids[v.i]]);
+  }
+  function paintPlace() {
+    unmountMoveMap();
+    const el = document.getElementById('fp-v-place');
+    if (!el || !v) return;
+    const r = S().byId[v.ids[v.i]];
+    el.innerHTML = v.editing && r ? viewerPlaceHtml(r) : '';
+    if (v.editing && r) mountMoveMap(r);
+  }
+  function paintCompass(note) {
+    const el = document.getElementById('fp-v-compass');
+    if (el && v) el.innerHTML = compassHtml(S().byId[v.ids[v.i]], note);
+  }
+  function paintSide() { paintDetails(); paintPlace(); paintCompass(); keepFocus(); }
+  // A redraw takes the control that had the focus with it; the focus stays in
+  // the dialog rather than falling to the page behind it.
+  function keepFocus() {
+    const card = document.querySelector('#fp-viewer .fp-v-card');
+    if (card && !card.contains(document.activeElement)) card.focus({ preventScroll: true });
   }
 
   function detailsHtml(r) {
@@ -1791,8 +1865,8 @@ const FieldPhotos = (function () {
     rows.push(['Taken', whenText(r) ? `${esc(whenText(r))}${zone === 'assumed' ? ' <span class="small txt-muted">(zone assumed from where it was taken)</span>' : ''}${
       r.taken_source === 'ocr' ? ' <span class="small txt-muted">(read off the photo)</span>' : ''}` : '<span class="txt-muted">Not known</span>']);
     rows.push(['Where', placed
-      ? `<span class="fp-coord">${esc(fmtCoord(r.lat, r.lon))}</span>${known(r.accuracy_m) ? ` ±${esc(String(Math.round(r.accuracy_m)))} m` : ''}
-         <br><span class="small">${esc(pl ? pl.long : r.placement)}${r.placement === 'ocr' && ocr && ocr.confidence ? ` — ${esc(ocr.confidence)} confidence` : ''}</span>`
+      ? `<span class="fp-coord">${esc(fmtCoord(r.lat, r.lon))}</span>${accHtml(r.accuracy_m)}
+         <br><span class="small">${esc(pl ? pl.long : r.placement)}${r.placement === 'ocr' && ocr && ocr.confidence ? ` — ${esc(ocr.confidence)} confidence` : ''}</span>${readAccHtml(r)}`
       : '<span class="txt-warn">Not placed</span>']);
     if (known(r.heading_deg)) rows.push(['Facing', esc(headingText(+r.heading_deg, r.heading_ref))]);
     if (known(r.altitude_m)) rows.push(['Altitude', `${esc(String(Math.round(r.altitude_m)))} m${r.altitude_ref ? ` ${esc(r.altitude_ref)}` : ''}`]);
@@ -1815,30 +1889,42 @@ const FieldPhotos = (function () {
         ${may && typeof PhotoReview !== 'undefined' ? `<button type="button" onclick="FieldPhotos.readLabels('${escAttr(r.id)}')"
              title="Read the makes, models and serial numbers on the equipment in this photo, and suggest them for its station's register">🔎 Read equipment labels</button>` : ''}
         ${may ? `<button type="button" onclick="FieldPhotos.removePhoto('${escAttr(r.id)}')">Remove</button>` : ''}
-      </div>
-      ${v && v.editing ? `<div id="fp-v-place">${viewerPlaceHtml(r)}</div>` : ''}`;
+      </div>`;
   }
 
+  // The mover: the map when Leaflet is on the page (it always is, bar a
+  // blocked CDN), the coordinates box whether or not, and the stations.
   function viewerPlaceHtml(r) {
-    const placed = known(r.lat);
+    const placed = known(r.lat) && known(r.lon);
     const around = placed ? stationsAround(+r.lat, +r.lon) : [];
+    const others = placed ? spotRows(r).filter(x => x !== r) : [];
+    const id = escAttr(r.id);
+    const withMap = typeof L !== 'undefined';
     return `
-      <div class="fp-place">
+      <div class="fp-place fp-v-move">
+        ${withMap ? `<p class="small fp-v-move-lead">${placed
+            ? 'Drag the pin to where the photo was taken, or click the map there.' : 'Click the map where the photo was taken.'}${
+            placed && known(r.accuracy_m) ? ` The ring is the GPS's ±${Math.round(+r.accuracy_m)} m.` : ''}</p>
+        <div class="fp-v-map" id="fp-v-map" role="region" aria-label="Map to move the photo's pin on — the coordinates box below does the same"></div>
+        <p class="small fp-v-moved" id="fp-v-moved" aria-live="polite"></p>` : ''}
         <label class="fp-place-field">Coordinates
           <span class="fp-place-row">
             <input type="text" id="fp-v-coord" value="${placed ? escAttr(fmtCoord(r.lat, r.lon)) : ''}" placeholder="-27.554294, 152.274116"
-                   autocomplete="off" spellcheck="false"
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();FieldPhotos.moveTo('${escAttr(r.id)}',this.value)}">
-            <button type="button" onclick="FieldPhotos.moveTo('${escAttr(r.id)}',document.getElementById('fp-v-coord').value)">Set</button>
+                   autocomplete="off" spellcheck="false" oninput="FieldPhotos.moveTyped(this.value)"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();FieldPhotos.moveTo('${id}',this.value)}">
+            <button type="button" class="primary" onclick="FieldPhotos.moveTo('${id}',document.getElementById('fp-v-coord').value)">Save</button>
           </span>
         </label>
+        ${others.length ? `<label class="fp-v-with small"><input type="checkbox" id="fp-v-with" checked onchange="FieldPhotos.moveWith(this.checked)">
+          Move the other ${others.length} photo${others.length === 1 ? '' : 's'} taken here with it, by the same distance</label>` : ''}
         ${around.length ? `<p class="small">File it under a station nearby:</p>
-          <div class="fp-hits">${around.map(({ s, m }) => `<button type="button" class="fp-hit" onclick="FieldPhotos.fileUnder('${escAttr(r.id)}','${escAttr(s.id)}')">${esc(s.name)} <span class="small">${esc(fmtM(m))}</span></button>`).join('')}</div>` : ''}
+          <div class="fp-hits">${around.map(({ s, m }) => `<button type="button" class="fp-hit" onclick="FieldPhotos.fileUnder('${id}','${escAttr(s.id)}')">${esc(s.name)} <span class="small">${esc(fmtM(m))}</span></button>`).join('')}</div>` : ''}
         <label class="fp-place-field">${placed ? 'Or another station' : 'Or put it at a station'}
           <input type="search" placeholder="name or station number" autocomplete="off"
-                 oninput="document.getElementById('fp-v-hits').innerHTML=FieldPhotos._hits(this.value,'${escAttr(r.id)}')">
+                 oninput="document.getElementById('fp-v-hits').innerHTML=FieldPhotos._hits(this.value,'${id}')">
         </label>
         <div id="fp-v-hits"></div>
+        <div class="button-group"><button type="button" onclick="FieldPhotos.editPlace()">Cancel</button></div>
       </div>`;
   }
 
@@ -1847,11 +1933,18 @@ const FieldPhotos = (function () {
     if (el) el.innerHTML = text ? `<span class="${kind === 'error' ? 'txt-bad' : 'txt-ok'}">${esc(text)}</span>` : '';
   }
 
+  // A change to one photo. One that places it — a move, a station — shuts
+  // the mover and redraws the side, since the spot, the compass and the
+  // station may all be different now; a caption leaves the mover as it was.
   async function patch(id, p, done) {
     try {
       const row = await dbRpc('update_field_photo', { p_id: id, p_patch: p });
       keep([Object.assign(row, { _full: true })]);
-      if (v && v.ids[v.i] === id) { v.editing = false; paintDetails(); vSay(done); }
+      if (v && v.ids[v.i] === id) {
+        if ('lat' in p || 'station_id' in p) { v.editing = false; paintSide(); }
+        else paintDetails();
+        vSay(done);
+      }
       changed();
     } catch (err) {
       vSay(`Not saved — ${(err && err.message) || err}`, 'error');
@@ -1863,17 +1956,49 @@ const FieldPhotos = (function () {
     if (!r || (r.caption || '') === text) return;
     patch(id, { caption: text }, 'Caption saved.');
   }
+  // Move… / Place it… opens the mover, focused on its coordinates; pressed
+  // again, Cancel or Escape shuts it and hands the focus back to the button.
   function editPlace() {
     if (!v) return;
     v.editing = !v.editing;
     paintDetails();
-    const el = document.getElementById('fp-v-coord');
+    paintPlace();
+    const el = v.editing ? document.getElementById('fp-v-coord') : document.querySelector('#fp-v-details [aria-controls="fp-v-place"]');
     if (el) el.focus();
   }
-  function moveTo(id, text) {
+  // Save: the photo to the coordinates in the box — where the pin was dragged
+  // to, or what was typed — placed by hand. With "the other photos taken here
+  // with it" ticked, each of those moves by the same offset, one patch each.
+  async function moveTo(id, text) {
     const p = typeof Places !== 'undefined' ? Places.parse(text) : null;
     if (!p) { vSay(`“${text}” is not a coordinate this can read — try -27.5543, 152.2741`, 'error'); return; }
-    patch(id, { lat: +p.lat.toFixed(7), lon: +p.lon.toFixed(7), placement: 'manual' }, 'Moved.');
+    const r = S().byId[id];
+    if (!r) return;
+    const lat = +p.lat.toFixed(7), lon = +p.lon.toFixed(7);
+    const box = document.getElementById('fp-v-with');
+    const others = box && box.checked && known(r.lat) && known(r.lon) ? spotRows(r).filter(x => x !== r) : [];
+    if (!others.length) { await patch(id, { lat, lon, placement: 'manual' }, 'Moved.'); return; }
+    const dLat = lat - +r.lat, dLon = lon - +r.lon;
+    try {
+      keep([Object.assign(await dbRpc('update_field_photo', { p_id: id, p_patch: { lat, lon, placement: 'manual' } }), { _full: true })]);
+    } catch (err) {
+      vSay(`Not saved — ${(err && err.message) || err}`, 'error');
+      return;
+    }
+    let moved = 0, lastErr = null;
+    for (const x of others) {
+      try {
+        const px = { lat: +(+x.lat + dLat).toFixed(7), lon: +(+x.lon + dLon).toFixed(7), placement: 'manual' };
+        keep([Object.assign(await dbRpc('update_field_photo', { p_id: x.id, p_patch: px }), { _full: true })]);
+        moved++;
+      } catch (err) { lastErr = err; }
+    }
+    if (v) { v.editing = false; paintSide(); }
+    const failed = others.length - moved;
+    const what = failed ? `${moved} of the ${others.length} other photos` : others.length === 1 ? 'the other photo' : `the ${moved} other photos`;
+    vSay(`Moved, and ${what} taken here with it.${failed ? ` ${failed} could not be moved — ${(lastErr && lastErr.message) || lastErr}.` : ''}`,
+      failed ? 'error' : undefined);
+    changed();
   }
   function fileUnder(id, stationId) {
     const r = S().byId[id], st = stationById(stationId);
@@ -1884,6 +2009,389 @@ const FieldPhotos = (function () {
   }
   function hitsFor(text, id) {
     return stationHitsHtml(text, sid => `FieldPhotos.fileUnder('${escAttr(id)}','${escAttr(sid)}')`);
+  }
+
+  // The photos taken where this one was: its spot among the carousel's
+  // photos, by the rule the map's pins and the twin's markers are drawn by
+  // (spots(), over them in time order as those are). Just itself when it has
+  // no place.
+  function spotRows(r) {
+    if (!r) return [];
+    if (!v || !known(r.lat) || !known(r.lon)) return [r];
+    const rows = v.ids.map(id => S().byId[id]).filter(x => x && known(x.lat) && known(x.lon)).sort(byTaken);
+    const sp = spots(rows).find(g => g.rows.includes(r));
+    return sp ? sp.rows : [r];
+  }
+  function fovOf(r) { return known(r.fov_deg) ? Math.max(1, Math.min(360, +r.fov_deg)) : FOV_ASSUMED; }
+
+  // ── Moving a photo's pin ───────────────────────────────────────────────────
+  // Move… opens a small map of the imagery under the buttons: the photo's pin
+  // where it stands, the ring its GPS's ± draws round that fix (red past
+  // ROUGH_M), the way it looks, and the other photos taken at the spot. Drag
+  // the pin — or click the map — to where the photo was taken and the
+  // coordinates box follows; Save writes them as placed by hand, which drops
+  // the ± (the place is somebody's word now, not the GPS's). Photos taken at
+  // the same spot were fixed by the same GPS within the minute and share its
+  // error, so they go with it by the same offset unless that is unticked.
+  // The box does all of it without the map, typed or pasted.
+  //
+  // One Leaflet map, made when the mover opens and taken down (removeMap, so
+  // a zoom in flight cannot throw from its timer) when it shuts, the viewer
+  // moves to another photo or closes: a map left behind would keep its
+  // listeners on the window. It is a live map while it is up, for the nav's
+  // re-measure. It is not taken down by a tab switch — the viewer sits over
+  // every tab, and a mover emptied under it would be a dead map in a live
+  // dialog. Esri's imagery, as the Stations map's Satellite base, stretched
+  // two levels past the 19 it is served to — finer than the tiles, and still
+  // the better place to drop a pin.
+  let mm = null;    // { map, id, from, at, pin, ring, ghost, leader, cone, others: [{ row, dot }], withOthers }
+
+  function unmountMoveMap() {
+    if (!mm) return;
+    const m = mm;
+    mm = null;
+    removeMap(m.map);
+  }
+
+  function mountMoveMap(r) {
+    const el = document.getElementById('fp-v-map');
+    if (!el || typeof L === 'undefined') return;
+    const placed = known(r.lat) && known(r.lon);
+    const from = placed ? [+r.lat, +r.lon] : null;
+    const acc = placed && known(r.accuracy_m) ? +r.accuracy_m : null;
+    const map = L.map(el, { maxZoom: 21, minZoom: 4, zoomControl: true, attributionControl: true, keyboard: true });
+    registerLiveMap('FieldPhotos mover', () => (mm ? mm.map : null));
+    map.attributionControl.setPrefix(false);
+    const base = typeof makeBaseLayers === 'function' ? makeBaseLayers().Satellite : null;
+    if (base) {
+      Object.assign(base.options, { maxNativeZoom: 19, maxZoom: 21, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' });
+      base.addTo(map);
+    }
+    const box = document.getElementById('fp-v-with');
+    mm = { map, id: r.id, from, at: from ? from.slice() : null, pin: null, ring: null, ghost: null, leader: null, cone: null,
+           others: [], withOthers: !!(box && box.checked) };
+    if (from) {
+      if (acc) mm.ring = L.circle(from, { radius: acc, interactive: false, className: `fp-mm-ring${rough(acc) ? ' is-rough' : ''}` }).addTo(map);
+      mm.ghost = L.circleMarker(from, { radius: 3.5, interactive: false, className: 'fp-mm-ghost' }).addTo(map);
+      mm.others = spotRows(r).filter(x => x !== r).map(x => ({
+        row: x, dot: L.circleMarker([+x.lat, +x.lon], { radius: 4, interactive: false, className: 'fp-mm-other' }).addTo(map),
+      }));
+      // The ring and a margin round it, or the pin close up.
+      map.fitBounds(L.latLng(from).toBounds(Math.max(40, (acc || 0) * 3)), { maxZoom: 20, animate: false });
+    } else {
+      const c = centreFor(r);
+      map.setView([c.lat, c.lon], c.z, { animate: false });
+    }
+    if (mm.at) placePin();
+    drawMove();
+    map.on('click', e => setAt(e.latlng.lat, e.latlng.lng));
+  }
+
+  // Where a photo with no place yet is looked for: its station, the other
+  // photos in the carousel, the Stations map's view, the network.
+  function centreFor(r) {
+    const st = r.station_id ? stationById(r.station_id) : null;
+    if (located(st)) return { lat: +st.lat, lon: +st.lon, z: 18 };
+    const near = v ? v.ids.map(id => S().byId[id]).find(x => x && known(x.lat) && known(x.lon)) : null;
+    if (near) return { lat: +near.lat, lon: +near.lon, z: 17 };
+    if (state.map && state.map.getCenter) {
+      const c = state.map.getCenter();
+      return { lat: c.lat, lon: c.lng, z: Math.max(12, Math.min(17, state.map.getZoom())) };
+    }
+    const h = home();
+    return { lat: h.lat, lon: h.lon, z: 6 };
+  }
+
+  function placePin() {
+    if (!mm || !mm.at || mm.pin) return;
+    const m = mm;
+    m.pin = L.marker(m.at, {
+      draggable: true, keyboard: true, autoPan: true, riseOnHover: true,
+      title: 'Drag to where the photo was taken', alt: 'The photo’s pin: drag it to where the photo was taken',
+      icon: L.divIcon({ className: 'fp-mm-pin-icon', html: '<span class="fp-mm-pin"></span>', iconSize: [28, 28], iconAnchor: [14, 14] }),
+    }).addTo(m.map);
+    const moved = () => { if (mm === m) { const ll = m.pin.getLatLng(); setAt(ll.lat, ll.lng, { fromPin: true }); } };
+    m.pin.on('drag', moved).on('dragend', moved);
+  }
+
+  // The pin to a point: dragged there, clicked there or typed. The box
+  // follows unless it is what was typed in.
+  function setAt(lat, lon, o = {}) {
+    if (!mm) return;
+    mm.at = [lat, lon];
+    if (!mm.pin) placePin();
+    else if (!o.fromPin) mm.pin.setLatLng(mm.at);
+    if (o.pan && !mm.map.getBounds().contains(mm.at)) mm.map.panTo(mm.at, { animate: false });
+    drawMove();
+    if (!o.fromBox) {
+      const el = document.getElementById('fp-v-coord');
+      if (el) el.value = fmtCoord(lat, lon);
+    }
+  }
+
+  function conePoints(lat, lon, h, fov, len) {
+    const ky = 1 / (KM_PER_DEG_LAT * 1000), kx = 1 / (kmPerDegLon(lat) * 1000);
+    const pts = [[lat, lon]];
+    const steps = Math.max(2, Math.ceil(fov / 10));
+    for (let k = 0; k <= steps; k++) {
+      const a = (h - fov / 2 + fov * k / steps) * Math.PI / 180;
+      pts.push([lat + len * Math.cos(a) * ky, lon + len * Math.sin(a) * kx]);
+    }
+    return pts;
+  }
+
+  // What follows the pin: the leader from the fix, the cone the way the
+  // camera looked, the others by the same offset, and the words.
+  function drawMove() {
+    if (!mm) return;
+    const r = S().byId[mm.id];
+    const { map, from, at } = mm;
+    if (from && at) {
+      if (mm.leader) mm.leader.setLatLngs([from, at]);
+      else mm.leader = L.polyline([from, at], { interactive: false, className: 'fp-mm-leader' }).addTo(map);
+    }
+    if (at && r && known(r.heading_deg)) {
+      const pts = conePoints(at[0], at[1], +r.heading_deg, fovOf(r), CONE_M);
+      if (mm.cone) mm.cone.setLatLngs(pts);
+      else mm.cone = L.polygon(pts, { interactive: false, className: 'fp-mm-cone' }).addTo(map);
+    }
+    const along = from && at && mm.withOthers;
+    for (const o of mm.others) o.dot.setLatLng([+o.row.lat + (along ? at[0] - from[0] : 0), +o.row.lon + (along ? at[1] - from[1] : 0)]);
+    const el = document.getElementById('fp-v-moved');
+    if (el) el.textContent = movedText(r);
+  }
+
+  function movedText(r) {
+    if (!mm || !mm.at) return 'Click the map where the photo was taken.';
+    if (!mm.from) return 'Save puts the photo where the pin is.';
+    const d = metres(mm.from[0], mm.from[1], mm.at[0], mm.at[1]);
+    if (d < 0.5) return 'Not moved yet.';
+    const acc = r && known(r.accuracy_m) ? ` (the GPS said ±${Math.round(+r.accuracy_m)} m)` : '';
+    return `${fmtM(d)} ${compass(bearingDeg(mm.from[0], mm.from[1], mm.at[0], mm.at[1]))} of where the GPS put it${acc}. Save to keep it.`;
+  }
+
+  // The coordinates box, as it is typed: the pin goes there too.
+  function moveTyped(text) {
+    if (!mm) return;
+    const p = typeof Places !== 'undefined' ? Places.parse(text) : null;
+    if (p) setAt(p.lat, p.lon, { pan: true, fromBox: true });
+  }
+  function moveWith(on) {
+    if (!mm) return;
+    mm.withOthers = !!on;
+    drawMove();
+  }
+
+  // ── The compass ────────────────────────────────────────────────────────────
+  // At the foot of the side: the way this photo looks, and every other photo
+  // taken at the same spot, dimmed — a wedge each, as wide as its lens saw
+  // (FOV_ASSUMED, dashed, where the file did not say). A wedge is a door:
+  // click a direction and the photo facing it comes up. Where several look
+  // that way, all of them are boxed in gold, on the strip and on the dial,
+  // the one looking most nearly that way comes up, and a click there again
+  // steps to the next. For a spot's photos the strip is in the dial's order
+  // too — openSpot sorts them N → E → S → W.
+  //
+  // In the SVG's 240-unit box: the face r 92, the wedges r 78, the cardinal
+  // letters outside the face at r 108; nothing is picked within the hub's
+  // r 6, where every wedge meets.
+  const DIAL = { face: 92, wedge: 78, label: 108, hub: 6, box: 240 };
+
+  function polar(deg, rad) { const a = deg * Math.PI / 180; return [rad * Math.sin(a), -rad * Math.cos(a)]; }
+  function wedgePath(h, fov, rad = DIAL.wedge) {
+    const half = Math.min(179.9, fov / 2);
+    const [x0, y0] = polar(h - half, rad), [x1, y1] = polar(h + half, rad);
+    return `M0 0L${x0.toFixed(2)} ${y0.toFixed(2)}A${rad} ${rad} 0 ${half > 90 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}Z`;
+  }
+
+  function compassHtml(r, note) {
+    if (!r || !v) return '';
+    const here = spotRows(r);
+    const faced = here.filter(x => known(x.heading_deg));
+    if (!faced.length) return '';
+    const gold = v.gold || new Set();
+    const n = v.ids.length;
+    const ticks = [];
+    for (let d = 0; d < 360; d += 22.5) {
+      const major = d % 90 === 0;
+      const [x0, y0] = polar(d, DIAL.face - (major ? 12 : 6)), [x1, y1] = polar(d, DIAL.face);
+      ticks.push(`<line class="fp-cmp-tick${major ? ' is-major' : ''}" x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}"/>`);
+    }
+    const letters = [['N', 0], ['E', 90], ['S', 180], ['W', 270]].map(([t, d]) => {
+      const [x, y] = polar(d, DIAL.label);
+      return `<text class="fp-cmp-label${t === 'N' ? ' is-north' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" aria-hidden="true">${t}</text>`;
+    }).join('');
+    // The others first and this photo last, so that it is drawn on top.
+    const wedges = faced.filter(x => x !== r).concat(faced.includes(r) ? [r] : []).map(x => {
+      const i = v.ids.indexOf(x.id), fov = fovOf(x);
+      const label = `${i >= 0 ? `Photo ${i + 1} of ${n}` : 'A photo'}, facing ${headingText(+x.heading_deg, x.heading_ref)}, ${
+        known(x.fov_deg) ? `${Math.round(fov)}° wide` : 'its width not recorded'}${x === r ? ' — the one shown' : ''}`;
+      const cls = `fp-cmp-wedge${x === r ? ' is-here' : ''}${gold.has(x.id) ? ' is-gold' : ''}${known(x.fov_deg) ? '' : ' is-assumed'}`;
+      return `<path class="${cls}" d="${wedgePath(+x.heading_deg, fov)}" data-fp-id="${escAttr(x.id)}" tabindex="0" role="button"
+                    aria-label="${escAttr(label)}"${x === r ? ' aria-current="true"' : ''}><title>${esc(label)}</title></path>`;
+    }).join('');
+    let needle = '';
+    if (known(r.heading_deg)) {
+      const [x, y] = polar(+r.heading_deg, DIAL.face - 3);
+      needle = `<line class="fp-cmp-needle" x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`;
+    }
+    const blind = here.length - faced.length;
+    const lead = known(r.heading_deg)
+      ? `Facing ${headingText(+r.heading_deg, r.heading_ref)}${known(r.fov_deg) ? `, ${Math.round(+r.fov_deg)}° wide` : ''}.`
+      : 'Which way this one faced was not recorded.';
+    const rest = note || (v.gold && v.goldSay) || (faced.length === 1 && faced[0] === r
+      ? (here.length === 1 ? 'The only photo taken here.' : `The only one of the ${here.length} photos taken here with a direction.`)
+      : `${here.length} photos taken here${blind ? ` (${blind} with no direction)` : ''} — click a direction for the one facing it.`);
+    const half = DIAL.box / 2;
+    return `
+      <svg class="fp-cmp" viewBox="${-half} ${-half} ${DIAL.box} ${DIAL.box}" role="group"
+           aria-label="Compass: which way the photos taken here look" onclick="FieldPhotos.compassClick(event)" onkeydown="FieldPhotos.compassKey(event)">
+        <circle class="fp-cmp-face" r="${DIAL.face}"/>
+        ${ticks.join('')}${letters}${wedges}${needle}
+        <circle class="fp-cmp-hub" r="3"/>
+      </svg>
+      <p class="fp-cmp-note" id="fp-cmp-note">${esc(lead)} ${esc(rest)}</p>`;
+  }
+
+  // A click on the dial: the direction it points, from the dial's centre.
+  function compassClick(e) {
+    if (!v || !e || !e.currentTarget) return;
+    const box = e.currentTarget.getBoundingClientRect();
+    if (!box.width) return;
+    const k = DIAL.box / box.width;
+    const x = (e.clientX - box.left - box.width / 2) * k, y = (e.clientY - box.top - box.height / 2) * k;
+    const d = Math.hypot(x, y);
+    if (d < DIAL.hub || d > DIAL.face + 4) return;
+    pickFacing((Math.atan2(x, -y) * 180 / Math.PI + 360) % 360);
+  }
+  // Enter or Space on a wedge: that photo, and the others facing its way.
+  function compassKey(e) {
+    if (!v || (e.key !== 'Enter' && e.key !== ' ')) return;
+    const id = e.target && e.target.dataset ? e.target.dataset.fpId : null;
+    const x = id ? S().byId[id] : null;
+    if (!x || !known(x.heading_deg)) return;
+    e.preventDefault();
+    pickFacing(+x.heading_deg, id);
+    const w = document.querySelector(`#fp-v-compass [data-fp-id="${CSS.escape(id)}"]`);
+    if (w) w.focus();
+  }
+
+  // The photos at this spot whose wedge takes in `deg`, the one looking most
+  // nearly that way first. One of them: it comes up. Several: they are boxed
+  // in gold and the first comes up — or, asked the same direction again, the
+  // next after the one shown. `prefer` is a wedge chosen by the keyboard.
+  function pickFacing(deg, prefer) {
+    if (!v) return;
+    const r = S().byId[v.ids[v.i]];
+    const hits = spotRows(r).filter(x => known(x.heading_deg) && angleOff(deg, +x.heading_deg) <= fovOf(x) / 2 + 1e-6)
+      .sort((a, b) => angleOff(deg, +a.heading_deg) - angleOff(deg, +b.heading_deg) || v.ids.indexOf(a.id) - v.ids.indexOf(b.id));
+    const d = Math.round(deg) % 360;
+    const where = `${d}° ${compass(d)}`;
+    if (!hits.length) {
+      v.gold = null;
+      paintGold();
+      paintCompass(`No photo taken here faces ${where}.`);
+      return;
+    }
+    const ids = hits.map(x => x.id), cur = v.ids[v.i];
+    const again = !!v.gold && v.gold.size === ids.length && ids.every(id => v.gold.has(id)) && ids.includes(cur);
+    const next = prefer && ids.includes(prefer) ? prefer : again ? ids[(ids.indexOf(cur) + 1) % ids.length] : ids[0];
+    v.gold = ids.length > 1 ? new Set(ids) : null;
+    // What the boxes mean, said under the dial for as long as they stand.
+    v.goldSay = ids.length > 1 ? `${ids.length} photos taken here face ${where} — boxed in gold on the strip. Click there again for the next.` : '';
+    const i = v.ids.indexOf(next);
+    if (i >= 0 && i !== v.i) goTo(i);
+    else { paintGold(); paintCompass(); }
+    if (v.goldSay && typeof announce === 'function') announce(v.goldSay);
+  }
+
+  // The gold boxes on the strip, without drawing it again.
+  function paintGold() {
+    if (!v) return;
+    document.querySelectorAll('#fp-viewer .fp-v-thumb').forEach((b, i) => {
+      const x = S().byId[v.ids[i]];
+      if (!x) return;
+      b.classList.toggle('is-gold', !!(v.gold && v.gold.has(x.id)));
+      b.setAttribute('aria-label', thumbLabel(x, i));
+    });
+  }
+
+  // ── Reading a stored photo's ± off its overlay ─────────────────────────────
+  // A photo stored before the upload read the ± off the picture — from an
+  // app that prints it there and leaves it out of the file (Solocator,
+  // PhotoMeta.printsAccuracy) — says so under its coordinates and offers to
+  // read it now: out of the stored picture, by the same OCR as the upload,
+  // for it and every other photo taken at the spot that still lacks one, one
+  // at a time. The ± is taken for the position already stored only when the
+  // overlay's own position is the same fix (PhotoMeta.overlayAccuracy).
+  function softwareOf(r) { return r.camera_software || (r.meta && r.meta.camera && r.meta.camera.software) || ''; }
+  function needsAccuracy(r) {
+    return !!r && known(r.lat) && known(r.lon) && !known(r.accuracy_m) && (r.placement === 'exif' || r.placement === 'xmp')
+      && typeof PhotoMeta !== 'undefined' && PhotoMeta.printsAccuracy({ software: softwareOf(r) });
+  }
+  function readAccHtml(r) {
+    if (!signedIn() || !needsAccuracy(r)) return '';
+    const n = spotRows(r).filter(needsAccuracy).length;
+    return `<br><span class="small txt-muted">No ± in the file — ${esc(softwareOf(r))} printed it on the picture.</span>
+      <button type="button" class="link-btn small" onclick="FieldPhotos.readAccuracy('${escAttr(r.id)}')" ${v && v.readingAcc ? 'disabled' : ''}>${
+        v && v.readingAcc ? 'Reading…' : n > 1 ? `Read it off the ${n} photos taken here` : 'Read it off the photo'}</button>`;
+  }
+
+  async function readAccuracy(id) {
+    if (!v || v.readingAcc || typeof PhotoMeta === 'undefined') return;
+    const r = S().byId[id];
+    if (!r) return;
+    const todo = [r, ...spotRows(r).filter(x => x !== r)].filter(needsAccuracy);
+    if (!todo.length) return;
+    if (S().reading) { vSay('Photos are being read on the Field Photos tab — try again when they are done.', 'error'); return; }
+    const mine = v;
+    mine.readingAcc = true;
+    paintDetails();
+    let got = 0, none = 0, failed = 0, lastErr = null;
+    try {
+      for (let k = 0; k < todo.length && v === mine; k++) {
+        const x = todo[k];
+        const lead = todo.length > 1 ? `Photo ${k + 1} of ${todo.length}: reading` : 'Reading';
+        vSay(`${lead} the ± off the picture…`);
+        try {
+          const acc = await accuracyOffPicture(x, n => { if (v === mine) vSay(`${lead} the ± off the picture — pass ${n}…`); });
+          if (acc === null) { none++; continue; }
+          keep([Object.assign(await dbRpc('update_field_photo', { p_id: x.id, p_patch: { accuracy_m: acc } }), { _full: true })]);
+          got++;
+          if (v === mine && v.ids[v.i] === x.id) paintDetails();
+        } catch (err) { failed++; lastErr = err; }
+      }
+    } finally {
+      mine.readingAcc = false;
+    }
+    if (v === mine) {
+      paintDetails();
+      paintCompass();
+      keepFocus();
+      const bits = [];
+      if (got) bits.push(todo.length === 1 ? 'The ± is read and saved.' : `${got} of ${todo.length} read and saved.`);
+      if (none) bits.push(todo.length === 1 ? 'No ± could be read off it.' : `No ± could be read off ${none}.`);
+      if (failed) bits.push(`${failed} could not be read — ${(lastErr && lastErr.message) || lastErr}.`);
+      vSay(bits.join(' '), got && !failed ? undefined : 'error');
+    }
+    if (got) changed();
+  }
+
+  async function accuracyOffPicture(r, onPass) {
+    const [url] = await sign([r.storage_path]);
+    if (!url) throw new Error('its link could not be signed');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`it could not be fetched (HTTP ${res.status})`);
+    const blob = await res.blob();
+    let bmp;
+    try { bmp = await createImageBitmap(blob, { imageOrientation: 'from-image' }); }
+    catch (_) { bmp = await createImageBitmap(blob); }
+    try {
+      const ocr = await PhotoMeta.ocrImage(bmp, bmp.width, bmp.height, { home: home(), onPass });
+      return PhotoMeta.overlayAccuracy(ocr, { lat: +r.lat, lon: +r.lon });
+    } finally {
+      try { bmp.close(); } catch (_) { /* already gone */ }
+    }
   }
 
   // "🔎 Read equipment labels": this photo's labels read, and what they say
@@ -1978,8 +2486,27 @@ const FieldPhotos = (function () {
     }
     view([id], id, { title: 'Field photo' });
   }
-  // A spot's photos (the twin's marker, the map's pin).
-  function openSpot(ids, startId, title) { view(ids, startId || ids[0], { title: title || 'Photos taken here' }); }
+  // A spot's photos (the twin's marker, the map's pin), in the compass's
+  // order: spot by spot as they were handed over, and within a spot N → E →
+  // S → W by the way each looked, so the strip reads round the dial the way
+  // its wedges do. A photo with no heading comes after the ones with; one
+  // with no place, last of all. Opened on the first unless told otherwise.
+  function openSpot(ids, startId, title) {
+    const ordered = byCompass(ids);
+    view(ordered, startId || ordered[0], { title: title || 'Photos taken here' });
+  }
+  function byCompass(ids) {
+    const rows = (ids || []).map(id => S().byId[id]).filter(Boolean);
+    const at = new Map(rows.map((r, i) => [r.id, i]));
+    const bearing = r => (known(r.heading_deg) ? ((+r.heading_deg % 360) + 360) % 360 : 999);
+    const groups = spots(rows.filter(r => known(r.lat) && known(r.lon)).sort(byTaken))
+      .map(g => ({ rows: g.rows, first: Math.min(...g.rows.map(r => at.get(r.id))) }))
+      .sort((a, b) => a.first - b.first);
+    const out = [];
+    for (const g of groups) out.push(...g.rows.slice().sort((a, b) => bearing(a) - bearing(b) || byTaken(a, b)).map(r => r.id));
+    for (const r of rows) if (!out.includes(r.id)) out.push(r.id);
+    return out;
+  }
 
   // The station card's door: this tab, filtered to the one station.
   function openStation(id) {
@@ -2029,7 +2556,8 @@ const FieldPhotos = (function () {
     queuePlace, queueAtStation, queueNoStation, queueEdit, queueFind,
     dragOver, dragLeave, drop,
     view, close, isOpen, go, goTo, openFromLib, openOne, openSpot, openStation, pillHtml,
-    setCaption, editPlace, moveTo, fileUnder, removePhoto, openOriginal, showOnMap, showInTwin,
+    setCaption, editPlace, moveTo, moveTyped, moveWith, fileUnder, removePhoto, openOriginal, showOnMap, showInTwin,
+    compassClick, compassKey, readAccuracy,
     inBox, spots, sign, thumbOf, urlFor, paintThumbs, row: id => S().byId[id] || null,
     authChanged, changed, signedIn,
     nearestStation, whenText, headingText,
@@ -2056,7 +2584,22 @@ const FieldPhotos = (function () {
     })),
     _record: key => { const i = S().queue.find(x => x.key === key); return i && i.uploadBytes ? photoRecord(i, 'photo/x.jpg', 'photo/x.thumb.jpg') : null; },
     _sha256js: bytes => sha256js(bytes),
-    _viewer: () => (v ? { ids: v.ids.slice(), i: v.i, title: v.title, editing: v.editing } : null),
+    _viewer: () => (v ? { ids: v.ids.slice(), i: v.i, title: v.title, editing: v.editing, gold: v.gold ? [...v.gold] : [],
+                          readingAcc: !!v.readingAcc,
+                          moving: mm ? { id: mm.id, from: mm.from && mm.from.slice(), at: mm.at && mm.at.slice(), withOthers: mm.withOthers,
+                                         pin: !!mm.pin, ring: mm.ring ? mm.ring.getRadius() : null, others: mm.others.length,
+                                         zoom: mm.map.getZoom() } : null } : null),
+    // Where the move map's pin is on the screen, for the check to drag it.
+    _pinAt: () => {
+      if (!mm || !mm.pin) return null;
+      const p = mm.map.latLngToContainerPoint(mm.pin.getLatLng()), b = mm.map.getContainer().getBoundingClientRect();
+      return { x: b.left + p.x, y: b.top + p.y };
+    },
+    _mapPoint: (lat, lon) => {
+      if (!mm) return null;
+      const p = mm.map.latLngToContainerPoint([lat, lon]), b = mm.map.getContainer().getBoundingClientRect();
+      return { x: b.left + p.x, y: b.top + p.y };
+    },
   };
 })();
 if (typeof window !== 'undefined') window.FieldPhotos = FieldPhotos;

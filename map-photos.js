@@ -146,10 +146,11 @@ const MapPhotos = (function () {
   }
 
   // What pressing a pin does, in either mode: the carousel over the photos
-  // taken there, from the first.
+  // taken there, in the viewer's compass order (FieldPhotos.openSpot), from
+  // the first.
   function open(g) {
     if (typeof FieldPhotos === 'undefined' || !g || !g.ids || !g.ids.length) return;
-    FieldPhotos.openSpot(g.ids, g.ids[0], `${g.n} photo${g.n === 1 ? '' : 's'} taken here`);
+    FieldPhotos.openSpot(g.ids, null, `${g.n} photo${g.n === 1 ? '' : 's'} taken here`);
   }
 
   function draw(groups) {

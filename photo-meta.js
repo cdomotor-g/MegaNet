@@ -42,6 +42,13 @@
 // A photo that none of the three can place is not guessed at. It is uploaded
 // unplaced, and somebody puts it where it belongs.
 //
+// One number is read off the picture even when the file places the photo: the
+// ±. Solocator writes the fix into the EXIF without GPSHPositioningError and
+// prints it on the overlay instead (`±13m`), so a photo from an app that does
+// that (printsAccuracy) is read for its ± alone — the file's position, time
+// and heading still win, and the overlay's ± is taken only for the same fix
+// (overlayAccuracy). The viewer flags a fix looser than 7 m.
+//
 // ── Reading an overlay ───────────────────────────────────────────────────────
 //
 // The overlay is not one format: every app draws its own, and OCR reads each
@@ -1597,7 +1604,37 @@ const PhotoMeta = (function () {
   // The file's own facts first, the overlay's where the file is silent — the
   // order in the header — as one reading both hosts upload from. `meta` is
   // read()'s answer, `ocr` readOverlay()'s or null.
-  function needsOcr(meta) { return !(meta && meta.gps && meta.taken); }
+  function needsOcr(meta) {
+    if (!(meta && meta.gps && meta.taken)) return true;
+    return !known(meta.gps.accuracy) && printsAccuracy(meta);
+  }
+
+  // A camera app that prints the fix's ± on the picture and leaves it out of
+  // the EXIF it writes, by the Software tag it signs the file with. Solocator
+  // does both — its GPS block has the position, altitude and heading and no
+  // GPSHPositioningError, and its overlay reads `±13m` — so a photo it took is
+  // read for that one number. An app is added here when a photo of its shows
+  // the same gap; a phone's own camera writes the ± into the file.
+  const PRINTS_ACCURACY = /\bsolocator\b/i;
+  function printsAccuracy(meta) { return !!meta && PRINTS_ACCURACY.test(String(meta.software || '')); }
+
+  // The ± an overlay printed, for a position that came from somewhere else —
+  // the file, or the database for a photo already stored. Taken only when the
+  // overlay's own position, where it could be read, is the same fix: within
+  // ACC_SAME_FIX_M, which forgives a misread last digit and nothing more. An
+  // overlay that printed somewhere else printed that place's ±. Null for no ±.
+  const ACC_SAME_FIX_M = 50;
+  function overlayAccuracy(ocr, pos) {
+    const a = ocr && ocr.accuracy;
+    if (!a || !known(a.accuracy) || !(a.accuracy > 0)) return null;
+    const c = ocr.coords;
+    if (c && pos && known(pos.lat) && known(pos.lon)) {
+      const dy = (c.lat - pos.lat) * 110574;
+      const dx = (c.lon - pos.lon) * 111320 * Math.cos(pos.lat * Math.PI / 180);
+      if (Math.hypot(dx, dy) > ACC_SAME_FIX_M) return null;
+    }
+    return a.accuracy;
+  }
 
   function reconcile(meta, ocr) {
     const out = { pos: null, heading: null, altitude: null, taken: null, pitch: null, fov: null, ocr: null };
@@ -1635,6 +1672,11 @@ const PhotoMeta = (function () {
         }
         out.taken = { local: ocr.time.local, iso: offset ? utcIso(ocr.time.local, offset) : null, source: 'ocr', zone };
       }
+      // The file placed it and said nothing of the ±; the overlay may have.
+      if (out.pos && out.pos.placement !== 'ocr' && !known(out.pos.accuracy)) {
+        const acc = overlayAccuracy(ocr, out.pos);
+        if (acc !== null) { out.pos.accuracy = acc; out.pos.accuracySource = 'ocr'; }
+      }
     }
     return out;
   }
@@ -1669,6 +1711,7 @@ const PhotoMeta = (function () {
       p.lon = +Number(r.pos.lon).toFixed(7);
       p.placement = r.pos.placement;
       if (known(r.pos.accuracy)) p.accuracy_m = r.pos.accuracy;
+      if (known(r.pos.accuracy) && r.pos.accuracySource === 'ocr') p.meta.accuracy = { source: 'ocr' };
     }
     if (r.heading && known(r.heading.deg)) { p.heading_deg = +(normHeading(r.heading.deg)).toFixed(2) % 360; p.heading_ref = r.heading.ref || 'T'; }
     if (r.altitude && known(r.altitude.m)) { p.altitude_m = r.altitude.m; if (r.altitude.ref) p.altitude_ref = r.altitude.ref; }
@@ -1688,7 +1731,7 @@ const PhotoMeta = (function () {
   }
 
   return {
-    read, parseOverlay, vote, readOverlay, ocrImage, needsOcr, reconcile, record,
+    read, parseOverlay, vote, readOverlay, ocrImage, needsOcr, printsAccuracy, overlayAccuracy, reconcile, record,
     readLabels, ocrLabels, labelPlan, greyStretch,
     utmToLatLon, auZone, compassPoint, fovFrom35, instant: utcIso,
     bandPlan, prepare, resample, orient, pgm, normalise, linesOf, cropLine,

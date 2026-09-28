@@ -70,6 +70,7 @@ import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { auditHandlers } from './lib/controls.mjs';
 import { storageStore, installStorage, fileOf } from './lib/storage.mjs';
+import { serveObjects } from './lib/photo-project.mjs';
 import { seedRows, attachmentsSql } from './lib/migration.mjs';
 import { hillyTerrariumPng } from './lib/terrarium.mjs';
 import { repo } from './lib/paths.mjs';
@@ -376,6 +377,36 @@ function nodeHalf() {
   ok('an overlay time with no zone takes the zone of where it was taken, and says so',
     noZone.taken.zone === 'assumed' && noZone.taken.iso === '2026-06-24T02:26:00.000Z', J(noZone.taken));
 
+  // Solocator writes the fix into the EXIF without GPSHPositioningError and
+  // prints the ± on the overlay (the Gatton photos: `±13m` on the picture,
+  // nothing in the file) — so its photos are read for the ± alone.
+  const soloTiff = ({ accuracy } = {}) => tiff({
+    ifd0: [[0x010f, 2, 'Apple'], [0x0110, 2, 'iPhone 12 mini'], [0x0112, 3, [1]], [0x0131, 2, 'Solocator']],
+    exif: [[0x9003, 2, '2026:06:24 12:26:08'], [0x9011, 2, '+10:00'], [0xa405, 3, [26]]],
+    gps: gpsEntries({ lat: G.lat, lon: G.lon, alt: 94, heading: 242, accuracy }),
+  });
+  const solo = read(jpegWith(jpegShell(640, 480), { tiff: soloTiff() }));
+  const soloAcc = read(jpegWith(jpegShell(640, 480), { tiff: soloTiff({ accuracy: 5 }) }));
+  ok('a file that places the photo but leaves out a ± its app prints is read for the ± — and only then',
+    solo.software === 'Solocator' && PhotoMeta.printsAccuracy(solo) && need(solo) === true && need(soloAcc) === false
+      && PhotoMeta.printsAccuracy(le) === false && need(le) === false && PhotoMeta.printsAccuracy(null) === false, J(solo.gps));
+  const soloBoth = PhotoMeta.reconcile(solo, ocrOf('242°SW (T) -27.554294°, 152.274116° ±13m ▲ 134m (HAE)\nGatton 2026-06-24, 12:26:08 AEST'));
+  ok('…the overlay\'s ± joins the file\'s fix, and nothing else of the overlay\'s does',
+    soloBoth.pos.placement === 'exif' && at(soloBoth.pos, G.lat, G.lon) && soloBoth.pos.accuracy === 13 && soloBoth.pos.accuracySource === 'ocr'
+      && soloBoth.altitude.m === 94 && soloBoth.altitude.ref === 'MSL' && soloBoth.heading.deg === 242 && soloBoth.taken.source === 'exif', J(soloBoth));
+  const soloRec = PhotoMeta.record({ name: 'BoM-FWIN_Gatton.jpg', meta: solo, ...soloBoth });
+  ok('…recorded as the photo\'s accuracy_m, with meta saying where the number came from',
+    soloRec.accuracy_m === 13 && soloRec.placement === 'exif' && J(soloRec.meta.accuracy) === J({ source: 'ocr' }), J(soloRec));
+  const elsewhere = PhotoMeta.reconcile(solo, ocrOf('-27.564294°, 152.274116° ±13m'));
+  ok('…but not from an overlay that printed another fix (a kilometre off): that is its ±, not this one\'s',
+    elsewhere.pos.accuracy === null && !('accuracy_m' in PhotoMeta.record({ name: 'x.jpg', ...elsewhere })), J(elsewhere.pos));
+  ok('…and the file\'s own ± is never replaced by the overlay\'s',
+    PhotoMeta.reconcile(soloAcc, ocrOf('-27.554294°, 152.274116° ±13m')).pos.accuracy === 5);
+  ok('overlayAccuracy(): the ± when the overlay\'s fix is the one given (or unread), null when it is another or there is none',
+    PhotoMeta.overlayAccuracy(ocrOf('±13m'), G) === 13 && PhotoMeta.overlayAccuracy(ocrOf('-27.554300°, 152.274115° ±13m'), G) === 13
+      && PhotoMeta.overlayAccuracy(ocrOf('-27.554294°, 152.284116° ±13m'), G) === null && PhotoMeta.overlayAccuracy(ocrOf('-27.554294°, 152.274116°'), G) === null
+      && PhotoMeta.overlayAccuracy(null, G) === null);
+
   const rec = PhotoMeta.record({ name: 'IMG_0042.jpg', size: 2163393, type: 'image/jpeg', width: 4032, height: 3024, meta: le, ...PhotoMeta.reconcile(le, null) });
   ok('record(): the position to seven places, the GPS\'s accuracy, heading, altitude and the time twice over',
     rec.lat === -27.554294 && rec.lon === 152.274116 && rec.placement === 'exif' && rec.accuracy_m === 4
@@ -573,6 +604,8 @@ function installProject(page, db, store, types) {
           row.placement = p.lat == null ? null : (p.placement || 'manual');
           row.accuracy_m = 'accuracy_m' in p ? p.accuracy_m : null;
           if (rematch) { const s = row.lat == null ? null : nearestStation(row); row.station_id = s ? s.id : null; row.station_auto = !!s; }
+        } else if ('accuracy_m' in p) {
+          row.accuracy_m = p.accuracy_m;
         }
         if ('station_id' in p) { row.station_id = p.station_id; row.station_auto = false; }
         for (const k of ['title', 'caption', 'heading_deg', 'heading_ref', 'pitch_deg']) if (k in p) row[k] = p[k];
@@ -624,6 +657,11 @@ async function browserHalf() {
     // The document with the Gatton stations where the photos were placed (above).
     await page.route(`${server.origin}/stations.json`, route =>
       route.fulfill({ status: 200, contentType: 'application/json; charset=utf-8', body: J(DOC) }));
+    // A signed picture is the bytes that went up, or ones a section put in the
+    // bucket by hand — the viewer's photos seeded as the Dropbox sync would
+    // have stored them — rather than the storage fixture's one-pixel GIF.
+    const objects = {};
+    await serveObjects(page, store, objects);
     await page.route(/elevation-tiles-prod\/terrarium\/(\d+)\/(\d+)\/(\d+)\.png/, route => {
       const m = /terrarium\/(\d+)\/(\d+)\/(\d+)\.png/.exec(route.request().url());
       return route.fulfill({ status: 200, contentType: 'image/png', body: hillyTerrariumPng(+m[1], +m[2], +m[3]),
@@ -1087,6 +1125,10 @@ async function browserHalf() {
       await twinHalf(page, R, db, viewer, text);
     }
 
+    // ── The viewer: the ±, the compass, a pin moved ──────────────────────────
+    section('The viewer — a rough fix in red, the compass, and a pin moved');
+    await compassHalf(page, R, db, objects, viewer, text);
+
     // ── Signing out ──────────────────────────────────────────────────────────
     section('Signing out');
     await page.evaluate(() => { dbSetAccessToken(null); FieldPhotos.authChanged(); });
@@ -1314,6 +1356,237 @@ async function tiltedHalf(page, R, db, viewer, text) {
   ok('leaving 3-D takes its badges with it, and leaves the 2-D pins', gone.markers === 0 && gone.pins === 0 && gone.flat === 3, J(gone));
 }
 
+
+// The viewer's side, on a spot of five: the SW and NE photos (their widths not
+// recorded — each drawn 60° and dashed) and three more put in the bucket by
+// hand as the Dropbox sync would have stored them, Solocator photos placed from
+// their EXIF, one of them a rough fix, one with no ± at all whose picture is
+// the SW photo, overlay and all. In time order NE 46°, SW 242°, then 201°,
+// 234° and 325°; round the compass NE, 201°, 234°, SW, 325°.
+async function compassHalf(page, R, db, objects, viewer, text) {
+  const seeded = [];
+  const seed = (n, o) => {
+    const id = `00000000-0000-4000-8000-0000000c0${String(n).padStart(3, '0')}`;
+    const row = {
+      id, storage_bucket: 'field-photos', storage_path: `photo/${id}.jpg`, thumb_path: null,
+      content_type: 'image/jpeg', byte_size: SW.length, sha256: crypto.createHash('sha256').update(id).digest('hex'), width: 1545, height: 1159,
+      title: `BoM-FWIN_Gatton_2026-06-24_12-58-0${n}.JPG`, caption: '',
+      taken_at: `2026-06-24T02:58:0${n}.000Z`, taken_local: `2026-06-24T12:58:0${n}`, taken_source: 'exif',
+      lat: G.lat, lon: G.lon, placement: 'exif', accuracy_m: null, altitude_m: 104, altitude_ref: 'MSL',
+      heading_deg: null, heading_ref: 'T', pitch_deg: null, fov_deg: null, station_id: 'gatton', station_auto: true,
+      meta: { camera: { make: 'Apple', model: 'iPhone 12 mini', software: 'Solocator', lens: null }, file: { format: 'jpeg', exif: true } },
+      origin: 'dropbox', origin_ref: null, uploaded_by: 'fixture@example.test',
+      created_at: '2026-06-24T06:00:00.000Z', updated_at: '2026-06-24T06:00:00.000Z', updated_by: null, deleted_at: null, deleted_by: null,
+      ...o,
+    };
+    db.rows.push(row);
+    seeded.push(row);
+    return row;
+  };
+  const s1 = seed(1, { heading_deg: 201, fov_deg: 67.3, accuracy_m: 13, lat: G.lat - 0.000004 });
+  const s2 = seed(2, { heading_deg: 234, fov_deg: 53.1 });
+  const s3 = seed(3, { heading_deg: 325, fov_deg: 58.9, accuracy_m: 4, lon: G.lon + 0.000004 });
+  objects[s2.storage_path] = SW;
+  const wedges = () => page.$$eval('#fp-v-compass .fp-cmp-wedge', ws => ws.map(w => ({
+    id: w.dataset.fpId, here: w.classList.contains('is-here'), gold: w.classList.contains('is-gold'),
+    assumed: w.classList.contains('is-assumed'), fill: +getComputedStyle(w).fillOpacity })));
+  const boxed = () => page.$$eval('#fp-viewer .fp-v-thumb', bs => bs.map(b => b.classList.contains('is-gold')));
+  // A click on the dial `deg` round from north, `rad` of its 240 units out —
+  // near the rim, where a pixel is least of an angle (under a degree).
+  const dial = async (deg, rad = 86) => {
+    const p = await page.evaluate(({ deg, rad }) => {
+      const b = document.querySelector('#fp-v-compass .fp-cmp').getBoundingClientRect(), k = b.width / 240, a = deg * Math.PI / 180;
+      return { x: b.left + b.width / 2 + rad * Math.sin(a) * k, y: b.top + b.height / 2 - rad * Math.cos(a) * k };
+    }, { deg, rad });
+    await page.mouse.click(p.x, p.y);
+  };
+  const msg = () => text('#fp-v-msg');
+
+  // On whichever tab the twin left open — the viewer is over all of them, and
+  // signing out, next, reads the twin's markers.
+  await page.evaluate(() => FieldPhotos.changed());
+  // The rows reach the page the way the map's and the twin's do: in a box.
+  await page.evaluate(g => FieldPhotos.inBox({ south: g.lat - 0.001, north: g.lat + 0.001, west: g.lon - 0.001, east: g.lon + 0.001 }), G);
+  const ids = [R.ne.id, R.sw.id, s1.id, s2.id, s3.id];
+  await page.evaluate(ids => FieldPhotos.openSpot(ids, null, 'Photos taken 120 m NW of Gatton'), ids);
+  let v = await viewer();
+  ok('a spot opens in the compass\'s order, N → E → S → W — NE 46°, 201°, 234°, SW 242°, 325° — on the first',
+    v && J(v.ids) === J([R.ne.id, s1.id, s2.id, R.sw.id, s3.id]) && v.i === 0 && /photo 1 of 5/.test(await text('#fp-v-title')), J(v && v.ids));
+
+  let w = await wedges();
+  ok('the compass: a wedge for each of the five, the one shown drawn last and strong, the other four dimmed',
+    w.length === 5 && w[4].id === R.ne.id && w[4].here && w.slice(0, 4).every(x => !x.here && x.fill < w[4].fill), J(w));
+  ok('…a width the file did not give drawn at 60° and dashed — the SW and NE photos\', read off their overlays',
+    w.filter(x => x.assumed).map(x => x.id).sort().join() === [R.ne.id, R.sw.id].sort().join(), J(w));
+  ok('…and under it, which way this one faces and how to use it',
+    /Facing 46° NE \(true\)\. 5 photos taken here — click a direction for the one facing it\./.test(await text('#fp-cmp-note')), await text('#fp-cmp-note'));
+  const cmpBox = await page.evaluate(() => {
+    const c = document.querySelector('#fp-v-compass .fp-cmp').getBoundingClientRect(), s = document.querySelector('#fp-viewer .fp-v-side').getBoundingClientRect();
+    return { right: s.right - c.right, bottom: s.bottom - c.bottom, left: c.left - s.left, w: c.width };
+  });
+  ok('…at the foot of the side panel — the viewer\'s bottom right', cmpBox.w > 120 && cmpBox.bottom < 90 && Math.abs(cmpBox.left - cmpBox.right) < 40, J(cmpBox));
+
+  await dial(201);
+  v = await viewer();
+  ok('a click on a wedge brings its photo up: 201°, the photo facing SSW, alone in that direction — nothing boxed',
+    v.i === 1 && v.ids[1] === s1.id && v.gold.length === 0 && J(await boxed()) === J([false, false, false, false, false]), J(v));
+  const acc = await page.evaluate(() => {
+    const e = document.querySelector('#fp-v-details .fp-acc');
+    return e && { text: e.textContent, rough: e.classList.contains('fp-acc-rough'), colour: getComputedStyle(e).color,
+                  bad: getComputedStyle(document.documentElement).getPropertyValue('--bad').trim() };
+  });
+  const rgb = hex => { const n = parseInt(hex.replace('#', ''), 16); return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`; };
+  ok('its ± is shown with the coordinates, red — ±13 m is wider than 7 m — and says "a rough fix" in words too',
+    acc && acc.rough && acc.colour === rgb(acc.bad) && acc.text === '±13 m — a rough fix, wider than 7 m'
+      && /Where\s*-27\.554298, 152\.274116 ±13 m/.test(await text('#fp-v-details')), J(acc));
+
+  await dial(236);
+  v = await viewer();
+  ok('236° is in two wedges — 234° 53° wide, and the SW photo\'s 242° — so both are boxed in gold and the nearer, 234°, comes up',
+    v.i === 2 && J(v.gold.slice().sort()) === J([s2.id, R.sw.id].sort()) && J(await boxed()) === J([false, false, true, true, false]), J(v));
+  w = await wedges();
+  ok('…boxed on the dial too, and the note says so',
+    w.filter(x => x.gold).map(x => x.id).sort().join() === [s2.id, R.sw.id].sort().join()
+      && /2 photos taken here face 23[5-7]° W?SW — boxed in gold on the strip\. Click there again for the next\./.test(await text('#fp-cmp-note')),
+    `${J(w)} ${await text('#fp-cmp-note')}`);
+  const gold = await page.evaluate(() => {
+    const b = document.querySelectorAll('#fp-viewer .fp-v-thumb')[3], cs = getComputedStyle(b);
+    return { border: cs.borderTopColor, shadow: cs.boxShadow, ring: getComputedStyle(document.documentElement).getPropertyValue('--hit-ring').trim() };
+  });
+  ok('…the box in the search-hit amber', gold.border === rgb(gold.ring) && gold.shadow.includes(rgb(gold.ring)), J(gold));
+  ok('…this one\'s ± was never in its file: it says so, and offers to read it off the picture',
+    /No ± in the file — Solocator printed it on the picture\.\s*Read it off the photo/.test(await text('#fp-v-details'))
+      && !(await page.$('#fp-v-details .fp-acc')), await text('#fp-v-details'));
+  await dial(236);
+  v = await viewer();
+  ok('the same direction again steps to the next of them, the gold kept', v.i === 3 && v.ids[3] === R.sw.id && v.gold.length === 2, J(v));
+  await page.click('.fp-v-thumb >> nth=2');
+  ok('a boxed thumbnail goes to its photo and the boxes stay', (await viewer()).i === 2 && J(await boxed()) === J([false, false, true, true, false]));
+  await dial(90);
+  v = await viewer();
+  ok('a direction nobody faced (90°) clears the gold and says so, leaving the photo where it was',
+    v.i === 2 && v.gold.length === 0 && J(await boxed()) === J([false, false, false, false, false])
+      && /No photo taken here faces (89|90|91)° E\./.test(await text('#fp-cmp-note')), `${J(v)} ${await text('#fp-cmp-note')}`);
+  await page.focus(`#fp-v-compass .fp-cmp-wedge[data-fp-id="${s3.id}"]`);
+  await page.keyboard.press('Enter');
+  ok('Enter on a wedge brings its photo up, the focus staying on that wedge',
+    (await viewer()).i === 4 && await page.evaluate(id => document.activeElement && document.activeElement.dataset.fpId === id, s3.id));
+  await page.keyboard.press('ArrowLeft');
+  ok('← from there is still the photo before, round the compass', (await viewer()).i === 3);
+
+  // The ± off the picture.
+  await page.click('.fp-v-thumb >> nth=2');
+  const before = db.calls.length;
+  await page.click('#fp-v-details button:has-text("Read it off the photo")');
+  await page.waitForFunction(() => /read and saved|could not be read|could not/.test((document.getElementById('fp-v-msg') || {}).textContent || ''),
+    null, { timeout: OCR_TIMEOUT });
+  const readCall = db.calls.slice(before).filter(c => c.fn === 'update_field_photo');
+  ok('"Read it off the photo": the stored picture read by the OCR, its ±4 m saved as a patch of accuracy_m and nothing else',
+    readCall.length === 1 && J(readCall[0].body) === J({ p_id: s2.id, p_patch: { accuracy_m: 4 } }) && s2.accuracy_m === 4
+      && /The ± is read and saved\./.test(await msg()), `${J(readCall.map(c => c.body))} ${await msg()}`);
+  ok('…and shown, not red — 4 m is inside 7', /Where\s*-27\.554294, 152\.274116 ±4 m/.test(await text('#fp-v-details'))
+    && !(await page.$('#fp-v-details .fp-acc-rough')) && !/Read it off/.test(await text('#fp-v-details')), await text('#fp-v-details'));
+
+  // Moving a pin: the rough one, and the four taken with it.
+  await page.click('.fp-v-thumb >> nth=1');
+  await page.click('#fp-v-details button:has-text("Move…")');
+  await page.waitForFunction(() => { const x = FieldPhotos._viewer(); return !!(x && x.moving && x.moving.pin); }, null, { timeout: LOAD_TIMEOUT });
+  let mv = (await viewer()).moving;
+  ok('Move… opens a map with the photo\'s pin where it stands, its GPS\'s ±13 m ring round it, and the four others taken there',
+    mv.id === s1.id && near(mv.from[0], s1.lat, 1e-9) && near(mv.from[1], s1.lon, 1e-9) && mv.ring === 13 && mv.others === 4 && mv.withOthers
+      && mv.zoom >= 18 && (await page.evaluate(() => document.activeElement && document.activeElement.id)) === 'fp-v-coord', J(mv));
+  ok('…the ring red, as the ± is', await page.evaluate(() => !!document.querySelector('#fp-v-map path.fp-mm-ring.is-rough')));
+  ok('…with the way the camera looked drawn from the pin, and the others\' dots',
+    await page.evaluate(() => !!document.querySelector('#fp-v-map path.fp-mm-cone') && document.querySelectorAll('#fp-v-map path.fp-mm-other').length === 4));
+  const audit = await auditHandlers(page);
+  ok(`the viewer with the mover and the compass: all ${audit.checked} handler(s) resolve`, audit.unresolved.length === 0, audit.unresolved.map(u => u.path).join(', '));
+  const pin = await page.evaluate(() => FieldPhotos._pinAt());
+  await page.mouse.move(pin.x, pin.y);
+  await page.mouse.down();
+  await page.mouse.move(pin.x + 15, pin.y, { steps: 3 });
+  await page.mouse.move(pin.x + 40, pin.y, { steps: 5 });
+  await page.mouse.up();
+  mv = (await viewer()).moving;
+  const coord = await page.inputValue('#fp-v-coord');
+  ok('dragging the pin moves it east, and the coordinates box follows',
+    mv.at[1] > mv.from[1] + 2e-5 && Math.abs(mv.at[0] - mv.from[0]) < 3e-6 && coord === `${mv.at[0].toFixed(6)}, ${mv.at[1].toFixed(6)}`, `${J(mv)} ${coord}`);
+  ok('…and says how far, which way, and from what',
+    /^\d+ m E of where the GPS put it \(the GPS said ±13 m\)\. Save to keep it\.$/.test(await text('#fp-v-moved')), await text('#fp-v-moved'));
+  const dots = await page.evaluate(() => [...document.querySelectorAll('#fp-v-map path.fp-mm-other')].map(p => p.getBoundingClientRect().x));
+  await page.uncheck('#fp-v-with');
+  const home = await page.evaluate(() => [...document.querySelectorAll('#fp-v-map path.fp-mm-other')].map(p => p.getBoundingClientRect().x));
+  ok('…the four others\' dots went with it, and back when "with it" is unticked',
+    dots.length === 4 && dots.every((x, i) => x - home[i] > 25), J({ dots, home }));
+  await page.check('#fp-v-with');
+  const at0 = [...mv.at], was = Object.fromEntries(seeded.concat([R.ne, R.sw]).map(r => [r.id, [r.lat, r.lon]]));
+  const from0 = callsFrom(db);
+  await page.click('#fp-v-place button:has-text("Save")');
+  await page.waitForFunction(() => /^Moved/.test((document.getElementById('fp-v-msg') || {}).textContent || ''), null, { timeout: LOAD_TIMEOUT });
+  const moves = from0();
+  const saved = moves[0] && moves[0].body.p_patch;
+  const dLat = saved ? saved.lat - was[s1.id][0] : NaN, dLon = saved ? saved.lon - was[s1.id][1] : NaN;
+  ok('Save: the photo to where its pin was dropped, placed by hand',
+    moves.length === 5 && moves[0].body.p_id === s1.id && near(saved.lat, +at0[0].toFixed(6), 1e-9) && near(saved.lon, +at0[1].toFixed(6), 1e-9)
+      && saved.placement === 'manual' && Object.keys(saved).length === 3, J(moves.map(c => c.body)));
+  ok('…and the other four taken there by the same offset, one patch each',
+    new Set(moves.slice(1).map(c => c.body.p_id)).size === 4 && moves.slice(1).every(c => {
+      const b = was[c.body.p_id], p = c.body.p_patch;
+      return b && near(p.lat - b[0], dLat, 2e-7) && near(p.lon - b[1], dLon, 2e-7) && p.placement === 'manual';
+    }) && /^Moved, and the 4 other photos taken here with it\.$/.test(await msg()), `${J(moves.map(c => c.body))} ${await msg()}`);
+  v = await viewer();
+  ok('…the mover shuts, the ± goes — the place is somebody\'s word now, not the GPS\'s — and the five are still one spot',
+    !v.editing && !v.moving && s1.accuracy_m === null && /placed by hand/.test(await text('#fp-v-details'))
+      && !(await page.$('#fp-v-details .fp-acc')) && (await wedges()).length === 5, `${J(v)} ${await text('#fp-v-details')}`);
+
+  // Once more, alone: clicked on the map, then typed.
+  await page.click('#fp-v-details button:has-text("Move…")');
+  await page.waitForFunction(() => { const x = FieldPhotos._viewer(); return !!(x && x.moving && x.moving.pin); }, null, { timeout: LOAD_TIMEOUT });
+  await page.uncheck('#fp-v-with');
+  const there = { lat: s1.lat - 0.00006, lon: s1.lon + 0.00001 };
+  const pt = await page.evaluate(p => FieldPhotos._mapPoint(p.lat, p.lon), there);
+  await page.mouse.click(pt.x, pt.y);
+  mv = (await viewer()).moving;
+  ok('a click on the map puts the pin there — to the pixel', near(mv.at[0], there.lat, 6e-6) && near(mv.at[1], there.lon, 6e-6), J(mv));
+  await page.fill('#fp-v-coord', '-27.554330, 152.274150');
+  mv = (await viewer()).moving;
+  ok('…and coordinates typed in the box move it as they are typed', near(mv.at[0], -27.55433, 1e-9) && near(mv.at[1], 152.27415, 1e-9), J(mv));
+  const from1 = callsFrom(db);
+  await page.press('#fp-v-coord', 'Enter');
+  await page.waitForFunction(() => /^Moved\.$/.test((document.getElementById('fp-v-msg') || {}).textContent || ''), null, { timeout: LOAD_TIMEOUT });
+  const alone = from1();
+  ok('unticked, Save moves that photo alone', alone.length === 1 && alone[0].body.p_id === s1.id
+    && J(alone[0].body.p_patch) === J({ lat: -27.55433, lon: 152.27415, placement: 'manual' }), J(alone.map(c => c.body)));
+
+  await page.click('#fp-v-details button:has-text("Move…")');
+  await page.waitForFunction(() => !!(FieldPhotos._viewer() || {}).moving, null, { timeout: LOAD_TIMEOUT });
+  await page.keyboard.press('Escape');
+  v = await viewer();
+  ok('Escape shuts the mover — the map with it — and hands the focus back to Move…', v && !v.editing && !v.moving
+    && !(await page.$('#fp-v-map')) && await page.evaluate(() => /Move…/.test((document.activeElement || {}).textContent || '')), J(v));
+  await page.keyboard.press('Escape');
+  ok('…and Escape again closes the viewer', !(await viewer()));
+
+  // One photo alone at its spot.
+  await page.evaluate(id => FieldPhotos.openOne(id), R.gps.id);
+  ok('a photo alone at its spot: one wedge, and the note says so',
+    (await wedges()).length === 1 && /Facing 118° ESE \(true\), \d+° wide\. The only photo taken here\./.test(await text('#fp-cmp-note')),
+    await text('#fp-cmp-note'));
+  await page.keyboard.press('Escape');
+  // Put back as they were, and out of the counts the sections after this keep
+  // — the twin's markers read again before anything signs out under them.
+  for (const r of seeded) r.deleted_at = '2026-06-25T00:00:00Z';
+  for (const r of [R.ne, R.sw]) [r.lat, r.lon] = was[r.id];
+  await page.evaluate(() => FieldPhotos.changed());
+  await page.waitForFunction(() => {
+    const d = typeof DigitalTwin !== 'undefined' && DigitalTwin.debug ? DigitalTwin.debug().photos : null;
+    return !d || d.status !== 'loading';
+  }, null, { timeout: LOAD_TIMEOUT });
+}
+// The update_field_photo calls made after this point, when asked.
+function callsFrom(db) {
+  const n = db.calls.length;
+  return () => db.calls.slice(n).filter(c => c.fn === 'update_field_photo');
+}
 
 async function twinHalf(page, R, db, viewer, text) {
   const settled = () => page.waitForFunction(() => DigitalTwin.debug().built && !DigitalTwin.debug().status.endsWith('…')

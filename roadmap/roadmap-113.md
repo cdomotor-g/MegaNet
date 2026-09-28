@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-28** (revision 107 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-28** (revision 108 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -402,7 +402,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
   - **A gauge's zero is a fact about a date, not about a gauge.** 129 of these gauges have had more than one zero, and through today's an old flood lands metres from where the water stood. Each peak goes through the zero in force on its own date, and the twin draws one only at the `level_m_ahd` that gives it — never through the zero it has now.
   - **An extract's column heading is not a promise about every row.** HDB holds some peaks already written in m AHD, and some dams' against a spillway, under the same "height" heading as the rest; put through the zero in force, some land 150–170 m above the river and others 670 m below it. Each peak is checked against the gauge's own flood levels (20 m over, 30 m under) and left off, with the reason, when it disagrees — and a gauge whose peaks and levels are wrong the same way is placed consistently wrong, which the twin shows as every level below the ground rather than hiding.
 - ~~**#202**~~ `[Standalone]` `[Sonnet5/Med]` — **CLOSED at revision 102** — HEIC photos in Chrome and Firefox. `libheif-js` **1.23.2** — the version the Dropbox sync's `heic-decode` already resolves to, so both doors decode with the same libheif — as its WebAssembly build (29 kB of glue + 469 kB gzipped, against 698 kB for the base64 bundle; LGPL-3.0, loaded separately and unmodified), fetched from unpkg on the first HEIC the browser cannot draw and **run in a worker let go after a quiet minute**, the OCR engine's terms. A worker rather than the page because a phone photo's decode is a heap of a couple of hundred MB that WebAssembly never hands back. The check drops a real 1.4 kB HEIC (made with pillow-heif; the recipe is in the check) and decodes the JPEG that went up to find the picture's four colours in its four corners.
-- **#201** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 100** — place a field photo by clicking the map: *Pick on the map* from the place editor, and a photo's own pin dragged to move it, the way a station's is. The database needs nothing — `update_field_photo()` already takes a move and re-files an unplaced photo by distance.
+- **#201** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 100; the viewer's half landed at revision 108** — place a field photo by clicking the map: *Pick on the map* from the place editor, and a photo's own pin dragged to move it, the way a station's is. The database needs nothing — `update_field_photo()` already takes a move and re-files an unplaced photo by distance. **Revision 108 did the viewer's place editor, in another shape than the issue drew**: not a step aside to the Stations map but a small map inside the viewer (*Move…* / *Place it…*), the pin dragged or the map clicked, the photos taken at the same spot moved with it by the same offset. **What is left**: the upload queue's *Place it…* (still coordinates or a station), and a photo's own 📷 pin dragged on the Stations map — the 3-D badge then follows by itself (sequencing item 10e).
 - **#190** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 93** — MapLibre 5.24.0 is the last UMD build, and the 3-D view pins it. **6.x ships ESM only**, so a plain `<script src>` cannot load it and the app is on a branch that stops getting fixes at a moment nobody picks. High not for the diff but for the decision: this is the first real pressure on the classic-script contract #129 argued for at length. Four options are on the issue; `await import(url)` inside a classic script looks right — it needs no bundler and `map-3d.js` already loads the library lazily from its own function, which is exactly where it would go — and it wants checking rather than assuming, in particular what `file://` does with a module script. **Gates nothing; gated by nothing.**
 - **#189** `[Standalone]` `[Haiku4.5/Low]` — **OPEN, opened revision 93** — the 2-D OpenStreetMap base asks for `{s}.tile.openstreetmap.org`, and the OSMF tile policy asks for exactly `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, adding that other hostnames "may be slower or withdrawn without notice". Works today; documented as something that may stop working, which on a base map means tiles that quietly stop arriving. The 3-D view already uses the bare host and says in a comment that the 2-D layer was left alone rather than changed in passing — this is that change. `OSM-Topo` is **not** in scope: OpenTopoMap publishes the `{a,b,c}` form itself.
 - **#185** `[Standalone]` `[Human]` — **OPEN** — spot-check the three things #184 could not check from an agent session. Not a credentials problem; **toolchain**, the second of the four categories below: the environment cannot reach `nominatim.openstreetmap.org`, cannot run Radio Mobile, and cannot form an opinion about whether a colour ramp looks right. Three parts, ~15 minutes, each with click-by-click steps on the issue:
@@ -502,6 +502,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ## Resource allocation summary
 
 > ## ⬛ Four AI rows, and six `[Human]` issues.
+>
+> **Revision 108 opens and closes nothing** — the field photo viewer gets a compass (a wedge per photo taken at the spot, clicked to bring one up, overlapping ones boxed in gold), a ± in red when a fix is looser than 7 m, a spot's photos in compass order, and a map to move a photo's pin on — from a session request. **#201 is half done by it** (the viewer's place editor; the queue's and the Stations map's own pin are left) and stays open at `[Sonnet5/Med]`, so the allocation below is unchanged. One step for a person came out of it — **the ± of the Solocator photos already stored, read off their pictures from the viewer, a spot at a time** — listed at the foot of the revision entry and unfiled pending the owner.
 >
 > **Revision 107 opens and closes nothing** — it is revision 105's one person-step done: **`0038` is live**, applied from an agent session over the Supabase connection at the owner's choice, run only after the database had fetched it from the repository at `1ad2b49` and its SHA-256 matched, and `select meganet.load_sls_from_github();` loaded both documents — 3,392 Queensland rows and 1,433 NSW. The database's merge of them matches the app's file on all 4,141 locations and 28 fields each. The live project is at schema version 38, the version the app expects, so the Data source panel no longer reads *schema mismatch*, and the agent API quotes both documents. The allocation below is unchanged; revision 104's person-steps, less its first, stand, unfiled pending the owner.
 >
@@ -619,7 +621,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 10. ~~#99 (doc bug fix) has no blockers — ready to pick up now.~~ — **done at `30cf03b`.** It gated nothing on the board, so nothing else moved.
 10. #66 (CORS check) has no blockers — ready now; gates only future/unfiled ARRO API work.
 10d. **#186's children (#187, #188), #189 and #190 have no blockers and gate nothing** — all four fell out of the 3-D view shipping at `d7509fc` and none of them is in front of anything. The one real sequencing note is negative and is constraint 2's: **#187 and #188 both edit `map-3d.js`, so they run one at a time.** #189 is a one-line change in `map-controls.js` and collides with neither. #190 is a decision rather than a change and should be made *before* either child grows the file further, because the answer could move which build the module loads.
-10e. ~~**#200, #201 and #202 have no blockers and gate nothing**~~ — **#200 and #202 are done at revision 102, taken together in one session and one at a time within it, as constraint 2 asked.** #201 is what is left, and it has the files it shares to itself now: `field-photos.js` (which #202 grew a HEIC decoder in, beside the queue — nowhere near the place editor) and `map-photos.js` (where #200 promoted `drawn()` and exposed the pin's parts as `badgeHtml()`, `conePath` and `open()` — **#201's second half, a photo's pin dragged to move it, is a 2-D drag; once the move lands the 3-D badge follows by itself**, since it is rebuilt from `drawn()` whenever that changes).
+10e. ~~**#200, #201 and #202 have no blockers and gate nothing**~~ — **#200 and #202 are done at revision 102, taken together in one session and one at a time within it, as constraint 2 asked.** #201 is what is left, and it has the files it shares to itself now: `field-photos.js` (which #202 grew a HEIC decoder in, beside the queue — nowhere near the place editor) and `map-photos.js` (where #200 promoted `drawn()` and exposed the pin's parts as `badgeHtml()`, `conePath` and `open()` — **#201's second half, a photo's pin dragged to move it, is a 2-D drag; once the move lands the 3-D badge follows by itself**, since it is rebuilt from `drawn()` whenever that changes). **Revision 108 did the viewer's place editor** — a move map inside the viewer, in `field-photos.js` (`mountMoveMap` and its neighbours), which the queue's editor can reuse — so what #201 has left is the queue's *Place it…* and the Stations map's own pin.
 10f. ~~**#203 is blocked, and not by anything on this board**~~ — **done at revision 106.** The extract arrived and #203 took `0037`, restating `station_json` from `0033` with nothing else in flight — `0038`, in flight beside it, leaves the view alone — so the next station migration restates it from `0037`. It gated nothing, and the twin's flood water drew the peaks the day the field arrived, as this item said it would — `stations.json` was regenerated from the live database the same day, not written by hand, since that alone is undone within a week (revision 99).
 10g. **#204 and #206 are blocked on the owner, and #205 on nothing.** #204 waits for the example assessment reports, and gates nothing: the dossier ships without templates and an agent can draft from it today with the prompt in `docs/agent-api.md`. #206 waits for the owner to choose the credential an agent proposes with; `0036`'s seam is already live in the file and needs no change to start. Neither needs `0036` applied to begin the code, ~~but #206 cannot be *proven* against the live project until it is~~ — **and `0036` is live since revision 106**, so #206 can be proven there once the credential is chosen. #205 has no blockers; it is the only thing on the board that touches `site-exposure.js`, and it gates nothing.
 10c. #145 (apply `0009`, create the bucket) has no blockers — ready now. **It gates nothing on this board**, which is worth stating plainly so it is not mistaken for a blocker on #116/#117/#123/#126: those four were unblocked by the *migration being written*, not by it being applied, and all four are code and schema-design work that can proceed against the file. What is actually waiting on it is the Export tab reading green, `tools/check_inspections.sql` being runnable against the real database, and — for Part B only — #116 being able to upload a photo at the end of a form.
@@ -651,12 +653,75 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 - **P3:** ~~#118~~ — **closed**; ~~#119 (epic) → #120/#121~~ — **all closed**; ~~#150~~, ~~#162~~, ~~#163~~, ~~#151~~, ~~#159~~, ~~#161~~, ~~#128~~, ~~#127~~ — **all closed**; ~~#200~~, as a child of EPIC #186 (P3) — **closed at revision 102**
 - **Unrated:** ~~#160~~ — **closed at revision 47** (sequencing item 23).
 - **P4:** #66
-- Unprioritised until reviewed: #204 (the report drafts — blocked on the example reports, so its priority is theirs); #206 (the equipment agent — blocked on a decision about a credential); #205 (site exposure outside Queensland — the section works without it and says in words where it stops); ~~#203~~ (the flood peaks — **closed at revision 106**); #201 (the field photos' follow-up — the feature works without it, and it closes a way in that today ends in "type the coordinates"; ~~#202~~, the other, which ended in "use Safari", **closed at revision 102**); #166 (the ELPRO trial — ~~#167~~ closed, so what is left is a credential, a card and a phone call; worth doing before it is worth a P-number, because the whole 115E-2 question stays theoretical until one unit publishes); #156 (a decision menu, not work — it gates nothing); #158 (three dashboard settings — it gates nothing either, but it is the only thing standing between a non-`@bom.gov.au` address and a working sign-in, so it is worth doing before it is worth prioritising)
+- Unprioritised until reviewed: #204 (the report drafts — blocked on the example reports, so its priority is theirs); #206 (the equipment agent — blocked on a decision about a credential); #205 (site exposure outside Queensland — the section works without it and says in words where it stops); ~~#203~~ (the flood peaks — **closed at revision 106**); #201 (the field photos' follow-up — the feature works without it, and it closes a way in that today ends in "type the coordinates" — in the viewer it ends in a map since revision 108, in the upload queue it still does not; ~~#202~~, the other, which ended in "use Safari", **closed at revision 102**); #166 (the ELPRO trial — ~~#167~~ closed, so what is left is a credential, a card and a phone call; worth doing before it is worth a P-number, because the whole 115E-2 question stays theoretical until one unit publishes); #156 (a decision menu, not work — it gates nothing); #158 (three dashboard settings — it gates nothing either, but it is the only thing standing between a non-`@bom.gov.au` address and a working sign-in, so it is worth doing before it is worth prioritising)
 - Unstated on ~~#101~~ (**closed**) /#107 and their children — ~~#108~~, ~~#109~~, ~~#137~~, ~~#141~~ and ~~#138~~ **closed** — and on ~~#99~~ (**closed**) — treat as normal priority, sequenced by the dependency chain above. The near-term-regardless-of-P-number pairing (#130 and #131, two live crashes) is now **both closed**.
 
 ---
 
 ## What changed
+
+### Revision 108 — 2026-09-28: the photo viewer gets a compass, a red ± for a rough fix, and a map to move a photo on
+
+From a session request — a screenshot of the viewer on the fifth of six photos
+taken 110 m north-east of Gatton, and four asks: the ± beside the
+coordinates, in red past 7 m, "if we have the numbers"; a photo's pin that can
+be moved when the ± is large and the person knows where they stood; a compass
+bottom right with this photo's direction and field of view, the others taken
+there dimmed, a wedge clicked to bring its photo up and overlapping ones
+boxed in gold; and the photos in compass order. In one commit. It opens and
+closes nothing; **#201 is half done by it** and stays open for the other half.
+
+**The ±, and where it had gone.** The viewer always printed `±n m` when there
+was one, and for the photos in the screenshot there was not: **Solocator writes
+the fix into the EXIF with no `GPSHPositioningError` and prints `±13m` on the
+overlay instead**, which the upload never read because the file had already
+placed the photo. All 40 Solocator photos on the live project (Gatton's) are
+`placement = 'exif'` with `accuracy_m` null; the other 12, from Context
+Camera, carry theirs in the file. So
+`PhotoMeta.printsAccuracy` names the apps with that gap (Solocator, by its
+Software tag), `needsOcr` reads such a photo's overlay for the ± alone, and
+`reconcile` takes it only for the same fix (`overlayAccuracy`: the overlay's
+own position within 50 m of the file's, where it was read) — for uploads and
+for the Dropbox and Drive syncs alike, since they read with the same file. A
+photo stored before this says *No ± in the file* and offers **Read it off the
+photo** — the stored picture through the same OCR, one photo at a time for
+every one at the spot that lacks it, the ± saved alone. The red is judged on
+the number shown (`ROUGH_M = 7`), so `±7 m` is never red.
+
+**The pin.** *Move…* opens a small map of the imagery in the viewer: the pin,
+the GPS's ± as a ring round the fix (red when rough), the view cone, a dot for
+each other photo taken at the spot. Drag the pin or click the map; the box and
+a line of words ("10 m SE of where the GPS put it") follow; Save writes a hand
+placement, which drops the ±, and **moves the spot's other photos by the same
+offset** — one GPS, one minute, one error — unless that is unticked. This is
+#201's viewer half in a different shape from the one the issue drew (a step
+aside to the Stations map): the photo stays on screen while its place is
+picked. **#201 keeps**: the upload queue's *Place it…*, and a photo's own 📷
+pin dragged on the Stations map. The mover is a live map in the registry's
+sense and goes down through `removeMap()`, as the registry check requires of
+anything calling `L.map()`.
+
+**The compass and the order.** A wedge per photo at the spot (the 3 m rule the
+map's pins and the twin's markers use), the one shown strong with a needle, a
+width the file did not give drawn 60° and dashed. A click takes the direction
+from the dial's centre: one photo facing it comes up; several are boxed in the
+search-hit amber on the strip and the dial, the nearest comes up, and a second
+click steps on. Each wedge is a button (Enter). A spot opened from the map or
+the twin runs N → E → S → W, spot by spot — `openSpot` sorts, so its three
+callers pass no start photo any more; the library keeps newest first.
+
+**Checks.** `npm run photos` grows from 218 assertions to 258 (and passes):
+under Node the Solocator rule both ways; in Chromium a spot of five — three
+Solocator photos put in the bucket by hand — for the order, the red, the
+wedges clicked and pressed, the gold, the ± read off a stored picture by the
+real OCR, and the pin dragged, clicked, typed and saved with and without the
+others. `npm run registry` holds the mover to the live-map rules.
+
+**Not filed, pending the owner:**
+- **The ± of the Solocator photos already stored.** Nothing reads them on its
+  own: open a spot's photos (a 📷 pin or a twin marker), and press *Read it off
+  the n photos taken here* under the coordinates — about ten seconds a photo,
+  once per spot.
 
 ### Revision 107 — 2026-09-28: `0038` is live, and the database quotes both states' SLS
 
