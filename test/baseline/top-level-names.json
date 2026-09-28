@@ -68,6 +68,7 @@
     "map-3d.js",
     "digital-twin.js",
     "twin-presence.js",
+    "twin-cadastre.js",
     "map-twin.js",
     "modal.js",
     "packets.js",
@@ -81,6 +82,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 786,
-  "distinct": 786
+  "total": 787,
+  "distinct": 787
 }

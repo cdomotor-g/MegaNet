@@ -12,10 +12,11 @@
 // cssVar, registerTabTeardown, KM_PER_DEG_LAT and kmPerDegLon; across to
 // terrain.js for the ~30 m fallback ground, to elvis.js for the AHD height at
 // the pin, to field-photos.js for the field photos taken in the patch (and the
-// viewer they open in), and to app.js for switchTab, goToStation and
-// primaryRole (from inline handlers). Every one of those is a runtime call from
-// inside this file's own functions, so its position among the modules is free.
-// Nothing executes at load (`npm run toplevel`).
+// viewer they open in), to twin-cadastre.js for the property boundaries, lot
+// numbers and road reserve drawn on the ground, and to app.js for switchTab,
+// goToStation and primaryRole (from inline handlers). Every one of those is a
+// runtime call from inside this file's own functions, so its position among
+// the modules is free. Nothing executes at load (`npm run toplevel`).
 //
 // ── Why a tab of its own, and not a mode on the Stations map ─────────────────
 //
@@ -988,6 +989,7 @@ const DigitalTwin = (function () {
     removeNeighbours();
     removeBridges();
     removeSharp();
+    if (typeof TwinCadastre !== 'undefined') TwinCadastre.remove();
     tw.photoNear = -1;
     sc.pole = null; sc.band = null; sc.doors = [];
     remoteClear();
@@ -3544,11 +3546,35 @@ void main() {
     });
   }
 
+  // ── the cadastre ───────────────────────────────────────────────────────────
+  // Every lot's boundary with its lot and plan, and the road reserve, on this
+  // ground: twin-cadastre.js asks the State's cadastre for the patch and draws
+  // it. This hands it the scene and the ground to draw on and the ways back
+  // into the lines over the stage — and nothing else of the twin's.
+  function loadCadastre(seq) {
+    if (typeof TwinCadastre === 'undefined' || !sc.scene || !tw.ground || !tw.origin) return;
+    const o = { ...tw.origin };
+    TwinCadastre.load({
+      THREE, scene: sc.scene, camera: sc.camera, canvas: sc.canvas, stage: sc.stage, terrain: sc.terrain,
+      ground: tw.ground, origin: o, box: patchBox(o.lat, o.lon, tw.ground.size),
+      exag: () => S().exag,
+      toXZ: (lat, lon) => localXZ(lat, lon, o.lat, o.lon),
+      surfaceY,
+      current: () => seq === tw.seq && !!sc.scene,
+      requestFrame,
+      refresh: () => { refreshSiteLine(); refreshAttrib(); },
+      note: list => { for (const n of list) if (!tw.notes.includes(n)) tw.notes.push(n); setNotes(tw.notes); },
+    });
+  }
+
   // ── what else is in the patch, as words ──────────────────────────────────
   // The neighbours by name — each a button that goes to that station's own
   // twin — and the bridges with the level their decks stand at and why.
   function siteLineHtml() {
     const parts = [];
+    // First, the ground the station stands on: whose lot, or whose road.
+    const cad = typeof TwinCadastre !== 'undefined' ? TwinCadastre.lineHtml() : '';
+    if (cad) parts.push(cad);
     const N_ = tw.neighbours;
     if (N_ && N_.list.length) {
       const btns = N_.list.slice(0, 12).map(n => `<button type="button" class="link-btn twin-site-stn" onclick="DigitalTwin.followPath('${escAttr(n.id)}')"
@@ -4965,7 +4991,8 @@ void main() {
       const ns = z <= 0 ? `${(-z).toFixed(1)} m N` : `${z.toFixed(1)} m S`;
       const d  = Math.hypot(x, z);
       out.textContent = `Clicked: ${ew}, ${ns} of the pole (${d.toFixed(1)} m away) — ground ${h.toFixed(2)} m ${tw.ground.datum}, `
-                      + `${(h - tw.ground.h0) >= 0 ? '+' : ''}${(h - tw.ground.h0).toFixed(2)} m against the station.`;
+                      + `${(h - tw.ground.h0) >= 0 ? '+' : ''}${(h - tw.ground.h0).toFixed(2)} m against the station.`
+                      + (typeof TwinCadastre !== 'undefined' ? TwinCadastre.pickWords(x, z) : '');
     }
   }
 
@@ -4997,6 +5024,8 @@ void main() {
     if (sc.scene.fog) sc.scene.fog.color.copy(sc.scene.background);
     syncSky();
     sc.renderer.render(sc.scene, sc.camera);
+    // The lot numbers and road names, written over the frame just drawn.
+    if (typeof TwinCadastre !== 'undefined') TwinCadastre.frame();
     tw.frames++;
   }
 
@@ -5234,6 +5263,7 @@ void main() {
       presenceJoin(st);
       loadPhotos(st, seq);
       loadBridges(st, seq, notes);
+      loadCadastre(seq);
       notes.push(...buildFlood(st));
       // A pin being moved, armed before this build — on the map before the
       // twin was opened, or on this station before a rebuild.
@@ -5504,6 +5534,7 @@ void main() {
                  oninput="DigitalTwin.setExag(this.value)">
         </label>
         <label class="check-label"><input type="checkbox" ${s.imagery ? 'checked' : ''} onchange="DigitalTwin.setImagery(this.checked)"><span>Drape the aerial imagery</span></label>
+        ${typeof TwinCadastre !== 'undefined' ? TwinCadastre.panelHtml() : ''}
         <label class="check-label"><input type="checkbox" ${s.horizon ? 'checked' : ''} onchange="DigitalTwin.setHorizon(this.checked)"><span>The horizon: far ground to ${HORIZON_M / 1000} km, a sky and haze (a few more requests)</span></label>
         ${floodPanelHtml()}
         ${avatarPanelHtml()}
@@ -5617,6 +5648,7 @@ void main() {
     if (tw.horizon) for (const g of tw.horizon.grids) if (g) parts.push(g.attribution);
     if (tw.horizonImages) for (const im of tw.horizonImages) if (im) parts.push(im.attribution);
     if (typeof Elvis !== 'undefined') parts.push(Elvis.attribution);
+    if (typeof TwinCadastre !== 'undefined') parts.push(TwinCadastre.attribution());
     return [...new Set(parts.filter(Boolean))].map(esc).join(' · ');
   }
 
@@ -5894,6 +5926,7 @@ void main() {
         placeSharp();
         placeNeighbours();
         if (tw.bridgesFound) buildBridges(currentStation(), tw.bridgesFound);
+        if (typeof TwinCadastre !== 'undefined') TwinCadastre.relift();
         placePhotoMarkers();
         placeFlood();
         liftHorizon();

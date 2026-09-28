@@ -504,6 +504,85 @@ the antenna is higher than the 2 m pole a thin mast joins them, so the ray
 leaves from somewhere the eye can see. The rays go into the `.glb` as meshes
 named `path to …`.
 
+## Property boundaries, lot numbers and the road reserve
+
+The Queensland cadastre lies on the twin's ground (`twin-cadastre.js`) — the
+land parcels Queensland Globe draws, and the Stations map's **Property
+boundaries** (`map-lots.js`) and **Road parcels** (`map-roads.js`) — in every
+view the twin has, orbit, top-down and the POV, on the tab and inside the
+Stations map:
+
+- **Every lot's boundary**, a white line over a dark casing (the map's answer
+  to imagery that is white on a roof and dark in a shadow), with **its lot
+  number and plan written in it** — *Lot 2 / RP64333* — at the point inside
+  the lot furthest from its edges.
+- **The road reserve**, outlined and washed in the road colour, with **the
+  road's name** written in it. The outline is the reserve's own edge: an edge
+  two road parcels share is inside the reserve and is not drawn, a lot's
+  frontage is drawn once, in the road colour, and the junction squares the
+  DCDB files under `'Unlinked parcel or inter'` are road reserve where they
+  share a corner with a road — `map-roads.js`'s rule — so the reserve is one
+  piece, with no hole at a junction and no line across it. A reserve the DCDB
+  names only "Road" (64,399 of the State's 383,176 road parcels are) is an
+  unnamed reserve, never *the road reserve of Road*.
+- **Watercourse parcels** named in blue, and **easements** as a white dash
+  where they cross a lot — named when the ground is clicked, not written on it.
+
+**What is asked.** One query per patch, of the Land Parcel Property
+Framework's *Cadastral parcels* layer (found by name, as `map-roads.js` finds
+it), for the patch's box, as GeoJSON to the centimetre and not generalised —
+the twin stands on 10 cm imagery, where the map's 10 m generalisation would
+show — read in pages of the service's 4,000 up to 8,000 parcels. A 400 m
+patch in Gatton is 134 parcels and 67 KB; the densest patch measured, 1.6 km
+of central Toowoomba, is 3,365 parcels, 150 KB on the wire and about 0.3 s to
+build. Only the *Base* and *Easement* coverage: strata and volumetric parcels
+subdivide buildings, and drawn on the ground they are a knot of rectangles
+over every block of units (the Surfers Paradise patch is 380 parcels with them
+and 217 without). An answer is kept per patch for the session; nothing is
+asked while both switches are off, or for a patch outside the service's
+extent.
+
+**On the ground exactly.** Each boundary is cut wherever it crosses a grid
+line or a cell's diagonal, and each cut point takes the height of the
+triangle it is on, so every piece of line lies *in* one of the ground's own
+triangles, at every exaggeration — lifted instead, it would float in the POV
+and sink into every hummock at a distance. Exactly on the ground, a line wins
+the depth test only because the ground is pushed back (the wireframe's
+trick), and the 10 cm drape round the station is pulled *forward* over it,
+so the lines would vanish exactly where a boundary matters most. Lines cannot
+take a polygon offset, so each vertex is moved toward the eye along its own
+line of sight — the same pixel, a nearer depth — by three pixels' worth of
+the ground's depth at that angle: enough to lie over the drape, nowhere near
+enough to show through a bridge deck, a pole or a hill.
+
+**The words** are written on a canvas laid over the stage rather than into
+the scene — 3,000 lots would be 3,000 textures. A lot's number goes in when
+the lot is big enough on screen to hold it, foreshortened by the angle it is
+seen at, so looking down on a town the numbers come in as the camera does,
+and in the POV only the lots near the eye are written; a road's name wants
+its parcel's length. Nearest first, none overlapping another, a sign the
+scene stands up or one of the stage's own controls (the compass, the flood's
+scale, the line of help along its foot), none a hill hides, at most 160 — and
+the lot the station stands in first, whatever its size.
+
+**What the twin says.** The line under the stage says where the station
+stands — *The station stands in Lot 2 on RP64333 (Freehold, 969 m²) · the
+road reserve of Railway Street 12 m N · boundaries plotted to ±0.5 m* — or
+that it stands in the road reserve, and whose road it is. A click on the
+ground adds which parcel the point is in and any easement over it. The
+plotting accuracy is the DCDB's own code: 0.1–0.5 m in a surveyed town, 25 m
+where the cadastre was compiled off a 1:10,000 map, 126 m in the far west; the
+imagery under the lines is flown to 10 cm, so past 5 m the notes say the
+boundaries can lie that far from the fences in the photograph. A cadastre that
+cannot be asked is a note, and ⟳ Rebuild asks again; over the border the line
+says there is no Queensland cadastre in the patch.
+
+**The switches** — *Property boundaries and lot numbers* and *Road parcels* —
+are in the Scene panel, on by default and remembered (`mn-twin-cadastre`),
+and they hold for the twin inside the Stations map as well. None of it is in
+the `.glb`: Blender gets the site, and a boundary is a statement about the
+site rather than a part of it.
+
 ## Exploring together
 
 With **Explore together** on (the Scene panel; the setting is kept), the twin
@@ -831,7 +910,7 @@ three.js was, and belongs to that issue.
 | `s3.amazonaws.com` | the ~30 m tiles, as a fallback and for the horizon's outer sheets | already allowed for every profile |
 | `server.arcgisonline.com` | Esri imagery, as a fallback | already allowed for the Satellite base |
 | `api-elevation.fsdf.org.au` | the height at the pin | already allowed for the station card |
-| `spatial-gis.information.qld.gov.au` | where the bridges are (RoadsAndTracks layer 22, OtherTransport layer 160) | already allowed for the cadastre, contours and survey marks |
+| `spatial-gis.information.qld.gov.au` | where the bridges are (RoadsAndTracks layer 22, OtherTransport layer 160); the patch's parcels (LandParcelPropertyFramework, *Cadastral parcels*) | already allowed for the cadastre, contours and survey marks |
 | `overpass-api.de`, `overpass.kumi.systems` | bridges outside Queensland, or when the State cannot be reached | already allowed for the rivers layer |
 
 See `docs/floodwarning-net.md` for why a hostname the Bureau's filter has never
@@ -879,6 +958,26 @@ writes the database's current copy with only the position changed and none of
 its lists, and the twin rebuilds on the new spot), inside the Stations map's
 twin, and in ⛰️ 3-D (the pin on the terrain, a click moved to MapLibre's own
 coordinate for the pixel and not the flat map's, a real drag, cancel).
+
+`npm run twincadastre` holds the cadastre, on a curved valley the check makes
+and a neighbourhood it lays over it in the service's own shape — two lots and
+a third across Railway Street, a T-junction with North Street whose square
+shares its corners with the four road halves, an unlinked remnant, an
+easement, a creek, a reserve the DCDB calls "Road", Lot 2 recorded twice and
+a strata lot over the station — with the stub honouring the query's `where`
+and paging as the live service does. The geometry first, under Node: heights
+on the triangles, not bilinear; a boundary cut at every grid line and
+diagonal so each piece lies in one triangle; the label point inside an L; the
+accuracy codes. Then on the page: the question asked; every line on the mesh
+three draws, found by a ray; the reserve one piece, its frontage drawn once;
+the station's lot, tenure, area, road and accuracy in words; a click naming
+the road, the lot and its easement, the junction and the unnamed reserve; the
+labels looking down, standing in the lot, clear of the signs and of the
+stage's own controls; **the lines
+drawn over the 10 cm drape at a slant** (red with the pull toward the eye taken
+out); the exaggeration; the two switches, and nothing asked while both are
+off; pages, a coarse plot, a service that will not answer, and New South
+Wales; and the twin inside the Stations map.
 
 `npm run flood` holds the water. `flood-stages.js` first, under Node, against
 real station records: the classes through the zero in force and only an AHD

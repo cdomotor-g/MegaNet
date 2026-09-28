@@ -12141,6 +12141,16 @@ code {
   transform: translate(-50%, -.3rem);
 }
 
+/* The lot numbers and road names (twin-cadastre.js): a second canvas laid
+   exactly over the scene's, written each time the view moves. It is a picture
+   of words, not a control — the pointer goes through it to the scene. */
+.twin-stage canvas.twin-cad-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  cursor: default;
+}
+
 .twin-hud {
   position: absolute;
   left: var(--sp-2);

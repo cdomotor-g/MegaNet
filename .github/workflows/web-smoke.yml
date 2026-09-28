@@ -178,7 +178,7 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    # Fifty-nine checks, most of them a browser each. The job took ~14 min at
+    # Sixty checks, most of them a browser each. The job took ~14 min at
     # fifty-two and was cut off at 15 when seven joined in one push (run 187,
     # stopped at 15:12 with every check it reached green). A limit is there to
     # stop a hang, not to budget the suite, so it sits well clear of the real
@@ -760,6 +760,21 @@ jobs:
       - name: Move pin in the twin and in 3-D — the pin on the ground, the coordinate each view hands back
         working-directory: test
         run: npm run twinpin
+
+      # The Queensland cadastre on the twin's ground (twin-cadastre.js): lot
+      # boundaries with their lot and plan, the road reserve outlined and
+      # named. Every way it goes wrong draws a plausible picture — a line on
+      # the bilinear surface instead of the triangles, a line exactly on the
+      # ground and so under the 10 cm drape round the station, the reserve cut
+      # into blocks at its own internal edges, a strata plan on the ground,
+      # "the road reserve of Road". So the geometry is held under Node, then a
+      # neighbourhood is laid over a curved valley with the stub honouring the
+      # query's `where`: every line on the mesh by a ray, the outline rules by
+      # segment, the words, the labels, and the boundary over the drape read
+      # off two screenshots. Skips without WebGL2, like twin.
+      - name: The cadastre in the twin — lot boundaries and numbers, the road reserve, on the ground exactly
+        working-directory: test
+        run: npm run twincadastre
 
       # The two navigators under and beside the Arrow chart. Their edge handles
       # were ungrabbable for a reason no check here could see: the drawing and

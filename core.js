@@ -1224,6 +1224,13 @@ const HELP = {
       + 'OpenStreetMap) is built as a deck — at the crossing height the Bureau lists for the gauge where '
       + 'there is one, else at its banks — with the photograph of the road on it. The other stations in '
       + 'the patch are built too, each named, and each name goes to its own twin.',
+      '<strong>The cadastre lies on the ground.</strong> Every lot\'s boundary, in white, with its lot '
+      + 'number and plan written in it, and the road reserve outlined and washed in the road colour with '
+      + 'the road\'s name in it — Queensland\'s cadastre, the land parcels Queensland Globe draws, on the '
+      + 'ground in every view. The line under the stage says which lot the station stands in and how far '
+      + 'the road reserve is (or whose road reserve it stands in), and how well the cadastre is plotted '
+      + 'there; a click on the ground names the parcel under it. Two switches in the Scene panel; '
+      + 'Queensland only.',
       '<strong>You are not necessarily alone.</strong> With <em>Explore together</em> on (the Scene '
       + 'panel), the twin joins a room for its station and whoever else has that station open is '
       + 'drawn where they stand, in the hat, shirt and trouser colours they chose, with their name over '

@@ -260,6 +260,12 @@ await page.route(/elevation-tiles-prod\/terrarium\/(\d+)\/(\d+)\/(\d+)\.png/, ro
 await page.route(/RoadsAndTracks\/MapServer\/22\/query|OtherTransport\/MapServer\/160\/query/, route =>
   route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ features: [] }),
                   headers: { 'Access-Control-Allow-Origin': '*' } }));
+// The State's cadastre, asked for the patch's parcels (twin-cadastre.js): none
+// in this world either, which is an answer as the bridges' is — a cadastre
+// that could not be asked is a note. `npm run twincadastre` holds the parcels.
+await page.route(/LandParcelPropertyFramework\/MapServer/, route =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ type: 'FeatureCollection', features: [] }),
+                  headers: { 'Access-Control-Allow-Origin': '*' } }));
 await page.route(/api-elevation\.fsdf\.org\.au/, route =>
   route.fulfill({ status: 200, contentType: 'application/json',
                   body: JSON.stringify({ SOURCE: 'QLD Government - https://www.qld.gov.au/', DATASET: 'Check_2026_1m.tif',

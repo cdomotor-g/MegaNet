@@ -90,6 +90,9 @@ MegaNet/
 ├── digital-twin.js         ← DigitalTwin — Digital Twin tab: one station's ground in
 │                             3-D, the station as built, its neighbours and bridges,
 │                             a figure for scale, the move-pin mode, a .glb for Blender
+├── twin-cadastre.js        ← TwinCadastre — the Queensland cadastre on the twin's
+│                             ground: lot boundaries with their lot and plan, and the
+│                             road reserve outlined and named
 ├── flood-stages.js         ← FloodStages — a station's flood classes, AEP levels
 │                             and peaks on one ladder in AHD, the colour the twin's
 │                             water takes past each, and its rise
@@ -3656,6 +3659,20 @@ photograph of the road, at the **crossing height the Bureau's HDB extract
 lists** for the gauge where there is one (Gatton's 3.90 m on a zero of
 87.54 m AHD is a deck at 91.44 m), otherwise at the higher of its banks.
 
+**The cadastre lies on the ground.** Every lot's boundary, in white over a
+dark casing, with its lot number and plan written in it — *Lot 2 / RP64333* —
+and the road reserve outlined and washed in the road colour with the road's
+name in it: the land parcels Queensland Globe draws, and the Stations map's
+Property boundaries and Road parcels, asked of the same Queensland cadastre for
+the patch and draped on the ground's own triangles, in orbit, top-down and the
+POV, on the tab and in the map. The line under the stage says which lot the
+station stands in — its tenure and area — how far the road reserve is and
+which way, or whose road reserve it stands in, and how well the cadastre is
+plotted there (±0.5 m in a surveyed town, ±25 m where it was compiled off a
+1:10,000 map, and a note when it is coarser than 5 m). A click on the ground
+names the parcel under it and any easement over it. Two switches in the Scene
+panel, on by default and remembered (`twin-cadastre.js`).
+
 **The request box is the patch grown by half a sample**, so the 201 pixel
 centres the service returns are the 201 mesh vertices and the middle one is
 the station. Vertical exaggeration scales the relief and nothing else — the
@@ -3770,7 +3787,8 @@ only, with every line that draws it naming whose levels they are.
 controls, the hosts a network has to allow, and the Blender workflow.
 `npm run twin` holds the geometry, the hand-over and the mirror,
 `npm run flood` the water, `npm run twinsite` the station as built, its
-neighbours, the bridges and the offer, and `npm run twinpin` the move-pin
+neighbours, the bridges and the offer, `npm run twincadastre` the property
+boundaries, lot numbers and road reserve, and `npm run twinpin` the move-pin
 mode in the twin and in 3-D — see **Testing** below.
 
 ### 22. Field Photos (Where Each Photo Was Taken, Shown There)
@@ -4186,6 +4204,7 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run photos` | a field photo read, placed, uploaded and shown — the reader against photos built byte by byte and the overlay parser against what field camera apps print and what OCR makes of it, then the app signed in against a fake project with the real OCR engine and the real HEIC decoder: eight files dropped at once, the upload's order and records, the same photo refused three ways with its bytes taken back down, the carousel by keyboard, Dropbox's PKCE link, the map's pins clicked with a real pointer — flat, and tilted into 3-D — the twin's markers on the ground, and a real HEIC, which Chromium cannot draw, decoded and uploaded as a JPEG that is the picture. Smoke sees a tab that says "sign in" |
 | `npm run flood` | the twin's flood water where the river would put it, in the colours of the levels it passes — the ladder, colours and cycle under Node against real station records (a class on an assumed-datum zero named and not drawn, a colour that never goes back from magenta to red past a major class set above the 1% AEP), then Gatton's levels stood on a valley the check makes: the channel wet at moderate, the floodplain at major, the hollow behind a bank dry until its crest is overtopped; every level passed in order in its colour; each frame of the rise where the cycle says for the moment it was drawn; the pause from the line and from the scale on the stage; the scale's marks to scale, its names never on one another and giving way least first on a short stage (the layout under Node too), a name pressed, the track dragged and taking a level near its mark, its keys; Gatton's own floods from HDB — 1893 over the rarest AEP level, so the rise goes to it, and a flood that colours nothing; the peaks contract (only a `level_m_ahd` is drawn, never a height through today's zero); hiding it, the Stations map's line and on a phone its scale, reduced motion, and nothing of it in the `.glb` |
 | `npm run twinsite` | the twin's site as the record builds it, on a valley the check makes: a Manual station drawn as a silver collector Ø200 × 300 mm, a 1 m staff gauge or both, and one the record cannot place as a 1 m red post saying what is not known — measured off the scene; a neighbour 129 m away built on its own ground and named; a bridge deck at Gatton's listed crossing (91.44 m AHD) and, with no listed crossing, at its banks; the four nearest donors offered to a station with no levels and one borrowed and given back; the lines over the stage folding after their delay and not under the pointer; and the map *offering* the twin at zoom 17 rather than handing itself over. Every one of those draws a plausible scene when it is wrong |
+| `npm run twincadastre` | the Queensland cadastre on the twin's ground (`twin-cadastre.js`), on a curved valley and a neighbourhood the check lays over it in the service's own shape, with the stub honouring the query's `where` and paging as the live one does. Under Node: heights on the ground's triangles rather than its bilinear surface, a boundary cut at every grid line and diagonal so each piece lies in one triangle, the label point inside an L, the DCDB's accuracy codes, "Road" read as no name. In Chromium: the query (Base and Easement, not Strata; GeoJSON to the centimetre, not generalised); every line on the mesh three draws, found by a ray; the road reserve one piece — no edge two road parcels share, the junction joined, a lot's frontage drawn once; the station's lot, tenure, area, road and accuracy in words; a click naming the road, the lot and its easement, the junction and the unnamed reserve; the lot numbers looking down, standing in the lot, clear of the signs and of the stage's own controls; the lines drawn over the 10 cm drape at a slant (red with the pull toward the eye taken out); the exaggeration; the two switches and nothing asked while both are off; pages, a coarse plot, a service that will not answer, New South Wales; and the twin inside the Stations map. Needs WebGL2 and skips without it |
 | `npm run twinpin` | the move-pin mode where the ground can be seen — the twin's tab, the twin inside the Stations map, and ⛰️ 3-D: the pin dragged with a real pointer and clicked into place in each renderer, the readout to the centimetre, the 3-D click landing on MapLibre's own coordinate for it rather than the flat map's, and Save writing the database's *current* copy of the station with only its position changed. Everywhere but the flat map the mode used to arm with its pin under a WebGL canvas, out of sight and out of reach |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
