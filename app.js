@@ -4690,6 +4690,7 @@ function stopStationsMap() {
   // is a WebGL context that must not outlive the map (map-twin.js).
   MapTwin.detach();
   MapSpider.detach();
+  MapLeader.detach();
   MapLocate.detach();
   MapMovePin.detach();
   MapArrows.detach();
@@ -4800,6 +4801,9 @@ function initMap() {
   // the class is already on the panel, renderStationsHtml() emitted it.
   syncMapFullEsc();
   MapSpider.attach(state.map);
+  // The line from the station card to its pin. Before the first refresh and
+  // the card's repaint below, both of which ask it to redraw.
+  MapLeader.attach(state.map);
   MapLocate.attach(state.map);
   // Nothing on screen until it is armed from the editor card or a callout, so
   // it is attached for the same reason MapSpider is: it needs to know which map
@@ -5055,7 +5059,12 @@ function refreshMapLayers({ skipFit = false } = {}) {
                          backbone: backbone.length,
                          backboneHidden: allBackbone.length - backbone.length };
   updateMapLinkNote();
-  if (!stations.length) { MapSpider.setPins('stations', []); state.mapMatchLabels = new Set(); return; }
+  if (!stations.length) {
+    MapSpider.setPins('stations', []);
+    state.mapMatchLabels = new Set();
+    MapLeader.sync();                     // its pin went with the rest
+    return;
+  }
 
   // A filter's matches are always named — that is what the filter was for —
   // while the set is small enough to read; the nearest to the matched extent
@@ -5202,33 +5211,22 @@ function refreshMapLayers({ skipFit = false } = {}) {
     marker.mnFilterDim = dim;
 
     // bindPopup takes a function so the HTML is built when the popup opens,
-    // not for all ~3,174 markers on every refresh — and so that update()
-    // rebuilds it, which is how the action row opens and shuts (see
-    // togglePopupPills).
+    // not for all ~3,174 markers on every refresh.
     //
-    // The callout is a signpost since #175: the name, the roles, the station
-    // number and elevation on one line, and a button that opens the actions.
-    // Everything else it used to carry — the ALERT ids, the wind region, the
-    // repeater's lines, the ACMA threat count — moved to the station card in
-    // the map's corner, which paints on the same click and stays put while
-    // callouts come and go. A callout carrying all of it and ten pills was the
-    // "bit much" that asked for this.
+    // The callout is the phone's alone now. On a desktop a pin click paints
+    // the station card and the gold leader from the card to the pin
+    // (map-leader.js), and the callout that used to open beside them said
+    // nothing the card did not: the name, the roles, the number and height,
+    // and the same pills again behind an "Actions (N)" button. On a phone the
+    // card is a sheet that opens on request, so the callout is the light first
+    // answer to a tap — identity, Details, Copy — and it is bound on every
+    // marker at every width, because a window can cross the phone width
+    // between one refresh and the next.
     //
-    // The pills are a row of equal things (#170) and there can be ten of them,
-    // each `nowrap` and ~160 px wide. `maxWidth` alone does nothing for that:
-    // Leaflet sizes a popup to its *content*, and the flex row is happy to be
-    // as narrow as it is given, so at Leaflet's default they wrap one per line
-    // and the callout is 520 px tall. `minWidth` is what hands the row two
-    // columns' worth of room. On a phone (isPhoneNav) the numbers are smaller
-    // because the callout is: a ~333 px map container was carrying a ~380 px
-    // balloon, and maxHeight hands Leaflet its own scrolled mode instead of a
-    // callout taller than the map. The options are read once, when the marker
-    // is bound; every refreshMapLayers rebinds, so a window that crosses the
-    // phone width mid-session is right again at the next filter change or
-    // render, and the content itself asks isPhoneNav() on every open.
-    marker.bindPopup(() => stationPopupHtml(s),
-      isPhoneNav() ? { minWidth: 200, maxWidth: 240, maxHeight: 220 }
-                   : { minWidth: 330, maxWidth: 340 });
+    // The numbers are a phone's: a ~333 px map container was carrying a
+    // ~380 px balloon, and maxHeight hands Leaflet its own scrolled mode
+    // instead of a callout taller than the map.
+    marker.bindPopup(() => stationPopupHtml(s), { minWidth: 200, maxWidth: 240, maxHeight: 220 });
     // Leaflet opens a bound popup on every click of its layer. Take that over,
     // so a modifier-click can mean "put this in the selection" without a popup
     // opening and closing again — a closed popup leaves its container fading
@@ -5268,6 +5266,9 @@ function refreshMapLayers({ skipFit = false } = {}) {
   // The lines are all on the map and styled; the arrowheads are painted off
   // them on the next frame (map-arrows.js).
   MapArrows.schedule();
+  // Every marker was just replaced, the card's among them: the leader lets go
+  // of the old one and finds the new (map-leader.js).
+  MapLeader.sync();
 }
 
 // Parts 1 and 2 of the graphic pattern: the picture's name says what it is
@@ -5351,66 +5352,52 @@ function clearMapSelection() {
   mapSelectionChanged();
 }
 
-// ── The station callout ──────────────────────────────────────────────────────
-// What a pin says when it is clicked. Two shapes, chosen on every open:
+// ── The station callout (phones) ─────────────────────────────────────────────
+// What a pin says when it is tapped on a phone:
 //
-//   desktop  name · roles · "Stn #N · 320 m AHD" · [Actions (9) ▾]
-//            …and the pill row under it once Actions has been pressed
-//   phone    name · roles · the same line · [ℹ️ Details & actions] [📋 Copy lat, lon]
+//   name · roles · "Stn #N · 320 m AHD" · [ℹ️ Details & actions] [📋 Copy lat, lon]
 //
-// The desktop row is shut by default and its openness is state.popupPillsOpen
-// rather than anything in the popup's DOM — Leaflet rebuilds the content on
-// every open and every update(), and map-survey.js records what happens to
-// anything written into the DOM instead. Shut means the row is *absent*, not
-// hidden: the expander sits outside .mn-popup-actions so that row, when it
-// exists, is pills and only pills — the shape test/movepin.mjs asserts.
+// A desktop has no callout at all any more. It had one until the leader
+// (map-leader.js): a signpost beside the station card saying the name, the
+// roles and the number the card said a hand's width away, with the card's own
+// pills again behind an "Actions (N)" button. What it did that the card could
+// not was point at the pin, and the leader does that.
 //
-// The phone callout keeps two things: the way to the card, which is where the
-// information went, and Copy — the one action that is *the* field action,
-// pasted into the message to whoever is driving to the site. Everything else
-// is one tap away behind Details. It never calls MapWind.askRegion: the card
-// owns the wind line now, under its own element id.
+// The phone keeps it because there it is not a duplicate: the card is a sheet
+// that opens on request, and a map a few hundred pixels high cannot carry a
+// sheet on every tap. So the callout keeps two things: the way to the card,
+// which is where the information went, and Copy — the one action that is
+// *the* field action, pasted into the message to whoever is driving to the
+// site. Everything else is one tap away behind Details. It never calls
+// MapWind.askRegion: the card owns the wind line, under its own element id.
+//
+// No width test in here: a window that has widened past the phone width since
+// the markers were bound can still be showing one, and it is the same callout
+// either way.
 function stationPopupHtml(s) {
   const stnElev = [
     s.station_number ? `Stn #${esc(s.station_number)}` : '',
     s.elevation_ahd == null ? ''
       : `${esc(s.elevation_ahd)} m AHD${s.elevation_source ? ' (modelled)' : ''}`,
   ].filter(Boolean).join(' · ');
-  const head = `
+  return `
       <strong>${esc(s.name)}</strong><br>
       ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${r}</span>`).join('')}
-      ${stnElev ? `<br><span class="mn-pop-line">${stnElev}</span>` : ''}`;
-  if (isPhoneNav()) {
-    return `${head}
+      ${stnElev ? `<br><span class="mn-pop-line">${stnElev}</span>` : ''}
       <div class="mn-popup-actions pill-row">
         <button type="button" class="pill mn-popup-details" onclick="stnCardFromPopup('${escAttr(s.id)}', event)"
            title="Open the station card — the full details and every action">ℹ️ Details &amp; actions</button>
         ${copyLatLonPillHtml(s)}
       </div>`;
-  }
-  const pills = stationActionPills(s);
-  const open  = state.popupPillsOpen;
-  // No aria-controls on the expander: the row it controls does not exist
-  // while it is shut, and an id pointing at nothing is worse than none.
-  return `${head}
-      <div class="mn-popup-more">
-        <button type="button" class="pill mn-popup-expand" aria-expanded="${open}"
-           onclick="togglePopupPills(event)"
-           title="${open ? 'Hide the action pills' : 'Show every action for this station'}"
-           >${open ? 'Hide actions ▴' : `Actions (${pills.length}) ▾`}</button>
-      </div>
-      ${open ? `<div class="mn-popup-actions pill-row">
-        ${pills.join('\n        ')}
-      </div>` : ''}`;
 }
 
-// The 7–11 actions a station offers, in four groups. One builder because
-// three surfaces draw them now — the callout's expanded row and the station
-// card (#175), the editor card its own subset — and test/movepin.mjs pins the
-// shapes once, not per surface. Every one of these is a pill (#170), and the
-// in-page ones are <button>s, which is what #138 says they always should have
-// been: the action happens here, so the element is a button dressed as one,
-// not a link to nowhere.
+// The 7–11 actions a station offers, in four groups. One builder for the two
+// surfaces that draw them — the station card (#175), and the editor card its
+// own subset — and test/movepin.mjs pins the shapes once, not per surface.
+// (The desktop callout's row was a third, flattened, until the callout went.)
+// Every one of these is a pill (#170), and the in-page ones are <button>s,
+// which is what #138 says they always should have been: the action happens
+// here, so the element is a button dressed as one, not a link to nowhere.
 //
 // The groups are what a row of eleven identical lozenges was missing. Read in
 // order they answer four different questions, and #170's flat row made a
@@ -5431,15 +5418,16 @@ function stationPopupHtml(s) {
 // A group whose pills a station doesn't get (no position, not a repeater, no
 // ARRO id) drops out entirely rather than drawing an empty rule.
 //
-// `edit` adds the station card's own first pill. Only the card has it — the
-// callout is a signpost, and "Station details ↓" from a balloon over the map is
-// a scroll to somewhere the balloon isn't.
-function stationActionGroups(s, { edit = false } = {}) {
+// "Station details" leads. It was the card's alone while the desktop callout
+// drew the same builder without it — a scroll to the editor from a balloon
+// over the map is a scroll to somewhere the balloon isn't — and the card is
+// the only caller now.
+function stationActionGroups(s) {
   const arroUrl = arroSiteUrl(arroSiteId(s));
   return [
     { label: 'In MegaNet', pills: [
-      edit ? `<button type="button" class="pill mn-edit-station" onclick="editStationFromCard('${escAttr(s.id)}')"
-           title="Select this station and jump to its details card ${stationsCardsWhere()}">✏️ Station details ${stationsCardsArrow()}</button>` : '',
+      `<button type="button" class="pill mn-edit-station" onclick="editStationFromCard('${escAttr(s.id)}')"
+           title="Select this station and jump to its details card ${stationsCardsWhere()}">✏️ Station details ${stationsCardsArrow()}</button>`,
       `<button type="button" class="pill" onclick="focusStation('${escAttr(s.id)}')"
            title="Select this station in the Stations list ${stationsCardsWhere()}">🗒️ Show in the list ${stationsCardsArrow()}</button>`,
       `<button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
@@ -5534,46 +5522,12 @@ function fieldDataFromCard(id) {
   ArroData.fieldOpenStation(id);
 }
 
-// The same pills flattened back into one row, which is what the callout draws
-// and what its "Actions (N)" label counts. The groups set the order; the
-// callout is a ~300 px balloon and rules across it would cost more height than
-// the grouping buys.
-function stationActionPills(s) {
-  return stationActionGroups(s).flatMap(g => g.pills);
-}
-
-// Flip the action row on the open callout (#175). State first, DOM second:
-// update() re-runs the content function, which destroys the button that was
-// just pressed and drops focus to <body> — so the replacement is re-focused a
-// frame later, once Leaflet has laid the new content out (#138's rule that a
-// control which vanishes under the keyboard hands focus somewhere sensible).
-// preventScroll, because the callout is on screen — the person just pressed
-// it — and a focus that scrolls the page is the one that loses the map.
-//
-// The click is stopped here, before the rebuild, and it is not optional.
-// Leaflet decides whether a click happened inside a popup by walking
-// parentNode up from the event's target when the click reaches the map's
-// container — after this handler has run. A target that update() has just
-// detached has no parents to walk, so the click reads as a click on the
-// empty map, and the map's answer to that is to close the popup. Stopping
-// the event at the button is what keeps the callout open after the one
-// press that changes it.
-function togglePopupPills(e) {
-  if (e) L.DomEvent.stopPropagation(e);
-  state.popupPillsOpen = !state.popupPillsOpen;
-  const m = state.mapMarkers.find(x => x.isPopupOpen && x.isPopupOpen());
-  if (m) m.getPopup().update();
-  requestAnimationFrame(() => {
-    const btn = document.querySelector('.leaflet-popup .mn-popup-expand');
-    if (btn) btn.focus({ preventScroll: true });
-  });
-}
-
 // Every click on a station pin: shift / ctrl / ⌘ adds or removes it from the
-// selection, and a plain click opens the popup, as it always did. A plain
-// click on a repeater also focuses it — see setMapFocusRepeater. Both live
-// here because refreshMapLayers takes Leaflet's own click-to-open off the
-// marker — see the note there.
+// selection, and a plain click paints the station card and its leader — or,
+// on a phone with no sheet open, opens the callout. A plain click on a
+// repeater also focuses it — see setMapFocusRepeater. All of it lives here
+// because refreshMapLayers takes Leaflet's own click-to-open off the marker —
+// see the note there.
 function onStationPinClick(e) {
   const oe = e.originalEvent;
   if (oe && (oe.shiftKey || oe.ctrlKey || oe.metaKey)) {
@@ -5583,10 +5537,10 @@ function onStationPinClick(e) {
   }
   L.DomEvent.stopPropagation(e);      // as Leaflet's own handler did
   // A click on a stack of pins fans the stack out instead of opening anything:
-  // MapSpider listens on the same marker, runs after this, and closes the
-  // callout this opens. The card must not paint for whichever pin happened to
-  // be on top of a stack nobody has picked from yet, so it asks first — and
-  // neither must the link budget take an endpoint off it.
+  // MapSpider listens on the same marker and runs after this (on a phone it
+  // closes the callout this opens). The card must not paint for whichever pin
+  // happened to be on top of a stack nobody has picked from yet, so it asks
+  // first — and neither must the link budget take an endpoint off it.
   const fans = MapSpider.willFan(e.target);
   // A link-budget pick that is armed gets this pin, and gets it before anything
   // else here runs. The card has always said "click a station on the map" and,
@@ -5608,16 +5562,24 @@ function onStationPinClick(e) {
     // pill; with the sheet open the sheet follows the tap instead — it is the
     // phone's detail surface, and a callout under a sheet that names another
     // station says two things at once.
-    if (state.stnCard.id && !fans) { showStationCard(e.target.mnStationId); return; }
+    if (state.stnCard.id && !fans) {
+      showStationCard(e.target.mnStationId);
+      MapLeader.reveal();             // a pin tapped just above the sheet's edge
+      return;
+    }
     e.target.openPopup(e.latlng);
     return;
   }
-  e.target.openPopup(e.latlng);
-  // Desktop gets the callout and the station card on the same click (#175):
-  // the card is where the details went, and painting it here is what makes
-  // "click a pin, read about it" cost no scrolling. A paint, not an open — a
-  // canvas click has no focus to protect, and the selection is untouched.
-  if (!fans) showStationCard(e.target.mnStationId);
+  if (fans) return;
+  // A desktop gets the station card and the gold leader from its top edge to
+  // this pin (map-leader.js), and no callout: the card says everything the
+  // callout used to, and the leader is the pointing it did. Painting the card
+  // here is what makes "click a pin, read about it" cost no scrolling — a
+  // paint, not an open: a canvas click has no focus to protect, and the
+  // selection is untouched. A card opened over the pin it is about moves the
+  // map off it, so the leader has somewhere to go.
+  showStationCard(e.target.mnStationId);
+  MapLeader.reveal();
 }
 
 // ── Repeater focus ───────────────────────────────────────────────────────────
@@ -6124,24 +6086,29 @@ function selectStation(id) {
   if (s) focusStationOnMap(s, opener);
 }
 
-// Pan the map above the table to a station and open its pin. Called whenever a
-// row is picked, so the list and the map stay talking about the same site.
+// Pan the map above the table to a station and point at its pin. Called
+// whenever a row is picked, so the list and the map stay talking about the same
+// site.
 //
-// The station card follows the row as well (#175), and on a phone it is what
-// opens *instead* of the callout: a balloon on a ~333 px map covers the map it
-// is pointing at, and the card is the phone's detail surface. This is also the
-// keyboard's way onto the map — the pins are canvas and have nothing to focus,
-// the rows do: a row picked from the keyboard keeps focus (rerenderStations
-// finds it again), paints the card in the map panel above, and closing the
-// card returns to that row. `opener` is that row, handed down by selectStation
-// because the table repaint has already replaced it by the time this runs.
+// The station card follows the row as well (#175), and its leader is what
+// points: the card's top edge to the pin, in gold (map-leader.js). No callout
+// at any width — on a desktop the leader replaced it, and on a phone a balloon
+// on a ~333 px map covers the map it is pointing at. The station goes in the
+// middle of the map, unless the card is covering the middle: then it goes just
+// clear of the card, where the leader can reach it.
+//
+// This is also the keyboard's way onto the map — the pins are canvas and have
+// nothing to focus, the rows do: a row picked from the keyboard keeps focus
+// (rerenderStations finds it again), paints the card in the map panel above,
+// and closing the card returns to that row. `opener` is that row, handed down
+// by selectStation because the table repaint has already replaced it by the
+// time this runs.
 function focusStationOnMap(s, opener = document.activeElement) {
   if (!state.map) return;
   showStationCard(s.id, { opener });
   if (s.lat == null || s.lon == null) return;
-  state.map.setView([s.lat, s.lon], Math.max(state.map.getZoom() || 0, 11));
-  const marker = state.mapMarkers.find(m => m.mnStationId === s.id);
-  if (marker && !isPhoneNav()) marker.openPopup();
+  const zoom = Math.max(state.map.getZoom() || 0, 11);
+  state.map.setView(MapLeader.centreFor(L.latLng(s.lat, s.lon), zoom), zoom);
 }
 
 // "Zoom to station" — the station centred at the closest zoom the map has,
@@ -6158,6 +6125,9 @@ function zoomToStation(id) {
   if (!state.map || !s || s.lat == null || s.lon == null) return;
   const max = state.map.getMaxZoom();
   // No base on at all leaves no layer to ask, and Leaflet answers Infinity.
+  // Dead centre, card or no card: this is the move that hands the station to
+  // its digital twin, and "on the station" is what it promises
+  // (test/twinsite.mjs).
   state.map.setView([s.lat, s.lon], Number.isFinite(max) ? max : 19);
 }
 
@@ -6246,15 +6216,18 @@ function goToStation(id) {
 // A card in the map's bottom-left corner carrying everything the callout used
 // to: the ALERT ids, position, elevation, wind region, the repeater's lines,
 // the ACMA threat count, and every action pill. The callout became a signpost
-// when this arrived, and the two split the job — the callout says *which*
-// station and offers the actions on request; the card says everything about
-// it, and stays.
+// when this arrived, and the two split the job — the callout said *which*
+// station, the card everything about it. Then the signpost went too, on a
+// desktop: a gold leader from the card's top edge to the pin says *which*
+// without saying anything twice (map-leader.js). A phone keeps its callout,
+// as the light answer to a tap before the sheet.
 //
 // Why a card and not a bigger callout: a callout is Leaflet's. Leaflet tears
 // it down with the marker on every filter keystroke (refreshMapLayers rebuilds
 // all ~3,174 pins), pans the map to fit it, and on a phone covers the map it
 // is annotating. This is a plain element in .map-panel, like #acma-card: it
-// outlives the markers, it never moves the map, it rides the
+// outlives the markers, it moves the map only to uncover the pin it is about
+// (MapLeader.reveal), it rides the
 // full-screen panel for free, and on a phone it is a sheet across the bottom
 // rather than a balloon over the middle. Bottom-right rather than the other
 // cards' top-right, so the map's icon column and its flyouts — the tab's whole
@@ -6363,14 +6336,20 @@ function showStationCard(id, { takeFocus = false, opener = document.activeElemen
 // destroyed under the keyboard. Focus that was inside the card is put back on
 // the same control of the new markup (same position among the card's
 // controls: the card is drawn from one template, so the order holds), or on
-// the card itself if that position is gone. #138's rule, the one
-// togglePopupPills keeps for the callout.
+// the card itself if that position is gone. #138's rule: a control that
+// vanishes under the keyboard hands focus somewhere sensible.
+//
+// The leader is redrawn last, for the card's new station and its new height.
 function repaintStnCard() {
   const el = document.getElementById('stn-card');
   if (!el) return;                          // not the Stations tab
   const s = state.stnCard.id && state.data
     && state.data.stations.find(x => x.id === state.stnCard.id);
-  if (!s) { state.stnCard.id = null; el.hidden = true; el.innerHTML = ''; return; }
+  if (!s) {
+    state.stnCard.id = null; el.hidden = true; el.innerHTML = '';
+    MapLeader.sync();
+    return;
+  }
   const controls = () => [...el.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')];
   const hadFocus = el.contains(document.activeElement);
   const at = hadFocus ? controls().indexOf(document.activeElement) : -1;
@@ -6397,6 +6376,7 @@ function repaintStnCard() {
   SiteExposure.ask(`mn-exposure-card-${s.id}`, s);
   // The equipment register, for a signed-in editor, on the same terms.
   if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
+  MapLeader.sync();
 }
 
 // Escape closes the card from anywhere inside it. On the card rather than on
@@ -6429,6 +6409,7 @@ function closeStnCard(refocus = true) {
   state.stnCard.id = null;
   el.hidden = true;
   el.innerHTML = '';
+  MapLeader.sync();                         // and the leader goes with it
   const back = state.stnCard.opener;
   state.stnCard.opener = null;
   if (!refocus) return;
@@ -6469,14 +6450,21 @@ function closeStnCard(refocus = true) {
 // for by name. The opener dies with the callout; closeStnCard's
 // document.contains guard then leaves focus where it is rather than throwing
 // it at a button that no longer exists.
+//
+// The sheet comes up over the bottom half of the map, which is often where the
+// pin that was tapped is — so the map moves it up clear of the sheet, where
+// the leader can reach it (MapLeader.reveal).
 function stnCardFromPopup(id, e) {
-  // Stopped for the reason togglePopupPills gives: once the callout is
-  // closed the button is detached, and a click that then reaches the map
-  // container reads as a click on the empty map — which clears the repeater
+  // Stopped, and not optionally. Leaflet decides whether a click happened
+  // inside a popup by walking parentNode up from the event's target when the
+  // click reaches the map's container — after this handler has run. Once the
+  // callout is closed the button is detached and has no parents to walk, so
+  // the click reads as a click on the empty map — which clears the repeater
   // focus the pin tap just set.
   if (e) L.DomEvent.stopPropagation(e);
   if (state.map) state.map.closePopup();
   showStationCard(id, { takeFocus: true });
+  MapLeader.reveal();
 }
 
 // "Station details ↓": the first thing in the app that scrolls the *editor* into
@@ -6631,20 +6619,20 @@ function stnCardHtml(s) {
          editors only, filled after the fetch by PhotoReview.cardAsk, and
          not drawn at all when the register has nothing. -->
     ${typeof PhotoReview !== 'undefined' ? PhotoReview.cardHtml(s) : ''}
-    <!-- Edit first, then the same pills the callout offers, from the same
-         builder — but in their groups, each its own wrapping row with a rule
-         between (stationActionGroups). The rules are full-bleed, like the
-         section borders above them, so the card reads as one stack of bands
-         rather than a panel with boxes in it. MapBlast's and MapMovePin's
-         pills close the callout when pressed; from here there may be none
-         open, which is fine.
+    <!-- Every action the station offers, Station details first, in their
+         groups — each its own wrapping row with a rule between
+         (stationActionGroups). The rules are full-bleed, like the section
+         borders above them, so the card reads as one stack of bands rather
+         than a panel with boxes in it. MapBlast's and MapMovePin's pills close
+         any callout open when pressed — a phone's — and there may be none,
+         which is fine.
 
          role=group with a name on each: the rules are the sighted version of
          a boundary, and a screen reader gets the boundary told to it instead.
          Nothing is drawn for the names — the card is 340 px and four headings
          would cost more height than they explain. -->
     <div class="acma-sect stn-card-actions">
-      ${stationActionGroups(s, { edit: true }).map(g =>
+      ${stationActionGroups(s).map(g =>
         `<div class="pill-row stn-card-group" role="group" aria-label="${escAttr(g.label)}">
         ${g.pills.join('\n        ')}
       </div>`).join('\n      ')}
@@ -6841,13 +6829,21 @@ function focusRepeaterOnMap(id) {
     mapNote(`${r.name} has no coordinates recorded, so the map can't go to it.`, 4000);
     return;
   }
-  state.map.setView([r.lat, r.lon], Math.max(state.map.getZoom() || 0, 10));
+  // Clear of the station card, which stays open over the map's corner.
+  const zoom = Math.max(state.map.getZoom() || 0, 10);
+  state.map.setView(MapLeader.centreFor(L.latLng(r.lat, r.lon), zoom), zoom);
   const marker = state.mapMarkers.find(m => m.mnStationId === r.id);
   // No pin means the map display is hiding it (hide-others mode with a filter
   // running). The view is on it either way, so say why there is nothing there
   // rather than leaving the operator looking at empty ground.
-  if (marker) marker.openPopup();
-  else mapNote(`${r.name} isn't drawn right now — the map display is hiding it.`, 4000);
+  //
+  // A pin that is there gets its "this one": the callout on a phone, and on a
+  // desktop — which has no station callouts — two gold pulses round it, in the
+  // leader's dress (MapLeader.ping). Not the card: the card is on the station
+  // being looked at, and this row moves the view, not the subject.
+  if (!marker) mapNote(`${r.name} isn't drawn right now — the map display is hiding it.`, 4000);
+  else if (isPhoneNav()) marker.openPopup();
+  else MapLeader.ping(marker);
 }
 
 // ── Filter helpers ─────────────────────────────────────────────────────────────

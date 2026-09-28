@@ -625,9 +625,9 @@ function downloadStationKml(id) {
   announce(`${s.name} downloaded as KML — the pin and ${n} link${n === 1 ? '' : 's'}. Open it in Google Earth.`);
 }
 
-// The pill itself, for the row stationActionPills builds. Next to the Google
-// Earth link rather than anywhere else: they are the same errand, and the one
-// that carries the network is the one worth reaching for.
+// The pill itself, for the groups stationActionGroups builds. Next to the
+// Google Earth link rather than anywhere else: they are the same errand, and
+// the one that carries the network is the one worth reaching for.
 function stationKmlPillHtml(s) {
   if (!s || s.lat == null || s.lon == null) return '';
   const n = stationKmlLinks(s).length;

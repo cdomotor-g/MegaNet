@@ -1128,7 +1128,7 @@ strip, where there is no split button to be half of, the settings are a button
 of their own under ⛰️ and wear 🎚️ rather than a second mountain — at every
 width, a phone's rail included.
 
-**The station card, and the callout as a signpost (#175).** Clicking a pin
+**The station card, and the leader to its pin (#175).** Clicking a pin
 paints a card in the map's bottom-left corner — the station's number,
 networks, position, elevation, wind region, every ALERT id with its reading
 kind, a repeater's passing count and delay, the ACMA threat count, and every
@@ -1136,16 +1136,25 @@ action pill — *without* selecting the station: reading about a site must not
 drag the editor and the table along, and the scroll from the map down to the
 list to *see* a station and back up again was what this replaces. It is the
 map's own memory of what you were last looking at: a filter keystroke rebuilds
-every marker and takes the callout with it, and the card stays; selecting a row
-paints it too, which is also the keyboard's way onto a map whose pins are
-canvas. *Station details ↓* on it selects the station and is the first thing in
-the app that scrolls the editor into view. The callout on the pin shrank to
-match — name, roles, `Stn #N · elevation`, and one *Actions (N) ▾* button that
-opens the pills, remembered for the session once pressed — because the callout
-carrying all of that *and* ten pills was a lot. On a phone the callout is the
-identity and two fat pills, *Details & actions* and *Copy lat, lon*, sized to
-fit inside the map with a finger-sized close button, and the card opens from
-*Details* as a sheet across the bottom of the map. One card over the map at a
+every marker, and the card stays; selecting a row paints it too, which is also
+the keyboard's way onto a map whose pins are canvas. *Station details ↓* on it
+selects the station and is the first thing in the app that scrolls the editor
+into view. A gold **leader** joins the card to its pin (`map-leader.js`): out
+of the card's top edge — straight up to a pin above it, round the top corner to
+one beside it — onto a ring round the pin, cased in near-black with a warm
+glow so it holds up on imagery, topo and the dark base alike, and the card's
+own top edge goes gold to match. It draws itself in when the card moves to a
+new station, follows the pin through pans, zooms and a fanned-out stack, and
+where the card opens over its own pin the map moves the pin clear. It replaced
+the callout a desktop used to open beside the card, which said nothing the card
+did not — name, roles, `Stn #N · elevation` and the same pills again behind an
+*Actions (N) ▾* button — and whose one job, pointing at the pin, is the
+leader's. A row in *Repeaters listening* moves the map without moving the card,
+so it pulses a gold ring round that repeater's pin instead. On a phone the
+callout stays, because there it duplicates nothing: a tap opens the identity
+and two fat pills, *Details & actions* and *Copy lat, lon*, sized to fit inside
+the map with a finger-sized close button, and the card opens from *Details* as a
+sheet across the bottom of the map, with the leader up to the pin. One card over the map at a
 time: opening this one, the ACMA transmitter card or *What is here* closes the
 others — which also ended the case where the ACMA card and the radio-path card,
 drawn in the same rectangle, simply covered each other. (The radio-path card has
@@ -4194,11 +4203,11 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run insp` | the Inspections form drawn against the schema's own seed data, on all six sheets. Smoke cannot see this one: it blocks the datastore, and this tab renders from it |
 | `npm run maint` | the Council Maintenance Tasks form drawn against the workbook's own filled sheet, read out of the `.xlsx` in `archive/`. Every cell where that sheet differs from the blank template has to be either on screen or named as having no column |
 | `npm run history` | a saved record reading back as the sheet it was written on. The fixture is not a file: the check fills a sheet in, saves it, and serves that document back — so the round trip is what is tested, and the read-only view is compared against the *editable* form's own section list |
-| `npm run movepin` | a station's links and its move-pin mode. The five pills in the callout and in the editor card, the two document searches carrying the *reduced* station name rather than the raw one and asking for both spellings of the words that have two, and the mode armed, dragged **with a real pointer**, read back, cancelled and saved. Smoke sees none of it: a pill row missing two pills and a Save that writes null over a coordinate both open a tab with a clean console |
+| `npm run movepin` | a station's links and its move-pin mode. The five pills in the editor card and every action on the station card a pin click opens (and no callout with it), the two document searches carrying the *reduced* station name rather than the raw one and asking for both spellings of the words that have two, and the mode armed, dragged **with a real pointer**, read back, cancelled and saved. Smoke sees none of it: a pill row missing two pills and a Save that writes null over a coordinate both open a tab with a clean console |
 | `npm run riverdetails` | the Bureau's flood warning details (0031, 0032) on the station card and in the editor: the card naming the indexes that list the station, its AWRC number, stream and URBS label, the newest flood classification, the gauge zero in force and the flood effects, with the rest under *Earlier*; the editor's rows shut to one line, added on top, removed without dropping focus, its three fields sent trimmed or not at all; and a save sending only the lists the form changed — an untouched list resent through the browser's parse would come back with 94.50 as 94.5, and nothing on screen would say so |
 | `npm run floodlevels` | the AEP flood levels (0033) and the indicative flood velocity from them. The arithmetic off the page against figures worked by hand — Manning, the critical-flow cap, the channel bed (the gauge zero, but not a storage's, not an assumed datum's and not one 30 m down), the slope's sources and bounds, a recorded setting and an entered roughness — and `flood-velocity.js`'s default slopes against the ones the ingest wrote into `data/aep-levels.json`. Then the card: a *Flood levels (AEP)* section flagged indicative, the velocity line straight after the wind region with the module's own figures, the sheet's far-off point said out loud, nothing for a station neither sheet names; and the editor sending the AEP list, and only it, when a setting is picked |
 | `npm run frequencies` | a station's RX/TX pairs (0033): the repeater's own pair as the primary row under the ids every path tool's form reads, **+ Add frequency** at the foot with the cursor in it, an untouched form sending no list and a filled row sending exactly what was typed, a use with no frequency or a frequency that is not one stopping the save by name, a base station's section of its own and none for a field station, and the card listing every pair a line each |
-| `npm run stncard` | the station card on the map and the callout it turned into a signpost (#175), at a desktop width and at a phone's. A real pin click paints the card without selecting; a filter change destroys the callout and leaves the card; *Station details ↓* selects and is the one thing that scrolls the details card into view; closing it holds until the next gesture; the three cards that share a rectangle close each other; and at 375 px the callout is two pills that fit inside the map with a finger-sized close button, and *Details* opens the card as a sheet with focus in it. Every one of those failures renders a page that looks right |
+| `npm run stncard` | the station card on the map (#175) and the gold leader that replaced the desktop callout, at a desktop width and at a phone's. A real pin click paints the card without selecting and opens no callout; the leader leaves the card's top outline and ends on a ring round the pin, follows it through a pan, an animated zoom, a marker rebuild and a fanned-out stack, gives way when the card covers the pin (and the map moves the pin clear), goes with the card, and pulses round a repeater picked in *Repeaters listening*; a filter change rebuilds the markers and leaves the card; *Station details ↓* selects and is the one thing that scrolls the details card into view; closing it holds until the next gesture; the three cards that share a rectangle close each other; and at 375 px the callout is two pills that fit inside the map with a finger-sized close button, and *Details* opens the card as a sheet with focus in it and its leader up to a pin the sheet is not covering. Every one of those failures renders a page that looks right |
 | `npm run itm` | the Longley–Rice port drifting from its reference: 53 losses computed by NTIA's own compiled library — its five published vectors and 48 synthetic profiles across every regime, climate, polarisation and mode of variability — held to 10⁻⁶ dB, intermediates included. Node-only, seconds |
 | `npm run pathcover` | the profile with ground cover on it and the budget over it — the one state nothing else can reach, because the tile server is blocked. This check answers it with flat ground it makes itself and seeds the land cover: trees on flat ground obstruct, the chart draws the band, the Terrain / Statistics / Ground-cover rows add up to the path loss, an end under the trees pays P.2108's terminal loss, the height table and the switch change the profile, and the propagation settings move the figure the way they should |
 | `npm run linkbudget` | the link budget card's two ends. Each is found by name, station number, ALERT address or address window — asserted against what the *Stations filter itself* returns for the same term, so the claim is that the card runs the shared matcher rather than a second copy of the rules. Then: the box keeping its caret through a paste, an end armed and filled from a pin click and from a row of the Stations list in its filtered state without selecting it, the three Clear buttons, a half-typed figure surviving a repaint it did not ask for, and the four things the table refuses to compute — the same station at both ends, a zero-length path, a term nobody supplied, and a frequency box that cannot say whether it holds an override. Every one of those is a clean console |

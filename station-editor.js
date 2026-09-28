@@ -132,14 +132,15 @@ function editorForm(s) {
   // (#176, export.js), and it is the same pill the map's own card carries.
   const links   = [mapLinksHtml(s), stationKmlPillHtml(s)].filter(Boolean).join('\n    ');
   const movePin = MapMovePin.editorButtonHtml(s);
-  // Same pill the map callout carries, from the same builder — but pointed at
+  // Same pill the station card on the map carries (and a phone's callout),
+  // from the same builder — but pointed at
   // editorCopyLatLon(), which reads the two boxes rather than the record. The
   // card is where a coordinate is *edited*: a pin dragged in from the map or a
   // figure typed over one has to be what the clipboard gets, and reading the
   // boxes at the click is the only version of that which cannot go stale.
   const copyLL  = copyLatLonPillHtml(s, { live: true });
-  // The wind region the station's coordinate falls in — the same answer its map
-  // callout gives, so the card and the callout never disagree. Read now, and
+  // The wind region the station's coordinate falls in — the same answer the
+  // station card on the map gives, so the two cards never disagree. Read now, and
   // filled in when the polygons land if this page has not needed them yet.
   const wind    = MapWind.regionState(s.lat, s.lon);
   MapWind.askRegion('ef-wind', s.lat, s.lon);
@@ -551,7 +552,7 @@ function deriveLegacyAlertIds(sensors) {
 // pFloat() rather than the raw strings, so half-typed input ("-33." or "  ")
 // copies as nothing — and copyStationLatLon() says so on the button — instead
 // of putting a broken coordinate on the clipboard. Formatted by the same
-// stationLatLonText() the callout uses, so the two never disagree about how
+// stationLatLonText() the map's own Copy pill uses, so the two never disagree about how
 // many digits a position has.
 function editorCopyLatLon(btn) {
   const lat = pFloat(document.getElementById('ef-lat')?.value);

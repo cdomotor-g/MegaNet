@@ -231,8 +231,24 @@ map has taught, so the hues belong to the dataset rather than to the theme;
 and at fill-opacity .2 over map tiles neither theme needs its own set. What
 carries the meaning without colour is the region letter — in the switch's
 legend, whose dots take the hex through `--dot` like every other swatch, and
-in every station callout once the layer has loaded — the same argument
+on every station card once the layer has loaded — the same argument
 `--maps-region-*` records.
+
+**`--map-leader`, `-hi`, `-lo` and `-ink` are the leader's gilt**
+(`map-leader.js`): the line from the station card to its pin, which replaced
+the desktop callout. They are out of the contrast contract — nothing is read
+in them; the line points, it does not rate — and one set for both themes,
+because it is drawn over base maps that do not go dark with the app. What
+keeps the gold from reading as the amber filter-match ring or a camera-yellow
+photo pin is the drawing, not the hue: a ramp from pale through deep and back
+instead of a flat stroke, a near-black case round it, and a warm glow nothing
+else on the map has. Unlike the wind fills these reach their svg as `var()` —
+the leader is its own svg, styled by class, not a Leaflet path option — so a
+token change needs no redraw. The one place the gold meets the page is the
+station card's top edge, where the leader leaves from, and it is paint only (a
+border colour and an inset band): the class that sets it is toggled from
+inside the card's own `ResizeObserver`, and a class that moved the card's edge
+there would move it again.
 
 ---
 

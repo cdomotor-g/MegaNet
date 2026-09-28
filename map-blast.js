@@ -232,7 +232,8 @@ const MapBlast = (function () {
   return {
     applyStyles,
 
-    // The popup affordance: arming is a mode on the repeater the operator
+    // The station card's affordance (the desktop callout's too, until the
+    // leader replaced it): arming is a mode on the repeater the operator
     // already picked, so the link lives where a repeater is already in hand.
     popupLinkHtml(s) {
       if (!s.roles.includes('repeater') || !s.repeater) return '';
@@ -258,9 +259,9 @@ const MapBlast = (function () {
       if (state.map) state.map.closePopup();
       applyMapFocusStyles();          // runs the blast restyle from its tail
       applyMapLabels();
-      // The station card draws this pill as well (#175), and is not rebuilt
-      // on its next open the way the callout is — so its label is put right
-      // here, or it would go on saying "Show" over a map already showing.
+      // The station card draws this pill (#175), and is not rebuilt on its
+      // next open the way a callout is — so its label is put right here, or
+      // it would go on saying "Show" over a map already showing.
       if (typeof repaintStnCard === 'function') repaintStnCard();
     },
 

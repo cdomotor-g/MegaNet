@@ -138,6 +138,17 @@
   --map-survey: #00695c;
   --map-repeater: #0b5cab;
   --map-field: #107c10;
+  /* The leader from the station card to its pin (map-leader.js), and the gold
+     edge along the top of the card it leaves from. Gilt rather than a flat
+     yellow: a ramp from pale through deep and back, cased in the near-black
+     ink, so it cannot be read as the filter matches' amber ring or a photo
+     pin, which are flat. One set for both themes — the line is drawn over the
+     base maps, which do not go dark with the app, and the edge holds up on
+     either panel. */
+  --map-leader-hi:  #fff4c9;
+  --map-leader:     #f0bf3c;
+  --map-leader-lo:  #a86d0a;
+  --map-leader-ink: #1d1402;
   /* The Digital Twin's sky, read by digital-twin.js with cssVar() because a
      renderer cannot take var(): the colour at the horizon (also the stage's
      own background and the haze the far ground fades into), the colour
@@ -6369,6 +6380,91 @@ hr {
   margin-top: var(--sp-1);
 }
 
+/* ── The leader (map-leader.js) ──────────────────────────────────────────────
+   The line from the station card to its pin, which replaced the desktop
+   callout: one svg in a pane of its own over the pins and labels, redrawn in
+   the map container's pixels. Three strokes laid one over another — the
+   near-black case, the gold, the pale shine down the middle — with the ring
+   round the pin in each, so the gold runs on into the ring without a seam.
+   The two shadows are what lift it off the map: a tight dark one under it,
+   and a warm glow round it that no line on a base map has. */
+.mn-leader {
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1.2px rgba(0, 0, 0, .6))
+          drop-shadow(0 0 6px rgba(255, 186, 40, .7));
+}
+
+.mn-leader-stop-hi  { stop-color: var(--map-leader-hi); }
+.mn-leader-stop-mid { stop-color: var(--map-leader); }
+.mn-leader-stop-lo  { stop-color: var(--map-leader-lo); }
+
+.mn-leader-case,
+.mn-leader-gilt,
+.mn-leader-shine {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mn-leader-case  { stroke: var(--map-leader-ink); stroke-opacity: .85; stroke-width: 6.5px; }
+.mn-leader-gilt  { stroke: url(#mn-leader-gilt); stroke-width: 3.5px; }
+.mn-leader-gilt .mn-leader-ring { stroke: url(#mn-leader-rim); }
+.mn-leader-shine { stroke: var(--map-leader-hi); stroke-opacity: .8; stroke-width: 1px; }
+
+/* The line and the ring are there only while there is a leader to draw; the
+   svg stays up without them while a ping is running. */
+.mn-leader:not(.is-on) .mn-leader-line,
+.mn-leader:not(.is-on) .mn-leader-ring {
+  display: none;
+}
+
+/* The ring lands scaled down onto the pin (drawIn), and a ping closes in on
+   it: both scale about their own centre, not the svg's corner. */
+.mn-leader-ring,
+.mn-leader-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* "This one": a ring that closes in on a pin the map was moved to without the
+   card (MapLeader.ping), twice, and rests on it until it goes. The keyframes
+   end on the ring at rest, so the app's one reduced-motion rule — which cuts
+   every animation to its last frame — leaves a still ring on the pin rather
+   than nothing. The strokes do not swell with the ring. */
+.mn-leader-ping {
+  animation: mn-leader-ping 1s cubic-bezier(.2, .7, .3, 1) 2 both;
+}
+
+.mn-leader-ping circle { vector-effect: non-scaling-stroke; }
+.mn-leader-ping .mn-leader-gilt { stroke: var(--map-leader); }
+
+@keyframes mn-leader-ping {
+  from { transform: scale(2.8); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+/* Nothing to point at in 3-D or in the twin: the pins are not where the map
+   pane draws them. The overlays cover the pane anyway; this keeps the line
+   from showing through the 3-D view's half-transparent loading veil. */
+.mn-map-stage:has(#map3d.is-on) .mn-leader,
+.mn-map-stage:has(#map3d.is-loading) .mn-leader,
+.mn-map-stage:has(#map-twin.is-on) .mn-leader {
+  visibility: hidden;
+}
+
+/* The card's crown while a leader can hang from it: its top edge in the same
+   gold, a hairline border and a band inside it along the heading. Paint only —
+   the border keeps its width and the band is a shadow — because MapLeader
+   sets this class from inside the card's ResizeObserver, and a class that
+   moved the card's edge there would move it again. */
+.stn-card.mn-leader-card {
+  border-top-color: var(--map-leader);
+}
+
+.stn-card.mn-leader-card > .acma-card-head {
+  box-shadow: inset 0 2px 0 var(--map-leader);
+}
+
 /* On a phone the card is a bottom sheet: the map's full width, capped so the
    part of the map the tapped pin is on stays visible above it. 560 is
    BREAKPOINTS.xs — the same width isPhoneNav() reads. */
@@ -6621,13 +6717,6 @@ hr {
   margin-top: .45rem;
   padding-top: .4rem;
   border-top: 1px solid var(--border);
-}
-
-/* The "Actions (N) ▾" expander under the callout's detail (#175). Its own row
-   so the pill sits on a line of its own under the identity, with the same
-   gap the actions row keeps — when the row is open it follows directly. */
-.mn-popup-more {
-  margin-top: .45rem;
 }
 
 .leaflet-control-attribution,

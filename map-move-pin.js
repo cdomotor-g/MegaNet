@@ -8,8 +8,8 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, cssVar, announce,
 // acmaHaversineKm and fmtKm; across to app.js for the Stations map itself,
-// mapNote and selectStation; to auth.js for Auth.open() from the callout's
-// pill; to station-editor.js for editorSave, stationSavePosition and the
+// mapNote and selectStation; to auth.js for Auth.open() from the station
+// card's pill; to station-editor.js for editorSave, stationSavePosition and the
 // #ef-lat / #ef-lon boxes it writes into; to map-draw.js, link-budget.js and
 // map-here.js, to take the map's other interactive modes off before it takes
 // the clicks; to datastore.js for dbCanWrite,
@@ -191,8 +191,9 @@ const MapMovePin = (function () {
   }
 
   // ── The two affordances that arm it ────────────────────────────────────────
-  // One in the station editor card next to the coordinate boxes, one on the map
-  // callout. Same mode, reached from wherever the station is already in hand.
+  // One in the station editor card next to the coordinate boxes, one on the
+  // station card on the map. Same mode, reached from wherever the station is
+  // already in hand.
 
   function label(id) {
     return stationId === id ? 'Moving on the map…' : 'Move pin on map';
@@ -213,9 +214,11 @@ const MapMovePin = (function () {
         >📍 ${label(s.id)}</button>`;
   }
 
-  // The map callout's pill. Only offered where a save could actually land: the
-  // callout is the one place this can be reached without the editor card being
-  // open, so it says why when it is not on offer rather than appearing dead.
+  // The station card's pill (it was the desktop callout's too, until the
+  // callout gave way to the leader). Only offered where a save could actually
+  // land: the card is the one place this can be reached without the editor card
+  // being open, so it says why when it is not on offer rather than appearing
+  // dead.
   function popupLinkHtml(s) {
     if (!s || !s.id) return '';
     const on = stationId === s.id;
@@ -231,15 +234,16 @@ const MapMovePin = (function () {
 
   // Both affordances, wherever they currently are. The editor button is
   // repainted in place rather than by re-rendering the card, which would throw
-  // away whatever else is half-typed into the form; the callout is closed,
-  // because a popup that stays open over the pin is the thing being dragged.
+  // away whatever else is half-typed into the form; any callout is closed — a
+  // phone's — because a popup that stays open over the pin is over the thing
+  // being dragged.
   function repaintButtons() {
     const s  = station() || (state.data && state.data.stations.find(x => x.id === state.editorId));
     const el = document.getElementById('ef-movepin');
     if (el && s) el.outerHTML = editorButtonHtml(s);
     if (map) map.closePopup();
-    // The station card draws this pill too (#175), and unlike the callout it
-    // is not rebuilt on its next open — so it is repainted here, on every
+    // The station card draws this pill (#175), and unlike a callout it is not
+    // rebuilt on its next open — so it is repainted here, on every
     // change of the mode, or its pill would go on offering to start a move
     // that has already started. Guarded because this module also serves a
     // page that has no card.
@@ -382,8 +386,8 @@ const MapMovePin = (function () {
     addPanel();
     map.panInside(at, { padding: [60, 60] });
 
-    // The mode takes the map, and the station card gives way to it the way
-    // the callout does (#175): on a phone the card is a sheet across the
+    // The mode takes the map, and the station card gives way to it, leader and
+    // all (#175): on a phone the card is a sheet across the
     // bottom of the map, over the panel this just added, and on a desktop it
     // is a rectangle a dragged pin can land under. A pin click brings it back
     // with the pill reading "cancel", which repaintButtons keeps true.

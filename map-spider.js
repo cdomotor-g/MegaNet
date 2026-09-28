@@ -4,7 +4,8 @@
 //               the ones underneath can be seen and clicked.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches across to app.js for mapNote, from inside its own functions. The IIFE
+// Reaches back to core.js for `state` (the station card, which holds a fan open)
+// and across to app.js for mapNote, from inside its own functions. The IIFE
 // body declares five tunables and four nulls and calls nothing, so this file's
 // position among the modules is free.
 //
@@ -149,6 +150,13 @@ const MapSpider = (function () {
     if (!open) return;
     // A popup open on one of the fanned pins is the user reading it — hold.
     if (open.members.some(m => m.isPopupOpen && m.isPopupOpen())) return;
+    // So is the station card on the pin that was picked out of this fan: its
+    // leader runs to that pin where it is fanned out, and a fan that folded
+    // under the pointer on its way to the card would take the pin back into
+    // the stack it was picked from. Only the pick — a card that was already
+    // on one of these stations before the stack was hovered holds nothing.
+    if (open.picked && typeof state !== 'undefined' && state.stnCard
+        && state.stnCard.id === open.picked.mnStationId) return;
     if (e.layerPoint.distanceTo(map.latLngToLayerPoint(open.centre)) > open.radius + LEAVE_PX) {
       unspiderfy();
     }
@@ -165,7 +173,10 @@ const MapSpider = (function () {
   }
 
   function onPinClick(e) {
-    if (!map || isOpen(e.target)) return;   // already fanned → let the popup open
+    // Already fanned → the click is a pick: the card (or a phone's callout)
+    // opens on it, and the fan holds while it does (onMapMove).
+    if (map && isOpen(e.target)) { open.picked = e.target; return; }
+    if (!map) return;
     // A modifier-click is the map selection talking, not "show me this stack".
     const oe = e.originalEvent;
     if (oe && (oe.shiftKey || oe.ctrlKey || oe.metaKey)) return;
@@ -175,8 +186,8 @@ const MapSpider = (function () {
 
   return {
     // Whether a plain click on this pin is about to fan a stack out rather
-    // than open its callout — the same test onPinClick makes, asked ahead of
-    // it by app.js's own click handler on the marker (#175): that handler runs
+    // than pick it — the same test onPinClick makes, asked ahead of it by
+    // app.js's own click handler on the marker (#175): that handler runs
     // first and paints the station card, and a stack nobody has picked from
     // yet has no station to paint.
     willFan(marker) {

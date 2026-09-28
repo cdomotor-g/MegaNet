@@ -1,11 +1,11 @@
 // The two things this change added to the Stations tab, driven in a real
 // browser.
 //
-//   1. **Copy lat, lon** — a pill on the station's map callout and on its
-//      editor card, beside Move pin on both. The callout's copies the station's
-//      recorded position; the card's copies what the two coordinate boxes
-//      currently say, which is not the same thing the moment a pin has been
-//      dragged into them or a figure typed over them.
+//   1. **Copy lat, lon** — a pill on the station's card on the map and on its
+//      editor card, beside Move pin on both. The map card's copies the
+//      station's recorded position; the editor's copies what the two coordinate
+//      boxes currently say, which is not the same thing the moment a pin has
+//      been dragged into them or a figure typed over them.
 //   2. **The station list collapses**, the same <details> the Filters, Path
 //      profile and Link budget cards on that tab already are — remembered
 //      between visits, with the live row count and the selected station on the
@@ -100,30 +100,24 @@ async function main() {
     check('nor is no station at all', text.nothing === '');
     check('but zero is a coordinate, and survives', text.origin === '0, 0', text.origin);
 
-    // ── 2. The callout ────────────────────────────────────────────────────
-    log('\nCopy lat, lon on the map callout\n');
+    // ── 2. The station card on the map ────────────────────────────────────
+    log('\nCopy lat, lon on the station card on the map\n');
 
     await page.evaluate(() => switchTab('stations'));
     await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0,
       null, { timeout: LOAD_TIMEOUT });
 
-    // The action row is shut by default since #175 — the pill is reached by
-    // pressing "Actions (N) ▾" first, the way a person does.
-    const calloutShut = await page.evaluate(() => {
-      const m = state.mapMarkers.find(x => x.mnStation && x.mnStation.lat != null);
-      m.openPopup();
-      return {
-        rowAbsent: !document.querySelector('.leaflet-popup .mn-popup-actions'),
-        expander:  !!document.querySelector('.leaflet-popup .mn-popup-expand'),
-      };
-    });
-    check('the callout opens with its actions shut', calloutShut.rowAbsent && calloutShut.expander);
-    await page.click('.leaflet-popup .mn-popup-expand');
-    await page.waitForSelector('.leaflet-popup .mn-copy-latlon', { timeout: 5000 });
-
+    // A pin click paints the card, whose Position group carries the pill. It
+    // was the desktop callout's too, behind "Actions (N) ▾", until the callout
+    // gave way to the leader; a phone's callout still carries it beside
+    // Details, from the same builder (npm run stncard holds that row).
     const pop = await page.evaluate(() => {
       const m = state.mapMarkers.find(x => x.mnStation && x.mnStation.lat != null);
-      const row = document.querySelector('.leaflet-popup .mn-popup-actions');
+      m.fire('click', { originalEvent: new MouseEvent('click'), latlng: m.getLatLng() });
+      // A pin on a stack fans the stack out and paints nothing; the card is
+      // what is under test here, so it is painted for this station directly.
+      if (state.stnCard.id !== m.mnStationId) showStationCard(m.mnStationId);
+      const row = document.querySelector('#stn-card .stn-card-group[aria-label="Position"]');
       const btn = row && row.querySelector('.mn-copy-latlon');
       return {
         inRow:  !!btn && btn.parentElement === row,
@@ -136,7 +130,7 @@ async function main() {
         want:   stationLatLonText(m.mnStation),
       };
     });
-    check('the callout’s action row carries it', pop.inRow && pop.isPill, pop.label || 'missing');
+    check('the card’s Position group carries it', pop.inRow && pop.isPill, pop.label || 'missing');
     check('as a <button type="button">, not a link to nowhere — nothing is navigated',
       pop.tag === 'BUTTON' && pop.type === 'button', `${pop.tag} type=${pop.type}`);
     check('carrying the station’s own position', !!pop.data && pop.data === pop.want,
@@ -144,10 +138,10 @@ async function main() {
     check('and a tooltip naming exactly what will be copied',
       (pop.title || '').includes(pop.want), pop.title);
 
-    await page.click('.leaflet-popup .mn-copy-latlon');
+    await page.click('#stn-card .mn-copy-latlon');
     const copied = await page.evaluate(async () => ({
       clip:  await navigator.clipboard.readText(),
-      label: document.querySelector('.leaflet-popup .mn-copy-latlon')?.textContent.trim(),
+      label: document.querySelector('#stn-card .mn-copy-latlon')?.textContent.trim(),
     }));
     check('pressing it puts that position on the clipboard', copied.clip === pop.want, copied.clip);
     check('and the label says so, in place', copied.label === '✓ Copied', copied.label);
@@ -162,13 +156,13 @@ async function main() {
     // left reading "Copied" for the rest of the session.
     await page.waitForTimeout(1800);
     const back = await page.evaluate(() =>
-      document.querySelector('.leaflet-popup .mn-copy-latlon')?.textContent.trim());
+      document.querySelector('#stn-card .mn-copy-latlon')?.textContent.trim());
     check('then it puts itself back', back === LABEL, back);
 
     // ── 3. The editor card ────────────────────────────────────────────────
     log('\nCopy lat, lon on the editor card — the boxes, not the record\n');
 
-    await page.evaluate(() => state.map.closePopup());
+    await page.evaluate(() => closeStnCard(false));
     const ed = await page.evaluate(() => {
       const s = state.data.stations.filter(x => x.lat != null && x.lon != null)[5];
       selectStation(s.id);
@@ -191,7 +185,7 @@ async function main() {
     check('reading the boxes rather than a figure baked in when the card was drawn',
       ed.noStale && ed.handler === 'editorCopyLatLon(this)', ed.handler);
 
-    // Type over the boxes. This is the case the callout's pill cannot cover and
+    // Type over the boxes. This is the case the map card's pill cannot cover and
     // the reason the card's is a different handler: what is on screen is what a
     // person means by "this station's coordinates".
     await page.evaluate(() => {

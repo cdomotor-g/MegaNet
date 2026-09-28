@@ -1,6 +1,6 @@
 // The three things #170 added to the Stations tab, driven in a real browser.
 //
-//   1. The row of pills a station's callout and its editor card both carry —
+//   1. The row of pills a station's card on the map and its editor card both carry —
 //      that every one of them is there, that the two document searches carry
 //      the *reduced* name rather than the raw one and ask for both spellings of
 //      the words that have two, and that a station with no coordinates still
@@ -161,55 +161,29 @@ async function main() {
       pills.noCoordsCount === 2 && pills.noCoordsLabels.every(l => /Search/.test(l)),
       pills.noCoordsLabels.join(' | '));
 
-    // The callout itself, opened for real, so the action row is asserted as the
-    // browser builds it rather than as a string.
+    // The station card, opened for real by a pin click, so its actions are
+    // asserted as the browser builds them rather than as a string. On a
+    // desktop the card is the only place on the map that draws them: the
+    // callout that used to carry the same row behind "Actions (N) ▾" gave way
+    // to the leader (map-leader.js), and a pin click opens no callout at all.
     await page.evaluate(() => switchTab('stations'));
     await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0,
       null, { timeout: LOAD_TIMEOUT });
+    await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: 10_000 });
 
-    // Since #175 the row is shut by default, behind an "Actions (N) ▾" button
-    // that sits *outside* the row — so the row, once open, is still pills and
-    // only pills. Shut means absent from the DOM, not hidden: the openness is
-    // state, and Leaflet rebuilds the popup's content from it.
-    const shut = await page.evaluate(() => {
-      const m = state.mapMarkers.find(x => x.mnStation && x.mnStation.lat != null);
-      m.openPopup();
-      const btn = document.querySelector('.leaflet-popup .mn-popup-expand');
-      const label = btn ? btn.textContent.trim() : '';
-      const said = /^Actions \((\d+)\) ▾$/.exec(label);
+    const card = await page.evaluate(() => {
+      // A pin with nothing near it: a click on a stack fans it out instead.
+      const near = (a, b) => Math.abs(a.lat - b.lat) < 0.005 && Math.abs(a.lon - b.lon) < 0.005;
+      const all = state.data.stations.filter(x => x.lat != null && x.lon != null);
+      const s = all.find(x => !all.some(y => y !== x && near(x, y)));
+      const m = state.mapMarkers.find(x => x.mnStationId === s.id);
+      state.map.setView(m.getLatLng(), 14, { animate: false });
+      m.fire('click', { originalEvent: new MouseEvent('click'), latlng: m.getLatLng() });
+      const acts = document.querySelector('#stn-card .stn-card-actions');
+      const kids = acts ? [...acts.querySelectorAll('.pill')] : [];
       return {
-        rowAbsent: !document.querySelector('.leaflet-popup .mn-popup-actions'),
-        hasButton: !!btn,
-        isPill:    !!btn && btn.classList.contains('pill'),
-        tag:       btn && btn.tagName, type: btn && btn.type,
-        expanded:  btn && btn.getAttribute('aria-expanded'),
-        label,
-        count:     said ? +said[1] : -1,
-        // The callout no longer carries the wind line or the ALERT ids — the
-        // station card does. Asserted here because a callout that quietly
-        // grew them back is the "bit much" #175 exists to stop.
-        noWind:    !document.querySelector('.leaflet-popup [id^="mn-wind-"]'),
-        noIds:     !/AlertID/.test(document.querySelector('.leaflet-popup-content').textContent),
-      };
-    });
-    check('the callout opens with its actions shut, behind one pill',
-      shut.rowAbsent && shut.hasButton && shut.isPill, shut.label || 'no expander');
-    check('which is a <button type="button"> that says it is collapsed',
-      shut.tag === 'BUTTON' && shut.type === 'button' && shut.expanded === 'false',
-      `${shut.tag} type=${shut.type} aria-expanded=${shut.expanded}`);
-    check('and says how many actions it is hiding', shut.count >= 7, shut.label);
-    check('the callout is a signpost now — no wind line, no ALERT ids',
-      shut.noWind && shut.noIds);
-
-    await page.click('.leaflet-popup .mn-popup-expand');
-    await page.waitForSelector('.leaflet-popup .mn-popup-actions', { timeout: 5000 });
-
-    const popup = await page.evaluate(() => {
-      const row = document.querySelector('.leaflet-popup .mn-popup-actions');
-      const kids = row ? [...row.children] : [];
-      const btn = document.querySelector('.leaflet-popup .mn-popup-expand');
-      return {
-        isRow: !!row && row.classList.contains('pill-row'),
+        popup: !!document.querySelector('.leaflet-popup'),
+        rows:  acts ? [...acts.children].every(g => g.classList.contains('pill-row')) : false,
         count: kids.length,
         allPills: kids.every(e => e.classList.contains('pill')),
         // Every in-page action is a <button>; every link out is an <a>.
@@ -217,54 +191,19 @@ async function main() {
                               .every(e => e.tagName === 'BUTTON' && e.type === 'button'),
         noDeadLinks: kids.every(e => e.getAttribute('href') !== '#'),
         labels: kids.map(e => e.textContent.trim()),
-        expanded: btn && btn.getAttribute('aria-expanded'),
-        btnLabel: btn && btn.textContent.trim(),
+        moveOffered: kids.some(e => /move this pin|Move pin on map/.test(e.textContent)),
       };
     });
 
-    check('pressing it draws the actions as a wrapping pill row', popup.isRow);
-    check('and every action in it is a pill', popup.allPills && popup.count >= 7,
-      `${popup.count}: ${popup.labels.join(' | ')}`);
-    check('exactly as many as the shut button promised', popup.count === shut.count,
-      `${popup.count} vs ${shut.count}`);
+    check('a pin click on a desktop opens no callout — the card carries the actions', !card.popup);
+    check('the card draws them as wrapping pill rows', card.rows);
+    check('and every action in them is a pill', card.allPills && card.count >= 7,
+      `${card.count}: ${card.labels.join(' | ')}`);
     check('the in-page ones are buttons, not links to nowhere',
-      popup.inPageAreButtons && popup.noDeadLinks);
-    check('and the button now says it is open',
-      popup.expanded === 'true' && popup.btnLabel === 'Hide actions ▴',
-      `aria-expanded=${popup.expanded} "${popup.btnLabel}"`);
-
-    // update() rebuilt the popup's content, destroying the button that was
-    // pressed; focus has to land on its replacement rather than on <body>.
-    await page.waitForFunction(() =>
-      document.activeElement && document.activeElement.classList.contains('mn-popup-expand'),
-      null, { timeout: 2000 }).catch(() => {});
-    const focused = await page.evaluate(() =>
-      document.activeElement && document.activeElement.classList.contains('mn-popup-expand'));
-    check('focus follows the button through the rebuild', focused === true);
-
-    // Open is remembered for the session: the next callout opens with its
-    // actions showing, and shutting one shuts them for the next as well.
-    const remembered = await page.evaluate(() => {
-      state.map.closePopup();
-      const first = state.mapMarkers.find(x => x.mnStation && x.mnStation.lat != null);
-      const m = state.mapMarkers.find(x => x !== first && x.mnStation && x.mnStation.lat != null);
-      m.openPopup();
-      return {
-        open: state.popupPillsOpen === true,
-        rowThere: !!document.querySelector('.leaflet-popup .mn-popup-actions'),
-      };
-    });
-    check('the next callout opens with its actions already showing',
-      remembered.open && remembered.rowThere);
-    await page.click('.leaflet-popup .mn-popup-expand');
-    await page.waitForFunction(() => !document.querySelector('.leaflet-popup .mn-popup-actions'),
-      null, { timeout: 5000 });
-    const reshut = await page.evaluate(() => {
-      const out = { off: state.popupPillsOpen === false };
-      state.map.closePopup();
-      return out;
-    });
-    check('and "Hide actions" shuts them for the session again', reshut.off);
+      card.inPageAreButtons && card.noDeadLinks);
+    check('and Move pin is among them, reachable without the editor card open', card.moveOffered,
+      card.labels.join(' | '));
+    await page.evaluate(() => closeStnCard(false));
 
     // ── 3. Move pin ───────────────────────────────────────────────────────
     log('\nMove pin: armed for one station, dragged, read back, saved\n');
@@ -334,12 +273,12 @@ async function main() {
     // is the same assertion without the guess — two consecutive frames agreeing
     // is what "settled" means.
     //
-    // And one more thing that has to be gone: the callout the selection opened.
-    // Arming closes it, and Leaflet fades a closed callout for 200 ms before
-    // removing its container — a container that still takes the pointer. Until
-    // #175 the callout was tall enough to pan the map, and the settling above
-    // outlasted the fade by accident; the callout is a signpost now, nothing
-    // pans, and the pointer went down on a ghost.
+    // And one more thing that has to be gone: any callout. A selection opened
+    // one on a desktop until the leader replaced it, arming closed it, and
+    // Leaflet fades a closed callout for 200 ms before removing its container
+    // — a container that still takes the pointer, which the drag once went
+    // down on. Nothing opens one here now; the wait stays as the guard that
+    // says so, because a ghost under the pointer fails silently.
     await page.waitForFunction(() => !document.querySelector('.leaflet-popup'),
       null, { timeout: 5000 });
     const handle = await page.evaluate(async () => {

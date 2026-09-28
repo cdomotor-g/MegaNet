@@ -537,13 +537,16 @@ const HELP = {
       + 'ARRO the station number fails by opening somebody else\'s station rather than by '
       + 'erroring.',
       'Clicking a pin paints the <strong>station card</strong> in the map\'s bottom corner — '
-      + 'the full details and every action, without changing the selection — and the callout '
-      + 'on the pin is a signpost: name, roles, and an <em>Actions</em> button that opens the '
-      + 'pills. The card stays put while callouts come and go, and while the filters change; '
-      + '<em>Station details</em> on it selects the station and jumps to its details card — in '
-      + 'the side panel, or under the map when the cards are there. On a phone the callout '
-      + 'carries only <em>Details &amp; actions</em> and <em>Copy lat, lon</em>, and the card '
-      + 'opens as a sheet across the bottom of the map.',
+      + 'the full details and every action, without changing the selection — and a gold '
+      + '<strong>leader</strong> runs from the top of the card to a ring round the pin, so it is '
+      + 'always plain which pin the card is about. The leader follows the pin as the map pans '
+      + 'and zooms, and if the card opens over its own pin the map moves the pin clear. The '
+      + 'card stays put while the filters change; <em>Station details</em> on it selects the '
+      + 'station and jumps to its details card — in the side panel, or under the map when the '
+      + 'cards are there. Picking a repeater in <em>Repeaters listening</em> puts the map on '
+      + 'it and pulses a gold ring round its pin. On a phone a tap opens a small callout with '
+      + '<em>Details &amp; actions</em> and <em>Copy lat, lon</em>, and the card opens as a '
+      + 'sheet across the bottom of the map, with the leader up to the pin.',
       'A station the Bureau\'s Queensland flood warning station lists name has a <strong>Bureau '
       + 'flood warning details</strong> section on its card: which of the Bureau\'s indexes list '
       + 'it (FloodWarn rainfall, daily rainfall, river height), its AWRC number, the stream it '
@@ -1780,10 +1783,11 @@ function stationMapLinkUrls(s) {
 // the one whose paperwork is worth finding.
 //
 // Split in two since #175: the array, and the row string joined from it. One
-// place the URL shapes are written, three places they are drawn — the editor
-// card's row, the callout's expanded row and the station card — and the
-// callout needs the *count* for its "Actions (N)" label, which is the array's
-// length rather than a regex over the string.
+// place the URL shapes are written, two places they are drawn — the editor
+// card's row, and the station card, which takes the halves below to put the
+// pills in its groups. (The desktop callout's expanded row was a third, and
+// counted them for its "Actions (N)" label, until the callout gave way to the
+// leader.)
 function mapLinksHtml(s) {
   return mapLinksPills(s).join('\n    ');
 }
@@ -1791,9 +1795,9 @@ function mapLinksHtml(s) {
 // Two kinds of leaving, kept apart since the station card grew groups (#175):
 // three pills that put the *site* on somebody else’s imagery, and two that go
 // looking for its *paperwork*. The concatenation is still what the editor card
-// and the callout draw — one flat row, in the order #170 fixed — so nothing
-// that reads mapLinksPills/mapLinksHtml changes shape; the station card asks
-// for the halves instead and draws a rule between them.
+// draws — one flat row, in the order #170 fixed — so nothing that reads
+// mapLinksPills/mapLinksHtml changes shape; the station card asks for the
+// halves instead and draws a rule between them.
 function mapLinksPills(s) {
   return [...mapViewPills(s), ...docSearchPills(s)];
 }
@@ -2423,12 +2427,6 @@ const state = {
   // of what this tab is, and a tab that opens showing an empty box where 3,174
   // stations should be reads as a file that failed to load.
   stationsListOpen: (localStorage.getItem('mn-stations-list') || 'open') === 'open',
-  // The map callout's pill row, shut or open (#175). Session-only and global
-  // rather than per-station: "show me the actions" is a way of reading
-  // callouts, not a fact about one station — and it dies with the page because
-  // a callout that opens pre-expanded on a fresh visit is the "bit much" this
-  // exists to stop.
-  popupPillsOpen: false,
   // The station the on-map card (bottom-left of the Stations map) is showing
   // (#175). Session-only, and deliberately NOT selectedId — a fourth thing
   // alongside the filters, selectedId and the map selection (see the
