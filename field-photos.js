@@ -5,17 +5,19 @@
 //                 every other part of the app opens a photo in: a carousel
 //                 over the photos taken at one spot, one station or one view.
 //
-// After core.js, photo-meta.js and datastore.js, before init.js — index.html
-// holds the order and the reasons. Reaches back to core.js for state, esc,
-// escAttr, announce, registerTabTeardown, KM_PER_DEG_LAT, kmPerDegLon,
-// bearingDeg and fmtKm; to photo-meta.js for PhotoMeta; to datastore.js for
-// dbSelect, dbRpc, dbCanWrite, dbUploadObject, dbSignedUrl, dbSignedUrls and
-// dbRemoveObject; to auth.js for Auth; to places.js for Places.parse; and to
-// app.js for switchTab, showStationCard, prepareSearch and
+// After core.js, photo-meta.js, photo-zip.js, photo-equipment.js and
+// datastore.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for state, esc, escAttr, announce,
+// registerTabTeardown, KM_PER_DEG_LAT, kmPerDegLon, bearingDeg and fmtKm; to
+// photo-meta.js for PhotoMeta; to photo-zip.js for PhotoZip; to datastore.js
+// for dbSelect, dbRpc, dbCanWrite, dbUploadObject, dbSignedUrl, dbSignedUrls
+// and dbRemoveObject; to auth.js for Auth; to places.js for Places.parse; and
+// to app.js for switchTab, showStationCard, prepareSearch and
 // stationMatchesSearch. Across to digital-twin.js and map-photos.js, which draw
-// what this file holds and are told when it changes. Every one of those is a
-// runtime call from inside a function here; nothing executes at load
-// (`npm run toplevel`).
+// what this file holds and are told when it changes, and to photo-review.js,
+// whose Review panel is drawn on this tab and reads this file's queue. Every
+// one of those is a runtime call from inside a function here; nothing executes
+// at load (`npm run toplevel`).
 //
 // ── Where a photo goes ───────────────────────────────────────────────────────
 //
@@ -49,13 +51,33 @@
 // browser cannot draw"). The hash is of the file as it arrived, so dropping the
 // same HEIC again is still the same photo.
 //
+// ── A zip of them ────────────────────────────────────────────────────────────
+//
+// A .zip dropped, chosen or found in a chosen folder is a pack: opened by
+// PhotoZip, and every photo in it queued as if it had been dropped on its own
+// — the same hash, reading, placing and upload — with a note saying which zip
+// it came out of, and one line for the pack saying how many photos it held
+// and what was left out and why. The queue holds an entry, not its bytes: a
+// photo is unzipped when the queue reads it, let go once it has been read, and
+// unzipped again to upload it, so a pack of two hundred is never two hundred
+// photos in memory (photo-zip.js's head has the rest, and the zip-bomb rules).
+//
+// ── What became of each one ──────────────────────────────────────────────────
+//
+// When an Upload finishes, a row per file goes to meganet.log_field_photo_upload
+// (0036) — imported, unplaced, already in MegaNet, refused or failed, and why —
+// so the Review panel (photo-review.js) can say what happened to a batch after
+// the tab that sent it has gone. Best-effort: a log that cannot be written is
+// said on the Review panel, and never fails the upload it was about.
+//
 // ── Who may see them ─────────────────────────────────────────────────────────
 //
 // Editors, signed in: the rows, the positions and the bytes (0035's head says
 // why). Signed out, the tab says so and the twin and the map draw nothing.
 //
-// Issue: the Field Photos epic. Schema: db/migrations/0035_field_photos.sql.
-// Bucket: tools/storage_bucket.sql. The whole of it: docs/field-photos.md.
+// Issue: the Field Photos epic. Schema: db/migrations/0035_field_photos.sql,
+// 0036_photo_review.sql. Bucket: tools/storage_bucket.sql. The whole of it:
+// docs/field-photos.md.
 
 const FieldPhotos = (function () {
 
@@ -427,6 +449,7 @@ const FieldPhotos = (function () {
     if (f.show === 'unplaced') q += '&lat=is.null';
     else if (f.show === 'station' && f.station) q += `&station_id=eq.${encodeURIComponent(f.station)}`;
     else if (f.show === 'dropbox') q += '&origin=eq.dropbox';
+    else if (f.show === 'gdrive') q += '&origin=eq.gdrive';
     return q;
   }
 
@@ -554,20 +577,86 @@ const FieldPhotos = (function () {
 
   // ── The queue ──────────────────────────────────────────────────────────────
 
+  // Photos, and zips of them, by the handful — dropped, chosen, or found in a
+  // chosen folder. A zip is opened in the background (openPack) and its
+  // photos join the queue behind the loose ones.
   function addFiles(list) {
-    const files = Array.from(list || []).filter(looksLikeImage);
-    const skipped = Array.from(list || []).length - files.length;
-    if (!files.length) {
-      say(skipped ? 'None of those are photos this tab reads (JPEG, PNG, WebP or HEIC).' : '', 'warn');
+    const all = Array.from(list || []);
+    const zips = typeof PhotoZip !== 'undefined' ? all.filter(f => PhotoZip.isZip(f)) : [];
+    const loose = all.filter(f => !zips.includes(f));
+    const files = loose.filter(looksLikeImage);
+    const skipped = loose.length - files.length;
+    if (!files.length && !zips.length) {
+      say(skipped ? 'None of those are photos this tab reads (JPEG, PNG, WebP or HEIC), or zips of them.' : '', 'warn');
       return;
     }
     const s = S();
     for (const file of files) {
       s.queue.push({ key: `q${++seq}`, file, name: file.name, size: file.size, status: 'waiting', note: '' });
     }
-    say(`${files.length} photo${files.length === 1 ? '' : 's'} added${skipped ? ` — ${skipped} file${skipped === 1 ? ' was' : 's were'} not a photo and ${skipped === 1 ? 'was' : 'were'} left out` : ''}. Reading them…`);
+    const bits = [];
+    if (files.length) bits.push(`${files.length} photo${files.length === 1 ? '' : 's'} added`);
+    if (zips.length) bits.push(`${zips.length} zip${zips.length === 1 ? '' : 's'} being opened`);
+    say(`${bits.join(' and ')}${skipped ? ` — ${skipped} file${skipped === 1 ? ' was' : 's were'} not a photo and ${skipped === 1 ? 'was' : 'were'} left out` : ''}. Reading them…`);
+    for (const z of zips) openPack(z);
     repaintQueue();
     readQueue();
+  }
+
+  // ── A zip pack ─────────────────────────────────────────────────────────────
+  // Opened, and every photo in it queued as an entry to be unzipped when the
+  // queue reaches it — the same queue, read one at a time, so the pack's
+  // photos are read, placed and uploaded exactly as dropped ones are. The
+  // pack keeps its own line: how many photos, what was left out and why, or
+  // why the whole zip was.
+  async function openPack(file) {
+    const s = S();
+    const pack = { key: `z${++seq}`, name: file.name, size: file.size, status: 'opening', photos: 0,
+                   leftOut: [], junk: 0, note: 'Opening…' };
+    packs().push(pack);
+    repaintQueue();
+    try {
+      // The largest a photo may be is the largest attachment_type allows, when
+      // that list is on hand; PhotoZip's own 24 MB when it is not.
+      await loadTypes();
+      const most = Math.max(0, ...(s.types || []).map(t => +t.max_bytes || 0));
+      const z = await PhotoZip.open(file, { limits: most ? { entry: most } : {} });
+      pack.status = 'open';
+      pack.photos = z.photos.length;
+      pack.leftOut = z.leftOut;
+      pack.junk = z.junk;
+      for (const entry of z.photos) {
+        s.queue.push({ key: `q${++seq}`, file: null, zip: { blob: file, entry }, pack: pack.key, from: file.name,
+                       name: entry.name, size: entry.usize, status: 'waiting', note: '' });
+      }
+      pack.note = packNote(pack);
+    } catch (err) {
+      pack.status = 'refused';
+      pack.note = `Not opened — ${(err && err.message) || String(err)}.`;
+    }
+    announce(`${file.name}: ${pack.note}`);
+    repaintQueue();
+    readQueue();
+  }
+
+  function packNote(pack) {
+    const bits = [`${pack.photos} photo${pack.photos === 1 ? '' : 's'} found`];
+    if (pack.leftOut.length) {
+      const why = {};
+      for (const l of pack.leftOut) (why[l.why] = why[l.why] || []).push(l.name);
+      bits.push(`${pack.leftOut.length} left out: ${Object.entries(why).map(([w, names]) =>
+        `${names.slice(0, 3).join(', ')}${names.length > 3 ? ` and ${names.length - 3} more` : ''} (${w})`).join('; ')}`);
+    }
+    if (pack.junk) bits.push(`${pack.junk} system file${pack.junk === 1 ? '' : 's'} skipped (__MACOSX, .DS_Store, Thumbs.db)`);
+    return `${bits.join('; ')}.`;
+  }
+
+  // The file a queue item is: itself, or its zip entry unzipped — checked
+  // against the zip's own size and checksum on the way (PhotoZip.file).
+  function fileOf(item) {
+    if (item.file) return Promise.resolve(item.file);
+    if (item.zip) return PhotoZip.file(item.zip.blob, item.zip.entry);
+    return Promise.reject(new Error('the file has gone from this page — add it again'));
   }
 
   // Read the queue one photo at a time: decoding a phone photo is 50 MB of
@@ -606,11 +695,13 @@ const FieldPhotos = (function () {
   }
 
   async function readOne(item) {
-    const file = item.file;
     item.status = 'reading';
-    item.note = 'Reading the file…';
+    item.note = item.zip ? `Unzipping it from ${item.from}…` : 'Reading the file…';
     repaintQueue();
 
+    const file = await fileOf(item);
+    if (item.zip) { item.note = 'Reading the file…'; repaintQueueRow(item); }
+    item.type = file.type || '';
     const buf = await file.arrayBuffer();
     item.sha = await sha256(buf);
     const meta = PhotoMeta.read(buf);
@@ -697,6 +788,13 @@ const FieldPhotos = (function () {
       if (limit && item.uploadBlob.size > limit.max_bytes) {
         throw new Error(`${mb(item.uploadBlob.size)} is over the ${mb(limit.max_bytes)} limit for a ${limit.label}`);
       }
+      // A photo out of a zip is let go now it has been read, and unzipped
+      // again to upload it (uploadOne): read, it is a hash, a thumbnail and a
+      // reading, not twenty megabytes held until somebody presses Upload. A
+      // HEIC's JPEG is kept, as it is for a HEIC dropped on its own — it was
+      // made here, and there is nothing to make it again from but the work.
+      item.uploadBytes = item.uploadBlob.size;
+      if (item.zip && !item.converted) item.uploadBlob = null;
     } finally {
       try { bmp.close(); } catch (_) { /* already gone */ }
     }
@@ -731,7 +829,8 @@ const FieldPhotos = (function () {
     if (!signedIn()) { say('Sign in first — field photos go into a private bucket only editors can write to.', 'error'); return; }
     const go = s.queue.filter(i => i.status === 'ready' || i.status === 'failed');
     if (!go.length) return;
-    go.forEach(i => { i.status = 'queued'; i.note = 'Waiting to upload…'; });
+    // A failed photo sent again is another attempt, and the log says so.
+    go.forEach(i => { i.status = 'queued'; i.note = 'Waiting to upload…'; i.logged = false; i.dbRefused = false; });
     repaintQueue();
     runUploads();
   }
@@ -750,7 +849,13 @@ const FieldPhotos = (function () {
         try { await uploadOne(item); }
         catch (err) {
           if (err && err.already) { item.status = 'already'; item.existingId = err.already; item.note = err.message; }
-          else { item.status = 'failed'; item.note = (err && err.message) || String(err); }
+          else {
+            item.status = 'failed';
+            item.note = (err && err.message) || String(err);
+            // The database said no — a rule, not a dropped connection. Sending
+            // it again is still offered; the log calls it refused.
+            item.dbRefused = !!(err && err.code && /^(22|23|42)/.test(String(err.code)));
+          }
         }
         repaintQueueRow(item);
       }
@@ -771,7 +876,88 @@ const FieldPhotos = (function () {
     announce(bits.join(', '));
     repaintQueue();
     if (done.length) changed();
+    // What became of each, for the Review panel — this press's files and any
+    // the reading refused that have not been said yet. Not awaited: the log
+    // is the panel's, not the upload's.
+    logOutcomes([...done, ...already, ...failed, ...s.queue.filter(i => i.status === 'refused')]);
+    if (s.readLabels && done.length) readLabelsAfter(done);
   }
+
+  // ── What became of each one (0036) ─────────────────────────────────────────
+  // A row per file to meganet.log_field_photo_upload, one batch per press of
+  // Upload, two hundred rows a call (the function takes five hundred). Never
+  // awaited by an upload and never failing one: a log that could not be
+  // written is kept as a sentence for the Review panel to show.
+  const LOG_CHUNK = 200;
+
+  function outcomeOf(i) {
+    if (i.status === 'done') return i.row && !known(i.row.lat) ? 'unplaced' : 'imported';
+    if (i.status === 'already') return 'duplicate';
+    if (i.status === 'refused') return 'refused';
+    if (i.status === 'failed') return i.dbRefused ? 'refused' : 'failed';
+    return null;
+  }
+
+  async function logOutcomes(items) {
+    const s = S();
+    const batch = uuid();
+    const rows = [];
+    for (const i of items) {
+      const outcome = outcomeOf(i);
+      if (!outcome || i.logged) continue;
+      i.logged = true;
+      const row = {
+        batch_id: batch, origin: 'upload', file_name: String(i.name || 'unnamed').slice(0, 300), outcome,
+        reason: outcome === 'imported' ? ''
+              : outcome === 'unplaced' ? 'Uploaded unplaced — nothing in the file or on the picture said where it was taken.'
+              : String(i.note || '').slice(0, 1000),
+      };
+      if (i.from) row.archive_name = String(i.from).slice(0, 300);
+      if (i.sha) row.sha256 = i.sha;
+      if (Number.isFinite(i.size)) row.byte_size = i.size;
+      // The photo it became or already was, and its station — both as the
+      // database has them, so the log's own foreign keys cannot refuse the
+      // batch over a station this browser knows and the database does not.
+      if (i.status === 'done' && i.row) {
+        row.photo_id = i.row.id;
+        if (i.row.station_id) row.station_id = i.row.station_id;
+      } else if (i.status === 'already' && typeof i.existingId === 'string') {
+        row.photo_id = i.existingId;
+      }
+      rows.push(row);
+    }
+    if (!rows.length) return;
+    for (let k = 0; k < rows.length; k += LOG_CHUNK) {
+      try {
+        await dbRpc('log_field_photo_upload', { p_rows: rows.slice(k, k + LOG_CHUNK) });
+        s.logError = null;
+      } catch (err) {
+        s.logError = (err && err.message) || String(err);
+      }
+    }
+    if (typeof PhotoReview !== 'undefined') PhotoReview.uploadsChanged();
+  }
+
+  // "Read equipment labels after upload": the photos just uploaded that are
+  // filed under a station, read one at a time by the Review panel's scanner,
+  // out of the bytes this page still has — not downloaded again.
+  function readLabelsAfter(items) {
+    if (typeof PhotoReview === 'undefined') return;
+    const jobs = items.filter(i => i.row && i.row.station_id).map(i => ({
+      id: i.row.id, station_id: i.row.station_id, title: i.name,
+      blob: () => (i.uploadBlob ? Promise.resolve(i.uploadBlob) : fileOf(i)),
+    }));
+    const unfiled = items.length - jobs.length;
+    if (!jobs.length) {
+      say(`${unfiled} uploaded photo${unfiled === 1 ? ' is' : 's are'} filed under no station, so no labels were read — a suggestion is for a station's register.`, 'warn');
+      return;
+    }
+    PhotoReview.scan(jobs, {
+      what: `the ${jobs.length} photo${jobs.length === 1 ? '' : 's'} just uploaded`,
+      onDone: out => say(`${out.text}${unfiled ? ` ${unfiled} filed under no station were not read.` : ''}`, out.kind),
+    });
+  }
+  function setReadLabels(on) { S().readLabels = !!on; }
 
   async function uploadOne(item) {
     // Asked first, so the same folder dropped twice costs one query a photo
@@ -785,7 +971,13 @@ const FieldPhotos = (function () {
     const id = uuid();
     const path = `photo/${id}.${item.ext}`;
     const thumb = item.thumbBlob ? `photo/${id}.thumb.jpg` : null;
-    await dbUploadObject(BUCKET, path, item.uploadBlob);
+    // A photo out of a zip was let go when it had been read: unzipped again
+    // here, checked again, and let go again when this returns.
+    const blob = item.uploadBlob || await fileOf(item);
+    if (blob.size !== item.uploadBytes) {
+      throw new Error(`the ${item.zip ? `photo in ${item.from}` : 'file'} is not the one that was read — add it again`);
+    }
+    await dbUploadObject(BUCKET, path, blob);
     if (thumb) {
       try { await dbUploadObject(BUCKET, thumb, item.thumbBlob); }
       catch (err) { try { await dbRemoveObject(BUCKET, path); } catch (_) { /* swept later */ } throw err; }
@@ -817,14 +1009,14 @@ const FieldPhotos = (function () {
   // said as a null; otherwise the database picks by distance and says so).
   function photoRecord(item, path, thumb) {
     const p = PhotoMeta.record({
-      meta: item.meta, name: item.name, size: item.size, type: item.file.type || null,
+      meta: item.meta, name: item.name, size: item.size, type: item.type || null,
       converted: !!item.converted, width: item.width, height: item.height, caption: item.caption,
       pos: item.pos, heading: item.heading, altitude: item.altitude, taken: item.taken,
       pitch: item.pitch, fov: item.fov, ocr: item.ocr,
     });
     Object.assign(p, {
       storage_path: path, thumb_path: thumb,
-      content_type: item.contentType, byte_size: item.uploadBlob.size, sha256: item.sha,
+      content_type: item.contentType, byte_size: item.uploadBytes, sha256: item.sha,
     });
     if (item.station && !item.station.auto) p.station_id = item.station.id;
     else if (!item.station && item.stationCleared) p.station_id = null;
@@ -843,9 +1035,13 @@ const FieldPhotos = (function () {
     const s = S();
     for (const item of s.queue) if ((item.status === 'done' || item.status === 'already' || item.status === 'refused') && item.thumbUrl) URL.revokeObjectURL(item.thumbUrl);
     s.queue = s.queue.filter(i => !['done', 'already', 'refused'].includes(i.status));
+    // A pack's line goes with the last of its photos — or at once, for one
+    // that opened on nothing, or was refused whole.
+    s.packs = packs().filter(p => p.status === 'opening' || s.queue.some(i => i.pack === p.key));
     say('');
     repaintQueue();
   }
+  function packs() { const s = S(); return s.packs || (s.packs = []); }
 
   // Placing one in the queue by hand: coordinates typed or pasted, or a station.
   function queuePlace(key, text) {
@@ -927,8 +1123,12 @@ const FieldPhotos = (function () {
       </div>
       <div id="fp-lib">${libHtml()}</div>
     </div>
+    <div class="panel" id="fp-review-panel">
+      <div class="panel-header"><h2>Review</h2></div>
+      <div id="fp-review">${typeof PhotoReview !== 'undefined' ? PhotoReview.html() : ''}</div>
+    </div>
     <div class="panel" id="fp-sync-panel">
-      <div class="panel-header"><h2>From Dropbox</h2></div>
+      <div class="panel-header"><h2>From Dropbox and Google Drive</h2></div>
       <div id="fp-sync">${syncHtml()}</div>
     </div>
   </div>`;
@@ -948,10 +1148,10 @@ const FieldPhotos = (function () {
     return `
       <div class="fp-drop" id="fp-drop"
            ondragover="FieldPhotos.dragOver(event)" ondragleave="FieldPhotos.dragLeave(event)" ondrop="FieldPhotos.drop(event)">
-        <p class="fp-drop-lead"><strong>Drop photos here</strong>, or choose them:</p>
+        <p class="fp-drop-lead"><strong>Drop photos here</strong> — or a zip of them — or choose them:</p>
         <div class="button-group">
-          <label class="fp-pick"><span>📷 Choose photos</span>
-            <input type="file" id="fp-files" multiple accept="image/*,.heic,.heif"
+          <label class="fp-pick"><span>📷 Choose photos or zips</span>
+            <input type="file" id="fp-files" multiple accept="image/*,.heic,.heif,.zip,application/zip"
                    onchange="FieldPhotos.addFiles(this.files);this.value=''"></label>
           <label class="fp-pick"><span>📁 Choose a folder</span>
             <input type="file" id="fp-folder" multiple webkitdirectory
@@ -960,7 +1160,12 @@ const FieldPhotos = (function () {
         <p class="small txt-muted">Each photo is placed where it was taken: from the camera's own GPS if the file
           has it, and otherwise from the position a field camera app printed on the picture (Solocator, GPS Map
           Camera and the like), read off it by OCR. Nothing is uploaded until you press Upload — check the
-          positions first. A photo nothing can place still uploads, into <em>Unplaced</em>.</p>
+          positions first. A photo nothing can place still uploads, into <em>Unplaced</em>. A zip is opened
+          here and its photos queued one by one, each saying which zip it came from.</p>
+        <label class="fp-labels-opt small"><input type="checkbox" id="fp-read-labels" ${s.readLabels ? 'checked' : ''}
+               onchange="FieldPhotos.setReadLabels(this.checked)">
+          Read equipment labels after upload — makes, models and serial numbers, suggested for the station's
+          register. Seconds a photo, so off unless you want it.</label>
       </div>
       <p class="small fp-msg" id="fp-msg" role="status">${msgHtml()}</p>
       <div id="fp-queue">${queueHtml()}</div>`;
@@ -971,13 +1176,25 @@ const FieldPhotos = (function () {
     queued: 'Waiting to upload', uploading: 'Uploading', done: 'Uploaded', already: 'Already in MegaNet', failed: 'Failed',
   };
 
+  // The zip packs, a line each, above the photos they held.
+  function packsHtml() {
+    const list = packs();
+    if (!list.length) return '';
+    return `<ul class="fp-packs" aria-label="Zip packs">${list.map(p => `
+        <li class="fp-pack fp-pack-${esc(p.status)}"><span class="fp-pack-name">🗜️ ${esc(p.name)}</span>
+          <span class="small txt-muted">${esc(mb(p.size))}</span>
+          <span class="small ${p.status === 'refused' ? 'txt-bad' : p.leftOut.length ? 'txt-warn' : ''}">${esc(p.note)}</span></li>`).join('')}</ul>`;
+  }
+
   function queueHtml() {
     const q = S().queue;
-    if (!q.length) return '';
+    if (!q.length) return packsHtml();
     const ready = q.filter(i => i.status === 'ready' || i.status === 'failed').length;
-    const busy = q.some(i => ['waiting', 'reading', 'ocr', 'queued', 'uploading'].includes(i.status));
+    const busy = q.some(i => ['waiting', 'reading', 'ocr', 'queued', 'uploading'].includes(i.status))
+              || packs().some(p => p.status === 'opening');
     const finished = q.some(i => ['done', 'already', 'refused'].includes(i.status));
     return `
+      ${packsHtml()}
       <div class="button-group fp-queue-actions">
         <button type="button" class="primary" id="fp-upload" onclick="FieldPhotos.uploadAll()" ${ready ? '' : 'disabled'}>⬆ Upload ${ready} photo${ready === 1 ? '' : 's'}</button>
         <button type="button" onclick="FieldPhotos.clearFinished()" ${finished ? '' : 'disabled'}>Clear finished</button>
@@ -1020,7 +1237,8 @@ const FieldPhotos = (function () {
     if (!['uploading', 'queued', 'reading', 'ocr'].includes(item.status)) actions.push(`<button type="button" class="link-btn" onclick="FieldPhotos.removeFromQueue('${escAttr(item.key)}')" aria-label="Take ${escAttr(item.name)} off the list">Remove</button>`);
     return `
       <td class="fp-q-photo">${item.thumbUrl ? `<img class="fp-q-thumb" src="${esc(item.thumbUrl)}" alt="">` : '<span class="fp-q-thumb fp-thumb-missing" aria-hidden="true"></span>'}
-        <span class="fp-q-name">${esc(item.name)}</span> <span class="small txt-muted">${esc(mb(item.size))}</span></td>
+        <span class="fp-q-name">${esc(item.name)}</span> <span class="small txt-muted">${esc(mb(item.size))}</span>
+        ${item.from ? `<span class="small txt-muted fp-q-from">from ${esc(item.from)}</span>` : ''}</td>
       <td>${item.taken ? `${esc(fmtLocal(item.taken.local))}${item.taken.zone === 'assumed' ? ' <span class="small txt-muted">(zone assumed)</span>' : ''}` : '<span class="txt-muted">—</span>'}</td>
       <td>${where}</td>
       <td>${station}</td>
@@ -1084,6 +1302,7 @@ const FieldPhotos = (function () {
       chip('all', 'All'),
       chip('unplaced', `Unplaced${known(n) ? ` (${n}${n >= 1000 ? '+' : ''})` : ''}`),
       chip('dropbox', 'From Dropbox'),
+      chip('gdrive', 'From Google Drive'),
       st ? chip('station', `At ${esc(st.name)}`) : '',
     ].join('');
   }
@@ -1104,6 +1323,7 @@ const FieldPhotos = (function () {
       return `<p class="small txt-muted">${s.filter.show === 'unplaced' ? 'Every photo has a place. Nothing to do here.'
         : s.filter.show === 'station' ? 'No photos have been filed under this station yet.'
         : s.filter.show === 'dropbox' ? 'Nothing has come in from Dropbox yet.'
+        : s.filter.show === 'gdrive' ? 'Nothing has come in from Google Drive yet.'
         : 'No field photos yet. Add some above.'}</p>`;
     }
     const f = s.filter;
@@ -1128,26 +1348,61 @@ const FieldPhotos = (function () {
       </button>`;
   }
 
+  // What each photo sync last did: every linked folder, a block each — the
+  // Dropbox folder tools/field-photos reads, and a Google Drive one — from its
+  // own row of meganet.field_photo_sync, drawn the same way. Only the words
+  // about setting one up differ, and only Dropbox's is linked from here; a
+  // source nobody has described yet (the next sync) still gets its block.
+  const SOURCES = {
+    dropbox: { name: 'Dropbox', doc: 'docs/field-photos.md#linking-a-dropbox-folder', link: 'docs/field-photos.md',
+               how: `Photos saved into the linked Dropbox folder are imported by a scheduled job about every
+                     fifteen minutes, and placed the same way as the ones dropped here. Setting it up is a Dropbox
+                     app and three secrets —`, after: ' has the steps.' },
+    gdrive:  { name: 'Google Drive', doc: 'docs/field-photos.md#linking-a-google-drive-folder',
+               link: 'Linking a Google Drive folder',
+               how: `Photos saved into the linked Google Drive folder are imported by a scheduled job, and placed
+                     the same way as the ones dropped here. Setting it up:`, after: ' in docs/field-photos.md.' },
+  };
+  function syncAgo(t) {
+    const m = Math.round((Date.now() - Date.parse(t)) / 60000);
+    return m < 1 ? 'just now' : m < 90 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+  }
+
   function syncHtml() {
     const s = S();
-    if (!signedIn()) return '<p class="small txt-muted">Sign in to see what the Dropbox sync has done.</p>';
-    const rows = s.sync;
-    const how = `Photos saved into the linked Dropbox folder are imported by a scheduled job about every
-      fifteen minutes, and placed the same way as the ones dropped here. Setting it up is a Dropbox app and
-      three secrets — <a href="${esc(typeof docUrl === 'function' ? docUrl('docs/field-photos.md') : 'docs/field-photos.md')}" target="_blank" rel="noopener">docs/field-photos.md</a> has the steps.`;
-    if (s.syncError) return `<p class="small txt-bad">The sync's report could not be read — ${esc(s.syncError)}.</p><p class="small">${how}</p>${connectHtml()}`;
-    if (!rows) return '<p class="small">Loading…</p>';
-    const d = rows.find(r => r.source === 'dropbox');
-    if (!d || !d.last_run_at) return `<p class="small">Not set up yet — nothing has reported from Dropbox.</p><p class="small txt-muted">${how}</p>${connectHtml()}`;
-    const ago = t => { const m = Math.round((Date.now() - Date.parse(t)) / 60000); return m < 1 ? 'just now' : m < 90 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
-    const ok = d.last_ok_at && (!d.last_error || Date.parse(d.last_ok_at) >= Date.parse(d.last_run_at));
+    if (!signedIn()) return '<p class="small txt-muted">Sign in to see what the Dropbox and Google Drive syncs have done.</p>';
+    if (!s.sync && !s.syncError) return '<p class="small">Loading…</p>';
+    const rows = s.sync || [];
+    const keys = [...new Set(['dropbox', 'gdrive', ...rows.map(r => r.source)])];
+    return `${s.syncError ? `<p class="small txt-bad">The syncs' report could not be read — ${esc(s.syncError)}.</p>` : ''}
+      ${keys.map(k => sourceHtml(k, s.syncError ? undefined : rows.find(r => r.source === k) || null)).join('')}`;
+  }
+
+  // One source's block. `d` is its report row, null for none, undefined for
+  // "could not be read".
+  function sourceHtml(key, d) {
+    const src = SOURCES[key] || { name: key, doc: 'docs/field-photos.md', link: 'docs/field-photos.md',
+                                  how: `Photos from ${key} are imported by a scheduled job —`, after: ' says how.' };
+    const href = esc(typeof docUrl === 'function' ? docUrl(src.doc) : src.doc);
+    const how = `${src.how} <a href="${href}" target="_blank" rel="noopener">${esc(src.link)}</a>${src.after}`;
+    let status;
+    if (d === undefined) status = '';
+    else if (!d || !d.last_run_at) status = `<p class="small">Not set up yet — nothing has reported from ${esc(src.name)}.</p>`;
+    else {
+      const ok = d.last_ok_at && (!d.last_error || Date.parse(d.last_ok_at) >= Date.parse(d.last_run_at));
+      status = `
+        <p class="small ${ok ? 'txt-ok' : 'txt-bad'}"><strong>${ok ? 'Working' : 'Failing'}</strong> — last ran ${esc(syncAgo(d.last_run_at))}${
+          d.account ? `, reading ${esc(d.account)}'s ${esc(src.name)}` : ''}${d.folder ? ` (${esc(d.folder)})` : ''}.</p>
+        ${!ok && d.last_error ? `<p class="small txt-bad">${esc(d.last_error)}</p>` : ''}
+        <p class="small">Last run: ${d.seen} new file${d.seen === 1 ? '' : 's'} seen, ${d.imported} imported${d.unplaced ? ` (${d.unplaced} could not be placed — see <button type="button" class="link-btn" onclick="FieldPhotos.setShow('unplaced')">Unplaced</button>)` : ''}, ${d.skipped} skipped, ${d.failed} failed.</p>`;
+    }
     return `
-      <p class="small ${ok ? 'txt-ok' : 'txt-bad'}"><strong>${ok ? 'Working' : 'Failing'}</strong> — last ran ${esc(ago(d.last_run_at))}${
-        d.account ? `, reading ${esc(d.account)}'s Dropbox` : ''}${d.folder ? ` (${esc(d.folder)})` : ''}.</p>
-      ${!ok && d.last_error ? `<p class="small txt-bad">${esc(d.last_error)}</p>` : ''}
-      <p class="small">Last run: ${d.seen} new file${d.seen === 1 ? '' : 's'} seen, ${d.imported} imported${d.unplaced ? ` (${d.unplaced} could not be placed — see <button type="button" class="link-btn" onclick="FieldPhotos.setShow('unplaced')">Unplaced</button>)` : ''}, ${d.skipped} skipped, ${d.failed} failed.</p>
-      <p class="small txt-muted">${how}</p>
-      ${connectHtml()}`;
+      <div class="fp-sync-source" id="fp-sync-${escAttr(key)}">
+        <h3 class="fp-sync-name">${esc(src.name)}</h3>
+        ${status}
+        <p class="small txt-muted">${how}</p>
+        ${key === 'dropbox' ? connectHtml() : ''}
+      </div>`;
   }
 
   // ── Linking a Dropbox folder ───────────────────────────────────────────────
@@ -1279,7 +1534,15 @@ const FieldPhotos = (function () {
 
   // Repaint one part, never the tab: a half-typed coordinate in the queue must
   // survive an upload finishing beside it.
-  function repaint() { repaintAdd(); repaintLib(); repaintSync(); repaintFilter(); }
+  function repaint() { repaintAdd(); repaintLib(); repaintSync(); repaintFilter(); repaintReview(); }
+  function repaintReview() {
+    if (typeof PhotoReview !== 'undefined') PhotoReview.repaint();
+  }
+  // The Review panel lists this queue too; it repaints its own list, at most a
+  // few times a second, however often a row here changes.
+  function queueChangedForReview() {
+    if (typeof PhotoReview !== 'undefined') PhotoReview.queueChanged();
+  }
   function repaintAdd() {
     const el = document.getElementById('fp-add-panel');
     if (!el) return;
@@ -1289,10 +1552,12 @@ const FieldPhotos = (function () {
   function repaintQueue() {
     const el = document.getElementById('fp-queue');
     if (el) el.innerHTML = queueHtml();
+    queueChangedForReview();
   }
   function repaintQueueRow(item) {
     const row = document.getElementById(`fp-row-${item.key}`);
     const edit = document.getElementById(`fp-edit-${item.key}`);
+    queueChangedForReview();
     if (!row || (!!edit !== !!item.editing)) { repaintQueue(); return; }
     row.className = `fp-q-${item.status}`;
     row.innerHTML = rowCellsHtml(item);
@@ -1322,6 +1587,7 @@ const FieldPhotos = (function () {
   function init() {
     registerTabTeardown('FieldPhotos', stop);
     if (signedIn()) { loadTypes(); loadLib(); loadSync(); }
+    if (typeof PhotoReview !== 'undefined') PhotoReview.init();
     paintThumbs(document.getElementById('fp-lib') || document);
   }
   // Leaving the tab stops nothing that matters: the queue keeps reading and
@@ -1532,7 +1798,8 @@ const FieldPhotos = (function () {
     if (known(r.altitude_m)) rows.push(['Altitude', `${esc(String(Math.round(r.altitude_m)))} m${r.altitude_ref ? ` ${esc(r.altitude_ref)}` : ''}`]);
     rows.push(['Station', st ? `${esc(st.name)}${rel ? ` <span class="small txt-muted">— ${esc(rel)}${r.station_auto ? ', the nearest' : ''}</span>` : ''}` : '<span class="txt-muted">None within a kilometre</span>']);
     rows.push(['File', `${esc(r.title || '—')} <span class="small txt-muted">${r.width ? `${r.width} × ${r.height} · ` : ''}${esc(mb(r.byte_size || 0))}</span>`]);
-    rows.push(['Added', `${esc(r.uploaded_by || '—')}${r.created_at ? `, ${esc(String(r.created_at).slice(0, 10))}` : ''}${r.origin === 'dropbox' ? ' <span class="fp-chip">Dropbox</span>' : ''}`]);
+    rows.push(['Added', `${esc(r.uploaded_by || '—')}${r.created_at ? `, ${esc(String(r.created_at).slice(0, 10))}` : ''}${
+      r.origin === 'dropbox' ? ' <span class="fp-chip">Dropbox</span>' : r.origin === 'gdrive' ? ' <span class="fp-chip">Google Drive</span>' : ''}`]);
     const may = signedIn();
     return `
       <dl class="fp-v-facts">${rows.map(([k, val]) => `<dt>${k}</dt><dd>${val}</dd>`).join('')}</dl>
@@ -1545,6 +1812,8 @@ const FieldPhotos = (function () {
         ${placed ? `<button type="button" onclick="FieldPhotos.showOnMap('${escAttr(r.id)}')">🗺️ On the map</button>` : ''}
         ${st && located(st) && typeof DigitalTwin !== 'undefined' ? `<button type="button" onclick="FieldPhotos.showInTwin('${escAttr(r.id)}')">🧊 In the twin</button>` : ''}
         ${may ? `<button type="button" onclick="FieldPhotos.editPlace('${escAttr(r.id)}')" aria-expanded="${v && v.editing ? 'true' : 'false'}" aria-controls="fp-v-place">${placed ? 'Move…' : 'Place it…'}</button>` : ''}
+        ${may && typeof PhotoReview !== 'undefined' ? `<button type="button" onclick="FieldPhotos.readLabels('${escAttr(r.id)}')"
+             title="Read the makes, models and serial numbers on the equipment in this photo, and suggest them for its station's register">🔎 Read equipment labels</button>` : ''}
         ${may ? `<button type="button" onclick="FieldPhotos.removePhoto('${escAttr(r.id)}')">Remove</button>` : ''}
       </div>
       ${v && v.editing ? `<div id="fp-v-place">${viewerPlaceHtml(r)}</div>` : ''}`;
@@ -1615,6 +1884,25 @@ const FieldPhotos = (function () {
   }
   function hitsFor(text, id) {
     return stationHitsHtml(text, sid => `FieldPhotos.fileUnder('${escAttr(id)}','${escAttr(sid)}')`);
+  }
+
+  // "🔎 Read equipment labels": this photo's labels read, and what they say
+  // proposed for its station's register — by the Review panel's scanner, so
+  // one photo and a station's worth are read and proposed the same way.
+  async function readLabels(id) {
+    const r = S().byId[id];
+    if (!r || typeof PhotoReview === 'undefined') return;
+    if (!r.station_id) {
+      vSay('File this photo under a station first (Move…) — what its labels say is suggested for a station\'s register.', 'error');
+      return;
+    }
+    const here = () => v && v.ids[v.i] === id;
+    vSay('Reading the labels — the whole picture, then its four quarters…');
+    const out = await PhotoReview.scan([{ id: r.id, station_id: r.station_id, title: r.title, storage_path: r.storage_path }], {
+      what: 'this photo',
+      onProgress: text => { if (here()) vSay(text); },
+    });
+    if (here()) vSay(out.text, out.kind === 'error' ? 'error' : undefined);
   }
 
   async function removePhoto(id) {
@@ -1730,6 +2018,7 @@ const FieldPhotos = (function () {
     const s = S();
     s.near = {}; s.lib = null; s.libKey = ''; s.sync = null; s.urls = {};
     if (!signedIn()) { s.byId = {}; close(); }
+    if (typeof PhotoReview !== 'undefined') PhotoReview.authChanged();
     if (state.activeTab === 'photos' && typeof renderMain === 'function') renderMain();
     changed();
   }
@@ -1741,14 +2030,23 @@ const FieldPhotos = (function () {
     dragOver, dragLeave, drop,
     view, close, isOpen, go, goTo, openFromLib, openOne, openSpot, openStation, pillHtml,
     setCaption, editPlace, moveTo, fileUnder, removePhoto, openOriginal, showOnMap, showInTwin,
-    inBox, spots, sign, thumbOf, urlFor, row: id => S().byId[id] || null,
+    inBox, spots, sign, thumbOf, urlFor, paintThumbs, row: id => S().byId[id] || null,
     authChanged, changed, signedIn,
     nearestStation, whenText, headingText,
     dbxKey, dbxOpen, dbxFinish, dbxCopy,
+    readLabels, setReadLabels,
+    // For the Review panel (photo-review.js): the station finder, the words
+    // for a queue row's state, the zip packs, and whether the log was written.
+    stationHits: (text, onPick) => stationHitsHtml(text, onPick),
+    statusText: st => STATUS[st] || st,
+    packs: () => packs().map(p => ({ key: p.key, name: p.name, size: p.size, status: p.status, photos: p.photos,
+                                     leftOut: p.leftOut.slice(), junk: p.junk, note: p.note })),
+    logError: () => S().logError || null,
     _hits: hitsFor,
     // Read by the check and by nothing else.
     _queue: () => S().queue.map(i => ({
       key: i.key, name: i.name, status: i.status, note: i.note, sha: i.sha,
+      from: i.from || null, pack: i.pack || null, held: !!(i.file || i.uploadBlob), bytes: i.uploadBytes || null,
       pos: i.pos ? { ...i.pos } : null, heading: i.heading ? { ...i.heading } : null,
       altitude: i.altitude ? { ...i.altitude } : null, taken: i.taken ? { ...i.taken } : null,
       station: i.station ? { ...i.station } : null, ocr: i.ocr ? { confidence: i.ocr.confidence, votes: i.ocr.votes, passes: i.ocr.passes } : null,
@@ -1756,7 +2054,7 @@ const FieldPhotos = (function () {
       decoder: i.decoder || null,
       thumb: !!i.thumbBlob, row: i.row ? { id: i.row.id } : null, existingId: i.existingId || null,
     })),
-    _record: key => { const i = S().queue.find(x => x.key === key); return i && i.uploadBlob ? photoRecord(i, 'photo/x.jpg', 'photo/x.thumb.jpg') : null; },
+    _record: key => { const i = S().queue.find(x => x.key === key); return i && i.uploadBytes ? photoRecord(i, 'photo/x.jpg', 'photo/x.thumb.jpg') : null; },
     _sha256js: bytes => sha256js(bytes),
     _viewer: () => (v ? { ids: v.ids.slice(), i: v.i, title: v.title, editing: v.editing } : null),
   };

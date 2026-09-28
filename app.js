@@ -6395,6 +6395,8 @@ function repaintStnCard() {
   // The site exposure section asks the State's map services, cached per
   // position for the session (site-exposure.js): a repaint asks nothing new.
   SiteExposure.ask(`mn-exposure-card-${s.id}`, s);
+  // The equipment register, for a signed-in editor, on the same terms.
+  if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
 }
 
 // Escape closes the card from anywhere inside it. On the card rather than on
@@ -6623,6 +6625,11 @@ function stnCardHtml(s) {
          the way the wind region line is. -->
     <div class="acma-sect" id="${escAttr(slsId)}"
          data-mn-sls="${escAttr(s.station_number || '')}">${sls.html}</div>
+    <!-- The equipment fitted here, as the station's register says once an
+         administrator has approved it (0036, photo-review.js): signed-in
+         editors only, filled after the fetch by PhotoReview.cardAsk, and
+         not drawn at all when the register has nothing. -->
+    ${typeof PhotoReview !== 'undefined' ? PhotoReview.cardHtml(s) : ''}
     <!-- Edit first, then the same pills the callout offers, from the same
          builder — but in their groups, each its own wrapping row with a rule
          between (stationActionGroups). The rules are full-bleed, like the

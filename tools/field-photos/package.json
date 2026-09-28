@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Dropbox → MegaNet field photo sync: lists a Dropbox folder, reads each new photo with the app's own photo-meta.js (EXIF, then the printed overlay by OCR), and files it in the field-photos bucket and meganet.field_photo.",
+  "description": "Dropbox and Google Drive → MegaNet field photo sync: lists a linked folder, opens any zip packs in it, reads each new photo with the app's own photo-meta.js (EXIF, then the printed overlay by OCR), and files it in the field-photos bucket and meganet.field_photo.",
   "license": "MIT",
   "engines": {
     "node": ">=22"

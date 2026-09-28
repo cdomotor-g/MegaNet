@@ -1,0 +1,87 @@
+# Field photos from Google Drive: every fifteen minutes, the photos saved into
+# the linked Google Drive folder — and the photos in any zip saved there — are
+# read, placed where they were taken and filed in MegaNet, by the same run as
+# the Dropbox sync (field-photos-dropbox.yml) with Google Drive as the place it
+# reads: tools/field-photos/sync.mjs with PHOTO_SOURCE=gdrive, lib/gdrive.mjs.
+# docs/field-photos.md ("Linking a Google Drive folder") is the setup, click by
+# click.
+#
+# It signs in as a Google Cloud service account the folder is shared with, as
+# a Viewer — no person's account, and no refresh token to expire. Until the
+# settings exist it does nothing and says so: a notice, not a red run every
+# fifteen minutes. What it needs (Settings → Secrets and variables → Actions):
+#
+#   GDRIVE_SERVICE_ACCOUNT_JSON  secret — the service account's key, the whole
+#                                JSON file as Google downloads it
+#   SUPABASE_SECRET_KEY          secret — the project's secret key, the one the
+#                                Dropbox sync uses
+#   GDRIVE_FOLDER_ID             variable — the folder's id, or its link (a
+#                                secret of that name is read if there is no
+#                                variable)
+#
+# The key only reads (drive.readonly), and only what is shared with it. It is
+# never printed: the job hands it to the sync in the environment and nowhere
+# else, and the service account's address is masked in the log before anything
+# runs — the Actions log of a public repository is public.
+
+name: Field photos from Google Drive
+
+on:
+  schedule:
+    # A quarter of an hour, seven minutes after the Dropbox sync's — the two
+    # never start together.
+    - cron: '7-59/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time, and a run is never cancelled for the next: a sync stopped
+# mid-upload leaves an object nothing points at. The next one waits.
+concurrency:
+  group: field-photos-gdrive
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PHOTO_SOURCE:                gdrive
+      GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+      GDRIVE_FOLDER_ID:            ${{ vars.GDRIVE_FOLDER_ID || secrets.GDRIVE_FOLDER_ID }}
+      SUPABASE_SECRET_KEY:         ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - name: Is Google Drive linked?
+        id: linked
+        run: |
+          if [ -z "$GDRIVE_SERVICE_ACCOUNT_JSON" ] || [ -z "$GDRIVE_FOLDER_ID" ] || [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "::notice::Google Drive is not linked yet — nothing to sync. docs/field-photos.md ('Linking a Google Drive folder') has the steps."
+            echo "linked=false" >> "$GITHUB_OUTPUT"
+          else
+            # The key's address, masked for the rest of the job. Read without
+            # echoing the key; a key that does not parse is the sync's to say.
+            email=$(node -e 'try { const t = process.env.GDRIVE_SERVICE_ACCOUNT_JSON.trim(); const j = JSON.parse(t.startsWith("{") ? t : Buffer.from(t, "base64").toString()); process.stdout.write(String(j.client_email || "")); } catch (_) {}')
+            if [ -n "$email" ]; then echo "::add-mask::$email"; fi
+            echo "linked=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.linked.outputs.linked == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.linked.outputs.linked == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/field-photos/package-lock.json
+
+      - name: Install the sync
+        if: steps.linked.outputs.linked == 'true'
+        working-directory: tools/field-photos
+        run: npm ci --omit=dev
+
+      - name: Sync
+        if: steps.linked.outputs.linked == 'true'
+        working-directory: tools/field-photos
+        run: node sync.mjs

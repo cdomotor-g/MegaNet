@@ -96,9 +96,13 @@ MegaNet/
 ├── photo-meta.js           ← PhotoMeta — what a photo says about where it was taken:
 │                             EXIF/XMP in four containers, and the overlay a field
 │                             camera app printed on it, read by OCR (also the
-│                             Dropbox sync's, under Node)
+│                             Dropbox and Google Drive syncs', under Node)
+├── photo-zip.js            ← PhotoZip  — a zip of photos, opened in the browser
+├── photo-equipment.js      ← PhotoEquipment — make, model, serial off a photo's labels
 ├── field-photos.js         ← FieldPhotos — Field Photos tab (bulk upload, placing,
 │                             the library) and the carousel every door opens
+├── photo-review.js         ← PhotoReview — the tab's Review panel, equipment
+│                             suggestions, the station card's Equipment section
 ├── site-exposure.js        ← SiteExposure — the station card's tides and soils:
 │                             tidal water, Water Act limits, coastal hazard areas,
 │                             acid sulfate soils, from the State's map services
@@ -193,6 +197,8 @@ MegaNet/
 │   ├── history.mjs          (a saved record read back, against the form that wrote it)
 │   ├── help.mjs             (every tab's help entry: real content, links that land)
 │   ├── photos.mjs           (field photos: the reader, the OCR, the tab, the map, the twin)
+│   ├── photozip.mjs         (zip packs: the reader under Node, then a zip dropped on the tab)
+│   ├── photoreview.mjs      (the Review panel, equipment labels, an administrator's decision)
 │   ├── exposure.mjs         (the station card's tides and soils, a failed source never "none")
 │   ├── twinsite.mjs         (the twin's site: the station as built, neighbours, bridges, the offer)
 │   ├── twinpin.mjs          (move pin in the twin's tab, the map's twin and ⛰️ 3-D)
@@ -206,7 +212,8 @@ MegaNet/
 │   ├── check_mqtt.sql       (psql: prove the MQTT bridge's database half — 39 checks)
 │   ├── check_inspections.sql (psql: prove the inspection schema — 90 checks, rolls back)
 │   ├── check_field_photos.sql (psql: prove the field photo doors (0035) — 83 checks, rolls back)
-│   ├── field-photos/        (the Dropbox → MegaNet photo sync, run by field-photos-dropbox.yml)
+│   ├── check_photo_review.sql (psql: prove the upload log, the administrator and the equipment register (0036) — 113 checks, rolls back)
+│   ├── field-photos/        (the Dropbox and Google Drive → MegaNet photo sync, run by field-photos-dropbox.yml and field-photos-gdrive.yml)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
 │   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
@@ -2320,6 +2327,8 @@ Side panel or modal showing full station record:
   asked of the State's map services when the card opens — indicative, and a
   source that did not answer is named, never read as "none"
   (`site-exposure.js`; `docs/site-exposure.md` has what each row means)
+- **Equipment**, for signed-in editors: what the station's register says is
+  fitted there, once an administrator has approved it (`photo-review.js`)
 
 ### 13. In-App Bug / Idea Reporter
 The **🐞 Report a Bug** button in the header lets any user flag a problem or
@@ -3748,8 +3757,10 @@ come in. Every one of those opens one viewer: a carousel over the photos taken
 at that spot, ← → through them, with when, where, which way and how each was
 known.
 
-**In, by the handful or the folderful** — dropped on the tab, chosen, or a
-whole folder — each read in the browser before anything is sent: its SHA-256
+**In, by the handful or the folderful** — dropped on the tab, chosen, a
+whole folder, or a zip of any of those (`photo-zip.js` opens it in the
+browser, and each photo in it is queued as if it had been dropped on its
+own) — each read in the browser before anything is sent: its SHA-256
 (the same photo twice is one photo, asked of the database before a byte
 moves), its EXIF or XMP (`photo-meta.js`: a JPEG, a HEIC, a PNG or a WebP, a
 DJI drone's gimbal), and where the file holds no position, **the overlay a
@@ -3763,12 +3774,26 @@ pressed Upload; a photo nothing could place still goes, into *Unplaced*. A HEIC
 goes up as a JPEG: Safari converts it, and Chrome and Firefox, which cannot
 draw one, fetch a WebAssembly libheif for the first HEIC of a session to do it.
 
-**Or on their own, from Dropbox**: a scheduled workflow
-(`.github/workflows/field-photos-dropbox.yml`) reads the linked folder every
-fifteen minutes with the same `photo-meta.js` and files what is new. Linking
-is a Dropbox app and a refresh token got from the tab itself (PKCE — no app
-secret anywhere), then three repository secrets; `docs/field-photos.md` has
-every click.
+**Or on their own, from Dropbox or Google Drive**: a scheduled workflow
+(`.github/workflows/field-photos-dropbox.yml`, `field-photos-gdrive.yml`)
+reads the linked folder every fifteen minutes with the same `photo-meta.js`
+and files what is new, zips included. Linking Dropbox is a Dropbox app and a
+refresh token got from the tab itself (PKCE — no app secret anywhere), then
+three repository secrets; linking Google Drive is a service account the
+folder is shared with, its key as a secret and the folder as a variable
+(the project's secret key is shared with the Dropbox sync);
+`docs/field-photos.md` has every click.
+
+**What became of each one, and what its labels say.** Every attempt from
+every way in — the tab, either sync — is logged to
+`meganet.field_photo_upload` with its outcome and why, and listed on the
+tab's **Review** panel. 🔎 on a photo reads the makes, models and serial
+numbers on the equipment in it (the same OCR engine, over the whole frame
+and four quarters) and proposes them through `propose_equipment()`, which is
+also the seam an agent will use. Nothing reaches a station's equipment
+register until an **administrator** (`app_user.role = 'admin'`) approves it,
+corrected or not; approved equipment shows on the station card
+(`photo-review.js`, `db/migrations/0036_photo_review.sql`).
 
 **Editors only.** The pictures and their positions are in a private bucket,
 shown through links that expire, written through three `security definer`
@@ -3779,8 +3804,10 @@ removed here is never brought back by the sync.
 `docs/field-photos.md` has the order a position is looked for in, the formats
 the overlay parser reads, the time zones, the setup, and how the sync runs.
 `npm run photos` holds the reader, the tab, the map (flat and tilted), the
-twin and the HEIC decoder;
-`tools/check_field_photos.sql` holds 0035.
+twin and the HEIC decoder; `npm run photozip` the zip packs and
+`npm run photoreview` the Review panel and the labels;
+`tools/check_field_photos.sql` holds 0035 and `tools/check_photo_review.sql`
+0036.
 
 ---
 
@@ -4104,7 +4131,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Fifty-five checks. The twenty-two below are the ones a change to the front end
+Fifty-seven checks. The twenty-two below are the ones a change to the front end
 meets first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |

@@ -1359,7 +1359,7 @@ const HELP = {
 
   photos: {
     summary: 'Photos from the field, <strong>filed by where they were taken</strong> — drop in a '
-           + 'handful or a whole folder, and each one is placed on the ground it shows: from the '
+           + 'handful, a whole folder or a zip of them, and each one is placed on the ground it shows: from the '
            + 'camera\'s own GPS where the file has it, and otherwise from the position a field camera '
            + 'app printed on the picture (Solocator, GPS Map Camera and the like), read off it by OCR. '
            + 'Each is filed under the nearest station within a kilometre. Then they are wherever that '
@@ -1386,9 +1386,21 @@ const HELP = {
       '<strong>Editors only</strong>: the pictures, and where they were taken, are in a private '
       + 'bucket and shown through links that expire. A site photo shows its access, its padlock and '
       + 'often a colleague, and its coordinates are as much a disclosure as its pixels.',
-      '<strong>From Dropbox</strong>: photos saved into the linked Dropbox folder are imported by a '
-      + 'scheduled job about every fifteen minutes, read the same way, and reported in the panel at '
-      + 'the foot of the tab. A photo removed here stays removed — the sync will not bring it back.',
+      '<strong>A zip of photos</strong> is opened here, not uploaded: every photo in it joins the '
+      + 'list as if dropped on its own, saying which zip it came from, and the zip gets a line of its '
+      + 'own — how many photos, and what was left out and why (not a photo, encrypted, too big, a '
+      + 'zip inside the zip). Photos are unzipped one at a time, so a big pack does not fill memory.',
+      '<strong>From Dropbox and Google Drive</strong>: photos saved into a linked folder are imported '
+      + 'by a scheduled job, read the same way, and reported in the panel at the foot of the tab. A '
+      + 'photo removed here stays removed — the sync will not bring it back.',
+      '<strong>Review</strong> lists what happened to every file — from this browser, and the last '
+      + 'two hundred from every way in: imported, unplaced, already in MegaNet, refused or failed, '
+      + 'and why. Filter it by outcome or by way in.',
+      '<strong>Equipment labels.</strong> 🔎 in the viewer, or a station\'s worth from Review, reads '
+      + 'the makes, models and serial numbers on the equipment in a photo (seconds a photo) and '
+      + '<em>suggests</em> them for the station\'s register. Nothing is written until an '
+      + '<strong>administrator</strong> approves it, correcting it first if the reading was wrong; '
+      + 'approved equipment shows on the station card.',
       'The altitude a photo carries is shown, never used: phones and apps disagree about its datum '
       + '(Solocator prints height above the ellipsoid, some 40 m off AHD here). The marker in the twin '
       + 'stands on the twin\'s own ground.',
@@ -1397,6 +1409,8 @@ const HELP = {
     links: [
       { label: 'Field photos — how a position is read, the Dropbox sync, and setting it up',
         href: 'docs/field-photos.md' },
+      { label: 'Reviewing uploads, and approving equipment suggestions — who is an administrator',
+        href: 'docs/field-photos.md#reviewing-what-came-in' },
     ],
   },
 
@@ -1970,7 +1984,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 35;
+const DB_SCHEMA_VERSION = 36;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
@@ -2778,8 +2792,12 @@ const state = {
     typesP: null,
     typesError: null,
     queue: [],           // files being read and uploaded — see FieldPhotos._queue for the shape
+    packs: [],           // zips opened into the queue, a line each (photo-zip.js)
     reading: false,
     uploading: false,
+    readLabels: false,   // "Read equipment labels after upload" — off unless ticked
+    logError: null,      // why the last upload's outcomes could not be logged (0036), if they could not
+    review: null,        // the Review panel's state, made by photo-review.js when first drawn
     msg: null,           // { text, kind } — the line under the drop zone
     lib: null,           // the library's rows, for the filter below
     libKey: '',

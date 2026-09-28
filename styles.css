@@ -12909,6 +12909,123 @@ code {
   .fp-q-photo { min-width: 9rem; }
 }
 
+/* ── Field photos: zip packs, the Review panel, the equipment register ───────
+   (photo-zip.js, photo-review.js, 0036). A zip's line above the photos it
+   held; the tab's Review panel — the queue, the upload log, the equipment
+   suggestions an administrator decides — and the station card's Equipment
+   section, which shows what was approved. */
+
+.fp-packs { list-style: none; margin: 0 0 var(--sp-2); padding: 0; display: grid; gap: var(--sp-1); }
+.fp-pack {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .15rem var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--subtle);
+}
+.fp-pack-name { font-weight: 600; overflow-wrap: anywhere; }
+.fp-pack-refused { border-color: var(--bad); }
+.fp-q-from { display: block; overflow-wrap: anywhere; }
+.fp-labels-opt { display: flex; align-items: flex-start; gap: var(--sp-2); margin: 0; color: var(--muted); }
+.fp-labels-opt input { flex: none; margin-top: .2rem; }
+
+/* One block per linked folder, a rule between them. */
+.fp-sync-source + .fp-sync-source { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+.fp-sync-name { margin: 0 0 var(--sp-1); font-size: var(--fs-md); }
+
+/* The Review panel. */
+.pr-sect + .pr-sect { margin-top: var(--sp-4); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+.pr-sect > h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-md); }
+.pr-count {
+  display: inline-block;
+  margin-left: var(--sp-1);
+  padding: 0 .5rem;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--warn) 16%, var(--panel));
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  vertical-align: middle;
+}
+.pr-filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.pr-n { color: var(--muted); font-weight: 400; }
+.pr-origin { display: flex; align-items: center; gap: var(--sp-2); color: var(--muted); }
+.pr-table td { vertical-align: top; }
+.pr-file { overflow-wrap: anywhere; font-weight: 600; }
+.pr-when { white-space: nowrap; font-size: var(--fs-sm); }
+.pr-reason { display: block; color: var(--muted); overflow-wrap: anywhere; }
+.pr-out-ok { border-color: var(--ok); color: var(--ok); }
+.pr-out-warn { border-color: var(--warn); color: var(--warn); }
+.pr-out-bad { border-color: var(--bad); color: var(--bad); }
+.pr-dec-approved { border-color: var(--ok); color: var(--ok); }
+.pr-dec-rejected { border-color: var(--bad); color: var(--bad); }
+.pr-q-refused, .pr-q-failed { color: var(--bad); }
+.pr-q-done { color: var(--ok); }
+
+.pr-scan { display: grid; gap: var(--sp-2); max-width: 44rem; margin-bottom: var(--sp-3); }
+.pr-scan > p { margin: 0; }
+
+.pr-sugs { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+.pr-sug {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+}
+.pr-thumb-btn { padding: 0; border: 0; background: none; cursor: pointer; }
+.pr-thumb {
+  display: block;
+  width: 8rem;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  background: var(--subtle);
+}
+.pr-thumb-none { display: flex; align-items: center; justify-content: center; text-align: center; }
+.pr-sug-h { margin: 0; font-size: var(--fs-md); overflow-wrap: anywhere; }
+.pr-sug-body > p { margin: .2rem 0; }
+.pr-evidence {
+  margin: var(--sp-2) 0;
+  padding: var(--sp-1) var(--sp-2);
+  border-left: 3px solid var(--border);
+  background: var(--subtle);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.pr-unit { display: inline-block; margin-right: var(--sp-2); }
+.pr-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0;
+}
+.pr-field { display: grid; gap: .15rem; font-size: var(--fs-sm); color: var(--muted); min-width: 0; }
+.pr-field input, .pr-field select { width: 100%; min-width: 0; color: var(--text); }
+.pr-field-wide { grid-column: 1 / -1; }
+.pr-value { color: var(--text); overflow-wrap: anywhere; }
+.pr-actions { margin-top: var(--sp-1); }
+.pr-msg { min-height: 1.2em; margin: var(--sp-1) 0 0; }
+.pr-decided { margin-top: var(--sp-3); }
+.pr-decided > summary { cursor: pointer; font-weight: 600; }
+
+@media (max-width: 560px) {
+  .pr-sug { grid-template-columns: minmax(0, 1fr); }
+  .pr-thumb { width: 100%; max-width: 16rem; }
+}
+
+/* The station card's Equipment section: gone when the register has nothing
+   (photo-review.js draws it empty, and fills it when the rows arrive). */
+.stn-card-equip:empty { display: none; }
+.stn-card-equip-h { display: block; margin-bottom: .25rem; }
+
 /* ── Field photos on the Stations map (map-photos.js) ── */
 .mn-photo-icon { background: none; border: 0; }
 /* The dot sits on the point; the badge stands up and to the right of it, so a

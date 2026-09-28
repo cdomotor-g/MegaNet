@@ -101,6 +101,27 @@ const ACCEPTED = {
          + 'never runs it. Constrains nothing below it.',
     },
   ],
+  'photo-zip.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = PhotoZip;",
+      why: 'The zip reader\'s CommonJS registration: test/photozip.mjs requires '
+         + 'this same file to hold it against zips built byte by byte — stored and '
+         + 'deflated entries, junk, encryption, bombs — so the reader the browser '
+         + 'runs is the one the check runs. Guarded so the browser, where `module` '
+         + 'is undefined, never runs it. Constrains nothing below it.',
+    },
+  ],
+  'photo-equipment.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = PhotoEquipment;",
+      why: 'The equipment label reader\'s CommonJS registration: test/photoreview.mjs '
+         + 'requires this same file to hold parse() against real and garbled OCR text, '
+         + 'and a sync or an agent reading labels on a server will require it too, so '
+         + 'a label is read by one set of rules whichever door the photo came in by. '
+         + 'Guarded so the browser, where `module` is undefined, never runs it. '
+         + 'Constrains nothing below it.',
+    },
+  ],
   'core.js': [
     {
       match: "if (typeof window !== 'undefined') {",

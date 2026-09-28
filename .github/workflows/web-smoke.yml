@@ -670,6 +670,27 @@ jobs:
         working-directory: test
         run: npm run photos
 
+      # Zip packs on the Field Photos tab (photo-zip.js). `photos` never drops a
+      # zip, and everything a zip can do wrong is quiet: wrong bytes still
+      # decode, a wrong code page is a wrong title, a zip that lies about its
+      # size runs a phone out of memory. The reader is held under Node against
+      # zips built byte by byte, every refusal with its sentence; then a zip
+      # dropped with loose photos goes in exactly as they do.
+      - name: Zip packs — a zip of photos opens in the browser, and its photos go in as photos
+        working-directory: test
+        run: npm run photozip
+
+      # The Review panel and equipment labels (photo-review.js,
+      # photo-equipment.js, 0036): what became of every upload, and the
+      # make, model and serial a label reads as, proposed and waiting for an
+      # administrator. The parser under Node against clean and garbled OCR,
+      # then the panel against a fake project and the real OCR engine — an
+      # editor who may not decide, and an administrator who corrects,
+      # approves and rejects. tools/check_photo_review.sql holds 0036's rules.
+      - name: Review — what came in, and what the labels say, waiting for an administrator
+        working-directory: test
+        run: npm run photoreview
+
       # The twin's flood water (flood-stages.js and its drawing in
       # digital-twin.js). `twin` holds the ground the water stands on and says
       # nothing about where the water goes: a class hung from an assumed
@@ -850,13 +871,14 @@ jobs:
         working-directory: bridge
         run: npm test
 
-  # ── The Dropbox photo sync's tests (0035) ─────────────────────────────────
+  # ── The photo syncs' tests: Dropbox (0035) and Google Drive (0036) ────────
   # The sync runs on a schedule with a secret key that can write where only
   # editors may, and everything it does wrong is silent: a photo filed in the
   # wrong place, the same one twice, a removed one brought back, a cursor that
-  # skips a folder's worth. So it is run here against a fake Dropbox and a fake
-  # project, with the real photo-meta.js and the real OCR engine reading the
-  # two Solocator fixtures — offline, as the bridge's are.
+  # skips a folder's worth. So it is run here against a fake Dropbox, a fake
+  # Google Drive and a fake project, with the real photo-meta.js and the real
+  # OCR engine reading the two Solocator fixtures, and zips of them opened by
+  # the sync's own reader — offline, as the bridge's are.
   field-photos-sync:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -870,7 +892,7 @@ jobs:
       - name: Install the sync
         working-directory: tools/field-photos
         run: npm ci
-      - name: The sync, against a fake Dropbox and a fake project
+      - name: The sync, against a fake Dropbox, a fake Google Drive and a fake project
         working-directory: tools/field-photos
         run: npm test
 
@@ -957,6 +979,13 @@ jobs:
       # editor, as a stranger, as anon and as the sync's service_role.
       - name: check_field_photos.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_field_photos.sql
+      # The upload log, the administrator and the equipment register (0036):
+      # an outcome per file from every way in, is_admin() for exactly the
+      # people it names, and a suggestion that reaches the register only
+      # through an administrator's decision — signed up through 0005's own
+      # triggers as an administrator, an editor and a stranger.
+      - name: check_photo_review.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_photo_review.sql
       # …and the same for the AEP sheets' SQL (0033): it attaches rows by
       # number and by position into columns only it and the editor write.
       - name: The AEP levels' SQL still fits the schema

@@ -88,7 +88,16 @@
 // the photo was taken in Australia (Queensland keeps +10:00 all year, New
 // South Wales does not), and the result says it was assumed.
 //
-// Schema: db/migrations/0035_field_photos.sql. The rest: docs/field-photos.md.
+// ── Reading labels ───────────────────────────────────────────────────────────
+//
+// The same engine reads the equipment in a photo, when somebody asks it to
+// (readLabels, ocrLabels): the whole frame and its four quarters rather than
+// the overlay's bands, every reading's text handed back, and nothing decided
+// here — photo-equipment.js turns the text into makes, models and serials,
+// and an administrator decides what the station's register believes (0036).
+//
+// Schema: db/migrations/0035_field_photos.sql, 0036_photo_review.sql. The
+// rest: docs/field-photos.md.
 
 const PhotoMeta = (function () {
 
@@ -119,6 +128,18 @@ const PhotoMeta = (function () {
   const OCR_MAX_W = 2000;
   const OCR_MIN_W = 1200;
   const OCR_MAX_PASSES = 8;
+
+  // Equipment labels (readLabels, below) are not in a band: they are wherever
+  // the equipment is, and small. So the whole frame is read once at a size a
+  // label's larger print survives, then in four overlapping quarters at the
+  // photo's own resolution — enlarged where the photo is small — which is
+  // where a serial number's 3 mm print is still 20 px tall. Bounded: six
+  // passes at most, a few seconds each, and a caller may ask for fewer.
+  const LABEL_WHOLE_W = 2400;
+  const LABEL_TILE_MAX = 2600;
+  const LABEL_TILE_MIN = 1400;
+  const LABEL_OVERLAP = 0.08;
+  const LABEL_PASSES = 6;
 
   // ── Small readers ──────────────────────────────────────────────────────────
 
@@ -1377,12 +1398,103 @@ const PhotoMeta = (function () {
     });
   }
 
+  // ── Labels: the whole frame, for the equipment in it ───────────────────────
+  // What photo-equipment.js reads a make, a model and a serial number out of.
+  // The overlay's bands are the wrong place to look — a logger's label is in
+  // the middle of the cabinet — and the overlay's votes are the wrong shape:
+  // there is no one answer that two readings have to agree on, only whatever
+  // text each part of the picture holds. So this reads regions, not bands,
+  // hands back every reading's text, and decides nothing.
+
+  // The whole frame, long edge LABEL_WHOLE_W, and four quarters that overlap
+  // by LABEL_OVERLAP, each at its own resolution between LABEL_TILE_MIN and
+  // LABEL_TILE_MAX wide.
+  function labelPlan(width, height) {
+    const out = [];
+    const whole = Math.min(3, LABEL_WHOLE_W / Math.max(width, height));
+    out.push({ name: 'whole', x: 0, y: 0, w: width, h: height,
+               outW: Math.max(1, Math.round(width * whole)), outH: Math.max(1, Math.round(height * whole)) });
+    const span = 0.5 + LABEL_OVERLAP;
+    for (const [ry, rx, name] of [[0, 0, 'top left'], [0, 1, 'top right'], [1, 0, 'bottom left'], [1, 1, 'bottom right']]) {
+      const x = Math.floor(rx ? width * (1 - span) : 0), y = Math.floor(ry ? height * (1 - span) : 0);
+      const w = Math.ceil(width * span), h = Math.ceil(height * span);
+      const s = w > LABEL_TILE_MAX ? LABEL_TILE_MAX / w : w < LABEL_TILE_MIN ? Math.min(3, LABEL_TILE_MIN / w) : 1;
+      out.push({ name, x, y, w: Math.min(w, width - x), h: Math.min(h, height - y),
+                 outW: Math.max(1, Math.round(Math.min(w, width - x) * s)), outH: Math.max(1, Math.round(Math.min(h, height - y) * s)) });
+    }
+    return out;
+  }
+
+  // Grey with its contrast stretched between the 1st and 99th percentiles —
+  // prepare()'s first variant, alone: a label is dark print on a light plate
+  // or the reverse, the engine inverts for itself, and the coloured-text keys
+  // prepare() also makes are for an overlay drawn on a photograph.
+  function greyStretch(px) {
+    const { data, width: w, height: h } = px;
+    const n = w * h;
+    const lum = new Uint8Array(n);
+    const hist = new Uint32Array(256);
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      const y = (data[p] * 299 + data[p + 1] * 587 + data[p + 2] * 114) / 1000 | 0;
+      lum[i] = y; hist[y]++;
+    }
+    let lo = 0, hi = 255, acc = 0;
+    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.01) { lo = v; break; } }
+    acc = 0;
+    for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= n * 0.01) { hi = v; break; } }
+    const span = Math.max(1, hi - lo);
+    for (let i = 0; i < n; i++) lum[i] = Math.max(0, Math.min(255, Math.round((lum[i] - lo) * 255 / span)));
+    return { variant: 'grey', gray: lum, width: w, height: h };
+  }
+
+  // Read every region of a picture for text. The host is readOverlay()'s:
+  // `width`, `height`, `pixels(region)` → RGBA at the region's out size, and
+  // `recognize(variant, psm)` → the text. Sparse-text mode (11) first — a
+  // cabinet is a scatter of labels, not a page — over the whole frame and the
+  // four quarters, then the whole frame again as a page (3) if the budget
+  // allows. One region's pixels at a time.
+  //
+  // → { passes, texts: [{ region, variant, psm, text }] }
+  async function readLabels(host, opts = {}) {
+    const plan = labelPlan(host.width, host.height);
+    const budget = Math.max(1, Math.min(opts.maxPasses || LABEL_PASSES, LABEL_PASSES));
+    const order = plan.map(r => [r, '11']).concat([[plan[0], '3']]);
+    const total = Math.min(budget, order.length);
+    const texts = [];
+    let passes = 0;
+    for (const [region, psm] of order) {
+      if (passes >= budget) break;
+      let px = null;
+      try { px = await host.pixels(region); } catch (_) { px = null; }
+      if (!px) continue;
+      const v = greyStretch(px);
+      px = null;
+      passes++;
+      let got = null;
+      try { got = await host.recognize(v, psm); } catch (_) { got = null; }
+      texts.push({ region: region.name, variant: v.variant, psm, text: typeof got === 'string' ? got : String((got && got.text) || '') });
+      if (opts.onPass) { try { opts.onPass(passes, total); } catch (_) { /* a progress line is not worth a failure */ } }
+    }
+    return { passes, texts };
+  }
+
   // ── The browser's OCR host ─────────────────────────────────────────────────
   // Tesseract.js, loaded by a script element on first use (a UMD build, like
   // MapLibre's), and one worker for the session, kept while there is work and
   // let go after a quiet minute — it holds ~100 MB of WebAssembly heap.
+  //
+  // One worker, and two things that may ask it at once — the queue reading an
+  // overlay while somebody reads a photo's labels — each of which sets the
+  // page segmentation mode and then recognises. Interleaved, one would read in
+  // the other's mode. So each set-then-read is one turn, taken in order.
 
   let libP = null, workerP = null, idleTimer = 0, busy = 0;
+  let turn = Promise.resolve();
+  function inTurn(fn) {
+    const p = turn.then(() => fn());
+    turn = p.catch(() => {});
+    return p;
+  }
   function loadTesseract() {
     if (typeof window === 'undefined') return Promise.reject(new Error('no browser here'));
     if (window.Tesseract) return Promise.resolve(window.Tesseract);
@@ -1413,39 +1525,68 @@ const PhotoMeta = (function () {
     }, 60000);
   }
 
+  // The host readOverlay() and readLabels() ask for pixels and for text: a
+  // canvas to cut a region out of something a canvas can draw, and the one
+  // worker, in turn. `params` are set with the page segmentation mode, each
+  // turn.
+  function canvasHost(w, img, width, height, params = {}) {
+    return {
+      width, height,
+      pixels(band) {
+        const cv = document.createElement('canvas');
+        cv.width = band.outW; cv.height = band.outH;
+        const cx = cv.getContext('2d', { willReadFrequently: true });
+        cx.imageSmoothingQuality = 'high';
+        cx.drawImage(img, band.x, band.y, band.w, band.h, 0, 0, band.outW, band.outH);
+        const id = cx.getImageData(0, 0, band.outW, band.outH);
+        return { data: id.data, width: id.width, height: id.height };
+      },
+      async recognize(v, psm) {
+        const cv = document.createElement('canvas');
+        cv.width = v.width; cv.height = v.height;
+        const cx = cv.getContext('2d');
+        const id = cx.createImageData(v.width, v.height);
+        for (let i = 0, p = 0; i < v.gray.length; i++, p += 4) {
+          id.data[p] = id.data[p + 1] = id.data[p + 2] = v.gray[i]; id.data[p + 3] = 255;
+        }
+        cx.putImageData(id, 0, 0);
+        return inTurn(async () => {
+          await w.setParameters(Object.assign({ tessedit_pageseg_mode: String(psm) }, params));
+          const r = await w.recognize(cv, {}, { text: true, blocks: true });
+          return r && r.data ? { text: r.data.text || '', lines: linesOf(r.data) } : '';
+        });
+      },
+    };
+  }
+
   // Read the overlay off something a canvas can draw — an ImageBitmap, an
   // <img> or a canvas — `width` × `height` upright.
   async function ocrImage(img, width, height, opts = {}) {
     busy++;
     clearTimeout(idleTimer);
     try {
-      const w = await worker();
-      const host = {
-        width, height,
-        pixels(band) {
-          const cv = document.createElement('canvas');
-          cv.width = band.outW; cv.height = band.outH;
-          const cx = cv.getContext('2d', { willReadFrequently: true });
-          cx.imageSmoothingQuality = 'high';
-          cx.drawImage(img, band.x, band.y, band.w, band.h, 0, 0, band.outW, band.outH);
-          const id = cx.getImageData(0, 0, band.outW, band.outH);
-          return { data: id.data, width: id.width, height: id.height };
-        },
-        async recognize(v, psm) {
-          const cv = document.createElement('canvas');
-          cv.width = v.width; cv.height = v.height;
-          const cx = cv.getContext('2d');
-          const id = cx.createImageData(v.width, v.height);
-          for (let i = 0, p = 0; i < v.gray.length; i++, p += 4) {
-            id.data[p] = id.data[p + 1] = id.data[p + 2] = v.gray[i]; id.data[p + 3] = 255;
-          }
-          cx.putImageData(id, 0, 0);
-          await w.setParameters({ tessedit_pageseg_mode: String(psm) });
-          const r = await w.recognize(cv, {}, { text: true, blocks: true });
-          return r && r.data ? { text: r.data.text || '', lines: linesOf(r.data) } : '';
-        },
-      };
-      return await readOverlay(host, opts);
+      return await readOverlay(canvasHost(await worker(), img, width, height), opts);
+    } finally {
+      busy--;
+      releaseSoon();
+    }
+  }
+
+  // Read the labels off one: every region's text, for PhotoEquipment.parse().
+  // Seconds a photo — which is why it runs when somebody asks, never on
+  // every upload.
+  //
+  // The modes a label is read in (11 and 3) analyse the page's layout, and
+  // Tesseract narrates that — "Estimating resolution as 812", "Detected 32
+  // diacritics" — on stderr, which its WebAssembly build writes to the
+  // browser's console as errors. Its `debug_file` sends that narration to the
+  // engine's own /dev/null instead: a console full of an engine talking to
+  // itself is one where the next real error is not seen.
+  async function ocrLabels(img, width, height, opts = {}) {
+    busy++;
+    clearTimeout(idleTimer);
+    try {
+      return await readLabels(canvasHost(await worker(), img, width, height, { debug_file: '/dev/null' }), opts);
     } finally {
       busy--;
       releaseSoon();
@@ -1548,6 +1689,7 @@ const PhotoMeta = (function () {
 
   return {
     read, parseOverlay, vote, readOverlay, ocrImage, needsOcr, reconcile, record,
+    readLabels, ocrLabels, labelPlan, greyStretch,
     utmToLatLon, auZone, compassPoint, fovFrom35, instant: utcIso,
     bandPlan, prepare, resample, orient, pgm, normalise, linesOf, cropLine,
     OCR: { lib: OCR_LIB, worker: OCR_WORKER, core: OCR_CORE, lang: OCR_LANG, version: OCR_VER },

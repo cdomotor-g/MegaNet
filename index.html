@@ -234,11 +234,28 @@
        photo is read one way whichever door it comes in by. Only declares (its
        CommonJS line is on npm run toplevel's list, like hfem.js's). -->
   <script src="photo-meta.js?v=20260928b"></script>
+  <!-- A zip of photos, opened in the browser: its directory read, each photo
+       unzipped (DecompressionStream) and checked when the queue reaches it.
+       Pure, and required by test/photozip.mjs under Node, like photo-meta.js
+       (its CommonJS line is on npm run toplevel's list). Before
+       field-photos.js, its one caller — a runtime relationship. -->
+  <script src="photo-zip.js?v=20260928b"></script>
+  <!-- What a photo's equipment labels say: make, model, serial number, and the
+       kind of equipment the station's register files it under, from the text
+       PhotoMeta.ocrLabels reads. Pure, and required under Node by
+       test/photoreview.mjs (its CommonJS line is on npm run toplevel's list).
+       Before field-photos.js and photo-review.js, which call it. -->
+  <script src="photo-equipment.js?v=20260928b"></script>
   <!-- The Field Photos tab and the viewer every other part of the app opens a
        photo in. After photo-meta.js, which reads the photos, and beside
        attachments.js, whose bucket-and-index shape it shares — a runtime
        relationship like every other one here (#154). -->
   <script src="field-photos.js?v=20260928b"></script>
+  <!-- The Field Photos tab's Review panel — what became of every upload, and
+       the equipment suggestions an administrator approves (0036) — and the
+       station card's Equipment section. After field-photos.js, whose tab
+       draws it and whose queue it lists; only declares. -->
+  <script src="photo-review.js?v=20260928b"></script>
   <script src="inspections.js?v=20260928b"></script>
   <script src="maintenance.js?v=20260928b"></script>
   <script src="history.js?v=20260928b"></script>

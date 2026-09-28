@@ -491,6 +491,27 @@ load.
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_aep_levels_and_frequencies.sql
 ```
 
+## `check_photo_review.sql` — prove the upload log, the administrator and the equipment register
+
+113 checks over `0036`, in a transaction that rolls back: the five tables with
+RLS and their grants, `gdrive` as a way in, and who is an administrator —
+signed in as an editor made one, one taken off the editors list, a stranger,
+anonymous and the secret key. The upload log's rules, all or nothing (500 rows
+a call, a photo only for a file that got in, the clock and the uploader the
+server's except for the syncs) and its pruning; proposing, with each collision
+refused and named — the same unit waiting, already on the register, or turned
+down before from the same photo — and who may propose as an agent; and
+deciding: an editor refused, approving with and without corrections, rejecting,
+a replaced unit retired and pointing at its replacement, a second of a kind
+added alongside, the ambiguous case refused, a unit whose serial was never known
+getting it, superseding, and the register's one-live-serial rule underneath the
+functions. It signs up three people through the real signup triggers (0005),
+and needs the stations loaded no more than check_field_photos.sql does.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_photo_review.sql
+```
+
 ## `storage_bucket.sql` — create the `inspections` bucket and its policies
 
 The one script here that writes, and the one that does not roll back. Idempotent

@@ -314,3 +314,57 @@ test('with no Dropbox configured it says which settings are missing', async () =
   assert.equal(out.ok, false);
   assert.match(out.report.last_error, /DROPBOX_APP_KEY and DROPBOX_REFRESH_TOKEN/);
 });
+
+// ── Zip packs ─────────────────────────────────────────────────────────────────
+
+test('a zip saved into the Dropbox folder: each photo in it comes in as a photo of its own, and the rest of the zip is left alone', async () => {
+  // Two phone photos, a macOS resource fork and a readme, zipped by Info-ZIP
+  // (test/zip.test.mjs has what is in it).
+  const PACK = fs.readFileSync(path.join(HERE, 'fixtures', 'pack.zip'));
+  const w = fakeWorld({ files: [{ name: 'Gatton 23 June.zip', bytes: PACK }] });
+  const eng = countedEngine();
+  const one = await run({ env: ENV, fetch: w.fetch, worker: eng, uuid });
+  assert.equal(one.ok, true, JSON.stringify(one.report));
+  assert.equal(one.report.seen, 2, 'the two photos in it — not the zip, the fork or the readme');
+  assert.equal(one.report.imported, 2);
+  assert.deepEqual(w.rpc.map(p => p.origin_ref), ['id:Gatton 23 June.zip#DCIM/IMG_1001.jpg', 'id:Gatton 23 June.zip#DCIM/IMG_1002.jpg']);
+  const [a, b] = w.rpc;
+  assert.equal(a.origin, 'dropbox');
+  assert.equal(a.title, 'IMG_1001.jpg', 'its own name, not the zip\'s');
+  assert.equal(a.uploaded_by, 'Dropbox — field@example.test');
+  assert.equal(a.placement, 'exif');
+  assert.ok(Math.abs(a.lat - -27.5549) < 1e-6 && Math.abs(b.lat - -27.5551) < 1e-6);
+  assert.equal(a.meta.dropbox.path, '/Gatton 23 June.zip', 'the Dropbox file is the zip');
+  assert.deepEqual(a.meta.dropbox.archive, { name: 'Gatton 23 June.zip', path: 'DCIM/IMG_1001.jpg' });
+  assert.equal(eng.calls, 0, 'both placed by their EXIF');
+  assert.deepEqual(one.report.detail.files.map(f => f.path),
+    ['/Gatton 23 June.zip › DCIM/IMG_1001.jpg', '/Gatton 23 June.zip › DCIM/IMG_1002.jpg']);
+  assert.equal(w.cursor, 'cursor-1', 'the cursor moved past the zip');
+
+  const two = await run({ env: ENV, fetch: w.fetch, worker: eng, uuid });
+  assert.equal(two.report.seen, 0, 'a finished zip is not opened again');
+  assert.equal(w.rpc.length, 2);
+});
+
+test('a zip that cannot be opened is skipped with its reason, and a damaged one fails — neither stops the run', async () => {
+  const PACK = fs.readFileSync(path.join(HERE, 'fixtures', 'pack.zip'));
+  const locked = Buffer.from(PACK);
+  for (let p = locked.readUInt32LE(locked.length - 22 + 16); locked.readUInt32LE(p) === 0x02014b50;) {
+    locked.writeUInt16LE(locked.readUInt16LE(p + 8) | 1, p + 8);
+    p += 46 + locked.readUInt16LE(p + 28) + locked.readUInt16LE(p + 30) + locked.readUInt16LE(p + 32);
+  }
+  const w = fakeWorld({ files: [
+    { name: 'locked.zip', bytes: locked },
+    { name: 'truncated.zip', bytes: PACK.subarray(0, 1000) },
+    { name: 'IMG_0100.JPG', bytes: GPS },
+  ] });
+  const out = await run({ env: ENV, fetch: w.fetch, worker: countedEngine(), uuid });
+  assert.equal(out.report.imported, 1, 'the loose photo');
+  assert.equal(out.report.skipped, 1);
+  assert.equal(out.report.failed, 1);
+  assert.equal(out.ok, false, 'a damaged zip is a failure to look at');
+  const why = Object.fromEntries(out.report.detail.files.map(f => [f.name, `${f.result}: ${f.reason}`]));
+  assert.match(why['locked.zip'], /^skipped: it is password-protected/);
+  assert.match(why['truncated.zip'], /^failed: not a zip file, or not the whole of one/);
+  assert.equal(w.cursor, 'cursor-3', 'dealt with, all three: the cursor moves on');
+});
