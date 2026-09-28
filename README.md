@@ -88,7 +88,8 @@ MegaNet/
 │                             station is, and save the coordinates
 ├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
 ├── digital-twin.js         ← DigitalTwin — Digital Twin tab: one station's ground in
-│                             3-D, a 2 m pole and a figure on it, a .glb for Blender
+│                             3-D, the station as built, its neighbours and bridges,
+│                             a figure for scale, the move-pin mode, a .glb for Blender
 ├── flood-stages.js         ← FloodStages — a station's flood classes, AEP levels
 │                             and peaks on one ladder in AHD, the colour the twin's
 │                             water takes past each, and its rise
@@ -188,6 +189,8 @@ MegaNet/
 │   ├── history.mjs          (a saved record read back, against the form that wrote it)
 │   ├── help.mjs             (every tab's help entry: real content, links that land)
 │   ├── photos.mjs           (field photos: the reader, the OCR, the tab, the map, the twin)
+│   ├── twinsite.mjs         (the twin's site: the station as built, neighbours, bridges, the offer)
+│   ├── twinpin.mjs          (move pin in the twin's tab, the map's twin and ⛰️ 3-D)
 │   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
 │   ├── syntax-check.mjs     (node --check over every script index.html loads)
@@ -3577,23 +3580,37 @@ photography told apart from a real one by its variance; Esri World Imagery
 stitched on a canvas where that fails; and the ground coloured by height
 where nothing can be had.
 
-**The station is read from the record.** A station whose record has a
-water-level sensor (a `Water Level…` or `Gas Pressure` sensor, a legacy
-`water_level` address, a Bureau listing typed Water Level) is the
-river-gauge tower — 4 m mast, grating platform with handrails, the cabinet
-with a Kisters HS40 compressor bubbler above and the Victron, the telemetry,
-the terminals and the battery below, the gauge, the antenna mast with its
-solar panel, and a ladder up the south side. Every other station — rainfall
-only, rain-and-repeater, or one the record does not place — is the Type 3
+**The station is read from the record, and nothing is assumed.** A
+telemetered station whose record has a water-level sensor (a `Water Level…`
+or `Gas Pressure` sensor, a legacy `water_level` address, a Bureau listing
+typed Water Level) is the river-gauge tower — 4 m mast, grating platform
+with handrails, the cabinet with a Kisters HS40 compressor bubbler above and
+the Victron, the telemetry, the terminals and the battery below, the gauge,
+the antenna mast with its solar panel, and a ladder up the south side. A
+telemetered rainfall station, rain-and-repeater included, is the Type 3
 rainfall pole: 2.000 m × Ø0.300 m, green, with the tipping-bucket gauge and
 its ring on top, the enclosure on the south face, the solar panel and the
 whip. Inside is the kit the telemetry calls for: an ELPRO ERRTS ERT-A2 for
 an ALERT station (AL/ALERT in the name, or ALERT addresses), a Campbell
 CR300 and a Beam Iridium SBD modem for a TM station (TM in the name, or
-satcom), a plate with the station's name and number either way; a station
-the record cannot place is drawn as TM and the notes say so. The doors open
-on their own — the pole's when the POV eye comes close, the tower's when
-the visitor is up on the platform — and shut again when they leave.
+satcom), a plate with the station's name and number either way. A station
+the Service Level Specification lists as **Manual** — or one the Bureau
+reads daily with nothing saying a radio does — is the observer's kit: a
+silver rain collector Ø200 × 300 mm, a white 1 m staff gauge, or both. And
+a station the record cannot place is a **red post 1 m tall**, with the notes
+saying what is not known, rather than a pole guessed at. The doors open on
+their own — the pole's when the POV eye comes close, the tower's when the
+visitor is up on the platform — and shut again when they leave.
+
+**The rest of the patch is built too.** Up to 40 other stations inside the
+modelled ground stand by the same rules, each named, each name a button to
+its own twin. The ground is bare-earth LiDAR, which has the bridges taken
+out, so a road bridge's imagery ran down into the creek: each bridge in the
+patch — the State's road network's bridges and its rail bridges, or
+OpenStreetMap's where that cannot be asked — is built as a deck wearing the
+photograph of the road, at the **crossing height the Bureau's HDB extract
+lists** for the gauge where there is one (Gatton's 3.90 m on a zero of
+87.54 m AHD is a deck at 91.44 m), otherwise at the higher of its banks.
 
 **The request box is the patch grown by half a sample**, so the 201 pixel
 centres the service returns are the 201 mesh vertices and the middle one is
@@ -3616,15 +3633,34 @@ Point clouds, when they are ingested, will land in this same frame.
 
 **The same twin is inside the Stations map, and that is the usual way in.**
 From zoom 17 with a station under the view — the one on the card, the
-selected one, or the nearest to the centre — the map's rectangle hands over
-to that station's twin, whichever view was showing (the 2-D map or ⛰️ 3-D,
-whose camera follows the 2-D map's zoom), and hands back one level out when
-you wheel past the edge, press Escape or press ← Map. From zoom 14 the
-station's patch is fetched ahead, so the hand-over is a build from memory.
-The switch is in 🗺️ Map display. ⛰️ 3-D and the twin are one idea at two
-scales — the network on its terrain, and the site — and neither replaces the
-other; zoom is what says which question is being asked, so zoom is the
-hand-over (`map-twin.js`).
+selected one, or the nearest to the centre — a card on the map **offers**
+that station's twin, saying what aerial imagery covers the station (10 cm
+over most towns) and when it was flown, read from the State's imagery
+catalogue; it never takes the map over by itself. *Open the digital twin*
+hands the rectangle over, whichever view was showing (the 2-D map or ⛰️ 3-D,
+whose camera follows the 2-D map's zoom); ← Map or Escape gives the map back
+at the same zoom, and wheeling past the edge steps one zoom out. 🔍 Zoom to
+station goes all the way in, which is where the card appears. From zoom 14
+the station's patch is fetched ahead, so the hand-over is a build from
+memory. The switch is in 🗺️ Map display. ⛰️ 3-D and the twin are one idea at
+two scales — the network on its terrain, and the site — and neither replaces
+the other; zoom is what says which question is being asked, so zoom is where
+the offer appears (`map-twin.js`).
+
+**Move pin works where the ground can be seen.** The station editor's *Move
+pin on map* arms in the twin as well — on the tab and inside the Stations
+map — as an amber post dragged across the ground or dropped where you click,
+its position read to the centimetre; round the station and the pin the
+State's finest imagery is draped again (100 m at 1024 px, 0.098 m a pixel,
+where the patch's drape is 0.39 m), so a coordinate can be fixed against
+10 cm photography. Save writes the latitude and longitude and nothing else,
+through `save_station()` against the station's current row. In ⛰️ 3-D the pin
+stands on the terrain and a click lands where the terrain is under the
+cursor, not where the flat map would put that pixel (`map-move-pin.js`).
+
+**The lines over the stage fold away** ten seconds after the twin opens —
+unless the pointer or the focus is in them — and ▾ Details brings them back,
+counting the notes while they are folded.
 
 **Past the patch the country runs to a horizon 60 km off**, under a sky, in
 haze: three sheets of far ground — the State's raster at 40 m to 4 km, the
@@ -3675,12 +3711,18 @@ patch the far edges are a guide. A staff in the channel carries a ring at
 every level. ⏸ on the pill at the stage's top left, or on the line under it,
 stops the rise; a level on the line holds the water there; *Hide the water*
 takes it away; each is remembered, reduced motion gets still water, and none
-of it is in the `.glb` (`flood-stages.js`).
+of it is in the `.glb` (`flood-stages.js`). A station with no levels the
+twin can stand on its ground is offered the four nearest stations that have
+some — distance, heights, catchment — and one chosen is drawn over this
+channel as heights on its gauge (or the same metres AHD), for the session
+only, with every line that draws it naming whose levels they are.
 
 `docs/digital-twin.md` has the measurements behind every claim above, the
 controls, the hosts a network has to allow, and the Blender workflow.
-`npm run twin` holds the geometry, the hand-over and the mirror, and
-`npm run flood` the water — see **Testing** below.
+`npm run twin` holds the geometry, the hand-over and the mirror,
+`npm run flood` the water, `npm run twinsite` the station as built, its
+neighbours, the bridges and the offer, and `npm run twinpin` the move-pin
+mode in the twin and in 3-D — see **Testing** below.
 
 ### 22. Field Photos (Where Each Photo Was Taken, Shown There)
 
@@ -4051,7 +4093,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Fifty-two checks. The twenty below are the ones a change to the front end
+Fifty-four checks. The twenty-two below are the ones a change to the front end
 meets first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |
@@ -4076,6 +4118,8 @@ meets first, in ascending order of cost; `test/README.md` has the full table:
 | `npm run twin` | the Digital Twin tab against a world the check makes — the State's elevation service answered with a tiled float GeoTIFF of a closed-form surface, so every mesh vertex is arithmetic: the request box grown by half a sample with the aspect snap switched off, each vertex at the surface's height at its own latitude and longitude, the Type 3 pole with its foot at the origin, the 1.75 m figure with its feet on the ground where it stands, exaggeration scaling the relief alone, the station as built (pole or tower from the record, the kit inside by telemetry, the door on approach, the ladder climbed and the deck at the top), the room (what the twin sends, a visitor played in through a fake Realtime server and drawn, walked, pointing, gone; the pointer's laser), the notes folded on a phone, the horizon (its innermost square the patch's edge vertex for vertex, each far vertex on its sheet's height at its own place less the Earth's curve, the far shell drawn first, the switch, the tiles gone), the `.glb` read back out of the binary with the horizon left out, each fallback by breaking one host, walk mode at eye height, and the renderer torn down with the tab |
 | `npm run photos` | a field photo read, placed, uploaded and shown — the reader against photos built byte by byte and the overlay parser against what field camera apps print and what OCR makes of it, then the app signed in against a fake project with the real OCR engine and the real HEIC decoder: eight files dropped at once, the upload's order and records, the same photo refused three ways with its bytes taken back down, the carousel by keyboard, Dropbox's PKCE link, the map's pins clicked with a real pointer — flat, and tilted into 3-D — the twin's markers on the ground, and a real HEIC, which Chromium cannot draw, decoded and uploaded as a JPEG that is the picture. Smoke sees a tab that says "sign in" |
 | `npm run flood` | the twin's flood water where the river would put it, in the colours of the levels it passes — the ladder, colours and cycle under Node against real station records (a class on an assumed-datum zero named and not drawn, a colour that never goes back from magenta to red past a major class set above the 1% AEP), then Gatton's levels stood on a valley the check makes: the channel wet at moderate, the floodplain at major, the hollow behind a bank dry until its crest is overtopped; every level passed in order in its colour; each frame of the rise where the cycle says for the moment it was drawn; the pause from the line and the pill, hiding it, the Stations map's line and on a phone its pill, reduced motion, and nothing of it in the `.glb` |
+| `npm run twinsite` | the twin's site as the record builds it, on a valley the check makes: a Manual station drawn as a silver collector Ø200 × 300 mm, a 1 m staff gauge or both, and one the record cannot place as a 1 m red post saying what is not known — measured off the scene; a neighbour 129 m away built on its own ground and named; a bridge deck at Gatton's listed crossing (91.44 m AHD) and, with no listed crossing, at its banks; the four nearest donors offered to a station with no levels and one borrowed and given back; the lines over the stage folding after their delay and not under the pointer; and the map *offering* the twin at zoom 17 rather than handing itself over. Every one of those draws a plausible scene when it is wrong |
+| `npm run twinpin` | the move-pin mode where the ground can be seen — the twin's tab, the twin inside the Stations map, and ⛰️ 3-D: the pin dragged with a real pointer and clicked into place in each renderer, the readout to the centimetre, the 3-D click landing on MapLibre's own coordinate for it rather than the flat map's, and Save writing the database's *current* copy of the station with only its position changed. Everywhere but the flat map the mode used to arm with its pin under a WebGL canvas, out of sight and out of reach |
 
 The smoke test serves the repo on loopback, blocks every off-origin request
 except a local copy of Leaflet, waits for the real `stations.json` to land, and

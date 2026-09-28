@@ -1,10 +1,12 @@
 // MegaNet — map-twin.js
 //
 //   MapTwin   the Digital Twin inside the Stations map: at close zoom, with a
-//             station under the view, the map's rectangle hands over to the
-//             twin — the site's ground to 1 m, the imagery, the 2 m pole, the
-//             figure, and the radio paths as the map has coloured them — and
-//             takes it back when the operator zooms out.
+//             station under the view, the map offers the twin — a card on the
+//             map saying what imagery covers the station, and a button — and
+//             when it is pressed the map's rectangle hands over to it: the
+//             site's ground to 1 m, the imagery, the station as built, the
+//             figure, and the radio paths as the map has coloured them. ← Map,
+//             Escape or a wheel out gives the map back.
 //
 // After core.js, digital-twin.js and map-3d.js, before init.js — index.html
 // holds the order and the reasons. Reaches back to core.js for `state`,
@@ -24,15 +26,35 @@
 // stand beside. Neither replaces the other, because neither can answer the
 // other's question — a map camera cannot be put at eye height and a site
 // twin cannot show a 60 km hop — so the hand-over is by *zoom*, which is the
-// one thing that already says which question is being asked:
+// one thing that already says which question is being asked — and then by a
+// press, because a zoom is a question and not yet a request:
 //
 //   * At zoom 17 and closer (about a kilometre across on a laptop's map) with
-//     a station under the view, the twin takes the map's rectangle, whichever
-//     view was showing — the 2-D map or the 3-D one. The 3-D camera follows
-//     the 2-D map's zoom (map-3d.js), so both paths arrive here the same way.
-//   * Wheeling out past the twin's widest orbit, pressing Escape, or the ←
-//     button on the overlay hands back: the map is set one zoom level out,
-//     which is where the operator was heading, and the twin goes.
+//     a station under the view, a card comes up on the map, whichever view
+//     was showing — the 2-D map or the 3-D one (the 3-D camera follows the
+//     2-D map's zoom, map-3d.js, so both arrive here the same way). It names
+//     the station and what the twin would show that the map does not: the
+//     aerial photography that covers the station, at the resolution and the
+//     date the State's own catalogue gives for that point — "10 cm, May
+//     2021" — or, outside Queensland's program, that the imagery is Esri's.
+//     "🧊 Open the digital twin" hands the rectangle over; × puts the card
+//     away for that station until the map is next zoomed out past 17.
+//   * The twin used to take the map over at 17 on its own. It did not ask,
+//     and a map that turns into something else at a zoom level is a map
+//     that cannot be used at that zoom level — a pin could not be clicked at
+//     17 without a WebGL scene arriving over it. Now the map stays a map at
+//     every zoom, and the twin is one press away wherever it has something
+//     to add.
+//   * ← Map and Escape give the map back as it was, at the zoom it was at,
+//     with the card on it again (it is the way back in). Wheeling out past
+//     the twin's widest orbit gives it back one zoom level out, which is
+//     where that gesture was heading.
+//
+// Asking the catalogue is one small request per station, made when the card
+// comes up and remembered for the session (DigitalTwin.imageryAt); the card
+// is up at once with the station's name and says "checking the imagery…"
+// until it answers, and a catalogue that does not answer leaves the card
+// saying what the twin is without claiming a resolution.
 //
 // "A station under the view" is, in order: the station on the card (the map's
 // memory of what you were looking at), the selected station, or the nearest
@@ -41,13 +63,14 @@
 //
 // ── What it costs, and when ───────────────────────────────────────────────
 //
-// The hand-over is on by default and is a switch in 🗺️ Map display. Nothing
-// is fetched until a station qualifies. From zoom 14 with a station under the
+// The offer is on by default and is a switch in 🗺️ Map display. Nothing is
+// fetched until a station qualifies. From zoom 14 with a station under the
 // view the twin's ground and imagery are fetched ahead (DigitalTwin.prefetch)
-// into the same bounded caches the tab uses, so the hand-over at 17 is a
-// build from memory rather than a wait — which is what makes it read as a
-// transition and not a stall. The renderer itself (three.js) arrives on the
-// first hand-over of the session and never for a session that stays wide.
+// into the same bounded caches the tab uses, so the hand-over, when it is
+// asked for, is a build from memory rather than a wait — which is what makes
+// it read as a transition and not a stall. The renderer itself (three.js)
+// arrives on the first hand-over of the session and never for a session that
+// does not ask for one.
 //
 // ── The seams ──────────────────────────────────────────────────────────────
 //
@@ -59,7 +82,7 @@
 // and teardown are digital-twin.js's; this file only decides *when*, and
 // gives it a host.
 const MapTwin = (function () {
-  // The hand-over zoom. z17 is ~1.1 m/px at Queensland's latitudes, so a
+  // The offer's zoom. z17 is ~1.1 m/px at Queensland's latitudes, so a
   // 1,000 px map shows about a kilometre — the 400 m default patch and its
   // surroundings, which is the moment a pin has become a place.
   const ZOOM = 17;
@@ -73,6 +96,10 @@ const MapTwin = (function () {
   let stationId = null;
   let lfHeld = [];
   let prefetched = null;
+  let offerEl = null;            // the card on the map, while it exists
+  let offerId = null;            // the station it is offering
+  const dismissed = new Set();   // stations put away with ×, until the map is next zoomed out past ZOOM
+  const told = new Set();        // stations the live region has already announced an offer for
 
   function enabled() { return typeof state === 'undefined' || state.mapTwinAuto !== false; }
 
@@ -115,20 +142,121 @@ const MapTwin = (function () {
   }
 
   // Called on every move and zoom of the map, and whenever the card or the
-  // selection changes: the one place that decides whether the twin is up.
+  // selection changes: the one place that decides what the map shows at this
+  // zoom — nothing, the offer, or (once it has been asked for) the twin.
   function sync() {
     if (!map || typeof DigitalTwin === 'undefined') return;
     const z = map.getZoom();
     const st = enabled() ? candidate() : null;
-    if (st && z >= ZOOM) {
-      if (!up || stationId !== st.id) enter(st);
-      return;
+    // Zoomed out past the offer: every × is forgotten, so the next time in
+    // the card comes up again.
+    if (z < ZOOM) dismissed.clear();
+    // The twin is up because it was asked for, and it follows the map: a far
+    // station's name pressed under the stage moves the map to that station
+    // at this zoom, and the twin goes with it (DigitalTwin.followPath). The
+    // map moved out from under it — zoomed out, or off every station — takes
+    // it down, and what is left is the map, offering again if it still can.
+    if (up) {
+      if (st && z >= ZOOM) { if (stationId !== st.id) enter(st); return; }
+      leave(false);
     }
-    if (up) { leave(false); return; }
+    if (st && z >= ZOOM && !dismissed.has(st.id)) showOffer(st);
+    else hideOffer();
     if (st && z >= PREFETCH_ZOOM && prefetched !== st.id) {
       prefetched = st.id;
       DigitalTwin.prefetch(st.id);
     }
+  }
+
+  // ── The offer ─────────────────────────────────────────────────────────────
+  // A card at the top of the map, under the note line (.map-note, which says
+  // passing things there and must not be covered), between the two control
+  // corners — above the 3-D canvas, since the offer is made in both views.
+  // It is a region with a name rather than a dialog: it asks nothing and
+  // takes no focus, it is simply there to be pressed or put away.
+  function makeOffer() {
+    const el = map && map.getContainer();
+    if (!el) return null;
+    if (offerEl && offerEl.parentNode === el) return offerEl;
+    offerEl = document.createElement('div');
+    offerEl.id = 'map-twin-offer';
+    offerEl.className = 'map-twin-offer';
+    offerEl.setAttribute('role', 'region');
+    offerEl.setAttribute('aria-label', 'Digital twin available');
+    offerEl.hidden = true;
+    if (typeof L !== 'undefined' && L.DomEvent) {
+      L.DomEvent.disableClickPropagation(offerEl);
+      L.DomEvent.disableScrollPropagation(offerEl);
+    }
+    el.appendChild(offerEl);
+    return offerEl;
+  }
+
+  // What the twin would show that the map does not, in words, from what the
+  // State's imagery catalogue says covers the station. `im` is
+  // DigitalTwin.imageryAt()'s answer: undefined while it is being asked,
+  // null when it could not be, { outside } beyond Queensland's program, or
+  // the finest tier over the point.
+  function resText(m) { return m < 1 ? `${Math.round(m * 100)} cm` : `${m.toFixed(m < 10 ? 1 : 0)} m`; }
+  function offerWords(st, im) {
+    const name = `<strong>${esc(st.name)}</strong>`;
+    if (im === undefined) return { title: 'Digital twin available', line: `Checking the aerial imagery over ${name}…` };
+    if (im === null) return { title: 'Digital twin available',
+      line: `${name}'s ground in 3-D, with the aerial imagery draped over it and the station as built.` };
+    if (im.outside) return { title: 'Digital twin available',
+      line: `${name}'s ground in 3-D under Esri World Imagery — outside Queensland's aerial program, so no finer photography is known here.` };
+    const when = im.when ? `, ${esc(im.when)}` : '';
+    const what = im.satellite ? 'Satellite imagery' : 'Aerial photography';
+    const sharp = im.res_m <= 0.5;
+    return {
+      title: sharp ? 'High-resolution imagery here' : 'Digital twin available',
+      line: `${what} at <strong>${esc(resText(im.res_m))}</strong> (${esc(im.label)}${when}) covers ${name}. `
+          + (sharp ? 'See it close up, on the ground in 3-D, with the station as built — and put the pin exactly where the station stands.'
+                   : `It is the finest the State holds here; the twin drapes it over the ground in 3-D, with the station as built.`),
+    };
+  }
+  function offerHtml(st, im) {
+    const w = offerWords(st, im);
+    return `
+      <div class="map-twin-offer-body">
+        <p class="map-twin-offer-title"><span aria-hidden="true">🛰️</span> ${esc(w.title)}</p>
+        <p class="small map-twin-offer-line">${w.line}</p>
+      </div>
+      <div class="map-twin-offer-actions">
+        <button type="button" class="primary map-twin-offer-open" onclick="MapTwin.open()"
+                title="Hand the map over to ${escAttr(st.name)}'s digital twin — ← Map, Escape or a wheel out comes back"
+                ><span aria-hidden="true">🧊</span> Open the digital twin</button>
+        <button type="button" class="map-twin-offer-x" onclick="MapTwin.dismiss()"
+                title="Not now — put this away until the map is next zoomed out"
+                aria-label="Not now: put the digital twin offer away"><span aria-hidden="true">×</span></button>
+      </div>`;
+  }
+
+  function showOffer(st) {
+    const el = makeOffer();
+    if (!el) return;
+    if (offerId !== st.id) {
+      offerId = st.id;
+      el.innerHTML = offerHtml(st, undefined);
+      const ask = typeof DigitalTwin.imageryAt === 'function' ? DigitalTwin.imageryAt(st.lat, st.lon) : Promise.resolve(null);
+      ask.catch(() => null).then(im => {
+        if (offerId !== st.id || !offerEl) return;
+        offerEl.innerHTML = offerHtml(st, im);
+        // Said once per station a session, when the words are final: the
+        // offer is the result of the zoom the operator just made.
+        if (!told.has(st.id) && !offerEl.hidden) {
+          told.add(st.id);
+          const w = offerWords(st, im);
+          announce(`${w.title}: ${st.name}. The Open the digital twin button is at the top of the map.`);
+        }
+      });
+    }
+    el.hidden = false;
+  }
+
+  function hideOffer() {
+    if (offerEl) offerEl.hidden = true;
+    offerId = null;
   }
 
   function makeHost() {
@@ -188,19 +316,25 @@ const MapTwin = (function () {
             <button type="button" id="twin-point" aria-pressed="false" onclick="DigitalTwin.togglePoint()"
                     title="Point where you are looking, for whoever is here with you — Space held in the POV does the same"><span aria-hidden="true">☝</span><span class="map-twin-label"> Point</span><span class="sr-only">Point</span></button>
             <button type="button" onclick="DigitalTwin.resetView()" title="Back to the opening view of the pole"><span aria-hidden="true">↺</span><span class="map-twin-label"> View</span><span class="sr-only">Reset the view</span></button>
-            <button type="button" onclick="MapTwin.openTab()"
+            <button type="button" id="twin-movepin-btn" aria-pressed="false" onclick="DigitalTwin.toggleMovePin()"
+                    title="Move this station's pin to where the station stands on the imagery, and save the position"><span aria-hidden="true">📍</span><span class="map-twin-label"> Move pin</span><span class="sr-only">Move this station's pin</span></button>
+            <button type="button" class="map-twin-wide" onclick="MapTwin.openTab()"
                     title="The Digital Twin tab: the settings, the ground truth, the .glb for Blender"><span aria-hidden="true">🧊</span><span class="map-twin-label"> Open the tab →</span><span class="sr-only">Open the Digital Twin tab</span></button>
+            ${DigitalTwin.infoToggleHtml()}
           </span>
         </div>
-        <p class="twin-status map-twin-status" id="twin-status" role="status">Building…</p>
-        <p class="small twin-paths map-twin-paths" id="twin-paths" hidden></p>
-        <p class="small twin-photos map-twin-photos" id="twin-photos" hidden></p>
-        <p class="small twin-flood map-twin-flood" id="twin-flood" hidden></p>
-        <p class="small twin-peers map-twin-peers" id="twin-peers" hidden></p>
-        <details class="map-twin-notes" id="twin-notes-fold" hidden>
-          <summary class="map-twin-notes-sum"><span aria-hidden="true">⚠</span> <span id="twin-notes-count">0 notes</span></summary>
-          <ul class="twin-notes" id="twin-notes"></ul>
-        </details>
+        <div class="twin-info map-twin-info" id="twin-info">
+          <p class="twin-status map-twin-status" id="twin-status" role="status">Building…</p>
+          <p class="small twin-paths map-twin-paths" id="twin-paths" hidden></p>
+          <p class="small twin-photos map-twin-photos" id="twin-photos" hidden></p>
+          <p class="small twin-flood map-twin-flood" id="twin-flood" hidden></p>
+          <p class="small twin-peers map-twin-peers" id="twin-peers" hidden></p>
+          <p class="small twin-site map-twin-site" id="twin-site" hidden></p>
+          <details class="map-twin-notes" id="twin-notes-fold" hidden>
+            <summary class="map-twin-notes-sum"><span aria-hidden="true">⚠</span> <span id="twin-notes-count">0 notes</span></summary>
+            <ul class="twin-notes" id="twin-notes"></ul>
+          </details>
+        </div>
       </div>
       ${DigitalTwin.stageHtml()}
       <p class="small map-twin-attrib" id="twin-attrib"></p>`;
@@ -209,6 +343,7 @@ const MapTwin = (function () {
   function enter(st) {
     host = makeHost();
     if (!host) return;
+    hideOffer();
     const wasUp = up;
     if (wasUp) DigitalTwin.stop();
     host.innerHTML = overlayHtml(st);
@@ -216,18 +351,22 @@ const MapTwin = (function () {
     if (!wasUp) holdLeaflet();
     up = true;
     stationId = st.id;
-    DigitalTwin.mountAt(st.id, { leave: () => leave(true) });
-    // The result of what the operator did — zoomed in on a place — said
-    // once, with the way back (core.js's live-region rules).
-    announce(`Digital twin of ${st.name}. Zoom out, or press Escape, for the map.`);
+    // `why` is the twin's own way out: 'wheel' for a wheel past the widest
+    // orbit, 'escape' for the key.
+    DigitalTwin.mountAt(st.id, { leave: why => leave(why === 'wheel') });
+    // The result of what the operator did — asked for the twin — said once,
+    // with the way back (core.js's live-region rules).
+    announce(`Digital twin of ${st.name}. Press Escape, or ← Map, for the map.`);
   }
 
-  // Down, and the map back. `zoomOut` is the operator's own gesture — a wheel
-  // past the edge, Escape, the ← button — which the map answers by stepping
-  // one level out, so the view they were heading for is the one they get.
-  // A leave the map itself caused (it was zoomed out, or moved off the
-  // station) changes nothing about the map.
-  function leave(zoomOut) {
+  // Down, and the map back. `zoomOut` is the one way out that is a zoom — a
+  // wheel past the twin's widest orbit — which the map answers by stepping
+  // one level out, so the view that gesture was heading for is the one it
+  // gets. ← Map and Escape leave the map exactly as it was: the twin was a
+  // press away, not a zoom level, and the offer is back on the map for the
+  // next one. A leave the map itself caused (it was zoomed out, or moved off
+  // the station) changes nothing about the map.
+  function leave(zoomOut, { offer = true } = {}) {
     if (!up) return;
     up = false;
     stationId = null;
@@ -238,8 +377,12 @@ const MapTwin = (function () {
     // picture to animate from, and a zoom animation left in flight would
     // overrule the next view the operator asks for when it ends.
     if (zoomOut && map && map.getPane && map.getPane('mapPane')) {
-      map.setZoom(Math.min(map.getZoom(), ZOOM - 1), { animate: false });
+      map.setZoom(map.getZoom() - 1, { animate: false });
     }
+    // The map is back as it was, and the card with it — the setZoom above
+    // has already asked, through zoomend, for anything else. Not for a map
+    // that is itself going (detach).
+    if (!zoomOut && offer) sync();
   }
 
   return {
@@ -250,19 +393,34 @@ const MapTwin = (function () {
       sync();
     },
 
-    // Leaving the tab, or a rebuild of the map: the twin goes with the
-    // container it drew into.
+    // Leaving the tab, or a rebuild of the map: the twin and the offer go
+    // with the container they drew into.
     detach() {
       if (map) { map.off('zoomend', sync); map.off('moveend', sync); }
-      leave(false);
+      leave(false, { offer: false });
+      map = null;
       if (host && host.parentNode) host.parentNode.removeChild(host);
       host = null;
-      map = null;
+      if (offerEl && offerEl.parentNode) offerEl.parentNode.removeChild(offerEl);
+      offerEl = null;
+      offerId = null;
       prefetched = null;
     },
 
     sync,
-    leave() { leave(true); },
+    // ← Map on the overlay: the map back as it was.
+    leave() { leave(false); },
+    // The offer's two buttons.
+    open() {
+      if (!map || up) return;
+      const st = candidate();
+      if (st) enter(st);
+    },
+    dismiss() {
+      if (offerId) dismissed.add(offerId);
+      hideOffer();
+      announce('Put away. Zoom out and back in to be offered the twin again.');
+    },
     openTab() { if (stationId && typeof DigitalTwin !== 'undefined') DigitalTwin.openStation(stationId); },
 
     // The switch in 🗺️ Map display. Remembered: it is how an operator reads
@@ -285,11 +443,13 @@ const MapTwin = (function () {
   };
 
   function noteHtml() {
-    if (!enabled()) return 'Off. The map stays a map at every zoom; the Digital Twin tab is still there on the left.';
+    if (!enabled()) return 'Off. Nothing is offered at close zoom; the Digital Twin tab is still there on the left.';
     return `From zoom ${ZOOM} in, with a station under the view — the one on the card, the selected one, or the `
-         + 'nearest to the centre — the map hands over to that station\'s digital twin: its ground to 1 m where the '
-         + 'State holds LiDAR, the aerial imagery, a 2 m pole and the radio paths as this map colours them. '
-         + 'Wheel out past the edge, press Escape or press ← Map to come back. In ⛰️ 3-D the same zoom hands over the same way.';
+         + 'nearest to the centre — a card at the top of the map offers that station\'s digital twin and says what '
+         + 'aerial imagery covers it, at what resolution and when it was flown. Press 🧊 Open the digital twin and the '
+         + 'map hands over: its ground to 1 m where the State holds LiDAR, the imagery, the station as built and the '
+         + 'radio paths as this map colours them. Press ← Map or Escape to come back, or wheel out past the edge. '
+         + 'In ⛰️ 3-D the same zoom makes the same offer.';
   }
 })();
 if (typeof window !== 'undefined') window.MapTwin = MapTwin;

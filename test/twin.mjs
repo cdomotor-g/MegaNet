@@ -255,6 +255,11 @@ await page.route(/elevation-tiles-prod\/terrarium\/(\d+)\/(\d+)\/(\d+)\.png/, ro
   return route.fulfill({ status: 200, contentType: 'image/png', body: hillyTerrariumPng(+m[1], +m[2], +m[3]),
                          headers: { 'Access-Control-Allow-Origin': '*' } });
 });
+// The State's road network, asked where the bridges are: none in this world,
+// which is an answer — a road network that could not be asked is a note.
+await page.route(/RoadsAndTracks\/MapServer\/22\/query|OtherTransport\/MapServer\/160\/query/, route =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ features: [] }),
+                  headers: { 'Access-Control-Allow-Origin': '*' } }));
 await page.route(/api-elevation\.fsdf\.org\.au/, route =>
   route.fulfill({ status: 200, contentType: 'application/json',
                   body: JSON.stringify({ SOURCE: 'QLD Government - https://www.qld.gov.au/', DATASET: 'Check_2026_1m.tif',
@@ -306,6 +311,9 @@ try {
   await page.waitForFunction(
     () => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations),
     null, { timeout: LOAD_TIMEOUT });
+  // The lines over the stage stay open: this check reads and presses what is
+  // in them, and must not race the fold (twinsite holds the fold itself).
+  await page.evaluate(() => DigitalTwin._infoFold(null));
 
   // ── 0. WebGL, or nothing below this line means anything ───────────────────
   const gl = await page.evaluate(() => {
@@ -866,9 +874,10 @@ try {
   ok('TM in the name, or satcom, is TM telemetry; AL and ALERT addresses are ALERT',
     kinds.riverTm.telemetry === 'tm' && kinds.satcom.telemetry === 'tm' && kinds.legacy.telemetry === 'alert' && kinds.riverAl.telemetry === 'alert');
   ok('a rain-and-repeater is a pole', kinds.repeater.structure === 'pole' && kinds.repeater.repeater);
-  ok('a station the record cannot place is a pole drawn as TM, and says it is a guess',
-    kinds.unknown.structure === 'pole' && kinds.unknown.telemetry === 'tm' && !kinds.unknown.telemetryKnown
-      && kinds.awrcOnly.structure === 'pole' && !kinds.awrcOnly.telemetryKnown, JSON.stringify(kinds.unknown));
+  ok('a station the record cannot place is a red post rather than a guess, and says what is not known',
+    kinds.unknown.structure === 'post' && !kinds.unknown.telemetryKnown && /neither what it measures nor whether/.test(kinds.unknown.unsure)
+      && kinds.awrcOnly.structure === 'post' && kinds.satcom.structure === 'post' && /a radio reads it/.test(kinds.satcom.unsure),
+    JSON.stringify([kinds.unknown, kinds.satcom.unsure]));
 
   d = await dbg();
   const model = d.model;
@@ -1239,8 +1248,12 @@ try {
     seen.dem.length > demBeforePrefetch && !pre.active && !pre.built && pre.zoom === 15,
     `requests +${seen.dem.length - demBeforePrefetch}, active:${pre.active} built:${pre.built} zoom:${pre.zoom}`);
 
-  // Zoom 17: the hand-over.
+  // Zoom 17: the offer, and nothing handed over until it is pressed.
   await page.evaluate(([lat, lon]) => state.map.setView([lat, lon], 17, { animate: false }), [linked.lat, linked.lon]);
+  await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
+  ok('at zoom 17 with the station on the card, the map offers its twin — and is still the map',
+    await page.evaluate(() => !MapTwin.active() && !DigitalTwin.debug().built));
+  await page.click('#map-twin-offer .map-twin-offer-open');
   await page.waitForFunction(() => MapTwin.active() && DigitalTwin.debug().built, null, { timeout: BUILD_TIMEOUT });
   await settled();
   const inMap = await page.evaluate(() => {
@@ -1254,7 +1267,7 @@ try {
              back: !!document.querySelector('#map-twin .map-twin-back'), status: d.status,
              cardAbove: (() => { const c = document.getElementById('stn-card'); return c ? getComputedStyle(c).zIndex : null; })() };
   });
-  ok('at zoom 17 with the station on the card, the map hands over to its twin',
+  ok('pressed, the map hands over to its twin',
     inMap.active && inMap.station === linked.id && inMap.embedded && inMap.built && inMap.live && inMap.hostOn && inMap.inMap && inMap.back,
     JSON.stringify({ ...inMap, paths: undefined }));
   ok('and Leaflet\'s own drag and wheel are held off under it', !inMap.dragging && !inMap.wheel);
@@ -1293,7 +1306,8 @@ try {
   const arrived = await page.evaluate(() => ({ station: MapTwin.station(), zoom: state.map.getZoom(), card: state.stnCard.id, tab: state.activeTab }));
   ok('pressing a far station\'s name goes to it: the map moves at this zoom and hands over to its twin',
     followed && arrived.station === farId && arrived.zoom === 17 && arrived.card === farId && arrived.tab === 'stations', JSON.stringify(arrived));
-  // Back to the station under test for what follows.
+  // Back to the station under test for what follows — the twin is up, so
+  // the map moving under it is the twin following (as a path's name does).
   await page.evaluate(([id, lat, lon]) => { showStationCard(id); state.map.setView([lat, lon], 17, { animate: false }); }, [linked.id, linked.lat, linked.lon]);
   await page.waitForFunction(id => MapTwin.active() && MapTwin.station() === id && DigitalTwin.debug().built, linked.id, { timeout: BUILD_TIMEOUT });
   await settled();
@@ -1390,19 +1404,22 @@ try {
   const off = await page.evaluate(() => ({ active: MapTwin.active(), zoom: state.map.getZoom(), auto: state.mapTwinAuto }));
   ok('switched off, zoom 17 is a map', !off.active && off.zoom === 17 && off.auto === false, JSON.stringify(off));
   await page.evaluate(() => MapTwin.setEnabled(true));
+  await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
+  ok('switched on again, the same view offers it', await page.evaluate(() => !MapTwin.active()));
+  await page.click('#map-twin-offer .map-twin-offer-open');
   await page.waitForFunction(() => MapTwin.active() && DigitalTwin.debug().built, null, { timeout: BUILD_TIMEOUT });
   await settled();
-  ok('switched on again, the same view hands over', await page.evaluate(() => MapTwin.active()));
-  // ← Map: one level out from the hand-over.
+  // ← Map: the map back as it was, the offer with it.
   await page.evaluate(() => MapTwin.leave());
   await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: 10_000 });
   await sleep(300);
-  const left = await page.evaluate(() => ({ active: MapTwin.active(), zoom: state.map.getZoom() }));
-  ok('← Map leaves, to the last zoom before the hand-over', !left.active && left.zoom === 16, JSON.stringify(left));
+  const left = await page.evaluate(() => ({ active: MapTwin.active(), zoom: state.map.getZoom(),
+                                            offer: !document.getElementById('map-twin-offer').hidden }));
+  ok('← Map leaves, at the zoom the map was at, with the offer back on it', !left.active && left.zoom === 17 && left.offer, JSON.stringify(left));
 
   // Zooming the map out with the twin up — the map's own move — takes the
   // twin down without touching the zoom asked for.
-  await page.evaluate(([lat, lon]) => state.map.setView([lat, lon], 17, { animate: false }), [linked.lat, linked.lon]);
+  await page.click('#map-twin-offer .map-twin-offer-open');
   await page.waitForFunction(() => MapTwin.active(), null, { timeout: BUILD_TIMEOUT });
   await page.evaluate(() => state.map.setZoom(12, { animate: false }));
   await page.waitForFunction(() => !MapTwin.active() && !state.map._animatingZoom, null, { timeout: 10_000 });
@@ -1411,6 +1428,8 @@ try {
   // From the overlay to the tab: the same station, no longer embedded, and
   // the paths now read from the relations rather than the map's lines.
   await page.evaluate(([lat, lon]) => state.map.setView([lat, lon], 17, { animate: false }), [linked.lat, linked.lon]);
+  await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
+  await page.click('#map-twin-offer .map-twin-offer-open');
   await page.waitForFunction(() => MapTwin.active() && DigitalTwin.debug().built, null, { timeout: BUILD_TIMEOUT });
   await page.evaluate(() => MapTwin.openTab());
   await page.waitForFunction(() => state.activeTab === 'twin' && DigitalTwin.debug().built && !DigitalTwin.debug().embedded, null, { timeout: BUILD_TIMEOUT });

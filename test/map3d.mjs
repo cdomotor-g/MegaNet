@@ -1266,12 +1266,14 @@ if (SA && SB && SC) {
   ok('panned away and asked for again, the camera goes back to it', at(v4),
      `${Math.round(v4.off)} px from the middle of the view`);
 
-  // Zoom to station is a fitBounds, not a setView — the other way the 2-D map is moved.
+  // Zoom to station goes all the way in — the deepest zoom the map's base
+  // allows, which the camera follows a level out.
   await page.evaluate(id => zoomToStation(id), SC.id);
   await settle3();
   const v5 = await view3(SC);
-  ok('Zoom to station (a fit, not a pan) takes the camera there too', at(v5)
-     && near(v5.zoom, v5.lf.zoom - 1, 0.3), JSON.stringify(v5));
+  const maxZ = await page.evaluate(() => state.map.getMaxZoom());
+  ok('Zoom to station (all the way in) takes the camera there too', at(v5)
+     && v5.lf.zoom === maxZ && near(v5.zoom, v5.lf.zoom - 1, 0.3), JSON.stringify({ ...v5, maxZ }));
 
   // The side panel's edge dragged: the 2-D map is re-measured on every frame
   // of it without being panned (dockResized), so its centre moves by half of

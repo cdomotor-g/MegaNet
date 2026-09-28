@@ -12279,11 +12279,68 @@ code {
   margin: 0;
 }
 
+/* The offer (map-twin.js): at close zoom, a card at the top of the map saying
+   what imagery covers the station and offering its twin. Under the note line
+   (.map-note, top 14px, z 1050) so a passing note never covers the button;
+   between the two control corners, so neither is covered; above the 3-D
+   canvas (#map3d, 750) and the twin's own overlay (755), since the offer is
+   made in both views and is gone while the twin is up; under the corners
+   (1000) and the station card's lifted place in 3-D (760 is below it, and the
+   card sits bottom-left, clear of it). display rather than opacity while it
+   is down, for #map3d's reason. */
+.map-twin-offer {
+  position: absolute;
+  top: 3.1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 800;
+  width: min(26rem, calc(100% - 8.5rem));
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-start;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-2);
+}
+.map-twin-offer[hidden] { display: none; }
+.map-twin-offer-body { flex: 1 1 auto; min-width: 0; }
+.map-twin-offer-title { margin: 0; font-weight: 600; }
+.map-twin-offer-line { margin: .15rem 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.map-twin-offer-line strong { color: var(--text); }
+.map-twin-offer-actions { display: flex; flex-direction: column; gap: var(--sp-1); align-items: stretch; flex: 0 0 auto; }
+.map-twin-offer-open { white-space: nowrap; }
+.map-twin-offer-x { align-self: flex-end; }
+
+/* `sm`: the card takes the width between the corners and lays its button
+   under the words, which a 340 px map has the height for and not the width. */
+@media (max-width: 700px) {
+  .map-twin-offer { flex-wrap: wrap; width: calc(100% - 7.5rem); }
+  .map-twin-offer-actions { flex-direction: row; width: 100%; justify-content: space-between; }
+}
+
+/* The lines over the stage fold under the bar (digital-twin.js, "the lines
+   over the stage, folded"): a column of them while open, nothing at all while
+   folded — the stage takes the height back. The attribute alone would lose to
+   the grid's display, so it is said again. */
+.map-twin-info { display: grid; gap: var(--sp-1); min-width: 0; }
+.twin-info[hidden] { display: none; }
+
+/* The fold's button: an arrow, a word that goes below `sm` (.map-twin-label),
+   and the count of notes while they are folded — in the warning colour, so a
+   warning folded away still shows on the bar. */
+.twin-info-toggle { white-space: nowrap; }
+.twin-info-badge { margin-left: .3rem; color: var(--warn); font-weight: 600; }
+.twin-info-badge[hidden] { display: none; }
+
 #map-twin .map-twin-status { margin: 0; }
 #map-twin .map-twin-paths { margin: 0; }
 #map-twin .map-twin-photos { margin: 0; }
 #map-twin .map-twin-flood { margin: 0; }
 #map-twin .map-twin-peers { margin: 0; }
+#map-twin .map-twin-site { margin: 0; }
 
 /* The notes, folded: a one-line count in the warning colour that opens as a
    flyout over the stage — the stage never moves for it. Closed on every
@@ -12327,6 +12384,7 @@ code {
 #map-twin .map-twin-photos,
 #map-twin .map-twin-flood,
 #map-twin .map-twin-peers,
+#map-twin .map-twin-site,
 #map-twin .map-twin-attrib {
   white-space: nowrap;
   overflow: hidden;
@@ -12376,9 +12434,43 @@ code {
   .map-twin-label { display: none; }
   .map-twin-head { padding-inline: 0 4rem; }
   /* A phone's map has no row to spare for the water's line: the pill on the
-     stage reads it and pauses it, and the tab has the levels in full. */
+     stage reads it and pauses it, and the tab has the levels in full. Nor
+     for the line naming the other stations and the bridges in the patch,
+     which the tab has in full too; nor, on the bar, for the button to the
+     tab, which the station card's 🧊 pill and the nav both reach — the bar
+     is one row of 44 px targets, and 📍 and ▴ needed the room. */
   #map-twin .map-twin-flood { display: none; }
+  #map-twin .map-twin-site { display: none; }
+  #map-twin .map-twin-wide { display: none; }
 }
+
+/* Borrowing a nearby station's flood levels (digital-twin.js, "borrowing
+   another station's levels"): the modal's choice of how the heights cross,
+   its table of the nearest stations, and the Scene panel's line. */
+.twin-borrow-mode { margin: var(--sp-2) 0; }
+.twin-borrow-mode .check-label { align-items: flex-start; }
+.twin-borrow-table { font-size: var(--fs-sm); }
+.twin-borrow-table th[scope="row"] { font-weight: 400; }
+.twin-borrow-table td { vertical-align: top; }
+.twin-borrow-fact { color: var(--muted); }
+.twin-borrow-same {
+  display: inline-block;
+  padding: 0 .35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.twin-borrow-line { margin: var(--sp-2) 0 0; }
+.twin-borrow-line:empty { display: none; }
+
+/* What else is in the patch (digital-twin.js, "the neighbours" and "the
+   crossings"): the other stations by name — each a button to its own twin —
+   and the bridges with the level their decks stand at. */
+.twin-site { margin: var(--sp-1) 0 0; }
+.twin-site-lead { color: var(--muted); }
+.twin-site-stn { font-weight: 600; }
 
 /* Who else is here (twin-presence.js), on the tab as under the map. */
 .twin-peers { margin: var(--sp-1) 0 0; color: var(--muted); }
@@ -12486,6 +12578,40 @@ code {
 }
 .twin-photo-prompt[hidden] { display: none; }
 .twin-stage canvas.is-over-photo { cursor: pointer; }
+
+/* The move-pin mode in the twin (digital-twin.js, "the pin being moved"): the
+   post under the pointer is something to take hold of, and while it is held
+   the hand closes. */
+.twin-stage canvas.is-over-pin { cursor: grab; }
+.twin-stage canvas.is-dragging-pin { cursor: grabbing; }
+
+/* Its panel, on the stage: map-move-pin.js draws the same panel it puts in
+   the map's corner (.mn-movepin-panel — its box, its readout, Save and
+   Cancel), here in the stage's top-left corner, which the compass (top
+   right), the hint and the flood pill (along the foot) leave free. */
+.twin-movepin-panel {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  z-index: 2;
+}
+.twin-movepin-panel[hidden] { display: none; }
+.mn-movepin-msg { margin: var(--sp-1) 0 0; }
+
+/* In the map's overlay the stage's panel is the one: the map's own, in the
+   corner above the overlay, stands down for as long as the twin is up. */
+.mn-map-stage:has(#map-twin.is-on) .leaflet-control.mn-movepin-panel { display: none; }
+
+/* `sm`: the stage is a phone's height, and the panel keeps to its numbers
+   and its two buttons. */
+@media (max-width: 700px) {
+  .twin-movepin-panel { max-width: calc(100% - 4rem); min-width: 0; }
+  .twin-movepin-panel .mn-movepin-hint { display: none; }
+}
+
+/* The move-pin mode's pin in ⛰️ 3-D (map-3d.js): a MapLibre marker needs its
+   box said, where Leaflet's divIcon writes it inline. */
+.mn-movepin-3d { width: 34px; height: 34px; }
 
 .twin-path-dot {
   display: inline-block;

@@ -224,6 +224,15 @@ const DigitalTwin = (function () {
     photoNear: -1,         // the spot the POV visitor is standing at, or −1
     focusPhotoId: null,    // a photo to stand the camera behind once the markers are up (the viewer's "In the twin")
     flood: null,           // the flood water: { lad, start, top, seed, fill, level, band, … } — see buildFlood
+    infoOpen: true,        // the lines over the stage: open, or folded under the bar
+    infoPinned: false,     // the operator pressed the fold: it stays as they left it
+    infoFor: null,         // the station the fold was last opened for — a new one opens it again
+    infoTimer: 0,          // the fold's own clock
+    origin: null,          // { lat, lon } the patch is centred on — the station where it was when built
+    neighbours: null,      // the other stations in the patch: { list: [{ id, name, x, z, d, structure, … }], more }
+    bridges: null,         // the bridges in the patch: { status, source, list, crossing, failed }
+    bridgesFound: null,    // what the sources said, kept to rebuild the decks at another exaggeration
+    tier: null,            // the State's finest imagery over the station (imageryAt), or null
   };
 
   // Ground under a far station that has no recorded height, read off the
@@ -240,6 +249,10 @@ const DigitalTwin = (function () {
     sun: null, hemi: null, texture: null, raf: 0, ro: null, dirty: false,
     horizon: null, shells: null, sky: null,   // the far field's group, its shells' bookkeeping, the dome
     photos: null,     // the field photo markers
+    movepin: null,    // the pin being moved (map-move-pin.js): { group, post, head, hit, ring, ghost, leader }
+    neighbours: null, // the other stations in the patch, built
+    bridges: null,    // the bridges' decks
+    sharp: null,      // the sharp drape round the station or the pin: { mesh, x, z, mpp }
     flood: null,      // the flood water and its staff: { water, staff, tex, data, mat, palette }
     off: [],          // listener removers
   };
@@ -251,6 +264,7 @@ const DigitalTwin = (function () {
     px: 3, pz: 6, yaw: -0.45, pitch: -0.08,             // POV: feet position and look
     level: 'ground', climb: 0, climbLatch: false,       // POV: on the ground, on the ladder (climb metres up it), or on the deck
     pointing: false, pointLatch: false,                 // POV: Space held, or the Point button latched
+    pinDrag: null,                                      // the pointer holding the pin being moved, or null
     keys: new Set(),
     pointers: new Map(),
     pinch: null,
@@ -707,6 +721,74 @@ const DigitalTwin = (function () {
     };
   }
 
+  // ── what covers a point: the State's imagery catalogue ────────────────────
+  // The Stations map's offer (map-twin.js) says what the twin would show that
+  // the map does not, and the honest form of "high-resolution imagery here"
+  // is the resolution and the date of the photography the State holds over
+  // the point. The program's ImageServer answers that as a catalog query:
+  // every tier whose footprint holds the point — a town's 10 cm flight, the
+  // region's 20 cm, the statewide 2.4 m satellite mosaic — with its pixel
+  // size in metres (`lowps`), its name and its capture dates. The finest
+  // primary tier is what an exportImage of that spot is drawn from. One small
+  // request per station, remembered for the session; outside the program's
+  // extent the answer is known without asking. A failure is not remembered,
+  // so a flaky link is asked again the next time.
+  const QLD_IMG_CAT = `${QLD_HOST}/Basemaps/LatestStateProgram_AllUsers/ImageServer/query`;
+  const imageryAtCache = new Map();
+
+  // "Lockyer_Valley_Urban_2021_10cm_SISP" → "Lockyer Valley Urban": the
+  // catalogue's name less its resolution, its year and its program codes,
+  // which the offer says in words of its own (the date from the capture).
+  function tierLabel(name) {
+    return String(name || '').split('_')
+      .filter(t => t && !/^\d+(\.\d+)?(cm|m)$/i.test(t) && !/^(SISP|v\d+)$/i.test(t) && !/^(19|20)\d\d$/.test(t))
+      .join(' ') || 'the State\'s imagery';
+  }
+  function tierWhen(a) {
+    const t = Number(a.capturestart || a.captureend);
+    if (isFinite(t) && t > 0) {
+      const d = new Date(t);
+      return `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    }
+    return a.year ? String(a.year) : '';
+  }
+  function bestTier(json) {
+    const rows = ((json && json.features) || []).map(f => f.attributes || {})
+      .filter(a => isFinite(Number(a.lowps)) && Number(a.lowps) > 0);
+    if (!rows.length) return null;
+    const a = rows.reduce((p, q) => (Number(q.lowps) < Number(p.lowps) ? q : p));
+    return {
+      res_m: Number(a.lowps), name: a.name || '', label: tierLabel(a.name), when: tierWhen(a),
+      satellite: Number(a.acq_platform) === 2 || /satellite|qsat|planet/i.test(`${a.name} ${a.title}`),
+    };
+  }
+  // "10 cm imagery", "2.4 m imagery" — how the status line says a tier.
+  function resWords(m) { return `${m < 1 ? `${Math.round(m * 100)} cm` : `${m.toFixed(1)} m`} imagery`; }
+
+  function imageryAt(lat, lon) {
+    if (!known(lat) || !known(lon)) return Promise.resolve(null);
+    lat = Number(lat); lon = Number(lon);
+    const key = `${lat.toFixed(5)},${lon.toFixed(5)}`;
+    if (imageryAtCache.has(key)) return imageryAtCache.get(key);
+    const inside = lon >= QLD_IMG_BOX.west && lon <= QLD_IMG_BOX.east && lat >= QLD_IMG_BOX.south && lat <= QLD_IMG_BOX.north;
+    let p;
+    if (!inside || typeof fetch !== 'function') p = Promise.resolve(inside ? null : { outside: true });
+    else {
+      const q = new URLSearchParams({
+        geometry: `${lon},${lat}`, geometryType: 'esriGeometryPoint', inSR: '4326',
+        spatialRel: 'esriSpatialRelIntersects', where: 'category=1',
+        outFields: 'name,title,lowps,year,capturestart,captureend,acq_platform',
+        returnGeometry: 'false', f: 'json',
+      });
+      p = fetchBytes(`${QLD_IMG_CAT}?${q}`)
+        .then(buf => bestTier(JSON.parse(new TextDecoder().decode(buf))))
+        .catch(() => null);
+    }
+    imageryAtCache.set(key, p);
+    p.then(v => { if (v === null) imageryAtCache.delete(key); });
+    return p;
+  }
+
   // ── the imagery ────────────────────────────────────────────────────────────
   // Texture width for a patch: 1024 px is 0.4 m/px over 400 m, which is near
   // what the aerial program resolves outside the towns; the two wide patches
@@ -902,6 +984,10 @@ const DigitalTwin = (function () {
     removeHorizon();
     removePhotoMarkers();
     removeFlood();
+    removeMovePin();
+    removeNeighbours();
+    removeBridges();
+    removeSharp();
     tw.photoNear = -1;
     sc.pole = null; sc.band = null; sc.doors = [];
     remoteClear();
@@ -1056,7 +1142,100 @@ const DigitalTwin = (function () {
     mat.map = want ? sc.texture : null;
     mat.vertexColors = !want;
     mat.needsUpdate = true;
+    if (sc.sharp) sc.sharp.mesh.visible = want;
+    // The bridges' decks wear the same photograph as the ground they span.
+    if (sc.bridges) {
+      sc.bridges.traverse(o => {
+        if (!o.userData.deckMap) return;
+        o.material.map = want ? sc.texture : null;
+        o.material.color.set(want ? 0xffffff : 0x6f7378);
+        o.material.needsUpdate = true;
+      });
+    }
     requestFrame();
+  }
+
+  // ── the imagery, sharp where it matters ───────────────────────────────────
+  // The drape is one texture over the whole patch — 1,024 px over 400 m, 0.39 m
+  // a pixel — while the State has flown most towns at 10 cm (the offer on the
+  // Stations map says so, from its catalogue). A pin put right on 0.39 m
+  // pixels is put right to half a metre; on 10 cm ones, to a hand's width.
+  // So round the station, and round the pin while it is being moved, a
+  // square SHARP_M across is draped again at the finest the catalogue holds
+  // there: one more exportImage of SHARP_PX over SHARP_M — 0.098 m a pixel
+  // — on a mesh of its own that rides the ground a hair above the patch's
+  // (polygonOffset, as the wire does the other way), so the photograph under
+  // the station is the one that was flown, not a quarter of it. Only where
+  // the catalogue's finest is at least SHARP_GAIN finer than the drape, only
+  // from the State's program (Esri's tiles have no catalogue to ask), and
+  // never in the .glb, which carries the patch's own texture. It follows the
+  // pin in SHARP_STEP jumps, so a drag is one request at its end, not one a
+  // frame.
+  const SHARP_M = 100, SHARP_PX = 1024, SHARP_GAIN = 1.5, SHARP_STEP = 25;
+  let sharpSeq = 0;
+
+  function removeSharp() {
+    if (sc.sharp && sc.scene) { sc.scene.remove(sc.sharp.mesh); disposeObject(sc.sharp.mesh); }
+    sc.sharp = null;
+  }
+
+  // Whether a sharper drape would show anything the patch's does not.
+  function sharpWorth() {
+    const t = tw.tier, im = tw.image;
+    return !!(t && !t.outside && isFinite(t.res_m) && im && im.source === 'qld' && S().imagery
+              && t.res_m * SHARP_GAIN < im.mpp && SHARP_M / SHARP_PX < im.mpp);
+  }
+
+  // The square's centre for a point: snapped to SHARP_STEP, and kept inside
+  // the patch.
+  function sharpCentre(x, z) {
+    const g = tw.ground, h = SHARP_M / 2;
+    const lim = v => Math.max(-g.half + h, Math.min(g.half - h, Math.round(v / SHARP_STEP) * SHARP_STEP));
+    return { x: lim(x), z: lim(z) };
+  }
+
+  function sharpenAt(x, z) {
+    if (!sc.scene || !tw.ground || !tw.origin || !sharpWorth()) return Promise.resolve(false);
+    const c = sharpCentre(x, z);
+    if (sc.sharp && sc.sharp.x === c.x && sc.sharp.z === c.z) return Promise.resolve(true);
+    const seq = tw.seq, mine = ++sharpSeq;
+    const ll = latLonAt(c.x, c.z);
+    const box = patchBox(ll.lat, ll.lon, SHARP_M);
+    return once(() => loadImage(qldImgUrl(box, SHARP_PX))).then(img => {
+      if (seq !== tw.seq || mine !== sharpSeq || !sc.scene || !tw.ground) return false;
+      const cv = drawToCanvas(img, SHARP_PX);
+      if (isBlank(cv)) return false;
+      const tex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = Math.min(8, sc.renderer.capabilities.getMaxAnisotropy() || 1);
+      const K = Math.round(SHARP_M / tw.ground.sample_m);
+      const geo = new THREE.PlaneGeometry(SHARP_M, SHARP_M, K, K);
+      geo.rotateX(-Math.PI / 2);
+      geo.translate(c.x, 0, c.z);
+      const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 1, metalness: 0,
+                                                   polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = 'sharp imagery';
+      mesh.receiveShadow = true;
+      mesh.userData.export = false;
+      removeSharp();
+      sc.sharp = { mesh, x: c.x, z: c.z, mpp: SHARP_M / SHARP_PX };
+      placeSharp();
+      mesh.visible = !!S().imagery;
+      sc.scene.add(mesh);
+      requestFrame();
+      return true;
+    }).catch(() => false);
+  }
+
+  // On the ground as drawn: the exaggeration moves it with the patch.
+  function placeSharp() {
+    if (!sc.sharp) return;
+    const pos = sc.sharp.mesh.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) pos.setY(i, yAt(pos.getX(i), pos.getZ(i)));
+    pos.needsUpdate = true;
+    sc.sharp.mesh.geometry.computeVertexNormals();
+    sc.sharp.mesh.geometry.computeBoundingSphere();
   }
 
   // ── the horizon ────────────────────────────────────────────────────────────
@@ -1498,34 +1677,64 @@ void main() {
 
   // ── the station as built ───────────────────────────────────────────────────
   // What stands at the origin is the station the network actually puts there,
-  // in two shapes, chosen from the record:
+  // chosen from the record — and, where the record cannot say, nothing is
+  // assumed:
   //
   //   * A **Type 3 rainfall station** — the Bureau's green pole with the
   //     tipping-bucket gauge and its ring on top, a small enclosure on the
   //     south face, a solar panel on a bracket to the north, a whip antenna
-  //     up the east side, on a concrete pad — for a station that reports
-  //     rainfall only, for a rain-and-repeater, and for any station the
-  //     record does not say has a water-level sensor. Its pole is still
-  //     2.000 m × Ø0.300 m: the brief's ruler, now with the right things on it.
+  //     up the east side, on a concrete pad — for a telemetered station that
+  //     reports rainfall and not a river. Its pole is still 2.000 m ×
+  //     Ø0.300 m: the brief's ruler, now with the right things on it. A
+  //     repeater that measures nothing is the same pole without the gauge.
   //   * A **river-gauge tower** — a 4 m galvanised mast on a flange, a 1.8 m
   //     grating platform with handrails, the cabinet on the platform, the
   //     gauge and the antenna mast with its solar panel, and a ladder up the
-  //     south side — for a station the record says has a water-level sensor
+  //     south side — for a telemetered station the record says reads a river
   //     (a 'Water Level…' or 'Gas Pressure' sensor, a water_level ALERT
-  //     address, or a Bureau listing typed Water Level). The foundation is
-  //     below the ground and so not drawn.
+  //     address, a Bureau listing typed Water Level, or the SLS's data type).
+  //     The foundation is below the ground and so not drawn.
+  //   * A **manual rainfall station** — the depositional collector an
+  //     observer empties and reads: a silver cylinder Ø200 mm and 300 mm tall
+  //     standing on the ground, open at the top with its funnel inset.
+  //   * A **manual river station** — a white staff gauge 1 m tall on the
+  //     ground, graduated as the real plates are: a black E every ten
+  //     centimetres, a red figure at each metre.
+  //   * A **manual rainfall and river station** — both, side by side: the
+  //     record has one coordinate for what are, on the ground, often two
+  //     places, and the notes say so.
+  //   * **A red post, 1 m tall**, where the record cannot say what the station
+  //     is: nothing says whether a person or a radio reads it, or nothing says
+  //     what it measures. A model of a Type 3 pole there would be a guess
+  //     drawn as confidently as a fact, which is the one thing this tab is
+  //     careful never to do; the notes say what is known and what is not.
+  //
+  // Manual is what the Bureau's Service Level Specification says (its gauge
+  // type, by bureau number — SLS.forStation, the card's own lookup), or, for a
+  // station the SLS does not carry, being in the Bureau's list of daily-read
+  // gauges (Section 2 of its river height station lists) with nothing in the
+  // record saying a radio reads it. Telemetered is a name ending AL, ALERT or
+  // TM, ALERT addresses, satcom, or the SLS saying Automatic. What it measures
+  // is the sensors, the ALERT addresses, the Bureau's location types and the
+  // SLS's data type, together. The SLS file is fetched once (710 KB, the
+  // card's) before the station is built, and a build that cannot have it
+  // decides without it and says so.
   //
   // Inside each enclosure is the electronics the network fits, by telemetry:
   // an ELPRO ERRTS ERT-A2 radio for an ALERT station (a name ending AL or
   // ALERT, or ALERT addresses in the record), a Campbell Scientific CR300
   // logger and a Beam Iridium SBD modem for a TM station (a name ending TM,
-  // or satcom on). A station the record cannot place is drawn as TM and the
-  // notes say so. Every tower cabinet carries a Kisters HS40 compressor
-  // bubbler in its upper compartment, and a Victron charge controller, the
-  // telemetry, the terminals and the battery below. A plate inside names the
-  // station and its number. The doors open on their own: a pole's when the
-  // POV eye comes within DOOR_NEAR of it, the tower's when the visitor is up
-  // on the platform — and close again when they leave.
+  // or satcom on). An automatic station whose radio the record cannot name
+  // is drawn as TM and the notes say so. Every tower cabinet carries a
+  // Kisters HS40 compressor bubbler in its upper compartment, and a Victron
+  // charge controller, the telemetry, the terminals and the battery below. A
+  // plate inside names the station and its number. The doors open on their
+  // own: a pole's when the POV eye comes within DOOR_NEAR of it, the tower's
+  // when the visitor is up on the platform — and close again when they leave.
+  //
+  // The other stations whose positions fall inside the patch are built too,
+  // each by the same rules, standing on the ground where they are — see
+  // "the neighbours", below.
   const TOWER_H   = 4.0;     // the mast, ground to the platform's underside
   const DECK_TOP  = 4.05;    // the grating's walking surface
   const DECK_HALF = 0.9;     // the platform is 1.8 m square
@@ -1536,7 +1745,17 @@ void main() {
   const DOOR_NEAR = 2.2;     // a pole enclosure opens when the eye is this close
   const DOOR_RATE = 2.6;     // radians per second
 
-  // What the record says a station is: its structure and its telemetry.
+  // Red-post and manual-kit dimensions, the owner's brief: a collector
+  // Ø200 mm × 300 mm, a staff gauge 1 m, a post 1 m.
+  const COLLECTOR_R = 0.10, COLLECTOR_H = 0.30;
+  const STAFF_H = 1.0, STAFF_W = 0.10;
+  const POST_H = 1.0, POST_R = 0.0375;
+
+  // What the record says a station is: its structure and its telemetry, and
+  // — where it cannot say — why not (`unsure`, words for the notes).
+  //
+  //   structure: 'pole' | 'tower' | 'repeater' | 'collector' | 'staff'
+  //            | 'collector+staff' | 'post'
   function stationKind(st) {
     const name = String((st && st.name) || '').trim();
     const m = /\s(AL|ALERT|TM)$/i.exec(name);
@@ -1544,18 +1763,46 @@ void main() {
     const sensors = st && typeof stationSensors === 'function' ? stationSensors(st) : ((st && st.sensors) || []);
     const types = sensors.map(s => String((s && s.type) || ''));
     const aids = (st && st.alert_ids) || {};
+    const locs = Array.isArray(st && st.location_types) ? st.location_types : [];
+    // The Service Level Specification, by bureau number, where it has loaded.
+    const sls = st && typeof SLS !== 'undefined' && SLS.forStation ? SLS.forStation(st) : null;
+    const slsData = sls ? String(sls.data_type || '') : '';
+    const slsManual = !!sls && /^manual$/i.test(String(sls.gauge_type || ''));
+    const slsAuto = !!sls && /^automatic$/i.test(String(sls.gauge_type || ''));
     const water = types.some(t => /^Water Level|^Gas Pressure/i.test(t))
-      || aids.water_level != null
-      || (Array.isArray(st && st.location_types) && st.location_types.includes('Water Level'));
+      || aids.water_level != null || locs.includes('Water Level') || /river/i.test(slsData);
     const rain = types.some(t => /^Rainfall/i.test(t)) || aids.rainfall != null
-      || (Array.isArray(st && st.location_types) && st.location_types.includes('Rain Gauge'));
+      || locs.includes('Rain Gauge') || /rainfall/i.test(slsData);
+    const repeater = (Array.isArray(st && st.roles) && st.roles.includes('repeater'))
+      || locs.includes('Repeater') || /repeater/i.test(slsData);
     const alertEvidence = sensors.some(s => s && s.alert_id != null) || Object.keys(aids).length > 0;
     const satcom = !!(st && st.satcom && st.satcom.enabled);
     let telemetry = suffix === 'TM' ? 'tm' : suffix ? 'alert' : alertEvidence ? 'alert' : satcom ? 'tm' : null;
     const known = telemetry != null;
-    if (!known) telemetry = 'tm';
-    return { structure: water ? 'tower' : 'pole', telemetry, telemetryKnown: known, water, rain,
-             repeater: Array.isArray(st && st.roles) && st.roles.includes('repeater'), suffix };
+    const dailyRead = Array.isArray(st && st.bureau_listings)
+      && st.bureau_listings.some(b => b && String(b.section) === '2');
+    // Manual: the SLS says so; or, where the SLS says nothing either way,
+    // the Bureau reads it daily and nothing in the record says a radio does.
+    const manual = slsManual || (!slsAuto && !known && dailyRead);
+    const telemetered = !manual && (known || slsAuto);
+    if (!telemetry) telemetry = 'tm';
+    let structure, unsure = null;
+    if (manual) {
+      structure = rain && water ? 'collector+staff' : rain ? 'collector' : water ? 'staff' : 'post';
+      if (structure === 'post') unsure = 'it is read by hand, but nothing says whether it measures rainfall or a river';
+    } else if (telemetered) {
+      structure = water ? 'tower' : rain ? 'pole' : repeater ? 'repeater' : 'post';
+      if (structure === 'post') unsure = `a radio reads it${suffix ? ` (its name ends ${suffix})` : ''}, but nothing says whether it measures rainfall or a river`;
+    } else {
+      structure = 'post';
+      const what = rain && water ? 'rainfall and a river' : rain ? 'rainfall' : water ? 'a river' : repeater ? 'as a repeater' : null;
+      unsure = what
+        ? `the record says it ${what === 'as a repeater' ? 'serves' : 'measures'} ${what}, but not whether a person or a radio reads it`
+        : 'the record says neither what it measures nor whether a person or a radio reads it';
+    }
+    return { structure, telemetry, telemetryKnown: known, telemetered, manual, water, rain, repeater, suffix,
+             sls: sls ? { gauge_type: sls.gauge_type || null, data_type: sls.data_type || null } : null,
+             dailyRead, unsure };
   }
 
   // The kit of parts: materials made once per build, and three shapes placed
@@ -1721,20 +1968,23 @@ void main() {
     const shaft = cyl(g, k.green, POLE_R, POLE_R, POLE_H, 0, POLE_H / 2, 0, 'station pole', 40);
     sc.pole = shaft;
     // The tipping-bucket gauge on the pole's top, its funnel, and the ring on
-    // three arms round it.
-    cyl(g, k.steel, 0.10, 0.10, 0.32, 0, POLE_H + 0.16, 0, 'rain gauge', 32);
-    cyl(g, k.copper, 0.095, 0.06, 0.03, 0, POLE_H + 0.335, 0, 'gauge funnel', 32);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.008, 8, 48), k.steel);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = POLE_H + 0.30;
-    ring.name = 'gauge ring';
-    ring.castShadow = true;
-    g.add(ring);
-    for (let i = 0; i < 3; i++) {
-      const a = i * Math.PI * 2 / 3;
-      const arm = box(g, k.steel, 0.12, 0.008, 0.008, Math.cos(a) * 0.16, POLE_H + 0.30, Math.sin(a) * 0.16, 'ring arm');
-      arm.rotation.y = -a;
-      arm.castShadow = false;
+    // three arms round it — not on a repeater that measures nothing.
+    const gauge = kind.structure !== 'repeater';
+    if (gauge) {
+      cyl(g, k.steel, 0.10, 0.10, 0.32, 0, POLE_H + 0.16, 0, 'rain gauge', 32);
+      cyl(g, k.copper, 0.095, 0.06, 0.03, 0, POLE_H + 0.335, 0, 'gauge funnel', 32);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.008, 8, 48), k.steel);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = POLE_H + 0.30;
+      ring.name = 'gauge ring';
+      ring.castShadow = true;
+      g.add(ring);
+      for (let i = 0; i < 3; i++) {
+        const a = i * Math.PI * 2 / 3;
+        const arm = box(g, k.steel, 0.12, 0.008, 0.008, Math.cos(a) * 0.16, POLE_H + 0.30, Math.sin(a) * 0.16, 'ring arm');
+        arm.rotation.y = -a;
+        arm.castShadow = false;
+      }
     }
     // The role band, as before, below the enclosure's top.
     const role = typeof primaryRole === 'function' ? primaryRole(st) : 'field';
@@ -1779,7 +2029,125 @@ void main() {
     box(g, k.galv, 0.10, 0.03, 0.03, POLE_R + 0.03, 1.30, 0, 'antenna bracket');
     box(g, k.galv, 0.10, 0.03, 0.03, POLE_R + 0.03, 1.80, 0, 'antenna bracket');
     cyl(g, k.white, 0.006, 0.006, 3.0, POLE_R + 0.07, 1.6 + 1.5, 0, 'whip antenna', 8);
-    return { group: g, top: POLE_H + 0.35, poleTop: POLE_H, ladder: null, deck: null };
+    return { group: g, top: gauge ? POLE_H + 0.35 : POLE_H, poleTop: POLE_H, ladder: null, deck: null };
+  }
+
+  // The manual rainfall station: a depositional collector an observer reads,
+  // Ø200 mm and 300 mm tall on the ground, silver. Its outside is the brief's
+  // cylinder exactly; the rim, the funnel sunk into its mouth and the dark of
+  // the throat are inside that envelope, so the ruler is still the ruler.
+  function buildCollector(k, x = 0) {
+    const g = new THREE.Group();
+    g.name = 'rain collector';
+    g.position.x = x;
+    const silver = new THREE.MeshStandardMaterial({ color: 0xc7ccd1, metalness: 0.85, roughness: 0.28 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(COLLECTOR_R, COLLECTOR_R, COLLECTOR_H, 40, 1, true), silver);
+    body.position.y = COLLECTOR_H / 2; body.castShadow = true; body.name = 'collector body';
+    const base = new THREE.Mesh(new THREE.CircleGeometry(COLLECTOR_R, 40), silver);
+    base.rotation.x = -Math.PI / 2; base.position.y = 0.002; base.name = 'collector base';
+    // The funnel: a cone opening upward from the throat to the rim, just
+    // inside the mouth.
+    const funnel = new THREE.Mesh(new THREE.CylinderGeometry(COLLECTOR_R - 0.004, 0.012, 0.07, 40, 1, true),
+      new THREE.MeshStandardMaterial({ color: 0x9aa1a8, metalness: 0.8, roughness: 0.35, side: THREE.DoubleSide }));
+    funnel.position.y = COLLECTOR_H - 0.035; funnel.name = 'collector funnel';
+    const throat = new THREE.Mesh(new THREE.CircleGeometry(0.012, 16), k.black);
+    throat.rotation.x = -Math.PI / 2; throat.position.y = COLLECTOR_H - 0.069; throat.name = 'collector throat';
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(COLLECTOR_R - 0.003, 0.003, 6, 48), silver);
+    rim.rotation.x = Math.PI / 2; rim.position.y = COLLECTOR_H - 0.003; rim.name = 'collector rim';
+    g.add(body, base, funnel, throat, rim);
+    return { group: g, top: COLLECTOR_H };
+  }
+
+  // The staff gauge's face: white, a black E every ten centimetres — the
+  // pattern real plates carry, each E's teeth a centimetre apart — and the
+  // metre figure in red at the foot of each metre. Drawn once per build on a
+  // canvas at 64 px a decimetre.
+  function staffFace() {
+    const PX = 64, W = 64, H = PX * 10;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#ffffff';
+    cx.fillRect(0, 0, W, H);
+    for (let dm = 0; dm < 10; dm++) {
+      // Canvas y runs down from the top, which is 1.0 m; the decimetre from
+      // dm to dm+1 is the band from H − (dm+1)·PX to H − dm·PX.
+      const top = H - (dm + 1) * PX;
+      const u = PX / 10;   // a centimetre
+      cx.fillStyle = '#111111';
+      // The E: its spine on the left for even decimetres, the right for odd,
+      // as the plates alternate; three teeth, each a centimetre deep, at the
+      // decimetre's top, middle and foot.
+      const left = dm % 2 === 0;
+      const sx = left ? 4 : W - 4 - 10;
+      cx.fillRect(sx, top + u * 0.5, 10, u * 9);
+      for (const t of [0.5, 4.5, 8.5]) cx.fillRect(left ? sx : W / 2 - 6, top + u * t, W / 2 + 2, u);
+    }
+    cx.fillStyle = '#d01818';
+    cx.font = '700 30px system-ui, sans-serif';
+    cx.textAlign = 'center';
+    cx.textBaseline = 'bottom';
+    cx.fillText('0', W - 16, H - 2);
+    cx.fillText('1', W - 16, 32);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  // The manual river station: the staff gauge, 1 m tall and 100 mm wide,
+  // standing on the ground on a galvanised post behind it, its face to the
+  // south (the scene's opening view looks north across the station).
+  function buildStaff(k, x = 0) {
+    const g = new THREE.Group();
+    g.name = 'staff gauge';
+    g.position.x = x;
+    // The plate is one white box — one material a mesh, which is what the
+    // .glb writer takes — and its graduations are a face laid a hair proud of
+    // its front.
+    const white = new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.55 });
+    // Named as a gauge board rather than a staff: the flood water's own
+    // staff (see "the flood water") is a simulation and never exported, and
+    // the .glb reader tells the two apart by name.
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(STAFF_W, STAFF_H, 0.012), white);
+    plate.position.set(0, STAFF_H / 2, 0.02); plate.castShadow = true; plate.name = 'gauge board';
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(STAFF_W, STAFF_H),
+      new THREE.MeshStandardMaterial({ map: staffFace(), roughness: 0.55 }));
+    face.position.set(0, STAFF_H / 2, 0.0265); face.name = 'gauge board graduations';
+    const post = box(g, k.galv, 0.04, STAFF_H, 0.04, 0, STAFF_H / 2, -0.012, 'gauge board post');
+    post.castShadow = true;
+    g.add(plate, face);
+    return { group: g, top: STAFF_H };
+  }
+
+  // A station the record cannot say what it is: a red post, 1 m, and no more.
+  function buildPost() {
+    const g = new THREE.Group();
+    g.name = 'unknown station post';
+    const red = new THREE.MeshStandardMaterial({ color: 0xd62020, roughness: 0.5 });
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(POST_R, POST_R, POST_H, 20), red);
+    post.position.y = POST_H / 2; post.castShadow = true; post.name = 'red post';
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(POST_R, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), red);
+    cap.position.y = POST_H; cap.name = 'red post cap';
+    g.add(post, cap);
+    return { group: g, top: POST_H + POST_R };
+  }
+
+  // The manual kit, one or both — side by side when both, 1.2 m apart, the
+  // origin between them.
+  function buildManual(kind, k) {
+    const g = new THREE.Group();
+    g.name = 'station';
+    let top = 0;
+    const both = kind.structure === 'collector+staff';
+    if (kind.structure === 'collector' || both) {
+      const c = buildCollector(k, both ? -0.6 : 0);
+      g.add(c.group); top = Math.max(top, c.top);
+    }
+    if (kind.structure === 'staff' || both) {
+      const t = buildStaff(k, both ? 0.6 : 0);
+      g.add(t.group); top = Math.max(top, t.top);
+    }
+    return { group: g, top, poleTop: top, ladder: null, deck: null };
   }
 
   // The river-gauge tower.
@@ -1900,16 +2268,57 @@ void main() {
   }
 
   // The station at the origin: which of the two, built, and remembered.
+  // One station, built by its kind, standing at its own origin: what
+  // buildStation puts at the patch's centre and what "the neighbours" put
+  // wherever theirs are.
+  function makeStation(st, kind, k) {
+    switch (kind.structure) {
+      case 'tower': return buildTower(st, kind, k);
+      case 'pole': case 'repeater': return buildPoleStation(st, kind, k);
+      case 'collector': case 'staff': case 'collector+staff': return buildManual(kind, k);
+      default: {
+        const p = buildPost();
+        p.group.name = 'station';
+        return { group: p.group, top: p.top, poleTop: POST_H, ladder: null, deck: null };
+      }
+    }
+  }
+
   function buildStation(st) {
     const kind = stationKind(st);
     const k = kitMaterials();
     sc.doors = [];
-    const built = kind.structure === 'tower' ? buildTower(st, kind, k) : buildPoleStation(st, kind, k);
+    sc.pole = null; sc.band = null;
+    const built = makeStation(st, kind, k);
     built.group.position.y = 0;
     sc.station = built.group;
     sc.scene.add(built.group);
     tw.model = { ...kind, top: built.top, poleTop: built.poleTop, ladder: built.ladder, deck: built.deck,
                  plate: { name: st.name || st.id, number: st.station_number ? String(st.station_number) : '' } };
+  }
+
+  // The station as a phrase, for the canvas's name.
+  function modelWords(m) {
+    switch (m && m.structure) {
+      case 'tower': return 'a river-gauge tower with its platform 4 m up';
+      case 'repeater': return 'a repeater\'s pole 2 m tall';
+      case 'collector': return 'a manual rain collector 300 mm tall';
+      case 'staff': return 'a 1 m staff gauge';
+      case 'collector+staff': return 'a manual rain collector and a 1 m staff gauge';
+      case 'post': return 'a 1 m red post — the record does not say what the station is';
+      default: return 'a Type 3 rainfall pole 2 m tall';
+    }
+  }
+
+  // What the build says about the station it stood up, for the notes.
+  function stationNote(m) {
+    if (!m) return null;
+    if (m.structure === 'post') return `There is no telling from the record what this station is — ${m.unsure} — so it is drawn as a red post 1 m tall rather than as a guess.`;
+    if (m.structure === 'collector+staff') return 'A manual station that reads both rainfall and a river: the collector and the staff gauge are drawn side by side at its one position, though on the ground they are often apart.';
+    if ((m.structure === 'pole' || m.structure === 'tower' || m.structure === 'repeater') && !m.telemetryKnown) {
+      return `This station's radio is not in its record — no AL or TM in the name, no ALERT addresses, no satcom${m.sls && m.sls.gauge_type ? '; the SLS says only that it is automatic' : ''} — so its enclosure is drawn as a TM station's: a CR300 logger and a Beam SBD modem.`;
+    }
+    return null;
   }
 
   // The ladder's foot, and its height, live: the ground under it moves with
@@ -2727,6 +3136,616 @@ void main() {
     requestFrame();
   }
 
+  // ── the neighbours ─────────────────────────────────────────────────────────
+  // Other stations whose positions fall inside the patch — a river gauge and
+  // the rain gauge beside it, a repeater on the ridge above a town — are
+  // built too, by the same rules as the one at the centre (stationKind,
+  // makeStation), each standing on the ground where the record puts it with
+  // its name over it. The nearest NEIGHBOUR_CAP, which a 1.6 km patch in a
+  // town can reach; the line under the stage says if more were left out.
+  // Their enclosure doors open as the POV visitor walks up, as the centre's
+  // do; a tower's deck is climbed only at the centre, so a neighbour tower's
+  // deck doors are not hung. Each name is a button on the line under the
+  // stage that goes to that station's own twin, as a radio path's far end
+  // does. In the .glb, like the station at the centre: they are the site.
+  const NEIGHBOUR_CAP = 40;
+
+  function removeNeighbours() {
+    if (sc.neighbours && sc.scene) { sc.scene.remove(sc.neighbours); disposeObject(sc.neighbours); }
+    sc.neighbours = null;
+    tw.neighbours = null;
+  }
+
+  function neighboursOf(st) {
+    const g = tw.ground, o = tw.origin;
+    if (!g || !o || !st || !state.data) return { list: [], more: 0 };
+    const all = [];
+    for (const s of state.data.stations) {
+      if (s.id === st.id || !located(s)) continue;
+      const p = localXZ(Number(s.lat), Number(s.lon), o.lat, o.lon);
+      if (Math.abs(p.x) > g.half || Math.abs(p.z) > g.half) continue;
+      all.push({ s, x: p.x, z: p.z, d: Math.hypot(p.x, p.z) });
+    }
+    all.sort((a, b) => a.d - b.d);
+    return { list: all.slice(0, NEIGHBOUR_CAP), more: Math.max(0, all.length - NEIGHBOUR_CAP) };
+  }
+
+  function buildNeighbours(st) {
+    removeNeighbours();
+    const { list, more } = neighboursOf(st);
+    tw.neighbours = { list: [], more };
+    if (!list.length || !sc.scene) { refreshSiteLine(); return; }
+    const grp = new THREE.Group();
+    grp.name = 'neighbours';
+    const k = kitMaterials();
+    const keep = { pole: sc.pole, band: sc.band };
+    for (const n of list) {
+      const kind = stationKind(n.s);
+      const before = sc.doors.length;
+      const built = makeStation(n.s, kind, k);
+      sc.doors = sc.doors.filter((d, i) => i < before || d.when !== 'deck');
+      built.group.name = `station ${n.s.name || n.s.id}`;
+      built.group.userData.neighbour = n.s.id;
+      grp.add(built.group);
+      const sign = makeSign(n.s.name || n.s.id, n.s.station_number ? String(n.s.station_number) : null);
+      sign.userData.neighbourSign = n.s.id;
+      sign.userData.top = built.top;
+      // A sign 3 m wide 400 m off is a speck: scaled with its distance, as a
+      // radio path's far-end sign is.
+      const kk = Math.max(1, n.d / 60);
+      sign.scale.multiplyScalar(kk);
+      sign.userData.lift = 0.75 * kk;
+      sign.visible = !!S().label;
+      grp.add(sign);
+      tw.neighbours.list.push({ id: n.s.id, name: n.s.name || n.s.id, x: n.x, z: n.z, d: n.d,
+                                bearing: (Math.atan2(n.x, -n.z) * 180 / Math.PI + 360) % 360,
+                                structure: kind.structure, top: built.top, group: built.group, sign });
+    }
+    sc.pole = keep.pole; sc.band = keep.band;
+    sc.neighbours = grp;
+    sc.scene.add(grp);
+    placeNeighbours();
+    refreshSiteLine();
+  }
+
+  // On the ground as drawn: the exaggeration lifts the ground under them.
+  function placeNeighbours() {
+    if (!tw.neighbours) return;
+    for (const n of tw.neighbours.list) {
+      const y = yAt(n.x, n.z);
+      n.group.position.set(n.x, y, n.z);
+      n.sign.position.set(n.x, y + n.top + n.sign.userData.lift, n.z);
+    }
+    requestFrame();
+  }
+
+  // ── the crossings ──────────────────────────────────────────────────────────
+  // The ground this tab stands on is bare earth — a LiDAR DTM is made by
+  // taking the bridges out — so a road bridge over a creek is, here, a road
+  // that dives into the creek and climbs the far bank, and the imagery draped
+  // on that ground dives with it. So each bridge in the patch is built as a
+  // deck across the gap, with the imagery of the road on its top, girders
+  // under it, rails along it and piers down to the bed.
+  //
+  // Where the bridges are: Queensland's own road network — the "Bridges" layer
+  // of RoadsAndTracks, polylines the length of each span, and the railway
+  // bridges of OtherTransport — asked for the patch's box, from the same
+  // State that serves the ground (CORS reflects any origin). Outside the
+  // State, and where it cannot be reached, OpenStreetMap's bridge ways through
+  // Overpass (the endpoints map-rivers.js asks). Neither answering leaves the
+  // ground as it is and says so; no deck is ever guessed at.
+  //
+  // How high the deck is:
+  //   * **The crossing the gauge is read against**, where the Bureau lists one
+  //     (the river height station lists' crossings, 0031: a height on the
+  //     gauge for a Bridge, Old Bridge or Highway crossing) and the gauge's
+  //     zero is surveyed in AHD: that height, in AHD, on the bridge nearest
+  //     the gauge within CROSSING_REACH — level from end to end. It is the
+  //     height the Bureau says the crossing goes under at, which is to say
+  //     the deck. The flood water, rising, covers it there.
+  //   * **Otherwise the banks**: the ground at each end of the span, a few
+  //     metres out along the road where the approach meets the abutment
+  //     (the higher of the end and that point), and a straight deck between
+  //     the two. The bank is the approach road, and the approach road is the
+  //     deck's level at each end.
+  //
+  // The widths are not in either source: a road bridge is drawn 8 m across
+  // (two lanes and their shoulders), a railway's 5 m, a track's 4 m. Piers
+  // every ~15 m where the deck stands more than 1.5 m over the ground.
+  const QLD_GIS = 'https://spatial-gis.information.qld.gov.au/arcgis/rest/services';
+  const QLD_BRIDGES = [
+    { url: `${QLD_GIS}/Transportation/RoadsAndTracks/MapServer/22/query`, kind: 'road' },
+    { url: `${QLD_GIS}/Transportation/OtherTransport/MapServer/160/query`, kind: 'rail' },
+  ];
+  const OVERPASS_URLS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+  const CROSSING_REACH = 250;   // metres from the gauge the listed crossing may be
+  const BRIDGE_TYPES = new Set(['B', 'O', 'H']);   // Bridge, Old Bridge, Highway (0031's legend)
+  const DECK_THICK = 0.8;       // the deck and its girders
+  const BRIDGE_W = { road: 8, rail: 5, track: 4 };
+  const bridgeCache = new Map();   // boxKey → Promise<{ list, source, failed }>
+
+  function removeBridges() {
+    if (sc.bridges && sc.scene) { sc.scene.remove(sc.bridges); disposeObject(sc.bridges); }
+    sc.bridges = null;
+  }
+
+  function qldBridges(box) {
+    const env = `${box.west},${box.south},${box.east},${box.north}`;
+    return Promise.all(QLD_BRIDGES.map(src => {
+      const q = new URLSearchParams({
+        geometry: env, geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects',
+        outFields: '*', returnGeometry: 'true', outSR: '4326', f: 'json',
+      });
+      return fetchBytes(`${src.url}?${q}`).then(buf => {
+        const j = JSON.parse(new TextDecoder().decode(buf));
+        if (j.error) throw new Error(j.error.message || 'the service refused the query');
+        return (j.features || []).flatMap(f => ((f.geometry && f.geometry.paths) || []).map(path => ({
+          kind: src.kind === 'rail' ? 'rail' : /track/i.test(String((f.attributes || {}).feature_type || '')) ? 'track' : 'road',
+          name: (f.attributes && (f.attributes.name || null)) || null,
+          length_m: f.attributes && isFinite(f.attributes.dimension_m) ? Number(f.attributes.dimension_m) : null,
+          points: path.map(p => [p[1], p[0]]),
+        })));
+      });
+    })).then(parts => ({ list: parts.flat(), source: 'qld' }));
+  }
+
+  function osmBridges(box) {
+    const b = `${box.south},${box.west},${box.north},${box.east}`;
+    const ql = `[out:json][timeout:20];(way["bridge"]["highway"](${b});way["bridge"]["railway"](${b}););out geom tags;`;
+    const tryAt = i => {
+      if (i >= OVERPASS_URLS.length) return Promise.reject(new Error('no Overpass endpoint answered'));
+      return fetch(OVERPASS_URLS[i], { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                       body: 'data=' + encodeURIComponent(ql) })
+        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .catch(() => tryAt(i + 1));
+    };
+    return tryAt(0).then(j => ({
+      source: 'osm',
+      list: ((j && j.elements) || []).filter(e => Array.isArray(e.geometry) && e.geometry.length > 1).map(e => {
+        const t = e.tags || {};
+        const lanes = Number(t.lanes);
+        const width = Number(String(t.width || '').replace(/[^\d.]/g, ''));
+        return {
+          kind: t.railway ? 'rail' : /track|path|footway|cycleway/.test(t.highway || '') ? 'track' : 'road',
+          name: t.name || t.ref || null, length_m: null,
+          width_m: isFinite(width) && width > 2 ? width : isFinite(lanes) && lanes > 0 ? lanes * 3.5 + 1.5 : null,
+          points: e.geometry.map(p => [p.lat, p.lon]),
+        };
+      }),
+    }));
+  }
+
+  function bridgesFor(box) {
+    const key = boxKey(box);
+    if (bridgeCache.has(key)) return bridgeCache.get(key);
+    const p = (insideBox(box, QLD_DEM_BOX) ? qldBridges(box).catch(() => osmBridges(box)) : osmBridges(box))
+      .catch(err => ({ list: [], source: null, failed: (err && err.message) || 'unreachable' }));
+    bridgeCache.set(key, p);
+    p.then(r => { if (r.failed) bridgeCache.delete(key); });
+    return p;
+  }
+
+  // The crossing the gauge is read against, in AHD, where the record can say.
+  function listedCrossing(st) {
+    if (!st || typeof FloodStages === 'undefined') return null;
+    const lad = FloodStages.ladder(st);
+    if (lad.ahdZero == null) return null;
+    const rows = [];
+    for (const c of (st.crossings || [])) {
+      if (c && BRIDGE_TYPES.has(String(c.crossing_type || '').trim()) && isFinite(Number(c.height_m)) && c.height_m !== null && c.height_m !== '') {
+        rows.push({ height: Number(c.height_m), type: c.crossing_type, name: c.name || null, as_at: c.as_at || '' });
+      }
+    }
+    for (const c of (st.flood_classes || [])) {
+      if (c && BRIDGE_TYPES.has(String(c.crossing_type || '').trim()) && c.crossing_height_m != null && isFinite(Number(c.crossing_height_m))) {
+        rows.push({ height: Number(c.crossing_height_m), type: c.crossing_type, name: null, as_at: c.as_at || '' });
+      }
+    }
+    if (!rows.length) return null;
+    rows.sort((a, b) => (a.as_at < b.as_at ? 1 : a.as_at > b.as_at ? -1 : 0));
+    const r = rows[0];
+    return { ...r, ahd: lad.ahdZero + r.height, zero: lad.ahdZero };
+  }
+
+  // A bridge's centreline in the patch's metres, densified to ~2 m, with the
+  // distance along it — clipped to the patch (a span running out of it is
+  // drawn to its edge).
+  function spanXZ(points) {
+    const g = tw.ground, o = tw.origin;
+    const raw = points.map(p => localXZ(p[0], p[1], o.lat, o.lon));
+    const out = [];
+    for (let i = 0; i < raw.length - 1; i++) {
+      const a = raw[i], b = raw[i + 1];
+      const L = Math.hypot(b.x - a.x, b.z - a.z);
+      // 60 m is thirty steps of 2 m, not thirty-one of 1.94 because the
+      // degrees came back a nanometre long.
+      const n = Math.max(1, Math.ceil(L / 2 - 1e-6));
+      for (let j = (i ? 1 : 0); j <= n; j++) out.push({ x: a.x + (b.x - a.x) * j / n, z: a.z + (b.z - a.z) * j / n });
+    }
+    const inside = out.filter(p => Math.abs(p.x) <= g.half && Math.abs(p.z) <= g.half);
+    let s = 0;
+    for (let i = 0; i < inside.length; i++) {
+      if (i) s += Math.hypot(inside[i].x - inside[i - 1].x, inside[i].z - inside[i - 1].z);
+      inside[i].s = s;
+    }
+    return inside;
+  }
+
+  // The bank at one end of a span: the ground at the end and a few metres on
+  // along the road, the higher of the two (AHD).
+  function bankAt(end, next) {
+    const dx = end.x - next.x, dz = end.z - next.z, L = Math.hypot(dx, dz) || 1;
+    const out = { x: end.x + dx / L * 4, z: end.z + dz / L * 4 };
+    return Math.max(heightAt(end.x, end.z), heightAt(out.x, out.z));
+  }
+
+  // One bridge's deck, girders, rails and piers, from its centreline and its
+  // deck level at each point (AHD). The deck's top wears the patch's own
+  // imagery, mapped as the ground's is, so the road on it is the road the
+  // aerial photograph saw.
+  function makeBridge(pts, deckAt, width, kind, name) {
+    const g = tw.ground, exag = S().exag;
+    const grp = new THREE.Group();
+    grp.name = `bridge${name ? ` ${name}` : ''}`;
+    const half = width / 2;
+    const top = [], bot = [], uv = [];
+    const side = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+      const dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz) || 1;
+      const nx = -dz / L, nz = dx / L;   // across the road
+      const y = (deckAt(i) - g.h0) * exag;
+      side.push({ nx, nz, y });
+      for (const sgn of [-1, 1]) {
+        const x = pts[i].x + nx * half * sgn, z = pts[i].z + nz * half * sgn;
+        top.push(x, y, z);
+        bot.push(x, y - DECK_THICK, z);
+        uv.push((x + g.half) / g.size, (g.half - z) / g.size);
+      }
+    }
+    const n = pts.length;
+    const quad = (idx, a, b, c, d) => { idx.push(a, b, c, a, c, d); };
+    // The top: the imagery, where there is imagery.
+    const tg = new THREE.BufferGeometry();
+    tg.setAttribute('position', new THREE.Float32BufferAttribute(top, 3));
+    tg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    const ti = [];
+    for (let i = 0; i < n - 1; i++) quad(ti, 2 * i, 2 * i + 2, 2 * i + 3, 2 * i + 1);
+    tg.setIndex(ti);
+    tg.computeVertexNormals();
+    const deckMat = new THREE.MeshStandardMaterial({ color: sc.texture && S().imagery ? 0xffffff : 0x6f7378, roughness: 0.9,
+                                                     map: sc.texture && S().imagery ? sc.texture : null, side: THREE.DoubleSide });
+    const deck = new THREE.Mesh(tg, deckMat);
+    deck.name = 'bridge deck';
+    deck.castShadow = true; deck.receiveShadow = true;
+    deck.userData.deckMap = true;
+    grp.add(deck);
+    // The girders: the two sides and the soffit, concrete.
+    const sg = new THREE.BufferGeometry();
+    const pos = [];
+    for (let i = 0; i < n; i++) pos.push(...top.slice(6 * i, 6 * i + 6), ...bot.slice(6 * i, 6 * i + 6));
+    sg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const si = [];
+    for (let i = 0; i < n - 1; i++) {
+      const A = 4 * i, B = 4 * (i + 1);
+      quad(si, A, A + 2, B + 2, B);           // one side: top-left, bottom-left
+      quad(si, A + 1, B + 1, B + 3, A + 3);   // the other
+      quad(si, A + 2, A + 3, B + 3, B + 2);   // the soffit
+    }
+    sg.setIndex(si);
+    sg.computeVertexNormals();
+    const concrete = new THREE.MeshStandardMaterial({ color: 0x9c9b95, roughness: 0.95, side: THREE.DoubleSide });
+    const girders = new THREE.Mesh(sg, concrete);
+    girders.name = 'bridge girders';
+    girders.castShadow = true;
+    grp.add(girders);
+    // Rails along both edges, a metre up (a track bridge's are timber-low).
+    const railH = kind === 'track' ? 0.6 : 1.0;
+    const railMat = new THREE.MeshStandardMaterial({ color: 0xb8bcc0, metalness: 0.6, roughness: 0.4 });
+    for (const sgn of [-1, 1]) {
+      for (let i = 0; i < n - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        const sa = side[i], sb = side[i + 1];
+        const ax = a.x + sa.nx * half * sgn, az = a.z + sa.nz * half * sgn;
+        const bx = b.x + sb.nx * half * sgn, bz = b.z + sb.nz * half * sgn;
+        const L = Math.hypot(bx - ax, bz - az);
+        if (L < 1e-6) continue;
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, railH, L), railMat);
+        rail.position.set((ax + bx) / 2, (sa.y + sb.y) / 2 + railH / 2, (az + bz) / 2);
+        rail.rotation.y = Math.atan2(bx - ax, bz - az);
+        rail.name = 'bridge rail';
+        grp.add(rail);
+      }
+    }
+    // Piers, where there is room under the deck for one.
+    const span = pts[n - 1].s;
+    const count = Math.floor(span / 15);
+    for (let k = 1; k <= count; k++) {
+      const want = span * k / (count + 1);
+      let i = 0;
+      while (i < n - 1 && pts[i + 1].s < want) i++;
+      const p = pts[i], sd = side[i];
+      const ground = yAt(p.x, p.z);
+      const h = sd.y - DECK_THICK - ground;
+      if (h < 1.5) continue;
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(width * 0.7, h, 0.8), concrete);
+      pier.position.set(p.x, ground + h / 2, p.z);
+      pier.rotation.y = Math.atan2(-sd.nz, sd.nx);   // its long side across the road
+      pier.name = 'bridge pier';
+      pier.castShadow = true;
+      grp.add(pier);
+    }
+    return grp;
+  }
+
+  function buildBridges(st, found) {
+    removeBridges();
+    tw.bridges = { status: 'none', source: found ? found.source : null, list: [], failed: found && found.failed || null, crossing: null };
+    if (!found || !found.list.length || !sc.scene || !tw.ground) { refreshSiteLine(); return []; }
+    const notes = [];
+    const listed = listedCrossing(st);
+    tw.bridges.crossing = listed;
+    const spans = found.list.map(b => ({ b, pts: spanXZ(b.points) })).filter(x => x.pts.length >= 2 && x.pts[x.pts.length - 1].s >= 3);
+    // The listed crossing goes on the span nearest the gauge, if one is near.
+    let nearest = null, nearD = Infinity;
+    for (const sp of spans) {
+      for (const p of sp.pts) {
+        const d = Math.hypot(p.x, p.z);
+        if (d < nearD) { nearD = d; nearest = sp; }
+      }
+    }
+    const grp = new THREE.Group();
+    grp.name = 'bridges';
+    for (const sp of spans) {
+      const pts = sp.pts, n = pts.length;
+      const width = sp.b.width_m || BRIDGE_W[sp.b.kind] || 8;
+      let basis, deckAt;
+      const underMin = Math.min(...pts.map(p => heightAt(p.x, p.z)));
+      if (listed && sp === nearest && nearD <= CROSSING_REACH && listed.ahd > underMin) {
+        basis = 'crossing';
+        deckAt = () => listed.ahd;
+      } else {
+        basis = 'banks';
+        const hA = bankAt(pts[0], pts[1]), hB = bankAt(pts[n - 1], pts[n - 2]);
+        const S0 = pts[n - 1].s || 1;
+        deckAt = i => hA + (hB - hA) * pts[i].s / S0;
+      }
+      grp.add(makeBridge(pts, deckAt, width, sp.b.kind, sp.b.name));
+      tw.bridges.list.push({
+        name: sp.b.name, kind: sp.b.kind, width, basis, length: pts[n - 1].s,
+        deck: [deckAt(0), deckAt(n - 1)], under: underMin, near: sp === nearest ? nearD : null,
+        ends: [{ x: pts[0].x, z: pts[0].z }, { x: pts[n - 1].x, z: pts[n - 1].z }],
+      });
+    }
+    if (listed && !tw.bridges.list.some(b => b.basis === 'crossing')) {
+      notes.push(`The Bureau lists the crossing this gauge is read against at ${listed.height.toFixed(2)} m on the gauge (${(listed.ahd).toFixed(2)} m AHD), but no bridge in this patch is within ${CROSSING_REACH} m of the gauge to carry it, so ${spans.length === 1 ? 'the bridge here stands at its banks' : 'the bridges here stand at their banks'}.`);
+    }
+    tw.bridges.status = 'ok';
+    sc.bridges = grp;
+    sc.scene.add(grp);
+    refreshSiteLine();
+    requestFrame();
+    return notes;
+  }
+
+  function loadBridges(st, seq, notes) {
+    const box = patchBox(tw.origin.lat, tw.origin.lon, tw.ground.size);
+    tw.bridges = { status: 'loading', list: [], source: null, failed: null, crossing: null };
+    refreshSiteLine();
+    return bridgesFor(box).then(found => {
+      if (seq !== tw.seq || !sc.scene) return;
+      tw.bridgesFound = found;
+      const said = buildBridges(st, found);
+      if (found.failed) {
+        notes.push('Neither Queensland\'s road network nor OpenStreetMap could be asked where the bridges are, so any bridge here is drawn where the bare ground puts its road — down the bank and up the other side.');
+      }
+      if (said.length) notes.push(...said);
+      if (found.failed || said.length) setNotes(notes);
+    });
+  }
+
+  // ── what else is in the patch, as words ──────────────────────────────────
+  // The neighbours by name — each a button that goes to that station's own
+  // twin — and the bridges with the level their decks stand at and why.
+  function siteLineHtml() {
+    const parts = [];
+    const N_ = tw.neighbours;
+    if (N_ && N_.list.length) {
+      const btns = N_.list.slice(0, 12).map(n => `<button type="button" class="link-btn twin-site-stn" onclick="DigitalTwin.followPath('${escAttr(n.id)}')"
+          title="Go to ${escAttr(n.name)}'s own twin">${esc(n.name)}</button> <span class="twin-path-fact">${Math.round(n.d)} m ${compassWord(n.bearing)}</span>`);
+      const more = N_.list.length - 12 + N_.more;
+      parts.push(`<span class="twin-site-lead"><span aria-hidden="true">📡</span> Also in this patch (${N_.list.length + N_.more}):</span> ${btns.join(' · ')}${more > 0 ? ` · and ${more} more` : ''}`);
+    }
+    const B = tw.bridges;
+    if (B && B.status === 'loading') parts.push('<span class="twin-site-lead"><span aria-hidden="true">🌉</span> Looking for bridges…</span>');
+    else if (B && B.list.length) {
+      const words = B.list.map(b => {
+        const lvl = b.deck[0] === b.deck[1] || Math.abs(b.deck[0] - b.deck[1]) < 0.005
+          ? `${b.deck[0].toFixed(2)} m AHD` : `${b.deck[0].toFixed(2)}–${b.deck[1].toFixed(2)} m AHD`;
+        const why = b.basis === 'crossing'
+          ? `the crossing height the Bureau lists (${B.crossing.height.toFixed(2)} m on the gauge)`
+          : 'the height of its banks';
+        return `${esc(b.name || (b.kind === 'rail' ? 'a railway bridge' : 'a bridge'))}, its deck at ${lvl} — ${why}`;
+      });
+      parts.push(`<span class="twin-site-lead"><span aria-hidden="true">🌉</span> Bridges (${B.list.length}):</span> ${words.join(' · ')}`);
+    }
+    return parts.join(' <span aria-hidden="true">·</span> ');
+  }
+  function refreshSiteLine() {
+    const el = document.getElementById('twin-site');
+    if (!el) return;
+    const html = sc.scene || tw.neighbours || tw.bridges ? siteLineHtml() : '';
+    el.innerHTML = html;
+    el.hidden = !html;
+    el.title = el.textContent.replace(/\s+/g, ' ').trim();
+  }
+
+  // ── the pin being moved ────────────────────────────────────────────────────
+  // The twin is where a station's position can be put right to the
+  // centimetre: the ground is the State's LiDAR and the imagery is flown at
+  // 10–20 cm over most towns. So the move-pin mode (map-move-pin.js) draws
+  // its pin here too — read from MapMovePin.drawn(), never kept here, the way
+  // map-3d.js draws it on its terrain: an amber post standing on the ground
+  // where the pin is, taller than whatever is built at the station so its
+  // head shows over it, a ring round its foot, a grey ring on the ground where
+  // the station was and a dashed line along the ground between the two.
+  //
+  // It is operated like everything else on this stage, with the pointer: a
+  // press on the post drags it across the ground (the ray from the pointer to
+  // the patch's own mesh — never the horizon's, which is scenery a kilometre
+  // off), and a click on the ground puts it there. Every position goes back
+  // through MapMovePin.moveTo() as a latitude and longitude, the inverse of
+  // localXZ about the station the patch is centred on; the panel on the stage
+  // (#twin-movepin-panel, drawn by MapMovePin) reads the numbers back, and
+  // Save and Cancel are there. Not in the .glb: it is a question being asked
+  // of the site, not part of it.
+  const PIN_COLOUR = 0xffc400;   // 2-D's amber (MAP_PIN_HIT, map-move-pin.js's ring)
+  const PIN_REACH  = 0.9;        // metres round the post a press still takes hold of it
+
+  function pinAt(latlon) {
+    const o = tw.origin;
+    if (!o || !latlon) return null;
+    const p = localXZ(latlon[0], latlon[1], o.lat, o.lon);
+    const g = tw.ground;
+    return g && Math.abs(p.x) <= g.half && Math.abs(p.z) <= g.half ? p : null;
+  }
+  function latLonAt(x, z) {
+    const o = tw.origin;
+    return { lat: o.lat - z / metresPerDegLat(), lon: o.lon + x / metresPerDegLon(o.lat) };
+  }
+
+  function removeMovePin() {
+    if (sc.movepin && sc.scene) { sc.scene.remove(sc.movepin.group); disposeObject(sc.movepin.group); }
+    sc.movepin = null;
+  }
+
+  function makeMovePin() {
+    const grp = new THREE.Group();
+    grp.name = 'move pin';
+    const amber = new THREE.MeshStandardMaterial({ color: PIN_COLOUR, emissive: PIN_COLOUR, emissiveIntensity: 0.35, roughness: 0.45 });
+    const H = Math.max(3.5, (tw.model ? tw.model.top : POLE_H) + 1.2);
+    const pin = new THREE.Group();
+    pin.name = 'pin';
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, H, 12), amber);
+    post.position.y = H / 2; post.name = 'pin post';
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 14), amber);
+    head.position.y = H; head.name = 'pin head';
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.045, 8, 40), amber);
+    ring.rotation.x = Math.PI / 2; ring.position.y = 0.04; ring.name = 'pin ring';
+    // What a press takes hold of: wider than the post, never drawn.
+    const hit = new THREE.Mesh(new THREE.CylinderGeometry(PIN_REACH, PIN_REACH, H + 0.6, 12),
+                               new THREE.MeshBasicMaterial({ visible: false }));
+    hit.position.y = (H + 0.6) / 2; hit.name = 'pin hit';
+    pin.add(post, head, ring, hit);
+    const ghost = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.58, 40),
+      new THREE.MeshBasicMaterial({ color: 0x6b7a89, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
+    ghost.rotation.x = -Math.PI / 2; ghost.name = 'pin was here';
+    const leader = new THREE.Line(new THREE.BufferGeometry(),
+      new THREE.LineDashedMaterial({ color: 0x0b5cab, dashSize: 0.6, gapSize: 0.4, depthTest: false, transparent: true }));
+    leader.renderOrder = 3; leader.name = 'pin leader';
+    grp.add(pin, ghost, leader);
+    noExport(grp);
+    sc.movepin = { group: grp, pin, post, head, hit, ring, ghost, leader, H };
+    sc.scene.add(grp);
+  }
+
+  // Where the pin is, on the ground as drawn — the exaggeration moves it with
+  // the ground, as it moves the figure.
+  function placeMovePin() {
+    const m = sc.movepin;
+    const d = typeof MapMovePin !== 'undefined' && MapMovePin.drawn ? MapMovePin.drawn() : null;
+    if (!m || !d) return false;
+    const a = pinAt(d.at);
+    if (!a) { m.group.visible = false; return false; }
+    m.group.visible = true;
+    m.pin.position.set(a.x, yAt(a.x, a.z), a.z);
+    const f = d.from ? pinAt(d.from) : null;
+    m.ghost.visible = !!f;
+    m.leader.visible = !!f;
+    if (f) {
+      m.ghost.position.set(f.x, yAt(f.x, f.z) + 0.03, f.z);
+      const pts = [];
+      const K = 24;
+      for (let i = 0; i <= K; i++) {
+        const x = f.x + (a.x - f.x) * i / K, z = f.z + (a.z - f.z) * i / K;
+        pts.push(new THREE.Vector3(x, yAt(x, z) + 0.06, z));
+      }
+      m.leader.geometry.dispose();
+      m.leader.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+      m.leader.computeLineDistances();
+    }
+    return true;
+  }
+
+  // MapMovePin changed: armed, dragged, saved or cancelled. The pin is drawn
+  // when the station armed is one whose pin stands in this patch — usually
+  // the station on screen, and any other whose position the patch holds.
+  function movePinChanged() {
+    const d = typeof MapMovePin !== 'undefined' && MapMovePin.drawn ? MapMovePin.drawn() : null;
+    syncMovePinUi();
+    if (!sc.scene || !THREE || !tw.ground || !tw.origin) { if (!d) removeMovePin(); return; }
+    if (!d) { removeMovePin(); rig.pinDrag = null; requestFrame(); return; }
+    if (!sc.movepin) makeMovePin();
+    placeMovePin();
+    // The sharp drape follows the pin — at the end of a drag, never during.
+    if (rig.pinDrag == null && sc.movepin.group.visible) sharpenAt(sc.movepin.pin.position.x, sc.movepin.pin.position.z);
+    requestFrame();
+  }
+
+  function showsPin() { return !!(sc.movepin && sc.movepin.group.visible); }
+
+  function syncMovePinUi() {
+    const btn = document.getElementById('twin-movepin-btn');
+    if (!btn) return;
+    const st = currentStation();
+    const on = !!(st && typeof MapMovePin !== 'undefined' && MapMovePin.armed() === st.id);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    const label = btn.querySelector('.map-twin-label'), sr = btn.querySelector('.sr-only');
+    if (label) {
+      label.textContent = on ? ' Moving…' : ' Move pin';
+      if (sr) sr.textContent = on ? 'Stop moving the pin' : 'Move this station\'s pin';
+    } else {
+      btn.textContent = on ? '📍 Moving the pin…' : '📍 Move pin';
+    }
+  }
+
+  // The pointer's ray onto the patch's own ground: { x, z } or null.
+  function groundUnder(clientX, clientY) {
+    if (!sc.terrain || !sc.camera) return null;
+    const r = sc.canvas.getBoundingClientRect();
+    const nd = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    const rc = new THREE.Raycaster();
+    rc.setFromCamera(nd, sc.camera);
+    const hit = rc.intersectObject(sc.terrain, false)[0];
+    return hit ? { x: hit.point.x, z: hit.point.z } : null;
+  }
+
+  // A press on the post takes hold of it.
+  function pinUnder(clientX, clientY) {
+    if (!showsPin() || !sc.camera) return false;
+    const r = sc.canvas.getBoundingClientRect();
+    const nd = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    const rc = new THREE.Raycaster();
+    rc.setFromCamera(nd, sc.camera);
+    return rc.intersectObject(sc.movepin.hit, false).length > 0;
+  }
+
+  // The pin to the ground under the pointer. `silent` while a drag is under
+  // way: the panel follows, the note waits for the end of it.
+  function pinTo(clientX, clientY, silent) {
+    const p = groundUnder(clientX, clientY);
+    if (!p || !tw.origin) return false;
+    const ll = latLonAt(p.x, p.z);
+    MapMovePin.moveTo(ll.lat, ll.lon, { silent });
+    return true;
+  }
+
+  // Armed, and for a station whose pin this patch shows: the ground's clicks
+  // are the pin's.
+  function pinArmedHere() {
+    return typeof MapMovePin !== 'undefined' && !!MapMovePin.armed() && showsPin();
+  }
+
   // ── the flood water ────────────────────────────────────────────────────────
   // The river at the heights it is known to reach — the Bureau's flood classes,
   // the modelled AEP levels, the peaks it has reached where there are any
@@ -2759,6 +3778,13 @@ void main() {
   const FLOOD_ALPHA   = { below: 0.45, level: 0.62 };
 
   let floodClock = null;       // the check's seam: a shorter cycle
+
+  // Levels borrowed from a nearby station, for a station that has none of its
+  // own: station id → { donorId, mode }. Asked for by the operator, kept for
+  // the session (a rebuild, a new patch size, a return to the station keep
+  // it), and never written anywhere — it is a way of looking, not a fact.
+  const floodBorrows = new Map();
+  const DONORS = 4;            // the nearest stations the modal offers
 
   function reducedMotion() {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; }
@@ -2860,14 +3886,25 @@ void main() {
     tw.flood = null;
     const g = tw.ground;
     if (!g || !st || typeof FloodStages === 'undefined') { refreshFloodLine(); return []; }
-    const lad = FloodStages.ladder(st);
-    const notes = lad.notes.slice();
+    const seed = floodSeed(g);
+    const own = FloodStages.ladder(st);
+    let lad = own;
+    // Its own levels first, always; borrowed ones only where it has none it
+    // can draw, and only where the operator asked for them.
+    const pick = floodBorrows.get(st.id);
+    if ((!own.levels.length || own.top == null) && pick) {
+      const donor = pick.donorId === st.id ? st : stationById(pick.donorId);
+      if (donor) {
+        const info = donorInfo(st, donor);
+        lad = FloodStages.borrowed(donor, pick.mode, seed ? seed.elev : null, info);
+      }
+    }
+    const notes = lad.borrowed ? [borrowNote(lad.borrowed), ...lad.notes] : lad.notes.slice();
     if (!lad.levels.length || lad.top == null) {
-      tw.flood = { lad, none: true, notes };
+      tw.flood = { lad, none: true, notes, own };
       refreshFloodLine();
       return notes;
     }
-    const seed = floodSeed(g);
     const start = FloodStages.start(lad, seed ? seed.elev : null);
     const fill = seed ? fillLevels(g.elev, seed.idx) : null;
     if (seed && seed.elev >= lad.top) {
@@ -2875,11 +3912,104 @@ void main() {
     }
     tw.flood = { lad, none: false, notes, seed, fill, start: start.m, startBasis: start.basis, top: lad.top,
                  level: null, band: null, bandKey: undefined, maskLevel: null, flooded: 0,
-                 t0: performance.now(), clock: null, lastDraw: 0, lastLine: 0 };
+                 t0: performance.now(), clock: null, lastDraw: 0, lastLine: 0, own };
     if (sc.scene && THREE) makeFlood();
     settleFlood();
     refreshFloodLine();
     return notes;
+  }
+
+  // ── borrowing another station's levels ──
+  // The words for a station's catchment: its basins by name, else the
+  // Bureau's grouping, and its stream — whatever the record has.
+  function catchmentWords(s) {
+    const names = [];
+    const cats = (state.data && state.data.catchments) || [];
+    for (const id of (s && s.catchment_ids) || []) {
+      const c = cats.find(x => x.id === id);
+      names.push(c ? c.name : id);
+    }
+    const where = names.length ? names.join(', ') : (s && s.basin) || null;
+    const stream = s && s.stream ? String(s.stream).toLowerCase().replace(/\b\w/g, m => m.toUpperCase()) : null;
+    return where && stream ? `${where} · ${stream}` : where || stream || null;
+  }
+  function sameCatchment(a, b) {
+    const x = new Set((a && a.catchment_ids) || []);
+    if ((b && b.catchment_ids || []).some(id => x.has(id))) return true;
+    return !!(a && b && a.basin && b.basin && a.basin === b.basin);
+  }
+  function donorInfo(st, donor) {
+    if (donor.id === st.id) return { km: 0, bearing: null, same: true, self: true };
+    const km = acmaHaversineKm(st.lat, st.lon, donor.lat, donor.lon);
+    return { km, bearing: bearingDeg(st.lat, st.lon, donor.lat, donor.lon), same: sameCatchment(st, donor), self: false };
+  }
+  function borrowNote(b) {
+    const how = b.mode === 'ahd' ? 'its levels in metres AHD, unchanged'
+                                 : 'its heights on the gauge, laid over this station\'s channel';
+    if (b.self) return `These are this station's own flood classes, as heights over its channel: its gauge has no zero in AHD to put them on the ground by.`;
+    return `Flood levels borrowed from ${b.name}, ${fmtKm(b.km)} ${compassWord(b.bearing)}${b.same ? ', in the same catchment' : ', in another catchment'}: `
+         + `${how}. A guide, not a model — the river here is not the river there.`;
+  }
+
+  // The stations nearest this one that have levels to lend, nearest first —
+  // and this station itself first where it has classes the ladder could not
+  // place (a gauge whose zero is not in AHD): its own heights over its own
+  // channel are a better guide than anybody else's.
+  function nearestDonors(st, n = DONORS) {
+    const out = [];
+    if (!st || !located(st) || typeof FloodStages === 'undefined' || !state.data) return out;
+    for (const s of state.data.stations) {
+      if (s.id === st.id || !located(s)) continue;
+      const b = FloodStages.borrowable(s);
+      if (!b) continue;
+      out.push({ s, b, km: acmaHaversineKm(st.lat, st.lon, s.lat, s.lon) });
+    }
+    out.sort((a, b) => a.km - b.km);
+    const top = out.slice(0, n).map(d => ({ ...d, bearing: bearingDeg(st.lat, st.lon, d.s.lat, d.s.lon), same: sameCatchment(st, d.s) }));
+    const self = FloodStages.borrowable(st);
+    if (self && self.classes.length) top.unshift({ s: st, b: self, km: 0, bearing: null, same: true, self: true });
+    return top;
+  }
+
+  function donorHeightsHtml(b) {
+    const parts = [];
+    if (b.classes.length) {
+      parts.push(`${b.classes.map(c => `${c.label.toLowerCase()} ${c.h.toFixed(2)}`).join(' · ')} m on the gauge${b.classesAsAt ? ` <span class="twin-borrow-fact">(${esc(String(b.classesAsAt).slice(0, 10))})</span>` : ''}`);
+    }
+    if (b.aeps.length) {
+      parts.push(`${b.aeps.map(d => `${d.label} AEP ${d.ahd.toFixed(2)}`).join(' · ')} m AHD`);
+    }
+    return parts.join('<br>');
+  }
+
+  function borrowModalHtml(st) {
+    const donors = nearestDonors(st);
+    if (!donors.length) return `<p>No station anywhere near ${esc(st.name)} has flood levels to lend.</p>`;
+    const pick = floodBorrows.get(st.id);
+    const mode = pick ? pick.mode : 'gauge';
+    const rows = donors.map(d => `
+          <tr>
+            <th scope="row"><strong>${esc(d.self ? `${d.s.name} (its own)` : d.s.name)}</strong>${d.s.station_number ? `<br><span class="twin-borrow-fact">${esc(d.s.station_number)}</span>` : ''}</th>
+            <td>${d.self ? 'here' : `${esc(fmtKm(d.km))} ${esc(compassWord(d.bearing))}`}</td>
+            <td>${donorHeightsHtml(d.b)}</td>
+            <td>${esc(catchmentWords(d.s) || '—')}${d.self ? '' : d.same ? ' <span class="twin-borrow-same">same catchment</span>' : ''}</td>
+            <td><button type="button" class="primary" onclick="DigitalTwin.useFloodFrom('${escAttr(d.s.id)}')">Use these</button></td>
+          </tr>`).join('');
+    return `
+      <p>No flood heights are recorded for <strong>${esc(st.name)}</strong> that can be put on its ground. Here are the ${donors.filter(d => !d.self).length} nearest stations that have some — their distance, their flood heights and their catchment. Pick one to draw its levels as water over this station's ground.</p>
+      <fieldset class="twin-borrow-mode">
+        <legend>Carry the heights across</legend>
+        <label class="check-label"><input type="radio" name="twin-borrow-mode" value="gauge" ${mode === 'gauge' ? 'checked' : ''}><span>As heights on the gauge, laid over this station's channel — the better guide across a river's fall</span></label>
+        <label class="check-label"><input type="radio" name="twin-borrow-mode" value="ahd" ${mode === 'ahd' ? 'checked' : ''}><span>As the same heights in metres AHD — only for a station on the same reach, a short way off</span></label>
+      </fieldset>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="The nearest stations with flood levels">
+        <table class="twin-borrow-table">
+          <caption class="sr-only">The nearest stations with flood levels, nearest first</caption>
+          <thead><tr><th scope="col">Station</th><th scope="col">Distance</th><th scope="col">Flood heights</th><th scope="col">Catchment</th><th scope="col"><span class="sr-only">Use</span></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <p class="small">Borrowed levels are drawn only in this twin and only for this session — nothing is saved to the station. The notes under the view say whose levels they are.</p>`;
   }
 
   function makeFlood() {
@@ -3073,6 +4203,16 @@ void main() {
     const el = document.getElementById('twin-flood-pill');
     if (!el) return;
     const F = tw.flood;
+    // No levels of its own, and some to borrow: the pill offers them — on a
+    // phone's map, where the line has no row, it is the only way to ask.
+    if (F && F.none && sc.terrain && canBorrow()) {
+      if (el.hidden) el.hidden = false;
+      el.dataset.mode = 'borrow';
+      el.innerHTML = '<span aria-hidden="true">🌊</span><span class="twin-flood-pill-text"> No flood levels here — borrow…</span>';
+      el.title = 'No flood heights are recorded for this station that can be put on its ground. Use a nearby station\'s?';
+      return;
+    }
+    if (el.dataset.mode === 'borrow') { el.dataset.mode = ''; el.innerHTML = ''; }
     const show = !!(F && !F.none && F.level != null && S().flood && sc.flood);
     if (el.hidden !== !show) el.hidden = !show;
     if (!show) return;
@@ -3089,12 +4229,31 @@ void main() {
     el.title = `${verb} — ${floodNowText()}`;
   }
 
+  // Whether the station on screen could borrow levels it lacks: it has none
+  // it can draw, and somebody near it (or its own classes) has some.
+  function canBorrow() {
+    const F = tw.flood, st = currentStation();
+    return !!(F && F.none && !F.lad.borrowed && st && nearestDonors(st, 1).length);
+  }
+
   function floodLineHtml() {
     const F = tw.flood;
-    if (typeof FloodStages === 'undefined' || !tw.ground || !F || F.none) return '';
+    if (typeof FloodStages === 'undefined' || !tw.ground || !F) return '';
+    const st = currentStation();
+    if (F.none) {
+      if (F.lad.borrowed) {
+        return `<span class="twin-flood-lead"><span aria-hidden="true">🌊</span> Flood levels:</span> ${esc(F.lad.borrowed.name)}'s leave no water to draw here. <button type="button" class="link-btn" data-flood="borrow" onclick="DigitalTwin.borrowFlood()">Pick another station…</button> · <button type="button" class="link-btn" data-flood="unborrow" onclick="DigitalTwin.stopBorrowingFlood()">Stop borrowing</button>`;
+      }
+      if (!canBorrow()) return '';
+      return `<span class="twin-flood-lead"><span aria-hidden="true">🌊</span> Flood levels:</span> none recorded for ${esc(st ? st.name : 'this station')} that can be put on its ground. `
+           + `<button type="button" class="link-btn" data-flood="borrow" onclick="DigitalTwin.borrowFlood()">Use a nearby station's levels…</button>`;
+    }
     const on = !!S().flood, anim = floodAnimating();
     const pal = (sc.flood && sc.flood.palette) || floodPalette();
-    const lead = `<span class="twin-flood-lead"><span aria-hidden="true">🌊</span> Flood levels:</span>`;
+    const from = F.lad.borrowed;
+    const lead = from
+      ? `<span class="twin-flood-lead"><span aria-hidden="true">🌊</span> Flood levels, ${from.self ? 'its own, over its channel' : `borrowed from ${esc(from.name)}`} (<button type="button" class="link-btn" data-flood="borrow" onclick="DigitalTwin.borrowFlood()">change</button> · <button type="button" class="link-btn" data-flood="unborrow" onclick="DigitalTwin.stopBorrowingFlood()">stop</button>):</span>`
+      : `<span class="twin-flood-lead"><span aria-hidden="true">🌊</span> Flood levels:</span>`;
     if (!on) return `${lead} the water is hidden. <button type="button" class="link-btn" data-flood="show" onclick="DigitalTwin.setFlood(true)">Show it</button>`;
     const levels = F.lad.levels.map(l => `<button type="button" class="link-btn twin-flood-level" data-flood="${escAttr(l.key)}" onclick="DigitalTwin.floodAt('${escAttr(l.key)}')"
                  title="Hold the water at ${escAttr(FloodStages.levelText(l))}${l.kind !== 'aep' && l.gauge != null ? ` (${escAttr(FloodStages.ahdText(l.ahd))})` : ''}"><span class="twin-flood-sw" style="--sw:${escAttr(FloodStages.colourOf(l, pal))}" aria-hidden="true"></span>${esc(FloodStages.levelText(l))}</button>`);
@@ -3116,15 +4275,16 @@ void main() {
       // The whole line as its tooltip (the Stations map cuts it to one), less
       // the reading, which moves on while the tooltip would stand still.
       const F = tw.flood;
-      el.title = html ? (S().flood
-        ? `Flood levels: ${F.lad.levels.map(l => FloodStages.levelText(l)).join(' · ')}. A level surface through the patch: a real flood slopes downstream, so the far edges of a wide patch are a guide, not a map.`
-        : 'Flood levels: the water is hidden.') : '';
+      el.title = !html ? '' : F.none ? el.textContent.replace(/\s+/g, ' ').trim() : (S().flood
+        ? `Flood levels${F.lad.borrowed ? ` (${F.lad.borrowed.self ? 'its own, over its channel' : `borrowed from ${F.lad.borrowed.name}`})` : ''}: ${F.lad.levels.map(l => FloodStages.levelText(l)).join(' · ')}. A level surface through the patch: a real flood slopes downstream, so the far edges of a wide patch are a guide, not a map.`
+        : 'Flood levels: the water is hidden.');
       if (had) {
         const back = el.querySelector(`[data-flood="${CSS.escape(had)}"]`) || el.querySelector('button');
         if (back) back.focus();
       }
     }
     syncFloodPill();
+    refreshBorrowLine();
   }
 
   function syncFloodReading() {
@@ -3152,6 +4312,23 @@ void main() {
     refreshFloodLine();
   }
 
+  // The Scene panel's word on borrowing: offered where the station has no
+  // levels of its own, said where levels are borrowed.
+  function borrowLineHtml() {
+    const F = tw.flood;
+    if (F && F.lad && F.lad.borrowed) {
+      const b = F.lad.borrowed;
+      return `${b.self ? 'Its own classes, over its channel' : `Levels borrowed from <strong>${esc(b.name)}</strong>, ${esc(fmtKm(b.km))} ${esc(compassWord(b.bearing))}`}. `
+           + `<button type="button" class="link-btn" onclick="DigitalTwin.borrowFlood()">Change…</button> · <button type="button" class="link-btn" onclick="DigitalTwin.stopBorrowingFlood()">Stop borrowing</button>`;
+    }
+    if (canBorrow()) return `No flood heights recorded here. <button type="button" class="link-btn" onclick="DigitalTwin.borrowFlood()">Use a nearby station's levels…</button>`;
+    return '';
+  }
+  function refreshBorrowLine() {
+    const el = document.getElementById('twin-borrow-line');
+    if (el) el.innerHTML = borrowLineHtml();
+  }
+
   function floodPanelHtml() {
     const s = S();
     const F = tw.flood;
@@ -3165,6 +4342,7 @@ void main() {
             <input type="range" id="twin-flood-level" min="0" max="1000" step="1" value="1000" ${s.flood && !none ? '' : 'disabled'}
                    oninput="DigitalTwin.setFloodFraction(this.value / 1000)">
           </label>
+          <p class="small twin-borrow-line" id="twin-borrow-line">${borrowLineHtml()}</p>
         </fieldset>`;
   }
 
@@ -3294,6 +4472,12 @@ void main() {
       if (e.button !== 0 && e.button !== 2) return;
       try { cv.setPointerCapture(e.pointerId); } catch (_) {}
       rig.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, b: e.button, moved: false });
+      // A press on the pin being moved takes hold of it, instead of the
+      // camera (see "the pin being moved").
+      if (rig.pointers.size === 1 && e.button === 0 && pinArmedHere() && pinUnder(e.clientX, e.clientY)) {
+        rig.pinDrag = e.pointerId;
+        cv.classList.add('is-dragging-pin');
+      }
       if (rig.pointers.size === 2) {
         const [a, b] = [...rig.pointers.values()];
         rig.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
@@ -3307,6 +4491,11 @@ void main() {
       const dx = e.clientX - p.x, dy = e.clientY - p.y;
       p.x = e.clientX; p.y = e.clientY;
       if (Math.hypot(e.clientX - p.x0, e.clientY - p.y0) > 4) p.moved = true;
+      if (rig.pinDrag === e.pointerId) {
+        if (p.moved) pinTo(e.clientX, e.clientY, true);
+        requestFrame();
+        return;
+      }
       if (rig.pointers.size === 2 && rig.pinch) {
         const [a, b] = [...rig.pointers.values()];
         const d = Math.hypot(a.x - b.x, a.y - b.y);
@@ -3338,9 +4527,22 @@ void main() {
       rig.pointers.delete(e.pointerId);
       if (rig.pointers.size < 2) rig.pinch = null;
       try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
+      // The end of a drag of the pin: where it was let go is where it is. A
+      // press on it that never moved is not a move — the ray through the
+      // post lands on the ground behind it, a hair from where it stands.
+      if (rig.pinDrag === e.pointerId) {
+        rig.pinDrag = null;
+        cv.classList.remove('is-dragging-pin');
+        if (p && p.moved && e.type === 'pointerup') pinTo(e.clientX, e.clientY, false);
+        return;
+      }
       // A field photo's marker first: it stands on the ground, and a click on
-      // it is about the photos, not the height under them.
-      if (p && !p.moved && p.b === 0 && e.type === 'pointerup' && !pickPhoto(e)) pickGround(e);
+      // it is about the photos, not the height under them. Then, with the pin
+      // being moved in this patch, the ground is where the pin goes.
+      if (p && !p.moved && p.b === 0 && e.type === 'pointerup' && !pickPhoto(e)) {
+        if (pinArmedHere()) { pinTo(e.clientX, e.clientY, false); pickGround(e); }
+        else pickGround(e);
+      }
     };
     on(cv, 'pointerup', up);
     on(cv, 'pointercancel', up);
@@ -3349,24 +4551,25 @@ void main() {
     // rather than an inline style, for the design system's rule (#109).
     let hoverAt = 0;
     on(cv, 'pointermove', e => {
-      if (rig.pointers.size || !sc.photos) return;
+      if (rig.pointers.size || (!sc.photos && !showsPin())) return;
       const now = performance.now();
       if (now - hoverAt < 60) return;
       hoverAt = now;
-      cv.classList.toggle('is-over-photo', photoAt(e.clientX, e.clientY) >= 0);
+      cv.classList.toggle('is-over-photo', !!sc.photos && photoAt(e.clientX, e.clientY) >= 0);
+      cv.classList.toggle('is-over-pin', pinArmedHere() && pinUnder(e.clientX, e.clientY));
     });
-    on(cv, 'pointerleave', () => cv.classList.remove('is-over-photo'));
+    on(cv, 'pointerleave', () => cv.classList.remove('is-over-photo', 'is-over-pin'));
 
     on(cv, 'wheel', e => {
       e.preventDefault();
       if (rig.mode === 'walk') walkStep(-e.deltaY * 0.01, 0);
       else {
         // Embedded in the Stations map, a wheel-out past the widest the
-        // orbit goes is the gesture that brought the twin up run backwards:
-        // the map takes over again, one zoom level out (map-twin.js).
+        // orbit goes is a zoom out of the twin altogether: the map takes over
+        // again, one zoom level out (map-twin.js).
         const atLimit = rig.radius >= maxRadius() - 1e-6;
         dolly(e.deltaY * 0.0015);
-        if (atLimit && e.deltaY > 0 && tw.hooks && tw.hooks.leave) { tw.hooks.leave(); return; }
+        if (atLimit && e.deltaY > 0 && tw.hooks && tw.hooks.leave) { tw.hooks.leave('wheel'); return; }
       }
       requestFrame();
     }, { passive: false });
@@ -3387,7 +4590,7 @@ void main() {
         if (WALK_KEYS.includes(k)) { e.preventDefault(); rig.keys.add(k); requestFrame(); }
         return;
       }
-      if (k === 'Escape' && tw.hooks && tw.hooks.leave) { e.preventDefault(); tw.hooks.leave(); return; }
+      if (k === 'Escape' && tw.hooks && tw.hooks.leave) { e.preventDefault(); tw.hooks.leave('escape'); return; }
       const step = 0.08;
       switch (k) {
         case 'ArrowLeft':  rig.theta += step; break;
@@ -3583,11 +4786,94 @@ void main() {
     if (!sc.raf && tw.live) sc.raf = requestAnimationFrame(tick);
   }
 
+  // ── the lines over the stage, folded ───────────────────────────────────────
+  // The status, the paths, the photos, the water, who else is here and the
+  // notes are a line each, and on a map a phone's height tall six lines and a
+  // bar were most of the map. So they fold under the bar, behind one button:
+  // open when the twin opens — the build is saying what it could and could
+  // not get, which is worth a read — and folded INFO_FOLD_MS later, unless
+  // the operator has taken the fold in hand (pressed it, either way: from
+  // then on it stays as they left it) or is reading it (the pointer over it
+  // or the focus in it, which puts the fold off until they are not). Opening
+  // again is one press; the button counts the notes while they are folded,
+  // so a warning is never folded out of sight without a mark saying so.
+  //
+  // "When the twin opens" is a new station, or the first build after a
+  // teardown — leaving the tab or the map's overlay — and not a rebuild of
+  // the same station at another patch size, which keeps the fold where it is.
+  // Folded, the status line is out of the accessibility tree with its box, so
+  // what it says from then on goes to the app's own live region instead.
+  const INFO_FOLD_MS = 10000;
+  const INFO_RETRY_MS = 2500;   // put off while being read: look again this often
+  let infoFoldMs = INFO_FOLD_MS;   // the check's seam: sooner, or never (null)
+
+  function infoEls() {
+    return { box: document.getElementById('twin-info'), btn: document.getElementById('twin-info-toggle') };
+  }
+  function infoBusy() {
+    const { box } = infoEls();
+    if (!box) return false;
+    return box.contains(document.activeElement) || box.matches(':hover');
+  }
+  function syncInfo() {
+    const { box, btn } = infoEls();
+    const open = tw.infoOpen !== false;
+    if (box) box.hidden = !open;
+    if (!btn) return;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    btn.title = open ? 'Fold the lines over the view away — the status, the paths, the photos, the water and the notes'
+                     : 'Show the lines over the view — the status, the paths, the photos, the water and the notes';
+    const icon = btn.querySelector('.twin-info-icon');
+    if (icon) icon.textContent = open ? '▴' : '▾';
+    const badge = btn.querySelector('.twin-info-badge');
+    const n = tw.notes.length;
+    if (badge) {
+      badge.hidden = open || !n;
+      badge.textContent = n ? `⚠ ${n}` : '';
+    }
+    const sr = btn.querySelector('.sr-only');
+    if (sr) sr.textContent = `${open ? 'Hide' : 'Show'} the details${!open && n ? ` (${n} note${n === 1 ? '' : 's'})` : ''}`;
+  }
+  function clearInfoTimer() {
+    if (tw.infoTimer) { clearTimeout(tw.infoTimer); tw.infoTimer = 0; }
+  }
+  function armInfoFold(ms) {
+    clearInfoTimer();
+    if (infoFoldMs == null || tw.infoPinned) return;
+    tw.infoTimer = setTimeout(() => {
+      tw.infoTimer = 0;
+      if (tw.infoPinned || tw.infoOpen === false) return;
+      if (infoBusy()) { armInfoFold(INFO_RETRY_MS); return; }
+      tw.infoOpen = false;
+      syncInfo();
+      if (sc.renderer) { fitRenderer(); requestFrame(); }
+    }, ms);
+  }
+  // A new station on screen (or the first build after a teardown): open, and
+  // fold again later.
+  function infoLoaded(stationId) {
+    if (tw.infoFor === stationId) { syncInfo(); return; }
+    tw.infoFor = stationId;
+    tw.infoOpen = true;
+    tw.infoPinned = false;
+    syncInfo();
+    armInfoFold(infoFoldMs);
+  }
+  function toggleInfo() {
+    clearInfoTimer();
+    tw.infoPinned = true;
+    tw.infoOpen = tw.infoOpen === false;
+    syncInfo();
+    if (sc.renderer) { fitRenderer(); requestFrame(); }
+  }
+
   // ── the build ──────────────────────────────────────────────────────────────
   function setStatus(text) {
     tw.status = text;
     const el = document.getElementById('twin-status');
     if (el) { el.textContent = text; el.title = text; }
+    // Folded, the line's box is out of the tree and its live region with it.
+    if (tw.infoOpen === false && el && text) announce(text);
   }
 
   function setNotes(notes) {
@@ -3602,6 +4888,8 @@ void main() {
     if (fold) el.hidden = false;
     const count = document.getElementById('twin-notes-count');
     if (count) count.textContent = `${notes.length} note${notes.length === 1 ? '' : 's'}`;
+    // Folded, the fold's button carries the count instead.
+    syncInfo();
   }
 
   function showPlaceholder(html) {
@@ -3617,17 +4905,24 @@ void main() {
   async function build() {
     const seq = ++tw.seq;
     const st = currentStation();
+    infoLoaded(st ? st.id : null);
+    // A pin being moved from this tab alone (no map under it) belongs to the
+    // station it was armed on; another station on the stage ends it.
+    if (typeof MapMovePin !== 'undefined' && MapMovePin.armed() && !MapMovePin.onMap()
+        && (!st || MapMovePin.armed() !== st.id)) MapMovePin.cancel();
     setNotes([]);
     // Nothing to build: the last station's scene and numbers must not stand
     // in for this one's, so they go, and every panel says so.
     const nothing = (status, placeholder) => {
-      tw.ground = null; tw.image = null; tw.elvis = null; tw.picked = null;
+      tw.ground = null; tw.image = null; tw.elvis = null; tw.picked = null; tw.origin = null;
       tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = ''; tw.model = null;
       tw.photos = null;
       tw.flood = null;
+      tw.neighbours = null; tw.bridges = null; tw.bridgesFound = null; tw.tier = null;
       if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
       clearScene();
       requestFrame();
+      refreshSiteLine();
       setStatus(status);
       showPlaceholder(placeholder);
       refreshTruth(); refreshTable(); syncCanvasName(); syncExportButton(); refreshAttrib(); refreshPathsLine(); refreshPeersLine();
@@ -3660,9 +4955,18 @@ void main() {
     // seconds behind an imagery host that took a minute to say no.
     setStatus('Reading the ground…');
     const imageP = imageryFor(box);
+    // The SLS says which stations a person reads — asked for alongside the
+    // ground, which takes longer, so the station is not held up by it.
+    const slsP = typeof SLS !== 'undefined' && SLS.ensureData ? SLS.ensureData().then(() => true, () => false) : Promise.resolve(false);
+    // What the State has flown over the station, for the sharp drape.
+    const tierP = imageryAt(st.lat, st.lon).catch(() => null);
     const ground = await groundFor(box);
     if (seq !== tw.seq) return;
+    const slsOk = await slsP;
+    if (seq !== tw.seq) return;
+    if (!slsOk) notes.push('The Service Level Specification could not be read, so whether this station is read by hand or by a radio is decided from its record alone.');
     tw.ground = ground;
+    tw.origin = ground ? { lat: Number(st.lat), lon: Number(st.lon) } : null;
     tw.image = null;
     tw.elvis = null;
     tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = ''; tw.model = null;
@@ -3701,9 +5005,9 @@ void main() {
       buildSky();
       buildTerrain();
       buildStation(st);
-      if (tw.model && !tw.model.telemetryKnown) {
-        notes.push('This station\'s telemetry is not in its record — no AL or TM in the name, no ALERT addresses, no satcom — so its enclosure is drawn as a TM station\'s: a CR300 logger and a Beam SBD modem.');
-      }
+      const said = stationNote(tw.model);
+      if (said) notes.push(said);
+      buildNeighbours(st);
       buildFigure();
       buildLabel(st);
       buildPaths(st);
@@ -3711,7 +5015,11 @@ void main() {
       resetOrbit();
       presenceJoin(st);
       loadPhotos(st, seq);
+      loadBridges(st, seq, notes);
       notes.push(...buildFlood(st));
+      // A pin being moved, armed before this build — on the map before the
+      // twin was opened, or on this station before a rebuild.
+      movePinChanged();
       showPlaceholder('');
       startLoop();
       requestFrame();
@@ -3752,6 +5060,16 @@ void main() {
     if (sc.terrain) applyImagery();
     tw.statusBase = `${groundLine}, ${image ? (image.source === 'qld' ? 'Queensland aerial imagery' : 'Esri imagery') + ` at ${image.mpp.toFixed(2)} m/px` : 'no imagery'}`;
     setStatus(`${tw.statusBase}.`);
+    // And sharp round the station, where the State has flown finer than the
+    // drape — the pin's own place, if one is being moved.
+    tw.tier = await tierP;
+    if (seq !== tw.seq) return;
+    const pinNow = sc.movepin && sc.movepin.group.visible ? sc.movepin.pin.position : null;
+    sharpenAt(pinNow ? pinNow.x : 0, pinNow ? pinNow.z : 0).then(done => {
+      if (!done || seq !== tw.seq || !tw.tier) return;
+      tw.statusBase += `; ${resWords(tw.tier.res_m)} (${tw.tier.label}${tw.tier.when ? `, ${tw.tier.when}` : ''}) round ${pinNow ? 'the pin' : 'the station'}`;
+      setStatus(`${tw.statusBase}.`);
+    });
     setNotes(notes);
     refreshTruth();
     refreshAttrib();
@@ -3780,7 +5098,7 @@ void main() {
     let name = 'Three-dimensional view. No station is built yet.';
     if (st && g) {
       name = `Three-dimensional view of ${st.name}: ${g.size} m of ground at ${g.sample_m.toFixed(1)} m, `
-           + `${(g.max - g.min).toFixed(1)} m of relief, ${tw.model && tw.model.structure === 'tower' ? 'a river-gauge tower with its platform 4 m up' : 'a Type 3 rainfall pole 2 m tall'} at the station and a 1.75 m figure beside it`
+           + `${(g.max - g.min).toFixed(1)} m of relief, ${modelWords(tw.model)} at the station and a 1.75 m figure beside it`
            + (sc.horizon ? `, the country round it to ${HORIZON_M / 1000} km under a sky` : '')
            + (tw.flood && !tw.flood.none && sc.flood && S().flood ? `, and water at its flood levels, up to ${FloodStages.ahdText(tw.flood.top)}. ` : '. ')
            + (rig.mode === 'walk' ? 'POV: W A S D move, drag looks, Escape leaves.'
@@ -4018,14 +5336,20 @@ void main() {
             <button type="button" id="twin-walk" aria-pressed="false" onclick="DigitalTwin.toggleWalk()" title="Point of view: stand on the ground at eye height, walk with the keys, climb the ladder">👁 POV</button>
             <button type="button" id="twin-point" aria-pressed="false" onclick="DigitalTwin.togglePoint()" title="Point where you are looking: the arm goes out and a laser lands on it, for whoever is here with you — Space held in the POV does the same">☝ Point</button>
             <button type="button" onclick="DigitalTwin.rebuild()" title="Fetch the ground and the imagery again">⟳ Rebuild</button>
+            <button type="button" id="twin-movepin-btn" aria-pressed="false" onclick="DigitalTwin.toggleMovePin()"
+                    title="Move this station's pin to where the station stands on the imagery, and save the position">📍 Move pin</button>
+            ${infoToggleHtml()}
           </div>
         </div>
-        <p class="twin-status" id="twin-status" role="status">${esc(tw.status || 'Building…')}</p>
-        <p class="small twin-paths" id="twin-paths" hidden></p>
-        <p class="small twin-photos" id="twin-photos" hidden></p>
-        <p class="small twin-flood" id="twin-flood" hidden></p>
-        <p class="small twin-peers" id="twin-peers" hidden></p>
-        <ul class="twin-notes" id="twin-notes" ${tw.notes.length ? '' : 'hidden'}>${tw.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+        <div class="twin-info" id="twin-info" ${tw.infoOpen === false ? 'hidden' : ''}>
+          <p class="twin-status" id="twin-status" role="status">${esc(tw.status || 'Building…')}</p>
+          <p class="small twin-paths" id="twin-paths" hidden></p>
+          <p class="small twin-photos" id="twin-photos" hidden></p>
+          <p class="small twin-flood" id="twin-flood" hidden></p>
+          <p class="small twin-peers" id="twin-peers" hidden></p>
+          <p class="small twin-site" id="twin-site" hidden></p>
+          <ul class="twin-notes" id="twin-notes" ${tw.notes.length ? '' : 'hidden'}>${tw.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+        </div>
         ${stageHtml()}
         <p class="small twin-pick" id="twin-pick"></p>
         <details class="twin-details">
@@ -4038,6 +5362,17 @@ void main() {
   </div>`;
   }
 
+  // The fold's button, for the tab's header and the map overlay's bar alike:
+  // an arrow, a word that goes on a phone (the overlay's .map-twin-label rule),
+  // the notes counted while folded, and a name for a reader. syncInfo() keeps
+  // all four true after it is drawn.
+  function infoToggleHtml() {
+    const open = tw.infoOpen !== false;
+    return `<button type="button" class="twin-info-toggle" id="twin-info-toggle" aria-controls="twin-info"
+              aria-expanded="${open ? 'true' : 'false'}" onclick="DigitalTwin.toggleInfo()"
+              title="${open ? 'Fold the lines over the view away' : 'Show the lines over the view'}"><span class="twin-info-icon" aria-hidden="true">${open ? '▴' : '▾'}</span><span class="map-twin-label" aria-hidden="true"> Details</span><span class="twin-info-badge" aria-hidden="true" hidden></span><span class="sr-only">${open ? 'Hide' : 'Show'} the details</span></button>`;
+  }
+
   // The stage — the canvas and what stands over it — for the tab and for the
   // Stations map alike (map-twin.js puts this in its overlay). The ids are the
   // ones every refresh here writes to, and the two hosts are never on screen
@@ -4047,9 +5382,10 @@ void main() {
     return `<div class="twin-stage" id="twin-stage">
           <canvas id="twin-canvas" tabindex="0" aria-label="Three-dimensional view. Nothing is built yet."></canvas>
           <div class="twin-compass" id="twin-compass" aria-hidden="true" style="--twin-heading:0deg">N</div>
-          <button type="button" class="twin-flood-pill" id="twin-flood-pill" hidden onclick="DigitalTwin.toggleFloodAnim()"></button>
+          <button type="button" class="twin-flood-pill" id="twin-flood-pill" hidden onclick="DigitalTwin.floodPill()"></button>
           <p class="twin-hud" id="twin-hud">Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.</p>
           <button type="button" class="twin-photo-prompt" id="twin-photo-prompt" hidden onclick="DigitalTwin.openNearPhotos()"></button>
+          <div class="mn-movepin-panel twin-movepin-panel" id="twin-movepin-panel" role="group" aria-label="Move this station's pin" hidden></div>
           <div class="twin-placeholder" id="twin-placeholder" hidden></div>
         </div>`;
   }
@@ -4072,6 +5408,10 @@ void main() {
 
   // ── lifecycle ──────────────────────────────────────────────────────────────
   function stop() {
+    // A pin being moved from the twin's own tab has nothing left to be moved
+    // on; one armed on the map goes on there without the twin.
+    if (typeof MapMovePin !== 'undefined' && MapMovePin.armed() && !MapMovePin.onMap()) MapMovePin.cancel();
+    rig.pinDrag = null;
     tw.seq++;
     tw.live = false;
     if (sc.raf) { cancelAnimationFrame(sc.raf); sc.raf = 0; }
@@ -4091,7 +5431,11 @@ void main() {
     tw.model = null;
     tw.photos = null; tw.photoNear = -1;
     tw.flood = null;
+    tw.neighbours = null; tw.bridges = null; tw.bridgesFound = null;
     rig.pointLatch = false; rig.pointing = false;
+    // The next build is an opening: the lines open again, and fold again.
+    clearInfoTimer();
+    tw.infoFor = null;
     if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
   }
 
@@ -4144,12 +5488,13 @@ void main() {
         extras: {
           station_id: st ? st.id : null, station_name: st ? st.name : null,
           station_number: st ? (st.station_number || null) : null,
-          origin: { lat: st ? st.lat : null, lon: st ? st.lon : null,
+          origin: { lat: tw.origin ? tw.origin.lat : st ? st.lat : null, lon: tw.origin ? tw.origin.lon : st ? st.lon : null,
                     ground_m: g.h0, datum: g.datum, axes: 'x east, y up, z south; metres' },
           ground: { source: g.source, sample_m: g.sample_m, size_m: g.size, exaggeration: S().exag,
                     attribution: g.attribution },
           imagery: tw.image && S().imagery ? { source: tw.image.source, attribution: tw.image.attribution } : null,
-          pole: { height_m: tw.model ? tw.model.poleTop : POLE_H, diameter_m: POLE_R * 2 },
+          pole: tw.model && (tw.model.structure === 'pole' || tw.model.structure === 'tower' || tw.model.structure === 'repeater')
+            ? { height_m: tw.model.poleTop, diameter_m: POLE_R * 2 } : null,
           station: tw.model ? { structure: tw.model.structure, telemetry: tw.model.telemetry, telemetry_known: tw.model.telemetryKnown } : null,
           figure: { height_m: FIGURE_H },
           generated: new Date().toISOString(),
@@ -4326,6 +5671,10 @@ void main() {
         if (sc.wire) { sc.wire.geometry.dispose(); sc.wire.geometry = new THREE.WireframeGeometry(sc.terrain.geometry); }
         if (sc.figure) sc.figure.position.y = yAt(sc.figure.position.x, sc.figure.position.z);
         if (sc.paths) buildPaths(currentStation());
+        placeMovePin();
+        placeSharp();
+        placeNeighbours();
+        if (tw.bridgesFound) buildBridges(currentStation(), tw.bridgesFound);
         placePhotoMarkers();
         placeFlood();
         liftHorizon();
@@ -4360,7 +5709,12 @@ void main() {
     },
     setWire(on)    { S().wire = !!on; saveSettings(); if (sc.wire) { sc.wire.visible = !!on; requestFrame(); } },
     setFigure(on)  { S().figure = !!on; saveSettings(); if (sc.figure) { sc.figure.visible = !!on; requestFrame(); } },
-    setLabel(on)   { S().label = !!on; saveSettings(); if (sc.label) { sc.label.visible = !!on; requestFrame(); } },
+    setLabel(on)   {
+      S().label = !!on; saveSettings();
+      if (sc.label) sc.label.visible = !!on;
+      if (tw.neighbours) for (const n of tw.neighbours.list) n.sign.visible = !!on;
+      requestFrame();
+    },
 
     // The camera.
     resetView() { resetOrbit(); requestFrame(); },
@@ -4403,15 +5757,74 @@ void main() {
       init();
     },
 
+    // ── Borrowing flood levels (see "borrowing another station's levels") ──
+    // The modal of the nearest stations with levels; the choice; the end of it.
+    borrowFlood() {
+      const st = currentStation();
+      if (!st || typeof Modal === 'undefined') return;
+      Modal.open({ title: `Flood levels for ${st.name}, from a nearby station`, html: borrowModalHtml(st), wide: true });
+    },
+    useFloodFrom(id, mode) {
+      const st = currentStation();
+      if (!st || !stationById(id)) return;
+      const radio = document.querySelector('input[name="twin-borrow-mode"]:checked');
+      const how = mode || (radio ? radio.value : 'gauge');
+      floodBorrows.set(st.id, { donorId: id, mode: how === 'ahd' ? 'ahd' : 'gauge' });
+      if (typeof Modal !== 'undefined') Modal.close();
+      const notes = horizonNotes(tw.notes).filter(n => !/^Flood levels borrowed from|^These are this station's own flood classes/.test(n));
+      const said = buildFlood(st);
+      setNotes([...notes, ...said.filter(n => !notes.includes(n))]);
+      syncCanvasName();
+      syncFloodControls();
+      const F = tw.flood;
+      announce(F && !F.none ? `Drawing ${F.lad.borrowed && F.lad.borrowed.self ? 'its own classes over its channel' : `${stationById(id).name}'s flood levels`} as water here.`
+                            : 'Those levels leave no water to draw here.');
+    },
+    stopBorrowingFlood() {
+      const st = currentStation();
+      if (!st) return;
+      floodBorrows.delete(st.id);
+      const notes = tw.notes.filter(n => !/^Flood levels borrowed from|^These are this station's own flood classes/.test(n));
+      buildFlood(st);
+      setNotes(notes);
+      syncCanvasName();
+      syncFloodControls();
+      announce('No longer borrowing flood levels.');
+    },
+    // The pill on the stage: the rise's pause and play, or — with no levels
+    // of its own — the way to borrow some.
+    floodPill() {
+      const el = document.getElementById('twin-flood-pill');
+      if (el && el.dataset.mode === 'borrow') this.borrowFlood();
+      else this.toggleFloodAnim();
+    },
+    // For the check: where a scene point is on the screen (CSS pixels,
+    // viewport), a scene point as a latitude and longitude and back, and the
+    // ground's height under one.
+    _screen(x, y, z) {
+      if (!sc.camera || !sc.canvas) return null;
+      sc.scene.updateMatrixWorld(true);
+      const v = new THREE.Vector3(x, y, z).project(sc.camera);
+      const r = sc.canvas.getBoundingClientRect();
+      return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height, inFront: v.z < 1 };
+    },
+    _latLonAt(x, z) { return tw.origin ? latLonAt(x, z) : null; },
+    _heightAt(x, z) { return heightAt(x, z); },
+    _xzOf(lat, lon) { return tw.origin ? localXZ(lat, lon, tw.origin.lat, tw.origin.lon) : null; },
+    // For the check: the stations the modal would offer.
+    _donors(id) { const st = stationById(id) || currentStation(); return nearestDonors(st).map(d => ({ id: d.s.id, km: d.km, same: d.same, self: !!d.self })); },
+
     // The memory strip's holder (mem-meter.js): what the caches hold, and
     // the Release button's call.
     cacheBytes, clearCaches,
 
     // ── Embedded in the Stations map (map-twin.js) ──
     // The stage markup for a host of its own, the build into it, and what the
-    // host wants to be told. `hooks.leave` is called when the operator wheels
-    // out past the widest orbit or presses Escape — the map's cue to take
-    // over again. stop() is the way out, as it is for the tab.
+    // host wants to be told. `hooks.leave(why)` is called when the operator
+    // wheels out past the widest orbit (why 'wheel') or presses Escape (why
+    // 'escape') — the map's cue to take over again, one zoom level out for
+    // the wheel and as it was for the key. stop() is the way out, as it is
+    // for the tab.
     stageHtml,
     mountAt(id, hooks) {
       const s = stationById(id);
@@ -4433,6 +5846,35 @@ void main() {
     },
     patchSize() { return S().size; },
     embedded() { return !!tw.hooks; },
+    // What the State's imagery catalogue says covers a point (map-twin.js's
+    // offer): { res_m, label, when, satellite } | { outside } | null.
+    imageryAt,
+
+    // ── The move-pin mode (map-move-pin.js) ──
+    // Whether this station is the one on the stage, built — the twin's tab
+    // is a place the pin can be moved from even with no map under it.
+    showing(id) { return tw.live && !!tw.ground && tw.stationId === id; },
+    // Whether the pin is drawn here now (its panel on the stage follows it).
+    showsPin,
+    // The mode changed: armed, dragged, saved, cancelled.
+    movePinChanged,
+    // A save moved a station: a twin centred on its old spot is rebuilt on
+    // the new one.
+    stationMoved(id) { if (tw.live && tw.stationId === id) init(); },
+    // The 📍 button on the tab's header and the overlay's bar.
+    toggleMovePin() {
+      const st = currentStation();
+      if (!st || typeof MapMovePin === 'undefined') return;
+      if (MapMovePin.armed() === st.id) MapMovePin.cancel();
+      else MapMovePin.start(st.id);
+    },
+
+    // The lines over the stage: the fold's button (for the overlay's bar),
+    // and the press on it.
+    infoToggleHtml, toggleInfo,
+    // The check's seam: fold after `ms` rather than ten seconds, or never
+    // (null) — so a check that is not about the fold is not raced by it.
+    _infoFold(ms) { infoFoldMs = ms == null ? null : Math.max(0, Number(ms)); if (infoFoldMs == null) clearInfoTimer(); },
 
     // Read by the check and by nothing else: what the scene is standing on.
     libLoaded() { return !!THREE; },
@@ -4454,6 +5896,13 @@ void main() {
           deck: tw.model.deck, level: rig.level, climb: rig.climb, walker: { x: rig.px, z: rig.pz, yaw: rig.yaw },
           doors: sc.doors.map(d => ({ name: d.name, angle: d.angle, open: d.open, when: d.when, wanted: doorWanted(d) })),
           parts: (() => { const n = []; if (sc.station) sc.station.traverse(o => { if (o.isMesh) n.push(o.name); }); return n; })(),
+          // The station's own extent, metres: what the brief's sizes are checked against.
+          size: (() => {
+            if (!sc.station) return null;
+            const b = new THREE.Box3().setFromObject(sc.station);
+            return { x: b.max.x - b.min.x, y: b.max.y - b.min.y, z: b.max.z - b.min.z, minY: b.min.y, maxY: b.max.y };
+          })(),
+          manual: tw.model.manual, telemetered: tw.model.telemetered, unsure: tw.model.unsure, sls: tw.model.sls,
         } : null,
         figure: sc.figure ? { h: FIGURE_H, x: sc.figure.position.x, z: sc.figure.position.z, baseY: sc.figure.position.y, visible: sc.figure.visible } : null,
         vertices: sc.terrain ? sc.terrain.geometry.attributes.position.count : 0,
@@ -4462,6 +5911,38 @@ void main() {
         camera: sc.camera ? { x: sc.camera.position.x, y: sc.camera.position.y, z: sc.camera.position.z } : null,
         paths: tw.paths ? { count: tw.paths.count, source: tw.paths.source, pending: tw.paths.pending, list: tw.paths.list.slice() } : null,
         embedded: !!tw.hooks,
+        info: { open: tw.infoOpen !== false, pinned: !!tw.infoPinned, timer: !!tw.infoTimer,
+                hidden: (() => { const el = document.getElementById('twin-info'); return el ? el.hidden : null; })() },
+        origin: tw.origin ? { ...tw.origin } : null,
+        tier: tw.tier ? { ...tw.tier } : null,
+        sharp: sc.sharp ? { x: sc.sharp.x, z: sc.sharp.z, mpp: sc.sharp.mpp, visible: sc.sharp.mesh.visible,
+                            textured: !!sc.sharp.mesh.material.map, size: SHARP_M,
+                            onGround: (() => { const p = sc.sharp.mesh.geometry.attributes.position; return Math.abs(p.getY(0) - yAt(p.getX(0), p.getZ(0))) < 1e-6; })() } : null,
+        neighbours: tw.neighbours ? {
+          more: tw.neighbours.more,
+          list: tw.neighbours.list.map(n => ({ id: n.id, name: n.name, x: n.x, z: n.z, d: n.d, structure: n.structure, top: n.top,
+            y: n.group.position.y, groundY: yAt(n.x, n.z), signY: n.sign.position.y, signVisible: n.sign.visible,
+            parts: (() => { const out = []; n.group.traverse(o => { if (o.isMesh) out.push(o.name); }); return out; })() })),
+        } : null,
+        bridges: tw.bridges ? {
+          status: tw.bridges.status, source: tw.bridges.source, failed: tw.bridges.failed,
+          crossing: tw.bridges.crossing ? { ...tw.bridges.crossing } : null,
+          list: tw.bridges.list.map(b => ({ ...b, deck: b.deck.slice(), ends: b.ends.map(e => ({ ...e })) })),
+          meshes: (() => { const out = []; if (sc.bridges) sc.bridges.traverse(o => { if (o.isMesh) out.push(o.name); }); return out; })(),
+          deckTop: (() => { let y = -Infinity; if (sc.bridges) sc.bridges.traverse(o => { if (o.name === 'bridge deck') { o.geometry.computeBoundingBox(); y = Math.max(y, o.geometry.boundingBox.max.y); } }); return isFinite(y) ? y : null; })(),
+          textured: (() => { let t = false; if (sc.bridges) sc.bridges.traverse(o => { if (o.name === 'bridge deck' && o.material.map) t = true; }); return t; })(),
+        } : null,
+        movepin: sc.movepin ? (() => {
+          const m = sc.movepin;
+          const pos = m.leader.geometry.attributes.position;
+          return {
+            visible: m.group.visible, x: m.pin.position.x, y: m.pin.position.y, z: m.pin.position.z,
+            groundY: yAt(m.pin.position.x, m.pin.position.z), height: m.H,
+            ghost: m.ghost.visible ? { x: m.ghost.position.x, z: m.ghost.position.z } : null,
+            leader: m.leader.visible && pos ? pos.count : 0, dragging: rig.pinDrag != null,
+            exported: (() => { let any = false; m.group.traverse(o => { if (o.userData.export !== false) any = true; }); return any; })(),
+          };
+        })() : null,
         pointing: !!rig.pointing, pointLatch: !!rig.pointLatch,
         laser: sc.laser && sc.laser.visible ? { len: sc.laser.scale.y, dot: { x: sc.dot.position.x, y: sc.dot.position.y, z: sc.dot.position.z } } : null,
         avatars: [...avatars.values()].map(a => ({

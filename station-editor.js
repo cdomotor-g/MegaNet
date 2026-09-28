@@ -736,6 +736,48 @@ async function editorSave() {
   });
 }
 
+// A station's position, saved without the form — the move-pin mode's Save
+// from the Digital Twin's tab, which has no editor card (map-move-pin.js).
+// It is the form's own write path rather than a second one — save_station()
+// and its stale-write stamp — with one difference that makes it safer than
+// the form for this one job: the document is the database's *current* copy
+// of the station (station_json, read the moment Save is pressed, with the
+// stamp that goes with it), not the copy this tab loaded an hour ago. So a
+// name or a sensor somebody else has changed since is kept rather than
+// written back over, and the only thing this save changes is the position.
+// Its lists are left out so that save_station() leaves them as they are
+// (river-details.js says why a list round-tripped through the browser is not
+// the list that was stored).
+//
+// Memory is brought up to date from what came back, as editorSave() does,
+// and the map's layers with it where there is a map. Throws what dbSelect and
+// dbSaveStation throw; editorSaveErrorText() has the words for each.
+async function stationSavePosition(id, lat, lon) {
+  const stations = (state.data && state.data.stations) || [];
+  if (!editorWritesGoToDatabase()) {
+    throw new Error('the station list on screen did not come from the datastore — load from the datastore first');
+  }
+  const rows = await dbSelect(`station_json?id=eq.${encodeURIComponent(id)}&select=doc,updated_at`);
+  const row = rows && rows[0];
+  if (!row || !row.doc) {
+    throw Object.assign(new Error(`station "${id}" is no longer in the database`), { conflict: true });
+  }
+  const d = { ...row.doc, lat, lon };
+  for (const k of RiverDetails.LIST_KEYS) delete d[k];
+  delete d.frequencies;
+  const result = await dbSaveStation(d, row.updated_at);
+  const saved = result.station;
+  const i = stations.findIndex(x => x.id === saved.id);
+  if (i >= 0) stations[i] = saved; else stations.push(saved);
+  if (state.editorId === saved.id) {
+    state.editorDraft    = saved;
+    state.editorStamp    = result.updated_at;
+    state.editorStampFor = saved.id;
+  }
+  if (state.map) refreshMapLayers({ skipFit: true });
+  return result;
+}
+
 // One message per way a save can fail, because "Error" is not an instruction.
 function editorSaveErrorText(err) {
   if (err.conflict) return `${err.message} Your edits are still on screen — copy anything you need, then reload from the datastore.`;

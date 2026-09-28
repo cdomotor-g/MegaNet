@@ -4075,16 +4075,17 @@ function mapDisplayControlsHtml() {
     </label>
     ${ElvisCoverage.rampHtml()}` : ''}
     <p class="filter-note" id="map-elvis-cov-note">${ElvisCoverage.noteHtml()}</p>
-    <!-- The Digital Twin at close zoom (map-twin.js): the map hands its
-         rectangle to the site twin from zoom 17 with a station under the
-         view, and takes it back on the way out. Beside the elevation layers
-         because it is the same ground, at the scale where 1 m LiDAR is the
-         difference between a bank and a gauge in a channel. -->
+    <!-- The Digital Twin at close zoom (map-twin.js): from zoom 17 with a
+         station under the view the map offers the site twin — a card saying
+         what imagery covers the station, and a button — and hands its
+         rectangle over only when the button is pressed. Beside the elevation
+         layers because it is the same ground, at the scale where 1 m LiDAR is
+         the difference between a bank and a gauge in a channel. -->
     <label class="filter-check"
-           title="From zoom 17 in, with a station under the view, the map hands over to that station's digital twin: the site's ground in 3-D, the imagery, a 2 m pole and the radio paths. Wheel out, Escape or ← Map to come back.">
+           title="From zoom 17 in, with a station under the view, a card on the map offers that station's digital twin and says what aerial imagery covers it. Press Open the digital twin for the site's ground in 3-D, the imagery, the station as built and the radio paths; ← Map or Escape to come back.">
       <input type="checkbox" ${state.mapTwinAuto ? 'checked' : ''}
              onchange="MapTwin.setEnabled(this.checked)">
-      Digital twin at close zoom (${MapTwin.zoom}+)
+      Offer the digital twin at close zoom (${MapTwin.zoom}+)
     </label>
     <p class="filter-note" id="map-twin-note">${MapTwin.noteHtml()}</p>
     <!-- The field photos (map-photos.js, 0035): a 📷 where each was taken,
@@ -5442,7 +5443,7 @@ function stationActionGroups(s, { edit = false } = {}) {
       `<button type="button" class="pill" onclick="focusStation('${escAttr(s.id)}')"
            title="Select this station in the Stations list ${stationsCardsWhere()}">🗒️ Show in the list ${stationsCardsArrow()}</button>`,
       `<button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
-           title="Zoom the map to the ~50 km area around this station">🔍 Zoom to station</button>`,
+           title="Zoom the map all the way in on this station — where the map offers its digital twin">🔍 Zoom to station</button>`,
       fieldDataPillHtml(s),
       twinPillHtml(s),
       fieldPhotosPillHtml(s),
@@ -6143,23 +6144,21 @@ function focusStationOnMap(s, opener = document.activeElement) {
   if (marker && !isPhoneNav()) marker.openPopup();
 }
 
-// A bounding box roughly radiusKm around a point, for map.fitBounds() — a
-// real-world distance rather than a Leaflet zoom level, which covers different
-// ground at different latitudes. One degree of latitude is ~111 km everywhere;
-// a degree of longitude shrinks by cos(latitude) as it closes in toward the poles.
-function boundsForRadiusKm(lat, lon, radiusKm) {
-  const dLat = radiusKm / 111;
-  const dLon = radiusKm / (111 * Math.cos(lat * Math.PI / 180));
-  return [[lat - dLat, lon - dLon], [lat + dLat, lon + dLon]];
-}
-
-// "Zoom to station" from a map popup — centers the station with a 50 km
-// wide view of surrounding context visible, regardless of the map's
-// current extent when clicked.
+// "Zoom to station" — the station centred at the closest zoom the map has,
+// wherever the map was. It used to fit a 50 km box of context round the
+// station, which is what "Show on the map" (focusStationOnMap, zoom 11) is
+// for; the pill is pressed to see the station itself, so it goes all the way
+// in. How far in is the base layers' to say — Leaflet's getMaxZoom() is the
+// deepest zoom of the layers on the map: 17 on the topo base, 19 on the
+// satellite, OpenStreetMap and dark ones — and from 17 in, with the station
+// under the view, the map offers the station's digital twin (map-twin.js),
+// which is where the imagery goes finer than the map's tiles.
 function zoomToStation(id) {
   const s = state.data && state.data.stations.find(x => x.id === id);
   if (!state.map || !s || s.lat == null || s.lon == null) return;
-  state.map.fitBounds(boundsForRadiusKm(s.lat, s.lon, 25));
+  const max = state.map.getMaxZoom();
+  // No base on at all leaves no layer to ask, and Leaflet answers Infinity.
+  state.map.setView([s.lat, s.lon], Number.isFinite(max) ? max : 19);
 }
 
 // Scroll a station's row into the middle of the table viewport, so a station

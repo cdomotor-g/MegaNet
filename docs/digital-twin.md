@@ -153,34 +153,109 @@ something close to its own resolution; 1600 m is the setting for a site on a
 ridge whose relief is what matters.
 
 **The station as built.** What stands at the origin is the station the
-network puts there, read from the record:
+network puts there, read from the record — and where the record cannot say,
+nothing is assumed:
 
 - A **Type 3 rainfall station** — the green pole, 2.000 m × Ø0.300 m, the
   tipping-bucket gauge and its ring on top, the enclosure on the south face,
   the solar panel on its bracket to the north, the whip antenna up the east
-  side, on a concrete pad — for a station that reports rainfall only, for a
-  rain-and-repeater, and for any station whose record does not say it has
-  a water-level sensor. A band in the station's role colour rides the pole.
+  side, on a concrete pad — for a *telemetered* station that reports rainfall
+  and not a river. A band in the station's role colour rides the pole. A
+  repeater that measures nothing is the same pole without the gauge.
 - A **river-gauge tower** — a 4 m galvanised mast on its flange, a 1.8 m
   grating platform with handrails and toe boards 4 m up, the cabinet on the
   platform's north side, the gauge on its west, the antenna mast with the
   solar panel and the whip at its north-east corner, and a ladder up the
-  south side with rungs every 300 mm — for a station whose record has a
-  water-level sensor: a sensor typed `Water Level…` or `Gas Pressure`, a
-  legacy `water_level` ALERT address, or a Bureau listing typed Water Level.
-  The foundation is below the ground and is not drawn.
+  south side with rungs every 300 mm — for a *telemetered* station whose
+  record says it reads a river: a sensor typed `Water Level…` or `Gas
+  Pressure`, a legacy `water_level` ALERT address, a Bureau listing typed
+  Water Level, or the SLS's data type. The foundation is below the ground and
+  is not drawn.
+- A **manual rainfall station** — the depositional collector an observer
+  reads: a silver cylinder **Ø200 mm and 300 mm tall** standing on the ground,
+  open at the top with its funnel inset.
+- A **manual river station** — a white **staff gauge 1 m tall** on the
+  ground, graduated as the real plates are: a black E every ten centimetres,
+  the metre figures in red.
+- A **manual station that reads both** — the two side by side, 1.2 m apart:
+  the record has one coordinate for what are often two places on the ground,
+  and the notes say so.
+- **A red post, 1 m tall**, where the record cannot say what the station is —
+  nothing says whether a person or a radio reads it, or nothing says what it
+  measures. A Type 3 pole there would be a guess drawn as confidently as a
+  fact; the notes say what is known and what is not.
 
-Inside each enclosure is the kit the network fits, by telemetry: an **ELPRO
-ERRTS ERT-A2** radio for an ALERT station (a name ending AL or ALERT, or
-ALERT addresses in the record), a **Campbell Scientific CR300** logger and a
-**Beam Iridium SBD modem** for a TM station (a name ending TM, or satcom
-on). A station the record cannot place is drawn as TM, and the notes say
-so. Every tower cabinet carries a **Kisters HS40 compressor bubbler** in its
-upper compartment — panel, desiccant tube, pressure gauge, display, valves,
-compressor control and compressor — and a **Victron** charge controller,
-the telemetry, the terminals and the battery below. A plate inside names
-the station and gives its number. Everything is primitives, not fetched
-models, at true size.
+*Manual* is what the Bureau's Service Level Specification says (its gauge
+type, by bureau number — the station card's own lookup), or, for a station
+the SLS does not carry, being in the Bureau's list of daily-read gauges
+(Section 2 of its river height station lists) with nothing in the record
+saying a radio reads it. *Telemetered* is a name ending AL, ALERT or TM,
+ALERT addresses, satcom, or the SLS saying Automatic. What it measures is the
+sensors, the ALERT addresses, the Bureau's location types and the SLS's data
+type, together. The SLS file is read once, alongside the ground; a build that
+cannot have it decides from the record alone and says so.
+
+Inside each pole and tower enclosure is the kit the network fits, by
+telemetry: an **ELPRO ERRTS ERT-A2** radio for an ALERT station (a name ending
+AL or ALERT, or ALERT addresses in the record), a **Campbell Scientific
+CR300** logger and a **Beam Iridium SBD modem** for a TM station (a name
+ending TM, or satcom on). An automatic station whose radio the record cannot
+name is drawn as TM, and the notes say so. Every tower cabinet carries a
+**Kisters HS40 compressor bubbler** in its upper compartment — panel,
+desiccant tube, pressure gauge, display, valves, compressor control and
+compressor — and a **Victron** charge controller, the telemetry, the
+terminals and the battery below. A plate inside names the station and gives
+its number. Everything is primitives, not fetched models, at true size.
+
+**The other stations in the patch** are built too, by the same rules, each
+standing on the ground where the record puts it with its name over it — a
+river gauge and the rain gauge beside it, a repeater on the ridge above a
+town. The nearest forty; the line under the stage (*📡 Also in this patch*)
+names every one with its distance and bearing, each name a button that goes
+to that station's own twin, as a radio path's far end does. Their enclosure
+doors open as the POV visitor walks up; only the centre's tower can be
+climbed. They are the site, so they are in the `.glb`.
+
+**Bridges.** The ground is bare earth — a LiDAR DTM is made by taking the
+bridges *out* — so a road bridge over a creek is, on that ground, a road that
+dives into the creek and climbs the far bank, and the imagery draped on it
+dives with it. So each bridge in the patch is built as a deck across the gap:
+the deck with the aerial photograph of the road on its top, girders under it,
+rails along it and piers down to the bed where there is room for one. Where
+they are comes from Queensland's road network — the *Bridges* layer of
+RoadsAndTracks and the railway bridges of OtherTransport, one query each for
+the patch's box — and, outside Queensland or when it cannot be reached, from
+OpenStreetMap through Overpass. Neither answering leaves the ground as it is
+and says so in the notes; no deck is ever guessed at.
+
+How high the deck stands:
+
+- **At the crossing height the Bureau lists**, where there is one: the river
+  height station lists give the crossing a gauge is read against as a height
+  *on the gauge* (a Bridge, Old Bridge or Highway crossing, 0031), and where
+  the gauge's zero is surveyed in AHD that is a level — Gatton's Smithfield
+  Road Bridge at 3.90 m on a zero of 87.54 m AHD is 91.44 m AHD. It goes on
+  the bridge nearest the gauge, within 250 m, level from end to end: it is
+  the height the Bureau says the crossing goes under at, which is the deck.
+  The flood water, rising, covers it there.
+- **Otherwise at its banks**: the ground at each end of the span, or a few
+  metres on along the road where the approach meets the abutment, whichever is
+  higher, and a straight deck between the two.
+
+The widths are not in either source: a road bridge is 8 m across, a railway's
+5 m, a track's 4 m (an OpenStreetMap way that gives its width or its lanes is
+drawn at that). The line under the stage says each deck's level and which
+rule set it. Bridges are the site: they are in the `.glb`.
+
+**The imagery, sharp where it matters.** The drape is one texture over the
+patch — 1,024 px over 400 m, 0.39 m a pixel — while the State has flown most
+towns at 10 cm. So round the station, where the State's catalogue holds
+imagery at least 1.5 times finer than the drape, a 100 m square is draped
+again at 0.098 m a pixel, on a mesh of its own riding the ground a hair above
+the patch's; while a pin is being moved, the square follows the pin (in 25 m
+steps, one request at the end of a drag, never during one). The status line
+says what was flown and when — *10 cm imagery (Lockyer Valley Urban, May
+2021) round the station*. It is the view, not the site: not in the `.glb`.
 
 **The doors** open on their own: the pole's enclosure when the POV eye comes
 within 2.2 m of it, the tower's cabinet when the visitor is up on the
@@ -194,6 +269,21 @@ for it — because a map on a phone is 340 px tall and three notes of four
 lines each once left it no height at all. The map's zoom corner stands down
 while the twin is up (← Map, Escape or a wheel out is the way back), which
 gives a phone's bar the room its buttons need.
+
+**The lines over the stage fold away.** The status, the radio paths, the
+photos, the water, who else is here, the other stations and bridges, and the
+notes are a line each, and together they were most of a small map. They sit
+under one button — **▴ Details** on the tab's header and on the map overlay's
+bar — and are **open when the twin opens** (the build is saying what it could
+and could not get) and **folded ten seconds later**, the stage taking the
+height back. The fold waits while the pointer is over the lines or the focus
+is in them, and once the button has been pressed either way it stays as it
+was left. Folded, the button counts the notes (**▾ ⚠ 2**), so a warning is
+never folded out of sight without a mark, and what the status line says from
+then on goes to the app's live region instead. A new station — or coming back
+to the twin — opens them again. On a phone's map the line naming the other
+stations and bridges stands down, as the water's does, and the button to the
+tab with them: the bar is one row of 44 px targets.
 
 **The figure.** 1.75 m, hi-vis and a hard hat, built from primitives (a model
 is a file to fetch and a licence to carry; a capsule in orange gives a sense
@@ -283,27 +373,43 @@ there for whoever cannot see the picture.
 
 The same twin is inside the Stations map (`map-twin.js`), and that is the
 usual way in. **From zoom 17** — about a kilometre across on a laptop's map,
-the moment a pin has become a place — with a station under the view, the
-map's rectangle hands over to that station's twin, whichever view was
+the moment a pin has become a place — with a station under the view, a card
+at the top of the map **offers** that station's twin, whichever view is
 showing: the 2-D map or ⛰️ 3-D (whose camera follows the 2-D map's zoom, so
-both paths arrive the same way). Wheeling out past the twin's widest orbit,
-pressing Escape, or **← Map** on the overlay hands back, with the map set one
-level out — where the operator was heading.
+both arrive the same way). It says what the twin would show that the map does
+not: the aerial photography over the station, at the resolution and the date
+the State's own imagery catalogue gives for that point — *Aerial photography
+at 10 cm (Lockyer Valley Urban, May 2021) covers Gatton* — or, outside
+Queensland's program, that the imagery is Esri's. **🧊 Open the digital twin**
+hands the map's rectangle over; **×** puts the card away for that station
+until the map is next zoomed out past 17. **🔍 Zoom to station** on the card
+goes all the way in — the deepest zoom the base allows (17 on the topo base,
+19 on the others) — so it lands on the offer.
+
+The twin used to take the map over at 17 on its own. It did not ask, and a
+map that turns into something else at a zoom level cannot be used at that
+zoom level — a pin could not be clicked at 17 without a WebGL scene arriving
+over it. Now the map stays a map at every zoom, and the twin is one press
+away wherever it has something to add. **← Map** or **Escape** gives the map
+back as it was, at the zoom it was at, with the card on it again; wheeling out
+past the twin's widest orbit gives it back one level out.
 
 "A station under the view" is, in order: the station on the card (the map's
 memory of what you were looking at), the selected station, or the nearest
 station to the map's centre — each only if it is within half a patch of the
-centre, so a twin is never built for a pin off the edge of the screen. From
+centre, so a twin is never offered for a pin off the edge of the screen. From
 zoom 14 a station under the view has its ground and imagery fetched ahead
-into the same bounded caches the tab uses, so the hand-over at 17 is a build
-from memory rather than a wait. The switch is in 🗺️ Map display, on by
-default and remembered.
+into the same bounded caches the tab uses, so the hand-over, when it is asked
+for, is a build from memory rather than a wait. The catalogue is asked once a
+station and remembered for the session. The switch — **Offer the digital twin
+at close zoom** — is in 🗺️ Map display, on by default and remembered.
 
 ⛰️ 3-D and the twin are one idea at two scales, and neither replaces the
 other: a map camera cannot be put at eye height, and a site twin cannot show
 a 60 km hop. The 3-D view is the network on its terrain — every pin and link,
 the line-of-sight sheets — and the twin is the site. Zoom is the one thing
-that already says which question is being asked, so zoom is the hand-over.
+that already says which question is being asked, so zoom is where the offer
+comes up.
 
 The overlay is a child of the Leaflet container, above the 3-D canvas and
 below the control corners (`#map-twin`, one step above `#map3d`'s window in
@@ -320,6 +426,47 @@ controls and teardown are `digital-twin.js`'s; `map-twin.js` decides *when*
 and gives it a host. **Open the tab →** on the overlay opens the Digital Twin
 tab on the same station, for the settings, the Ground truth panel and the
 `.glb`.
+
+## Moving a station's pin
+
+The twin is the best place there is to put a station's position right: the
+ground is the State's LiDAR and, round the station, the imagery is what was
+flown — 10–20 cm over most towns. So the move-pin mode (`map-move-pin.js`, the
+station card's **📍 Move pin on map**) works here, and in ⛰️ 3-D, as it does on
+the flat map:
+
+- **On the Digital Twin tab**, **📍 Move pin** on the header arms it for the
+  station on the stage — there is no map under it, and none is needed. An
+  **amber post** stands on the ground at the station, taller than what is
+  built there so its head shows over it, with a ring at its foot. Drag the
+  post across the ground, or click the ground where the station stands: the
+  post goes there, a grey ring marks where the station was and a dashed line
+  runs along the ground between the two. A panel on the stage reads the
+  latitude and longitude back to six places and the distance moved — in
+  centimetres under a metre — with **Save position** and **Cancel**. The 10 cm
+  drape follows the post. **Escape** ends the move, and only the move.
+- **Inside the Stations map**, the overlay's **📍** arms the same mode the
+  station card's pill does; its panel is on the stage and the map's own, in the
+  corner, stands down while the twin is up. Escape ends the move and leaves the
+  twin up.
+- **In ⛰️ 3-D**, the pin is drawn on the terrain — the same amber pin, as a
+  marker that can be dragged, with its leader and its "was here" ring — and a
+  click on the ground puts it where MapLibre says that pixel is on the
+  terrain. It used to arm, put its panel in the corner and leave its pin under
+  the canvas, where nobody could see or reach it; and a click fell through to
+  the flat map, which on a tilted camera is somewhere else.
+
+**Saving.** On the Stations tab the numbers go into the station editor's boxes
+and the editor's own Save is pressed, as on the flat map. On the Digital Twin
+tab there is no editor, so Save reads the station's **current copy from the
+database** (`station_json`, with the stamp that goes with it), changes the
+position and nothing else — its lists are left out, so `save_station()` leaves
+every one of them as it is — and writes it back through the editor's own
+`save_station()`. Somebody else's edit since this tab loaded is kept rather
+than written over. Signed out, or with the station list not from the
+datastore, the panel says so and the pin stays where it was put. Saved, the
+twin is rebuilt standing on the new spot: its ground is a patch centred on
+the station.
 
 ## The radio paths
 
@@ -541,6 +688,38 @@ something moves — and paused it draws nothing at all.
 It is a simulation, not the site: **not in the `.glb`**. Editors and visitors
 alike see it; the levels are the station card's, and those are public.
 
+### A station with no levels, and a nearby one's
+
+3,710 stations have no heights the twin can put on their ground, and many of
+them are a few kilometres up or down a river from one that has. For those the
+flood line says so and offers **Use a nearby station's levels…** (the pill on
+the stage offers it too — on a phone's map it is the only place that can —
+and so does the Scene panel's *Flood water*). The offer opens a dialog listing
+the **four nearest stations that have levels**: each one's distance and
+bearing, its flood heights (the classes on its gauge, the AEP levels in AHD)
+and its catchment — the basin by name, the stream, and *same catchment* where
+it shares one. **Use these** draws that station's levels here.
+
+How the heights cross from there to here is the operator's choice, and the
+dialog asks:
+
+- **As heights on the gauge, laid over this station's channel** (the
+  default). Each level becomes a height over the lowest ground by this gauge:
+  a minor class of 3.0 m is water 3.0 m over this channel's bed. A class is
+  already a gauge height; an AEP level is brought down to one through the
+  other gauge's AHD zero, and left out — with a note — where it has none. The
+  better guide across a river's fall, which on a creek is a metre a
+  kilometre.
+- **As the same heights in metres AHD** — the other station's own ladder,
+  unchanged: right only a short way along the same reach.
+
+A station whose own classes are on an assumed or a State datum — which the
+twin cannot put on the ground — is offered **its own** first, as heights over
+its own channel. Borrowed levels are drawn only in the twin and only for the
+session; nothing is saved to the station. The notes, the flood line and the
+Scene panel all say whose they are, how far off, and that they are a guide,
+not a model — and **change** or **stop** is on the line.
+
 ## The Ground truth panel
 
 Side by side: the station's recorded height (surveyed, or modelled with its
@@ -615,6 +794,8 @@ three.js was, and belongs to that issue.
 | `s3.amazonaws.com` | the ~30 m tiles, as a fallback and for the horizon's outer sheets | already allowed for every profile |
 | `server.arcgisonline.com` | Esri imagery, as a fallback | already allowed for the Satellite base |
 | `api-elevation.fsdf.org.au` | the height at the pin | already allowed for the station card |
+| `spatial-gis.information.qld.gov.au` | where the bridges are (RoadsAndTracks layer 22, OtherTransport layer 160) | already allowed for the cadastre, contours and survey marks |
+| `overpass-api.de`, `overpass.kumi.systems` | bridges outside Queensland, or when the State cannot be reached | already allowed for the rivers layer |
 
 See `docs/floodwarning-net.md` for why a hostname the Bureau's filter has never
 categorised is denied by default, and what to ask for.
@@ -642,6 +823,25 @@ sheet alone and a note), the `.glb`'s chunks and positions read back out of
 the binary with the horizon left out, each fallback by breaking one host,
 walk mode at eye height, and the renderer going with the tab. It needs WebGL2, which Playwright's Chromium
 has through SwiftShader, and skips rather than fails without it.
+
+`npm run twinsite` holds what the owner asked the site to be, on a valley
+the check makes about whichever station is under test: the collector, the
+staff gauge, both, and the red post measured off the scene's own bounding box
+(and the pole and the tower where the record is sure); a neighbour 129 m off
+built where it is, on its ground, named, and its name going to its twin; a
+bridge across the creek at Gatton's listed crossing height and, for a station
+with none, at its banks — and a road network that will not answer, said out
+loud; the 10 cm drape round the station; a station with no levels offered the
+four nearest with theirs, one chosen and drawn over the channel, and stopped;
+the lines folding after the delay, waiting while the focus is in them, and
+staying as pressed; and the offer at zoom 17, the hand-over only when pressed,
+← Map at the same zoom, × until the next zoom in, and Zoom to station all the
+way in. `npm run twinpin` moves a pin: on the twin's tab with no map (a real
+pointer drags the post, a click puts it, Escape ends only the move, Save
+writes the database's current copy with only the position changed and none of
+its lists, and the twin rebuilds on the new spot), inside the Stations map's
+twin, and in ⛰️ 3-D (the pin on the terrain, a click moved to MapLibre's own
+coordinate for the pixel and not the flat map's, a real drag, cancel).
 
 `npm run flood` holds the water. `flood-stages.js` first, under Node, against
 real station records: the classes through the zero in force and only an AHD

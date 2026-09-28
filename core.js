@@ -290,12 +290,15 @@ const HELP = {
            + 'the address out of the box rather than off the saved record, so a row you have '
            + 'retyped sends you to the number on screen.',
     watch: [
-      '<strong>From zoom 17 the map becomes the station\'s digital twin</strong> — the ground to '
-      + '1 m where the State holds LiDAR, the aerial imagery, a 2 m pole and the radio paths as this '
-      + 'map colours them — whenever a station is under the view: the one on the card, the selected '
-      + 'one, or the nearest to the centre. Wheel out past the edge, press Escape or ← Map to come '
-      + 'back; the switch is in 🗺️ Map display. ⛰️ 3-D is the same idea at network scale, and hands '
-      + 'over at the same zoom.',
+      '<strong>From zoom 17 the map offers the station\'s digital twin</strong> — the ground to '
+      + '1 m where the State holds LiDAR, the aerial imagery, the station as built and the radio paths '
+      + 'as this map colours them — whenever a station is under the view: the one on the card, the '
+      + 'selected one, or the nearest to the centre. It never jumps there by itself: a card on the map '
+      + 'says what imagery covers the station (10 cm over most towns, and when it was flown) and '
+      + '<em>Open the digital twin</em> hands the rectangle over. ← Map or Escape gives the map back at '
+      + 'the same zoom; wheeling out steps one zoom out. <strong>🔍 Zoom to station</strong> goes all '
+      + 'the way in, which is where the card appears. The switch is in 🗺️ Map display; ⛰️ 3-D is the '
+      + 'same idea at network scale, and offers it at the same zoom.',
       '<strong>3-D view</strong> — ⛰️ in the side panel\'s strip, or the panel of the same name — '
       + 'tilts the map onto the ground it is drawn on: the base map you are already on (the most opaque one, if you have blended several), draped over '
       + '~30 m terrain, with the pins and links you are already looking at on it. Drag to pan, '
@@ -511,7 +514,11 @@ const HELP = {
       + 'position and the distance between them on the panel. <em>Save position</em> puts the new '
       + 'coordinates in the two boxes on the form and saves the station exactly as the card\'s own '
       + 'Save would — so it needs the same signed-in session. <em>Cancel</em>, or Escape, leaves '
-      + 'the station where it was.',
+      + 'the station where it was. It works the same in <strong>⛰️ 3-D</strong> — the pin stands on '
+      + 'the terrain and a click lands where the terrain is under the cursor, not where the flat map '
+      + 'would put it — and <strong>inside the digital twin</strong>, where the pin is an amber post '
+      + 'you drag across the ground with the State\'s finest imagery (10 cm over most towns) draped '
+      + 'round it: the closest look this app has at where a station really stands.',
       'The two <strong>document searches</strong> do not send the station\'s name as written. A '
       + 'library search box requires <em>every</em> term to match, so a site filed as "Upper Sandy '
       + 'Ck" would be unreachable from a search that said "Creek" — the wrong half of the pair '
@@ -1155,16 +1162,29 @@ const HELP = {
     summary: 'One station\'s patch of ground in three dimensions — the real relief under it from the '
            + 'best public elevation model there is (Queensland\'s 0.5–1 m LiDAR where it exists, the '
            + '~30 m SRTM elsewhere), the aerial imagery draped over it, <strong>the station as built</strong> '
-           + 'where it stands — the Type 3 rainfall pole, or the river-gauge tower with its platform and '
-           + 'ladder — with the kit inside its enclosure, and a 1.75 m figure beside it for scale. Orbit it, '
+           + 'where it stands — the Type 3 rainfall pole, the river-gauge tower with its platform and '
+           + 'ladder, a manual collector or staff gauge, or a red post where the record cannot say — with '
+           + 'the other stations and the bridges in the patch, and a 1.75 m figure beside it for scale. Orbit it, '
            + 'look straight down on it, or take the POV and walk about in it at eye height (and up the '
-           + 'ladder); click the ground for its height; and '
+           + 'ladder); click the ground for its height; move the station\'s pin to where it stands on '
+           + '10 cm imagery; and '
            + 'download the whole scene as a <code>.glb</code> that Blender opens in one step.',
     watch: [
       '<strong>The same twin is inside the Stations map.</strong> From zoom 17 with a station under '
-      + 'the view the map hands its rectangle to the twin and takes it back when you wheel out, press '
-      + 'Escape or ← Map — so the usual way in is to zoom to a pin, not to come here. This tab is the '
-      + 'full version: the settings, the Ground truth panel and the .glb.',
+      + 'the view a card on the map offers it, saying what aerial imagery covers the station and when '
+      + 'it was flown; press Open the digital twin and the map hands its rectangle over, and ← Map or '
+      + 'Escape gives it back at the same zoom. So the usual way in is 🔍 Zoom to station on a pin, not '
+      + 'to come here. This tab is the full version: the settings, the Ground truth panel and the .glb.',
+      '<strong>📍 Move pin</strong> puts the station where it stands: drag the amber post across the '
+      + 'ground, or click where the station is, and a panel on the stage reads the new position to the '
+      + 'centimetre. Round the station and the pin the State\'s finest imagery is draped again — 10 cm '
+      + 'over most towns, where the rest of the patch is 0.39 m. Save writes the position (and nothing '
+      + 'else) through the station editor\'s own save, then rebuilds the twin on the new spot. The '
+      + 'same mode works inside the Stations map\'s twin and in ⛰️ 3-D.',
+      '<strong>The lines over the view fold away</strong> ten seconds after the twin opens — the '
+      + 'status, the paths, the photos, the water and the notes — so the stage gets the height back. '
+      + '▾ Details brings them back (it counts the notes while they are folded); once pressed, they '
+      + 'stay as you left them.',
       '<strong>The radio paths are drawn from the antenna</strong> as rays to the edge of the patch, '
       + 'along the line of sight to the far station, each named at its end. Inside the Stations map '
       + 'they are the map\'s own lines — the same filters, the same colouring (channel, fade margin or '
@@ -1183,13 +1203,19 @@ const HELP = {
       + 'gauge down in the channel and the mark is the hut on the bank</strong> — a flag on the '
       + 'position, not a correction to the height. The Ground truth panel puts the two side by side, '
       + 'with what Elvis says at the point and which dataset it read.',
-      '<strong>The station is read from its record.</strong> A water-level sensor in the record — a '
-      + 'Water Level or Gas Pressure sensor, a water_level ALERT address, a Bureau listing typed Water '
-      + 'Level — makes it the tower; anything else, rainfall-only and rain-and-repeater included, is the '
-      + 'Type 3 pole. AL or ALERT in the name (or ALERT addresses) puts an ELPRO ERT-A2 in the '
-      + 'enclosure; TM in the name (or satcom) a Campbell CR300 and a Beam SBD modem; every tower '
-      + 'cabinet carries a Kisters HS40 bubbler. A station the record cannot place is drawn as TM, and '
-      + 'the notes say so. The doors open when you come up to them in the POV.',
+      '<strong>The station is read from its record, and nothing is assumed.</strong> A telemetered '
+      + 'station that reads a river is the tower; one that reads rainfall the Type 3 pole. A station the '
+      + 'SLS lists as Manual (or one the Bureau reads daily with nothing saying a radio does) is the '
+      + 'observer\'s kit: a silver collector Ø200 × 300 mm for rain, a white 1 m staff gauge for a river, '
+      + 'both side by side for both. Where the record cannot say what a station is, it is a red post '
+      + '1 m tall, and the notes say what is not known. AL or ALERT in the name (or ALERT addresses) '
+      + 'puts an ELPRO ERT-A2 in an enclosure; TM (or satcom) a Campbell CR300 and a Beam SBD modem; '
+      + 'every tower cabinet carries a Kisters HS40 bubbler. The doors open when you come up to them.',
+      '<strong>Bridges stand over the creek.</strong> The ground is bare-earth LiDAR, which has the '
+      + 'bridges taken out, so each bridge in the patch (from the State\'s road network, or '
+      + 'OpenStreetMap) is built as a deck — at the crossing height the Bureau lists for the gauge where '
+      + 'there is one, else at its banks — with the photograph of the road on it. The other stations in '
+      + 'the patch are built too, each named, and each name goes to its own twin.',
       '<strong>You are not necessarily alone.</strong> With <em>Explore together</em> on (the Scene '
       + 'panel), the twin joins a room for its station and whoever else has that station open is '
       + 'drawn where they stand, in the hat, shirt and trouser colours they chose, with their name over '
@@ -1213,6 +1239,12 @@ const HELP = {
       + 'stage\'s top left (or the line under it) stops the rise; a level on the line holds the water '
       + 'there; <em>Hide the water</em> takes it away — each remembered. Classes on a gauge whose zero '
       + 'is not surveyed to AHD are named in the notes and not drawn. Not in the .glb.',
+      '<strong>No levels here? Borrow a neighbour\'s.</strong> For a station with no flood heights '
+      + 'the twin can put on its ground, the flood line (and the pill) offers the four nearest stations '
+      + 'that have some — their distance, their heights and their catchment. Pick one and its levels '
+      + 'are drawn over this channel as heights on its gauge (or, if you say so, as the same metres '
+      + 'AHD). Only in the twin, only for the session, and every place that draws them says whose '
+      + 'they are.',
       '<strong>A 📷 on the ground is where somebody stood with a camera</strong> — a post at chest '
       + 'height, the camera turned the way it faced and a pale wedge for each way a photo from there '
       + 'looked. Click it, pick it from the line under the stage, or walk up to it in the POV and '

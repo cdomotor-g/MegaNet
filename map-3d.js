@@ -65,6 +65,12 @@
 // under the canvas follows the camera (see "One view"), so it is asked about
 // the ground the camera is looking at.
 //
+// The pin being moved (map-move-pin.js) is the fourth, and the only one that
+// talks back: `MapMovePin.drawn()` is read into a source (`mn-movepin`) and a
+// draggable DOM marker, and a drag or a click on the terrain is handed to
+// `MapMovePin.moveTo()` / `pick()` with MapLibre's own coordinate for it —
+// never Leaflet's, which for a pixel on a tilted view is somewhere else.
+//
 // ── Why the library is fetched rather than listed in index.html ──────────────
 // MapLibre is ~1 MB of WebGL renderer. Leaflet is in index.html because half
 // the tabs are unusable without it; this is one optional mode on one tab, and
@@ -171,6 +177,8 @@ const Map3D = (function () {
   let sitePins = [];     // the site finder's pins and site marks, as ml.Markers
   let photoPins = [];    // the field photos' badges: [{ marker, pin }] (syncPhotos)
   let photoKey  = null;  // what they were last built from, so a pan that finds the same photos rebuilds nothing
+  let pinMarker = null;  // the move-pin mode's pin, draggable on the terrain (syncMovePin)
+  let pinDragging = false; // …while a drag of it is under way, when the mode's own echo must not move it
   let dimK     = 1;      // MapSites.dimOthers(), as last applied — 1 when idle
   let lfHeld   = [];     // Leaflet's own handlers this file switched off (holdLeaflet)
   let lfMoving = false;  // the 2-D map was moved, and the camera has not followed yet
@@ -665,6 +673,68 @@ const Map3D = (function () {
     standOnGround();
   }
 
+  // ── The pin being moved (map-move-pin.js) ───────────────────────────────
+  // MapMovePin's marker is a Leaflet L.Marker, and this canvas covers every
+  // Leaflet pane: armed in 3-D, the mode came up with its panel in the corner
+  // and its pin out of sight and out of reach, and a click on the ground fell
+  // through to Leaflet with the flat map's coordinate for that pixel. So the
+  // pin is drawn here as well, the photos' way — read from MapMovePin.drawn(),
+  // never re-derived: the dashed leader and the "was here" ring in a source of
+  // their own (`mn-movepin`), and the pin itself as a draggable DOM marker
+  // wearing 2-D's own icon, so it is the same amber pin in both views. A drag
+  // hands every position back through MapMovePin.moveTo() with the terrain's
+  // own coordinate, and a click on the ground is routed there by the click
+  // handler below, ahead of the paths and What is here.
+  function movePinFeatures(d) {
+    const out = [];
+    if (d && d.from) {
+      out.push({ type: 'Feature', properties: { kind: 'leader' },
+                 geometry: { type: 'LineString', coordinates: [[d.from[1], d.from[0]], [d.at[1], d.at[0]]] } });
+      out.push({ type: 'Feature', properties: { kind: 'ghost' },
+                 geometry: { type: 'Point', coordinates: [d.from[1], d.from[0]] } });
+    }
+    return { type: 'FeatureCollection', features: out };
+  }
+
+  function syncMovePin() {
+    if (!map || !ready) return;
+    const d = typeof MapMovePin !== 'undefined' && MapMovePin.drawn ? MapMovePin.drawn() : null;
+    const live = !!(d && d.onMap);
+    const src = map.getSource('mn-movepin');
+    if (src) src.setData(movePinFeatures(live ? d : null));
+    if (!live) {
+      if (pinMarker) { try { pinMarker.remove(); } catch (_) {} }
+      pinMarker = null;
+      pinDragging = false;
+      return;
+    }
+    if (!pinMarker && ml) {
+      const el = document.createElement('div');
+      el.className = 'mn-movepin-icon mn-movepin-3d';
+      el.innerHTML = '<div class="mn-movepin"><i class="mn-movepin-ring"></i><i class="mn-movepin-dot"></i></div>';
+      el.title = `Drag to where ${d.name} stands`;
+      pinMarker = new ml.Marker({ element: el, anchor: 'center', draggable: true })
+        .setLngLat([d.at[1], d.at[0]]).addTo(map);
+      pinMarker.on('dragstart', () => { pinDragging = true; });
+      pinMarker.on('drag', () => {
+        const p = pinMarker.getLngLat();
+        MapMovePin.moveTo(p.lat, p.lng, { silent: true });
+      });
+      pinMarker.on('dragend', () => {
+        pinDragging = false;
+        const p = pinMarker.getLngLat();
+        MapMovePin.moveTo(p.lat, p.lng);
+      });
+      // A press on the pin is the start of a drag, not a click on the ground
+      // under it — which would move the pin to wherever MapLibre thinks that
+      // pixel is, a hair from where it was.
+      el.addEventListener('click', e => e.stopPropagation());
+    } else if (!pinDragging) {
+      pinMarker.setLngLat([d.at[1], d.at[0]]);
+    }
+    standOnGround();
+  }
+
   // ── Standing the DOM markers on the ground ──────────────────────────────
   // A marker is placed on the ground as far as the terrain has loaded when it
   // is added, and MapLibre places its markers again as tiles land only for the
@@ -685,6 +755,7 @@ const Map3D = (function () {
       if (!map) { standing = false; return; }
       for (const m of sitePins) m.setLngLat(m.getLngLat());
       for (const p of photoPins) p.marker.setLngLat(p.marker.getLngLat());
+      if (pinMarker && !pinDragging) pinMarker.setLngLat(pinMarker.getLngLat());
       if (map.loaded() && !map.isMoving()) { standing = false; return; }
       map.once('render', again);
     };
@@ -1076,6 +1147,8 @@ const Map3D = (function () {
         // image is added — a symbol laid out before its image exists is a
         // console warning and a missing cone.
         'mn-photos':   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+        // The move-pin mode's leader and "was here" ring (syncMovePin).
+        'mn-movepin':  { type: 'geojson', data: movePinFeatures(null) },
       },
       layers: [
         { id: 'mn-base', type: 'raster', source: 'mn-base' },
@@ -1187,6 +1260,15 @@ const Map3D = (function () {
                    'circle-stroke-color': 'rgba(0,0,0,.5)', 'circle-stroke-width': 2,
                    'circle-opacity-transition':        { duration: 0, delay: 0 },
                    'circle-stroke-opacity-transition': { duration: 0, delay: 0 } } },
+        // ── The pin being moved: 2-D's dashed leader and hollow "was here"
+        // ring, in 2-D's colours (map-move-pin.js), over everything — it is
+        // the thing being operated. The pin itself is a DOM marker.
+        { id: 'mn-movepin-leader', type: 'line', source: 'mn-movepin', filter: ['==', ['get', 'kind'], 'leader'],
+          layout: { 'line-cap': 'round' },
+          paint: { 'line-color': cssVar('--accent', '#0b5cab'), 'line-width': 2, 'line-dasharray': [2.5, 2.5] } },
+        { id: 'mn-movepin-ghost', type: 'circle', source: 'mn-movepin', filter: ['==', ['get', 'kind'], 'ghost'],
+          paint: { 'circle-radius': 9, 'circle-color': 'rgba(0,0,0,0)',
+                   'circle-stroke-color': cssVar('--muted', '#6b7a89'), 'circle-stroke-width': 2 } },
       ],
       sky: {
         'sky-color': cssVar('--map3d-sky', '#7fb3e8'),
@@ -1430,6 +1512,8 @@ const Map3D = (function () {
       // with the cone's image first, since the symbols need it to lay out.
       addConeImage();
       syncPhotos();
+      // And a pin being moved, armed before 3-D was opened.
+      syncMovePin();
       applyDim();
       queueSheets();
       setNote();
@@ -1485,6 +1569,16 @@ const Map3D = (function () {
       const hit = hid ? null : map.queryRenderedFeatures(e.point, { layers: ['mn-stations'] })[0];
       const id  = hit && hit.properties ? hit.properties.id : null;
       if (id != null) { clickedStation(id, e); return; }
+      // The move-pin mode, armed: anything but a pin is ground the pin is
+      // being put on, with the terrain's own coordinate for it — ahead of
+      // the paths (a line crossing the spot is not what was meant) and of
+      // What is here, which arming the mode disarmed. A pin stays a pin,
+      // as in 2-D, where pins keep their clicks to themselves.
+      if (typeof MapMovePin !== 'undefined' && MapMovePin.armed() && MapMovePin.onMap()) {
+        MapMovePin.pick(e.lngLat.lat, e.lngLat.lng);
+        stopBubbling(e);
+        return;
+      }
       // Then a path (#196). Pins are asked first and the order is not
       // arbitrary: a pin sits on the end of every line it belongs to, so
       // asking the lines first would make the station at a link's end the one
@@ -1844,6 +1938,8 @@ const Map3D = (function () {
     // moved or removed. Two early returns while 3-D is shut, and nothing
     // rebuilt when what it drew is what it drew last time.
     photosChanged() { syncPhotos(); },
+    // The move-pin mode's pin changed: armed, moved, saved or cancelled.
+    movePinChanged() { syncMovePin(); },
 
     // Put the camera back overhead without leaving 3-D — the gesture that gets
     // somebody un-lost after a rotate, and the one thing a tilted map makes
@@ -1951,6 +2047,17 @@ const Map3D = (function () {
     // …and the field photos': the badges as the markers stand (where MapLibre
     // was told each is, and what it opens), and what the dot-and-cone source
     // holds. Kept out of _mirror() for _sites()' reason.
+    // For the check: the move-pin mode's drawing here — where the pin stands
+    // and what the leader and ring source holds.
+    _movePin() {
+      const src = map && map.getSource('mn-movepin');
+      const data = src ? src.serialize().data : null;
+      const at = pinMarker ? pinMarker.getLngLat() : null;
+      return {
+        pin: at ? { lat: at.lat, lon: at.lng, draggable: pinMarker.isDraggable() } : null,
+        features: data && data.features ? data.features.map(f => ({ kind: f.properties.kind, coordinates: f.geometry.coordinates })) : [],
+      };
+    },
     _photos() {
       const src = map && map.getSource('mn-photos');
       return {
@@ -2026,6 +2133,10 @@ const Map3D = (function () {
     for (const p of photoPins) { try { p.marker.remove(); } catch (_) {} }
     photoPins = [];
     photoKey = null;
+    // And the pin being moved, whose mode goes on in 2-D without it.
+    if (pinMarker) { try { pinMarker.remove(); } catch (_) {} }
+    pinMarker = null;
+    pinDragging = false;
     standing = false;   // a chain waiting on this map's next frame waits for ever
     dimK = 1;
     if (map) { try { map.remove(); } catch (_) {} }

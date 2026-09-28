@@ -218,6 +218,9 @@ async function browserHalf(FS) {
 
     await page.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
+    // The lines over the stage stay open: this check presses the buttons in
+    // them, and must not race the fold (twinsite holds the fold itself).
+    await page.evaluate(() => DigitalTwin._infoFold(null));
     const gl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); });
     if (!gl) { console.log('\n  SKIP — this Chromium has no WebGL; the twin\'s water cannot be exercised here.'); return; }
 
@@ -475,9 +478,12 @@ async function browserHalf(FS) {
     await page.evaluate(() => { DigitalTwin.floodAt('major_m'); switchTab('stations'); });
     await page.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
     await page.evaluate(() => { state.selectedId = 'gatton'; state.map.setView([-27.555, 152.275], 18, { animate: false }); });
+    // Zoom 18 offers the twin; pressing the offer hands the map over.
+    await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
+    await page.click('#map-twin-offer .map-twin-offer-open');
     await page.waitForFunction(() => { const el = document.querySelector('#map-twin.is-on #twin-flood'); return !!el && !el.hidden; }, null, { timeout: BUILD_TIMEOUT });
     F = await fl();
-    ok('at zoom 18 the map hands over to the twin, and its one line carries the water and the controls',
+    ok('at zoom 18 the map offers the twin, pressed it hands over, and its one line carries the water and the controls',
       near(F.level, 102.54, 1e-9) && /Flood levels:/.test(await text('#map-twin #twin-flood')) && (await page.$$('#map-twin #twin-flood .twin-flood-level')).length === 7,
       await text('#map-twin #twin-flood'));
     P = await pill('#map-twin');
@@ -518,6 +524,7 @@ async function browserHalf(FS) {
     });
     await qp.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
     await qp.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
+    await qp.evaluate(() => DigitalTwin._infoFold(null));
     await qp.evaluate(() => DigitalTwin.openStation('gatton'));
     await qp.waitForFunction(() => { const d = DigitalTwin.debug(); return d.built && d.flood && !d.flood.none && d.flood.level != null; }, null, { timeout: BUILD_TIMEOUT });
     const q = await qp.evaluate(() => DigitalTwin.debug().flood);

@@ -676,6 +676,35 @@ jobs:
         working-directory: test
         run: npm run flood
 
+      # The twin's site, as built from the record (digital-twin.js, map-twin.js).
+      # `twin` holds the ground and the hand-over's mechanics and `flood` the
+      # water; everything here draws a scene that looks right when it is
+      # wrong — a manual gauge drawn as a Type 3 pole, a bridge deck at the
+      # height of the creek bed, a neighbour floating over its ground, levels
+      # borrowed from a station that is not the nearest without a word. So the
+      # manual collector, the staff gauge and the red post are measured off the
+      # scene, the neighbours stood on a valley the check makes, the bridge
+      # deck put at Gatton's listed crossing (3.90 m on a zero of 87.54 m AHD:
+      # 91.44 m) and at its banks without one, the four nearest donors offered
+      # and one borrowed and given back; then the lines over the stage folding
+      # after their delay, and the map offering the twin at zoom 17 rather than
+      # handing itself over. Skips without WebGL2, like twin.
+      - name: The twin's site — the station as built, its neighbours, the bridge, borrowed levels, the offer
+        working-directory: test
+        run: npm run twinsite
+
+      # Moving a station's pin where the ground can be seen: the twin's own
+      # tab, the twin inside the Stations map, and ⛰️ 3-D. `movepin` drives the
+      # mode on the flat map; everywhere else it used to arm with its pin under
+      # a WebGL canvas — out of sight and out of reach — and, in 3-D, move it
+      # to the flat map's coordinate for a pixel on a tilted view. So the pin
+      # is asserted in each renderer: dragged with a real pointer, clicked into
+      # place, read back to the centimetre, and saved as the database's current
+      # copy of the station with only its position changed. Skips without WebGL2.
+      - name: Move pin in the twin and in 3-D — the pin on the ground, the coordinate each view hands back
+        working-directory: test
+        run: npm run twinpin
+
       # The two navigators under and beside the Arrow chart. Their edge handles
       # were ungrabbable for a reason no check here could see: the drawing and
       # the hit-test each converted client coordinates to viewBox coordinates

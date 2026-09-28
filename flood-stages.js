@@ -187,6 +187,80 @@ const FloodStages = (function () {
     };
   }
 
+  // ── Borrowed levels ──────────────────────────────────────────────────────
+  // 3,710 stations have no heights at all to draw water from, and many of
+  // them are a few kilometres up or down a river from one that has. The twin
+  // offers to borrow the nearest such station's levels — only when asked, and
+  // saying so everywhere it draws them — and this is the arithmetic, pure
+  // like the rest of this file.
+  //
+  // Two ways to carry a height from there to here, and the operator picks:
+  //
+  //   'gauge'  (the default) — each level as a height *on the other station's
+  //            gauge*, laid over this station's channel: 0 m is the lowest
+  //            ground by this gauge, and minor at 3.0 m is 3.0 m over it. A
+  //            class is already a gauge height; an AEP level is brought down
+  //            to one through the other gauge's AHD zero, and left out where
+  //            that gauge has none. The better guide across a river's fall,
+  //            which is a metre a kilometre on a creek.
+  //   'ahd'    — the other station's own ladder in metres AHD, unchanged: the
+  //            right thing only a short way along the same reach, where the
+  //            water surface is nearly level.
+  //
+  // Peaks the other river reached are not carried: they are that river's
+  // history, not a class.
+
+  // What a station has that could be borrowed, or null: its newest classes
+  // (as gauge heights, whatever its datum) and its AEP levels (AHD), and its
+  // gauge zero where that is AHD.
+  function borrowable(s) {
+    const classes = newest(((s && s.flood_classes) || []).filter(r => r), 'as_at')[0] || null;
+    const cls = classes ? CLASSES.filter(c => num(classes[c.key]) != null).map(c => ({ ...c, h: num(classes[c.key]) })) : [];
+    const row = aepRow(s);
+    const aeps = row ? aepLevels().filter(d => num(row[d.key]) != null).map(d => ({ ...d, ahd: num(row[d.key]) })) : [];
+    if (!cls.length && !aeps.length) return null;
+    const zero = zeroOf(s);
+    return { classes: cls, classesAsAt: classes ? classes.as_at || null : null, aeps, aepAsAt: row ? row.as_at || null : null,
+             ahdZero: zero && zero.datum === 'AHD' ? zero.m : null, zero };
+  }
+
+  // The ladder the twin draws from a borrowed station's levels, for a
+  // channel here at `channel` m AHD. The shape ladder() returns, with
+  // `borrowed` saying from whom and how.
+  function borrowed(donor, mode, channel, info = {}) {
+    const b = borrowable(donor);
+    const notes = [];
+    const levels = [];
+    const ch = num(channel);
+    const name = (donor && donor.name) || 'the other station';
+    if (!b) return { levels, zero: null, ahdZero: null, storage: false, top: null, classesAsAt: null, aepAsAt: null, aepSource: null,
+                     notes: [`${name} has no flood levels to borrow.`], borrowed: { id: donor && donor.id, name, mode, ...info } };
+    if (mode === 'ahd') {
+      const lad = ladder(donor);
+      return { ...lad, notes: lad.notes.slice(), borrowed: { id: donor.id, name, mode, ...info } };
+    }
+    if (ch == null) {
+      return { levels, zero: null, ahdZero: null, storage: false, top: null, classesAsAt: null, aepAsAt: null, aepSource: null,
+               notes: ['There is no channel in this patch to lay borrowed gauge heights over.'], borrowed: { id: donor.id, name, mode, ...info } };
+    }
+    for (const c of b.classes) levels.push({ key: c.key, kind: c.kind, label: c.label, ahd: ch + c.h, gauge: c.h, rank: c.rank });
+    if (b.aeps.length && b.ahdZero == null) {
+      notes.push(`${name}'s AEP levels are in metres AHD and its gauge has no zero in AHD to bring them down to heights on the gauge, so they are left out.`);
+    } else if (b.aeps.length) {
+      b.aeps.forEach((d, i) => {
+        const g = d.ahd - b.ahdZero;
+        levels.push({ key: d.key, kind: 'aep', label: `${d.label} AEP`, short: d.label, ahd: ch + g, gauge: g,
+                      rank: 4 + i, oneIn: d.oneIn, aepIndex: i, aepCount: b.aeps.length });
+      });
+    }
+    levels.sort((x, y) => x.ahd - y.ahd || (x.rank ?? 99) - (y.rank ?? 99));
+    return {
+      levels, zero: null, ahdZero: ch, storage: false, top: levels.length ? levels[levels.length - 1].ahd : null,
+      classesAsAt: b.classesAsAt, aepAsAt: b.aepAsAt, aepSource: null, notes,
+      borrowed: { id: donor.id, name, mode, ...info },
+    };
+  }
+
   function datumWord(code) {
     return { ASSUM: 'assumed datum', STATE: 'State datum', UNKNOWN: 'datum it does not know', AHD: 'Australian Height Datum' }[code] || `${code} datum`;
   }
@@ -271,6 +345,7 @@ const FloodStages = (function () {
   return {
     CLASSES, COLOURS, RISE_S, HOLD_S, DRAIN_S, ZERO_MAX_BELOW, ZERO_MAX_ABOVE,
     ladder, start, passed, colourOf, mix, cycle, gaugeText, ahdText, levelText,
+    borrowable, borrowed,
   };
 })();
 if (typeof window !== 'undefined') window.FloodStages = FloodStages;

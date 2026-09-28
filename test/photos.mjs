@@ -643,6 +643,9 @@ async function browserHalf() {
     await page.goto(server.origin + '/index.html', { waitUntil: 'load', timeout: LOAD_TIMEOUT });
     await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations),
       null, { timeout: LOAD_TIMEOUT });
+    // The twin's lines over the stage stay open for the buttons pressed in
+    // them (twinsite holds the fold itself).
+    await page.evaluate(() => { if (typeof DigitalTwin !== 'undefined') DigitalTwin._infoFold(null); });
     await page.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(String(u)); return null; }; });
 
     const queue = () => page.evaluate(() => FieldPhotos._queue());
