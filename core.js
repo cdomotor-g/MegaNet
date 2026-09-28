@@ -569,6 +569,12 @@ const HELP = {
       + 'the station is, with its slope, roughness and depths under <em>How the velocity is '
       + 'worked out</em>. The setting, slope and roughness are editable on the AEP row in the '
       + 'details card.',
+      'Every station in Queensland has a <strong>Site exposure — tides and soils</strong> section, '
+      + 'asked of the Queensland Government\'s maps when its card opens: whether it is in or near '
+      + 'tidal water, the nearest Water Act tidal limit, the coastal management district and storm '
+      + 'tide areas, and the acid sulfate soil mapping under it, with a plain reading of what that '
+      + 'means for what is built there — indicative, and a station outside Queensland is told the '
+      + 'maps do not reach it (what each row means is in the link below).',
       'A station the Bureau\'s <strong>Service Level Specification</strong> for Queensland (the '
       + 'SLS) lists has a <strong>Flood warning service</strong> section as well: its flood '
       + 'class levels as the SLS gives them, whether somebody forecasts for it and how far ahead, '
@@ -638,7 +644,9 @@ const HELP = {
              + 'map. Esc cancels the shape in progress; Esc again puts the tool away. Nothing here '
              + 'is saved — reloading clears it — so a drawing worth keeping goes out as a KML.',
     },
-    links: [{ label: 'Who may edit, and what to do when nobody can get in', href: 'docs/access.md' }],
+    links: [{ label: 'Who may edit, and what to do when nobody can get in', href: 'docs/access.md' },
+            { label: 'Site exposure on the station card — what each row means, its sources and limits',
+              href: 'docs/site-exposure.md' }],
     related: ['passranges', 'maps', 'inspections'],
   },
 

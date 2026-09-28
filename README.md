@@ -99,6 +99,9 @@ MegaNet/
 │                             Dropbox sync's, under Node)
 ├── field-photos.js         ← FieldPhotos — Field Photos tab (bulk upload, placing,
 │                             the library) and the carousel every door opens
+├── site-exposure.js        ← SiteExposure — the station card's tides and soils:
+│                             tidal water, Water Act limits, coastal hazard areas,
+│                             acid sulfate soils, from the State's map services
 ├── map-photos.js           ← MapPhotos — the Stations map's 📷 pins, a cone each
 │                             way the camera faced
 ├── modal.js                ← Modal     — the shared dialog shell
@@ -138,6 +141,7 @@ MegaNet/
 │   ├── mqtt-provisioning.md                (standing the broker and bridge up — browser only)
 │   ├── message-log.md                      (the Message Log tab — columns, uses, edges)
 │   ├── floodwarning-net.md                 (moving the domain to MegaNet — runbook)
+│   ├── site-exposure.md                    (tides and soils on the station card — rows, sources, limits)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
 │   ├── 357 Filter doco.doc                  (the 1998 first edition of the same spec)
@@ -189,6 +193,7 @@ MegaNet/
 │   ├── history.mjs          (a saved record read back, against the form that wrote it)
 │   ├── help.mjs             (every tab's help entry: real content, links that land)
 │   ├── photos.mjs           (field photos: the reader, the OCR, the tab, the map, the twin)
+│   ├── exposure.mjs         (the station card's tides and soils, a failed source never "none")
 │   ├── twinsite.mjs         (the twin's site: the station as built, neighbours, bridges, the offer)
 │   ├── twinpin.mjs          (move pin in the twin's tab, the map's twin and ⛰️ 3-D)
 │   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
@@ -2309,6 +2314,12 @@ Side panel or modal showing full station record:
 - Matched repeaters (if field station)
 - Satcom details if applicable
 - Direct link to ARRO graphs for each AlertID
+- **Site exposure — tides and soils** (Queensland): whether it stands in or
+  near tidal water, the nearest Water Act tidal limit, the coastal management
+  district and storm tide areas, and the acid sulfate soil mapping under it,
+  asked of the State's map services when the card opens — indicative, and a
+  source that did not answer is named, never read as "none"
+  (`site-exposure.js`; `docs/site-exposure.md` has what each row means)
 
 ### 13. In-App Bug / Idea Reporter
 The **🐞 Report a Bug** button in the header lets any user flag a problem or
@@ -4093,7 +4104,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Fifty-four checks. The twenty-two below are the ones a change to the front end
+Fifty-five checks. The twenty-two below are the ones a change to the front end
 meets first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |

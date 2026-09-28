@@ -2966,6 +2966,24 @@ hr {
 .stn-card-rhs-effects[open] > summary { margin-bottom: .2rem; }
 .stn-card-rhs-asat { margin: .25rem 0 .1rem; }
 
+/* The site exposure section on the station card (site-exposure.js): the same
+   heading and label/value rows as the Bureau's sections above it, plus what
+   they do not have — a short list of what the rows add up to, a line naming
+   any source that did not answer, and the sources behind a disclosure. Those
+   are sentences, not rows, so they sit left-aligned and may break anywhere: a
+   dataset's name is long, and at 375 px an unbroken one would push the card
+   sideways. Tokens only; nothing here has a colour of its own. */
+.stn-card-exp-sum { margin-top: var(--sp-1); }
+.stn-card-exp-list {
+  margin: .15rem 0 0;
+  padding-left: 1.1em;
+  font-size: .8rem;
+  overflow-wrap: anywhere;
+}
+.stn-card-exp-list li + li { margin-top: .2rem; }
+.stn-card-exp-foot { margin: .3rem 0 0; overflow-wrap: anywhere; }
+.stn-card-exp-retry { margin-top: var(--sp-1); }
+
 /* Manual, as a pill. The one fact in that block that changes what a person
    does: a gauge read by hand reports nothing over the radio, so silence from it
    is not a telemetry fault to go chasing. Amber rather than red — it is a

@@ -6392,6 +6392,9 @@ function repaintStnCard() {
   // the document does not carry fills with nothing.
   SLS.ask(`mn-sls-card-${s.id}`, s);
   elvisCardAsk(`mn-elvis-card-${s.id}`, s);
+  // The site exposure section asks the State's map services, cached per
+  // position for the session (site-exposure.js): a repaint asks nothing new.
+  SiteExposure.ask(`mn-exposure-card-${s.id}`, s);
 }
 
 // Escape closes the card from anywhere inside it. On the card rather than on
@@ -6528,6 +6531,7 @@ function stnCardHtml(s) {
   const elvisId  = `mn-elvis-card-${s.id}`;
   const sls      = SLS.state(s);
   const slsId    = `mn-sls-card-${s.id}`;
+  const expId    = `mn-exposure-card-${s.id}`;
   const nets     = (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean).join(', ');
   const isRpt    = s.roles.includes('repeater');
   const passing  = isRpt ? repeaterPassingCount(s) : null;
@@ -6599,6 +6603,17 @@ function stnCardHtml(s) {
          because a model is talking, not the Bureau's lists: indicative levels,
          the sheet's own confidence, and the velocity's workings. -->
     ${RiverDetails.aepCardHtml(s)}
+    <!-- What the water and the ground at the station are likely to do to what is
+         built there: tidal water, the Water Act's downstream limits, the coastal
+         hazard areas, acid sulfate soils (site-exposure.js). Its own section,
+         because it is a third kind of source — neither the Bureau's lists nor a
+         flood model, but the State's maps of the ground, read at a point — and
+         the only one of them asked of a live service, so it says for itself
+         when a map could not be read. Filled after the fetch by
+         SiteExposure.ask, the way the SLS below is; a station outside
+         Queensland is told so, in words, and nothing is asked for it. -->
+    ${located ? `<div class="acma-sect" id="${escAttr(expId)}"
+         data-mn-exposure="${escAttr(SiteExposure.key(s))}">${SiteExposure.html(s)}</div>` : ''}
     <!-- What the Bureau's Service Level Specification says about this station
          (#180). Its own section rather than rows in the one above, because it
          is a different document talking: those rows are what MegaNet knows,

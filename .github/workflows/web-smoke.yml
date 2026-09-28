@@ -519,6 +519,16 @@ jobs:
         working-directory: test
         run: npm run frequencies
 
+      # The site exposure section on the station card (site-exposure.js): tidal
+      # water, the Water Act's downstream limits, the coastal hazard areas and
+      # acid sulfate soils, from the Queensland Government's map services, which
+      # the check answers itself layer by layer. The assertion it exists for is
+      # invisible when it breaks: a source that did not answer is named as such,
+      # never shown as "none", and a station outside Queensland is told so.
+      - name: Site exposure — tides and soils on the card, a failed source named and never read as "none"
+        working-directory: test
+        run: npm run exposure
+
       - name: Claim an address from the message that arrived on it
         working-directory: test
         run: npm run claim
