@@ -235,6 +235,9 @@ its cache at all (`PGRST002`).
 | `meganet.station.awrc_number`, `.stream`, `.urbs_label` | Three fields `0032` adds to the station: the AWRC gauging station number and the stream the gauge is on (Section 3), and the station's node in the Bureau's URBS runoff-routing model. Optional keys in the document, absent when null. |
 | `meganet.station_aep_level` | The modelled water level at a station in the 1%, 0.5%, 0.2% and 0.066% AEP floods (`0033`), m AHD, with the ground height and the source sheet's own three scores — one row per sheet (the QLD and NSW AEP level workbooks, supplied 26/09/2026). Indicative, not observed. Its `setting`, `slope` and `manning_n` are the assumptions of the indicative flood velocity the card works out (`flood-velocity.js`); blank uses the defaults. The station's `aep_levels` list. |
 | `meganet.station_frequency` | A station's RX/TX frequency pairs beyond a repeater's own (`0033`): `rx_mhz`, `tx_mhz`, what the channel is for, its ACMA licence. `meganet.repeater.rx_mhz`/`tx_mhz` stays the primary pair — it is what every path tool reads — and a base station, which has no repeater row, keeps all its pairs here. The station's `frequencies` list. |
+| `meganet.flood_peak_extract`, `meganet.flood_peak_gauge`, `meganet.flood_peak` | HDB's peak flood heights (`0037`), as the extract prints them: which extract (one row, with the reader's meta), every gauge it lists — MegaNet station or not, keyed on the bureau number like the SLS — and every peak under each: the UTC date to the day, month or year, the time, the height on the gauge as it then stood, the HDB site letter, the source and the kind of reading. Public, like the rest of the Bureau's record here. Written only by `load_flood_peaks_doc()`. |
+| `meganet.station_flood_peaks(text[])`, `meganet.station_flood_peak` | The rule, as a function of the stations asked about (all when null) and as a view of every station: each peak of a live MegaNet station with the zero in force on its date, its level in m AHD where that can honestly be had, why not where it cannot (`not_placed`), its July–June season, and `flood_rank` 1–5 for the station's five largest floods. Public. See **HDB's flood peaks**, below. |
+| `meganet.station_flood_peak_top` | Those five, kept for `station_json` — the station's `flood_peaks` list — and kept current by `refresh_station_flood_peaks()`: the loader rebuilds them all, and eleven statement-level triggers on the survey, the flood classes, the AEP levels and the station rebuild a station's own when what they are worked out from changes. Public. |
 | `meganet.field_photo` | One row per field photo (`0035`): the object and its thumbnail in the `field-photos` bucket, the file (type against `attachment_type`, size, **SHA-256** — one live photo per hash), when it was taken (as the camera's clock read it and as an instant, and from what), **where** (lat/lon, how placed — `exif`, `xmp`, `ocr`, `manual`, `station` — and the GPS's accuracy), altitude and its datum, heading (true or magnetic), pitch and field of view, the station it is filed under and whether by distance, `meta` (the camera, every OCR reading's text, the Dropbox file), where it came from (`upload`, `dropbox`, with the Dropbox file id — one row per file, tombstones included, so a removed photo is never re-imported), and who. Soft-deleted. **Editors only**: no grant to `anon`, and the policy hides tombstones. A null in any of the measured columns means the photo did not say — never nought. |
 | `meganet.field_photo_origin`, `meganet.field_photo_placement` | The two vocabularies: where a photo came in, and how its position was known. |
 | `meganet.field_photo_sync` | The Dropbox sync's report, one row per source: when it last ran and last ran clean, whose Dropbox, how many photos it saw, imported, could not place, skipped and failed, and the last error. Readable by editors; written by the sync with the secret key. |
@@ -1349,6 +1352,97 @@ psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_aep_levels_and_frequenc
 23 checks, in a transaction that rolls back: both tables, RLS and grants,
 `save_station()`'s three cases (absent, empty, rows) for both lists, its
 refusals, and the loader's sync.
+
+## HDB's flood peaks
+
+`0037`. The floods each gauge has seen, from HDB's *Peak Flood Heights*
+report run for 54 Queensland basins on 28/09/2026 —
+`archive/flood-peaks/all-flood-peaks-2026-09-28.txt`, 1,536 gauges and 61,039
+peaks once the 276 rows it prints twice are dropped. 535 gauges more have no
+peaks, and HDB does not name them; two it skipped, and says so.
+`tools/ingest/flood_peaks.py` reads the report into `data/flood-peaks.json`,
+interpreting nothing.
+
+They are kept **the way the SLS is, not the way the AEP levels are**: keyed on
+the bureau number and joined to `meganet.station` through `bureau_key()`, so
+the 170 gauges MegaNet has no station for keep their floods for the day it
+does; and written only by the loader, because they are the Bureau's record,
+not something an editor types. `save_station()` and `load_stations_doc()` read
+the lists they know by name, so a document carrying `flood_peaks` saves and
+loads as before and the peaks stay as loaded.
+
+```sh
+python3 tools/ingest/flood_peaks.py --check    # CI
+python3 tools/ingest/flood_peaks.py --report   # what came out, in prose
+python3 tools/ingest/flood_peaks.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+# or, from the file on main, as the live database was loaded:
+select meganet.load_flood_peaks_from_url();
+```
+
+**The level a peak reached is worked out here, not in the file**, because it
+depends on the gauge survey, which the file does not carry and which can
+change. A peak is a reading of the gauge *as it then stood*, and 129 of these
+gauges have had more than one zero — Tinaroo Dam's read AHD off a zero of 0 m
+until the last day of 2010, the survey says, and off 670.42 m since, so its
+March 1977 flood is printed as 672.63. So each peak stands on
+the survey row that started last on or before its date (an undated row counts
+as always), or, for a peak older than every row, on the oldest: HDB's 1887
+flood mark at Beenleigh is placed through the zero surveyed in 1998, there
+being no other. A zero on an assumed, a State or an unknown datum places
+nothing, as for a flood class.
+
+**And a level that could not be right is left off.** HDB is not consistent
+about what a height is — Little Nerang Dam lists its 1996 peak once as 1.35 m
+on the gauge and once as 169.38, the same peak in m AHD, and Tinaroo Dam most
+of its floods both in m AHD and over the spillway — so every level is
+held to an anchor: the major class (else moderate, else minor) through today's
+zero where that is AHD, else the 1% AEP level (else the rarer ones), else the
+median of the station's own levels. More than 20 m over it or 30 m under it
+and the peak is not placed, and `not_placed` says why. The largest real
+floods clear it with room to spare (Ipswich 1893, 12.9 m over major); what it
+catches is almost all storages, whose headwater gauges changed what they read
+more often than the survey says.
+
+**The station record carries five**: the largest floods, one per July–June
+season (a Queensland wet runs December to April), largest first — ranked by
+level among the placed peaks, or by height on the gauge where none can be
+placed. Five and not every one because the document is what every page load
+fetches, and every peak would add 2.3 MB to it. `date` is the Queensland day
+where HDB gives the hour; the extract is in UTC, so the Brisbane River flood
+remembered on the 13th of January 2011 is printed on the 12th.
+
+**Working that out is ~0.4 s over the whole network**, three times that live,
+and `stations_doc()` is on every page load, so the five are kept in
+`meganet.station_flood_peak_top` rather than worked out per request. The
+loader rebuilds them all; a station's own are rebuilt by statement-level
+triggers when its survey, its flood classes, its AEP levels, its bureau number
+or its deletion changes — a few milliseconds a station, so a save from the
+editor does not notice. `station_flood_peaks()` is PL/pgSQL running its query
+with `EXECUTE`, so it is planned for the stations it is asked about each time:
+planned once as a plain SQL function, it guessed one station, looped where it
+should have hashed, and took six seconds over all of them.
+
+| As loaded, 28/09/2026 extract | Gauges | Peaks |
+| --- | --- | --- |
+| In the extract | 1,536 | 61,039 |
+| …MegaNet stations | 1,366 | 54,858 |
+| …placed in m AHD | 841 | 36,714 |
+| …zero that day not in AHD | | 12,681 |
+| …no surveyed zero | | 4,981 |
+| …left off, 20 m over the gauge's levels / 30 m under them | | 270 / 212 |
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_flood_peaks.sql
+```
+
+32 checks, in a transaction that rolls back: the four tables, RLS, grants and
+the eleven triggers; with the extract loaded, its counts, the kept five against
+the rule, and Beenleigh, Ipswich and Little Nerang Dam read from the real
+record; then, on a gauge of its own, every rule — a zero for each day, a peak
+older than the survey, one written in m AHD, two in one season, an hour that is
+the next day in Queensland — and the five following a re-survey, an editor's
+save, a renumbering, a deletion and an extract that drops the gauge.
 
 ## Checking it from outside
 

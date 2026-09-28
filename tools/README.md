@@ -175,6 +175,45 @@ QLD rows with no station number, only to live stations and only where the
 station has no row from that sheet yet — so it is safe to run again.
 `check_aep_levels_and_frequencies.sql` is the database's half.
 
+## HDB's peak flood heights (0037)
+
+`ingest/flood_peaks.py` reads `archive/flood-peaks/all-flood-peaks-2026-09-28.txt`
+— HDB's *Peak Flood Heights (Chronological Listing)* for 54 Queensland basins,
+run on 28/09/2026 — into `data/flood-peaks.json`: every gauge it lists (1,536,
+MegaNet station or not) and every peak under each (61,039), as printed. It
+interprets nothing: which zero a height stands on, and so the level it
+reached, is the database's (`meganet.station_flood_peaks()`), because that is
+in the gauge survey and the survey can change without this file changing.
+
+```bash
+python3 tools/ingest/flood_peaks.py            # rewrite the JSON
+python3 tools/ingest/flood_peaks.py --report   # what came out, in prose
+python3 tools/ingest/flood_peaks.py --check    # fail on drift (CI does this)
+python3 tools/ingest/flood_peaks.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+Standard library only. The report is tab-aligned only nearly — a row with no
+site leaves an empty column, seven rows at Waller Rd put the source two tabs
+over — so a row is read by its tokens in order: a date (dd/mm/yyyy, mm/yyyy or
+yyyy), a time if there is one, the height, a site letter if there is one, then
+a source and a type from HDB's two vocabularies. Every line is one of a dozen
+known shapes and anything else raises; so do a bureau number listed twice, a
+date or time that is not one, and basins dated different days. A row printed
+twice, every column the same, is kept once and counted; nothing else is merged.
+`NO PEAK HEIGHT DATA EXISTS FOR STATION` stands in for a gauge with no peaks
+and does not name it (one is the first line of the Logan-Albert listing, above
+any station), so those are counted per basin, and HDB's two `Skipping station`
+lines are kept by number. Peaks are written as lists, `[date, time_utc,
+height_m, site, source, type]`, one to a line, which the meta names.
+
+`--sql` prints one call to `meganet.load_flood_peaks_doc()` carrying the whole
+document, which makes the tables match it (CI loads it that way). The live
+database fetches the file from `main` itself: `select
+meganet.load_flood_peaks_from_url();`. Then refresh `stations.json`
+(`snapshot_stations_json.py`), whose stations now carry `flood_peaks`.
+`check_flood_peaks.sql` is the database's half.
+
 ## `ingest/` — the historical inspection workbook (#122)
 
 `ingest/xlsx.py` is a read-only .xlsx reader with nothing but the standard
@@ -489,6 +528,24 @@ load.
 
 ```bash
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_aep_levels_and_frequencies.sql
+```
+
+## `check_flood_peaks.sql` — prove HDB's flood peaks
+
+32 checks over `0037`, in a transaction that rolls back: the four tables with
+RLS, no write policy and grants (only the service role loads, fetches or
+rebuilds), and the eleven triggers; with the extract loaded, its counts, the
+kept five against the rule, and three real gauges — Beenleigh's 1887 mark,
+Ipswich across its 1975 re-zeroing, Little Nerang Dam's peak written in m AHD
+— and a 23:47 UTC peak that is the next day in Queensland; then, on a gauge of
+its own, the loader's refusals, a zero for each day and the oldest for a peak
+older than the survey, one to a season, and the five following a re-survey, an
+editor's save, a renumbering, a deletion and an extract that drops the gauge.
+Without the extract it says `skip` for that part. CI loads the extract and runs
+it.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_flood_peaks.sql
 ```
 
 ## `check_photo_review.sql` — prove the upload log, the administrator and the equipment register

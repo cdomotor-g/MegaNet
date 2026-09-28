@@ -7,3 +7,8 @@
 # is a column moved. Section 9 is an HTML page of <pre> blocks, read the same way.
 archive/river-height-stations/*.txt text eol=lf
 archive/river-height-stations/*.html text eol=lf
+
+# HDB's peak flood heights extract: its SHA-256 is in data/flood-peaks.json's
+# meta, and a line ending rewritten on checkout would make `--check` fail on a
+# file nobody changed.
+archive/flood-peaks/*.txt text eol=lf

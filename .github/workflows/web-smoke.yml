@@ -66,6 +66,10 @@ on:
       # aep_levels.py, whose slopes also read the file above.
       - 'archive/aep-levels/**'
       - 'data/aep-levels.json'
+      # …and HDB's peak flood heights (0037), read by tools/ingest/
+      # flood_peaks.py and loaded by the database job.
+      - 'archive/flood-peaks/**'
+      - 'data/flood-peaks.json'
       # The Service Level Specification and what tools/ingest/sls.py reads out
       # of it (0028, 0034), and the check holding the database's merge of it to
       # the app's. Neither the PDF nor the two files were listed, so a push
@@ -135,6 +139,10 @@ on:
       # aep_levels.py, whose slopes also read the file above.
       - 'archive/aep-levels/**'
       - 'data/aep-levels.json'
+      # …and HDB's peak flood heights (0037), read by tools/ingest/
+      # flood_peaks.py and loaded by the database job.
+      - 'archive/flood-peaks/**'
+      - 'data/flood-peaks.json'
       # The Service Level Specification and what tools/ingest/sls.py reads out
       # of it (0028, 0034), and the check holding the database's merge of it to
       # the app's. Neither the PDF nor the two files were listed, so a push
@@ -878,6 +886,14 @@ jobs:
       - name: AEP flood levels — the extraction still matches the sheets
         run: python3 tools/ingest/aep_levels.py --check
 
+      # HDB's peak flood heights (0037), on the same footing: data/flood-peaks
+      # .json is read out of a 3.9 MB extract in archive/ whose rows are tab-
+      # aligned only nearly — a site letter missing here, a source two tabs
+      # over there — and the reader that tells a row from a header is the part
+      # worth re-running.
+      - name: HDB flood peaks — the extraction still matches the extract
+        run: python3 tools/ingest/flood_peaks.py --check
+
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
 # against a recorded snapshot, so any honest change to app.js makes it stale —
 # as a per-push gate it would train everyone to re-record the baseline without
@@ -1025,6 +1041,17 @@ jobs:
         run: |
           { echo 'begin;'; python3 tools/ingest/aep_levels.py --sql; echo 'rollback;'; } \
             | psql -v ON_ERROR_STOP=1 -q
+      # HDB's peak flood heights (0037), loaded for real — 61,039 rows, the way
+      # load_flood_peaks_from_url() loads them live — and then held to the
+      # rules: each peak through the zero of its day or left off with a reason,
+      # the five a station keeps, and the triggers that keep them current
+      # through a survey edit, a renumbering and a save from the editor. The
+      # check runs without the load too (it says `skip`), but only with it
+      # does it read the real Gatton, Ipswich and Little Nerang Dam.
+      - name: Load the HDB flood peaks
+        run: python3 tools/ingest/flood_peaks.py --sql | psql -v ON_ERROR_STOP=1 --single-transaction -q
+      - name: check_flood_peaks.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_flood_peaks.sql
       # The SLS's merge rule is written twice — in tools/ingest/sls.py for the
       # file the app reads off disk, and in meganet.sls_location for anything
       # that asks the database — and this is what holds the two to one rule:

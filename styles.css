@@ -12541,8 +12541,10 @@ code {
 }
 .twin-flood-set legend { padding: 0 var(--sp-1); font-weight: 600; }
 
-/* The water on the stage, top left (the compass has the right): its colour,
-   ⏸ or ▶, and how high. The off switch within reach wherever the twin is. */
+/* The pill on the stage, top left (the compass has the right): for a
+   station with no flood levels of its own, the offer to borrow a nearby
+   station's — on a phone's map, where the line under the stage has no row,
+   the only way to ask. Where there is water, the scale below has the corner. */
 .twin-flood-pill {
   position: absolute;
   top: var(--sp-2);
@@ -12565,14 +12567,203 @@ code {
   cursor: pointer;
 }
 .twin-flood-pill[hidden] { display: none; }
-.twin-flood-pill .twin-flood-sw { margin-right: 0; flex: 0 0 auto; }
-.twin-flood-pill-icon { flex: 0 0 auto; }
 .twin-flood-pill-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .twin-flood-pill:hover { background: var(--panel); }
 @media (pointer: coarse) {
-  /* EPIC #107's 44 px floor: on a phone's map this is the water's only
-     control. */
+  /* EPIC #107's 44 px floor: on a phone's map this is the only way to ask. */
   .twin-flood-pill { min-height: 2.75rem; padding-inline: .8rem; }
+}
+
+/* The flood scale (digital-twin.js, "the scale on the stage"): the water's
+   control, stood up the left of the stage. ⏸ or ▶ and how high at the head;
+   under it a track from 0 m on the gauge at its foot to the highest level at
+   its head, the water filling it in the colour it has, a mark at every level
+   to scale and the level's name beside it, a line from each mark to its name.
+   The positions are the script's, handed over as --y (px down the track) and
+   --level (how full); everything else is here.
+
+   The box takes no pointer itself — a drag between two names still turns the
+   view — and its parts do: the head, the track and the names. It stops above
+   the hint along the stage's foot, whose height the script hands the stage as
+   --twin-hud-h, and it steps aside while the pin is being moved, whose panel
+   has this corner then. */
+.twin-flood-scale {
+  --scale-gap: 18px;             /* SCALE_GAP: a label's height, and half of it pads each end */
+  --scale-hit: 1.5rem;           /* the track's width to a pointer */
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  bottom: calc(var(--twin-hud-h, 1.6rem) + 2 * var(--sp-2));
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  width: 12rem;
+  max-width: calc(50% - var(--sp-2));
+  min-height: 5rem;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  color: var(--text);
+  pointer-events: none;
+}
+.twin-flood-scale[hidden] { display: none; }
+.twin-stage:has(.twin-movepin-panel:not([hidden])) .twin-flood-scale { display: none; }
+
+.twin-scale-head {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  align-self: flex-start;
+  max-width: 100%;
+  min-width: 0;
+  padding: .1rem .55rem .1rem .1rem;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  pointer-events: auto;
+}
+.twin-scale-play {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 1;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.twin-scale-play:hover { background: var(--subtle); }
+.twin-scale-now { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.twin-scale-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* The track: a hit area --scale-hit wide, the bar down its middle. Half a
+   label's height is left at each end so the first and last names fit. */
+.twin-scale-track {
+  position: absolute;
+  top: calc(var(--scale-gap) / 2);
+  bottom: calc(var(--scale-gap) / 2);
+  left: 0;
+  width: var(--scale-hit);
+  pointer-events: auto;
+  touch-action: none;
+  cursor: ns-resize;
+  border-radius: var(--r-sm);
+}
+.twin-scale-track::before {
+  content: '';
+  position: absolute;
+  inset: 0 calc(50% - .35rem);
+  border-radius: .35rem;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  border: 1px solid var(--border);
+}
+.twin-scale-track:focus-visible { outline: var(--focus-width) solid var(--focus); outline-offset: 1px; }
+.twin-scale-track.is-dragging { cursor: grabbing; }
+
+/* The water, from the foot to the level, in the colour it has there. */
+.twin-scale-water {
+  position: absolute;
+  left: calc(50% - .35rem);
+  right: calc(50% - .35rem);
+  bottom: 0;
+  height: calc(var(--level, 0) * 100%);
+  border-radius: 0 0 .35rem .35rem;
+  background: var(--sw, var(--flood-water-below));
+  opacity: .9;
+  pointer-events: none;
+}
+
+/* The level the water is at: a bar across the track to take hold of. */
+.twin-scale-thumb {
+  position: absolute;
+  left: calc(50% - .6rem);
+  right: calc(50% - .6rem);
+  bottom: calc(var(--level, 0) * 100%);
+  height: 4px;
+  transform: translateY(50%);
+  border-radius: 2px;
+  background: var(--text);
+  box-shadow: 0 0 0 1px var(--panel);
+  pointer-events: none;
+}
+
+/* A mark at each level, to scale, in its colour — a flood's a shorter one. */
+.twin-scale-marks { position: absolute; inset: 0; pointer-events: none; }
+.twin-scale-mark {
+  position: absolute;
+  top: var(--y);
+  left: calc(50% - .45rem);
+  width: .9rem;
+  height: 2px;
+  transform: translateY(-50%);
+  background: var(--sw);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 45%, transparent);
+}
+.twin-scale-mark.is-peak { left: calc(50% - .3rem); width: .6rem; }
+
+/* The lines from the marks to the names. */
+.twin-scale-leaders { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+.twin-scale-leaders polyline { fill: none; stroke: color-mix(in srgb, var(--text) 55%, transparent); stroke-width: 1; }
+
+/* The names, each a button that holds the water at its level: where the
+   script put it (--y, down the body), clear of the track. */
+.twin-scale-labels {
+  position: absolute;
+  top: calc(var(--scale-gap) / 2);
+  bottom: calc(var(--scale-gap) / 2);
+  left: calc(var(--scale-hit) + .9rem);
+  right: 0;
+  pointer-events: none;
+}
+.twin-scale-label {
+  position: absolute;
+  top: var(--y);
+  left: 0;
+  max-width: 100%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 .35rem;
+  font: inherit;
+  line-height: calc(var(--scale-gap) - 3px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.twin-scale-label:hover { background: var(--panel); border-color: var(--border); }
+.twin-scale-label.is-band { font-weight: 600; }
+.twin-scale-label[aria-pressed="true"] { border-color: var(--text); background: var(--panel); }
+.twin-scale-label .twin-flood-sw { flex: 0 0 auto; }
+/* A flood's colour is white — history, not a class — so its swatch is a
+   ring with an edge that shows on a pale name. */
+.twin-scale-label.is-peak .twin-flood-sw { border-radius: 50%; border-color: var(--text); }
+
+@media (pointer: coarse) {
+  /* EPIC #107's 44 px floor for the button, and a finger's width for the
+     track; the names stay a line tall — the track reaches every level, and
+     takes hold of one a finger lands near. */
+  .twin-flood-scale { --scale-hit: 2.75rem; }
+  .twin-scale-play { width: 2.75rem; height: 2.75rem; }
 }
 
 /* Standing at a photo spot in the POV: what Enter opens, over the stage above

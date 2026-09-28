@@ -14,9 +14,12 @@
 //
 //   1. flood-stages.js under Node, against real station records: the classes
 //      through the gauge zero in force (and only an AHD one), the AEP row the
-//      card reads, the peaks when a station carries them, the order, the
-//      colours (the AEP ramp shared out for one to four levels), the colour
-//      that never goes back down, where 0 m is and why, and the cycle.
+//      card reads, the peaks — each at the level the database gives it, and a
+//      height with none never hung from today's zero — the order, the colours
+//      (the AEP ramp shared out for one to four levels), the colour that never
+//      goes back down, where 0 m is and why, the cycle, and the scale's
+//      layout: every mark to scale, no label on another, the least of them
+//      giving way first when the stage is short.
 //
 //   2. The twin in Chromium (skipped without WebGL), standing the real Gatton
 //      record — minor 7, moderate 10, major 15 m on a gauge zero of 87.54 m
@@ -35,11 +38,20 @@
 //      colour, a step at a time on the slider; the rise, each frame's water
 //      where the cycle puts it for that moment (from 0 m to the top, held, let
 //      out, again — frames come when they come, so the clock is what is read),
-//      paused from the line and held, a level chosen from the line; hidden and
-//      shown; remembered; a browser asking for reduced motion getting still
-//      water; the same line inside the Stations map; nothing of it in the
-//      .glb; and a station whose zero is on an assumed datum keeping its AEP
-//      water and saying why its classes are not drawn.
+//      paused from the line and held, a level chosen from the line; the scale
+//      on the stage — its marks where the levels are, its names never on one
+//      another and inside the stage, a name pressed, the track dragged and
+//      taking hold of a level near its mark, the keys, a short stage giving
+//      the least names away; hidden and shown; remembered; a browser asking
+//      for reduced motion getting still water; the same inside the Stations
+//      map and on a phone; nothing of it in the .glb; a station whose zero is
+//      on an assumed datum keeping its AEP water and saying why its classes
+//      are not drawn; and Gatton's own floods from HDB — 1893 over the rarest
+//      AEP level, so the water rises to it, a ring and a name each.
+//
+// Gatton's record carries its five largest floods since 0037. The sections
+// about the classes and the AEP levels set them aside, so what they assert
+// is those alone, and the floods have a section of their own.
 //
 // Run:  npm run flood
 //       npm run flood -- -v    also print what passed, and the rise's frames
@@ -68,7 +80,16 @@ const section = t => console.log(`\n${t}\n`);
 const J = v => JSON.stringify(v);
 
 const STATIONS = JSON.parse(fs.readFileSync(repo('stations.json'), 'utf8')).stations;
-const GATTON = STATIONS.find(s => s.id === 'gatton');
+// Gatton's classes and AEP levels, its floods set aside (they have a section
+// of their own, with the five HDB gives it — GATTON_PEAKS, as 0037 emits them).
+const GATTON = (({ flood_peaks, ...rest }) => rest)(STATIONS.find(s => s.id === 'gatton'));
+const GATTON_PEAKS = [
+  { date: '1893-02-04', height_m: 16.33, level_m_ahd: 103.87 },
+  { date: '2011-01-11', height_m: 15.38, level_m_ahd: 102.92 },
+  { date: '1974-01-27', height_m: 14.63, level_m_ahd: 102.17 },
+  { date: '1959-02-18', height_m: 12.80, level_m_ahd: 100.34 },
+  { date: '1983-06',    height_m: 11.58, level_m_ahd: 99.12 },
+];
 
 function loadModule() {
   const ctx = { console };
@@ -117,18 +138,26 @@ function nodeHalf(FS) {
   const nothing = FS.ladder({ id: 'x', name: 'Nowhere' });
   ok('a station with none of it: no levels, no top', nothing.levels.length === 0 && nothing.top === null);
 
-  // Peaks: the HDB extract's, when they land.
-  const peaks = FS.ladder({ ...GATTON, flood_peaks: [
-    { date: '2011-01-10', height_m: 18.92 }, { date: '2013-01-28', height_m: 15.2 }, { date: '1974-01-26', level_m_ahd: 105.1 },
-  ] });
+  // Peaks: HDB's, as 0037 puts them on the station — the level each reached
+  // through the zero in force that day, and none where that cannot be had.
+  const peaks = FS.ladder({ ...GATTON, flood_peaks: [...GATTON_PEAKS, { date: '1990', height_m: 3.1 }] });
   const pk = peaks.levels.filter(l => l.kind === 'peak');
-  ok('peaks are levels: on the gauge through the zero, or AHD as given; the highest is named so, with its date',
-    pk.length === 3 && near(pk.find(p => p.date === '2011-01-10').ahd, 87.54 + 18.92, 1e-9)
-      && near(pk.find(p => p.date === '1974-01-26').ahd, 105.1, 1e-9)
-      && pk.find(p => p.highest).label === 'Highest recorded (2011-01-10)', J(pk));
-  ok('…the top rises to the highest of them', near(peaks.top, 87.54 + 18.92, 1e-9));
+  ok('peaks are levels at the level the database gives; the highest is named so, with its date',
+    pk.length === 5 && GATTON_PEAKS.every(g => near(pk.find(p => p.date === g.date).ahd, g.level_m_ahd, 1e-9))
+      && pk.find(p => p.highest).label === 'Highest recorded (1893-02-04)' && pk.filter(p => p.highest).length === 1, J(pk));
+  ok('…on today\'s gauge through today\'s zero, the height HDB recorded kept beside it, and a month and a year to name it by',
+    near(pk.find(p => p.date === '1974-01-27').gauge, 102.17 - 87.54, 1e-9) && pk.find(p => p.date === '1974-01-27').recorded === 14.63
+      && pk.find(p => p.date === '1893-02-04').short === 'Feb 1893' && pk.find(p => p.date === '1983-06').short === 'Jun 1983', J(pk));
+  ok('…the top rises to the highest of them, the 1893 flood over the rarest AEP level', near(peaks.top, 103.87, 1e-9) && peaks.top > 103.75);
   ok('…and a peak never colours the water', pk.every(p => p.rank === null)
-    && FS.passed(peaks, 106.9).key === 'aep_0_066_m', J(FS.passed(peaks, 106.9)));
+    && FS.passed(peaks, 103.8).key === 'aep_0_066_m', J(FS.passed(peaks, 103.8)));
+  ok('a height with no level is not drawn — never hung from today\'s zero — and the notes say so, height and date',
+    !peaks.levels.some(l => l.date === '1990') && peaks.notes.length === 1 && /One of the floods HDB records here cannot be put on the ground/.test(peaks.notes[0])
+      && /3\.1 m \(1990\) on the gauge/.test(peaks.notes[0]), J(peaks.notes));
+  const onlyHeights = FS.ladder({ ...GATTON, flood_peaks: [{ date: '2011-01-10', height_m: 18.92 }] });
+  ok('…and a station whose floods all lack one draws none, and says why',
+    !onlyHeights.levels.some(l => l.kind === 'peak') && near(onlyHeights.top, 103.75, 1e-9)
+      && /^HDB records floods here, but none can be put on the ground/.test(onlyHeights.notes[0]), J(onlyHeights.notes));
 
   section('The colours');
 
@@ -176,6 +205,41 @@ function nodeHalf(FS) {
       && near(FS.cycle(R + H + D / 2), 0.5, 1e-12) && near(FS.cycle(R + H + D), 0, 1e-12) && near(FS.cycle(R + H + D + R / 4), 0.25, 1e-12));
   ok('how a level is said', FS.levelText(L.levels[0]) === 'Minor 7.0 m' && FS.levelText(L.levels[3]) === '1% AEP 102.69 m AHD'
     && FS.gaugeText(7) === '7.0 m on the gauge' && FS.ahdText(94.54) === '94.54 m AHD');
+
+  section('The scale beside the water');
+
+  // Gatton with its floods: twelve levels, seven of them in the top 1.7 m of
+  // a 16 m range — the crowd the spreading is for.
+  const G = peaks.levels, lo = 87.54, hi = peaks.top, GAP = 18;
+  const layoutOk = (pos, px, gap) => {
+    const shown = pos.filter(p => p.shown).sort((a, b) => a.at - b.at);
+    return shown.every((p, i) => p.at >= -1e-9 && p.at <= px + 1e-9 && (i === 0 || p.at - shown[i - 1].at >= gap - 1e-9))
+      && shown.every((p, i) => i === 0 || p.mark >= shown[i - 1].mark - 1e-9);
+  };
+  const big = FS.scale(G, { lo, hi, px: 400, gap: GAP });
+  ok('every level\'s mark is to scale: the top at the head, 0 m at the foot, the rest in proportion',
+    big.every((p, i) => near(p.mark, 400 * (hi - G[i].ahd) / (hi - lo), 1e-9)) && near(big.find(p => p.key === 'peak 1893-02-04').mark, 0, 1e-9),
+    J(big.map(p => [p.key, +p.mark.toFixed(1)])));
+  ok('with room for them all, every name is shown, none nearer another than a line, all on the track, in the marks\' order',
+    big.every(p => p.shown) && layoutOk(big, 400, GAP), J(big.map(p => [p.key, +p.at.toFixed(1)])));
+  ok('…a name on its own sits on its mark', near(big.find(p => p.key === 'minor_m').at, big.find(p => p.key === 'minor_m').mark, 1e-9), J(big[0]));
+  const head = big.filter(p => p.mark < 40).sort((a, b) => a.at - b.at);
+  ok('…a crowd against the head runs down from it a line apart — Gatton\'s seven levels in its top 1.7 m',
+    head.length === 7 && head.every((p, i) => near(p.at, i * GAP, 1e-9)), J(head.map(p => [p.key, +p.mark.toFixed(1), +p.at.toFixed(1)])));
+  ok('…and one clear of the ends is spread evenly about the middle of its marks, which moves it least',
+    J(FS.spread([100, 101, 102], 18, 0, 400)) === J([83, 101, 119]) && J(FS.spread([100, 101, 150], 18, 0, 400)) === J([91.5, 109.5, 150]));
+  const small = FS.scale(G, { lo, hi, px: 100, gap: GAP });
+  const kept = small.filter(p => p.shown).map(p => p.key).sort();
+  ok('a short track shows as many names as a line each allows, and the least give way first: the classes, the record flood, the AEP levels from the 1%',
+    kept.length === 6 && J(kept) === J(['aep_0_5_m', 'aep_1_m', 'major_m', 'minor_m', 'moderate_m', 'peak 1893-02-04'])
+      && layoutOk(small, 100, GAP) && small.every(p => p.mark >= 0 && p.mark <= 100), J(kept));
+  ok('…and a name that gives way keeps its mark', small.filter(p => !p.shown).length === 6 && small.every(p => p.shown || p.at === null));
+  ok('the spreading itself: overlapping names run a line apart, pushed back inside the ends',
+    J(FS.spread([0, 5, 10, 100], 18, 0, 200)) === J([0, 18, 36, 100]) && J(FS.spread([195, 198, 200], 18, 0, 200)) === J([164, 182, 200]));
+  ok('a name on the scale: a class, an AEP level, a flood by month and year, the record starred — on the gauge, else in m AHD',
+    FS.scaleText(G.find(l => l.key === 'major_m'), true) === 'Major 15.0 m' && FS.scaleText(G.find(l => l.key === 'aep_1_m'), true) === '1% AEP 15.1 m'
+      && FS.scaleText(G.find(l => l.date === '1893-02-04'), true) === 'Feb 1893 ★ 16.3 m' && FS.scaleText(G.find(l => l.date === '1974-01-27'), true) === 'Jan 1974 14.6 m'
+      && FS.scaleText(G.find(l => l.key === 'aep_1_m'), false) === '1% AEP 102.69 m', G.map(l => FS.scaleText(l, true)).join(' · '));
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -221,6 +285,8 @@ async function browserHalf(FS) {
     // The lines over the stage stay open: this check presses the buttons in
     // them, and must not race the fold (twinsite holds the fold itself).
     await page.evaluate(() => DigitalTwin._infoFold(null));
+    // Gatton's floods wait for their own section (see the head).
+    await page.evaluate(() => { delete state.data.stations.find(x => x.id === 'gatton').flood_peaks; });
     const gl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); });
     if (!gl) { console.log('\n  SKIP — this Chromium has no WebGL; the twin\'s water cannot be exercised here.'); return; }
 
@@ -232,16 +298,28 @@ async function browserHalf(FS) {
     const wet = (x, z) => page.evaluate(([x, z]) => DigitalTwin._floodWet(x, z), [x, z]);
     const text = sel => page.evaluate(s => { const el = document.querySelector(s); return el ? el.textContent.replace(/\s+/g, ' ').trim() : null; }, sel);
     const pal = await page.evaluate(() => Object.fromEntries(Object.entries(FloodStages.COLOURS).map(([k, v]) => [k, cssVar(v.token, v.hex)])));
-    // The pill on the stage, and whether it sits inside the stage.
-    const pill = (scope = '') => page.evaluate(sc => {
-      const el = document.querySelector(`${sc} #twin-flood-pill`), stage = document.querySelector(`${sc} #twin-stage`);
-      if (!el || !stage) return null;
-      const b = el.getBoundingClientRect(), st = stage.getBoundingClientRect();
-      const sw = el.querySelector('.twin-flood-sw');
-      return { hidden: el.hidden || getComputedStyle(el).display === 'none', text: el.textContent.replace(/\s+/g, ' ').trim(), title: el.title,
-               sw: sw ? sw.style.getPropertyValue('--sw') : null, inside: b.left >= st.left && b.top >= st.top && b.right <= st.right && b.bottom <= st.bottom,
-               width: b.width, stage: { w: st.width, h: st.height } };
+    // The scale on the stage: its head, its track, its marks and names, and
+    // whether all of it sits inside the stage.
+    const scale = (scope = '') => page.evaluate(sc => {
+      const box = document.querySelector(`${sc} #twin-flood-scale`), stage = document.querySelector(`${sc} #twin-stage`);
+      if (!box || !stage) return null;
+      const r = el => { const b = el.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right, width: b.width, height: b.height }; };
+      const st = r(stage), track = box.querySelector('.twin-scale-track'), play = box.querySelector('.twin-scale-play');
+      const inside = b => b.left >= st.left - 0.5 && b.top >= st.top - 0.5 && b.right <= st.right + 0.5 && b.bottom <= st.bottom + 0.5;
+      const labels = [...box.querySelectorAll('.twin-scale-label')].map(b => ({ key: b.dataset.flood, text: b.textContent.trim(),
+        pressed: b.getAttribute('aria-pressed') === 'true', band: b.classList.contains('is-band'), ...r(b) }));
+      const marks = [...box.querySelectorAll('.twin-scale-mark')].map(m => ({ key: m.dataset.level, colour: m.style.getPropertyValue('--sw'), ...r(m) }));
+      const hidden = box.hidden || getComputedStyle(box).display === 'none';
+      return { hidden, play: play.textContent.trim(), playTitle: play.title, now: box.querySelector('.twin-scale-now').textContent,
+               fill: Number(track.style.getPropertyValue('--level')), water: track.style.getPropertyValue('--sw'),
+               valuenow: Number(track.getAttribute('aria-valuenow')), valuetext: track.getAttribute('aria-valuetext'),
+               track: r(track), head: r(box.querySelector('.twin-scale-head')), labels, marks,
+               leaders: box.querySelectorAll('.twin-scale-leaders polyline').length,
+               inside: !hidden && inside(r(box)) && inside(r(box.querySelector('.twin-scale-head'))) && labels.every(inside), stage: st };
     }, scope);
+    // Where a level's mark should be on the track: to scale from the foot.
+    const markY = (T, F, ahd) => T.track.top + T.track.height * (F.top - ahd) / (F.top - F.start);
+    const noOverlap = T => T.labels.slice().sort((a, b) => a.top - b.top).every((l, i, a) => i === 0 || l.top >= a[i - 1].bottom - 0.5);
 
     section('The twin, on a valley the check made, under Gatton\'s levels');
     await page.evaluate(() => DigitalTwin.openStation('gatton'));
@@ -255,8 +333,9 @@ async function browserHalf(FS) {
     ok('0 m is the gauge zero, which sits under the channel\'s bed', F.start === 87.54 && F.startBasis === 'the gauge zero' && near(F.top, 103.75, 1e-9), `${F.start} ${F.startBasis}`);
     ok('the channel is found by the gauge: the lowest ground within 60 m, 30 m west', F.seed && near(F.seed.x, -30, 1e-6) && near(F.seed.elev, 89, 1e-3), J(F.seed));
     ok('by default, with nothing asked for, the water rises', F.on && F.animating);
-    let P = await pill();
-    ok('on the stage, a pill: ⏸ while it rises, and how high', P && !P.hidden && /^⏸ ?Pause the rise: \d+\.\d m · /.test(P.text) && P.inside, J(P));
+    let T = await scale();
+    ok('on the stage, the scale: ⏸ at its head while the water rises, how high beside it, and all of it inside the stage',
+      T && !T.hidden && /^⏸/.test(T.play) && /Pause the rise/.test(T.play) && /^\d+\.\d m · /.test(T.now) && T.inside, J(T && { play: T.play, now: T.now, inside: T.inside }));
 
     // Held at each level from the line, with a real click.
     const hold = async label => {
@@ -270,9 +349,12 @@ async function browserHalf(FS) {
       `${F.level} ${F.band} ${await text('#twin-flood-now')}`);
     ok('…the plane at that height over the station\'s ground', near(F.y, 97.54 - h0, 1e-4), `${F.y}`);
     ok('…yellow, and as opaque as a class', F.colour === pal.moderate && near(F.opacity, 0.62, 1e-9), `${F.colour} ${F.opacity}`);
-    P = await pill();
-    ok('…and the pill says so in a few words, in the water\'s colour, and offers to play', /^▶ ?Play the rise: 10\.0 m · moderate$/.test(P.text) && P.sw === pal.moderate
-      && /water 10\.0 m on the gauge, 97\.54 m AHD — past moderate/.test(P.title), J(P));
+    T = await scale();
+    ok('…and the scale says so: ▶ at its head, 10.0 m · moderate, the track half full in yellow, and Moderate pressed',
+      /^▶/.test(T.play) && /Play the rise/.test(T.play) && T.now === '10.0 m · moderate' && T.water === pal.moderate
+        && near(T.fill, (97.54 - 87.54) / (103.75 - 87.54), 1e-4) && /water 10\.0 m on the gauge, 97\.54 m AHD — past moderate/.test(T.playTitle)
+        && T.labels.find(l => l.key === 'moderate_m').pressed && T.labels.filter(l => l.pressed).length === 1
+        && T.valuetext === 'water 10.0 m on the gauge, 97.54 m AHD — past moderate', J({ play: T.play, now: T.now, water: T.water, fill: T.fill, labels: T.labels.map(l => [l.key, l.pressed]) }));
     ok('at moderate the channel is wet and the floodplain, a metre over it, is not',
       await wet(-30, 0) && await wet(-30, -150) && !(await wet(0, 50)) && !(await wet(80, 40)), '');
 
@@ -322,7 +404,7 @@ async function browserHalf(FS) {
     ok('the slider at nought: 0 m on the gauge, clear blue, nothing wet — the channel\'s bed is a metre and a half up',
       near(F.level, 87.54, 1e-9) && F.band === null && F.colour === pal.below && near(F.opacity, 0.45, 1e-9) && F.flooded === 0, J({ l: F.level, c: F.colour, n: F.flooded }));
     ok('…and below the first level the water is named by the level it has yet to reach', /0\.0 m on the gauge, 87\.54 m AHD — below minor$/.test(await text('#twin-flood-now'))
-      && /0\.0 m · below minor$/.test((await pill()).text), `${await text('#twin-flood-now')} | ${(await pill()).text}`);
+      && (await scale()).now === '0.0 m · below minor' && (await scale()).fill === 0, `${await text('#twin-flood-now')} | ${(await scale()).now}`);
     await page.evaluate(() => { const r = document.getElementById('twin-flood-level'); r.value = '100'; r.dispatchEvent(new Event('input', { bubbles: true })); });
     F = await fl();
     ok('a tenth of the way up the channel is wet and nothing else, still blue', near(F.level, 87.54 + 0.1 * (103.75 - 87.54), 1e-9)
@@ -363,6 +445,86 @@ async function browserHalf(FS) {
       const before = sweep[sweep.indexOf(x) - 1];
       return x.level >= l.ahd && before.level < l.ahd;
     }));
+    await page.evaluate(() => DigitalTwin.setFloodFraction(0.1));
+
+    // The scale on the stage, at full size: every mark where its level is,
+    // every name clear of the others, and each of the ways to move the water.
+    section('The scale on the stage');
+    T = await scale();
+    F = await fl();
+    ok('a mark for every level, in its colour, each at its height on the track to scale — 0 m at the foot, the top at the head',
+      T.marks.length === 7 && T.marks.every(m => { const l = F.levels.find(x => x.key === m.key); return near(m.top + m.height / 2, markY(T, F, l.ahd), 1.5) && m.colour === l.colour; }),
+      J(T.marks.map(m => [m.key, +(m.top + m.height / 2 - markY(T, F, F.levels.find(x => x.key === m.key).ahd)).toFixed(2)])));
+    ok('…a name for each, none on another, each joined to its mark, and every one inside the stage',
+      T.labels.length === 7 && noOverlap(T) && T.leaders === 7 && T.inside
+        && J(T.labels.map(l => l.text)) === J(['Minor 7.0 m', 'Moderate 10.0 m', 'Major 15.0 m', '1% AEP 15.1 m', '0.5% AEP 15.6 m', '0.2% AEP 15.9 m', '0.066% AEP 16.2 m']),
+      J(T.labels.map(l => [l.text, +l.top.toFixed(1), +l.bottom.toFixed(1)])));
+    ok('…in the order of their marks, top to bottom: no two lines cross',
+      J(T.labels.slice().sort((a, b) => a.top - b.top).map(l => l.key)) === J(T.marks.slice().sort((a, b) => a.top - b.top || F.levels.findIndex(x => x.key === b.key) - F.levels.findIndex(x => x.key === a.key)).map(m => m.key)),
+      J(T.labels.slice().sort((a, b) => a.top - b.top).map(l => l.key)));
+    // A name pressed.
+    await page.click('#twin-flood-scale .twin-scale-label[data-flood="aep_1_m"]');
+    F = await fl();
+    T = await scale();
+    ok('a name pressed holds the water at its level, and says it is the one held',
+      near(F.level, 102.69, 1e-9) && !F.animating && T.labels.find(l => l.key === 'aep_1_m').pressed && T.now === '15.1 m · 1% AEP'
+        && await page.evaluate(() => document.activeElement && document.activeElement.dataset.flood) === 'aep_1_m', `${F.level} ${T.now}`);
+    // The track, dragged: from its foot to a quarter of the way up, and let go
+    // — the water follows and stays; then onto the moderate mark, give or take
+    // a few pixels, and it takes hold of the level itself. The mouse goes where
+    // it is told, and the stage is taller than what is left of the window
+    // under the lines over it: brought into view first.
+    await page.evaluate(() => document.getElementById('twin-stage').scrollIntoView({ block: 'center' }));
+    T = await scale();
+    const tr = T.track, midX = tr.left + tr.width / 2;
+    await page.mouse.move(midX, tr.bottom - 1);
+    await page.mouse.down();
+    const drag = [];
+    for (const f of [0.1, 0.2, 0.25]) { await page.mouse.move(midX, tr.bottom - f * tr.height); drag.push((await fl()).level); }
+    await page.mouse.up();
+    F = await fl();
+    const qtr = 87.54 + 0.25 * (103.75 - 87.54);
+    ok('the track dragged: the water follows the pointer up it, and stays where it is let go', near(F.level, qtr, 0.2) && !F.animating
+      && drag.every((x, i) => i === 0 || x > drag[i - 1]) && await page.evaluate(() => typeof JSON.parse(localStorage.getItem('mn-twin')).floodHold === 'number'),
+      `${J(drag)} → ${F.level} (wanted ${qtr.toFixed(2)})`);
+    const modY = markY(T, F, 97.54);
+    await page.mouse.move(midX, modY + 4);
+    await page.mouse.down();
+    await page.mouse.up();
+    F = await fl();
+    ok('…and let go within a few pixels of a mark, it takes hold of that level exactly', near(F.level, 97.54, 1e-9) && F.band === 'moderate_m'
+      && await page.evaluate(() => JSON.parse(localStorage.getItem('mn-twin')).floodHold) === 'moderate_m', `${F.level}`);
+    // The keys, on the track: Page Up to the next level, Home to 0 m, End to the top.
+    await page.focus('#twin-flood-scale .twin-scale-track');
+    await page.keyboard.press('PageUp');
+    const k1 = (await fl()).level;
+    await page.keyboard.press('ArrowUp');
+    const k2 = (await fl()).level;
+    await page.keyboard.press('Home');
+    const k3 = (await fl()).level;
+    await page.keyboard.press('End');
+    const k4 = (await fl()).level;
+    await page.keyboard.press('PageDown');
+    const k5 = (await fl()).level;
+    ok('the keys on the track: Page Up to the next level, an arrow a hundredth of the way, Home 0 m, End the top, Page Down the level below',
+      near(k1, 102.54, 1e-9) && near(k2, 102.54 + 0.01 * (103.75 - 87.54), 1e-6) && near(k3, 87.54, 1e-9) && near(k4, 103.75, 1e-9) && near(k5, 103.47, 1e-9),
+      J([k1, k2, k3, k4, k5]));
+    ok('…and the track says where the water is, in words, as a slider',
+      (await scale()).valuenow === Math.round(100 * (103.47 - 87.54) / (103.75 - 87.54)) && (await scale()).valuetext === 'water 15.9 m on the gauge, 103.47 m AHD — past the 0.2% AEP',
+      `${(await scale()).valuenow} ${(await scale()).valuetext}`);
+    // A short stage: the names give way, the least of them first. The tab's
+    // stage never goes under 320 px, so it is squeezed here to the height the
+    // map's overlay can leave it on a phone, and let go again after.
+    await page.addStyleTag({ content: '#twin-stage.is-squeezed { height: 180px !important; }' });
+    await page.evaluate(() => document.getElementById('twin-stage').classList.add('is-squeezed'));
+    await page.waitForFunction(() => { const s = DigitalTwin.debug().flood.scale; return s && s.labels.length < 7; }, null, { timeout: LOAD_TIMEOUT });
+    T = await scale();
+    ok('on a short stage fewer names fit: the classes keep theirs, none sits on another, all inside the stage, and every level keeps its mark',
+      T.labels.length < 7 && T.labels.length >= 3 && ['minor_m', 'moderate_m', 'major_m'].every(k => T.labels.some(l => l.key === k))
+        && noOverlap(T) && T.inside && T.marks.length === 7 && T.leaders === T.labels.length,
+      J({ h: T.track.height, labels: T.labels.map(l => [l.key, +l.top.toFixed(1), +l.bottom.toFixed(1)]) }));
+    await page.evaluate(() => document.getElementById('twin-stage').classList.remove('is-squeezed'));
+    await page.waitForFunction(() => { const s = DigitalTwin.debug().flood.scale; return s && s.labels.length === 7; }, null, { timeout: LOAD_TIMEOUT });
     await page.evaluate(() => DigitalTwin.setFloodFraction(0.1));
 
     // The rise, on a short clock (2 s up, 1.2 s held, 0.3 s let out). Frames
@@ -422,25 +584,25 @@ async function browserHalf(FS) {
       `${a.level} ${b.level} frames ${framesA}→${framesB}`);
     ok('…and the choice is remembered as a place on the way up', await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('mn-twin')); return s.floodAnim === false && typeof s.floodHold === 'number'; }));
 
-    // The pill does the same, from the stage.
-    await page.click('#twin-flood-pill');
+    // The scale's head does the same, from the stage.
+    await page.click('#twin-flood-scale .twin-scale-play');
     F = await fl();
-    P = await pill();
-    ok('▶ on the pill plays the rise again, and both it and the line then offer ⏸', F.animating && /^⏸/.test(P.text) && /Pause the rise/.test(await text('#twin-flood .twin-flood-play')), J(P));
-    await page.click('#twin-flood-pill');
+    T = await scale();
+    ok('▶ at the scale\'s head plays the rise again, and both it and the line then offer ⏸', F.animating && /^⏸/.test(T.play) && /Pause the rise/.test(await text('#twin-flood .twin-flood-play')), J(T.play));
+    await page.click('#twin-flood-scale .twin-scale-play');
     F = await fl();
-    ok('…and ⏸ on it holds the water again', !F.animating && /^▶/.test((await pill()).text));
+    ok('…and ⏸ on it holds the water again, where it was caught', !F.animating && /^▶/.test((await scale()).play));
 
     // Hidden, and shown.
     await page.click('#twin-flood button:has-text("Hide the water")');
     F = await fl();
-    ok('"Hide the water": no water, no staff, no pill, and the line offers it back — with the focus on the offer', !F.on && F.visible === false && F.staff.visible === false
-      && (await pill()).hidden && /the water is hidden/.test(await text('#twin-flood'))
+    ok('"Hide the water": no water, no staff, no scale, and the line offers it back — with the focus on the offer', !F.on && F.visible === false && F.staff.visible === false
+      && (await scale()).hidden && /the water is hidden/.test(await text('#twin-flood'))
       && await page.evaluate(() => document.activeElement && document.activeElement.dataset.flood) === 'show', await text('#twin-flood'));
     ok('…the panel\'s box agrees', await page.evaluate(() => !document.getElementById('twin-flood-on').checked && document.getElementById('twin-flood-anim').disabled));
     await page.click('#twin-flood button:has-text("Show it")');
     F = await fl();
-    ok('"Show it" brings it back, and the pill', F.on && F.visible && F.staff.visible && !(await pill()).hidden);
+    ok('"Show it" brings it back, and the scale', F.on && F.visible && F.staff.visible && !(await scale()).hidden);
 
     // Not in the .glb.
     const meshes = await page.evaluate(async () => {
@@ -473,6 +635,37 @@ async function browserHalf(FS) {
     ok('…and the notes say why the classes are not drawn', notes.some(n => /assumed datum rather than AHD/.test(n)), notes.join(' | '));
     await page.evaluate(() => { state.data.stations.find(x => x.id === 'gatton').gauge_survey = window.__zero; });
 
+    // Gatton's own floods, as HDB records them and 0037 puts them on the
+    // station: 1893 is over the rarest AEP level, so the water rises to it.
+    section('The floods Gatton has seen');
+    await page.evaluate(pk => {
+      state.data.stations.find(x => x.id === 'gatton').flood_peaks = [...pk, { date: '1990', height_m: 3.1 }];
+      DigitalTwin.setFloodAnim(true);
+      DigitalTwin.rebuild();
+    }, GATTON_PEAKS);
+    await settled();
+    F = await fl();
+    ok('twelve levels now, and the top is the 1893 flood — 16.3 m on the gauge, over the rarest AEP level — so the rise goes up to it',
+      F.levels.length === 12 && near(F.top, 103.87, 1e-9) && F.levels[11].label === 'Highest recorded (1893-02-04)' && F.animating, F.levels.map(l => `${l.key} ${l.ahd}`).join(', '));
+    ok('…a ring on the staff for each flood, smaller than a class\'s, in the colour a flood has', F.staff.rings.length === 12
+      && F.staff.rings.filter(r => /^peak /.test(r.key)).every(r => r.colour === pal.peak && near(r.y, F.levels.find(l => l.key === r.key).ahd - h0, 1e-4)), J(F.staff.rings));
+    ok('…the flood with no level is not drawn, and the notes say so', !F.levels.some(l => l.key === 'peak 1990')
+      && (await page.evaluate(() => DigitalTwin.debug().notes)).some(n => /3\.1 m \(1990\) on the gauge/.test(n)));
+    await page.evaluate(() => DigitalTwin.floodAt('peak 1893-02-04'));
+    F = await fl();
+    ok('past the rarest AEP level the water keeps its colour: a flood colours nothing', near(F.level, 103.87, 1e-9) && F.band === 'aep_0_066_m' && F.colour === pal.aepLast, `${F.band} ${F.colour}`);
+    T = await scale();
+    ok('the scale names the floods by month and year, the record starred at the head, none on another, inside the stage',
+      T.labels.some(l => l.text === 'Feb 1893 ★ 16.3 m') && T.labels.some(l => l.text === 'Jan 1974 14.6 m') && noOverlap(T) && T.inside && T.marks.length === 12
+        && T.labels.find(l => l.key === 'peak 1893-02-04').top <= Math.min(...T.labels.map(l => l.top)) + 0.5,
+      J(T.labels.map(l => [l.text, +l.top.toFixed(1)])));
+    ok('…and its marks are where the floods reached, to scale', T.marks.every(m => near(m.top + m.height / 2, markY(T, F, F.levels.find(l => l.key === m.key).ahd), 1.5)));
+    await page.click('#twin-flood-scale .twin-scale-label[data-flood="peak 1974-01-27"]');
+    F = await fl();
+    ok('a flood\'s name pressed holds the water at the level it reached', near(F.level, 102.17, 1e-9) && !F.animating, `${F.level}`);
+    await page.evaluate(() => { delete state.data.stations.find(x => x.id === 'gatton').flood_peaks; DigitalTwin.rebuild(); });
+    await settled();
+
     // The same line in the Stations map's twin.
     section('Inside the Stations map');
     await page.evaluate(() => { DigitalTwin.floodAt('major_m'); switchTab('stations'); });
@@ -486,21 +679,23 @@ async function browserHalf(FS) {
     ok('at zoom 18 the map offers the twin, pressed it hands over, and its one line carries the water and the controls',
       near(F.level, 102.54, 1e-9) && /Flood levels:/.test(await text('#map-twin #twin-flood')) && (await page.$$('#map-twin #twin-flood .twin-flood-level')).length === 7,
       await text('#map-twin #twin-flood'));
-    P = await pill('#map-twin');
-    ok('…and the pill is on its stage too', P && !P.hidden && P.inside && /15\.0 m · major$/.test(P.text), J(P));
+    T = await scale('#map-twin');
+    ok('…and the scale is on its stage too, inside it', T && !T.hidden && T.inside && T.now === '15.0 m · major' && noOverlap(T), J(T && { now: T.now, inside: T.inside }));
 
     // A phone: the map has no row to spare, so the line stands down and the
-    // pill is the water's control — still there, still inside the stage.
+    // scale is the water's control — still there, still inside the stage.
     await page.setViewportSize({ width: 375, height: 800 });
     // The nav is a drawer at this width, and one left open lays its backdrop
     // over the map: shut, as a phone has it.
     await page.evaluate(() => { if (typeof setNavCollapsed === 'function') setNavCollapsed(true); });
     await page.waitForFunction(() => { const el = document.querySelector('#map-twin #twin-flood'); return !!el && getComputedStyle(el).display === 'none'; }, null, { timeout: LOAD_TIMEOUT });
-    P = await pill('#map-twin');
-    ok('on a phone the line above the stage stands down, and the pill on the stage stays, inside it', P && !P.hidden && P.inside && P.width > 60 && P.stage.h >= 160, J(P));
-    await page.click('#map-twin #twin-flood-pill');
+    T = await scale('#map-twin');
+    ok('on a phone the line above the stage stands down, and the scale on the stage stays, inside it, its names clear of one another',
+      T && !T.hidden && T.inside && noOverlap(T) && T.labels.length >= 1 && T.stage.height >= 160,
+      J(T && { inside: T.inside, labels: T.labels.map(l => [l.key, +l.top.toFixed(1), +l.bottom.toFixed(1)]), track: T.track, head: T.head, stage: T.stage }));
+    await page.click('#map-twin .twin-scale-play');
     ok('…and it still starts and stops the rise', (await fl()).animating);
-    await page.click('#map-twin #twin-flood-pill');
+    await page.click('#map-twin .twin-scale-play');
     ok('…both ways', !(await fl()).animating);
     await page.setViewportSize({ width: 1360, height: 900 });
     await page.evaluate(() => MapTwin.leave());
@@ -525,6 +720,7 @@ async function browserHalf(FS) {
     await qp.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
     await qp.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
     await qp.evaluate(() => DigitalTwin._infoFold(null));
+    await qp.evaluate(() => { delete state.data.stations.find(x => x.id === 'gatton').flood_peaks; });
     await qp.evaluate(() => DigitalTwin.openStation('gatton'));
     await qp.waitForFunction(() => { const d = DigitalTwin.debug(); return d.built && d.flood && !d.flood.none && d.flood.level != null; }, null, { timeout: BUILD_TIMEOUT });
     const q = await qp.evaluate(() => DigitalTwin.debug().flood);

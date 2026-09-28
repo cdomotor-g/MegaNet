@@ -1042,7 +1042,7 @@ const DigitalTwin = (function () {
     sc.scene.add(sc.sun);
 
     fitRenderer();
-    sc.ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { fitRenderer(); requestFrame(); }) : null;
+    sc.ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { fitRenderer(); layoutFloodScale(); requestFrame(); }) : null;
     if (sc.ro) sc.ro.observe(stage);
     attachControls();
     tw.live = true;
@@ -4105,7 +4105,18 @@ void main() {
     }
     F.band = band;
     F.bandKey = key;
+    scaleWater();
     return true;
+  }
+
+  // The water in the scale's track, for every frame the level moves: two
+  // custom properties, the rest waiting for the reading's slower beat.
+  function scaleWater() {
+    const F = tw.flood, track = document.getElementById('twin-scale-track');
+    if (!track || !F || F.none || F.level == null || !sc.flood) return;
+    const f = F.top > F.start ? Math.max(0, Math.min(1, (F.level - F.start) / (F.top - F.start))) : 1;
+    track.style.setProperty('--level', f.toFixed(4));
+    track.style.setProperty('--sw', FloodStages.colourOf(F.band, sc.flood.palette));
   }
 
   function floodMask(L) {
@@ -4194,39 +4205,217 @@ void main() {
     return `${h} · ${band}`;
   }
 
-  // The water's own control on the stage: its colour, ⏸ or ▶, how high. The
-  // off switch within reach wherever the twin is — and on a phone's map the
-  // only one, the line there having no row to spare. Built once and written
-  // in place after: a press that lands between two readings still lands on
-  // the button it began on.
+  // The pill on the stage, top left: for a station with no levels of its own
+  // and some to borrow, the offer — on a phone's map, where the line has no
+  // row, it is the only way to ask. Where there is water, the scale below is
+  // the water's control and the pill stands down.
   function syncFloodPill() {
     const el = document.getElementById('twin-flood-pill');
     if (!el) return;
     const F = tw.flood;
-    // No levels of its own, and some to borrow: the pill offers them — on a
-    // phone's map, where the line has no row, it is the only way to ask.
-    if (F && F.none && sc.terrain && canBorrow()) {
-      if (el.hidden) el.hidden = false;
+    const offer = !!(F && F.none && sc.terrain && canBorrow());
+    if (el.hidden !== !offer) el.hidden = !offer;
+    if (!offer) return;
+    if (el.dataset.mode !== 'borrow') {
       el.dataset.mode = 'borrow';
       el.innerHTML = '<span aria-hidden="true">🌊</span><span class="twin-flood-pill-text"> No flood levels here — borrow…</span>';
       el.title = 'No flood heights are recorded for this station that can be put on its ground. Use a nearby station\'s?';
-      return;
     }
-    if (el.dataset.mode === 'borrow') { el.dataset.mode = ''; el.innerHTML = ''; }
-    const show = !!(F && !F.none && F.level != null && S().flood && sc.flood);
-    if (el.hidden !== !show) el.hidden = !show;
-    if (!show) return;
-    if (el.children.length !== 4) {
-      el.innerHTML = '<span class="twin-flood-sw" aria-hidden="true"></span><span class="twin-flood-pill-icon" aria-hidden="true"></span><span class="sr-only"></span><span class="twin-flood-pill-text"></span>';
+  }
+
+  // ── the scale on the stage ──
+  // The water's control, stood up the left of the stage: ⏸ or ▶ and how high
+  // at its head, and under it a track from 0 m on the gauge at the foot to the
+  // highest level at the head — the water filling it in its colour — with a
+  // mark at every level, to scale, and its name beside it. Labels are moved
+  // off their marks only as far as they must be not to sit on one another
+  // (FloodStages.scale), a line joining each to its mark; where the stage is
+  // too short for them all, the least of them give way and keep their mark.
+  // Press a name and the water is held at that level; press or drag on the
+  // track and it follows the pointer, taking hold of a level within a few
+  // pixels of its mark; the arrow keys move it, Page Up and Page Down go
+  // level to level, Home and End to 0 m and the top. Anything but ▶ holds it
+  // still.
+  const SCALE_GAP  = 18;       // px between two labels' middles: a line of --fs-xs and a hair
+  const SCALE_SNAP = 6;        // px: a drag this near a level's mark takes that level
+
+  function floodScaleHtml() {
+    return `<div class="twin-flood-scale" id="twin-flood-scale" role="group" aria-label="Flood levels" hidden>
+            <div class="twin-scale-head">
+              <button type="button" class="twin-scale-play" id="twin-scale-play" data-flood="scale-play" onclick="DigitalTwin.toggleFloodAnim()"><span class="twin-scale-play-icon" aria-hidden="true">⏸</span><span class="sr-only">Pause the rise</span></button>
+              <span class="twin-scale-now" id="twin-scale-now"></span>
+            </div>
+            <div class="twin-scale-body" id="twin-scale-body">
+              <div class="twin-scale-track" id="twin-scale-track" role="slider" tabindex="0" aria-orientation="vertical"
+                   aria-label="Water level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+                   title="Drag to move the water; Page Up and Page Down go level to level">
+                <span class="twin-scale-water" aria-hidden="true"></span>
+                <span class="twin-scale-marks" id="twin-scale-marks" aria-hidden="true"></span>
+                <span class="twin-scale-thumb" aria-hidden="true"></span>
+              </div>
+              <svg class="twin-scale-leaders" id="twin-scale-leaders" aria-hidden="true" focusable="false"></svg>
+              <div class="twin-scale-labels" id="twin-scale-labels"></div>
+            </div>
+          </div>`;
+  }
+
+  // Whether the scale is up: water to control, shown, and a scene to show it in.
+  function floodScaleOn() {
+    const F = tw.flood;
+    return !!(F && !F.none && F.level != null && S().flood && sc.flood);
+  }
+
+  // Every level said in full, for a label's title and the track's reading.
+  function floodLevelWords(l, onGauge) {
+    if (l.kind === 'peak') {
+      const when = l.date || 'a date HDB does not give';
+      const rec = l.recorded != null ? `${Number(l.recorded).toFixed(2)} m on the gauge as it then stood; ` : '';
+      return `${l.highest ? 'The highest flood recorded' : 'A flood recorded'}, ${when}: ${rec}${FloodStages.ahdText(l.ahd)}`
+           + (onGauge && l.gauge != null ? `, ${FloodStages.gaugeText(l.gauge)} today` : '');
+    }
+    return `${FloodStages.levelText(l)}${l.kind !== 'aep' && l.gauge != null ? ` (${FloodStages.ahdText(l.ahd)})` : l.gauge != null ? ` (${FloodStages.gaugeText(l.gauge)})` : ''}`;
+  }
+
+  // The marks, the labels and the lines between them, for the ladder on
+  // screen and the stage's height now. Again whenever either changes.
+  function layoutFloodScale() {
+    const box = document.getElementById('twin-flood-scale');
+    if (!box) return;
+    const on = floodScaleOn();
+    if (box.hidden !== !on) box.hidden = !on;
+    if (!on) return;
+    const F = tw.flood, pal = sc.flood.palette;
+    const stage = document.getElementById('twin-stage'), hud = document.getElementById('twin-hud');
+    // The foot of the scale clears the hint along the foot of the stage, however
+    // many lines the stage's width makes of it.
+    if (stage && hud) stage.style.setProperty('--twin-hud-h', `${hud.offsetHeight}px`);
+    const body = document.getElementById('twin-scale-body'), track = document.getElementById('twin-scale-track');
+    const marks = document.getElementById('twin-scale-marks'), labels = document.getElementById('twin-scale-labels');
+    const svg = document.getElementById('twin-scale-leaders');
+    if (!body || !track || !marks || !labels || !svg) return;
+    const px = Math.max(0, track.clientHeight);
+    const onGauge = F.lad.levels.every(l => l.gauge != null);
+    const pos = FloodStages.scale(F.lad.levels, { lo: F.start, hi: F.top, px, gap: SCALE_GAP });
+    F.scale = { px, onGauge, pos };
+    const byKey = new Map(F.lad.levels.map(l => [l.key, l]));
+    marks.innerHTML = pos.map(p => {
+      const l = byKey.get(p.key);
+      return `<span class="twin-scale-mark${l.kind === 'peak' ? ' is-peak' : ''}" data-level="${escAttr(p.key)}" style="--y:${p.mark.toFixed(1)}px;--sw:${escAttr(FloodStages.colourOf(l, pal))}"></span>`;
+    }).join('');
+    // The labels are buttons: each holds the water at its level. The one it is
+    // held at says so (aria-pressed), and so does its look.
+    const had = labels.contains(document.activeElement) ? document.activeElement.dataset.flood : null;
+    labels.innerHTML = pos.filter(p => p.shown).map(p => {
+      const l = byKey.get(p.key);
+      const words = floodLevelWords(l, onGauge);
+      return `<button type="button" class="twin-scale-label${l.kind === 'peak' ? ' is-peak' : ''}" data-flood="${escAttr(p.key)}" aria-pressed="false"
+                style="--y:${p.at.toFixed(1)}px" onclick="DigitalTwin.floodAt('${escAttr(p.key)}')"
+                title="Hold the water at ${escAttr(words)}" aria-label="Hold the water at ${escAttr(words)}"><span class="twin-flood-sw" style="--sw:${escAttr(FloodStages.colourOf(l, pal))}" aria-hidden="true"></span>${esc(FloodStages.scaleText(l, onGauge))}</button>`;
+    }).join('');
+    if (had) { const back = labels.querySelector(`[data-flood="${CSS.escape(had)}"]`); if (back) back.focus(); }
+    // A line from each mark out to its label — straight across where the label
+    // is at its mark, a dog-leg where it had to move.
+    const b = body.getBoundingClientRect(), t = track.getBoundingClientRect();
+    const x0 = t.right - b.left, y0 = t.top - b.top;
+    const lx = labels.getBoundingClientRect().left - b.left;
+    svg.setAttribute('width', String(Math.round(b.width)));
+    svg.setAttribute('height', String(Math.round(b.height)));
+    svg.innerHTML = pos.filter(p => p.shown).map(p => {
+      const ya = y0 + p.mark, yb = y0 + p.at, xm = x0 + Math.max(2, (lx - x0) * 0.45);
+      return `<polyline points="${x0.toFixed(1)},${ya.toFixed(1)} ${xm.toFixed(1)},${ya.toFixed(1)} ${lx.toFixed(1)},${yb.toFixed(1)}"/>`;
+    }).join('');
+    syncFloodScale();
+  }
+
+  // What changes as the water moves: the water in the track, the thumb, ⏸ or
+  // ▶, the reading, which label it is held at — cheap enough for every frame.
+  function syncFloodScale() {
+    const box = document.getElementById('twin-flood-scale');
+    if (!box || box.hidden) return;
+    const F = tw.flood;
+    if (!F || F.none || F.level == null || !sc.flood) return;
+    const f = F.top > F.start ? Math.max(0, Math.min(1, (F.level - F.start) / (F.top - F.start))) : 1;
+    const track = document.getElementById('twin-scale-track');
+    scaleWater();
+    if (track) {
+      const pct = String(Math.round(f * 100));
+      if (track.getAttribute('aria-valuenow') !== pct) track.setAttribute('aria-valuenow', pct);
+      const words = floodNowText();
+      if (track.getAttribute('aria-valuetext') !== words) track.setAttribute('aria-valuetext', words);
     }
     const anim = floodAnimating();
-    const verb = anim ? 'Pause the rise' : 'Play the rise';
-    const [sw, icon, sr, txt] = el.children;
-    sw.style.setProperty('--sw', FloodStages.colourOf(F.band, sc.flood.palette));
-    icon.textContent = anim ? '⏸' : '▶';
-    sr.textContent = `${verb}: `;
-    txt.textContent = floodBrief();
-    el.title = `${verb} — ${floodNowText()}`;
+    const play = document.getElementById('twin-scale-play');
+    if (play) {
+      const verb = anim ? 'Pause the rise' : 'Play the rise';
+      const [icon, sr] = play.children;
+      if (icon && icon.textContent !== (anim ? '⏸' : '▶')) icon.textContent = anim ? '⏸' : '▶';
+      if (sr && sr.textContent !== verb) sr.textContent = verb;
+      const title = `${verb} — ${floodNowText()}`;
+      if (play.title !== title) play.title = title;
+    }
+    const now = document.getElementById('twin-scale-now');
+    if (now) {
+      const brief = floodBrief();
+      if (now.textContent !== brief) now.textContent = brief;
+    }
+    const held = !anim && typeof S().floodHold === 'string' ? S().floodHold : null;
+    for (const el of document.querySelectorAll('#twin-scale-labels .twin-scale-label')) {
+      const on = el.dataset.flood === held ? 'true' : 'false';
+      if (el.getAttribute('aria-pressed') !== on) el.setAttribute('aria-pressed', on);
+      el.classList.toggle('is-band', !!(F.band && el.dataset.flood === F.band.key));
+    }
+  }
+
+  // Where on the track a pointer is, as a fraction of the way from 0 m to the
+  // top — or, within SCALE_SNAP of a level's mark, that level.
+  function scaleAt(clientY) {
+    const F = tw.flood, track = document.getElementById('twin-scale-track');
+    if (!F || F.none || !track) return null;
+    const r = track.getBoundingClientRect();
+    if (!(r.height > 0)) return null;
+    const y = Math.max(0, Math.min(r.height, clientY - r.top));
+    const pos = F.scale && F.scale.pos;
+    if (pos) {
+      let best = null;
+      for (const p of pos) if (Math.abs(p.mark - y) <= SCALE_SNAP && (!best || Math.abs(p.mark - y) < Math.abs(best.mark - y))) best = p;
+      if (best) return { key: best.key };
+    }
+    return { f: 1 - y / r.height };
+  }
+
+  // The water held where the scale was pressed or dragged to, without the
+  // round trip through the settings a drag would make at every pixel: the
+  // choice is written once, when the pointer lets go.
+  function scrubFlood(at, final) {
+    const F = tw.flood, s = S();
+    if (!F || F.none || !at) return;
+    const wasAnim = floodAnimating();
+    s.flood = true; s.floodAnim = false;
+    s.floodHold = at.key != null ? String(at.key) : Math.max(0, Math.min(1, at.f));
+    if (wasAnim || final) { if (final) saveSettings(); settleFlood(); return; }
+    setFloodLevel(floodHoldLevel());
+    syncFloodReading();
+    requestFrame();
+  }
+
+  // The keys on the track: a hundredth of the way, a tenth with Shift, level
+  // to level, and the ends.
+  function scaleKey(e) {
+    const F = tw.flood;
+    if (!F || F.none || F.level == null) return;
+    const span = F.top - F.start;
+    const f = span > 0 ? (F.level - F.start) / span : 1;
+    const levels = F.lad.levels;
+    let at = null;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') at = { f: Math.min(1, f + (e.shiftKey ? 0.1 : 0.01)) };
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') at = { f: Math.max(0, f - (e.shiftKey ? 0.1 : 0.01)) };
+    else if (e.key === 'Home') at = { f: 0 };
+    else if (e.key === 'End') at = { f: 1 };
+    else if (e.key === 'PageUp') { const l = levels.find(x => x.ahd > F.level + 1e-6); at = l ? { key: l.key } : { f: 1 }; }
+    else if (e.key === 'PageDown') { const l = levels.slice().reverse().find(x => x.ahd < F.level - 1e-6); at = l ? { key: l.key } : { f: 0 }; }
+    if (!at) return;
+    e.preventDefault();
+    scrubFlood(at, true);
   }
 
   // Whether the station on screen could borrow levels it lacks: it has none
@@ -4284,6 +4473,7 @@ void main() {
       }
     }
     syncFloodPill();
+    layoutFloodScale();
     refreshBorrowLine();
   }
 
@@ -4298,6 +4488,7 @@ void main() {
     const out = document.getElementById('twin-flood-out');
     if (out) out.textContent = F && !F.none && F.level != null ? `${F.level.toFixed(2)} m AHD` : '';
     syncFloodPill();
+    syncFloodScale();
   }
 
   // The panel's controls, where the setting changed somewhere else (the line).
@@ -4457,6 +4648,7 @@ void main() {
       ? `POV at eye height: W A S D or the arrow keys move, drag to look, Shift to hurry, Space points, Esc to leave.${tw.model && tw.model.ladder ? ' Walk into the ladder to climb it.' : ''}${tw.photos && tw.photos.spots && tw.photos.spots.length ? ' Walk up to a 📷 and press Enter for its photos.' : ''}`
       : (tw.hooks ? 'Drag to orbit, wheel to zoom, right-drag to pan; click the ground for its height, a 📷 for its photos. Wheel out past the edge, or Esc, for the map.'
                   : 'Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height, a 📷 for the photos taken there.');
+    layoutFloodScale();
     syncCanvasName();
     requestFrame();
   }
@@ -4467,6 +4659,32 @@ void main() {
     const on = (el, ev, fn, opts) => { el.addEventListener(ev, fn, opts); sc.off.push(() => el.removeEventListener(ev, fn, opts)); };
 
     on(cv, 'contextmenu', e => e.preventDefault());
+
+    // The flood scale's track: pressed, it takes the water there; dragged,
+    // the water follows; let go, the choice is kept.
+    const track = document.getElementById('twin-scale-track');
+    if (track) {
+      let scrub = null;
+      const stop = e => {
+        if (scrub !== e.pointerId) return false;
+        scrub = null;
+        track.classList.remove('is-dragging');
+        return true;
+      };
+      on(track, 'pointerdown', e => {
+        if (e.button !== 0 || !floodScaleOn()) return;
+        e.preventDefault();
+        try { track.setPointerCapture(e.pointerId); } catch (_) {}
+        scrub = e.pointerId;
+        track.classList.add('is-dragging');
+        track.focus({ preventScroll: true });
+        scrubFlood(scaleAt(e.clientY), false);
+      });
+      on(track, 'pointermove', e => { if (scrub === e.pointerId) scrubFlood(scaleAt(e.clientY), false); });
+      on(track, 'pointerup', e => { if (stop(e)) scrubFlood(scaleAt(e.clientY), true); });
+      on(track, 'pointercancel', e => { if (stop(e)) { saveSettings(); settleFlood(); } });
+      on(track, 'keydown', scaleKey);
+    }
 
     on(cv, 'pointerdown', e => {
       if (e.button !== 0 && e.button !== 2) return;
@@ -5383,6 +5601,7 @@ void main() {
           <canvas id="twin-canvas" tabindex="0" aria-label="Three-dimensional view. Nothing is built yet."></canvas>
           <div class="twin-compass" id="twin-compass" aria-hidden="true" style="--twin-heading:0deg">N</div>
           <button type="button" class="twin-flood-pill" id="twin-flood-pill" hidden onclick="DigitalTwin.floodPill()"></button>
+          ${floodScaleHtml()}
           <p class="twin-hud" id="twin-hud">Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.</p>
           <button type="button" class="twin-photo-prompt" id="twin-photo-prompt" hidden onclick="DigitalTwin.openNearPhotos()"></button>
           <div class="mn-movepin-panel twin-movepin-panel" id="twin-movepin-panel" role="group" aria-label="Move this station's pin" hidden></div>
@@ -5791,12 +6010,11 @@ void main() {
       syncFloodControls();
       announce('No longer borrowing flood levels.');
     },
-    // The pill on the stage: the rise's pause and play, or — with no levels
-    // of its own — the way to borrow some.
+    // The pill on the stage: with no levels of its own, the way to borrow
+    // some. (The scale is the water's control where there is water.)
     floodPill() {
       const el = document.getElementById('twin-flood-pill');
       if (el && el.dataset.mode === 'borrow') this.borrowFlood();
-      else this.toggleFloodAnim();
     },
     // For the check: where a scene point is on the screen (CSS pixels,
     // viewport), a scene point as a latitude and longitude and back, and the
@@ -5974,6 +6192,26 @@ void main() {
             } : null,
             exported: sc.flood ? (() => { let any = false; for (const o of [sc.flood.water, sc.flood.staff]) o.traverse(x => { if (x.userData.export !== false) any = true; }); return any; })() : null,
             notes: F.notes.slice(),
+            // The scale on the stage, as laid out and as drawn.
+            scale: (() => {
+              const box = document.getElementById('twin-flood-scale');
+              if (!box) return null;
+              const rect = el => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }; };
+              const track = document.getElementById('twin-scale-track'), stage = document.getElementById('twin-stage');
+              const play = document.getElementById('twin-scale-play'), now = document.getElementById('twin-scale-now');
+              return {
+                hidden: box.hidden || getComputedStyle(box).display === 'none',
+                box: rect(box), stage: stage ? rect(stage) : null, track: track ? rect(track) : null,
+                play: play ? play.textContent.trim() : null, now: now ? now.textContent : null,
+                fill: track ? Number(track.style.getPropertyValue('--level')) : null,
+                valuetext: track ? track.getAttribute('aria-valuetext') : null,
+                marks: [...document.querySelectorAll('#twin-scale-marks .twin-scale-mark')].map(m => ({ key: m.dataset.level, ...rect(m) })),
+                labels: [...document.querySelectorAll('#twin-scale-labels .twin-scale-label')].map(b => ({
+                  key: b.dataset.flood, text: b.textContent.trim(), pressed: b.getAttribute('aria-pressed') === 'true', ...rect(b) })),
+                leaders: document.querySelectorAll('#twin-scale-leaders polyline').length,
+                layout: F.scale ? F.scale.pos.map(q => ({ ...q })) : null,
+              };
+            })(),
           };
         })() : null,
         photos: tw.photos ? {

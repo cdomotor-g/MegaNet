@@ -420,8 +420,8 @@ do off the banner's — and the status, the paths, the flood water and the
 credit line are one line each with the whole text as their tooltip, so a map
 340 px tall on a phone still gives the stage a picture's worth of height and
 nothing spills over the credit line under the map. Below `sm` the flood
-water's line stands down altogether — there is no row to spare — and the pill
-on the stage is its control. The twin's scene,
+water's line stands down altogether — there is no row to spare — and the
+scale on the stage is its control. The twin's scene,
 controls and teardown are `digital-twin.js`'s; `map-twin.js` decides *when*
 and gives it a host. **Open the tab →** on the overlay opens the Digital Twin
 tab on the same station, for the settings, the Ground truth panel and the
@@ -615,22 +615,32 @@ the water rises. The tokens are `--flood-water-*` in `styles.css`.
   ground: minor 7 m, moderate 10 m, major 15 m"*) and not drawn.
 - **The AEP flood levels** — the row the station card reads
   (`FloodVelocity.pickRow`), already in AHD, so they stand whatever the zero.
-- **The peaks the river has reached**, when there are any. None are in the
-  database yet: the HDB extract that would carry them is failing. The twin
-  reads them the moment the station record does, as `flood_peaks`:
+- **The floods the river has seen** — HDB's peak flood heights (`0037`,
+  `tools/ingest/flood_peaks.py`; `db/README.md` has the rest). The station
+  record carries its **five largest floods, one per July–June season, largest
+  first**, as `flood_peaks`:
 
   ```json
   "flood_peaks": [
-    { "date": "2011-01-10", "height_m": 18.92 },
-    { "date": "1974-01-26", "level_m_ahd": 105.1 }
+    { "date": "1893-02-04", "height_m": 16.33, "level_m_ahd": 103.87 },
+    { "date": "2011-01-11", "height_m": 15.38, "level_m_ahd": 102.92 }
   ]
   ```
 
-  `height_m` is on the gauge (placed through an AHD zero, like a class);
-  `level_m_ahd` is used as it is. Each is a ring on the staff, the highest
-  labelled *Highest recorded (date)*, and the rise goes up to it when it is the
-  highest level there is. A peak never colours the water: it is history, not a
-  class.
+  `height_m` is the height on the gauge as it then stood. `level_m_ahd` is the
+  level the water reached, which the database works out through the gauge
+  zero **in force on that day** — 129 of these gauges have had more than one,
+  and Tinaroo Falls Dam's zero moved by 670 m at the end of 2010 — and leaves
+  off where it cannot honestly be had: a zero then on an assumed, a State or
+  no datum, or a height that would put the water more than 20 m over the
+  gauge's own flood levels (HDB holds a few peaks written in m AHD). **Only a
+  peak with a level is drawn**; one without is named in the notes, never
+  hung from today's zero. `date` is the day in Queensland where HDB gives the
+  hour (its extract is in UTC), else as much of a date as it holds — 1947-01,
+  1887. Each is a ring on the staff, smaller than a class's, the highest
+  labelled *Highest recorded (date)*, and the rise goes up to it when it is
+  the highest level there is — at Gatton, 1893 stands 12 cm over the 0.066%
+  AEP level. A flood never colours the water: it is history, not a class.
 
 **Where 0 m is.** The gauge zero, when it is AHD and sits at the channel the
 ground shows — no more than 30 m below the lowest ground by the gauge (a
@@ -667,12 +677,39 @@ guide, not a map. The line's tooltip says so.
 at every level in its colour — the gauge board the water is read against. The
 exaggeration slider moves the water and the rings with the ground.
 
+**The scale on the stage** stands the levels up the left of the view, to
+scale: ⏸ or ▶ and how high at its head (*14.6 m · moderate*), and under it a
+track from 0 m on the gauge at the foot to the highest level at the head, the
+water filling it in the colour it has, a mark at every level at its height,
+and the level's name beside it — *Major 15.0 m*, *1% AEP 15.1 m*, *Jan 1974
+14.6 m*, *Feb 1893 ★ 16.3 m* for the record — on the gauge where every level
+has a height on it, else in m AHD. Names are moved off their marks only as far
+as they must be not to sit on one another, a crowd of them spread evenly about
+where their marks are and a line joining each to its own (`FloodStages.scale`,
+pure, so `npm run flood` holds the arithmetic under Node as well as the
+drawing in Chromium). Where the stage is too short for every name — the
+Stations map on a phone — the least give way and keep their marks: the classes
+first, then the highest flood recorded, the AEP levels from the 1%, then the
+other floods.
+
+- **Play and pause** at its head.
+- **Skip to a level**: press its name, and the water is held there — the name
+  says it is the one held.
+- **Slide through the levels**: press or drag on the track and the water
+  follows the pointer; let go within a few pixels of a mark and it takes that
+  level exactly.
+- **The keys**, on the track (a slider to a reader): ↑ ↓ a hundredth of the
+  way, a tenth with Shift, Page Up and Page Down level to level, Home 0 m and
+  End the top.
+
+Anything but ▶ holds the water still. The scale steps aside while a pin is
+being moved (its panel has that corner then), and its foot clears the hint
+along the stage's foot, however many lines that makes.
+
 **Turning it off.** Three places, each remembered in the browser (`mn-twin`):
 
-- **The pill** on the stage, top left: the water's colour, ⏸ or ▶, and how
-  high — *10.0 m · moderate*. Pauses and plays the rise wherever the twin is.
-  On a phone's Stations map it is the only control: the line above the stage
-  has no row to spare there, so it stands down.
+- **The scale** above. On a phone's Stations map it is the only control: the
+  line above the stage has no row to spare there, so it stands down.
 - **The line** under the stage (in the Stations map, above it): *🌊 Flood
   levels:* ⏸ *Pause the rise* / ▶ *Play the rise*, the reading (*water 10.0 m
   on the gauge, 97.54 m AHD — past moderate*), every level as a button that
@@ -692,9 +729,9 @@ alike see it; the levels are the station card's, and those are public.
 
 3,710 stations have no heights the twin can put on their ground, and many of
 them are a few kilometres up or down a river from one that has. For those the
-flood line says so and offers **Use a nearby station's levels…** (the pill on
-the stage offers it too — on a phone's map it is the only place that can —
-and so does the Scene panel's *Flood water*). The offer opens a dialog listing
+flood line says so and offers **Use a nearby station's levels…** (a pill on
+the stage, where the scale would be, offers it too — on a phone's map it is
+the only place that can — and so does the Scene panel's *Flood water*). The offer opens a dialog listing
 the **four nearest stations that have levels**: each one's distance and
 bearing, its flood heights (the classes on its gauge, the AEP levels in AHD)
 and its catchment — the basin by name, the stream, and *same catchment* where

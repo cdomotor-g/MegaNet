@@ -39,10 +39,18 @@
 // red — the colour says how rare a flood the water has passed, and it never
 // says less as the water rises.
 //
-// A peak the river has reached (the HDB extract's, when it lands: a
-// `flood_peaks` list on the station of { date, height_m on the gauge, or
-// level_m_ahd }) is a level on the ladder and a mark on the twin's staff, but
-// it does not colour the water: it is history, not a class.
+// A peak the river has reached is a level on the ladder and a mark on the
+// twin's staff, but it does not colour the water: it is history, not a class.
+// They are HDB's (0037, tools/ingest/flood_peaks.py): the station carries its
+// five largest floods as `flood_peaks`, { date, height_m, level_m_ahd } — the
+// height on the gauge as it then stood, and the level it reached in m AHD
+// through the zero in force *on that day*. The database works that level out,
+// from the dated gauge survey, and leaves it off where it cannot honestly be
+// had: a zero then on the assumed datum, none surveyed, or a height that would
+// put the water 20 m over the gauge's own flood levels (HDB holds a few peaks
+// written in m AHD). A peak with no level is named in the notes and not drawn
+// — never hung from today's zero, which for 129 of these gauges is not the one
+// the height was read against.
 //
 // ── The cycle ────────────────────────────────────────────────────────────────
 // From 0 m on the gauge — the zero, where it is AHD and where it sits at the
@@ -158,20 +166,26 @@ const FloodStages = (function () {
                     gauge: ahdZero == null ? null : ahd - ahdZero, rank: 4 + i, oneIn: d.oneIn, aepIndex: i, aepCount: aeps.length });
     });
 
-    // The peaks the river has reached, when the station carries them.
-    const peaks = ((s && s.flood_peaks) || []).map(p => {
-      const lvl = num(p.level_m_ahd);
-      const h = num(p.height_m);
-      const ahd = lvl != null ? lvl : (h != null ? onGauge(h) : null);
-      return ahd == null ? null : { key: `peak ${p.date || ''}`.trim(), kind: 'peak', label: `Peak${p.date ? ` ${String(p.date).slice(0, 10)}` : ''}`,
-                                     ahd, gauge: ahdZero == null ? (lvl == null ? h : null) : ahd - ahdZero, rank: null, date: p.date || null };
-    }).filter(Boolean);
-    if (((s && s.flood_peaks) || []).length && !peaks.length) {
-      notes.push('The peaks the river has reached are heights on the gauge, and its zero is not in AHD, so they cannot be put on the ground.');
+    // The peaks the river has reached, where the station carries them: each at
+    // the level the database says it reached (see the head of this file), and
+    // only there.
+    const given = ((s && s.flood_peaks) || []).filter(p => p && (num(p.level_m_ahd) != null || num(p.height_m) != null));
+    const peaks = given.filter(p => num(p.level_m_ahd) != null).map(p => {
+      const ahd = num(p.level_m_ahd);
+      const date = p.date ? String(p.date).slice(0, 10) : null;
+      return { key: `peak ${date || ''}`.trim(), kind: 'peak', label: `Peak${date ? ` ${date}` : ''}`, short: peakWhen(date),
+               ahd, gauge: ahdZero == null ? null : ahd - ahdZero, recorded: num(p.height_m), rank: null, date };
+    });
+    const unplaced = given.filter(p => num(p.level_m_ahd) == null);
+    if (unplaced.length) {
+      const said = unplaced.map(p => `${num(p.height_m)} m${p.date ? ` (${String(p.date).slice(0, 10)})` : ''}`).join(', ');
+      notes.push(peaks.length
+        ? `${unplaced.length === 1 ? 'One of the floods' : `${unplaced.length} of the floods`} HDB records here cannot be put on the ground — the gauge's zero on the day is not known in AHD, or the height disagrees with its flood levels: ${said} on the gauge.`
+        : `HDB records floods here, but none can be put on the ground — the gauge's zero on the day is not known in AHD, or the heights disagree with its flood levels: ${said} on the gauge.`);
     }
     if (peaks.length) {
       const high = peaks.reduce((a, b) => (b.ahd > a.ahd ? b : a));
-      high.label = `Highest recorded${high.date ? ` (${String(high.date).slice(0, 10)})` : ''}`;
+      high.label = `Highest recorded${high.date ? ` (${high.date})` : ''}`;
       high.highest = true;
       levels.push(...peaks);
     }
@@ -261,6 +275,14 @@ const FloodStages = (function () {
     };
   }
 
+  // "Feb 1893", "Jan 1947", "1887": when a flood was, as the scale says it.
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function peakWhen(date) {
+    const m = /^(\d{4})(?:-(\d\d))?/.exec(String(date || ''));
+    if (!m) return 'Flood';
+    return m[2] && MONTHS[Number(m[2]) - 1] ? `${MONTHS[Number(m[2]) - 1]} ${m[1]}` : m[1];
+  }
+
   function datumWord(code) {
     return { ASSUM: 'assumed datum', STATE: 'State datum', UNKNOWN: 'datum it does not know', AHD: 'Australian Height Datum' }[code] || `${code} datum`;
   }
@@ -333,6 +355,70 @@ const FloodStages = (function () {
     return Math.max(0, 1 - (u - rise - hold) / drain);
   }
 
+  // ── The scale beside the water ─────────────────────────────────────────────
+  // The twin stands the levels up the left of its stage, to scale: each
+  // level's mark at its height between 0 m on the gauge (`lo`, the foot of a
+  // track `px` tall) and the top (`hi`, its head), and its label beside it —
+  // moved off the mark only as far as it must be not to sit on another, a
+  // crowd of labels spread evenly about where their marks are. Where there are
+  // more labels than the track has room for, the least of them give way and
+  // keep only their mark: the classes first, then the highest flood recorded,
+  // the AEP floods from the 1%, then the other floods, largest first.
+  //
+  //   scale(levels, { lo, hi, px, gap }) → [{ key, mark, at, shown }]
+  //
+  // in the levels' own order; `mark` and `at` are px down from the head of the
+  // track, and `at` is null for a label that gave way. `gap` is the height of
+  // a label: no two labels' middles are nearer than that.
+  function scale(levels, { lo, hi, px, gap }) {
+    const span = hi - lo;
+    const markOf = a => (span > 0 ? Math.max(0, Math.min(px, px * (hi - a) / span)) : px);
+    const out = levels.map(l => ({ key: l.key, mark: markOf(l.ahd), at: null, shown: false }));
+    const room = gap > 0 ? Math.max(0, Math.floor(px / gap) + 1) : levels.length;
+    const wanted = levels.map((l, i) => i)
+      .sort((a, b) => labelRank(levels[a]) - labelRank(levels[b]) || levels[b].ahd - levels[a].ahd || a - b)
+      .slice(0, room);
+    const down = wanted.sort((a, b) => out[a].mark - out[b].mark || b - a);
+    const at = spread(down.map(i => out[i].mark), gap, 0, px);
+    down.forEach((i, k) => { out[i].at = at[k]; out[i].shown = true; });
+    return out;
+  }
+
+  function labelRank(l) {
+    const cls = { major: 0, moderate: 1, minor: 2 }[l.kind];
+    if (cls != null) return cls;
+    if (l.kind === 'peak') return l.highest ? 3 : 5;
+    return 4 + (l.aepIndex || 0) / 10;
+  }
+
+  // Positions for labels wanted at `ys` (ascending), none nearer than `gap`,
+  // all within [lo, hi]. Labels that would overlap are gathered into a run and
+  // the run centred on the middle of the marks it stands for — the placement
+  // that moves them least — and runs that then overlap are gathered again.
+  function spread(ys, gap, lo, hi) {
+    const top = c => Math.max(lo, Math.min(hi - (c.n - 1) * gap, c.sum / c.n - (c.n - 1) * gap / 2));
+    const runs = [];
+    for (const y of ys) {
+      runs.push({ n: 1, sum: y });
+      while (runs.length > 1) {
+        const b = runs[runs.length - 1], a = runs[runs.length - 2];
+        if (top(a) + a.n * gap <= top(b) + 1e-9) break;
+        a.n += b.n; a.sum += b.sum; runs.pop();
+      }
+    }
+    const out = [];
+    for (const r of runs) { const t = top(r); for (let j = 0; j < r.n; j++) out.push(t + j * gap); }
+    return out;
+  }
+
+  // A level on the scale, in a few words: its name — a flood by its month and
+  // year, the highest with a star — and its height, on the gauge where every
+  // level has one, else in m AHD. The label's title says it in full.
+  function scaleText(l, onGauge) {
+    const name = l.kind === 'peak' ? `${l.short || 'Flood'}${l.highest ? ' ★' : ''}` : l.label;
+    return `${name} ${onGauge && l.gauge != null ? `${Number(l.gauge).toFixed(1)} m` : `${Number(l.ahd).toFixed(2)} m`}`;
+  }
+
   // "7.0 m on the gauge", "102.69 m AHD" — how a level is said.
   function gaugeText(m) { return num(m) == null ? '' : `${Number(m).toFixed(1)} m on the gauge`; }
   function ahdText(m) { return num(m) == null ? '' : `${Number(m).toFixed(2)} m AHD`; }
@@ -345,7 +431,7 @@ const FloodStages = (function () {
   return {
     CLASSES, COLOURS, RISE_S, HOLD_S, DRAIN_S, ZERO_MAX_BELOW, ZERO_MAX_ABOVE,
     ladder, start, passed, colourOf, mix, cycle, gaugeText, ahdText, levelText,
-    borrowable, borrowed,
+    borrowable, borrowed, scale, spread, scaleText, peakWhen,
   };
 })();
 if (typeof window !== 'undefined') window.FloodStages = FloodStages;

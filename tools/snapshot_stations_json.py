@@ -81,7 +81,7 @@ KEY_ORDER = {
                 'location_types', 'TBRGbucketSize', 'inspection_config_key',
                 'awrc_number', 'stream', 'urbs_label', 'bureau_listings',
                 'flood_classes', 'crossings', 'gauge_survey', 'flood_effects',
-                'aep_levels', 'frequencies'],
+                'aep_levels', 'frequencies', 'flood_peaks'],
     'sensor':  ['alert_id', 'type', 'sensor_id', 'device_id'],
     'site':    ['db_id', 'number', 'name'],
     'satcom':  ['enabled', 'provider', 'terminal_id'],
@@ -104,13 +104,15 @@ KEY_ORDER = {
                     'level_difference', 'confidence', 'setting', 'slope', 'slope_basis',
                     'manning_n', 'note'],
     'frequency':   ['rx_mhz', 'tx_mhz', 'label', 'acma_licence'],
+    # …and 0037's: a station's five largest floods, from HDB.
+    'flood_peak':  ['date', 'height_m', 'level_m_ahd'],
 }
 
 # Which shape each of a station's lists holds.
 STATION_LIST_SHAPE = {'flood_classes': 'flood_class', 'crossings': 'crossing',
                       'gauge_survey': 'gauge_survey', 'bureau_listings': 'bureau_listing',
                       'flood_effects': 'flood_effect', 'aep_levels': 'aep_level',
-                      'frequencies': 'frequency'}
+                      'frequencies': 'frequency', 'flood_peaks': 'flood_peak'}
 
 
 def ordered(obj, shape):

@@ -1243,12 +1243,20 @@ const HELP = {
       + 'magenta through to dark blue past the AEP floods — the colour of the rarest level passed, so '
       + 'it never goes back down. It goes where the river would take it, not everywhere low: a hollow '
       + 'behind a bank stays dry until the bank is overtopped. It is one level surface through the '
-      + 'patch, and a real flood slopes downstream, so the far edges are a guide. ⏸ on the pill at the '
-      + 'stage\'s top left (or the line under it) stops the rise; a level on the line holds the water '
-      + 'there; <em>Hide the water</em> takes it away — each remembered. Classes on a gauge whose zero '
-      + 'is not surveyed to AHD are named in the notes and not drawn. Not in the .glb.',
+      + 'patch, and a real flood slopes downstream, so the far edges are a guide. The floods the river '
+      + 'has seen — its five largest from the Bureau\'s records, at the level each reached — rise with '
+      + 'it as rings on the staff, the highest named; a flood colours nothing. Classes on a gauge whose '
+      + 'zero is not surveyed to AHD, and floods whose gauge zero that day is not known in AHD, are named '
+      + 'in the notes and not drawn. Not in the .glb.',
+      '<strong>The scale up the left of the stage is the water\'s control.</strong> Every level is '
+      + 'marked on it at its height, to scale, its name beside it — moved only far enough not to sit on '
+      + 'another. ⏸ or ▶ at its head stops and starts the rise; press a name and the water is held at '
+      + 'that level; press or drag on the track and the water follows the pointer, taking a level '
+      + 'exactly when let go near its mark. On the track, Page Up and Page Down go level to level, Home '
+      + 'and End to 0 m and the top. The line under the stage has the same levels, and <em>Hide the '
+      + 'water</em> — each choice remembered.',
       '<strong>No levels here? Borrow a neighbour\'s.</strong> For a station with no flood heights '
-      + 'the twin can put on its ground, the flood line (and the pill) offers the four nearest stations '
+      + 'the twin can put on its ground, the flood line (and a pill on the stage) offers the four nearest stations '
       + 'that have some — their distance, their heights and their catchment. Pick one and its levels '
       + 'are drawn over this channel as heights on its gauge (or, if you say so, as the same metres '
       + 'AHD). Only in the twin, only for the session, and every place that draws them says whose '
@@ -1990,7 +1998,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 36;
+const DB_SCHEMA_VERSION = 37;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
