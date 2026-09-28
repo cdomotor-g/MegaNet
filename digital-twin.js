@@ -229,6 +229,8 @@ const DigitalTwin = (function () {
     infoPinned: false,     // the operator pressed the fold: it stays as they left it
     infoFor: null,         // the station the fold was last opened for — a new one opens it again
     infoTimer: 0,          // the fold's own clock
+    hudTimer: 0,           // a phone's: when the hint goes back to its "?" (see "a phone's stage, kept clear")
+    scaleTimer: 0,         // a phone's: when the scale's names stand down
     origin: null,          // { lat, lon } the patch is centred on — the station where it was when built
     neighbours: null,      // the other stations in the patch: { list: [{ id, name, x, z, d, structure, … }], more }
     bridges: null,         // the bridges in the patch: { status, source, list, crossing, failed }
@@ -1044,7 +1046,7 @@ const DigitalTwin = (function () {
     sc.scene.add(sc.sun);
 
     fitRenderer();
-    sc.ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { fitRenderer(); layoutFloodScale(); requestFrame(); }) : null;
+    sc.ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { fitRenderer(); syncCompact(); layoutFloodScale(); requestFrame(); }) : null;
     if (sc.ro) sc.ro.observe(stage);
     attachControls();
     tw.live = true;
@@ -4310,7 +4312,11 @@ void main() {
     const box = document.getElementById('twin-flood-scale');
     if (!box) return;
     const on = floodScaleOn();
-    if (box.hidden !== !on) box.hidden = !on;
+    if (box.hidden !== !on) {
+      box.hidden = !on;
+      // Up: its names are too, for their few seconds on a phone.
+      if (on) scaleNamesShow();
+    }
     if (!on) return;
     const F = tw.flood, pal = sc.flood.palette;
     const stage = document.getElementById('twin-stage'), hud = document.getElementById('twin-hud');
@@ -4660,6 +4666,106 @@ void main() {
     return typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   }
 
+  // ── a phone's stage, kept clear ──
+  // On a phone the stage is the map's size, which is not much of it, and two
+  // things on it are words: the scale's names, and the hint along its foot.
+  // So there both stand down after a few seconds — the names to the marks on
+  // the track they point from, the hint to the "?" it starts with — and come
+  // back for as long again when asked: the names by a tap on the track (or
+  // focus reaching one of them), the hint by the "?". Anywhere else both stay
+  // up, as they always have. The scale's foot stops above the "?" there rather
+  // than above the whole hint, so the hint showing lies over the foot of the
+  // scale for its few seconds and nothing is laid out again for it.
+  const COMPACT_MS = 5000;
+  let compactMs = COMPACT_MS;    // the check's seam: sooner, or never (null)
+
+  // A phone: a finger, on a screen whose short side is a phone's — `xs`,
+  // whichever way up it is held. Not a tablet, whose stage has the room.
+  function compactStage() {
+    const xs = typeof BREAKPOINTS !== 'undefined' ? BREAKPOINTS.xs : 560;
+    return coarsePointer() && Math.min(window.innerWidth, window.innerHeight) <= xs;
+  }
+
+  function clearCompactTimers() {
+    if (tw.hudTimer) { clearTimeout(tw.hudTimer); tw.hudTimer = 0; }
+    if (tw.scaleTimer) { clearTimeout(tw.scaleTimer); tw.scaleTimer = 0; }
+  }
+
+  // The stage told which it is, and what stands on it made to agree: a
+  // phone's gets the "?", and whatever is up there has its clock running;
+  // anything else has everything up and no clock. Asked on every build (the
+  // stage's resize observer answers once as it starts), every mode and every
+  // resize — a stage is new each time it is mounted, a rebuild stops the
+  // clocks under one that is not (stop()), and a window can stop being a
+  // phone's under an emulator.
+  function syncCompact() {
+    const stage = document.getElementById('twin-stage');
+    if (!stage) return;
+    const compact = compactStage(), was = stage.classList.contains('is-compact');
+    const hud = document.getElementById('twin-hud'), box = document.getElementById('twin-flood-scale');
+    if (was !== compact) {
+      stage.classList.toggle('is-compact', compact);
+      const q = document.getElementById('twin-hud-q');
+      if (q) q.hidden = !compact;
+    }
+    if (!compact) {
+      if (!was) return;
+      clearCompactTimers();
+      if (hud) hud.classList.remove('is-folded');
+      if (box) box.classList.remove('is-quiet');
+      return;
+    }
+    if (compactMs == null) return;
+    if (hud && !hud.classList.contains('is-folded') && !tw.hudTimer) tw.hudTimer = setTimeout(hudFold, compactMs);
+    if (box && !box.hidden && !box.classList.contains('is-quiet') && !tw.scaleTimer) tw.scaleTimer = setTimeout(scaleNamesQuiet, compactMs);
+  }
+
+  // The hint in full: for COMPACT_MS on a phone, then back to its "?".
+  function hudShow() {
+    if (tw.hudTimer) { clearTimeout(tw.hudTimer); tw.hudTimer = 0; }
+    const hud = document.getElementById('twin-hud'), q = document.getElementById('twin-hud-q');
+    if (hud) hud.classList.remove('is-folded');
+    if (q) { q.setAttribute('aria-expanded', 'true'); q.title = 'Hide how to move the view'; }
+    if (compactMs != null && compactStage()) tw.hudTimer = setTimeout(hudFold, compactMs);
+  }
+
+  function hudFold() {
+    if (tw.hudTimer) { clearTimeout(tw.hudTimer); tw.hudTimer = 0; }
+    if (!compactStage()) return;
+    const hud = document.getElementById('twin-hud'), q = document.getElementById('twin-hud-q');
+    if (hud) hud.classList.add('is-folded');
+    if (q) { q.setAttribute('aria-expanded', 'false'); q.title = 'How to move the view'; }
+  }
+
+  // The "?": the hint for another few seconds, or — pressed while it is up —
+  // put away now.
+  function toggleHud() {
+    const hud = document.getElementById('twin-hud');
+    if (hud && !hud.classList.contains('is-folded')) hudFold();
+    else hudShow();
+  }
+
+  // The scale's names and the lines to them: up for COMPACT_MS on a phone,
+  // then gone but for the marks on the track. Called when the scale comes
+  // up, and by everything that is a hand on it (attachControls).
+  function scaleNamesShow() {
+    if (tw.scaleTimer) { clearTimeout(tw.scaleTimer); tw.scaleTimer = 0; }
+    const box = document.getElementById('twin-flood-scale');
+    if (!box) return;
+    box.classList.remove('is-quiet');
+    if (compactMs != null && compactStage()) tw.scaleTimer = setTimeout(scaleNamesQuiet, compactMs);
+  }
+
+  function scaleNamesQuiet() {
+    tw.scaleTimer = 0;
+    const box = document.getElementById('twin-flood-scale'), track = document.getElementById('twin-scale-track');
+    if (!box || !compactStage()) return;
+    // Not from under a finger on the track: its letting go starts the clock
+    // again.
+    if (track && track.classList.contains('is-dragging')) return;
+    box.classList.add('is-quiet');
+  }
+
   function syncModeUi() {
     const stage = document.getElementById('twin-stage');
     if (stage) stage.classList.toggle('is-walk', rig.mode === 'walk');
@@ -4696,14 +4802,14 @@ void main() {
                    : 'Drag to orbit, wheel to zoom, right-drag to pan; click the ground for its height, a 📷 for its photos. Wheel out past the edge, or Esc, for the map.')
           : (touch ? 'Drag to orbit, pinch to zoom, two fingers to pan. Tap the ground for its height, a 📷 for the photos taken there.'
                    : 'Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height, a 📷 for the photos taken there.');
-      // A finger on the scene fades the hint (attachControls): it has been
-      // read, and on a phone it is two lines across the foot of a stage the
-      // size of the map. A new mode brings it back, with that mode's words.
+      // A new mode says its words in full — on a phone for a few seconds,
+      // then back to the "?" (see "a phone's stage, kept clear").
       if (hud.dataset.mode !== rig.mode) {
         hud.dataset.mode = rig.mode;
-        hud.classList.remove('is-quiet');
+        hudShow();
       }
     }
+    syncCompact();
     layoutFloodScale();
     syncCanvasName();
     requestFrame();
@@ -4717,38 +4823,64 @@ void main() {
     on(cv, 'contextmenu', e => e.preventDefault());
 
     // The flood scale's track: pressed, it takes the water there; dragged,
-    // the water follows; let go, the choice is kept.
+    // the water follows; let go, the choice is kept. On a phone with the
+    // scale's names stood down (scaleNamesShow), a tap on the track brings
+    // them back and does nothing else — the water stays where it was, since
+    // the tap was for the names — and a drag from it moves the water as any
+    // drag does. Every hand on the scale gives the names their few seconds
+    // again.
     const track = document.getElementById('twin-scale-track');
     if (track) {
-      let scrub = null;
+      let scrub = null, peek = null;
       const stop = e => {
         if (scrub !== e.pointerId) return false;
         scrub = null;
         track.classList.remove('is-dragging');
         return true;
       };
+      const begin = e => {
+        scrub = e.pointerId;
+        track.classList.add('is-dragging');
+      };
       on(track, 'pointerdown', e => {
         if (e.button !== 0 || !floodScaleOn()) return;
         e.preventDefault();
+        // Asked before the focus below, whose focusin brings the names back.
+        const box = document.getElementById('twin-flood-scale');
+        const quiet = !!(box && box.classList.contains('is-quiet'));
         try { track.setPointerCapture(e.pointerId); } catch (_) {}
-        scrub = e.pointerId;
-        track.classList.add('is-dragging');
         track.focus({ preventScroll: true });
+        scaleNamesShow();
+        if (quiet) { peek = { id: e.pointerId, y: e.clientY }; return; }
+        begin(e);
         scrubFlood(scaleAt(e.clientY), false);
       });
-      on(track, 'pointermove', e => { if (scrub === e.pointerId) scrubFlood(scaleAt(e.clientY), false); });
-      on(track, 'pointerup', e => { if (stop(e)) scrubFlood(scaleAt(e.clientY), true); });
-      on(track, 'pointercancel', e => { if (stop(e)) { saveSettings(); settleFlood(); } });
-      on(track, 'keydown', scaleKey);
+      on(track, 'pointermove', e => {
+        if (peek && peek.id === e.pointerId && Math.abs(e.clientY - peek.y) > 4) { peek = null; begin(e); }
+        if (scrub === e.pointerId) scrubFlood(scaleAt(e.clientY), false);
+      });
+      // Letting go is a hand on the scale too — a press held past the clock
+      // has had the names go from under it.
+      on(track, 'pointerup', e => {
+        if (peek && peek.id === e.pointerId) { peek = null; scaleNamesShow(); return; }
+        if (stop(e)) { scrubFlood(scaleAt(e.clientY), true); scaleNamesShow(); }
+      });
+      on(track, 'pointercancel', e => {
+        if (peek && peek.id === e.pointerId) { peek = null; scaleNamesShow(); return; }
+        if (stop(e)) { saveSettings(); settleFlood(); scaleNamesShow(); }
+      });
+      on(track, 'keydown', e => { scaleNamesShow(); scaleKey(e); });
     }
+    // Focus reaching the scale — a keyboard, a screen reader walking it — is
+    // a hand on it too, and a finger pressing a name (which takes no focus on
+    // a phone) is another.
+    const scaleBox = document.getElementById('twin-flood-scale');
+    if (scaleBox) on(scaleBox, 'focusin', scaleNamesShow);
+    const scaleNames = document.getElementById('twin-scale-labels');
+    if (scaleNames) on(scaleNames, 'pointerdown', scaleNamesShow);
 
     on(cv, 'pointerdown', e => {
       if (e.button !== 0 && e.button !== 2) return;
-      // A finger doing what the hint says: the hint has been read (syncModeUi).
-      if (e.pointerType === 'touch') {
-        const hud = document.getElementById('twin-hud');
-        if (hud) hud.classList.add('is-quiet');
-      }
       try { cv.setPointerCapture(e.pointerId); } catch (_) {}
       rig.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, b: e.button, moved: false });
       // A press on the pin being moved takes hold of it, instead of the
@@ -5669,6 +5801,8 @@ void main() {
           <button type="button" class="twin-flood-pill" id="twin-flood-pill" hidden onclick="DigitalTwin.floodPill()"></button>
           ${floodScaleHtml()}
           <p class="twin-hud" id="twin-hud">Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.</p>
+          <button type="button" class="twin-hud-q" id="twin-hud-q" aria-controls="twin-hud" aria-expanded="true"
+                  aria-label="How to move the view" title="How to move the view" onclick="DigitalTwin.toggleHud()" hidden>?</button>
           <button type="button" class="twin-photo-prompt" id="twin-photo-prompt" hidden onclick="DigitalTwin.openNearPhotos()"></button>
           <div class="mn-movepin-panel twin-movepin-panel" id="twin-movepin-panel" role="group" aria-label="Move this station's pin" hidden></div>
           <div class="twin-placeholder" id="twin-placeholder" hidden></div>
@@ -5722,6 +5856,8 @@ void main() {
     // The next build is an opening: the lines open again, and fold again.
     clearInfoTimer();
     tw.infoFor = null;
+    // …and a phone's hint and scale names have nothing left to put away.
+    clearCompactTimers();
     if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
   }
 
@@ -6161,6 +6297,15 @@ void main() {
     // The check's seam: fold after `ms` rather than ten seconds, or never
     // (null) — so a check that is not about the fold is not raced by it.
     _infoFold(ms) { infoFoldMs = ms == null ? null : Math.max(0, Number(ms)); if (infoFoldMs == null) clearInfoTimer(); },
+    // A phone's hint, from its "?"; and the same kind of seam for its clock
+    // and the scale names' (COMPACT_MS), for the check that holds them:
+    // whatever is up folds `ms` from now, or never (null).
+    toggleHud,
+    _compact(ms) {
+      compactMs = ms == null ? null : Math.max(0, Number(ms));
+      clearCompactTimers();
+      syncCompact();
+    },
 
     // Read by the check and by nothing else: what the scene is standing on.
     libLoaded() { return !!THREE; },
@@ -6199,6 +6344,16 @@ void main() {
         embedded: !!tw.hooks,
         info: { open: tw.infoOpen !== false, pinned: !!tw.infoPinned, timer: !!tw.infoTimer,
                 hidden: (() => { const el = document.getElementById('twin-info'); return el ? el.hidden : null; })() },
+        // A phone's stage: whether this is one, the clock, and what is put away.
+        compact: (() => {
+          const stage = document.getElementById('twin-stage'), hud = document.getElementById('twin-hud');
+          const q = document.getElementById('twin-hud-q'), box = document.getElementById('twin-flood-scale');
+          return { on: compactStage(), ms: compactMs, staged: !!(stage && stage.classList.contains('is-compact')),
+                   hudFolded: !!(hud && hud.classList.contains('is-folded')), q: !!(q && !q.hidden),
+                   qExpanded: q ? q.getAttribute('aria-expanded') : null,
+                   namesQuiet: !!(box && box.classList.contains('is-quiet')),
+                   hudTimer: !!tw.hudTimer, scaleTimer: !!tw.scaleTimer };
+        })(),
         origin: tw.origin ? { ...tw.origin } : null,
         tier: tw.tier ? { ...tw.tier } : null,
         sharp: sc.sharp ? { x: sc.sharp.x, z: sc.sharp.z, mpp: sc.sharp.mpp, visible: sc.sharp.mesh.visible,

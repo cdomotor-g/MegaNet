@@ -1272,8 +1272,10 @@ const HELP = {
       + 'another. ⏸ or ▶ at its head stops and starts the rise; press a name and the water is held at '
       + 'that level; press or drag on the track and the water follows the pointer, taking a level '
       + 'exactly when let go near its mark. On the track, Page Up and Page Down go level to level, Home '
-      + 'and End to 0 m and the top. The line under the stage has the same levels, and <em>Hide the '
-      + 'water</em> — each choice remembered.',
+      + 'and End to 0 m and the top. On a phone the names give way to their marks after five seconds — '
+      + 'tap the track for five more (a tap only brings them back; drag to move the water) — and the '
+      + 'hint along the foot folds to a <strong>?</strong> that brings it back. The line under the stage '
+      + 'has the same levels, and <em>Hide the water</em> — each choice remembered.',
       '<strong>No levels here? Borrow a neighbour\'s.</strong> For a station with no flood heights '
       + 'the twin can put on its ground, the flood line (and a pill on the stage) offers the four nearest stations '
       + 'that have some — their distance, their heights and their catchment. Pick one and its levels '

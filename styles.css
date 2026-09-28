@@ -12409,13 +12409,67 @@ code {
   background: color-mix(in srgb, var(--panel) 82%, transparent);
   border-radius: var(--r-sm);
   pointer-events: none;
-  transition: opacity .4s ease;
+  transition: opacity .3s ease;
 }
 
-/* Read: a finger has done what it says (digital-twin.js). Faded rather than
-   taken out, so the flood scale, which stops above it, stays where it is. */
-.twin-hud.is-quiet {
+/* ── A phone's stage, kept clear (digital-twin.js) ──────────────────────────
+   On a phone (a finger, and a screen whose short side is `xs`) the stage is
+   the map's size, and two things on it are words. The hint along its foot
+   folds to the "?" it starts with a few seconds after it has said its piece,
+   and the "?" brings it back for as long again; the scale's names stand down
+   to the marks on its track the same way, and a tap on the track brings them
+   back (digital-twin.js, "a phone's stage, kept clear"). Everywhere else
+   neither folds and the "?" is not drawn. */
+.twin-hud-q {
+  position: absolute;
+  left: var(--sp-2);
+  bottom: var(--sp-2);
+  z-index: 3;
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.twin-hud-q[hidden] { display: none; }
+.twin-hud-q:hover { background: var(--panel); }
+
+/* A finger's worth to aim at round a mark drawn small: the corner has nothing
+   else in it, and the scale's foot is further off than this reaches. */
+.twin-hud-q::after {
+  content: '';
+  position: absolute;
+  inset: -.4rem;
+  border-radius: 50%;
+}
+
+/* The hint, beside its "?" rather than under it, and over the foot of the
+   scale while it is up — the scale's foot stops above the "?" (below). */
+.twin-stage.is-compact .twin-hud {
+  display: flex;
+  align-items: center;
+  min-height: 2rem;
+  padding-left: 2.45rem;
+  z-index: 2;
+}
+
+/* Folded: gone after its fade, not merely see-through, so that nothing
+   reads it out from under the "?". */
+.twin-stage.is-compact .twin-hud.is-folded {
   opacity: 0;
+  visibility: hidden;
+  transition: opacity .3s ease, visibility 0s linear .3s;
 }
 
 /* What the stage says while there is nothing to draw: no station, no ground,
@@ -13021,6 +13075,11 @@ code {
   border-radius: var(--r-sm);
   cursor: pointer;
   pointer-events: auto;
+  /* A line tall on a touch screen too, as the coarse-pointer note below
+     says: the names are laid out a line apart (SCALE_GAP), and the app's
+     2 rem floor for a finger's button made each 32 px, every name half over
+     the next. The track is the finger's way to a level; a name is a line. */
+  min-height: 0;
 }
 .twin-scale-label:hover { background: var(--panel); border-color: var(--border); }
 .twin-scale-label.is-band { font-weight: 600; }
@@ -13036,6 +13095,56 @@ code {
      takes hold of one a finger lands near. */
   .twin-flood-scale { --scale-hit: 2.75rem; }
   .twin-scale-play { width: 2.75rem; height: 2.75rem; }
+}
+
+/* The names and the lines to them, stood down on a phone's stage a few
+   seconds after they came up (digital-twin.js): the marks on the track stay,
+   in their colours, and a tap on the track brings the rest back. Faded, and
+   out of a finger's way while they are — a tap where a name was lands on the
+   scene. They stay in the page for a keyboard or a screen reader, whose focus
+   reaching one brings them all back. */
+.twin-scale-labels,
+.twin-scale-leaders {
+  transition: opacity .3s ease;
+}
+
+.twin-flood-scale.is-quiet .twin-scale-labels,
+.twin-flood-scale.is-quiet .twin-scale-leaders {
+  opacity: 0;
+}
+
+.twin-flood-scale.is-quiet .twin-scale-label {
+  pointer-events: none;
+}
+
+/* On a phone's stage the scale's foot stops above the "?" rather than above
+   the whole hint, which lies over it for the few seconds it is up. */
+.twin-stage.is-compact .twin-flood-scale {
+  bottom: calc(2rem + 2 * var(--sp-2));
+}
+
+/* …and ⏸ is drawn smaller than a finger's 44 px, so the pill it heads is a
+   line and a bit tall rather than a thumb's width — with the whole pill, the
+   reading beside it included, and a little above and below, as what a finger
+   presses to start and stop the rise. That target is over the app's 2 rem
+   floor for a button on a touch screen, so the circle drawn inside it may be
+   under it: the floor is about where a finger lands, and it lands on the
+   pill. */
+.twin-stage.is-compact .twin-scale-head {
+  position: relative;
+}
+
+.twin-stage.is-compact .twin-scale-play {
+  width: 1.75rem;
+  height: 1.75rem;
+  min-height: 0;
+}
+
+.twin-stage.is-compact .twin-scale-play::after {
+  content: '';
+  position: absolute;
+  inset: -.3rem 0;
+  border-radius: var(--r-pill);
 }
 
 /* Standing at a photo spot in the POV: what Enter opens, over the stage above

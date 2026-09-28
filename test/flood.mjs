@@ -44,7 +44,10 @@
 //      taking hold of a level near its mark, the keys, a short stage giving
 //      the least names away; hidden and shown; remembered; a browser asking
 //      for reduced motion getting still water; the same inside the Stations
-//      map and on a phone; nothing of it in the .glb; a station whose zero is
+//      map and on a phone; a phone in the hand, whose scale names and hint
+//      stand down after five seconds and come back when asked (a tap on the
+//      track for the names, the "?" for the hint), with ⏸'s pill a line and a
+//      bit tall; nothing of it in the .glb; a station whose zero is
 //      on an assumed datum keeping its AEP water and saying why its classes
 //      are not drawn; and Gatton's own floods from HDB — 1893 over the rarest
 //      AEP level, so the water rises to it, a ring and a name each.
@@ -693,6 +696,12 @@ async function browserHalf(FS) {
     ok('on a phone the line above the stage stands down, and the scale on the stage stays, inside it, its names clear of one another',
       T && !T.hidden && T.inside && noOverlap(T) && T.labels.length >= 1 && T.stage.height >= 160,
       J(T && { inside: T.inside, labels: T.labels.map(l => [l.key, +l.top.toFixed(1), +l.bottom.toFixed(1)]), track: T.track, head: T.head, stage: T.stage }));
+    // A phone's width with a mouse is a narrow window, not a phone: nothing
+    // folds there (the phone in the hand is its own section, below).
+    const mouseStage = await page.evaluate(() => DigitalTwin.debug().compact);
+    ok('…and driven by a mouse, a phone\'s width keeps the names and the hint up, with no "?" and no clock',
+      !mouseStage.on && !mouseStage.staged && !mouseStage.q && !mouseStage.namesQuiet && !mouseStage.hudFolded
+        && !mouseStage.hudTimer && !mouseStage.scaleTimer, J(mouseStage));
     await page.click('#map-twin .twin-scale-play');
     ok('…and it still starts and stops the rise', (await fl()).animating);
     await page.click('#map-twin .twin-scale-play');
@@ -727,6 +736,139 @@ async function browserHalf(FS) {
     ok('reduced motion: the water stands still at the highest level, and the line offers to play it', !q.animating && near(q.level, 103.75, 1e-9)
       && /Play the rise/.test(await qp.evaluate(() => document.querySelector('#twin-flood .twin-flood-play').textContent)), `${q.animating} ${q.level}`);
     await quiet.close();
+
+    // A phone in the hand — a finger and a phone's screen, the twin opened
+    // from the map the way a phone opens it. The stage is the map's size and
+    // little of it, so the scale's names and the hint along the foot stand
+    // down after five seconds: the names to the marks on the track, which a
+    // tap brings them back from (and a tap is for the names, not the water),
+    // the hint to its "?", which brings it back. ⏸'s pill is a line and a bit
+    // tall, and the whole pill starts and stops the rise. The clock is the
+    // seam's while this runs — off for the opening, so what is up can be
+    // read, then short — rather than five seconds of waiting each time.
+    section('A phone in the hand');
+    const hand = await browser.newContext({ viewport: { width: 393, height: 760 }, hasTouch: true, isMobile: true });
+    const hp = await hand.newPage();
+    const handErrors = [];
+    hp.on('pageerror', e => handErrors.push(e.stack || e.message));
+    await applyNetworkPolicy(hp, server.origin);
+    await hp.route(/QldDem\/ImageServer\/exportImage/, route => {
+      const u = new URL(route.request().url());
+      const bbox = (u.searchParams.get('bbox') || '').split(',').map(Number);
+      const [W, H] = (u.searchParams.get('size') || '0,0').split(',').map(Number);
+      const extent = snapExtent(bbox, W, H, u.searchParams.get('adjustAspectRatio'));
+      const pw = (extent[2] - extent[0]) / W, ph = (extent[3] - extent[1]) / H;
+      return route.fulfill({ status: 200, contentType: 'image/tiff', headers: { 'Access-Control-Allow-Origin': '*' },
+        body: tiffF32(W, H, extent, (x, y) => groundAt(extent[3] - (y + 0.5) * ph, extent[0] + (x + 0.5) * pw)) });
+    });
+    await hp.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
+    await hp.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
+    const clock = await hp.evaluate(() => DigitalTwin.debug().compact);
+    ok('on a phone the names and the hint stand down five seconds after they come up', clock.on && clock.ms === 5000, J(clock));
+    await hp.evaluate(() => {
+      DigitalTwin._infoFold(null);
+      DigitalTwin._compact(null);
+      delete state.data.stations.find(x => x.id === 'gatton').flood_peaks;
+      switchTab('stations');
+    });
+    await hp.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
+    await hp.evaluate(() => { state.selectedId = 'gatton'; state.map.setView([-27.555, 152.275], 18, { animate: false }); });
+    await hp.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
+    await hp.tap('#map-twin-offer .map-twin-offer-open');
+    await hp.waitForFunction(() => {
+      const d = DigitalTwin.debug();
+      return MapTwin.active() && d.built && d.flood && !d.flood.none && d.flood.level != null && !d.status.endsWith('…');
+    }, null, { timeout: BUILD_TIMEOUT });
+    // What is on the stage for a finger: the hint, its "?", the scale's head,
+    // names and marks — boxes, what they look like, and what is under a point.
+    const stageNow = () => hp.evaluate(() => {
+      const r = el => { const b = el.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right, width: b.width, height: b.height }; };
+      const $ = s => document.querySelector(s);
+      const box = $('#twin-flood-scale'), hud = $('#twin-hud'), q = $('#twin-hud-q'), head = $('#twin-flood-scale .twin-scale-head');
+      const play = $('#twin-scale-play'), now = $('#twin-scale-now');
+      const labels = [...document.querySelectorAll('#twin-scale-labels .twin-scale-label')];
+      const nb = r(now), hit = document.elementFromPoint(nb.left + nb.width / 2, nb.top + nb.height / 2);
+      const d = DigitalTwin.debug();
+      return {
+        compact: d.compact, level: d.flood.level, animating: d.flood.animating,
+        stage: r($('#twin-stage')), box: r(box), head: r(head), play: r(play), q: r(q),
+        qShown: !q.hidden && getComputedStyle(q).display !== 'none', qExpanded: q.getAttribute('aria-expanded'),
+        hudShown: getComputedStyle(hud).visibility !== 'hidden', hudText: hud.textContent,
+        namesOpacity: Number(getComputedStyle($('#twin-scale-labels')).opacity),
+        leadersOpacity: Number(getComputedStyle($('#twin-scale-leaders')).opacity),
+        namesTouchable: labels.length > 0 && labels.every(b => getComputedStyle(b).pointerEvents !== 'none'),
+        labels: labels.map(b => r(b)),
+        marks: [...document.querySelectorAll('#twin-scale-marks .twin-scale-mark')].filter(m => m.getClientRects().length).length,
+        readingIsPlay: !!hit && (hit === play || play.contains(hit)),
+      };
+    });
+    let P = await stageNow();
+    ok('in the map\'s twin on a phone the stage says it is one: the "?" at its foot, and the hint beside it in a finger\'s words',
+      P.compact.on && P.compact.staged && P.qShown && P.qExpanded === 'true' && P.hudShown
+        && /pinch to zoom, two fingers to pan/.test(P.hudText) && !/wheel/.test(P.hudText)
+        && P.q.left >= P.stage.left && P.q.bottom <= P.stage.bottom, J({ compact: P.compact, q: P.q, hud: P.hudText }));
+    ok('…and the scale up beside it, every name a line tall and none on another, its foot above the "?"',
+      P.namesOpacity === 1 && P.namesTouchable && P.labels.length === 7 && P.labels.every(l => l.height <= 18)
+        && P.labels.slice().sort((a, b) => a.top - b.top).every((l, i, a) => i === 0 || l.top >= a[i - 1].bottom - 0.5)
+        && P.box.bottom <= P.q.top, J({ labels: P.labels.map(l => [+l.top.toFixed(1), +l.height.toFixed(1)]), box: P.box.bottom, q: P.q.top }));
+    ok('⏸\'s pill is a line and a bit tall — 36 px at most, where a finger\'s 44 px button made it 49 — and the whole pill, its reading too, is the button',
+      P.head.height <= 36 && P.play.height <= 30 && P.readingIsPlay, J({ head: P.head.height, play: P.play.height, readingIsPlay: P.readingIsPlay }));
+    // Where a finger lands on the reading — by its place on the screen, since
+    // the reading is under ⏸'s reach by design (a tap aimed at the element
+    // would be refused as covered).
+    const nb = await (await hp.$('#twin-scale-now')).boundingBox();
+    const before = (await stageNow()).animating;
+    await hp.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
+    const played = (await stageNow()).animating;
+    await hp.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
+    ok('…a tap on the reading pauses and plays the rise, both ways', played !== before && (await stageNow()).animating === before,
+      `${before} → ${played}`);
+    // The clock, short, and the water held so that nothing else moves it.
+    // Short enough to wait out, long enough that a check made just after a
+    // tap — the fade in (.3 s) done — is well inside it.
+    const HAND_MS = 900, HAND_FADE = 450, HAND_PAST = HAND_MS + 600;
+    await hp.evaluate(ms => { DigitalTwin.floodAt('moderate_m'); DigitalTwin._compact(ms); }, HAND_MS);
+    await hp.waitForTimeout(HAND_PAST);
+    P = await stageNow();
+    const held = P.level;
+    ok('its few seconds up, the hint goes back to its "?", which says so',
+      !P.hudShown && P.compact.hudFolded && P.qShown && P.qExpanded === 'false', J({ hud: P.hudShown, q: P.qExpanded }));
+    ok('…and the names and their lines go, the marks staying on the track in their colours, and a tap where a name was is not a name\'s',
+      P.namesOpacity === 0 && P.leadersOpacity === 0 && !P.namesTouchable && P.marks === 7 && P.compact.namesQuiet,
+      J({ names: P.namesOpacity, leaders: P.leadersOpacity, touchable: P.namesTouchable, marks: P.marks }));
+    const tb = await (await hp.$('#twin-scale-track')).boundingBox();
+    await hp.touchscreen.tap(tb.x + tb.width / 2, tb.y + tb.height * 0.2);
+    await hp.waitForTimeout(HAND_FADE);
+    P = await stageNow();
+    ok('a tap on the track brings the names back — and leaves the water where it was, the tap having been for them',
+      P.namesOpacity === 1 && P.namesTouchable && !P.compact.namesQuiet && P.level === held && !P.animating,
+      J({ names: P.namesOpacity, level: P.level, held }));
+    await hp.waitForTimeout(HAND_PAST);
+    P = await stageNow();
+    ok('…for its few seconds, after which they go again', P.namesOpacity === 0 && P.compact.namesQuiet, `${P.namesOpacity}`);
+    // A drag, with the names down: the water follows it, as ever.
+    await hp.mouse.move(tb.x + tb.width / 2, tb.y + tb.height * 0.5);
+    await hp.mouse.down();
+    await hp.mouse.move(tb.x + tb.width / 2, tb.y + tb.height * 0.3, { steps: 6 });
+    await hp.mouse.up();
+    await hp.waitForTimeout(HAND_FADE);
+    P = await stageNow();
+    ok('a drag on the track with the names down moves the water, and brings them back', P.level > held + 0.5 && P.namesOpacity === 1,
+      J({ level: P.level, held, names: P.namesOpacity }));
+    await hp.tap('#twin-hud-q');
+    await hp.waitForTimeout(HAND_FADE);
+    P = await stageNow();
+    ok('the "?" brings the hint back', P.hudShown && !P.compact.hudFolded && P.qExpanded === 'true', J({ hud: P.hudShown, q: P.qExpanded }));
+    await hp.waitForTimeout(HAND_PAST);
+    const refolded = await stageNow();
+    await hp.tap('#twin-hud-q');
+    await hp.tap('#twin-hud-q');
+    await hp.waitForTimeout(HAND_FADE);
+    P = await stageNow();
+    ok('…for its few seconds, and pressed again while it is up it goes at once',
+      !refolded.hudShown && refolded.qExpanded === 'false' && !P.hudShown && P.qExpanded === 'false', J({ refolded: refolded.hudShown, after: P.hudShown }));
+    ok('nothing threw on the phone', handErrors.length === 0, handErrors.slice(0, 3).join(' | '));
+    await hand.close();
   } finally {
     await browser.close();
     await server.close();

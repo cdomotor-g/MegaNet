@@ -353,6 +353,11 @@ reads as a place rather than a model on a table:
 | Orbit (default) | drag to orbit; wheel to zoom; right-drag, Shift-drag or two fingers to pan; pinch to zoom | arrows orbit; `+`/`−` zoom; `W A S D` pan; `R` reset; `T` top-down; `F` or `P` for the POV; inside the Stations map, a wheel out past the edge or `Esc` hands back to the map |
 | POV | drag to look; wheel to step; Point (a latch) to point | `W A S D` / arrows move at 3.2 m/s, Shift runs at 9; `Q`/`E` turn; Space held points; `Esc` back to orbit |
 
+The hint along the stage's foot says the same in a finger's words on a touch
+screen — drag, pinch, two fingers, tap, and *← Map* rather than a wheel or
+`Esc` — and on a phone folds to a **?** after five seconds (see *On a phone*
+under the scale, below).
+
 The POV eye is 1.70 m above whatever is under it — the ground, a rung, the
 grating — and the orbit camera is never let under the hill between it and
 the station. At a tower, walking into the foot of the ladder while facing it
@@ -784,6 +789,26 @@ other floods.
 Anything but ▶ holds the water still. The scale steps aside while a pin is
 being moved (its panel has that corner then), and its foot clears the hint
 along the stage's foot, however many lines that makes.
+
+**On a phone** — a finger, on a screen whose short side is a phone's, either
+way up — the stage is the map's size and little of it, so two things on it
+stand down after five seconds and come back for five more when asked:
+
+- **The names** and the lines to them, leaving the marks on the track in their
+  colours. A tap on the track brings them back and leaves the water where it
+  was (the tap was for the names); a drag moves the water as it always does.
+  Focus reaching a name brings them back too, for a keyboard or a screen
+  reader. The names are a line tall there as everywhere — the app's 2 rem
+  floor for a finger's button had made each 32 px, half over the next.
+- **The hint** along the stage's foot folds to the **?** it starts with, and
+  the **?** brings it back (pressed while it is up, it puts it away). The
+  scale's foot stops above the **?**, so the hint lies over the foot of the
+  scale for its five seconds rather than the scale being laid out again.
+
+⏸'s circle is drawn smaller there too, so its pill is a line and a bit tall
+rather than a thumb's width; the whole pill, the reading beside ⏸ included, is
+what a finger presses to start and stop the rise. A phone's width driven by a
+mouse is a narrow window, not a phone, and keeps everything up.
 
 **Turning it off.** Three places, each remembered in the browser (`mn-twin`):
 

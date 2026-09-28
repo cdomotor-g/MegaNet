@@ -952,7 +952,10 @@ sliders a 1.75 rem thumb. Header buttons are 2.4 rem square from `md` down,
 side panel rail is 36 px buttons too — over the app-wide floor below, under
 EPIC #107's 44, and on purpose: it stands beside a map that is the whole
 screen, and a narrower rail whose column fits the screen's height was asked
-for over the larger target.
+for over the larger target. The Digital Twin's ⏸ on a phone is the other way
+round: its circle is drawn at 28 px, under the floor, and what a finger
+presses is the whole pill it heads, which is over it — the floor is about
+where a finger lands, not what is drawn there.
 
 **Two floors, and which one applies.** The app-wide floor is **2 rem / 32 px** —
 comfortably past WCAG 2.5.8 (AA, 24 px), and raising every button in nineteen
