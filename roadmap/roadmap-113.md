@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-28** (revision 104 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-28** (revision 105 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -501,6 +501,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Four AI rows, and six `[Human]` issues.
 >
+> **Revision 105 opens and closes nothing** — the Bureau's Service Level Specification for New South Wales and the ACT (version 3.16) is read into the station card and the agent API beside Queensland's, from a session request, with `0038` giving the SLS tables one document per state. The allocation below is unchanged. One step for a person came out of it — **`0038` to the live project, after `0036` and `0037`, then `select meganet.load_sls_from_github();`** — listed at the foot of the revision entry and unfiled pending the owner; the live project is at schema version 35.
+>
 > **Revision 104 opens #204, #205 and #206, and closes nothing** — three agent follow-ups out of fourteen asks in one session request (the Digital Twin's pin, stations and bridges; tides and soils on the station card; zips, Google Drive and equipment from photos; a read-only API and MCP server for agents). `[Opus5/High]` #204 (assessment report drafts — *blocked on the example reports*), `[Opus5/Med]` #206 (an agent proposing equipment — *blocked on the owner's choice of credential*) and `[Sonnet5/Med]` #205 (site exposure beyond Queensland). The Opus5 Med row is no longer empty. Nine steps for a person came out of it as well — `0036` to the live project, a first administrator, Cloudflare Access's bypass for the API, linking Drive (and Dropbox, still from revision 100) — listed at the foot of the revision entry and unfiled pending the owner. **#171 leaves the Human row**, eleven revisions late: it closed at revision 71.
 >
 > **Revision 103 opens and closes nothing** — it is revision 100's first unfiled step done: `0035` and the `field-photos` bucket are on the live project, applied from an agent session over the Supabase connection at the owner's request and verified there (see the entry at the bottom of the file). The allocation below is unchanged. Of the two person-steps revision 100 left, **one remains — linking a Dropbox folder** — still unfiled.
@@ -649,6 +651,51 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 105 — 2026-09-28: the station card quotes the NSW SLS as well as Queensland's
+
+From a session request ("here is the NSW SLS, … handle it the same as how we
+did with the QLD SLS"), in one commit. It opens and closes nothing.
+
+**The document.** `archive/NSW_SLS_Current.pdf` is the Bureau's Service Level
+Specification for New South Wales and the ACT, version 3.16, December 2025 —
+byte for byte its copy at <https://www.bom.gov.au/nsw/NSW_SLS_Current.pdf>,
+which the heading of a card's NSW section links to. `tools/ingest/sls.py`
+reads both documents now, through one reader with a settings entry each: the
+NSW one opens its schedules with bold headings rather than footers, numbers
+them 2, 3a, 4, 6, 7 and 8, adds an AWRC number and the gauge's datum, stacks a
+second target and a second owner inside one cell, lists its Bureau sites once
+per data type, and has six rows with no bureau number. Queensland's output did
+not move: all 3,392 rows and 2,766 locations are the committed ones, and 3.1
+still reads as it did.
+
+**What came out.** 1,433 NSW rows, 1,375 locations, **615 of them MegaNet
+stations** (the North Coast and the border rivers; the document covers the
+whole state). 3,253 of the 4,873 stations are now in one document or the
+other, and **47 are in both** — all on the Queensland border, and the two do
+not agree about them (GOONDIWINDI's major level: 9.2 m in Queensland's, 8.5 m
+in the NSW one). So nothing merges across documents: the card shows a section
+from each, under its own heading and link, and the API an entry from each.
+
+**`0038`.** `sls_doc` gets a row per jurisdiction, `sls_row` the jurisdiction
+in its key and each row's role (Bureau-owned is Schedule 7 in one document and
+6 in the other), `sls_location` one row per (jurisdiction, bureau number), and
+five NSW columns: the AWRC number, the gauge datum, the classes the NSW SES has
+not defined yet, and the page's `^` and `*`. `load_sls_doc()` replaces only its
+own jurisdiction's rows; `load_sls_from_github()` loads both. Applied from
+zero and on top of the live project's current shape on a local Postgres 16,
+re-applied, and `check_sls_merge.py` holds the view to the app's file: 4,141
+locations × 28 fields, one md5. The agent API answers from either shape, so
+the Worker deploying before `0038` is applied changes nothing for it.
+
+**Not filed, pending the owner:**
+- **`0038` to the live project**, after `0036` and `0037` (it is at 35), and
+  then `select meganet.load_sls_from_github();`. Until then the app's Data
+  source panel reads *schema mismatch* (it expects 38) and the agent API quotes
+  Queensland's document only; the station card does not wait for either — it
+  reads `data/sls-locations.json`. It can go the way `0035` did at revision
+  103, from an agent session over the Supabase connection at the owner's
+  request.
 
 ### Revision 104 — 2026-09-28: the pin moves where the ground can be seen, the card learns the tide and the soil, photos come as zips and from Drive, and agents can read the network
 

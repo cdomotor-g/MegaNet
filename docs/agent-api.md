@@ -319,7 +319,7 @@ curl -s 'https://floodwarning.net/api/v1/stations?near=-18.51,146.0&radius_km=10
       "radio_network_ids": [], "awrc_number": "116914", "enabled": true,
       "telemetry": { "alert_ids": { "rainfall": 6039 }, "sensor_types": ["Rainfall", "Rainfall Increment", "Water Level", "Battery"],
                      "satcom": false, "last_seen_at": null, "last_reading_at": null },
-      "sls": { "gauge_type": "Automatic", "data_type": "Rainfall/River", "priority": "High", "owner": "Hinchinbrook Shire Council" },
+      "sls": { "gauge_type": "Automatic", "data_type": "Rainfall/River", "priority": "High", "owner": "Hinchinbrook Shire Council", "jurisdiction": "QLD" },
       "has": { "flood_classes": true, "aep_levels": true, "crossings": true, "gauge_survey": true, "flood_effects": true, "sls": true },
       "distance_km": 0.49, "bearing_deg": 173, "direction": "S"
     },
@@ -377,7 +377,7 @@ never silently missing, and "not recorded" never means zero.
 | `location` | lat/lon, height in m AHD **and where it came from** (surveyed, or modelled from a DEM via Elvis), LGA, basin, stream, catchment (with drainage division), maintenance hub |
 | `networks_and_radio` | radio networks, Radio Mobile system, ALERT/ALERT2 addresses, satcom, repeater record, frequencies, the repeaters whose pass ranges cover its addresses, saved modelled link margins |
 | `telemetry` | sensors, health (when MegaNet last heard from it), a per-channel summary of the last 30 days of daily rollups |
-| `service_level` | the SLS entry: gauge type, data type, priority, owner, schedules, flood classes, prediction, and the edition |
+| `service_level` | the SLS entries — one per document that lists the station (Queensland's; New South Wales and the ACT's): gauge type, data type, priority, owner, schedules, flood classes, prediction, and each document's edition |
 | `bureau_listings` | which of the Bureau's Queensland station indexes list it (FloodWarn rainfall, daily rainfall, river height) |
 | `flood_levels` | as [`/flood-levels`](#get-apiv1stationsidflood-levels) |
 | `inspections` | how many visits, first and last, and the numbers the last three recorded (battery and solar volts, SWR, RSSI, fade margins, gas) |
@@ -392,7 +392,7 @@ curl -s https://floodwarning.net/api/v1/stations/abergowrie_br_al/dossier | jq '
 [
   "Abergowrie Bridge AL (Bureau number 532028) is a rain and river station in the Herbert catchment, Hinchinbrook Shire, maintained from the Cairns Hub.",
   "Ground height 34.5 m AHD (surveyed).",
-  "Service Level Specification: gauge type Automatic, data type Rainfall/River, priority High, owner Hinchinbrook Shire Council.",
+  "Service Level Specification (QLD v3.7): gauge type Automatic, data type Rainfall/River, priority High, owner Hinchinbrook Shire Council.",
   "Flood classes (2026-09-25): minor 6 m, moderate 10 m, major 14 m on the gauge.",
   "Modelled 1% AEP level 38.45 m AHD (indicative, confidence 2 of 9)."
 ]
@@ -466,26 +466,54 @@ That note is the kind of thing to carry into a report rather than smooth over.
 
 ### `GET /api/v1/stations/{id}/service-level`
 
-The station's entry in the Queensland **Service Level Specification** (the six
-station schedules merged per Bureau number), with the edition it was read from.
+The station's entries in the Bureau's **Service Level Specifications** — one
+per state the network reaches: Queensland's (`QLD`, version 3.7) and the one
+for New South Wales and the Australian Capital Territory (`NSW`, version 3.16).
+Each document's six station schedules are merged per Bureau number, and each
+entry is one document's: a station on the border (47 of them) has an entry
+from each, and they can disagree — GOONDIWINDI's major level is 9.2 m in
+Queensland's and 8.5 m in the NSW one. Quote the one for the state whose
+service a report is about, and say which. `editions` lists every document the
+database holds; `edition` is the first entry's.
 
 ```json
 {
-  "id": "abergowrie_br_al",
+  "id": "goondiwindi_tm",
   "service_level": {
     "status": "ok",
-    "edition": { "title": "Service Level Specification for Flood Forecasting and Warning Services for Queensland – Version 3.7", "version": "3.7",
-                 "current_edition_url": "https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf" },
+    "editions": [
+      { "jurisdiction": "QLD", "place": "Queensland", "version": "3.7", "published": "December 2025",
+        "title": "Service Level Specification for Flood Forecasting and Warning Services for Queensland – Version 3.7",
+        "current_edition_url": "https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf" },
+      { "jurisdiction": "NSW", "place": "New South Wales and the Australian Capital Territory", "version": "3.16", "published": "December 2025",
+        "title": "Service Level Specification for Flood Forecasting and Warning Services for New South Wales and the Australian Capital Territory – Version 3.16",
+        "current_edition_url": "https://www.bom.gov.au/nsw/NSW_SLS_Current.pdf" }
+    ],
     "entries": [{
-      "bureau_number": "532028", "name": "ABERGOWRIE BRIDGE", "owner": "Hinchinbrook Shire Council",
-      "gauge_type": "Automatic", "data_type": "Rainfall/River", "priority": "High", "schedules": [2, 8],
-      "roles": ["forecast location (Schedule 2)", "Bureau assists (Schedule 8)"],
-      "flood_classes_m_on_gauge": { "minor": 6, "moderate": 10, "major": 14 },
-      "prediction": { "type": "Qualitative", "lead_time": "6 hours", "lead_time_hours": 6, "trigger_height": "Moderate", "peak_accuracy": "N/A" }
+      "jurisdiction": "QLD", "edition": "3.7", "bureau_number": "041500", "name": "GOONDIWINDI", "owner": "DLGWV",
+      "gauge_type": "Automatic", "priority": "High", "schedules": [2], "roles": ["forecast location (Schedule 2)"],
+      "flood_classes_m_on_gauge": { "minor": 4, "moderate": 7.5, "major": 9.2 },
+      "prediction": { "type": "Quantitative", "lead_time": "15 hrs", "lead_time_hours": 15, "trigger_height": "> 7.0", "peak_accuracy": "+/- 0.3m" }
+    }, {
+      "jurisdiction": "NSW", "edition": "3.16", "bureau_number": "041500", "name": "Goondiwindi", "owner": "DNRM",
+      "gauge_type": "Automatic", "priority": "High", "schedules": [2], "roles": ["forecast location (Schedule 2)"],
+      "awrc_number": "416201A", "gauge_datum": "Local",
+      "flood_classes_m_on_gauge": { "minor": 4, "moderate": 6, "major": 8.5 },
+      "prediction": { "type": "Quantitative", "lead_time": "15 hrs", "lead_time_hours": 15, "trigger_height": "> 6.0", "peak_accuracy": "+/- 0.3m" }
     }]
   }
 }
 ```
+
+Roles are labelled in each document's own numbering: the NSW document's
+information locations are its Schedule 3a and its Bureau-owned sites its
+Schedule 6 (Queensland's are 3 and 7). Only the NSW document gives
+`awrc_number` and `gauge_datum` — where the datum is `AHD`, its flood classes
+and trigger heights are metres AHD as well as on the gauge — and it can say a
+class has not been defined yet (`flood_classes_not_yet_defined`, printed
+`n/a`: "not yet defined by the NSW SES"), that a location is a small catchment
+with a faster response (`fast_response`, its `^`), or that a service is
+interim with no determined lead time (`prediction.interim_service`, its `*`).
 
 ### `GET /api/v1/catchments`
 
@@ -570,9 +598,12 @@ quote it:
   NSW AEP level workbooks, at the sheet's own point (sometimes not where MegaNet
   puts the station — `point_offset_km` says how far), with the sheet's
   confidence score (1–9, higher is better). Not observations.
-- **Two sets of flood classes.** The Bureau's river height station lists and the
-  Service Level Specification each give classes; they can differ. Both are
-  given, each with its edition (`as_at` for the lists; the SLS's version).
+- **Two sets of flood classes — three on the border.** The Bureau's river
+  height station lists and the Service Level Specifications each give classes;
+  they can differ. All are given, each with its edition (`as_at` for the lists;
+  each SLS row names its document, `QLD` or `NSW`, and `service_level.editions`
+  its version). A station both SLSs list has a row from each, and they can
+  disagree with each other too.
 - **Manual vs telemetered.** The SLS's `gauge_type` is its own word: *Manual*
   (read by an observer) or *Automatic* (telemetered). A station's ALERT
   addresses, ARRO sensors and satcom flag are the register's telemetry evidence.

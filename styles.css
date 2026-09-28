@@ -2931,7 +2931,14 @@ hr {
    different kind of card. */
 .stn-card-sls { border-top: 1px solid var(--border); padding-top: .5rem; }
 .stn-card-sls > .small { display: block; margin-bottom: .25rem; }
+/* A station on the border has a section from each state's document, one under
+   the other, each under its own heading. */
+.stn-card-sls + .stn-card-sls { margin-top: .5rem; }
 .mn-sls-note { margin: .35rem 0 0; }
+/* What the NSW document marks a location or a service with (^, *), said in
+   words; what the mark means is in the title, so it is underlined the way an
+   abbreviation is, to say there is more to read. */
+.mn-sls-mark { text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
 /* One line per forecast target (sls.js serviceLines): a station the schedule
    gives two targets reads as two, with air between them, even once each has
    wrapped in a narrow card. */

@@ -575,14 +575,17 @@ const HELP = {
       + 'tide areas, and the acid sulfate soil mapping under it, with a plain reading of what that '
       + 'means for what is built there — indicative, and a station outside Queensland is told the '
       + 'maps do not reach it (what each row means is in the link below).',
-      'A station the Bureau\'s <strong>Service Level Specification</strong> for Queensland (the '
-      + 'SLS) lists has a <strong>Flood warning service</strong> section as well: its flood '
-      + 'class levels as the SLS gives them, whether somebody forecasts for it and how far ahead, '
-      + 'its priority, who owns it and the Bureau\'s part in the site, and a <em>Manual — read '
-      + 'by hand</em> pill on a gauge a person reads, which reports nothing over the radio. The '
-      + 'section\'s heading opens the Bureau\'s own copy of the document, a PDF, in a new tab; it '
-      + 'is always the Bureau\'s current edition, and the heading names the edition the card\'s '
-      + 'figures are from.',
+      'A station the Bureau\'s <strong>Service Level Specification</strong> (the SLS) for '
+      + 'Queensland, or for New South Wales and the ACT, lists has a <strong>Flood warning '
+      + 'service</strong> section as well: its flood class levels as the SLS gives them, whether '
+      + 'somebody forecasts for it and how far ahead, its priority, who owns it and the Bureau\'s '
+      + 'part in the site, and a <em>Manual — read by hand</em> pill on a gauge a person reads, '
+      + 'which reports nothing over the radio. The NSW document also gives the gauge\'s datum — '
+      + 'where it is AHD the levels are metres AHD — its AWRC number, and which classes the SES '
+      + 'has not defined yet. The section\'s heading names the state and opens the Bureau\'s own '
+      + 'copy of that document, a PDF, in a new tab; it is always the Bureau\'s current edition, '
+      + 'and the heading names the edition the card\'s figures are from. A station on the border '
+      + 'that both documents list has a section from each, since they do not always agree.',
       'Repeaters and base stations carry <strong>Frequencies</strong>: the repeater\'s own RX/TX '
       + 'pair is the primary — the one the path, fade and ACMA tools use — and <strong>+ Add '
       + 'frequency</strong> in the details card adds a row for every other channel, with its use '
@@ -2005,7 +2008,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 37;
+const DB_SCHEMA_VERSION = 38;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

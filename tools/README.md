@@ -54,17 +54,21 @@ assignment still uses.
 
 ## The Service Level Specification (#180)
 
-`ingest/sls.py` reads six of the ten schedules out of
-`archive/QLD_SLS_current.pdf` — the Bureau's Queensland flood-warning SLS,
-version 3.7 (December 2025), the file the Bureau publishes at
-<https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf> — into
-`data/sls-qld.json` and `data/sls-locations.json`. Version 3.1 (September
-2018), which it read before, is `archive/QLD_SLS_v3.1_2018-09.pdf`, and still
-reads through `--pdf` for a comparison.
+`ingest/sls.py` reads the six station schedules out of each of the Bureau's
+flood-warning SLSs the network reaches — `archive/QLD_SLS_current.pdf`,
+Queensland's, version 3.7 (December 2025), as the Bureau publishes it at
+<https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf>, and
+`archive/NSW_SLS_Current.pdf`, the one for New South Wales and the ACT, version
+3.16 (December 2025), as it publishes it at
+<https://www.bom.gov.au/nsw/NSW_SLS_Current.pdf> — into `data/sls-qld.json`,
+`data/sls-nsw.json` and, both merged, `data/sls-locations.json`. Queensland's
+version 3.1 (September 2018), which it read before, is
+`archive/QLD_SLS_v3.1_2018-09.pdf`, and still reads through `--pdf` for a
+comparison; which state a document is for is read off its own title.
 
 ```bash
 pip install pdfplumber                     # the only dependency in this directory
-python3 tools/ingest/sls.py                # rewrite both files
+python3 tools/ingest/sls.py                # rewrite the three files
 python3 tools/ingest/sls.py --report       # what came out, in prose
 python3 tools/ingest/sls.py --check        # fail on drift (CI does this)
 python3 tools/ingest/sls.py --pdf archive/QLD_SLS_v3.1_2018-09.pdf \
@@ -74,10 +78,22 @@ python3 tools/check_sls_merge.py           # meganet.sls_location against the fi
 
 `check_sls_merge.py` is the other half: the merge rule is in `sls.py` for the
 file the app reads and in the view `meganet.sls_location` for the database, and
-it loads `data/sls-qld.json` into the database the PG* variables name — in a
+it loads both documents' rows into the database the PG* variables name — in a
 transaction it rolls back, so it is safe against the live one — and compares
-the view with `data/sls-locations.json` location by location. Standard library
-and `psql`.
+the view with `data/sls-locations.json` location by location, a location being
+one document's entry for one bureau number. Standard library and `psql`.
+
+The two documents number the same six schedules differently (Bureau-owned is 7
+in Queensland's, 6 in the NSW one; information locations are the NSW
+document's 3a), so each is filed under its number **and its role**, and each
+is merged on its own: the 47 stations both list are two locations, because the
+documents disagree about them (GOONDIWINDI's major level is 9.2 m in one and
+8.5 m in the other) and neither is the other's to overrule. The NSW document
+is found by its bold schedule headings rather than Queensland's footers, adds
+an AWRC number and the gauge's datum, stacks a second target (and a second
+owner) inside one cell rather than on a second ruled line, lists its Bureau
+sites once per data type, and prints six rows with no bureau number; how each
+is read is in the tool's own header.
 
 The tables are ruled, so the cell grid recovers exactly — but the grid is not
 the same from one page to the next. 3.7's Schedule 2 comes out 17, 18 or 20

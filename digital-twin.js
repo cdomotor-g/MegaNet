@@ -1712,13 +1712,14 @@ void main() {
   //     careful never to do; the notes say what is known and what is not.
   //
   // Manual is what the Bureau's Service Level Specification says (its gauge
-  // type, by bureau number — SLS.forStation, the card's own lookup), or, for a
+  // type, by bureau number — SLS.forStation, the card's own lookup, which for a
+  // station both states' documents list is the one the card quotes first), or, for a
   // station the SLS does not carry, being in the Bureau's list of daily-read
   // gauges (Section 2 of its river height station lists) with nothing in the
   // record saying a radio reads it. Telemetered is a name ending AL, ALERT or
   // TM, ALERT addresses, satcom, or the SLS saying Automatic. What it measures
   // is the sensors, the ALERT addresses, the Bureau's location types and the
-  // SLS's data type, together. The SLS file is fetched once (710 KB, the
+  // SLS's data type, together. The SLS file is fetched once (1.2 MB, the
   // card's) before the station is built, and a build that cannot have it
   // decides without it and says so.
   //

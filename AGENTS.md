@@ -52,8 +52,10 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   - flood classes, crossings and flood effects are **metres on the gauge**, not
     AHD; they convert to AHD only via a gauge zero surveyed in AHD;
   - AEP levels are **modelled m AHD, indicative**, with a 1–9 confidence score;
-  - the Bureau's station lists and the Service Level Specification give separate
-    flood classes, each with its own edition;
+  - the Bureau's station lists and the Service Level Specifications give
+    separate flood classes, each with its own edition; there are two SLSs,
+    Queensland's and the one for New South Wales and the ACT, and a station on
+    the border has an entry from each that can disagree — say which you quote;
   - `elevation_source` says whether a height is surveyed or modelled (Elvis DEM);
   - health and readings are only what reached MegaNet's own ingest — most
     stations report through the Bureau's systems, so "not recorded" there says

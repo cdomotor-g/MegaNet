@@ -403,8 +403,13 @@ const rmSystemsOf = rc => vocabRead(rc, 'rm_system',
 const crossingTypesOf = rc => vocabRead(rc, 'crossing_type', 'code,label,meaning');
 const datumsOf = rc => vocabRead(rc, 'gauge_datum', 'code,label');
 const bureauIndexOf = rc => vocabRead(rc, 'bureau_index', 'code,label,title');
-const slsDocOf = rc => memo('vocab:sls_doc', VOCAB_MS, async () =>
-  (await rc.up.select('sls_doc', [['select', 'title,version,source,loaded_at']], { ttl: LIMITS.vocabularySeconds })).rows[0] || null);
+// Every Service Level Specification the database holds, one row per state.
+// `*`, and a row with no jurisdiction read as Queensland's, so this answers the
+// same before 0038 has reached the database (one document, no such column) as
+// after it — the Worker deploys on push, the migration when someone applies it.
+const slsDocsOf = rc => memo('vocab:sls_doc', VOCAB_MS, async () =>
+  bySlsDoc((await rc.up.select('sls_doc', [['select', '*']], { ttl: LIMITS.vocabularySeconds })).rows
+    .map(r => ({ ...r, jurisdiction: r.jurisdiction || 'QLD' }))));
 
 const byKey = (rows, key = 'id') => new Map((rows || []).map(r => [r[key], r]));
 
@@ -458,6 +463,43 @@ const COMPACT_SELECT = [
 
 const elevationBasis = (ahd, source) => (ahd == null ? null : (source ? `modelled — ${source}` : 'surveyed'));
 
+// ── The Service Level Specifications ─────────────────────────────────────────
+// One per state the network reaches — Queensland's, and the one for New South
+// Wales and the ACT (0038) — and each is its own document: a station on the
+// border has an entry in each, they can disagree (GOONDIWINDI's major level is
+// 9.2 m in one and 8.5 m in the other), and they are given side by side, never
+// merged. What each numbers its schedules is here for a database that has not
+// said (sls_doc.schedules arrives with 0038).
+const SLS_DOCS = {
+  QLD: { place: 'Queensland', url: 'https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf',
+         schedules: { forecast_location: '2', information_location: '3', river_data_location: '4',
+                      bureau_owned: '7', bureau_assists: '8', bureau_colocated: '9' } },
+  NSW: { place: 'New South Wales and the Australian Capital Territory', url: 'https://www.bom.gov.au/nsw/NSW_SLS_Current.pdf',
+         schedules: { forecast_location: '2', information_location: '3a', river_data_location: '4',
+                      bureau_owned: '6', bureau_assists: '7', bureau_colocated: '8' } },
+};
+const SLS_DOC_ORDER = ['QLD', 'NSW'];
+const slsDocRank = j => { const i = SLS_DOC_ORDER.indexOf(j || 'QLD'); return i < 0 ? SLS_DOC_ORDER.length : i; };
+const bySlsDoc = rows => [...rows].sort((a, b) => slsDocRank(a.jurisdiction) - slsDocRank(b.jurisdiction));
+
+const SLS_ROLES = [
+  ['forecast_location', 'forecast location'],
+  ['information_location', 'information location'],
+  ['river_data_location', 'river data location'],
+  ['bureau_owned', 'Bureau-owned'],
+  ['bureau_assists', 'Bureau assists'],
+  ['bureau_colocated', 'Bureau co-located'],
+];
+
+// The entry to quote first where a station has two — the more specific
+// statement of service, then Queensland's — the rule sls.js puts first on the
+// card, so a compact row and the card agree about which one they mean.
+function slsRank(r) {
+  const i = SLS_ROLES.findIndex(([k]) => r[k]);
+  return (i < 0 ? SLS_ROLES.length : i) * 10 + slsDocRank(r.jurisdiction);
+}
+const bySlsRank = rows => [...(rows || [])].sort((a, b) => slsRank(a) - slsRank(b));
+
 function compactRow(r, { sls, health, catchments, from } = {}) {
   const sensors = Array.isArray(r.sensor) ? r.sensor : [];
   const out = {
@@ -487,6 +529,7 @@ function compactRow(r, { sls, health, catchments, from } = {}) {
     },
     sls: sls ? stripNulls({
       gauge_type: sls.gauge_type, data_type: sls.data_type, priority: sls.priority, owner: sls.owner,
+      jurisdiction: sls.jurisdiction || 'QLD',
     }) : null,
     has: {
       flood_classes: nonEmpty(r.station_flood_class),
@@ -750,8 +793,9 @@ async function decorate(rc, rows, from, notes) {
   if (!rows.length) return [];
   const ids = rows.map(r => r.id);
   const [sls, health, cats] = await Promise.all([
-    settle(rc.up.select('sls_location', [['select', 'station_id,gauge_type,data_type,priority,owner'],
-      ['station_id', `in.${pgList(ids)}`]])),
+    // `*` rather than a list, for slsDocsOf's reason: the columns that say
+    // whose entry it is arrive with 0038.
+    settle(rc.up.select('sls_location', [['select', '*'], ['station_id', `in.${pgList(ids)}`]])),
     settle(rc.up.select('station_health', [['select', 'station_id,online,last_seen_at,last_reading_at'],
       ['station_id', `in.${pgList(ids)}`], ['order', 'last_seen_at.desc.nullslast']])),
     settle(catchmentsOf(rc)),
@@ -759,7 +803,7 @@ async function decorate(rc, rows, from, notes) {
   if (!sls.ok) notes.push('The SLS could not be read just now; "sls" is null on every row.');
   if (!health.ok) notes.push('Station health could not be read just now; last_seen_at is null on every row.');
   const slsBy = new Map(), healthBy = new Map();
-  if (sls.ok) for (const r of sls.value.rows) if (!slsBy.has(r.station_id)) slsBy.set(r.station_id, r);
+  if (sls.ok) for (const r of bySlsRank(sls.value.rows)) if (!slsBy.has(r.station_id)) slsBy.set(r.station_id, r);
   if (health.ok) for (const r of health.value.rows) if (!healthBy.has(r.station_id)) healthBy.set(r.station_id, r);
   const catMap = cats.ok ? byKey(cats.value) : null;
   return rows.map(r => compactRow(r, { sls: slsBy.get(r.id), health: healthBy.get(r.id), catchments: catMap, from }));
@@ -901,9 +945,10 @@ function echoToParams(echo, raw) {
 
 // ── GET /api/v1/stations/{id} ────────────────────────────────────────────────
 
+// A station's entries, the one to quote first first.
 async function slsRowsFor(rc, id) {
-  return (await rc.up.select('sls_location', [['select', '*'], ['station_id', `eq.${id}`],
-    ['order', 'bureau_number.asc']])).rows;
+  return bySlsRank((await rc.up.select('sls_location', [['select', '*'], ['station_id', `eq.${id}`],
+    ['order', 'bureau_number.asc']])).rows);
 }
 
 async function healthRowsFor(rc, id) {
@@ -925,7 +970,7 @@ async function stationDetail(rc, rawId) {
     links: stationLinks(rc, st.id),
     sources: [
       { relation: 'meganet.station_json', what: 'the station register record (the stations.json fragment)', updated_at: st.updated_at },
-      { relation: 'meganet.sls_location', what: 'the Queensland Service Level Specification, merged per Bureau number' },
+      { relation: 'meganet.sls_location', what: 'the Bureau\'s Service Level Specifications — Queensland\'s, and the one for New South Wales and the ACT — each merged per Bureau number' },
       { relation: 'meganet.station_health', what: 'when MegaNet last heard from the station itself' },
     ],
     generated_at: new Date().toISOString(),
@@ -954,7 +999,8 @@ const FLOOD_CAVEATS = [
   'Flood classes, crossing heights and flood effects are metres on the station\'s gauge (above its zero), not AHD.',
   'An AHD equivalent is given only where the gauge zero in force was surveyed in AHD (zero + height). A zero on an assumed, State or unknown datum cannot be put on the ground.',
   'AEP levels are modelled water levels in metres AHD from the QLD/NSW AEP level workbooks, at the sheet\'s own point — indicative, not observed. confidence runs 1–9 (data_quality × level_difference); higher is better.',
-  'The SLS\'s flood classes are the Service Level Specification\'s own figures; they can differ from the Bureau\'s station lists. Both are given, each with its edition.',
+  'The SLS\'s flood classes are the Service Level Specifications\' own figures — Queensland\'s, and the one for New South Wales and the ACT, each row naming its document. They can differ from the Bureau\'s station lists and from each other; all are given, each with its edition.',
+  'Where the NSW document says a gauge reads AHD (gauge_datum), its SLS classes are metres AHD as well as metres on the gauge; where it says Local, they are metres on the gauge only. not_yet_defined lists classes the NSW SES has not set.',
   'Levels from different sources can disagree; say which one a report quotes.',
 ];
 
@@ -1019,14 +1065,17 @@ function buildFloodLevels(doc, slsRows, v) {
     source: 'The Bureau\'s Queensland river height station lists, Section 4 (meganet.station_flood_class)',
   } : { status: 'not recorded', detail: 'The Bureau\'s river height station lists give no flood classes for this station.' };
 
-  const slsWith = (slsRows || []).filter(r => r.class_minor != null || r.class_moderate != null || r.class_major != null);
+  const slsWith = bySlsRank(slsRows).filter(r => r.class_minor != null || r.class_moderate != null
+    || r.class_major != null || nonEmpty(r.classes_undefined));
   const sls_flood_classes = slsWith.length ? {
     status: 'ok',
     unit: 'm on the gauge',
-    rows: slsWith.map(r => stripNulls({ bureau_number: r.bureau_number, minor_m: num(r.class_minor),
-      moderate_m: num(r.class_moderate), major_m: num(r.class_major) })),
-    source: 'Queensland Service Level Specification (meganet.sls_location); edition in service_level.edition',
-  } : { status: 'not recorded', detail: 'The SLS gives no flood classes for this station.' };
+    rows: slsWith.map(r => stripNulls({ jurisdiction: r.jurisdiction || 'QLD', bureau_number: r.bureau_number,
+      minor_m: num(r.class_minor), moderate_m: num(r.class_moderate), major_m: num(r.class_major),
+      not_yet_defined: nonEmpty(r.classes_undefined) ? r.classes_undefined : null,
+      gauge_datum: r.gauge_datum })),
+    source: 'The Service Level Specifications (meganet.sls_location); each row\'s document is its jurisdiction, and its edition is in service_level.editions',
+  } : { status: 'not recorded', detail: 'No Service Level Specification gives flood classes for this station.' };
 
   const crossingRows = newestFirst(doc.crossings || [], 'as_at');
   const crossings = crossingRows.length ? {
@@ -1138,65 +1187,100 @@ async function floodLevelsEndpoint(rc, rawId) {
   };
 }
 
-// ── Service level (the Queensland SLS) ───────────────────────────────────────
+// ── Service level (the Service Level Specifications) ─────────────────────────
 
-const SLS_ROLES = [
-  ['forecast_location', 'forecast location (Schedule 2)'],
-  ['information_location', 'information location (Schedule 3)'],
-  ['river_data_location', 'river data location (Schedule 4)'],
-  ['bureau_owned', 'Bureau-owned (Schedule 7)'],
-  ['bureau_assists', 'Bureau assists (Schedule 8)'],
-  ['bureau_colocated', 'Bureau co-located (Schedule 9)'],
-];
+// One document's edition, as the answer quotes it.
+function slsEdition(d) {
+  const j = d.jurisdiction || 'QLD';
+  const known = SLS_DOCS[j] || {};
+  return stripNulls({ jurisdiction: j, place: d.place || known.place || null, title: d.title,
+    version: d.version, published: d.published, source: d.source, loaded_at: d.loaded_at,
+    current_edition_url: d.url || known.url || null });
+}
 
-function buildServiceLevel(doc, slsRows, slsDoc) {
-  const edition = slsDoc ? stripNulls({ title: slsDoc.title, version: slsDoc.version, source: slsDoc.source,
-    loaded_at: slsDoc.loaded_at, current_edition_url: 'https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf' }) : null;
-  if (!slsRows.length) {
+// "forecast location (Schedule 2)", in the entry's own document's numbering:
+// the NSW document's information locations are its Schedule 3a, its Bureau-
+// owned sites Schedule 6.
+function slsRoleLabels(r, d) {
+  const said = (d && d.schedules && typeof d.schedules === 'object') ? Object.values(d.schedules) : [];
+  const known = (SLS_DOCS[r.jurisdiction || 'QLD'] || {}).schedules || {};
+  return SLS_ROLES.filter(([k]) => r[k]).map(([k, label]) => {
+    const n = (said.find(s => s && s.role === k) || {}).label || known[k];
+    return n ? `${label} (Schedule ${n})` : label;
+  });
+}
+
+function buildServiceLevel(doc, slsRows, slsDocs) {
+  const docs = bySlsDoc(slsDocs || []);
+  const docBy = new Map(docs.map(d => [d.jurisdiction || 'QLD', d]));
+  const editions = docs.map(slsEdition);
+  const rows = bySlsRank(slsRows);
+  // `edition` is the first entry's document's (or, with none, the first
+  // document's): the one field this answer had when there was one document.
+  const first = rows.length ? docBy.get(rows[0].jurisdiction || 'QLD') : docs[0];
+  const edition = first ? slsEdition(first) : null;
+  if (!rows.length) {
+    const named = editions.map(e => `${e.place || e.jurisdiction}${e.version ? `, version ${e.version}` : ''}`).join('; ');
     return {
       status: 'not recorded',
       detail: doc.station_number
-        ? `Bureau number ${doc.station_number} is not in the Queensland Service Level Specification${slsDoc && slsDoc.version ? ` (version ${slsDoc.version})` : ''}.`
-        : 'The station has no Bureau number, so it cannot be matched to the Service Level Specification.',
+        ? `Bureau number ${doc.station_number} is in no Service Level Specification MegaNet holds${named ? ` (${named})` : ''}.`
+        : 'The station has no Bureau number, so it cannot be matched to a Service Level Specification.',
       edition,
+      editions,
     };
   }
   return {
     status: 'ok',
     edition,
-    entries: slsRows.map(r => stripNulls({
-      bureau_number: r.bureau_number,
-      name: r.name,
-      owner: r.owner,
-      gauge_type: r.gauge_type,
-      data_type: r.data_type,
-      priority: r.priority,
-      schedules: r.schedules,
-      roles: SLS_ROLES.filter(([k]) => r[k]).map(([, label]) => label),
-      catchment_name: r.catchment_name,
-      basin_no: r.basin_no,
-      flood_classes_m_on_gauge: stripNulls({ minor: num(r.class_minor), moderate: num(r.class_moderate), major: num(r.class_major) }),
-      prediction: stripNulls({ type: r.prediction_type, lead_time: r.lead_time, lead_time_hours: num(r.lead_time_hours),
-        trigger_height: r.trigger_height, peak_accuracy: r.peak_accuracy }),
-      source_note: r.source_note,
-    })),
+    editions,
+    entries: rows.map(r => {
+      const j = r.jurisdiction || 'QLD';
+      const d = docBy.get(j);
+      return stripNulls({
+        jurisdiction: j,
+        edition: d && d.version ? d.version : null,
+        bureau_number: r.bureau_number,
+        name: r.name,
+        owner: r.owner,
+        gauge_type: r.gauge_type,
+        data_type: r.data_type,
+        priority: r.priority,
+        schedules: r.schedules,
+        roles: slsRoleLabels({ ...r, jurisdiction: j }, d),
+        catchment_name: r.catchment_name,
+        basin_no: r.basin_no,
+        awrc_number: r.awrc_number,
+        gauge_datum: r.gauge_datum,
+        flood_classes_m_on_gauge: stripNulls({ minor: num(r.class_minor), moderate: num(r.class_moderate), major: num(r.class_major) }),
+        flood_classes_not_yet_defined: nonEmpty(r.classes_undefined) ? r.classes_undefined : null,
+        prediction: stripNulls({ type: r.prediction_type, lead_time: r.lead_time, lead_time_hours: num(r.lead_time_hours),
+          trigger_height: r.trigger_height, peak_accuracy: r.peak_accuracy,
+          interim_service: r.interim_service ? true : null }),
+        fast_response: r.fast_response ? true : null,
+        source_note: r.source_note,
+      });
+    }),
     notes: [
+      'Each entry is one document\'s: QLD is Queensland\'s, NSW the one for New South Wales and the ACT. A station on the border has an entry in each and they can disagree — quote the one for the state whose service the report is about, and say which.',
       'gauge_type is the SLS\'s own word: Manual (read by an observer) or Automatic (telemetered).',
-      'priority is the impact of losing the site; where schedules disagree the highest is kept.',
+      'priority is the impact of losing the site; where a document\'s schedules disagree the highest is kept.',
+      'gauge_datum (NSW) is what the gauge reads in: where it is AHD, the flood classes and trigger heights are metres AHD as well as on the gauge.',
+      'flood_classes_not_yet_defined (NSW) are classes the document prints n/a for: not yet defined by the NSW SES. fast_response is its ^ (a small catchment with a faster response); prediction.interim_service its * (an interim service with no determined lead time).',
     ],
   };
 }
 
 async function serviceLevelEndpoint(rc, rawId) {
   const st = await loadStationDoc(rc, rawId);
-  const [sls, slsDoc] = await Promise.all([slsRowsFor(rc, st.id), settle(slsDocOf(rc))]);
+  const [sls, slsDocs] = await Promise.all([slsRowsFor(rc, st.id), settle(slsDocsOf(rc))]);
   return {
     id: st.id,
     name: st.doc.name,
     station_number: st.doc.station_number || null,
     ...(st.resolved_from ? { resolved_from: st.resolved_from } : {}),
-    service_level: buildServiceLevel(st.doc, sls, slsDoc.ok ? slsDoc.value : null),
-    source: 'meganet.sls_location (the SLS\'s six station schedules merged per Bureau number) and meganet.sls_doc (its edition)',
+    service_level: buildServiceLevel(st.doc, sls, slsDocs.ok ? slsDocs.value : []),
+    source: 'meganet.sls_location (each Service Level Specification\'s six station schedules merged per Bureau number) and meganet.sls_doc (their editions)',
     generated_at: new Date().toISOString(),
   };
 }
@@ -1530,9 +1614,11 @@ function summaryLines(doc, d) {
   if (d.location.elevation_ahd_m != null) lines.push(`Ground height ${d.location.elevation_ahd_m} m AHD (${d.location.elevation_source}).`);
   const sl = d.service_level;
   if (sl.status === 'ok') {
-    const e = sl.entries[0];
-    lines.push(`Service Level Specification: gauge type ${e.gauge_type || 'not stated'}, data type ${e.data_type || 'not stated'}, `
-      + `priority ${e.priority || 'not stated'}, owner ${e.owner || 'not stated'}.`);
+    for (const e of sl.entries) {
+      lines.push(`Service Level Specification (${e.jurisdiction}${e.edition ? ` v${e.edition}` : ''}): `
+        + `gauge type ${e.gauge_type || 'not stated'}, data type ${e.data_type || 'not stated'}, `
+        + `priority ${e.priority || 'not stated'}, owner ${e.owner || 'not stated'}.`);
+    }
   }
   const fc = d.flood_levels.flood_classes;
   if (fc.status === 'ok') {
@@ -1556,7 +1642,7 @@ async function dossierEndpoint(rc, rawId) {
   const toDate = new Date(rc.now).toISOString().slice(0, 10);
   const fromDate = new Date(rc.now - (days - 1) * 86400000).toISOString().slice(0, 10);
 
-  const [sls, health, daily, cats, hubs, nets, rms, slsDoc, fv, indexes] = await Promise.all([
+  const [sls, health, daily, cats, hubs, nets, rms, slsDocs, fv, indexes] = await Promise.all([
     settle(slsRowsFor(rc, id)),
     settle(healthRowsFor(rc, id)),
     settle(rc.up.select('reading_daily', [['select',
@@ -1566,7 +1652,7 @@ async function dossierEndpoint(rc, rawId) {
     settle(hubsOf(rc)),
     settle(networksOf(rc)),
     settle(rmSystemsOf(rc)),
-    settle(slsDocOf(rc)),
+    settle(slsDocsOf(rc)),
     floodVocab(rc),
     settle(bureauIndexOf(rc)),
   ]);
@@ -1594,7 +1680,7 @@ async function dossierEndpoint(rc, rawId) {
         : unavailable(daily.error, 'meganet.reading_daily'),
       source: 'meganet.station_json (sensors, addresses); station_health; reading_daily',
     },
-    service_level: sls.ok ? buildServiceLevel(doc, slsRows, slsDoc.ok ? slsDoc.value : null) : unavailable(sls.error, 'meganet.sls_location'),
+    service_level: sls.ok ? buildServiceLevel(doc, slsRows, slsDocs.ok ? slsDocs.value : []) : unavailable(sls.error, 'meganet.sls_location'),
     bureau_listings: nonEmpty(doc.bureau_listings) ? {
       status: 'ok',
       items: doc.bureau_listings.map(l => stripNulls({ ...l, index: indexBy.get(String(l.section))?.title || null })),
@@ -1607,7 +1693,7 @@ async function dossierEndpoint(rc, rawId) {
   };
   if (!sls.ok) d.flood_levels.sls_flood_classes = unavailable(sls.error, 'meganet.sls_location');
 
-  const slsEdition = slsDoc.ok && slsDoc.value ? slsDoc.value : null;
+  const slsEditions = slsDocs.ok ? slsDocs.value.map(slsEdition) : [];
   return {
     dossier_version: '1',
     id,
@@ -1618,8 +1704,8 @@ async function dossierEndpoint(rc, rawId) {
     ...d,
     sources: [
       { relation: 'meganet.station_json', what: 'the station register record', updated_at: st.updated_at },
-      { relation: 'meganet.sls_location / meganet.sls_doc', what: 'Queensland Service Level Specification',
-        edition: slsEdition ? (slsEdition.title || (slsEdition.version ? `version ${slsEdition.version}` : null)) : null },
+      { relation: 'meganet.sls_location / meganet.sls_doc', what: 'the Service Level Specifications for Queensland, and for New South Wales and the ACT',
+        edition: slsEditions.length ? slsEditions.map(e => e.title || `${e.jurisdiction} version ${e.version}`).join('; ') : null },
       { relation: 'meganet.station_flood_class / station_crossing / station_gauge_survey / station_flood_effect / station_bureau_listing',
         what: 'the Bureau\'s Queensland flood warning station lists (Sections 1–6, 9), dated by as_at' },
       { relation: 'meganet.station_aep_level', what: 'QLD and NSW AEP level workbooks (modelled, indicative)' },
@@ -1819,7 +1905,7 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/stations/{id}/dossier', op: 'getStationDossier', summary: 'Everything a report needs about one station, labelled with its sources.' },
   { path: '/api/v1/stations/{id}/readings', op: 'getStationReadings', summary: 'Telemetry ingested into MegaNet: raw, hourly or daily, bounded windows.' },
   { path: '/api/v1/stations/{id}/flood-levels', op: 'getStationFloodLevels', summary: 'Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels and one AHD ladder.' },
-  { path: '/api/v1/stations/{id}/service-level', op: 'getStationServiceLevel', summary: 'The station\'s entry in the Queensland Service Level Specification.' },
+  { path: '/api/v1/stations/{id}/service-level', op: 'getStationServiceLevel', summary: 'The station\'s entries in the Service Level Specifications (Queensland; New South Wales and the ACT).' },
   { path: '/api/v1/catchments', op: 'listCatchments', summary: 'The 77 Queensland drainage basins.' },
   { path: '/api/v1/catchments/{id}', op: 'getCatchment', summary: 'One basin and its stations.' },
   { path: '/api/v1/networks', op: 'listNetworks', summary: 'Radio networks, maintenance hubs and Radio Mobile systems.' },
@@ -1929,9 +2015,9 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
       '/api/v1/stations/{id}/flood-levels': op('getStationFloodLevels', 'Get flood levels',
         'Flood classes (by edition), the SLS classes, crossings, the gauge zero and datum, flood effects, AEP levels and one ladder in m AHD — with the datum caveats.',
         [idParam], ok('Flood levels.')),
-      '/api/v1/stations/{id}/service-level': op('getStationServiceLevel', 'Get the SLS entry',
-        'The station\'s entry in the Queensland Service Level Specification: gauge type, data type, priority, owner, schedules, flood classes and prediction, with the edition.',
-        [idParam], ok('The SLS entry.')),
+      '/api/v1/stations/{id}/service-level': op('getStationServiceLevel', 'Get the SLS entries',
+        'The station\'s entries in the Service Level Specifications (QLD; NSW and the ACT), one per document that lists it: gauge type, data type, priority, owner, schedules, flood classes and prediction — and the NSW gauge datum and AWRC number — with each edition.',
+        [idParam], ok('The SLS entries.')),
       '/api/v1/catchments': op('listCatchments', 'List catchments', 'The 77 Queensland drainage basins with basin number, area and drainage division.', [], ok('Catchments.')),
       '/api/v1/catchments/{id}': op('getCatchment', 'Get a catchment and its stations', 'One basin (by id or name) and a page of its stations.',
         [{ name: 'id', in: 'path', required: true, description: 'Catchment id, e.g. "herbert".', schema: { type: 'string' } },
@@ -2387,8 +2473,8 @@ export const MCP_TOOLS = Object.freeze([
   },
   {
     name: 'get_service_level',
-    title: 'Get the SLS entry',
-    description: 'A station\'s entry in the Queensland Service Level Specification: gauge type (Manual/Automatic), data type, priority, owner, schedules, flood classes and prediction, with the edition quoted.',
+    title: 'Get the SLS entries',
+    description: 'A station\'s entries in the Service Level Specifications — Queensland\'s, and the one for New South Wales and the ACT; a station on the border has one from each: gauge type (Manual/Automatic), data type, priority, owner, schedules, flood classes and prediction (and, from the NSW document, the gauge datum and AWRC number), each with its edition.',
     inputSchema: { type: 'object', properties: { id: idArg }, required: ['id'], additionalProperties: false },
     route: a => [`/stations/${enc(a.id)}/service-level`, {}],
   },

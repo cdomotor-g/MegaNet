@@ -160,8 +160,8 @@ its cache at all (`PGRST002`).
 | `meganet.pass_range` | The ALERT ranges a repeater passes or excludes, as rows with an `int4range` and a GiST index — so "which repeaters cover address N" is a lookup, not 88 × 10 ranges walked in JavaScript. |
 | `meganet.radio_network`, `meganet.catchment`, `meganet.hub`, `meganet.rm_system` | The reference vocabularies from the top of `stations.json`. `catchment` carries the 77 Queensland drainage basins and, since `0027`, each one's drainage division. `hub` is the Bureau's eight field maintenance regions — the boundaries themselves are `data/bom-hubs.geojson`, not a column here. |
 | `meganet.doc_meta` | The document's `meta` header. Exactly one row, enforced. |
-| `meganet.sls_row`, `meganet.sls_doc` | The Queensland Service Level Specification's six station schedules, as written, and which edition they came from. |
-| `meganet.sls_location` | View: one row per bureau number, the six schedules merged and joined to the station. See **What the SLS says**, below. |
+| `meganet.sls_row`, `meganet.sls_doc` | The Service Level Specifications' six station schedules, as written — Queensland's, and since `0038` the one for New South Wales and the ACT — and which edition of each they came from. |
+| `meganet.sls_location` | View: one row per (document, bureau number), a document's six schedules merged and joined to the station. See **What the SLS says**, below. |
 | `meganet.bureau_key(text)` | A bureau number with its leading zeros gone. The SLS pads to six digits and `station_number` does not; this is what makes them join. |
 | `meganet.station.hub_id`, `meganet.station.catchment_ids` | Which hub maintains a station and which basin it is in — both point-in-polygon against real WGS84 boundaries by `tools/build_geo_layers.py`, not typed and not derived from the affine-fitted basin SVG. See **Where a station is**, below. |
 | `meganet.station_json` | View: one row per *live* station — its id, its `ord`, its `updated_at`, and its `stations.json` fragment. Deleted stations are filtered out here, which is what makes the soft delete work everywhere at once. |
@@ -1083,106 +1083,197 @@ database has it.
 
 ## What the SLS says
 
-`0028`, and `0034` for the edition. `archive/QLD_SLS_current.pdf` is the
-Bureau's "Service Level Specification for Flood Forecasting and Warning
-Services for Queensland", version 3.7, December 2025 — the file the Bureau
-publishes at <https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf>,
-which the heading of the station card's SLS section links to. Version 3.1
-(September 2018), which `0028` was written against, is kept beside it as
-`archive/QLD_SLS_v3.1_2018-09.pdf`. Six of the ten schedules are tables of
-stations keyed on the **bureau number** — the same number
-`station.station_number` carries — which makes it the answer to questions this
-database could not previously ask about a station: its flood class levels,
-whether anybody forecasts for it, who owns it, whether a person reads it, and
-how much it matters when it stops.
+`0028`, `0034` for the edition, and `0038` for the second document. The Bureau
+writes one "Service Level Specification for Flood Forecasting and Warning
+Services" per state, and the network reaches two of them:
 
-`tools/ingest/sls.py` reads schedules 2, 3, 4, 7, 8 and 9 into
-`data/sls-qld.json` (3,392 rows) and the merged half into
-`data/sls-locations.json` (2,766 locations, what the app fetches).
-`meganet.sls_doc` says which edition the rows in `meganet.sls_row` came from;
-a new edition is new data, not a migration — `0034` only took the edition out
-of two comments that had named it.
+| | Document | Edition | Where the Bureau publishes it |
+| --- | --- | --- | --- |
+| `QLD` | `archive/QLD_SLS_current.pdf` — for Queensland | 3.7, December 2025 | <https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf> |
+| `NSW` | `archive/NSW_SLS_Current.pdf` — for New South Wales and the Australian Capital Territory | 3.16, December 2025 | <https://www.bom.gov.au/nsw/NSW_SLS_Current.pdf> |
+
+The heading of each section of the station card's SLS block links to its
+document's URL. Queensland's version 3.1 (September 2018), which `0028` was
+written against, is kept beside it as `archive/QLD_SLS_v3.1_2018-09.pdf`. Six
+schedules of each are tables of stations keyed on the **bureau number** — the
+same number `station.station_number` carries — which makes them the answer to
+questions this database could not previously ask about a station: its flood
+class levels, whether anybody forecasts for it, who owns it, whether a person
+reads it, and how much it matters when it stops.
+
+The two documents number those six schedules differently, and the rows carry
+what each schedule is for — its **role** — as well as its number:
+
+| Role | QLD | NSW |
+| --- | --- | --- |
+| `forecast_location` — flood classes, prediction, lead time, trigger, accuracy | 2 | 2 |
+| `information_location` — flood classes, reported but not forecast | 3 | 3a (loaded as 3, which is what its own text calls it) |
+| `river_data_location` | 4 | 4 |
+| `bureau_owned` | 7 | 6 |
+| `bureau_assists` | 8 | 7 (it reads NIL) |
+| `bureau_colocated` | 9 | 8 |
+
+`tools/ingest/sls.py` reads both into `data/sls-qld.json` (3,392 rows) and
+`data/sls-nsw.json` (1,433), and the merged half of both into
+`data/sls-locations.json` (4,141 locations, what the app fetches).
+`meganet.sls_doc` has a row per jurisdiction saying which edition the rows in
+`meganet.sls_row` came from, where the Bureau publishes it and what its
+schedules are called; a new edition of either is new data, not a migration.
+
+**Each document is its own.** `sls_row` is keyed (jurisdiction, schedule,
+bureau number) and `sls_location` is one row per (jurisdiction, bureau
+number). 47 stations are in both documents, all on the Queensland border (45
+of them in the Border Rivers basin), and the documents do not agree about them:
+GOONDIWINDI's moderate and major levels are 7.5 and 9.2 m in Queensland's and
+6.0 and 8.5 m in the NSW one, its trigger `> 7.0` and `> 6.0`; the NSW document
+rates 36 of the 47 higher in priority than Queensland's does (17 High where it
+says Low). Each is the Bureau's statement of a different state's service, so
+nothing merges across them: such a station has two locations, the card a
+section from each, the API an entry from each.
+Before `0038` the second document had nowhere to go — loaded into `0028`'s key
+it would have overwritten Queensland's rows for those 47 numbers, and its
+delete-what-is-not-in-the-document would have emptied the rest.
 
 **The document as written, and the reading of it — kept apart**, the same split
-`0014` made for the inspection workbook. 591 bureau numbers appear in more than
-one schedule and they disagree: on priority for 55 of them, the owner for 41,
-the name for 31, the gauge type for 4, the basin for 1. `meganet.sls_row` keeps
-every version; `meganet.sls_location` states its rule.
+`0014` made for the inspection workbook. Within a document, 647 bureau numbers
+appear in more than one schedule (591 Queensland, 56 NSW) and they disagree:
+on priority for 80 of them, the owner for 66. `meganet.sls_row` keeps every
+version; `meganet.sls_location` states its rule.
 
-**The rule.** The lowest-numbered schedule that states a field wins, because the
-schedules run from the most specific statement of service (2: forecast
-locations) to the most general inventory (7: what the Bureau owns), so the
-earlier one is making a claim about the flood-warning service rather than about
-a site register. **Except priority, where the highest stated anywhere wins** —
-priority measures the impact of losing a site, and a site that is High to any
-part of the service is High to lose. Letting a `Low` in a site register overrule
-a `High` in the forecast schedule is the one direction that field must not move.
+**The rule.** Per document, the lowest-numbered schedule that states a field
+wins, because the schedules run from the most specific statement of service
+(2: forecast locations) to the most general inventory (what the Bureau owns),
+so the earlier one is making a claim about the flood-warning service rather
+than about a site register. **Except priority, where the highest stated
+anywhere wins** — priority measures the impact of losing a site, and a site
+that is High to any part of the service is High to lose. Letting a `Low` in a
+site register overrule a `High` in the forecast schedule is the one direction
+that field must not move.
 
 That rule is implemented twice — in Python for the file the app reads, and in
 SQL for `sls_location` — because the app is a field tool that has to work from
 `file://` with no database behind it. The two are held together by
-`tools/check_sls_merge.py`, not by hope: it loads `data/sls-qld.json` in a
+`tools/check_sls_merge.py`, not by hope: it loads both documents' rows in a
 transaction it rolls back and compares the view with `data/sls-locations.json`
-— all 2,766 locations, 23 fields each, and an md5 of each side — and CI runs it
-on every push that touches either.
+— all 4,141 locations, 28 fields each, and an md5 of each side — and CI runs it
+on every push that touches any of them.
 
-**The join needs `bureau_key()`.** The document pads to six digits (`040846`);
+**The join needs `bureau_key()`.** The file pads to six digits (`040846`);
 `station_number` does not — 2,877 stations carry six digits, 1,891 five and 87
-four. Matching the strings as they stand finds 1,509 stations; matching them
-with the leading zeros stripped finds **2,685**, and nothing collides either
+four. Matching the strings as they stand finds 1,779 stations; matching them
+with the leading zeros stripped finds **3,253**, and nothing collides either
 way.
 
-| | |
-| --- | --- |
-| SLS locations | 2,766 |
-| …that are MegaNet stations | 2,685 |
-| …automatic | 1,901, of which 1,889 are MegaNet stations |
-| …manual, read by a person | 865, of which **796** are MegaNet stations |
-| …with flood class levels | 1,069 |
+| | QLD | NSW |
+| --- | --- | --- |
+| SLS locations | 2,766 | 1,375 |
+| …that are MegaNet stations | 2,685 | 615 |
+| …automatic | 1,901, of which 1,889 are MegaNet stations | 1,338, of which 608 |
+| …manual, read by a person | 865, of which **796** are MegaNet stations | 37, of which 7 |
+| …with flood class levels | 1,069 | 213 |
 
-**The 81 that are not MegaNet stations are kept anyway**, with a null
-`station_id`, and that is a decision rather than an oversight. 69 are manual
-gauges (68 the Bureau's own) that telemeter nothing; 12 are automatic. None of
-them go into `stations.json` — the Bureau's own station indexes do not list
-them, and inventing rows for them would corrupt every count in the app. (Under
-3.1 it was 1,637, until `0032` added the stations those indexes list.)
+3,253 of MegaNet's 4,873 stations are in one document or the other; 47 are in
+both.
+
+**The locations that are not MegaNet stations are kept anyway**, with a null
+`station_id`, and that is a decision rather than an oversight: 81 of
+Queensland's (69 manual gauges, 68 the Bureau's own, that telemeter nothing;
+12 automatic) and 760 of the NSW document's — MegaNet reaches the NSW North
+Coast and the border rivers, and the document covers the whole state and the
+ACT. None of them go into `stations.json` — the Bureau's own station indexes
+do not list them, and inventing rows for them would corrupt every count in the
+app. (Under 3.1 it was 1,637 of Queensland's, until `0032` added the stations
+those indexes list.)
+
+**What the NSW document says that Queensland's does not** — five columns,
+null or false on a Queensland row:
+
+- `awrc_number`, beside every forecast, information and river data location —
+  as printed, so `416201A`, `2054193` and `41000283` are kept as they are, and
+  "n/a" ("no AWRC number allocated") is no number;
+- `gauge_datum`, `AHD` or `Local`: "All levels are in metres to Local gauge
+  datums unless indicated otherwise." Where it is AHD — 44 forecast locations,
+  most of them estuaries — the flood class levels and the triggers are metres
+  AHD;
+- `classes_undefined`: the classes the page prints "n/a" for, "not yet
+  defined by the NSW SES" in the document's own words — 26 locations. Not a
+  missing value and not an irregularity; the card says "major not yet
+  defined";
+- `fast_response`: the page's `^`, "forecasts are provided for small
+  catchments with faster response times" — 14 locations;
+- `interim_service`: the page's `*` on WARDELL and BALLINA (BURNS POINT), "an
+  interim service, while the Bureau develops improved forecasting tools.
+  There is no determined lead time".
 
 **Where the page is irregular, the row says so** (`source_note`) rather than
 guessing, and the card shows the note under the section:
 
-- `540149` GLENORE GROVE is a forecast location whose priority, like its
+- `540149` GLENORE GROVE (QLD) is a forecast location whose priority, like its
   prediction type, lead time, trigger and accuracy, reads `TBC`.
-- `540071` CORINDA HIGH's minor level reads `3. 5`, and five Schedule 3 rows
-  print `N/A` for a moderate or major level (UPPER CABOOLTURE twice, WAMURAN,
-  AWOONGA DAM and AWOONGA DAM HW). Neither is a height, so neither is stored as
-  one.
-- Five numbers are printed without their leading zero (`27015` and four more);
-  they are padded back, and noted.
-- Three stations are listed twice in one schedule with different values —
-  `044209` as OAKPARK and OAK PARK in Schedule 7, `040940` YARRAHAPPINI and
-  `032169` GLENEAGLE in Schedule 8. The first row is kept as printed and the
-  second's differences are noted on it.
+- `540071` CORINDA HIGH's minor level reads `3. 5`, and five Queensland
+  Schedule 3 rows print `N/A` for a moderate or major level (UPPER CABOOLTURE
+  twice, WAMURAN, AWOONGA DAM and AWOONGA DAM HW) — the Queensland document
+  does not say what `N/A` means there. Neither is a height, so neither is
+  stored as one.
+- Five Queensland numbers are printed without their leading zero (`27015` and
+  four more); they are padded back, and noted. The NSW document prints numbers
+  without their leading zero as a matter of course in four of its six
+  schedules (and with it in Schedule 4), so there they are padded and not
+  noted — padding is what makes one site one key in every schedule.
+- `558037` DOUBTFUL (NSW) is printed `n558037`.
+- Stations listed twice in one schedule with different values — `044209` as
+  OAKPARK and OAK PARK in Queensland's Schedule 7, `040940` YARRAHAPPINI and
+  `032169` GLENEAGLE in its Schedule 8, `562010` COGGAN (High and Medium) and
+  `574026` as EDWARD RIVER and EDWARDS RIVER AT OFFTAKE in the NSW Schedule 4.
+  The first row is kept as printed and the second's differences are noted on
+  it.
+- Two NSW Schedule 4 gauges print their datum `ASS`, and six NSW rainfall
+  stations sit under catchment headings with four-digit numbers
+  (`1102 – Lake Bancannia`, `1004 – Lake Frome`): the datum and the basin
+  number are left out, the name kept.
 
-**A forecast location can have two targets.** PALMVIEW (`540350`) and both
-EMERALD gauges (`035260`, `535076`) are printed as two lines of one row: PALMVIEW
-is forecast 6 hours ahead of a peak over 4.5 m to ±0.1 m, and 18 hours ahead of
-the river passing 4.5 m to ±0.3 m. Their lead time, trigger and accuracy hold
-both values in order, separated by ` / ` (`6 hours / 18 hours`), and the card
+**A forecast location can have more than one target.** PALMVIEW (`540350`) and
+both EMERALD gauges (`035260`, `535076`) in Queensland's document are printed
+as two lines of one row: PALMVIEW is forecast 6 hours ahead of a peak over
+4.5 m to ±0.1 m, and 18 hours ahead of the river passing 4.5 m to ±0.3 m. The
+NSW document gives 28 stations a second target the other way, as a second line
+inside the lead time and trigger cells — WAGGA WAGGA a third (12, 24 and 30
+hours ahead of 7.3, 9.0 and 9.6 m). Their lead time, trigger and accuracy hold
+every value in order, separated by ` / ` (`6 hours / 18 hours`), and the card
 shows one line per target.
+
+**The NSW document's other shapes.** Its Schedules 6 and 8 list a site once
+for each thing it measures (CHINDERAH once for River, once for Rainfall); those
+rows are folded into one per site with the types joined as Queensland prints
+them (`Rainfall/River`) and the highest priority kept. Six of its rows have no
+bureau number — ORANGE, COOTAMUNDRA and STOCKINBINGAL are forecast from
+rainfall with no gauge at all, and three river data sites are `External` —
+so they are not locations; `data/sls-nsw.json` keeps them as its schedules'
+`unkeyed` rows, as printed, and the loader does not load them. Its Schedule 3b
+(the SES's alert thresholds) names its stations but gives no number to key
+them on, and is not read.
 
 ```sh
 pip install pdfplumber
-python3 tools/ingest/sls.py            # rewrite both JSON files
+python3 tools/ingest/sls.py            # rewrite the three JSON files
 python3 tools/ingest/sls.py --report   # what came out, in prose
 python3 tools/ingest/sls.py --check    # CI
 python3 tools/check_sls_merge.py       # the view against the file (CI; PG* variables)
 ```
 
-Then, after pushing:
+Then, after pushing (and after `0038`):
 
 ```sql
-select meganet.load_sls_from_url();
+select meganet.load_sls_from_github();   -- both documents, from main
 ```
+
+`meganet.load_sls_from_url(url)` still loads one document from a URL, and
+`meganet.load_sls_doc(doc)` one document given as JSON; each replaces only its
+own jurisdiction's rows. **Not `data/sls-nsw.json` before `0038`:** `0028`'s
+loader has no jurisdiction to file it under, so it would take the NSW rows for
+Queensland's — overwriting the 47 numbers both documents list and deleting
+every Queensland row the NSW document does not have. `0038`'s loader refuses a
+document that does not say whose it is.
 
 ## The Bureau's flood warning station lists
 

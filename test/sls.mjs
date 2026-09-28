@@ -1,15 +1,23 @@
-// The Service Level Specification on a station card (#180).
+// The Service Level Specifications on a station card (#180) — Queensland's and,
+// since 0038, the one for New South Wales and the ACT.
 //
 // What is worth asserting, in order of what would actually go wrong:
 //
-//   * The join. The document pads bureau numbers to six digits and
-//     station_number does not, so `40939` and `040939` are the same station and
-//     string equality says they are not. 1,176 of the 2,685 matches depend on
+//   * The join. The file pads bureau numbers to six digits and station_number
+//     does not, so `40939` and `040939` are the same station and string
+//     equality says they are not. 1,474 of the 3,253 stations found depend on
 //     that, and BEAUDESERT is one of them — a station whose number is five
 //     digits in MegaNet and six in the SLS.
-//   * Nothing is invented for a station the document does not carry. 2,188 of
-//     MegaNet's stations are not in the SLS and their cards must look exactly
-//     as they did before this existed.
+//   * Nothing is invented for a station neither document carries. 1,620 of
+//     MegaNet's stations are in neither and their cards must look exactly as
+//     they did before this existed.
+//   * Each document speaks for itself. A station both list (GOONDIWINDI) gets a
+//     section from each, under its own heading and link, with its own figures
+//     — they do not agree, and neither is allowed to overwrite the other.
+//   * What the NSW document says that Queensland's does not reaches the card:
+//     the gauge's datum (AHD levels say "m AHD"), its AWRC number, a class the
+//     SES has not defined yet said in words, two owners, the small-catchment
+//     and interim-service marks.
 //   * Manual is visible. It is the one fact in the block that changes what a
 //     person does — a gauge read by hand reports nothing over the radio, so
 //     silence from it is not a fault to go chasing — and it has to carry a word
@@ -45,13 +53,16 @@ function check(name, pass, detail = '') {
 // checked against what tools/ingest/sls.py wrote, not against a copy typed here
 // that would drift the first time the document is re-ingested.
 const doc = JSON.parse(fs.readFileSync(repo('data/sls-locations.json'), 'utf8'));
+// One document's entry for one number: a station on the border is in both.
 const byKey = new Map();
 for (const l of doc.locations) {
   const k = String(l.bureau_number).replace(/^0+/, '');
-  if (k) byKey.set(k, l);
+  if (k) byKey.set(`${l.jurisdiction}:${k}`, l);
 }
-const BEAUDESERT = byKey.get('40939');
-const ALPHA      = byKey.get('35229');
+const qld = (n) => byKey.get(`QLD:${n}`);
+const nsw = (n) => byKey.get(`NSW:${n}`);
+const BEAUDESERT = qld('40939');
+const ALPHA      = qld('35229');
 
 const server = await startServer();
 const browser = await launchBrowser();
@@ -88,12 +99,15 @@ try {
   // ── The file loads, and every location is reachable by its key ────────────
   const loaded = await page.evaluate(async () => {
     await SLS.ensureData();
-    return { n: SLS.all().length, version: (SLS.meta() || {}).version, ready: SLS.loaded() };
+    const docs = SLS.documents() || {};
+    return { n: SLS.all().length, qld: (docs.QLD || {}).version, nsw: (docs.NSW || {}).version,
+             ready: SLS.loaded() };
   });
   check('every location in the file is loaded', loaded.n === doc.locations.length,
     `${loaded.n} of ${doc.locations.length}`);
-  check('the card can say which edition it is quoting', loaded.version === doc.meta.version,
-    String(loaded.version));
+  check('the card can say which edition of each document it is quoting',
+    loaded.qld === doc.documents.QLD.version && loaded.nsw === doc.documents.NSW.version,
+    JSON.stringify(loaded));
 
   // ── The join, on a station whose number is padded in the document ─────────
   const beau = await page.evaluate(() => {
@@ -150,9 +164,9 @@ try {
                   text: a.textContent.replace(/\s+/g, ' ').trim(),
                   name: a.getAttribute('aria-label') || '', title: a.title || '',
                   heading: a.closest('.stn-card-sls').firstElementChild.contains(a),
-                  docUrl: SLS.DOC_URL };
+                  docUrl: SLS.DOCS.QLD.url };
   });
-  const edition = `Flood warning service (SLS v${doc.meta.version})`;
+  const edition = `Flood warning service (QLD SLS v${doc.documents.QLD.version})`;
   check('the SLS heading links to the document as the Bureau publishes it',
     !!head && head.href === 'https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf'
       && head.href === head.docUrl, JSON.stringify(head));
@@ -164,15 +178,15 @@ try {
     !!head && head.name.startsWith(edition) && /PDF/.test(head.name) && /new tab/.test(head.name),
     head && head.name);
   check('…and its tooltip naming the edition and its date, with no stray escape in "Bureau\'s"',
-    !!head && head.title.includes(`version ${doc.meta.version}`)
-      && (!doc.meta.published || head.title.includes(doc.meta.published))
+    !!head && head.title.includes(`version ${doc.documents.QLD.version}`)
+      && (!doc.documents.QLD.published || head.title.includes(doc.documents.QLD.published))
       && head.title.includes('Bureau of Meteorology\'s') && !head.title.includes('\\'),
     head && head.title);
 
   // ── Two targets are two lines, each lead time beside its own trigger ──────
   // PALMVIEW is warned 6 hours ahead of a peak over 4.5 m and 18 hours ahead of
   // the river passing it. The file keeps the pair apart with " / ".
-  const PALMVIEW = byKey.get('540350');
+  const PALMVIEW = qld('540350');
   const parts = (v) => String(v).split(' / ');
   const predictionLines = (id) => page.evaluate((id) => {
     const rows = [...document.querySelectorAll(`#mn-sls-card-${id} .acma-row`)];
@@ -198,7 +212,7 @@ try {
     `${JSON.stringify(palm)} vs ${JSON.stringify(palmWant)}`);
 
   // ── What the Bureau has not settled reads as such ────────────────────────
-  const GLENORE = byKey.get('540149');
+  const GLENORE = qld('540149');
   await openCard('glenore_grove_alert');
   const glen = await page.evaluate(() => {
     const el = document.getElementById('mn-sls-card-glenore_grove_alert');
@@ -240,35 +254,163 @@ try {
     return { present: !!el, text: el ? el.textContent.trim() : null,
              lookup: SLS.forStation(s) };
   });
-  check('a station the SLS does not carry gets an empty section, not a wrong one',
+  check('a station neither SLS carries gets an empty section, not a wrong one',
     absent.present && absent.text === '' && absent.lookup === null,
     JSON.stringify(absent));
+
+  // ── New South Wales and the ACT ──────────────────────────────────────────
+  // The NSW document's own entries, on stations that are only in it. Every
+  // figure is checked against the file, as above.
+  const sections = (id) => page.evaluate((id) => [...document.querySelectorAll(
+    `#mn-sls-card-${id} .stn-card-sls`)].map((el) => {
+    const a = el.querySelector('a.mn-sls-doc');
+    const rows = {};
+    for (const r of el.querySelectorAll('.acma-row')) {
+      rows[r.firstElementChild.textContent.trim()] = r.lastElementChild.innerText
+        .split('\n').map((t) => t.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    }
+    return { jurisdiction: el.dataset.jurisdiction, href: a && a.getAttribute('href'),
+             label: a ? a.textContent.replace(/\s+/g, ' ').trim() : '',
+             name: a ? a.getAttribute('aria-label') || '' : '', title: a ? a.title : '',
+             text: el.textContent.replace(/\s+/g, ' ').trim(), rows,
+             manualPill: !!el.querySelector('.mn-sls-manual'),
+             marks: [...el.querySelectorAll('.mn-sls-mark')].map((m) => ({
+               text: m.textContent.replace(/\s+/g, ' ').trim(), title: m.title })) };
+  }), id);
+  const NSWDOC = doc.documents.NSW;
+  const nswEdition = `Flood warning service (NSW SLS v${NSWDOC.version})`;
+
+  const LISMORE = nsw('58176');
+  await openCard('lismore_wilsons_river');
+  const lis = await sections('lismore_wilsons_river');
+  check('a station only the NSW document lists gets one section, and it is the NSW one',
+    lis.length === 1 && lis[0].jurisdiction === 'NSW', JSON.stringify(lis.map((x) => x.jurisdiction)));
+  check('…whose heading opens the Bureau\'s copy of the NSW document and names its edition',
+    lis[0].href === 'https://www.bom.gov.au/nsw/NSW_SLS_Current.pdf' && lis[0].href === NSWDOC.url
+      && lis[0].label.startsWith(nswEdition) && lis[0].name.startsWith(nswEdition)
+      && /New South Wales and the Australian Capital Territory/.test(lis[0].name)
+      && lis[0].title.includes(`version ${NSWDOC.version}`) && lis[0].title.includes(NSWDOC.published),
+    JSON.stringify({ href: lis[0].href, label: lis[0].label, title: lis[0].title }));
+  check('an AHD gauge\'s flood classes are the file\'s, in metres AHD',
+    JSON.stringify(lis[0].rows['Flood classes'])
+      === JSON.stringify([`minor ${LISMORE.class_minor} · moderate ${LISMORE.class_moderate} · major ${LISMORE.class_major} m AHD`]),
+    JSON.stringify(lis[0].rows['Flood classes']));
+  check('…with the gauge datum, the AWRC number and the owner beside them',
+    LISMORE.gauge_datum === 'AHD' && JSON.stringify(lis[0].rows['Gauge datum']) === '["AHD"]'
+      && JSON.stringify(lis[0].rows['AWRC number']) === JSON.stringify([LISMORE.awrc_number])
+      && JSON.stringify(lis[0].rows['Station owner']) === JSON.stringify([LISMORE.owner]),
+    JSON.stringify(lis[0].rows));
+  check('…and its forecast service: type, lead time, trigger and accuracy',
+    JSON.stringify(lis[0].rows.Prediction) === JSON.stringify([
+      `${LISMORE.prediction_type} · ${LISMORE.lead_time} lead · from ${LISMORE.trigger} · ${LISMORE.peak_accuracy}`]),
+    JSON.stringify(lis[0].rows.Prediction));
+
+  // NSW stacks a second target, and a second owner, inside one cell.
+  const MURW = nsw('58186');
+  await openCard('north_murwillumbah_tweed_river');
+  const murw = (await sections('north_murwillumbah_tweed_river'))[0];
+  const murwWant = parts(MURW.lead_time).map((lead, i) =>
+    `${MURW.prediction_type} · ${lead} lead · from ${parts(MURW.trigger)[i]} · ${MURW.peak_accuracy}`);
+  check('the NSW file gives NORTH MURWILLUMBAH two targets and two owners',
+    murwWant.length === 2 && MURW.owner === 'Tweed Shire Council / NSW DCCEEW', `${MURW.lead_time} | ${MURW.owner}`);
+  check('…and the card gives each target its own line, and names both owners',
+    JSON.stringify(murw.rows.Prediction) === JSON.stringify(murwWant)
+      && JSON.stringify(murw.rows['Station owner']) === JSON.stringify([MURW.owner]),
+    JSON.stringify(murw.rows));
+
+  // "n/a" is a class the NSW SES has not defined yet: said, not dropped.
+  const REPTON = nsw('559024');
+  await openCard('repton_bellinger_ri');
+  const rep = (await sections('repton_bellinger_ri'))[0];
+  check('a class the NSW SES has not defined is said in words, after the ones it has',
+    JSON.stringify(REPTON.classes_undefined) === '["moderate"]'
+      && JSON.stringify(rep.rows['Flood classes'])
+        === JSON.stringify([`minor ${REPTON.class_minor} · major ${REPTON.class_major} m AHD · moderate not yet defined`]),
+    JSON.stringify(rep.rows['Flood classes']));
+  check('…and that is not called an irregularity', !/irregular/.test(rep.text), rep.text.slice(-120));
+
+  // The page's marks, in words, with what the document says they mean.
+  await openCard('billinudgel_marshal');
+  const bil = (await sections('billinudgel_marshal'))[0];
+  check('a location the document marks ^ says "small catchment, fast response", and why',
+    nsw('558020').fast_response === true && bil.marks.length === 1
+      && bil.marks[0].text === 'small catchment, fast response' && /faster response/.test(bil.marks[0].title)
+      && /^Forecast location · small catchment, fast response$/.test((bil.rows.Role || [])[0] || ''),
+    JSON.stringify({ role: bil.rows.Role, marks: bil.marks }));
+  await openCard('byrnes_point');
+  const bal = (await sections('byrnes_point'))[0];
+  check('a service the document marks * (BALLINA) says it is interim, with no set lead time',
+    nsw('558044').interim_service === true && nsw('558044').lead_time === 'TBC'
+      && bal.marks.some((m) => /^Interim service/.test(m.text) && /no determined lead time/.test(m.title)),
+    JSON.stringify({ prediction: bal.rows.Prediction, marks: bal.marks }));
+
+  await openCard('copmanhurst_clarenc');
+  const cop = (await sections('copmanhurst_clarenc'))[0];
+  check('an NSW gauge a person reads carries the manual pill too',
+    nsw('58181').gauge_type === 'Manual' && cop.manualPill, cop.text.slice(0, 120));
+
+  // ── A station both documents list ────────────────────────────────────────
+  // GOONDIWINDI is a forecast location in both, and the two disagree about its
+  // levels. Both are shown, each with its own heading, link and figures.
+  const GQ = qld('41500'), GN = nsw('41500');
+  await openCard('goondiwindi_tm');
+  const goon = await sections('goondiwindi_tm');
+  check('the documents disagree about GOONDIWINDI',
+    GQ && GN && GQ.class_major !== GN.class_major, `${GQ && GQ.class_major} vs ${GN && GN.class_major}`);
+  check('…so its card has a section from each, Queensland\'s first',
+    goon.length === 2 && goon[0].jurisdiction === 'QLD' && goon[1].jurisdiction === 'NSW',
+    JSON.stringify(goon.map((x) => x.jurisdiction)));
+  check('…each under its own document\'s heading and link',
+    goon[0].href === doc.documents.QLD.url && goon[1].href === NSWDOC.url
+      && goon[0].label.startsWith('Flood warning service (QLD SLS') && goon[1].label.startsWith(nswEdition),
+    JSON.stringify(goon.map((x) => [x.href, x.label])));
+  check('…and each with its own flood classes, neither overwritten',
+    goon[0].text.includes(`major ${GQ.class_major}`) && !goon[0].text.includes(`major ${GN.class_major}`)
+      && goon[1].text.includes(`major ${GN.class_major}`) && !goon[1].text.includes(`major ${GQ.class_major}`),
+    JSON.stringify(goon.map((x) => x.rows['Flood classes'])));
+  const goonOne = await page.evaluate(() => {
+    const l = SLS.forStation(state.data.stations.find((x) => x.id === 'goondiwindi_tm'));
+    return l && l.jurisdiction;
+  });
+  check('…and asked for one answer, the lookup gives Queensland\'s, as the card puts first',
+    goonOne === 'QLD', String(goonOne));
 
   // ── The counts the whole thing rests on ──────────────────────────────────
   const counts = await page.evaluate(() => {
     const all = SLS.all();
     const key = (n) => (String(n || '').trim().replace(/^0+/, '') || null);
     const stations = new Set(state.data.stations.map((s) => key(s.station_number)).filter(Boolean));
-    let matched = 0, manual = 0, manualMatched = 0;
+    const by = {};
+    const withAny = new Set();
     for (const l of all) {
+      const c = by[l.jurisdiction] || (by[l.jurisdiction] = { all: 0, matched: 0, manual: 0, manualMatched: 0 });
       const inNet = stations.has(key(l.bureau_number));
-      if (inNet) matched++;
+      c.all++;
+      if (inNet) { c.matched++; withAny.add(key(l.bureau_number)); }
       if ((l.gauge_type || '').toLowerCase() === 'manual') {
-        manual++;
-        if (inNet) manualMatched++;
+        c.manual++;
+        if (inNet) c.manualMatched++;
       }
     }
-    return { all: all.length, matched, manual, manualMatched };
+    const both = [...withAny].filter((k) => SLS.entriesFor({ station_number: k }).length === 2).length;
+    return { ...by, stations: withAny.size, both };
   });
-  // 1,146 and 54 until 0032 added the 1,697 stations the Bureau's flood
-  // warning indexes list and MegaNet did not have — most of the SLS's manual
-  // gauges among them, which are the daily read stations of Section 2 — and
-  // then 2,566 of 2,783 and 789 of 909 until the SLS went from version 3.1 to
-  // 3.7.
-  check('2,685 of the 2,766 SLS locations are MegaNet stations',
-    counts.all === 2766 && counts.matched === 2685, JSON.stringify(counts));
-  check('796 of MegaNet’s stations are gauges a person reads',
-    counts.manual === 865 && counts.manualMatched === 796, JSON.stringify(counts));
+  // Queensland's: 1,146 and 54 until 0032 added the 1,697 stations the
+  // Bureau's flood warning indexes list and MegaNet did not have — most of the
+  // SLS's manual gauges among them, which are the daily read stations of
+  // Section 2 — and then 2,566 of 2,783 and 789 of 909 until the SLS went from
+  // version 3.1 to 3.7.
+  check('2,685 of the 2,766 Queensland SLS locations are MegaNet stations',
+    counts.QLD.all === 2766 && counts.QLD.matched === 2685, JSON.stringify(counts.QLD));
+  check('796 of MegaNet’s stations are gauges the Queensland SLS says a person reads',
+    counts.QLD.manual === 865 && counts.QLD.manualMatched === 796, JSON.stringify(counts.QLD));
+  // The NSW document covers the whole state and the ACT; MegaNet reaches its
+  // North Coast and the border rivers.
+  check('615 of the 1,375 NSW SLS locations are MegaNet stations, 7 of them read by hand',
+    counts.NSW.all === 1375 && counts.NSW.matched === 615
+      && counts.NSW.manual === 37 && counts.NSW.manualMatched === 7, JSON.stringify(counts.NSW));
+  check('3,253 of MegaNet’s stations are in one document or the other, 47 in both',
+    counts.stations === 3253 && counts.both === 47, JSON.stringify({ stations: counts.stations, both: counts.both }));
 
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {

@@ -64,8 +64,8 @@ const COLUMNS = Object.fromEntries(Object.entries({
   crossing_type: 'code label meaning ord updated_at updated_by',
   gauge_datum: 'code label ord updated_at updated_by',
   bureau_index: 'code label title ord updated_at updated_by',
-  sls_location: 'bureau_number name owner gauge_type data_type basin_no catchment_name class_minor class_moderate class_major prediction_type lead_time lead_time_hours trigger_height peak_accuracy priority schedules forecast_location information_location river_data_location bureau_owned bureau_assists bureau_colocated multi_schedule source_note station_id station_name catchment_id',
-  sls_doc: 'only_row title version source loaded_at updated_by',
+  sls_location: 'bureau_number name owner gauge_type data_type basin_no catchment_name class_minor class_moderate class_major prediction_type lead_time lead_time_hours trigger_height peak_accuracy priority schedules forecast_location information_location river_data_location bureau_owned bureau_assists bureau_colocated multi_schedule source_note station_id station_name catchment_id jurisdiction awrc_number gauge_datum classes_undefined fast_response interim_service',
+  sls_doc: 'jurisdiction title version source place published url schedules loaded_at updated_by',
   station_health: 'station_key station_id station_name online since last_seen_at last_reading_at minutes_since_seen minutes_since_reading last_status reported_by updated_at',
   reading: 'alert_id station_number channel addr station_id reading_ts received_at value_raw value unit conversion quality protocol source path dup_count dup_paths last_dup_at raw_id ingest_token_id',
   reading_hourly: 'addr bucket alert_id station_number channel station_id unit n n_dup n_val raw_min raw_max raw_sum raw_last raw_mean val_min val_max val_sum val_last val_mean first_ts last_ts rolled_at',
@@ -128,13 +128,14 @@ T.gauge_datum.push(...[['AHD', 'Australian Height Datum'], ['ASSUM', 'Assumed da
   .map(([code, label], ord) => ({ code, label, ord })));
 T.bureau_index.push(...[['1', 'FloodWarn rainfall', 'Index of Queensland FloodWarn rainfall stations'], ['2', 'Daily rainfall', 'Index of Queensland daily reporting rainfall stations'],
   ['3', 'River height', 'Index of Queensland river height stations']].map(([code, label, title], ord) => ({ code, label, title, ord })));
-T.app_meta.push({ key: 'schema_version', value: '36' });
+T.app_meta.push({ key: 'schema_version', value: '38' });
 
 // A soft-deleted station: in `station` with deleted_at set, absent from station_json.
 const deletedTwin = { ...T.station[0], id: 'zz_deleted_twin', name: `${T.station[0].name} (deleted)`, deleted_at: '2026-01-01T00:00:00+00:00' };
 T.station.push(deletedTwin);
 
-// The SLS, merged per bureau number and joined to the live stations as the view does.
+// The SLS, merged per (document, bureau number) and joined to the live stations
+// as the view does (0038): a station both documents list is two rows.
 const bureauKey = n => ((n || '').trim().replace(/^0+/, '') || null);
 const stationByKey = new Map();
 for (const s of T.station) if (!s.deleted_at && bureauKey(s.station_number)) stationByKey.set(bureauKey(s.station_number), s);
@@ -151,9 +152,20 @@ for (const r of SLS.locations) {
     river_data_location: !!r.river_data_location, bureau_owned: !!r.bureau_owned, bureau_assists: !!r.bureau_assists,
     bureau_colocated: !!r.bureau_colocated, multi_schedule: (r.schedules || []).length > 1, source_note: r.source_note ?? null,
     station_id: st ? st.id : null, station_name: st ? st.name : null, catchment_id: cat ? cat.id : null,
+    jurisdiction: r.jurisdiction, awrc_number: r.awrc_number ?? null, gauge_datum: r.gauge_datum ?? null,
+    classes_undefined: r.classes_undefined ?? null, fast_response: !!r.fast_response, interim_service: !!r.interim_service,
   });
 }
-T.sls_doc.push({ only_row: true, title: SLS.meta.title, version: SLS.meta.version, source: SLS.meta.source, loaded_at: '2026-09-20T00:00:00+00:00' });
+// One row per document, as load_sls_doc() writes it — its schedules read off
+// the rows file, as the loader reads them.
+for (const [j, file] of [['QLD', 'data/sls-qld.json'], ['NSW', 'data/sls-nsw.json']]) {
+  const rows = JSON.parse(fs.readFileSync(repo(file), 'utf8'));
+  const m = SLS.documents[j];
+  T.sls_doc.push({ jurisdiction: j, title: m.title, version: m.version, source: m.source, place: m.place,
+    published: m.published, url: m.url, loaded_at: '2026-09-28T00:00:00+00:00', updated_by: 'load_sls_doc',
+    schedules: Object.fromEntries(Object.entries(rows.schedules).map(([k, v]) =>
+      [k, { label: v.label, title: v.title, role: v.role, pages: v.pages, rows: v.rows.length }])) });
+}
 
 // ── The stations the checks are about ────────────────────────────────────────
 
@@ -538,8 +550,10 @@ let dossier;
     || (dossier.bureau_listings.status === 'ok' && dossier.bureau_listings.items.every(i => /^Index of Queensland/.test(i.index))),
     JSON.stringify(dossier.bureau_listings.items && dossier.bureau_listings.items[0]));
   const sl = dossier.service_level;
-  check('the SLS section is present either way and names its edition', ['ok', 'not recorded'].includes(sl.status) && sl.edition && sl.edition.version === SLS.meta.version,
-    sl.status);
+  check('the SLS section is present either way and names every document\'s edition', ['ok', 'not recorded'].includes(sl.status)
+    && sl.editions.length === 2 && sl.editions.every(e => e.version === SLS.documents[e.jurisdiction].version
+      && e.current_edition_url === SLS.documents[e.jurisdiction].url) && sl.edition && sl.edition.version,
+    JSON.stringify(sl.editions));
   check('the dossier stays well inside an MCP client\'s output budget', r.text.length < 60000, `${r.text.length} bytes`);
 }
 
@@ -579,10 +593,102 @@ section('Flood levels, SLS, readings');
     && JSON.stringify(r.json.flood_classes) === JSON.stringify(dossier.flood_levels.flood_classes));
   const s = await get(`/api/v1/stations/${MANUAL.id}/service-level`);
   const e = s.json.service_level;
-  check('service-level for a manual station says Manual, with its edition', s.status === 200 && e.status === 'ok'
-    && e.entries[0].gauge_type === 'Manual' && e.edition.version === SLS.meta.version, e.status);
+  check('service-level for a manual station says Manual, with its document and edition', s.status === 200 && e.status === 'ok'
+    && e.entries[0].gauge_type === 'Manual' && e.entries[0].edition === SLS.documents[e.entries[0].jurisdiction].version
+    && e.edition.version === e.entries[0].edition, e.status);
   const n = await get(`/api/v1/stations/${SPARSE.id}/service-level`);
-  check('a station outside the SLS is "not recorded", with the reason', n.json.service_level.status === 'not recorded' && n.json.service_level.detail);
+  check('a station outside the SLS is "not recorded", with the reason, and both editions', n.json.service_level.status === 'not recorded'
+    && n.json.service_level.detail && n.json.service_level.editions.length === 2, n.json.service_level.detail);
+  const numbered = live.find(s => s.station_number && !T.sls_location.some(r => r.station_id === s.id));
+  const nn = await get(`/api/v1/stations/${numbered.id}/service-level`);
+  check('…and a numbered one is told it is in neither document, each named with its version',
+    nn.json.service_level.status === 'not recorded' && /Queensland, version /.test(nn.json.service_level.detail)
+      && /New South Wales and the Australian Capital Territory, version /.test(nn.json.service_level.detail),
+    nn.json.service_level.detail);
+}
+
+// Two documents (0038). GOONDIWINDI is a forecast location in both, and they
+// disagree about its levels; each entry is its own document's, QLD's first.
+{
+  const locOf = (j, n) => SLS.locations.find(l => l.jurisdiction === j && l.bureau_number === n);
+  const GQ = locOf('QLD', '041500'), GN = locOf('NSW', '041500');
+  const s = await get('/api/v1/stations/goondiwindi_tm/service-level');
+  const e = s.json.service_level;
+  check('a station both documents list has an entry from each, Queensland\'s first', s.status === 200 && e.status === 'ok'
+    && e.entries.length === 2 && e.entries[0].jurisdiction === 'QLD' && e.entries[1].jurisdiction === 'NSW',
+    JSON.stringify(e.entries && e.entries.map(x => x.jurisdiction)));
+  check('…each with its own document\'s figures and edition, neither overwritten',
+    e.entries[0].flood_classes_m_on_gauge.major === GQ.class_major && e.entries[1].flood_classes_m_on_gauge.major === GN.class_major
+      && GQ.class_major !== GN.class_major && e.entries[0].edition === SLS.documents.QLD.version
+      && e.entries[1].edition === SLS.documents.NSW.version,
+    JSON.stringify(e.entries.map(x => [x.jurisdiction, x.flood_classes_m_on_gauge, x.edition])));
+  check('…and the NSW entry carries what only that document gives: the datum and the AWRC number',
+    e.entries[1].gauge_datum === GN.gauge_datum && e.entries[1].awrc_number === GN.awrc_number && !('gauge_datum' in e.entries[0]),
+    JSON.stringify(e.entries[1]));
+  const f = await get('/api/v1/stations/goondiwindi_tm/flood-levels');
+  const rows = f.json.sls_flood_classes.rows;
+  check('flood-levels gives both documents\' SLS classes, each naming its document',
+    f.status === 200 && rows.length === 2 && rows[0].jurisdiction === 'QLD' && rows[1].jurisdiction === 'NSW'
+      && rows[1].major_m === GN.class_major && rows[1].gauge_datum === GN.gauge_datum, JSON.stringify(rows));
+  const d = await get('/api/v1/stations/goondiwindi_tm/dossier');
+  check('the dossier\'s summary says what each document says, and whose it is',
+    d.json.summary.filter(l => /^Service Level Specification \((QLD|NSW) v/.test(l)).length === 2, JSON.stringify(d.json.summary));
+  const q = await get('/api/v1/stations?q=goondiwindi&limit=50');
+  const row = q.json.stations.find(x => x.id === 'goondiwindi_tm');
+  check('a compact row\'s sls is the entry the card quotes first, and says whose', !!row && row.sls && row.sls.jurisdiction === 'QLD'
+    && row.sls.priority === GQ.priority, JSON.stringify(row && row.sls));
+
+  // The NSW document's own numbering, and what it says that Queensland's does not.
+  const c = await get('/api/v1/stations/chinderah_tweed_riv/service-level');
+  const ce = c.json.service_level.entries || [];
+  check('roles are labelled in the entry\'s own document\'s numbering (NSW: Bureau-owned is Schedule 6)',
+    ce.length === 1 && ce[0].jurisdiction === 'NSW'
+      && JSON.stringify(ce[0].roles) === JSON.stringify(['forecast location (Schedule 2)', 'Bureau-owned (Schedule 6)']),
+    JSON.stringify(ce[0] && ce[0].roles));
+  const rp = await get('/api/v1/stations/repton_bellinger_ri/flood-levels');
+  const rr = (rp.json.sls_flood_classes.rows || [])[0] || {};
+  check('a class the NSW SES has not defined is listed as not yet defined, not left out',
+    JSON.stringify(rr.not_yet_defined) === '["moderate"]' && rr.gauge_datum === 'AHD' && rr.moderate_m === undefined,
+    JSON.stringify(rr));
+  const bp = await get('/api/v1/stations/byrnes_point/service-level');
+  const be = (bp.json.service_level.entries || [])[0] || {};
+  check('an interim service (the page\'s *) says so', be.prediction && be.prediction.interim_service === true
+    && be.prediction.lead_time === 'TBC', JSON.stringify(be.prediction));
+}
+
+// Before 0038 reaches the database the Worker is already live — Cloudflare
+// deploys it on push — so it must answer from 0028's shape too: one document,
+// no jurisdiction column, sls_doc keyed by its one-row flag.
+{
+  const OLD = {
+    sls_location: COLUMNS.sls_location && [...COLUMNS.sls_location].filter(c =>
+      !['jurisdiction', 'awrc_number', 'gauge_datum', 'classes_undefined', 'fast_response', 'interim_service'].includes(c)),
+    sls_doc: ['only_row', 'title', 'version', 'source', 'loaded_at', 'updated_by'],
+  };
+  const oldTables = { ...T,
+    sls_location: T.sls_location.filter(r => r.jurisdiction === 'QLD').map(r => Object.fromEntries(
+      Object.entries(r).filter(([k]) => OLD.sls_location.includes(k)))),
+    sls_doc: [{ only_row: true, title: SLS.documents.QLD.title, version: SLS.documents.QLD.version,
+      source: SLS.documents.QLD.source, loaded_at: '2026-09-20T00:00:00+00:00', updated_by: 'load_sls_doc' }] };
+  const oldStub = new PostgrestStub({ base: api.SUPABASE_REST_URL,
+    columns: { ...COLUMNS, sls_location: new Set(OLD.sls_location), sls_doc: new Set(OLD.sls_doc) }, tables: oldTables });
+  api.resetApiState();
+  globalThis.fetch = (input, init) => oldStub.fetch(input, init);
+  try {
+    const s = await get('/api/v1/stations/goondiwindi_tm/service-level');
+    const e = s.json && s.json.service_level;
+    check('before 0038 is applied, service-level still answers from the one document there is',
+      s.status === 200 && e && e.status === 'ok' && e.entries.length === 1 && e.entries[0].jurisdiction === 'QLD'
+        && e.editions.length === 1 && e.editions[0].version === SLS.documents.QLD.version,
+      JSON.stringify(e && { status: e.status, entries: e.entries && e.entries.length, editions: e.editions }));
+    const q = await get('/api/v1/stations?q=goondiwindi&limit=50');
+    const row = q.json && q.json.stations && q.json.stations.find(x => x.id === 'goondiwindi_tm');
+    check('…and a compact row still carries its SLS words', q.status === 200 && row && row.sls && row.sls.jurisdiction === 'QLD'
+      && !(q.json.notes || []).some(n => /SLS could not be read/.test(n)), JSON.stringify(row && row.sls));
+  } finally {
+    globalThis.fetch = (input, init) => stub.fetch(input, init);
+    api.resetApiState();
+  }
 }
 
 {

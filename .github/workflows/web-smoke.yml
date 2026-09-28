@@ -70,11 +70,12 @@ on:
       # flood_peaks.py and loaded by the database job.
       - 'archive/flood-peaks/**'
       - 'data/flood-peaks.json'
-      # The Service Level Specification and what tools/ingest/sls.py reads out
-      # of it (0028, 0034), and the check holding the database's merge of it to
-      # the app's. Neither the PDF nor the two files were listed, so a push
-      # carrying a new edition alone would have run nothing.
+      # The Service Level Specifications and what tools/ingest/sls.py reads out
+      # of them (0028, 0034, 0038), and the check holding the database's merge
+      # of them to the app's. Neither the PDFs nor the files were listed, so a
+      # push carrying a new edition alone would have run nothing.
       - 'archive/QLD_SLS_*.pdf'
+      - 'archive/NSW_SLS_*.pdf'
       - 'data/sls-*.json'
       - 'tools/check_sls_merge.py'
       # The base station program and the migration that gives its readings a
@@ -143,11 +144,12 @@ on:
       # flood_peaks.py and loaded by the database job.
       - 'archive/flood-peaks/**'
       - 'data/flood-peaks.json'
-      # The Service Level Specification and what tools/ingest/sls.py reads out
-      # of it (0028, 0034), and the check holding the database's merge of it to
-      # the app's. Neither the PDF nor the two files were listed, so a push
-      # carrying a new edition alone would have run nothing.
+      # The Service Level Specifications and what tools/ingest/sls.py reads out
+      # of them (0028, 0034, 0038), and the check holding the database's merge
+      # of them to the app's. Neither the PDFs nor the files were listed, so a
+      # push carrying a new edition alone would have run nothing.
       - 'archive/QLD_SLS_*.pdf'
+      - 'archive/NSW_SLS_*.pdf'
       - 'data/sls-*.json'
       - 'tools/check_sls_merge.py'
       # The base station program and the migration that gives its readings a
@@ -877,8 +879,9 @@ jobs:
         run: python3 tools/elvis_station_elevations.py --check
 
       # The SLS extraction, on the same footing as the three above: data/
-      # sls-qld.json and data/sls-locations.json are derived from a PDF in
-      # archive/, and a derived file nobody re-derives quietly stops being true.
+      # sls-qld.json, sls-nsw.json and sls-locations.json are derived from two
+      # PDFs in archive/, and a derived file nobody re-derives quietly stops
+      # being true.
       # Needs pdfplumber, which is the only dependency in tools/ — installed
       # here rather than pinned into the repo, because it is read once per SLS
       # revision and never by the app.
@@ -1070,8 +1073,10 @@ jobs:
       # The SLS's merge rule is written twice — in tools/ingest/sls.py for the
       # file the app reads off disk, and in meganet.sls_location for anything
       # that asks the database — and this is what holds the two to one rule:
-      # data/sls-qld.json loaded in a transaction that rolls back, the view
-      # read, and every location compared with data/sls-locations.json, field
-      # by field. It also proves a new edition's rows load into the schema.
+      # data/sls-qld.json and data/sls-nsw.json loaded in a transaction that
+      # rolls back, the view read, and every location compared with
+      # data/sls-locations.json, field by field. It also proves a new edition's
+      # rows load into the schema, and that one document's load leaves the
+      # other's rows alone.
       - name: The SLS loads, and the database merges it as the app's file does
         run: python3 tools/check_sls_merge.py

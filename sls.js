@@ -1,6 +1,6 @@
 // MegaNet — sls.js
 //
-//   SLS   What the Bureau's Service Level Specification says about a station:
+//   SLS   What the Bureau's Service Level Specifications say about a station:
 //         its flood class levels, whether anybody forecasts for it, who owns
 //         it, and whether a person reads it or a radio does.
 //
@@ -9,64 +9,96 @@
 // functions, so this file's position among the modules is free.
 //
 // ── What this is ─────────────────────────────────────────────────────────────
-// `archive/QLD_SLS_current.pdf` is the "Service Level Specification for Flood
-// Forecasting and Warning Services for Queensland", version 3.7, December
-// 2025 — the Bureau's own copy is at DOC_URL below, and the card's heading
-// links to it. Six of its ten schedules are tables of stations keyed on the
-// bureau number — the same number `station_number` carries.
+// The Bureau writes one "Service Level Specification for Flood Forecasting and
+// Warning Services" per state, and the network reaches two:
+//
+//   QLD  `archive/QLD_SLS_current.pdf`, version 3.7, December 2025.
+//   NSW  `archive/NSW_SLS_Current.pdf` — New South Wales and the Australian
+//        Capital Territory — version 3.16, December 2025.
+//
+// The Bureau's own copy of each is at its `url` in the file's `documents`, and
+// the card's heading links to it. Six schedules of each are tables of stations
+// keyed on the bureau number — the same number `station_number` carries.
 // `tools/ingest/sls.py` reads them into `data/sls-locations.json`, and this
 // reads that.
 //
 // It answers questions the app has never been able to answer about a station:
 //
 //   * The flood class levels — the minor, moderate and major heights that
-//     decide which warning goes out. 1,069 of these locations have them.
+//     decide which warning goes out. 1,282 of these locations have them; the
+//     NSW document also says which it has not defined yet, and whether the
+//     gauge reads in metres AHD or on its own local datum.
 //   * Whether it is a **forecast** location (Schedule 2 — somebody predicts a
-//     height for it) or an **information** location (Schedule 3 — it is
-//     reported and classified but not predicted).
-//   * The prediction type, the target warning lead time and the trigger —
-//     two of each for the three stations the schedule gives two targets.
-//   * Who owns it, and the Bureau's part in it: owned (7), assisted (8), or
-//     equipment co-located on somebody else's site (9).
+//     height for it) or an **information** location (Schedule 3, NSW's 3a — it
+//     is reported and classified but not predicted).
+//   * The prediction type, the target warning lead time and the trigger — two
+//     or three of each for the stations the schedule gives more than one
+//     target.
+//   * Who owns it, and the Bureau's part in it: owned, assisted, or equipment
+//     co-located on somebody else's site.
 //   * Whether it is read by a person or by a radio.
 //   * How much it matters when it stops.
 //
 // ── The merge is not done here ───────────────────────────────────────────────
-// 591 bureau numbers appear in more than one schedule and the schedules
-// disagree — on priority for 55 of them, on the owner for 41, the name for 31.
-// Folding them together is a rule with a reason behind it (db/README.md states
-// it once), and it is applied in `tools/ingest/sls.py`, whose output this file
-// reads already merged. `meganet.sls_location` is the same rule in SQL for
-// anything querying the database, and `tools/check_sls_merge.py` holds the two
-// together — all 2,766 locations, every field, in CI — rather than hoping.
-// **Nothing in this file decides anything**; it looks up and it renders.
+// Within a document, 647 bureau numbers appear in more than one schedule
+// (591 Queensland, 56 NSW) and the schedules disagree — on priority for 80 of
+// them, on the owner for 66. Folding them together is a rule with a reason
+// behind it (db/README.md states it once), and it is applied in
+// `tools/ingest/sls.py`, whose output this file reads already merged.
+// `meganet.sls_location` is the same rule in SQL for anything querying the
+// database, and `tools/check_sls_merge.py` holds the two together — all 4,141
+// locations, every field, in CI — rather than hoping. **Nothing in this file
+// decides anything**; it looks up and it renders.
+//
+// ── Two documents, one station ───────────────────────────────────────────────
+// 47 stations are in both documents — all on the Queensland border, 45 of them
+// in the Border Rivers basin — and the documents do not agree about them:
+// GOONDIWINDI's moderate and major levels are 7.5 and 9.2 m in Queensland's
+// and 6.0 and 8.5 m in the NSW one. Each is the Bureau's statement of a
+// different state's service and neither overrules the other, so the card
+// shows both, each under its own heading.
+// forStation() answers with one of them, for the things that want one answer
+// (the SLS catchment column, the twin's gauge): the more specific statement
+// of service — a forecast location before a river data location — and between
+// equals, Queensland's, the document the network was first read against.
 //
 // ── The join, and the leading zeros ──────────────────────────────────────────
-// The document pads bureau numbers to six digits — `040846`. `station_number`
+// The file pads bureau numbers to six digits — `040846`. `station_number`
 // does not: 2,877 stations carry six digits, 1,891 carry five and 87 carry
-// four. Comparing the strings as they stand finds 1,509 stations; comparing
-// them with the leading zeros stripped finds 2,685, and nothing collides either
-// way. That is `key()` below, and the 1,176 stations it recovers are the whole
-// reason it is not `===`.
+// four. Comparing the strings as they stand finds 1,779 stations; comparing
+// them with the leading zeros stripped finds 3,253, and nothing collides
+// either way. That is `key()` below, and the 1,474 stations it recovers are
+// the whole reason it is not `===`.
 //
 // ── What is deliberately not here ────────────────────────────────────────────
-// 81 of the 2,766 locations are not MegaNet stations: 69 manual gauges an
-// observer reads, 68 of them the Bureau's, and 12 automatic ones. They are in
-// the file and they are **not** stations — nothing here invents a pin, a row or
-// a count for them. A station's card shows the SLS's answer for that station
-// and nothing else.
+// 841 of the 4,141 locations are not MegaNet stations: 81 in Queensland's
+// document (69 manual gauges an observer reads, 68 of them the Bureau's, and
+// 12 automatic ones) and 760 in the NSW one, whose network MegaNet reaches
+// only on the North Coast and the border rivers. They are in the file and they
+// are **not** stations — nothing here invents a pin, a row or a count for
+// them. A station's card shows the SLS's answer for that station and nothing
+// else.
 const SLS = (function () {
   const DATA_URL = 'data/sls-locations.json';
-  // Where the Bureau publishes the document — always its current edition, so
-  // the day it issues a newer one this link moves on and data/ does not until
+  // Where the Bureau publishes each document — always its current edition, so
+  // the day it issues a newer one the link moves on and data/ does not until
   // tools/ingest/sls.py has read it. The link's title says which edition the
-  // card is quoting for that reason.
-  const DOC_URL = 'https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf';
-  const ATTRIBUTION = 'Service Level Specification for Flood Forecasting and Warning '
-                    + 'Services for Queensland v3.7 (Bureau of Meteorology, 2025)';
+  // card is quoting for that reason. The file carries these too (its
+  // `documents`); these are what the card falls back on without them.
+  const DOCS = {
+    QLD: { place: 'Queensland',
+           url: 'https://www.bom.gov.au/qld/flood/brochures/QLD_SLS_current.pdf' },
+    NSW: { place: 'New South Wales and the Australian Capital Territory',
+           url: 'https://www.bom.gov.au/nsw/NSW_SLS_Current.pdf' },
+  };
+  // Between two documents' equally specific entries, the earlier here first.
+  const DOC_ORDER = ['QLD', 'NSW'];
+  // Most specific statement of service first.
+  const ROLE_ORDER = ['forecast_location', 'information_location', 'river_data_location',
+                      'bureau_owned', 'bureau_assists', 'bureau_colocated'];
 
-  let data = null;      // { meta, locations[] }
-  let byKey = null;     // bureau key -> location
+  let data = null;      // { meta, documents, locations[] }
+  let byKey = null;     // bureau key -> [location, …], the one to quote first
   let loading = null;
   let failed = false;
 
@@ -77,16 +109,25 @@ const SLS = (function () {
     return t || null;
   }
 
+  function rank(loc) {
+    const r = ROLE_ORDER.findIndex(f => loc[f]);
+    const d = DOC_ORDER.indexOf(loc.jurisdiction);
+    return (r < 0 ? ROLE_ORDER.length : r) * 10 + (d < 0 ? DOC_ORDER.length : d);
+  }
+
   function index(doc) {
     const map = new Map();
     for (const loc of doc.locations || []) {
       const k = key(loc.bureau_number);
-      if (k) map.set(k, loc);
+      if (!k) continue;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(loc);
     }
+    for (const list of map.values()) list.sort((a, b) => rank(a) - rank(b));
     return map;
   }
 
-  // Fetched once, when something first asks — never at page load. 710 KB of
+  // Fetched once, when something first asks — never at page load. 1.2 MB of
   // schedule is not part of opening the app, and most sessions never open a
   // station card at all.
   function ensureData() {
@@ -99,11 +140,30 @@ const SLS = (function () {
     return loading;
   }
 
-  // The SLS entry for a station, or null. Null until the file is loaded, which
-  // is what state()/ask() exist to paper over.
+  // Every document's entry for a station, the one to quote first first; empty
+  // until the file is loaded, which is what state()/ask() exist to paper over.
+  function entriesFor(s) {
+    if (!byKey || !s) return [];
+    return byKey.get(key(s.station_number)) || [];
+  }
+
+  // The one entry to quote for a station, or null.
   function forStation(s) {
-    if (!byKey || !s) return null;
-    return byKey.get(key(s.station_number)) || null;
+    return entriesFor(s)[0] || null;
+  }
+
+  // A document's edition and where the Bureau publishes it: the file's word
+  // where it has one, the fallback above where it does not.
+  function docOf(jurisdiction) {
+    const j = jurisdiction || 'QLD';
+    const fromFile = (data && data.documents && data.documents[j]) || {};
+    return { jurisdiction: j, ...(DOCS[j] || {}), ...fromFile };
+  }
+
+  function attribution(jurisdiction) {
+    const d = docOf(jurisdiction);
+    return `Service Level Specification for Flood Forecasting and Warning Services for ${d.place}`
+         + `${d.version ? ` v${d.version}` : ''} (Bureau of Meteorology${d.published ? `, ${String(d.published).slice(-4)}` : ''})`;
   }
 
   // ── Rendering ─────────────────────────────────────────────────────────────
@@ -111,12 +171,17 @@ const SLS = (function () {
   // over "> 4.5" reads as two facts. Lines break at the " · " between phrases.
   const keep = (t) => String(t).replace(/ /g, '\u00a0');
 
+  // The classes the document states, in metres of the gauge's datum — AHD
+  // where the NSW document says the gauge reads AHD — and then the ones it
+  // says have not been defined yet, which is not the same as not saying.
   function classesText(loc) {
     const parts = [];
+    const unit = loc.gauge_datum === 'AHD' ? '\u00a0m\u00a0AHD' : '\u00a0m';
     if (loc.class_minor != null)    parts.push(keep(`minor ${loc.class_minor}`));
     if (loc.class_moderate != null) parts.push(keep(`moderate ${loc.class_moderate}`));
-    if (loc.class_major != null)    parts.push(keep(`major ${loc.class_major} m`));
-    else if (parts.length)          parts[parts.length - 1] += '\u00a0m';
+    if (loc.class_major != null)    parts.push(keep(`major ${loc.class_major}`));
+    if (parts.length) parts[parts.length - 1] += unit;
+    for (const c of loc.classes_undefined || []) parts.push(keep(`${c} not yet defined`));
     return parts.length ? parts.join(' · ') : null;
   }
 
@@ -149,18 +214,18 @@ const SLS = (function () {
     if (prediction && !tbc(prediction)) bits.push(prediction);
     if (lead && !tbc(lead))             bits.push(`${lead} lead`);
     if (trigger && !tbc(trigger))       bits.push(`from ${trigger}`);
-    if (accuracy && accuracy !== 'N/A' && !tbc(accuracy)) bits.push(accuracy);
+    if (accuracy && !/^n\/a$/i.test(accuracy) && !tbc(accuracy)) bits.push(accuracy);
     if (!bits.length && [prediction, lead, trigger, accuracy].some(tbc)) return 'To be confirmed';
     return bits.length ? bits.map(keep).join(' · ') : null;
   }
 
-  // One line per target. A forecast location can have two — PALMVIEW is
-  // warned 6 hours ahead of a peak over 4.5 m to ±0.1 m, and 18 hours ahead of
-  // the river passing 4.5 m to ±0.3 m — which the schedule prints as two lines
-  // of one row and sls.py keeps apart with " / ". Paired back up here, so a
-  // lead time is never read against the other target's trigger. A field that
-  // states one value states it for every target; fields that cannot be paired
-  // are shown as the document has them, on one line.
+  // One line per target. A forecast location can have more than one — PALMVIEW
+  // is warned 6 hours ahead of a peak over 4.5 m to ±0.1 m, and 18 hours ahead
+  // of the river passing 4.5 m to ±0.3 m; WAGGA WAGGA 12, 24 and 30 hours ahead
+  // of 7.3, 9.0 and 9.6 m — which sls.py keeps apart with " / ". Paired back up
+  // here, so a lead time is never read against another target's trigger. A
+  // field that states one value states it for every target; fields that cannot
+  // be paired are shown as the document has them, on one line.
   function serviceLines(loc) {
     const parts = (v) => (v ? String(v).split(' / ') : []);
     const lead = parts(loc.lead_time), trig = parts(loc.trigger), acc = parts(loc.peak_accuracy);
@@ -181,20 +246,21 @@ const SLS = (function () {
   // The section's heading, and the way to the document it quotes: the
   // Bureau's own copy, in a new tab. The name starts with the words on screen
   // and says the rest (#109); the title says which edition the figures are
-  // from, since the link always opens the latest. esc() and not escAttr() for
-  // these attributes: they are text, not JavaScript, and escAttr's \' would
-  // be read out as a backslash in "Bureau's".
-  function headingHtml() {
-    const meta = (data && data.meta) || {};
-    const label = `Flood warning service (SLS${meta.version ? ` v${meta.version}` : ''})`;
-    const quoted = meta.version
-      ? ` The figures on this card are from version ${meta.version}`
-        + `${meta.published ? `, ${meta.published}` : ''}.`
+  // from, since the link always opens the latest. It names the state, because
+  // a station on the border has a section from each. esc() and not escAttr()
+  // for these attributes: they are text, not JavaScript, and escAttr's \'
+  // would be read out as a backslash in "Bureau's".
+  function headingHtml(loc) {
+    const d = docOf(loc.jurisdiction);
+    const label = `Flood warning service (${d.jurisdiction} SLS${d.version ? ` v${d.version}` : ''})`;
+    const quoted = d.version
+      ? ` The figures on this card are from version ${d.version}`
+        + `${d.published ? `, ${d.published}` : ''}.`
       : '';
-    return `<span class="small txt-muted"><a class="mn-sls-doc" href="${esc(DOC_URL)}"
-        target="_blank" rel="noopener"
-        aria-label="${esc(`${label} — the Bureau's Service Level Specification for Queensland, a PDF, in a new tab`)}"
-        title="${esc(`The Bureau of Meteorology's Service Level Specification for Flood Forecasting and Warning Services for Queensland, as the Bureau publishes it now (PDF).${quoted}`)}"
+    return `<span class="small txt-muted"><a class="mn-sls-doc" href="${esc(d.url || '')}"
+        target="_blank" rel="noopener" data-jurisdiction="${esc(d.jurisdiction)}"
+        aria-label="${esc(`${label} — the Bureau's Service Level Specification for ${d.place}, a PDF, in a new tab`)}"
+        title="${esc(`The Bureau of Meteorology's Service Level Specification for Flood Forecasting and Warning Services for ${d.place}, as the Bureau publishes it now (PDF).${quoted}`)}"
         >${esc(label)} ↗</a></span>`;
   }
 
@@ -204,26 +270,46 @@ const SLS = (function () {
          + `${extra || ''}</span></div>`;
   }
 
-  // The card block. Manual is a pill rather than a word, because it is the one
-  // fact on here that changes what a person does: a gauge nobody can interrogate
-  // over the radio is not a telemetry fault when it goes quiet, and 865 of the
-  // locations in this document are read by hand.
+  // What the gauge's heights are metres of, where the document says (NSW).
+  function datumHtml(loc) {
+    if (!loc.gauge_datum) return '';
+    const ahd = loc.gauge_datum === 'AHD';
+    return `<span title="${esc(ahd
+      ? 'The gauge reads in metres AHD (the Australian Height Datum), so its flood class levels and triggers are heights above mean sea level.'
+      : 'The gauge reads in metres above its own local zero, so its flood class levels and triggers are heights on the gauge, not AHD.')}"
+      >${esc(ahd ? 'AHD' : 'Local')}</span>`;
+  }
+
+  // The card block for one document's entry. Manual is a pill rather than a
+  // word, because it is the one fact on here that changes what a person does:
+  // a gauge nobody can interrogate over the radio is not a telemetry fault when
+  // it goes quiet, and 902 of the locations in these documents are read by
+  // hand.
   function html(loc) {
     if (!loc) return '';
     const manual = (loc.gauge_type || '').toLowerCase() === 'manual';
+    const role = roleText(loc);
+    const fast = loc.fast_response
+      ? `<span class="mn-sls-mark" title="The document marks this location ^: forecasts are provided for small catchments with faster response times."
+           >small catchment, fast response</span>` : '';
+    const interim = loc.interim_service
+      ? `<span class="mn-sls-target mn-sls-mark" title="The document marks this service *: an interim service while the Bureau develops improved forecasting tools. There is no determined lead time; best efforts are made to give one."
+           >Interim service — no set lead time</span>` : '';
     return `
-      <div class="stn-card-sls">
-        ${headingHtml()}
+      <div class="stn-card-sls" data-jurisdiction="${esc(loc.jurisdiction || '')}">
+        ${headingHtml(loc)}
         ${manual ? `<div class="acma-row"><span>Gauge</span><span><span class="mn-sls-manual"
              title="Read by a person, not telemetered. It reports nothing over the radio, so silence from it is not a fault.">Manual — read by hand</span></span></div>`
           : row('Gauge', esc(loc.gauge_type || ''))}
-        ${row('Role', esc(roleText(loc) || ''))}
+        ${row('Role', role ? `${esc(role)}${fast ? ` · ${fast}` : ''}` : fast)}
         ${row('Flood classes', esc(classesText(loc) || ''))}
+        ${row('Gauge datum', datumHtml(loc))}
         ${row('Prediction', serviceLines(loc)
-            .map(t => `<span class="mn-sls-target">${esc(t)}</span>`).join(''))}
+            .map(t => `<span class="mn-sls-target">${esc(t)}</span>`).join('') + interim)}
         ${row('SLS priority', esc(loc.priority || ''))}
         ${row('Station owner', esc(loc.owner || ''))}
         ${row('Bureau role', esc(bureauRole(loc) || ''))}
+        ${row('AWRC number', esc(loc.awrc_number || ''))}
         ${row('SLS catchment', loc.catchment_name
             ? `${esc(loc.basin_no || '')} ${esc(loc.catchment_name)}` : '')}
         ${loc.source_note ? `<p class="small txt-muted mn-sls-note">The document is
@@ -231,12 +317,17 @@ const SLS = (function () {
       </div>`;
   }
 
+  // Every document's block for a station: nothing for one no document lists.
+  function htmlFor(s) {
+    return entriesFor(s).map(html).join('');
+  }
+
   // What the card renders before the file is on hand, and what replaces it.
   // Mirrors MapWind's pair for the same reason: the card is built synchronously
   // and the answer is not available yet on a first open.
   function state(s) {
     if (!s || !s.station_number) return { ready: true, html: '' };
-    if (data) return { ready: true, html: html(forStation(s)) };
+    if (data) return { ready: true, html: htmlFor(s) };
     if (failed) return { ready: true, html: '' };
     return { ready: false, html: '' };
   }
@@ -251,17 +342,20 @@ const SLS = (function () {
     const fill = () => {
       const el = document.getElementById(elId);
       if (!el || el.dataset.mnSls !== want) return;
-      el.innerHTML = html(forStation(s));
+      el.innerHTML = htmlFor(s);
     };
     ensureData().then(fill, fill);
   }
 
   return {
-    ATTRIBUTION,
-    DOC_URL,
+    DOCS,
     key,
     forStation,
+    entriesFor,
+    docOf,
+    attribution,
     html,
+    htmlFor,
     state,
     ask,
     ensureData,
@@ -270,6 +364,7 @@ const SLS = (function () {
     // not — a caller that needs it loaded awaits ensureData() first.
     all() { return (data && data.locations) || []; },
     meta() { return (data && data.meta) || null; },
+    documents() { return (data && data.documents) || null; },
     loaded() { return !!data; },
   };
 })();
