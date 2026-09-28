@@ -436,8 +436,21 @@ const HEIC_AT = { lat: -27.5551, lon: 152.2756 };
 const HEIC_QUADS = [['top left', 40, 30, [220, 40, 40]], ['top right', 120, 30, [40, 180, 60]],
                     ['bottom left', 40, 90, [40, 80, 220]], ['bottom right', 120, 90, [240, 210, 40]]];
 
-const STATIONS = JSON.parse(fs.readFileSync(repo('stations.json'), 'utf8')).stations
-  .filter(s => s.lat != null && s.lon != null);
+// Where the three Gatton stations stood when these photos were placed round
+// them. Which station a photo is filed under, and how far away, is a fact about
+// these positions — and stations.json follows the database, where a person
+// corrects a station's position in the editor (Gatton moved 67 m and Gatton AL
+// 221 m on 27–28 September 2026, which filed the SW photo under Gatton AL). So the
+// check pins them, in what it reads here and in the file the page is served,
+// rather than chasing the survey.
+const PINNED = {
+  gatton:    { lat: -27.555,    lon: 152.275 },
+  gatton_al: { lat: -27.556389, lon: 152.273056 },
+  gatton_tm: { lat: -27.55,     lon: 152.26861 },
+};
+const DOC = JSON.parse(fs.readFileSync(repo('stations.json'), 'utf8'));
+for (const s of DOC.stations) if (PINNED[s.id]) Object.assign(s, PINNED[s.id]);
+const STATIONS = DOC.stations.filter(s => s.lat != null && s.lon != null);
 const GATTON = STATIONS.find(s => s.id === 'gatton');
 const metres = (a, b) => Math.hypot((b.lat - a.lat) * 110574, (b.lon - a.lon) * 111320 * Math.cos(a.lat * Math.PI / 180));
 function nearestStation(p, within = 1000) {
@@ -608,6 +621,9 @@ async function browserHalf() {
     const net = await applyNetworkPolicy(page, server.origin);
     await installProject(page, db, store, types);
     await installStorage(page, store);
+    // The document with the Gatton stations where the photos were placed (above).
+    await page.route(`${server.origin}/stations.json`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json; charset=utf-8', body: J(DOC) }));
     await page.route(/elevation-tiles-prod\/terrarium\/(\d+)\/(\d+)\/(\d+)\.png/, route => {
       const m = /terrarium\/(\d+)\/(\d+)\/(\d+)\.png/.exec(route.request().url());
       return route.fulfill({ status: 200, contentType: 'image/png', body: hillyTerrariumPng(+m[1], +m[2], +m[3]),
