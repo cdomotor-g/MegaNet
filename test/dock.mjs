@@ -60,7 +60,9 @@
 //      away again, focus to ⋮. Full screen brings it out for ⛶ and takes it
 //      away after. No drawer on arrival, whatever a desktop left stored, and
 //      none on a phone turned from a tablet's width unless the operator was
-//      working in the cards under the map, which come with them.
+//      working in the cards under the map, which come with them. And a station
+//      opened from another tab is where a phone's map lands: the fresh map's
+//      first fit does not take the view with it.
 //   8. **No sideways scroll** at 375, 768 and 1440 with the side panel open,
 //      and a strip taller than the window that scrolls, with every button in
 //      reach and a scrollbar that stands beside the buttons, not over them.
@@ -1504,6 +1506,27 @@ try {
       && creditOpen.leafletH === creditOpen.mapH && creditOpen.scrollH <= creditOpen.winH + 1
       && !creditRefolded.open && creditRefolded.h === creditShut.h && creditRefolded.leafletH === creditRefolded.mapH && creditRefolded.mapH === creditShut.mapH,
     JSON.stringify({ creditShut, creditOpen, creditRefolded }));
+  // A station opened from another tab — a Pass Ranges row, which is what
+  // goToStation is for — is where a phone's map lands. The map is built fresh
+  // on the way in and fits itself to the network first, and on a phone that
+  // fit is a zoom (4 to 3) where a desktop's is a pan. Animated, it took the
+  // station's view with it — Leaflet ignores a setView while a zoom animation
+  // runs, and starts one on the frame after it is asked for — and the map
+  // ended at zoom 3 over the middle of Australia (app.js, initMap).
+  const fromTab = await page.evaluate(() => {
+    switchTab('passranges');
+    const s = filteredStations().find(x => x.lat != null && x.lon != null);
+    goToStation(s.id);
+    return s.id;
+  });
+  await page.waitForTimeout(600);
+  const fromTabView = await page.evaluate((id) => {
+    const s = state.data.stations.find(x => x.id === id);
+    return { tab: state.activeTab, z: state.map.getZoom(), inView: state.map.getBounds().contains([s.lat, s.lon]) };
+  }, fromTab);
+  check('a station opened from another tab (a Pass Ranges row) is where a phone\'s map lands: zoom 11 or closer, the station in view',
+    fromTabView.tab === 'stations' && fromTabView.z >= 11 && fromTabView.inView, JSON.stringify(fromTabView));
+  await page.evaluate((id) => { closeStnCard(false); selectStation(id); shutDock({ instant: true }); }, fromTab);
 
   // ── 8. No sideways scroll with the side panel open ───────────────────────
   for (const [width, how] of [[375, 'help'], [375, 'map-display'], [768, 'help'], [768, 'map-display'], [1440, 'stations'], [1440, 'map-display']]) {

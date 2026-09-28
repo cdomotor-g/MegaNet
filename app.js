@@ -5039,7 +5039,15 @@ function initMap() {
   // Auto/On name labels are picked from what is in view, so they are re-picked
   // whenever the view changes rather than only when the layers are rebuilt.
   state.map.on('moveend zoomend', applyMapLabels);
-  refreshMapLayers();
+  // The first fit is a jump, not a flight. The view it would fly from (MAP_HOME,
+  // above) was never painted, and a view set as the tab opens has to be the one
+  // that stays: a station opened from another tab (goToStation), a field photo
+  // shown on the map (field-photos.js, showOnMap). Leaflet ignores a setView
+  // while a zoom animation runs, and starts one on the frame after it is asked
+  // for, over any view set in between. On a phone the fit is a zoom (4 to 3)
+  // where a desktop's is a pan, and both of those arrivals ended on the whole
+  // network instead.
+  refreshMapLayers({ animate: false });
   refreshAcmaLayer();
   // ACMA transmitters are on by default, so the first visit to the map pulls the
   // core data in. Panels that gain content once it lands are refreshed in place
@@ -5154,8 +5162,10 @@ const MAP_BACKBONE_DASH = '9,9';
 
 // `skipFit` clears the fit for this refresh while still recording the extent it
 // would have fitted, so the map holds the operator's pan and zoom and the next
-// genuine change still moves it. See clearStationFilters.
-function refreshMapLayers({ skipFit = false } = {}) {
+// genuine change still moves it. See clearStationFilters. `animate: false`
+// makes the fit a jump (a fresh map's first, from initMap); left out, Leaflet
+// decides, as it always has. Not `true`: to Leaflet that forces the animation.
+function refreshMapLayers({ skipFit = false, animate } = {}) {
   const map = state.map;
   if (!map || !state.data) return;
   MapSpider.reset();                       // pins go home before any are replaced
@@ -5422,7 +5432,7 @@ function refreshMapLayers({ skipFit = false } = {}) {
     state.mapFitKey = key;
     // The extent is recorded either way, so a suppressed fit is skipped once
     // rather than deferred to the next refresh that happens along.
-    if (!skipFit) map.fitBounds(fitTo, { padding: [24, 24], maxZoom: fitTo.length === 1 ? 14 : 12 });
+    if (!skipFit) map.fitBounds(fitTo, { padding: [24, 24], maxZoom: fitTo.length === 1 ? 14 : 12, animate });
   }
   applyMapLabels();
   // The lines are all on the map and styled; the arrowheads are painted off
