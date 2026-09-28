@@ -9,11 +9,14 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, slug, pInt, pFloat,
 // parseRangeLines, mapLinksHtml, stationMapLinkUrls, stationSensors,
-// arroSiteId, arroSiteUrl, arroSensorUrl, buildArroUrl, bucketSizeGapNote and
-// ROLE_LABEL; across to app.js for the Stations tab's rerender hooks —
+// arroSiteId, arroSiteUrl, arroSensorUrl, buildArroUrl, bucketSizeGapNote,
+// ROLE_LABEL and STATION_TYPE_LABEL (a proposed station's type, 0039); across
+// to app.js for the Stations tab's rerender hooks —
 // rerenderStations, rerenderStationEditorCard, refreshFilterOptions,
 // refreshMapLayers, updateHeaderStats, findStationMatches, stationAlertIds,
-// passRangeCoversId, repeaterPassingCount and repeaterPassRangeSpan — and back
+// passRangeCoversId, repeaterPassingCount and repeaterPassRangeSpan — and for
+// the places a new proposal is shown (focusStationOnMap, dockReveal,
+// toggleMapFullscreen) — and back
 // the other way, rerenderStationEditorCard() calls editorRefreshA2Seen() here
 // once the card is on screen, because the heard-slots list reads the readings
 // rather than state.data; to
@@ -62,6 +65,155 @@ function editorNew() {
   state.editorMsg      = null;
   rerenderStations();          // drop any row highlight
   rerenderStationEditorCard(); // show the blank form
+}
+
+// ── A proposed station (0039) ────────────────────────────────────────────────
+// Where a station is meant to go, before it is built or numbered: a name, what
+// kind of station it is to be, the year it is proposed for, and a position.
+// Anybody who may edit may propose one; adding a station outright, and
+// establishing a proposal, are an administrator's — save_station() decides,
+// and this only says so first.
+//
+// "+ Propose" under the station list opens a blank proposal, and What is here
+// (map-here.js) opens one at the point it was asked about, which is the way to
+// say where without typing coordinates. The year is this year until somebody
+// dates it back or forward.
+function editorPropose({ lat = null, lon = null } = {}) {
+  editorNew();
+  Object.assign(state.editorDraft, {
+    lat, lon, proposed: true, proposed_year: new Date().getFullYear(),
+  });
+  rerenderStationEditorCard();
+  editorReveal();
+}
+
+// The editor on screen with focus in its first box — beside the map in the
+// side panel, under it, or a phone's drawer — for the two ways in that start
+// on the map rather than in the list. Out of full screen first, as Station
+// details does (editStationFromCard): there is no "beside" inside it.
+function editorReveal(focusId = 'ef-name') {
+  if (state.mapFullscreen) toggleMapFullscreen(false);
+  requestAnimationFrame(() => {
+    const card = document.getElementById('stations-editor-card');
+    if (!card) return;
+    dockReveal(card);
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const box = document.getElementById(focusId);
+    if (box) box.focus({ preventScroll: true });
+  });
+}
+
+// An administrator, as the database said at sign-in (whoami(): an editor whose
+// meganet.app_user row says admin) — what meganet.is_admin() will say to the
+// save. Signed out, nobody is.
+function editorIsAdmin() {
+  return typeof Auth !== 'undefined' && Auth.mayWrite() && Auth.role() === 'admin';
+}
+
+// The kinds of station, for the Station type box. "Choose one" for a proposal,
+// which has to say, and "not recorded" for a station that does not.
+function stationTypeOptions(cur, proposed) {
+  return [
+    `<option value="">${proposed ? '— choose one —' : '— not recorded —'}</option>`,
+    ...Object.entries(STATION_TYPE_LABEL).map(([k, v]) =>
+      `<option value="${escAttr(k)}"${k === cur ? ' selected' : ''}>${esc(v)}</option>`),
+  ].join('');
+}
+
+// The band across the top of the form while the station is a proposal: what a
+// proposal is, and the year it is proposed for. There for every station and
+// hidden unless it is proposed, so ticking the box below shows it without a
+// repaint that would throw the typing away.
+function editorProposalHtml(s) {
+  const on = !!s.proposed;
+  const year = s.proposed_year ?? (on ? new Date().getFullYear() : '');
+  return `
+    <div class="ef-proposal" id="ef-proposal" ${on ? '' : 'hidden'}>
+      <p class="ef-proposal-lead"><span class="proposed-tag">Proposed</span>
+        <strong>A proposed station</strong> — where one is meant to go, not yet established. It has no
+        station number until it is; an administrator establishes it.</p>
+      <label class="ef-proposal-year">Proposed for (year)
+        <input type="number" id="ef-pyear" min="1900" max="2200" step="1" inputmode="numeric"
+               value="${escAttr(String(year))}">
+      </label>
+      <p class="small ef-hint ef-proposal-hint">
+        This year unless it was put forward earlier or is planned for later — date it either way.
+        Where it would go is its latitude and longitude below: type them, or pick the point on the map
+        with ℹ️ <em>What is here</em> and press <em>Propose a station here</em>.
+      </p>
+    </div>`;
+}
+
+// The Proposed box. Once a station is in the database, whether it is proposed
+// is an administrator's to change — establishing a proposal is adding a
+// station — so for anybody else it is shown, and not changeable, with why. A
+// draft not yet saved is anybody's to tick; the database has the last word
+// when it arrives, and the line under the box says what that word will be.
+function editorProposedBoxHtml(s) {
+  const on = !!s.proposed;
+  const saved = !!state.editorId;
+  const locked = saved && !editorIsAdmin();
+  const why = !locked ? ''
+    : on ? 'Only an administrator establishes a proposed station.'
+         : 'Only an administrator takes an established station back to proposed.';
+  const outright = !saved && typeof Auth !== 'undefined' && Auth.isSignedIn() && !editorIsAdmin();
+  return `
+      <label class="check-label ef-proposed"${locked ? ` title="${escAttr(why)}"` : ''}>
+        <input type="checkbox" id="ef-proposed" ${on ? 'checked' : ''} ${locked ? 'disabled' : ''}
+               onchange="editorProposedChanged(this.checked)"> Proposed — not yet established
+      </label>
+      ${outright ? `<div class="full small ef-hint ef-proposed-hint" id="ef-proposed-hint" ${on ? 'hidden' : ''}>
+        Only an administrator adds a station outright. Tick <em>Proposed</em> and it goes in as a proposal,
+        for an administrator to establish.</div>` : ''}`;
+}
+
+// The box ticked or unticked: the band and its year shown or put away, and the
+// words beside it brought into line — in place, since a repaint of the card
+// would throw away whatever has been typed.
+function editorProposedChanged(on) {
+  const band = document.getElementById('ef-proposal');
+  if (band) band.hidden = !on;
+  const year = document.getElementById('ef-pyear');
+  if (on && year && !year.value) year.value = String(new Date().getFullYear());
+  const hint = document.getElementById('ef-proposed-hint');
+  if (hint) hint.hidden = on;
+  const num = document.getElementById('ef-stnno');
+  if (num) num.placeholder = on ? 'none yet — it is proposed' : '';
+  const blank = document.querySelector('#ef-stype option[value=""]');
+  if (blank) blank.textContent = on ? '— choose one —' : '— not recorded —';
+}
+
+// What a proposal has to say before it is sent: the three things
+// save_station() asks of one, in the editor's words, so a missing one is found
+// at the keyboard rather than after a round trip. Null when there is nothing
+// to say, which includes every station that is not a proposal.
+function editorProposalProblem(d) {
+  if (!d.proposed) return null;
+  const missing = [];
+  if (!d.station_type) missing.push('its type');
+  if (d.proposed_year == null) missing.push('the year it is proposed for');
+  if (d.lat == null || d.lon == null) {
+    missing.push('where it would go — its latitude and longitude, or a point picked with ℹ️ What is here');
+  }
+  if (missing.length) {
+    const list = missing.length === 1 ? missing[0]
+      : `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`;
+    return `Not saved — a proposed station needs ${list}. Your edits are still here.`;
+  }
+  if (d.proposed_year < 1900 || d.proposed_year > 2200) {
+    return `Not saved — ${d.proposed_year} is not a year a station could be proposed for (1900–2200). Your edits are still here.`;
+  }
+  return null;
+}
+
+// A database that has not had 0039 would take a proposal as an ordinary
+// station — and from anybody who may edit — so one that says it is older is
+// not sent the proposal at all. whoami() says which schema answered the
+// session; the Data source panel's own check says it too, if that has run.
+function editorProposalsKnown() {
+  const v = typeof Auth !== 'undefined' && Auth.schemaVersion ? Auth.schemaVersion() : null;
+  const known = v != null ? v : (state.dbStatus && state.dbStatus.version != null ? state.dbStatus.version : null);
+  return known == null || known >= 39 ? null : known;
 }
 
 // Spelled-out "Passing N ALERT addresses across M stations, in R ranges
@@ -146,7 +298,7 @@ function editorForm(s) {
   MapWind.askRegion('ef-wind', s.lat, s.lon);
   return `
     <div class="panel-header ef-head">
-      <h3>${esc(s.name) || 'New Station'}</h3>
+      <h3>${esc(s.name) || (s.proposed ? 'New Proposed Station' : 'New Station')}</h3>
       <div class="button-group">
         <!-- Signed out, the button is not disabled and does not fail at the
              network: it says what is missing and opens the panel that supplies
@@ -163,9 +315,19 @@ function editorForm(s) {
          answer arrives: saved and when, refused and why. A failed save leaves
          everything below untouched — the typing is the thing being protected. -->
     <div id="ef-status" class="small ef-status">${editorStatusHtml()}</div>
+    <!-- A proposal says so first (0039): the band, and the year it is for. -->
+    ${editorProposalHtml(s)}
     <div class="form-grid">
       <label>Name<input type="text" id="ef-name" value="${esc(s.name)}"></label>
-      <label>Station Number<input type="text" id="ef-stnno" value="${esc(s.station_number || '')}"></label>
+      <label>Station Number<input type="text" id="ef-stnno" value="${esc(s.station_number || '')}"
+             ${s.proposed ? 'placeholder="none yet — it is proposed"' : ''}></label>
+      <!-- What kind of station it is, or is to be, and whether it is only
+           proposed (0039). The type is asked of every proposal and allowed on
+           any station; the box is an administrator's once the station is saved. -->
+      <label>Station type
+        <select id="ef-stype">${stationTypeOptions(s.station_type, s.proposed)}</select>
+      </label>
+      ${editorProposedBoxHtml(s)}
       <label>Latitude<input type="number" step="any" id="ef-lat" value="${s.lat ?? ''}"></label>
       <label>Longitude<input type="number" step="any" id="ef-lon" value="${s.lon ?? ''}"></label>
       <!-- Typing a coordinate is the exact form of this that nobody can check.
@@ -585,6 +747,18 @@ function editorReadForm() {
   // emits, so a save that set nothing round-trips without gaining a key.
   const owner = document.getElementById('ef-owner')?.value.trim() || '';
   if (owner) d.owner = owner; else delete d.owner;
+  // The proposal (0039), the same way: `proposed` only where it is, and the
+  // type and the year absent where blank — so a station that never was one
+  // round-trips without gaining a key. The year stays when a proposal is
+  // established, as the record of what was proposed.
+  const proposedBox = document.getElementById('ef-proposed');
+  const proposed = proposedBox ? proposedBox.checked : !!d.proposed;
+  if (proposed) d.proposed = true; else delete d.proposed;
+  const stype = document.getElementById('ef-stype')?.value || '';
+  if (stype) d.station_type = stype; else delete d.station_type;
+  const yearBox = document.getElementById('ef-pyear');
+  const pyear = yearBox ? pInt(yearBox.value) : (d.proposed_year ?? null);
+  if (pyear != null) d.proposed_year = pyear; else delete d.proposed_year;
   d.roles          = [...document.querySelectorAll('input[name="ef-roles"]:checked')].map(b => b.value);
   const inspCfg = document.getElementById('ef-insp-config')?.value || '';
   if (inspCfg) d.inspection_config_key = inspCfg; else delete d.inspection_config_key;
@@ -690,6 +864,24 @@ async function editorSave() {
   const isNew    = !state.editorId;
   const expected = isNew ? null : state.editorStamp;
 
+  // A proposal that does not say what, when or where; and one headed for a
+  // database that would take it for an ordinary station (0039).
+  const unproposed = editorProposalProblem(d);
+  if (unproposed) {
+    setEditorStatus({ kind: 'error', text: unproposed });
+    return;
+  }
+  const older = d.proposed || (!isNew && !!state.editorDraft.proposed) ? editorProposalsKnown() : null;
+  if (older != null) {
+    setEditorStatus({
+      kind: 'error',
+      text: `Not saved — the database is at schema ${older} and does not know proposed stations yet: it would`
+          + ' take this one for a station on the ground. They need db/migrations/0039_proposed_stations.sql'
+          + ' applied first. Your edits are still here.',
+    });
+    return;
+  }
+
   state.editorBusy = true;
   setEditorStatus({ kind: 'busy', text: 'Saving…' });
   rerenderEditorButtons();
@@ -730,9 +922,12 @@ async function editorSave() {
   // that re-fits the view to the whole network moves the ground under them.
   if (state.map) refreshMapLayers({ skipFit: true });
   rerenderStationEditorCard();
+  // A new proposal is shown where it was proposed, with its card up: the
+  // first sight of it is the hollow pin and the band saying it is proposed.
+  if (result.created && saved.proposed && state.map) focusStationOnMap(saved);
   setEditorStatus({
     kind: 'ok',
-    text: `${result.created ? 'Created' : 'Saved'} at ${new Date().toLocaleTimeString()}`
+    text: `${result.created ? (saved.proposed ? 'Proposed' : 'Created') : 'Saved'} at ${new Date().toLocaleTimeString()}`
         + ` as ${result.updated_by || 'you'} — in the database, not just this tab.`,
   });
 }
@@ -782,6 +977,18 @@ async function stationSavePosition(id, lat, lon) {
 // One message per way a save can fail, because "Error" is not an instruction.
 function editorSaveErrorText(err) {
   if (err.conflict) return `${err.message} Your edits are still on screen — copy anything you need, then reload from the datastore.`;
+  // The editors-list refusal's status for another reason (0039): this person
+  // may edit, and adding a station outright or establishing a proposal is an
+  // administrator's. The detail line is what tells the two apart, and the
+  // instruction is different — nothing an administrator has to do to the list.
+  if (err.details === 'administrator') {
+    return state.editorId
+      ? 'Not saved — only an administrator establishes a proposed station, or takes an established one back to'
+        + ' proposed. Anything else about it is yours to change: leave Proposed as it was and save again.'
+        + ' Your edits are still here.'
+      : 'Not saved — only an administrator adds a station outright. Tick Proposed, give it a type and a year,'
+        + ' and save it as a proposal for an administrator to establish. Your edits are still here.';
+  }
   // Two different situations arrive as the same refusal, and the instruction is
   // different for each: one is fixed at the keyboard, the other needs somebody
   // with SQL access. Telling them apart from what this browser knows is the

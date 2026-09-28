@@ -1304,6 +1304,12 @@ function identitySection(st, doc) {
     owner: doc.owner || null,
     owner_note: doc.owner ? null : 'No owner recorded on the station; the SLS entry (service_level) names one where it lists the station.',
     enabled: doc.enabled !== false,
+    // Whether it is only proposed — where a station is meant to go, not yet
+    // built or numbered — what kind it is or is to be (a meganet.station_type
+    // code), and the year it is proposed for (0039).
+    proposed: doc.proposed === true,
+    station_type: doc.station_type || null,
+    proposed_year: doc.proposed_year ?? null,
     roles: doc.roles || [],
     kinds: stationKinds(doc),
     location_types: doc.location_types || [],
@@ -1601,6 +1607,15 @@ async function radioSection(rc, doc, id, networks, rmSystems) {
   };
 }
 
+// meganet.station_type's four (0039), in the words a sentence needs — the
+// app's STATION_TYPE_LABEL (core.js), with its article.
+const STATION_TYPE_WORDS = {
+  auto_water_level: 'an automatic water level station',
+  auto_rain_gauge: 'an automatic rain gauge',
+  manual_water_level: 'a manual water level station',
+  manual_rain_gauge: 'a manual rain gauge',
+};
+
 function summaryLines(doc, d) {
   const lines = [];
   const kinds = stationKinds(doc);
@@ -1611,6 +1626,14 @@ function summaryLines(doc, d) {
   lines.push(`${doc.name}${doc.station_number ? ` (Bureau number ${doc.station_number})` : ''} is a `
     + `${kinds.length ? kinds.join(' and ') : 'field'} station${where ? ` in the ${where}` : ''}`
     + `${d.location.hub?.name ? `, maintained from the ${d.location.hub.name}` : ''}.`);
+  // A proposal says so next (0039): everything after it is about where a
+  // station would be, not where one is.
+  if (doc.proposed === true) {
+    const type = STATION_TYPE_WORDS[doc.station_type];
+    lines.push(`It is proposed, not yet established${type ? `: ${type}` : ''}`
+      + `${doc.proposed_year ? `, proposed for ${doc.proposed_year}` : ''}`
+      + `${doc.station_number ? '' : ', with no Bureau number until it is'}.`);
+  }
   if (d.location.elevation_ahd_m != null) lines.push(`Ground height ${d.location.elevation_ahd_m} m AHD (${d.location.elevation_source}).`);
   const sl = d.service_level;
   if (sl.status === 'ok') {

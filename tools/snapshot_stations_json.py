@@ -73,7 +73,9 @@ KEY_ORDER = {
     'rm_system': ['id', 'name', 'tx_power_w', 'line_loss_db', 'supp_loss_db_m',
                   'antenna_type', 'antenna_gain_dbi', 'antenna_height_m',
                   'rx_threshold_dbm'],
-    'station': ['id', 'name', 'station_number', 'lat', 'lon', 'elevation_ahd',
+    # A proposal (0039) says so beside its number, which it does not have yet.
+    'station': ['id', 'name', 'station_number', 'proposed', 'station_type',
+                'proposed_year', 'lat', 'lon', 'elevation_ahd',
                 'elevation_source', 'owner',
                 'roles', 'radio_network_ids', 'catchment_ids', 'alert_ids',
                 'satcom', 'rm_system_id', 'enabled', 'notes', 'legacy_unit_id',

@@ -250,6 +250,18 @@ border colour and an inset band): the class that sets it is toggled from
 inside the card's own `ResizeObserver`, and a class that moved the card's edge
 there would move it again.
 
+**A proposed station is `--warn` with dashes** (0039): the tag beside its name
+(`.proposed-tag`) on the card, in the list, on the trail, over the twin and on
+a phone's callout, the band its card and the editor open with, and — on the map
+— a hollow pin, white inside a dashed ring of its role's colour
+(`MAP_PIN_PROPOSED_*`, `app.js`, which are Leaflet path options and so literals,
+like the wind fills). The warning colour because a proposal qualifies
+everything said about it, which is what `--warn` is for; the dashes because
+they are what carries "planned, not built" without the colour — the cartographic
+convention, and the one thing the tag, the band and the pin all share. The
+text holds `--warn`'s own contrast on its tint in both themes, the tint being
+12% of the same token over `--panel`.
+
 ---
 
 ## 2. Breakpoints
@@ -750,6 +762,18 @@ Three things that are not optional:
 
 Not a modal, and it does not trap focus: it is a disclosure, `aria-expanded`
 says so, and Shift+Tab off the first control lands back on the icon.
+
+**The one control on the map that carries words: the station trail.** The pill
+beside the zoom buttons (`station-trail.js`) names a station, because naming the
+station the card was last on is its whole job — an icon could not say *which* —
+so it breaks the rule above on purpose and keeps to the rest of it. It is one
+row whatever the name (the name gives way, with an ellipsis); it is not there at
+all until a station has been looked at; and the list is a disclosure like the
+panels', down only when asked for, away on Escape, a press elsewhere or a pick.
+It is not a `MapChrome` control, because it is not in a corner: it stands in the
+top row beside the corner's zoom buttons, and in the twin — whose corner stands
+down — at the top of the stage beside the flood scale. Anything else that wants
+words on a map still has to ask first.
 
 ### Full screen — fix the anchor, never reparent
 

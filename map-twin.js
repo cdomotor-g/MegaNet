@@ -11,8 +11,9 @@
 // After core.js, digital-twin.js and map-3d.js, before init.js — index.html
 // holds the order and the reasons. Reaches back to core.js for `state`,
 // esc, escAttr, announce and acmaHaversineKm; across to digital-twin.js for
-// the scene (DigitalTwin.stageHtml, mountAt, stop, prefetch, patchSize), and
-// to app.js for the Leaflet map it is attached to. Every one of those is a
+// the scene (DigitalTwin.stageHtml, mountAt, stop, prefetch, patchSize), to
+// app.js for the Leaflet map it is attached to, and to station-trail.js for
+// the pill that stands at the top of its stage. Every one of those is a
 // runtime call from inside this file's own functions, so its position among
 // the modules is free. Nothing executes at load (`npm run toplevel`).
 //
@@ -308,7 +309,8 @@ const MapTwin = (function () {
         <div class="map-twin-bar">
           <button type="button" class="map-twin-back" onclick="MapTwin.leave()"
                   title="Back to the map, one zoom level out">← Map</button>
-          <span class="map-twin-title" title="${escAttr(st.name)}${st.station_number ? ` · ${escAttr(st.station_number)}` : ''}"><strong>${esc(st.name)}</strong>
+          <span class="map-twin-title" title="${escAttr(st.name)}${st.station_number ? ` · ${escAttr(st.station_number)}` : ''}${st.proposed ? ' · proposed, not yet established' : ''}"><strong>${esc(st.name)}</strong>${
+            typeof proposedTagHtml === 'function' ? proposedTagHtml(st, { short: true }) : ''}
             <span class="small map-twin-label">digital twin${st.station_number ? ` · ${esc(st.station_number)}` : ''}</span></span>
           <span class="button-group map-twin-actions">
             <button type="button" id="twin-walk" aria-pressed="false" onclick="DigitalTwin.toggleWalk()"
@@ -354,6 +356,9 @@ const MapTwin = (function () {
     // `why` is the twin's own way out: 'wheel' for a wheel past the widest
     // orbit, 'escape' for the key.
     DigitalTwin.mountAt(st.id, { leave: why => leave(why === 'wheel') });
+    // A twin opened is a station looked at, and the trail's pill moves to the
+    // top of this stage, beside the flood scale (station-trail.js).
+    if (typeof StationTrail !== 'undefined') StationTrail.visit(st.id);
     // The result of what the operator did — asked for the twin — said once,
     // with the way back (core.js's live-region rules).
     announce(`Digital twin of ${st.name}. Press Escape, or ← Map, for the map.`);
@@ -373,6 +378,8 @@ const MapTwin = (function () {
     DigitalTwin.stop();
     if (host) { host.classList.remove('is-on'); host.innerHTML = ''; }
     releaseLeaflet();
+    // …and back beside the zoom buttons, which are back on the map.
+    if (typeof StationTrail !== 'undefined') StationTrail.sync();
     // A snap, not a slide: the twin has just covered the map, so there is no
     // picture to animate from, and a zoom animation left in flight would
     // overrule the next view the operator asks for when it ends.

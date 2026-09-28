@@ -610,6 +610,11 @@ const Auth = (function () {
     mayWrite:   () => !!session && (who ? who.may_write !== false : true),
     email:      () => (who && who.email) || (session && session.email) || null,
     role:       () => (who && who.role) || null,
+    // The schema the database answering this session is at, as whoami()
+    // echoes it (0005), or null before it has answered. What the editor asks
+    // before it sends a proposal to a database that would not know one (0039).
+    schemaVersion: () => (who && who.schema_version != null && who.schema_version !== ''
+      ? Number(who.schema_version) : null),
   };
 })();
 if (typeof window !== 'undefined') window.Auth = Auth;

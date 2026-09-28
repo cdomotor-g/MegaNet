@@ -6556,6 +6556,238 @@ hr {
   }
 }
 
+/* ── The station trail (station-trail.js) ────────────────────────────────────
+   The stations looked at this session, as a pill in the Stations map's top
+   row: right of the zoom buttons on the map and in 3-D, right of the flood
+   scale's column in the twin. The script measures where that is and hands it
+   over — --trail-x and --trail-y from the stage's top-left corner and the room
+   before the top-right corner's control (--trail-room), and for the list its
+   width, how far left it has to start to stay on the map and the height under
+   it (--trail-drop-w, -x, -h) — and everything else is here.
+
+   Over the station card, the twin and its offer (690 to 800) and a phone's
+   sheet (1100, above), since its list drops down over all of them; over
+   Leaflet's corners (1000), whose one control on this map, ↺, it stops short
+   of. The box takes no pointer itself — only the pill and the list do. */
+.stn-trail {
+  position: absolute;
+  top: var(--trail-y, 10px);
+  left: var(--trail-x, 52px);
+  z-index: 1110;
+  display: flex;
+  max-width: var(--trail-room, calc(100% - 8rem));
+  pointer-events: none;
+}
+
+.stn-trail[hidden] { display: none; }
+
+/* One row, whatever the name: the name gives way first, with an ellipsis, and
+   the tooltip has it whole. A zoom button's height, beside them. "+3" is how
+   many more are in the list, and short of room (.is-tight) the 📍 stands down
+   so the name has what there is. */
+.stn-trail-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  margin: 0;
+  padding: .2rem .7rem .2rem .55rem;
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 1.25;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-pill);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, .3);
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.stn-trail-pill:hover { background: var(--subtle); }
+.stn-trail.is-open .stn-trail-pill { border-color: var(--accent); }
+.stn-trail-ico,
+.stn-trail-more,
+.stn-trail-caret { flex: 0 0 auto; }
+.stn-trail-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.stn-trail-more { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.stn-trail-caret { color: var(--muted); }
+.stn-trail.is-tight .stn-trail-ico { display: none; }
+
+/* The list: under the pill, 19 rem where the map has it, started further left
+   where the pill is too far right for that, and scrolled inside itself past
+   what the map has under it. */
+.stn-trail-drop {
+  position: absolute;
+  top: calc(100% + var(--sp-1));
+  left: var(--trail-drop-x, 0px);
+  width: var(--trail-drop-w, 19rem);
+  max-height: var(--trail-drop-h, 20rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-1);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+  pointer-events: auto;
+}
+
+.stn-trail-drop[hidden] { display: none; }
+.stn-trail-lead { margin: .2rem .45rem .35rem; font-size: var(--fs-xs); color: var(--muted); }
+.stn-trail-list { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
+
+.stn-trail-item {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: .35rem .5rem;
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+}
+
+.stn-trail-item:hover { background: var(--subtle); border-color: var(--border); }
+
+/* The one looked at last — the one the pill names. */
+.stn-trail-item.is-current {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.stn-trail-item.is-current .stn-trail-item-name { font-weight: 600; }
+
+/* Its role's colour, as its pin is drawn. */
+.stn-trail-dot {
+  flex: 0 0 auto;
+  width: .6rem;
+  height: .6rem;
+  border-radius: 50%;
+  background: var(--dot);
+  box-shadow: 0 0 0 1px var(--panel), 0 0 0 2px var(--border);
+}
+
+.stn-trail-item-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stn-trail-item-num { flex: 0 0 auto; color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+
+/* On a touch screen the pill is still drawn a zoom button's height, and what a
+   finger presses is the pill and a little above and below it — over the 44 px
+   floor (EPIC #107) — as the twin's ⏸ pill is. The rows are a finger each. */
+@media (pointer: coarse) {
+  .stn-trail-pill { position: relative; }
+  .stn-trail-pill::after {
+    content: '';
+    position: absolute;
+    inset: -.3rem 0;
+    border-radius: var(--r-pill);
+  }
+  .stn-trail-item { min-height: 2.75rem; }
+}
+
+/* In the twin the card's top stays under the pill's row, where the zoom
+   buttons kept it on the map (5.75 rem, .stn-card): the twin's bar and the
+   lines over its stage put the stage, and the pill with it, lower than that.
+   --stn-trail-foot is the pill's foot, from the script. Not on a phone, whose
+   card is a sheet along the foot of the map. */
+@media not all and (max-width: 560px) {
+  .mn-map-stage:has(#map-twin.is-on):has(.stn-trail:not([hidden])) .stn-card {
+    max-height: calc(100% - 1.2rem - max(5.75rem, var(--stn-trail-foot, 0px)));
+  }
+}
+
+/* …the pill that offers a nearby station's flood levels, which has the twin's
+   corner where there is no scale, keeps to the scale's column, so it ends
+   where the trail begins… */
+.mn-map-stage:has(.stn-trail:not([hidden])) #map-twin .twin-flood-pill {
+  max-width: min(12rem, calc(50% - var(--sp-2)));
+}
+
+/* …and while the pin is being moved in the twin, its panel has the corner and
+   the row beside it, and the trail stands down as the scale does. */
+.mn-map-stage:has(#map-twin.is-on #twin-movepin-panel:not([hidden])) .stn-trail {
+  display: none;
+}
+
+/* ── A proposed station (0039) ────────────────────────────────────────────────
+   Planned and not built, said the same way everywhere it is named: a tag in
+   the warning colour with a dashed edge — the dashes of its hollow pin on the
+   map (MAP_PIN_PROPOSED_*, app.js) — beside its name on the card, in the list,
+   on the trail, over the twin and on a phone's callout; a band at the head of
+   its card and of the editor saying what that means; and a swatch in the
+   legend. */
+.proposed-tag {
+  display: inline-block;
+  margin-left: .35rem;
+  padding: 0 .45rem;
+  border: 1px dashed var(--warn);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--warn) 12%, var(--panel));
+  color: var(--warn);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: .03em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.stn-trail-item .proposed-tag { flex: 0 0 auto; margin-left: 0; }
+
+/* The band the card opens with: it qualifies everything under it. */
+.stn-card-proposed {
+  background: color-mix(in srgb, var(--warn) 9%, var(--panel));
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+
+.stn-card-proposed-head { margin: 0; }
+.stn-card-proposed-head .proposed-tag,
+.ef-proposal-lead .proposed-tag { margin: 0 .35rem 0 0; }
+.stn-card-proposed-line { margin: .2rem 0 0; }
+
+/* …and the editor's, with the year it is proposed for. */
+.ef-proposal {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px dashed var(--warn);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--warn) 8%, var(--panel));
+}
+
+.ef-proposal[hidden] { display: none; }
+.ef-proposal-lead { margin: 0; font-size: var(--fs-sm); }
+
+/* The Proposed box beside the Station type it goes with: a box and its words
+   on one line (the grid's labels are a caption over a field), level with the
+   select rather than its caption. */
+.form-grid .ef-proposed {
+  display: flex;
+  align-self: end;
+  min-height: 2.4rem;
+}
+.ef-proposal-year { display: grid; gap: .25rem; max-width: 14rem; font-size: var(--fs-sm); }
+.ef-proposal-hint { margin: 0; }
+
+/* The legend's swatch: the pin, hollow in a dashed ring. */
+.legend-dot-proposed {
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: 2px dashed var(--dot);
+  background: #fff;
+}
+
 /* Find a control, at the top of the 👁️ Map display flyout (#186). The panel is
    a dozen switches, three sliders, four selects, a radio group and the ACMA
    block under four headings, and it scrolls — so it is sticky rather than

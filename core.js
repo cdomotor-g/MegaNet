@@ -552,6 +552,23 @@ const HELP = {
       + 'it and pulses a gold ring round its pin. On a phone a tap opens a small callout with '
       + '<em>Details &amp; actions</em> and <em>Copy lat, lon</em>, and the card opens as a '
       + 'sheet across the bottom of the map, with the leader up to the pin.',
+      'The <strong>📍 pill</strong> in the map\'s top row, beside the zoom buttons, names the station '
+      + 'whose card you last had up: press it and a card you closed comes back, and the stations '
+      + 'you have looked at this session drop down under it, the latest first. Pick one and the map '
+      + 'goes there, zoomed in, the station is selected and its card comes up. Looking at a station '
+      + 'again — a pin, a row, its twin — moves it back to the top, so going back and forth between '
+      + 'two keeps both at the head of the list. In the digital twin the pill is at the top of the '
+      + 'view, beside the flood scale, and a pick takes the twin to that station. The list lasts '
+      + 'as long as the browser tab does.',
+      'A <strong>proposed station</strong> is where one is meant to go, not yet built. <strong>+ '
+      + 'Propose</strong> under the station list opens one: a name, its <em>Station type</em> — an '
+      + 'automatic or manual water level station, an automatic or manual rain gauge — the year it is '
+      + 'proposed for (this year, or any year back or forward), and where it would go; '
+      + '<strong>ℹ️ What is here</strong> offers <em>Propose a station here</em> at the point it was '
+      + 'asked about. It needs no station number. Anybody who may edit may propose one; adding a '
+      + 'station outright, and establishing a proposal (unticking <em>Proposed</em>), are an '
+      + 'administrator\'s. A proposal is drawn hollow in a dashed ring, and is tagged '
+      + '<em>Proposed</em> on its card, in the list and on the trail.',
       'A station the Bureau\'s Queensland flood warning station lists name has a <strong>Bureau '
       + 'flood warning details</strong> section on its card: which of the Bureau\'s indexes list '
       + 'it (FloodWarn rainfall, daily rainfall, river height), its AWRC number, the stream it '
@@ -1565,6 +1582,35 @@ const ROLE_LABEL = {
   satcom:   'Satcom',
 };
 
+// What kind of station a station is, or is proposed to be (0039):
+// meganet.station_type's four rows, in its order. Written out here rather than
+// read from the database, as ROLE_LABEL is: the editor offers them in a session
+// that loaded a file, and save_station() refuses a code it does not know
+// whichever list the tab offered. A new kind is a row there and a line here.
+const STATION_TYPE_LABEL = {
+  auto_water_level:   'Automatic water level station',
+  auto_rain_gauge:    'Automatic rain gauge',
+  manual_water_level: 'Manual water level station',
+  manual_rain_gauge:  'Manual rain gauge',
+};
+
+function stationTypeLabel(code) {
+  return code ? (STATION_TYPE_LABEL[code] || code) : '';
+}
+
+// A proposed station, named the same way wherever it is named (0039): a tag
+// beside it on the station card, in the station list, on the trail and over
+// the twin, with what it is proposed as and for when on its tooltip. `short`
+// leaves the year off the tag itself. Empty for a station that is not
+// proposed.
+function proposedTagHtml(s, { short = false } = {}) {
+  if (!s || !s.proposed) return '';
+  const what = [stationTypeLabel(s.station_type), s.proposed_year ? `proposed for ${s.proposed_year}` : '']
+    .filter(Boolean).join(', ');
+  return `<span class="proposed-tag" title="${escAttr(`Proposed — not yet established${what ? `: ${what}` : ''}.`)}"`
+    + `>Proposed${!short && s.proposed_year ? ` ${esc(String(s.proposed_year))}` : ''}</span>`;
+}
+
 // ── ARRO ──────────────────────────────────────────────────────────────────────
 // ARRO (Contrail) is where a station's telemetry actually lives, and the only
 // key it accepts is `site.db_id` — an arbitrary database index, *not* the BoM
@@ -2020,7 +2066,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 38;
+const DB_SCHEMA_VERSION = 39;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

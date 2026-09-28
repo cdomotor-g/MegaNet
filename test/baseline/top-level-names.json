@@ -71,6 +71,7 @@
     "twin-presence.js",
     "twin-cadastre.js",
     "map-twin.js",
+    "station-trail.js",
     "modal.js",
     "packets.js",
     "alert2.js",
@@ -83,6 +84,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 795,
-  "distinct": 795
+  "total": 811,
+  "distinct": 811
 }

@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-28** (revision 108 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-28** (revision 109 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -503,6 +503,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Four AI rows, and six `[Human]` issues.
 >
+> **Revision 109 opens and closes nothing** — two session requests in one commit: a **📍 pill in the Stations map's top row** that brings back a station card you closed and drops down the stations looked at this session, latest first, each a way back to it (`station-trail.js`; in the twin it stands beside the flood scale), and **proposed stations** — a name, a type (an automatic or manual water level station, an automatic or manual rain gauge), a year and a place, no station number — which anybody who may edit may propose, while adding a station outright and establishing a proposal become an administrator's (`0039`). The allocation below is unchanged. Two steps came out of it, listed at the foot of the revision entry and unfiled pending the owner: **`0039` to the live project**, without which the editor refuses to send a proposal (the live database is at 38), and **then the agent API's compact rows carrying the three columns**, which cannot be asked for before `0039` is there.
+>
 > **Revision 108 opens and closes nothing** — the field photo viewer gets a compass (a wedge per photo taken at the spot, clicked to bring one up, overlapping ones boxed in gold), a ± in red when a fix is looser than 7 m, a spot's photos in compass order, and a map to move a photo's pin on — from a session request. **#201 is half done by it** (the viewer's place editor; the queue's and the Stations map's own pin are left) and stays open at `[Sonnet5/Med]`, so the allocation below is unchanged. One step for a person came out of it — **the ± of the Solocator photos already stored, read off their pictures from the viewer, a spot at a time** — listed at the foot of the revision entry and unfiled pending the owner.
 >
 > **Revision 107 opens and closes nothing** — it is revision 105's one person-step done: **`0038` is live**, applied from an agent session over the Supabase connection at the owner's choice, run only after the database had fetched it from the repository at `1ad2b49` and its SHA-256 matched, and `select meganet.load_sls_from_github();` loaded both documents — 3,392 Queensland rows and 1,433 NSW. The database's merge of them matches the app's file on all 4,141 locations and 28 fields each. The live project is at schema version 38, the version the app expects, so the Data source panel no longer reads *schema mismatch*, and the agent API quotes both documents. The allocation below is unchanged; revision 104's person-steps, less its first, stand, unfiled pending the owner.
@@ -659,6 +661,61 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 109 — 2026-09-28: the stations you looked at, a pill away; and a station can be proposed
+
+From one session request with two asks, in one commit. It opens and closes
+nothing.
+
+**The trail (`station-trail.js`).** Closing the station card was a decision
+that held, and nothing brought it back short of finding the pin again. A 📍
+pill now stands in the map's top row beside the zoom buttons, naming the
+station the card was last on: pressed, the card comes back and the stations
+looked at this session drop down under it, the latest first. A pick selects
+the station as its row does, puts its card up and moves the map to it, zoomed
+in (zoom 15, or as close as the map was). A pin, a row, a path's far end, a
+twin opened and a phone's tapped callout each put their station at the head,
+once. The request placed it: top left, **right of the flood scale** in the
+twin, which stays where it was, since the pill folds to one row and the scale
+does not. It is a child of the map's stage, not of the twin's overlay, so its
+list drops over the card — which in the twin is kept below the pill's row. The
+list is `sessionStorage`'s: a reload keeps it, closing the tab forgets it; the
+latest hundred.
+
+**Proposed stations (`0039`).** A proposal has a name, a `station_type` (a new
+vocabulary of four: an automatic or manual water level station, an automatic
+or manual rain gauge), a `proposed_year` (this year unless dated back or
+forward, 1900–2200) and a position; no station number. `proposed` true marks
+it. **The request also set who may do what**, and `save_station()` now holds
+it: anybody who may edit may propose and edit a proposal; adding a station
+outright and establishing a proposal (or taking an established one back) are
+an administrator's (`is_admin()`, `0036`) — refused otherwise with `42501` and
+the detail `administrator`, which the editor words as that rather than as
+"not on the editors list". **That is a change for editors who are not
+administrators: + New no longer saves for them**, and the form says so before
+they try. + Propose sits beside + New, and What is here proposes at its point.
+On the map a proposal is hollow in a dashed ring; its card opens with a band
+saying it is not established; it is tagged in the list, on the trail, over the
+twin and on a phone's callout. The three keys are optional in the document, so
+`stations.json` is unchanged. The agent API's dossier says so first; its
+compact rows cannot yet (below).
+
+**Checks.** Two new, and CI runs both: `npm run trail` (48 assertions) and
+`npm run proposed` (36), and `tools/check_proposed_stations.sql` (40) in the
+db-checks job. `npm run agentapi` grows by four (247). The whole db-checks job
+was run from zero against a local Postgres 16 with `0039` in the chain and
+passes.
+
+**Not filed, pending the owner:**
+- **`0039` to the live project.** Until it is there the editor will not send a
+  proposal — it reads the schema whoami() reports and says so — and the Data
+  source panel reads *schema mismatch* (the app expects 39). Apply as `0036`–`0038`
+  were; it has no data step.
+- **Then the agent API's compact rows.** `COMPACT_SELECT` names station columns,
+  and a worker deployed before `0039` asking for `proposed` would have every
+  search refused — so the three go into it, and into `compactRow`, once the
+  migration is live. Until then an agent sees a proposal as one in `station`
+  and the dossier, and docs/agent-api.md says to check there.
 
 ### Revision 108 — 2026-09-28: the photo viewer gets a compass, a red ± for a rough fix, and a map to move a photo on
 

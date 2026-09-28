@@ -7,7 +7,8 @@
 // Reaches back to core.js for `state`, esc/escAttr, acmaHaversineKm,
 // stationLatLonText and copyLatLonPillHtml; across to terrain.js, land-cover.js,
 // map-wind.js, map-catchments.js, map-hubs.js and map-survey.js for the answers,
-// and to app.js for the card furniture it shares with the station card. All of
+// to app.js for the card furniture it shares with the station card, and to
+// station-editor.js for the proposed station it opens at the point. All of
 // it from inside its own functions, so this file's position among the modules
 // is free.
 //
@@ -315,6 +316,12 @@ const MapHere = (function () {
         <button type="button" class="pill${armed ? ' is-on' : ''}" onclick="MapHere.arm()"
                 aria-pressed="${armed}"
                 title="Pick another point">📍 ${armed ? 'Click the map…' : 'Pick another point'}</button>
+        <!-- The way to say where a proposed station would go (0039): the
+             editor opens on a proposal at this point, for a name, a type and
+             a year. -->
+        <button type="button" class="pill" onclick="MapHere.propose()"
+                title="Propose a station at this point: the editor opens with its position filled in, for a name, a type and the year it is proposed for"
+                >📌 Propose a station here</button>
       </div>
       <p class="small acma-card-note">
         Ground height and land cover are read off ~30 m terrain and a 10 m raster — context for
@@ -464,6 +471,15 @@ const MapHere = (function () {
 
     zoom() {
       if (map && at) map.setView(at, Math.max(map.getZoom(), 14), { animate: true });
+    },
+
+    // A proposed station at this point (0039): the editor, on a proposal with
+    // the point's position in it — to six decimals, a tenth of a metre, which
+    // is finer than the pick. The card and its pin stay, marking where.
+    propose() {
+      if (!at) return;
+      const round = v => Math.round(v * 1e6) / 1e6;
+      editorPropose({ lat: round(at[0]), lon: round(at[1]) });
     },
 
     goToStation(id) {

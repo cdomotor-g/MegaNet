@@ -86,6 +86,9 @@ MegaNet/
 ├── map-locate.js           ← MapLocate — GPS dot, accuracy ring, compass cone
 ├── map-move-pin.js         ← MapMovePin — drag one station's pin to where the
 │                             station is, and save the coordinates
+├── station-trail.js        ← StationTrail — the stations looked at this session:
+│                             a pill in the map's top row that brings a closed
+│                             card back and goes back to any of them
 ├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
 ├── digital-twin.js         ← DigitalTwin — Digital Twin tab: one station's ground in
 │                             3-D, the station as built, its neighbours and bridges,
@@ -213,6 +216,8 @@ MegaNet/
 │   ├── exposure.mjs         (the station card's tides and soils, a failed source never "none")
 │   ├── twinsite.mjs         (the twin's site: the station as built, neighbours, bridges, the offer)
 │   ├── twinpin.mjs          (move pin in the twin's tab, the map's twin and ⛰️ 3-D)
+│   ├── trail.mjs            (the stations looked at: the pill, its list, a pick, the twin, a phone)
+│   ├── proposed.mjs         (proposed stations: + Propose, the pin and card, who may establish)
 │   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
 │   ├── syntax-check.mjs     (node --check over every script index.html loads)
@@ -224,6 +229,7 @@ MegaNet/
 │   ├── check_inspections.sql (psql: prove the inspection schema — 90 checks, rolls back)
 │   ├── check_field_photos.sql (psql: prove the field photo doors (0035) — 83 checks, rolls back)
 │   ├── check_photo_review.sql (psql: prove the upload log, the administrator and the equipment register (0036) — 113 checks, rolls back)
+│   ├── check_proposed_stations.sql (psql: prove proposed stations and who may add or establish one (0039) — 40 checks, rolls back)
 │   ├── field-photos/        (the Dropbox and Google Drive → MegaNet photo sync, run by field-photos-dropbox.yml and field-photos-gdrive.yml)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
@@ -325,6 +331,17 @@ it:
   the list came from `stations.json` rather than the datastore, load from the
   datastore before editing: otherwise Save would write what is on screen over
   whatever the database has since been told.
+* **Anybody who may edit may propose a station; adding one outright is an
+  administrator's.** **+ Propose** beside **+ New** under the station list — or
+  *Propose a station here* on **ℹ️ What is here**, at the point it was asked
+  about — opens a proposal: a name, its *Station type* (an automatic or manual
+  water level station, an automatic or manual rain gauge), the year it is
+  proposed for (this year, or any year back or forward) and where it would go.
+  It needs no station number. An administrator establishes it by unticking
+  *Proposed* and giving it one; the type and the year stay, as the record of
+  what was proposed. A proposal is drawn hollow in a dashed ring on the map and
+  tagged *Proposed* on its card, in the list and on the trail. The database
+  enforces all of it (`0039`); see `db/README.md`, *Proposed stations*.
 
 The contract, the SQL and the `curl` proof that a stranger cannot write are in
 [`db/README.md`](db/README.md) under **Writing**.
@@ -825,6 +842,9 @@ Each entry in the `stations` array represents one node in the network. A node ca
 | `urbs_label` | `string` | The station's node in the Bureau's URBS runoff-routing model. Not unique — a TM and the ALERT gauge beside it read the same place. Absent when not recorded |
 | `aep_levels` | `object[]` | The modelled water level at the station in four floods — `aep_1_m`, `aep_0_5_m`, `aep_0_2_m`, `aep_0_066_m` (the 1%, 0.5%, 0.2% and 0.066% annual exceedance probability events, m AHD) — over `ground_m`, at the sheet's `point_lat`/`point_lon`, with the sheet's `data_quality` (1–3), `level_difference` (1–3) and `confidence` (1–9), its `source` and `as_at`; then the indicative flood velocity's assumptions, `setting` (`channel` or `floodplain`), `slope` (m/m) with `slope_basis`, and `manning_n`, and a `note`. One row per sheet. **Absent when there are none.** Indicative, not observed. See `db/README.md`, *AEP flood levels and frequencies* |
 | `frequencies` | `object[]` | RX/TX pairs beyond a repeater's own: `rx_mhz`, `tx_mhz`, `label` (what the channel is for), `acma_licence`. `repeater.rx_mhz`/`tx_mhz` stays the primary pair every path tool reads; a base station keeps all its pairs here. Absent when there are none |
+| `proposed` | `boolean` | `true` while the station is **proposed and not yet established** — where one is meant to go, with no station number yet (`0039`). **Absent, never `false`**, on every other station. Setting or clearing it on a saved station is an administrator's, as is adding a station that is not a proposal |
+| `station_type` | `string` | What kind of station it is, or is proposed to be: `auto_water_level`, `auto_rain_gauge`, `manual_water_level` or `manual_rain_gauge` (`meganet.station_type`). Required of a proposal, allowed on any station. Absent when not recorded |
+| `proposed_year` | `number` | The year the station is proposed for — this year when it is proposed, unless somebody dates it back or forward (1900–2200). Required of a proposal, and kept once it is established. Absent when not recorded |
 | `flood_peaks` | `object[]` | The station's five largest floods from HDB's peak flood heights, one per July–June season, largest first: `date` (the Queensland day where HDB gives the hour, else `yyyy-mm` or `yyyy`), `height_m` (on the gauge as it then stood) and `level_m_ahd` — the level reached, through the gauge zero in force that day, **absent** where that zero is not in AHD or the height disagrees with the gauge's flood levels. **Read-only**: worked out by the database from `meganet.flood_peak` and the gauge survey, never saved through the editor. Absent when HDB lists none. See `db/README.md`, *HDB's flood peaks* |
 
 > **`site` / `sensors`** are the authoritative sensor records — the `alert_ids`
@@ -1166,6 +1186,24 @@ since #191, because uppercase small caps in `--muted` was the whole of the
 separation and an eye going down a single column of tick boxes reads a heading
 as one more row unless something physically stops it — and a first visit is told
 about the button once.
+
+**The trail of stations looked at (`station-trail.js`).** Closing the card is a
+decision that holds, and nothing brought it back short of finding the pin again
+— at zoom 6 one pin in thousands, and in the twin not a pin at all. So a 📍 pill
+in the map's top row, beside the zoom buttons, names the station the card was
+last on: press it and the card comes back, and the stations looked at this
+session drop down under it, the latest first, the pill's own marked. A pick
+selects the station as its row in the list does, puts its card up and moves the
+map to it, zoomed in (to zoom 15, or as close as the map already was); looking
+at a station again — a pin, a row, a path's far end, its twin, a tap on a
+phone — moves it back to the top, so going back and forth between two keeps
+both at the head. It folds to one row whatever the name, and Escape, a press
+elsewhere or a pick puts the list away. In the digital twin, whose zoom buttons
+stand down, the pill is at the top of the stage beside the flood scale's column
+— the scale stays where it was — and a pick takes the twin to that station; the
+card is kept below the pill's row there, so the one never covers the other. The
+list is the tab's (`sessionStorage`): a reload keeps it and closing the tab
+forgets it, and it holds the latest hundred.
 
 **Reset (#191).** A fifth corner button, **↺**, and the one gesture that puts the
 map back the way it was found: the filters and the search behind them, the
@@ -4214,7 +4252,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Fifty-nine checks. The twenty-two below are the ones a change to the front end
+Sixty-two checks. The twenty-two below are the ones a change to the front end
 meets first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |
@@ -4259,7 +4297,7 @@ then clicks its way through the RF Changes and Interference Workbench controls,
 keyed by the handler each one names rather than by its label. See
 `test/lib/controls.mjs`.
 
-CI runs all fifty-two on any push touching a root `*.js`, `index.html`, `styles.css`,
+CI runs all sixty-two on any push touching a root `*.js`, `index.html`, `styles.css`,
 `stations.json`, `db/migrations/`, `test/` or the inspection workbook in
 `archive/`. The filter is a glob rather than a list of filenames
 because the app's script list grew with every milestone of the split — a named

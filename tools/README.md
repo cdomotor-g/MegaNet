@@ -585,6 +585,27 @@ and needs the stations loaded no more than check_field_photos.sql does.
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_photo_review.sql
 ```
 
+## `check_proposed_stations.sql` — prove the proposed stations and who may add one
+
+40 checks over `0039`, in a transaction that rolls back: the four station types
+and their RLS, no station already in the register proposed and no station
+document gaining a key; then, signed in as an editor, an administrator, a
+stranger, anonymously and as the secret key, what a proposal has to say (its
+type, its year and its place, each missing one refused in words, and a year
+dated back and forward) and who may do what — an editor proposing and editing a
+proposal but refused a station outright or its establishment, with the detail
+`administrator` that tells that refusal from the editors-list one; an
+administrator adding outright, establishing (the flag gone, the type and year
+kept) and taking back; a stale tab told it is stale first; the two checks on
+`meganet.station` holding round `save_station()` — and the whole register back
+through `load_stations_doc()` with a proposal in it, rewriting nothing else. It
+signs up two people through the real signup triggers (0005) and wants the
+stations loaded, as CI has them.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_proposed_stations.sql
+```
+
 ## `storage_bucket.sql` — create the `inspections` bucket and its policies
 
 The one script here that writes, and the one that does not roll back. Idempotent

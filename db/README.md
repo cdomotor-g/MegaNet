@@ -248,6 +248,7 @@ its cache at all (`PGRST002`).
 | `meganet.station_equipment` | A station's equipment register (`0036`): each unit fitted there — kind (`equipment_kind`), make, model, serial, note — how it was known (`meganet.equipment_source`: photo, inspection, manual, agent), the photo and suggestion it came from, and once replaced, when, by whom and by what (`retired_at`, `replaced_by`). One live unit per serial, kind and station, serials compared by `meganet.equipment_serial_key()` (letters and digits, upper-cased). **Editors only** — serial numbers have only ever been in the editors-only inspection records. Written only by `meganet.decide_equipment_suggestion()`. |
 | `meganet.equipment_suggestion` | A proposed change to a register (`0036`) — read off a photo's labels by the OCR, typed by a person, or proposed by an agent — with its evidence, confidence and proposer, and the decision: `pending`, `approved`, `rejected` or `superseded`, by whom, the note, and the corrections the administrator made (`decision_patch`). One pending suggestion per photo, kind and unit (serial, or model when there is none). **Editors only**. |
 | `meganet.propose_equipment(jsonb)`, `meganet.decide_equipment_suggestion(uuid, text, text, jsonb)` | The seam and the decision (`0036`). `propose` — editors (as themselves, or as `ocr`) and `service_role` (as `agent:<name>`, the door an agent uses) — refuses a unit already pending from the same photo, already live on the register, or rejected before from the same photo, with `23505` and the colliding id as the detail. `decide` is **administrators only**: reject changes nothing else; approve takes corrections (`equipment_key`, `make`, `model`, `serial_no`, `note`, `replaces`), updates the same unit or writes a new one and retires the unit it replaced, refuses to guess between two of a kind, and supersedes the other pending suggestions for that unit. |
+| `meganet.station.proposed`, `.station_type`, `.proposed_year`, `meganet.station_type` | A **proposed** station (`0039`): where one is meant to go, not yet established — `proposed` true, what kind of station it is to be (`station_type`, one of `meganet.station_type`'s four: an automatic or manual water level station, an automatic or manual rain gauge) and the year it is proposed for. A proposal needs its type, its year and a position, and no station number. Optional keys in the document: `proposed` only where it is true. Anybody who may edit may propose; adding a station outright and establishing one are an administrator's. See **Proposed stations**, below. |
 | `meganet.is_admin()` | May this request decide (`0036`)? Anon never; `service_role` always; `authenticated` when it is an editor **and** its `meganet.app_user` row says `role = 'admin'` — the first reader of that column. The owner grants it with `update meganet.app_user set role = 'admin' where lower(email) = lower('…')` (docs/field-photos.md, *Administrators*). |
 
 Everything is readable by `anon` **except `meganet.reading_raw`, the whole
@@ -1534,6 +1535,53 @@ record; then, on a gauge of its own, every rule — a zero for each day, a peak
 older than the survey, one written in m AHD, two in one season, an hour that is
 the next day in Queensland — and the five following a re-survey, an editor's
 save, a renumbering, a deletion and an extract that drops the gauge.
+
+## Proposed stations
+
+`0039`. Stations are planned before they are built, and a planned site has no
+station number yet. A **proposed** station has a place in the register that
+says what it is: `proposed` true, its `station_type` — one of the four in
+`meganet.station_type`, an automatic or a manual water level station, an
+automatic or a manual rain gauge — and `proposed_year`, the year it is proposed
+for, which the editor offers as this year and takes any other, back or forward.
+A proposal needs all three and a position, because a proposed station with no
+place on the map proposes nothing; it needs no station number. The two checks
+on `meganet.station` hold that for every way in, and `save_station()` asks it
+first, in sentences.
+
+**Who may do what** is `save_station()`'s, on top of `is_editor()`:
+
+- anybody who may edit may **propose** a station, and edit a proposal;
+- adding a station **outright** — a new one that is not a proposal — is an
+  administrator's (`is_admin()`, `0036`);
+- so is **establishing** a proposal (proposed → not), and taking an established
+  station back to proposed.
+
+Each refusal is SQLSTATE `42501` with the detail `administrator`, which is what
+tells it from the same code's other meaning — not on the editors list — in the
+editor. The service role and a direct connection are administrators, so the
+loaders and the syncs are untouched; `delete_station()` is left as it was, so
+an editor withdraws a proposal by deleting it. An established station keeps
+its type and its proposed year, as the record of what was proposed.
+
+In the document the three are optional keys, as `owner` is: `proposed` only
+where it is true, and the other two absent where null — so the stations in
+`stations.json` gain nothing, and an editor that knows nothing of proposals
+carries them through a save untouched.
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_proposed_stations.sql
+```
+
+40 checks, in a transaction that rolls back: the vocabulary and its RLS, no
+station already here proposed and no document gaining a key; then, signed in as
+an editor, an administrator, a stranger, anonymously and as the service role,
+every rule above — what a proposal must say, each missing piece refused in
+words, a year dated back and forward, an editor editing a proposal and refused
+its establishment, an administrator establishing it (the flag gone, the type
+and year kept), a stale tab told it is stale first — and the whole register
+back through `load_stations_doc()` with a proposal in it, rewriting nothing
+else.
 
 ## Checking it from outside
 

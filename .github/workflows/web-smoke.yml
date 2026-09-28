@@ -460,6 +460,31 @@ jobs:
         working-directory: test
         run: npm run stncard
 
+      # The stations looked at this session, as a pill in the map's top row
+      # (station-trail.js). A trail that forgets a station, lists one twice or
+      # keeps the order of the first look rather than the last; a pill that
+      # drops under the card it is meant to bring back, wraps to two rows or
+      # sits somewhere other than beside the zoom buttons — or, in the twin,
+      # beside the flood scale; a pick that moves the map and leaves the old
+      # station selected: none of them throws. Driven with real clicks and keys
+      # at a desktop's width and a phone's, in and out of the twin.
+      - name: The station trail — the pill that brings the card back and goes back to any of them
+        working-directory: test
+        run: npm run trail
+
+      # Proposed stations (0039) in the editor, on the card and on the map,
+      # against a stand-in for save_station() that holds the database's rules
+      # (tools/check_proposed_stations.sql holds the real one to them): a
+      # proposal missing its type, year or place not sent; a complete one sent
+      # with the three keys and no number; its hollow pin, its band, its tags;
+      # an editor locked out of establishing one and told, in words about
+      # administrators rather than the editors list, that adding a station
+      # outright is an administrator's; What is here proposing at its point;
+      # and a database without 0039 not sent a proposal at all.
+      - name: Proposed stations — proposed, shown for what they are, established by an administrator
+        working-directory: test
+        run: npm run proposed
+
       # What the Stations filter box *selects*. `npm run smoke` opens the tab
       # and asserts a clean console; a search box handing back the wrong
       # stations throws nothing at all, so nothing else here can see it. The
@@ -1053,6 +1078,13 @@ jobs:
       # triggers as an administrator, an editor and a stranger.
       - name: check_photo_review.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_photo_review.sql
+      # Proposed stations (0039): what a proposal has to say, the station
+      # document gaining nothing for a station that is not one, and who may
+      # propose, add outright and establish — signed up through 0005's own
+      # triggers as an editor and an administrator — with the whole register
+      # back through load_stations_doc() carrying a proposal.
+      - name: check_proposed_stations.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_proposed_stations.sql
       # …and the same for the AEP sheets' SQL (0033): it attaches rows by
       # number and by position into columns only it and the editor write.
       - name: The AEP levels' SQL still fits the schema

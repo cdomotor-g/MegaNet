@@ -57,6 +57,10 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     Queensland's and the one for New South Wales and the ACT, and a station on
     the border has an entry from each that can disagree — say which you quote;
   - `elevation_source` says whether a height is surveyed or modelled (Elvis DEM);
+  - a station with `proposed: true` is **proposed, not yet built** — where one is
+    meant to go, with a `station_type` and `proposed_year` and usually no Bureau
+    number (the dossier's `identity` and first lines say so); never report it
+    as a station on the ground. Search rows do not carry the flag yet;
   - health and readings are only what reached MegaNet's own ingest — most
     stations report through the Bureau's systems, so "not recorded" there says
     nothing about whether a station works;

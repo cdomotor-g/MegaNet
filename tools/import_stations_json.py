@@ -22,11 +22,12 @@ That makes this the way to reload a snapshot into any empty database — includi
 the one inside the corporate network, which is the whole reason the schema is
 portable SQL in the first place.
 
-Requires the migrations through 0033_aep_levels_and_frequencies.sql to have
-been applied — the station's flood classes, crossings and gauge survey are synced
+Requires the migrations through 0039_proposed_stations.sql to have been
+applied — the station's flood classes, crossings and gauge survey are synced
 into the tables 0031 creates, its index listings, flood effects, AWRC number,
-stream and URBS label into 0032's, and its AEP flood levels and frequencies into
-0033's. Standard library only.
+stream and URBS label into 0032's, its AEP flood levels and frequencies into
+0033's, and whether it is proposed, its type and the year it is proposed for
+into 0039's three columns. Standard library only.
 """
 
 from __future__ import annotations
@@ -323,7 +324,8 @@ def build(data, out):
                'elevation_source', 'owner',
                'roles', 'radio_network_ids', 'catchment_ids', 'alert_ids', 'satcom',
                'rm_system_id', 'enabled', 'notes', 'legacy_unit_id', 'site', 'lga',
-               'basin', 'location_types', 'awrc_number', 'stream', 'urbs_label'],
+               'basin', 'location_types', 'awrc_number', 'stream', 'urbs_label',
+               'proposed', 'station_type', 'proposed_year'],
               ['id'],
               [[q(s['id']), q(i), q(s.get('name', '')), q(s.get('station_number', '')),
                 q(s.get('lat')), q(s.get('lon')), q(s.get('elevation_ahd')),
@@ -341,7 +343,12 @@ def build(data, out):
                 # 0032's three: absent where not recorded, like `owner`.
                 q((s.get('awrc_number') or '').strip() or None),
                 q((s.get('stream') or '').strip() or None),
-                q((s.get('urbs_label') or '').strip() or None)]
+                q((s.get('urbs_label') or '').strip() or None),
+                # 0039's three: `proposed` only where it is true, the type and
+                # the year absent where not recorded, as the view writes them.
+                q(s.get('proposed') is True),
+                q((s.get('station_type') or '').strip() or None),
+                q(s.get('proposed_year'))]
                for i, s in enumerate(stations)],
               prune_where='t.document_managed')
 

@@ -363,6 +363,14 @@ An all-digit id that names no station is tried as a Bureau number:
 `/api/v1/stations/532028` answers for `abergowrie_br_al`, with
 `"resolved_from": "station number 532028"`.
 
+A **proposed** station — where one is meant to go, not yet built, and usually
+with no Bureau number (0039) — carries `"proposed": true` in its record, with
+`station_type` (`auto_water_level`, `auto_rain_gauge`, `manual_water_level` or
+`manual_rain_gauge`) and `proposed_year`. An established station has no
+`proposed` key; one that was proposed keeps its type and year. The compact rows
+of `GET /api/v1/stations` do not carry the three yet, so check `station` (or the
+dossier's `identity`) before reporting a station as one on the ground.
+
 ### `GET /api/v1/stations/{id}/dossier`
 
 Everything a report drafter needs about one station, in one call. Every section
@@ -373,7 +381,7 @@ never silently missing, and "not recorded" never means zero.
 | Section | What is in it |
 |---|---|
 | `summary` | a few plain sentences built from the sections below |
-| `identity` | name, Bureau/AWRC numbers, URBS label, ARRO site, owner, roles, kinds, location types |
+| `identity` | name, Bureau/AWRC numbers, URBS label, ARRO site, owner, roles, kinds, location types, and whether it is only **proposed** — `proposed`, `station_type`, `proposed_year` (a station planned and not yet built, which `summary` says straight after its opening line) |
 | `location` | lat/lon, height in m AHD **and where it came from** (surveyed, or modelled from a DEM via Elvis), LGA, basin, stream, catchment (with drainage division), maintenance hub |
 | `networks_and_radio` | radio networks, Radio Mobile system, ALERT/ALERT2 addresses, satcom, repeater record, frequencies, the repeaters whose pass ranges cover its addresses, saved modelled link margins |
 | `telemetry` | sensors, health (when MegaNet last heard from it), a per-channel summary of the last 30 days of daily rollups |

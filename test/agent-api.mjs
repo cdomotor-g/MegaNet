@@ -128,11 +128,24 @@ T.gauge_datum.push(...[['AHD', 'Australian Height Datum'], ['ASSUM', 'Assumed da
   .map(([code, label], ord) => ({ code, label, ord })));
 T.bureau_index.push(...[['1', 'FloodWarn rainfall', 'Index of Queensland FloodWarn rainfall stations'], ['2', 'Daily rainfall', 'Index of Queensland daily reporting rainfall stations'],
   ['3', 'River height', 'Index of Queensland river height stations']].map(([code, label, title], ord) => ({ code, label, title, ord })));
-T.app_meta.push({ key: 'schema_version', value: '38' });
+T.app_meta.push({ key: 'schema_version', value: '39' });
 
 // A soft-deleted station: in `station` with deleted_at set, absent from station_json.
 const deletedTwin = { ...T.station[0], id: 'zz_deleted_twin', name: `${T.station[0].name} (deleted)`, deleted_at: '2026-01-01T00:00:00+00:00' };
 T.station.push(deletedTwin);
+
+// A proposed station (0039): where one is meant to go, with no number yet. Its
+// record says so; the station table has no columns for it in this stub, as the
+// live one has none before 0039 is applied — which is why the compact rows do
+// not carry it yet.
+const PROPOSED = { id: 'zz_proposed_gauge', name: 'Proposed Creek Gauge', station_number: '', lat: -27.57, lon: 152.39,
+  elevation_ahd: null, roles: ['field'], radio_network_ids: [], catchment_ids: [], alert_ids: {},
+  satcom: { enabled: false, provider: '', terminal_id: '' }, rm_system_id: 1, enabled: true, notes: '',
+  proposed: true, station_type: 'auto_rain_gauge', proposed_year: 2027 };
+T.station.push({ ...T.station[0], id: PROPOSED.id, name: PROPOSED.name, station_number: '', lat: PROPOSED.lat, lon: PROPOSED.lon,
+  catchment_ids: [], alert_ids: {}, site: null, lga: null, basin: null, location_types: null, hub_id: null, owner: null,
+  awrc_number: null, stream: null, urbs_label: null, legacy_unit_id: null, elevation_ahd: null, elevation_source: null });
+T.station_json.push({ id: PROPOSED.id, ord: T.station_json.length, updated_at: stationUpdated, doc: PROPOSED });
 
 // The SLS, merged per (document, bureau number) and joined to the live stations
 // as the view does (0038): a station both documents list is two rows.
@@ -322,7 +335,8 @@ section('Index and OpenAPI');
 // ── /api/v1/stations ─────────────────────────────────────────────────────────
 section('Station search');
 
-const liveCount = live.length;
+// Every live row of the station table — the file's stations and the proposal above.
+const liveCount = T.station.filter(s => !s.deleted_at).length;
 {
   const r = await get('/api/v1/stations');
   const s = r.json && r.json.stations;
@@ -567,6 +581,23 @@ let dossier;
     ['gauge_zero', 'flood_classes', 'crossings', 'flood_effects', 'aep_levels'].every(k => d.flood_levels[k].status === 'not recorded' && d.flood_levels[k].detail));
   check('no telemetry is "not recorded" with the reason', d.telemetry.health.status === 'not recorded' && /Bureau/.test(d.telemetry.health.detail)
     && d.telemetry.recent_daily.status === 'not recorded');
+}
+
+{
+  // A proposal is one in its identity, and said to be one before anything else.
+  const r = await get(`/api/v1/stations/${PROPOSED.id}/dossier`);
+  const id = r.json && r.json.identity;
+  check('a proposed station\'s identity says so, with its type and its year', r.status === 200 && id.proposed === true
+    && id.station_type === 'auto_rain_gauge' && id.proposed_year === 2027, JSON.stringify(id));
+  check('…and its summary says it next after its name, in words',
+    /^It is proposed, not yet established: an automatic rain gauge, proposed for 2027/.test(r.json.summary[1] || ''),
+    JSON.stringify(r.json.summary.slice(0, 2)));
+  const st = await get(`/api/v1/stations/${PROPOSED.id}`);
+  check('…and its record carries the three keys', st.status === 200 && st.json.station.proposed === true
+    && st.json.station.proposed_year === 2027);
+  const est = dossier.identity;
+  check('an established station is not proposed and has neither', est.proposed === false && est.station_type === null
+    && est.proposed_year === null, JSON.stringify({ proposed: est.proposed, station_type: est.station_type }));
 }
 
 {

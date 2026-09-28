@@ -3150,7 +3150,13 @@ function renderStationsHtml() {
               <span class="small" id="stations-list-note">${stationsListNoteHtml()}</span>
             </summary>
             <div class="stations-card-body">
+              <!-- + Propose (0039): a station where one is meant to go, not yet
+                   built — anybody who may edit may propose one; adding one
+                   outright is an administrator's. What is here on the map
+                   proposes one at the point it was asked about. -->
               <div class="stations-card-actions">
+                <button onclick="editorPropose()"
+                        title="Propose a station: where one is meant to go, what kind it will be, and the year it is proposed for">+ Propose</button>
                 <button onclick="editorNew()">+ New</button>
               </div>
               <!-- Pattern 7a: the wrapper caps its own height, so it is a named
@@ -4619,6 +4625,12 @@ function mapLegendHtml() {
       <span class="legend-dot legend-dot-rel" style="--dot:${roleVar('repeater')}"></span>
       <span class="small">Related by pass range</span>
     </span>
+    <!-- A proposed station (0039): hollow, in a dashed ring of its role's
+         colour — planned, not built. -->
+    <span class="legend-item">
+      <span class="legend-dot legend-dot-proposed" style="--dot:${roleVar('field')}"></span>
+      <span class="small">Proposed — not yet established</span>
+    </span>
     <!-- The plain link colour. With a colouring running it is not what a link
          normally looks like any more — it is what is left for the ones the
          colouring has no answer for — so the entry says which of the two it is
@@ -4851,6 +4863,8 @@ function stopStationsMap() {
   // First, and before the container it drew into goes: a twin up in the map
   // is a WebGL context that must not outlive the map (map-twin.js).
   MapTwin.detach();
+  // The pill over the map's stage goes with the stage; the trail is kept.
+  StationTrail.detach();
   MapSpider.detach();
   MapLeader.detach();
   MapLocate.detach();
@@ -4992,6 +5006,10 @@ function initMap() {
   // 3-D canvas. Its own teardown is digital-twin.js's, registered when a twin
   // is built; stopStationsMap() detaches this the way it does every layer.
   MapTwin.attach(state.map);
+  // The stations looked at this session, as a pill in the map's top row
+  // (station-trail.js). After MapTwin, whose stage it stands in while the
+  // twin is up, and before the card's repaint below, which says it again.
+  StationTrail.attach(state.map);
   // Before MapDraw, for MapMovePin's reason: the tools that take a map click
   // have to know which map before anybody arms one.
   MapHere.attach(state.map);
@@ -5090,6 +5108,8 @@ const MAP_LABEL_CAP = 60;     // permanent name labels beyond this are unreadabl
 const MAP_PIN_RING  = '#ffffff';
 const MAP_PIN_HIT   = '#ffc400';
 const MAP_PIN_REL   = '#00b8d4';   // dashed ring: on the map by relation, not by name
+const MAP_PIN_PROPOSED_FILL = '#ffffff';   // a proposed station (0039): hollow…
+const MAP_PIN_PROPOSED_DASH = '3,3';       // …inside a dashed ring of its role's colour
 const MAP_PIN_SEL   = '#7c4dff';   // heavy ring: hand-picked into the map selection.
                                    // Violet is none of the role fills, none of the
                                    // ACMA colours, and neither the amber of a filter
@@ -5349,7 +5369,9 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     const hit    = active && matchIds.has(s.id);
     const rel    = active && !hit && relIds.has(s.id);
     const dim    = active && !hit && !rel;
-    const radius = (isRpt ? MAP_PIN_R_RPT : MAP_PIN_R_FIELD) + (hit || rel ? 1 : 0);
+    // A proposed station's pin a pixel bigger, so the dashes of its ring read
+    // as dashes at a pin's size.
+    const radius = (isRpt ? MAP_PIN_R_RPT : MAP_PIN_R_FIELD) + (hit || rel || s.proposed ? 1 : 0);
     // Every pin carries a white ring so it separates from the base map and from
     // its neighbours; matches swap it for amber, and stations pulled in by a
     // pass range for a dashed cyan one — full opacity either way, but you can
@@ -5359,17 +5381,22 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     // can be put on and taken off with setStyle rather than by rebuilding
     // ~3,174 markers — and so it survives the canvas renderer, which draws no
     // DOM node for a className to land on.
+    //
+    // A proposed station (0039) is drawn hollow — white, inside a dashed ring
+    // in its role's colour — the way a map marks something planned rather than
+    // built, and it keeps that ring's dashes whatever else rings it.
+    const proposed = !!s.proposed;
     const base = {
       radius,
-      color:       hit ? MAP_PIN_HIT : rel ? MAP_PIN_REL : MAP_PIN_RING,
-      weight:      hit || rel ? 3 : 2,
-      dashArray:   rel ? '4,3' : null,
+      color:       hit ? MAP_PIN_HIT : rel ? MAP_PIN_REL : proposed ? color : MAP_PIN_RING,
+      weight:      hit || rel || proposed ? 3 : 2,
+      dashArray:   rel ? '4,3' : proposed ? MAP_PIN_PROPOSED_DASH : null,
       opacity:     dim ? 0.6 : 1,
       fillOpacity: dim ? 0.45 : 1,
     };
     const marker = L.circleMarker([s.lat, s.lon], {
       ...base,
-      fillColor:   color,
+      fillColor:   proposed ? MAP_PIN_PROPOSED_FILL : color,
       className:   hit ? 'mn-pin mn-pin-hit' : rel ? 'mn-pin mn-pin-rel' : 'mn-pin',
       bubblingMouseEvents: false,          // a pin click is not an empty-map click
     }).addTo(map);
@@ -5488,9 +5515,12 @@ function applyMapSelectionStyles() {
     if (on === !!m.mnSelected) continue;
     m.mnSelected = on;
     m.mnRadius   = on ? base.radius + 3 : base.radius;
+    // A proposed station's ring stays dashed in the selection's violet: the
+    // dashes are what say it is proposed (0039).
     m.setStyle(on
       ? { radius: m.mnRadius, color: MAP_PIN_SEL, weight: 4,
-          dashArray: null, opacity: 1, fillOpacity: 1 }
+          dashArray: m.mnStation && m.mnStation.proposed ? MAP_PIN_PROPOSED_DASH : null,
+          opacity: 1, fillOpacity: 1 }
       : { ...base });
   }
 }
@@ -5554,7 +5584,7 @@ function stationPopupHtml(s) {
   ].filter(Boolean).join(' · ');
   return `
       <strong>${esc(s.name)}</strong><br>
-      ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${r}</span>`).join('')}
+      ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${r}</span>`).join('')}${proposedTagHtml(s)}
       ${stnElev ? `<br><span class="mn-pop-line">${stnElev}</span>` : ''}
       <div class="mn-popup-actions pill-row">
         <button type="button" class="pill mn-popup-details" onclick="stnCardFromPopup('${escAttr(s.id)}', event)"
@@ -5739,6 +5769,10 @@ function onStationPinClick(e) {
       MapLeader.reveal();             // a pin tapped just above the sheet's edge
       return;
     }
+    // The callout is a look at the station as much as the sheet is, so it
+    // goes on the session's trail too — whose pill then brings up its card.
+    // Not a stack's top pin, which the tap fans out rather than opens.
+    if (!fans) StationTrail.visit(e.target.mnStationId);
     e.target.openPopup(e.latlng);
     return;
   }
@@ -6090,6 +6124,7 @@ function stationsTable(allStations) {
                     >${markHits(s.name, marks.name, marks.nameRes)}</button></td>
               <td class="small stn-num">${markHits(s.station_number || '', marks.number)}</td>
               <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}${
+                s.proposed ? ` ${proposedTagHtml(s)}` : ''}${
                 s.roles.includes('repeater') && repeaterPassingCount(s) != null
                   ? ` <span class="badge" title="ALERT addresses carried, in this repeater's open pass ranges">passing ${repeaterPassingCount(s)}</span>`
                   : ''}${
@@ -6485,6 +6520,9 @@ function showStationCard(id, { takeFocus = false, opener = document.activeElemen
   if (state.acma.cardDeviceId) closeAcmaCard(false);
   MapHere.close();
   state.stnCard.id = id;
+  // Looked at: to the head of the session's trail, which the pill in the
+  // map's top row names and lists (station-trail.js).
+  StationTrail.visit(id);
   repaintStnCard();
   if (takeFocus) {
     const el = document.getElementById('stn-card');
@@ -6520,6 +6558,7 @@ function repaintStnCard() {
   if (!s) {
     state.stnCard.id = null; el.hidden = true; el.innerHTML = '';
     MapLeader.sync();
+    StationTrail.sync();
     return;
   }
   const controls = () => [...el.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')];
@@ -6549,6 +6588,9 @@ function repaintStnCard() {
   // The equipment register, for a signed-in editor, on the same terms.
   if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
   MapLeader.sync();
+  // The trail's pill says whether its station's card is up, and its name,
+  // which a save may just have changed.
+  StationTrail.sync();
 }
 
 // Escape closes the card from anywhere inside it. On the card rather than on
@@ -6582,6 +6624,7 @@ function closeStnCard(refocus = true) {
   el.hidden = true;
   el.innerHTML = '';
   MapLeader.sync();                         // and the leader goes with it
+  StationTrail.sync();                      // whose pill now brings it back
   const back = state.stnCard.opener;
   state.stnCard.opener = null;
   if (!refocus) return;
@@ -6682,6 +6725,26 @@ function stationsCardsArrow() {
   return stationsSplitActive() ? '→' : '↓';
 }
 
+// The band a proposed station's card opens with (0039): that it is proposed
+// and not built, what it is proposed as and for when, and that it has no
+// number yet. A note rather than rows, because it qualifies everything under
+// it — a position, a wind region and a flood velocity are all about where a
+// station would be, not where one is.
+function stnCardProposalHtml(s) {
+  if (!s || !s.proposed) return '';
+  const type = stationTypeLabel(s.station_type);
+  const what = type ? `${/^[AEIOU]/.test(type) ? 'An' : 'A'} ${type.charAt(0).toLowerCase()}${type.slice(1)}` : 'A station';
+  return `
+    <div class="acma-sect stn-card-proposed" role="note" aria-label="Proposed station">
+      <p class="stn-card-proposed-head"><span class="proposed-tag">Proposed</span>
+        <strong>Not yet established</strong></p>
+      <p class="small stn-card-proposed-line">${esc(what)}, proposed${s.proposed_year
+        ? ` for <strong>${esc(String(s.proposed_year))}</strong>` : ''}.${s.station_number
+        ? ' An administrator establishes it in the editor.'
+        : ' It has no station number until it is established — an administrator does that in the editor.'}</p>
+    </div>`;
+}
+
 // The card's body. acmaCardRow draws the label/value rows, so the two cards
 // that share a dress share a grammar. Networks are looked up by id, the way
 // the table shows them (stations carry radio_network_ids, not a name).
@@ -6703,13 +6766,18 @@ function stnCardHtml(s) {
     <div class="acma-card-head">
       <span>
         <strong id="stn-card-title">${esc(s.name)}</strong><br>
-        ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${r}</span>`).join('')}
+        ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${r}</span>`).join('')}${proposedTagHtml(s)}
       </span>
       <button type="button" onclick="closeStnCard()"
               aria-label="Close the station card"><span aria-hidden="true">×</span></button>
     </div>
+    <!-- A proposed station says so before anything else on its card (0039):
+         nothing below it is about a station on the ground yet. -->
+    ${stnCardProposalHtml(s)}
     <div class="acma-sect">
-      ${acmaCardRow('Stn #', s.station_number ? esc(s.station_number) : null)}
+      ${acmaCardRow('Stn #', s.station_number ? esc(s.station_number)
+        : s.proposed ? '<span class="txt-muted">none yet — proposed</span>' : null)}
+      ${!s.proposed && s.station_type ? acmaCardRow('Type', esc(stationTypeLabel(s.station_type))) : ''}
       ${acmaCardRow('Networks', nets ? esc(nets) : null)}
       <!-- The owner as recorded on the station (0030). The SLS section below has
            its own "Station owner" row, which is what the SLS says —
@@ -6828,8 +6896,8 @@ function renderStationEditorCard() {
     return `
       <div class="panel-header"><h3>Station details</h3></div>
       <p class="small st-note-pad">
-        Select a station in the list above to view and edit it, or click
-        <em>+ New</em> to add one.
+        Select a station in the list above to view and edit it, click
+        <em>+ Propose</em> to propose one, or <em>+ New</em> to add one.
       </p>`;
   }
   // Existing station → render from the live record; new station → from the draft.
