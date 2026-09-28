@@ -13787,6 +13787,17 @@ code {
 .fp-cmp-needle { stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; pointer-events: none; }
 .fp-cmp-hub { fill: var(--text); pointer-events: none; }
 .fp-cmp-note { margin: 0; max-width: 18rem; text-align: center; color: var(--muted); font-size: var(--fs-xs); }
+/* The spot map under the compass: where the photo was taken, on the imagery. */
+.fp-v-spot { padding-top: var(--sp-2); }
+.fp-v-spot:empty { display: none; }
+.fp-v-spotmap {
+  height: 12rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--subtle);
+}
+.fp-v-spotmap .leaflet-control-attribution { font-size: 9px; }
+.fp-sm-here { stroke: var(--photo-ink); stroke-width: 2; fill: var(--photo); fill-opacity: 1; }
 
 @media (max-width: 900px) {
   .fp-v-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr); }

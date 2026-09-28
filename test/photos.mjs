@@ -1422,9 +1422,17 @@ async function compassHalf(page, R, db, objects, viewer, text) {
     /Facing 46° NE \(true\)\. 5 photos taken here — click a direction for the one facing it\./.test(await text('#fp-cmp-note')), await text('#fp-cmp-note'));
   const cmpBox = await page.evaluate(() => {
     const c = document.querySelector('#fp-v-compass .fp-cmp').getBoundingClientRect(), s = document.querySelector('#fp-viewer .fp-v-side').getBoundingClientRect();
-    return { right: s.right - c.right, bottom: s.bottom - c.bottom, left: c.left - s.left, w: c.width };
+    const m = document.querySelector('#fp-v-spotmap');
+    const mb = m ? m.getBoundingClientRect() : null;
+    return { right: s.right - c.right, left: c.left - s.left, w: c.width,
+             map: !!mb, mapBelow: mb ? Math.round(mb.top - c.bottom) : null, mapBottom: mb ? Math.round(s.bottom - mb.bottom) : null,
+             mapW: mb ? Math.round(mb.width) : 0, tiles: m ? m.querySelectorAll('.leaflet-tile').length : 0,
+             here: m ? m.querySelectorAll('.fp-sm-here').length : 0, others: m ? m.querySelectorAll('.fp-mm-other').length : 0,
+             cone: m ? m.querySelectorAll('.fp-mm-cone').length : 0 };
   });
-  ok('…at the foot of the side panel — the viewer\'s bottom right', cmpBox.w > 120 && cmpBox.bottom < 90 && Math.abs(cmpBox.left - cmpBox.right) < 40, J(cmpBox));
+  ok('…at the foot of the side panel — the viewer\'s bottom right', cmpBox.w > 120 && Math.abs(cmpBox.left - cmpBox.right) < 40, J(cmpBox));
+  ok('…and under it a satellite map of the spot: this photo\'s point and cone, the other four as dots',
+    cmpBox.map && cmpBox.mapBelow >= 0 && cmpBox.mapW > 120 && cmpBox.here === 1 && cmpBox.cone === 1 && cmpBox.others === 4, J(cmpBox));
 
   await dial(201);
   v = await viewer();

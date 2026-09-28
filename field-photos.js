@@ -1652,6 +1652,7 @@ const FieldPhotos = (function () {
     if (!ids.length) return;
     const opener = document.activeElement;
     unmountMoveMap();
+    unmountSpotMap();
     // `gold`: the photos the compass last picked out — every one facing the
     // direction clicked, boxed on the strip — or null; `goldSay`, what the
     // note under the dial says about them.
@@ -1675,6 +1676,7 @@ const FieldPhotos = (function () {
 
   function close() {
     unmountMoveMap();
+    unmountSpotMap();
     const el = document.getElementById('fp-viewer');
     if (el) { el.hidden = true; el.innerHTML = ''; }
     if (v) {
@@ -1764,6 +1766,7 @@ const FieldPhotos = (function () {
             <div id="fp-v-details">${detailsHtml(r)}</div>
             <div id="fp-v-place"></div>
             <div class="fp-v-compass" id="fp-v-compass">${compassHtml(r)}</div>
+            <div class="fp-v-spot" id="fp-v-spot"></div>
           </div>
         </div>
         ${n > 1 ? `<div class="fp-v-strip" role="group" aria-label="All ${n} photos">
@@ -1826,18 +1829,24 @@ const FieldPhotos = (function () {
   // The side, in its three parts, each painted on its own: the facts and the
   // buttons (redrawn when the full row arrives), the mover under them while
   // Move… is open (a map that must survive the facts being redrawn), and the
-  // compass at the foot.
+  // compass at the foot with the spot's map under it while the mover is shut.
   function paintDetails() {
     const el = document.getElementById('fp-v-details');
     if (el && v) el.innerHTML = detailsHtml(S().byId[v.ids[v.i]]);
   }
   function paintPlace() {
     unmountMoveMap();
+    unmountSpotMap();
     const el = document.getElementById('fp-v-place');
     if (!el || !v) return;
     const r = S().byId[v.ids[v.i]];
     el.innerHTML = v.editing && r ? viewerPlaceHtml(r) : '';
     if (v.editing && r) mountMoveMap(r);
+    const spot = document.getElementById('fp-v-spot');
+    const show = !v.editing && r && known(r.lat) && known(r.lon) && typeof L !== 'undefined';
+    if (spot) spot.innerHTML = show
+      ? '<div class="fp-v-spotmap" id="fp-v-spotmap" role="region" aria-label="Satellite map of where this photo was taken"></div>' : '';
+    if (show) mountSpotMap(r);
   }
   function paintCompass(note) {
     const el = document.getElementById('fp-v-compass');
@@ -2085,6 +2094,42 @@ const FieldPhotos = (function () {
     if (mm.at) placePin();
     drawMove();
     map.on('click', e => setAt(e.latlng.lat, e.latlng.lng));
+  }
+
+  // ── The spot map ───────────────────────────────────────────────────────────
+  // Under the compass, while the mover is shut: the same imagery with the
+  // photo's point, its GPS ± and the way it looked, and the other photos
+  // taken at the spot — so the dial has a place to stand on. Look only: the
+  // wheel is left to the side panel's scroll, and a pin is moved in Move….
+  // Made and taken down with the side, like the mover (removeMap).
+  let sm = null;    // { map, id }
+
+  function unmountSpotMap() {
+    if (!sm) return;
+    const m = sm;
+    sm = null;
+    removeMap(m.map);
+  }
+
+  function mountSpotMap(r) {
+    const el = document.getElementById('fp-v-spotmap');
+    if (!el || typeof L === 'undefined') return;
+    const at = [+r.lat, +r.lon];
+    const acc = known(r.accuracy_m) ? +r.accuracy_m : null;
+    const map = L.map(el, { maxZoom: 21, minZoom: 4, zoomControl: true, attributionControl: true, keyboard: true, scrollWheelZoom: false });
+    registerLiveMap('FieldPhotos spot', () => (sm ? sm.map : null));
+    map.attributionControl.setPrefix(false);
+    const base = typeof makeBaseLayers === 'function' ? makeBaseLayers().Satellite : null;
+    if (base) {
+      Object.assign(base.options, { maxNativeZoom: 19, maxZoom: 21, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' });
+      base.addTo(map);
+    }
+    sm = { map, id: r.id };
+    if (acc) L.circle(at, { radius: acc, interactive: false, className: `fp-mm-ring${rough(acc) ? ' is-rough' : ''}` }).addTo(map);
+    if (known(r.heading_deg)) L.polygon(conePoints(at[0], at[1], +r.heading_deg, fovOf(r), CONE_M), { interactive: false, className: 'fp-mm-cone' }).addTo(map);
+    spotRows(r).filter(x => x !== r).forEach(x => L.circleMarker([+x.lat, +x.lon], { radius: 4, interactive: false, className: 'fp-mm-other' }).addTo(map));
+    L.circleMarker(at, { radius: 6, interactive: false, className: 'fp-sm-here' }).addTo(map);
+    map.fitBounds(L.latLng(at).toBounds(Math.max(60, (acc || 0) * 3)), { maxZoom: 19, animate: false });
   }
 
   // Where a photo with no place yet is looked for: its station, the other
