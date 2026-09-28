@@ -170,7 +170,12 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Fifty-nine checks, most of them a browser each. The job took ~14 min at
+    # fifty-two and was cut off at 15 when seven joined in one push (run 187,
+    # stopped at 15:12 with every check it reached green). A limit is there to
+    # stop a hang, not to budget the suite, so it sits well clear of the real
+    # run time; move it when the suite grows again.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
