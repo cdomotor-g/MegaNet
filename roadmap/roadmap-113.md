@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-28** (revision 106 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-28** (revision 107 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -503,9 +503,11 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Four AI rows, and six `[Human]` issues.
 >
-> **Revision 106 closes #203, and opens nothing** — the HDB extract it was blocked on arrived in a session request, so the historical flood peaks are in the database (`0037`), on every station's record and on the twin's staff; the same request replaced the twin's play/pause pill with a scale of the station's levels. The Sonnet5 Med row goes from five to four and no longer holds anything blocked. **`0036` and `0037` are live** — applied from an agent session over the Supabase connection at the owner's choice, each run only after the database had fetched it from the repository and its SHA-256 matched — which is revision 104's first person-step done, and leaves revision 105's `0038` the only migration the live project lacks. The rest of both lists stands, unfiled pending the owner.
+> **Revision 107 opens and closes nothing** — it is revision 105's one person-step done: **`0038` is live**, applied from an agent session over the Supabase connection at the owner's choice, run only after the database had fetched it from the repository at `1ad2b49` and its SHA-256 matched, and `select meganet.load_sls_from_github();` loaded both documents — 3,392 Queensland rows and 1,433 NSW. The database's merge of them matches the app's file on all 4,141 locations and 28 fields each. The live project is at schema version 38, the version the app expects, so the Data source panel no longer reads *schema mismatch*, and the agent API quotes both documents. The allocation below is unchanged; revision 104's person-steps, less its first, stand, unfiled pending the owner.
 >
-> **Revision 105 opens and closes nothing** — the Bureau's Service Level Specification for New South Wales and the ACT (version 3.16) is read into the station card and the agent API beside Queensland's, from a session request, with `0038` giving the SLS tables one document per state. The allocation below is unchanged. One step for a person came out of it — **`0038` to the live project**, after ~~`0036` and `0037`~~ (**live since revision 106**), **then `select meganet.load_sls_from_github();`** — listed at the foot of the revision entry and unfiled pending the owner; the live project is at schema version ~~35~~ **37 since revision 106**.
+> **Revision 106 closes #203, and opens nothing** — the HDB extract it was blocked on arrived in a session request, so the historical flood peaks are in the database (`0037`), on every station's record and on the twin's staff; the same request replaced the twin's play/pause pill with a scale of the station's levels. The Sonnet5 Med row goes from five to four and no longer holds anything blocked. **`0036` and `0037` are live** — applied from an agent session over the Supabase connection at the owner's choice, each run only after the database had fetched it from the repository and its SHA-256 matched — which is revision 104's first person-step done, and leaves ~~revision 105's `0038` the only migration the live project lacks~~ (**`0038` live since revision 107**). The rest of ~~both lists~~ revision 104's list stands, unfiled pending the owner.
+>
+> **Revision 105 opens and closes nothing** — the Bureau's Service Level Specification for New South Wales and the ACT (version 3.16) is read into the station card and the agent API beside Queensland's, from a session request, with `0038` giving the SLS tables one document per state. The allocation below is unchanged. One step for a person came out of it — ~~**`0038` to the live project**, after `0036` and `0037`, then `select meganet.load_sls_from_github();`~~ (**done at revision 107**, `0036` and `0037` having gone in at revision 106) — listed at the foot of the revision entry; the live project is at schema version ~~35~~ **38 since revision 107**.
 >
 > **Revision 104 opens #204, #205 and #206, and closes nothing** — three agent follow-ups out of fourteen asks in one session request (the Digital Twin's pin, stations and bridges; tides and soils on the station card; zips, Google Drive and equipment from photos; a read-only API and MCP server for agents). `[Opus5/High]` #204 (assessment report drafts — *blocked on the example reports*), `[Opus5/Med]` #206 (an agent proposing equipment — *blocked on the owner's choice of credential*) and `[Sonnet5/Med]` #205 (site exposure beyond Queensland). The Opus5 Med row is no longer empty. Nine steps for a person came out of it as well — ~~`0036` to the live project~~ (**done at revision 106**, with `0037`), a first administrator, Cloudflare Access's bypass for the API, linking Drive (and Dropbox, still from revision 100) — listed at the foot of the revision entry and unfiled pending the owner. **#171 leaves the Human row**, eleven revisions late: it closed at revision 71.
 >
@@ -655,6 +657,52 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 107 — 2026-09-28: `0038` is live, and the database quotes both states' SLS
+
+Revision 105's one person-step, done from the session that wrote it at the
+owner's choice ("apply 0038 and load both documents now through the Supabase
+connection"). **Opens and closes nothing.**
+
+**Applied the way `0036` and `0037` were.** Beforehand the live project was at
+37 with `0028`'s SLS shape — 3,392 Queensland rows, the one-row `sls_doc` —
+and nothing depended on those tables but the view and the two loaders `0038`
+replaces. One `do` block, recorded in the project's migration history as
+`0038_sls_nsw`: the database checked it was at 37, fetched
+`db/migrations/0038_sls_nsw.sql` from the repository at `1ad2b49`, ran it only
+when its SHA-256 matched the committed file's (`4d5041b9…51cd`, 32,423
+bytes), and checked that it read 38 afterwards. The file's own did-it-take
+block passed inside the same transaction, and the 3,392 Queensland rows came
+out of it each with its role, as many per role as there had been per schedule.
+
+**Loaded.** `select meganet.load_sls_from_github();` — *"loaded 3392 QLD SLS
+rows; 2685 of 2766 locations match a MegaNet station"* and *"loaded 1433 NSW
+SLS rows; 615 of 1375 locations match a MegaNet station"*, the counts the
+repository's files give. The Queensland rows were already the file's, so the
+loader wrote none of them again and their `updated_at` did not move.
+
+**Verified against the files, in the database.** `check_sls_merge.py` wants
+psql and a role that may load, so its comparison was run as one read-only
+query instead: the database fetched `data/sls-locations.json` at `1ad2b49`
+(its SHA-256 the file's here) and held `meganet.sls_location` to it — 4,141
+locations on each side, none on one side only, 28 fields each: 115,948
+comparisons, 43,575 of them with a value, and **no disagreement**. Every field
+had as many values on one side as the other, so none agreed by both being
+empty, and three deliberate breaks — a class level moved 1 cm in the view, an
+AHD datum called Local and a `^` dropped in the file — were each caught.
+
+**What reads it now.** The Data API, with the app's publishable key, gives
+both editions and, for GOONDIWINDI (041500), an entry from each document;
+`app_meta` reads 38, so the Data source panel no longer reports a schema
+mismatch. The public roles may read the three relations and nothing more — no
+insert, update or delete, and no loader. The agent API at `floodwarning.net`
+answers `service-level` for Goondiwindi TM with both editions and both
+entries, the NSW one with its AWRC number (416201A) and its Local datum. The
+security advisor lists what it listed before the apply, none of it about the
+SLS.
+
+**What is left for a person.** Nothing from revision 105. Revision 104's list,
+less its first step, stands as revision 106 left it.
 
 ### Revision 106 — 2026-09-28: the floods each gauge has seen, on the record and on the twin's staff — and `0036` and `0037` are live
 
