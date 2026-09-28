@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-27** (revision 103 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-28** (revision 104 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -395,6 +395,9 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
+- **#206** `[Standalone]` `[Opus5/Med]` — **OPEN, opened revision 104, blocked** — an agent that proposes station equipment from new field photos, through the seam `0036` built for it: `propose_equipment()` accepts `agent:<name>` from the secret key and files a suggestion that waits on the Review panel for an administrator; nothing reaches `station_equipment` without `decide_equipment_suggestion()`. **Blocked on the owner's choice of credential** — the secret key, or a new role with execute on that one function — which is a decision, not work. Med rather than High because the plumbing, the collision rules and the approval gate all exist; what is left is a scheduled job and the evidence it attaches.
+- **#205** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 104** — the station card's *Site exposure — tides and soils* beyond Queensland. The section asks Queensland's services and says *Not in Queensland*, in words, for the ~1,500 stations outside the State; the same questions have NSW and national answers (NSW acid sulfate soil risk mapping, the national atlas outside Queensland, a tide line, NSW's tidal limits where published). The rules are written — coverage first, three row states and never "none" for a failed source, bounded staged requests — so this is sources and a check, the shape of #177 for the road parcels.
+- **#204** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 104, blocked** — assessment report drafts from the station dossier (`GET /api/v1/stations/{id}/dossier`, `get_station_dossier`): templates and a drafting guide, and whatever the dossier lacks that the reports need. **Blocked on the example reports**, which the owner is providing. High for the judgement, not the size: each figure in a report has a datum, a source and a caveat (flood classes are metres on the gauge; AEP levels are modelled; "not recorded" is never zero), and a template that loses one reads perfectly.
 - **#203** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 101, blocked** — historical flood peaks into the station record. The twin's flood water (revision 101) already reads them as `flood_peaks` on the station — `[{ date, height_m }]` on the gauge through an AHD zero, or `[{ date, level_m_ahd }]` — a ring on the staff each, the rise up to the highest, never colouring the water, and `npm run flood` holds that contract. What is missing is the data: a table, an importer in `tools/ingest/` and `stations_doc()` emitting the field, `0033` being the pattern for all three. **Blocked on the HDB extract that carries the peaks, which is failing** — the owner's, since it needs HDB access. Writing `stations.json` alone is undone within a week (revision 99); the field has to come out of the database.
 - ~~**#202**~~ `[Standalone]` `[Sonnet5/Med]` — **CLOSED at revision 102** — HEIC photos in Chrome and Firefox. `libheif-js` **1.23.2** — the version the Dropbox sync's `heic-decode` already resolves to, so both doors decode with the same libheif — as its WebAssembly build (29 kB of glue + 469 kB gzipped, against 698 kB for the base64 bundle; LGPL-3.0, loaded separately and unmodified), fetched from unpkg on the first HEIC the browser cannot draw and **run in a worker let go after a quiet minute**, the OCR engine's terms. A worker rather than the page because a phone photo's decode is a heap of a couple of hundred MB that WebAssembly never hands back. The check drops a real 1.4 kB HEIC (made with pillow-heif; the recipe is in the check) and decodes the JPEG that went up to find the picture's four colours in its four corners.
 - **#201** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 100** — place a field photo by clicking the map: *Pick on the map* from the place editor, and a photo's own pin dragged to move it, the way a station's is. The database needs nothing — `update_field_photo()` already takes a move and re-files an unplaced photo by distance.
@@ -496,7 +499,9 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## Resource allocation summary
 
-> ## ⬛ Five AI rows, and six `[Human]` issues.
+> ## ⬛ Four AI rows, and six `[Human]` issues.
+>
+> **Revision 104 opens #204, #205 and #206, and closes nothing** — three agent follow-ups out of fourteen asks in one session request (the Digital Twin's pin, stations and bridges; tides and soils on the station card; zips, Google Drive and equipment from photos; a read-only API and MCP server for agents). `[Opus5/High]` #204 (assessment report drafts — *blocked on the example reports*), `[Opus5/Med]` #206 (an agent proposing equipment — *blocked on the owner's choice of credential*) and `[Sonnet5/Med]` #205 (site exposure beyond Queensland). The Opus5 Med row is no longer empty. Nine steps for a person came out of it as well — `0036` to the live project, a first administrator, Cloudflare Access's bypass for the API, linking Drive (and Dropbox, still from revision 100) — listed at the foot of the revision entry and unfiled pending the owner. **#171 leaves the Human row**, eleven revisions late: it closed at revision 71.
 >
 > **Revision 103 opens and closes nothing** — it is revision 100's first unfiled step done: `0035` and the `field-photos` bucket are on the live project, applied from an agent session over the Supabase connection at the owner's request and verified there (see the entry at the bottom of the file). The allocation below is unchanged. Of the two person-steps revision 100 left, **one remains — linking a Dropbox folder** — still unfiled.
 >
@@ -533,13 +538,13 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Opus5
 | Effort | Issues |
 |---|---|
-| High | **#188** (polar coverage on the 3-D terrain) · **#190** (MapLibre's UMD end of life) · **#186** (epic — rating is for its children) |
-| Med | *(empty)* |
+| High | **#188** (polar coverage on the 3-D terrain) · **#190** (MapLibre's UMD end of life) · **#186** (epic — rating is for its children) · **#204** (assessment report drafts from the dossier — *blocked on the example reports*) |
+| Med | **#206** (an agent proposing equipment from new photos — *blocked on the credential decision*) |
 
 ### AI agent — Sonnet5
 | Effort | Issues |
 |---|---|
-| Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters and drawings in 3-D) · **#201** (place a field photo on the map) · **#203** (historical flood peaks into the station record — *blocked on the HDB extract*) |
+| Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters and drawings in 3-D) · **#201** (place a field photo on the map) · **#203** (historical flood peaks into the station record — *blocked on the HDB extract*) · **#205** (tides and soils on the card beyond Queensland) |
 
 ### AI agent — Haiku4.5
 | Effort | Issues |
@@ -578,7 +583,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### Human
 | Issues |
 |---|
-| #66, #156, #157, #158, #166, #171, #185 |
+| #66, #156, #157, #158, #166, #185 |
 
 > **The Human column shrank for a reason worth recording.** #145 was `[Human]` because applying a migration and creating a Storage bucket "needs the dashboard and the database password". That is no longer true: #149 applied `0010` and created the bucket from an agent session over the Supabase MCP connection, and verified both with read-only queries afterwards. **Before allocating anything else to a human on the grounds that it touches the live database, check whether that connection is available.** #146 and #148 were both allocated partly on that assumption, were re-noted at revision 15, and at revision 16 were done that way: `0011` applied over the same connection and verified with read-only queries. **Two migrations applied by an agent now, so this is a settled fact rather than one project's luck.** The Human column is #66, #156 and #157 — and each is `[Human]` for the right reason rather than the dashboard one: #156 is a product decision (which suggested features to want), and **#157 is the first one on this board that is `[Human]` because of the *toolchain*, not the credentials.** CRBasic Editor is Windows-only and Campbell's, and every `campbellsci.com` host is unreachable from the agent environment's egress policy, so a datalogger program cannot be compiled — or its instruction reference read — by any session, however it is allocated. That is a new category, and it is worth naming: the test above ("check whether that connection is available") does not dispose of it, because no connection would help.
 >
@@ -607,7 +612,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 10. #66 (CORS check) has no blockers — ready now; gates only future/unfiled ARRO API work.
 10d. **#186's children (#187, #188), #189 and #190 have no blockers and gate nothing** — all four fell out of the 3-D view shipping at `d7509fc` and none of them is in front of anything. The one real sequencing note is negative and is constraint 2's: **#187 and #188 both edit `map-3d.js`, so they run one at a time.** #189 is a one-line change in `map-controls.js` and collides with neither. #190 is a decision rather than a change and should be made *before* either child grows the file further, because the answer could move which build the module loads.
 10e. ~~**#200, #201 and #202 have no blockers and gate nothing**~~ — **#200 and #202 are done at revision 102, taken together in one session and one at a time within it, as constraint 2 asked.** #201 is what is left, and it has the files it shares to itself now: `field-photos.js` (which #202 grew a HEIC decoder in, beside the queue — nowhere near the place editor) and `map-photos.js` (where #200 promoted `drawn()` and exposed the pin's parts as `badgeHtml()`, `conePath` and `open()` — **#201's second half, a photo's pin dragged to move it, is a 2-D drag; once the move lands the 3-D badge follows by itself**, since it is rebuilt from `drawn()` whenever that changes).
-10f. **#203 is blocked, and not by anything on this board**: it waits on the HDB extract of historical flood peaks, which is failing and needs a person with HDB access. It gates nothing — the twin's flood water ships without peaks and draws them the day the field arrives. When the extract works, #203 is a migration (`0036` or whatever is next), so it takes the next number at the time it is picked up, and it touches `stations_doc()`, which every station migration restates — one at a time with any other migration in flight.
+10f. **#203 is blocked, and not by anything on this board**: it waits on the HDB extract of historical flood peaks, which is failing and needs a person with HDB access. It gates nothing — the twin's flood water ships without peaks and draws them the day the field arrives. When the extract works, #203 is a migration (`0037` or whatever is next — `0036` went to the photo review at revision 104), so it takes the next number at the time it is picked up, and it touches `stations_doc()`, which every station migration restates — one at a time with any other migration in flight.
+10g. **#204 and #206 are blocked on the owner, and #205 on nothing.** #204 waits for the example assessment reports, and gates nothing: the dossier ships without templates and an agent can draft from it today with the prompt in `docs/agent-api.md`. #206 waits for the owner to choose the credential an agent proposes with; `0036`'s seam is already live in the file and needs no change to start. Neither needs `0036` applied to begin the code, but #206 cannot be *proven* against the live project until it is. #205 has no blockers; it is the only thing on the board that touches `site-exposure.js`, and it gates nothing.
 10c. #145 (apply `0009`, create the bucket) has no blockers — ready now. **It gates nothing on this board**, which is worth stating plainly so it is not mistaken for a blocker on #116/#117/#123/#126: those four were unblocked by the *migration being written*, not by it being applied, and all four are code and schema-design work that can proceed against the file. What is actually waiting on it is the Export tab reading green, `tools/check_inspections.sql` being runnable against the real database, and — for Part B only — #116 being able to upload a photo at the end of a form.
 10. ~~**#115 (inspection schema) is the widest gate in the repo**~~ — **done at `68baffc`.** It was the widest gate and it is discharged: #116, #117, #123 and #126 are unblocked in one go, which makes four of the board's five next-pickable items come out of one epic. What it leaves behind is a constraint rather than a dependency — the record tables are editors-only, so #118 and #128 render behind sign-in.
 11. ~~#116 and #117 can run in parallel now~~ — **both are closed, and the parallelism claim was never tested.** It would have held: different form families, different tables, different save functions, shared lookup tables neither writes. What actually happened was better for #117 than the parallel would have been — the tab, the CSS section, the three-state pick-list, the draft path, the 409 contract and the section-pruning rule all existed to copy, and the fixture reader in `test/` did too. **Two tabs, two issues, four shared edits each** (`TABS`, `HELP`, a `state` block, one `renderMain()` line) — see constraint 3, which now states that as a shape rather than a single data point.
@@ -637,12 +643,211 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 - **P3:** ~~#118~~ — **closed**; ~~#119 (epic) → #120/#121~~ — **all closed**; ~~#150~~, ~~#162~~, ~~#163~~, ~~#151~~, ~~#159~~, ~~#161~~, ~~#128~~, ~~#127~~ — **all closed**; ~~#200~~, as a child of EPIC #186 (P3) — **closed at revision 102**
 - **Unrated:** ~~#160~~ — **closed at revision 47** (sequencing item 23).
 - **P4:** #66
-- Unprioritised until reviewed: #203 (the flood peaks — blocked on the HDB extract, so its priority is the extract's); #201 (the field photos' follow-up — the feature works without it, and it closes a way in that today ends in "type the coordinates"; ~~#202~~, the other, which ended in "use Safari", **closed at revision 102**); #166 (the ELPRO trial — ~~#167~~ closed, so what is left is a credential, a card and a phone call; worth doing before it is worth a P-number, because the whole 115E-2 question stays theoretical until one unit publishes); #156 (a decision menu, not work — it gates nothing); #158 (three dashboard settings — it gates nothing either, but it is the only thing standing between a non-`@bom.gov.au` address and a working sign-in, so it is worth doing before it is worth prioritising)
+- Unprioritised until reviewed: #204 (the report drafts — blocked on the example reports, so its priority is theirs); #206 (the equipment agent — blocked on a decision about a credential); #205 (site exposure outside Queensland — the section works without it and says in words where it stops); #203 (the flood peaks — blocked on the HDB extract, so its priority is the extract's); #201 (the field photos' follow-up — the feature works without it, and it closes a way in that today ends in "type the coordinates"; ~~#202~~, the other, which ended in "use Safari", **closed at revision 102**); #166 (the ELPRO trial — ~~#167~~ closed, so what is left is a credential, a card and a phone call; worth doing before it is worth a P-number, because the whole 115E-2 question stays theoretical until one unit publishes); #156 (a decision menu, not work — it gates nothing); #158 (three dashboard settings — it gates nothing either, but it is the only thing standing between a non-`@bom.gov.au` address and a working sign-in, so it is worth doing before it is worth prioritising)
 - Unstated on ~~#101~~ (**closed**) /#107 and their children — ~~#108~~, ~~#109~~, ~~#137~~, ~~#141~~ and ~~#138~~ **closed** — and on ~~#99~~ (**closed**) — treat as normal priority, sequenced by the dependency chain above. The near-term-regardless-of-P-number pairing (#130 and #131, two live crashes) is now **both closed**.
 
 ---
 
 ## What changed
+
+### Revision 104 — 2026-09-28: the pin moves where the ground can be seen, the card learns the tide and the soil, photos come as zips and from Drive, and agents can read the network
+
+From one session request of fourteen asks, shipped as four commits:
+`23fc952` (the twin and the pin), `aacaa29` (tides and soils on the card),
+`d7d9435` (zips, Google Drive, the Review panel and equipment from photos, and
+`0036`) and `aa5de3f` (the agent API). It opens #204, #205 and #206 — three
+agent follow-ups — and closes nothing. What is left for a person is listed at
+the end, unfiled pending the owner.
+
+**The pin, in the three places it could not be moved.** `MapMovePin` has been
+a Leaflet `L.Marker` since revision 68, and the two newer views draw over
+Leaflet rather than in it:
+
+- **In ⛰️ 3-D the mode armed and did nothing.** Its panel came up in the
+  corner; its pin was on a Leaflet pane under the WebGL canvas (z 750), out
+  of sight and out of reach; and a click on the terrain fell through to
+  Leaflet, which answered with *the flat map's* coordinate for that pixel —
+  on a view tilted to 62°, somewhere else, by up to kilometres. The pin is
+  now mirrored the way the photos are (`MapMovePin.drawn()` into a source
+  of its own, `mn-movepin`, and a draggable DOM marker wearing 2-D's own
+  icon), and a drag or a click hands back **MapLibre's own coordinate**.
+  The check does not compute where the click "should" land: it captures the
+  `e.lngLat` MapLibre itself reported for that click and requires the pin
+  to be exactly there — the first version compared against `unproject()`
+  and failed on a camera that had moved a hair between the two.
+- **In the twin — on the Digital Twin tab and inside the Stations map —
+  there was no mode at all.** 📍 Move pin now arms there: an amber post
+  dragged across the ground, or dropped where you click, with a panel on the
+  stage reading the position to the centimetre. Save writes the latitude and
+  longitude **and nothing else**: `stationSavePosition()` reads the station's
+  document fresh from `station_json`, changes the two numbers, leaves the
+  list-shaped keys out (so `save_station` keeps what it has rather than being
+  handed back the card's copy of them) and saves against *that* row's stamp —
+  so a move made from the twin cannot write a stale copy of the rest of the
+  record over somebody's edit. With the editor open on the same station, the
+  editor's own Save is used instead, as in 2-D.
+- **Why the twin is where a pin should be moved.** The patch is 201 samples
+  a side and its drape one `exportImage` over the whole of it: **0.39 m a
+  pixel**, over imagery the State flew at 10 cm across most towns. So a
+  100 m square round the station — and round the pin while it moves, in
+  25 m steps, one request at the end of a drag rather than one a frame — is
+  draped again at 1024 px, **0.098 m a pixel**, wherever the catalogue says
+  the finest tier there is at least 1.5× finer than the patch's. The map's
+  offer card reads the same catalogue, so it can say how sharp the imagery
+  at the station is, and when it was flown, before anyone presses anything.
+
+**The twin waits to be asked.** From zoom 17 the Stations map no longer hands
+itself over; a card on the map offers the twin and says what imagery covers
+the station and when it was flown. ← Map and Escape give the map back **at
+the same zoom** — they used to drop it to 16, because at 17 the map would
+have handed itself straight back, and that threw away the zoom you came in
+at. Wheeling out steps one zoom out. 🔍 Zoom to station now
+lands at the map's **maximum** zoom rather than a fitted radius, so the offer
+is where zoom-to-station leaves you.
+
+**The lines over the twin fold after ten seconds** — status, paths, photos,
+water and notes. ▾ Details brings them back and counts the notes while they
+are folded; the timer waits while the pointer or the focus is in them, which
+is also why the check has to move its own mouse away before it can see a
+fold at all; once pressed, they stay as left.
+
+**The station as built, and nothing assumed.** A station the SLS schedules
+list as **Manual** (or one the Bureau's daily-read list carries with nothing
+saying a radio does) is the observer's kit: a silver collector Ø200 × 300 mm
+for rain, a white 1 m staff gauge for a river, both for both. Where the record
+cannot say what a station is, it is a **red post, 1 m** — no longer drawn as a
+TM pole by default — and the notes say what is not known. Gatton, which the
+SLS lists as a manual river station, is now a staff gauge. The gauge board is
+one material and its graduations a separate textured plane, because the
+`.glb` exporter writes one material per mesh and a board with two would not
+survive the export.
+
+**The patch holds the rest of the network.** Up to 40 other stations inside
+the modelled ground are built by the same rules, each named, each name
+opening its own twin.
+
+**Bridges stand over the creek.** The State's DEM is bare-earth LiDAR — the
+bridges are classified out of it — so the drape of a road bridge ran down
+into the channel and up the far bank. Each bridge in the patch (the State's
+road network's bridge layer, its rail bridges, OpenStreetMap as fallback) is
+built as a deck: **at the crossing height the HDB extract lists** for the
+gauge's crossing, on the span nearest the gauge within 250 m (Gatton's 3.9 m
+on a zero of 87.54 m AHD: 91.44 m); otherwise from bank to bank, each end at
+the higher of the ground there and 4 m on along the road. Densifying the deck's span found a float trap worth one line: a 60 m
+span is thirty 2 m steps, but its length comes back from degrees a nanometre
+long, and `Math.ceil` of thirty-and-a-nanometre is thirty-one.
+
+**No levels here? Borrow a neighbour's.** A station with no flood heights the
+twin can stand on its ground is offered the four nearest that have some —
+distance, heights, catchment — in a modal. Chosen, the donor's classes are
+laid over *this* channel as heights on its gauge (or, if asked, as the same
+metres AHD), for the session only, with every line that draws them naming
+whose they are. `FloodStages.borrowable()` / `borrowed()` are the whole of the
+logic, so the ladder that draws a borrowed level is the ladder that draws an
+owned one.
+
+**The station card learns the tide and the soil.** A *Site exposure — tides
+and soils* section on every located station's card (`site-exposure.js`),
+asked of the State's map services when the card opens: in or near tidal water,
+the nearest Water Act downstream limit, the coastal management district, the
+erosion prone area and the storm tide areas, and the acid sulfate soil mapping
+under the station — for choosing what goes into the ground at a site chosen
+for the river. Three things worth carrying forward:
+- **A failed source is never "none".** An empty answer and an unanswered
+  question look the same to a template, and on this section the wrong one is
+  a finding nobody made — "no acid sulfate soil" at a station whose soil map
+  timed out. Every row is an answer, *asking…*, or *could not be read* with
+  the source named, and `npm run exposure` breaks two layers on purpose to
+  hold it. The same rule covers coverage: the State's layers answer "nothing
+  here" for a point in New South Wales, so a station outside Queensland is
+  told the maps do not reach it — in words — and nothing is asked for it.
+- **The obvious dataset was the wrong one.** "Distance to the tide" from the
+  Fisheries tidal polygons put a beach station 3.7 km from tidal water — the
+  polygons are estuaries and stop at the coast — and cost 200 KB–3.5 MB of
+  geometry a question. The State's highest-astronomical-tide line, asked as
+  three count-only distance bands, answers in bytes.
+- **The Water Act's downstream limits are sparse** — 197 statewide, none on
+  the Brisbane River — so the row prefers a limit on the station's own stream
+  within 20 km and otherwise says the nearest is on another.
+
+**Photos come as zips and from Google Drive, and their labels become
+equipment.** Four asks landed together because they share one tab and one
+migration (`0036_photo_review.sql`):
+- **Zip packs** open in the browser (`photo-zip.js`, `DecompressionStream`),
+  and each photo in one goes in exactly as a loose one would; the Dropbox and
+  Drive syncs open zips in their folders too. Everything a zip can do wrong
+  is quiet — wrong bytes still decode, a wrong code page is a wrong title, a
+  zip that lies about its size runs a phone out of memory — so each refusal
+  has a sentence and a check.
+- **Google Drive** links like Dropbox: a service account the folder is
+  shared with, one secret and one variable, the same sync run with
+  `PHOTO_SOURCE=gdrive` (`field-photos-gdrive.yml`).
+- **Every upload's outcome is recorded**, from every way in, in
+  `meganet.field_photo_upload`, and listed on the tab's **Review** panel.
+- **Equipment labels** are read by the same OCR engine over the whole frame
+  and four quarters, parsed into make, model and serial
+  (`photo-equipment.js`), and proposed through `propose_equipment()`.
+  **Nothing reaches a station's equipment register until an administrator
+  approves it** — `is_admin()`, an editor whose `app_user.role` is `admin`,
+  a role the schema has carried since `0005` and nothing enforced until now.
+  `propose_equipment()` is the seam an agent will use; which credential an
+  agent gets is the owner's decision, and the function refuses `agent:<name>`
+  from anything but the secret key until then.
+
+**Agents can read the network.** A read-only REST API at `/api/v1` and an MCP
+server at `/api/mcp` (`worker/api.js`), with a one-call station **dossier** as
+the starting point for assessment reports — "not just the assessment reports",
+as asked. Three things worth carrying forward:
+- **Read-only by construction, not by policy.** Its only upstream request is a
+  GET, with the publishable key, for a relation on a fixed list `anon` can
+  already read; nothing of the caller's is forwarded; no RPC is called. So it
+  can expose nothing the page's own anonymous reads do not — and `npm run
+  agentapi` asserts that of every request it makes, against a strict
+  PostgREST stand-in built from `stations.json` (20 deliberate breaks, 20 red).
+- **Throttling is possible, and on the free plan.** Cloudflare's Rate Limiting
+  binding is three `[[ratelimits]]` blocks in `wrangler.toml`: 60 a minute and
+  20 in ten seconds per client, and 240 a minute per address so that inventing
+  client names does not multiply the allowance. A deploy whose wrangler does
+  not know the section falls back to a per-isolate limiter and says so in a
+  header, rather than failing the deploy.
+- **Agent-agnostic means one file per agent.** Each agent reads its own:
+  `AGENTS.md` (canonical), `GEMINI.md`, `.github/copilot-instructions.md`,
+  `llms.txt`, `.cursor/rules/`, and `CLAUDE.md`'s new section. Five copies of
+  the URLs and limits drift, so `npm run agentdocs` holds all of them to the
+  numbers in `worker/api.js`.
+
+**The checks.** Seven new ones, all in `npm run all` and CI, which makes
+fifty-nine: `twinsite` (53), `twinpin` (25), `exposure` (70), `photozip`
+(46), `photoreview` (81), `agentapi` (231) and `agentdocs` (88) — plus
+`tools/check_photo_review.sql` (113) in the database job. `twin`, `flood`,
+`map3d` and `photos` changed for the offer, the fold and the red post. The
+whole of `npm run all` was run on the final tree before the push, and `0036`
+was applied from zero on a local Postgres 16 with every migration before it,
+re-applied, and checked (83 and 113).
+
+**Not filed, pending the owner** — each needs a dashboard, a person, or a
+decision:
+- **`0036` to the live project.** Until it is there, the Export tab's Data
+  source panel reads *schema mismatch* (the app expects 36), the Review panel
+  says to apply 0036, and the Drive sync cannot file a photo (its `gdrive`
+  origin is 0036's). Uploads from the tab still work. It can go the way
+  `0035` did at revision 103 — from an agent session over the Supabase
+  connection, at the owner's request.
+- **A first administrator**: one `update meganet.app_user set role = 'admin'`
+  for a person who has signed in once. Until then every suggestion waits.
+- **Cloudflare Access's bypass for `/api/v1` and `/api/mcp`**: until it
+  exists, an agent gets the Access login page. `docs/agent-api.md`, *For the
+  owner*, has the clicks; after the first deploy, the same section says how
+  to confirm the three rate-limit bindings took (`X-RateLimit-Limiter:
+  cloudflare`), and an optional WAF rule in front of both paths.
+- **Linking a Google Drive folder** (after `0036`) and **a Dropbox folder**
+  (still open from revision 100): `docs/field-photos.md` has every click for
+  both.
+- **The credential an agent proposes equipment with** (blocks #206), and **the
+  example assessment reports** (block #204).
+
+**Also on this board:** #171 had stayed in the Human row since it closed at
+revision 71; it is out.
 
 ### Revision 103 — 2026-09-27: `0035` and the field photos' bucket are live
 
