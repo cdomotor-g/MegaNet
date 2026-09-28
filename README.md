@@ -1066,7 +1066,7 @@ saying so over the map; *Off* draws none at all. Filter matches are always
 named in Auto and On.
 
 **Map and table together.** The map and the station table share the Stations
-tab and the one filter card: a search term, role or network narrows the table to
+tab and the one Stations card: a search term, role or network narrows the table to
 the matching rows while the map highlights (or, with *Hide stations that don't
 match*, drops) the same set. Picking a row pans the map to that station and
 opens its pin, so the list and the map never disagree about which site is being
@@ -1235,8 +1235,8 @@ viewport, the card collapses, and its summary line carries the live match count
 costs you nothing of the map.
 
 **Beside the map it lands with the card shut (#191)**, whatever was remembered.
-Above 1,100 px the cards are in the side panel, and the filter card is the first
-thing in that pane — so a stored "open" would land on a pane whose whole height
+Above 1,100 px the cards are in the side panel, and the filters are the first
+thing in its Stations card — so a stored "open" would land on a pane whose whole height
 is eight blocks of tick boxes, with the list they filter below the fold, which
 is not what the pane is for. Pressing **Filters** still opens it and still
 writes the preference, which is honoured on every visit between a phone's width
@@ -1249,6 +1249,18 @@ Inside the card the search box leads and spans, and the six filter groups flow
 into as many columns as the window allows — four on a wide screen, two at 768 px,
 one on a phone. A 320 px rail had one sensible arrangement; a card the width of
 the page has a better one.
+
+**The list and its filters are one card.** They were two, a Filters card and a
+Stations card under it, and two cards is two borders, two paddings and the gap
+between them for what is one question asked twice — the filters say which
+stations, the list is that set as rows. The one card's head carries the list's
+toggle with the live row count, the **Filters** toggle and **+ Propose** and
+**+ New**; under it the search box and the two clear buttons (**Clear** and
+**Clear & zoom out**), one line tall; then one line saying what the filters are
+doing and which station is selected; then the list. **Filters** opens the whole
+panel in the search box's place; the heading shuts the list and leaves the
+search box and that line, since the tab is operated from them. Both are
+remembered.
 
 **Finding a control in the Map display panel.** That one flyout holds a dozen
 switches, three sliders, four selects, a radio group and the whole ACMA licence
@@ -2119,20 +2131,33 @@ Terms combine with OR. The box is a `<textarea>` (a single-line `<input>`
 strips the line breaks out of a pasted column, gluing `6128` and `6129` into
 `61286129`) that opens one line tall and grows with the paste.
 
-**The filter box also answers with places.** Paste a coordinate into it —
+**Places have a box of their own: 📍 Find a place.** The blue pin in the side
+panel's strip, beside the stations' red one (`places.js`). It used to be the
+filter box that answered with places as well (#184), which made "Gympie" typed
+to find the *town* also cut the network down to the four stations named after
+it; a place moves the map and leaves the stations alone, so it has its own tool
+and the filter box is the stations' again. Paste a coordinate into it —
 decimal, degrees and minutes, or degrees-minutes-seconds, with or without
-hemisphere letters, in either order — and the map goes there and drops a pin,
-with no network at all. Type a name and, where the place-name service can be
-reached, the towns, localities and airports it matches are offered under the box.
-Neither changes what the station filter matches: the strip is an extra answer
-beside the station list, never instead of it.
+hemisphere letters, in either order — and the map goes there and drops a blue
+pin, with no network at all. Type a name and it lists, grouped:
 
-That strip belongs to the box the caret is in, and to no other. It appears when
-the box takes focus and goes when focus leaves — six place names left under a box
-nobody is typing in are six rows of map the operator asked to see and cannot. The
-results themselves are kept, so clicking back into the box brings the same strip
-straight back with no second lookup, and clicking a result does not dismiss the
-strip out from under the click.
+- **Catchments** — the 77 Queensland drainage basins the file carries, by name
+  or basin number ("fitzroy", "130"); pressed, the basin is drawn in outline
+  from `data/qld-basins.geojson` and the map fitted to it.
+- **Rivers and creeks this network is on** — the register's `stream` values,
+  with how many stations each has (a creek written *CK* and *CREEK* is one
+  creek); pressed, the map goes to the stretch its stations span, drawn along
+  its course where the gazetteer has already answered with it.
+- **Council areas with stations in them** — the register's `lga` values, the
+  same way.
+- **Towns, localities and more** — OpenStreetMap's gazetteer (Nominatim):
+  towns, localities, suburbs, airports, hills, rivers and creeks, council
+  boundaries, each with its outline or course where OSM has one.
+
+The first three are the file's own and answer at once, offline; the last is a
+request, debounced, throttled to Nominatim's one a second and cached, and never
+made for a number. A lookup that cannot be made says so and leaves the file's
+answers standing. ✕ beside the box, or ↺, takes the pin and the outline away.
 
 **Address ranges.** A term shaped `4021-4025` is a *window* over ALERT
 addresses, and every station holding an address inside it is a match. It is the
@@ -3459,8 +3484,9 @@ summary says so rather than inventing one.
 ### 20. Side Panel (Help, the Stations Cards, the Stations Map's Controls)
 One column on the right of every tab, the *side panel* (`#help-panel`, called
 "the dock" in the code): a strip of buttons on the screen's edge and, open, one
-pane beside it. ❔ is the help described below; 📋, on the Stations tab, is the
-Stations cards; 〽️ is the path tools (the elevation profile and the link budget);
+pane beside it. ❔ is the help described below; 📍, on the Stations tab, is the
+Stations cards (the red pin, a station's wherever the app draws one); the blue 📍
+under it is Find a place; 〽️ is the path tools (the elevation profile and the link budget);
 and under them, on that tab, every one of the Stations map's own
 controls — its panels as panes with a button each, its buttons as themselves.
 It is the help rail and the Stations tab's right-hand column of cards merged
@@ -3547,18 +3573,18 @@ settled rather than during the slide. Where it differs:
   Escape — and only ever one somebody opened on that screen: nothing stored
   opens one on arrival, and turning a phone from landscape to portrait opens
   none, unless the operator was typing in the cards under the map, which then
-  come with them as 📋's drawer, caret and all. What it opens from depends on
+  come with them as 📍's drawer, caret and all. What it opens from depends on
   the tab:
   - **On the Stations tab the map is the screen.** It runs edge to edge from
     the banner's foot to a one-line credit at the screen's (tap the credit for
     the rest of it), and the page under it does not scroll: the Stations cards
-    are in the side panel, 📋 and 〽️, as beside a desktop's map. The strip is a
+    are in the side panel, 📍 and 〽️, as beside a desktop's map. The strip is a
     rail down the right-hand edge, put away behind **⋮** at the right-hand end
     of the banner until it is asked for. ⋮ brings it out — 40 px wide, its
     buttons 36 px, sticky under the banner and taking its width from the page,
     so the map ends where the rail begins and only ↺, in its top-right corner,
     stands on it — and puts it away again, and which it was is remembered as
-    `mn-dock-rail`. It holds ❔, 📋, 〽️ and every other one of the map's
+    `mn-dock-rail`. It holds ❔, 📍, 〽️ and every other one of the map's
     controls, in the same groups and order as on a desktop; a pane's drawer
     opens on the rail's inner edge, and the rail stays lit above the backdrop,
     so its buttons go on switching panes and the lit one puts its drawer away.
@@ -3595,7 +3621,7 @@ Stations pane while the window is wider than 1,100 px, or a phone's, where
 the pane is a drawer over a map that fills the screen. The radio
 path card, the elevation profile and the link budget are a wrapper of their own
 inside it (`#stations-path-cards`), and
-beside the map that goes to a pane of its own, 〽️ *Path tools*, under 📋: they
+beside the map that goes to a pane of its own, 〽️ *Path tools*, under 📍: they
 answer a question asked of the map rather than of the list, and they are the
 cards the map sends people to. Under the map it goes back into the column
 between the list and *Repeaters listening*, where the render emitted it. `#stations-main.is-split` then
@@ -3646,7 +3672,7 @@ corner's groups and order (`MapChrome.groups()`), one labelled group each with a
 hairline between them, and the strip scrolls, with a thin bar beside the
 buttons rather than over them, when it is taller than the window. Building the
 map opens nothing: which pane shows is the side panel's own preference, and a
-fresh visit still opens on 📋. The map is rebuilt on every render of the tab,
+fresh visit still opens on 📍. The map is rebuilt on every render of the tab,
 and its new controls land in the *same* panes and strip buttons, so the pane
 that was showing stays showing, a focused strip button keeps focus, focus on a
 control of the old map goes to the same control of the new one — ↺ in the
@@ -3957,7 +3983,9 @@ Tabs / panels:
   a **Repeaters listening** card between the two, listing every repeater with a
   pass range open to that station's addresses (nearest first); clicking a row
   puts the map on that repeater without touching the filters or the selection.
-  The filter card under the map drives the map and the table together
+  The Stations card's filters, under the map or beside it, drive the map and the
+  table together; 📍 Find a place (the blue pin) takes the map to a town, river,
+  catchment, council area or coordinate
 - **Radio Path Maps** — Queensland basin explorer + bundled Radio-path PDF maps, with station-aware search
 - **Networks** — radio network cluster management
 - **Pass Ranges** — pass-range matching and hop-chain view; rows link through to

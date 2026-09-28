@@ -837,7 +837,7 @@ await page.evaluate(() => MapSites.select(1));
 await page.locator('#sites-dim').fill('20');
 
 // ── 2f. the profile card, in the side panel beside the finder ───────────────
-// At this width the Stations cards are in the side panel too — 📋, and the
+// At this width the Stations cards are in the side panel too — 📍, and the
 // profile card in the path tools' pane (〽️) — and "Profile the worst path"
 // draws into it there. It used to leave the card hidden there and say it was
 // "under the map". (The run used to put the cards under the map first, with a

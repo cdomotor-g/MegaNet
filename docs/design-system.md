@@ -851,7 +851,7 @@ pointer or moved with the arrow keys, stored as `mn-dock-w` and clamped to the
 window when it is used (never below 300 px while there is room, never leaving
 the page less than 400 px — or, on a window too narrow for both, never more than
 55 % of the room). On the Stations tab it is also the tab's right-hand
-column: the station cards are one wrapper moved into its Stations pane (📋),
+column: the station cards are one wrapper moved into its Stations pane (📍),
 the path tools (the elevation profile and the link budget) a second wrapper
 moved into a pane of their own (〽️), and every one of the Stations map's controls but ↺ (which stays in the map's top-right corner) is moved into its strip — a panel into
 a pane of its own. None of them is ever re-rendered to get there, which is what

@@ -1635,15 +1635,21 @@ function invalidateMapSizes(delay) {
 // What stands in the strip, top to bottom:
 //
 //   ❔ Help        whatever HELP says about the open tab. Always there.
-//   📋 Stations    the Stations cards — filters, list, the editor — while
+//   📍 Stations    the Stations cards — filters, list, the editor — while
 //                  that tab is open and the window is wide enough for them to
 //                  be beside the map rather than under it, or narrow enough —
 //                  a phone's — for them to be a drawer over it
-//                  (stationsSplitActive).
+//                  (stationsSplitActive). The red pin, which is a station's
+//                  wherever the app draws one.
+//   📍 Places      Find a place (places.js): a town, a river, a catchment, a
+//                  council area or a coordinate, and the map taken there — its
+//                  pin blue, so that the place found is never mistaken for a
+//                  station. On that tab at every width, since it is a tool for
+//                  the map rather than one of the cards.
 //   〽️ Path tools  the radio path card (while a path is open), the elevation
 //                  profile and the link budget (its fade margin), under the
 //                  same condition. A pane of their own
-//                  rather than two more cards at the foot of 📋's column: they
+//                  rather than two more cards at the foot of 📍's column: they
 //                  answer "what is between these two points", a question
 //                  asked of the map rather than of the list, and they are the
 //                  cards the map itself sends people to (a drawn line, a
@@ -1689,7 +1695,7 @@ function invalidateMapSizes(delay) {
 //    opened on that screen (state.dockDrawer; dockOpen is not read there).
 //    The strip is one of two things there. On the Stations tab it is a rail
 //    down the right-hand edge, holding the map's controls as it does on a
-//    desktop, and the Stations cards and path tools with them as 📋 and 〽️,
+//    desktop, and the Stations cards and path tools with them as 📍 and 〽️,
 //    as beside a desktop's map: in the map's corner the controls were two
 //    columns of 44 px buttons over a quarter of a 390 px map, and under the
 //    map the cards were a page to scroll the map away to reach. The map fills
@@ -1909,6 +1915,9 @@ function dockSkeleton(panel) {
         <div class="dock-pane dock-pane-stations" id="${dockPaneId('paths')}" data-dock="paths" hidden>
           <h2 class="sr-only">Path tools — radio path, elevation profile and link budget</h2>
         </div>
+        <div class="dock-pane dock-pane-map dock-pane-places" id="${dockPaneId('places')}" data-dock="places" hidden>
+          ${Places.paneHtml()}
+        </div>
       </div>
     </div>`;
 }
@@ -1982,6 +1991,7 @@ function dockMapListed(e) {
 function dockHas(id) {
   if (id === 'help') return true;
   if (id === 'stations' || id === 'paths') return dockStationsHere();
+  if (id === 'places') return dockHoldsMapTools();
   if (!id.startsWith('map-') || state.activeTab !== 'stations') return false;
   const e = dockMapItems.get(id);
   if (e) return dockMapListed(e);
@@ -2078,9 +2088,17 @@ function helpShowing() {
 // so it is simply not there for that moment; a pane's button is.
 function dockStripGroups() {
   const side = [{ key: 'help', kind: 'tab', icon: '?', label: 'Help' }];
-  if (dockStationsHere()) {
-    side.push({ key: 'stations', kind: 'tab', icon: '📋',
+  const here = dockStationsHere();
+  if (here) {
+    side.push({ key: 'stations', kind: 'tab', icon: '📍',
                 label: 'Stations — filters, station list and station details' });
+  }
+  // The blue pin beside the red one: the stylesheet turns it (.mn-pin-blue).
+  if (dockHoldsMapTools()) {
+    side.push({ key: 'places', kind: 'tab', icon: '<span class="mn-pin-blue">📍</span>',
+                label: 'Find a place — a town, river, catchment, council area or coordinate' });
+  }
+  if (here) {
     side.push({ key: 'paths', kind: 'tab', icon: '〽️',
                 label: 'Path tools — radio path, elevation profile and link budget (fade margin)' });
   }
@@ -3070,7 +3088,7 @@ function renderStationsHtml() {
                aria-describedby="map-alt"></div>
           <p id="map-alt" class="sr-only">
             This map is drawn as a picture and has no per-station markup. The same set it is
-            showing is listed as text: the match note on the Filters card says how many stations
+            showing is listed as text: the match note on the Stations card says how many stations
             matched and how many were pulled in by a pass range, and the
             <strong>Stations</strong> table — in the side panel beside this map, or under the map
             when the cards are stacked below it — is the same filtered set, one row per station,
@@ -3096,83 +3114,77 @@ function renderStationsHtml() {
          </div>
         </div>
        <div class="stn-cards" id="stations-cards">
-        <!-- Directly under the map (#165), and shut on arrival (#181). It is a
-             disclosure built out of a button and a panel rather than the
-             <details> the three cards below it still are, and that is a
-             consequence of what #181 asked for rather than a preference: the
-             search box and the two clear buttons have to be usable while the
-             card is shut, and a <details> can show nothing but its <summary>
-             when it is closed. Putting them *in* the summary was the other
-             option and is the one this file already rejected once — "a button
-             inside one is a target that toggles the card as often as it is
-             pressed", which is why "+ New" is in the stations card's body and
-             not beside its heading.
+        <!-- The station list and its filters, one card. They were two — a
+             Filters card (#165, #181) and a Stations card under it — and two
+             cards is two borders, two paddings and the gap between them for
+             what is one question asked twice: the filters say which stations,
+             and the list is that set as rows. So, top to bottom:
 
-             So the head row is: the toggle (a real button, in the h3, which is
-             the accordion pattern), the live match note, and — while the card
-             is shut — the first search entry and the two clear buttons. The
-             match note stays in the row whichever way the card is facing: it
-             is the line that says what the filters are doing, and #165 made a
-             shut card conditional on it. -->
-        <div class="panel" id="stations-filter-card">
-          <div class="filter-card">
-            <div class="filter-card-head">
-              <h3 class="filter-card-title">
-                <button type="button" class="filter-toggle" id="filter-toggle"
-                        aria-expanded="${state.filtersOpen}" aria-controls="station-filters"
-                        onclick="toggleStationFilters()">Filters</button>
-              </h3>
-              <span class="small" id="map-match-note">${mapMatchNoteHtml()}</span>
-              <span class="filter-quick" id="filter-quick" ${state.filtersOpen ? 'hidden' : ''}
-                    >${filterQuickHtml()}</span>
-            </div>
+               the head   the list's toggle (a real button in the h3, the
+                          accordion pattern) with the live row count; the
+                          Filters toggle beside it; + Propose and + New at the
+                          far end, where the card's actions go — out of any
+                          <summary>, since a button in one toggles the card as
+                          often as it is pressed
+               filters    while the Filters are shut, the first search entry
+                          and the two clear buttons (#181: the tab is operated
+                          from them, and they must work with the panel shut);
+                          open, the whole panel in their place
+               the notes  what the filters are doing and which station is
+                          selected, on one line — what #165 asked a shut card
+                          to go on saying, and what the list is open for
+               the list   the scroller, which is what shutting the card puts
+                          away; the filters above it stay.
+
+             The two disclosures are buttons and panels rather than <details>
+             for #181's reason, and each is remembered. The filters keep the
+             id #stations-filter-card: it is the block every search box and
+             clear button is found inside. -->
+        <div class="panel stn-list-card" id="stations-list-card">
+          <div class="stn-list-head">
+            <h3 class="stn-list-title" id="stations-table-h">
+              <button type="button" class="stn-list-toggle" id="stations-list-toggle"
+                      aria-expanded="${state.stationsListOpen}" aria-controls="stations-list-body"
+                      onclick="toggleStationsList()">Stations <span class="badge" id="st-count">${stations.length}</span></button>
+            </h3>
+            <button type="button" class="filter-toggle" id="filter-toggle"
+                    aria-expanded="${state.filtersOpen}" aria-controls="station-filters"
+                    onclick="toggleStationFilters()"
+                    title="The filters: the search entries and what they look in, the networks, roles, sensors, basin and council, and what is still to be filled in">Filters</button>
+            <!-- + Propose (0039): a station where one is meant to go, not yet
+                 built — anybody who may edit may propose one; adding one
+                 outright is an administrator's. What is here on the map
+                 proposes one at the point it was asked about. -->
+            <span class="stations-card-actions">
+              <button onclick="editorPropose()"
+                      title="Propose a station: where one is meant to go, what kind it will be, and the year it is proposed for">+ Propose</button>
+              <button onclick="editorNew()" title="Add a station to the register">+ New</button>
+            </span>
+          </div>
+          <div class="filter-card" id="stations-filter-card">
+            <div class="filter-quick" id="filter-quick" ${state.filtersOpen ? 'hidden' : ''}
+                 >${filterQuickHtml()}</div>
             <div class="filter-panel" id="station-filters" ${state.filtersOpen ? '' : 'hidden'}>
               ${stationFiltersHtml()}
             </div>
           </div>
-        </div>
-        <!-- Collapsible, the same <details> the Path profile and Link budget
-             cards below it are. It is the tallest thing on the page — a scroller
-             capped at most of the viewport — and it sits here, directly under
-             the filters, because those two things are one question asked twice:
-             the filters say which stations, and this is that set as rows. The
-             path tools below are a different job, and #181 moved them below it
-             rather than leaving them between the filter and its own answer.
-             The condition #165 set for letting a card on this tab shut is that
-             its summary still says what is inside: the count badge is live, and
-             the note beside it names the selected station, which is the one row
-             a shut list would otherwise hide. -->
-        <div class="panel" id="stations-list-card">
-          <details class="stations-card" ${state.stationsListOpen ? 'open' : ''}
-                   ontoggle="setStationsListOpen(this.open)">
-            <summary>
-              <h3 id="stations-table-h">Stations <span class="badge" id="st-count">${stations.length}</span></h3>
-              <span class="small" id="stations-list-note">${stationsListNoteHtml()}</span>
-            </summary>
-            <div class="stations-card-body">
-              <!-- + Propose (0039): a station where one is meant to go, not yet
-                   built — anybody who may edit may propose one; adding one
-                   outright is an administrator's. What is here on the map
-                   proposes one at the point it was asked about. -->
-              <div class="stations-card-actions">
-                <button onclick="editorPropose()"
-                        title="Propose a station: where one is meant to go, what kind it will be, and the year it is proposed for">+ Propose</button>
-                <button onclick="editorNew()">+ New</button>
-              </div>
-              <!-- Pattern 7a: the wrapper caps its own height, so it is a named
-                   scroll region. Named by the heading above it, which carries the
-                   row count — so the name says how much is in here, live. -->
-              <div class="table-wrap tall" id="stations-table-wrap"
-                   role="region" tabindex="0" aria-labelledby="stations-table-h">
-                ${stationsTable(stations)}
-              </div>
+          <p class="small stn-list-notes"><span id="map-match-note">${mapMatchNoteHtml()}</span>
+            <span class="stn-list-sep" aria-hidden="true">·</span>
+            <span id="stations-list-note">${stationsListNoteHtml()}</span></p>
+          <div class="stations-card-body" id="stations-list-body" ${state.stationsListOpen ? '' : 'hidden'}>
+            <!-- Pattern 7a: the wrapper caps its own height, so it is a named
+                 scroll region. Named by the heading above it, which carries the
+                 row count — so the name says how much is in here, live. -->
+            <div class="table-wrap tall" id="stations-table-wrap"
+                 role="region" tabindex="0" aria-labelledby="stations-table-h">
+              ${stationsTable(stations)}
             </div>
-          </details>
+          </div>
         </div>
         <!-- The path tools: the clicked radio path, the ground under it (or
              under a drawn line), and the link budget over it. A wrapper of
              their own inside the cards, because beside the map they are not in
-             📋's column but in a pane of their own (〽️) — syncStationsCardsHome
+             📍's column but in a pane of their own (〽️) — syncStationsCardsHome
              moves this whole, and puts it back here, before the carriers card,
              when the cards go under the map. The profile is always a card, and
              with no line it says how to draw one (PathProfile's empty state) —
@@ -3324,14 +3336,14 @@ function syncStationsSplitHeight() {
 }
 let lastSplitHeight = null;
 
-// The filters card's own toggle. A plain button now rather than a <summary>
-// (#181) — see the markup — so the state is not kept for us by the element and
-// this has to move it in both directions.
+// The filters' own toggle, in the Stations card's head. A plain button rather
+// than a <summary> (#181) — see the markup — so the state is not kept for us by
+// the element and this has to move it in both directions.
 function toggleStationFilters() {
   setStationFiltersOpen(!state.filtersOpen);
 }
 
-// The filters card, open or shut. Remembered between visits, which is the
+// The filters, open or shut. Remembered between visits, which is the
 // difference between this card and the path tools further down: Path profile
 // and Link budget are things you open to answer one question and close again,
 // and the filters are how this tab is *operated*. An operator who wants the map
@@ -3361,21 +3373,30 @@ function setStationFiltersOpen(open) {
   else                   renderFilterQuick();
 }
 
-// The station list card, open or shut. Remembered for the same reason the
-// filters are: this is not a card you open to answer one question, it is the
-// tab's other half, and an operator who shuts a 1,300-row scroller to get the
-// map and the editor onto one screen means it. Writes state and nothing else —
-// see the note above about #160 and re-rendering a <details> from its own
-// ontoggle.
+// The station list, open or shut. Remembered for the same reason the filters
+// are: this is not a card you open to answer one question, it is the tab's
+// other half, and an operator who shuts a 1,300-row scroller to get the map
+// and the editor onto one screen means it. What it shuts is the scroller: the
+// head, the filters and the notes above it stay, since the tab is operated
+// from them. Two attributes and the state, and nothing re-rendered — see the
+// note above about #160.
 function setStationsListOpen(open) {
   state.stationsListOpen = !!open;
   localStorage.setItem('mn-stations-list', state.stationsListOpen ? 'open' : 'closed');
+  const btn  = document.getElementById('stations-list-toggle');
+  const body = document.getElementById('stations-list-body');
+  if (btn)  btn.setAttribute('aria-expanded', state.stationsListOpen ? 'true' : 'false');
+  if (body) body.hidden = !state.stationsListOpen;
 }
 
-// What the summary says beside the count. A shut card must still answer the
-// question the list is open for — the count badge says how many the filters
-// kept, and this says which one is selected, because the selected row is the
-// one thing in a shut list that the editor card below is talking about.
+function toggleStationsList() {
+  setStationsListOpen(!state.stationsListOpen);
+}
+
+// What the notes line says after the match note. A shut list must still
+// answer the question it is open for — the count badge says how many the
+// filters kept, and this says which one is selected, because the selected row
+// is the one thing in a shut list that the editor card below is talking about.
 function stationsListNoteHtml() {
   const s = state.selectedId && state.data
     ? state.data.stations.find(x => x.id === state.selectedId) : null;
@@ -4001,6 +4022,7 @@ function resetStationsMap() {
   try_(() => { if (MapPolar.active()) MapPolar.clear(); });
   try_(() => MapSites.clear());
   try_(() => MapSpider.reset());
+  try_(() => Places.clearMark());
 
   // 4. The selection, the focus and the blast ring that rides on it. The blast
   //    flag goes before the focus it reads, so applyMapFocusStyles' tail has
@@ -4819,11 +4841,6 @@ function mapSearchInput(i, value) {
   const row = searchRows()[i];
   if (!row) return;
   row.text = value;
-  // What this text means somewhere other than the station list (#184). Its own
-  // debounce, well past this one: a coordinate is answered from arithmetic on
-  // the spot, and a place name waits for a real pause before anybody's
-  // geocoder is asked about it.
-  Places.forRow(i, value);
   clearTimeout(state.mapSearchTimer);
   state.mapSearchTimer = setTimeout(stationsFilterChanged, 160);
 }
@@ -5042,9 +5059,10 @@ function initMap() {
   // out. After MapDraw, whose circle it selects with — though like every other
   // attach here it only needs the map it is handed.
   MapSites.attach(state.map);
-  // No layer of its own until somebody types somewhere into the filter box —
-  // attached for MapSpider's reason: it has to know which map it would be
-  // dropping a pin on before anybody asks it to.
+  // 📍 Find a place, the side panel's tool: no layer of its own until a place
+  // is pressed in it — attached for MapSpider's reason, to know which map it
+  // would be dropping a pin on before anybody asks it to, and to draw the one
+  // it was showing again on a map built new.
   Places.attach(state.map);
   MapRoads.attach(state.map);
   MapLots.attach(state.map);
@@ -6251,9 +6269,9 @@ function rerenderStations() {
   }
   const cnt = document.getElementById('st-count');
   if (cnt) cnt.textContent = stations.length;
-  // Both halves of what the card's summary claims, repainted together: the
-  // badge above and the selected station beside it. Deliberately not a
-  // re-render of the <details> itself — see setStationsListOpen().
+  // Both halves of what the card's head and notes claim, repainted together:
+  // the badge and the selected station. Deliberately not a re-render of the
+  // card itself — see setStationsListOpen().
   refreshStationsListNote();
 }
 
@@ -7163,10 +7181,12 @@ function renderStationFilters() {
 }
 
 // The two clear buttons. Drawn from one place because they are drawn in two
-// (#181): in the panel beside the search block while the card is open, and in
-// the head row beside the quick box while it is shut. They are the same pair of
-// buttons either way — a second copy that drifted from the first would be two
-// answers to "what does Clear do".
+// (#181): in the panel beside the search block while the Filters are open, and
+// beside the quick box while they are shut. They are the same pair of buttons
+// either way — a second copy that drifted from the first would be two answers
+// to "what does Clear do". "Clear" rather than "Clear filters" since the two
+// cards became one: beside the Filters toggle it says the same, and the shorter
+// pair leaves the box beside them one line tall.
 // Is there anything for the Clear buttons to put back? A filter, or — since
 // #186 — a repeater focus with no filter behind it. That second case is exactly
 // the state they were reported as failing to fix: the map three-quarters dimmed,
@@ -7182,25 +7202,26 @@ function filterResetsHtml() {
   return `
     <span class="filter-resets">
       <button class="filter-reset" onclick="clearStationFilters(false)"
-              title="Put every station and link back at full opacity — filters and repeater focus both — without moving the map"
-              ${idle ? 'disabled' : ''}>Clear filters</button>
+              title="Clear the filters: every station and link back at full opacity — filters and repeater focus both — without moving the map"
+              ${idle ? 'disabled' : ''}>Clear</button>
       <button class="filter-reset" onclick="clearStationFilters(true)"
               title="The same, and zoom back out to the whole network"
               ${idle ? 'disabled' : ''}>Clear &amp; zoom out</button>
     </span>`;
 }
 
-// ── The head row's own controls, for while the card is shut ─────────────────
-// #165 let this card close on the condition that its head still said what the
-// filters were doing; #181 asks for the head to still *do* it. So a shut card
-// carries the thing the tab is operated with — one search box and the two clear
-// buttons — and opening it hands the job back to the full panel underneath.
+// ── The quick row, for while the Filters are shut ───────────────────────────
+// #165 let the filters close on the condition that something still said what
+// they were doing; #181 asks for them to still *do* it. So with the Filters
+// shut the card carries the thing the tab is operated with — one search box and
+// the two clear buttons — and opening them hands the job back to the full
+// panel, which takes this row's place.
 //
 // It is the first entry, not a third search: the box writes
 // `state.filters.searches[0]`, exactly as `station-search-0` in the panel does.
-// A stack of two or more entries cannot fit in a row that also holds a heading
-// and a match note, so it is not attempted — the count beside the box says how
-// many entries are not in view, and opening the card shows them.
+// A stack of two or more entries cannot fit in one row beside the clear
+// buttons, so it is not attempted — the count beside the box says how many
+// entries are not in view, and opening the Filters shows them.
 function filterQuickHtml() {
   const rows = searchRows();
   const n    = rows.length;
@@ -7208,29 +7229,22 @@ function filterQuickHtml() {
     <textarea id="station-search-quick" class="filter-search filter-search--quick"
               rows="1" spellcheck="false"
               aria-label="${n > 1 ? `Filter entry 1 of ${n}` : 'Search stations'}"
-              title="Name, station # or ALERT address. Open the card for the ranges, the fields each entry looks in, and the rest of the filters."
-              placeholder="Name, station # or ALERT address"
-              onfocus="Places.focusIn(0)" onblur="Places.focusOut(0)"
+              title="Name, station # or ALERT address. Open Filters for the ranges, the fields each entry looks in, and the rest of the filters."
+              placeholder="Name, station # or AlertID"
               oninput="mapSearchInput(0, this.value);autoGrowSearch(this)">${esc(rows[0].text)}</textarea>
     <span class="filter-quick-more" id="filter-quick-more" ${n > 1 ? '' : 'hidden'}
-          title="More search entries than this row can show — open the card to see them"
+          title="More search entries than this row can show — open the filters to see them"
       >+${n - 1}</span>
-    ${filterResetsHtml()}
-    <!-- The same strip the panel's first entry carries, because this box is the
-         one being typed into while the card is shut. Places.js writes both.
-         A <span> rather than the panel's <div>: this row's container is itself
-         a <span>, and only phrasing content may go inside one. -->
-    <span class="search-places search-places--quick" data-mn-places="0"></span>`;
+    ${filterResetsHtml()}`;
 }
 
-// Redraw the head row's controls. Called when the card shuts, which is the one
-// moment the quick box can be behind the panel it is replacing.
+// Redraw the quick row's controls. Called when the Filters shut, which is the
+// one moment the quick box can be behind the panel it is replacing.
 function renderFilterQuick() {
   const el = document.getElementById('filter-quick');
   if (!el) return;
   el.innerHTML = filterQuickHtml();
   el.querySelectorAll('.filter-search').forEach(autoGrowSearch);
-  Places.repaint();
 }
 
 // Keep the quick box honest without redrawing it. updateFilterChrome runs on
@@ -7303,7 +7317,6 @@ function searchRowHtml(row, i, total) {
       <textarea id="station-search-${i}" class="filter-search" rows="1" spellcheck="false"
                 aria-label="${total > 1 ? `Filter entry ${n} of ${total}` : 'Search'}"
                 placeholder="e.g. 6128, 6129, 4021-4025 — or paste from a telemetry log"
-                onfocus="Places.focusIn(${i})" onblur="Places.focusOut(${i})"
                 oninput="mapSearchInput(${i}, this.value);autoGrowSearch(this)">${esc(row.text)}</textarea>
       <div class="search-scope" role="group" aria-labelledby="${scopeId}">
         <span class="search-scope-lead" id="${scopeId}">Look in</span>
@@ -7317,11 +7330,6 @@ function searchRowHtml(row, i, total) {
                 ${total > 1 ? '' : 'hidden'}>−</button>
       </div>
       <p class="filter-note" id="search-terms-note-${i}">${searchTermsNoteHtml(i)}</p>
-      <!-- What this entry means on the ground rather than in the station list:
-           a coordinate it parses as, or the towns, localities and airports it
-           names (#184). Places.js fills it in; empty markup here, because the
-           strip is state that outlives a redraw of the stack around it. -->
-      <div class="search-places" data-mn-places="${i}"></div>
     </div>`;
 }
 
@@ -7332,11 +7340,6 @@ function initStationFilters() {
   // The whole card: the head row's quick box (#181) is the same textarea with
   // the same paste in it, and it measures itself the same way.
   document.querySelectorAll('#stations-filter-card .filter-search').forEach(autoGrowSearch);
-  // Whatever the place strips already knew, back onto a card that has just been
-  // re-emitted empty. Deliberately not a fresh lookup: a re-render of the tab
-  // is not somebody asking a question, and re-running one would move the map
-  // out from under an operator who only switched tabs and came back.
-  Places.repaint();
 }
 
 // Redraw the stack in place — the block, not the panel around it, so the
@@ -7350,10 +7353,6 @@ function renderSearchStack(focus) {
   if (!el) return;
   el.innerHTML = searchStackHtml();
   el.querySelectorAll('.filter-search').forEach(autoGrowSearch);
-  // The strips are empty markup until Places writes them back — it holds what
-  // each entry found, so removing the entry above one does not lose it.
-  Places.trim(searchRows().length);
-  Places.repaint();
   const box = focus == null ? null : document.getElementById(`station-search-${focus}`);
   if (box) box.focus();
 }
@@ -7413,8 +7412,6 @@ function autoGrowSearch(el) {
 // "clear" is pressed to start again.
 function clearSearch() {
   state.filters.searches = [newSearchRow()];
-  // The place pin was an answer to a question nobody is asking any more.
-  Places.clear();
   renderSearchStack(0);
   stationsFilterChanged();
 }

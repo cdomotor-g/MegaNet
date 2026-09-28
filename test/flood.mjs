@@ -19,7 +19,10 @@
 //      (the AEP ramp shared out for one to four levels), the colour that never
 //      goes back down, where 0 m is and why, the cycle, and the scale's
 //      layout: every mark to scale, no label on another, the least of them
-//      giving way first when the stage is short.
+//      giving way first when the stage is short; and the scale's two
+//      measures — linear, and logarithmic in the depth below the top — with
+//      the bend a station's levels are fitted with and whether they warrant
+//      it (Gatton's twelve do, three classes metres apart do not).
 //
 //   2. The twin in Chromium (skipped without WebGL), standing the real Gatton
 //      record — minor 7, moderate 10, major 15 m on a gauge zero of 87.54 m
@@ -50,7 +53,13 @@
 //      bit tall; nothing of it in the .glb; a station whose zero is
 //      on an assumed datum keeping its AEP water and saying why its classes
 //      are not drawn; and Gatton's own floods from HDB — 1893 over the rarest
-//      AEP level, so the water rises to it, a ring and a name each.
+//      AEP level, so the water rises to it, a ring and a name each — and on
+//      them the scale's measure: linear when the twin opens, logarithmic by
+//      itself a moment later, Log lit, the names beside their marks rather
+//      than fanned out from the head, the water not moved, the rise and a
+//      press and the keys along the bent track, Log pressed off and kept for
+//      the station through a rebuild, and a station whose levels do not
+//      warrant it left linear.
 //
 // Gatton's record carries its five largest floods since 0037. The sections
 // about the classes and the AEP levels set them aside, so what they assert
@@ -243,6 +252,36 @@ function nodeHalf(FS) {
     FS.scaleText(G.find(l => l.key === 'major_m'), true) === 'Major 15.0 m' && FS.scaleText(G.find(l => l.key === 'aep_1_m'), true) === '1% AEP 15.1 m'
       && FS.scaleText(G.find(l => l.date === '1893-02-04'), true) === 'Feb 1893 ★ 16.3 m' && FS.scaleText(G.find(l => l.date === '1974-01-27'), true) === 'Jan 1974 14.6 m'
       && FS.scaleText(G.find(l => l.key === 'aep_1_m'), false) === '1% AEP 102.69 m', G.map(l => FS.scaleText(l, true)).join(' · '));
+
+  section('Linear or logarithmic');
+
+  // The track's two measures: the linear one, and the logarithm of the depth
+  // below the top with a bend of k metres.
+  const lin = FS.curve(lo, hi), bend = FS.curve(lo, hi, 0.8);
+  ok('the linear track: 0 at 0 m, 1 at the top, in proportion, and back',
+    lin.k === null && lin.at(lo) === 0 && lin.at(hi) === 1 && near(lin.at(lo + 0.25 * (hi - lo)), 0.25, 1e-12) && near(lin.of(0.4), lo + 0.4 * (hi - lo), 1e-9));
+  ok('the logarithmic one: the same ends, the depth below the top on a logarithm, and back again to the micrometre',
+    near(bend.at(lo), 0, 1e-12) && near(bend.at(hi), 1, 1e-12)
+      && near(bend.at(hi - 0.8), 1 - Math.log(2) / Math.log1p((hi - lo) / 0.8), 1e-12)
+      && [lo, 94.54, 100, 102.54, 103.5, hi].every(h => near(bend.of(bend.at(h)), h, 1e-6)));
+  ok('…and it gives the top the room: its top metre over a quarter of the track, where the linear one\'s is a sixteenth',
+    near(lin.at(hi) - lin.at(hi - 1), 1 / (hi - lo), 1e-12) && bend.at(hi) - bend.at(hi - 1) > 0.25, `${(bend.at(hi) - bend.at(hi - 1)).toFixed(3)}`);
+  const fit = FS.logFit(G, lo, hi);
+  const logPos = FS.scale(G, { lo, hi, px: 400, gap: GAP, k: fit.k });
+  ok('Gatton\'s twelve levels warrant it: on a linear track their names are pushed off their marks by 49 px on average, on the bent one by 4',
+    fit.warrant && near(fit.linear, 49.4, 0.1) && fit.log < 5 && fit.k > 0.5 && fit.k < 1, J(fit));
+  ok('…every mark where the bend puts it, every name shown, none on another',
+    logPos.every((p, i) => near(p.mark, 400 * (1 - FS.curve(lo, hi, fit.k).at(G[i].ahd)), 1e-9)) && logPos.every(p => p.shown) && layoutOk(logPos, 400, GAP));
+  const tried = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5].map(f => Math.max(0.02, f * (hi - lo))).map(k => ({ k, c: FS.crowding(G, lo, hi, k) }));
+  const least = Math.min(...tried.map(t => t.c));
+  ok('…the gentlest bend that does about as well as the best of them — not the top few centimetres given the whole track',
+    near(fit.k, Math.max(...tried.filter(t => t.c <= least + 3).map(t => t.k)), 1e-12) && fit.k > tried.find(t => t.c === least).k,
+    J(tried.map(t => [+t.k.toFixed(3), +t.c.toFixed(1)])));
+  const classesOnly = FS.ladder({ ...GATTON, aep_levels: [] });
+  const cf = FS.logFit(classesOnly.levels, 87.54, classesOnly.top);
+  ok('three classes metres apart do not warrant it: the linear scale stays', !cf.warrant && cf.linear < 1, J(cf));
+  const one = FS.logFit(classesOnly.levels.slice(2), 87.54, classesOnly.top);
+  ok('…nor does one level, which still has a bend for when Log is pressed', !one.warrant && one.k > 0, J(one));
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -286,8 +325,10 @@ async function browserHalf(FS) {
     await page.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
     // The lines over the stage stay open: this check presses the buttons in
-    // them, and must not race the fold (twinsite holds the fold itself).
-    await page.evaluate(() => DigitalTwin._infoFold(null));
+    // them, and must not race the fold (twinsite holds the fold itself). Nor
+    // does the scale turn itself logarithmic, which Gatton's levels warrant,
+    // except in the section about that.
+    await page.evaluate(() => { DigitalTwin._infoFold(null); DigitalTwin._floodScaleAuto(null); });
     // Gatton's floods wait for their own section (see the head).
     await page.evaluate(() => { delete state.data.stations.find(x => x.id === 'gatton').flood_peaks; });
     const gl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); });
@@ -666,6 +707,122 @@ async function browserHalf(FS) {
     await page.click('#twin-flood-scale .twin-scale-label[data-flood="peak 1974-01-27"]');
     F = await fl();
     ok('a flood\'s name pressed holds the water at the level it reached', near(F.level, 102.17, 1e-9) && !F.animating, `${F.level}`);
+
+    // The scale's measure, on Gatton with its floods — the crowd at the head
+    // the logarithmic track is for. Linear to begin with; logarithmic by itself
+    // a little later (the seam's 300 ms rather than four seconds), Log lit;
+    // the water never moved by either; the rise and a drag along the bent
+    // track; Log pressed off, and the operator's choice kept for the station;
+    // and a station whose levels do not warrant it left linear.
+    section('Linear or logarithmic');
+    // The Log toggle beside the scale's head: pressed for the bent track.
+    const modes = () => page.evaluate(() => `log:${document.getElementById('twin-scale-log').getAttribute('aria-pressed')}`);
+    // How far on average a name is pushed off its mark, as drawn.
+    const pushed = T => {
+      const at = new Map(T.marks.map(m => [m.key, m.top + m.height / 2]));
+      const ls = T.labels.filter(l => at.has(l.key));
+      return ls.reduce((a, l) => a + Math.abs((l.top + l.bottom) / 2 - at.get(l.key)), 0) / ls.length;
+    };
+    const want = FS.logFit(FS.ladder({ ...GATTON, flood_peaks: GATTON_PEAKS }).levels, 87.54, 103.87);
+    const bendY = (T, k, ahd) => T.track.top + T.track.height * (1 - FS.curve(87.54, 103.87, k).at(ahd));
+    await page.evaluate(() => DigitalTwin.floodAt('major_m'));
+    F = await fl();
+    T = await scale();
+    const linPushed = pushed(T);
+    ok('the scale opens linear, Log not pressed, though Gatton\'s levels warrant the other: its names fanned out from the head',
+      F.measure === 'lin' && F.fit.warrant && near(F.fit.k, want.k, 1e-9) && !F.chosen && !F.autoDone && !F.autoArmed
+        && (await modes()) === 'log:false' && linPushed > 30, J({ measure: F.measure, fit: F.fit, modes: await modes(), linPushed }));
+    await page.evaluate(() => DigitalTwin._floodScaleAuto(300));
+    await page.waitForFunction(() => DigitalTwin.debug().flood.measure === 'log', null, { timeout: 10_000 });
+    await page.waitForTimeout(700);    // the marks and names gliding to their places
+    F = await fl();
+    T = await scale();
+    ok('a moment on it turns logarithmic by itself — Log lit — with the bend its levels were fitted with, nobody having chosen',
+      F.measure === 'log' && near(F.logK, want.k, 1e-9) && F.autoDone && !F.chosen && (await modes()) === 'log:true',
+      J({ measure: F.measure, k: F.logK, want: want.k, modes: await modes() }));
+    ok('…the water where it was, at major, and the track filled to major on the bent track',
+      near(F.level, 102.54, 1e-9) && !F.animating && near(T.fill, FS.curve(87.54, 103.87, F.logK).at(102.54), 1e-3), `${F.level} ${T.fill}`);
+    ok('…every mark where the bend puts it, every name beside its mark rather than fanned out from the head, none on another',
+      T.marks.length === 12 && T.marks.every(m => near(m.top + m.height / 2, bendY(T, F.logK, F.levels.find(l => l.key === m.key).ahd), 1.5))
+        && T.labels.length === 12 && noOverlap(T) && T.inside && pushed(T) < linPushed / 3,
+      `pushed ${pushed(T).toFixed(1)} px on average, against ${linPushed.toFixed(1)} linear`);
+    ok('…and it does it once: the auto clock is spent', !F.autoArmed);
+    // The rise along the bent track, on a short clock: each frame's water
+    // where the cycle puts it *on the track*, so it reaches major two-thirds
+    // of the way through the rise rather than in its last tenth.
+    const bent = FS.curve(87.54, 103.87, F.logK), RISE = { rise: 2, hold: 0.5, drain: 0.3 };
+    const risen = await page.evaluate(async c => {
+      DigitalTwin.setFloodAnim(true);
+      DigitalTwin._floodClock(c.rise, c.hold, c.drain);
+      const out = [];
+      const t0 = performance.now();
+      while (performance.now() - t0 < 1800) { await new Promise(r => requestAnimationFrame(r)); const d = DigitalTwin.debug().flood; out.push({ t: d.clock, level: d.level, animating: d.animating }); }
+      return out;
+    }, RISE);
+    const offTrack = risen.filter(x => x.t == null || !near(x.level, bent.of(FS.cycle(x.t, RISE)), 1e-3));
+    ok('the rise runs along the bent track: every frame\'s water where the cycle puts it on the track, reaching major two-thirds of the way up rather than in the last tenth',
+      risen.length > 3 && risen.every(x => x.animating) && offTrack.length === 0 && bent.at(102.54) < 0.75 && FS.curve(87.54, 103.87).at(102.54) > 0.9,
+      `${offTrack.length} off; major at ${bent.at(102.54).toFixed(2)} of the rise`);
+    await page.evaluate(() => { DigitalTwin._floodClock(null); DigitalTwin.floodAt('major_m'); document.getElementById('twin-stage').scrollIntoView({ block: 'center' }); });
+    // A press on the bent track, clear of every mark: the water goes where
+    // that place on the track stands, not that fraction of the metres.
+    T = await scale();
+    const trk = T.track, ys = T.marks.map(m => m.top + m.height / 2);
+    const tAt = [0.5, 0.45, 0.55, 0.4, 0.6].find(t => ys.every(y => Math.abs(y - (trk.bottom - t * trk.height)) > 9));
+    await page.mouse.move(trk.left + trk.width / 2, trk.bottom - tAt * trk.height);
+    await page.mouse.down();
+    await page.mouse.up();
+    F = await fl();
+    ok('the bent track pressed holds the water where that place on it stands, not at that fraction of the metres',
+      near(F.level, bent.of(tAt), 0.1) && Math.abs(F.level - (87.54 + tAt * (103.87 - 87.54))) > 1 && !F.animating,
+      `${F.level.toFixed(2)} at ${tAt} of the track; ${bent.of(tAt).toFixed(2)} wanted`);
+    // The keys step along the track, a hundredth of it.
+    await page.focus('#twin-flood-scale .twin-scale-track');
+    const beforeKey = (await fl()).level;
+    await page.keyboard.press('ArrowUp');
+    ok('…an arrow a hundredth of the bent track', near((await fl()).level, bent.of(bent.at(beforeKey) + 0.01), 1e-6), `${(await fl()).level}`);
+    // Log pressed off: the water stays, and the choice is the operator's.
+    await page.evaluate(() => DigitalTwin.floodAt('major_m'));
+    await page.click('#twin-flood-scale #twin-scale-log');
+    await page.waitForTimeout(700);
+    F = await fl();
+    T = await scale();
+    ok('Log pressed off: the linear track again — every mark to scale — the water where it was, and the choice the operator\'s now',
+      F.measure === 'lin' && F.logK === null && F.chosen && near(F.level, 102.54, 1e-9) && (await modes()) === 'log:false'
+        && T.marks.every(m => near(m.top + m.height / 2, markY(T, F, F.levels.find(l => l.key === m.key).ahd), 1.5)),
+      J({ measure: F.measure, chosen: F.chosen, level: F.level, modes: await modes() }));
+    await page.evaluate(() => DigitalTwin.rebuild());
+    await settled();
+    await page.waitForTimeout(700);    // past the seam's 300 ms
+    F = await fl();
+    ok('…kept for the station: rebuilt, it opens linear and nothing turns it', F.measure === 'lin' && F.chosen && !F.autoArmed && !F.autoDone, J(F));
+    // Log from the keyboard, then back.
+    await page.focus('#twin-flood-scale #twin-scale-log');
+    await page.keyboard.press('Enter');
+    F = await fl();
+    ok('Log from the keyboard: the bent track, kept as the choice, the focus still on Log',
+      F.measure === 'log' && F.chosen && (await modes()) === 'log:true'
+        && await page.evaluate(() => document.activeElement && document.activeElement.id) === 'twin-scale-log');
+    await page.click('#twin-flood-scale #twin-scale-log');
+    // A station whose levels do not warrant it — Gatton's three classes on
+    // their own, in a session that has chosen nothing — stays linear.
+    await page.evaluate(() => {
+      const s = state.data.stations.find(x => x.id === 'gatton');
+      window.__aep = s.aep_levels; window.__pk = s.flood_peaks;
+      s.aep_levels = []; delete s.flood_peaks;
+      DigitalTwin._floodScaleAuto(300, true);
+      DigitalTwin.rebuild();
+    });
+    await settled();
+    await page.waitForTimeout(800);
+    F = await fl();
+    ok('three classes metres apart: the scale stays linear, nothing armed, nothing chosen', F.levels.length === 3 && F.measure === 'lin'
+      && !F.fit.warrant && !F.autoArmed && !F.autoDone && !F.chosen, J({ levels: F.levels.length, measure: F.measure, fit: F.fit }));
+    await page.evaluate(() => {
+      const s = state.data.stations.find(x => x.id === 'gatton');
+      s.aep_levels = window.__aep; s.flood_peaks = window.__pk;
+      DigitalTwin._floodScaleAuto(null, true);
+    });
     await page.evaluate(() => { delete state.data.stations.find(x => x.id === 'gatton').flood_peaks; DigitalTwin.rebuild(); });
     await settled();
 
@@ -728,7 +885,7 @@ async function browserHalf(FS) {
     });
     await qp.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
     await qp.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
-    await qp.evaluate(() => DigitalTwin._infoFold(null));
+    await qp.evaluate(() => { DigitalTwin._infoFold(null); DigitalTwin._floodScaleAuto(null); });
     await qp.evaluate(() => { delete state.data.stations.find(x => x.id === 'gatton').flood_peaks; });
     await qp.evaluate(() => DigitalTwin.openStation('gatton'));
     await qp.waitForFunction(() => { const d = DigitalTwin.debug(); return d.built && d.flood && !d.flood.none && d.flood.level != null; }, null, { timeout: BUILD_TIMEOUT });
@@ -768,6 +925,7 @@ async function browserHalf(FS) {
     await hp.evaluate(() => {
       DigitalTwin._infoFold(null);
       DigitalTwin._compact(null);
+      DigitalTwin._floodScaleAuto(null);
       delete state.data.stations.find(x => x.id === 'gatton').flood_peaks;
       switchTab('stations');
     });

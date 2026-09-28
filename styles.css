@@ -3936,51 +3936,120 @@ hr {
   line-height: 1;
 }
 
-/* ── Places & coordinates in the filter box (places.js) ─────────────────── */
-/* The strip under a filter entry: what the text means on the ground, as
-   against what it matches in the station list. Empty until Places writes it,
-   and it collapses to nothing when there is nothing to say — :empty rather
-   than [hidden], because the module writes innerHTML and never attributes. */
+/* ── 📍 Find a place (places.js) ─────────────────────────────────────────── */
+/* The tool's pin is the station's 📍 turned blue: the same glyph, so the two
+   read as one family, and the other colour, so a place found is never taken
+   for a station. A hue turn rather than a second glyph because there is no
+   blue pin among the emoji, and rather than a drawn one because the red is
+   the platform's own emoji and a drawn blue beside it would be a different
+   pin. Grey and white (the needle, the shine) are left as they are by a hue
+   turn, so only the head changes. The same blue, as a colour to draw with, is
+   --place-ink: the outline or course the tool draws round a place. */
+:root { --place-ink: #1a6fd6; }
+[data-theme="dark"] { --place-ink: #5aa2ff; }
 
-.search-places:empty { display: none; }
+.mn-pin-blue {
+  display: inline-block;
+  filter: hue-rotate(218deg) saturate(1.15);
+}
 
-.search-places-in {
+/* The pane, in the side panel on the Stations tab: a heading drawn as the
+   map's panels draw theirs, the box with its ✕, a line about what it takes,
+   and the list — grouped, each group headed, each row a button. */
+.places-pane {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.places-head { margin-bottom: 0; }
+
+.places-box {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  gap: var(--sp-1);
+  align-items: stretch;
+}
+
+.places-q {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: .35rem .5rem;
+  font: inherit;
+  font-size: .9rem;
+}
+
+.places-clear {
+  flex: 0 0 auto;
+  padding: 0 .6rem;
+  line-height: 1;
+}
+
+/* The box's own ✕ stands down for the one beside it, which takes the pin off
+   the map as well — two of them side by side was one too many. */
+.places-q::-webkit-search-cancel-button { display: none; }
+
+.places-hint { margin: 0; color: var(--muted); }
+
+.places-results:empty { display: none; }
+
+.places-group + .places-group { margin-top: var(--sp-2); }
+
+.places-group-h {
+  margin: 0 0 .15rem;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.places-list {
+  display: grid;
   gap: 1px;
-  margin-top: var(--sp-1);
-  padding: var(--sp-1) var(--sp-2);
-  border-left: 3px solid var(--accent);
-  background: var(--subtle);
-  border-radius: 0 var(--r-sm, 4px) var(--r-sm, 4px) 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-/* In the head row the strip has to take a line of its own: .filter-quick is a
-   wrapping flex row that otherwise squeezes it in beside the clear buttons. It
-   is a <span> there rather than a <div> — that row's container is a <span> and
-   only phrasing content may go inside one — so it is given the block it would
-   otherwise have had. */
-.search-places--quick {
-  display: block;
-  flex: 1 1 100%;
-  text-align: left;
-}
-
-.search-places--quick:empty { display: none; }
-
-.mn-place-go {
-  display: block;
+/* A row: the pin, the name, and what it is in the muted colour after it. The
+   one on the map now is drawn pressed. */
+.places-hit {
+  display: flex;
+  align-items: baseline;
+  gap: .45rem;
   width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: .3rem .45rem;
+  font: inherit;
+  font-size: .85rem;
+  line-height: 1.3;
   text-align: left;
-  font-size: .8rem;
+  color: var(--text);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
 }
 
-.mn-place-go .txt-muted { font-weight: 400; }
+.places-hit:hover { background: var(--subtle); }
+.places-hit.is-here { background: var(--subtle); border-color: var(--place-ink); }
+.places-hit-ico { flex: 0 0 auto; font-size: .8rem; }
+.places-hit-text { min-width: 0; overflow-wrap: anywhere; }
+.places-hit-name { font-weight: 600; }
+.places-hit-kind { color: var(--muted); }
 
-/* The one pin the module ever drops. A divIcon at a zero anchor, for the
-   reason .mn-peak gives: the marker's origin is the coordinate, and the
-   emoji hangs off it rather than being centred on it. */
+.places-more,
+.places-status,
+.places-credit { margin: .2rem 0 0 .45rem; }
+
+@media (pointer: coarse) {
+  /* EPIC #107's floor for a finger, on a row that is otherwise a line. */
+  .places-hit { min-height: 2.75rem; align-items: center; }
+}
+
+/* The one pin the tool drops. A divIcon at a zero anchor, for the reason
+   .mn-peak gives: the marker's origin is the coordinate, and the emoji hangs
+   off it rather than being centred on it. */
 .mn-place-icon {
   background: none;
   border: 0;
@@ -3993,7 +4062,12 @@ hr {
   transform: translateX(-50%);
   font-size: 22px;
   line-height: 1;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5));
+}
+
+/* The shadow goes on after the hue turn, so it stays a shadow and not a blue
+   one. */
+.mn-place.mn-pin-blue {
+  filter: hue-rotate(218deg) saturate(1.15) drop-shadow(0 1px 2px rgba(0, 0, 0, .5));
 }
 
 .mn-place-pop h4 {
@@ -5061,7 +5135,6 @@ hr {
   --cover-range:   #d6d49a;
 }
 
-.stations-card > summary,
 .path-panel > summary,
 .lb-panel > summary {
   display: flex;
@@ -5072,7 +5145,6 @@ hr {
   padding: .1rem 0;
 }
 
-.stations-card > summary::before,
 .path-panel > summary::before,
 .lb-panel > summary::before {
   content: '▸';
@@ -5080,11 +5152,9 @@ hr {
   font-size: .85rem;
 }
 
-.stations-card[open] > summary::before,
 .path-panel[open] > summary::before,
 .lb-panel[open] > summary::before { content: '▾'; }
 
-.stations-card > summary h3,
 .path-panel > summary h3,
 .lb-panel > summary h3 {
   margin: 0;
@@ -5171,54 +5241,37 @@ hr {
   margin: var(--sp-2) 0 0;
 }
 
-/* The stations card is deliberately not in the rule above, and this is the one
-   place the two differ. That selector is `summary span` — every span *inside*
-   the summary, at any depth — and the stations card's heading carries the live
-   row-count badge, which has colours of its own and must keep them. So only the
-   note beside the heading is muted here. */
-.stations-card > summary > .small { color: var(--muted); }
-
-.filter-card > .filter-panel,
-.stations-card > .stations-card-body,
 .path-body,
 .lb-body { padding-top: .5rem; }
 
-/* ── The filters card's head row (#181) ───────────────────────────────────
-   The three cards below this one on the Stations tab are <details>, and their
-   heads are <summary> — the rules above. This one is a button and a panel
-   instead, because its head has to keep working while the card is shut: a
-   <details> shows nothing but its summary when closed, and the alternative,
-   putting the controls *inside* the summary, is the thing the note under
-   .stations-card-actions already says not to do.
+/* ── The Stations card: the list and its filters, one card ────────────────
+   Its head is one row: the list's toggle (the heading, with the live count),
+   the Filters toggle beside it, and + Propose and + New at the far end. Under
+   it the filters — the first search entry and the clear buttons while the
+   Filters are shut, the whole panel while they are open — then one line of
+   notes, then the list. Every gap in it is a tight one: it was two cards, and
+   the second border, padding and gap were most of what it gave back.
 
-   So the row is styled to read as the same head as the other three — the same
-   caret, the same 0.95 rem heading, the same muted note beside it — and then
-   carries the search box and the two clear buttons on its right while the card
-   is closed. It wraps rather than squeezing: the box asks for 16 rem and drops
-   to its own line under a heading that has run out of room, which is a phone
-   and needs no breakpoint to say so. */
-.filter-card-head {
+   Both toggles are real buttons (#181), stripped back: the list's to the text
+   of the heading it is in, with the caret the <summary> cards draw, turned by
+   aria-expanded; the Filters' to a small pill beside it, so that two carets in
+   one row are not read as the same kind of thing. */
+.stn-list-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: .3rem .6rem;
-  padding: .1rem 0;
+  gap: .3rem .5rem;
 }
 
-.filter-card-title {
+.stn-list-title {
   margin: 0;
   font-size: .95rem;
 }
 
-/* A real button, so it is one tab stop with one accessible name and one
-   aria-expanded — and stripped back to the text of the heading it is inside,
-   so the row reads as a heading rather than as a control. The caret is the
-   same character the <summary> cards draw, turned by aria-expanded rather than
-   by [open], because that attribute is now where the state lives. */
-.filter-toggle {
+.stn-list-toggle {
   display: inline-flex;
   align-items: baseline;
-  gap: .5rem;
+  gap: .4rem;
   padding: .1rem 0;
   border: 0;
   border-radius: 4px;
@@ -5228,32 +5281,71 @@ hr {
   cursor: pointer;
 }
 
-.filter-toggle::before {
+.stn-list-toggle::before {
   content: '▸';
   color: var(--muted);
   font-size: .85rem;
 }
 
-.filter-toggle[aria-expanded="true"]::before { content: '▾'; }
+.stn-list-toggle[aria-expanded="true"]::before { content: '▾'; }
 
-.filter-card-head > .small { color: var(--muted); }
+.filter-toggle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .3rem;
+  min-height: 0;
+  padding: .12rem .55rem;
+  font: inherit;
+  font-size: .8rem;
+  line-height: 1.3;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+}
 
-/* Everything the shut card still has to *do*, pushed to the far end of the row
-   and taking whatever width is left. `min-width: 0` on the flex item is what
-   lets the textarea inside it shrink below its own intrinsic width instead of
-   pushing the row wider than the page. */
+.filter-toggle::after {
+  content: '▸';
+  font-size: .75rem;
+}
+
+.filter-toggle[aria-expanded="true"] { color: var(--text); border-color: var(--accent); }
+.filter-toggle[aria-expanded="true"]::after { content: '▾'; }
+.filter-toggle:hover { color: var(--text); background: var(--subtle); }
+
+.filter-card { margin-top: .4rem; }
+.filter-card > .filter-panel { padding-top: .1rem; }
+
+/* The search entry and the clear buttons, the row the tab is operated from
+   while the Filters are shut. `min-width: 0` on the flex item is what lets the
+   textarea inside it shrink below its own intrinsic width instead of pushing
+   the row wider than the pane. */
 .filter-quick {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: .3rem .45rem;
-  flex: 1 1 16rem;
+  gap: .3rem .4rem;
   min-width: 0;
-  margin-left: auto;
 }
 
 .filter-quick[hidden] { display: none; }
+
+/* What the filters are doing and which station is selected: one line of
+   muted words between the filters and the list, wrapping only when it must. */
+.stn-list-notes {
+  margin: .3rem 0 0;
+  color: var(--muted);
+}
+
+.stn-list-notes strong { color: var(--text); }
+
+/* Under an open panel the notes are a line clear of its last group, which is
+   a row of the same size and would otherwise read as one more of its lines. */
+.filter-card:has(> .filter-panel:not([hidden])) + .stn-list-notes { margin-top: .55rem; }
+
+.stations-card-body { padding-top: .4rem; }
+.stations-card-body[hidden] { display: none; }
 
 /* The same textarea as the one in the panel — a paste of ALERT addresses keeps
    its line breaks here too — sized for a row rather than for a block. It grows
@@ -5285,14 +5377,23 @@ hr {
 
 .filter-quick-more[hidden] { display: none; }
 
-/* "+ New" used to sit in a .panel-header beside the heading. The heading is a
-   <summary> now, and a button inside one is a target that toggles the card as
-   often as it is pressed — so the action moved into the body, on its own row,
-   right-aligned where the panel header used to put it. */
+/* + Propose and + New, at the far end of the card's head: small, since they
+   share a row with the heading, and pushed right by the auto margin — onto a
+   row of their own, still right, when the head wraps. */
 .stations-card-actions {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--sp-2);
+  gap: .3rem;
+  margin-left: auto;
+}
+
+.stations-card-actions > button {
+  min-height: 0;
+  padding: .15rem .55rem;
+  font-size: .8rem;
+}
+
+@media (pointer: coarse) {
+  .stations-card-actions > button { min-height: 2.75rem; }
 }
 
 /* verdict strip: the plain-English answer, before any of the numbers */
@@ -7827,7 +7928,7 @@ body.mn-dock-dragging {
    panel shows is a drawer over the page from the right, exactly as the nav's
    becomes one from the left; app.js closes whichever was open when the other
    opens, and the backdrop and Escape put either away. The Stations cards are
-   two of its panes here, 📋 and 〽️, as they are beside a desktop's map — not
+   two of its panes here, 📍 and 〽️, as they are beside a desktop's map — not
    under the map, where they are between `xs` and `lg`.
 
    What the strip is depends on what it is holding.
@@ -12558,6 +12659,10 @@ code {
    style but the compass's heading, which is a token (--twin-heading) and
    is what `npm run tabs` allows. */
 .twin-stage {
+  /* The caveat's line along the foot (below): a constant, because the words
+     shorten with the stage rather than wrap, and everything else along the
+     foot stands this far up. */
+  --twin-caveat-h: 1.5rem;
   position: relative;
   height: clamp(320px, 62vh, 760px);
   margin-top: var(--sp-2);
@@ -12565,6 +12670,9 @@ code {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   overflow: hidden;
+  /* A container, so the caveat can pick its words by the stage's width — the
+     tab's panel, the Stations map, a phone's map — rather than the window's. */
+  container: twin-stage / inline-size;
 }
 
 .twin-stage canvas {
@@ -12633,7 +12741,7 @@ code {
   position: absolute;
   left: var(--sp-2);
   right: 3.4rem;
-  bottom: var(--sp-2);
+  bottom: calc(var(--twin-caveat-h) + var(--sp-2));
   margin: 0;
   padding: .2rem .5rem;
   font-size: var(--fs-xs);
@@ -12655,7 +12763,7 @@ code {
 .twin-hud-q {
   position: absolute;
   left: var(--sp-2);
-  bottom: var(--sp-2);
+  bottom: calc(var(--twin-caveat-h) + var(--sp-2));
   z-index: 3;
   display: inline-grid;
   place-items: center;
@@ -12720,6 +12828,52 @@ code {
 
 .twin-placeholder p { margin: 0; max-width: 34rem; }
 .twin-placeholder[hidden] { display: none; }
+
+/* The caveat (digital-twin.js, caveatHtml): along the foot of every twin — the
+   tab's and the Stations map's — whatever else is up or folded, saying that
+   everything in the view is modelled. Red text on the panel, a hairline of the
+   same red above it; one line, --twin-caveat-h tall, the words picked by the
+   stage's width (three lengths, the longest that fits), and an ellipsis for a
+   stage narrower than the shortest. It takes no pointer: a drag that starts on
+   it turns the view. The red is the flood cards' text-safe one — 6.4:1 on a
+   white panel, and a lighter one for the dark theme's. */
+:root { --twin-caveat-ink: #b3261e; }
+[data-theme="dark"] { --twin-caveat-ink: #ff7b72; }
+
+.twin-caveat {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  height: var(--twin-caveat-h);
+  margin: 0;
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: var(--twin-caveat-h);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--twin-caveat-ink);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--twin-caveat-ink) 45%, transparent);
+  pointer-events: none;
+}
+
+.twin-caveat-long,
+.twin-caveat-mid { display: none; }
+
+@container twin-stage (min-width: 480px) {
+  .twin-caveat-short { display: none; }
+  .twin-caveat-mid { display: inline; }
+}
+
+@container twin-stage (min-width: 860px) {
+  .twin-caveat-mid { display: none; }
+  .twin-caveat-long { display: inline; }
+}
 
 .twin-status {
   margin: var(--sp-2) 0 0;
@@ -13151,7 +13305,7 @@ code {
   position: absolute;
   top: var(--sp-2);
   left: var(--sp-2);
-  bottom: calc(var(--twin-hud-h, 1.6rem) + 2 * var(--sp-2));
+  bottom: calc(var(--twin-hud-h, 1.6rem) + var(--twin-caveat-h) + 2 * var(--sp-2));
   z-index: 1;
   display: flex;
   flex-direction: column;
@@ -13200,6 +13354,50 @@ code {
 }
 .twin-scale-play:hover { background: var(--subtle); }
 .twin-scale-now { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The head and, beside it, Log: the track's measure, a toggle pressed for
+   the logarithmic track (digital-twin.js). One row, the width of the scale's
+   column at most; the reading in the head gives way first. */
+.twin-scale-top {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  align-self: flex-start;
+  max-width: 100%;
+  min-width: 0;
+}
+.twin-scale-top > .twin-scale-head { align-self: auto; flex: 0 1 auto; }
+
+.twin-scale-log {
+  position: relative;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: .15rem .45rem;
+  min-height: 0;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.twin-scale-log:hover { color: var(--text); background: var(--panel); }
+.twin-scale-log[aria-pressed="true"] { color: var(--panel); background: var(--text); border-color: var(--text); }
+@media (pointer: coarse) {
+  /* A finger's worth to aim at round a chip drawn small, as the play pill has. */
+  .twin-scale-log::after { content: ''; position: absolute; inset: -.55rem -.2rem; border-radius: var(--r-pill); }
+}
+
+/* The marks and names moving to their places on the track of the other
+   measure (digital-twin.js, setScaleMode), the lines to them faded out until
+   they are there. Only while the class is on: a resize moves them at once. */
+.twin-flood-scale.is-rescaling .twin-scale-mark,
+.twin-flood-scale.is-rescaling .twin-scale-label { transition: top .45s ease; }
+.twin-flood-scale.is-rescaling .twin-scale-leaders { opacity: 0; transition: none; }
 
 .twin-scale-body {
   position: relative;
@@ -13352,7 +13550,7 @@ code {
 /* On a phone's stage the scale's foot stops above the "?" rather than above
    the whole hint, which lies over it for the few seconds it is up. */
 .twin-stage.is-compact .twin-flood-scale {
-  bottom: calc(2rem + 2 * var(--sp-2));
+  bottom: calc(2rem + var(--twin-caveat-h) + 2 * var(--sp-2));
 }
 
 /* …and ⏸ is drawn smaller than a finger's 44 px, so the pill it heads is a
@@ -13384,7 +13582,7 @@ code {
 .twin-photo-prompt {
   position: absolute;
   left: 50%;
-  bottom: 2.6rem;
+  bottom: calc(2.6rem + var(--twin-caveat-h));
   transform: translateX(-50%);
   max-width: calc(100% - 2rem);
   padding: .35rem .8rem;

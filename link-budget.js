@@ -208,12 +208,12 @@ const LinkBudget = (function () {
   }
 
   // Where the Stations list is from this card. Beside the map the two are in
-  // different panes of the side panel — this one under 〽️, the list under 📋 —
+  // different panes of the side panel — this one under 〽️, the list under 📍 —
   // and "above" would send the operator scrolling up a pane that has no list
   // in it. Under the map it is above, past the elevation profile.
   function listWhere() {
     return typeof stationsSplitActive === 'function' && stationsSplitActive()
-      ? '(📋 in the side panel)' : 'above';
+      ? '(📍 in the side panel)' : 'above';
   }
 
   // The box itself, plus the sentence that says what arming an end means. The

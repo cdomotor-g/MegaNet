@@ -1,30 +1,49 @@
 // MegaNet — places.js
 //
-//   Places   what the Stations filter box does with text that is not a
-//            station: a coordinate, or the name of a town, locality, airport
-//            or hill. Parses the first, looks up the second, and takes the map
-//            to whichever it was.
+//   Places   📍 Find a place, the side panel's tool on the Stations tab (its
+//            pin blue, where a station's is red): a box that takes the name of
+//            a town, a river, a catchment or a council area, or a coordinate,
+//            and lists what it means on the ground — and a press on one takes
+//            the map there, with a blue pin and, for anything bigger than a
+//            point, its outline. And, through the same parse(), a coordinate
+//            pair pasted into any latitude or longitude box in the app lands
+//            half in each (bindCoordPaste, from init.js).
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for `state`, esc, escAttr, stationLatLonText,
-// copyLatLonPillHtml and mapViewPills; across to app.js for mapNote. All of it
-// from inside its own functions, so this file's position among the modules is
-// free.
+// Reaches back to core.js for `state`, esc, escAttr, announce,
+// stationLatLonText, copyLatLonPillHtml and mapViewPills; across to app.js for
+// mapNote, and to map-catchments.js for the basins' geometry. All of it from
+// inside its own functions, so this file's position among the modules is free.
 //
-// ── Why this is in the filter box and not a second box beside it ─────────────
-// The filter box is where an operator types when they want the map to be
-// somewhere. Until now it could only answer with stations, so "Gympie" found
-// the four sites with Gympie in their names and "-26.19, 152.66" found
-// nothing at all — and the operator went to Google Maps, read a coordinate off
-// it and came back. Both of those are the same gesture as far as anybody using
-// this is concerned, so they belong in the same box.
+// ── Why it has a box of its own now ──────────────────────────────────────────
+// It lived in the Stations filter box (#184): text that was not a station was
+// answered under the box as well — a coordinate parsed, a town looked up — on
+// the argument that both are "make the map be somewhere". In use they were two
+// questions sharing one box. The filter narrows the stations on the map and
+// the list, so "Gympie" typed to *find the town* also cut the network down to
+// the four stations with Gympie in their names, and the answer under the box
+// came and went with the caret in it. A place is not a filter: it moves the
+// map and leaves the stations alone. So it has its own tool in the side
+// panel's strip, beside the stations' 📍, and the filter box is the stations'
+// again.
 //
-// Nothing about how stations are filtered changes. The station filter still
-// sees the same text and still matches it the same way (name, station number,
-// ALERT addresses, windows); this only *adds* an answer under the box when the
-// text also means somewhere on the ground. A term that is both — "Gympie" is
-// a town and is in four station names — gets both answers at once, which is
-// the honest result and the useful one.
+// And a box of its own can answer more than towns. What an operator reaches
+// for a map of this network to find is as often a river or a catchment as a
+// town — "where is the Lockyer", "show me the Fitzroy" — so the list is, in
+// this order:
+//
+//   Coordinate   what the text parses as — answered on the spot, offline
+//   Catchments   the 77 Queensland drainage basins the file carries, by name
+//                or basin number; drawn from data/qld-basins.geojson
+//   Rivers       the rivers and creeks this network's stations stand on (the
+//                register's `stream`), with how many; the map goes to them
+//   Councils     the local government areas its stations are in, likewise
+//   Towns and    OpenStreetMap's gazetteer: towns, localities, suburbs,
+//   more         airports, hills, rivers and creeks anywhere, council
+//                boundaries — each with its outline or its course where OSM
+//                has one
+//
+// The first four are the file's own and cost nothing; the last is a request.
 //
 // ── Coordinates are parsed here, never looked up ─────────────────────────────
 // A coordinate is not a search. It is already the answer, and sending it to a
@@ -33,7 +52,8 @@
 // standing beside a site with a handheld GPS is. So parse() is pure, handles
 // the four shapes a coordinate actually arrives in (decimal, decimal with
 // hemispheres, degrees-minutes, degrees-minutes-seconds), and an entry that
-// is *only* a coordinate moves the map on the spot.
+// is *only* a coordinate moves the map on the spot. Field photos and the site
+// finder read coordinates through the same parse().
 //
 // ── The gazetteer ───────────────────────────────────────────────────────────
 // Nominatim, OpenStreetMap's own. Keyless, CORS-open, and the only geocoder
@@ -42,39 +62,45 @@
 // footnote: at most one request a second, no bulk querying, and results
 // cached rather than re-asked. So a lookup is debounced well past a
 // keystroke, throttled to the published rate, answered from a cache whenever
-// it can be, and never fired at text that is obviously a station number or an
-// ALERT address — the box's usual traffic makes no geocoder requests at all.
+// it can be, and never fired at text that is obviously a coordinate, a number
+// or too short to be a name. Each answer carries its outline or course,
+// simplified to about a hundred metres (polygon_threshold), which is what lets
+// a river be drawn rather than pinned.
 //
 // Failure is quiet and says so: no network, a blocked host or a rate limit
-// leaves the station filtering untouched and puts one line under the box. This
-// is an extra answer, never the only one.
+// leaves the file's own answers standing and puts one line in the list.
 const Places = (function () {
   const URL_BASE   = 'https://nominatim.openstreetmap.org/search';
   const ATTRIB     = 'Place names © OpenStreetMap contributors (Nominatim)';
   const DEBOUNCE_MS = 650;    // a pause, not a keystroke, before anybody's
                               // geocoder is asked
   const COORD_SETTLE_MS = 250; // …and a shorter one before the map moves to a
-                              // typed coordinate; see forRow
+                              // typed coordinate; see input()
   const MIN_RATE_MS = 1100;   // Nominatim's published ceiling is 1/s
   const TIMEOUT_MS  = 12000;
-  const MAX_HITS    = 6;
+  const MAX_HITS    = 8;
   const MIN_CHARS   = 3;
   const CACHE_MAX   = 120;
+  const LOCAL_CAP   = 6;      // rows shown per group of the file's own
+  const SHAPE_DEG   = 0.001;  // the gazetteer's outlines, simplified to ~100 m
 
   // What counts as a place worth offering. Nominatim's `category` is the OSM
   // key and `type` the value, so this is a whitelist of keys with an optional
   // set of values under each. Everything else — a shop, a house number, a
-  // driveway — is dropped: this box is for finding a *locality*, and a list
-  // with a bakery in it is a list nobody reads to the bottom of.
+  // driveway — is dropped: this is for finding somewhere on a map of a
+  // telemetry network, and a list with a bakery in it is a list nobody reads
+  // to the bottom of.
   const KINDS = {
     place:    null,   // city, town, village, hamlet, suburb, locality, island…
     aeroway:  new Set(['aerodrome', 'airstrip', 'heliport', 'terminal']),
     boundary: new Set(['administrative']),
-    natural:  new Set(['peak', 'bay', 'cape', 'beach', 'volcano']),
-    waterway: new Set(['river', 'stream', 'creek']),
-    landuse:  new Set(['residential']),
+    natural:  new Set(['peak', 'bay', 'cape', 'beach', 'volcano', 'water']),
+    waterway: new Set(['river', 'stream', 'creek', 'canal', 'dam', 'weir']),
+    water:    null,
+    landuse:  new Set(['residential', 'reservoir']),
     railway:  new Set(['station', 'halt']),
     amenity:  new Set(['townhall']),
+    leisure:  new Set(['park', 'nature_reserve']),
   };
 
   // The label under a result, in words rather than in OSM's own vocabulary.
@@ -87,29 +113,30 @@ const Places = (function () {
     aerodrome: 'airport', airstrip: 'airstrip', heliport: 'heliport',
     terminal: 'airport terminal',
     peak: 'peak', volcano: 'peak', bay: 'bay', cape: 'headland', beach: 'beach',
-    river: 'river', stream: 'creek', creek: 'creek',
+    river: 'river', stream: 'creek', creek: 'creek', canal: 'canal', dam: 'dam', weir: 'weir',
+    water: 'water', reservoir: 'reservoir', lake: 'lake',
     residential: 'residential area', station: 'railway station', halt: 'railway stop',
-    townhall: 'town hall',
+    townhall: 'town hall', park: 'park', nature_reserve: 'nature reserve',
   };
 
-  const cache = new Map();      // lowercased query → results array (LRU by re-insert)
+  // Words that say what kind of thing a name is rather than which one. Left
+  // out of a catchment's match, because the basins are named bare — "Fitzroy",
+  // not "Fitzroy River" — and "fitzroy river catchment" means that one.
+  const GENERIC = new Set(['river', 'rivers', 'creek', 'ck', 'catchment', 'basin', 'the']);
+
+  const cache = new Map();      // lowercased query → results (LRU by re-insert)
   let lastAt = 0;               // when the last request went out, for the throttle
-  let map = null, marker = null;
-  // Per filter entry: what was typed, what came back, and whether a request is
-  // out. Keyed by the entry's index, which is what the panel renders by.
-  const rows = new Map();
-  const timers = new Map();
-  // Which entry's box the caret is in, or null. The strip is drawn for that
-  // entry and no other (#186): it is an answer to what is being typed *now*,
-  // and a stack of six place names left under a box nobody is in is six rows
-  // of map the operator asked to see and cannot. The results themselves are
-  // kept — clicking back into the box brings the same strip straight back with
-  // no second lookup, which is the whole reason this is a paint rule and not a
-  // clear().
-  let focusRow = null;
-  let blurTimer = null;
+  let map = null;
+  let layer = null;             // the pin and the outline of the one place shown
+  let query = '';               // what is in the box
+  let coord = null;             // what it parses as, if anything
+  let local = null;             // the file's own answers: { catchments, rivers, councils }
+  let gaz = { text: '', list: null, loading: false, error: '', asked: false };
+  let shown = null;             // the result the map is showing: { group, n, hit, q }
   let flownTo = null;           // the coordinate the map was last moved to, so a
-                                // re-render does not move it again
+                                // second settle of the same text does not move it
+  let lookupTimer = 0, coordTimer = 0;
+  let index = null;             // rivers and councils from the file, built once per file
 
   // ── Coordinates ─────────────────────────────────────────────────────────────
 
@@ -355,12 +382,91 @@ const Places = (function () {
     }
   }
 
+  // ── The file's own: catchments, rivers, councils ──────────────────────────
+
+  // "LOCKYER CREEK" as a person writes it. The register's stream names are
+  // upper case, and a list of them shouted is harder to read than it needs to
+  // be; "Mc", "O'" and a word after a hyphen or a bracket are capitalised
+  // too (not one after any other apostrophe: King's Creek, not King'S).
+  function titleCase(s) {
+    return String(s || '').toLowerCase().replace(/(^|[\s\-(/])([a-z])/g, (m, a, b) => a + b.toUpperCase())
+      .replace(/\bMc([a-z])/g, (m, a) => `Mc${a.toUpperCase()}`)
+      .replace(/\bO['’]([a-z])/g, (m, a) => `${m.slice(0, 2)}${a.toUpperCase()}`);
+  }
+
+  function norm(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  // A river's name as a key: the register writes a creek as "CK" as often as
+  // "CREEK" (Lockyer Creek has seventeen stations under the one and one under
+  // the other), and a river as "R" at the end of its name (Burdekin R), and
+  // they are the same creek and the same river.
+  function riverKey(s) {
+    return norm(s).replace(/\b(ck|crk)\b/g, 'creek').replace(/\b(rv|riv)\b/g, 'river').replace(/ r$/, ' river');
+  }
+
+  // Rivers and councils, from the stations: each distinct name with the
+  // stations it holds and the box round the ones with a position, named as
+  // most of its stations spell it. Built once for each file loaded — 4,873
+  // stations is a few milliseconds, but not one worth spending on every
+  // keystroke.
+  function fileIndex() {
+    const data = typeof state !== 'undefined' ? state.data : null;
+    if (!data) return { rivers: [], councils: [] };
+    if (index && index.data === data) return index;
+    const group = field => {
+      const by = new Map();
+      for (const s of data.stations || []) {
+        const raw = String(s[field] || '').trim();
+        if (!raw) continue;
+        const key = field === 'stream' ? riverKey(raw) : norm(raw);
+        let g = by.get(key);
+        if (!g) by.set(key, g = { key, name: '', spell: new Map(), n: 0, s: 90, w: 180, north: -90, e: -180, located: 0 });
+        g.n++;
+        g.spell.set(raw, (g.spell.get(raw) || 0) + 1);
+        if (s.lat != null && s.lon != null && isFinite(s.lat) && isFinite(s.lon)) {
+          g.located++;
+          g.s = Math.min(g.s, s.lat); g.north = Math.max(g.north, s.lat);
+          g.w = Math.min(g.w, s.lon); g.e = Math.max(g.e, s.lon);
+        }
+      }
+      for (const g of by.values()) {
+        const raw = [...g.spell].sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0][0];
+        g.name = field === 'stream' ? titleCase(raw) : raw;
+        delete g.spell;
+      }
+      return [...by.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+    };
+    index = { data, rivers: group('stream'), councils: group('lga') };
+    return index;
+  }
+
+  // The file's answers for what is in the box. A name matches where it holds
+  // what was typed; a catchment also by its basin number, whole and as a
+  // number ("130", or "011" and "11" both the Bulloo — MapCatchments' rule).
+  function localFor(q) {
+    const t = norm(q);
+    if (t.length < 2 || coord) return { catchments: [], rivers: [], councils: [] };
+    const bare = t.split(' ').filter(w => !GENERIC.has(w)).join(' ');
+    const digits = /^\d+$/.test(t) ? Number(t) : null;
+    const cats = ((typeof state !== 'undefined' && state.data && state.data.catchments) || [])
+      .filter(c => (digits != null ? c.basin_no != null && Number(c.basin_no) === digits
+                                   : !!bare && norm(c.name).includes(bare)))
+      .sort((a, b) => (norm(a.name).startsWith(bare) ? 0 : 1) - (norm(b.name).startsWith(bare) ? 0 : 1) || a.name.localeCompare(b.name));
+    const ix = fileIndex();
+    const named = (list, k) => (digits != null ? [] : list.filter(g => g.located && g.key.includes(k))
+      .sort((a, b) => (a.key.startsWith(k) ? 0 : 1) - (b.key.startsWith(k) ? 0 : 1) || b.n - a.n));
+    return { catchments: cats, rivers: named(ix.rivers, riverKey(q)), councils: named(ix.councils, t) };
+  }
+
   // ── The gazetteer ───────────────────────────────────────────────────────────
 
   // Is this worth asking a geocoder about? Station numbers, ALERT addresses,
-  // address windows and pasted digit columns are the box's normal traffic and
-  // none of them is a place name — sending them would be bulk-querying
-  // somebody else's free service with text that cannot match.
+  // address windows and pasted digit columns are what an operator of this
+  // network has in their clipboard, and none of them is a place name — sending
+  // them would be bulk-querying somebody else's free service with text that
+  // cannot match.
   function askable(q) {
     const s = String(q || '').trim();
     if (s.length < MIN_CHARS) return false;
@@ -392,22 +498,27 @@ const Places = (function () {
     if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
   }
 
-  // One request, throttled to the published rate and never overlapping. Resolves
-  // to a list — never rejects: a failed lookup is a line under the box, not a
-  // broken filter panel.
-  function ask(q) {
+  // One request, throttled to the published rate. Resolves to a list — never
+  // rejects: a failed lookup is a line in the list, not a broken tool. The
+  // request's slot is taken when it is asked for, not when its wait is over:
+  // two asked for inside one wait would otherwise both read the same last
+  // request and go out together. `stale` says whether the box has moved on to
+  // another lookup by the time the slot comes round, and then nothing is sent.
+  function ask(q, stale) {
     const key = q.trim().toLowerCase();
     if (cache.has(key)) {
       const hit = cache.get(key);
       remember(key, hit);
       return Promise.resolve({ ok: true, list: hit, cached: true });
     }
-    const wait = Math.max(0, MIN_RATE_MS - (Date.now() - lastAt));
-    return new Promise(resolve => setTimeout(resolve, wait)).then(() => {
-      lastAt = Date.now();
+    const at = Math.max(Date.now(), lastAt + MIN_RATE_MS);
+    lastAt = at;
+    return new Promise(resolve => setTimeout(resolve, at - Date.now())).then(() => {
+      if (stale && stale()) return { ok: false, list: [], stale: true };
       const params = new URLSearchParams({
         q, format: 'jsonv2', limit: String(MAX_HITS * 3),
         countrycodes: 'au', 'accept-language': 'en',
+        polygon_geojson: '1', polygon_threshold: String(SHAPE_DEG),
       });
       const ctl = new AbortController();
       const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
@@ -416,10 +527,14 @@ const Places = (function () {
         .then(json => {
           const list = (Array.isArray(json) ? json : []).filter(keep).slice(0, MAX_HITS).map(h => {
             const { name, where } = shorten(h);
+            const bb = Array.isArray(h.boundingbox) ? h.boundingbox.map(Number) : null;   // [s, n, w, e]
+            const shape = h.geojson && h.geojson.type && h.geojson.type !== 'Point' ? h.geojson : null;
             return {
               name, where,
-              kind: KIND_LABEL[h.type] || String(h.type || '').replace(/_/g, ' '),
+              kind: KIND_LABEL[h.addresstype] || KIND_LABEL[h.type] || String(h.type || '').replace(/_/g, ' '),
               lat: parseFloat(h.lat), lon: parseFloat(h.lon),
+              bbox: bb && bb.every(isFinite) ? bb : null,
+              shape,
             };
           }).filter(h => isFinite(h.lat) && isFinite(h.lon));
           remember(key, list);
@@ -432,6 +547,16 @@ const Places = (function () {
     });
   }
 
+  function lookup(text) {
+    gaz = { text, list: null, loading: true, error: '', asked: true };
+    render();
+    ask(text, () => gaz.text !== text).then(res => {
+      if (gaz.text !== text) return;   // the box moved on while we waited
+      gaz = { text, list: res.list, loading: false, error: res.ok ? '' : res.error, asked: true };
+      render();
+    });
+  }
+
   // ── On the map ──────────────────────────────────────────────────────────────
 
   function markerHtml(p) {
@@ -441,7 +566,7 @@ const Places = (function () {
         <h4>${esc(p.name || 'Coordinate')}</h4>
         <p class="small">${p.kind ? `${esc(p.kind)}${p.where ? ` · ${esc(p.where)}` : ''}<br>` : ''}
           ${esc(stationLatLonText(s))}<br>
-          <span class="txt-muted">${p.name ? esc(ATTRIB) : 'Typed into the filter box — not a station.'}</span></p>
+          <span class="txt-muted">${esc(p.credit || (p.name ? ATTRIB : 'Typed into Find a place — not a station.'))}</span></p>
         <div class="pill-row">
           ${copyLatLonPillHtml(s)}
           ${mapViewPills(s).join('\n          ')}
@@ -449,91 +574,279 @@ const Places = (function () {
       </div>`;
   }
 
-  // Drop the one marker — there is never more than one — and go there. Zoom is
-  // only raised, never lowered: an operator looking at a whole region who asks
-  // where a town is wants the town marked on the view they have, not a jump
-  // into the main street.
-  function goTo(p, zoom) {
-    if (!map) return;
-    if (marker) marker.remove();
-    marker = L.marker([p.lat, p.lon], {
-      title: p.name || p.text,
-      icon: L.divIcon({
-        className: 'mn-place-icon',
-        html: '<span class="mn-place" aria-hidden="true">📍</span>',
-        iconSize: [0, 0], iconAnchor: [0, 0],
-      }),
-      zIndexOffset: 1500,
-    }).bindPopup(() => markerHtml(p), { maxWidth: 320 }).addTo(map);
-    map.setView([p.lat, p.lon], Math.max(map.getZoom(), zoom || 12));
-    marker.openPopup();
-    mapNote(`${p.name ? `${p.name} — ` : ''}${stationLatLonText(p)}. Not a station; the pin clears with the filter.`, 7000);
+  // The colour of what this tool draws: the blue of its pin, a token so that
+  // it follows the theme (Leaflet's path options cannot take var()).
+  function ink() {
+    return (typeof cssVar === 'function' && cssVar('--place-ink', '')) || '#1a6fd6';
   }
 
-  // ── The strip under one filter entry ────────────────────────────────────────
-
-  function stripHtml(i) {
-    const r = rows.get(i);
-    if (!r) return '';
-    if (focusRow !== i) return '';      // the box this belongs to is not in use
-    const bits = [];
-    if (r.coord) {
-      bits.push(`
-        <button type="button" class="btn-link mn-place-go" onclick="Places.goToRow(${i}, -1)"
-                onmousedown="event.preventDefault()"
-                title="Centre the map on this coordinate">
-          📍 <strong>${esc(r.coord.text)}</strong>
-          <span class="txt-muted">${r.flown ? 'the map is here' : 'go here'}</span>
-        </button>`);
+  // Draw what `hit` is — a pin, and its outline or course where it has one —
+  // replacing whatever this tool drew before. `move` is whether the map goes
+  // there: a result pressed, yes; the same one drawn again on a new map (a
+  // render of the tab), no. Returns the layer.
+  function draw(hit, move) {
+    if (!map) return null;
+    if (layer) layer.remove();
+    layer = L.layerGroup().addTo(map);
+    const c = ink();
+    if (hit.shape) {
+      L.geoJSON(hit.shape, {
+        interactive: false,
+        style: f => ({ color: c, weight: /Line/.test(f.geometry.type) ? 4 : 2.5, opacity: 0.9,
+                       fillColor: c, fillOpacity: /Polygon/.test(f.geometry.type) ? 0.08 : 0 }),
+      }).addTo(layer);
     }
-    if (r.loading) bits.push('<span class="small txt-muted">Looking up the place name…</span>');
-    else if (r.error) bits.push(`<span class="small txt-warn">Place lookup unavailable — ${esc(r.error)}. Station filtering is unaffected.</span>`);
-    else if (r.list && r.list.length) {
-      bits.push(r.list.map((h, n) => `
-        <button type="button" class="btn-link mn-place-go" onclick="Places.goToRow(${i}, ${n})"
-                onmousedown="event.preventDefault()"
-                title="Centre the map on ${escAttr(h.name)}">
-          📍 <strong>${esc(h.name)}</strong>
-          <span class="txt-muted">${esc(h.kind)}${h.where ? ` · ${esc(h.where)}` : ''}</span>
-        </button>`).join(''));
-      bits.push(`<span class="small txt-muted">${esc(ATTRIB)}</span>`);
-    } else if (r.asked && r.list && !r.list.length) {
-      bits.push('<span class="small txt-muted">No town, locality or airport by that name.</span>');
+    if (hit.lat != null && hit.lon != null) {
+      L.marker([hit.lat, hit.lon], {
+        title: hit.name || hit.text,
+        icon: L.divIcon({
+          className: 'mn-place-icon',
+          html: '<span class="mn-place mn-pin-blue" aria-hidden="true">📍</span>',
+          iconSize: [0, 0], iconAnchor: [0, 0],
+        }),
+        zIndexOffset: 1500,
+      }).bindPopup(() => markerHtml(hit), { maxWidth: 320 }).addTo(layer);
     }
-    if (!bits.length) return '';
-    // A <span>, not a <div>: this markup is written into the filter panel and
-    // into the card's head row, and that row's container is a <span> — only
-    // phrasing content may go inside one. The layout is CSS either way.
-    return `<span class="search-places-in">${bits.join('')}</span>`;
+    if (move) {
+      const b = hit.bounds;
+      if (b && (b[1] - b[0] > 1e-4 || b[3] - b[2] > 1e-4)) {
+        map.fitBounds([[b[0], b[2]], [b[1], b[3]]], { padding: [28, 28], maxZoom: hit.maxZoom || 14 });
+      } else if (hit.lat != null) {
+        map.setView([hit.lat, hit.lon], Math.max(map.getZoom(), hit.zoom || 12));
+      }
+      if (hit.lat != null && !hit.shape) layer.eachLayer(l => { if (l.openPopup) l.openPopup(); });
+    }
+    return layer;
   }
 
-  // Every strip for this entry, not one: the first entry is drawn twice — once
-  // in the filter panel and once in the card's head row, which is the box being
-  // typed into while the card is shut (#181). A live strip beside a stale one
-  // is worse than no strip at all, which is updateFilterChrome's own rule about
-  // the two copies of the clear buttons.
-  function paint(i) {
-    const html = stripHtml(i);
-    for (const el of document.querySelectorAll(`[data-mn-places="${i}"]`)) el.innerHTML = html;
+  // ── The results, as a thing to go to ─────────────────────────────────────
+  // Each group's rows turned into what draw() takes: a point, a box, an
+  // outline. `n` is the row's index in its group.
+  function hitFor(group, n) {
+    if (group === 'coord') {
+      return coord ? { name: '', text: coord.text, lat: coord.lat, lon: coord.lon, zoom: 13, kind: '' } : null;
+    }
+    if (group === 'catchment') {
+      const c = local && local.catchments[n];
+      if (!c) return null;
+      return { name: `${c.name} catchment`, kind: `drainage basin ${c.basin_no || ''}`.trim(),
+               where: c.division ? `${c.division} division` : '', catchmentId: c.id,
+               credit: typeof MapCatchments !== 'undefined' ? MapCatchments.ATTRIBUTION : '' };
+    }
+    if (group === 'river' || group === 'council') {
+      const g = local && local[group === 'river' ? 'rivers' : 'councils'][n];
+      if (!g || !g.located) return null;
+      const what = group === 'river' ? 'river or creek' : 'local government area';
+      // The river's own course, where the gazetteer has already been asked
+      // and answered with a watercourse of that name.
+      const osm = group === 'river' && gaz.list
+        ? gaz.list.find(h => h.shape && /river|creek|stream|canal/.test(h.kind) && riverKey(h.name) === g.key) : null;
+      return {
+        name: g.name, kind: `${what} · ${g.n} station${g.n === 1 ? '' : 's'}`, where: '',
+        lat: (g.s + g.north) / 2, lon: (g.w + g.e) / 2,
+        bounds: osm && osm.bbox ? osm.bbox : [g.s, g.north, g.w, g.e], shape: osm ? osm.shape : null, maxZoom: 13,
+        credit: osm ? ATTRIB : 'Where this network\'s stations on it are — from the station register.',
+      };
+    }
+    if (group === 'osm') {
+      const h = gaz.list && gaz.list[n];
+      if (!h) return null;
+      const zoom = /city/.test(h.kind) ? 11 : /town|suburb|airport|peak|locality|village/.test(h.kind) ? 13 : 12;
+      return { ...h, bounds: h.shape ? h.bbox : null, zoom };
+    }
+    return null;
   }
 
-  function lookup(i, text) {
-    const r = rows.get(i) || {};
-    r.text = text;
-    r.loading = true;
-    r.error = '';
-    r.asked = true;
-    rows.set(i, r);
-    paint(i);
-    const mine = text;
-    ask(text).then(res => {
-      const cur = rows.get(i);
-      if (!cur || cur.text !== mine) return;   // the box moved on while we waited
-      cur.loading = false;
-      cur.list = res.list;
-      cur.error = res.ok ? '' : res.error;
-      paint(i);
-    });
+  // Go to a row: draw it, move the map, and say where it went.
+  function go(group, n) {
+    const hit = hitFor(group, n);
+    if (!hit || !map) return;
+    // With the query it was pressed under: a row is the one shown only in the
+    // list it was pressed in, not whatever the next query puts at its index.
+    shown = { group, n, hit, q: query.trim() };
+    if (hit.catchmentId && typeof MapCatchments !== 'undefined') {
+      // The basin's outline is 760 KB the first time it is asked for, and it is
+      // asked for by somebody who pressed a catchment.
+      const mine = shown;
+      MapCatchments.ready().then(fc => {
+        if (shown !== mine || !map) return;
+        const f = ((fc && fc.features) || []).find(x => x.properties && x.properties.id === hit.catchmentId);
+        if (!f) return;
+        const b = L.geoJSON(f).getBounds();
+        hit.shape = f.geometry;
+        hit.bounds = [b.getSouth(), b.getNorth(), b.getWest(), b.getEast()];
+        const at = MapCatchments.labelPoint ? MapCatchments.labelPoint(f) : null;
+        const c = at || [b.getCenter().lat, b.getCenter().lng];
+        hit.lat = c[0]; hit.lon = c[1];
+        hit.maxZoom = 12;
+        draw(hit, true);
+        told(hit);
+      }).catch(() => { if (typeof mapNote === 'function') mapNote('The catchment outlines could not be loaded.', 5000); });
+    } else {
+      draw(hit, true);
+      told(hit);
+    }
+    render();
+  }
+
+  function told(hit) {
+    const where = hit.lat != null ? stationLatLonText({ lat: hit.lat, lon: hit.lon }) : '';
+    const name = hit.name || hit.text || 'That place';
+    if (typeof mapNote === 'function') {
+      mapNote(`${name}${where ? ` — ${where}` : ''}. Not a station: the blue pin clears with ✕ in Find a place, or with ↺.`, 7000);
+    }
+    announce(`${name} — the map is there, marked with a blue pin.`);
+  }
+
+  // ── The pane ────────────────────────────────────────────────────────────────
+
+  // The pane's markup, once, for the side panel's skeleton (app.js,
+  // dockSkeleton): a heading, the box, a line about what it takes, and the
+  // list this module writes.
+  function paneHtml() {
+    return `
+      <div class="places-pane">
+        <div class="mn-mapctl-head places-head">
+          <h2 class="mn-mapctl-title" id="places-h"><span class="mn-pin-blue" aria-hidden="true">📍</span> Find a place</h2>
+        </div>
+        <div class="places-box">
+          <input type="search" id="places-q" class="places-q" autocomplete="off" spellcheck="false"
+                 aria-labelledby="places-h" aria-describedby="places-hint" aria-controls="places-results"
+                 placeholder="Town, river, catchment or lat, lon"
+                 oninput="Places.input(this.value)" onkeydown="Places.key(event)">
+          <button type="button" class="places-clear" onclick="Places.clear(true)" title="Clear the box and the pin on the map"
+                  aria-label="Clear the place">✕</button>
+        </div>
+        <p class="small places-hint" id="places-hint">A town, river or creek, catchment or basin number, council area, or a coordinate. The map goes there; the stations are left as they are.</p>
+        <div class="places-results" id="places-results"></div>
+      </div>`;
+  }
+
+  function rowHtml(group, n, name, kind) {
+    const here = shown && shown.q === query.trim() && shown.group === group && shown.n === n;
+    return `<li><button type="button" class="places-hit${here ? ' is-here' : ''}" data-group="${group}" data-n="${n}"
+                ${here ? 'aria-current="true"' : ''} onclick="Places.go('${group}', ${n})"
+                title="Take the map to ${escAttr(name)}"><span class="places-hit-ico mn-pin-blue" aria-hidden="true">📍</span><span class="places-hit-text"><span class="places-hit-name">${esc(name)}</span> <span class="places-hit-kind">${esc(kind)}</span></span></button></li>`;
+  }
+
+  function groupHtml(id, title, rows, more) {
+    if (!rows.length) return '';
+    return `<section class="places-group" aria-labelledby="places-g-${id}">
+        <h3 class="places-group-h" id="places-g-${id}">${esc(title)}</h3>
+        <ul class="places-list">${rows.join('')}</ul>
+        ${more > 0 ? `<p class="small places-more">and ${more} more — keep typing to narrow it</p>` : ''}
+      </section>`;
+  }
+
+  function resultsHtml() {
+    const q = query.trim();
+    if (!q) return '';
+    const out = [];
+    if (coord) {
+      out.push(groupHtml('coord', 'Coordinate', [rowHtml('coord', 0, coord.text, flownTo === `${coord.lat},${coord.lon}` ? 'the map is here' : 'go here')], 0));
+    }
+    const L0 = local || { catchments: [], rivers: [], councils: [] };
+    const cap = (list, f) => list.slice(0, LOCAL_CAP).map(f);
+    out.push(groupHtml('catchment', 'Catchments', cap(L0.catchments, (c, i) =>
+      rowHtml('catchment', i, c.name, `basin ${c.basin_no || '—'}${c.division ? ` · ${c.division}` : ''}`)), L0.catchments.length - LOCAL_CAP));
+    out.push(groupHtml('river', 'Rivers and creeks this network is on', cap(L0.rivers, (g, i) =>
+      rowHtml('river', i, g.name, `${g.n} station${g.n === 1 ? '' : 's'}`)), L0.rivers.length - LOCAL_CAP));
+    out.push(groupHtml('council', 'Council areas with stations in them', cap(L0.councils, (g, i) =>
+      rowHtml('council', i, g.name, `${g.n} station${g.n === 1 ? '' : 's'}`)), L0.councils.length - LOCAL_CAP));
+    if (!coord && askable(q)) {
+      let body;
+      if (gaz.text !== q || gaz.loading) body = '<p class="small txt-muted places-status">Looking up the place name…</p>';
+      else if (gaz.error) body = `<p class="small txt-warn places-status">Place lookup unavailable — ${esc(gaz.error)}. What the station file knows is above.</p>`;
+      else if (gaz.list && gaz.list.length) {
+        body = `<ul class="places-list">${gaz.list.map((h, i) => rowHtml('osm', i, h.name, `${h.kind}${h.where ? ` · ${h.where}` : ''}`)).join('')}</ul>
+          <p class="small txt-muted places-credit">${esc(ATTRIB)}</p>`;
+      } else body = '<p class="small txt-muted places-status">No town, locality, river or airport by that name.</p>';
+      out.push(`<section class="places-group" aria-labelledby="places-g-osm">
+          <h3 class="places-group-h" id="places-g-osm">Towns, localities and more</h3>${body}</section>`);
+    }
+    const html = out.filter(Boolean).join('');
+    return html || '<p class="small txt-muted places-status">Nothing by that name in the station file. Keep typing for the gazetteer — three letters at least.</p>';
+  }
+
+  // Write the list. The pressed row, or failing it the box, keeps focus: a
+  // row pressed re-renders the list under the finger.
+  function render() {
+    const el = document.getElementById('places-results');
+    if (!el) return;
+    const a = document.activeElement;
+    const had = a && el.contains(a) && a.dataset ? { group: a.dataset.group, n: a.dataset.n } : null;
+    el.innerHTML = resultsHtml();
+    if (had) {
+      const back = el.querySelector(`.places-hit[data-group="${had.group}"][data-n="${had.n}"]`);
+      if (back) back.focus({ preventScroll: true });
+    }
+  }
+
+  // Called from the box on every keystroke. Coordinates and the file's own
+  // answers are there at once — no network, works offline — and an entry that
+  // is *nothing but* a coordinate takes the map with it, because that is what
+  // pasting one into a box is asking for. A name waits for a pause and then,
+  // only if it looks like one, is asked about.
+  function input(text) {
+    query = String(text || '');
+    const s = query.trim();
+    clearTimeout(lookupTimer);
+    clearTimeout(coordTimer);
+    if (!s) { clear(false); return; }
+    coord = parse(s);
+    local = localFor(s);
+    if (coord) {
+      render();
+      // The list says so at once — the parse is arithmetic and costs nothing —
+      // but the *map* waits for the typing to stop. Typed a character at a
+      // time, "-26.1234, 152.5678" is a valid coordinate at "-26.1 152", again
+      // at "-26.12 152.5" and so on, and a map that lurches at each of them is
+      // a map nobody can read. A paste, which is what this is mostly for, is
+      // one event and moves once.
+      const key = `${coord.lat},${coord.lon}`;
+      coordTimer = setTimeout(() => {
+        if (!coord || `${coord.lat},${coord.lon}` !== key || flownTo === key) return;
+        flownTo = key;
+        go('coord', 0);
+      }, COORD_SETTLE_MS);
+      return;
+    }
+    render();
+    if (askable(s) && gaz.text !== s) lookupTimer = setTimeout(() => lookup(s), DEBOUNCE_MS);
+  }
+
+  // Enter in the box goes to the first thing listed; the arrow down steps into
+  // the list, where the buttons take Tab and Enter as buttons do.
+  function key(e) {
+    if (e.key === 'Enter') {
+      const first = document.querySelector('#places-results .places-hit');
+      if (first) { e.preventDefault(); go(first.dataset.group, Number(first.dataset.n)); }
+    } else if (e.key === 'ArrowDown') {
+      const first = document.querySelector('#places-results .places-hit');
+      if (first) { e.preventDefault(); first.focus(); }
+    }
+  }
+
+  // The pin and the outline off the map, the list left as it is (↺, which
+  // clears what is drawn on the map and leaves the tools' own contents).
+  function clearMark() {
+    if (layer) { layer.remove(); layer = null; }
+    shown = null;
+    render();
+  }
+
+  // Everything: the box, the list and the mark. `box` also empties the field,
+  // for the ✕ beside it; the field's own emptying calls this without it.
+  function clear(box) {
+    clearTimeout(lookupTimer);
+    clearTimeout(coordTimer);
+    query = ''; coord = null; local = null; flownTo = null;
+    gaz = { text: '', list: null, loading: false, error: '', asked: false };
+    if (box) {
+      const q = document.getElementById('places-q');
+      if (q) { q.value = ''; q.focus({ preventScroll: true }); }
+    }
+    clearMark();
   }
 
   return {
@@ -545,126 +858,40 @@ const Places = (function () {
     // latitude and longitude box, including ones rendered later.
     bindCoordPaste() { document.addEventListener('paste', onCoordPaste); },
     attribution: ATTRIB,
+    paneHtml,
+    input,
+    key,
+    go,
+    clear,
+    clearMark,
 
-    attach(m) { map = m; },
+    // The Stations map, as it is built — the place shown is drawn on it again
+    // where it was, without moving it: a render of the tab is not somebody
+    // asking to go anywhere.
+    attach(m) {
+      map = m;
+      layer = null;
+      if (shown && shown.hit) draw(shown.hit, false);
+    },
 
+    // …and as it is taken down. The box, the list and the place shown are
+    // kept: they are the tool's, and the tool is in the side panel, which
+    // outlives the map.
     detach() {
-      if (marker) marker.remove();
-      marker = null;
+      if (layer) layer.remove();
+      layer = null;
       map = null;
-      flownTo = null;
-      // The box the caret was in is going away with the tab, and the results
-      // are not: without this, leaving the Stations tab and coming back would
-      // repaint a strip under a box nobody is typing in — the state this
-      // feature exists to avoid.
-      clearTimeout(blurTimer);
-      blurTimer = null;
-      focusRow = null;
     },
 
-    // Every entry's strip, rebuilt after the stack is re-rendered. The state
-    // lives here rather than in the DOM, so removing an entry above this one
-    // does not lose what the one below it found.
-    repaint() { for (const i of rows.keys()) paint(i); },
-
-    // ── Which box is in use ───────────────────────────────────────────────
-    // The strip belongs to the entry being typed in, and to no other (#186).
-    // Called from the search boxes' own focus and blur — including the head
-    // row's quick box, which writes entry 0 exactly as the panel's first box
-    // does, so both hand in the same index and the strip follows the caret
-    // between them.
-    //
-    // The blur is deferred by a beat and the buttons in the strip cancel the
-    // focus move with preventDefault on mousedown, which is belt and braces
-    // over the same hazard: a result clicked with the mouse must not be
-    // unmounted by the blur that click causes before the click itself lands.
-    focusIn(i) {
-      clearTimeout(blurTimer);
-      blurTimer = null;
-      if (focusRow === i) return;
-      const prev = focusRow;
-      focusRow = i;
-      if (prev != null) paint(prev);
-      paint(i);
-    },
-
-    focusOut(i) {
-      clearTimeout(blurTimer);
-      blurTimer = setTimeout(() => {
-        blurTimer = null;
-        if (focusRow !== i) return;
-        focusRow = null;
-        paint(i);
-      }, 160);
-    },
-
-    // The stack was rebuilt with a different number of entries: anything past
-    // the end no longer exists.
-    trim(n) {
-      for (const i of [...rows.keys()]) if (i >= n) { rows.delete(i); clearTimeout(timers.get(i)); timers.delete(i); }
-    },
-
-    // Called from the search box on every keystroke, for the entry being typed
-    // in. Coordinates are answered on the spot — no network, works offline —
-    // and an entry that is *nothing but* a coordinate takes the map with it,
-    // because that is what pasting one into a box is asking for. Everything
-    // else waits for a pause and then, only if it looks like a name, asks.
-    forRow(i, text) {
-      const s = String(text || '').trim();
-      const coord = parse(s);
-      const prev = rows.get(i) || {};
-      const r = { text: s, coord, list: prev.list, asked: prev.asked, loading: false, error: '', flown: false };
-      // A different entry's results are not this one's.
-      if (prev.text !== s) { r.list = null; r.asked = false; }
-      rows.set(i, r);
-      clearTimeout(timers.get(i));
-
-      if (coord) {
-        paint(i);
-        // The strip appears at once — the parse is arithmetic and costs
-        // nothing — but the *map* waits for the typing to stop. Typed a
-        // character at a time, "-26.1234, 152.5678" is a valid coordinate at
-        // "-26.1 152", again at "-26.12 152.5" and so on, and a map that
-        // lurches at each of them is a map nobody can read. A paste, which is
-        // what this feature is actually for, is one event and moves once.
-        const key = `${coord.lat},${coord.lon}`;
-        timers.set(i, setTimeout(() => {
-          const cur = rows.get(i);
-          if (!cur || cur.text !== s) return;
-          cur.flown = true;
-          paint(i);
-          if (flownTo === key) return;
-          flownTo = key;
-          goTo(coord, 13);
-        }, COORD_SETTLE_MS));
-        return;
-      }
-      paint(i);
-      if (!askable(s)) return;
-      timers.set(i, setTimeout(() => lookup(i, s), DEBOUNCE_MS));
-    },
-
-    // A result clicked. -1 is the entry's own parsed coordinate; anything else
-    // is an index into what the gazetteer returned for it.
-    goToRow(i, n) {
-      const r = rows.get(i);
-      if (!r) return;
-      if (n < 0) { if (r.coord) goTo(r.coord, 13); return; }
-      const h = r.list && r.list[n];
-      if (h) goTo(h, 12);
-    },
-
-    // The filter was cleared: the pin was an answer to a question nobody is
-    // asking any more.
-    clear() {
-      for (const t of timers.values()) clearTimeout(t);
-      timers.clear();
-      rows.clear();
-      clearTimeout(blurTimer);
-      blurTimer = null;
-      focusRow = null;
-      flownTo = null;
-      if (marker) { marker.remove(); marker = null; }
+    // Read by the checks: what the tool holds.
+    debug() {
+      return {
+        query, coord, flownTo,
+        local: local ? { catchments: local.catchments.map(c => c.name), rivers: local.rivers.map(g => g.name), councils: local.councils.map(g => g.name) } : null,
+        gaz: { text: gaz.text, loading: gaz.loading, error: gaz.error, n: gaz.list ? gaz.list.length : null },
+        shown: shown ? { group: shown.group, n: shown.n, name: shown.hit.name || shown.hit.text, shape: !!shown.hit.shape } : null,
+        drawn: layer ? layer.getLayers().length : 0,
+      };
     },
   };
 })();

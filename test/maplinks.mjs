@@ -31,12 +31,15 @@
 //      path at the base, and a repeater-to-repeater path is two-way. Also
 //      asserted: the canvas exists, is in a pane above the links, and takes no
 //      pointer.
-//   6. **Clear filters clears the repeater focus.** The reported bug is a map
+//   6. **Clear clears the repeater focus.** The reported bug is a map
 //      dimmed by a focus, no filter running, and *both* Clear buttons greyed
 //      out — so the enable rule is asserted as well as the clear.
-//   7. **The place strip belongs to the box the caret is in.** Shown on focus,
-//      gone on blur, and back on refocus *with the same results* — the last
-//      clause is what separates a paint rule from a `clear()`.
+//   7. **A place is found in 📍 Find a place, not in the filter box.** A
+//      coordinate typed into the filter box is a filter and nothing else: no
+//      strip under it, no pin, the map not moved. The same text in the blue
+//      pin's pane is a place: listed, gone to, pinned — and the station filter
+//      is not touched by it. (The strip #186 made follow the caret went with
+//      the move; this is what replaced it.)
 //   8. **Find a control filters the Map display panel.** Measured by
 //      `getClientRects()`, never by `el.hidden`. The first implementation set
 //      `hidden` and looked perfect in a property dump and wrong on screen —
@@ -338,27 +341,22 @@ try {
     cleared.focus === null && cleared.blast === false
       && cleared.dimmed === 0 && cleared.lines === 0, JSON.stringify(cleared));
 
-  // ── 7. The place strip follows the caret ─────────────────────────────────
+  // ── 7. A place is found in Find a place, not in the filter box ──────────
+  const centre = () => page.evaluate(() => { const c = state.map.getCenter(); return [c.lat, c.lng]; });
+  const beforePlace = await centre();
   await page.click('#station-search-quick');
   await page.fill('#station-search-quick', '-26.66, 150.19');
-  await page.waitForTimeout(500);
-  const strip = () => page.evaluate(() => {
-    const el = document.querySelector('[data-mn-places="0"]');
-    return { len: el ? el.innerHTML.length : -1,
-             coord: !!el && /150\.19/.test(el.textContent) };
-  });
-  const onFocus = await strip();
-  await page.evaluate(() => document.getElementById('station-search-quick').blur());
-  await page.waitForTimeout(400);
-  const onBlur = await strip();
-  await page.click('#station-search-quick');
-  await page.waitForTimeout(250);
-  const back = await strip();
-  check('a coordinate typed into the filter box is offered under it',
-    onFocus.len > 0 && onFocus.coord, JSON.stringify(onFocus));
-  check('…and goes when focus leaves the box', onBlur.len === 0, JSON.stringify(onBlur));
-  check('…and comes back on refocus, with the same answer and no new lookup',
-    back.len === onFocus.len && back.coord, JSON.stringify(back));
+  await page.waitForTimeout(700);
+  const inFilter = await page.evaluate(() => ({
+    strips: document.querySelectorAll('[data-mn-places], .search-places').length,
+    pins: document.querySelectorAll('.mn-place').length,
+    placesQuery: Places.debug().query,
+  }));
+  const afterPlace = await centre();
+  check('a coordinate typed into the filter box is a filter and nothing else: no place strip, no pin, the map where it was',
+    inFilter.strips === 0 && inFilter.pins === 0 && inFilter.placesQuery === ''
+      && Math.abs(afterPlace[0] - beforePlace[0]) < 1e-6 && Math.abs(afterPlace[1] - beforePlace[1]) < 1e-6,
+    JSON.stringify({ inFilter, beforePlace, afterPlace }));
   await page.evaluate(() => {
     const box = document.getElementById('station-search-quick');
     box.value = '';
@@ -366,6 +364,27 @@ try {
     box.blur();
   });
   await page.waitForTimeout(400);
+  await page.click('#help-panel .dock-tab[data-dock="places"]');
+  await page.waitForTimeout(300);
+  await page.fill('#places-q', '-26.66, 150.19');
+  await page.waitForTimeout(900);
+  const inPane = await page.evaluate(() => {
+    const c = state.map.getCenter();
+    return {
+      showing: dockShowing(),
+      rows: [...document.querySelectorAll('#places-results .places-hit')].map(b => b.textContent.replace(/\s+/g, ' ').trim()),
+      pins: document.querySelectorAll('.mn-place.mn-pin-blue').length,
+      d: acmaHaversineKm(c.lat, c.lng, -26.66, 150.19),
+      filtering: anyStationFilterActive(),
+    };
+  });
+  check('the same text in the blue pin\'s pane is a place: listed, gone to, pinned in blue — and nothing filtered',
+    inPane.showing === 'places' && inPane.rows.some(r => /-26\.66, 150\.19/.test(r)) && inPane.pins === 1
+      && inPane.d < 0.2 && inPane.filtering === false, JSON.stringify(inPane));
+  await page.evaluate(() => Places.clear(true));
+  await page.waitForTimeout(200);
+  check('…and ✕ takes the pin away with the text', await page.evaluate(() =>
+    document.querySelectorAll('.mn-place').length === 0 && document.getElementById('places-q').value === ''));
 
   // ── 8. Find a control, measured on screen ────────────────────────────────
   // getClientRects(), never el.hidden: see the header. A row with the

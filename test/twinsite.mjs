@@ -42,7 +42,11 @@
 //                    own classes are on a State datum is offered its own.
 //   The fold         open on arrival, folded after the delay (the check's
 //                    seam shortens it), put off while the pointer or the
-//                    focus is in it, and left alone once pressed.
+//                    focus is in it, and left alone once pressed — and the
+//                    caveat along the stage's foot, which no fold takes:
+//                    everything here is indicative modelling, in red, one
+//                    line at every width, a note with the whole of it for a
+//                    reader, on the tab and inside the Stations map alike.
 //   The offer        zoom 17 on a station offers the twin and names the
 //                    flight; nothing is handed over until it is pressed; ←
 //                    Map leaves the map at the zoom it was; × puts it away
@@ -367,10 +371,35 @@ async function browserHalf() {
     const btn = await page.evaluate(() => { const b = document.getElementById('twin-info-toggle'); const g = b.querySelector('.twin-info-badge'); return { exp: b.getAttribute('aria-expanded'), badge: g.hidden ? null : g.textContent }; });
     ok('folded after the delay, the button saying so and counting the notes', !d.info.open && d.info.hidden === true && btn.exp === 'false'
       && (d.notes.length ? btn.badge === `⚠ ${d.notes.length}` : btn.badge === null), J({ info: d.info, btn, notes: d.notes.length }));
+    // The caveat is not one of the lines: folded, it is still along the foot.
+    const caveat = scope => page.evaluate(sc => {
+      const p = document.querySelector(`${sc} #twin-caveat`), st = document.querySelector(`${sc} #twin-stage`);
+      if (!p || !st) return null;
+      const r = p.getBoundingClientRect(), b = st.getBoundingClientRect();
+      const cs = getComputedStyle(p);
+      const rgb = (cs.color.match(/\d+/g) || []).map(Number);
+      return {
+        shown: [...p.children].filter(x => !x.classList.contains('sr-only') && x.getClientRects().length).map(x => x.textContent),
+        sr: (p.querySelector('.sr-only') || {}).textContent || '', role: p.getAttribute('role'),
+        red: rgb.length >= 3 && rgb[0] > 2 * rgb[1] && rgb[0] > 2 * rgb[2],
+        inStage: r.left >= b.left - 0.5 && r.right <= b.right + 0.5 && r.top >= b.top && r.bottom <= b.bottom + 0.5,
+        atFoot: Math.abs(r.bottom - b.bottom) <= 2, oneLine: r.height <= 26 && p.scrollHeight <= p.clientHeight + 1,
+        pointer: cs.pointerEvents, stageW: Math.round(b.width),
+        // The hint above it, not under it.
+        hudClear: (() => { const h = document.querySelector(`${sc} #twin-hud`); return !h || h.getBoundingClientRect().bottom <= r.top + 0.5; })(),
+      };
+    }, scope);
+    let cv = await caveat('');
+    ok('the caveat stays along the foot of the stage with the lines folded: red, one line, the hint clear above it',
+      cv && cv.shown.length === 1 && /^⚠ Indicative modelling only/.test(cv.shown[0]) && cv.red && cv.inStage && cv.atFoot && cv.oneLine && cv.hudClear, J(cv));
+    ok('…a note that a reader is read the whole of, and that takes no pointer from the view under it',
+      cv.role === 'note' && /Everything in this view is modelled, not surveyed/.test(cv.sr) && /not a flood map or a forecast/.test(cv.sr) && cv.pointer === 'none', J(cv));
     await page.click('#twin-info-toggle');
     await sleep(1600);
     d = await page.evaluate(() => DigitalTwin.debug());
     ok('pressed open, it stays open: the operator has it now', d.info.open && d.info.pinned && !d.info.hidden, J(d.info));
+    cv = await caveat('');
+    ok('…and the caveat is there with them open as well', cv && cv.shown.length === 1 && cv.atFoot, J(cv));
     // Being read: the focus inside it puts the fold off. The status line is
     // written in place, never re-rendered, so the focus stays where it is put.
     CUR = { lat: byIdLat('babinda_post_office'), lon: byIdLon('babinda_post_office') };
@@ -407,6 +436,9 @@ async function browserHalf() {
     await page.click('#map-twin-offer .map-twin-offer-open');
     await page.waitForFunction(() => MapTwin.active() && DigitalTwin.debug().built, null, { timeout: BUILD_TIMEOUT });
     ok('pressed, the map hands over', await page.evaluate(() => MapTwin.active() && MapTwin.station() === 'gatton' && document.getElementById('map-twin-offer').hidden));
+    cv = await caveat('#map-twin');
+    ok('…and the twin inside the map carries the caveat along its foot too, in the words its width has room for',
+      cv && cv.shown.length === 1 && /^⚠ Indicative modelling only/.test(cv.shown[0]) && cv.red && cv.atFoot && cv.oneLine && cv.inStage, J(cv));
     await page.click('#map-twin .map-twin-back');
     await page.waitForFunction(() => !MapTwin.active(), null, { timeout: 10_000 });
     const back = await page.evaluate(() => ({ zoom: state.map.getZoom(), offer: !document.getElementById('map-twin-offer').hidden }));

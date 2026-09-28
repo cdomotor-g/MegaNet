@@ -3620,7 +3620,7 @@ void main() {
       const btns = N_.list.slice(0, 12).map(n => `<button type="button" class="link-btn twin-site-stn" onclick="DigitalTwin.followPath('${escAttr(n.id)}')"
           title="Go to ${escAttr(n.name)}'s own twin">${esc(n.name)}</button> <span class="twin-path-fact">${Math.round(n.d)} m ${compassWord(n.bearing)}</span>`);
       const more = N_.list.length - 12 + N_.more;
-      parts.push(`<span class="twin-site-lead"><span aria-hidden="true">📡</span> Also in this patch (${N_.list.length + N_.more}):</span> ${btns.join(' · ')}${more > 0 ? ` · and ${more} more` : ''}`);
+      parts.push(`<span class="twin-site-lead"><span aria-hidden="true">📍</span> Also in this patch (${N_.list.length + N_.more}):</span> ${btns.join(' · ')}${more > 0 ? ` · and ${more} more` : ''}`);
     }
     const B = tw.bridges;
     if (B && B.status === 'loading') parts.push('<span class="twin-site-lead"><span aria-hidden="true">🌉</span> Looking for bridges…</span>');
@@ -3845,6 +3845,19 @@ void main() {
 
   let floodClock = null;       // the check's seam: a shorter cycle
 
+  // The scale's measure, linear or logarithmic (flood-stages.js, "linear or
+  // logarithmic"). Every twin opens on a linear scale; a few seconds after
+  // the scale first comes up, it turns logarithmic by itself where the
+  // station's levels warrant it — the pause is so that the operator sees the
+  // metres as they are first, and sees the scale open out where they crowd.
+  // Once the operator has pressed Log, on or off, for a station, that is kept
+  // for it for the session and nothing turns it by itself again: rebuilt, a
+  // new patch size, a return to it later.
+  const SCALE_AUTO_MS = 4000;
+  let scaleAutoMs = SCALE_AUTO_MS;   // the check's seam: sooner, or never (null)
+  const floodScales = new Map();     // station id → 'lin' | 'log', as chosen
+  const SCALE_GLIDE_MS = 450;        // the marks and names moving to their new places
+
   // Levels borrowed from a nearby station, for a station that has none of its
   // own: station id → { donorId, mode }. Asked for by the operator, kept for
   // the session (a rebuild, a new patch size, a return to the station keep
@@ -3949,6 +3962,7 @@ void main() {
   // notes the build should show.
   function buildFlood(st) {
     removeFlood();
+    clearScaleAuto();
     tw.flood = null;
     const g = tw.ground;
     if (!g || !st || typeof FloodStages === 'undefined') { refreshFloodLine(); return []; }
@@ -3976,9 +3990,16 @@ void main() {
     if (seed && seed.elev >= lad.top) {
       notes.push(`Every flood level recorded here is below the lowest ground by the gauge in this patch (${seed.elev.toFixed(2)} m AHD against ${lad.top.toFixed(2)} m), so the water has nothing to cover.`);
     }
+    // The scale's measure: the bend its levels would take and whether they
+    // warrant it, and linear to begin with — or what the operator pressed for
+    // this station, which also means nothing turns it by itself.
+    const fit = FloodStages.logFit(lad.levels, start.m, lad.top);
+    const chose = floodScales.get(st.id) || null;
+    const logK = chose === 'log' ? fit.k : null;
     tw.flood = { lad, none: false, notes, seed, fill, start: start.m, startBasis: start.basis, top: lad.top,
                  level: null, band: null, bandKey: undefined, maskLevel: null, flooded: 0,
-                 t0: performance.now(), clock: null, lastDraw: 0, lastLine: 0, own };
+                 t0: performance.now(), clock: null, lastDraw: 0, lastLine: 0, own,
+                 fit, logK, curve: FloodStages.curve(start.m, lad.top, logK), scaleChosen: !!chose, scaleAutoDone: false };
     if (sc.scene && THREE) makeFlood();
     settleFlood();
     refreshFloodLine();
@@ -4180,7 +4201,7 @@ void main() {
   function scaleWater() {
     const F = tw.flood, track = document.getElementById('twin-scale-track');
     if (!track || !F || F.none || F.level == null || !sc.flood) return;
-    const f = F.top > F.start ? Math.max(0, Math.min(1, (F.level - F.start) / (F.top - F.start))) : 1;
+    const f = F.curve.at(F.level);
     track.style.setProperty('--level', f.toFixed(4));
     track.style.setProperty('--sw', FloodStages.colourOf(F.band, sc.flood.palette));
   }
@@ -4212,10 +4233,7 @@ void main() {
     if (!F || F.none) { refreshFloodLine(); return; }
     if (floodAnimating()) {
       // Carried on from where the water is, not from the bottom.
-      const f = F.level == null || F.top <= F.start ? 0 : Math.max(0, Math.min(1, (F.level - F.start) / (F.top - F.start)));
-      F.t0 = performance.now() - f * floodClockOpts().rise * 1000;
-      F.clock = f * floodClockOpts().rise;
-      F.lastDraw = 0;
+      reanchorFlood();
       if (F.level == null) setFloodLevel(F.start);
     } else {
       setFloodLevel(floodHoldLevel());
@@ -4231,6 +4249,18 @@ void main() {
     return floodClock || { rise: FloodStages.RISE_S, hold: FloodStages.HOLD_S, drain: FloodStages.DRAIN_S };
   }
 
+  // The rise's clock set to where the water is on the track now, so that it
+  // goes on from there — after a pause, or onto a track of the other measure.
+  // The rise runs along the track, not the metres: on a logarithmic one it
+  // climbs quickly through the bottom and slowly through the levels.
+  function reanchorFlood() {
+    const F = tw.flood;
+    const f = F.level == null ? 0 : F.curve.at(F.level);
+    F.t0 = performance.now() - f * floodClockOpts().rise * 1000;
+    F.clock = f * floodClockOpts().rise;
+    F.lastDraw = 0;
+  }
+
   // One frame of the rise. True when the scene needs drawing.
   function floodTick(now) {
     const F = tw.flood;
@@ -4240,7 +4270,7 @@ void main() {
     // A frame's time can be a moment before the clock was set (it is when the
     // frame began); that is the start, not the end of the last cycle.
     F.clock = Math.max(0, (now - F.t0) / 1000);
-    const moved = setFloodLevel(F.start + FloodStages.cycle(F.clock, floodClockOpts()) * (F.top - F.start));
+    const moved = setFloodLevel(F.curve.of(FloodStages.cycle(F.clock, floodClockOpts())));
     if (now - F.lastLine >= 1000 / FLOOD_LINE_HZ) { F.lastLine = now; syncFloodReading(); }
     return moved;
   }
@@ -4305,11 +4335,20 @@ void main() {
   const SCALE_GAP  = 18;       // px between two labels' middles: a line of --fs-xs and a hair
   const SCALE_SNAP = 6;        // px: a drag this near a level's mark takes that level
 
+  // Beside the head, the track's measure: one toggle, Log, pressed for the
+  // logarithmic track and not for the linear one. A toggle and not a Lin|Log
+  // pair, and beside the head rather than under the track, because both of
+  // those cost what a phone's stage has least of — the head's width, which
+  // the reading needs, and the track's height, which the names do.
   function floodScaleHtml() {
     return `<div class="twin-flood-scale" id="twin-flood-scale" role="group" aria-label="Flood levels" hidden>
-            <div class="twin-scale-head">
-              <button type="button" class="twin-scale-play" id="twin-scale-play" data-flood="scale-play" onclick="DigitalTwin.toggleFloodAnim()"><span class="twin-scale-play-icon" aria-hidden="true">⏸</span><span class="sr-only">Pause the rise</span></button>
-              <span class="twin-scale-now" id="twin-scale-now"></span>
+            <div class="twin-scale-top">
+              <div class="twin-scale-head">
+                <button type="button" class="twin-scale-play" id="twin-scale-play" data-flood="scale-play" onclick="DigitalTwin.toggleFloodAnim()"><span class="twin-scale-play-icon" aria-hidden="true">⏸</span><span class="sr-only">Pause the rise</span></button>
+                <span class="twin-scale-now" id="twin-scale-now"></span>
+              </div>
+              <button type="button" class="twin-scale-log" id="twin-scale-log" aria-pressed="false" onclick="DigitalTwin.toggleFloodScale()"
+                      title="Logarithmic scale: measured down from the highest level, so the levels crowded near the top have room and the rise slows through them. Off, the scale is linear — every metre the same height">Log</button>
             </div>
             <div class="twin-scale-body" id="twin-scale-body">
               <div class="twin-scale-track" id="twin-scale-track" role="slider" tabindex="0" aria-orientation="vertical"
@@ -4343,8 +4382,13 @@ void main() {
   }
 
   // The marks, the labels and the lines between them, for the ladder on
-  // screen and the stage's height now. Again whenever either changes.
-  function layoutFloodScale() {
+  // screen, the stage's height now and the track's measure. Again whenever
+  // any of them changes. `from` is where the marks and names were on the
+  // track of the other measure (setScaleMode): they are drawn there first and
+  // glide to their new places, the lines to them faded out while they move —
+  // so that a scale turning logarithmic by itself is seen to open out, rather
+  // than to be a different picture from one frame to the next.
+  function layoutFloodScale(from = null) {
     const box = document.getElementById('twin-flood-scale');
     if (!box) return;
     const on = floodScaleOn();
@@ -4354,6 +4398,8 @@ void main() {
       if (on) scaleNamesShow();
     }
     if (!on) return;
+    // Up, and untouched: in a few seconds, logarithmic if the levels warrant it.
+    armScaleAuto();
     const F = tw.flood, pal = sc.flood.palette;
     const stage = document.getElementById('twin-stage'), hud = document.getElementById('twin-hud');
     // The foot of the scale clears the hint along the foot of the stage, however
@@ -4365,12 +4411,16 @@ void main() {
     if (!body || !track || !marks || !labels || !svg) return;
     const px = Math.max(0, track.clientHeight);
     const onGauge = F.lad.levels.every(l => l.gauge != null);
-    const pos = FloodStages.scale(F.lad.levels, { lo: F.start, hi: F.top, px, gap: SCALE_GAP });
-    F.scale = { px, onGauge, pos };
+    const pos = FloodStages.scale(F.lad.levels, { lo: F.start, hi: F.top, px, gap: SCALE_GAP, k: F.logK });
+    F.scale = { px, onGauge, pos, k: F.logK };
     const byKey = new Map(F.lad.levels.map(l => [l.key, l]));
+    // Where each is drawn first: its old place when it is gliding from one.
+    const glide = !!from && !reducedMotion();
+    const markAt = p => (glide && from.has(p.key) ? from.get(p.key).mark : p.mark);
+    const nameAt = p => (glide && from.has(p.key) && from.get(p.key).at != null ? from.get(p.key).at : p.at);
     marks.innerHTML = pos.map(p => {
       const l = byKey.get(p.key);
-      return `<span class="twin-scale-mark${l.kind === 'peak' ? ' is-peak' : ''}" data-level="${escAttr(p.key)}" style="--y:${p.mark.toFixed(1)}px;--sw:${escAttr(FloodStages.colourOf(l, pal))}"></span>`;
+      return `<span class="twin-scale-mark${l.kind === 'peak' ? ' is-peak' : ''}" data-level="${escAttr(p.key)}" style="--y:${markAt(p).toFixed(1)}px;--sw:${escAttr(FloodStages.colourOf(l, pal))}"></span>`;
     }).join('');
     // The labels are buttons: each holds the water at its level. The one it is
     // held at says so (aria-pressed), and so does its look.
@@ -4379,10 +4429,20 @@ void main() {
       const l = byKey.get(p.key);
       const words = floodLevelWords(l, onGauge);
       return `<button type="button" class="twin-scale-label${l.kind === 'peak' ? ' is-peak' : ''}" data-flood="${escAttr(p.key)}" aria-pressed="false"
-                style="--y:${p.at.toFixed(1)}px" onclick="DigitalTwin.floodAt('${escAttr(p.key)}')"
+                style="--y:${nameAt(p).toFixed(1)}px" onclick="DigitalTwin.floodAt('${escAttr(p.key)}')"
                 title="Hold the water at ${escAttr(words)}" aria-label="Hold the water at ${escAttr(words)}"><span class="twin-flood-sw" style="--sw:${escAttr(FloodStages.colourOf(l, pal))}" aria-hidden="true"></span>${esc(FloodStages.scaleText(l, onGauge))}</button>`;
     }).join('');
     if (had) { const back = labels.querySelector(`[data-flood="${CSS.escape(had)}"]`); if (back) back.focus(); }
+    if (glide) {
+      // Drawn where they were; now, with the transition on, where they go.
+      box.classList.add('is-rescaling');
+      void box.offsetWidth;
+      const want = new Map(pos.map(p => [p.key, p]));
+      for (const el of marks.children) el.style.setProperty('--y', `${want.get(el.dataset.level).mark.toFixed(1)}px`);
+      for (const el of labels.children) el.style.setProperty('--y', `${want.get(el.dataset.flood).at.toFixed(1)}px`);
+      clearTimeout(tw.glideTimer);
+      tw.glideTimer = setTimeout(() => { tw.glideTimer = 0; box.classList.remove('is-rescaling'); }, SCALE_GLIDE_MS);
+    }
     // A line from each mark out to its label — straight across where the label
     // is at its mark, a dog-leg where it had to move.
     const b = body.getBoundingClientRect(), t = track.getBoundingClientRect();
@@ -4404,9 +4464,13 @@ void main() {
     if (!box || box.hidden) return;
     const F = tw.flood;
     if (!F || F.none || F.level == null || !sc.flood) return;
-    const f = F.top > F.start ? Math.max(0, Math.min(1, (F.level - F.start) / (F.top - F.start))) : 1;
+    const f = F.curve.at(F.level);
     const track = document.getElementById('twin-scale-track');
     scaleWater();
+    // The measure the track is in: Log pressed, or not.
+    const logBtn = document.getElementById('twin-scale-log');
+    const logOn = F.logK != null ? 'true' : 'false';
+    if (logBtn && logBtn.getAttribute('aria-pressed') !== logOn) logBtn.setAttribute('aria-pressed', logOn);
     if (track) {
       const pct = String(Math.round(f * 100));
       if (track.getAttribute('aria-valuenow') !== pct) track.setAttribute('aria-valuenow', pct);
@@ -4436,6 +4500,14 @@ void main() {
     }
   }
 
+  // A place on the track, as a fraction of the way from 0 m to the top in
+  // metres — which is what the water is held at (floodHold) whatever the
+  // track's measure, so that turning the scale never moves the water.
+  function heightFraction(t) {
+    const F = tw.flood;
+    return F.top > F.start ? Math.max(0, Math.min(1, (F.curve.of(t) - F.start) / (F.top - F.start))) : 1;
+  }
+
   // Where on the track a pointer is, as a fraction of the way from 0 m to the
   // top — or, within SCALE_SNAP of a level's mark, that level.
   function scaleAt(clientY) {
@@ -4450,7 +4522,7 @@ void main() {
       for (const p of pos) if (Math.abs(p.mark - y) <= SCALE_SNAP && (!best || Math.abs(p.mark - y) < Math.abs(best.mark - y))) best = p;
       if (best) return { key: best.key };
     }
-    return { f: 1 - y / r.height };
+    return { f: heightFraction(1 - y / r.height) };
   }
 
   // The water held where the scale was pressed or dragged to, without the
@@ -4468,17 +4540,17 @@ void main() {
     requestFrame();
   }
 
-  // The keys on the track: a hundredth of the way, a tenth with Shift, level
-  // to level, and the ends.
+  // The keys on the track: a hundredth of the way, a tenth with Shift — of
+  // the track, so a step is the same distance on either measure — level to
+  // level, and the ends.
   function scaleKey(e) {
     const F = tw.flood;
     if (!F || F.none || F.level == null) return;
-    const span = F.top - F.start;
-    const f = span > 0 ? (F.level - F.start) / span : 1;
+    const t = F.curve.at(F.level);
     const levels = F.lad.levels;
     let at = null;
-    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') at = { f: Math.min(1, f + (e.shiftKey ? 0.1 : 0.01)) };
-    else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') at = { f: Math.max(0, f - (e.shiftKey ? 0.1 : 0.01)) };
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') at = { f: heightFraction(Math.min(1, t + (e.shiftKey ? 0.1 : 0.01))) };
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') at = { f: heightFraction(Math.max(0, t - (e.shiftKey ? 0.1 : 0.01))) };
     else if (e.key === 'Home') at = { f: 0 };
     else if (e.key === 'End') at = { f: 1 };
     else if (e.key === 'PageUp') { const l = levels.find(x => x.ahd > F.level + 1e-6); at = l ? { key: l.key } : { f: 1 }; }
@@ -4486,6 +4558,49 @@ void main() {
     if (!at) return;
     e.preventDefault();
     scrubFlood(at, true);
+  }
+
+  // ── the scale's measure ──
+  // Linear or logarithmic: the track put in the other measure, the marks and names
+  // gliding to their new places, the water where it was and the rise going on
+  // from it. `auto` is the scale turning itself (armScaleAuto); anything else
+  // is the operator's choice, kept for the station for the session.
+  function setScaleMode(mode, auto = false) {
+    const F = tw.flood;
+    if (!F || F.none) return;
+    const k = mode === 'log' ? F.fit.k : null;
+    if (!auto) {
+      F.scaleChosen = true;
+      clearScaleAuto();
+      const st = currentStation();
+      if (st) floodScales.set(st.id, mode === 'log' ? 'log' : 'lin');
+    }
+    if (F.logK === k) { syncFloodScale(); return; }
+    const from = F.scale ? new Map(F.scale.pos.map(p => [p.key, p])) : null;
+    F.logK = k;
+    F.curve = FloodStages.curve(F.start, F.top, k);
+    if (floodAnimating() && F.level != null) reanchorFlood();
+    layoutFloodScale(from);
+    syncFloodReading();
+    requestFrame();
+  }
+
+  // Once the scale is up, and only where nothing has chosen for it yet: a few
+  // seconds on, the logarithmic track if the levels warrant it. Once a build.
+  function armScaleAuto() {
+    const F = tw.flood;
+    if (!F || F.none || F.scaleChosen || F.scaleAutoDone || F.logK != null || !F.fit.warrant) return;
+    if (scaleAutoMs == null || tw.scaleAutoTimer) return;
+    tw.scaleAutoTimer = setTimeout(() => {
+      tw.scaleAutoTimer = 0;
+      if (tw.flood !== F || F.scaleChosen || !floodScaleOn()) return;
+      F.scaleAutoDone = true;
+      setScaleMode('log', true);
+    }, scaleAutoMs);
+  }
+
+  function clearScaleAuto() {
+    if (tw.scaleAutoTimer) { clearTimeout(tw.scaleAutoTimer); tw.scaleAutoTimer = 0; }
   }
 
   // Whether the station on screen could borrow levels it lacks: it has none
@@ -4553,7 +4668,7 @@ void main() {
     const F = tw.flood;
     const slider = document.getElementById('twin-flood-level');
     if (slider && F && !F.none && F.level != null && document.activeElement !== slider) {
-      slider.value = String(Math.round(F.top > F.start ? 1000 * (F.level - F.start) / (F.top - F.start) : 0));
+      slider.value = String(Math.round(1000 * F.curve.at(F.level)));
     }
     const out = document.getElementById('twin-flood-out');
     if (out) out.textContent = F && !F.none && F.level != null ? `${F.level.toFixed(2)} m AHD` : '';
@@ -5830,6 +5945,25 @@ void main() {
   // ones every refresh here writes to, and the two hosts are never on screen
   // together: the overlay lives in the Stations tab's map, the panel in this
   // tab's page.
+  //
+  // Along its foot, whatever else is up, the caveat: everything in the view is
+  // a model — the ground, the imagery on it, the station built from its record,
+  // the water — and none of it a survey, a flood map or a forecast. In red, and
+  // never folded away with the lines over the stage or a phone's hint: a
+  // picture this convincing is one that gets screenshotted and passed round,
+  // and the caveat has to go with it. One line at every width (the words
+  // shorten with the stage — three lengths, CSS picks one), the whole of it for
+  // a screen reader. No tooltip: it takes no pointer, so that a drag started
+  // on it still turns the view, and a title nobody can hover is no title.
+  const CAVEAT = 'Indicative modelling only. Everything in this view is modelled, not surveyed: the ground from '
+    + 'elevation data, the imagery draped over it, the station as built from its record, and the flood water as '
+    + 'a level surface at the recorded levels. It is not a flood map or a forecast — check anything that matters '
+    + 'on site.';
+
+  function caveatHtml() {
+    return `<p class="twin-caveat" id="twin-caveat" role="note"><span class="twin-caveat-long" aria-hidden="true">⚠ Indicative modelling only — the ground, the station and the flood water are modelled, not surveyed. Not a flood map or a forecast.</span><span class="twin-caveat-mid" aria-hidden="true">⚠ Indicative modelling only — not a survey, a flood map or a forecast.</span><span class="twin-caveat-short" aria-hidden="true">⚠ Indicative modelling only</span><span class="sr-only">${esc(CAVEAT)}</span></p>`;
+  }
+
   function stageHtml() {
     return `<div class="twin-stage" id="twin-stage">
           <canvas id="twin-canvas" tabindex="0" aria-label="Three-dimensional view. Nothing is built yet."></canvas>
@@ -5839,6 +5973,7 @@ void main() {
           <p class="twin-hud" id="twin-hud">Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.</p>
           <button type="button" class="twin-hud-q" id="twin-hud-q" aria-controls="twin-hud" aria-expanded="true"
                   aria-label="How to move the view" title="How to move the view" onclick="DigitalTwin.toggleHud()" hidden>?</button>
+          ${caveatHtml()}
           <button type="button" class="twin-photo-prompt" id="twin-photo-prompt" hidden onclick="DigitalTwin.openNearPhotos()"></button>
           <div class="mn-movepin-panel twin-movepin-panel" id="twin-movepin-panel" role="group" aria-label="Move this station's pin" hidden></div>
           <div class="twin-placeholder" id="twin-placeholder" hidden></div>
@@ -5892,8 +6027,11 @@ void main() {
     // The next build is an opening: the lines open again, and fold again.
     clearInfoTimer();
     tw.infoFor = null;
-    // …and a phone's hint and scale names have nothing left to put away.
+    // …and a phone's hint and scale names have nothing left to put away, nor
+    // the scale a measure to turn to.
     clearCompactTimers();
+    clearScaleAuto();
+    if (tw.glideTimer) { clearTimeout(tw.glideTimer); tw.glideTimer = 0; }
     if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
   }
 
@@ -6438,6 +6576,9 @@ void main() {
           return {
             none: false, on: !!S().flood, animating: floodAnimating(), level: F.level, top: F.top, start: F.start, startBasis: F.startBasis,
             clock: floodAnimating() && F.clock != null ? F.clock : null,
+            // The scale's measure: which, the bend, what the levels warrant, and who chose.
+            measure: F.logK != null ? 'log' : 'lin', logK: F.logK, fit: { ...F.fit }, chosen: !!F.scaleChosen,
+            autoDone: !!F.scaleAutoDone, autoArmed: !!tw.scaleAutoTimer, autoMs: scaleAutoMs,
             zero: F.lad.ahdZero, band: F.band ? F.band.key : null, flooded: F.flooded,
             colour: sc.flood ? `#${sc.flood.mat.color.getHexString()}` : null, opacity: sc.flood ? sc.flood.mat.opacity : null,
             y: sc.flood ? sc.flood.water.position.y : null, visible: sc.flood ? sc.flood.water.visible : null,
@@ -6587,17 +6728,33 @@ void main() {
       saveSettings();
       settleFlood();
     },
-    // Hold the water at one level (its key), or a fraction of the way from 0 m
-    // to the top — either stops the rise.
+    // Hold the water at one level (its key), or a fraction of the way up the
+    // scale's track — on a linear one, that fraction of the way from 0 m to
+    // the top; on a logarithmic one, where that place on it stands, as the
+    // Scene panel's slider does with the scale — either stops the rise.
     floodAt(key) {
       S().flood = true; S().floodAnim = false; S().floodHold = String(key); saveSettings();
       settleFlood();
     },
     setFloodFraction(v) {
-      const f = Math.max(0, Math.min(1, Number(v)));
-      if (!isFinite(f)) return;
-      S().flood = true; S().floodAnim = false; S().floodHold = f; saveSettings();
+      const t = Math.max(0, Math.min(1, Number(v)));
+      if (!isFinite(t)) return;
+      const F = tw.flood;
+      S().flood = true; S().floodAnim = false; S().floodHold = F && !F.none ? heightFraction(t) : t; saveSettings();
       settleFlood();
+    },
+    // The scale's measure, chosen: 'lin' or 'log' — and the Log toggle beside
+    // the scale's head, which turns it to the other.
+    setFloodScale(mode) { setScaleMode(mode === 'log' ? 'log' : 'lin'); },
+    toggleFloodScale() { const F = tw.flood; setScaleMode(F && !F.none && F.logK != null ? 'lin' : 'log'); },
+    // The check's seam: the scale turns itself `ms` after it comes up rather
+    // than four seconds, or never (null); `forget` drops the Log choices the
+    // operator pressed, as a new session would.
+    _floodScaleAuto(ms, forget = false) {
+      scaleAutoMs = ms == null ? null : Math.max(0, Number(ms));
+      if (forget) floodScales.clear();
+      clearScaleAuto();
+      if (scaleAutoMs != null && floodScaleOn()) armScaleAuto();
     },
     // The check's seams: a shorter cycle, and whether a scene point is wet.
     _floodClock(rise, hold, drain) {

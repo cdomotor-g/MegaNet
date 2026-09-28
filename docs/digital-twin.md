@@ -12,6 +12,18 @@ It is `digital-twin.js`, the **Digital Twin** tab under *Stations & networks*,
 and a 🧊 pill on the card of every station with a position. `npm run twin` holds it, and `npm run flood` its
 flood water (see the end).
 
+**All of it is indicative modelling**, and every twin says so for as long as it
+is up: a line of red along the foot of the view — on this tab and inside the
+Stations map alike, never folded away with the lines over the stage or a
+phone's hint — *⚠ Indicative modelling only — the ground, the station and the
+flood water are modelled, not surveyed. Not a flood map or a forecast.* It
+shortens with the view (three lengths, picked by the stage's width through a
+container query, so it is always one line and everything else along the foot
+stands a constant height above it), a screen reader is read the whole of it,
+and it takes no pointer, so a drag that starts on it still turns the view. A
+picture this convincing gets screenshotted and passed round; the caveat is
+drawn on the picture so that it goes with it.
+
 ---
 
 ## Why a tab of its own
@@ -789,6 +801,44 @@ other floods.
 Anything but ▶ holds the water still. The scale steps aside while a pin is
 being moved (its panel has that corner then), and its foot clears the hint
 along the stage's foot, however many lines that makes.
+
+**Log.** A toggle beside the scale's head carries its measure: pressed, the
+track is *logarithmic*; not, *linear*. The scale opens linear — a metre the
+same height all the way up — and a few seconds later turns logarithmic by
+itself where the station's levels warrant it, and **Log** lights up. A toggle
+rather than a Lin|Log pair, and beside the head rather than under the track,
+because a phone's stage is short of both the width the reading needs and the
+height the names do. The logarithmic track is measured down from the top:
+
+    t(h) = 1 − ln(1 + (hi − h) / k) / ln(1 + (hi − lo) / k)
+
+0 at the foot and 1 at the head either way; `k`, the bend, is the depth below
+the top over which the track is still nearly linear, and under which it opens
+out. Down from the top, because that is where a station's levels crowd: at
+Gatton (40444) major, the four AEP floods and the 1893 and 2011 floods are seven
+levels in the top 1.7 m of a 16.3 m range, a tenth of a linear track, their
+names fanned out from their marks; the rise passes all seven in its last second
+and a half. Whether the levels warrant it, and which bend, is worked out from
+the levels alone on a track of a set height (`FloodStages.logFit`, so it is the
+station's answer and not the window's): laid out as the stage lays them out,
+how far on average is a name pushed off its mark? The gentlest of a handful of
+bends that does about as well as the best is kept — a sharper one than the
+levels need spends the track on the top few centimetres — and the levels
+warrant it where a linear track pushes the names more than half a name's height
+and the bend takes more than a third of that away. Gatton's go from 49 px on
+average to 4; a station with only its three classes, metres apart, never
+turns, and nearly a third of the stations with levels on the ground do.
+
+The rise runs along the track, so on a logarithmic one it climbs quickly
+through the bottom and slowly through the levels — Gatton's water reaches major
+two-thirds of the way through the rise instead of in its last tenth. A press or
+a drag holds the water where that place on the track stands, and an arrow key
+moves it a hundredth of the track, on either measure. The water itself never
+moves when the scale does: the marks and names glide to their new places and
+the level stays where it was. Pressing **Log**, on or off, is the operator's
+choice, kept for that station for the session — rebuilt, it opens as chosen,
+and nothing turns it by itself again. The Scene panel's water-level slider
+follows the scale's measure too.
 
 **On a phone** — a finger, on a screen whose short side is a phone's, either
 way up — the stage is the map's size and little of it, so two things on it

@@ -6,10 +6,12 @@
 //      station's recorded position; the editor's copies what the two coordinate
 //      boxes currently say, which is not the same thing the moment a pin has
 //      been dragged into them or a figure typed over them.
-//   2. **The station list collapses**, the same <details> the Filters, Path
-//      profile and Link budget cards on that tab already are — remembered
-//      between visits, with the live row count and the selected station on the
-//      summary so a shut card still answers what the list is open for.
+//   2. **The station list collapses** — one card with its filters now, a
+//      toggle in its head (the accordion pattern #181 gave the filters) that
+//      shuts the list and leaves the search box and the notes, remembered
+//      between visits, with the live row count on the head and the selected
+//      station on the notes line so a shut list still answers what it is open
+//      for.
 //
 // Why a check of its own rather than a few more lines in `smoke`: every failure
 // here renders a page that looks entirely correct. A Copy button that puts the
@@ -230,21 +232,29 @@ async function main() {
       [...document.querySelectorAll('textarea')].filter(t => t.value === 'fallback-wrote-this').length);
     check('and takes its scratch textarea away again', leftover === 0, `${leftover} left behind`);
 
-    // ── 5. The list collapses ─────────────────────────────────────────────
-    log('\nThe station list is a card that shuts, and says what it is hiding\n');
+    // ── 5. The list and its filters, one card; the list collapses ─────────
+    log('\nThe station list and its filters are one card, and the list shuts and says what it is hiding\n');
 
     const card = await page.evaluate(() => {
-      const d = document.querySelector('#stations-list-card > details.stations-card');
+      const c = document.getElementById('stations-list-card');
+      const t = document.getElementById('stations-list-toggle');
+      const head = c && c.querySelector(':scope > .stn-list-head');
       return {
-        exists:  !!d,
-        open:    !!d && d.open,
-        heading: d ? d.querySelector('summary h3')?.textContent.replace(/\s+/g, ' ').trim() : '',
-        count:   d ? d.querySelector('summary #st-count')?.textContent.trim() : '',
+        exists:  !!c && !!t && !c.querySelector('details.stations-card'),
+        // The filters are in it: the block every search box and clear button
+        // is found inside, and the Filters toggle in its head.
+        filtersIn: !!c && !!c.querySelector('#stations-filter-card #filter-quick')
+          && !!head && !!head.querySelector('#filter-toggle'),
+        oneCard: document.querySelectorAll('#stations-cards > .panel#stations-filter-card').length === 0,
+        open:    !!t && t.getAttribute('aria-expanded') === 'true'
+          && document.getElementById('stations-list-body').checkVisibility(),
+        heading: document.getElementById('stations-table-h')?.textContent.replace(/\s+/g, ' ').trim() || '',
+        count:   document.getElementById('st-count')?.textContent.trim() || '',
         rows:    tableStations().length,
-        // "+ New" is in the body, not the summary: a <button> inside a <summary>
-        // is a target that toggles the card as often as it is pressed.
-        newInBody:    !!d && !!d.querySelector('.stations-card-body .stations-card-actions button'),
-        newInSummary: !!d && !!d.querySelector('summary button'),
+        // + Propose and + New are in the head, and not inside the toggle: a
+        // button inside a button would be pressed as often as the toggle is.
+        actions: !!head && [...head.querySelectorAll('.stations-card-actions button')].map(b => b.textContent.trim()),
+        nested:  !!t && !!t.querySelector('button'),
         // The scroll region and its name came along unchanged.
         namedRegion: (() => {
           const w = document.getElementById('stations-table-wrap');
@@ -254,36 +264,40 @@ async function main() {
         })(),
       };
     });
-    check('the list is a <details class="stations-card">', card.exists);
+    check('the list is one card with its filters in it — no second card, no <details>',
+      card.exists && card.filtersIn && card.oneCard, JSON.stringify(card));
     check('open on a first visit — the list is half of what this tab is', card.open);
-    check('its summary is the heading, with the live row count on it',
+    check('its heading is the toggle, with the live row count on it',
       /^Stations\b/.test(card.heading) && card.count === String(card.rows),
       `${card.heading} (table has ${card.rows})`);
-    check('"+ New" moved into the body rather than into the summary',
-      card.newInBody && !card.newInSummary);
+    check('+ Propose and + New are in the head, and not inside the toggle',
+      JSON.stringify(card.actions) === JSON.stringify(['+ Propose', '+ New']) && !card.nested, JSON.stringify(card.actions));
     check('the table is still a named scroll region inside it', card.namedRegion);
 
-    // Shut it through the gesture a person makes, not by setting `open`.
-    await page.click('#stations-list-card > details.stations-card > summary');
+    // Shut it through the gesture a person makes, not by setting state.
+    await page.click('#stations-list-toggle');
     await page.waitForTimeout(150);
     const shut = await page.evaluate(() => ({
-      open:    document.querySelector('#stations-list-card > details.stations-card').open,
+      expanded: document.getElementById('stations-list-toggle').getAttribute('aria-expanded'),
       state:   state.stationsListOpen,
       stored:  localStorage.getItem('mn-stations-list'),
       heading: document.getElementById('stations-table-h').checkVisibility(),
       table:   document.getElementById('stations-table-wrap').checkVisibility(),
+      search:  (() => { const b = document.getElementById('station-search-quick') || document.getElementById('station-search-0');
+                        return !!b && b.checkVisibility(); })(),
       note:    document.getElementById('stations-list-note')?.textContent.trim(),
+      noteShown: document.getElementById('stations-list-note').checkVisibility(),
       selected: (state.data.stations.find(s => s.id === state.selectedId) || {}).name,
     }));
-    check('clicking the summary shuts it', shut.open === false);
+    check('pressing the heading shuts it', shut.expanded === 'false');
     check('and the state and the stored answer both follow',
       shut.state === false && shut.stored === 'closed',
       `state=${shut.state} stored=${shut.stored}`);
-    check('the heading stays on screen; the 3,000-row scroller does not',
-      shut.heading === true && shut.table === false);
-    check('and the summary names the selected station, so a shut card still answers '
+    check('the heading and the search box stay on screen; the 3,000-row scroller does not',
+      shut.heading === true && shut.search === true && shut.table === false, JSON.stringify(shut));
+    check('and the notes line names the selected station, so a shut list still answers '
       + 'what the editor below is talking about',
-      shut.note === `Selected: ${shut.selected}`, `${shut.note} vs ${shut.selected}`);
+      shut.noteShown && shut.note === `Selected: ${shut.selected}`, `${shut.note} vs ${shut.selected}`);
 
     // The note is repainted by rerenderStations(), which every selection path
     // goes through — including one made while the card is shut.
@@ -304,12 +318,15 @@ async function main() {
       cleared === 'No station selected', cleared);
 
     // Remembered: the whole reason this one is stored rather than reset per
-    // visit, the same argument the Filters card makes.
+    // visit, the same argument the Filters make.
     await page.evaluate(() => { switchTab('networks'); switchTab('stations'); });
     await page.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
-    const remembered = await page.evaluate(() =>
-      document.querySelector('#stations-list-card > details.stations-card').open);
-    check('leaving the tab and coming back finds it still shut', remembered === false);
+    const remembered = await page.evaluate(() => ({
+      expanded: document.getElementById('stations-list-toggle').getAttribute('aria-expanded'),
+      table: document.getElementById('stations-table-wrap').checkVisibility(),
+    }));
+    check('leaving the tab and coming back finds it still shut', remembered.expanded === 'false' && !remembered.table,
+      JSON.stringify(remembered));
 
     await page.reload({ waitUntil: 'load', timeout: LOAD_TIMEOUT });
     await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data,
@@ -317,25 +334,25 @@ async function main() {
     await page.evaluate(() => switchTab('stations'));
     await page.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
     const afterReload = await page.evaluate(() => ({
-      open:  document.querySelector('#stations-list-card > details.stations-card').open,
+      expanded: document.getElementById('stations-list-toggle').getAttribute('aria-expanded'),
       state: state.stationsListOpen,
     }));
     check('and so does a reload — it is a decision, not a gesture',
-      afterReload.open === false && afterReload.state === false,
-      `open=${afterReload.open} state=${afterReload.state}`);
+      afterReload.expanded === 'false' && afterReload.state === false,
+      `expanded=${afterReload.expanded} state=${afterReload.state}`);
 
     // Put it back, and prove the round trip: a card that could only ever be
     // shut would pass everything above.
-    await page.click('#stations-list-card > details.stations-card > summary');
+    await page.click('#stations-list-toggle');
     await page.waitForTimeout(150);
     const reopened = await page.evaluate(() => ({
-      open:   document.querySelector('#stations-list-card > details.stations-card').open,
+      expanded: document.getElementById('stations-list-toggle').getAttribute('aria-expanded'),
       stored: localStorage.getItem('mn-stations-list'),
       table:  document.getElementById('stations-table-wrap').checkVisibility(),
       rows:   document.querySelectorAll('#stations-table-wrap tr[data-sid]').length,
     }));
     check('opening it again brings the table back, and is remembered too',
-      reopened.open && reopened.stored === 'open' && reopened.table && reopened.rows > 0,
+      reopened.expanded === 'true' && reopened.stored === 'open' && reopened.table && reopened.rows > 0,
       `${reopened.rows} row(s), stored=${reopened.stored}`);
 
     check('nothing threw for the whole run', errors.length === 0, errors.slice(0, 3).join(' | '));
@@ -352,7 +369,7 @@ async function main() {
     process.exit(1);
   }
   log('\nPASS — the position on the clipboard is the one on screen, and the station\n'
-    + '       list shuts, says what it is hiding, and is remembered.');
+    + '       list is one card with its filters, shuts, says what it is hiding, and is remembered.');
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

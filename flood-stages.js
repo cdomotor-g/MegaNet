@@ -365,14 +365,15 @@ const FloodStages = (function () {
   // keep only their mark: the classes first, then the highest flood recorded,
   // the AEP floods from the 1%, then the other floods, largest first.
   //
-  //   scale(levels, { lo, hi, px, gap }) → [{ key, mark, at, shown }]
+  //   scale(levels, { lo, hi, px, gap, k }) → [{ key, mark, at, shown }]
   //
   // in the levels' own order; `mark` and `at` are px down from the head of the
   // track, and `at` is null for a label that gave way. `gap` is the height of
-  // a label: no two labels' middles are nearer than that.
-  function scale(levels, { lo, hi, px, gap }) {
-    const span = hi - lo;
-    const markOf = a => (span > 0 ? Math.max(0, Math.min(px, px * (hi - a) / span)) : px);
+  // a label: no two labels' middles are nearer than that. `k` is the track's
+  // bend (see curve(), below): none for a linear track.
+  function scale(levels, { lo, hi, px, gap, k = null }) {
+    const c = curve(lo, hi, k);
+    const markOf = a => (hi - lo > 0 ? Math.max(0, Math.min(px, px * (1 - c.at(a)))) : px);
     const out = levels.map(l => ({ key: l.key, mark: markOf(l.ahd), at: null, shown: false }));
     const room = gap > 0 ? Math.max(0, Math.floor(px / gap) + 1) : levels.length;
     const wanted = levels.map((l, i) => i)
@@ -411,6 +412,87 @@ const FloodStages = (function () {
     return out;
   }
 
+  // ── Linear or logarithmic ──────────────────────────────────────────────────
+  // The scale is linear to begin with: a metre is the same height on the track
+  // from 0 m to the top. Where a station's levels crowd together at the top —
+  // at Gatton, major, the four AEP floods and the 1893 and 2011 floods are
+  // seven levels in the top 1.7 m of 16.3, 10% of the track — a linear track
+  // has them all on one short stretch, their names pushed off their marks in
+  // a fan, and the rise passes all seven in its last second and a half.
+  //
+  // So the track can be logarithmic instead, in the depth below the top:
+  //
+  //   t(h) = 1 − ln(1 + (hi − h) / k) / ln(1 + (hi − lo) / k)
+  //
+  // 0 at the foot and 1 at the head either way. `k` is the bend, in metres:
+  // the depth below the top over which the track is still roughly linear, and
+  // under which it opens out — a small k gives the top metres most of the
+  // track, a large one is nearly linear. Measured down from the top because
+  // that is where a station's levels crowd: the classes are metres apart and
+  // the AEP floods and the largest floods are centimetres to a metre apart over
+  // them, never under them. The rise keeps its clock and runs along the track,
+  // so on a logarithmic one it slows as it climbs into the levels, and passes
+  // them at a pace a person can follow.
+  //
+  // Which k, and whether a station's levels warrant it at all, are worked out
+  // from the levels alone, on a track of a set height (LOG_PX, about the tab's)
+  // so that the answer is the station's and not the window's: laid out as the
+  // stage lays them out (scale(), above), how far on average is a name pushed
+  // off its mark? logFit() tries a handful of bends and keeps the gentlest
+  // that does about as well as the best of them — a sharper bend than the
+  // levels need spends the track on the top few centimetres; the levels
+  // warrant it where the linear track pushes the names more than half a
+  // name's height on average and the bend takes more than a third of that
+  // away. A station with only its three classes, a few metres apart, never
+  // does; nearly a third of the stations with levels on the ground do.
+  const LOG_PX     = 320;
+  const LOG_GAP    = 18;                  // a name's height (digital-twin.js, SCALE_GAP)
+  const LOG_BENDS  = [0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5];   // as fractions of the range
+  const LOG_K_MIN  = 0.02;                // m: no bend sharper than 2 cm
+  const LOG_EASE   = LOG_GAP / 6;         // px: "about as well as the best"
+  const LOG_WANT   = LOG_GAP / 2;         // px pushed, on average, before log is worth offering
+  const LOG_GAIN   = 2 / 3;               // …and it must come down to at most this share of it
+
+  // The track's own measure: where a height stands on it, 0 at the foot (lo)
+  // to 1 at the head (hi), and the height at a place on it. Linear for no k.
+  function curve(lo, hi, k = null) {
+    const D = hi - lo;
+    const clamp = t => Math.max(0, Math.min(1, t));
+    if (!(D > 0)) return { k: null, at: () => 1, of: () => hi };
+    if (!(k > 0)) return { k: null, at: h => clamp((h - lo) / D), of: t => lo + clamp(t) * D };
+    const L = Math.log1p(D / k);
+    return {
+      k,
+      at: h => 1 - Math.log1p(Math.max(0, Math.min(D, hi - h)) / k) / L,
+      of: t => hi - k * Math.expm1((1 - clamp(t)) * L),
+    };
+  }
+
+  // How far, on average, the names are pushed off their marks on a track of
+  // LOG_PX with bend k (px). The names that give way are the same whatever
+  // the bend — the track's height decides how many fit — so only the shown
+  // ones are counted.
+  function crowding(levels, lo, hi, k) {
+    const pos = scale(levels, { lo, hi, px: LOG_PX, gap: LOG_GAP, k }).filter(p => p.shown);
+    return pos.length ? pos.reduce((a, p) => a + Math.abs(p.at - p.mark), 0) / pos.length : 0;
+  }
+
+  // The bend that spreads these levels best, and whether they warrant it:
+  //   { k, linear, log, warrant } — `linear` and `log` the crowding of each.
+  //
+  // A bend is found for any station with a range, so that one pressed onto
+  // the logarithmic track has one; with one or two levels the gentlest wins,
+  // since there is nothing to crowd.
+  function logFit(levels, lo, hi) {
+    const D = hi - lo;
+    const linear = crowding(levels, lo, hi, null);
+    if (!(D > 0)) return { k: null, linear, log: linear, warrant: false };
+    const tried = LOG_BENDS.map(f => Math.max(LOG_K_MIN, f * D)).map(k => ({ k, cost: crowding(levels, lo, hi, k) }));
+    const least = Math.min(...tried.map(t => t.cost));
+    const pick = tried.filter(t => t.cost <= least + LOG_EASE).reduce((a, b) => (b.k > a.k ? b : a));
+    return { k: pick.k, linear, log: pick.cost, warrant: linear > LOG_WANT && pick.cost <= linear * LOG_GAIN };
+  }
+
   // A level on the scale, in a few words: its name — a flood by its month and
   // year, the highest with a star — and its height, on the gauge where every
   // level has one, else in m AHD. The label's title says it in full.
@@ -432,6 +514,7 @@ const FloodStages = (function () {
     CLASSES, COLOURS, RISE_S, HOLD_S, DRAIN_S, ZERO_MAX_BELOW, ZERO_MAX_ABOVE,
     ladder, start, passed, colourOf, mix, cycle, gaugeText, ahdText, levelText,
     borrowable, borrowed, scale, spread, scaleText, peakWhen,
+    curve, crowding, logFit, LOG_PX, LOG_GAP,
   };
 })();
 if (typeof window !== 'undefined') window.FloodStages = FloodStages;

@@ -106,7 +106,7 @@
 // anything renamed. Anything a person has called a tab out loud belongs here.
 const TABS = [
   { group: 'Stations & networks', tabs: [
-    { id: 'stations',   label: 'Stations',               icon: '📡',
+    { id: 'stations',   label: 'Stations',               icon: '📍',
       find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor' },
     { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
       find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
@@ -235,9 +235,10 @@ const TAB_LIST = TABS.flatMap(g => g.tabs);
 const HELP = {
   stations: {
     summary: 'The map fills the page, and its cards sit beside it in the <strong>side panel</strong> '
-           + 'on the right: press 📋 in the strip on its edge, under ❔, for the '
-           + '<strong>Filters</strong>, the <strong>Stations</strong> list and the station details, '
-           + 'one column that scrolls on its own, and 〽️ under it for the path tools — the '
+           + 'on the right: press the red 📍 in the strip on its edge, under ❔, for the '
+           + '<strong>Stations</strong> list with its filters, and the station details, '
+           + 'one column that scrolls on its own; the blue 📍 under it for <strong>Find a place</strong>; '
+           + 'and 〽️ for the path tools — the '
            + '<strong>radio path</strong> you clicked, the <strong>elevation profile</strong> and the '
            + '<strong>link budget</strong> with its fade margin — in a pane of their own. Press the '
            + 'button of the pane that is showing and the side panel shuts, giving the map the '
@@ -248,7 +249,7 @@ const HELP = {
            + 'measure</strong>, 📡 <strong>Polar radio coverage</strong>, <strong>🗼 Repeater site '
            + 'finder</strong>, <strong>ℹ️ What is here</strong>), the <strong>3-D view</strong> (⛰️, 🎚️ '
            + 'its settings, and its camera), and how much screen the map gets (⛶ full screen). A panel '
-           + 'among them opens as a pane of the side panel, the way 📋 does; a button does its one '
+           + 'among them opens as a pane of the side panel, the way 📍 does; a button does its one '
            + 'thing. The one control left on the map is <strong>↺ Reset</strong>, alone in its '
            + 'top-right corner: it clears the filters, the selection, every drawing and every card. '
            + '<strong>⛶ Full screen</strong> gives the map the whole window except the side panel, '
@@ -257,16 +258,25 @@ const HELP = {
            + 'the side panel keeps the tools. On a phone the map fills the screen under the banner '
            + 'and the side panel is put away behind <strong>⋮</strong> at the top right: press it and '
            + 'the strip comes out as a rail down the right-hand edge, beside the map rather than on '
-           + 'it, with ❔, 📋, 〽️ and the map\'s controls in it, and press it again to put the rail '
+           + 'it, with ❔, the two 📍, 〽️ and the map\'s controls in it, and press it again to put the rail '
            + 'away. A pane opens as a drawer beside the rail — the cards and the path tools too — '
            + 'and pressing its button again, tapping the dimmed page or pressing Escape puts it '
-           + 'away. The <strong>Filters</strong> card drives the map and the list '
-           + 'at once, and is built from whatever <code>stations.json</code> holds — every option '
-           + 'carries the number of stations behind it, and nothing is offered that no station uses. '
-           + 'It collapses, and its summary line says what the filters are doing while it is shut. '
-           + 'The <strong>Stations</strong> list under it collapses the same way — it is the tallest '
-           + 'card there, and shutting it is how the path tools and the editor get onto one screen '
-           + 'together; its summary keeps the live row count and names the selected station. '
+           + 'away. The <strong>Stations</strong> card is the list and its filters in one: its head '
+           + 'carries the live row count, the <strong>Filters</strong> toggle and + Propose and + New; '
+           + 'under it the search box and the two clear buttons, then a line saying what the filters '
+           + 'are doing and which station is selected, then the list. The filters drive the map and '
+           + 'the list at once, and are built from whatever <code>stations.json</code> holds — every '
+           + 'option carries the number of stations behind it, and nothing is offered that no station '
+           + 'uses. <strong>Filters</strong> opens the whole panel in place of the search box. The '
+           + 'heading shuts the list — it is the tallest thing there, and shutting it is how the '
+           + 'editor gets onto one screen with the map — and leaves the search box and the notes. '
+           + '<strong>Find a place</strong> (the blue 📍) takes the name of a town, a river or '
+           + 'creek, a catchment or its basin number, a council area, or a coordinate, and lists what '
+           + 'it means on the ground: the catchments and the rivers and council areas this network\'s '
+           + 'stations are in, from the file, and the towns, localities, airports, rivers and '
+           + 'boundaries OpenStreetMap knows. Press one and the map goes there, with a blue pin and '
+           + 'its outline or course; the stations are left as they are. ✕ beside the box, or ↺, '
+           + 'takes the pin away. '
            + 'Under the map the elevation profile and link budget follow the list; beside it they '
            + 'are the 〽️ pane, which opens by itself when you draw a line, click a radio path or '
            + 'ask for a link budget. The profile says how to draw a path until there is one. '
@@ -373,13 +383,18 @@ const HELP = {
       + 'the search area, the rings, the chosen candidate\'s paths and the numbered pins stand on '
       + 'the terrain, and a pin click picks that candidate there too — only <em>Draw a circle</em> '
       + 'waits for 2-D, because its clicks land on the flat map.',
-      'The filter box also answers with <strong>places</strong>. Paste a coordinate into it — '
-      + 'decimal, degrees and minutes, degrees-minutes-seconds, with or without hemisphere '
-      + 'letters, in either order — and the map goes there and drops a pin, with no network at all. '
-      + 'Type a name and, where the place-name service can be reached, the towns, localities and '
-      + 'airports it matches are offered under the box. Neither changes what the station filter '
-      + 'matches: the strip is an extra answer beside the station list, never instead of it, and a '
-      + 'lookup that cannot be made says so and leaves the filtering alone.',
+      '<strong>Find a place</strong> (the blue 📍 in the strip) is where a place is looked for, '
+      + 'not the filter box — which filters the stations, and would have cut the network down to '
+      + 'the stations named after a town while you were only looking for the town. Paste a '
+      + 'coordinate into it — decimal, degrees and minutes, degrees-minutes-seconds, with or '
+      + 'without hemisphere letters, in either order — and the map goes there and drops a blue '
+      + 'pin, with no network at all. Type a name and it lists, at once and offline, the '
+      + 'catchments (by name or basin number), and the rivers and creeks and the council areas '
+      + 'this network\'s stations are on, each with how many; then, where the place-name service '
+      + 'can be reached, the towns, localities, airports, rivers and boundaries it matches. A '
+      + 'catchment is drawn in outline, a river along its course where OpenStreetMap has it, and a '
+      + 'river from the file is the stretch its stations span. A lookup that cannot be made says '
+      + 'so and leaves the rest of the list standing.',
       '<strong>Limit link length</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
       + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 100 km; '
@@ -436,12 +451,12 @@ const HELP = {
       + 'somewhere. It filters what is drawn and switches nothing off; in the side panel the '
       + 'pane is the full height of the window, so there is plenty for it to filter.',
       'Where the station cards go follows the width of the window. Above 1,100 px they are in '
-      + 'the <strong>side panel</strong> beside the map (📋, and 〽️ for the path tools), the map '
+      + 'the <strong>side panel</strong> beside the map (📍, and 〽️ for the path tools), the map '
       + 'filling the height of the window and the cards scrolling on their own — the single '
       + 'column put the map\'s own answer below the fold, so reading it cost you the map. At or '
       + 'below 1,100 px they are under the map in one long page, because two 400 px columns are '
       + 'two things too narrow to read rather than two things in view. On a phone they are in the '
-      + 'side panel again — 📋 and 〽️ in the rail that ⋮ brings out, each a drawer over the map — '
+      + 'side panel again — 📍 and 〽️ in the rail that ⋮ brings out, each a drawer over the map — '
       + 'so that the map can have the whole screen. The side panel\'s width is '
       + 'yours: drag its left edge, or focus it and use the arrow keys, and it is remembered. The '
       + 'station list in the side panel carries five columns rather than ten — name, station '
@@ -449,7 +464,7 @@ const HELP = {
       + '420 px pane is ten columns nothing fits in. The network, position, elevation, the enabled '
       + 'tick and the ARRO link are all on the station\'s card, which a click on any row opens; '
       + 'under the map the table has them back.',
-      '<strong>Clear filters</strong> also clears the repeater focus — the dim that a click on a '
+      '<strong>Clear</strong> also clears the repeater focus — the dim that a click on a '
       + 'repeater pin puts over everything not on its own paths. Both are ways of saying "back to '
       + 'the whole network", so both buttons do both, and both are enabled by a focus even with no '
       + 'filter running.',
@@ -1207,6 +1222,11 @@ const HELP = {
            + '10 cm imagery; and '
            + 'download the whole scene as a <code>.glb</code> that Blender opens in one step.',
     watch: [
+      '<strong>Everything in the view is indicative modelling</strong>, and the red line along the '
+      + 'foot of every twin — on this tab and inside the Stations map — says so for as long as it is '
+      + 'up: the ground is an elevation model, the imagery is draped on it, the station is built from '
+      + 'its record, and the water is a level surface at the recorded levels. None of it is a survey, '
+      + 'a flood map or a forecast; check anything that matters on site.',
       '<strong>The same twin is inside the Stations map.</strong> From zoom 17 with a station under '
       + 'the view a card on the map offers it, saying what aerial imagery covers the station and when '
       + 'it was flown; press Open the digital twin and the map hands its rectangle over, and ← Map or '
@@ -1293,6 +1313,14 @@ const HELP = {
       + 'tap the track for five more (a tap only brings them back; drag to move the water) — and the '
       + 'hint along the foot folds to a <strong>?</strong> that brings it back. The line under the stage '
       + 'has the same levels, and <em>Hide the water</em> — each choice remembered.',
+      '<strong>Log, beside the scale\'s head.</strong> The scale opens linear — a metre the '
+      + 'same height all the way up. Where a station\'s levels crowd together near the top (the AEP '
+      + 'floods and the largest floods within a metre or two of each other over major, as at Gatton), '
+      + 'it turns <em>logarithmic</em> by itself a few seconds later: measured down from the highest '
+      + 'level, so the top metres get the room and every name sits by its mark, and the rise slows as '
+      + 'it climbs into them rather than passing them all in its last second — and <strong>Log</strong> '
+      + 'lights up. Press it to turn the logarithmic scale on or off; the choice is kept for that station '
+      + 'for the session, and the water never moves when the scale does.',
       '<strong>No levels here? Borrow a neighbour\'s.</strong> For a station with no flood heights '
       + 'the twin can put on its ground, the flood line (and a pill on the stage) offers the four nearest stations '
       + 'that have some — their distance, their heights and their catchment. Pick one and its levels '
@@ -1559,8 +1587,9 @@ const HELP_TRANSITION_MS = 160;
 // replaced ever gave it.
 const DOCK_DEFAULT_W = 420;
 // The narrowest a pane may be dragged to while there is room for more. Below
-// this the filter card's head row — the search box, the match note and two
-// Clear buttons — wraps onto four lines, and a card is not readable at that.
+// this the Stations card's head and filter rows — the toggles, + Propose and
+// + New, the search box and two Clear buttons — wrap onto four lines, and a
+// card is not readable at that.
 const DOCK_MIN_W = 300;
 // What the side panel always leaves the page, in px: a map that is a strip is
 // not a map, and the Stations map beside the pane is the reason the pane is
@@ -2445,7 +2474,8 @@ const state = {
   mapSearchTimer: null,    // debounce for the search box → marker rebuild
   passRelIdx:     null,    // both directions of the pass-range relation, per loaded file
   backboneIdx:    null,    // repeater backbone pairs + suggested delays, per loaded file
-  // The Stations tab's filter card, open or shut (#165). Remembered, and it is
+  // The Stations tab's filters, open or shut (#165) — in the Stations card
+  // since the filters and the list became one card. Remembered, and it is
   // the one collapsible on that tab that is: Path profile and Link budget are
   // opened to answer a question and closed again, while the filters are how the
   // tab is operated — so an operator who shuts them to give the map the screen
@@ -2461,7 +2491,7 @@ const state = {
   //
   // **Beside the map it lands shut, whatever was stored (#191).** Above `lg`
   // the cards are in the side panel beside the map (stationsSplitActive,
-  // app.js), and the filter card is the first thing in that pane — so a stored
+  // app.js), and the filters are the first thing in that pane — so a stored
   // "open" would land on a pane whose whole height is eight blocks of tick
   // boxes, with the list they filter below the fold. That is not what the pane
   // is for. So the landing state there is shut; pressing Filters still opens
@@ -2478,7 +2508,8 @@ const state = {
                   && !(typeof window !== 'undefined' && window.matchMedia
                        && (!window.matchMedia(`(max-width: ${BREAKPOINTS.lg}px)`).matches
                            || window.matchMedia(`(max-width: ${BREAKPOINTS.xs}px)`).matches)),
-  // The station list card on the same tab, and remembered for the same reason.
+  // The station list on the same tab — the scroller in the Stations card,
+  // under its filters — and remembered for the same reason.
   // It is the tallest card on the page — a scroller capped at most of the
   // viewport — so shutting it is how the map, the path tools and the editor
   // card get onto one screen together. Open on a first visit: the list is half

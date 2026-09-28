@@ -28,7 +28,11 @@
 //   Places               the coordinate parser, over every shape a coordinate
 //                        arrives in — including "26 07 24 S", where reading
 //                        the S as a seconds marker rather than as South is a
-//                        silent 52-degree error.
+//                        silent 52-degree error — and 📍 Find a place, the
+//                        blue pin's pane: a coordinate there moves the map
+//                        offline, the file's catchments, rivers and council
+//                        areas are listed at once and each is gone to, and a
+//                        blocked gazetteer says so and leaves them standing.
 //   Fade margin          the profile card's new row: a figure where both ends
 //                        are stations with radios, and a stated reason where
 //                        they are not.
@@ -454,8 +458,8 @@ await page.evaluate(() => { MapPeaks.setEnabled(false); state.map.setView([-27.5
 ok('switching it off takes the pins with it',
    await page.evaluate(() => document.querySelectorAll('.mn-peak').length === 0 && !MapPeaks.active()));
 
-// ── 3. places and coordinates in the filter box ─────────────────────────────
-console.log('\nPlaces and coordinates in the filter box');
+// ── 3. places and coordinates: 📍 Find a place ──────────────────────────────
+console.log('\nPlaces and coordinates in Find a place');
 
 const COORDS = [
   ['-26.1234, 152.5678', -26.1234, 152.5678],
@@ -487,52 +491,136 @@ NOT_COORDS.forEach((t, i) => {
      parsed.misses[i] ? parsed.misses[i].text : '');
 });
 
-// Typed into the box, a coordinate has to move the map and drop a pin — with
-// no network at all, which is the case a person standing beside a site is in.
-//
-// The box is focused first, and that is not stage-dressing: since #186 the
-// strip belongs to the entry the caret is in and is not drawn for any other, so
-// a value assigned to a box nobody is typing in correctly produces no strip.
-// Focusing is what "typed into the box" means.
+// 📍 Find a place — the blue pin's pane in the side panel. A coordinate typed
+// into it moves the map and drops a blue pin, with no network at all, which
+// is the case a person standing beside a site is in.
 const typed = await page.evaluate(async () => {
-  setStationFiltersOpen(true);
-  const box = document.getElementById('station-search-0');
+  setDockTab('places', { instant: true });
+  const box = document.getElementById('places-q');
   box.focus();
   box.value = '-26.1234, 152.5678';
   box.dispatchEvent(new Event('input', { bubbles: true }));
-  await new Promise(r => setTimeout(r, 400));
+  await new Promise(r => setTimeout(r, 500));
   const c = state.map.getCenter();
   return {
     d: acmaHaversineKm(c.lat, c.lng, -26.1234, 152.5678),
-    pin: document.querySelectorAll('.mn-place').length,
-    strips: document.querySelectorAll('[data-mn-places] .search-places-in').length,
-    strip: (document.querySelector('[data-mn-places="0"]') || {}).textContent || '',
+    pin: document.querySelectorAll('.mn-place.mn-pin-blue').length,
+    list: (document.getElementById('places-results') || {}).textContent || '',
+    filtering: anyStationFilterActive(),
   };
 });
-ok('a coordinate in the filter box takes the map there', typed.d < 0.2, `${typed.d.toFixed(3)} km off`);
-ok('…and drops one pin', typed.pin === 1, `${typed.pin} pin(s)`);
-ok('…and says so under the box, in both copies of it', typed.strips === 2, `${typed.strips}`);
-ok('…naming the coordinate it read', typed.strip.includes('-26.1234, 152.5678'), typed.strip.trim().slice(0, 80));
+ok('a coordinate in Find a place takes the map there', typed.d < 0.2, `${typed.d.toFixed(3)} km off`);
+ok('…and drops one blue pin', typed.pin === 1, `${typed.pin} pin(s)`);
+ok('…and lists the coordinate it read', typed.list.includes('-26.1234, 152.5678'), typed.list.trim().slice(0, 80));
+ok('…without filtering a single station', typed.filtering === false);
+
+// The file's own answers, at once and offline: a catchment by name and by its
+// basin number, the rivers the stations stand on (a creek written CK and
+// CREEK is one creek), the council areas they are in.
+const local = await page.evaluate(async () => {
+  const ask = async t => {
+    const box = document.getElementById('places-q');
+    box.value = t;
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    return Places.debug().local;
+  };
+  return { fitzroy: await ask('fitzroy'), basin: await ask('130'), lockyer: await ask('lockyer') };
+});
+ok('a catchment by name, and the rivers named for it', local.fitzroy.catchments.includes('Fitzroy') && local.fitzroy.rivers.includes('Fitzroy River'), JSON.stringify(local.fitzroy));
+ok('…and by its basin number alone', JSON.stringify(local.basin.catchments) === JSON.stringify(['Fitzroy']) && !local.basin.rivers.length, JSON.stringify(local.basin));
+ok('Lockyer Creek once, however its stations spell it, and the council area',
+  local.lockyer.rivers.filter(n => /^Lockyer C/.test(n)).length === 1 && local.lockyer.rivers.includes('Lockyer Creek')
+    && local.lockyer.councils.includes('Lockyer Valley Regional'), JSON.stringify(local.lockyer));
+
+// Pressed: the catchment drawn in outline and the map fitted to it; the river
+// the stretch its stations span.
+const went = await page.evaluate(async () => {
+  const box = document.getElementById('places-q');
+  box.value = 'fitzroy';
+  box.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 50));
+  Places.go('catchment', 0);
+  const until = Date.now() + 15000;
+  while (Date.now() < until && !(Places.debug().shown && Places.debug().shown.shape)) await new Promise(r => setTimeout(r, 100));
+  const b = state.map.getBounds();
+  const cat = { shown: Places.debug().shown, drawn: Places.debug().drawn,
+                inView: b.contains([-23.5, 149.5]), span: b.getEast() - b.getWest() };
+  Places.go('river', 0);
+  await new Promise(r => setTimeout(r, 400));
+  const rb = state.map.getBounds();
+  const on = state.data.stations.filter(s => /^FITZROY RIVER$/i.test(String(s.stream || '').trim()) && s.lat != null);
+  return { cat, river: { shown: Places.debug().shown, all: on.every(s => rb.pad(0.01).contains([s.lat, s.lon])), n: on.length } };
+});
+ok('a catchment pressed: its outline and a pin drawn, and the map fitted to the basin',
+  went.cat.shown && went.cat.shown.group === 'catchment' && went.cat.shown.shape && went.cat.drawn === 2 && went.cat.inView && went.cat.span > 2,
+  JSON.stringify(went.cat));
+ok('a river pressed: the map over every station on it', went.river.shown && went.river.shown.group === 'river' && went.river.all && went.river.n > 3,
+  JSON.stringify(went.river));
 
 // A place name with the gazetteer unreachable — which is what the network
-// policy makes of it — must leave the station filter alone and say so.
+// policy makes of it — must say so and leave the file's answers standing.
 const blocked = await page.evaluate(async () => {
-  const box = document.getElementById('station-search-0');
-  box.focus();
+  const box = document.getElementById('places-q');
   box.value = 'Gympie';
   box.dispatchEvent(new Event('input', { bubbles: true }));
   await new Promise(r => setTimeout(r, 2600));
   return {
-    strip: (document.querySelector('[data-mn-places="0"]') || {}).textContent || '',
+    list: (document.getElementById('places-results') || {}).textContent || '',
+    councils: Places.debug().local.councils,
     matched: computeFilteredStations().length,
   };
 });
-ok('a blocked gazetteer says so rather than throwing',
-   /unavailable/i.test(blocked.strip), blocked.strip.trim().slice(0, 120));
-ok('…and the station filter is untouched by it', blocked.matched > 0, `${blocked.matched} station(s)`);
+ok('a blocked gazetteer says so rather than throwing', /unavailable/i.test(blocked.list), blocked.list.trim().slice(0, 160));
+ok('…and the file\'s own answers stand beside it — the council area Gympie\'s stations are in',
+  blocked.councils.includes('Gympie Regional') && blocked.list.includes('Gympie Regional'), JSON.stringify(blocked.councils));
+ok('…and the station filter is untouched by any of it', blocked.matched > 0, `${blocked.matched} station(s)`);
 
-await page.evaluate(() => { clearSearch(); });
-ok('clearing the filter takes the place pin with it',
+// Nominatim's ceiling is a request a second. Typed a letter every 700 ms —
+// each past the 650 ms pause, so each a lookup — the requests still go out a
+// slot of 1.1 s apart, and one overtaken by the next before its turn is not
+// sent at all. (A slot taken when the wait was over, not when it began, let two go
+// out together.) The gazetteer answers from a stand-in here: the network
+// policy blocks the real one.
+const paced = await page.evaluate(async () => {
+  const calls = [], t0 = performance.now(), real = window.fetch;
+  window.fetch = (url, opts) => {
+    if (!String(url).includes('nominatim')) return real(url, opts);
+    const q = new URL(String(url)).searchParams.get('q');
+    calls.push({ q, t: performance.now() - t0 });
+    return Promise.resolve(new Response(JSON.stringify([{ category: 'place', type: 'town', addresstype: 'town', name: q,
+      display_name: `${q}, Somewhere Regional, Queensland, 4000, Australia`, lat: '-26.19', lon: '152.66' }]),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  };
+  const box = document.getElementById('places-q');
+  const type = v => { box.value = v; box.dispatchEvent(new Event('input', { bubbles: true })); };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  try {
+    for (const v of ['Kil', 'Kilk', 'Kilki', 'Kilkiv']) { type(v); await sleep(700); }
+    await sleep(3000);
+    const answered = Places.debug().gaz;
+    // A row pressed is the one shown in its own list only, not in the next
+    // query's at the same place.
+    Places.go('osm', 0);
+    const mine = document.querySelectorAll('#places-results .places-hit.is-here').length;
+    type('Kilcoy'); await sleep(2000);
+    const other = document.querySelectorAll('#places-results .places-hit.is-here, #places-results [aria-current]').length;
+    return { calls, answered, mine, other };
+  } finally { window.fetch = real; }
+});
+const gaps = paced.calls.slice(1).map((c, i) => Math.round(c.t - paced.calls[i].t));
+// A second, not 1.1: the slots are 1.1 s apart, and a timer running late on a
+// loaded machine can only eat into that margin, never go under the second.
+ok('the gazetteer asked no more than once a second, however the typing falls',
+  paced.calls.length >= 3 && gaps.every(g => g >= 1000), `${paced.calls.map(c => c.q).join(', ')}; gaps ${gaps.join(', ')} ms`);
+ok('…a lookup overtaken before its turn not sent, and the last one answered',
+  !paced.calls.some(c => c.q === 'Kilki') && paced.answered.text === 'Kilkiv' && !paced.answered.loading && paced.answered.n === 1,
+  JSON.stringify(paced.answered));
+ok('a row pressed is marked as the place shown in its own list, and in no other',
+  paced.mine === 1 && paced.other === 0, `${paced.mine} / ${paced.other}`);
+
+await page.evaluate(() => { Places.clear(true); shutDock({ instant: true }); });
+ok('✕ takes the place pin with it',
    await page.evaluate(() => document.querySelectorAll('.mn-place').length === 0));
 
 // ── 4. the fade margin on the profile card ──────────────────────────────────

@@ -414,6 +414,9 @@ const MapCatchments = (function () {
 
     noteHtml,
     catchmentAt,
+    // Where a basin's name goes: inside it, on its largest ring — and where 📍
+    // Find a place puts its pin for a catchment (places.js).
+    labelPoint,
 
     // A filter change re-emphasises without re-fetching — the data is already
     // here, so unlike MapRivers.sync() this costs a redraw and nothing else.

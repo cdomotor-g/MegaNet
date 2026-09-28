@@ -44,7 +44,7 @@
 //      the strip keeps Help and the map's controls; at 375 px the Stations
 //      tab's strip is a rail beside the map, of 36 px buttons, the map ending
 //      where it begins and nothing left in the map's corner — every control in
-//      the rail, and the cards in it too (📋, 〽️), a panel opening as a drawer
+//      the rail, and the cards in it too (📍, 〽️), a panel opening as a drawer
 //      on the rail's inner edge over the map, with a backdrop behind it and the
 //      rail lit above that, which the lit button, a tap on the dimmed page and
 //      Escape each put away, one drawer at a time with the nav's; the rail's
@@ -104,11 +104,12 @@ const CARD_IDS = ['stations-cards', 'stations-filter-card', 'stations-list-card'
 const PANEL_IDS = ['map-display-block', 'map-legend', 'map-draw-panel', 'map-3d-panel-body', 'sites-run', 'polar-status'];
 
 // The strip, top to bottom, as the corner orders it: the side panel's own
-// three (❔, 📋 the cards, 〽️ the path tools), then the map's groups — show,
+// four (❔, 📍 the cards, the blue 📍 Find a place, 〽️ the path tools), then
+// the map's groups — show,
 // tools, 3d, screen — and within each by its declared order. Panes are
 // 'map-<id>', plain buttons their class. Not ↺ (the reset group's one button):
 // it is built to stay in the map's corner (`corner`), and is asserted there.
-const STRIP = ['help', 'stations', 'paths',
+const STRIP = ['help', 'stations', 'places', 'paths',
                'map-display', 'map-legend',
                'map-draw', 'map-polar', 'map-sites', 'mn-map-here',
                'mn-map-3d', 'map-3d', 'mn-map-north', 'mn-map-tilt',
@@ -241,7 +242,7 @@ try {
     s.showing === 'stations' && s.cardsIn === 'dock' && !s.collapsed, JSON.stringify(s));
   check('…the elevation profile and the link budget are not among them but in a pane of their own',
     s.pathsIn === 'paths' && s.expanded.paths === 'false', JSON.stringify({ pathsIn: s.pathsIn, expanded: s.expanded }));
-  check('…and ❔ says Help is not the pane showing, 📋 that Stations is',
+  check('…and ❔ says Help is not the pane showing, 📍 that Stations is',
     s.help === 'false' && s.expanded.stations === 'true', JSON.stringify(s.expanded));
   check('every card id and every panel id is on the page exactly once',
     [...CARD_IDS, ...PANEL_IDS].every(id => s.counts[id] === 1), JSON.stringify(s.counts));
@@ -379,7 +380,7 @@ try {
   await page.keyboard.press('Enter');
   await page.waitForTimeout(300);
   s = await look();
-  check('…and 📋 brings the cards back', s.showing === 'stations' && s.help === 'false', JSON.stringify(s));
+  check('…and 📍 brings the cards back', s.showing === 'stations' && s.help === 'false', JSON.stringify(s));
   // 〽️, by a real pointer: the path tools at the same width, and the cards'
   // pane put away rather than scrolled past.
   await page.click('#help-panel .dock-tab[data-dock="paths"]');
@@ -698,10 +699,12 @@ try {
   check('…with ↺ still alone at the top right of the full-screen map, under the pointer',
     resetAlone(fullCorner), JSON.stringify(fullCorner));
   // The walls place every Tab themselves, so they have to stop wherever the
-  // browser would — a <summary> included, or no card beside a full-screen map
-  // could be opened or shut from the keyboard. From the filter box, the next
-  // disclosure down is the Stations list's own summary.
-  await page.focus('#station-search-quick');
+  // browser would — a <summary> included, or no disclosure beside a
+  // full-screen map could be opened or shut from the keyboard. With the
+  // Filters open, the next disclosure down from the search box is a filter
+  // group's summary, in the Stations card.
+  await page.evaluate(() => setStationFiltersOpen(true));
+  await page.focus('#station-search-0');
   let sumAt = null;
   for (let i = 0; i < 40 && !sumAt; i++) {
     await page.keyboard.press('Tab');
@@ -710,8 +713,9 @@ try {
       return a && a.tagName === 'SUMMARY' ? (a.closest('.panel') || {}).id || 'summary' : null;
     });
   }
-  check('in full screen Tab stops on a card\'s <summary> — the Stations list\'s, after the filter box',
+  check('in full screen Tab stops on a <summary> — a filter group\'s, in the Stations card, after the search box',
     sumAt === 'stations-list-card', String(sumAt));
+  await page.evaluate(() => setStationFiltersOpen(false));
   // The side panel works in full screen: a pane changes, the panel shuts and
   // opens, the handle moves — and the map's edge follows each, re-measured.
   await page.click('#help-panel .dock-tab[data-dock="map-display"]');
@@ -995,7 +999,7 @@ try {
     s.cardsIn === 'main' && s.pathsIn === 'cards'
       && JSON.stringify(s.strip) === JSON.stringify(STRIP.filter(k => k !== 'stations' && k !== 'paths'))
       && (await wrapAt('display')).where === 'dock', JSON.stringify(s));
-  check('…the path tools back among the cards, after the list and before Repeaters listening, 〽️ gone with 📋, and every card on the page once',
+  check('…the path tools back among the cards, after the list and before Repeaters listening, 〽️ gone with 📍, and every card on the page once',
     !s.strip.includes('paths') && [...CARD_IDS, ...PANEL_IDS].every(id => s.counts[id] === 1),
     JSON.stringify({ pathsIn: s.pathsIn, strip: s.strip, counts: s.counts }));
   check('…without forgetting which pane was open', s.pref === 'stations', JSON.stringify(s));
@@ -1089,7 +1093,7 @@ try {
   // 36 px: a step under a desktop's 44, so the rail is less of the map and
   // its column fits a phone's height — and still half as big again as the
   // 24 px WCAG 2.2 sets as a target's least.
-  check('…holding ❔, 📋, 〽️ and every one of the map\'s controls, in the corner\'s order, each 36 px square',
+  check('…holding ❔, the two 📍, 〽️ and every one of the map\'s controls, in the corner\'s order, each 36 px square',
     JSON.stringify(phone.strip) === JSON.stringify(PHONE_STRIP) && phone.square.every(([w, h]) => w === 36 && h === 36)
       && phone.panels.length === 6 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
     JSON.stringify(phone));
@@ -1097,7 +1101,7 @@ try {
   check('…the map ending where the rail begins, measured to it, and only ↺ standing on it, at its top right',
     p.map.r <= p.panel.l && p.leafletW === p.mapClientW && resetAlone(phoneCorner), JSON.stringify({ p, phoneCorner }));
   s = await look();
-  check('…the cards in the side panel — the list in 📋\'s pane, the path tools in 〽️\'s — and nothing scrolling sideways',
+  check('…the cards in the side panel — the list in 📍\'s pane, the path tools in 〽️\'s — and nothing scrolling sideways',
     !phone.cards && s.cardsIn === 'dock' && s.pathsIn === 'paths' && !phone.sideways
       && [...CARD_IDS, ...PANEL_IDS].every(id => s.counts[id] === 1), JSON.stringify({ phone, cardsIn: s.cardsIn, pathsIn: s.pathsIn }));
 
@@ -1377,7 +1381,7 @@ try {
   p = await phoneLook();
   side = await sideLook();
   const inEditor = await page.evaluate(() => !!document.activeElement?.closest('#help-panel #stations-editor-card'));
-  check('with the rail away, Station details opens 📋 as a drawer, the rail out beside it over the page, the map not moved',
+  check('with the rail away, Station details opens 📍 as a drawer, the rail out beside it over the page, the map not moved',
     p.showing === 'stations' && p.panel.w === 0 && p.strip.w === 40 && p.strip.r === p.winW
       && Math.abs(p.drawer.r - p.strip.l) <= 1 && p.backdrop && p.onTab === 'rail' && inEditor
       && p.map.w === awayMap.w && p.map.l === awayMap.l && p.leafletW === p.mapClientW && side.expanded === 'true',
@@ -1386,7 +1390,7 @@ try {
   await page.waitForTimeout(300);
   p = await phoneLook();
   side = await sideLook();
-  check('…and its lit 📋 puts the drawer away and the rail with it, focus going to ⋮',
+  check('…and its lit 📍 puts the drawer away and the rail with it, focus going to ⋮',
     p.showing === null && !p.backdrop && p.panel.w === 0 && p.strip.w === 0 && side.focused && side.expanded === 'false',
     JSON.stringify({ p, side }));
   await page.evaluate(() => setDockTab('paths'));
@@ -1433,7 +1437,7 @@ try {
     JSON.stringify({ offTab, offWide }));
   // A phone turned from a tablet's width, where the cards are under the map:
   // they go to the side panel, and no drawer comes with them — unless the
-  // operator was typing in them, and then 📋 opens with the caret kept.
+  // operator was typing in them, and then 📍 opens with the caret kept.
   await page.evaluate(() => shutDock({ instant: true }));
   await page.focus('#leaflet-map');
   await page.setViewportSize({ width: 375, height: 700 });
@@ -1456,7 +1460,7 @@ try {
     return { id: a?.id, value: a?.value, inDrawer: !!a?.closest('#dock-pane-stations'), seen: !!a?.checkVisibility?.(),
              showing: dockShowing(), backdrop: !document.getElementById('help-backdrop').hidden };
   });
-  check('…unless they were typing in them under the map: then 📋 opens as the drawer, the caret still in the box',
+  check('…unless they were typing in them under the map: then 📍 opens as the drawer, the caret still in the box',
     /^station-search-/.test(turned.id || '') && turned.value === 'ab' && turned.inDrawer && turned.seen
       && turned.showing === 'stations' && turned.backdrop, JSON.stringify(turned));
   // Arriving on a phone: the map, the whole screen of it. Nothing a desktop

@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-09-28** (revision 110 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-09-29** (revision 111 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -407,7 +407,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 - **#189** `[Standalone]` `[Haiku4.5/Low]` — **OPEN, opened revision 93** — the 2-D OpenStreetMap base asks for `{s}.tile.openstreetmap.org`, and the OSMF tile policy asks for exactly `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, adding that other hostnames "may be slower or withdrawn without notice". Works today; documented as something that may stop working, which on a base map means tiles that quietly stop arriving. The 3-D view already uses the bare host and says in a comment that the 2-D layer was left alone rather than changed in passing — this is that change. `OSM-Topo` is **not** in scope: OpenTopoMap publishes the `{a,b,c}` form itself.
 - **#185** `[Standalone]` `[Human]` — **OPEN** — spot-check the three things #184 could not check from an agent session. Not a credentials problem; **toolchain**, the second of the four categories below: the environment cannot reach `nominatim.openstreetmap.org`, cannot run Radio Mobile, and cannot form an opinion about whether a colour ramp looks right. Three parts, ~15 minutes, each with click-by-click steps on the issue:
   - **Is the elevation ramp the right way up?** The colour file is two lists and does not say which way the colours run; the two readings give opposite maps, and the wrong one is silently confident. Paired end to end (as shipped) the water is blue and the tops are grey then pale; head to head it puts pure blue on the mountains. **No test can settle this** — `npm run terrain` asserts the twelve pairs are what the code says they are, which is the most a check of a ramp can do. One line to reverse if it reads inverted.
-  - **Does the place lookup work from the live origin?** Nominatim is keyless but refuses traffic it does not like, and every off-origin host is blocked here and in the harness — so the check only proves the app *fails politely*, not that it succeeds. If it is refused, the Queensland place-names service is the fallback, and it is the same kind of ArcGIS endpoint the survey marks and contours already use.
+  - **Does the place lookup work from the live origin?** Nominatim is keyless but refuses traffic it does not like, and every off-origin host is blocked here and in the harness — so the check only proves the app *fails politely*, not that it succeeds. If it is refused, the Queensland place-names service is the fallback, and it is the same kind of ArcGIS endpoint the survey marks and contours already use. **Asked in 📍 Find a place since revision 111** — the blue pin in the side panel, where the lookup moved from the filter box — and each answer now asks for its outline or course as well (`polygon_geojson`), so the step on the issue also asks whether a river is drawn along its course; the issue's steps were edited to match.
   - **Does the polar plot agree with Radio Mobile?** Same model, deliberately missing antenna patterns, land cover and terminal clutter — all three of which only ever take coverage away, so MegaNet's plot should be the same shape or slightly more generous, **never tighter**. Tighter anywhere is a real disagreement and worth chasing.
 - ~~#183~~ `[Standalone]` **CLOSED** — the Draw & measure drawing leaves for Google Earth: **🌏 KML ⬇** in the flyout writes every shape in the colour it was drawn in, plus a pin for every station those shapes enclose or run between, with each shape naming the stations it holds and each station naming the shapes it is in. The complement to #176's station KML, from the other direction: that one answers *"what does this station reach"* out of the network the app knows, this one answers *"what did I just draw, and which sites are in it"* out of a plan somebody made by hand. Four things worth carrying forward:
   - **A circle is round on the sphere, not on the screen, and the wrong version is convincing.** KML's only area is `<LinearRing>`, so a 25 km coverage circle goes out as a 72-sided polygon. Stepping the sides by **bearing** through `destPoint` is right everywhere; stepping them by degrees of latitude and longitude around a trig circle is exact at the equator, out by 6% at Brisbane and worse further south — and draws an *ellipse* that looks entirely right at every zoom. **Any geometry generated for export needs measuring on the ground, not eyeballing on the map.**
@@ -502,6 +502,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ## Resource allocation summary
 
 > ## ⬛ Four AI rows, and six `[Human]` issues.
+>
+> **Revision 111 opens and closes nothing** — one session request with five asks, in one commit: the red 📍 is a station's everywhere (the Stations tab and its side-panel button were 📡 and 📋), **📍 Find a place** — a blue pin of its own in the side panel, where the place lookup moved from the filter box — lists catchments, rivers and council areas from the station file and towns, localities and rivers from Nominatim, each drawn in outline or along its course; **the Stations list and its filters are one card**; **a red line along the foot of every twin** says it is indicative modelling, not a survey, a flood map or a forecast; and **the flood scale has a Log toggle** — linear when it opens, logarithmic by itself a few seconds later where a station's levels crowd at the top (Gatton, 40444, among 280 of the 927 with levels on the ground). It edits **#185**, whose place-lookup step moved with the lookup. The allocation below is unchanged.
 >
 > **Revision 110 opens and closes nothing** — it is revision 109's three steps, done from the session that wrote them at the owner's choice ("do them 3 yourself"): **a first administrator** (the owner's account, the only `admin` of the project's two users — revision 104's step too), **`0039` is live** (fetched by the database from the repository at `6ef3ffe` and run only when its SHA-256 matched; the project went from 38 to 39, and `tools/check_proposed_stations.sql` passed 40 of 40 against production, rolled back), and **the agent API's search rows and a dossier's `nearby_stations` say which stations are proposed**. The allocation below is unchanged. Revision 104's list, less its first two steps, stands.
 >
@@ -663,6 +665,63 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 111 — 2026-09-29: a blue pin to find a place, one card for the list and its filters, the twin says it is a model, and the flood scale turns logarithmic
+
+From one session request with five asks, in one commit. It opens and closes
+nothing; it edits **#185**, whose place-lookup step had moved (above).
+
+**The red pin is a station's.** The Stations tab's icon in the nav (📡) and
+its pane's button in the side panel (📋) are both 📍 now — the pin the station
+trail already wore — and the twin's *Also in this patch* names its stations
+under it. 📡 stays the polar plot's, and 📋 *Copy lat, lon*'s and Inspection
+History's.
+
+**📍 Find a place, the blue one (`places.js`).** The place lookup left the
+filter box (#184) for a pane of its own in the side panel, beside the
+stations' red pin, its hue turned so that a place found is never taken for a
+station. Typed into the filter box to find the *town*, "Gympie" also cut the
+network down to the four stations named after it; a place moves the map and
+leaves the stations alone. It lists, at once and offline, the catchments (the
+77 basins, by name or basin number, drawn in outline from
+`data/qld-basins.geojson`) and the rivers and creeks and the council areas the
+register's stations are on — *CK* and *CREEK* one creek, *R* and *RIVER* one
+river — and a coordinate; then, where Nominatim answers, towns, localities,
+airports, rivers and boundaries, each with its outline or course
+(`polygon_geojson`, simplified to about 100 m). Its pacing is mended on the
+way: a lookup's slot at Nominatim's one a second is taken when it is asked
+for, not when its wait ends — two asked for inside one wait used to go out
+together — and one overtaken before its turn is not sent. ✕ or ↺ takes the
+pin away. The
+filter box is the stations' again; what MapRivers and MapCatchments light up
+from it is unchanged.
+
+**One card for the list and its filters.** The Filters card and the Stations
+card under it are one: its head carries the list's toggle and live count,
+*Filters*, and + Propose and + New; then the search box and *Clear* / *Clear &
+zoom out* (*Clear filters* shortened, which is what lets the box beside them be
+one line); then one line saying what the filters are doing and which station
+is selected; then the list. About 85 px back before the first row in the side
+panel — a border, a padding, a gap and a row of buttons.
+
+**The twin says it is a model.** A line of red along the foot of every twin —
+the tab's and the Stations map's — that no fold takes: *indicative modelling
+only — not a survey, a flood map or a forecast*. One line at every width, the
+words picked by the stage's width through a container query.
+
+**A Log toggle on the flood scale.** Linear when a twin opens; logarithmic by
+itself four seconds later where the levels warrant it — the track measured
+down from the top with a bend fitted to the levels (`FloodStages.logFit`).
+Gatton's (40444) names go from 49 px off their marks on average to 4, and its
+rise reaches major two-thirds of the way up rather than in the last tenth. 280
+of the 927 stations with levels on the ground warrant it; three classes metres
+apart never do. Log pressed, on or off, is the operator's, kept for the
+station for the session, and the water never moves when the scale does.
+
+**Checks.** `npm run flood` grows by twenty (138), `npm run twinsite` by four
+(57); `npm run terrain` (102) and `npm run maplinks` hold places in the pane and
+not the filter box; `npm run stationscard` and `npm run dock` hold the one card
+and the second pin.
 
 ### Revision 110 — 2026-09-28: a first administrator, `0039` is live, and the agent API's rows say which stations are proposed
 
