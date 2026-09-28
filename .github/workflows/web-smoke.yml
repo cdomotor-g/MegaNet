@@ -825,6 +825,14 @@ jobs:
         working-directory: test
         run: npm run adqual
 
+      # A coordinate pasted into a latitude or longitude box (places.js). A pair
+      # in either box splits across both; DMS or a hemisphere letter is
+      # converted to decimal degrees. A paste handler that stops matching the
+      # boxes throws nothing — the pair just lands whole in one box.
+      - name: Coordinate paste — a pair splits across the lat and lon boxes
+        working-directory: test
+        run: npm run coordpaste
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each

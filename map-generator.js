@@ -1489,9 +1489,9 @@ function viewFieldsHtml() {
     </div>
     <div class="control-row" id="mg-view-fields">
       <label>Centre latitude
-        <input type="number" step="0.0001" class="mg-num" value="${s.lat}" onchange="MapGen.set('lat', this.value, 'lat')"></label>
+        <input type="number" step="0.0001" class="mg-num" data-coord="lat" value="${s.lat}" onchange="MapGen.set('lat', this.value, 'lat')"></label>
       <label>Centre longitude
-        <input type="number" step="0.0001" class="mg-num" value="${s.lon}" onchange="MapGen.set('lon', this.value, 'lon')"></label>
+        <input type="number" step="0.0001" class="mg-num" data-coord="lon" value="${s.lon}" onchange="MapGen.set('lon', this.value, 'lon')"></label>
       <label>Scale 1:
         <input type="number" step="1000" min="1000" max="50000000" class="mg-num" value="${s.scale}"
                onchange="MapGen.set('scale', this.value, 'scale')" list="mg-scales"></label>

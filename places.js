@@ -154,25 +154,8 @@ const Places = (function () {
   // all. The hemisphere letters are what make that one tractable: where they
   // are present they mark the end of each half.
   function parse(text) {
-    const raw = String(text || '').trim();
-    if (!raw) return null;
-    // Strip the labels a coordinate is sometimes pasted with, and normalise the
-    // letter form of the symbols — "26d 07m 24s", which is how more than one
-    // handheld writes it. The letters are only rewritten when a `d` or `m`
-    // marker is actually there, because a bare trailing "s" is South far more
-    // often than it is seconds, and reading it as a symbol is what would put a
-    // Queensland site in Mongolia. Done here rather than per half, because the
-    // halves are found by looking for the hemisphere letters and an "s" that
-    // means seconds must be gone before that search runs.
-    let s = raw.replace(/\b(lat|latitude|lon|lng|long|longitude)\s*[:=]?\s*/gi, ' ')
-               .replace(/[()\[\]]/g, ' ')
-               .replace(/\s+/g, ' ')
-               .trim();
-    if (/\d\s*[dm]\b/i.test(s)) {
-      s = s.replace(/(\d)\s*d\b/gi, '$1°')
-           .replace(/(\d)\s*m\b/gi, "$1'")
-           .replace(/(\d)\s*s\b/gi, '$1"');
-    }
+    const s = normalise(text);
+    if (!s) return null;
 
     const halves = split(s);
     if (!halves) return null;
@@ -204,6 +187,38 @@ const Places = (function () {
     if (!decimal && !marked) return null;
 
     return { lat, lon, text: `${Number(lat.toFixed(6))}, ${Number(lon.toFixed(6))}` };
+  }
+
+  // One coordinate's worth of text, made regular enough for split() and
+  // parseOne() to read: labels off, brackets off, one space between tokens.
+  function normalise(text) {
+    const raw = String(text || '').trim();
+    if (!raw) return '';
+    // Strip the labels a coordinate is sometimes pasted with, and normalise the
+    // letter form of the symbols — "26d 07m 24s", which is how more than one
+    // handheld writes it. The letters are only rewritten when a `d` or `m`
+    // marker is actually there, because a bare trailing "s" is South far more
+    // often than it is seconds, and reading it as a symbol is what would put a
+    // Queensland site in Mongolia. Done here rather than per half, because the
+    // halves are found by looking for the hemisphere letters and an "s" that
+    // means seconds must be gone before that search runs.
+    // The look-alikes first: º (an ordinal) and ˚ (a ring) stand in for the
+    // degree sign, curly quotes and accents for minutes and seconds, and two
+    // primes typed as one second mark — each is how some other program's
+    // export writes the same symbol.
+    let s = raw.replace(/[º˚]/g, '°')
+               .replace(/[’‘´`]/g, "'")
+               .replace(/[”“]|''/g, '"')
+               .replace(/\b(lat|latitude|lon|lng|long|longitude)\s*[:=]?\s*/gi, ' ')
+               .replace(/[()\[\]]/g, ' ')
+               .replace(/\s+/g, ' ')
+               .trim();
+    if (/\d\s*[dm]\b/i.test(s)) {
+      s = s.replace(/(\d)\s*d\b/gi, '$1°')
+           .replace(/(\d)\s*m\b/gi, "$1'")
+           .replace(/(\d)\s*s\b/gi, '$1"');
+    }
+    return s;
   }
 
   // Where the latitude stops and the longitude starts. Four rules, tried in
@@ -240,6 +255,104 @@ const Places = (function () {
       if (bits.length === 4) return [bits.slice(0, 2).join(' '), bits.slice(2).join(' ')];
     }
     return null;
+  }
+
+  // One value on its own — "27°33'15.8\"S", "152 16.48 E", "-27.554389" —
+  // as signed decimal degrees and the hemisphere letter it carried, or null.
+  function parseSingle(text) {
+    const s = normalise(text);
+    if (!s) return null;
+    const one = parseOne(s);
+    if (!one || !(Math.abs(one.v) <= 180)) return null;
+    return { v: one.v, hemi: one.hemi };
+  }
+
+  // ── Pasting into a latitude or longitude box ────────────────────────────────
+  // Every latitude box in the app sits beside a longitude box, and a position
+  // is almost always copied as the pair — out of Google Maps, a GPS, a
+  // spreadsheet — so pasting "-27.554389, 152.274658" into either one puts
+  // each half where it belongs instead of making the operator split it by
+  // hand. A single value in degrees-minutes-seconds, or with a hemisphere
+  // letter, is converted on the way in, and one with a letter that says it is
+  // the other half goes to the other box. Whatever lands is decimal degrees:
+  // that is all any of these boxes stores.
+  //
+  // The boxes are found by what they are, not wired one by one: an input with
+  // data-coord="lat" or "lon", or failing that one whose id, name or data-f
+  // ends in lat / latitude or lon / lng / long / longitude (data-coord="off"
+  // opts one out). Its other half is the nearest box of the other kind that
+  // shares an ancestor with it, which keeps a list of rows pairing within
+  // each row.
+  const LAT_KEY = /(?:^|[-_])lat(?:itude)?$/i;
+  const LON_KEY = /(?:^|[-_])(?:lon|lng|long|longitude)$/i;
+  const PLAIN   = /^\s*[-+]?(?:\d+\.?\d*|\.\d+)\s*$/;
+
+  function coordRole(el) {
+    if (!el || el.tagName !== 'INPUT') return null;
+    const d = el.getAttribute('data-coord');
+    if (d) return d === 'lat' || d === 'lon' ? d : null;
+    for (const k of [el.id, el.name, el.getAttribute('data-f')]) {
+      if (!k) continue;
+      if (LAT_KEY.test(k)) return 'lat';
+      if (LON_KEY.test(k)) return 'lon';
+    }
+    return null;
+  }
+
+  function partnerOf(el, role) {
+    const want = role === 'lat' ? 'lon' : 'lat';
+    let node = el.parentElement;
+    for (let depth = 0; node && depth < 6; depth++, node = node.parentElement) {
+      for (const c of node.querySelectorAll('input')) {
+        if (c !== el && coordRole(c) === want) return c;
+      }
+    }
+    return null;
+  }
+
+  // What a paste into a `role` box means: { lat?, lon? } in decimal degrees,
+  // or null to leave the paste to the browser. A plain number that fits the
+  // box is left alone, so pasting a few digits into the middle of a value
+  // still does what it always did.
+  function readPaste(text, role) {
+    const t = String(text || '').trim();
+    if (!t) return null;
+    const pair = parse(t);
+    if (pair) return { lat: pair.lat, lon: pair.lon };
+    const one = parseSingle(t);
+    if (!one) return null;
+    let as = role;
+    if (one.hemi === 'N' || one.hemi === 'S') as = 'lat';
+    else if (one.hemi === 'E' || one.hemi === 'W') as = 'lon';
+    else if (role === 'lat' && Math.abs(one.v) > 90) as = 'lon';
+    if (as === 'lat' && !(Math.abs(one.v) <= 90)) return null;
+    if (as === role && PLAIN.test(t)) return null;
+    return { [as]: one.v };
+  }
+
+  function onCoordPaste(e) {
+    const el = e.target;
+    const role = coordRole(el);
+    if (!role || el.readOnly || el.disabled) return;
+    const text = e.clipboardData && e.clipboardData.getData('text');
+    const got = readPaste(text, role);
+    if (!got) return;
+    const other = partnerOf(el, role);
+    const writes = [];
+    for (const k of ['lat', 'lon']) {
+      if (got[k] == null) continue;
+      const box = k === role ? el : other;
+      if (box && !box.readOnly && !box.disabled) writes.push([box, got[k]]);
+    }
+    if (!writes.length) return;
+    e.preventDefault();
+    // Every value in before any event goes out, because a change handler may
+    // re-render the form and take the other box with it.
+    for (const [box, v] of writes) box.value = String(Number(v.toFixed(7)));
+    for (const [box] of writes) {
+      box.dispatchEvent(new Event('input', { bubbles: true }));
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+    }
   }
 
   // ── The gazetteer ───────────────────────────────────────────────────────────
@@ -425,6 +538,12 @@ const Places = (function () {
 
   return {
     parse,
+    parseSingle,
+    readPaste,
+    coordRole,
+    // Called once from init.js: one listener on the document serves every
+    // latitude and longitude box, including ones rendered later.
+    bindCoordPaste() { document.addEventListener('paste', onCoordPaste); },
     attribution: ATTRIB,
 
     attach(m) { map = m; },

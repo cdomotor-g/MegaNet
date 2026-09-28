@@ -103,6 +103,9 @@
     e.preventDefault();
     focusNavFind();
   });
+  // A coordinate pair pasted into any latitude or longitude box splits across
+  // both (places.js).
+  Places.bindCoordPaste();
   MemMeter.start();
   // Before autoLoad(), so that a tab returning from a magic link has taken the
   // session out of the URL fragment before anything else reads location.
