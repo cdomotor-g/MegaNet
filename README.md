@@ -125,6 +125,9 @@ MegaNet/
 ├── stations.json           ← the document schema (see below); export + offline fallback
 ├── migrate.html            ← legacy-CSV → stations.json converter (linked from the app)
 ├── .nojekyll               ← serve every file verbatim on GitHub Pages
+├── AGENTS.md, GEMINI.md,   ← what an AI agent should know here, and how to read the
+│   llms.txt                  station data (Copilot's and Cursor's copies are under
+│                             .github/ and .cursor/; docs/agent-api.md is the source)
 │
 ├── maps/                   ← Radio-path maps for the Radio Path Maps tab, by region
 │   ├── far-north/          │  Barron, Herbert, Tully/Johnstone, Mulgrave, Saddle Mt
@@ -145,6 +148,7 @@ MegaNet/
 │   ├── mqtt-provisioning.md                (standing the broker and bridge up — browser only)
 │   ├── message-log.md                      (the Message Log tab — columns, uses, edges)
 │   ├── floodwarning-net.md                 (moving the domain to MegaNet — runbook)
+│   ├── agent-api.md                        (station data for AI agents — REST API and MCP server)
 │   ├── site-exposure.md                    (tides and soils on the station card — rows, sources, limits)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
@@ -154,6 +158,10 @@ MegaNet/
 ├── db/                     ← the datastore's schema, as plain SQL
 │   ├── README.md                           (how to apply, and the rules — read first)
 │   └── migrations/                         (numbered, forward-only, run with psql)
+│
+├── worker/                 ← the Cloudflare Worker in front of the site (wrangler.toml)
+│   ├── index.js                            (/api/db — the database proxy; /api/session — the gate's sign-in)
+│   └── api.js                              (/api/v1, /api/mcp — the read-only agent API and MCP server)
 │
 ├── bridge/                 ← the MQTT → MegaNet subscriber (#B6; Node, one dependency)
 │   ├── README.md                           (running it, its config, and what its logs mean)
@@ -340,6 +348,21 @@ Two independent locks, and it is worth knowing which is which:
 
 Adding a domain, adding one person, and what to do when nobody can get in are all
 in [`docs/access.md`](docs/access.md).
+
+### Reading it from an agent
+
+Station data can also be read by programs: a read-only REST API at
+`https://floodwarning.net/api/v1` (OpenAPI at `/api/v1/openapi.json`) and an
+MCP server at `https://floodwarning.net/api/mcp` (`worker/api.js`) — public
+data only, no sign-in, rate limited per client and per address, with a
+one-call station **dossier** for drafting assessment reports. It reads with the
+same publishable key the page does, only from relations `anon` may already
+read, and never forwards anything from the caller. Setup for each agent (Claude
+Code, Codex, Gemini, Copilot, Cursor, or plain `curl`), every endpoint, the
+limits, and the Cloudflare Access bypass it needs are in
+[`docs/agent-api.md`](docs/agent-api.md); `AGENTS.md`, `GEMINI.md`, `llms.txt`,
+`.github/copilot-instructions.md` and `.cursor/rules/` say the same to the
+agents that read each.
 
 ### Keeping `stations.json` current
 
@@ -4131,7 +4154,7 @@ at 22 %.
 cd test && npm install && npm run all
 ```
 
-Fifty-seven checks. The twenty-two below are the ones a change to the front end
+Fifty-nine checks. The twenty-two below are the ones a change to the front end
 meets first, in ascending order of cost; `test/README.md` has the full table:
 
 | | Catches |

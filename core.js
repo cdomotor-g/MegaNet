@@ -1439,9 +1439,15 @@ const HELP = {
       '<strong>Snapshot</strong> writes today\'s document out as a file to take somewhere without '
       + 'a network. It is a copy, not a branch — nothing reads it back in automatically, and '
       + 'editing it changes nothing in the database.',
+      '<strong>An AI agent or a script does not need this tab.</strong> The read-only station API '
+      + '(<code>/api/v1</code>) and MCP server (<code>/api/mcp</code>) answer a station — or a '
+      + 'whole-station dossier for a report — at a time, with no sign-in and rate limited. How to '
+      + 'connect Claude, Copilot, Gemini, Cursor or ChatGPT is in the agent API link below.',
     ],
     links: [{ label: 'Why the station list lives in Postgres, and what that bought',
-              href: 'docs/datastore-decision.md' }],
+              href: 'docs/datastore-decision.md' },
+            { label: 'Station data for AI agents and scripts — the read-only API and MCP server',
+              href: 'docs/agent-api.md' }],
     related: ['stations', 'passranges'],
   },
 };

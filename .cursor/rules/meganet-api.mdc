@@ -1,0 +1,17 @@
+---
+description: MegaNet station data — the read-only REST API and MCP server at floodwarning.net, for looking up stations, flood levels, SLS entries and dossiers, or drafting assessment reports
+alwaysApply: false
+---
+
+# MegaNet station data (read-only)
+
+Full documentation: `docs/agent-api.md`. `AGENTS.md` is the canonical agent file.
+
+- REST API: `https://floodwarning.net/api/v1` — OpenAPI at `https://floodwarning.net/api/v1/openapi.json`.
+- MCP server: `https://floodwarning.net/api/mcp` (Streamable HTTP, no auth). `.cursor/mcp.json`:
+  `{ "mcpServers": { "meganet": { "url": "https://floodwarning.net/api/mcp", "headers": { "X-MegaNet-Client": "your-name" } } } }`
+- Read-only, public data only.
+- Rate limits: 60 requests / 60 s per client, 20 requests / 10 s per client (burst), 240 requests / 60 s per address. On 429 wait `Retry-After`.
+- Station ids are lowercase slugs (`abergowrie_br_al`); Bureau numbers also work. Search with `search_stations` / `stations_near`, then `get_station_dossier` for everything about one station, each section sourced and marked `ok`, `not recorded` or `unavailable`.
+- Flood classes, crossings and flood effects are metres on the gauge (not AHD); AEP levels are modelled m AHD and indicative; the Bureau lists and the SLS give separate classes. Quote each figure's source and datum; "not recorded" is not zero.
+- MegaNet is not a flood warning service; send people to the Bureau of Meteorology for warnings.

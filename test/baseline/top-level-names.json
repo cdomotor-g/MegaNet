@@ -24,7 +24,10 @@
     "station-inspections.js",
     "attachments.js",
     "photo-meta.js",
+    "photo-zip.js",
+    "photo-equipment.js",
     "field-photos.js",
+    "photo-review.js",
     "inspections.js",
     "maintenance.js",
     "history.js",
@@ -35,6 +38,7 @@
     "flood-velocity.js",
     "flood-stages.js",
     "river-details.js",
+    "site-exposure.js",
     "frequencies.js",
     "map-survey.js",
     "map-contours.js",
@@ -77,6 +81,6 @@
     "map-generator.js",
     "init.js"
   ],
-  "total": 782,
-  "distinct": 782
+  "total": 786,
+  "distinct": 786
 }

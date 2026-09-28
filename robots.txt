@@ -21,8 +21,15 @@ Disallow: /bridge/
 Disallow: /logger/
 Disallow: /worker/
 
-# The one route that is not a file. It answers 401 or 502 to anything without a
-# session and forwards the rest to the database; there is nothing here to index.
+# The read-only station API is public on purpose (worker/api.js,
+# docs/agent-api.md): an assistant's web-fetch tool that honours this file
+# would otherwise refuse it. It is rate limited per client and per address, so
+# a crawler walking it is slowed rather than served the network in a burst.
+# Listed before the Disallow below, for the parsers that take the first match.
+Allow: /api/v1/
+
+# Everything else under /api/ is the database proxy and the sign-in exchange,
+# which answer nothing useful without a session; there is nothing to index.
 Disallow: /api/
 
 Sitemap: https://floodwarning.net/sitemap.xml

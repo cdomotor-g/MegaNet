@@ -553,6 +553,21 @@ reads the local `stations.json`. Because the dataset is large (3,000+ stations),
 this keeps the raw records out of the model's context — Claude filters and
 aggregates in code and only the answer comes back.
 
+**The live alternative.** This tool answers from a local `stations.json`. To
+point any agent at the *live* database instead — the same register plus Service
+Level Specification entries, flood levels with their datums, health, ingested
+readings and inspection numbers — use MegaNet's read-only API: REST at
+`https://floodwarning.net/api/v1` (OpenAPI at
+`https://floodwarning.net/api/v1/openapi.json`) or the MCP server at
+`https://floodwarning.net/api/mcp`, whose `get_station_dossier` tool returns
+everything about one station in one call. No key; rate limited. Setup for each
+agent is in [`docs/agent-api.md`](../docs/agent-api.md).
+
+`alert_id` queries match a station's `alert_ids` and its sensors' addresses.
+`alert_ids.water_level` is a list rather than a number for a few stations (two
+water-level addresses on one site); those are flattened first — they used to
+raise `TypeError: unhashable type: 'list'`.
+
 ### Setup
 
 ```bash

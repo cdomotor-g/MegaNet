@@ -37,3 +37,12 @@
   - **Closing an issue**: remove it from the open lists (move epics to "children closed" notes where relevant, as already done for shipped sub-issues), and re-check whether closing it unblocks anything else noted in the sequencing snapshot.
   - **Editing an issue** (retitling, re-scoping, changing its model/effort recommendation, re-parenting it): update the corresponding entry in #113 to match.
 - If a change touches several issues at once, make one edit to #113 covering all of them rather than several small edits.
+
+## Agent API and MCP server (`worker/api.js`)
+- `https://floodwarning.net/api/v1` (REST; OpenAPI at `/api/v1/openapi.json`) and `https://floodwarning.net/api/mcp` (MCP, Streamable HTTP) serve public station data, read-only, to AI agents and scripts. The user doc is `docs/agent-api.md`. From Claude Code: `claude mcp add --transport http meganet https://floodwarning.net/api/mcp`.
+- Keep it read-only by construction. Upstream requests are GETs to PostgREST with the publishable key, only for relations in `READABLE_RELATIONS`, and nothing from the caller's request is forwarded. Add a relation only if a migration grants it to `anon` and `db/README.md` lists it as public. No RPCs.
+- The limits are `RATE_LIMITS` / `LIMITS` in `worker/api.js` and `[[ratelimits]]` in `wrangler.toml` (period 10 or 60; wrangler ≥ 4.36). They are quoted in `docs/agent-api.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `llms.txt` and `.cursor/rules/meganet-api.mdc`, because each agent reads only its own file — change them together.
+- Every MCP tool is an adapter over a `/api/v1` route: add the route and the tool together, and document both in `docs/agent-api.md` and `AGENTS.md`.
+- A `wrangler.toml` that does not validate breaks every deploy: `npx wrangler deploy --dry-run --outdir /tmp/wr` before pushing a change to it.
+- Checks: `cd test && npm run agentapi && npm run agentdocs` (Node only; add `npm run gate && npm run dbproxy` when `worker/index.js` changes).
+- `AGENTS.md` restates this file's process rules for agents that do not read `CLAUDE.md`; update its process section when these rules change.

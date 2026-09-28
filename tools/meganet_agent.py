@@ -24,6 +24,18 @@ The fix is to capture ``response.container.id`` and pass it back as the
 sandbox. See ``_run_turn`` below (the ``if container_id:`` branch).
 
 --------------------------------------------------------------------------------
+The live alternative: MegaNet's read-only API
+--------------------------------------------------------------------------------
+This tool answers from a local ``stations.json``. The live database — the same
+register plus Service Level Specification entries, flood levels with their
+datums, health, ingested readings and inspection numbers — is open to any agent
+through MegaNet's read-only API: REST at https://floodwarning.net/api/v1 (OpenAPI
+at https://floodwarning.net/api/v1/openapi.json) and an MCP server at
+https://floodwarning.net/api/mcp, rate limited and needing no key. Its
+``get_station_dossier`` tool returns everything about one station in one call.
+See docs/agent-api.md.
+
+--------------------------------------------------------------------------------
 Usage
 --------------------------------------------------------------------------------
     export ANTHROPIC_API_KEY=sk-ant-...
@@ -79,6 +91,22 @@ def _station_summary(s: dict) -> dict:
         "alert_ids": s.get("alert_ids", {}),
         "satcom_enabled": bool(s.get("satcom", {}).get("enabled")),
     }
+
+
+def _alert_ids(s: dict) -> set:
+    """Every ALERT address a station carries: its alert_ids and its sensors'.
+
+    ``alert_ids.water_level`` is a list for a few stations (four in 2026:
+    two water-level addresses on one site), not an int, so the values are
+    flattened before they go into a set — a list is unhashable, and
+    ``set(alert_ids.values())`` raised TypeError for exactly those stations.
+    """
+    ids = set()
+    for v in s.get("alert_ids", {}).values():
+        ids.update(v if isinstance(v, list) else [v])
+    ids.update(sen.get("alert_id") for sen in s.get("sensors", []))
+    ids.discard(None)
+    return ids
 
 
 def make_query_stations_tool(stations: list[dict]):
@@ -145,9 +173,7 @@ def make_query_stations_tool(stations: list[dict]):
             if (cc := inp.get("catchment_id")) and cc not in s.get("catchment_ids", []):
                 continue
             if (aid := inp.get("alert_id")) is not None:
-                ids = set(s.get("alert_ids", {}).values())
-                ids |= {sen.get("alert_id") for sen in s.get("sensors", [])}
-                if aid not in ids:
+                if aid not in _alert_ids(s):
                     continue
             matches.append(s)
 

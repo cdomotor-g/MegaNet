@@ -31,6 +31,12 @@ on:
       # gate check is the only thing asserting the verifier still refuses (#173).
       - 'worker/**'
       - 'wrangler.toml'
+      # The agent instruction files test/agent-docs.mjs holds to worker/api.js.
+      - 'AGENTS.md'
+      - 'GEMINI.md'
+      - 'llms.txt'
+      - '.github/copilot-instructions.md'
+      - '.cursor/**'
       # The Inspections check reads its fixture out of the migration, so a
       # change to the matrix has to re-run it (#116).
       - 'db/migrations/**'
@@ -94,6 +100,12 @@ on:
       # gate check is the only thing asserting the verifier still refuses (#173).
       - 'worker/**'
       - 'wrangler.toml'
+      # The agent instruction files test/agent-docs.mjs holds to worker/api.js.
+      - 'AGENTS.md'
+      - 'GEMINI.md'
+      - 'llms.txt'
+      - '.github/copilot-instructions.md'
+      - '.cursor/**'
       # The Inspections check reads its fixture out of the migration, so a
       # change to the matrix has to re-run it (#116).
       - 'db/migrations/**'
@@ -780,6 +792,22 @@ jobs:
       - name: The database proxy carries only what it should, and strips the rest
         working-directory: test
         run: npm run dbproxy
+
+      # The third server-side door: /api/v1 and /api/mcp (worker/api.js), public
+      # and read-only, for AI agents and scripts. What it must never do fails in
+      # silence — forward a caller's token, read a private relation, write
+      # anything, stop holding a limit — so each is asserted against a strict
+      # in-memory PostgREST built from stations.json. Offline, no network.
+      - name: The agent API reads only public relations, and holds its limits
+        working-directory: test
+        run: npm run agentapi
+
+      # Five agent instruction files quote the API's URLs and limits, because
+      # each agent reads only its own; this holds them, docs/agent-api.md and
+      # wrangler.toml's [[ratelimits]] to what worker/api.js does.
+      - name: The agent docs say what the agent API does
+        working-directory: test
+        run: npm run agentdocs
 
       # Python, no browser, no dependencies, and the only check in this file
       # that is about a *data* artefact rather than about the app: #123's sheet

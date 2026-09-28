@@ -38,6 +38,11 @@
 //
 // See docs/access.md ("Between the layers"), docs/floodwarning-net.md ("The
 // Access login host is blocked on the Bureau network") and issue #173.
+//
+// A third, separate door: /api/v1/* and /api/mcp, the read-only station API and
+// MCP server for agents, which live in worker/api.js (docs/agent-api.md).
+
+import { isApiPath, handleApi } from './api.js';
 
 // Already public in core.js — the project ref is in the committed client config,
 // so keeping it here costs nothing and saves a binding the operator would have
@@ -378,7 +383,7 @@ async function dbProxy(request, target) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // The database, routed through this origin so the browser never has to name
@@ -388,6 +393,10 @@ export default {
     // switched off, which is the state that made it necessary.
     const target = dbProxyTarget(url.pathname, url.search);
     if (target) return dbProxy(request, target);
+
+    // The read-only station API and MCP server (worker/api.js): public data,
+    // the publishable key only, GET upstream only, rate limited.
+    if (isApiPath(url.pathname)) return handleApi(request, env, ctx);
 
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.
