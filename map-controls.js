@@ -1,6 +1,7 @@
 // MegaNet — map-controls.js
 //
 //   makeBaseLayers  the shared base-map tile set, as fresh Leaflet layers.
+//   makeStateImagery the States' aerial imagery, laid over Satellite.
 //   addBaseLayers   put that set on a map, blendable: a checkbox and an
 //                   opacity slider per base, in 🗺️ Map display.
 //   MapChrome       the map's corner: one column of icons, grouped and
@@ -135,7 +136,11 @@ function makeBaseLayers() {
     // attribution of their own because they are only ever on when this is.
     'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community | Labels © Esri, HERE, Garmin, © OpenStreetMap contributors',
-      maxZoom: 19,
+      // Only z18 is asked for and stretched past it: over much of the bush
+      // Esri has nothing at z19 and paints "Map data not yet available", and a
+      // tile layer cannot fall back tile by tile. The State imagery that rides
+      // along with this base (makeStateImagery) is the detail past z18.
+      maxZoom: 19, maxNativeZoom: 18,
     }),
     // ── Dark ────────────────────────────────────────────────────────────────
     // Esri's Dark Gray Canvas, which is the genre's whole point: a base drawn
@@ -171,6 +176,23 @@ function makeBaseLayers() {
     // the top of map-elevation.js. The ground and the place names are not
     // alternatives, which is the one thing a radio button cannot say.
   };
+}
+
+// Each State's own aerial program, tiled in Web Mercator, as fresh layers to
+// lay over Esri's imagery (the Satellite base here, and the photo maps in
+// field-photos.js): Queensland's LatestStateProgram (the cache
+// digital-twin.js exports from — 10–20 cm in towns, Planet satellite where
+// nothing was flown, to z20 nearly everywhere) and NSW's SIX Maps imagery (z20
+// in towns, often z18 in the bush). Where a State has no tile at a zoom it
+// answers 404, or a transparent PNG past its border, and Esri shows through.
+// maxZoom is the caller's: a layer's maxZoom is a map's zoom limit (see above).
+function makeStateImagery(opts = {}) {
+  return [
+    { url: 'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/MapServer/tile/{z}/{y}/{x}',
+      bounds: [[-37.6, 140.9], [-28.1, 153.7]], attribution: 'Imagery © Spatial Services NSW' },
+    { url: 'https://spatial-img.information.qld.gov.au/arcgis/rest/services/Basemaps/LatestStateProgram_AllUsers/ImageServer/tile/{z}/{y}/{x}',
+      bounds: [[-29.6, 137.6], [-8.9, 153.9]], attribution: 'Imagery © State of Queensland' },
+  ].map(s => L.tileLayer(s.url, { maxNativeZoom: 20, maxZoom: 19, minZoom: 6, ...opts, bounds: s.bounds, attribution: s.attribution }));
 }
 
 // Add the shared base-layer set to a map and give it the base-map controls.
@@ -237,9 +259,12 @@ function addBaseLayers(map, opts = {}) {
     `https://server.arcgisonline.com/ArcGIS/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`,
     { pane: 'mnBaseLabels', maxZoom: 19 }   // attribution rides on the base layer
   );
+  // Satellite also takes the State imagery (makeStateImagery), in the base's
+  // own pane and added after it, so it paints over Esri and under the names.
   const companions = {
-    'Satellite': ['Reference/World_Boundaries_and_Places',
-                  'Reference/World_Transportation'].map(refLayer),
+    'Satellite': [...makeStateImagery(),
+                  ...['Reference/World_Boundaries_and_Places',
+                      'Reference/World_Transportation'].map(refLayer)],
     'Dark':      ['Canvas/World_Dark_Gray_Reference'].map(refLayer),
   };
   // ── What is on, and how strongly ───────────────────────────────────────────

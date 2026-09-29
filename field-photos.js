@@ -12,8 +12,8 @@
 // bearingDeg and fmtKm; to photo-meta.js for PhotoMeta; to photo-zip.js for
 // PhotoZip; to datastore.js for dbSelect, dbRpc, dbCanWrite, dbUploadObject,
 // dbSignedUrl, dbSignedUrls and dbRemoveObject; to auth.js for Auth; to
-// places.js for Places.parse; to map-controls.js for makeBaseLayers (the
-// viewer's move map, on Leaflet's `L`); and to app.js for switchTab,
+// places.js for Places.parse; to map-controls.js for makeBaseLayers and
+// makeStateImagery (the viewer's photo maps, on Leaflet's `L`); and to app.js for switchTab,
 // showStationCard, prepareSearch and stationMatchesSearch. Across to
 // digital-twin.js and map-photos.js, which draw what this file holds and are
 // told when it changes, and to photo-review.js, whose Review panel is drawn on
@@ -2057,21 +2057,9 @@ const FieldPhotos = (function () {
   // the tiles, and still the better place to drop a pin.
   let mm = null;    // { map, id, from, at, pin, ring, ghost, leader, cone, others: [{ row, dot }], withOthers }
 
-  // The imagery under both photo maps. Esri's, as the Stations map's
-  // Satellite base, at the bottom — but only its z18 tiles, stretched from
-  // there: over much of the bush Esri has nothing at z19 and paints "Map data
-  // not yet available", and a Leaflet layer cannot fall back tile by tile.
-  // Over it, each State's own aerial program, tiled in Web Mercator:
-  // Queensland's LatestStateProgram (the cache digital-twin.js exports from —
-  // 10–20 cm in towns, Planet satellite where nothing was flown) and NSW's
-  // SIX Maps imagery. Where a State has no tile at a zoom it answers 404, or
-  // a transparent PNG past its border, and the layer below shows through.
-  const STATE_IMAGERY = [
-    { url: 'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/MapServer/tile/{z}/{y}/{x}',
-      bounds: [[-37.6, 140.9], [-28.1, 153.7]], attribution: 'Imagery © Spatial Services NSW' },
-    { url: 'https://spatial-img.information.qld.gov.au/arcgis/rest/services/Basemaps/LatestStateProgram_AllUsers/ImageServer/tile/{z}/{y}/{x}',
-      bounds: [[-29.6, 137.6], [-8.9, 153.9]], attribution: 'Imagery © State of Queensland' },
-  ];
+  // The imagery under both photo maps: the Stations map's Satellite base —
+  // Esri's z18 stretched, under each State's own aerial program
+  // (makeStateImagery, map-controls.js) — to z21.
   const QLD_BOX = { west: 137.6, east: 153.9, south: -29.6, north: -8.9 };
 
   // Queensland's photography runs to z20 nearly everywhere; elsewhere z19
@@ -2087,9 +2075,7 @@ const FieldPhotos = (function () {
       Object.assign(base.options, { maxNativeZoom: 18, maxZoom: 21, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' });
       base.addTo(map);
     }
-    STATE_IMAGERY.forEach(s => L.tileLayer(s.url, {
-      maxNativeZoom: 20, maxZoom: 21, minZoom: 6, bounds: s.bounds, attribution: s.attribution,
-    }).addTo(map));
+    if (typeof makeStateImagery === 'function') makeStateImagery({ maxZoom: 21 }).forEach(l => l.addTo(map));
   }
 
   function unmountMoveMap() {
