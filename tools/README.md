@@ -606,6 +606,22 @@ stations loaded, as CI has them.
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_proposed_stations.sql
 ```
 
+## `check_tower_height.sql` — prove a tower's recorded platform height
+
+18 checks over `0040`, in a transaction that rolls back: the column, no station
+already in the register carrying a height and no document gaining a key; then
+an editor recording 4.5 and 3.0 (as a number or as a form's text) and refused
+4.0, words and `true`; a stranger and anonymous refused; the column's own check
+refusing 4.0 from any other way in; the document saying `tower_height` as a
+number, a save of the document as loaded keeping it and a save without it
+clearing it; and the whole register back through `load_stations_doc()` with one
+height in it, rewriting nothing else. It signs up one editor through the real
+signup triggers (0005) and wants the stations loaded, as CI has them.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_tower_height.sql
+```
+
 ## `storage_bucket.sql` — create the `inspections` bucket and its policies
 
 The one script here that writes, and the one that does not roll back. Idempotent

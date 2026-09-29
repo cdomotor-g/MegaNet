@@ -831,14 +831,17 @@ async function browserHalf(FS) {
     await page.evaluate(() => {
       const s = state.data.stations.find(x => x.id === 'gatton');
       window.__gattonName = s.name; s.name = `${s.name} AL`;
+      // Recorded on the station (0040): the 4.5 m tower, tall enough for its
+      // major class and 1% AEP level to fall on it.
+      s.tower_height = 4.5;
       if (typeof SLS !== 'undefined') { window.__slsFor = SLS.forStation; SLS.forStation = (...a) => (a[0] && a[0].id === 'gatton' ? null : window.__slsFor(...a)); }
       DigitalTwin.rebuild();
     });
     await settled();
-    const TWR = await page.evaluate(() => { const d = DigitalTwin.debug(); return { structure: d.model.structure, staff: d.model.towerStaff, parts: d.model.parts, marks: d.flood.towerMarks, levels: d.flood.levels }; });
-    const onTower = TWR.levels.filter(l => l.ahd - h0 > 0.1 && l.ahd - h0 <= 3.05 + 1.1).map(l => l.key);
+    const TWR = await page.evaluate(() => { const d = DigitalTwin.debug(); return { deck: d.model.deck && d.model.deck.top, structure: d.model.structure, staff: d.model.towerStaff, parts: d.model.parts, marks: d.flood.towerMarks, levels: d.flood.levels }; });
+    const onTower = TWR.levels.filter(l => l.ahd - h0 > 0.1 && l.ahd - h0 <= 4.55 + 1.1).map(l => l.key);
     ok('a tower: on a slab 100 mm proud, its staff up the mast reading the gauge — 10.56 m at the slab, over a zero at 87.54 m AHD',
-      TWR.structure === 'tower' && TWR.parts.includes('foundation slab') && TWR.staff && TWR.staff.onGauge && near(TWR.staff.base, h0 + 0.1 - 87.54, 1e-3), J({ structure: TWR.structure, staff: TWR.staff }));
+      TWR.structure === 'tower' && near(TWR.deck, 4.55, 1e-9) && TWR.parts.includes('foundation slab') && TWR.staff && TWR.staff.onGauge && near(TWR.staff.base, h0 + 0.1 - 87.54, 1e-3), J({ structure: TWR.structure, staff: TWR.staff }));
     ok('…every level between the slab and the handrail\'s top is marked on it — floods, classes and AEP levels alike — at its height, a call-out each, none on another',
       TWR.marks && J(TWR.marks.marks.map(m => m.key)) === J(onTower) && onTower.includes('major_m') && onTower.includes('aep_1_m') && onTower.some(k => /^peak /.test(k))
         && TWR.marks.marks.every(m => near(m.y, TWR.levels.find(l => l.key === m.key).ahd - h0, 1e-6))
@@ -847,7 +850,7 @@ async function browserHalf(FS) {
     ok('…its bands in the scale\'s colours', TWR.parts.filter(n => n === 'flood level band').length > 0);
     await page.evaluate(() => {
       const s = state.data.stations.find(x => x.id === 'gatton');
-      s.name = window.__gattonName; delete s.flood_peaks;
+      s.name = window.__gattonName; delete s.flood_peaks; delete s.tower_height;
       if (window.__slsFor) SLS.forStation = window.__slsFor;
       DigitalTwin.rebuild();
     });

@@ -283,7 +283,7 @@ const DigitalTwin = (function () {
   // reduced motion. `floodHold` is where still water stands — a level's key,
   // or a fraction of the way from 0 m to the top.
   const DEFAULTS = { size: 400, exag: 1, imagery: true, figure: true, label: true, wire: false, horizon: true,
-                     flood: true, floodAnim: null, floodHold: null, fitBridges: true, towers: {} };
+                     flood: true, floodAnim: null, floodHold: null, fitBridges: true };
 
   function loadSettings() {
     let s = {};
@@ -293,8 +293,6 @@ const DigitalTwin = (function () {
     const ex = Number(s.exag);
     if (isFinite(ex) && ex >= 1 && ex <= 3) out.exag = ex;
     for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon', 'flood', 'fitBridges']) if (typeof s[k] === 'boolean') out[k] = s[k];
-    out.towers = {};
-    if (s.towers && typeof s.towers === 'object') for (const [id, v] of Object.entries(s.towers)) if (TOWER_TYPES[v]) out.towers[id] = v;
     if (typeof s.floodAnim === 'boolean') out.floodAnim = s.floodAnim;
     if ((typeof s.floodHold === 'number' && s.floodHold >= 0 && s.floodHold <= 1) || (typeof s.floodHold === 'string' && s.floodHold)) out.floodHold = s.floodHold;
     return out;
@@ -1754,16 +1752,17 @@ void main() {
   // each by the same rules, standing on the ground where they are — see
   // "the neighbours", below.
   // The tower comes in two platform heights (the standard drawing's table:
-  // 3.0 m and 4.5 m, each on a 2100 × 2100 footing). 3.0 m is the default;
-  // the operator can change a site's (S().towers, by station id).
+  // 3.0 m and 4.5 m, each on a 2100 × 2100 footing). Which one a site has is
+  // the station's `tower_height` (0040), recorded by an editor here or in the
+  // station editor; where nobody has, it is drawn at the 3.0 m default.
   const TOWER_TYPES = { '3.0': { key: '3.0', h: 3.0 }, '4.5': { key: '4.5', h: 4.5 } };
   const TOWER_DEFAULT = '3.0';
   const FOOTING = 2.1;       // the footing, 2100 × 2100, the mast at its centre
   function towerSpec(st) {
-    const t = st && st.id != null && S().towers ? TOWER_TYPES[S().towers[st.id]] : null;
-    const spec = t || TOWER_TYPES[TOWER_DEFAULT];
+    const rec = st && st.tower_height != null ? TOWER_TYPES[Number(st.tower_height).toFixed(1)] : null;
+    const spec = rec || TOWER_TYPES[TOWER_DEFAULT];
     const h = spec.h;
-    return { key: spec.key, h, deck: h + 0.05,
+    return { key: spec.key, h, recorded: !!rec, deck: h + 0.05,
              ladderZ: LADDER_TOP_Z + (h + 0.05 - SLAB_TOP) * LADDER_RUN,   // the ladder's foot
              staffH: Math.min(3.0, h - 0.2) };                            // the gauge board, kept under the grating
   }
@@ -2218,8 +2217,20 @@ void main() {
   }
 
   // The river-gauge tower.
-  function buildTower(st, kind, k) {
-    const T = towerSpec(st), TOWER_H = T.h, DECK_TOP = T.deck, LADDER_Z = T.ladderZ, TOWER_STAFF_H = T.staffH;
+  function buildTower(st, kind, k, groundAt) {
+    const T = towerSpec(st), TOWER_H = T.h, DECK_TOP = T.deck, TOWER_STAFF_H = T.staffH;
+    // The ladder's foot is beyond the 2100 footing, on the ground: leant from
+    // the deck's edge at 1 in 4 down to wherever the ground is there (found in
+    // a few passes, since where it lands depends on how far it falls). Without
+    // the ground — nothing built under it yet — it stands level with the slab.
+    const standOn = z => { const y = groundAt(0, z); return z <= SLAB_S ? Math.max(y, SLAB_TOP) : y; };
+    let footY = SLAB_TOP, footZ = T.ladderZ;
+    if (groundAt) {
+      for (let i = 0; i < 4; i++) {
+        footY = Math.min(DECK_TOP - 1, Math.max(DECK_TOP - 8, standOn(footZ)));
+        footZ = LADDER_TOP_Z + (DECK_TOP - footY) * LADDER_RUN;
+      }
+    }
     const g = new THREE.Group();
     g.name = 'station';
     // The foundation: the footing's top 100 mm proud of the ground (drawn
@@ -2268,7 +2279,7 @@ void main() {
     staffFaceMesh.name = 'gauge board graduations';
     staffFaceMesh.userData.staffH = TOWER_STAFF_H;
     g.add(staffFaceMesh);
-    buildExtensionLadder(g, k, T);
+    buildExtensionLadder(g, k, T, footY, footZ);
     // The cabinet on the north of the platform, its door to the south, facing
     // whoever comes up the ladder. Two compartments: the bubbler above, the
     // power and the telemetry below.
@@ -2339,7 +2350,7 @@ void main() {
     box(sp, k.galv, 0.58, 0.43, 0.02, 0, 0, 0, 'solar frame');
     box(sp, k.panel, 0.55, 0.40, 0.006, 0, 0, -0.012, 'solar panel');
     return { group: g, top: DECK_TOP + RAIL_H, poleTop: TOWER_H, tower: T,
-             ladder: { x: 0, z: LADDER_Z, foot: LADDER_Z, stand: LADDER_Z + 0.22, run: LADDER_RUN, halfW: LADDER_HW },
+             ladder: { x: 0, z: footZ, foot: footZ, stand: footZ + 0.22, y: footY, run: LADDER_RUN, halfW: LADDER_HW },
              slab: { n: SLAB_N, s: SLAB_S, halfEW: SLAB_HALF_EW, top: SLAB_TOP },
              deck: { top: DECK_TOP, half: DECK_HALF, front: -H + CD + 0.12 },
              staff: staffFaceMesh };
@@ -2351,14 +2362,14 @@ void main() {
   // local y runs up the stiles and local +z out to the climber, then leant.
   // Rungs every 300 mm, rubber feet, the guide brackets that hold the two
   // sections together, the rung locks on the fly and a tie at the top.
-  function buildExtensionLadder(g, k, T) {
-    const DECK_TOP = T.deck, LADDER_Z = T.ladderZ;
+  function buildExtensionLadder(g, k, T, footY, footZ) {
+    const DECK_TOP = T.deck;
     const lean = Math.atan(LADDER_RUN);
-    const rise = DECK_TOP - SLAB_TOP;
+    const rise = DECK_TOP - footY;
     const len = Math.hypot(rise, rise * LADDER_RUN) + LADDER_OVER;
     const lg = new THREE.Group();
     lg.name = 'extension ladder';
-    lg.position.set(0, SLAB_TOP, LADDER_Z);
+    lg.position.set(0, footY, footZ);
     lg.rotation.x = -lean;
     g.add(lg);
     const baseHW = LADDER_HW + 0.03, BASE_TOP = 3.2, FLY_FOOT = 2.0, FLY_Z = -0.07;
@@ -2376,7 +2387,7 @@ void main() {
     for (let y = FLY_FOOT + 0.15; y <= len - 0.1; y += 0.3) bar(lg, k.steel, 0.016, -LADDER_HW, y, FLY_Z, LADDER_HW, y, FLY_Z, 'ladder rung');
     // The tie: the fly's stiles lashed to the handrail posts either side of
     // the gap, 300 mm over the grating.
-    const ty = DECK_TOP + 0.3, tz = LADDER_Z - (ty - SLAB_TOP) * LADDER_RUN + FLY_Z, p = DECK_HALF - 0.02, hw = LADDER_HW + 0.1;
+    const ty = DECK_TOP + 0.3, tz = footZ - (ty - footY) * LADDER_RUN + FLY_Z, p = DECK_HALF - 0.02, hw = LADDER_HW + 0.1;
     for (const sx of [-1, 1]) bar(g, k.orange, 0.008, sx * LADDER_HW, ty, tz, sx * hw, ty, p, 'ladder tie');
   }
 
@@ -2437,9 +2448,11 @@ void main() {
   // One station, built by its kind, standing at its own origin: what
   // buildStation puts at the patch's centre and what "the neighbours" put
   // wherever theirs are.
-  function makeStation(st, kind, k) {
+  // `groundAt(x, z)` is the ground at a point, in metres over the station's own
+  // foot — for what reaches past the station's footing (a tower's ladder).
+  function makeStation(st, kind, k, groundAt) {
     switch (kind.structure) {
-      case 'tower': return buildTower(st, kind, k);
+      case 'tower': return buildTower(st, kind, k, groundAt);
       case 'pole': case 'repeater': return buildPoleStation(st, kind, k);
       case 'collector': case 'staff': case 'collector+staff': return buildManual(kind, k);
       default: {
@@ -2455,7 +2468,7 @@ void main() {
     const k = kitMaterials();
     sc.doors = [];
     sc.pole = null; sc.band = null;
-    const built = makeStation(st, kind, k);
+    const built = makeStation(st, kind, k, tw.ground ? (x, z) => yAt(x, z) - yAt(0, 0) : null);
     built.group.position.y = 0;
     sc.station = built.group;
     sc.towerStaff = built.staff || null;
@@ -2463,12 +2476,14 @@ void main() {
     sc.scene.add(built.group);
     tw.model = { ...kind, top: built.top, poleTop: built.poleTop, ladder: built.ladder, deck: built.deck, slab: built.slab || null, tower: built.tower || null,
                  plate: { name: st.name || st.id, number: st.station_number ? String(st.station_number) : '' } };
+    refreshTowerField();
   }
 
   // The station as a phrase, for the canvas's name.
   function modelWords(m) {
     switch (m && m.structure) {
-      case 'tower': return `a river-gauge tower with its platform ${m.tower ? m.tower.h.toFixed(1) : '3.0'} m up`;
+      case 'tower': return `a river-gauge tower with its platform ${m.tower ? m.tower.h.toFixed(1) : '3.0'} m up`
+                           + (m.tower && !m.tower.recorded ? ' (the default: the station records no height)' : '');
       case 'repeater': return 'a repeater\'s pole 2 m tall';
       case 'collector': return 'a manual rain collector 300 mm tall';
       case 'staff': return 'a 1 m staff gauge';
@@ -3362,7 +3377,7 @@ void main() {
     for (const n of list) {
       const kind = stationKind(n.s);
       const before = sc.doors.length;
-      const built = makeStation(n.s, kind, k);
+      const built = makeStation(n.s, kind, k, (x, z) => yAt(n.x + x, n.z + z) - yAt(n.x, n.z));
       if (built.staff) setTowerStaff(built.staff, n.s, heightAt(n.x, n.z));
       sc.doors = sc.doors.filter((d, i) => i < before || d.when !== 'deck');
       built.group.name = `station ${n.s.name || n.s.id}`;
@@ -6337,7 +6352,7 @@ void main() {
             ${SIZES.map(v => `<option value="${v}" ${v === s.size ? 'selected' : ''}>${v} m square</option>`).join('')}
           </select>
         </label>
-        ${towerFieldHtml()}
+        <div id="twin-tower-field">${towerFieldHtml()}</div>
         <label class="twin-field">Vertical exaggeration <span class="small" id="twin-exag-out">${s.exag.toFixed(1)}×</span>
           <input type="range" id="twin-exag" min="1" max="3" step="0.1" value="${s.exag}"
                  oninput="DigitalTwin.setExag(this.value)">
@@ -6355,15 +6370,30 @@ void main() {
       <p class="small">The pole is 2.000 m tall and 300 mm across, the figure 1.75 m, at every exaggeration — they are the ruler; only the ground stretches.</p>`;
   }
 
-  // The tower's platform height for the station on screen, when it is a tower.
+  // The tower's platform height for the station on screen, when it is a tower:
+  // the station's own (0040), changed here by whoever may edit the station and
+  // saved to the database, as Move pin saves a position. Anybody else sees it
+  // and why they cannot change it.
+  function towerCanSave() {
+    return typeof stationSaveFields === 'function' && typeof dbCanWrite === 'function' && dbCanWrite()
+      && typeof editorWritesGoToDatabase === 'function' && editorWritesGoToDatabase();
+  }
+  function refreshTowerField() {
+    const el = document.getElementById('twin-tower-field');
+    if (el) el.innerHTML = towerFieldHtml();
+  }
   function towerFieldHtml() {
     const st = currentStation();
     if (!st || !(tw.model ? tw.model.structure === 'tower' : stationKind(st).structure === 'tower')) return '';
-    const cur = towerSpec(st).key;
+    const spec = towerSpec(st), can = towerCanSave();
+    const why = can ? (spec.recorded ? 'Saved on the station, for everybody.' : 'Not recorded on the station, so drawn at the 3.0 m default. Picking one saves it, for everybody.')
+      : typeof editorWritesGoToDatabase === 'function' && !editorWritesGoToDatabase() ? 'The station list on screen is not from the datastore, so this cannot be saved.'
+      : 'Sign in as an editor to change it.';
     return `<label class="twin-field">Tower platform height
-          <select id="twin-tower" onchange="DigitalTwin.setTower(this.value)">
-            ${Object.values(TOWER_TYPES).map(t => `<option value="${t.key}" ${t.key === cur ? 'selected' : ''}>${t.h.toFixed(1)} m platform, ${FOOTING * 1000} × ${FOOTING * 1000} footing${t.key === TOWER_DEFAULT ? ' (default)' : ''}</option>`).join('')}
+          <select id="twin-tower" onchange="DigitalTwin.setTower(this.value)" ${can ? '' : 'disabled'}>
+            ${Object.values(TOWER_TYPES).map(t => `<option value="${t.key}" ${t.key === spec.key ? 'selected' : ''}>${t.h.toFixed(1)} m platform, ${FOOTING * 1000} × ${FOOTING * 1000} footing${t.key === TOWER_DEFAULT && !spec.recorded ? ' (default)' : ''}</option>`).join('')}
           </select>
+          <span class="small" id="twin-tower-msg">${esc(why)}</span>
         </label>`;
   }
 
@@ -6757,13 +6787,23 @@ void main() {
       S().size = n; saveSettings();
       init();
     },
-    setTower(v) {
+    // Saved on the station (0040) and the twin rebuilt from what came back.
+    // Picking 3.0 m on a station that records nothing records 3.0 m.
+    async setTower(v) {
       const st = currentStation();
-      if (!st || !TOWER_TYPES[v] || towerSpec(st).key === v) return;
-      const t = { ...(S().towers || {}) };
-      if (v === TOWER_DEFAULT) delete t[st.id]; else t[st.id] = v;
-      S().towers = t; saveSettings();
-      init();
+      const box = document.getElementById('twin-tower'), msg = document.getElementById('twin-tower-msg');
+      const spec = st ? towerSpec(st) : null;
+      if (!st || !TOWER_TYPES[v] || (spec.key === v && spec.recorded)) return;
+      if (!towerCanSave()) { if (box) box.value = spec.key; return; }
+      if (box) box.disabled = true;
+      if (msg) msg.textContent = 'Saving…';
+      try {
+        await stationSaveFields(st.id, { tower_height: TOWER_TYPES[v].h });
+        init();
+      } catch (err) {
+        if (box) { box.value = spec.key; box.disabled = false; }
+        if (msg) msg.textContent = typeof editorSaveErrorText === 'function' ? editorSaveErrorText(err) : `Not saved: ${err.message}`;
+      }
     },
     setExag(v) {
       const n = Math.max(1, Math.min(3, Number(v) || 1));

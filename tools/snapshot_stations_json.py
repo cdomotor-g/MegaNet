@@ -83,7 +83,7 @@ KEY_ORDER = {
                 'location_types', 'TBRGbucketSize', 'inspection_config_key',
                 'awrc_number', 'stream', 'urbs_label', 'bureau_listings',
                 'flood_classes', 'crossings', 'gauge_survey', 'flood_effects',
-                'aep_levels', 'frequencies', 'flood_peaks'],
+                'aep_levels', 'frequencies', 'flood_peaks', 'tower_height'],
     'sensor':  ['alert_id', 'type', 'sensor_id', 'device_id'],
     'site':    ['db_id', 'number', 'name'],
     'satcom':  ['enabled', 'provider', 'terminal_id'],

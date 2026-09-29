@@ -959,9 +959,11 @@ try {
     ok('the twin\'s station is the tower, its mast 3 m (the 3.0 m default) and Ø0.300 m with its foot at the origin',
       tm && tm.structure === 'tower' && near(d.pole.h, 3, 1e-9) && near(d.pole.r, 0.15, 1e-9) && near(d.pole.baseY, 0, 1e-6), JSON.stringify({ structure: tm && tm.structure, pole: d.pole }));
     const rungs = tm ? tm.parts.filter(n => n === 'ladder rung').length : 0;
-    ok('the platform, its rails, an extension ladder leaning on the south edge at 1 in 4 with rungs every 300 mm, the gauge and the antenna mast are there',
+    // The ladder's feet are past the 2100 footing (its south edge 1.05 m out),
+    // on the ground there — however far below the slab that is.
+    ok('the platform, its rails, an extension ladder leaning on the south edge at 1 in 4 down to the ground past the footing, rungs every 300 mm, the gauge and the antenna mast are there',
       tm && tm.deck && near(tm.deck.top, 3.05, 1e-9) && near(tm.deck.half, 0.9, 1e-9) && tm.ladder && near(tm.ladder.run, 0.25, 1e-9)
-        && near(tm.ladder.foot, 1.005 + (3.05 - 0.1) * 0.25, 1e-9) && tm.ladder.footY >= 0.1 - 1e-9 && rungs === 16 && tm.parts.includes('platform grating') && tm.parts.filter(n => n === 'handrail').length === 10
+        && near(tm.ladder.foot, 1.005 + (3.05 - tm.ladder.y) * 0.25, 1e-9) && tm.ladder.foot > 1.05 && Math.abs(tm.ladder.footY - tm.ladder.y) < 0.3 && rungs >= 16 && tm.parts.includes('platform grating') && tm.parts.filter(n => n === 'handrail').length === 10
         && tm.parts.includes('ladder stile') && tm.parts.includes('ladder guide bracket') && !tm.parts.includes('ladder bracket')
         && tm.parts.includes('rain gauge') && tm.parts.includes('antenna mast') && tm.parts.includes('solar panel'),
       JSON.stringify({ deck: tm && tm.deck, ladder: tm && tm.ladder, rungs, rails: tm && tm.parts.filter(n => n === 'handrail').length }));
@@ -982,6 +984,16 @@ try {
         && (tst.kind.telemetry === 'alert' ? tm.parts.includes('ERT-A2') : tm.parts.includes('CR300') && tm.parts.includes('Beam SBD modem'))
         && tm.plate.name === tst.name && tm.plate.number === tst.number && tm.telemetry === tst.kind.telemetry,
       JSON.stringify({ telemetry: tm && tm.telemetry, plate: tm && tm.plate, missing: tm && ['Kisters HS40 panel', 'Victron charge controller', 'battery', 'cabinet door'].filter(n => !tm.parts.includes(n)) }));
+    // The platform height is the station's own (0040): none recorded in the
+    // test's register, so the 3.0 m default, and the box says whether this
+    // browser may change it.
+    const towerBox = await page.evaluate(() => {
+      const sel = document.getElementById('twin-tower'), msg = document.getElementById('twin-tower-msg');
+      return sel ? { value: sel.value, options: [...sel.options].map(o => o.value), disabled: sel.disabled, msg: msg && msg.textContent } : null;
+    });
+    ok('the Scene panel offers the tower\'s two platform heights, 3.0 m (the default) chosen, and says whether it can be saved',
+      towerBox && towerBox.value === '3.0' && towerBox.options.join() === '3.0,4.5' && !!towerBox.msg
+        && (towerBox.disabled ? !/Saved on the station/.test(towerBox.msg) : /default/.test(towerBox.msg)), JSON.stringify(towerBox));
     ok('the note says when the telemetry is a guess',
       tst.kind.telemetryKnown ? !d.notes.some(n => /telemetry/i.test(n)) : d.notes.some(n => /telemetry/i.test(n) && /TM/.test(n)), d.notes.join(' | '));
 

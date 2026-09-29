@@ -112,6 +112,16 @@ function editorIsAdmin() {
 
 // The kinds of station, for the Station type box. "Choose one" for a proposal,
 // which has to say, and "not recorded" for a station that does not.
+// The tower heights the database takes (0040's check), for the editor's box.
+const TOWER_HEIGHTS = [3.0, 4.5];
+function towerHeightOptions(cur) {
+  const n = cur == null || cur === '' ? null : Number(cur);
+  return [
+    `<option value=""${n == null ? ' selected' : ''}>— not recorded (drawn at 3.0 m) —</option>`,
+    ...TOWER_HEIGHTS.map(h => `<option value="${h.toFixed(1)}"${n === h ? ' selected' : ''}>${h.toFixed(1)} m</option>`),
+  ].join('');
+}
+
 function stationTypeOptions(cur, proposed) {
   return [
     `<option value="">${proposed ? '— choose one —' : '— not recorded —'}</option>`,
@@ -326,6 +336,12 @@ function editorForm(s) {
            any station; the box is an administrator's once the station is saved. -->
       <label>Station type
         <select id="ef-stype">${stationTypeOptions(s.station_type, s.proposed)}</select>
+      </label>
+      <!-- A river-gauge tower's platform height (0040): the standard drawing's
+           two, each on a 2100 × 2100 footing. Blank is not recorded, which the
+           Digital Twin draws as the 3.0 m default. -->
+      <label>Tower platform height
+        <select id="ef-tower">${towerHeightOptions(s.tower_height)}</select>
       </label>
       ${editorProposedBoxHtml(s)}
       <label>Latitude<input type="number" step="any" id="ef-lat" value="${s.lat ?? ''}"></label>
@@ -756,6 +772,10 @@ function editorReadForm() {
   if (proposed) d.proposed = true; else delete d.proposed;
   const stype = document.getElementById('ef-stype')?.value || '';
   if (stype) d.station_type = stype; else delete d.station_type;
+  // 0040's, the same way: absent where blank.
+  const towerBox = document.getElementById('ef-tower');
+  const tower = towerBox ? pFloat(towerBox.value) : (d.tower_height ?? null);
+  if (tower != null) d.tower_height = tower; else delete d.tower_height;
   const yearBox = document.getElementById('ef-pyear');
   const pyear = yearBox ? pInt(yearBox.value) : (d.proposed_year ?? null);
   if (pyear != null) d.proposed_year = pyear; else delete d.proposed_year;
@@ -949,6 +969,13 @@ async function editorSave() {
 // and the map's layers with it where there is a map. Throws what dbSelect and
 // dbSaveStation throw; editorSaveErrorText() has the words for each.
 async function stationSavePosition(id, lat, lon) {
+  return stationSaveFields(id, { lat, lon });
+}
+
+// The same save for any of the station's own keys — the Digital Twin's tower
+// height (0040) is the other. A value of null takes the key out, which is how
+// the document says "not recorded".
+async function stationSaveFields(id, fields) {
   const stations = (state.data && state.data.stations) || [];
   if (!editorWritesGoToDatabase()) {
     throw new Error('the station list on screen did not come from the datastore — load from the datastore first');
@@ -958,7 +985,8 @@ async function stationSavePosition(id, lat, lon) {
   if (!row || !row.doc) {
     throw Object.assign(new Error(`station "${id}" is no longer in the database`), { conflict: true });
   }
-  const d = { ...row.doc, lat, lon };
+  const d = { ...row.doc };
+  for (const [k, v] of Object.entries(fields)) { if (v == null) delete d[k]; else d[k] = v; }
   for (const k of RiverDetails.LIST_KEYS) delete d[k];
   delete d.frequencies;
   const result = await dbSaveStation(d, row.updated_at);

@@ -1093,6 +1093,11 @@ jobs:
       # back through load_stations_doc() carrying a proposal.
       - name: check_proposed_stations.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_proposed_stations.sql
+      # A tower's platform height (0040): 3.0 or 4.5 m and nothing else, the
+      # document gaining nothing until one is recorded, and only an editor
+      # recording it — through save_station() and load_stations_doc() alike.
+      - name: check_tower_height.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_tower_height.sql
       # …and the same for the AEP sheets' SQL (0033): it attaches rows by
       # number and by position into columns only it and the editor write.
       - name: The AEP levels' SQL still fits the schema

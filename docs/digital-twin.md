@@ -185,8 +185,11 @@ nothing is assumed:
   south edge at the safe 1 in 4 (a metre out at the foot for every four up,
   about 76°) with its stiles running a metre past the landing. The platform
   is **3.0 m** up by default or **4.5 m**, as the standard drawing's table has
-  it, both on a **2100 × 2100 mm** footing; the Scene panel's *Tower platform
-  height* picks one per site and remembers it. It stands on
+  it, both on a **2100 × 2100 mm** footing. Which one is the station's own
+  `tower_height` (`0040`), recorded in the database for everybody: an editor
+  sets it in the Scene panel's *Tower platform height* (saved the way Move pin
+  saves a position) or in the station editor. A station that records none is
+  drawn at the 3.0 m default, and the canvas's description says so. It stands on
   its concrete footing, of which only the top is drawn: 2.1 m square, 100 mm
   proud of the ground, the mast at its centre; the ladder's foot stands beyond
   it, on the ground (the step down, the pit and the conduit below the ground
