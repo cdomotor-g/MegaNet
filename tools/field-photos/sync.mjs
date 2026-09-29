@@ -29,6 +29,9 @@
 //
 //   SUPABASE_SECRET_KEY    the project's secret (service role) key
 //   SUPABASE_URL           the project, if not MegaNet's own
+//   PHOTO_STORE_URL        where the bytes go (R2, through the Worker) — by
+//                          default https://floodwarning.net/api/photos for
+//                          MegaNet's own project; empty for Supabase Storage
 //   MAX_FILES, TIME_BUDGET_S   how much one run may do (150 photos, 600 s)
 //
 // A photo is read here by the same photo-meta.js the browser runs (lib/read.mjs

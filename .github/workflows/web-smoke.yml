@@ -856,6 +856,15 @@ jobs:
         working-directory: test
         run: npm run dbproxy
 
+      # Another server-side door: /api/photos (worker/photos.js), the field
+      # photos' bytes in R2. Who may put, sign and delete, which paths exist,
+      # and whether a view URL was signed here and is in date — each fails open
+      # and in silence if wrong, because the app works either way. Offline: R2
+      # is a Map and the project's answers are a stand-in.
+      - name: The photo store admits editors and signed URLs, and nothing else
+        working-directory: test
+        run: npm run photostore
+
       # The third server-side door: /api/v1 and /api/mcp (worker/api.js), public
       # and read-only, for AI agents and scripts. What it must never do fails in
       # silence — forward a caller's token, read a private relation, write

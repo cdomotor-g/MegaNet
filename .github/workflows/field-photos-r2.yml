@@ -1,0 +1,64 @@
+# Field photos into R2: carries the photos' bytes out of Supabase Storage (1 GB
+# on the free plan) and into Cloudflare R2 behind the Worker's /api/photos
+# route (worker/photos.js). tools/field-photos/move-to-r2.mjs is the run;
+# docs/field-photos.md ("Where the bytes live") is the why and the setup.
+#
+# Run it by hand once after R2 is bound (Actions → Field photos into R2 → Run
+# workflow). It also runs once a day, to sweep up anything a sync or a browser
+# had to write to Supabase while the store could not be reached; a day with
+# nothing to move is a minute of nothing.
+#
+# Needs the SUPABASE_SECRET_KEY repository secret the Dropbox and Drive syncs
+# already use. Until the Worker has its R2 binding it moves nothing and says so
+# in a notice rather than failing.
+
+name: Field photos into R2
+
+on:
+  schedule:
+    - cron: '17 16 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only count what would move'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: field-photos-r2
+  cancel-in-progress: false
+
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+    steps:
+      - name: Is the secret key there?
+        id: ready
+        run: |
+          if [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "::notice::SUPABASE_SECRET_KEY is not set — nothing to move. docs/field-photos.md ('Where the bytes live') has the steps."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          node-version: '22'
+
+      # No npm install: the move uses nothing but fetch.
+      - name: Move
+        if: steps.ready.outputs.ready == 'true'
+        working-directory: tools/field-photos
+        run: node move-to-r2.mjs

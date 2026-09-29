@@ -62,9 +62,18 @@ import { readPhoto, PhotoMeta } from './read.mjs';
 import { dropbox } from './dropbox.mjs';
 import { gdrive } from './gdrive.mjs';
 import { openZip, ZipError, ZIP_LIMITS } from './zip.mjs';
-import { client } from './supabase.mjs';
+import { client, DEFAULT_PHOTO_STORE } from './supabase.mjs';
 
 export const DEFAULT_SUPABASE_URL = 'https://jjprlritvhdqpvphfrnu.supabase.co';
+
+// Where the bytes go: PHOTO_STORE_URL if it is set (empty turns the store off),
+// otherwise MegaNet's own Worker — but only for MegaNet's own project, since the
+// store behind floodwarning.net belongs to it and to no other.
+export function photoStoreFor(env) {
+  if (typeof env.PHOTO_STORE_URL === 'string') return env.PHOTO_STORE_URL.trim() || null;
+  const project = (env.SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/+$/, '');
+  return project === DEFAULT_SUPABASE_URL ? DEFAULT_PHOTO_STORE : null;
+}
 export const PROVIDERS = Object.freeze({ dropbox, gdrive });
 const PHOTO_EXT = /\.(jpe?g|png|heic|heif|webp)$/i;
 const ZIP_EXT = /\.zip$/i;
@@ -126,7 +135,8 @@ export async function run({
     photo_id: id || null, station_id: station || null, uploaded_by: by,
   });
 
-  const db = client(fetch, { url: env.SUPABASE_URL || DEFAULT_SUPABASE_URL, key: env.SUPABASE_SECRET_KEY });
+  const db = client(fetch, { url: env.SUPABASE_URL || DEFAULT_SUPABASE_URL, key: env.SUPABASE_SECRET_KEY,
+                            store: photoStoreFor(env), log });
   let prior = null;
   try {
     prior = (await db.select(`field_photo_sync?source=eq.${provider.source}&select=runs`)).at(0) || null;

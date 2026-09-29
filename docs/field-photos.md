@@ -886,9 +886,76 @@ where it stopped.
 | `propose_equipment(p jsonb)`, `decide_equipment_suggestion(p_id, p_decision, p_note, p_patch)` | the seam anything proposes through (editors, the secret key for an agent); the administrator's decision |
 | `is_admin()` | may this request decide — an editor whose `app_user.role` is `admin`, the secret key, or the owner |
 
-The bucket, `field-photos`, private, 25 MB an object, editors only for all
-four operations, is `tools/storage_bucket.sql` — run once per project, after
+The Supabase bucket, `field-photos` — where the bytes lived before R2, and
+where they still go while R2 is not bound (see *Where the bytes live*) —
+private, 25 MB an object, editors only for all four operations, is
+`tools/storage_bucket.sql` — run once per project, after
 the migration, like 0010's.
+
+## Where the bytes live
+
+The pictures themselves are in **Cloudflare R2**, in the bucket
+`meganet-photos`, reached only through this app's Worker at `/api/photos`
+(`worker/photos.js`). Everything *about* a photo — the row in
+`meganet.field_photo`, its position, station, hash and who added it — stays in
+Supabase, and `add_field_photo()` still decides what may be added. Only the
+bytes moved.
+
+Why: Supabase's free plan holds **1 GB** of storage for the whole organisation
+and lets **5 GB a month** out of it, and one crew's zip of site photos is 2 GB.
+R2 holds **10 GB free**, charges nothing for reading photos out (so viewing
+them costs nothing however often), and past 10 GB is about US$0.015 per GB a
+month — 100 GB of photos is about US$1.50 a month.
+
+| Route | Who | What |
+|---|---|---|
+| `POST /api/photos/sign` | an editor | signed view links (an hour) for the paths R2 holds, and a list of the ones it does not |
+| `PUT /api/photos/field-photos/photo/<uuid>.<ext>` | an editor, or the syncs' secret key | the bytes, create-only, 25 MB at most, raster image types only |
+| `DELETE` the same | an editor, or the secret key | removes them |
+| `GET` the same `?e=…&s=…` | whoever holds a signed link | the picture, until the link expires |
+
+"An editor" is decided by the project, not the Worker: the caller's own
+Supabase token is put to `rpc/is_editor`, the same check the old bucket's
+policies made. The links are signed with a key the Worker makes on first use
+and keeps in the bucket, where no path the route accepts can reach it — there
+is no secret to set.
+
+**The move is gradual and nothing breaks during it.** A photo R2 does not hold
+yet is signed in Supabase Storage instead, as before (`datastore.js`). Until R2
+is bound, the route answers `503 {unbound: true}` and the app and the syncs
+write to Supabase as they always did. Once it is bound, the **Field photos into
+R2** workflow (`tools/field-photos/move-to-r2.mjs`) carries what is in Supabase
+across — put to R2 first, removed from Supabase only after — and runs daily to
+sweep up anything written to Supabase while the store could not be reached.
+Attachments (the `inspections` bucket) stay in Supabase Storage.
+
+### Turning it on
+
+About ten minutes, once, by someone who can administer the Cloudflare account
+and this repository.
+
+1. **Create the bucket.** Cloudflare dashboard → **R2 Object Storage**. If it
+   asks you to subscribe to R2, do (the free tier is 10 GB; it asks for a
+   payment method but charges nothing under the free limits). → **Create
+   bucket** → name `meganet-photos`, location **Automatic** (or *Oceania* as a
+   hint) → **Create bucket**.
+2. **Bind it.** In `wrangler.toml`, uncomment the three `[[r2_buckets]]` lines
+   and push to `main` (or ask Claude Code to). The next deploy binds it.
+3. **Let the syncs past Access.** Zero Trust → **Access controls** →
+   **Applications** → the `MegaNet public API` bypass application (see
+   `docs/agent-api.md`, "Let agents past Cloudflare Access") → **Add public
+   hostname**: domain `floodwarning.net`, path `api/photos` → **Save**. The
+   route checks every request itself (an editor's token, the secret key, or a
+   signed link), so Access has nothing to add there — and without this the
+   Dropbox and Drive syncs, the move, and the app opened from github.io cannot
+   reach it. The app on `floodwarning.net` works either way.
+4. **Move what is there.** GitHub → **Actions** → **Field photos into R2** →
+   **Run workflow** (tick *Only count* first if you want to see the numbers).
+   It uses the `SUPABASE_SECRET_KEY` secret the syncs already have.
+
+Check it: open a photo on the Field Photos tab and look at the image's address
+(right-click → *Open image in new tab*): it starts
+`https://floodwarning.net/api/photos/field-photos/…`.
 
 ## What the network has to allow
 
@@ -896,7 +963,8 @@ the migration, like 0010's.
 |---|---|---|
 | `unpkg.com` | the OCR engine, once a session, only for a photo with no GPS (or a Solocator photo's ±); the HEIC decoder, once a session, only for a HEIC the browser cannot draw | already allowed for Leaflet, MapLibre and three.js |
 | `server.arcgisonline.com` | the imagery under the viewer's *Move…* map | already allowed for the Stations map's Satellite base |
-| `*.supabase.co` (or the `/api/db` proxy) | the rows, the bucket, the signed links | already allowed |
+| `*.supabase.co` (or the `/api/db` proxy) | the rows, and photos not yet moved to R2 | already allowed |
+| `floodwarning.net` (`/api/photos`) | the photos' bytes, in R2 | the app's own host; from another origin, across origins |
 | `www.dropbox.com`, `api.dropboxapi.com` | linking Dropbox, once, from the tab | only for whoever sets it up; the sync itself runs on GitHub |
 | `oauth2.googleapis.com`, `www.googleapis.com` | the Google Drive sync: its hour's token, and the folder's listing and files | from GitHub's runners only — nothing in the browser talks to Google |
 | `console.cloud.google.com`, `drive.google.com` | linking a Google Drive folder, once | only for whoever sets it up |

@@ -401,6 +401,17 @@ const STORAGE_URL = DB_URL.replace(/\/rest\/v1\/?$/, '/storage/v1');
 // wrong upstream and quietly overwriting somebody else's photo is not the way to
 // find out.
 async function dbUploadObject(bucket, path, file) {
+  if (usesPhotoStore(bucket)) {
+    const res = await photoStoreFetch(`/${bucket}/${path}`, {
+      method: 'PUT',
+      headers: { ...photoStoreAuth(), 'Content-Type': file.type || photoTypeOf(path) },
+      body: file,
+    });
+    if (res) {
+      if (!res.ok) throw await storageError(res, bucket);
+      return { bucket, path };
+    }
+  }
   const res = await fetch(`${STORAGE_URL}/object/${bucket}/${path}`, {
     method: 'POST',
     headers: {
@@ -420,6 +431,10 @@ async function dbUploadObject(bucket, path, file) {
 // tools/storage_bucket.sql), so there is no permanent URL to render — every
 // thumbnail on screen is signed for the session that asked for it.
 async function dbSignedUrl(bucket, path, seconds) {
+  if (usesPhotoStore(bucket)) {
+    const got = await dbSignedUrls(bucket, [path], seconds);
+    if (got[path]) return got[path];
+  }
   const res = await fetch(`${STORAGE_URL}/object/sign/${bucket}/${path}`, {
     method: 'POST',
     headers: {
@@ -445,8 +460,26 @@ async function dbSignedUrl(bucket, path, seconds) {
 // answers one entry per path, each with its own error where it has one; a path
 // it could not sign comes back without a URL rather than failing the rest.
 async function dbSignedUrls(bucket, paths, seconds) {
-  const list = [...new Set((paths || []).filter(Boolean))];
+  let list = [...new Set((paths || []).filter(Boolean))];
   if (!list.length) return {};
+  // The photo store signs what it holds and names what it does not — a photo
+  // still in Supabase, not yet carried over — and that much is signed below,
+  // the way every photo was before.
+  let fromStore = {};
+  if (usesPhotoStore(bucket)) {
+    const res = await photoStoreFetch('/sign', {
+      method: 'POST',
+      headers: { ...photoStoreAuth(), 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ bucket, paths: list, expiresIn: seconds || 3600 }),
+    });
+    if (res) {
+      if (!res.ok) throw await storageError(res, bucket);
+      const body = await res.json();
+      fromStore = (body && body.urls) || {};
+      list = list.filter(p => !fromStore[p]);
+      if (!list.length) return fromStore;
+    }
+  }
   const res = await fetch(`${STORAGE_URL}/object/sign/${bucket}`, {
     method: 'POST',
     headers: {
@@ -465,13 +498,26 @@ async function dbSignedUrls(bucket, paths, seconds) {
     const signed = e && (e.signedURL || e.signedUrl);
     if (e && e.path && signed) out[e.path] = `${STORAGE_URL}${signed.startsWith('/') ? '' : '/'}${signed}`;
   }
-  return out;
+  return { ...out, ...fromStore };
 }
 
 // Remove the bytes. Called after meganet.detach_file() has dropped the index
 // row, and as the compensating half of a failed attach — see attachments.js for
 // why the two are in that order.
 async function dbRemoveObject(bucket, path) {
+  if (usesPhotoStore(bucket)) {
+    const res = await photoStoreFetch(`/${bucket}/${path}`, { method: 'DELETE', headers: photoStoreAuth() });
+    if (res) {
+      if (!res.ok) throw await storageError(res, bucket);
+      // It may not have been carried over yet. Either way it is gone from both.
+      try { await supabaseRemoveObject(bucket, path); } catch (_) { /* not there: fine */ }
+      return true;
+    }
+  }
+  return supabaseRemoveObject(bucket, path);
+}
+
+async function supabaseRemoveObject(bucket, path) {
   const res = await fetch(`${STORAGE_URL}/object/${bucket}/${path}`, {
     method: 'DELETE',
     headers: {
@@ -482,6 +528,58 @@ async function dbRemoveObject(bucket, path) {
   });
   if (!res.ok) throw await storageError(res, bucket);
   return true;
+}
+
+// ── The photo store (R2, through this app's Worker) ────────────────────────────
+// Field photos outgrew Supabase's free 1 GB, so their bytes live in Cloudflare
+// R2 behind /api/photos (worker/photos.js, docs/field-photos.md "Where the bytes
+// live"). The four functions above keep their signatures and route the photo
+// bucket there; `inspections` (attachments) stays in Supabase Storage.
+//
+// The Worker is on floodwarning.net; any other origin (github.io, a local
+// checkout) reaches it there, across origins. If it answers that R2 is not bound
+// yet — the state between this code landing and the binding being added — the
+// page goes back to Supabase Storage for the rest of the session. If it cannot
+// be reached at all, that one call does, and the next asks again.
+const PHOTO_STORE_BUCKETS = ['field-photos'];
+const PHOTO_STORE_HOST = 'https://floodwarning.net';
+let _photoStoreOff = false;
+
+function usesPhotoStore(bucket) {
+  return !_photoStoreOff && PHOTO_STORE_BUCKETS.includes(bucket);
+}
+
+function photoStoreUrl() {
+  return `${dbProxyAvailable() ? '' : PHOTO_STORE_HOST}/api/photos`;
+}
+
+function photoStoreAuth() {
+  return _dbToken ? { Authorization: `Bearer ${_dbToken}` } : {};
+}
+
+// The content type from the path, for a File that came without one (a photo
+// out of a zip has none).
+function photoTypeOf(path) {
+  const ext = String(path).split('.').pop().toLowerCase();
+  return ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+            heic: 'image/heic', heif: 'image/heif', gif: 'image/gif', tif: 'image/tiff',
+            tiff: 'image/tiff', avif: 'image/avif' })[ext] || 'application/octet-stream';
+}
+
+// The response, or null for "use Supabase instead".
+async function photoStoreFetch(path, init) {
+  let res;
+  try {
+    res = await fetch(`${photoStoreUrl()}${path}`, { ...init, cache: 'no-store' });
+  } catch (_) {
+    return null;
+  }
+  if (res.status === 503) {
+    let body = null;
+    try { body = await res.clone().json(); } catch (_) { /* not the store's answer */ }
+    if (body && body.unbound) { _photoStoreOff = true; return null; }
+  }
+  return res;
 }
 
 // Storage speaks its own error shape — {statusCode, error, message} — rather

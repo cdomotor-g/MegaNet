@@ -41,8 +41,13 @@
 //
 // A third, separate door: /api/v1/* and /api/mcp, the read-only station API and
 // MCP server for agents, which live in worker/api.js (docs/agent-api.md).
+//
+// A fourth: /api/photos/*, the field photos' bytes in Cloudflare R2 rather than
+// Supabase Storage — worker/photos.js, docs/field-photos.md ("Where the bytes
+// live").
 
 import { isApiPath, handleApi } from './api.js';
+import { isPhotoPath, handlePhotos } from './photos.js';
 
 // Already public in core.js — the project ref is in the committed client config,
 // so keeping it here costs nothing and saves a binding the operator would have
@@ -397,6 +402,10 @@ export default {
     // The read-only station API and MCP server (worker/api.js): public data,
     // the publishable key only, GET upstream only, rate limited.
     if (isApiPath(url.pathname)) return handleApi(request, env, ctx);
+
+    // The field photos' bytes, in R2 (worker/photos.js). Its own checks: an
+    // editor's Supabase token, the project's secret key, or a signed URL.
+    if (isPhotoPath(url.pathname)) return handlePhotos(request, env);
 
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.
