@@ -267,8 +267,9 @@ fallback — what went wrong and a button to retry the database.
 | 2 | **`stations.json` from this site** | The datastore did not answer |
 | 3 | **`stations.json` from GitHub raw** | Neither of the above (e.g. the app is served from somewhere without the file) |
 
-**Load stations.json from this device** is untouched and always available. Working
-from a laptop with no network is a real part of this job.
+**Load from this device** (a `stations.json` file) is always available, on the
+**🛠️ Admin** tab with **Load from GitHub**, the Data source panel and the snapshot button.
+Working from a laptop with no network is a real part of this job.
 
 The fallback is not padding. A free-tier Supabase project pauses after about a
 week of inactivity, and a paused project *fails* the read rather than slowing it

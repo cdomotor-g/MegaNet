@@ -8,7 +8,8 @@
 // Reaches back to core.js for AUTH_URL, DB_URL, DB_ANON_KEY, DB_SCHEMA and esc;
 // across to app.js for setHeaderLabel and rerenderStationEditorCard; to
 // field-photos.js for FieldPhotos.authChanged, because every photo it holds was
-// fetched for one session (0035 makes them editors-only); and to
+// fetched for one session (0035 makes them editors-only); to admin.js for
+// Admin.authChanged (0042, administrators only); and to
 // datastore.js for dbSetAccessToken. datastore.js and station-editor.js call
 // back into Auth, so this is a cycle — which is fine in one shared global scope
 // and would not be under ESM, one of the four reasons #129 gives for classic
@@ -337,7 +338,7 @@ const Auth = (function () {
     // The editor's status line says "not signed in" until something tells it
     // otherwise, and it is on screen behind this panel.
     if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
-    photosAuthChanged();
+    tabsAuthChanged();
   }
 
   // GoTrue does not pass a trigger's message through, so a refused signup
@@ -376,7 +377,7 @@ const Auth = (function () {
     syncHeader();
     if (announce && document.getElementById('auth-modal')?.style.display === 'flex') render();
     if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
-    photosAuthChanged();
+    tabsAuthChanged();
   }
 
   // ── the magic link landing ──
@@ -433,9 +434,13 @@ const Auth = (function () {
 
   // Field photos are editors-only (0035): whatever the tab, the twin and the
   // map were holding was fetched for the session that just ended or began.
-  function photosAuthChanged() {
-    if (typeof FieldPhotos !== 'undefined' && FieldPhotos.authChanged) {
-      try { FieldPhotos.authChanged(); } catch (_) { /* its own problem, not the sign-in's */ }
+  // The Admin tab (admin.js) is administrators-only (0042), and redraws its
+  // users and allowlist — or its "sign in" — for the same reason.
+  function tabsAuthChanged() {
+    for (const mod of [typeof FieldPhotos !== 'undefined' ? FieldPhotos : null,
+                       typeof Admin       !== 'undefined' ? Admin       : null]) {
+      if (!mod || !mod.authChanged) continue;
+      try { mod.authChanged(); } catch (_) { /* its own problem, not the sign-in's */ }
     }
   }
 
@@ -598,7 +603,7 @@ const Auth = (function () {
       syncHeader();
       render();
       if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
-      photosAuthChanged();
+      tabsAuthChanged();
     })();
   }
 
@@ -610,6 +615,10 @@ const Auth = (function () {
     mayWrite:   () => !!session && (who ? who.may_write !== false : true),
     email:      () => (who && who.email) || (session && session.email) || null,
     role:       () => (who && who.role) || null,
+    // whoami()'s is_admin (0042) — meganet.is_admin() as the database sees it.
+    // What the Admin tab asks before it offers the user list; the functions
+    // behind it refuse anybody else regardless.
+    isAdmin:    () => !!session && !!(who && who.is_admin),
     // The schema the database answering this session is at, as whoami()
     // echoes it (0005), or null before it has answered. What the editor asks
     // before it sends a proposal to a database that would not know one (0039).

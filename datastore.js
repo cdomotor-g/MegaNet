@@ -13,16 +13,15 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for DB_URL, DB_ANON_KEY, DB_SCHEMA,
 // DB_SCHEMA_VERSION, _dbClock, dbHostLabel, dbRouteLabel, state, esc and dlText; across to
-// app.js for SOURCE_LABELS and loadFromApi; to export.js for exportMayDownload
-// and rerenderExport, which are the Export tab's sign-in gate and the repaint
-// that follows one (#191); and to auth.js for Auth, which reaches back here for
-// dbSetAccessToken.
+// app.js for SOURCE_LABELS, loadFromApi and renderMain; to export.js for
+// exportMayDownload, the sign-in gate on taking the network away as a file
+// (#191); and to auth.js for Auth, which reaches back here for dbSetAccessToken.
 //
 // This was three banner sections of app.js with the Export tab sitting in the
 // middle of them; they are joined here because they are one concern. The seam
-// that did not move: renderDbStatusHtml() renders into the Export tab and
-// snapshotStationsJson() is driven by a button export.js writes, so those two
-// files are wired across a file boundary. Moving a module never moves its
+// that did not move: renderDbStatusHtml() renders into the Admin tab (it was the
+// Export tab's until the Admin tab took it) and snapshotStationsJson() is driven
+// by a button admin.js writes, so those files are wired across a file boundary. Moving a module never moves its
 // registration — constraint 3 on #113.
 //
 // One thing here executes at load, and it is the only such thing in the whole
@@ -192,11 +191,6 @@ function renderDbStatusHtml() {
     ${host}`;
 }
 
-// First visit to the tab checks; after that the panel holds what it found until
-// Re-test is pressed, so flipping between tabs is not a stream of requests.
-function initExport() {
-  if (!state.dbStatus) dbCheck();
-}
 
 // ── stations.json, from the database ───────────────────────────────────────────
 // The escape hatch, kept deliberately. stations.json is the offline copy, the
@@ -214,22 +208,22 @@ function initExport() {
 // wants a copy on a USB stick before going somewhere without a network.
 async function snapshotStationsJson() {
   const btn = document.getElementById('btn-snapshot');
-  // The note is a live region on the Export tab (#141), so writing to it is the
+  // The note is a live region on the Admin tab (#141), so writing to it is the
   // announcement — the tone class is the visible half of the same sentence.
   const say = (text, tone) => {
     const el = document.getElementById('snapshot-note');
     if (el) el.innerHTML = `<span class="${tone || 'txt-muted'}">${esc(text)}</span>`;
   };
 
-  // The runtime half of the Export tab's gate (#191) — see exportMayDownload()
+  // The runtime half of the sign-in gate (#191) — see exportMayDownload()
   // in export.js for why this is checked here as well as in the markup. The
   // tab is re-rendered rather than only told, so the button it is offering
   // matches the session it actually has.
   if (typeof exportMayDownload === 'function' && !exportMayDownload()) {
-    // Repaint first: rerenderExport() rebuilds the note element say() writes
+    // Repaint first: renderMain() rebuilds the note element say() writes
     // into, so saying it first would put the sentence on a node that is about
     // to be thrown away.
-    if (state.activeTab === 'export') rerenderExport(() => document.getElementById('btn-snapshot'));
+    if (state.activeTab === 'admin') renderMain();
     say('Not downloaded — the station document needs a signed-in session.', 'txt-bad');
     return;
   }

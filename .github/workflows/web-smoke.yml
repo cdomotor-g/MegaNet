@@ -1098,6 +1098,10 @@ jobs:
       # recording it — through save_station() and load_stations_doc() alike.
       - name: check_tower_height.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_tower_height.sql
+      # The Admin tab's user management (0042): administrators only, the role
+      # a first sign-in arrives with, and the guards against locking everybody out.
+      - name: check_user_admin.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_user_admin.sql
       # …and the same for the AEP sheets' SQL (0033): it attaches rows by
       # number and by position into columns only it and the editor write.
       - name: The AEP levels' SQL still fits the schema

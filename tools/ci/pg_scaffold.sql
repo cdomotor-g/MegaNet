@@ -35,7 +35,8 @@ create table if not exists auth.users (
   email text unique,
   raw_app_meta_data jsonb default '{}'::jsonb,
   raw_user_meta_data jsonb default '{}'::jsonb,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  last_sign_in_at timestamptz
 );
 
 -- The three claim readers, in their modern claims-JSON form — the form the

@@ -118,38 +118,12 @@ function renderExportHtml() {
           </div>
         </div>
 
-        <!-- The station list itself now comes from the datastore, so this panel
-             answers two questions rather than one: what is on screen, and
-             whether the database is reachable. They can disagree — a healthy
-             connection under a station list that fell back to a file is exactly
-             the case worth being able to see. -->
+        <!-- The Data source and stations.json panels that were here are on
+             the Admin tab now (admin.js), with the header's load buttons. -->
         <div class="panel">
-          <div class="panel-header">
-            <h2>Data source</h2>
-            <button class="exp-btn-sm" onclick="dbCheck()"
-                    aria-label="Re-test the datastore connection">Re-test</button>
-          </div>
-          <div id="db-status" role="status">${renderDbStatusHtml()}</div>
-        </div>
-
-        <!-- The JSON escape hatch. Edits land in the database now, so the file
-             has to be refreshable from it — see snapshotStationsJson(). -->
-        <div class="panel">
-          <div class="panel-header">
-            <h2>stations.json</h2>
-            ${mayDl
-              ? `<button id="btn-snapshot" class="exp-btn-sm" onclick="snapshotStationsJson()"
-                    title="Download the database's current station list as stations.json">Snapshot</button>`
-              : `<button class="exp-btn-sm" onclick="Auth.open()"
-                    title="Downloading the station document needs a signed-in session">Sign in to snapshot</button>`}
-          </div>
-          <div class="small">
-            The whole station list as a file — the offline copy, and what this app
-            falls back to when the datastore cannot be reached. Taken from the
-            database as it is right now, not from what this tab has loaded.
-          </div>
-          ${mayDl ? '' : exportGateNoteHtml('download the station document')}
-          <div id="snapshot-note" class="small exp-note" role="status"></div>
+          <div class="small">Where the station list came from, and the
+            <strong>stations.json</strong> snapshot, are on the
+            <a href="#" onclick="switchTab('admin');return false">🛠️ Admin</a> tab.</div>
         </div>
       </aside>
 

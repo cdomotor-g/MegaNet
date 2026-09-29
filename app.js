@@ -58,7 +58,9 @@
 function setHeaderLabel(id, text) {
   const btn = document.getElementById(id);
   if (!btn) return;
-  const label = btn.querySelector('.hdr-label');
+  // .btn-label is the same thing on a button outside the banner (the Admin
+  // tab's ⬇️ Load from GitHub), where the icon must survive the rewrite too.
+  const label = btn.querySelector('.hdr-label, .btn-label');
   if (label) label.textContent = text;
   else btn.textContent = text;
 }
@@ -2962,7 +2964,9 @@ function renderMain() {
   // Field Photos joins them too: its library and its uploads are the
   // datastore's, and the station list only names the station a photo is of —
   // a photo read before it loads is still placed, and filed by the database.
-  const noDataTabs = ['packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos'];
+  // Admin joins them too: loading the station file is one of the things it is
+  // for, so it cannot be the thing it waits on.
+  const noDataTabs = ['packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'admin'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -3002,7 +3006,8 @@ function renderMain() {
     case 'maintenance': el.innerHTML = Maintenance.render();  Maintenance.init(); break;
     case 'history':    el.innerHTML = History.render();       History.init();      break;
     case 'photos':     el.innerHTML = FieldPhotos.render();   FieldPhotos.init();  break;
-    case 'export':     el.innerHTML = renderExportHtml();     initExport();     break;
+    case 'export':     el.innerHTML = renderExportHtml();                      break;
+    case 'admin':      el.innerHTML = Admin.render();         Admin.init();        break;
     default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }
   updateChromeHeight();     // three tabs size their own scrollers off it
@@ -3022,6 +3027,8 @@ function renderEmpty() {
           <button class="primary" onclick="document.getElementById('file-input').click()">
             Load stations.json
           </button>
+          <button onclick="loadFromGitHub()">Load from GitHub</button>
+          <button onclick="switchTab('admin')">🛠️ Admin</button>
         </div>
       </div>
     </div>`;

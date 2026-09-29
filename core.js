@@ -161,6 +161,13 @@ const TABS = [
     { id: 'photos',     label: 'Field Photos',           icon: '📷',
       find: 'pictures camera gps exif ocr overlay solocator geotag position heading upload bulk folder dropbox carousel unplaced' },
   ] },
+  // Last, so it sits at the foot of the nav: nobody's daily work, and the one
+  // group whose tab the header's load buttons and the Export tab's Data source
+  // and snapshot panels moved into.
+  { group: 'Admin', tabs: [
+    { id: 'admin',      label: 'Admin',                  icon: '🛠️',
+      find: 'administration users accounts people roles privileges permissions groups allowlist editors sign in access database datastore data source schema load stations.json github file snapshot backup settings storage reset migration' },
+  ] },
 ];
 
 // Flattened, for the lookups that only care which tab is open (the bug
@@ -1490,9 +1497,9 @@ const HELP = {
 
   export: {
     summary: 'Builds the full set of CSV files Radio Mobile needs, scoped to the networks ticked in '
-           + 'the sidebar. The station file itself can also be exported here as the escape hatch '
-           + 'from the database, and the <strong>Data source</strong> panel says which of the '
-           + 'three sources the list on screen actually came from.',
+           + 'the sidebar. The station file itself — the escape hatch from the database — and the '
+           + '<strong>Data source</strong> panel that says which of the three sources the list on '
+           + 'screen came from are on the <strong>Admin</strong> tab.',
     watch: [
       '<strong>The Stations tab\'s filters have no say here.</strong> What gets exported is the '
       + 'repeaters on the ticked networks plus every station their pass ranges cover — so a '
@@ -1502,17 +1509,10 @@ const HELP = {
       'That also means a station on <strong>no recorded network</strong> cannot be exported by '
       + 'ticking every box, because nothing pulls it in. Ticking all of them is a little under '
       + 'half the file, not the file.',
-      '<strong>Both downloads need a signed-in session.</strong> Everything that says what this '
-      + 'tab would produce — the ticks, the counts, the repeater table and the Data source panel '
-      + '— reads without one; what is behind the sign-in is taking the network away as a file, '
-      + 'which is the whole list rather than a view of it. Your ticks survive signing in.',
-      'The <strong>Data source</strong> panel is the first place a schema mismatch shows up: if it '
-      + 'says the list came from <code>stations.json</code> rather than the datastore, the app '
-      + 'fell back, edits elsewhere are refused, and the retry button is there rather than a '
-      + 'reload.',
-      '<strong>Snapshot</strong> writes today\'s document out as a file to take somewhere without '
-      + 'a network. It is a copy, not a branch — nothing reads it back in automatically, and '
-      + 'editing it changes nothing in the database.',
+      '<strong>The download needs a signed-in session.</strong> Everything that says what this '
+      + 'tab would produce — the ticks, the counts and the repeater table — reads without one; '
+      + 'what is behind the sign-in is taking the network away as a file, which is the whole list '
+      + 'rather than a view of it. Your ticks survive signing in.',
       '<strong>An AI agent or a script does not need this tab.</strong> The read-only station API '
       + '(<code>/api/v1</code>) and MCP server (<code>/api/mcp</code>) answer a station — or a '
       + 'whole-station dossier for a report — at a time, with no sign-in and rate limited. How to '
@@ -1522,7 +1522,35 @@ const HELP = {
               href: 'docs/datastore-decision.md' },
             { label: 'Station data for AI agents and scripts — the read-only API and MCP server',
               href: 'docs/agent-api.md' }],
-    related: ['stations', 'passranges'],
+    related: ['stations', 'passranges', 'admin'],
+  },
+  admin: {
+    summary: 'Where the station data comes from and the housekeeping around it: load '
+           + '<code>stations.json</code> from a file, GitHub or the datastore, see which one is on '
+           + 'screen and whether the database answers, and snapshot it. Administrators also manage '
+           + '<strong>users</strong> and the <strong>allowlist</strong> of who may sign in here, and '
+           + 'everybody can read what each user group may do.',
+    watch: [
+      '<strong>Adding a user is adding an allowlist entry.</strong> A person appears under Users '
+      + 'the first time they sign in, with the entry\'s initial role. An address lets one person '
+      + 'in; <code>@domain</code> lets in everybody at it.',
+      '<strong>Viewer is recorded, not enforced.</strong> Editing is decided by the allowlist, so '
+      + 'to stop somebody writing, remove their entry — setting them to viewer does not.',
+      'The database refuses what would lock everybody out: demoting or deleting yourself, removing '
+      + 'the last administrator, or removing the only entry that lets you in. The owner at a '
+      + '<code>psql</code> prompt can still do all three.',
+      'The <strong>Data source</strong> panel is the first place a schema mismatch shows up: if it '
+      + 'says the list came from <code>stations.json</code> rather than the datastore, the app '
+      + 'fell back, edits are refused, and <strong>Load from the datastore</strong> retries.',
+      '<strong>Snapshot</strong> writes today\'s document out as a file to take somewhere without '
+      + 'a network. It is a copy, not a branch — nothing reads it back in automatically.',
+      '<strong>Clear settings</strong> forgets what this browser keeps for the app — filters, '
+      + 'widths, drafts — and keeps your sign-in.',
+    ],
+    links: [{ label: 'Access, sign-in and the allowlist', href: 'docs/access.md' },
+            { label: 'The database schema, migrations and who may write', href: 'db/README.md' },
+            { label: 'Why the station list lives in Postgres', href: 'docs/datastore-decision.md' }],
+    related: ['export', 'photos'],
   },
 };
 
@@ -2095,7 +2123,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 41;
+const DB_SCHEMA_VERSION = 42;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

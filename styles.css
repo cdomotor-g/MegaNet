@@ -776,19 +776,27 @@ header {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: .8rem 1.25rem;
+  padding: .45rem 1.25rem;
   background: var(--header);
   color: white;
 }
 
+/* The title and the line under it used to be two rows; they are one now, the
+   tagline and the count set beside the name on its baseline, which is most of
+   a row of banner given back to the page. */
 .header-id {
+  display: flex;
+  align-items: baseline;
+  gap: .75rem;
   min-width: 0;                 /* the title may ellipsise before the buttons wrap */
 }
 
 header h1 {
-  margin: 0 0 .15rem 0;
-  font-size: 1.45rem;
+  margin: 0;
+  flex: 0 0 auto;
+  font-size: 1.3rem;
   line-height: 1.15;
+  white-space: nowrap;
 }
 
 header p {
@@ -798,16 +806,25 @@ header p {
   max-width: 70ch;
 }
 
-/* Tagline and station count share one line — two stacked lines of 0.85 rem
-   text under the title bought nothing that one line does not. */
+/* Tagline and station count share one line, beside the title — and give way
+   before the title does: the count ellipsises, its tooltip keeps the rest. */
 .header-sub {
   display: flex;
-  flex-wrap: wrap;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
   align-items: baseline;
-  gap: .1rem .5rem;
+  gap: .5rem;
+  min-width: 0;
   font-size: .85rem;
   line-height: 1.3;
+  white-space: nowrap;
   color: rgba(255, 255, 255, .82);
+}
+
+.header-stats {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-stats:not(:empty)::before {
@@ -11962,12 +11979,11 @@ code {
 
   /* The name and the count take whatever the buttons leave, and give it up
      before a button does. */
-  .header-id { flex: 1 1 auto; }
+  .header-id { flex: 1 1 auto; gap: .5rem; }
 
   header h1 {
-    margin: 0;
+    flex: 0 0 auto;
     font-size: 1.05rem;
-    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -14356,3 +14372,55 @@ code {
      in-app button. */
   a[href]::after { content: none !important; }
 }
+
+
+/* ── Admin tab (admin.js) ────────────────────────────────────────────────────
+   Two columns on a wide screen — the data and this browser on the left, the
+   people and the reference on the right — and one below `lg`. */
+.adm-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .adm-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.adm-actions { margin: .5rem 0; }
+.adm-loaded  { margin: 0; color: var(--muted); }
+
+.adm-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .3rem .9rem;
+  margin: 0 0 .6rem;
+  font-size: .9rem;
+}
+.adm-dl dt { color: var(--muted); }
+.adm-dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+.adm-table td,
+.adm-table th { vertical-align: middle; }
+.adm-table td { overflow-wrap: anywhere; text-overflow: clip; }
+.adm-table input,
+.adm-table select { min-width: 0; }
+.adm-row-acts { white-space: nowrap; }
+.adm-row-acts button + button { margin-left: .3rem; }
+
+.adm-form {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(9rem, 1fr) minmax(0, 2fr) auto;
+  gap: .5rem;
+  align-items: end;
+  margin: .5rem 0 .75rem;
+}
+.adm-form label { display: grid; gap: .2rem; font-size: .85rem; }
+
+@media (max-width: 700px) {
+  .adm-form { grid-template-columns: minmax(0, 1fr); }
+}
+
+button.adm-danger { color: var(--bad); }
+button.adm-danger:hover { border-color: var(--bad); }
