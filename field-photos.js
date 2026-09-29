@@ -2057,26 +2057,39 @@ const FieldPhotos = (function () {
   // the tiles, and still the better place to drop a pin.
   let mm = null;    // { map, id, from, at, pin, ring, ghost, leader, cone, others: [{ row, dot }], withOthers }
 
-  // The imagery under both photo maps: Esri's, as the Stations map's
-  // Satellite base, and over it inside Queensland the State's aerial program
-  // (the LatestStateProgram cache digital-twin.js exports from — 10–20 cm in
-  // towns, Planet satellite where nothing was flown), tiled in Web Mercator to
-  // z20. Esri runs out at z19 over much of the bush and paints "Map data not
-  // yet available" there; the State's tiles cover it. Outside the State its
-  // tiles 404 and Esri shows through.
-  const QLD_TILE = 'https://spatial-img.information.qld.gov.au/arcgis/rest/services/Basemaps/LatestStateProgram_AllUsers/ImageServer/tile/{z}/{y}/{x}';
-  const QLD_BOUNDS = [[-29.6, 137.6], [-8.9, 153.9]];
+  // The imagery under both photo maps. Esri's, as the Stations map's
+  // Satellite base, at the bottom — but only its z18 tiles, stretched from
+  // there: over much of the bush Esri has nothing at z19 and paints "Map data
+  // not yet available", and a Leaflet layer cannot fall back tile by tile.
+  // Over it, each State's own aerial program, tiled in Web Mercator:
+  // Queensland's LatestStateProgram (the cache digital-twin.js exports from —
+  // 10–20 cm in towns, Planet satellite where nothing was flown) and NSW's
+  // SIX Maps imagery. Where a State has no tile at a zoom it answers 404, or
+  // a transparent PNG past its border, and the layer below shows through.
+  const STATE_IMAGERY = [
+    { url: 'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/MapServer/tile/{z}/{y}/{x}',
+      bounds: [[-37.6, 140.9], [-28.1, 153.7]], attribution: 'Imagery © Spatial Services NSW' },
+    { url: 'https://spatial-img.information.qld.gov.au/arcgis/rest/services/Basemaps/LatestStateProgram_AllUsers/ImageServer/tile/{z}/{y}/{x}',
+      bounds: [[-29.6, 137.6], [-8.9, 153.9]], attribution: 'Imagery © State of Queensland' },
+  ];
+  const QLD_BOX = { west: 137.6, east: 153.9, south: -29.6, north: -8.9 };
+
+  // Queensland's photography runs to z20 nearly everywhere; elsewhere z19
+  // is often not there, so a map opens a level out.
+  function openZoom(lat, lon, z) {
+    const q = lat >= QLD_BOX.south && lat <= QLD_BOX.north && lon >= QLD_BOX.west && lon <= QLD_BOX.east;
+    return q ? z : z - 1;
+  }
 
   function addPhotoImagery(map) {
     const base = typeof makeBaseLayers === 'function' ? makeBaseLayers().Satellite : null;
     if (base) {
-      Object.assign(base.options, { maxNativeZoom: 19, maxZoom: 21, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' });
+      Object.assign(base.options, { maxNativeZoom: 18, maxZoom: 21, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' });
       base.addTo(map);
     }
-    L.tileLayer(QLD_TILE, {
-      maxNativeZoom: 20, maxZoom: 21, minZoom: 6, bounds: QLD_BOUNDS,
-      attribution: 'Imagery © State of Queensland',
-    }).addTo(map);
+    STATE_IMAGERY.forEach(s => L.tileLayer(s.url, {
+      maxNativeZoom: 20, maxZoom: 21, minZoom: 6, bounds: s.bounds, attribution: s.attribution,
+    }).addTo(map));
   }
 
   function unmountMoveMap() {
@@ -2106,7 +2119,7 @@ const FieldPhotos = (function () {
         row: x, dot: L.circleMarker([+x.lat, +x.lon], { radius: 4, interactive: false, className: 'fp-mm-other' }).addTo(map),
       }));
       // The ring and a margin round it, or the pin close up.
-      map.fitBounds(L.latLng(from).toBounds(Math.max(40, (acc || 0) * 3)), { maxZoom: 20, animate: false });
+      map.fitBounds(L.latLng(from).toBounds(Math.max(40, (acc || 0) * 3)), { maxZoom: openZoom(from[0], from[1], 20), animate: false });
     } else {
       const c = centreFor(r);
       map.setView([c.lat, c.lon], c.z, { animate: false });
@@ -2144,7 +2157,7 @@ const FieldPhotos = (function () {
     if (acc) L.circle(at, { radius: acc, interactive: false, className: `fp-mm-ring${rough(acc) ? ' is-rough' : ''}` }).addTo(map);
     spotRows(r).filter(x => x !== r).forEach(x => L.circleMarker([+x.lat, +x.lon], { radius: 4, interactive: false, className: 'fp-mm-other' }).addTo(map));
     L.circleMarker(at, { radius: 6, interactive: false, className: 'fp-sm-here' }).addTo(map);
-    map.fitBounds(L.latLng(at).toBounds(Math.max(60, (acc || 0) * 3)), { maxZoom: 19, animate: false });
+    map.fitBounds(L.latLng(at).toBounds(Math.max(60, (acc || 0) * 3)), { maxZoom: openZoom(at[0], at[1], 19), animate: false });
     // The compass, on the map: a ring of screen size around the spot with
     // N E S W on it and a wedge per photo. Added once the view is set.
     const dial = dialHtml(r);
