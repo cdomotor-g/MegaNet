@@ -135,6 +135,12 @@ function nodeHalf(FS) {
   const noAhd = FS.borrowed({ ...gatton, gauge_survey: [] }, 'gauge', 85);
   ok('a lender whose AEP levels cannot come down to its gauge: they are left out, and the notes say so',
     noAhd.levels.every(l => l.kind !== 'aep') && noAhd.notes.some(n => /left out/.test(n)), J(noAhd.notes));
+  const withPeaks = { ...gatton, flood_peaks: [{ date: '1974-01-27', height_m: 10, level_m_ahd: 97.54 }, { date: '2011-01-12', height_m: 9, level_m_ahd: 96.54 }, { date: '1893-02-01', height_m: 12 }] };
+  const LP = FS.borrowed(withPeaks, 'gauge', 85);
+  const pk = LP.levels.filter(l => l.kind === 'peak');
+  ok('recorded floods cross too, as gauge heights over the channel, the highest starred, none colouring the water; an unplaced one is left out',
+    pk.length === 2 && near(pk.find(l => l.highest).ahd, 85 + 97.54 - 87.54, 1e-9) && pk.every(l => l.rank === null), J(pk));
+  ok('a station with only recorded floods still has something to lend', FS.borrowable({ id: 'y', name: 'Old', flood_peaks: [{ date: '1974-01-27', level_m_ahd: 50 }] }) !== null);
   ok('a station with nothing to lend lends nothing', FS.borrowable({ id: 'x', name: 'Nowhere' }) === null);
 }
 

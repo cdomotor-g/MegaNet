@@ -794,8 +794,9 @@ and how high — *Major*, *1% AEP*, *1974 flood* (★ for the highest recorded),
 with its height on the gauge and in m AHD. The call-outs are spread so none
 sits on another. The heights are the tower's own metres over the ground at
 its foot, which is where the water meets the tower at the exaggeration the
-twin opens with. Levels borrowed from another station are not the station's,
-so they are not marked on it. The marks show and hide with the water, and
+twin opens with. Levels borrowed from another station — classes, AEP levels
+and the floods it has recorded — are marked the same way, and the notes say
+whose they are. The marks show and hide with the water, and
 they are not in the `.glb`.
 
 **The scale on the stage** stands the levels up the left of the view, to

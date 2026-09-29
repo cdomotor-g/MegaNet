@@ -221,8 +221,11 @@ const FloodStages = (function () {
   //            right thing only a short way along the same reach, where the
   //            water surface is nearly level.
   //
-  // Peaks the other river reached are not carried: they are that river's
-  // history, not a class.
+  // The floods the other river has reached (`flood_peaks`) are carried too,
+  // as marks on the staff and the tower and never as colour: laid on as
+  // heights on the other gauge in 'gauge' mode, at their own AHD level in
+  // 'ahd' mode. Only those the database could place (see the head of this
+  // file); the rest are named in the notes.
 
   // What a station has that could be borrowed, or null: its newest classes
   // (as gauge heights, whatever its datum) and its AEP levels (AHD), and its
@@ -232,9 +235,10 @@ const FloodStages = (function () {
     const cls = classes ? CLASSES.filter(c => num(classes[c.key]) != null).map(c => ({ ...c, h: num(classes[c.key]) })) : [];
     const row = aepRow(s);
     const aeps = row ? aepLevels().filter(d => num(row[d.key]) != null).map(d => ({ ...d, ahd: num(row[d.key]) })) : [];
-    if (!cls.length && !aeps.length) return null;
+    const peaks = ((s && s.flood_peaks) || []).filter(p => p && num(p.level_m_ahd) != null);
+    if (!cls.length && !aeps.length && !peaks.length) return null;
     const zero = zeroOf(s);
-    return { classes: cls, classesAsAt: classes ? classes.as_at || null : null, aeps, aepAsAt: row ? row.as_at || null : null,
+    return { classes: cls, classesAsAt: classes ? classes.as_at || null : null, aeps, peaks, aepAsAt: row ? row.as_at || null : null,
              ahdZero: zero && zero.datum === 'AHD' ? zero.m : null, zero };
   }
 
@@ -266,6 +270,21 @@ const FloodStages = (function () {
         levels.push({ key: d.key, kind: 'aep', label: `${d.label} AEP`, short: d.label, ahd: ch + g, gauge: g,
                       rank: 4 + i, oneIn: d.oneIn, aepIndex: i, aepCount: b.aeps.length });
       });
+    }
+    if (b.peaks.length) {
+      const mine = b.peaks.map(p => {
+        const at = num(p.level_m_ahd);
+        const date = p.date ? String(p.date).slice(0, 10) : null;
+        const g = b.ahdZero != null ? at - b.ahdZero : (num(p.height_m) != null ? num(p.height_m) : null);
+        return g == null ? null : { key: `peak ${date || ''}`.trim(), kind: 'peak', label: `Peak${date ? ` ${date}` : ''}`, short: peakWhen(date),
+                                    ahd: ch + g, gauge: g, recorded: num(p.height_m), rank: null, date };
+      }).filter(Boolean);
+      if (mine.length) {
+        const high = mine.reduce((a, c) => (c.ahd > a.ahd ? c : a));
+        high.label = `Highest recorded${high.date ? ` (${high.date})` : ''}`;
+        high.highest = true;
+        levels.push(...mine);
+      }
     }
     levels.sort((x, y) => x.ahd - y.ahd || (x.rank ?? 99) - (y.rank ?? 99));
     return {

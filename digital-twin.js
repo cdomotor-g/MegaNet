@@ -4183,6 +4183,9 @@ void main() {
     if (b.aeps.length) {
       parts.push(`${b.aeps.map(d => `${d.label} AEP ${d.ahd.toFixed(2)}`).join(' · ')} m AHD`);
     }
+    if (b.peaks && b.peaks.length) {
+      parts.push(`${b.peaks.length} recorded flood${b.peaks.length === 1 ? '' : 's'}`);
+    }
     return parts.join('<br>');
   }
 
@@ -4295,8 +4298,8 @@ void main() {
   // high, the call-outs spread so none sits on another. Heights are the
   // tower's own metres over the ground at its foot (the level less the
   // ground at the origin), which is where the water meets the tower at the
-  // exaggeration it opens with. Borrowed levels are not the station's and
-  // are not marked on it. A simulation's marks: never in the .glb.
+  // exaggeration it opens with. Borrowed levels are marked like its own, the call-outs
+  // and the water's notes saying whose they are. A simulation's marks: never in the .glb.
   const MARK_GAP = 0.45;       // call-outs' middles no nearer than this, metres
   const CALLOUT_W = 1.5;       // a call-out's width, metres; 640 × 180 px
 
@@ -4361,7 +4364,7 @@ void main() {
   function buildTowerMarks() {
     removeTowerMarks();
     const F = tw.flood, m = tw.model, g = tw.ground;
-    if (!F || F.none || !g || !sc.station || !m || m.structure !== 'tower' || F.lad.borrowed) return;
+    if (!F || F.none || !g || !sc.station || !m || m.structure !== 'tower') return;
     const pal = (sc.flood && sc.flood.palette) || floodPalette();
     const railTop = DECK_TOP + RAIL_H;
     const on = F.lad.levels.map(l => ({ l, y: l.ahd - g.h0 })).filter(o => o.y > SLAB_TOP && o.y <= railTop);
