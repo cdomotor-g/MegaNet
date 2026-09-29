@@ -1756,18 +1756,19 @@ void main() {
   const DECK_HALF = 0.9;     // the platform is 1.8 m square
   const RAIL_H    = 1.1;     // handrail over the deck
   const SLAB_TOP  = 0.10;    // the foundation slab stands 100 mm proud of the ground
-  // The footing's top, as the drawings have it: a rectangle 4.0 m east–west
-  // and 2.4 m north–south, the mast 1.2 m in from its west end on the long
-  // axis. Below the ground it steps down deeper under part of it, and there
-  // is a pit and a conduit at its east end; none of that is seen, so none
-  // of it is drawn.
-  const SLAB_W = -1.2, SLAB_E = 2.8, SLAB_HALF_NS = 1.2;
+  // The footing's top, as the drawings have it: a rectangle 4.0 m north–south
+  // and 2.4 m east–west, the mast 1.2 m in from its north end on the long
+  // axis, the rest running south under the ladder so that its feet stand on
+  // the concrete. Below the ground it steps down deeper under part of it,
+  // and there is a pit and a conduit at its far end; none of that is seen,
+  // so none of it is drawn.
+  const SLAB_N = -1.2, SLAB_S = 2.8, SLAB_HALF_EW = 1.2;
   // The extension ladder: leaning on the deck's south edge at 1 in 4 (a metre
   // out at its foot for every four up — AS/NZS 1892 and every WorkSafe
   // guide, about 76°), running on a metre past the landing as a handhold.
   const LADDER_RUN   = 0.25;   // horizontal metres per vertical metre
   const LADDER_TOP_Z = 1.005;  // the base section's centre line where it passes the deck's top
-  const LADDER_Z  = LADDER_TOP_Z + DECK_TOP * LADDER_RUN;   // the ladder's foot, on the ground
+  const LADDER_Z  = LADDER_TOP_Z + (DECK_TOP - SLAB_TOP) * LADDER_RUN;   // the ladder's foot, on the footing
   const LADDER_HW = 0.2;     // half the fly section's width (the base's is 0.23)
   const LADDER_OVER = 1.0;   // how far past the landing the stiles run
   const TOWER_STAFF_H = 3.0; // the staff gauge on the mast, from the slab up
@@ -2216,7 +2217,7 @@ void main() {
     // 400 mm deep so a slope under it never shows a gap), and the mast's
     // flange bolted to it. The mast's foot is still the ground at the
     // origin — the footing is cast round it.
-    box(g, k.concrete, SLAB_E - SLAB_W, 0.4, 2 * SLAB_HALF_NS, (SLAB_W + SLAB_E) / 2, SLAB_TOP - 0.2, 0, 'foundation slab');
+    box(g, k.concrete, 2 * SLAB_HALF_EW, 0.4, SLAB_S - SLAB_N, 0, SLAB_TOP - 0.2, (SLAB_N + SLAB_S) / 2, 'foundation slab');
     cyl(g, k.cream, 0.28, 0.28, 0.03, 0, SLAB_TOP + 0.015, 0, 'base flange', 32);
     const mast = cyl(g, k.galv, POLE_R, POLE_R, TOWER_H, 0, TOWER_H / 2, 0, 'station pole', 40);
     sc.pole = mast;
@@ -2329,11 +2330,12 @@ void main() {
     box(sp, k.panel, 0.55, 0.40, 0.006, 0, 0, -0.012, 'solar panel');
     return { group: g, top: DECK_TOP + RAIL_H, poleTop: TOWER_H,
              ladder: { x: 0, z: LADDER_Z, foot: LADDER_Z, stand: LADDER_Z + 0.22, run: LADDER_RUN, halfW: LADDER_HW },
+             slab: { n: SLAB_N, s: SLAB_S, halfEW: SLAB_HALF_EW, top: SLAB_TOP },
              deck: { top: DECK_TOP, half: DECK_HALF, front: -H + CD + 0.12 },
              staff: staffFaceMesh };
   }
 
-  // The extension ladder: a base section on the ground and a fly section
+  // The extension ladder: a base section on the footing and a fly section
   // behind it, run up until the stiles stand a metre past the landing, both
   // leaning on the deck's south edge at 1 in 4. Built square in a group whose
   // local y runs up the stiles and local +z out to the climber, then leant.
@@ -2341,10 +2343,11 @@ void main() {
   // sections together, the rung locks on the fly and a tie at the top.
   function buildExtensionLadder(g, k) {
     const lean = Math.atan(LADDER_RUN);
-    const len = Math.hypot(DECK_TOP, DECK_TOP * LADDER_RUN) + LADDER_OVER;
+    const rise = DECK_TOP - SLAB_TOP;
+    const len = Math.hypot(rise, rise * LADDER_RUN) + LADDER_OVER;
     const lg = new THREE.Group();
     lg.name = 'extension ladder';
-    lg.position.set(0, 0, LADDER_Z);
+    lg.position.set(0, SLAB_TOP, LADDER_Z);
     lg.rotation.x = -lean;
     g.add(lg);
     const baseHW = LADDER_HW + 0.03, BASE_TOP = 3.2, FLY_FOOT = 2.0, FLY_Z = -0.07;
@@ -2362,7 +2365,7 @@ void main() {
     for (let y = FLY_FOOT + 0.15; y <= len - 0.1; y += 0.3) bar(lg, k.steel, 0.016, -LADDER_HW, y, FLY_Z, LADDER_HW, y, FLY_Z, 'ladder rung');
     // The tie: the fly's stiles lashed to the handrail posts either side of
     // the gap, 300 mm over the grating.
-    const ty = DECK_TOP + 0.3, tz = LADDER_Z - ty * LADDER_RUN + FLY_Z, p = DECK_HALF - 0.02, hw = LADDER_HW + 0.1;
+    const ty = DECK_TOP + 0.3, tz = LADDER_Z - (ty - SLAB_TOP) * LADDER_RUN + FLY_Z, p = DECK_HALF - 0.02, hw = LADDER_HW + 0.1;
     for (const sx of [-1, 1]) bar(g, k.orange, 0.008, sx * LADDER_HW, ty, tz, sx * hw, ty, p, 'ladder tie');
   }
 
@@ -2447,7 +2450,7 @@ void main() {
     sc.towerStaff = built.staff || null;
     if (built.staff && tw.ground) setTowerStaff(built.staff, st, tw.ground.h0);
     sc.scene.add(built.group);
-    tw.model = { ...kind, top: built.top, poleTop: built.poleTop, ladder: built.ladder, deck: built.deck,
+    tw.model = { ...kind, top: built.top, poleTop: built.poleTop, ladder: built.ladder, deck: built.deck, slab: built.slab || null,
                  plate: { name: st.name || st.id, number: st.station_number ? String(st.station_number) : '' } };
   }
 
@@ -2475,11 +2478,20 @@ void main() {
     return null;
   }
 
+  // Where feet on the ground are: on the tower's footing where they are over
+  // it (unless the ground, exaggerated, has risen over it), else the ground.
+  function standY(x, z) {
+    const y = yAt(x, z);
+    const f = tw.model && tw.model.slab;
+    if (f && Math.abs(x) <= f.halfEW && z >= f.n && z <= f.s) return Math.max(y, f.top);
+    return y;
+  }
+
   // The ladder's foot, and its height, live: the ground under it moves with
   // the exaggeration, the deck does not.
   function ladderFootY() {
     const m = tw.model;
-    return m && m.ladder ? yAt(m.ladder.x, m.ladder.stand) : 0;
+    return m && m.ladder ? standY(m.ladder.x, m.ladder.stand) : 0;
   }
   function ladderHeight() {
     const m = tw.model;
@@ -2551,7 +2563,7 @@ void main() {
   // there — not at the pole's height.
   function buildFigure() {
     const grp = makeFigure();
-    // West of a tower, off its footing, which runs away to the east.
+    // West of a tower, off its footing, which runs away to the south.
     const tower = tw.model && tw.model.structure === 'tower';
     const fx = tower ? -1.6 : 1.0, fz = tower ? 0.6 : 0.25;
     grp.position.set(fx, yAt(fx, fz), fz);
@@ -2648,7 +2660,7 @@ void main() {
     const m = tw.model;
     if (m && m.deck && pose.level === 'deck') return m.deck.top;
     if (m && m.ladder && pose.level === 'ladder') return ladderFootY() + (pose.climb || 0);
-    return yAt(x, z);
+    return standY(x, z);
   }
   function remotePose(key, p) {
     const a = avatars.get(key);
@@ -5027,7 +5039,7 @@ void main() {
     if (rig.mode === 'walk') {
       // Feet on the ground, or on a rung, or on the grating.
       const m = tw.model;
-      let feet = yAt(rig.px, rig.pz);
+      let feet = standY(rig.px, rig.pz);
       if (m && m.deck && rig.level === 'deck') feet = m.deck.top;
       else if (m && m.ladder && rig.level === 'ladder') feet = ladderFootY() + rig.climb;
       const y = feet + EYE_H;

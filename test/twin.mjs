@@ -961,7 +961,7 @@ try {
     const rungs = tm ? tm.parts.filter(n => n === 'ladder rung').length : 0;
     ok('the platform, its rails, an extension ladder leaning on the south edge at 1 in 4 with rungs every 300 mm, the gauge and the antenna mast are there',
       tm && tm.deck && near(tm.deck.top, 4.05, 1e-9) && near(tm.deck.half, 0.9, 1e-9) && tm.ladder && near(tm.ladder.run, 0.25, 1e-9)
-        && near(tm.ladder.foot, 1.005 + 4.05 * 0.25, 1e-9) && rungs === 20 && tm.parts.includes('platform grating') && tm.parts.filter(n => n === 'handrail').length === 10
+        && near(tm.ladder.foot, 1.005 + (4.05 - 0.1) * 0.25, 1e-9) && tm.ladder.footY >= 0.1 - 1e-9 && rungs === 20 && tm.parts.includes('platform grating') && tm.parts.filter(n => n === 'handrail').length === 10
         && tm.parts.includes('ladder stile') && tm.parts.includes('ladder guide bracket') && !tm.parts.includes('ladder bracket')
         && tm.parts.includes('rain gauge') && tm.parts.includes('antenna mast') && tm.parts.includes('solar panel'),
       JSON.stringify({ deck: tm && tm.deck, ladder: tm && tm.ladder, rungs, rails: tm && tm.parts.filter(n => n === 'handrail').length }));

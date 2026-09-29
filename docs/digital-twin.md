@@ -184,9 +184,10 @@ nothing is assumed:
   south edge at the safe 1 in 4 (a metre out at the foot for every four up,
   about 76°) with its stiles running a metre past the landing. It stands on
   its concrete footing, of which only the top is drawn: a rectangle 4.0 m
-  east–west by 2.4 m north–south, 100 mm proud of the ground, the mast 1.2 m
-  in from its west end (the step down, the pit and the conduit below the
-  ground are not drawn). This
+  north–south by 2.4 m east–west, 100 mm proud of the ground, the mast 1.2 m
+  in from its north end and the rest running south under the ladder, whose
+  feet stand on it (the step down, the pit and the conduit below the ground
+  are not drawn). Anyone walking onto the footing stands on its top. This
   is the tower for a *telemetered* station whose record says it reads a
   river: a sensor typed `Water Level…` or `Gas Pressure`, a legacy
   `water_level` ALERT address, a Bureau listing typed Water Level, or the
