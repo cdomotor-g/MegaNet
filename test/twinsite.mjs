@@ -104,7 +104,8 @@ const lonLat = (x, z) => [CUR.lon + x / M_LON(), CUR.lat - z / M_LAT()];
 
 // The span across the creek, 40 m south of the gauge, 60 m long.
 const BRIDGE = { z: 40, x0: -60, x1: 0 };
-let bridgesAnswer = 'span';   // 'span' | 'fail'
+let bridgesAnswer = 'span';   // 'span' | 'fail' | 'edge' | 'rail' | 'cut' | 'twin' | 'flaky'
+let flakyLeft = 0;
 
 // The flood module, off the page, for the arithmetic the page is held to.
 function loadFloodStages() {
@@ -180,8 +181,15 @@ async function browserHalf() {
       seen.bridges++;
       if (bridgesAnswer === 'fail') return route.fulfill({ status: 500, body: 'no', headers: cors });
       const rail = /OtherTransport/.test(route.request().url());
-      const feats = rail ? [] : [{ attributes: { name: null, feature_type: 'Road Bridge', dimension_m: 60 },
-        geometry: { paths: [[lonLat(BRIDGE.x0, BRIDGE.z), lonLat(BRIDGE.x1, BRIDGE.z)]] } }];
+      if (bridgesAnswer === 'flaky' && flakyLeft > 0) { flakyLeft--; return route.fulfill({ status: 500, body: 'busy', headers: cors }); }
+      const road = (x0, x1, z) => ({ attributes: { name: null, feature_type: 'Road Bridge', dimension_m: 60 }, geometry: { paths: [[lonLat(x0, z), lonLat(x1, z)]] } });
+      const railF = (x0, x1, z) => ({ attributes: { name: null, feature_type: 'Railway Bridge', dimension_m: 60 }, geometry: { paths: [[lonLat(x0, z), lonLat(x1, z)]] } });
+      let feats;
+      if (bridgesAnswer === 'edge') feats = rail ? [] : [road(-10, 20, -215)];             // wholly past the north edge of 400 m
+      else if (bridgesAnswer === 'rail') feats = rail ? [railF(-60, 0, 5)] : [road(BRIDGE.x0, BRIDGE.x1, BRIDGE.z)];   // a railway nearer the gauge than the road
+      else if (bridgesAnswer === 'cut') feats = rail ? [] : [road(20, 500, 40)];            // too long to hold, one end in the patch
+      else if (bridgesAnswer === 'twin') feats = rail ? [railF(-60, 0, 5), railF(-60, 0, 8.5)] : [];   // one bridge digitised twice
+      else feats = rail ? [] : [road(BRIDGE.x0, BRIDGE.x1, BRIDGE.z)];
       return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: J({ features: feats }) });
     });
     page.on('pageerror', e => errors.push(e.stack || e.message));
@@ -194,15 +202,19 @@ async function browserHalf() {
     // about them: a check pressing a button in them must not race the fold.
     await page.evaluate(() => DigitalTwin._infoFold(null));
 
-    const built = id => page.waitForFunction(i => {
+    // `after` is the build sequence the twin was at: a build for the station already
+    // on the stage must not be answered with the last one's numbers.
+    const built = (id, after = -1) => page.waitForFunction(([i, a, lat]) => {
       const d = DigitalTwin.debug();
-      return d.built && d.stationId === i && !d.status.endsWith('…') && d.bridges && d.bridges.status !== 'loading';
-    }, id, { timeout: BUILD_TIMEOUT });
+      return d.built && d.stationId === i && d.seq > a && (a < 0 || (d.origin && Math.abs(d.origin.lat - lat) < 1e-9)) && !d.status.endsWith('…') && d.bridges && d.bridges.status !== 'loading';
+    }, [id, after, CUR.lat], { timeout: BUILD_TIMEOUT });
     const open = async id => {
       const s = byId(id);
       CUR = { lat: s.lat, lon: s.lon };
+      await page.evaluate(() => DigitalTwin._forgetBridges());
+      const before = await page.evaluate(() => DigitalTwin.debug().seq);
       await page.evaluate(i => { if (state.activeTab === 'twin') DigitalTwin.pick(i); else DigitalTwin.openStation(i); }, id);
-      await built(id);
+      await built(id, before);
       return page.evaluate(() => DigitalTwin.debug());
     };
     const text = sel => page.evaluate(s => { const el = document.querySelector(s); return el ? el.textContent.replace(/\s+/g, ' ').trim() : null; }, sel);
@@ -293,6 +305,63 @@ async function browserHalf() {
     });
     ok('the bridge is in the .glb — it is the site — and the station\'s staff with it',
       glb.includes('bridge deck') && glb.includes('bridge girders') && glb.includes('gauge board'), J(glb.filter(n => /bridge|gauge/.test(n))));
+
+    // ── bridges at and past the patch's edge, whose carrier, whose crossing ──
+    bridgesAnswer = 'edge';
+    d = await open('babinda_post_office');
+    ok('a bridge wholly past the 400 m patch\'s edge widens the patch to hold it whole (460 m, 2.3 m samples), and says so',
+      d.size === 460 && near(d.sample_m, 2.3, 1e-9) && d.bridges.list.length === 1 && !d.bridges.list[0].cut
+        && d.notes.some(n => /patch is 460 m, not the 400 m asked for/.test(n)), J({ size: d.size, B: d.bridges.list, notes: d.notes }));
+    ok('…and its deck stands at its banks, a level of 90.5 m over a bank of 90.5 m',
+      d.bridges.list[0].basis === 'banks' && near(d.bridges.list[0].deck[0], 90.5, 0.05), J(d.bridges.list[0]));
+    const b5 = await page.evaluate(() => DigitalTwin.debug().seq);
+    await page.evaluate(() => DigitalTwin.setFitBridges(false));
+    await built('babinda_post_office', b5);
+    d = await page.evaluate(() => DigitalTwin.debug());
+    ok('with the switch off the patch stays 400 m, the bridge is not drawn, and the notes name it past the edge',
+      d.size === 400 && d.bridges.list.length === 0 && d.notes.some(n => /past the patch's edge/.test(n)), J({ size: d.size, notes: d.notes }));
+    await page.evaluate(() => DigitalTwin.setFitBridges(true));
+
+    bridgesAnswer = 'rail';
+    d = await open('gatton');
+    const rl = d.bridges.list.find(b => b.kind === 'rail'), rd = d.bridges.list.find(b => b.kind === 'road');
+    ok('the listed crossing goes on the road bridge, not the railway nearer the gauge, which stands at its banks',
+      rd && rd.basis === 'crossing' && near(rd.deck[0], crossingAhd, 1e-9) && rl && rl.basis === 'banks', J(d.bridges.list));
+
+    bridgesAnswer = 'twin';
+    d = await open('babinda_post_office');
+    ok('one railway bridge digitised twice is drawn once, wide enough to cover both',
+      d.bridges.list.length === 1 && d.bridges.list[0].merged === 1 && d.bridges.list[0].width > 5, J(d.bridges.list));
+
+    bridgesAnswer = 'cut';
+    d = await open('babinda_post_office');
+    ok('a bridge too long to hold runs out of the patch: level from the bank that is in it (90.5 m), not from the creek bed or the edge',
+      d.bridges.list.length === 1 && d.bridges.list[0].basis === 'one bank' && d.bridges.list[0].cut && near(d.bridges.list[0].deck[0], 90.5, 0.05)
+        && d.notes.some(n => /past what a patch of up to/.test(n)), J({ B: d.bridges.list, notes: d.notes }));
+
+    bridgesAnswer = 'flaky';
+    flakyLeft = 1;
+    d = await open('babinda_post_office');
+    ok('a State layer that drops one request is asked again: the bridge is drawn and no failure is said',
+      d.bridges.list.length === 1 && !d.bridges.failed && !d.notes.some(n => /Neither Queensland/.test(n)), J({ B: d.bridges, notes: d.notes }));
+
+    // A station with no crossing of its own, beside a gauge that has one: the
+    // same bridge at the same height.
+    bridgesAnswer = 'span';
+    const g0 = byId('gatton');
+    await page.evaluate(({ lat, lon }) => {
+      const st = state.data.stations;
+      if (!st.find(s => s.id === 'beside_gatton')) st.push({ id: 'beside_gatton', name: 'Beside Gatton', lat, lon: lon + 100 / (111320 * Math.cos(lat * Math.PI / 180)), roles: ['field'], enabled: true, proposed: true, station_type: 'auto_water_level', alert_ids: {}, sensors: [] });
+    }, { lat: g0.lat, lon: g0.lon });
+    CUR = { lat: g0.lat, lon: g0.lon + 100 / (111320 * Math.cos(g0.lat * Math.PI / 180)) };
+    const b4 = await page.evaluate(() => DigitalTwin.debug().seq);
+    await page.evaluate(() => { DigitalTwin._forgetBridges(); DigitalTwin.pick('beside_gatton'); });
+    await built('beside_gatton', b4);
+    d = await page.evaluate(() => DigitalTwin.debug());
+    ok('a proposed station beside Gatton stands the bridge at Gatton\'s listed crossing, 91.44 m AHD, and the line says whose it is',
+      d.bridges.list.length === 1 && d.bridges.list[0].basis === 'crossing' && near(d.bridges.list[0].deck[0], crossingAhd, 1e-9)
+        && d.bridges.list[0].crossing.from.id === 'gatton' && /lists for Gatton/.test(await text('#twin-site')), J({ B: d.bridges.list, site: await text('#twin-site') }));
+    bridgesAnswer = 'span';
 
     // The State flew this station at 10 cm, and the drape is 0.39 m a pixel.
     await page.waitForFunction(() => { const d = DigitalTwin.debug(); return !!d.sharp && /round the station/.test(d.status); }, null, { timeout: BUILD_TIMEOUT });

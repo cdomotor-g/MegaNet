@@ -283,7 +283,7 @@ const DigitalTwin = (function () {
   // reduced motion. `floodHold` is where still water stands — a level's key,
   // or a fraction of the way from 0 m to the top.
   const DEFAULTS = { size: 400, exag: 1, imagery: true, figure: true, label: true, wire: false, horizon: true,
-                     flood: true, floodAnim: null, floodHold: null };
+                     flood: true, floodAnim: null, floodHold: null, fitBridges: true };
 
   function loadSettings() {
     let s = {};
@@ -292,7 +292,7 @@ const DigitalTwin = (function () {
     if (SIZES.includes(Number(s.size))) out.size = Number(s.size);
     const ex = Number(s.exag);
     if (isFinite(ex) && ex >= 1 && ex <= 3) out.exag = ex;
-    for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon', 'flood']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon', 'flood', 'fitBridges']) if (typeof s[k] === 'boolean') out[k] = s[k];
     if (typeof s.floodAnim === 'boolean') out.floodAnim = s.floodAnim;
     if ((typeof s.floodHold === 'number' && s.floodHold >= 0 && s.floodHold <= 1) || (typeof s.floodHold === 'string' && s.floodHold)) out.floodHold = s.floodHold;
     return out;
@@ -797,7 +797,7 @@ const DigitalTwin = (function () {
   // Texture width for a patch: 1024 px is 0.4 m/px over 400 m, which is near
   // what the aerial program resolves outside the towns; the two wide patches
   // take 2048 so a 1.6 km square is not 1.6 m blocks.
-  function texturePx(size) { return size > 400 ? 2048 : 1024; }
+  function texturePx(size) { return size > 600 ? 2048 : 1024; }
 
   // The State answers a patch it has no photography for with a plain grey
   // sheet rather than an error. Sixty-four pixels on an 8 × 8 lattice across
@@ -3434,11 +3434,34 @@ void main() {
   const BRIDGE_W = { road: 8, rail: 5, track: 4 };
   const bridgeCache = new Map();   // boxKey → Promise<{ list, source, failed }>
 
+  // Bridges are looked for past the patch's edge, not only inside it. A bridge
+  // that runs out of the patch, or stands just beyond it, used to be clipped
+  // or never asked for: Gatton's Smithfield Road Bridge is 4–20 m past the
+  // edge of a patch centred on a station 194 m from the gauge, so that twin
+  // had the road diving into the creek where the bridge should be. So the
+  // State is asked over the patch grown by BRIDGE_EDGE of its width (30 m at
+  // least), and where a bridge that far out could be held whole by a slightly
+  // wider patch, the patch is widened to hold it — by 20 m steps, never past
+  // BRIDGE_FIT_MAX times the size asked for, never past the widest offered.
+  const BRIDGE_EDGE = 0.15;
+  const BRIDGE_PAD = 8;         // metres of ground kept beyond a held bridge's far end: the approach its deck lands on
+  const BRIDGE_FIT_STEP = 20;
+  const BRIDGE_FIT_MAX = 1.5;
+  const BRIDGE_FIT_WAIT = 4000; // ms the build waits to hear where the bridges are before standing the patch it was asked for
+  const LEND_REACH = 600;       // metres: another station's listed crossing is used within this of the patch's centre
+  const MERGE_LATERAL = 6;      // metres: two spans of one kind this close side by side are one bridge drawn twice
+
+  function edgeMargin(size) { return Math.max(30, Math.round(size * BRIDGE_EDGE)); }
+  function bridgeQueryBox(lat, lon, size) { return patchBox(lat, lon, size + 2 * edgeMargin(size)); }
+
   function removeBridges() {
     if (sc.bridges && sc.scene) { sc.scene.remove(sc.bridges); disposeObject(sc.bridges); }
     sc.bridges = null;
   }
 
+  // Each layer is asked with the one retry the ground and the imagery get: a
+  // service that drops one request looks, from here, exactly like a place with
+  // no bridges.
   function qldBridges(box) {
     const env = `${box.west},${box.south},${box.east},${box.north}`;
     return Promise.all(QLD_BRIDGES.map(src => {
@@ -3446,7 +3469,7 @@ void main() {
         geometry: env, geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects',
         outFields: '*', returnGeometry: 'true', outSR: '4326', f: 'json',
       });
-      return fetchBytes(`${src.url}?${q}`).then(buf => {
+      return once(() => fetchBytes(`${src.url}?${q}`).then(buf => {
         const j = JSON.parse(new TextDecoder().decode(buf));
         if (j.error) throw new Error(j.error.message || 'the service refused the query');
         return (j.features || []).flatMap(f => ((f.geometry && f.geometry.paths) || []).map(path => ({
@@ -3455,7 +3478,7 @@ void main() {
           length_m: f.attributes && isFinite(f.attributes.dimension_m) ? Number(f.attributes.dimension_m) : null,
           points: path.map(p => [p[1], p[0]]),
         })));
-      });
+      }));
     })).then(parts => ({ list: parts.flat(), source: 'qld' }));
   }
 
@@ -3520,9 +3543,9 @@ void main() {
   // A bridge's centreline in the patch's metres, densified to ~2 m, with the
   // distance along it — clipped to the patch (a span running out of it is
   // drawn to its edge).
-  function spanXZ(points) {
-    const g = tw.ground, o = tw.origin;
-    const raw = points.map(p => localXZ(p[0], p[1], o.lat, o.lon));
+  // The whole span, patch or no patch, in metres from (lat0, lon0).
+  function spanMetres(points, lat0, lon0) {
+    const raw = points.map(p => localXZ(p[0], p[1], lat0, lon0));
     const out = [];
     for (let i = 0; i < raw.length - 1; i++) {
       const a = raw[i], b = raw[i + 1];
@@ -3532,13 +3555,62 @@ void main() {
       const n = Math.max(1, Math.ceil(L / 2 - 1e-6));
       for (let j = (i ? 1 : 0); j <= n; j++) out.push({ x: a.x + (b.x - a.x) * j / n, z: a.z + (b.z - a.z) * j / n });
     }
-    const inside = out.filter(p => Math.abs(p.x) <= g.half && Math.abs(p.z) <= g.half);
+    let s = 0;
+    for (let i = 0; i < out.length; i++) {
+      if (i) s += Math.hypot(out[i].x - out[i - 1].x, out[i].z - out[i - 1].z);
+      out[i].s = s;
+    }
+    return out;
+  }
+
+  // The part in the patch, with the distance along it from its own first point.
+  function clipToPatch(all) {
+    const g = tw.ground;
+    const inside = all.filter(p => Math.abs(p.x) <= g.half && Math.abs(p.z) <= g.half).map(p => ({ x: p.x, z: p.z }));
     let s = 0;
     for (let i = 0; i < inside.length; i++) {
       if (i) s += Math.hypot(inside[i].x - inside[i - 1].x, inside[i].z - inside[i - 1].z);
       inside[i].s = s;
     }
     return inside;
+  }
+
+  // Two features of one kind running side by side within MERGE_LATERAL of one
+  // another for most of their length are one bridge digitised twice — the
+  // State's Gatton railway bridge is two 124 m polylines 3–4 m apart with the
+  // one persistent id. Drawn as two, their decks overlap at nearly one height
+  // and the imagery on them shimmers, and each has its own rails. Merged: the
+  // centreline halfway between, wide enough to cover both.
+  function mergeParallel(items) {
+    const out = [];
+    const nearest = (p, poly) => {
+      let best = null, bd = Infinity;
+      for (let i = 0; i < poly.length - 1; i++) {
+        const a = poly[i], b = poly[i + 1], dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1;
+        const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / L2));
+        const q = { x: a.x + t * dx, z: a.z + t * dz }, d = Math.hypot(p.x - q.x, p.z - q.z);
+        if (d < bd) { bd = d; best = q; }
+      }
+      return { q: best || poly[0], d: bd };
+    };
+    for (const it of items.slice().sort((a, b) => b.all[b.all.length - 1].s - a.all[a.all.length - 1].s)) {
+      const host = out.find(h => {
+        if (h.b.kind !== it.b.kind) return false;
+        const ds = it.all.filter((_, i) => i % 2 === 0).map(p => nearest(p, h.all).d);
+        return ds.filter(d => d <= MERGE_LATERAL).length >= 0.8 * ds.length;
+      });
+      if (!host) { out.push({ ...it, merged: 0, lateral: 0 }); continue; }
+      // The host's centreline moves halfway to the other's.
+      let sum = 0;
+      host.all = host.all.map(p => {
+        const n = nearest(p, it.all);
+        sum += n.d;
+        return { x: (p.x + n.q.x) / 2, z: (p.z + n.q.z) / 2, s: p.s };
+      });
+      host.lateral = Math.max(host.lateral, sum / host.all.length);
+      host.merged++;
+    }
+    return out;
   }
 
   // The bank at one end of a span: the ground at the end and a few metres on
@@ -3648,47 +3720,162 @@ void main() {
     return grp;
   }
 
+  // How wide a patch must be to hold the bridges round a station, from what
+  // the State said (pure: no scene needed). Only a bridge that runs to the
+  // patch's edge or stands within the margin past it counts, only one that a
+  // patch no wider than BRIDGE_FIT_MAX times the size asked for could hold
+  // whole; a longer one stays clipped and is said so.
+  function fitBridges(found, lat0, lon0, size0) {
+    const half0 = size0 / 2, margin = edgeMargin(size0);
+    const maxSize = Math.min(SIZES[SIZES.length - 1], size0 * BRIDGE_FIT_MAX);
+    let need = half0, held = 0, tooLong = 0;
+    for (const b of (found && found.list) || []) {
+      const pts = spanMetres(b.points, lat0, lon0);
+      if (pts.length < 2) continue;
+      let lo = Infinity, hi = 0;
+      for (const p of pts) { const e = Math.max(Math.abs(p.x), Math.abs(p.z)); lo = Math.min(lo, e); hi = Math.max(hi, e); }
+      if (lo > half0 + margin || hi + 4 <= half0) continue;   // out of reach, or already whole in the patch
+      const want = hi + BRIDGE_PAD;
+      if (want * 2 > maxSize) { tooLong++; continue; }
+      need = Math.max(need, want); held++;
+    }
+    let size = size0;
+    if (need > half0) size = Math.min(maxSize, Math.max(size0, Math.ceil(need * 2 / BRIDGE_FIT_STEP) * BRIDGE_FIT_STEP));
+    return { size, size0, widened: size > size0, held, tooLong };
+  }
+
+  // The crossings the Bureau lists that bear on this patch: this station's
+  // own, then those of gauges beside it. A crossing is a height of a named
+  // bridge on a gauge, and the gauge's surveyed zero makes it a level (AHD):
+  // the bridge is the same bridge whichever gauge reads it, so a proposed
+  // station beside Gatton stands the Smithfield Road Bridge at Gatton's 3.90 m
+  // rather than at its banks. Each one says whose it is.
+  function crossingSources(st, o) {
+    const out = [];
+    const own = listedCrossing(st);
+    if (own) out.push({ ...own, x: 0, z: 0, d: 0, from: { id: st.id, name: st.name, own: true } });
+    const lenders = [];
+    for (const s of (state.data && state.data.stations) || []) {
+      if (!s || s.id === st.id || !located(s)) continue;
+      const p = localXZ(s.lat, s.lon, o.lat, o.lon), d = Math.hypot(p.x, p.z);
+      if (d > LEND_REACH) continue;
+      const c = listedCrossing(s);
+      if (c) lenders.push({ ...c, x: p.x, z: p.z, d, from: { id: s.id, name: s.name, number: s.station_number || null, own: false } });
+    }
+    lenders.sort((a, b) => a.d - b.d);
+    return out.concat(lenders);
+  }
+
+  // Which span a crossing goes on: the road bridge nearest the gauge within
+  // CROSSING_REACH, else a track's, and a railway's only if nothing else is in
+  // reach or the crossing is named for the railway. (It used to be the nearest
+  // span of any kind, and at Gatton that was the railway bridge 6 m from the
+  // gauge — which stood at the road bridge's level, 14 m under the rails.)
+  function pickCarrier(c, cands, taken) {
+    const named = /rail/i.test(c.name || '');
+    // Only the gauge's own listing may fall back to a railway: a crossing lent by
+    // another gauge is put on a road or track bridge or on nothing.
+    const strict = !c.from.own && !named;
+    const rank = k => (named ? (k === 'rail' ? 0 : 1) : (k === 'road' ? 0 : k === 'track' ? 1 : 2));
+    let best = null;
+    for (const sp of cands) {
+      if (taken.has(sp)) continue;
+      let d = Infinity;
+      for (const p of sp.all) d = Math.min(d, Math.hypot(p.x - c.x, p.z - c.z));
+      if (d > CROSSING_REACH) continue;
+      const r = rank(sp.b.kind);
+      if (strict && sp.b.kind === 'rail') continue;
+      if (!best || r < best.r || (r === best.r && d < best.d)) best = { sp, d, r };
+    }
+    return best;
+  }
+
+  const compassOf = (x, z) => compassWord(((Math.atan2(x, -z) * 180 / Math.PI) + 360) % 360);
+
   function buildBridges(st, found) {
     removeBridges();
-    tw.bridges = { status: 'none', source: found ? found.source : null, list: [], failed: found && found.failed || null, crossing: null };
+    tw.bridges = { status: 'none', source: found ? found.source : null, list: [], failed: found && found.failed || null, crossing: null, beyond: [], skipped: [] };
     if (!found || !found.list.length || !sc.scene || !tw.ground) { refreshSiteLine(); return []; }
+    const g = tw.ground, o = tw.origin;
     const notes = [];
-    const listed = listedCrossing(st);
-    tw.bridges.crossing = listed;
-    const spans = found.list.map(b => ({ b, pts: spanXZ(b.points) })).filter(x => x.pts.length >= 2 && x.pts[x.pts.length - 1].s >= 3);
-    // The listed crossing goes on the span nearest the gauge, if one is near.
-    let nearest = null, nearD = Infinity;
-    for (const sp of spans) {
-      for (const p of sp.pts) {
-        const d = Math.hypot(p.x, p.z);
-        if (d < nearD) { nearD = d; nearest = sp; }
-      }
+    // Every feature the State returned, whole, and the part of it in the patch.
+    let cands = found.list.map(b => ({ b, all: spanMetres(b.points, o.lat, o.lon) })).filter(x => x.all.length >= 2);
+    cands = mergeParallel(cands);
+    for (const sp of cands) {
+      sp.pts = clipToPatch(sp.all);
+      sp.drawn = sp.pts.length >= 2 && sp.pts[sp.pts.length - 1].s >= 3;
+    }
+    // The listed crossings go on their carriers — whether or not the carrier is
+    // in the patch, so a road bridge just off it is not passed over for the
+    // railway beside it.
+    const sources = crossingSources(st, o);
+    tw.bridges.crossing = sources.length ? sources[0] : null;
+    const taken = new Map();
+    for (const c of sources) {
+      const pick = pickCarrier(c, cands, new Set(taken.keys()));
+      if (!pick) continue;
+      const under = pick.sp.drawn ? Math.min(...pick.sp.pts.map(p => heightAt(p.x, p.z))) : -Infinity;
+      if (pick.sp.drawn && !(c.ahd > under)) continue;
+      taken.set(pick.sp, { c, d: pick.d });
     }
     const grp = new THREE.Group();
     grp.name = 'bridges';
-    for (const sp of spans) {
+    const half = g.half;
+    const inPatch = p => Math.abs(p.x) <= half - 1 && Math.abs(p.z) <= half - 1;
+    for (const sp of cands) {
+      const nm = sp.b.name || (sp.b.kind === 'rail' ? 'a railway bridge' : 'a bridge');
+      if (!sp.drawn) {
+        // Not in the patch at all: said, not drawn.
+        let best = null;
+        for (const p of sp.all) { const e = Math.max(Math.abs(p.x), Math.abs(p.z)); if (!best || e < best.e) best = { e, p }; }
+        if (best && best.e <= half + edgeMargin(g.size)) {
+          tw.bridges.beyond.push({ name: sp.b.name, kind: sp.b.kind, past: best.e - half, bearing: compassOf(best.p.x, best.p.z), length: sp.all[sp.all.length - 1].s });
+        }
+        continue;
+      }
       const pts = sp.pts, n = pts.length;
-      const width = sp.b.width_m || BRIDGE_W[sp.b.kind] || 8;
-      let basis, deckAt;
+      const width = (sp.b.width_m || BRIDGE_W[sp.b.kind] || 8) + (sp.lateral || 0);
       const underMin = Math.min(...pts.map(p => heightAt(p.x, p.z)));
-      if (listed && sp === nearest && nearD <= CROSSING_REACH && listed.ahd > underMin) {
+      const aIn = inPatch(sp.all[0]), bIn = inPatch(sp.all[sp.all.length - 1]);
+      const cx = taken.get(sp);
+      let basis, deckAt;
+      if (cx) {
         basis = 'crossing';
-        deckAt = () => listed.ahd;
-      } else {
+        deckAt = () => cx.c.ahd;
+      } else if (aIn && bIn) {
         basis = 'banks';
         const hA = bankAt(pts[0], pts[1]), hB = bankAt(pts[n - 1], pts[n - 2]);
         const S0 = pts[n - 1].s || 1;
         deckAt = i => hA + (hB - hA) * pts[i].s / S0;
+      } else if (aIn || bIn) {
+        // Runs out of the patch. The bank at the end that is in it is known;
+        // the far one is not, and the bare ground at the edge is a creek bed
+        // as often as a bank. Level from the known bank.
+        basis = 'one bank';
+        const h = aIn ? bankAt(pts[0], pts[1]) : bankAt(pts[n - 1], pts[n - 2]);
+        deckAt = () => h;
+      } else {
+        // Passes through with both ends out of the patch: nothing says how high.
+        tw.bridges.skipped.push({ name: sp.b.name, kind: sp.b.kind });
+        continue;
       }
       grp.add(makeBridge(pts, deckAt, width, sp.b.kind, sp.b.name));
       tw.bridges.list.push({
-        name: sp.b.name, kind: sp.b.kind, width, basis, length: pts[n - 1].s,
-        deck: [deckAt(0), deckAt(n - 1)], under: underMin, near: sp === nearest ? nearD : null,
+        name: sp.b.name, kind: sp.b.kind, width, basis, length: pts[n - 1].s, cut: !(aIn && bIn), merged: sp.merged || 0,
+        deck: [deckAt(0), deckAt(n - 1)], under: underMin, near: cx ? cx.d : null,
+        crossing: cx ? { height: cx.c.height, name: cx.c.name, ahd: cx.c.ahd, from: cx.c.from } : null,
         ends: [{ x: pts[0].x, z: pts[0].z }, { x: pts[n - 1].x, z: pts[n - 1].z }],
       });
     }
-    if (listed && !tw.bridges.list.some(b => b.basis === 'crossing')) {
-      notes.push(`The Bureau lists the crossing this gauge is read against at ${listed.height.toFixed(2)} m on the gauge (${(listed.ahd).toFixed(2)} m AHD), but no bridge in this patch is within ${CROSSING_REACH} m of the gauge to carry it, so ${spans.length === 1 ? 'the bridge here stands at its banks' : 'the bridges here stand at their banks'}.`);
+    const own = sources.find(c => c.from.own);
+    if (own && !tw.bridges.list.some(b => b.crossing && b.crossing.from.own)) {
+      notes.push(`The Bureau lists the crossing this gauge is read against at ${own.height.toFixed(2)} m on the gauge (${own.ahd.toFixed(2)} m AHD), but no road bridge in this patch is within ${CROSSING_REACH} m of the gauge to carry it, so ${tw.bridges.list.length === 1 ? 'the bridge here stands at its banks' : 'the bridges here stand at their banks'}.`);
+    }
+    for (const b of tw.bridges.beyond) {
+      notes.push(`${b.name || (b.kind === 'rail' ? 'A railway bridge' : 'A bridge')} stands ${Math.round(b.past)} m past the patch's edge to the ${b.bearing}, out of it, so it is not drawn. Widen the patch on the Scene panel to include it.`);
+    }
+    if (tw.bridges.skipped.length) {
+      notes.push(`${tw.bridges.skipped.length === 1 ? 'A bridge passes' : `${tw.bridges.skipped.length} bridges pass`} through the patch with both ends out of it, so nothing here says how high ${tw.bridges.skipped.length === 1 ? 'its deck stands' : 'their decks stand'}; not drawn.`);
     }
     tw.bridges.status = 'ok';
     sc.bridges = grp;
@@ -3698,11 +3885,10 @@ void main() {
     return notes;
   }
 
-  function loadBridges(st, seq, notes) {
-    const box = patchBox(tw.origin.lat, tw.origin.lon, tw.ground.size);
-    tw.bridges = { status: 'loading', list: [], source: null, failed: null, crossing: null };
+  function loadBridges(st, seq, notes, askP) {
+    tw.bridges = { status: 'loading', list: [], source: null, failed: null, crossing: null, beyond: [], skipped: [] };
     refreshSiteLine();
-    return bridgesFor(box).then(found => {
+    return (askP || bridgesFor(bridgeQueryBox(tw.origin.lat, tw.origin.lon, (tw.fit && tw.fit.size0) || tw.ground.size))).then(found => {
       if (seq !== tw.seq || !sc.scene) return;
       tw.bridgesFound = found;
       const said = buildBridges(st, found);
@@ -3757,7 +3943,10 @@ void main() {
         const lvl = b.deck[0] === b.deck[1] || Math.abs(b.deck[0] - b.deck[1]) < 0.005
           ? `${b.deck[0].toFixed(2)} m AHD` : `${b.deck[0].toFixed(2)}–${b.deck[1].toFixed(2)} m AHD`;
         const why = b.basis === 'crossing'
-          ? `the crossing height the Bureau lists (${B.crossing.height.toFixed(2)} m on the gauge)`
+          ? (b.crossing.from.own
+              ? `the crossing height the Bureau lists (${b.crossing.height.toFixed(2)} m on the gauge)`
+              : `the crossing height the Bureau lists for ${esc(b.crossing.from.name)}${b.crossing.from.number ? ` (${esc(b.crossing.from.number)})` : ''}, ${b.crossing.height.toFixed(2)} m on its gauge`)
+          : b.basis === 'one bank' ? 'the height of its bank in the patch — the far end is past the edge'
           : 'the height of its banks';
         return `${esc(b.name || (b.kind === 'rail' ? 'a railway bridge' : 'a bridge'))}, its deck at ${lvl} — ${why}`;
       });
@@ -5769,8 +5958,15 @@ void main() {
     if (!st) { nothing('Pick a station to build its twin.', '<p>No station chosen. Find one on the left, or select one on the Stations tab and come back.</p>'); return; }
     if (!located(st)) { nothing(`${st.name} has no position, so there is no ground to stand it on.`, `<p><strong>${esc(st.name)}</strong> has no coordinates. Give it a position in the station editor and the twin can be built.</p>`); return; }
     const gl = webglOk();
-    const box = patchBox(st.lat, st.lon, S().size);
+    const size0 = S().size;
     const notes = [];
+    // Where the bridges are, asked first and over more than the patch: a bridge
+    // that runs to the patch's edge or stands just past it widens the patch to
+    // hold it (fitBridges). The State answers in a second or so; the build
+    // waits for it no longer than BRIDGE_FIT_WAIT and outside Queensland, where
+    // the answer is Overpass's and slow, not at all.
+    const askP = bridgesFor(bridgeQueryBox(st.lat, st.lon, size0));
+    tw.fit = { size0, size: size0, widened: false, held: 0, tooLong: 0 };
 
     // The renderer, only where it can draw: without WebGL there is no point
     // fetching three quarters of a megabyte to be told so.
@@ -5790,6 +5986,12 @@ void main() {
     // draped when it arrives. Waiting for both held a ground that took
     // seconds behind an imagery host that took a minute to say no.
     setStatus('Reading the ground…');
+    if (S().fitBridges && insideBox(bridgeQueryBox(st.lat, st.lon, size0), QLD_DEM_BOX)) {
+      const found = await Promise.race([askP, new Promise(res => setTimeout(() => res(null), BRIDGE_FIT_WAIT))]);
+      if (seq !== tw.seq) return;
+      if (found && found.source === 'qld' && !found.failed) tw.fit = fitBridges(found, Number(st.lat), Number(st.lon), size0);
+    }
+    const box = patchBox(st.lat, st.lon, tw.fit.size);
     const imageP = imageryFor(box);
     // The SLS says which stations a person reads — asked for alongside the
     // ground, which takes longer, so the station is not held up by it.
@@ -5834,6 +6036,12 @@ void main() {
     } else if (ground.filled) {
       notes.push(`${ground.filled.toLocaleString()} of ${(N * N).toLocaleString()} samples were outside the State's data and were filled from ~30 m terrain tiles.`);
     }
+    if (tw.fit && tw.fit.widened) {
+      notes.push(`The patch is ${tw.fit.size} m, not the ${tw.fit.size0} m asked for: a bridge runs to its edge or stands just past it, and the ground is widened to hold it whole so its deck has ground under both ends. The samples are ${ground.sample_m.toFixed(1)} m apart as a result; the Scene panel can turn this off.`);
+    }
+    if (tw.fit && tw.fit.tooLong) {
+      notes.push(`${tw.fit.tooLong === 1 ? 'A bridge runs' : `${tw.fit.tooLong} bridges run`} past what a patch of up to ${Math.min(SIZES[SIZES.length - 1], Math.round(tw.fit.size0 * BRIDGE_FIT_MAX))} m can hold whole, so ${tw.fit.tooLong === 1 ? 'it is' : 'they are'} drawn only as far as the patch goes, level with the bank that is in it.`);
+    }
     if (ground.unfilled) notes.push(`${ground.unfilled.toLocaleString()} samples could not be read from any source and are drawn at the station's own height.`);
 
     if (lib && ensureRenderer()) {
@@ -5851,7 +6059,7 @@ void main() {
       resetOrbit();
       presenceJoin(st);
       loadPhotos(st, seq);
-      loadBridges(st, seq, notes);
+      loadBridges(st, seq, notes, askP);
       loadCadastre(seq);
       notes.push(...buildFlood(st));
       // A pin being moved, armed before this build — on the map before the
@@ -6124,6 +6332,7 @@ void main() {
         </label>
         <label class="check-label"><input type="checkbox" ${s.imagery ? 'checked' : ''} onchange="DigitalTwin.setImagery(this.checked)"><span>Drape the aerial imagery</span></label>
         ${typeof TwinCadastre !== 'undefined' ? TwinCadastre.panelHtml() : ''}
+        <label class="check-label"><input type="checkbox" ${s.fitBridges ? 'checked' : ''} onchange="DigitalTwin.setFitBridges(this.checked)"><span>Widen the patch to hold a bridge at its edge</span></label>
         <label class="check-label"><input type="checkbox" ${s.horizon ? 'checked' : ''} onchange="DigitalTwin.setHorizon(this.checked)"><span>The horizon: far ground to ${HORIZON_M / 1000} km, a sky and haze (a few more requests)</span></label>
         ${floodPanelHtml()}
         ${avatarPanelHtml()}
@@ -6559,6 +6768,7 @@ void main() {
         drapeHorizon(st, tw.seq, horizonNotes(tw.notes)).catch(() => {});
       }
     },
+    setFitBridges(on) { S().fitBridges = !!on; saveSettings(); init(); },
     setHorizon(on) {
       S().horizon = !!on; saveSettings();
       const st = currentStation();
@@ -6591,8 +6801,11 @@ void main() {
     rebuild() {
       const st = currentStation();
       if (st && located(st)) {
-        const key = boxKey(patchBox(st.lat, st.lon, S().size));
-        groundCache.delete(key); imageCache.delete(key);
+        for (const sz of new Set([S().size, tw.fit ? tw.fit.size : S().size])) {
+          const key = boxKey(patchBox(st.lat, st.lon, sz));
+          groundCache.delete(key); imageCache.delete(key);
+        }
+        bridgeCache.delete(boxKey(bridgeQueryBox(st.lat, st.lon, S().size)));
         horizonCache.delete(horizonKey(st));
         for (const h of SHELL_HALF) imageCache.delete(boxKey(shellBox(st.lat, st.lon, h)));
       }
@@ -6707,9 +6920,13 @@ void main() {
     prefetch(id) {
       const s = stationById(id);
       if (!located(s) || typeof fetch !== 'function') return;
-      const box = patchBox(s.lat, s.lon, S().size);
-      groundFor(box).catch(() => {});
-      imageryFor(box).catch(() => {});
+      const size0 = S().size, qbox = bridgeQueryBox(s.lat, s.lon, size0);
+      const go = size => { const box = patchBox(s.lat, s.lon, size); groundFor(box).catch(() => {}); imageryFor(box).catch(() => {}); };
+      // The patch a build would stand: widened for a bridge at its edge, which
+      // the State says (and the build then has from the cache).
+      if (S().fitBridges && insideBox(qbox, QLD_DEM_BOX)) {
+        bridgesFor(qbox).then(f => go(f && f.source === 'qld' && !f.failed ? fitBridges(f, Number(s.lat), Number(s.lon), size0).size : size0), () => go(size0));
+      } else go(size0);
     },
     patchSize() { return S().size; },
     embedded() { return !!tw.hooks; },
@@ -6757,7 +6974,7 @@ void main() {
     debug() {
       const g = tw.ground;
       return {
-        live: tw.live, lib: !!THREE, built: !!sc.terrain, frames: tw.frames,
+        live: tw.live, lib: !!THREE, built: !!sc.terrain, frames: tw.frames, seq: tw.seq,
         stationId: tw.stationId, mode: rig.mode,
         size: g ? g.size : null, N, sample_m: g ? g.sample_m : null,
         source: g ? g.source : null, holes: g ? g.holes : null, filled: g ? g.filled : null, qld: g ? g.qld : null,
@@ -7122,6 +7339,8 @@ void main() {
       requestFrame();
       return sc.camera ? { x: sc.camera.position.x, y: sc.camera.position.y, z: sc.camera.position.z } : null;
     },
+    // Forget what the State said about bridges, so a check can change its answer.
+    _forgetBridges() { bridgeCache.clear(); },
     // Forget the station, so a check can measure the tab with nothing chosen.
     _clear() {
       tw.stationId = null; tw.ground = null; tw.image = null; tw.elvis = null;

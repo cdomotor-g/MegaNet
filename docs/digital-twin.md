@@ -265,6 +265,26 @@ How high the deck stands:
   metres on along the road where the approach meets the abutment, whichever is
   higher, and a straight deck between the two.
 
+**Bridges at and past the patch's edge.** The State is asked over the patch
+grown by 15 % of its width (30 m at least), not the patch alone. A bridge that
+runs to the edge or stands just past it widens the patch, in 20 m steps and to
+no more than 1.5 × the size asked for, so its deck has ground under both ends
+(Gatton's Smithfield Road Bridge is 4–20 m past a 400 m patch centred 194 m
+away, which made the road dive into the creek; that patch is 460 m). The notes
+say so, and *Widen the patch to hold a bridge at its edge* in the Scene panel
+turns it off. What still runs out is levelled from the bank that is in the
+patch (never from the bare ground at the edge, which is often the creek bed);
+a bridge with both ends out is not drawn, and a bridge wholly out is named in
+the notes. Two features of one kind within 6 m side by side are one bridge
+digitised twice and are drawn once. A layer that drops a request is asked
+again before OpenStreetMap is tried.
+
+**Whose crossing.** The listed crossing goes on the *road* bridge nearest the
+gauge (a railway only if the crossing is named for one), and it is lent: a
+station with no crossing of its own — a proposal beside a gauge — stands the
+same bridge at the neighbouring gauge's listed level, within 600 m, and the
+line under the stage says whose it is.
+
 The widths are not in either source: a road bridge is 8 m across, a railway's
 5 m, a track's 4 m (an OpenStreetMap way that gives its width or its lanes is
 drawn at that). The line under the stage says each deck's level and which

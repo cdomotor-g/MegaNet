@@ -666,6 +666,10 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 112 — 2026-09-29: bridges at the twin's edge, and whose crossing a bridge stands at
+
+A proposed Gatton station's twin had no Smithfield Road Bridge: the State was asked only over the 400 m patch and the bridge is 4–20 m past it. Now asked over the patch plus a margin, the patch widens to hold a bridge at its edge (switchable), a cut span is levelled from its in-patch bank, the crossing goes on the road bridge and is lent to neighbouring stations, duplicate features merge, and a dropped request is retried. Checks in `npm run twinsite`. No issue opened or closed.
+
 ### Revision 111 — 2026-09-29: a blue pin to find a place, one card for the list and its filters, the twin says it is a model, and the flood scale turns logarithmic
 
 From one session request with five asks, in one commit. It opens and closes
