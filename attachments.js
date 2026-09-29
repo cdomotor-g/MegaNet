@@ -406,6 +406,16 @@ const Attachments = (function () {
       ? extensionOf(file.name) : type.extensions[0];
     const path = `${owner.prefix}/${id}/${uuid()}.${ext}`;
 
+    // The same bytes twice on one record is one file (0043). Asked first, so a
+    // photo picked twice costs one query rather than its upload; the database
+    // refuses it anyway if two people race.
+    const sha = await sha256(file);
+    if (sha) {
+      const dup = await dbSelect(`attachment?select=id,title,uploaded_by,created_at`
+        + `&${owner.arg.slice(2)}=eq.${encodeURIComponent(id)}&sha256=eq.${sha}&limit=1`);
+      if (dup.length) throw new Error(alreadyText(dup[0]));
+    }
+
     await dbUploadObject(BUCKET, path, file);
 
     try {
@@ -416,6 +426,7 @@ const Attachments = (function () {
         p_byte_size:    file.size,
         p_title:        file.name,
         p_taken_at:     file.lastModified ? new Date(file.lastModified).toISOString() : null,
+        p_sha256:       sha,
       }, { [owner.arg]: id }));
     } catch (err) {
       // The compensating half. The bytes are up and nothing points at them, so
@@ -423,8 +434,26 @@ const Attachments = (function () {
       // cheaper wrong state than the error the operator actually needs to read
       // being replaced by a second one about the cleanup.
       try { await dbRemoveObject(BUCKET, path); } catch (_) { /* swept later */ }
+      if (err && err.status === 409 && sha) {
+        throw new Error('already attached here — somebody added the same file a moment ago');
+      }
       throw err;
     }
+  }
+
+  function alreadyText(row) {
+    const when = String(row.created_at || '').slice(0, 10);
+    return `already attached here${row.title ? ` as ${row.title}` : ''}`
+         + ` — added by ${row.uploaded_by || 'someone'}${when ? ` on ${when}` : ''}`;
+  }
+
+  // SHA-256 of the file as picked, lower-case hex. null where SubtleCrypto is
+  // missing (a page served over plain http from somewhere other than
+  // localhost): the upload goes ahead unchecked rather than not at all.
+  async function sha256(file) {
+    if (typeof crypto === 'undefined' || !crypto.subtle || !crypto.subtle.digest) return null;
+    const d = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+    return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
   // crypto.randomUUID() everywhere it exists — every browser this app supports,

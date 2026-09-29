@@ -145,13 +145,13 @@ begin
 
   perform pg_temp.check_that('an editor may run all three functions',
     has_function_privilege('authenticated',
-      'meganet.attach_file(uuid, uuid, text, text, text, bigint, text, text, timestamptz, text)', 'execute')
+      'meganet.attach_file(uuid, uuid, text, text, text, bigint, text, text, timestamptz, text, text)', 'execute')
     and has_function_privilege('authenticated', 'meganet.update_attachment(uuid, jsonb)', 'execute')
     and has_function_privilege('authenticated', 'meganet.detach_file(uuid)', 'execute'));
 
   perform pg_temp.check_that('public holds EXECUTE on none of them',
     not has_function_privilege('public',
-      'meganet.attach_file(uuid, uuid, text, text, text, bigint, text, text, timestamptz, text)', 'execute')
+      'meganet.attach_file(uuid, uuid, text, text, text, bigint, text, text, timestamptz, text, text)', 'execute')
     and not has_function_privilege('public', 'meganet.update_attachment(uuid, jsonb)', 'execute')
     and not has_function_privilege('public', 'meganet.detach_file(uuid)', 'execute'),
     'db/README.md: a function that writes has its EXECUTE revoked from public, in the same file');
@@ -369,6 +369,60 @@ begin
       'select meganet.attach_file(p_inspection_id => %L, p_storage_path => %L,
               p_content_type => ''image/jpeg'', p_byte_size => 100)',
       v_insp, v_path), '23505'));
+end
+$$;
+
+-- ── 6b. The same bytes twice on one record (0043) ────────────────────────────
+
+do $$
+declare
+  v_insp uuid;
+  v_act  uuid;
+  v_sha  text := repeat('ab', 32);
+begin
+  select inspection_id, activity_id into v_insp, v_act from _ids;
+
+  perform meganet.attach_file(
+    p_inspection_id => v_insp, p_storage_path => pg_temp.good_path('inspection', v_insp),
+    p_content_type => 'image/jpeg', p_byte_size => 100, p_sha256 => v_sha);
+
+  perform pg_temp.check_that('the hash is stored with the row',
+    exists (select 1 from meganet.attachment where inspection_id = v_insp and sha256 = v_sha));
+
+  perform pg_temp.check_that('refuses the same file twice on one inspection',
+    pg_temp.raises(format(
+      'select meganet.attach_file(p_inspection_id => %L, p_storage_path => %L,
+              p_content_type => ''image/jpeg'', p_byte_size => 100, p_sha256 => %L)',
+      v_insp, pg_temp.good_path('inspection', v_insp), v_sha), '23505'));
+
+  perform pg_temp.check_that('the unique index refuses it too, past the function',
+    pg_temp.raises(format(
+      'update meganet.attachment set sha256 = %L
+        where inspection_id = %L and sha256 is null and id = (select id from meganet.attachment
+              where inspection_id = %L and sha256 is null limit 1)',
+      v_sha, v_insp, v_insp), '23505'));
+
+  perform meganet.attach_file(
+    p_maintenance_activity_id => v_act, p_storage_path => pg_temp.good_path('maintenance', v_act),
+    p_content_type => 'image/jpeg', p_byte_size => 100, p_sha256 => v_sha);
+  perform pg_temp.check_that('the same file on a different record is allowed',
+    exists (select 1 from meganet.attachment where maintenance_activity_id = v_act and sha256 = v_sha));
+
+  perform pg_temp.check_that('refuses a hash that is not 64 hex digits',
+    pg_temp.raises(format(
+      'select meganet.attach_file(p_inspection_id => %L, p_storage_path => %L,
+              p_content_type => ''image/jpeg'', p_byte_size => 100, p_sha256 => ''ABC'')',
+      v_insp, pg_temp.good_path('inspection', v_insp)), '22023'));
+
+  perform meganet.attach_file(
+    p_inspection_id => v_insp, p_storage_path => pg_temp.good_path('inspection', v_insp),
+    p_content_type => 'image/jpeg', p_byte_size => 100);
+  perform meganet.attach_file(
+    p_inspection_id => v_insp, p_storage_path => pg_temp.good_path('inspection', v_insp),
+    p_content_type => 'image/jpeg', p_byte_size => 100);
+  perform pg_temp.check_that('no hash is not a duplicate of no hash',
+    (select count(*) from meganet.attachment where inspection_id = v_insp and sha256 is null) >= 2,
+    'an older tab that sends none still attaches');
 end
 $$;
 

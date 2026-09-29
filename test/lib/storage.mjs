@@ -110,6 +110,12 @@ export function attachmentRpc(fn, body, store) {
   store.calls.push({ fn, body });
 
   if (fn === 'attach_file') {
+    // 0043: the same bytes twice on one record is refused, as a 409.
+    if (body.p_sha256 && store.rows.some(r => r.sha256 === body.p_sha256
+        && ((body.p_inspection_id && r.inspection_id === body.p_inspection_id)
+         || (body.p_maintenance_activity_id && r.maintenance_activity_id === body.p_maintenance_activity_id)))) {
+      return { __status: 409, code: '23505', message: 'this file is already attached to this record' };
+    }
     // ord and uploaded_by are the database's to decide, so the fixture decides
     // them too — the panel re-reads the list after an upload precisely because
     // it must not guess these, and a fixture that echoed what was sent would
@@ -129,6 +135,7 @@ export function attachmentRpc(fn, body, store) {
       taken_at: body.p_taken_at || null,
       uploaded_by: 'fixture@example.test',
       created_at: '2026-08-13T03:00:00Z',
+      sha256: body.p_sha256 || null,
     };
     store.rows.push(row);
     return row;
@@ -151,9 +158,11 @@ export function attachmentRpc(fn, body, store) {
 export function attachmentRows(store, query) {
   const insp = /inspection_id=eq\.([^&]+)/.exec(query);
   const act  = /maintenance_activity_id=eq\.([^&]+)/.exec(query);
+  const sha  = /sha256=eq\.([0-9a-f]+)/.exec(query);
   return store.rows.filter(r =>
-    (insp && r.inspection_id === decodeURIComponent(insp[1]))
-    || (act && r.maintenance_activity_id === decodeURIComponent(act[1])));
+    ((insp && r.inspection_id === decodeURIComponent(insp[1]))
+    || (act && r.maintenance_activity_id === decodeURIComponent(act[1])))
+    && (!sha || r.sha256 === sha[1]));
 }
 
 /** A file for setInputFiles(), sized to order. */

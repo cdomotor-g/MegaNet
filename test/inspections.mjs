@@ -87,7 +87,7 @@ function installDatastore(page, tables, saved, store) {
       const body = JSON.parse(route.request().postData() || '{}');
       const att = attachmentRpc(fn, body, store);
       if (att !== undefined) {
-        return route.fulfill({ status: 200, contentType: 'application/json',
+        return route.fulfill({ status: (att && att.__status) || 200, contentType: 'application/json',
           body: JSON.stringify(att) });
       }
       if (fn === 'save_inspection') {
@@ -432,6 +432,22 @@ async function main() {
     await page.waitForFunction(p => !!state.attach.urls[p], path, { timeout: LOAD_TIMEOUT });
     check('the thumbnail is fetched through a signed URL rather than a public one',
       store.signed.includes(path), store.signed.join(', '));
+
+    check('the file\'s SHA-256 is sent with it',
+      !!call && /^[0-9a-f]{64}$/.test(call.body.p_sha256 || ''), call && call.body.p_sha256);
+
+    // 0043: the same photo picked again for the same visit is refused before
+    // its bytes are sent — one query, no upload, no index row.
+    const before = { uploads: store.uploads.length, calls: store.calls.length };
+    await page.setInputFiles('.att-panel input[type="file"]',
+      fileOf('IMG_0042 copy.jpg', 'image/jpeg', 4096));
+    await page.waitForFunction(() => !state.attach.busy && state.attach.msg
+      && state.attach.msg.kind === 'error', null, { timeout: LOAD_TIMEOUT });
+    const dupMsg = await page.evaluate(() => state.attach.msg.text);
+    check('the same file twice on one record is refused before its bytes go up',
+      store.uploads.length === before.uploads && store.calls.length === before.calls
+      && store.rows.length === 1 && /already attached here as IMG_0042\.jpg/.test(dupMsg),
+      `${store.uploads.length - before.uploads} upload(s), ${store.rows.length} row(s): ${dupMsg}`);
 
     const attAudit = await auditHandlers(page);
     check(`attachments: all ${attAudit.checked} handler(s) across ${attAudit.total} attribute(s) resolve`,
