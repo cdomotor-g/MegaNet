@@ -938,7 +938,7 @@ try {
 
   // ── 5c. The station as built: the river-gauge tower ───────────────────────
   // A station whose record has a water-level sensor gets the tower: the mast,
-  // the platform 4 m up with its rails, the cabinet with the Kisters HS40
+  // the platform 3 m up with its rails, the cabinet with the Kisters HS40
   // above and the power and telemetry below, the ladder up the south side.
   // The visitor walks into the ladder, climbs it, steps onto the deck where
   // the door opens on its own, and climbs down again.
@@ -956,12 +956,12 @@ try {
     await settled();
     d = await dbg();
     const tm = d.model;
-    ok('the twin\'s station is the tower, its mast 4 m and Ø0.300 m with its foot at the origin',
-      tm && tm.structure === 'tower' && near(d.pole.h, 4, 1e-9) && near(d.pole.r, 0.15, 1e-9) && near(d.pole.baseY, 0, 1e-6), JSON.stringify({ structure: tm && tm.structure, pole: d.pole }));
+    ok('the twin\'s station is the tower, its mast 3 m (the 3.0 m default) and Ø0.300 m with its foot at the origin',
+      tm && tm.structure === 'tower' && near(d.pole.h, 3, 1e-9) && near(d.pole.r, 0.15, 1e-9) && near(d.pole.baseY, 0, 1e-6), JSON.stringify({ structure: tm && tm.structure, pole: d.pole }));
     const rungs = tm ? tm.parts.filter(n => n === 'ladder rung').length : 0;
     ok('the platform, its rails, an extension ladder leaning on the south edge at 1 in 4 with rungs every 300 mm, the gauge and the antenna mast are there',
-      tm && tm.deck && near(tm.deck.top, 4.05, 1e-9) && near(tm.deck.half, 0.9, 1e-9) && tm.ladder && near(tm.ladder.run, 0.25, 1e-9)
-        && near(tm.ladder.foot, 1.005 + (4.05 - 0.1) * 0.25, 1e-9) && tm.ladder.footY >= 0.1 - 1e-9 && rungs === 20 && tm.parts.includes('platform grating') && tm.parts.filter(n => n === 'handrail').length === 10
+      tm && tm.deck && near(tm.deck.top, 3.05, 1e-9) && near(tm.deck.half, 0.9, 1e-9) && tm.ladder && near(tm.ladder.run, 0.25, 1e-9)
+        && near(tm.ladder.foot, 1.005 + (3.05 - 0.1) * 0.25, 1e-9) && tm.ladder.footY >= 0.1 - 1e-9 && rungs === 16 && tm.parts.includes('platform grating') && tm.parts.filter(n => n === 'handrail').length === 10
         && tm.parts.includes('ladder stile') && tm.parts.includes('ladder guide bracket') && !tm.parts.includes('ladder bracket')
         && tm.parts.includes('rain gauge') && tm.parts.includes('antenna mast') && tm.parts.includes('solar panel'),
       JSON.stringify({ deck: tm && tm.deck, ladder: tm && tm.ladder, rungs, rails: tm && tm.parts.filter(n => n === 'handrail').length }));
@@ -974,7 +974,7 @@ try {
       const tmk = d.flood.towerMarks;
       ok('the levels that fall on the tower are banded on it, a call-out each, never in the .glb',
         tmk.marks.length > 0 && tmk.callouts.length === tmk.marks.length && !tmk.exported
-          && tmk.marks.every(mk => mk.y > 0.1 && mk.y <= 4.05 + 1.1), JSON.stringify(tmk));
+          && tmk.marks.every(mk => mk.y > 0.1 && mk.y <= 3.05 + 1.1), JSON.stringify(tmk));
     }
     ok('the cabinet holds the Kisters HS40 bubbler above and the Victron, the telemetry, the terminals and the battery below, and the plate names the station',
       tm && ['Kisters HS40 panel', 'HS40 desiccant tube', 'HS40 pressure gauge', 'Kisters HS40 display', 'HS40 valve', 'HS40 compressor control', 'HS40 compressor',
@@ -1009,7 +1009,7 @@ try {
     await hold(['w', 'Shift'], 2400);
     const onDeck = await page.evaluate(() => { const d = DigitalTwin.debug(); return { level: d.model.level, walker: d.model.walker, cam: d.camera, door: d.model.doors[0] }; });
     ok('at the top the visitor steps onto the platform, eye 1.70 m over the grating, facing the cabinet',
-      onDeck.level === 'deck' && near(onDeck.cam.y, 4.05 + 1.7, 0.01) && Math.abs(onDeck.walker.x) < 0.9 && Math.abs(onDeck.walker.z) < 0.9 && near(onDeck.walker.yaw, 0, 1e-6),
+      onDeck.level === 'deck' && near(onDeck.cam.y, 3.05 + 1.7, 0.01) && Math.abs(onDeck.walker.x) < 0.9 && Math.abs(onDeck.walker.z) < 0.9 && near(onDeck.walker.yaw, 0, 1e-6),
       JSON.stringify({ level: onDeck.level, cam: onDeck.cam, walker: onDeck.walker }));
     await page.waitForFunction(() => { const d = DigitalTwin.debug().model.doors[0]; return Math.abs(d.angle - d.open) < 1e-6; }, null, { timeout: 10_000 }).catch(() => {});
     const deckDoor = await page.evaluate(() => DigitalTwin.debug().model.doors[0]);

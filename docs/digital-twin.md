@@ -174,19 +174,22 @@ nothing is assumed:
   side, on a concrete pad — for a *telemetered* station that reports rainfall
   and not a river. A band in the station's role colour rides the pole. A
   repeater that measures nothing is the same pole without the gauge.
-- A **river-gauge tower** — a 4 m galvanised mast on its flange, a 1.8 m
-  grating platform with handrails and toe boards 4 m up, the cabinet on the
+- A **river-gauge tower** — a galvanised mast on its flange, a 1.8 m
+  grating platform with handrails and toe boards on top of it, the cabinet on the
   platform's north side, the rain gauge on a wing bracket off the cabinet's
   west side, level with its top, the antenna mast with the
-  solar panel and the whip at its north-east corner, a staff gauge 3 m tall
-  up the mast's south face, and an extension ladder — a base section and a
+  solar panel and the whip at its north-east corner, a staff gauge up the
+  mast's south face (3 m tall, or 2.8 m on the low tower so it stays under the
+  grating), and an extension ladder — a base section and a
   fly, rungs every 300 mm, tied off at the top — leaning on the platform's
   south edge at the safe 1 in 4 (a metre out at the foot for every four up,
-  about 76°) with its stiles running a metre past the landing. It stands on
-  its concrete footing, of which only the top is drawn: a rectangle 4.0 m
-  north–south by 2.4 m east–west, 100 mm proud of the ground, the mast 1.2 m
-  in from its north end and the rest running south under the ladder, whose
-  feet stand on it (the step down, the pit and the conduit below the ground
+  about 76°) with its stiles running a metre past the landing. The platform
+  is **3.0 m** up by default or **4.5 m**, as the standard drawing's table has
+  it, both on a **2100 × 2100 mm** footing; the Scene panel's *Tower platform
+  height* picks one per site and remembers it. It stands on
+  its concrete footing, of which only the top is drawn: 2.1 m square, 100 mm
+  proud of the ground, the mast at its centre; the ladder's foot stands beyond
+  it, on the ground (the step down, the pit and the conduit below the ground
   are not drawn). Anyone walking onto the footing stands on its top. This
   is the tower for a *telemetered* station whose record says it reads a
   river: a sensor typed `Water Level…` or `Gas Pressure`, a legacy

@@ -283,7 +283,7 @@ const DigitalTwin = (function () {
   // reduced motion. `floodHold` is where still water stands — a level's key,
   // or a fraction of the way from 0 m to the top.
   const DEFAULTS = { size: 400, exag: 1, imagery: true, figure: true, label: true, wire: false, horizon: true,
-                     flood: true, floodAnim: null, floodHold: null, fitBridges: true };
+                     flood: true, floodAnim: null, floodHold: null, fitBridges: true, towers: {} };
 
   function loadSettings() {
     let s = {};
@@ -293,6 +293,8 @@ const DigitalTwin = (function () {
     const ex = Number(s.exag);
     if (isFinite(ex) && ex >= 1 && ex <= 3) out.exag = ex;
     for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon', 'flood', 'fitBridges']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    out.towers = {};
+    if (s.towers && typeof s.towers === 'object') for (const [id, v] of Object.entries(s.towers)) if (TOWER_TYPES[v]) out.towers[id] = v;
     if (typeof s.floodAnim === 'boolean') out.floodAnim = s.floodAnim;
     if ((typeof s.floodHold === 'number' && s.floodHold >= 0 && s.floodHold <= 1) || (typeof s.floodHold === 'string' && s.floodHold)) out.floodHold = s.floodHold;
     return out;
@@ -1751,27 +1753,33 @@ void main() {
   // The other stations whose positions fall inside the patch are built too,
   // each by the same rules, standing on the ground where they are — see
   // "the neighbours", below.
-  const TOWER_H   = 4.0;     // the mast, ground to the platform's underside
-  const DECK_TOP  = 4.05;    // the grating's walking surface
+  // The tower comes in two platform heights (the standard drawing's table:
+  // 3.0 m and 4.5 m, each on a 2100 × 2100 footing). 3.0 m is the default;
+  // the operator can change a site's (S().towers, by station id).
+  const TOWER_TYPES = { '3.0': { key: '3.0', h: 3.0 }, '4.5': { key: '4.5', h: 4.5 } };
+  const TOWER_DEFAULT = '3.0';
+  const FOOTING = 2.1;       // the footing, 2100 × 2100, the mast at its centre
+  function towerSpec(st) {
+    const t = st && st.id != null && S().towers ? TOWER_TYPES[S().towers[st.id]] : null;
+    const spec = t || TOWER_TYPES[TOWER_DEFAULT];
+    const h = spec.h;
+    return { key: spec.key, h, deck: h + 0.05,
+             ladderZ: LADDER_TOP_Z + (h + 0.05 - SLAB_TOP) * LADDER_RUN,   // the ladder's foot
+             staffH: Math.min(3.0, h - 0.2) };                            // the gauge board, kept under the grating
+  }
   const DECK_HALF = 0.9;     // the platform is 1.8 m square
   const RAIL_H    = 1.1;     // handrail over the deck
   const SLAB_TOP  = 0.10;    // the foundation slab stands 100 mm proud of the ground
-  // The footing's top, as the drawings have it: a rectangle 4.0 m north–south
-  // and 2.4 m east–west, the mast 1.2 m in from its north end on the long
-  // axis, the rest running south under the ladder so that its feet stand on
-  // the concrete. Below the ground it steps down deeper under part of it,
-  // and there is a pit and a conduit at its far end; none of that is seen,
-  // so none of it is drawn.
-  const SLAB_N = -1.2, SLAB_S = 2.8, SLAB_HALF_EW = 1.2;
+  // The footing's top, as the drawings have it: 2100 × 2100 with the mast at
+  // its centre. The ladder's foot stands beyond it, on the ground.
+  const SLAB_N = -FOOTING / 2, SLAB_S = FOOTING / 2, SLAB_HALF_EW = FOOTING / 2;
   // The extension ladder: leaning on the deck's south edge at 1 in 4 (a metre
   // out at its foot for every four up — AS/NZS 1892 and every WorkSafe
   // guide, about 76°), running on a metre past the landing as a handhold.
   const LADDER_RUN   = 0.25;   // horizontal metres per vertical metre
   const LADDER_TOP_Z = 1.005;  // the base section's centre line where it passes the deck's top
-  const LADDER_Z  = LADDER_TOP_Z + (DECK_TOP - SLAB_TOP) * LADDER_RUN;   // the ladder's foot, on the footing
   const LADDER_HW = 0.2;     // half the fly section's width (the base's is 0.23)
   const LADDER_OVER = 1.0;   // how far past the landing the stiles run
-  const TOWER_STAFF_H = 3.0; // the staff gauge on the mast, from the slab up
   const CLIMB_MPS = 1.2;     // up the ladder (Shift doubles it)
   const DOOR_NEAR = 2.2;     // a pole enclosure opens when the eye is this close
   const DOOR_RATE = 2.6;     // radians per second
@@ -2211,6 +2219,7 @@ void main() {
 
   // The river-gauge tower.
   function buildTower(st, kind, k) {
+    const T = towerSpec(st), TOWER_H = T.h, DECK_TOP = T.deck, LADDER_Z = T.ladderZ, TOWER_STAFF_H = T.staffH;
     const g = new THREE.Group();
     g.name = 'station';
     // The foundation: the footing's top 100 mm proud of the ground (drawn
@@ -2254,11 +2263,12 @@ void main() {
       STAFF_W, TOWER_STAFF_H, 0.012, 0, SLAB_TOP + TOWER_STAFF_H / 2, POLE_R + 0.021, 'gauge board');
     staffBoard.castShadow = true;
     const staffFaceMesh = new THREE.Mesh(new THREE.PlaneGeometry(STAFF_W, TOWER_STAFF_H),
-      new THREE.MeshStandardMaterial({ map: towerStaffFace(SLAB_TOP), roughness: 0.55 }));
+      new THREE.MeshStandardMaterial({ map: towerStaffFace(SLAB_TOP, TOWER_STAFF_H), roughness: 0.55 }));
     staffFaceMesh.position.set(0, SLAB_TOP + TOWER_STAFF_H / 2, POLE_R + 0.0275);
     staffFaceMesh.name = 'gauge board graduations';
+    staffFaceMesh.userData.staffH = TOWER_STAFF_H;
     g.add(staffFaceMesh);
-    buildExtensionLadder(g, k);
+    buildExtensionLadder(g, k, T);
     // The cabinet on the north of the platform, its door to the south, facing
     // whoever comes up the ladder. Two compartments: the bubbler above, the
     // power and the telemetry below.
@@ -2328,7 +2338,7 @@ void main() {
     g.add(sp);
     box(sp, k.galv, 0.58, 0.43, 0.02, 0, 0, 0, 'solar frame');
     box(sp, k.panel, 0.55, 0.40, 0.006, 0, 0, -0.012, 'solar panel');
-    return { group: g, top: DECK_TOP + RAIL_H, poleTop: TOWER_H,
+    return { group: g, top: DECK_TOP + RAIL_H, poleTop: TOWER_H, tower: T,
              ladder: { x: 0, z: LADDER_Z, foot: LADDER_Z, stand: LADDER_Z + 0.22, run: LADDER_RUN, halfW: LADDER_HW },
              slab: { n: SLAB_N, s: SLAB_S, halfEW: SLAB_HALF_EW, top: SLAB_TOP },
              deck: { top: DECK_TOP, half: DECK_HALF, front: -H + CD + 0.12 },
@@ -2341,7 +2351,8 @@ void main() {
   // local y runs up the stiles and local +z out to the climber, then leant.
   // Rungs every 300 mm, rubber feet, the guide brackets that hold the two
   // sections together, the rung locks on the fly and a tie at the top.
-  function buildExtensionLadder(g, k) {
+  function buildExtensionLadder(g, k, T) {
+    const DECK_TOP = T.deck, LADDER_Z = T.ladderZ;
     const lean = Math.atan(LADDER_RUN);
     const rise = DECK_TOP - SLAB_TOP;
     const len = Math.hypot(rise, rise * LADDER_RUN) + LADDER_OVER;
@@ -2374,7 +2385,7 @@ void main() {
   // red — but reading from `base` at its foot, so the figures are the
   // gauge's own heights wherever its zero is known in AHD. Drawn at 48 px a
   // decimetre.
-  function towerStaffFace(base) {
+  function towerStaffFace(base, TOWER_STAFF_H) {
     const PX = 48, W = 64, H = Math.round(PX * TOWER_STAFF_H * 10);
     const cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
@@ -2415,7 +2426,7 @@ void main() {
     const onGauge = zero != null && isFinite(groundAhd);
     const base = onGauge ? groundAhd + SLAB_TOP - zero : SLAB_TOP;
     const old = face.material.map;
-    face.material.map = towerStaffFace(base);
+    face.material.map = towerStaffFace(base, face.userData.staffH);
     face.material.needsUpdate = true;
     if (old) old.dispose();
     face.userData.staff = { base, onGauge };
@@ -2450,14 +2461,14 @@ void main() {
     sc.towerStaff = built.staff || null;
     if (built.staff && tw.ground) setTowerStaff(built.staff, st, tw.ground.h0);
     sc.scene.add(built.group);
-    tw.model = { ...kind, top: built.top, poleTop: built.poleTop, ladder: built.ladder, deck: built.deck, slab: built.slab || null,
+    tw.model = { ...kind, top: built.top, poleTop: built.poleTop, ladder: built.ladder, deck: built.deck, slab: built.slab || null, tower: built.tower || null,
                  plate: { name: st.name || st.id, number: st.station_number ? String(st.station_number) : '' } };
   }
 
   // The station as a phrase, for the canvas's name.
   function modelWords(m) {
     switch (m && m.structure) {
-      case 'tower': return 'a river-gauge tower with its platform 4 m up';
+      case 'tower': return `a river-gauge tower with its platform ${m.tower ? m.tower.h.toFixed(1) : '3.0'} m up`;
       case 'repeater': return 'a repeater\'s pole 2 m tall';
       case 'collector': return 'a manual rain collector 300 mm tall';
       case 'staff': return 'a 1 m staff gauge';
@@ -4567,7 +4578,7 @@ void main() {
     const F = tw.flood, m = tw.model, g = tw.ground;
     if (!F || F.none || !g || !sc.station || !m || m.structure !== 'tower') return;
     const pal = (sc.flood && sc.flood.palette) || floodPalette();
-    const railTop = DECK_TOP + RAIL_H;
+    const TOWER_H = m.tower.h, railTop = m.tower.deck + RAIL_H;
     const on = F.lad.levels.map(l => ({ l, y: l.ahd - g.h0 })).filter(o => o.y > SLAB_TOP && o.y <= railTop);
     F.towerMarks = on.map(o => ({ key: o.l.key, y: o.y }));
     if (!on.length) return;
@@ -5212,7 +5223,7 @@ void main() {
     if (rig.mode !== 'walk') return;
     // Orbit again, from about where the visitor stood, looking at the station.
     // Off the ladder or the deck, back on the ground.
-    if (rig.level !== 'ground') { rig.level = 'ground'; rig.climb = 0; rig.pz = Math.max(rig.pz, (tw.model && tw.model.ladder ? tw.model.ladder.foot : LADDER_Z) + 1.2); }
+    if (rig.level !== 'ground') { rig.level = 'ground'; rig.climb = 0; rig.pz = Math.max(rig.pz, (tw.model && tw.model.ladder ? tw.model.ladder.foot : 0) + 1.2); }
     rig.pointLatch = false; rig.pointing = false;
     rig.mode = 'orbit';
     if (rig.target) rig.target.set(0, 1, 0);
@@ -6326,6 +6337,7 @@ void main() {
             ${SIZES.map(v => `<option value="${v}" ${v === s.size ? 'selected' : ''}>${v} m square</option>`).join('')}
           </select>
         </label>
+        ${towerFieldHtml()}
         <label class="twin-field">Vertical exaggeration <span class="small" id="twin-exag-out">${s.exag.toFixed(1)}×</span>
           <input type="range" id="twin-exag" min="1" max="3" step="0.1" value="${s.exag}"
                  oninput="DigitalTwin.setExag(this.value)">
@@ -6341,6 +6353,18 @@ void main() {
         <label class="check-label"><input type="checkbox" ${s.label ? 'checked' : ''} onchange="DigitalTwin.setLabel(this.checked)"><span>Name over the pole</span></label>
       </div>
       <p class="small">The pole is 2.000 m tall and 300 mm across, the figure 1.75 m, at every exaggeration — they are the ruler; only the ground stretches.</p>`;
+  }
+
+  // The tower's platform height for the station on screen, when it is a tower.
+  function towerFieldHtml() {
+    const st = currentStation();
+    if (!st || !(tw.model ? tw.model.structure === 'tower' : stationKind(st).structure === 'tower')) return '';
+    const cur = towerSpec(st).key;
+    return `<label class="twin-field">Tower platform height
+          <select id="twin-tower" onchange="DigitalTwin.setTower(this.value)">
+            ${Object.values(TOWER_TYPES).map(t => `<option value="${t.key}" ${t.key === cur ? 'selected' : ''}>${t.h.toFixed(1)} m platform, ${FOOTING * 1000} × ${FOOTING * 1000} footing${t.key === TOWER_DEFAULT ? ' (default)' : ''}</option>`).join('')}
+          </select>
+        </label>`;
   }
 
   function render() {
@@ -6731,6 +6755,14 @@ void main() {
       const n = Number(v);
       if (!SIZES.includes(n) || n === S().size) return;
       S().size = n; saveSettings();
+      init();
+    },
+    setTower(v) {
+      const st = currentStation();
+      if (!st || !TOWER_TYPES[v] || towerSpec(st).key === v) return;
+      const t = { ...(S().towers || {}) };
+      if (v === TOWER_DEFAULT) delete t[st.id]; else t[st.id] = v;
+      S().towers = t; saveSettings();
       init();
     },
     setExag(v) {

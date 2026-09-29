@@ -836,7 +836,7 @@ async function browserHalf(FS) {
     });
     await settled();
     const TWR = await page.evaluate(() => { const d = DigitalTwin.debug(); return { structure: d.model.structure, staff: d.model.towerStaff, parts: d.model.parts, marks: d.flood.towerMarks, levels: d.flood.levels }; });
-    const onTower = TWR.levels.filter(l => l.ahd - h0 > 0.1 && l.ahd - h0 <= 4.05 + 1.1).map(l => l.key);
+    const onTower = TWR.levels.filter(l => l.ahd - h0 > 0.1 && l.ahd - h0 <= 3.05 + 1.1).map(l => l.key);
     ok('a tower: on a slab 100 mm proud, its staff up the mast reading the gauge — 10.56 m at the slab, over a zero at 87.54 m AHD',
       TWR.structure === 'tower' && TWR.parts.includes('foundation slab') && TWR.staff && TWR.staff.onGauge && near(TWR.staff.base, h0 + 0.1 - 87.54, 1e-3), J({ structure: TWR.structure, staff: TWR.staff }));
     ok('…every level between the slab and the handrail\'s top is marked on it — floods, classes and AEP levels alike — at its height, a call-out each, none on another',
