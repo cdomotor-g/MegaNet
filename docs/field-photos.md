@@ -939,16 +939,20 @@ and this repository.
    payment method but charges nothing under the free limits). → **Create
    bucket** → name `meganet-photos`, location **Automatic** (or *Oceania* as a
    hint) → **Create bucket**.
-2. **Bind it.** In `wrangler.toml`, uncomment the three `[[r2_buckets]]` lines
-   and push to `main` (or ask Claude Code to). The next deploy binds it.
-3. **Let the syncs past Access.** Zero Trust → **Access controls** →
-   **Applications** → the `MegaNet public API` bypass application (see
-   `docs/agent-api.md`, "Let agents past Cloudflare Access") → **Add public
-   hostname**: domain `floodwarning.net`, path `api/photos` → **Save**. The
-   route checks every request itself (an editor's token, the secret key, or a
-   signed link), so Access has nothing to add there — and without this the
-   Dropbox and Drive syncs, the move, and the app opened from github.io cannot
-   reach it. The app on `floodwarning.net` works either way.
+2. **Bind it.** The `[[r2_buckets]]` block in `wrangler.toml` does that, and
+   the next deploy picks it up.
+3. **Keep `/api/photos` out of Cloudflare Access.** The route checks every
+   request itself (an editor's token, the secret key, or a signed link), and
+   the Dropbox and Drive syncs, the move and the app opened from github.io
+   carry no Access session. If `floodwarning.net` is not behind Access at all,
+   there is nothing to do — and do **not** add an Access application for
+   `api/photos` with no policy: Access denies everything an application's
+   policies do not allow, so an empty one blocks the route outright. If the
+   site *is* behind Access, add `api/photos` as a hostname path to an
+   application whose only policy is **Action: Bypass**, **Include → Everyone**
+   (as `docs/agent-api.md`, "Let agents past Cloudflare Access", does for the
+   API). Check: `curl -s -X POST https://floodwarning.net/api/photos/sign`
+   answers JSON, not a 302 to a login page.
 4. **Move what is there.** GitHub → **Actions** → **Field photos into R2** →
    **Run workflow** (tick *Only count* first if you want to see the numbers).
    It uses the `SUPABASE_SECRET_KEY` secret the syncs already have.
