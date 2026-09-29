@@ -13760,38 +13760,36 @@ code {
 .fp-mm-cone { stroke: var(--photo-ink); stroke-width: 1; fill: var(--photo); fill-opacity: .35; }
 .fp-mm-other { stroke: var(--photo-ink); stroke-width: 1; fill: var(--photo); fill-opacity: .85; }
 
-/* The compass at the foot of the side. A wedge per photo taken at the spot,
-   as wide as its lens saw: the one on screen strong with its needle, the
-   rest dimmed, a width the file did not give dashed, and the ones the last
-   click picked out ringed in the same amber as their boxes on the strip. */
-.fp-v-compass {
-  margin-top: auto;
-  display: grid;
-  justify-items: center;
-  gap: var(--sp-1);
-  padding-top: var(--sp-2);
+/* The compass, on the spot map: a ring round the photo's point with N E S W
+   on it and a wedge per photo taken at the spot, as wide as its lens saw —
+   the one on screen strong, the rest dimmed, a width the file did not give
+   dashed, and the ones the last click picked out ringed in the same amber as
+   their boxes on the strip. It sits over imagery, so its colours are fixed
+   rather than themed. Only the wedges and the ring take the pointer. */
+.fp-cmp-icon { background: none; border: 0; }
+.fp-cmp { display: block; overflow: visible; cursor: crosshair; pointer-events: none; }
+.fp-cmp-face { fill: none; stroke: #fff; stroke-opacity: .85; stroke-width: 2; }
+.fp-cmp-hit { fill: none; stroke: transparent; stroke-width: 18; pointer-events: stroke; }
+.fp-cmp-tick { stroke: #fff; stroke-opacity: .85; stroke-width: 1.5; }
+.fp-cmp-label {
+  fill: #fff; font-size: 12px; font-weight: 700; text-anchor: middle; dominant-baseline: central;
+  stroke: rgba(0, 0, 0, .75); stroke-width: 3; paint-order: stroke; pointer-events: none;
 }
-.fp-v-compass:empty { display: none; }
-.fp-cmp { width: min(100%, 12.5rem); height: auto; overflow: visible; cursor: crosshair; }
-.fp-cmp-face { fill: var(--subtle); stroke: var(--border); stroke-width: 2; }
-.fp-cmp-tick { stroke: var(--muted); stroke-width: 1.5; }
-.fp-cmp-tick.is-major { stroke: var(--text); stroke-width: 2.5; }
-.fp-cmp-label { fill: var(--muted); font-size: 17px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
-.fp-cmp-label.is-north { fill: var(--text); }
-.fp-cmp-wedge { fill: var(--accent); fill-opacity: .16; stroke: var(--accent); stroke-opacity: .5; stroke-width: 1.5; cursor: pointer; }
-.fp-cmp-wedge:hover { fill-opacity: .3; }
-.fp-cmp-wedge.is-assumed { stroke-dasharray: 5 4; }
-.fp-cmp-wedge.is-here { fill-opacity: .55; stroke-opacity: 1; stroke-width: 2; }
-.fp-cmp-wedge.is-gold { stroke: var(--hit-ring); stroke-opacity: 1; stroke-width: 3.5; }
-.fp-cmp-wedge:focus-visible { stroke: var(--text); stroke-opacity: 1; stroke-width: 3.5; }
-.fp-cmp-needle { stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; pointer-events: none; }
-.fp-cmp-hub { fill: var(--text); pointer-events: none; }
+.fp-cmp-label.is-north { fill: #ff8a80; }
+.fp-cmp-wedge { fill: var(--accent); fill-opacity: .16; stroke: #fff; stroke-opacity: .6; stroke-width: 1; cursor: pointer; pointer-events: all; }
+.fp-cmp-wedge:hover { fill-opacity: .35; }
+.fp-cmp-wedge.is-assumed { stroke-dasharray: 4 3; }
+.fp-cmp-wedge.is-here { fill: var(--photo); fill-opacity: .5; stroke-opacity: 1; stroke-width: 1.5; }
+.fp-cmp-wedge.is-gold { stroke: var(--hit-ring); stroke-opacity: 1; stroke-width: 3; }
+.fp-cmp-wedge:focus-visible { stroke: #fff; stroke-opacity: 1; stroke-width: 3; outline: none; }
 .fp-cmp-note { margin: 0; max-width: 18rem; text-align: center; color: var(--muted); font-size: var(--fs-xs); }
-/* The spot map under the compass: where the photo was taken, on the imagery. */
+.fp-v-compass { display: grid; justify-items: center; padding-top: var(--sp-1); }
+.fp-v-compass:empty { display: none; }
+/* The spot map: where the photo was taken, on the imagery, the compass round it. */
 .fp-v-spot { padding-top: var(--sp-2); }
 .fp-v-spot:empty { display: none; }
 .fp-v-spotmap {
-  height: 12rem;
+  height: 15rem;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--subtle);

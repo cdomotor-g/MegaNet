@@ -1387,15 +1387,16 @@ async function compassHalf(page, R, db, objects, viewer, text) {
   const s2 = seed(2, { heading_deg: 234, fov_deg: 53.1 });
   const s3 = seed(3, { heading_deg: 325, fov_deg: 58.9, accuracy_m: 4, lon: G.lon + 0.000004 });
   objects[s2.storage_path] = SW;
-  const wedges = () => page.$$eval('#fp-v-compass .fp-cmp-wedge', ws => ws.map(w => ({
+  const wedges = () => page.$$eval('#fp-v-spotmap .fp-cmp-wedge', ws => ws.map(w => ({
     id: w.dataset.fpId, here: w.classList.contains('is-here'), gold: w.classList.contains('is-gold'),
     assumed: w.classList.contains('is-assumed'), fill: +getComputedStyle(w).fillOpacity })));
   const boxed = () => page.$$eval('#fp-viewer .fp-v-thumb', bs => bs.map(b => b.classList.contains('is-gold')));
-  // A click on the dial `deg` round from north, `rad` of its 240 units out —
-  // near the rim, where a pixel is least of an angle (under a degree).
-  const dial = async (deg, rad = 86) => {
+  // A click on the dial `deg` round from north, `rad` of its 140 pixels out —
+  // near the rim, where a pixel is least of an angle.
+  const dial = async (deg, rad = 52) => {
     const p = await page.evaluate(({ deg, rad }) => {
-      const b = document.querySelector('#fp-v-compass .fp-cmp').getBoundingClientRect(), k = b.width / 240, a = deg * Math.PI / 180;
+      document.querySelector('#fp-v-spotmap .fp-cmp').scrollIntoView({ block: 'center' });
+      const b = document.querySelector('#fp-v-spotmap .fp-cmp').getBoundingClientRect(), k = b.width / 140, a = deg * Math.PI / 180;
       return { x: b.left + b.width / 2 + rad * Math.sin(a) * k, y: b.top + b.height / 2 - rad * Math.cos(a) * k };
     }, { deg, rad });
     await page.mouse.click(p.x, p.y);
@@ -1421,18 +1422,21 @@ async function compassHalf(page, R, db, objects, viewer, text) {
   ok('…and under it, which way this one faces and how to use it',
     /Facing 46° NE \(true\)\. 5 photos taken here — click a direction for the one facing it\./.test(await text('#fp-cmp-note')), await text('#fp-cmp-note'));
   const cmpBox = await page.evaluate(() => {
-    const c = document.querySelector('#fp-v-compass .fp-cmp').getBoundingClientRect(), s = document.querySelector('#fp-viewer .fp-v-side').getBoundingClientRect();
     const m = document.querySelector('#fp-v-spotmap');
     const mb = m ? m.getBoundingClientRect() : null;
-    return { right: s.right - c.right, left: c.left - s.left, w: c.width,
-             map: !!mb, mapBelow: mb ? Math.round(mb.top - c.bottom) : null, mapBottom: mb ? Math.round(s.bottom - mb.bottom) : null,
+    const c = m ? m.querySelector('.fp-cmp') : null, cb = c ? c.getBoundingClientRect() : null;
+    const n = document.querySelector('#fp-cmp-note'), nb = n ? n.getBoundingClientRect() : null;
+    return { map: !!mb, ring: !!cb, w: cb ? cb.width : 0,
+             inside: !!(cb && mb && cb.left >= mb.left && cb.right <= mb.right && cb.top >= mb.top && cb.bottom <= mb.bottom),
+             letters: c ? [...c.querySelectorAll('.fp-cmp-label')].map(t => t.textContent).join('') : '',
+             noteBelow: !!(nb && mb && nb.top >= mb.bottom - 1), separateDial: !!document.querySelector('#fp-v-compass .fp-cmp'),
              mapW: mb ? Math.round(mb.width) : 0, tiles: m ? m.querySelectorAll('.leaflet-tile').length : 0,
-             here: m ? m.querySelectorAll('.fp-sm-here').length : 0, others: m ? m.querySelectorAll('.fp-mm-other').length : 0,
-             cone: m ? m.querySelectorAll('.fp-mm-cone').length : 0 };
+             here: m ? m.querySelectorAll('.fp-sm-here').length : 0, others: m ? m.querySelectorAll('.fp-mm-other').length : 0 };
   });
-  ok('…at the foot of the side panel — the viewer\'s bottom right', cmpBox.w > 120 && Math.abs(cmpBox.left - cmpBox.right) < 40, J(cmpBox));
-  ok('…and under it a satellite map of the spot: this photo\'s point and cone, the other four as dots',
-    cmpBox.map && cmpBox.mapBelow >= 0 && cmpBox.mapW > 120 && cmpBox.here === 1 && cmpBox.cone === 1 && cmpBox.others === 4, J(cmpBox));
+  ok('…on the satellite map of the spot — one compass, not two — a ring round the photo\'s point with N, E, S and W on it',
+    cmpBox.map && cmpBox.ring && cmpBox.inside && cmpBox.letters === 'NESW' && !cmpBox.separateDial && cmpBox.mapW > 120, J(cmpBox));
+  ok('…this photo\'s point, the other four as dots, and the note under the map',
+    cmpBox.here === 1 && cmpBox.others === 4 && cmpBox.noteBelow, J(cmpBox));
 
   await dial(201);
   v = await viewer();
@@ -1475,7 +1479,7 @@ async function compassHalf(page, R, db, objects, viewer, text) {
   ok('a direction nobody faced (90°) clears the gold and says so, leaving the photo where it was',
     v.i === 2 && v.gold.length === 0 && J(await boxed()) === J([false, false, false, false, false])
       && /No photo taken here faces (89|90|91)° E\./.test(await text('#fp-cmp-note')), `${J(v)} ${await text('#fp-cmp-note')}`);
-  await page.focus(`#fp-v-compass .fp-cmp-wedge[data-fp-id="${s3.id}"]`);
+  await page.focus(`#fp-v-spotmap .fp-cmp-wedge[data-fp-id="${s3.id}"]`);
   await page.keyboard.press('Enter');
   ok('Enter on a wedge brings its photo up, the focus staying on that wedge',
     (await viewer()).i === 4 && await page.evaluate(id => document.activeElement && document.activeElement.dataset.fpId === id, s3.id));

@@ -299,12 +299,13 @@ offers **Read it off the photo** (or *the n photos taken here*): the stored
 picture read by the same OCR as an upload, one photo at a time, and the ±
 saved on its own (`update_field_photo` with `accuracy_m` alone).
 
-**The compass**, at the foot of the side panel, is the photo's direction and
+**The compass**, drawn on the spot map in the side panel (a ring round the
+photo's point with N, E, S and W on it, north-up), is the photo's direction and
 field of view as a wedge, with every other photo taken at the same spot (the
 3 m rule the map's pins use) drawn the same way, dimmed; a lens whose width
 the file did not give is drawn 60° wide and dashed. **Click a direction** and
 the photo facing it comes up. Where several photos' wedges take in that
-direction, **all of them are boxed in gold** — on the strip and on the dial,
+direction, **all of them are boxed in gold** — on the strip and on the map,
 in the search-hit amber — and the one looking most nearly that way comes up;
 clicking there again steps to the next. A direction nobody faced clears the
 boxes and says so. Each wedge is also a button: Tab to it and press Enter.

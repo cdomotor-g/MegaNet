@@ -1765,8 +1765,8 @@ const FieldPhotos = (function () {
           <div class="fp-v-side">
             <div id="fp-v-details">${detailsHtml(r)}</div>
             <div id="fp-v-place"></div>
-            <div class="fp-v-compass" id="fp-v-compass">${compassHtml(r)}</div>
             <div class="fp-v-spot" id="fp-v-spot"></div>
+            <div class="fp-v-compass" id="fp-v-compass">${compassHtml(r)}</div>
           </div>
         </div>
         ${n > 1 ? `<div class="fp-v-strip" role="group" aria-label="All ${n} photos">
@@ -1850,7 +1850,10 @@ const FieldPhotos = (function () {
   }
   function paintCompass(note) {
     const el = document.getElementById('fp-v-compass');
-    if (el && v) el.innerHTML = compassHtml(S().byId[v.ids[v.i]], note);
+    const r = v ? S().byId[v.ids[v.i]] : null;
+    if (el && r) el.innerHTML = compassHtml(r, note);
+    const ring = sm && sm.ring && sm.ring.getElement ? sm.ring.getElement() : null;
+    if (ring && r) ring.innerHTML = dialHtml(r);
   }
   function paintSide() { paintDetails(); paintPlace(); paintCompass(); keepFocus(); }
   // A redraw takes the control that had the focus with it; the focus stays in
@@ -2097,9 +2100,9 @@ const FieldPhotos = (function () {
   }
 
   // ── The spot map ───────────────────────────────────────────────────────────
-  // Under the compass, while the mover is shut: the same imagery with the
-  // photo's point, its GPS ± and the way it looked, and the other photos
-  // taken at the spot — so the dial has a place to stand on. Look only: the
+  // While the mover is shut: the same imagery with the photo's point, its
+  // GPS ± and the compass ring round it (see The compass), and the other
+  // photos taken at the spot. Look only: the
   // wheel is left to the side panel's scroll, and a pin is moved in Move….
   // Made and taken down with the side, like the mover (removeMap).
   let sm = null;    // { map, id }
@@ -2126,10 +2129,16 @@ const FieldPhotos = (function () {
     }
     sm = { map, id: r.id };
     if (acc) L.circle(at, { radius: acc, interactive: false, className: `fp-mm-ring${rough(acc) ? ' is-rough' : ''}` }).addTo(map);
-    if (known(r.heading_deg)) L.polygon(conePoints(at[0], at[1], +r.heading_deg, fovOf(r), CONE_M), { interactive: false, className: 'fp-mm-cone' }).addTo(map);
     spotRows(r).filter(x => x !== r).forEach(x => L.circleMarker([+x.lat, +x.lon], { radius: 4, interactive: false, className: 'fp-mm-other' }).addTo(map));
     L.circleMarker(at, { radius: 6, interactive: false, className: 'fp-sm-here' }).addTo(map);
     map.fitBounds(L.latLng(at).toBounds(Math.max(60, (acc || 0) * 3)), { maxZoom: 19, animate: false });
+    // The compass, on the map: a ring of screen size around the spot with
+    // N E S W on it and a wedge per photo. Added once the view is set.
+    const dial = dialHtml(r);
+    if (dial) sm.ring = L.marker(at, {
+      interactive: false, keyboard: false,
+      icon: L.divIcon({ className: 'fp-cmp-icon', html: dial, iconSize: [DIAL.box, DIAL.box], iconAnchor: [DIAL.box / 2, DIAL.box / 2] }),
+    }).addTo(map);
   }
 
   // Where a photo with no place yet is looked for: its station, the other
@@ -2228,19 +2237,21 @@ const FieldPhotos = (function () {
   }
 
   // ── The compass ────────────────────────────────────────────────────────────
-  // At the foot of the side: the way this photo looks, and every other photo
-  // taken at the same spot, dimmed — a wedge each, as wide as its lens saw
-  // (FOV_ASSUMED, dashed, where the file did not say). A wedge is a door:
-  // click a direction and the photo facing it comes up. Where several look
-  // that way, all of them are boxed in gold, on the strip and on the dial,
-  // the one looking most nearly that way comes up, and a click there again
-  // steps to the next. For a spot's photos the strip is in the dial's order
-  // too — openSpot sorts them N → E → S → W.
+  // On the spot map, round the photo's point: a ring the size of the screen
+  // (not of the ground) with N E S W on it, and inside it a wedge per photo
+  // taken at the spot, as wide as its lens saw (FOV_ASSUMED, dashed, where
+  // the file did not say) — this photo's strong, the rest dimmed. A wedge is
+  // a door: click a direction, on a wedge or on the ring, and the photo
+  // facing it comes up. Where several look that way, all of them are boxed
+  // in gold, on the strip and on the map, the one looking most nearly that
+  // way comes up, and a click there again steps to the next. For a spot's
+  // photos the strip is in the dial's order too — openSpot sorts them
+  // N → E → S → W. The map is north-up, so the letters are true.
   //
-  // In the SVG's 240-unit box: the face r 92, the wedges r 78, the cardinal
-  // letters outside the face at r 108; nothing is picked within the hub's
-  // r 6, where every wedge meets.
-  const DIAL = { face: 92, wedge: 78, label: 108, hub: 6, box: 240 };
+  // In the SVG's 140-pixel box: the ring r 56 with the letters on it, the
+  // wedges r 48; nothing is picked within the hub's r 6, where every wedge
+  // meets. Only the wedges and the ring take the pointer; the rest is the map's.
+  const DIAL = { face: 56, wedge: 48, label: 56, hub: 6, box: 140 };
 
   function polar(deg, rad) { const a = deg * Math.PI / 180; return [rad * Math.sin(a), -rad * Math.cos(a)]; }
   function wedgePath(h, fov, rad = DIAL.wedge) {
@@ -2249,18 +2260,17 @@ const FieldPhotos = (function () {
     return `M0 0L${x0.toFixed(2)} ${y0.toFixed(2)}A${rad} ${rad} 0 ${half > 90 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}Z`;
   }
 
-  function compassHtml(r, note) {
+  function dialHtml(r) {
     if (!r || !v) return '';
-    const here = spotRows(r);
-    const faced = here.filter(x => known(x.heading_deg));
+    const faced = spotRows(r).filter(x => known(x.heading_deg));
     if (!faced.length) return '';
     const gold = v.gold || new Set();
     const n = v.ids.length;
     const ticks = [];
-    for (let d = 0; d < 360; d += 22.5) {
-      const major = d % 90 === 0;
-      const [x0, y0] = polar(d, DIAL.face - (major ? 12 : 6)), [x1, y1] = polar(d, DIAL.face);
-      ticks.push(`<line class="fp-cmp-tick${major ? ' is-major' : ''}" x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}"/>`);
+    for (let d = 22.5; d < 360; d += 22.5) {
+      if (d % 90 === 0) continue;
+      const [x0, y0] = polar(d, DIAL.face - 6), [x1, y1] = polar(d, DIAL.face);
+      ticks.push(`<line class="fp-cmp-tick" x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}"/>`);
     }
     const letters = [['N', 0], ['E', 90], ['S', 180], ['W', 270]].map(([t, d]) => {
       const [x, y] = polar(d, DIAL.label);
@@ -2275,11 +2285,21 @@ const FieldPhotos = (function () {
       return `<path class="${cls}" d="${wedgePath(+x.heading_deg, fov)}" data-fp-id="${escAttr(x.id)}" tabindex="0" role="button"
                     aria-label="${escAttr(label)}"${x === r ? ' aria-current="true"' : ''}><title>${esc(label)}</title></path>`;
     }).join('');
-    let needle = '';
-    if (known(r.heading_deg)) {
-      const [x, y] = polar(+r.heading_deg, DIAL.face - 3);
-      needle = `<line class="fp-cmp-needle" x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`;
-    }
+    const half = DIAL.box / 2;
+    return `<svg class="fp-cmp" width="${DIAL.box}" height="${DIAL.box}" viewBox="${-half} ${-half} ${DIAL.box} ${DIAL.box}" role="group"
+           aria-label="Compass: which way the photos taken here look" onclick="FieldPhotos.compassClick(event)" onkeydown="FieldPhotos.compassKey(event)">
+        <circle class="fp-cmp-face" r="${DIAL.face}"/>
+        <circle class="fp-cmp-hit" r="${DIAL.face}"/>
+        ${ticks.join('')}${wedges}${letters}
+      </svg>`;
+  }
+
+  // Under the map: the way this photo looks, and what a click does.
+  function compassHtml(r, note) {
+    if (!r || !v) return '';
+    const here = spotRows(r);
+    const faced = here.filter(x => known(x.heading_deg));
+    if (!faced.length) return '';
     const blind = here.length - faced.length;
     const lead = known(r.heading_deg)
       ? `Facing ${headingText(+r.heading_deg, r.heading_ref)}${known(r.fov_deg) ? `, ${Math.round(+r.fov_deg)}° wide` : ''}.`
@@ -2287,15 +2307,7 @@ const FieldPhotos = (function () {
     const rest = note || (v.gold && v.goldSay) || (faced.length === 1 && faced[0] === r
       ? (here.length === 1 ? 'The only photo taken here.' : `The only one of the ${here.length} photos taken here with a direction.`)
       : `${here.length} photos taken here${blind ? ` (${blind} with no direction)` : ''} — click a direction for the one facing it.`);
-    const half = DIAL.box / 2;
-    return `
-      <svg class="fp-cmp" viewBox="${-half} ${-half} ${DIAL.box} ${DIAL.box}" role="group"
-           aria-label="Compass: which way the photos taken here look" onclick="FieldPhotos.compassClick(event)" onkeydown="FieldPhotos.compassKey(event)">
-        <circle class="fp-cmp-face" r="${DIAL.face}"/>
-        ${ticks.join('')}${letters}${wedges}${needle}
-        <circle class="fp-cmp-hub" r="3"/>
-      </svg>
-      <p class="fp-cmp-note" id="fp-cmp-note">${esc(lead)} ${esc(rest)}</p>`;
+    return `<p class="fp-cmp-note" id="fp-cmp-note">${esc(lead)} ${esc(rest)}</p>`;
   }
 
   // A click on the dial: the direction it points, from the dial's centre.
@@ -2317,7 +2329,7 @@ const FieldPhotos = (function () {
     if (!x || !known(x.heading_deg)) return;
     e.preventDefault();
     pickFacing(+x.heading_deg, id);
-    const w = document.querySelector(`#fp-v-compass [data-fp-id="${CSS.escape(id)}"]`);
+    const w = document.querySelector(`#fp-v-spotmap [data-fp-id="${CSS.escape(id)}"]`);
     if (w) w.focus();
   }
 
