@@ -11,7 +11,18 @@
       "mcp__Supabase__get_project_url",
       "mcp__Supabase__list_projects",
       "mcp__Supabase__search_docs",
-      "mcp__Supabase__generate_typescript_types"
+      "mcp__Supabase__generate_typescript_types",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__claude_ai_Supabase__list_migrations",
+      "mcp__claude_ai_Supabase__list_extensions",
+      "mcp__claude_ai_Supabase__get_advisors",
+      "mcp__claude_ai_Supabase__query_logs",
+      "mcp__claude_ai_Supabase__get_project",
+      "mcp__claude_ai_Supabase__get_project_url",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__search_docs",
+      "mcp__claude_ai_Supabase__generate_typescript_types"
     ]
   }
 }
