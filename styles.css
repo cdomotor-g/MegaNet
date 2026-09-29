@@ -443,10 +443,11 @@
      control that is itself accent-coloured.
 
      The rule: never `outline: none` without a replacement that is at least as
-     visible. There is one allowlisted exception in this file (.nv-node) and it
-     replaces the outline with a shape change on the thing being focused;
-     `npm run shell` holds the allowlist, so a second one has to be argued for
-     rather than added. (There were two until #165 deleted the Stations
+     visible. There are two allowlisted exceptions of that kind in this file
+     (.nv-node, and the photo compass's .fp-cmp-wedge), SVG shapes with no box,
+     and each replaces the outline with a shape change on the thing being
+     focused; `npm run shell` holds the allowlist, so another has to be argued
+     for rather than added. (There were two until #165 deleted the Stations
      divider, and the check is what remembered that its exception had to go
      with it — a stale entry fails it exactly as an unlisted removal does.) */
   --focus: var(--accent);
@@ -9861,7 +9862,7 @@ code {
 }
 
 .nv-node:hover circle { stroke: var(--text); stroke-width: 2.5; }
-/* Allowlisted `outline: none` #2 of 2 (#109's focus policy). An SVG <g> has no
+/* Allowlisted `outline: none` #2 of 3 (#109's focus policy). An SVG <g> has no
    box to outline — browsers draw the ring around the group's bounding box,
    which on a force-directed graph is a rectangle nowhere near the node. The
    replacement is the line under it: the node's own circle takes the accent
@@ -10273,7 +10274,7 @@ code {
 .ad-cell:hover { border-color: var(--border); }
 /* The border and the ground change on focus; the focus *ring* stays, because a
    text box in a table is exactly the shape a keyboard user needs one on, and
-   the two allowlisted `outline: none` rules in this file are both elements with
+   the three allowlisted `outline: none` rules in this file are all elements with
    no box worth ringing (see test/shell.mjs). A border colour is not a ring. */
 .ad-cell:focus { border-color: var(--accent); background: var(--panel); }
 .ad-cell--q { max-width: 5rem; }
@@ -13979,6 +13980,10 @@ code {
 .fp-cmp-wedge.is-assumed { stroke-dasharray: 4 3; }
 .fp-cmp-wedge.is-here { fill: var(--photo); fill-opacity: .5; stroke-opacity: 1; stroke-width: 1.5; }
 .fp-cmp-wedge.is-gold { stroke: var(--hit-ring); stroke-opacity: 1; stroke-width: 3; }
+/* Allowlisted `outline: none` #3 of 3 (#109's focus policy), for .nv-node's
+   reason: a wedge is an SVG path with no box, and the ring a browser draws
+   round its bounding box is a rectangle beside the wedge rather than on it.
+   The replacement is on the wedge itself — its edge solid white at 3 px. */
 .fp-cmp-wedge:focus-visible { stroke: #fff; stroke-opacity: 1; stroke-width: 3; outline: none; }
 .fp-cmp-note { margin: 0; max-width: 18rem; text-align: center; color: var(--muted); font-size: var(--fs-xs); }
 .fp-v-compass { display: grid; justify-items: center; padding-top: var(--sp-1); }
