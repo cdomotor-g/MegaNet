@@ -823,7 +823,34 @@ async function browserHalf(FS) {
       s.aep_levels = window.__aep; s.flood_peaks = window.__pk;
       DigitalTwin._floodScaleAuto(null, true);
     });
-    await page.evaluate(() => { delete state.data.stations.find(x => x.id === 'gatton').flood_peaks; DigitalTwin.rebuild(); });
+
+    // Gatton drawn as a telemetered river tower (its name ending AL, the SLS
+    // set aside): every level that falls on the tower is banded on it, in the
+    // colour the scale gives it, with a call-out; its staff reads the gauge.
+    section('The levels on a tower');
+    await page.evaluate(() => {
+      const s = state.data.stations.find(x => x.id === 'gatton');
+      window.__gattonName = s.name; s.name = `${s.name} AL`;
+      if (typeof SLS !== 'undefined') { window.__slsFor = SLS.forStation; SLS.forStation = (...a) => (a[0] && a[0].id === 'gatton' ? null : window.__slsFor(...a)); }
+      DigitalTwin.rebuild();
+    });
+    await settled();
+    const TWR = await page.evaluate(() => { const d = DigitalTwin.debug(); return { structure: d.model.structure, staff: d.model.towerStaff, parts: d.model.parts, marks: d.flood.towerMarks, levels: d.flood.levels }; });
+    const onTower = TWR.levels.filter(l => l.ahd - h0 > 0.1 && l.ahd - h0 <= 4.05 + 1.1).map(l => l.key);
+    ok('a tower: on a slab 100 mm proud, its staff up the mast reading the gauge — 10.56 m at the slab, over a zero at 87.54 m AHD',
+      TWR.structure === 'tower' && TWR.parts.includes('foundation slab') && TWR.staff && TWR.staff.onGauge && near(TWR.staff.base, h0 + 0.1 - 87.54, 1e-3), J({ structure: TWR.structure, staff: TWR.staff }));
+    ok('…every level between the slab and the handrail\'s top is marked on it — floods, classes and AEP levels alike — at its height, a call-out each, none on another',
+      TWR.marks && J(TWR.marks.marks.map(m => m.key)) === J(onTower) && onTower.includes('major_m') && onTower.includes('aep_1_m') && onTower.some(k => /^peak /.test(k))
+        && TWR.marks.marks.every(m => near(m.y, TWR.levels.find(l => l.key === m.key).ahd - h0, 1e-6))
+        && TWR.marks.callouts.length === onTower.length && TWR.marks.callouts.every((c, i, a) => i === 0 || c.y - a[i - 1].y >= 0.45 - 1e-6)
+        && TWR.marks.visible && !TWR.marks.exported, J(TWR.marks));
+    ok('…its bands in the scale\'s colours', TWR.parts.filter(n => n === 'flood level band').length > 0);
+    await page.evaluate(() => {
+      const s = state.data.stations.find(x => x.id === 'gatton');
+      s.name = window.__gattonName; delete s.flood_peaks;
+      if (window.__slsFor) SLS.forStation = window.__slsFor;
+      DigitalTwin.rebuild();
+    });
     await settled();
 
     // The same line in the Stations map's twin.

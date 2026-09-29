@@ -1215,7 +1215,7 @@ const HELP = {
            + 'best public elevation model there is (Queensland\'s 0.5–1 m LiDAR where it exists, the '
            + '~30 m SRTM elsewhere), the aerial imagery draped over it, <strong>the station as built</strong> '
            + 'where it stands — the Type 3 rainfall pole, the river-gauge tower with its platform and '
-           + 'ladder, a manual collector or staff gauge, or a red post where the record cannot say — with '
+           + 'extension ladder, its staff gauge and its flood levels marked on it, a manual collector or staff gauge, or a red post where the record cannot say — with '
            + 'the other stations and the bridges in the patch, and a 1.75 m figure beside it for scale. Orbit it, '
            + 'look straight down on it, or take the POV and walk about in it at eye height (and up the '
            + 'ladder); click the ground for its height; move the station\'s pin to where it stands on '

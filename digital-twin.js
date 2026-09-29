@@ -247,6 +247,7 @@ const DigitalTwin = (function () {
   const sc = {
     renderer: null, scene: null, camera: null, canvas: null, stage: null,
     terrain: null, wire: null, pole: null, band: null, figure: null, label: null, paths: null,
+    towerStaff: null, towerMarks: null,   // the tower's staff face, and its flood-level bands and call-outs
     station: null, doors: [],   // the station as built, and its doors
     avatars: null, laser: null, dot: null,   // the other visitors, and the visitor's own pointer
     sun: null, hemi: null, texture: null, raf: 0, ro: null, dirty: false,
@@ -993,7 +994,7 @@ const DigitalTwin = (function () {
     removeSharp();
     if (typeof TwinCadastre !== 'undefined') TwinCadastre.remove();
     tw.photoNear = -1;
-    sc.pole = null; sc.band = null; sc.doors = [];
+    sc.pole = null; sc.band = null; sc.doors = []; sc.towerStaff = null;
     remoteClear();
     for (const k of ['terrain', 'wire', 'station', 'figure', 'label', 'paths', 'sky', 'avatars', 'laser', 'dot']) {
       if (sc[k]) { sc.scene.remove(sc[k]); disposeObject(sc[k]); sc[k] = null; }
@@ -1693,11 +1694,13 @@ void main() {
   //     repeater that measures nothing is the same pole without the gauge.
   //   * A **river-gauge tower** — a 4 m galvanised mast on a flange, a 1.8 m
   //     grating platform with handrails, the cabinet on the platform, the
-  //     gauge and the antenna mast with its solar panel, and a ladder up the
-  //     south side — for a telemetered station the record says reads a river
-  //     (a 'Water Level…' or 'Gas Pressure' sensor, a water_level ALERT
-  //     address, a Bureau listing typed Water Level, or the SLS's data type).
-  //     The foundation is below the ground and so not drawn.
+  //     gauge and the antenna mast with its solar panel, a staff gauge up
+  //     the mast's south face, and an extension ladder leaning on the
+  //     platform's south edge at 1 in 4 — for a telemetered station the
+  //     record says reads a river (a 'Water Level…' or 'Gas Pressure'
+  //     sensor, a water_level ALERT address, a Bureau listing typed Water
+  //     Level, or the SLS's data type). It stands on a concrete foundation
+  //     slab whose top is 100 mm proud of the ground.
   //   * A **manual rainfall station** — the depositional collector an
   //     observer empties and reads: a silver cylinder Ø200 mm and 300 mm tall
   //     standing on the ground, open at the top with its funnel inset.
@@ -1752,8 +1755,17 @@ void main() {
   const DECK_TOP  = 4.05;    // the grating's walking surface
   const DECK_HALF = 0.9;     // the platform is 1.8 m square
   const RAIL_H    = 1.1;     // handrail over the deck
-  const LADDER_Z  = 0.98;    // the ladder's stiles, just south of the deck's edge
-  const LADDER_HW = 0.2;     // half the ladder's width
+  const SLAB_TOP  = 0.10;    // the foundation slab stands 100 mm proud of the ground
+  const SLAB_HALF = 0.7;     // and is 1.4 m square
+  // The extension ladder: leaning on the deck's south edge at 1 in 4 (a metre
+  // out at its foot for every four up — AS/NZS 1892 and every WorkSafe
+  // guide, about 76°), running on a metre past the landing as a handhold.
+  const LADDER_RUN   = 0.25;   // horizontal metres per vertical metre
+  const LADDER_TOP_Z = 1.005;  // the base section's centre line where it passes the deck's top
+  const LADDER_Z  = LADDER_TOP_Z + DECK_TOP * LADDER_RUN;   // the ladder's foot, on the ground
+  const LADDER_HW = 0.2;     // half the fly section's width (the base's is 0.23)
+  const LADDER_OVER = 1.0;   // how far past the landing the stiles run
+  const TOWER_STAFF_H = 3.0; // the staff gauge on the mast, from the slab up
   const CLIMB_MPS = 1.2;     // up the ladder (Shift doubles it)
   const DOOR_NEAR = 2.2;     // a pole enclosure opens when the eye is this close
   const DOOR_RATE = 2.6;     // radians per second
@@ -2195,7 +2207,11 @@ void main() {
   function buildTower(st, kind, k) {
     const g = new THREE.Group();
     g.name = 'station';
-    cyl(g, k.cream, 0.28, 0.28, 0.03, 0, 0.015, 0, 'base flange', 32);
+    // The foundation: a concrete slab 400 mm deep, its top 100 mm proud of
+    // the ground, and the mast's flange bolted to it. The mast's foot is
+    // still the ground at the origin — the slab is cast round it.
+    box(g, k.concrete, 2 * SLAB_HALF, 0.4, 2 * SLAB_HALF, 0, SLAB_TOP - 0.2, 0, 'foundation slab');
+    cyl(g, k.cream, 0.28, 0.28, 0.03, 0, SLAB_TOP + 0.015, 0, 'base flange', 32);
     const mast = cyl(g, k.galv, POLE_R, POLE_R, TOWER_H, 0, TOWER_H / 2, 0, 'station pole', 40);
     sc.pole = mast;
     const role = typeof primaryRole === 'function' ? primaryRole(st) : 'field';
@@ -2232,13 +2248,19 @@ void main() {
       bar(g, k.galv, 0.016, -p, y, p, -hw, y, p, 'handrail');
       bar(g, k.galv, 0.016, hw, y, p, p, y, p, 'handrail');
     }
-    // The ladder up the south side: stiles that run on past the deck as
-    // handholds, rungs every 300 mm, two brackets back to the mast.
-    for (const sx of [-LADDER_HW, LADDER_HW]) {
-      cyl(g, k.galv, 0.016, 0.016, DECK_TOP + RAIL_H - 0.25, sx, (DECK_TOP + RAIL_H + 0.25) / 2, LADDER_Z, 'ladder stile', 10);
-      for (const y of [1.5, 3.0]) bar(g, k.galv, 0.012, sx, y, LADDER_Z, sx * 0.6, y, POLE_R + 0.02, 'ladder bracket');
-    }
-    for (let y = 0.4; y <= TOWER_H + 0.01; y += 0.3) bar(g, k.galv, 0.013, -LADDER_HW, y, LADDER_Z, LADDER_HW, y, LADDER_Z, 'ladder rung');
+    // The staff gauge up the mast's south face, where whoever comes up the
+    // ladder can read it: a white board from the slab to 3 m over it, its
+    // graduations drawn by towerStaffFace once the ground under it is known.
+    box(g, k.galv, 0.05, TOWER_STAFF_H, 0.02, 0, SLAB_TOP + TOWER_STAFF_H / 2, POLE_R + 0.005, 'gauge board post');
+    const staffBoard = box(g, new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.55 }),
+      STAFF_W, TOWER_STAFF_H, 0.012, 0, SLAB_TOP + TOWER_STAFF_H / 2, POLE_R + 0.021, 'gauge board');
+    staffBoard.castShadow = true;
+    const staffFaceMesh = new THREE.Mesh(new THREE.PlaneGeometry(STAFF_W, TOWER_STAFF_H),
+      new THREE.MeshStandardMaterial({ map: towerStaffFace(SLAB_TOP), roughness: 0.55 }));
+    staffFaceMesh.position.set(0, SLAB_TOP + TOWER_STAFF_H / 2, POLE_R + 0.0275);
+    staffFaceMesh.name = 'gauge board graduations';
+    g.add(staffFaceMesh);
+    buildExtensionLadder(g, k);
     // The cabinet on the north of the platform, its door to the south, facing
     // whoever comes up the ladder. Two compartments: the bubbler above, the
     // power and the telemetry below.
@@ -2304,8 +2326,95 @@ void main() {
     box(sp, k.galv, 0.58, 0.43, 0.02, 0, 0, 0, 'solar frame');
     box(sp, k.panel, 0.55, 0.40, 0.006, 0, 0, -0.012, 'solar panel');
     return { group: g, top: DECK_TOP + RAIL_H, poleTop: TOWER_H,
-             ladder: { x: 0, z: LADDER_Z, stand: LADDER_Z + 0.22, halfW: LADDER_HW },
-             deck: { top: DECK_TOP, half: DECK_HALF, front: -H + CD + 0.12 } };
+             ladder: { x: 0, z: LADDER_Z, foot: LADDER_Z, stand: LADDER_Z + 0.22, run: LADDER_RUN, halfW: LADDER_HW },
+             deck: { top: DECK_TOP, half: DECK_HALF, front: -H + CD + 0.12 },
+             staff: staffFaceMesh };
+  }
+
+  // The extension ladder: a base section on the ground and a fly section
+  // behind it, run up until the stiles stand a metre past the landing, both
+  // leaning on the deck's south edge at 1 in 4. Built square in a group whose
+  // local y runs up the stiles and local +z out to the climber, then leant.
+  // Rungs every 300 mm, rubber feet, the guide brackets that hold the two
+  // sections together, the rung locks on the fly and a tie at the top.
+  function buildExtensionLadder(g, k) {
+    const lean = Math.atan(LADDER_RUN);
+    const len = Math.hypot(DECK_TOP, DECK_TOP * LADDER_RUN) + LADDER_OVER;
+    const lg = new THREE.Group();
+    lg.name = 'extension ladder';
+    lg.position.set(0, 0, LADDER_Z);
+    lg.rotation.x = -lean;
+    g.add(lg);
+    const baseHW = LADDER_HW + 0.03, BASE_TOP = 3.2, FLY_FOOT = 2.0, FLY_Z = -0.07;
+    for (const sx of [-baseHW, baseHW]) {
+      box(lg, k.steel, 0.03, BASE_TOP, 0.07, sx, BASE_TOP / 2, 0, 'ladder stile');
+      box(lg, k.black, 0.05, 0.05, 0.11, sx, 0.025, 0.01, 'ladder foot');
+      box(lg, k.dark, 0.045, 0.08, 0.16, sx, BASE_TOP - 0.06, FLY_Z / 2, 'ladder guide bracket');
+    }
+    for (const sx of [-LADDER_HW, LADDER_HW]) {
+      box(lg, k.steel, 0.03, len - FLY_FOOT, 0.07, sx, (FLY_FOOT + len) / 2, FLY_Z, 'ladder stile');
+      box(lg, k.dark, 0.045, 0.08, 0.16, sx, FLY_FOOT + 0.06, FLY_Z / 2, 'ladder guide bracket');
+      box(lg, k.orange, 0.05, 0.10, 0.04, sx, FLY_FOOT + 0.20, FLY_Z + 0.05, 'ladder rung lock');
+    }
+    for (let y = 0.3; y <= BASE_TOP - 0.15; y += 0.3) bar(lg, k.steel, 0.016, -baseHW, y, 0, baseHW, y, 0, 'ladder rung');
+    for (let y = FLY_FOOT + 0.15; y <= len - 0.1; y += 0.3) bar(lg, k.steel, 0.016, -LADDER_HW, y, FLY_Z, LADDER_HW, y, FLY_Z, 'ladder rung');
+    // The tie: the fly's stiles lashed to the handrail posts either side of
+    // the gap, 300 mm over the grating.
+    const ty = DECK_TOP + 0.3, tz = LADDER_Z - ty * LADDER_RUN + FLY_Z, p = DECK_HALF - 0.02, hw = LADDER_HW + 0.1;
+    for (const sx of [-1, 1]) bar(g, k.orange, 0.008, sx * LADDER_HW, ty, tz, sx * hw, ty, p, 'ladder tie');
+  }
+
+  // The staff gauge's face for the tower's board, TOWER_STAFF_H tall: the
+  // same plate as staffFace — a black E every ten centimetres, the metre in
+  // red — but reading from `base` at its foot, so the figures are the
+  // gauge's own heights wherever its zero is known in AHD. Drawn at 48 px a
+  // decimetre.
+  function towerStaffFace(base) {
+    const PX = 48, W = 64, H = Math.round(PX * TOWER_STAFF_H * 10);
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#ffffff';
+    cx.fillRect(0, 0, W, H);
+    const yOf = r => H - (r - base) * 10 * PX;   // canvas y of a reading
+    const u = PX / 10;
+    cx.fillStyle = '#111111';
+    for (let dm = Math.floor(base * 10); dm < Math.ceil((base + TOWER_STAFF_H) * 10); dm++) {
+      const top = yOf((dm + 1) / 10);
+      const left = ((dm % 2) + 2) % 2 === 0;
+      const sx = left ? 4 : W - 4 - 10;
+      cx.fillRect(sx, top + u * 0.5, 10, u * 9);
+      for (const t of [0.5, 4.5, 8.5]) cx.fillRect(left ? sx : W / 2 - 6, top + u * t, W / 2 + 2, u);
+    }
+    cx.fillStyle = '#d01818';
+    cx.font = '700 26px system-ui, sans-serif';
+    cx.textAlign = 'center';
+    cx.textBaseline = 'bottom';
+    for (let m = Math.ceil(base); m < base + TOWER_STAFF_H; m++) {
+      const y = yOf(m);
+      cx.fillRect(0, y - 2, W, 3);
+      cx.fillText(String(m), W / 2, y - 4);
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  // What a tower's staff reads at its foot: the height on the gauge where
+  // the station's zero is surveyed in AHD, else the height over the ground
+  // the tower stands on. Re-draws the board's face; returns the basis.
+  function setTowerStaff(face, st, groundAhd) {
+    if (!face) return null;
+    let zero = null;
+    try { zero = typeof FloodStages !== 'undefined' ? FloodStages.ladder(st).ahdZero : null; } catch (_) { zero = null; }
+    const onGauge = zero != null && isFinite(groundAhd);
+    const base = onGauge ? groundAhd + SLAB_TOP - zero : SLAB_TOP;
+    const old = face.material.map;
+    face.material.map = towerStaffFace(base);
+    face.material.needsUpdate = true;
+    if (old) old.dispose();
+    face.userData.staff = { base, onGauge };
+    return face.userData.staff;
   }
 
   // The station at the origin: which of the two, built, and remembered.
@@ -2333,6 +2442,8 @@ void main() {
     const built = makeStation(st, kind, k);
     built.group.position.y = 0;
     sc.station = built.group;
+    sc.towerStaff = built.staff || null;
+    if (built.staff && tw.ground) setTowerStaff(built.staff, st, tw.ground.h0);
     sc.scene.add(built.group);
     tw.model = { ...kind, top: built.top, poleTop: built.poleTop, ladder: built.ladder, deck: built.deck,
                  plate: { name: st.name || st.id, number: st.station_number ? String(st.station_number) : '' } };
@@ -3225,6 +3336,7 @@ void main() {
       const kind = stationKind(n.s);
       const before = sc.doors.length;
       const built = makeStation(n.s, kind, k);
+      if (built.staff) setTowerStaff(built.staff, n.s, heightAt(n.x, n.z));
       sc.doors = sc.doors.filter((d, i) => i < before || d.when !== 'deck');
       built.group.name = `station ${n.s.name || n.s.id}`;
       built.group.userData.neighbour = n.s.id;
@@ -3949,6 +4061,7 @@ void main() {
   }
 
   function removeFlood() {
+    removeTowerMarks();
     if (sc.flood && sc.scene) {
       sc.scene.remove(sc.flood.water); sc.scene.remove(sc.flood.staff);
       disposeObject(sc.flood.water); disposeObject(sc.flood.staff);
@@ -4000,7 +4113,7 @@ void main() {
                  level: null, band: null, bandKey: undefined, maskLevel: null, flooded: 0,
                  t0: performance.now(), clock: null, lastDraw: 0, lastLine: 0, own,
                  fit, logK, curve: FloodStages.curve(start.m, lad.top, logK), scaleChosen: !!chose, scaleAutoDone: false };
-    if (sc.scene && THREE) makeFlood();
+    if (sc.scene && THREE) { makeFlood(); buildTowerMarks(); }
     settleFlood();
     refreshFloodLine();
     return notes;
@@ -4165,6 +4278,135 @@ void main() {
     const on = !!S().flood;
     sc.flood.water.visible = on;
     sc.flood.staff.visible = on;
+    if (sc.towerMarks) sc.towerMarks.visible = on;
+    requestFrame();
+  }
+
+  // ── the levels on the tower ──
+  // Every level of the station's own that falls on the tower — a flood class,
+  // an AEP flood, a flood the river has reached — marked where it is on the
+  // structure, in the colour the scale and the slider give it: a band round
+  // the mast below the platform, a band round the handrails above it. Each
+  // has a call-out to the east of the platform saying what it is and how
+  // high, the call-outs spread so none sits on another. Heights are the
+  // tower's own metres over the ground at its foot (the level less the
+  // ground at the origin), which is where the water meets the tower at the
+  // exaggeration it opens with. Borrowed levels are not the station's and
+  // are not marked on it. A simulation's marks: never in the .glb.
+  const MARK_GAP = 0.45;       // call-outs' middles no nearer than this, metres
+  const CALLOUT_W = 1.5;       // a call-out's width, metres; 640 × 180 px
+
+  // A call-out: the level's colour down its left edge, what it is, and how
+  // high — large enough to read from the ground at the tower's foot.
+  function makeCallout(title, sub, colour) {
+    const cv = document.createElement('canvas');
+    const W = 640, H = 180;
+    cv.width = W; cv.height = H;
+    const cx = cv.getContext('2d');
+    cx.fillStyle = 'rgba(16, 32, 42, 0.86)';
+    cx.beginPath();
+    if (typeof cx.roundRect === 'function') cx.roundRect(4, 4, W - 8, H - 8, 22);
+    else cx.rect(4, 4, W - 8, H - 8);
+    cx.fill();
+    cx.fillStyle = colour;
+    cx.fillRect(4, 4, 30, H - 8);
+    cx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; cx.lineWidth = 2;
+    cx.strokeRect(4, 4, 30, H - 8);
+    cx.textAlign = 'left';
+    cx.textBaseline = 'middle';
+    const fit = (t, px, weight) => {
+      cx.font = `${weight} ${px}px system-ui, sans-serif`;
+      while (px > 24 && cx.measureText(t).width > W - 70) { px -= 2; cx.font = `${weight} ${px}px system-ui, sans-serif`; }
+    };
+    cx.fillStyle = '#ffffff';
+    fit(String(title), 66, 700);
+    cx.fillText(String(title), 52, 62);
+    cx.fillStyle = '#d7e8f7';
+    fit(String(sub), 46, 500);
+    cx.fillText(String(sub), 52, 132);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+    sp.center.set(0, 0.5);
+    sp.scale.set(CALLOUT_W, CALLOUT_W * H / W, 1);
+    return sp;
+  }
+  function removeTowerMarks() {
+    const g = sc.towerMarks;
+    if (g) {
+      if (g.parent) g.parent.remove(g);
+      disposeObject(g);
+    }
+    sc.towerMarks = null;
+    if (tw.flood) tw.flood.towerMarks = [];
+  }
+
+  function towerMarkTitle(l) {
+    if (l.kind === 'aep') return `${l.short || l.label.replace(/ AEP$/, '')} AEP`;
+    if (l.kind === 'peak') {
+      const y = l.date ? String(l.date).slice(0, 4) : null;
+      return `${y ? `${y} flood` : 'Recorded flood'}${l.highest ? ' ★' : ''}`;
+    }
+    return l.label;
+  }
+  function towerMarkHeight(l) {
+    return l.gauge != null ? `${Number(l.gauge).toFixed(2)} m · ${Number(l.ahd).toFixed(2)} AHD`
+                           : `${Number(l.ahd).toFixed(2)} m AHD`;
+  }
+
+  function buildTowerMarks() {
+    removeTowerMarks();
+    const F = tw.flood, m = tw.model, g = tw.ground;
+    if (!F || F.none || !g || !sc.station || !m || m.structure !== 'tower' || F.lad.borrowed) return;
+    const pal = (sc.flood && sc.flood.palette) || floodPalette();
+    const railTop = DECK_TOP + RAIL_H;
+    const on = F.lad.levels.map(l => ({ l, y: l.ahd - g.h0 })).filter(o => o.y > SLAB_TOP && o.y <= railTop);
+    F.towerMarks = on.map(o => ({ key: o.l.key, y: o.y }));
+    if (!on.length) return;
+    const grp = new THREE.Group();
+    grp.name = 'flood level marks';
+    const H = DECK_HALF, p = H - 0.02;
+    const at = FloodStages.spread(on.map(o => o.y), MARK_GAP, SLAB_TOP, railTop + 3);
+    on.forEach((o, i) => {
+      const col = FloodStages.colourOf(o.l, pal);
+      const mat = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.4, roughness: 0.5, side: THREE.DoubleSide });
+      let edge;
+      if (o.y < TOWER_H - 0.06) {
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(POLE_R + 0.035, POLE_R + 0.035, 0.05, 40, 1, true), mat);
+        band.position.y = o.y;
+        band.name = 'flood level band';
+        grp.add(band);
+        edge = POLE_R + 0.035;
+      } else {
+        for (const [w, d, x, z] of [[2 * p, 0.03, 0, p], [2 * p, 0.03, 0, -p], [0.03, 2 * p, p, 0], [0.03, 2 * p, -p, 0]]) {
+          const b = box(grp, mat, w, 0.05, d, x, o.y, z, 'flood level band');
+          b.castShadow = false;
+        }
+        edge = p + 0.015;
+      }
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 8), mat);
+      dot.position.set(edge, o.y, 0);
+      dot.name = 'flood level marker';
+      grp.add(dot);
+      // The call-out: a leader from the band out past the platform, then up
+      // or down to where its label was spread to.
+      const x1 = H + 0.2, x2 = H + 0.4;
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(edge, o.y, 0), new THREE.Vector3(x1, o.y, 0), new THREE.Vector3(x2, at[i], 0)]),
+        new THREE.LineBasicMaterial({ color: col, depthTest: false, transparent: true }));
+      line.renderOrder = 5;
+      line.name = 'flood level leader';
+      grp.add(line);
+      const sign = makeCallout(towerMarkTitle(o.l), towerMarkHeight(o.l), col);
+      sign.position.set(x2 + 0.02, at[i], 0);
+      sign.renderOrder = 6;
+      sign.name = `flood level call-out ${o.l.label}`;
+      grp.add(sign);
+    });
+    grp.traverse(o => { o.userData.export = false; });
+    grp.visible = !!S().flood;
+    sc.towerMarks = grp;
+    sc.station.add(grp);
     requestFrame();
   }
 
@@ -4762,7 +5004,7 @@ void main() {
     if (rig.mode !== 'walk') return;
     // Orbit again, from about where the visitor stood, looking at the station.
     // Off the ladder or the deck, back on the ground.
-    if (rig.level !== 'ground') { rig.level = 'ground'; rig.climb = 0; rig.pz = Math.max(rig.pz, LADDER_Z + 1.2); }
+    if (rig.level !== 'ground') { rig.level = 'ground'; rig.climb = 0; rig.pz = Math.max(rig.pz, (tw.model && tw.model.ladder ? tw.model.ladder.foot : LADDER_Z) + 1.2); }
     rig.pointLatch = false; rig.pointing = false;
     rig.mode = 'orbit';
     if (rig.target) rig.target.set(0, 1, 0);
@@ -5216,7 +5458,7 @@ void main() {
       const lim = m.deck.half - 0.14;
       if (nz > lim && Math.abs(nx) < m.ladder.halfW && f > 0 && cy < -0.5) {
         rig.level = 'ladder'; rig.climb = ladderHeight();
-        rig.px = m.ladder.x; rig.pz = m.ladder.stand; rig.pitch = -0.35;
+        rig.px = m.ladder.x; rig.pz = ladderStandZ(rig.climb); rig.pitch = -0.35;
         // W is still held from the walk out: it must not put the visitor
         // straight back on the deck. Released and pressed again, it does.
         rig.climbLatch = true;
@@ -5232,15 +5474,24 @@ void main() {
     rig.px = Math.max(-lim, Math.min(lim, rig.px));
     rig.pz = Math.max(-lim, Math.min(lim, rig.pz));
     if (m && m.ladder && rig.level === 'ground' && f > 0 && cy > 0.5) {
-      // The foot of the ladder is a gate 0.9 m south of the rungs: a step
-      // that lands inside it, or one long enough to cross it, takes hold.
-      const L = m.ladder, gate = L.z + 0.9;
+      // The foot of the ladder is a gate from its feet to 0.9 m south of
+      // them: a step that ends past the gate's south side having started
+      // south of the feet — one that lands inside it, or crosses it, however
+      // long a slow frame makes it — takes hold.
+      const L = m.ladder, gate = L.foot + 0.9;
       const inLine = Math.abs(rig.px - L.x) < L.halfW + 0.15;
-      if (inLine && rig.pz < gate && (rig.pz > L.z || oz >= gate)) {
+      if (inLine && rig.pz < gate && oz > L.foot) {
         rig.level = 'ladder'; rig.climb = 0;
         rig.px = L.x; rig.pz = L.stand; rig.yaw = 0; rig.pitch = 0.35;
       }
     }
+  }
+
+  // Where the visitor stands, north–south, `climb` metres up the ladder: it
+  // leans, so every metre up is a quarter-metre nearer the mast.
+  function ladderStandZ(climb) {
+    const L = tw.model && tw.model.ladder;
+    return L ? L.stand - Math.max(0, climb) * (L.run || 0) : 0;
   }
 
   // A step up or down the ladder; at the top the deck, at the bottom the ground.
@@ -5249,6 +5500,7 @@ void main() {
     if (!m || !m.ladder) { rig.level = 'ground'; rig.climb = 0; return; }
     rig.climb += dy;
     const h = ladderHeight();
+    rig.pz = ladderStandZ(Math.min(rig.climb, h));
     if (rig.climb >= h) {
       if (rig.climbLatch) { rig.climb = h; return; }
       // On the grating at the hatch, facing the cabinet — which is 1.2 m
@@ -5259,7 +5511,7 @@ void main() {
       rig.px = 0; rig.pz = m.deck.half - 0.3; rig.yaw = 0; rig.pitch = -0.55;
     } else if (rig.climb <= 0) {
       rig.level = 'ground'; rig.climb = 0;
-      rig.pz = m.ladder.z + 0.6; rig.pitch = -0.06;
+      rig.pz = m.ladder.foot + 0.6; rig.pitch = -0.06;
     }
   }
 
@@ -6498,6 +6750,7 @@ void main() {
           structure: tw.model.structure, telemetry: tw.model.telemetry, telemetryKnown: tw.model.telemetryKnown,
           water: tw.model.water, rain: tw.model.rain, repeater: tw.model.repeater, top: tw.model.top, poleTop: tw.model.poleTop,
           plate: tw.model.plate, ladder: tw.model.ladder ? { ...tw.model.ladder, footY: ladderFootY(), height: ladderHeight() } : null,
+          towerStaff: sc.towerStaff && sc.towerStaff.userData.staff ? { ...sc.towerStaff.userData.staff } : null,
           deck: tw.model.deck, level: rig.level, climb: rig.climb, walker: { x: rig.px, z: rig.pz, yaw: rig.yaw },
           doors: sc.doors.map(d => ({ name: d.name, angle: d.angle, open: d.open, when: d.when, wanted: doorWanted(d) })),
           parts: (() => { const n = []; if (sc.station) sc.station.traverse(o => { if (o.isMesh) n.push(o.name); }); return n; })(),
@@ -6589,6 +6842,12 @@ void main() {
               x: sc.flood.staff.position.x, z: sc.flood.staff.position.z, visible: sc.flood.staff.visible,
               rings: sc.flood.staff.children.filter(c => c.userData.level).map(c => ({ key: c.userData.level, y: c.position.y, colour: `#${c.material.color.getHexString()}` })),
               post: (() => { const p = sc.flood.staff.getObjectByName('staff post'); return { bottom: p.position.y - p.scale.y / 2, top: p.position.y + p.scale.y / 2 }; })(),
+            } : null,
+            towerMarks: sc.towerMarks ? {
+              visible: sc.towerMarks.visible,
+              marks: (F.towerMarks || []).slice(),
+              callouts: sc.towerMarks.children.filter(c => c.isSprite).map(c => ({ name: c.name, y: c.position.y })),
+              exported: (() => { let any = false; sc.towerMarks.traverse(x => { if (x.userData.export !== false) any = true; }); return any; })(),
             } : null,
             exported: sc.flood ? (() => { let any = false; for (const o of [sc.flood.water, sc.flood.staff]) o.traverse(x => { if (x.userData.export !== false) any = true; }); return any; })() : null,
             notes: F.notes.slice(),

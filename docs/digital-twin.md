@@ -177,12 +177,18 @@ nothing is assumed:
 - A **river-gauge tower** — a 4 m galvanised mast on its flange, a 1.8 m
   grating platform with handrails and toe boards 4 m up, the cabinet on the
   platform's north side, the gauge on its west, the antenna mast with the
-  solar panel and the whip at its north-east corner, and a ladder up the
-  south side with rungs every 300 mm — for a *telemetered* station whose
-  record says it reads a river: a sensor typed `Water Level…` or `Gas
-  Pressure`, a legacy `water_level` ALERT address, a Bureau listing typed
-  Water Level, or the SLS's data type. The foundation is below the ground and
-  is not drawn.
+  solar panel and the whip at its north-east corner, a staff gauge 3 m tall
+  up the mast's south face, and an extension ladder — a base section and a
+  fly, rungs every 300 mm, tied off at the top — leaning on the platform's
+  south edge at the safe 1 in 4 (a metre out at the foot for every four up,
+  about 76°) with its stiles running a metre past the landing. It stands on a
+  1.4 m concrete foundation slab whose top is 100 mm proud of the ground. This
+  is the tower for a *telemetered* station whose record says it reads a
+  river: a sensor typed `Water Level…` or `Gas Pressure`, a legacy
+  `water_level` ALERT address, a Bureau listing typed Water Level, or the
+  SLS's data type. The staff reads the gauge's own heights where the
+  station's gauge zero is surveyed in AHD, and otherwise height over the
+  ground the tower stands on.
 - A **manual rainfall station** — the depositional collector an observer
   reads: a silver cylinder **Ø200 mm and 300 mm tall** standing on the ground,
   open at the top with its funnel inset.
@@ -373,7 +379,8 @@ under the scale, below).
 The POV eye is 1.70 m above whatever is under it — the ground, a rung, the
 grating — and the orbit camera is never let under the hill between it and
 the station. At a tower, walking into the foot of the ladder while facing it
-takes hold of it: `W` climbs (1.2 m/s, Shift doubles it), `S` climbs down,
+takes hold of it: `W` climbs (1.2 m/s, Shift doubles it, and a quarter-metre
+nearer the mast for every metre up, as the ladder leans), `S` climbs down,
 and at the top the visitor steps onto the platform, where the toe boards
 and the cabinet hold them in and the cabinet door swings open. Walking out
 through the hatch, facing it, is back onto the ladder. A compass rose over the
@@ -772,6 +779,20 @@ guide, not a map. The line's tooltip says so.
 **The staff** is a white post in the channel from 0 m to the top, with a ring
 at every level in its colour — the gauge board the water is read against. The
 exaggeration slider moves the water and the rings with the ground.
+
+**The levels on a tower.** At a river-gauge tower, every level of the
+station's own that falls on the structure — between the foundation slab and
+the top of the handrail — is marked on it in the colour the scale gives it: a
+band round the mast below the platform, a band round the handrails above it.
+The flood classes, the AEP levels and the floods the river has reached are
+all marked. Each band has a call-out east of the platform saying what it is
+and how high — *Major*, *1% AEP*, *1974 flood* (★ for the highest recorded),
+with its height on the gauge and in m AHD. The call-outs are spread so none
+sits on another. The heights are the tower's own metres over the ground at
+its foot, which is where the water meets the tower at the exaggeration the
+twin opens with. Levels borrowed from another station are not the station's,
+so they are not marked on it. The marks show and hide with the water, and
+they are not in the `.glb`.
 
 **The scale on the stage** stands the levels up the left of the view, to
 scale: ⏸ or ▶ and how high at its head (*14.6 m · moderate*), and under it a

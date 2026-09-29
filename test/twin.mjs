@@ -959,11 +959,23 @@ try {
     ok('the twin\'s station is the tower, its mast 4 m and Ø0.300 m with its foot at the origin',
       tm && tm.structure === 'tower' && near(d.pole.h, 4, 1e-9) && near(d.pole.r, 0.15, 1e-9) && near(d.pole.baseY, 0, 1e-6), JSON.stringify({ structure: tm && tm.structure, pole: d.pole }));
     const rungs = tm ? tm.parts.filter(n => n === 'ladder rung').length : 0;
-    ok('the platform, its rails, the ladder up the south side with rungs every 300 mm, the gauge and the antenna mast are there',
-      tm && tm.deck && near(tm.deck.top, 4.05, 1e-9) && near(tm.deck.half, 0.9, 1e-9) && tm.ladder && near(tm.ladder.z, 0.98, 1e-9)
-        && rungs === 13 && tm.parts.includes('platform grating') && tm.parts.filter(n => n === 'handrail').length === 10
-        && tm.parts.includes('ladder stile') && tm.parts.includes('rain gauge') && tm.parts.includes('antenna mast') && tm.parts.includes('solar panel'),
+    ok('the platform, its rails, an extension ladder leaning on the south edge at 1 in 4 with rungs every 300 mm, the gauge and the antenna mast are there',
+      tm && tm.deck && near(tm.deck.top, 4.05, 1e-9) && near(tm.deck.half, 0.9, 1e-9) && tm.ladder && near(tm.ladder.run, 0.25, 1e-9)
+        && near(tm.ladder.foot, 1.005 + 4.05 * 0.25, 1e-9) && rungs === 20 && tm.parts.includes('platform grating') && tm.parts.filter(n => n === 'handrail').length === 10
+        && tm.parts.includes('ladder stile') && tm.parts.includes('ladder guide bracket') && !tm.parts.includes('ladder bracket')
+        && tm.parts.includes('rain gauge') && tm.parts.includes('antenna mast') && tm.parts.includes('solar panel'),
       JSON.stringify({ deck: tm && tm.deck, ladder: tm && tm.ladder, rungs, rails: tm && tm.parts.filter(n => n === 'handrail').length }));
+    ok('the tower stands on a foundation slab 100 mm proud of the ground, a staff gauge up its mast reading the gauge where its zero is AHD',
+      tm && tm.parts.includes('foundation slab') && tm.parts.includes('gauge board') && tm.parts.includes('gauge board graduations')
+        && tm.towerStaff && isFinite(tm.towerStaff.base)
+        && (d.flood && !d.flood.none && d.flood.zero != null ? tm.towerStaff.onGauge : true),
+      JSON.stringify({ staff: tm && tm.towerStaff, zero: d.flood && d.flood.zero }));
+    if (d.flood && !d.flood.none && d.flood.towerMarks) {
+      const tmk = d.flood.towerMarks;
+      ok('the levels that fall on the tower are banded on it, a call-out each, never in the .glb',
+        tmk.marks.length > 0 && tmk.callouts.length === tmk.marks.length && !tmk.exported
+          && tmk.marks.every(mk => mk.y > 0.1 && mk.y <= 4.05 + 1.1), JSON.stringify(tmk));
+    }
     ok('the cabinet holds the Kisters HS40 bubbler above and the Victron, the telemetry, the terminals and the battery below, and the plate names the station',
       tm && ['Kisters HS40 panel', 'HS40 desiccant tube', 'HS40 pressure gauge', 'Kisters HS40 display', 'HS40 valve', 'HS40 compressor control', 'HS40 compressor',
              'Victron charge controller', 'DIN rail', 'battery', 'name plate', 'cabinet door'].every(n => tm.parts.includes(n))
@@ -981,7 +993,7 @@ try {
       await page.evaluate(keys => { const cv = document.getElementById('twin-canvas'); for (const k of keys) cv.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true })); }, keys);
       await frames(3);
     };
-    const groundEye = await page.evaluate(() => { const c = DigitalTwin._pov({ px: 0, pz: 2.5, yaw: 0, pitch: 0 }); const d = DigitalTwin.debug(); return { c, level: d.model.level, ground: d.yAt(0, 2.5) }; });
+    const groundEye = await page.evaluate(() => { const c = DigitalTwin._pov({ px: 0, pz: 3.5, yaw: 0, pitch: 0 }); const d = DigitalTwin.debug(); return { c, level: d.model.level, ground: d.yAt(0, 3.5) }; });
     ok('on the ground south of the ladder, facing it', groundEye.level === 'ground' && near(groundEye.c.y - groundEye.ground, 1.7, 0.01), JSON.stringify(groundEye));
     // W held until the ladder is taken and climbed a little — however fast
     // this machine draws frames.
@@ -989,9 +1001,10 @@ try {
     await page.waitForFunction(() => { const m = DigitalTwin.debug().model; return m.level === 'ladder' && m.climb > 0.05; }, null, { timeout: 6000 }).catch(() => {});
     await page.evaluate(() => document.getElementById('twin-canvas').dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true })));
     await frames(3);
-    const onLadder = await page.evaluate(() => { const d = DigitalTwin.debug(); return { level: d.model.level, climb: d.model.climb, walker: d.model.walker, cam: d.camera, footY: d.model.ladder.footY }; });
+    const onLadder = await page.evaluate(() => { const d = DigitalTwin.debug(); return { level: d.model.level, climb: d.model.climb, walker: d.model.walker, cam: d.camera, footY: d.model.ladder.footY, ladder: d.model.ladder }; });
     ok('walking into the foot of the ladder takes hold of it, and W climbs',
-      onLadder.level === 'ladder' && onLadder.climb > 0.05 && near(onLadder.walker.x, 0, 1e-6) && near(onLadder.walker.z, 1.2, 1e-6)
+      onLadder.level === 'ladder' && onLadder.climb > 0.05 && near(onLadder.walker.x, 0, 1e-6)
+        && near(onLadder.walker.z, onLadder.ladder.stand - onLadder.climb * onLadder.ladder.run, 1e-6)
         && near(onLadder.cam.y - onLadder.footY - onLadder.climb, 1.7, 0.01), JSON.stringify(onLadder));
     await hold(['w', 'Shift'], 2400);
     const onDeck = await page.evaluate(() => { const d = DigitalTwin.debug(); return { level: d.model.level, walker: d.model.walker, cam: d.camera, door: d.model.doors[0] }; });
