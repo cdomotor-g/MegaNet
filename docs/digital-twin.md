@@ -176,13 +176,17 @@ nothing is assumed:
   repeater that measures nothing is the same pole without the gauge.
 - A **river-gauge tower** — a 4 m galvanised mast on its flange, a 1.8 m
   grating platform with handrails and toe boards 4 m up, the cabinet on the
-  platform's north side, the gauge on its west, the antenna mast with the
+  platform's north side, the rain gauge on a wing bracket off the cabinet's
+  west side, level with its top, the antenna mast with the
   solar panel and the whip at its north-east corner, a staff gauge 3 m tall
   up the mast's south face, and an extension ladder — a base section and a
   fly, rungs every 300 mm, tied off at the top — leaning on the platform's
   south edge at the safe 1 in 4 (a metre out at the foot for every four up,
-  about 76°) with its stiles running a metre past the landing. It stands on a
-  1.4 m concrete foundation slab whose top is 100 mm proud of the ground. This
+  about 76°) with its stiles running a metre past the landing. It stands on
+  its concrete footing, of which only the top is drawn: a rectangle 4.0 m
+  east–west by 2.4 m north–south, 100 mm proud of the ground, the mast 1.2 m
+  in from its west end (the step down, the pit and the conduit below the
+  ground are not drawn). This
   is the tower for a *telemetered* station whose record says it reads a
   river: a sensor typed `Water Level…` or `Gas Pressure`, a legacy
   `water_level` ALERT address, a Bureau listing typed Water Level, or the

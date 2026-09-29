@@ -1756,7 +1756,12 @@ void main() {
   const DECK_HALF = 0.9;     // the platform is 1.8 m square
   const RAIL_H    = 1.1;     // handrail over the deck
   const SLAB_TOP  = 0.10;    // the foundation slab stands 100 mm proud of the ground
-  const SLAB_HALF = 0.7;     // and is 1.4 m square
+  // The footing's top, as the drawings have it: a rectangle 4.0 m east–west
+  // and 2.4 m north–south, the mast 1.2 m in from its west end on the long
+  // axis. Below the ground it steps down deeper under part of it, and there
+  // is a pit and a conduit at its east end; none of that is seen, so none
+  // of it is drawn.
+  const SLAB_W = -1.2, SLAB_E = 2.8, SLAB_HALF_NS = 1.2;
   // The extension ladder: leaning on the deck's south edge at 1 in 4 (a metre
   // out at its foot for every four up — AS/NZS 1892 and every WorkSafe
   // guide, about 76°), running on a metre past the landing as a handhold.
@@ -2207,22 +2212,14 @@ void main() {
   function buildTower(st, kind, k) {
     const g = new THREE.Group();
     g.name = 'station';
-    // The foundation: a concrete slab 400 mm deep, its top 100 mm proud of
-    // the ground, and the mast's flange bolted to it. The mast's foot is
-    // still the ground at the origin — the slab is cast round it.
-    box(g, k.concrete, 2 * SLAB_HALF, 0.4, 2 * SLAB_HALF, 0, SLAB_TOP - 0.2, 0, 'foundation slab');
+    // The foundation: the footing's top 100 mm proud of the ground (drawn
+    // 400 mm deep so a slope under it never shows a gap), and the mast's
+    // flange bolted to it. The mast's foot is still the ground at the
+    // origin — the footing is cast round it.
+    box(g, k.concrete, SLAB_E - SLAB_W, 0.4, 2 * SLAB_HALF_NS, (SLAB_W + SLAB_E) / 2, SLAB_TOP - 0.2, 0, 'foundation slab');
     cyl(g, k.cream, 0.28, 0.28, 0.03, 0, SLAB_TOP + 0.015, 0, 'base flange', 32);
     const mast = cyl(g, k.galv, POLE_R, POLE_R, TOWER_H, 0, TOWER_H / 2, 0, 'station pole', 40);
     sc.pole = mast;
-    const role = typeof primaryRole === 'function' ? primaryRole(st) : 'field';
-    const colour = (typeof ROLE_COLOR !== 'undefined' && ROLE_COLOR[role]) || '#107c10';
-    const band = new THREE.Mesh(
-      new THREE.CylinderGeometry(POLE_R + 0.008, POLE_R + 0.008, 0.12, 40, 1, true),
-      new THREE.MeshStandardMaterial({ color: new THREE.Color(colour), metalness: 0.1, roughness: 0.6 }));
-    band.position.y = 1.6;
-    band.name = 'role band';
-    sc.band = band;
-    g.add(band);
     // The platform: struts from the mast, the grating, toe boards, handrails
     // with a gap at the south for the ladder.
     const H = DECK_HALF;
@@ -2312,11 +2309,16 @@ void main() {
     plateAt(cab, 'INVICTA', '', 0.09, 0.026, 0, -0.47, face + 0.175, 'label');
     addGlands(cab, k, -0.08, -CH / 2 + t + 0.012, 0.05, 3, true);
     addDoor(cab, k.green, CW / 2, 0, CD / 2 - t / 2, CW, CH, t, -1, 1.9, 'deck', 'cabinet door');
-    // The gauge on the platform's west, and the antenna mast at the north-
-    // east corner with its solar panel and the whip.
-    cyl(g, k.galv, 0.025, 0.025, 0.55, -0.62, DECK_TOP + 0.275, 0.25, 'gauge post', 12);
-    cyl(g, k.steel, 0.10, 0.10, 0.30, -0.62, DECK_TOP + 0.70, 0.25, 'rain gauge', 32);
-    cyl(g, k.orange, 0.10, 0.07, 0.04, -0.62, DECK_TOP + 0.87, 0.25, 'gauge funnel', 32);
+    // The rain gauge on a wing bracket off the cabinet's west side, its foot
+    // level with the cabinet's top: a plate on the cabinet's side, a shelf
+    // out from it and a brace under the shelf. Then the antenna mast at the
+    // north-east corner with its solar panel and the whip.
+    const cabTop = DECK_TOP + CH, cz = cab.position.z, side = -CW / 2, gx = side - 0.21;
+    box(g, k.galv, 0.008, 0.30, 0.20, side - 0.004, cabTop - 0.15, cz, 'gauge bracket');
+    box(g, k.galv, 0.30, 0.012, 0.24, side - 0.15, cabTop - 0.006, cz, 'gauge bracket');
+    bar(g, k.galv, 0.012, side - 0.01, cabTop - 0.28, cz, side - 0.27, cabTop - 0.015, cz, 'gauge bracket brace');
+    cyl(g, k.steel, 0.10, 0.10, 0.30, gx, cabTop + 0.15, cz, 'rain gauge', 32);
+    cyl(g, k.orange, 0.10, 0.07, 0.04, gx, cabTop + 0.32, cz, 'gauge funnel', 32);
     cyl(g, k.galv, 0.025, 0.025, 3.5, 0.75, DECK_TOP + 1.75, -0.75, 'antenna mast', 12);
     cyl(g, k.white, 0.006, 0.006, 3.0, 0.75, DECK_TOP + 3.5 + 1.5, -0.75, 'whip antenna', 8);
     const sp = new THREE.Group();
@@ -2549,7 +2551,9 @@ void main() {
   // there — not at the pole's height.
   function buildFigure() {
     const grp = makeFigure();
-    const fx = 1.0, fz = 0.25;
+    // West of a tower, off its footing, which runs away to the east.
+    const tower = tw.model && tw.model.structure === 'tower';
+    const fx = tower ? -1.6 : 1.0, fz = tower ? 0.6 : 0.25;
     grp.position.set(fx, yAt(fx, fz), fz);
     grp.rotation.y = Math.atan2(-fx, -fz) + Math.PI;   // facing away from the pole, as if looking at it over a shoulder
     grp.visible = !!S().figure;
