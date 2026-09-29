@@ -14424,3 +14424,137 @@ code {
 
 button.adm-danger { color: var(--bad); }
 button.adm-danger:hover { border-color: var(--bad); }
+
+/* ── Admin dashboard (admin-dashboard.js) ────────────────────────────────────
+   Stat tiles across the top, the visitors and API panels beside where the
+   data is, and the sortable table list the full width under both. Marks take
+   one hue (--accent) for magnitude; the two visitor series have a pair of
+   their own (--adm-in / --adm-anon, below).
+   Every number is printed in text ink beside its mark. */
+.adm-dash-head { margin-bottom: .5rem; }
+.adm-stamp     { color: var(--muted); }
+
+.adm-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(13rem, 45%), 1fr));
+  gap: .6rem;
+}
+@media (max-width: 560px) {
+  .adm-kpi-value { font-size: 1.2rem; }
+  .adm-kpi { padding: .5rem .55rem; }
+  .adm-bars li { grid-template-columns: minmax(0, 8rem) minmax(0, 1fr) 4.5rem; }
+}
+/* The table list keeps its columns and scrolls sideways in its wrapper rather
+   than folding eight columns into a phone's width. */
+.adm-tables { min-width: 44rem; }
+.adm-kpi {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: .6rem .75rem;
+  min-width: 0;
+}
+.adm-kpi-label { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.adm-kpi-value { font-size: 1.5rem; font-weight: 700; line-height: 1.2; margin: .15rem 0; }
+.adm-kpi-value small { font-size: .8rem; font-weight: 400; color: var(--muted); }
+.adm-kpi-sub   { font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+.adm-kpi--ok   { border-left: 4px solid var(--ok); }
+.adm-kpi--warn { border-left: 4px solid var(--warn); }
+.adm-kpi--ok   .adm-kpi-value { color: var(--ok); }
+.adm-kpi--warn .adm-kpi-value { color: var(--warn); }
+
+.adm-meter {
+  display: block;
+  height: 6px;
+  margin: .3rem 0 .25rem;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.adm-meter-fill { display: block; height: 100%; border-radius: 3px; }
+.adm-meter--ok   { background: var(--ok); }
+.adm-meter--warn { background: var(--warn); }
+.adm-meter--bad  { background: var(--bad); }
+
+.adm-dash-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+.adm-dash-grid .adm-span { grid-column: 1 / -1; }
+@media (max-width: 1100px) {
+  .adm-dash-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.adm-dash-grid h3 { margin: 0; font-size: 1.05rem; }
+.adm-sub-h { margin: .9rem 0 .3rem; font-size: .92rem; }
+
+.adm-bars { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: .3rem; }
+.adm-bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) 5.5rem;
+  align-items: center;
+  gap: .5rem;
+  font-size: .85rem;
+}
+.adm-bar-k { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-bar-track { height: 12px; }
+.adm-bar {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+.adm-bars li:hover .adm-bar { filter: brightness(1.15); }
+.adm-bar-v { text-align: right; font-variant-numeric: tabular-nums; }
+
+.adm-legend { display: flex; gap: 1rem; margin: .3rem 0; }
+.adm-legend span { display: inline-flex; align-items: center; gap: .35rem; }
+.adm-sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.adm-chart { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .4rem; height: 140px; }
+.adm-chart-y {
+  display: flex; flex-direction: column; justify-content: space-between;
+  color: var(--muted); text-align: right; font-variant-numeric: tabular-nums;
+}
+.adm-cols {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  height: 100%;
+}
+.adm-col {
+  flex: 1 1 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column-reverse;   /* signed in on the baseline, anonymous on top */
+  justify-content: flex-start;
+  gap: 2px;
+  min-width: 0;
+  cursor: default;
+}
+.adm-col:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.adm-col-seg { display: block; width: 100%; min-height: 0; }
+.adm-col-seg[style*="height:0%"] { display: none; }
+.adm-col-seg:last-of-type { border-radius: 4px 4px 0 0; }
+/* The two visitor series. Light is --ad-series-1/2; dark takes its own steps,
+   one notch darker than --ad-series-1/2's dark values, which sit just above
+   the dark lightness band — validated (validate_palette.js) against #18222d. */
+.adm-dash-grid, .adm-dash { --adm-in: #0b5cab; --adm-anon: #c7401a; }
+[data-theme="dark"] .adm-dash-grid,
+[data-theme="dark"] .adm-dash { --adm-in: #4a94e0; --adm-anon: #e46a44; }
+.adm-col--in   { background: var(--adm-in); }
+.adm-col--anon { background: var(--adm-anon); }
+.adm-chart-x {
+  display: flex; justify-content: space-between;
+  color: var(--muted); margin: .2rem 0 .4rem calc(1.5rem + .4rem);
+}
+
+.adm-filter { max-width: 16rem; }
+.adm-sort {
+  all: unset;
+  cursor: pointer;
+  font-weight: 600;
+}
+.adm-sort:focus-visible { outline: var(--focus-width) solid var(--focus); outline-offset: 2px; }
+.adm-sql { font-size: .75rem; white-space: normal; overflow-wrap: anywhere; }
+.adm-online { color: var(--ok); font-weight: 600; }

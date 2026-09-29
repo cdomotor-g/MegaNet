@@ -1102,6 +1102,10 @@ jobs:
       # a first sign-in arrives with, and the guards against locking everybody out.
       - name: check_user_admin.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_user_admin.sql
+      # The Admin tab's dashboard (0043): administrators only, and the visit
+      # log's anonymous write held to one row a visitor a day, 5,000 a day.
+      - name: check_admin_dashboard.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_admin_dashboard.sql
       # …and the same for the AEP sheets' SQL (0033): it attaches rows by
       # number and by position into columns only it and the editor write.
       - name: The AEP levels' SQL still fits the schema

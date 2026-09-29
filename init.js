@@ -111,6 +111,9 @@
   // session out of the URL fragment before anything else reads location.
   Auth.start();
   autoLoad();
+  // The visit count (admin-dashboard.js): once for opening the app, a few
+  // seconds on so a saved session has been adopted and it counts as its person.
+  AdminDash.beacon(state.activeTab, { delay: 4000 });
 })();
 
 // Restore a shared investigation from the URL hash. Defined in workbench.js,

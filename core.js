@@ -166,7 +166,7 @@ const TABS = [
   // and snapshot panels moved into.
   { group: 'Admin', tabs: [
     { id: 'admin',      label: 'Admin',                  icon: '🛠️',
-      find: 'administration users accounts people roles privileges permissions groups allowlist editors sign in access database datastore data source schema load stations.json github file snapshot backup settings storage reset migration' },
+      find: 'administration users accounts people roles privileges permissions groups allowlist editors sign in access database datastore data source schema load stations.json github file snapshot backup settings storage reset migration dashboard health stats statistics visitors analytics last seen online active size tables volume connections' },
   ] },
 ];
 
@@ -1529,7 +1529,10 @@ const HELP = {
            + '<code>stations.json</code> from a file, GitHub or the datastore, see which one is on '
            + 'screen and whether the database answers, and snapshot it. Administrators also manage '
            + '<strong>users</strong> and the <strong>allowlist</strong> of who may sign in here, and '
-           + 'everybody can read what each user group may do.',
+           + 'everybody can read what each user group may do. At the top, administrators get a '
+           + '<strong>dashboard</strong>: database health and size, where the data is by part of the '
+           + 'app, every table\'s size and rows, who is online and when each user was last seen, '
+           + 'and visitors a day — signed in and anonymous.',
     watch: [
       '<strong>Adding a user is adding an allowlist entry.</strong> A person appears under Users '
       + 'the first time they sign in, with the entry\'s initial role. An address lets one person '
@@ -1544,6 +1547,9 @@ const HELP = {
       + 'fell back, edits are refused, and <strong>Load from the datastore</strong> retries.',
       '<strong>Snapshot</strong> writes today\'s document out as a file to take somewhere without '
       + 'a network. It is a copy, not a branch — nothing reads it back in automatically.',
+      '<strong>Anonymous visitors are counted by a random id this browser keeps</strong> — no name, '
+      + 'address or IP. One browser is one visitor a day; clearing its storage makes a new one. Days are '
+      + 'UTC. Database calls by role come from <code>pg_stat_statements</code> and count since its last reset.',
       '<strong>Clear settings</strong> forgets what this browser keeps for the app — filters, '
       + 'widths, drafts — and keeps your sign-in.',
     ],

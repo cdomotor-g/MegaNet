@@ -1501,6 +1501,9 @@ function switchTab(id) {
   // registry now, and each module registers itself — core.js and #142 say why.
   runTabTeardowns();
   state.activeTab = id;
+  // Counted once per tab per page (admin-dashboard.js) — which tabs people
+  // actually open is one of the dashboard's questions.
+  if (typeof AdminDash !== 'undefined') AdminDash.beacon(id);
   // The find box was an errand and picking a tab is the end of it — same rule
   // the phone drawer follows two lines down. Left standing, the query would hide
   // the tab you just opened from the nav that opened it, which reads as the nav

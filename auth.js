@@ -438,7 +438,8 @@ const Auth = (function () {
   // users and allowlist — or its "sign in" — for the same reason.
   function tabsAuthChanged() {
     for (const mod of [typeof FieldPhotos !== 'undefined' ? FieldPhotos : null,
-                       typeof Admin       !== 'undefined' ? Admin       : null]) {
+                       typeof Admin       !== 'undefined' ? Admin       : null,
+                       typeof AdminDash   !== 'undefined' ? AdminDash   : null]) {
       if (!mod || !mod.authChanged) continue;
       try { mod.authChanged(); } catch (_) { /* its own problem, not the sign-in's */ }
     }

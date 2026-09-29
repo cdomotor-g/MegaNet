@@ -177,7 +177,7 @@ const Admin = (function () {
           <h2 id="adm-users-h">Users <span class="badge">${list.length}</span></h2>
           <button class="exp-btn-sm" onclick="Admin.load()">Refresh</button>
         </div>
-        <p class="small">Everybody who has signed in. A person appears here the first time they
+        <p class="small">Everybody who has signed in, most recently seen first. A person appears here the first time they
           do; to add somebody, put their address on the allowlist below with the role they
           should arrive with. <strong>Viewer</strong> is recorded but not enforced yet — to stop
           somebody editing, remove their allowlist entry.</p>
@@ -190,7 +190,7 @@ const Admin = (function () {
               <col style="width:4.5rem"><col style="width:20%"><col style="width:9.5rem"></colgroup>
             <thead><tr>
               <th scope="col">Email</th><th scope="col">Display name</th><th scope="col">Role</th>
-              <th scope="col">May edit</th><th scope="col" class="col-optional">Last sign-in</th>
+              <th scope="col">May edit</th><th scope="col" class="col-optional">Last seen</th>
               <th scope="col"><span class="sr-only">Actions</span></th>
             </tr></thead>
             <tbody>
@@ -203,7 +203,10 @@ const Admin = (function () {
                     ${ROLES.map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${r}</option>`).join('')}
                   </select></td>
                   <td>${u.may_edit ? '<span class="txt-ok">yes</span>' : '<span class="txt-bad">no</span>'}</td>
-                  <td class="small col-optional">${when(u.last_sign_in_at)}</td>
+                  <td class="small col-optional" title="${escAttr(lastSeenTitle(u))}">${u.active_sessions
+                    ? '<span class="adm-online">● online</span>'
+                    : esc(typeof AdminDash !== 'undefined' ? AdminDash.ago(u.last_seen_at || u.last_sign_in_at) : '')}
+                    ${u.visits_30d ? `<br><span class="txt-muted">${u.visits_30d} day${u.visits_30d === 1 ? '' : 's'} in 30</span>` : ''}</td>
                   <td class="adm-row-acts">
                     <button class="exp-btn-sm" onclick="Admin.saveUser('${escAttr(u.id)}')">Save</button>
                     ${u.is_you ? '' : `<button class="exp-btn-sm adm-danger"
@@ -214,6 +217,25 @@ const Admin = (function () {
           </table>
         </div>` : (users ? '<p class="small table-empty">Nobody has signed in yet.</p>' : '')}
       </div>`;
+  }
+
+  // The hover on "Last seen": the absolute times, and what browser the latest
+  // session was — the only place a user agent is shown.
+  function lastSeenTitle(u) {
+    const bits = [];
+    if (u.last_seen_at)    bits.push(`Last seen ${new Date(u.last_seen_at).toLocaleString()}`);
+    if (u.last_sign_in_at) bits.push(`last sign-in ${new Date(u.last_sign_in_at).toLocaleString()}`);
+    if (u.active_sessions) bits.push(`${u.active_sessions} live session${u.active_sessions === 1 ? '' : 's'}`);
+    if (u.user_agent)      bits.push(browserOf(u.user_agent));
+    return bits.join(' · ') || 'Never seen';
+  }
+
+  function browserOf(ua) {
+    const b = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome'
+            : /Safari\//.test(ua) ? 'Safari' : 'a browser';
+    const o = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows'
+            : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : '';
+    return `${b}${o ? ` on ${o}` : ''}`;
   }
 
   function allowHtml() {
@@ -299,6 +321,11 @@ const Admin = (function () {
 
   // ── This browser ──
 
+  // What "clear settings" keeps: the sign-in, and the random visitor id the
+  // dashboard counts this browser by (admin-dashboard.js) — clearing it would
+  // count one person as two.
+  const KEEP = ['meganet.session', 'meganet.visitor'];
+
   function storageKeys() {
     const out = [];
     try {
@@ -325,7 +352,9 @@ const Admin = (function () {
         </div>
         <p class="small">App version <code>${esc(APP_VERSION)}</code>. Settings kept here —
           filters, panel widths, drafts — are this browser's alone:
-          ${keys.length} item${keys.length !== 1 ? 's' : ''}, ${(total / 1024).toFixed(1)} KB.</p>
+          ${keys.length} item${keys.length !== 1 ? 's' : ''}, ${(total / 1024).toFixed(1)} KB.
+          The app counts visits with a random id kept here — no name, address or IP — so the
+          dashboard can tell how many people use it without signing in.</p>
         ${keys.length ? `
         <details><summary class="small">Stored items</summary>
           <div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="adm-local-h">
@@ -335,7 +364,7 @@ const Admin = (function () {
                 <th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
               <tbody>${keys.map((x, i) => `
                 <tr><td><code>${esc(x.k)}</code></td><td class="small">${(x.n / 1024).toFixed(1)} KB</td>
-                  <td>${x.k === 'meganet.session' ? '<span class="small">sign-in</span>'
+                  <td>${KEEP.includes(x.k) ? `<span class="small">${x.k === 'meganet.session' ? 'sign-in' : 'visitor id'}</span>`
                     : `<button class="exp-btn-sm" onclick="Admin.forgetKey(${i})">Forget</button>`}</td></tr>`).join('')}
               </tbody>
             </table>
@@ -371,6 +400,7 @@ const Admin = (function () {
     return `
       <div class="page adm-page" style="--page-max:1200px">
         <h2 class="sr-only">Admin</h2>
+        <div id="adm-dash" class="stack">${typeof AdminDash !== 'undefined' ? AdminDash.render() : ''}</div>
         <div class="adm-grid">
           <div class="stack">
             ${dataHtml()}
@@ -392,6 +422,7 @@ const Admin = (function () {
   function init() {
     if (!state.dbStatus) dbCheck();
     if (isAdmin() && users === null && !loading) load();
+    if (typeof AdminDash !== 'undefined') AdminDash.start();
   }
 
   // Only the parts that change are repainted: the Data source panel and the
@@ -478,7 +509,7 @@ const Admin = (function () {
 
   function forgetKey(i) {
     const x = storageKeys()[i];
-    if (!x || x.k === 'meganet.session') return;
+    if (!x || KEEP.includes(x.k)) return;
     try { localStorage.removeItem(x.k); } catch (_) { /* blocked */ }
     repaint('browser');
     announce(`Forgot ${x.k}.`);
@@ -488,7 +519,7 @@ const Admin = (function () {
     if (!confirm('Forget every setting this browser keeps for the app — filters, panel widths, drafts?\n\n' +
                  'Your sign-in is kept. Unsaved drafts are lost.')) return;
     for (const x of storageKeys()) {
-      if (x.k === 'meganet.session') continue;
+      if (KEEP.includes(x.k)) continue;
       try { localStorage.removeItem(x.k); } catch (_) { /* blocked */ }
     }
     repaint('browser');
