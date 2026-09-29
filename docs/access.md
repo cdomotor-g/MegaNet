@@ -320,6 +320,79 @@ Set Site URL to the origin the app is actually served from — `https://floodwar
 
 ---
 
+### Sign in with Microsoft
+
+Bureau staff have a Microsoft work account, so the sign-in panel can offer
+**Sign in with Microsoft** above the email box: one click, and no email to wait
+for. `auth.js` shows the button only once GoTrue's own `/settings` reports the
+**Azure** provider as on, so until the steps below are done the panel is exactly
+the email-and-code flow described above. The session comes back in the URL
+fragment, the same way a magic link's does, and is adopted by the same code.
+
+**Who may edit does not change.** `auth_user_gate()` still refuses to create an
+account for an address that is not on `editor_allow`, and `is_editor()` still
+reads the token's email. Microsoft only proves who the person is.
+
+**The provider must be pinned to the Bureau's tenant.** An Entra ID account's
+email claim is whatever its tenant's administrator typed, so an app open to
+*any* tenant would accept `someone@bom.gov.au` from a tenant anybody can create.
+The **Azure Tenant URL** below fixes the authority to the Bureau's own
+directory, `d1ad7db5-97dd-4f2b-816e-50d663b7bb94`. That ID is public: it is in
+`https://login.microsoftonline.com/bom.gov.au/v2.0/.well-known/openid-configuration`.
+Do not leave that field empty.
+
+**One hop the Bureau's filter might not like.** Microsoft returns the person to
+`https://jjprlritvhdqpvphfrnu.supabase.co/auth/v1/callback`. That is the
+project's own host, which the `/api/db` proxy exists to avoid, and hosted
+Supabase does not let the callback move. Step 0 checks whether the filter
+allows it. If it does not, the fix is a Worker callback on `floodwarning.net`
+that mints the session the way the gate route (#173) does.
+
+#### Setting it up (human, about 20 minutes)
+
+0. **On a Bureau machine**, open
+   `https://jjprlritvhdqpvphfrnu.supabase.co/auth/v1/health`. A line of JSON,
+   even an error, means the hop is fine. A ProxySG block page means stop here
+   and report it, because the rest will not work from inside the Bureau.
+1. Go to <https://entra.microsoft.com> and sign in with your `@bom.gov.au`
+   account. Open **Identity → Applications → App registrations → New
+   registration**.
+   - If you are not allowed to register apps there, create a free tenant of your
+     own (<https://azure.microsoft.com/free>), register it there instead, and
+     choose the multitenant account type in the next step.
+2. **Name** `MegaNet`. For **Supported account types**, choose *Accounts in this
+   organizational directory only* if you are in the Bureau's tenant, or
+   *Accounts in any organizational directory (Multitenant)* if you are in your
+   own. For **Redirect URI**, choose platform **Web** and enter
+   `https://jjprlritvhdqpvphfrnu.supabase.co/auth/v1/callback`. Click
+   **Register**.
+3. On **Overview**, copy the **Application (client) ID**.
+4. Go to **Certificates & secrets → Client secrets → New client secret**. Set the
+   expiry to 24 months and click **Add**. Copy the **Value** column now; it is
+   shown only once. The *Secret ID* is not it.
+5. Go to **Token configuration → Add optional claim**, choose token type **ID**,
+   tick **email** and **xms_edov**, and click **Add**. Accept the prompt to add
+   the Microsoft Graph `email` permission.
+   - Supabase treats the address as verified only when `xms_edov` is present.
+     If it is not in the list, open **Manifest** and add
+     `{"name": "xms_edov", "essential": false}` to `optionalClaims.idToken`.
+6. In Supabase, go to **Authentication → Sign In / Providers → Azure**. Switch it
+   **on**, then paste the **Application ID** (step 3) and the **Secret Value**
+   (step 4). Set **Azure Tenant URL** to
+   `https://login.microsoftonline.com/d1ad7db5-97dd-4f2b-816e-50d663b7bb94`.
+   Click **Save**.
+7. Go to **Authentication → URL Configuration → Redirect URLs** and check that
+   `https://floodwarning.net/*` is listed (it is already needed by the magic link).
+8. Test it. Open `https://floodwarning.net`, click **Sign in**, then **Sign in with
+   Microsoft**.
+   - **Signed in:** done.
+   - **"Need admin approval":** the Bureau does not let users consent to apps
+     themselves. Send IT the approval request Microsoft offers on that page. It
+     asks for sign-in and email only, which is read-only.
+   - **A ProxySG block page on `…supabase.co`:** the hop from step 0. Report it.
+9. Put a calendar reminder a week before the client secret expires. When it
+   expires, the button fails and the email code keeps working.
+
 ## Proving it works
 
 The acceptance criterion on #72 is that an unsigned write is refused **at the

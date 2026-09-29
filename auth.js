@@ -45,6 +45,16 @@
 // operator gets depends on a template in a dashboard, and an app that only
 // handles one of them is an app that breaks when somebody edits it.
 //
+// **A third way in: Microsoft.** Bureau staff already have a Microsoft work
+// account, so where the project has GoTrue's Azure provider switched on the
+// panel offers it above the email box — one click, no mailbox round trip. It
+// comes back through the same URL-fragment landing as the magic link, so
+// consumeHash() adopts it and nothing downstream can tell the difference. The
+// button appears only when GoTrue's own /settings says the provider is on, so
+// the code can ship before the dashboard work is done (docs/access.md →
+// Sign in with Microsoft). Who may edit is decided exactly as before:
+// auth_user_gate() and editor_allow read the address, whichever way it arrived.
+//
 // **localStorage, not sessionStorage — the trade was re-judged.** 0004 and the
 // original #B8 build kept this per-tab: a token that outlives the tab it was
 // obtained in is a token left behind on a shared machine. That priced sign-in
@@ -74,6 +84,10 @@ const Auth = (function () {
   // every state change repaints the panel: a message that arrives while somebody
   // is mid-type would otherwise take the typing with it.
   let ui      = { step: 'email', email: '', code: '', busy: false, msg: null };
+  // GoTrue's /settings answer, once asked: which external providers are on.
+  // null until it answers, and it stays {} if it never does — a panel with no
+  // Microsoft button is the email flow as it always was, not a fault.
+  let external = null;
 
   // ── session plumbing ──
 
@@ -233,6 +247,32 @@ const Auth = (function () {
     } catch (_) { return null; }
   }
 
+  // ── Microsoft ──
+
+  async function loadProviders() {
+    if (external) return external;
+    try {
+      const res = await fetch(`${AUTH_URL}/settings`, {
+        headers: { apikey: DB_ANON_KEY }, cache: 'no-store',
+      });
+      external = res.ok ? ((await res.json()).external || {}) : {};
+    } catch (_) { external = {}; }
+    return external;
+  }
+
+  // A navigation, not a fetch: GoTrue answers /authorize with a redirect to
+  // Microsoft, Microsoft to the project's /callback, and that to redirect_to
+  // with the session in the fragment. redirect_to is stated for the reason
+  // requestCode() gives, and is honoured only if it is on the dashboard's list.
+  // `email` is the scope GoTrue needs to be handed the address at all.
+  function signInMicrosoft() {
+    ui.busy = true;
+    ui.msg  = { kind: 'busy', text: 'Opening Microsoft sign-in…' };
+    render();
+    location.assign(`${AUTH_URL}/authorize?provider=azure&scopes=email`
+      + `&redirect_to=${encodeURIComponent(location.origin + location.pathname)}`);
+  }
+
   // ── sign in ──
 
   // Refuse in the browser what the database is going to refuse anyway, so an
@@ -387,15 +427,29 @@ const Auth = (function () {
   // URL or a screenshot is not a copied session.
   function consumeHash() {
     const raw = location.hash || '';
-    if (!raw.includes('access_token=') && !raw.includes('error=')) return false;
+    // A refused OAuth sign-in can come back in the query string rather than the
+    // fragment, depending on which hop refused it.
+    const q = new URLSearchParams(location.search);
+    const queryError = q.get('error') && (q.get('error_description') || q.get('error_code'));
+    if (!raw.includes('access_token=') && !raw.includes('error=') && !queryError) return false;
 
-    const p = new URLSearchParams(raw.replace(/^#/, ''));
+    const p = new URLSearchParams(raw.includes('=') ? raw.replace(/^#/, '') : location.search);
+    if (queryError) for (const k of ['error', 'error_code', 'error_description']) q.delete(k);
+    const search = q.toString() ? `?${q}` : '';
     // replaceState rather than clearing location.hash, which would leave a bare
     // '#' and push a history entry.
-    history.replaceState(null, '', location.pathname + location.search);
+    history.replaceState(null, '', location.pathname + search);
 
     if (p.get('error') || p.get('error_description')) {
-      ui.msg = { kind: 'error', text: p.get('error_description') || p.get('error') };
+      const text = p.get('error_description') || p.get('error');
+      // The database refusing the signup (auth_user_gate) reaches here as a
+      // generic "Database error saving new user"; say what it means instead.
+      ui.msg = { kind: 'error', text: /database error|unexpected_failure/i.test(text)
+        ? 'That account was refused because its address is not on the access list. '
+          + 'An administrator has to add it — see docs/access.md.'
+        : text };
+      // Opened, so the refusal is seen rather than sitting in a closed panel.
+      setTimeout(open, 0);
       return false;
     }
     const access = p.get('access_token');
@@ -495,8 +549,14 @@ const Auth = (function () {
           <button class="primary" onclick="Auth.verifyCode()" ${busy ? 'disabled' : ''}>Sign in</button>
         </div>`;
     } else {
+      const ms = external && external.azure
+        ? `<button class="primary" style="width:100%" onclick="Auth.signInMicrosoft()" ${busy ? 'disabled' : ''}>
+             Sign in with Microsoft</button>
+           <p class="small">Your Bureau work account — no code to wait for. Or use an email code:</p>`
+        : '';
       body = `
         <div class="modal-form">
+          ${ms}
           <label>Work email address
             <input type="email" id="au-email" autocomplete="email" placeholder="you@bom.gov.au"
                    value="${esc(ui.email)}" ${busy ? 'disabled' : ''}
@@ -544,6 +604,8 @@ const Auth = (function () {
     if (session && ui.step !== 'in') { ui.step = 'in'; ui.msg = null; }
     root.style.display = 'flex';
     root.innerHTML = template();
+    // First open only: ask whether the Microsoft button belongs, and redraw if so.
+    if (!external) loadProviders().then(e => { if (e.azure) render(); });
     document.addEventListener('keydown', onKey);
     document.getElementById(ui.step === 'code' ? 'au-code' : 'au-email')?.focus();
   }
@@ -609,7 +671,7 @@ const Auth = (function () {
   }
 
   return {
-    start, open, close, back, requestCode, verifyCode, signOut, render,
+    start, open, close, back, requestCode, verifyCode, signInMicrosoft, signOut, render,
     // Read by the editor and the Data source panel. Both ask the database in the
     // end; these only decide what to say before that round trip.
     isSignedIn: () => !!session,
