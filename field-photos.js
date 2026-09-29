@@ -2053,10 +2053,31 @@ const FieldPhotos = (function () {
   // listeners on the window. It is a live map while it is up, for the nav's
   // re-measure. It is not taken down by a tab switch — the viewer sits over
   // every tab, and a mover emptied under it would be a dead map in a live
-  // dialog. Esri's imagery, as the Stations map's Satellite base, stretched
-  // two levels past the 19 it is served to — finer than the tiles, and still
-  // the better place to drop a pin.
+  // dialog. Imagery as below (addPhotoImagery), stretched to z21 — finer than
+  // the tiles, and still the better place to drop a pin.
   let mm = null;    // { map, id, from, at, pin, ring, ghost, leader, cone, others: [{ row, dot }], withOthers }
+
+  // The imagery under both photo maps: Esri's, as the Stations map's
+  // Satellite base, and over it inside Queensland the State's aerial program
+  // (the LatestStateProgram cache digital-twin.js exports from — 10–20 cm in
+  // towns, Planet satellite where nothing was flown), tiled in Web Mercator to
+  // z20. Esri runs out at z19 over much of the bush and paints "Map data not
+  // yet available" there; the State's tiles cover it. Outside the State its
+  // tiles 404 and Esri shows through.
+  const QLD_TILE = 'https://spatial-img.information.qld.gov.au/arcgis/rest/services/Basemaps/LatestStateProgram_AllUsers/ImageServer/tile/{z}/{y}/{x}';
+  const QLD_BOUNDS = [[-29.6, 137.6], [-8.9, 153.9]];
+
+  function addPhotoImagery(map) {
+    const base = typeof makeBaseLayers === 'function' ? makeBaseLayers().Satellite : null;
+    if (base) {
+      Object.assign(base.options, { maxNativeZoom: 19, maxZoom: 21, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' });
+      base.addTo(map);
+    }
+    L.tileLayer(QLD_TILE, {
+      maxNativeZoom: 20, maxZoom: 21, minZoom: 6, bounds: QLD_BOUNDS,
+      attribution: 'Imagery © State of Queensland',
+    }).addTo(map);
+  }
 
   function unmountMoveMap() {
     if (!mm) return;
@@ -2074,11 +2095,7 @@ const FieldPhotos = (function () {
     const map = L.map(el, { maxZoom: 21, minZoom: 4, zoomControl: true, attributionControl: true, keyboard: true });
     registerLiveMap('FieldPhotos mover', () => (mm ? mm.map : null));
     map.attributionControl.setPrefix(false);
-    const base = typeof makeBaseLayers === 'function' ? makeBaseLayers().Satellite : null;
-    if (base) {
-      Object.assign(base.options, { maxNativeZoom: 19, maxZoom: 21, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' });
-      base.addTo(map);
-    }
+    addPhotoImagery(map);
     const box = document.getElementById('fp-v-with');
     mm = { map, id: r.id, from, at: from ? from.slice() : null, pin: null, ring: null, ghost: null, leader: null, cone: null,
            others: [], withOthers: !!(box && box.checked) };
@@ -2122,11 +2139,7 @@ const FieldPhotos = (function () {
     const map = L.map(el, { maxZoom: 21, minZoom: 4, zoomControl: true, attributionControl: true, keyboard: true, scrollWheelZoom: false });
     registerLiveMap('FieldPhotos spot', () => (sm ? sm.map : null));
     map.attributionControl.setPrefix(false);
-    const base = typeof makeBaseLayers === 'function' ? makeBaseLayers().Satellite : null;
-    if (base) {
-      Object.assign(base.options, { maxNativeZoom: 19, maxZoom: 21, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' });
-      base.addTo(map);
-    }
+    addPhotoImagery(map);
     sm = { map, id: r.id };
     if (acc) L.circle(at, { radius: acc, interactive: false, className: `fp-mm-ring${rough(acc) ? ' is-rough' : ''}` }).addTo(map);
     spotRows(r).filter(x => x !== r).forEach(x => L.circleMarker([+x.lat, +x.lon], { radius: 4, interactive: false, className: 'fp-mm-other' }).addTo(map));
