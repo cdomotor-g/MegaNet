@@ -10,6 +10,14 @@
 - If human tasks remain, or fall out of scope, at the end of your work: ask whether to create a new issue tagged `[Human]` in place of a model/effort recommendation (see below), with explicit, click-by-click instructions for what the human needs to do.
 - When you finish work that closes an issue, close it with a comment summarizing what was done.
 
+## CI and token use
+- CI is a backstop, not something to watch. The web smoke test (`.github/workflows/web-smoke.yml`) takes ~20 minutes and cancels itself when a newer push lands on `main`, so a "cancelled" run is normal — never investigate one. The repo is public, so Actions minutes cost nothing; the only cost is tokens spent looking at CI.
+- After pushing, do **not** poll, wait for, or summarise CI. Look at a run only when I tell you one failed, and then read just the failing step's log tail, not the whole log.
+- Before pushing a change to any root `*.js`, `index.html` or `styles.css`, run the cheap local checks (about 4 seconds, no browser): `cd test && npm run check && npm run names && npm run toplevel && npm run steps` (`npm install` once first). Run the check for the area you touched as well (see `test/README.md`). Do not run `npm run all` locally unless asked — CI does that.
+- Several chat threads push to `main` at once, so `git pull --rebase origin main` before every push. If the push is rejected, rebase and retry once, then stop and tell me rather than looping.
+- Batch related edits into one push where you can. Each push touching the app starts a ~20-minute run, and a newer push cancels the older one, so a burst of small pushes wastes both.
+- Pushes that touch only `CLAUDE.md`, `roadmap/**`, or `data/` files not listed in the smoke filter do not start the smoke test.
+
 ## Raising issues for AI agents
 - If a new issue is something an AI coding agent (e.g. Claude Code) could pick up and complete, recommend a model and effort level for it.
 - Put the recommendation as a tag at the very start of the issue title, so it's visible at a glance in issue lists — no need to open the issue to see it. Format: `[<Model>/<Effort>] <title>`.
