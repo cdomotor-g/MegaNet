@@ -622,6 +622,24 @@ signup triggers (0005) and wants the stations loaded, as CI has them.
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_tower_height.sql
 ```
 
+## `check_flood_peaks_from.sql` — prove a station taking another's flood history
+
+23 checks over `0041`, in a transaction that rolls back: with the stations and
+the HDB extract loaded, a station beside Gatton with no gauge of its own names
+Gatton and gets its five floods, the same dates and levels, the document saying
+whose (`flood_peaks_from`, `flood_peaks_gauge`); placed through Gatton's zero
+rather than one of its own, and following Gatton's when it moves; gone while
+Gatton is deleted and back when it is restored; kept through a save of the
+document as loaded and dropped by a save without the key. Refused: naming
+itself, a station that is not there, a number, a stranger, anon. A station
+with a gauge of its own keeps its own floods whatever it names; and the whole
+register back through `load_stations_doc()` with one link in it, rewriting
+nothing else.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_flood_peaks_from.sql
+```
+
 ## `storage_bucket.sql` — create the `inspections` bucket and its policies
 
 The one script here that writes, and the one that does not roll back. Idempotent

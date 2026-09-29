@@ -166,6 +166,13 @@ function nodeHalf(FS) {
   ok('a height with no level is not drawn — never hung from today\'s zero — and the notes say so, height and date',
     !peaks.levels.some(l => l.date === '1990') && peaks.notes.length === 1 && /One of the floods HDB records here cannot be put on the ground/.test(peaks.notes[0])
       && /3\.1 m \(1990\) on the gauge/.test(peaks.notes[0]), J(peaks.notes));
+  // Another station's floods (0041): a station taking its flood history from
+  // Gatton says whose they are; its own floods say nothing of the kind.
+  const borrowedPeaks = FS.ladder({ ...GATTON, id: 'beside', flood_peaks: GATTON_PEAKS, flood_peaks_from: 'gatton', flood_peaks_gauge: '40444' });
+  ok('a station taking Gatton\'s flood history draws its floods and says they are the Bureau\'s record at gauge 40444',
+    borrowedPeaks.levels.filter(l => l.kind === 'peak').length === GATTON_PEAKS.length
+      && borrowedPeaks.notes.some(n => /Bureau's record at .*40444.*takes its flood history from/.test(n))
+      && !peaks.notes.some(n => /takes its flood history/.test(n)), J(borrowedPeaks.notes));
   const onlyHeights = FS.ladder({ ...GATTON, flood_peaks: [{ date: '2011-01-10', height_m: 18.92 }] });
   ok('…and a station whose floods all lack one draws none, and says why',
     !onlyHeights.levels.some(l => l.kind === 'peak') && near(onlyHeights.top, 103.75, 1e-9)

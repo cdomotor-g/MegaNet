@@ -1115,6 +1115,11 @@ jobs:
         run: python3 tools/ingest/flood_peaks.py --sql | psql -v ON_ERROR_STOP=1 --single-transaction -q
       - name: check_flood_peaks.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_flood_peaks.sql
+      # A station taking its flood history from another (0041): Gatton's floods
+      # on a station beside it, through Gatton's zero, following Gatton's changes,
+      # and a gauge of its own winning — after the peaks are loaded, above.
+      - name: check_flood_peaks_from.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_flood_peaks_from.sql
       # The SLS's merge rule is written twice — in tools/ingest/sls.py for the
       # file the app reads off disk, and in meganet.sls_location for anything
       # that asks the database — and this is what holds the two to one rule:

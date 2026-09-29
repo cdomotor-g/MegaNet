@@ -775,6 +775,11 @@ the water rises. The tokens are `--flood-water-*` in `styles.css`.
   labelled *Highest recorded (date)*, and the rise goes up to it when it is
   the highest level there is — at Gatton, 1893 stands 12 cm over the 0.066%
   AEP level. A flood never colours the water: it is history, not a class.
+  A station with no gauge of its own — a proposal beside one — can **take
+  its flood history from another station** (`flood_peaks_from`, `0041`, set
+  in the station editor): it then has that gauge's floods, placed through
+  that gauge's zero, and the notes say whose they are. Proposed Gatton Auto
+  takes Gatton's (40444).
 
 **Where 0 m is.** The gauge zero, when it is AHD and sits at the channel the
 ground shows — no more than 30 m below the lowest ground by the gauge (a

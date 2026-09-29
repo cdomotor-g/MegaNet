@@ -343,6 +343,10 @@ function editorForm(s) {
       <label>Tower platform height
         <select id="ef-tower">${towerHeightOptions(s.tower_height)}</select>
       </label>
+      <!-- The station it takes its flood history from (0041), by id: for a
+           station with no gauge of its own, such as a proposal beside one. -->
+      <label>Flood history from<input type="text" id="ef-fpfrom" value="${esc(s.flood_peaks_from || '')}"
+             placeholder="a station's id, e.g. gatton" title="The Bureau's floods at that station's gauge are shown for this one while it has no gauge of its own"></label>
       ${editorProposedBoxHtml(s)}
       <label>Latitude<input type="number" step="any" id="ef-lat" value="${s.lat ?? ''}"></label>
       <label>Longitude<input type="number" step="any" id="ef-lon" value="${s.lon ?? ''}"></label>
@@ -776,6 +780,9 @@ function editorReadForm() {
   const towerBox = document.getElementById('ef-tower');
   const tower = towerBox ? pFloat(towerBox.value) : (d.tower_height ?? null);
   if (tower != null) d.tower_height = tower; else delete d.tower_height;
+  const fpBox = document.getElementById('ef-fpfrom');
+  const fpFrom = fpBox ? fpBox.value.trim() : (d.flood_peaks_from || '');
+  if (fpFrom) d.flood_peaks_from = fpFrom; else delete d.flood_peaks_from;
   const yearBox = document.getElementById('ef-pyear');
   const pyear = yearBox ? pInt(yearBox.value) : (d.proposed_year ?? null);
   if (pyear != null) d.proposed_year = pyear; else delete d.proposed_year;

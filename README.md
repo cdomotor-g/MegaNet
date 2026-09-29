@@ -231,6 +231,7 @@ MegaNet/
 │   ├── check_photo_review.sql (psql: prove the upload log, the administrator and the equipment register (0036) — 113 checks, rolls back)
 │   ├── check_proposed_stations.sql (psql: prove proposed stations and who may add or establish one (0039) — 40 checks, rolls back)
 │   ├── check_tower_height.sql (psql: prove a tower's platform height, 3.0 or 4.5 m, and who may record it (0040) — 18 checks, rolls back)
+│   ├── check_flood_peaks_from.sql (psql: prove a station taking its flood history from another (0041) — 23 checks, rolls back)
 │   ├── field-photos/        (the Dropbox and Google Drive → MegaNet photo sync, run by field-photos-dropbox.yml and field-photos-gdrive.yml)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)

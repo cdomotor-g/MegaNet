@@ -325,7 +325,8 @@ def build(data, out):
                'roles', 'radio_network_ids', 'catchment_ids', 'alert_ids', 'satcom',
                'rm_system_id', 'enabled', 'notes', 'legacy_unit_id', 'site', 'lga',
                'basin', 'location_types', 'awrc_number', 'stream', 'urbs_label',
-               'proposed', 'station_type', 'proposed_year', 'tower_height'],
+               'proposed', 'station_type', 'proposed_year', 'tower_height',
+               'flood_peaks_from'],
               ['id'],
               [[q(s['id']), q(i), q(s.get('name', '')), q(s.get('station_number', '')),
                 q(s.get('lat')), q(s.get('lon')), q(s.get('elevation_ahd')),
@@ -350,7 +351,9 @@ def build(data, out):
                 q((s.get('station_type') or '').strip() or None),
                 q(s.get('proposed_year')),
                 # 0040's: absent where nobody has recorded one.
-                q(s.get('tower_height'))]
+                q(s.get('tower_height')),
+                # 0041's: absent where the station has floods of its own, or none.
+                q((s.get('flood_peaks_from') or '').strip() or None)]
                for i, s in enumerate(stations)],
               prune_where='t.document_managed')
 

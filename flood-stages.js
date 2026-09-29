@@ -183,6 +183,13 @@ const FloodStages = (function () {
         ? `${unplaced.length === 1 ? 'One of the floods' : `${unplaced.length} of the floods`} HDB records here cannot be put on the ground — the gauge's zero on the day is not known in AHD, or the height disagrees with its flood levels: ${said} on the gauge.`
         : `HDB records floods here, but none can be put on the ground — the gauge's zero on the day is not known in AHD, or the heights disagree with its flood levels: ${said} on the gauge.`);
     }
+    // Another station's floods (0041): a station with no gauge of its own that
+    // takes its flood history from one nearby says whose they are.
+    if (given.length && s.flood_peaks_gauge) {
+      const from = typeof state !== 'undefined' && state.data && s.flood_peaks_from
+        ? (state.data.stations || []).find(x => x.id === s.flood_peaks_from) : null;
+      notes.push(`The floods are the Bureau's record at ${from ? `${from.name} (${s.flood_peaks_gauge})` : `gauge ${s.flood_peaks_gauge}`}, which this station takes its flood history from until it has a gauge of its own.`);
+    }
     if (peaks.length) {
       const high = peaks.reduce((a, b) => (b.ahd > a.ahd ? b : a));
       high.label = `Highest recorded${high.date ? ` (${high.date})` : ''}`;
