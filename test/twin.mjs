@@ -870,6 +870,15 @@ try {
       unknown:  K({ name: 'Somewhere Ck', roles: ['field'] }),
       satcom:   K({ name: 'Somewhere Ck', satcom: { enabled: true } }),
       awrcOnly: K({ name: 'Somewhere Ck', awrc_number: '422988', stream: 'SOMEWHERE CREEK' }),
+      // Proposals: the type decides the structure with no address assigned,
+      // and the Telemetry field names the kit.
+      propWater: K({ name: 'Proposed Ck', proposed: true, station_type: 'auto_water_level' }),
+      propRain:  K({ name: 'Proposed Ck', proposed: true, station_type: 'auto_rain_gauge', inspection_config_key: 'alert' }),
+      propManW:  K({ name: 'Proposed Ck', proposed: true, station_type: 'manual_water_level' }),
+      propManR:  K({ name: 'Proposed Ck', proposed: true, station_type: 'manual_rain_gauge' }),
+      typeWins:  K({ name: 'Somewhere Ck AL', station_type: 'auto_water_level', sensors: [{ alert_id: 1, type: 'Rainfall' }] }),
+      cfgTm:     K({ name: 'Somewhere Ck', station_type: 'auto_rain_gauge', inspection_config_key: 'campbell_datalogger', alert_ids: { rainfall: 100 } }),
+      cfgAlone:  K({ name: 'Somewhere Ck', inspection_config_key: 'gas_only' }),
     };
   });
   ok('a rainfall-only AL station is a pole with an ALERT radio',
@@ -884,6 +893,18 @@ try {
     kinds.unknown.structure === 'post' && !kinds.unknown.telemetryKnown && /neither what it measures nor whether/.test(kinds.unknown.unsure)
       && kinds.awrcOnly.structure === 'post' && kinds.satcom.structure === 'post' && /a radio reads it/.test(kinds.satcom.unsure),
     JSON.stringify([kinds.unknown, kinds.satcom.unsure]));
+  ok('a proposed automatic water level station is the tower and an automatic rain gauge the pole, with no ALERT address',
+    kinds.propWater.structure === 'tower' && kinds.propWater.telemetered && !kinds.propWater.unsure
+      && kinds.propRain.structure === 'pole' && kinds.propRain.telemetry === 'alert' && kinds.propRain.telemetryKnown,
+    JSON.stringify([kinds.propWater, kinds.propRain]));
+  ok('a proposed manual one is the staff gauge or the collector',
+    kinds.propManW.structure === 'staff' && kinds.propManR.structure === 'collector', JSON.stringify([kinds.propManW.structure, kinds.propManR.structure]));
+  ok('the station type wins over what the sensors say',
+    kinds.typeWins.structure === 'tower', JSON.stringify(kinds.typeWins));
+  ok('the Telemetry field wins over the ALERT addresses, and alone makes a station automatic',
+    kinds.cfgTm.telemetry === 'tm' && kinds.cfgTm.telemetryKnown && kinds.cfgTm.structure === 'pole'
+      && kinds.cfgAlone.structure === 'tower' && kinds.cfgAlone.telemetered,
+    JSON.stringify([kinds.cfgTm, kinds.cfgAlone]));
 
   d = await dbg();
   const model = d.model;

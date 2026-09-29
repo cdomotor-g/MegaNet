@@ -1713,23 +1713,31 @@ void main() {
   //     drawn as confidently as a fact, which is the one thing this tab is
   //     careful never to do; the notes say what is known and what is not.
   //
+  // A station type in the record (0039 — asked of every proposal) decides
+  // outright: an automatic water level station is the tower, an automatic
+  // rain gauge the pole, a manual one the staff or the collector, whatever
+  // the sensors and addresses say or do not yet say. Otherwise:
+  //
   // Manual is what the Bureau's Service Level Specification says (its gauge
   // type, by bureau number — SLS.forStation, the card's own lookup, which for a
   // station both states' documents list is the one the card quotes first), or, for a
   // station the SLS does not carry, being in the Bureau's list of daily-read
   // gauges (Section 2 of its river height station lists) with nothing in the
-  // record saying a radio reads it. Telemetered is a name ending AL, ALERT or
-  // TM, ALERT addresses, satcom, or the SLS saying Automatic. What it measures
+  // record saying a radio reads it. Telemetered is the Telemetry field set,
+  // a name ending AL, ALERT or TM, ALERT addresses, satcom, or the SLS saying
+  // Automatic. What it measures
   // is the sensors, the ALERT addresses, the Bureau's location types and the
   // SLS's data type, together. The SLS file is fetched once (1.2 MB, the
   // card's) before the station is built, and a build that cannot have it
   // decides without it and says so.
   //
-  // Inside each enclosure is the electronics the network fits, by telemetry:
-  // an ELPRO ERRTS ERT-A2 radio for an ALERT station (a name ending AL or
-  // ALERT, or ALERT addresses in the record), a Campbell Scientific CR300
-  // logger and a Beam Iridium SBD modem for a TM station (a name ending TM,
-  // or satcom on). An automatic station whose radio the record cannot name
+  // Inside each enclosure is the electronics the network fits, by telemetry,
+  // read first from the Telemetry field (inspection_config_key) and only
+  // failing that from the name and addresses: an ELPRO ERRTS ERT-A2 radio for
+  // an ALERT station (Telemetry ALERT, a name ending AL or ALERT, or ALERT
+  // addresses in the record), a Campbell Scientific CR300 logger and a Beam
+  // Iridium SBD modem for a TM station (Telemetry a Campbell or older data
+  // logger, a name ending TM, or satcom on). An automatic station whose radio the record cannot name
   // is drawn as TM and the notes say so. Every tower cabinet carries a
   // Kisters HS40 compressor bubbler in its upper compartment, and a Victron
   // charge controller, the telemetry, the terminals and the battery below. A
@@ -1769,30 +1777,57 @@ void main() {
     const types = sensors.map(s => String((s && s.type) || ''));
     const aids = (st && st.alert_ids) || {};
     const locs = Array.isArray(st && st.location_types) ? st.location_types : [];
+    const stype = String((st && st.station_type) || '');
+    const cfg = String((st && st.inspection_config_key) || '');
     // The Service Level Specification, by bureau number, where it has loaded.
     const sls = st && typeof SLS !== 'undefined' && SLS.forStation ? SLS.forStation(st) : null;
     const slsData = sls ? String(sls.data_type || '') : '';
     const slsManual = !!sls && /^manual$/i.test(String(sls.gauge_type || ''));
     const slsAuto = !!sls && /^automatic$/i.test(String(sls.gauge_type || ''));
     const water = types.some(t => /^Water Level|^Gas Pressure/i.test(t))
+      || cfg === 'gas_only' || /_water_level$/.test(stype)
       || aids.water_level != null || locs.includes('Water Level') || /river/i.test(slsData);
     const rain = types.some(t => /^Rainfall/i.test(t)) || aids.rainfall != null
+      || /_rain_gauge$/.test(stype)
       || locs.includes('Rain Gauge') || /rainfall/i.test(slsData);
     const repeater = (Array.isArray(st && st.roles) && st.roles.includes('repeater'))
-      || locs.includes('Repeater') || /repeater/i.test(slsData);
+      || locs.includes('Repeater') || /repeater/i.test(slsData)
+      || cfg === 'base_station';
     const alertEvidence = sensors.some(s => s && s.alert_id != null) || Object.keys(aids).length > 0;
     const satcom = !!(st && st.satcom && st.satcom.enabled);
-    let telemetry = suffix === 'TM' ? 'tm' : suffix ? 'alert' : alertEvidence ? 'alert' : satcom ? 'tm' : null;
+    // The Telemetry field — the editor's "Telemetry / inspection form", whose
+    // six configurations follow the station's telemetry type — says outright
+    // what reads the station, so it comes before anything inferred: an ALERT
+    // canister is the radio; a Campbell or older data logger is a logger and
+    // modem, drawn as TM; Mace (the telephone) and a gas-only site are read
+    // automatically by something the kit here does not draw, so the radio
+    // stays unnamed. A base station is a repeater's.
+    const cfgTelemetry = cfg === 'alert' ? 'alert'
+      : cfg === 'campbell_datalogger' || cfg === 'datalogger_old' ? 'tm' : null;
+    const cfgAuto = cfgTelemetry != null || cfg === 'mace' || cfg === 'gas_only';
+    let telemetry = cfgTelemetry
+      || (suffix === 'TM' ? 'tm' : suffix ? 'alert' : alertEvidence ? 'alert' : satcom ? 'tm' : null);
     const known = telemetry != null;
+    // The station type (0039), where the record has one — asked of every
+    // proposal — is what the station is or is to be, said by a person, and
+    // wins over anything read from sensors and listings: an automatic water
+    // level station is the tower and an automatic rain gauge the pole, before
+    // any ALERT address is assigned to it.
+    const typeAuto = /^auto_/.test(stype), typeManual = /^manual_/.test(stype);
+    const typeWater = /_water_level$/.test(stype), typeRain = /_rain_gauge$/.test(stype);
     const dailyRead = Array.isArray(st && st.bureau_listings)
       && st.bureau_listings.some(b => b && String(b.section) === '2');
-    // Manual: the SLS says so; or, where the SLS says nothing either way,
-    // the Bureau reads it daily and nothing in the record says a radio does.
-    const manual = slsManual || (!slsAuto && !known && dailyRead);
-    const telemetered = !manual && (known || slsAuto);
+    // Manual: the station type or the SLS says so; or, where neither says
+    // either way, the Bureau reads it daily and nothing in the record says a
+    // radio does.
+    const manual = typeManual
+      || (!typeAuto && (slsManual || (!slsAuto && !known && !cfgAuto && dailyRead)));
+    const telemetered = !manual && (typeAuto || known || cfgAuto || slsAuto);
     if (!telemetry) telemetry = 'tm';
     let structure, unsure = null;
-    if (manual) {
+    if (typeWater || typeRain) {
+      structure = manual ? (typeWater ? 'staff' : 'collector') : (typeWater ? 'tower' : 'pole');
+    } else if (manual) {
       structure = rain && water ? 'collector+staff' : rain ? 'collector' : water ? 'staff' : 'post';
       if (structure === 'post') unsure = 'it is read by hand, but nothing says whether it measures rainfall or a river';
     } else if (telemetered) {
@@ -1806,6 +1841,7 @@ void main() {
         : 'the record says neither what it measures nor whether a person or a radio reads it';
     }
     return { structure, telemetry, telemetryKnown: known, telemetered, manual, water, rain, repeater, suffix,
+             stationType: stype || null, config: cfg || null,
              sls: sls ? { gauge_type: sls.gauge_type || null, data_type: sls.data_type || null } : null,
              dailyRead, unsure };
   }
@@ -2321,7 +2357,7 @@ void main() {
     if (m.structure === 'post') return `There is no telling from the record what this station is — ${m.unsure} — so it is drawn as a red post 1 m tall rather than as a guess.`;
     if (m.structure === 'collector+staff') return 'A manual station that reads both rainfall and a river: the collector and the staff gauge are drawn side by side at its one position, though on the ground they are often apart.';
     if ((m.structure === 'pole' || m.structure === 'tower' || m.structure === 'repeater') && !m.telemetryKnown) {
-      return `This station's radio is not in its record — no AL or TM in the name, no ALERT addresses, no satcom${m.sls && m.sls.gauge_type ? '; the SLS says only that it is automatic' : ''} — so its enclosure is drawn as a TM station's: a CR300 logger and a Beam SBD modem.`;
+      return `This station's radio is not in its record — no Telemetry field, no AL or TM in the name, no ALERT addresses, no satcom${m.stationType && /^auto_/.test(m.stationType) ? '; its type says only that it is automatic' : ''}${m.sls && m.sls.gauge_type ? '; the SLS says only that it is automatic' : ''} — so its enclosure is drawn as a TM station's: a CR300 logger and a Beam SBD modem.`;
     }
     return null;
   }
