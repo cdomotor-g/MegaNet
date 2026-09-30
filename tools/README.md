@@ -622,6 +622,22 @@ signup triggers (0005) and wants the stations loaded, as CI has them.
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_tower_height.sql
 ```
 
+## `check_station_facing.sql` — prove the way a station faces
+
+20 checks over `0044`, in a transaction that rolls back: the column and a
+station with none recorded carrying no key; then an editor recording 135, 0,
+359.5 and a form's "90", and refused 361, −10, words and `true`; a stranger and
+anonymous refused; the column's own check refusing 360 from any other way in;
+360 saved as 0, the document saying `facing_deg` as a number, a save of the
+document as loaded keeping it and a save without it clearing it; and the whole
+register back through `load_stations_doc()` with one bearing in it, rewriting
+nothing else. It signs up one editor through the real signup triggers (0005)
+and wants the stations loaded, as CI has them.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_station_facing.sql
+```
+
 ## `check_flood_peaks_from.sql` — prove a station taking another's flood history
 
 23 checks over `0041`, in a transaction that rolls back: with the stations and

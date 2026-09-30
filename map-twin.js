@@ -320,6 +320,8 @@ const MapTwin = (function () {
             <button type="button" onclick="DigitalTwin.resetView()" title="Back to the opening view of the pole"><span aria-hidden="true">↺</span><span class="map-twin-label"> View</span><span class="sr-only">Reset the view</span></button>
             <button type="button" id="twin-movepin-btn" aria-pressed="false" onclick="DigitalTwin.toggleMovePin()"
                     title="Move this station's pin to where the station stands on the imagery, and save the position"><span aria-hidden="true">📍</span><span class="map-twin-label"> Move pin</span><span class="sr-only">Move this station's pin</span></button>
+            <button type="button" id="twin-orient-btn" aria-pressed="false" onclick="DigitalTwin.toggleOrient()"
+                    title="Turn the station to the way it faces on the ground — the side its door or ladder is on — and save the bearing"><span aria-hidden="true">🧭</span><span class="map-twin-label"> Orientation</span><span class="sr-only">Turn this station to the way it faces</span></button>
             <button type="button" class="map-twin-wide" onclick="MapTwin.openTab()"
                     title="The Digital Twin tab: the settings, the ground truth, the .glb for Blender"><span aria-hidden="true">🧊</span><span class="map-twin-label"> Open the tab →</span><span class="sr-only">Open the Digital Twin tab</span></button>
             ${DigitalTwin.infoToggleHtml()}

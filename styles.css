@@ -6830,9 +6830,15 @@ hr {
   max-width: min(12rem, calc(50% - var(--sp-2)));
 }
 
-/* …and while the pin is being moved in the twin, its panel has the corner and
-   the row beside it, and the trail stands down as the scale does. */
-.mn-map-stage:has(#map-twin.is-on #twin-movepin-panel:not([hidden])) .stn-trail {
+/* …and while the pin is being moved in the twin, or the station turned (🧭
+   Orientation), that panel has the corner and the row beside it, and the
+   trail stands down as the scale does. So it does while the twin's notes are
+   open: their flyout drops over the stage's top row, and the trail — over
+   the whole twin, so no z-index inside the twin can put the notes above it —
+   would sit on the note being read. Closing the notes brings it back. */
+.mn-map-stage:has(#map-twin.is-on #twin-movepin-panel:not([hidden])) .stn-trail,
+.mn-map-stage:has(#map-twin.is-on #twin-orient-panel:not([hidden])) .stn-trail,
+.mn-map-stage:has(#map-twin.is-on #twin-notes-fold[open]) .stn-trail {
   display: none;
 }
 
@@ -13633,6 +13639,21 @@ code {
   z-index: 2;
 }
 .twin-movepin-panel[hidden] { display: none; }
+
+/* The 🧭 Orientation tool's panel (digital-twin.js), in Move pin's corner and
+   box — the two are never open together. The bearing box, its compass word
+   and the two 15° nudges on one line; the slider under them, full width. */
+.twin-orient-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-1);
+}
+.twin-orient-deg { display: inline-flex; align-items: center; gap: .15rem; }
+.twin-orient-deg input { width: 4.5rem; font-variant-numeric: tabular-nums; }
+.twin-orient-word { min-width: 2ch; color: var(--muted); }
+.twin-orient-range { width: 100%; margin: 0 0 var(--sp-1); }
+.twin-orient-quick { margin-bottom: var(--sp-2); }
 .mn-movepin-msg { margin: var(--sp-1) 0 0; }
 
 /* In the map's overlay the stage's panel is the one: the map's own, in the

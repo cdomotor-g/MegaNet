@@ -343,6 +343,13 @@ function editorForm(s) {
       <label>Tower platform height
         <select id="ef-tower">${towerHeightOptions(s.tower_height)}</select>
       </label>
+      <!-- The way the station faces (0044): the bearing its front — enclosure
+           door, or a tower's ladder — looks out. Blank is not recorded, which
+           the Digital Twin draws facing south. Its 🧭 Orientation tool sets it
+           by eye. -->
+      <label>Faces (° from north)<input type="number" id="ef-facing" min="0" max="359.9" step="0.1" inputmode="decimal"
+             value="${s.facing_deg == null ? '' : esc(String(s.facing_deg))}" placeholder="not recorded (south)"
+             title="The bearing the station's front — its enclosure door, or a tower's ladder — faces, clockwise from true north"></label>
       <!-- The station it takes its flood history from (0041), by id: for a
            station with no gauge of its own, such as a proposal beside one. -->
       <label>Flood history from<input type="text" id="ef-fpfrom" value="${esc(s.flood_peaks_from || '')}"
@@ -780,6 +787,10 @@ function editorReadForm() {
   const towerBox = document.getElementById('ef-tower');
   const tower = towerBox ? pFloat(towerBox.value) : (d.tower_height ?? null);
   if (tower != null) d.tower_height = tower; else delete d.tower_height;
+  // 0044's, the same way: absent where blank, 360 being north again.
+  const facingBox = document.getElementById('ef-facing');
+  const facing = facingBox ? pFloat(facingBox.value) : (d.facing_deg ?? null);
+  if (facing != null) d.facing_deg = ((facing % 360) + 360) % 360; else delete d.facing_deg;
   const fpBox = document.getElementById('ef-fpfrom');
   const fpFrom = fpBox ? fpBox.value.trim() : (d.flood_peaks_from || '');
   if (fpFrom) d.flood_peaks_from = fpFrom; else delete d.flood_peaks_from;

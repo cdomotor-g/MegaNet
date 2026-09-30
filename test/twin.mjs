@@ -1042,6 +1042,41 @@ try {
     await page.evaluate(() => document.getElementById('twin-canvas').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     await frames(3);
     ok('Escape leaves the POV', (await dbg()).mode === 'orbit');
+    // 🧭 Orientation (0044): turned to face east, the tower turns as a whole,
+    // and the ladder — now on its east — is walked into and climbed the same
+    // way, from the east, facing west. Cancel puts it back.
+    await page.evaluate(() => DigitalTwin.toggleOrient());
+    await frames(2);
+    const orientUi = await page.evaluate(() => ({ panel: !document.getElementById('twin-orient-panel').hidden,
+      pressed: document.getElementById('twin-orient-btn').getAttribute('aria-pressed'), f: DigitalTwin._facing() }));
+    ok('🧭 Orientation opens its panel on the stage, at the default: facing south, not turned',
+      orientUi.panel && orientUi.pressed === 'true' && orientUi.f.deg === 180 && orientUi.f.turn === 0, JSON.stringify(orientUi));
+    await page.evaluate(() => DigitalTwin.orientTo(90));
+    await frames(2);
+    const turned = await page.evaluate(() => ({ f: DigitalTwin._facing(), word: document.getElementById('twin-orient-word').textContent,
+      box: document.getElementById('twin-orient-deg').value }));
+    ok('set to 90°, the model is turned a quarter anticlockwise from as built, and the panel says E',
+      turned.f.deg === 90 && near(turned.f.turn, -Math.PI / 2, 1e-9) && turned.word === 'E' && turned.box === '90', JSON.stringify(turned));
+    await page.evaluate(() => DigitalTwin._pov({ px: 3.5, pz: 0, yaw: -Math.PI / 2, pitch: 0 }));
+    await page.evaluate(() => { const cv = document.getElementById('twin-canvas'); cv.focus(); cv.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true })); });
+    await page.waitForFunction(() => { const m = DigitalTwin.debug().model; return m.level === 'ladder' && m.climb > 0.05; }, null, { timeout: 6000 }).catch(() => {});
+    await page.evaluate(() => document.getElementById('twin-canvas').dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true })));
+    await frames(3);
+    const tLadder = await page.evaluate(() => { const d = DigitalTwin.debug(); return { level: d.model.level, climb: d.model.climb, walker: d.model.walker, ladder: d.model.ladder }; });
+    ok('turned, the ladder is on the east and taken from the east, facing west',
+      tLadder.level === 'ladder' && near(tLadder.walker.z, 0, 1e-6)
+        && near(tLadder.walker.x, tLadder.ladder.stand - tLadder.climb * tLadder.ladder.run, 1e-6)
+        && near(tLadder.walker.yaw, -Math.PI / 2, 1e-6), JSON.stringify(tLadder));
+    await hold(['w', 'Shift'], 2400);
+    const tDeck = await page.evaluate(() => DigitalTwin.debug().model);
+    ok('and climbed onto the platform, facing the cabinet on its west',
+      tDeck.level === 'deck' && Math.abs(tDeck.walker.x) < 0.9 && Math.abs(tDeck.walker.z) < 0.9 && near(tDeck.walker.yaw, -Math.PI / 2, 1e-6),
+      JSON.stringify(tDeck.walker));
+    await page.evaluate(() => document.getElementById('twin-canvas').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    await page.evaluate(() => DigitalTwin.orientCancel());
+    await frames(2);
+    const undone = await page.evaluate(() => ({ f: DigitalTwin._facing(), panel: !document.getElementById('twin-orient-panel').hidden }));
+    ok('Cancel puts it back facing south and closes the panel', undone.f.deg === 180 && undone.f.turn === 0 && !undone.f.open && !undone.panel, JSON.stringify(undone));
     // Back to the pole station for what follows.
     await page.evaluate(id => DigitalTwin.openStation(id), st.id);
     await page.waitForFunction(id => DigitalTwin.debug().built && DigitalTwin.debug().stationId === id, st.id, { timeout: BUILD_TIMEOUT });

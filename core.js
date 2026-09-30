@@ -1245,6 +1245,11 @@ const HELP = {
       + 'over most towns, where the rest of the patch is 0.39 m. Save writes the position (and nothing '
       + 'else) through the station editor\'s own save, then rebuilds the twin on the new spot. The '
       + 'same mode works inside the Stations map\'s twin and in ⛰️ 3-D.',
+      '<strong>🧭 Orientation</strong> turns the station to the way it faces on the ground — the side '
+      + 'its enclosure door or a tower\'s ladder is on. Turn it with the bearing box, the 15° buttons '
+      + 'or the slider, or orbit round to where the front should be and press Face the view. Save '
+      + 'writes the bearing on the station for everybody; a station with none recorded is drawn facing '
+      + 'south. The walk, the ladder and the deck turn with it.',
       '<strong>The lines over the view fold away</strong> ten seconds after the twin opens — the '
       + 'status, the paths, the photos, the water and the notes — so the stage gets the height back. '
       + '▾ Details brings them back (it counts the notes while they are folded); once pressed, they '
@@ -2129,7 +2134,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 43;
+const DB_SCHEMA_VERSION = 44;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

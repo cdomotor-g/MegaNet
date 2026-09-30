@@ -523,6 +523,32 @@ datastore, the panel says so and the pin stays where it was put. Saved, the
 twin is rebuilt standing on the new spot: its ground is a patch centred on
 the station.
 
+## Turning a station to the way it faces
+
+Every model is built square to the compass, its front — a pole's enclosure
+door, a tower's ladder — on the south and its solar panel and cabinet on the
+north. Stations on the ground are not all built that way, so a station records
+the way it faces (`facing_deg`, migration `0044`): the bearing its front looks
+out, clockwise from true north. Where nothing is recorded it is drawn facing
+south (180°), as before.
+
+- **🧭 Orientation**, on the Digital Twin tab's header and the Stations map
+  twin's bar, opens a panel in Move pin's corner (the two are never open
+  together; the station trail stands down while it is up). The model turns as
+  the numbers change: the bearing box, **⟲ 15° / 15° ⟳**, the slider,
+  **👁 Face the view** (orbit round to where the front should be, then press:
+  the front turns toward the camera) and **Facing south** (the default).
+- **Save orientation** writes the bearing — and nothing else — through
+  `save_station()`, then rebuilds the twin, since a turned tower's ladder
+  stands on different ground. Saving is an editor's; anybody can turn the model
+  to look. **Cancel** puts it back.
+- The walk turns with it: the ladder, the hatch and the footing are asked in
+  the station's own frame, so a turned tower is climbed the same way. A visitor
+  up the ladder or on the deck while it turns goes round with it.
+- The neighbours in the patch are drawn at their own recorded bearings.
+- The station editor has the same number as **Faces (° from north)**.
+  `tools/check_station_facing.sql` proves the database side.
+
 ## The radio paths
 
 What joins the station to the rest of the network is drawn from its antenna

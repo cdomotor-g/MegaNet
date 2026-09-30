@@ -1107,6 +1107,8 @@ jobs:
       # recording it — through save_station() and load_stations_doc() alike.
       - name: check_tower_height.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_tower_height.sql
+      - name: check_station_facing.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_station_facing.sql
       # The Admin tab's user management (0042): administrators only, the role
       # a first sign-in arrives with, and the guards against locking everybody out.
       - name: check_user_admin.sql

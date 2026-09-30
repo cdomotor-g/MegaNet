@@ -221,6 +221,7 @@ const DigitalTwin = (function () {
     horizonUnfilled: 0,    // edge vertices no sheet had a height under
     horizonPending: false, // a fetch is in flight
     statusBase: '',        // the status line without the horizon's clause
+    orient: null,          // the Orientation tool, open: { id, deg, saving, msg } — see "the way the station faces"
     photos: null,          // the field photos in the patch: { status, spots: [{ x, z, ids, rows, heading, fov, pitch }], count, error }
     photoNear: -1,         // the spot the POV visitor is standing at, or −1
     focusPhotoId: null,    // a photo to stand the camera behind once the markers are up (the viewer's "In the twin")
@@ -1766,6 +1767,35 @@ void main() {
              ladderZ: LADDER_TOP_Z + (h + 0.05 - SLAB_TOP) * LADDER_RUN,   // the ladder's foot
              staffH: Math.min(3.0, h - 0.2) };                            // the gauge board, kept under the grating
   }
+  // The way the station faces (0044): the bearing its front — the side the
+  // enclosure door, or a tower's ladder, is on — looks out, clockwise from
+  // true north. Every model is built facing south (180), which is also what a
+  // station that records nothing is drawn as. The model is built square in its
+  // own frame and turned as a whole: `sc.turn` is how far, in radians
+  // clockwise from as-built, and toWorld/toLocal carry a point between the
+  // station's frame and the scene's — for the ladder, the deck and the footing,
+  // which the walk reads in the station's frame.
+  const FACING_DEFAULT = 180;
+  function facingOf(st) {
+    const v = st && st.facing_deg != null && st.facing_deg !== '' ? Number(st.facing_deg) : NaN;
+    return Number.isFinite(v) ? ((v % 360) + 360) % 360 : null;
+  }
+  // The bearing drawn now: the Orientation tool's, while it is open on this
+  // station, else the station's own, else the default.
+  function facingNow(st = currentStation()) {
+    if (tw.orient && st && tw.orient.id === st.id) return tw.orient.deg;
+    const f = facingOf(st);
+    return f == null ? FACING_DEFAULT : f;
+  }
+  function turnOf(deg) { return (deg - FACING_DEFAULT) * Math.PI / 180; }
+  function toWorld(x, z, t = sc.turn || 0) {
+    const c = Math.cos(t), s = Math.sin(t);
+    return { x: x * c - z * s, z: x * s + z * c };
+  }
+  function toLocal(x, z, t = sc.turn || 0) {
+    const c = Math.cos(t), s = Math.sin(t);
+    return { x: x * c + z * s, z: -x * s + z * c };
+  }
   const DECK_HALF = 0.9;     // the platform is 1.8 m square
   const RAIL_H    = 1.1;     // handrail over the deck
   const SLAB_TOP  = 0.10;    // the foundation slab stands 100 mm proud of the ground
@@ -2468,8 +2498,11 @@ void main() {
     const k = kitMaterials();
     sc.doors = [];
     sc.pole = null; sc.band = null;
-    const built = makeStation(st, kind, k, tw.ground ? (x, z) => yAt(x, z) - yAt(0, 0) : null);
+    if (tw.orient && tw.orient.id !== st.id) tw.orient = null;
+    sc.turn = turnOf(facingNow(st));
+    const built = makeStation(st, kind, k, tw.ground ? (x, z) => { const w = toWorld(x, z); return yAt(w.x, w.z) - yAt(0, 0); } : null);
     built.group.position.y = 0;
+    built.group.rotation.y = -sc.turn;
     sc.station = built.group;
     sc.towerStaff = built.staff || null;
     if (built.staff && tw.ground) setTowerStaff(built.staff, st, tw.ground.h0);
@@ -2477,6 +2510,7 @@ void main() {
     tw.model = { ...kind, top: built.top, poleTop: built.poleTop, ladder: built.ladder, deck: built.deck, slab: built.slab || null, tower: built.tower || null,
                  plate: { name: st.name || st.id, number: st.station_number ? String(st.station_number) : '' } };
     refreshTowerField();
+    renderOrientPanel();
   }
 
   // The station as a phrase, for the canvas's name.
@@ -2506,10 +2540,13 @@ void main() {
 
   // Where feet on the ground are: on the tower's footing where they are over
   // it (unless the ground, exaggerated, has risen over it), else the ground.
+  // `x`, `z` are the scene's; the footing is the station's, so turned with it.
   function standY(x, z) {
     const y = yAt(x, z);
     const f = tw.model && tw.model.slab;
-    if (f && Math.abs(x) <= f.halfEW && z >= f.n && z <= f.s) return Math.max(y, f.top);
+    if (!f) return y;
+    const p = toLocal(x, z);
+    if (Math.abs(p.x) <= f.halfEW && p.z >= f.n && p.z <= f.s) return Math.max(y, f.top);
     return y;
   }
 
@@ -2517,7 +2554,9 @@ void main() {
   // the exaggeration, the deck does not.
   function ladderFootY() {
     const m = tw.model;
-    return m && m.ladder ? standY(m.ladder.x, m.ladder.stand) : 0;
+    if (!m || !m.ladder) return 0;
+    const w = toWorld(m.ladder.x, m.ladder.stand);
+    return standY(w.x, w.z);
   }
   function ladderHeight() {
     const m = tw.model;
@@ -3377,7 +3416,9 @@ void main() {
     for (const n of list) {
       const kind = stationKind(n.s);
       const before = sc.doors.length;
-      const built = makeStation(n.s, kind, k, (x, z) => yAt(n.x + x, n.z + z) - yAt(n.x, n.z));
+      const nt = turnOf(facingNow(n.s));
+      const built = makeStation(n.s, kind, k, (x, z) => { const w = toWorld(x, z, nt); return yAt(n.x + w.x, n.z + w.z) - yAt(n.x, n.z); });
+      built.group.rotation.y = -nt;
       if (built.staff) setTowerStaff(built.staff, n.s, heightAt(n.x, n.z));
       sc.doors = sc.doors.filter((d, i) => i < before || d.when !== 'deck');
       built.group.name = `station ${n.s.name || n.s.id}`;
@@ -4092,6 +4133,7 @@ void main() {
   function movePinChanged() {
     const d = typeof MapMovePin !== 'undefined' && MapMovePin.drawn ? MapMovePin.drawn() : null;
     syncMovePinUi();
+    if (d && tw.orient) closeOrient();
     if (!sc.scene || !THREE || !tw.ground || !tw.origin) { if (!d) removeMovePin(); return; }
     if (!d) { removeMovePin(); rig.pinDrag = null; requestFrame(); return; }
     if (!sc.movepin) makeMovePin();
@@ -4116,6 +4158,126 @@ void main() {
     } else {
       btn.textContent = on ? '📍 Moving the pin…' : '📍 Move pin';
     }
+  }
+
+  // ── The Orientation tool ───────────────────────────────────────────────────
+  // Turn the station on its spot to the way it faces on the ground, and save
+  // the bearing (0044's facing_deg) — the Move pin of which way round. Open,
+  // the model turns as the numbers change and nothing is written until Save;
+  // Cancel puts it back. Its panel sits where Move pin's does, so the two are
+  // never open together. Anybody may turn the model to look; saving is an
+  // editor's, as the tower's height is.
+  function norm360(v) { return ((Math.round(Number(v) * 10) / 10 % 360) + 360) % 360; }
+  function facingWords(deg) { return `${Math.round(deg)}° ${compassWord(deg)}`; }
+
+  // The model, and a visitor up the ladder or on the deck, turned to what the
+  // tool says now. The visitor goes round with the station rather than being
+  // left standing in the air where the deck was.
+  function applyFacing() {
+    const was = sc.turn || 0;
+    sc.turn = turnOf(facingNow());
+    if (sc.station) sc.station.rotation.y = -sc.turn;
+    const d = sc.turn - was;
+    if (d && rig.mode === 'walk' && rig.level !== 'ground') {
+      const w = toWorld(rig.px, rig.pz, d);
+      rig.px = w.x; rig.pz = w.z; rig.yaw += d;
+      placeCamera();
+    }
+    requestFrame();
+  }
+
+  function orientPanelHtml() {
+    const st = currentStation(), o = tw.orient;
+    if (!st || !o) return '';
+    const rec = facingOf(st), can = towerCanSave();
+    const saved = rec == null ? `not recorded — drawn facing ${facingWords(FACING_DEFAULT)}` : facingWords(rec);
+    const why = can ? '' : typeof editorWritesGoToDatabase === 'function' && !editorWritesGoToDatabase()
+      ? 'The station list on screen is not from the datastore, so this cannot be saved.'
+      : 'Sign in as an editor to save it.';
+    const msg = o.msg ? o.msg : why ? { kind: '', text: why } : null;
+    const dis = o.saving ? 'disabled' : '';
+    return `
+      <div class="mn-movepin-head">
+        <strong>Orientation</strong>
+        <span class="mn-movepin-name">${esc(st.name || st.id)}</span>
+      </div>
+      <p class="mn-movepin-hint">The bearing the station's front — its enclosure door, or a tower's ladder — faces. Turn it to match the imagery, or orbit round to where the front should be and press Face the view.</p>
+      <div class="twin-orient-row">
+        <button type="button" class="pill" onclick="DigitalTwin.orientBy(-15)" ${dis} title="Turn it 15° anticlockwise" aria-label="Turn 15 degrees anticlockwise">⟲ 15°</button>
+        <label class="twin-orient-deg"><span class="sr-only">Faces, degrees from north</span>
+          <input type="number" id="twin-orient-deg" min="0" max="359.9" step="1" inputmode="decimal" value="${norm360(o.deg)}" ${dis}
+                 oninput="DigitalTwin.orientTo(this.value, 'box')">°</label>
+        <span class="twin-orient-word" id="twin-orient-word">${compassWord(o.deg)}</span>
+        <button type="button" class="pill" onclick="DigitalTwin.orientBy(15)" ${dis} title="Turn it 15° clockwise" aria-label="Turn 15 degrees clockwise">15° ⟳</button>
+      </div>
+      <input type="range" class="twin-orient-range" id="twin-orient-range" min="0" max="359" step="1" value="${Math.round(o.deg) % 360}" ${dis}
+             aria-label="Faces, degrees clockwise from north" oninput="DigitalTwin.orientTo(this.value, 'range')">
+      <div class="pill-row twin-orient-quick">
+        <button type="button" class="pill" onclick="DigitalTwin.orientFaceView()" ${dis} title="Turn the front toward where you are looking from">👁 Face the view</button>
+        <button type="button" class="pill" onclick="DigitalTwin.orientTo(${FACING_DEFAULT})" ${dis} title="Back to facing south, as every station is drawn until it records otherwise">Facing south</button>
+      </div>
+      <dl class="mn-movepin-read">
+        <dt>Saved</dt><dd>${esc(saved)}</dd>
+      </dl>
+      ${msg ? `<p class="small mn-movepin-msg ${msg.kind === 'error' ? 'txt-bad' : msg.kind === 'ok' ? 'txt-ok' : ''}" role="status">${esc(msg.text)}</p>` : ''}
+      <div class="mn-movepin-actions pill-row">
+        <button type="button" class="pill is-on" onclick="DigitalTwin.orientSave()" ${o.saving || !can ? 'disabled' : ''}>${o.saving ? 'Saving…' : 'Save orientation'}</button>
+        <button type="button" class="pill" onclick="DigitalTwin.orientCancel()" ${dis}>Cancel</button>
+      </div>`;
+  }
+  function renderOrientPanel() {
+    const el = document.getElementById('twin-orient-panel');
+    if (el) {
+      const on = !!(tw.orient && currentStation());
+      el.hidden = !on;
+      el.innerHTML = on ? orientPanelHtml() : '';
+    }
+    syncOrientUi();
+  }
+  // Only the numbers, while they are being changed: a repaint of the panel
+  // would take the caret out of the box being typed in.
+  function syncOrientFields(from) {
+    const o = tw.orient;
+    if (!o) return;
+    const box = document.getElementById('twin-orient-deg');
+    if (box && from !== 'box') box.value = String(norm360(o.deg));
+    const rng = document.getElementById('twin-orient-range');
+    if (rng && from !== 'range') rng.value = String(Math.round(o.deg) % 360);
+    const w = document.getElementById('twin-orient-word');
+    if (w) w.textContent = compassWord(o.deg);
+  }
+  function syncOrientUi() {
+    const btn = document.getElementById('twin-orient-btn');
+    if (!btn) return;
+    const on = !!tw.orient;
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    const label = btn.querySelector('.map-twin-label');
+    if (label) label.textContent = on ? ' Turning…' : ' Orientation';
+    else btn.textContent = on ? '🧭 Turning…' : '🧭 Orientation';
+  }
+  function openOrient() {
+    const st = currentStation();
+    if (!st) return;
+    // Move pin's panel is where this one goes: one at a time.
+    if (typeof MapMovePin !== 'undefined' && MapMovePin.armed()) MapMovePin.cancel();
+    tw.orient = { id: st.id, deg: facingNow(st), saving: false, msg: null };
+    renderOrientPanel();
+  }
+  function closeOrient() {
+    if (!tw.orient) return;
+    tw.orient = null;
+    applyFacing();
+    renderOrientPanel();
+  }
+  function orientTo(v, from) {
+    const o = tw.orient;
+    if (!o || o.saving) return;
+    const n = Number(v);
+    if (v === '' || !Number.isFinite(n)) return;
+    o.deg = norm360(n);
+    if (o.msg && o.msg.kind !== 'error') o.msg = null;
+    applyFacing();
+    syncOrientFields(from);
   }
 
   // The pointer's ray onto the patch's own ground: { x, z } or null.
@@ -5238,7 +5400,11 @@ void main() {
     if (rig.mode !== 'walk') return;
     // Orbit again, from about where the visitor stood, looking at the station.
     // Off the ladder or the deck, back on the ground.
-    if (rig.level !== 'ground') { rig.level = 'ground'; rig.climb = 0; rig.pz = Math.max(rig.pz, (tw.model && tw.model.ladder ? tw.model.ladder.foot : 0) + 1.2); }
+    if (rig.level !== 'ground') {
+      rig.level = 'ground'; rig.climb = 0;
+      const p = toLocal(rig.px, rig.pz);
+      setRigLocal(p.x, Math.max(p.z, (tw.model && tw.model.ladder ? tw.model.ladder.foot : 0) + 1.2));
+    }
     rig.pointLatch = false; rig.pointing = false;
     rig.mode = 'orbit';
     if (rig.target) rig.target.set(0, 1, 0);
@@ -5682,47 +5848,57 @@ void main() {
   // and the cabinet. Walking into the foot of the ladder, facing it, is how
   // the ladder is taken; walking out through the hatch on the deck, facing
   // it, is how it is taken down. Forward is (sin yaw, −cos yaw): yaw 0 is
-  // north, which is the way the ladder faces.
+  // north. The ladder, the deck and the hatch are the station's, so they are
+  // asked in its frame (toLocal), where the ladder faces its own north —
+  // the scene's north turned by `sc.turn`.
+  function setRigLocal(x, z) {
+    const w = toWorld(x, z);
+    rig.px = w.x; rig.pz = w.z;
+  }
   function walkStep(f, r) {
     const sy = Math.sin(rig.yaw), cy = Math.cos(rig.yaw);
     const nx = rig.px + f * sy + r * cy, nz = rig.pz - f * cy + r * sy;
     const m = tw.model;
+    const turn = sc.turn || 0;
+    const lcy = Math.cos(rig.yaw - turn);   // facing the station's own north: 1
     if (m && m.deck && rig.level === 'deck') {
       if (rig.climbLatch && f > 0) return;   // just arrived: W has to be pressed again
       const lim = m.deck.half - 0.14;
-      if (nz > lim && Math.abs(nx) < m.ladder.halfW && f > 0 && cy < -0.5) {
+      const n = toLocal(nx, nz);
+      if (n.z > lim && Math.abs(n.x) < m.ladder.halfW && f > 0 && lcy < -0.5) {
         rig.level = 'ladder'; rig.climb = ladderHeight();
-        rig.px = m.ladder.x; rig.pz = ladderStandZ(rig.climb); rig.pitch = -0.35;
+        setRigLocal(m.ladder.x, ladderStandZ(rig.climb)); rig.pitch = -0.35;
         // W is still held from the walk out: it must not put the visitor
         // straight back on the deck. Released and pressed again, it does.
         rig.climbLatch = true;
         return;
       }
-      rig.px = Math.max(-lim, Math.min(lim, nx));
-      rig.pz = Math.max(m.deck.front, Math.min(lim, nz));
+      setRigLocal(Math.max(-lim, Math.min(lim, n.x)), Math.max(m.deck.front, Math.min(lim, n.z)));
       return;
     }
-    const oz = rig.pz;
+    const oz = toLocal(rig.px, rig.pz).z;
     rig.px = nx; rig.pz = nz;
     const lim = (tw.ground ? tw.ground.half : 100) - 1;
     rig.px = Math.max(-lim, Math.min(lim, rig.px));
     rig.pz = Math.max(-lim, Math.min(lim, rig.pz));
-    if (m && m.ladder && rig.level === 'ground' && f > 0 && cy > 0.5) {
+    if (m && m.ladder && rig.level === 'ground' && f > 0 && lcy > 0.5) {
       // The foot of the ladder is a gate from its feet to 0.9 m south of
-      // them: a step that ends past the gate's south side having started
-      // south of the feet — one that lands inside it, or crosses it, however
-      // long a slow frame makes it — takes hold.
+      // them (in the station's frame): a step that ends past the gate's
+      // south side having started south of the feet — one that lands inside
+      // it, or crosses it, however long a slow frame makes it — takes hold.
       const L = m.ladder, gate = L.foot + 0.9;
-      const inLine = Math.abs(rig.px - L.x) < L.halfW + 0.15;
-      if (inLine && rig.pz < gate && oz > L.foot) {
+      const p = toLocal(rig.px, rig.pz);
+      const inLine = Math.abs(p.x - L.x) < L.halfW + 0.15;
+      if (inLine && p.z < gate && oz > L.foot) {
         rig.level = 'ladder'; rig.climb = 0;
-        rig.px = L.x; rig.pz = L.stand; rig.yaw = 0; rig.pitch = 0.35;
+        setRigLocal(L.x, L.stand); rig.yaw = turn; rig.pitch = 0.35;
       }
     }
   }
 
-  // Where the visitor stands, north–south, `climb` metres up the ladder: it
-  // leans, so every metre up is a quarter-metre nearer the mast.
+  // Where the visitor stands, north–south in the station's frame, `climb`
+  // metres up the ladder: it leans, so every metre up is a quarter-metre
+  // nearer the mast.
   function ladderStandZ(climb) {
     const L = tw.model && tw.model.ladder;
     return L ? L.stand - Math.max(0, climb) * (L.run || 0) : 0;
@@ -5734,7 +5910,7 @@ void main() {
     if (!m || !m.ladder) { rig.level = 'ground'; rig.climb = 0; return; }
     rig.climb += dy;
     const h = ladderHeight();
-    rig.pz = ladderStandZ(Math.min(rig.climb, h));
+    setRigLocal(m.ladder.x, ladderStandZ(Math.min(rig.climb, h)));
     if (rig.climb >= h) {
       if (rig.climbLatch) { rig.climb = h; return; }
       // On the grating at the hatch, facing the cabinet — which is 1.2 m
@@ -5742,10 +5918,10 @@ void main() {
       // there until W is pressed afresh, so the climb does not run on into
       // the cabinet.
       rig.level = 'deck'; rig.climb = 0; rig.climbLatch = true;
-      rig.px = 0; rig.pz = m.deck.half - 0.3; rig.yaw = 0; rig.pitch = -0.55;
+      setRigLocal(0, m.deck.half - 0.3); rig.yaw = sc.turn || 0; rig.pitch = -0.55;
     } else if (rig.climb <= 0) {
       rig.level = 'ground'; rig.climb = 0;
-      rig.pz = m.ladder.foot + 0.6; rig.pitch = -0.06;
+      setRigLocal(m.ladder.x, m.ladder.foot + 0.6); rig.pitch = -0.06;
     }
   }
 
@@ -6439,6 +6615,8 @@ void main() {
             <button type="button" onclick="DigitalTwin.rebuild()" title="Fetch the ground and the imagery again">⟳ Rebuild</button>
             <button type="button" id="twin-movepin-btn" aria-pressed="false" onclick="DigitalTwin.toggleMovePin()"
                     title="Move this station's pin to where the station stands on the imagery, and save the position">📍 Move pin</button>
+            <button type="button" id="twin-orient-btn" aria-pressed="false" onclick="DigitalTwin.toggleOrient()"
+                    title="Turn the station to the way it faces on the ground — the side its door or ladder is on — and save the bearing">🧭 Orientation</button>
             ${infoToggleHtml()}
           </div>
         </div>
@@ -6510,6 +6688,7 @@ void main() {
           ${caveatHtml()}
           <button type="button" class="twin-photo-prompt" id="twin-photo-prompt" hidden onclick="DigitalTwin.openNearPhotos()"></button>
           <div class="mn-movepin-panel twin-movepin-panel" id="twin-movepin-panel" role="group" aria-label="Move this station's pin" hidden></div>
+          <div class="mn-movepin-panel twin-movepin-panel twin-orient-panel" id="twin-orient-panel" role="group" aria-label="Turn this station to the way it faces" hidden></div>
           <div class="twin-placeholder" id="twin-placeholder" hidden></div>
         </div>`;
   }
@@ -7017,6 +7196,41 @@ void main() {
     // A save moved a station: a twin centred on its old spot is rebuilt on
     // the new one.
     stationMoved(id) { if (tw.live && tw.stationId === id) init(); },
+    // The 🧭 Orientation tool: the button on the tab's header and the
+    // overlay's bar, and its panel's controls.
+    toggleOrient() { if (tw.orient) closeOrient(); else openOrient(); },
+    orientTo,
+    orientBy(d) { if (tw.orient) orientTo(tw.orient.deg + Number(d)); },
+    // The front turned toward the camera: orbit to where the door should be,
+    // and press.
+    orientFaceView() {
+      if (!tw.orient || !sc.camera) return;
+      const x = sc.camera.position.x, z = sc.camera.position.z;
+      if (Math.hypot(x, z) < 0.2) return;
+      orientTo((Math.atan2(x, -z) * 180 / Math.PI + 360) % 360);
+    },
+    orientCancel() { closeOrient(); },
+    // Saved on the station (0044) and the twin rebuilt from what came back —
+    // the ladder's foot is on different ground once it is turned.
+    async orientSave() {
+      const st = currentStation(), o = tw.orient;
+      if (!st || !o || o.saving || !towerCanSave()) return;
+      o.saving = true; o.msg = null;
+      renderOrientPanel();
+      try {
+        await stationSaveFields(st.id, { facing_deg: norm360(o.deg) });
+        tw.orient = null;
+        renderOrientPanel();
+        if (typeof announce === 'function') announce(`${st.name || st.id} saved facing ${facingWords(norm360(o.deg))}`);
+        init();
+      } catch (err) {
+        o.saving = false;
+        o.msg = { kind: 'error', text: typeof editorSaveErrorText === 'function' ? editorSaveErrorText(err) : `Not saved: ${err.message}` };
+        renderOrientPanel();
+      }
+    },
+    // The check's seam: the bearing drawn, and the turn it is drawn at.
+    _facing() { return { deg: facingNow(), turn: sc.turn || 0, open: !!tw.orient }; },
     // The 📍 button on the tab's header and the overlay's bar.
     toggleMovePin() {
       const st = currentStation();
