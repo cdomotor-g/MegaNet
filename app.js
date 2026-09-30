@@ -7004,7 +7004,17 @@ function stationCarriersHtml() {
   const header = `
     <div class="panel-header">
       <h3>Repeaters listening</h3>
-      <span class="badge" title="Repeaters with a pass range open to this station">${rows.length}</span>
+      <div class="button-group">
+        <span class="badge" title="Repeaters with a pass range open to this station">${rows.length}</span>
+        ${rows.length ? `<details class="hdr-help">
+          <summary aria-label="How the rows work" title="How the rows work">?</summary>
+          <div class="hdr-help-pop small">
+            Click a row to put the map on that repeater and dim everything off its own paths — the
+            filters, the picked selection and the station in the editor below all stay as they are.
+            Clicking it again puts the map back.
+          </div>
+        </details>` : ''}
+      </div>
     </div>`;
 
   // Two different nothings, and they mean opposite things: a station with no
@@ -7030,9 +7040,6 @@ function stationCarriersHtml() {
   return `${header}
     <p class="small st-note">
       Pass ranges open to ${ids.length === 1 ? 'address' : 'addresses'} <strong>${ids.join(', ')}</strong>.
-      Click a row to put the map on that repeater and dim everything off its own paths — the
-      filters, the picked selection and the station in the editor below all stay as they are.
-      Clicking it again puts the map back.
     </p>
     <div class="table-wrap medium" role="region" tabindex="0"
          aria-label="Repeaters listening to ${escAttr(s.name)} — ${rows.length} repeater${rows.length === 1 ? '' : 's'}">

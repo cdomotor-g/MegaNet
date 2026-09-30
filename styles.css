@@ -14579,3 +14579,36 @@ button.adm-danger:hover { border-color: var(--bad); }
 .adm-sort:focus-visible { outline: var(--focus-width) solid var(--focus); outline-offset: 2px; }
 .adm-sql { font-size: .75rem; white-space: normal; overflow-wrap: anywhere; }
 .adm-online { color: var(--ok); font-weight: 600; }
+
+/* ── A header's "?" (Repeaters listening) ────────────────────────────────────
+   How-to text that every visit would otherwise pay for in card height, moved
+   behind a disclosure at the header's right end. A <details> for the same
+   reason as .ad-colour: no outside-click handler, keyboard-operable for free.
+   The pop hangs from the right edge so it opens inward on a narrow rail. */
+.hdr-help { position: relative; flex: none; }
+.hdr-help > summary {
+  display: grid; place-items: center;
+  width: 1.4rem; height: 1.4rem;
+  border: 1px solid var(--border); border-radius: 50%;
+  color: var(--muted); font-weight: 600; font-size: .8rem;
+  cursor: pointer; list-style: none;
+}
+.hdr-help > summary::-webkit-details-marker { display: none; }
+.hdr-help > summary::marker { content: ''; }
+.hdr-help > summary:hover,
+.hdr-help[open] > summary { color: var(--text); border-color: var(--accent); }
+.hdr-help > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hdr-help-pop {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + .3rem);
+  right: 0;
+  width: max-content;
+  max-width: min(20rem, 80vw);
+  padding: var(--sp-2) var(--sp-3, .75rem);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 14px rgba(0,0,0,.16);
+  font-weight: normal;
+}
