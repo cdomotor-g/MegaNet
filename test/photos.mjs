@@ -1011,6 +1011,23 @@ async function browserHalf() {
       await page.evaluate(() => document.activeElement && document.activeElement.classList.contains('modal-x')));
     ok('the metadata is fetched whole for the photo on screen', db.selects.some(s => /select=\*&id=eq\./.test(s)));
 
+    // ⟲ ⟳: a turn for the viewer, remembered per photo in this browser.
+    const rot = () => page.evaluate(() => document.getElementById('fp-v-img').style.transform);
+    await page.click('.fp-v-rot button[aria-label="Rotate right"]');
+    ok('⟳ turns the photo a quarter right', await rot() === 'rotate(90deg)', await rot());
+    const fits = await page.evaluate(() => {
+      const i = document.getElementById('fp-v-img').getBoundingClientRect(), st = document.getElementById('fp-v-stage').getBoundingClientRect();
+      return i.left >= st.left - 1 && i.right <= st.right + 1 && i.top >= st.top - 1 && i.bottom <= st.bottom + 1;
+    });
+    ok('…and the turned picture still fits the stage', fits);
+    await page.click('.fp-v-next');
+    ok('the next photo is not turned', await rot() === '');
+    await page.click('.fp-v-prev');
+    ok('the turned one is still turned coming back to it', await rot() === 'rotate(90deg)');
+    await page.click('.fp-v-rot button[aria-label="Rotate left"]');
+    ok('⟲ turns it back, and nothing is left remembered',
+      await rot() === '' && await page.evaluate(() => localStorage.getItem('mn-fp-rot')) === '{}');
+
     // A caption, typed and left.
     await page.keyboard.press('Home');
     await page.fill('#fp-v-details textarea', 'The staff gauge from the bridge, looking downstream');

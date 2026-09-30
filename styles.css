@@ -13907,6 +13907,27 @@ code {
   cursor: pointer;
 }
 .fp-v-nav:hover { background: rgba(0, 0, 0, .65); }
+/* ⟲ ⟳ in the stage's top-right corner, dark glass like the arrows. */
+.fp-v-rot {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  display: flex;
+  gap: .25rem;
+}
+.fp-v-rot button {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: rgba(0, 0, 0, .45);
+  color: #fff;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.fp-v-rot button:hover { background: rgba(0, 0, 0, .65); }
+.fp-v-rot button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .fp-v-prev { left: var(--sp-2); }
 .fp-v-next { right: var(--sp-2); }
 

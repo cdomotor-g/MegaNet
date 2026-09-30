@@ -1759,6 +1759,10 @@ const FieldPhotos = (function () {
         <div class="fp-v-body">
           <div class="fp-v-stage" id="fp-v-stage">
             <img id="fp-v-img" class="fp-v-img" alt="${escAttr(altOf(r))}" data-fp-src="${escAttr(r.storage_path)}">
+            <div class="fp-v-rot" role="group" aria-label="Rotate the photo">
+              <button type="button" onclick="FieldPhotos.rotate(-90)" aria-label="Rotate left" title="Rotate left">⟲</button>
+              <button type="button" onclick="FieldPhotos.rotate(90)" aria-label="Rotate right" title="Rotate right">⟳</button>
+            </div>
             ${n > 1 ? `<button type="button" class="fp-v-nav fp-v-prev" onclick="FieldPhotos.go(-1)" aria-label="Previous photo">‹</button>
                        <button type="button" class="fp-v-nav fp-v-next" onclick="FieldPhotos.go(1)" aria-label="Next photo">›</button>` : ''}
           </div>
@@ -1782,6 +1786,8 @@ const FieldPhotos = (function () {
     // The picture: its thumbnail at once (already signed, often already
     // loaded), the full size when it arrives.
     const img = el.querySelector('#fp-v-img');
+    img.addEventListener('load', applyRot);
+    applyRot();
     const t = urlFor(thumbOf(r));
     if (t) img.src = t;
     sign([r.storage_path]).then(([url]) => { if (url && img.isConnected && img.dataset.fpSrc === r.storage_path) img.src = url; });
@@ -1794,6 +1800,36 @@ const FieldPhotos = (function () {
     const strip = el.querySelector('.fp-v-thumb.is-here');
     if (strip && strip.scrollIntoView) strip.scrollIntoView({ block: 'nearest', inline: 'center' });
     swipe(el.querySelector('#fp-v-stage'));
+  }
+
+  // ── Rotation ──────────────────────────────────────────────────────────────
+  // A turn for looking at a photo that came in sideways. The viewer's alone:
+  // the file, its thumbnail and its row are not touched, so it is kept per
+  // photo in this browser rather than for everyone. A quarter turn swaps the
+  // box the picture has to fit, so its size is set from the stage's.
+  const ROT_KEY = 'mn-fp-rot';
+  function rotations() {
+    try { return JSON.parse(localStorage.getItem(ROT_KEY) || '{}') || {}; } catch { return {}; }
+  }
+  function rotationOf(id) { return +rotations()[id] || 0; }
+  function rotate(delta) {
+    if (!v) return;
+    const id = v.ids[v.i];
+    const all = rotations();
+    const deg = (((+all[id] || 0) + delta) % 360 + 360) % 360;
+    if (deg) all[id] = deg; else delete all[id];
+    try { localStorage.setItem(ROT_KEY, JSON.stringify(all)); } catch {}
+    applyRot();
+  }
+  function applyRot() {
+    const img = document.getElementById('fp-v-img');
+    const stage = document.getElementById('fp-v-stage');
+    if (!img || !stage || !v) return;
+    const deg = rotationOf(v.ids[v.i]);
+    const quarter = deg === 90 || deg === 270;
+    img.style.transform = deg ? `rotate(${deg}deg)` : '';
+    img.style.maxWidth  = quarter ? `${stage.clientHeight}px` : '';
+    img.style.maxHeight = quarter ? `${stage.clientWidth}px` : '';
   }
 
   function altOf(r) {
@@ -2624,7 +2660,7 @@ const FieldPhotos = (function () {
     addFiles, uploadAll, clearFinished, removeFromQueue, retry, more, setShow,
     queuePlace, queueAtStation, queueNoStation, queueEdit, queueFind,
     dragOver, dragLeave, drop,
-    view, close, isOpen, go, goTo, openFromLib, openOne, openSpot, openStation, pillHtml,
+    view, close, isOpen, go, goTo, rotate, openFromLib, openOne, openSpot, openStation, pillHtml,
     setCaption, editPlace, moveTo, moveTyped, moveWith, fileUnder, removePhoto, openOriginal, showOnMap, showInTwin,
     compassClick, compassKey, readAccuracy,
     inBox, spots, sign, thumbOf, urlFor, paintThumbs, row: id => S().byId[id] || null,
