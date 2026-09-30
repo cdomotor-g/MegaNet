@@ -5305,6 +5305,13 @@ hr {
   font-size: .85rem;
 }
 
+/* Shut, the triangle is gilt — the leader's gold (--map-leader), cased so it
+   holds up on a light panel — to draw the eye back to the list after a pick
+   has put it away. Open, it goes back to muted. */
+.stn-list-toggle[aria-expanded="false"]::before {
+  color: var(--map-leader);
+  text-shadow: 0 0 1px var(--map-leader-lo), 0 0 1px var(--map-leader-lo);
+}
 .stn-list-toggle[aria-expanded="true"]::before { content: '▾'; }
 
 .filter-toggle {

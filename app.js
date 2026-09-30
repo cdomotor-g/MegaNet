@@ -3403,6 +3403,26 @@ function toggleStationsList() {
   setStationsListOpen(!state.stationsListOpen);
 }
 
+// A row picked in the list shuts the list: the pick is what it was open for,
+// and shut it gives the map and the editor card the room. The triangle turns
+// gold while it is shut (styles.css) so the way back is easy to find. Only a
+// pick that selects shuts it — clicking the selected row again deselects, and
+// a row taken by an armed link-budget end is an answer, not a pick.
+// A pick from the keyboard would leave focus on a row the shut list hides, so
+// it goes to the toggle, and the station card's Escape comes back there too.
+function pickStationFromList(id) {
+  const was = state.selectedId;
+  selectStation(id);
+  if (was === id || state.selectedId !== id) return;
+  setStationsListOpen(false);
+  const body = document.getElementById('stations-list-body');
+  const btn  = document.getElementById('stations-list-toggle');
+  if (btn && body && body.contains(document.activeElement)) {
+    btn.focus({ preventScroll: true });
+    if (state.stnCard.id) state.stnCard.opener = btn;
+  }
+}
+
 // What the notes line says after the match note. A shut list must still
 // answer the question it is open for — the count badge says how many the
 // filters kept, and this says which one is selected, because the selected row
@@ -6145,10 +6165,10 @@ function stationsTable(allStations) {
           const aids = stationAlertIds(s);
           return `
             <tr class="row-link ${state.selectedId === s.id ? 'selected' : ''}" data-sid="${escAttr(s.id)}"
-                onclick="selectStation('${escAttr(s.id)}')">
+                onclick="pickStationFromList('${escAttr(s.id)}')">
               <td title="${esc(s.id)}"><button type="button" class="row-open stn-name role-${primaryRole(s)}"
                     aria-pressed="${state.selectedId === s.id}"
-                    onclick="event.stopPropagation();selectStation('${escAttr(s.id)}')"
+                    onclick="event.stopPropagation();pickStationFromList('${escAttr(s.id)}')"
                     >${markHits(s.name, marks.name, marks.nameRes)}</button></td>
               <td class="small stn-num">${markHits(s.station_number || '', marks.number)}</td>
               <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}${

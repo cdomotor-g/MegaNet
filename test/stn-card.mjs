@@ -596,19 +596,21 @@ async function main() {
     await rowBtn.focus();
     await page.keyboard.press('Enter');
     const keyed = await page.evaluate(sid => {
-      const a = document.activeElement;
-      const row = a && a.closest('tr[data-sid]');
-      const out = { kept: !!row && row.dataset.sid === sid, selected: state.selectedId === sid,
+      // The pick shuts the list (pickStationFromList), so focus goes to the
+      // list's toggle rather than a row it hides.
+      const toggle = document.getElementById('stations-list-toggle');
+      const out = { kept: document.activeElement === toggle, selected: state.selectedId === sid,
+        shut: document.getElementById('stations-list-body').hidden,
         card: !document.getElementById('stn-card').hidden };
       document.getElementById('stn-card').dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      const b = document.activeElement;
-      out.backOnRow = !!(b && b.closest('tr[data-sid]') && b.closest('tr[data-sid]').dataset.sid === sid);
+      out.backOnRow = document.activeElement === toggle;
+      setStationsListOpen(true);
       return out;
     }, rowSid);
-    check('Enter on a row selects it and keeps focus on that row through the repaint',
-      keyed.kept && keyed.selected && keyed.card);
-    check('and Escape on the card returns to that row', keyed.backOnRow);
+    check('Enter on a row selects it, shuts the list and keeps focus on the list\'s toggle',
+      keyed.kept && keyed.selected && keyed.shut && keyed.card, JSON.stringify(keyed));
+    check('and Escape on the card returns to that toggle', keyed.backOnRow);
 
     log('\nThe modes that share the card\'s pills\n');
 

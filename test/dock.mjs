@@ -977,7 +977,8 @@ try {
   // Entered from the cards — the pane a fresh visit opens on, and the one the
   // section above left for the path tools'. (◫ used to put the side panel
   // back on them; the pane is chosen here instead.)
-  await page.evaluate(() => { state.map.__probe = 'same'; setDockTab('stations', { instant: true }); });
+  // The list open: the row picked in section 6 shut it (pickStationFromList).
+  await page.evaluate(() => { state.map.__probe = 'same'; setDockTab('stations', { instant: true }); setStationsListOpen(true); });
   await page.waitForTimeout(200);
   // Focus is carried across the fold: moving the cards with a row button
   // focused used to drop the keyboard user back on <body>.
