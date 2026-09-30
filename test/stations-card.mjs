@@ -355,6 +355,26 @@ async function main() {
       reopened.expanded === 'true' && reopened.stored === 'open' && reopened.table && reopened.rows > 0,
       `${reopened.rows} row(s), stored=${reopened.stored}`);
 
+    // A row picked shuts the list (pickStationFromList), and typing a new
+    // search opens it again to show what the search kept.
+    await page.evaluate(() => { if (state.selectedId) selectStation(state.selectedId); });
+    await page.click('#stations-table-wrap tr[data-sid] button');
+    await page.waitForTimeout(150);
+    const picked = await page.evaluate(() => ({
+      expanded: document.getElementById('stations-list-toggle').getAttribute('aria-expanded'),
+      selected: !!state.selectedId,
+    }));
+    check('picking a row shuts the list', picked.expanded === 'false' && picked.selected, JSON.stringify(picked));
+    await page.locator('#filter-quick textarea').first().fill('a');
+    await page.waitForTimeout(400);
+    const typed = await page.evaluate(() => ({
+      expanded: document.getElementById('stations-list-toggle').getAttribute('aria-expanded'),
+      table: document.getElementById('stations-table-wrap').checkVisibility(),
+    }));
+    check('and typing a new search opens it again', typed.expanded === 'true' && typed.table, JSON.stringify(typed));
+    await page.locator('#filter-quick textarea').first().fill('');
+    await page.waitForTimeout(300);
+
     check('nothing threw for the whole run', errors.length === 0, errors.slice(0, 3).join(' | '));
   } finally {
     await browser.close();

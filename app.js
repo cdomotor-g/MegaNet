@@ -4871,6 +4871,9 @@ function mapSearchInput(i, value) {
   const row = searchRows()[i];
   if (!row) return;
   row.text = value;
+  // A new search is a question the list answers, so a list shut by a pick
+  // (pickStationFromList) opens again to show what the new text kept.
+  if (!state.stationsListOpen) setStationsListOpen(true);
   clearTimeout(state.mapSearchTimer);
   state.mapSearchTimer = setTimeout(stationsFilterChanged, 160);
 }
