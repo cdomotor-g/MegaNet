@@ -283,7 +283,10 @@ async function browserHalf() {
       const m = /MapServer\/(\d+)\/query$/.exec(u.pathname);
       if (!m) return route.fulfill({ status: 404, body: 'no', headers: cors });
       const q = Object.fromEntries(u.searchParams);
-      cad.queries.push({ id: Number(m[1]), ...q });
+      // The twin's own questions, which always name a page. The Stations map
+      // the twin now stands in asks the same layer for its own parcels, with
+      // none, and that is not what is being counted here.
+      if ('resultOffset' in q) cad.queries.push({ id: Number(m[1]), ...q });
       if (cad.mode === 'fail') return route.fulfill({ status: 500, body: 'down', headers: cors });
       const all = honour(q.where, neighbourhood());
       let feats = all, more = false;
@@ -517,7 +520,9 @@ async function browserHalf() {
     // ═══════════════════════════════════════════════════════════════════════
     section('The two switches in the Scene panel');
 
-    await page.evaluate(() => DigitalTwin.topView());
+    // The Scene panel is in the 🧊 pane of the Stations side panel, beside the
+    // twin in the map: opened, as ⚙ Settings on the twin's bar opens it.
+    await page.evaluate(() => { setDockTab('twin'); DigitalTwin.topView(); });
     const boxes = await page.evaluate(() => [...document.querySelectorAll('#twin-cad-lots, #twin-cad-roads')].map(b => ({ id: b.id, checked: b.checked, label: b.closest('label').textContent.trim() })));
     ok('two switches, on, each named for what it draws', boxes.length === 2 && boxes.every(b => b.checked)
       && /Property boundaries and lot numbers/.test(boxes[0].label) && /Road parcels/.test(boxes[1].label), J(boxes));

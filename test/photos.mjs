@@ -1148,12 +1148,19 @@ async function browserHalf() {
 
     // ── Signing out ──────────────────────────────────────────────────────────
     section('Signing out');
+    // The twin up with its photos first: it is inside the Stations map now,
+    // and a render of that tab since (a photo moved above) takes it down.
+    if (gl) {
+      await page.evaluate(() => { if (!MapTwin.active()) DigitalTwin.openStation('gatton'); });
+      await page.waitForFunction(() => MapTwin.active() && DigitalTwin.debug().built && DigitalTwin.debug().photos
+        && DigitalTwin.debug().photos.status === 'ok', null, { timeout: BUILD_TIMEOUT }).catch(() => {});
+    }
     await page.evaluate(() => { dbSetAccessToken(null); FieldPhotos.authChanged(); });
     await page.waitForTimeout(400);
     if (gl) {
       const d = await page.evaluate(() => DigitalTwin.debug().photos);
       ok('the twin takes its markers down and says to sign in', d && d.status === 'signed-out' && d.spots.length === 0
-        && /sign in/.test(await text('#twin-photos')), J(d));
+        && /sign in/.test(await text('#twin-pane-photos')), J(d));
     }
     ok('the viewer\'s rows are forgotten', await page.evaluate(id => !FieldPhotos.row(id), R.sw.id));
     await page.evaluate(() => switchTab('stations'));
@@ -1626,7 +1633,7 @@ async function twinHalf(page, R, db, viewer, text) {
   // "In the twin", from the viewer, on the SW photo.
   await page.evaluate(id => FieldPhotos.openOne(id), R.sw.id);
   await page.click('#fp-v-details button:has-text("In the twin")');
-  await page.waitForFunction(() => state.activeTab === 'twin', null, { timeout: LOAD_TIMEOUT });
+  await page.waitForFunction(() => state.activeTab === 'stations' && MapTwin.active(), null, { timeout: LOAD_TIMEOUT });
   await settled();
   await frame();
   let P = await photos();

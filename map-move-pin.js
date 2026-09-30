@@ -45,13 +45,13 @@
 //     station stands. The twin draws the pin as a post on its ground, drags
 //     it across the terrain, and its own panel on the stage reads the same
 //     numbers the map's does. In the map's overlay the map's panel stands
-//     down for it; on the Digital Twin tab, where there is no map at all,
-//     the mode is armed from the twin's own 📍 button.
+//     down for it, and the mode is armed from the twin's own 📍 button.
 //
 // Saving is the station editor's write path either way. On the Stations tab
 // the numbers go into the editor card's boxes and the card's own Save is
-// pressed, as before. On the Digital Twin tab there is no form, so the same
-// document goes through stationSavePosition() (station-editor.js): the
+// pressed, as before. Where there is no form for the station — the digital
+// twin, or the editor shut — the same document goes through
+// stationSavePosition() (station-editor.js): the
 // database's current copy of the station, read when Save is pressed, its lists
 // left out so save_station() leaves them alone, and the two numbers changed.
 //
@@ -277,6 +277,14 @@ const MapMovePin = (function () {
     // the canvas carries the flat map's coordinate for that pixel, which on a
     // tilted camera is somewhere else. Belt and braces again.
     if (typeof Map3D !== 'undefined' && Map3D.active && Map3D.active()) return;
+    // …and the same for the digital twin over the map, whose ground answers
+    // its own clicks (DigitalTwin, pinTo). Leaflet keeps the twin's clicks off
+    // the map by walking up from what was clicked, and a button the click
+    // itself repainted away — the panel's Save, whose answer rewrites the
+    // panel — has no ancestors left to walk: its click arrived here as a
+    // click on the flat map under the twin, and the pin went hundreds of
+    // metres. A twin up means no click here is the map's.
+    if (typeof MapTwin !== 'undefined' && MapTwin.active && MapTwin.active()) return;
     moveTo(e.latlng.lat, e.latlng.lng);
   }
 
@@ -449,19 +457,36 @@ const MapMovePin = (function () {
     moved(id);
   }
 
+  // Whether this station's digital twin is up over the map (map-twin.js).
+  function inTwin(id) {
+    return typeof MapTwin !== 'undefined' && MapTwin.active() && MapTwin.station() === id;
+  }
+
+  // Whether the editor card's two boxes are on screen, and for this station.
+  function formFor(id) {
+    return !!(document.getElementById('ef-lat') && document.getElementById('ef-lon') && state.editorId === id);
+  }
+
   // Save writes the new position into the form and then presses the card's own
   // Save, rather than writing to the database itself. One write path, one place
   // the stale-write stamp is handled, one status line saying what happened — and
   // an operator who was halfway through editing something else in the same card
-  // gets the save they would have got from the button they can see. Off the
-  // Stations tab — the Digital Twin's own — it is saveOffForm(), above.
+  // gets the save they would have got from the button they can see. With no
+  // card for the station in sight — the twin up over the map, the editor shut,
+  // or no map at all — it is saveOffForm(), above.
   async function save() {
     if (!stationId || !at || saving) return;
     const id  = stationId;
     const lat = at[0], lon = at[1];
     const km  = movedKm();
     const where = `${lat.toFixed(DP)}, ${lon.toFixed(DP)}`;
-    if (!onMap) return saveOffForm(id, lat, lon, where, km);
+    // The pin moved in the digital twin, or with no editor form on screen for
+    // this station, is the same case as no map at all: there is no card in
+    // sight whose Save to press, so the position is written on its own
+    // (saveOffForm), and what it says is said on the twin's panel, where the
+    // operator is looking. The twin had a tab of its own where that was the
+    // only way; it is in the map now, over the card.
+    if (!onMap || inTwin(id) || !formFor(id)) return saveOffForm(id, lat, lon, where, km);
 
     teardown();
     repaintButtons();

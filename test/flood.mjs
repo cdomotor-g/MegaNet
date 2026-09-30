@@ -373,7 +373,10 @@ async function browserHalf(FS) {
     const noOverlap = T => T.labels.slice().sort((a, b) => a.top - b.top).every((l, i, a) => i === 0 || l.top >= a[i - 1].bottom - 0.5);
 
     section('The twin, on a valley the check made, under Gatton\'s levels');
-    await page.evaluate(() => DigitalTwin.openStation('gatton'));
+    // The twin in the Stations map, and the 🧊 pane beside it: the flood
+    // line whole, every button on it in reach (over the stage it is one
+    // line, cut short).
+    await page.evaluate(() => { DigitalTwin.openStation('gatton'); setDockTab('twin'); });
     await settled();
     let F = await fl();
     const h0 = await page.evaluate(() => DigitalTwin.debug().h0);
@@ -390,14 +393,14 @@ async function browserHalf(FS) {
 
     // Held at each level from the line, with a real click.
     const hold = async label => {
-      await page.click(`#twin-flood .twin-flood-level:has-text("${label}")`);
+      await page.click(`#twin-pane-flood .twin-flood-level:has-text("${label}")`);
       await page.waitForFunction(() => !DigitalTwin.debug().flood.animating, null, { timeout: LOAD_TIMEOUT });
       return fl();
     };
     F = await hold('Moderate');
     ok('"Moderate" on the line holds the water at 97.54 m AHD, stops the rise, and says so on the line',
-      near(F.level, 97.54, 1e-9) && !F.animating && F.band === 'moderate_m' && /water 10\.0 m on the gauge, 97\.54 m AHD — past moderate/.test(await text('#twin-flood-now')),
-      `${F.level} ${F.band} ${await text('#twin-flood-now')}`);
+      near(F.level, 97.54, 1e-9) && !F.animating && F.band === 'moderate_m' && /water 10\.0 m on the gauge, 97\.54 m AHD — past moderate/.test(await text('#twin-pane-flood-now')),
+      `${F.level} ${F.band} ${await text('#twin-pane-flood-now')}`);
     ok('…the plane at that height over the station\'s ground', near(F.y, 97.54 - h0, 1e-4), `${F.y}`);
     ok('…yellow, and as opaque as a class', F.colour === pal.moderate && near(F.opacity, 0.62, 1e-9), `${F.colour} ${F.opacity}`);
     T = await scale();
@@ -413,7 +416,7 @@ async function browserHalf(FS) {
       await page.evaluate(() => document.activeElement && document.activeElement.dataset.flood) === 'moderate_m');
 
     // Major by the keyboard: Tab onto it and Enter, as someone without a mouse.
-    await page.focus('#twin-flood .twin-flood-level[data-flood="major_m"]');
+    await page.focus('#twin-pane-flood .twin-flood-level[data-flood="major_m"]');
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => DigitalTwin.debug().flood.band === 'major_m', null, { timeout: LOAD_TIMEOUT });
     F = await fl();
@@ -454,8 +457,8 @@ async function browserHalf(FS) {
     F = await fl();
     ok('the slider at nought: 0 m on the gauge, clear blue, nothing wet — the channel\'s bed is a metre and a half up',
       near(F.level, 87.54, 1e-9) && F.band === null && F.colour === pal.below && near(F.opacity, 0.45, 1e-9) && F.flooded === 0, J({ l: F.level, c: F.colour, n: F.flooded }));
-    ok('…and below the first level the water is named by the level it has yet to reach', /0\.0 m on the gauge, 87\.54 m AHD — below minor$/.test(await text('#twin-flood-now'))
-      && (await scale()).now === '0.0 m · below minor' && (await scale()).fill === 0, `${await text('#twin-flood-now')} | ${(await scale()).now}`);
+    ok('…and below the first level the water is named by the level it has yet to reach', /0\.0 m on the gauge, 87\.54 m AHD — below minor$/.test(await text('#twin-pane-flood-now'))
+      && (await scale()).now === '0.0 m · below minor' && (await scale()).fill === 0, `${await text('#twin-pane-flood-now')} | ${(await scale()).now}`);
     await page.evaluate(() => { const r = document.getElementById('twin-flood-level'); r.value = '100'; r.dispatchEvent(new Event('input', { bubbles: true })); });
     F = await fl();
     ok('a tenth of the way up the channel is wet and nothing else, still blue', near(F.level, 87.54 + 0.1 * (103.75 - 87.54), 1e-9)
@@ -525,7 +528,15 @@ async function browserHalf(FS) {
     // a few pixels, and it takes hold of the level itself. The mouse goes where
     // it is told, and the stage is taller than what is left of the window
     // under the lines over it: brought into view first.
-    await page.evaluate(() => document.getElementById('twin-stage').scrollIntoView({ block: 'center' }));
+    // The map, not the stage: the stage is inside Leaflet's container, which
+    // a scrollIntoView would scroll and Leaflet then snaps back, after the
+    // track has been measured.
+    const stageInView = () => page.evaluate(() => new Promise(r => {
+      const st = document.getElementById('twin-stage');
+      (st.closest('.leaflet-container') || st).scrollIntoView({ block: 'center' });
+      requestAnimationFrame(() => requestAnimationFrame(r));
+    }));
+    await stageInView();
     T = await scale();
     const tr = T.track, midX = tr.left + tr.width / 2;
     await page.mouse.move(midX, tr.bottom - 1);
@@ -563,10 +574,12 @@ async function browserHalf(FS) {
     ok('…and the track says where the water is, in words, as a slider',
       (await scale()).valuenow === Math.round(100 * (103.47 - 87.54) / (103.75 - 87.54)) && (await scale()).valuetext === 'water 15.9 m on the gauge, 103.47 m AHD — past the 0.2% AEP',
       `${(await scale()).valuenow} ${(await scale()).valuetext}`);
-    // A short stage: the names give way, the least of them first. The tab's
-    // stage never goes under 320 px, so it is squeezed here to the height the
-    // map's overlay can leave it on a phone, and let go again after.
-    await page.addStyleTag({ content: '#twin-stage.is-squeezed { height: 180px !important; }' });
+    // A short stage: the names give way, the least of them first. Squeezed
+    // here to a little more than the map's overlay can leave it on a phone
+    // (its bar, the pill and the caveat stand on it too), and let go
+    // again after. The overlay's stage is a flex item that grows to fill the
+    // map, so its basis is what is squeezed.
+    await page.addStyleTag({ content: '#twin-stage.is-squeezed { flex: 0 0 250px !important; height: 250px !important; }' });
     await page.evaluate(() => document.getElementById('twin-stage').classList.add('is-squeezed'));
     await page.waitForFunction(() => { const s = DigitalTwin.debug().flood.scale; return s && s.labels.length < 7; }, null, { timeout: LOAD_TIMEOUT });
     T = await scale();
@@ -585,7 +598,7 @@ async function browserHalf(FS) {
     // held, came down and started again.
     section('The rise');
     const CLOCK = { rise: 2, hold: 1.2, drain: 0.3 };
-    await page.click('#twin-flood .twin-flood-play');
+    await page.click('#twin-pane-flood .twin-flood-play');
     const samples = await page.evaluate(async ({ rise, hold, drain }) => {
       const out = [];
       const take = () => { const d = DigitalTwin.debug().flood; out.push({ t: d.clock, level: d.level, band: d.band, animating: d.animating }); };
@@ -617,14 +630,14 @@ async function browserHalf(FS) {
     const rank = k => (k == null ? -1 : F.levels.find(l => l.key === k).rank);
     ok('…in the colours of the levels it passes, in order on the way up', up.every((x, i) => i === 0 || rank(x.band) >= rank(up[i - 1].band))
       && up[0].band === null && up[up.length - 1].band === 'aep_0_066_m', J(up.map(x => x.band)));
-    ok('the line says what it is doing', /Pause the rise/.test(await text('#twin-flood .twin-flood-play')));
+    ok('the line says what it is doing', /Pause the rise/.test(await text('#twin-pane-flood .twin-flood-play')));
 
     // Paused: still water, and a still scene draws nothing. The pause settles
     // the water and asks for one last frame, which is right; what must not
     // follow is another. Three animation frames let that one land first (under
     // SwiftShader it can take longer than the click's own round trip), as
     // twin.mjs waits before it counts.
-    await page.click('#twin-flood .twin-flood-play');
+    await page.click('#twin-pane-flood .twin-flood-play');
     await page.evaluate(() => new Promise(r => { let k = 0; const f = () => (++k >= 3 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); }));
     const a = await fl();
     const framesA = await page.evaluate(() => DigitalTwin.debug().frames);
@@ -639,19 +652,19 @@ async function browserHalf(FS) {
     await page.click('#twin-flood-scale .twin-scale-play');
     F = await fl();
     T = await scale();
-    ok('▶ at the scale\'s head plays the rise again, and both it and the line then offer ⏸', F.animating && /^⏸/.test(T.play) && /Pause the rise/.test(await text('#twin-flood .twin-flood-play')), J(T.play));
+    ok('▶ at the scale\'s head plays the rise again, and both it and the line then offer ⏸', F.animating && /^⏸/.test(T.play) && /Pause the rise/.test(await text('#twin-pane-flood .twin-flood-play')), J(T.play));
     await page.click('#twin-flood-scale .twin-scale-play');
     F = await fl();
     ok('…and ⏸ on it holds the water again, where it was caught', !F.animating && /^▶/.test((await scale()).play));
 
     // Hidden, and shown.
-    await page.click('#twin-flood button:has-text("Hide the water")');
+    await page.click('#twin-pane-flood button:has-text("Hide the water")');
     F = await fl();
     ok('"Hide the water": no water, no staff, no scale, and the line offers it back — with the focus on the offer', !F.on && F.visible === false && F.staff.visible === false
-      && (await scale()).hidden && /the water is hidden/.test(await text('#twin-flood'))
-      && await page.evaluate(() => document.activeElement && document.activeElement.dataset.flood) === 'show', await text('#twin-flood'));
+      && (await scale()).hidden && /the water is hidden/.test(await text('#twin-pane-flood'))
+      && await page.evaluate(() => document.activeElement && document.activeElement.dataset.flood) === 'show', await text('#twin-pane-flood'));
     ok('…the panel\'s box agrees', await page.evaluate(() => !document.getElementById('twin-flood-on').checked && document.getElementById('twin-flood-anim').disabled));
-    await page.click('#twin-flood button:has-text("Show it")');
+    await page.click('#twin-pane-flood button:has-text("Show it")');
     F = await fl();
     ok('"Show it" brings it back, and the scale', F.on && F.visible && F.staff.visible && !(await scale()).hidden);
 
@@ -770,7 +783,8 @@ async function browserHalf(FS) {
     ok('the rise runs along the bent track: every frame\'s water where the cycle puts it on the track, reaching major two-thirds of the way up rather than in the last tenth',
       risen.length > 3 && risen.every(x => x.animating) && offTrack.length === 0 && bent.at(102.54) < 0.75 && FS.curve(87.54, 103.87).at(102.54) > 0.9,
       `${offTrack.length} off; major at ${bent.at(102.54).toFixed(2)} of the rise`);
-    await page.evaluate(() => { DigitalTwin._floodClock(null); DigitalTwin.floodAt('major_m'); document.getElementById('twin-stage').scrollIntoView({ block: 'center' }); });
+    await page.evaluate(() => { DigitalTwin._floodClock(null); DigitalTwin.floodAt('major_m'); });
+    await stageInView();
     // A press on the bent track, clear of every mark: the water goes where
     // that place on the track stands, not that fraction of the metres.
     T = await scale();
@@ -928,7 +942,7 @@ async function browserHalf(FS) {
     await qp.waitForFunction(() => { const d = DigitalTwin.debug(); return d.built && d.flood && !d.flood.none && d.flood.level != null; }, null, { timeout: BUILD_TIMEOUT });
     const q = await qp.evaluate(() => DigitalTwin.debug().flood);
     ok('reduced motion: the water stands still at the highest level, and the line offers to play it', !q.animating && near(q.level, 103.75, 1e-9)
-      && /Play the rise/.test(await qp.evaluate(() => document.querySelector('#twin-flood .twin-flood-play').textContent)), `${q.animating} ${q.level}`);
+      && /Play the rise/.test(await qp.evaluate(() => document.querySelector('#twin-pane-flood .twin-flood-play').textContent)), `${q.animating} ${q.level}`);
     await quiet.close();
 
     // A phone in the hand — a finger and a phone's screen, the twin opened

@@ -1,11 +1,13 @@
 // MegaNet — digital-twin.js
 //
-//   DigitalTwin   the Digital Twin tab: one station's patch of ground in three
+//   DigitalTwin   the digital twin: one station's patch of ground in three
 //                 dimensions — the real relief under it, the aerial imagery
 //                 draped over it, a 2 m × 300 mm pole where the station stands
 //                 and a 1.75 m figure beside it for scale — to orbit, and to
 //                 walk about in at eye height. Exports the scene as a .glb for
-//                 Blender.
+//                 Blender. It is drawn inside the Stations map (map-twin.js
+//                 hosts it), and its settings are the 🧊 pane of that tab's
+//                 side panel (paneHtml, which app.js puts in the dock).
 //
 // After core.js and terrain.js, before init.js — index.html holds the order and
 // the reasons. Reaches back to core.js for state, esc, escAttr, announce,
@@ -13,12 +15,13 @@
 // terrain.js for the ~30 m fallback ground, to elvis.js for the AHD height at
 // the pin, to field-photos.js for the field photos taken in the patch (and the
 // viewer they open in), to twin-cadastre.js for the property boundaries, lot
-// numbers and road reserve drawn on the ground, and to app.js for switchTab,
-// goToStation and primaryRole (from inline handlers). Every one of those is a
-// runtime call from inside this file's own functions, so its position among
-// the modules is free. Nothing executes at load (`npm run toplevel`).
+// numbers and road reserve drawn on the ground, to map-twin.js for the map it
+// is drawn in, and to app.js for switchTab and primaryRole (from inline
+// handlers). Every one of those is a runtime call from inside this file's own
+// functions, so its position among the modules is free. Nothing executes at
+// load (`npm run toplevel`).
 //
-// ── Why a tab of its own, and not a mode on the Stations map ─────────────────
+// ── One twin, in the map ─────────────────────────────────────────────────────
 //
 // The Stations map's 3-D view (map-3d.js) is the whole network on the ground —
 // tens of kilometres of terrain at ~30 m, links and pins draped over it, and a
@@ -28,6 +31,12 @@
 // LiDAR, and a camera that can be put at a technician's eye height beside the
 // pole. Those are different renderers for different questions, and the honest
 // thing is two of them rather than one that half-answers both.
+//
+// It had a tab of its own as well, once — the same scene in a second host,
+// with the settings down its left. Two ways to the one thing, each with half
+// the tools, is one too many: the tab's column is the 🧊 pane in the Stations
+// side panel now, beside the map the twin opens in, and every "open the twin"
+// (the station card, the finder, a field photo) opens it there.
 //
 // ── Where the ground comes from, in order ─────────────────────────────────
 //
@@ -3244,7 +3253,7 @@ void main() {
     });
   }
 
-  function photosLineHtml() {
+  function photosLineHtml(full = false) {
     if (typeof FieldPhotos === 'undefined' || !tw.ground) return '';
     const P = tw.photos;
     const lead = n => `<span class="twin-photos-lead"><span aria-hidden="true">📷</span> Field photos${n ? ` (${n})` : ''}:</span>`;
@@ -3252,8 +3261,8 @@ void main() {
     // Inside the Stations map the overlay is a phone's 340 px of map, and a
     // line that only says there is nothing here — or to sign in — is a line
     // of stage given up for no photo. There it is shown when there are photos
-    // to list; the tab says the rest.
-    if (tw.hooks && !(P.spots && P.spots.length)) return '';
+    // to list; the 🧊 pane (`full`) says the rest.
+    if (tw.hooks && !full && !(P.spots && P.spots.length)) return '';
     if (P.status === 'signed-out') return `${lead()} <button type="button" class="link-btn" onclick="Auth.open()">sign in</button> to see the photos taken here.`;
     if (P.status === 'loading' && !P.spots.length) return `${lead()} looking…`;
     if (P.status === 'error') return `${lead()} could not be read — ${esc(P.error)}.`;
@@ -3268,11 +3277,19 @@ void main() {
 
   function refreshPhotosLine() {
     const el = document.getElementById('twin-photos');
-    if (!el) return;
-    const html = photosLineHtml();
-    el.innerHTML = html;
-    el.hidden = !html;
-    el.title = el.textContent.replace(/\s+/g, ' ').trim();
+    if (el) {
+      const html = photosLineHtml();
+      el.innerHTML = html;
+      el.hidden = !html;
+      el.title = el.textContent.replace(/\s+/g, ' ').trim();
+    }
+    // …and the whole of it in the side panel's pane, where there is room.
+    const pane = document.getElementById('twin-pane-photos');
+    if (pane) {
+      const html = tw.live ? photosLineHtml(true) : '';
+      pane.innerHTML = html;
+      pane.hidden = !html;
+    }
   }
 
   // Which spot the POV visitor is standing at, if any — the prompt over the
@@ -5277,22 +5294,28 @@ void main() {
   // The line is drawn again whenever a setting changes — which is what a press
   // on it does — so the focus is put back on the control that was pressed, or
   // on the one that took its place (Hide the water becomes Show it).
+  //
+  // Twice: over the stage, cut to one line in the Stations map, and whole in
+  // the side panel's 🧊 pane, where every one of its buttons can be reached
+  // (the reading's id is the pane's own there).
   function refreshFloodLine() {
-    const el = document.getElementById('twin-flood');
-    if (el) {
-      const had = el.contains(document.activeElement) && document.activeElement.dataset ? document.activeElement.dataset.flood : null;
-      const html = floodLineHtml();
-      el.innerHTML = html;
-      el.hidden = !html;
-      // The whole line as its tooltip (the Stations map cuts it to one), less
-      // the reading, which moves on while the tooltip would stand still.
-      const F = tw.flood;
-      el.title = !html ? '' : F.none ? el.textContent.replace(/\s+/g, ' ').trim() : (S().flood
-        ? `Flood levels${F.lad.borrowed ? ` (${F.lad.borrowed.self ? 'its own, over its channel' : `borrowed from ${F.lad.borrowed.name}`})` : ''}: ${F.lad.levels.map(l => FloodStages.levelText(l)).join(' · ')}. A level surface through the patch: a real flood slopes downstream, so the far edges of a wide patch are a guide, not a map.`
-        : 'Flood levels: the water is hidden.');
-      if (had) {
-        const back = el.querySelector(`[data-flood="${CSS.escape(had)}"]`) || el.querySelector('button');
-        if (back) back.focus();
+    for (const [id, pane] of [['twin-flood', false], ['twin-pane-flood', true]]) {
+      const el = document.getElementById(id);
+      if (el) {
+        const had = el.contains(document.activeElement) && document.activeElement.dataset ? document.activeElement.dataset.flood : null;
+        const html = pane ? (tw.live ? floodLineHtml().replace('id="twin-flood-now"', 'id="twin-pane-flood-now"') : '') : floodLineHtml();
+        el.innerHTML = html;
+        el.hidden = !html;
+        // The whole line as its tooltip (the Stations map cuts it to one), less
+        // the reading, which moves on while the tooltip would stand still.
+        const F = tw.flood;
+        el.title = !html ? '' : F.none ? el.textContent.replace(/\s+/g, ' ').trim() : (S().flood
+          ? `Flood levels${F.lad.borrowed ? ` (${F.lad.borrowed.self ? 'its own, over its channel' : `borrowed from ${F.lad.borrowed.name}`})` : ''}: ${F.lad.levels.map(l => FloodStages.levelText(l)).join(' · ')}. A level surface through the patch: a real flood slopes downstream, so the far edges of a wide patch are a guide, not a map.`
+          : 'Flood levels: the water is hidden.');
+        if (had) {
+          const back = el.querySelector(`[data-flood="${CSS.escape(had)}"]`) || el.querySelector('button');
+          if (back) back.focus();
+        }
       }
     }
     syncFloodPill();
@@ -5301,8 +5324,10 @@ void main() {
   }
 
   function syncFloodReading() {
-    const el = document.getElementById('twin-flood-now');
-    if (el) el.textContent = floodNowText();
+    for (const id of ['twin-flood-now', 'twin-pane-flood-now']) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = floodNowText();
+    }
     const F = tw.flood;
     const slider = document.getElementById('twin-flood-level');
     if (slider && F && !F.none && F.level != null && document.activeElement !== slider) {
@@ -6157,7 +6182,7 @@ void main() {
       const pk = document.getElementById('twin-pick');
       if (pk) pk.textContent = '';
     };
-    if (!st) { nothing('Pick a station to build its twin.', '<p>No station chosen. Find one on the left, or select one on the Stations tab and come back.</p>'); return; }
+    if (!st) { nothing('Pick a station to build its twin.', '<p>No station chosen. Find one in the 🧊 pane of the side panel, or zoom the map to one.</p>'); return; }
     if (!located(st)) { nothing(`${st.name} has no position, so there is no ground to stand it on.`, `<p><strong>${esc(st.name)}</strong> has no coordinates. Give it a position in the station editor and the twin can be built.</p>`); return; }
     const gl = webglOk();
     const size0 = S().size;
@@ -6499,7 +6524,9 @@ void main() {
     const role = typeof primaryRole === 'function' ? primaryRole(st) : 'field';
     return `<p class="twin-station"><strong>${esc(st.name)}</strong>
         <span class="small">${esc(st.station_number || st.id)} · ${esc(role)}${located(st) ? '' : ' · no position'}</span>
-        <button type="button" class="link-btn" onclick="goToStation('${escAttr(st.id)}')" title="Open this station on the Stations map">Show on the map →</button>
+        ${tw.live && tw.hooks
+          ? `<button type="button" class="link-btn" onclick="MapTwin.leave()" title="Put the twin away and give the map back, as it was">← Map</button>`
+          : located(st) ? `<button type="button" class="link-btn" onclick="DigitalTwin.openStation('${escAttr(st.id)}')" title="Open this station's twin on the Stations map">🧊 Open its twin →</button>` : ''}
       </p>`;
   }
 
@@ -6573,26 +6600,45 @@ void main() {
         </label>`;
   }
 
-  function render() {
+  // The 🧊 pane in the Stations tab's side panel (app.js, dockSkeleton): what
+  // the Digital Twin tab's left column was, beside the one twin there is now —
+  // the one inside the Stations map (map-twin.js). The station and the finder,
+  // the scene's settings, the ground truth, the camera's two moves the map's
+  // bar has no room for, the .glb, and the ground as numbers. Written once,
+  // with the skeleton, and kept true after by id (syncPane and the refreshes
+  // that already write these ids), never rewritten wholesale: the find box
+  // has a caret in it.
+  function paneHtml() {
     S();
-    const st = currentStation();
     return `
-  <div class="layout twin-layout">
-    <aside class="sidebar stack" aria-label="Digital twin controls">
+      <h2 class="sr-only">Digital twin — the station, the scene's settings, the ground truth and the .glb</h2>
+      <div class="stack twin-pane">
       <div class="panel">
-        <div class="panel-header"><h2>Station</h2></div>
+        <div class="panel-header"><h2>Digital twin</h2></div>
+        <p class="small twin-pane-lead" id="twin-pane-lead">${paneLeadHtml()}</p>
         <div id="twin-station-line">${stationLineHtml()}</div>
-        <label class="twin-field">Find a station
+        <label class="twin-field">Open a station's twin
           <input type="search" id="twin-find" value="${esc(tw.query)}" autocomplete="off" spellcheck="false"
                  placeholder="name, station number or ALERT address"
                  oninput="DigitalTwin.setQuery(this.value)">
         </label>
         <div id="twin-hits">${hitsHtml()}</div>
+        <div class="button-group twin-pane-actions">
+          <button type="button" id="twin-top" onclick="DigitalTwin.topView()" ${tw.live ? '' : 'disabled'} title="Straight down on the patch">⬇ Top-down</button>
+          <button type="button" id="twin-rebuild" onclick="DigitalTwin.rebuild()" ${tw.live ? '' : 'disabled'} title="Fetch the ground and the imagery again">⟳ Rebuild</button>
+        </div>
+        <p class="small twin-pick" id="twin-pick"></p>
+        <p class="small twin-photos" id="twin-pane-photos" hidden></p>
+        <p class="small twin-flood" id="twin-pane-flood" hidden></p>
       </div>
       <div class="panel" id="twin-panel-scene">${scenePanelHtml()}</div>
       <div class="panel">
         <div class="panel-header"><h2>Ground truth</h2></div>
         <div id="twin-truth">${truthHtml()}</div>
+        <details class="twin-details">
+          <summary>The ground under the station, as numbers</summary>
+          <div id="twin-table">${tableHtml()}</div>
+        </details>
       </div>
       <div class="panel">
         <div class="panel-header"><h2>Take it further</h2></div>
@@ -6602,46 +6648,57 @@ void main() {
         </div>
         <p class="small">Metres, y up, origin on the ground at the pole; the file's header carries the station's coordinates and datum. Blender turns it z-up on import. Point cloud data, when it is ingested, will land in this same scene beside the mesh.</p>
       </div>
-    </aside>
-    <div class="stack">
-      <div class="panel">
-        <div class="panel-header">
-          <h2 id="twin-heading">${st ? `Digital twin — ${esc(st.name)}` : 'Digital twin'}</h2>
-          <div class="button-group">
-            <button type="button" onclick="DigitalTwin.resetView()" title="Back to the opening view of the pole">↺ Reset view</button>
-            <button type="button" onclick="DigitalTwin.topView()" title="Straight down on the patch">⬇ Top-down</button>
-            <button type="button" id="twin-walk" aria-pressed="false" onclick="DigitalTwin.toggleWalk()" title="Point of view: stand on the ground at eye height, walk with the keys, climb the ladder">👁 POV</button>
-            <button type="button" id="twin-point" aria-pressed="false" onclick="DigitalTwin.togglePoint()" title="Point where you are looking: the arm goes out and a laser lands on it, for whoever is here with you — Space held in the POV does the same">☝ Point</button>
-            <button type="button" onclick="DigitalTwin.rebuild()" title="Fetch the ground and the imagery again">⟳ Rebuild</button>
-            <button type="button" id="twin-movepin-btn" aria-pressed="false" onclick="DigitalTwin.toggleMovePin()"
-                    title="Move this station's pin to where the station stands on the imagery, and save the position">📍 Move pin</button>
-            <button type="button" id="twin-orient-btn" aria-pressed="false" onclick="DigitalTwin.toggleOrient()"
-                    title="Turn the station to the way it faces on the ground — the side its door or ladder is on — and save the bearing">🧭 Orientation</button>
-            ${infoToggleHtml()}
-          </div>
-        </div>
-        <div class="twin-info" id="twin-info" ${tw.infoOpen === false ? 'hidden' : ''}>
-          <p class="twin-status" id="twin-status" role="status">${esc(tw.status || 'Building…')}</p>
-          <p class="small twin-paths" id="twin-paths" hidden></p>
-          <p class="small twin-photos" id="twin-photos" hidden></p>
-          <p class="small twin-flood" id="twin-flood" hidden></p>
-          <p class="small twin-peers" id="twin-peers" hidden></p>
-          <p class="small twin-site" id="twin-site" hidden></p>
-          <ul class="twin-notes" id="twin-notes" ${tw.notes.length ? '' : 'hidden'}>${tw.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
-        </div>
-        ${stageHtml()}
-        <p class="small twin-pick" id="twin-pick"></p>
-        <details class="twin-details">
-          <summary>The ground under the station, as numbers</summary>
-          <div id="twin-table">${tableHtml()}</div>
-        </details>
-        <p class="small twin-attrib" id="twin-attrib">${attribHtml()}</p>
-      </div>
-    </div>
-  </div>`;
+      ${paneHelpHtml()}
+      </div>`;
   }
 
-  // The fold's button, for the tab's header and the map overlay's bar alike:
+  // How the twin works, at the pane's foot: what was the Digital Twin tab's
+  // help (core.js, TWIN_HELP — authored HTML, like HELP), folded.
+  function paneHelpHtml() {
+    if (typeof TWIN_HELP === 'undefined') return '';
+    const h = TWIN_HELP;
+    const href = u => typeof docUrl === 'function' ? docUrl(u) : u;
+    return `<details class="panel twin-details twin-help">
+        <summary>How the twin works</summary>
+        <p class="small">${h.summary}</p>
+        <ul class="small twin-help-list">${h.watch.map(w => `<li>${w}</li>`).join('')}</ul>
+        ${(h.links || []).map(l => `<p class="small"><a href="${escAttr(href(l.href))}" target="_blank" rel="noopener">${esc(l.label)}</a></p>`).join('')}
+      </details>`;
+  }
+
+  // The pane's first line: which twin these settings are standing beside, or
+  // how to open one.
+  function paneLeadHtml() {
+    const st = currentStation();
+    if (tw.live && tw.hooks && st) return `The twin of <strong>${esc(st.name)}</strong> is open on the map. These settings apply to it as you change them.`;
+    return `No twin is open. Pick a station below, or zoom the map to ${typeof MapTwin !== 'undefined' ? MapTwin.zoom : 17} on one and press 🧊 Open the digital twin. The settings here are kept for the next one.`;
+  }
+
+  // The pane brought up to date with the twin: on its showing, and whenever
+  // a twin is opened or put away. The scene panel is rewritten only when
+  // nobody is in it.
+  function syncPane() {
+    const lead = document.getElementById('twin-pane-lead');
+    if (!lead) return;
+    lead.innerHTML = paneLeadHtml();
+    const line = document.getElementById('twin-station-line');
+    if (line) line.innerHTML = stationLineHtml();
+    // The hits and the scene panel are rewritten only when nobody is in them:
+    // the hit just pressed, or a setting being dragged, keeps its focus.
+    const a = document.activeElement;
+    const hits = document.getElementById('twin-hits');
+    if (hits && !(a && hits.contains(a))) hits.innerHTML = hitsHtml();
+    const scene = document.getElementById('twin-panel-scene');
+    if (scene && !(a && scene.contains(a))) scene.innerHTML = scenePanelHtml();
+    for (const id of ['twin-top', 'twin-rebuild']) {
+      const b = document.getElementById(id);
+      if (b) b.disabled = !tw.live;
+    }
+    if (!tw.live) { const pk = document.getElementById('twin-pick'); if (pk) pk.textContent = ''; }
+    refreshTruth(); refreshTable(); syncExportButton(); refreshPhotosLine(); refreshFloodLine();
+  }
+
+  // The fold's button, for the map overlay's bar:
   // an arrow, a word that goes on a phone (the overlay's .map-twin-label rule),
   // the notes counted while folded, and a name for a reader. syncInfo() keeps
   // all four true after it is drawn.
@@ -6652,11 +6709,9 @@ void main() {
               title="${open ? 'Fold the lines over the view away' : 'Show the lines over the view'}"><span class="twin-info-icon" aria-hidden="true">${open ? '▴' : '▾'}</span><span class="map-twin-label" aria-hidden="true"> Details</span><span class="twin-info-badge" aria-hidden="true" hidden></span><span class="sr-only">${open ? 'Hide' : 'Show'} the details</span></button>`;
   }
 
-  // The stage — the canvas and what stands over it — for the tab and for the
-  // Stations map alike (map-twin.js puts this in its overlay). The ids are the
-  // ones every refresh here writes to, and the two hosts are never on screen
-  // together: the overlay lives in the Stations tab's map, the panel in this
-  // tab's page.
+  // The stage — the canvas and what stands over it — for the Stations map's
+  // overlay (map-twin.js), the one host there is. The ids are the ones every
+  // refresh here writes to.
   //
   // Along its foot, whatever else is up, the caveat: everything in the view is
   // a model — the ground, the imagery on it, the station built from its record,
@@ -6746,15 +6801,21 @@ void main() {
     clearScaleAuto();
     if (tw.glideTimer) { clearTimeout(tw.glideTimer); tw.glideTimer = 0; }
     if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
+    // …and the side panel's pane says there is no twin open.
+    syncPane();
   }
 
   function init() {
     registerTabTeardown('DigitalTwin', stop);
-    // A render of the tab that did not come through switchTab() — a seed in
-    // the harness calling renderMain() — replaces the canvas under a live
-    // renderer. Nothing may go on drawing into a node that is not in the
+    // A render of the Stations tab that did not come through switchTab() — a
+    // seed in the harness calling renderMain() — replaces the canvas under a
+    // live renderer. Nothing may go on drawing into a node that is not in the
     // document, so that is a teardown first.
     if (sc.canvas && !document.contains(sc.canvas)) stop();
+    // No twin up — a setting changed in the side panel's pane with nothing
+    // open on the map: the setting is kept for the next one, and there is
+    // nothing to build.
+    if (!tw.hooks || !document.getElementById('twin-canvas')) { rerenderStationBits(); syncPane(); return; }
     build().catch(err => {
       setStatus('The twin could not be built.');
       setNotes([`${(err && err.message) || err}`]);
@@ -6771,9 +6832,8 @@ void main() {
     if (line) line.innerHTML = stationLineHtml();
     const hits = document.getElementById('twin-hits');
     if (hits) hits.innerHTML = hitsHtml();
-    const h = document.getElementById('twin-heading');
-    const st = currentStation();
-    if (h) h.textContent = st ? `Digital twin — ${st.name}` : 'Digital twin';
+    const lead = document.getElementById('twin-pane-lead');
+    if (lead) lead.innerHTML = paneLeadHtml();
     syncExportButton();
   }
 
@@ -6935,27 +6995,33 @@ void main() {
 
   // ── public surface ─────────────────────────────────────────────────────────
   return {
-    render, init, stop,
+    init, stop,
 
-    // The station finder.
+    // The 🧊 pane in the Stations tab's side panel (app.js).
+    paneHtml, syncPane,
+
+    // The station finder: a hit opens that station's twin on the map.
     setQuery(v) {
       tw.query = String(v || '');
       const hits = document.getElementById('twin-hits');
       if (hits) hits.innerHTML = hitsHtml();
     },
-    pick(id) {
-      const s = stationById(id);
-      if (!s) return;
-      tw.stationId = s.id;
-      rerenderStationBits();
-      init();
-    },
-    // From the station card, or anywhere else with a station in hand.
+    pick(id) { this.openStation(id); },
+    // From the station card, the finder, a field photo, or anywhere else with
+    // a station in hand: the Stations map, at the station, with its twin up
+    // (map-twin.js). The twin used to have a tab of its own for this; it is
+    // one twin now, and it lives in the map.
     openStation(id) {
       const s = stationById(id);
       if (!s) return;
       tw.stationId = s.id;
-      switchTab('twin');
+      if (typeof switchTab === 'function' && state.activeTab !== 'stations') switchTab('stations');
+      if (!located(s)) {
+        rerenderStationBits();
+        announce(`${s.name} has no position, so there is no ground to stand its twin on. Give it one in the station editor.`);
+        return;
+      }
+      if (typeof MapTwin !== 'undefined') MapTwin.openStation(s.id);
     },
 
     // The scene settings — each persisted, each applied without a refetch
@@ -7065,9 +7131,8 @@ void main() {
 
     exportGlb, buildGlb,
 
-    // Go to the far end of a radio path. Inside the Stations map, the map
-    // moves there and, at this zoom, hands over to that station's twin
-    // (map-twin.js); on the tab, the twin is rebuilt for it.
+    // Go to the far end of a radio path: the map moves there and, at this
+    // zoom, hands over to that station's twin (map-twin.js).
     followPath(id) {
       const s = stationById(id);
       if (!s || !located(s)) return;
@@ -7084,9 +7149,7 @@ void main() {
         }
         return;
       }
-      tw.stationId = s.id;
-      rerenderStationBits();
-      init();
+      this.openStation(s.id);
     },
 
     // ── Borrowing flood levels (see "borrowing another station's levels") ──
@@ -7163,6 +7226,7 @@ void main() {
       tw.stationId = s.id;
       tw.hooks = hooks || null;
       init();
+      syncPane();
       return true;
     },
     // Fetch a station's ground and imagery into the caches ahead of a
@@ -7196,8 +7260,7 @@ void main() {
     // A save moved a station: a twin centred on its old spot is rebuilt on
     // the new one.
     stationMoved(id) { if (tw.live && tw.stationId === id) init(); },
-    // The 🧭 Orientation tool: the button on the tab's header and the
-    // overlay's bar, and its panel's controls.
+    // The 🧭 Orientation tool: the button on the overlay's bar, and its panel's controls.
     toggleOrient() { if (tw.orient) closeOrient(); else openOrient(); },
     orientTo,
     orientBy(d) { if (tw.orient) orientTo(tw.orient.deg + Number(d)); },
@@ -7231,7 +7294,7 @@ void main() {
     },
     // The check's seam: the bearing drawn, and the turn it is drawn at.
     _facing() { return { deg: facingNow(), turn: sc.turn || 0, open: !!tw.orient }; },
-    // The 📍 button on the tab's header and the overlay's bar.
+    // The 📍 button on the overlay's bar.
     toggleMovePin() {
       const st = currentStation();
       if (!st || typeof MapMovePin === 'undefined') return;

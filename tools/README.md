@@ -762,7 +762,7 @@ results as *only* `tool_result` blocks (required for programmatic tool calls).
 ## Blender: the Digital Twin's `.glb`
 
 `blender/import_twin.py` is the one script here that runs under Blender's
-Python rather than the system one. The Digital Twin tab downloads a station's
+Python rather than the system one. The digital twin (🧊 pane, Stations side panel) downloads a station's
 patch of ground — relief, imagery, the 2 m pole and the figure — as a glTF
 binary that Blender opens with *File → Import → glTF 2.0* and nothing more;
 this script is the ten clicks after that: metres, a sun from the north, a

@@ -14640,3 +14640,11 @@ button.adm-danger:hover { border-color: var(--bad); }
   box-shadow: 0 4px 14px rgba(0,0,0,.16);
   font-weight: normal;
 }
+
+/* The digital twin's pane in the Stations side panel (digital-twin.js,
+   paneHtml) — what the Digital Twin tab's left column was. */
+.twin-pane-actions { margin-top: var(--sp-2); }
+.twin-pane-lead { margin: 0 0 var(--sp-2); }
+.twin-help summary { cursor: pointer; font-weight: 600; }
+.twin-help-list { padding-left: 1.2em; }
+.twin-help-list li + li { margin-top: var(--sp-1); }

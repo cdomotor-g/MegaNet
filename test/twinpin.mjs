@@ -133,7 +133,7 @@ try {
     const topDown = () => page.evaluate(() => { DigitalTwin.topView(); });
 
     // ═══════════════════════════════════════════════════════════════════════
-    section('On the Digital Twin\'s tab — no map under it');
+    section('Opened by name — the twin in the map, no editor open on the station');
 
     await page.evaluate(() => DigitalTwin.openStation('gatton'));
     await built('gatton');
@@ -142,8 +142,8 @@ try {
     await page.click('#twin-movepin-btn');
     let d = await page.evaluate(() => ({ armed: MapMovePin.armed(), onMap: MapMovePin.onMap(), dbg: DigitalTwin.debug().movepin,
                                          pressed: document.getElementById('twin-movepin-btn').getAttribute('aria-pressed') }));
-    ok('📍 on the tab arms the mode for the station on the stage, with no map under it',
-      d.armed === 'gatton' && d.onMap === false && d.pressed === 'true', J(d));
+    ok('📍 on the twin\'s bar arms the mode for the station on the stage',
+      d.armed === 'gatton' && d.pressed === 'true', J(d));
     ok('…and an amber post stands on the ground at the station, taller than what is built there',
       d.dbg && d.dbg.visible && near(d.dbg.x, 0, 1e-6) && near(d.dbg.z, 0, 1e-6) && near(d.dbg.y, d.dbg.groundY, 1e-6) && d.dbg.height >= 3.5
         && d.dbg.exported === false, J(d.dbg));
@@ -191,7 +191,7 @@ try {
     await page.focus('#twin-canvas');
     await page.keyboard.press('Escape');
     d = await page.evaluate(() => ({ armed: MapMovePin.armed(), tab: state.activeTab, built: DigitalTwin.debug().built, pin: DigitalTwin.debug().movepin, panel: document.getElementById('twin-movepin-panel').hidden }));
-    ok('Escape ends the move — and only the move: the twin is still up, on its tab', d.armed === null && d.tab === 'twin' && d.built && !d.pin && d.panel, J(d));
+    ok('Escape ends the move — and only the move: the twin is still up, in the map', d.armed === null && d.tab === 'stations' && d.built && !d.pin && d.panel, J(d));
 
     // Signed out, Save refuses and says so; the pin stays.
     await page.click('#twin-movepin-btn');
@@ -199,6 +199,8 @@ try {
     await page.evaluate(() => { window.dbCanWrite = () => false; });
     await page.click('#twin-movepin-panel button.is-on');
     P = await panel();
+    // (In the map, as the twin is now: the Save's own click must not reach the
+    // flat map under the twin and move the pin there — map-move-pin.js.)
     ok('signed out, Save writes nothing and says why, and the pin stays where it was dragged',
       !P.hidden && /signed-in session/.test(P.msg || '') && (await page.evaluate(() => MapMovePin.armed())) === 'gatton', J(P));
 

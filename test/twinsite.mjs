@@ -392,7 +392,10 @@ async function browserHalf() {
       d.flood && d.flood.none && /none recorded for Babinda Post Office/.test(await text('#twin-flood')), await text('#twin-flood'));
     const pill = await page.evaluate(() => { const el = document.getElementById('twin-flood-pill'); return { hidden: el.hidden, text: el.textContent }; });
     ok('…and so does the pill on the stage — on a phone\'s map, the only place it can', !pill.hidden && /borrow/.test(pill.text), J(pill));
-    await page.click('#twin-flood button[data-flood="borrow"]');
+    // The pill, which is where a desktop's map offers it too: the twin is in
+    // the Stations map now, where the line under the bar is one line, cut
+    // short, and the link at its end is past the cut.
+    await page.click('#twin-flood-pill');
     await page.waitForSelector('#app-modal .twin-borrow-table');
     const modal = await page.evaluate(() => [...document.querySelectorAll('#app-modal .twin-borrow-table tbody tr')].map(tr => ({
       name: tr.querySelector('th').textContent.trim(), cells: [...tr.querySelectorAll('td')].map(td => td.textContent.replace(/\s+/g, ' ').trim()) })));
@@ -413,7 +416,7 @@ async function browserHalf() {
       d.flood.levels.some(l => l.key === 'minor_m' && near(l.ahd, seedElev + minorH.minor_m, 1e-9)) && near(seedElev, 85, 0.05), J({ levels: d.flood.levels, seedElev }));
     ok('…and says whose, how far, and that it is a guide', d.notes.some(n => n.startsWith(`Flood levels borrowed from ${first.name}`) && /A guide, not a model/.test(n))
       && /borrowed from/.test(await text('#twin-flood')), J(d.notes));
-    await page.click('#twin-flood button[data-flood="unborrow"]');
+    await page.$eval('#twin-flood button[data-flood="unborrow"]', b => b.click());
     d = await page.evaluate(() => DigitalTwin.debug());
     ok('stopping takes the water away and the note with it', d.flood.none && !d.notes.some(n => /borrowed from/.test(n)), J(d.notes));
 

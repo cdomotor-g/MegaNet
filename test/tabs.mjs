@@ -415,23 +415,24 @@ const SEED_HFEM = `() => {
   for (const d of document.querySelectorAll('#main-content details')) d.open = true;
 }`;
 
-// The Digital Twin draws nothing until a station is chosen, and under this
-// harness draws nothing even then: its renderer arrives from disk, but every
-// elevation and imagery host is blocked, so the stage says so and the panels
-// around it — the finder, the settings, the Ground truth list, the empty
-// table — are what is measured here. The built scene, with its ground and
-// its canvas name, is `npm run twin`'s to hold. Two entries: no station at
-// all, and a station whose ground could not be read.
+// The digital twin: the 🧊 pane of the Stations side panel (what was the
+// Digital Twin tab's left column), and the twin itself inside the map. Under
+// this harness the twin draws nothing: its renderer arrives from disk, but
+// every elevation and imagery host is blocked, so the stage says so and the
+// panels round it — the finder, the settings, the Ground truth list, the
+// empty table, the help at the foot — are what is measured here. The built
+// scene, with its ground and its canvas name, is `npm run twin`'s to hold.
+// Two entries: the pane with no twin open, and a station's twin opened on the
+// map, its ground unreachable, with the pane beside it.
 const SEED_TWIN_NONE = `async () => {
-  state.selectedId = null;
-  DigitalTwin._clear();
-  renderMain();
-  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+  setDockTab('twin');
+  for (const d of document.querySelectorAll('#main-content details, #dock-pane-twin details')) d.open = true;
 }`;
 
 const SEED_TWIN = `async () => {
   const s = state.data.stations.find(x => isFinite(x.lat) && isFinite(x.lon));
   DigitalTwin.pick(s.id);
+  setDockTab('twin');
   // The build ends — with a scene, or with a status that says why not — in a
   // sentence that does not trail off. Bounded, so a harness with no WebGL is
   // still measured rather than hung.
@@ -440,7 +441,7 @@ const SEED_TWIN = `async () => {
     const tick = () => (!DigitalTwin.debug().status.endsWith('…') || Date.now() - t0 > 20000) ? res() : setTimeout(tick, 100);
     tick();
   });
-  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+  for (const d of document.querySelectorAll('#main-content details, #dock-pane-twin details')) d.open = true;
 }`;
 
 // The Field Photos tab, born converted. Signed out it is a sentence and a
@@ -527,8 +528,8 @@ const CONVERTED = [
   { id: 'stations',   label: 'Stations — a drawn path, its profile and its link budget', issue: '#136', seed: SEED_STATIONS_PATH },
   { id: 'hfem',       label: 'HFEM Messages — empty, with the builder and the reference', issue: 'born converted at #154' },
   { id: 'hfem',       label: 'HFEM Messages — the spec\'s ten examples decoded', issue: 'born converted at #154', seed: SEED_HFEM },
-  { id: 'twin',       label: 'Digital Twin — no station chosen', issue: 'born converted', seed: SEED_TWIN_NONE },
-  { id: 'twin',       label: 'Digital Twin — a station, its ground unreachable', issue: 'born converted', seed: SEED_TWIN },
+  { id: 'stations',   label: 'Stations — the 🧊 digital twin pane, no twin open', issue: 'the Digital Twin tab, folded in', seed: SEED_TWIN_NONE },
+  { id: 'stations',   label: 'Stations — a station\'s twin on the map, its ground unreachable, the pane beside it', issue: 'the Digital Twin tab, folded in', seed: SEED_TWIN },
   { id: 'photos',     label: 'Field Photos — signed out', issue: 'born converted', seed: SEED_PHOTOS_OUT },
   { id: 'photos',     label: 'Field Photos — a queue, the place editor, the library and the sync', issue: 'born converted', seed: SEED_PHOTOS },
 ];

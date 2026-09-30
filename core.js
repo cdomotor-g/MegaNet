@@ -107,7 +107,7 @@
 const TABS = [
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
-      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor' },
+      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb' },
     { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
       find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
     { id: 'passranges', label: 'Pass Ranges',            icon: '🔗',
@@ -116,8 +116,6 @@ const TABS = [
       find: 'csv radio mobile networks clusters download stations.json backup escape hatch data source' },
     { id: 'mapgen',     label: 'Map Generator',          icon: '🖨️',
       find: 'print paper a4 svg laser cut engrave k40 whisperer contour elevation layers billet plate title block scale bar graticule sheet' },
-    { id: 'twin',       label: 'Digital Twin',         icon: '🧊',
-      find: '3d three dimensional scene render explore walk site model elvis lidar dem ground terrain relief imagery aerial drape blender glb export point cloud pole figure' },
   ] },
   { group: 'Interference', tabs: [
     { id: 'rf',         label: 'RF Environment',         icon: '📶',
@@ -317,8 +315,14 @@ const HELP = {
       + 'says what imagery covers the station (10 cm over most towns, and when it was flown) and '
       + '<em>Open the digital twin</em> hands the rectangle over. ← Map or Escape gives the map back at '
       + 'the same zoom; wheeling out steps one zoom out. <strong>🔍 Zoom to station</strong> goes all '
-      + 'the way in, which is where the card appears. The switch is in 🗺️ Map display; ⛰️ 3-D is the '
+      + 'the way in, which is where the card appears, and <strong>🧊 Digital twin</strong> on a '
+      + 'station\'s card opens its twin in one press. The switch is in 🗺️ Map display; ⛰️ 3-D is the '
       + 'same idea at network scale, and offers it at the same zoom.',
+      '<strong>🧊 in the side panel\'s strip is the twin\'s pane</strong> — what the Digital Twin tab '
+      + 'used to be: find a station and open its twin, the scene\'s settings (the patch, the '
+      + 'exaggeration, the imagery, the cadastre, the horizon, the water, exploring together), the '
+      + 'ground truth, the ground as numbers and the <code>.glb</code> for Blender. ⚙ Settings on the '
+      + 'twin\'s own bar opens it. How the twin works is at the foot of the pane.',
       '<strong>3-D view</strong> — ⛰️ in the side panel\'s strip, or the panel of the same name — '
       + 'tilts the map onto the ground it is drawn on: the base map you are already on (the most opaque one, if you have blended several), draped over '
       + '~30 m terrain, with the pins and links you are already looking at on it. Drag to pan, '
@@ -1217,144 +1221,6 @@ const HELP = {
     related: ['stations', 'maps', 'export'],
   },
 
-  twin: {
-    summary: 'One station\'s patch of ground in three dimensions — the real relief under it from the '
-           + 'best public elevation model there is (Queensland\'s 0.5–1 m LiDAR where it exists, the '
-           + '~30 m SRTM elsewhere), the aerial imagery draped over it, <strong>the station as built</strong> '
-           + 'where it stands — the Type 3 rainfall pole, the river-gauge tower with its platform and '
-           + 'extension ladder, its staff gauge and its flood levels marked on it, a manual collector or staff gauge, or a red post where the record cannot say — with '
-           + 'the other stations and the bridges in the patch, and a 1.75 m figure beside it for scale. Orbit it, '
-           + 'look straight down on it, or take the POV and walk about in it at eye height (and up the '
-           + 'ladder); click the ground for its height; move the station\'s pin to where it stands on '
-           + '10 cm imagery; and '
-           + 'download the whole scene as a <code>.glb</code> that Blender opens in one step.',
-    watch: [
-      '<strong>Everything in the view is indicative modelling</strong>, and the red line along the '
-      + 'foot of every twin — on this tab and inside the Stations map — says so for as long as it is '
-      + 'up: the ground is an elevation model, the imagery is draped on it, the station is built from '
-      + 'its record, and the water is a level surface at the recorded levels. None of it is a survey, '
-      + 'a flood map or a forecast; check anything that matters on site.',
-      '<strong>The same twin is inside the Stations map.</strong> From zoom 17 with a station under '
-      + 'the view a card on the map offers it, saying what aerial imagery covers the station and when '
-      + 'it was flown; press Open the digital twin and the map hands its rectangle over, and ← Map or '
-      + 'Escape gives it back at the same zoom. So the usual way in is 🔍 Zoom to station on a pin, not '
-      + 'to come here. This tab is the full version: the settings, the Ground truth panel and the .glb.',
-      '<strong>📍 Move pin</strong> puts the station where it stands: drag the amber post across the '
-      + 'ground, or click where the station is, and a panel on the stage reads the new position to the '
-      + 'centimetre. Round the station and the pin the State\'s finest imagery is draped again — 10 cm '
-      + 'over most towns, where the rest of the patch is 0.39 m. Save writes the position (and nothing '
-      + 'else) through the station editor\'s own save, then rebuilds the twin on the new spot. The '
-      + 'same mode works inside the Stations map\'s twin and in ⛰️ 3-D.',
-      '<strong>🧭 Orientation</strong> turns the station to the way it faces on the ground — the side '
-      + 'its enclosure door or a tower\'s ladder is on. Turn it with the bearing box, the 15° buttons '
-      + 'or the slider, or orbit round to where the front should be and press Face the view. Save '
-      + 'writes the bearing on the station for everybody; a station with none recorded is drawn facing '
-      + 'south. The walk, the ladder and the deck turn with it.',
-      '<strong>The lines over the view fold away</strong> ten seconds after the twin opens — the '
-      + 'status, the paths, the photos, the water and the notes — so the stage gets the height back. '
-      + '▾ Details brings them back (it counts the notes while they are folded); once pressed, they '
-      + 'stay as you left them.',
-      '<strong>The radio paths are drawn from the antenna</strong> as rays to the edge of the patch, '
-      + 'along the line of sight to the far station, each named at its end. Inside the Stations map '
-      + 'they are the map\'s own lines — the same filters, the same colouring (channel, fade margin or '
-      + 'line of sight), the same culled set. On this tab there is no map to mirror, so they are the '
-      + 'pass-range and backbone relations as recorded, in the plain colours.',
-      '<strong>The country runs to a horizon 60 km off</strong> — far ground round the patch from the '
-      + 'State\'s raster at 40 m and the ~30 m tiles beyond, under a sky, with haze — but it is scenery: '
-      + 'coarse on purpose, dropped for the Earth\'s curve, not in the .glb and not clickable. The '
-      + 'patch is the survey. It is a few more requests, so the Scene panel can switch it off.',
-      '<strong>The ground is a model, not a survey.</strong> Queensland\'s service is bare-earth LiDAR '
-      + 'in AHD at 0.5–1 m where the State has flown it and SRTM where it has not, and it does not say '
-      + 'which per pixel — a patch that looks smooth may be the 30 m data. Outside Queensland the '
-      + 'ground is the same ~30 m terrain tiles every profile in this app reads, and the notes say so: '
-      + 'at that resolution the channel a gauge sits in is not there.',
-      'A recorded height well above the ground at the pin usually means the <strong>coordinate is the '
-      + 'gauge down in the channel and the mark is the hut on the bank</strong> — a flag on the '
-      + 'position, not a correction to the height. The Ground truth panel puts the two side by side, '
-      + 'with what Elvis says at the point and which dataset it read.',
-      '<strong>The station is read from its record, and nothing is assumed.</strong> A telemetered '
-      + 'station that reads a river is the tower; one that reads rainfall the Type 3 pole. A station the '
-      + 'SLS lists as Manual (or one the Bureau reads daily with nothing saying a radio does) is the '
-      + 'observer\'s kit: a silver collector Ø200 × 300 mm for rain, a white 1 m staff gauge for a river, '
-      + 'both side by side for both. Where the record cannot say what a station is, it is a red post '
-      + '1 m tall, and the notes say what is not known. AL or ALERT in the name (or ALERT addresses) '
-      + 'puts an ELPRO ERT-A2 in an enclosure; TM (or satcom) a Campbell CR300 and a Beam SBD modem; '
-      + 'every tower cabinet carries a Kisters HS40 bubbler. The doors open when you come up to them.',
-      '<strong>Bridges stand over the creek.</strong> The ground is bare-earth LiDAR, which has the '
-      + 'bridges taken out, so each bridge in the patch (from the State\'s road network, or '
-      + 'OpenStreetMap) is built as a deck — at the crossing height the Bureau lists for the gauge where '
-      + 'there is one, else at its banks — with the photograph of the road on it. The other stations in '
-      + 'the patch are built too, each named, and each name goes to its own twin.',
-      '<strong>The cadastre lies on the ground.</strong> Every lot\'s boundary, in white, with its lot '
-      + 'number and plan written in it, and the road reserve outlined and washed in the road colour with '
-      + 'the road\'s name in it — Queensland\'s cadastre, the land parcels Queensland Globe draws, on the '
-      + 'ground in every view. The line under the stage says which lot the station stands in and how far '
-      + 'the road reserve is (or whose road reserve it stands in), and how well the cadastre is plotted '
-      + 'there; a click on the ground names the parcel under it. Two switches in the Scene panel; '
-      + 'Queensland only.',
-      '<strong>You are not necessarily alone.</strong> With <em>Explore together</em> on (the Scene '
-      + 'panel), the twin joins a room for its station and whoever else has that station open is '
-      + 'drawn where they stand, in the hat, shirt and trouser colours they chose, with their name over '
-      + 'their head — and you are drawn for them. Hold Space in the POV, or press Point, and your arm '
-      + 'goes out with a laser to whatever you are looking at. The room sees a chosen name (a signed-in '
-      + 'address\'s local part, or a visitor number), three colours and metres from the station; never '
-      + 'the address, never a coordinate on the Earth. Past four others the twin listens without '
-      + 'publishing, to keep the project\'s message budget for the readings it also serves.',
-      'Vertical exaggeration stretches the relief and nothing else: the station is its true size and '
-      + 'the figure 1.75 m at every setting. They are the ruler.',
-      'Everything arrives over the network — the renderer on the first visit (~750 KB), then one '
-      + 'raster and one image per patch. Whatever fails, the tab says which and draws what it did get; '
-      + 'a ground that could not be read is never drawn flat.',
-      '<strong>The water is the station\'s flood levels, stood on the ground.</strong> It rises from '
-      + '0 m on the gauge to the highest level the record holds, is held there, let out, and rises '
-      + 'again: clear blue below minor, then green, yellow and red past minor, moderate and major, and '
-      + 'magenta through to dark blue past the AEP floods — the colour of the rarest level passed, so '
-      + 'it never goes back down. It goes where the river would take it, not everywhere low: a hollow '
-      + 'behind a bank stays dry until the bank is overtopped. It is one level surface through the '
-      + 'patch, and a real flood slopes downstream, so the far edges are a guide. The floods the river '
-      + 'has seen — its five largest from the Bureau\'s records, at the level each reached — rise with '
-      + 'it as rings on the staff, the highest named; a flood colours nothing. Classes on a gauge whose '
-      + 'zero is not surveyed to AHD, and floods whose gauge zero that day is not known in AHD, are named '
-      + 'in the notes and not drawn. Not in the .glb.',
-      '<strong>The scale up the left of the stage is the water\'s control.</strong> Every level is '
-      + 'marked on it at its height, to scale, its name beside it — moved only far enough not to sit on '
-      + 'another. ⏸ or ▶ at its head stops and starts the rise; press a name and the water is held at '
-      + 'that level; press or drag on the track and the water follows the pointer, taking a level '
-      + 'exactly when let go near its mark. On the track, Page Up and Page Down go level to level, Home '
-      + 'and End to 0 m and the top. On a phone the names give way to their marks after five seconds — '
-      + 'tap the track for five more (a tap only brings them back; drag to move the water) — and the '
-      + 'hint along the foot folds to a <strong>?</strong> that brings it back. The line under the stage '
-      + 'has the same levels, and <em>Hide the water</em> — each choice remembered.',
-      '<strong>Log, beside the scale\'s head.</strong> The scale opens linear — a metre the '
-      + 'same height all the way up. Where a station\'s levels crowd together near the top (the AEP '
-      + 'floods and the largest floods within a metre or two of each other over major, as at Gatton), '
-      + 'it turns <em>logarithmic</em> by itself a few seconds later: measured down from the highest '
-      + 'level, so the top metres get the room and every name sits by its mark, and the rise slows as '
-      + 'it climbs into them rather than passing them all in its last second — and <strong>Log</strong> '
-      + 'lights up. Press it to turn the logarithmic scale on or off; the choice is kept for that station '
-      + 'for the session, and the water never moves when the scale does.',
-      '<strong>No levels here? Borrow a neighbour\'s.</strong> For a station with no flood heights '
-      + 'the twin can put on its ground, the flood line (and a pill on the stage) offers the four nearest stations '
-      + 'that have some — their distance, their heights and their catchment. Pick one and its levels '
-      + 'are drawn over this channel as heights on its gauge (or, if you say so, as the same metres '
-      + 'AHD). Only in the twin, only for the session, and every place that draws them says whose '
-      + 'they are.',
-      '<strong>A 📷 on the ground is where somebody stood with a camera</strong> — a post at chest '
-      + 'height, the camera turned the way it faced and a pale wedge for each way a photo from there '
-      + 'looked. Click it, pick it from the line under the stage, or walk up to it in the POV and '
-      + 'press Enter, and the photos taken there open one after another. Editors only, like the '
-      + 'photos themselves; the markers are not in the .glb.',
-      'The <code>.glb</code> is in metres, y up, with its origin on the ground at the pole and the '
-      + 'station\'s coordinates and datum in its header. Blender: <em>File → Import → glTF 2.0</em>, '
-      + 'and it lands z-up. Point cloud data, when it is ingested, will sit in this same scene.',
-    ],
-    related: ['stations', 'photos', 'mapgen', 'maps'],
-    links: [
-      { label: 'Digital twin — where the ground and the imagery come from, and the Blender workflow',
-        href: 'docs/digital-twin.md' },
-    ],
-  },
-
   inspections: {
     summary: 'The six paper station-inspection sheets, digitised — pick a station, pick which of the '
            + 'six forms its configuration prints, and fill it in. There is <strong>one</strong> form '
@@ -1491,7 +1357,7 @@ const HELP = {
       + '(Solocator prints height above the ellipsoid, some 40 m off AHD here). The marker in the twin '
       + 'stands on the twin\'s own ground.',
     ],
-    related: ['twin', 'stations', 'inspections', 'history'],
+    related: ['stations', 'inspections', 'history'],
     links: [
       { label: 'Field photos — how a position is read, the Dropbox sync, and setting it up',
         href: 'docs/field-photos.md' },
@@ -1613,6 +1479,148 @@ const NAV_TRANSITION_MS = 160;
 // it is one too many. Named off the scale rather than repeated as a literal —
 // this is what `md` *means*.
 const NAV_AUTO_COLLAPSE_PX = BREAKPOINTS.md;
+
+// How the digital twin works: what was the Digital Twin tab's help, when it
+// had a tab. It is not keyed by a tab any more — the twin is inside the
+// Stations map and its controls are the 🧊 pane of that tab's side panel — so
+// it is not in HELP (whose keys are TABS' ids, `npm run help`); the pane
+// shows it at its foot (digital-twin.js, paneHtml).
+const TWIN_HELP = {
+  summary: 'One station\'s patch of ground in three dimensions — the real relief under it from the '
+         + 'best public elevation model there is (Queensland\'s 0.5–1 m LiDAR where it exists, the '
+         + '~30 m SRTM elsewhere), the aerial imagery draped over it, <strong>the station as built</strong> '
+         + 'where it stands — the Type 3 rainfall pole, the river-gauge tower with its platform and '
+         + 'extension ladder, its staff gauge and its flood levels marked on it, a manual collector or staff gauge, or a red post where the record cannot say — with '
+         + 'the other stations and the bridges in the patch, and a 1.75 m figure beside it for scale. Orbit it, '
+         + 'look straight down on it, or take the POV and walk about in it at eye height (and up the '
+         + 'ladder); click the ground for its height; move the station\'s pin to where it stands on '
+         + '10 cm imagery; and '
+         + 'download the whole scene as a <code>.glb</code> that Blender opens in one step.',
+  watch: [
+    '<strong>Everything in the view is indicative modelling</strong>, and the red line along the '
+    + 'foot of every twin says so for as long as it is '
+    + 'up: the ground is an elevation model, the imagery is draped on it, the station is built from '
+    + 'its record, and the water is a level surface at the recorded levels. None of it is a survey, '
+    + 'a flood map or a forecast; check anything that matters on site.',
+    '<strong>The twin is inside the Stations map.</strong> From zoom 17 with a station under '
+    + 'the view a card on the map offers it, saying what aerial imagery covers the station and when '
+    + 'it was flown; press Open the digital twin and the map hands its rectangle over, and ← Map or '
+    + 'Escape gives it back at the same zoom. 🧊 Digital twin on a station\'s card, or a station '
+    + 'picked in this pane, goes straight there. This pane is the rest of it: the settings, the '
+    + 'Ground truth panel and the .glb — ⚙ Settings on the twin\'s bar opens it.',
+    '<strong>📍 Move pin</strong> puts the station where it stands: drag the amber post across the '
+    + 'ground, or click where the station is, and a panel on the stage reads the new position to the '
+    + 'centimetre. Round the station and the pin the State\'s finest imagery is draped again — 10 cm '
+    + 'over most towns, where the rest of the patch is 0.39 m. Save writes the position (and nothing '
+    + 'else) through the station editor\'s own save, then rebuilds the twin on the new spot. The '
+    + 'same mode works on the 2-D map and in ⛰️ 3-D.',
+    '<strong>🧭 Orientation</strong> turns the station to the way it faces on the ground — the side '
+    + 'its enclosure door or a tower\'s ladder is on. Turn it with the bearing box, the 15° buttons '
+    + 'or the slider, or orbit round to where the front should be and press Face the view. Save '
+    + 'writes the bearing on the station for everybody; a station with none recorded is drawn facing '
+    + 'south. The walk, the ladder and the deck turn with it.',
+    '<strong>The lines over the view fold away</strong> ten seconds after the twin opens — the '
+    + 'status, the paths, the photos, the water and the notes — so the stage gets the height back. '
+    + '▾ Details brings them back (it counts the notes while they are folded); once pressed, they '
+    + 'stay as you left them.',
+    '<strong>The radio paths are drawn from the antenna</strong> as rays to the edge of the patch, '
+    + 'along the line of sight to the far station, each named at its end. Inside the Stations map '
+    + 'they are the map\'s own lines — the same filters, the same colouring (channel, fade margin or '
+    + 'line of sight), the same culled set.',
+    '<strong>The country runs to a horizon 60 km off</strong> — far ground round the patch from the '
+    + 'State\'s raster at 40 m and the ~30 m tiles beyond, under a sky, with haze — but it is scenery: '
+    + 'coarse on purpose, dropped for the Earth\'s curve, not in the .glb and not clickable. The '
+    + 'patch is the survey. It is a few more requests, so the Scene panel can switch it off.',
+    '<strong>The ground is a model, not a survey.</strong> Queensland\'s service is bare-earth LiDAR '
+    + 'in AHD at 0.5–1 m where the State has flown it and SRTM where it has not, and it does not say '
+    + 'which per pixel — a patch that looks smooth may be the 30 m data. Outside Queensland the '
+    + 'ground is the same ~30 m terrain tiles every profile in this app reads, and the notes say so: '
+    + 'at that resolution the channel a gauge sits in is not there.',
+    'A recorded height well above the ground at the pin usually means the <strong>coordinate is the '
+    + 'gauge down in the channel and the mark is the hut on the bank</strong> — a flag on the '
+    + 'position, not a correction to the height. The Ground truth panel puts the two side by side, '
+    + 'with what Elvis says at the point and which dataset it read.',
+    '<strong>The station is read from its record, and nothing is assumed.</strong> A telemetered '
+    + 'station that reads a river is the tower; one that reads rainfall the Type 3 pole. A station the '
+    + 'SLS lists as Manual (or one the Bureau reads daily with nothing saying a radio does) is the '
+    + 'observer\'s kit: a silver collector Ø200 × 300 mm for rain, a white 1 m staff gauge for a river, '
+    + 'both side by side for both. Where the record cannot say what a station is, it is a red post '
+    + '1 m tall, and the notes say what is not known. AL or ALERT in the name (or ALERT addresses) '
+    + 'puts an ELPRO ERT-A2 in an enclosure; TM (or satcom) a Campbell CR300 and a Beam SBD modem; '
+    + 'every tower cabinet carries a Kisters HS40 bubbler. The doors open when you come up to them.',
+    '<strong>Bridges stand over the creek.</strong> The ground is bare-earth LiDAR, which has the '
+    + 'bridges taken out, so each bridge in the patch (from the State\'s road network, or '
+    + 'OpenStreetMap) is built as a deck — at the crossing height the Bureau lists for the gauge where '
+    + 'there is one, else at its banks — with the photograph of the road on it. The other stations in '
+    + 'the patch are built too, each named, and each name goes to its own twin.',
+    '<strong>The cadastre lies on the ground.</strong> Every lot\'s boundary, in white, with its lot '
+    + 'number and plan written in it, and the road reserve outlined and washed in the road colour with '
+    + 'the road\'s name in it — Queensland\'s cadastre, the land parcels Queensland Globe draws, on the '
+    + 'ground in every view. The line under the stage says which lot the station stands in and how far '
+    + 'the road reserve is (or whose road reserve it stands in), and how well the cadastre is plotted '
+    + 'there; a click on the ground names the parcel under it. Two switches in the Scene panel; '
+    + 'Queensland only.',
+    '<strong>You are not necessarily alone.</strong> With <em>Explore together</em> on (the Scene '
+    + 'panel), the twin joins a room for its station and whoever else has that station open is '
+    + 'drawn where they stand, in the hat, shirt and trouser colours they chose, with their name over '
+    + 'their head — and you are drawn for them. Hold Space in the POV, or press Point, and your arm '
+    + 'goes out with a laser to whatever you are looking at. The room sees a chosen name (a signed-in '
+    + 'address\'s local part, or a visitor number), three colours and metres from the station; never '
+    + 'the address, never a coordinate on the Earth. Past four others the twin listens without '
+    + 'publishing, to keep the project\'s message budget for the readings it also serves.',
+    'Vertical exaggeration stretches the relief and nothing else: the station is its true size and '
+    + 'the figure 1.75 m at every setting. They are the ruler.',
+    'Everything arrives over the network — the renderer on the first visit (~750 KB), then one '
+    + 'raster and one image per patch. Whatever fails, the twin says which and draws what it did get; '
+    + 'a ground that could not be read is never drawn flat.',
+    '<strong>The water is the station\'s flood levels, stood on the ground.</strong> It rises from '
+    + '0 m on the gauge to the highest level the record holds, is held there, let out, and rises '
+    + 'again: clear blue below minor, then green, yellow and red past minor, moderate and major, and '
+    + 'magenta through to dark blue past the AEP floods — the colour of the rarest level passed, so '
+    + 'it never goes back down. It goes where the river would take it, not everywhere low: a hollow '
+    + 'behind a bank stays dry until the bank is overtopped. It is one level surface through the '
+    + 'patch, and a real flood slopes downstream, so the far edges are a guide. The floods the river '
+    + 'has seen — its five largest from the Bureau\'s records, at the level each reached — rise with '
+    + 'it as rings on the staff, the highest named; a flood colours nothing. Classes on a gauge whose '
+    + 'zero is not surveyed to AHD, and floods whose gauge zero that day is not known in AHD, are named '
+    + 'in the notes and not drawn. Not in the .glb.',
+    '<strong>The scale up the left of the stage is the water\'s control.</strong> Every level is '
+    + 'marked on it at its height, to scale, its name beside it — moved only far enough not to sit on '
+    + 'another. ⏸ or ▶ at its head stops and starts the rise; press a name and the water is held at '
+    + 'that level; press or drag on the track and the water follows the pointer, taking a level '
+    + 'exactly when let go near its mark. On the track, Page Up and Page Down go level to level, Home '
+    + 'and End to 0 m and the top. On a phone the names give way to their marks after five seconds — '
+    + 'tap the track for five more (a tap only brings them back; drag to move the water) — and the '
+    + 'hint along the foot folds to a <strong>?</strong> that brings it back. The line under the stage '
+    + 'has the same levels, and <em>Hide the water</em> — each choice remembered.',
+    '<strong>Log, beside the scale\'s head.</strong> The scale opens linear — a metre the '
+    + 'same height all the way up. Where a station\'s levels crowd together near the top (the AEP '
+    + 'floods and the largest floods within a metre or two of each other over major, as at Gatton), '
+    + 'it turns <em>logarithmic</em> by itself a few seconds later: measured down from the highest '
+    + 'level, so the top metres get the room and every name sits by its mark, and the rise slows as '
+    + 'it climbs into them rather than passing them all in its last second — and <strong>Log</strong> '
+    + 'lights up. Press it to turn the logarithmic scale on or off; the choice is kept for that station '
+    + 'for the session, and the water never moves when the scale does.',
+    '<strong>No levels here? Borrow a neighbour\'s.</strong> For a station with no flood heights '
+    + 'the twin can put on its ground, the flood line (and a pill on the stage) offers the four nearest stations '
+    + 'that have some — their distance, their heights and their catchment. Pick one and its levels '
+    + 'are drawn over this channel as heights on its gauge (or, if you say so, as the same metres '
+    + 'AHD). Only in the twin, only for the session, and every place that draws them says whose '
+    + 'they are.',
+    '<strong>A 📷 on the ground is where somebody stood with a camera</strong> — a post at chest '
+    + 'height, the camera turned the way it faced and a pale wedge for each way a photo from there '
+    + 'looked. Click it, pick it from the line under the stage, or walk up to it in the POV and '
+    + 'press Enter, and the photos taken there open one after another. Editors only, like the '
+    + 'photos themselves; the markers are not in the .glb.',
+    'The <code>.glb</code> is in metres, y up, with its origin on the ground at the pole and the '
+    + 'station\'s coordinates and datum in its header. Blender: <em>File → Import → glTF 2.0</em>, '
+    + 'and it lands z-up. Point cloud data, when it is ingested, will sit in this same scene.',
+  ],
+  links: [
+    { label: 'Digital twin — where the ground and the imagery come from, and the Blender workflow',
+      href: 'docs/digital-twin.md' },
+  ],
+};
 
 // The help panel's own width transition, and it plays exactly the role
 // NAV_TRANSITION_MS does: the maps are re-measured once the slide has finished

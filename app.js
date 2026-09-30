@@ -1475,6 +1475,10 @@ function refocusAfterTabSwitch(cameFromShell) {
 }
 
 function switchTab(id) {
+  // The Digital Twin had a tab of its own; it is the 🧊 pane of the Stations
+  // side panel now, beside the map the twin opens in. An old link to it —
+  // a bookmark's handler, a help page — lands there.
+  if (id === 'twin') { switchTab('stations'); setDockTab('twin'); return; }
   // Read before anything re-renders — afterwards the element is gone and the
   // question "was the user in the nav" can no longer be asked.
   const from = document.activeElement;
@@ -1923,6 +1927,9 @@ function dockSkeleton(panel) {
         <div class="dock-pane dock-pane-map dock-pane-places" id="${dockPaneId('places')}" data-dock="places" hidden>
           ${Places.paneHtml()}
         </div>
+        <div class="dock-pane dock-pane-map dock-pane-twin" id="${dockPaneId('twin')}" data-dock="twin" hidden>
+          ${DigitalTwin.paneHtml()}
+        </div>
       </div>
     </div>`;
 }
@@ -1996,7 +2003,7 @@ function dockMapListed(e) {
 function dockHas(id) {
   if (id === 'help') return true;
   if (id === 'stations' || id === 'paths') return dockStationsHere();
-  if (id === 'places') return dockHoldsMapTools();
+  if (id === 'places' || id === 'twin') return dockHoldsMapTools();
   if (!id.startsWith('map-') || state.activeTab !== 'stations') return false;
   const e = dockMapItems.get(id);
   if (e) return dockMapListed(e);
@@ -2106,6 +2113,13 @@ function dockStripGroups() {
   if (here) {
     side.push({ key: 'paths', kind: 'tab', icon: '〽️',
                 label: 'Path tools — radio path, elevation profile and link budget (fade margin)' });
+  }
+  // The digital twin's pane: what was the Digital Twin tab's left column —
+  // the finder, the scene's settings, the ground truth and the .glb — beside
+  // the map the twin opens in (digital-twin.js, paneHtml).
+  if (dockHoldsMapTools()) {
+    side.push({ key: 'twin', kind: 'tab', icon: '🧊',
+                label: 'Digital twin — open a station\'s twin, its scene settings, ground truth and the .glb for Blender' });
   }
   const groups = [{ name: 'side', label: '', items: side }];
   const map = [...dockMapItems.values()]
@@ -2244,6 +2258,10 @@ function renderDock(opts = {}) {
   syncDockWidth();
   syncDockStrip(showing);
   for (const pane of panel.querySelectorAll('.dock-pane')) pane.hidden = pane.dataset.dock !== showing;
+  // The twin's pane is written once and kept true by id; coming into view is
+  // one of the moments it is brought up to date (a stations file loaded since,
+  // a twin opened or put away while it was shut).
+  if (showing === 'twin' && dockLastShowing !== 'twin') DigitalTwin.syncPane();
   syncHelpChrome();
 
   // Same reason renderTabs() does this — a map built on the opening render must
@@ -3004,7 +3022,6 @@ function renderMain() {
     case 'field':      el.innerHTML = ArroData.render('field'); ArroData.init();  break;
     case 'msglog':     el.innerHTML = MessageLog.render();      MessageLog.init(); break;
     case 'mapgen':     el.innerHTML = MapGen.render();          MapGen.init();     break;
-    case 'twin':       el.innerHTML = DigitalTwin.render();     DigitalTwin.init(); break;
     case 'inspections': el.innerHTML = Inspections.render();  Inspections.init(); break;
     case 'maintenance': el.innerHTML = Maintenance.render();  Maintenance.init(); break;
     case 'history':    el.innerHTML = History.render();       History.init();      break;
@@ -5716,15 +5733,15 @@ function stationActionGroups(s) {
    .filter(g => g.pills.length);
 }
 
-// "Digital twin →": the station's own patch of ground in three dimensions, on
-// the tab that builds it (digital-twin.js). Only for a station with a position
+// "Digital twin →": the station's own patch of ground in three dimensions, in
+// the map it is on — zoomed in on it and handed over (map-twin.js). Only for a station with a position
 // — there is no ground to stand a pole on otherwise — and only when the module
 // is loaded, for fieldDataPillHtml's reason below.
 function twinPillHtml(s) {
   if (typeof DigitalTwin === 'undefined' || !DigitalTwin.openStation) return '';
   if (s.lat == null || s.lon == null || !isFinite(s.lat) || !isFinite(s.lon)) return '';
   return `<button type="button" class="pill mn-twin" onclick="DigitalTwin.openStation('${escAttr(s.id)}')"
-           title="Open the Digital Twin tab on this station: its ground in 3-D, a 2 m pole where it stands"
+           title="Open this station's digital twin on the map: its ground in 3-D, the station as built where it stands"
            >🧊 Digital twin →</button>`;
 }
 

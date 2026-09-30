@@ -1,4 +1,4 @@
-# The Digital Twin tab
+# The digital twin
 
 One station's patch of ground in three dimensions: the real relief under it
 from the best public elevation model there is, the aerial imagery draped over
@@ -8,13 +8,21 @@ at eye height; click the ground for its height; watch the station's flood
 levels rise over it as water; and download the whole scene as a `.glb` that
 Blender opens in one step.
 
-It is `digital-twin.js`, the **Digital Twin** tab under *Stations & networks*,
-and a 🧊 pill on the card of every station with a position. `npm run twin` holds it, and `npm run flood` its
-flood water (see the end).
+It is `digital-twin.js`, drawn **inside the Stations map** (`map-twin.js`
+hosts it: the map offers it from zoom 17, and the 🧊 pill on the card of every
+station with a position opens it in one press), with its settings in the
+**🧊 pane of the Stations side panel** — find a station and open its twin, the
+Scene settings, Ground truth, the ground as numbers and the `.glb`. ⚙ Settings
+on the twin's bar opens that pane. `npm run twin` holds it, and `npm run flood`
+its flood water (see the end).
+
+It had a tab of its own until September 2026 — the same scene in a second
+host, with those settings down its left. Two ways to one thing, each with half
+the tools, was one too many; the tab's column became the pane, and an old
+link to the tab lands on the Stations tab with the pane open.
 
 **All of it is indicative modelling**, and every twin says so for as long as it
-is up: a line of red along the foot of the view — on this tab and inside the
-Stations map alike, never folded away with the lines over the stage or a
+is up: a line of red along the foot of the view, never folded away with the lines over the stage or a
 phone's hint — *⚠ Indicative modelling only — the ground, the station and the
 flood water are modelled, not surveyed. Not a flood map or a forecast.* It
 shortens with the view (three lengths, picked by the stage's width through a
@@ -26,7 +34,7 @@ drawn on the picture so that it goes with it.
 
 ---
 
-## Why a tab of its own
+## Why a renderer of its own, next to ⛰️ 3-D
 
 The Stations map's 3-D view (`map-3d.js`) is the whole network on the
 ground — tens of kilometres of terrain at ~30 m, links and pins draped over
@@ -490,8 +498,8 @@ flown — 10–20 cm over most towns. So the move-pin mode (`map-move-pin.js`, t
 station card's **📍 Move pin on map**) works here, and in ⛰️ 3-D, as it does on
 the flat map:
 
-- **On the Digital Twin tab**, **📍 Move pin** on the header arms it for the
-  station on the stage — there is no map under it, and none is needed. An
+- **In the twin**, **📍 Move pin** on its bar arms it for the station on the
+  stage. An
   **amber post** stands on the ground at the station, taller than what is
   built there so its head shows over it, with a ring at its foot. Drag the
   post across the ground, or click the ground where the station stands: the
@@ -532,8 +540,7 @@ the way it faces (`facing_deg`, migration `0044`): the bearing its front looks
 out, clockwise from true north. Where nothing is recorded it is drawn facing
 south (180°), as before.
 
-- **🧭 Orientation**, on the Digital Twin tab's header and the Stations map
-  twin's bar, opens a panel in Move pin's corner (the two are never open
+- **🧭 Orientation**, on the twin's bar, opens a panel in Move pin's corner (the two are never open
   together; the station trail stands down while it is up). The model turns as
   the numbers change: the bearing box, **⟲ 15° / 15° ⟳**, the slider,
   **👁 Face the view** (orbit round to where the front should be, then press:
@@ -567,11 +574,10 @@ the one that matters:
   sets. Nothing is re-derived, so the twin cannot disagree with the map it
   was opened from. `npm run twin` holds the mirror: one ray per far end, in
   the colour the map gave the line.
-- **On the Digital Twin tab** there is no map to mirror (leaving the Stations
-  tab takes its lines with it), so the relations themselves are asked — the
-  pass-range and backbone indexes `app.js` draws the lines from, through its
-  own functions — in the plain colours. The notes say which, because "as the
-  map colours them" and "as recorded" are different claims.
+- **Before the map has drawn its lines** the relations themselves are asked —
+  the pass-range and backbone indexes `app.js` draws the lines from, through
+  its own functions — in the plain colours. The notes say which, because "as
+  the map colours them" and "as recorded" are different claims.
 
 A path's far end is beyond the patch almost always, so the ray runs from the
 antenna to the patch's edge along the line of sight to the far antenna (the

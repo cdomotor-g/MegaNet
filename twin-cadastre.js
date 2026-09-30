@@ -7,7 +7,7 @@
 //                  draws as land parcels, and the Stations map as Property
 //                  boundaries (map-lots.js) and Road parcels (map-roads.js),
 //                  in every view the twin has — orbit, top-down and the POV —
-//                  on the Digital Twin tab and inside the Stations map.
+//                  inside the Stations map.
 //
 // After digital-twin.js, whose scene it draws into, and before map-twin.js,
 // which hosts the same scene — index.html holds the order. Reaches back to

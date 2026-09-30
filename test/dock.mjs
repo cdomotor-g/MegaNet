@@ -104,12 +104,13 @@ const CARD_IDS = ['stations-cards', 'stations-filter-card', 'stations-list-card'
 const PANEL_IDS = ['map-display-block', 'map-legend', 'map-draw-panel', 'map-3d-panel-body', 'sites-run', 'polar-status'];
 
 // The strip, top to bottom, as the corner orders it: the side panel's own
-// four (❔, 📍 the cards, the blue 📍 Find a place, 〽️ the path tools), then
+// five (❔, 📍 the cards, the blue 📍 Find a place, 〽️ the path tools, 🧊 the
+// digital twin's pane), then
 // the map's groups — show,
 // tools, 3d, screen — and within each by its declared order. Panes are
 // 'map-<id>', plain buttons their class. Not ↺ (the reset group's one button):
 // it is built to stay in the map's corner (`corner`), and is asserted there.
-const STRIP = ['help', 'stations', 'places', 'paths',
+const STRIP = ['help', 'stations', 'places', 'paths', 'twin',
                'map-display', 'map-legend',
                'map-draw', 'map-polar', 'map-sites', 'mn-map-here',
                'mn-map-3d', 'map-3d', 'mn-map-north', 'mn-map-tilt',

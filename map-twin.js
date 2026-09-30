@@ -67,7 +67,7 @@
 // The offer is on by default and is a switch in 🗺️ Map display. Nothing is
 // fetched until a station qualifies. From zoom 14 with a station under the
 // view the twin's ground and imagery are fetched ahead (DigitalTwin.prefetch)
-// into the same bounded caches the tab uses, so the hand-over, when it is
+// into the same bounded caches a build reads, so the hand-over, when it is
 // asked for, is a build from memory rather than a wait — which is what makes
 // it read as a transition and not a stall. The renderer itself (three.js)
 // arrives on the first hand-over of the session and never for a session that
@@ -148,7 +148,10 @@ const MapTwin = (function () {
   function sync() {
     if (!map || typeof DigitalTwin === 'undefined') return;
     const z = map.getZoom();
-    const st = enabled() ? candidate() : null;
+    // The switch in Map display is the offer's: a twin opened by name (the
+    // card's pill, the side panel's pane) stays up with it off.
+    const cand = candidate();
+    const st = enabled() ? cand : null;
     // Zoomed out past the offer: every × is forgotten, so the next time in
     // the card comes up again.
     if (z < ZOOM) dismissed.clear();
@@ -158,7 +161,7 @@ const MapTwin = (function () {
     // map moved out from under it — zoomed out, or off every station — takes
     // it down, and what is left is the map, offering again if it still can.
     if (up) {
-      if (st && z >= ZOOM) { if (stationId !== st.id) enter(st); return; }
+      if (cand && z >= ZOOM) { if (stationId !== cand.id) enter(cand); return; }
       leave(false);
     }
     if (st && z >= ZOOM && !dismissed.has(st.id)) showOffer(st);
@@ -299,7 +302,7 @@ const MapTwin = (function () {
     // One row, whatever the width: the words on the buttons go below `sm`
     // the way the banner's do (.hdr-label), the title truncates, and the
     // status, the paths, the company and the credit line are each one line
-    // with the whole text as their tooltip — the tab has them in full (the
+    // with the whole text as their tooltip (the
     // field photos' line among them: one line, its spots as buttons). The
     // notes are folded under a one-line count that opens over the stage
     // rather than in front of it: a map on a phone is 340 px tall, and three
@@ -322,8 +325,8 @@ const MapTwin = (function () {
                     title="Move this station's pin to where the station stands on the imagery, and save the position"><span aria-hidden="true">📍</span><span class="map-twin-label"> Move pin</span><span class="sr-only">Move this station's pin</span></button>
             <button type="button" id="twin-orient-btn" aria-pressed="false" onclick="DigitalTwin.toggleOrient()"
                     title="Turn the station to the way it faces on the ground — the side its door or ladder is on — and save the bearing"><span aria-hidden="true">🧭</span><span class="map-twin-label"> Orientation</span><span class="sr-only">Turn this station to the way it faces</span></button>
-            <button type="button" class="map-twin-wide" onclick="MapTwin.openTab()"
-                    title="The Digital Twin tab: the settings, the ground truth, the .glb for Blender"><span aria-hidden="true">🧊</span><span class="map-twin-label"> Open the tab →</span><span class="sr-only">Open the Digital Twin tab</span></button>
+            <button type="button" class="map-twin-wide" onclick="MapTwin.openPane()"
+                    title="The twin's settings, the ground truth and the .glb for Blender — the 🧊 pane of the side panel"><span aria-hidden="true">⚙</span><span class="map-twin-label"> Settings</span><span class="sr-only">The twin's settings, in the side panel</span></button>
             ${DigitalTwin.infoToggleHtml()}
           </span>
         </div>
@@ -430,7 +433,32 @@ const MapTwin = (function () {
       hideOffer();
       announce('Put away. Zoom out and back in to be offered the twin again.');
     },
-    openTab() { if (stationId && typeof DigitalTwin !== 'undefined') DigitalTwin.openStation(stationId); },
+    // ⚙ on the overlay's bar: the side panel open on the 🧊 pane — what the
+    // Digital Twin tab's left column was — beside the twin it sets.
+    openPane() { if (typeof setDockTab === 'function') setDockTab('twin'); },
+    // A station's twin, asked for by name rather than by zoom (the station
+    // card's pill, the pane's finder, a field photo — DigitalTwin.openStation,
+    // which has already made this the Stations tab): the card on the
+    // station, the map at it at the offer's zoom, and the hand-over.
+    openStation(id) {
+      const st = stationById(id);
+      if (!map || !located(st)) return false;
+      // A card already up for another station moves to this one — it is the
+      // twin's first choice of station (candidate), and one left on a
+      // neighbour within the patch would take the twin there. No card is
+      // opened otherwise: over a twin it covers the ground being looked at.
+      if (typeof showStationCard === 'function' && state.stnCard && state.stnCard.id && state.stnCard.id !== st.id) showStationCard(st.id);
+      const was = up ? stationId : null;
+      if (map.getPane && map.getPane('mapPane')) {
+        map.setView([st.lat, st.lon], Math.max(map.getZoom(), ZOOM), { animate: false });
+      }
+      // The move's end may already have handed over (sync, with the twin up
+      // on another station), and that build stands. Otherwise it is done here
+      // — and a station asked for by name that was already up is built again,
+      // as picking it on the Digital Twin tab did: the operator asked.
+      if (!up || stationId !== st.id || was === st.id) enter(st);
+      return true;
+    },
 
     // The switch in 🗺️ Map display. Remembered: it is how an operator reads
     // the map, not something they are doing right now.
@@ -452,7 +480,7 @@ const MapTwin = (function () {
   };
 
   function noteHtml() {
-    if (!enabled()) return 'Off. Nothing is offered at close zoom; the Digital Twin tab is still there on the left.';
+    if (!enabled()) return 'Off. Nothing is offered at close zoom; a station\'s twin still opens from 🧊 Digital twin on its card, or from the 🧊 pane of the side panel.';
     return `From zoom ${ZOOM} in, with a station under the view — the one on the card, the selected one, or the `
          + 'nearest to the centre — a card at the top of the map offers that station\'s digital twin and says what '
          + 'aerial imagery covers it, at what resolution and when it was flown. Press 🧊 Open the digital twin and the '

@@ -357,7 +357,8 @@ try {
   await settled();
   let d = await dbg();
 
-  ok('the tab is open on the station', d.stationId === st.id && await page.evaluate(() => state.activeTab === 'twin'));
+  ok('the twin is open on the station, inside the Stations map', d.stationId === st.id && d.embedded
+    && await page.evaluate(() => state.activeTab === 'stations' && MapTwin.active() && MapTwin.station() === DigitalTwin.debug().stationId));
   ok('three.js arrived, and only once the tab was opened', d.lib && seen.three >= 1, `${seen.three} request(s)`);
   ok('the ground came from the State\'s service', d.source === 'qld' && d.holes === 0, `${d.source}, ${d.holes} hole(s)`);
   ok('N × N vertices', d.vertices === d.N * d.N && d.N === 201, `${d.vertices}`);
@@ -436,7 +437,7 @@ try {
   const dom = await page.evaluate(() => {
     const cv = document.getElementById('twin-canvas');
     const truth = document.getElementById('twin-truth');
-    const h2 = document.getElementById('twin-heading');
+    const h2 = document.querySelector('#map-twin .map-twin-title');
     const table = document.querySelector('#twin-table table');
     return {
       name: cv.getAttribute('aria-label') || '', tab: cv.tabIndex,
@@ -446,7 +447,7 @@ try {
       cells: table ? table.querySelectorAll('tbody td').length : 0,
       exportOn: !document.getElementById('twin-export').disabled,
       status: document.getElementById('twin-status').textContent,
-      inline: [...document.querySelectorAll('#main-content [style]')]
+      inline: [...document.querySelectorAll('#map-twin [style]')]
         .filter(el => !(el.getAttribute('style') || '').split(';').map(s => s.trim()).filter(Boolean)
           .every(s => /^--[\w-]+\s*:/.test(s)))
         .map(el => el.tagName + '[' + el.getAttribute('style') + ']'),
@@ -845,11 +846,24 @@ try {
   ok('the button reads as pressed and the canvas name says how to move about', walk.pressed === 'true' && /POV/.test(walk.name), walk.name);
   ok('Escape returns to orbit', walk.modeAfter === 'orbit' && walk.pressedAfter === 'false');
 
-  const box = await page.locator('#twin-canvas').boundingBox();
-  await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.62);
+  // A point of ground the canvas itself is under: the station card stands
+  // over part of the twin (map-twin.js keeps it above the stage), and a
+  // click there is the card's.
+  const spot = await page.evaluate(() => {
+    const cv = document.getElementById('twin-canvas');
+    const r = cv.getBoundingClientRect();
+    const first = { x: r.left + r.width * 0.5, y: r.top + r.height * 0.62 };
+    if (document.elementFromPoint(first.x, first.y) === cv) return first;
+    for (const [x, z] of [[-15, 10], [15, 10], [-15, -10], [0, 15], [-30, 0], [10, -20], [-8, 4]]) {
+      const p = DigitalTwin._screen(x, DigitalTwin._heightAt(x, z) - DigitalTwin.debug().h0, z);
+      if (p && p.inFront && document.elementFromPoint(p.x, p.y) === cv) return p;
+    }
+    return null;
+  });
+  if (spot) await page.mouse.click(spot.x, spot.y);
   await sleep(300);
   const picked = await page.evaluate(() => document.getElementById('twin-pick').textContent);
-  ok('a click on the ground is answered with where it is and how high', /ground \d+\.\d\d m/.test(picked) && /of the pole/.test(picked), picked);
+  ok('a click on the ground is answered, in the 🧊 pane, with where it is and how high', /ground \d+\.\d\d m/.test(picked) && /of the pole/.test(picked), `${picked} — at ${JSON.stringify(spot)}`);
 
   // ── 5b. The station as built: the Type 3 pole ─────────────────────────────
   // What stands at the origin is read from the record. This station has no
@@ -1295,10 +1309,10 @@ try {
     const b = document.querySelector('#stn-card .mn-twin');
     if (!b) return { present: false };
     b.click();
-    return { present: true, tab: state.activeTab, station: DigitalTwin.debug().stationId, text: b.textContent.trim() };
+    return { present: true, tab: state.activeTab, station: DigitalTwin.debug().stationId, text: b.textContent.trim(), up: MapTwin.active() };
   }, st.id);
-  ok('the station card carries a Digital twin pill that opens the tab on the station',
-    pill.present && pill.tab === 'twin' && pill.station === st.id && /^🧊/.test(pill.text), JSON.stringify(pill));
+  ok('the station card carries a Digital twin pill that opens the station\'s twin on the map',
+    pill.present && pill.tab === 'stations' && pill.station === st.id && /^🧊/.test(pill.text), JSON.stringify(pill));
   await page.waitForFunction(() => DigitalTwin.debug().built, null, { timeout: BUILD_TIMEOUT });
   await settled();
   // …and drawing again: the frame count has to move past where the teardown
@@ -1512,29 +1526,39 @@ try {
   await page.waitForFunction(() => !MapTwin.active() && !state.map._animatingZoom, null, { timeout: 10_000 });
   ok('zooming the map out takes the twin down at the zoom asked for', (await page.evaluate(() => state.map.getZoom())) === 12);
 
-  // From the overlay to the tab: the same station, no longer embedded, and
-  // the paths now read from the relations rather than the map's lines.
+  // From the overlay to the 🧊 pane: ⚙ Settings opens the side panel on the
+  // twin's pane (what the Digital Twin tab's column was), beside the same
+  // twin, still embedded, with the paths as the map colours them.
   await page.evaluate(([lat, lon]) => state.map.setView([lat, lon], 17, { animate: false }), [linked.lat, linked.lon]);
   await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
   await page.click('#map-twin-offer .map-twin-offer-open');
   await page.waitForFunction(() => MapTwin.active() && DigitalTwin.debug().built, null, { timeout: BUILD_TIMEOUT });
-  await page.evaluate(() => MapTwin.openTab());
-  await page.waitForFunction(() => state.activeTab === 'twin' && DigitalTwin.debug().built && !DigitalTwin.debug().embedded, null, { timeout: BUILD_TIMEOUT });
   await settled();
-  const onTab = await page.evaluate(async () => {
+  await page.click('#map-twin .map-twin-wide');
+  await sleep(300);
+  const inPane = await page.evaluate(async () => {
     const d = DigitalTwin.debug();
     const buf = await DigitalTwin.buildGlb();
     const dv = new DataView(buf);
     const jsonLen = dv.getUint32(12, true);
     const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen)));
-    return { station: d.stationId, embedded: d.embedded, paths: d.paths, mapUp: !!state.map,
+    const pane = document.getElementById('dock-pane-twin');
+    return { station: d.stationId, embedded: d.embedded, paths: d.paths, up: MapTwin.active(), showing: dockShowing(),
+             paneShown: !!pane && !pane.hidden, lead: (document.getElementById('twin-pane-lead') || {}).textContent || '',
+             exportOn: !document.getElementById('twin-export').disabled, tab: state.activeTab,
              pathMeshes: json.meshes.filter(m => /^path to /.test(m.name)).length };
   });
-  ok('the tab opens on the station from the overlay, with the paths read from the relations',
-    onTab.station === linked.id && !onTab.embedded && !onTab.mapUp && onTab.paths && onTab.paths.source === 'data'
-      && onTab.paths.count >= linked.far.length && linked.far.every(id => onTab.paths.list.some(p => p.farId === id)),
-    JSON.stringify({ ...onTab, paths: onTab.paths && { source: onTab.paths.source, count: onTab.paths.count, far: onTab.paths.list.map(p => p.farId) } }));
-  ok('and the .glb carries one mesh per path', onTab.pathMeshes === onTab.paths.count, `${onTab.pathMeshes} vs ${onTab.paths.count}`);
+  ok('⚙ Settings opens the side panel on the 🧊 pane, beside the same twin, which stays up',
+    inPane.showing === 'twin' && inPane.paneShown && inPane.up && inPane.embedded && inPane.station === linked.id
+      && inPane.tab === 'stations' && inPane.exportOn && inPane.lead.includes(linked.name),
+    JSON.stringify({ ...inPane, paths: undefined }));
+  ok('and the .glb carries one mesh per path', inPane.paths && inPane.pathMeshes === inPane.paths.count, `${inPane.pathMeshes} vs ${inPane.paths && inPane.paths.count}`);
+  // An old way in to the tab lands here too.
+  await page.evaluate(() => { shutDock(); switchTab('twin'); });
+  await sleep(300);
+  const legacy = await page.evaluate(() => ({ tab: state.activeTab, showing: dockShowing() }));
+  ok('switchTab(\'twin\') — the tab that was — lands on Stations with the 🧊 pane open',
+    legacy.tab === 'stations' && legacy.showing === 'twin', JSON.stringify(legacy));
 
   ok('no uncaught page errors', errors.length === 0, errors.join(' | '));
 } catch (err) {
