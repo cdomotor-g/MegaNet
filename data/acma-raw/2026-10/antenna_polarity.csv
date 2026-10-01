@@ -1,0 +1,13 @@
+POLARISATION_CODE,POLARISATION_TEXT
+CL,CL - Left-hand circular or indirect
+CR,CR - Right-hand circular or direct
+D,D - Dual
+H,H - Horizontal linear
+L,L - Linear
+M,M - Mixed
+O,O - Other
+S,S - Slant
+SL,SL - Left-hand slant
+SR,SR - Right-hand slant
+U,U - Unknown
+V,V - Vertical linear

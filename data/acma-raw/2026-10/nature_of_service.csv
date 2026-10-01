@@ -1,0 +1,17 @@
+CODE,DESCRIPTION
+AS,AS - Station using adaptive system
+AX,AX - Fixed station used for transmission of aeronautical information (from 1 January 1999)
+CO,CO - Station open to official correspondence exclusively
+CP,CP - Station open to public correspondence
+CR,CR - Station open to limited public correspondence
+CV,CV - Station open exclusively to correspondence of a private agency
+FS,FS - Land station established solely for the safety of life
+HP,HP - Fixed station using high altitude platform
+MX,MX - Fixed station used for transmission of meteorological information
+OT,OT - Station open exclusively to operational traffic of the service concerned
+PX,PX - Fixed station used for press transmission
+RC,RC - Non-directional radiobeacon
+RD,RD - Directional radiobeacon
+RG,RG - Radio direction-finding station
+RT,RT - Revolving radiobeacon
+ST,ST - Fixed station using tropospheric scatter
