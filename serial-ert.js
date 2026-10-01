@@ -140,6 +140,8 @@ const SerialErt = (function () {
       : text;
     if (f.error) {
       e.bad++;
+      if (typeof RxLog !== 'undefined' && typeof SerialIngest !== 'undefined')
+        RxLog.add(c, { t: SerialIngest.arrival(c), protocol: 'alert2', alert_id: null, ok: false, fault: 'frame', rssi_dbm: f.hdr ? f.hdr.rssi : null, detail: { error: String(f.error).slice(0, 120) } });
       Serial.logLine(c, label, 'ert-bad');
       Serial.logLine(c, '↳ not decoded: ' + f.error, 'err');
       mark(c, 'status');
@@ -180,9 +182,21 @@ const SerialErt = (function () {
   // network clock) is timed by arrival instead, and the card says so. A binary
   // frame out of history carries no date at all, and is not sent.
   function ingest(c, f, text) {
-    if (typeof SerialIngest === 'undefined' || !f.payload || f.hdr.frameOk === 0) return;
+    if (typeof SerialIngest === 'undefined' || !f.payload) return;
+    const ts = frameTime(c, f);
+    // Every reading to the reception log, the bad ones too — a frame the
+    // receiver called dirty and a status byte that is set are what finding a
+    // corrupting transmitter is made of.
+    if (typeof RxLog !== 'undefined') f.records.forEach(r => RxLog.add(c, { t: ts, protocol: 'alert2', alert_id: r.alertId, value_raw: r.value,
+      payload_hex: r.bytes.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase(),
+      ok: r.ok && f.hdr.frameOk !== 0, fault: !r.ok ? 'status' : f.hdr.frameOk === 0 ? 'frame' : null,
+      rssi_dbm: f.hdr.rssi, detail: { source: f.hdr.source, quality: f.hdr.quality } }));
+    if (f.hdr.frameOk === 0) return;
     const recs = f.records.filter(r => r.ok);
     if (!recs.length) return;
+    SerialIngest.add(c, recs.map((r, i) => ({ alert_id: r.alertId, value_raw: r.value, ts, protocol: 'alert2', line: i ? null : text })));
+  }
+  function frameTime(c, f) {
     const sod = f.payload.sod, live = SerialIngest.arrival(c);
     let ts = null;
     if (live != null) {
@@ -195,7 +209,7 @@ const SerialErt = (function () {
       ts = onDay(sod, f.hdr.clockMs, false);
       if (ts > Date.now() + 5 * 60000) ts -= 86400000;
     }
-    SerialIngest.add(c, recs.map((r, i) => ({ alert_id: r.alertId, value_raw: r.value, ts, protocol: 'alert2', line: i ? null : text })));
+    return ts;
   }
   function onDay(sod, refMs, nearest) {
     const d = new Date(refMs);
@@ -441,6 +455,7 @@ const SerialErt = (function () {
       + '<th scope="col">RSSI (median)</th><th scope="col" class="col-optional">Last heard</th></tr></thead>'
       + '<tbody id="ert-stn-' + id + '"></tbody></table></div></section>'
       + (typeof SerialIngest !== 'undefined' ? SerialIngest.panel(c) : '')
+      + (typeof RxLog !== 'undefined' ? RxLog.panel(c) : '')
       + '<details class="qs-ctl" open><summary>Raw stream</summary>'
       + Serial.statsHtml(c) + Serial.logHtml(c)
       + '</details>'

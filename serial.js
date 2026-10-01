@@ -100,20 +100,20 @@ const Serial = (function () {
   // an 'sdr' card is made by SerialSdr.create instead.
   function makeConn(kind, extra) {
     const d = loadDefaults();
-    const radio = kind === 'quansheng', ert = kind === 'ert';
+    const radio = kind === 'quansheng', ert = kind === 'ert', gps = kind === 'gps';
     return Object.assign({
       id: 'c' + (nextId++),
       kind: kind || 'serial',
-      name: radio ? 'Quansheng radio' : ert ? 'ERT-A2' : 'Connection ' + (conns.length + 1),
+      name: radio ? 'Quansheng radio' : ert ? 'ERT-A2' : gps ? 'GPS' : 'Connection ' + (conns.length + 1),
       phase: 'setup',                    // setup | open | follow | closed | error | demo
       source: d.source,                  // port | file
       follow: null,                      // { src, follower, note } while a log file is the source
       fromStart: true,                   // a followed log: read what is already in it first
       port: null,
       portLabel: '',
-      settings: { baudRate: radio ? 115200 : d.baudRate, dataBits: d.dataBits, stopBits: d.stopBits,
+      settings: { baudRate: radio ? 115200 : gps ? 9600 : d.baudRate, dataBits: d.dataBits, stopBits: d.stopBits,
                   parity: d.parity, flowControl: d.flowControl },
-      mode: radio ? 'radio' : ert ? 'ert' : d.mode,
+      mode: radio ? 'radio' : ert ? 'ert' : gps ? 'gps' : d.mode,
       entries: [],                       // {ts, cls, body(html), raw(text)}
       bytes: 0,
       count: 0,                          // lines (text) / rows (hex) / frames (alert)
@@ -143,7 +143,7 @@ const Serial = (function () {
   function addConnection(kind) {
     const conn = kind === 'sdr'
       ? SerialSdr.create('c' + (nextId++), 'RTL-SDR ' + (conns.filter(c => c.kind === 'sdr').length + 1))
-      : makeConn(kind === 'quansheng' || kind === 'ert' ? kind : 'serial');
+      : makeConn(kind === 'quansheng' || kind === 'ert' || kind === 'gps' ? kind : 'serial');
     conns.push(conn);
     renderList();
     // reveal the freshly added card
@@ -511,6 +511,7 @@ const Serial = (function () {
     if (conn.kind === 'sdr') await SerialSdr.remove(conn);          // a USB card: none of the serial teardown applies
     else {
       if (conn.kind === 'quansheng' && conn.radio) SerialRadio.detach(conn);
+      if (conn.kind === 'gps') SerialGps.detach(conn);
       if (conn.phase === 'open') await closeConn(id, { silent: true });
       stopFollower(conn);
     }
@@ -564,6 +565,15 @@ const Serial = (function () {
       renderList();
       const el = document.getElementById('ser-card-' + conn.id);
       if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      return;
+    }
+    if (kind === 'gps') {
+      const conn = makeConn('gps', { name: 'Demo GPS', phase: 'demo', portLabel: 'Demo (a drive west of Toowoomba, no receiver attached)' });
+      conns.push(conn);
+      emitSys(conn, 'Demo GPS — a made-up drive, NMEA sentences through the real parser. Its position is offered to demo cards only.', 'sys');
+      startTicker();
+      renderList();
+      SerialGps.demo(conn);
       return;
     }
     if (kind === 'sdr') {
@@ -728,6 +738,8 @@ const Serial = (function () {
       if (text.charCodeAt(i + 7) === 0x75 && text.charCodeAt(i + 8) === 0x01) return 'ert';
     }
     if (/4\s*1\W*4\s*C\W*4\s*5\W*5\s*2\W*5\s*4\W*3\s*2/i.test(text)) return 'ert';
+    // A GPS: NMEA position sentences from any talker.
+    if ((text.match(/\$(GP|GN|GL|GA|BD)(GGA|RMC),/g) || []).length >= 2) return 'gps';
     const lines = text.split(/\r\n|\r|\n/);
     for (let i = 0; i < lines.length && i < 2000; i++) {
       if (Quansheng.classify(lines[i].trim()) === 'record' && !/^ALERT2/.test(lines[i].trim())) return 'quansheng';
@@ -887,6 +899,7 @@ const Serial = (function () {
     tally(conn, u8.length);
     if (conn.kind === 'quansheng') { SerialRadio.feed(conn, u8); scheduleStats(conn); return; }
     if (conn.kind === 'ert') { SerialErt.feed(conn, u8); scheduleStats(conn); return; }
+    if (conn.kind === 'gps') { SerialGps.feed(conn, u8); scheduleStats(conn); return; }
     if      (conn.mode === 'text')  handleText(conn, u8);
     else if (conn.mode === 'hex')   handleHex(conn, u8);
     else if (conn.mode === 'alert') handleAlert(conn, u8);
@@ -1241,8 +1254,8 @@ const Serial = (function () {
   // USB CDC) and its card is SerialRadio's dashboard rather than a stream.
   function setKind(id, kind, quiet) {
     const c = byId(id); if (!c) return;
-    c.kind = kind === 'quansheng' || kind === 'ert' ? kind : 'serial';
-    const plain = /^(Connection \d+|Quansheng radio|ERT-A2)$/.test(c.name);
+    c.kind = kind === 'quansheng' || kind === 'ert' || kind === 'gps' ? kind : 'serial';
+    const plain = /^(Connection \d+|Quansheng radio|ERT-A2|GPS)$/.test(c.name);
     if (c.kind === 'quansheng') {
       c.mode = 'radio';
       if (plain) c.name = 'Quansheng radio';
@@ -1250,7 +1263,11 @@ const Serial = (function () {
     } else if (c.kind === 'ert') {
       c.mode = 'ert';
       if (plain) c.name = 'ERT-A2';
-    } else if (c.mode === 'radio' || c.mode === 'ert') {
+    } else if (c.kind === 'gps') {
+      c.mode = 'gps';
+      if (plain) c.name = 'GPS';
+      if (!quiet) c.settings.baudRate = 9600;
+    } else if (c.mode === 'radio' || c.mode === 'ert' || c.mode === 'gps') {
       c.mode = loadDefaults().mode;
       if (plain) c.name = 'Connection ' + (conns.indexOf(c) + 1);
     }
@@ -1282,12 +1299,13 @@ const Serial = (function () {
   }
 
   // ── rendering ─────────────────────────────────────────────────────────────────
-  const MODE_LABEL = { text: 'ASCII text', hex: 'Hex dump', alert: 'ALERT decode', radio: 'Quansheng ALERT receiver', ert: 'ELPRO ERT-A2' };
+  const MODE_LABEL = { text: 'ASCII text', hex: 'Hex dump', alert: 'ALERT decode', radio: 'Quansheng ALERT receiver', ert: 'ELPRO ERT-A2', gps: 'GPS (NMEA)' };
   const MODE_HINT = {
     text:  'Bytes are decoded as UTF-8/ASCII and split into lines on CR/LF.',
     hex:   'Raw bytes shown as a hex + ASCII dump (16 bytes per row) — best for inspecting binary framing.',
     alert: 'Every 4 bytes are decoded as a 32-bit ALERT payload (ABF/BCC/EAF/EIF) and matched to the station database. Use “Resync” to shift byte alignment if frames don’t line up. For ALERT2, choose the ELPRO ERT-A2 device instead.',
     radio: 'A Quansheng UV-K5 V3 / UV-K1 running the ALERT receiver firmware: its readings, bursts, noise floor and battery as a dashboard, and its console (clock, settings, flash log, station table, screen) as controls. The radio ignores the baud rate — any value works.',
+    gps:   'A USB GPS receiver (u-blox or any NMEA 0183 device, usually 9600 baud): its fix, satellites, accuracy and speed — and the position every receiver card here stamps on what it hears.',
     ert:   'An ELPRO ERT-A2: the RS232 port’s ALERT2A lines (with the receiver’s clock) or the USB port’s binary frames (with RSSI), told apart by what arrives, and every reading matched to its station the way the ALERT2 tab matches them.',
   };
 
@@ -1307,7 +1325,7 @@ const Serial = (function () {
   function setupBody(conn) {
     const id = conn.id;
     const file = conn.source === 'file';
-    const radio = conn.kind === 'quansheng', ert = conn.kind === 'ert';
+    const radio = conn.kind === 'quansheng', ert = conn.kind === 'ert' || conn.kind === 'gps';
     const radioBtn = (v, label) => '<label class="ser-check"><input type="radio" name="ser-src-' + id + '" value="' + v + '"'
       + (conn.source === v ? ' checked' : '') + ' onchange="Serial.setSource(\'' + id + '\',this.value)"> ' + label + '</label>';
     let html = '<div class="ser-form">'
@@ -1317,7 +1335,7 @@ const Serial = (function () {
       + '  <label class="ser-f-kind">Device'
       + '    <select onchange="Serial.setKind(\'' + id + '\',this.value)">'
       +        opt('serial', 'Generic serial device', conn.kind) + opt('quansheng', 'Quansheng ALERT receiver (UV-K5 V3 / UV-K1)', conn.kind)
-      +        opt('ert', 'ELPRO ERT-A2 (ALERT2 — RS232 ASCII or USB)', conn.kind) + '</select>'
+      +        opt('ert', 'ELPRO ERT-A2 (ALERT2 — RS232 ASCII or USB)', conn.kind) + opt('gps', 'GPS receiver (NMEA)', conn.kind) + '</select>'
       + (conn.recognised ? '<span class="ser-port-ok">✓ recognised ' + (conn.recognised === 'contents' ? 'from its log' : 'by its USB ID') + '</span>' : '')
       + '  </label>'
       + '  <fieldset class="ser-f-source"><legend>Read from</legend>'
@@ -1458,13 +1476,14 @@ const Serial = (function () {
   // and stop, keep the stream in a region the reader visits at their own
   // pace, with the stats line beside it as the on-demand summary.
   function logHtml(conn) {
-    return '<div class="ser-log' + (conn.mode === 'text' || conn.kind === 'quansheng' || conn.kind === 'ert' ? ' ser-log-text' : '') + '" id="ser-log-' + conn.id + '"'
+    return '<div class="ser-log' + (conn.mode === 'text' || conn.kind === 'quansheng' || conn.kind === 'ert' || conn.kind === 'gps' ? ' ser-log-text' : '') + '" id="ser-log-' + conn.id + '"'
       + ' role="region" tabindex="0" aria-label="Received data — ' + esc(conn.name) + '"></div>';
   }
 
   function liveBody(conn) {
     if (conn.kind === 'quansheng') return SerialRadio.body(conn);
     if (conn.kind === 'ert') return SerialErt.body(conn);
+    if (conn.kind === 'gps') return SerialGps.body(conn);
     const isOpen = conn.phase === 'open';
     const tb = '<div class="ser-toolbar">' + toolbarButtons(conn) + '</div>' + followHtml(conn);
     let send = '';
@@ -1512,6 +1531,7 @@ const Serial = (function () {
         + '<button class="ghost" onclick="Serial.addDemo()">Show a demo connection</button>'
         + '<button class="ghost" onclick="Serial.addDemo(\'quansheng\')">Demo Quansheng radio</button>'
         + '<button class="ghost" onclick="Serial.addDemo(\'ert\')">Demo ERT-A2</button>'
+        + '<button class="ghost" onclick="Serial.addDemo(\'gps\')">Demo GPS</button>'
         + '<button class="ghost" onclick="Serial.addDemo(\'sdr\')">Demo RTL-SDR</button>'
         + '</div>'
         + '<p class="ser-empty-follow"><strong>No COM port on this computer?</strong> Open the port in PuTTY with logging on '
@@ -1532,6 +1552,8 @@ const Serial = (function () {
       if (c.plot && c.plot.on) paintPlot(c);
       if (c.kind === 'quansheng') { SerialRadio.mount(c); SerialIngest.mount(c); }
       if (c.kind === 'ert') SerialErt.mount(c);
+      if (c.kind === 'gps') SerialGps.mount(c);
+      if (typeof RxLog !== 'undefined') RxLog.mount(c);
     });
   }
 
@@ -1559,6 +1581,7 @@ const Serial = (function () {
       + '    <button class="primary" onclick="Serial.addConnection()">+ Serial device</button>'
       + '    <button class="primary" onclick="Serial.addConnection(\'quansheng\')">+ Quansheng radio</button>'
       + '    <button class="primary" onclick="Serial.addConnection(\'ert\')">+ ERT-A2</button>'
+      + '    <button class="primary" onclick="Serial.addConnection(\'gps\')">+ GPS</button>'
       + '    <button class="primary" onclick="Serial.addConnection(\'sdr\')"' + (usb ? '' : ' disabled') + '>+ RTL-SDR</button>'
       + '    </div>'
       + '  </div>'
@@ -1605,7 +1628,7 @@ const Serial = (function () {
     setSource, setFromStart, chooseLog, readOnce, onFile, dragOver, dragLeave, drop, dropAnywhere, guardDragOver,
     stopFollow, followAgain, readNow, sniffKind,
     // for serial-radio.js, serial-ert.js and serial-sdr.js
-    findConn: byId, list: () => conns.slice(), writeText, toggleDtr, logLine, toolbarButtons, statsHtml, logHtml, followHtml,
+    findConn: byId, list: () => conns.slice(), feed: handleChunk, writeText, toggleDtr, logLine, toolbarButtons, statsHtml, logHtml, followHtml,
   };
 })();
 

@@ -340,6 +340,9 @@ const SEED_SERIAL_FOLLOW = `() => {
   const c = Serial.list()[Serial.list().length - 1];
   Serial.setSource(c.id, 'file');
 }`;
+// The Reception Map, on its own demo drive: the map, the suspects table and
+// the bad copies all populated.
+const SEED_RECEPTION_DEMO = `async () => { Reception.loadDemo(); await new Promise(r => setTimeout(r, 300)); }`;
 const SEED_SDR_DEMO = `async () => {
   Serial.addDemo('sdr');
   await new Promise(r => setTimeout(r, 1500));
@@ -548,6 +551,7 @@ const CONVERTED = [
   { id: 'serial',     label: 'Serial Monitor — Quansheng radio demo', issue: '#140', seed: SEED_RADIO_DEMO },
   { id: 'serial',     label: 'Serial Monitor — RTL-SDR demo',  issue: '#140', seed: SEED_SDR_DEMO },
   { id: 'serial',     label: 'Serial Monitor — ERT-A2 demo',   issue: '#140', seed: SEED_ERT_DEMO },
+  { id: 'reception',  label: 'Reception Map — demo drive',     issue: '#140', seed: SEED_RECEPTION_DEMO },
   { id: 'serial',     label: 'Serial Monitor — following a log file (setup)', issue: '#140', seed: SEED_SERIAL_FOLLOW },
   { id: 'alert2',     label: 'ALERT2 Decoder — readings and map',  issue: '#140', seed: SEED_ALERT2 },
   { id: 'alert2',     label: 'ALERT2 Decoder — frame anatomy',     issue: '#140', seed: SEED_ALERT2_FRAMES },

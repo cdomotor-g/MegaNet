@@ -3010,6 +3010,7 @@ function renderMain() {
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;
     case 'rfchanges':  el.innerHTML = RfChanges.render();    RfChanges.init();    break;
     case 'workbench':  el.innerHTML = Workbench.render();    Workbench.init();    break;
+    case 'reception':  el.innerHTML = Reception.render();    Reception.init();    break;
     case 'bitflipper': el.innerHTML = renderBitFlipperHtml(); initBitFlipperMap(); break;
     case 'network':    el.innerHTML = NetworkView.render();  NetworkView.init();  break;
     case 'packets':    el.innerHTML = Packets.render();       Packets.init();      break;

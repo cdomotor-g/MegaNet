@@ -45,6 +45,7 @@ const SerialIngest = (function () {
   const PREFIX = { quansheng: 'qs', ert: 'ert', sdr: 'sdr' };
   const KIND_LABEL = { quansheng: 'Quansheng radio', ert: 'ERT-A2', sdr: 'RTL-SDR' };
   const LOC_LABEL = {
+    gps:     'the GPS card on this tab (exact, while it has a fix)',
     browser: 'this computer\'s location, as the browser gives it',
     station: 'at a station',
     manual:  'coordinates typed in',
@@ -237,7 +238,14 @@ const SerialIngest = (function () {
   async function report(c) {
     const g = c.ingest, token = load().token, p = point(c);
     if (!g.on || !token) return;
-    const loc = p.loc || { source: 'none' };
+    let loc = p.loc || { source: 'none' };
+    // GPS: wherever the GPS card says the receiver is now — the one location
+    // the database records as exact. No fix, no location: said, not guessed.
+    if (loc.source === 'gps') {
+      const f = typeof SerialGps !== 'undefined' ? SerialGps.fix(false) : null;
+      loc = f ? { source: 'gps', lat: f.lat, lon: f.lon, accuracy_m: f.accuracy_m } : { source: 'none', gpsLost: true };
+      g.lastLoc = f ? { lat: f.lat, lon: f.lon } : null;
+    }
     const body = { payload: {
       point_id: p.pointId, name: p.name, receiver: RECEIVER[c.kind], detail: detail(c),
       location_source: loc.source || 'none', location_note: locNote(loc),
@@ -261,6 +269,8 @@ const SerialIngest = (function () {
   }
 
   function locNote(loc) {
+    if (loc && loc.gpsLost) return 'GPS chosen, but the GPS card has no fix right now.';
+    if (loc && loc.source === 'gps') return 'GPS fix from the GPS card on the Serial Monitor' + (isFinite(loc.accuracy_m) ? ', ±' + fmtDist(loc.accuracy_m) : '') + '.';
     if (!loc || !loc.source || loc.source === 'none') return 'No location given. No GPS.';
     const acc = isFinite(loc.accuracy_m) ? ', ±' + fmtDist(loc.accuracy_m) : '';
     if (loc.source === 'browser') return 'Approximate: the browser\'s location for this computer (Wi-Fi or IP)' + acc + '. No GPS.';
@@ -277,8 +287,20 @@ const SerialIngest = (function () {
     const g = c.ingest;
     g.on = true; g.err = '';
     setPoint(c, { on: true });
-    clearInterval(g.reportTimer);
+    clearInterval(g.reportTimer); clearInterval(g.moveTimer);
     g.reportTimer = setInterval(() => report(c), REPORT_MS);
+    // A receiver on the GPS moves: say so when it has gone more than a
+    // kilometre since it last said where it was (its receptions carry the
+    // exact track; this is its description).
+    g.moveTimer = setInterval(() => {
+      const p = point(c);
+      if (!p.loc || p.loc.source !== 'gps') return;
+      const f = typeof SerialGps !== 'undefined' ? SerialGps.fix(false) : null;
+      if (!f) return;
+      const L = g.lastLoc;
+      const km = L ? Math.hypot((f.lat - L.lat) * 111.32, (f.lon - L.lon) * 111.32 * Math.cos(f.lat * Math.PI / 180)) : Infinity;
+      if (km > 1) report(c);
+    }, 60000);
     report(c);
     schedule(c, 0);
     if (!quiet) announce((c.name || 'Card') + ' — sending readings to MegaNet');
@@ -287,7 +309,7 @@ const SerialIngest = (function () {
   function stop(c, why) {
     const g = c.ingest;
     g.on = false;
-    clearTimeout(g.timer); clearInterval(g.reportTimer);
+    clearTimeout(g.timer); clearInterval(g.reportTimer); clearInterval(g.moveTimer);
     if (why) g.err = why; else setPoint(c, { on: false });
     persistNow(c);
     paint(c);
@@ -361,6 +383,7 @@ const SerialIngest = (function () {
     state_(c);
     const cur = point(c).loc || {};
     if (src === 'browser') return locate(id);
+    if (src === 'gps') return setLoc(c, { source: 'gps' });
     if (src === 'heard') return fromHeard(id);
     if (src === 'none') return setLoc(c, { source: 'none' });
     // station and manual wait for what is typed; keep the source chosen
@@ -460,6 +483,11 @@ const SerialIngest = (function () {
   // ── the panel ─────────────────────────────────────────────────────────────
 
   function locText(loc) {
+    if (loc && loc.source === 'gps') {
+      const f = typeof SerialGps !== 'undefined' ? SerialGps.fix(false) : null;
+      return f ? 'GPS: ' + f.lat.toFixed(5) + ', ' + f.lon.toFixed(5) + (f.accuracy_m ? ' ± ' + f.accuracy_m + ' m' : '') + ' — exact, and followed as it moves.'
+        : 'GPS chosen; the GPS card has no fix yet, so no location is sent until it has one.';
+    }
     if (!loc || !loc.source || loc.source === 'none') return 'No location given.';
     if (loc.pending || !isFinite(loc.lat)) return loc.source === 'station' ? 'Type a station below.' : 'Type the coordinates below.';
     return loc.lat.toFixed(4) + ', ' + loc.lon.toFixed(4) + (isFinite(loc.accuracy_m) ? ' ± ' + fmtDist(loc.accuracy_m) : '')
@@ -492,6 +520,7 @@ const SerialIngest = (function () {
       + '<p class="qs-small qs-dim">Receiver id <code>' + esc(p.pointId) + '</code> — every reading it sends carries the path <code>serial-monitor/' + esc(p.pointId)
       + '</code>. The token is kept in this browser only.</p>'
       + '<fieldset class="ing-loc"><legend>Where the receiver is — there is no GPS, so this is approximate and recorded as such</legend>'
+      + (typeof SerialGps !== 'undefined' && Serial.list().some(x => x.kind === 'gps' && x.phase !== 'demo') ? radio('gps') : '')
       + radio('browser') + radio('station') + radio('manual') + radio('heard') + radio('none')
       + (loc.source === 'station' ? '<label class="ing-inline">Station <input type="text" placeholder="name or station number" value="' + esc(loc.stationName || '')
           + '" onchange="SerialIngest.setStation(\'' + id + '\',this.value)"></label>' : '')
@@ -548,11 +577,32 @@ const SerialIngest = (function () {
   // The card is going away: whatever is waiting is kept for next time.
   function detach(c) {
     if (!c || !c.ingest) return;
-    clearTimeout(c.ingest.timer); clearInterval(c.ingest.reportTimer); clearTimeout(c.ingest.persistTimer);
+    clearTimeout(c.ingest.timer); clearInterval(c.ingest.reportTimer); clearInterval(c.ingest.moveTimer); clearTimeout(c.ingest.persistTimer);
     persistNow(c);
   }
 
-  return { add, arrival, note, panel, mount, paint, detach, toggle, setToken, setName, setLocSource, locate, setStation, setManual, sendNow,
+  // For reception-log.js: which receiver a card is, where it was put, and
+  // whether a receiver id is set to send. A demo card is no receiver.
+  function pointInfo(c) {
+    if (!RECEIVER[c.kind]) return null;
+    if (isDemo(c)) return { pointId: 'demo-' + PREFIX[c.kind], name: c.name };
+    state_(c);
+    const p = point(c);
+    return { pointId: p.pointId, name: p.name };
+  }
+  function locOf(c) {
+    if (!RECEIVER[c.kind] || isDemo(c)) return null;
+    state_(c);
+    const l = point(c).loc;
+    return l && l.source !== 'gps' ? l : null;
+  }
+  function pointIsOn(pointId) {
+    const s = load();
+    return !!s.token && Object.values(s.points).some(p => p.pointId === pointId && p.on);
+  }
+  function token() { return load().token || ''; }
+
+  return { add, arrival, note, panel, pointInfo, locOf, pointIsOn, token, mount, paint, detach, toggle, setToken, setName, setLocSource, locate, setStation, setManual, sendNow,
            // for the check
            _locNote: locNote, _findStation: findStation };
 })();

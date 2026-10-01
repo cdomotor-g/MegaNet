@@ -201,6 +201,18 @@ const SerialSdr = (function () {
       c.readings.push(Object.assign({ t, name: stationName(r.sensorId), burst: m.burst }, r));
     });
     if (c.readings.length > MAX_READ) c.readings.splice(0, c.readings.length - MAX_READ);
+    // To the reception log (reception-log.js): every accepted reading with its
+    // votes and the burst's level, every bit-flip shadow the decoder set
+    // aside, and a burst nothing came out of.
+    if (typeof RxLog !== 'undefined') {
+      const t = c.source === 'file' ? null : Date.now(), lvl = m.burst ? m.burst.peakDb : null, nf = m.burst ? m.burst.nfDb : null;
+      m.readings.forEach(r => RxLog.add(c, { t, protocol: 'alert', alert_id: r.sensorId, value_raw: r.value, ok: true, votes: r.votes,
+        level_dbfs: lvl, detail: { format: r.format, polarity: r.polarity, crc: r.crcOk } }));
+      (m.shadows || []).forEach(s => RxLog.add(c, { t, protocol: 'alert', alert_id: s.sensorId, value_raw: s.value, ok: false, fault: 'shadow',
+        votes: s.votes, level_dbfs: lvl, detail: { of: s.of } }));
+      if (m.burst && !m.readings.length && !(m.shadows || []).length) RxLog.add(c, { t, protocol: 'alert', alert_id: null, ok: false,
+        fault: 'undecoded', level_dbfs: lvl, detail: { burst_ms: m.burst.ms, nf_dbfs: nf } });
+    }
     // To MegaNet, when the card is set to send (serial-ingest.js): timed by
     // arrival, and never from the demo band or a replayed capture.
     if (typeof SerialIngest !== 'undefined' && m.readings.length) {
@@ -647,6 +659,7 @@ const SerialSdr = (function () {
     }
     paint(c);
     if (typeof SerialIngest !== 'undefined') SerialIngest.mount(c);
+    if (typeof RxLog !== 'undefined') RxLog.mount(c);
   }
 
   function fmtMHz(hz, dp) { return (hz / 1e6).toFixed(dp == null ? 4 : dp); }
@@ -1174,6 +1187,7 @@ const SerialSdr = (function () {
       + '<span><i class="qs-sw sw-dash"></i>noise floor</span><span><i class="qs-sw sw-ok"></i>decoder channel (±6 kHz)</span></div></section>'
       + '<details class="qs-ctl sdr-controls" open><summary>Controls</summary>' + controlsHtml(c) + '</details>'
       + (typeof SerialIngest !== 'undefined' ? SerialIngest.panel(c) : '')
+      + (typeof RxLog !== 'undefined' ? RxLog.panel(c) : '')
       + '<div class="sdr-mini">'
       + '<section class="qs-panel" aria-labelledby="sdr-h-time-' + id + '"><h3 id="sdr-h-time-' + id + '">Channel and bursts</h3>'
       + '<canvas class="qs-canvas" id="sdr-time-' + id + '" role="img" aria-label="Channel power"></canvas></section>'

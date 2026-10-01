@@ -124,6 +124,8 @@ const TABS = [
       find: 'acma register history new licences appeared changed timeline diff when' },
     { id: 'workbench',  label: 'Interference Workbench', icon: '🔬',
       find: 'case hypotheses scoring evidence checklist acma complaint site visit share' },
+    { id: 'reception',  label: 'Reception Map',          icon: '📡',
+      find: 'drive survey signal strength rssi coverage gps vehicle bad packets bit flip repeater triangulate where heard receptions' },
   ] },
   { group: 'ALERT', tabs: [
     { id: 'bitflipper', label: 'Bit Flipper',            icon: '🔀',
@@ -853,7 +855,30 @@ const HELP = {
       + 'with the whole investigation encoded in it — the station sets, the onset date and the '
       + 'symptom all travel in the link.',
     ],
-    related: ['rf', 'rfchanges', 'bitflipper'],
+    related: ['rf', 'rfchanges', 'bitflipper', 'reception'],
+  },
+
+  reception: {
+    summary: 'What the Serial Monitor\'s receivers heard, where, and how strongly — and which '
+           + 'transmitter is sending bad packets. Every frame a Quansheng, RTL-SDR or ERT-A2 card hears '
+           + 'is logged with its level and the receiver\'s position; bad copies are laid against the '
+           + 'repeaters whose pass ranges could have carried them.',
+    watch: [
+      '<strong>It works without moving.</strong> A bad copy of an address can only have come through a '
+      + 'repeater that passes that address, so even one fixed receiver narrows the field: blame is split '
+      + 'among the possible repeaters, and the one common to several stations\' bad copies collects it.',
+      '<strong>Positions sharpen it.</strong> With a GPS card on the Serial Monitor (any USB GPS puck) or a '
+      + 'phone\'s location, bad copies get louder nearer the repeater sending them; the table gives the '
+      + 'correlation and the map shows where they were loudest. A drive past the suspects is the test.',
+      'It <strong>narrows; it does not convict</strong>. Adjacent addresses transmitting in the same '
+      + 'seconds can look like a flip, a missing pass range hides a path, and no repeater delays are '
+      + 'recorded yet, so timing is not used. Confirm on site.',
+      'Receptions are <strong>kept in this browser</strong> and, from a receiver sending to MegaNet, in '
+      + 'the database (editors only — they say where a vehicle was). Export a drive as CSV or GeoJSON '
+      + 'and load it on another computer.',
+    ],
+    links: [{ label: 'The Reception Map and a vehicle rig', href: 'docs/reception-map.md' }],
+    related: ['serial', 'workbench', 'bitflipper', 'network'],
   },
 
   bitflipper: {
@@ -2176,6 +2201,12 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
+// 0047 (receptions) is written and passes its checks, but was not yet applied
+// live when this shipped: the app does not need it to run — the reception log
+// stays in the browser and the Reception Map's "From the database" says the
+// migration is missing — so the expected version stays 46 rather than every
+// session reporting a mismatch. Goes to 47 in the commit that records 0047
+// applied.
 const DB_SCHEMA_VERSION = 46;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.

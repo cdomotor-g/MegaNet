@@ -36,6 +36,11 @@ only (never `anon`), and a reading posted through `ingest_http()` carrying the
 receiver's path. Same transaction-and-rollback shape, so it is safe against the live
 database. The browser half is `npm run serialingest` in `test/`.
 
+`check_receptions.sql` holds `0047`: 10 checks — a batch storing its good rows and
+refusing bad ones by index, a retried batch stored once, GPS exact and everything else
+approximate (the table refuses otherwise), no position stored as none, and a window
+readable by an editor and not by anon.
+
 `check_ingest_token_admin.sql` holds `0046`, the Admin tab's token panel: 15 checks
 signed in through 0005's triggers as anon, an editor and an administrator — only the
 administrator may list, mint or revoke; a minted token is shown once and kept as its

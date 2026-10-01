@@ -9311,6 +9311,14 @@ code {
 .adm-tok-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: .6rem; align-items: end; margin: .6rem 0; }
 .adm-tok-form label { display: grid; gap: .3rem; font-size: .85rem; color: var(--muted); }
 .adm-tok-minted p { margin: .3rem 0; }
+.rx-sources, .rx-filters { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .5rem 0; }
+.rx-filters label { display: inline-flex; gap: .4rem; align-items: center; font-size: .85rem; color: var(--muted); }
+.rx-map { height: min(60vh, 520px); border-radius: 8px; }
+.rx-sw { width: 10px; height: 10px; border-radius: 50%; background: var(--dot, var(--muted)); }
+.rx-sw-bad { background: transparent; border: 2px dashed var(--bad); }
+.rx-sw-rep { background: var(--warn); border: 1px solid var(--text); }
+.rx-sw-cen { background: transparent; border: 2px dashed var(--bad); width: 14px; height: 14px; }
+tr.rx-sel th, tr.rx-sel td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .adm-tok-value { display: inline-block; max-width: 100%; overflow-wrap: anywhere; font-size: .85rem; user-select: all; }
 
 /* ── Quansheng radio dashboard and RTL-SDR card (serial-radio.js, serial-sdr.js) ── */

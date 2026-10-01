@@ -221,8 +221,8 @@ const SerialRadio = (function () {
           + '. Fields are mapped by name, so most of it will still read right.', 'warn');
       }
       mark(c, 'status');
-    } else if (p.type === 'DEC') { addDec(c, p.rec, t); ingestDec(c, p.rec, line); }
-    else if (p.type === 'BST') addBurst(c, p.rec, t);
+    } else if (p.type === 'DEC') { addDec(c, p.rec, t); ingestDec(c, p.rec, line); logDec(c, p.rec); }
+    else if (p.type === 'BST') { addBurst(c, p.rec, t); logBurst(c, p.rec); }
     else if (p.type === 'STA') addSta(c, p.rec, t);
     else if (p.type === 'EVT') addEvt(c, p.rec, t);
   }
@@ -239,6 +239,48 @@ const SerialRadio = (function () {
       if (ms <= Date.now() + 5 * 60000 && ms >= Date.now() - 30 * 86400000) ts = ms;
     }
     SerialIngest.add(c, [{ alert_id: rec.id, value_raw: rec.value, ts, protocol: 'alert', line }]);
+  }
+
+  // To the reception log (reception-log.js): every DEC, and — a moment after
+  // each burst, when its DECs have all arrived — every frame the radio's own
+  // bits show it heard and did not report, and a burst nothing came out of.
+  // Timed as ingestDec times readings; out of history with no clock, not at all.
+  function rxTime(c, epoch) {
+    let ts = typeof SerialIngest !== 'undefined' ? SerialIngest.arrival(c) : Date.now();
+    if (ts == null && epoch) {
+      const ms = epoch * 1000;
+      if (ms <= Date.now() + 5 * 60000 && ms >= Date.now() - 30 * 86400000) ts = ms;
+    }
+    return ts;
+  }
+  function logDec(c, rec) {
+    if (typeof RxLog === 'undefined' || rec.id == null) return;
+    RxLog.add(c, { t: rxTime(c, rec.epoch), protocol: 'alert', alert_id: rec.id, value_raw: rec.value, payload_hex: rec.payload_hex || null,
+      ok: true, rssi_dbm: rec.rssi, nf_dbm: rec.nf, detail: { fmt: rec.fmt, fade: rec.fade, uptime_ms: rec.uptime_ms } });
+  }
+  function logBurst(c, rec) {
+    if (typeof RxLog === 'undefined') return;
+    const t = rxTime(c, rec.epoch), history = !!c.history;
+    setTimeout(() => {
+      const r = c.radio;
+      if (!r) return;
+      const reported = r.decs.filter(d => d.uptime_ms === rec.uptime_ms);
+      const extra = (rec.found || []).filter(f => !reported.some(d => d.id === f.id && d.value === f.value));
+      const seen = new Set();
+      const was = c.history; c.history = history;
+      extra.forEach(f => {
+        const k = f.id + ':' + f.value;
+        if (seen.has(k)) return;
+        seen.add(k);
+        RxLog.add(c, { t, protocol: 'alert', alert_id: f.id, value_raw: f.value, payload_hex: f.hex, ok: false, fault: 'rejected',
+          rssi_dbm: rec.peak, nf_dbm: rec.nf, detail: { fmt: f.fmt, uptime_ms: rec.uptime_ms, in_burst: true } });
+      });
+      if (!reported.length && !extra.length) {
+        RxLog.add(c, { t, protocol: 'alert', alert_id: null, ok: false, fault: 'undecoded', rssi_dbm: rec.peak, nf_dbm: rec.nf,
+          detail: { uptime_ms: rec.uptime_ms, burst_ms: rec.burst_ms, nbits: rec.nbits } });
+      }
+      c.history = was;
+    }, c.demo ? 0 : 1500);
   }
 
   function meganetName(id) {
@@ -1092,6 +1134,7 @@ const SerialRadio = (function () {
       + btn('Save PNG', 'screenSave(\'' + id + '\')') + btn('Reboot radio…', 'reboot(\'' + id + '\')', dis) + '</div></details>'
       + '<details class="qs-ctl"><summary>Events</summary><ul class="qs-events" id="qs-events-' + id + '"></ul></details>'
       + (typeof SerialIngest !== 'undefined' ? SerialIngest.panel(c) : '')
+      + (typeof RxLog !== 'undefined' ? RxLog.panel(c) : '')
       + '<details class="qs-ctl"' + (c.radio && c.radio.consoleOpen || following ? ' open' : '') + '><summary>Console and raw stream</summary>'
       + (following ? '<p class="qs-hint">Following a log file: each command below is copied, for pasting into PuTTY.</p>' : '')
       + '<div class="ser-send"><input type="text" id="qs-cmd-' + id + '" placeholder="Console command, e.g. HELP" aria-label="Console command to '

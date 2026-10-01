@@ -126,6 +126,9 @@ MegaNet/
 ├── serial-radio.js         ← SerialRadio — its Quansheng ALERT radio dashboard
 ├── serial-sdr.js           ← SerialSdr — its RTL-SDR card (WebUSB)
 ├── serial-ert.js           ← SerialErt — its ELPRO ERT-A2 card (alert2.js, live)
+├── serial-gps.js           ← SerialGps — a USB GPS (NMEA) card; the position for the rest
+├── reception-log.js        ← RxLog     — every frame each receiver heard, with position
+├── reception.js            ← Reception — the Reception Map tab (who was heard where; the bad repeater)
 ├── serial-ingest.js        ← SerialIngest — a receiver card as a base station
 │                             (posts what it decodes into MegaNet)
 ├── serial-viz.js           ← SerialViz — the canvas helpers those cards share
@@ -2461,6 +2464,15 @@ output live, on the **Serial Monitor** tab. Built on the browser's
   to store anything but a GPS fix as exact. Readings out of a followed log's history
   go only with a time of their own; demos and replays never. See
   [`docs/ingest-serial-monitor.md`](docs/ingest-serial-monitor.md).
+- **GPS** — a USB GPS puck (any NMEA 0183 receiver) is a card of its own: fix,
+  satellites, accuracy, speed. Every receiver card stamps its position on what it
+  hears, and a receiver sending to MegaNet can use it as its location — the one kind
+  the database records as exact.
+- **Reception log and the Reception Map** — every frame each receiver hears, good or
+  bad, with level and position, kept in the browser and (sending to MegaNet) in the
+  database (`0047`). The **Reception Map** tab maps it and ranks the repeaters most
+  likely to be flipping bits in what they relay. See
+  [`docs/reception-map.md`](docs/reception-map.md).
 - **Demos** — each card has one, so the tab can be seen with nothing plugged in.
 - **Managed / work computers** — enterprise policy can block Web Serial, in which
   case the browser rejects the port picker *instantly without showing it*. The app

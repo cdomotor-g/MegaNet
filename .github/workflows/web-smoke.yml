@@ -308,6 +308,13 @@ jobs:
         working-directory: test
         run: npm run serialingest
 
+      # Chromium. The Reception Map against a drive built to blame one real
+      # repeater: named first by pass ranges alone and with positions; NMEA
+      # parsed; a GPS card placing a receiver's receptions; CSV/GeoJSON round trip.
+      - name: Reception Map — the bad repeater named
+        working-directory: test
+        run: npm run reception
+
       - name: Smoke — every tab, clean console
         working-directory: test
         run: npm run smoke
@@ -1110,6 +1117,10 @@ jobs:
       # revoke that shuts the door at once.
       - name: check_ingest_token_admin.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest_token_admin.sql
+      # Receptions (0047): every frame a receiver heard, good or bad, kept —
+      # token-checked, a retry stored once, editors only, GPS the only exact.
+      - name: check_receptions.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_receptions.sql
       - name: check_inspections.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
       - name: check_inspection_history.sql
