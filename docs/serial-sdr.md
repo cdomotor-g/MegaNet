@@ -7,7 +7,7 @@ whole card with nothing plugged in.
 
 | File | What it is |
 |---|---|
-| `rtlsdr.js` | The WebUSB driver: RTL2832U + Rafael R820T/R820T2/R828D, with the RTL-SDR Blog V3 and V4 behaviours |
+| `rtlsdr.js` | The WebUSB driver: RTL2832U + Rafael R820T/R820T2/R828D, with the RTL-SDR Blog V3 and V4 behaviours, or + Fitipower FC0012/FC0013 (the V2), as librtlsdr drives them |
 | `alert-dsp.js` | The off-air decoder, run in a Web Worker built from its own source: channeliser, burst gate, ALERT Binary / Enhanced iFLOWS / ASCII decode, spectrum, FM audio |
 | `serial-sdr.js` | The card: controls, graphics, the readings table |
 | `serial-viz.js` | Canvas helpers shared with the Quansheng card |
@@ -82,15 +82,21 @@ The card's error messages say which of these it looks like.
 
 | Model | Tuner | Range | Extras |
 |---|---|---|---|
-| **V2** / generic | R820T or R820T2 | about 25–1766 MHz | none |
+| **V2** | Fitipower FC0013 (or FC0012) | about 22–1100 MHz (948 on an FC0012) | zero-IF — tuned 0.85 × the sample rate below the frequency, so the tuner's DC spike stays out of the band (the *Tuned* chip says `offset`); 23 gain steps, −9.9 to 19.7 dB; bias tee (GPIO 0) |
 | **V3** | R820T2 | about 25–1766 MHz; **0.5–24 MHz by direct sampling** on the Q-branch | bias tee (GPIO 0) |
 | **V4** | R828D, 28.8 MHz crystal | **0.5–1766 MHz** — below 28.8 MHz through its built-in upconverter | bias tee (GPIO 0); three inputs switched by band; FM/DAB notch filters switched off when tuned inside those bands; upconverter path switch on GPIO 5 |
+| generic R820T | R820T or R820T2 | about 25–1766 MHz | none |
 | other R828D | R828D, 16 MHz crystal | about 25–1766 MHz | cable 1 below 345 MHz, air input above |
+| generic FC0013 / FC0012 | FC0013 or FC0012 | as the V2 | as the V2 without its bias tee; an FC0012 has 5 gain steps, no AGC of its own, and its VHF/UHF filter on GPIO 6 |
 
-A V4 is recognised by its USB strings (`RTLSDRBlog` / `Blog V4`). A V3 that does not
-name itself looks like a V2 to the driver; pick *V3* in the setup form to get direct
-sampling and the bias tee. Bias tee puts 4.5 V on the antenna socket — the card asks
-before turning it on.
+A V4 is recognised by its USB strings (`RTLSDRBlog` / `Blog V4`). A V2 is not — the one
+this was brought up on reports `Generic` / `RTL2832U` — so it opens as *Generic FC0013*;
+pick *V2* in the setup form for its bias tee. A V3 that does not name itself opens as a
+generic R820T; pick *V3* to get direct sampling and the bias tee. Bias tee puts 4.5 V on
+the antenna socket — the card asks before turning it on. The Blog's EEPROM switch for
+forcing the bias tee on (byte 7, bit 1 clear) is honoured on a V3 or V4 only: on any
+other stick that bit just turns its IR interface off, and a one-interface stick has it
+clear.
 
 ## Using it
 
@@ -118,12 +124,18 @@ read its frames from, each frame boxed; and the ADC histogram.
 
 ## Hardware bring-up checklist (for whoever has the sticks)
 
-The driver has only ever run against `test/rtlsdr.mjs`'s simulated dongle; the decoder
-has run against a real capture. What needs a real V2 and V4, in order:
+Where it stands: the **V4** opens and streams in the card. The **V2** (FC0013) was
+checked on 2026-10-01 against librtlsdr on the same stick, driven from Node through
+node-usb's WebUSB with this same `rtlsdr.js`: it opens, streams 240 k, 960 k and
+2.4 Msps without loss, tunes 25–1090 MHz within 200 Hz, puts a carrier at the frequency
+librtlsdr's own capture puts it, and matches librtlsdr's noise level at −9.9, 7.1 and
+19.7 dB of gain. Not yet seen on either: an off-air ALERT decode (step 7). The **V3**
+has run only against `test/rtlsdr.mjs`'s simulated dongle; the decoder has run against
+a real capture. What needs real hardware, in order:
 
 1. **Open.** *+ RTL-SDR → Choose USB stick → Open* (on Windows, a stick missing from
    the chooser has no WinUSB driver yet — run `tools/install-rtlsdr-driver.cmd` first). Expect the card's notes to say
-   `Opened … tuner R820T` (V2/V3) or `R828D` (V4) and the *Device* chip to name the
+   `Opened … tuner FC0013` (V2), `R820T` (V3) or `R828D` (V4) and the *Device* chip to name the
    model. If the V4 shows as *Generic R828D*, its USB strings differ from
    `RTLSDRBlog` / `Blog V4` — read them from `chrome://usb-internals` and fix
    `pickModel()` in `rtlsdr.js`.

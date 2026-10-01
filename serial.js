@@ -72,7 +72,7 @@ const Serial = (function () {
   // Bumped whenever the Serial Monitor changes. Shown in the tab header so it is
   // possible to confirm at a glance which build of app.js the browser actually
   // loaded — a stale, cached app.js is the usual reason a "fixed" bug persists.
-  const SERIAL_BUILD = '2026-10-01b';
+  const SERIAL_BUILD = '2026-10-01c';
 
   function loadDefaults() {
     let d = {};

@@ -306,7 +306,8 @@ const SerialSdr = (function () {
       if (c.dev) { try { await c.dev.close(); } catch (_) {} }
       c.dev = new RtlSdr.Device(c.usb, msg => note(c, msg));
       c.info = await c.dev.open({ model: c.cfg.model, ppm: c.cfg.ppm });
-      if (c.cfg.freq < c.info.minHz) c.cfg.freq = 151500000;
+      if (c.cfg.freq < c.info.minHz || c.cfg.freq > c.info.maxHz) c.cfg.freq = 151500000;
+      c.cfg.gain = c.info.gains[nearestStep(c.info.gains, c.cfg.gain)];   // a gain saved from another tuner's steps
       await c.dev.setSampleRate(c.cfg.rate);
       c.dev.directMode = c.info.directSampling ? c.cfg.direct : 'off';
       c.tune = await c.dev.setFrequency(c.cfg.freq);
@@ -439,10 +440,20 @@ const SerialSdr = (function () {
     saveCfg(c);
   }
 
+  // The gain steps the slider walks: the open stick's own (an R82xx has 29,
+  // an FC0013 23 from -9.9 dB, an FC0012 5), or the R82xx's before one is open.
+  function gainSteps(c) { return (c.info && c.info.gains) || RtlSdr.GAINS; }
+  function nearestStep(G, g) {
+    let best = 0;
+    for (let i = 1; i < G.length; i++) if (Math.abs(G[i] - g) < Math.abs(G[best] - g)) best = i;
+    return best;
+  }
+
   function setGain(id, idx) {
     const c = conn(id);
     if (!c) return;
-    c.cfg.gain = RtlSdr.GAINS[Math.max(0, Math.min(RtlSdr.GAINS.length - 1, +idx))];
+    const G = gainSteps(c);
+    c.cfg.gain = G[Math.max(0, Math.min(G.length - 1, +idx))];
     const ro = document.getElementById('sdr-gain-v-' + id);
     if (ro) ro.textContent = (c.cfg.gain / 10).toFixed(1) + ' dB';
     if (c.dev && !c.cfg.autoGain) return act(c, () => c.dev.setGain(c.cfg.gain));
@@ -1077,7 +1088,7 @@ const SerialSdr = (function () {
   function controlsHtml(c) {
     const id = c.id, f = c.cfg, i = c.info || {}, usb = c.source === 'usb';
     const dis = usb ? '' : ' disabled';
-    const gIdx = Math.max(0, RtlSdr.GAINS.indexOf(f.gain));
+    const G = gainSteps(c), gIdx = nearestStep(G, f.gain);
     const btn = (label, fn, extra) => '<button type="button" class="ghost" onclick="SerialSdr.' + fn + '"' + (extra || '') + '>' + label + '</button>';
     return '<div class="sdr-ctl-grid">'
       // tuning
@@ -1098,7 +1109,7 @@ const SerialSdr = (function () {
       + '</fieldset>'
       // gain
       + '<fieldset class="sdr-fs"><legend>Gain</legend>'
-      + '<div class="sdr-row"><label class="sdr-l">Tuner gain <input type="range" min="0" max="' + (RtlSdr.GAINS.length - 1) + '" step="1" value="' + gIdx + '" id="sdr-gain-' + id + '"'
+      + '<div class="sdr-row"><label class="sdr-l">Tuner gain <input type="range" min="0" max="' + (G.length - 1) + '" step="1" value="' + gIdx + '" id="sdr-gain-' + id + '"'
       + ' oninput="SerialSdr.setGain(\'' + id + '\',this.value)"' + (f.autoGain || !usb ? ' disabled' : '') + '></label>'
       + '<span class="qs-readout" id="sdr-gain-v-' + id + '">' + (f.gain / 10).toFixed(1) + ' dB</span></div>'
       + '<div class="sdr-row"><label class="ser-check"><input type="checkbox"' + (f.autoGain ? ' checked' : '') + dis + ' onchange="SerialSdr.setAutoGain(\'' + id + '\',this.checked)"> tuner AGC</label>'

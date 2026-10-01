@@ -1,9 +1,10 @@
 // MegaNet — rtlsdr.js
 //
 //   RtlSdr   a WebUSB driver for RTL2832U dongles with a Rafael R820T/R820T2
-//            or R828D tuner — the RTL-SDR Blog V2-era sticks, the V3 and the
-//            V4 — enough of one to tune, set gain, and stream 8-bit IQ into
-//            the Serial Monitor's RTL-SDR card.
+//            or R828D tuner — the RTL-SDR Blog V3 and V4, and the generic
+//            R820T sticks — or a Fitipower FC0012/FC0013 — the RTL-SDR Blog
+//            V2 and the older DVB-T sticks — enough of one to tune, set gain,
+//            and stream 8-bit IQ into the Serial Monitor's RTL-SDR card.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches for nothing but the USBDevice it is handed: no DOM, no state. That
@@ -36,6 +37,25 @@
 //   * Every tune forces the VGA to 16.3 dB and the VCO current to maximum —
 //     the Blog driver's "hacks", kept because they are what its users run.
 //
+// The Fitipower FC0012 and FC0013 are librtlsdr's (osmocom rtl-sdr,
+// tuner_fc0012.c and tuner_fc0013.c, from the Linux kernel's drivers),
+// re-expressed the same way:
+//
+//   * Zero-IF tuners. The RTL2832U samples I and Q in zero-IF mode with no
+//     spectrum inversion, and the tuner's DC spike sits on its LO. So an FC
+//     tune is always offset — librtlsdr's offset tuning, off unless asked for
+//     there and always on here, because the decoder's channel is the centre:
+//     the LO goes 0.85 × the sample rate below the frequency, the RTL2832U's
+//     own mixer brings the frequency back to the centre, and the spike falls
+//     outside the band.
+//   * The PLL: the VCO at the LO times a divider (96 down to 2), as an integer
+//     and a signed 15-bit fraction of half the 28.8 MHz crystal; then a VCO
+//     calibration, and the other VCO if this one ends at the edge of its range.
+//     The FC0013 also picks a VHF tracking filter and its VHF or UHF input by
+//     band; the FC0012 switches its input filter on GPIO 6.
+//   * Gain is the LNA's steps — 23 on the FC0013, 5 on the FC0012 — with the
+//     FC0013's own AGC when no gain is set, and its IF gain fixed either way.
+//
 // ── What the browser needs ──────────────────────────────────────────────────
 //
 // WebUSB: Chrome or Edge, https or localhost. The operating system must let go
@@ -64,7 +84,7 @@ const RtlSdr = (function () {
     USB_SYSCTL: 0x2000, USB_EPA_CTL: 0x2148, USB_EPA_MAXPKT: 0x2158,
     DEMOD_CTL: 0x3000, GPO: 0x3001, GPI: 0x3002, GPOE: 0x3003, GPD: 0x3004, DEMOD_CTL_1: 0x300b,
   };
-  const I2C = { R820T: 0x34, R828D: 0x74, EEPROM: 0xa0 };
+  const I2C = { R820T: 0x34, R828D: 0x74, FC001X: 0xc6, E4000: 0xc8, FC2580: 0xac, EEPROM: 0xa0 };
 
   // The default FIR the RTL2832U ships with, packed as the chip wants it
   // (eight 8-bit taps, then eight 12-bit taps in pairs).
@@ -93,16 +113,60 @@ const RtlSdr = (function () {
 
   const IF_LPF = [1700000, 1600000, 1550000, 1450000, 1200000, 900000, 700000, 550000, 450000, 350000];
 
+  // FC0012 / FC0013 registers 0x01-0x15 at init, with librtlsdr's two edits
+  // made: 0x07 bit 5 (a 28.8 MHz crystal) and 0x0c bit 1 (dual master).
+  const FC0013_INIT = [0x09, 0x16, 0x00, 0x00, 0x17, 0x02, 0x2a, 0xff, 0x6e, 0xb8, 0x82, 0xfe, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x01];
+  const FC0012_INIT = [0x05, 0x10, 0x00, 0x00, 0x0f, 0x00, 0x20, 0xff, 0x6e, 0xb8, 0x82, 0xfe, 0x02, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x04];
+  // [LO below Hz, VCO multiple, reg 0x05, reg 0x06]: the RF divider by band.
+  // The chips share the bands and differ in 0x05; only the FC0013 has ÷2.
+  const FC0013_DIV = [[37084000, 96, 0x82, 0x00], [55625000, 64, 0x02, 0x02], [74167000, 48, 0x42, 0x00], [111250000, 32, 0x82, 0x02],
+    [148334000, 24, 0x22, 0x00], [222500000, 16, 0x42, 0x02], [296667000, 12, 0x12, 0x00], [445000000, 8, 0x22, 0x02],
+    [593334000, 6, 0x0a, 0x00], [950000000, 4, 0x12, 0x02], [Infinity, 2, 0x0a, 0x02]];
+  const FC0012_DIV = [[37084000, 96, 0x82, 0x00], [55625000, 64, 0x82, 0x02], [74167000, 48, 0x42, 0x00], [111250000, 32, 0x42, 0x02],
+    [148334000, 24, 0x22, 0x00], [222500000, 16, 0x22, 0x02], [296667000, 12, 0x12, 0x00], [445000000, 8, 0x12, 0x02],
+    [593334000, 6, 0x0a, 0x00], [Infinity, 4, 0x0a, 0x02]];
+  // FC0013 VHF tracking filter, reg 0x1d bits 4-2, by LO: [up to Hz, bits].
+  const FC0013_TRACK = [[177500000, 0x1c], [184500000, 0x18], [191500000, 0x14], [198500000, 0x10], [205500000, 0x0c],
+    [219500000, 0x08], [299999999, 0x04], [Infinity, 0x1c]];
+  // LNA gain (tenths of a dB) and the code for it. -6.3 dB has two codes on
+  // the FC0013; the first is the one used, as in librtlsdr.
+  const FC0013_LNA = [[-99, 0x02], [-73, 0x03], [-65, 0x05], [-63, 0x04], [-63, 0x00], [-60, 0x07], [-58, 0x01], [-54, 0x06],
+    [58, 0x0f], [61, 0x0e], [63, 0x0d], [65, 0x0c], [67, 0x0b], [68, 0x0a], [70, 0x09], [71, 0x08],
+    [179, 0x17], [181, 0x16], [182, 0x15], [184, 0x14], [186, 0x13], [188, 0x12], [191, 0x11], [197, 0x10]];
+  const FC0012_LNA = [[-99, 0x02], [-40, 0x00], [71, 0x08], [179, 0x17], [192, 0x10]];
+  const steps = lna => lna.map(g => g[0]).filter((g, i, a) => a.indexOf(g) === i);
+
+  // What each tuner answers at, reaches, and offers.
+  const TUNERS = {
+    R820T: { addr: I2C.R820T, zeroIf: false, minHz: 25000000, maxHz: 1766000000, gains: GAINS },
+    R828D: { addr: I2C.R828D, zeroIf: false, minHz: 25000000, maxHz: 1766000000, gains: GAINS },
+    FC0012: { addr: I2C.FC001X, zeroIf: true, minHz: 22000000, maxHz: 948600000, gains: steps(FC0012_LNA) },
+    FC0013: { addr: I2C.FC001X, zeroIf: true, minHz: 22000000, maxHz: 1100000000, gains: steps(FC0013_LNA) },
+  };
+  // librtlsdr's offset: 0.85 × the sample rate ("based on keenerd's 1/f noise
+  // measurements"), past the band's edge, so the DC spike is filtered out.
+  const offsetFor = rate => Math.floor(Math.floor(Math.floor(rate) / 2) * 170 / 100);
+
+  // `tuners`: the tuners a model can have. `eepromBiasTee`: the Blog's own
+  // EEPROM convention for forcing the bias tee on, which only its V3 and V4
+  // follow — on another stick that bit just switches its IR interface off.
   const MODELS = {
     auto: { label: 'Detect from the stick' },
-    v2: { label: 'RTL-SDR Blog V2 / generic R820T(2)', tuner: 'R820T', biasTee: false, direct: false,
-      note: 'Tunes about 25–1766 MHz. No bias tee or HF direct sampling unless the stick has been modified.' },
-    v3: { label: 'RTL-SDR Blog V3 (R820T2)', tuner: 'R820T', biasTee: true, direct: true,
+    v2: { label: 'RTL-SDR Blog V2 (FC0013 / FC0012)', tuners: ['FC0013', 'FC0012'], biasTee: true, direct: false,
+      note: 'Tunes about 22–1100 MHz (948 on an FC0012). A zero-IF tuner: the stick is tuned to one side so its DC spike stays out of the band. '
+        + 'Bias tee on GPIO 0, as on the V3 — the label ticks BIAS-T, but check it with a meter before trusting an LNA to it.' },
+    v3: { label: 'RTL-SDR Blog V3 (R820T2)', tuners: ['R820T'], biasTee: true, direct: true, eepromBiasTee: true,
       note: 'Tunes about 25–1766 MHz on the tuner, and 0.5–24 MHz by direct sampling on the Q-branch (HF on the same SMA).' },
-    v4: { label: 'RTL-SDR Blog V4 (R828D)', tuner: 'R828D', biasTee: true, direct: false, upconverter: true,
+    v4: { label: 'RTL-SDR Blog V4 (R828D)', tuners: ['R828D'], biasTee: true, direct: false, upconverter: true, eepromBiasTee: true,
       note: 'Tunes 0.5–1766 MHz: below 28.8 MHz through its built-in upconverter. FM and DAB notch filters switch themselves.' },
-    r828d: { label: 'Generic R828D', tuner: 'R828D', biasTee: false, direct: false,
+    r820t: { label: 'Generic R820T / R820T2', tuners: ['R820T'], biasTee: false, direct: false,
+      note: 'Tunes about 25–1766 MHz. No bias tee or HF direct sampling unless the stick has been modified.' },
+    r828d: { label: 'Generic R828D', tuners: ['R828D'], biasTee: false, direct: false,
       note: 'A 16 MHz-crystal R828D stick (not a Blog V4).' },
+    fc0013: { label: 'Generic FC0013', tuners: ['FC0013'], biasTee: false, direct: false,
+      note: 'Tunes about 22–1100 MHz. A zero-IF tuner: the stick is tuned to one side so its DC spike stays out of the band.' },
+    fc0012: { label: 'Generic FC0012', tuners: ['FC0012'], biasTee: false, direct: false,
+      note: 'Tunes about 22–948 MHz. A zero-IF tuner, tuned to one side like the FC0013; it has no AGC of its own, so "tuner AGC" leaves it at its start-up gain.' },
   };
 
   function supported() { return typeof navigator !== 'undefined' && !!navigator.usb; }
@@ -215,7 +279,9 @@ const RtlSdr = (function () {
 
     // ── R82xx ────────────────────────────────────────────────────────────────
 
-    get i2cAddr() { return this.tuner === 'R828D' ? I2C.R828D : I2C.R820T; }
+    get tunerSpec() { return TUNERS[this.tuner] || TUNERS.R820T; }
+    get zeroIf() { return !!(TUNERS[this.tuner] && TUNERS[this.tuner].zeroIf); }
+    get i2cAddr() { return this.tunerSpec.addr; }
     get tunerXtal() {
       const base = (this.tuner === 'R828D' && this.model !== 'v4') ? R828D_XTAL : RTL_XTAL;
       return Math.round(base * (1 + this.ppm / 1e6));
@@ -237,6 +303,7 @@ const RtlSdr = (function () {
     }
 
     async tunerInit() {
+      if (this.zeroIf) return this.fcInit();
       this.regs = new Uint8Array(R82XX_INIT);
       for (let i = 0; i < R82XX_INIT.length; i += 7) {           // 8-byte I2C messages: register + 7
         await this.i2cWrite(this.i2cAddr, [5 + i].concat(R82XX_INIT.slice(i, i + 7)));
@@ -292,6 +359,7 @@ const RtlSdr = (function () {
     }
 
     async tunerStandby() {
+      if (this.zeroIf) return;                // librtlsdr's FC "exit" does nothing either
       for (const [r, v] of [[0x06, 0xb1], [0x05, 0xa0], [0x07, 0x3a], [0x08, 0x40], [0x09, 0xc0], [0x0a, 0x36],
         [0x0c, 0x35], [0x0f, 0x68], [0x11, 0x03], [0x17, 0xf4], [0x19, 0x0c]]) await this.tw(r, v);
     }
@@ -370,6 +438,7 @@ const RtlSdr = (function () {
     }
 
     async tunerSetFreq(freq) {
+      if (this.zeroIf) return this.fcSetFreq(freq);
       const v4 = this.model === 'v4';
       const up = v4 && freq < 28800000 ? freq + 28800000 : freq;
       const lo = up + this.ifFreq;
@@ -424,6 +493,86 @@ const RtlSdr = (function () {
       return ifFreq;
     }
 
+    // ── FC0012 / FC0013 ──────────────────────────────────────────────────────
+    // Plain registers that read back as written (no bit reversal). librtlsdr
+    // reads before every masked write rather than shadowing, and so does this.
+
+    fcWrite(reg, val) { return this.i2cWrite(I2C.FC001X, [reg, val & 0xff]); }
+    async fcRead(reg) {
+      await this.i2cWrite(I2C.FC001X, [reg]);
+      return (await this.i2cRead(I2C.FC001X, 1))[0];
+    }
+    async fcMask(reg, val, mask) { await this.fcWrite(reg, ((await this.fcRead(reg)) & ~mask) | (val & mask)); }
+
+    async fcInit() {
+      const init = this.tuner === 'FC0013' ? FC0013_INIT : FC0012_INIT;
+      for (let i = 0; i < init.length; i++) await this.fcWrite(1 + i, init[i]);
+    }
+
+    // fc001x_set_params at a 6 MHz bandwidth: the LO. Returns the LO the
+    // registers program — librtlsdr's arithmetic, integer for integer.
+    async fcSetLo(freq) {
+      const fc13 = this.tuner === 'FC0013';
+      if (fc13) {
+        await this.fcMask(0x1d, FC0013_TRACK.find(t => freq <= t[0])[1], 0x1c);
+        await this.fcMask(0x07, freq < 300e6 ? 0x10 : 0x00, 0x10);     // VHF filter
+        await this.fcMask(0x14, freq < 300e6 ? 0x00 : 0x40, 0xe0);     // UHF input (librtlsdr never selects GPS)
+      } else {
+        await this.gpioBit(6, freq > 300e6);                           // the FC0012's VHF / UHF filter
+      }
+      const half = Math.floor(this.tunerXtal / 2);
+      const [, multi, r5, r6base] = (fc13 ? FC0013_DIV : FC0012_DIV).find(d => freq < d[0]);
+      const vco = freq * multi, vcoHigh = vco >= 3060000000;
+      let r6 = r6base | (vcoHigh ? 0x08 : 0);
+      let xdiv = Math.floor(vco / half);
+      if (vco - xdiv * half >= Math.floor(half / 2)) xdiv++;
+      let pm = Math.floor(xdiv / 8), am = xdiv - 8 * pm;
+      if (am < 2) { am += 8; pm--; }
+      const r1 = pm > 31 ? am + 8 * (pm - 31) : am, r2 = pm > 31 ? 31 : pm;
+      if (r1 > 15 || r2 < 0x0b) throw new Error('No PLL setting reaches ' + (freq / 1e6).toFixed(3) + ' MHz — outside what the tuner can tune');
+      // The fraction is signed: past a half, xdiv was rounded up and it counts back.
+      let xin = Math.floor(Math.floor((vco - Math.floor(vco / half) * half) / 1000) * 32768 / Math.floor(half / 1000));
+      if (xin >= 16384) xin += 32768;
+      xin &= 0xffff;
+      r6 = ((r6 | 0x20) & 0x3f) | 0x80;                                // clock out on; IF filter 6 MHz
+      const regs = [r1, r2, xin >> 8, xin & 0xff, r5 | 0x07, r6];
+      for (let i = 0; i < regs.length; i++) await this.fcWrite(1 + i, regs[i]);
+      if (fc13) await this.fcMask(0x11, multi === 64 ? 0x04 : 0x00, 0x04);
+      // Calibrate the VCO; if it has landed at the edge of its range, change VCO and calibrate again.
+      await this.fcWrite(0x0e, 0x80);
+      await this.fcWrite(0x0e, 0x00);
+      await this.fcWrite(0x0e, 0x00);
+      const v = (await this.fcRead(0x0e)) & 0x3f;
+      if (vcoHigh ? v > 0x3c : v < 0x02) {
+        await this.fcWrite(0x06, r6 ^ 0x08);
+        await this.fcWrite(0x0e, 0x80);
+        await this.fcWrite(0x0e, 0x00);
+      }
+      const n = 8 * r2 + r1, frac = xin >= 32768 ? xin - 65536 : xin;
+      this.pll = { n, xin, multi, vco: v };
+      return half * (n + frac / 32768) / multi;
+    }
+
+    // The LO sits ifFreq (the offset) below the frequency; the RTL2832U's mixer
+    // brings the frequency back to the centre.
+    async fcSetFreq(freq) {
+      const lo = await this.fcSetLo(freq - this.ifFreq);
+      return { lo, rf: lo + this.ifFreq };
+    }
+
+    // null = the FC0013's own AGC (the FC0012 has none: its start-up gain).
+    async fcGain(tenths) {
+      if (this.tuner === 'FC0013') {
+        await this.fcMask(0x0d, tenths == null ? 0x00 : 0x08, 0x08);   // LNA forced, or AGC
+        await this.fcWrite(0x13, 0x0a);                                 // IF gain fixed, as librtlsdr fixes it
+        if (tenths == null) return null;
+      }
+      const lna = this.tuner === 'FC0013' ? FC0013_LNA : FC0012_LNA;
+      const g = tenths == null ? [null, FC0012_INIT[0x13 - 1]] : lna.find(x => x[0] >= tenths) || lna[lna.length - 1];
+      await this.fcMask(this.tuner === 'FC0013' ? 0x14 : 0x13, g[1], 0x1f);
+      return g[0];
+    }
+
     async setIfFreq(freq) {
       const v = -Math.floor(freq * 4194304 / this.rtlXtal);
       await this.demodWrite(1, 0x19, (v >> 16) & 0x3f, 1);
@@ -475,56 +624,100 @@ const RtlSdr = (function () {
         await this.demodWrite(0, 0x0d, 0x83, 1);
         // probe the tuner
         await this.repeater(true);
-        if ((await this.i2cReadReg(I2C.R820T, 0)) === 0x69) this.tuner = 'R820T';
-        else if ((await this.i2cReadReg(I2C.R828D, 0)) === 0x69) this.tuner = 'R828D';
+        this.tuner = await this.probeTuner();
         if (!this.tuner) {
+          const other = await this.probeUnsupported();
           await this.repeater(false);
-          throw new Error('No R820T or R828D tuner answered. This driver supports RTL-SDR Blog V2/V3/V4-style sticks '
-            + '(Rafael tuners); an E4000 or FC0012 stick is not supported.');
+          throw new Error((other ? 'This stick has ' + other + ' tuner, which this driver does not support'
+            : 'No tuner this driver knows answered') + '. It supports the Rafael R820T, R820T2 and R828D (RTL-SDR Blog V3, V4 '
+            + 'and most sticks since) and the Fitipower FC0012 and FC0013 (RTL-SDR Blog V2, older DVB-T sticks).');
         }
         this.model = this.pickModel(opts.model);
-        // R82xx: low IF, In-phase ADC only, spectrum inverted
-        await this.demodWrite(1, 0xb1, 0x1a, 1);
-        await this.demodWrite(0, 0x08, 0x4d, 1);
-        await this.setIfFreq(3570000);
-        await this.demodWrite(1, 0x15, 0x01, 1);
-        // EEPROM byte 7, bit 1 clear: the owner has forced the bias tee on
-        try {
-          await this.i2cWrite(I2C.EEPROM, [7]);
-          const b7 = (await this.i2cRead(I2C.EEPROM, 1))[0];
-          this.forceBiasTee = !(b7 & 0x02);
-        } catch (_) { this.forceBiasTee = false; }
+        if (this.zeroIf) {
+          // FC0012 / FC0013: zero-IF, I and Q both sampled, spectrum upright.
+          // The IF register carries the offset once there is a sample rate.
+          await this.demodWrite(1, 0xb1, 0x1b, 1);
+          await this.demodWrite(0, 0x08, 0xcd, 1);
+          this.ifFreq = 0;
+          await this.setIfFreq(0);
+          await this.demodWrite(1, 0x15, 0x00, 1);
+        } else {
+          // R82xx: low IF, In-phase ADC only, spectrum inverted
+          await this.demodWrite(1, 0xb1, 0x1a, 1);
+          await this.demodWrite(0, 0x08, 0x4d, 1);
+          await this.setIfFreq(3570000);
+          await this.demodWrite(1, 0x15, 0x01, 1);
+        }
+        // EEPROM byte 7, bit 1 clear: on a Blog V3 or V4, the owner has forced
+        // the bias tee on. Asked of those alone — elsewhere the bit only turns
+        // the IR interface off, and a one-interface stick has it clear.
+        this.forceBiasTee = false;
+        if (MODELS[this.model].eepromBiasTee) {
+          try {
+            await this.i2cWrite(I2C.EEPROM, [7]);
+            const b7 = (await this.i2cRead(I2C.EEPROM, 1))[0];
+            this.forceBiasTee = !(b7 & 0x02);
+          } catch (_) { this.forceBiasTee = false; }
+        }
         await this.repeater(true);
         if (this.forceBiasTee) await this.biasTeeRaw(true);
         await this.tunerInit();
+        if (this.zeroIf) await this.gainRaw(null);   // the state librtlsdr's tools leave it in: AGC, IF gain fixed
         await this.repeater(false);
         this.log('Opened ' + label(u) + ' — tuner ' + this.tuner + ', ' + MODELS[this.model].label);
         return this.info();
       });
     }
 
+    // librtlsdr's probe, for the tuners this drives: each chip's ID register
+    // at its own address; the FC0012 only after a reset pulse on GPIO 4.
+    async probeTuner() {
+      if ((await this.i2cReadReg(I2C.R820T, 0)) === 0x69) return 'R820T';
+      if ((await this.i2cReadReg(I2C.R828D, 0)) === 0x69) return 'R828D';
+      if ((await this.i2cReadReg(I2C.FC001X, 0)) === 0xa3) return 'FC0013';
+      await this.gpioOutput(4);
+      await this.gpioBit(4, true);
+      await this.gpioBit(4, false);
+      if ((await this.i2cReadReg(I2C.FC001X, 0)) === 0xa1) {
+        await this.gpioOutput(6);              // its VHF / UHF filter switch
+        return 'FC0012';
+      }
+      return null;
+    }
+    // The tuners it does not drive, so the refusal can name the one it found.
+    async probeUnsupported() {
+      if ((await this.i2cReadReg(I2C.E4000, 2)) === 0x40) return 'an Elonics E4000';
+      const id = await this.i2cReadReg(I2C.FC2580, 1);
+      return id != null && (id & 0x7f) === 0x56 ? 'an FCI FC2580' : null;
+    }
+
     pickModel(want) {
       const m = this.usb.manufacturerName || '', p = this.usb.productName || '';
       if (want && want !== 'auto' && MODELS[want]) {
-        if (MODELS[want].tuner === this.tuner) return want;
+        if ((MODELS[want].tuners || []).includes(this.tuner)) return want;
         this.log('Asked for ' + MODELS[want].label + ' but the tuner is an ' + this.tuner + ' — detecting instead.');
       }
       if (this.tuner === 'R828D') return (m === 'RTLSDRBlog' && p === 'Blog V4') ? 'v4' : 'r828d';
+      // An FC stick does not say whose it is — the Blog V2 this was brought up
+      // on reports "Generic" / "RTL2832U" — so the generic model, and the V2
+      // (for its bias tee) picked by hand.
+      if (this.tuner === 'FC0013') return 'fc0013';
+      if (this.tuner === 'FC0012') return 'fc0012';
       if (/Blog V3/i.test(p)) return 'v3';
       // An R820T(2) that does not name itself: a V3 is the common case and the
-      // superset (its extras do nothing harmful on a V2), but say so honestly.
-      return /RTLSDRBlog/i.test(m) ? 'v3' : 'v2';
+      // superset (its extras do nothing harmful on a generic stick), but say so honestly.
+      return /RTLSDRBlog/i.test(m) ? 'v3' : 'r820t';
     }
 
     info() {
-      const u = this.usb, M = MODELS[this.model] || {};
-      const min = this.model === 'v4' ? 500000 : M.direct ? 500000 : 25000000;
+      const u = this.usb, M = MODELS[this.model] || {}, T = this.tunerSpec;
+      const min = this.model === 'v4' || M.direct ? 500000 : T.minHz;
       return {
         tuner: this.tuner, model: this.model, modelLabel: M.label, note: M.note,
         manufacturer: u.manufacturerName || '', product: u.productName || '', serial: u.serialNumber || '',
         label: label(u), biasTee: !!M.biasTee, directSampling: !!M.direct, upconverter: !!M.upconverter,
-        forceBiasTee: this.forceBiasTee, gains: GAINS.slice(), minHz: min, maxHz: 1766000000,
-        filterCal: this.filterCal,
+        forceBiasTee: this.forceBiasTee, gains: T.gains.slice(), minHz: min, maxHz: T.maxHz,
+        zeroIf: !!T.zeroIf, filterCal: this.filterCal,
       };
     }
 
@@ -534,7 +727,10 @@ const RtlSdr = (function () {
         let ratio = Math.floor(RTL_XTAL * 4194304 / rate) & 0x0ffffffc;
         const real = RTL_XTAL * 4194304 / (ratio | ((ratio & 0x08000000) << 1));
         this.rate = real;
-        if (!this.direct) {
+        if (!this.direct && this.zeroIf) {
+          this.ifFreq = offsetFor(real);       // the offset follows the rate; tuneRaw() below moves the LO
+          await this.setIfFreq(this.ifFreq);
+        } else if (!this.direct) {
           await this.repeater(true);
           const ifFreq = await this.tunerSetBandwidth(this.bw > 0 ? this.bw : real);
           await this.repeater(false);
@@ -562,11 +758,15 @@ const RtlSdr = (function () {
       } else {
         await this.repeater(true);
         await this.tunerInit();
-        const ifFreq = await this.tunerSetBandwidth(this.bw > 0 ? this.bw : (this.rate || 2048000));
-        if (this.gain != null) await this.gainRaw(this.gain);
+        const ifFreq = this.zeroIf ? (this.ifFreq = offsetFor(this.rate || 2048000))
+          : await this.tunerSetBandwidth(this.bw > 0 ? this.bw : (this.rate || 2048000));
+        if (this.gain != null || this.zeroIf) await this.gainRaw(this.gain);
         await this.repeater(false);
         await this.setIfFreq(ifFreq);
-        await this.demodWrite(1, 0x15, 0x01, 1);
+        if (this.zeroIf) {
+          await this.demodWrite(0, 0x08, 0xcd, 1);
+          await this.demodWrite(1, 0xb1, 0x1b, 1);
+        } else await this.demodWrite(1, 0x15, 0x01, 1);
         await this.demodWrite(0, 0x06, 0x80, 1);
       }
       this.direct = on;
@@ -587,7 +787,7 @@ const RtlSdr = (function () {
       } else {
         await this.repeater(true);
         try { res = await this.tunerSetFreq(freq); } finally { await this.repeater(false); }
-        res.mode = this.model === 'v4' && freq < 28800000 ? 'upconverter' : 'tuner';
+        res.mode = this.model === 'v4' && freq < 28800000 ? 'upconverter' : this.zeroIf ? 'offset' : 'tuner';
       }
       this.freq = freq;
       res.errorHz = Math.round(res.rf - freq);
@@ -606,6 +806,7 @@ const RtlSdr = (function () {
     }
 
     async gainRaw(tenths) {
+      if (this.zeroIf) return this.fcGain(tenths);
       if (tenths == null) {
         await this.twm(0x05, 0x00, 0x10);
         await this.twm(0x07, 0x10, 0x10);
@@ -627,10 +828,12 @@ const RtlSdr = (function () {
       return total;
     }
 
-    // null = the tuner's own AGC; else tenths of a dB (the nearest step at or above).
+    // null = the tuner's own AGC; else tenths of a dB (the nearest step at or
+    // above, from info().gains — each tuner has its own).
     setGain(tenths) {
       return this.serial(async () => {
-        this.gain = tenths == null ? null : Math.max(0, Math.min(496, Math.round(tenths)));
+        const G = this.tunerSpec.gains;
+        this.gain = tenths == null ? null : Math.max(G[0], Math.min(G[G.length - 1], Math.round(tenths)));
         if (this.direct) return this.gain;
         await this.repeater(true);
         try { return await this.gainRaw(this.gain); } finally { await this.repeater(false); }
@@ -654,7 +857,7 @@ const RtlSdr = (function () {
     setBandwidth(hz) {
       return this.serial(async () => {
         this.bw = hz > 0 ? hz : 0;
-        if (this.direct) return null;
+        if (this.direct || this.zeroIf) return null;     // an FC tuner's IF filter stays at 6 MHz, as in librtlsdr
         await this.repeater(true);
         const ifFreq = await this.tunerSetBandwidth(this.bw > 0 ? this.bw : (this.rate || 2048000));
         await this.repeater(false);
