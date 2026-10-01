@@ -11,6 +11,7 @@ whole card with nothing plugged in.
 | `alert-dsp.js` | The off-air decoder, run in a Web Worker built from its own source: channeliser, burst gate, ALERT Binary / Enhanced iFLOWS / ASCII decode, spectrum, FM audio |
 | `serial-sdr.js` | The card: controls, graphics, the readings table |
 | `serial-viz.js` | Canvas helpers shared with the Quansheng card |
+| `tools/install-rtlsdr-driver.cmd` | Windows: puts Windows' own WinUSB driver on every stick plugged in that lacks it — double-click it |
 | `test/alertdsp.mjs`, `test/rtlsdr.mjs` | The checks — a real off-air burst, and a simulated V2/V3/V4 |
 
 ## Where it comes from
@@ -45,12 +46,32 @@ Where the port departs from the Kotlin, the code says so at the spot:
 WebUSB needs Chrome or Edge, served over https or from localhost. The operating
 system has to let go of the stick first, exactly as for `rtl_sdr`, SDR# or rtl_tcp:
 
-- **Windows** — install the **WinUSB** driver on the stick's *interface 0* with
-  [Zadig](https://zadig.akeo.ie/). If SDR# already works on the machine, this is done.
+- **Windows** — the stick needs the **WinUSB** driver, and until it has it, it is not
+  in the browser's chooser at all: Windows offers the browser only devices it can hand
+  over. Run [`tools/install-rtlsdr-driver.cmd`](../tools/install-rtlsdr-driver.cmd)
+  (the card's *Getting the stick to the browser* links it as a download): double-click
+  it, say Yes to the admin prompt, and it lists every stick plugged in and gives WinUSB
+  to the ones that lack it — Windows' own `winusb.inf`, signed by Microsoft, so nothing
+  is downloaded and no certificate is added. `install-rtlsdr-driver.cmd -List` only
+  reports. The browser does not need restarting; re-plug the stick if it is still
+  missing from the list. If SDR# already works with the stick, this is done.
+
+  By hand, [Zadig](https://zadig.akeo.ie/) does the same: *Options → List All Devices*,
+  pick the stick, WinUSB, *Replace Driver*. Which entry is the stick depends on how many
+  USB interfaces it has:
+
+  | Stick | USB ID | Zadig lists it as | WinUSB goes on |
+  |---|---|---|---|
+  | Blog V3, V4 and most `RTL2838UHIDIR` sticks | `0bda:2838` | "Bulk-In, Interface (Interface 0)" | interface 0 (interface 1 is the IR receiver) |
+  | V2-era and generic sticks that name themselves "RTL2832U" | `0bda:2832` | "RTL2832U" | the whole device — these usually have one interface, so there is no "Interface 0" entry |
+
+  To undo it: Device Manager → *Universal Serial Bus devices* → the stick →
+  *Uninstall device*, then re-plug it.
 - **Linux** — the kernel's DVB-T TV driver claims the stick on plug-in:
   `sudo rmmod dvb_usb_rtl28xxu` (or blacklist it in `/etc/modprobe.d/`), and give
-  your user access with a udev rule for `0bda:2838`
-  (e.g. `SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", MODE="0666"`).
+  your user access with a udev rule for `0bda:2838` and `0bda:2832`
+  (e.g. `SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", MODE="0666"`,
+  and the same line with `2832`).
 - **macOS** — nothing to do.
 - **Anywhere** — close whatever else holds it: rtl_tcp, SDR#, SDR++, GQRX, or this
   card in another tab. Only one program can hold the stick.
@@ -100,7 +121,8 @@ read its frames from, each frame boxed; and the ADC histogram.
 The driver has only ever run against `test/rtlsdr.mjs`'s simulated dongle; the decoder
 has run against a real capture. What needs a real V2 and V4, in order:
 
-1. **Open.** *+ RTL-SDR → Choose USB stick → Open*. Expect the card's notes to say
+1. **Open.** *+ RTL-SDR → Choose USB stick → Open* (on Windows, a stick missing from
+   the chooser has no WinUSB driver yet — run `tools/install-rtlsdr-driver.cmd` first). Expect the card's notes to say
    `Opened … tuner R820T` (V2/V3) or `R828D` (V4) and the *Device* chip to name the
    model. If the V4 shows as *Generic R828D*, its USB strings differ from
    `RTLSDRBlog` / `Blog V4` — read them from `chrome://usb-internals` and fix

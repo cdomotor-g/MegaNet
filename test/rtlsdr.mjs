@@ -18,6 +18,7 @@
 //
 // Node only. Run:  npm run rtlsdr   (-v to list what passed)
 
+import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { REPO_ROOT } from './lib/paths.mjs';
@@ -270,7 +271,37 @@ await new R.Device(new FakeStick({ tuner: null })).open({}).then(
   e => check('no Rafael tuner: refused, saying which sticks are supported', /R820T or R828D/.test(e.message)));
 await new R.Device(new FakeStick({ claimFails: true })).open({}).then(
   () => check('a claimed stick: refused', false),
-  e => { const why = R.describeOpenError(e); check('a stick the OS still holds: the reason names the DVB driver and Zadig', /dvb_usb_rtl28xxu/.test(why) && /Zadig/.test(why)); });
+  e => {
+    const why = R.describeOpenError(e);
+    check('a stick the OS still holds: the reason names the DVB driver, the Windows driver installer and Zadig',
+      /dvb_usb_rtl28xxu/.test(why) && why.includes(R.WINDOWS_INSTALLER) && /Zadig/.test(why));
+  });
+
+// ── the Windows driver installer ─────────────────────────────────────────────
+//
+// On Windows a stick with no WinUSB driver never reaches the browser's
+// chooser, so the card links tools/install-rtlsdr-driver.cmd. It finds sticks
+// by its own list of IDs: this holds that list to FILTERS, and the file to the
+// shape cmd.exe needs, since it is a batch file and a PowerShell script at once.
+
+{
+  const file = path.join(REPO_ROOT, R.WINDOWS_INSTALLER);
+  const exists = fs.existsSync(file);
+  check('the Windows driver installer the card links is in the repo', exists, R.WINDOWS_INSTALLER);
+  if (exists) {
+    const buf = fs.readFileSync(file);
+    const text = buf.toString('latin1');
+    check('…plain ASCII, no byte-order mark: cmd.exe reads its first lines', buf.every(b => b < 0x80));
+    check('…a batch file that hands itself to PowerShell: "<# :" first, "#>" closing the batch part',
+      text.startsWith('<# :') && /\r?\n#>\r?\n/.test(text));
+    const line = (text.match(/^\$StickIds = @\((.*)\)\s*$/m) || [])[1] || '';
+    const hex = n => n.toString(16).padStart(4, '0');
+    const ids = [...line.matchAll(/VID_([0-9A-F]{4})&PID_([0-9A-F]{4})/gi)].map(m => `${m[1]}:${m[2]}`.toLowerCase()).sort();
+    const want = R.FILTERS.map(f => `${hex(f.vendorId)}:${hex(f.productId)}`).sort();
+    check('…and it looks for exactly the sticks the browser is asked for (FILTERS)', ids.join() === want.join(),
+      `installer ${ids.join(' ') || 'none'}, FILTERS ${want.join(' ')}`);
+  }
+}
 
 // ── Verdict ──────────────────────────────────────────────────────────────────
 

@@ -759,6 +759,38 @@ See `meganet_agent.py` (`_run_turn` and the loop in `run_agent`) for the full,
 commented implementation, including `pause_turn` handling and returning tool
 results as *only* `tool_result` blocks (required for programmatic tool calls).
 
+## `install-rtlsdr-driver.cmd` — the WinUSB driver for an RTL-SDR stick, on Windows
+
+The Serial Monitor's RTL-SDR card reaches the stick over WebUSB, and on Windows a
+stick is offered to the browser only once it has the **WinUSB** driver — without it,
+it is simply missing from the chooser. This puts Windows' own `winusb.inf` ("WinUsb
+Device", signed by Microsoft) on every RTL-SDR stick plugged in that lacks it: no
+download, no driver package added, no certificate added to the trusted roots, as
+Zadig's are. Double-click it; it lists the sticks first, asks before changing
+anything, and asks Windows for admin rights only then. The card links it as a
+download under *Getting the stick to the browser*. From a terminal, `-List` only
+reports, and `-Yes` installs without asking first:
+
+```bat
+tools\install-rtlsdr-driver.cmd
+tools\install-rtlsdr-driver.cmd -List
+tools\install-rtlsdr-driver.cmd -Yes
+```
+
+It knows the two shapes a stick comes in. A Blog V3 or V4 (`0bda:2838`) is a
+composite device and takes WinUSB on interface 0 — Zadig's "Bulk-In, Interface
+(Interface 0)". Many V2-era and generic sticks (`0bda:2832`) have one interface and
+take it on the device itself — Zadig's "RTL2832U", with no "Interface 0" entry to
+find, which is how such a stick gets left out. It also writes the
+`DeviceInterfaceGUIDs` value WinUSB announces the device by (Chrome finds a
+composite stick's interface 0 through it), where none is set.
+
+The file is a batch file and a PowerShell script at once, so a downloaded copy runs
+with a double-click and no execution-policy change; it is plain ASCII with CRLF line
+ends (`.gitattributes`), because cmd reads its first lines. The sticks it looks for
+are `RtlSdr.FILTERS` in `rtlsdr.js`, and `npm run rtlsdr` fails if the two lists
+drift apart. Undo: Device Manager → the stick → *Uninstall device*, re-plug.
+
 ## Blender: the Digital Twin's `.glb`
 
 `blender/import_twin.py` is the one script here that runs under Blender's

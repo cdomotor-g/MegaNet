@@ -59,7 +59,7 @@ const SerialSdr = (function () {
       spec: null, peak: null, floorDb: null, wf: null, wfLo: null, wfHi: null,
       scope: null, level: null, readings: [], bursts: [], power: [], trace: null, lastDecode: null,
       notes: [], rx: { bytes: 0, t0: 0, rate: 0, lastBytes: 0, lastT: 0 }, audio: null,
-      paintPending: {}, raf: 0, knownList: [], replay: null,
+      paintPending: {}, raf: 0, knownList: [], replay: null, helpOpen: false,
     };
   }
 
@@ -249,6 +249,13 @@ const SerialSdr = (function () {
 
   // ── the dongle ─────────────────────────────────────────────────────────────
 
+  // Windows is where a stick most often never reaches the chooser: one with no
+  // WinUSB driver is not offered to the browser at all.
+  function onWindows() {
+    if (typeof navigator === 'undefined') return false;
+    return /Windows/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.userAgent || '');
+  }
+
   async function choose(id) {
     const c = conn(id);
     if (!c) return;
@@ -257,9 +264,15 @@ const SerialSdr = (function () {
       c.usb = await RtlSdr.request();
       c.label = RtlSdr.label(c.usb);
       c.err = null;
+      c.helpOpen = false;
     } catch (e) {
-      if (e && e.name === 'NotFoundError') { c.err = 'No stick chosen. If the list was empty, the computer is not offering the stick to the browser — see "Getting the stick to the browser" below.'; }
-      else c.err = RtlSdr.describeOpenError(e);
+      if (e && e.name === 'NotFoundError') {
+        c.err = onWindows()
+          ? 'No stick chosen. If the list was empty, or your stick was not in it, Windows is not offering it to the browser: '
+            + 'it needs the WinUSB driver first. "Getting the stick to the browser" below has a one-click installer.'
+          : 'No stick chosen. If the list was empty, the computer is not offering the stick to the browser — see "Getting the stick to the browser" below.';
+        c.helpOpen = true;
+      } else c.err = RtlSdr.describeOpenError(e);
     }
     Serial.renderList();
   }
@@ -1037,10 +1050,15 @@ const SerialSdr = (function () {
       + '<p class="ser-mode-note">' + esc(f.model !== 'auto' && M[f.model] ? M[f.model].note : 'The stick says what it is: a Blog V4 names itself "RTLSDRBlog / Blog V4" and has an R828D; '
         + 'a V3 has an R820T2. Pick a model only if detection gets it wrong.') + '</p>'
       + (c.err ? '<p class="ser-err">' + esc(c.err) + '</p>' : '')
-      + '<details class="qs-ctl"><summary>Getting the stick to the browser</summary>'
+      + '<details class="qs-ctl"' + (c.helpOpen ? ' open' : '') + '><summary>Getting the stick to the browser</summary>'
       + '<p class="qs-hint">The browser talks to the stick over WebUSB (Chrome or Edge, https or localhost), so the computer has to let go of it first — exactly as for rtl_sdr or SDR#:</p>'
-      + '<ul class="qs-hint"><li><strong>Windows</strong>: install the WinUSB driver on the stick\'s interface 0 with Zadig (the step SDR# and rtl_tcp need too).</li>'
-      + '<li><strong>Linux</strong>: the DVB-T TV driver grabs it — <code>sudo rmmod dvb_usb_rtl28xxu</code>, or blacklist it; and give your user access (a udev rule for 0bda:2838).</li>'
+      + '<ul class="qs-hint"><li><strong>Windows</strong>: a stick is in the browser\'s list only once it has the WinUSB driver (the step SDR# and rtl_tcp need too). '
+      + '<a href="' + esc(RtlSdr.WINDOWS_INSTALLER) + '" download>Download the driver installer</a>, double-click it and say Yes to the admin prompt: '
+      + 'it lists the sticks plugged in and gives WinUSB to any that lack it, with Windows\' own driver. It is a plain-text script, so the browser may ask '
+      + 'you to keep it, and SmartScreen to choose <em>More info → Run anyway</em>. Then press <em>Choose USB stick…</em> again. '
+      + 'By hand instead: Zadig, <em>Options → List All Devices</em>, WinUSB — a V3 or V4 is "Bulk-In, Interface (Interface 0)", '
+      + 'a one-interface V2-era stick is "RTL2832U".</li>'
+      + '<li><strong>Linux</strong>: the DVB-T TV driver grabs it — <code>sudo rmmod dvb_usb_rtl28xxu</code>, or blacklist it; and give your user access (a udev rule for 0bda:2838 and 0bda:2832).</li>'
       + '<li><strong>macOS</strong>: nothing to install.</li>'
       + '<li>Close anything else using the stick: rtl_tcp, SDR#, SDR++, GQRX, or this card in another tab.</li></ul>'
       + '<p class="qs-hint"><a href="docs/serial-sdr.md" target="_blank" rel="noopener">The RTL-SDR guide</a> has the details, and what the card does with each model.</p></details>'

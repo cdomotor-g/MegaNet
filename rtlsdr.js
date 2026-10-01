@@ -40,14 +40,22 @@
 //
 // WebUSB: Chrome or Edge, https or localhost. The operating system must let go
 // of the stick first — exactly as for rtl_sdr:
-//   Windows  WinUSB on the dongle's interface 0 (Zadig), as for SDR# and rtl_tcp.
+//   Windows  WinUSB, as for SDR# and rtl_tcp — without it the stick is not in
+//            the browser's chooser at all. A V3/V4 is a composite device and
+//            takes it on interface 0; many V2-era and generic sticks (0bda:2832)
+//            have one interface and take it on the device itself, which Zadig
+//            lists as "RTL2832U", not "Interface 0". WINDOWS_INSTALLER does
+//            either, for every stick plugged in, with Windows' own winusb.inf.
 //   Linux    the DVB-T driver claims it: `sudo rmmod dvb_usb_rtl28xxu`, or
-//            blacklist it; and a udev rule for 0bda:2838 so it is not root-only.
+//            blacklist it; and a udev rule for 0bda:2838 and 0bda:2832 so it is
+//            not root-only.
 //   macOS    nothing to do.
 // docs/serial-sdr.md says this at length; describeOpenError() says it briefly.
 
 const RtlSdr = (function () {
+  // The installer looks for these same sticks; test/rtlsdr.mjs holds the two lists together.
   const FILTERS = [{ vendorId: 0x0bda, productId: 0x2838 }, { vendorId: 0x0bda, productId: 0x2832 }];
+  const WINDOWS_INSTALLER = 'tools/install-rtlsdr-driver.cmd';
 
   const RTL_XTAL = 28800000;
   const R828D_XTAL = 16000000;
@@ -118,8 +126,8 @@ const RtlSdr = (function () {
     if (/claim/i.test(msg) || name === 'NetworkError' || name === 'InvalidStateError') {
       return 'The computer would not hand the stick over (' + msg + '). Something else has it: on Linux the '
         + 'DVB-T driver — run `sudo rmmod dvb_usb_rtl28xxu` (or blacklist it) and re-plug; on Windows the '
-        + 'stick needs the WinUSB driver (Zadig, interface 0), as for SDR#; anywhere, close rtl_tcp, SDR#, '
-        + 'SDR++ or another tab using it.';
+        + 'stick needs the WinUSB driver, as for SDR# — run the driver installer (' + WINDOWS_INSTALLER + '), '
+        + 'or Zadig; anywhere, close rtl_tcp, SDR#, SDR++ or another tab using it.';
     }
     if (name === 'SecurityError') return 'The browser blocked USB access (' + msg + '). WebUSB needs https or localhost, and no IT policy blocking it.';
     if (name === 'NotFoundError') return 'The stick is no longer connected. Re-plug it and choose it again.';
@@ -725,7 +733,7 @@ const RtlSdr = (function () {
     }
   }
 
-  return { FILTERS, MODELS, GAINS, supported, request, known, label, describeOpenError, Device, bitrev };
+  return { FILTERS, WINDOWS_INSTALLER, MODELS, GAINS, supported, request, known, label, describeOpenError, Device, bitrev };
 })();
 
 // test/rtlsdr.mjs requires this same file and drives it against a simulated

@@ -1008,9 +1008,10 @@ const HELP = {
       + 'changed. A followed card only listens — PuTTY holds the port — so a radio\'s console buttons copy '
       + 'their command for pasting into PuTTY.',
       'An <strong>RTL-SDR needs the computer to let go of it</strong> before the browser can '
-      + 'have it: WinUSB via Zadig on Windows, the DVB-T driver unloaded on Linux, nothing on a '
-      + 'Mac — the same step rtl_sdr and SDR# need. Gain is ADC headroom, not SNR: keep the '
-      + 'histogram\'s end bins empty.',
+      + 'have it: the WinUSB driver on Windows (the card\'s one-click installer, or Zadig — '
+      + 'without it the stick is not even in the list), the DVB-T driver unloaded on Linux, '
+      + 'nothing on a Mac — the same step rtl_sdr and SDR# need. Gain is ADC headroom, not SNR: '
+      + 'keep the histogram\'s end bins empty.',
       'ALERT Binary has <strong>no checksum</strong>. Off the air, a reading is only as good as '
       + 'its votes, and a strong burst can throw a one-bit ghost — the card reports those as '
       + 'shadows, not stations. Check the agency\'s own feed before acting on a value.',

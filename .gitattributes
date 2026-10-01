@@ -12,3 +12,8 @@ archive/river-height-stations/*.html text eol=lf
 # meta, and a line ending rewritten on checkout would make `--check` fail on a
 # file nobody changed.
 archive/flood-peaks/*.txt text eol=lf
+
+# Batch files are read by cmd.exe, which mis-reads LF-only lines in places.
+# The site serves tools/install-rtlsdr-driver.cmd from a checkout, so this
+# decides the line ends of the copy people download, not just their own clone.
+*.cmd text eol=crlf
