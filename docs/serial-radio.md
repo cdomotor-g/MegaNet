@@ -12,7 +12,7 @@ with the firmware's USB vendor ID (`0x36B7`) becomes a Quansheng card by itself.
 |---|---|
 | `quansheng.js` | The codec: line classes, the HDR schema, DEC/BST/STA/EVT records, console replies, payload and burst re-decoding, the screen, binary 0xABCD frames, and the station-table blob |
 | `serial-radio.js` | The dashboard and the console queue |
-| `serial.js` | Opens the port, reads it, keeps the raw log |
+| `serial.js` | Opens the port (or follows PuTTY's log of it, through `log-follow.js`), reads it, keeps the raw log |
 | `test/quansheng.mjs` | Every example line in the firmware's `docs/ALERT_SERIAL.md`, and the station table against the firmware's own lookup |
 
 The firmware's [`docs/ALERT_SERIAL.md`](https://github.com/cdomotor-g/quansheng_alert_v3/blob/main/docs/ALERT_SERIAL.md)
@@ -59,6 +59,26 @@ All go through the console, one command at a time, each ending on its `OK` or `E
   the console is idle; *Save PNG*.
 - **Reboot**, **Events** (BOOT, CENSUS, SET, LOG, STN, CLOCK), and a **console** with
   quick buttons and the raw stream, every line classed as the firmware's document does.
+
+## Following PuTTY's log instead of a port
+
+On a computer whose browser will not open a COM port, open the radio in PuTTY with
+logging on (*Session → Logging → All session output*) and drag the log onto the
+Serial Monitor tab — the card is recognised from the log's `HDR`/`DEC` lines and the
+dashboard fills as PuTTY writes. Step by step:
+[`serial-help.html#putty`](serial-help.html#putty).
+
+- **Receive-only.** PuTTY holds the port, so nothing is sent from the card: no
+  handshake, no DTR watchdog (PuTTY asserts DTR itself). The console's buttons and
+  box copy their command instead — paste it into PuTTY (right-click), press Enter.
+- **Replies are read back.** `INFO`, `GET`, `LOG STAT` and `STN INFO` replies typed
+  for in PuTTY come through the log and fill the settings, log and station-table
+  panels as they pass.
+- **Copy clock command** copies `TIME <now>`. Send it first: the clock is lost on
+  every reboot, and the log's history is drawn at the times the radio's clock gave
+  each record (by when it was read, for records written while the clock was unset).
+- Uploading a station table or capturing the screen needs the port, and so the
+  card's own **Open / Connect** rather than PuTTY.
 
 ## Things to know
 

@@ -133,11 +133,11 @@ const TABS = [
     { id: 'packets',    label: 'ALERT Packets',          icon: '📦',
       find: 'decoder decode encoder encode erts message frame crc check bits hex payload spec' },
     { id: 'alert2',     label: 'ALERT2 / ERT-A2',        icon: '🛰️',
-      find: 'erta2 elpro decode ports capture sample' },
+      find: 'erta2 elpro decode ports capture sample putty log watch follow drop' },
     { id: 'hfem',       label: 'HFEM Messages',          icon: '🌊',
       find: 'hydro field event message bom bureau meteorology decode paste site sensor scheme timestamp maintenance builder logger' },
     { id: 'serial',     label: 'Serial Monitor',         icon: '🔌',
-      find: 'com port web serial live stream terminal baud log quansheng radio uv-k5 rtl-sdr sdr usb dongle spectrum waterfall off air' },
+      find: 'com port web serial live stream terminal baud log quansheng radio uv-k5 rtl-sdr sdr usb dongle spectrum waterfall off air putty log file follow tail erta2 ert-a2 elpro alert2' },
   ] },
   { group: 'Data', tabs: [
     { id: 'arro',       label: 'ARRO Launcher',          icon: '🚀',
@@ -940,6 +940,10 @@ const HELP = {
       + '<strong>RSSI</strong>; the RS232 ASCII line is the only one carrying the receiver\'s own '
       + 'clock. The tab sniffs which it was handed rather than asking, and says what is missing '
       + 'instead of inventing it.',
+      'A log can be <strong>watched as it grows</strong>: drag it onto the tab from File Explorer. That still '
+      + 'works where a policy has switched the browser\'s file picker off, and <em>Watch a log file…</em> says '
+      + 'so when it has. For a live dashboard of the same decode, the Serial Monitor\'s ERT-A2 card follows '
+      + 'a log, or the unit\'s port, the same way.',
       'Addresses matching exactly one station are what <strong>fix where a capture is</strong>, '
       + 'and an ambiguous address is then resolved to whichever candidate is near them. Two '
       + 'stations 6 km apart carrying the same addresses cannot be told apart by anything in the '
@@ -992,8 +996,17 @@ const HELP = {
     summary: 'Streams live output from serial devices over the browser\'s Web Serial API — as many '
            + 'ports at once as the machine has, each an independent card with its own settings. A '
            + 'Quansheng radio on the ALERT receiver firmware becomes a dashboard with its own controls, '
-           + 'and an RTL-SDR stick (Blog V2, V3 or V4, over WebUSB) decodes ALERT off the air itself.',
+           + 'an ELPRO ERT-A2 decodes as it arrives, and an RTL-SDR stick (Blog V2, V3 or V4, over WebUSB) '
+           + 'decodes ALERT off the air itself. Where the browser will not open a port, a card follows the '
+           + 'log file PuTTY writes instead.',
     watch: [
+      '<strong>No Web Serial? Use PuTTY\'s log.</strong> Open the port in PuTTY with logging on '
+      + '(Session → Logging → <em>All session output</em>) and <strong>drag the log file onto the tab</strong> '
+      + '— or the folder it logs into, to follow its newest file. It is read every second as it grows, and '
+      + 'that works where IT has switched off both Web Serial and the browser\'s file picker. Picking the file '
+      + 'with an ordinary file dialog cannot do it: the browser refuses to read a picked file again once it has '
+      + 'changed. A followed card only listens — PuTTY holds the port — so a radio\'s console buttons copy '
+      + 'their command for pasting into PuTTY.',
       'An <strong>RTL-SDR needs the computer to let go of it</strong> before the browser can '
       + 'have it: WinUSB via Zadig on Windows, the DVB-T driver unloaded on Linux, nothing on a '
       + 'Mac — the same step rtl_sdr and SDR# need. Gain is ADC headroom, not SNR: keep the '
@@ -1015,7 +1028,7 @@ const HELP = {
       + 'newest. <em>Save log</em> before <em>Clear</em>, and before the buffer laps.',
     ],
     links: [
-      { label: 'Serial Monitor — what to ask IT for', href: 'docs/serial-help.html' },
+      { label: 'Serial Monitor — what to ask IT for, and following PuTTY\'s log meanwhile', href: 'docs/serial-help.html' },
       { label: 'The Quansheng ALERT radio card', href: 'docs/serial-radio.md' },
       { label: 'The RTL-SDR card — sticks, drivers, and a hardware checklist', href: 'docs/serial-sdr.md' },
     ],
@@ -2803,8 +2816,8 @@ const state = {
     battDiv:   10,
     picks:     {},          // alert id -> chosen station id, when the capture can't tell
     limit:     400,         // rows drawn before "show more"; a day's log is ~15k readings
-    watch:     null,        // { handle, timer, name } — File System Access polling
-    watchMs:   5000,
+    watch:     null,        // { src, follower, name } — a log followed as it grows (log-follow.js)
+    watchMs:   2000,        // the whole tab re-renders on each change, so not every second
     watchErr:  '',          // why the last Watch attempt failed, if it did
     // The table and the map are two views of one selection: a station id when
     // the address resolved to one, otherwise the bare ALERT address.

@@ -20,6 +20,13 @@
 // live body is built here (body, mount). Everything the radio says is a line
 // in the raw log as well, so the dashboard never hides what came off the wire.
 //
+// A card can also be following the log file PuTTY writes from the radio's port
+// (c.follow — see serial.js and log-follow.js). Then there is no port to send
+// on: no handshake, no DTR watchdog, and the controls that need the console
+// copy their command for pasting into PuTTY instead. The radio's replies come
+// back through the log like everything else, and the ones that carry state
+// (INFO, GET, LOG STAT, STN INFO) are read into the dashboard as they pass.
+//
 // The protocol rules this leans on are quansheng.js's header; the two that
 // shape this file are DTR (re-asserted after 25 s of silence — the radio goes
 // quiet for good otherwise) and one console command at a time (a queue, each
@@ -56,7 +63,11 @@ const SerialRadio = (function () {
     const r = c.radio;
     r.lastByte = Date.now();
     clearInterval(r.watch);
-    if (!c.demo) {
+    if (c.follow) {
+      note(c, 'Following ' + c.follow.src.name + ': the dashboard fills from what PuTTY records. PuTTY holds the port, so nothing is sent '
+        + 'from here — the console buttons copy their command instead, to paste into PuTTY (right-click) and send with Enter. The reply '
+        + 'comes back through the log and shows here. Readings from the log\'s history are timed by the radio\'s clock where it was set.', '');
+    } else if (!c.demo) {
       r.watch = setInterval(() => watchdog(c), 5000);
       handshake(c);
     }
@@ -169,6 +180,7 @@ const SerialRadio = (function () {
     Serial.logLine(c, line, cls === 'record' ? 'qs-rec' : cls === 'debug' ? 'qs-dbg' : cls === 'final' ? 'qs-fin' : 'qs-dat', t);
     if (cls === 'record') { onRecord(c, line, t); return; }
     if (cls === 'debug') return;
+    if (c.follow && !r.busy) { absorb(c, line); return; }
     if (r.busy) {
       if (cls === 'final') finish(c, Quansheng.parseFinal(line));
       else {
@@ -179,10 +191,30 @@ const SerialRadio = (function () {
     }
   }
 
+  // A reply someone typed for in PuTTY, read off the followed log: nothing
+  // here asked for it, so nothing is waiting on it, but what it says is still
+  // the radio's state and worth showing.
+  function absorb(c, line) {
+    const r = c.radio, d = Quansheng.parseData(r.schema, line);
+    if (d.type === 'INFO') { r.info[d.key] = d.values; mark(c, 'status'); }
+    else if (d.type === 'GET') { r.settings[d.name] = d.value; mark(c, 'settings'); }
+    else if (d.type === 'LOG' && d.stat) { r.logStat = d; mark(c, 'log', 'status'); }
+    else if (d.type === 'STN' && d.info) { r.stnInfo = d; mark(c, 'stations-table', 'status'); }
+  }
+
+  // When a record happened. Off a port, when it arrived. Off a followed log,
+  // the radio's own clock if it was set: the log's history arrives all at once,
+  // and stamping an hour of it "now" would draw it all at the right-hand edge.
+  function recordTime(c, rec) {
+    if (!c.follow || !rec || !rec.epoch) return Date.now();
+    const ms = rec.epoch * 1000;
+    return Math.abs(ms - Date.now()) < 30 * 86400000 ? Math.min(ms, Date.now()) : Date.now();
+  }
+
   function onRecord(c, line, t) {
     const r = c.radio;
     const p = Quansheng.parseRecord(r.schema, line);
-    t = t || Date.now();
+    t = t || recordTime(c, p.rec);
     if (p.type === 'HDR') {
       if (p.header && p.header.kind === 'fw' && p.header.schema !== Quansheng.SCHEMA) {
         note(c, 'The radio speaks schema ' + p.header.schema + '; this dashboard was written for schema ' + Quansheng.SCHEMA
@@ -506,9 +538,40 @@ const SerialRadio = (function () {
     if (!el || !el.value.trim()) return Promise.resolve();
     const text = el.value.trim();
     el.value = '';
+    const c = conn(id);
+    if (c && c.follow) return copyForPutty(c, text);
     return guard(id, c => cmd(c, text));
   }
-  function quick(id, text) { return guard(id, c => cmd(c, text)); }
+  function quick(id, text) {
+    const c = conn(id);
+    if (c && c.follow) return copyForPutty(c, text);
+    return guard(id, c => cmd(c, text));
+  }
+
+  // Following a log: the command goes to the clipboard, for PuTTY. The radio's
+  // clock is the one worth setting this way — it is lost on every reboot, and
+  // it is what times the log's history.
+  function copyClock(id) {
+    const c = conn(id);
+    if (c) return copyForPutty(c, 'TIME ' + Math.round(Date.now() / 1000), ' It sets the clock to the second you copied it, so send it straight away.');
+    return Promise.resolve();
+  }
+  async function copyForPutty(c, text, extra) {
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (_) {
+      // The async clipboard can be blocked by policy too; the old way often is not.
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', ''); ta.className = 'sr-only';
+        document.body.appendChild(ta); ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      } catch (_) {}
+    }
+    note(c, ok ? 'Copied “' + text + '” — paste it into PuTTY (right-click), press Enter, and the reply shows here.' + (extra || '')
+      : 'Could not copy to the clipboard. Type this into PuTTY and press Enter: ' + text, ok ? '' : 'warn');
+    if (ok) announce('Copied ' + text + ' for PuTTY');
+  }
 
   function select(id, key) {
     const c = conn(id);
@@ -610,8 +673,10 @@ const SerialRadio = (function () {
     chips.push(chip('Heard', (s ? (s.bursts || 0) + ' bursts · ' + (s.decodes || 0) + ' decodes' : r.bursts.length + ' bursts · ' + r.decs.length + ' decodes')
       + (s && s.min_ok != null ? ' · weakest ' + s.min_ok + ' dBm' : '')));
     const quiet = Date.now() - r.lastByte;
-    chips.push(chip('Link', c.demo ? 'demo' : c.phase !== 'open' ? 'closed' : r.busy ? 'busy: ' + esc(r.busy.text.split(' ').slice(0, 2).join(' '))
-      : quiet > 15000 ? 'quiet ' + Math.round(quiet / 1000) + ' s' : 'live', c.phase === 'open' && quiet > 15000 ? 'warn' : ''));
+    const live = c.phase === 'open' || c.phase === 'follow';
+    chips.push(chip('Link', c.demo ? 'demo' : !live ? 'closed' : r.busy ? 'busy: ' + esc(r.busy.text.split(' ').slice(0, 2).join(' '))
+      : (c.phase === 'follow' ? 'log file · ' : '') + (quiet > 15000 ? 'quiet ' + Math.round(quiet / 1000) + ' s' : 'live'),
+      live && quiet > 15000 ? 'warn' : ''));
     el.innerHTML = chips.join('');
   }
 
@@ -941,12 +1006,16 @@ const SerialRadio = (function () {
   // The live body of a Quansheng card. serial.js puts the head above it.
   function body(c) {
     const id = c.id, open = c.phase === 'open' || c.demo;
+    const following = c.phase === 'follow';
     const btn = (label, fn, extra) => '<button type="button" class="ghost" onclick="SerialRadio.' + fn + '"' + (extra || '') + '>' + label + '</button>';
     const dis = open ? '' : ' disabled';
+    // The console's own controls copy their command while following a log.
+    const cdis = open || following ? '' : ' disabled';
     let tb = '<div class="ser-toolbar">';
     if (c.phase === 'open' || c.demo) tb += btn('Sync clock', 'syncClock(\'' + id + '\')') + btn('Refresh', 'refresh(\'' + id + '\')');
+    if (following) tb += btn('Copy clock command', 'copyClock(\'' + id + '\')');
     tb += Serial.toolbarButtons(c);
-    tb += '</div>';
+    tb += '</div>' + Serial.followHtml(c);
     const spans = SPANS.map(([m, l]) => '<option value="' + m + '"' + (c.radio && c.radio.span === m ? ' selected' : '') + '>' + l + '</option>').join('');
     return '<div class="qs-dash" id="qs-dash-' + id + '">'
       + tb
@@ -1008,11 +1077,13 @@ const SerialRadio = (function () {
       + ' onchange="SerialRadio.screenAuto(\'' + id + '\',this.checked)"> mirror</label>'
       + btn('Save PNG', 'screenSave(\'' + id + '\')') + btn('Reboot radio…', 'reboot(\'' + id + '\')', dis) + '</div></details>'
       + '<details class="qs-ctl"><summary>Events</summary><ul class="qs-events" id="qs-events-' + id + '"></ul></details>'
-      + '<details class="qs-ctl"' + (c.radio && c.radio.consoleOpen ? ' open' : '') + '><summary>Console and raw stream</summary>'
-      + '<div class="ser-send"><input type="text" id="qs-cmd-' + id + '" placeholder="Console command, e.g. HELP" aria-label="Console command to send to the radio"'
-      + ' onkeydown="if(event.key===\'Enter\')SerialRadio.sendCmd(\'' + id + '\')"' + dis + '>'
-      + btn('Send', 'sendCmd(\'' + id + '\')', dis) + '</div>'
-      + '<div class="ser-actions qs-quick">' + QUICK.map(q => btn(esc(q), 'quick(\'' + id + '\',\'' + q + '\')', dis)).join('') + '</div>'
+      + '<details class="qs-ctl"' + (c.radio && c.radio.consoleOpen || following ? ' open' : '') + '><summary>Console and raw stream</summary>'
+      + (following ? '<p class="qs-hint">Following a log file: each command below is copied, for pasting into PuTTY.</p>' : '')
+      + '<div class="ser-send"><input type="text" id="qs-cmd-' + id + '" placeholder="Console command, e.g. HELP" aria-label="Console command to '
+      + (following ? 'copy for PuTTY' : 'send to the radio') + '"'
+      + ' onkeydown="if(event.key===\'Enter\')SerialRadio.sendCmd(\'' + id + '\')"' + cdis + '>'
+      + btn(following ? 'Copy for PuTTY' : 'Send', 'sendCmd(\'' + id + '\')', cdis) + '</div>'
+      + '<div class="ser-actions qs-quick">' + QUICK.map(q => btn(esc(q), 'quick(\'' + id + '\',\'' + q + '\')', cdis)).join('') + '</div>'
       + Serial.statsHtml(c) + Serial.logHtml(c)
       + '</details>'
       + '</div></div>';
@@ -1294,6 +1365,6 @@ const SerialRadio = (function () {
     attach, detach, feed, body, mount: mountAll, demo,
     syncClock, refresh, applySetting, applyNumber, step, logStat, logDownload, logClear, logFormat,
     stnInfo, stnLookup, stnBuild, stnSaveBlob, stnUpload, stnCancel, stnClear,
-    screen, screenAuto, screenSave, reboot, sendCmd, quick, select, setSpan, clearData, exportReadings, openPayload,
+    screen, screenAuto, screenSave, reboot, sendCmd, quick, copyClock, select, setSpan, clearData, exportReadings, openPayload,
   };
 })();

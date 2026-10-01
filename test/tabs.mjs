@@ -329,6 +329,17 @@ const SEED_RADIO_DEMO = `() => {
   Serial.addDemo('quansheng');
   document.querySelectorAll('.ser-radio details').forEach(d => { d.open = true; });
 }`;
+// The ERT-A2 card, on the tab's own demo button: real frames off a test unit's
+// USB port through the live decoder, so its chips, both tables (with RSSI and
+// station links) and the raw stream are all populated. And a card set to
+// follow a log file, for the source choice and the drop zone a managed
+// computer is left with.
+const SEED_ERT_DEMO = `() => { Serial.addDemo('ert'); }`;
+const SEED_SERIAL_FOLLOW = `() => {
+  Serial.addConnection('ert');
+  const c = Serial.list()[Serial.list().length - 1];
+  Serial.setSource(c.id, 'file');
+}`;
 const SEED_SDR_DEMO = `async () => {
   Serial.addDemo('sdr');
   await new Promise(r => setTimeout(r, 1500));
@@ -536,6 +547,8 @@ const CONVERTED = [
   { id: 'serial',     label: 'Serial Monitor — demo stream',   issue: '#140', seed: SEED_SERIAL_DEMO },
   { id: 'serial',     label: 'Serial Monitor — Quansheng radio demo', issue: '#140', seed: SEED_RADIO_DEMO },
   { id: 'serial',     label: 'Serial Monitor — RTL-SDR demo',  issue: '#140', seed: SEED_SDR_DEMO },
+  { id: 'serial',     label: 'Serial Monitor — ERT-A2 demo',   issue: '#140', seed: SEED_ERT_DEMO },
+  { id: 'serial',     label: 'Serial Monitor — following a log file (setup)', issue: '#140', seed: SEED_SERIAL_FOLLOW },
   { id: 'alert2',     label: 'ALERT2 Decoder — readings and map',  issue: '#140', seed: SEED_ALERT2 },
   { id: 'alert2',     label: 'ALERT2 Decoder — frame anatomy',     issue: '#140', seed: SEED_ALERT2_FRAMES },
   { id: 'network',    label: 'Ghosting Graph',  issue: '#140', seed: SEED_NETWORK },

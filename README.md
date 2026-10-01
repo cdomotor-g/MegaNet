@@ -117,12 +117,15 @@ MegaNet/
 │                             way the camera faced
 ├── modal.js                ← Modal     — the shared dialog shell
 ├── packets.js              ← Packets   — ALERT / ERTS codec, and its tab
+├── log-follow.js           ← LogFollow — follows a log file as it grows (PuTTY's,
+│                             for a computer that blocks Web Serial)
 ├── alert2.js               ← Alert2    — ALERT2 / ERT-A2 tab
 ├── network-maps.js         ← Maps      — Radio Path Maps tab (named for the tab, not
 │                             the module, so it isn't confused with maps-data.js)
 ├── serial.js               ← Serial    — Serial Monitor tab (Web Serial)
 ├── serial-radio.js         ← SerialRadio — its Quansheng ALERT radio dashboard
 ├── serial-sdr.js           ← SerialSdr — its RTL-SDR card (WebUSB)
+├── serial-ert.js           ← SerialErt — its ELPRO ERT-A2 card (alert2.js, live)
 ├── serial-viz.js           ← SerialViz — the canvas helpers those cards share
 ├── quansheng.js            ← Quansheng — the radio firmware's serial protocol codec
 ├── alert-dsp.js            ← AlertDsp  — the off-air ALERT decoder (runs in a Worker)
@@ -2399,7 +2402,7 @@ output live, on the **Serial Monitor** tab. Built on the browser's
     the loaded MegaNet database and the bundled national address file). A
     *Resync* button drops a byte to shift frame alignment when a stream isn't
     4-byte aligned, and each decoded frame links through to the full ALERT
-    Packets decoder. *(ALERT2 support is planned.)*
+    Packets decoder. ALERT2 has a card of its own — the ERT-A2, below.
 - **Live controls** — Pause/Resume, Clear, Save log (download the scrollback as
   text), optional timestamps and autoscroll, byte/line/frame counters with a
   live throughput reading, and a send box (with selectable line ending) to talk
@@ -2425,6 +2428,26 @@ output live, on the **Serial Monitor** tab. Built on the browser's
   Worker: spectrum with noise floor and peak hold, waterfall, channel power and
   bursts, FM audio waveform and tone spectrum, the decoded symbols, the ADC
   histogram, IQ capture and replay. See [`docs/serial-sdr.md`](docs/serial-sdr.md).
+- **ELPRO ERT-A2** — the ALERT2 / ERT-A2 tab's decoder fed live: the RS232 port's
+  ALERT2A lines (with the receiver's clock and its skew against the frame time) or
+  the USB port's binary frames (with RSSI), told apart by what arrives; every
+  reading matched to its station the way that tab matches them, a stations-heard
+  table, CSV export, and *Open in the ALERT2 tab* for the map and frame anatomy.
+- **Following a log file instead of a port** — for a computer whose browser will
+  not open a COM port. PuTTY opens the port and logs it (Session → Logging → *All
+  session output*); any serial card — generic, Quansheng or ERT-A2 — follows that
+  file as it grows, through the same pipeline a port's bytes take. Drag the log
+  (or the folder PuTTY logs into, to follow its newest file) anywhere on the tab:
+  a radio's or an ERT-A2's log becomes that card by itself. Re-picking a file with
+  `<input type=file>` cannot do this — Chromium refuses to read a picked file
+  again once it has changed (`NotReadableError`) — and the File System Access
+  picker is what a managed Chrome/Edge switches off
+  (`DefaultFileSystemReadGuardSetting`), so a dropped file is read through the
+  File and Directory Entries API instead, which that policy does not cover
+  (measured on Chromium 141 with the policy installed). Receive-only: PuTTY holds
+  the port, so the radio's console buttons copy their command for pasting into
+  PuTTY, and the replies are read back from the log. See `log-follow.js`'s header
+  and `npm run logfollow`.
 - **Demos** — each card has one, so the tab can be seen with nothing plugged in.
 - **Managed / work computers** — enterprise policy can block Web Serial, in which
   case the browser rejects the port picker *instantly without showing it*. The app
@@ -3461,11 +3484,13 @@ breaks. That is what makes Ranger's pane usable as-is: it wraps mid-frame at
 whatever width the window happens to be. Space-delimited, run together, `0x`
 prefixed, upper or lower case all work.
 
-On a Chromium browser the **Watch** button re-opens the same log on a timer
-through the File System Access API, which is as close to live as this gets
-without a serial port — and the case for opening one. A machine whose policy
-blocks that API now says so, with the policy name, instead of the button doing
-nothing.
+A log can also be **watched as it grows**: drag it (or the folder PuTTY logs
+into) onto the tab and it is re-read every two seconds — which works even where a
+policy has switched the browser's file picker off, since a dropped file is read
+through a different API (see `log-follow.js`). Where the picker is allowed,
+**Watch a log file…** does the same from a dialog; where it is blocked, the
+button says so, with the policy name, and points at the drop. The Serial
+Monitor's ERT-A2 card follows a log the same way, as a live dashboard.
 
 **Map.** One pin per station heard in the capture, sized by how many readings it
 sent and coloured by RSSI where the format carries it. The pins and the readings

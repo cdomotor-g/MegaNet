@@ -290,6 +290,15 @@ jobs:
         working-directory: test
         run: npm run rtlsdr
 
+      # Chromium. Following the log PuTTY writes instead of a COM port, under
+      # the policy a managed browser has (the file picker refused): real files
+      # dropped through CDP, then grown, truncated and replaced on disk — a
+      # generic card, a Quansheng radio's log, an ERT-A2's RS232 and USB logs,
+      # a dropped folder, "Read it once", and the ALERT2 tab's Watch.
+      - name: Log-file following — PuTTY's log instead of a port
+        working-directory: test
+        run: npm run logfollow
+
       - name: Smoke — every tab, clean console
         working-directory: test
         run: npm run smoke

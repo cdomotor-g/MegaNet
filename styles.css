@@ -9271,6 +9271,33 @@ code {
 .ser-plot { margin-bottom: .6rem; border: 1px solid var(--border); border-radius: 8px; padding: .4rem .5rem; background: var(--panel-sub); }
 .ser-plot-sw { width: 14px; height: 3px; background: var(--dot, var(--accent)); }
 
+/* Following a log file instead of a port (log-follow.js). The drop zone is the
+   way in that works on a locked-down machine, so it is the biggest thing in
+   the form; the whole card lights up while a file is dragged over it. */
+.ser-form .ser-check { display: inline-flex; color: var(--muted); }
+.ser-f-source { grid-column: 1 / -1; border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; min-width: 0; }
+.ser-f-source legend { padding: 0; margin-bottom: .3rem; font-size: .85rem; color: var(--muted); }
+.ser-f-follow { grid-column: 1 / -1; display: grid; gap: .5rem; min-width: 0; }
+.ser-drop {
+  border: 2px dashed var(--border); border-radius: 10px; padding: 1rem 1.1rem;
+  background: var(--panel-sub); color: var(--text); font-size: .9rem; text-align: center; overflow-wrap: anywhere;
+}
+.ser-drop span { display: block; margin-top: .25rem; font-size: var(--fs-xs); color: var(--muted); }
+.ser-conn.ser-drag { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.ser-drag .ser-drop { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel-sub)); }
+.ser-follow-how { margin: 0; font-size: var(--fs-xs); color: var(--muted); }
+.ser-follow-line { margin: .5rem 0 0; font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; }
+.ser-conn.ser-follow { border-color: var(--ok); }
+.ser-empty .ser-empty-follow { margin-top: .9rem; }
+
+/* The ERT-A2 card (serial-ert.js) — the Quansheng dashboard's panels and
+   chips, with its own classes for the raw stream's frames. */
+.ser-ert-ok   .ser-linebody { color: var(--text); }
+.ser-ert-warn .ser-linebody { color: var(--warn); }
+.ser-ert-bad  .ser-linebody { color: var(--bad); }
+.ert-row-bad td { color: var(--bad); }
+.a2-drop-hint { margin-top: var(--sp-2); }
+
 /* ── Quansheng radio dashboard and RTL-SDR card (serial-radio.js, serial-sdr.js) ── */
 .qs-dash, .sdr-dash { display: grid; gap: .8rem; min-width: 0; }
 .qs-status { display: flex; flex-wrap: wrap; gap: .4rem; }

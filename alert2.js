@@ -55,9 +55,11 @@
 //
 // Live capture is the destination, not the starting point. Web Serial is closed
 // off on managed machines, so this ingests what an operator can get today: text
-// pasted out of PuTTY, or a PuTTY session log picked off disk. Where the browser
-// offers the File System Access API the picked log can also be re-read on a
-// timer, which is as close to live as this gets without a serial port.
+// pasted out of PuTTY, or a PuTTY session log picked off disk — and the log can
+// be watched as it grows (log-follow.js): picked, where the browser's File
+// System Access picker is allowed, or dragged onto the tab, which still works
+// where a policy has switched that picker off. The Serial Monitor's ERT-A2 card
+// is the same decoder fed live, from a port or from the same followed log.
 
 const Alert2 = (function () {
 
@@ -535,27 +537,62 @@ const Alert2 = (function () {
   // or a log that starts mid-frame all harmless.
   function splitBinary(text) {
     const { bytes, marks, stats } = hexStream(text);
+    const n = bytes.length;
+    const scan = scanBinary(bytes, at => lineAt(marks, at));
+    let { at, stray } = scan, tail = null;
+    if (at + 7 <= n) {
+      // The log stops part-way through a frame. Reported, not decoded: half a
+      // frame decodes to readings that were never sent.
+      tail = { at, want: bytes[at + 6] + 7, got: n - at, lineNo: lineAt(marks, at) };
+      at = n;
+    }
+    stray += Math.max(0, n - at);
+    return { frames: scan.frames, stats, stray, tail, total: n };
+  }
+
+  // The frames in a byte array, whole ones only. Stops at the first frame the
+  // bytes run out in the middle of, or where too few are left to hold a sync,
+  // and says where (`at`) — the rest is a pasted capture's tail, or a live
+  // feed's next frame still arriving. "ALERT2A," is the RS232 port's ASCII line
+  // and never a binary frame (whose first element is 0x75, never a comma), so
+  // a feed carrying both does not read its text lines as frames.
+  function scanBinary(bytes, lineOf) {
     const frames = [];
     const n = bytes.length;
-    let at = 0, stray = 0, tail = null;
-
+    let at = 0, stray = 0;
     while (at + 7 <= n) {
       let sync = true;
       for (let k = 0; k < 6; k++) if (bytes[at + k] !== BIN_MAGIC[k]) { sync = false; break; }
+      if (sync && bytes[at + 6] === 0x41 && bytes[at + 7] === 0x2C) sync = false;
       if (!sync) { at++; stray++; continue; }
       const len = bytes[at + 6];
-      if (at + 7 + len > n) {
-        // The log stops part-way through a frame. Reported, not decoded: half a
-        // frame decodes to readings that were never sent.
-        tail = { at, want: len + 7, got: n - at, lineNo: lineAt(marks, at) };
-        at = n;
-        break;
-      }
-      frames.push(parseBinFrame(bytes, at, lineAt(marks, at), frames.length));
+      if (at + 7 + len > n) break;
+      frames.push(parseBinFrame(bytes, at, lineOf ? lineOf(at) : 0, frames.length));
       at += 7 + len;
     }
-    stray += Math.max(0, n - at);
-    return { frames, stats, stray, tail, total: n };
+    return { frames, at, stray };
+  }
+
+  // A live feed's raw bytes (a port, or a log PuTTY wrote "All session
+  // output" into), as against hex text: the whole frames, and how many bytes
+  // were used — the caller keeps the rest for the next chunk. Bytes that cannot
+  // start a sync any more are counted as stray and used up too.
+  function parseBinBytes(bytes) {
+    const scan = scanBinary(bytes, null);
+    let used = scan.at, stray = scan.stray;
+    if (used + 7 > bytes.length) {
+      // No frame can start before the last six bytes unless they open with
+      // part of the sync, so everything ahead of that is spent.
+      let keep = bytes.length;
+      for (let k = Math.max(used, bytes.length - 6); k < bytes.length; k++) {
+        let ok = true;
+        for (let j = 0; k + j < bytes.length && j < 6; j++) if (bytes[k + j] !== BIN_MAGIC[j]) { ok = false; break; }
+        if (ok) { keep = k; break; }
+      }
+      stray += keep - used;
+      used = keep;
+    }
+    return { frames: scan.frames, used, stray };
   }
 
   function parseBin(text) {
@@ -1801,11 +1838,16 @@ const Alert2 = (function () {
 
           <h4 class="a2-h">Watching a file</h4>
           <p class="spec">PuTTY writes its session log continuously (Session → Logging has <em>Flush log file
-            frequently</em> on by default, so the file is not held back until the session closes). On a Chromium
-            browser the <b>Watch</b> button uses the File System Access API to re-open that same file on a timer,
-            which gives a log that keeps up with the unit without a serial port being involved. It needs Chrome or
-            Edge over https or localhost, and it is a common thing for a managed machine to have switched off by
-            policy — if that is what has happened the button now says so instead of doing nothing.</p>
+            frequently</em> on by default, so the file is not held back until the session closes), and a watched log
+            is re-read as it grows, so the decode keeps up with the unit without a serial port being involved.
+            <b>Drag the log onto this tab</b> from File Explorer — or the folder PuTTY logs into, to watch whichever
+            log in it is newest. That works in every browser, and it still works on a managed machine whose policy
+            has switched the browser's file picker off (<code>DefaultFileSystemReadGuardSetting</code>), because a
+            dropped file is read through a different API that the policy does not cover. Where the picker is
+            allowed, <b>Watch a log file…</b> does the same from a dialog. A file picked with <b>Choose log file…</b>
+            cannot be watched: the browser refuses to read it again once it has changed, which is what made the
+            first attempt at this fail. The Serial Monitor's ERT-A2 card follows a log the same way, as a live
+            dashboard.</p>
         </details>
       </div>`;
   }
@@ -1862,7 +1904,6 @@ const Alert2 = (function () {
   // ── rendering: the tab ────────────────────────────────────────────────────────
 
   const ROW_STEP = 400;
-  const canWatch = typeof window !== 'undefined' && typeof window.showOpenFilePicker === 'function';
 
   function inputPanel() {
     const a = state.a2;
@@ -1887,7 +1928,8 @@ const Alert2 = (function () {
         <div class="row pkt-block">
           <div class="fit"><button class="primary" onclick="Alert2.decode()">Decode</button></div>
           <div class="fit"><button class="ghost" onclick="Alert2.chooseFile()">Choose log file…</button></div>
-          ${canWatch ? '<div class="fit"><button class="ghost" onclick="Alert2.' + (w ? 'stopWatching()">Stop watching ' + esc(w.name) : 'watchFile()">Watch a log file…') + '</button></div>' : ''}
+          ${w ? '<div class="fit"><button class="ghost" onclick="Alert2.stopWatching()">Stop watching ' + esc(w.name) + '</button></div>'
+              : LogFollow.canPick() ? '<div class="fit"><button class="ghost" onclick="Alert2.watchFile()">Watch a log file…</button></div>' : ''}
           <div class="fit"><button class="ghost" onclick="Alert2.loadSample('ascii')">Sample — RS232 ASCII</button></div>
           <div class="fit"><button class="ghost" onclick="Alert2.loadSample('bin')">Sample — USB hex</button></div>
           <div class="fit"><button class="ghost" onclick="Alert2.clear()">Clear</button></div>
@@ -1895,7 +1937,7 @@ const Alert2 = (function () {
         <input type="file" id="a2-file" accept=".txt,.log,.csv,.hex,.dat,text/plain" hidden onchange="Alert2.onFile(this)">
         <div id="a2-status" class="note compact pkt-block"${a.source ? '' : ' hidden'}>${esc(a.source)}</div>
         ${a.watchErr ? '<div class="note compact warn pkt-block">' + a.watchErr + '</div>' : ''}
-        ${!canWatch ? '<div class="spec">Watching a log file as it grows needs the File System Access API — a Chromium browser (Chrome, Edge) over https or localhost. Choosing a file still works everywhere; it reads the file once, as it stands.</div>' : ''}
+        ${w ? '' : '<div class="spec a2-drop-hint">To <b>watch a log as PuTTY writes it</b>, drag the file — or the folder it logs into — onto this tab from File Explorer. It is re-read as it grows, and that works even where IT has switched the browser\'s file picker off.</div>'}
       </div>`;
   }
 
@@ -1949,7 +1991,7 @@ const Alert2 = (function () {
     const p = current();
     const res = p ? resolve(p) : null;
     return `
-    <div class="pkt a2 page" style="--page-max:1280px">
+    <div class="pkt a2 page" style="--page-max:1280px" ondragover="Alert2.dragOver(event)" ondrop="Alert2.dropFile(event)">
 
       <div class="panel">
         <div class="panel-header"><h2>ALERT2 / ERT-A2 Serial Decoder</h2></div>
@@ -2073,99 +2115,101 @@ const Alert2 = (function () {
     reader.readAsArrayBuffer(f);
   }
 
-  // Why the picker refused. Every path out of showOpenFilePicker except a
-  // dismissal used to end up in the same bare `return`, which is exactly what a
-  // managed machine looks like: the button is present, because the API exists,
-  // and pressing it does nothing at all, because policy blocks the call and the
-  // rejection was being swallowed. The failure has to be visible and it has to
-  // name the likely cause — an operator cannot ask IT to unblock something the
-  // page never admitted was blocked.
-  function pickerRefusal(e) {
-    const name = (e && e.name) || '';
-    const msg  = esc((e && e.message) || String(e));
-    if (name === 'SecurityError') return '<b>Watching was refused by the browser.</b> This usually means the page '
-      + 'is not in a secure context (needs https or localhost), or it is embedded in a frame that is not allowed '
-      + 'to open a file picker. <span class="spec">' + msg + '</span>';
-    if (name === 'NotAllowedError') return '<b>Watching is blocked on this machine.</b> Chrome and Edge let an '
-      + 'administrator turn the File System Access API off by policy (<code>DefaultFileSystemReadGuardSetting</code>, '
-      + 'or a site on <code>FileSystemReadBlockedForUrls</code>) and a blocked call fails exactly like this — with '
-      + 'no prompt. Ask for this site to be allowed, or use <b>Choose log file…</b>, which reads the file once and '
-      + 'is not affected. <span class="spec">' + msg + '</span>';
-    if (name === 'TypeError') return '<b>This browser would not accept the file picker\'s options.</b> Use '
-      + '<b>Choose log file…</b> instead. <span class="spec">' + msg + '</span>';
-    return '<b>Could not start watching.</b> Use <b>Choose log file…</b> instead — it reads the file once and works '
-      + 'everywhere. <span class="spec">' + esc(name ? name + ': ' : '') + msg + '</span>';
-  }
-
-  // The nearest thing to a live feed available without Web Serial: keep the file
-  // handle the picker returned and re-open it on a timer. PuTTY flushes its log
-  // as it writes, so each re-read picks up whatever has arrived since.
+  // Watching a log as it grows. How the file is re-read — and why a dropped
+  // file can be watched where the picker is blocked by policy, and a chosen
+  // one never can — is log-follow.js's header. A refusal used to end in a bare
+  // `return`, which is exactly what a managed machine looks like: the button
+  // there, pressing it doing nothing. Every refusal is said now, with the way
+  // round it (LogFollow.refusal).
   async function watchFile() {
     const a = state.a2;
     a.watchErr = '';
-    if (!canWatch) {
-      a.watchErr = '<b>This browser has no File System Access API.</b> Watching needs Chrome or Edge over https or '
-                 + 'localhost. <b>Choose log file…</b> works everywhere.';
-      refresh();
-      return;
-    }
-    let handle;
-    try {
-      [handle] = await window.showOpenFilePicker({ multiple: false,
-        types: [{ description: 'Terminal or hex log', accept: { 'text/plain': ['.txt', '.log', '.csv', '.hex', '.dat'] } }] });
-    } catch (e) {
-      // A dismissed picker is not a fault and must stay silent. Everything else
-      // is a fault, and used to be silent too — that was the bug.
-      if (e && (e.name === 'AbortError' || e.name === 'NotFoundError')) return;
-      a.watchErr = pickerRefusal(e);
-      refresh();
-      return;
-    }
-    if (!handle) { a.watchErr = 'The file picker returned nothing to watch.'; refresh(); return; }
+    const r = await LogFollow.pick();
+    if (!r) return;                                   // dismissed: not a fault
+    if (r.error) { a.watchErr = LogFollow.refusal(r.error); refresh(); return; }
+    beginWatch(r.src);
+  }
+
+  function dragOver(e) {
+    if (!LogFollow.isFileDrag(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  }
+  // A drop anywhere on the tab, or anywhere on the page while it is up (the
+  // document guard in init) — a file let fall beside the target must not make
+  // the browser navigate away to show it.
+  function dropFile(e) {
+    if (e.defaultPrevented || !LogFollow.isFileDrag(e)) return;
+    e.preventDefault();
+    if (state.activeTab !== 'alert2') return;
+    const r = LogFollow.fromDrop(e.dataTransfer);    // synchronously: the items die with the event
+    if (r.error) { state.a2.watchErr = esc(r.error.message); refresh(); return; }
+    beginWatch(r.src);
+  }
+
+  // PuTTY writes bytes as they came off the port, which is ASCII; a log saved
+  // as UTF-16 carries a byte-order mark, read here as onFile reads it.
+  function decoderFor(u8, from) {
+    if (from === 0 && u8[0] === 0xFF && u8[1] === 0xFE) return new TextDecoder('utf-16le');
+    if (from === 0 && u8[0] === 0xFE && u8[1] === 0xFF) return new TextDecoder('utf-16be');
+    return new TextDecoder('utf-8');
+  }
+
+  function beginWatch(src) {
+    const a = state.a2;
     stopWatch();
-    a.watch = { handle, name: handle.name, timer: null, reads: 0 };
-    const tick = async () => {
-      // The watch outlives re-renders, so check the handle is still the one this
-      // closure was started for — a second Watch replaces it, and the old timer
-      // must not keep writing over the new one's text.
-      if (!a.watch || a.watch.handle !== handle) return;
-      try {
-        const file = await handle.getFile();
-        const text = decodeBuffer(await file.arrayBuffer());
-        a.watch.reads++;
-        if (text !== a.text) {
-          a.text = text;
+    a.watchErr = '';
+    a.text = '';
+    a.limit = ROW_STEP;
+    a.sel = null;
+    a.mapView = null;
+    const w = a.watch = { src, name: src.name, follower: null, dec: null, changed: false };
+    const label = () => src.via === 'folder' ? w.name + ' (newest in ' + src.folder + ')' : w.name;
+    w.follower = LogFollow.start(src, {
+      fromStart: true,
+      intervalMs: src.live ? a.watchMs : undefined,
+      onData: (u8, m) => {
+        if (a.watch !== w) return;
+        if (!w.dec) w.dec = decoderFor(u8, m.from);
+        a.text += w.dec.decode(u8, { stream: true });
+        w.name = m.name || w.name;
+        w.changed = true;
+      },
+      onReset: (why, name) => {
+        if (a.watch !== w) return;
+        a.text = ''; w.dec = null; w.name = name || w.name; w.changed = true;
+      },
+      onError: (e, fatal) => {
+        if (a.watch !== w) return;
+        if (fatal) {
+          stopWatch();
+          a.watchErr = '<b>Stopped watching ' + esc(label()) + '.</b> ' + esc(LogFollow.trouble(e, src, true));
+          announce('Stopped watching ' + w.name);
           if (state.activeTab === 'alert2') refresh();
-        }
-        status('Watching ' + a.watch.name + ' — re-read every ' + (a.watchMs / 1000)
-             + ' s, last at ' + clockText(Date.now()) + ' (' + a.watch.reads + ' reads).');
-      } catch (e) {
-        // Permission can be revoked mid-watch (the file moves, the tab loses
-        // its grant), and a timer failing quietly every five seconds is worse
-        // than one that stops and says why.
-        const name = a.watch ? a.watch.name : 'the file';
-        stopWatch();
-        a.watchErr = '<b>Stopped watching ' + esc(name) + '.</b> <span class="spec">'
-                   + esc((e && e.name ? e.name + ': ' : '') + ((e && e.message) || e)) + '</span>';
-        announce('Stopped watching ' + name);
-        if (state.activeTab === 'alert2') refresh();
-      }
-    };
-    await tick();
-    if (a.watch) {
-      a.watch.timer = setInterval(tick, a.watchMs);
-      // The live-surface policy (design-system §4): a stream announces when it
-      // starts and stops, never per re-read — the status line under the box
-      // updates every tick and is read on demand.
-      announce('Watching ' + a.watch.name + ' — decoding as the log grows');
-    }
+        } else status(LogFollow.trouble(e, src, false));
+      },
+      onTick: f => {
+        if (a.watch !== w) return;
+        const changed = w.changed;
+        w.changed = false;
+        if (changed && state.activeTab === 'alert2') refresh();
+        status(src.live
+          ? 'Watching ' + label() + ' — re-read every ' + (a.watchMs / 1000) + ' s, last at ' + clockText(Date.now())
+            + ' (' + (f.bytes / 1024).toFixed(1) + ' kB read' + (f.trimmed ? ', its last ' + (LogFollow.FIRST_MAX / 1048576) + ' MB only' : '') + ').'
+          : 'Read ' + w.name + ' once — this browser cannot keep reading a dropped file; drop it again for what has been added.');
+      },
+    });
+    // The live-surface policy (design-system §4): a stream announces when it
+    // starts and stops, never per re-read — the status line under the box
+    // updates every tick and is read on demand.
+    announce('Watching ' + src.name + ' — decoding as the log grows');
     refresh();
   }
 
   function stopWatch() {
     const w = state.a2.watch;
     if (!w) return;
-    if (w.timer) clearInterval(w.timer);
+    if (w.follower) w.follower.stop();
     state.a2.watch = null;
   }
 
@@ -2261,6 +2305,10 @@ const Alert2 = (function () {
     // has to take it down. Named in app.js's stop-list until #142; it says so
     // here now, and the registry is keyed by name so re-running init() is free.
     registerTabTeardown('Alert2', stop);
+    document.removeEventListener('dragover', dragOver);
+    document.removeEventListener('drop', dropFile);
+    document.addEventListener('dragover', dragOver);
+    document.addEventListener('drop', dropFile);
     // Station names come from the same two sources as the ALERT Packets tab, and
     // the national address file is the fallback for addresses MegaNet has never
     // seen. It loads once for both tabs.
@@ -2272,7 +2320,12 @@ const Alert2 = (function () {
   }
 
   // Leaving the tab: the div this map was built on is about to be replaced.
-  function stop() { stopMap(); }
+  // The watch, like the capture, carries on — only the page-wide drop guard goes.
+  function stop() {
+    stopMap();
+    document.removeEventListener('dragover', dragOver);
+    document.removeEventListener('drop', dropFile);
+  }
 
   // Hovering a reading lights up the four bytes it came out of, and vice versa.
   function attachRecHover(root) {
@@ -2291,7 +2344,11 @@ const Alert2 = (function () {
   // the mode, so both wire formats are reachable without a page.
   return { render, init, stop, decode, clear, loadSample, more, setView, setMode, setOpt,
            openFrame, pick, clearPicks, select,
-           chooseFile, onFile, watchFile, stopWatch, stopWatching, exportCsv, exportJson,
-           parse, parseAscii, parseBin, decodeRecord };
+           chooseFile, onFile, watchFile, stopWatch, stopWatching, dragOver, dropFile, exportCsv, exportJson,
+           parse, parseAscii, parseBin, decodeRecord,
+           // for the Serial Monitor's ERT-A2 card (serial-ert.js), which decodes
+           // the same two wire formats as they arrive rather than pasted whole
+           parseBinBytes, hexStream, resolve, engValue, stationCell, rssiCell,
+           samples: () => ({ ascii: SAMPLE, bin: SAMPLE_BIN }) };
 })();
 

@@ -50,6 +50,66 @@ and the app can only report that the picker was suppressed.</p>
       <td>The OS refused the open — almost always another program (PuTTY, a logger,
           another browser tab) already has the COM port open.</td></tr>
 </table>
+<p>None of this stops you working today: <a href="#putty">let PuTTY open the port and
+follow its log</a> instead.</p>
+
+<h2 id="putty">No Web Serial? Let PuTTY open the port, and follow its log</h2>
+<p>If the browser will not open a COM port but you can run PuTTY, you do not need IT
+to change anything. PuTTY opens the port and writes everything it receives to a log
+file; the Serial Monitor follows that file as it grows, and the card fills exactly as
+it would from the port — a Quansheng radio's dashboard, an ERT-A2's readings, or a
+plain text, hex or ALERT stream.</p>
+<ol>
+  <li>Plug the device in and find its port: <em>Device Manager → Ports (COM &amp; LPT)</em>
+      — for example <code>COM5</code>.</li>
+  <li>Open PuTTY. In <em>Session</em>, set <strong>Connection type</strong> to
+      <strong>Serial</strong>, <strong>Serial line</strong> to the port
+      (<code>COM5</code>) and <strong>Speed</strong> to the device's baud rate — the
+      ERT-A2's RS232 port at whatever it is configured for; a Quansheng radio over
+      USB accepts any speed; the UV-K1's jack UART is <code>38400</code>.</li>
+  <li>Still in PuTTY, go to <em>Session → Logging</em>. Choose
+      <strong>All session output</strong> (not <em>Printable output</em>, which drops
+      the binary bytes an ERT-A2's USB port and the radio's screen frames are made of).
+      Set <strong>Log file name</strong> to something like
+      <code>C:\Users\you\Documents\serial-logs\&amp;H-&amp;Y&amp;M&amp;D-&amp;T.log</code>
+      — the <code>&amp;Y&amp;M&amp;D-&amp;T</code> part gives each session its own file.
+      Leave <strong>Flush log file frequently</strong> ticked (it is by default): it is
+      what makes each line reach the file as it arrives.</li>
+  <li>Optionally save these settings under a name in <em>Session → Saved Sessions</em>,
+      then press <strong>Open</strong>. The PuTTY window shows the device's output.</li>
+  <li>In MegaNet, open the <strong>Serial Monitor</strong> tab and <strong>drag the log
+      file from File Explorer onto the tab</strong> — or drag the whole
+      <code>serial-logs</code> folder, and the card follows whichever log in it is
+      newest, moving on by itself when PuTTY starts a new session. A radio's log or an
+      ERT-A2's log is recognised from what is in it and becomes that card. (You can
+      also add a card, set <em>Read from</em> to <em>a log file</em>, and drop the file
+      on it.)</li>
+</ol>
+<table>
+  <tr><th>What you see</th><th>What it means</th></tr>
+  <tr><td>The card says it is following, but nothing new for a minute or more</td>
+      <td>PuTTY is not writing: its window was closed, the port dropped, or logging was
+          not switched on for this session. The card says so after 60 s of silence.</td></tr>
+  <tr><td>"Pick the log file…" says the file picker is switched off</td>
+      <td>The browser's File System Access API is blocked by policy
+          (<code>DefaultFileSystemReadGuardSetting</code>). Dragging the file in still
+          works — it is read through a different API that policy does not cover.</td></tr>
+  <tr><td>Only "Read it once…" works, and it has to be pressed again for new lines</td>
+      <td>A browser that cannot keep reading a file it was handed. Each pick reads only
+          what was added since the last one, so nothing is read twice.</td></tr>
+  <tr><td>A Quansheng card's buttons say "Copy" rather than sending</td>
+      <td>PuTTY holds the port, so the browser cannot send to the radio. Each console
+          button copies its command: right-click in the PuTTY window to paste, press
+          Enter, and the radio's reply comes back through the log to the card.
+          <em>Copy clock command</em> is the one worth doing first — the radio's clock
+          is lost on every reboot, and it is what times the log's history.</td></tr>
+</table>
+<p class="note">Why the card cannot just keep re-reading a file you picked with the
+ordinary file dialog: Chrome and Edge refuse to read a picked file a second time once
+it has changed on disk (<code>NotReadableError</code>). That is what made earlier
+attempts at following a log fail. A file <em>dragged</em> in is different — the page
+can ask for a fresh copy of it every second — and that is how the Serial Monitor and
+the ALERT2 tab follow a log.</p>
 
 <h2>What to ask IT for</h2>
 <p>Web Serial permission in Chrome and Edge is controlled by group policy. Either of
