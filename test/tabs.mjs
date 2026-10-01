@@ -320,6 +320,20 @@ const SEED_PACKETS = `() => { Packets.loadExample(); }`;
 // mock-up of it.
 const SEED_SERIAL_DEMO = `() => { Serial.addDemo(); }`;
 
+// The two device cards, demoed the same way: the Quansheng dashboard (the
+// firmware's own example lines through the real parser, with its settings,
+// log, station table, screen and console sections opened so their controls
+// are measured too) and the RTL-SDR card (the demo band through the real
+// decoder, its controls open by default).
+const SEED_RADIO_DEMO = `() => {
+  Serial.addDemo('quansheng');
+  document.querySelectorAll('.ser-radio details').forEach(d => { d.open = true; });
+}`;
+const SEED_SDR_DEMO = `async () => {
+  Serial.addDemo('sdr');
+  await new Promise(r => setTimeout(r, 1500));
+}`;
+
 // The ALERT2 tab, twice, on the tab's own sample-capture button — real binary
 // frames off a test ERT-A2's USB port, so the RSSI columns, the coverage map
 // and the ambiguity panel all populate. The two entries split on the view
@@ -520,6 +534,8 @@ const CONVERTED = [
   { id: 'packets',    label: 'ALERT Packets',   issue: '#140', seed: SEED_PACKETS },
   { id: 'serial',     label: 'Serial Monitor — no connection', issue: '#140' },
   { id: 'serial',     label: 'Serial Monitor — demo stream',   issue: '#140', seed: SEED_SERIAL_DEMO },
+  { id: 'serial',     label: 'Serial Monitor — Quansheng radio demo', issue: '#140', seed: SEED_RADIO_DEMO },
+  { id: 'serial',     label: 'Serial Monitor — RTL-SDR demo',  issue: '#140', seed: SEED_SDR_DEMO },
   { id: 'alert2',     label: 'ALERT2 Decoder — readings and map',  issue: '#140', seed: SEED_ALERT2 },
   { id: 'alert2',     label: 'ALERT2 Decoder — frame anatomy',     issue: '#140', seed: SEED_ALERT2_FRAMES },
   { id: 'network',    label: 'Ghosting Graph',  issue: '#140', seed: SEED_NETWORK },

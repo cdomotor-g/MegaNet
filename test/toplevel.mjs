@@ -122,6 +122,34 @@ const ACCEPTED = {
          + 'Constrains nothing below it.',
     },
   ],
+  'quansheng.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = Quansheng;",
+      why: 'The Quansheng ALERT receiver codec\'s CommonJS registration: test/quansheng.mjs '
+         + 'requires this same file and holds it against every example line in the '
+         + 'firmware\'s interface document, so the client the browser runs is the one the '
+         + 'check runs. Guarded so the browser, where `module` is undefined, never runs it. '
+         + 'Constrains nothing below it.',
+    },
+  ],
+  'alert-dsp.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = AlertDsp;",
+      why: 'The off-air ALERT decoder\'s CommonJS registration: test/alertdsp.mjs requires '
+         + 'this same file and decodes a real off-air burst with it, so the decoder the '
+         + 'browser runs (in a Worker built from this file\'s own source) is the decoder the '
+         + 'check runs. Guarded so the browser, where `module` is undefined, never runs it. '
+         + 'Constrains nothing below it.',
+    },
+  ],
+  'rtlsdr.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = RtlSdr;",
+      why: 'The RTL-SDR WebUSB driver\'s CommonJS registration: test/rtlsdr.mjs requires '
+         + 'this same file and drives it against a simulated dongle. Guarded so the '
+         + 'browser, where `module` is undefined, never runs it. Constrains nothing below it.',
+    },
+  ],
   'core.js': [
     {
       match: "if (typeof window !== 'undefined') {",

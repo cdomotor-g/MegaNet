@@ -270,6 +270,26 @@ jobs:
         working-directory: test
         run: npm run logger
 
+      # Node-only and fast. The Serial Monitor's three device modules, each held
+      # to the one oracle it has. The off-air decoder against a real burst the
+      # 4078 test rig put on air (test/fixtures/sdr/, from agmurf/sdr-alert-
+      # decoder): 4079 = 420 and 4080 = 121 under Enhanced iFLOWS, and noise as
+      # nothing. The Quansheng codec against every example line in the
+      # firmware's own interface document, and the station table it builds
+      # from stations.json against the firmware's own lookup. The RTL-SDR
+      # driver against a simulated V2, V3 and V4 — no CI runner has a dongle.
+      - name: Off-air ALERT decoder — the 4078 rig's real burst
+        working-directory: test
+        run: npm run alertdsp
+
+      - name: Quansheng ALERT receiver — the firmware document's own lines
+        working-directory: test
+        run: npm run quansheng
+
+      - name: RTL-SDR driver — a simulated V2, V3 and V4
+        working-directory: test
+        run: npm run rtlsdr
+
       - name: Smoke — every tab, clean console
         working-directory: test
         run: npm run smoke

@@ -78,12 +78,20 @@
     "hfem.js",
     "hfem-tab.js",
     "network-maps.js",
+    "serial-viz.js",
+    "quansheng.js",
+    "alert-dsp.js",
+    "rtlsdr.js",
+    "serial-radio.js",
+    "serial-sdr.js",
     "serial.js",
     "message-log.js",
     "bug-report.js",
     "map-generator.js",
+    "admin.js",
+    "admin-dashboard.js",
     "init.js"
   ],
-  "total": 811,
-  "distinct": 811
+  "total": 834,
+  "distinct": 834
 }

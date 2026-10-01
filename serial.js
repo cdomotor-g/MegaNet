@@ -2,12 +2,23 @@
 //
 //   Serial   the Serial Monitor tab: physical serial ports opened through the
 //            Web Serial API and streamed live, as text, as a hex dump, or
-//            decoded as ALERT payloads through the shared Packets codec.
+//            decoded as ALERT payloads through the shared Packets codec — and
+//            two kinds of card that are more than a stream: a Quansheng ALERT
+//            receiver (serial-radio.js) and an RTL-SDR on USB (serial-sdr.js).
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, slug and dlText, across to app.js for
-// switchTab, and sideways to Packets — all from inside exported functions, none
-// at load, so packets.js may load after this file.
+// switchTab, and sideways to Packets, SerialRadio, SerialSdr, SerialViz and
+// Quansheng — all from inside exported functions, none at load, so those files
+// may load after this one.
+//
+// The three kinds share one list of connections (`conns`) and one card frame
+// (name, status badge, port). A 'serial' card is this file's from end to end.
+// A 'quansheng' card is a serial port like any other — this file opens it,
+// reads it and keeps its raw log — but it hands its bytes to SerialRadio, which
+// builds the card's body. An 'sdr' card is not a serial port at all (WebUSB),
+// and SerialSdr owns it whole; it lives in this list so the tab has one place
+// to add, show and remove a device.
 //
 // Live port objects hold non-serialisable streams, so connections live in this
 // module's own `conns` array rather than in global state. That is what lets them
@@ -51,7 +62,7 @@ const Serial = (function () {
   // Bumped whenever the Serial Monitor changes. Shown in the tab header so it is
   // possible to confirm at a glance which build of app.js the browser actually
   // loaded — a stale, cached app.js is the usual reason a "fixed" bug persists.
-  const SERIAL_BUILD = '2026-08-18a';
+  const SERIAL_BUILD = '2026-10-01a';
 
   function loadDefaults() {
     let d = {};
@@ -72,18 +83,21 @@ const Serial = (function () {
 
   function byId(id) { return conns.find(c => c.id === id); }
 
-  // ── connection lifecycle ──────────────────────────────────────────────────────
-  function addConnection() {
+  // A serial connection's state. `kind` is 'serial' or 'quansheng'; an 'sdr'
+  // card is made by SerialSdr.create instead.
+  function makeConn(kind, extra) {
     const d = loadDefaults();
-    const conn = {
+    const radio = kind === 'quansheng';
+    return Object.assign({
       id: 'c' + (nextId++),
-      name: 'Connection ' + (conns.length + 1),
-      phase: 'setup',                    // setup | open | closed | error
+      kind: kind || 'serial',
+      name: radio ? 'Quansheng radio' : 'Connection ' + (conns.length + 1),
+      phase: 'setup',                    // setup | open | closed | error | demo
       port: null,
       portLabel: '',
-      settings: { baudRate: d.baudRate, dataBits: d.dataBits, stopBits: d.stopBits,
+      settings: { baudRate: radio ? 115200 : d.baudRate, dataBits: d.dataBits, stopBits: d.stopBits,
                   parity: d.parity, flowControl: d.flowControl },
-      mode: d.mode,
+      mode: radio ? 'radio' : d.mode,
       entries: [],                       // {ts, cls, body(html), raw(text)}
       bytes: 0,
       count: 0,                          // lines (text) / rows (hex) / frames (alert)
@@ -93,7 +107,7 @@ const Serial = (function () {
       timestamps: true,
       err: null,
       // per-mode framing buffers
-      decoder: null,
+      decoder: new TextDecoder(),
       textBuf: '',
       hexBuf: [],
       hexOffset: 0,
@@ -104,7 +118,16 @@ const Serial = (function () {
       readLoopPromise: null,
       flushTimer: null,
       statsPending: false,
-    };
+      act: new Array(120).fill(0),       // bytes a second, the last two minutes
+    }, extra || {});
+  }
+
+  // ── connection lifecycle ──────────────────────────────────────────────────────
+  // `kind`: 'serial' (the default), 'quansheng', or 'sdr' (WebUSB, SerialSdr's).
+  function addConnection(kind) {
+    const conn = kind === 'sdr'
+      ? SerialSdr.create('c' + (nextId++), 'RTL-SDR ' + (conns.filter(c => c.kind === 'sdr').length + 1))
+      : makeConn(kind === 'quansheng' ? 'quansheng' : 'serial');
     conns.push(conn);
     renderList();
     // reveal the freshly added card
@@ -175,6 +198,7 @@ const Serial = (function () {
       conn.port = port;
       conn.portLabel = portLabel(port);
       conn.err = null;
+      recognise(conn);
       hookDisconnect();
       await refreshKnownPorts();
       renderList();
@@ -271,8 +295,21 @@ const Serial = (function () {
     conn.port = port;
     conn.portLabel = portLabel(port);
     conn.err = null;
+    recognise(conn);
     hookDisconnect();
     renderList();
+  }
+
+  // §2 of the radio's interface document: find it by VID, not by name. A port
+  // with the ALERT firmware's VID becomes a Quansheng card on its own.
+  function recognise(conn) {
+    try {
+      const info = conn.port && conn.port.getInfo ? conn.port.getInfo() : {};
+      if (info && info.usbVendorId === Quansheng.USB_VID && conn.kind !== 'quansheng') {
+        setKind(conn.id, 'quansheng', true);
+        conn.recognised = true;
+      }
+    } catch (_) {}
   }
 
   function portLabel(port) {
@@ -281,6 +318,7 @@ const Serial = (function () {
       if (info && info.usbVendorId != null) {
         const v = info.usbVendorId.toString(16).padStart(4, '0');
         const p = (info.usbProductId != null ? info.usbProductId : 0).toString(16).padStart(4, '0');
+        if (typeof Quansheng !== 'undefined' && info.usbVendorId === Quansheng.USB_VID) return 'Quansheng ALERT radio (USB ' + v + ':' + p + ')';
         return 'USB serial (VID:PID ' + v + ':' + p + ')';
       }
     } catch (_) {}
@@ -339,6 +377,10 @@ const Serial = (function () {
       renderList();
       return;
     }
+    // The radio sends only while the host holds DTR, and a fresh
+    // SET_CONTROL_LINE_STATE is what tells it a host is there (§2): drop DTR,
+    // wait 50 ms, raise it.
+    if (conn.kind === 'quansheng') await toggleDtr(conn);
     // reset framing buffers for a clean session
     conn.decoder   = new TextDecoder();
     conn.textBuf   = '';
@@ -358,7 +400,20 @@ const Serial = (function () {
     // frames live in the log region, read at the reader's own pace.
     announce(conn.name + ' — serial port open, streaming');
     conn.readLoopPromise = readLoop(conn);
+    if (conn.kind === 'quansheng') SerialRadio.attach(conn);
+    startTicker();
     renderList();
+  }
+
+  async function toggleDtr(conn) {
+    if (!conn.port || !conn.port.setSignals) return;
+    try {
+      await conn.port.setSignals({ dataTerminalReady: false });
+      await new Promise(r => setTimeout(r, 50));
+      await conn.port.setSignals({ dataTerminalReady: true });
+    } catch (e) {
+      emitSys(conn, 'Could not set DTR: ' + ((e && e.message) || e), 'err');
+    }
   }
 
   function fmtParity(p) { return p === 'none' ? 'N' : p === 'even' ? 'E' : 'O'; }
@@ -399,6 +454,7 @@ const Serial = (function () {
   // guarded so it is safe to call in any state (never opened, open, or already
   // dropped). Used both by Close and as the clean-slate step before (re)opening.
   async function teardown(conn) {
+    if (conn.kind === 'quansheng' && conn.radio) SerialRadio.detach(conn);
     conn.keepReading = false;
     try { if (conn.reader) await conn.reader.cancel(); } catch (_) {}
     try { if (conn.readLoopPromise) await conn.readLoopPromise; } catch (_) {}
@@ -429,7 +485,11 @@ const Serial = (function () {
   async function removeConn(id) {
     const conn = byId(id);
     if (!conn) return;
-    if (conn.phase === 'open') await closeConn(id, { silent: true });
+    if (conn.kind === 'sdr') await SerialSdr.remove(conn);          // a USB card: none of the serial teardown applies
+    else {
+      if (conn.kind === 'quansheng' && conn.radio) SerialRadio.detach(conn);
+      if (conn.phase === 'open') await closeConn(id, { silent: true });
+    }
     const i = conns.indexOf(conn);
     if (i >= 0) conns.splice(i, 1);
     renderList();
@@ -451,31 +511,50 @@ const Serial = (function () {
   // could otherwise reach without hardware. The sample bytes run through the
   // real pipeline — handleChunk → the mode framers → the shared Packets codec
   // — so what the demo shows is what a device produces, not a mock-up.
-  function addDemo() {
-    const d = loadDefaults();
-    const conn = {
-      id: 'c' + (nextId++),
-      name: 'Demo connection',
-      phase: 'closed',
-      port: null,
-      portLabel: 'Demo (no device attached)',
-      settings: { baudRate: d.baudRate, dataBits: d.dataBits, stopBits: d.stopBits,
-                  parity: d.parity, flowControl: d.flowControl },
-      mode: 'text',
-      entries: [], bytes: 0, count: 0, openedAt: null,
-      paused: false, autoscroll: true, timestamps: true, err: null,
-      decoder: new TextDecoder(), textBuf: '', hexBuf: [], hexOffset: 0, alertBuf: [],
-      reader: null, writer: null, keepReading: false, readLoopPromise: null,
-      flushTimer: null, statsPending: false,
-    };
+  //
+  // `kind` picks which demo: the plain stream (the default, and what the tabs
+  // check seeds), a Quansheng radio (SerialRadio.demo — the firmware's own
+  // example lines through the real parser), or an RTL-SDR (SerialSdr.demo —
+  // synthesised bursts through the real decoder).
+  function addDemo(kind) {
+    if (kind === 'quansheng') {
+      const conn = makeConn('quansheng', { name: 'Demo Quansheng radio', phase: 'demo', portLabel: 'Demo (no radio attached)' });
+      conns.push(conn);
+      SerialRadio.demo(conn);
+      startTicker();
+      renderList();
+      const el = document.getElementById('ser-card-' + conn.id);
+      if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      return;
+    }
+    if (kind === 'sdr') {
+      const conn = SerialSdr.create('c' + (nextId++), 'Demo RTL-SDR');
+      conns.push(conn);
+      renderList();
+      SerialSdr.demo(conn);
+      const el = document.getElementById('ser-card-' + conn.id);
+      if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      return;
+    }
+    const conn = makeConn('serial', { name: 'Demo connection', phase: 'closed', portLabel: 'Demo (no device attached)', mode: 'text' });
     conns.push(conn);
     emitSys(conn, 'Demo connection — sample data, no device attached', 'sys');
     handleChunk(conn, new TextEncoder().encode('MegaNet serial demo — plain text mode\r\n'));
+    // a logger printing readings, for the plotter
+    conn.plot = { on: true, n: 0, series: new Map(), raf: 0 };
+    let lines = '';
+    for (let i = 0; i < 90; i++) {
+      const stage = 1.2 + 0.35 * Math.sin(i / 14) + 0.02 * Math.sin(i * 1.7);
+      lines += 'stage=' + stage.toFixed(3) + ' batt=' + (13.4 - i * 0.004 + 0.03 * Math.sin(i / 3)).toFixed(2)
+        + ' rssi=' + Math.round(-82 + 6 * Math.sin(i / 9) + 3 * Math.cos(i * 0.9)) + '\r\n';
+    }
+    handleChunk(conn, new TextEncoder().encode(lines));
     conn.mode = 'hex';
     handleChunk(conn, new TextEncoder().encode('hex dump demo bytes'));
     conn.mode = 'alert';
     handleChunk(conn, new Uint8Array([0x07, 0xD5, 0xF8, 0xFE]));
     flushPartials(conn);
+    conn.mode = 'text';   // where it started, so the plot toggle shows beside the plot
     emitSys(conn, 'End of demo — Remove this card and Add connection to open a real port', 'sys');
     renderList();
     const el = document.getElementById('ser-card-' + conn.id);
@@ -485,6 +564,8 @@ const Serial = (function () {
   // ── incoming data handling ────────────────────────────────────────────────────
   function handleChunk(conn, u8) {
     conn.bytes += u8.length;
+    tally(conn, u8.length);
+    if (conn.kind === 'quansheng') { SerialRadio.feed(conn, u8); scheduleStats(conn); return; }
     if      (conn.mode === 'text')  handleText(conn, u8);
     else if (conn.mode === 'hex')   handleHex(conn, u8);
     else if (conn.mode === 'alert') handleAlert(conn, u8);
@@ -500,6 +581,7 @@ const Serial = (function () {
       conn.textBuf = conn.textBuf.slice(m + (conn.textBuf.substr(m, 2) === '\r\n' ? 2 : 1));
       conn.count++;
       emit(conn, { ts: Date.now(), cls: 'rx', body: esc(line) || '&nbsp;', raw: line });
+      plotLine(conn, line);
     }
     // don't let a newline-less stream buffer forever
     if (conn.textBuf.length > 8192) {
@@ -584,6 +666,130 @@ const Serial = (function () {
 
   function emitSys(conn, text, cls) {
     emit(conn, { ts: Date.now(), cls: cls || 'sys', body: esc(text), raw: text, sys: true });
+  }
+
+  // A line into a connection's raw log, for SerialRadio: what the radio said
+  // (classed by §3's four kinds), what was sent, and system notes. `t`
+  // backdates it — the demo's history.
+  function logLine(conn, text, cls, t) {
+    if (cls !== 'sys' && cls !== 'err' && cls !== 'tx') conn.count++;
+    const body = cls === 'tx' ? '<span class="ser-tx-arrow">»</span> ' + esc(String(text).replace(/^» /, '')) : (esc(text) || '&nbsp;');
+    emit(conn, { ts: t || Date.now(), cls: cls || 'rx', body, raw: text });
+  }
+
+  // ── the plotter ───────────────────────────────────────────────────────────
+  //
+  // Numbers in text lines, drawn as they arrive — the Arduino IDE's serial
+  // plotter, for a logger printing readings. A line of `key=value` (or
+  // `key: value`) pairs names its series; otherwise its numbers are series 1,
+  // 2, 3… in order. Up to eight series and 600 points each; every series is
+  // scaled to its own range, so a river stage in metres and an RSSI in dBm
+  // can share the picture, and the legend carries the units' worth of truth:
+  // last, minimum and maximum.
+  const PLOT_MAX = 600;
+  const NUM = '-?\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?';
+  function plotLine(conn, line) {
+    const p = conn.plot;
+    if (!p || !p.on) return;
+    let pairs = [];
+    const kv = line.match(new RegExp('([A-Za-z_][\\w.]*)\\s*[=:]\\s*(' + NUM + ')', 'g'));
+    if (kv && kv.length) {
+      pairs = kv.map(t => { const m = new RegExp('([A-Za-z_][\\w.]*)\\s*[=:]\\s*(' + NUM + ')').exec(t); return [m[1], parseFloat(m[2])]; });
+    } else {
+      const nums = line.match(new RegExp(NUM, 'g'));
+      if (!nums) return;
+      pairs = nums.slice(0, 8).map((n, i) => ['#' + (i + 1), parseFloat(n)]);
+    }
+    p.n++;
+    pairs.forEach(([k, v]) => {
+      if (!Number.isFinite(v)) return;
+      if (!p.series.has(k)) { if (p.series.size >= 8) return; p.series.set(k, []); }
+      const a = p.series.get(k);
+      a.push([p.n, v]);
+      if (a.length > PLOT_MAX) a.shift();
+    });
+    if (!p.raf) p.raf = requestAnimationFrame(() => { p.raf = 0; paintPlot(conn); });
+  }
+
+  function togglePlot(id, on) {
+    const conn = byId(id);
+    if (!conn) return;
+    conn.plot = conn.plot || { on: false, n: 0, series: new Map(), raf: 0 };
+    conn.plot.on = !!on;
+    if (on && !conn.plot.series.size) conn.entries.forEach(e => { if (e.cls === 'rx') plotLine(conn, e.raw); });
+    renderList();
+  }
+
+  function plotHtml(conn) {
+    if (!conn.plot || !conn.plot.on) return '';
+    return '<div class="ser-plot"><canvas class="qs-canvas" id="ser-plot-' + conn.id + '" role="img" aria-label="Plot of the numbers in each line"></canvas>'
+      + '<div class="qs-legend" id="ser-plot-legend-' + conn.id + '"></div></div>';
+  }
+
+  function paintPlot(conn) {
+    const cv = document.getElementById('ser-plot-' + conn.id);
+    if (!cv || typeof SerialViz === 'undefined') return;
+    const f = SerialViz.fit(cv, 170);
+    if (!f) return;
+    const { ctx, w, h, dpr } = f, col = SerialViz.colors(), p = conn.plot;
+    ctx.clearRect(0, 0, w, h);
+    const palette = [col.accent, col.ok, col.warn, col.bad, col.crc, col.ident, col.addr, col.muted];
+    const n1 = p.n, n0 = Math.max(0, n1 - PLOT_MAX);
+    ctx.strokeStyle = col.border; ctx.lineWidth = dpr;
+    for (let k = 1; k < 4; k++) { const y = Math.round(k * h / 4) + 0.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    const legend = [];
+    let i = 0;
+    for (const [name, pts] of p.series) {
+      const color = palette[i++ % palette.length];
+      if (!pts.length) continue;
+      let lo = Infinity, hi = -Infinity;
+      pts.forEach(q => { if (q[1] < lo) lo = q[1]; if (q[1] > hi) hi = q[1]; });
+      const pad = (hi - lo) * 0.08 || Math.abs(hi) * 0.05 || 1;
+      const L = lo - pad, H = hi + pad;
+      ctx.beginPath();
+      pts.forEach((q, j) => {
+        const x = (q[0] - n0) / Math.max(1, n1 - n0) * (w - 4 * dpr) + 2 * dpr, y = h - 4 * dpr - (q[1] - L) / (H - L) * (h - 8 * dpr);
+        j ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      });
+      ctx.strokeStyle = color; ctx.lineWidth = 1.6 * dpr; ctx.stroke();
+      const last = pts[pts.length - 1][1];
+      legend.push('<span><i class="qs-sw ser-plot-sw" style="--dot: ' + color + '"></i>' + esc(name) + ' <strong>' + esc(String(+last.toPrecision(6)))
+        + '</strong> <span class="qs-dim">(' + esc(String(+lo.toPrecision(5))) + ' – ' + esc(String(+hi.toPrecision(5))) + ')</span></span>');
+    }
+    const lg = document.getElementById('ser-plot-legend-' + conn.id);
+    if (lg) lg.innerHTML = legend.length ? legend.join('') : '<span>No numbers in the lines yet.</span>';
+    cv.setAttribute('aria-label', 'Plot of ' + p.series.size + ' series from the last ' + Math.min(PLOT_MAX, n1) + ' lines, each scaled to its own range; '
+      + 'the legend beside it gives each one\'s last, lowest and highest value.');
+  }
+
+  // Bytes a second, for the activity sparkline.
+  function tally(conn, n) {
+    if (!conn.act) conn.act = new Array(120).fill(0);
+    const sec = Math.floor(Date.now() / 1000);
+    if (conn.actSec == null) conn.actSec = sec;
+    const steps = Math.min(120, sec - conn.actSec);
+    for (let i = 0; i < steps; i++) { conn.act.shift(); conn.act.push(0); }
+    conn.actSec = sec;
+    conn.act[conn.act.length - 1] += n;
+  }
+
+  // One second tick for every card's sparkline, running only while a card can
+  // be receiving. Started by open and by a demo, never at load.
+  let ticker = null;
+  function startTicker() {
+    if (ticker) return;
+    ticker = setInterval(() => {
+      const live = conns.filter(c => c.kind !== 'sdr' && (c.phase === 'open' || c.phase === 'demo'));
+      if (!live.length) { clearInterval(ticker); ticker = null; return; }
+      live.forEach(c => { tally(c, 0); paintSpark(c); });
+    }, 1000);
+  }
+  function paintSpark(conn) {
+    const cv = document.getElementById('ser-spark-' + conn.id);
+    if (!cv || typeof SerialViz === 'undefined') return;
+    SerialViz.spark(cv, conn.act || [], { height: 26 });
+    const recent = (conn.act || []).slice(-10).reduce((a, b) => a + b, 0) / 10;
+    cv.setAttribute('aria-label', 'Bytes received a second over the last two minutes; ' + Math.round(recent) + ' B/s over the last ten seconds.');
   }
 
   // ── entry buffer + surgical DOM append ────────────────────────────────────────
@@ -675,14 +881,19 @@ const Serial = (function () {
     const end = endSel ? endSel.value : 'lf';
     const suffix = end === 'lf' ? '\n' : end === 'cr' ? '\r' : end === 'crlf' ? '\r\n' : '';
     try {
-      if (!conn.port.writable) throw new Error('port is not writable');
-      if (!conn.writer) conn.writer = conn.port.writable.getWriter();
-      await conn.writer.write(new TextEncoder().encode(text + suffix));
-      emit(conn, { ts: Date.now(), cls: 'tx', body: '<span class="ser-tx-arrow">»</span> ' + esc(text), raw: '» ' + text });
+      await writeText(conn, text + suffix, text);
       inp.value = '';
     } catch (e) {
       emitSys(conn, 'Send failed: ' + e.message, 'err');
     }
+  }
+
+  // Write text to an open port, and log what was sent (`echo`, if given).
+  async function writeText(conn, text, echo) {
+    if (!conn.port || !conn.port.writable) throw new Error('port is not writable');
+    if (!conn.writer) conn.writer = conn.port.writable.getWriter();
+    await conn.writer.write(new TextEncoder().encode(text));
+    if (echo != null) emit(conn, { ts: Date.now(), cls: 'tx', body: '<span class="ser-tx-arrow">»</span> ' + esc(echo), raw: '» ' + echo });
   }
 
   function openInPackets(hex) {
@@ -703,6 +914,20 @@ const Serial = (function () {
     const note = document.getElementById('ser-mode-note-' + id);
     if (note) note.textContent = MODE_HINT[val];
   }
+  // Generic stream or Quansheng radio. The radio ignores the baud rate (it is
+  // USB CDC) and its card is SerialRadio's dashboard rather than a stream.
+  function setKind(id, kind, quiet) {
+    const c = byId(id); if (!c) return;
+    c.kind = kind === 'quansheng' ? 'quansheng' : 'serial';
+    if (c.kind === 'quansheng') {
+      c.mode = 'radio';
+      if (/^Connection \d+$/.test(c.name)) c.name = 'Quansheng radio';
+      c.settings.baudRate = 115200;
+    } else if (c.mode === 'radio') {
+      c.mode = loadDefaults().mode === 'radio' ? 'text' : loadDefaults().mode;
+    }
+    if (!quiet) renderList();
+  }
 
   // ── disconnect handling ───────────────────────────────────────────────────────
   function hookDisconnect() {
@@ -719,6 +944,7 @@ const Serial = (function () {
           conn.err = 'Device disconnected';
           emitSys(conn, 'Device disconnected', 'err');
         }
+        if (conn.kind === 'quansheng' && conn.radio) SerialRadio.detach(conn);
         // Release our handle so a later reopen (after re-plugging) succeeds
         // instead of failing with "The port is already open".
         teardown(conn).then(() => renderList());
@@ -728,14 +954,16 @@ const Serial = (function () {
   }
 
   // ── rendering ─────────────────────────────────────────────────────────────────
-  const MODE_LABEL = { text: 'ASCII text', hex: 'Hex dump', alert: 'ALERT decode' };
+  const MODE_LABEL = { text: 'ASCII text', hex: 'Hex dump', alert: 'ALERT decode', radio: 'Quansheng ALERT receiver' };
   const MODE_HINT = {
     text:  'Bytes are decoded as UTF-8/ASCII and split into lines on CR/LF.',
     hex:   'Raw bytes shown as a hex + ASCII dump (16 bytes per row) — best for inspecting binary framing.',
     alert: 'Every 4 bytes are decoded as a 32-bit ALERT payload (ABF/BCC/EAF/EIF) and matched to the station database. Use “Resync” to shift byte alignment if frames don’t line up. ALERT2 support is planned.',
+    radio: 'A Quansheng UV-K5 V3 / UV-K1 running the ALERT receiver firmware: its readings, bursts, noise floor and battery as a dashboard, and its console (clock, settings, flash log, station table, screen) as controls. The radio ignores the baud rate — any value works.',
   };
 
   function statusBadge(conn) {
+    if (conn.phase === 'demo')   return '<span class="ser-badge ok">● demo</span>';
     if (conn.phase === 'open')   return '<span class="ser-badge ok">● live</span>';
     if (conn.phase === 'closed') return '<span class="ser-badge">closed</span>';
     if (conn.phase === 'error')  return '<span class="ser-badge bad">● ' + esc(conn.err || 'error') + '</span>';
@@ -761,10 +989,16 @@ const Serial = (function () {
             + conn.id + '\',' + i + ')">' + esc(portLabel(p)) + '</button>').join(' ')
         + '</div>'
       : '';
+    const radio = conn.kind === 'quansheng';
     return ''
       + '<div class="ser-form">'
       + '  <label class="ser-f-name">Name'
       + '    <input type="text" value="' + esc(conn.name) + '" oninput="Serial.setName(\'' + conn.id + '\',this.value)">'
+      + '  </label>'
+      + '  <label class="ser-f-kind">Device'
+      + '    <select onchange="Serial.setKind(\'' + conn.id + '\',this.value)">'
+      +        opt('serial', 'Generic serial device', conn.kind) + opt('quansheng', 'Quansheng ALERT receiver (UV-K5 V3 / UV-K1)', conn.kind) + '</select>'
+      + (conn.recognised ? '<span class="ser-port-ok">✓ recognised by its USB ID</span>' : '')
       + '  </label>'
       + '  <div class="ser-f-port"><label>COM port</label><div class="ser-port-row">' + portBtn + '</div>'
       + knownHtml
@@ -785,9 +1019,9 @@ const Serial = (function () {
       + '  <label>Flow control'
       + '    <select onchange="Serial.setSetting(\'' + conn.id + '\',\'flowControl\',this.value)">'
       +        opt('none', 'None', s.flowControl) + opt('hardware', 'Hardware (RTS/CTS)', s.flowControl) + '</select></label>'
-      + '  <label>Display mode'
+      + (radio ? '' : '  <label>Display mode'
       + '    <select onchange="Serial.setMode(\'' + conn.id + '\',this.value)">'
-      +        opt('text', 'ASCII text', conn.mode) + opt('hex', 'Hex dump', conn.mode) + opt('alert', 'ALERT decode', conn.mode) + '</select></label>'
+      +        opt('text', 'ASCII text', conn.mode) + opt('hex', 'Hex dump', conn.mode) + opt('alert', 'ALERT decode', conn.mode) + '</select></label>')
       + '</div>'
       + '<p class="ser-mode-note" id="ser-mode-note-' + conn.id + '">' + MODE_HINT[conn.mode] + '</p>'
       + (conn.err ? '<p class="ser-err">Could not open port: ' + esc(conn.err) + '</p>' : '')
@@ -797,19 +1031,19 @@ const Serial = (function () {
       + '</div>';
   }
 
-  function liveBody(conn) {
-    const isOpen = conn.phase === 'open';
-    const cfg = conn.settings.baudRate + ' baud · ' + conn.settings.dataBits + fmtParity(conn.settings.parity)
-      + conn.settings.stopBits + ' · ' + MODE_LABEL[conn.mode];
-    let tb = '<div class="ser-toolbar">';
+  // The toolbar every stream card has. SerialRadio puts its own buttons in
+  // front of these.
+  function toolbarButtons(conn) {
+    const isOpen = conn.phase === 'open', demo = conn.phase === 'demo';
+    let tb = '';
     if (isOpen) {
       tb += '<button class="ghost" onclick="Serial.togglePause(\'' + conn.id + '\')">' + (conn.paused ? 'Resume' : 'Pause') + '</button>';
       if (conn.mode === 'alert')
         tb += '<button class="ghost" onclick="Serial.resync(\'' + conn.id + '\')">Resync</button>';
-    } else {
+    } else if (!demo && conn.port) {
       tb += '<button class="primary" onclick="Serial.reopenConn(\'' + conn.id + '\')">Reopen</button>';
     }
-    tb += '<button class="ghost" onclick="Serial.clearLog(\'' + conn.id + '\')">Clear</button>';
+    tb += '<button class="ghost" onclick="Serial.clearLog(\'' + conn.id + '\')">Clear' + (conn.kind === 'quansheng' ? ' raw' : '') + '</button>';
     tb += '<button class="ghost" onclick="Serial.saveLog(\'' + conn.id + '\')">Save log</button>';
     if (isOpen) tb += '<button class="ghost" onclick="Serial.closeConn(\'' + conn.id + '\')">Close</button>';
     tb += '<button class="ghost" onclick="Serial.removeConn(\'' + conn.id + '\')">Remove</button>';
@@ -817,21 +1051,39 @@ const Serial = (function () {
         + ' onchange="Serial.toggleFlag(\'' + conn.id + '\',\'timestamps\',this.checked)"> timestamps</label>';
     tb += '<label class="ser-check"><input type="checkbox"' + (conn.autoscroll ? ' checked' : '')
         + ' onchange="Serial.toggleFlag(\'' + conn.id + '\',\'autoscroll\',this.checked)"> autoscroll</label>';
-    tb += '</div>';
+    if (conn.kind === 'serial' && conn.mode === 'text') {
+      tb += '<label class="ser-check"><input type="checkbox"' + (conn.plot && conn.plot.on ? ' checked' : '')
+        + ' onchange="Serial.togglePlot(\'' + conn.id + '\',this.checked)"> plot numbers</label>';
+    }
+    return tb;
+  }
 
-    const stats = '<div class="ser-substats"><span class="ser-cfg">' + esc(cfg) + '</span>'
+  // The settings line, the byte counter and the activity sparkline.
+  function statsHtml(conn) {
+    const cfg = conn.kind === 'quansheng'
+      ? 'USB CDC · ' + MODE_LABEL.radio
+      : conn.settings.baudRate + ' baud · ' + conn.settings.dataBits + fmtParity(conn.settings.parity) + conn.settings.stopBits + ' · ' + MODE_LABEL[conn.mode];
+    return '<div class="ser-substats"><span class="ser-cfg">' + esc(cfg) + '</span>'
+      + '<canvas class="ser-spark" id="ser-spark-' + conn.id + '" role="img" aria-label="Bytes received a second"></canvas>'
       + '<span class="ser-stats" id="ser-stats-' + conn.id + '">' + esc(statsText(conn)) + '</span></div>';
+  }
 
-    // The log is a fixed-height scroller, so it is a named region with a tab
-    // stop (pattern 7 — overflow: auto is keyboard-scrollable in Firefox and
-    // nothing else). It is deliberately NOT a live region: at 9600 baud a
-    // role="log" would announce every line, which is the unusable half of the
-    // aria-live failure mode. The policy (design-system §4): announce start
-    // and stop, keep the stream in a region the reader visits at their own
-    // pace, with the stats line beside it as the on-demand summary.
-    const log = '<div class="ser-log' + (conn.mode === 'text' ? ' ser-log-text' : '') + '" id="ser-log-' + conn.id + '"'
+  // The log is a fixed-height scroller, so it is a named region with a tab
+  // stop (pattern 7 — overflow: auto is keyboard-scrollable in Firefox and
+  // nothing else). It is deliberately NOT a live region: at 9600 baud a
+  // role="log" would announce every line, which is the unusable half of the
+  // aria-live failure mode. The policy (design-system §4): announce start
+  // and stop, keep the stream in a region the reader visits at their own
+  // pace, with the stats line beside it as the on-demand summary.
+  function logHtml(conn) {
+    return '<div class="ser-log' + (conn.mode === 'text' || conn.kind === 'quansheng' ? ' ser-log-text' : '') + '" id="ser-log-' + conn.id + '"'
       + ' role="region" tabindex="0" aria-label="Received data — ' + esc(conn.name) + '"></div>';
+  }
 
+  function liveBody(conn) {
+    if (conn.kind === 'quansheng') return SerialRadio.body(conn);
+    const isOpen = conn.phase === 'open';
+    const tb = '<div class="ser-toolbar">' + toolbarButtons(conn) + '</div>';
     let send = '';
     if (isOpen) {
       send = '<div class="ser-send">'
@@ -845,11 +1097,12 @@ const Serial = (function () {
         + '<button class="ghost" onclick="Serial.sendData(\'' + conn.id + '\')">Send</button>'
         + '</div>';
     }
-    return tb + stats + send + log;
+    return tb + statsHtml(conn) + plotHtml(conn) + send + logHtml(conn);
   }
 
   function connCardHtml(conn) {
-    return '<div class="panel ser-conn ser-' + conn.phase + '" id="ser-card-' + conn.id + '">'
+    if (conn.kind === 'sdr') return SerialSdr.cardHtml(conn);
+    return '<div class="panel ser-conn ser-' + conn.phase + (conn.kind === 'quansheng' ? ' ser-radio' : '') + '" id="ser-card-' + conn.id + '">'
       + '<div class="ser-conn-head">'
       + '  <span class="ser-conn-name">' + esc(conn.name) + '</span>'
       + '  ' + statusBadge(conn)
@@ -863,26 +1116,39 @@ const Serial = (function () {
     const host = document.getElementById('serial-conns');
     if (!host) return;
     if (!conns.length) {
-      host.innerHTML = '<div class="panel ser-empty"><p>No connections yet. Click '
-        + '<strong>+ Add connection</strong> to choose a COM port and open a serial device.</p>'
+      host.innerHTML = '<div class="panel ser-empty"><p>No connections yet. Add a <strong>serial device</strong> or a '
+        + '<strong>Quansheng ALERT radio</strong> to choose a COM port, or an <strong>RTL-SDR</strong> to pick a USB stick — '
+        + 'or look at what each card does first, with nothing plugged in:</p>'
         + '<div class="button-group">'
         + '<button class="ghost" onclick="Serial.addDemo()">Show a demo connection</button>'
+        + '<button class="ghost" onclick="Serial.addDemo(\'quansheng\')">Demo Quansheng radio</button>'
+        + '<button class="ghost" onclick="Serial.addDemo(\'sdr\')">Demo RTL-SDR</button>'
         + '</div></div>';
       return;
     }
     host.innerHTML = conns.map(connCardHtml).join('');
-    // repopulate live logs from each connection's retained scrollback
-    conns.forEach(c => { if (c.phase !== 'setup') repaintLog(c); });
+    // repopulate live logs from each connection's retained scrollback, and
+    // redraw each card's graphics from its own model — the canvases are new
+    conns.forEach(c => {
+      if (c.kind === 'sdr') { SerialSdr.mount(c); return; }
+      if (c.phase === 'setup') return;
+      repaintLog(c);
+      paintSpark(c);
+      if (c.plot && c.plot.on) paintPlot(c);
+      if (c.kind === 'quansheng') SerialRadio.mount(c);
+    });
   }
 
   function render() {
     const bauds = '<datalist id="ser-bauds">' + BAUD_RATES.map(b => '<option value="' + b + '">').join('') + '</datalist>';
     let banner = '';
+    const usb = typeof navigator !== 'undefined' && 'usb' in navigator;
     if (!supported) {
       banner = '<div class="panel ser-warn"><h3>Web Serial isn’t available in this browser</h3>'
         + '<p>The Serial Monitor uses the <a href="https://developer.mozilla.org/docs/Web/API/Web_Serial_API" target="_blank" rel="noopener">Web Serial API</a>, '
         + 'which needs a Chromium-based browser — <strong>Chrome, Edge or Opera</strong> — served over <strong>https</strong> or from <strong>localhost</strong>. '
-        + 'It is not supported in Firefox or Safari, or when this page is opened directly from a <code>file://</code> path.</p></div>';
+        + 'It is not supported in Firefox or Safari, or when this page is opened directly from a <code>file://</code> path.'
+        + (usb ? '' : ' The RTL-SDR card needs WebUSB, which has the same requirement.') + ' The demos below work anywhere.</p></div>';
     } else if (typeof location !== 'undefined' && !window.isSecureContext) {
       banner = '<div class="panel ser-warn"><h3>Not a secure context</h3>'
         + '<p>Web Serial only works over <strong>https</strong> or <strong>localhost</strong>. This page appears to be served insecurely, '
@@ -892,13 +1158,18 @@ const Serial = (function () {
       + '<div class="panel">'
       + '  <div class="panel-header"><h2>Serial Monitor '
       + '<span class="small ser-build">build ' + SERIAL_BUILD + '</span></h2>'
-      + '    <button class="primary" onclick="Serial.addConnection()"' + (supported ? '' : ' disabled') + '>+ Add connection</button>'
+      + '    <div class="ser-add">'
+      + '    <button class="primary" onclick="Serial.addConnection()"' + (supported ? '' : ' disabled') + '>+ Serial device</button>'
+      + '    <button class="primary" onclick="Serial.addConnection(\'quansheng\')"' + (supported ? '' : ' disabled') + '>+ Quansheng radio</button>'
+      + '    <button class="primary" onclick="Serial.addConnection(\'sdr\')"' + (usb ? '' : ' disabled') + '>+ RTL-SDR</button>'
+      + '    </div>'
       + '  </div>'
-      + '  <p class="sub">Connect physical serial devices to your computer’s COM ports and watch their output live. '
-      + '     Open several devices at once — each connection has its own port, baud rate and framing, and its own display mode: '
-      + '     plain <strong>ASCII text</strong>, a raw <strong>hex dump</strong>, or live <strong>ALERT</strong> binary decoding '
-      + '     (ABF/BCC/EAF/EIF) cross-referenced to the station database. Click <em>+ Add connection</em>, choose a COM port, '
-      + '     set the serial parameters, then <em>Open / Connect</em>.</p>'
+      + '  <p class="sub">Connect physical devices and watch them live — several at once, each its own card. '
+      + '     A <strong>serial device</strong> streams as plain <strong>ASCII text</strong>, a raw <strong>hex dump</strong>, or live '
+      + '     <strong>ALERT</strong> binary decoding (ABF/BCC/EAF/EIF) cross-referenced to the station database. '
+      + '     A <strong>Quansheng ALERT radio</strong> (UV-K5 V3 / UV-K1 on the ALERT receiver firmware) becomes a dashboard: its readings, '
+      + '     bursts, noise floor and battery, and its own controls — clock, settings, flash log, station table, screen. '
+      + '     An <strong>RTL-SDR</strong> (Blog V2, V3 or V4, over USB) decodes ALERT off the air itself, with a live spectrum, waterfall and audio.</p>'
       + '</div>'
       + banner
       + '<div id="serial-conns"></div>'
@@ -915,8 +1186,10 @@ const Serial = (function () {
 
   return {
     render, init, addConnection, addDemo, choosePort, useKnownPort, openConn, closeConn, removeConn, reopenConn,
-    togglePause, clearLog, saveLog, toggleFlag, sendData, resync, openInPackets,
-    setName, setSetting, setMode,
+    togglePause, clearLog, saveLog, toggleFlag, togglePlot, sendData, resync, openInPackets,
+    setName, setSetting, setMode, setKind, renderList,
+    // for serial-radio.js and serial-sdr.js
+    findConn: byId, list: () => conns.slice(), writeText, toggleDtr, logLine, toolbarButtons, statsHtml, logHtml,
   };
 })();
 

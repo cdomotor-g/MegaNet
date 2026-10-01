@@ -137,7 +137,7 @@ const TABS = [
     { id: 'hfem',       label: 'HFEM Messages',          icon: '🌊',
       find: 'hydro field event message bom bureau meteorology decode paste site sensor scheme timestamp maintenance builder logger' },
     { id: 'serial',     label: 'Serial Monitor',         icon: '🔌',
-      find: 'com port web serial live stream terminal baud log' },
+      find: 'com port web serial live stream terminal baud log quansheng radio uv-k5 rtl-sdr sdr usb dongle spectrum waterfall off air' },
   ] },
   { group: 'Data', tabs: [
     { id: 'arro',       label: 'ARRO Launcher',          icon: '🚀',
@@ -990,8 +990,17 @@ const HELP = {
 
   serial: {
     summary: 'Streams live output from serial devices over the browser\'s Web Serial API — as many '
-           + 'ports at once as the machine has, each an independent card with its own settings.',
+           + 'ports at once as the machine has, each an independent card with its own settings. A '
+           + 'Quansheng radio on the ALERT receiver firmware becomes a dashboard with its own controls, '
+           + 'and an RTL-SDR stick (Blog V2, V3 or V4, over WebUSB) decodes ALERT off the air itself.',
     watch: [
+      'An <strong>RTL-SDR needs the computer to let go of it</strong> before the browser can '
+      + 'have it: WinUSB via Zadig on Windows, the DVB-T driver unloaded on Linux, nothing on a '
+      + 'Mac — the same step rtl_sdr and SDR# need. Gain is ADC headroom, not SNR: keep the '
+      + 'histogram\'s end bins empty.',
+      'ALERT Binary has <strong>no checksum</strong>. Off the air, a reading is only as good as '
+      + 'its votes, and a strong burst can throw a one-bit ghost — the card reports those as '
+      + 'shadows, not stations. Check the agency\'s own feed before acting on a value.',
       'Web Serial is a Chromium-only API, and it is refused outright on a page that is not '
       + 'HTTPS or localhost. A managed browser can also have it switched off by policy, in which '
       + 'case nothing on this tab will work until IT changes that — the linked page is written to '
@@ -1005,7 +1014,11 @@ const HELP = {
       + 'you come back — so a long unattended capture loses its oldest lines rather than its '
       + 'newest. <em>Save log</em> before <em>Clear</em>, and before the buffer laps.',
     ],
-    links: [{ label: 'Serial Monitor — what to ask IT for', href: 'docs/serial-help.html' }],
+    links: [
+      { label: 'Serial Monitor — what to ask IT for', href: 'docs/serial-help.html' },
+      { label: 'The Quansheng ALERT radio card', href: 'docs/serial-radio.md' },
+      { label: 'The RTL-SDR card — sticks, drivers, and a hardware checklist', href: 'docs/serial-sdr.md' },
+    ],
     related: ['alert2', 'packets'],
   },
 

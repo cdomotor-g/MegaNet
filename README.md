@@ -121,6 +121,12 @@ MegaNet/
 ├── network-maps.js         ← Maps      — Radio Path Maps tab (named for the tab, not
 │                             the module, so it isn't confused with maps-data.js)
 ├── serial.js               ← Serial    — Serial Monitor tab (Web Serial)
+├── serial-radio.js         ← SerialRadio — its Quansheng ALERT radio dashboard
+├── serial-sdr.js           ← SerialSdr — its RTL-SDR card (WebUSB)
+├── serial-viz.js           ← SerialViz — the canvas helpers those cards share
+├── quansheng.js            ← Quansheng — the radio firmware's serial protocol codec
+├── alert-dsp.js            ← AlertDsp  — the off-air ALERT decoder (runs in a Worker)
+├── rtlsdr.js               ← RtlSdr    — WebUSB driver, RTL2832U + R820T/R828D
 ├── message-log.js          ← MessageLog — Message Log tab (the arrival log:
 │                             every message the datastore accepted, filterable,
 │                             with a plot-and-map tray and a decode drawer)
@@ -2404,6 +2410,22 @@ output live, on the **Serial Monitor** tab. Built on the browser's
 - **Requirements** — Web Serial needs a Chromium browser (Chrome/Edge/Opera)
   served over **https** or **localhost**; the tab shows a clear notice in
   unsupported browsers or insecure contexts.
+- **Quansheng ALERT radio** — a UV-K5 V3 / UV-K1 on the
+  [ALERT receiver firmware](https://github.com/cdomotor-g/quansheng_alert_v3) becomes
+  a dashboard: readings with fade-margin bars, a signal chart (noise floor,
+  sensitivity, every burst), the raw bits of each burst with its frames boxed,
+  stations heard — and the firmware's console as controls: clock sync, every
+  setting, flash-log download/erase, the station table (built from MegaNet and
+  uploaded in the browser), a live mirror of the radio's screen, reboot.
+  See [`docs/serial-radio.md`](docs/serial-radio.md).
+- **RTL-SDR (Blog V2 / V3 / V4)** — a WebUSB driver for the RTL2832U with R820T(2) /
+  R828D tuners (V3 direct sampling, V4 upconverter and input switching, bias tee),
+  and an off-air ALERT decoder ported from
+  [agmurf/sdr-alert-decoder](https://github.com/agmurf/sdr-alert-decoder), run in a
+  Worker: spectrum with noise floor and peak hold, waterfall, channel power and
+  bursts, FM audio waveform and tone spectrum, the decoded symbols, the ADC
+  histogram, IQ capture and replay. See [`docs/serial-sdr.md`](docs/serial-sdr.md).
+- **Demos** — each card has one, so the tab can be seen with nothing plugged in.
 - **Managed / work computers** — enterprise policy can block Web Serial, in which
   case the browser rejects the port picker *instantly without showing it*. The app
   detects this (an instant rejection can't be a human cancelling the dialog) and
@@ -4004,7 +4026,7 @@ Tabs / panels:
   Stations map as a selection
 - **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF, A2C)
 - **ALERT2 / ERT-A2** — decode ELPRO ERT-A2 serial captures, either wire format (ALERT2 ASCII on RS232, or the USB binary framing that carries RSSI), mapped and matched to stations
-- **Serial Monitor** — live ingestion from physical COM ports (Web Serial), with ASCII / hex / ALERT-decode display
+- **Serial Monitor** — live ingestion from physical COM ports (Web Serial), with ASCII / hex / ALERT-decode display; a Quansheng ALERT radio dashboard with its controls; and an RTL-SDR (Blog V2/V3/V4, WebUSB) that decodes ALERT off the air with a live spectrum and waterfall
 - **Inspections** — the six paper station-inspection sheets, digitised: one form
   driven by `meganet.inspection_form`, drafts on the device, and the printed 6%
   tip-test rule computed rather than read
