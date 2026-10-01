@@ -1,0 +1,125 @@
+SS_ID,SV_SV_ID,SS_NAME
+101,1,HF Domestic Service
+102,1,HF Overseas (IBL) Service
+103,1,HF Overseas Service
+104,1,Narrowband Area Service station(s)
+105,1,Narrowcasting Service (LPON)
+106,1,Narrowcasting Service (Fixed Tax)
+107,1,National Broadcasting
+108,1,Commercial Radio
+109,1,Commercial Television
+110,1,Community Broadcasting
+111,1,Cat 1 DRMT
+112,1,Cat 2 DRMT
+113,1,Cat 3 DRMT
+114,1,Foundation Cat 1 DRMT
+115,1,Foundation Cat 2 DRMT
+116,1,Retransmission
+117,1,Retransmission (Out of Area)
+118,1,Narrowcasting Service Station(s)
+119,1,Temporary Community Broadcasting
+120,1,Temporary Transmission
+121,1,Test Transmission
+125,10,PMTS Class B
+127,10,PMTS Class B (870-890 MHz)
+129,10,PMTS Class C
+140,12,Radio Equipment
+150,110,PMTS Class B (935-960 MHz)
+151,110,Station Registrations
+181,18,Radiodetermination
+182,18,Radiodetermination - RNSS Repeater
+200,2,Point to Multipoint
+201,2,Point to Multipoint - Land Mobile Spec
+202,2,Point to Multipoint System
+203,2,Point to Point
+204,2,Point to Point (5.8GHz) Band
+205,2,Point to Point (900MHz STL)
+206,2,Point to Point (Self Coordinated)
+207,2,Sound Outside Broadcast
+208,2,Television Outside Broadcast
+209,2,Television Outside Broadcast Network
+210,2,Television Outside Broadcast System
+211,2,Temporary Fixed Link
+250,102,Fixed Receive
+260,25,Spectrum Trade
+261,25,Apparatus Transfer
+262,25,BSA Transfer
+300,3,Ambulatory - Copy
+301,3,Ambulatory - Initial
+302,3,Ambulatory System
+303,3,CBRS Repeater
+304,3,Land Mobile System - > 30MHz
+305,3,Land Mobile System 0-30MHz
+306,3,PABX Cordless Telephone Service
+307,3,Paging System - Exterior
+308,3,Paging System - Interior
+401,90,Commercial Radio Broadcasting
+402,90,Commercial Television Broadcasting
+403,90,Community Broadcasting
+404,90,Cat 1 DRMT
+405,90,Cat 2 DRMT
+406,90,Cat 3 DRMT
+407,90,Foundation Cat 1 DRMT
+408,90,Foundation Cat 2 DRMT
+409,93,Datacasting
+410,90,International Broadcasting
+412,90,National Broadcasting
+413,90,Commercial Radio Broadcasting (Section 40 - NON-BSB)
+414,90,Commercial Television Broadcasting (Section 40 - NON-BSB)
+415,90,Community Broadcasting (Section 82 NON-BSB)
+416,90,Subscription Television Broadcasting
+417,90,Temporary Community Broadcasting
+451,95,Open Narrowcasting Radio Services Class
+452,95,Open Narrowcasting Television Services Class
+453,95,Subscription Radio Broadcasting Services Class
+454,95,Subscription Radio Narrowcasting Services Class
+455,95,Subscription Television Narrowcasting Services Class
+501,5,Limited Coast Assigned System
+502,5,Limited Coast Marine Rescue
+503,5,Limited Coast Non Assigned
+504,5,Major Coast A
+505,5,Major Coast B
+550,105,Major Coast Receive
+599,50,Datacasting
+600,6,Advanced
+601,6,Amateur Beacon
+602,6,Amateur Repeater
+603,6,Foundation
+604,6,Standard
+650,65,Defence
+655,165,Defence Receive
+660,66,Aircraft Assigned
+670,67,Ship Station Class B Assigned
+671,67,Ship Station Class B Non Assigned
+672,67,Ship Station Class C Assigned
+673,67,Ship Station Class C Non Assigned
+680,68,Outpost Assigned
+681,68,Outpost Non Assigned
+690,69,Scientific Assigned
+691,69,Scientific Non Assigned
+751,75,Space
+756,175,Space Receive
+800,8,Aeronautical Assigned System
+850,85,1800 MHz Band
+854,85,2 GHz Band
+857,85,2.3 GHz Band
+858,85,20 GHz Defence Band
+859,85,AWL - Standard
+860,85,AWL - FSS Only
+861,85,3.4 GHz Band
+864,85,30 GHz Defence Band
+865,85,31 GHz Band
+866,85,26 GHz Band
+868,85,800 MHz Band
+870,85,700 MHz Band
+871,85,2.5 GHz Band
+872,85,2.5 GHz Mid Band Gap
+873,85,850/900 MHz Band
+874,85,Future Auction 5 (Label Editable)
+875,85,Device Registration (Spectrum Licences)
+876,85,Future Auction 6 (Label Editable)
+877,85,Future Auction 7 (Label Editable)
+878,85,Future Auction 8 (Label Editable)
+900,9,Fixed Earth
+901,9,Mobile Earth
+950,109,Earth Receive
