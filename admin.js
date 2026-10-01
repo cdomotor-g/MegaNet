@@ -412,6 +412,7 @@ const Admin = (function () {
           </div>
           <div class="stack">
             <div id="adm-people" class="stack">${peopleHtml()}</div>
+            <div id="adm-tokens">${typeof AdminTokens !== 'undefined' ? AdminTokens.render() : ''}</div>
             ${rolesHtml()}
             ${toolsHtml()}
           </div>
@@ -423,6 +424,7 @@ const Admin = (function () {
     if (!state.dbStatus) dbCheck();
     if (isAdmin() && users === null && !loading) load();
     if (typeof AdminDash !== 'undefined') AdminDash.start();
+    if (typeof AdminTokens !== 'undefined' && isAdmin()) AdminTokens.load();
   }
 
   // Only the parts that change are repainted: the Data source panel and the

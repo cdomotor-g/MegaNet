@@ -1105,6 +1105,11 @@ jobs:
       # and nothing but a GPS fix ever stored as an exact location.
       - name: check_ingest_points.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest_points.sql
+      # Ingest tokens from the Admin tab (0046): administrators only, a token
+      # shown once and kept as its hash, labels unique among live tokens, and a
+      # revoke that shuts the door at once.
+      - name: check_ingest_token_admin.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest_token_admin.sql
       - name: check_inspections.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
       - name: check_inspection_history.sql

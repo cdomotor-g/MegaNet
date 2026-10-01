@@ -493,7 +493,8 @@ const Auth = (function () {
   function tabsAuthChanged() {
     for (const mod of [typeof FieldPhotos !== 'undefined' ? FieldPhotos : null,
                        typeof Admin       !== 'undefined' ? Admin       : null,
-                       typeof AdminDash   !== 'undefined' ? AdminDash   : null]) {
+                       typeof AdminDash   !== 'undefined' ? AdminDash   : null,
+                       typeof AdminTokens !== 'undefined' ? AdminTokens : null]) {
       if (!mod || !mod.authChanged) continue;
       try { mod.authChanged(); } catch (_) { /* its own problem, not the sign-in's */ }
     }

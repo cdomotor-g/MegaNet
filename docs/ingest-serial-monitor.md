@@ -14,18 +14,19 @@ PuTTY writes (see [`serial-help.html#putty`](serial-help.html#putty)).
 ## Setting one up
 
 1. **Get a token for the computer** — one per computer, not per card or station.
-   Token issuing is still a database operation. In the Supabase SQL editor:
+   An administrator does it on the **Admin** tab, under **Ingest tokens**: give it a
+   label someone would recognise (*Cameron work laptop*) and press **Create token**.
+   It is shown once — only its hash is kept.
+   - Setting up **this** computer? Press **Use in this browser** and every Serial
+     Monitor card here has it; nothing to copy.
+   - Setting up another one? **Copy** it, and paste it into a card's **Send to
+     MegaNet** panel on that computer.
 
-   ```sql
-   select meganet.create_ingest_token('Cameron work laptop');
-   -- {"id": 7, "label": "Cameron work laptop", "token": "mgn_…"}
-   ```
+   (The SQL route still works: `select meganet.create_ingest_token('label');`.)
 
-   Name it for the computer, as someone would recognise it. Copy the `token` now:
-   only its hash is kept.
-
-2. On the card, open **Send to MegaNet** and paste the token. It is kept in this
-   browser only (localStorage), and the same token serves every card on this computer.
+2. On the card, open **Send to MegaNet** — the token is already there if you used
+   it in this browser; otherwise paste it. It is kept in this browser only
+   (localStorage), and the same token serves every card on this computer.
 
 3. Give the receiver a **name** (it starts as e.g. *Quansheng radio on a Windows
    PC*) and say **where it is** — see below.
@@ -133,9 +134,8 @@ directly.
 
 ## Revoking
 
-```sql
-update meganet.ingest_token set revoked_at = now() where label = 'Cameron work laptop';
-```
+On the Admin tab, **Revoke…** beside the token (or
+`update meganet.ingest_token set revoked_at = now() where label = '…';`).
 
 Immediate, as for any ingest point — and every card on that computer stops, says the
 token was refused, and keeps what it had to send.

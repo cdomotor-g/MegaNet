@@ -9307,6 +9307,12 @@ code {
 .ing-loc p { flex: 1 1 100%; margin: .2rem 0 0; overflow-wrap: anywhere; }
 .ing-status { margin: .5rem 0 0; font-size: .85rem; overflow-wrap: anywhere; }
 
+/* The Admin tab's ingest tokens (admin-tokens.js). */
+.adm-tok-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: .6rem; align-items: end; margin: .6rem 0; }
+.adm-tok-form label { display: grid; gap: .3rem; font-size: .85rem; color: var(--muted); }
+.adm-tok-minted p { margin: .3rem 0; }
+.adm-tok-value { display: inline-block; max-width: 100%; overflow-wrap: anywhere; font-size: .85rem; user-select: all; }
+
 /* ── Quansheng radio dashboard and RTL-SDR card (serial-radio.js, serial-sdr.js) ── */
 .qs-dash, .sdr-dash { display: grid; gap: .8rem; min-width: 0; }
 .qs-status { display: flex; flex-wrap: wrap; gap: .4rem; }

@@ -36,6 +36,13 @@ only (never `anon`), and a reading posted through `ingest_http()` carrying the
 receiver's path. Same transaction-and-rollback shape, so it is safe against the live
 database. The browser half is `npm run serialingest` in `test/`.
 
+`check_ingest_token_admin.sql` holds `0046`, the Admin tab's token panel: 15 checks
+signed in through 0005's triggers as anon, an editor and an administrator — only the
+administrator may list, mint or revoke; a minted token is shown once and kept as its
+hash, with the administrator as its maker; a live label cannot be used twice; a
+minted token opens the door and its receiver shows in the list; a revoke shuts the
+door at once and frees the label.
+
 ## Map boundaries from a KMZ (#179)
 
 `kml_to_geojson.py` turns a KML or KMZ of polygons into a web-sized GeoJSON, with

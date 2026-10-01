@@ -299,11 +299,11 @@ unless it came from a GPS. That page is [`ingest-serial-monitor.md`](ingest-seri
 
 ## Getting a token
 
-Token issuing is a database operation for now — there is no page in the app for
-it, on the reasoning that a UI can wait until it is actually needed for a pilot
-this size. Run this once, from the Supabase SQL editor or `psql`, as a role that
-can reach `meganet` directly (the service key, or a direct connection — see
-`db/README.md`):
+**From the app:** an administrator mints, lists and revokes tokens on the
+**Admin** tab, under **Ingest tokens** (`0046`). The token is shown once, with a
+copy button. **From SQL**, which still works — run this from the Supabase SQL
+editor or `psql`, as a role that can reach `meganet` directly (the service key,
+or a direct connection — see `db/README.md`):
 
 ```sql
 select meganet.create_ingest_token('Mt Stuart base');

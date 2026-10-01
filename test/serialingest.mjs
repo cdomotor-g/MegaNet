@@ -19,6 +19,8 @@
 //   * a refused token stops sending, says so, and keeps what was waiting
 //   * a demo card never sends
 //   * the token travels in X-Ingest-Token, never in Authorization
+//   * the Admin tab's token panel (0046): mint, shown once, "Use in this
+//     browser", listed, revoked after asking
 //
 // Run:  npm run serialingest
 //       npm run serialingest -- -v    also print what passed
@@ -214,6 +216,48 @@ try {
   const demo = await page.evaluate(() => { const c = Serial.list().find(c => c.phase === 'demo'); const el = document.getElementById('ing-' + c.id);
     return { text: el ? el.textContent : '', box: !!(el && el.querySelector('input[type=checkbox]')), ingest: !!c.ingest }; });
   ok('a demo card says it never sends, offers no switch, and sends nothing', /never/.test(demo.text) && !demo.box && !demo.ingest && posts.length === nD, JSON.stringify(demo));
+
+  // ── the Admin tab's token panel (0046) ─────────────────────────────────────
+  // Auth stood in for an administrator; the three calls answered as
+  // tools/check_ingest_token_admin.sql holds the real ones to.
+  const minted = 'mgn_' + 'a'.repeat(64);
+  const tokens = [];
+  const adminCalls = [];
+  await page.route('**/rest/v1/rpc/admin_ingest_tokens', r => { adminCalls.push('list'); r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(tokens) }); });
+  await page.route('**/rest/v1/rpc/admin_create_ingest_token', r => {
+    const a = JSON.parse(r.request().postData() || '{}');
+    adminCalls.push('create:' + a.p_label);
+    tokens.unshift({ id: 9, label: a.p_label, created_at: new Date().toISOString(), created_by: 'admin@example.test', receivers: [] });
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 9, label: a.p_label, token: minted }) });
+  });
+  await page.route('**/rest/v1/rpc/admin_revoke_ingest_token', r => {
+    adminCalls.push('revoke:' + JSON.parse(r.request().postData() || '{}').p_id);
+    tokens[0].revoked_at = new Date().toISOString();
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 9, revoked_at: tokens[0].revoked_at }) });
+  });
+  await page.route('**/rest/v1/rpc/admin_users', r => r.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/rest/v1/rpc/admin_allowlist', r => r.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/rest/v1/rpc/admin_dashboard', r => r.fulfill({ status: 404, contentType: 'application/json', body: '{}' }));
+  await page.evaluate(() => {
+    localStorage.removeItem('mn-ingest');
+    Auth.isSignedIn = () => true; Auth.isAdmin = () => true; Auth.role = () => 'admin';
+    switchTab('admin');
+  });
+  await until(() => page.evaluate(() => !!document.querySelector('#adm-tokens .adm-tok-form')), 'the Admin tab shows the token panel to an administrator');
+  await page.fill('#adm-tok-label', 'Check laptop');
+  await page.click('#adm-tokens button:has-text("Create token")');
+  await until(() => page.evaluate(t => (document.getElementById('adm-tok-value') || {}).textContent === t, minted), 'a minted token is shown once');
+  ok('…asked for under its label', adminCalls.includes('create:Check laptop'), adminCalls.join(','));
+  await page.click('#adm-tokens button:has-text("Use in this browser")');
+  ok('"Use in this browser" hands it to the Serial Monitor\'s cards',
+    await page.evaluate(t => JSON.parse(localStorage.getItem('mn-ingest') || '{}').token === t, minted));
+  await page.click('#adm-tokens button:has-text("Done")');
+  ok('Done takes the token off the screen', await page.evaluate(t => !document.body.textContent.includes(t), minted));
+  ok('the new token is listed', await page.evaluate(() => /Check laptop/.test(document.querySelector('#adm-tokens table').textContent)));
+  page.once('dialog', d => d.accept());
+  await page.click('#adm-tokens button:has-text("Revoke")');
+  await until(() => page.evaluate(() => /revoked/.test(document.querySelector('#adm-tokens table').textContent)), 'Revoke… revokes it, after asking');
+  ok('…by its id', adminCalls.includes('revoke:9'), adminCalls.join(','));
 
   ok('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 } finally {
