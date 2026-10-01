@@ -201,6 +201,12 @@ const SerialSdr = (function () {
       c.readings.push(Object.assign({ t, name: stationName(r.sensorId), burst: m.burst }, r));
     });
     if (c.readings.length > MAX_READ) c.readings.splice(0, c.readings.length - MAX_READ);
+    // To MegaNet, when the card is set to send (serial-ingest.js): timed by
+    // arrival, and never from the demo band or a replayed capture.
+    if (typeof SerialIngest !== 'undefined' && m.readings.length) {
+      const ts = SerialIngest.arrival(c);
+      SerialIngest.add(c, m.readings.map(r => ({ alert_id: r.sensorId, value_raw: r.value, ts, protocol: 'alert' })));
+    }
     (m.shadows || []).forEach(s => note(c, 'Ignored ' + s.sensorId + ' = ' + s.value + ' (' + s.votes + ' votes): a bit-flip shadow of ' + s.of + '.', ''));
     mark(c, 'readings', 'trace', 'chips', 'timeline');
   }
@@ -629,6 +635,7 @@ const SerialSdr = (function () {
       return;
     }
     paint(c);
+    if (typeof SerialIngest !== 'undefined') SerialIngest.mount(c);
   }
 
   function fmtMHz(hz, dp) { return (hz / 1e6).toFixed(dp == null ? 4 : dp); }
@@ -1155,6 +1162,7 @@ const SerialSdr = (function () {
       + '<div class="qs-legend"><span><i class="qs-sw sw-accent"></i>spectrum</span><span><i class="qs-sw sw-warn"></i>peak hold</span>'
       + '<span><i class="qs-sw sw-dash"></i>noise floor</span><span><i class="qs-sw sw-ok"></i>decoder channel (±6 kHz)</span></div></section>'
       + '<details class="qs-ctl sdr-controls" open><summary>Controls</summary>' + controlsHtml(c) + '</details>'
+      + (typeof SerialIngest !== 'undefined' ? SerialIngest.panel(c) : '')
       + '<div class="sdr-mini">'
       + '<section class="qs-panel" aria-labelledby="sdr-h-time-' + id + '"><h3 id="sdr-h-time-' + id + '">Channel and bursts</h3>'
       + '<canvas class="qs-canvas" id="sdr-time-' + id + '" role="img" aria-label="Channel power"></canvas></section>'

@@ -514,6 +514,7 @@ const Serial = (function () {
       if (conn.phase === 'open') await closeConn(id, { silent: true });
       stopFollower(conn);
     }
+    SerialIngest.detach(conn);
     const i = conns.indexOf(conn);
     if (i >= 0) conns.splice(i, 1);
     renderList();
@@ -771,13 +772,20 @@ const Serial = (function () {
           fo.saidTrim = true;
           emitSys(conn, src.name + ' is ' + fmtBytes(m.size) + ' — reading its last ' + fmtBytes(m.size - fo.follower.trimmed) + ' only', 'sys');
         }
+        // What was already in the file when following started is history:
+        // its readings have no arrival time worth the name, which is what
+        // SerialIngest.arrival() needs to know before timing one by "now".
+        if (fo.historyEnd == null) fo.historyEnd = src.via === 'manual' ? Infinity : conn.fromStart || resumed ? m.size : m.from;
+        conn.history = m.from < fo.historyEnd;
         // A big read (the file's history) is drawn once at the end rather
         // than line by line.
         conn.bulk = u8.length > 65536;
         handleChunk(conn, u8);
+        conn.history = false;
         if (conn.bulk) { conn.bulk = false; repaintLog(conn); }
       },
       onReset: (why, name) => {
+        fo.historyEnd = null;
         flushPartials(conn);
         conn.decoder = new TextDecoder();
         conn.portLabel = LogFollow.describe(src);
@@ -1522,7 +1530,7 @@ const Serial = (function () {
       repaintLog(c);
       paintSpark(c);
       if (c.plot && c.plot.on) paintPlot(c);
-      if (c.kind === 'quansheng') SerialRadio.mount(c);
+      if (c.kind === 'quansheng') { SerialRadio.mount(c); SerialIngest.mount(c); }
       if (c.kind === 'ert') SerialErt.mount(c);
     });
   }

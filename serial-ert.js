@@ -166,7 +166,43 @@ const SerialErt = (function () {
     });
     if (e.recs.length > MAX_RECS) e.recs.splice(0, e.recs.length - MAX_RECS);
     if (f.records.length) e.dirty = true;
+    ingest(c, f, text);
     mark(c, 'status', 'readings', 'stations');
+  }
+
+  // To MegaNet, when the card is set to send (serial-ingest.js). Only a frame
+  // the receiver called clean, and only its clean readings. The time is the
+  // frame's own (seconds since midnight, the network's clock) — which is what
+  // lets two receivers hearing one frame agree on it — put on the right day:
+  // the day nearest to when it arrived, live; the receiver's own date, out of
+  // a log's history. A live frame whose time of day cannot be squared with
+  // this computer's clock (more than ten minutes out — a timezone, a drifted
+  // network clock) is timed by arrival instead, and the card says so. A binary
+  // frame out of history carries no date at all, and is not sent.
+  function ingest(c, f, text) {
+    if (typeof SerialIngest === 'undefined' || !f.payload || f.hdr.frameOk === 0) return;
+    const recs = f.records.filter(r => r.ok);
+    if (!recs.length) return;
+    const sod = f.payload.sod, live = SerialIngest.arrival(c);
+    let ts = null;
+    if (live != null) {
+      ts = onDay(sod, live, true);
+      if (Math.abs(ts - live) > 10 * 60000) {
+        SerialIngest.note(c, 'Frame times are ' + Math.round((ts - live) / 60000) + ' min from this computer\'s clock, so readings are timed by when they arrived.');
+        ts = live;
+      }
+    } else if (f.hdr.clockMs) {
+      ts = onDay(sod, f.hdr.clockMs, false);
+      if (ts > Date.now() + 5 * 60000) ts -= 86400000;
+    }
+    SerialIngest.add(c, recs.map((r, i) => ({ alert_id: r.alertId, value_raw: r.value, ts, protocol: 'alert2', line: i ? null : text })));
+  }
+  function onDay(sod, refMs, nearest) {
+    const d = new Date(refMs);
+    d.setHours(0, 0, 0, 0);
+    const t = d.getTime() + sod * 1000;
+    if (!nearest) return t;
+    return [t - 86400000, t, t + 86400000].reduce((a, b) => Math.abs(b - refMs) < Math.abs(a - refMs) ? b : a);
   }
 
   function keep(e, text) {
@@ -251,6 +287,7 @@ const SerialErt = (function () {
     // the ALERT2 tab loads it once for both.
     if (typeof Packets !== 'undefined' && Packets.loadStationsFile) Packets.loadStationsFile();
     mark(c, 'status', 'readings', 'stations');
+    if (typeof SerialIngest !== 'undefined') SerialIngest.mount(c);
   }
 
   function resolved(e) {
@@ -403,6 +440,7 @@ const SerialErt = (function () {
       + '<th scope="col">ID</th><th scope="col">Station</th><th scope="col">Last value</th><th scope="col">Heard</th>'
       + '<th scope="col">RSSI (median)</th><th scope="col" class="col-optional">Last heard</th></tr></thead>'
       + '<tbody id="ert-stn-' + id + '"></tbody></table></div></section>'
+      + (typeof SerialIngest !== 'undefined' ? SerialIngest.panel(c) : '')
       + '<details class="qs-ctl" open><summary>Raw stream</summary>'
       + Serial.statsHtml(c) + Serial.logHtml(c)
       + '</details>'

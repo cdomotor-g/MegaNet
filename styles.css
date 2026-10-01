@@ -9298,6 +9298,15 @@ code {
 .ert-row-bad td { color: var(--bad); }
 .a2-drop-hint { margin-top: var(--sp-2); }
 
+/* A receiver card as a base station (serial-ingest.js). */
+.ing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: .6rem; margin: .5rem 0; }
+.ing-grid label, .ing-inline { display: grid; gap: .3rem; font-size: .85rem; color: var(--muted); }
+.ing-loc { border: 1px solid var(--border); border-radius: 8px; margin: .5rem 0; padding: .4rem .7rem .6rem; display: flex; flex-wrap: wrap; gap: .3rem 1rem; align-items: center; min-width: 0; }
+.ing-loc legend { font-size: .85rem; color: var(--muted); padding: 0 .3rem; }
+.ing-loc .ing-inline { flex: 1 1 100%; }
+.ing-loc p { flex: 1 1 100%; margin: .2rem 0 0; overflow-wrap: anywhere; }
+.ing-status { margin: .5rem 0 0; font-size: .85rem; overflow-wrap: anywhere; }
+
 /* ── Quansheng radio dashboard and RTL-SDR card (serial-radio.js, serial-sdr.js) ── */
 .qs-dash, .sdr-dash { display: grid; gap: .8rem; min-width: 0; }
 .qs-status { display: flex; flex-wrap: wrap; gap: .4rem; }

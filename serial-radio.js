@@ -221,10 +221,24 @@ const SerialRadio = (function () {
           + '. Fields are mapped by name, so most of it will still read right.', 'warn');
       }
       mark(c, 'status');
-    } else if (p.type === 'DEC') addDec(c, p.rec, t);
+    } else if (p.type === 'DEC') { addDec(c, p.rec, t); ingestDec(c, p.rec, line); }
     else if (p.type === 'BST') addBurst(c, p.rec, t);
     else if (p.type === 'STA') addSta(c, p.rec, t);
     else if (p.type === 'EVT') addEvt(c, p.rec, t);
+  }
+
+  // To MegaNet, when the card is set to send (serial-ingest.js). Off a port, a
+  // reading is timed by when it arrived. Out of a followed log's history it is
+  // timed by the radio's own clock, where that was set and is believable, and
+  // otherwise not sent — history stamped "now" would be wrong data.
+  function ingestDec(c, rec, line) {
+    if (typeof SerialIngest === 'undefined' || rec.id == null || rec.value == null) return;
+    let ts = SerialIngest.arrival(c);
+    if (ts == null && rec.epoch) {
+      const ms = rec.epoch * 1000;
+      if (ms <= Date.now() + 5 * 60000 && ms >= Date.now() - 30 * 86400000) ts = ms;
+    }
+    SerialIngest.add(c, [{ alert_id: rec.id, value_raw: rec.value, ts, protocol: 'alert', line }]);
   }
 
   function meganetName(id) {
@@ -1077,6 +1091,7 @@ const SerialRadio = (function () {
       + ' onchange="SerialRadio.screenAuto(\'' + id + '\',this.checked)"> mirror</label>'
       + btn('Save PNG', 'screenSave(\'' + id + '\')') + btn('Reboot radio…', 'reboot(\'' + id + '\')', dis) + '</div></details>'
       + '<details class="qs-ctl"><summary>Events</summary><ul class="qs-events" id="qs-events-' + id + '"></ul></details>'
+      + (typeof SerialIngest !== 'undefined' ? SerialIngest.panel(c) : '')
       + '<details class="qs-ctl"' + (c.radio && c.radio.consoleOpen || following ? ' open' : '') + '><summary>Console and raw stream</summary>'
       + (following ? '<p class="qs-hint">Following a log file: each command below is copied, for pasting into PuTTY.</p>' : '')
       + '<div class="ser-send"><input type="text" id="qs-cmd-' + id + '" placeholder="Console command, e.g. HELP" aria-label="Console command to '

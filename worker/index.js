@@ -267,6 +267,12 @@ const DB_PROXY_SERVICES = ['rest/v1', 'auth/v1', 'storage/v1', 'realtime/v1'];
 const DB_PROXY_REQUEST_HEADERS = [
   'accept', 'accept-profile', 'apikey', 'authorization',
   'content-profile', 'content-type', 'prefer', 'range', 'x-upsert',
+  // A base station's ingest token (docs/ingest-http.md), for the Serial
+  // Monitor's cards posting what they hear from a browser on this origin.
+  // Forwarding it adds nothing a caller could not do by dialling Supabase
+  // directly: it is checked by meganet.ingest_token_id() inside the database,
+  // and opens only the ingest RPCs.
+  'x-ingest-token',
 ];
 
 // The handshake headers a WebSocket upgrade needs, forwarded only on one —

@@ -76,6 +76,7 @@ const sent = dbProxyRequestHeaders(new Headers({
   'Accept-Profile': 'meganet',
   'Content-Type': 'application/json',
   'x-upsert': 'false',
+  'X-Ingest-Token': 'mgn_a-base-stations-token',
   // None of the below is Supabase's business, and two of them are identity.
   Cookie: 'CF_Authorization=an-access-session',
   'Cf-Access-Jwt-Assertion': 'the-access-identity',
@@ -89,6 +90,8 @@ header('the caller’s own token is forwarded',
 header('the publishable key is forwarded', sent.get('apikey') === 'publishable-key', sent.get('apikey'));
 header('the schema profile is forwarded', sent.get('accept-profile') === 'meganet', sent.get('accept-profile'));
 header('a Storage control header is forwarded', sent.get('x-upsert') === 'false', sent.get('x-upsert'));
+header('a base station\'s ingest token is forwarded (the Serial Monitor posting from this origin)',
+       sent.get('x-ingest-token') === 'mgn_a-base-stations-token', String(sent.get('x-ingest-token')));
 
 header('the Access cookie is not', sent.get('cookie') === null, String(sent.get('cookie')));
 header('the Access identity assertion is not',

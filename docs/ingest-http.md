@@ -288,6 +288,15 @@ A null `ingest_token_id` means the reading did not come through this endpoint �
 backfill, or a manual entry by an editor. Readings stored before this was added
 are null too.
 
+## A browser as an ingest point
+
+The Serial Monitor's receiver cards — a Quansheng radio, an ERT-A2, an RTL-SDR —
+can post what they decode through this same endpoint, holding a token minted for
+the computer they run on, with `source: "serial"` and a per-receiver `path`. Each
+receiver also says what and roughly where it is through
+`meganet.report_ingest_point()` (`0045`), its location always marked approximate
+unless it came from a GPS. That page is [`ingest-serial-monitor.md`](ingest-serial-monitor.md).
+
 ## Getting a token
 
 Token issuing is a database operation for now — there is no page in the app for

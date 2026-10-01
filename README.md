@@ -126,6 +126,8 @@ MegaNet/
 ├── serial-radio.js         ← SerialRadio — its Quansheng ALERT radio dashboard
 ├── serial-sdr.js           ← SerialSdr — its RTL-SDR card (WebUSB)
 ├── serial-ert.js           ← SerialErt — its ELPRO ERT-A2 card (alert2.js, live)
+├── serial-ingest.js        ← SerialIngest — a receiver card as a base station
+│                             (posts what it decodes into MegaNet)
 ├── serial-viz.js           ← SerialViz — the canvas helpers those cards share
 ├── quansheng.js            ← Quansheng — the radio firmware's serial protocol codec
 ├── alert-dsp.js            ← AlertDsp  — the off-air ALERT decoder (runs in a Worker)
@@ -2448,6 +2450,17 @@ output live, on the **Serial Monitor** tab. Built on the browser's
   the port, so the radio's console buttons copy their command for pasting into
   PuTTY, and the replies are read back from the log. See `log-follow.js`'s header
   and `npm run logfollow`.
+- **A base station in the browser** — the Quansheng, ERT-A2 and RTL-SDR cards can
+  post every reading they decode into MegaNet's database (*Send to MegaNet*), through
+  the same `ingest_http()` door and token model every base station uses, with source
+  `serial` and a per-receiver path (`serial-monitor/<receiver id>`) so ingest points
+  can be told apart — and two receivers hearing one reading are both on record. Each
+  receiver reports its name, kind, device and location through
+  `report_ingest_point()` (`0045`); with no GPS the location is the browser's, a
+  station's, typed in, or the middle of the stations heard, and the database refuses
+  to store anything but a GPS fix as exact. Readings out of a followed log's history
+  go only with a time of their own; demos and replays never. See
+  [`docs/ingest-serial-monitor.md`](docs/ingest-serial-monitor.md).
 - **Demos** — each card has one, so the tab can be seen with nothing plugged in.
 - **Managed / work computers** — enterprise policy can block Web Serial, in which
   case the browser rejects the port picker *instantly without showing it*. The app

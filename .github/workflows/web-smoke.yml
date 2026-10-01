@@ -299,6 +299,15 @@ jobs:
         working-directory: test
         run: npm run logfollow
 
+      # Chromium, the database stood in for by two routes. A receiver card as a
+      # base station: what the Quansheng and ERT-A2 cards post (source serial,
+      # the receiver's path, the right time), the receiver's report (an
+      # approximate location said as such), history never stamped "now", a
+      # refused token stopping, and a demo never sending.
+      - name: Serial Monitor as a base station — what each card posts
+        working-directory: test
+        run: npm run serialingest
+
       - name: Smoke — every tab, clean console
         working-directory: test
         run: npm run smoke
@@ -1091,6 +1100,11 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest.sql
       - name: check_mqtt.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_mqtt.sql
+      # The receivers behind an ingest token (0045): token-checked, refusing a
+      # bad report by name, a change a new row and a repeat not, editors only —
+      # and nothing but a GPS fix ever stored as an exact location.
+      - name: check_ingest_points.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest_points.sql
       - name: check_inspections.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
       - name: check_inspection_history.sql

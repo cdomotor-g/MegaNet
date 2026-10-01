@@ -1007,6 +1007,12 @@ const HELP = {
       + 'with an ordinary file dialog cannot do it: the browser refuses to read a picked file again once it has '
       + 'changed. A followed card only listens — PuTTY holds the port — so a radio\'s console buttons copy '
       + 'their command for pasting into PuTTY.',
+      '<strong>A card can be a base station.</strong> <em>Send to MegaNet</em> on a Quansheng, ERT-A2 or '
+      + 'RTL-SDR card posts every reading it decodes into the database, with an ingest token for this '
+      + 'computer, tagged with the receiver so its readings can be told from every other ingest point\'s. '
+      + 'With no GPS, its location is approximate — the browser\'s, a station\'s, typed in, or the middle '
+      + 'of the stations it hears — and is recorded as approximate. A reading from a log\'s history goes '
+      + 'only with a time of its own, and a demo never sends.',
       'An <strong>RTL-SDR needs the computer to let go of it</strong> before the browser can '
       + 'have it: the WinUSB driver on Windows (the card\'s one-click installer, or Zadig — '
       + 'without it the stick is not even in the list), the DVB-T driver unloaded on Linux, '
@@ -1031,6 +1037,7 @@ const HELP = {
     links: [
       { label: 'Serial Monitor — what to ask IT for, and following PuTTY\'s log meanwhile', href: 'docs/serial-help.html' },
       { label: 'The Quansheng ALERT radio card', href: 'docs/serial-radio.md' },
+      { label: 'A receiver card as a base station — tokens, tagging, location', href: 'docs/ingest-serial-monitor.md' },
       { label: 'The RTL-SDR card — sticks, drivers, and a hardware checklist', href: 'docs/serial-sdr.md' },
     ],
     related: ['alert2', 'packets'],
@@ -2169,7 +2176,7 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-const DB_SCHEMA_VERSION = 44;
+const DB_SCHEMA_VERSION = 45;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

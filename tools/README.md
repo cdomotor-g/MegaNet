@@ -27,6 +27,15 @@ token-checked endpoints the bridge calls, in a transaction that rolls back. The
 half of that acceptance which is about a client and a broker rather than about
 Postgres is `bridge/test/integration.test.js`.
 
+`check_ingest_points.sql` holds `0045` — the Serial Monitor's receiver cards as base
+stations: 33 checks over `meganet.ingest_point_report`, its latest-report view and
+`meganet.report_ingest_point()`, token-checked like the bridge's heartbeat. The one
+that matters most is the constraint: nothing but a GPS fix may be stored as an exact
+location. Plus refusals by name, a change as a new row and a repeat as none, editors
+only (never `anon`), and a reading posted through `ingest_http()` carrying the
+receiver's path. Same transaction-and-rollback shape, so it is safe against the live
+database. The browser half is `npm run serialingest` in `test/`.
+
 ## Map boundaries from a KMZ (#179)
 
 `kml_to_geojson.py` turns a KML or KMZ of polygons into a web-sized GeoJSON, with
