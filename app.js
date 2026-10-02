@@ -1663,6 +1663,13 @@ function invalidateMapSizes(delay) {
 //                  asked of the map rather than of the list, and they are the
 //                  cards the map itself sends people to (a drawn line, a
 //                  clicked radio path, the site finder's worst path).
+//   🧊 Twin        the digital twin's finder and settings (digital-twin.js),
+//                  on that tab at every width, like 📍 Places.
+//   🔭 AR          the AR station finder (station-ar.js): its way in, its
+//                  distance and its types. The view it opens is the whole
+//                  screen — a phone held up, the stations the way it faces
+//                  pinned over the camera's picture — so the pane is only the
+//                  door to it and the settings it shares. At every width too.
 //   the Stations map's own controls, all of them but ↺ — everything MapChrome
 //                  would otherwise have put in the map's top-right corner, in
 //                  the same groups and the same order, a hairline between
@@ -1930,6 +1937,9 @@ function dockSkeleton(panel) {
         <div class="dock-pane dock-pane-map dock-pane-twin" id="${dockPaneId('twin')}" data-dock="twin" hidden>
           ${DigitalTwin.paneHtml()}
         </div>
+        <div class="dock-pane dock-pane-map dock-pane-ar" id="${dockPaneId('ar')}" data-dock="ar" hidden>
+          ${StationAR.paneHtml()}
+        </div>
       </div>
     </div>`;
 }
@@ -2003,7 +2013,7 @@ function dockMapListed(e) {
 function dockHas(id) {
   if (id === 'help') return true;
   if (id === 'stations' || id === 'paths') return dockStationsHere();
-  if (id === 'places' || id === 'twin') return dockHoldsMapTools();
+  if (id === 'places' || id === 'twin' || id === 'ar') return dockHoldsMapTools();
   if (!id.startsWith('map-') || state.activeTab !== 'stations') return false;
   const e = dockMapItems.get(id);
   if (e) return dockMapListed(e);
@@ -2120,6 +2130,12 @@ function dockStripGroups() {
   if (dockHoldsMapTools()) {
     side.push({ key: 'twin', kind: 'tab', icon: '🧊',
                 label: 'Digital twin — open a station\'s twin, its scene settings, ground truth and the .glb for Blender' });
+  }
+  // The AR station finder (station-ar.js): its pane holds the way in, the
+  // distance and the types; the view itself is the whole screen.
+  if (dockHoldsMapTools()) {
+    side.push({ key: 'ar', kind: 'tab', icon: '🔭',
+                label: 'AR station finder — hold a phone up and see which stations lie the way it faces' });
   }
   const groups = [{ name: 'side', label: '', items: side }];
   const map = [...dockMapItems.values()]
@@ -2262,6 +2278,8 @@ function renderDock(opts = {}) {
   // one of the moments it is brought up to date (a stations file loaded since,
   // a twin opened or put away while it was shut).
   if (showing === 'twin' && dockLastShowing !== 'twin') DigitalTwin.syncPane();
+  // …and the AR finder's says how many stations the map's filters leave it.
+  if (showing === 'ar' && dockLastShowing !== 'ar') StationAR.syncPane();
   syncHelpChrome();
 
   // Same reason renderTabs() does this — a map built on the opening render must

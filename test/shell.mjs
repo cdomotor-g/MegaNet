@@ -107,6 +107,10 @@ const TEXT_PAIRS = [
   ['--warn', '--bg'], ['--warn', '--panel'],
   ['--role-field', '--panel'], ['--role-repeater', '--panel'],
   ['--role-base', '--panel'], ['--role-satcom', '--panel'],
+  // The F, R and B the AR station finder writes on each role's own colour —
+  // its pins, its sheet and its toggles (station-ar.js).
+  ['--role-field-ink', '--role-field'], ['--role-repeater-ink', '--role-repeater'],
+  ['--role-base-ink', '--role-base'],
   // The flood classes on the station card, written in their colours on the
   // card's own ground — green, yellow, red, and the yellow is the one that
   // would fail if it were the yellow people picture.

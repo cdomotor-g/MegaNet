@@ -164,6 +164,13 @@
   --role-repeater: #0b5cab;
   --role-base: #c7401a;
   --role-satcom: #7c35a3;
+  /* Text on a role colour: the F, R and B the AR station finder puts on its
+     pins, its sheet and its toggles (station-ar.js). White on the light
+     theme's deep role colours; the page's own dark on the dark theme's light
+     ones. In the contrast contract (`npm run shell`). */
+  --role-field-ink: #ffffff;      /* 5.37:1 */
+  --role-repeater-ink: #ffffff;   /* 6.70:1 */
+  --role-base-ink: #ffffff;       /* 5.03:1 */
   /* Bit Flipper's station-of-interest hue (#139): an identity colour, not a
      status — it ties the pinned table row (.bf-row-base) to the halo and pin
      on the map below, so it is one value in both themes and deliberately out
@@ -553,6 +560,9 @@
   --role-repeater: #6bb6ff;
   --role-base: #ff8a63;
   --role-satcom: #c79ae8;
+  --role-field-ink: #0f1720;      /* 9.59:1 */
+  --role-repeater-ink: #0f1720;   /* 8.39:1 */
+  --role-base-ink: #0f1720;       /* 7.79:1 */
   --accent: #6bb6ff;
   --ok:   #3ecf8e;
   --bad:  #ff6b6b;
@@ -14816,3 +14826,484 @@ button.adm-danger:hover { border-color: var(--bad); }
 .twin-help summary { cursor: pointer; font-weight: 600; }
 .twin-help-list { padding-left: 1.2em; }
 .twin-help-list li + li { margin-top: var(--sp-1); }
+
+/* ── 🔭 The AR station finder (station-ar.js) ────────────────────────────────
+   Two things: a pane in the Stations side panel, which is the way in and the
+   settings, and the view it opens over the whole screen — the camera's
+   picture, a pin for each direction standing on the horizon, the heading and
+   a little circle of the directions from above at the top, the distance and
+   the types at the foot, and a station's sheet rising over them.
+
+   The view is always the dark theme (data-theme="dark" on .ar-view): it is a
+   HUD over a camera's picture, which is no lighter in the light theme, and
+   the tokens follow it there without a colour written twice. A pin's colour
+   is its role's (--ar-c), the letter on it in that role's ink (--ar-ink) —
+   the same pair on the pane's toggles, in the page's own theme. */
+:is(.ar-pane, .ar-view) .role-field    { --ar-c: var(--role-field);    --ar-ink: var(--role-field-ink); }
+:is(.ar-pane, .ar-view) .role-repeater { --ar-c: var(--role-repeater); --ar-ink: var(--role-repeater-ink); }
+:is(.ar-pane, .ar-view) .role-base     { --ar-c: var(--role-base);     --ar-ink: var(--role-base-ink); }
+
+.ar-letter {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--ar-c, var(--muted));
+  color: var(--ar-ink, var(--panel));
+  font-size: .85rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* The pane. */
+.ar-pane {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.ar-pane-head { margin-bottom: 0; }
+.ar-pane-lead,
+.ar-pane-note { margin: 0; }
+.ar-pane-how > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 600; }
+.ar-pane-how p { margin: var(--sp-2) 0 0; }
+
+/* The distance — the figure is in the label, so the slider's name says it —
+   and the three types. A type that is off is a hollow letter and a struck
+   word, so off is not carried by colour alone; aria-pressed says it to
+   anything not reading pixels. */
+.ar-range {
+  display: grid;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+}
+
+.ar-range output { font-weight: 700; }
+.ar-range-input { width: 100%; margin: 0; }
+
+.ar-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.ar-role {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  min-height: 2rem;
+  padding: .2rem .65rem .2rem .25rem;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm);
+}
+
+.ar-role[aria-pressed="false"] {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.ar-role[aria-pressed="false"] .ar-letter {
+  background: transparent;
+  color: var(--ar-c);
+  box-shadow: inset 0 0 0 2px var(--ar-c);
+}
+
+/* The view. The stage — picture, sky, horizon and pins — is under
+   everything; the bars sit over it in three rows, each placed by name so a
+   hidden hint does not pull the foot up into the middle. */
+.ar-view {
+  position: fixed;
+  inset: 0;
+  z-index: 1950;                 /* over the shell and its drawers, under Modal (2000) */
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  overscroll-behavior: contain;   /* a swipe on the bars does not scroll the page behind */
+}
+
+.ar-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+.ar-view.is-manual .ar-stage { cursor: grab; }
+
+.ar-cam {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ar-cam[hidden] { display: none; }
+
+/* Where there is no picture: a dusk sky over dark ground, meeting at the
+   horizon wherever the phone's tilt puts it. Twice the stage each way, so
+   turning it with the roll never shows a corner. */
+.ar-sky {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(to bottom,
+    var(--twin-zenith) 0%,
+    var(--twin-sky) calc(25% + var(--ar-h, 25%)),
+    var(--twin-haze) calc(25% + var(--ar-h, 25%)),
+    var(--bg) 100%);
+  transform: rotate(var(--ar-roll, 0deg));
+}
+
+.ar-cam:not([hidden]) ~ .ar-sky { display: none; }
+
+.ar-world {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--ar-roll, 0deg));
+}
+
+.ar-horizon {
+  position: absolute;
+  top: var(--ar-h, 50%);
+  left: -50%;
+  right: -50%;
+  border-top: 1px solid color-mix(in srgb, var(--text) 55%, transparent);
+}
+
+.ar-pins {
+  position: absolute;
+  inset: 0;
+}
+
+/* A pin: its label over a stem, the stem's foot on the horizon at the
+   station's bearing. Only the label takes a press — a stem standing through
+   the rows under it must not take the press meant for a lower label. */
+.ar-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: var(--ar-z, 1);
+  transform: translate(calc(var(--ar-x, -999px) - 50%), calc(var(--ar-h, 50%) - 100%));
+  pointer-events: none;
+}
+
+.ar-pin[hidden] { display: none; }
+
+.ar-pin-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  max-width: 13rem;
+  min-height: 2.75rem;
+  padding: .2rem .6rem .2rem .3rem;
+  border: 2px solid var(--ar-c);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  color: var(--text);
+  line-height: var(--lh-tight);
+  text-align: left;
+  box-shadow: var(--shadow-2);
+  transform: translateX(var(--ar-dx, 0px));   /* slid back onto the screen at an edge */
+  pointer-events: auto;
+}
+
+.ar-pin.is-picked .ar-pin-box {
+  border-width: 3px;
+  background: color-mix(in srgb, var(--ar-c) 28%, var(--panel));
+}
+
+.ar-pin-text {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.ar-pin-name {
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ar-pin-dist {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+/* How many stations stand this way, the nearest one named. */
+.ar-pin-n {
+  position: absolute;
+  top: -.7rem;
+  right: -.7rem;
+  display: grid;
+  place-items: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 .3rem;
+  border-radius: var(--r-pill);
+  background: var(--text);
+  color: var(--panel);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--ar-c);
+}
+
+/* A row is 50 px: the label's 44 and a gap — what layoutRows() assumes. */
+.ar-pin-stem {
+  position: relative;
+  width: 2px;
+  height: calc(22px + var(--ar-row, 0) * 50px);
+  background: var(--ar-c);
+}
+
+.ar-pin-stem::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--ar-c);
+  box-shadow: 0 0 0 2px var(--panel);
+}
+
+/* The picked station off the screen: which way to turn, and how far. */
+.ar-edge {
+  position: absolute;
+  top: var(--ar-h, 50%);
+  padding: .3rem .6rem;
+  border-radius: var(--r-pill);
+  background: var(--ar-c);
+  color: var(--ar-ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.ar-edge.is-left { left: var(--sp-2); }
+.ar-edge.is-right { right: var(--sp-2); }
+.ar-edge[hidden] { display: none; }
+
+.ar-top {
+  grid-row: 1;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  pointer-events: none;           /* the stage under it still drags… */
+}
+
+.ar-top button { pointer-events: auto; }   /* …and its buttons still press */
+
+.ar-close {
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.ar-top-mid {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: .2rem;
+  padding: .35rem .6rem;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+}
+
+.ar-title {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+}
+
+.ar-status {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+
+.ar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.ar-tool {
+  padding: .25rem .6rem;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+}
+
+.ar-tool[hidden] { display: none; }
+
+/* The directions from above, the way you face at the top: the dots and the N
+   turn with you (--ar-rot), the wedge of what the screen shows does not. */
+.ar-radar {
+  flex: 0 0 auto;
+  width: 4.75rem;
+  height: 4.75rem;
+}
+
+.ar-radar-disc { fill: color-mix(in srgb, var(--panel) 86%, transparent); stroke: var(--border); stroke-width: 1; }
+.ar-radar-ring { fill: none; stroke: var(--border); stroke-width: .75; }
+.ar-radar-fov { fill: color-mix(in srgb, var(--accent) 24%, transparent); }
+.ar-radar-rot { transform: rotate(var(--ar-rot, 0deg)); }
+.ar-radar-n { fill: var(--text); font-size: 9px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+.ar-radar-dot { fill: var(--ar-c); }
+.ar-radar-dot.is-picked { stroke: var(--text); stroke-width: 1.5; }
+.ar-radar-me { fill: var(--text); }
+
+.ar-hint {
+  grid-row: 2;
+  position: relative;
+  z-index: 1;
+  align-self: end;
+  justify-self: center;
+  max-width: min(22rem, calc(100% - 2rem));
+  margin: 0 0 var(--sp-2);
+  padding: .45rem .8rem;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  font-size: var(--fs-sm);
+  text-align: center;
+  pointer-events: none;
+}
+
+.ar-hint[hidden] { display: none; }
+
+.ar-bottom {
+  grid-row: 3;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+}
+
+.ar-count {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+
+/* A station's sheet, risen over the foot of the view. It scrolls; the stage
+   under it does not take the touch. */
+.ar-detail {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  max-height: min(60vh, 32rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-3);
+  border-top: 1px solid var(--border);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--panel);
+  box-shadow: var(--shadow-2);
+}
+
+.ar-detail[hidden] { display: none; }
+
+.ar-detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.ar-detail-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+
+.ar-x {
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.ar-detail-line {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+}
+
+.ar-detail-kind { color: var(--muted); }
+.ar-detail-actions { margin-top: var(--sp-3); }
+
+.ar-more-h {
+  margin: var(--sp-3) 0 var(--sp-1);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.ar-more {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ar-more-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: 2.75rem;
+  padding: .3rem .5rem;
+  text-align: left;
+}
+
+.ar-more-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ar-more-d {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-more-cap {
+  margin: var(--sp-1) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+/* A finger's size where a finger is what presses them. */
+@media (pointer: coarse) {
+  .ar-role,
+  .ar-tool { min-height: 2.75rem; }
+}

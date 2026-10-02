@@ -892,6 +892,21 @@ jobs:
         working-directory: test
         run: npm run coordpaste
 
+      # The AR station finder (station-ar.js), 🔭 in the Stations side panel.
+      # Nothing above opens it — the view waits for a press, and wants a camera,
+      # a GPS and a compass — and everything it shows is arithmetic nobody can
+      # see go wrong: a heading 11° out still draws a tidy row of pins. The World
+      # Magnetic Model against NOAA's own test values, the phone's attitude from
+      # poses built by hand, the directions against a haversine that is not the
+      # app's; then on a phone (Chromium's fake camera, a set GPS fix, compass
+      # readings dispatched, Android's and an iPhone's) and a desktop: the pins
+      # on the screen exactly the directions in view, a tap to a station's sheet,
+      # the slider and the types, and the camera, the GPS and the compass all
+      # let go when it shuts.
+      - name: AR station finder — true north, the directions, the pins, and nothing left running
+        working-directory: test
+        run: npm run ar
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each

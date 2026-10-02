@@ -89,6 +89,9 @@ MegaNet/
 ├── station-trail.js        ← StationTrail — the stations looked at this session:
 │                             a pill in the map's top row that brings a closed
 │                             card back and goes back to any of them
+├── station-ar.js           ← StationAR — 🔭 the AR station finder: a phone held up,
+│                             the stations the way it faces pinned over the camera's
+│                             picture, its compass turned to true north by WMM2025
 ├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
 ├── digital-twin.js         ← DigitalTwin — the digital twin (in the Stations map, its
 │                             settings the side panel's 🧊 pane): one station's ground in
@@ -3582,6 +3585,7 @@ One column on the right of every tab, the *side panel* (`#help-panel`, called
 pane beside it. ❔ is the help described below; 📍, on the Stations tab, is the
 Stations cards (the red pin, a station's wherever the app draws one); the blue 📍
 under it is Find a place; 〽️ is the path tools (the elevation profile and the link budget);
+🧊 is the digital twin's pane and 🔭 the AR station finder's;
 and under them, on that tab, every one of the Stations map's own
 controls — its panels as panes with a button each, its buttons as themselves.
 It is the help rail and the Stations tab's right-hand column of cards merged
@@ -4054,6 +4058,57 @@ twin and the HEIC decoder; `npm run photozip` the zip packs and
 `npm run photoreview` the Review panel and the labels;
 `tools/check_field_photos.sql` holds 0035 and `tools/check_photo_review.sql`
 0036.
+
+### 23. AR Station Finder (Hold a Phone Up, See Which Way the Stations Are)
+
+🔭 in the Stations tab's side panel, in its first group after 🧊. Press **Look
+around** on a phone and hold it up: the camera's picture fills the screen and the
+stations the way it faces are pinned over it, each pin a callout on a stem whose
+foot stands on the horizon at the station's bearing. A pin names the station and
+says how far away it is, and its type in one letter in the map's own colours —
+**F** field station (green), **R** repeater (blue), **B** base station (red).
+Turn round and the pins come and go with the view; a little circle at the top
+right is the same directions from above, the way you face at the top, so the
+next one is easy to find.
+
+**One pin a direction.** Thirty kilometres from a town in the south-east is two
+hundred stations, and a pin each is a wall of labels nobody can read. So the
+stations in range are gathered by bearing, nearest first: each joins the
+direction of the nearest station already standing within a few degrees of it, or
+starts one. A direction's pin is its nearest station — the one most likely to be
+in sight — with a count of how many stand that way. The gathering is done in
+bearings rather than on the screen, so a pin never changes what it stands for as
+the phone turns; the labels are laid out in rows over the horizon round the
+whole circle, nearest lowest, so none moves rows either, and one cut by the
+screen's edge slides back onto it while its stem stays on the bearing.
+
+**Tap a pin** for its sheet: the station's name, type and station number, its
+ALERT IDs with what each reads, how far and on what bearing, every other station
+that way nearest first (each a tap away), and **Show on the map** — the station's
+card on the map, the map on its pin. The slider at the foot sets how far out it
+looks (500 m to 300 km, 30 km to begin with) and the F, R and B toggles beside it
+switch a type off; the pane carries the same two controls, and both are
+remembered. It shows what the map shows: the map's filters apply.
+
+**True north.** A phone's compass reads *magnetic* north, and in Brisbane that is
+eleven degrees from true — a pin two kilometres to one side of its mast at ten
+kilometres. So the heading is corrected by the declination where the phone
+stands, from the World Magnetic Model 2025 (NOAA and the British Geological
+Survey; its coefficients are in `station-ar.js`, good to 2030, and held to
+NOAA's own test values by `npm run ar`). Android's `deviceorientationabsolute`
+gives the camera's heading directly; an iPhone's gyro turns the view and its
+`webkitCompassHeading` only keeps saying where north is in the gyro's frame, so
+the pins move smoothly and a compass that twitches does not drag them. Phone
+compasses are still often 5–15° out, more beside a vehicle: aim at a station you
+can see, tap its pin and press **I'm facing it** to bring every pin into line
+(*Undo align* puts it back).
+
+**From the map's centre** does the same without GPS or camera — a look at a site
+before driving to it, or on a computer, where a drag or ← and → turn the view. The
+camera is asked for only on a phone or tablet, the screen is kept awake while the
+view is up, and closing it (✕ or Escape) stops the camera, the GPS and the
+compass. The picture is drawn on the screen and goes nowhere else: nothing is
+recorded or sent.
 
 ---
 

@@ -457,6 +457,15 @@ const SEED_TWIN_NONE = `async () => {
   for (const d of document.querySelectorAll('#main-content details, #dock-pane-twin details')) d.open = true;
 }`;
 
+// The 🔭 AR station finder's pane (station-ar.js): the way in, the distance and
+// the types, with "How it works" opened so what is inside it is measured too.
+// The view the pane opens is the whole screen and wants a camera, a GPS and a
+// compass this harness does not give it; `npm run ar` drives that.
+const SEED_AR_PANE = `async () => {
+  setDockTab('ar');
+  for (const d of document.querySelectorAll('#main-content details, #dock-pane-ar details')) d.open = true;
+}`;
+
 const SEED_TWIN = `async () => {
   const s = state.data.stations.find(x => isFinite(x.lat) && isFinite(x.lon));
   DigitalTwin.pick(s.id);
@@ -563,6 +572,7 @@ const CONVERTED = [
   { id: 'hfem',       label: 'HFEM Messages — the spec\'s ten examples decoded', issue: 'born converted at #154', seed: SEED_HFEM },
   { id: 'stations',   label: 'Stations — the 🧊 digital twin pane, no twin open', issue: 'the Digital Twin tab, folded in', seed: SEED_TWIN_NONE },
   { id: 'stations',   label: 'Stations — a station\'s twin on the map, its ground unreachable, the pane beside it', issue: 'the Digital Twin tab, folded in', seed: SEED_TWIN },
+  { id: 'stations',   label: 'Stations — the 🔭 AR station finder pane', issue: 'new with the tool', seed: SEED_AR_PANE },
   { id: 'photos',     label: 'Field Photos — signed out', issue: 'born converted', seed: SEED_PHOTOS_OUT },
   { id: 'photos',     label: 'Field Photos — a queue, the place editor, the library and the sync', issue: 'born converted', seed: SEED_PHOTOS },
 ];
