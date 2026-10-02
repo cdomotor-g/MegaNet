@@ -1,8 +1,9 @@
 # The Serial Monitor as a base station
 
 A receiver card on the Serial Monitor — a **Quansheng radio** on the ALERT receiver
-firmware, an **ELPRO ERT-A2**, an **RTL-SDR** stick — can post every reading it
-decodes into MegaNet's database. The computer it runs on becomes an ingest point,
+firmware, an **ELPRO ERT-A2**, an **RTL-SDR** stick (on this computer, or on a
+Raspberry Pi whose log the card follows — [`sdr-pi.md`](sdr-pi.md)) — can post every
+reading it decodes into MegaNet's database. The computer it runs on becomes an ingest point,
 exactly as [`ingest-http.md`](ingest-http.md) describes one ("a PC on the end of a
 serial cable"): it holds an ingest token, posts through `meganet.ingest_http()`, and
 every reading it stores is deduplicated, validated and attributed like any base
@@ -44,7 +45,8 @@ Two things identify where a reading came from:
 
 - **The token** — the computer. Every stored reading carries `ingest_token_id`.
 - **The receiver** — each card makes itself an id once (`qs-1a2b3c4d`, `ert-…`,
-  `sdr-…`) and keeps it in this browser. Every reading it posts carries the
+  `sdr-…`, and `sdrpi-…` for an RTL-SDR on a Raspberry Pi, which the database is told
+  is an `rtl-sdr`) and keeps it in this browser. Every reading it posts carries the
   path **`serial-monitor/<receiver id>`**, and the source `serial`. When two
   receivers hear the same reading, `ingest()` stores it once and records the second
   receiver's path in `dup_paths` — so it is on record that both heard it.
@@ -106,6 +108,11 @@ Nothing in the database has to change for that; the app needs a way to read the 
 - **ERT-A2** — each clean reading of each frame the receiver called clean, protocol
   `alert2`.
 - **RTL-SDR** — each reading the decoder accepts (shadows never), protocol `alert`.
+- **RTL-SDR on a Raspberry Pi** — each `RX` line the Pi printed, protocol `alert`. Timed
+  by the Pi's clock where it has one (NTP, or the card's *Copy clock command*), else by
+  the Pi's uptime against this computer's clock — so a reading the Pi queued before
+  PuTTY opened the port goes with the time it was heard, not the time it arrived. From
+  the log's history, only with the Pi's clock; otherwise counted and skipped.
 
 **Times.** A reading off a live port or stick is timed by when it arrived. An ERT-A2
 frame carries its own time of day (the network's clock), and that is used — on the

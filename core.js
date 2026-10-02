@@ -1021,9 +1021,9 @@ const HELP = {
     summary: 'Streams live output from serial devices over the browser\'s Web Serial API — as many '
            + 'ports at once as the machine has, each an independent card with its own settings. A '
            + 'Quansheng radio on the ALERT receiver firmware becomes a dashboard with its own controls, '
-           + 'an ELPRO ERT-A2 decodes as it arrives, and an RTL-SDR stick (Blog V2, V3 or V4, over WebUSB) '
-           + 'decodes ALERT off the air itself. Where the browser will not open a port, a card follows the '
-           + 'log file PuTTY writes instead.',
+           + 'an ELPRO ERT-A2 decodes as it arrives, and an RTL-SDR stick (Blog V2, V3 or V4, over WebUSB — '
+           + 'or on a Raspberry Pi, read through PuTTY\'s log) decodes ALERT off the air itself. Where the '
+           + 'browser will not open a port, a card follows the log file PuTTY writes instead.',
     watch: [
       '<strong>No Web Serial? Use PuTTY\'s log.</strong> Open the port in PuTTY with logging on '
       + '(Session → Logging → <em>All session output</em>) and <strong>drag the log file onto the tab</strong> '
@@ -1041,8 +1041,10 @@ const HELP = {
       'An <strong>RTL-SDR needs the computer to let go of it</strong> before the browser can '
       + 'have it: the WinUSB driver on Windows (the card\'s one-click installer, or Zadig — '
       + 'without it the stick is not even in the list), the DVB-T driver unloaded on Linux, '
-      + 'nothing on a Mac — the same step rtl_sdr and SDR# need. Gain is ADC headroom, not SNR: '
-      + 'keep the histogram\'s end bins empty.',
+      + 'nothing on a Mac — the same step rtl_sdr and SDR# need. Where that cannot happen — WebUSB '
+      + 'off by policy, no administrator — <strong>put the stick on a Raspberry Pi</strong>: it decodes with '
+      + 'the same code and prints what it hears on a serial port, for PuTTY to log and the card to follow. '
+      + 'Gain is ADC headroom, not SNR: keep the histogram\'s end bins empty.',
       'ALERT Binary has <strong>no checksum</strong>. Off the air, a reading is only as good as '
       + 'its votes, and a strong burst can throw a one-bit ghost — the card reports those as '
       + 'shadows, not stations. Check the agency\'s own feed before acting on a value.',
@@ -1064,6 +1066,7 @@ const HELP = {
       { label: 'The Quansheng ALERT radio card', href: 'docs/serial-radio.md' },
       { label: 'A receiver card as a base station — tokens, tagging, location', href: 'docs/ingest-serial-monitor.md' },
       { label: 'The RTL-SDR card — sticks, drivers, and a hardware checklist', href: 'docs/serial-sdr.md' },
+      { label: 'An RTL-SDR on a Raspberry Pi — for a PC that cannot reach USB', href: 'docs/sdr-pi.md' },
     ],
     related: ['alert2', 'packets'],
   },

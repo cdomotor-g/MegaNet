@@ -39,6 +39,14 @@
 //   * the ALERT2 tab watching a dropped log as it grows
 //   * a file dropped beside the target does not navigate the page away, and
 //     goes to the card waiting for a log
+//   * a Raspberry Pi's log (sdr-pi/relay.js, run here on the demo band)
+//     dropped on the tab: recognised, an RTL-SDR card in the generic card's
+//     place; the readings in its history shown with no time and never timed
+//     "now"; live records timed by the Pi's uptime once two seconds of them
+//     have settled it — a reading the Pi queued before PuTTY opened the port
+//     timed when it was heard, not when it arrived; the controls copying
+//     commands for PuTTY, three changes waiting as one CFG line, and the Pi's
+//     CFG answer clearing them
 //
 // Run:  npm run logfollow
 //       npm run logfollow -- -v    also print what passed
@@ -46,9 +54,15 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { REPO_ROOT } from './lib/paths.mjs';
+
+const require = createRequire(import.meta.url);
+const SdrPi = require(path.join(REPO_ROOT, 'sdr-pi.js'));
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -122,7 +136,7 @@ try {
     ok(what, false, 'timed out after ' + WAIT / 1000 + ' s');
     return false;
   });
-  const card = () => page.evaluate(() => Serial.list().map(c => ({ id: c.id, kind: c.kind, phase: c.phase, source: c.source,
+  const card = () => page.evaluate(() => Serial.list().filter(c => c.entries).map(c => ({ id: c.id, kind: c.kind, phase: c.phase, source: c.source,
     lines: c.entries.filter(e => !e.sys).map(e => e.raw), sys: c.entries.filter(e => e.sys).map(e => e.raw), label: c.portLabel })));
 
   // ── the premise ────────────────────────────────────────────────────────────
@@ -223,6 +237,130 @@ try {
   });
   ok('…with RSSI on every reading', bin && bin.recs > 0 && bin.rssi === bin.recs && bin.cells > 0 && bin.bad === 0, JSON.stringify(bin));
 
+  // ── a Raspberry Pi's log ───────────────────────────────────────────────────
+  // The relay itself, on the demo band, writes the log's history: what PuTTY
+  // would have recorded before the log was dropped.
+  fs.writeFileSync(file('demo_240k.iq8'), require(path.join(REPO_ROOT, 'alert-dsp.js')).demoBand());
+  const relay = spawnSync(process.execPath, [path.join(REPO_ROOT, 'sdr-pi/relay.js'), '--stdio', '--no-title', '--state', 'none',
+    '--file', file('demo_240k.iq8'), '--speed', '0', '--exit-after-file'], { input: '', timeout: 60000, maxBuffer: 1 << 24 });
+  ok('the relay writes a log to follow', relay.status === 0 && relay.stdout.length > 1000, String(relay.stderr || '').slice(-300));
+  fs.writeFileSync(file('sdr-pi.log'), Buffer.concat([Buffer.from(BANNER), relay.stdout]));
+  await page.evaluate(() => Serial.addConnection());
+  const gid = await page.evaluate(() => Serial.list()[Serial.list().length - 1].id);
+  await page.evaluate(id => Serial.setSource(id, 'file'), gid);
+  await dropFiles(`#ser-card-${gid}`, [file('sdr-pi.log')]);
+  await waitFor(() => Serial.list().some(c => c.kind === 'sdr' && c.source === 'pi' && c.readings.length === 5), null,
+    'a Pi\'s log becomes an RTL-SDR card with the five demo readings');
+  const pid = await page.evaluate(() => (Serial.list().find(c => c.kind === 'sdr' && c.source === 'pi') || {}).id);
+  if (pid) {
+    const p1 = await page.evaluate(([id, gid]) => {
+      const c = SerialSdr && Serial.findConn(id);
+      return { replaced: !Serial.findConn(gid), phase: c.phase, untimed: c.readings.every(r => r.t == null),
+        ids: c.readings.map(r => r.sensorId + '=' + r.value).sort().join(' '), name: (c.readings.find(r => r.sensorId === 2088) || {}).name,
+        freq: c.cfg.freq, fmt: c.cfg.format, host: c.pi.info && c.pi.info.host, notes: c.notes.map(n => n.text).join(' | '),
+        dash: document.getElementById('ser-card-' + id).textContent, rows: document.querySelectorAll('#sdr-read-' + id + ' tr').length };
+    }, [pid, gid]);
+    ok('…in the generic card\'s place, following, and saying it recognised the log', p1.replaced && p1.phase === 'follow' && /Recognised a Raspberry Pi/.test(p1.notes), p1.notes);
+    ok('…every reading decoded on the Pi, named (MegaNet\'s name first, else the Pi\'s)', p1.ids === '2088=143 2442=23 2443=142 4109=1290 4110=12' && /marburg/i.test(p1.name || ''), p1.ids + ' / ' + p1.name);
+    ok('…the history\'s readings untimed (the Pi\'s clock was not set), never "now"', p1.untimed && p1.rows === 5);
+    ok('…the Pi\'s settings and identity read off its CFG and SDRPI lines', p1.freq === 151500000 && p1.fmt === 'BINARY' && !!p1.host);
+    ok('…its chips say what the Pi is and how it is followed', /Pi clock/.test(p1.dash) && /following/.test(p1.dash));
+    ok('…no FM audio or AFSK tones panel', await page.evaluate(id => !document.getElementById('sdr-scope-' + id) && !document.getElementById('sdr-tones-' + id), pid));
+
+    // Live: a Pi that restarted (a new run), talking as PuTTY appends. The
+    // first piece carries a reading the Pi queued 3.5 s before the burst after
+    // it; nothing may be timed until two seconds of the Pi's uptime have been
+    // seen against this computer's clock.
+    const run = 'beefcafe';
+    const rec = (t, o) => SdrPi.record(t, Object.assign({ run }, o));
+    const hide = l => SdrPi.hide(l);
+    const lvl = up => hide(rec('LVL', { up, ch_dbfs: -95, nf_dbfs: -101, open: false, dbfs: -30, clip_pct: 0, hist: 'AAAAAAAAAABBEHJb//bJHEBAAAAAAAAA' }));
+    const append = parts => fs.appendFileSync(file('sdr-pi.log'), parts.join(''));
+    append([SdrPi.kvRecord('SDRPI', { version: SdrPi.VERSION, schema: 1, run, host: 'meganet-pi', model: 'RTL-SDR Blog V4', tuner: 'R828D',
+      min_hz: 500000, max_hz: 1766000000, bias_tee: true, direct: false, upconverter: true }) + '\r\n',
+      rec('RX', { seq: 1, up: 500, id: 2088, value: 143, fmt: 'ABF', votes: 26, pol: 'STD', hex: '6860DEC4', peak_dbfs: -40, nf_dbfs: -101, burst_ms: 300, freq_hz: 151500000 }) + '\r\n',
+      lvl(1000), hide(rec('STAT', { up: 1000, state: 'streaming', freq_hz: 151500000, offset_hz: 0, rate: 240000, in_rate: 240000, gain: '29.7',
+        fmt: 'ABF', gate: 1, squelch: 8, clock: '', temp_c: 48.2, cpu_pct: 21, model: 'RTL-SDR Blog V4', tuner: 'R828D' }))]);
+    await page.waitForTimeout(1500);
+    ok('a live reading waits until the Pi\'s uptime is settled against this clock',
+      await page.evaluate(id => { const c = Serial.findConn(id); return c.readings.length === 5 && c.pi.pending.length === 1; }, pid));
+    await page.waitForTimeout(1200);
+    append([lvl(3700)]);
+    await page.waitForTimeout(1300);
+    append([rec('BURST', { seq: 1, up: 4000, ms: 410, peak_dbfs: -61.5, nf_dbfs: -101, freq_hz: 151500000 }) + '\r\n',
+      rec('RX', { seq: 2, up: 4000, id: 4079, value: 420, fmt: 'EIF', votes: 25, pol: 'STD', crc: 1, hex: 'EF3FD208', burst: 1, peak_dbfs: -61.5, nf_dbfs: -101, burst_ms: 410, freq_hz: 151500000 }) + '\r\n',
+      hide(rec('TRACE', { up: 4600, burst: 1, ms: 380, combos: 45, seconds: 1.2, all: 1, carrier_hz: -300, start: 0, frames: '30:4079:420:0', shadows: '', symbols: 'yz0'.repeat(40) }))]);
+    await waitFor(id => Serial.findConn(id).readings.some(r => r.sensorId === 4079), pid, 'a live reading arrives');
+    const p2 = await page.evaluate(id => {
+      const c = Serial.findConn(id), now = Date.now();
+      const r = c.readings.find(x => x.sensorId === 4079), q = c.readings.filter(x => x.sensorId === 2088).find(x => x.t != null);
+      const b = c.bursts.find(x => x.seq === 1 && x.run === 'beefcafe');
+      return { t: r && r.t, now, queued: q && q.t, burst: b && b.decoded, trace: c.trace && c.trace.frames.length, pending: c.pi.pending.length,
+        restarted: c.notes.some(n => /started again/.test(n.text)), tuner: c.info && c.info.tuner, chips: document.getElementById('sdr-chips-' + id).textContent };
+    }, pid);
+    ok('…timed by the Pi\'s uptime, within a few seconds of now', p2.t != null && Math.abs(p2.now - p2.t) < 6000, `${p2.now - p2.t} ms ago`);
+    ok('…and the reading the Pi queued is timed when it was heard, 3.5 s earlier', p2.queued != null && Math.abs((p2.t - p2.queued) - 3500) < 600,
+      `${p2.t - p2.queued} ms apart`);
+    ok('…its burst marked decoded, its trace drawn, nothing left waiting', p2.burst === true && p2.trace === 1 && p2.pending === 0);
+    ok('…the restart and the new stick noticed', p2.restarted && p2.tuner === 'R828D' && /meganet-pi/.test(p2.chips) && /not set/.test(p2.chips), p2.chips);
+
+    // The controls copy commands; changes wait together; the Pi's CFG clears them.
+    await page.evaluate(id => { document.getElementById('sdr-freq-' + id).value = '151.5125'; SerialSdr.setFreq(id); }, pid);
+    await page.evaluate(id => SerialSdr.setFormat(id, 'ENHANCED_IFLOWS'), pid);
+    await page.evaluate(id => SerialSdr.setSquelch(id, 10), pid);
+    await page.waitForTimeout(300);
+    const p3 = await page.evaluate(id => {
+      const c = Serial.findConn(id), w = document.getElementById('sdr-want-' + id);
+      return { notes: c.notes.map(n => n.text), want: Object.keys(c.pi.want).sort().join(','), banner: w && !w.hidden && w.textContent, freq: c.cfg.freq };
+    }, pid);
+    ok('a control copies its command for PuTTY', p3.notes.some(t => /Copied “FREQ 151\.512500”/.test(t)), p3.notes.slice(-3).join(' | '));
+    ok('…three changes wait together and copy as one CFG line', p3.notes.some(t => /Copied “CFG freq=151\.512500 fmt=EIF squelch=10”/.test(t)) && p3.want === 'fmt,freq,squelch',
+      p3.notes.slice(-1)[0]);
+    ok('…shown as waiting, while the card still shows what the Pi has', /Waiting for the Pi/.test(p3.banner || '') && p3.freq === 151500000, p3.banner);
+    append([SdrPi.cfgRecord(Object.assign(SdrPi.defaults(), { freq: 151512500, fmt: 'EIF', squelch: 10 })) + '\r\nOK\r\n']);
+    await waitFor(id => { const c = Serial.findConn(id); return !Object.keys(c.pi.want).length && c.cfg.freq === 151512500 && c.cfg.format === 'ENHANCED_IFLOWS'; },
+      pid, 'the Pi\'s CFG answer clears what was waiting, and the card follows the Pi');
+    ok('…the waiting banner gone', await page.evaluate(id => document.getElementById('sdr-want-' + id).hidden, pid));
+    append(['ERR,RANGE this stick tunes 0.5 to 1766 MHz\r\n']);
+    await waitFor(id => Serial.findConn(id).notes.some(n => /refused a command: RANGE/.test(n.text)), pid, 'a command the Pi refuses is said on the card');
+  }
+
+  // Dropped anywhere on the tab while an RTL-SDR card waits for a Pi's log: a
+  // radio's log is not given to it; a Pi's log is, and no other card is made.
+  await page.evaluate(() => Serial.addConnection('sdr'));
+  const wid = await page.evaluate(() => Serial.list()[Serial.list().length - 1].id);
+  await page.evaluate(id => SerialSdr.setWhere(id, 'pi'), wid);
+  const radios = await page.evaluate(() => Serial.list().filter(c => c.kind === 'quansheng').length);
+  fs.writeFileSync(file('radio-2.log'), BANNER + RADIO.join('\r\n') + '\r\n');
+  await dropFiles('.serial .panel-header h2', [file('radio-2.log')]);
+  await waitFor(n => Serial.list().filter(c => c.kind === 'quansheng').length === n + 1, radios,
+    'a radio\'s log dropped on the tab, with an RTL-SDR card waiting for a Pi, still becomes a radio card');
+  ok('…and the RTL-SDR card is still waiting', await page.evaluate(id => Serial.findConn(id).phase === 'setup', wid));
+  const count = await page.evaluate(() => Serial.list().length);
+  fs.writeFileSync(file('sdr-pi-2.log'), Buffer.concat([Buffer.from(BANNER), relay.stdout]));
+  await dropFiles('.serial .panel-header h2', [file('sdr-pi-2.log')]);
+  await waitFor(id => { const c = Serial.findConn(id); return c && c.phase === 'follow' && c.source === 'pi' && c.readings.length === 5; }, wid,
+    'a Pi\'s log dropped on the tab goes to the RTL-SDR card waiting for one');
+  ok('…and no other card is made for it', await page.evaluate(n => Serial.list().length === n, count), String(await page.evaluate(() => Serial.list().length)) + ' vs ' + count);
+
+  // A log PuTTY has only just started — nothing from the Pi in it yet — dropped
+  // beside an RTL-SDR card waiting for a Pi: the card takes it, and reads the Pi
+  // as it starts talking.
+  await page.evaluate(() => Serial.addConnection('sdr'));
+  const nid = await page.evaluate(() => Serial.list()[Serial.list().length - 1].id);
+  await page.evaluate(id => SerialSdr.setWhere(id, 'pi'), nid);
+  fs.writeFileSync(file('sdr-pi-new.log'), BANNER);
+  await dropFiles('.serial .panel-header h2', [file('sdr-pi-new.log')]);
+  await waitFor(id => { const c = Serial.findConn(id); return c && c.phase === 'follow' && c.source === 'pi'; }, nid,
+    'a still-empty log dropped beside a card waiting for a Pi goes to that card');
+  ok('…which does not claim to have recognised it', await page.evaluate(id => !Serial.findConn(id).notes.some(n => /Recognised/.test(n.text)), nid));
+  // What is in the file at the card's first look is history; the Pi starts
+  // talking after it.
+  await waitFor(id => Serial.findConn(id).pi.follow.follower.offset > 0, nid, '…and has read what is in it so far');
+  fs.appendFileSync(file('sdr-pi-new.log'), relay.stdout);
+  await waitFor(id => { const c = Serial.findConn(id); return c.pi.info && c.pi.info.version && c.pi.pending.length > 0; }, nid,
+    '…and reads the Pi as it starts talking, its readings held until their time is settled');
+
   // ── a dropped folder ───────────────────────────────────────────────────────
   const logs = path.join(DIR, 'logs');
   fs.mkdirSync(logs);
@@ -290,4 +428,4 @@ try {
 }
 
 if (failures) { console.log(`\nFAIL — ${failures} check(s) failed.`); process.exit(1); }
-console.log('PASS — a log PuTTY writes is followed as it grows, by drop where the picker is blocked, on every serial card and on the ALERT2 tab.');
+console.log('PASS — a log PuTTY writes is followed as it grows, by drop where the picker is blocked, on every serial card, the RTL-SDR card following a Raspberry Pi, and the ALERT2 tab.');

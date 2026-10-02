@@ -27,6 +27,8 @@ on:
       - 'styles.css'
       - 'stations.json'
       - 'test/**'
+      # The Raspberry Pi end of the SDR link, which test/sdrpi.mjs runs.
+      - 'sdr-pi/**'
       # The Access-to-Supabase exchange and the config that routes to it: the
       # gate check is the only thing asserting the verifier still refuses (#173).
       - 'worker/**'
@@ -101,6 +103,8 @@ on:
       - 'styles.css'
       - 'stations.json'
       - 'test/**'
+      # The Raspberry Pi end of the SDR link, which test/sdrpi.mjs runs.
+      - 'sdr-pi/**'
       # The Access-to-Supabase exchange and the config that routes to it: the
       # gate check is the only thing asserting the verifier still refuses (#173).
       - 'worker/**'
@@ -289,6 +293,16 @@ jobs:
       - name: RTL-SDR driver — a simulated V2, V3 and V4
         working-directory: test
         run: npm run rtlsdr
+
+      # Node only (python3 for one pseudo-terminal). The RTL-SDR on a Raspberry
+      # Pi: sdr-pi.js's codec, and sdr-pi/relay.js playing the demo band and the
+      # 4078 rig's real burst through the decoder, answering its console over
+      # stdio, TCP (Raw and Telnet) and a pseudo-terminal as its serial port,
+      # and opening the simulated V3 through rtlsdr.js — read back with the
+      # Reader the card uses. No Pi, stick or PuTTY in CI.
+      - name: RTL-SDR on a Raspberry Pi — the relay and its protocol
+        working-directory: test
+        run: npm run sdrpi
 
       # Chromium. Following the log PuTTY writes instead of a COM port, under
       # the policy a managed browser has (the file picker refused): real files

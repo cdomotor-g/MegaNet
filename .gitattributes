@@ -17,3 +17,8 @@ archive/flood-peaks/*.txt text eol=lf
 # The site serves tools/install-rtlsdr-driver.cmd from a checkout, so this
 # decides the line ends of the copy people download, not just their own clone.
 *.cmd text eol=crlf
+
+# Shell scripts run on a Raspberry Pi (sdr-pi/install.sh, usb-gadget.sh), and
+# bash refuses a script with CRLF line ends — so one copied off a Windows
+# checkout must still be LF.
+*.sh text eol=lf

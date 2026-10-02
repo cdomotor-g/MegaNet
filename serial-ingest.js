@@ -41,9 +41,12 @@ const SerialIngest = (function () {
   const STORE = 'mn-ingest';
   const QUEUE_MAX = 20000, KEEP_MAX = 5000, BATCH_MAX = 1000;
   const FLUSH_MS = 5000, REPORT_MS = 15 * 60 * 1000, BACKOFF_MAX = 5 * 60 * 1000;
-  const RECEIVER = { quansheng: 'quansheng', ert: 'ert-a2', sdr: 'rtl-sdr' };
-  const PREFIX = { quansheng: 'qs', ert: 'ert', sdr: 'sdr' };
-  const KIND_LABEL = { quansheng: 'Quansheng radio', ert: 'ERT-A2', sdr: 'RTL-SDR' };
+  // An RTL-SDR on a Raspberry Pi (serial-sdr.js following a Pi's log, sdr-pi.js)
+  // is a receiver of its own — its own id and name — but an 'rtl-sdr' to the
+  // database, which knows the kind of radio, not where its samples are decoded.
+  const RECEIVER = { quansheng: 'quansheng', ert: 'ert-a2', sdr: 'rtl-sdr', sdrpi: 'rtl-sdr' };
+  const PREFIX = { quansheng: 'qs', ert: 'ert', sdr: 'sdr', sdrpi: 'sdrpi' };
+  const KIND_LABEL = { quansheng: 'Quansheng radio', ert: 'ERT-A2', sdr: 'RTL-SDR', sdrpi: 'RTL-SDR on a Raspberry Pi' };
   const LOC_LABEL = {
     gps:     'the GPS card on this tab (exact, while it has a fix)',
     browser: 'this computer\'s location, as the browser gives it',
@@ -72,13 +75,16 @@ const SerialIngest = (function () {
   // A receiver's identity in this browser: one slot per kind, a second for a
   // second card of the same kind at once. The point id is made once and kept,
   // so the same radio on the same computer is the same receiver next week.
+  function kindOf(c) { return c.kind === 'sdr' && c.source === 'pi' ? 'sdrpi' : c.kind; }
+
   function slotFor(c) {
     const s = load();
     const used = new Set(Serial.list().filter(x => x !== c && x.ingest && x.ingest.slot).map(x => x.ingest.slot));
-    let slot = c.kind, n = 1;
-    while (used.has(slot)) slot = c.kind + '#' + (++n);
+    const kind = kindOf(c);
+    let slot = kind, n = 1;
+    while (used.has(slot)) slot = kind + '#' + (++n);
     if (!s.points[slot]) {
-      s.points[slot] = { pointId: PREFIX[c.kind] + '-' + rid(), name: defaultName(c, n), loc: { source: 'none' }, on: false };
+      s.points[slot] = { pointId: PREFIX[kind] + '-' + rid(), name: defaultName(c, n), loc: { source: 'none' }, on: false };
       save(s);
     }
     return slot;
@@ -86,7 +92,7 @@ const SerialIngest = (function () {
   function defaultName(c, n) {
     const ua = navigator.userAgent || '';
     const os = /Windows/.test(ua) ? 'Windows PC' : /Mac OS/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux PC' : 'computer';
-    return KIND_LABEL[c.kind] + (n > 1 ? ' ' + n : '') + ' on a ' + os;
+    return KIND_LABEL[kindOf(c)] + (n > 1 ? ' ' + n : '') + (kindOf(c) === 'sdrpi' ? ', read on a ' : ' on a ') + os;
   }
   function point(c) { const s = load(); return s.points[c.ingest.slot]; }
   function setPoint(c, patch) {
@@ -114,7 +120,7 @@ const SerialIngest = (function () {
   // From a card: [{ alert_id, value_raw, ts (ms) | null, protocol, line? }].
   // `ts` null is a reading with no time this card can stand behind.
   function add(c, items) {
-    if (!c || isDemo(c) || !RECEIVER[c.kind]) return;
+    if (!c || isDemo(c) || !RECEIVER[kindOf(c)]) return;
     const g = state_(c);
     if (!g.on) return;
     items.forEach(it => {
@@ -214,7 +220,7 @@ const SerialIngest = (function () {
   // ── the receiver describes itself ─────────────────────────────────────────
 
   function detail(c) {
-    const d = { app: 'MegaNet Serial Monitor', via: c.kind === 'sdr' ? (c.source === 'file' ? 'IQ replay' : 'USB')
+    const d = { app: 'MegaNet Serial Monitor', via: c.kind === 'sdr' ? (c.source === 'file' ? 'IQ replay' : c.source === 'pi' ? 'Raspberry Pi, log file' : 'USB')
       : c.follow ? 'log file' : 'COM port', browser: (navigator.userAgent || '').slice(0, 160) };
     if (c.kind === 'quansheng' && c.radio) {
       const sc = c.radio.schema || {};
@@ -232,6 +238,12 @@ const SerialIngest = (function () {
       if (c.info && c.info.tuner) d.tuner = String(c.info.tuner);
       if (c.cfg.model) d.model = c.cfg.model;
     }
+    if (c.kind === 'sdr' && c.source === 'pi' && c.pi && c.pi.info) {
+      const i = c.pi.info;
+      if (i.host) d.pi_host = String(i.host).slice(0, 64);
+      if (i.version) d.pi_version = String(i.version).slice(0, 16);
+      if (i.stick) d.stick = String(i.stick).slice(0, 80);
+    }
     return d;
   }
 
@@ -247,7 +259,7 @@ const SerialIngest = (function () {
       g.lastLoc = f ? { lat: f.lat, lon: f.lon } : null;
     }
     const body = { payload: {
-      point_id: p.pointId, name: p.name, receiver: RECEIVER[c.kind], detail: detail(c),
+      point_id: p.pointId, name: p.name, receiver: RECEIVER[kindOf(c)], detail: detail(c),
       location_source: loc.source || 'none', location_note: locNote(loc),
     } };
     if (loc.source && loc.source !== 'none' && isFinite(loc.lat) && isFinite(loc.lon)) {
@@ -495,10 +507,10 @@ const SerialIngest = (function () {
   }
 
   function panel(c, open) {
-    if (!RECEIVER[c.kind]) return '';
+    if (!RECEIVER[kindOf(c)]) return '';
     if (isDemo(c)) {
       return '<details class="qs-ctl ing-ctl" id="ing-' + c.id + '"><summary>Send to MegaNet <span class="qs-dim">· never, from a demo</span></summary>'
-        + '<p class="qs-hint">A demo card\'s readings are made up, so it never sends them. Add a real ' + KIND_LABEL[c.kind]
+        + '<p class="qs-hint">A demo card\'s readings are made up, so it never sends them. Add a real ' + KIND_LABEL[kindOf(c)]
         + ' card to make this computer a base station that posts what it hears into MegaNet.</p></details>';
     }
     const g = state_(c), p = point(c), id = c.id, s = load();
@@ -572,7 +584,7 @@ const SerialIngest = (function () {
   }
 
   // Called by each card after it renders.
-  function mount(c) { if (RECEIVER[c.kind] && !isDemo(c)) { state_(c); paint(c); } }
+  function mount(c) { if (RECEIVER[kindOf(c)] && !isDemo(c)) { state_(c); paint(c); } }
 
   // The card is going away: whatever is waiting is kept for next time.
   function detach(c) {
@@ -584,14 +596,14 @@ const SerialIngest = (function () {
   // For reception-log.js: which receiver a card is, where it was put, and
   // whether a receiver id is set to send. A demo card is no receiver.
   function pointInfo(c) {
-    if (!RECEIVER[c.kind]) return null;
-    if (isDemo(c)) return { pointId: 'demo-' + PREFIX[c.kind], name: c.name };
+    if (!RECEIVER[kindOf(c)]) return null;
+    if (isDemo(c)) return { pointId: 'demo-' + PREFIX[kindOf(c)], name: c.name };
     state_(c);
     const p = point(c);
     return { pointId: p.pointId, name: p.name };
   }
   function locOf(c) {
-    if (!RECEIVER[c.kind] || isDemo(c)) return null;
+    if (!RECEIVER[kindOf(c)] || isDemo(c)) return null;
     state_(c);
     const l = point(c).loc;
     return l && l.source !== 'gps' ? l : null;

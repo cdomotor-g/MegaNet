@@ -150,6 +150,15 @@ const ACCEPTED = {
          + 'browser, where `module` is undefined, never runs it. Constrains nothing below it.',
     },
   ],
+  'sdr-pi.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = SdrPi;",
+      why: 'The SDR Pi link\'s CommonJS registration: sdr-pi/relay.js requires this same '
+         + 'file to write what the RTL-SDR card reads, and test/sdrpi.mjs to read what the '
+         + 'relay wrote, so the two ends cannot drift. Guarded so the browser, where '
+         + '`module` is undefined, never runs it. Constrains nothing below it.',
+    },
+  ],
   'core.js': [
     {
       match: "if (typeof window !== 'undefined') {",

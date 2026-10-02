@@ -72,7 +72,7 @@ const Serial = (function () {
   // Bumped whenever the Serial Monitor changes. Shown in the tab header so it is
   // possible to confirm at a glance which build of app.js the browser actually
   // loaded — a stale, cached app.js is the usual reason a "fixed" bug persists.
-  const SERIAL_BUILD = '2026-10-01c';
+  const SERIAL_BUILD = '2026-10-02a';
 
   function loadDefaults() {
     let d = {};
@@ -692,8 +692,16 @@ const Serial = (function () {
     const conn = byId(id);
     const card = document.getElementById('ser-card-' + id);
     if (card) card.classList.remove('ser-drag');
-    // A card with its port open is not where a log goes: a new card is.
-    if (!conn || conn.phase === 'open' || conn.kind === 'sdr') return;
+    // A card with its port open is not where a log goes: a new card is. An
+    // RTL-SDR card takes a Raspberry Pi's log, unless it has a stick of its own.
+    if (conn && conn.kind === 'sdr') {
+      if (!SerialSdr.acceptsLog(conn)) return;
+      e.preventDefault();
+      const rs = LogFollow.fromDrop(e.dataTransfer);
+      if (!rs.error) sdrDrop(conn, rs.src, rs.more);
+      return;
+    }
+    if (!conn || conn.phase === 'open') return;
     e.preventDefault();
     const r = LogFollow.fromDrop(e.dataTransfer);       // synchronously: the items die with the event
     if (r.error) { setFollowStatus(conn, r.error.message, 'err'); return; }
@@ -706,8 +714,9 @@ const Serial = (function () {
     const r = LogFollow.fromDrop(e.dataTransfer);
     if (r.error) return;
     let conn = conns.find(c => c.kind !== 'sdr' && c.phase === 'setup' && c.source === 'file');
-    if (!conn) { conn = makeConn('serial', { source: 'file' }); conns.push(conn); }
-    beginFollow(conn, r.src, r.more);
+    const made = !conn;
+    if (made) { conn = makeConn('serial', { source: 'file' }); conns.push(conn); }
+    beginFollow(conn, r.src, r.more, { anywhere: true, made });
   }
   function guardDragOver(e) {
     if (!LogFollow.isFileDrag(e)) return;
@@ -716,11 +725,15 @@ const Serial = (function () {
   }
 
   // Before following: a generic card whose log turns out to be a radio's or an
-  // ERT-A2's becomes that card — the way a radio's USB ID does on a port.
-  async function beginFollow(conn, src, more) {
+  // ERT-A2's becomes that card — the way a radio's USB ID does on a port. A
+  // Raspberry Pi's (sdr-pi.js) becomes an RTL-SDR card, in the generic card's place.
+  async function beginFollow(conn, src, more, how) {
     if (conn.kind === 'serial') {
       try {
         const kind = sniffKind(await LogFollow.peek(src, 65536));
+        // Not yet anything (a log PuTTY has only just started), dropped beside
+        // an RTL-SDR card that is waiting for a Pi's log: that is what it is for.
+        if (kind === 'sdrpi' || (kind === null && how && how.anywhere && waitingForPi())) { adoptSdrPi(conn, src, more, how || {}, kind === 'sdrpi'); return; }
         if (kind) { setKind(conn.id, kind, true); conn.recognised = 'contents'; }
       } catch (_) { /* the follower reports a file it cannot read */ }
     }
@@ -728,11 +741,47 @@ const Serial = (function () {
     if (more) emitSys(conn, 'Only the first of the ' + (more + 1) + ' things dropped is followed — drop the others on cards of their own', 'sys');
   }
 
-  // What a log holds, from its first 64 kB: an ERT-A2's ALERT2A lines or its
+  // A log dropped on an RTL-SDR card: a Pi's is that card's to follow; anything
+  // else gets a card of its own, as if dropped beside it.
+  // A log PuTTY has only just started is often empty yet, and so not
+  // recognised as anything: on the RTL-SDR card it was dropped on, that is the
+  // Pi's log it will be.
+  async function sdrDrop(sdr, src, more) {
+    let kind = null;
+    try { kind = sniffKind(await LogFollow.peek(src, 65536)); } catch (_) { /* the follower says why it cannot read it */ }
+    if (kind && kind !== 'sdrpi') {
+      const conn = makeConn('serial', { source: 'file' });
+      conns.push(conn);
+      beginFollow(conn, src, more);
+      return;
+    }
+    SerialSdr.followLog(sdr, src, { recognised: kind === 'sdrpi', more });
+  }
+
+  // A Pi's log dropped on a card goes to an RTL-SDR card in that card's place.
+  // Dropped anywhere on the tab, it goes to an RTL-SDR card already waiting for
+  // a Pi's log, if there is one — and a card made just to take the drop goes.
+  function waitingForPi() { return conns.find(c => c.kind === 'sdr' && c.phase === 'setup' && c.cfg && c.cfg.where === 'pi') || null; }
+  function adoptSdrPi(conn, src, more, how, recognised) {
+    const i = conns.indexOf(conn);
+    const waiting = how.anywhere && waitingForPi();
+    if (waiting) {
+      if (how.made && i >= 0) conns.splice(i, 1);
+      SerialSdr.followLog(waiting, src, { recognised, more });
+      return;
+    }
+    const sdr = SerialSdr.create('c' + (nextId++), 'RTL-SDR on a Pi');
+    if (i >= 0) conns.splice(i, 1, sdr); else conns.push(sdr);
+    SerialSdr.followLog(sdr, src, { recognised, more });
+  }
+
+  // What a log holds, from its first 64 kB: a Raspberry Pi's SDR records
+  // (first: its readings are not a radio's), an ERT-A2's ALERT2A lines or its
   // binary frames ("ALERT2", a length, then the version element 75 01), or a
   // line that is one of the Quansheng firmware's records.
   function sniffKind(u8) {
     const text = new TextDecoder('latin1').decode(u8);
+    if (typeof SdrPi !== 'undefined' && SdrPi.sniff(text)) return 'sdrpi';
     if (text.indexOf('ALERT2A,') >= 0) return 'ert';
     for (let i = text.indexOf('ALERT2'); i >= 0 && i + 8 < text.length; i = text.indexOf('ALERT2', i + 1)) {
       if (text.charCodeAt(i + 7) === 0x75 && text.charCodeAt(i + 8) === 0x01) return 'ert';
@@ -1536,7 +1585,7 @@ const Serial = (function () {
         + '</div>'
         + '<p class="ser-empty-follow"><strong>No COM port on this computer?</strong> Open the port in PuTTY with logging on '
         + '(Session → Logging → <em>All session output</em>), then drag the log file — or the folder it logs into — anywhere on this tab. '
-        + 'It is followed as it grows, and a radio’s or an ERT-A2’s log becomes that card by itself. '
+        + 'It is followed as it grows, and a radio’s, an ERT-A2’s or an SDR Pi’s log becomes that card by itself. '
         + '<a href="docs/serial-help.html#putty" target="_blank" rel="noopener">How to set PuTTY up</a></p>'
         + '</div>';
       return;
@@ -1566,7 +1615,7 @@ const Serial = (function () {
         + '<p>The Serial Monitor uses the <a href="https://developer.mozilla.org/docs/Web/API/Web_Serial_API" target="_blank" rel="noopener">Web Serial API</a>, '
         + 'which needs a Chromium-based browser — <strong>Chrome, Edge or Opera</strong> — served over <strong>https</strong> or from <strong>localhost</strong>. '
         + 'It is not supported in Firefox or Safari, or when this page is opened directly from a <code>file://</code> path.'
-        + (usb ? '' : ' The RTL-SDR card needs WebUSB, which has the same requirement.') + ' The demos below work anywhere, and so does '
+        + (usb ? '' : ' A stick plugged into this computer needs WebUSB, which has the same requirement — one on a Raspberry Pi does not.') + ' The demos below work anywhere, and so does '
         + '<strong>following a log file</strong> a terminal such as PuTTY is writing: add a card and drop the log on it.</p></div>';
     } else if (typeof location !== 'undefined' && !window.isSecureContext) {
       banner = '<div class="panel ser-warn"><h3>Not a secure context</h3>'
@@ -1582,7 +1631,7 @@ const Serial = (function () {
       + '    <button class="primary" onclick="Serial.addConnection(\'quansheng\')">+ Quansheng radio</button>'
       + '    <button class="primary" onclick="Serial.addConnection(\'ert\')">+ ERT-A2</button>'
       + '    <button class="primary" onclick="Serial.addConnection(\'gps\')">+ GPS</button>'
-      + '    <button class="primary" onclick="Serial.addConnection(\'sdr\')"' + (usb ? '' : ' disabled') + '>+ RTL-SDR</button>'
+      + '    <button class="primary" onclick="Serial.addConnection(\'sdr\')">+ RTL-SDR</button>'
       + '    </div>'
       + '  </div>'
       + '  <p class="sub">Connect physical devices and watch them live — several at once, each its own card. '
@@ -1591,7 +1640,8 @@ const Serial = (function () {
       + '     A <strong>Quansheng ALERT radio</strong> (UV-K5 V3 / UV-K1 on the ALERT receiver firmware) becomes a dashboard: its readings, '
       + '     bursts, noise floor and battery, and its own controls — clock, settings, flash log, station table, screen. '
       + '     An <strong>ELPRO ERT-A2</strong> decodes as it arrives — RS232 ASCII or USB binary with RSSI — every reading matched to its station. '
-      + '     An <strong>RTL-SDR</strong> (Blog V2, V3 or V4, over USB) decodes ALERT off the air itself, with a live spectrum, waterfall and audio. '
+      + '     An <strong>RTL-SDR</strong> (Blog V2, V3 or V4, over USB) decodes ALERT off the air itself, with a live spectrum, waterfall and audio — '
+      + '     or, where this browser cannot reach USB, on a <strong>Raspberry Pi</strong> that prints what it hears for PuTTY to log. '
       + '     Where the browser will not open a COM port, a card can <strong>follow the log file PuTTY writes</strong> instead — drop it anywhere on this tab.</p>'
       + '</div>'
       + banner

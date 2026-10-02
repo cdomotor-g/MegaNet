@@ -29,6 +29,16 @@
 // generated and looped inside the worker; a loaded IQ file (u8, as rtl_sdr
 // and this card's own Capture write it) replaces the dongle the same way.
 // docs/serial-sdr.md is the person-facing guide, the hardware notes included.
+//
+// And a fourth source, for a computer that cannot reach the stick at all — a
+// managed PC with no WebUSB, and no administrator to give the stick WinUSB:
+// the stick on a Raspberry Pi running this same driver and decoder
+// (sdr-pi/relay.js), the Pi printing what it finds on a serial port, PuTTY
+// logging the port, and this card following the log (log-follow.js), the way
+// a Quansheng radio's card does. source 'pi'. The Pi's records (sdr-pi.js)
+// are turned back into the messages the worker would have posted, so the
+// same painting draws them; the controls copy commands for PuTTY instead of
+// setting a stick. docs/sdr-pi.md.
 
 const SerialSdr = (function () {
   const CFG_KEY = 'mn-sdr-defaults';
@@ -45,6 +55,9 @@ const SerialSdr = (function () {
       model: 'auto', freq: 151500000, rate: 960000, gain: 296, autoGain: false, agc: false, ppm: 0, bias: false,
       direct: 'auto', format: 'BINARY', gate: true, squelch: 8, offsetHz: 0, audio: false, volume: 0.6, audioGate: true,
       fftSize: 2048, peakHold: true,
+      // Where the stick is: on this computer's USB, or on a Raspberry Pi whose
+      // log this card follows. A computer with no WebUSB can only do the second.
+      where: typeof navigator !== 'undefined' && navigator.usb ? 'usb' : 'pi',
     }, d, { audio: false });
   }
   function saveCfg(c) {
@@ -60,6 +73,7 @@ const SerialSdr = (function () {
       scope: null, level: null, readings: [], bursts: [], power: [], trace: null, lastDecode: null,
       notes: [], rx: { bytes: 0, t0: 0, rate: 0, lastBytes: 0, lastT: 0 }, audio: null,
       paintPending: {}, raf: 0, knownList: [], replay: null, helpOpen: false,
+      pi: null, history: false, followMsg: null,
     };
   }
 
@@ -135,6 +149,7 @@ const SerialSdr = (function () {
 
   function deviceRate(c) {
     if (c.source === 'demo') return AlertDsp.FS_IN;
+    if (c.source === 'pi') return c.cfg.rate;
     if (c.source === 'file') return c.replay ? c.replay.rate : AlertDsp.FS_IN;
     return c.dev && c.dev.rate ? Math.round(c.dev.rate) : c.cfg.rate;
   }
@@ -285,10 +300,12 @@ const SerialSdr = (function () {
       c.helpOpen = false;
     } catch (e) {
       if (e && e.name === 'NotFoundError') {
-        c.err = onWindows()
+        c.err = (onWindows()
           ? 'No stick chosen. If the list was empty, or your stick was not in it, Windows is not offering it to the browser: '
             + 'it needs the WinUSB driver first. "Getting the stick to the browser" below has a one-click installer.'
-          : 'No stick chosen. If the list was empty, the computer is not offering the stick to the browser — see "Getting the stick to the browser" below.';
+          : 'No stick chosen. If the list was empty, the computer is not offering the stick to the browser — see "Getting the stick to the browser" below.')
+          + ' If no list appeared at all, this browser may not be allowed near USB (an IT policy): a Raspberry Pi can drive the stick instead — '
+          + 'choose "on a Raspberry Pi" above.';
         c.helpOpen = true;
       } else c.err = RtlSdr.describeOpenError(e);
     }
@@ -307,7 +324,8 @@ const SerialSdr = (function () {
     Serial.renderList();
   }
 
-  function setModel(id, v) { const c = conn(id); if (c) { c.cfg.model = v; saveCfg(c); Serial.renderList(); } }
+  function setModel(id, v) { const c = conn(id); if (!c) return; if (isPi(c)) return piWant(c, { model: v }); c.cfg.model = v; saveCfg(c); Serial.renderList(); }
+  function setSpecEvery(id, v) { const c = conn(id); if (c && isPi(c)) piWant(c, { spec: Math.max(0, Math.round(+v) || 0) }); }
   function setName(id, v) { const c = conn(id); if (c) c.name = v; }
 
   async function open(id) {
@@ -387,6 +405,7 @@ const SerialSdr = (function () {
 
   function stopAll(c) {
     clearInterval(c.rxTimer);
+    if (c.pi && c.pi.follow && c.pi.follow.follower) c.pi.follow.follower.stop();
     stopReplay(c);
     audioOff(c);
     c.cfg.audio = false;
@@ -422,12 +441,13 @@ const SerialSdr = (function () {
     if (!(mhz > 0)) { note(c, 'Frequency is a number in MHz, e.g. 151.5', 'warn'); return; }
     return tuneTo(c, Math.round(mhz * 1e6));
   }
-  function nudge(id, hz) { const c = conn(id); if (c) return tuneTo(c, c.cfg.freq + hz); }
+  function nudge(id, hz) { const c = conn(id); if (c) return tuneTo(c, shownCfg(c).freq + hz); }
   function preset(id, v) { const c = conn(id); if (c && v) return tuneTo(c, Math.round(parseFloat(v) * 1e6)); }
 
   function tuneTo(c, hz) {
     const min = c.info ? c.info.minHz : 500000, max = c.info ? c.info.maxHz : 1766000000;
     if (hz < min || hz > max) { note(c, 'Out of this stick\'s range (' + (min / 1e6) + '–' + (max / 1e6) + ' MHz).', 'warn'); mark(c, 'controls'); return; }
+    if (isPi(c)) return piWant(c, { freq: hz });
     c.cfg.freq = hz;
     if (c.peak) c.peak = null;
     if (c.dev && c.source === 'usb') return act(c, async () => { c.tune = await c.dev.setFrequency(hz); });
@@ -437,6 +457,7 @@ const SerialSdr = (function () {
   function setRate(id, v) {
     const c = conn(id);
     if (!c) return;
+    if (isPi(c)) return piWant(c, { rate: +v });
     c.cfg.rate = +v;
     c.peak = null;
     if (c.dev && c.source === 'usb') {
@@ -465,26 +486,40 @@ const SerialSdr = (function () {
     const c = conn(id);
     if (!c) return;
     const G = gainSteps(c);
-    c.cfg.gain = G[Math.max(0, Math.min(G.length - 1, +idx))];
+    const g = G[Math.max(0, Math.min(G.length - 1, +idx))];
     const ro = document.getElementById('sdr-gain-v-' + id);
-    if (ro) ro.textContent = (c.cfg.gain / 10).toFixed(1) + ' dB';
+    if (ro) ro.textContent = (g / 10).toFixed(1) + ' dB';
+    // Following a Pi, the slider's every step is not a command: the one it is
+    // let go at is (gainDone).
+    if (isPi(c)) { if (c.pi) c.pi.gainDraft = g; return; }
+    c.cfg.gain = g;
     if (c.dev && !c.cfg.autoGain) return act(c, () => c.dev.setGain(c.cfg.gain));
     saveCfg(c);
+  }
+  function gainDone(id) {
+    const c = conn(id);
+    if (!c || !isPi(c) || !c.pi || c.pi.gainDraft == null) return;
+    const g = c.pi.gainDraft;
+    c.pi.gainDraft = null;
+    piWant(c, { gain: g / 10 });
   }
   function setAutoGain(id, on) {
     const c = conn(id);
     if (!c) return;
+    if (isPi(c)) return piWant(c, { gain: on ? null : shownCfg(c).gain / 10 });
     c.cfg.autoGain = !!on;
     const sl = document.getElementById('sdr-gain-' + id);
     if (sl) sl.disabled = !!on;
     if (c.dev) return act(c, () => c.dev.setGain(on ? null : c.cfg.gain));
     saveCfg(c);
   }
-  function setAgc(id, on) { const c = conn(id); if (!c) return; c.cfg.agc = !!on; if (c.dev) return act(c, () => c.dev.setAgc(!!on)); saveCfg(c); }
+  function setAgc(id, on) { const c = conn(id); if (!c) return; if (isPi(c)) return piWant(c, { agc: !!on }); c.cfg.agc = !!on; if (c.dev) return act(c, () => c.dev.setAgc(!!on)); saveCfg(c); }
   function setPpm(id) {
     const c = conn(id), el = document.getElementById('sdr-ppm-' + id);
     if (!c || !el) return;
-    c.cfg.ppm = Math.max(-200, Math.min(200, Math.round(+el.value || 0)));
+    const ppm = Math.max(-200, Math.min(200, Math.round(+el.value || 0)));
+    if (isPi(c)) return piWant(c, { ppm });
+    c.cfg.ppm = ppm;
     if (c.dev) return act(c, async () => { c.tune = await c.dev.setPpm(c.cfg.ppm) || c.tune; });
     saveCfg(c);
   }
@@ -493,6 +528,7 @@ const SerialSdr = (function () {
     if (!c) return;
     if (on && !confirm('Turn the bias tee on? It puts 4.5 V on the antenna socket — for a powered LNA or active antenna. '
       + 'Never with an antenna or filter that shorts DC to ground.')) { mark(c, 'controls'); Serial.renderList(); return; }
+    if (isPi(c)) return piWant(c, { bias: !!on });
     c.cfg.bias = !!on;
     if (c.dev) return act(c, async () => { await c.dev.setBiasTee(!!on); });
     saveCfg(c);
@@ -500,13 +536,14 @@ const SerialSdr = (function () {
   function setDirect(id, v) {
     const c = conn(id);
     if (!c) return;
+    if (isPi(c)) return piWant(c, { direct: v });
     c.cfg.direct = v;
     if (c.dev) return act(c, async () => { c.tune = await c.dev.setDirectSampling(v) || c.tune; });
     saveCfg(c);
   }
-  function setFormat(id, v) { const c = conn(id); if (!c) return; c.cfg.format = v; configure(c); saveCfg(c); mark(c, 'controls'); }
-  function setGate(id, on) { const c = conn(id); if (!c) return; c.cfg.gate = !!on; configure(c); saveCfg(c); }
-  function setSquelch(id, v) { const c = conn(id); if (!c) return; c.cfg.squelch = Math.max(2, Math.min(40, +v || 8)); configure(c); saveCfg(c); }
+  function setFormat(id, v) { const c = conn(id); if (!c) return; if (isPi(c)) return piWant(c, { fmt: SdrPi.FMT_CODE[v] || 'ABF' }); c.cfg.format = v; configure(c); saveCfg(c); mark(c, 'controls'); }
+  function setGate(id, on) { const c = conn(id); if (!c) return; if (isPi(c)) return piWant(c, { gate: !!on }); c.cfg.gate = !!on; configure(c); saveCfg(c); }
+  function setSquelch(id, v) { const c = conn(id); if (!c) return; if (isPi(c)) return piWant(c, { squelch: Math.max(2, Math.min(40, Math.round(+v) || 8)) }); c.cfg.squelch = Math.max(2, Math.min(40, +v || 8)); configure(c); saveCfg(c); }
   function setOffsetKhz(id) {
     const c = conn(id), el = document.getElementById('sdr-off-' + id);
     if (!c || !el) return;
@@ -514,6 +551,7 @@ const SerialSdr = (function () {
   }
   function setOffset(c, hz) {
     const half = deviceRate(c) / 2 - 12000;
+    if (isPi(c)) return piWant(c, { offset: Math.round(Math.max(-half, Math.min(half, hz))) });
     c.cfg.offsetHz = c.source === 'demo' ? 0 : Math.max(-half, Math.min(half, hz));
     configure(c);
     saveCfg(c);
@@ -553,13 +591,13 @@ const SerialSdr = (function () {
   }
   function pause(id) { const c = conn(id); if (c) { c.paused = !c.paused; Serial.renderList(); } }
   function capture(id, secs) { const c = conn(id); if (c && c.post) c.post({ type: 'capture', seconds: secs || 3 }); }
-  function decodeNow(id) { const c = conn(id); if (c && c.post) { c.post({ type: 'decodeNow', seconds: 3 }); note(c, 'Decoding the last 3 s…', ''); } }
+  function decodeNow(id) { const c = conn(id); if (c && isPi(c)) { copyForPutty(c, 'DECODE 3', ' The Pi decodes its last 3 s and the result comes back through the log.'); return; } if (c && c.post) { c.post({ type: 'decodeNow', seconds: 3 }); note(c, 'Decoding the last 3 s…', ''); } }
   function clearReadings(id) { const c = conn(id); if (c) { c.readings = []; c.bursts = []; c.trace = null; mark(c, 'readings', 'trace', 'timeline', 'chips'); } }
   function exportReadings(id) {
     const c = conn(id);
     if (!c) return;
     const rows = ['time,sensor_id,value,station,votes,format,polarity,bytes,carrier_hz,burst_ms,burst_peak_dbfs'];
-    c.readings.forEach(r => rows.push([new Date(r.t).toISOString(), r.sensorId, r.value, '"' + String(r.name || '').replace(/"/g, '""') + '"', r.votes, r.format,
+    c.readings.forEach(r => rows.push([r.t != null ? new Date(r.t).toISOString() : '', r.sensorId, r.value, '"' + String(r.name || '').replace(/"/g, '""') + '"', r.votes, r.format,
       r.polarity, r.hex, r.carrierHz, r.burst ? r.burst.ms : '', r.burst ? r.burst.peakDb.toFixed(1) : ''].join(',')));
     dlText('sdr-readings-' + new Date().toISOString().slice(0, 10) + '.csv', rows.join('\n') + '\n');
   }
@@ -621,6 +659,484 @@ const SerialSdr = (function () {
   }
   function stopReplay(c) { if (c.replay && c.replay.timer) { clearInterval(c.replay.timer); c.replay.timer = null; } c.streaming = false; }
 
+  // ── a Raspberry Pi's log ─────────────────────────────────────────────────────
+  //
+  // The stick on a Pi (sdr-pi/relay.js), its records in the log PuTTY keeps of
+  // the Pi's serial port, read here through LogFollow as the file grows and
+  // SdrPi's Reader. Each record becomes what the worker would have posted — a
+  // level, a spectrum, a burst, a decode — so the painting below draws it as it
+  // draws a stick on this computer. What the Pi does not send (the FM audio,
+  // IQ captures) is simply absent.
+  //
+  // Times. A Pi has no clock of its own and, at work, no network: its records
+  // always carry its uptime (`up`), and the time of day (`epoch_ms`) only once
+  // NTP or a TIME command has set it. A record's uptime against this computer's
+  // clock as it arrives gives an offset — plus however late PuTTY wrote it and
+  // this card read it, never minus — so the smallest offset seen is the truest,
+  // and readings are timed by it. A reading that arrives before two seconds of
+  // records have given that waits for them: the first lines after PuTTY opens
+  // the port can be ones the Pi queued long before, and timing those "now"
+  // would be wrong. A log's history — what was in the file before following
+  // started — has no arrival time at all, so its readings go by the Pi's clock
+  // or not at all, never "now": the rule a radio's history has.
+
+  const PI_SETTLE_MS = 2000, PI_HOLD_MS = 20000, PI_QUIET_MS = 30000;
+
+  function isPi(c) { return c.source === 'pi'; }
+
+  function piState() {
+    return { reader: new SdrPi.Reader(), follow: null, info: null, settings: {}, stat: null, want: {}, gainDraft: null,
+      anchor: { run: null, off: Infinity, n: 0, first: 0, last: 0 }, pending: [], lastRec: 0, untimed: 0 };
+  }
+
+  function setWhere(id, v) {
+    const c = conn(id);
+    if (!c) return;
+    c.cfg.where = v === 'pi' ? 'pi' : 'usb';
+    c.err = null;
+    saveCfg(c);
+    Serial.renderList();
+  }
+
+  // Serial.drop asks before handing this card a dropped log: one still being
+  // set up takes it, and one already following a Pi — not one with its own stick.
+  function acceptsLog(c) { return !!c && (c.phase === 'setup' || isPi(c)); }
+
+  async function pickLog(id) {
+    const c = conn(id);
+    if (!c) return;
+    const r = await LogFollow.pick();
+    if (!r) return;
+    if (r.error) { c.followMsg = { html: LogFollow.refusal(r.error), kind: 'err' }; Serial.renderList(); return; }
+    followLog(c, r.src);
+  }
+  function readLogOnce(id) {
+    const el = document.getElementById('sdr-logfile-' + id);
+    if (el) { el.value = ''; el.click(); }
+  }
+  function onLogFile(id, input) {
+    const c = conn(id);
+    const f = input && input.files && input.files[0];
+    if (!c || !f) return;
+    const fo = c.pi && c.pi.follow;
+    if (fo && fo.src.via === 'manual' && fo.follower && c.phase === 'follow') { fo.follower.feed(f); return; }
+    followLog(c, LogFollow.fromFile(f).src);
+  }
+
+  // Follow `src` — the log PuTTY is writing from the Pi's port — from its top,
+  // so the Pi's settings and identity in it are known before what is new.
+  function followLog(c, src, opts) {
+    opts = opts || {};
+    stopAll(c);
+    c.source = 'pi';
+    c.cfg.where = 'pi';
+    saveCfg(c);
+    c.phase = 'follow';
+    c.err = null;
+    c.followMsg = null;
+    c.pi = piState();
+    c.info = null; c.tune = null;
+    c.readings = []; c.bursts = []; c.trace = null; c.lastDecode = null;
+    resetDisplay(c);
+    c.label = LogFollow.describe(src);
+    if (/^RTL-SDR \d+$/.test(c.name)) c.name = 'RTL-SDR on a Pi';
+    startLog(c, src, null);
+    note(c, (opts.recognised ? 'Recognised a Raspberry Pi\'s log. ' : '') + 'Following ' + src.name + ' — '
+      + (src.live ? 'read every second as PuTTY writes it.' : 'read when you pick it again; this browser cannot follow it by itself.'), '');
+    if (opts.more) note(c, 'Only the first of the ' + (opts.more + 1) + ' things dropped is followed.', 'warn');
+    announce(c.name + ' — following ' + src.name);
+    Serial.renderList();
+  }
+
+  function startLog(c, src, offset) {
+    const p = c.pi;
+    if (p.follow && p.follow.follower) p.follow.follower.stop();
+    const resumed = offset != null;
+    const fo = { src, follower: null, historyEnd: null, note: '' };
+    p.follow = fo;
+    fo.follower = LogFollow.start(src, {
+      fromStart: true,
+      offset: resumed ? offset : null,
+      onData: (u8, m) => {
+        if (fo.historyEnd == null) fo.historyEnd = src.via === 'manual' ? Infinity : resumed ? m.from : m.size;
+        c.history = m.from < fo.historyEnd;
+        piBytes(c, u8);
+        c.history = false;
+      },
+      onReset: (why, name) => {
+        fo.historyEnd = null;
+        p.reader = new SdrPi.Reader();
+        c.label = LogFollow.describe(src);
+        note(c, why === 'switched' ? 'Now following ' + name + ' — reading it from the top'
+          : name + ' got shorter — PuTTY started it again — reading it from the top', '');
+        Serial.renderList();
+      },
+      onError: (e, fatal) => {
+        const text = LogFollow.trouble(e, src, fatal);
+        fo.note = text;
+        note(c, text, 'bad');
+        if (fatal) { c.phase = 'closed'; c.streaming = false; Serial.renderList(); } else paintFollow(c);
+      },
+      onTick: f => {
+        if (!f.err && fo.note && !f.fails) fo.note = '';
+        piResolve(c);
+        paintFollow(c);
+        mark(c, 'chips');
+      },
+    });
+  }
+
+  function stopLog(id) {
+    const c = conn(id);
+    if (!c || !c.pi || !c.pi.follow) return;
+    c.pi.follow.follower.stop();
+    c.phase = 'closed';
+    c.streaming = false;
+    note(c, 'Stopped following ' + c.pi.follow.src.name, '');
+    announce(c.name + ' — stopped following the log');
+    Serial.renderList();
+  }
+  // Carry on from where it stopped: what was written in between is read now,
+  // and nothing is read twice.
+  function followLogAgain(id) {
+    const c = conn(id);
+    if (!c || !c.pi || !c.pi.follow) return;
+    const f = c.pi.follow.follower;
+    c.phase = 'follow';
+    startLog(c, c.pi.follow.src, f ? f.offset : 0);
+    Serial.renderList();
+  }
+  function readLogNow(id) {
+    const c = conn(id);
+    if (!c || !c.pi || !c.pi.follow) return;
+    if (c.pi.follow.src.via === 'manual') { readLogOnce(id); return; }
+    c.pi.follow.follower.readNow();
+  }
+
+  function piBytes(c, u8) {
+    const p = c.pi;
+    const items = p.reader.feed(u8);
+    for (let i = 0; i < items.length; i++) piItem(c, items[i]);
+    // A history's spectra are old pictures: the newest of them, once, is better
+    // than an empty plot until the Pi sends another (or, PuTTY closed, never).
+    if (p.histSpec) { piSpectrum(c, p.histSpec); p.histSpec = null; }
+    piResolve(c);
+  }
+
+  function piItem(c, it) {
+    const p = c.pi;
+    if (it.kind === 'final') {
+      if (!c.history && !it.ok) note(c, 'The Pi refused a command: ' + it.reason, 'warn');
+      return;
+    }
+    if (it.kind !== 'record') return;
+    const r = it.rec;
+    if (r && !c.history) { p.lastRec = Date.now(); piObserve(c, r); }
+    switch (it.type) {
+      case 'SDRPI': piHello(c, it.info); break;
+      case 'CFG': piSettings(c, it.settings); break;
+      case 'STAT': piStat(c, r); break;
+      case 'LVL': piLevel(c, r); break;
+      case 'SPEC': if (c.history) p.histSpec = r; else piSpectrum(c, r); break;
+      case 'BURST': case 'RX': case 'TRACE': piTimed(c, it); break;
+      case 'NOTE': if (!c.history) note(c, 'Pi: ' + r.text, r.level === 'bad' ? 'bad' : r.level === 'warn' ? 'warn' : ''); break;
+      default: break;
+    }
+  }
+
+  function piObserve(c, r) {
+    if (r.up == null || !r.run) return;
+    const now = Date.now();
+    let a = c.pi.anchor;
+    if (a.run !== r.run) a = c.pi.anchor = { run: r.run, off: Infinity, n: 0, first: now, last: now };
+    a.off = Math.min(a.off, now - r.up);
+    a.n++;
+    a.last = now;
+  }
+
+  // A burst's or a reading's time: the Pi's clock where it has one; else its
+  // uptime on this computer's clock, once that is settled; null for a history
+  // line with no clock; undefined for "not yet — wait".
+  function piTime(c, it) {
+    const r = it.rec;
+    if (it.type === 'TRACE') return null;
+    if (r.epoch_ms != null) return r.epoch_ms;
+    if (c.history) return null;
+    const a = c.pi.anchor;
+    if (a.run === r.run && r.up != null && a.n >= 2 && a.last - a.first >= PI_SETTLE_MS) return Math.min(Date.now(), Math.round(a.off + r.up));
+    return undefined;
+  }
+
+  // Bursts, readings and traces in the order the Pi sent them: one waiting for
+  // its time holds up the ones behind it.
+  function piTimed(c, it) {
+    const p = c.pi;
+    const t = p.pending.length ? undefined : piTime(c, it);
+    if (t === undefined) { p.pending.push({ it, at: Date.now(), history: c.history }); return; }
+    piApply(c, it, t);
+  }
+  function piResolve(c) {
+    const p = c.pi;
+    if (!p) return;
+    const was = c.history;
+    while (p.pending.length) {
+      const e = p.pending[0];
+      c.history = e.history;
+      let t = piTime(c, e.it);
+      // Nothing to time it by after this long (a Pi sending no level or status
+      // records): when it came is the best there is.
+      if (t === undefined && Date.now() - e.at > PI_HOLD_MS) { t = e.at; p.untimed++; }
+      if (t === undefined) break;
+      p.pending.shift();
+      piApply(c, e.it, t);
+    }
+    c.history = was;
+  }
+
+  function piBurst(c, r) { return r.burst == null ? null : c.bursts.slice().reverse().find(b => b.seq === r.burst && b.run === r.run) || null; }
+
+  function piApply(c, it, t) {
+    const r = it.rec;
+    if (it.type === 'BURST') {
+      c.bursts.push({ t, ms: r.ms, peakDb: r.peak_dbfs, nfDb: r.nf_dbfs, decoded: null, seq: r.seq, run: r.run });
+      if (c.bursts.length > MAX_BURST) c.bursts.shift();
+      mark(c, 'timeline', 'chips');
+      return;
+    }
+    if (it.type === 'RX') {
+      const b = piBurst(c, r);
+      if (b) b.decoded = true;
+      const rd = {
+        t, sensorId: r.id, value: r.value, votes: r.votes, format: SdrPi.FMT_KEY[r.fmt] || r.fmt, polarity: r.pol,
+        crcOk: r.crc == null ? null : !!r.crc, hex: String(r.hex || '').replace(/(..)(?=.)/g, '$1 '), carrierHz: r.carrier_hz,
+        name: stationName(r.id) || r.name || '',
+        burst: r.burst_ms != null ? { ms: r.burst_ms, peakDb: r.peak_dbfs, nfDb: r.nf_dbfs, t: b ? b.t : t } : null,
+      };
+      c.readings.push(rd);
+      if (c.readings.length > MAX_READ) c.readings.splice(0, c.readings.length - MAX_READ);
+      if (typeof RxLog !== 'undefined') RxLog.add(c, { t, protocol: 'alert', alert_id: r.id, value_raw: r.value, ok: true, votes: r.votes,
+        level_dbfs: r.peak_dbfs, detail: { format: rd.format, polarity: r.pol, crc: rd.crcOk, via: 'pi' } });
+      // To MegaNet when the card is set to send: by the time worked out above,
+      // or — a history line with no clock — counted and skipped, never "now".
+      if (typeof SerialIngest !== 'undefined') SerialIngest.add(c, [{ alert_id: r.id, value_raw: r.value, ts: t, protocol: 'alert' }]);
+      mark(c, 'readings', 'chips', 'timeline');
+      return;
+    }
+    if (it.type === 'TRACE') {
+      const b = piBurst(c, r), bt = b ? b.t : c.history ? null : Date.now();
+      const shadows = SdrPi.unpackShadows(r.shadows), frames = SdrPi.unpackFrames(r.frames, r.start || 0);
+      c.lastDecode = { t: Date.now(), ms: r.ms || 0, combos: r.combos || 0, seconds: r.seconds || 0, candidates: [], all: r.all || 0, shadows };
+      if (r.symbols && (frames.length || !c.trace || !c.trace.frames.length)) {
+        c.trace = { t: Date.now(), symbols: SdrPi.unpackSymbols(r.symbols), carrierHz: r.carrier_hz, frames };
+      }
+      if (b && b.decoded !== true) b.decoded = (r.all || 0) > 0;
+      if (typeof RxLog !== 'undefined') {
+        shadows.forEach(sh => RxLog.add(c, { t: bt, protocol: 'alert', alert_id: sh.sensorId, value_raw: sh.value, ok: false, fault: 'shadow',
+          votes: sh.votes, level_dbfs: b ? b.peakDb : null, detail: { of: sh.of } }));
+        if (b && !(r.all > 0) && !shadows.length) RxLog.add(c, { t: bt, protocol: 'alert', alert_id: null, ok: false, fault: 'undecoded',
+          level_dbfs: b.peakDb, detail: { burst_ms: b.ms, nf_dbfs: b.nfDb } });
+      }
+      if (!c.history) shadows.forEach(sh => note(c, 'Ignored ' + sh.sensorId + ' = ' + sh.value + ' (' + sh.votes + ' votes): a bit-flip shadow of ' + sh.of + '.', ''));
+      mark(c, 'trace', 'chips', 'timeline');
+    }
+  }
+
+  function piHello(c, info) {
+    const p = c.pi;
+    if (p.info && p.info.run && info.run && p.info.run !== info.run && !c.history) note(c, 'The Pi\'s relay started again.', '');
+    p.info = Object.assign({}, p.info, info);
+    if (Number(info.schema) > SdrPi.SCHEMA && !p.saidSchema) {
+      p.saidSchema = true;
+      note(c, 'The Pi speaks schema ' + info.schema + '; this page knows ' + SdrPi.SCHEMA + '. What it adds is passed over — reload MegaNet for the newest card.', 'warn');
+    }
+    piInfo(c);
+  }
+
+  // What the card knows about the stick, from the Pi's hello (or its STAT,
+  // for a log joined after the hello).
+  function piInfo(c) {
+    const i = c.pi.info || {}, st = c.pi.stat || {};
+    const gains = i.gains ? String(i.gains).split(';').map(Number).filter(n => isFinite(n)) : [];
+    c.info = {
+      pi: true, modelLabel: i.model || st.model || 'RTL-SDR on a Pi', tuner: i.tuner || st.tuner || '—',
+      minHz: Number(i.min_hz) || 500000, maxHz: Number(i.max_hz) || 1766000000, gains: gains.length ? gains : RtlSdr.GAINS,
+      biasTee: i.bias_tee === '1', directSampling: i.direct === '1', upconverter: i.upconverter === '1',
+    };
+    c.label = 'Raspberry Pi' + (i.host ? ' ' + i.host : '') + (i.stick ? ' · ' + i.stick : '')
+      + (c.pi.follow ? ' · ' + LogFollow.describe(c.pi.follow.src) : '');
+    const el = document.getElementById('sdr-label-' + c.id);
+    if (el) el.textContent = c.label;
+    mark(c, 'chips', 'ctlhtml');
+  }
+
+  const sameSetting = (k, a, b) => SdrPi.formatSetting(k, a) === SdrPi.formatSetting(k, b);
+
+  // What the Pi says it is set to. The card's settings follow it — they are the
+  // Pi's, not this browser's — and a change waiting for the Pi that it has now
+  // made stops waiting.
+  function piSettings(c, set) {
+    const p = c.pi, before = JSON.stringify(c.cfg);
+    Object.assign(p.settings, set);
+    Object.keys(p.want).forEach(k => { if (k in set && sameSetting(k, set[k], p.want[k])) delete p.want[k]; });
+    const wasFreq = c.cfg.freq;
+    Object.assign(c.cfg, SdrPi.toCard(set));
+    if (c.cfg.freq !== wasFreq) c.peak = null;
+    if (JSON.stringify(c.cfg) !== before) mark(c, 'ctlhtml', 'chips', 'spectrum', 'waterfall');
+    paintWant(c);
+  }
+
+  function piStat(c, r) {
+    const p = c.pi;
+    p.stat = r;
+    if (!c.history) { c.streaming = r.state === 'streaming'; c.rx.rate = r.in_rate || 0; }
+    const set = {};
+    if (r.freq_hz != null) set.freq = r.freq_hz;
+    if (r.offset_hz != null) set.offset = r.offset_hz;
+    if (SdrPi.RATES.indexOf(r.rate) >= 0) set.rate = r.rate;
+    if (SdrPi.FMT_KEY[r.fmt]) set.fmt = r.fmt;
+    if (r.gate != null) set.gate = !!r.gate;
+    if (r.squelch != null) set.squelch = r.squelch;
+    if (r.ppm != null) set.ppm = r.ppm;
+    if (r.agc != null) set.agc = !!r.agc;
+    if (r.gain) { const g = SdrPi.parseSetting('gain', r.gain); if (g.ok) set.gain = g.value; }
+    piSettings(c, set);
+    if (!p.info) piInfo(c);
+    mark(c, 'chips');
+  }
+
+  function piLevel(c, r) {
+    c.level = {
+      dbfs: r.dbfs != null ? r.dbfs : -60, clipPct: r.clip_pct || 0, hist: r.hist ? SdrPi.unpackHist(r.hist) : new Array(32).fill(0),
+      chDb: r.ch_dbfs != null ? r.ch_dbfs : -200, nfDb: r.nf_dbfs, open: !!r.open, squelchDb: c.cfg.squelch,
+    };
+    if (!c.history) {
+      const a = c.pi.anchor;
+      const t = a.run === r.run && isFinite(a.off) && r.up != null ? Math.min(Date.now(), a.off + r.up) : Date.now();
+      c.power.push({ t, db: c.level.chDb, nf: c.level.nfDb, open: c.level.open });
+      while (c.power.length && c.power[0].t < Date.now() - TIMELINE_S * 1000) c.power.shift();
+    }
+    mark(c, 'chips', 'hist', 'timeline');
+  }
+
+  // The Pi's spectrum, drawn where the Pi was tuned when it took it.
+  function piSpectrum(c, r) {
+    if (!r.bins) return;
+    const db = SdrPi.unpackSpectrum(r.lo_dbfs || 0, r.step_db || 1, r.bins);
+    const sorted = Float32Array.from(db).sort();
+    if (r.freq_hz && r.freq_hz !== c.cfg.freq) { c.cfg.freq = r.freq_hz; c.peak = null; }
+    if (r.offset_hz != null) c.cfg.offsetHz = r.offset_hz;
+    if (SdrPi.RATES.indexOf(r.rate) >= 0) c.cfg.rate = r.rate;
+    onSpectrum(c, { db, floorDb: sorted[Math.floor(db.length * 0.3)], peakDb: sorted[db.length - 1], rate: r.rate });
+  }
+
+  // ── commands for PuTTY ────────────────────────────────────────────────────
+  //
+  // The card cannot write to the Pi — PuTTY holds the port — so a control
+  // copies its command for pasting into PuTTY, as a radio's card does. And a
+  // change waits, with any others not yet made, so all of them go as one line:
+  // change the frequency, the gain and the format, paste once.
+
+  async function copyForPutty(c, text, extra) {
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (_) {
+      // The async clipboard can be blocked by policy too; the old way often is not.
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', ''); ta.className = 'sr-only';
+        document.body.appendChild(ta); ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      } catch (_) {}
+    }
+    note(c, ok ? 'Copied “' + text + '” — paste it into PuTTY (right-click) and press Enter.' + (extra || '')
+      : 'Could not copy to the clipboard. Type this into PuTTY and press Enter: ' + text, ok ? '' : 'warn');
+    if (ok) announce('Copied ' + text + ' for PuTTY');
+    return ok;
+  }
+
+  function piWant(c, set) {
+    const p = c.pi;
+    if (!p) return;
+    Object.keys(set).forEach(k => {
+      if (k in p.settings && sameSetting(k, p.settings[k], set[k])) delete p.want[k];   // back to what the Pi has: nothing to send
+      else p.want[k] = set[k];
+    });
+    const keys = Object.keys(p.want);
+    paintWant(c);
+    mark(c, 'ctlhtml');
+    if (!keys.length) { note(c, 'That is what the Pi already has — nothing to send.', ''); return; }
+    const cmd = keys.length === 1 ? SdrPi.setCommand(keys[0], p.want[keys[0]]) : SdrPi.cfgCommand(p.want, keys);
+    copyForPutty(c, cmd, keys.length > 1 ? ' It makes all ' + keys.length + ' changes that are waiting.' : ' The Pi answers through the log, and the change shows here.');
+  }
+  function copyWant(id) { const c = conn(id); if (c && c.pi && Object.keys(c.pi.want).length) piWant(c, {}); }
+  function discardWant(id) {
+    const c = conn(id);
+    if (!c || !c.pi) return;
+    c.pi.want = {};
+    paintWant(c);
+    mark(c, 'ctlhtml');
+  }
+  // Every setting the card shows, as one line: set a fresh Pi up like this one.
+  function copyAll(id) {
+    const c = conn(id);
+    if (c) copyForPutty(c, SdrPi.cfgCommand(SdrPi.fromCard(shownCfg(c))), ' It sets everything the card shows, in one go.');
+  }
+  function copyClock(id) {
+    const c = conn(id);
+    if (c) copyForPutty(c, 'TIME ' + Math.round(Date.now() / 1000), ' It sets the Pi\'s clock to the second you copied it, so send it straight away.');
+  }
+  function copyCmd(id, text) { const c = conn(id); if (c) copyForPutty(c, text); }
+
+  // What the controls show: the Pi's settings, with what is waiting on top.
+  function shownCfg(c) { return isPi(c) && c.pi ? Object.assign({}, c.cfg, SdrPi.toCard(c.pi.want)) : c.cfg; }
+
+  function paintWant(c) {
+    const el = document.getElementById('sdr-want-' + c.id);
+    if (!el || !c.pi) return;
+    const keys = Object.keys(c.pi.want);
+    el.hidden = !keys.length;
+    el.innerHTML = keys.length ? '<strong>Waiting for the Pi:</strong> '
+      + esc(keys.map(k => k + ' ' + SdrPi.formatSetting(k, c.pi.want[k])).join(', '))
+      + '. Paste the copied command into PuTTY (right-click) and press Enter. '
+      + '<button type="button" class="ghost" onclick="SerialSdr.copyWant(\'' + c.id + '\')">Copy again</button> '
+      + '<button type="button" class="ghost" onclick="SerialSdr.discardWant(\'' + c.id + '\')">Discard</button>' : '';
+  }
+
+  function kB(n) { return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' kB' : (n / 1048576).toFixed(1) + ' MB'; }
+  function ago(t) {
+    const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    return s < 60 ? s + ' s ago' : s < 3600 ? Math.round(s / 60) + ' min ago' : Math.round(s / 3600) + ' h ago';
+  }
+
+  // One line on what is being followed, and whether the Pi is still talking.
+  function followText(c) {
+    const fo = c.pi && c.pi.follow, f = fo && fo.follower;
+    if (!f) return { text: '', kind: '' };
+    const src = fo.src, name = src.via === 'folder' ? (src.name || 'nothing yet') + ' (newest in ' + src.folder + ')' : src.name;
+    if (src.via === 'manual') {
+      return { text: 'Read ' + kB(f.offset) + ' of ' + name + '. This browser cannot keep reading it by itself: drop the file on this card '
+        + 'again, or press Read again…, to take what has been added since.', kind: '' };
+    }
+    const live = c.phase === 'follow', last = c.pi.lastRec;
+    let text = (live ? 'Following ' : 'Stopped following ') + name + ' — ' + kB(f.offset) + ' read'
+      + (last ? ', the Pi last heard ' + ago(last) : ', nothing new from the Pi yet');
+    let kind = '';
+    if (live && Date.now() - (last || f.started) > PI_QUIET_MS) {
+      text += '. Nothing new for a while — is PuTTY still connected to the Pi, and still logging to this file (Session → Logging → All session output)?';
+      kind = 'warn';
+    }
+    if (c.pi.untimed) text += '. ' + c.pi.untimed + ' timed by arrival — the Pi sent nothing else to time them by';
+    if (fo.note) { text += '. ' + fo.note; kind = 'warn'; }
+    return { text, kind };
+  }
+  function paintFollow(c) {
+    const el = document.getElementById('sdr-follow-' + c.id);
+    if (!el) return;
+    const t = followText(c);
+    el.textContent = t.text;
+    el.classList.toggle('txt-warn', t.kind === 'warn');
+  }
+
   // ── painting ────────────────────────────────────────────────────────────────
 
   function resetDisplay(c) { c.spec = null; c.peak = null; c.wf = null; c.scope = null; c.level = null; c.power = []; }
@@ -638,6 +1154,7 @@ const SerialSdr = (function () {
     if (!document.getElementById('sdr-dash-' + c.id)) return;
     if (p.chips) paintChips(c);
     if (p.notes) paintNotes(c);
+    if (p.ctlhtml) repaintControls(c);
     if (p.controls) syncControls(c);
     if (p.spectrum) paintSpectrum(c);
     if (p.waterfall) paintWaterfall(c);
@@ -658,8 +1175,18 @@ const SerialSdr = (function () {
       return;
     }
     paint(c);
+    if (isPi(c)) { paintFollow(c); paintWant(c); }
     if (typeof SerialIngest !== 'undefined') SerialIngest.mount(c);
     if (typeof RxLog !== 'undefined') RxLog.mount(c);
+  }
+
+  // The controls drawn again from what the Pi now reports — inside their
+  // <details>, so whether it is open is kept.
+  function repaintControls(c) {
+    const el = document.getElementById('sdr-ctl-' + c.id);
+    if (!el || (document.activeElement && el.contains(document.activeElement))) return;
+    el.innerHTML = '<summary>Controls</summary>' + controlsHtml(c);
+    syncControls(c);
   }
 
   function fmtMHz(hz, dp) { return (hz / 1e6).toFixed(dp == null ? 4 : dp); }
@@ -677,8 +1204,9 @@ const SerialSdr = (function () {
     chips.push(chip('Channel', fmtMHz(chan) + ' MHz' + (c.cfg.offsetHz && c.source !== 'demo' ? ' (' + (c.cfg.offsetHz > 0 ? '+' : '') + (c.cfg.offsetHz / 1000) + ' kHz)' : '')));
     if (c.tune) chips.push(chip('Tuned', esc(c.tune.mode) + (c.tune.errorHz ? ' · ' + (c.tune.errorHz > 0 ? '+' : '') + c.tune.errorHz + ' Hz' : ''), Math.abs(c.tune.errorHz || 0) > 2000 ? 'warn' : ''));
     const rate = deviceRate(c);
-    const got = c.source === 'usb' && c.rx.rate ? ' · ' + (c.rx.rate / 1000).toFixed(0) + 'k/s in' : '';
-    const short = c.source === 'usb' && c.rx.rate && c.rx.rate < rate * 0.95;
+    const live = c.source === 'usb' || isPi(c);
+    const got = live && c.rx.rate ? ' · ' + (c.rx.rate / 1000).toFixed(0) + 'k/s in' : '';
+    const short = live && c.rx.rate && c.rx.rate < rate * 0.95;
     chips.push(chip('Rate', (rate / 1000) + ' ksps' + got, short ? 'warn' : ''));
     if (lv) {
       chips.push(chip('ADC', lv.dbfs.toFixed(1) + ' dBFS · clip ' + lv.clipPct.toFixed(2) + '%', lv.clipPct > 0.5 ? 'bad' : lv.clipPct > 0.05 ? 'warn' : ''));
@@ -688,7 +1216,20 @@ const SerialSdr = (function () {
     const nd = c.readings.length, nb = c.bursts.length;
     chips.push(chip('Heard', nb + ' burst' + (nb === 1 ? '' : 's') + ' · ' + nd + ' reading' + (nd === 1 ? '' : 's')));
     if (c.lastDecode) chips.push(chip('Last decode', c.lastDecode.ms + ' ms · ' + c.lastDecode.combos + ' combos · ' + c.lastDecode.seconds.toFixed(1) + ' s window'));
-    chips.push(chip('Stream', c.streaming ? (c.paused ? 'paused display' : 'running') : 'stopped', c.streaming ? '' : 'warn'));
+    if (isPi(c) && c.pi) {
+      const st = c.pi.stat, info = c.pi.info || {};
+      const state = st ? st.state : '';
+      chips.push(chip('Stream', state === 'streaming' ? (c.paused ? 'paused display' : 'running on the Pi') : state === 'no-stick' ? 'no stick on the Pi'
+        : state ? esc(state) : 'waiting for the Pi', state === 'streaming' ? '' : 'warn'));
+      const up = st && st.up != null ? Math.round(st.up / 60000) : null;
+      chips.push(chip('Pi', esc(info.host || '—') + (up != null ? ' · up ' + Math.floor(up / 60) + ' h ' + (up % 60) + ' min' : '')
+        + (st && st.temp_c != null ? ' · ' + st.temp_c.toFixed(0) + ' °C' : '') + (st && st.cpu_pct != null ? ' · CPU ' + st.cpu_pct + '%' : ''),
+        st && st.temp_c >= 80 ? 'warn' : ''));
+      const clock = st ? st.clock : null;
+      chips.push(chip('Pi clock', clock === 'ntp' ? 'NTP' : clock === 'set' ? 'set' : st ? 'not set — Copy clock command' : '—', st && !clock ? 'warn' : ''));
+    } else {
+      chips.push(chip('Stream', c.streaming ? (c.paused ? 'paused display' : 'running') : 'stopped', c.streaming ? '' : 'warn'));
+    }
     el.innerHTML = chips.join('');
   }
 
@@ -1040,7 +1581,7 @@ const SerialSdr = (function () {
     if (!tb) return;
     const rows = c.readings.slice(-150).reverse();
     if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="qs-dim">No readings yet. Each frame the decoder accepts appears here.</td></tr>'; return; }
-    tb.innerHTML = rows.map(r => '<tr><td>' + SerialViz.hhmm(r.t, true) + '</td>'
+    tb.innerHTML = rows.map(r => '<tr><td>' + (r.t != null ? SerialViz.hhmm(r.t, true) : '<span class="qs-dim" title="From the log\'s history, and the Pi\'s clock was not set">—</span>') + '</td>'
       + '<td class="qs-num">' + r.sensorId + '</td>'
       + '<td>' + (r.name ? esc(r.name) : '<span class="qs-dim">not in MegaNet</span>') + '</td>'
       + '<td class="qs-num">' + r.value + '</td>'
@@ -1056,13 +1597,53 @@ const SerialSdr = (function () {
 
   function statusBadge(c) {
     if (c.phase === 'demo') return '<span class="ser-badge ok">● ' + (c.source === 'file' ? 'file' : 'demo') + '</span>';
+    if (c.phase === 'follow') return '<span class="ser-badge ok">● ' + (c.pi && c.pi.follow && c.pi.follow.src.via === 'manual' ? 'read on request' : 'following') + '</span>';
     if (c.phase === 'open') return '<span class="ser-badge ok">● live</span>';
     if (c.phase === 'closed') return '<span class="ser-badge">closed</span>';
     if (c.phase === 'error') return '<span class="ser-badge bad">● ' + esc(c.err || 'error') + '</span>';
     return '<span class="ser-badge warn">not opened</span>';
   }
 
+  // Where the stick is, first: on this computer's USB, or on a Raspberry Pi
+  // whose log this card follows. A browser with no WebUSB has only the second.
   function setupBody(c) {
+    const id = c.id, usbOk = RtlSdr.supported();
+    const where = !usbOk || c.cfg.where === 'pi' ? 'pi' : 'usb';
+    const radio = (v, label, dis) => '<label class="ser-check"><input type="radio" name="sdr-where-' + id + '" value="' + v + '"'
+      + (where === v ? ' checked' : '') + (dis ? ' disabled' : '') + ' onchange="SerialSdr.setWhere(\'' + id + '\',this.value)"> ' + label + '</label>';
+    const head = '<label class="ser-f-name">Name <input type="text" value="' + esc(c.name) + '" oninput="SerialSdr.setName(\'' + id + '\',this.value)"></label>'
+      + '<fieldset class="ser-f-source"><legend>Where is the stick?</legend>'
+      + radio('usb', 'plugged into this computer (WebUSB)', !usbOk)
+      + radio('pi', 'on a Raspberry Pi, read through PuTTY\'s log')
+      + '</fieldset>';
+    const why = usbOk ? '' : '<p class="ser-mode-note">This browser has no WebUSB, so it cannot reach a stick plugged in here. A Raspberry Pi can drive the stick '
+      + 'with this same decoder and print what it hears on a serial port, for PuTTY to log and this card to follow.</p>';
+    return where === 'pi' ? piSetup(c, head) + why : usbSetup(c, head);
+  }
+
+  function piSetup(c, head) {
+    const id = c.id, m = c.followMsg;
+    return '<div class="ser-form">' + head
+      + '<div class="ser-f-follow">'
+      + '<div class="ser-drop" id="sdr-drop-' + id + '"><strong>Drag the Pi\'s log here</strong> from File Explorer — the file PuTTY is writing, '
+      + 'or the folder it logs into. <span>It is read every second as it grows, including where IT has switched the browser’s file picker off.</span></div>'
+      + '<div class="ser-port-row">'
+      + (LogFollow.canPick() ? '<button class="ghost" onclick="SerialSdr.pickLog(\'' + id + '\')">Pick the log file…</button>' : '')
+      + '<button class="ghost" onclick="SerialSdr.readLogOnce(\'' + id + '\')">Read it once…</button></div>'
+      + (m ? '<div class="ser-port-status' + (m.kind === 'err' ? ' txt-bad' : '') + '">' + m.html + '</div>' : '')
+      + '<ol class="ser-follow-how">'
+      + '<li>Plug the Pi into this computer: a Pi 4 or 5 by its USB-C port, any other by a USB-serial cable on its pins. '
+      + 'It appears in Device Manager under <em>Ports (COM &amp; LPT)</em>.</li>'
+      + '<li>In PuTTY: <em>Connection type</em> <strong>Serial</strong>, that COM port, speed <strong>115200</strong>; '
+      + '<em>Session → Logging</em>: <strong>All session output</strong> and a file name. Open — readings scroll by as the Pi hears them.</li>'
+      + '<li>Drop that log here. Settings changed on this card are copied as one line to paste into PuTTY.</li></ol>'
+      + '<p class="ser-follow-how">Setting a Pi up — what to buy, the one install command, PuTTY step by step: '
+      + '<a href="docs/sdr-pi.md" target="_blank" rel="noopener">the SDR Pi guide</a>.</p>'
+      + '</div></div>'
+      + '<div class="ser-actions"><button class="ghost" onclick="Serial.removeConn(\'' + id + '\')">Remove</button></div>';
+  }
+
+  function usbSetup(c, head) {
     const id = c.id, f = c.cfg;
     const M = RtlSdr.MODELS;
     const known = (!c.usb && c.knownList.length)
@@ -1072,8 +1653,7 @@ const SerialSdr = (function () {
     const stick = c.usb
       ? '<span class="ser-port-ok">✓ ' + esc(c.label) + '</span> <button class="ghost" onclick="SerialSdr.choose(\'' + id + '\')">Change…</button>'
       : '<button class="ghost" onclick="SerialSdr.choose(\'' + id + '\')">Choose USB stick…</button>';
-    return '<div class="ser-form">'
-      + '<label class="ser-f-name">Name <input type="text" value="' + esc(c.name) + '" oninput="SerialSdr.setName(\'' + id + '\',this.value)"></label>'
+    return '<div class="ser-form">' + head
       + '<div class="ser-f-port"><label>RTL-SDR stick</label><div class="ser-port-row">' + stick + '</div>' + known + '</div>'
       + '<label>Model <select onchange="SerialSdr.setModel(\'' + id + '\',this.value)">'
       + Object.keys(M).map(k => opt(k, M[k].label, f.model)).join('') + '</select></label>'
@@ -1099,11 +1679,13 @@ const SerialSdr = (function () {
   }
 
   function controlsHtml(c) {
-    const id = c.id, f = c.cfg, i = c.info || {}, usb = c.source === 'usb';
+    const id = c.id, f = shownCfg(c), i = c.info || {}, pi = isPi(c), usb = c.source === 'usb' || pi;
     const dis = usb ? '' : ' disabled';
     const G = gainSteps(c), gIdx = nearestStep(G, f.gain);
     const btn = (label, fn, extra) => '<button type="button" class="ghost" onclick="SerialSdr.' + fn + '"' + (extra || '') + '>' + label + '</button>';
-    return '<div class="sdr-ctl-grid">'
+    return (pi ? '<p class="qs-hint">These show what the Pi last reported. A change is copied as a command for PuTTY — paste it (right-click) and press Enter; '
+        + 'several changes wait together and go as one line. The Pi answers through the log, and the card follows.</p>' : '')
+      + '<div class="sdr-ctl-grid">'
       // tuning
       + '<fieldset class="sdr-fs"><legend>Tuning</legend>'
       + '<div class="sdr-row"><label class="sdr-l">Frequency <span class="sdr-freq"><input type="number" step="0.0005" id="sdr-freq-' + id + '" value="' + fmtMHz(f.freq) + '"'
@@ -1119,11 +1701,13 @@ const SerialSdr = (function () {
       + (i.directSampling ? '<div class="sdr-row"><label class="sdr-l">HF direct sampling <select onchange="SerialSdr.setDirect(\'' + id + '\',this.value)"' + dis + '>'
         + opt('auto', 'Auto (Q-branch below 24 MHz)', f.direct) + opt('off', 'Off', f.direct) + opt('q', 'Q-branch', f.direct) + opt('i', 'I-branch', f.direct) + '</select></label></div>' : '')
       + (i.upconverter ? '<p class="qs-hint">Below 28.8 MHz this V4 tunes through its built-in upconverter, on its HF input, automatically.</p>' : '')
+      + (pi ? '<div class="sdr-row"><label class="sdr-l">Stick model <select onchange="SerialSdr.setModel(\'' + id + '\',this.value)">'
+        + Object.keys(RtlSdr.MODELS).map(k => opt(k, RtlSdr.MODELS[k].label, f.model)).join('') + '</select></label></div>' : '')
       + '</fieldset>'
       // gain
       + '<fieldset class="sdr-fs"><legend>Gain</legend>'
       + '<div class="sdr-row"><label class="sdr-l">Tuner gain <input type="range" min="0" max="' + (G.length - 1) + '" step="1" value="' + gIdx + '" id="sdr-gain-' + id + '"'
-      + ' oninput="SerialSdr.setGain(\'' + id + '\',this.value)"' + (f.autoGain || !usb ? ' disabled' : '') + '></label>'
+      + ' oninput="SerialSdr.setGain(\'' + id + '\',this.value)" onchange="SerialSdr.gainDone(\'' + id + '\')"' + (f.autoGain || !usb ? ' disabled' : '') + '></label>'
       + '<span class="qs-readout" id="sdr-gain-v-' + id + '">' + (f.gain / 10).toFixed(1) + ' dB</span></div>'
       + '<div class="sdr-row"><label class="ser-check"><input type="checkbox"' + (f.autoGain ? ' checked' : '') + dis + ' onchange="SerialSdr.setAutoGain(\'' + id + '\',this.checked)"> tuner AGC</label>'
       + '<label class="ser-check"><input type="checkbox"' + (f.agc ? ' checked' : '') + dis + ' onchange="SerialSdr.setAgc(\'' + id + '\',this.checked)"> RTL AGC</label></div>'
@@ -1145,8 +1729,26 @@ const SerialSdr = (function () {
       + ' onchange="SerialSdr.setSquelch(\'' + id + '\',this.value)"> dB</label></div>'
       + '<p class="qs-hint">One format at a time, on purpose: Enhanced iFLOWS read from a strong Binary burst makes CRC-valid ghosts.</p>'
       + '</fieldset>'
-      // listen & display
-      + '<fieldset class="sdr-fs"><legend>Listen and display</legend>'
+      + (pi ? piTail(c, f, btn) : localTail(c, f))
+      + '</div>';
+  }
+
+  // Following a Pi: its pace, and the commands worth having to hand. Its FM
+  // audio and IQ stay on the Pi — a serial line carries readings, not sound.
+  function piTail(c, f, btn) {
+    const id = c.id, every = c.pi && c.pi.settings.spec != null ? c.pi.settings.spec : 5;
+    return '<fieldset class="sdr-fs"><legend>From the Pi</legend>'
+      + '<div class="sdr-row"><label class="sdr-l">Spectrum every <select onchange="SerialSdr.setSpecEvery(\'' + id + '\',this.value)">'
+      + [[2, '2 s'], [5, '5 s'], [10, '10 s'], [30, '30 s'], [0, 'never']].map(([v, l]) => opt(v, l, every)).join('') + '</select></label>'
+      + '<label class="ser-check"><input type="checkbox"' + (f.peakHold ? ' checked' : '') + ' onchange="SerialSdr.setPeak(\'' + id + '\',this.checked)"> peak hold</label></div>'
+      + '<div class="sdr-row">' + btn('Copy all settings', 'copyAll(\'' + id + '\')') + btn('Copy clock command', 'copyClock(\'' + id + '\')') + '</div>'
+      + '<div class="sdr-row">' + btn('Ask for status', 'copyCmd(\'' + id + '\',\'STATUS\')') + btn('Restart the stick', 'copyCmd(\'' + id + '\',\'RESTART\')') + '</div>'
+      + '<p class="qs-hint">The Pi\'s FM audio and IQ recordings stay on the Pi: a serial line carries readings, not sound.</p></fieldset>';
+  }
+
+  function localTail(c, f) {
+    const id = c.id;
+    return '<fieldset class="sdr-fs"><legend>Listen and display</legend>'
       + '<div class="sdr-row"><label class="ser-check"><input type="checkbox"' + (f.audio ? ' checked' : '') + ' onchange="SerialSdr.setAudio(\'' + id + '\',this.checked)"> listen</label>'
       + '<label class="ser-check"><input type="checkbox"' + (f.audioGate ? ' checked' : '') + ' onchange="SerialSdr.setAudioGate(\'' + id + '\',this.checked)"> only while the gate is open</label></div>'
       + '<div class="sdr-row"><label class="sdr-l">Volume <input type="range" min="0" max="1" step="0.05" value="' + f.volume + '" oninput="SerialSdr.setVolume(\'' + id + '\',this.value)"></label></div>'
@@ -1160,15 +1762,22 @@ const SerialSdr = (function () {
       + AlertDsp.DEVICE_RATES.map(r => opt(r, (r >= 1e6 ? (r / 1e6) + ' Msps' : (r / 1000) + ' ksps'), AlertDsp.FS_IN)).join('') + '</select></label></div>'
       + '<div class="sdr-row sdr-file"><input type="file" accept=".iq8,.cu8,.bin,.raw,.iq" aria-label="IQ file to replay (8-bit unsigned I/Q)" onchange="SerialSdr.loadFile(\'' + id + '\',this)"></div>'
       + (c.source === 'file' && c.replay ? '<p class="qs-hint">Playing ' + esc(c.replay.name) + '.</p>' : '')
-      + '</fieldset>'
-      + '</div>';
+      + '</fieldset>';
   }
 
   function liveBody(c) {
     const id = c.id;
     const btn = (label, fn, extra) => '<button type="button" class="ghost" onclick="SerialSdr.' + fn + '"' + (extra || '') + '>' + label + '</button>';
+    const pi = isPi(c);
     let tb = '<div class="ser-toolbar">';
-    if (c.phase === 'open' || c.phase === 'demo') {
+    if (pi) {
+      const manual = c.pi && c.pi.follow && c.pi.follow.src.via === 'manual';
+      if (c.phase === 'follow') {
+        tb += manual ? btn('Read again…', 'readLogNow(\'' + id + '\')') : btn('Stop following', 'stopLog(\'' + id + '\')') + btn('Read now', 'readLogNow(\'' + id + '\')');
+      } else tb += '<button class="primary" onclick="SerialSdr.followLogAgain(\'' + id + '\')">Follow again</button>';
+      tb += btn(c.paused ? 'Resume display' : 'Pause display', 'pause(\'' + id + '\')');
+      tb += btn('Decode last 3 s', 'decodeNow(\'' + id + '\')') + btn('Copy all settings', 'copyAll(\'' + id + '\')') + btn('Copy clock command', 'copyClock(\'' + id + '\')');
+    } else if (c.phase === 'open' || c.phase === 'demo') {
       tb += btn(c.streaming ? 'Stop stream' : 'Start stream', 'stream(\'' + id + '\',' + !c.streaming + ')');
       tb += btn(c.paused ? 'Resume display' : 'Pause display', 'pause(\'' + id + '\')');
       tb += btn('Decode last 3 s', 'decodeNow(\'' + id + '\')') + btn('Capture 3 s IQ', 'capture(\'' + id + '\',3)') + btn('Capture 10 s', 'capture(\'' + id + '\',10)');
@@ -1177,6 +1786,10 @@ const SerialSdr = (function () {
     tb += '<button class="ghost" onclick="Serial.removeConn(\'' + id + '\')">Remove</button>';
     tb += '</div>';
     return '<div class="sdr-dash" id="sdr-dash-' + id + '">' + tb
+      + (pi ? '<p class="ser-follow-line" id="sdr-follow-' + id + '"></p>'
+        + '<p class="qs-note txt-warn" id="sdr-want-' + id + '" hidden></p>'
+        + '<input type="file" id="sdr-logfile-' + id + '" hidden accept=".log,.txt,text/plain" aria-label="The Pi\'s log file"'
+        + ' onchange="SerialSdr.onLogFile(\'' + id + '\',this)">' : '')
       + '<div class="qs-status" id="sdr-chips-' + id + '"></div>'
       + '<div class="qs-notes" id="sdr-notes-' + id + '"></div>'
       + '<section class="qs-panel" aria-labelledby="sdr-h-spec-' + id + '"><div class="qs-panel-head"><h3 id="sdr-h-spec-' + id + '">Spectrum and waterfall</h3>'
@@ -1185,16 +1798,16 @@ const SerialSdr = (function () {
       + '<canvas class="qs-canvas sdr-wf" id="sdr-wf-' + id + '" role="img" aria-label="Waterfall"></canvas>'
       + '<div class="qs-legend"><span><i class="qs-sw sw-accent"></i>spectrum</span><span><i class="qs-sw sw-warn"></i>peak hold</span>'
       + '<span><i class="qs-sw sw-dash"></i>noise floor</span><span><i class="qs-sw sw-ok"></i>decoder channel (±6 kHz)</span></div></section>'
-      + '<details class="qs-ctl sdr-controls" open><summary>Controls</summary>' + controlsHtml(c) + '</details>'
+      + '<details class="qs-ctl sdr-controls" id="sdr-ctl-' + id + '" open><summary>Controls</summary>' + controlsHtml(c) + '</details>'
       + (typeof SerialIngest !== 'undefined' ? SerialIngest.panel(c) : '')
       + (typeof RxLog !== 'undefined' ? RxLog.panel(c) : '')
       + '<div class="sdr-mini">'
       + '<section class="qs-panel" aria-labelledby="sdr-h-time-' + id + '"><h3 id="sdr-h-time-' + id + '">Channel and bursts</h3>'
       + '<canvas class="qs-canvas" id="sdr-time-' + id + '" role="img" aria-label="Channel power"></canvas></section>'
-      + '<section class="qs-panel" aria-labelledby="sdr-h-scope-' + id + '"><h3 id="sdr-h-scope-' + id + '">FM audio</h3>'
-      + '<canvas class="qs-canvas" id="sdr-scope-' + id + '" role="img" aria-label="FM audio waveform"></canvas></section>'
-      + '<section class="qs-panel" aria-labelledby="sdr-h-tones-' + id + '"><h3 id="sdr-h-tones-' + id + '">AFSK tones</h3>'
-      + '<canvas class="qs-canvas" id="sdr-tones-' + id + '" role="img" aria-label="Audio spectrum"></canvas><p class="qs-small qs-dim" id="sdr-tones-v-' + id + '"></p></section>'
+      + (pi ? '' : '<section class="qs-panel" aria-labelledby="sdr-h-scope-' + id + '"><h3 id="sdr-h-scope-' + id + '">FM audio</h3>'
+        + '<canvas class="qs-canvas" id="sdr-scope-' + id + '" role="img" aria-label="FM audio waveform"></canvas></section>'
+        + '<section class="qs-panel" aria-labelledby="sdr-h-tones-' + id + '"><h3 id="sdr-h-tones-' + id + '">AFSK tones</h3>'
+        + '<canvas class="qs-canvas" id="sdr-tones-' + id + '" role="img" aria-label="Audio spectrum"></canvas><p class="qs-small qs-dim" id="sdr-tones-v-' + id + '"></p></section>')
       + '<section class="qs-panel" aria-labelledby="sdr-h-hist-' + id + '"><h3 id="sdr-h-hist-' + id + '">ADC</h3>'
       + '<canvas class="qs-canvas" id="sdr-hist-' + id + '" role="img" aria-label="ADC histogram"></canvas></section>'
       + '</div>'
@@ -1214,10 +1827,13 @@ const SerialSdr = (function () {
       + '</div>';
   }
 
+  // Drops land here, through Serial's handlers, which ask acceptsLog() first.
   function cardHtml(c) {
-    return '<div class="panel ser-conn ser-sdr ser-' + (c.phase === 'demo' ? 'open' : c.phase) + '" id="ser-card-' + c.id + '">'
+    const id = c.id;
+    return '<div class="panel ser-conn ser-sdr ser-' + (c.phase === 'demo' || c.phase === 'follow' ? 'open' : c.phase) + '" id="ser-card-' + id + '"'
+      + ' ondragover="Serial.dragOver(event,\'' + id + '\')" ondragleave="Serial.dragLeave(event,\'' + id + '\')" ondrop="Serial.drop(event,\'' + id + '\')">'
       + '<div class="ser-conn-head"><span class="ser-conn-name">' + esc(c.name) + '</span> ' + statusBadge(c)
-      + ' <span class="ser-conn-port small">' + esc(c.label || 'RTL-SDR (USB)') + '</span></div>'
+      + ' <span class="ser-conn-port small" id="sdr-label-' + id + '">' + esc(c.label || (c.cfg.where === 'pi' ? 'RTL-SDR on a Raspberry Pi' : 'RTL-SDR (USB)')) + '</span></div>'
       + (c.phase === 'setup' ? setupBody(c) : liveBody(c))
       + '</div>';
   }
@@ -1225,8 +1841,11 @@ const SerialSdr = (function () {
   return {
     create, cardHtml, mount, remove, demo,
     choose, useKnown, setModel, setName, open, close, reopen, stream,
-    setFreq, nudge, preset, setRate, setGain, setAutoGain, setAgc, setPpm, setBias, setDirect,
+    setFreq, nudge, preset, setRate, setGain, gainDone, setAutoGain, setAgc, setPpm, setBias, setDirect,
     setFormat, setGate, setSquelch, setOffsetKhz, clickSpectrum, setFft, setPeak, setAudio, setAudioGate, setVolume,
     pause, capture, decodeNow, clearReadings, exportReadings, loadFile,
+    // a Raspberry Pi's log (sdr-pi.js)
+    setWhere, acceptsLog, followLog, pickLog, readLogOnce, onLogFile, stopLog, followLogAgain, readLogNow,
+    copyAll, copyClock, copyCmd, copyWant, discardWant, setSpecEvery,
   };
 })();

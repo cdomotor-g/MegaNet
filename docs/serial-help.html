@@ -59,6 +59,10 @@ to change anything. PuTTY opens the port and writes everything it receives to a 
 file; the Serial Monitor follows that file as it grows, and the card fills exactly as
 it would from the port — a Quansheng radio's dashboard, an ERT-A2's readings, or a
 plain text, hex or ALERT stream.</p>
+<p><strong>An RTL-SDR stick works this way too</strong>, on a Raspberry Pi: the Pi drives
+the stick with MegaNet's own decoder and prints what it hears on a serial port, which
+PuTTY opens and logs like any other. Its log becomes an RTL-SDR card by itself. Setting
+the Pi up: <a href="sdr-pi.md">the SDR Pi guide</a>.</p>
 <ol>
   <li>Plug the device in and find its port: <em>Device Manager → Ports (COM &amp; LPT)</em>
       — for example <code>COM5</code>.</li>

@@ -5,6 +5,12 @@ decoding it off the air — in the browser, with no other software. Add one with
 **+ RTL-SDR** on the Serial Monitor tab, or press **Demo RTL-SDR** to see the
 whole card with nothing plugged in.
 
+**A computer that cannot reach USB** — no WebUSB, no administrator for the WinUSB
+driver — can still have one: the stick goes on a **Raspberry Pi** that runs this
+same driver and decoder and prints what it hears on a serial port, PuTTY logs the
+port, and this card follows the log (*Where is the stick?* → *on a Raspberry Pi*).
+[`sdr-pi.md`](sdr-pi.md) is that guide.
+
 | File | What it is |
 |---|---|
 | `rtlsdr.js` | The WebUSB driver: RTL2832U + Rafael R820T/R820T2/R828D, with the RTL-SDR Blog V3 and V4 behaviours, or + Fitipower FC0012/FC0013 (the V2), as librtlsdr drives them |
@@ -77,6 +83,10 @@ system has to let go of the stick first, exactly as for `rtl_sdr`, SDR# or rtl_t
   card in another tab. Only one program can hold the stick.
 
 The card's error messages say which of these it looks like.
+
+If none of this is possible on a computer — WebUSB switched off by policy, or no
+administrator to install the driver — put the stick on a Raspberry Pi instead:
+[`sdr-pi.md`](sdr-pi.md).
 
 ## What each model does
 

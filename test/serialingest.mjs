@@ -131,7 +131,10 @@ try {
     rep && JSON.stringify(rep.body.payload));
   ok('the token goes in X-Ingest-Token, not Authorization',
     rep && rep.headers['x-ingest-token'] === 'mgn_check-token' && !rep.headers.authorization && rep.headers['content-profile'] === 'meganet');
-  ok('the card names the ingest point it posts as', await page.evaluate(i => /Check laptop/.test(document.getElementById('ing-status-' + i).textContent), id));
+  // The label is the report's answer, painted once the response is read: wait
+  // for it, rather than reading the line the moment the request is recorded.
+  await until(() => page.evaluate(i => /Check laptop/.test(document.getElementById('ing-status-' + i).textContent), id),
+    'the card names the ingest point it posts as');
 
   // A live reading: timed by arrival.
   const before = Date.now();

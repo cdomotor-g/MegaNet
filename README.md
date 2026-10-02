@@ -124,7 +124,9 @@ MegaNet/
 │                             the module, so it isn't confused with maps-data.js)
 ├── serial.js               ← Serial    — Serial Monitor tab (Web Serial)
 ├── serial-radio.js         ← SerialRadio — its Quansheng ALERT radio dashboard
-├── serial-sdr.js           ← SerialSdr — its RTL-SDR card (WebUSB)
+├── serial-sdr.js           ← SerialSdr — its RTL-SDR card (WebUSB, or a Raspberry Pi's log)
+├── sdr-pi.js               ← SdrPi     — the text an RTL-SDR on a Raspberry Pi prints for PuTTY
+│                             (both ends: sdr-pi/relay.js writes it, the card reads it)
 ├── serial-ert.js           ← SerialErt — its ELPRO ERT-A2 card (alert2.js, live)
 ├── serial-gps.js           ← SerialGps — a USB GPS (NMEA) card; the position for the rest
 ├── reception-log.js        ← RxLog     — every frame each receiver heard, with position
@@ -190,6 +192,12 @@ MegaNet/
 │   ├── test/                               (npm test — unit, plus a real broker end to end)
 │   ├── deploy/                             (mosquitto.conf + ACL examples for the self-hosted case)
 │   └── tools/publish-sample.js             (a test client, for proving the path from a laptop)
+│
+├── sdr-pi/                 ← an RTL-SDR on a Raspberry Pi, for a PC that cannot reach USB (docs/sdr-pi.md)
+│   ├── relay.js                            (rtlsdr.js + alert-dsp.js under Node; readings out on a serial port, commands in)
+│   ├── dsp-worker.js                       (the decoder's thread)
+│   ├── install.sh                          (one command on the Pi: usb package, udev, the serial link, the service)
+│   └── usb-gadget.sh                       (a Pi 4/5's USB-C port as a USB serial device — a COM port, no driver)
 │
 ├── logger/                 ← the base station's side of ingest, over BOTH paths (CRBasic)
 │   ├── README.md                           (loading it, commissioning it, what its diagnostics mean)
@@ -2433,6 +2441,17 @@ output live, on the **Serial Monitor** tab. Built on the browser's
   Worker: spectrum with noise floor and peak hold, waterfall, channel power and
   bursts, FM audio waveform and tone spectrum, the decoded symbols, the ADC
   histogram, IQ capture and replay. See [`docs/serial-sdr.md`](docs/serial-sdr.md).
+- **RTL-SDR on a Raspberry Pi** — for a computer that cannot reach USB at all (no
+  WebUSB, no administrator to give the stick WinUSB): the stick goes on a Pi running
+  the same driver and decoder under Node (`sdr-pi/relay.js`), which prints what it
+  hears on a serial port — a Pi 4/5's USB-C port as a USB serial device, or a
+  USB-serial cable on any Pi's pins — exactly as the Quansheng radio does. PuTTY logs
+  that port; the RTL-SDR card follows the log and draws it as it draws a stick of
+  its own. The spectrum, levels and decode traces travel inside an escape sequence
+  PuTTY does not print, so its window reads like a scanner's while its log carries
+  everything; the card's controls copy commands for PuTTY, several changes as one
+  line. One install command on the Pi. See [`docs/sdr-pi.md`](docs/sdr-pi.md) and,
+  for the protocol, [`docs/sdr-pi-serial.md`](docs/sdr-pi-serial.md).
 - **ELPRO ERT-A2** — the ALERT2 / ERT-A2 tab's decoder fed live: the RS232 port's
   ALERT2A lines (with the receiver's clock and its skew against the frame time) or
   the USB port's binary frames (with RSSI), told apart by what arrives; every
@@ -4076,7 +4095,7 @@ Tabs / panels:
   Stations map as a selection
 - **ALERT Packets** — decode/encode ALERT/ERTS telemetry messages (ABF, BCC, EAF, EIF, A2C)
 - **ALERT2 / ERT-A2** — decode ELPRO ERT-A2 serial captures, either wire format (ALERT2 ASCII on RS232, or the USB binary framing that carries RSSI), mapped and matched to stations
-- **Serial Monitor** — live ingestion from physical COM ports (Web Serial), with ASCII / hex / ALERT-decode display; a Quansheng ALERT radio dashboard with its controls; and an RTL-SDR (Blog V2/V3/V4, WebUSB) that decodes ALERT off the air with a live spectrum and waterfall
+- **Serial Monitor** — live ingestion from physical COM ports (Web Serial), with ASCII / hex / ALERT-decode display; a Quansheng ALERT radio dashboard with its controls; and an RTL-SDR (Blog V2/V3/V4, WebUSB — or on a Raspberry Pi, read through PuTTY's log) that decodes ALERT off the air with a live spectrum and waterfall
 - **Inspections** — the six paper station-inspection sheets, digitised: one form
   driven by `meganet.inspection_form`, drafts on the device, and the printed 6%
   tip-test rule computed rather than read

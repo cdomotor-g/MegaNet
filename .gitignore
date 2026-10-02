@@ -14,6 +14,10 @@ acma_subset/
 # build. See test/README.md.
 test/node_modules/
 
+# The Raspberry Pi relay's one dependency (usb), installed on the Pi by
+# sdr-pi/install.sh — never part of the site.
+sdr-pi/node_modules/
+
 # tools/ingest/ is plain scripts run with python3, not a package. The bytecode
 # cache appears the moment survey.py imports xlsx.py from beside it.
 __pycache__/
