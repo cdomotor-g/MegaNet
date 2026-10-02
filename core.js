@@ -1499,8 +1499,14 @@ const HELP = {
       + 'UTC. Database calls by role come from <code>pg_stat_statements</code> and count since its last reset.',
       '<strong>Clear settings</strong> forgets what this browser keeps for the app — filters, '
       + 'widths, drafts — and keeps your sign-in.',
+      '<strong>A base station can ask for its own ingest token.</strong> Press <em>Request a token</em> '
+      + 'on a Raspberry Pi running RPi ALERT (or <em>Ask an administrator</em> in a Serial Monitor card) and '
+      + 'it appears under <em>Ingest tokens → Waiting for approval</em> with the code it shows. Check the '
+      + 'code matches, then Approve: the device starts sending by itself — nothing to copy. Scanning the '
+      + 'QR code on the Pi\'s screen opens that request here.',
     ],
     links: [{ label: 'Access, sign-in and the allowlist', href: 'docs/access.md' },
+            { label: 'Ingest tokens, and base stations that ask for one', href: 'docs/ingest-http.md' },
             { label: 'The database schema, migrations and who may write', href: 'db/README.md' },
             { label: 'Why the station list lives in Postgres', href: 'docs/datastore-decision.md' }],
     related: ['export', 'photos'],
@@ -2218,13 +2224,10 @@ const DB_SCHEMA = 'meganet';
 // migration that raises the database's. A mismatch is reported rather than
 // papered over — an app newer than its database is the failure that otherwise
 // shows up as columns quietly reading as undefined.
-// 0047 (receptions) is written and passes its checks, but was not yet applied
-// live when this shipped: the app does not need it to run — the reception log
-// stays in the browser and the Reception Map's "From the database" says the
-// migration is missing — so the expected version stays 46 rather than every
-// session reporting a mismatch. Goes to 47 in the commit that records 0047
-// applied.
-const DB_SCHEMA_VERSION = 46;
+// 48: 0047 (receptions) and 0048 (a base station asking for its token) were
+// applied live together — 0047 had waited since its own commit, when the
+// connection timed out on every write.
+const DB_SCHEMA_VERSION = 48;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

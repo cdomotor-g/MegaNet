@@ -535,6 +535,13 @@ is written for whoever is configuring the logger, with the curl that works, the
 payload shape, and how to mint and revoke a token. `db/migrations/0007_ingest_http.sql`
 is the database side.
 
+**Or the base station asks for its token** (`0048`): press *Request a token* on a
+Raspberry Pi running [RPi ALERT](https://github.com/cdomotor-g/RPi_ALERT) (or *Ask
+an administrator* in a Serial Monitor card), and approve the request on the Admin
+tab from any device you are signed in on — after checking the code it shows. The
+device makes the token itself and MegaNet keeps only its hash, so nothing is
+copied or carried and nobody signs in on the Pi.
+
 **A base station that speaks this already exists**: [`logger/`](logger/README.md)
 holds a CRBasic program for the datalogger at the base — it reads the ALERT2
 ASCII the ERT-A2 puts on its RS-232 port (the same lines the ALERT2 / ERT-A2 tab

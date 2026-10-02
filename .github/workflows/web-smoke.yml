@@ -1150,6 +1150,11 @@ jobs:
       # token-checked, a retry stored once, editors only, GPS the only exact.
       - name: check_receptions.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_receptions.sql
+      # A base station asking for its token (0048): anon may ask, only the hash
+      # of the device's own token is kept, only an administrator approves —
+      # and the approved token opens the door with nothing to collect.
+      - name: check_ingest_token_requests.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest_token_requests.sql
       - name: check_inspections.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
       - name: check_inspection_history.sql

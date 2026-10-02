@@ -21,6 +21,13 @@
 //   * the token travels in X-Ingest-Token, never in Authorization
 //   * the Admin tab's token panel (0046): mint, shown once, "Use in this
 //     browser", listed, revoked after asking
+//   * asking an administrator for the token (0048), from a card: a token the
+//     browser made, asked with in X-Ingest-Token, kept only once approved —
+//     and the card that asked then sends by itself; Stop asking withdraws it
+//   * the other side, on the Admin tab: a request appearing by itself within a
+//     poll, the code to check, a taken name offered as a replacement (and not
+//     sent until that is ticked), approve and deny, and the Pi's QR link
+//     (#pair=CODE) opening that request — before sign-in and after
 //
 // Run:  npm run serialingest
 //       npm run serialingest -- -v    also print what passed
@@ -220,12 +227,88 @@ try {
     return { text: el ? el.textContent : '', box: !!(el && el.querySelector('input[type=checkbox]')), ingest: !!c.ingest }; });
   ok('a demo card says it never sends, offers no switch, and sends nothing', /never/.test(demo.text) && !demo.box && !demo.ingest && posts.length === nD, JSON.stringify(demo));
 
+  // ── asking an administrator for the token (0048) ───────────────────────────
+  // The three device calls answered as tools/check_ingest_token_requests.sql
+  // holds the real ones to: pending with a code, then approved once `pair.status`
+  // says so — which is the moment an administrator would press Approve.
+  const pair = { requests: [], polls: [], withdrawals: [], status: 'pending' };
+  await page.route('**/rest/v1/rpc/request_ingest_token', r => {
+    const req = r.request();
+    pair.requests.push({ headers: req.headers(), body: JSON.parse(req.postData() || '{}') });
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'pending', id: 40 + pair.requests.length, code: 'BCDF-GHJK',
+      label: 'Serial Monitor on a Linux PC', expires_at: new Date(Date.now() + 1800e3).toISOString(), expires_in: 1800, poll_s: 5 }) });
+  });
+  await page.route('**/rest/v1/rpc/ingest_token_request_status', r => {
+    pair.polls.push(r.request().headers()['x-ingest-token']);
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(pair.status === 'approved'
+      ? { status: 'approved', label: 'Field laptop' } : { status: 'pending', code: 'BCDF-GHJK', expires_in: 1700 }) });
+  });
+  await page.route('**/rest/v1/rpc/withdraw_ingest_token_request', r => {
+    pair.withdrawals.push(r.request().headers()['x-ingest-token']);
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'withdrawn' }) });
+  });
+  const ingText = i => page.evaluate(x => (document.getElementById('ing-' + x) || {}).textContent || '', i);
+
+  await page.evaluate(i => { SerialIngest.toggle(i, false); SerialIngest.setToken(i, ''); }, id);
+  ok('with no token, the card offers to ask an administrator for one', /Ask an administrator for one/.test(await ingText(id)));
+  await page.click('#ing-' + id + ' button:has-text("Ask an administrator for one")');
+  await until(async () => /BCDF-GHJK/.test(await ingText(id)) && /Waiting for an administrator/.test(await ingText(id)), 'asking shows the code the request carries');
+  const ask = pair.requests[0];
+  const asked = ask && ask.headers['x-ingest-token'];
+  ok('…having asked with a token it made itself, in X-Ingest-Token — mgn_ and 64 hex — never Authorization',
+    /^mgn_[0-9a-f]{64}$/.test(asked || '') && !ask.headers.authorization && ask.headers['content-profile'] === 'meganet', asked);
+  ok('…saying what it is: a label, and the receivers on this computer',
+    ask && /Serial Monitor/.test(ask.body.payload.label) && Array.isArray(ask.body.payload.detail.receivers) && ask.body.payload.detail.receivers.length >= 1,
+    ask && JSON.stringify(ask.body));
+  ok('…keeping no token to send with until it is approved', await page.evaluate(() => !JSON.parse(localStorage.getItem('mn-ingest')).token));
+  await until(() => pair.polls.length >= 1, 'it asks how the request is going');
+  ok('…holding the token it asked with', pair.polls[0] === asked);
+  const nA = posts.length;
+  pair.status = 'approved';
+  await until(() => page.evaluate(t => JSON.parse(localStorage.getItem('mn-ingest')).token === t, asked), 'approved, the token it made is kept');
+  await until(() => page.evaluate(i => Serial.findConn(i).ingest.on, id), '…and the card that asked starts sending by itself');
+  ok('…and says so, under the name MegaNet gave it', /Approved/.test(await ingText(id)) && /Field laptop/.test(await ingText(id)));
+  fs.appendFileSync(file('radio-old.log'), dec(5, null, 4110, 77) + '\r\n');
+  await until(() => posts.slice(nA).some(p => p.headers['x-ingest-token'] === asked && (p.body.payload.readings || []).some(r => r.alert_id === 4110)),
+    'a reading is then posted with the approved token');
+
+  pair.status = 'pending';
+  await page.evaluate(i => { SerialIngest.toggle(i, false); SerialIngest.setToken(i, ''); }, id);
+  await page.click('#ing-' + id + ' button:has-text("Ask an administrator for one")');
+  await until(async () => /Stop asking/.test(await ingText(id)), 'asking again shows the code again');
+  await page.click('#ing-' + id + ' button:has-text("Stop asking")');
+  await until(() => pair.withdrawals.length === 1, 'Stop asking withdraws the request, so it leaves the Admin tab\'s list');
+  ok('…with the token it asked with, and nothing is left waiting',
+    pair.withdrawals[0] === pair.requests[1].headers['x-ingest-token'] && await page.evaluate(() => !JSON.parse(localStorage.getItem('mn-ingest')).pending));
+
   // ── the Admin tab's token panel (0046) ─────────────────────────────────────
   // Auth stood in for an administrator; the three calls answered as
   // tools/check_ingest_token_admin.sql holds the real ones to.
   const minted = 'mgn_' + 'a'.repeat(64);
   const tokens = [];
   const adminCalls = [];
+  // …and the requests (0048), as tools/check_ingest_token_requests.sql holds
+  // the real calls to. Empty until a base station asks, further down.
+  const reqList = [], approveCalls = [], denyCalls = [];
+  await page.route('**/rest/v1/rpc/admin_ingest_token_requests', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reqList) }));
+  await page.route('**/rest/v1/rpc/admin_approve_ingest_token_request', r => {
+    const a = JSON.parse(r.request().postData() || '{}');
+    approveCalls.push(a);
+    const q = reqList.find(x => x.id === a.p_id);
+    const at = new Date().toISOString();
+    Object.assign(q, { status: 'approved', decided_at: at, decided_by: 'admin@example.test', token_label: a.p_label || q.label, ingest_token_id: 30 + approveCalls.length });
+    if (a.p_replace_token_id) { const old = tokens.find(t => t.id === a.p_replace_token_id); if (old) old.revoked_at = at; }
+    tokens.unshift({ id: 30 + approveCalls.length, label: q.token_label, created_at: at, created_by: 'admin@example.test', receivers: [] });
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 30 + approveCalls.length, label: q.token_label,
+      request_id: q.id, code: q.code, host_station_id: null, replaced_token_id: a.p_replace_token_id || null }) });
+  });
+  await page.route('**/rest/v1/rpc/admin_deny_ingest_token_request', r => {
+    const a = JSON.parse(r.request().postData() || '{}');
+    denyCalls.push(a.p_id);
+    const q = reqList.find(x => x.id === a.p_id);
+    Object.assign(q, { status: 'denied', decided_at: new Date().toISOString(), decided_by: 'admin@example.test' });
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: q.id, status: 'denied' }) });
+  });
   await page.route('**/rest/v1/rpc/admin_ingest_tokens', r => { adminCalls.push('list'); r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(tokens) }); });
   await page.route('**/rest/v1/rpc/admin_create_ingest_token', r => {
     const a = JSON.parse(r.request().postData() || '{}');
@@ -262,6 +345,59 @@ try {
   await until(() => page.evaluate(() => /revoked/.test(document.querySelector('#adm-tokens table').textContent)), 'Revoke… revokes it, after asking');
   ok('…by its id', adminCalls.includes('revoke:9'), adminCalls.join(','));
 
+  // ── base stations asking for a token, on the Admin tab (0048) ──────────────
+  const reqsText = () => page.evaluate(() => (document.getElementById('adm-tok-reqs') || {}).textContent || '');
+  ok('with nothing waiting, the panel says how a base station asks', /Nothing is waiting/.test(await reqsText()));
+  // A live token already called what the Pi will ask as: a reflashed Pi.
+  const ago = s => new Date(Date.now() - s * 1000).toISOString();
+  tokens.unshift({ id: 12, label: 'Bench Pi', created_at: ago(86400 * 9), last_used_at: ago(86400 * 3), receivers: [] });
+  await page.evaluate(() => AdminTokens.load());
+  reqList.push({ id: 7, code: 'WDJB-MJHT', label: 'Bench Pi', status: 'pending', requested_at: ago(60), expires_at: new Date(Date.now() + 29 * 60e3).toISOString(),
+    host_station_id: null, detail: { app: 'RPi ALERT', version: '0.2.0', board: 'Raspberry Pi 4 Model B', host: 'rpi-alert', receivers: [{ kind: 'rtl-sdr', name: 'RTL-SDR' }] } });
+  await until(async () => /WDJB-MJHT/.test(await reqsText()), 'a request appears under Waiting for approval by itself, within a poll');
+  const shown = await reqsText();
+  ok('…with its code, its name and what it said about itself',
+    /Bench Pi/.test(shown) && /RPi ALERT 0\.2\.0/.test(shown) && /Raspberry Pi 4 Model B/.test(shown) && /RTL-SDR/.test(shown), shown.slice(0, 300));
+  await page.click('#adm-tok-reqs button:has-text("Approve…")');
+  const form = await page.evaluate(() => ({ text: document.getElementById('adm-tok-reqs').textContent,
+    label: (document.getElementById('adm-req-label') || {}).value, go: (document.getElementById('adm-req-go') || {}).textContent }));
+  ok('Approve… asks for the code to be checked, the name filled in', /Check the device shows WDJB-MJHT/.test(form.text) && form.label === 'Bench Pi' && /WDJB-MJHT/.test(form.go || ''), JSON.stringify(form).slice(0, 300));
+  ok('…and, a live token having that name, says so and offers to replace it',
+    /already called “Bench Pi”/.test(form.text) && await page.evaluate(() => !!document.querySelector('#adm-req-clash input[type=checkbox]')));
+  await page.click('#adm-req-go');
+  ok('approving under a taken name without replacing it is stopped before anything is sent',
+    approveCalls.length === 0 && /change the label, or tick Replace it/.test(await reqsText()));
+  await page.check('#adm-req-clash input[type=checkbox]');
+  await page.click('#adm-req-go');
+  await until(() => approveCalls.length === 1, 'Approve sends the approval');
+  ok('…for that request, under that name, replacing the live token, with no station',
+    approveCalls[0] && approveCalls[0].p_id === 7 && approveCalls[0].p_label === 'Bench Pi' && approveCalls[0].p_replace_token_id === 12 && approveCalls[0].p_host_station_id === '',
+    JSON.stringify(approveCalls[0]));
+  await until(() => page.evaluate(() => /Approved “Bench Pi”/.test(document.getElementById('adm-tokens').textContent)), 'the panel says it is approved, and that nothing needs copying');
+  ok('…and the request moves to the last day\'s list', await page.evaluate(() => /approved/.test((document.querySelector('.adm-req-recent') || {}).textContent || '')));
+
+  reqList.push({ id: 8, code: 'KLMN-PQRS', label: 'Somebody', status: 'pending', requested_at: ago(30), expires_at: new Date(Date.now() + 29 * 60e3).toISOString(), detail: {} });
+  await until(async () => /KLMN-PQRS/.test(await reqsText()), 'a second request appears');
+  page.once('dialog', d => d.accept());
+  await page.click('#adm-tok-reqs button:has-text("Deny")');
+  await until(() => denyCalls.includes(8), 'Deny turns it down, after asking');
+
+  // The QR code on the Pi's screen: #pair=CODE. Signed out first, then in.
+  reqList.push({ id: 9, code: 'XZBC-DFGH', label: 'Hut Pi', status: 'pending', requested_at: ago(20), expires_at: new Date(Date.now() + 29 * 60e3).toISOString(), detail: { app: 'RPi ALERT' } });
+  await page.evaluate(() => {
+    Auth.isSignedIn = () => false; Auth.isAdmin = () => false; Auth.role = () => null;
+    location.hash = '#pair=xzbc-dfgh';
+    AdminTokens.restoreFromUrl();
+  });
+  ok('the Pi\'s QR link opens the Admin tab, asking an administrator to sign in to approve that code',
+    await page.evaluate(() => state.activeTab === 'admin' && /Sign in as an administrator to approve it/.test(document.getElementById('adm-tokens').textContent)
+      && /XZBC-DFGH/.test(document.getElementById('adm-tokens').textContent)));
+  ok('…and takes the code out of the address bar', await page.evaluate(() => location.hash === ''));
+  await page.evaluate(() => { Auth.isSignedIn = () => true; Auth.isAdmin = () => true; Auth.role = () => 'admin'; AdminTokens.authChanged(); });
+  await until(() => page.evaluate(() => { const f = document.querySelector('.adm-req.is-focus'); return !!f && /XZBC-DFGH/.test(f.textContent) && !!document.getElementById('adm-req-go'); }),
+    'signed in, that request is picked out with its approve form open');
+  ok('…and nothing was approved by the link itself', approveCalls.length === 1);
+
   ok('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 } finally {
   await browser.close();
@@ -270,4 +406,4 @@ try {
 }
 
 if (failures) { console.log(`\nFAIL — ${failures} check(s) failed.`); process.exit(1); }
-console.log('PASS — a receiver card posts what it hears as a tagged base station, approximate location said as such, and never a reading it cannot time.');
+console.log('PASS — a receiver card posts what it hears as a tagged base station, approximate location said as such, and never a reading it cannot time; a base station asks for its token and an administrator approves it.');

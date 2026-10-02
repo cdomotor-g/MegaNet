@@ -15,13 +15,21 @@ PuTTY writes (see [`serial-help.html#putty`](serial-help.html#putty)).
 ## Setting one up
 
 1. **Get a token for the computer** — one per computer, not per card or station.
-   An administrator does it on the **Admin** tab, under **Ingest tokens**: give it a
-   label someone would recognise (*Cameron work laptop*) and press **Create token**.
-   It is shown once — only its hash is kept.
-   - Setting up **this** computer? Press **Use in this browser** and every Serial
-     Monitor card here has it; nothing to copy.
-   - Setting up another one? **Copy** it, and paste it into a card's **Send to
-     MegaNet** panel on that computer.
+   Either way round:
+   - **Ask for one from the card** — nobody signs in on this computer. In the
+     card's **Send to MegaNet** panel press **Ask an administrator for one**: the
+     panel shows a code such as `WDJB-MJHT`. On a phone or computer signed in to
+     MegaNet as an administrator, open **Admin → Ingest tokens → Waiting for
+     approval**, check the code matches, and press **Approve** (renaming it if you
+     like). Within five seconds this browser keeps the token and the card that
+     asked starts sending. **Stop asking** withdraws the request. How it works:
+     [`ingest-http.md`](ingest-http.md#a-base-station-that-asks-for-its-token).
+   - **Or an administrator mints one** on the **Admin** tab, under **Ingest
+     tokens**: give it a label someone would recognise (*Cameron work laptop*) and
+     press **Create token**. It is shown once — only its hash is kept. Setting up
+     **this** computer? Press **Use in this browser** and every Serial Monitor card
+     here has it; nothing to copy. Setting up another one? **Copy** it, and paste
+     it into a card's **Send to MegaNet** panel on that computer.
 
    (The SQL route still works: `select meganet.create_ingest_token('label');`.)
 

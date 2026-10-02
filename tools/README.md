@@ -48,6 +48,21 @@ hash, with the administrator as its maker; a live label cannot be used twice; a
 minted token opens the door and its receiver shows in the list; a revoke shuts the
 door at once and frees the label.
 
+`check_ingest_token_requests.sql` holds `0048`, a base station asking for its token:
+38 checks, the devices played by anon holding a token in `X-Ingest-Token` and the
+people made through 0005's triggers. A device asks and is told *pending*, an
+eight-consonant code and half an hour; only the hash of its own token is kept; a retry
+is the same request and the same code; a token of the wrong shape, a label that is not
+one line or a description over 4 KB is refused by name. Only an administrator may list,
+approve or deny, and the list never carries the hash. Until approval the token opens
+nothing; once approved it is the device's own hash, made by the administrator, and
+opens the door at once — nothing to collect — while the device is told *approved*
+under the label MegaNet knows it by, never who approved it. A live label cannot be
+approved twice, but can be approved as a replacement (the old token revoked in the same
+step); denied, withdrawn and expired requests cannot be approved and their tokens
+cannot ask again; a request a day past expiry is swept; and the twenty-first waiting
+device is told to try later (`PT429`). Confirmed red on four deliberate breaks.
+
 ## Map boundaries from a KMZ (#179)
 
 `kml_to_geojson.py` turns a KML or KMZ of polygons into a web-sized GeoJSON, with

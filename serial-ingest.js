@@ -36,6 +36,13 @@
 // The queue survives a reload (localStorage, the newest 5,000), a retry is
 // safe — ingest() stores the same reading once however often it is posted —
 // and a refused token stops sending and says so rather than retrying for ever.
+//
+// Getting a token without signing in (0048): "Ask an administrator" makes a
+// token in this browser, asks MegaNet to approve it, and shows the code the
+// request carries. An administrator signed in anywhere — a phone — approves it
+// on the Admin tab; this browser asks how it is going every five seconds, and
+// on approval keeps the token and starts the card that asked. The token never
+// has to be typed or carried, and the code is what the administrator matches.
 
 const SerialIngest = (function () {
   const STORE = 'mn-ingest';
@@ -193,9 +200,11 @@ const SerialIngest = (function () {
       persistSoon(c);
       if (g.queue.length) schedule(c, 0);
     } else if (res.status === 401 || res.status === 403) {
+      g.refused = true;
       stop(c, 'The database refused the ingest token (' + res.status + ') — it is mistyped, or it has been revoked. Nothing is lost: '
         + g.queue.length + ' reading' + (g.queue.length === 1 ? ' is' : 's are') + ' kept to send once a working token is in.');
       announce((c.name || 'Card') + ' — the ingest token was refused; sending to MegaNet stopped');
+      renderCard(c);
     } else if (res.status === 400) {
       // The contract was misread, by this file: the batch would fail the same
       // way for ever, so it is dropped and said rather than retried.
@@ -333,7 +342,7 @@ const SerialIngest = (function () {
     const g = state_(c);
     if (on) {
       if (isDemo(c)) { g.err = 'A demo card\'s readings are made up, so it never sends them.'; paint(c); renderCard(c); return; }
-      if (!load().token) { g.err = 'Paste the ingest token for this computer first.'; paint(c); renderCard(c); return; }
+      if (!load().token) { g.err = 'Paste the ingest token for this computer first — or ask an administrator for one, below.'; paint(c); renderCard(c); return; }
       start(c);
     } else {
       stop(c);
@@ -374,10 +383,151 @@ const SerialIngest = (function () {
     save(s);
     const c = Serial.findConn(id);
     if (c && c.ingest) {
-      c.ingest.err = ''; c.ingest.label = '';
+      c.ingest.err = ''; c.ingest.label = ''; c.ingest.refused = false;
       if (c.ingest.on) { report(c); schedule(c, 0); }
-      paint(c);
+      // Drawn again rather than painted: whether to offer "Ask an
+      // administrator" turns on whether there is a token at all.
+      renderCard(c);
     }
+  }
+
+  // ── asking an administrator for the token (0048) ──────────────────────────
+  // One request per browser, like the token itself: it is the computer that is
+  // the ingest point. What is waiting lives in `mn-ingest` beside the token —
+  // { token, code, id, label, expiresAt, askedBy: [point ids] } — so a reload
+  // carries on asking, and the cards that asked start once it is approved.
+
+  const PAIR_POLL_MS = 5000;
+  let pairTimer = 0, pairMsg = '', pairBusy = false;
+
+  function newToken() {
+    const a = new Uint8Array(32);
+    crypto.getRandomValues(a);
+    return 'mgn_' + Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function computerLabel() {
+    const ua = navigator.userAgent || '';
+    const os = /Windows/.test(ua) ? 'Windows PC' : /Mac OS/.test(ua) ? 'Mac' : /CrOS/.test(ua) ? 'Chromebook'
+      : /Linux (aarch64|armv\d)/.test(ua) ? 'Linux ARM computer (a Raspberry Pi?)' : /Linux/.test(ua) ? 'Linux PC' : 'computer';
+    return 'Serial Monitor on a ' + os;
+  }
+
+  async function pairCall(fn, token, payload) {
+    const res = await fetch(DB_URL + '/rpc/' + fn, { method: 'POST', headers: headers(token), body: JSON.stringify({ payload: payload || {} }) });
+    return { res, out: await res.json().catch(() => null) };
+  }
+
+  function renderAll() { Serial.list().forEach(c => { if (document.getElementById('ing-' + c.id)) renderCard(c); }); }
+
+  async function requestToken(id) {
+    if (pairBusy || load().pending) return;
+    const c = Serial.findConn(id);
+    const cards = Serial.list().filter(x => RECEIVER[kindOf(x)] && !isDemo(x));
+    const token = newToken();
+    const payload = { label: computerLabel(), detail: {
+      app: 'MegaNet Serial Monitor', browser: (navigator.userAgent || '').slice(0, 160),
+      receivers: cards.map(x => ({ kind: RECEIVER[kindOf(x)], name: x.ingest ? point(x).name : (x.name || KIND_LABEL[kindOf(x)]) })).slice(0, 8),
+    } };
+    pairBusy = true; pairMsg = 'Asking MegaNet…'; renderAll();
+    try {
+      const { res, out } = await pairCall('request_ingest_token', token, payload);
+      if (res.ok && out && out.code) {
+        const s = load();
+        s.pending = { token, code: out.code, id: out.id, label: out.label, expiresAt: out.expires_at,
+                      askedBy: c && c.ingest ? [point(c).pointId] : [] };
+        save(s);
+        pairMsg = '';
+        announce('Asked MegaNet for a token. Code ' + out.code.split('').join(' ') + ' — an administrator approves it on the Admin tab.');
+        pollPair();
+      } else if (res.status === 404) {
+        pairMsg = 'The database cannot take requests yet (migration 0048 is not applied there). An administrator can make a token on the Admin tab instead.';
+      } else if (res.status === 429) {
+        pairMsg = (out && out.message) || 'Too many base stations are already waiting — try again in a few minutes.';
+      } else {
+        pairMsg = 'The request was not taken (' + ((out && out.message) || res.status) + ').';
+      }
+    } catch (e) {
+      pairMsg = 'Could not reach the database (' + ((e && e.message) || e) + ') — try again.';
+    }
+    pairBusy = false;
+    renderAll();
+  }
+
+  function pollPair() {
+    clearTimeout(pairTimer);
+    if (!load().pending) return;
+    pairTimer = setTimeout(async () => {
+      const p = load().pending;
+      if (!p) return;
+      let st = null;
+      try {
+        const { res, out } = await pairCall('ingest_token_request_status', p.token, {});
+        if (res.ok && out && out.status) st = out;
+      } catch (_) { /* no network: ask again next time */ }
+      if (!st || st.status === 'pending') { pollPair(); return; }
+      const s = load();
+      if (!s.pending || s.pending.token !== p.token) return;
+      delete s.pending;
+      if (st.status === 'approved') {
+        s.token = p.token;
+        save(s);
+        pairMsg = 'Approved — this computer posts as “' + (st.label || p.label) + '”.';
+        announce(pairMsg);
+        Serial.list().forEach(c => {
+          if (!c.ingest) return;
+          c.ingest.err = ''; c.ingest.label = ''; c.ingest.refused = false;
+          if (c.ingest.on) { report(c); schedule(c, 0); }
+          else if ((p.askedBy || []).includes(point(c).pointId) && !isDemo(c)) start(c);
+        });
+      } else {
+        save(s);
+        pairMsg = {
+          denied:    'An administrator turned the request down.',
+          withdrawn: 'The request was withdrawn.',
+          expired:   'Nobody approved it within half an hour — ask again for a new code.',
+          revoked:   'That token has been revoked — ask again.',
+        }[st.status] || 'MegaNet no longer has the request — ask again.';
+        announce(pairMsg);
+      }
+      renderAll();
+    }, PAIR_POLL_MS);
+  }
+
+  async function cancelPair() {
+    const s = load(), p = s.pending;
+    if (!p) return;
+    clearTimeout(pairTimer);
+    delete s.pending;
+    save(s);
+    pairMsg = 'Stopped asking.';
+    renderAll();
+    // So the request leaves the Admin tab's list rather than waiting to be
+    // approved for nobody. Best effort: it runs out in half an hour anyway.
+    try { await pairCall('withdraw_ingest_token_request', p.token, {}); } catch (_) { /* expires by itself */ }
+  }
+
+  function pairHtml(c) {
+    const s = load(), g = c.ingest || {};
+    if (s.pending) {
+      const until = new Date(s.pending.expiresAt);
+      return '<div class="ing-pair" role="status">'
+        + '<p class="qs-small">Waiting for an administrator to approve this computer'
+        + (s.pending.label ? ' (“' + esc(s.pending.label) + '”)' : '') + '. The code is</p>'
+        + '<p><span class="adm-req-code" aria-label="' + esc(s.pending.code.split('').join(' ')) + '">' + esc(s.pending.code) + '</span></p>'
+        + '<p class="qs-small">On a phone or computer signed in to MegaNet as an administrator: <strong>Admin</strong> → '
+        + '<strong>Ingest tokens</strong> → <strong>Waiting for approval</strong>. Check the code matches, then Approve — '
+        + 'this card starts sending by itself.' + (isFinite(until) ? ' The code lasts until ' + esc(until.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) + '.' : '') + '</p>'
+        + '<button type="button" class="ghost" onclick="SerialIngest.cancelPair()">Stop asking</button></div>';
+    }
+    let h = '';
+    if (!s.token || g.refused) {
+      h += '<p class="qs-small">' + (s.token ? 'A new token?' : 'No token?') + ' <button type="button" class="ghost"'
+        + (pairBusy ? ' disabled' : '') + ' onclick="SerialIngest.requestToken(\'' + c.id + '\')">Ask an administrator for one</button> '
+        + '— this computer gets a code, an administrator signed in anywhere approves it on the Admin tab, and nothing has to be copied.</p>';
+    }
+    if (pairMsg) h += '<p class="qs-small" role="status">' + esc(pairMsg) + '</p>';
+    return h;
   }
   function setName(id, v) {
     const c = Serial.findConn(id); if (!c) return;
@@ -529,6 +679,7 @@ const SerialIngest = (function () {
       + '" onchange="SerialIngest.setToken(\'' + id + '\',this.value)"></label>'
       + '<label>Receiver name <input type="text" maxlength="120" value="' + esc(p.name) + '" onchange="SerialIngest.setName(\'' + id + '\',this.value)"></label>'
       + '</div>'
+      + pairHtml(c)
       + '<p class="qs-small qs-dim">Receiver id <code>' + esc(p.pointId) + '</code> — every reading it sends carries the path <code>serial-monitor/' + esc(p.pointId)
       + '</code>. The token is kept in this browser only.</p>'
       + '<fieldset class="ing-loc"><legend>Where the receiver is — there is no GPS, so this is approximate and recorded as such</legend>'
@@ -584,7 +735,11 @@ const SerialIngest = (function () {
   }
 
   // Called by each card after it renders.
-  function mount(c) { if (RECEIVER[kindOf(c)] && !isDemo(c)) { state_(c); paint(c); } }
+  function mount(c) {
+    if (RECEIVER[kindOf(c)] && !isDemo(c)) { state_(c); paint(c); }
+    // A request left waiting by a reload goes on being asked about.
+    if (load().pending && !pairTimer) pollPair();
+  }
 
   // The card is going away: whatever is waiting is kept for next time.
   function detach(c) {
@@ -615,6 +770,7 @@ const SerialIngest = (function () {
   function token() { return load().token || ''; }
 
   return { add, arrival, note, panel, pointInfo, locOf, pointIsOn, token, mount, paint, detach, toggle, setToken, setName, setLocSource, locate, setStation, setManual, sendNow,
+           requestToken, cancelPair,
            // for the check
            _locNote: locNote, _findStation: findStation };
 })();

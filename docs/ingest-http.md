@@ -299,6 +299,72 @@ unless it came from a GPS. That page is [`ingest-serial-monitor.md`](ingest-seri
 
 ## Getting a token
 
+Two ways round. **The base station asks** — the easy one for a Raspberry Pi or
+any device nobody wants to sign in on — or **an administrator mints one** and it
+is carried to the device.
+
+### A base station that asks for its token
+
+`0048`. The device makes its own token, asks MegaNet to approve it, and shows a
+short code; an administrator signed in anywhere — a phone, a work computer —
+approves it on the **Admin** tab, and the device starts posting by itself. Nothing
+is copied, typed or carried, and nobody signs in on the device. It is the device
+authorisation grant of RFC 8628, the way a television signs in to a streaming
+service.
+
+1. **On the device**, press **Request a token**: RPi ALERT's **Settings →
+   MegaNet** (or the banner on its dashboard, on the Pi's own screen or at
+   `http://rpi-alert.local/`), `rpi-alert request-token` over SSH, or **Ask an
+   administrator** in a Serial Monitor card. It shows a code such as `WDJB-MJHT`,
+   and on RPi ALERT a QR code.
+2. **On a phone or computer signed in to MegaNet as an administrator**, open
+   **Admin → Ingest tokens**. The request is under **Waiting for approval** within
+   a few seconds — or scan the QR code, which opens it directly
+   (`https://floodwarning.net/#pair=WDJB-MJHT`).
+3. **Check the code matches what the device shows**, change the label if you like,
+   and press **Approve**. The device notices within five seconds and starts
+   sending. **Deny** turns it down.
+
+**Check the code.** Anyone can ask (that is what makes it work without a sign-in),
+so the code is how you know the request you approve is the device in front of
+you and not somebody else's with a copied name. Two waiting requests never share
+a code. A request lasts **30 minutes**; at most **20** wait at once.
+
+**A reflashed Pi** asks under the name its old token still holds. The approve form
+says a live token already has that label and offers **Replace it**, which revokes
+the old token in the same step.
+
+What travels: the device draws `mgn_` and 64 hex characters from its own random
+number generator and sends them in `X-Ingest-Token`, exactly as it will to
+`ingest_http()` afterwards. MegaNet keeps only their hash; approving turns that
+hash into an ordinary ingest token, revoked from the same panel the same way. So
+there is no token sitting in the database waiting to be collected, and a dropped
+connection cannot lose it. For a device of your own:
+
+```sh
+TOKEN="mgn_$(openssl rand -hex 32)"           # keep this — it is the device's token
+curl -sS "$URL/rest/v1/rpc/request_ingest_token" \
+  -H "apikey: $KEY" -H "X-Ingest-Token: $TOKEN" \
+  -H 'Content-Type: application/json' -H 'Content-Profile: meganet' \
+  -d '{"payload":{"label":"Mt Stuart base","detail":{"app":"my logger"}}}'
+# => {"status":"pending","code":"WDJB-MJHT","expires_in":1800,"poll_s":5,…}
+
+# Every five seconds until it is not pending:
+curl -sS "$URL/rest/v1/rpc/ingest_token_request_status" \
+  -H "apikey: $KEY" -H "X-Ingest-Token: $TOKEN" \
+  -H 'Content-Type: application/json' -H 'Content-Profile: meganet' -d '{}'
+# => {"status":"approved","label":"Mt Stuart base"} — now post readings with $TOKEN
+```
+
+The status is one of `pending`, `approved`, `denied`, `expired`, `withdrawn` (the
+device called `withdraw_ingest_token_request` to stop waiting), `revoked` or
+`unknown`. A token asks once: after a denial or an expiry, make a new one and ask
+again. `429` means 20 requests are already waiting — try again in a few minutes.
+`payload.host_station_id` may name the station the device sits at; the
+administrator sees it as a suggestion.
+
+### An administrator mints one
+
 **From the app:** an administrator mints, lists and revokes tokens on the
 **Admin** tab, under **Ingest tokens** (`0046`). The token is shown once, with a
 copy button. **From SQL**, which still works — run this from the Supabase SQL

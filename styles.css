@@ -9316,6 +9316,9 @@ code {
 .ing-loc .ing-inline { flex: 1 1 100%; }
 .ing-loc p { flex: 1 1 100%; margin: .2rem 0 0; overflow-wrap: anywhere; }
 .ing-status { margin: .5rem 0 0; font-size: .85rem; overflow-wrap: anywhere; }
+/* Waiting for an administrator to approve this computer's token (0048). */
+.ing-pair { border: 1px solid var(--accent); border-radius: 8px; padding: .4rem .7rem .6rem; margin: .5rem 0; overflow-wrap: anywhere; }
+.ing-pair p { margin: .25rem 0; }
 
 /* The Admin tab's ingest tokens (admin-tokens.js). */
 .adm-tok-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: .6rem; align-items: end; margin: .6rem 0; }
@@ -9330,6 +9333,21 @@ code {
 .rx-sw-cen { background: transparent; border: 2px dashed var(--bad); width: 14px; height: 14px; }
 tr.rx-sel th, tr.rx-sel td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .adm-tok-value { display: inline-block; max-width: 100%; overflow-wrap: anywhere; font-size: .85rem; user-select: all; }
+/* Base stations asking for a token (0048): the code is what gets matched
+   against the device, so it is the largest thing in each request. */
+.adm-tok-reqs { margin: .2rem 0 1rem; }
+.adm-req-h { font-size: 1rem; margin: .6rem 0 .4rem; display: flex; align-items: center; gap: .4rem; }
+.adm-reqs { display: grid; gap: .6rem; }
+.adm-req { display: flex; flex-wrap: wrap; gap: .4rem 1rem; align-items: flex-start; padding: .6rem .8rem;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--panel-sub); min-width: 0; }
+.adm-req.is-focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.adm-req-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1.35rem; font-weight: 700;
+  letter-spacing: .12em; color: var(--text); white-space: nowrap; }
+.adm-req-body { flex: 1 1 16rem; min-width: 0; display: grid; gap: .3rem; overflow-wrap: anywhere; }
+.adm-req-body .button-group { margin-top: .2rem; }
+.adm-req-form { border-top: 1px solid var(--border); margin-top: .3rem; padding-top: .4rem; }
+.adm-req-form p { margin: .2rem 0; }
+.adm-req-recent ul { margin: .3rem 0 0; padding-left: 1.2rem; }
 
 /* ── Quansheng radio dashboard and RTL-SDR card (serial-radio.js, serial-sdr.js) ── */
 .qs-dash, .sdr-dash { display: grid; gap: .8rem; min-width: 0; }

@@ -125,3 +125,8 @@
 // restored tab.
 if (typeof window !== 'undefined') Workbench.restoreFromUrl();
 
+// A base station's QR code (0048): #pair=XXXX-XXXX opens the Admin tab with
+// that request's approve form open (admin-tokens.js). After the first render
+// for Workbench's reason, and after it: the two never share a URL.
+if (typeof window !== 'undefined') AdminTokens.restoreFromUrl();
+

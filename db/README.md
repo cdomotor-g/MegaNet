@@ -200,6 +200,7 @@ its cache at all (`PGRST002`).
 | `meganet.bridge_health` | One row per running MQTT bridge. Exists so "no readings since Tuesday" can be told apart from "the relay died on Tuesday". |
 | `meganet.ingest_point_report`, `meganet.ingest_point_latest` | What each receiver behind an ingest token says about itself (`0045`) — the Serial Monitor's Quansheng, ERT-A2 and RTL-SDR cards posting as base stations: name, kind, device detail, and a location with how it was got (`gps`, `browser`, `manual`, `station`, `heard`, `none`). **Only a `gps` location may be stored as exact** — a constraint, not a convention. A change is a new row; a repeat moves `last_seen_at`. The receiver's readings carry `path = 'serial-monitor/' \|\| point_id`. **Editors only, never `anon`**: a laptop's location can be somebody's house. The view is `security_invoker`. See `docs/ingest-serial-monitor.md`. |
 | `meganet.admin_ingest_tokens()`, `meganet.admin_create_ingest_token(text, text)`, `meganet.admin_revoke_ingest_token(bigint)` | The Admin tab's **Ingest tokens** panel (`0046`): list every token (never its hash) with the receivers behind it, mint one through `create_ingest_token()` (shown once; a label unique among live tokens), revoke one (immediate; nothing un-revokes). **Administrators only** (`admin_require()`); granted to `authenticated`, not `anon`. |
+| `meganet.ingest_token_request`, `meganet.request_ingest_token(jsonb)`, `meganet.ingest_token_request_status(jsonb)`, `meganet.withdraw_ingest_token_request(jsonb)`, `meganet.admin_ingest_token_requests()`, `meganet.admin_approve_ingest_token_request(bigint, text, text, bigint)`, `meganet.admin_deny_ingest_token_request(bigint)` | **A base station asking for its token** (`0048`), the device grant of RFC 8628: the device makes its own `mgn_` token, asks with it in `X-Ingest-Token`, and shows an eight-consonant code; an administrator approves it on the Admin tab, and the device's own hash becomes an `ingest_token` — nothing to collect afterwards. The table has RLS on, no policy and no grant; only the hash is kept. The device's three functions are `anon` (30 minutes a request, at most 20 waiting, `PT429` beyond); the three `admin_*` are **administrators only**. Approving can replace a live token of the same label in the same step. See **HTTP ingest → A base station that asks for its token**. |
 | `meganet.reception`, `meganet.report_receptions(jsonb)`, `meganet.reception_window(timestamptz, timestamptz, int)` | Every frame a Serial Monitor receiver heard, good or bad, with level and position (`0047`) — the Reception Map's raw material, kept because deduplicated readings throw away the corrupted copies that find a bad repeater. Posted token-checked (≤ 1,000 a batch, each row on its own, a retry stored once); **only a `gps` position stored as exact**; **editors only** to read. See `docs/reception-map.md`. |
 | `meganet.report_ingest_point(jsonb)` | The door to the above (`0045`), token-checked like `bridge_heartbeat()`: `PT401` without a live token, `22023` naming the field for a bad report. Granted to `anon` because the token, not the role, authorises it. |
 | `meganet.ingest_token_id()` | The `X-Ingest-Token` check `0007` does inline, factored out for `0008`'s endpoints. Raises PT401. Not granted to `anon` — directly reachable it would be a guessing oracle. |
@@ -738,6 +739,51 @@ station a base station reports for. Null now means nothing has ever told us.
 `ingest()` has returned and inside an exception block: a batch that was accepted
 must not be lost to a failure in the record of it. A failure there is a `warning`
 in the server log naming the token and the SQLSTATE, and a `200` for the device.
+
+### A base station that asks for its token
+
+`0048_ingest_token_requests.sql`. Minting on the Admin tab (`0046`) still left a
+68-character token to carry to a Raspberry Pi, or a browser that had to sign in by
+email code before it could mint one itself. So the device asks instead — RFC 8628's
+device grant, the way a television signs in — and an administrator signed in
+anywhere approves it.
+
+**The device makes the token; only its hash arrives.** It draws `mgn_` and 64 hex
+characters from its own CSPRNG and sends them in `X-Ingest-Token` to
+`request_ingest_token()`, exactly as it will afterwards to `ingest_http()`. The
+request keeps `sha256(token)` — the hash `ingest_token` keeps — and approving copies
+that hash into a new `ingest_token` row. No plaintext waits in the database to be
+collected, a lost response cannot lose the token, and the device's next call simply
+works. That is why approval does not go through `create_ingest_token()`, which makes
+a token of its own. The shape is enforced (`^mgn_[0-9a-f]{64}$`).
+
+**The code is for matching.** The administrator sees every waiting request and
+approves by pressing a button; the code the device shows — eight of RFC 8628's
+twenty consonants, `XXXX-XXXX`, from `gen_random_uuid()`'s CSPRNG without modulo
+bias — is how they know the request they press is the device in front of them. A
+partial unique index means two waiting requests never show the same code.
+
+**Asking is open, and bounded.** The device's three calls are granted to `anon`: a
+request lasts 30 minutes, at most 20 wait at once (`PT429`, HTTP 429, beyond that),
+a description is at most 4 KB, and until approved the token opens nothing. A retry
+while it waits answers the same request and code; a token that has asked once and
+been denied, withdrawn or expired cannot ask again (`23505`) — the device makes a new
+one. The status call answers only about the caller's own token and never names the
+approver. Requests a day past expiry, and decisions a month old, are swept by the
+next request.
+
+**Approving** labels the token with the device's name unless the administrator gives
+another — unique among live tokens, as `0046` requires — and takes the station the
+device named as its `host_station_id` unless told otherwise (`''` is none).
+`p_replace_token_id` revokes a live token first, in the same transaction, for the Pi
+that was reflashed and asks under the name its old token still holds.
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_ingest_token_requests.sql
+```
+
+38 checks in a transaction that rolls back. The operational side — what the Admin
+tab shows and what a Pi does — is [`docs/ingest-http.md`](../docs/ingest-http.md).
 
 ## MQTT ingest
 
