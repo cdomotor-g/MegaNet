@@ -7782,8 +7782,8 @@
       "id": "ben_avon_al",
       "name": "Ben Avon AL",
       "station_number": "531082",
-      "lat": -17.8072,
-      "lon": 145.325,
+      "lat": -17.80726,
+      "lon": 145.325017,
       "elevation_ahd": 661.5,
       "roles": [
         "field"
@@ -34707,8 +34707,8 @@
       "id": "gatton",
       "name": "Gatton",
       "station_number": "40444",
-      "lat": -27.554471,
-      "lon": 152.274671,
+      "lat": -27.553062,
+      "lon": 152.275931,
       "elevation_ahd": 107.6,
       "roles": [
         "field"
@@ -54259,8 +54259,8 @@
       "id": "main_camp_rd_al",
       "name": "Main Camp Ck AL",
       "station_number": "540717",
-      "lat": -27.8336,
-      "lon": 152.3144,
+      "lat": -27.831873,
+      "lon": 152.315606,
       "elevation_ahd": 596.3,
       "roles": [
         "field"
@@ -54269,7 +54269,10 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 4070,
+        "battery": 4071
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -64984,8 +64987,8 @@
       "id": "munna_ck_glenbar_ti",
       "name": "Munna Ck (Glenbar Tiaro Rd) Alert",
       "station_number": "140025",
-      "lat": -25.7474,
-      "lon": 152.2966,
+      "lat": -25.748398,
+      "lon": 152.296751,
       "elevation_ahd": 93,
       "roles": [
         "field"
@@ -64995,7 +64998,9 @@
         "mary"
       ],
       "alert_ids": {
-        "rainfall": 850
+        "rainfall": 848,
+        "battery": 850,
+        "water_level": 849
       },
       "satcom": {
         "enabled": false,
@@ -65037,7 +65042,8 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
-      ]
+      ],
+      "facing_deg": 250.0
     },
     {
       "id": "munna_ck_al",
@@ -66715,8 +66721,8 @@
       "id": "neabul_ck",
       "name": "Neabul Ck",
       "station_number": "44238",
-      "lat": -27.5955,
-      "lon": 147.7925,
+      "lat": -27.595859,
+      "lon": 147.791841,
       "elevation_ahd": 232.2,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
@@ -78613,10 +78619,11 @@
     },
     {
       "id": "running_ck_bells",
-      "name": "Running Ck (Bells",
+      "name": "Running Ck (Bells Bridge)",
       "station_number": "140846",
-      "lat": -28.3183,
-      "lon": 152.9216,
+      "station_type": "auto_water_level",
+      "lat": -28.318178,
+      "lon": 152.921509,
       "elevation_ahd": 176.8,
       "roles": [
         "field"
@@ -78641,7 +78648,10 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
-      ]
+      ],
+      "inspection_config_key": "datalogger_old",
+      "tower_height": 3.0,
+      "facing_deg": 153.0
     },
     {
       "id": "running_ck_tm",
@@ -94906,8 +94916,8 @@
       "id": "upper_tenthill_al",
       "name": "Upper Tenthill AL",
       "station_number": "540519",
-      "lat": -27.8094,
-      "lon": 152.2867,
+      "lat": -27.809145,
+      "lon": 152.286472,
       "elevation_ahd": 359.3,
       "roles": [
         "field"
@@ -94917,7 +94927,8 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 4024
+        "rainfall": 4024,
+        "battery": 4025
       },
       "satcom": {
         "enabled": false,
@@ -352929,6 +352940,127 @@
           "level_m_ahd": 93.21
         }
       ]
+    },
+    {
+      "id": "proposed_gatton_auto",
+      "name": "Proposed Gatton Auto",
+      "station_number": "",
+      "proposed": true,
+      "station_type": "auto_water_level",
+      "proposed_year": 2026,
+      "lat": -27.554456,
+      "lon": 152.274684,
+      "elevation_ahd": null,
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [],
+      "alert_ids": {
+        "water_level": 9999
+      },
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "",
+      "sensors": [
+        {
+          "alert_id": 9999,
+          "type": "Water Level",
+          "sensor_id": "proposed_gatton_auto:9999",
+          "device_id": null
+        }
+      ],
+      "TBRGbucketSize": 0.2,
+      "inspection_config_key": "alert",
+      "flood_classes": [
+        {
+          "as_at": "2026-09-25",
+          "first_report_m": 3.0,
+          "crossing_height_m": 3.90,
+          "crossing_type": "B",
+          "minor_m": 7.0,
+          "crops_grazing_m": 13.0,
+          "moderate_m": 10.0,
+          "towns_m": 18.3,
+          "major_m": 15.0,
+          "note": "Copied from Gatton (40444, id gatton) on 2026-09-29 for the proposed station beside it; not surveyed or assessed at this site."
+        },
+        {
+          "as_at": "2014-01-15",
+          "first_report_m": 3.0,
+          "crossing_height_m": 3.9,
+          "crossing_type": "B",
+          "minor_m": 7.0,
+          "crops_grazing_m": 13.0,
+          "moderate_m": 10.0,
+          "towns_m": 18.3,
+          "major_m": 15.0,
+          "note": "Copied from Gatton (40444, id gatton) on 2026-09-29 for the proposed station beside it; not surveyed or assessed at this site."
+        }
+      ],
+      "gauge_survey": [
+        {
+          "valid_from": "1929-09-01",
+          "gauge_zero_m": 87.54,
+          "datum": "AHD",
+          "amtd_km": 72.0,
+          "catchment_area_km2": 1550.00,
+          "note": "Copied from Gatton (40444, id gatton) on 2026-09-29 for the proposed station beside it; not surveyed or assessed at this site. The gauge zero is 40444's, so the copied heights on the gauge read as they do there."
+        }
+      ],
+      "aep_levels": [
+        {
+          "as_at": "2026-09-26",
+          "source": "QLD_AEP_Levels_1.xlsx (FWIN_QLD_V9_2)",
+          "point_lat": -27.555,
+          "point_lon": 152.275,
+          "ground_m": 101.62,
+          "aep_1_m": 102.69,
+          "aep_0_5_m": 103.11,
+          "aep_0_2_m": 103.47,
+          "aep_0_066_m": 103.75,
+          "data_quality": 3,
+          "level_difference": 3,
+          "confidence": 9,
+          "slope": 0.00172,
+          "slope_basis": "1% AEP water surface from Ma Ma Creek Alert, 20.0 km upstream, to Glenore Grove Alert, 20.2 km downstream: 69.22 m over 40.2 km (AMTD and straight line × 1.3)",
+          "note": "Copied from Gatton (40444, id gatton) on 2026-09-29 for the proposed station beside it; not surveyed or assessed at this site."
+        }
+      ],
+      "flood_peaks": [
+        {
+          "date": "1893-02-04",
+          "height_m": 16.33,
+          "level_m_ahd": 103.87
+        },
+        {
+          "date": "2011-01-11",
+          "height_m": 15.38,
+          "level_m_ahd": 102.92
+        },
+        {
+          "date": "1974-01-27",
+          "height_m": 14.63,
+          "level_m_ahd": 102.17
+        },
+        {
+          "date": "1959-02-18",
+          "height_m": 12.80,
+          "level_m_ahd": 100.34
+        },
+        {
+          "date": "1983-06",
+          "height_m": 11.58,
+          "level_m_ahd": 99.12
+        }
+      ],
+      "flood_peaks_from": "gatton",
+      "flood_peaks_gauge": "40444"
     }
   ]
 }
