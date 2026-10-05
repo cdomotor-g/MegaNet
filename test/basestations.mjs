@@ -85,7 +85,10 @@ const STATUS = {
   receivers: [
     { key: STICK_1, name: 'RTL-SDR 1', kind: 'sdr', state: 'running', protocol: 'ALERT', error: null, point: 'rx-1', enabled: true,
       freq_hz: 151500000, format: 'BINARY', gain_db: 29.7, ppm: 0, squelch_db: 8, bias_tee: false, sample_rate: 960000,
-      model: 'RTL-SDR Blog V4', serial: '00000001', usb_port: '1-1.3', own: false },
+      model: 'RTL-SDR Blog V4', serial: '00000001', usb_port: '1-1.3', own: false,
+      // One stick, two channels (the station's moreChannels).
+      channels: [{ freq_hz: 151500000, format: 'BINARY', in_band: true, decoded: 410, point: 'rx-1' },
+                 { freq_hz: 151625000, format: 'ENHANCED_IFLOWS', in_band: true, decoded: 2, point: 'rx-1-151.625' }] },
     { key: ODD_KEY, name: 'Second stick', kind: 'sdr', state: 'error', protocol: 'ALERT', error: 'usb_claim_interface error -6', point: 'rx-2',
       enabled: true, freq_hz: 160250000, format: 'BINARY', gain_db: 29.7, ppm: 3, squelch_db: 8, bias_tee: false, sample_rate: 960000,
       model: 'RTL-SDR Blog V3', serial: '00000002', usb_port: '1-1.4', own: true },
@@ -325,6 +328,8 @@ try {
   await until(() => page.evaluate(() => !!document.querySelector('#bs-settings #bs-f-name')), 'its settings arrive with its whole status');
   const detail = (await text('#bs-detail')).replace(/\s+/g, ' ');
   ok('its health', /mt-stuart/.test(detail) && /192\.168\.1\.40/.test(detail) && /58\.4 °C/.test(detail) && /under-voltage since boot/.test(detail), detail.slice(0, 400));
+  ok('a stick hearing two channels says each, with what each decoded', /151\.5000 MHz ALERT Binary \(410 decoded\), 151\.6250 MHz Enhanced iFLOWS \(2 decoded\)/.test(detail)
+    && /its other channel is set on the station/.test(detail), detail.slice(detail.indexOf('Receivers'), detail.indexOf('Receivers') + 400));
   ok('its receivers, with the heartbeat\'s state over the status\'s', /RTL-SDR 1/.test(detail) && /receiving/.test(detail) && /151\.5000 MHz/.test(detail)
     && /usb_claim_interface error -6/.test(detail) && /412 decoded/.test(detail), detail.slice(0, 600));
   ok('its uplink', /Waiting to send 3 · 12 receptions/.test(detail) && /floodwarning\.net/.test(detail));

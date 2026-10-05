@@ -249,7 +249,12 @@ const BaseStations = (function () {
 
   function rxDetail(r) {
     if (r.kind === 'sdr') {
-      return [r.freq_hz ? (r.freq_hz / 1e6).toFixed(4) + ' MHz' : '', FORMATS[r.format] || r.format, r.gain_db == null ? 'gain auto' : 'gain ' + r.gain_db + ' dB',
+      // A stick hearing several channels says each, its own first.
+      const tuned = Array.isArray(r.channels) && r.channels.length > 1
+        ? r.channels.map(ch => (ch.freq_hz / 1e6).toFixed(4) + ' MHz ' + (FORMATS[ch.format] || ch.format)
+            + (ch.in_band === false ? ' (outside what the stick hears)' : ' (' + (ch.decoded || 0) + ' decoded)')).join(', ')
+        : [r.freq_hz ? (r.freq_hz / 1e6).toFixed(4) + ' MHz' : '', FORMATS[r.format] || r.format].filter(Boolean).join(' · ');
+      return [tuned, r.gain_db == null ? 'gain auto' : 'gain ' + r.gain_db + ' dB',
         r.model, r.usb_port ? 'USB port ' + r.usb_port : ''].filter(Boolean).join(' · ');
     }
     return [r.port ? String(r.port).split('/').pop() : '', r.baud ? r.baud + ' baud' : '', r.firmware ? 'firmware ' + r.firmware : '',
@@ -452,7 +457,9 @@ const BaseStations = (function () {
       ${sticks.length ? `<h4>Each stick <span class="small qs-dim">(blank: as above)</span></h4>${sticks.map(r => {
         const v = f['s:' + r.key] || {};
         const k = escAttr(r.key);
-        return `<fieldset class="bs-stick"><legend>${esc(r.name)} <span class="small qs-dim">${esc(r.usb_port ? 'USB port ' + r.usb_port : r.key)}</span></legend><div class="bs-form">
+        const more = Array.isArray(r.channels) && r.channels.length > 1 ? r.channels.length - 1 : 0;
+        return `<fieldset class="bs-stick"><legend>${esc(r.name)} <span class="small qs-dim">${esc(r.usb_port ? 'USB port ' + r.usb_port : r.key)}</span></legend>
+          ${more ? `<p class="small qs-dim">Its own channel below; ${more === 1 ? 'its other channel is' : 'its ' + more + ' other channels are'} set on the station.</p>` : ''}<div class="bs-form">
           <label>Name <input type="text" maxlength="60" value="${esc(v.name)}" placeholder="${esc(r.name)}" oninput="BaseStations.stick('${k}', 'name', this.value)"></label>
           <label>Frequency, MHz <input type="text" inputmode="decimal" value="${esc(v.freq)}" placeholder="${esc(f.freq)}" oninput="BaseStations.stick('${k}', 'freq', this.value)"></label>
           <label>Format <select onchange="BaseStations.stick('${k}', 'format', this.value)"><option value="">As above</option>${Object.entries(FORMATS).map(([fv, t]) => `<option value="${fv}"${v.format === fv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
