@@ -14804,6 +14804,75 @@ button.adm-danger:hover { border-color: var(--bad); }
 .adm-sql { font-size: .75rem; white-space: normal; overflow-wrap: anywhere; }
 .adm-online { color: var(--ok); font-weight: 600; }
 
+/* ── Base Stations tab (base-stations.js, 0049) ──────────────────────────────
+   The list with the admin tiles over it, then the open station: two columns
+   of what it reports on a wide screen and one below `lg`, its settings as a
+   grid of fields that folds to one column by itself, and its log in a
+   scroller of its own. The open row borrows the table pattern's tr.selected. */
+.bs-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .bs-cols { grid-template-columns: minmax(0, 1fr); }
+}
+/* The tables keep legible columns and scroll sideways in their wrappers on a
+   phone. Below `md` the system lays wrapped tables out automatically at
+   min-width 100%; these are floors under that (hence the `.table-wrap`, to
+   outrank it), and a word is broken only where nothing else fits — break-word
+   rather than the admin tables' anywhere, which folds "receiving" into
+   "recei/ving" sooner than let a table be wider than its wrapper. */
+.table-wrap table.bs-list { min-width: 36rem; }
+.table-wrap table.bs-rx   { min-width: 34rem; }
+.table-wrap table.bs-ssh,
+.table-wrap table.bs-req,
+.table-wrap table.bs-team { min-width: 32rem; }
+.bs-list td, .bs-rx td, .bs-ssh td, .bs-req td, .bs-team td { overflow-wrap: break-word; }
+.bs-list .bs-act, .bs-req .bs-act { width: 6rem; }
+.bs-rx .bs-act, .bs-team .bs-act { width: 7rem; }
+.bs-rx .bs-wide, .bs-req .bs-wide { width: 34%; }
+.bs-ssh .bs-wide, .bs-team .bs-wide { width: 44%; }
+.bs-detail h3 { margin: var(--sp-3) 0 var(--sp-2); font-size: var(--fs-lg); }
+.bs-detail h4 { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-md); }
+.bs-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--sp-2) var(--sp-3);
+  align-items: end;
+  margin: var(--sp-2) 0;
+}
+.bs-form label {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.bs-form .ser-check { display: inline-flex; }
+.bs-stick {
+  min-width: 0;
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.bs-stick legend { padding: 0 var(--sp-1); font-size: var(--fs-sm); font-weight: 600; }
+.bs-log {
+  max-height: 24rem;
+  overflow: auto;
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--subtle);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* ── A header's "?" (Repeaters listening) ────────────────────────────────────
    How-to text that every visit would otherwise pay for in card height, moved
    behind a disclosure at the header's right end. A <details> for the same

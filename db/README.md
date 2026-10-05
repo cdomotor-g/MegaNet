@@ -201,6 +201,7 @@ its cache at all (`PGRST002`).
 | `meganet.ingest_point_report`, `meganet.ingest_point_latest` | What each receiver behind an ingest token says about itself (`0045`) — the Serial Monitor's Quansheng, ERT-A2 and RTL-SDR cards posting as base stations: name, kind, device detail, and a location with how it was got (`gps`, `browser`, `manual`, `station`, `heard`, `none`). **Only a `gps` location may be stored as exact** — a constraint, not a convention. A change is a new row; a repeat moves `last_seen_at`. The receiver's readings carry `path = 'serial-monitor/' \|\| point_id`. **Editors only, never `anon`**: a laptop's location can be somebody's house. The view is `security_invoker`. See `docs/ingest-serial-monitor.md`. |
 | `meganet.admin_ingest_tokens()`, `meganet.admin_create_ingest_token(text, text)`, `meganet.admin_revoke_ingest_token(bigint)` | The Admin tab's **Ingest tokens** panel (`0046`): list every token (never its hash) with the receivers behind it, mint one through `create_ingest_token()` (shown once; a label unique among live tokens), revoke one (immediate; nothing un-revokes). **Administrators only** (`admin_require()`); granted to `authenticated`, not `anon`. |
 | `meganet.ingest_token_request`, `meganet.request_ingest_token(jsonb)`, `meganet.ingest_token_request_status(jsonb)`, `meganet.withdraw_ingest_token_request(jsonb)`, `meganet.admin_ingest_token_requests()`, `meganet.admin_approve_ingest_token_request(bigint, text, text, bigint)`, `meganet.admin_deny_ingest_token_request(bigint)` | **A base station asking for its token** (`0048`), the device grant of RFC 8628: the device makes its own `mgn_` token, asks with it in `X-Ingest-Token`, and shows an eight-consonant code; an administrator approves it on the Admin tab, and the device's own hash becomes an `ingest_token` — nothing to collect afterwards. The table has RLS on, no policy and no grant; only the hash is kept. The device's three functions are `anon` (30 minutes a request, at most 20 waiting, `PT429` beyond); the three `admin_*` are **administrators only**. Approving can replace a live token of the same label in the same step. See **HTTP ingest → A base station that asks for its token**. |
+| `meganet.base_station`, `meganet.base_station_command`, `meganet.base_station_key`, `meganet.base_station_checkin(jsonb)`, `meganet.base_station_keys(jsonb)`, `meganet.admin_base_stations()`, `meganet.admin_base_station(bigint)`, `meganet.admin_base_station_command(bigint, text, jsonb)`, `meganet.admin_base_station_cancel(bigint)`, `meganet.admin_base_station_watch(bigint, boolean)`, `meganet.admin_base_station_keys()`, `meganet.admin_base_station_key_add(text, text)`, `meganet.admin_base_station_key_remove(bigint)` | **The Base Stations tab** (`0049`): a base station checks in about once a minute with its token (`base_station_checkin()`, `anon`, token-checked) — a heartbeat every time, its whole status when it changed — and collects what an administrator asked of it: one of a fixed list of requests (`base_station_verb_check()`), handed over once, expired after ten minutes, at most 20 waiting (`PT429`). `config.set` can never reach the token, where readings go, the station's web password or its own remote settings. The station says whether it manages, only reports or is off, and nothing here can change that. `base_station_key` is the team's SSH **public** keys, served to a station holding a live token (`base_station_keys()`) and installed only if its owner allows it. All three tables have RLS on, no policy and no grant; the eight `admin_*` functions are **administrators only**. See **Base stations checking in**. |
 | `meganet.reception`, `meganet.report_receptions(jsonb)`, `meganet.reception_window(timestamptz, timestamptz, int)` | Every frame a Serial Monitor receiver heard, good or bad, with level and position (`0047`) — the Reception Map's raw material, kept because deduplicated readings throw away the corrupted copies that find a bad repeater. Posted token-checked (≤ 1,000 a batch, each row on its own, a retry stored once); **only a `gps` position stored as exact**; **editors only** to read. See `docs/reception-map.md`. |
 | `meganet.report_ingest_point(jsonb)` | The door to the above (`0045`), token-checked like `bridge_heartbeat()`: `PT401` without a live token, `22023` naming the field for a bad report. Granted to `anon` because the token, not the role, authorises it. |
 | `meganet.ingest_token_id()` | The `X-Ingest-Token` check `0007` does inline, factored out for `0008`'s endpoints. Raises PT401. Not granted to `anon` — directly reachable it would be a guessing oracle. |
@@ -784,6 +785,72 @@ psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_ingest_token_requests.s
 
 38 checks in a transaction that rolls back. The operational side — what the Admin
 tab shows and what a Pi does — is [`docs/ingest-http.md`](../docs/ingest-http.md).
+
+### Base stations checking in
+
+`0049_base_stations.sql`. Once a base station posts, MegaNet knew it only by what
+it sent — readings, what each receiver is (`0045`), what it heard (`0047`).
+Whether it was healthy, and changing anything on it, both meant somebody going to
+it. The Base Stations tab does both from here, and **MegaNet still never connects
+to a base station.**
+
+**The station calls in.** `base_station_checkin(payload)` is granted to `anon` and
+checked by `ingest_token_id()`, like `report_ingest_point()`: the same door and
+the same token as the readings, so it works behind any NAT or cellular modem and
+nothing listens on the station. Each check-in upserts `base_station` — the
+software and version, `mode`, how often it checks in (`idle_s`, held to 30–900),
+a heartbeat of at most 2 KB, and the whole status (at most 16 KB) when it sends
+one; a check-in without a status keeps the last. It answers when to check in
+next: `idle_s`, **5** while `watch_until` is in the future (an administrator has
+it open — `admin_base_station_watch()`, three minutes at a time), **2** while
+more requests wait than one check-in carries, `null` for a station that said
+`off`. And the team keys' hash, the station's label, and the time.
+
+**What may be asked is a short list, checked twice.** `base_station_verb_check()`
+allows `status`, `log` (1–400 lines), `config.set`, `device.restart`,
+`device.rescan`, `device.forget`, `send-now`, `stations.refresh`, `agent.restart`,
+`reboot`, `update.check`, `update.install`, `update.auto` and `access.sync`, with
+their arguments, and the station holds itself to the same list again.
+`config.set` may not touch `web`, `remote` or `version`, nor any `meganet` key but
+`enabled` and `receptions` — so no request can take the token, point the readings
+elsewhere, set the station's web password or widen what MegaNet may ask. Nothing
+on the list is a shell, a file or a credential.
+
+**A request is handed over once and answered once.** `admin_base_station_command()`
+refuses a station that never checked in, a revoked token, and a station that does
+not manage; queues the request for ten minutes; refuses the 21st waiting (`PT429`);
+and starts the five-second check-ins. The check-in hands over up to ten, oldest
+first (`for update skip locked`), marking each `sent` so it is never handed over
+again, and takes the answers to its own requests only (`done` or `failed`; a
+result over 64 KB is kept as `{"truncated": true}`). A request nobody collected
+reads as `expired` — worked out from `expires_at`, not stored, as in `0048`. A
+waiting one can be cancelled; a sent one cannot be called back. Requests 90 days
+old go at the station's next check-in.
+
+**The station decides how much.** `mode` is whatever the station said: `manage`,
+`report` (nothing handed over; anything waiting fails with the reason, and asking
+is refused), or `off` (said once, and no next check-in). Nothing here can set it.
+
+**Team keys are public keys, fetched.** `base_station_key` holds the SSH public
+keys an administrator adds (`admin_base_station_key_add()` checks the type, the
+blob against its type, RSA ≥ 2048 bits, and fingerprints it exactly as `ssh-keygen
+-l` does) and takes off (`removed_at`, kept as the record). `base_station_keys()`
+serves the live ones, with whose each is, to any live token — a station installs
+them only if its owner turned that on, on the station — and every check-in
+answers their hash (`base_station_keys_hash()`), so a station that takes the list
+notices a change within a minute.
+
+**Who reads it:** administrators, through the `admin_*` functions — a status names
+the station's addresses and who may log in to it. The tables have RLS on, no
+policy and no grant.
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_base_stations.sql
+```
+
+48 checks in a transaction that rolls back. What the tab shows, and the protocol
+for whoever writes a base station's software, are
+[`docs/base-stations.md`](../docs/base-stations.md).
 
 ## MQTT ingest
 

@@ -63,6 +63,29 @@ step); denied, withdrawn and expired requests cannot be approved and their token
 cannot ask again; a request a day past expiry is swept; and the twenty-first waiting
 device is told to try later (`PT429`). Confirmed red on four deliberate breaks.
 
+`check_base_stations.sql` holds `0049`, base stations checking in: 48 checks, the
+stations played by anon holding a token in `X-Ingest-Token` and the people made
+through 0005's triggers. The three tables are closed to every role a browser holds,
+and anon may check in and fetch the team keys but not list, ask or add. A check-in
+without a live token is refused (`PT401`); a first one is answered with a minute
+to the next, its label and the keys' hash, and what it said is kept — a heartbeat
+alone keeping the status before it; a version, mode or size it cannot take is
+refused by name. Only an administrator lists or asks; nothing can be asked of a
+station that never checked in, nothing off the list (a shell is not on it), and no
+setting that reaches the token, where readings go, the web page or the station's
+own remote settings. A request waits under its asker and starts the five-second
+check-ins; the next check-in hands it over once, another station cannot answer it,
+a failure keeps its reason; a waiting one can be cancelled and a sent one cannot;
+one ten minutes old reads as expired and is never handed over; the 21st waiting is
+refused (`PT429`), and the backlog goes ten at a time. A station that only reports
+is handed nothing, what waited fails saying why, and asking it is refused; one
+that turned this off is told no next check-in. Opening a station asks for its whole
+status and five-second check-ins, which stop three minutes after. Team keys: an
+editor cannot add one; Ed25519 and ECDSA are fingerprinted exactly as `ssh-keygen
+-l` prints them; a weak RSA key, a non-key, a duplicate or no owner is refused; a
+station fetches them with its token and nobody else can; a key taken off is no
+longer served, changes the hash, stays on the record, and can be added again.
+
 ## Map boundaries from a KMZ (#179)
 
 `kml_to_geojson.py` turns a KML or KMZ of polygons into a web-sized GeoJSON, with

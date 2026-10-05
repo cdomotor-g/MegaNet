@@ -144,6 +144,8 @@ MegaNet/
 │                             every message the datastore accepted, filterable,
 │                             with a plot-and-map tray and a decode drawer)
 ├── bug-report.js           ← BugReport — prefilled GitHub issue reporter
+├── base-stations.js        ← BaseStations — Base Stations tab (every ingest point's
+│                             health; asking a base station that checks in, 0049)
 ├── init.js                 ← the only code that runs at load; must stay last
 ├── maps-data.js            ← Radio Path Maps catalogue, QLD basin SVG + georeference
 ├── styles.css              ← the design system, then theme and layout
@@ -175,6 +177,7 @@ MegaNet/
 │   ├── message-log.md                      (the Message Log tab — columns, uses, edges)
 │   ├── floodwarning-net.md                 (moving the domain to MegaNet — runbook)
 │   ├── agent-api.md                        (station data for AI agents — REST API and MCP server)
+│   ├── base-stations.md                    (the Base Stations tab — checking in, what may be asked, team SSH keys)
 │   ├── site-exposure.md                    (tides and soils on the station card — rows, sources, limits)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
@@ -230,7 +233,7 @@ MegaNet/
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
 ├── test/                   ← the web app's safety net (see test/README.md, and Testing below)
-│   ├── smoke.mjs            (headless Chromium: load, open all 23 tabs, clean console)
+│   ├── smoke.mjs            (headless Chromium: load, open all 25 tabs, clean console)
 │   ├── dup-names.mjs        (no duplicate top-level names across the loaded scripts)
 │   ├── inspections.mjs      (the six sheets, against the migration's own seed data)
 │   ├── maintenance.mjs      (the Council sheet, against the workbook's filled example)
@@ -244,6 +247,7 @@ MegaNet/
 │   ├── twinpin.mjs          (move pin in the twin's tab, the map's twin and ⛰️ 3-D)
 │   ├── trail.mjs            (the stations looked at: the pill, its list, a pick, the twin, a phone)
 │   ├── proposed.mjs         (proposed stations: + Propose, the pin and card, who may establish)
+│   ├── basestations.mjs     (the Base Stations tab: the list, a station's panel, what each button sends)
 │   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
 │   ├── syntax-check.mjs     (node --check over every script index.html loads)
@@ -258,6 +262,7 @@ MegaNet/
 │   ├── check_proposed_stations.sql (psql: prove proposed stations and who may add or establish one (0039) — 40 checks, rolls back)
 │   ├── check_tower_height.sql (psql: prove a tower's platform height, 3.0 or 4.5 m, and who may record it (0040) — 18 checks, rolls back)
 │   ├── check_flood_peaks_from.sql (psql: prove a station taking its flood history from another (0041) — 23 checks, rolls back)
+│   ├── check_base_stations.sql (psql: prove base stations checking in, being asked, and the team keys (0049) — 48 checks, rolls back)
 │   ├── field-photos/        (the Dropbox and Google Drive → MegaNet photo sync, run by field-photos-dropbox.yml and field-photos-gdrive.yml)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
@@ -541,6 +546,18 @@ an administrator* in a Serial Monitor card), and approve the request on the Admi
 tab from any device you are signed in on — after checking the code it shows. The
 device makes the token itself and MegaNet keeps only its hash, so nothing is
 copied or carried and nobody signs in on the Pi.
+
+**Once it posts, it can check in** (`0049`): a base station whose software
+supports it reports its health about once a minute — receivers, queue, power,
+temperature, clock, software — and collects what an administrator asked of it on
+the **Base Stations** tab: a setting changed, a receiver restarted, an update
+installed, its log. MegaNet never connects to it; the request waits for the
+station's next check-in, and only a short fixed list can be asked — never its
+token, its passwords or where it sends readings. How much of this it takes is
+decided on the station itself. The same tab keeps the team's **SSH public keys**,
+which a station whose owner allows it installs for its maintenance login — so
+getting in does not depend on whoever set it up remembering a password.
+[`docs/base-stations.md`](docs/base-stations.md) has the whole contract.
 
 **A base station that speaks this already exists**: [`logger/`](logger/README.md)
 holds a CRBasic program for the datalogger at the base — it reads the ALERT2

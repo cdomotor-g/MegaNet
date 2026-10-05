@@ -167,6 +167,8 @@ const TABS = [
   { group: 'Admin', tabs: [
     { id: 'admin',      label: 'Admin',                  icon: '🛠️',
       find: 'administration users accounts people roles privileges permissions groups allowlist editors sign in access database datastore data source schema load stations.json github file snapshot backup settings storage reset migration dashboard health stats statistics visitors analytics last seen online active size tables volume connections' },
+    { id: 'basestations', label: 'Base Stations',        icon: '🖥️',
+      find: 'ingest points receivers fleet devices heartbeat check-in checking in uptime temperature under-voltage uplink queue remote manage restart reboot update upgrade release log ssh keys login maintenance team public key' },
   ] },
 ];
 
@@ -1509,7 +1511,39 @@ const HELP = {
             { label: 'Ingest tokens, and base stations that ask for one', href: 'docs/ingest-http.md' },
             { label: 'The database schema, migrations and who may write', href: 'db/README.md' },
             { label: 'Why the station list lives in Postgres', href: 'docs/datastore-decision.md' }],
-    related: ['export', 'photos'],
+    related: ['export', 'photos', 'basestations'],
+  },
+  basestations: {
+    summary: 'Every base station and ingest point on one list: whether it is checking in, its '
+           + 'receivers, its uplink, its power and temperature, and what needs a look. Open one to see '
+           + 'its health, software and settings, and ask it to <strong>change a setting</strong>, '
+           + '<strong>restart</strong> a receiver or itself, <strong>install an update</strong> or '
+           + '<strong>show its log</strong> — without going to site. Below the list are the team\'s '
+           + '<strong>SSH public keys</strong>, which a base station installs for its maintenance '
+           + 'login if its owner allows it. Administrators only.',
+    watch: [
+      '<strong>MegaNet never connects to a base station.</strong> Each one checks in about once a '
+      + 'minute, over the same HTTPS door and with the same ingest token as its readings, so nothing '
+      + 'listens on it and no port is opened for it. What is asked here waits for that check-in; '
+      + 'opening a station makes it check in every five seconds for the next three minutes.',
+      '<strong>It can be asked for a short list of things, and nothing else.</strong> The database '
+      + 'checks the list and the station checks it again. Never its token, where its readings go, its '
+      + 'web page\'s password, its SSH keys, or how much it lets MegaNet do.',
+      '<strong>The station decides how much.</strong> Its owner can set it, on the station and never '
+      + 'from here, to <em>report only</em> — its health shows, every request is refused — or stop '
+      + 'it checking in at all.',
+      '<strong>A request not collected within ten minutes expires</strong> rather than running hours '
+      + 'later, and at most 20 wait for any one station. A queued one can be cancelled.',
+      '<strong>Team keys are public keys, one per person.</strong> Nothing on the list can log in to '
+      + 'anything by itself: a station installs it only if its owner turned that on, and the keys work '
+      + 'only from a private network unless the station says otherwise. Take a key off when its owner '
+      + 'moves on — stations that take the list drop it within the hour, or a minute if checking in.',
+      'A station that posts readings but does not check in is listed as <em>not managed</em>, with when '
+      + 'it last posted. Its token is under Admin → Ingest tokens.',
+    ],
+    links: [{ label: 'Base stations: checking in, what may be asked, and the team keys', href: 'docs/base-stations.md' },
+            { label: 'Ingest tokens, and base stations that ask for one', href: 'docs/ingest-http.md' }],
+    related: ['admin', 'msglog'],
   },
 };
 
@@ -2227,7 +2261,7 @@ const DB_SCHEMA = 'meganet';
 // 48: 0047 (receptions) and 0048 (a base station asking for its token) were
 // applied live together — 0047 had waited since its own commit, when the
 // connection timed out on every write.
-const DB_SCHEMA_VERSION = 48;
+const DB_SCHEMA_VERSION = 49;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

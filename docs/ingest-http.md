@@ -363,6 +363,12 @@ again. `429` means 20 requests are already waiting — try again in a few minute
 `payload.host_station_id` may name the station the device sits at; the
 administrator sees it as a suggestion.
 
+**Once it posts, it can check in too** (`0049`): with the same token, a base
+station whose software supports it reports its health to the **Base Stations**
+tab about once a minute and collects what an administrator asks of it there —
+MegaNet never connects to it. [`base-stations.md`](base-stations.md) is the tab
+and the protocol.
+
 ### An administrator mints one
 
 **From the app:** an administrator mints, lists and revokes tokens on the

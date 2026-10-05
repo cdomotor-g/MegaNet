@@ -3004,8 +3004,9 @@ function renderMain() {
   // datastore's, and the station list only names the station a photo is of —
   // a photo read before it loads is still placed, and filed by the database.
   // Admin joins them too: loading the station file is one of the things it is
-  // for, so it cannot be the thing it waits on.
-  const noDataTabs = ['packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'admin'];
+  // for, so it cannot be the thing it waits on. Base Stations as well — its
+  // list is the database's, and names a host station only as text.
+  const noDataTabs = ['packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'admin', 'basestations'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -3047,6 +3048,7 @@ function renderMain() {
     case 'photos':     el.innerHTML = FieldPhotos.render();   FieldPhotos.init();  break;
     case 'export':     el.innerHTML = renderExportHtml();                      break;
     case 'admin':      el.innerHTML = Admin.render();         Admin.init();        break;
+    case 'basestations': el.innerHTML = BaseStations.render(); BaseStations.init(); break;
     default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }
   updateChromeHeight();     // three tabs size their own scrollers off it

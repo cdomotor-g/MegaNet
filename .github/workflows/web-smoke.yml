@@ -322,6 +322,16 @@ jobs:
         working-directory: test
         run: npm run serialingest
 
+      # Chromium, the database stood in for by routes. The Base Stations tab
+      # (0049): the list on the database's clock, a station's panel drawn from
+      # what it sent, every button sending exactly its request (quotes in a
+      # receiver's key and a confirmation included), the smallest settings
+      # patch, typing and focus surviving the poll, and nothing for a station
+      # that only reports.
+      - name: Base Stations tab — what each station said, and what is asked of it
+        working-directory: test
+        run: npm run basestations
+
       # Chromium. The Reception Map against a drive built to blame one real
       # repeater: named first by pass ranges alone and with positions; NMEA
       # parsed; a GPS card placing a receiver's receptions; CSV/GeoJSON round trip.
@@ -1155,6 +1165,13 @@ jobs:
       # and the approved token opens the door with nothing to collect.
       - name: check_ingest_token_requests.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest_token_requests.sql
+      # Base stations checking in (0049): token-checked check-ins, a fixed list
+      # of requests handed over once and expired after ten minutes, settings
+      # kept away from the token and the station's own remote settings, a
+      # station that only reports refused, and the team keys — public keys,
+      # fingerprinted as ssh-keygen prints them, fetched only with a live token.
+      - name: check_base_stations.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_base_stations.sql
       - name: check_inspections.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
       - name: check_inspection_history.sql

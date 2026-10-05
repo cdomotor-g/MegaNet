@@ -489,12 +489,14 @@ const Auth = (function () {
   // Field photos are editors-only (0035): whatever the tab, the twin and the
   // map were holding was fetched for the session that just ended or began.
   // The Admin tab (admin.js) is administrators-only (0042), and redraws its
-  // users and allowlist — or its "sign in" — for the same reason.
+  // users and allowlist — or its "sign in" — for the same reason; so is the
+  // Base Stations tab (0049).
   function tabsAuthChanged() {
     for (const mod of [typeof FieldPhotos !== 'undefined' ? FieldPhotos : null,
                        typeof Admin       !== 'undefined' ? Admin       : null,
                        typeof AdminDash   !== 'undefined' ? AdminDash   : null,
-                       typeof AdminTokens !== 'undefined' ? AdminTokens : null]) {
+                       typeof AdminTokens !== 'undefined' ? AdminTokens : null,
+                       typeof BaseStations !== 'undefined' ? BaseStations : null]) {
       if (!mod || !mod.authChanged) continue;
       try { mod.authChanged(); } catch (_) { /* its own problem, not the sign-in's */ }
     }

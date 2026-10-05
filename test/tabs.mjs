@@ -537,6 +537,101 @@ const PHOTO_FIXTURE = {
     last_ok_at: '2026-06-24T05:01:00Z', last_error: null, runs: 12, seen: 3, imported: 2, unplaced: 1, skipped: 0, failed: 0 }],
 };
 
+// The Base Stations tab (0049), born converted. Signed out it is a paragraph
+// and a button; as an administrator it is the list, a station's panel and the
+// team keys — none of which exists until the database answers, so its four
+// reads are answered by a route below (BS_FIXTURE), and the panel is opened
+// through the tab's own Open. "Administrator" is stood in for only while this
+// tab is the one on screen, so no other entry here is measured signed in.
+// test/basestations.mjs holds what the tab does; this holds how it is built.
+const SEED_BS_OUT = `() => {
+  if (window.__bsAuth) { Object.assign(Auth, window.__bsAuth); delete window.__bsAuth; }
+  BaseStations.authChanged();
+}`;
+
+const SEED_BS = `async () => {
+  if (!window.__bsAuth) {
+    const real = { isSignedIn: Auth.isSignedIn, isAdmin: Auth.isAdmin, role: Auth.role };
+    window.__bsAuth = real;
+    const here = () => state.activeTab === 'basestations';
+    Auth.isSignedIn = () => here() || real.isSignedIn();
+    Auth.isAdmin = () => here() || (real.isAdmin ? real.isAdmin() : false);
+    Auth.role = () => here() ? 'admin' : real.role();
+  }
+  BaseStations.authChanged();
+  const until = async (fn, ms) => { const t0 = Date.now(); while (!fn() && Date.now() - t0 < ms) await new Promise(r => setTimeout(r, 50)); };
+  await until(() => document.querySelector('#bs-list table') && document.querySelector('#bs-keys table'), 5000);
+  BaseStations.open(11);
+  await until(() => document.querySelector('#bs-settings #bs-f-name') && document.querySelector('#bs-requests table'), 5000);
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
+const BS_AGO = s => new Date(Date.now() - s * 1000).toISOString();
+const BS_STATUS = {
+  name: 'Mt Stuart base',
+  host: { hostname: 'mt-stuart', model: 'Model B Rev 1.5', os: 'Debian GNU/Linux 12 (bookworm)', arch: 'arm64', node: 'v20.18.0',
+    cores: 4, mem_mb: 3796, disk_mb: 29000, addresses: [{ iface: 'eth0', address: '192.168.1.40' }, { iface: 'wlan0', address: '10.20.30.40' }] },
+  clock: { trusted: true, source: 'ntp', timezone: 'Australia/Brisbane' },
+  location: { source: 'gps', lat: -19.35123, lon: 146.78456, accuracy_m: 4 },
+  meganet: { enabled: true, receptions: true, label: 'Mt Stuart base', endpoint: 'https://floodwarning.net/api/db/rest/v1', token_refused: false,
+    error: 'HTTP 503 from https://floodwarning.net/api/db/rest/v1/rpc/ingest_http — retrying in 30 s' },
+  receivers: [
+    { key: 'sdr:00000001', name: 'RTL-SDR 1 with a long name for a narrow screen', kind: 'sdr', state: 'running', freq_hz: 151500000, format: 'BINARY',
+      gain_db: 29.7, model: 'RTL-SDR Blog V4', usb_port: '1-1.3' },
+    { key: 'sdr:00000002', name: 'RTL-SDR 2', kind: 'sdr', state: 'unplugged', freq_hz: 160250000, format: 'ENHANCED_IFLOWS', gain_db: null, usb_port: '1-1.4' },
+    { key: 'ert:/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A10KXYZW-if00-port0', name: 'ERT-A2', kind: 'ert-a2', state: 'error',
+      error: 'no frames for 10 minutes', port: '/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A10KXYZW-if00-port0', baud: 115200, firmware: '2.1' },
+    { key: 'gps:ttyACM0', name: 'GPS', kind: 'gps', state: 'running', port: '/dev/ttyACM0', baud: 9600 },
+  ],
+  update: { available: true, auto: true, running: false, last: { state: 'rolled-back', at: Math.round(Date.now() / 1000) - 3600,
+    message: 'the new version did not start, so 0.5.2 was put back — see its update log' } },
+  access: { available: true, account: { name: 'alert', exists: true, password: 'set', keys: 3 },
+    ssh: { enabled: true, active: true, passwordLogin: false, port: 22 }, policy: { meganetKeys: true, github: ['jo-bloggs', 'sam-field'] },
+    logins: [{ user: 'pi', password: 'empty', keys: 1 }, { user: 'alert', password: 'set', keys: 3 }],
+    keys: [{ fingerprint: 'SHA256:VeBIQNSQYe0Ge+JIoXnjKbfB0gSWAJChLuItuhNNFew', comment: 'jo@a-very-long-laptop-name.example.org', source: 'github', restricted: true },
+           { fingerprint: 'SHA256:RknIRqux7NWt85Wr0wnUI0GZOtVaVIIGAxKdQwI8OEU', comment: 'Sam Field', source: 'meganet', restricted: true },
+           { fingerprint: 'SHA256:ST5vehZy5UfLDnjvsU9mbYVfaSPQlCgvu9WdYYqm760', comment: 'console@site', source: 'local', restricted: false }],
+    keys_total: 4 },
+  remote: { mode: 'manage', idle_s: 60 },
+  config: { name: 'Mt Stuart base', meganet: { enabled: true, receptions: true },
+    receivers: { sdr: { enabled: true, freqHz: 151500000, sampleRate: 0, gainDb: 29.7, ppm: 0, format: 'BINARY', squelchDb: 8 },
+      sdrDevices: [{ key: 'sdr:00000002', name: 'RTL-SDR 2', freqHz: 160250000, format: 'ENHANCED_IFLOWS', gainDb: null }] },
+    audio: { enabled: true, mode: 'auto', device: 'default', volume: 80 }, kiosk: { mode: 'auto' }, system: { timezone: 'Australia/Brisbane' } },
+};
+const BS_ROW = (o) => Object.assign({ host_station_id: null, host_station: null, revoked_at: null, managed: true, app: 'base station agent',
+  version: '0.6.0', mode: 'manage', idle_s: 60, last_seen_at: BS_AGO(20), status_at: BS_AGO(300), last_used_at: BS_AGO(30),
+  watch_until: null, keys_hash: 'h1', waiting: 0, receivers: [] }, o);
+const BS_FIXTURE = {
+  admin_base_stations: () => ({ now: new Date().toISOString(), keys_hash: 'h2', stations: [
+    BS_ROW({ id: 11, label: 'Mt Stuart base', host_station: 'Mt Stuart', status: BS_STATUS, keys_hash: 'h1',
+      beat: { up: 400000, agent_up: 3600, temp: 66, load: 0.42, mem_free: 2900, disk_free: 400, uv: false, uv_boot: true, throttled: true,
+        clock: true, q: 640, hold: 12, rxq: 40, stored: 18233, refused: 2, last_ok: BS_AGO(600),
+        rx: [['sdr:00000001', 'running', 412, 15], ['sdr:00000002', 'unplugged', 0, null]] } }),
+    BS_ROW({ id: 12, label: 'Hut reporter', mode: 'report', status: { name: 'The hut on the ridge', receivers: [] }, beat: { temp: 40 } }),
+    BS_ROW({ id: 14, label: 'Creek gauge base', last_seen_at: BS_AGO(7200), status: { name: 'Creek gauge base', meganet: { token_refused: true }, receivers: [] },
+      beat: { uv: true, temp: 80, clock: false }, revoked_at: BS_AGO(3600) }),
+    BS_ROW({ id: 13, label: 'Serial laptop', managed: false, app: null, version: null, mode: null, last_seen_at: null, status: null, beat: null,
+      receivers: [{ point_id: 'sm-1', name: 'Quansheng radio', receiver: 'quansheng', last_seen_at: BS_AGO(300) }] }),
+  ] }),
+  admin_base_station: () => ({ now: new Date().toISOString(), keys_hash: 'h2',
+    station: BS_FIXTURE.admin_base_stations().stations[0],
+    commands: [
+      { id: 3, verb: 'config.set', args: { patch: { receivers: { sdr: { freqHz: 151625000 } }, name: 'Mt Stuart base' } }, status: 'queued',
+        created_at: BS_AGO(5), created_by: 'admin@example.test', expires_at: BS_AGO(-595) },
+      { id: 2, verb: 'log', args: { lines: 200 }, status: 'done', created_at: BS_AGO(60), created_by: 'admin@example.test', sent_at: BS_AGO(58),
+        done_at: BS_AGO(57), result: { lines: [{ t: Date.now() - 60000, level: 'info', tag: 'remote',
+          msg: 'MegaNet asks: show its log — a long line that has to wrap rather than push the page sideways on a phone' }] } },
+      { id: 1, verb: 'update.install', args: {}, status: 'failed', created_at: BS_AGO(7200), created_by: 'admin@example.test', error: 'no published release found' },
+    ] }),
+  admin_base_station_watch: () => ({ id: 11, watch_until: new Date(Date.now() + 180000).toISOString(), want_status: true }),
+  admin_base_station_keys: () => ({ hash: 'h2', keys: [
+    { id: 5, key_type: 'ssh-ed25519', fingerprint: 'SHA256:VeBIQNSQYe0Ge+JIoXnjKbfB0gSWAJChLuItuhNNFew', owner: 'Jo Bloggs', comment: 'jo@laptop',
+      added_at: BS_AGO(864000), added_by: 'admin@example.test' },
+    { id: 4, key_type: 'ssh-rsa', fingerprint: 'SHA256:ST5vehZy5UfLDnjvsU9mbYVfaSPQlCgvu9WdYYqm760', owner: 'Former Staff', comment: null,
+      added_at: BS_AGO(8640000), added_by: 'admin@example.test', removed_at: BS_AGO(86400), removed_by: 'admin@example.test' },
+  ] }),
+};
+
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
@@ -575,6 +670,8 @@ const CONVERTED = [
   { id: 'stations',   label: 'Stations — the 🔭 AR station finder pane', issue: 'new with the tool', seed: SEED_AR_PANE },
   { id: 'photos',     label: 'Field Photos — signed out', issue: 'born converted', seed: SEED_PHOTOS_OUT },
   { id: 'photos',     label: 'Field Photos — a queue, the place editor, the library and the sync', issue: 'born converted', seed: SEED_PHOTOS },
+  { id: 'basestations', label: 'Base Stations — signed out', issue: 'born converted', seed: SEED_BS_OUT },
+  { id: 'basestations', label: 'Base Stations — the list, a station open, and the team keys', issue: 'born converted', seed: SEED_BS },
 ];
 
 
@@ -627,6 +724,13 @@ try {
     const rows = PHOTO_FIXTURE[table];
     if (route.request().method() !== 'GET' || !rows) return route.fallback();
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
+  });
+  // The Base Stations tab's calls, answered from BS_FIXTURE (see SEED_BS).
+  await page.route('**://*.supabase.co/rest/v1/rpc/*base_station*', route => {
+    const fn = new URL(route.request().url()).pathname.split('/').pop();
+    const answer = BS_FIXTURE[fn];
+    if (!answer) return route.fallback();
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(answer()) });
   });
   page.on('pageerror', e => errors.push(e.message));
 
