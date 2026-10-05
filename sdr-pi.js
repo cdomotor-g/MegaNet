@@ -58,11 +58,11 @@ const SdrPi = (function () {
     RX: 'seq,run,up,epoch_ms,id,value,fmt,votes,pol,crc,hex,carrier_hz,burst,peak_dbfs,nf_dbfs,burst_ms,freq_hz,name,kind'.split(','),
     BURST: 'seq,run,up,epoch_ms,ms,peak_dbfs,nf_dbfs,freq_hz'.split(','),
     STAT: ('run,up,epoch_ms,clock,state,freq_hz,offset_hz,rate,in_rate,gain,agc,ppm,fmt,gate,squelch,nf_dbfs,ch_dbfs,open,'
-      + 'dbfs,clip_pct,bursts,readings,drops,cpu_pct,temp_c,model,tuner,source').split(','),
+      + 'dbfs,clip_pct,bursts,readings,drops,cpu_pct,temp_c,model,tuner,source,chans').split(','),
     NOTE: 'run,up,epoch_ms,level,text'.split(','),
     LVL: 'run,up,ch_dbfs,nf_dbfs,open,dbfs,clip_pct,hist'.split(','),
     SPEC: 'run,up,rate,freq_hz,offset_hz,lo_dbfs,step_db,agg,bins'.split(','),
-    TRACE: 'run,up,burst,ms,combos,seconds,all,carrier_hz,start,frames,shadows,symbols'.split(','),
+    TRACE: 'run,up,burst,ms,combos,seconds,all,carrier_hz,start,frames,shadows,symbols,freq_hz'.split(','),
   };
   // The type whose last field takes the rest of the line, commas and all.
   const TAIL = { NOTE: 'text' };
@@ -87,17 +87,24 @@ const SdrPi = (function () {
   // The CFG record and the CFG command use the same keys in the same units, so
   // a CFG line from the Pi, turned into `CFG key=value …`, sets the same state
   // back. freq is MHz and offset kHz there — the units the card's boxes use.
+  //
+  // more: the channels the stick decodes besides its own (freq + offset), all
+  // at once — [{ hz, fmt? }], absolute frequencies, each in its own format or
+  // the stick's. Written `151.525;152.4/EIF`, or `none`; every one must lie in
+  // the band the stick is tuned to (offsetLimit). CHANNELS works out freq,
+  // rate and offset for a list of channels (planChannels) and sets all four.
   const RATES = [240000, 960000, 1200000, 1920000, 2400000];      // AlertDsp.DEVICE_RATES
   const MODELS = ['auto', 'v2', 'v3', 'v4', 'r820t', 'r828d', 'fc0013', 'fc0012'];
   const DIRECT = ['auto', 'off', 'i', 'q'];
-  const SETTING_KEYS = ['freq', 'rate', 'gain', 'agc', 'ppm', 'fmt', 'gate', 'squelch', 'offset', 'bias', 'direct', 'model', 'spec', 'lvl'];
+  const SETTING_KEYS = ['freq', 'rate', 'gain', 'agc', 'ppm', 'fmt', 'gate', 'squelch', 'offset', 'more', 'bias', 'direct', 'model', 'spec', 'lvl'];
   // What `CFG` with the card's settings sends: the radio state. spec and lvl
   // are the link's own pacing, left where the Pi has them.
-  const CARD_KEYS = ['freq', 'rate', 'gain', 'agc', 'ppm', 'fmt', 'gate', 'squelch', 'offset', 'bias', 'direct', 'model'];
+  const CARD_KEYS = ['freq', 'rate', 'gain', 'agc', 'ppm', 'fmt', 'gate', 'squelch', 'offset', 'more', 'bias', 'direct', 'model'];
+  const MAX_CHANNELS = 8;          // on one stick, its own included: each is a decoder thread
 
   function defaults() {
     return { freq: 151500000, rate: 240000, gain: 29.7, agc: false, ppm: 0, fmt: 'ABF', gate: true, squelch: 8,
-      offset: 0, bias: false, direct: 'auto', model: 'auto', spec: 5, lvl: 2 };
+      offset: 0, more: [], bias: false, direct: 'auto', model: 'auto', spec: 5, lvl: 2 };
   }
 
   const ok = value => ({ ok: true, value });
@@ -147,6 +154,132 @@ const SdrPi = (function () {
     return ok(Math.round(v * f) / f);
   }
 
+  // A channel's frequency as the lists write it: MHz, three decimals or as
+  // many more as it has (151.500, 151.5125).
+  function mhzText(hz) {
+    let s = (hz / 1e6).toFixed(6);
+    while (/\.\d{4,}$/.test(s) && s.endsWith('0')) s = s.slice(0, -1);
+    return s;
+  }
+
+  // A frequency is decoded in one format, never two: Enhanced iFLOWS read off
+  // a strong Binary burst makes CRC-valid ghosts (alert-dsp.js: there is no
+  // "both"), so a frequency listed twice is refused, whatever its formats.
+  const TWICE = ' MHz is listed twice - each channel in one format: Enhanced iFLOWS read off a strong Binary burst makes CRC-valid ghosts';
+
+  // Channels as people write them: frequencies as FREQ takes them, with
+  // commas, semicolons or spaces between, and after a channel sent in another
+  // format than the stick's, that format — `152.4/EIF` or `152.4 EIF`. `none`
+  // is none. → ok([{ hz, fmt? }]) — at most `max` — or bad(why).
+  function parseChannels(raw, max) {
+    const s = String(raw).trim();
+    if (/^(none|off|-)$/i.test(s)) return ok([]);
+    const out = [];
+    for (const w of s.split(/[\s,;]+/).filter(Boolean)) {
+      const slash = w.indexOf('/'), f = slash < 0 ? w : w.slice(0, slash), fm = slash < 0 ? null : w.slice(slash + 1);
+      if (fm == null && FMT_ALIAS[f.toUpperCase()]) {          // a format on its own: the channel before it
+        if (!out.length) return bad('a format goes after its channel, e.g. 152.4/EIF');
+        out[out.length - 1].fmt = FMT_ALIAS[f.toUpperCase()];
+        continue;
+      }
+      const r = parseFreq(f);
+      if (!r.ok) return bad(w + ': ' + r.error);
+      const ch = { hz: r.value };
+      if (fm != null) {
+        if (!FMT_ALIAS[fm.toUpperCase()]) return bad(w + ': a format is ABF, EIF or ASC');
+        ch.fmt = FMT_ALIAS[fm.toUpperCase()];
+      }
+      out.push(ch);
+    }
+    if (!out.length) return bad('channels in MHz, e.g. 151.525;152.4, or none');
+    if (out.length > max) return bad('at most ' + max + ' channels');
+    const seen = new Set();
+    for (const ch of out) {
+      if (seen.has(ch.hz)) return bad(mhzText(ch.hz) + TWICE);
+      seen.add(ch.hz);
+    }
+    return ok(out);
+  }
+
+  function channelsText(list, sep) {
+    return list.length ? list.map(ch => mhzText(ch.hz) + (ch.fmt ? '/' + ch.fmt : '')).join(sep || ';') : 'none';
+  }
+
+  // ── several channels on one stick ──────────────────────────────────────────
+  //
+  // Where to tune, and how fast to sample, so that one stick hears every
+  // channel in a list at once — each decoded by a decoder of its own on the
+  // same samples (relay.js). The same rules as RPi ALERT's (its
+  // agent/lib/devices/sdr-plan.js): the lowest rate that holds them all in the
+  // middle USABLE part of the slice (the RTL2832U's filter rolls off at the
+  // edges), and the centre that keeps every channel furthest from the DC spike
+  // at the centre (worst on the V2's zero-IF FC0013) and from every other
+  // channel's mirror image (a zero-IF tuner's I/Q imbalance puts a faint copy
+  // of each signal at the opposite offset, which would be decoded there too) —
+  // each hazard measured against its own clearance, then the channels kept
+  // furthest from the edges. A rate that cannot keep DC_GOOD from the spike and
+  // MIRROR_GOOD from every image gives way to the next one up that does better.
+  // One channel is tuned as the Pi always tunes one: on it, offset 0.
+  const PLAN = { USABLE: 0.8, CH_HALF: 15000, DC_MIN: 20000, DC_GOOD: 50000, DC_CLEAR: 100000, MIRROR_GOOD: 20000, MIRROR_CLEAR: 30000, STEP: 500 };
+  // Channels further apart than this never fit one stick.
+  const MAX_SPAN_HZ = PLAN.USABLE * RATES[RATES.length - 1] - 2 * PLAN.CH_HALF;
+
+  function reach(rate) { return PLAN.USABLE * rate / 2 - PLAN.CH_HALF; }
+
+  function centreScore(freqs, c, half) {
+    let dc = Infinity, mirror = Infinity, far = 0;
+    for (let i = 0; i < freqs.length; i++) {
+      const o = freqs[i] - c;
+      dc = Math.min(dc, Math.abs(o));
+      far = Math.max(far, Math.abs(o));
+      for (let j = i + 1; j < freqs.length; j++) mirror = Math.min(mirror, Math.abs(o + freqs[j] - c));
+    }
+    const clear = Math.min(Math.min(dc, PLAN.DC_CLEAR) / PLAN.DC_CLEAR, Math.min(mirror, PLAN.MIRROR_CLEAR) / PLAN.MIRROR_CLEAR);
+    return { centre: c, dc, mirror, clear, edge: half - far, good: dc >= PLAN.DC_GOOD && mirror >= PLAN.MIRROR_GOOD };
+  }
+
+  function bestCentre(freqs, rate) {
+    const half = reach(rate);
+    const lo = Math.max.apply(null, freqs) - half, hi = Math.min.apply(null, freqs) + half;
+    if (lo > hi) return null;
+    let best = null;
+    const consider = c => {
+      const s = centreScore(freqs, c, half);
+      if (!best || s.clear > best.clear || (s.clear === best.clear && s.edge > best.edge)) best = s;
+    };
+    for (let c = Math.ceil(lo / PLAN.STEP) * PLAN.STEP; c <= hi; c += PLAN.STEP) consider(c);
+    if (!best) consider(Math.round((lo + hi) / 2));
+    return best;
+  }
+
+  // list: [{ hz, fmt? }], the stick's own channel first. → ok({ freq, rate,
+  // offset, fmt?, more, dcHz, mirrorHz }) — the settings that hear them all —
+  // or bad(why). minRate: the lowest rate to consider (240k by default).
+  function planChannels(list, minRate) {
+    if (!list.length) return bad('which channels?');
+    const main = list[0], from = minRate || RATES[0];
+    const out = { more: list.slice(1).map(ch => Object.assign({}, ch)), dcHz: null, mirrorHz: null };
+    if (main.fmt) out.fmt = main.fmt;
+    const freqs = list.map(ch => ch.hz).filter((f, i, a) => a.indexOf(f) === i).sort((a, b) => a - b);
+    if (freqs.length === 1) return ok(Object.assign(out, { freq: main.hz, rate: from, offset: 0 }));
+    const span = freqs[freqs.length - 1] - freqs[0];
+    if (span > MAX_SPAN_HZ) {
+      return bad(mhzText(freqs[0]) + ' and ' + mhzText(freqs[freqs.length - 1]) + ' MHz are ' + (span / 1e6).toFixed(2)
+        + ' MHz apart; one stick hears channels up to ' + (MAX_SPAN_HZ / 1e6).toFixed(2) + ' MHz apart');
+    }
+    let pick = null;
+    for (const r of RATES) {
+      if (r < from) continue;
+      const b = bestCentre(freqs, r);
+      if (!b || b.dc < PLAN.DC_MIN) continue;
+      if (!pick || b.clear > pick.b.clear) pick = { rate: r, b };
+      if (pick.b.good) break;
+    }
+    if (!pick) return bad('no tuning keeps every one of these channels off the stick\'s DC spike - leave one out');
+    return ok(Object.assign(out, { freq: pick.b.centre, rate: pick.rate, offset: main.hz - pick.b.centre,
+      dcHz: Math.round(pick.b.dc), mirrorHz: Math.round(pick.b.mirror) }));
+  }
+
   // One setting from text, in the command's units. { ok, value } or { ok: false, error }.
   function parseSetting(key, raw) {
     if (raw == null || String(raw).trim() === '') return bad('no value');
@@ -163,6 +296,7 @@ const SdrPi = (function () {
         const r = num(s.replace(/khz$/i, ''), -1200, 1200, 3, 'kHz from -1200 to 1200');
         return r.ok ? ok(Math.round(r.value * 1000)) : r;
       }
+      case 'more': return parseChannels(s, MAX_CHANNELS - 1);
       case 'direct': { const d = s.toLowerCase(); return DIRECT.indexOf(d) >= 0 ? ok(d) : bad(DIRECT.join(', ')); }
       case 'model': { const m = s.toLowerCase(); return MODELS.indexOf(m) >= 0 ? ok(m) : bad(MODELS.join(', ')); }
       case 'spec': case 'lvl': return num(s.replace(/s$/i, ''), 0, 600, 0, 'whole seconds, 0 for off');
@@ -177,6 +311,7 @@ const SdrPi = (function () {
       case 'gain': return v == null ? 'auto' : (Math.round(v * 10) / 10).toFixed(1);
       case 'agc': case 'gate': case 'bias': return v ? '1' : '0';
       case 'offset': return String(Math.round(v) / 1000);
+      case 'more': return channelsText(v || []);
       default: return String(v);
     }
   }
@@ -185,15 +320,34 @@ const SdrPi = (function () {
   // its edge by a channel's width (serial-sdr.js's rule).
   function offsetLimit(rate) { return rate / 2 - 12000; }
 
+  // Settings `s` the stick can decode at `rate`: every channel — its own
+  // (freq + offset) and each of more — inside the band it is tuned to, and no
+  // frequency twice (TWICE). The relay refuses settings that are not; the card
+  // asks before it copies them. → null, or { error: the console's ERR text,
+  // hz: the channel it is about, far: true for one outside the band }.
+  function checkChannels(s, rate) {
+    const lim = offsetLimit(rate);
+    if (Math.abs(s.offset) > lim) return { error: 'RANGE offset is within ' + (lim / 1000) + ' kHz of the centre at ' + rate + ' sps', hz: s.freq + s.offset, far: true };
+    const list = [{ hz: s.freq + s.offset, fmt: s.fmt }].concat((s.more || []).map(m => ({ hz: m.hz, fmt: m.fmt || s.fmt })));
+    const out = list.find((ch, k) => k > 0 && Math.abs(ch.hz - s.freq) > lim);
+    if (out) {
+      return { hz: out.hz, far: true, error: 'RANGE ' + mhzText(out.hz) + ' MHz is ' + Math.round((out.hz - s.freq) / 1000) + ' kHz from the centre and at '
+        + rate + ' sps a channel must be within ' + (lim / 1000) + ' kHz - CHANNELS works out a tuning that holds them all' };
+    }
+    const twice = list.find((ch, k) => list.findIndex(o => o.hz === ch.hz) !== k);
+    if (twice) return { hz: twice.hz, far: false, error: 'ARG ' + mhzText(twice.hz) + TWICE };
+    return null;
+  }
+
   // ── console commands ───────────────────────────────────────────────────────
   //
   // `VERB args…`, case-insensitive. CFG takes key=value pairs; SET takes a key
   // and a value; the setting verbs are shorthand for SET. Parsed here so the
   // card can build what the relay will accept, and the test can hold both.
   const VERB_KEY = { FREQ: 'freq', RATE: 'rate', GAIN: 'gain', AGC: 'agc', PPM: 'ppm', FORMAT: 'fmt', FMT: 'fmt',
-    GATE: 'gate', SQUELCH: 'squelch', SQ: 'squelch', OFFSET: 'offset', DIRECT: 'direct', MODEL: 'model', SPEC: 'spec',
+    GATE: 'gate', SQUELCH: 'squelch', SQ: 'squelch', OFFSET: 'offset', MORE: 'more', DIRECT: 'direct', MODEL: 'model', SPEC: 'spec',
     LVL: 'lvl', LEVEL: 'lvl', BIAS: 'bias' };
-  const VERBS = ['HELP', 'HELLO', 'INFO', 'STATUS', 'CFG', 'SET', 'TIME', 'DECODE', 'RESTART', 'DEFAULTS'].concat(Object.keys(VERB_KEY));
+  const VERBS = ['HELP', 'HELLO', 'INFO', 'STATUS', 'CFG', 'SET', 'TIME', 'DECODE', 'RESTART', 'DEFAULTS', 'CHANNELS'].concat(Object.keys(VERB_KEY));
 
   // { verb, args, set: {key: value} } — `set` already parsed and checked — or
   // { verb, error } naming what was wrong. An empty line is { verb: '' }.
@@ -253,6 +407,18 @@ const SdrPi = (function () {
       if (!(s >= 1 && s <= 8)) return { verb, args, error: 'ARG DECODE <1 to 8 seconds>' };
       return { verb, args, seconds: s };
     }
+    // Every channel to hear, the stick's own first: the tuning worked out
+    // (planChannels) and freq, rate, offset and more set to it together.
+    if (verb === 'CHANNELS') {
+      if (!args.length) return { verb, args };
+      const r = parseChannels(args.join(' '), MAX_CHANNELS);
+      if (!r.ok || !r.value.length) return { verb, args, error: 'ARG ' + (r.ok ? 'CHANNELS <MHz> <MHz> …' : r.error) };
+      const p = planChannels(r.value);
+      if (!p.ok) return { verb, args, error: 'RANGE ' + p.error };
+      const set = { freq: p.value.freq, rate: p.value.rate, offset: p.value.offset, more: p.value.more };
+      if (p.value.fmt) set.fmt = p.value.fmt;
+      return { verb, args, set, plan: p.value };
+    }
     if (verb === 'DEFAULTS' && (args[0] || '').toUpperCase() !== 'YES') return { verb, args, error: 'CONFIRM DEFAULTS YES puts every setting back' };
     return { verb, args };
   }
@@ -272,6 +438,7 @@ const SdrPi = (function () {
       case 'fmt': return 'FORMAT ' + v;
       case 'direct': return 'DIRECT ' + String(v).toUpperCase();
       case 'model': return 'MODEL ' + String(v).toUpperCase();
+      case 'more': return 'MORE ' + formatSetting('more', v).toUpperCase();
       default: return key.toUpperCase() + ' ' + formatSetting(key, v);
     }
   }
@@ -286,7 +453,10 @@ const SdrPi = (function () {
     'RATE 240000                  240000 960000 1200000 1920000 2400000',
     'GAIN 29.7 | GAIN AUTO        tuner gain, dB',
     'PPM -3                       the stick\'s frequency error',
-    'FORMAT ABF | EIF | ASC       ALERT Binary, Enhanced iFLOWS, ALERT ASCII - one at a time',
+    'FORMAT ABF | EIF | ASC       ALERT Binary, Enhanced iFLOWS, ALERT ASCII - one per channel',
+    'CHANNELS 151.5 151.525 152.4 several channels at once, the stick\'s own first: works out FREQ RATE OFFSET',
+    '                             and MORE to hear them all (152.4/EIF: one in another format)',
+    'MORE 151.525 152.4 | NONE    the channels decoded besides the stick\'s own, MHz - inside its band',
     'GATE ON | OFF  SQUELCH 8     decode bursts only, and how far over the floor one is',
     'AGC ON | OFF                 the RTL2832U\'s own AGC',
     'BIAS ON YES | BIAS OFF       4.5 V on the antenna socket (V2, V3, V4)',
@@ -432,6 +602,21 @@ const SdrPi = (function () {
     if (!s) return [];
     return String(s).split(';').map(x => x.split(':')).filter(p => p.length >= 3).map(p => ({
       sensorId: Number(p[0]), value: Number(p[1]), votes: Number(p[2]), of: p[3] ? p[3] + '=' + p[4] : '',
+    }));
+  }
+
+  // STAT's chans: every channel the stick decodes, its own first, as
+  // hz:fmt:ch_dbfs:nf_dbfs:open:bursts:readings with `;` between — the level
+  // the strongest since the last STAT, as ch_dbfs is, and the counts since the
+  // channel was set. Empty while it decodes one.
+  function packChans(list) {
+    const f = v => (v == null || !isFinite(v) ? '' : String(Math.round(v * 10) / 10));
+    return list.map(ch => [ch.hz, ch.fmt, f(ch.chDb), f(ch.nfDb), ch.open ? 1 : 0, ch.bursts || 0, ch.readings || 0].join(':')).join(';');
+  }
+  function unpackChans(s) {
+    const n = v => (v === '' || v == null || !isFinite(Number(v)) ? null : Number(v));
+    return String(s || '').split(';').map(x => x.split(':')).filter(p => n(p[0]) > 0).map(p => ({
+      hz: n(p[0]), fmt: FMT_KEY[p[1]] ? p[1] : '', chDb: n(p[2]), nfDb: n(p[3]), open: p[4] === '1', bursts: n(p[5]) || 0, readings: n(p[6]) || 0,
     }));
   }
 
@@ -603,7 +788,8 @@ const SdrPi = (function () {
       freq: Math.round(cfg.freq), rate: RATES.indexOf(+cfg.rate) >= 0 ? +cfg.rate : 240000,
       gain: cfg.autoGain ? null : Math.round(cfg.gain) / 10, agc: !!cfg.agc, ppm: Math.round(cfg.ppm || 0),
       fmt: FMT_CODE[cfg.format] || 'ABF', gate: cfg.gate !== false, squelch: Math.round(cfg.squelch || 8),
-      offset: Math.round(cfg.offsetHz || 0), bias: !!cfg.bias, direct: cfg.direct || 'auto', model: cfg.model || 'auto',
+      offset: Math.round(cfg.offsetHz || 0), more: (cfg.more || []).map(ch => Object.assign({}, ch)), bias: !!cfg.bias,
+      direct: cfg.direct || 'auto', model: cfg.model || 'auto',
     };
   }
 
@@ -618,6 +804,7 @@ const SdrPi = (function () {
     if (s.gate != null) c.gate = !!s.gate;
     if (s.squelch != null) c.squelch = s.squelch;
     if (s.offset != null) c.offsetHz = s.offset;
+    if (s.more) c.more = s.more.map(ch => Object.assign({}, ch));
     if (s.bias != null) c.bias = !!s.bias;
     if (s.direct) c.direct = s.direct;
     if (s.model) c.model = s.model;
@@ -626,11 +813,12 @@ const SdrPi = (function () {
 
   return {
     SCHEMA, VERSION, OSC_ID, RECORDS, DEFAULT_FIELDS, NUMERIC, RATES, MODELS, DIRECT, SETTING_KEYS, CARD_KEYS,
-    FMT_KEY, FMT_CODE, FMT_LABEL, HELP,
+    FMT_KEY, FMT_CODE, FMT_LABEL, FMT_ALIAS, HELP, MAX_CHANNELS, MAX_SPAN_HZ, PLAN,
     defaults, parseSetting, formatSetting, offsetLimit, parseCommand, cfgCommand, setCommand,
+    parseChannels, channelsText, mhzText, planChannels, reach, checkChannels,
     clean, record, kvRecord, cfgRecord, fieldsRecords, hide,
     packSpectrum, unpackSpectrum, packHist, unpackHist, packSymbols, unpackSymbols, packTrace, unpackFrames,
-    packShadows, unpackShadows,
+    packShadows, unpackShadows, packChans, unpackChans,
     createSchema, parseLine, Reader, sniff, fromCard, toCard,
   };
 })();

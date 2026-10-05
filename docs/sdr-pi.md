@@ -129,12 +129,15 @@ off: `--uninstall`.
    correctly either way; it is the log's history that needs it.
 6. **Send to MegaNet** works as on any receiver card —
    [`ingest-serial-monitor.md`](ingest-serial-monitor.md). The Pi is a receiver of
-   its own (`sdrpi-…`), reported to the database as an `rtl-sdr`.
+   its own (`sdrpi-…`), reported to the database as an `rtl-sdr` — one receiver
+   however many channels it decodes; each reading's channel is in the card's
+   reception log (`freq_mhz`).
 
 ## Settings
 
 Out of the box: **151.500 MHz, ALERT Binary, gain 29.7 dB, 240 ksps, decode bursts
-only at 8 dB** — the MegaNet networks' channel. Nothing to set for those.
+only at 8 dB** — the MegaNet networks' channel. Nothing to set for those. One stick
+can also decode several channels at once — [below](#several-channels-from-one-stick).
 
 - **On the card**: change a control and its command is copied — right-click in PuTTY,
   Enter. Change several before pasting and they wait together and copy as one
@@ -154,7 +157,9 @@ only at 8 dB** — the MegaNet networks' channel. Nothing to set for those.
   | `RATE 240000` | 240000, 960000, 1200000, 1920000 or 2400000 sample/s |
   | `GAIN 29.7`, `GAIN AUTO` | tuner gain |
   | `PPM -3` | the stick's frequency error |
-  | `FORMAT ABF` / `EIF` / `ASC` | ALERT Binary, Enhanced iFLOWS, ALERT ASCII — one at a time |
+  | `FORMAT ABF` / `EIF` / `ASC` | ALERT Binary, Enhanced iFLOWS, ALERT ASCII — one format a channel |
+  | `CHANNELS 151.5 151.525 152.4/EIF` | several channels at once, the stick's own first: works out `FREQ`, `RATE`, `OFFSET` and `MORE` to hear them all; `CHANNELS` alone lists them |
+  | `MORE 151.525 152.4/EIF`, `MORE NONE` | the channels decoded besides the stick's own — inside the band it is tuned to |
   | `GATE ON`, `SQUELCH 8` | decode bursts only, and how far over the floor one must be |
   | `BIAS ON YES`, `BIAS OFF` | 4.5 V on the antenna socket, for an LNA (V2, V3, V4) |
   | `MODEL V4` | when the stick does not say what it is |
@@ -166,6 +171,41 @@ A higher sample rate shows more of the band on the card and costs the Pi more: a
 Pi 4 manages any of them; a Pi Zero 2 W is comfortable at 240k and 960k. If the Pi
 falls behind it says so (`The decoder is … behind`) and drops samples rather than
 queueing them.
+
+### Several channels from one stick
+
+The stick hears a slice of the band as wide as its sample rate, and the Pi decodes
+every channel you list in it at once — each by a decoder of its own on the same
+samples, up to 8 channels within 1.89 MHz of each other. On the card, type them into
+**Channels** (*Controls → Decoder*), the stick's own first — `151.5 151.525 151.95/EIF
+152.4` — and press **Set**. The card works out where to tune the stick and how fast to
+sample, and copies it as one `CFG` line to paste: the lowest rate that holds every
+channel in the middle of the slice, and the centre that keeps each channel furthest
+from the stick's DC spike and from every other channel's *mirror image* (a zero-IF
+tuner like the V2's shows a faint copy of each signal at the opposite offset, which
+would be decoded there too). For those four: 1.92 Msps around 151.85 MHz, the nearest
+channel 100 kHz from the spike and no image within 200 kHz. In PuTTY,
+`CHANNELS 151.5 151.525 151.95/EIF 152.4` does the same — RPi ALERT tunes a stick the
+same way.
+
+- **Formats**: each channel is decoded in the stick's format or its own (`/EIF`,
+  `/ABF`, `/ASC`), and a frequency is listed once — in two formats it would turn strong
+  Binary bursts into CRC-valid Enhanced iFLOWS ghosts, the reason the decoder reads one
+  format at a time.
+- **Shared**: the gain, ppm and bias tee are the stick's, and so is the ADC — a very
+  strong channel can push it towards clipping for the rest. Each channel gates on its
+  own power, at the stick's squelch.
+- **On the card**: a chip for each channel with the readings heard on it, a band for
+  each on the spectrum, and each reading's channel beside its station. They all go to
+  MegaNet as the card's one receiver.
+- **Afterwards**: `FREQ`, `RATE` and `OFFSET` move the stick's own channel and leave the
+  others where they are; a change that would put one outside the band is refused, on
+  the card and by the Pi — set the channels again instead.
+- **CPU**: a decoder thread a channel, each working through the whole slice — on a Pi 4
+  roughly 15–20% of a core each at 960 ksps and 30–40% at 1.92 Msps, plus a second or
+  two per burst decoded (estimated on a PC; the bring-up below measures it). Four
+  channels at 1.92 Msps fit a Pi 4; a Zero 2 W manages a few at 960 ksps. The `STAT`
+  line's `cpu_pct` says how it is going.
 
 ## What the Pi sends, and why PuTTY's window stays readable
 
@@ -203,6 +243,7 @@ sent to MegaNet.
 | The card: *Nothing new for a while* | PuTTY closed, or not logging this session. |
 | The card: readings with `—` for a time | From the log's history, with the Pi's clock unset — *Copy clock command*. |
 | `The decoder is … behind` | Too high a `RATE` for this Pi — `RATE 240000`. |
+| `The decoder for 151.525 MHz is … behind` | Too many channels for this Pi, or channels so far apart they need a high rate — fewer, or closer together. |
 | The Pi restarts, or PuTTY drops the port | Not enough power — recipe A from a USB-A port. A USB-C port, or recipe B. |
 | Settings changed on the card do not happen | The copied command was not pasted — *Waiting for the Pi* says what is waiting; *Copy again*. |
 
@@ -244,6 +285,10 @@ What the checks cannot reach, in order:
    still `throttled=0x0`.
 8. **Load**: a Zero 2 W at 240k and 960k — the `STAT` line's `cpu_pct`, and no
    *behind* notes.
+9. **Several channels**: `CHANNELS 151.5 151.525 151.95/EIF 152.4` on a Pi 4 — readings
+   on each channel that the networks' own feeds agree with, none of one channel's
+   stations turning up on another, `cpu_pct` over an hour and no *behind* notes; two
+   channels on a Zero 2 W.
 
 Report what differs. The relay's own behaviour is held by `npm run sdrpi`; a fix
 there should come with an assertion there.

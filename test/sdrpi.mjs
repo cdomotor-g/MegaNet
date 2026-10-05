@@ -24,7 +24,11 @@
 //   * the USB path: the relay opening test/lib/fake-rtlsdr.mjs's simulated V3
 //     through rtlsdr.js, streaming it, retuning, regaining, switching the bias
 //     tee and the rate from the console, losing it when it is "unplugged" and
-//     finding it again when it comes back.
+//     finding it again when it comes back;
+//   * several channels on one stick: the channel list and the tuning that
+//     hears them all, the band check the relay and the card share, STAT's
+//     chans; a recording of four frequencies decoded by a decoder each, every
+//     reading on its own channel only; CHANNELS retuning the simulated stick.
 //
 // What it cannot hold is a real stick on a real Pi in front of a real PuTTY:
 // docs/sdr-pi.md's bring-up list is for that.
@@ -95,11 +99,12 @@ function runRelay(args, input, { wait = 0, timeout = 60000 } = {}) {
     s('fmt', 'binary').value === 'ABF' && s('fmt', 'enhanced').value === 'EIF' && s('fmt', 'ascii').value === 'ASC' && !s('fmt', 'iflows').ok);
   check('offset: kHz in, Hz kept', s('offset', '12.5').value === 12500 && s('offset', '-0.5kHz').value === -500);
   check('on/off settings take 1/0, on/off, yes/no', s('gate', 'off').value === false && s('agc', '1').value === true && !s('bias', 'maybe').ok);
-  const all = P.defaults();
+  const all = Object.assign(P.defaults(), { more: [{ hz: 151525000 }, { hz: 152400000, fmt: 'EIF' }] });
+  const same = (k, a, b) => P.formatSetting(k, a) === P.formatSetting(k, b);
   const back = P.parseCommand(P.cfgCommand(all, P.SETTING_KEYS)).set;
-  check('every setting survives CFG → command → parse', P.SETTING_KEYS.every(k => back[k] === all[k]), JSON.stringify(back));
+  check('every setting survives CFG → command → parse', P.SETTING_KEYS.every(k => same(k, back[k], all[k])), JSON.stringify(back));
   const cfgItem = P.parseLine(P.createSchema(), P.cfgRecord(all), false);
-  check('a CFG record reads back as the same settings', P.SETTING_KEYS.every(k => cfgItem.settings[k] === all[k]));
+  check('a CFG record reads back as the same settings', P.SETTING_KEYS.every(k => same(k, cfgItem.settings[k], all[k])));
   const card = { freq: 151512500, rate: 960000, gain: 296, autoGain: false, agc: true, ppm: -3, format: 'ENHANCED_IFLOWS', gate: false,
     squelch: 11, offsetHz: -25000, bias: true, direct: 'q', model: 'v3' };
   const there = P.toCard(P.parseCommand(P.cfgCommand(P.fromCard(card))).set);
@@ -167,6 +172,76 @@ function runRelay(args, input, { wait = 0, timeout = 60000 } = {}) {
   check('sniff: not a Quansheng radio\'s log, not an ERT-A2\'s', !P.sniff('HDR,fw,4d06107f,schema,2\r\nDEC,1041,1790843886') && !P.sniff('ALERT2A,1,2,3'));
 }
 
+// ── several channels on one stick: the codec ─────────────────────────────────
+
+{
+  const s = P.parseSetting;
+  const more = s('more', '151.525;152.4/EIF');
+  check('more: channels in MHz, a format after the one sent in another', more.ok && JSON.stringify(more.value) === JSON.stringify([{ hz: 151525000 }, { hz: 152400000, fmt: 'EIF' }]));
+  check('more: typed with spaces or commas, a format as its own word, none for none',
+    JSON.stringify(s('more', '151.525, 152.4 enhanced').value) === JSON.stringify(more.value) && JSON.stringify(s('more', 'NONE').value) === '[]');
+  check('more: written back as it is read', P.formatSetting('more', more.value) === '151.525;152.400/EIF' && P.formatSetting('more', []) === 'none');
+  check('more: refuses a format with no channel before it, iFLOWS, a channel twice — in two formats too — more than 7',
+    !s('more', 'EIF 152.4').ok && !s('more', '152.4/IFLOWS').ok && !s('more', '151.5;151.5').ok && /listed twice - each channel in one format/.test(s('more', '151.5 151.5/EIF').error)
+    && !s('more', Array.from({ length: 8 }, (_, i) => (151.5 + i * 0.025).toFixed(3)).join(';')).ok);
+  check('MORE: a verb for it, and the command a control copies', P.parseCommand('MORE 151.525 152.4 EIF').set.more.length === 2
+    && P.setCommand('more', more.value) === 'MORE 151.525;152.400/EIF' && P.setCommand('more', []) === 'MORE NONE');
+
+  // CHANNELS: the tuning worked out — the networks' four channels on one stick.
+  const c = P.parseCommand('CHANNELS 151.5 151.525 151.95/EIF 152.4');
+  const set = c.set || {};
+  const all = [{ hz: 151500000, offset: set.offset }].concat((set.more || []).map(m => ({ hz: m.hz, offset: m.hz - set.freq })));
+  check('CHANNELS: the four networks\' channels at 1.92 Msps around 151.85 MHz', set.rate === 1920000 && set.freq === 151850000 && set.offset === -350000
+    && P.formatSetting('more', set.more) === '151.525;151.950/EIF;152.400', JSON.stringify(set));
+  check('CHANNELS: every channel inside the band, 50 kHz+ off the DC spike, none on another\'s mirror image',
+    all.every(ch => Math.abs(ch.offset) <= P.offsetLimit(set.rate) && Math.abs(ch.offset) >= P.PLAN.DC_GOOD)
+    && all.every((a, i) => all.every((b, j) => i === j || Math.abs(a.offset + b.offset) >= P.PLAN.MIRROR_GOOD)));
+  const one = P.parseCommand('CHANNELS 151.525/EIF').set;
+  check('CHANNELS: one channel is tuned as the Pi always tunes one — on it, 240 ksps', one.freq === 151525000 && one.offset === 0 && one.rate === 240000
+    && one.more.length === 0 && one.fmt === 'EIF');
+  check('CHANNELS: two channels 25 kHz apart fit 240 ksps', P.parseCommand('CHANNELS 151.5 151.525').set.rate === 240000);
+  check('CHANNELS: channels too far apart for one stick are refused, saying how far', /^RANGE .*2\.50 MHz apart/.test(P.parseCommand('CHANNELS 151.5 154').error || ''));
+  let seed = 3, plans = 0;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  for (let n = 0; n < 100; n++) {
+    const list = Array.from({ length: 2 + Math.floor(rnd() * 7) }, () => ({ hz: 150500000 + Math.round(rnd() * 120) * 12500 }))
+      .filter((ch, i, a) => a.findIndex(x => x.hz === ch.hz) === i);
+    if (list.length < 2) continue;
+    const p = P.planChannels(list);
+    const offs = p.ok ? list.map(ch => ch.hz - p.value.freq) : [];
+    if (p.ok && offs.every(o => Math.abs(o) <= P.reach(p.value.rate) && Math.abs(o) >= P.PLAN.DC_MIN) && p.value.offset === offs[0]) plans++;
+  }
+  check('CHANNELS: any channels within 1.5 MHz of each other fit, inside the band and off the spike', plans >= 95, plans + ' of the sets that had two channels');
+  const card = { freq: 151850000, rate: 1920000, gain: 297, autoGain: false, agc: false, ppm: 0, format: 'BINARY', gate: true, squelch: 8,
+    offsetHz: -350000, more: [{ hz: 151525000 }, { hz: 152400000, fmt: 'EIF' }], bias: false, direct: 'auto', model: 'auto' };
+  const there = P.toCard(P.parseCommand(P.cfgCommand(P.fromCard(card))).set);
+  check('the card\'s channels → CFG command → the card\'s channels', JSON.stringify(there.more) === JSON.stringify(card.more) && there.offsetHz === -350000);
+  check('a STAT field and a TRACE field appended, not inserted', P.DEFAULT_FIELDS.STAT.slice(-1)[0] === 'chans' && P.DEFAULT_FIELDS.TRACE.slice(-1)[0] === 'freq_hz'
+    && P.DEFAULT_FIELDS.STAT.indexOf('source') === 27);
+
+  // What the relay refuses, and the card asks before it copies a change.
+  const cs = Object.assign(P.defaults(), { freq: 151850000, rate: 1920000, offset: -350000, more: [{ hz: 151525000 }, { hz: 151950000, fmt: 'EIF' }, { hz: 152400000 }] });
+  check('checkChannels: the four channels as CHANNELS tuned them', P.checkChannels(cs, cs.rate) === null);
+  const low = P.checkChannels(cs, 240000);
+  check('checkChannels: the stick\'s own channel outside the band at a lower rate', low && low.far && low.hz === 151500000
+    && /^RANGE offset is within 108 kHz of the centre at 240000 sps$/.test(low.error), low && low.error);
+  const far = P.checkChannels(Object.assign({}, cs, { offset: 0, rate: 960000 }), 960000);
+  check('checkChannels: one of the others outside it, saying which and how far', far && far.far && far.hz === 152400000
+    && /^RANGE 152\.400 MHz is 550 kHz from the centre and at 960000 sps a channel must be within 468 kHz/.test(far.error), far && far.error);
+  const twice = P.checkChannels(Object.assign({}, cs, { more: [{ hz: 151500000 }] }), cs.rate);
+  check('checkChannels: a channel twice — the stick\'s own', twice && !twice.far && /^ARG 151\.500 MHz is listed twice - each channel in one format/.test(twice.error), twice && twice.error);
+  const both = P.checkChannels(Object.assign({}, cs, { more: [{ hz: 151500000, fmt: 'EIF' }] }), cs.rate);
+  check('checkChannels: one frequency in two formats too — the CRC-valid ghosts alert-dsp.js will not make', both && /Enhanced iFLOWS read off a strong Binary burst makes CRC-valid ghosts$/.test(both.error), both && both.error);
+
+  // STAT's chans: each channel's level and what it has heard.
+  const packed = P.packChans([{ hz: 151500000, fmt: 'ABF', chDb: -45.26, nfDb: null, open: true, bursts: 2, readings: 1 }, { hz: 151525000, fmt: 'EIF', chDb: -Infinity }]);
+  check('packChans: hz:fmt:ch_dbfs:nf_dbfs:open:bursts:readings, a level to 0.1 dB, none as nothing', packed === '151500000:ABF:-45.3::1:2:1;151525000:EIF:::0:0:0', packed);
+  const unpacked = P.unpackChans(packed);
+  check('unpackChans: read back', unpacked.length === 2 && unpacked[0].chDb === -45.3 && unpacked[0].nfDb === null && unpacked[0].open
+    && unpacked[0].bursts === 2 && unpacked[0].readings === 1 && unpacked[1].fmt === 'EIF' && unpacked[1].chDb === null && !unpacked[1].open, JSON.stringify(unpacked));
+  check('unpackChans: one channel (an empty field), or a relay with no chans, is no list', P.unpackChans('').length === 0 && P.unpackChans(undefined).length === 0);
+}
+
 // ── the relay, playing recordings ──────────────────────────────────────────────
 
 {
@@ -205,6 +280,51 @@ function runRelay(args, input, { wait = 0, timeout = 60000 } = {}) {
   check('the 4078 rig\'s real burst: 4080 = 121 (12.1 V)', got(4080) && got(4080).value === 121);
   check('the 4078 rig\'s real burst: CRC good, 4079\'s bytes EF3FD208', got(4079) && got(4079).crc === 1 && got(4079).hex === 'EF3FD208');
   check('the 4078 rig\'s real burst: nothing else', rx.every(x => [4078, 4079, 4080].indexOf(x.id) >= 0));
+}
+
+// ── several channels on one stick: one recording, a decoder each ──────────────
+
+{
+  // A 960 ksps slice around 151.8 MHz: a station on 151.500 and another on
+  // 151.525 in the same instant, an ERT-A2 on 151.950 in Enhanced iFLOWS, and
+  // one on 152.200, where nobody is listening.
+  const centre = 151800000;
+  const B = (id, v) => D.encodeFrame(D.BINARY, id, v), E = (id, v) => D.encodeFrame(D.ENHANCED_IFLOWS, id, v);
+  const at = (mhz, startSec, frames) => ({ startSec, frames: [frames], cfoHz: Math.round(mhz * 1e6) - centre, amp: 40, polarity: 'NEG' });
+  const file = path.join(TMP, 'channels_960k.iq8');
+  fs.writeFileSync(file, D.synthIq({ fs: 960000, seconds: 7, snrDb: 30, seed: 5, amp: 40,
+    bursts: [at(151.5, 1.0, B(2088, 143)), at(151.525, 1.05, B(2443, 142)), at(151.95, 3.0, E(4079, 420)), at(152.2, 5.0, B(6129, 77))] }));
+  const r = await runRelay(['--file', file, '--set', 'freq=151.8', '--set', 'offset=-300', '--set', 'more=151.525;151.95/EIF',
+    '--speed', '0', '--exit-after-file', '--state', 'none']);
+  const items = read(r.out);
+  const rx = recs(items, 'RX').map(i => i.rec);
+  const heard = [...new Set(rx.map(x => x.id + '=' + x.value + '@' + x.freq_hz))].sort().join(' ');
+  check('channels: exits cleanly once every channel\'s decoder has finished', r.code === 0, r.err.slice(-300));
+  check('channels: each station heard on its own channel and no other — the two 25 kHz apart in the same instant too',
+    heard === '2088=143@151500000 2443=142@151525000 4079=420@151950000', heard);
+  check('channels: each channel in its own format', rx.every(x => x.fmt === (x.freq_hz === 151950000 ? 'EIF' : 'ABF')) && rx.find(x => x.id === 4079).crc === 1);
+  check('channels: nothing from 152.200, where no channel is', !rx.some(x => x.id === 6129));
+  const bursts = recs(items, 'BURST').map(i => i.rec);
+  check('channels: a burst on each channel, named by it, each reading tied to its own',
+    bursts.map(b => b.freq_hz).sort().join() === '151500000,151525000,151950000' && rx.every(x => bursts.find(b => b.seq === x.burst).freq_hz === x.freq_hz),
+    bursts.map(b => b.seq + '@' + b.freq_hz).join(' '));
+  check('channels: each decode\'s trace says its channel', recs(items, 'TRACE').every(t => [151500000, 151525000, 151950000].indexOf(t.rec.freq_hz) >= 0));
+  const stat = recs(items, 'STAT').slice(-1)[0];
+  const chans = stat ? String(stat.rec.chans).split(';').map(x => x.split(':')) : [];
+  check('channels: STAT counts each channel — its frequency, format, a burst and a reading each',
+    chans.length === 3 && chans.map(c => c[0] + '/' + c[1] + '/' + c[5] + '/' + c[6]).join(' ') === '151500000/ABF/1/1 151525000/ABF/1/1 151950000/EIF/1/1'
+    && stat.rec.bursts === 3 && stat.rec.readings === 3, stat && stat.rec.chans);
+  check('channels: the greeting and the notes name them', recs(items, 'NOTE').some(i => /3 channels: 151\.500 ABF; 151\.525 ABF; 151\.950 EIF MHz/.test(i.rec.text)));
+
+  // One the stick cannot hear at this rate (kept from before, or given with
+  // --set) gets no decoder: it would hear another frequency and name it this one.
+  const far = await runRelay(['--file', file, '--set', 'freq=151.8', '--set', 'offset=-300', '--set', 'more=151.525;152.9',
+    '--speed', '0', '--exit-after-file', '--state', 'none']);
+  const farItems = read(far.out), farStat = recs(farItems, 'STAT').slice(-1)[0];
+  check('channels: one outside the band gets no decoder, and the Pi says so',
+    far.code === 0 && recs(farItems, 'NOTE').some(i => /^Not decoding 152\.900 MHz: outside the band the stick hears at 960000 sps/.test(i.rec.text))
+    && !recs(farItems, 'RX').some(i => i.rec.freq_hz === 152900000) && !!farStat && P.unpackChans(farStat.rec.chans).length === 2
+    && recs(farItems, 'RX').some(i => i.rec.freq_hz === 151525000), recs(farItems, 'NOTE').map(i => i.rec.text).join(' | '));
 }
 
 // ── the console over stdio ─────────────────────────────────────────────────────
@@ -338,8 +458,21 @@ function runRelay(args, input, { wait = 0, timeout = 60000 } = {}) {
   await say('RATE 960000', 400);
   check('USB: RATE restarts the stream at the new rate', Math.round(relay.dev.rate) === 960000 && relay.dev.streaming);
   await say('FREQ 2000', 150);
-  const lastFinal = finals(read(Buffer.from(lines.filter(l => !l.hidden).map(l => l.line + '\r\n').join(''), 'latin1'))).slice(-1)[0];
+  const shown = () => read(Buffer.from(lines.filter(l => !l.hidden).map(l => l.line + '\r\n').join(''), 'latin1'));
+  const lastFinal = finals(shown()).slice(-1)[0];
   check('USB: a frequency the stick cannot tune is refused', lastFinal === 'ERR RANGE' || lastFinal === 'ERR ARG', lastFinal);
+  await say('CHANNELS 151.5 151.525 151.95/EIF 152.4', 600);
+  check('USB: CHANNELS retunes the stick to hear all four — 1.92 Msps around 151.85 MHz — a decoder each',
+    Math.round(relay.dev.rate) === 1920000 && relay.dev.freq === 151850000 && relay.dev.streaming && relay.decoders.length === 4
+    && relay.decoders.map(d => d.ch.hz + ':' + d.ch.offset + ':' + d.ch.fmt).join(' ')
+      === '151500000:-350000:ABF 151525000:-325000:ABF 151950000:100000:EIF 152400000:550000:ABF', relay.decoders.map(d => d.ch && d.ch.hz).join());
+  check('USB: …and says where it tuned, and why there', recs(shown(), 'NOTE').some(i => /^Decoding 4 channels: 151\.500 ABF; 151\.525 ABF; 151\.950 EIF; 152\.400 ABF MHz - tuned to 151\.8500 MHz at 1920000 sps - the nearest channel 100 kHz from the DC spike/.test(i.rec.text)));
+  await say('MORE 152.9', 150);
+  check('USB: a channel outside the band the stick is tuned to is refused, saying so', finals(shown()).slice(-1)[0] === 'ERR RANGE' && relay.decoders.length === 4);
+  await say('MORE NONE', 300);
+  check('USB: MORE NONE leaves the stick its own channel, one decoder', relay.decoders.length === 1 && relay.settings.more.length === 0
+    && recs(shown(), 'CFG').slice(-1)[0].settings.more.length === 0);
+  await say('FREQ 151.6', 150);
   stick.unplugged = true;
   await sleep(600);
   check('USB: an unplugged stick is noticed and said', relay.state === 'no-stick' && lines.some(l => /stopped streaming/.test(l.line)));

@@ -86,11 +86,12 @@ trustworthy (NTP synchronised, or set by `TIME`), else empty.
 
 ### CFG — the settings (key, value pairs)
 
-`CFG,freq,151.500000,rate,240000,gain,29.7,agc,0,ppm,0,fmt,ABF,gate,1,squelch,8,offset,0,bias,0,direct,auto,model,auto,spec,5,lvl,2`
+`CFG,freq,151.500000,rate,240000,gain,29.7,agc,0,ppm,0,fmt,ABF,gate,1,squelch,8,offset,0,more,none,bias,0,direct,auto,model,auto,spec,5,lvl,2`
 
 Sent after every change and on `CFG`. **The same keys in the same units as the
 `CFG` command**, so a CFG line turned into `CFG key=value …` sets the same state
-again. `freq` MHz; `offset` kHz; `gain` dB or `auto`; the rest as section 6.
+again. `freq` MHz; `offset` kHz; `gain` dB or `auto`; `more` the other channels
+(`151.525;152.400/EIF`, or `none`); the rest as section 6.
 
 ### RX — one accepted reading (shown)
 
@@ -108,7 +109,7 @@ again. `freq` MHz; `offset` kHz; `gain` dB or `auto`; the rest as section 6.
 | carrier_hz | int | the carrier's offset from the channel centre |
 | burst | int | the `BURST` it came from (its `seq`); empty when decoding is not gated |
 | peak_dbfs, nf_dbfs, burst_ms | | that burst's peak, the channel floor, its length |
-| freq_hz | int | the channel: the stick's frequency plus the offset |
+| freq_hz | int | the channel it was heard on: the stick's own (its frequency plus the offset), or one of `more` |
 | name, kind | | MegaNet's name for the address, as the Quansheng radio's table names it (`stations.json`), and `RAIN` `LVL` `BATT` `REP` `SNSR` `CHK`; empty when unknown |
 
 Bit-flip shadows (a frame within two bits of one with three times its votes) are
@@ -119,10 +120,12 @@ never sent as `RX`; they are in the decode's `TRACE`.
 `seq, run, up, epoch_ms, ms, peak_dbfs, nf_dbfs, freq_hz` — sent when the gate
 closes; its readings follow in `RX` lines naming its `seq`, and its `TRACE` after
 them. A burst with no `RX` and a `TRACE` whose `all` is 0 was heard and not decoded.
+`freq_hz` the channel it rose on: each channel gates on its own, so bursts on two
+channels at once are two `BURST`s.
 
 ### TRACE — one decode (hidden)
 
-`run, up, burst, ms, combos, seconds, all, carrier_hz, start, frames, shadows, symbols`
+`run, up, burst, ms, combos, seconds, all, carrier_hz, start, frames, shadows, symbols, freq_hz`
 
 `ms` decode time; `combos` combinations tried; `seconds` window length; `all`
 frames accepted (including ones already reported in the last 10 s); `symbols` the
@@ -131,11 +134,11 @@ when no frame was found), one character each — the index of the character in
 `A–Z a–z 0–9 + /` is `(s + 3) / 6 × 63`, `s` clamped to ±3; `start` the index of
 the first one sent; `frames` `pos:id:value:inv;…` with `pos` counted from the
 window's first symbol (so `pos − start` in the slice); `shadows`
-`id:value:votes:ofId:ofValue;…`.
+`id:value:votes:ofId:ofValue;…`; `freq_hz` the channel decoded.
 
 ### STAT — status (hidden every 10 s, shown every 5 min and on `STATUS`)
 
-`run, up, epoch_ms, clock, state, freq_hz, offset_hz, rate, in_rate, gain, agc, ppm, fmt, gate, squelch, nf_dbfs, ch_dbfs, open, dbfs, clip_pct, bursts, readings, drops, cpu_pct, temp_c, model, tuner, source`
+`run, up, epoch_ms, clock, state, freq_hz, offset_hz, rate, in_rate, gain, agc, ppm, fmt, gate, squelch, nf_dbfs, ch_dbfs, open, dbfs, clip_pct, bursts, readings, drops, cpu_pct, temp_c, model, tuner, source, chans`
 
 `clock` `ntp`, `set` or empty (no time of day to trust). `state` `streaming`,
 `no-stick`, `starting` or `stopped`. `in_rate` samples a second actually arriving.
@@ -143,12 +146,16 @@ window's first symbol (so `pos − start` in the slice); `shadows`
 sampled ten times a second); `nf_dbfs` its floor; `open` the gate now; `dbfs`, `clip_pct` the ADC's mean level and clipping.
 `drops` lost USB transfers and samples dropped because the decoder fell behind.
 `cpu_pct` the relay's share of one core (it can pass 100 on a multi-core Pi);
-`temp_c` the SoC.
+`temp_c` the SoC. `ch_dbfs`, `nf_dbfs` and `open` are the stick's own channel's;
+`bursts` and `readings` count every channel's. `chans`, while the stick decodes
+several channels: each, its own first, `;` between, as
+`hz:fmt:ch_dbfs:nf_dbfs:open:bursts:readings` — its level as `ch_dbfs` is, its
+counts since it was set (`sdr-pi.js`'s `unpackChans`); empty while it decodes one.
 
 ### LVL — the level (hidden, every `lvl` seconds)
 
 `run, up, ch_dbfs, nf_dbfs, open, dbfs, clip_pct, hist` — over the interval: the
-channel's strongest level (as in `STAT`), its floor, whether the gate opened, the ADC's mean
+stick's own channel's strongest level (as in `STAT`), its floor, whether its gate opened, the ADC's mean
 level and clipping, and `hist`, the ADC's 32-bin histogram as 32 characters on a
 square-root scale against the fullest bin (`(i / 63)²` of it), where a bin with
 anything in it is never `A`.
@@ -158,6 +165,8 @@ anything in it is never `A`.
 `run, up, rate, freq_hz, offset_hz, lo_dbfs, step_db, agg, bins` — `bins`
 characters across the band, negative frequencies first: each the strongest of its
 group of FFT bins (`agg` `max`) over the interval, at `lo_dbfs + index × step_db`.
+`offset_hz` where the stick's own channel sits in it (0 for a recording of one
+channel, which is taken centred on it).
 
 ### NOTE — something happened (shown)
 
@@ -191,7 +200,9 @@ one-line status (text, not a record).
 | `CFG` | | `CFG`, `OK` |
 | `CFG key=value …` | several settings, all checked before any is made | `CFG`, `OK` |
 | `SET key value` | one | `CFG`, `OK` |
-| `FREQ v`, `RATE v`, `GAIN v`, `PPM v`, `FORMAT v` (`FMT`), `OFFSET v`, `GATE v`, `SQUELCH v` (`SQ`), `AGC v`, `DIRECT v`, `MODEL v`, `SPEC v`, `LVL v` (`LEVEL`) | one setting; on its own, asks for it | `CFG`, `OK` |
+| `FREQ v`, `RATE v`, `GAIN v`, `PPM v`, `FORMAT v` (`FMT`), `OFFSET v`, `MORE v`, `GATE v`, `SQUELCH v` (`SQ`), `AGC v`, `DIRECT v`, `MODEL v`, `SPEC v`, `LVL v` (`LEVEL`) | one setting; on its own, asks for it | `CFG`, `OK` |
+| `CHANNELS f f …` | every channel to decode, the stick's own first (`152.4/EIF` or `152.4 EIF` for one in another format): `freq`, `rate`, `offset` and `more` worked out to hear them all (below), and set together | `CFG`, `NOTE`, `OK` |
+| `CHANNELS` | | `CFG` with `freq`, `rate`, `offset`, `fmt`, `more`; `OK` |
 | `BIAS ON YES`, `BIAS OFF` | the bias tee | `CFG`, `OK` |
 | `TIME <unix seconds>` | sets the clock (ignored when NTP keeps it) | `NOTE`, `OK` |
 | `TIME` | | `TIME,<unix seconds or empty>`, `OK,<ntp\|set\|unset>` |
@@ -208,17 +219,32 @@ Settings and their units:
 | `gain` | dB, −10 to 50, or `auto` (the tuner's AGC). The tuner takes the nearest step at or above. |
 | `agc` | the RTL2832U's own AGC: `on`/`off` (`1`/`0`, `yes`/`no`) |
 | `ppm` | −200 to 200 |
-| `fmt` | `ABF` (`BINARY`), `EIF` (`ENHANCED`), `ASC` (`ASCII`). Never `IFLOWS`: NSW's network is called iFLOWS and sends ALERT Binary. |
+| `fmt` | `ABF` (`BINARY`), `EIF` (`ENHANCED`), `ASC` (`ASCII`) — the stick's own channel's, and that of every channel in `more` that names none. Never `IFLOWS`: NSW's network is called iFLOWS and sends ALERT Binary. |
 | `gate` | decode bursts only: `on`/`off` |
 | `squelch` | dB over the channel floor a burst must rise, 2–40 |
 | `offset` | the decoder's channel from the centre, kHz; within `rate/2 − 12` kHz |
+| `more` | the channels decoded besides the stick's own, at once: MHz, with `;`, `,` or spaces between, each followed by `/EIF`, `/ABF` or `/ASC` when sent in another format than `fmt`; `none` for none. At most 7, each within `rate/2 − 12` kHz of `freq`; no frequency twice, not even in two formats — Enhanced iFLOWS read off a strong Binary burst makes CRC-valid ghosts. |
 | `bias` | `on`/`off` — in `CFG` with no confirmation (MegaNet's card asks before it sends one) |
 | `direct` | `auto` `off` `i` `q` (V3 HF direct sampling) |
 | `model` | `auto` `v2` `v3` `v4` `r820t` `r828d` `fc0013` `fc0012` — reopens the stick |
 | `spec`, `lvl` | seconds between `SPEC` / `LVL` records, 0 for none |
 
-Reasons in `ERR`: `UNKNOWN` (no such command), `ARG …` (a value it cannot read),
-`RANGE …` (outside the stick's range, or an offset outside the band), `CONFIRM …`
+`CHANNELS` tunes as RPi ALERT does (`sdr-pi.js`'s `planChannels`): the lowest rate
+whose middle 80% holds every channel with half a channel (15 kHz) to spare — so one
+stick hears channels up to 1.89 MHz apart — and, on a 500 Hz grid, the centre that
+keeps the channels furthest from the DC spike (never nearer than 20 kHz; 100 kHz is
+clear) and from each other's mirror images (a zero-IF tuner's I/Q imbalance puts a
+faint copy of each signal at the opposite offset; 30 kHz is clear), then furthest from
+the band's edges. A rate that cannot keep 50 kHz from the spike and 20 kHz from every
+image gives way to the next one up that does better. One channel is tuned on, at
+240 ksps. Each channel is a decoder thread of its own, fed the same samples. A
+channel in `more` the stick cannot hear at its rate — kept from before, given with
+`--set`, or a recording's rate at odds with the settings — gets no decoder, and a
+`NOTE` says so: it would hear another frequency and name it this one.
+
+Reasons in `ERR`: `UNKNOWN` (no such command), `ARG …` (a value it cannot read, or a
+frequency listed twice), `RANGE …` (outside the stick's range, an offset or a channel
+outside the band, or channels too far apart for one stick), `CONFIRM …`
 (`BIAS ON` without `YES`, `DEFAULTS` without `YES`), `NOSUPPORT …` (no bias tee on
 this stick), `USB …` (the stick refused), `NODECODER`.
 

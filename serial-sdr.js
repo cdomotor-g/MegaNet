@@ -58,7 +58,7 @@ const SerialSdr = (function () {
       // Where the stick is: on this computer's USB, or on a Raspberry Pi whose
       // log this card follows. A computer with no WebUSB can only do the second.
       where: typeof navigator !== 'undefined' && navigator.usb ? 'usb' : 'pi',
-    }, d, { audio: false });
+    }, d, { audio: false, more: [] });
   }
   function saveCfg(c) {
     try { localStorage.setItem(CFG_KEY, JSON.stringify(Object.assign({}, c.cfg, { audio: false }))); } catch (_) {}
@@ -596,9 +596,9 @@ const SerialSdr = (function () {
   function exportReadings(id) {
     const c = conn(id);
     if (!c) return;
-    const rows = ['time,sensor_id,value,station,votes,format,polarity,bytes,carrier_hz,burst_ms,burst_peak_dbfs'];
+    const rows = ['time,sensor_id,value,station,votes,format,polarity,bytes,carrier_hz,burst_ms,burst_peak_dbfs,freq_mhz'];
     c.readings.forEach(r => rows.push([r.t != null ? new Date(r.t).toISOString() : '', r.sensorId, r.value, '"' + String(r.name || '').replace(/"/g, '""') + '"', r.votes, r.format,
-      r.polarity, r.hex, r.carrierHz, r.burst ? r.burst.ms : '', r.burst ? r.burst.peakDb.toFixed(1) : ''].join(',')));
+      r.polarity, r.hex, r.carrierHz, r.burst ? r.burst.ms : '', r.burst ? r.burst.peakDb.toFixed(1) : '', r.freqHz ? SdrPi.mhzText(r.freqHz) : ''].join(',')));
     dlText('sdr-readings-' + new Date().toISOString().slice(0, 10) + '.csv', rows.join('\n') + '\n');
   }
 
@@ -686,7 +686,7 @@ const SerialSdr = (function () {
 
   function piState() {
     return { reader: new SdrPi.Reader(), follow: null, info: null, settings: {}, stat: null, want: {}, gainDraft: null,
-      anchor: { run: null, off: Infinity, n: 0, first: 0, last: 0 }, pending: [], lastRec: 0, untimed: 0 };
+      anchor: { run: null, off: Infinity, n: 0, first: 0, last: 0 }, pending: [], lastRec: 0, untimed: 0, chans: [], cfgMore: false };
   }
 
   function setWhere(id, v) {
@@ -735,6 +735,7 @@ const SerialSdr = (function () {
     c.err = null;
     c.followMsg = null;
     c.pi = piState();
+    c.cfg.more = [];
     c.info = null; c.tune = null;
     c.readings = []; c.bursts = []; c.trace = null; c.lastDecode = null;
     resetDisplay(c);
@@ -834,7 +835,7 @@ const SerialSdr = (function () {
     if (r && !c.history) { p.lastRec = Date.now(); piObserve(c, r); }
     switch (it.type) {
       case 'SDRPI': piHello(c, it.info); break;
-      case 'CFG': piSettings(c, it.settings); break;
+      case 'CFG': if ('more' in it.settings) p.cfgMore = true; piSettings(c, it.settings); break;
       case 'STAT': piStat(c, r); break;
       case 'LVL': piLevel(c, r); break;
       case 'SPEC': if (c.history) p.histSpec = r; else piSpectrum(c, r); break;
@@ -898,7 +899,7 @@ const SerialSdr = (function () {
   function piApply(c, it, t) {
     const r = it.rec;
     if (it.type === 'BURST') {
-      c.bursts.push({ t, ms: r.ms, peakDb: r.peak_dbfs, nfDb: r.nf_dbfs, decoded: null, seq: r.seq, run: r.run });
+      c.bursts.push({ t, ms: r.ms, peakDb: r.peak_dbfs, nfDb: r.nf_dbfs, decoded: null, seq: r.seq, run: r.run, freqHz: r.freq_hz });
       if (c.bursts.length > MAX_BURST) c.bursts.shift();
       mark(c, 'timeline', 'chips');
       return;
@@ -909,13 +910,15 @@ const SerialSdr = (function () {
       const rd = {
         t, sensorId: r.id, value: r.value, votes: r.votes, format: SdrPi.FMT_KEY[r.fmt] || r.fmt, polarity: r.pol,
         crcOk: r.crc == null ? null : !!r.crc, hex: String(r.hex || '').replace(/(..)(?=.)/g, '$1 '), carrierHz: r.carrier_hz,
-        name: stationName(r.id) || r.name || '',
+        name: stationName(r.id) || r.name || '', freqHz: r.freq_hz,
         burst: r.burst_ms != null ? { ms: r.burst_ms, peakDb: r.peak_dbfs, nfDb: r.nf_dbfs, t: b ? b.t : t } : null,
       };
       c.readings.push(rd);
       if (c.readings.length > MAX_READ) c.readings.splice(0, c.readings.length - MAX_READ);
+      const detail = { format: rd.format, polarity: r.pol, crc: rd.crcOk, via: 'pi' };
+      if (r.freq_hz) detail.freq_mhz = r.freq_hz / 1e6;          // which of the Pi's channels
       if (typeof RxLog !== 'undefined') RxLog.add(c, { t, protocol: 'alert', alert_id: r.id, value_raw: r.value, ok: true, votes: r.votes,
-        level_dbfs: r.peak_dbfs, detail: { format: rd.format, polarity: r.pol, crc: rd.crcOk, via: 'pi' } });
+        level_dbfs: r.peak_dbfs, detail });
       // To MegaNet when the card is set to send: by the time worked out above,
       // or — a history line with no clock — counted and skipped, never "now".
       if (typeof SerialIngest !== 'undefined') SerialIngest.add(c, [{ alert_id: r.id, value_raw: r.value, ts: t, protocol: 'alert' }]);
@@ -999,6 +1002,10 @@ const SerialSdr = (function () {
     if (r.ppm != null) set.ppm = r.ppm;
     if (r.agc != null) set.agc = !!r.agc;
     if (r.gain) { const g = SdrPi.parseSetting('gain', r.gain); if (g.ok) set.gain = g.value; }
+    // Every channel it decodes, its own first — none listed while it decodes
+    // one. They are its `more` too, for a log joined after its last CFG.
+    p.chans = SdrPi.unpackChans(r.chans);
+    if (!p.cfgMore && set.fmt) set.more = p.chans.slice(1).map(ch => (ch.fmt && ch.fmt !== set.fmt ? { hz: ch.hz, fmt: ch.fmt } : { hz: ch.hz }));
     piSettings(c, set);
     if (!p.info) piInfo(c);
     mark(c, 'chips');
@@ -1057,6 +1064,12 @@ const SerialSdr = (function () {
   function piWant(c, set) {
     const p = c.pi;
     if (!p) return;
+    // Tuning that would leave one of its channels outside the stick's band,
+    // refused here as the Pi would refuse it.
+    if (['freq', 'rate', 'offset', 'more', 'fmt'].some(k => k in set)) {
+      const s = Object.assign(SdrPi.fromCard(shownCfg(c)), set), bad = SdrPi.checkChannels(s, s.rate);
+      if (bad) { note(c, channelRefusal(bad, s), 'warn'); mark(c, 'controls', 'ctlhtml'); return; }
+    }
     Object.keys(set).forEach(k => {
       if (k in p.settings && sameSetting(k, p.settings[k], set[k])) delete p.want[k];   // back to what the Pi has: nothing to send
       else p.want[k] = set[k];
@@ -1069,6 +1082,51 @@ const SerialSdr = (function () {
     copyForPutty(c, cmd, keys.length > 1 ? ' It makes all ' + keys.length + ' changes that are waiting.' : ' The Pi answers through the log, and the change shows here.');
   }
   function copyWant(id) { const c = conn(id); if (c && c.pi && Object.keys(c.pi.want).length) piWant(c, {}); }
+
+  function rateText(r) { return r >= 1e6 ? (r / 1e6) + ' Msps' : (r / 1000) + ' ksps'; }
+
+  function channelRefusal(bad, s) {
+    if (!bad.far) return bad.error.replace(/^[A-Z]+ /, '') + '.';
+    return SdrPi.mhzText(bad.hz) + ' MHz would be ' + Math.round(Math.abs(bad.hz - s.freq) / 1000) + ' kHz from where the stick is tuned, and at '
+      + rateText(s.rate) + ' a channel must be within ' + (SdrPi.offsetLimit(s.rate) / 1000) + ' kHz of it. '
+      + ((s.more || []).length ? 'Type every channel into the Channels box instead: it works out a tuning that holds them all.'
+        : 'Bring the channel offset in first.');
+  }
+
+  // The channels a Pi's stick decodes, as the Channels box writes them: its
+  // own (freq + offset) first, then the rest, each in its own format where
+  // that is not the stick's.
+  function channelList(f) { return [{ hz: f.freq + f.offsetHz }].concat(f.more || []); }
+
+  // Several channels on the Pi's one stick, each decoded on its own: the
+  // list typed — the stick's own first — and the tuning that hears them all
+  // (SdrPi.planChannels, as the Pi's CHANNELS works it out), waiting to be
+  // copied with any other change. The list the Pi already has changes nothing.
+  function setChannels(id) {
+    const c = conn(id), el = document.getElementById('sdr-chans-' + id);
+    if (!c || !el || !isPi(c)) return;
+    const r = SdrPi.parseChannels(el.value, SdrPi.MAX_CHANNELS);
+    if (!r.ok || !r.value.length) {
+      note(c, r.ok ? 'Which channels? In MHz, the stick\'s own first, e.g. 151.5 151.525 152.4' : 'Channels: ' + r.error + '.', 'warn');
+      return;
+    }
+    const f = shownCfg(c), list = r.value, min = c.info ? c.info.minHz : 500000, max = c.info ? c.info.maxHz : 1766000000;
+    const outside = list.find(ch => ch.hz < min || ch.hz > max);
+    if (outside) { note(c, SdrPi.mhzText(outside.hz) + ' MHz is out of this stick\'s range (' + (min / 1e6) + '–' + (max / 1e6) + ' MHz).', 'warn'); return; }
+    const own = SdrPi.FMT_CODE[f.format] || 'ABF', main = list[0].fmt || own;
+    const key = (ch, fm) => ch.hz + '/' + (ch.fmt || fm), rest = l => l.slice(1).map(ch => key(ch, main)).sort().join(' ');
+    const now = channelList(f);
+    if (key(list[0], own) === key(now[0], own) && rest(list) === rest(now)) { piWant(c, {}); return; }
+    const pl = SdrPi.planChannels(list);
+    if (!pl.ok) { note(c, 'Channels: ' + pl.error + '.', 'warn'); return; }
+    const v = pl.value, set = { freq: v.freq, rate: v.rate, offset: v.offset, more: v.more };
+    if (v.fmt) set.fmt = v.fmt;
+    if (v.more.length) {
+      note(c, 'For ' + list.length + ' channels the stick is tuned to ' + fmtMHz(v.freq) + ' MHz at ' + rateText(v.rate) + ': the nearest channel '
+        + Math.round(v.dcHz / 1000) + ' kHz from its DC spike and ' + Math.round(v.mirrorHz / 1000) + ' kHz from any mirror image.', '');
+    }
+    piWant(c, set);
+  }
   function discardWant(id) {
     const c = conn(id);
     if (!c || !c.pi) return;
@@ -1201,7 +1259,18 @@ const SerialSdr = (function () {
     const i = c.info || {}, lv = c.level, chips = [];
     chips.push(chip('Device', esc(i.modelLabel || '—') + (i.tuner && i.tuner !== '—' ? ' · ' + esc(i.tuner) : '')));
     const chan = c.cfg.freq + (c.source === 'demo' ? 0 : c.cfg.offsetHz);
-    chips.push(chip('Channel', fmtMHz(chan) + ' MHz' + (c.cfg.offsetHz && c.source !== 'demo' ? ' (' + (c.cfg.offsetHz > 0 ? '+' : '') + (c.cfg.offsetHz / 1000) + ' kHz)' : '')));
+    const offText = c.cfg.offsetHz && c.source !== 'demo' ? ' (' + (c.cfg.offsetHz > 0 ? '+' : '') + (c.cfg.offsetHz / 1000) + ' kHz)' : '';
+    const more = isPi(c) ? c.cfg.more || [] : [];
+    if (!more.length) chips.push(chip('Channel', fmtMHz(chan) + ' MHz' + offText));
+    else {
+      // A Pi decoding several: each, with what this card has heard on it.
+      const own = SdrPi.FMT_CODE[c.cfg.format];
+      channelList(c.cfg).forEach((ch, k) => {
+        const n = c.readings.filter(r => r.freqHz === ch.hz).length;
+        chips.push(chip('Channel ' + (k + 1), SdrPi.mhzText(ch.hz) + ' MHz' + (ch.fmt && ch.fmt !== own ? ' ' + ch.fmt : '') + (k ? '' : offText)
+          + ' · ' + n + ' reading' + (n === 1 ? '' : 's')));
+      });
+    }
     if (c.tune) chips.push(chip('Tuned', esc(c.tune.mode) + (c.tune.errorHz ? ' · ' + (c.tune.errorHz > 0 ? '+' : '') + c.tune.errorHz + ' Hz' : ''), Math.abs(c.tune.errorHz || 0) > 2000 ? 'warn' : ''));
     const rate = deviceRate(c);
     const live = c.source === 'usb' || isPi(c);
@@ -1210,8 +1279,8 @@ const SerialSdr = (function () {
     chips.push(chip('Rate', (rate / 1000) + ' ksps' + got, short ? 'warn' : ''));
     if (lv) {
       chips.push(chip('ADC', lv.dbfs.toFixed(1) + ' dBFS · clip ' + lv.clipPct.toFixed(2) + '%', lv.clipPct > 0.5 ? 'bad' : lv.clipPct > 0.05 ? 'warn' : ''));
-      chips.push(chip('Channel power', (lv.chDb > -150 ? lv.chDb.toFixed(1) : '—') + (lv.nfDb != null ? ' · floor ' + lv.nfDb.toFixed(1) : '') + ' dBFS'));
-      chips.push(chip('Gate', '<span class="qs-led' + (lv.open ? ' on' : '') + '" aria-hidden="true"></span>' + (lv.open ? 'open' : 'closed') + ' · ' + c.cfg.squelch + ' dB'));
+      chips.push(chip(more.length ? 'Channel 1 power' : 'Channel power', (lv.chDb > -150 ? lv.chDb.toFixed(1) : '—') + (lv.nfDb != null ? ' · floor ' + lv.nfDb.toFixed(1) : '') + ' dBFS'));
+      chips.push(chip(more.length ? 'Channel 1 gate' : 'Gate', '<span class="qs-led' + (lv.open ? ' on' : '') + '" aria-hidden="true"></span>' + (lv.open ? 'open' : 'closed') + ' · ' + c.cfg.squelch + ' dB'));
     }
     const nd = c.readings.length, nb = c.bursts.length;
     chips.push(chip('Heard', nb + ' burst' + (nb === 1 ? '' : 's') + ' · ' + nd + ' reading' + (nd === 1 ? '' : 's')));
@@ -1274,19 +1343,33 @@ const SerialSdr = (function () {
     }
   }
 
+  // The decoder's channel — each of them, on a Pi decoding several — ±6 kHz.
+  // label: named, in up to three rows so channels close together keep theirs.
   function channelBand(ctx, c, x0, w, h, dpr, col, label) {
-    const rate = deviceRate(c);
-    const off = c.source === 'demo' ? 0 : c.cfg.offsetHz;
-    const xc = x0 + (0.5 + off / rate) * w, hw = 6000 / rate * w;
-    ctx.fillStyle = SerialViz.alpha(col.ok, 0.12);
-    ctx.fillRect(xc - hw, 0, Math.max(2 * dpr, 2 * hw), h);
-    ctx.strokeStyle = SerialViz.alpha(col.ok, 0.9); ctx.lineWidth = dpr; ctx.setLineDash([4 * dpr, 3 * dpr]);
-    ctx.beginPath(); ctx.moveTo(xc, 0); ctx.lineTo(xc, h); ctx.stroke();
-    ctx.setLineDash([]);
-    if (label) {
-      ctx.fillStyle = col.ok; ctx.textAlign = xc > x0 + w - 80 * dpr ? 'right' : 'left'; ctx.textBaseline = 'top';
-      ctx.fillText('ALERT channel', xc + (ctx.textAlign === 'left' ? 4 : -4) * dpr, 4 * dpr);
-    }
+    const rate = deviceRate(c), off = c.source === 'demo' ? 0 : c.cfg.offsetHz;
+    const more = isPi(c) ? c.cfg.more || [] : [];
+    const bands = [{ off, text: more.length ? SdrPi.mhzText(c.cfg.freq + off) : 'ALERT channel' }]
+      .concat(more.map(ch => ({ off: ch.hz - c.cfg.freq, text: SdrPi.mhzText(ch.hz) })))
+      .filter(b => Math.abs(b.off) < rate / 2)
+      .map(b => Object.assign(b, { xc: x0 + (0.5 + b.off / rate) * w }))
+      .sort((a, b) => a.xc - b.xc);
+    const hw = 6000 / rate * w, rows = [];
+    bands.forEach(b => {
+      ctx.fillStyle = SerialViz.alpha(col.ok, 0.12);
+      ctx.fillRect(b.xc - hw, 0, Math.max(2 * dpr, 2 * hw), h);
+      ctx.strokeStyle = SerialViz.alpha(col.ok, 0.9); ctx.lineWidth = dpr; ctx.setLineDash([4 * dpr, 3 * dpr]);
+      ctx.beginPath(); ctx.moveTo(b.xc, 0); ctx.lineTo(b.xc, h); ctx.stroke();
+      ctx.setLineDash([]);
+      if (!label) return;
+      const tw = ctx.measureText(b.text).width;
+      const lo = b.xc > x0 + w - tw - 8 * dpr ? b.xc - 4 * dpr - tw : b.xc + 4 * dpr;
+      let k = rows.findIndex(end => lo > end + 4 * dpr);
+      if (k < 0 && rows.length < 3) k = rows.length;
+      if (k < 0) return;
+      rows[k] = lo + tw;
+      ctx.fillStyle = col.ok; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText(b.text, lo, (4 + 12 * k) * dpr);
+    });
   }
 
   function paintSpectrum(c) {
@@ -1350,6 +1433,8 @@ const SerialSdr = (function () {
     const pkHz = c.cfg.freq + (pki / n - 0.5) * deviceRate(c);
     cv.setAttribute('aria-label', 'Spectrum, ' + fmtMHz(c.cfg.freq) + ' MHz ± ' + (deviceRate(c) / 2000) + ' kHz: noise floor '
       + (c.floorDb != null ? c.floorDb.toFixed(0) : '?') + ' dB, strongest signal ' + pk.toFixed(0) + ' dB at ' + fmtMHz(pkHz) + ' MHz. '
+      + ((isPi(c) && (c.cfg.more || []).length) ? 'Decoding ' + (1 + c.cfg.more.length) + ' channels: '
+        + channelList(c.cfg).map(ch => SdrPi.mhzText(ch.hz)).join(', ') + ' MHz. ' : '')
       + 'Click to put the decoder\'s channel there (the Channel offset box does the same).');
   }
 
@@ -1576,6 +1661,13 @@ const SerialSdr = (function () {
     cv.setAttribute('aria-label', 'ADC sample histogram: level ' + lv.dbfs.toFixed(1) + ' dBFS, ' + lv.clipPct.toFixed(2) + '% of samples clipping.');
   }
 
+  // Which of a Pi's channels a reading came in on: said once it decodes
+  // several, or when it came in on one the Pi no longer decodes.
+  function chanTag(c, r) {
+    if (!r.freqHz || !isPi(c) || (!(c.cfg.more || []).length && r.freqHz === c.cfg.freq + c.cfg.offsetHz)) return '';
+    return ' <span class="qs-dim qs-small">' + SdrPi.mhzText(r.freqHz) + ' MHz</span>';
+  }
+
   function paintReadings(c) {
     const tb = document.getElementById('sdr-read-' + c.id);
     if (!tb) return;
@@ -1583,7 +1675,7 @@ const SerialSdr = (function () {
     if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="qs-dim">No readings yet. Each frame the decoder accepts appears here.</td></tr>'; return; }
     tb.innerHTML = rows.map(r => '<tr><td>' + (r.t != null ? SerialViz.hhmm(r.t, true) : '<span class="qs-dim" title="From the log\'s history, and the Pi\'s clock was not set">—</span>') + '</td>'
       + '<td class="qs-num">' + r.sensorId + '</td>'
-      + '<td>' + (r.name ? esc(r.name) : '<span class="qs-dim">not in MegaNet</span>') + '</td>'
+      + '<td>' + (r.name ? esc(r.name) : '<span class="qs-dim">not in MegaNet</span>') + chanTag(c, r) + '</td>'
       + '<td class="qs-num">' + r.value + '</td>'
       + '<td class="qs-num">' + r.votes + '</td>'
       + '<td class="col-optional">' + esc((AlertDsp.FORMATS.find(x => x.key === r.format) || {}).label || r.format) + (r.polarity === 'NEG' ? ' · inverted' : '') + '</td>'
@@ -1724,10 +1816,17 @@ const SerialSdr = (function () {
       + '<div class="sdr-row"><label class="sdr-l">Channel offset <span class="sdr-freq"><input type="number" step="0.5" id="sdr-off-' + id + '" value="' + (f.offsetHz / 1000) + '"'
       + ' aria-label="Decoder channel offset from the centre, kHz" onkeydown="if(event.key===\'Enter\')SerialSdr.setOffsetKhz(\'' + id + '\')"' + (c.source === 'demo' ? ' disabled' : '') + '> kHz</span></label>'
       + btn('Set', 'setOffsetKhz(\'' + id + '\')', (c.source === 'demo' ? ' disabled' : '') + ' aria-label="Set channel offset"') + '</div>'
+      + (pi ? '<div class="sdr-row"><label class="sdr-l">Channels <input type="text" class="sdr-chans" id="sdr-chans-' + id + '" value="'
+        + esc(SdrPi.channelsText(channelList(f).map(ch => (ch.fmt === SdrPi.FMT_CODE[f.format] ? { hz: ch.hz } : ch)), ' ')) + '"'
+        + ' spellcheck="false" autocomplete="off" aria-describedby="sdr-chans-hint-' + id + '" onkeydown="if(event.key===\'Enter\')SerialSdr.setChannels(\'' + id + '\')"></label>'
+        + btn('Set', 'setChannels(\'' + id + '\')', ' aria-label="Set the channels"') + '</div>'
+        + '<p class="qs-hint" id="sdr-chans-hint-' + id + '">Several channels at once from the one stick, each decoded on its own: MHz, the stick\'s own first, '
+        + 'up to ' + SdrPi.MAX_CHANNELS + ' within ' + (SdrPi.MAX_SPAN_HZ / 1e6).toFixed(2) + ' MHz of each other — one in another format as 152.4/EIF. '
+        + 'The card works out where to tune the stick and how fast to sample, clear of its DC spike and mirror images.</p>' : '')
       + '<div class="sdr-row"><label class="ser-check"><input type="checkbox"' + (f.gate ? ' checked' : '') + ' onchange="SerialSdr.setGate(\'' + id + '\',this.checked)"> decode bursts only</label>'
       + '<label class="sdr-l sdr-inline">gate <input type="number" min="2" max="40" step="1" value="' + f.squelch + '" aria-label="Gate threshold, dB over the channel floor"'
       + ' onchange="SerialSdr.setSquelch(\'' + id + '\',this.value)"> dB</label></div>'
-      + '<p class="qs-hint">One format at a time, on purpose: Enhanced iFLOWS read from a strong Binary burst makes CRC-valid ghosts.</p>'
+      + '<p class="qs-hint">One format ' + (pi ? 'a channel' : 'at a time') + ', on purpose: Enhanced iFLOWS read from a strong Binary burst makes CRC-valid ghosts.</p>'
       + '</fieldset>'
       + (pi ? piTail(c, f, btn) : localTail(c, f))
       + '</div>';
@@ -1846,6 +1945,6 @@ const SerialSdr = (function () {
     pause, capture, decodeNow, clearReadings, exportReadings, loadFile,
     // a Raspberry Pi's log (sdr-pi.js)
     setWhere, acceptsLog, followLog, pickLog, readLogOnce, onLogFile, stopLog, followLogAgain, readLogNow,
-    copyAll, copyClock, copyCmd, copyWant, discardWant, setSpecEvery,
+    copyAll, copyClock, copyCmd, copyWant, discardWant, setSpecEvery, setChannels,
   };
 })();

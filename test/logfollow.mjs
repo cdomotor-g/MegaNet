@@ -46,7 +46,10 @@
 //     have settled it — a reading the Pi queued before PuTTY opened the port
 //     timed when it was heard, not when it arrived; the controls copying
 //     commands for PuTTY, three changes waiting as one CFG line, and the Pi's
-//     CFG answer clearing them
+//     CFG answer clearing them; several channels from its one stick — the
+//     Channels box copying the tuning that hears them all, a chip, a band and
+//     the readings' channel for each, a rate too low for them refused, and a
+//     log joined after the Pi's last CFG reading its channels off STAT
 //
 // Run:  npm run logfollow
 //       npm run logfollow -- -v    also print what passed
@@ -323,6 +326,67 @@ try {
     ok('…the waiting banner gone', await page.evaluate(id => document.getElementById('sdr-want-' + id).hidden, pid));
     append(['ERR,RANGE this stick tunes 0.5 to 1766 MHz\r\n']);
     await waitFor(id => Serial.findConn(id).notes.some(n => /refused a command: RANGE/.test(n.text)), pid, 'a command the Pi refuses is said on the card');
+
+    // Several channels from the one stick: the Channels box works out the
+    // tuning that hears them all, as the Pi's CHANNELS does, and copies it as
+    // one CFG line; the Pi's answer gives each channel a chip, a band, and its
+    // readings their channel; a change that would leave one outside the band
+    // is refused on the card, as the Pi would refuse it.
+    const typed = '151.5/ABF 151.525 151.95/EIF 152.4';
+    const plan = SdrPi.planChannels(SdrPi.parseChannels(typed, SdrPi.MAX_CHANNELS).value).value;
+    await page.evaluate(([id, v]) => { document.getElementById('sdr-chans-' + id).value = v; SerialSdr.setChannels(id); }, [pid, typed]);
+    await page.waitForTimeout(300);
+    const p4 = await page.evaluate(id => { const c = Serial.findConn(id); return { notes: c.notes.map(n => n.text), want: Object.keys(c.pi.want).join(',') }; }, pid);
+    ok('the Channels box copies the tuning that hears them all, as one CFG line', p4.want === 'freq,rate,offset,more,fmt'
+      && p4.notes.some(t => t.includes('Copied “CFG freq=151.850000 rate=1920000 offset=-350 more=151.525;151.950/EIF;152.400 fmt=ABF”')), p4.notes.slice(-2).join(' | '));
+    ok('…saying where it tunes the stick, and why there', p4.notes.some(t => t.startsWith('For 4 channels the stick is tuned to 151.8500 MHz at 1.92 Msps: '
+      + 'the nearest channel 100 kHz from its DC spike and 200 kHz from any mirror image')), p4.notes.join(' | '));
+    const chans = SdrPi.packChans([{ hz: 151500000, fmt: 'ABF' }, { hz: 151525000, fmt: 'ABF', bursts: 1, readings: 1 },
+      { hz: 151950000, fmt: 'EIF', bursts: 1, readings: 1 }, { hz: 152400000, fmt: 'ABF' }]);
+    append([SdrPi.cfgRecord(Object.assign(SdrPi.defaults(), { squelch: 10, freq: plan.freq, rate: plan.rate, offset: plan.offset, fmt: 'ABF', more: plan.more })) + '\r\nOK\r\n',
+      rec('RX', { seq: 3, up: 9000, id: 2443, value: 142, fmt: 'ABF', votes: 30, pol: 'STD', hex: '6860DEC4', peak_dbfs: -50, nf_dbfs: -100, burst_ms: 300, freq_hz: 151525000 }) + '\r\n',
+      rec('RX', { seq: 4, up: 9100, id: 4079, value: 421, fmt: 'EIF', votes: 30, pol: 'STD', crc: 1, hex: 'EF3FD208', peak_dbfs: -55, nf_dbfs: -100, burst_ms: 400, freq_hz: 151950000 }) + '\r\n',
+      hide(rec('STAT', { up: 9500, state: 'streaming', freq_hz: plan.freq, offset_hz: plan.offset, rate: plan.rate, in_rate: plan.rate, gain: '29.7',
+        fmt: 'ABF', gate: 1, squelch: 10, clock: '', chans }))]);
+    await waitFor(id => { const c = Serial.findConn(id); return !Object.keys(c.pi.want).length && c.cfg.more.length === 3 && c.readings.some(r => r.freqHz === 151950000); },
+      pid, 'the Pi\'s answer: four channels, and a reading from two of them');
+    await page.waitForTimeout(300);
+    const p5 = await page.evaluate(id => {
+      const c = Serial.findConn(id);
+      return { chips: document.getElementById('sdr-chips-' + id).textContent, box: document.getElementById('sdr-chans-' + id).value,
+        rows: [...document.querySelectorAll('#sdr-read-' + id + ' tr')].slice(0, 2).map(tr => tr.textContent),
+        spec: document.getElementById('sdr-spec-' + id).getAttribute('aria-label') || '', chans: c.pi.chans.map(ch => ch.readings).join(',') };
+    }, pid);
+    ok('…a chip for each channel, with the readings heard on it', /Channel 1151\.500 MHz \(-350 kHz\) · \d+ readings/.test(p5.chips)
+      && /Channel 2151\.525 MHz · 1 reading(?!s)/.test(p5.chips) && /Channel 3151\.950 MHz EIF · 1 reading(?!s)/.test(p5.chips)
+      && /Channel 4152\.400 MHz · 0 readings/.test(p5.chips) && /Channel 1 power/.test(p5.chips), p5.chips);
+    ok('…the Channels box showing them, each in its own format only where that is not the stick\'s', p5.box === '151.500 151.525 151.950/EIF 152.400', p5.box);
+    ok('…each reading saying which channel it came in on', /151\.950 MHz/.test(p5.rows[0] || '') && /151\.525 MHz/.test(p5.rows[1] || ''), p5.rows.join(' | '));
+    ok('…the spectrum naming them', /Decoding 4 channels: 151\.500, 151\.525, 151\.950, 152\.400 MHz/.test(p5.spec), p5.spec);
+    ok('…and STAT\'s count for each read', p5.chans === '0,1,1,0', p5.chans);
+    await page.evaluate(id => SerialSdr.setRate(id, 240000), pid);
+    const p6 = await page.evaluate(id => { const c = Serial.findConn(id); return { notes: c.notes.map(n => n.text), want: Object.keys(c.pi.want).length }; }, pid);
+    ok('a rate too low for the channels is refused on the card, pointing at the Channels box', p6.want === 0
+      && p6.notes.some(t => /^151\.500 MHz would be 350 kHz from where the stick is tuned, and at 240 ksps a channel must be within 108 kHz of it\. Type every channel into the Channels box/.test(t)),
+      p6.notes.slice(-1)[0]);
+    await page.evaluate(id => { document.getElementById('sdr-chans-' + id).value = '151.5 151.525 151.95 EIF 152.4'; SerialSdr.setChannels(id); }, pid);
+    ok('the same channels typed again change nothing', await page.evaluate(id => {
+      const c = Serial.findConn(id);
+      return !Object.keys(c.pi.want).length && /nothing to send/.test(c.notes[c.notes.length - 1].text);
+    }, pid));
+
+    // A log joined after the Pi's last CFG: its channels read off STAT.
+    await page.evaluate(() => Serial.addConnection('sdr'));
+    const mid = await page.evaluate(() => Serial.list()[Serial.list().length - 1].id);
+    await page.evaluate(id => SerialSdr.setWhere(id, 'pi'), mid);
+    fs.writeFileSync(file('sdr-pi-mid.log'), BANNER + SdrPi.kvRecord('SDRPI', { version: SdrPi.VERSION, schema: 1, run: 'feedf00d', host: 'meganet-pi-2' }) + '\r\n'
+      + SdrPi.hide(SdrPi.record('STAT', { run: 'feedf00d', up: 5000, state: 'streaming', freq_hz: plan.freq, offset_hz: plan.offset, rate: plan.rate,
+        fmt: 'ABF', gate: 1, squelch: 8, chans })) + 'MegaNet SDR Pi - streaming\r\n');
+    await dropFiles(`#ser-card-${mid}`, [file('sdr-pi-mid.log')]);
+    await waitFor(id => { const c = Serial.findConn(id); return c && c.pi && c.pi.stat && c.cfg.more.length === 3; }, mid,
+      'a log joined after the Pi\'s last CFG: its channels read off STAT');
+    ok('…each in its own format only where that is not the stick\'s', await page.evaluate(id => SdrPi.channelsText(Serial.findConn(id).cfg.more) === '151.525;151.950/EIF;152.400', mid));
+    await page.evaluate(id => Serial.removeConn(id), mid);
   }
 
   // Dropped anywhere on the tab while an RTL-SDR card waits for a Pi's log: a

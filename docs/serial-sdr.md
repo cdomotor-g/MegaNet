@@ -9,7 +9,8 @@ whole card with nothing plugged in.
 driver — can still have one: the stick goes on a **Raspberry Pi** that runs this
 same driver and decoder and prints what it hears on a serial port, PuTTY logs the
 port, and this card follows the log (*Where is the stick?* → *on a Raspberry Pi*).
-[`sdr-pi.md`](sdr-pi.md) is that guide.
+[`sdr-pi.md`](sdr-pi.md) is that guide. A stick on a Pi can also decode several
+channels at once — the card's **Channels** box, [`sdr-pi.md`](sdr-pi.md#several-channels-from-one-stick).
 
 | File | What it is |
 |---|---|

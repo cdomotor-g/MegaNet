@@ -4,8 +4,10 @@
 //   The Raspberry Pi end of the SDR link (docs/sdr-pi.md). An RTL-SDR on this
 //   computer, driven by MegaNet's own driver (rtlsdr.js) through node-usb's
 //   WebUSB — the browser card's code, unchanged — decoded by MegaNet's own
-//   decoder (alert-dsp.js) in a worker thread, and what it finds printed on a
-//   serial port in the text ../sdr-pi.js defines. PuTTY, on the PC at the other
+//   decoder (alert-dsp.js) in a worker thread, one for each channel the stick
+//   decodes at once (CHANNELS: every channel in the slice it hears, all from
+//   the one stream), and what it finds printed on a serial port in the text
+//   ../sdr-pi.js defines. PuTTY, on the PC at the other
 //   end of the cable, logs that port; the Serial Monitor's RTL-SDR card follows
 //   the log. Commands typed or pasted into PuTTY come back up the same cable and
 //   set the stick.
@@ -20,6 +22,7 @@
 //   node relay.js --stdio                           this terminal is the port
 //   node relay.js --serial /dev/ttyGS0 --tcp 7355   PuTTY on Serial, or on Raw/Telnet
 //   node relay.js --file rig_240k.iq8 --stdio --set fmt=EIF
+//   node relay.js --stdio --set freq=151.85 --set rate=1920000 --set offset=-350 --set 'more=151.525;151.95/EIF;152.4'
 //
 // `node relay.js --help` lists the rest. Settings changed from the console are
 // kept (--state) and survive a restart.
@@ -251,6 +254,105 @@ function openSerial(devPath, baud, onData, onGone) {
   return { write: t => s.write(t, 'latin1'), pending: () => s.writableLength || 0, echo: true, close: () => bye(null) };
 }
 
+// ── a channel's decoder ───────────────────────────────────────────────────────
+//
+// The stick hands over a slice of the band as wide as its sample rate, and each
+// channel in it — the stick's own (freq + offset), then each of `more` — is
+// decoded by alert-dsp.js's Pipeline in a thread of its own (dsp-worker.js),
+// fed every sample the stick sends and set to that channel's offset. One
+// stick, one stream, as many decoders as channels; a decode on one channel
+// never holds up another. Each answers `ping` after everything sent before
+// it, so each is held to its own lag: one falling behind has its samples
+// dropped, not the rest.
+
+class Decoder {
+  constructor(relay, index) {
+    this.relay = relay;
+    this.index = index;               // 0: the stick's own channel
+    this.ch = null;                   // { hz, fmt, offset }
+    this.lag = { ms: 0, stopped: false };
+    this.bursts = new Map();          // the decoder's burst time → the BURST it was sent as
+    this.st = relay.blankLevel();     // since the last STAT
+    this.last = null;                 // its last level
+    this.counts = { bursts: 0, readings: 0 };
+    this.start();
+  }
+
+  label() { return this.relay.decoders.length > 1 && this.ch ? ' for ' + SdrPi.mhzText(this.ch.hz) + ' MHz' : ''; }
+
+  start() {
+    const w = new Worker(path.join(__dirname, 'dsp-worker.js'), { workerData: { dsp: path.join(ROOT, 'alert-dsp.js') } });
+    this.worker = w;
+    w.on('message', m => this.relay.onDsp(this, m));
+    w.on('error', e => {
+      if (this.worker !== w) return;
+      this.relay.note('bad', 'The decoder' + this.label() + ' stopped (' + e.message + ') - starting it again');
+      this.worker = null;
+      setTimeout(() => { if (!this.relay.stopping && !this.ended) { this.start(); this.configure(true); } }, 1000);
+    });
+  }
+
+  // Tell it its channel and the settings. A channel moved under it starts
+  // afresh: what it holds is another frequency's.
+  configure(reset) {
+    if (!this.worker || !this.ch) return;
+    const s = this.relay.settings;
+    if (reset) this.worker.postMessage({ type: 'reset' });
+    // specHz 2: four FFTs averaged a post, eight a second — enough that a burst
+    // never falls between them; SPEC sends the strongest of each bin, from the
+    // stick's own channel's decoder (the slice is the same for every one).
+    // scopeHz: the FM audio picture is not sent, so it is drawn as rarely as it can be.
+    this.worker.postMessage({ type: 'config', cfg: {
+      deviceRate: this.relay.deviceRate(), channelOffsetHz: this.ch.offset, format: SdrPi.FMT_KEY[this.ch.fmt],
+      gate: s.gate, squelchDb: s.squelch, fftSize: 2048, specHz: this.index === 0 ? 2 : 0, scopeHz: 0.1, audio: false, minVotes: 4, minVotesCrc: 4,
+    } });
+  }
+
+  // Samples — unless a live stick's are coming faster than it can take them,
+  // when they are dropped (and counted) rather than queued without end. A
+  // recording waits for it instead: it is not going anywhere.
+  feed(u8) {
+    if (!this.worker) return;
+    if (this.lag.stopped && this.relay.opts.source !== 'file') { this.relay.counts.drops++; return; }
+    const buf = u8.slice().buffer;                // a copy: a USB library's buffer is not ours to hand away
+    this.worker.postMessage({ type: 'iq', buf }, [buf]);
+  }
+
+  ping(id) { if (this.worker) this.worker.postMessage({ type: 'ping', id, sent: performance.now() }); }
+
+  // Resolves once it has decoded everything sent before.
+  drained() {
+    if (!this.worker) return Promise.resolve();
+    return new Promise(resolve => {
+      this.waits = (this.waits || []).concat([{ id: ++this.relay.lagId, resolve }]);
+      this.ping(this.relay.lagId);
+    });
+  }
+
+  pong(m) {
+    this.lag.ms = performance.now() - m.sent;
+    if (!this.lag.stopped && this.lag.ms > LAG_STOP_MS) {
+      this.lag.stopped = true;
+      this.relay.note('warn', 'The decoder' + this.label() + ' is ' + (this.lag.ms / 1000).toFixed(1) + ' s behind - dropping samples until it catches up. '
+        + (this.relay.decoders.length > 1 ? 'Fewer channels, or a lower RATE, need less of the Pi.' : 'A lower RATE needs less of the Pi.'));
+    } else if (this.lag.stopped && this.lag.ms < LAG_GO_MS) {
+      this.lag.stopped = false;
+      this.relay.note('info', 'The decoder' + this.label() + ' has caught up');
+    }
+    const w = (this.waits || []).find(x => x.id === m.id);
+    if (w) { this.waits = this.waits.filter(x => x !== w); w.resolve(); }
+  }
+
+  end() {
+    this.ended = true;
+    const w = this.worker;
+    this.worker = null;
+    if (w) w.terminate();
+    (this.waits || []).forEach(x => x.resolve());
+    this.waits = [];
+  }
+}
+
 // ── the relay ─────────────────────────────────────────────────────────────────
 
 class Relay {
@@ -272,7 +374,9 @@ class Relay {
     this.stat = this.blankLevel();
     this.specMax = null;
     this.lastLevel = null;
-    this.bursts = new Map();
+    this.decoders = [];                   // one per channel, the stick's own first
+    this.leftOut = '';                    // channels set that get no decoder (syncDecoders)
+    this.lagId = 0;
     this.state = 'starting';
     this.info = null;
     this.stickLabel = '';
@@ -281,7 +385,6 @@ class Relay {
     this.proc = null;
     this.rx = { bytes: 0, lastBytes: 0, lastT: performance.now(), rate: 0 };
     this.cpu = { last: process.cpuUsage(), t: performance.now(), pct: null };
-    this.lag = { ms: 0, stopped: false, id: 0 };
     this.timers = [];
     this.queue = Promise.resolve();
     this.names = new Map();
@@ -371,11 +474,30 @@ class Relay {
 
   channelHz() { return this.settings.freq + this.settings.offset; }
 
+  // The channels the stick decodes: its own (freq + offset), then each of
+  // `more`, with its offset from where the stick is tuned. A recording of one
+  // channel is taken centred on it, so its offset is 0 there; one with more
+  // channels is a slice of the band, and every offset counts.
+  channelList(s) {
+    s = s || this.settings;
+    const file = this.opts.source === 'file', more = s.more || [];
+    return [{ hz: s.freq + s.offset, fmt: s.fmt, offset: file && !more.length ? 0 : s.offset }]
+      .concat(more.map(m => ({ hz: m.hz, fmt: m.fmt || s.fmt, offset: m.hz - s.freq })));
+  }
+
+  // "151.5000 MHz ALERT Binary", or "4 channels: 151.500 ABF; 151.525 ABF; …"
+  // — no commas: a NOTE's text loses them. The channels decoded, once there
+  // are decoders.
+  channelsText() {
+    const s = this.settings, list = this.decoders.length ? this.decoders.map(d => d.ch) : this.channelList();
+    if (list.length === 1) return (s.freq / 1e6).toFixed(4) + ' MHz ' + SdrPi.FMT_LABEL[s.fmt];
+    return list.length + ' channels: ' + list.map(ch => SdrPi.mhzText(ch.hz) + ' ' + ch.fmt).join('; ') + ' MHz';
+  }
+
   banner() {
-    const s = this.settings;
     return 'MegaNet SDR Pi ' + SdrPi.VERSION + ' on ' + SdrPi.clean(this.host) + ' - '
       + (this.info ? SdrPi.clean(this.info.modelLabel) + ' ' + SdrPi.clean(this.info.tuner) : 'looking for a stick') + ' - '
-      + (s.freq / 1e6).toFixed(4) + ' MHz ' + SdrPi.FMT_LABEL[s.fmt] + ' - type HELP and press Enter';
+      + this.channelsText() + ' - type HELP and press Enter';
   }
 
   helloRecords() {
@@ -414,7 +536,16 @@ class Relay {
       dbfs: r1(st.n ? st.dbfs / st.n : null), clip_pct: r3(st.n ? st.clip / st.n : null),
       bursts: this.counts.bursts, readings: this.counts.readings, drops: this.counts.drops + (this.dev ? this.dev.stats.errors : 0),
       cpu_pct: this.cpu.pct, temp_c: this.temperature(), model: i.modelLabel || null, tuner: i.tuner || null, source: this.opts.source,
+      chans: this.decoders.length > 1 ? SdrPi.packChans(this.decoders.map(d => this.chanStat(d))) : null,
     });
+  }
+
+  // One channel in STAT's chans (SdrPi.packChans): its level over the last
+  // STAT's interval, as STAT's own fields are, and what it has heard.
+  chanStat(d) {
+    const a = d.st, lv = d.last;
+    return { hz: d.ch ? d.ch.hz : '', fmt: d.ch ? d.ch.fmt : '', chDb: a.n ? a.chMax : lv && lv.chDb, nfDb: lv && lv.nfDb, open: !!(lv && lv.open),
+      bursts: d.counts.bursts, readings: d.counts.readings };
   }
 
   temperature() {
@@ -423,8 +554,8 @@ class Relay {
 
   title() {
     if (!this.opts.title) return;
-    const s = this.settings, lv = this.lastLevel;
-    const t = 'MegaNet SDR Pi - ' + (s.freq / 1e6).toFixed(4) + ' MHz ' + s.fmt + ' - ' + this.state
+    const s = this.settings, lv = this.lastLevel, n = this.decoders.length;
+    const t = 'MegaNet SDR Pi - ' + (s.freq / 1e6).toFixed(4) + ' MHz ' + s.fmt + (n > 1 ? ' + ' + (n - 1) + ' more' : '') + ' - ' + this.state
       + (lv && lv.nfDb != null ? ' - floor ' + lv.nfDb.toFixed(1) + ' dBFS' : '')
       + ' - ' + this.counts.bursts + ' bursts ' + this.counts.readings + ' readings';
     for (const l of this.links) if (l.io.terminal) l.write('\x1b]0;' + t + '\x07', true);
@@ -456,10 +587,27 @@ class Relay {
         return;
       }
       case 'DECODE':
-        if (!this.worker) { this.final(false, 'NODECODER'); return; }
-        this.worker.postMessage({ type: 'decodeNow', seconds: c.seconds });
+        if (!this.decoders.some(d => d.worker)) { this.final(false, 'NODECODER'); return; }
+        this.decoders.forEach(d => { if (d.worker) d.worker.postMessage({ type: 'decodeNow', seconds: c.seconds }); });
         this.final(true);
         return;
+      case 'CHANNELS': {
+        const s = this.settings;
+        if (!c.set) {
+          this.send(SdrPi.kvRecord('CFG', ['freq', 'rate', 'offset', 'fmt', 'more'].reduce((o, k) => { o[k] = SdrPi.formatSetting(k, s[k]); return o; }, {})));
+          this.final(true);
+          return;
+        }
+        const r = await this.apply(c.set);
+        if (r.ok) {
+          const p = c.plan, n = 1 + p.more.length;
+          this.note('info', n === 1 ? 'One channel: ' + this.channelsText()
+            : 'Decoding ' + this.channelsText() + ' - tuned to ' + (p.freq / 1e6).toFixed(4) + ' MHz at ' + p.rate + ' sps - the nearest channel '
+              + Math.round(p.dcHz / 1000) + ' kHz from the DC spike and ' + Math.round(p.mirrorHz / 1000) + ' kHz from any mirror image');
+        }
+        this.final(r.ok, r.ok ? r.detail : r.error);
+        return;
+      }
       case 'RESTART':
         this.final(true);
         await this.reopen('restart asked for');
@@ -483,8 +631,8 @@ class Relay {
   }
 
   statusText() {
-    const s = this.settings, lv = this.lastLevel, u = Math.round(this.up() / 60000);
-    return 'MegaNet SDR Pi - ' + this.state + ' - ' + (s.freq / 1e6).toFixed(4) + ' MHz ' + s.fmt
+    const s = this.settings, lv = this.lastLevel, u = Math.round(this.up() / 60000), n = this.decoders.length;
+    return 'MegaNet SDR Pi - ' + this.state + ' - ' + (s.freq / 1e6).toFixed(4) + ' MHz ' + s.fmt + (n > 1 ? ' + ' + (n - 1) + ' more channels' : '')
       + (lv && lv.nfDb != null ? ' - floor ' + lv.nfDb.toFixed(1) + ' dBFS' : '')
       + ' - ' + this.counts.bursts + ' bursts ' + this.counts.readings + ' readings - up ' + Math.floor(u / 60) + 'h ' + (u % 60) + 'm - type HELP';
   }
@@ -493,8 +641,10 @@ class Relay {
   // decoder, and reported back as a CFG line. { ok, detail } or { ok, error }.
   async apply(set) {
     const s = Object.assign({}, this.settings, set), i = this.info;
-    const lim = SdrPi.offsetLimit(s.rate);
-    if (Math.abs(s.offset) > lim) return { ok: false, error: 'RANGE offset is within ' + (lim / 1000) + ' kHz of the centre at ' + s.rate + ' sps' };
+    const rate = this.opts.source === 'file' ? this.deviceRate() : s.rate;
+    // Every channel inside the band the stick is tuned to, and none twice.
+    const bad = SdrPi.checkChannels(s, rate);
+    if (bad) return { ok: false, error: bad.error };
     if (i && i.minHz && (s.freq < i.minHz || s.freq > i.maxHz)) {
       return { ok: false, error: 'RANGE this stick tunes ' + (i.minHz / 1e6) + ' to ' + (i.maxHz / 1e6) + ' MHz' };
     }
@@ -503,7 +653,7 @@ class Relay {
     this.settings = s;
     this.saveState();
     let detail = '';
-    const changed = k => k in set && set[k] !== before[k];
+    const changed = k => k in set && (k === 'more' ? SdrPi.formatSetting(k, set[k]) !== SdrPi.formatSetting(k, before[k]) : set[k] !== before[k]);
     try {
       if (this.dev) {
         if (changed('model')) await this.reopen('model changed');
@@ -511,7 +661,7 @@ class Relay {
           if (changed('rate')) {
             await this.dev.stop();
             await this.dev.setSampleRate(s.rate);
-            this.configureDsp(true);
+            this.syncDecoders(true);
             this.startStream();
           }
           if ('ppm' in set) this.tune = (await this.dev.setPpm(s.ppm)) || this.tune;
@@ -529,53 +679,55 @@ class Relay {
       this.send(SdrPi.cfgRecord(this.settings));
       return { ok: false, error: 'USB ' + e.message };
     }
-    if (['fmt', 'gate', 'squelch', 'offset', 'rate'].some(changed)) this.configureDsp(changed('rate'));
+    if (['fmt', 'gate', 'squelch', 'offset', 'rate', 'more', 'freq'].some(changed)) this.syncDecoders(changed('rate'));
+    if (changed('more')) this.log('Decoding ' + this.channelsText());
     if (changed('spec') || changed('lvl')) this.pace();
     this.send(SdrPi.cfgRecord(this.settings));
     return { ok: true, detail };
   }
 
-  // ── the decoder ────────────────────────────────────────────────────────────
+  // ── the decoders ───────────────────────────────────────────────────────────
 
   deviceRate() {
     if (this.opts.source === 'file') return this.fileRate || 240000;
     return this.dev && this.dev.rate ? Math.round(this.dev.rate) : this.settings.rate;
   }
 
-  startWorker() {
-    const w = new Worker(path.join(__dirname, 'dsp-worker.js'), { workerData: { dsp: path.join(ROOT, 'alert-dsp.js') } });
-    this.worker = w;
-    w.on('message', m => this.onDsp(m));
-    w.on('error', e => {
-      this.note('bad', 'The decoder stopped (' + e.message + ') - starting it again');
-      this.worker = null;
-      if (!this.stopping) setTimeout(() => { if (!this.stopping) { this.startWorker(); this.configureDsp(true); } }, 1000);
+  // A decoder for each channel, made or ended to match the settings, each told
+  // its channel; one whose channel moved in the band starts afresh. reset: the
+  // stream itself changed (a new rate, a new source), so all do.
+  syncDecoders(reset) {
+    // A channel outside the band the stick hears at this rate, or listed
+    // twice — kept from before, given with --set, or a recording's rate at
+    // odds with the settings — gets no decoder: it would hear another
+    // frequency and name it this one. Said once, when there is someone to
+    // tell (the journal has it regardless).
+    const all = this.channelList(), lim = SdrPi.offsetLimit(this.deviceRate());
+    const chans = all.filter((ch, k) => k === 0 || (Math.abs(ch.offset) <= lim && all.findIndex(o => o.hz === ch.hz) === k));
+    const left = all.filter(ch => chans.indexOf(ch) < 0).map(ch => SdrPi.mhzText(ch.hz)).join(' ');
+    if (left !== this.leftOut && (this.links.size || !left)) {
+      this.leftOut = left;
+      if (left) {
+        this.note('warn', 'Not decoding ' + left + ' MHz: outside the band the stick hears at ' + this.deviceRate()
+          + ' sps or listed twice - CHANNELS works out a tuning that holds them all');
+      }
+    }
+    while (this.decoders.length > chans.length) this.decoders.pop().end();
+    chans.forEach((ch, k) => {
+      let d = this.decoders[k], fresh = false;
+      if (!d) { d = this.decoders[k] = new Decoder(this, k); fresh = true; }
+      const moved = !fresh && d.ch && (d.ch.offset !== ch.offset || d.ch.hz !== ch.hz);
+      if (moved) { d.counts = { bursts: 0, readings: 0 }; d.bursts.clear(); d.last = null; d.st = this.blankLevel(); }
+      d.ch = ch;
+      d.configure(reset || moved);
     });
-    this.configureDsp(true);
-  }
-
-  configureDsp(reset) {
-    if (!this.worker) return;
-    const s = this.settings;
-    // specHz 2: four FFTs averaged a post, eight a second — enough that a burst
-    // never falls between them; SPEC sends the strongest of each bin. scopeHz:
-    // the FM audio picture is not sent, so it is drawn as rarely as it can be.
-    this.worker.postMessage({ type: 'config', cfg: {
-      deviceRate: this.deviceRate(), channelOffsetHz: this.opts.source === 'file' ? 0 : s.offset, format: SdrPi.FMT_KEY[s.fmt],
-      gate: s.gate, squelchDb: s.squelch, fftSize: 2048, specHz: 2, scopeHz: 0.1, audio: false, minVotes: 4, minVotesCrc: 4,
-    } });
     if (reset) { this.specMax = null; this.lvl = this.blankLevel(); }
   }
 
-  // Samples to the decoder — unless a live stick's are coming faster than it
-  // can take them, when they are dropped (and counted) rather than queued
-  // without end. A recording waits for it instead: it is not going anywhere.
+  // The stick's samples, to every channel's decoder.
   feed(u8) {
     this.rx.bytes += u8.length;
-    if (!this.worker) return;
-    if (this.lag.stopped && this.opts.source !== 'file') { this.counts.drops++; return; }
-    const buf = u8.slice().buffer;              // a copy: a USB library's buffer is not ours to hand away
-    this.worker.postMessage({ type: 'iq', buf }, [buf]);
+    for (const d of this.decoders) d.feed(u8);
   }
 
   blankLevel() { return { n: 0, chMax: -Infinity, nf: null, open: false, dbfs: 0, clip: 0, hist: new Array(32).fill(0) }; }
@@ -590,61 +742,59 @@ class Relay {
     for (let i = 0; i < 32 && i < m.hist.length; i++) a.hist[i] += m.hist[i];
   }
 
-  onDsp(m) {
+  // From one channel's decoder. The level and spectrum the card draws are the
+  // stick's own channel's; every channel's level goes into STAT's chans.
+  onDsp(d, m) {
     switch (m.type) {
       case 'level':
-        this.lastLevel = m;
-        this.addLevel(this.lvl, m);
-        this.addLevel(this.stat, m);
+        d.last = m;
+        this.addLevel(d.st, m);
+        if (d.index === 0) {
+          this.lastLevel = m;
+          this.addLevel(this.lvl, m);
+          this.addLevel(this.stat, m);
+        }
         break;
       case 'spectrum':
+        if (d.index !== 0) break;
         if (!this.specMax || this.specMax.length !== m.db.length) this.specMax = Float32Array.from(m.db);
         else for (let i = 0; i < m.db.length; i++) if (m.db[i] > this.specMax[i]) this.specMax[i] = m.db[i];
         break;
-      case 'burst': this.onBurst(m); break;
-      case 'decode': this.onDecode(m); break;
-      case 'pong': {
-        this.lag.ms = performance.now() - m.sent;
-        if (!this.lag.stopped && this.lag.ms > LAG_STOP_MS) {
-          this.lag.stopped = true;
-          this.note('warn', 'The decoder is ' + (this.lag.ms / 1000).toFixed(1) + ' s behind - dropping samples until it catches up. A lower RATE needs less of the Pi.');
-        } else if (this.lag.stopped && this.lag.ms < LAG_GO_MS) {
-          this.lag.stopped = false;
-          this.note('info', 'The decoder has caught up');
-        }
-        if (this.pongWait && m.id === this.pongWait.id) { const f = this.pongWait.resolve; this.pongWait = null; f(); }
-        break;
-      }
-      case 'error': this.note('bad', 'Decoder: ' + m.message); break;
+      case 'burst': this.onBurst(d, m); break;
+      case 'decode': this.onDecode(d, m); break;
+      case 'pong': d.pong(m); break;
+      case 'error': this.note('bad', 'Decoder' + d.label() + ': ' + m.message); break;
       default: break;
     }
   }
 
   // Stamped when the gate closes, here, by this thread's clock — the decoder's
   // own Date.now() would move with an NTP step — and kept for the decode that
-  // follows it, which names the burst by its `t`.
-  onBurst(m) {
+  // follows it, which names the burst by its `t`. Each channel's own.
+  onBurst(d, m) {
     const seq = ++this.seq.burst;
     this.counts.bursts++;
+    d.counts.bursts++;
     const b = { seq, up: this.up(), epoch: this.epoch() };
-    this.bursts.set(m.t, b);
-    if (this.bursts.size > BURSTS_KEPT) this.bursts.delete(this.bursts.keys().next().value);
+    d.bursts.set(m.t, b);
+    if (d.bursts.size > BURSTS_KEPT) d.bursts.delete(d.bursts.keys().next().value);
     this.send(SdrPi.record('BURST', {
-      seq, run: this.run, up: b.up, epoch_ms: b.epoch, ms: m.ms, peak_dbfs: r1(m.peakDb), nf_dbfs: r1(m.nfDb), freq_hz: this.channelHz(),
+      seq, run: this.run, up: b.up, epoch_ms: b.epoch, ms: m.ms, peak_dbfs: r1(m.peakDb), nf_dbfs: r1(m.nfDb), freq_hz: d.ch.hz,
     }));
   }
 
-  onDecode(m) {
-    const b = m.burst ? this.bursts.get(m.burst.t) : null;
+  onDecode(d, m) {
+    const b = m.burst ? d.bursts.get(m.burst.t) : null;
     const up = b ? b.up : this.up(), epoch = b ? b.epoch : this.epoch();
     m.readings.forEach(r => {
       this.counts.readings++;
+      d.counts.readings++;
       const n = this.names.get(r.sensorId);
       this.send(SdrPi.record('RX', {
         seq: ++this.seq.rx, run: this.run, up, epoch_ms: epoch, id: r.sensorId, value: r.value, fmt: SdrPi.FMT_CODE[r.format] || r.format,
         votes: r.votes, pol: r.polarity, crc: r.crcOk == null ? null : r.crcOk, hex: String(r.hex || '').replace(/\s+/g, ''),
         carrier_hz: r.carrierHz, burst: b ? b.seq : null, peak_dbfs: m.burst ? r1(m.burst.peakDb) : null,
-        nf_dbfs: m.burst ? r1(m.burst.nfDb) : null, burst_ms: m.burst ? m.burst.ms : null, freq_hz: this.channelHz(),
+        nf_dbfs: m.burst ? r1(m.burst.nfDb) : null, burst_ms: m.burst ? m.burst.ms : null, freq_hz: d.ch.hz,
         name: n ? n.name : null, kind: n ? n.kind : null,
       }));
     });
@@ -652,6 +802,7 @@ class Relay {
     this.sendHidden(SdrPi.record('TRACE', {
       run: this.run, up: this.up(), burst: b ? b.seq : null, ms: m.ms, combos: m.combos, seconds: r3(m.seconds), all: m.all,
       carrier_hz: m.trace ? m.trace.carrierHz : null, start: t.start, frames: t.frames, shadows: SdrPi.packShadows(m.shadows), symbols: t.symbols,
+      freq_hz: d.ch.hz,
     }));
   }
 
@@ -680,7 +831,7 @@ class Relay {
     this.specMax = null;
     this.sendHidden(SdrPi.record('SPEC', {
       run: this.run, up: this.up(), rate: this.deviceRate(), freq_hz: this.settings.freq,
-      offset_hz: this.opts.source === 'file' ? 0 : this.settings.offset, lo_dbfs: p.lo, step_db: p.step, agg: 'max', bins: p.bins,
+      offset_hz: this.channelList()[0].offset, lo_dbfs: p.lo, step_db: p.step, agg: 'max', bins: p.bins,
     }));
   }
 
@@ -693,7 +844,8 @@ class Relay {
     this.cpu.pct = Math.round(((c.user - this.cpu.last.user) + (c.system - this.cpu.last.system)) / 1000 / (now - this.cpu.t) * 100);
     this.cpu.last = c;
     this.cpu.t = now;
-    if (this.worker) this.worker.postMessage({ type: 'ping', id: ++this.lag.id, sent: performance.now() });
+    const id = ++this.lagId;
+    for (const d of this.decoders) d.ping(id);
   }
 
   // ── the stick ──────────────────────────────────────────────────────────────
@@ -777,11 +929,12 @@ class Relay {
     this.info = info;
     this.stickLabel = RtlSdr.label(u);
     this.lastOpenError = null;
-    this.configureDsp(true);
+    this.syncDecoders(true);
     this.startStream();
     this.setState('streaming');
     this.note('info', 'Opened ' + this.stickLabel + ' - ' + info.modelLabel + ', tuner ' + info.tuner + ' - '
-      + (s.freq / 1e6).toFixed(4) + ' MHz at ' + this.deviceRate() + ' sps' + (this.tune && this.tune.mode !== 'tuner' ? ' (' + this.tune.mode + ')' : ''));
+      + (s.freq / 1e6).toFixed(4) + ' MHz at ' + this.deviceRate() + ' sps' + (this.tune && this.tune.mode !== 'tuner' ? ' (' + this.tune.mode + ')' : '')
+      + (this.decoders.length > 1 ? ' - ' + this.channelsText() : ''));
     this.hello(null, false);
   }
 
@@ -843,9 +996,9 @@ class Relay {
       this.note('warn', 'rtl_sdr stopped (' + code + '): ' + SdrPi.clean(err.split('\n').filter(Boolean).slice(-1)[0] || '', 160));
       this.retry();
     });
-    this.configureDsp(true);
+    this.syncDecoders(true);
     this.setState('streaming');
-    this.note('info', 'Streaming through rtl_sdr - ' + (s.freq / 1e6).toFixed(4) + ' MHz at ' + s.rate + ' sps');
+    this.note('info', 'Streaming through rtl_sdr - ' + (s.freq / 1e6).toFixed(4) + ' MHz at ' + s.rate + ' sps' + (this.decoders.length > 1 ? ' - ' + this.channelsText() : ''));
     this.hello(null, false);
   }
 
@@ -859,9 +1012,10 @@ class Relay {
     this.fileRate = this.opts.fileRate || (m && SdrPi.RATES.indexOf(+m[1] * 1000) >= 0 ? +m[1] * 1000 : 240000);
     this.info = { modelLabel: 'IQ file', tuner: path.basename(file), minHz: 500000, maxHz: 1766000000, gains: RtlSdr.GAINS.slice(), biasTee: false, directSampling: false };
     this.stickLabel = 'IQ file ' + path.basename(file);
-    this.configureDsp(true);
+    this.syncDecoders(true);
     this.setState('streaming');
-    this.note('info', 'Playing ' + path.basename(file) + ' - ' + (buf.length / 2 / this.fileRate).toFixed(1) + ' s at ' + this.fileRate + ' sps');
+    this.note('info', 'Playing ' + path.basename(file) + ' - ' + (buf.length / 2 / this.fileRate).toFixed(1) + ' s at ' + this.fileRate + ' sps'
+      + (this.decoders.length > 1 ? ' - ' + this.channelsText() : ''));
     this.hello(null, false);
     const chunk = Math.round(this.fileRate / 10) * 2;
     const quiet = new Uint8Array(this.fileRate * 2).map((_, i) => 127 + (i & 1));
@@ -890,11 +1044,7 @@ class Relay {
   // pong says the file is decoded.
   fileDone() {
     this.setState('stopped');
-    const id = ++this.lag.id;
-    new Promise(resolve => {
-      this.pongWait = { id, resolve };
-      this.worker.postMessage({ type: 'ping', id, sent: performance.now() });
-    }).then(() => {
+    Promise.all(this.decoders.map(d => d.drained())).then(() => {
       this.sendLevel();
       this.sendSpectrum();
       this.note('info', 'End of ' + path.basename(this.opts.file));
@@ -984,14 +1134,19 @@ class Relay {
   async start() {
     this.loadNames();
     this.checkClock();
-    this.startWorker();
+    this.syncDecoders(true);
     if (this.opts.stdio) this.stdio();
     if (this.opts.tcp != null) this.listen();
     if (this.opts.serial.length) this.openSerials();
     this.pace();
     const every = (ms, fn) => this.timers.push(setInterval(fn, ms));
     every(1000, () => this.tick());
-    every(STAT_MS, () => { this.sendHidden(this.statRecord()); this.title(); this.stat = this.blankLevel(); });
+    every(STAT_MS, () => {
+      this.sendHidden(this.statRecord());
+      this.title();
+      this.stat = this.blankLevel();
+      this.decoders.forEach(d => { d.st = this.blankLevel(); });
+    });
     every(STAT_SHOWN_MS, () => this.send(this.statRecord()));
     every(HELLO_MS, () => this.hello(null, true));
     every(60000, () => this.checkClock());
@@ -1014,7 +1169,7 @@ class Relay {
     if (this.proc) { try { this.proc.kill(); } catch (_) {} this.proc = null; }
     if (this.server) this.server.close();
     const done = () => {
-      if (this.worker) this.worker.terminate();
+      this.decoders.forEach(d => d.end());
       if (this.saveTimer) { clearTimeout(this.saveTimer); this.saveTimer = null; }
       if (this.deps.onStop) { this.deps.onStop(code); return; }
       // stdout drained before going: a pipe still holding records would lose them
