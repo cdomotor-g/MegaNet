@@ -156,6 +156,10 @@ try {
     rd && rd.length === 1 && rd[0].alert_id === 2088 && rd[0].value_raw === 143 && rd[0].reading_ts >= before - 1000 && rd[0].reading_ts <= Date.now() + 1000,
     rd && JSON.stringify(rd));
   ok('…and the line it came from as the frame', post && /^DEC,1,/.test(post.body.payload.frame || ''));
+  // The DEC's rssi and nf columns, -20 and -121 dBm: the RSSI as it is, and the
+  // SNR as their difference (0050). A radio has no dBFS to give.
+  ok('…and how it was heard: the radio\'s RSSI, and its SNR over its noise floor',
+    rd && rd[0].rssi_dbm === -20 && rd[0].snr_db === 101 && !('level_dbfs' in rd[0]), rd && JSON.stringify(rd));
 
   // ── the same receiver again, out of a log's history ────────────────────────
   await page.evaluate(i => Serial.removeConn(i), id);
@@ -217,6 +221,9 @@ try {
   const ets = ep ? [...new Set(ep.body.payload.readings.map(r => r.reading_ts))].sort() : [];
   ok('…as ALERT2, every clean reading, on the receiver\'s path', ep && ep.body.payload.readings.length === 3 && ep.body.payload.path === 'serial-monitor/ert-check01', ep && JSON.stringify(ep.body.payload).slice(0, 300));
   ok('…timed by each frame\'s own time of day on the receiver\'s date', JSON.stringify(ets) === JSON.stringify(expect), JSON.stringify(ets) + ' vs ' + JSON.stringify(expect));
+  ok('…with the signal the frame gave as a number, or none — never null or NaN on the wire',
+    ep && ep.body.payload.readings.every(r => ['freq_mhz', 'rssi_dbm', 'level_dbfs', 'snr_db'].every(k => !(k in r) || Number.isFinite(r[k]))),
+    ep && JSON.stringify(ep.body.payload.readings));
   ok('…and a receiver that gave no location reports none', reports.some(r => r.body.payload.point_id === 'ert-check01' && r.body.payload.location_source === 'none' && r.body.payload.lat === undefined));
 
   // ── a demo ─────────────────────────────────────────────────────────────────

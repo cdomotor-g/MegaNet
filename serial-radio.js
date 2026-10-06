@@ -238,7 +238,12 @@ const SerialRadio = (function () {
       const ms = rec.epoch * 1000;
       if (ms <= Date.now() + 5 * 60000 && ms >= Date.now() - 30 * 86400000) ts = ms;
     }
-    SerialIngest.add(c, [{ alert_id: rec.id, value_raw: rec.value, ts, protocol: 'alert', line }]);
+    // How it was heard (0050): the radio's RSSI and noise floor are in dBm, so
+    // their difference is the SNR; the frequency is the radio's own setting.
+    const f = Number(c.radio && c.radio.settings && c.radio.settings.FREQ_MHZ);
+    SerialIngest.add(c, [{ alert_id: rec.id, value_raw: rec.value, ts, protocol: 'alert', line,
+      freq_mhz: f > 0 ? f : null, rssi_dbm: rec.rssi,
+      snr_db: rec.rssi != null && rec.nf != null ? rec.rssi - rec.nf : null }]);
   }
 
   // To the reception log (reception-log.js): every DEC, and — a moment after

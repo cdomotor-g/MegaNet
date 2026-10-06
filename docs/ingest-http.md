@@ -166,11 +166,26 @@ with a channel, in the same batches. See
 | `reading_ts` | yes | When the device took the reading. ISO 8601 (`"2026-08-11T04:15:00Z"`), or epoch seconds/milliseconds as a number. |
 | `value_raw` | yes* | The value as your device measured it — a raw count, or an engineering value if that is all your device has. *A reading carrying only `value` is accepted — `value` stands in as the raw record — but send `value_raw` where the device has one; a row with neither is rejected. |
 | `value`, `unit` | no | The converted engineering value and its unit, if your device (or you) already did the conversion. Units are from a fixed list — `mm`, `m`, `V`, `degC`, `NTU`, and others; an unrecognised one is a rejected row, not a silent guess. |
-| `quality` | no | `good`, `suspect`, `estimated`, `bad`, or `missing`. Defaults to unstated. |
+| `quality` | no | `good`, `suspect`, `estimated`, `bad`, or `missing`. Defaults to unstated. What the source asserts about the *value* — not the signal; that is the next four. |
+| `freq_mhz` | no | The frequency your receiver heard it on, in MHz — `151.525`, not `151525000`. |
+| `rssi_dbm` | no | Received signal strength in dBm, from a receiver that measures it in dBm (a radio, an ERT-A2). |
+| `level_dbfs` | no | The burst's level against the receiver's full scale, in dBFS — what an RTL-SDR has instead of dBm. |
+| `snr_db` | no | Signal over the receiver's noise floor, in dB. The figure that compares across receivers; send it whenever you know the noise floor. |
 
 `source` and `path` may be set once at the top level and apply to every reading
 in the batch, or set per-reading to override it. `source` defaults to `"http"`
-if you leave it out entirely.
+if you leave it out entirely. `freq_mhz` may sit at the top level too, for a
+batch from one receiver channel.
+
+**The last four never cost a reading** (`0050`). They describe how your copy
+was heard, not what was measured, so one that is missing, not a number or out of
+range (a frequency outside 0.001–100,000 MHz, an RSSI outside −200…+50 dBm, a
+level outside −200…+20 dBFS, an SNR outside −100…+200 dB) is stored as null and
+the reading is kept — never a rejected row. They are stored for the copy MegaNet
+keeps: the first to arrive. A later copy of the same reading is counted and its
+`path` recorded, but its frequency and signal are not; every copy, with its level,
+is what [`report_receptions()`](reception-map.md) keeps for the Reception
+Map.
 
 **A batch is at most 1,000 readings.** A larger one is refused outright — split
 it into more than one `POST`.

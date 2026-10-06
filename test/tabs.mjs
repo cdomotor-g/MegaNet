@@ -248,7 +248,10 @@ const SEED_RFC_ONSET = `async () => {${SEED_ACMA}
 // meganet.reading returns them), the table, the selection column and an open
 // detail drawer are all on screen to be measured. Two addresses, one of them
 // station-number-addressed, so the channel column and the "no ALERT id" cell
-// are both exercised; toggleRow opens the drawer the way a click would.
+// are both exercised; toggleRow opens the drawer the way a click would. The
+// opened row and a Raspberry Pi's say how they were heard (0050) — dBm from a
+// radio, dBFS from an RTL-SDR — so the Freq, Signal and SNR cells and the
+// drawer's Heard line are measured with something in them.
 const SEED_MSGLOG = `() => {
   MessageLog.adoptRows([
     { addr: 'a:6128', alert_id: 6128, station_number: null, channel: '',
@@ -257,7 +260,14 @@ const SEED_MSGLOG = `() => {
       unit: 'mm', conversion: 'raw x 0.2 mm per tip', quality: 0, protocol: 1,
       source: 2, path: 'MOUNT_TABLETOP', dup_count: 2,
       dup_paths: ['DURIKAI', 'direct'], last_dup_at: '2026-03-01T04:15:40+00:00',
-      raw_id: 41 },
+      raw_id: 41, freq_mhz: 151.5125, rssi_dbm: -97.5, level_dbfs: null, snr_db: 21.5 },
+    { addr: 'a:4160', alert_id: 4160, station_number: null, channel: '',
+      station_id: null, reading_ts: '2026-03-01T04:12:00+00:00',
+      received_at: '2026-03-01T04:12:01+00:00', value_raw: 24, value: null,
+      unit: null, conversion: null, quality: 0, protocol: 1, source: 5,
+      path: 'serial-monitor/rpi-83071968-sdr1-152.400', dup_count: 0, dup_paths: [],
+      last_dup_at: null, raw_id: 42, freq_mhz: 152.4, rssi_dbm: null,
+      level_dbfs: -57.6, snr_db: 11 },
     { addr: 's:541155/level', alert_id: null, station_number: '541155',
       channel: 'level', station_id: null, reading_ts: '2026-03-01T04:10:00+00:00',
       received_at: '2026-03-01T04:10:05+00:00', value_raw: 1.842, value: null,

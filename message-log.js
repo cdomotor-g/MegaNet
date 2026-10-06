@@ -25,7 +25,8 @@
 //   * **The ingress pathway.** Which base heard it, which protocol carried
 //     it, which transport delivered it, and how many further copies arrived by
 //     which other paths — `path`, `protocol`, `source` and `dup_paths` are
-//     columns here, where on a chart they are a tooltip.
+//     columns here, where on a chart they are a tooltip. So are the frequency
+//     the kept copy was heard on and how strongly (0050), when the base said.
 //   * **Verifying a calibration onto the trace.** A gauge tipped by hand in
 //     the field either lands in this table within a minute or it did not
 //     arrive. The raw value is the headline column because raw is the truth —
@@ -59,11 +60,14 @@ const MessageLog = (() => {
 
   // Everything meganet.reading holds about a message, minus the generated addr
   // parts the columns below re-derive. One string so the query and the CSV
-  // cannot disagree about what came down.
+  // cannot disagree about what came down. The last four are how the kept copy
+  // was heard (0050) — null for anything that arrived before, or by a route
+  // that does not say.
   const ML_SELECT = 'addr,alert_id,a2_station,a2_sensor,station_number,channel,station_id,'
                   + 'reading_ts,received_at,'
                   + 'value_raw,value,unit,conversion,quality,protocol,source,path,'
-                  + 'dup_count,dup_paths,last_dup_at,raw_id';
+                  + 'dup_count,dup_paths,last_dup_at,raw_id,'
+                  + 'freq_mhz,rssi_dbm,level_dbfs,snr_db';
 
   // The vocabularies, as seeded by db/migrations/0006_telemetry.sql. Fetched
   // fresh once per session (they are lookup tables so a new protocol is a row,
@@ -82,6 +86,11 @@ const MessageLog = (() => {
   //
   // `ts` is not hideable: it is the leftmost column by design and its cell
   // carries the row's expand button, which is what a keyboard user drives.
+  //
+  // `w` is a starting width in pixels for a column whose every value is a
+  // short number with a unit — "-102.5 dBFS" at an even share of fifteen
+  // columns reads "-102…", the unit gone. The rest share what is left; a
+  // dragged width wins over either.
   const ML_COLS = [
     { key: 'ts',       label: 'Time',     narrow: true,  fixed: true,
       title: 'When the device says it read — reading_ts. Field clocks drift; the detail drawer shows the received time beside it.' },
@@ -107,9 +116,23 @@ const MessageLog = (() => {
       title: 'How it reached us — the transport: HTTP, the MQTT bridge, typed in, backfilled, read off a serial port.' },
     { key: 'path',     label: 'Path',     narrow: false,
       title: 'The repeater or base that delivered the copy we kept, when the adapter knew. The duplicate copies\' paths are in the detail drawer.' },
+    { key: 'freq',     label: 'Freq',     narrow: false, since: 2, w: 84,
+      title: 'The frequency the kept copy was heard on, in MHz — when the base station said. Not the Channel column, which names a sensor behind a station number.' },
+    { key: 'signal',   label: 'Signal',   narrow: false, since: 2, w: 108,
+      title: 'How strongly the kept copy was heard: dBm from a radio or an ERT-A2; dBFS from an RTL-SDR, which is not calibrated in dBm, so it compares only within one receiver at one gain.' },
+    { key: 'snr',      label: 'SNR',      narrow: false, since: 2, w: 84,
+      title: 'The kept copy\'s signal over the receiver\'s own noise floor, in dB — the figure that compares between receivers, and the nearest a base station gets to a measured fade margin.' },
     { key: 'dup',      label: 'Copies',   narrow: false,
       title: 'How many times this reading was heard in total. Three copies is one transmission heard direct and via two repeaters — the network working.' },
   ];
+
+  // Which generation of ML_COLS a remembered column set was chosen from. A set
+  // saved before a column existed never said no to it, so a column whose
+  // `since` is newer than the set is added where the view's defaults have it —
+  // otherwise everyone who ever touched Columns would never see Freq, Signal
+  // and SNR (0050). Raise it, and give the new columns this `since`, the next
+  // time a column is added.
+  const ML_COLSET = 2;
 
   // The table wrapper's height, as three named steps rather than a drag edge —
   // a draggable edge on a box that already scrolls two ways is a fight with the
@@ -151,8 +174,19 @@ const MessageLog = (() => {
       const raw = localStorage.getItem(`mn-ml-cols-${view}`);
       if (!raw) return null;
       const keys = JSON.parse(raw).filter(k => ML_COLS.some(c => c.key === k));
-      return keys.length ? [...new Set(['ts', ...keys])] : null;
+      if (!keys.length) return null;
+      // A set from before a column existed: add the newer defaults, in table order.
+      const set = Number(localStorage.getItem(`mn-ml-colset-${view}`)) || 1;
+      const added = new Set(defaultCols(view).filter(k => (ML_COLS.find(c => c.key === k).since || 1) > set));
+      return ML_COLS.map(c => c.key).filter(k => k === 'ts' || keys.includes(k) || added.has(k));
     } catch (_) { return null; }
+  }
+
+  function saveCols(view) {
+    try {
+      localStorage.setItem(`mn-ml-cols-${view}`, JSON.stringify(ml.cols[view]));
+      localStorage.setItem(`mn-ml-colset-${view}`, String(ML_COLSET));
+    } catch (_) {}
   }
 
   // Dragged column widths, remembered the way the column sets are: per view,
@@ -188,6 +222,7 @@ const MessageLog = (() => {
       find:    '',             // station / address box; takes a pasted list
       protocol: '', source: '', quality: '',   // '' = any, else the smallint code
       path:    '', channel: '',
+      freq:    '',             // MHz, exact — '' = any
       dupsOnly: false,         // only readings heard more than once
       unresolvedOnly: false,   // only rows no station has claimed yet
       order:   'received.desc',
@@ -244,6 +279,38 @@ const MessageLog = (() => {
     if (v == null || v === '') return '—';
     const n = Number(v);
     return Number.isFinite(n) ? String(n) : String(v);
+  }
+
+  // How the kept copy was heard (0050). A frequency reads as a channel does —
+  // 151.500, three places always, more only when the channel has them
+  // (151.5125). Signal follows the Reception Map's rule: dBm when the receiver
+  // measures dBm, else an RTL-SDR's dBFS, and the unit always says which.
+  function fmtFreq(v) {
+    if (v == null || v === '') return '—';
+    const n = Number(v);
+    if (!Number.isFinite(n)) return String(v);
+    const s = n.toFixed(6).replace(/0+$/, '');
+    return (s.split('.')[1] || '').length > 3 ? s : n.toFixed(3);
+  }
+
+  function fmtDb(v) {
+    if (v == null || v === '') return '—';
+    const n = Number(v);
+    return Number.isFinite(n) ? n.toFixed(1) : String(v);
+  }
+
+  function signalOf(r) {
+    if (r.rssi_dbm != null) return { v: r.rssi_dbm, unit: 'dBm' };
+    if (r.level_dbfs != null) return { v: r.level_dbfs, unit: 'dBFS' };
+    return null;
+  }
+
+  // The Freq filter's box, as a number to match exactly, or null for "any".
+  function freqFilter(text) {
+    const t = String(text ?? '').trim().replace(/\s*mhz$/i, '');
+    if (!/^\d+(\.\d+)?$/.test(t)) return null;
+    const n = Number(t);
+    return n > 0 && n <= 100000 ? n : null;
   }
 
   // The primary key, as a string — stable across re-fetches, which is what
@@ -393,6 +460,10 @@ const MessageLog = (() => {
     if (q.quality  !== '') parts.push(`quality=eq.${q.quality}`);
     if (q.path.trim())     parts.push(`path=ilike.${encodeURIComponent('*' + q.path.trim().replace(/[%*]/g, '') + '*')}`);
     if (q.channel.trim())  parts.push(`channel=ilike.${encodeURIComponent('*' + q.channel.trim().replace(/[%*]/g, '') + '*')}`);
+    // Exact, because a frequency is a channel name as much as a number: 152.4
+    // is 152.400 and is not 152.4125. numeric in the table, so no float fuzz.
+    const mhz = freqFilter(q.freq);
+    if (mhz != null)       parts.push(`freq_mhz=eq.${mhz}`);
     if (q.dupsOnly)        parts.push('dup_count=gt.0');
     if (q.unresolvedOnly)  parts.push('station_id=is.null');
     const [col, dir] = q.order.split('.');
@@ -518,7 +589,7 @@ const MessageLog = (() => {
                         onclick="MessageLog.setView('narrow')">Narrow</button>
                 <button class="ml-seg${ml.view === 'wide' ? ' ml-seg--on' : ''}"
                         aria-pressed="${ml.view === 'wide'}"
-                        title="The full record — protocol, transport, ingress path, copies"
+                        title="The full record — protocol, transport, ingress path, frequency and signal, copies"
                         onclick="MessageLog.setView('wide')">Wide</button>
               </span>
               <span class="ml-viewswitch" role="group" aria-label="Table height">
@@ -596,6 +667,10 @@ const MessageLog = (() => {
               <span>Channel</span>
               <input type="search" value="${escAttr(q.channel)}"
                      onchange="MessageLog.setText('channel', this.value)"></label>
+            <label class="ml-f" title="The frequency the kept copy was heard on, in MHz — exact: 152.4 finds 152.400 and not 152.4125. Empty for any.">
+              <span>Freq (MHz)</span>
+              <input type="number" inputmode="decimal" step="any" min="0" value="${escAttr(q.freq)}"
+                     onchange="MessageLog.setText('freq', this.value)"></label>
             <label class="ml-f" title="Order the log by when we received it, or by when the device says it read">
               <span>Order</span>
               <select onchange="MessageLog.setOrder(this.value)">
@@ -640,7 +715,7 @@ const MessageLog = (() => {
           <button class="ml-btn" onclick="MessageLog.resetCols()"
                   title="Back to the default set for this view">Reset</button>
           <button class="ml-btn" onclick="MessageLog.resetWidths()"
-                  title="Forget the dragged column widths for this view — back to sharing the space evenly">Reset widths</button>
+                  title="Forget the dragged column widths for this view — back to the number columns at their own width and the rest sharing the space evenly">Reset widths</button>
         </div>
       </details>`;
   }
@@ -707,6 +782,16 @@ const MessageLog = (() => {
       case 'protocol': return `<td class="small">${esc(vocabKey('protocol', r.protocol))}</td>`;
       case 'source':   return `<td class="small">${esc(vocabKey('source', r.source))}</td>`;
       case 'path':     return `<td class="small mono">${esc(r.path || '—')}</td>`;
+      case 'freq':     return `<td class="small mono">${esc(fmtFreq(r.freq_mhz))}</td>`;
+      case 'signal': {
+        const s = signalOf(r);
+        if (!s) return '<td class="small">—</td>';
+        return `<td class="small mono" title="${escAttr(s.unit === 'dBm'
+          ? 'Received signal strength, in dBm'
+          : 'The burst\'s level against the RTL-SDR\'s full scale, in dBFS — not dBm; it compares only within one receiver at one gain')
+        }">${esc(fmtDb(s.v))} ${s.unit}</td>`;
+      }
+      case 'snr':      return `<td class="small mono">${r.snr_db != null ? `${esc(fmtDb(r.snr_db))} dB` : '—'}</td>`;
       case 'dup': {
         const n = (r.dup_count || 0) + 1;
         const via = [r.path, ...(r.dup_paths || [])].filter(Boolean);
@@ -774,7 +859,7 @@ const MessageLog = (() => {
           <caption class="sr-only">Messages received by the datastore, one row per reading, ${esc(ml.q.order.startsWith('received') ? 'in arrival order' : 'in reading order')}</caption>
           <colgroup>
             <col>
-            ${cols.map(c => `<col data-mlcol="${c.key}"${widths[c.key] ? ` style="width:${widths[c.key]}px"` : ''}>`).join('')}
+            ${cols.map(c => { const w = widths[c.key] || c.w; return `<col data-mlcol="${c.key}"${w ? ` style="width:${w}px"` : ''}>`; }).join('')}
           </colgroup>
           <thead><tr>
             <th scope="col" class="ml-pick">
@@ -883,6 +968,23 @@ const MessageLog = (() => {
         <pre class="mono small">${esc(JSON.stringify(got.payload, null, 2))}</pre></div>`;
   }
 
+  // On what frequency, and how strongly, the kept copy was heard (0050) — the
+  // copy `path` names. Further copies are counted and their paths kept, but
+  // not described; every copy with its level is the Reception Map's.
+  function detailHeardHtml(r) {
+    const said = [];
+    if (r.freq_mhz != null)   said.push(`${fmtFreq(r.freq_mhz)} MHz`);
+    if (r.rssi_dbm != null)   said.push(`${fmtDb(r.rssi_dbm)} dBm`);
+    if (r.level_dbfs != null) said.push(`${fmtDb(r.level_dbfs)} dBFS`);
+    if (r.snr_db != null)     said.push(`SNR ${fmtDb(r.snr_db)} dB`);
+    if (!said.length) {
+      return `<b>—</b> <span class="small">the base station did not say on what frequency, or how strongly — a Raspberry Pi and the Serial Monitor do; an MQTT gateway, a backfill and readings stored before they could do not</span>`;
+    }
+    const notes = [r.dup_count ? `the copy kept, of ${r.dup_count + 1}` : 'the only copy heard'];
+    if (r.level_dbfs != null && r.rssi_dbm == null) notes.push('dBFS is the RTL-SDR\'s own scale, not dBm');
+    return `<b class="mono">${esc(said.join(' · '))}</b> <span class="small">${esc(notes.join('; '))}</span>`;
+  }
+
   function detailHtml(r, res) {
     const lag = Date.parse(r.received_at) - Date.parse(r.reading_ts);
     const via = [...new Set([r.path, ...(r.dup_paths || [])].filter(Boolean))];
@@ -916,6 +1018,7 @@ const MessageLog = (() => {
         <div><span>Pathway</span>
           <b>${esc(vocabKey('protocol', r.protocol))} · ${esc(vocabKey('source', r.source))}${r.path ? ` · in at ${esc(r.path)}` : ''}</b>
           <span class="small">protocol · transport${r.path ? ' · ingress point' : ' — the adapter did not say where it came in'}</span></div>
+        <div><span>Heard</span>${detailHeardHtml(r)}</div>
         <div><span>Copies</span>
           <b>heard ${(r.dup_count || 0) + 1} time${r.dup_count ? 's' : ''}</b>
           ${via.length ? `<span class="small mono">via ${esc(via.join(', '))}</span>` : ''}
@@ -1313,13 +1416,16 @@ const MessageLog = (() => {
     } else if (!on && has && key !== 'ts') {
       ml.cols[ml.view] = cols.filter(k => k !== key);
     }
-    try { localStorage.setItem(`mn-ml-cols-${ml.view}`, JSON.stringify(ml.cols[ml.view])); } catch (_) {}
+    saveCols(ml.view);
     renderTable();
   }
 
   function resetCols() {
     ml.cols[ml.view] = defaultCols(ml.view);
-    try { localStorage.removeItem(`mn-ml-cols-${ml.view}`); } catch (_) {}
+    try {
+      localStorage.removeItem(`mn-ml-cols-${ml.view}`);
+      localStorage.removeItem(`mn-ml-colset-${ml.view}`);
+    } catch (_) {}
     rerender();
   }
 
@@ -1531,7 +1637,9 @@ const MessageLog = (() => {
     if (!rows.length) return;
     const head = ['reading_ts', 'received_at', 'addr', 'alert_id', 'station_number', 'channel',
                   'station', 'station_id', 'value_raw', 'value', 'unit', 'conversion',
-                  'quality', 'protocol', 'source', 'path', 'dup_count', 'dup_paths', 'raw_id'];
+                  'quality', 'protocol', 'source', 'path',
+                  'freq_mhz', 'rssi_dbm', 'level_dbfs', 'snr_db',
+                  'dup_count', 'dup_paths', 'raw_id'];
     const lines = [head.join(',')];
     for (const r of rows) {
       const res = rowStation(r);
@@ -1542,6 +1650,7 @@ const MessageLog = (() => {
         r.value_raw ?? '', r.value ?? '', csvEscape(r.unit || ''), csvEscape(r.conversion || ''),
         csvEscape(vocabKey('quality', r.quality)), csvEscape(vocabKey('protocol', r.protocol)),
         csvEscape(vocabKey('source', r.source)), csvEscape(r.path || ''),
+        r.freq_mhz ?? '', r.rssi_dbm ?? '', r.level_dbfs ?? '', r.snr_db ?? '',
         r.dup_count ?? 0, csvEscape((r.dup_paths || []).join(' | ')), r.raw_id ?? '',
       ].join(','));
     }

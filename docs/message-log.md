@@ -55,14 +55,26 @@ nowhere else.
 | Stn # | The station number the message carried, or the resolved station's. |
 | Station | The resolved station — see the note on resolution below. |
 | AlertID | The ALERT address the message was addressed to. Empty for satellite/cellular messages, which report under a station number and channel. |
-| Channel | Which sensor spoke, for station-number-addressed messages. An ALERT address *is* the sensor, so radio rows have no channel. |
+| Channel | Which sensor spoke, for station-number-addressed messages. An ALERT address *is* the sensor, so radio rows have no channel. **Not the radio channel** — that is Freq. |
 | **Raw** | `value_raw` — as transmitted, before any interpretation. |
 | Value | The conversion, when one was recorded, with its unit. Display only. |
-| Quality | What the source said about the reading. `unqualified` means nobody said anything — not that anybody checked. |
+| Quality | What the source said about the reading. `unqualified` means nobody said anything — not that anybody checked. About the value, not the signal. |
 | Protocol | The wire protocol decoded from — `alert`, `alert2`, `arro` (backfill). |
 | Source | The transport — `http`, `mqtt`, `manual`, `backfill`, `serial`. |
 | Path | The repeater or base that delivered the kept copy, when the adapter knew. |
+| Freq | The frequency the kept copy was heard on, in MHz. |
+| Signal | How strongly the kept copy was heard: **dBm** from a radio or an ERT-A2, **dBFS** from an RTL-SDR — which is not calibrated in dBm, so a dBFS figure compares only within one receiver at one gain. |
+| SNR | The kept copy's signal over the receiver's own noise floor, in dB — the figure that compares between receivers, and the nearest a base station gets to a measured fade margin. |
 | Copies | How many times the reading was heard in total; hover for the paths. |
+
+**Freq, Signal and SNR are there when the base station said** — a Raspberry Pi
+running RPi ALERT and the Serial Monitor's receiver cards do; an MQTT gateway, a
+backfill and every reading stored before `0050` do not, and read `—`. They
+describe the kept copy, the one Path names: a reading heard by three receivers is
+one row, the other two are counted in Copies, and their own frequency and signal
+are not kept here. Every copy, with its level, is what the
+[Reception Map](reception-map.md) keeps (signed in). The **Freq (MHz)** filter
+under *More filters* matches exactly — `152.4` finds 152.400 and not 152.4125.
 
 **Station names are a resolution, not a claim the message made.** The address
 is the identity (a packet carries an address; which station that is may be
@@ -114,7 +126,9 @@ where the slots that station has actually been heard on are listed for you.
 Two views of the same table. **Narrow** opens with the field set — time,
 station number, station name, AlertID, raw value — for a phone held in a
 paddock; **wide** opens with the full record. The **Columns** button decides
-what each view keeps, per view, remembered on this device; the station-name
+what each view keeps, per view, remembered on this device — and a column added
+to the tab after you last chose (Freq, Signal and SNR were) joins the wide view
+anyway, since you never said no to it; the station-name
 column is width-capped so one long site name cannot spend the whole of a small
 screen. **Export CSV** always writes every column of every fetched row,
 whatever the views are hiding — the narrow view is a reading aid, not a

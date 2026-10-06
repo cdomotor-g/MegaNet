@@ -181,7 +181,7 @@ its cache at all (`PGRST002`).
 | `meganet.auth_user_sync()` | `AFTER INSERT/UPDATE` on `auth.users`: keeps `app_user` in step. Never writes `role`. |
 | `meganet.email_may_sign_in(text)` | Yes/no for one address, callable anonymously so the sign-in panel can refuse before emailing. Deliberately an oracle — see `docs/access.md`. |
 | `meganet.whoami()` | Identity and write permission as the database sees them. What the app shows in the header and the Data source panel. |
-| `meganet.reading` | Every field-station reading. `addr` is the identity and the primary key is the deduplication — see **Telemetry**, below. `ingest_token_id` names the ingest point it came in through, or is null for a backfill or a manual edit. |
+| `meganet.reading` | Every field-station reading. `addr` is the identity and the primary key is the deduplication — see **Telemetry**, below. `ingest_token_id` names the ingest point it came in through, or is null for a backfill or a manual edit. `freq_mhz`, `rssi_dbm`, `level_dbfs` and `snr_db` (`0050`) say on what frequency, and how strongly, the kept copy was heard — null when the adapter did not say. |
 | `meganet.reading_raw` | One row per `ingest()` call, holding the payload exactly as submitted. Ages out in 30 days. **The one table `anon` cannot read.** |
 | `meganet.reading_hourly`, `meganet.reading_daily` | The rollups, kept forever. Sums rather than means, so a day re-aggregates from its hours exactly — and goes on being right after the readings are gone. |
 | `meganet.ingest_source`, `meganet.protocol`, `meganet.quality`, `meganet.unit` | The four vocabularies a reading is validated against. A new transport or protocol is an `insert` here, not a migration. |
@@ -191,6 +191,7 @@ its cache at all (`PGRST002`).
 | `meganet.roll_up(timestamptz)` | Rebuild the rollups for every bucket touched since the watermark. Idempotent. |
 | `meganet.retain(int)` | Roll up, then age out. The one retention job. |
 | `meganet.as_ts()`, `meganet.as_num()`, `meganet.code_for()` | `ingest()`'s validators, split out so "be liberal in what you accept" is written once and a bad field produces a sentence rather than a cast error. |
+| `meganet.as_num_within(jsonb, numeric, numeric)` | Their lenient sibling (`0050`): a number between two bounds, else null, never an error — for a reading's frequency and signal, which the reading stands without. |
 | `meganet.ingest_token` | One row per **ingest point** — a base station, a gateway, the MQTT bridge — not per field station: an ingest point writes for every station it can hear (`0012`). Only `token_hash` is stored. RLS on, no policy — reachable with the service key or a direct connection, same trade as `editor_allow`. |
 | `meganet.create_ingest_token(text, text, int, int)` | Mints a token for one ingest point and returns it once. Its second argument is `p_host_station_id` — where the ingest point *lives*, not what it may write. `EXECUTE` revoked from `public`, granted only to `service_role`. |
 | `meganet.current_ingest_token_id()` | The ingest point this request proved it is, from a transaction-local setting `ingest_http()` publishes. Backs the `ingest_token_id` default on `reading` and `reading_raw`, which is why it is granted widely: it reads one setting belonging to the caller's own request and nothing else. |
@@ -543,8 +544,9 @@ select meganet.ingest('[{"alert_id": 6128, "reading_ts": "2026-08-12T04:15:00Z",
 ```
 
 An array, an object with a `readings` array, or a single reading object are all
-accepted. Envelope keys — `source`, `protocol`, `path`, `received_at`, `keep_raw`
-— are defaults that any row may override, so one batch can carry a mixed archive.
+accepted. Envelope keys — `source`, `protocol`, `path`, `received_at`, `keep_raw`,
+and since `0050` `freq_mhz` — are defaults that any row may override, so one batch
+can carry a mixed archive.
 
 **A bad row and a bad envelope get different answers, on purpose.** A row that
 fails validation comes back as `{"i": 4, "why": "…"}` with the rest of the batch
@@ -564,6 +566,19 @@ appends its path to `dup_paths`.
 A station that transmits both ways has two addresses, and they do not deduplicate
 against each other. That is correct — they are two transmissions — and it is the
 thing `path` and `dup_count` exist to make visible.
+
+**How the kept copy was heard rides on the reading (`0050`).** `freq_mhz`, and the
+signal in whichever terms the receiver measures it: `rssi_dbm` from a radio or an
+ERT-A2, `level_dbfs` from an RTL-SDR (which is not calibrated in dBm, so its level
+compares only within one receiver at one gain), and `snr_db` — over the receiver's
+own noise floor — from either, the one figure comparable between receivers. They
+describe the copy `path` names; a further copy's path goes to `dup_paths` and its
+signal does not, because per-copy detail is `meganet.reception`'s (`0047`). They are
+also the one part of a reading that never costs it: a value that is missing, not a
+number or implausible is stored as null by `meganet.as_num_within()`, where a bad
+`value_raw` or `unit` refuses the row with a sentence. Note that `channel` is not a
+radio channel — it names the sensor behind a station number — and `quality` is what
+the source asserts about the value, not how loud it was.
 
 **`station_id` is never taken from the payload.** It is resolved by
 `meganet.resolve_station()`, which answers only when exactly one live station

@@ -41,6 +41,16 @@ refusing bad ones by index, a retried batch stored once, GPS exact and everythin
 approximate (the table refuses otherwise), no position stored as none, and a window
 readable by an editor and not by anon.
 
+`check_reading_signal.sql` holds `0050`, a reading's frequency and signal: 16 checks
+— `freq_mhz`, `rssi_dbm`, `level_dbfs` and `snr_db` stored from each reading (the
+frequency from the envelope too), readable by anon like the rest of a reading; a
+frequency in hertz, an RSSI of +300, words, NaN or an underflowing 1e-50 stored as
+null and the reading kept, never refused; a duplicate keeping the first copy's
+frequency and signal while its path goes to `dup_paths`; a Raspberry Pi's batch
+through `ingest_http()` with a token; and the table refusing out-of-range values
+written round `ingest()`. Red on a missing round-before-cast, a dropped envelope
+frequency and a strict RSSI parse.
+
 `check_ingest_token_admin.sql` holds `0046`, the Admin tab's token panel: 15 checks
 signed in through 0005's triggers as anon, an editor and an administrator — only the
 administrator may list, mint or revoke; a minted token is shown once and kept as its

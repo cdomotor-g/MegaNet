@@ -1232,6 +1232,12 @@ const HELP = {
       + 'on address, instant and value, and counts the further copies — so a reading heard '
       + 'direct and via two repeaters is one row saying ×3, and the copies\' paths are in the '
       + 'detail drawer. That count is the network\'s real path redundancy, visible nowhere else.',
+      '<strong>Freq, Signal and SNR are how the kept copy was heard</strong> — when the base '
+      + 'station said: a Raspberry Pi and the Serial Monitor do; an MQTT gateway or a backfill '
+      + 'does not. Signal is dBm from a radio or an ERT-A2, and dBFS from an RTL-SDR, which is '
+      + 'not calibrated in dBm — so compare SNR between receivers, and dBFS only within one. '
+      + '<strong>Channel is not the radio channel</strong>: it names the sensor behind a station '
+      + 'number, and Quality is what the source said about the value, not how loud it was.',
       'A station name here is a <strong>resolution, not a claim the message made</strong>. The '
       + 'datastore backfills <code>station_id</code> where the address is unambiguous; where it '
       + 'is not, the row shows the first candidate and says how many more share the address — '
@@ -2261,7 +2267,7 @@ const DB_SCHEMA = 'meganet';
 // 48: 0047 (receptions) and 0048 (a base station asking for its token) were
 // applied live together — 0047 had waited since its own commit, when the
 // connection timed out on every write.
-const DB_SCHEMA_VERSION = 49;
+const DB_SCHEMA_VERSION = 50;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

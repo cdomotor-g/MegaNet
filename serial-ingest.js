@@ -124,15 +124,30 @@ const SerialIngest = (function () {
 
   // ── readings in ───────────────────────────────────────────────────────────
 
-  // From a card: [{ alert_id, value_raw, ts (ms) | null, protocol, line? }].
-  // `ts` null is a reading with no time this card can stand behind.
+  // How a reading was heard (0050): the frequency, and the signal in whatever
+  // terms the card measures it — dBm off a radio or an ERT-A2, dBFS and SNR off
+  // an RTL-SDR. Each a finite number or left out: the database stores a bad one
+  // as null anyway, but a queue kept across reloads is no place to carry NaN.
+  const HEARD = ['freq_mhz', 'rssi_dbm', 'level_dbfs', 'snr_db'];
+  function heard(it) {
+    const o = {};
+    for (const k of HEARD) {
+      const v = it[k] == null || it[k] === '' ? NaN : Number(it[k]);
+      if (Number.isFinite(v)) o[k] = +v.toFixed(k === 'freq_mhz' ? 6 : 2);
+    }
+    return o;
+  }
+
+  // From a card: [{ alert_id, value_raw, ts (ms) | null, protocol, line?,
+  // freq_mhz?, rssi_dbm?, level_dbfs?, snr_db? }]. `ts` null is a reading with
+  // no time this card can stand behind.
   function add(c, items) {
     if (!c || isDemo(c) || !RECEIVER[kindOf(c)]) return;
     const g = state_(c);
     if (!g.on) return;
     items.forEach(it => {
       if (it.ts == null || !isFinite(it.ts)) { g.skipped++; return; }
-      g.queue.push({ alert_id: it.alert_id, reading_ts: Math.round(it.ts), value_raw: it.value_raw, protocol: it.protocol || 'alert' });
+      g.queue.push(Object.assign({ alert_id: it.alert_id, reading_ts: Math.round(it.ts), value_raw: it.value_raw, protocol: it.protocol || 'alert' }, heard(it)));
       if (it.line) { g.frames.push(it.line); if (g.frames.length > 200) g.frames.shift(); }
     });
     if (g.queue.length > QUEUE_MAX) { g.dropped += g.queue.length - QUEUE_MAX; g.queue.splice(0, g.queue.length - QUEUE_MAX); }
@@ -172,7 +187,7 @@ const SerialIngest = (function () {
     const body = { payload: {
       source: 'serial', protocol: proto, path: 'serial-monitor/' + point(c).pointId,
       frame: g.frames.join('\n').slice(-32768) || undefined,
-      readings: same.map(r => ({ alert_id: r.alert_id, reading_ts: r.reading_ts, value_raw: r.value_raw })),
+      readings: same.map(r => Object.assign({ alert_id: r.alert_id, reading_ts: r.reading_ts, value_raw: r.value_raw }, heard(r))),
     } };
     let res, out;
     try {

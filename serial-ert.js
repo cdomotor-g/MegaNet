@@ -194,7 +194,9 @@ const SerialErt = (function () {
     if (f.hdr.frameOk === 0) return;
     const recs = f.records.filter(r => r.ok);
     if (!recs.length) return;
-    SerialIngest.add(c, recs.map((r, i) => ({ alert_id: r.alertId, value_raw: r.value, ts, protocol: 'alert2', line: i ? null : text })));
+    // The frame's RSSI is the ERT-A2's own, in dBm (0050); it does not say its frequency.
+    SerialIngest.add(c, recs.map((r, i) => ({ alert_id: r.alertId, value_raw: r.value, ts, protocol: 'alert2', line: i ? null : text,
+      rssi_dbm: f.hdr.rssi })));
   }
   function frameTime(c, f) {
     const sod = f.payload.sod, live = SerialIngest.arrival(c);

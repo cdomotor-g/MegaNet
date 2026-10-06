@@ -1160,6 +1160,11 @@ jobs:
       # token-checked, a retry stored once, editors only, GPS the only exact.
       - name: check_receptions.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_receptions.sql
+      # A reading's frequency and signal (0050): stored from the reading or
+      # its envelope, readable by anon like the rest of it, the first copy's
+      # kept on a duplicate — and a bad one stored as null, never a refusal.
+      - name: check_reading_signal.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_reading_signal.sql
       # A base station asking for its token (0048): anon may ask, only the hash
       # of the device's own token is kept, only an administrator approves —
       # and the approved token opens the door with nothing to collect.

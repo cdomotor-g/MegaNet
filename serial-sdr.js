@@ -232,7 +232,12 @@ const SerialSdr = (function () {
     // arrival, and never from the demo band or a replayed capture.
     if (typeof SerialIngest !== 'undefined' && m.readings.length) {
       const ts = SerialIngest.arrival(c);
-      SerialIngest.add(c, m.readings.map(r => ({ alert_id: r.sensorId, value_raw: r.value, ts, protocol: 'alert' })));
+      // How it was heard (0050): the channel decoded, and the burst's level and
+      // its height over the noise floor — dBFS, the stick's own scale.
+      const pk = m.burst ? m.burst.peakDb : null, nf = m.burst ? m.burst.nfDb : null;
+      const heard = { freq_mhz: (c.cfg.freq + (c.source === 'demo' ? 0 : c.cfg.offsetHz)) / 1e6,
+        level_dbfs: pk, snr_db: pk != null && nf != null ? pk - nf : null };
+      SerialIngest.add(c, m.readings.map(r => Object.assign({ alert_id: r.sensorId, value_raw: r.value, ts, protocol: 'alert' }, heard)));
     }
     (m.shadows || []).forEach(s => note(c, 'Ignored ' + s.sensorId + ' = ' + s.value + ' (' + s.votes + ' votes): a bit-flip shadow of ' + s.of + '.', ''));
     mark(c, 'readings', 'trace', 'chips', 'timeline');
@@ -921,7 +926,9 @@ const SerialSdr = (function () {
         level_dbfs: r.peak_dbfs, detail });
       // To MegaNet when the card is set to send: by the time worked out above,
       // or — a history line with no clock — counted and skipped, never "now".
-      if (typeof SerialIngest !== 'undefined') SerialIngest.add(c, [{ alert_id: r.id, value_raw: r.value, ts: t, protocol: 'alert' }]);
+      if (typeof SerialIngest !== 'undefined') SerialIngest.add(c, [{ alert_id: r.id, value_raw: r.value, ts: t, protocol: 'alert',
+        freq_mhz: r.freq_hz ? r.freq_hz / 1e6 : null, level_dbfs: r.peak_dbfs,
+        snr_db: r.peak_dbfs != null && r.nf_dbfs != null ? r.peak_dbfs - r.nf_dbfs : null }]);
       mark(c, 'readings', 'chips', 'timeline');
       return;
     }
