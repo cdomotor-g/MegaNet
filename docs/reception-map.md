@@ -44,6 +44,44 @@ copies on the Reception Map* hands over the readings it already holds.
 The map reads this browser's log, a loaded file, the stored readings, the
 receptions table (*Receptions table (editors)*), or a **demo drive**.
 
+## Site surveys
+
+Is a hill worth a repeater, or a depot a base station? Leave a receiver there
+for a day or three and see. An [RPi ALERT](https://github.com/cdomotor-g/RPi_ALERT)
+base station does it as a **site survey** (its *Survey* page, or `survey = <name>`
+on its SD card; the kit list — receivers, a clock that survives a power cut,
+power for the days — is in its `docs/survey.md`). It needs no network at the site:
+everything it hears is kept on its card, and when it is next on a network it sends
+it here as **receptions** tagged with the survey (`report_receptions`, `0047`,
+which takes frames of any age and keeps them). Its readings stay on the Pi unless
+the survey says otherwise: a reading posted days late marks its station *last
+seen* now, and is stored beside the copy the network already has, since readings
+deduplicate on the exact moment and no two receivers time a burst the same.
+
+*Site surveys (editors)* lists them — the site, the base station, when, how much
+it heard, where. Pick one and:
+
+- **its receptions become the map's source** (this browser's own log is unticked),
+  so the map and the bad-copy analysis are of that site alone;
+- **a table of every station it heard**: good and bad frames, *heard of sent* — of
+  the transmissions the network stored from that address while the site was
+  listening, how many the site heard (the same value within 10 s; copies within
+  5 s are one transmission; *listening* is any frame of the site's within 20
+  minutes, so a night with the Pi switched off is not held against the site) —
+  *only here*, the transmissions the site heard that no base station stored (the
+  case for building there), the median signal and its spread (dBm off a radio,
+  dBFS off an RTL-SDR — relative to the stick's gain, so compare sites surveyed
+  with the same stick and gain), the median SNR, and the channels;
+- the stations the network heard while the site listened and the site did not,
+  on request;
+- **a line on the map from the site to each station**, coloured by how much of it
+  the site caught (blue: heard only there);
+- the table as **CSV**, for a report.
+
+`survey_list()`, `survey_receptions()` and `survey_summary()` (`0051`) do the
+work in the database — the last joins every frame of the survey against the
+readings of the same days — and, like the receptions, are for editors only.
+
 ## How it finds the bad repeater
 
 1. **Copies of one transmission.** The copies of one frame land within seconds

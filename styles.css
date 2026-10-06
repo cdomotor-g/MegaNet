@@ -9334,6 +9334,9 @@ code {
 .rx-sw-bad { background: transparent; border: 2px dashed var(--bad); }
 .rx-sw-rep { background: var(--warn); border: 1px solid var(--text); }
 .rx-sw-cen { background: transparent; border: 2px dashed var(--bad); width: 14px; height: 14px; }
+.rx-sw-site { background: var(--accent); border: 2px solid var(--text); width: 14px; height: 14px; }
+.rx-pct { display: inline-block; min-width: 3.2em; padding: 0 .35em; border-radius: 4px; font-size: .85em; text-align: right;
+  background: color-mix(in srgb, var(--dot, var(--muted)) 22%, transparent); }
 tr.rx-sel th, tr.rx-sel td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .adm-tok-value { display: inline-block; max-width: 100%; overflow-wrap: anywhere; font-size: .85rem; user-select: all; }
 /* Base stations asking for a token (0048): the code is what gets matched

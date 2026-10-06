@@ -75,6 +75,16 @@
 // editors: every copy, and where it was heard); and a demo drive, built
 // against the real registry with one repeater made to flip bits, so the method
 // can be seen before anyone drives.
+//
+// And SITE SURVEYS (0051): a receiver — an RPi ALERT base station — left at a
+// candidate repeater or base-station site for a day or three, network or not,
+// which sends what it heard there, when it is next on a network, as receptions
+// tagged with the survey. Picked from the list, a survey's receptions become
+// the database source (so the map and the bad-copy analysis are of that site
+// alone), and survey_summary() sets each address the site heard beside what
+// the network stored from it over the same days: how many of its transmissions
+// the site caught while it listened, and how many the site heard that no base
+// station stored — the case for building there.
 
 const Reception = (function () {
   const SAME_MS = 12000;            // a copy on the same address lands within this of the first
@@ -93,6 +103,7 @@ const Reception = (function () {
   const S = {
     useLocal: true, loaded: [], loadedName: '', db: [], dbNote: '', readings: [], rdNote: '', rdSeq: 0, demo: [],
     window: 'all', filter: '', onlyBad: false, sel: null, map: null, layer: null, view: null, off: null, timer: 0,
+    surveys: null, svNote: '', survey: null, svId: null, svAll: false, svSeq: 0,
   };
 
   // ── bits ──────────────────────────────────────────────────────────────────
@@ -620,7 +631,145 @@ const Reception = (function () {
     return out;
   }
   function loadDemo() { S.demo = demoDrive(); S.note = S.demo.length ? 'Demo drive: ' + S.demo.length + ' receptions, made up, with one repeater flipping bits. Which one does the method name?' : 'No two repeaters in the registry fit a demo drive.'; refresh(); }
-  function clearLoaded() { S.loaded = []; S.db = []; S.readings = []; S.rdSeq++; S.demo = []; S.loadedName = ''; S.note = ''; S.dbNote = ''; S.rdNote = ''; refresh(); }
+  function clearLoaded() { S.loaded = []; S.db = []; S.readings = []; S.rdSeq++; S.demo = []; S.loadedName = ''; S.note = ''; S.dbNote = ''; S.rdNote = ''; S.svSeq++; S.svId = null; S.survey = null; refresh(); }
+
+  // ── site surveys (0051) ───────────────────────────────────────────────────
+
+  function dbErr(err, what) {
+    return err.status === 404 ? 'The database does not keep site surveys yet — apply db/migrations/0051_site_surveys.sql.'
+      : err.status === 401 || err.status === 403 || /editor/i.test(err.message) ? 'Site surveys are for editors — sign in to read them.'
+      : 'Could not read ' + what + ': ' + err.message;
+  }
+
+  async function listSurveys() {
+    S.svNote = 'Asking the database for site surveys…'; refresh();
+    try {
+      const r = await dbRpc('survey_list', {});
+      S.surveys = Array.isArray(r) ? r : [];
+      S.svNote = S.surveys.length ? '' : 'No site surveys yet. Start one on an RPi ALERT base station (its Survey page, or survey = <name> on its SD card); what it hears arrives here when it is next on a network.';
+    } catch (err) { S.surveys = S.surveys || []; S.svNote = dbErr(err, 'site surveys'); }
+    refresh();
+  }
+
+  // One survey: its summary, and its receptions as the database source.
+  async function openSurvey(id) {
+    const seq = ++S.svSeq;
+    S.svId = id; S.survey = null;
+    S.svNote = 'Reading the survey…'; refresh();
+    try {
+      const [sum, rx] = await Promise.all([dbRpc('survey_summary', { p_survey: id }), dbRpc('survey_receptions', { p_survey: id, p_limit: 50000 })]);
+      if (seq !== S.svSeq) return;
+      S.survey = sum || null;
+      S.db = (Array.isArray(rx) ? rx : []).map(e => Object.assign({}, e, { t: Date.parse(e.heard_at), src: 'db' }));
+      S.dbNote = S.db.length.toLocaleString() + ' receptions from the survey' + (sum && sum.name ? ' “' + sum.name + '”' : '') + '.'
+        + (sum && S.db.length < sum.frames ? ' The first ' + S.db.length.toLocaleString() + ' of ' + sum.frames.toLocaleString() + ' are on the map; the table counts them all.' : '');
+      // The site alone: not this browser's own log, and over the survey's days.
+      S.useLocal = false; S.window = 'all'; S.view = null; S.sel = null;
+      S.svNote = sum ? '' : 'That survey has no receptions.';
+    } catch (err) { if (seq === S.svSeq) S.svNote = dbErr(err, 'the survey'); }
+    refresh();
+  }
+  function closeSurvey() { S.svSeq++; S.svId = null; S.survey = null; S.db = []; S.dbNote = ''; S.view = null; refresh(); }
+  function setSurveyAll(v) { S.svAll = !!v; refresh(); }
+
+  function pct(n, d) { return d ? Math.round(100 * n / d) : null; }
+  function svRows() {
+    const v = S.survey;
+    if (!v) return [];
+    const site = v.lat != null && v.lon != null ? { lat: v.lat, lon: v.lon } : null;
+    const ids = filterIds();
+    return (v.stations || []).map(r => {
+      const st = stationNear(r.alert_id, site);
+      return Object.assign({}, r, { st, km: st && site && st.lat != null && st.lon != null ? km(site.lat, site.lon, st.lat, st.lon) : null,
+        pct: pct(r.heard_of_sent, r.sent) });
+    }).filter(r => (S.svAll || r.ok > 0) && (!ids || ids.has(r.alert_id)));
+  }
+  // The signal a row was heard at: dBm off a radio, else dBFS off an RTL-SDR.
+  function svLevel(r) {
+    const a = r.rssi_dbm || r.level_dbfs;
+    if (!Array.isArray(a)) return null;
+    return { p10: a[0], p50: a[1], p90: a[2], unit: r.rssi_dbm ? 'dBm' : 'dBFS' };
+  }
+  function pctColor(p) {
+    return p == null ? cssVar('--accent', '#1f6feb') : p >= 90 ? cssVar('--rssi-strong', '#137a3b') : p >= 70 ? cssVar('--rssi-good', '#5a9e18')
+      : p >= 40 ? cssVar('--rssi-fair', '#b98511') : p > 0 ? cssVar('--rssi-marginal', '#d4691f') : cssVar('--rssi-weak', '#b3261e');
+  }
+
+  function surveyListHtml() {
+    if (!S.surveys || !S.surveys.length) return '';
+    const rows = S.surveys.map(v => {
+      const sel = S.svId === v.id;
+      return '<tr' + (sel ? ' class="rx-sel"' : '') + '><th scope="row"><button type="button" class="link-btn" aria-pressed="' + sel + '" onclick="Reception.openSurvey(\'' + escAttr(v.id) + '\')">'
+        + esc(v.name || v.id) + '</button></th><td class="small">' + esc(v.token_label || '') + '</td>'
+        + '<td class="qs-time">' + esc(when(Date.parse(v.first_heard), true)) + ' – ' + esc(when(Date.parse(v.last_heard), true)) + '</td>'
+        + '<td class="qs-num">' + Number(v.ok).toLocaleString() + '</td><td class="qs-num">' + v.addresses + '</td>'
+        + '<td class="small col-optional">' + (v.lat != null ? Number(v.lat).toFixed(4) + ', ' + Number(v.lon).toFixed(4) + (v.gps ? ' (GPS)' : ' (approximate)') : '—') + '</td></tr>';
+    }).join('');
+    return '<div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="rx-h-sv"><table class="qs-table">'
+      + '<caption class="sr-only">Site surveys, newest first</caption>'
+      + '<thead><tr><th scope="col">Site</th><th scope="col">Base station</th><th scope="col">Heard</th><th scope="col">Good frames</th>'
+      + '<th scope="col">Addresses</th><th scope="col" class="col-optional">Where</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function surveyHtml() {
+    const v = S.survey;
+    if (!v) return '';
+    const rows = svRows();
+    const all = v.stations || [];
+    const sent = all.reduce((a, r) => a + r.sent, 0), got = all.reduce((a, r) => a + r.heard_of_sent, 0), only = all.reduce((a, r) => a + r.only_here, 0);
+    const unheard = all.filter(r => !r.ok && r.sent).length;
+    const c = (k, val, cls) => '<div class="qs-chip' + (cls ? ' ' + cls : '') + '"><span class="qs-chip-k">' + esc(k) + '</span><span class="qs-chip-v">' + val + '</span></div>';
+    const chans = (v.points || []).map(p => (p.freq_mhz ? p.freq_mhz + ' MHz' : esc(p.point_id)) + ' <span class="qs-dim">' + p.ok + '</span>').join(' · ');
+    const body = rows.map(r => {
+      const lv = svLevel(r);
+      return '<tr><th scope="row">' + stLink(r.st) + '</th><td class="qs-num">' + r.alert_id + '</td><td class="qs-num col-optional">' + fmtKm(r.km) + '</td>'
+        + '<td class="qs-num">' + r.ok + (r.bad ? ' <span class="qs-dim" title="' + r.bad + ' bad">+' + r.bad + '</span>' : '') + '</td>'
+        + '<td class="qs-num">' + (r.sent ? r.heard_of_sent + ' / ' + r.sent + ' <span class="rx-pct" style="--dot:' + pctColor(r.pct) + '">' + r.pct + '%</span>' : '<span class="qs-dim">—</span>') + '</td>'
+        + '<td class="qs-num">' + (r.only_here || '') + '</td>'
+        + '<td class="qs-num"' + (lv ? ' title="10–90 %: ' + lv.p10 + ' … ' + lv.p90 + ' ' + lv.unit + '"' : '') + '>' + (lv ? lv.p50 + ' ' + lv.unit : '—') + '</td>'
+        + '<td class="qs-num">' + (r.snr_db != null ? r.snr_db + ' dB' : '—') + '</td>'
+        + '<td class="small col-optional"' + (r.last_heard ? ' title="last heard ' + escAttr(when(Date.parse(r.last_heard), true)) + '"' : '') + '>' + esc((r.freqs || []).join(', ')) + '</td></tr>';
+    }).join('');
+    return '<div class="panel">'
+      + '<div class="panel-header"><h3 id="rx-h-svs">Site survey: ' + esc(v.name || v.id) + '</h3>'
+      + '<button class="ghost" onclick="Reception.exportSurveyCsv()">Export CSV</button><button class="ghost" onclick="Reception.closeSurvey()">Close</button></div>'
+      + '<p class="small">' + esc(v.token_label || '') + ' · ' + esc(when(Date.parse(v.first_heard), true)) + ' – ' + esc(when(Date.parse(v.last_heard), true))
+      + ' · listening about ' + v.listening_h + ' h · ' + (v.lat != null ? Number(v.lat).toFixed(5) + ', ' + Number(v.lon).toFixed(5) + (v.gps ? ' (GPS)' : ' (approximate — typed in on the Pi)') : 'no position')
+      + (chans ? ' · ' + chans : '') + '</p>'
+      + '<div class="qs-status">'
+      + c('Good frames', Number(v.ok).toLocaleString()) + c('Bad', Number(v.bad).toLocaleString(), v.bad ? 'warn' : '')
+      + c('Undecoded bursts', Number(v.undecoded).toLocaleString())
+      + c('Addresses heard', String(all.filter(r => r.ok).length))
+      + c('Of all the network stored', sent ? got.toLocaleString() + ' of ' + sent.toLocaleString() + ' (' + pct(got, sent) + '%)' : 'nothing to compare')
+      + c('Heard only here', only.toLocaleString(), only ? 'ok' : '')
+      + '</div>'
+      + (unheard ? '<label class="ser-check"><input type="checkbox" ' + (S.svAll ? 'checked' : '') + ' onchange="Reception.setSurveyAll(this.checked)"> also the '
+        + unheard + ' address' + (unheard === 1 ? '' : 'es') + ' the network stored while this site listened and did not hear</label>' : '')
+      + (rows.length ? '<div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="rx-h-svs"><table class="qs-table">'
+        + '<caption class="sr-only">What the site heard, address by address, most heard first</caption>'
+        + '<colgroup><col style="width:auto"><col style="width:5.5rem"><col style="width:4.75rem"><col style="width:4.5rem"><col style="width:8.25rem">'
+        + '<col style="width:6.25rem"><col style="width:6.25rem"><col style="width:4.75rem"><col style="width:5.5rem"></colgroup>'
+        + '<thead><tr><th scope="col">Station</th><th scope="col">Address</th><th scope="col" class="col-optional">Away</th><th scope="col" title="Good frames (+ bad)">Good</th>'
+        + '<th scope="col">Heard of sent</th><th scope="col">Only here</th><th scope="col" title="Median; hover a cell for the 10–90 % spread">Signal</th><th scope="col">SNR</th>'
+        + '<th scope="col" class="col-optional" title="Hover a cell for when it was last heard">MHz</th></tr></thead><tbody>' + body + '</tbody></table></div>'
+        : '<p class="qs-dim small">Nothing matches the station filter.</p>')
+      + '<p class="qs-hint">Heard of sent: of the transmissions the network stored from that address while the site was listening (any frame of its within 20 minutes), how many the site heard — the same value within '
+      + v.match_s + ' s. Copies within 5 s are one transmission. Only here: transmissions the site heard that no base station stored. Signal: dBm off a radio, dBFS off an RTL-SDR (relative to its own gain — compare stations at one site, and sites surveyed with the same stick and gain). '
+      + 'The map draws a line from the site to each station heard, coloured by how much of it the site caught.</p></div>';
+  }
+
+  function exportSurveyCsv() {
+    const v = S.survey;
+    if (!v) return;
+    const q = (x) => { const t = x == null ? '' : String(x); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const head = ['survey', 'site', 'station_id', 'station', 'alert_id', 'km_from_site', 'good', 'bad', 'sent', 'heard_of_sent', 'heard_pct', 'only_here', 'signal_p10', 'signal_p50', 'signal_p90', 'signal_unit', 'snr_db', 'mhz', 'first_heard', 'last_heard'];
+    const lines = [head.join(',')].concat(svRows().map(r => {
+      const lv = svLevel(r) || {};
+      return [v.id, v.name, r.st && r.st.id, r.st && r.st.name, r.alert_id, r.km == null ? '' : r.km.toFixed(1), r.ok, r.bad, r.sent, r.heard_of_sent, r.pct, r.only_here,
+        lv.p10, lv.p50, lv.p90, lv.unit, r.snr_db, (r.freqs || []).join(' '), r.first_heard, r.last_heard].map(q).join(',');
+    }));
+    dlText('site-survey-' + String(v.name || v.id).replace(/[^\w.-]+/g, '-').slice(0, 40) + '.csv', lines.join('\n') + '\n');
+  }
 
   // ── rendering ─────────────────────────────────────────────────────────────
 
@@ -636,15 +785,21 @@ const Reception = (function () {
   }
   function fmtKm(d) { return d == null ? '—' : d < 10 ? d.toFixed(1) + ' km' : Math.round(d) + ' km'; }
 
-  function filtered(a) {
+  // The addresses the Station-or-address box names; null when it is empty.
+  function filterIds() {
     const q = S.filter.trim().toLowerCase();
-    if (!q) return a;
+    if (!q) return null;
     const R = registry();
     const ids = new Set();
     q.split(/[\s,]+/).forEach(tok => {
       if (/^\d+$/.test(tok)) ids.add(+tok);
       R.stations.forEach(s => { if ((s.name || '').toLowerCase().includes(tok) || String(s.station_number || '') === tok) stationAlertIds(s).forEach(x => ids.add(x)); });
     });
+    return ids;
+  }
+  function filtered(a) {
+    const ids = filterIds();
+    if (!ids) return a;
     return { ...a, bad: a.bad.filter(b => ids.has(b.truth.alert_id) || ids.has(b.e.alert_id)) };
   }
 
@@ -749,6 +904,7 @@ const Reception = (function () {
           <button class="ghost" onclick="Reception.chooseFile()">Load a log file…</button>
           <button class="ghost" onclick="Reception.fromStored()" title="Every base station's stored ALERT readings for the time picked — public, no positions">From the stored readings</button>
           <button class="ghost" onclick="Reception.fromDb()" title="Every copy each receiver sending to MegaNet heard, with where — editors only">Receptions table (editors)</button>
+          <button class="ghost" onclick="Reception.listSurveys()" title="A receiver left at a candidate repeater or base-station site: what it heard there, beside what the network received — editors only">Site surveys (editors)</button>
           <button class="ghost" onclick="Reception.loadDemo()">Demo drive</button>
           ${S.loaded.length || S.db.length || S.readings.length || S.demo.length ? '<button class="ghost" onclick="Reception.clearLoaded()">Clear loaded</button>' : ''}
           <button class="ghost" onclick="Reception.exportCsv()">Export CSV</button>
@@ -764,10 +920,15 @@ const Reception = (function () {
         <p class="small" id="rx-rd-note" role="status">${esc(S.rdNote)}</p>
         ${chips(a)}
       </div>
+      ${S.surveys || S.svNote ? '<div class="panel"><div class="panel-header"><h3 id="rx-h-sv">Site surveys</h3></div>'
+        + '<p class="sub">A receiver left at a candidate repeater or base-station site for a day or three — an RPi ALERT base station on its Survey page — sends what it heard there when it is next on a network. Pick one to see each station it heard, how much of what the network received it caught, and what it heard that no base station did.</p>'
+        + (S.svNote ? '<p class="small" role="status">' + esc(S.svNote) + '</p>' : '') + surveyListHtml() + '</div>' : ''}
+      ${surveyHtml()}
       <div class="panel">
         <div class="rx-map" id="rx-map" role="region" aria-label="Reception map"></div>
         <div class="qs-legend">${BANDS.map((b, i) => '<span><i class="qs-sw rx-sw" style="--dot: var(' + b[1] + ')"></i>' + ['> −90', '−90 to −100', '−100 to −107', '−107 to −112', '< −112'][i] + ' dBm</span>').join('')}
-          <span><i class="qs-sw rx-sw rx-sw-bad"></i>bad copy</span><span><i class="qs-sw rx-sw rx-sw-rep"></i>repeater</span><span><i class="qs-sw rx-sw rx-sw-cen"></i>where bad copies are loudest</span></div>
+          <span><i class="qs-sw rx-sw rx-sw-bad"></i>bad copy</span><span><i class="qs-sw rx-sw rx-sw-rep"></i>repeater</span><span><i class="qs-sw rx-sw rx-sw-cen"></i>where bad copies are loudest</span>
+          ${S.survey ? '<span><i class="qs-sw rx-sw rx-sw-site"></i>survey site</span><span>lines: share of a station\'s transmissions the site heard — ≥ 90 %, ≥ 70 %, ≥ 40 %, less, none; blue: heard only here</span>' : ''}</div>
         <p class="qs-hint">Each dot is where a receiver was when it heard something. Pick a repeater below to draw lines from it to the bad copies it could have carried.
           ${a.receptions && !a.placed ? (S.readings.length
             ? '<strong>Stored readings carry no position</strong> — the map shows the suspect repeaters only, and the pass-range ranking below works without. Each reading is placed by the area its receiver hears, which is enough to rule out repeaters too far away to have been heard. A drive with a GPS card is what fills the map.'
@@ -842,6 +1003,25 @@ const Reception = (function () {
       L.circleMarker([a.centroid.lat, a.centroid.lon], { radius: 12, color: cssVar('--bad', '#b3261e'), weight: 3, fill: false, dashArray: '6 4' })
         .bindPopup('Bad copies are loudest here (' + a.centroid.n + ' placed)').addTo(layer);
     }
+    // A site survey: the site, and a line to each station it heard, coloured by how much of it the site caught.
+    const v = S.survey;
+    if (v && v.lat != null && v.lon != null) {
+      svRows().forEach(r => {
+        if (!r.st || r.st.lat == null || r.st.lon == null) return;
+        const col = pctColor(r.sent ? r.pct : null);
+        const lv = svLevel(r);
+        L.polyline([[v.lat, v.lon], [r.st.lat, r.st.lon]], { color: col, weight: r.ok ? 2.5 : 1.5, opacity: .75, dashArray: r.ok ? null : '4 4', interactive: false }).addTo(layer);
+        L.circleMarker([r.st.lat, r.st.lon], { radius: 6, color: '#fff', weight: 1, fillColor: col, fillOpacity: r.ok ? .95 : .4 })
+          .bindPopup('<b>' + esc(r.st.name) + '</b> · ' + r.alert_id + '<br>' + (r.sent ? r.heard_of_sent + ' of ' + r.sent + ' heard at the site (' + r.pct + '%)' : r.ok + ' heard at the site; the network stored none')
+            + (r.only_here ? '<br>' + r.only_here + ' heard only here' : '') + (lv ? '<br>' + lv.p50 + ' ' + lv.unit + ' median' : '') + (r.snr_db != null ? ', SNR ' + r.snr_db + ' dB' : '')
+            + (r.km != null ? '<br>' + fmtKm(r.km) + ' from the site' : ''))
+          .addTo(layer);
+        pts.push([r.st.lat, r.st.lon]);
+      });
+      L.circleMarker([v.lat, v.lon], { radius: 11, color: cssVar('--text', '#1b2733'), weight: 3, fillColor: cssVar('--accent', '#1f6feb'), fillOpacity: .9 })
+        .bindPopup('<b>Survey site: ' + esc(v.name || v.id) + '</b><br>' + Number(v.ok).toLocaleString() + ' good frames over about ' + v.listening_h + ' h').addTo(layer);
+      pts.push([v.lat, v.lon]);
+    }
     if (pts.length) { const b = L.latLngBounds(pts); if (pts.length === 1) map.setView(b.getCenter(), 11); else map.fitBounds(b.pad(0.1)); }
     if (S.view) map.setView(S.view.center, S.view.zoom);
     map.on('moveend zoomend', () => { S.view = { center: map.getCenter(), zoom: map.getZoom() }; });
@@ -875,7 +1055,8 @@ const Reception = (function () {
   }
 
   return { render, init, stop, analyse, demoDrive, fromFile, fromReadings, setLocal, setWindow, setFilter, select, chooseFile, onFile, fromDb,
-           fromStored, useReadings, loadDemo, clearLoaded, exportCsv, exportGeoJson, _state: S };
+           fromStored, useReadings, loadDemo, clearLoaded, exportCsv, exportGeoJson, listSurveys, openSurvey, closeSurvey, setSurveyAll,
+           exportSurveyCsv, _state: S };
 })();
 
 if (typeof window !== 'undefined') window.Reception = Reception;

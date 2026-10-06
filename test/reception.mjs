@@ -28,6 +28,10 @@
 //   * a receiver card's receptions logged, good and bad (an ERT-A2 status byte)
 //   * the log exported as CSV and loaded back as a file, the same analysis out
 //   * the tab drawing its map, a suspect picked, no page errors
+//   * a site survey (0051, stood in for): the list, one opened — its receptions
+//     the map's source, each station it heard with how much of what the network
+//     received it caught, the ones it did not hear on request, a line from the
+//     site to each, and the table as CSV
 //
 // Run:  npm run reception
 //       npm run reception -- -v    also print what passed
@@ -219,6 +223,57 @@ try {
   ok('…and says the stored readings carry no position', /Stored readings carry no position/.test(ui.hint), ui.hint.slice(0, 200));
   await page.evaluate(() => { Reception.clearLoaded(); Reception.setLocal(true); });
 
+  // ── a site survey ─────────────────────────────────────────────────────────
+  const SV = await page.evaluate(() => {
+    const st = state.data.stations.filter(s => s.lat != null && s.lon != null && stationAlertIds(s).length).slice(0, 3);
+    const site = { lat: st[0].lat + 0.05, lon: st[0].lon + 0.05 };
+    const a = st.map(s => stationAlertIds(s)[0]);
+    const t0 = Date.now() - 3 * 86400e3;
+    const iso = (t) => new Date(t).toISOString();
+    const summary = { id: 's-6dfef7f4-abc123', name: 'Mt Test candidate repeater', token_label: 'Survey Pi', first_heard: iso(t0), last_heard: iso(t0 + 72 * 3600e3),
+      listening_h: 71.7, match_s: 10, frames: 40, ok: 30, bad: 2, undecoded: 8, lat: site.lat, lon: site.lon, gps: true, location_source: 'gps',
+      points: [{ point_id: 'rpi-6dfef7f4-sdr1', receiver: 'rtl-sdr', freq_mhz: 151.5, ok: 30, bad: 2, undecoded: 8 }],
+      stations: [
+        { alert_id: a[0], ok: 20, bad: 2, first_heard: iso(t0), last_heard: iso(t0 + 70 * 3600e3), level_dbfs: [-40, -35, -30], rssi_dbm: null, snr_db: 24.5, freqs: [151.5], points: ['rpi-6dfef7f4-sdr1'], sent: 10, heard_of_sent: 9, only_here: 11 },
+        { alert_id: a[1], ok: 10, bad: 0, first_heard: iso(t0), last_heard: iso(t0 + 60 * 3600e3), level_dbfs: [-60, -57, -52], rssi_dbm: null, snr_db: 8, freqs: [151.5], points: ['rpi-6dfef7f4-sdr1'], sent: 0, heard_of_sent: 0, only_here: 10 },
+        { alert_id: a[2], ok: 0, bad: 0, first_heard: null, last_heard: null, level_dbfs: null, rssi_dbm: null, snr_db: null, freqs: null, points: null, sent: 5, heard_of_sent: 0, only_here: 0 },
+      ] };
+    const rx = Array.from({ length: 30 }, (_, i) => ({ heard_at: iso(t0 + i * 3600e3), receiver: 'rtl-sdr', point_id: 'rpi-6dfef7f4-sdr1', point_name: 'Survey Pi — RTL-SDR',
+      protocol: 'alert', alert_id: a[i % 2], value_raw: i, ok: true, fault: null, rssi_dbm: null, level_dbfs: -40, lat: site.lat, lon: site.lon, location_source: 'gps', location_approx: false,
+      detail: { survey: 's-6dfef7f4-abc123', survey_name: 'Mt Test candidate repeater' } }));
+    const list = [{ id: summary.id, name: summary.name, token_label: 'Survey Pi', first_heard: summary.first_heard, last_heard: summary.last_heard, frames: 40, ok: 30, bad: 2, undecoded: 8,
+      addresses: 2, lat: site.lat, lon: site.lon, gps: true, points: ['rpi-6dfef7f4-sdr1'] }];
+    return { summary, rx, list, names: st.map(s => s.name) };
+  });
+  const svAsks = [];
+  await page.route('**/rest/v1/rpc/survey_*', route => {
+    const fn = new URL(route.request().url()).pathname.split('/').pop();
+    svAsks.push(fn + ' ' + (route.request().postData() || ''));
+    const body = fn === 'survey_list' ? SV.list : fn === 'survey_summary' ? SV.summary : fn === 'survey_receptions' ? SV.rx : null;
+    return route.fulfill({ status: body ? 200 : 404, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  await page.click('button:has-text("Site surveys (editors)")');
+  await page.waitForSelector('[aria-labelledby="rx-h-sv"] tbody tr', { timeout: 15_000 });
+  ok('the survey list is read and shown', await page.evaluate(() => /Mt Test candidate repeater/.test(document.querySelector('[aria-labelledby="rx-h-sv"]').textContent)));
+  await page.click('[aria-labelledby="rx-h-sv"] tbody button');
+  await page.waitForSelector('[aria-labelledby="rx-h-svs"] tbody tr', { timeout: 15_000 });
+  const sv1 = await page.evaluate(() => ({
+    rows: document.querySelectorAll('[aria-labelledby="rx-h-svs"] tbody tr').length,
+    text: document.querySelector('.rx-page').textContent, db: Reception._state.db.length, local: Reception._state.useLocal,
+    lines: document.querySelectorAll('#rx-map path.leaflet-interactive, #rx-map path').length,
+  }));
+  ok('opening a survey asks for its summary and its receptions', svAsks.some(x => /^survey_summary .*s-6dfef7f4-abc123/.test(x)) && svAsks.some(x => /^survey_receptions /.test(x)), svAsks.join(' | '));
+  ok('its receptions are the map\'s source, without this browser\'s own log', sv1.db === 30 && sv1.local === false, JSON.stringify({ db: sv1.db, local: sv1.local }));
+  ok('each station heard is a row; the one the site never heard is not, until asked', sv1.rows === 2, 'rows ' + sv1.rows);
+  ok('how much of what the network received the site caught, and what only it heard', /Of all the network stored\s*9 of 15 \(60%\)/.test(sv1.text) && /9 \/ 10\s*90%/.test(sv1.text) && /Heard only here\s*21/.test(sv1.text), sv1.text.match(/Of all the network stored.{0,40}/) + ' / ' + (sv1.text.match(/Heard only here.{0,10}/) || ''));
+  ok('a line from the site to each station heard', sv1.lines >= 3, 'paths ' + sv1.lines);
+  await page.evaluate(() => Reception.setSurveyAll(true));
+  ok('…and the station the site did not hear, when asked', await page.evaluate(() => document.querySelectorAll('[aria-labelledby="rx-h-svs"] tbody tr').length === 3));
+  const csv = await page.evaluate(() => { let out = null; const keep = window.dlText; window.dlText = (n, c) => { out = { n, c }; }; try { Reception.exportSurveyCsv(); } finally { window.dlText = keep; } return out; });
+  ok('the table exports as CSV', csv && /^site-survey-Mt-Test-candidate-repeater\.csv$/.test(csv.n) && csv.c.split('\n').filter(Boolean).length === 4 && /heard_pct/.test(csv.c), csv && csv.n);
+  await page.evaluate(() => { Reception.closeSurvey(); Reception.setSurveyAll(false); Reception.setLocal(true); });
+  ok('closing it clears the survey', await page.evaluate(() => !document.querySelector('[aria-labelledby="rx-h-svs"]') && Reception._state.db.length === 0));
+
   ok('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 } finally {
   await browser.close();
@@ -226,4 +281,4 @@ try {
 }
 
 if (failures) { console.log(`\nFAIL — ${failures} check(s) failed.`); process.exit(1); }
-console.log('PASS — the Reception Map names the repeater a drive was built to blame, by pass ranges and by where its bad copies were loud, and keeps its rules on the stored readings.');
+console.log('PASS — the Reception Map names the repeater a drive was built to blame, by pass ranges and by where its bad copies were loud, keeps its rules on the stored readings, and lays a site survey beside what the network received.');

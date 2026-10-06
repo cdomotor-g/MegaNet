@@ -244,6 +244,11 @@ const BaseStations = (function () {
       ['Clock', c.trusted === false || b.clock === false ? '<span class="txt-warn">not set yet — readings are held until it is</span>' : esc((c.source || 'set') + (c.timezone ? ' · ' + c.timezone : ''))],
       ['Location', loc.source && loc.source !== 'none' ? esc(loc.source + (loc.lat != null ? ' · ' + loc.lat + ', ' + loc.lon : '') + (loc.source === 'gps' ? '' : ' (approximate)')) : 'not given'],
     ];
+    // A site survey (RPi ALERT 0.9): what it heard goes to the Reception Map's Site surveys.
+    const sv = st.survey;
+    if (sv && sv.state === 'running') rows.push(['Site survey', esc('“' + sv.name + '” — listening ' + span(Math.round((sv.elapsed_ms != null ? sv.elapsed_ms : sv.elapsedMs || 0) / 1000)) + ', ' + (sv.addresses || 0) + ' addresses heard')
+      + ' <span class="qs-dim">· Reception Map → Site surveys</span>']);
+    else if (sv && sv.state === 'armed') rows.push(['Site survey', esc('“' + sv.name + '” starts at its next power-up')]);
     return `<h3>Health</h3><dl class="adm-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
   }
 

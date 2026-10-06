@@ -125,7 +125,7 @@ const TABS = [
     { id: 'workbench',  label: 'Interference Workbench', icon: '🔬',
       find: 'case hypotheses scoring evidence checklist acma complaint site visit share' },
     { id: 'reception',  label: 'Reception Map',          icon: '📡',
-      find: 'drive survey signal strength rssi coverage gps vehicle bad packets bit flip repeater triangulate where heard receptions' },
+      find: 'drive survey site survey candidate repeater base station site signal strength rssi coverage gps vehicle bad packets bit flip repeater triangulate where heard receptions' },
   ] },
   { group: 'ALERT', tabs: [
     { id: 'bitflipper', label: 'Bit Flipper',            icon: '🔀',
@@ -901,6 +901,12 @@ const HELP = {
       'Receptions are <strong>kept in this browser</strong> and, from a receiver sending to MegaNet, in '
       + 'the database (editors only — they say where a vehicle was). Export a drive as CSV or GeoJSON '
       + 'and load it on another computer.',
+      '<strong>Site surveys</strong> (editors): an RPi ALERT base station left at a candidate repeater or '
+      + 'base-station site for a day or three, network or not, sends what it heard there when it is next '
+      + 'on a network. Pick one under <em>Site surveys</em>: each station it heard, how many of the '
+      + 'transmissions the network stored from it the site caught while listening, what the site heard '
+      + 'that no base station stored, and its signal and SNR — with a line on the map from the site to '
+      + 'each station, coloured by how much got through.',
     ],
     links: [{ label: 'The Reception Map and a vehicle rig', href: 'docs/reception-map.md' }],
     related: ['health', 'serial', 'workbench', 'bitflipper', 'network'],
@@ -2331,7 +2337,8 @@ const DB_SCHEMA = 'meganet';
 // 48: 0047 (receptions) and 0048 (a base station asking for its token) were
 // applied live together — 0047 had waited since its own commit, when the
 // connection timed out on every write.
-const DB_SCHEMA_VERSION = 50;
+// 51: site surveys (survey_list, survey_receptions, survey_summary).
+const DB_SCHEMA_VERSION = 51;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
