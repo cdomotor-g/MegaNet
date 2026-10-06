@@ -385,6 +385,14 @@ async function dbProxy(request, target) {
   // and a cache between here and the browser keyed on the URL alone would hand
   // one caller's answer to the next.
   headers.set('Cache-Control', 'no-store');
+  // Nothing proxied here is ever meant to render as a document on this origin.
+  // Storage objects in particular are user-uploaded bytes served from the app's
+  // own origin, so an uploaded SVG/HTML must not execute as a page: nosniff stops
+  // content-type guessing, and the sandbox CSP strips script/navigation if one is
+  // opened directly. These are ignored by fetch(), so the JSON API is unaffected
+  // and inline <img> subresource loads still render. Same headers as /api/photos.
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
 
   return new Response(res.body, {
     status: res.status,
