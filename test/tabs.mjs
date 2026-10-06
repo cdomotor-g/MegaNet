@@ -711,6 +711,7 @@ const CONVERTED = [
   { id: 'basestations', label: 'Base Stations — the list, a station open, and the team keys', issue: 'born converted', seed: SEED_BS },
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },
+  { id: 'sitemap',    label: 'Site Map',        issue: 'born converted' },
 ];
 
 

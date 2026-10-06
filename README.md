@@ -146,6 +146,8 @@ MegaNet/
 ├── bug-report.js           ← BugReport — prefilled GitHub issue reporter
 ├── base-stations.js        ← BaseStations — Base Stations tab (every ingest point's
 │                             health; asking a base station that checks in, 0049)
+├── site-map.js             ← SiteMap   — Site Map tab (a guide to every other tab,
+│                             and the gold line from each to its button in the nav)
 ├── init.js                 ← the only code that runs at load; must stay last
 ├── maps-data.js            ← Radio Path Maps catalogue, QLD basin SVG + georeference
 ├── styles.css              ← the design system, then theme and layout
@@ -233,7 +235,7 @@ MegaNet/
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
 ├── test/                   ← the web app's safety net (see test/README.md, and Testing below)
-│   ├── smoke.mjs            (headless Chromium: load, open all 25 tabs, clean console)
+│   ├── smoke.mjs            (headless Chromium: load, open all 27 tabs, clean console)
 │   ├── dup-names.mjs        (no duplicate top-level names across the loaded scripts)
 │   ├── inspections.mjs      (the six sheets, against the migration's own seed data)
 │   ├── maintenance.mjs      (the Council sheet, against the workbook's filled example)
@@ -4149,6 +4151,28 @@ camera is asked for only on a phone or tablet, the screen is kept awake while th
 view is up, and closing it (✕ or Escape) stops the camera, the GPS and the
 compass. The picture is drawn on the screen and goes nowhere else: nothing is
 recorded or sent.
+
+### 24. Site Map (A Guide to Every Tab)
+
+🗂️ **Site Map**, first in the nav under **Start here**, is for somebody who has
+not met the app yet. It draws the screen — the banner, the bar of tabs, the open
+tab, the side panel — numbered to a key; lays the groups out in the order the
+work moves through them (what is out there, what is stepping on it, what it
+actually sent, what the sensors said, what was done on site, keeping it
+running); lists everyday jobs ("decode an ALERT message", "see which stations
+need attention today") with the tab each is done on; and gives every tab a card
+— what it is for, two or three things to use it for, and the tabs that go with
+it.
+
+**Point at anything** — a card, a job, a group, a related tab on a card — or
+move to it with the keyboard, and a gold line runs from it to that tab's button
+in the bar on the left, ending on a ring, the way the station card's line runs
+to its pin. With the bar shrunk to icons it ends on the icon; on a phone, where
+the bar is behind ☰, on ☰. A button below the nav's fold is scrolled into view
+for it. The tabs, their groups and their icons are read from the nav itself, so
+a new tab is on the page the moment it is added; what each card says is
+`site-map.js`'s own, and `npm run nav` fails on a tab it has not written up.
+Every other tab's ❔ Help ends with a pointer back here.
 
 ---
 

@@ -65,6 +65,8 @@ const PROBES = [
   { q: 'network maps',          want: 'maps',        why: 'the old label, after the rename' },
   { q: 'orphan',                want: 'passranges',  why: 'a term from the tab, not its title' },
   { q: 'radio mobile',          want: 'export',      why: 'what the output is for' },
+  { q: 'guide',                 want: 'sitemap',     why: 'what a newcomer looks for' },
+  { q: 'what does each tab do', want: 'sitemap',     why: 'the question, typed as asked' },
 ];
 
 const server  = await startServer();
@@ -295,6 +297,134 @@ try {
   });
   check('Ctrl+K opens the nav from the rail', chord.open);
   check('and puts the cursor in the find box', chord.focused);
+
+  // ── The site map ──────────────────────────────────────────────────────────
+  // The nav's guide, so it is held here: a card for every tab the nav lists,
+  // in words written for it, and a line from each card to the button it is
+  // about — which is a claim about the nav as much as about the page, because
+  // the line has to find that button wherever the nav has put it.
+  console.log('\nThe site map — a card for every tab, and a line from each to its button\n');
+
+  await page.evaluate(() => { navFind(''); setNavCollapsed(false); switchTab('sitemap'); });
+  await page.waitForTimeout(150);
+
+  const sm = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('#main-content .sm-card')];
+    return {
+      ids: cards.map(c => c.dataset.tab),
+      borrowed: cards.filter(c => c.dataset.fallback).map(c => c.dataset.tab),
+      unused: Object.keys(SiteMap.guide).filter(id => !TAB_LIST.some(t => t.id === id)),
+      jobs: SiteMap.tasks.filter(t => !TAB_LIST.some(x => x.id === t.tab)).map(t => t.tab),
+      stops: document.querySelectorAll('#main-content .sm-stop').length,
+      groups: TABS.filter(g => g.tabs.some(t => t.id !== 'sitemap')).length,
+    };
+  });
+  const others = shape.ids.filter(id => id !== 'sitemap');
+  check(`the site map has a card for each of the other ${others.length} tabs, once`,
+    sm.ids.length === others.length && others.every(id => sm.ids.includes(id)),
+    `${sm.ids.length} card(s); missing: ${others.filter(id => !sm.ids.includes(id)).join(', ') || 'none'}`);
+  check('every card is written for the site map, not borrowed from the help',
+    sm.borrowed.length === 0, sm.borrowed.length ? `no GUIDE entry in site-map.js for: ${sm.borrowed.join(', ')}` : '');
+  check('and nothing is written up for a tab that is not there', sm.unused.length === 0, sm.unused.join(', '));
+  check('every job under "I want to…" opens a real tab', sm.jobs.length === 0, sm.jobs.join(', '));
+  check('the journey has a stop for every group', sm.stops === sm.groups, `${sm.stops} for ${sm.groups}`);
+
+  // What the line is doing, read off the page: the svg up, the one element it
+  // lit, and whether the ring drawn round that element actually encloses it.
+  const lead = () => page.evaluate(() => {
+    const svg = document.getElementById('sm-leader');
+    const ring = svg && svg.querySelector('.sm-l-ring');
+    const lit = [...document.querySelectorAll('.sm-lit')];
+    const r = ring && ring.getBoundingClientRect();
+    const t = lit[0] && lit[0].getBoundingClientRect();
+    return {
+      on: !!svg && svg.classList.contains('is-on') && getComputedStyle(svg).display !== 'none',
+      lit: lit.map(el => el.dataset.tab || el.id || el.querySelector('.nav-heading')?.textContent || el.className),
+      rings: !!(r && t && r.left <= t.left && r.right >= t.right && r.top <= t.top && r.bottom >= t.bottom),
+      inView: !!(t && t.top >= 0 && t.bottom <= innerHeight),
+      svgCount: document.querySelectorAll('#sm-leader').length,
+    };
+  });
+  const settle = () => page.waitForTimeout(150);
+
+  await page.hover('#sm-card-packets .sm-card-h');
+  await settle();
+  let L = await lead();
+  check('pointing at a card draws the line', L.on);
+  check('  …to that tab\'s button in the nav, and nothing else', L.lit.length === 1 && L.lit[0] === 'packets',
+    L.lit.join(', ') || 'nothing lit');
+  check('  …ending on a ring round it', L.rings);
+
+  await page.hover('#sm-card-packets .sm-pair[data-sm-point="tab:bitflipper"]');
+  await settle();
+  L = await lead();
+  check('a related tab on a card points at its own button', L.lit.length === 1 && L.lit[0] === 'bitflipper',
+    L.lit.join(', '));
+
+  // The nav is taller than a 900 px window with every group in it, so the
+  // last group's buttons start below its fold.
+  await page.hover('#sm-card-basestations .sm-card-h');
+  await settle();
+  L = await lead();
+  check('a button below the nav\'s fold is scrolled into it, and ringed there',
+    L.lit[0] === 'basestations' && L.inView && L.rings, `lit ${L.lit.join(', ')}, in view ${L.inView}`);
+
+  await page.hover('.sm-stop-btn[data-sm-point="group:interference"]');
+  await settle();
+  L = await lead();
+  check('a group on the journey rings that whole group in the nav',
+    L.lit.length === 1 && L.lit[0] === 'Interference' && L.rings, L.lit.join(', '));
+
+  // Off every source: the line goes, and so does the lit button.
+  await page.hover('#sm-h');
+  await page.waitForTimeout(400);
+  L = await lead();
+  check('moving off it takes the line and the lit button away', !L.on && L.lit.length === 0,
+    `on ${L.on}, lit ${L.lit.join(', ')}`);
+
+  // The keyboard gets the same line: focus on a card's button is pointing at it.
+  await page.focus('#sm-card-rf .sm-open');
+  await settle();
+  L = await lead();
+  check('focus on a card\'s button draws the same line, without a pointer',
+    L.on && L.lit[0] === 'rf' && L.rings, L.lit.join(', '));
+  await page.evaluate(() => document.activeElement.blur());
+
+  // Shrunk to the icon rail, the nav is rewritten (renderTabs) — the line has
+  // to find the button again, and end on the icon.
+  await page.evaluate(() => setNavCollapsed(true));
+  await page.waitForTimeout(300);
+  await page.hover('#sm-card-health .sm-card-h');
+  await settle();
+  L = await lead();
+  check('with the nav shrunk to icons, the line ends on the icon',
+    L.on && L.lit[0] === 'health' && L.rings, L.lit.join(', '));
+  await page.evaluate(() => setNavCollapsed(false));
+  await page.waitForTimeout(300);
+
+  await page.evaluate(() => switchTab('stations'));
+  await page.waitForTimeout(150);
+  L = await lead();
+  check('leaving the tab takes the line\'s svg off the page and unlights the nav',
+    L.svgCount === 0 && L.lit.length === 0, `${L.svgCount} svg(s), lit ${L.lit.join(', ')}`);
+
+  // A phone: the bar is behind ☰, so the line goes to ☰ — from the key under
+  // the drawing, the one source near enough the top of a phone's page for the
+  // banner to be on screen with it.
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.evaluate(() => { setNavCollapsed(true); switchTab('sitemap'); window.scrollTo(0, 0); });
+  await page.waitForTimeout(300);
+  await page.hover('.sm-anat-key li[data-sm-point="nav"] strong');
+  await settle();
+  L = await lead();
+  check('on a phone, with the bar put away, the line ends on ☰ in the banner',
+    L.on && L.lit.length === 1 && L.lit[0] === 'btn-nav' && L.rings, L.lit.join(', ') || 'nothing lit');
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.hover('#sm-card-history .sm-card-h');
+  await settle();
+  L = await lead();
+  check('and once the banner has scrolled away, no line at all rather than one off the screen',
+    !L.on, `on ${L.on}, lit ${L.lit.join(', ')}`);
 
   if (errors.length) check('no uncaught page errors', false, errors.join(' | '));
 } finally {

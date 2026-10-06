@@ -1298,11 +1298,12 @@ function navGroupsHtml() {
           const tip = collapsed ? `${t.label} — ${g.group}` : t.label;
           // The ↵ is not decoration: it is where Enter goes, said out loud, and
           // the winner is not always the top of the list — the groups keep their
-          // order so the list does not reshuffle under the cursor.
+          // order so the list does not reshuffle under the cursor. data-tab is
+          // how the Site Map's leader finds a tab's button (site-map.js).
           return `
         <li>
           <button class="tab-btn${on ? ' active' : ''}${pick ? ' nav-best' : ''}"
-                  onclick="switchTab('${t.id}')"
+                  data-tab="${t.id}" onclick="switchTab('${t.id}')"
                   ${on ? 'aria-current="page"' : ''} title="${esc(tip)}">
             <span class="nav-icon" aria-hidden="true">${t.icon}</span>
             <span class="nav-label">${esc(t.label)}</span>
@@ -2938,6 +2939,14 @@ function renderHelpBody() {
        </figure>`
     : '';
 
+  // The way to the Site Map from every other tab's help, because this pane is
+  // where somebody lost goes looking — and the nav entry, at the top of a
+  // column of twenty-odd, is easy to read past.
+  const newHere = state.activeTab !== 'sitemap'
+    ? `<p class="help-new">New here? <button type="button" class="help-inline"
+         onclick="switchTab('sitemap')">🗂️ The Site Map</button> says what every tab is for.</p>`
+    : '';
+
   // A tab with no HELP entry says so rather than rendering an empty panel — the
   // panel is always present, so an empty one reads as broken rather than as
   // unwritten.
@@ -2946,7 +2955,8 @@ function renderHelpBody() {
        ${section('Watch out for', watch)}
        ${section(h.figure && h.figure.title ? h.figure.title : 'Walkthrough', figure)}
        ${section('See also', related)}
-       ${section('Read more', links)}`
+       ${section('Read more', links)}
+       ${newHere}`
     : `<p class="help-summary help-empty">Nothing written for this tab yet.</p>`;
 
   bodyEl.innerHTML = `
@@ -3005,8 +3015,10 @@ function renderMain() {
   // a photo read before it loads is still placed, and filed by the database.
   // Admin joins them too: loading the station file is one of the things it is
   // for, so it cannot be the thing it waits on. Base Stations as well — its
-  // list is the database's, and names a host station only as text.
-  const noDataTabs = ['packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'admin', 'basestations'];
+  // list is the database's, and names a host station only as text. The Site
+  // Map is about the tabs, not the stations, and is most needed by somebody
+  // who has not loaded anything yet.
+  const noDataTabs = ['sitemap', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'admin', 'basestations'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -3024,6 +3036,7 @@ function renderMain() {
                        el.innerHTML = renderStationsHtml();
                        syncStationsCardsHome({ instant: true, remeasure: false });
                        initStationFilters(); initMap(); break;
+    case 'sitemap':    el.innerHTML = SiteMap.render();       SiteMap.init();      break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
     case 'passranges': el.innerHTML = renderPassRangesHtml();             break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;

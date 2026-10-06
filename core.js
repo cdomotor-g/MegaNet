@@ -104,7 +104,21 @@
 // somebody would actually type — the job ("packet decoder", "com port"), the
 // artefact ("csv", "pdf"), the vendor ("contrail", "elpro"), and the old name of
 // anything renamed. Anything a person has called a tab out loud belongs here.
+//
+// ── Start here: the one group that is not part of the work ───────────────────
+//
+// The Site Map (site-map.js) is a guide to the other tabs, for somebody who has
+// not met them yet: so it goes first, above the six groups the work runs
+// through, under a heading that says what to do with it. Its find words are the
+// ones a lost person types — "guide", "help", "what does each tab do" — and
+// deliberately none that another tab owns: "user" and "new" would tie with
+// Admin's users and RF Changes' new licences, and the tie goes to the first
+// group, which is this one.
 const TABS = [
+  { group: 'Start here', tabs: [
+    { id: 'sitemap',    label: 'Site Map',               icon: '🗂️',
+      find: 'guide overview tour index directory contents orientation beginner introduction getting started help what does each every tab do explained' },
+  ] },
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
       find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb' },
@@ -244,6 +258,25 @@ const TAB_LIST = TABS.flatMap(g => g.tabs);
 //    loud: that the box highlights rather than hides, and that a "not recorded
 //    yet" bucket is ticked by default.
 const HELP = {
+  sitemap: {
+    summary: 'A guide to the whole app for somebody new to it: how the screen is laid out, the '
+           + 'groups the tabs are filed under and the order the work moves through them, a list of '
+           + 'everyday jobs with the tab each one is done on, and a card for every tab saying what it '
+           + 'is for and when you would reach for it. Point at a card, a job or a group — or move to '
+           + 'its button with the keyboard — and a <strong>gold line</strong> runs from it to that '
+           + 'tab\'s button in the bar on the left, so the next time you want it you know where it '
+           + 'is. Press the button to go there.',
+    watch: [
+      'The line points at the bar on the left wherever it is. Shrunk to icons (« at its top), it '
+      + 'points at the icon; on a phone, where the bar is put away behind <strong>☰</strong> in the '
+      + 'banner, it points at ☰ instead.',
+      'A card is a summary, not the manual. Each tab\'s own ❔ Help, in this side panel, says how '
+      + 'that tab works in full — it changes as you change tabs.',
+      'The words under each card\'s <em>Goes with</em> are the tabs its help names as related: '
+      + 'the other places the same job is usually carried on. Point at one and the line goes to it.',
+    ],
+    related: ['stations', 'health', 'admin'],
+  },
   stations: {
     summary: 'The map fills the page, and its cards sit beside it in the <strong>side panel</strong> '
            + 'on the right: press the red 📍 in the strip on its edge, under ❔, for the '

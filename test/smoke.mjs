@@ -140,7 +140,7 @@ async function main() {
     // ── The tab registry ─────────────────────────────────────────────────
     // #130 asks for the count to be asserted, so that a tab added to TABS
     // without a renderMain() case fails here rather than in front of a user.
-    const EXPECTED_TABS = 26;   // 21 from #191 (Networks removed), 22 with the Digital Twin, 23 with Field Photos, 24 with Admin, 23 with the Digital Twin folded into Stations' 🧊 pane, 24 with the Reception Map, 25 with Base Stations, 26 with Station Health
+    const EXPECTED_TABS = 27;   // 21 from #191 (Networks removed), 22 with the Digital Twin, 23 with Field Photos, 24 with Admin, 23 with the Digital Twin folded into Stations' 🧊 pane, 24 with the Reception Map, 25 with Base Stations, 26 with Station Health, 27 with the Site Map
     check(`TABS holds ${EXPECTED_TABS} tabs`, boot.tabs.length === EXPECTED_TABS ? []
       : [{ kind: 'assert', text: `TABS holds ${boot.tabs.length} tabs, expected ${EXPECTED_TABS}. `
           + `If a tab was added on purpose: give it a renderMain() case, a HELP entry, and bump `

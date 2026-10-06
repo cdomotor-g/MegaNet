@@ -301,6 +301,21 @@
   --ad-series-11: #2e7d32;
   --ad-series-12: #6a1b9a;
 
+  /* ── Site Map: the six group hues (site-map.js) ─────────────────────────────
+     A categorical set like the region fills: each says "this group", in the
+     order TABS lists the groups — a card's top edge, a stop on the journey, a
+     row in the drawing of the nav. Never text, and the group's name is always
+     beside it, so out of the contrast contract; but --sm-group-ink, the number
+     drawn on each, clears AA on all six anyway (worst 5.0:1, light; 7.6:1,
+     dark). */
+  --sm-group-1: #0b5cab;
+  --sm-group-2: #c2410c;
+  --sm-group-3: #7c35a3;
+  --sm-group-4: #00796b;
+  --sm-group-5: #2e7d32;
+  --sm-group-6: #546e7a;
+  --sm-group-ink: #ffffff;
+
   /* ── ACMA interference mechanisms, and the RF Changes series (#138) ────────
      The third categorical set, and it arrives here for the reason the first two
      did: it was seven literals inside ACMA_MECH in core.js, drawn as a legend
@@ -610,6 +625,15 @@
   --ad-series-10: #ffb066;
   --ad-series-11: #8fdc9e;
   --ad-series-12: #d9a6ff;
+
+  /* The Site Map's six group hues, lifted for a dark page, with a dark ink. */
+  --sm-group-1: #6bb6ff;
+  --sm-group-2: #ff9a6b;
+  --sm-group-3: #c79ae8;
+  --sm-group-4: #4fd3c4;
+  --sm-group-5: #8fdc9e;
+  --sm-group-6: #a7bccb;
+  --sm-group-ink: #0f1720;
 
   /* The seven mechanism colours, lifted for a dark page — same seven hues,
      raised in lightness and dropped in saturation, on the same reasoning as the
@@ -15570,3 +15594,566 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-brief ol, .hl-brief ul { padding-left: 1.3rem; display: grid; gap: .35rem; }
 .hl-followup { margin-top: var(--sp-3); display: grid; gap: .3rem; }
 .hl-followup input { flex: 1 1 18rem; min-width: 0; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Site Map (site-map.js) — a guide to every other tab, and the gold line from
+   each to its button in the nav.
+
+   Nothing here is a new pattern: .page, .panel, the button, .link-btn and
+   .button-group are the system's own, and the leader is map-leader.js's gilt
+   (--map-leader-*), so it reads as the app's one way of saying "this, there".
+   The one thing that responds to its container rather than the window is the
+   journey strip: it is a row of six where there is room for six, and a
+   timeline down the page where there is not, and whether there is room
+   depends on the help pane beside it as much as on the window.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.sm-g0 { --sm-hue: var(--map-leader); }
+.sm-g1 { --sm-hue: var(--sm-group-1); }
+.sm-g2 { --sm-hue: var(--sm-group-2); }
+.sm-g3 { --sm-hue: var(--sm-group-3); }
+.sm-g4 { --sm-hue: var(--sm-group-4); }
+.sm-g5 { --sm-hue: var(--sm-group-5); }
+.sm-g6 { --sm-hue: var(--sm-group-6); }
+
+.sm-page h3 {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
+}
+
+.sm-sub {
+  margin: 0 0 var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+/* ── The head of the page ─────────────────────────────────────────────────── */
+
+.sm-hero {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.sm-title {
+  margin: 0;
+  font-size: var(--fs-xl);
+  line-height: var(--lh-tight);
+}
+
+.sm-lede {
+  margin: 0;
+  max-width: 60rem;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+}
+
+.sm-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.sm-facts li {
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.sm-facts strong {
+  color: var(--text);
+  font-size: var(--fs-md);
+}
+
+/* ── The screen at a glance ───────────────────────────────────────────────── */
+
+.sm-anat {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: var(--sp-4);
+  align-items: center;
+}
+
+.sm-anat-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sm-a-frame   { fill: var(--bg); stroke: var(--border); }
+.sm-a-region  { stroke: var(--border); stroke-width: 1; transition: stroke var(--motion-fast) var(--ease), stroke-width var(--motion-fast) var(--ease); }
+.sm-a-main,
+.sm-a-nav,
+.sm-a-strip   { fill: var(--panel); }
+.sm-a-header  { fill: var(--header); stroke: transparent; }
+.sm-a-pane    { fill: var(--panel-sub); stroke: var(--border); stroke-dasharray: 3 3; }
+.sm-a-title   { fill: var(--text); opacity: .7; }
+.sm-a-text    { fill: var(--muted); opacity: .45; }
+.sm-a-label   { fill: var(--muted); opacity: .7; }
+.sm-a-head    { fill: var(--muted); }
+.sm-a-card    { fill: var(--panel-sub); stroke: var(--border); }
+.sm-a-edge,
+.sm-a-dot     { fill: var(--sm-hue); }
+.sm-a-find    { fill: var(--bg); stroke: var(--ctl-border); stroke-width: .8; }
+.sm-a-tiny    { font-size: 7px; fill: var(--muted); }
+.sm-a-q       { font-weight: 700; fill: var(--text); }
+.sm-a-btn     { fill: var(--panel); stroke: var(--ctl-border); }
+.sm-a-ghost   { fill: var(--muted); opacity: .22; }
+.sm-a-caption { font-size: 10px; font-style: italic; fill: var(--muted); }
+/* The banner's own white, as the real one has it in both themes. */
+.sm-a-brand   { font-size: 12px; font-weight: 700; fill: #fff; }
+.sm-a-hbtn    { fill: rgba(255, 255, 255, .16); stroke: rgba(255, 255, 255, .45); }
+.sm-a-emoji   { font-size: 9px; }
+.sm-a-here    { fill: none; stroke: var(--map-leader-lo); stroke-width: 1; stroke-dasharray: 2 1.5; }
+.sm-a-lead-case { fill: none; stroke: var(--map-leader-ink); stroke-width: 3.4; stroke-linecap: round; opacity: .85; }
+.sm-a-lead    { fill: none; stroke: var(--map-leader); stroke-width: 1.8; stroke-linecap: round; }
+.sm-a-ring    { fill: none; stroke: var(--map-leader); stroke-width: 1.6; }
+.sm-a-lead-dot { fill: var(--map-leader); stroke: var(--map-leader-ink); stroke-width: 1; }
+.sm-a-nums circle { fill: var(--map-leader); stroke: var(--map-leader-ink); stroke-width: 1.2; }
+.sm-a-nums text   { font-size: 10.5px; font-weight: 700; fill: var(--map-leader-ink); }
+
+/* The region the key's pointed-at entry is about, outlined in gold. */
+.sm-anat[data-lit="nav"] .sm-a-nav,
+.sm-anat[data-lit="main"] .sm-a-main,
+.sm-anat[data-lit="dock"] .sm-a-strip,
+.sm-anat[data-lit="header"] .sm-a-header {
+  stroke: var(--map-leader);
+  stroke-width: 3;
+}
+
+.sm-anat-key {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.sm-anat-key > li {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-items: start;
+  padding: var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+}
+
+.sm-anat-key > li.is-pointing {
+  border-color: var(--map-leader);
+  background: var(--subtle);
+}
+
+.sm-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid var(--map-leader-ink);
+  border-radius: 50%;
+  background: var(--map-leader);
+  color: var(--map-leader-ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* ── The groups, in order ─────────────────────────────────────────────────── */
+
+.sm-journey-wrap {
+  container: sm-journey / inline-size;
+}
+
+.sm-journey {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-1);
+}
+
+/* The spine through the numbers: down the page by default, across it where
+   the six fit side by side (the container query below). Its offsets are the
+   button's border and padding plus half a number's width, so it runs through
+   their middles. */
+.sm-journey::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--sp-2) + 1.25rem);
+  top: 1.5rem;
+  bottom: 1.5rem;
+  width: 2px;
+  background: var(--border);
+}
+
+.sm-stop-btn {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: var(--sp-3);
+  align-items: center;
+  width: 100%;
+  padding: var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.sm-stop-btn:hover,
+.sm-stop-btn.is-pointing {
+  border-color: var(--map-leader);
+  background: var(--subtle);
+}
+
+.sm-stop-n,
+.sm-group-n {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--sm-hue);
+  color: var(--sm-group-ink);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  box-shadow: 0 0 0 4px var(--panel);
+}
+
+.sm-stop-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sm-stop-name { font-weight: 700; }
+
+.sm-stop-step {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.sm-stop-icons {
+  font-size: var(--fs-sm);
+  letter-spacing: .04em;
+}
+
+@container sm-journey (min-width: 50rem) {
+  .sm-journey {
+    grid-template-columns: repeat(var(--sm-stops, 6), minmax(0, 1fr));
+  }
+
+  .sm-journey::before {
+    left: calc(100% / (2 * var(--sm-stops, 6)));
+    right: calc(100% / (2 * var(--sm-stops, 6)));
+    top: calc(var(--sp-2) + 1.25rem);
+    bottom: auto;
+    width: auto;
+    height: 2px;
+  }
+
+  .sm-stop-btn {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    align-content: start;
+    height: 100%;
+    text-align: center;
+  }
+}
+
+/* ── I want to… ───────────────────────────────────────────────────────────── */
+
+.sm-tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--sp-2);
+}
+
+.sm-task {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+}
+
+.sm-task:hover,
+.sm-task.is-pointing {
+  border-color: var(--map-leader);
+  background: var(--subtle);
+}
+
+.sm-task-ico {
+  font-size: 1.35rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.sm-task-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sm-task-do {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.sm-task-where {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+/* ── A group, and its cards ───────────────────────────────────────────────── */
+
+.sm-group {
+  display: grid;
+  gap: var(--sp-3);
+  scroll-margin-top: var(--sp-4);
+}
+
+.sm-group-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-3);
+  align-items: center;
+  padding-bottom: var(--sp-2);
+  border-bottom: 3px solid var(--sm-hue);
+}
+
+.sm-group-n { box-shadow: none; }
+
+.sm-page .sm-group-h {
+  margin: 0;
+  font-size: var(--fs-xl);
+}
+
+.sm-group-step {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  font-weight: 400;
+}
+
+.sm-group-blurb {
+  margin: 2px 0 0;
+  max-width: 60rem;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+
+.sm-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: var(--sp-3);
+}
+
+.sm-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--sm-hue);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  overflow-wrap: anywhere;
+  transition: border-color var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease);
+}
+
+.sm-card.is-pointing {
+  border-color: var(--map-leader);
+  border-top-color: var(--sm-hue);
+  box-shadow: 0 0 0 1px var(--map-leader), var(--shadow-2);
+}
+
+.sm-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sm-card-ico {
+  flex: 0 0 2.4rem;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--sm-hue) 16%, var(--panel));
+  font-size: 1.3rem;
+}
+
+.sm-page .sm-card-h {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
+}
+
+.sm-card-what {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+}
+
+.sm-card-use {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 2px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+
+.sm-card-use li::marker { color: var(--sm-hue); }
+
+.sm-card-note {
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.sm-card-foot {
+  margin-top: auto;
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+}
+
+.sm-pairs {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+}
+
+.sm-pairs-h {
+  margin-right: var(--sp-1);
+  color: var(--muted);
+}
+
+.sm-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--subtle);
+  color: var(--text);
+}
+
+.sm-pair.is-pointing { border-color: var(--map-leader); }
+
+.sm-open {
+  justify-self: start;
+  font-weight: 600;
+}
+
+.sm-more p {
+  margin: 0 0 var(--sp-3);
+  line-height: var(--lh-body);
+}
+
+/* ── The leader ───────────────────────────────────────────────────────────────
+   One svg over the whole window, in client pixels, never in the way of a
+   pointer. Over the page and the nav, under the backdrops (1150) and the
+   drawers (1200) a phone opens over both. */
+
+.sm-leader {
+  position: fixed;
+  inset: 0;
+  z-index: 1140;
+  display: none;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(240, 191, 60, .55));
+}
+
+.sm-leader.is-on { display: block; }
+
+/* pathLength="1" on each path, so a dash of 1 is the whole line however long
+   it is — and the draw-in is that dash sliding on. */
+.sm-l-case,
+.sm-l-gold,
+.sm-l-hi {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+}
+
+.sm-l-case      { stroke: var(--map-leader-ink); stroke-width: 5.5; opacity: .85; }
+.sm-l-gold      { stroke: var(--map-leader); stroke-width: 3; }
+.sm-l-hi        { stroke: var(--map-leader-hi); stroke-width: 1; opacity: .9; }
+.sm-l-ring-case { fill: none; stroke: var(--map-leader-ink); stroke-width: 5; opacity: .85; }
+.sm-l-ring      { fill: none; stroke: var(--map-leader); stroke-width: 2.5; }
+.sm-l-dot       { fill: var(--map-leader); stroke: var(--map-leader-ink); stroke-width: 1.5; }
+
+.sm-leader.is-drawing .sm-l-case,
+.sm-leader.is-drawing .sm-l-gold,
+.sm-leader.is-drawing .sm-l-hi {
+  animation: sm-draw var(--motion-slow) var(--ease) both;
+}
+
+.sm-leader.is-drawing .sm-l-ring-case,
+.sm-leader.is-drawing .sm-l-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sm-ring var(--motion-slow) var(--ease) .1s both;
+}
+
+@keyframes sm-draw {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes sm-ring {
+  from { opacity: 0; transform: scale(1.25); }
+}
+
+/* The button the line ends on, lit as well as ringed: the ring says where,
+   the fill says which, and survives the ring being clipped by the nav's edge. */
+#tab-nav .tab-btn.sm-lit {
+  border-color: var(--map-leader-lo);
+  background: color-mix(in srgb, var(--map-leader) 24%, var(--panel));
+}
+
+/* The way to the Site Map, at the foot of every other tab's help. */
+.help-new {
+  margin: var(--sp-4) 0 0;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}

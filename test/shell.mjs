@@ -86,6 +86,8 @@ const OUTLINE_NONE_ALLOWED = [
     because: 'an SVG <g> has no box; the node\'s own circle takes a 3px accent stroke' },
   { selector: '#main-content:focus',
     because: 'a script-focus target; the ring is restored on :focus-visible directly below' },
+  { selector: '.hl-page [tabindex="-1"]:focus:not(:focus-visible)',
+    because: 'Station Health\'s script-focus headings, #main-content\'s pattern: only a mouse loses the ring, :focus-visible keeps it' },
   { selector: '.fp-cmp-wedge:focus-visible',
     because: 'an SVG path has no box — the ring would be its bounding box, beside the wedge; the wedge\'s own edge goes solid white at 3px' },
 ];
