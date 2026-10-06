@@ -334,10 +334,24 @@ jobs:
 
       # Chromium. The Reception Map against a drive built to blame one real
       # repeater: named first by pass ranges alone and with positions; NMEA
-      # parsed; a GPS card placing a receiver's receptions; CSV/GeoJSON round trip.
+      # parsed; a GPS card placing a receiver's receptions; CSV/GeoJSON round
+      # trip; and the stored readings — a station's own burst not a flip, a
+      # copy nine seconds late found, a ghost told from a look-alike by each
+      # address's own reports, a storm's tips kept as reports.
       - name: Reception Map — the bad repeater named
         working-directory: test
         run: npm run reception
+
+      # Chromium, the datastore stood in for by a route. Station Health against
+      # a demo week with one of every fault planted: each found where it was
+      # planted and the untouched stations clean; raw counts worked out
+      # (battery 133 → 13.3 V); the copy, storm and ghost rules on readings
+      # built for each; the tab fetched, filtered, a station and a missed check
+      # opened; the door to the Reception Map; the agent's tool loop against a
+      # scripted client; 375 px.
+      - name: Station Health — every planted fault found where it was planted
+        working-directory: test
+        run: npm run health
 
       - name: Smoke — every tab, clean console
         working-directory: test

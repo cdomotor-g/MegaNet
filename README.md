@@ -607,15 +607,31 @@ select station_key, station_name, online, round(minutes_since_seen) as quiet_for
  where minutes_since_seen > 180 order by minutes_since_seen desc;
 ```
 
-### Reading it back — two tabs, one table
+### Reading it back — three tabs, one table
 
-What lands through `ingest()` is read back two ways. **Field Data** charts one
+What lands through `ingest()` is read back three ways. **Field Data** charts one
 station's sensors over a window — the 357 filter, the rollups, the gaps.
 **Message Log** is the same rows read as an arrival log: every message the
 datastore accepted, newest first, with the ingress pathway (protocol,
 transport, which base heard it, how many further copies by which other paths)
 as columns, a plot-and-map tray over any selection, a decode drawer per row,
-and a Follow switch for watching a field test land. Each page links to the
+and a Follow switch for watching a field test land. A raw count the datastore
+holds no conversion for — everything an RTL-SDR or a radio hears off the air —
+is shown as what it is worth, worked out from what the address measures and
+marked as such: a battery's `133` is *13.3 V*, a rain gauge's `43` is *8.6 mm*
+of its running total, a level stays a count.
+**Station Health** reads the same rows over days, for operations and
+maintenance: which stations have gone quiet, whose missed check signals are
+rising, whose battery is sliding or not charging, whose rain gauge stayed dry
+through its neighbours' storm, which receiver stopped, which repeater a run of
+silences or corrupted copies has in common — ranked by what needs doing, each
+with its evidence and the action. Pick a station for its checks slot by slot
+and its battery across its solar day, and pick any missed check or reading to
+see what every receiver and neighbour was doing at that moment. *Ask Claude*
+hands the findings to an agent (Claude Opus 5.5, the person's own API key) that
+investigates with tools over the same readings and writes the briefing.
+[`docs/station-health.md`](docs/station-health.md) lists every finding, what
+triggers it and what to do. Each page links to the
 other per reading. The log is its rows, so it gets most of a screen: a
 Short / Tall / Max switch in the panel header sets how much of one (Tall —
 most of it — is the default), and each column header carries a grip that

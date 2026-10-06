@@ -6,7 +6,9 @@
 //
 // After core.js and app.js, before init.js — index.html holds the order.
 // Reaches back to core.js for state, esc/escAttr/csvEscape, dbSelect,
-// buildSensorIndex, announce, the registries and removeMap; to datastore.js for
+// announce, the registries and removeMap; to sensor-values.js (SensorValues)
+// for which station and sensor a row is and what its count is worth; to
+// datastore.js for
 // dbCanWrite and dbRpc — this tab is otherwise read-only, and those two are here
 // only for the claim in the detail drawer (#172); to map-controls.js
 // for addBaseLayers (in app.js until #164); across to app.js
@@ -104,10 +106,12 @@ const MessageLog = (() => {
       title: 'The ALERT address the message was addressed to. A relayed ALERT2 message shows "a2 station/slot" instead — its identity is the pair, not an address. Empty for satellite/cellular messages, which report under a station number and channel.' },
     { key: 'channel',  label: 'Channel',  narrow: false,
       title: 'Which sensor spoke, for messages addressed by station number. An ALERT address is the sensor, so radio rows have no channel.' },
+    { key: 'sensor',   label: 'Sensor',   narrow: false, since: 3,
+      title: 'What the address measures, from the station register — battery, rainfall, water level. A shared address shows what the station it resolved to says it is.' },
     { key: 'raw',      label: 'Raw',      narrow: true,
       title: 'value_raw — as transmitted, before any conversion. Raw values are the truth; a rainfall count means nothing without the bucket size.' },
-    { key: 'value',    label: 'Value',    narrow: false,
-      title: 'The conversion, when the datastore recorded one, with its unit. Display only — the raw column is what arrived.' },
+    { key: 'value',    label: 'Value',    narrow: true, since: 3,
+      title: 'The value in engineering units: the datastore\'s own conversion when it recorded one, otherwise worked out here from the sensor type — a battery count ÷ 10 is volts, a rain gauge\'s count × its bucket is millimetres (a running total). A water level has no scale on file, so its raw count is the reading. Worked-out values are marked, and one that cannot be what the sensor type says (a 187 V battery) is flagged. Display only — the raw column is what arrived.' },
     { key: 'quality',  label: 'Quality',  narrow: false,
       title: 'What the source said about the reading. "unqualified" means nobody said anything — not that anybody checked.' },
     { key: 'protocol', label: 'Protocol', narrow: false,
@@ -131,8 +135,10 @@ const MessageLog = (() => {
   // `since` is newer than the set is added where the view's defaults have it —
   // otherwise everyone who ever touched Columns would never see Freq, Signal
   // and SNR (0050). Raise it, and give the new columns this `since`, the next
-  // time a column is added.
-  const ML_COLSET = 2;
+  // time a column is added. 3 is the Sensor column, and Value joining the
+  // narrow view: a battery reading 133 is 13.3 V, and the phone in the paddock
+  // is exactly where that should not need working out.
+  const ML_COLSET = 3;
 
   // The table wrapper's height, as three named steps rather than a drag edge —
   // a draggable edge on a box that already scrolls two ways is a fight with the
@@ -326,62 +332,32 @@ const MessageLog = (() => {
 
   // ── station resolution ─────────────────────────────────────────────────────
   // The address is the identity, not the station (0006's point 1), so a row
-  // resolves to a station three ways, in order of confidence: the station_id
-  // the datastore backfilled, the ALERT address against the loaded file, the
-  // station number against the loaded file. 604 of 5,122 ALERT addresses
-  // belong to more than one station, so an address match names the first and
-  // says how many more — a candidate, never an identification.
+  // resolves to a station in order of confidence: the station_id the
+  // datastore backfilled, the relayed ALERT2 pair, the ALERT address against
+  // the loaded file, the station number against the loaded file. 604 of 5,122
+  // ALERT addresses belong to more than one station, so an address match is a
+  // candidate, never an identification — sensor-values.js picks the candidate
+  // nearest to where the row's receiver hears, says how sure it is, and says
+  // how many more stations share the address.
+  //
+  // The resolver reads the rows on screen as its evidence (which addresses
+  // each ingress path heard), so it is rebuilt when the rows change and not
+  // per cell.
 
-  let _res = null, _resFor = null;
-
-  function resIndex() {
-    if (_res && _resFor === state.data) return _res;
-    const byId = new Map(), byNumber = new Map();
-    let sensors = null;
-    for (const s of (state.data?.stations || [])) {
-      byId.set(s.id, s);
-      for (const num of [s.station_number, s.site && s.site.number]) {
-        if (!num) continue;
-        const k = String(num);
-        if (!byNumber.has(k)) byNumber.set(k, []);
-        byNumber.get(k).push(s);
-      }
-    }
-    _resFor = state.data;
-    _res = {
-      byId, byNumber,
-      get sensors() {
-        if (!sensors) sensors = state.data ? buildSensorIndex() : new Map();
-        return sensors;
-      },
-    };
-    return _res;
-  }
+  let _resolve = null, _resolveFor = null, _resolveData = null;
 
   function rowStation(r) {
-    const ri = resIndex();
-    if (r.station_id && ri.byId.has(r.station_id)) {
-      return { st: ri.byId.get(r.station_id), how: 'resolved by the datastore', others: 0 };
+    if (!_resolve || _resolveFor !== ml.rows || _resolveData !== state.data) {
+      _resolve = SensorValues.resolver(ml.rows || []);
+      _resolveFor = ml.rows;
+      _resolveData = state.data;
     }
-    // The relayed ALERT2 station address, before the ALERT one — a row carrying
-    // a pair carries no ALERT address, so these are disjoint rather than ranked.
-    // An address belongs to one station (a unique index says so), which is why
-    // this tier never reports `others`.
-    if (r.a2_station != null) {
-      const st = ((state.data && state.data.stations) || [])
-        .find(x => x.alert2_station_id === r.a2_station);
-      if (st) return { st, how: 'matched on the relayed ALERT2 station address', others: 0 };
-    }
-    if (r.alert_id != null) {
-      const sts = [...new Set((ri.sensors.get(r.alert_id) || []).map(h => h.station))];
-      if (sts.length) return { st: sts[0], how: 'matched on the ALERT address', others: sts.length - 1 };
-    }
-    if (r.station_number) {
-      const list = ri.byNumber.get(String(r.station_number)) || [];
-      if (list.length) return { st: list[0], how: 'matched on the station number', others: list.length - 1 };
-    }
-    return { st: null, how: '', others: 0 };
+    return _resolve(r);
   }
+
+  // What the row is worth, recorded or worked out — sensor-values.js says
+  // which, and why when it cannot say.
+  const rowValueOf = (r, res) => SensorValues.rowValue(r, res || rowStation(r));
 
   // ── the query ──────────────────────────────────────────────────────────────
 
@@ -760,7 +736,12 @@ const MessageLog = (() => {
       }
       case 'name': {
         const name = res.st ? res.st.name : (r.addr && r.addr.startsWith('a:') ? '' : '');
-        const extra = res.others ? ` <span class="small" title="${res.others} more station${res.others === 1 ? ' shares' : 's share'} this address — an ALERT address is only unique within a region">+${res.others}</span>` : '';
+        // A station the register names, far from everything else this
+        // receiver hears, is the register being wrong about this corner of
+        // the country — said where it is seen, not only in the drawer.
+        const far = res.conf === 'far'
+          ? ` <span class="small txt-warn" title="${escAttr(res.how)}">far</span>` : '';
+        const extra = (res.others ? ` <span class="small" title="${res.others} more station${res.others === 1 ? ' shares' : 's share'} this address — an ALERT address is only unique within a region">+${res.others}</span>` : '') + far;
         return `<td class="ml-name" title="${escAttr(res.st ? `${res.st.name} — ${res.how}` : 'No station on file claims this message')}">${
           name ? esc(name) + extra : '<span class="small">—</span>'}</td>`;
       }
@@ -776,8 +757,9 @@ const MessageLog = (() => {
         return `<td class="small mono">${r.alert_id != null ? r.alert_id : '—'}</td>`;
       }
       case 'channel':  return `<td class="small">${esc(r.channel || '—')}</td>`;
+      case 'sensor':   return sensorCellHtml(r, res);
       case 'raw':      return `<td class="mono ml-raw">${esc(fmtNum(r.value_raw))}</td>`;
-      case 'value':    return `<td class="small">${r.value != null ? `${esc(fmtNum(r.value))} ${esc(r.unit || '')}` : '—'}</td>`;
+      case 'value':    return valueCellHtml(r, res);
       case 'quality':  return `<td class="small">${esc(vocabKey('quality', r.quality))}</td>`;
       case 'protocol': return `<td class="small">${esc(vocabKey('protocol', r.protocol))}</td>`;
       case 'source':   return `<td class="small">${esc(vocabKey('source', r.source))}</td>`;
@@ -800,6 +782,47 @@ const MessageLog = (() => {
       }
       default: return '<td>—</td>';
     }
+  }
+
+  // "Rainfall" for an address the register lists as Rainfall and Rainfall
+  // Increment (ARRO's accumulator and the increments it derives — one address,
+  // one gauge); every type when they genuinely differ.
+  function sensorLabel(res) {
+    const types = (res && res.types) || [];
+    if (!types.length) return SensorValues.kindLabel(res && res.kind);
+    const kinds = new Set(types.map(t => SensorValues.kindOf(t)));
+    return kinds.size === 1 ? types[0] : types.join(' / ');
+  }
+
+  // The register's word for the sensor, and the kind behind it when the
+  // types say nothing more specific. A shared address the rows cannot settle
+  // shows its kind only when every candidate agrees on it.
+  function sensorCellHtml(r, res) {
+    const label = sensorLabel(res);
+    if (!label) return '<td class="small">—</td>';
+    const tip = res.conf === 'ambiguous' ? 'Every station sharing this address says the same — the station itself is not settled'
+              : res.conf === 'far' ? 'What the register says — but the station it names is far from where this was heard; another station may be using the address'
+              : `From the station register, for ${res.st ? res.st.name : 'this address'}`;
+    return `<td class="small" title="${escAttr(tip)}">${esc(label)}</td>`;
+  }
+
+  // Recorded, inferred, or a sentence: never a bare dash for a row whose
+  // sensor is known. An inferred value carries a dotted underline and says so
+  // to a screen reader; an implausible one carries a warning sign.
+  function valueCellHtml(r, res) {
+    const v = rowValueOf(r, res);
+    if (!v) {
+      return `<td class="small" title="No station on file says what this address measures, so there is nothing to convert the raw count with">—</td>`;
+    }
+    if (v.value == null) {
+      return `<td class="small txt-muted" title="${escAttr(v.rule)}">${esc(v.text)}</td>`;
+    }
+    const warn = v.plausible === false
+      ? ` <span class="txt-warn" role="img" aria-label="implausible" title="${escAttr(v.note)}">⚠</span>` : '';
+    if (!v.inferred) {
+      return `<td class="small" title="${escAttr(v.rule)}">${esc(fmtNum(v.value))} ${esc(v.unit || '')}${warn}</td>`;
+    }
+    return `<td class="small" title="${escAttr(v.rule + (v.note ? ' — ' + v.note : ''))}"><span class="ml-inferred">${esc(v.text)}</span><span class="sr-only"> (worked out, not recorded)</span>${warn}</td>`;
   }
 
   function rowHtml(r, cols) {
@@ -985,6 +1008,26 @@ const MessageLog = (() => {
     return `<b class="mono">${esc(said.join(' · '))}</b> <span class="small">${esc(notes.join('; '))}</span>`;
   }
 
+  // The value, the rule that made it, and whether anybody recorded it. A
+  // value worked out here says so in as many words, and says what the sensor
+  // type was read from — a shared address is the case where that matters.
+  function detailValueHtml(r, res) {
+    const v = rowValueOf(r, res);
+    const sensor = sensorLabel(res);
+    if (!v) {
+      return `<b>—</b> <span class="small">no station on file says what this address measures — the raw value stands alone</span>`;
+    }
+    if (v.value == null) {
+      return `<b>${esc(v.text)}</b> <span class="small">${esc(v.rule)}</span>`;
+    }
+    const whose = v.inferred
+      ? `worked out here, not recorded by the datastore: ${esc(v.rule)}${sensor ? ` — the register calls this address ${esc(sensor)}${res.st ? ` at ${esc(res.st.name)}` : ''}` : ''}`
+      : `recorded at ingest: ${esc(v.rule)}`;
+    return `<b>${esc(fmtNum(v.value))} ${esc(v.unit || '')}</b>
+      <span class="small">${whose}</span>
+      ${v.plausible === false ? `<span class="small txt-warn">⚠ ${esc(v.note)}</span>` : ''}`;
+  }
+
   function detailHtml(r, res) {
     const lag = Date.parse(r.received_at) - Date.parse(r.reading_ts);
     const via = [...new Set([r.path, ...(r.dup_paths || [])].filter(Boolean))];
@@ -1009,11 +1052,7 @@ const MessageLog = (() => {
           ${isFinite(lag) ? `<span class="small${Math.abs(lag) > 600000 ? ' txt-warn' : ''}">${lag >= 0 ? '+' : '−'}${Math.round(Math.abs(lag) / 1000)} s after the reading${lag < 0 ? ' — the device clock is ahead of ours' : ''}</span>` : ''}</div>
         <div><span>Raw</span><b class="mono">${esc(fmtNum(r.value_raw))}</b>
           <span class="small">as transmitted — raw values are the truth</span></div>
-        <div><span>Converted</span>
-          ${r.value != null
-            ? `<b>${esc(fmtNum(r.value))} ${esc(r.unit || '')}</b>
-               <span class="small">${esc(r.conversion || 'rule not recorded')}</span>`
-            : `<b>—</b> <span class="small">no conversion recorded — the raw value stands alone</span>`}</div>
+        <div><span>Converted</span>${detailValueHtml(r, res)}</div>
         <div><span>Quality</span><b>${esc(vocabKey('quality', r.quality))}</b></div>
         <div><span>Pathway</span>
           <b>${esc(vocabKey('protocol', r.protocol))} · ${esc(vocabKey('source', r.source))}${r.path ? ` · in at ${esc(r.path)}` : ''}</b>
@@ -1178,7 +1217,8 @@ const MessageLog = (() => {
     ml.claim = null;
     // The registry changed under the datastore's copy of it, so put the address
     // where the row-resolver will find it rather than making the operator
-    // reload. resIndex() is rebuilt from state.data on the next render.
+    // reload — and drop the address index and the resolver built over it,
+    // which were both made before the station carried the address.
     if (st) {
       if (what.kind === 'a2') st.alert2_station_id = r.a2_station;
       else {
@@ -1187,6 +1227,8 @@ const MessageLog = (() => {
           st.sensors.push({ sensor_id: out.sensor_id, type: 'Unknown', alert_id: r.alert_id });
         }
       }
+      SensorValues.invalidate();
+      _resolve = null;
     }
     // Repaint before the re-query, not after it. The write has already landed;
     // leaving the picker on screen until a *read* comes back means a datastore
@@ -1628,6 +1670,21 @@ const MessageLog = (() => {
     });
   }
 
+  // The entrance from the Station Health tab: a station's addresses (or one
+  // address) over the window that tab analysed, in reading order — the
+  // readings behind a finding, one row each.
+  function showWindow(find, t0, t1) {
+    const iso = t => { const d = new Date(t); return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+    ml.q.find = String(find || '');
+    ml.q.win = 'custom';
+    ml.q.from = iso(t0);
+    ml.q.to = iso(t1 + 60000);
+    ml.q.order = 'reading.desc';
+    ml.focusKey = null;
+    switchTab('msglog');
+    run();
+  }
+
   // ── export ─────────────────────────────────────────────────────────────────
   // Every fetched row and every column, whatever the views are hiding — the
   // narrow view is a reading aid, not a statement about the record.
@@ -1639,10 +1696,15 @@ const MessageLog = (() => {
                   'station', 'station_id', 'value_raw', 'value', 'unit', 'conversion',
                   'quality', 'protocol', 'source', 'path',
                   'freq_mhz', 'rssi_dbm', 'level_dbfs', 'snr_db',
-                  'dup_count', 'dup_paths', 'raw_id'];
+                  'dup_count', 'dup_paths', 'raw_id',
+                  // Last, so a reader of the older layout finds every column
+                  // where it was: what the address measures and what the
+                  // count is worth, worked out here when nobody recorded it.
+                  'sensor_type', 'value_shown', 'unit_shown', 'value_inferred', 'value_rule'];
     const lines = [head.join(',')];
     for (const r of rows) {
       const res = rowStation(r);
+      const v = rowValueOf(r, res);
       lines.push([
         csvEscape(r.reading_ts), csvEscape(r.received_at), csvEscape(r.addr),
         r.alert_id ?? '', csvEscape(r.station_number || ''), csvEscape(r.channel || ''),
@@ -1652,6 +1714,9 @@ const MessageLog = (() => {
         csvEscape(vocabKey('source', r.source)), csvEscape(r.path || ''),
         r.freq_mhz ?? '', r.rssi_dbm ?? '', r.level_dbfs ?? '', r.snr_db ?? '',
         r.dup_count ?? 0, csvEscape((r.dup_paths || []).join(' | ')), r.raw_id ?? '',
+        csvEscape(sensorLabel(res)),
+        v && v.value != null ? v.value : '', csvEscape(v && v.value != null ? v.unit || '' : ''),
+        v ? (v.inferred ? 'true' : 'false') : '', csvEscape(v ? v.rule + (v.note ? ' — ' + v.note : '') : ''),
       ].join(','));
     }
     dlText(`meganet-message-log-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
@@ -1709,7 +1774,7 @@ const MessageLog = (() => {
     setWin, setDate, setFind, findKey, setCode, setText, setFlag, setOrder, loadMore,
     setFollow, setView, setCol, resetCols, setHeight, resetWidths, colGrip,
     rowClick, toggleRow, pickClick, setSel, selAll, clearSel, trayToggle,
-    fetchRaw, showStation, openInField, openInPackets, openInAlert2, showReading,
+    fetchRaw, showStation, openInField, openInPackets, openInAlert2, showReading, showWindow,
     claimOpen, claimClose, claimSearch, claimPick,
     exportCsv, adoptRows,
   };

@@ -6,6 +6,20 @@
 // same stations, one of them made to flip a bit in a third of what it relays —
 // and the check holds the analysis to naming that one, by pass ranges alone
 // (positions stripped) and with positions (the bad copies loudest near it).
+// Then the stored readings, which every base station's traffic lands in, on
+// readings built for each rule:
+//
+//   * a row is a copy, and each further path that heard it another; anything
+//     not an ALERT frame is left out
+//   * a station's two sensors a bit apart, a second apart in its burst, are two
+//     readings, not a flip
+//   * a repeater's corrupted copy nine seconds after the clean one is found
+//   * a frame landing on another station's address is a ghost of the one whose
+//     own reports it is in line with; two stations that only look alike are both
+//     kept
+//   * a gauge tipping every few seconds through a storm is reporting
+//   * the tab reads them from the datastore (stood in for) and finds the same
+//
 // Then the pieces an operator touches:
 //
 //   * NMEA: GGA and RMC from any talker, checksums enforced, hemispheres signed
@@ -123,6 +137,88 @@ try {
   await page.click('.rx-page tbody tr th button');
   await page.waitForTimeout(300);
   ok('picking a suspect draws its lines and marks the row', await page.evaluate(() => document.querySelectorAll('.rx-page tr.rx-sel').length === 1));
+  // ── the stored readings ────────────────────────────────────────────────────
+  const STORED = await page.evaluate(() => {
+    const H = 3600e3;
+    const idx = SensorValues.index();
+    const own = new Map([...idx.entries()].filter(([, l]) => l.length === 1 && l[0].station.lat != null).map(([a, l]) => [a, l[0].station]));
+    // A station with two addresses a bit apart, and two pairs of stations near
+    // each other whose addresses are a bit apart.
+    let sib = null;
+    const pairs = [];
+    for (const [a, sa] of own) {
+      for (let k = 0; k < 13; k++) {
+        const b = a ^ (1 << k), sb = own.get(b);
+        if (!sb || b < a) continue;
+        if (sb.id === sa.id) { if (!sib) sib = { a, b }; }
+        else if (SensorValues.km(sa.lat, sa.lon, sb.lat, sb.lon) < 60 && !pairs.some(p => [p.a, p.b].some(x => x === a || x === b))) pairs.push({ a, b });
+      }
+    }
+    const used = new Set([sib.a, sib.b, ...pairs.slice(0, 2).flatMap(p => [p.a, p.b])]);
+    const r = [...own.keys()].find(x => !used.has(x));
+    const [p, q] = pairs;
+    const t0 = Math.floor((Date.now() - 3 * 86400e3) / 60e3) * 60e3 + 41e3;
+    const row = (aid, t, v, dups) => ({ addr: 'a:' + aid, alert_id: aid, reading_ts: new Date(t).toISOString(), value_raw: v,
+      path: 'serial-monitor/test-pi-sdr0', dup_count: (dups || []).length, dup_paths: dups || [], rssi_dbm: null, level_dbfs: -40, snr_db: 12 });
+    const rows = [];
+    for (let k = 0; k < 8; k++) {
+      const t = t0 + k * 3 * H;
+      rows.push(row(sib.a, t, 5), row(sib.b, t + 1000, 5));                       // one station's burst
+      rows.push(row(p.a, t + 600e3, 133 + (k % 2)), row(p.b, t + 1800e3, 1200 + k));  // p.a 133-ish, p.b in the thousands
+      rows.push(row(q.a, t + 2400e3, 130 + (k % 2)), row(q.b, t + 3000e3, 131 - (k % 2)));  // both 130-ish
+    }
+    rows.push(row(p.a, t0 + 24 * H + 600e3, 133), row(p.a, t0 + 24 * H + 609e3, 133 ^ 64));  // corrupted, 9 s on
+    rows.push(row(p.a, t0 + 27 * H + 600e3, 134), row(p.b, t0 + 27 * H + 602e3, 134));        // p.a's frame on p.b's address
+    rows.push(row(q.a, t0 + 27 * H + 2400e3, 131), row(q.b, t0 + 27 * H + 2401e3, 131));       // q's two just look alike
+    for (let i = 0; i < 12; i++) rows.push(row(r, t0 + 40 * H + i * 7000, 400 + i));            // a storm, a tip every 7 s
+    rows.push(row(p.a, t0 + 30 * H + 600e3, 133, ['serial-monitor/test-pi-sdr1']));            // heard twice
+    rows.push({ addr: 's:541155/level', alert_id: null, reading_ts: new Date(t0).toISOString(), value_raw: 1.5, path: 'x', dup_count: 0, dup_paths: [] });
+    rows.push(row(p.a, t0 + 31 * H, 4000));                                                     // not an ALERT value
+    return { rows, sib, p, q, r };
+  });
+  const sr = await page.evaluate(W => {
+    const ents = Reception.fromReadings(W.rows);
+    const a = Reception.analyse(ents);
+    const bad = a.bad.map(b => ({ heard: b.e.alert_id + '=' + b.e.value_raw, truth: b.truth.alert_id + '=' + b.truth.value_raw, why: b.why }));
+    return { ents: ents.length, valid: W.rows.filter(r => r.alert_id != null && r.value_raw <= 2047).length, bad, rapid: a.rapid, own: a.own,
+      twice: ents.filter(e => e.alert_id === W.p.a && e.value_raw === 133 && e.t === Date.parse(W.rows.find(r => r.dup_count === 1).reading_ts)).length };
+  }, STORED);
+  const has = (heard, truth) => sr.bad.some(b => b.heard === heard && b.truth === truth);
+  ok('a stored reading is a copy, and each further path that heard it another; what is not an ALERT frame is left out',
+    sr.ents === sr.valid + 1 && sr.twice === 2, JSON.stringify({ ents: sr.ents, valid: sr.valid, twice: sr.twice }));
+  ok('a station\'s two sensors a bit apart, a second apart in its burst, are not a flip',
+    !sr.bad.some(b => [STORED.sib.a, STORED.sib.b].some(x => b.heard.startsWith(x + '='))), JSON.stringify(sr.bad));
+  ok('a repeater\'s corrupted copy nine seconds after the clean one is found', has(STORED.p.a + '=' + (133 ^ 64), STORED.p.a + '=133'), JSON.stringify(sr.bad));
+  ok('a frame on another station\'s address is a ghost of the one whose own reports it is in line with',
+    has(STORED.p.b + '=134', STORED.p.a + '=134'), JSON.stringify(sr.bad));
+  ok('two stations that only look alike are both kept', sr.own >= 1 && !sr.bad.some(b => [STORED.q.a, STORED.q.b].some(x => b.heard.startsWith(x + '='))), JSON.stringify(sr));
+  ok('a gauge tipping every 7 s through a storm is reporting, not corrupted', sr.rapid >= 5 && !sr.bad.some(b => b.heard.startsWith(STORED.r + '=')), JSON.stringify(sr));
+  ok('…and that is all that is bad', sr.bad.length === 2, JSON.stringify(sr.bad));
+
+  const readingAsks = [];
+  await page.route('**/rest/v1/reading?*', route => {
+    const u = new URL(route.request().url());
+    readingAsks.push(u.search);
+    const q = u.searchParams;
+    const ts = q.getAll('reading_ts');
+    const gte = Date.parse(ts.find(x => x.startsWith('gte.')).slice(4)), lt = Date.parse(ts.find(x => x.startsWith('lt.')).slice(3));
+    let rows = STORED.rows.filter(r => { const t = Date.parse(r.reading_ts); return t >= gte && t < lt; });
+    if (q.get('alert_id') === 'not.is.null') rows = rows.filter(r => r.alert_id != null);
+    const off = Number(q.get('offset')) || 0, cols = q.get('select').split(',');
+    const body = rows.slice(off, off + 1000).map(r => Object.fromEntries(cols.map(k => [k, r[k] === undefined ? null : r[k]])));
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  await page.evaluate(() => { Reception.clearLoaded(); Reception.setLocal(false); });
+  await page.click('button:has-text("From the stored readings")');
+  await page.waitForFunction(() => /copies of ALERT frames/.test((document.getElementById('rx-rd-note') || {}).textContent || ''), null, { timeout: 15_000 });
+  const ui = await page.evaluate(() => ({ bad: Reception._state.last.bad.length, rows: document.querySelectorAll('[aria-labelledby="rx-h-bad"] tbody tr').length,
+    hint: (document.querySelector('.rx-page .qs-hint') || {}).textContent || '' }));
+  ok('the tab reads the stored readings from the datastore — ALERT frames only — and finds the same',
+    readingAsks.length > 0 && readingAsks.every(s => /alert_id=not\.is\.null/.test(s)) && ui.bad === sr.bad.length && ui.rows === sr.bad.length,
+    JSON.stringify({ asks: readingAsks.length, ui: { bad: ui.bad, rows: ui.rows } }));
+  ok('…and says the stored readings carry no position', /Stored readings carry no position/.test(ui.hint), ui.hint.slice(0, 200));
+  await page.evaluate(() => { Reception.clearLoaded(); Reception.setLocal(true); });
+
   ok('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 } finally {
   await browser.close();
@@ -130,4 +226,4 @@ try {
 }
 
 if (failures) { console.log(`\nFAIL — ${failures} check(s) failed.`); process.exit(1); }
-console.log('PASS — the Reception Map names the repeater a drive was built to blame, by pass ranges and by where its bad copies were loud.');
+console.log('PASS — the Reception Map names the repeater a drive was built to blame, by pass ranges and by where its bad copies were loud, and keeps its rules on the stored readings.');

@@ -149,7 +149,9 @@ const TABS = [
     { id: 'field',      label: 'Field Data',             icon: '🌡️',
       find: 'readings telemetry datastore sensors chart plot window rainfall level quality' },
     { id: 'msglog',     label: 'Message Log',            icon: '📨',
-      find: 'messages telemetry arrivals incoming ingest raw log fade margin ingress base pathway follow live decode calibration' },
+      find: 'messages telemetry arrivals incoming ingest raw log fade margin ingress base pathway follow live decode calibration value volts battery converted' },
+    { id: 'health',     label: 'Station Health',         icon: '🚦',
+      find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage' },
   ] },
   { group: 'Site visits', tabs: [
     { id: 'inspections', label: 'Inspections',           icon: '🩺',
@@ -875,10 +877,11 @@ const HELP = {
   },
 
   reception: {
-    summary: 'What the Serial Monitor\'s receivers heard, where, and how strongly — and which '
-           + 'transmitter is sending bad packets. Every frame a Quansheng, RTL-SDR or ERT-A2 card hears '
-           + 'is logged with its level and the receiver\'s position; bad copies are laid against the '
-           + 'repeaters whose pass ranges could have carried them.',
+    summary: 'What the receivers heard, where, and how strongly — and which transmitter is sending '
+           + 'bad packets. Every frame a Quansheng, RTL-SDR or ERT-A2 card hears is logged with its level '
+           + 'and the receiver\'s position, and every base station\'s <strong>stored readings</strong> '
+           + 'can be read in too; bad copies are laid against the repeaters whose pass ranges could have '
+           + 'carried them.',
     watch: [
       '<strong>It works without moving.</strong> A bad copy of an address can only have come through a '
       + 'repeater that passes that address, so even one fixed receiver narrows the field: blame is split '
@@ -886,15 +889,21 @@ const HELP = {
       '<strong>Positions sharpen it.</strong> With a GPS card on the Serial Monitor (any USB GPS puck) or a '
       + 'phone\'s location, bad copies get louder nearer the repeater sending them; the table gives the '
       + 'correlation and the map shows where they were loudest. A drive past the suspects is the test.',
-      'It <strong>narrows; it does not convict</strong>. Adjacent addresses transmitting in the same '
-      + 'seconds can look like a flip, a missing pass range hides a path, and no repeater delays are '
-      + 'recorded yet, so timing is not used. Confirm on site.',
+      '<strong>Each packet is read in its context.</strong> A station\'s own two sensors in one burst '
+      + 'are never a flip of each other; between two stations\' addresses, the frame in line with its own '
+      + 'address\'s other reports is the original and the other its ghost, and two that are both in line '
+      + 'are both kept; a gauge tipping through a storm is reporting. The stored readings carry no '
+      + 'position, so each is placed by the area its receiver hears — enough to rule out repeaters out of '
+      + 'reach.',
+      'It <strong>narrows; it does not convict</strong>. Two stations with nearby addresses and no other '
+      + 'reports to set them against can still look like a flip, a missing pass range hides a path, and no '
+      + 'repeater delays are recorded yet, so timing is not used. Confirm on site.',
       'Receptions are <strong>kept in this browser</strong> and, from a receiver sending to MegaNet, in '
       + 'the database (editors only — they say where a vehicle was). Export a drive as CSV or GeoJSON '
       + 'and load it on another computer.',
     ],
     links: [{ label: 'The Reception Map and a vehicle rig', href: 'docs/reception-map.md' }],
-    related: ['serial', 'workbench', 'bitflipper', 'network'],
+    related: ['health', 'serial', 'workbench', 'bitflipper', 'network'],
   },
 
   bitflipper: {
@@ -1207,7 +1216,7 @@ const HELP = {
       { label: 'Posting readings over MQTT, and knowing which stations went quiet',
         href: 'docs/ingest-mqtt.md' },
     ],
-    related: ['arrodata', 'msglog', 'stations', 'alert2'],
+    related: ['arrodata', 'msglog', 'health', 'stations', 'alert2'],
   },
 
   msglog: {
@@ -1220,10 +1229,14 @@ const HELP = {
            + 'the mode for standing in a paddock waiting for a test transmission to land.',
     watch: [
       '<strong>Raw is the headline column because raw is the truth.</strong> The value the device '
-      + 'transmitted is always shown; the converted value appears beside it only when the '
-      + 'datastore recorded a conversion, and the rule that produced it is in the row\'s detail. '
-      + 'A rainfall count means nothing without the bucket size, and this tab never pretends '
-      + 'otherwise.',
+      + 'transmitted is always shown. <strong>Value</strong> beside it is the datastore\'s own '
+      + 'conversion when it recorded one, and otherwise worked out here from what the register '
+      + 'says the address is: a battery count ÷ 10 is volts (133 is 13.3 V), a rain gauge\'s '
+      + 'count × its bucket is millimetres — a running total, not a fall. A worked-out value has '
+      + 'a dotted underline and says so; one that cannot be what the sensor is (a 187 V battery) '
+      + 'carries ⚠. A <strong>water level stays a raw count</strong>: its scale is set per site '
+      + 'and nothing in MegaNet records it, and a number invented here would read like a '
+      + 'measurement.',
       'The <strong>narrow view is a reading aid, not the record</strong>. It opens with the '
       + 'field set — time, station, address, raw value — and the Columns button decides what '
       + 'each view keeps, remembered on this device per view. Export CSV always writes every '
@@ -1240,8 +1253,12 @@ const HELP = {
       + 'number, and Quality is what the source said about the value, not how loud it was.',
       'A station name here is a <strong>resolution, not a claim the message made</strong>. The '
       + 'datastore backfills <code>station_id</code> where the address is unambiguous; where it '
-      + 'is not, the row shows the first candidate and says how many more share the address — '
-      + '604 of 5,122 ALERT addresses belong to more than one station.',
+      + 'is not, the row shows the candidate nearest to where the receiver that heard it '
+      + 'listens, and says how many more share the address — 604 of 5,122 ALERT addresses belong '
+      + 'to more than one station, usually in different states. A station marked '
+      + '<strong>far</strong> is the only one on file with the address and is hundreds of '
+      + 'kilometres from everything else that receiver hears: an unregistered station nearby is '
+      + 'using it.',
       '<strong>An unresolved row can name its own station.</strong> Open it and the drawer offers '
       + 'to attribute the message: pick a station and the address is attached to it, every '
       + 'reading already stored under that address is backfilled, and the tab says how many. '
@@ -1266,7 +1283,54 @@ const HELP = {
       { label: 'Posting readings over MQTT, and knowing which stations went quiet',
         href: 'docs/ingest-mqtt.md' },
     ],
-    related: ['field', 'alert2', 'packets', 'stations'],
+    related: ['health', 'field', 'alert2', 'packets', 'stations'],
+  },
+
+  health: {
+    summary: 'What the readings landing in the datastore say about each field station and the '
+           + 'network carrying them, ranked by what needs doing. <strong>Needs attention</strong> '
+           + 'is the morning\'s list: stations gone silent, missed check signals rising, batteries '
+           + 'sliding or not charging, rain gauges dry through their neighbours\' rain, levels that '
+           + 'did not move, receivers that stopped, repeaters that a run of silences has in common — '
+           + 'each with its evidence and what to do about it. Pick a station for its '
+           + '<strong>checks slot by slot</strong>, its <strong>battery across its solar day</strong>, '
+           + 'its sensors, and the <strong>context lens</strong>: pick a missed check or a reading and '
+           + 'see what every receiver and neighbour was doing at that moment. <strong>Ask Claude</strong> '
+           + 'hands the findings to an agent that investigates and writes the briefing.',
+    watch: [
+      '<strong>Check schedules are learned, not assumed.</strong> Most stations send every sensor '
+      + 'every three hours, some every two or every half hour; the period is read off the gaps '
+      + 'between a station\'s battery reports (a battery reports at checks and nothing else), and a '
+      + 'gap must be a whole number of periods — mostly exactly one.',
+      '<strong>A missed check only counts when somebody was listening.</strong> A slot is a miss '
+      + 'only if a receiver that hears the station delivered other traffic just before and just '
+      + 'after it; otherwise it is unknown, not missed. A quarter-hour most of the network missed at '
+      + 'once is the network\'s, and is counted apart from each station\'s.',
+      '<strong>The battery is trended on its night lows.</strong> A solar station swings half a volt '
+      + 'or more every day, so its trend is the lowest reading before dawn, in the station\'s own '
+      + 'solar time, night after night — and the daily swing says whether charge is arriving at all.',
+      '<strong>Corrupted copies are stored as readings.</strong> A repeater that relays with bit '
+      + 'errors produces a second, different copy seconds after the first, and the datastore keeps '
+      + 'both — 2% of the Raspberry Pi feed\'s first days. A flip in the address bits files it under '
+      + 'another address: a ghost — told, on a station\'s own address, by being out of line with what '
+      + 'that address reports while its near-twin is in line with its own. Both are set aside before '
+      + 'anything is worked out, and both count against the repeaters within reach that could have '
+      + 'carried them; a rain gauge tipping every few seconds through a storm is reporting, not being '
+      + 'corrupted. <em>Weigh the copies on the Reception Map</em> takes them further.',
+      '<strong>Silences that happen together are one finding.</strong> Stations behind one repeater '
+      + 'that went quiet inside one check period of each other, or that went silent together and came '
+      + 'back together, are reported as the repeater or the area, not as a dozen station faults. One '
+      + 'that went at night and came back in daylight is the shape of a solar site that cannot carry '
+      + 'itself through the night.',
+      '<strong>Readings are public, so this tab needs no sign-in</strong> — and it reads only what the '
+      + 'datastore holds: raw readings age out at about 90 days, and a station only one receiver can '
+      + 'hear cannot be judged while that receiver is down.',
+    ],
+    links: [
+      { label: 'Station Health — every finding, what triggers it, and what to do',
+        href: 'docs/station-health.md' },
+    ],
+    related: ['msglog', 'reception', 'basestations', 'field', 'stations'],
   },
 
   mapgen: {
@@ -1549,7 +1613,7 @@ const HELP = {
     ],
     links: [{ label: 'Base stations: checking in, what may be asked, and the team keys', href: 'docs/base-stations.md' },
             { label: 'Ingest tokens, and base stations that ask for one', href: 'docs/ingest-http.md' }],
-    related: ['admin', 'msglog'],
+    related: ['admin', 'msglog', 'health'],
   },
 };
 

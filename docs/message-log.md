@@ -40,6 +40,34 @@ station numbers, a protocol, an ingress path, quality, "heard more than once",
 "unresolved address only". Note the retention edge below before reaching back
 too far.
 
+## Values worked out from raw counts
+
+Everything an RTL-SDR or a radio hears off the air arrives with the count
+alone — a battery as `133`, a rain gauge as `43` — so the datastore records no
+converted value for most of what is now stored. Rather than leave Value empty,
+the tab works one out from what the address measures (`sensor-values.js`, the
+same rules the ALERT2 / ERT-A2 tab uses):
+
+| Sensor | Rule | Example |
+| --- | --- | --- |
+| Battery | raw ÷ 10 = volts. A result outside 9–16.5 V is flagged ⚠ — that address is probably another kind of sensor somewhere else. | 133 → *13.3 V* |
+| Rainfall | raw × the bucket = millimetres of the gauge's **running total**, not a fall. The station's recorded bucket size when it has one; 0.2 mm/tip assumed, and said so, when it does not. | 43 → *8.6 mm* |
+| Water level | no conversion — its scale is set per site and nothing in MegaNet records it, so the count is the reading and the cell says *raw count*. | 512 → *raw count* |
+
+A recorded value always wins over a worked-out one; hover any Value for the rule
+that produced it. The CSV export carries both: `value` as recorded, and
+`value_shown`, `unit_shown`, `value_inferred` and `value_rule` for what the table
+showed.
+
+**Which station, when an address is shared.** 604 of 5,122 ALERT addresses
+belong to more than one station, usually across the country, and the kind decides
+the conversion — so it cannot be "the first station on file". The readings in view
+say where each receiver listens (the stations it hears that nobody else carries),
+and a shared address resolves to the candidate near there, when the next is at
+least 100 km further. An address whose only owner on file is more than 400 km from
+everything else that receiver hears is marked **far** in the Station cell — the
+strongest hint there is that an unregistered station nearby is using it.
+
 ## Reading the table
 
 One row is **one reading, not one transmission**. The datastore deduplicates
@@ -56,8 +84,9 @@ nowhere else.
 | Station | The resolved station — see the note on resolution below. |
 | AlertID | The ALERT address the message was addressed to. Empty for satellite/cellular messages, which report under a station number and channel. |
 | Channel | Which sensor spoke, for station-number-addressed messages. An ALERT address *is* the sensor, so radio rows have no channel. **Not the radio channel** — that is Freq. |
+| Sensor | What the address measures — the register's sensor type at the resolved station (Battery, Rainfall, Water Level…), or the kind every station sharing the address agrees on. |
 | **Raw** | `value_raw` — as transmitted, before any interpretation. |
-| Value | The conversion, when one was recorded, with its unit. Display only. |
+| Value | The conversion, with its unit: the one the datastore recorded when there is one; otherwise one **worked out here** from the sensor, shown in italic and read out as "worked out, not recorded". Display only. See below. |
 | Quality | What the source said about the reading. `unqualified` means nobody said anything — not that anybody checked. About the value, not the signal. |
 | Protocol | The wire protocol decoded from — `alert`, `alert2`, `arro` (backfill). |
 | Source | The transport — `http`, `mqtt`, `manual`, `backfill`, `serial`. |

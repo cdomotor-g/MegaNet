@@ -3041,6 +3041,7 @@ function renderMain() {
     // Same module, second instance — see the comment at the top of ArroData.
     case 'field':      el.innerHTML = ArroData.render('field'); ArroData.init();  break;
     case 'msglog':     el.innerHTML = MessageLog.render();      MessageLog.init(); break;
+    case 'health':     el.innerHTML = Health.render();          Health.init();     break;
     case 'mapgen':     el.innerHTML = MapGen.render();          MapGen.init();     break;
     case 'inspections': el.innerHTML = Inspections.render();  Inspections.init(); break;
     case 'maintenance': el.innerHTML = Maintenance.render();  Maintenance.init(); break;

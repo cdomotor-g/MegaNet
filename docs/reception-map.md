@@ -1,9 +1,9 @@
 # The Reception Map, and a receiver in a vehicle
 
-The **Reception Map** tab (Interference group) shows what the Serial Monitor's
-receivers heard, where, and how strongly — and works out which transmitter is
-sending bad packets. It is built for the question the network has now: *is a
-repeater hearing stations cleanly and re-transmitting them with flipped bits?*
+The **Reception Map** tab (Interference group) shows what the receivers heard,
+where, and how strongly — and works out which transmitter is sending bad
+packets. It is built for the question the network has now: *is a repeater
+hearing stations cleanly and re-transmitting them with flipped bits?*
 
 ## What feeds it
 
@@ -28,22 +28,63 @@ to MegaNet*; otherwise none. History read out of a log file gets no position.
 The log is kept in this browser (newest 10,000), exported as **CSV or GeoJSON**,
 and — when the receiver is sending to MegaNet — posted to the database
 (`meganet.report_receptions()`, migration `0047`; editors-only to read, since a
-vehicle's receptions say where the vehicle went). The map reads this browser's
-log, a loaded file, the database, or a **demo drive**.
+vehicle's receptions say where the vehicle went).
+
+**The stored readings** are the other source, and the one with the most in it:
+every base station's traffic, public, a week of it in a few seconds (*From the
+stored readings*, ALERT frames only, for the time picked — *everything* means a
+week). A stored reading is the copy the datastore kept, and each further path
+that heard the same frame (`dup_paths`) counts as another copy. They carry no
+position, so the map shows only the suspect repeaters; each is placed instead by
+the **area its receiver hears** (the stations it hears that nobody else carries),
+which is enough to rule out repeaters too far away to have been heard and to pick
+the right station for a shared address. The **Station Health** tab's *Weigh the
+copies on the Reception Map* hands over the readings it already holds.
+
+The map reads this browser's log, a loaded file, the stored readings, the
+receptions table (*Receptions table (editors)*), or a **demo drive**.
 
 ## How it finds the bad repeater
 
-1. **Copies of one transmission.** Frames heard within 3 s of each other and
-   within 3 bits are copies of one transmission (direct, then each repeater's
-   re-send). The version a station actually carries, heard most often, is the
-   truth; any other copy is **flipped**. A lone frame whose address no station
-   carries, within 2 bits of one the receiver did hear, is a **ghost**. What a
-   card refused counts too.
+1. **Copies of one transmission.** The copies of one frame land within seconds
+   of each other — direct, then each repeater's re-send. On the stored readings a
+   repeater's corrupted copy lands a median 2.1 s after the clean one, nine in ten
+   within 6.6 s and none past 12, so:
+   - a frame on the **same address** within 12 s is a copy, however many bits
+     differ;
+   - a frame on **another address** is a copy only within 3 bits — within 12 s
+     when no station carries that address, within 3 s when one does (two
+     stations' frames can be that alike by chance), and **never when one station
+     carries both**: that is its next sensor, in the same burst (190 such pairs
+     a week, which this used to call flips).
+
+   The version a station carries beats one nobody does. Between two addresses,
+   the version **in line with its own address's other reports** (within 5 counts
+   of its last or next) beats one that is not — the context the packet was heard
+   in: `4803 = 51` two seconds after `4801 = 51`, where 4801 reads 50-odd all week
+   and 4803 reads in the thousands, is 4801's frame with an address bit flipped.
+   Then the most copies; then, on one address, the value nearest that address's
+   last; then the first heard; then the loudest. Any other copy is **flipped**.
+
+   Three things are set aside rather than blamed, each counted on the tab:
+   - **two stations that only look alike** — each frame in line with its own
+     station's reports — are both kept;
+   - **a station reporting faster than its copies land** — a rain gauge tipping
+     every few seconds in a storm — sends real values inside one window: a value
+     a few counts on, between the transmission's and the address's next or last
+     one sent within two minutes, or carrying on the run, is that report (29 of
+     the 33 one-to-three-tip "flips" on rain gauges in a week were);
+   - **an address on no station that keeps turning up on its own** is a station
+     MegaNet does not know about (or a repeater stuck on one bit whose victim this
+     receiver never hears), not a ghost.
+
+   A lone frame whose address no station carries, within 2 bits of one heard
+   clean, is a **ghost**. What a card refused counts too.
 2. **Pass ranges — works today, even from one fixed receiver.** A bad copy of
    address A can only have come through a repeater whose pass ranges let A
-   through. Each bad copy's **blame** is split across those repeaters; the one
-   common to several stations' bad copies collects it, and one that is the *only*
-   path for some is named.
+   through and that is within 400 km of where the copy was heard. Each bad copy's
+   **blame** is split across those repeaters; the one common to several stations'
+   bad copies collects it, and one that is the *only* path for some is named.
 3. **Geometry — once receptions have positions.** Bad copies are loudest near the
    repeater sending them: for each suspect, the correlation between bad-copy RSSI
    and log-distance from it (strongly negative for the culprit), the median
@@ -57,9 +98,13 @@ The demo drive is built against the real registry with one real repeater made to
 flip bits; `npm run reception` holds the method to naming it, by pass ranges
 alone and with positions.
 
-**It narrows; it does not convict.** Two stations with nearby addresses
-transmitting in the same seconds can look like a flip; a missing pass range hides
-a path. Confirm on site — a receiver parked beside the suspect, or its own logs.
+**It narrows; it does not convict.** Two stations with nearby addresses and
+similar values transmitting in the same seconds can still look like a flip when
+neither has other reports to set it against; repeaters that pass the same
+addresses share the blame equally, however different their records; a missing
+pass range hides a path. Confirm on site — a receiver parked beside the suspect,
+or its own logs. `npm run reception` holds each rule above to readings built for
+it.
 
 ## Doing it now, with what there is
 
@@ -96,4 +141,4 @@ location *the GPS card*, and leave it. Each card resumes sending after a restart
 
 Still to build when a rig exists: a headless runner (so a Pi does not need a
 browser window), and the database side of the analysis — the same method run over
-every vehicle's receptions at once, on the Reception Map's *From the database*.
+every vehicle's receptions at once, on the Reception Map's *Receptions table (editors)*.

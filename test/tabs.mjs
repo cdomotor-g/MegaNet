@@ -642,6 +642,33 @@ const BS_FIXTURE = {
   ] }),
 };
 
+// The Station Health tab, born converted. It draws nothing but its status
+// line until the datastore answers, which under this harness it never does, so
+// its seed is the tab's own Demo week — real stations, a made-up week with one
+// of every fault planted — waited for: the analysis takes a frame to start and
+// a few hundred milliseconds to run. Two entries: the board (what needs
+// attention, the map, the checks matrix, the network, the agent's key form),
+// and a station open with a missed check put in context, which is where the
+// slot strip, the battery chart and the context lens live. test/health.mjs
+// holds what the tab does; this holds how it is built.
+const SEED_HEALTH = `async () => {
+  const st = Health.state();
+  if (!(st.A && st.demo)) Health.demo();
+  for (let i = 0; i < 200 && !(Health.state().A && document.querySelector('.hl-ftable')); i++) await new Promise(r => setTimeout(r, 25));
+  if (Health.state().sel) Health.close();
+}`;
+const SEED_HEALTH_STATION = `async () => {
+  const st = Health.state();
+  if (!(st.A && st.demo)) Health.demo();
+  for (let i = 0; i < 200 && !(Health.state().A && document.querySelector('.hl-ftable')); i++) await new Promise(r => setTimeout(r, 25));
+  const A = Health.state().A;
+  const f = A.findings.find(x => x.kind === 'silent');
+  if (Health.state().sel !== f.stationId) Health.select(f.stationId);
+  const miss = A.stations.get(f.stationId).slots.filter(sl => sl.outcome === 'miss').pop();
+  Health.lensAt(f.stationId, miss.t, 'slot');
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+}`;
+
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
@@ -682,6 +709,8 @@ const CONVERTED = [
   { id: 'photos',     label: 'Field Photos — a queue, the place editor, the library and the sync', issue: 'born converted', seed: SEED_PHOTOS },
   { id: 'basestations', label: 'Base Stations — signed out', issue: 'born converted', seed: SEED_BS_OUT },
   { id: 'basestations', label: 'Base Stations — the list, a station open, and the team keys', issue: 'born converted', seed: SEED_BS },
+  { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
+  { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },
 ];
 
 
