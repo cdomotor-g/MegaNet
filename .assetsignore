@@ -9,3 +9,10 @@ node_modules
 wrangler.toml
 .assetsignore
 worker
+
+# Never ship local secrets as static assets, even if one is present in the
+# working tree at deploy time (appraisal L-12).
+.env
+.env.*
+.dev.vars
+.wrangler

@@ -23,3 +23,12 @@ sdr-pi/node_modules/
 __pycache__/
 *.pyc
 
+# Local Worker/wrangler secrets — never commit or deploy these. A stray
+# `wrangler deploy` from a working tree holding bridge/.env would otherwise
+# publish it as a static asset (see .assetsignore, and the appraisal's L-12).
+.env
+.env.*
+!.env.example
+.dev.vars
+.wrangler/
+
