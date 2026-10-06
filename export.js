@@ -176,7 +176,7 @@ function renderExportHtml() {
                   ${selRpts.map(r => `
                     <tr>
                       <td>${esc(r.name)}</td>
-                      <td class="small col-optional">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
+                      <td class="small col-optional">${r.radio_network_ids.map(id => esc(netName(id))).join(', ')}</td>
                       <td class="rx-cell small">${r.repeater.rx_mhz || ''}</td>
                       <td class="tx-cell small">${r.repeater.tx_mhz || ''}</td>
                       <td class="small">${(r.repeater.pass_ranges || []).map(p => `${p.low}–${p.high}`).join(', ')}${

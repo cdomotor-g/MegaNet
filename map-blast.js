@@ -208,7 +208,7 @@ const MapBlast = (function () {
                       onclick="event.stopPropagation();zoomToStation('${escAttr(s.id)}')"
                       title="Zoom the map to ${escAttr(s.name)}">${esc(s.name)}</button></td>
                 <td class="small">${stationAlertIds(s).join(', ')}</td>
-                <td class="small">${(s.radio_network_ids || []).map(nid => netName(nid)).join(', ')}</td>
+                <td class="small">${(s.radio_network_ids || []).map(nid => esc(netName(nid))).join(', ')}</td>
                 <td class="small">${km == null ? '—' : fmtKm(km)}</td>
               </tr>`).join('')}
           </tbody>

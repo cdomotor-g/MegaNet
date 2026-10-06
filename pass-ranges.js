@@ -241,7 +241,7 @@ function passRangeTablesHtml() {
               ${rptData.map(({ r, matched }) => `
                 <tr class="row-link" onclick="goToStation('${escAttr(r.id)}')">
                   <td>${passRangeRowOpen(r, markHits(r.name, terms, res))}</td>
-                  <td class="small col-optional">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
+                  <td class="small col-optional">${r.radio_network_ids.map(id => esc(netName(id))).join(', ')}</td>
                   <td><span class="badge" title="ALERT addresses carried, post-exclusion">${repeaterPassingCount(r) ?? 0}</span></td>
                   <td><span class="badge" title="Field stations matched">${matched.length}</span></td>
                   <td class="small">${passRangesHtml(r.repeater, searchIds, ranges)}</td>
@@ -280,7 +280,7 @@ function passRangeTablesHtml() {
                     <td>${passRangeRowOpen(s, markHits(s.name, terms, res))}</td>
                     <td class="small">${markHits(s.station_number || '', terms)}</td>
                     <td class="small">${stationAlertIds(s).map(id => markAlertId(id, nums, ranges)).join(', ')}</td>
-                    <td class="small col-optional">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>
+                    <td class="small col-optional">${s.radio_network_ids.map(id => esc(netName(id))).join(', ')}</td>
                   </tr>`).join('')}
               </tbody>
             </table>`}

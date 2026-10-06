@@ -5687,7 +5687,7 @@ function stationPopupHtml(s) {
   ].filter(Boolean).join(' · ');
   return `
       <strong>${esc(s.name)}</strong><br>
-      ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${r}</span>`).join('')}${proposedTagHtml(s)}
+      ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${esc(r)}</span>`).join('')}${proposedTagHtml(s)}
       ${stnElev ? `<br><span class="mn-pop-line">${stnElev}</span>` : ''}
       <div class="mn-popup-actions pill-row">
         <button type="button" class="pill mn-popup-details" onclick="stnCardFromPopup('${escAttr(s.id)}', event)"
@@ -6226,7 +6226,7 @@ function stationsTable(allStations) {
                     onclick="event.stopPropagation();pickStationFromList('${escAttr(s.id)}')"
                     >${markHits(s.name, marks.name, marks.nameRes)}</button></td>
               <td class="small stn-num">${markHits(s.station_number || '', marks.number)}</td>
-              <td>${s.roles.map(r => `<span class="badge">${r}</span>`).join(' ')}${
+              <td>${s.roles.map(r => `<span class="badge">${esc(r)}</span>`).join(' ')}${
                 s.proposed ? ` ${proposedTagHtml(s)}` : ''}${
                 s.roles.includes('repeater') && repeaterPassingCount(s) != null
                   ? ` <span class="badge" title="ALERT addresses carried, in this repeater's open pass ranges">passing ${repeaterPassingCount(s)}</span>`
@@ -6234,7 +6234,7 @@ function stationsTable(allStations) {
                 relIds.has(s.id)
                   ? ' <span class="badge badge--rel" title="Not a filter match — a pass range ties it to one">via pass range</span>'
                   : ''}</td>
-              ${narrow ? '' : `<td class="small">${s.radio_network_ids.map(id => netName(id)).join(', ')}</td>`}
+              ${narrow ? '' : `<td class="small">${s.radio_network_ids.map(id => esc(netName(id))).join(', ')}</td>`}
               <td class="small">${aids.map(id => markAlertId(id, marks.nums, marks.ranges)).join(', ')}</td>
               ${narrow ? `<td class="small">${slsCatchmentCell(s)}</td>` : stationWideCellsHtml(s)}
             </tr>`;
@@ -6869,7 +6869,7 @@ function stnCardHtml(s) {
     <div class="acma-card-head">
       <span>
         <strong id="stn-card-title">${esc(s.name)}</strong><br>
-        ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${r}</span>`).join('')}${proposedTagHtml(s)}
+        ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${esc(r)}</span>`).join('')}${proposedTagHtml(s)}
       </span>
       <button type="button" onclick="closeStnCard()"
               aria-label="Close the station card"><span aria-hidden="true">×</span></button>
@@ -7140,7 +7140,7 @@ function stationCarriersHtml() {
                     onclick="event.stopPropagation();focusRepeaterOnMap('${escAttr(r.id)}')"
                     title="Put the map on ${escAttr(r.name)} — nothing else on this page moves"
                     >${esc(r.name)}</button></td>
-              <td class="small">${r.radio_network_ids.map(id => netName(id)).join(', ')}</td>
+              <td class="small">${r.radio_network_ids.map(id => esc(netName(id))).join(', ')}</td>
               <td class="small">${carried.join(', ')}</td>
               <td class="small">${ranges.join(', ')}</td>
               <td class="small" title="${km == null ? 'One end has no coordinates recorded' : 'Straight-line distance'}"
