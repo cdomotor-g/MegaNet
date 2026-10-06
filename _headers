@@ -1,0 +1,16 @@
+# Security response headers for the Cloudflare-served site (floodwarning.net).
+# Cloudflare Workers static assets apply these to served files; the /api/* Worker
+# routes set their own headers (see worker/index.js). GitHub Pages ignores this
+# file, so the github.io copy is unaffected.
+#
+# Deliberately conservative: only headers that cannot change how the app loads
+# its own resources. `frame-ancestors 'none'` blocks clickjacking without a
+# resource-blocking CSP (a full script-src policy is a tested follow-up, since
+# the app relies on inline handlers and several CDNs). See the security
+# appraisal, finding M-3.
+/*
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000
