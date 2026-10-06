@@ -451,9 +451,13 @@ select station_key, station_name, minutes_since_seen, minutes_since_reading
  order by minutes_since_seen desc;
 ```
 
-`minutes_since_seen` is time since anything at all arrived for that station,
-**including a reading that was rejected** — a logger whose clock has died is
-still transmitting. `minutes_since_reading` is time since one was actually
+`minutes_since_seen` is time since that station was last heard, **including
+through a reading that was rejected** — a logger whose clock has died is still
+transmitting. *Heard* is the reading's own time (never later than its arrival),
+so a base station posting a backlog days late fills in history without making
+its stations look heard today; a time from a dead clock — none, before 1990,
+more than a day ahead, or over 90 days old in a batch not marked
+`"source": "backfill"` — counts as heard on arrival (`0052`). `minutes_since_reading` is time since one was actually
 stored. The two diverging is the signature of a station that is on the air and
 sending something MegaNet will not accept: check `rejected` in your POST
 responses, not the radio path.

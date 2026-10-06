@@ -51,6 +51,14 @@ through `ingest_http()` with a token; and the table refusing out-of-range values
 written round `ingest()`. Red on a missing round-before-cast, a dropped envelope
 frequency and a strict RSSI parse.
 
+`check_ingest_seen.sql` holds `0052`, a station last seen when it was heard: 15 checks
+through `ingest_http()` with a token — a live reading seen at its own time; one posted
+three days late seen three days ago, not now, and never dragging back a station heard
+since; a dead clock's time (before 1990, a day ahead, an RTC reset to 2000, none, not a
+time) seen now, never in the future; a batch or a row marked `backfill` keeping even a
+2000 time; the latest of several rows for one address. Run against the live database
+before 0052 was applied, rolled back: 15 of 15.
+
 `check_ingest_token_admin.sql` holds `0046`, the Admin tab's token panel: 15 checks
 signed in through 0005's triggers as anon, an editor and an administrator — only the
 administrator may list, mint or revoke; a minted token is shown once and kept as its

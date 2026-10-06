@@ -743,7 +743,13 @@ the MQTT bridge reports to — and `meganet.station_health` answers for both pat
 `last_seen_at` moves for every address in the batch, including one whose reading
 was rejected, because a logger with a dead clock is still on the air and the
 fault that needs a person is the clock rather than the silence; `last_reading_at`
-moves only for rows actually stored. Where an address resolves to no one station
+moves only for rows actually stored. Since `0052` `last_seen_at` is *when it was
+heard* — the reading's own time, no later than now — not when the batch arrived, so
+a base station posting a weekend's backlog, or an RPi ALERT site survey back on a
+network, fills history without making every station in it look heard today. A dead
+clock's time says nothing about when, so a reading with none, one `ingest()` refuses
+(before 1990, more than a day ahead) or one over 90 days old in a batch not marked
+`"source": "backfill"` (an RTC reset to 2000) still counts as heard now. Where an address resolves to no one station
 — 604 ALERT addresses are shared — the row is keyed `a:<address>` or
 `s:<station number>`, which is the identity we have rather than a guess.
 

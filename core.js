@@ -2338,7 +2338,8 @@ const DB_SCHEMA = 'meganet';
 // applied live together — 0047 had waited since its own commit, when the
 // connection timed out on every write.
 // 51: site surveys (survey_list, survey_receptions, survey_summary).
-const DB_SCHEMA_VERSION = 51;
+// 52: a station last seen when it was heard (ingest_http's station_status).
+const DB_SCHEMA_VERSION = 52;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
