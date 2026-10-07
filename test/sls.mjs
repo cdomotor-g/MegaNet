@@ -157,6 +157,33 @@ try {
     card.text.slice(0, 200));
   check('an automatic gauge gets no manual pill', card.manualPills === 0);
 
+  // ── The owner, first on the card and always there ────────────────────────
+  // The station's own owner where it has one; else the SLS's, marked so;
+  // else "Not recorded" — never "unknown".
+  const owners = await page.evaluate(async () => {
+    const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const first = async (id) => {
+      showStationCard(id);
+      await frame();
+      const row = document.querySelector('#stn-card .acma-sect .acma-row');
+      const [k, v] = row ? [...row.children].map(c => c.textContent.replace(/\s+/g, ' ').trim()) : [];
+      return { id, k, v };
+    };
+    const st = state.data.stations;
+    const own = st.find(s => s.owner && String(s.owner).trim());
+    const none = st.find(s => !s.owner && s.lat != null && !(SLS.forStation(s) || {}).owner);
+    return { sls: await first('beaudesert_al'), own: own ? await first(own.id) : null, ownName: own && own.owner,
+             none: none ? await first(none.id) : null };
+  });
+  check('the card\'s first row is its owner, from the SLS and marked so where the station records none',
+    owners.sls.k === 'Owner' && owners.sls.v.includes(BEAUDESERT.owner.replace(/^Bureau$/, 'Bureau of Meteorology'))
+      && /per SLS/.test(owners.sls.v), JSON.stringify(owners.sls));
+  check('…the station\'s own owner where it records one, not marked',
+    owners.own && owners.own.k === 'Owner' && owners.own.v === owners.ownName, JSON.stringify(owners.own));
+  check('…and "Not recorded" where nobody is on record — the row is still there',
+    owners.none && owners.none.k === 'Owner' && owners.none.v === 'Not recorded', JSON.stringify(owners.none));
+  await page.evaluate(() => showStationCard('beaudesert_al'));
+
   // ── The heading is the way to the document ───────────────────────────────
   const head = await page.evaluate(() => {
     const a = document.querySelector('#mn-sls-card-beaudesert_al .stn-card-sls a.mn-sls-doc');

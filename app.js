@@ -6972,6 +6972,7 @@ function repaintStnCard() {
   // card that asks pays for the 1.2 MB, every one after is free, and a station
   // the document does not carry fills with nothing.
   SLS.ask(`mn-sls-card-${s.id}`, s);
+  stnCardOwnerAsk(`mn-owner-card-${s.id}`, s);
   elvisCardAsk(`mn-elvis-card-${s.id}`, s);
   // The site exposure section asks the State's map services, cached per
   // position for the session (site-exposure.js): a repaint asks nothing new.
@@ -7143,6 +7144,77 @@ function stnCardProposalHtml(s) {
     </div>`;
 }
 
+// Who owns a station, as one answer — the station card's top row and the
+// Station Health tab both read it. The owner recorded on the station (0030)
+// where there is one; where not, the Bureau's Service Level Specification's
+// "Station owner" (sls.js), which is the only source for nearly all of them:
+// four stations carry their own, the SLS names one for 3,253 of the 4,873.
+// The card's SLS section still quotes the document word for word; this is the
+// one line to read at a glance.
+//
+// A joint owner is split into its parties — "Bureau/Seqwater" is Seqwater's
+// station as much as the Bureau's, and Station Health's owner filter finds it
+// under either — and the documents' two spellings of one party are made one:
+// the QLD SLS writes "Bureau", the NSW one "Bureau of Meteorology". Nothing
+// else is renamed. Returns { name, parties, from: 'station'|'sls', src }, or
+// null: nobody on record, or the SLS file not on hand yet (SLS.loaded() tells
+// those two apart).
+const OWNER_PARTY_ALIAS = { 'Bureau': 'Bureau of Meteorology' };
+const stationOwnerMemo = new Map();
+function stationOwnerParse(raw, from, src) {
+  const k = `${from}|${src}|${raw}`;
+  if (!stationOwnerMemo.has(k)) {
+    const tidy = p => {
+      const t = String(p).replace(/\s+/g, ' ').replace(/(\S)\(/g, '$1 (').replace(/[\s\-–]+$/, '').trim();
+      return OWNER_PARTY_ALIAS[t] || t;
+    };
+    const parties = [...new Set(String(raw).split(/\s*[/,]\s*/).map(tidy).filter(Boolean))];
+    stationOwnerMemo.set(k, parties.length ? { name: parties.join(' / '), parties, from, src } : null);
+  }
+  return stationOwnerMemo.get(k);
+}
+function stationOwner(s) {
+  if (!s) return null;
+  if (s.owner && String(s.owner).trim()) return stationOwnerParse(s.owner, 'station', 'recorded on the station');
+  if (typeof SLS === 'undefined' || !SLS.loaded()) return null;
+  const loc = SLS.forStation(s);
+  return loc && loc.owner
+    ? stationOwnerParse(loc.owner, 'sls', `the Bureau's ${loc.jurisdiction ? loc.jurisdiction + ' ' : ''}Service Level Specification`)
+    : null;
+}
+
+// The card's Owner row, which is always there: an owner, where it came from,
+// or that none is recorded — said as "Not recorded", never "unknown", which
+// would read as a claim about the station rather than about the records.
+// Until the SLS file is on hand a station with no owner of its own cannot be
+// told apart from one with none anywhere; stnCardOwnerAsk fills it in.
+function stnCardOwnerHtml(s) {
+  const o = stationOwner(s);
+  if (o && o.from === 'station') return esc(o.name);
+  if (o) {
+    return `<span title="${esc(`From ${o.src}. No owner is recorded on the station itself.`)}">${esc(o.name)}
+      <span class="mn-pop-note">per SLS</span></span>`;
+  }
+  if (typeof SLS !== 'undefined' && !SLS.loaded() && !stnCardOwnerFailed) {
+    return '<span class="txt-muted">checking the records…</span>';
+  }
+  return `<span class="txt-muted" title="${esc('No owner is recorded for this station — not on the station in the database'
+    + (stnCardOwnerFailed ? ', and the Bureau’s Service Level Specification could not be loaded to check it.'
+                          : ', nor in the Bureau’s Service Level Specification.')
+    + ' An editor can add one in the station editor.')}">Not recorded</span>`;
+}
+let stnCardOwnerFailed = false;
+// The row's half of SLS.ask, on its terms: data-mn-owner carries the station
+// the placeholder was painted for, checked before writing.
+function stnCardOwnerAsk(elId, s) {
+  if (typeof SLS === 'undefined' || SLS.loaded() || (s.owner && String(s.owner).trim())) return;
+  const fill = () => {
+    const el = document.getElementById(elId);
+    if (el && el.dataset.mnOwner === String(s.id)) el.innerHTML = stnCardOwnerHtml(s);
+  };
+  SLS.ensureData().then(fill, () => { stnCardOwnerFailed = true; fill(); });
+}
+
 // The card's body. acmaCardRow draws the label/value rows, so the two cards
 // that share a dress share a grammar. Networks are looked up by id, the way
 // the table shows them (stations carry radio_network_ids, not a name).
@@ -7156,6 +7228,7 @@ function stnCardHtml(s) {
   const slsId    = `mn-sls-card-${s.id}`;
   const expId    = `mn-exposure-card-${s.id}`;
   const landId   = `mn-land-card-${s.id}`;
+  const ownerId  = `mn-owner-card-${s.id}`;
   const nets     = (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean).join(', ');
   const isRpt    = s.roles.includes('repeater');
   const passing  = isRpt ? repeaterPassingCount(s) : null;
@@ -7174,14 +7247,15 @@ function stnCardHtml(s) {
          nothing below it is about a station on the ground yet. -->
     ${stnCardProposalHtml(s)}
     <div class="acma-sect">
+      <!-- Who owns it, first and always — "Not recorded" where nobody is on
+           record (stnCardOwnerHtml). The SLS section below quotes the
+           document's own "Station owner" row word for word. -->
+      <div class="acma-row"><span>Owner</span><span id="${escAttr(ownerId)}"
+          data-mn-owner="${escAttr(String(s.id))}">${stnCardOwnerHtml(s)}</span></div>
       ${acmaCardRow('Stn #', s.station_number ? esc(s.station_number)
         : s.proposed ? '<span class="txt-muted">none yet — proposed</span>' : null)}
       ${!s.proposed && s.station_type ? acmaCardRow('Type', esc(stationTypeLabel(s.station_type))) : ''}
       ${acmaCardRow('Networks', nets ? esc(nets) : null)}
-      <!-- The owner as recorded on the station (0030). The SLS section below has
-           its own "Station owner" row, which is what the SLS says —
-           a different source, and the only one for most stations. -->
-      ${acmaCardRow('Owner', s.owner ? esc(s.owner) : null)}
       ${acmaCardRow('Position', located ? esc(stationLatLonText(s)) : null)}
       <!-- A modelled height and a surveyed one are different claims, and the
            card must not let them read alike (#198). elevation_source carries

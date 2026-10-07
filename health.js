@@ -4,12 +4,12 @@
 //            datastore say about each field station and about the network
 //            carrying them, ranked by what needs doing.
 //
-// After core.js, app.js (switchTab, goToStation, stationAlertIds, MAP_HOME),
-// map-controls.js (addBaseLayers), datastore.js (dbSelect, dbHostLabel),
-// sensor-values.js and health-analysis.js (HealthAnalysis, which does all
-// the reasoning); before health-agent.js, which reads what this tab holds,
-// and init.js. Registers its map and its teardown (#142). Nothing here runs
-// at load.
+// After core.js, app.js (switchTab, goToStation, stationAlertIds,
+// stationOwner, MAP_HOME), map-controls.js (addBaseLayers), datastore.js
+// (dbSelect, dbHostLabel), sensor-values.js and health-analysis.js
+// (HealthAnalysis, which does all the reasoning); before health-agent.js,
+// which reads what this tab holds, and init.js. Registers its map and its
+// teardown (#142). Nothing here runs at load.
 //
 // ── What this tab is for, and why it is not the Message Log again ────────────
 // The Message Log is the arrivals board: every reading, newest first, and the
@@ -132,44 +132,17 @@ const Health = (() => {
   const stationById = id => ((state.data && state.data.stations) || []).find(s => s.id === id) || null;
 
   // ── who owns a station ─────────────────────────────────────────────────────
-  // The owner recorded on the station (0030) where there is one, and the
-  // Bureau's Service Level Specification's "Station owner" where there is not —
-  // which is most of them: four stations carry their own, the SLS names one
-  // for 3,253. The station card shows the two apart; here one answer is
-  // wanted, and the station's own record is the more specific statement.
-  //
-  // A joint owner is split into its parties for the filter — "Bureau/Seqwater"
-  // is Seqwater's station as much as the Bureau's, and somebody picking
-  // Seqwater expects it — and the documents' spellings of the same party are
-  // made one: the QLD SLS writes "Bureau", the NSW one "Bureau of
-  // Meteorology". Nothing else is renamed; the rest is the document's words.
+  // app.js's stationOwner: the owner recorded on the station, else the
+  // Bureau's SLS "Station owner" — the same answer the station card's top row
+  // gives — split into its parties for the filter ("Bureau/Seqwater" is
+  // Seqwater's station too). { name, parties, src } or null: nobody on
+  // record, or the SLS file not on hand yet.
   const NO_OWNER = '(none on record)';
-  const PARTY_ALIAS = { 'Bureau': 'Bureau of Meteorology' };
-  function tidyParty(p) {
-    const t = String(p).replace(/\s+/g, ' ').replace(/(\S)\(/g, '$1 (').replace(/[\s\-–]+$/, '').trim();
-    return PARTY_ALIAS[t] || t;
-  }
-  const ownerMemo = new Map();
-  function parseOwner(raw, src) {
-    const k = src + '|' + raw;
-    if (!ownerMemo.has(k)) {
-      const parties = [...new Set(String(raw).split(/\s*[/,]\s*/).map(tidyParty).filter(Boolean))];
-      ownerMemo.set(k, parties.length ? { name: parties.join(' / '), parties, src } : null);
-    }
-    return ownerMemo.get(k);
-  }
   // Whether every owner can be told yet: the SLS file is fetched on first need
   // (sls.js), and until it lands a station with no owner of its own is not
   // known to have none.
   const ownersReady = () => typeof SLS === 'undefined' || SLS.loaded() || H.slsFailed;
-  // { name, parties, src } — or null: nobody on record, or not known yet.
-  function ownerOf(st) {
-    if (!st) return null;
-    if (st.owner && String(st.owner).trim()) return parseOwner(st.owner, 'recorded on the station');
-    if (typeof SLS === 'undefined' || !SLS.loaded()) return null;
-    const loc = SLS.forStation(st);
-    return loc && loc.owner ? parseOwner(loc.owner, `the Bureau's ${loc.jurisdiction ? loc.jurisdiction + ' ' : ''}Service Level Specification`) : null;
-  }
+  const ownerOf = st => (typeof stationOwner === 'function' ? stationOwner(st) : null);
   function ownerSmallHtml(st, cls) {
     const o = ownerOf(st);
     if (!o) return '';
