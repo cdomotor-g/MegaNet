@@ -35,6 +35,8 @@ const WhatsNew = (() => {
         + 'nothing answers, what was tried, with <em>Try again</em>.',
       'A first visit opens the <strong>Site Map</strong>, the app\'s guide to every tab. After that the app opens on '
         + 'the tab you used last.',
+      '<strong>🌗 Theme</strong> follows this device\'s light or dark setting unless you pick one — and there is a '
+        + 'fourth, <strong>Sunlight</strong>: black on white with heavier lines on the map, for a screen read outdoors.',
     ] },
   ];
 

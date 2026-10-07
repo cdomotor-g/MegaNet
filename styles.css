@@ -699,6 +699,44 @@
   --shadow-2: 0 6px 24px rgba(0,0,0,.5);
 }
 
+/* ── Sunlight (#224) ─────────────────────────────────────────────────────────
+   The light theme with the contrast turned up, for a phone read in full sun:
+   white grounds, black ink, dividers and control edges dark enough to find at
+   a glance, and the muted ink kept well clear of muted. Only what changes is
+   restated — everything else is the light theme's, so every pair `npm run
+   shell` holds the light theme to it holds this one to as well, and it adds
+   this theme to the loop. The map's lines are heavier too, which is not a
+   token (mapStrokeScale, app.js). */
+[data-theme="sunlight"] {
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-sub: #ffffff;
+  --text: #000000;
+  --muted: #26323d;
+  --border: #7d8d9c;
+  --subtle: #eef2f6;
+  --thead: #eef2f6;
+  --header: #003a80;
+  --ctl-border: #34414e;
+  --accent: #00449a;
+  --warn: #6e4100;
+  --flood-moderate: #5b4c00;
+}
+
+/* Forced colours (Windows contrast themes): the system paints every ground
+   and ink, so a state carried by a background — the tab that is open, the
+   option Enter will take, a pressed toggle — would vanish. Each gets an
+   outline in the system's highlight instead (#224). */
+@media (forced-colors: active) {
+  #tab-nav .tab-btn.active,
+  .pal-opt.is-active,
+  [aria-pressed="true"],
+  [aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
 body {
   margin: 0;
   font-family: Segoe UI, Arial, sans-serif;
@@ -3140,10 +3178,11 @@ hr {
   text-transform: uppercase;
   color: #33404d;
 }
-@media (prefers-color-scheme: dark) {
-  .mn-catchment-label > span { color: #123044; }
-  .mn-hub-label > span { color: #2a3742; }
-}
+/* Darker still in the dark theme — the theme the page wears, not the device's
+   setting (#224: this was the one rule that asked the device, and could
+   disagree with the toggle). */
+[data-theme="dark"] .mn-catchment-label > span { color: #123044; }
+[data-theme="dark"] .mn-hub-label > span { color: #2a3742; }
 
 /* The road parcel's name on hover (#176). Sticky to the cursor like the river
    label above, and dressed the way the fixed river name is — its own near-white
@@ -7462,6 +7501,21 @@ hr {
 .pal-none { margin: var(--sp-3) var(--sp-2); }
 .pal-count, .pal-hint { margin: var(--sp-2) var(--sp-2) 0; }
 .pal-count:empty { display: none; }
+
+/* 🌗 Theme (#224): the four as radios, each a row with what it is for. */
+.theme-pick { margin: 0; padding: 0; border: 0; display: grid; gap: var(--sp-2); }
+.theme-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.theme-opt:has(input:checked) { border-color: var(--accent); background: var(--subtle); }
+.theme-opt input { margin-top: .2rem; accent-color: var(--accent); }
+.theme-opt-text { display: grid; gap: var(--sp-1); }
 
 .nav-heading {
   margin: 0 0 .25rem;

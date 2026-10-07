@@ -156,7 +156,7 @@ in scope for 1.4.11 and are not checked.
 nothing once the picture has been handed to a canvas — but the literals now
 come from `--ad-series-1…12` (light and dark), resolved off the document at draw
 time exactly as `--text` and `--panel` always were. A palette change reaches the
-chart on the next `repaint()`, which `toggleTheme()` already calls, and
+chart on the next `repaint()`, which `applyTheme()` already calls (#224), and
 `npm run tabs` holds the round trip.
 
 The twelve series colours are **categorical and deliberately out of the contrast

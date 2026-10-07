@@ -2485,6 +2485,28 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// ── Theme: the choice, and what it resolves to (#224) ──────────────────────────
+// Four choices. 'system' follows the device's light or dark setting, and is
+// what a device that has never chosen gets; 'light', 'dark' and 'sunlight' are
+// fixed. Sunlight is the light theme with the contrast turned up, for a phone
+// read in full sun — styles.css restates only what changes. The choice is kept
+// under 'mn-theme', where the light/dark choice always was, so a choice made
+// before there were four still stands. Here rather than beside toggleTheme()
+// in app.js because `state` below is built from them, before app.js has loaded.
+const THEME_CHOICES = ['system', 'light', 'dark', 'sunlight'];
+
+function themeStored() {
+  let v = null;
+  try { v = localStorage.getItem('mn-theme'); } catch (_) {}
+  return THEME_CHOICES.includes(v) ? v : 'system';
+}
+
+function themeResolve(choice) {
+  if (choice !== 'system') return choice;
+  try { return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+  catch (_) { return 'light'; }
+}
+
 // ── State ──────────────────────────────────────────────────────────────────────
 
 const state = {
@@ -3239,7 +3261,11 @@ const state = {
   // draws nothing for a session that is not signed in, and a photo somebody
   // took is the first thing they will look for.
   mapPhotos:     localStorage.getItem('mn-field-photos') !== 'off',
-  theme: localStorage.getItem('mn-theme') || 'light',
+  // The theme picked, and what it comes to: every module reads `theme`, which
+  // is 'light', 'dark' or 'sunlight' — never 'system' — so `=== 'dark'` stays
+  // the right question everywhere it is asked (#224).
+  themeChoice: themeStored(),
+  theme: themeResolve(themeStored()),
 };
 
 // ── Module registries ─────────────────────────────────────────────────────────

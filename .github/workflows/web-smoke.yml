@@ -602,6 +602,15 @@ jobs:
         working-directory: test
         run: npm run firstvisit
 
+      # The theme follows the device, and Sunlight (#224), with the device's
+      # colour scheme emulated: System at load and as the device changes, a
+      # choice made before there were four still standing, the 🌗 menu, the
+      # map's heavier lines in Sunlight, the one rule that used to ask the
+      # device, and forced colours. Sunlight's contrast is `shell`'s.
+      - name: Themes — System follows the device, and Sunlight for the field
+        working-directory: test
+        run: npm run themes
+
       # Proposed stations (0039) in the editor, on the card and on the map,
       # against a stand-in for save_station() that holds the database's rules
       # (tools/check_proposed_stations.sql holds the real one to them): a

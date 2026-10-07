@@ -66,17 +66,78 @@ function setHeaderLabel(id, text) {
 }
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
+// System, Light, Dark or Sunlight (#224) — the choice and its resolution are
+// core.js's (themeStored, themeResolve), because state is built from them.
+// The banner's 🌗 opens the four as a small dialog; toggleTheme() is the old
+// light/dark flip, kept for the palette's quick switch.
 
-function toggleTheme() {
-  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+const THEME_LABELS = { system: 'System', light: 'Light', dark: 'Dark', sunlight: 'Sunlight' };
+const THEME_HINTS = {
+  system:   'Light or dark, as this device is set — and changing when it does',
+  light:    'Dark ink on light grounds',
+  dark:     'Light ink on dark grounds, for a dim room or a long night',
+  sunlight: 'Black on white with heavier lines on the map — for a screen read outdoors',
+};
+
+// What the page wears now, and everything that paints its own colours told
+// it moved. `repaint: false` is the first render's, which has nothing drawn.
+function applyTheme({ repaint = true } = {}) {
+  const was = document.documentElement.getAttribute('data-theme');
+  state.theme = themeResolve(state.themeChoice);
   document.documentElement.setAttribute('data-theme', state.theme);
-  localStorage.setItem('mn-theme', state.theme);
-  setHeaderLabel('btn-theme', state.theme === 'dark' ? 'Light' : 'Dark');
+  setHeaderLabel('btn-theme', THEME_LABELS[state.themeChoice]);
+  const btn = document.getElementById('btn-theme');
+  if (btn) {
+    btn.title = `Theme: ${THEME_LABELS[state.themeChoice]}`
+      + (state.themeChoice === 'system' ? ` — ${state.theme} now, as this device is set` : '')
+      + '. Choose another.';
+  }
+  if (!repaint || was === state.theme) return;
   if (state.map) { refreshMapLayers(); MapDraw.render(); MapRivers.repaint(); }
   // The ARRO chart writes real colour values into its SVG rather than `var(…)`,
   // so that the PNG export has something to resolve. That is the trade: the
   // chart has to be told the palette moved.
   if (state.activeTab === 'arrodata' || state.activeTab === 'field') ArroData.repaint();
+}
+
+function setTheme(choice) {
+  if (!THEME_CHOICES.includes(choice)) return;
+  state.themeChoice = choice;
+  try { localStorage.setItem('mn-theme', choice); } catch (_) {}
+  applyTheme();
+  const menu = document.getElementById('theme-pick');
+  if (menu) announce(`Theme: ${THEME_LABELS[choice]}`);
+}
+
+function toggleTheme() {
+  setTheme(state.theme === 'dark' ? 'light' : 'dark');
+}
+
+// The four, as radios: a pick applies at once and the dialog stays, so two
+// can be compared on the page behind it; Escape or × when done.
+function openThemeMenu() {
+  Modal.open({
+    title: 'Theme',
+    html: `
+      <fieldset class="theme-pick" id="theme-pick">
+        <legend class="sr-only">Theme</legend>
+        ${THEME_CHOICES.map(c => `
+        <label class="theme-opt">
+          <input type="radio" name="mn-theme-pick" value="${c}"${state.themeChoice === c ? ' checked' : ''}
+                 onchange="setTheme(this.value)">
+          <span class="theme-opt-text"><strong>${THEME_LABELS[c]}</strong>
+            <span class="small txt-muted">${esc(THEME_HINTS[c])}</span></span>
+        </label>`).join('')}
+      </fieldset>`,
+  });
+  const on = document.querySelector('#theme-pick input:checked');
+  if (on) on.focus();
+}
+
+// Sunlight draws the map's lines heavier: a 1.5 px radio path is a hairline on
+// a phone in the sun. One factor, read where the widths are set.
+function mapStrokeScale() {
+  return state.theme === 'sunlight' ? 1.6 : 1;
 }
 
 // ── File loading ───────────────────────────────────────────────────────────────
@@ -5593,7 +5654,7 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
       const lineOp = casing ? casingOp : coreOp;
       const line = L.polyline([[l.s.lat, l.s.lon], [l.r.lat, l.r.lon]], {
         color:   casing ? '#ffffff' : lineColor,
-        weight:  casing ? MAP_LINK_CASING_W : MAP_LINK_CORE_W,
+        weight:  (casing ? MAP_LINK_CASING_W : MAP_LINK_CORE_W) * mapStrokeScale(),
         opacity: lineOp,
       }).addTo(map);
       line.mnLinkRole       = pass;         // lets the opacity slider restyle in place
@@ -5646,7 +5707,7 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
       const lineOp = casing ? casingOp : coreOp;
       const line = L.polyline([[p.a.lat, p.a.lon], [p.b.lat, p.b.lon]], {
         color:   casing ? '#ffffff' : backboneColor,
-        weight:  casing ? MAP_BACKBONE_CASING_W : MAP_BACKBONE_CORE_W,
+        weight:  (casing ? MAP_BACKBONE_CASING_W : MAP_BACKBONE_CORE_W) * mapStrokeScale(),
         opacity: lineOp,
         dashArray: dash ? MAP_BACKBONE_DASH : null,
       }).addTo(map);

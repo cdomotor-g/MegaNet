@@ -187,6 +187,8 @@ const Palette = (() => {
         run: () => switchTab('export') },
       { icon: '🌗', label: dark ? 'Switch to the light theme' : 'Switch to the dark theme',
         find: 'theme dark light colour color night mode', run: () => toggleTheme() },
+      { icon: '☀️', label: 'Choose a theme — System, Light, Dark or Sunlight', find: 'theme sunlight contrast outdoors system device',
+        run: () => openThemeMenu() },
       { icon: '🐞', label: 'Report a bug or suggest an improvement', find: 'bug report problem issue feedback suggest broken',
         run: () => BugReport.open() },
     ];

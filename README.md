@@ -2593,9 +2593,16 @@ output live, on the **Serial Monitor** tab. Built on the browser's
   (`SerialAskForUrls`, or `SerialAllowUsbDevicesForUrls` to pre-approve a device
   with no picker at all — pre-approved ports show up under *"Previously allowed"*).
 
-### 10. Dark / Light Theme
-- Toggle between dark and light modes
-- Preference persisted to `localStorage`
+### 10. Theme — System, Light, Dark or Sunlight
+- 🌗 in the banner opens the four (#224). **System**, the default for a device that
+  has never chosen, follows the device's own light or dark setting, and changes
+  when it does; Light and Dark are fixed; **Sunlight** is the light theme with the
+  contrast turned up and the map's lines drawn heavier, for a phone read outdoors.
+- The choice is kept in `localStorage` (`mn-theme`, where the old light/dark
+  choice was, so it still stands). `npm run shell` holds all three themes to the
+  same contrast pairs; `npm run themes` holds which one is worn, and when.
+- Windows contrast themes (forced colours): the open tab, the palette's marked
+  option and pressed toggles keep an outline in the system's highlight.
 
 ### 11. Radio Network Management
 - Named radio network clusters (typically named after the primary repeater or ingest point)

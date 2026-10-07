@@ -305,8 +305,8 @@ try {
     ring.style !== 'none' && parseFloat(ring.width) >= 2,
     `${ring.width} ${ring.style} ${ring.colour}`);
 
-  // ── 3. Contrast, in both themes ───────────────────────────────────────────
-  console.log('\nContrast — every text pair, both themes, off the resolved values\n');
+  // ── 3. Contrast, in all three themes ───────────────────────────────────────────
+  console.log('\nContrast — every text pair, all three themes, off the resolved values\n');
 
   // Resolved in the page rather than parsed out of the file, so a var() chain,
   // a color-mix() and an inherited value are all measured as they render. The
@@ -332,7 +332,10 @@ try {
   const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   const wanted = [...new Set([...TEXT_PAIRS, ...NONTEXT_PAIRS].flat())];
 
-  for (const theme of ['light', 'dark']) {
+  // Sunlight (#224) restates a dozen of these over the light theme's and is
+  // held to the same floors; it changes no layout, so the overflow loops
+  // below do not need it.
+  for (const theme of ['light', 'dark', 'sunlight']) {
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme);
     const values = await readTokens(wanted);
 
@@ -693,5 +696,5 @@ if (failed.length) {
   console.log('  find. See #109.\n');
   process.exit(1);
 }
-console.log('PASS — the shell is navigable, the palette clears AA in both themes, and the');
+console.log('PASS — the shell is navigable, the palette clears AA in all three themes, and the');
 console.log('       scale is six steps with nothing outside it.');

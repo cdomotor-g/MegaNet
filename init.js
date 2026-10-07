@@ -29,8 +29,13 @@
   // ✨ What's new: shown if this device has something it has not seen, and a
   // device that has never been here has seen it all (whats-new.js, #222).
   WhatsNew.start();
-  document.documentElement.setAttribute('data-theme', state.theme);
-  setHeaderLabel('btn-theme', state.theme === 'dark' ? 'Light' : 'Dark');
+  applyTheme({ repaint: false });
+  // System follows the device as it changes — a phone that goes dark at
+  // sunset takes the app with it (#224).
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)')
+      .addEventListener('change', () => { if (state.themeChoice === 'system') applyTheme(); });
+  } catch (_) {}
   renderTabs();
   renderHelp();
   renderMain();
