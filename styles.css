@@ -13272,17 +13272,21 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
    made in both views and is gone while the twin is up; under the corners
    (1000) and the station card's lifted place in 3-D (760 is below it, and the
    card sits bottom-left, clear of it). display rather than opacity while it
-   is down, for #map3d's reason. */
+   is down, for #map3d's reason. Wide and short, the button and × side by
+   side after the words, so it covers a strip of the map rather than a block
+   of it; where the words would get narrower than 18rem the buttons wrap
+   under them instead. */
 .map-twin-offer {
   position: absolute;
   top: 3.1rem;
   left: 50%;
   transform: translateX(-50%);
   z-index: 800;
-  width: min(26rem, calc(100% - 8.5rem));
+  width: min(48rem, calc(100% - 8.5rem));
   display: flex;
-  gap: var(--sp-2);
-  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  align-items: center;
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -13291,19 +13295,19 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   box-shadow: var(--shadow-2);
 }
 .map-twin-offer[hidden] { display: none; }
-.map-twin-offer-body { flex: 1 1 auto; min-width: 0; }
+.map-twin-offer-body { flex: 1 1 18rem; min-width: 0; }
 .map-twin-offer-title { margin: 0; font-weight: 600; }
-.map-twin-offer-line { margin: .15rem 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.map-twin-offer-line { margin: .1rem 0 0; color: var(--muted); overflow-wrap: anywhere; }
 .map-twin-offer-line strong { color: var(--text); }
-.map-twin-offer-actions { display: flex; flex-direction: column; gap: var(--sp-1); align-items: stretch; flex: 0 0 auto; }
+.map-twin-offer-actions { display: flex; gap: var(--sp-1); align-items: center; flex: 0 0 auto; margin-left: auto; }
 .map-twin-offer-open { white-space: nowrap; }
-.map-twin-offer-x { align-self: flex-end; }
 
-/* `sm`: the card takes the width between the corners and lays its button
-   under the words, which a 340 px map has the height for and not the width. */
+/* `sm`: the card takes the width between the corners and always lays its
+   button under the words, which a 340 px map has the height for and not the
+   width. */
 @media (max-width: 700px) {
-  .map-twin-offer { flex-wrap: wrap; width: calc(100% - 7.5rem); }
-  .map-twin-offer-actions { flex-direction: row; width: 100%; justify-content: space-between; }
+  .map-twin-offer { width: calc(100% - 7.5rem); }
+  .map-twin-offer-actions { width: 100%; justify-content: space-between; }
 }
 
 /* The lines over the stage fold under the bar (digital-twin.js, "the lines
