@@ -400,7 +400,9 @@ it:
   and as it became, newest first — and puts back one field, or the whole
   station as it was before a change, through the editor's own save. The
   station's own fields are recorded; its sensors, repeater ranges and the
-  Bureau's lists are not yet. See `db/README.md`, *Station history*.
+  Bureau's lists are not, because every save replaces those lists whole and
+  logging them is a design of its own. History begins once `0056` is on the
+  live database, which is step 3 of #210. See `db/README.md`, *Station history*.
 * **Saving needs a signed-in session.** The database refuses anonymous writes.
   Signed out, the editor still opens and still shows everything — the Save button
   reads **Sign in to save** and opens the sign-in panel rather than failing at the
@@ -535,8 +537,8 @@ refreshed on write is the fix — worth knowing before the write path lands.
 ## Field-station telemetry
 
 The station list is what the network *is*. This is what it *reports*, and it is a
-completely separate source of truth from ARRO — same charting machinery later
-(#B7), different data.
+completely separate source of truth from ARRO — the same charting machinery (the
+**Field Data** tab is the ARRO Data chart over these rows), different data.
 
 Everything that will ever write a reading goes through **one function**:
 
@@ -554,9 +556,11 @@ select meganet.ingest('{
 -- {"accepted": 2, "duplicates": 0, "rejected": [], "raw_id": 1}
 ```
 
-HTTP POST (#B5), the MQTT bridge (#B6), a backfill from an ARRO export and a
-person typing one in are all adapters onto that call, which is why each of them
-is thin and why none of them gets to disagree with the others about timestamps.
+HTTP POST (#B5) and the MQTT bridge (#B6) are adapters onto that call, which is
+why each of them is thin and why none of them gets to disagree with the others
+about timestamps. The schema names two more ways in — a backfill from an ARRO
+export (protocol `arro`) and a reading typed in by a person (source `manual`) —
+but no adapter for either was built, and no issue asks for one.
 It is a plain Postgres function, so the whole thing moves inside the corporate
 network with a `pg_dump`.
 
@@ -989,7 +993,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 | `repeater.exclusions` | `object[]` | Reserved for next-generation equipment; same `low`/`high` structure |
 | `rm_system_id` | `number` | References the Radio Mobile system spec (power, antenna, etc.) |
 | `satcom.enabled` | `boolean` | Marks stations with satellite comms capability |
-| `catchment_ids` | `string[]` | References `catchments[].id`. **Not yet populated** — the Radio Path Maps tab derives a station's catchment at runtime from its coordinates (see feature 8). Populate this to make map suggestions exact. |
+| `catchment_ids` | `string[]` | References `catchments[].id`: the Queensland drainage basin the station's coordinates fall in, point-in-polygon against the Bureau's basin boundaries (#179; see `db/README.md`, *Where a station is*). An empty list for most stations outside Queensland. The Radio Path Maps tab does not read it, and still works a station's catchment out at runtime from its coordinates (see feature 8). |
 | `TBRGbucketSize` | `number` | Millimetres per tip for this station's tipping-bucket rain gauge. **Absent, not `null`, when not recorded** — most stations today. Every consumer that converts a tip count to millimetres falls back to an assumed 0.2 mm/tip and says so (`bucketSizeMm()` in `app.js`) when this is missing. Named as the ticket that introduced it asked, so it doesn't match this schema's usual snake_case (`tbrg_bucket_size_mm`) — flag it if that should change before more call sites depend on the name. |
 | `flood_classes` | `object[]` | The station's flood classification levels, one per edition of the Bureau's river height station list: `as_at`, and any of `first_report_m`, `minor_m`, `crops_grazing_m`, `moderate_m`, `towns_m`, `major_m` (metres on the gauge), `crossing_height_m` and `crossing_type` (a code from the Bureau's legend — `B` Bridge … `S` Spillway, `T` Highest Astronomical Tide), `note`. **Absent when there are none**, and a row carries a key only for what it states. The newest `as_at` is what the station card shows. See `db/README.md`, *The Bureau's flood warning station lists* |
 | `crossings` | `object[]` | The crossing the gauge is read against: `stream`, `name`, `height_m`, `crossing_type`, `as_at`, `note`. Absent when there are none |
@@ -1046,25 +1050,41 @@ Each entry in the `stations` array represents one node in the network. A node ca
 
 ---
 
-## Planned Features
+## Features
+
+This section started as the list of planned features, and everything in it has
+shipped unless it says otherwise where it stands: a feature built another way
+says how, and one that was not built says so and why. Work still to do is filed
+as issues and sequenced on the roadmap,
+[#113](https://github.com/cdomotor-g/MegaNet/issues/113), rather than listed
+here.
 
 ### 1. Unified Data Management
-- Load `stations.json` from disk or drag-and-drop
-- In-browser CRUD editor for stations with live validation
-- Export edited data back to `stations.json`
-- Import from legacy CSV format (migration path from current files)
+- Load `stations.json` from this device — **Load from this device** on the
+  🛠️ Admin tab, and **Load stations.json** on the first-load screen. Loading it
+  by drag-and-drop was planned and not built, and no issue asks for it
+- Add, edit and delete stations in the browser — the station editor card on the
+  Stations tab; a save is checked before it is sent, and again by the database
+  (see [**Editing it**](#editing-it))
+- Take the data away as `stations.json` — the snapshot on the Admin tab, written
+  from the datastore, behind a sign-in (#191)
+- Import from the legacy CSVs — `migrate.html`, the **Migration Tool**, linked
+  from the Admin tab and the first-load screen: `ALL_UNITS.csv` and
+  `ALL_REPEATERS.csv` in, `stations.json` out
 
 ### 2. Interactive Map
-- Plot all stations by role using distinct markers:
-  - Field stations (rainfall, water level, or both)
-  - Repeaters
-  - Base stations / ingest points
-  - Satcom terminals
+- Plot all stations by role, each role in its own colour — field station green,
+  repeater blue, base station red; a station with several roles takes base over
+  repeater over field. Two splits the plan drew were not built, and no issue asks
+  for either: a field station's pin does not say whether it measures rainfall,
+  water level or both (the *Sensor type* filter does), and satcom terminals have
+  no pin of their own — *Satcom* is in the legend and among the editor's roles,
+  but no station in `stations.json` carries it
 - Draw signal path lines between field stations and the repeaters/base stations their AlertID passes through
 - Click a station to see its full detail panel
 - Filter map display by role, sensor type, radio network, region, basin/council or data completeness (see *Filtering & Exploration*)
 - Pull the repeaters that carry a matched station onto the map and into the table with it (*Include related repeaters*)
-- Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Limit link/path length*)
+- Toggle the link lines on/off (the backbone paths have a switch of their own), fade them with a slider, and cap how long a link may be before it is dropped (*Limit link/path length*)
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
 - **Colour pins by health** — every station OK, watch, fault or no data by when Flood-Net last heard it (and, once its card has been opened, by what its readings say), with its key in the legend; bigger is worse and the ring says it again, so colour is never the only channel; off by default, one request for the whole network a load
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
@@ -1918,8 +1938,9 @@ failure mode — no network means no rivers, and nothing else on the tab changes
 > actual watercourse, consistently west and south — accurate enough for its own
 > job, point-in-polygon against 65 basins the size of small countries, and
 > useless for drawing a line over a topographic basemap. Re-exporting it with
-> real coordinates would make it a good offline layer; until then it stays out of
-> this. See issue #84.
+> real coordinates would make it a good offline layer, which issue #84 left as an
+> optional second phase. #84 closed with the OpenStreetMap layer above; the
+> offline one was not built and is not tracked.
 
 **Survey marks.** *Survey marks & CORS sites (Qld)*, in the same **Map
 display** panel, draws the Department of Resources' permanent survey marks and
@@ -2291,10 +2312,14 @@ first tap) and from GPS course otherwise. Leaving the Stations tab stops the wat
 
 ### 3. Pass Ranges
 - For any station, identify which repeaters have a pass range covering its AlertIDs
-- Show the full hop chain: field → repeater(s) → base station
+- The full hop chain, field → repeater(s) → base station, is drawn on the
+  Stations map rather than listed here: a pass-range link from the station to
+  each repeater, and a black-dashed backbone path on to the base. *Repeaters
+  listening*, under a selected station, lists the first hop
 - Flag stations with no matching repeater (orphaned)
-- Flag pass-range gaps (AlertIDs that fall between all windows)
-- Display pass-range exclusions (future equipment) alongside inclusions
+- Pass-range exclusions (reserved for future equipment) sit under the inclusions
+  in the station editor's repeater block, and every match on this tab and on the
+  map honours them; no repeater in `stations.json` has one
 - One filter box across both tables, taking a station number, an AlertID, part
   of a station name, or a pasted list of them — a repeater is kept when it
   matches, when a station it serves matches, or when its pass ranges cover any
@@ -2310,6 +2335,10 @@ first tap) and from GPS course otherwise. Leaving the Stations tab stops the wat
 A station is only treated as a repeater when it carries pass ranges saying which
 AlertIDs it forwards; entries flagged `repeater` with no pass-range block at all
 are field stations that were mis-tagged during the metadata import.
+
+Gap detection — the AlertIDs that fall between every window — was planned and
+not built, and no issue tracks it. The orphan list is the station-by-station
+half of the same question.
 
 ### 4. Filtering & Exploration
 
@@ -2467,7 +2496,10 @@ Generate the complete set of CSV files required by Radio Mobile software from th
 | `FloodNet_System.csv` | Transmitter/receiver system specs |
 | `FloodNet_NetData.csv` | Network membership matrix (antenna heights, system IDs, roles) |
 
-Export is scoped to the current filter selection so users can generate per-catchment or per-network RM projects.
+Export is scoped by the BoM networks ticked on the tab's own rail (with **All** and
+**None** to tick or clear them), not by the Stations filters, so a Radio Mobile
+project can be generated per network or for several. Per-catchment scoping was
+planned and not built; no issue asks for it.
 
 **Both downloads need a signed-in session (#191)** — *Generate & Download All*
 and the `stations.json` *Snapshot* beside it. What is behind the sign-in is
@@ -2579,9 +2611,11 @@ by region, and — new — suggests the relevant map(s) for any station.
 > a shortlist of PDFs, and the reason #84 says that same fit cannot draw a boundary
 > over a basemap.
 >
-> **Roadmap item (b) is done (#179).** `catchment_ids` are no longer derived from
-> that fit: they are point-in-polygon against the Bureau's own basin boundaries in
-> WGS84 (`data/qld-basins.geojson`, from `QldBasin_2009Nov.kmz` via
+> **Roadmap item (b) is done (#179).** This note used to end on a three-item
+> roadmap to make the search exact, and (b) was to populate `catchment_ids` from
+> official basin boundaries. They are no longer derived from that fit: they are
+> point-in-polygon against the Bureau's own basin boundaries in WGS84
+> (`data/qld-basins.geojson`, from `QldBasin_2009Nov.kmz` via
 > `tools/build_geo_layers.py`), and 1,754 of 3,173 stations now carry one — 755
 > more than before, with the rest outside Queensland. Each station also carries
 > `hub_id`, the Bureau maintenance hub responsible for it, from
@@ -2592,10 +2626,15 @@ by region, and — new — suggests the relevant map(s) for any station.
 > drainage division. See `db/README.md` → **Where a station is** for what changed
 > and how it was checked.
 >
-> Still open: (a) an `lga` field populated from an authoritative QLD LGA boundary
-> set; (c) `radio_network_ids` backfilled for the remaining stations; and #84
-> itself — the Radio Path Maps search could now read the real polygons instead of
-> the affine fit.
+> The roadmap's other two items were not done and are not tracked: (a) an `lga`
+> field populated from an authoritative QLD LGA boundary set, and (c)
+> `radio_network_ids` backfilled for the remaining stations. The `lga` that 1,287
+> stations carry is free text from the FRED site list merged in July 2026, and a
+> Queensland station's card names its council area from the State's cadastre
+> (*Land — tenure and council*, §12); 88 stations carry `radio_network_ids`, 85
+> of them repeaters. Nor does the Radio Path Maps search read the real polygons:
+> it could take a station's `catchment_ids` in place of the affine fit above, and
+> no issue asks for the change (#84, which measured the fit, is closed).
 
 ### 9. Serial Monitor (Live Serial Ingestion)
 Connect physical serial devices to the computer's COM ports and stream their
@@ -2718,21 +2757,34 @@ output live, on the **Serial Monitor** tab. Built on the browser's
   option and pressed toggles keep an outline in the system's highlight.
 
 ### 11. Radio Network Management
-- Named radio network clusters (typically named after the primary repeater or ingest point)
-- Assign stations and repeaters to one or more networks
-- Select networks to scope all views and exports to that cluster
-- "Select all" / "Clear all" shortcuts
+- Named radio network clusters (typically named after the primary repeater or
+  ingest point) — fifteen, in the station document's `radio_networks`. A
+  station's networks are on its card, in the Pass Ranges tab's *Network* column
+  and in the Ghosting Graph's filters
+- Scope to a network: the Stations filter's *Radio network* block narrows the map
+  and the list, and the Export tab's own ticks scope the Radio Mobile files, with
+  **All** and **None** as the select-all and clear-all shortcuts (§5)
+- Assigning stations to networks in the app was not built: `radio_network_ids`
+  and the network list arrive with the station document, the station editor has
+  no field for them, and no issue asks for one. The **Networks** tab that listed
+  the clusters was removed at roadmap revision 91 (§14)
 
 ### 12. Station Detail Panel
 Side panel or modal showing full station record:
 - Name, number, coordinates, elevation
 - All AlertIDs with sensor type labels
 - Radio network memberships
-- Repeater pass ranges (visual range bars)
-- Matched field stations (if repeater)
-- Matched repeaters (if field station)
-- Satcom details if applicable
-- Direct link to ARRO graphs for each AlertID
+- Repeater pass ranges, as `low–high` text in the station editor's repeater
+  block — the visual range bars the plan drew were not built, and no issue asks
+  for them
+- Matched field stations (if repeater) — the repeater block's *ALERT IDs in
+  range → stations*
+- Matched repeaters (if field station) — the *Repeaters listening* card
+- Satcom details were not built: every station keeps a `satcom` block, nothing
+  shows it, and none in `stations.json` has it switched on. No issue asks for it
+- A link to ARRO's graphs — *Graph last 7 days* in the editor's ARRO block draws
+  every sensor of the station at once, and each sensor row with an ARRO device id
+  links to that sensor's admin page
 - **Site exposure — tides and soils** (Queensland): whether it stands in or
   near tidal water, the nearest Water Act tidal limit, the coastal management
   district and storm tide areas, and the acid sulfate soil mapping under it,
@@ -4116,7 +4168,10 @@ function. The `.glb` is written by the module itself (metres, y up, origin
 on the ground at the pole, the station's coordinates and datum in its
 header; the imagery embedded) and `tools/blender/import_twin.py` sets the
 scene up in Blender — units, a sun from the north, a camera on the pole.
-Point clouds, when they are ingested, will land in this same frame.
+No point cloud is read. The frame is the one a cloud would land in — the
+header carries the origin a LAS/LAZ file is shifted by — but reading one was
+not built and no issue tracks it; `docs/digital-twin.md`, *Point clouds*, has
+what it would take.
 
 **The same twin is inside the Stations map, and that is the usual way in.**
 From zoom 17 with a station under the view — the one on the card, the
@@ -4267,10 +4322,11 @@ every way in — the tab, either sync — is logged to
 tab's **Review** panel. 🔎 on a photo reads the makes, models and serial
 numbers on the equipment in it (the same OCR engine, over the whole frame
 and four quarters) and proposes them through `propose_equipment()`, which is
-also the seam an agent will use. Nothing reaches a station's equipment
-register until an **administrator** (`app_user.role = 'admin'`) approves it,
-corrected or not; approved equipment shows on the station card
-(`photo-review.js`, `db/migrations/0036_photo_review.sql`).
+also the seam an agent proposing equipment from new photos would use (#206).
+Nothing reaches a station's equipment register until an **administrator**
+(`app_user.role = 'admin'`) approves it, corrected or not; approved equipment
+shows on the station card (`photo-review.js`,
+`db/migrations/0036_photo_review.sql`).
 
 **Editors only.** The pictures and their positions are in a private bucket,
 shown through links that expire, written through three `security definer`
@@ -4363,18 +4419,37 @@ Every other tab's ❔ Help ends with a pointer back here.
 
 ## Deployment Plan
 
+The plan the consolidation was built to, kept as the record of it. **Every
+phase shipped**, and under each step is what became of it: where it shipped, how
+it was done another way, or — struck through — that it was not built or has
+since gone, and why.
+Work still to do is in the issues and on the roadmap,
+[#113](https://github.com/cdomotor-g/MegaNet/issues/113), not here.
+
 ### Phase 1 — Data Migration (Foundation)
 **Goal:** Single JSON file replaces all CSVs with no loss of information.
 
 1. Write a migration script (standalone HTML or Node.js) that reads `ALL_UNITS.csv`, `ALL_REPEATERS.csv`, `MegaNet_Network.csv`, and `MegaNet_System.csv` and outputs a valid `stations.json`.
+   **Done** as `migrate.html`, the Migration Tool, linked from the 🛠️ Admin tab.
+   It reads the first two files: the networks come from `ALL_REPEATERS.csv`'s
+   *BoM Network* column, and the Radio Mobile systems are written in from
+   `MegaNet_System.csv`'s defaults.
 2. Map existing repeater pass-window columns (up to 8) into the flexible `pass_ranges` array.
+   **Done** — `Pass low 1` to `Pass high 8`.
 3. Map existing `Text` (AlertID) column into `alert_ids.battery` / `.rainfall` / `.water_level` based on naming conventions in the data.
+   **Done another way.** The tool files every `Text` address under `rainfall`;
+   what each address measures came later, from ARRO's sensor exports, as each
+   station's `sensors` (see *Field notes* above).
 4. Add `roles` inference: entries in `ALL_REPEATERS.csv` → `"repeater"`, remainder → `"field"`.
-5. Validate output: every station referenced in `MegaNet_NetData.csv` must appear in `stations.json`.
+   **Done**, with the unit's icon marking a base as well.
+5. ~~Validate output: every station referenced in `MegaNet_NetData.csv` must appear in `stations.json`.~~
+   **Not built**, and not tracked: the list has long outgrown those files — the
+   Bureau's station indexes alone added 1,697 stations — so they are no longer
+   the reference to check it against.
 6. ~~Keep `z_Sensors_…_NATIONAL.csv` as a separate sidecar file.~~ The relevant
    sensor records (type, Sensor ID, ARRO device IDs) are now baked into each
-   station's `site` / `sensors` fields in `stations.json`, so the CSV is
-   redundant and can be removed.
+   station's `site` / `sensors` fields in `stations.json`, and the CSV is in
+   `archive/`, kept only for the ARRO ids the newer workbooks lack.
 
 ### Phase 2 — Single-Page Application Shell
 **Goal:** One `index.html` with tabbed navigation replacing all three HTML files.
@@ -4390,9 +4465,12 @@ Tabs / panels:
   table together; 📍 Find a place (the blue pin) takes the map to a town, river,
   catchment, council area or coordinate
 - **Radio Path Maps** — Queensland basin explorer + bundled Radio-path PDF maps, with station-aware search
-- **Networks** — radio network cluster management
-- **Pass Ranges** — pass-range matching and hop-chain view; rows link through to
-  the station on the Stations tab
+- ~~**Networks** — radio network cluster management~~ — built as a read-only
+  list of the clusters and the catchment vocabulary, and removed at roadmap
+  revision 91: every number on it was already on a tab somebody is on (§11, §14)
+- **Pass Ranges** — pass-range matching and orphaned stations; rows link through
+  to the station on the Stations tab. The hop chain is drawn on the Stations map
+  instead (§3)
 - **Bit Flipper** — ALERT address tool
 - **Ghosting Graph** — ALERT addresses as nodes, bit-flip
   adjacency and observed ghosting as edges; hands its visible set to the
@@ -4414,39 +4492,78 @@ Tabs / panels:
 
 Technology: Vanilla JS (no framework), same stack as current `app.js`.
 
+The shell has grown well past this list: 27 tabs in seven groups now, which
+`TABS` in `core.js` describes and the 🗂️ Site Map tab draws.
+
 ### Phase 3 — Map & Link Visualisation
 **Goal:** Full interactive map with signal paths.
 
 1. Render markers by role with distinct icons/colours.
+   **Done** — a colour per role (§2).
 2. Compute pass-range matches at load time; draw polylines for each matched pair.
+   **Done** (§2).
 3. Click station → open detail panel with full record.
+   **Done** — the station card (§2, §12).
 4. Filter controls update both the station table and the map simultaneously.
+   **Done** (§4).
 5. Toggle link-line visibility per radio network.
+   **Done another way.** There is no per-network switch; narrowing the map to a
+   network with the *Radio network* filter and *Hide stations that don't match*
+   leaves only the links whose two ends are still on it.
 
 ### Phase 4 — Pass-Range Analysis & BitFlipper Integration
 **Goal:** Merge BitFlipper functionality into the main tool.
 
 1. Move bit-flip logic and ARRO URL builder into `app.js`.
+   **Done**, and moved on again when `app.js` was split: `bit-flipper.js`, and
+   `buildArroUrl()` in `core.js`.
 2. Cross-reference against `stations.json` alert IDs instead of loading the national CSV separately (or load it on demand).
+   **Done** — the Bit Flipper reads each station's `sensors` (§6).
 3. Add orphan detection (stations with no matching repeater).
-4. Add gap detection (AlertID ranges not covered by any pass window in a network).
+   **Done** — the Pass Ranges tab (§3).
+4. ~~Add gap detection (AlertID ranges not covered by any pass window in a network).~~
+   **Not built**, and no issue tracks it (§3).
 
 ### Phase 5 — Radio Mobile Export
 **Goal:** Generate RM files from filtered JSON data.
 
 1. Port `buildRmFiles()` from current `app.js` to read from `stations.json`.
-2. Add per-catchment and per-network export scoping.
+   **Done** — the Export tab, `runExport()` in `export.js` (§5).
+2. Add ~~per-catchment and~~ per-network export scoping.
+   **Per network, done**, by the tab's own ticks. Per catchment was not built,
+   and no issue asks for it.
 3. Allow user to set the Windows path prefix for RM config (stored in `meta` section of JSON).
-4. Validate export: warn if any selected station is missing coordinates or system ID.
+   **Half done**: the paths are kept in `meta.rm_paths` and the tab shows the
+   map's, but nothing in the app sets them — they change with the station
+   document. No issue asks for more.
+4. ~~Validate export: warn if any selected station is missing coordinates or system ID.~~
+   **Not built**: the files are written as the data stands, a missing position
+   as a blank, and no issue asks for a warning.
 
 ### Phase 6 — Editor & Import/Export
 **Goal:** Maintain the data without editing JSON by hand.
 
 1. Form-based station editor with validation.
-2. Add / edit / delete stations, repeaters, networks, catchments.
-3. Import CSV (legacy format) with field-mapping wizard.
+   **Done** — the station editor card on the Stations tab; a save is checked
+   before it is sent and again by the database ([**Editing it**](#editing-it)).
+2. Add / edit / delete stations, repeaters, ~~networks, catchments~~.
+   **Stations and their repeater blocks, done**, a deletion recoverable.
+   Networks and catchments are not edited in the app: both arrive with the
+   station document, the catchments built from the Bureau's basin boundaries
+   (§8, §11). No issue asks for it.
+3. Import CSV (legacy format) ~~with field-mapping wizard~~.
+   **Done without the wizard**: the legacy import is `migrate.html` (Phase 1),
+   which knows the two legacy files' columns by name. A wizard to map another
+   CSV's columns was not built and is not tracked; data has come in since through
+   the importers in `tools/`.
 4. Export `stations.json` from the browser.
-5. Optional: diff view showing what changed since last export.
+   **Done** — the snapshot on the 🛠️ Admin tab (§1).
+5. ~~Optional: diff view showing what changed since last export.~~
+   Not built as a diff against an export. What it was for — seeing what changed —
+   shipped as the station card's **History** (#219): who changed each field,
+   when, what it was and what it became, with **Restore**, and **Deleted
+   stations** on the Admin tab. It needs `0056` on the live database, which is
+   step 3 of #210. A diff against the last export is not tracked.
 
 ---
 
@@ -4491,7 +4608,8 @@ interference investigation starts from evidence instead of guesswork.
 
 Each candidate gets a 0–100 score (mechanism weight × distance × power ×
 line-of-sight), with the components shown on the card. Line-of-sight is **not
-yet assessed** (`los: null`, factor 0.7); the honest blind spots — amateur
+assessed** (`los: null`, factor 0.7): `tools/acma_fetch.py` reserves a `--los`
+switch for it, and no issue tracks building it. The honest blind spots — amateur
 radio, unlicensed/faulty emitters, spurious emissions, non-co-sited mixing,
 tropospheric ducting — are documented in the layer's own "?" help panel.
 

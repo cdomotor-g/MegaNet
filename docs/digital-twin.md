@@ -1122,17 +1122,18 @@ written onto the scene as custom properties, and optionally a render:
 blender --background --python tools/blender/import_twin.py -- twin-loudoun_br_al-400m.glb --render twin.png
 ```
 
-### Point clouds, later
+### Point clouds — not built
 
-The scene is built to take them: `three.Points` draws a cloud in the same
-metres-from-the-pole frame the mesh is in, and the `.glb`'s header carries the
-origin a LAS/LAZ file's coordinates have to be shifted by. Elvis is the
+No point cloud is read, and no issue tracks reading one. The scene is built to
+take them: `three.Points` would draw a cloud in the same metres-from-the-pole
+frame the mesh is in, and the `.glb`'s header carries the origin a LAS/LAZ
+file's coordinates have to be shifted by. Elvis is the
 source: its point-cloud coverage is published as tiles
 (`s3-ap-southeast-2.amazonaws.com/fsdf-elevation-tile-cache/POINT_CLOUD/{z}/{x}/{y}.png`,
 the same cache `map-elvis-coverage.js` reads the DEM coverage from, and one
 whose CORS allows only Elvis's own origin) and the data itself comes from a
 download job. A LAZ decoder in the browser is a library decision the way
-three.js was, and belongs to that issue.
+three.js was, and belongs to whichever issue takes this up.
 
 ## What the network has to allow
 
