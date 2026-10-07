@@ -297,7 +297,16 @@ const SerialSdr = (function () {
   async function choose(id) {
     const c = conn(id);
     if (!c) return;
-    if (!RtlSdr.supported()) { alert('WebUSB is not available in this browser. Use Chrome or Edge, over https or from localhost.'); return; }
+    // The setup already says this and greys the choice out (setupBody); this is
+    // for a press that reaches here anyway, said on the card like every other
+    // way choosing a stick can end.
+    if (!RtlSdr.supported()) {
+      c.err = 'This browser has no WebUSB, so it cannot reach a stick plugged in here. Chrome or Edge on a computer can, '
+        + 'over https or from localhost — or a Raspberry Pi can drive the stick: choose "on a Raspberry Pi" above.';
+      Serial.renderList();
+      announce(c.err);
+      return;
+    }
     try {
       c.usb = await RtlSdr.request();
       c.label = RtlSdr.label(c.usb);
@@ -531,8 +540,17 @@ const SerialSdr = (function () {
   function setBias(id, on) {
     const c = conn(id);
     if (!c) return;
-    if (on && !confirm('Turn the bias tee on? It puts 4.5 V on the antenna socket — for a powered LNA or active antenna. '
-      + 'Never with an antenna or filter that shorts DC to ground.')) { mark(c, 'controls'); Serial.renderList(); return; }
+    // On asks first; a "no" redraws the controls, which puts the tick back.
+    if (on) {
+      return confirmDialog({ title: 'Turn the bias tee on?',
+        message: 'It puts 4.5 V on the antenna socket — for a powered LNA or active antenna. '
+          + 'Never with an antenna or filter that shorts DC to ground.',
+        confirm: 'Turn it on', danger: true })
+        .then(ok => { if (ok) return applyBias(c, true); mark(c, 'controls'); Serial.renderList(); });
+    }
+    return applyBias(c, false);
+  }
+  function applyBias(c, on) {
     if (isPi(c)) return piWant(c, { bias: !!on });
     c.cfg.bias = !!on;
     if (c.dev) return act(c, async () => { await c.dev.setBiasTee(!!on); });

@@ -38,6 +38,7 @@ import path from 'node:path';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { answer as answerAsk } from './lib/ask.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -347,8 +348,9 @@ try {
   await page.click('#adm-tokens button:has-text("Done")');
   ok('Done takes the token off the screen', await page.evaluate(t => !document.body.textContent.includes(t), minted));
   ok('the new token is listed', await page.evaluate(() => /Check laptop/.test(document.querySelector('#adm-tokens table').textContent)));
-  page.once('dialog', d => d.accept());
   await page.click('#adm-tokens button:has-text("Revoke")');
+  const revokeQ = await answerAsk(page, true);
+  ok('Revoke… asks first, named for what it does', /^Revoke “Check laptop”\?$/.test(revokeQ.title) && revokeQ.yes === 'Revoke the token' && revokeQ.danger, JSON.stringify(revokeQ));
   await until(() => page.evaluate(() => /revoked/.test(document.querySelector('#adm-tokens table').textContent)), 'Revoke… revokes it, after asking');
   ok('…by its id', adminCalls.includes('revoke:9'), adminCalls.join(','));
 
@@ -385,8 +387,8 @@ try {
 
   reqList.push({ id: 8, code: 'KLMN-PQRS', label: 'Somebody', status: 'pending', requested_at: ago(30), expires_at: new Date(Date.now() + 29 * 60e3).toISOString(), detail: {} });
   await until(async () => /KLMN-PQRS/.test(await reqsText()), 'a second request appears');
-  page.once('dialog', d => d.accept());
   await page.click('#adm-tok-reqs button:has-text("Deny")');
+  await answerAsk(page, true);
   await until(() => denyCalls.includes(8), 'Deny turns it down, after asking');
 
   // The QR code on the Pi's screen: #pair=CODE. Signed out first, then in.

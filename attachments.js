@@ -506,8 +506,9 @@ const Attachments = (function () {
   async function remove(id) {
     const row = rowById(id);
     if (!row) return;
-    if (!window.confirm(`Remove ${row.title || 'this file'}? The file itself is deleted, not just `
-                      + `the link to it, and it cannot be recovered.`)) return;
+    if (!(await confirmDialog({ title: `Remove ${row.title || 'this file'}?`,
+      message: 'The file itself is deleted, not just the link to it, and it cannot be recovered.',
+      confirm: 'Remove the file', danger: true }))) return;
 
     const [kind, ownerId] = String(S().ownerKey || ':').split(':');
     try {

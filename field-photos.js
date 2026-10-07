@@ -462,7 +462,13 @@ const FieldPhotos = (function () {
   // of them without asking again, and an edit made in one place is the row the
   // others draw.
 
+  //
+  // Not while signed out. A request made in the last session can answer after
+  // it has ended — the twin's spots, a page of the library — and its rows
+  // would come back into a cache authChanged() has just emptied, readable by
+  // whoever sits down next. What arrives then is shown nowhere and kept nowhere.
   function keep(rows) {
+    if (!signedIn()) return rows;
     const by = S().byId;
     for (const r of rows || []) if (r && r.id) by[r.id] = Object.assign(by[r.id] || {}, r);
     return rows;
@@ -2521,8 +2527,9 @@ const FieldPhotos = (function () {
   async function removePhoto(id) {
     const r = S().byId[id];
     if (!r) return;
-    if (!window.confirm(`Remove ${r.title || 'this photo'}? The picture is deleted, not just hidden, and it will not `
-                      + `come back from Dropbox.`)) return;
+    if (!(await confirmDialog({ title: `Remove ${r.title || 'this photo'}?`,
+      message: 'The picture is deleted, not just hidden, and it will not come back from Dropbox.',
+      confirm: 'Remove the photo', danger: true }))) return;
     try {
       const out = await dbRpc('remove_field_photo', { p_id: id });
       if (out && out.storage_path) {

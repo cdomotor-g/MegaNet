@@ -550,9 +550,13 @@ const MapDraw = (function () {
     mapNote(`Line turned round — ${snapLabel(sh) || measure(sh)}`, 3000);
   }
 
-  function clearAll() {
+  // One drawing goes without a question — it is one click to draw again — and
+  // so, without one, before this returns.
+  async function clearAll() {
     if (D().shapes.length > 1 &&
-        !confirm(`Remove all ${D().shapes.length} drawings?`)) return;
+        !(await confirmDialog({ title: `Remove all ${D().shapes.length} drawings?`,
+          message: 'This cannot be undone.',
+          confirm: 'Remove the drawings', danger: true }))) return;
     D().shapes = [];
     D().selectedId = null;
     cancelPending();
@@ -601,8 +605,9 @@ const MapDraw = (function () {
     const { ll, sid } = resolve(e.latlng);
     if (tool === 'pin') { add({ kind: 'pin', lat: ll[0], lon: ll[1], snappedTo: [sid] }); return; }
     if (tool === 'text') {
-      const t = prompt('Annotation text');
-      if (t && t.trim()) add({ kind: 'text', lat: ll[0], lon: ll[1], text: t.trim(), snappedTo: [sid] });
+      promptDialog({ title: 'Add a note to the map', label: 'Text, placed where you clicked',
+                     placeholder: 'e.g. flood watch area', confirm: 'Add the note' })
+        .then(t => { if (t && t.trim()) add({ kind: 'text', lat: ll[0], lon: ll[1], text: t.trim(), snappedTo: [sid] }); });
       return;
     }
     if (!pending || pending.kind !== tool) {

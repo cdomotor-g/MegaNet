@@ -57,6 +57,7 @@ import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { hillyTerrariumPng, hillyHeightAt } from './lib/terrarium.mjs';
+import { answer } from './lib/ask.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -988,6 +989,11 @@ console.log('\nReset');
 
 await runSites();
 await page.evaluate(() => document.querySelector('.mn-map-reset')?.click());
+// There are drawings, so ↺ asks first — in the app's own dialog (#223) — and
+// the reset is what a yes does.
+const resetQ = await answer(page, true);
+ok('↺ asks before it takes the drawings, in words and with a button that says what it does',
+   resetQ.title === 'Reset the map?' && /drawing/.test(resetQ.text) && resetQ.yes === 'Reset the map', JSON.stringify(resetQ));
 await page.waitForTimeout(400);
 const after = await page.evaluate(() => {
   let ours = 0;

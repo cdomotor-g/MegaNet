@@ -913,6 +913,7 @@ everything.
 | The Stations map rebuilt under a focused control | The same control of the new map — the same strip button (panes and their buttons outlive the map), the same button by its class, the element with the same id in the same panel |
 | A card brought into view (*Station details*, a row) | The code that brought it moves focus if it means to; opening the side panel on it moves none |
 | Modal open / close | The dialog card / whatever opened it. `Modal` already does this; `MemMeter` does now too |
+| A question (`confirmDialog`, `promptDialog`) open / close | Its way out if what it asks cannot be taken back, else its answer — the box, for a line of text / whatever had focus when it was asked, which may be inside the dialog it was asked over |
 
 The tab-switch rule exists because `renderTabs()` replaces the nav's
 `innerHTML`: the button that was clicked no longer exists when the switch
@@ -953,6 +954,43 @@ page". The live region stays quiet there, and speaks on every other route into
 a tab: a deep-link button inside a page, a restore from the URL, and the phone
 drawer closing to `<main>`, which has no name to read. Both halves are asserted
 in `npm run shell`.
+
+### Asking and telling — never the browser's pop-ups (#223)
+
+No script calls `alert()`, `confirm()` or `prompt()`; `npm run dialogs` parses
+every one `index.html` loads to keep it that way. They stop the whole page,
+cannot be styled, say "OK" for every action, and in some browsers carry the
+site's address as their only heading. In their place:
+
+- **`confirmDialog({ title, message, confirm, cancel, danger, checkbox })`**
+  (`modal.js`) for a question, answering with a Promise. The title *is* the
+  question; `confirm` names the button that acts for what it does — "Delete the
+  station", never "OK"; `danger` draws that button as the destructive one and
+  starts focus on the way out, so a stray Enter keeps things as they were. Esc,
+  ×, the backdrop and another question asked over it are all "no". A second
+  question that only arises from a "yes" goes inside the first as a
+  `checkbox`, not after it.
+- **`promptDialog({ title, label, value, confirm })`** (`modal.js`) for a line of
+  text: the string, or `null`.
+- **`Toast.done(text)` / `Toast.failed(text)` / `Toast.note(text)`** (`toast.js`)
+  for the outcome of something somebody just did, said where they will see it
+  without being stopped by it. It speaks through `announce()` — one live region,
+  not two. A "done" goes after a few seconds (not while pointed at); a
+  "failed" stays until it is dismissed.
+
+Questions are asked one layer up, in `#app-ask` (z-index 2100, over `Modal`'s
+2000 and the photo viewer's 2050), because a question is usually asked from
+inside something — a photo in the viewer, a table in `Modal` — and asking must
+not tear down what it was asked from. While one is up it takes the keys on the
+window, in the capture phase, and none go further: an Escape meant for the
+question must not also close the viewer underneath.
+
+A **state** the page is in is neither: it is said on the page, for as long as
+it is true. A browser with no Web Serial is told by the Serial Monitor's own
+banner, and the nav marks the tab first (🖥️, with the reason in the tooltip
+and the button's accessible name — `TAB_NEEDS` in `core.js`). A form's missing
+field is said beside the field, which it describes (`aria-describedby`), with
+the cursor put in it.
 
 The nav's find box keeps its own `role="status"` region for the result count.
 That is deliberate: it is a count attached to a list, and it is read where the

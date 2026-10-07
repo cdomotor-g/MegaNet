@@ -611,6 +611,16 @@ jobs:
         working-directory: test
         run: npm run themes
 
+      # The app asks and tells in its own words (#223): no script calls
+      # alert(), confirm() or prompt() (parsed, not grepped); confirmDialog's
+      # question, buttons named for what they do, every exit but the button a
+      # "no", asked over an open dialog without tearing it down or letting a
+      # key past; promptDialog; the toasts and the live region; the call sites
+      # people meet first; and the nav's mark for a tab this browser cannot run.
+      - name: Dialogs — the app's own questions and toasts, and no browser pop-ups
+        working-directory: test
+        run: npm run dialogs
+
       # Proposed stations (0039) in the editor, on the card and on the map,
       # against a stand-in for save_station() that holds the database's rules
       # (tools/check_proposed_stations.sql holds the real one to them): a

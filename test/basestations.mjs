@@ -33,6 +33,7 @@
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { answer } from './lib/ask.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -361,24 +362,30 @@ try {
 
   // ── Asking ───────────────────────────────────────────────────────────────────
   const commands = () => sent('admin_base_station_command');
-  let dialog = '';
-  page.once('dialog', d => { dialog = d.message(); d.dismiss(); });
+  // The app's own questions (#223): what is asked is read off the dialog, and
+  // the button pressed is the one a person would press.
   await page.click('#bs-detail button:has-text("Restart its software")');
+  let q = await answer(page, false);
+  let dialog = q.message;
   await page.waitForTimeout(300);
   ok('a restart asks first, in words with an apostrophe in them', /base station's software/.test(dialog), dialog);
+  ok('…its question the title, and the button that acts named for what it does', q.title === 'Restart the base station\'s software?'
+    && q.yes === 'Restart its software' && !q.danger, JSON.stringify(q));
   ok('…and a "no" sends nothing', commands().length === 0, JSON.stringify(commands()));
-  page.once('dialog', d => d.accept());
   await page.click('#bs-detail button:has-text("Restart its software")');
+  await answer(page, true);
   await until(() => commands().length === 1, 'a "yes" sends it');
   ok('…as exactly that request, of that station', commands()[0].p_id === 11 && commands()[0].p_verb === 'agent.restart' && JSON.stringify(commands()[0].p_args) === '{}', JSON.stringify(commands()[0]));
 
   await page.click(`#bs-detail button[aria-label="Restart Second stick"]`);
   await until(() => commands().length === 2, 'a receiver\'s Restart sends a request');
   ok('…carrying that receiver\'s key exactly, quotes and all', commands()[1].p_verb === 'device.restart' && commands()[1].p_args.key === ODD_KEY, JSON.stringify(commands()[1]));
-  page.once('dialog', d => { dialog = d.message(); d.accept(); });
   await page.click(`#bs-detail button[aria-label="Remove ERT-A2"]`);
+  q = await answer(page, true);
+  dialog = q.message;
   await until(() => commands().length === 3, 'an unplugged receiver can be removed, after asking');
   ok('…by its key', commands()[2].p_verb === 'device.forget' && commands()[2].p_args.key === 'ert:usb-FTDI_A10K' && /Remove ERT-A2\?/.test(dialog), JSON.stringify(commands()[2]));
+  ok('…a button drawn as dangerous asking as one, its answer "Remove" without the …', q.danger && q.yes === 'Remove', JSON.stringify(q));
   await page.click('#bs-detail button:has-text("Show its last 200 lines")');
   await until(() => commands().length === 4, 'Show its log asks for it');
   ok('…for 200 lines', commands()[3].p_verb === 'log' && commands()[3].p_args.lines === 200, JSON.stringify(commands()[3]));
@@ -456,8 +463,8 @@ try {
     await page.waitForTimeout(400);
     return /an older list/.test(await text('#bs-detail'));
   })());
-  page.once('dialog', d => { dialog = d.message(); d.accept(); });
   await page.click('#bs-keys button[aria-label="Take Jo Bloggs\'s key off"]');
+  dialog = (await answer(page, true)).message;
   await until(() => sent('admin_base_station_key_remove').length === 1, 'Take off… takes a key off, after asking');
   ok('…naming whose, and its fingerprint', /Jo Bloggs/.test(dialog) && /SHA256:VeBIQNSQ/.test(dialog) && sent('admin_base_station_key_remove')[0].p_id === 5, dialog);
 

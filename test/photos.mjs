@@ -69,6 +69,7 @@ import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { auditHandlers } from './lib/controls.mjs';
+import { answer } from './lib/ask.mjs';
 import { storageStore, installStorage, fileOf } from './lib/storage.mjs';
 import { serveObjects } from './lib/photo-project.mjs';
 import { seedRows, attachmentsSql } from './lib/migration.mjs';
@@ -1048,8 +1049,15 @@ async function browserHalf() {
     // Removing.
     await page.evaluate(id => FieldPhotos.openOne(id), R.p1.id);
     await page.click('#fp-v-details button:has-text("Remove")');
+    // Asked in the app's own dialog (#223), over the viewer — which has to
+    // still be there underneath, not torn down by the asking.
+    await page.waitForSelector('#app-ask .modal-card', { timeout: 5000 });
+    const over = await page.evaluate(() => !!document.querySelector('#fp-viewer:not([hidden]) .fp-v-card'));
+    const asked = await answer(page, true);
     await page.waitForFunction(id => !FieldPhotos.row(id), R.p1.id, { timeout: LOAD_TIMEOUT });
-    ok('Remove asks first, and says the picture is deleted, not hidden', dialogs.some(d => /is deleted, not just hidden/.test(d)), dialogs.join(' | '));
+    ok('Remove asks first — over the viewer, which stays — and says the picture is deleted, not hidden',
+      over && /is deleted, not just hidden/.test(asked.text) && asked.yes === 'Remove the photo' && asked.danger,
+      JSON.stringify({ over, asked, native: dialogs }));
     ok('…takes the row, then both objects', R.p1.deleted_at && store.removed.includes(R.p1.storage_path) && store.removed.includes(R.p1.thumb_path));
     ok('…and a viewer of one photo closes', !(await viewer()));
     await page.waitForFunction(() => document.querySelectorAll('#fp-lib .fp-card').length === 4, null, { timeout: LOAD_TIMEOUT });
@@ -1163,6 +1171,12 @@ async function browserHalf() {
         && /sign in/.test(await text('#twin-pane-photos')), J(d));
     }
     ok('the viewer\'s rows are forgotten', await page.evaluate(id => !FieldPhotos.row(id), R.sw.id));
+    // A request of the last session's that answers after it has ended — the
+    // twin's spots, a page of the library — must not put its rows back.
+    // openOne() asks for exactly one such row, now, and answers into keep().
+    await page.evaluate(id => FieldPhotos.openOne(id), R.sw.id);
+    ok('…and a row that arrives after signing out is kept nowhere and shown nowhere',
+      await page.evaluate(id => !FieldPhotos.row(id) && !FieldPhotos.isOpen(), R.sw.id));
     await page.evaluate(() => switchTab('stations'));
     await page.waitForFunction(() => MapPhotos._note().kind === 'signed-out', null, { timeout: LOAD_TIMEOUT });
     ok('the map draws no pins for a session that is not signed in', (await page.$$('.mn-photo-icon')).length === 0);

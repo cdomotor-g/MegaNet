@@ -1076,7 +1076,9 @@ async function editorDelete() {
     });
     return;
   }
-  if (!confirm(`Delete "${name}"?\n\nIt is removed from the station list. The record is kept and can be restored by whoever administers the database.`)) return;
+  if (!(await confirmDialog({ title: `Delete “${name}”?`,
+    message: 'It is removed from the station list. The record is kept and can be restored by whoever administers the database.',
+    confirm: 'Delete the station', danger: true }))) return;
 
   state.editorBusy = true;
   setEditorStatus({ kind: 'busy', text: 'Deleting…' });

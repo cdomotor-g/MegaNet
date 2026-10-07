@@ -152,7 +152,7 @@ const TABS = [
       find: 'erta2 elpro decode ports capture sample putty log watch follow drop' },
     { id: 'hfem',       label: 'HFEM Messages',          icon: '🌊',
       find: 'hydro field event message bom bureau meteorology decode paste site sensor scheme timestamp maintenance builder logger' },
-    { id: 'serial',     label: 'Serial Monitor',         icon: '🔌',
+    { id: 'serial',     label: 'Serial Monitor',         icon: '🔌',     needs: 'serial',
       find: 'com port web serial live stream terminal baud log quansheng radio uv-k5 rtl-sdr sdr usb dongle spectrum waterfall off air putty log file follow tail erta2 ert-a2 elpro alert2' },
   ] },
   { group: 'Data', tabs: [
@@ -191,6 +191,26 @@ const TABS = [
 // Flattened, for the lookups that only care which tab is open (the bug
 // reporter) and don't want to know how the nav happens to be grouped.
 const TAB_LIST = TABS.flatMap(g => g.tabs);
+
+// What a tab's own job needs from the browser (#223), for the tabs whose job is
+// a device on a cable: a `needs` on the tab above names one of these. The nav
+// marks such a tab where this browser lacks it — on a phone, or in Firefox or
+// Safari anywhere — so the news comes before the tab is opened rather than
+// after a button has been pressed; the tab's own banner says the rest.
+// Asked of the browser itself, not guessed from the screen's width: a tablet
+// with Chrome may have it, a desktop Firefox does not.
+const TAB_NEEDS = {
+  serial: {
+    has: () => typeof navigator !== 'undefined' && 'serial' in navigator,
+    why: 'needs Chrome, Edge or Opera on a computer, to reach a device on a cable',
+  },
+};
+
+// '' when this browser can do what the tab is for, else why not, in words.
+function tabCannot(t) {
+  const n = t && t.needs && TAB_NEEDS[t.needs];
+  return n && !n.has() ? n.why : '';
+}
 
 // What the help panel says, keyed by the same tab ids TABS uses. Kept beside
 // TABS rather than folded into it: TABS is the nav's description and reads as

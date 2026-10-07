@@ -94,7 +94,7 @@ const BugReport = (function () {
             <select id="br-type">${typeOpts}</select>
           </label>
           <label>What went wrong, or what would you like? <span class="req">*</span>
-            <textarea id="br-desc" placeholder="e.g. Clicking a repeater on the Stations tab does nothing…"></textarea>
+            <textarea id="br-desc" aria-describedby="br-msg" placeholder="e.g. Clicking a repeater on the Stations tab does nothing…"></textarea>
           </label>
           <label>What did you expect to happen? <span class="small">(optional)</span>
             <textarea id="br-expected" placeholder="e.g. The station's details should open on the right."></textarea>
@@ -110,6 +110,8 @@ const BugReport = (function () {
             <pre class="diag-pre">${esc(diagBlock())}</pre>
           </details>
         </div>
+
+        <p id="br-msg" class="br-msg" tabindex="-1" hidden></p>
 
         <div class="modal-foot">
           <button onclick="BugReport.close()">Cancel</button>
@@ -176,23 +178,46 @@ const BugReport = (function () {
     return { url, report: r };
   }
 
+  // A line in the dialog's own markup, for what alert() used to say (#223).
+  // Not Toast: this file depends on nothing newer than itself (see the top).
+  // The field it is about is described by it, so moving focus there reads it.
+  function say(text, bad) {
+    const el = document.getElementById('br-msg');
+    if (!el) return null;
+    el.textContent = text;
+    el.hidden = !text;
+    el.classList.toggle('is-bad', !!bad);
+    return el;
+  }
+
   function submit() {
     const { url, report } = issueUrl(false);
+    const ta = document.getElementById('br-desc');
     if (!report.desc) {
-      alert('Please describe what went wrong or what you\'d like before submitting.');
-      const ta = document.getElementById('br-desc'); if (ta) ta.focus();
+      say('Describe what went wrong, or what you would like, first — it is the one thing the report needs.', true);
+      if (ta) { ta.setAttribute('aria-invalid', 'true'); ta.focus(); }
       return;
     }
+    if (ta) ta.removeAttribute('aria-invalid');
     // GitHub caps the length of a prefilled issue URL. If we're over a safe
     // budget, copy the report and open a blank issue so nothing typed is lost.
+    // The copy is started first, while the page still has the focus a new tab
+    // is about to take; and the dialog stays, because what it now says is the
+    // next step — closing it would take the instructions away with it.
     if (url.length > 7500) {
-      copyText(`${report.title}\n\n${report.body}`);
-      alert('Your report is long, so it was copied to the clipboard instead of pre-filling GitHub. '
-          + 'A blank new-issue page is opening — paste (Ctrl/Cmd+V) into the description.');
+      const copied = copyText(`${report.title}\n\n${report.body}`);
       window.open(issueUrl(true).url, '_blank', 'noopener');
-    } else {
-      window.open(url, '_blank', 'noopener');
+      copied.then(ok => {
+        const el = say(ok
+          ? 'Your report is long, so it was copied to the clipboard instead of filled in on GitHub. '
+            + 'A blank issue has opened in a new tab: paste it into the description (Ctrl/Cmd+V).'
+          : 'Your report is too long to fill in on GitHub, and it could not be copied by itself. '
+            + 'Press Copy report, then paste it into the blank issue that opened in a new tab.', !ok);
+        if (el) el.focus();
+      });
+      return;
     }
+    window.open(url, '_blank', 'noopener');
     close();
   }
 

@@ -4563,13 +4563,14 @@ const ArroData = (function () {
   // changes `n`, and therefore the only one that has to touch `extra`, `orig`
   // and `edited` as well — everything the series carries per reading is cut
   // with one mask, here, so there is exactly one list to keep up to date.
-  function editDelete() {
+  async function editDelete() {
     const by = pickedBySeries();
     if (!by.size) return;
     const total = [...by.values()].reduce((a, r) => a + r.length, 0);
-    if (!confirm(`Delete ${total.toLocaleString()} reading${total === 1 ? '' : 's'}? `
-               + 'They go out of the chart, the table and the exports. '
-               + 'Revert puts back edited values but not deleted rows.')) return;
+    if (!(await confirmDialog({ title: `Delete ${total.toLocaleString()} reading${total === 1 ? '' : 's'}?`,
+      message: 'They go out of the chart, the table and the exports. '
+        + 'Revert puts back edited values but not deleted rows.',
+      confirm: `Delete ${total === 1 ? 'the reading' : 'them'}`, danger: true }))) return;
     for (const [s, rows] of by) {
       keepOriginal(s);
       const drop = new Set(rows);
@@ -4598,12 +4599,14 @@ const ArroData = (function () {
   // says so — putting them back would mean keeping the whole original series
   // beside the edited one for the life of the tab, which is a lot of memory for
   // an undo nobody asked for.
-  function revertSeries(key) {
+  async function revertSeries(key) {
     const s = find(key);
     if (!s || !s.orig) return;
-    if (!confirm(`Put ${s.label} back to the values and quality codes it was loaded with?`
-               + (s.deleted ? ` The ${s.deleted.toLocaleString()} deleted reading${
-                   s.deleted === 1 ? '' : 's'} cannot come back.` : ''))) return;
+    if (!(await confirmDialog({ title: `Revert ${s.label}?`,
+      message: 'Its values and quality codes go back to what it was loaded with, and every edit is lost.'
+        + (s.deleted ? ` The ${s.deleted.toLocaleString()} deleted reading${
+            s.deleted === 1 ? '' : 's'} cannot come back.` : ''),
+      confirm: 'Revert', danger: true }))) return;
     s.v = Float64Array.from(s.orig.v);
     s.q = Uint8Array.from(s.orig.q);
     s.edited = new Uint8Array(s.n);
@@ -6710,9 +6713,9 @@ const ArroData = (function () {
   function removeWarning(s) {
     const ed = editedCount(s), del = s.deleted || 0;
     if (!ed && !del) return '';
-    return `${s.label} has ${[ed ? `${ed.toLocaleString()} edited reading${ed === 1 ? '' : 's'}` : '',
-                              del ? `${del.toLocaleString()} deleted` : ''].filter(Boolean).join(' and ')}. `
-         + 'Removing it loses them — the exports are the only copy. Remove it anyway?';
+    return `It has ${[ed ? `${ed.toLocaleString()} edited reading${ed === 1 ? '' : 's'}` : '',
+                      del ? `${del.toLocaleString()} deleted` : ''].filter(Boolean).join(' and ')}. `
+         + 'Removing it loses them — the exports are the only copy.';
   }
 
   // Picks belonging to series that are going away go with them: pickedBySeries()
@@ -6724,23 +6727,25 @@ const ArroData = (function () {
     for (const k of [...ad.picked]) if (gone.has(k.slice(0, k.indexOf('\u0000')))) ad.picked.delete(k);
   }
 
-  function remove(key) {
+  async function remove(key) {
     const s = find(key);
     const warn = s ? removeWarning(s) : '';
-    if (warn && !confirm(warn)) return;
+    if (warn && !(await confirmDialog({ title: `Remove ${s.label}?`, message: warn,
+      confirm: 'Remove it anyway', danger: true }))) return;
     ad.series = ad.series.filter(x => x.key !== key);
     if (ad.pin && ad.pin.key === key) ad.pin = null;
     forgetPicks([key]);
     ad.view = null;
     renderAll();
   }
-  function clearAll() {
+  async function clearAll() {
     const what = ad.source === 'field' ? 'loaded series' : 'imports';
     const edited = ad.series.filter(s => editedCount(s) || s.deleted).length;
     const extra = edited
       ? ` ${edited} of them ${edited === 1 ? 'has' : 'have'} unsaved edits, which go with them.` : '';
     if ((ad.series.length > 1 || edited)
-        && !confirm(`Remove all ${ad.series.length} ${what}?${extra}`)) return;
+        && !(await confirmDialog({ title: `Remove all ${ad.series.length} ${what}?`, message: extra.trim(),
+          confirm: 'Remove them all', danger: true }))) return;
     forgetPicks(ad.series.map(s => s.key));
     ad.series = []; ad.pin = null; ad.hover = null; ad.view = null;
     renderAll();
@@ -6748,10 +6753,11 @@ const ArroData = (function () {
 
   // The memory meter's release. It counted both instances, so it drops both —
   // clearAll() is the per-tab button and deliberately never reaches across.
-  function dropAll() {
+  async function dropAll() {
     const total = Object.values(instances).reduce((a, i) => a + i.series.length, 0);
     if (!total) return;
-    if (total > 1 && !confirm(`Remove all ${total} loaded series, on both data tabs?`)) return;
+    if (total > 1 && !(await confirmDialog({ title: `Remove all ${total} loaded series, on both data tabs?`,
+      confirm: 'Remove them all', danger: true }))) return;
     for (const i of Object.values(instances)) {
       i.series = []; i.pin = null; i.hover = null; i.view = null; i.picked.clear();
     }

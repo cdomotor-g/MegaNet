@@ -459,7 +459,7 @@ const Admin = (function () {
       if (done) announce(done(out));
       await load();
     } catch (err) {
-      alert(err.message);
+      Toast.failed(err.message);
     }
   }
 
@@ -473,13 +473,20 @@ const Admin = (function () {
         () => `Saved ${u ? u.email : 'user'}.`);
   }
 
-  function deleteUser(id) {
+  // One question, with the second as a tick inside it (#223): the second used
+  // to be a confirm() of its own, asked only after a yes to the first, whose
+  // OK and Cancel meant "remove it" and "keep it" — which nobody could tell
+  // from the buttons.
+  async function deleteUser(id) {
     const u = (users || []).find(x => x.id === id);
     if (!u) return;
-    if (!confirm(`Delete ${u.email}?\n\nTheir sign-in is removed. What they edited stays, attributed to them.`)) return;
-    const disallow = confirm(`Also remove ${u.email}'s own allowlist entry, so they cannot sign in again?\n\n` +
-                             'OK removes it. Cancel keeps it. A domain entry that matches them is left alone.');
-    act('admin_user_delete', { p_id: id, p_disallow: disallow }, out =>
+    const answer = await confirmDialog({ title: `Delete ${u.email}?`,
+      message: 'Their sign-in is removed. What they edited stays, attributed to them.',
+      checkbox: { label: `Also remove ${u.email}'s own allowlist entry, so they cannot sign in again. `
+                       + 'A domain entry that matches them is left alone.' },
+      confirm: 'Delete the user', danger: true });
+    if (!answer) return;
+    act('admin_user_delete', { p_id: id, p_disallow: answer.checked }, out =>
       `Deleted ${u.email}.${out && out.still_allowed ? ' The allowlist still lets them sign in again.' : ''}`);
   }
 
@@ -500,12 +507,14 @@ const Admin = (function () {
     document.getElementById('adm-entry')?.focus();
   }
 
-  function removeEntry(i) {
+  async function removeEntry(i) {
     const a = (allow || [])[i];
     if (!a) return;
-    const who = a.kind === 'domain' ? `everybody at ${a.entry}` : a.entry;
-    if (!confirm(`Remove ${a.entry} from the allowlist?\n\n${who} will no longer be able to sign in or edit` +
-                 ' (unless another entry matches). Existing users keep their row but lose editing.')) return;
+    const who = a.kind === 'domain' ? `Everybody at ${a.entry}` : a.entry;
+    if (!(await confirmDialog({ title: `Remove ${a.entry} from the allowlist?`,
+      message: `${who} will no longer be able to sign in or edit (unless another entry matches). `
+        + 'Existing users keep their row but lose editing.',
+      confirm: 'Remove from the allowlist', danger: true }))) return;
     act('admin_allow_remove', { p_entry: a.entry }, () => `Removed ${a.entry}.`);
   }
 
@@ -517,9 +526,10 @@ const Admin = (function () {
     announce(`Forgot ${x.k}.`);
   }
 
-  function clearLocal() {
-    if (!confirm('Forget every setting this browser keeps for the app — filters, panel widths, drafts?\n\n' +
-                 'Your sign-in is kept. Unsaved drafts are lost.')) return;
+  async function clearLocal() {
+    if (!(await confirmDialog({ title: 'Forget every setting this browser keeps for the app?',
+      message: 'Filters, panel widths, drafts. Your sign-in is kept. Unsaved drafts are lost.',
+      confirm: 'Forget the settings', danger: true }))) return;
     for (const x of storageKeys()) {
       if (KEEP.includes(x.k)) continue;
       try { localStorage.removeItem(x.k); } catch (_) { /* blocked */ }

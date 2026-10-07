@@ -129,7 +129,11 @@ MegaNet/
 │                             from the Queensland cadastre
 ├── map-photos.js           ← MapPhotos — the Stations map's 📷 pins, a cone each
 │                             way the camera faced
-├── modal.js                ← Modal     — the shared dialog shell
+├── modal.js                ← Modal     — the shared dialog shell, and confirmDialog /
+│                             promptDialog: the app's own questions, in place of the
+│                             browser's confirm() and prompt() (#223)
+├── toast.js                ← Toast     — how something just went, at the foot of the
+│                             window, in place of alert() (#223)
 ├── packets.js              ← Packets   — ALERT / ERTS codec, and its tab
 ├── log-follow.js           ← LogFollow — follows a log file as it grows (PuTTY's,
 │                             for a computer that blocks Web Serial)

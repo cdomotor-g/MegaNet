@@ -9733,6 +9733,84 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   overscroll-behavior: contain;
 }
 
+/* ── Questions and toasts (#223) ──────────────────────────────────────────────
+   confirmDialog and promptDialog (modal.js) ask in a shell of their own,
+   #app-ask, one layer over everything a question can be asked from: Modal's
+   own shell (2000) and the photo viewer (2050). A toast (toast.js) is over
+   that again, because the outcome of an answer is said while the dialog it
+   came from may still be up. */
+.modal-overlay--ask { z-index: 2100; align-items: center; }
+.modal-card--ask { max-width: 460px; }
+.ask-text p { margin: .2rem 0 .55rem; line-height: 1.45; }
+.ask-text p:first-child { margin-top: 0; }
+.ask-check { display: flex; align-items: flex-start; gap: .5rem; margin: .6rem 0 0; font-size: .92rem; }
+.ask-check input { width: auto; margin-top: .2rem; }
+.ask-form { display: grid; gap: .3rem; }
+.ask-field { display: grid; gap: .35rem; font-size: .9rem; color: var(--muted); }
+.ask-field input { font-size: 1rem; }
+/* The destructive answer is the outlined one in the base-station hue, as it is
+   everywhere else (.btn-danger), but filled on hover and focus so the one that
+   acts is unmistakable as it is about to be pressed. */
+.modal-card--ask .ask-danger:hover,
+.modal-card--ask .ask-danger:focus-visible { background: var(--role-base); color: var(--role-base-ink); }
+
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 2200;
+  display: grid;
+  gap: .5rem;
+  width: min(32rem, calc(100vw - 2rem));
+  pointer-events: none;          /* the map under the gap between them stays the map's */
+}
+.toast {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: .6rem;
+  padding: .65rem .7rem .65rem .85rem;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .28);
+  animation: toast-in .18s ease-out;
+}
+.toast--done   { border-left-color: var(--ok); }
+.toast--failed { border-left-color: var(--bad); }
+.toast-icon { font-weight: 700; line-height: 1.4; }
+.toast--done .toast-icon   { color: var(--ok); }
+.toast--failed .toast-icon { color: var(--bad); }
+.toast--note .toast-icon   { color: var(--accent); }
+.toast-text { margin: 0; line-height: 1.4; overflow-wrap: anywhere; }
+.toast-x {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0 .25rem;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  cursor: pointer;
+}
+.toast-x:hover { color: var(--text); }
+/* Reduced motion is the one policy at the foot of this file, which stills this too. */
+@keyframes toast-in { from { opacity: 0; transform: translateY(.5rem); } to { opacity: 1; transform: none; } }
+
+/* A tab this browser cannot run (#223): marked in the nav, said in its tooltip
+   and to a screen reader — not only by the mark. */
+.nav-needs { margin-left: auto; padding-left: .4rem; font-size: .85em; }
+#tab-nav.collapsed .nav-needs { display: none; }
+
+/* The bug reporter's own message line (bug-report.js keeps its own markup). */
+.br-msg { margin: .8rem 0 0; font-size: .9rem; }
+.br-msg.is-bad { color: var(--bad); }
+
 /* ── "How the 357 filter works" ──────────────────────────────────────────────
    Prose narrower than the figures: a paragraph is unreadable at the width a
    flowchart needs, so the figures are allowed the full card and the text is
@@ -12424,6 +12502,15 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   /* The card is already the whole screen here, so the body scrolls with the
      page rather than inside a box of its own. */
   .modal-body { max-height: none; overflow: visible; }
+
+  /* A question (#223) is not a page: two buttons and a sentence stay a card
+     over the page they are about, with the page still showing round it. */
+  .modal-overlay--ask { padding: 1rem; }
+  .modal-overlay--ask .modal-card--ask {
+    min-height: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
 
   /* .button-row spaces its buttons to both ends, which on a phone wraps them
      and then strands the last one alone against the right edge. Packed to the

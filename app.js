@@ -162,7 +162,7 @@ function onFileLoad(input) {
     try {
       loadJson(e.target.result, { kind: 'file', detail: f.name });
     } catch (err) {
-      alert(`Failed to load stations.json: ${err.message}`);
+      Toast.failed(`Could not load ${f.name}: ${err.message}`);
     }
   };
   reader.readAsText(f);
@@ -171,8 +171,10 @@ function onFileLoad(input) {
 
 // Returns true when the load succeeded. `announce` is what separates a button
 // press — where silence would be baffling — from a step in the automatic
-// fallback chain, where an alert for each source that did not answer would be
-// three dialogs before the app has drawn anything.
+// fallback chain, where a message for each source that did not answer would be
+// three failures said before the app has drawn anything; the loading card says
+// those (#212). (The flag shadows announce() in here, which is why the toast
+// says it rather than a call to it.)
 async function loadFromUrl(url, { kind = 'github', announce = true } = {}) {
   const btn = document.getElementById('btn-load-gh');
   if (announce && btn) btn.disabled = true;
@@ -185,7 +187,7 @@ async function loadFromUrl(url, { kind = 'github', announce = true } = {}) {
     const text = await readLoadText(res, kind);
     applyStationDoc(text, { kind, ms: Math.round(_dbClock() - t0) });
   } catch (err) {
-    if (announce) alert(`Failed to load from URL: ${err.message}`);
+    if (announce) Toast.failed(`Could not load ${SOURCE_LABELS[kind] || url}: ${err && err.message || err}`);
     state.loadError = `${SOURCE_LABELS[kind] || url}: ${err && err.message || err}`;
     loadFailed(kind, err);
     return false;
@@ -246,7 +248,7 @@ async function loadFromApi({ announce = true } = {}) {
     // paused for inactivity — the browser deliberately does not distinguish
     // them. Record what is known and let the caller fall back.
     state.loadError = `the datastore: ${err && err.message || err}`;
-    if (announce) alert(`Failed to load from the datastore: ${err && err.message || err}`);
+    if (announce) Toast.failed(`Could not load from the datastore: ${err && err.message || err}`);
     loadFailed('api', err);
     return false;
   }
@@ -1526,6 +1528,11 @@ function navGroupsHtml() {
           // group a tooltip belongs to is exactly what the clipped heading was
           // saying — so collapsed the tooltip says both.
           const tip = collapsed ? `${t.label} — ${g.group}` : t.label;
+          // A tab this browser cannot do the job of is marked (#223): 🖥️ for
+          // the eye, the reason in the tooltip and, for a screen reader, in
+          // the button's own name — the mark alone would be colour's mistake
+          // made with an emoji.
+          const cannot = tabCannot(t);
           // The ↵ is not decoration: it is where Enter goes, said out loud, and
           // the winner is not always the top of the list — the groups keep their
           // order so the list does not reshuffle under the cursor. data-tab is
@@ -1534,9 +1541,10 @@ function navGroupsHtml() {
         <li>
           <button class="tab-btn${on ? ' active' : ''}${pick ? ' nav-best' : ''}"
                   data-tab="${t.id}" onclick="switchTab('${t.id}')"
-                  ${on ? 'aria-current="page"' : ''} title="${esc(tip)}">
+                  ${on ? 'aria-current="page"' : ''} title="${esc(cannot ? `${tip} — ${cannot}` : tip)}">
             <span class="nav-icon" aria-hidden="true">${t.icon}</span>
             <span class="nav-label">${esc(t.label)}</span>
+            ${cannot ? `<span class="nav-needs" aria-hidden="true">🖥️</span><span class="sr-only"> — ${esc(cannot)}</span>` : ''}
             ${pick ? '<span class="nav-enter" aria-hidden="true">↵</span>' : ''}
           </button>
         </li>`;
@@ -4335,14 +4343,16 @@ function stationsMapPanels(map) {
 // modules are loaded — but it is one function naming eleven of them, and a
 // reset that throws because one module was not on the page would be the worst
 // possible failure for a button whose whole job is recovery.
-function resetStationsMap() {
+async function resetStationsMap() {
   const drawn = (state.draw && state.draw.shapes.length) || 0;
   // Only the drawings are unrecoverable — a filter takes a moment to retype, a
-  // sketch does not — so they are the only thing worth a confirm, and it is
-  // skipped entirely when there is nothing to lose.
-  if (drawn && !confirm(
-      `Reset the map? This removes ${drawn} drawing${drawn === 1 ? '' : 's'}, `
-      + 'the filters and the selection. Layers and the base map are left as they are.')) return;
+  // sketch does not — so they are the only thing worth a question, and it is
+  // skipped entirely when there is nothing to lose (and with it, the wait: a
+  // reset with no drawings is done before this returns).
+  if (drawn && !(await confirmDialog({ title: 'Reset the map?',
+      message: `This removes ${drawn} drawing${drawn === 1 ? '' : 's'}, the filters and the selection. `
+        + 'Layers and the base map are left as they are.',
+      confirm: 'Reset the map', danger: true }))) return;
 
   const try_ = fn => { try { fn(); } catch (_) { /* a module that is not here has nothing to clear */ } };
 

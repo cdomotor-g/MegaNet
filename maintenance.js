@@ -1430,8 +1430,10 @@ const Maintenance = (function () {
     S().stamp = d.stamp || null;
   }
 
-  function discard(key) {
-    if (!window.confirm('Discard this draft? It is only on this device, so it cannot be recovered.')) return;
+  async function discard(key) {
+    if (!(await confirmDialog({ title: 'Discard this draft?',
+      message: 'It is only on this device, so it cannot be recovered.',
+      confirm: 'Discard the draft', danger: true }))) return;
     dropDraft(key);
     repaint();
   }

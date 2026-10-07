@@ -362,7 +362,9 @@ const AdminTokens = (function () {
   async function deny(id) {
     const r = pending().find(x => x.id === id);
     if (!r) return;
-    if (!confirm('Deny “' + r.label + '” (code ' + r.code + ')?\n\nIts token never works. The device can ask again, and will show a new code.')) return;
+    if (!(await confirmDialog({ title: 'Deny “' + r.label + '” (code ' + r.code + ')?',
+      message: 'Its token never works. The device can ask again, and will show a new code.',
+      confirm: 'Deny the request', cancel: 'Keep it waiting', danger: true }))) return;
     try {
       await dbRpc('admin_deny_ingest_token_request', { p_id: id });
       note = '“' + r.label + '” (' + r.code + ') denied.';
@@ -398,8 +400,10 @@ const AdminTokens = (function () {
   async function revoke(id) {
     const t = (list || []).find(x => x.id === id);
     if (!t) return;
-    if (!confirm('Revoke “' + t.label + '”?\n\nEverything posting with it stops at once — every station behind that base station, '
-      + 'every receiver on that computer. A replacement is a new token; a revoked one never comes back.')) return;
+    if (!(await confirmDialog({ title: 'Revoke “' + t.label + '”?',
+      message: 'Everything posting with it stops at once — every station behind that base station, '
+        + 'every receiver on that computer. A replacement is a new token; a revoked one never comes back.',
+      confirm: 'Revoke the token', danger: true }))) return;
     try {
       await dbRpc('admin_revoke_ingest_token', { p_id: id });
       note = t.label + ' revoked.';

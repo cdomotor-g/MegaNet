@@ -835,10 +835,11 @@ const BaseStations = (function () {
     repaint();
   }
 
-  async function ask(verb, args, confirmText) {
+  // `question`, when the action needs one, is confirmDialog's (askFrom builds it).
+  async function ask(verb, args, question) {
     const s = stationOf();
     if (!s) return;
-    if (confirmText && !confirm(confirmText)) return;
+    if (question && !(await confirmDialog(question))) return;
     try {
       await dbRpc('admin_base_station_command', { p_id: s.id, p_verb: verb, p_args: args || {} });
       lastAsk = Date.now();
@@ -854,7 +855,22 @@ const BaseStations = (function () {
   function askFrom(btn) {
     let args = {};
     try { args = JSON.parse(btn.dataset.args || '{}'); } catch (_) { return; }
-    ask(btn.dataset.verb, args, btn.dataset.confirm || null);
+    ask(btn.dataset.verb, args, btn.dataset.confirm ? questionFor(btn) : null);
+  }
+
+  // The question a button's data-confirm asks, in confirmDialog's terms (#223):
+  // its first sentence, up to the question mark, is the dialog's title and the
+  // rest is what follows; the button that acts is named for what the button
+  // pressed said, without its "…"; and a button drawn as dangerous asks as one.
+  function questionFor(btn) {
+    const text = btn.dataset.confirm;
+    const at = text.indexOf('?');
+    return {
+      title: at > 0 ? text.slice(0, at + 1) : text,
+      message: at > 0 ? text.slice(at + 1).trim() : '',
+      confirm: btn.textContent.replace(/…\s*$/, '').trim() || 'Go ahead',
+      danger: btn.classList.contains('adm-danger'),
+    };
   }
 
   async function cancel(cmdId) {
@@ -917,7 +933,9 @@ const BaseStations = (function () {
   async function removeKey(id) {
     const k = ((keys && keys.keys) || []).find(x => x.id === id);
     if (!k) return;
-    if (!confirm('Take ' + k.owner + '\'s key off the list?\n\n' + k.fingerprint + '\n\nBase stations that take the team keys drop it at their next fetch — within a minute for one checking in.')) return;
+    if (!(await confirmDialog({ title: 'Take ' + k.owner + '\'s key off the list?',
+      message: k.fingerprint + '\n\nBase stations that take the team keys drop it at their next fetch — within a minute for one checking in.',
+      confirm: 'Take the key off', danger: true }))) return;
     try { await dbRpc('admin_base_station_key_remove', { p_id: id }); setKeyMsg('Took ' + k.owner + '\'s key off.', 'txt-ok'); }
     catch (err) { setKeyMsg('Not taken off: ' + err.message, 'txt-bad'); }
     loadKeys();

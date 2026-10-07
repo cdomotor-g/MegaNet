@@ -440,13 +440,19 @@ const SerialRadio = (function () {
     }).finally(() => { const r = R(id); if (r) { r.dump = null; mark(conn(id), 'log'); } });
   }
 
+  // Each of these asks first (confirmDialog, #223) and resolves either way —
+  // with nothing done on a "no" — so a caller can wait on it as it always could.
   function logClear(id) {
-    if (!confirm('Erase the radio\'s flash log? Every stored reading is lost. Download it first if you need it.')) return Promise.resolve();
-    return guard(id, async c => { await cmd(c, 'LOG CLEAR YES'); await logStatFor(c); announce('Radio log erased'); });
+    return confirmDialog({ title: 'Erase the radio\'s flash log?',
+      message: 'Every stored reading is lost. Download it first if you need it.',
+      confirm: 'Erase the log', danger: true })
+      .then(ok => ok && guard(id, async c => { await cmd(c, 'LOG CLEAR YES'); await logStatFor(c); announce('Radio log erased'); }));
   }
   function logFormat(id) {
-    if (!confirm('Take over the log region and format it? It holds data this firmware did not write (state FOREIGN) — whatever it is will be erased.')) return Promise.resolve();
-    return guard(id, async c => { await cmd(c, 'LOG FORMAT FORCE'); await logStatFor(c); });
+    return confirmDialog({ title: 'Take over the log region and format it?',
+      message: 'It holds data this firmware did not write (state FOREIGN) — whatever it is will be erased.',
+      confirm: 'Format the log region', danger: true })
+      .then(ok => ok && guard(id, async c => { await cmd(c, 'LOG FORMAT FORCE'); await logStatFor(c); }));
   }
 
   async function stnInfoFor(c) {
@@ -523,9 +529,10 @@ const SerialRadio = (function () {
   function stnUpload(id) {
     const r0 = R(id);
     if (!r0 || !r0.table) return Promise.resolve();
-    if (!confirm('Upload ' + r0.table.sites.length + ' sites (' + r0.table.blob.length + ' bytes) to the radio\'s station table? '
-      + 'The region is erased first; if the upload is interrupted the radio falls back to its built-in table until you upload again.')) return Promise.resolve();
-    return guard(id, async (c, r) => {
+    return confirmDialog({ title: 'Upload ' + r0.table.sites.length + ' sites to the radio\'s station table?',
+      message: r0.table.blob.length + ' bytes. The region is erased first; if the upload is interrupted the radio falls back to '
+        + 'its built-in table until you upload again.',
+      confirm: 'Upload the table' }).then(ok => ok && guard(id, async (c, r) => {
       const blob = r.table.blob;
       for (const chunk of [64, 32]) {
         const lines = Quansheng.uploadCommands(blob, chunk);
@@ -547,12 +554,14 @@ const SerialRadio = (function () {
           Serial.logLine(c, 'Upload refused at 64-byte chunks (' + e.message + ') — starting over at 32', 'sys');
         }
       }
-    });
+    }));
   }
   function stnCancel(id) { const r = R(id); if (r && r.upload) r.upload.cancel = true; }
   function stnClear(id) {
-    if (!confirm('Erase the uploaded station table? The radio goes back to the table built into its firmware (13-character names).')) return Promise.resolve();
-    return guard(id, async c => { await cmd(c, 'STN CLEAR YES'); await stnInfoFor(c); });
+    return confirmDialog({ title: 'Erase the uploaded station table?',
+      message: 'The radio goes back to the table built into its firmware (13-character names).',
+      confirm: 'Erase the table', danger: true })
+      .then(ok => ok && guard(id, async c => { await cmd(c, 'STN CLEAR YES'); await stnInfoFor(c); }));
   }
 
   // §9: the display, 8 rows of 128 bytes.
@@ -590,8 +599,10 @@ const SerialRadio = (function () {
   }
 
   function reboot(id) {
-    if (!confirm('Reboot the radio? It resets with the transmitter safely off; the USB port disappears and comes back once it has restarted.')) return Promise.resolve();
-    return guard(id, async c => { await cmd(c, 'REBOOT').catch(() => {}); note(c, 'Reboot sent. The port will drop — Reopen it once the radio has restarted.', 'warn'); });
+    return confirmDialog({ title: 'Reboot the radio?',
+      message: 'It resets with the transmitter safely off; the USB port disappears and comes back once it has restarted.',
+      confirm: 'Reboot the radio' })
+      .then(ok => ok && guard(id, async c => { await cmd(c, 'REBOOT').catch(() => {}); note(c, 'Reboot sent. The port will drop — Reopen it once the radio has restarted.', 'warn'); }));
   }
 
   function sendCmd(id) {

@@ -1365,7 +1365,7 @@ const PhotoMeta = (function () {
     }
 
     // 2, which 1 and 3 call.
-    const confirm = async () => {
+    const confirmCoords = async () => {
       if (!answer.coords || answer.coords.votes >= 2) return;
       const want = answer.coords;
       const src = readings.find(r => parseOverlay(r.text, opts).coords.some(c => Math.abs(c.lat - want.lat) < 1.2e-5 && Math.abs(c.lon - want.lon) < 1.2e-5));
@@ -1389,7 +1389,7 @@ const PhotoMeta = (function () {
         if (v.variant === 'grey' && !(v.bar >= 0.25)) { flat.push([band, v]); continue; }
         if (settled()) break;
         await run(band, v, '6');
-        await confirm();
+        await confirmCoords();
       }
     }
 
@@ -1397,7 +1397,7 @@ const PhotoMeta = (function () {
     for (const [band, v] of white.concat(flat)) {
       if (answer.coords && answer.time) break;
       await run(band, v, '6');
-      await confirm();
+      await confirmCoords();
     }
     return Object.assign({}, answer, {
       passes,

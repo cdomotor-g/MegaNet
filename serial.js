@@ -177,20 +177,22 @@ const Serial = (function () {
     // The port picker can never look like a dead click: every path below either
     // opens the browser chooser, updates the UI, or leaves a visible message.
     console.log('[Serial] choosePort() invoked for', id, '(build ' + SERIAL_BUILD + ')');
+    // What alert() used to say (#223) is said where the press was, on the card's
+    // own status line, and to a screen reader — the tab's banner says it too,
+    // before anybody presses anything.
+    const refuse = (m, kind = 'err') => { setPortStatus(conn, m, kind); announce(m); };
     if (!supported) {
-      alert('Web Serial isn’t available in this browser.\n\n'
-        + 'Use a Chromium-based browser — Chrome, Edge or Opera — served over https or from localhost.');
+      refuse('Web Serial isn’t available in this browser, so no COM port can be chosen here. '
+        + 'Use a Chromium-based browser — Chrome, Edge or Opera — on a computer, over https or from localhost.');
       return;
     }
     if (typeof window !== 'undefined' && !window.isSecureContext) {
-      alert('Choosing a COM port needs a secure context (https or localhost).\n\n'
+      refuse('Choosing a COM port needs a secure context (https or localhost). '
         + 'This page is being served insecurely, so the browser blocks access to serial ports.');
       return;
     }
     if (!navigator.serial || typeof navigator.serial.requestPort !== 'function') {
-      const m = 'navigator.serial.requestPort is unavailable, so no COM-port picker can be shown.';
-      setPortStatus(conn, m, 'err');
-      alert(m);
+      refuse('navigator.serial.requestPort is unavailable, so no COM-port picker can be shown.');
       return;
     }
     // Definite Permissions-Policy block: the picker would be refused before it is
@@ -246,8 +248,7 @@ const Serial = (function () {
           + 'otherwise check the padlock menu → Site settings → Serial ports.', 'err');
         return;
       }
-      setPortStatus(conn, 'Could not select a COM port: ' + ((e && e.message) || e), 'err');
-      alert('Could not select a COM port: ' + ((e && e.message) || e) + '\n\n'
+      refuse('Could not select a COM port: ' + ((e && e.message) || e) + '. '
         + 'If no port picker appeared, check that serial access is allowed for this site.');
     }
   }
@@ -365,7 +366,7 @@ const Serial = (function () {
   async function openConn(id) {
     const conn = byId(id);
     if (!conn) return;
-    if (!conn.port) { alert('Choose a COM port first.'); return; }
+    if (!conn.port) { setPortStatus(conn, 'Choose a COM port first.', 'warn'); announce('Choose a COM port first.'); return; }
     const s = conn.settings;
     const baudRate = +s.baudRate || 0;
     if (baudRate < 1) {

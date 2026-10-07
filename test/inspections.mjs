@@ -51,6 +51,7 @@ import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { auditHandlers } from './lib/controls.mjs';
+import { answer } from './lib/ask.mjs';
 import { storageStore, installStorage, attachmentRpc, attachmentRows, fileOf }
   from './lib/storage.mjs';
 
@@ -457,8 +458,10 @@ async function main() {
     // Removing takes the index row first and the bytes second — a photo that has
     // gone from the form and not from the bucket is invisible; the reverse is a
     // broken thumbnail on a record somebody is relying on.
-    await page.evaluate(() => { window.confirm = () => true; });
-    await page.evaluate(() => Attachments.remove(state.attach.list[0].id));
+    await page.evaluate(() => { Attachments.remove(state.attach.list[0].id); });
+    const asked = await answer(page, true);
+    check('removing a file asks first, and its button says what it does',
+      /^Remove .+\?$/.test(asked.title) && asked.yes === 'Remove the file' && asked.danger, JSON.stringify(asked));
     await page.waitForFunction(() => (state.attach.list || []).length === 0,
       null, { timeout: LOAD_TIMEOUT });
     check('removing drops the index row and then deletes the object',

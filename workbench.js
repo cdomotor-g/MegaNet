@@ -542,7 +542,13 @@ function wbCases() {
 function wbSaveCase() {
   const el = document.getElementById('wb-case-name');
   const name = ((el && el.value) || state.wb.caseName || '').trim();
-  if (!name) { alert('Name the investigation first.'); return; }
+  if (!name) {
+    // Said at the box that needs filling, and the cursor put in it (#223).
+    if (el) { el.setAttribute('aria-invalid', 'true'); el.focus(); }
+    Toast.note('Name the investigation first — the Case name box, above Save.');
+    return;
+  }
+  if (el) el.removeAttribute('aria-invalid');
   const cases = wbCases();
   cases[name] = { a: state.wb.affected, g: state.wb.good, o: state.wb.onset,
                   e: state.wb.onsetEnd, s: state.wb.symptom, saved: new Date().toISOString() };
