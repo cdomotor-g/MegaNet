@@ -479,5 +479,5 @@ there are far fewer tokens now, each one is loaded by someone commissioning
 hardware rather than handed out per site, and every reading carries the token
 that wrote it, so an ingest point behaving badly is a query rather than a
 guess. If it becomes a real problem, the fix is Cloudflare in front of the
-endpoint, not application code — the same infrastructure already planned for the
-app itself.
+endpoint, not application code — the same infrastructure the app itself is now
+served from (floodwarning.net).

@@ -75,10 +75,10 @@ const SiteMap = (function () {
       ],
     },
     passranges: {
-      what: 'Which repeaters pass each station\'s ALERT addresses on, and the hop chain from field to base.',
+      what: 'Which repeaters pass each station\'s ALERT addresses on, and which stations no repeater covers.',
       use: [
-        'Trace field → repeater → base for any station',
-        'Find orphans — stations no repeater covers — and gaps between address windows',
+        'See which repeaters carry a station\'s addresses, and which stations each repeater carries',
+        'Find orphans — stations no repeater covers',
       ],
     },
     export: {

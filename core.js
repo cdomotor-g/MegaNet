@@ -813,11 +813,11 @@ const HELP = {
   },
 
   passranges: {
-    summary: 'Which repeaters have a pass range covering a station\'s AlertIDs, and the hop chain '
-           + 'that follows: field → repeater(s) → base. Stations no repeater covers are flagged as '
-           + 'orphans, and AlertIDs that fall between every window are flagged as gaps. One filter '
-           + 'box drives both tables, and takes a name, a station number, an address or a pasted '
-           + 'list of them.',
+    summary: 'Which repeaters have a pass range covering a station\'s AlertIDs, and which stations '
+           + 'each repeater carries. Stations no repeater covers are flagged as orphans. The chain on '
+           + 'from a repeater to its base is drawn on the Stations map rather than listed here. One '
+           + 'filter box drives both tables, and takes a name, a station number, an address or a '
+           + 'pasted list of them.',
     watch: [
       '<strong>Orphaned usually means unrecorded, not unserved.</strong> A station is orphaned '
       + 'here when no repeater\'s <em>recorded</em> pass ranges cover any of its addresses — and '

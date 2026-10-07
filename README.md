@@ -1066,8 +1066,10 @@ here.
 - Add, edit and delete stations in the browser — the station editor card on the
   Stations tab; a save is checked before it is sent, and again by the database
   (see [**Editing it**](#editing-it))
-- Take the data away as `stations.json` — the snapshot on the Admin tab, written
-  from the datastore, behind a sign-in (#191)
+- Take the data away — the station list as CSV, GeoJSON or KML through
+  **⤓ Export** in the banner, with the Stations filters applied (#227), and the
+  whole document as the snapshot on the Admin tab, written from the datastore
+  (it downloads as `floodnet-stations.json`); both behind a sign-in (#191)
 - Import from the legacy CSVs — `migrate.html`, the **Migration Tool**, linked
   from the Admin tab and the first-load screen: `ALL_UNITS.csv` and
   `ALL_REPEATERS.csv` in, `stations.json` out
