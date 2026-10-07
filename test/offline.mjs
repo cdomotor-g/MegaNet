@@ -207,6 +207,19 @@ async function main() {
       && C.data.some(u => /\/rest\/v1\/yes_no\?/.test(u)), J(C.data.filter(u => /rest/.test(u)).length));
     let H = await header(page);
     check('online, the header says where the list came from, as ever', /from stations\.json/.test(H.stats) && !/saved copy/.test(H.stats), J(H));
+    // A kept copy on screen while there is a signal (a paused datastore fails
+    // a request as no network does) names the source that did not answer.
+    const withSignal = await page.evaluate(() => {
+      const was = state.dataSource.kept;
+      state.dataSource.kept = new Date(Date.now() - 2 * 3600e3);
+      updateHeaderStats();
+      const text = document.getElementById('hdr-stats').textContent;
+      state.dataSource.kept = was;
+      updateHeaderStats();
+      return text;
+    });
+    check('…and a kept copy shown while there is a signal names the source that did not answer — never "no signal"',
+      /saved copy, 2 hours old — no answer from this site/.test(withSignal) && !/no signal/.test(withSignal), withSignal);
     // The list goes through the worker as it arrives: held after two pieces,
     // the loading card already counts them, of the whole.
     const g = newGate();

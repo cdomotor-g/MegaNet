@@ -513,7 +513,7 @@ function updateHeaderStats() {
   // the database or from a file committed a month ago, and telling those apart
   // should not require opening a tab and pressing a button.
   const from = !src ? ''
-    : src.kept ? ` · saved copy${src.kept instanceof Date ? `, ${keptAge(src.kept)} old` : ''} — no signal`
+    : src.kept ? ` · saved copy${src.kept instanceof Date ? `, ${keptAge(src.kept)} old` : ''} — ${keptWhy(src.kind)}`
     : ` · from ${SOURCE_LABELS[src.kind] || src.kind}`;
   el.textContent =
     `${s.length} stations · ${s.filter(x => x.roles.includes('repeater')).length} repeaters${from}`;
@@ -529,6 +529,16 @@ function keptDate(v) {
   if (!v) return null;
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? true : d;
+}
+
+// Why the kept copy is the one showing: no signal at all, or — with one — the
+// source it stands in for not answering. A paused datastore fails a request
+// exactly as no network does, and sw.js cannot tell the two apart; the page
+// can say which, so "no signal" is never said with a signal.
+const KEPT_SOURCE = { api: 'the datastore', bundled: 'this site', github: 'GitHub' };
+function keptWhy(kind) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'no signal';
+  return `no answer from ${KEPT_SOURCE[kind] || 'its source'}`;
 }
 
 // "40 minutes", "5 hours", "3 days" — how old a kept copy is, said plainly.

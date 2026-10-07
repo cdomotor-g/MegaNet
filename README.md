@@ -456,7 +456,9 @@ A device that has opened Flood-Net before opens it again with no signal (#213).
 keeps the app — `index.html` and everything it loads, Leaflet included — and,
 as they arrive, the station list and the inspection and maintenance sheets'
 reference tables. With no network the app opens from that copy, and the header
-says so: **saved copy, 3 hours old — no signal**, never "from the datastore".
+says so: **saved copy, 3 hours old — no signal**, never "from the datastore" (and
+with a signal but no answer from its source — a paused datastore fails the same
+way — *no answer from the datastore* instead).
 An inspection or maintenance sheet can be started and its draft is saved on the
 device, as it always was.
 
