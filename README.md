@@ -116,6 +116,9 @@ MegaNet/
 ├── site-exposure.js        ← SiteExposure — the station card's tides and soils:
 │                             tidal water, Water Act limits, coastal hazard areas,
 │                             acid sulfate soils, from the State's map services
+├── site-land.js            ← SiteLand  — the land at a station or a picked point:
+│                             lot, tenure, who holds it, council, address, land use,
+│                             from the Queensland cadastre
 ├── map-photos.js           ← MapPhotos — the Stations map's 📷 pins, a cone each
 │                             way the camera faced
 ├── modal.js                ← Modal     — the shared dialog shell
@@ -181,6 +184,7 @@ MegaNet/
 │   ├── agent-api.md                        (station data for AI agents — REST API and MCP server)
 │   ├── base-stations.md                    (the Base Stations tab — checking in, what may be asked, team SSH keys)
 │   ├── site-exposure.md                    (tides and soils on the station card — rows, sources, limits)
+│   ├── site-land.md                        (the land — tenure, council, address — on the station and What is here cards)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
 │   ├── 357 Filter doco.doc                  (the 1998 first edition of the same spec)
@@ -980,7 +984,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
 - Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
-- **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub and nearest station, repeater and survey mark
+- **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, and the nearest station, repeater and survey mark
 - **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
@@ -1680,7 +1684,9 @@ sampling.
 rail that ⋮ brings out) arms a pick: click
 anywhere and a card in the map's bottom corner says what the app already knows about
 that point — ground height, land cover, wind region, drainage basin, maintenance
-hub, and the nearest station, repeater and survey mark with the distance and
+hub, the land (its lot, tenure, who holds that kind of land, the council area,
+the address and the land use — the station card's land section, asked about the
+point), and the nearest station, repeater and survey mark with the distance and
 bearing to each, every one of them a button that takes you there.
 
 Every fact on that card was already in the app and every one of them was
@@ -2572,6 +2578,14 @@ Side panel or modal showing full station record:
   asked of the State's map services when the card opens — indicative, and a
   source that did not answer is named, never read as "none"
   (`site-exposure.js`; `docs/site-exposure.md` has what each row means)
+- **Land — tenure and council** (Queensland): the lot and plan the station
+  stands on (with the State's free SmartMap of it), its tenure — freehold, a
+  reserve, State land, a national park, a road reserve, a watercourse — who
+  holds that kind of land in plain words (a reserve: the State through a
+  trustee, most often the council), the council area, the street address, the
+  rural property's name and the mapped land use. Queensland does not publish
+  owners, so freehold says the owner is on the title and links to a title
+  search (`site-land.js`; `docs/site-land.md` has what each row means)
 - **Equipment**, for signed-in editors: what the station's register says is
   fitted there, once an administrator has approved it (`photo-review.js`)
 

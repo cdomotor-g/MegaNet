@@ -6,7 +6,8 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state`, esc/escAttr, acmaHaversineKm,
 // stationLatLonText and copyLatLonPillHtml; across to terrain.js, land-cover.js,
-// map-wind.js, map-catchments.js, map-hubs.js and map-survey.js for the answers,
+// map-wind.js, map-catchments.js, map-hubs.js, map-survey.js and site-land.js
+// for the answers,
 // to app.js for the card furniture it shares with the station card, and to
 // station-editor.js for the proposed station it opens at the point. All of
 // it from inside its own functions, so this file's position among the modules
@@ -64,6 +65,9 @@
 // for. (The radio-path card was a fourth, until it moved into the path tools.)
 const MapHere = (function () {
   const CARD_ID = 'here-card';
+  // The land section's element (site-land.js): the station card's section, for
+  // a point. Its own id, so a fill meant for a station can never land here.
+  const LAND_ID = 'mn-land-here';
   // How far apart the two land-cover samples are, in degrees of longitude —
   // about 20 m, which is two pixels of a 10 m raster. The service samples a
   // path rather than a point, so it is asked for the shortest honest path
@@ -284,6 +288,7 @@ const MapHere = (function () {
     const near   = nearestOf(lat, lon);
     const rpt    = nearestOf(lat, lon, s => s.roles.includes('repeater'));
     const text   = stationLatLonText({ lat, lon });
+    const here   = landPoint();
     return `
       <div class="acma-card-head">
         <span><strong id="here-card-title">What is here</strong><br>
@@ -302,6 +307,11 @@ const MapHere = (function () {
         ${basinRow()}
         ${hubRow()}
       </div>
+      <!-- Whose ground: the lot, its tenure, who holds that kind of land, the
+           council, the address and the land use — the station card's land
+           section, asked about this point instead (site-land.js). -->
+      <div class="acma-sect" id="${LAND_ID}"
+           data-mn-land="${escAttr(SiteLand.key(here))}">${SiteLand.html(here)}</div>
       <div class="acma-sect">
         ${awayRow('Nearest station', near, `MapHere.goToStation('${near ? escAttr(near.s.id) : ''}')`,
                   'Show this station on the map and open its card')}
@@ -329,12 +339,21 @@ const MapHere = (function () {
       </p>`;
   }
 
+  // The point as site-land.js takes a place: an id for its heading, and the
+  // position.
+  function landPoint() {
+    return at ? { id: 'here', lat: at[0], lon: at[1] } : null;
+  }
+
   function render() {
     const el = document.getElementById(CARD_ID);
     if (!el) return;
     if (!at) { el.hidden = true; el.innerHTML = ''; return; }
     el.innerHTML = cardHtml();
     el.hidden = false;
+    // Asked after the paint, as repaintStnCard asks: the section fills itself
+    // in as the answers land, and a repaint with them in hand asks nothing.
+    SiteLand.ask(LAND_ID, landPoint());
   }
 
   // ── Arming ─────────────────────────────────────────────────────────────────

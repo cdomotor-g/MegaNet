@@ -664,6 +664,16 @@ jobs:
         working-directory: test
         run: npm run exposure
 
+      # The land section on the station card and the What is here card
+      # (site-land.js): the lot, its tenure, who holds that kind of land and the
+      # council, from the Queensland cadastre, which the check answers itself.
+      # The assertions it exists for: freehold never says who owns it (the State
+      # does not publish owners), a failed source is never read as "none", and
+      # the DCDB's New South Wales pseudo-parcel is never read as a lot.
+      - name: Land — tenure and council on the cards, never an owner guessed or a failure read as "none"
+        working-directory: test
+        run: npm run land
+
       - name: Claim an address from the message that arrived on it
         working-directory: test
         run: npm run claim

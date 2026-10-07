@@ -6688,6 +6688,8 @@ function repaintStnCard() {
   // The site exposure section asks the State's map services, cached per
   // position for the session (site-exposure.js): a repaint asks nothing new.
   SiteExposure.ask(`mn-exposure-card-${s.id}`, s);
+  // The land section, on the same terms (site-land.js).
+  SiteLand.ask(`mn-land-card-${s.id}`, s);
   // The equipment register, for a signed-in editor, on the same terms.
   if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
   MapLeader.sync();
@@ -6860,6 +6862,7 @@ function stnCardHtml(s) {
   const sls      = SLS.state(s);
   const slsId    = `mn-sls-card-${s.id}`;
   const expId    = `mn-exposure-card-${s.id}`;
+  const landId   = `mn-land-card-${s.id}`;
   const nets     = (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean).join(', ');
   const isRpt    = s.roles.includes('repeater');
   const passing  = isRpt ? repeaterPassingCount(s) : null;
@@ -6927,6 +6930,14 @@ function stnCardHtml(s) {
       ${Frequencies.cardHtml(s)}
       ${acmaRepeaterPopupExtra(s)}
     </div>
+    <!-- The land the station stands on: its lot, tenure, who holds that kind of
+         land, the council area, the address and the land use (site-land.js).
+         Next to the Owner row above because it answers the other ownership
+         question — whose ground, not whose station. Asked of the Queensland
+         cadastre when the card opens and filled by SiteLand.ask, the way the
+         exposure section below is; a station outside Queensland is told so. -->
+    ${located ? `<div class="acma-sect" id="${escAttr(landId)}"
+         data-mn-land="${escAttr(SiteLand.key(s))}">${SiteLand.html(s)}</div>` : ''}
     <!-- The flood classes, crossing and gauge survey recorded on the station
          (0031), from the Bureau's river height station lists and whatever an
          editor has added since. Its own section, like the SLS below it, and
