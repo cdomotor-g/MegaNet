@@ -34,6 +34,11 @@ import { applyNetworkPolicy } from './lib/network.mjs';
 import { formFixture } from './lib/migration.mjs';
 import { repo } from './lib/paths.mjs';
 
+// The worker's own requests — its install, its fetches — reach the context's
+// routes only with this set (Chromium; Playwright calls it experimental).
+// Without it they go round the network policy to the real network.
+process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS = '1';
+
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
 
@@ -137,6 +142,11 @@ async function main() {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'allow' });
     await applyNetworkPolicy(context, server.origin);
     await installDatastore(context, formFixture());
+    // No signal, for the worker too: setOffline() does not reach the requests
+    // the worker makes through the context's routes, so the cut is made here
+    // as well — last registered, so asked first.
+    let noSignal = false;
+    await context.route('**/*', route => (noSignal ? route.abort('internetdisconnected') : route.fallback()));
     await context.addInitScript(() => { try { localStorage.setItem('mn-sw', 'on'); } catch (_) {} });
     const page = await context.newPage();
     page.on('pageerror', e => errors.push(String(e)));
@@ -172,6 +182,7 @@ async function main() {
 
     // ═══════════════════════════════════════════════════════════════════════
     log('\n3. No signal\n');
+    noSignal = true;
     await context.setOffline(true);
     await page.reload({ waitUntil: 'load', timeout: LOAD_TIMEOUT });
     await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
@@ -196,6 +207,7 @@ async function main() {
     // ═══════════════════════════════════════════════════════════════════════
     log('\n4. A new deploy\n');
     site = 'deployed';
+    noSignal = false;
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     const offered = await page.waitForSelector('#pwa-update', { timeout: 10_000 }).then(() => true, () => false);
@@ -214,6 +226,12 @@ async function main() {
     await page.waitForFunction(() => !!state.data, null, { timeout: LOAD_TIMEOUT });
     await page.waitForFunction(v => navigator.serviceWorker.controller && navigator.serviceWorker.controller.scriptURL.endsWith(`?v=${v}`),
       NEXT, { timeout: 20_000 }).catch(() => {});
+    // A worker becomes the page's controller as it starts to activate; the old
+    // copy goes during activation, a moment later.
+    for (const end = Date.now() + 15_000; Date.now() < end;) {
+      if (!(await page.evaluate(v => caches.keys().then(k => k.includes(`floodnet-shell-${v}`)), STAMP))) break;
+      await page.waitForTimeout(200);
+    }
     const after = await page.evaluate(async () => ({
       version: APP_VERSION,
       sw: navigator.serviceWorker.controller && navigator.serviceWorker.controller.scriptURL,

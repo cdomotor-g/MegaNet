@@ -89,23 +89,37 @@ function shellUrls(html) {
   return [...urls];
 }
 
+// Six at a time, each kept as it arrives. A response held unread keeps its
+// connection, and the browser has six to a host: an install that fetched
+// everything first and kept it after would wait for ever on the seventh.
+async function inTurn(items, width, fn) {
+  let next = 0;
+  const lane = async () => { while (next < items.length) await fn(items[next++]); };
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, lane));
+}
+
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const res = await fetch(INDEX, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' });
     const html = res.ok ? await res.clone().text() : '';
     if (!isApp(res, html)) throw new Error('index.html did not come back as the app — not keeping it');
     const cache = await caches.open(SHELL);
-    const urls = shellUrls(html);
-    const got = await Promise.all(urls.map(async u => {
-      const cross = !u.startsWith(SCOPE.origin);
-      const r = await fetch(new Request(u, cross
-        ? { mode: 'cors', credentials: 'omit', cache: 'no-cache' }
-        : { credentials: 'same-origin', redirect: 'manual', cache: 'no-cache' }));
-      if (!r.ok || (r.type !== 'basic' && r.type !== 'cors')) throw new Error(`${u}: ${r.status || r.type}`);
-      return [u, r];
-    }));
-    await Promise.all(got.map(([u, r]) => cache.put(u, r)));
-    await cache.put(INDEX, res);
+    // All or nothing, for this version: a file that will not come takes the
+    // whole copy with it, and the worker before this one carries on.
+    try {
+      await cache.put(INDEX, res);
+      await inTurn(shellUrls(html), 6, async u => {
+        const cross = !u.startsWith(SCOPE.origin);
+        const r = await fetch(new Request(u, cross
+          ? { mode: 'cors', credentials: 'omit', cache: 'no-cache' }
+          : { credentials: 'same-origin', redirect: 'manual', cache: 'no-cache' }));
+        if (!r.ok || (r.type !== 'basic' && r.type !== 'cors')) throw new Error(`${u}: ${r.status || r.type}`);
+        await cache.put(u, r);
+      });
+    } catch (err) {
+      await caches.delete(SHELL);
+      throw err;
+    }
     await self.skipWaiting();
   })());
 });
@@ -167,15 +181,21 @@ async function page(req) {
   return network;                    // nothing kept: whatever the network says, late or not
 }
 
-// The shell: the kept copy, else the network (and kept, if it is one of ours
-// and came back whole — a layer's data file fetched online is there offline).
+// The shell: the kept copy, else the network — and kept, if it is one of
+// ours and came back whole: a layer's data file fetched online is there
+// offline. Not a file of another version (a ?v= that is not this worker's):
+// while a new deploy's page loads through this worker, its files are the new
+// worker's to keep. And never into a copy that has gone — a newer worker
+// deletes this version's on taking over, and caches.open() would quietly
+// make it again.
 async function shell(req) {
   const hit = await caches.match(req, { cacheName: SHELL });
   if (hit) return hit;
   const res = await fetch(req);
-  if (res.ok && (res.type === 'basic' || res.type === 'cors') && !res.redirected) {
+  const v = new URL(req.url).searchParams.get('v');
+  if (res.ok && (res.type === 'basic' || res.type === 'cors') && !res.redirected && (v === null || v === VERSION)) {
     const copy = res.clone();
-    caches.open(SHELL).then(c => c.put(req, copy)).catch(() => {});
+    caches.has(SHELL).then(has => has && caches.open(SHELL).then(c => c.put(req, copy))).catch(() => {});
   }
   return res;
 }
