@@ -40,7 +40,7 @@ bucket_name = "meganet-photos"
 # The read-only agent API (/api/v1/*, /api/mcp — worker/api.js,
 # docs/agent-api.md) is throttled by Cloudflare's rate limiting binding: three
 # rules, keyed on a hash of the caller's address plus the name it gives in
-# X-MegaNet-Client, and on the address alone for the ceiling. The numbers must
+# X-FloodNet-Client, and on the address alone for the ceiling. The numbers must
 # match RATE_LIMITS in worker/api.js — test/agent-docs.mjs checks that they do.
 #
 # Per Cloudflare location and eventually consistent: a brake, not a quota.

@@ -45,7 +45,7 @@ MQTT ingest is two components, not one:
 2. A **bridge** — a subscriber that receives, validates and calls
    `meganet.ingest()`.
 
-The bridge is the first piece of MegaNet that has to run somewhere permanently.
+The bridge is the first piece of Flood-Net that has to run somewhere permanently.
 Until this, everything was a static page plus a database. That is a real change
 in the project's shape and it is worth being deliberate about, which is what this
 page and `bridge/README.md` are for.
@@ -74,7 +74,7 @@ the gateway puts below that is carried as **opaque provenance** — recorded as 
 raw row's `path`, never parsed, never resolved by. On the bench that tail was
 `Station 1003`: the relayed ALERT2 station, which is real information the payload
 does not carry (#169). The segment rules below deliberately do **not** apply to
-it — `Station 1003` has a space in it, and a rule written to keep MegaNet's own
+it — `Station 1003` has a space in it, and a rule written to keep Flood-Net's own
 identifiers boring has no business being applied to a name a vendor chose.
 
 `<station>` is the **bureau station number** — `541155` — the number on the site
@@ -106,14 +106,14 @@ order and never a guess.
 The database resolves it by exact match, and a mistyped segment is loud rather
 than silent: the broker ACL is generated from that same column, so a credential
 may only write the topic its own number spells and the broker refuses the
-publish. A wrong number never reaches MegaNet to be quietly filed under an
+publish. A wrong number never reaches Flood-Net to be quietly filed under an
 identity nobody claims.
 
 `<device>` is **which box at the site is talking**: `logger` for the usual case
 of one, `logger_backup` or `rain` where a site has more than one. It is a topic
 segment rather than a payload field because it says *who published*, not what was
 measured — the reading carries its own address (`alert_id`, or `station_number`
-and `channel`), and that is what MegaNet stores against.
+and `channel`), and that is what Flood-Net stores against.
 
 Both segments must start with a letter or digit, then accept letters,
 digits, dot, dash and underscore, up to 64
@@ -168,7 +168,7 @@ already have an idempotent retry.
 
 **There is no reply.** MQTT gives a device no response channel, so a station
 cannot be told its reading was stored. The QoS 1 PUBACK it gets back is from the
-*broker*, and means the broker has the message — not that MegaNet has it. That is
+*broker*, and means the broker has the message — not that Flood-Net has it. That is
 the honest picture, and it is why the bridge never acknowledges a *storable*
 message to the broker until the database has actually stored it: if the bridge
 or the database is down, the broker keeps the message and hands it back when
@@ -188,10 +188,10 @@ sequenceDiagram
     participant S as Station
     participant B as Broker
     participant G as Bridge
-    participant M as MegaNet (ingest_http)
+    participant M as Flood-Net (ingest_http)
 
     S->>B: PUBLISH reading (QoS 1)
-    B-->>S: PUBACK — the broker has it, MegaNet does not yet
+    B-->>S: PUBACK — the broker has it, Flood-Net does not yet
     B->>G: deliver
     Note over G: batch up to 1,000 readings,<br/>up to 1 s
     G->>M: POST /rpc/ingest_http (bridge's token)
@@ -255,7 +255,7 @@ sequenceDiagram
     participant S as Station
     participant B as Broker
     participant G as Bridge
-    participant M as MegaNet (mqtt_status)
+    participant M as Flood-Net (mqtt_status)
 
     S->>B: CONNECT (LWT = status topic, {"online": false}, retained)
     S->>B: PUBLISH status {"online": true} (retained)
@@ -357,7 +357,7 @@ managed one now creates no lock-in in either direction — the topic scheme, the
 station credentials and the bridge are all unchanged by a broker swap, and the
 config that would replace it is already in this repository.
 
-The two broker settings that matter to MegaNet, whichever you pick:
+The two broker settings that matter to Flood-Net, whichever you pick:
 
 - **Persistent sessions must be allowed**, and their queues kept for at least as
   long as you would tolerate the bridge being down. The bridge connects with
@@ -396,7 +396,7 @@ select station_key, online, since, last_reading_at
 **Note which identifier that last query uses.** The station published under
 `541155`; `station_status` stores it under the station *id*, because the
 canonical key is `station.id` from the moment the identity resolves (`0019`).
-The number is how it announced itself on the wire; the id is how MegaNet files
+The number is how it announced itself on the wire; the id is how Flood-Net files
 it. A row still keyed by a bare number means that number resolves to no station
 — check it against `meganet.station.station_number`.
 

@@ -23,10 +23,10 @@ what finding a corrupting repeater needs.
 old — recorded as exact); this device's own location while *track this device's
 position* is ticked (a phone or tablet's is GPS-grade; a laptop's is Wi-Fi — kept
 as approximate with its stated accuracy); the receiver's fixed location from *Send
-to MegaNet*; otherwise none. History read out of a log file gets no position.
+to Flood-Net*; otherwise none. History read out of a log file gets no position.
 
 The log is kept in this browser (newest 10,000), exported as **CSV or GeoJSON**,
-and — when the receiver is sending to MegaNet — posted to the database
+and — when the receiver is sending to Flood-Net — posted to the database
 (`meganet.report_receptions()`, migration `0047`; editors-only to read, since a
 vehicle's receptions say where the vehicle went).
 
@@ -113,7 +113,7 @@ readings of the same days — and, like the receptions, are for editors only.
      one sent within two minutes, or carrying on the run, is that report (29 of
      the 33 one-to-three-tip "flips" on rain gauges in a week were);
    - **an address on no station that keeps turning up on its own** is a station
-     MegaNet does not know about (or a repeater stuck on one bit whose victim this
+     Flood-Net does not know about (or a repeater stuck on one bit whose victim this
      receiver never hears), not a ghost.
 
    A lone frame whose address no station carries, within 2 bits of one heard
@@ -172,9 +172,9 @@ receptions to the database under an ingest token. What the rig needs:
 | Mobile data (the vehicle's hotspot) | receptions post as they happen; without it they wait in the browser and post later |
 | A 1/4-wave 150 MHz magnetic-mount antenna, a fused ignition-switched supply | the usual |
 
-Set-up on the rig: open MegaNet, add the receiver card and a GPS card, give the
+Set-up on the rig: open Flood-Net, add the receiver card and a GPS card, give the
 receiver a name (*Ute 3 — SDR*), paste the ingest token made for the rig on the
-Admin tab (or press *Use in this browser* there), tick *Send to MegaNet* with
+Admin tab (or press *Use in this browser* there), tick *Send to Flood-Net* with
 location *the GPS card*, and leave it. Each card resumes sending after a restart.
 
 Still to build when a rig exists: a headless runner (so a Pi does not need a

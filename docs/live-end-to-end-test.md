@@ -1,7 +1,7 @@
 # The live end-to-end test — proving the whole path, on demand
 
 This page is for whoever wants to answer *does a reading actually get from a
-base station into MegaNet, right now* — without waiting for a field station to
+base station into Flood-Net, right now* — without waiting for a field station to
 transmit, without a radio, and without unplugging anything.
 
 It exists because that question had no answer. Every other check in this
@@ -31,7 +31,7 @@ Two things make it possible now, and they are independent. Use either, or both.
   ran out of memory, because the program was still carrying the bring-up
   machinery it was built with (a byte census, a raw capture file, four forensics
   tables). v3.0 removes 22.8 KB of variable memory and about 800 KB of table
-  allocation and changes nothing about what reaches MegaNet. It also makes the
+  allocation and changes nothing about what reaches Flood-Net. It also makes the
   self-test frame **binary** rather than ASCII, which is what this receiver
   actually emits — so the decoder under test is the decoder in use.
 - **`db/migrations/0026_bateson_test_rig.sql` has been applied.** Check it in one
@@ -173,7 +173,7 @@ All four report every `LOCAL_EVERY` minutes (5 by default) and carry
 saying so is what stops a rain gauge on a cable being read as one on the air.
 
 **`battery` is the channel to watch first.** It needs nothing wired to it, so a
-rig with every sensor unplugged still answers *is this station reaching MegaNet*.
+rig with every sensor unplugged still answers *is this station reaching Flood-Net*.
 
 What to read at the logger:
 

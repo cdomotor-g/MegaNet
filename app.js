@@ -5730,7 +5730,7 @@ function stationPopupHtml(s) {
 function stationActionGroups(s) {
   const arroUrl = arroSiteUrl(arroSiteId(s));
   return [
-    { label: 'In MegaNet', pills: [
+    { label: 'In Flood-Net', pills: [
       `<button type="button" class="pill mn-edit-station" onclick="editStationFromCard('${escAttr(s.id)}')"
            title="Select this station and jump to its details card ${stationsCardsWhere()}">✏️ Station details ${stationsCardsArrow()}</button>`,
       `<button type="button" class="pill" onclick="focusStation('${escAttr(s.id)}')"
@@ -5992,7 +5992,7 @@ function exportMapSelection() {
       s.enabled ? 1 : 0,
     ].join(','));
   }
-  dlText(`meganet-selection-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
+  dlText(`floodnet-selection-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
 }
 
 // ── Station name labels ──────────────────────────────────────────────────────
@@ -6960,7 +6960,7 @@ function stnCardHtml(s) {
          data-mn-exposure="${escAttr(SiteExposure.key(s))}">${SiteExposure.html(s)}</div>` : ''}
     <!-- What the Bureau's Service Level Specification says about this station
          (#180). Its own section rather than rows in the one above, because it
-         is a different document talking: those rows are what MegaNet knows,
+         is a different document talking: those rows are what Flood-Net knows,
          these are what the SLS says, and a flood class level is not the same
          kind of fact as an antenna height. Empty for a station the SLS does
          not carry, which is 1,620 of them, and two sections — one per state's
@@ -8127,7 +8127,7 @@ function acmaFilterBodyHtml() {
     <label class="check-label acma-check">
       <input type="checkbox" ${f.hideMeganet ? 'checked' : ''}
              onchange="state.filters.acma.hideMeganet=this.checked;refreshAcmaLayer()">
-      Hide MegaNet's own licences
+      Hide Flood-Net's own licences
     </label>
     <label class="small acma-field">
       Search radius
@@ -8391,7 +8391,7 @@ function acmaPopupHtml(d, site) {
     <strong>${esc((site && site.name) || 'Unknown site')}</strong><br>
     <span class="mn-pop-line">${esc(t.client || 'Unknown licensee')} · score ${t.score}</span><br>
     <span class="mn-pop-pill" style="--pill:${acmaMechVar(t.mechanism)};--pill-ink:${acmaMechInkVar(t.mechanism)}">${mech.label}</span>
-    ${t.meganet ? '<span class="badge">MegaNet licence</span>' : ''}<br>
+    ${t.meganet ? '<span class="badge">Flood-Net licence</span>' : ''}<br>
     <span class="mn-pop-line">${esc(t.detail)}</span><br>
     <span class="mn-pop-line">${t.f_mhz != null ? t.f_mhz.toFixed(4) + ' MHz · ' : ''}${t.distance_km} km @ ${t.bearing_deg}° from ${esc(t.anchor_name)}</span><br>
     <span class="mn-pop-line">Licence ${esc(t.lic || '?')}${t.expiry ? ' · expires ' + esc(t.expiry) : ''}${t.inactive ? ' · <strong>not current</strong>' : ''}</span>
@@ -8787,7 +8787,7 @@ function rfTableHtml() {
             <td class="small" title="${esc(t.detail)}">${dk != null ? dk.toFixed(1) : ''}</td>
             <td class="small">${t.distance_km}</td>
             <td class="small">${rfLosCell(t.los)}</td>
-            <td class="small">${esc(t.client || '')}${t.meganet ? ' <span class="badge">MegaNet</span>' : ''}</td>
+            <td class="small">${esc(t.client || '')}${t.meganet ? ' <span class="badge">Flood-Net</span>' : ''}</td>
             <td class="small col-optional">${esc(t.lic || '')}</td>
             <td class="small col-optional">${esc(t.expiry || '')}${t.inactive
               ? ' <span class="txt-warn" title="Licence is not current">⚠<span class="sr-only"> not current</span></span>' : ''}</td>
@@ -9008,7 +9008,7 @@ function rfExportCsv() {
   const rows = rfVisibleRows();
   const head = ['repeater', 'rx_mhz', 'mechanism', 'score', 'freq_mhz', 'product_mhz', 'delta_khz',
                 'distance_km', 'bearing_deg', 'los', 'licensee', 'licence', 'expiry', 'current',
-                'meganet_own_licence', 'device_id', 'site_id', 'detail'];
+                'floodnet_own_licence', 'device_id', 'site_id', 'detail'];
   const lines = [head.join(',')];
   for (const t of rows) {
     const dk = rfDeltaKhz(t);

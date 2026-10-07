@@ -46,7 +46,7 @@ function world({ store = 'bound' } = {}) {
 
 const bytes = Buffer.from([0xff, 0xd8, 1, 2, 3]);
 
-test('which store: MegaNet\'s own project uses the Worker; another project, or an empty setting, does not', () => {
+test('which store: Flood-Net\'s own project uses the Worker; another project, or an empty setting, does not', () => {
   assert.equal(photoStoreFor({}), 'https://floodwarning.net/api/photos');
   assert.equal(photoStoreFor({ SUPABASE_URL: DEFAULT_SUPABASE_URL }), 'https://floodwarning.net/api/photos');
   assert.equal(photoStoreFor({ SUPABASE_URL: SUPA }), null);

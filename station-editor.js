@@ -429,7 +429,7 @@ function editorForm(s) {
                  onchange="editorRefreshA2Seen()">
         </label>
         <div class="small ef-note">
-          Set this only when the station's readings reach MegaNet relayed over ALERT2 — an
+          Set this only when the station's readings reach Flood-Net relayed over ALERT2 — an
           ELPRO 115E-2 publishes them under this address, and it is what attributes them here.
           The <b>A2 slot</b> on each row above then says which of that station's sensors the row is.
           One address belongs to one station: claiming one another station holds is refused.

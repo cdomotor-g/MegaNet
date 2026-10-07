@@ -141,7 +141,7 @@ function runRelay(args, input, { wait = 0, timeout = 60000 } = {}) {
 
   // the Reader, fed one byte at a time and in odd pieces
   const run = 'abcd1234';
-  const stream = 'MegaNet SDR Pi banner\r\n'
+  const stream = 'Flood-Net SDR Pi banner\r\n'
     + P.record('RX', { seq: 1, run, up: 5000, id: 4079, value: 420, fmt: 'EIF', votes: 25, name: 'FORDS, RD' }) + '\r\n'
     + 'FRE' + P.hide(P.record('LVL', { run, up: 5100, ch_dbfs: -80, nf_dbfs: -95, open: false, dbfs: -30, clip_pct: 0, hist: 'A'.repeat(32) }))
     + 'Q 151.6\b \b5\r\n'
@@ -345,7 +345,7 @@ function runRelay(args, input, { wait = 0, timeout = 60000 } = {}) {
   check('console: CFG sets several at once and says so in a CFG line', after && after.settings.gain === null && after.settings.fmt === 'EIF'
     && after.settings.squelch === 10 && after.settings.offset === 12500);
   check('console: GAIN on its own answers CFG,gain,auto', cfgs.some(i => /^CFG,gain,auto$/.test(i.raw)));
-  check('console: Enter on its own answers a status line', items.some(i => i.kind === 'text' && /^MegaNet SDR Pi - streaming - 151\.4250 MHz EIF/.test(i.text)));
+  check('console: Enter on its own answers a status line', items.some(i => i.kind === 'text' && /^Flood-Net SDR Pi - streaming - 151\.4250 MHz EIF/.test(i.text)));
   const timed = recs(items, 'NOTE').find(i => /Clock set/.test(i.rec.text));
   check('console: TIME sets the clock, and what follows carries it', timed && timed.rec.epoch_ms >= 1790843760000 && timed.rec.epoch_ms < 1790843770000
     && recs(items, 'STAT').some(i => i.rec.epoch_ms >= 1790843760000 && i.rec.clock === 'set'));

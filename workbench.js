@@ -1573,7 +1573,7 @@ function wbExportCsv() {
   if (!an) return;
   const wbs = state.wb;
   const L1 = [];
-  L1.push('MegaNet Interference Workbench — case export');
+  L1.push('Flood-Net Interference Workbench — case export');
   L1.push(`generated,${new Date().toISOString()}`);
   L1.push(`case,${csvEscape(wbs.caseName || '(unnamed)')}`);
   L1.push(`affected_ids,${csvEscape(wbs.affected.join(' '))}`);
@@ -1689,7 +1689,7 @@ function wbExportComplaint() {
     ? A.anchorById[top.r.id].threats.slice().sort((a, b) => b.score - a.score).slice(0, 5) : [];
   const out = [];
   out.push('# Draft — interference report to ACMA');
-  out.push('(Review every field before sending. This draft was assembled by the MegaNet');
+  out.push('(Review every field before sending. This draft was assembled by the Flood-Net');
   out.push('Interference Workbench; all conclusions are stated as leads, not findings.)');
   out.push('');
   out.push('## Reporting party');

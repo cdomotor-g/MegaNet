@@ -555,7 +555,7 @@ const MessageLog = (() => {
           <div class="panel-header ml-header">
             <h2>Message log</h2>
             <span class="small"
-                  title="Every row on this tab is a reading the MegaNet datastore accepted. ARRO's numbers live on the ARRO Data tab and the two are never mixed."
+                  title="Every row on this tab is a reading the Flood-Net datastore accepted. ARRO's numbers live on the ARRO Data tab and the two are never mixed."
                   >${esc(dbHostLabel())}</span>
             <span class="ml-header-tools">
               <span class="ml-viewswitch" role="group" aria-label="Table width">
@@ -1719,7 +1719,7 @@ const MessageLog = (() => {
         v ? (v.inferred ? 'true' : 'false') : '', csvEscape(v ? v.rule + (v.note ? ' — ' + v.note : '') : ''),
       ].join(','));
     }
-    dlText(`meganet-message-log-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
+    dlText(`floodnet-message-log-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
     announce(`Downloaded ${rows.length.toLocaleString()} messages as CSV.`);
   }
 

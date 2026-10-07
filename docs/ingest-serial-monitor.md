@@ -3,7 +3,7 @@
 A receiver card on the Serial Monitor — a **Quansheng radio** on the ALERT receiver
 firmware, an **ELPRO ERT-A2**, an **RTL-SDR** stick (on this computer, or on a
 Raspberry Pi whose log the card follows — [`sdr-pi.md`](sdr-pi.md)) — can post every
-reading it decodes into MegaNet's database. The computer it runs on becomes an ingest point,
+reading it decodes into Flood-Net's database. The computer it runs on becomes an ingest point,
 exactly as [`ingest-http.md`](ingest-http.md) describes one ("a PC on the end of a
 serial cable"): it holds an ingest token, posts through `meganet.ingest_http()`, and
 every reading it stores is deduplicated, validated and attributed like any base
@@ -17,9 +17,9 @@ PuTTY writes (see [`serial-help.html#putty`](serial-help.html#putty)).
 1. **Get a token for the computer** — one per computer, not per card or station.
    Either way round:
    - **Ask for one from the card** — nobody signs in on this computer. In the
-     card's **Send to MegaNet** panel press **Ask an administrator for one**: the
+     card's **Send to Flood-Net** panel press **Ask an administrator for one**: the
      panel shows a code such as `WDJB-MJHT`. On a phone or computer signed in to
-     MegaNet as an administrator, open **Admin → Ingest tokens → Waiting for
+     Flood-Net as an administrator, open **Admin → Ingest tokens → Waiting for
      approval**, check the code matches, and press **Approve** (renaming it if you
      like). Within five seconds this browser keeps the token and the card that
      asked starts sending. **Stop asking** withdraws the request. How it works:
@@ -29,18 +29,18 @@ PuTTY writes (see [`serial-help.html#putty`](serial-help.html#putty)).
      press **Create token**. It is shown once — only its hash is kept. Setting up
      **this** computer? Press **Use in this browser** and every Serial Monitor card
      here has it; nothing to copy. Setting up another one? **Copy** it, and paste
-     it into a card's **Send to MegaNet** panel on that computer.
+     it into a card's **Send to Flood-Net** panel on that computer.
 
    (The SQL route still works: `select meganet.create_ingest_token('label');`.)
 
-2. On the card, open **Send to MegaNet** — the token is already there if you used
+2. On the card, open **Send to Flood-Net** — the token is already there if you used
    it in this browser; otherwise paste it. It is kept in this browser only
    (localStorage), and the same token serves every card on this computer.
 
 3. Give the receiver a **name** (it starts as e.g. *Quansheng radio on a Windows
    PC*) and say **where it is** — see below.
 
-4. Tick **send this card's readings to MegaNet**. The status line names the ingest
+4. Tick **send this card's readings to Flood-Net**. The status line names the ingest
    point the token belongs to and counts what is stored, already there, refused and
    waiting.
 

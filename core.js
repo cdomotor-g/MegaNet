@@ -931,7 +931,7 @@ const HELP = {
       'It <strong>narrows; it does not convict</strong>. Two stations with nearby addresses and no other '
       + 'reports to set them against can still look like a flip, a missing pass range hides a path, and no '
       + 'repeater delays are recorded yet, so timing is not used. Confirm on site.',
-      'Receptions are <strong>kept in this browser</strong> and, from a receiver sending to MegaNet, in '
+      'Receptions are <strong>kept in this browser</strong> and, from a receiver sending to Flood-Net, in '
       + 'the database (editors only — they say where a vehicle was). Export a drive as CSV or GeoJSON '
       + 'and load it on another computer.',
       '<strong>Site surveys</strong> (editors): an RPi ALERT base station left at a candidate repeater or '
@@ -1003,7 +1003,7 @@ const HELP = {
       + '32-bit input alone: the four-byte form an address and value take inside an ALERT2 '
       + 'concentration payload, with no framing and no CRC — just a status byte that reads zero on '
       + 'every valid record seen. Whole serial lines of it belong on the ALERT2 tab.',
-      'A decoded address is matched against the <strong>loaded MegaNet file first</strong> (shown '
+      'A decoded address is matched against the <strong>loaded Flood-Net file first</strong> (shown '
       + 'with a badge) and only then against the bundled 2021 national address list. An address is '
       + 'unique within a region and not nationally, so a name here is a candidate rather than an '
       + 'identification.',
@@ -1096,7 +1096,7 @@ const HELP = {
       + 'with an ordinary file dialog cannot do it: the browser refuses to read a picked file again once it has '
       + 'changed. A followed card only listens — PuTTY holds the port — so a radio\'s console buttons copy '
       + 'their command for pasting into PuTTY.',
-      '<strong>A card can be a base station.</strong> <em>Send to MegaNet</em> on a Quansheng, ERT-A2 or '
+      '<strong>A card can be a base station.</strong> <em>Send to Flood-Net</em> on a Quansheng, ERT-A2 or '
       + 'RTL-SDR card posts every reading it decodes into the database, with an ingest token for this '
       + 'computer, tagged with the receiver so its readings can be told from every other ingest point\'s. '
       + 'With no GPS, its location is approximate — the browser\'s, a station\'s, typed in, or the middle '
@@ -1219,7 +1219,7 @@ const HELP = {
   },
 
   field: {
-    summary: 'Plots readings that field stations sent us, out of the MegaNet datastore, using the '
+    summary: 'Plots readings that field stations sent us, out of the Flood-Net datastore, using the '
            + 'same chart and the same 3-5-7 filter as the ARRO Data tab. Pick a station, its '
            + 'sensors and a window; the readings are fetched and drawn.',
     watch: [
@@ -1274,7 +1274,7 @@ const HELP = {
       + 'count × its bucket is millimetres — a running total, not a fall. A worked-out value has '
       + 'a dotted underline and says so; one that cannot be what the sensor is (a 187 V battery) '
       + 'carries ⚠. A <strong>water level stays a raw count</strong>: its scale is set per site '
-      + 'and nothing in MegaNet records it, and a number invented here would read like a '
+      + 'and nothing in Flood-Net records it, and a number invented here would read like a '
       + 'measurement.',
       'The <strong>narrow view is a reading aid, not the record</strong>. It opens with the '
       + 'field set — time, station, address, raw value — and the Columns button decides what '
@@ -1489,7 +1489,7 @@ const HELP = {
       + 'the Council form carries named contacts\' phone numbers. Photos are drawn through links '
       + 'that expire, and the CSV names a photo by its object path rather than carrying a link '
       + 'that would still open it out of somebody\'s Downloads folder.',
-      'It is <strong>empty for a station nobody has inspected in MegaNet yet</strong>. The ~35 '
+      'It is <strong>empty for a station nobody has inspected in Flood-Net yet</strong>. The ~35 '
       + 'years of paper history in the archive workbook is issue #122\'s to load, and this is the '
       + 'view that will show it.',
     ],
@@ -1533,7 +1533,7 @@ const HELP = {
       + 'by a scheduled job, read the same way, and reported in the panel at the foot of the tab. A '
       + 'photo removed here stays removed — the sync will not bring it back.',
       '<strong>Review</strong> lists what happened to every file — from this browser, and the last '
-      + 'two hundred from every way in: imported, unplaced, already in MegaNet, refused or failed, '
+      + 'two hundred from every way in: imported, unplaced, already in Flood-Net, refused or failed, '
       + 'and why. Filter it by outcome or by way in.',
       '<strong>Equipment labels.</strong> 🔎 in the viewer, or a station\'s worth from Review, reads '
       + 'the makes, models and serial numbers on the equipment in a photo (seconds a photo) and '
@@ -1631,13 +1631,13 @@ const HELP = {
            + '<strong>SSH public keys</strong>, which a base station installs for its maintenance '
            + 'login if its owner allows it. Administrators only.',
     watch: [
-      '<strong>MegaNet never connects to a base station.</strong> Each one checks in about once a '
+      '<strong>Flood-Net never connects to a base station.</strong> Each one checks in about once a '
       + 'minute, over the same HTTPS door and with the same ingest token as its readings, so nothing '
       + 'listens on it and no port is opened for it. What is asked here waits for that check-in; '
       + 'opening a station makes it check in every five seconds for the next three minutes.',
       '<strong>It can be asked for a short list of things, and nothing else.</strong> The database '
       + 'checks the list and the station checks it again. Never its token, where its readings go, its '
-      + 'web page\'s password, its SSH keys, or how much it lets MegaNet do.',
+      + 'web page\'s password, its SSH keys, or how much it lets Flood-Net do.',
       '<strong>The station decides how much.</strong> Its owner can set it, on the station and never '
       + 'from here, to <em>report only</em> — its health shows, every request is refused — or stop '
       + 'it checking in at all.',

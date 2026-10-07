@@ -495,7 +495,7 @@ const SerialRadio = (function () {
   function stnBuild(id) {
     return guard(id, async (c, r) => {
       if (!state || !state.data || !Array.isArray(state.data.stations) || !state.data.stations.length) {
-        throw new Error('No station database is loaded in MegaNet yet — open the Stations tab once, then build again.');
+        throw new Error('No station database is loaded in Flood-Net yet — open the Stations tab once, then build again.');
       }
       const useFile = (document.getElementById('qs-stn-file-' + id) || {}).checked !== false;
       const file = useFile ? await addressFile() : null;
@@ -651,8 +651,8 @@ const SerialRadio = (function () {
   function exportReadings(id) {
     const r = R(id);
     if (!r) return;
-    const fields = r.schema.fields.DEC.concat(['received', 'meganet_name']);
-    const rows = r.decs.map(d => Object.assign({}, d, { received: new Date(d.t).toISOString(), meganet_name: d.mn || '' }));
+    const fields = r.schema.fields.DEC.concat(['received', 'floodnet_name']);
+    const rows = r.decs.map(d => Object.assign({}, d, { received: new Date(d.t).toISOString(), floodnet_name: d.mn || '' }));
     dlText('radio-readings-' + new Date().toISOString().slice(0, 10) + '.csv', Quansheng.toCsv(fields, rows));
   }
   function openPayload(id, hex) { Serial.openInPackets('0x' + hex); }
@@ -989,10 +989,10 @@ const SerialRadio = (function () {
     if (r.lookup) {
       const l = r.lookup;
       h += '<p>Address ' + l.id + ': the radio calls it <strong>' + (l.name ? esc(l.name) + ' (' + esc(l.kind || 'no kind') + ')' : 'nothing') + '</strong>'
-        + (l.mn ? '; MegaNet calls it <strong>' + esc(l.mn) + '</strong>' : '; MegaNet has no station at it') + '.</p>';
+        + (l.mn ? '; Flood-Net calls it <strong>' + esc(l.mn) + '</strong>' : '; Flood-Net has no station at it') + '.</p>';
     }
     if (t) {
-      h += '<p>Built from MegaNet: <strong>' + t.sites.length + ' sites</strong>, ' + t.addresses + ' addresses, ' + t.blob.length + ' of 65,504 bytes, '
+      h += '<p>Built from Flood-Net: <strong>' + t.sites.length + ' sites</strong>, ' + t.addresses + ' addresses, ' + t.blob.length + ' of 65,504 bytes, '
         + 'source ' + esc(t.source) + ', CRC-32 ' + Quansheng.hex8(t.crc) + (t.withFile ? ' (address file as fallback)' : ' (stations only)') + '. '
         + (t.problems.length ? '<span class="txt-bad">' + esc(t.problems.join('; ')) + '</span>' : 'Every structural check passes.')
         + (t.collisions ? ' ' + t.collisions + ' addresses are claimed by more than one name; the first claimant wins, as in the firmware build.' : '') + '</p>';
@@ -1126,7 +1126,7 @@ const SerialRadio = (function () {
       + '<label class="qs-inline">address <input type="number" min="0" max="8191" id="qs-stn-id-' + id + '" aria-label="ALERT address to look up"></label>'
       + btn('Look up', 'stnLookup(\'' + id + '\')', dis) + '</div>'
       + '<div class="ser-actions"><label class="ser-check"><input type="checkbox" id="qs-stn-file-' + id + '" checked> address file as fallback</label>'
-      + btn('Build from MegaNet', 'stnBuild(\'' + id + '\')') + btn('Save .bin', 'stnSaveBlob(\'' + id + '\')')
+      + btn('Build from Flood-Net', 'stnBuild(\'' + id + '\')') + btn('Save .bin', 'stnSaveBlob(\'' + id + '\')')
       + '<button type="button" class="ghost" id="qs-stn-up-' + id + '" onclick="SerialRadio.stnUpload(\'' + id + '\')" disabled>Upload to radio…</button>'
       + '<button type="button" class="ghost" id="qs-stn-cancel-' + id + '" onclick="SerialRadio.stnCancel(\'' + id + '\')" hidden>Cancel upload</button>'
       + btn('Erase uploaded table…', 'stnClear(\'' + id + '\')', dis) + '</div></details>'

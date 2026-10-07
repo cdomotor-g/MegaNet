@@ -229,7 +229,7 @@ const RxLog = (function () {
       + '<button type="button" class="ghost" onclick="switchTab(\'reception\')">Open the Reception Map ▸</button>'
       + '</div>'
       + '<p class="qs-small" id="rx-where-' + id + '"></p>'
-      + '<p class="qs-small qs-dim">A GPS card on this tab, when it has a fix, is used first and recorded as exact. Receptions go to MegaNet while this card is set to send there.</p>'
+      + '<p class="qs-small qs-dim">A GPS card on this tab, when it has a fix, is used first and recorded as exact. Receptions go to Flood-Net while this card is set to send there.</p>'
       + '</details>';
   }
   function setOn(id, v) { const c = Serial.findConn(id); if (c) { c.rxlogOff = !v; paint(c); } }

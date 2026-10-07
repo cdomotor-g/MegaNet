@@ -1,7 +1,7 @@
 # HTTP ingest — posting readings from a base station
 
 This page is for whoever is configuring a base station to send readings to
-MegaNet. It assumes you have a serial cable and a datasheet for your device, not
+Flood-Net. It assumes you have a serial cable and a datasheet for your device, not
 that you have read this repository. If you are changing how the endpoint itself
 works, the database side is `db/migrations/0007_ingest_http.sql`,
 `db/migrations/0012_base_station_tokens.sql` and `db/README.md`.
@@ -62,7 +62,7 @@ that one token posts readings for **every station that ingest point can hear**.
 
 You do not need a token per field station, and you should not mint one. Each
 reading in a batch carries its own address — an ALERT ID, or a station number —
-and MegaNet works out which station it belongs to from that. A base station
+and Flood-Net works out which station it belongs to from that. A base station
 hearing forty sites sends one POST with forty readings in it and one token in the
 header.
 
@@ -87,7 +87,7 @@ called `payload`:
 | `apikey` | `sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY` — identifies the project. Not a secret; it is committed to this repo and cannot read or write anything on its own. |
 | `X-Ingest-Token` | Your base station's token — see **Getting a token**, below. This is the secret. |
 | `Content-Type` | `application/json` |
-| `Content-Profile` | `meganet` — MegaNet's tables live in their own schema, not `public`. Without this, PostgREST looks in `public`, finds no `ingest_http` there, and the request never reaches the database ([`db/README.md`](../db/README.md)). |
+| `Content-Profile` | `meganet` — Flood-Net's tables live in their own schema, not `public`. Without this, PostgREST looks in `public`, finds no `ingest_http` there, and the request never reaches the database ([`db/README.md`](../db/README.md)). |
 
 ```sh
 curl -sS -X POST \
@@ -123,7 +123,7 @@ If you have used a Supabase project before, you may expect the token to go in
 that header as a login token and rejects anything that is not one, before your
 request reaches the database at all — an ingest token sent that way is refused
 every time, whether or not it is valid. `X-Ingest-Token` is an ordinary header
-that passes straight through, which is where MegaNet actually checks it.
+that passes straight through, which is where Flood-Net actually checks it.
 
 ## Payload shape
 
@@ -147,7 +147,7 @@ body itself — is one reading, an array of readings, or an object with a
 **Those are three different stations, in one POST, under one token** — which is
 the normal case for a base station, not a special one. Nothing in the batch names
 a station: each reading's `alert_id` or `station_number` is the address, and
-MegaNet resolves it. Send everything your base station heard since the last POST
+Flood-Net resolves it. Send everything your base station heard since the last POST
 and let the addresses sort it out.
 
 The two shapes travel together on purpose, and the base station at 18 Bateson is
@@ -181,7 +181,7 @@ batch from one receiver channel.
 was heard, not what was measured, so one that is missing, not a number or out of
 range (a frequency outside 0.001–100,000 MHz, an RSSI outside −200…+50 dBm, a
 level outside −200…+20 dBFS, an SNR outside −100…+200 dB) is stored as null and
-the reading is kept — never a rejected row. They are stored for the copy MegaNet
+the reading is kept — never a rejected row. They are stored for the copy Flood-Net
 keeps: the first to arrive. A later copy of the same reading is counted and its
 `path` recorded, but its frequency and signal are not; every copy, with its level,
 is what [`report_receptions()`](reception-map.md) keeps for the Reception
@@ -220,7 +220,7 @@ most common `why` you will see in the field:
 | --- | --- |
 | `reading_ts … is before 1990 — a dead clock, not a reading` | The logger's real-time clock has lost power and reset to 1970 (or similar). Check the battery backing the RTC, not the network. |
 | `reading_ts … is more than a day in the future` | The clock is fast, or set to the wrong year. |
-| `unknown unit: …` | A `unit` value that is not on MegaNet's list. Send `value_raw` without `unit`/`value` if you are not doing the conversion yourself. |
+| `unknown unit: …` | A `unit` value that is not on Flood-Net's list. Send `value_raw` without `unit`/`value` if you are not doing the conversion yourself. |
 | `no address: a reading needs an alert_id, or a station_number for a station that has none` | Neither field was set. |
 | `alert_id % is outside 1-65535` | Typo, or a value read from the wrong register. |
 
@@ -320,7 +320,7 @@ is carried to the device.
 
 ### A base station that asks for its token
 
-`0048`. The device makes its own token, asks MegaNet to approve it, and shows a
+`0048`. The device makes its own token, asks Flood-Net to approve it, and shows a
 short code; an administrator signed in anywhere — a phone, a work computer —
 approves it on the **Admin** tab, and the device starts posting by itself. Nothing
 is copied, typed or carried, and nobody signs in on the device. It is the device
@@ -328,11 +328,11 @@ authorisation grant of RFC 8628, the way a television signs in to a streaming
 service.
 
 1. **On the device**, press **Request a token**: RPi ALERT's **Settings →
-   MegaNet** (or the banner on its dashboard, on the Pi's own screen or at
+   Flood-Net** (or the banner on its dashboard, on the Pi's own screen or at
    `http://rpi-alert.local/`), `rpi-alert request-token` over SSH, or **Ask an
    administrator** in a Serial Monitor card. It shows a code such as `WDJB-MJHT`,
    and on RPi ALERT a QR code.
-2. **On a phone or computer signed in to MegaNet as an administrator**, open
+2. **On a phone or computer signed in to Flood-Net as an administrator**, open
    **Admin → Ingest tokens**. The request is under **Waiting for approval** within
    a few seconds — or scan the QR code, which opens it directly
    (`https://floodwarning.net/#pair=WDJB-MJHT`).
@@ -351,7 +351,7 @@ the old token in the same step.
 
 What travels: the device draws `mgn_` and 64 hex characters from its own random
 number generator and sends them in `X-Ingest-Token`, exactly as it will to
-`ingest_http()` afterwards. MegaNet keeps only their hash; approving turns that
+`ingest_http()` afterwards. Flood-Net keeps only their hash; approving turns that
 hash into an ordinary ingest token, revoked from the same panel the same way. So
 there is no token sitting in the database waiting to be collected, and a dropped
 connection cannot lose it. For a device of your own:
@@ -381,7 +381,7 @@ administrator sees it as a suggestion.
 **Once it posts, it can check in too** (`0049`): with the same token, a base
 station whose software supports it reports its health to the **Base Stations**
 tab about once a minute and collects what an administrator asks of it there —
-MegaNet never connects to it. [`base-stations.md`](base-stations.md) is the tab
+Flood-Net never connects to it. [`base-stations.md`](base-stations.md) is the tab
 and the protocol.
 
 ### An administrator mints one
@@ -459,11 +459,11 @@ its stations look heard today; a time from a dead clock — none, before 1990,
 more than a day ahead, or over 90 days old in a batch not marked
 `"source": "backfill"` — counts as heard on arrival (`0052`). `minutes_since_reading` is time since one was actually
 stored. The two diverging is the signature of a station that is on the air and
-sending something MegaNet will not accept: check `rejected` in your POST
+sending something Flood-Net will not accept: check `rejected` in your POST
 responses, not the radio path.
 
 A `station_key` that looks like `a:6128` or `s:541155` rather than a station name
-is an address MegaNet could not resolve to exactly one station — 604 ALERT
+is an address Flood-Net could not resolve to exactly one station — 604 ALERT
 addresses in the current data are carried by more than one station, so it records
 the address it has rather than guessing.
 

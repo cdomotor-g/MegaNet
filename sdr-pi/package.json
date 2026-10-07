@@ -2,7 +2,7 @@
   "name": "meganet-sdr-pi",
   "version": "1.0.0",
   "private": true,
-  "description": "MegaNet SDR Pi: an RTL-SDR on a Raspberry Pi, decoding ALERT with MegaNet's own driver and decoder, printed on a serial port for PuTTY. See ../docs/sdr-pi.md.",
+  "description": "Flood-Net SDR Pi: an RTL-SDR on a Raspberry Pi, decoding ALERT with Flood-Net's own driver and decoder, printed on a serial port for PuTTY. See ../docs/sdr-pi.md.",
   "main": "relay.js",
   "license": "MIT",
   "engines": {

@@ -668,7 +668,7 @@ Two smaller things the extract records rather than resolves:
 
 ## Attributing a block to a station — what #125 built
 
-Parsing ends at a block; #125 decides which MegaNet station that block is
+Parsing ends at a block; #125 decides which Flood-Net station that block is
 *about*. [`tools/ingest/crosswalk.py`](../tools/ingest/crosswalk.py) groups the
 extract's blocks and flat rows into **1,051 workbook station identities** —
 grouped by CBM number where there is one and by name where there is not — and

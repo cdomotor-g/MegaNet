@@ -445,9 +445,9 @@ const SdrPi = (function () {
 
   // What the console answers to HELP, one `HELP,` line each, then OK.
   const HELP = [
-    'MegaNet SDR Pi - type a command and press Enter. Each ends in OK or ERR.',
+    'Flood-Net SDR Pi - type a command and press Enter. Each ends in OK or ERR.',
     'CFG                          every setting, as one line',
-    'CFG freq=151.5 gain=29.7 ... set several at once (MegaNet\'s card copies this for you)',
+    'CFG freq=151.5 gain=29.7 ... set several at once (Flood-Net\'s card copies this for you)',
     'FREQ 151.5                   tune, MHz (or 151500000 in Hz)',
     'OFFSET 12.5                  the decoder\'s channel, kHz from the centre',
     'RATE 240000                  240000 960000 1200000 1920000 2400000',
@@ -462,7 +462,7 @@ const SdrPi = (function () {
     'BIAS ON YES | BIAS OFF       4.5 V on the antenna socket (V2, V3, V4)',
     'DIRECT AUTO|OFF|I|Q  MODEL AUTO|V2|V3|V4|R820T|R828D|FC0013|FC0012',
     'SPEC 5  LVL 2                seconds between spectrum / level records, 0 for none',
-    'TIME 1790843760              set the clock (Unix seconds, UTC) - MegaNet\'s card copies this too',
+    'TIME 1790843760              set the clock (Unix seconds, UTC) - Flood-Net\'s card copies this too',
     'STATUS  INFO  DECODE 3  RESTART  DEFAULTS YES',
     'Settings are kept on the Pi and survive a restart.',
   ];

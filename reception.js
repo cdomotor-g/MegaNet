@@ -853,7 +853,7 @@ const Reception = (function () {
     if (a.unknown.length) {
       const list = a.unknown.slice(0, 8).map(u => u.alert_id + ' (' + u.n + '×)').join(', ');
       li.push(a.unknown.length + ' address' + (a.unknown.length === 1 ? '' : 'es') + ' on no station turned up on ' + (a.unknown.length === 1 ? 'its' : 'their')
-        + ' own again and again — ' + esc(list) + (a.unknown.length > 8 ? ', …' : '') + '. A station MegaNet does not know about, or a repeater stuck'
+        + ' own again and again — ' + esc(list) + (a.unknown.length > 8 ? ', …' : '') + '. A station Flood-Net does not know about, or a repeater stuck'
         + ' on one bit whose victim this receiver never hears: not counted as ghosts. The Station Health tab lists them under the register.');
     }
     return li.length ? '<ul class="small rx-notes">' + li.map(x => '<li>' + x + '</li>').join('') + '</ul>' : '';
@@ -903,7 +903,7 @@ const Reception = (function () {
           <label class="ser-check"><input type="checkbox" ${S.useLocal ? 'checked' : ''} onchange="Reception.setLocal(this.checked)"> this browser's log (${local})</label>
           <button class="ghost" onclick="Reception.chooseFile()">Load a log file…</button>
           <button class="ghost" onclick="Reception.fromStored()" title="Every base station's stored ALERT readings for the time picked — public, no positions">From the stored readings</button>
-          <button class="ghost" onclick="Reception.fromDb()" title="Every copy each receiver sending to MegaNet heard, with where — editors only">Receptions table (editors)</button>
+          <button class="ghost" onclick="Reception.fromDb()" title="Every copy each receiver sending to Flood-Net heard, with where — editors only">Receptions table (editors)</button>
           <button class="ghost" onclick="Reception.listSurveys()" title="A receiver left at a candidate repeater or base-station site: what it heard there, beside what the network received — editors only">Site surveys (editors)</button>
           <button class="ghost" onclick="Reception.loadDemo()">Demo drive</button>
           ${S.loaded.length || S.db.length || S.readings.length || S.demo.length ? '<button class="ghost" onclick="Reception.clearLoaded()">Clear loaded</button>' : ''}

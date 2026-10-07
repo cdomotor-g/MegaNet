@@ -1661,7 +1661,7 @@ const HealthAnalysis = (() => {
         regFindings.push(finding('registry-unknown', sch ? 'warn' : 'info', {
           addr: nt.addr,
           title: `Address ${nt.aid} is in use, and no station on file has it`,
-          detail: `Heard ${plural(real.length, 'time')}${cadence} (not ghosts — nothing near it was heard at those moments). A station not yet in MegaNet, or one whose address changed.`,
+          detail: `Heard ${plural(real.length, 'time')}${cadence} (not ghosts — nothing near it was heard at those moments). A station not yet in Flood-Net, or one whose address changed.`,
           evidence: { aid: nt.aid, heard: real.length, periodMin: sch ? sch.P / MIN : null },
         }));
       } else if (nt.res.conf === 'far') {

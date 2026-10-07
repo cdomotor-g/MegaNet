@@ -588,7 +588,7 @@ const Serial = (function () {
     const conn = makeConn('serial', { name: 'Demo connection', phase: 'closed', portLabel: 'Demo (no device attached)', mode: 'text' });
     conns.push(conn);
     emitSys(conn, 'Demo connection — sample data, no device attached', 'sys');
-    handleChunk(conn, new TextEncoder().encode('MegaNet serial demo — plain text mode\r\n'));
+    handleChunk(conn, new TextEncoder().encode('Flood-Net serial demo — plain text mode\r\n'));
     // a logger printing readings, for the plotter
     conn.plot = { on: true, n: 0, series: new Map(), raf: 0 };
     let lines = '';
@@ -1242,7 +1242,7 @@ const Serial = (function () {
   function saveLog(id) {
     const conn = byId(id);
     if (!conn) return;
-    const header = '# MegaNet Serial Monitor log — ' + conn.name + ' (' + conn.portLabel + ')\n'
+    const header = '# Flood-Net Serial Monitor log — ' + conn.name + ' (' + conn.portLabel + ')\n'
       + '# ' + conn.settings.baudRate + ' baud, ' + conn.settings.dataBits + fmtParity(conn.settings.parity)
       + conn.settings.stopBits + ', mode ' + conn.mode + '\n';
     const lines = conn.entries.map(e => (conn.timestamps ? fmtTime(e.ts) + '  ' : '') + e.raw).join('\n');

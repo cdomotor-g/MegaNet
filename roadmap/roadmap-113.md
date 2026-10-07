@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-05** (revision 114 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-07** (revision 115 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -676,6 +676,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 115 — 2026-10-07: the app is Flood-Net wherever a person reads it
+
+The owner asked for the name MegaNet to go from everything a user sees. Revision 90 renamed the banner and only the banner; now every label, message, help entry, tooltip and page title says **Flood-Net**, and so do the About page, `llms.txt`, `robots.txt`, the agent files and the docs. Downloads are `floodnet-…` (CSV, KML, map images), the Radio Mobile export set is `FloodNet*.csv`, the bug reporter signs its issues *Reported from Flood-Net*, the Station Health agent's prompt names the app Flood-Net, and the SDR Pi's console, installer and USB device strings say Flood-Net SDR Pi. The agent API's headers are `X-FloodNet-Client` / `-Cache` / `-Api-Version` and its MCP server is `floodnet` (`X-MegaNet-Client` is still read, undocumented); `.cursor/rules/meganet-api.mdc` is now `floodnet-api.mdc`.
+
+**What keeps the old name, on purpose:** the repository, the `meganet` schema and its migrations, browser storage keys, MQTT topics, the Worker and R2 bucket, the Pi's service names and install markers, the Quansheng station-table tag (its field is 15 characters and the firmware's built-in table carries `MegaNet:` too), and code comments. A few strings live in the database rather than the code — the Bateson test rig's station note, `stations.json`'s `meta.description`, the photo-outcome labels — and still say MegaNet until a migration rewrites them.
+
+**`npm run brand`** (new, parse-only, in CI and in the cheap pre-push list) fails on any string literal, page or agent file that says MegaNet, or a download named `meganet-…`, so a label written beside an old comment cannot bring the name back. No issue opened or closed.
 
 ### Revision 114 — 2026-10-05: the ERT-A2's field 18 is a port, not a verdict
 

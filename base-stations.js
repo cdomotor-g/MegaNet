@@ -319,7 +319,7 @@ const BaseStations = (function () {
           <td class="small">${esc(rxDetail(r)) || '—'}</td>
           <td class="small">${r.decoded != null ? esc(r.decoded) + ' decoded' : ''}${r.dataAgoS != null ? `<div class="qs-dim">data ${esc(span(r.dataAgoS).replace(/^0 min$/, 'just now'))}</div>` : ''}</td>
           <td class="adm-row-acts">${!ask ? '' : r.state === 'unplugged'
-            ? askBtn('device.forget', { key: r.key }, 'Remove ' + r.name + '? The station forgets it — its name, its own settings and its MegaNet receiver id.', 'Remove…', 'exp-btn-sm adm-danger', 'Remove ' + r.name)
+            ? askBtn('device.forget', { key: r.key }, 'Remove ' + r.name + '? The station forgets it — its name, its own settings and its Flood-Net receiver id.', 'Remove…', 'exp-btn-sm adm-danger', 'Remove ' + r.name)
             : askBtn('device.restart', { key: r.key }, null, 'Restart', 'exp-btn-sm', 'Restart ' + r.name)}</td>
         </tr>`).join('')}</tbody></table></div>`;
   }
@@ -479,10 +479,10 @@ const BaseStations = (function () {
     const chk = (k, label) => `<label class="ser-check"><input type="checkbox" id="bs-f-${k}"${f[k] ? ' checked' : ''} onchange="BaseStations.field('${k}', this.checked)"> ${label}</label>`;
     const sticks = rx.filter(x => x.kind === 'sdr');
     return `<h3>Settings</h3>
-      <p class="small">Sent to the station as one request, and changed there through the checks its own page uses. Never from here: its ingest token, where readings go, its web page's password, its SSH keys, or what it lets MegaNet do.</p>
+      <p class="small">Sent to the station as one request, and changed there through the checks its own page uses. Never from here: its ingest token, where readings go, its web page's password, its SSH keys, or what it lets Flood-Net do.</p>
       <div class="bs-form">
         ${inp('name', 'Name of the base station', ' maxlength="80"')}
-        ${chk('enabled', 'Send readings to MegaNet')}
+        ${chk('enabled', 'Send readings to Flood-Net')}
         ${chk('receptions', 'Send every frame heard (Reception Map)')}
       </div>
       <h4>RTL-SDR — every stick</h4>
@@ -625,7 +625,7 @@ const BaseStations = (function () {
     return `<div class="panel">
       <div class="panel-header"><h2>Base stations</h2></div>
       <p class="small">Every base station's health on one list — whether it is checking in, its receivers, its uplink, its power and temperature — and, for an administrator, asking one of them to change a setting, restart, install an update or show its log, without going to site.</p>
-      <p class="small">A base station is never reached from here: it checks in with MegaNet about once a minute, and what is asked waits for that. It can only be asked for a short list of things, never its token or its passwords, and its owner can turn this off on the station itself.</p>
+      <p class="small">A base station is never reached from here: it checks in with Flood-Net about once a minute, and what is asked waits for that. It can only be asked for a short list of things, never its token or its passwords, and its owner can turn this off on the station itself.</p>
       ${typeof Auth !== 'undefined' && Auth.isSignedIn() ? '<p class="small">This needs an administrator.</p>'
         : '<div class="button-group"><button class="primary" onclick="Auth.open()">🔑 Sign in</button></div>'}
     </div>`;
@@ -650,7 +650,7 @@ const BaseStations = (function () {
       <div id="bs-keys">${keysHtml()}</div>
       <div class="panel">
         <div class="panel-header"><h2>How a base station is reached</h2></div>
-        <p class="small">It is not: it checks in. About once a minute each base station sends MegaNet a heartbeat — and its whole status when something changed — and collects what was asked of it here, which it does and answers at its next check-in. Opening one makes it check in every five seconds for the next three minutes. It can be asked only for the things above; never its token, where it sends readings, its passwords or SSH keys, or how much it lets MegaNet do — that is set on the station, which can also refuse everything (report only) or stop checking in.</p>
+        <p class="small">It is not: it checks in. About once a minute each base station sends Flood-Net a heartbeat — and its whole status when something changed — and collects what was asked of it here, which it does and answers at its next check-in. Opening one makes it check in every five seconds for the next three minutes. It can be asked only for the things above; never its token, where it sends readings, its passwords or SSH keys, or how much it lets Flood-Net do — that is set on the station, which can also refuse everything (report only) or stop checking in.</p>
         <div class="button-group adm-actions">
           <a class="pill" href="${esc(docUrl('docs/base-stations.md'))}" target="_blank" rel="noopener">How it works</a>
           <button class="pill" onclick="switchTab('admin')">🛠️ Ingest tokens (Admin)</button>

@@ -67,7 +67,7 @@ const PhotoReview = (function () {
   const OUTCOME = {
     imported:  { word: 'Imported',           cls: 'ok' },
     unplaced:  { word: 'Unplaced',           cls: 'warn' },
-    duplicate: { word: 'Already in MegaNet', cls: 'muted' },
+    duplicate: { word: 'Already in Flood-Net', cls: 'muted' },
     refused:   { word: 'Refused',            cls: 'bad' },
     failed:    { word: 'Failed',             cls: 'bad' },
     skipped:   { word: 'Skipped',            cls: 'muted' },
@@ -311,7 +311,7 @@ const PhotoReview = (function () {
       ${r.uploadsError ? `<p class="small txt-bad">${esc(r.uploadsError)}</p>` : ''}
       ${rows.length ? `<div class="table-wrap">
         <table class="pr-table">
-          <caption class="sr-only">Recent attempts to bring photos into MegaNet, from every way in, and what became of each</caption>
+          <caption class="sr-only">Recent attempts to bring photos into Flood-Net, from every way in, and what became of each</caption>
           <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">File</th><th scope="col">Outcome</th><th scope="col">Station</th></tr></thead>
           <tbody>${rows.map(uploadRowHtml).join('')}</tbody>
         </table>

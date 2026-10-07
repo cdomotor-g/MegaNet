@@ -52,7 +52,7 @@ same rules the ALERT2 / ERT-A2 tab uses):
 | --- | --- | --- |
 | Battery | raw ÷ 10 = volts. A result outside 9–16.5 V is flagged ⚠ — that address is probably another kind of sensor somewhere else. | 133 → *13.3 V* |
 | Rainfall | raw × the bucket = millimetres of the gauge's **running total**, not a fall. The station's recorded bucket size when it has one; 0.2 mm/tip assumed, and said so, when it does not. | 43 → *8.6 mm* |
-| Water level | no conversion — its scale is set per site and nothing in MegaNet records it, so the count is the reading and the cell says *raw count*. | 512 → *raw count* |
+| Water level | no conversion — its scale is set per site and nothing in Flood-Net records it, so the count is the reading and the cell says *raw count*. | 512 → *raw count* |
 
 A recorded value always wins over a worked-out one; hover any Value for the rule
 that produced it. The CSV export carries both: `value` as recorded, and
@@ -114,7 +114,7 @@ station, so an address match names the first candidate and says how many more
 share the address. A relayed ALERT2 row matches on its **station address**
 instead, which one station holds and no other may, so that tier never reports a
 tie. An **unresolved** row is not an error — a new site reports before anyone
-adds it to MegaNet, and the reading is kept rather than dropped. The
+adds it to Flood-Net, and the reading is kept rather than dropped. The
 *unresolved address only* filter is how those are found.
 
 ### Claiming one
@@ -221,7 +221,7 @@ to the other:
   screen when it bites, with *load more* for the next page.
 * **Reading needs no sign-in.** The log, like the station list, is public by
   design; only the raw submissions behind it are gated.
-* **This is the MegaNet datastore only.** ARRO's numbers live on the ARRO
+* **This is the Flood-Net datastore only.** ARRO's numbers live on the ARRO
   Data tab and the two are never combined — different source of truth,
   different retention, different trust.
 * **Follow is polling, not push.** Every 30 seconds while the tab is open,

@@ -240,8 +240,8 @@ test('a photo somebody removed is never brought back, and one already dropped in
   assert.equal(w.rpc.length, 0);
   assert.equal(w.objects.size, 0, 'nothing was uploaded for either');
   const reasons = out.report.detail.files.map(f => f.reason).join(' | ');
-  assert.match(reasons, /removed from MegaNet/);
-  assert.match(reasons, /already in MegaNet/);
+  assert.match(reasons, /removed from Flood-Net/);
+  assert.match(reasons, /already in Flood-Net/);
 });
 
 test('a refused index row takes its bytes down again', async () => {

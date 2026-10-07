@@ -59,8 +59,8 @@ and so on), pick a station round it, find one by name or number, or say
 *Unplaced*, and is placed from there later.
 
 **The same photo twice is one photo.** Twice in one drop, the second is
-refused before it is read further. Already in MegaNet, the upload asks the
-database by hash first and sends nothing: *Already in MegaNet — added by …
+refused before it is read further. Already in Flood-Net, the upload asks the
+database by hash first and sends nothing: *Already in Flood-Net — added by …
 on …*, with *Show it*. If two people race, the database's own unique index
 refuses the second and the objects it sent are taken down again.
 
@@ -371,7 +371,7 @@ is an administrator's (below). Three lists:
    When, who, the file (and the zip it was in), the outcome and why, the
    station it was filed under, and *Show it* for the photo it became. Counts
    per outcome over those two hundred; filter by outcome (*Imported*,
-   *Unplaced*, *Already in MegaNet*, *Refused*, *Failed*, *Skipped*) or by way
+   *Unplaced*, *Already in Flood-Net*, *Refused*, *Failed*, *Skipped*) or by way
    in — in the database, so *Failed* is the last two hundred failures, not the
    failures among the last two hundred attempts.
 3. **Equipment suggestions** — what the photos' labels say is fitted at a
@@ -382,8 +382,8 @@ is an administrator's (below). Three lists:
 
 Every attempt is a row in `meganet.field_photo_upload`, written through
 `meganet.log_field_photo_upload(p_rows)`: the tab writes one per file when an
-Upload finishes — *imported* (in MegaNet, placed), *unplaced* (in, but nothing
-could place it), *duplicate* (already in MegaNet — the row points at the photo
+Upload finishes — *imported* (in Flood-Net, placed), *unplaced* (in, but nothing
+could place it), *duplicate* (already in Flood-Net — the row points at the photo
 that is), *refused* (the reader, or a rule in the database, said no — with its
 words), *failed* (the upload did not finish; sending it again may work) — and
 every file the reading refused that had not been recorded yet. The syncs write
@@ -391,7 +391,7 @@ one per file they tried, *skipped* included. One press of Upload, or one run
 of a sync, is one `batch_id`.
 
 **Best-effort, on purpose.** A log that cannot be written never fails the
-upload it is about: the photo is in MegaNet either way, and the Review panel
+upload it is about: the photo is in Flood-Net either way, and the Review panel
 says the log could not be written, and why. A row per attempt, not per photo:
 the same file sent twice is two rows, the second saying *duplicate* — the log
 is what happened, and `meganet.field_photo` is what is true now.
@@ -475,7 +475,7 @@ address taken off `meganet.editor_allow` stops being an administrator with it,
 without anyone having to remember a second list. The service key is one, and
 so is the owner at a `psql` prompt.
 
-To make somebody an administrator, once they have signed in to MegaNet at
+To make somebody an administrator, once they have signed in to Flood-Net at
 least once (which is what creates their `app_user` row), run this in the
 Supabase dashboard's **SQL Editor** (or `psql`), with their address:
 
@@ -577,8 +577,8 @@ up; the first is the one to use unless you need the second.
 3. *Choose an API*: **Scoped access**.
 4. *Choose the type of access you need*: **App folder** (or **Full Dropbox**,
    see above).
-5. *Name your app*: something unique, e.g. `MegaNet Field Photos` — with App
-   folder access this is also the folder's name, `Apps/MegaNet Field Photos`.
+5. *Name your app*: something unique, e.g. `Flood-Net Field Photos` — with App
+   folder access this is also the folder's name, `Apps/Flood-Net Field Photos`.
 6. Press **Create app**.
 7. On the app's page, open the **Permissions** tab, tick
    **`files.metadata.read`** and **`files.content.read`**, and press
@@ -594,17 +594,17 @@ account that created it.
 
 ### 2. Get a refresh token, from the Field Photos tab
 
-1. In MegaNet, sign in, open **Field Photos**, and at the foot of the tab under
+1. In Flood-Net, sign in, open **Field Photos**, and at the foot of the tab under
    **From Dropbox** open **Link a Dropbox folder**.
 2. Paste the **App key** into the box in step 1 of that list.
 3. Press **Open Dropbox to allow access ↗**. A Dropbox page opens in a new tab:
    check it names your app, sign in as the account from step 1 if asked, and
    press **Allow**.
-4. Dropbox shows an **access code**. Copy it, come back to MegaNet's tab, paste
+4. Dropbox shows an **access code**. Copy it, come back to Flood-Net's tab, paste
    it into step 3 of the list, and press **Get the token**.
 5. *Linked.* — the **refresh token** is shown, once. Press **Copy**.
 
-The token is not stored anywhere in MegaNet — not in the database, not in the
+The token is not stored anywhere in Flood-Net — not in the database, not in the
 browser. The exchange is PKCE, Dropbox's flow for an app that cannot keep a
 secret, which is why the app secret is never needed. A code is single-use and
 expires in minutes; if it is refused, press *Open Dropbox…* again for a new
@@ -617,7 +617,7 @@ one.
 2. Name **`DROPBOX_REFRESH_TOKEN`**, value the token from step 2 → **Add
    secret**.
 3. **New repository secret** again: **`DROPBOX_APP_KEY`**, the app key.
-4. And **`SUPABASE_SECRET_KEY`**: in the Supabase dashboard, open the MegaNet
+4. And **`SUPABASE_SECRET_KEY`**: in the Supabase dashboard, open the Flood-Net
    project → **Project Settings** → **API Keys** → under *Secret keys*, reveal
    and copy the secret key (`sb_secret_…`; on a project still on the legacy
    keys, the `service_role` key). This is the one credential that can write
@@ -674,7 +674,7 @@ big to walk.
 1. Open <https://console.cloud.google.com/> and sign in — with a work Google
    account if you have one (but see the note at the end of step 2).
 2. In the project picker at the top of the page, press **New project**.
-   *Project name*: `MegaNet Field Photos`. Leave *Location* as it is and press
+   *Project name*: `Flood-Net Field Photos`. Leave *Location* as it is and press
    **Create**; when it is made, choose it in the project picker.
 3. Open <https://console.cloud.google.com/apis/library/drive.googleapis.com>
    (or ☰ → **APIs & Services** → **Library**, and search for *Google Drive
@@ -788,12 +788,12 @@ Each run (`tools/field-photos/sync.mjs`, one Node process on a GitHub runner)
    first. Photos (`.jpg`, `.jpeg`, `.png`, `.heic`, `.heif`, `.webp`), and zip
    packs of them (below).
 3. **What came in before** — asked a hundred files at a time — is skipped: an
-   imported photo is not imported twice, and **a photo removed from MegaNet is
+   imported photo is not imported twice, and **a photo removed from Flood-Net is
    never brought back** (its tombstone keeps the Dropbox file id).
 4. **Each photo left**: downloaded; read by `photo-meta.js` exactly as the tab
    reads one (a HEIC decoded and converted to JPEG here, by the same libheif
    the tab fetches in a browser that cannot draw one); skipped if the same
-   bytes are already in MegaNet (somebody
+   bytes are already in Flood-Net (somebody
    dropped it in by hand); the photo and a thumbnail uploaded; indexed through
    `meganet.add_field_photo()`, which files it under the nearest station and
    refuses what it must — a refused photo's objects are taken down again.
@@ -857,7 +857,7 @@ byte past what the zip declares — and each photo's checksum is checked, so a
 damaged zip fails the photo rather than filing a broken one.
 
 A zip is dealt with once, like any file: the cursor moves past it. Changed
-later, it is opened again, the photos from it already in MegaNet are skipped
+later, it is opened again, the photos from it already in Flood-Net are skipped
 and the new ones imported; a photo from it that somebody removed stays
 removed. Its photos count against a run's 150 like loose ones, and a run that
 stops partway through a big zip downloads it again next run and carries on
@@ -879,7 +879,7 @@ where it stopped.
 | `add_field_photo(p_photo jsonb)`, `update_field_photo(p_id, p_patch jsonb)`, `remove_field_photo(p_id)` | the three doors |
 | `field_photo_station_for(p_lat, p_lon, p_within_m default 1000)` | the nearest live station within a distance |
 | `meganet.field_photo_upload` (0036) | a row per file per attempt, from every way in: when, the way in (`upload`, `dropbox`, `gdrive`), the batch, the file and its zip, hash and size, the outcome and why, the photo it became or already was, the station, who |
-| `meganet.field_photo_outcome` | the outcomes, and which of them are a photo in MegaNet (`has_photo`) |
+| `meganet.field_photo_outcome` | the outcomes, and which of them are a photo in Flood-Net (`has_photo`) |
 | `log_field_photo_upload(p_rows jsonb)`, `prune_field_photo_uploads(p_older_than interval)` | write up to 500 outcomes, all or nothing (editors and the syncs); take out the old ones (the secret key or the owner) |
 | `meganet.station_equipment` | a station's equipment register: each unit, kind, make, model, serial, note, how it was known (`equipment_source`), the photo and suggestion it came from, and — retired — when, by whom, and what replaced it |
 | `meganet.equipment_suggestion` | a proposed change to a register: station, photo, kind, make, model, serial, evidence, confidence, who or what proposed it, and the decision — `pending`, `approved`, `rejected`, `superseded` — with its note and the corrections made |

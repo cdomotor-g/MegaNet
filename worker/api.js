@@ -15,7 +15,7 @@
 // Every MCP tool is a thin adapter over a /api/v1 route, so both doors give the
 // same answer, share one cache and one set of limits, and are documented once:
 // docs/agent-api.md. AGENTS.md, GEMINI.md, .github/copilot-instructions.md,
-// llms.txt and .cursor/rules/meganet-api.mdc tell agents it exists, and
+// llms.txt and .cursor/rules/floodnet-api.mdc tell agents it exists, and
 // test/agent-docs.mjs holds all of them to the numbers written here.
 //
 // ── Read-only by construction ────────────────────────────────────────────────
@@ -35,7 +35,7 @@
 // ── Throttling ───────────────────────────────────────────────────────────────
 // Three rules, per RATE_LIMITS: a per-client minute, a per-client ten-second
 // burst, and a per-address ceiling. A client is the caller's address plus the
-// optional name it gives in X-MegaNet-Client (or ?client=), so colleagues
+// optional name it gives in X-FloodNet-Client (or ?client=), so colleagues
 // behind one office NAT — or everyone using a hosted connector, which reaches
 // us from the provider's addresses — are not one client; the address ceiling
 // is what stops one caller minting names to dodge its own limit. Keys are
@@ -66,7 +66,10 @@ export const API_BASE_URL = `${PUBLIC_ORIGIN}${API_PREFIX}`;
 export const MCP_URL = `${PUBLIC_ORIGIN}${MCP_PATH}`;
 export const OPENAPI_URL = `${API_BASE_URL}/openapi.json`;
 export const DOCS_URL = 'https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md';
-export const CLIENT_HEADER = 'X-MegaNet-Client';
+export const CLIENT_HEADER = 'X-FloodNet-Client';
+// The same header under the name the app had before it was Flood-Net. Still
+// read, so an agent set up with it keeps its own allowance; never documented.
+export const LEGACY_CLIENT_HEADER = 'X-MegaNet-Client';
 
 // The project and its publishable key — both already public in core.js
 // (DB_ORIGIN, DB_ANON_KEY) and worker/index.js; rotate them together. The key
@@ -76,7 +79,7 @@ export const PUBLISHABLE_KEY = 'sb_publishable_PV9VjCM8NQeGAJMuwa5TKA_yX9GWacY';
 const DB_SCHEMA = 'meganet';
 
 export const DISCLAIMER =
-  'MegaNet is not a flood warning service, and it does not issue warnings, forecasts or public alerts. '
+  'Flood-Net is not a flood warning service, and it does not issue warnings, forecasts or public alerts. '
   + 'It is engineering tooling for the radio networks that telemetry travels over — an asset register, a '
   + 'path planner and a fault-finding aid. Nothing here should be read as an official statement about '
   + 'flooding, river conditions or public safety. It is also not an official product of, and is not '
@@ -136,7 +139,7 @@ export const READABLE_RELATIONS = Object.freeze(new Set([
 ]));
 
 const PAUSE_HINT =
-  'MegaNet\'s database is a Supabase free-tier project, which pauses after 7 days without activity; '
+  'Flood-Net\'s database is a Supabase free-tier project, which pauses after 7 days without activity; '
   + 'while it is paused every read fails until the owner restores it. Try again later, and if it '
   + 'persists, raise an issue at https://github.com/cdomotor-g/MegaNet/issues.';
 
@@ -977,7 +980,7 @@ async function stationDetail(rc, rawId) {
     sources: [
       { relation: 'meganet.station_json', what: 'the station register record (the stations.json fragment)', updated_at: st.updated_at },
       { relation: 'meganet.sls_location', what: 'the Bureau\'s Service Level Specifications — Queensland\'s, and the one for New South Wales and the ACT — each merged per Bureau number' },
-      { relation: 'meganet.station_health', what: 'when MegaNet last heard from the station itself' },
+      { relation: 'meganet.station_health', what: 'when Flood-Net last heard from the station itself' },
     ],
     generated_at: new Date().toISOString(),
   };
@@ -1121,7 +1124,7 @@ function buildFloodLevels(doc, slsRows, v) {
       rows: aepRows.map(r => stripNulls({ ...r })),
       point_offset_km: offset,
       note: offset != null && offset > 1
-        ? `The sheet puts this station ${offset} km from where MegaNet does; its levels are for the sheet's point.`
+        ? `The sheet puts this station ${offset} km from where Flood-Net does; its levels are for the sheet's point.`
         : 'Modelled at the sheet\'s point for the station.',
       source: `AEP level workbooks (meganet.station_aep_level): ${uniq(aepRows.map(r => r.source).filter(Boolean)).join('; ') || 'source not recorded'}`,
     };
@@ -1230,7 +1233,7 @@ function buildServiceLevel(doc, slsRows, slsDocs) {
     return {
       status: 'not recorded',
       detail: doc.station_number
-        ? `Bureau number ${doc.station_number} is in no Service Level Specification MegaNet holds${named ? ` (${named})` : ''}.`
+        ? `Bureau number ${doc.station_number} is in no Service Level Specification Flood-Net holds${named ? ` (${named})` : ''}.`
         : 'The station has no Bureau number, so it cannot be matched to a Service Level Specification.',
       edition,
       editions,
@@ -1361,7 +1364,7 @@ function healthSection(rows) {
   if (!rows.length) {
     return {
       status: 'not recorded',
-      detail: 'MegaNet has not heard from this station directly (no MQTT status and no ingest batch). Most stations report through the Bureau\'s own systems rather than MegaNet\'s ingest, so this says nothing about whether the station works.',
+      detail: 'Flood-Net has not heard from this station directly (no MQTT status and no ingest batch). Most stations report through the Bureau\'s own systems rather than Flood-Net\'s ingest, so this says nothing about whether the station works.',
       source: 'meganet.station_health',
     };
   }
@@ -1396,7 +1399,7 @@ function dailySummarySection(rows, doc, fromDate, toDate, days) {
     return {
       status: 'not recorded',
       window: { from: fromDate, to: toDate, days },
-      detail: `No telemetry for this station was ingested into MegaNet in the last ${days} days. MegaNet holds only what reaches its own ingest; most stations' records live in the Bureau's systems.`,
+      detail: `No telemetry for this station was ingested into Flood-Net in the last ${days} days. Flood-Net holds only what reaches its own ingest; most stations' records live in the Bureau's systems.`,
       source: 'meganet.reading_daily',
     };
   }
@@ -1431,7 +1434,7 @@ function dailySummarySection(rows, doc, fromDate, toDate, days) {
     status: 'ok',
     window: { from: fromDate, to: toDate, days, basis: 'UTC days' },
     channels,
-    note: 'raw is as transmitted (an ALERT count, or an engineering value for a source without counts); value is the converted figure where MegaNet had a conversion. A rainfall accumulator counts tips: its raw.last is a counter, not a day\'s rain.',
+    note: 'raw is as transmitted (an ALERT count, or an engineering value for a source without counts); value is the converted figure where Flood-Net had a conversion. A rainfall accumulator counts tips: its raw.last is a counter, not a day\'s rain.',
     source: 'meganet.reading_daily',
   };
 }
@@ -1492,7 +1495,7 @@ async function inspectionsSection(rc, id) {
     first_visit: dated.length ? dated[dated.length - 1].inspected_on : null,
     last_visit: dated.length ? stripNulls({ date: dated[0].inspected_on, date_precision: dated[0].date_precision, origin: dated[0].origin }) : null,
     recent_visits,
-    note: 'Numbers only: remarks, the inspector and any free text are not public. date_precision says how much of the date the record claims; origin tells a sheet typed into MegaNet from one imported from the historical workbook.',
+    note: 'Numbers only: remarks, the inspector and any free text are not public. date_precision says how much of the date the record claims; origin tells a sheet typed into Flood-Net from one imported from the historical workbook.',
     unavailable: failed.length ? failed : null,
     source: src,
   });
@@ -1661,7 +1664,7 @@ function summaryLines(doc, d) {
   if (aep.status === 'ok' && aep.selected.aep_1_m != null) lines.push(`Modelled 1% AEP level ${aep.selected.aep_1_m} m AHD (indicative, confidence ${aep.selected.confidence ?? 'n/a'} of 9).`);
   const insp = d.inspections;
   if (insp.status === 'ok' && insp.last_visit) lines.push(`${insp.visits_recorded} site visit(s) recorded; the last on ${insp.last_visit.date}.`);
-  if (d.telemetry.health.status === 'ok') lines.push(`MegaNet last heard from it at ${d.telemetry.health.last_seen_at}.`);
+  if (d.telemetry.health.status === 'ok') lines.push(`Flood-Net last heard from it at ${d.telemetry.health.last_seen_at}.`);
   return lines;
 }
 
@@ -1740,8 +1743,8 @@ async function dossierEndpoint(rc, rawId) {
       { relation: 'meganet.station_flood_class / station_crossing / station_gauge_survey / station_flood_effect / station_bureau_listing',
         what: 'the Bureau\'s Queensland flood warning station lists (Sections 1–6, 9), dated by as_at' },
       { relation: 'meganet.station_aep_level', what: 'QLD and NSW AEP level workbooks (modelled, indicative)' },
-      { relation: 'meganet.station_health', what: 'what MegaNet\'s own ingest last heard' },
-      { relation: 'meganet.reading_daily', what: `daily rollups of telemetry ingested into MegaNet, last ${days} UTC days` },
+      { relation: 'meganet.station_health', what: 'what Flood-Net\'s own ingest last heard' },
+      { relation: 'meganet.reading_daily', what: `daily rollups of telemetry ingested into Flood-Net, last ${days} UTC days` },
       { relation: 'meganet.inspection_chart_*', what: 'numbers recorded at site visits (no remarks)' },
       { relation: 'meganet.pass_range / meganet.link_fade_margin', what: 'repeater pass ranges and saved modelled link margins' },
       { relation: 'meganet.station / catchment / hub / radio_network / rm_system', what: 'nearby stations and reference names' },
@@ -1850,7 +1853,7 @@ async function readingsEndpoint(rc, rawId, params) {
         raw_mean: num(r.raw_mean), raw_last: num(r.raw_last), val_min: num(r.val_min), val_max: num(r.val_max),
         val_mean: num(r.val_mean), val_last: num(r.val_last), unit: r.unit, first_ts: r.first_ts, last_ts: r.last_ts })));
   if (!shaped.length) {
-    notes.push('No readings in this window. MegaNet holds only telemetry ingested into it (docs/ingest-http.md, docs/ingest-mqtt.md); most stations report through the Bureau\'s own systems. Raw readings are kept 90 days; hourly and daily rollups are kept indefinitely.');
+    notes.push('No readings in this window. Flood-Net holds only telemetry ingested into it (docs/ingest-http.md, docs/ingest-mqtt.md); most stations report through the Bureau\'s own systems. Raw readings are kept 90 days; hourly and daily rollups are kept indefinitely.');
   }
   if (resolution === 'daily') notes.push('Daily buckets are UTC dates.');
   const nextOffset = offset + shaped.length;
@@ -1934,7 +1937,7 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/stations', op: 'searchStations', summary: 'Search and filter stations; compact rows.' },
   { path: '/api/v1/stations/{id}', op: 'getStation', summary: 'One station\'s full register record, its SLS rows and health.' },
   { path: '/api/v1/stations/{id}/dossier', op: 'getStationDossier', summary: 'Everything a report needs about one station, labelled with its sources.' },
-  { path: '/api/v1/stations/{id}/readings', op: 'getStationReadings', summary: 'Telemetry ingested into MegaNet: raw, hourly or daily, bounded windows.' },
+  { path: '/api/v1/stations/{id}/readings', op: 'getStationReadings', summary: 'Telemetry ingested into Flood-Net: raw, hourly or daily, bounded windows.' },
   { path: '/api/v1/stations/{id}/flood-levels', op: 'getStationFloodLevels', summary: 'Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels and one AHD ladder.' },
   { path: '/api/v1/stations/{id}/service-level', op: 'getStationServiceLevel', summary: 'The station\'s entries in the Service Level Specifications (Queensland; New South Wales and the ACT).' },
   { path: '/api/v1/catchments', op: 'listCatchments', summary: 'The 77 Queensland drainage basins.' },
@@ -1948,10 +1951,10 @@ function rateLimitWords() {
 
 function apiIndex(rc) {
   return {
-    name: 'MegaNet station API',
+    name: 'Flood-Net station API',
     version: API_VERSION,
     read_only: true,
-    description: 'Read-only, public station-level data from MegaNet — the register of the Bureau of Meteorology\'s Queensland (and neighbouring) flood-warning telemetry network: field stations, repeaters, base stations, their Bureau flood-warning details, SLS entries, AEP levels, health, ingested readings and inspection numbers. Useful for drafting assessment reports, and for anything else.',
+    description: 'Read-only, public station-level data from Flood-Net — the register of the Bureau of Meteorology\'s Queensland (and neighbouring) flood-warning telemetry network: field stations, repeaters, base stations, their Bureau flood-warning details, SLS entries, AEP levels, health, ingested readings and inspection numbers. Useful for drafting assessment reports, and for anything else.',
     endpoints: ENDPOINTS.map(e => ({ method: 'GET', path: e.path, summary: e.summary })),
     mcp: { url: `${rc.origin}${MCP_PATH}`, transport: 'Streamable HTTP (POST, JSON responses)', protocol_versions: MCP_VERSIONS },
     openapi: `${rc.origin}${API_PREFIX}/openapi.json`,
@@ -1999,10 +2002,10 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
   const doc = {
     openapi: '3.1.0',
     info: {
-      title: 'MegaNet station API',
+      title: 'Flood-Net station API',
       version: API_VERSION,
-      summary: 'Read-only public station data from the MegaNet telemetry network register.',
-      description: `Read-only, public station-level data from MegaNet (${PUBLIC_ORIGIN}): the register of the Bureau of Meteorology's Queensland flood-warning telemetry network. `
+      summary: 'Read-only public station data from the Flood-Net telemetry network register.',
+      description: `Read-only, public station-level data from Flood-Net (${PUBLIC_ORIGIN}): the register of the Bureau of Meteorology's Queensland flood-warning telemetry network. `
         + `Rate limited (${rateLimitWords().join('; ')}); a 429 carries Retry-After. The same data is served to MCP clients at ${MCP_URL}. `
         + `Documentation: ${DOCS_URL}. ${DISCLAIMER}`,
       license: { name: 'MIT', identifier: 'MIT' },
@@ -2034,7 +2037,7 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
         'Everything an assessment report needs about one station in one call: identity, location, radio, telemetry and health, SLS, Bureau flood details, AEP levels, inspections, nearby stations — each section labelled with its source and status.',
         [idParam], ok('The dossier.')),
       '/api/v1/stations/{id}/readings': op('getStationReadings', 'Get readings',
-        `Telemetry ingested into MegaNet for one station. raw: up to ${LIMITS.windowMaxDays.raw} days; hourly: ${LIMITS.windowMaxDays.hourly}; daily: ${LIMITS.windowMaxDays.daily}. At most ${LIMITS.readingsMax} rows per call.`,
+        `Telemetry ingested into Flood-Net for one station. raw: up to ${LIMITS.windowMaxDays.raw} days; hourly: ${LIMITS.windowMaxDays.hourly}; daily: ${LIMITS.windowMaxDays.daily}. At most ${LIMITS.readingsMax} rows per call.`,
         [
           idParam,
           q('from', 'Start, ISO 8601 date or date-time (default: the window before "to").', { type: 'string' }),
@@ -2191,7 +2194,7 @@ const WINDOWS = new Map();          // key → timestamps (ms), the in-isolate f
 const WINDOW_KEYS_MAX = 10000;
 
 function clientName(request, url) {
-  const raw = request.headers.get(CLIENT_HEADER) || url.searchParams.get('client') || '';
+  const raw = request.headers.get(CLIENT_HEADER) || request.headers.get(LEGACY_CLIENT_HEADER) || url.searchParams.get('client') || '';
   const s = raw.trim();
   return /^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$/.test(s) ? s : null;
 }
@@ -2273,7 +2276,7 @@ function rateDetail(rate) {
 // ── HTTP plumbing ────────────────────────────────────────────────────────────
 
 const EXPOSE = ['ETag', 'Retry-After', 'X-RateLimit-Policy', 'X-RateLimit-Limiter', CLIENT_HEADER,
-  'X-MegaNet-Cache', 'X-MegaNet-Api-Version'].join(', ');
+  'X-FloodNet-Cache', 'X-FloodNet-Api-Version'].join(', ');
 
 function baseHeaders(extra = {}) {
   return {
@@ -2282,7 +2285,7 @@ function baseHeaders(extra = {}) {
     'Access-Control-Expose-Headers': EXPOSE,
     'X-Content-Type-Options': 'nosniff',
     'X-Robots-Tag': 'noindex',
-    'X-MegaNet-Api-Version': API_VERSION,
+    'X-FloodNet-Api-Version': API_VERSION,
     ...extra,
   };
 }
@@ -2301,7 +2304,7 @@ async function etagFor(text) {
 
 const SAFE_REQUEST_HEADERS = /^[A-Za-z0-9 ,_-]{0,512}$/;
 const DEFAULT_ALLOWED_HEADERS = ['Content-Type', 'Accept', 'MCP-Protocol-Version', 'Mcp-Session-Id', 'Mcp-Method',
-  'Mcp-Name', CLIENT_HEADER, 'If-None-Match', 'Last-Event-ID', 'Authorization'].join(', ');
+  'Mcp-Name', CLIENT_HEADER, LEGACY_CLIENT_HEADER, 'If-None-Match', 'Last-Event-ID', 'Authorization'].join(', ');
 
 function preflight(request, isMcp) {
   const asked = request.headers.get('Access-Control-Request-Headers') || '';
@@ -2312,7 +2315,7 @@ function preflight(request, isMcp) {
       'Access-Control-Allow-Methods': isMcp ? 'POST, OPTIONS' : 'GET, HEAD, OPTIONS',
       'Access-Control-Allow-Headers': asked && SAFE_REQUEST_HEADERS.test(asked) ? asked : DEFAULT_ALLOWED_HEADERS,
       'Access-Control-Max-Age': '86400',
-      'X-MegaNet-Api-Version': API_VERSION,
+      'X-FloodNet-Api-Version': API_VERSION,
     },
   });
 }
@@ -2345,7 +2348,7 @@ async function handleRest(request, env, ctx, url) {
   const rc = makeRc(env, ctx, url);
   const sub = url.pathname.slice(API_PREFIX.length) || '/';
   const out = await cachedRoute(rc, sub.startsWith('/') ? sub : `/${sub}`, params);
-  const headers = { ...rateHeaders(rate), 'X-MegaNet-Cache': out.cache };
+  const headers = { ...rateHeaders(rate), 'X-FloodNet-Cache': out.cache };
   if (out.status === 200) {
     const etag = await etagFor(out.text);
     headers.ETag = etag;
@@ -2394,19 +2397,19 @@ export const MCP_VERSIONS = Object.freeze([...MCP_MODERN_VERSIONS, ...MCP_LEGACY
 const MCP_LATEST_LEGACY = '2025-11-25';
 
 const SERVER_INFO = Object.freeze({
-  name: 'meganet',
-  title: 'MegaNet station data (read-only)',
+  name: 'floodnet',
+  title: 'Flood-Net station data (read-only)',
   version: API_VERSION,
-  description: 'Read-only public data about the stations of the Bureau of Meteorology\'s Queensland flood-warning telemetry network, from the MegaNet register.',
+  description: 'Read-only public data about the stations of the Bureau of Meteorology\'s Queensland flood-warning telemetry network, from the Flood-Net register.',
   websiteUrl: PUBLIC_ORIGIN,
 });
 
 export const MCP_INSTRUCTIONS = [
-  'MegaNet (floodwarning.net) is the engineering register of the Bureau of Meteorology\'s Queensland (and neighbouring) flood-warning telemetry network: rainfall and river-height field stations, the repeaters that relay them, base stations, and the radio paths between. This server is READ-ONLY and serves only public data.',
+  'Flood-Net (floodwarning.net) is the engineering register of the Bureau of Meteorology\'s Queensland (and neighbouring) flood-warning telemetry network: rainfall and river-height field stations, the repeaters that relay them, base stations, and the radio paths between. This server is READ-ONLY and serves only public data.',
   'Station ids are lowercase slugs such as "abergowrie_br_al" (a Bureau number also works). Find stations with search_stations or stations_near, then call get_station_dossier for everything about one station in a single call — identity, location, radio, telemetry and health, the Service Level Specification entry, the Bureau\'s flood classes, crossings and gauge zero, AEP levels, inspection numbers and nearby stations, each labelled with its source. Use get_flood_levels or get_service_level when only that is needed.',
   'Heights: flood classes, crossings and flood effects are metres on the gauge, not AHD; AEP levels are modelled metres AHD and indicative only. Say which source a figure came from. Sections report status "ok", "not recorded" or "unavailable" — never read "not recorded" as zero.',
   `Be gentle: ${rateLimitWords().join('; ')}. Cache what you fetch and do not walk the whole network station by station.`,
-  'MegaNet is not a flood warning service. For current warnings and observations, send people to the Bureau of Meteorology (bom.gov.au).',
+  'Flood-Net is not a flood warning service. For current warnings and observations, send people to the Bureau of Meteorology (bom.gov.au).',
 ].join('\n\n');
 
 const idArg = { type: 'string', description: 'Station id, a lowercase slug such as "abergowrie_br_al" (a Bureau station number also works).', maxLength: 64 };
@@ -2467,7 +2470,7 @@ export const MCP_TOOLS = Object.freeze([
   {
     name: 'get_readings',
     title: 'Get readings',
-    description: `Telemetry ingested into MegaNet for one station: raw readings (window up to ${LIMITS.windowMaxDays.raw} days), hourly (${LIMITS.windowMaxDays.hourly} days) or daily rollups (${LIMITS.windowMaxDays.daily} days). Most stations report through the Bureau's own systems, so an empty answer is normal.`,
+    description: `Telemetry ingested into Flood-Net for one station: raw readings (window up to ${LIMITS.windowMaxDays.raw} days), hourly (${LIMITS.windowMaxDays.hourly} days) or daily rollups (${LIMITS.windowMaxDays.daily} days). Most stations report through the Bureau's own systems, so an empty answer is normal.`,
     inputSchema: { type: 'object', properties: {
       id: idArg,
       from: { type: 'string', maxLength: 40, description: 'Start, ISO 8601 date or date-time.' },

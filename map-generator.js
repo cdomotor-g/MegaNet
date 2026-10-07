@@ -509,7 +509,7 @@ function defaults() {
     },
     label: { sizeMm: 2.0 },
     grat: { spacing: 'auto', sizeMm: 2.2 },
-    title: { text: 'MegaNet radio network' },
+    title: { text: 'Flood-Net radio network' },
   };
 }
 
@@ -1245,7 +1245,7 @@ function layerFileName(k) {
   const g = mg.gen.art.contours;
   const lv = k > 0 ? g.levels[k - 1] : null;
   const date = localDateStr();
-  return `meganet-map-${date}-layer-${String(k).padStart(2, '0')}-` +
+  return `floodnet-map-${date}-layer-${String(k).padStart(2, '0')}-` +
          (lv == null ? 'base' : String(lv).replace('.', '_') + 'm') + '.svg';
 }
 
@@ -1823,7 +1823,7 @@ function dlBlob(name, content, type) {
 }
 
 function flatFileName(ext) {
-  return `meganet-map-${localDateStr()}-1to${Math.round(mg.s.scale)}.${ext}`;
+  return `floodnet-map-${localDateStr()}-1to${Math.round(mg.s.scale)}.${ext}`;
 }
 
 // ── Public surface ───────────────────────────────────────────────────────────

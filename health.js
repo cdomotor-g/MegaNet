@@ -1112,7 +1112,7 @@ const Health = (() => {
       <p class="small">${num(c.corrupted)} corrupted copies and ${num(c.ghosts)} ghosts were stored as readings in the window
         (${c.readings ? (100 * (c.corrupted + c.ghosts) / c.readings).toFixed(1) : 0}% of everything stored) — set aside here before anything else
         was worked out. Every address heard is checked against the register: one heard regularly that no station here carries is a station
-        MegaNet does not know about yet.</p>
+        Flood-Net does not know about yet.</p>
       ${reg.length ? `<ul class="hl-flist">${reg.map(f => `<li>${sevHtml(f.severity)} <b>${esc(f.title)}</b> <span class="small">${esc(f.detail)}</span>
         ${f.addr ? `<span class="small"><button class="link-btn" onclick="Health.openAddr('${escAttr(f.addr)}')">its readings</button></span>` : ''}</li>`).join('')}</ul>`
         : '<p class="small">Every address heard matches a station on file, near enough to be heard.</p>'}`;
@@ -1273,7 +1273,7 @@ const Health = (() => {
       ].map(csvEscape).join(','));
     });
     const slug = filtering() ? '-' + [...H.owners].sort().join('-').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) : '';
-    dlText(`meganet-station-health${slug}-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
+    dlText(`floodnet-station-health${slug}-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
     announce(`Downloaded ${F.length} findings as CSV${filtering() ? ', for the owners picked' : ''}.`);
   }
 

@@ -962,7 +962,7 @@ const LinkBudget = (function () {
           <table class="lb-compare-table">
             <caption class="sr-only">What this budget models against what Radio Mobile models, term by term</caption>
             <thead><tr><th scope="col"><span class="sr-only">Term</span></th>
-              <th scope="col">MegaNet</th>
+              <th scope="col">Flood-Net</th>
               <th scope="col">Radio Mobile</th></tr></thead>
             <tbody>${rows.map(([k, mine, rm]) =>
               `<tr><th scope="row">${k}</th><td>${mine}</td><td>${rm}</td></tr>`).join('')}</tbody>

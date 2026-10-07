@@ -3,7 +3,7 @@
 // The facts an agent needs — where the API is, where the MCP server is, and how
 // fast it may ask — are written in seven places: worker/api.js, wrangler.toml,
 // docs/agent-api.md and the five agent instruction files (AGENTS.md, GEMINI.md,
-// .github/copilot-instructions.md, llms.txt, .cursor/rules/meganet-api.mdc).
+// .github/copilot-instructions.md, llms.txt, .cursor/rules/floodnet-api.mdc).
 // There are five of those on purpose — each agent reads its own file and not the
 // others — and that is exactly how they drift: a limit changed in the code and
 // in two files, with three still quoting the old number to every agent that
@@ -38,7 +38,7 @@ const read = rel => {
 };
 
 const DOC = 'docs/agent-api.md';
-const AGENT_FILES = ['AGENTS.md', 'GEMINI.md', '.github/copilot-instructions.md', 'llms.txt', '.cursor/rules/meganet-api.mdc'];
+const AGENT_FILES = ['AGENTS.md', 'GEMINI.md', '.github/copilot-instructions.md', 'llms.txt', '.cursor/rules/floodnet-api.mdc'];
 const RATE_PHRASES = api.RATE_LIMITS.map(r => `${r.limit} requests / ${r.period} s`);
 
 // ── Every file states the same facts ─────────────────────────────────────────
@@ -81,7 +81,7 @@ check(`${DOC} states the page and row caps the code enforces`,
   doc.includes(`${api.LIMITS.listMax} rows per page`) && doc.includes(`${api.LIMITS.readingsMax.toLocaleString('en-AU')} readings per call`)
   && doc.includes(`${api.LIMITS.radiusMaxKm} km search radius`));
 check(`${DOC} names the MCP protocol versions the server speaks`, api.MCP_VERSIONS.filter(v => v !== '2024-11-05').every(v => doc.includes(v)));
-check(`${DOC} carries the About page's disclaimer`, doc.includes('MegaNet is not a flood warning service'));
+check(`${DOC} carries the About page's disclaimer`, doc.includes('Flood-Net is not a flood warning service'));
 
 // ── wrangler.toml declares the bindings the code reads ───────────────────────
 
@@ -115,7 +115,7 @@ const listItems = lines.filter(l => l.startsWith('- '));
 check('every llms.txt list item is a link', listItems.length > 0 && listItems.every(l => /^- \[[^\]]+\]\([^)]+\)/.test(l)),
   listItems.filter(l => !/^- \[[^\]]+\]\([^)]+\)/.test(l)).join(' | '));
 
-const mdc = read('.cursor/rules/meganet-api.mdc') || '';
+const mdc = read('.cursor/rules/floodnet-api.mdc') || '';
 const fm = /^---\n([\s\S]*?)\n---\n/.exec(mdc);
 check('the Cursor rule has frontmatter with a description and alwaysApply',
   fm && /^description: \S/m.test(fm[1]) && /^alwaysApply: (true|false)$/m.test(fm[1]));

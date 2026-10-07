@@ -258,6 +258,15 @@ jobs:
         working-directory: test
         run: npm run steps
 
+      # Parse-only too. The app was renamed MegaNet → Flood-Net in what people
+      # read, while the code's comments, the schema and the repository kept the
+      # old name — so a new label written beside one of those comments brings
+      # it back on screen. Every string literal, the two pages and the agent
+      # files, held to the new name.
+      - name: Nothing a person reads says MegaNet
+        working-directory: test
+        run: npm run brand
+
       # Node-only and fast, so it runs before a browser is launched. The HFEM
       # codec's tests ARE the specification restated — there is no sample
       # capture, the spec's ten worked examples are the only oracle, and the

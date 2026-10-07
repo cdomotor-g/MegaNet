@@ -2,7 +2,7 @@
 
 **Decided:** 11 August 2026 · **Ticket:** [#71](https://github.com/cdomotor-g/MegaNet/issues/71), under epic [#70](https://github.com/cdomotor-g/MegaNet/issues/70) · **Status:** in force
 
-MegaNet's datastore is **Postgres, hosted on Supabase**, in a **dedicated free-tier
+Flood-Net's datastore is **Postgres, hosted on Supabase**, in a **dedicated free-tier
 project** (`MegaNet`, ref `jjprlritvhdqpvphfrnu`) in **`ap-southeast-2` (Sydney)**,
 with all schema kept as plain SQL in [`db/migrations/`](../db/migrations/) and
 applied with `psql`.
@@ -62,13 +62,13 @@ neither a slot nor a restore window.
 `meganet` schema inside the existing free project. A dedicated project was created
 instead, and that is the better call now that the org has room for it: the 500 MB
 quota and the pause timer are both *per project*, so sharing one would couple
-MegaNet's headroom and its uptime to an unrelated app's usage. It also keeps the
-anon key scoped to data MegaNet owns — a key shared across apps is a key that
+Flood-Net's headroom and its uptime to an unrelated app's usage. It also keeps the
+anon key scoped to data Flood-Net owns — a key shared across apps is a key that
 leaks two apps' data at once.
 
 **Still a `meganet` schema inside it**, rather than dumping tables in `public`.
 `public` is where Supabase's own machinery and every copy-pasted snippet land by
-default. Keeping our tables out of it means "what belongs to MegaNet" is
+default. Keeping our tables out of it means "what belongs to Flood-Net" is
 answerable by listing one schema, and nothing arrives there by accident. It costs
 one line of config (see `db/README.md`) and an `Accept-Profile` header per request.
 

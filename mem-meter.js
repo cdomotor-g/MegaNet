@@ -306,7 +306,7 @@ const MemMeter = (function () {
           <h2 id="mem-title">Memory this page is holding</h2>
           <button class="modal-x" title="Close (Esc)" onclick="MemMeter.closePanel()">×</button>
         </div>
-        <p class="sub">Our own accounting of what MegaNet is keeping in memory — cheap to compute
+        <p class="sub">Our own accounting of what Flood-Net is keeping in memory — cheap to compute
            (lengths recorded when each piece loaded, map layers counted off the registry the map
            already keeps), not a walk of the object graph. Estimates, not exact byte counts.</p>
         <table class="mem-table">

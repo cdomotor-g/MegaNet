@@ -2305,7 +2305,7 @@ const ArroData = (function () {
       <div class="panel ad-panel">
         <div class="panel-header"><h2 id="ad-field-h">Field readings</h2>
           <span class="small"
-                title="Every reading on this tab comes from the MegaNet datastore. ARRO exports live on the ARRO Data tab and the two are never mixed."
+                title="Every reading on this tab comes from the Flood-Net datastore. ARRO exports live on the ARRO Data tab and the two are never mixed."
                 >${esc(dbHostLabel())}</span></div>
 
         <label class="ad-cfg-row ad-cfg-row--block">
@@ -2607,7 +2607,7 @@ const ArroData = (function () {
     const capped = vis.some(s => s.prov.capped);
     return `
       <div class="ad-prov" role="note">
-        <span class="ad-badge ad-badge--src" title="These readings came out of the MegaNet datastore, not from ARRO. The two are never combined.">Field data</span>
+        <span class="ad-badge ad-badge--src" title="These readings came out of the Flood-Net datastore, not from ARRO. The two are never combined.">Field data</span>
         <span class="mono small">${esc(vis[0].prov.host)}</span>
         <span>·</span>
         <b>${esc(res.map(r => AD_RES_LABEL[r]).join(' + '))}</b>
@@ -2818,7 +2818,7 @@ const ArroData = (function () {
           ${s.prov ? `
             <div class="small ad-series-meta">
               <span class="ad-badge ad-badge--src"
-                    title="From the MegaNet datastore. Never mixed with an ARRO export.">Field</span>
+                    title="From the Flood-Net datastore. Never mixed with an ARRO export.">Field</span>
               <span class="mono">${esc(s.prov.addr)}</span> ·
               <span title="Which table this was drawn from">${esc(AD_RES_LABEL[s.prov.res])}</span>
               ${dupSummary(s)}
@@ -3814,7 +3814,7 @@ const ArroData = (function () {
     return `
       <div class="ad-empty">
         <h2>Our own telemetry</h2>
-        <p>Readings that field stations sent us, out of the MegaNet datastore — pick a station,
+        <p>Readings that field stations sent us, out of the Flood-Net datastore — pick a station,
            its sensors and a window on the left.</p>
         <p>The chart, the Bureau's 3-5-7 continuity filter and the inspector are the ARRO Data
            tab's, unchanged. What is different is where the numbers came from, and this tab never
@@ -6502,7 +6502,7 @@ const ArroData = (function () {
         if (which === 'kept' && f.status[i] !== AD_GOOD) continue;
         const via = e.paths ? e.paths[i] : null;
         const r = [
-          'MegaNet field data', p.host || dbHostLabel(), AD_RES_LABEL[p.res] || p.res || '',
+          'Flood-Net field data', p.host || dbHostLabel(), AD_RES_LABEL[p.res] || p.res || '',
           p.addr || '', s.station?.name || '', s.station?.station_number || '',
           s.sensor?.type || '',
           fmtFull(s.t[i]), fmtFull(s.tr[i]), s.v[i], s.unit,
@@ -6520,7 +6520,7 @@ const ArroData = (function () {
       }
     }
     const res = [...new Set(vis.map(s => s.prov?.res).filter(Boolean))].join('-') || 'field';
-    const base = vis.length > 1 ? 'meganet_field' : `meganet_field_${slug(vis[0].label) || 'series'}`;
+    const base = vis.length > 1 ? 'floodnet_field' : `floodnet_field_${slug(vis[0].label) || 'series'}`;
     dlText(`${base}_${res}_${which === 'kept' ? '357filtered' : 'verdict'}.csv`, lines.join('\n'));
     note(`Exported ${rows.toLocaleString()} rows of field data.`);
   }
@@ -6537,7 +6537,7 @@ const ArroData = (function () {
     if (!vis.length) return 0;
     const p = vis[0].prov;
     const res = [...new Set(vis.map(s => s.prov.res))].map(r => AD_RES_LABEL[r]).join(' + ');
-    const line = `MegaNet field data · ${p.host} · ${res} · `
+    const line = `Flood-Net field data · ${p.host} · ${res} · `
                + `${fmtFull(Math.min(...vis.map(s => s.prov.t0)))} to ${fmtFull(Math.max(...vis.map(s => s.prov.t1)))}`;
     const c = theme();
     clone.setAttribute('viewBox', `0 0 ${w} ${h + AD_STAMP_H}`);
@@ -6564,7 +6564,7 @@ const ArroData = (function () {
     const clone = svg.cloneNode(true);
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     const grew = stampProvenance(clone, ad.w, ad.h);
-    const base = ad.source === 'field' ? 'meganet-field-chart' : 'arro-chart';
+    const base = ad.source === 'field' ? 'floodnet-field-chart' : 'arro-chart';
     const text = new XMLSerializer().serializeToString(clone);
     if (fmt === 'svg') {
       const a = Object.assign(document.createElement('a'), {

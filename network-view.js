@@ -1575,7 +1575,7 @@ const NetworkView = (function () {
         e.reciprocal, e.sameSite, e.evidence.join('; '),
       ].map(csvEscape).join(','));
     }
-    dlText('meganet_ghosting_links.csv', lines.join('\n'));
+    dlText('floodnet_ghosting_links.csv', lines.join('\n'));
   }
 
   // ── control handlers ──────────────────────────────────────────────────────────

@@ -210,11 +210,11 @@ export async function run({
       if (before.length <= 20) {
         for (const e of before) {
           const had = known.get(e.ref);
-          note(e, 'skipped', had.deleted_at ? 'removed from MegaNet — not brought back' : 'already imported', had.id);
+          note(e, 'skipped', had.deleted_at ? 'removed from Flood-Net — not brought back' : 'already imported', had.id);
         }
       } else {
         const gone = before.filter(e => known.get(e.ref).deleted_at).length;
-        log(`  ${before.length} imported before${gone ? ` (${gone} of them since removed from MegaNet)` : ''} — skipped`);
+        log(`  ${before.length} imported before${gone ? ` (${gone} of them since removed from Flood-Net)` : ''} — skipped`);
       }
     }
 
@@ -302,7 +302,7 @@ export async function run({
       }
       got.sha = r.sha;
       const dup = await db.select(`field_photo?select=id&sha256=eq.${r.sha}&deleted_at=is.null&limit=1`);
-      if (dup.length) return { result: 'skipped', outcome: 'duplicate', reason: 'the same photo is already in MegaNet', id: dup[0].id };
+      if (dup.length) return { result: 'skipped', outcome: 'duplicate', reason: 'the same photo is already in Flood-Net', id: dup[0].id };
 
       const id = uuid();
       const path = `photo/${id}.${r.ext}`;
@@ -334,7 +334,7 @@ export async function run({
         // word MegaNet does not have: an origin before the migration that adds
         // it. Every photo after this one would be refused the same way, so the
         // run stops here and says why.
-        if (err && err.status === 409 && err.code !== '23503') return { result: 'skipped', outcome: 'duplicate', reason: 'already in MegaNet (the database said so)', id: err.details || null };
+        if (err && err.status === 409 && err.code !== '23503') return { result: 'skipped', outcome: 'duplicate', reason: 'already in Flood-Net (the database said so)', id: err.details || null };
         if (err && err.code === '23503') err.fatal = err.refused = true;
         else if (err && err.status === 400) err.refused = true;
         throw err;

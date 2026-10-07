@@ -957,7 +957,7 @@ const SerialSdr = (function () {
     p.info = Object.assign({}, p.info, info);
     if (Number(info.schema) > SdrPi.SCHEMA && !p.saidSchema) {
       p.saidSchema = true;
-      note(c, 'The Pi speaks schema ' + info.schema + '; this page knows ' + SdrPi.SCHEMA + '. What it adds is passed over — reload MegaNet for the newest card.', 'warn');
+      note(c, 'The Pi speaks schema ' + info.schema + '; this page knows ' + SdrPi.SCHEMA + '. What it adds is passed over — reload Flood-Net for the newest card.', 'warn');
     }
     piInfo(c);
   }
@@ -1682,7 +1682,7 @@ const SerialSdr = (function () {
     if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="qs-dim">No readings yet. Each frame the decoder accepts appears here.</td></tr>'; return; }
     tb.innerHTML = rows.map(r => '<tr><td>' + (r.t != null ? SerialViz.hhmm(r.t, true) : '<span class="qs-dim" title="From the log\'s history, and the Pi\'s clock was not set">—</span>') + '</td>'
       + '<td class="qs-num">' + r.sensorId + '</td>'
-      + '<td>' + (r.name ? esc(r.name) : '<span class="qs-dim">not in MegaNet</span>') + chanTag(c, r) + '</td>'
+      + '<td>' + (r.name ? esc(r.name) : '<span class="qs-dim">not in Flood-Net</span>') + chanTag(c, r) + '</td>'
       + '<td class="qs-num">' + r.value + '</td>'
       + '<td class="qs-num">' + r.votes + '</td>'
       + '<td class="col-optional">' + esc((AlertDsp.FORMATS.find(x => x.key === r.format) || {}).label || r.format) + (r.polarity === 'NEG' ? ' · inverted' : '') + '</td>'

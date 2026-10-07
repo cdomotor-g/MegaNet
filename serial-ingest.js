@@ -218,7 +218,7 @@ const SerialIngest = (function () {
       g.refused = true;
       stop(c, 'The database refused the ingest token (' + res.status + ') — it is mistyped, or it has been revoked. Nothing is lost: '
         + g.queue.length + ' reading' + (g.queue.length === 1 ? ' is' : 's are') + ' kept to send once a working token is in.');
-      announce((c.name || 'Card') + ' — the ingest token was refused; sending to MegaNet stopped');
+      announce((c.name || 'Card') + ' — the ingest token was refused; sending to Flood-Net stopped');
       renderCard(c);
     } else if (res.status === 400) {
       // The contract was misread, by this file: the batch would fail the same
@@ -244,7 +244,7 @@ const SerialIngest = (function () {
   // ── the receiver describes itself ─────────────────────────────────────────
 
   function detail(c) {
-    const d = { app: 'MegaNet Serial Monitor', via: c.kind === 'sdr' ? (c.source === 'file' ? 'IQ replay' : c.source === 'pi' ? 'Raspberry Pi, log file' : 'USB')
+    const d = { app: 'Flood-Net Serial Monitor', via: c.kind === 'sdr' ? (c.source === 'file' ? 'IQ replay' : c.source === 'pi' ? 'Raspberry Pi, log file' : 'USB')
       : c.follow ? 'log file' : 'COM port', browser: (navigator.userAgent || '').slice(0, 160) };
     if (c.kind === 'quansheng' && c.radio) {
       const sc = c.radio.schema || {};
@@ -339,8 +339,8 @@ const SerialIngest = (function () {
     }, 60000);
     report(c);
     schedule(c, 0);
-    if (!quiet) announce((c.name || 'Card') + ' — sending readings to MegaNet');
-    if (quiet && typeof Serial !== 'undefined') Serial.logLine(c, 'Sending readings to MegaNet again, as this receiver was last time', 'sys');
+    if (!quiet) announce((c.name || 'Card') + ' — sending readings to Flood-Net');
+    if (quiet && typeof Serial !== 'undefined') Serial.logLine(c, 'Sending readings to Flood-Net again, as this receiver was last time', 'sys');
   }
   function stop(c, why) {
     const g = c.ingest;
@@ -361,7 +361,7 @@ const SerialIngest = (function () {
       start(c);
     } else {
       stop(c);
-      announce((c.name || 'Card') + ' — stopped sending readings to MegaNet');
+      announce((c.name || 'Card') + ' — stopped sending readings to Flood-Net');
     }
     renderCard(c);
   }
@@ -441,10 +441,10 @@ const SerialIngest = (function () {
     const cards = Serial.list().filter(x => RECEIVER[kindOf(x)] && !isDemo(x));
     const token = newToken();
     const payload = { label: computerLabel(), detail: {
-      app: 'MegaNet Serial Monitor', browser: (navigator.userAgent || '').slice(0, 160),
+      app: 'Flood-Net Serial Monitor', browser: (navigator.userAgent || '').slice(0, 160),
       receivers: cards.map(x => ({ kind: RECEIVER[kindOf(x)], name: x.ingest ? point(x).name : (x.name || KIND_LABEL[kindOf(x)]) })).slice(0, 8),
     } };
-    pairBusy = true; pairMsg = 'Asking MegaNet…'; renderAll();
+    pairBusy = true; pairMsg = 'Asking Flood-Net…'; renderAll();
     try {
       const { res, out } = await pairCall('request_ingest_token', token, payload);
       if (res.ok && out && out.code) {
@@ -453,7 +453,7 @@ const SerialIngest = (function () {
                       askedBy: c && c.ingest ? [point(c).pointId] : [] };
         save(s);
         pairMsg = '';
-        announce('Asked MegaNet for a token. Code ' + out.code.split('').join(' ') + ' — an administrator approves it on the Admin tab.');
+        announce('Asked Flood-Net for a token. Code ' + out.code.split('').join(' ') + ' — an administrator approves it on the Admin tab.');
         pollPair();
       } else if (res.status === 404) {
         pairMsg = 'The database cannot take requests yet (migration 0048 is not applied there). An administrator can make a token on the Admin tab instead.';
@@ -502,7 +502,7 @@ const SerialIngest = (function () {
           withdrawn: 'The request was withdrawn.',
           expired:   'Nobody approved it within half an hour — ask again for a new code.',
           revoked:   'That token has been revoked — ask again.',
-        }[st.status] || 'MegaNet no longer has the request — ask again.';
+        }[st.status] || 'Flood-Net no longer has the request — ask again.';
         announce(pairMsg);
       }
       renderAll();
@@ -530,7 +530,7 @@ const SerialIngest = (function () {
         + '<p class="qs-small">Waiting for an administrator to approve this computer'
         + (s.pending.label ? ' (“' + esc(s.pending.label) + '”)' : '') + '. The code is</p>'
         + '<p><span class="adm-req-code" aria-label="' + esc(s.pending.code.split('').join(' ')) + '">' + esc(s.pending.code) + '</span></p>'
-        + '<p class="qs-small">On a phone or computer signed in to MegaNet as an administrator: <strong>Admin</strong> → '
+        + '<p class="qs-small">On a phone or computer signed in to Flood-Net as an administrator: <strong>Admin</strong> → '
         + '<strong>Ingest tokens</strong> → <strong>Waiting for approval</strong>. Check the code matches, then Approve — '
         + 'this card starts sending by itself.' + (isFinite(until) ? ' The code lasts until ' + esc(until.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) + '.' : '') + '</p>'
         + '<button type="button" class="ghost" onclick="SerialIngest.cancelPair()">Stop asking</button></div>';
@@ -674,9 +674,9 @@ const SerialIngest = (function () {
   function panel(c, open) {
     if (!RECEIVER[kindOf(c)]) return '';
     if (isDemo(c)) {
-      return '<details class="qs-ctl ing-ctl" id="ing-' + c.id + '"><summary>Send to MegaNet <span class="qs-dim">· never, from a demo</span></summary>'
+      return '<details class="qs-ctl ing-ctl" id="ing-' + c.id + '"><summary>Send to Flood-Net <span class="qs-dim">· never, from a demo</span></summary>'
         + '<p class="qs-hint">A demo card\'s readings are made up, so it never sends them. Add a real ' + KIND_LABEL[kindOf(c)]
-        + ' card to make this computer a base station that posts what it hears into MegaNet.</p></details>';
+        + ' card to make this computer a base station that posts what it hears into Flood-Net.</p></details>';
     }
     const g = state_(c), p = point(c), id = c.id, s = load();
     const loc = p.loc || { source: 'none' };
@@ -684,8 +684,8 @@ const SerialIngest = (function () {
     const radio = (v) => '<label class="ser-check"><input type="radio" name="ing-loc-' + id + '" value="' + v + '"'
       + (loc.source === v ? ' checked' : '') + ' onchange="SerialIngest.setLocSource(\'' + id + '\',this.value)"> ' + esc(LOC_LABEL[v]) + '</label>';
     return '<details class="qs-ctl ing-ctl" id="ing-' + id + '"' + (open || g.on ? ' open' : '') + '>'
-      + '<summary>Send to MegaNet <span class="qs-dim" id="ing-sum-' + id + '">' + esc(summary(c)) + '</span></summary>'
-      + '<p class="qs-hint">Makes this computer a base station: every reading this card decodes is posted into MegaNet\'s database '
+      + '<summary>Send to Flood-Net <span class="qs-dim" id="ing-sum-' + id + '">' + esc(summary(c)) + '</span></summary>'
+      + '<p class="qs-hint">Makes this computer a base station: every reading this card decodes is posted into Flood-Net\'s database '
       + 'the way a base station\'s logger posts them, tagged with this receiver so its readings can be told from every other ingest point\'s. '
       + '<a href="docs/ingest-serial-monitor.md" target="_blank" rel="noopener">How it works, and getting a token</a></p>'
       + (demo ? '<p class="qs-hint txt-warn">A demo card\'s readings are made up, so it never sends them.</p>' : '')
@@ -709,7 +709,7 @@ const SerialIngest = (function () {
       + '<p class="qs-small" id="ing-loc-text-' + id + '">' + esc(locText(loc)) + '</p></fieldset>'
       + '<div class="ser-actions">'
       + '<label class="ser-check"><input type="checkbox"' + (g.on ? ' checked' : '') + (demo ? ' disabled' : '')
-      + ' onchange="SerialIngest.toggle(\'' + id + '\',this.checked)"> send this card\'s readings to MegaNet</label>'
+      + ' onchange="SerialIngest.toggle(\'' + id + '\',this.checked)"> send this card\'s readings to Flood-Net</label>'
       + (g.on ? '<button type="button" class="ghost" onclick="SerialIngest.sendNow(\'' + id + '\')">Send now</button>' : '')
       + '</div>'
       + '<p class="ing-status" id="ing-status-' + id + '"></p>'

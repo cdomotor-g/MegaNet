@@ -2,7 +2,7 @@
 
 A CRBasic program for a Campbell Scientific datalogger sitting at a radio base
 station. It reads what the ALERT2 receiver hears off RS-232 and sends it to
-MegaNet **twice**: a POST to the ingest endpoint, and a publish to the MQTT
+Flood-Net **twice**: a POST to the ingest endpoint, and a publish to the MQTT
 broker that [`bridge/`](../bridge/README.md) subscribes to.
 
 ```
@@ -201,7 +201,7 @@ one body and the addresses sort themselves out at the far end.
 
 `battery` is the one to commission first: it needs nothing wired to it, so a
 logger with every sensor still in its box can already answer *is this station
-reaching MegaNet*.
+reaching Flood-Net*.
 
 All four report every `LOCAL_EVERY` minutes (5 by default), which is also the
 rainfall accumulation period — the tips are totalised across it and the interval's
@@ -474,7 +474,7 @@ Then read the Public table, in this order:
 | `MqttPublished` | `1` |
 | `QDepth` | back to `0` — **only once both have sent it** |
 
-Then find it in MegaNet: the **Message Log** tab, filtered to your `path`. A
+Then find it in Flood-Net: the **Message Log** tab, filtered to your `path`. A
 reading that got as far as `Accepted` is in the database.
 
 Type the same line again and `Duplicates` goes to `1` while `Accepted` stays at
@@ -621,7 +621,7 @@ terminals*, above, for what each channel is and where it is wired.
 | `Rain_total_mm` | Since the program started. Not sent; it is here so a bench test can be checked against a measuring cylinder. |
 | `Level1_m`, `Level2_m` | Metres, or `NAN` for a sensor that did not answer. |
 | `Rain_bucket` | Millimetres per tip. `Public`, so it can be corrected at the logger — and it travels with each reading in `conversion`, so correcting it does not rewrite what is already stored. |
-| `LocName()`, `LocUnit()`, `LocConv()` | The channel table, so what this logger sends can be checked against MegaNet's station row on one screen. |
+| `LocName()`, `LocUnit()`, `LocConv()` | The channel table, so what this logger sends can be checked against Flood-Net's station row on one screen. |
 
 ### Is the self-test armed
 
@@ -694,7 +694,7 @@ the same words so the two blocks can be read side by side.
 **There is no accepted / duplicates / rejected row here, and that absence is the
 honest one.** MQTT gives a publisher no response channel at all. The PUBACK
 behind `MqttResult = 0` is from the *broker*, and means the broker has the
-message — not that MegaNet has it. Anything more would be the program inventing
+message — not that Flood-Net has it. Anything more would be the program inventing
 a confirmation nobody sent it.
 
 Where the readings actually went is answerable, just not from the logger: the
@@ -956,7 +956,7 @@ minus this logger's time of day:
 
 - **near zero** — the two clocks agree, and the frame time is UTC.
 - **a whole number of hours** — that is the answer to the question above, and
-  worth telling MegaNet about: it would let a future version use the frame time,
+  worth telling Flood-Net about: it would let a future version use the frame time,
   which is the more accurate of the two.
 - **drifting** — the receiver, or this logger, is losing time.
 
@@ -1090,7 +1090,7 @@ what it is trying to do is right.
 **It does not convert counts to millimetres.** `value_raw` is the 11-bit number
 that came off the air. A base station hearing forty sites does not know which is
 a rain gauge and which is a level sensor, and a wrong bucket size is worse than
-no bucket size — MegaNet does the conversion where it knows the sensor.
+no bucket size — Flood-Net does the conversion where it knows the sensor.
 
 **It does not decode HFEM.** An HFEM line (`:HS=1|I1=…|NN:`) is a different
 format from a different kind of station, and [`hfem.js`](../hfem.js) is the

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Two pages, which is genuinely all there is: MegaNet is a single-page
+  Two pages, which is genuinely all there is: Flood-Net is a single-page
   application, so every tab beyond the first is a state of "/" rather than a URL
   a crawler could fetch. Listing them would be listing the same document under
   twenty names. See docs/floodwarning-net.md.

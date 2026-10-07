@@ -30,7 +30,7 @@ gets wrong.
 - **Burst bits** — each burst's demodulated 300-baud bits (BST `bits_hex`), newest on
   top. The dashboard re-decodes them (alertmon.py's UART scan, ported) and boxes each
   frame: green for frames the radio reported, amber for frames in the bits it did not.
-- **Readings** — every DEC: time, address, station (MegaNet's name, else the radio's),
+- **Readings** — every DEC: time, address, station (Flood-Net's name, else the radio's),
   value in engineering units, format, RSSI and a fade-margin bar on the RSSI scale.
   Pick a time to see its 32 payload bits coloured by role, and open it in ALERT Packets.
 - **Stations heard** — per address: last value, how often heard, mean and worst fade
@@ -49,8 +49,8 @@ All go through the console, one command at a time, each ending on its `OK` or `E
   back. Frequency, squelch level and census only answer while the ALERT app runs.
 - **Flash log** — state, download (all or the newest *n*) as CSV with the DEC field
   names as the header, erase, and format (only when the region holds foreign data).
-- **Station table** — state, look up an address (the radio's name beside MegaNet's),
-  and **build MegaNet's table and upload it**: the same structure `gen_stations.py`
+- **Station table** — state, look up an address (the radio's name beside Flood-Net's),
+  and **build Flood-Net's table and upload it**: the same structure `gen_stations.py`
   builds for the firmware — stations.json first, the legacy address file as fallback,
   names to 40 characters — checked against every rule the firmware relies on before it
   is offered for upload. Upload is `STN BEGIN`, 64-byte `STN W` lines, `STN END`, and

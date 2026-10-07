@@ -1,6 +1,6 @@
 # The SDR Pi's serial interface
 
-What MegaNet's SDR receiver on a Raspberry Pi (`sdr-pi/relay.js`,
+What Flood-Net's SDR receiver on a Raspberry Pi (`sdr-pi/relay.js`,
 [`sdr-pi.md`](sdr-pi.md)) sends on its serial port, and what it accepts. Written
 for people and for software agents: a client built from this page alone should
 work. `sdr-pi.js` is both ends of it in code — the relay writes with it, the
@@ -15,7 +15,7 @@ kept on purpose so the two receivers read alike. **Schema 1.**
 
 | | |
 |---|---|
-| Pi 4 / Pi 5, USB-C | a USB CDC ACM device (VID `0x1d6b`, PID `0x0104`, product "MegaNet SDR Pi"). Windows: *USB Serial Device (COMn)*, its own driver. The Pi's end is `/dev/ttyGS0`. Any speed. |
+| Pi 4 / Pi 5, USB-C | a USB CDC ACM device (VID `0x1d6b`, PID `0x0104`, product "Flood-Net SDR Pi"). Windows: *USB Serial Device (COMn)*, its own driver. The Pi's end is `/dev/ttyGS0`. Any speed. |
 | any Pi, GPIO UART | pins 8 (Pi TX) and 10 (Pi RX), ground on 6, 3.3 V. **115200 8N1**, no flow control. The Pi's end is `/dev/serial0`. |
 | TCP (`--tcp PORT`) | Raw or Telnet. A Telnet client is answered `IAC WILL ECHO`, `IAC WILL SUPPRESS-GO-AHEAD`, and the Pi echoes; a Raw one is not echoed. |
 
@@ -79,7 +79,7 @@ trustworthy (NTP synchronised, or set by `TIME`), else empty.
 
 ### SDRPI — who is talking (key, value pairs)
 
-`SDRPI,version,1.0.0,schema,1,run,742054db,host,meganet-pi,source,usb,stick,RTLSDRBlog Blog V4 s/n 00000001,model,RTL-SDR Blog V4 (R828D),tuner,R828D,min_hz,500000,max_hz,1766000000,gains,0;9;14;…;496,bias_tee,1,direct,0,upconverter,1,node,v18.19.0`
+`SDRPI,version,1.0.0,schema,1,run,742054db,host,floodnet-pi,source,usb,stick,RTLSDRBlog Blog V4 s/n 00000001,model,RTL-SDR Blog V4 (R828D),tuner,R828D,min_hz,500000,max_hz,1766000000,gains,0;9;14;…;496,bias_tee,1,direct,0,upconverter,1,node,v18.19.0`
 
 `gains` are the tuner's steps in tenths of a dB, `;`-separated. `source` is `usb`,
 `rtl_sdr` or `file`. Keys may be added.
@@ -110,7 +110,7 @@ again. `freq` MHz; `offset` kHz; `gain` dB or `auto`; `more` the other channels
 | burst | int | the `BURST` it came from (its `seq`); empty when decoding is not gated |
 | peak_dbfs, nf_dbfs, burst_ms | | that burst's peak, the channel floor, its length |
 | freq_hz | int | the channel it was heard on: the stick's own (its frequency plus the offset), or one of `more` |
-| name, kind | | MegaNet's name for the address, as the Quansheng radio's table names it (`stations.json`), and `RAIN` `LVL` `BATT` `REP` `SNSR` `CHK`; empty when unknown |
+| name, kind | | Flood-Net's name for the address, as the Quansheng radio's table names it (`stations.json`), and `RAIN` `LVL` `BATT` `REP` `SNSR` `CHK`; empty when unknown |
 
 Bit-flip shadows (a frame within two bits of one with three times its votes) are
 never sent as `RX`; they are in the decode's `TRACE`.
@@ -224,7 +224,7 @@ Settings and their units:
 | `squelch` | dB over the channel floor a burst must rise, 2–40 |
 | `offset` | the decoder's channel from the centre, kHz; within `rate/2 − 12` kHz |
 | `more` | the channels decoded besides the stick's own, at once: MHz, with `;`, `,` or spaces between, each followed by `/EIF`, `/ABF` or `/ASC` when sent in another format than `fmt`; `none` for none. At most 7, each within `rate/2 − 12` kHz of `freq`; no frequency twice, not even in two formats — Enhanced iFLOWS read off a strong Binary burst makes CRC-valid ghosts. |
-| `bias` | `on`/`off` — in `CFG` with no confirmation (MegaNet's card asks before it sends one) |
+| `bias` | `on`/`off` — in `CFG` with no confirmation (Flood-Net's card asks before it sends one) |
 | `direct` | `auto` `off` `i` `q` (V3 HF direct sampling) |
 | `model` | `auto` `v2` `v3` `v4` `r820t` `r828d` `fc0013` `fc0012` — reopens the stick |
 | `spec`, `lvl` | seconds between `SPEC` / `LVL` records, 0 for none |

@@ -1,7 +1,7 @@
-# ELPRO 115E-2 → MegaNet: test unit setup card
+# ELPRO 115E-2 → Flood-Net: test unit setup card
 
 **For the technician configuring the test unit.** One sitting, about an hour.
-You do not need to know anything about MegaNet, and you should not need to read
+You do not need to know anything about Flood-Net, and you should not need to read
 anything else. If a value is not on this card it will be on the **settings sheet**
 that came with it — every `▢` below is a line on that sheet.
 

@@ -1,4 +1,4 @@
-# MegaNet — https://floodwarning.net
+# Flood-Net — https://floodwarning.net
 #
 # Everything a visitor can see, a crawler may read. That is not indifference:
 # a categorisation feed decides what this site is by fetching it, and a name it

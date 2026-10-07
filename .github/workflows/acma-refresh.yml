@@ -39,11 +39,11 @@ jobs:
       - name: Download ACMA extract
         run: |
           curl -fSL --retry 3 --retry-delay 15 \
-            -A "MegaNet-flood-telemetry-interference-check (+https://github.com/${{ github.repository }})" \
+            -A "FloodNet-flood-telemetry-interference-check (+https://github.com/${{ github.repository }})" \
             -o /tmp/spectra_rrl.zip "$ACMA_ZIP_URL"
           ls -l /tmp/spectra_rrl.zip
 
-      - name: Prefilter to MegaNet-relevant subset
+      - name: Prefilter to Flood-Net-relevant subset
         run: python3 tools/acma_prefilter.py --zip /tmp/spectra_rrl.zip
              --stations stations.json --out data/acma-raw
 

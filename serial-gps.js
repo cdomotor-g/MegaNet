@@ -204,7 +204,7 @@ const SerialGps = (function () {
       + Serial.followHtml(c)
       + '<div class="qs-status" id="gps-status-' + c.id + '"></div>'
       + '<p class="qs-hint">Every receiver card on this tab stamps what it hears with this position while the fix is fresh '
-      + '(under 10 s old), and a receiver sending to MegaNet can use it as its location — the one kind the database records as exact. '
+      + '(under 10 s old), and a receiver sending to Flood-Net can use it as its location — the one kind the database records as exact. '
       + 'Open the <button type="button" class="link-btn" onclick="switchTab(\'reception\')">Reception Map</button> to see where things were heard.</p>'
       + '<details class="qs-ctl" open><summary>Raw stream</summary>' + Serial.statsHtml(c) + Serial.logHtml(c) + '</details>'
       + '</div>';

@@ -142,11 +142,11 @@ function renderExportHtml() {
               <caption class="sr-only">The five files "Generate &amp; Download All" produces, and what each holds</caption>
               <thead><tr><th scope="col">File</th><th scope="col">Contents</th></tr></thead>
               <tbody>
-                <tr><td><code>MegaNet.csv</code></td>        <td class="small">Master config — version, map/land paths, $Include list</td></tr>
-                <tr><td><code>MegaNet_Network.csv</code></td><td class="small">One row per selected repeater, propagation parameters</td></tr>
-                <tr><td><code>MegaNet_Unit.csv</code></td>   <td class="small">All units (repeaters + pass-range matched field stations)</td></tr>
-                <tr><td><code>MegaNet_System.csv</code></td> <td class="small">Transmitter/receiver system specs</td></tr>
-                <tr><td><code>MegaNet_NetData.csv</code></td><td class="small">Network membership matrix (heights, system IDs, roles)</td></tr>
+                <tr><td><code>FloodNet.csv</code></td>        <td class="small">Master config — version, map/land paths, $Include list</td></tr>
+                <tr><td><code>FloodNet_Network.csv</code></td><td class="small">One row per selected repeater, propagation parameters</td></tr>
+                <tr><td><code>FloodNet_Unit.csv</code></td>   <td class="small">All units (repeaters + pass-range matched field stations)</td></tr>
+                <tr><td><code>FloodNet_System.csv</code></td> <td class="small">Transmitter/receiver system specs</td></tr>
+                <tr><td><code>FloodNet_NetData.csv</code></td><td class="small">Network membership matrix (heights, system IDs, roles)</td></tr>
               </tbody>
             </table>
           </div>
@@ -278,15 +278,15 @@ function runExport() {
   const units    = [...unitMap.values()];
   const unitRmId = new Map(units.map((u, i) => [u.id, i + 1]));
 
-  // MegaNet.csv
+  // FloodNet.csv
   const megaNetCsv = [
     'Radio Mobile', '$Version', '4000', '","',
     '$Map', paths.map || '', '$Picture', paths.jpg || '', paths.jpg || '',
     '$Land', paths.land || '',
-    '$Include', 'MegaNet_Network.csv', 'MegaNet_Unit.csv', 'MegaNet_System.csv', 'MegaNet_NetData.csv',
+    '$Include', 'FloodNet_Network.csv', 'FloodNet_Unit.csv', 'FloodNet_System.csv', 'FloodNet_NetData.csv',
   ].join('\n');
 
-  // MegaNet_Network.csv
+  // FloodNet_Network.csv
   const d = RM_NET_DEFAULTS;
   const networkCsv = [
     'Radio Mobile', '$Style', 'Prop mode,Color 1,Color 2,Color 3', '0,38,40,81',
@@ -302,7 +302,7 @@ function runExport() {
     ].join(',')),
   ].join('\n');
 
-  // MegaNet_Unit.csv
+  // FloodNet_Unit.csv
   const unitCsv = [
     'Unit ID,Unit name,Enabled,Latitude,Longitude,Elevation,Icon,Forecolor,Style,Backcolor,Text,Locked',
     ...units.map(u => {
@@ -317,7 +317,7 @@ function runExport() {
     }),
   ].join('\n');
 
-  // MegaNet_System.csv
+  // FloodNet_System.csv
   // The two systems this network is, for a document that arrived without them.
   // Line loss is the half a decibel the real rm_systems rows now carry — these
   // stand in for those rows, so a figure they disagreed on would export a
@@ -335,7 +335,7 @@ function runExport() {
     ].join(',')),
   ].join('\n');
 
-  // MegaNet_NetData.csv
+  // FloodNet_NetData.csv
   // For each repeater row: which units are in its network (1 = repeater itself, 2 = matched field stations)
   const unitIds = units.map(u => u.id);
 
@@ -361,11 +361,11 @@ function runExport() {
   ].join('\n');
 
   const files = [
-    ['MegaNet.csv',         megaNetCsv ],
-    ['MegaNet_Network.csv', networkCsv ],
-    ['MegaNet_Unit.csv',    unitCsv    ],
-    ['MegaNet_System.csv',  systemCsv  ],
-    ['MegaNet_NetData.csv', netDataCsv ],
+    ['FloodNet.csv',         megaNetCsv ],
+    ['FloodNet_Network.csv', networkCsv ],
+    ['FloodNet_Unit.csv',    unitCsv    ],
+    ['FloodNet_System.csv',  systemCsv  ],
+    ['FloodNet_NetData.csv', netDataCsv ],
   ];
   files.forEach(([name, content], i) => {
     setTimeout(() => dlText(name, content), i * 180);
@@ -556,8 +556,8 @@ function stationKml(s) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
 <Document>
-  <name>${kmlEsc(s.name)} — MegaNet</name>
-  <description><![CDATA[${kmlEsc(summary)}.<br>Exported from MegaNet on ${
+  <name>${kmlEsc(s.name)} — Flood-Net</name>
+  <description><![CDATA[${kmlEsc(summary)}.<br>Exported from Flood-Net on ${
     kmlEsc(new Date().toLocaleString())}. Pass-range links are drawn amber, backbone paths black,
     both clamped to the ground.]]></description>
 ${styles}
@@ -591,7 +591,7 @@ function downloadStationKml(id) {
   const a = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(new Blob([stationKml(s)],
       { type: 'application/vnd.google-earth.kml+xml' })),
-    download: `meganet-${safe}-${stamp}.kml`,
+    download: `floodnet-${safe}-${stamp}.kml`,
   });
   a.click();
   URL.revokeObjectURL(a.href);
@@ -799,8 +799,8 @@ function drawingKml(shapes) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
 <Document>
-  <name>MegaNet drawing — ${kmlEsc(summary)}</name>
-  <description><![CDATA[${kmlEsc(summary)}.<br>Exported from MegaNet's Draw &amp;
+  <name>Flood-Net drawing — ${kmlEsc(summary)}</name>
+  <description><![CDATA[${kmlEsc(summary)}.<br>Exported from Flood-Net's Draw &amp;
     measure panel on ${kmlEsc(new Date().toLocaleString())}. Shapes keep the colour they
     were drawn in and are clamped to the ground; each names the stations it encloses or
     runs between, and each of those stations names the shapes it is in.]]></description>
@@ -828,7 +828,7 @@ function downloadDrawingKml() {
   const a = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(new Blob([drawingKml(shapes)],
       { type: 'application/vnd.google-earth.kml+xml' })),
-    download: `meganet-drawing-${stamp}.kml`,
+    download: `floodnet-drawing-${stamp}.kml`,
   });
   a.click();
   URL.revokeObjectURL(a.href);
@@ -1235,7 +1235,7 @@ function sitesKml(data, { icons } = {}) {
       + '<i>Links from</i> folder to compare its paths. The <i>Sight lines at antenna height (3-D)</i> folders start off: '
       + 'straight chords from mast top to antenna top, not Fresnel clearance.',
     `<b>Caveat:</b> ${kmlEsc(data.caveat)}`,
-    `Exported from MegaNet on ${kmlEsc(new Date().toLocaleString())}.`,
+    `Exported from Flood-Net on ${kmlEsc(new Date().toLocaleString())}.`,
   ].join('<br>');
 
   return `<?xml version="1.0" encoding="UTF-8"?>

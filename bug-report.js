@@ -85,7 +85,7 @@ const BugReport = (function () {
           <h2 id="br-title">Report a bug or idea</h2>
           <button class="modal-x" title="Close (Esc)" onclick="BugReport.close()">×</button>
         </div>
-        <p class="sub">Tell us what happened. When you submit, MegaNet opens a pre-filled issue on the
+        <p class="sub">Tell us what happened. When you submit, Flood-Net opens a pre-filled issue on the
            project's GitHub — just review it and click <em>Submit new issue</em>. No GitHub account?
            Use <em>Copy report</em> and email it to the maintainer instead.</p>
 
@@ -162,7 +162,7 @@ const BugReport = (function () {
     if (expected) body += `\n**Expected**\n${expected}\n`;
     body += `\n**Where:** ${screen} screen`;
     if (include) body += `\n\n---\n### Diagnostics\n${diagBlock()}`;
-    body += `\n\n<sub>Reported from MegaNet ${APP_VERSION} via the in-app bug reporter.</sub>`;
+    body += `\n\n<sub>Reported from Flood-Net ${APP_VERSION} via the in-app bug reporter.</sub>`;
 
     return { title, body, ghLabel: t.ghLabel, desc };
   }

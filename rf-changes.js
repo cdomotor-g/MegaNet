@@ -94,7 +94,7 @@ const RFC_CLASS = {
   removed:  { label: 'Removed',                token: '--rfc-class-removed',
               blurb: 'Assignment gone from the register — the only way a decommissioning is ever visible.' },
   freq:     { label: 'Frequency changed',      token: '--rfc-class-freq',
-              blurb: 'May have moved onto or off a MegaNet channel.' },
+              blurb: 'May have moved onto or off a Flood-Net channel.' },
   power:    { label: 'Power changed',          token: '--rfc-class-power',
               blurb: 'TX power or EIRP differs — direct noise-floor impact.' },
   antenna:  { label: 'Antenna changed',        token: '--rfc-class-antenna',

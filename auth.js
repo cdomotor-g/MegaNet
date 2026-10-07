@@ -580,7 +580,7 @@ const Auth = (function () {
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="au-title"
            onclick="event.stopPropagation()">
         <div class="modal-head">
-          <h2 id="au-title">${ui.step === 'in' ? 'Your session' : 'Sign in to MegaNet'}</h2>
+          <h2 id="au-title">${ui.step === 'in' ? 'Your session' : 'Sign in to Flood-Net'}</h2>
           <button class="modal-x" title="Close (Esc)" onclick="Auth.close()">×</button>
         </div>
         <p class="sub">Signing in is only needed to <em>edit</em>. The station list, the maps and every

@@ -442,7 +442,7 @@ try {
   ]);
   const stamp = await page.evaluate(() => new Date().toISOString().slice(0, 10));
   check('the button downloads a dated KML',
-    download.suggestedFilename() === `meganet-drawing-${stamp}.kml`,
+    download.suggestedFilename() === `floodnet-drawing-${stamp}.kml`,
     download.suggestedFilename());
 
   const stream = await download.createReadStream();
@@ -452,7 +452,7 @@ try {
   // two calls: the Document description carries the export time, and the two
   // were generated seconds apart. Everything the rest of this file asserted
   // about has to be identical in what the button actually handed over.
-  const undated = (t) => t.replace(/Exported from MegaNet[\s\S]*?\]\]><\/description>/, '');
+  const undated = (t) => t.replace(/Exported from Flood-Net[\s\S]*?\]\]><\/description>/, '');
   check('what it downloads is the document that was asserted about',
     undated(body) === undated(kml),
     `${body.length} bytes vs ${kml.length}`);

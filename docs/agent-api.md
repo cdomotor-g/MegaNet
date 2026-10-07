@@ -1,6 +1,6 @@
 # The agent API — read-only station data for AI agents and scripts
 
-MegaNet's station register can be read by programs as well as people. Point an
+Flood-Net's station register can be read by programs as well as people. Point an
 AI agent (Claude, ChatGPT, Gemini, Copilot, Cursor, Codex…) or a script at it and
 it can pull **station-level information** — identity and location, networks and
 radio, sensors and health, the Service Level Specification entry, the Bureau's
@@ -23,7 +23,7 @@ follow once example reports are provided; see
 | Station ids | lowercase slugs such as `abergowrie_br_al`; a Bureau station number also works |
 | Source | `worker/api.js` (the Worker), checked by `test/agent-api.mjs` |
 
-**Use `floodwarning.net`.** The GitHub Pages copy of MegaNet
+**Use `floodwarning.net`.** The GitHub Pages copy of Flood-Net
 (`cdomotor-g.github.io/MegaNet`) is static files only — there is no Worker there,
 so there is no API. If `floodwarning.net` answers with a Cloudflare Access login
 page instead of JSON, the owner has not yet let the API past Access; see
@@ -49,7 +49,7 @@ or anything about users and editors.
 
 **Not a warning service.** From [the About page](../about.html):
 
-> MegaNet is not a flood warning service, and it does not issue warnings,
+> Flood-Net is not a flood warning service, and it does not issue warnings,
 > forecasts or public alerts. It is engineering tooling for the radio networks
 > that telemetry travels over — an asset register, a path planner and a
 > fault-finding aid. Nothing here should be read as an official statement about
@@ -75,7 +75,7 @@ the `initialize` handshake of protocol versions 2025-03-26, 2025-06-18 and
 2025-11-25, and the stateless per-request metadata of 2026-07-28, including
 `server/discover`.
 
-**Name your client.** Add an `X-MegaNet-Client: <your-name>` header (letters,
+**Name your client.** Add an `X-FloodNet-Client: <your-name>` header (letters,
 digits, `.`, `_`, `-`, `@`; up to 64 characters), or append `?client=<your-name>`
 to the URL where a client cannot set headers. Your name and your address
 together are your rate-limit bucket, so colleagues behind one office network —
@@ -85,8 +85,8 @@ addresses — do not share one allowance. It is not a password and proves nothin
 ### Claude Code
 
 ```sh
-claude mcp add --transport http meganet https://floodwarning.net/api/mcp \
-  --header "X-MegaNet-Client: your-name"
+claude mcp add --transport http floodnet https://floodwarning.net/api/mcp \
+  --header "X-FloodNet-Client: your-name"
 ```
 
 Add `--scope project` to write it into the repository's `.mcp.json` for everyone
@@ -95,10 +95,10 @@ working there, which looks like this:
 ```json
 {
   "mcpServers": {
-    "meganet": {
+    "floodnet": {
       "type": "http",
       "url": "https://floodwarning.net/api/mcp",
-      "headers": { "X-MegaNet-Client": "your-name" }
+      "headers": { "X-FloodNet-Client": "your-name" }
     }
   }
 }
@@ -109,7 +109,7 @@ typically about 5,000.
 
 ### Claude Desktop and claude.ai
 
-Settings → **Connectors** → **Add custom connector** → name it `MegaNet` and give
+Settings → **Connectors** → **Add custom connector** → name it `Flood-Net` and give
 the URL `https://floodwarning.net/api/mcp?client=your-name`. No authentication.
 Custom connectors are reached from Anthropic's servers, not your computer — which
 is exactly why the `client` name matters.
@@ -121,9 +121,9 @@ is exactly why the `client` name matters.
 ```json
 {
   "mcpServers": {
-    "meganet": {
+    "floodnet": {
       "url": "https://floodwarning.net/api/mcp",
-      "headers": { "X-MegaNet-Client": "your-name" }
+      "headers": { "X-FloodNet-Client": "your-name" }
     }
   }
 }
@@ -137,10 +137,10 @@ Command Palette for all of them) — note the top-level key is `servers`:
 ```json
 {
   "servers": {
-    "meganet": {
+    "floodnet": {
       "type": "http",
       "url": "https://floodwarning.net/api/mcp",
-      "headers": { "X-MegaNet-Client": "your-name" }
+      "headers": { "X-FloodNet-Client": "your-name" }
     }
   }
 }
@@ -155,16 +155,16 @@ transport:
 ```json
 {
   "mcpServers": {
-    "meganet": {
+    "floodnet": {
       "httpUrl": "https://floodwarning.net/api/mcp",
-      "headers": { "X-MegaNet-Client": "your-name" }
+      "headers": { "X-FloodNet-Client": "your-name" }
     }
   }
 }
 ```
 
 or from the command line:
-`gemini mcp add --transport http meganet https://floodwarning.net/api/mcp`.
+`gemini mcp add --transport http floodnet https://floodwarning.net/api/mcp`.
 
 ### OpenAI Codex CLI
 
@@ -172,9 +172,9 @@ or from the command line:
 bridge is needed:
 
 ```toml
-[mcp_servers.meganet]
+[mcp_servers.floodnet]
 url = "https://floodwarning.net/api/mcp"
-http_headers = { "X-MegaNet-Client" = "your-name" }
+http_headers = { "X-FloodNet-Client" = "your-name" }
 ```
 
 An older Codex that only runs stdio servers can reach it through a bridge:
@@ -193,7 +193,7 @@ that accept a remote MCP server URL can use the MCP server instead.
 ### Plain HTTP
 
 ```sh
-curl -s -H 'X-MegaNet-Client: your-name' \
+curl -s -H 'X-FloodNet-Client: your-name' \
   'https://floodwarning.net/api/v1/stations?q=abergowrie' | jq '.stations[].id'
 ```
 
@@ -213,7 +213,7 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 | `stations_near` | Stations within a radius of a point, nearest first, with distance and bearing | `GET /api/v1/stations?near=` |
 | `get_station` | One station's full register record, SLS rows and health | `GET /api/v1/stations/{id}` |
 | `get_station_dossier` | Everything a report needs about one station, in one call | `GET /api/v1/stations/{id}/dossier` |
-| `get_readings` | Telemetry ingested into MegaNet: raw, hourly or daily | `GET /api/v1/stations/{id}/readings` |
+| `get_readings` | Telemetry ingested into Flood-Net: raw, hourly or daily | `GET /api/v1/stations/{id}/readings` |
 | `get_flood_levels` | Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels, one AHD ladder | `GET /api/v1/stations/{id}/flood-levels` |
 | `get_service_level` | The station's Service Level Specification entry | `GET /api/v1/stations/{id}/service-level` |
 | `list_catchments` | The 77 Queensland drainage basins | `GET /api/v1/catchments` |
@@ -221,7 +221,7 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 | `list_networks` | Radio networks, maintenance hubs, Radio Mobile systems | `GET /api/v1/networks` |
 
 The server's `instructions` (sent at `initialize` and `server/discover`) tell an
-agent what MegaNet is, how to find a station, the datum caveats and the limits.
+agent what Flood-Net is, how to find a station, the datum caveats and the limits.
 
 ---
 
@@ -243,7 +243,7 @@ a 429 and `candidates` where there is something to suggest:
 | 429 | rate limited — wait `Retry-After` seconds ([Limits](#limits-and-fair-use)) |
 | 502 / 503 / 504 | the database was unreachable, answered with an error, or took over 10 s. The usual cause is the free-tier database pausing after 7 days idle; `detail` says so |
 
-Numbers in the examples below are MegaNet's real data for Abergowrie Bridge AL,
+Numbers in the examples below are Flood-Net's real data for Abergowrie Bridge AL,
 trimmed; readings and health are illustrative.
 
 ### `GET /api/v1/`
@@ -257,7 +257,7 @@ curl -s https://floodwarning.net/api/v1/
 
 ```json
 {
-  "name": "MegaNet station API",
+  "name": "Flood-Net station API",
   "version": "1.0.0",
   "read_only": true,
   "endpoints": [{ "method": "GET", "path": "/api/v1/stations", "summary": "Search and filter stations; compact rows." }, "…"],
@@ -265,7 +265,7 @@ curl -s https://floodwarning.net/api/v1/
            "protocol_versions": ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"] },
   "openapi": "https://floodwarning.net/api/v1/openapi.json",
   "limits": { "rate": ["60 requests / 60 s per client", "20 requests / 10 s per client (burst)", "240 requests / 60 s per address"], "list_max": 100 },
-  "disclaimer": "MegaNet is not a flood warning service, …"
+  "disclaimer": "Flood-Net is not a flood warning service, …"
 }
 ```
 
@@ -387,7 +387,7 @@ never silently missing, and "not recorded" never means zero.
 | `identity` | name, Bureau/AWRC numbers, URBS label, ARRO site, owner, roles, kinds, location types, and whether it is only **proposed** — `proposed`, `station_type`, `proposed_year` (a station planned and not yet built, which `summary` says straight after its opening line) |
 | `location` | lat/lon, height in m AHD **and where it came from** (surveyed, or modelled from a DEM via Elvis), LGA, basin, stream, catchment (with drainage division), maintenance hub |
 | `networks_and_radio` | radio networks, Radio Mobile system, ALERT/ALERT2 addresses, satcom, repeater record, frequencies, the repeaters whose pass ranges cover its addresses, saved modelled link margins |
-| `telemetry` | sensors, health (when MegaNet last heard from it), a per-channel summary of the last 30 days of daily rollups |
+| `telemetry` | sensors, health (when Flood-Net last heard from it), a per-channel summary of the last 30 days of daily rollups |
 | `service_level` | the SLS entries — one per document that lists the station (Queensland's; New South Wales and the ACT's): gauge type, data type, priority, owner, schedules, flood classes, prediction, and each document's edition |
 | `bureau_listings` | which of the Bureau's Queensland station indexes list it (FloodWarn rainfall, daily rainfall, river height) |
 | `flood_levels` | as [`/flood-levels`](#get-apiv1stationsidflood-levels) |
@@ -414,7 +414,7 @@ typically 15–20 KB.
 
 ### `GET /api/v1/stations/{id}/readings`
 
-Telemetry **ingested into MegaNet** for one station (see the caveat under
+Telemetry **ingested into Flood-Net** for one station (see the caveat under
 [Data provenance](#data-provenance-and-caveats) — most stations report through
 the Bureau's systems, and an empty answer is normal).
 
@@ -565,7 +565,7 @@ everyone else — the app itself reads the same database.
 
 | Rule | Limit | Keyed on |
 |---|---|---|
-| per client | 60 requests / 60 s | your address + your `X-MegaNet-Client` name |
+| per client | 60 requests / 60 s | your address + your `X-FloodNet-Client` name |
 | burst | 20 requests / 10 s | the same |
 | per address | 240 requests / 60 s | your address alone, whatever names it uses |
 
@@ -606,7 +606,7 @@ quote it:
   unknown datum cannot be put on the ground, and the API says so rather than
   convert.
 - **AEP levels are indicative.** They are modelled water levels from the QLD and
-  NSW AEP level workbooks, at the sheet's own point (sometimes not where MegaNet
+  NSW AEP level workbooks, at the sheet's own point (sometimes not where Flood-Net
   puts the station — `point_offset_km` says how far), with the sheet's
   confidence score (1–9, higher is better). Not observations.
 - **Two sets of flood classes — three on the border.** The Bureau's river
@@ -621,7 +621,7 @@ quote it:
 - **Elevation.** `elevation_source` is `surveyed`, or `modelled — Elvis …` for a
   height taken from a digital elevation model through Geoscience Australia's
   Elvis. A modelled height is not a survey mark.
-- **Health and readings are MegaNet's own ingest.** `health` is when MegaNet's
+- **Health and readings are Flood-Net's own ingest.** `health` is when Flood-Net's
   MQTT bridge or HTTP ingest last heard from the station; readings are what
   reached that ingest. Most stations report through the Bureau's systems, so
   "not recorded" here says nothing about whether a station works.
@@ -642,7 +642,7 @@ identity, location, network, telemetry, service level, flood heights,
 inspection history and neighbours, each labelled with its source, plus a
 `summary` of plain sentences to build from. A prompt that works:
 
-> Using the MegaNet MCP server, get the dossier for station `<id or Bureau
+> Using the Flood-Net MCP server, get the dossier for station `<id or Bureau
 > number>`. Draft the station-level sections of an assessment report from it:
 > location and catchment, network and telemetry, service level, flood levels
 > (state each height's datum and source, and carry over any caveat the data
@@ -674,7 +674,7 @@ In the Cloudflare dashboard:
 1. **Zero Trust** → **Access controls** → **Applications** (on older dashboards,
    **Access** → **Applications**).
 2. **Add an application** → **Self-hosted**.
-3. **Application name:** `MegaNet public API`.
+3. **Application name:** `Flood-Net public API`.
 4. **Add public hostname:** domain `floodwarning.net`, path `api/v1`.
 5. **Add public hostname** again: domain `floodwarning.net`, path `api/mcp`.
 6. *(Optional)* once more for path `llms.txt`, so agents can read the index file
@@ -700,7 +700,7 @@ limited in the Worker. If you would rather admit only named agents, use
 Access controls → Service credentials → **Service Tokens**; on older dashboards
 Access → Service Auth); each agent then
 sends `CF-Access-Client-Id` and `CF-Access-Client-Secret` headers, which every
-MCP client above can set the same way it sets `X-MegaNet-Client`.
+MCP client above can set the same way it sets `X-FloodNet-Client`.
 
 The API is also on `meganet.<account>.workers.dev` if that is enabled (Access
 does not cover it; the same limits apply). GitHub Pages has no API.
@@ -727,7 +727,7 @@ The numbers live in two places that must agree: `[[ratelimits]]` in
 `wrangler.toml` (`limit`; `period` may only be 10 or 60) and `RATE_LIMITS` in
 `worker/api.js`. They are also quoted in this page and the agent instruction
 files (`AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `llms.txt`,
-`.cursor/rules/meganet-api.mdc`); `npm run agentdocs` (`test/agent-docs.mjs`)
+`.cursor/rules/floodnet-api.mdc`); `npm run agentdocs` (`test/agent-docs.mjs`)
 fails until every one of them says the same thing. Edit, run
 `cd test && npm run agentapi && npm run agentdocs`, push — Workers Builds deploys
 it.

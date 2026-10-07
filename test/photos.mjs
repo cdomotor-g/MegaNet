@@ -907,8 +907,8 @@ async function browserHalf() {
     };
     let n0 = store.uploads.length, c0 = adds.length;
     let one = await again();
-    ok('asked before a byte moves: "Already in MegaNet — added by … on …", and nothing sent',
-      one.status === 'already' && /^Already in MegaNet — added by fixture@example\.test on 2026-06-24\.$/.test(one.note)
+    ok('asked before a byte moves: "Already in Flood-Net — added by … on …", and nothing sent',
+      one.status === 'already' && /^Already in Flood-Net — added by fixture@example\.test on 2026-06-24\.$/.test(one.note)
         && one.existingId === R.gps.id && store.uploads.length === n0 && db.calls.filter(c => c.fn === 'add_field_photo').length === c0, J(one));
     ok('…with a way to it', /Show it/.test(await text(`#fp-row-${one.key}`)));
 

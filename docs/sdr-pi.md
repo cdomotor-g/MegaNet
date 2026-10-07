@@ -6,13 +6,13 @@ it needs. What that PC *can* do is what the Quansheng radio already relies on �
 PuTTY opens a COM port and logs it, and the Serial Monitor follows the log.
 
 So the stick goes on a Raspberry Pi, and the Pi is made to look like the radio:
-it runs MegaNet's own RTL-SDR driver and ALERT decoder (the same `rtlsdr.js` and
+it runs Flood-Net's own RTL-SDR driver and ALERT decoder (the same `rtlsdr.js` and
 `alert-dsp.js` the browser card runs), and prints what it hears on a serial port.
 
 ```
-antenna ── RTL-SDR ──USB── Raspberry Pi ──USB serial── work PC: PuTTY ──log file──▶ MegaNet, Serial Monitor
+antenna ── RTL-SDR ──USB── Raspberry Pi ──USB serial── work PC: PuTTY ──log file──▶ Flood-Net, Serial Monitor
                            decodes ALERT               (a COM port)    "All session      (an RTL-SDR card
-                           with MegaNet's code                          output"          following the log)
+                           with Flood-Net's code                          output"          following the log)
 ```
 
 On the PC nothing is installed and no browser permission is needed: PuTTY and
@@ -76,12 +76,12 @@ before plugging anything in.
    *Choose Device* (Raspberry Pi 4 / Zero 2 W) → *Choose OS* → *Raspberry Pi OS
    (other)* → **Raspberry Pi OS Lite (64-bit)** → *Choose Storage* (the microSD) →
    *Next* → **Edit settings**:
-   - *General*: hostname `meganet-pi`; a username and password; your home Wi-Fi.
+   - *General*: hostname `floodnet-pi`; a username and password; your home Wi-Fi.
    - *Services*: **Enable SSH**, use password authentication.
    - *Save*, *Yes*, *Yes*.
 2. Put the card in the Pi and power it. After about two minutes, from your computer:
-   `ssh you@meganet-pi.local` (Windows: PowerShell, or PuTTY → *SSH* →
-   `meganet-pi.local`).
+   `ssh you@floodnet-pi.local` (Windows: PowerShell, or PuTTY → *SSH* →
+   `floodnet-pi.local`).
 3. On the Pi, one command:
 
    ```bash
@@ -99,7 +99,7 @@ before plugging anything in.
 Updating later: `sudo bash /opt/meganet/sdr-pi/install.sh --update`. Taking it all
 off: `--uninstall`.
 
-## At work — PuTTY, then MegaNet
+## At work — PuTTY, then Flood-Net
 
 1. **Plug in**: stick and antenna into the Pi; the Pi into the PC (recipe A: USB-C;
    recipe B: the USB-serial adapter, and the Pi's own power). It is ready about 40 s
@@ -113,13 +113,13 @@ off: `--uninstall`.
    - *Session → Logging*: **All session output**; *Log file name*
      `C:\Users\you\Documents\serial-logs\sdr-&Y&M&D-&T.log`; leave *Flush log file
      frequently* ticked.
-   - *Session*: under *Saved Sessions* type `MegaNet SDR` and press **Save**. Next
+   - *Session*: under *Saved Sessions* type `Flood-Net SDR` and press **Save**. Next
      time, double-click it.
    - **Open**. The window shows the Pi's greeting, then a line for each burst and
      each reading as they are heard; the title bar shows the frequency, the noise
      floor and the counts. Press **Enter** on its own for a one-line status, or type
      **HELP**.
-4. **MegaNet** → *Serial Monitor* → **drag the log file** (or the whole
+4. **Flood-Net** → *Serial Monitor* → **drag the log file** (or the whole
    `serial-logs` folder, to follow the newest log in it) anywhere onto the tab. It is
    recognised and becomes an RTL-SDR card following the Pi. (Or *+ RTL-SDR* → *on a
    Raspberry Pi, read through PuTTY's log* → drop it on the card.)
@@ -127,7 +127,7 @@ off: `--uninstall`.
    PuTTY, Enter. A Pi has no clock of its own and no network at work; with the time
    set, every record carries it until the Pi is unplugged. Live readings are timed
    correctly either way; it is the log's history that needs it.
-6. **Send to MegaNet** works as on any receiver card —
+6. **Send to Flood-Net** works as on any receiver card —
    [`ingest-serial-monitor.md`](ingest-serial-monitor.md). The Pi is a receiver of
    its own (`sdrpi-…`), reported to the database as an `rtl-sdr` — one receiver
    however many channels it decodes; each reading's channel is in the card's
@@ -136,7 +136,7 @@ off: `--uninstall`.
 ## Settings
 
 Out of the box: **151.500 MHz, ALERT Binary, gain 29.7 dB, 240 ksps, decode bursts
-only at 8 dB** — the MegaNet networks' channel. Nothing to set for those. One stick
+only at 8 dB** — the Flood-Net networks' channel. Nothing to set for those. One stick
 can also decode several channels at once — [below](#several-channels-from-one-stick).
 
 - **On the card**: change a control and its command is copied — right-click in PuTTY,
@@ -197,7 +197,7 @@ same way.
   own power, at the stick's squelch.
 - **On the card**: a chip for each channel with the readings heard on it, a band for
   each on the spectrum, and each reading's channel beside its station. They all go to
-  MegaNet as the card's one receiver.
+  Flood-Net as the card's one receiver.
 - **Afterwards**: `FREQ`, `RATE` and `OFFSET` move the stick's own channel and leave the
   others where they are; a change that would put one outside the band is refused, on
   the card and by the Pi — set the channels again instead.
@@ -212,7 +212,7 @@ same way.
 Readings, bursts and notes are plain lines a person can read in PuTTY:
 
 ```
-MegaNet SDR Pi 1.0.0 on meganet-pi - RTL-SDR Blog V4 R828D - 151.5000 MHz ALERT Binary - type HELP and press Enter
+Flood-Net SDR Pi 1.0.0 on floodnet-pi - RTL-SDR Blog V4 R828D - 151.5000 MHz ALERT Binary - type HELP and press Enter
 BURST,1,742054db,767,,320,-15.8,-48.1,151500000
 RX,1,742054db,767,,2088,143,ABF,26,STD,,6860DEC4,190,1,-15.8,-48.1,320,151500000,MARBURG,BATT
 ```
@@ -229,7 +229,7 @@ not *Printable output*. The full record set is
 against this computer's clock — so a reading the Pi had queued before PuTTY opened
 the port is timed when it was heard, not when it arrived — and never times a
 reading out of the log's history "now": with no clock, those show `—` and are not
-sent to MegaNet.
+sent to Flood-Net.
 
 ## When it does not work
 
@@ -258,7 +258,7 @@ On the Pi, `journalctl -u meganet-sdr -f` is the running commentary.
   that computer's address and port instead of a COM port (a Telnet session is asked to
   leave the echo to the Pi); log it the same way;
 - `node sdr-pi/relay.js --stdio` — this terminal;
-- `--source rtl_sdr` — librtlsdr's own `rtl_sdr` instead of MegaNet's driver;
+- `--source rtl_sdr` — librtlsdr's own `rtl_sdr` instead of Flood-Net's driver;
 - `--file capture_240k.iq8` — a recording, through the same decoder.
 
 `node sdr-pi/relay.js --help` lists the rest. The console takes only the commands

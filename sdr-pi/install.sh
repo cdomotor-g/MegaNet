@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# MegaNet — sdr-pi/install.sh
+# Flood-Net — sdr-pi/install.sh
 #
-#   Sets a Raspberry Pi up as MegaNet's SDR receiver (docs/sdr-pi.md): Node and
+#   Sets a Raspberry Pi up as Flood-Net's SDR receiver (docs/sdr-pi.md): Node and
 #   the usb package; a udev rule so the service may open the stick; the DVB-T
 #   TV driver kept off it; the serial link to the PC — the USB-C port as a USB
 #   serial device on a Pi 4 or 5, the GPIO UART (for a USB-serial cable) on
@@ -15,7 +15,7 @@
 #   --link usb|uart|both|none  how the PC reaches it (default: usb on a Pi 4 or 5, uart otherwise)
 #   --tcp PORT                 also listen on TCP, for PuTTY over a network (Raw or Telnet)
 #   --dir PATH                 where the repository goes (default /opt/meganet)
-#   --update                   fetch the latest MegaNet and restart the service
+#   --update                   fetch the latest Flood-Net and restart the service
 #   --uninstall                take everything this added off again (the repository stays)
 #   --dry-run                  say what it would do and change nothing
 #   --model "Raspberry Pi 4…"  (testing) act as if on this model
@@ -102,7 +102,7 @@ strip_block() {     # our block out of config.txt, for re-installing and uninsta
 }
 
 uninstall() {
-  say "Taking MegaNet SDR Pi off this computer"
+  say "Taking Flood-Net SDR Pi off this computer"
   run systemctl disable --now meganet-sdr.service 2>/dev/null || true
   run systemctl disable --now meganet-sdr-gadget.service 2>/dev/null || true
   run rm -f "$UNIT" "$GADGET_UNIT" "$UDEV" "$BLACKLIST"
@@ -114,7 +114,7 @@ uninstall() {
 }
 [ "$MODE" = uninstall ] && uninstall
 
-say "MegaNet SDR Pi on: $MODEL"
+say "Flood-Net SDR Pi on: $MODEL"
 case "$MODEL" in
   *"Pi 4"*|*"Pi 5"*|*"Compute Module 4"*|*"Compute Module 5"*) AUTO=usb ;;
   *"Pi Zero 2"*|*"Pi 3"*) AUTO=uart ;;
@@ -144,13 +144,13 @@ NODE_BIN=$(command -v node || echo /usr/bin/node)
 # Only what the Pi needs: the relay, the driver, the decoder, the protocol, the
 # station names. The rest of the repository (maps, data) stays on GitHub.
 if [ -n "$HERE" ]; then
-  say "Using the copy of MegaNet at $DIR"
+  say "Using the copy of Flood-Net at $DIR"
   [ "$MODE" = update ] && run git -C "$DIR" pull --ff-only
 elif [ -d "$DIR/.git" ]; then
-  say "Updating MegaNet in $DIR"
+  say "Updating Flood-Net in $DIR"
   run git -C "$DIR" pull --ff-only
 else
-  say "Fetching MegaNet into $DIR"
+  say "Fetching Flood-Net into $DIR"
   run git clone --depth 1 --filter=blob:none --sparse "$REPO_URL" "$DIR"
   run git -C "$DIR" sparse-checkout set --no-cone /sdr-pi/ /sdr-pi.js /rtlsdr.js /alert-dsp.js /quansheng.js /stations.json /LICENSE
 fi
@@ -173,7 +173,7 @@ fi
 # A copy of the repository in someone's home directory is often closed to
 # other users (Bookworm makes homes private), and the service runs as its own.
 if [ "$DRY" = 0 ] && ! runuser -u "$SVC_USER" -- test -r "$DIR/sdr-pi/relay.js"; then
-  die "$SVC_USER cannot read $DIR. Install with the curl line instead (it puts MegaNet in /opt/meganet), or: sudo bash $0 --dir /opt/meganet"
+  die "$SVC_USER cannot read $DIR. Install with the curl line instead (it puts Flood-Net in /opt/meganet), or: sudo bash $0 --dir /opt/meganet"
 fi
 
 say "Letting $SVC_USER open RTL-SDR sticks (udev)"
@@ -210,7 +210,7 @@ if [ "$LINK" = usb ] || [ "$LINK" = both ]; then
   run chmod +x "$DIR/sdr-pi/usb-gadget.sh"
   put "$GADGET_UNIT" <<EOF
 [Unit]
-Description=MegaNet SDR Pi - the USB-C port as a USB serial device for PuTTY
+Description=Flood-Net SDR Pi - the USB-C port as a USB serial device for PuTTY
 Documentation=https://github.com/cdomotor-g/MegaNet/blob/main/docs/sdr-pi.md
 After=sys-kernel-config.mount
 Before=meganet-sdr.service
@@ -259,7 +259,7 @@ ARGS="--serial auto"
 say "The service (meganet-sdr.service), from boot"
 put "$UNIT" <<EOF
 [Unit]
-Description=MegaNet SDR Pi - an RTL-SDR decoding ALERT, on a serial port for PuTTY
+Description=Flood-Net SDR Pi - an RTL-SDR decoding ALERT, on a serial port for PuTTY
 Documentation=https://github.com/cdomotor-g/MegaNet/blob/main/docs/sdr-pi.md
 After=network.target meganet-sdr-gadget.service
 
@@ -293,5 +293,5 @@ case "$LINK" in
   uart|both) echo "    Then wire a 3.3 V USB-serial cable: its RX to GPIO 14 (pin 8), its TX to GPIO 15 (pin 10), ground to pin 6." ;;
 esac
 echo "    On the PC, PuTTY: Connection type Serial, the new COM port, speed 115200, and"
-echo "    Session > Logging > All session output. Drop the log on MegaNet's Serial Monitor."
+echo "    Session > Logging > All session output. Drop the log on Flood-Net's Serial Monitor."
 echo "    Here: journalctl -u meganet-sdr -f shows what the Pi is doing."

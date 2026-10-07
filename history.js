@@ -894,7 +894,7 @@ const History = (function () {
         <p class="small hist-muted">${m.kind === 'inspection' ? 'Inspection' : 'Maintenance form'}
           <code>${esc(m.id || '')}</code>${m.station_id
             ? ` · station <code>${esc(m.station_id)}</code>` : ' · not matched to a station'}.
-          Printed from MegaNet on ${esc(new Date().toLocaleDateString())}.</p>
+          Printed from Flood-Net on ${esc(new Date().toLocaleDateString())}.</p>
       </section>`;
   }
 
@@ -972,7 +972,7 @@ const History = (function () {
         r.origin || '', r.id,
       ]);
     });
-    download(`meganet-history-${s.station ? slug(s.station.name) : 'all-stations'}.csv`, toCsv(rows));
+    download(`floodnet-history-${s.station ? slug(s.station.name) : 'all-stations'}.csv`, toCsv(rows));
   }
 
   function exportRecord() {
@@ -1000,7 +1000,7 @@ const History = (function () {
 
     m.absent.forEach(a => rows.push([...head, 'Not on this form', '', a.label, a.note]));
 
-    download(`meganet-${m.kind}-${slug(m.title)}-${m.dated || 'undated'}.csv`, toCsv(rows));
+    download(`floodnet-${m.kind}-${slug(m.title)}-${m.dated || 'undated'}.csv`, toCsv(rows));
   }
 
   function headingValue(m, label) {

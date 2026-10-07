@@ -1,9 +1,9 @@
-# bridge/ — the MQTT → MegaNet bridge
+# bridge/ — the MQTT → Flood-Net bridge
 
 A small, permanently-running process that subscribes to `meganet/v1/…` on an
-MQTT broker, validates what arrives, and posts it to MegaNet's ingest endpoint.
+MQTT broker, validates what arrives, and posts it to Flood-Net's ingest endpoint.
 
-**This is the first piece of MegaNet that needs a process running somewhere all
+**This is the first piece of Flood-Net that needs a process running somewhere all
 the time.** Everything else in this repository is a static page plus a database.
 That is a real change in the project's shape, and it is worth being deliberate
 about: the reason it is unavoidable is that **Postgres cannot subscribe to

@@ -545,7 +545,7 @@ const MapPolar = (function () {
     if (!plot) return;
     const R1 = plot.rings + 1;
     const rows = [
-      `# MegaNet polar radio coverage`,
+      `# Flood-Net polar radio coverage`,
       `# centre,${plot.cName},${plot.centre[0].toFixed(6)},${plot.centre[1].toFixed(6)},${plot.cAgl} m AGL`,
       `# mobile,${plot.mName},${plot.mAgl} m AGL`,
       `# frequency_mhz,${plot.fMhz.toFixed(3)}`,

@@ -6971,7 +6971,7 @@ void main() {
     const json = {
       asset: {
         version: '2.0',
-        generator: 'MegaNet digital twin',
+        generator: 'Flood-Net digital twin',
         extras: {
           station_id: st ? st.id : null, station_name: st ? st.name : null,
           station_number: st ? (st.station_number || null) : null,

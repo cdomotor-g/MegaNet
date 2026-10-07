@@ -1,4 +1,4 @@
-# MegaNet tools
+# Flood-Net tools
 
 Small command-line helpers that sit alongside the browser app. Unlike the app
 itself, most of these need Python (the ACMA tools are stdlib-only; the agent also
@@ -75,7 +75,7 @@ one line or a description over 4 KB is refused by name. Only an administrator ma
 approve or deny, and the list never carries the hash. Until approval the token opens
 nothing; once approved it is the device's own hash, made by the administrator, and
 opens the door at once — nothing to collect — while the device is told *approved*
-under the label MegaNet knows it by, never who approved it. A live label cannot be
+under the label Flood-Net knows it by, never who approved it. A live label cannot be
 approved twice, but can be approved as a replacement (the old token revoked in the same
 step); denied, withdrawn and expired requests cannot be approved and their tokens
 cannot ask again; a request a day past expiry is swept; and the twenty-first waiting
@@ -109,7 +109,7 @@ longer served, changes the hash, stays on the record, and can be added again.
 `kml_to_geojson.py` turns a KML or KMZ of polygons into a web-sized GeoJSON, with
 nothing but the standard library — Douglas-Peucker simplification written out,
 because adding shapely to draw a polygon would be the first crack in this repo's
-no-build-step rule. `build_geo_layers.py` is the MegaNet half: the handful of
+no-build-step rule. `build_geo_layers.py` is the Flood-Net half: the handful of
 facts about *these two files* that a general converter has no business knowing —
 that the basins arrive in pieces ("Border Rivers 1/2/3", "Stradbroke 1–4",
 "Maroochy" twice), that `BASIN_NUMB` reads "416 QLDNSW" and is two fields, and
@@ -225,7 +225,7 @@ and hub from the Bureau's own row — then attaches every list only where the
 station has none of its own for that edition, and sets the AWRC number, stream
 and URBS label only where they are empty. It never writes over a station's
 position, name or elevation; `--report` lists where the Bureau puts a station a
-kilometre or more from where MegaNet does, and which new stations sit on top of
+kilometre or more from where Flood-Net does, and which new stations sit on top of
 an existing one, for a person to decide. Safe to run again. `--sql` reads
 `stations.json` to know which stations exist, so snapshot it from the database
 first. `check_river_height_details.sql` and `check_bureau_station_lists.sql`
@@ -273,7 +273,7 @@ station has no row from that sheet yet — so it is safe to run again.
 `ingest/flood_peaks.py` reads `archive/flood-peaks/all-flood-peaks-2026-09-28.txt`
 — HDB's *Peak Flood Heights (Chronological Listing)* for 54 Queensland basins,
 run on 28/09/2026 — into `data/flood-peaks.json`: every gauge it lists (1,536,
-MegaNet station or not) and every peak under each (61,039), as printed. It
+Flood-Net station or not) and every peak under each (61,039), as printed. It
 interprets nothing: which zero a height stands on, and so the level it
 reached, is the database's (`meganet.station_flood_peaks()`), because that is
 in the gauge survey and the survey can change without this file changing.
@@ -363,7 +363,7 @@ See the "ACMA RF Interference Layer" section of the repo README for the full
 picture. In short:
 
 ```bash
-# 1. reduce the ~68 MB ACMA RRL daily extract to the MegaNet-relevant subset
+# 1. reduce the ~68 MB ACMA RRL daily extract to the Flood-Net-relevant subset
 python3 tools/acma_prefilter.py --zip spectra_rrl.zip --stations stations.json --out data/acma-raw
 
 # 2. classify + score interference candidates, emit the JSON the map reads
@@ -753,7 +753,7 @@ raises rather than printing a row, so a scripted run fails loudly.
 
 **Why it is here and not in `db/migrations/`.** `storage.buckets` and
 `storage.objects` are Supabase's, not ours, and `db/README.md` records exactly one
-deliberate exception to "everything MegaNet owns lives in `meganet`". This is not
+deliberate exception to "everything Flood-Net owns lives in `meganet`". This is not
 a second one.
 
 **Why it is a file and not a dashboard click-path.** Because the click-path was
@@ -777,7 +777,7 @@ aggregates in code and only the answer comes back.
 **The live alternative.** This tool answers from a local `stations.json`. To
 point any agent at the *live* database instead — the same register plus Service
 Level Specification entries, flood levels with their datums, health, ingested
-readings and inspection numbers — use MegaNet's read-only API: REST at
+readings and inspection numbers — use Flood-Net's read-only API: REST at
 `https://floodwarning.net/api/v1` (OpenAPI at
 `https://floodwarning.net/api/v1/openapi.json`) or the MCP server at
 `https://floodwarning.net/api/mcp`, whose `get_station_dossier` tool returns

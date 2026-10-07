@@ -1,8 +1,13 @@
-# MegaNet — Radio & Satcom Network Station Tool
+# Flood-Net — Radio & Satcom Network Station Tool
 
 **Live app:** https://cdomotor-g.github.io/MegaNet/
 
-MegaNet is a browser-based tool for managing and visualising a radio and satellite communications (satcom) network. It consolidates station data, repeater pass-range analysis, Radio Mobile export, and interactive mapping into a single self-contained HTML application backed by one JSON data file. No server, no build step — just open the file in a browser.
+> **The app is Flood-Net.** The repository keeps the project's earlier name, MegaNet, and so do a few
+> things nobody reads as a name: the `meganet` database schema, browser storage keys, MQTT topics
+> (`meganet/v1/…`), the Cloudflare Worker and R2 bucket, and the Quansheng radio's station-table tag.
+> Anything a person reads — the app, its downloads, the agent API and these docs — says Flood-Net.
+
+Flood-Net is a browser-based tool for managing and visualising a radio and satellite communications (satcom) network. It consolidates station data, repeater pass-range analysis, Radio Mobile export, and interactive mapping into a single self-contained HTML application backed by one JSON data file. No server, no build step — just open the file in a browser.
 
 ---
 
@@ -141,7 +146,7 @@ MegaNet/
 ├── reception-log.js        ← RxLog     — every frame each receiver heard, with position
 ├── reception.js            ← Reception — the Reception Map tab (who was heard where; the bad repeater)
 ├── serial-ingest.js        ← SerialIngest — a receiver card as a base station
-│                             (posts what it decodes into MegaNet)
+│                             (posts what it decodes into Flood-Net)
 ├── serial-viz.js           ← SerialViz — the canvas helpers those cards share
 ├── quansheng.js            ← Quansheng — the radio firmware's serial protocol codec
 ├── alert-dsp.js            ← AlertDsp  — the off-air ALERT decoder (runs in a Worker)
@@ -183,7 +188,7 @@ MegaNet/
 │   ├── ingest-mqtt.md                      (topic scheme, broker choice, station credentials — #B6)
 │   ├── mqtt-provisioning.md                (standing the broker and bridge up — browser only)
 │   ├── message-log.md                      (the Message Log tab — columns, uses, edges)
-│   ├── floodwarning-net.md                 (moving the domain to MegaNet — runbook)
+│   ├── floodwarning-net.md                 (moving the domain to Flood-Net — runbook)
 │   ├── agent-api.md                        (station data for AI agents — REST API and MCP server)
 │   ├── base-stations.md                    (the Base Stations tab — checking in, what may be asked, team SSH keys)
 │   ├── site-exposure.md                    (tides and soils on the station card — rows, sources, limits)
@@ -201,7 +206,7 @@ MegaNet/
 │   ├── index.js                            (/api/db — the database proxy; /api/session — the gate's sign-in)
 │   └── api.js                              (/api/v1, /api/mcp — the read-only agent API and MCP server)
 │
-├── bridge/                 ← the MQTT → MegaNet subscriber (#B6; Node, one dependency)
+├── bridge/                 ← the MQTT → Flood-Net subscriber (#B6; Node, one dependency)
 │   ├── README.md                           (running it, its config, and what its logs mean)
 │   ├── index.js, src/                      (topics, payload rules, batching + acking, health)
 │   ├── test/                               (npm test — unit, plus a real broker end to end)
@@ -272,7 +277,7 @@ MegaNet/
 │   ├── check_tower_height.sql (psql: prove a tower's platform height, 3.0 or 4.5 m, and who may record it (0040) — 18 checks, rolls back)
 │   ├── check_flood_peaks_from.sql (psql: prove a station taking its flood history from another (0041) — 23 checks, rolls back)
 │   ├── check_base_stations.sql (psql: prove base stations checking in, being asked, and the team keys (0049) — 48 checks, rolls back)
-│   ├── field-photos/        (the Dropbox and Google Drive → MegaNet photo sync, run by field-photos-dropbox.yml and field-photos-gdrive.yml)
+│   ├── field-photos/        (the Dropbox and Google Drive → Flood-Net photo sync, run by field-photos-dropbox.yml and field-photos-gdrive.yml)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
 │   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
@@ -313,7 +318,7 @@ Working from a laptop with no network is a real part of this job.
 
 The fallback is not padding. A free-tier Supabase project pauses after about a
 week of inactivity, and a paused project *fails* the read rather than slowing it
-down — MegaNet is exactly the burst-shaped tool that gets paused. Falling back
+down — Flood-Net is exactly the burst-shaped tool that gets paused. Falling back
 turns that into "yesterday's data" instead of "no data", which is only acceptable
 because the header then says so.
 
@@ -488,7 +493,7 @@ Four facts about this network are in the schema rather than left to be discovere
 
 * **The address is the identity, not the station.** A packet carries an address;
   which station that is may be unknown. 604 of 5,122 ALERT addresses belong to
-  more than one station, and a new site reports before anyone adds it to MegaNet.
+  more than one station, and a new site reports before anyone adds it to Flood-Net.
   A reading is *never* dropped for an unresolved address — `station_id` is filled
   in where it is unambiguous and backfilled later where it is not.
 * **Not every station has an ALERT address.** Satellite and cellular sites are not
@@ -553,14 +558,14 @@ is the database side.
 Raspberry Pi running [RPi ALERT](https://github.com/cdomotor-g/RPi_ALERT) (or *Ask
 an administrator* in a Serial Monitor card), and approve the request on the Admin
 tab from any device you are signed in on — after checking the code it shows. The
-device makes the token itself and MegaNet keeps only its hash, so nothing is
+device makes the token itself and Flood-Net keeps only its hash, so nothing is
 copied or carried and nobody signs in on the Pi.
 
 **Once it posts, it can check in** (`0049`): a base station whose software
 supports it reports its health about once a minute — receivers, queue, power,
 temperature, clock, software — and collects what an administrator asked of it on
 the **Base Stations** tab: a setting changed, a receiver restarted, an update
-installed, its log. MegaNet never connects to it; the request waits for the
+installed, its log. Flood-Net never connects to it; the request waits for the
 station's next check-in, and only a short fixed list can be asked — never its
 token, its passwords or where it sends readings. How much of this it takes is
 decided on the station itself. The same tab keeps the team's **SSH public keys**,
@@ -598,7 +603,7 @@ ours to move. The sites that have no bureau number, being repeaters and radars,
 publish under their station id instead (`0020`).
 
 **Postgres cannot subscribe to MQTT**, and Supabase does not host a broker, so
-this is the first piece of MegaNet that needs a process running somewhere
+this is the first piece of Flood-Net that needs a process running somewhere
 permanently: [`bridge/`](bridge/README.md), a small Node subscriber that
 validates what arrives and posts it to the same `ingest_http()` endpoint an HTTP
 logger uses. It holds a device token and no service key, and it acknowledges
@@ -813,7 +818,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 {
   "meta": {
     "version": "1.0",
-    "description": "MegaNet station database",
+    "description": "Flood-Net station database",
     "updated": "YYYY-MM-DD"
   },
   "radio_networks": [
@@ -946,7 +951,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 > the station's own rows from there on: an editor adds the next edition,
 > crossing, re-levelling or effect in the station editor's *Bureau flood warning
 > details* block, and the station card shows what holds now with the rest under
-> *Earlier*. The 1,697 stations Sections 1–3 list that MegaNet had none for were
+> *Earlier*. The 1,697 stations Sections 1–3 list that Flood-Net had none for were
 > created from those indexes on 25/09/2026 — a field station each, at the
 > Bureau's position, with no elevation yet.
 
@@ -2340,11 +2345,11 @@ Generate the complete set of CSV files required by Radio Mobile software from th
 
 | File | Contents |
 |------|---------|
-| `MegaNet.csv` | Master config (version, map paths, file includes) |
-| `MegaNet_Network.csv` | One row per repeater with propagation parameters |
-| `MegaNet_Unit.csv` | All selected stations with coordinates and display settings |
-| `MegaNet_System.csv` | Transmitter/receiver system specs |
-| `MegaNet_NetData.csv` | Network membership matrix (antenna heights, system IDs, roles) |
+| `FloodNet.csv` | Master config (version, map paths, file includes) |
+| `FloodNet_Network.csv` | One row per repeater with propagation parameters |
+| `FloodNet_Unit.csv` | All selected stations with coordinates and display settings |
+| `FloodNet_System.csv` | Transmitter/receiver system specs |
+| `FloodNet_NetData.csv` | Network membership matrix (antenna heights, system IDs, roles) |
 
 Export is scoped to the current filter selection so users can generate per-catchment or per-network RM projects.
 
@@ -2419,8 +2424,8 @@ specification (July 2003).
 - **Encode** — pick a format, enter the sensor ID and raw value(s), and get the message back
   (40-bit framed, 32-bit payload and hex) with CRC/FCS computed automatically. ABF, BCC, EAF and EIF
   only; A2C is a decode-side layout.
-- **Station names** — decoded ALERT addresses are matched against the loaded MegaNet station
-  database first (shown with a *MegaNet* badge), then against the bundled national address file
+- **Station names** — decoded ALERT addresses are matched against the loaded Flood-Net station
+  database first (shown with a *Flood-Net* badge), then against the bundled national address file
   `data/All 2021 Working 2.txt`.
 - Spec reference: `docs/BOM spec erts_data_formats_doc.pdf` (bundled).
 
@@ -2496,7 +2501,7 @@ output live, on the **Serial Monitor** tab. Built on the browser's
   - **ALERT decode** — every 4 bytes are decoded as a 32-bit ALERT payload
     (ABF/BCC/EAF/EIF) using the same codec as the ALERT Packets tab, showing the
     matched format, sensor ID, value and the station name (cross-referenced to
-    the loaded MegaNet database and the bundled national address file). A
+    the loaded Flood-Net database and the bundled national address file). A
     *Resync* button drops a byte to shift frame alignment when a stream isn't
     4-byte aligned, and each decoded frame links through to the full ALERT
     Packets decoder. ALERT2 has a card of its own — the ERT-A2, below.
@@ -2515,7 +2520,7 @@ output live, on the **Serial Monitor** tab. Built on the browser's
   a dashboard: readings with fade-margin bars, a signal chart (noise floor,
   sensitivity, every burst), the raw bits of each burst with its frames boxed,
   stations heard — and the firmware's console as controls: clock sync, every
-  setting, flash-log download/erase, the station table (built from MegaNet and
+  setting, flash-log download/erase, the station table (built from Flood-Net and
   uploaded in the browser), a live mirror of the radio's screen, reboot.
   See [`docs/serial-radio.md`](docs/serial-radio.md).
 - **RTL-SDR (Blog V2 / V3 / V4)** — a WebUSB driver for the RTL2832U with R820T(2) /
@@ -2557,7 +2562,7 @@ output live, on the **Serial Monitor** tab. Built on the browser's
   PuTTY, and the replies are read back from the log. See `log-follow.js`'s header
   and `npm run logfollow`.
 - **A base station in the browser** — the Quansheng, ERT-A2 and RTL-SDR cards can
-  post every reading they decode into MegaNet's database (*Send to MegaNet*), through
+  post every reading they decode into Flood-Net's database (*Send to Flood-Net*), through
   the same `ingest_http()` door and token model every base station uses, with source
   `serial` and a per-receiver path (`serial-monitor/<receiver id>`) so ingest points
   can be told apart — and two receivers hearing one reading are both on record. Each
@@ -2569,10 +2574,10 @@ output live, on the **Serial Monitor** tab. Built on the browser's
   [`docs/ingest-serial-monitor.md`](docs/ingest-serial-monitor.md).
 - **GPS** — a USB GPS puck (any NMEA 0183 receiver) is a card of its own: fix,
   satellites, accuracy, speed. Every receiver card stamps its position on what it
-  hears, and a receiver sending to MegaNet can use it as its location — the one kind
+  hears, and a receiver sending to Flood-Net can use it as its location — the one kind
   the database records as exact.
 - **Reception log and the Reception Map** — every frame each receiver hears, good or
-  bad, with level and position, kept in the browser and (sending to MegaNet) in the
+  bad, with level and position, kept in the browser and (sending to Flood-Net) in the
   database (`0047`). The **Reception Map** tab maps it and ranks the repeaters most
   likely to be flipping bits in what they relay. See
   [`docs/reception-map.md`](docs/reception-map.md).
@@ -2624,7 +2629,7 @@ Side panel or modal showing full station record:
 
 ### 13. In-App Bug / Idea Reporter
 The **🐞 Report a Bug** button in the header lets any user flag a problem or
-suggestion without leaving the app. Because MegaNet is a static GitHub Pages
+suggestion without leaving the app. Because Flood-Net is a static GitHub Pages
 site with no backend (and nowhere safe for an API token), the reporter gathers
 context and opens GitHub's own pre-filled **New Issue** page — the user reviews
 it and clicks *Submit new issue*, so the report lands straight on the project
@@ -2884,9 +2889,9 @@ zoom, so what they collide with is the room the pane has.
 ### 17. Terrain Path Tools (Elevation Profile, Ground Cover & the Longley–Rice Link Budget)
 Two features under the Stations map that both answer *"will this radio path
 work?"*, and one module underneath them that neither could exist without:
-**ground elevation along a line**, which MegaNet previously had no way to get.
+**ground elevation along a line**, which Flood-Net previously had no way to get.
 
-**Terrain, with no backend.** MegaNet is a static page on GitHub Pages, so an
+**Terrain, with no backend.** Flood-Net is a static page on GitHub Pages, so an
 elevation API with a key was never available. Instead `Terrain` fetches
 **terrarium-encoded PNG elevation tiles** from AWS Terrain Tiles
 (`elevation-tiles-prod`) — open data, no key, `Access-Control-Allow-Origin: *`,
@@ -4330,7 +4335,7 @@ interference investigation starts from evidence instead of guesswork.
   Under it, *ACMA / RF Environment options* holds the mechanism checkboxes,
   minimum-score slider, current-licences-only, search
   radius, antenna beam wedges and threat links. Transmitters render as
-  **squares** (MegaNet stations are circles), coloured by mechanism, capped at
+  **squares** (Flood-Net stations are circles), coloured by mechanism, capped at
   the top 500 by score. Click one for a summary popup, then *Full details →*
   for the complete card: RF parameters, antenna, site (including ACMA's
   coordinate precision), licence, licensee, advisory notes / special
@@ -4434,7 +4439,7 @@ and opens a PR. In sandboxed
 environments without ACMA access, attach the extract to a GitHub Release
 (see the `acma-data-*` tags) and fetch it from there instead.
 
-`data/acma-licence-suggestions.csv` matches MegaNet repeater coordinates
+`data/acma-licence-suggestions.csv` matches Flood-Net repeater coordinates
 against ACMA sites to help backfill `repeater.acma_licence` (only 40 of the 88
 repeaters have it) — it is a review file, never applied automatically. The
 single highest-value data task remains backfilling `repeater.rx_mhz`: the
@@ -4456,7 +4461,7 @@ list.
 ## Interference Workbench
 
 A single investigation surface (**Workbench** tab): select the stations you
-believe are affected and MegaNet assembles the evidence spread across Map,
+believe are affected and Flood-Net assembles the evidence spread across Map,
 Networks, Bit Flipper, RF Environment and RF Changes into one argued case. It
 is deliberately not a dashboard — it states what it thinks, shows the evidence,
 says how confident it is, and names the observation most likely to change the

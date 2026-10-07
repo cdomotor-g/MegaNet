@@ -1,6 +1,6 @@
 # Access — who gets in, and who may change things
 
-MegaNet has two locks, and they are not the same lock. This is the page to read
+Flood-Net has two locks, and they are not the same lock. This is the page to read
 before changing either, and the page to open when somebody cannot get in.
 
 - **Cloudflare Access** is the perimeter. It decides who may load the site at
@@ -283,7 +283,7 @@ Dashboard → **Authentication** → **Email Templates** → **Magic Link**, and
 include the token somewhere in the body:
 
 ```html
-<p>Your MegaNet sign-in code is <strong>{{ .Token }}</strong>.</p>
+<p>Your Flood-Net sign-in code is <strong>{{ .Token }}</strong>.</p>
 <p>Or click here: <a href="{{ .ConfirmationURL }}">sign in</a></p>
 ```
 
@@ -360,7 +360,7 @@ that mints the session the way the gate route (#173) does.
    - If you are not allowed to register apps there, create a free tenant of your
      own (<https://azure.microsoft.com/free>), register it there instead, and
      choose the multitenant account type in the next step.
-2. **Name** `MegaNet`. For **Supported account types**, choose *Accounts in this
+2. **Name** `Flood-Net`. For **Supported account types**, choose *Accounts in this
    organizational directory only* if you are in the Bureau's tenant, or
    *Accounts in any organizational directory (Multitenant)* if you are in your
    own. For **Redirect URI**, choose platform **Web** and enter

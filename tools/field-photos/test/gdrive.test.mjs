@@ -8,7 +8,7 @@
 // linked one is read, and nothing but files with bytes of their own — not a
 // Google Doc, not a shortcut, not what is in the bin; a zip's photos come in as
 // photos of their own, and a run that stops inside a zip carries on from it;
-// the second run downloads nothing at all; a photo removed from MegaNet is
+// the second run downloads nothing at all; a photo removed from Flood-Net is
 // never brought back, even when the file changes in Drive; what a run could not
 // take is not tried again every fifteen minutes; and whatever is wrong with the
 // key or the folder is said in a sentence — never with the key in it.
@@ -295,7 +295,7 @@ test('the folder and every folder under it are imported, and the photos in a zip
   assert.equal(w.sync.runs, 2, 'every run reports, a quiet one included');
 });
 
-test('a photo removed from MegaNet stays removed — changed in Drive or not — and one added later is the only one looked at', async () => {
+test('a photo removed from Flood-Net stays removed — changed in Drive or not — and one added later is the only one looked at', async () => {
   const w = fakeWorld({
     items: [file('photo-x', 'x.jpg', ROOT, phone(5)), file('photo-y', 'y.jpg', ROOT, phone(6))],
     rows: [{ id: 'removed-y', origin: 'gdrive', origin_ref: 'photo-y', sha256: 'e'.repeat(64), deleted_at: '2026-06-25T00:00:00Z' }],
@@ -303,7 +303,7 @@ test('a photo removed from MegaNet stays removed — changed in Drive or not —
   const one = await sync(w);
   assert.equal(one.report.imported, 1);
   assert.equal(one.report.skipped, 1);
-  assert.match(one.report.detail.files.find(f => f.name === 'y.jpg').reason, /removed from MegaNet — not brought back/);
+  assert.match(one.report.detail.files.find(f => f.name === 'y.jpg').reason, /removed from Flood-Net — not brought back/);
   assert.deepEqual(w.downloads, ['x.jpg'], 'a removed photo is not even downloaded');
 
   // Somebody removes x in MegaNet, then edits it in Drive (a new version);
@@ -315,7 +315,7 @@ test('a photo removed from MegaNet stays removed — changed in Drive or not —
   assert.equal(two.report.seen, 2, 'x changed, z new — y, unchanged, is not looked at again');
   assert.equal(two.report.imported, 1);
   assert.equal(two.report.skipped, 1);
-  assert.match(two.report.detail.files.find(f => f.name === 'x.jpg').reason, /removed from MegaNet/);
+  assert.match(two.report.detail.files.find(f => f.name === 'x.jpg').reason, /removed from Flood-Net/);
   assert.deepEqual(w.downloads, ['x.jpg', 'z.jpg']);
   assert.deepEqual(w.rpc.map(p => p.origin_ref), ['photo-x', 'photo-z']);
 });
@@ -378,7 +378,7 @@ test('a folder in a Shared Drive is listed from that drive, and its photos are f
   assert.equal(w.rpc[0].meta.gdrive.owner, null);
 });
 
-test('before MegaNet knows Google Drive as a way in, the run stops at the first photo and says why', async () => {
+test('before Flood-Net knows Google Drive as a way in, the run stops at the first photo and says why', async () => {
   const w = fakeWorld({ items: [file('photo-1', '1.jpg', ROOT, phone(11)), file('photo-2', '2.jpg', ROOT, phone(12))] });
   w.origins.delete('gdrive');
   const out = await sync(w);

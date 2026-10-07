@@ -177,7 +177,7 @@ const AdminTokens = (function () {
     if (focusCode && reqs !== null && !waiting.some(r => r.code === focusCode)) {
       const gone = (reqs || []).find(r => r.code === focusCode);
       h += '<p class="small txt-warn" role="status">' + (gone ? 'The request showing ' + esc(focusCode) + ' was ' + esc(gone.status) + '.'
-        : 'No request is waiting with the code ' + esc(focusCode) + ' — it may have expired, or not reached MegaNet yet.') + '</p>';
+        : 'No request is waiting with the code ' + esc(focusCode) + ' — it may have expired, or not reached Flood-Net yet.') + '</p>';
     }
     if (waiting.length) h += '<div class="adm-reqs" role="list" aria-labelledby="adm-req-h">' + waiting.map(r => '<div role="listitem">' + reqHtml(r) + '</div>').join('') + '</div>';
     if (recent.length) {

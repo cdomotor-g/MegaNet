@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MegaNet — Serial access on managed computers</title>
+<title>Flood-Net — Serial access on managed computers</title>
 <style>
   :root { color-scheme: light dark; }
   body { font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -25,7 +25,7 @@
 <body>
 <h1>Serial Monitor access on managed (work) computers</h1>
 
-<p>The MegaNet Serial Monitor uses the browser's
+<p>The Flood-Net Serial Monitor uses the browser's
 <a href="https://developer.mozilla.org/docs/Web/API/Web_Serial_API">Web Serial API</a>.
 On a personal computer, clicking <em>Choose COM port…</em> opens the browser's
 port picker and you select the device. On a <strong>managed work computer</strong>,
@@ -60,7 +60,7 @@ file; the Serial Monitor follows that file as it grows, and the card fills exact
 it would from the port — a Quansheng radio's dashboard, an ERT-A2's readings, or a
 plain text, hex or ALERT stream.</p>
 <p><strong>An RTL-SDR stick works this way too</strong>, on a Raspberry Pi: the Pi drives
-the stick with MegaNet's own decoder and prints what it hears on a serial port, which
+the stick with Flood-Net's own decoder and prints what it hears on a serial port, which
 PuTTY opens and logs like any other. Its log becomes an RTL-SDR card by itself. Setting
 the Pi up: <a href="sdr-pi.md">the SDR Pi guide</a>.</p>
 <ol>
@@ -81,7 +81,7 @@ the Pi up: <a href="sdr-pi.md">the SDR Pi guide</a>.</p>
       what makes each line reach the file as it arrives.</li>
   <li>Optionally save these settings under a name in <em>Session → Saved Sessions</em>,
       then press <strong>Open</strong>. The PuTTY window shows the device's output.</li>
-  <li>In MegaNet, open the <strong>Serial Monitor</strong> tab and <strong>drag the log
+  <li>In Flood-Net, open the <strong>Serial Monitor</strong> tab and <strong>drag the log
       file from File Explorer onto the tab</strong> — or drag the whole
       <code>serial-logs</code> folder, and the card follows whichever log in it is
       newest, moving on by itself when PuTTY starts a new session. A radio's log or an
@@ -155,7 +155,7 @@ values, but a screenshot of them is exactly what IT needs to see with the reques
   <li>Web Serial only ever grants access <em>per-site, per-device, with an explicit
       user gesture</em> (or an explicit device allowlist via policy). It cannot
       enumerate or open ports silently.</li>
-  <li>MegaNet is a static single-page app served from GitHub Pages
+  <li>Flood-Net is a static single-page app served from GitHub Pages
       (<a href="https://cdomotor-g.github.io/MegaNet/">cdomotor-g.github.io/MegaNet</a>);
       serial data is processed entirely in the browser and never leaves the machine.</li>
   <li>Policy reference:
@@ -163,6 +163,6 @@ values, but a screenshot of them is exactly what IT needs to see with the reques
       <a href="https://learn.microsoft.com/deployedge/microsoft-edge-policies#serialaskforurls">Edge serial policies</a>.</li>
 </ul>
 
-<p><a href="../index.html">← Back to MegaNet</a></p>
+<p><a href="../index.html">← Back to Flood-Net</a></p>
 </body>
 </html>

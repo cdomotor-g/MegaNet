@@ -308,7 +308,7 @@ try {
   await page.waitForTimeout(300);
   const out = await text('#main-content');
   ok('signed out, the tab says what it is for and offers to sign in',
-    /checks in with MegaNet/.test(out) && await page.evaluate(() => !!document.querySelector('#main-content button[onclick="Auth.open()"]')), out.slice(0, 200));
+    /checks in with Flood-Net/.test(out) && await page.evaluate(() => !!document.querySelector('#main-content button[onclick="Auth.open()"]')), out.slice(0, 200));
   await page.evaluate(() => { Auth.isSignedIn = () => true; Auth.role = () => 'editor'; BaseStations.authChanged(); });
   await page.waitForTimeout(300);
   ok('signed in without being an administrator, it says this needs one', /needs an administrator/.test(await text('#main-content')));

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MegaNet agent — answer questions about the station network with the Claude API.
+"""Flood-Net agent — answer questions about the station network with the Claude API.
 
 This is a reference implementation of an *agentic* Claude API loop that uses
 **code execution with tools** (programmatic tool calling): Claude runs Python in
@@ -24,12 +24,12 @@ The fix is to capture ``response.container.id`` and pass it back as the
 sandbox. See ``_run_turn`` below (the ``if container_id:`` branch).
 
 --------------------------------------------------------------------------------
-The live alternative: MegaNet's read-only API
+The live alternative: Flood-Net's read-only API
 --------------------------------------------------------------------------------
 This tool answers from a local ``stations.json``. The live database — the same
 register plus Service Level Specification entries, flood levels with their
 datums, health, ingested readings and inspection numbers — is open to any agent
-through MegaNet's read-only API: REST at https://floodwarning.net/api/v1 (OpenAPI
+through Flood-Net's read-only API: REST at https://floodwarning.net/api/v1 (OpenAPI
 at https://floodwarning.net/api/v1/openapi.json) and an MCP server at
 https://floodwarning.net/api/mcp, rate limited and needing no key. Its
 ``get_station_dossier`` tool returns everything about one station in one call.
@@ -66,7 +66,7 @@ DEFAULT_MODEL = "claude-opus-4-8"
 DEFAULT_STATIONS = Path(__file__).resolve().parent.parent / "stations.json"
 
 SYSTEM_PROMPT = (
-    "You are the MegaNet network analyst. MegaNet is a Bureau of Meteorology radio "
+    "You are the Flood-Net network analyst. Flood-Net is a Bureau of Meteorology radio "
     "and satcom telemetry network. Answer questions about the station network using "
     "the query_stations tool for the ground truth — never guess station data. Prefer "
     "writing Python in the code execution sandbox and calling query_stations from "
@@ -118,7 +118,7 @@ def make_query_stations_tool(stations: list[dict]):
     tool_def = {
         "name": "query_stations",
         "description": (
-            "Query the MegaNet station database. Combine any filters (AND). "
+            "Query the Flood-Net station database. Combine any filters (AND). "
             "Returns {'count': N, 'stations': [...]}; {'count': N} when count_only; "
             "or {'groups': [{'value', 'count'}, ...]} (descending) when group_by is set "
             "— use group_by to rank basins/LGAs etc. in a single call instead of guessing. "
@@ -268,7 +268,7 @@ def run_agent(question: str, *, stations_path: Path, model: str, max_tokens: int
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Ask the Claude-powered MegaNet agent about the station network.")
+    parser = argparse.ArgumentParser(description="Ask the Claude-powered Flood-Net agent about the station network.")
     parser.add_argument("question", nargs="?", help="Natural-language question about the network.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Claude model id (default: {DEFAULT_MODEL}).")
     parser.add_argument("--max-tokens", type=int, default=8000)

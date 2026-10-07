@@ -1,4 +1,4 @@
-# Provisioning an ELPRO 115E-2 to publish into MegaNet over MQTT
+# Provisioning an ELPRO 115E-2 to publish into Flood-Net over MQTT
 
 This page covers one job: taking an ELPRO 115E-2 Ethernet I/O and Gateway from its
 box to the point where a reading it publishes appears in `meganet.reading`.
@@ -20,7 +20,7 @@ to understand the other's tools — that is the point of splitting them.
 > **[`elpro115e_blanks_sheet.md`](elpro115e_blanks_sheet.md) is the one you fill in first** —
 > every value the card asks for, with where to find it, and the three rows that are the
 > other office's to supply rather than yours.
-> It is one sitting, assumes no MegaNet knowledge, and gets a real reading into
+> It is one sitting, assumes no Flood-Net knowledge, and gets a real reading into
 > the database against the `elpro_test` station — which exists in the registry for
 > exactly this (`db/migrations/0021_elpro_test_station.sql`, publisher `elpro_test`,
 > addresses `9001`–`9003`). This page stays the reference behind it: it says *why*
@@ -42,7 +42,7 @@ own manual.
 
 Both cites are **PDF page numbers**. Do not use the 115E-2 manual's own table of contents
 or cross-references: they run as much as 12 pages out from the printed page numbers, and
-one reads "see 'Feature license keys' on page 4461". MegaNet facts are cited to `file:line`.
+one reads "see 'Feature license keys' on page 4461". Flood-Net facts are cited to `file:line`.
 
 > **Read the hardware caveat before you rely on the second document.** It is written for
 > the **x15U** family — 215U-2-BGN, 415U-E-Cx, 415U-2-Cx and 915U-2 (MQTT p.1) — and does
@@ -59,7 +59,7 @@ one reads "see 'Feature license keys' on page 4461". MegaNet facts are cited to 
 
 ## Read this before you buy anything
 
-**The 115E-2 can be made to publish something MegaNet stores, and it needs one small,
+**The 115E-2 can be made to publish something Flood-Net stores, and it needs one small,
 idiomatic change to the bridge to do it.** That is a change of verdict from the first
 version of this page, and it comes from ELPRO's MQTT Gateway Configuration Guide, which
 answers the questions the hardware manual left open.
@@ -70,7 +70,7 @@ Three facts decide it:
 using / symbol for logical system separations" (MQTT p.6). The full published topic is
 simply the prefix plus the **Device** name: "The Device is added to the topic prefix at top
 of table to form the overall topic to this payload" (MQTT p.10). So the device can be made
-to publish any topic you can spell — including MegaNet's.
+to publish any topic you can spell — including Flood-Net's.
 
 **2 · Plain MQTT is JSON, not protobuf.** With Sparkplug *off*, the gateway publishes
 (MQTT p.4):
@@ -89,8 +89,8 @@ single message transmission" (MQTT p.4). **`timestamp` is epoch milliseconds, wh
 name of the input that is to be used in the MQTT message… Do not use # or + as they are
 illegal characters" (MQTT p.11, p.19).
 
-So the gap between ELPRO and MegaNet is no longer a wall. It is a key-name difference:
-ELPRO says `{"timestamp": …, "<label>": value}`, MegaNet wants
+So the gap between ELPRO and Flood-Net is no longer a wall. It is a key-name difference:
+ELPRO says `{"timestamp": …, "<label>": value}`, Flood-Net wants
 `{"alert_id": …, "reading_ts": …, "value_raw": …}`. That is a parser, not a redesign.
 
 ### Sparkplug is still a hard no
@@ -161,7 +161,7 @@ exactly the row in the troubleshooting table below that says to capture the actu
 string. **The fix was to subscribe `meganet/v1/+/+/reading/elpro/#`** and carry the tail
 as provenance, because the relayed station is real information the payload does not
 carry. Note `Station 1003` has a space in it: the tail is deliberately *not* held to the
-segment grammar, which exists for identifiers MegaNet resolves things by.
+segment grammar, which exists for identifiers Flood-Net resolves things by.
 
 **No device-side change was needed.** A unit configured off the card — prefix
 `meganet/v1/<station>/logger/reading/`, Device `elpro` — publishes readings to
@@ -191,7 +191,7 @@ list is not exhaustive for the 115E-2, so trust the unit over the document.
 `meganet/v1/<station>/logger/reading/elpro/` — puts *everything* the gateway emits under
 the subscribed filter, including the DBIRTH copies and the diagnostic devices. It is not
 the default and it is not needed for readings: DBIRTH duplicates a reading the unit is
-about to publish anyway (MegaNet's primary key absorbs it, `dup_count` rises), and the
+about to publish anyway (Flood-Net's primary key absorbs it, `dup_count` rises), and the
 diagnostic devices are human-labelled, so they become raw rows claiming nothing. Worth it
 only where somebody wants the gateway's own chatter in `reading_raw`, and worth knowing
 about because it explains why a site's topics may be one level deeper than this page.
@@ -200,14 +200,14 @@ about because it explains why a site's topics may be one level deeper than this 
 
 | | Path | Verdict |
 |---|---|---|
-| **A** | **Emit MegaNet's contract exactly, with no bridge change.** | **Not possible.** The topic can be spelled exactly, but the payload cannot: the gateway always emits `timestamp` plus label/value pairs, with no template for key names. Ruled out by MQTT p.4. |
+| **A** | **Emit Flood-Net's contract exactly, with no bridge change.** | **Not possible.** The topic can be spelled exactly, but the payload cannot: the gateway always emits `timestamp` plus label/value pairs, with no template for key names. Ruled out by MQTT p.4. |
 | **B** | **A format segment plus a parser** (above). | **Recommended.** Idiomatic, ~1 subscription + 1 parser, keeps every per-station ACL and the one-contract property intact. |
 | **C** | **A translation service** republishing into the scheme. | Now unnecessary. Costs a second always-on process, a credential that can write as other stations, and it breaks the Last Will. Keep only if the bridge must not change at all. |
 | **D** | **Sparkplug B decoding.** | Still net-new engineering, and now clearly avoidable — plain mode gives JSON. Revisit only if a Sparkplug fleet arrives. |
 | **E** | **Skip MQTT, poll Modbus TCP.** | Still viable and still carries no device-side unknowns, but it forfeits store-and-forward, which is the best thing the ELPRO gateway offers (below). |
 | **F** | **Do the status half separately.** | **Still needed, and still open** — see the Last Will gap below. The reading path and the liveness path remain independent. |
 
-### What ELPRO gives you that MegaNet's own loggers do not
+### What ELPRO gives you that Flood-Net's own loggers do not
 
 **Store-and-forward, up to 10,000 messages.** "Queuing or Historian store-and-forward is a
 mode that allows the remote node to be able to hold messages when there is a break in
@@ -218,7 +218,7 @@ across all configured brokers; and messages for a common topic are concentrated 
 single message on the way out (MQTT p.14).
 
 This covers the outage case from the device side, which is worth more here than the QoS
-argument: a 115E-2 that loses the broker for an hour backfills, and MegaNet's primary key
+argument: a 115E-2 that loses the broker for an hour backfills, and Flood-Net's primary key
 eats any duplicates the backfill creates. **The queue is held in RAM and is lost on power
 failure** (MQTT p.14) — so it protects against a comms outage, not a flat battery.
 
@@ -229,7 +229,7 @@ failure** (MQTT p.14) — so it protects against a comms outage, not a flat batt
    Queue Delay and TLS (MQTT p.8) — **there is no will topic, will payload, will QoS or
    will retain field**, even though the Keep Alive description refers to "the configured
    last will and testament". For Sparkplug that will is NDEATH, defined by the standard;
-   for plain MQTT the document never says what, if anything, is sent. So MegaNet's
+   for plain MQTT the document never says what, if anything, is sent. So Flood-Net's
    `{"online": false}` on `meganet/v1/<station>/status` **cannot be produced by
    configuration**, and station-offline detection has to come from
    `station_health.minutes_since_seen` — which the view already exposes and deliberately
@@ -245,7 +245,7 @@ failure** (MQTT p.14) — so it protects against a comms outage, not a flat batt
 
 ## What you are actually building
 
-A 115E-2 in a MegaNet context is a **base station**, not a sensor. It has its own I/O,
+A 115E-2 in a Flood-Net context is a **base station**, not a sensor. It has its own I/O,
 but the data worth publishing arrives from the field over ALERT2 and lands in its
 register store first:
 
@@ -269,7 +269,7 @@ Three joins have to be right, and they are owned by different people:
 2. **Register → published value.** An Input Configuration row names the register, the
    **Payload Prefix** that becomes the JSON key, and what triggers a publish
    (MQTT p.10–12).
-3. **Published value → MegaNet address.** A reading MegaNet stores needs an `alert_id`
+3. **Published value → Flood-Net address.** A reading Flood-Net stores needs an `alert_id`
    (1–65535), a relayed ALERT2 **station address + sensor slot**, or a `station_number` +
    `channel`. Which of the first two you get depends on which path the value took, and
    the device decides that, not you:
@@ -278,14 +278,14 @@ Three joins have to be right, and they are owned by different people:
      key on the wire *is* the address, stored as `a:6128`. This is what the
      register→reading map's Payload Prefix column is for.
    - **Relayed ALERT2.** The gateway sends `{"Sensor": 13, "Value": …}` under a topic
-     tail naming the relayed station, and MegaNet stores the **pair** — `a2:1003/13`
+     tail naming the relayed station, and Flood-Net stores the **pair** — `a2:1003/13`
      (#172). Nothing has to be mapped for the reading to land; what is mapped is which
-     *station* ALERT2 address 1003 is, and that is done once, in MegaNet, either on the
+     *station* ALERT2 address 1003 is, and that is done once, in Flood-Net, either on the
      station card or by claiming the address off a message in the Message Log.
 
 > **Note what does *not* need solving.** A base station may publish readings for many
 > field stations under its own topic. The reading carries its own address
-> (`alert_id`), and MegaNet stores against that, not against the topic segment
+> (`alert_id`), and Flood-Net stores against that, not against the topic segment
 > (`topics.js:41-45`). The topic segment only decides *who published* and which ACL
 > applies. So one 115E-2, one credential, one topic prefix — and hundreds of field
 > stations' readings inside it.
@@ -317,7 +317,7 @@ shared defaults. Limits: **1,000 readings** and **256 KiB** per message
 | `value_raw` | yes | The value as measured. A reading carrying only `value` is accepted; one with neither is rejected. |
 | `value`, `unit`, `quality` | no | `unit` comes from a fixed list (`mm`, `m`, `V`, `degC`, `NTU`, …) — an unrecognised one is a rejected row, not a guess. |
 
-**Status and Last Will** — what MegaNet wants, and what a 115E-2 cannot currently give it:
+**Status and Last Will** — what Flood-Net wants, and what a 115E-2 cannot currently give it:
 
 | | Value |
 |---|---|
@@ -400,7 +400,7 @@ Items 1–3 are a gate. Do not order hardware or brief a technician past them.
    own checksum, record it, and keep firmware plus configuration in the offsite backup
    the hardening appendix asks for (p.66).
 
-5. **Register the base station in MegaNet and fix its publisher segment.** Confirm the
+5. **Register the base station in Flood-Net and fix its publisher segment.** Confirm the
    exact string the database will resolve, before it is flashed into anything:
 
    ```sql
@@ -438,7 +438,7 @@ The full run is [`mqtt-provisioning.md`](mqtt-provisioning.md). What matters her
 9. **Confirm the bridge credential** (`meganet-bridge`, **subscribe** on `meganet/v1/#`,
    writes nothing) and that the bridge is running with `MQTT_CLIENT_ID` pinned.
 
-10. **Mint the MegaNet ingest token** if one does not exist, in the Supabase SQL editor:
+10. **Mint the Flood-Net ingest token** if one does not exist, in the Supabase SQL editor:
 
     ```sql
     select meganet.create_ingest_token('mqtt bridge');
@@ -485,15 +485,15 @@ The full run is [`mqtt-provisioning.md`](mqtt-provisioning.md). What matters her
 12. **Build the register → reading map.** One row per published point. This is the join
     nothing else supplies:
 
-    | ELPRO register | ALERT2 addr / sensor ID | Name | Type | Unit | MegaNet address |
+    | ELPRO register | ALERT2 addr / sensor ID | Name | Type | Unit | Flood-Net address |
     |---|---|---|---|---|---|
     | `46009` | `1234` / `1` | Loudoun Br river level | S-4 | `m` | `alert_id: 6128` |
 
     That last column is only needed for rows the unit publishes **off a register**, where
-    you choose the Payload Prefix and it becomes the address. A row that reaches MegaNet
+    you choose the Payload Prefix and it becomes the address. A row that reaches Flood-Net
     down the **relay** path already has an address of its own — `a2:1234/1`, the pair in
     columns two and three — so leave the column blank for those and record what the sensor
-    measures instead. It is the same question, asked once in MegaNet rather than encoded
+    measures instead. It is the same question, asked once in Flood-Net rather than encoded
     into the device (#172).
 
     Recommended ELPRO register ranges for ERT-A2 work (p.51):
@@ -530,7 +530,7 @@ The full run is [`mqtt-provisioning.md`](mqtt-provisioning.md). What matters her
     so `admin` and `user`
     remain as usernames whatever you do.
 
-15. **Publish cadence and volume.** No MegaNet-side budget exists yet. HiveMQ's free tier
+15. **Publish cadence and volume.** No Flood-Net-side budget exists yet. HiveMQ's free tier
     is 100 connections / 10 GB a month / 5 MB messages, and `meganet.retain()` is still
     run by hand — the whole network at 15-minute reporting is roughly 914,000 rows a
     day, which fills the Supabase free tier in under a week. Pick a cadence deliberately.
@@ -699,7 +699,7 @@ pages can do it, in either direction, and the web role-privileges table has no M
     | Field | Set to | Note |
     |---|---|---|
     | **MQTT Enable** | on | MQTT, like every protocol on this device, is **disabled by default** (p.66). |
-    | **Enable Sparkplug** | **off** | Not optional. With Sparkplug on the topic is forced to `spBv1.0/GROUP/STATE/NODE` and the payload becomes protobuf — MegaNet can store neither (MQTT p.4, p.6). |
+    | **Enable Sparkplug** | **off** | Not optional. With Sparkplug on the topic is forced to `spBv1.0/GROUP/STATE/NODE` and the payload becomes protobuf — Flood-Net can store neither (MQTT p.4, p.6). |
     | **Owner Name (Group)** / **Device Name (Node)** | from the sheet | Pulled from Module Information; editable here (MQTT p.6). With Sparkplug off these do not appear in the topic, but they are reported in the node's own status messages. |
     | **Topic Prefix** | `meganet/v1/<station>/logger/reading/` — exactly, from the sheet | Free-form, `/` allowed anywhere (MQTT p.6). The **Device** name from step 22 becomes the final segment, giving the full topic. |
     | **Queuing Mode** | **FIFO** unless the sheet says otherwise | FIFO replays an outage in the order it happened, which is what you want for a backfill (MQTT p.7). |
@@ -774,7 +774,7 @@ pages can do it, in either direction, and the web role-privileges table has no M
     > For more than a handful of rows use **Export Table / Import Table** — the CSV
     > round-trip below the table (MQTT p.18–19, and step 32).
 
-24. **Outputs tab** (p.41): leave it alone unless the sheet says otherwise. MegaNet's
+24. **Outputs tab** (p.41): leave it alone unless the sheet says otherwise. Flood-Net's
     bridge publishes nothing and sends no commands, so there is nothing to subscribe to.
 
 25. **Commit** — **Program Unit** in CConfig (p.16), or **Save and Activate Changes** on
@@ -972,7 +972,7 @@ done instead.
 
 ### D1 · Sysadmin side, before the device exists
 
-Prove the MegaNet half on its own, so that when the device fails you already know it is
+Prove the Flood-Net half on its own, so that when the device fails you already know it is
 not this half.
 
 1. **Broker and ACL.** In the HiveMQ Web Client (port **8884**, `wss://` — a browser
@@ -1050,11 +1050,11 @@ gives `message_unparseable`.
 
 **In none of these cases is the device told anything.** MQTT gives a publisher no reply
 channel — the PUBACK it receives is from the *broker*, and means the broker has the
-message, not that MegaNet does.
+message, not that Flood-Net does.
 
 ### D4 · Find out what the Last Will actually does
 
-On a MegaNet logger this step confirms offline detection works. **On a 115E-2 it is an
+On a Flood-Net logger this step confirms offline detection works. **On a 115E-2 it is an
 experiment**, because the broker table has no will fields at all (MQTT p.8) and nothing
 documents what plain MQTT mode emits on an ungraceful disconnect.
 
@@ -1122,7 +1122,7 @@ here as a record, because knowing a question is *settled* is worth as much as th
 | Still unknown | Why it matters |
 |---|---|
 | **Publish QoS and retain.** Neither is a configurable field, and the guide never states what the gateway publishes with. Only the *subscribe* (output) side has a QoS field, "usually set to 1" (MQTT p.13). | If publishes are QoS 0, at-least-once does not hold between device and broker. Store-and-forward covers the outage case, so measure it rather than assume it — capture on the bench. |
-| **Last Will in plain MQTT mode.** The broker table has no will topic, payload, QoS or retain field, yet the Keep Alive description refers to "the configured last will and testament" (MQTT p.8). For Sparkplug the will is NDEATH; for plain MQTT nothing is documented. | MegaNet's retained `{"online": false}` cannot be produced by configuration, so offline detection falls back to `station_health.minutes_since_seen`. Confirm on the bench whether *any* will is emitted, and to what topic. |
+| **Last Will in plain MQTT mode.** The broker table has no will topic, payload, QoS or retain field, yet the Keep Alive description refers to "the configured last will and testament" (MQTT p.8). For Sparkplug the will is NDEATH; for plain MQTT nothing is documented. | Flood-Net's retained `{"online": false}` cannot be produced by configuration, so offline detection falls back to `station_health.minutes_since_seen`. Confirm on the bench whether *any* will is emitted, and to what topic. |
 
 **Two more that the guide does not touch, and the hardware manual did not either:**
 
@@ -1186,7 +1186,7 @@ here as a record, because knowing a question is *settled* is worth as much as th
   Reset**" (p.47) while the reset procedure says press "**Clear Configuration and Reset**"
   (p.56); and that procedure names the rebooting product as "The 215U-2".
 
-### E3 · Not in MegaNet either
+### E3 · Not in Flood-Net either
 
 - ~~**No `elpro` parser yet.**~~ — shipped. `READING_FORMATS = ['json', 'hfem', 'elpro']`,
   the fourth subscription is live, and `parseElpro()` decodes `timestamp` plus
@@ -1197,7 +1197,7 @@ here as a record, because knowing a question is *settled* is worth as much as th
   rather than asserting one string.
 - **No topic prefix, rewrite or template setting exists in the bridge**, and none is
   needed now that the device's prefix is free-form — but it does mean the device must
-  spell MegaNet's topic exactly, not approximately, **up to and including the `elpro`
+  spell Flood-Net's topic exactly, not approximately, **up to and including the `elpro`
   segment**. Below that segment the gateway spells what it likes and the bridge carries
   it as provenance (#169).
 - **No Sparkplug B / protobuf decoder**, and no vendor-payload key-mapping layer. The
@@ -1294,7 +1294,7 @@ odd addresses** — `46009`, then `46011`, then `46013`; reading `46012` is an a
 <Topic Prefix>  +  "/"  +  <Device name>
 ```
 
-Both are free text; the prefix may contain any number of `/`. For MegaNet:
+Both are free text; the prefix may contain any number of `/`. For Flood-Net:
 `meganet/v1/<station>/logger/reading/` + `elpro`.
 
 **Payload (Sparkplug off)**
@@ -1430,7 +1430,7 @@ what units, and no code can find out: it is a fact about an instrument in a padd
 
 What has changed since that was first written is what it takes to answer it, and it is now
 much less. This page used to say somebody had to map each relayed station and sensor ID to
-an ALERT2 address MegaNet would store the reading under. **That mapping is gone** (#172).
+an ALERT2 address Flood-Net would store the reading under. **That mapping is gone** (#172).
 A relayed reading is stored as the pair that arrived — `a2:1003/13` — so the traffic lands,
 is visible, and is countable before anybody has decided anything. Two smaller answers
 replace the one big one, and neither is a prerequisite for the data arriving:
@@ -1446,7 +1446,7 @@ replace the one big one, and neither is a prerequisite for the data arriving:
    button on each one nobody has claimed — so the question is asked with the evidence
    beside it rather than from a blank form.
 
-Neither is the technician's to type. Both are sysadmin's, both are done in MegaNet rather
+Neither is the technician's to type. Both are sysadmin's, both are done in Flood-Net rather
 than on the device, and neither blocks a trial.
 
 **The rest is the fleet questions in [A1](#a1--fleet-standards)** — the TLS rung that

@@ -536,7 +536,7 @@ let dossier;
   check('crossings carry the legend\'s words', fl.crossings.status === 'ok' && fl.crossings.items.every(c => !c.crossing_type || c.crossing_type_label));
 
   const tel = dossier.telemetry;
-  check('health says when MegaNet last heard it', tel.health.status === 'ok' && tel.health.last_seen_at && tel.health.minutes_since_seen === 5);
+  check('health says when Flood-Net last heard it', tel.health.status === 'ok' && tel.health.last_seen_at && tel.health.minutes_since_seen === 5);
   const ch = tel.recent_daily.channels || [];
   check('recent daily rollups are summarised per channel over exactly 30 UTC days', tel.recent_daily.status === 'ok' && ch.length === 2
     && ch.every(c => c.days_with_data === 30), ch.map(c => `${c.addr}:${c.days_with_data}`).join(' '));
@@ -886,9 +886,9 @@ section('CORS, HEAD, ETag');
 
 {
   const pre = await send('/api/v1/stations', { method: 'OPTIONS', headers: { Origin: 'https://example.org',
-    'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'x-meganet-client' } });
+    'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'x-floodnet-client' } });
   check('a preflight is 204 with open CORS for GET', pre.status === 204 && pre.headers.get('access-control-allow-origin') === '*'
-    && pre.headers.get('access-control-allow-methods') === 'GET, HEAD, OPTIONS' && /x-meganet-client/i.test(pre.headers.get('access-control-allow-headers')));
+    && pre.headers.get('access-control-allow-methods') === 'GET, HEAD, OPTIONS' && /x-floodnet-client/i.test(pre.headers.get('access-control-allow-headers')));
   const mpre = await send('/api/mcp', { method: 'OPTIONS', headers: { Origin: 'http://localhost:6274', 'Access-Control-Request-Method': 'POST',
     'Access-Control-Request-Headers': 'content-type, mcp-protocol-version' } });
   check('the MCP preflight allows POST', mpre.status === 204 && mpre.headers.get('access-control-allow-methods') === 'POST, OPTIONS');
@@ -924,10 +924,12 @@ section('Throttling');
     && Number(r.headers.get('retry-after')) >= 1 && r.json.retry_after === Number(r.headers.get('retry-after')) && r.json.error === 'rate limited',
     `${r.headers.get('retry-after')} ${r.json && r.json.detail}`);
   check('…names the limiter that answered', r.headers.get('x-ratelimit-limiter') === 'isolate');
-  const other = await get('/api/v1/', { ip, headers: { 'X-MegaNet-Client': 'report-bot' } });
-  check('a named client behind the same address has its own allowance', other.status === 200 && other.headers.get('x-meganet-client') === 'report-bot');
+  const other = await get('/api/v1/', { ip, headers: { 'X-FloodNet-Client': 'report-bot' } });
+  check('a named client behind the same address has its own allowance', other.status === 200 && other.headers.get('x-floodnet-client') === 'report-bot');
   const viaQuery = await get('/api/v1/?client=second-bot', { ip });
-  check('…and so does one named with ?client=', viaQuery.status === 200 && viaQuery.headers.get('x-meganet-client') === 'second-bot');
+  check('…and so does one named with ?client=', viaQuery.status === 200 && viaQuery.headers.get('x-floodnet-client') === 'second-bot');
+  const legacy = await get('/api/v1/', { ip, headers: { 'X-MegaNet-Client': 'old-bot' } });
+  check('…and one still naming itself with the header\'s old name, X-MegaNet-Client', legacy.status === 200 && legacy.headers.get('x-floodnet-client') === 'old-bot');
 
   api.resetApiState();
   const addr = api.RATE_LIMITS.find(x => x.name === 'address');
@@ -935,7 +937,7 @@ section('Throttling');
   for (let c = 0; c < 20 && !tripped; c++) {
     for (let i = 0; i < 19 && !tripped; i++) {
       n++;
-      const x = await get('/api/v1/', { ip: '203.0.113.10', headers: { 'X-MegaNet-Client': `bot-${c}` } });
+      const x = await get('/api/v1/', { ip: '203.0.113.10', headers: { 'X-FloodNet-Client': `bot-${c}` } });
       if (x.status === 429) tripped = { n, x };
     }
   }
@@ -988,7 +990,7 @@ section('MCP');
   const res = init.json.result;
   check('initialize echoes a supported protocol version', init.status === 200 && res.protocolVersion === '2025-06-18', res && res.protocolVersion);
   check('…declares tools and no list-change notifications', res.capabilities.tools && res.capabilities.tools.listChanged === false);
-  check('…names the server and gives instructions', res.serverInfo.name === 'meganet' && /READ-ONLY/.test(res.instructions) && /dossier/.test(res.instructions));
+  check('…names the server and gives instructions', res.serverInfo.name === 'floodnet' && /READ-ONLY/.test(res.instructions) && /dossier/.test(res.instructions));
   check('…and mints no session', !init.headers.get('mcp-session-id'));
   const future = await rpc('initialize', { protocolVersion: '2099-01-01', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
   check('an unknown version in initialize is answered with the latest legacy one', future.json.result.protocolVersion === '2025-11-25');
@@ -1102,7 +1104,7 @@ section('MCP');
   const d = disc.json.result;
   check('2026-07-28: server/discover lists the versions, capabilities and instructions', disc.status === 200 && d.supportedVersions.includes(V)
     && d.supportedVersions.includes('2025-06-18') && d.capabilities.tools && d.instructions && d.resultType === 'complete', JSON.stringify(d.supportedVersions));
-  check('…and names the server in _meta', d._meta['io.modelcontextprotocol/serverInfo'].name === 'meganet');
+  check('…and names the server in _meta', d._meta['io.modelcontextprotocol/serverInfo'].name === 'floodnet');
   const tl = await modern('tools/list');
   check('2026-07-28: tools/list is cacheable (ttlMs, cacheScope)', tl.status === 200 && tl.json.result.ttlMs > 0 && tl.json.result.cacheScope === 'public'
     && tl.json.result.resultType === 'complete');
@@ -1179,20 +1181,20 @@ section('Edge cache');
   const readsFirst = stub.requests.length;
   stub.requests = [];
   const second = await call(`/api/v1/stations/${RICH.id}/dossier`);
-  check('a repeated question is answered from the edge cache without the database', first.headers.get('x-meganet-cache') === 'miss'
-    && second.headers.get('x-meganet-cache') === 'hit' && stub.requests.length === 0 && readsFirst > 0, `${readsFirst} then ${stub.requests.length}`);
+  check('a repeated question is answered from the edge cache without the database', first.headers.get('x-floodnet-cache') === 'miss'
+    && second.headers.get('x-floodnet-cache') === 'hit' && stub.requests.length === 0 && readsFirst > 0, `${readsFirst} then ${stub.requests.length}`);
   const toolCall = await rpc('tools/call', { name: 'get_station_dossier', arguments: { id: RICH.id } });
   check('an MCP tool call shares the REST answer\'s cache entry', toolCall.json.result.isError === false && stub.requests.length === 0);
   const vocabCached = [...cache.store.keys()].some(k => k.startsWith(`${api.SUPABASE_REST_URL}/catchment?`));
   check('the vocabularies are cached at the edge too, by their upstream URL', vocabCached);
   const withClient = await call(`/api/v1/stations/${RICH.id}/dossier?client=someone`);
-  check('?client= is not part of the cache key', withClient.headers.get('x-meganet-cache') === 'hit');
+  check('?client= is not part of the cache key', withClient.headers.get('x-floodnet-cache') === 'hit');
   stub.fault = () => new TypeError('fetch failed');
   const failed = await call(`/api/v1/stations/${SPARSE.id}`);
   stub.fault = null;
   const after = await call(`/api/v1/stations/${SPARSE.id}`);
   check('an error is never cached: the next ask goes to the database and succeeds', failed.status === 502 && after.status === 200
-    && after.headers.get('x-meganet-cache') === 'miss', `${failed.status} then ${after.status} ${after.headers.get('x-meganet-cache')}`);
+    && after.headers.get('x-floodnet-cache') === 'miss', `${failed.status} then ${after.status} ${after.headers.get('x-floodnet-cache')}`);
   delete globalThis.caches;
 }
 

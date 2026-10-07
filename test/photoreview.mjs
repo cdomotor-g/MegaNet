@@ -229,7 +229,7 @@ function seed(db) {
     up(3, 1, { file_name: 'IMG_0007.JPG', archive_name: 'run-3.zip', outcome: 'unplaced', photo_id: db.photos[1].id }),
     up(4, 2, { file_name: 'IMG_0008.JPG', archive_name: 'run-3.zip', outcome: 'refused', reason: 'Refused — it unpacks to more than the zip says it holds.' }),
     up(5, 3, { file_name: 'IMG_0009.JPG', outcome: 'failed', reason: 'HTTP 503' }),
-    up(6, 4, { file_name: 'DSC_0101.JPG', origin: 'dropbox', outcome: 'duplicate', reason: 'the same photo is already in MegaNet', photo_id: db.photos[0].id, uploaded_by: 'Dropbox — Flood Crew' }),
+    up(6, 4, { file_name: 'DSC_0101.JPG', origin: 'dropbox', outcome: 'duplicate', reason: 'the same photo is already in Flood-Net', photo_id: db.photos[0].id, uploaded_by: 'Dropbox — Flood Crew' }),
     up(7, 5, { file_name: 'notes.txt', origin: 'gdrive', outcome: 'skipped', reason: 'not a photo', uploaded_by: 'Google Drive — Flood Crew' }),
     up(8, 6, { file_name: 'IMG_0010.JPG', origin: 'gdrive', outcome: 'failed', reason: 'the download stopped', uploaded_by: 'Google Drive — Flood Crew' }),
   );
@@ -362,7 +362,7 @@ async function browserHalf() {
       && /^IMG_0010\.JPG/.test((await text('#pr-uploads tbody tr:first-child td:nth-child(3)')) || '')
       && /Google Drive/.test(await text('#pr-uploads tbody tr:first-child')), `${upRows} rows; ${await text('#pr-uploads tbody tr:first-child')}`);
     ok('…counted per outcome over them', /All 8/.test(await text('#pr-uploads .pr-filters')) && /Imported 2/.test(await text('#pr-uploads .pr-filters'))
-      && /Failed 2/.test(await text('#pr-uploads .pr-filters')) && /Already in MegaNet 1/.test(await text('#pr-uploads .pr-filters')), await text('#pr-uploads .pr-filters'));
+      && /Failed 2/.test(await text('#pr-uploads .pr-filters')) && /Already in Flood-Net 1/.test(await text('#pr-uploads .pr-filters')), await text('#pr-uploads .pr-filters'));
     ok('…each saying the zip it came out of, and why it was refused',
       /IMG_0008\.JPG from run-3\.zip Refused Refused — it unpacks to more than the zip says it holds\./.test(await text('#pr-uploads tbody')), await text('#pr-uploads tbody'));
     ok('…with a way to the photo a file became', (await page.$$eval('#pr-uploads button', bs => bs.filter(b => b.textContent === 'Show it').length)) === 4);

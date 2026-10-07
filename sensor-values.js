@@ -344,7 +344,7 @@ const SensorValues = (() => {
     if (kind === 'level') {
       return {
         value: null, unit: null, text: 'raw count', plausible: true,
-        rule: 'water level — its scale is set per site and MegaNet records none, so the raw count is the reading',
+        rule: 'water level — its scale is set per site and Flood-Net records none, so the raw count is the reading',
         note: '',
       };
     }

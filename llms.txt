@@ -1,8 +1,8 @@
-# MegaNet
+# Flood-Net
 
-> MegaNet (https://floodwarning.net) is the engineering register of the Bureau of Meteorology's Queensland flood-warning telemetry network — rainfall and river-height stations, repeaters, base stations and radio paths. Agents can read its public station data through a read-only REST API at https://floodwarning.net/api/v1 and an MCP server at https://floodwarning.net/api/mcp. It is not a flood warning service.
+> Flood-Net (https://floodwarning.net) is the engineering register of the Bureau of Meteorology's Queensland flood-warning telemetry network — rainfall and river-height stations, repeaters, base stations and radio paths. Agents can read its public station data through a read-only REST API at https://floodwarning.net/api/v1 and an MCP server at https://floodwarning.net/api/mcp. It is not a flood warning service.
 
-No sign-in or key. Rate limits: 60 requests / 60 s per client, 20 requests / 10 s per client (burst), 240 requests / 60 s per address; on 429 wait for Retry-After. Name your client with the X-MegaNet-Client header or ?client=. Station ids are lowercase slugs such as abergowrie_br_al (a Bureau station number also works); the dossier endpoint (/api/v1/stations/{id}/dossier, MCP tool get_station_dossier) returns everything about one station with sources. Flood classes are metres on the gauge, AEP levels modelled metres AHD (indicative). Full documentation: docs/agent-api.md.
+No sign-in or key. Rate limits: 60 requests / 60 s per client, 20 requests / 10 s per client (burst), 240 requests / 60 s per address; on 429 wait for Retry-After. Name your client with the X-FloodNet-Client header or ?client=. Station ids are lowercase slugs such as abergowrie_br_al (a Bureau station number also works); the dossier endpoint (/api/v1/stations/{id}/dossier, MCP tool get_station_dossier) returns everything about one station with sources. Flood classes are metres on the gauge, AEP levels modelled metres AHD (indicative). Full documentation: docs/agent-api.md.
 
 ## API
 
@@ -17,7 +17,7 @@ No sign-in or key. Rate limits: 60 requests / 60 s per client, 20 requests / 10 
 
 ## Optional
 
-- [About MegaNet](https://floodwarning.net/about): what it is and is not
+- [About Flood-Net](https://floodwarning.net/about): what it is and is not
 - [Access and data policy](https://github.com/cdomotor-g/MegaNet/blob/main/docs/access.md): why the station data is public
 - [Database schema](https://github.com/cdomotor-g/MegaNet/blob/main/db/README.md): the tables and views behind the API
 - [Source code](https://github.com/cdomotor-g/MegaNet): the repository

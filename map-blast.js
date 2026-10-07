@@ -290,7 +290,7 @@ const MapBlast = (function () {
           csvEscape(rule),
         ].join(','));
       }
-      dlText(`meganet-blast-${(R ? R.id : id)}.csv`, lines.join('\n'));
+      dlText(`floodnet-blast-${(R ? R.id : id)}.csv`, lines.join('\n'));
     },
   };
 })();

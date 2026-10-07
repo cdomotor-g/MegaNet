@@ -50,7 +50,7 @@ card.
 ## Part 0 — Clean up the accidental Fly app
 
 **Do this first, and do not skip it.** A `fly launch` run from the repository
-root builds and deploys *the repository*, not the bridge — the whole MegaNet
+root builds and deploys *the repository*, not the bridge — the whole Flood-Net
 tree, with whatever start command Fly guessed. That app is not the bridge, it
 cannot become the bridge, and while it exists it may be running a machine you are
 paying for.
@@ -89,7 +89,7 @@ explicitly, every time, and it cannot pick up anything else.
    free plan.
 3. Pick the region **closest to where the bridge will run**, not to the stations.
    A station's hop is one TLS connection it holds open; the bridge's hop is every
-   message. Take **AWS ap-southeast-2 (Sydney)** if offered — the MegaNet
+   message. Take **AWS ap-southeast-2 (Sydney)** if offered — the Flood-Net
    Supabase project is already in `ap-southeast-2`.
 4. **Create.** Ready in under a minute.
 
@@ -160,7 +160,7 @@ your cluster.
 
 5. **Publish.**
 
-**Expected:** it publishes without error. Nothing lands in MegaNet yet — nothing
+**Expected:** it publishes without error. Nothing lands in Flood-Net yet — nothing
 is subscribed. That is correct at this step.
 
 Now prove the ACL is doing its job, which is the half nobody tests:
@@ -178,7 +178,7 @@ Now prove the ACL is doing its job, which is the half nobody tests:
 
 ## Part 2 — The ingest token
 
-The bridge authenticates to MegaNet the same way a base-station logger does: an
+The bridge authenticates to Flood-Net the same way a base-station logger does: an
 ordinary ingest token, no service key. Three RPCs, and `revoked_at` turns all
 three off at once. **The bridge is not more trusted than the loggers it relays
 for.**
@@ -331,7 +331,7 @@ select station_key, station_id, online, since, last_reading_at
 **The station published under `541155`; the row comes back keyed
 `loudoun_br_al`.** That is correct, and it is the point of the identity work in
 `0020`: the bureau number is how a station announces itself on the wire, and
-`station.id` is how MegaNet files it once the identity resolves. A row still
+`station.id` is how Flood-Net files it once the identity resolves. A row still
 keyed by a bare number is one the registry cannot name — check that number
 against `meganet.station.station_number`.
 
@@ -429,7 +429,7 @@ Better to learn that now than after forty stations are flashed.
 | Signal | What to do |
 |---|---|
 | Approaching 100 connections | One connection per publishing station, plus the bridge. HiveMQ Cloud Starter is unlimited connections, hourly billing. |
-| Above 10 GB/month | At 15-minute reporting, MegaNet's whole network is nowhere near this. Recheck if reporting intervals shorten. |
+| Above 10 GB/month | At 15-minute reporting, Flood-Net's whole network is nowhere near this. Recheck if reporting intervals shorten. |
 | Persistent sessions insufficient (Part 5) | EMQX Serverless, or Mosquitto on a ~$5/mo VPS with the config in `bridge/deploy/`. |
 | An employer broker appears | Ask for a credential on it. That is the best answer if the corporate move happens. |
 

@@ -1,6 +1,6 @@
 # sdr-pi — an RTL-SDR on a Raspberry Pi, for a PC that cannot reach USB
 
-The Pi drives the stick with MegaNet's own driver (`../rtlsdr.js`) and decoder
+The Pi drives the stick with Flood-Net's own driver (`../rtlsdr.js`) and decoder
 (`../alert-dsp.js`) and prints what it hears on a serial port — the USB-C port of a
 Pi 4 or 5 made into a USB serial device, or the GPIO UART with a USB-serial cable.
 PuTTY on the PC logs that port; the Serial Monitor's RTL-SDR card follows the log.

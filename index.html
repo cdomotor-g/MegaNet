@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>MegaNet — radio and satcom telemetry network tool</title>
+  <title>Flood-Net — radio and satcom telemetry network tool</title>
 
   <!-- The app is a shell that draws itself from JavaScript, so anything that
        does not run scripts — a categorisation crawler, a proxy deciding what
@@ -24,7 +24,7 @@
 
   <!-- First focusable thing on the page, and invisible until it is focused
        (#109). The nav is twenty buttons and a find box: without this, a
-       keyboard user arriving at MegaNet had twenty-two stops to make before
+       keyboard user arriving at Flood-Net had twenty-two stops to make before
        reaching the first control on the tab they came for, on every single
        page load. focusMain() rather than the href alone — a fragment jump
        scrolls the page but leaves focus at the top of the document in several
@@ -49,12 +49,13 @@
             aria-controls="tab-nav" aria-expanded="false" aria-label="Sections"
             title="Sections">☰</button>
     <div class="header-id">
-      <!-- The name in the banner, and only there (#191). Everything the repo
-           calls itself — the file names, the module prefixes, the Radio Mobile
-           export's MegaNet*.csv set, the bug reporter's user agent — is
-           untouched: renaming a product in the one place people read it is a
-           label change, and renaming it everywhere would be a migration with a
-           thousand edges and nothing gained on screen. -->
+      <!-- The product is Flood-Net in everything a person reads: this banner
+           (#191), the page titles, every label, message and help entry, the
+           files it downloads and the agent API. "meganet" survives only where
+           nobody reads it as a name — the repository, the database schema,
+           storage keys, MQTT topics, the Worker and bucket names, and the
+           Quansheng radio's station-table tag — because renaming those is a
+           migration with a thousand edges and nothing gained on screen. -->
       <h1>Flood-Net</h1>
       <p class="header-sub">
         <span class="header-tag">Network Tool</span>

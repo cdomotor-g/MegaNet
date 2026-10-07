@@ -57,7 +57,7 @@ const r3 = v => (v == null || !isFinite(v) ? null : Math.round(v * 1000) / 1000)
 
 // ── options ──────────────────────────────────────────────────────────────────
 
-const USAGE = `MegaNet SDR Pi — an RTL-SDR decoding ALERT, on a serial port for PuTTY.
+const USAGE = `Flood-Net SDR Pi — an RTL-SDR decoding ALERT, on a serial port for PuTTY.
 
   --serial PATH|auto  talk on this serial port (repeatable). auto: ${AUTO_SERIAL.join(' and ')}
                       when present — the USB-C gadget and the GPIO UART
@@ -76,7 +76,7 @@ const USAGE = `MegaNet SDR Pi — an RTL-SDR decoding ALERT, on a serial port fo
   --set KEY=VALUE     a setting at start (repeatable), as the console's CFG takes it
   --state PATH        where settings are kept (default $STATE_DIRECTORY/settings.json,
                       else ~/.config/meganet-sdr/settings.json); "none" to keep nothing
-  --stations PATH     MegaNet's stations.json, to name stations (default ../stations.json)
+  --stations PATH     Flood-Net's stations.json, to name stations (default ../stations.json)
   --rtl-sdr PATH      the rtl_sdr program for --source rtl_sdr (default rtl_sdr)
   --no-title          do not set the terminal's window title
   --help              this
@@ -495,7 +495,7 @@ class Relay {
   }
 
   banner() {
-    return 'MegaNet SDR Pi ' + SdrPi.VERSION + ' on ' + SdrPi.clean(this.host) + ' - '
+    return 'Flood-Net SDR Pi ' + SdrPi.VERSION + ' on ' + SdrPi.clean(this.host) + ' - '
       + (this.info ? SdrPi.clean(this.info.modelLabel) + ' ' + SdrPi.clean(this.info.tuner) : 'looking for a stick') + ' - '
       + this.channelsText() + ' - type HELP and press Enter';
   }
@@ -555,7 +555,7 @@ class Relay {
   title() {
     if (!this.opts.title) return;
     const s = this.settings, lv = this.lastLevel, n = this.decoders.length;
-    const t = 'MegaNet SDR Pi - ' + (s.freq / 1e6).toFixed(4) + ' MHz ' + s.fmt + (n > 1 ? ' + ' + (n - 1) + ' more' : '') + ' - ' + this.state
+    const t = 'Flood-Net SDR Pi - ' + (s.freq / 1e6).toFixed(4) + ' MHz ' + s.fmt + (n > 1 ? ' + ' + (n - 1) + ' more' : '') + ' - ' + this.state
       + (lv && lv.nfDb != null ? ' - floor ' + lv.nfDb.toFixed(1) + ' dBFS' : '')
       + ' - ' + this.counts.bursts + ' bursts ' + this.counts.readings + ' readings';
     for (const l of this.links) if (l.io.terminal) l.write('\x1b]0;' + t + '\x07', true);
@@ -632,7 +632,7 @@ class Relay {
 
   statusText() {
     const s = this.settings, lv = this.lastLevel, u = Math.round(this.up() / 60000), n = this.decoders.length;
-    return 'MegaNet SDR Pi - ' + this.state + ' - ' + (s.freq / 1e6).toFixed(4) + ' MHz ' + s.fmt + (n > 1 ? ' + ' + (n - 1) + ' more channels' : '')
+    return 'Flood-Net SDR Pi - ' + this.state + ' - ' + (s.freq / 1e6).toFixed(4) + ' MHz ' + s.fmt + (n > 1 ? ' + ' + (n - 1) + ' more channels' : '')
       + (lv && lv.nfDb != null ? ' - floor ' + lv.nfDb.toFixed(1) + ' dBFS' : '')
       + ' - ' + this.counts.bursts + ' bursts ' + this.counts.readings + ' readings - up ' + Math.floor(u / 60) + 'h ' + (u % 60) + 'm - type HELP';
   }

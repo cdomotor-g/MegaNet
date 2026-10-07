@@ -1798,7 +1798,7 @@ const Alert2 = (function () {
             payload after the three-byte header was a whole number of four-byte records; addresses and values
             matched Ranger's decoded output record for record, including multi-reading frames; and the payload
             times matched Ranger's received times exactly. 339 of the 348 addresses heard matched a station in
-            MegaNet. Fields with no such evidence behind them are marked “constant only” above, and the
+            Flood-Net. Fields with no such evidence behind them are marked “constant only” above, and the
             engineering scales below are interpretations, not part of the protocol.</p>
 
           <h4 class="a2-h">Engineering values</h4>
@@ -1997,7 +1997,7 @@ const Alert2 = (function () {
         <div class="panel-header"><h2>ALERT2 / ERT-A2 Serial Decoder</h2></div>
         <p class="sub">Decodes what an ELPRO ERT-A2 puts on its serial ports: receiver metadata, the frame's own
           timestamp, the signal level it came in at, and the ALERT readings packed into its payload — each one
-          matched back to a station in the MegaNet database and put on the map. The readings inside are ordinary
+          matched back to a station in the Flood-Net database and put on the map. The readings inside are ordinary
           13-bit ALERT addresses and 11-bit values, the same ones the
           <button type="button" class="link-btn" onclick="switchTab('packets')">ALERT Packets</button> tab decodes one at a time.</p>
         ${state.data ? '' : '<div class="note compact">No station file loaded — addresses will decode but nothing will be named or mapped. Load <b>stations.json</b> from the header to see station names.</div>'}

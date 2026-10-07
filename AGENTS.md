@@ -1,6 +1,6 @@
-# AGENTS.md — MegaNet, for AI agents
+# AGENTS.md — Flood-Net, for AI agents
 
-MegaNet is the engineering register and toolset for the Bureau of Meteorology's
+Flood-Net is the engineering register and toolset for the Bureau of Meteorology's
 Queensland (and neighbouring) flood-warning telemetry network: rainfall and
 river-height field stations, the repeaters that relay them, base stations and the
 radio paths between. It is a browser app at https://floodwarning.net backed by a
@@ -10,7 +10,7 @@ warnings and observations send people to the Bureau of Meteorology
 
 This file has two audiences: agents that want **station data**, and coding agents
 **working in this repository**. Other agent files (`GEMINI.md`,
-`.github/copilot-instructions.md`, `llms.txt`, `.cursor/rules/meganet-api.mdc`)
+`.github/copilot-instructions.md`, `llms.txt`, `.cursor/rules/floodnet-api.mdc`)
 repeat the essentials for tools that read only their own file; this one is
 canonical.
 
@@ -24,14 +24,14 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
 - **MCP server:** `https://floodwarning.net/api/mcp` — Streamable HTTP, POST
   JSON-RPC, JSON answers, stateless, no auth. Protocol versions 2025-03-26 to
   2026-07-28. Claude Code:
-  `claude mcp add --transport http meganet https://floodwarning.net/api/mcp`.
+  `claude mcp add --transport http floodnet https://floodwarning.net/api/mcp`.
 - **Read-only, public data only.** It reads with the database's publishable key,
   so it sees what an anonymous visitor sees: no inspection remarks, raw ingest
   payloads, photos or user data. Nothing you send is forwarded upstream.
 - **Rate limits:** 60 requests / 60 s per client, 20 requests / 10 s per client
   (burst), 240 requests / 60 s per address. A 429 carries `Retry-After` (over
   MCP, JSON-RPC error `-32000` with `data.retry_after`): wait, then continue.
-  Name your client with the `X-MegaNet-Client` header (or `?client=` on the URL)
+  Name your client with the `X-FloodNet-Client` header (or `?client=` on the URL)
   so a shared address does not share your limit.
 - **Station ids** are lowercase slugs such as `abergowrie_br_al`; an all-digit id
   is tried as a Bureau station number. Find ids with a search first.
@@ -62,7 +62,7 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     number (the dossier's `identity` and first lines say so, and search rows
     and the dossier's `nearby_stations` carry the flag); never report it as a
     station on the ground;
-  - health and readings are only what reached MegaNet's own ingest — most
+  - health and readings are only what reached Flood-Net's own ingest — most
     stations report through the Bureau's systems, so "not recorded" there says
     nothing about whether a station works;
   - "not recorded" is never zero.
@@ -88,10 +88,15 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
 - **CI:** do not poll or wait for CI after pushing; the smoke test takes ~20
   minutes and a newer push cancels it, so "cancelled" is normal. Look at a run
   only when the owner says one failed. Before pushing app changes run
-  `cd test && npm run check && npm run names && npm run toplevel && npm run steps`
+  `cd test && npm run check && npm run names && npm run toplevel && npm run steps && npm run brand`
   (seconds, no browser), and `git pull --rebase origin main` first — several
   threads push to `main`. If a push is rejected, rebase and retry once, then
   stop and ask.
+- **Naming:** the app is **Flood-Net** in anything a person reads (labels,
+  messages, help, page titles, downloads named `floodnet-…`, the API, docs).
+  The repository keeps its earlier name, MegaNet, as do internal identifiers —
+  the `meganet` schema, storage keys, MQTT topics. Code comments still say
+  it; never copy it into a string. `npm run brand` checks.
 - **Leftover human work:** if human tasks remain or fall out of scope at the end,
   ask whether to open a `[Human]` issue with explicit, click-by-click steps.
 - **Closing issues:** when your work closes an issue, close it with a comment

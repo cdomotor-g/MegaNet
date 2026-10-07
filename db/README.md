@@ -1,6 +1,6 @@
 # db/
 
-The MegaNet datastore's schema, as plain SQL.
+The Flood-Net datastore's schema, as plain SQL.
 
 Postgres, hosted on Supabase. Why that and not something else is in
 [`docs/datastore-decision.md`](../docs/datastore-decision.md) — read it before
@@ -151,7 +151,7 @@ its cache at all (`PGRST002`).
 
 | Object | What it is |
 | --- | --- |
-| `meganet` | The schema. Everything MegaNet owns lives here, not in `public`. |
+| `meganet` | The schema. Everything Flood-Net owns lives here, not in `public`. |
 | `meganet.touch_updated_at()` | `BEFORE UPDATE` trigger function stamping `updated_at`. Every table with that column hangs it off this one. |
 | `meganet.app_meta` | Key/value facts about the database itself. `schema_version` is the number of the highest migration that *wrote it* — which is not the same as the highest applied, and not proof the ones below it ran; see above. Readable by anyone, writable by no one holding the anon key. |
 | `meganet.station` | One row per station, 3,174 of them. `id` is the `stations.json` slug — also the app's `selectedId`, and in URLs. `station_number` is the bureau (BoM/CBM) number, unique among the 3,156 that have one and the identity a station publishes under over MQTT (`0020`). `deleted_at` is the soft delete: null means live. `inspection_config_key` (`0013`, #147) names which of the six inspection sheets the site's telemetry answers to — FK into `meganet.inspection_config`, null until somebody who knows the site says; deliberately not backfilled, because a wrong pre-selected form is worse than being asked. |
@@ -246,8 +246,8 @@ its cache at all (`PGRST002`).
 | `meganet.station.awrc_number`, `.stream`, `.urbs_label` | Three fields `0032` adds to the station: the AWRC gauging station number and the stream the gauge is on (Section 3), and the station's node in the Bureau's URBS runoff-routing model. Optional keys in the document, absent when null. |
 | `meganet.station_aep_level` | The modelled water level at a station in the 1%, 0.5%, 0.2% and 0.066% AEP floods (`0033`), m AHD, with the ground height and the source sheet's own three scores — one row per sheet (the QLD and NSW AEP level workbooks, supplied 26/09/2026). Indicative, not observed. Its `setting`, `slope` and `manning_n` are the assumptions of the indicative flood velocity the card works out (`flood-velocity.js`); blank uses the defaults. The station's `aep_levels` list. |
 | `meganet.station_frequency` | A station's RX/TX frequency pairs beyond a repeater's own (`0033`): `rx_mhz`, `tx_mhz`, what the channel is for, its ACMA licence. `meganet.repeater.rx_mhz`/`tx_mhz` stays the primary pair — it is what every path tool reads — and a base station, which has no repeater row, keeps all its pairs here. The station's `frequencies` list. |
-| `meganet.flood_peak_extract`, `meganet.flood_peak_gauge`, `meganet.flood_peak` | HDB's peak flood heights (`0037`), as the extract prints them: which extract (one row, with the reader's meta), every gauge it lists — MegaNet station or not, keyed on the bureau number like the SLS — and every peak under each: the UTC date to the day, month or year, the time, the height on the gauge as it then stood, the HDB site letter, the source and the kind of reading. Public, like the rest of the Bureau's record here. Written only by `load_flood_peaks_doc()`. |
-| `meganet.station_flood_peaks(text[])`, `meganet.station_flood_peak` | The rule, as a function of the stations asked about (all when null) and as a view of every station: each peak of a live MegaNet station with the zero in force on its date, its level in m AHD where that can honestly be had, why not where it cannot (`not_placed`), its July–June season, and `flood_rank` 1–5 for the station's five largest floods. Public. See **HDB's flood peaks**, below. |
+| `meganet.flood_peak_extract`, `meganet.flood_peak_gauge`, `meganet.flood_peak` | HDB's peak flood heights (`0037`), as the extract prints them: which extract (one row, with the reader's meta), every gauge it lists — Flood-Net station or not, keyed on the bureau number like the SLS — and every peak under each: the UTC date to the day, month or year, the time, the height on the gauge as it then stood, the HDB site letter, the source and the kind of reading. Public, like the rest of the Bureau's record here. Written only by `load_flood_peaks_doc()`. |
+| `meganet.station_flood_peaks(text[])`, `meganet.station_flood_peak` | The rule, as a function of the stations asked about (all when null) and as a view of every station: each peak of a live Flood-Net station with the zero in force on its date, its level in m AHD where that can honestly be had, why not where it cannot (`not_placed`), its July–June season, and `flood_rank` 1–5 for the station's five largest floods. Public. See **HDB's flood peaks**, below. |
 | `meganet.station_flood_peak_top` | Those five, kept for `station_json` — the station's `flood_peaks` list — and kept current by `refresh_station_flood_peaks()`: the loader rebuilds them all, and eleven statement-level triggers on the survey, the flood classes, the AEP levels and the station rebuild a station's own when what they are worked out from changes. Public. |
 | `meganet.field_photo` | One row per field photo (`0035`): the object and its thumbnail in the `field-photos` bucket, the file (type against `attachment_type`, size, **SHA-256** — one live photo per hash), when it was taken (as the camera's clock read it and as an instant, and from what), **where** (lat/lon, how placed — `exif`, `xmp`, `ocr`, `manual`, `station` — and the GPS's accuracy), altitude and its datum, heading (true or magnetic), pitch and field of view, the station it is filed under and whether by distance, `meta` (the camera, every OCR reading's text, the Dropbox file), where it came from (`upload`, `dropbox`, with the Dropbox file id — one row per file, tombstones included, so a removed photo is never re-imported), and who. Soft-deleted. **Editors only**: no grant to `anon`, and the policy hides tombstones. A null in any of the measured columns means the photo did not say — never nought. |
 | `meganet.field_photo_origin`, `meganet.field_photo_placement` | The two vocabularies: where a photo came in, and how its position was known. |
@@ -585,7 +585,7 @@ the source asserts about the value, not how loud it was.
 `meganet.resolve_station()`, which answers only when exactly one live station
 carries the address. 604 of 5,122 ALERT addresses are shared; guessing between
 them would invent a fact. There is deliberately no foreign key on the column
-either: a reading from a station MegaNet has not been told about yet is precisely
+either: a reading from a station Flood-Net has not been told about yet is precisely
 the reading that must not be dropped.
 
 **`value_raw` is `numeric`, not the `int` #75 sketched.** A satellite or cellular
@@ -810,10 +810,10 @@ tab shows and what a Pi does — is [`docs/ingest-http.md`](../docs/ingest-http.
 
 ### Base stations checking in
 
-`0049_base_stations.sql`. Once a base station posts, MegaNet knew it only by what
+`0049_base_stations.sql`. Once a base station posts, Flood-Net knew it only by what
 it sent — readings, what each receiver is (`0045`), what it heard (`0047`).
 Whether it was healthy, and changing anything on it, both meant somebody going to
-it. The Base Stations tab does both from here, and **MegaNet still never connects
+it. The Base Stations tab does both from here, and **Flood-Net still never connects
 to a base station.**
 
 **The station calls in.** `base_station_checkin(payload)` is granted to `anon` and
@@ -835,7 +835,7 @@ allows `status`, `log` (1–400 lines), `config.set`, `device.restart`,
 their arguments, and the station holds itself to the same list again.
 `config.set` may not touch `web`, `remote` or `version`, nor any `meganet` key but
 `enabled` and `receptions` — so no request can take the token, point the readings
-elsewhere, set the station's web password or widen what MegaNet may ask. Nothing
+elsewhere, set the station's web password or widen what Flood-Net may ask. Nothing
 on the list is a shell, a file or a credential.
 
 **A request is handed over once and answered once.** `admin_base_station_command()`
@@ -888,7 +888,7 @@ to `ingest_http()`, exactly as an HTTP logger does. It holds an ordinary
 three off at once. The bridge is not more trusted than the loggers it relays for.
 
 **The `<station>` topic segment is the bureau station number** (`0020`). It was
-the stations.json slug until then, which was a MegaNet artifact derived from the
+the stations.json slug until then, which was a Flood-Net artifact derived from the
 station's name: nobody outside this app knows it, and renaming a station moves it
 in the one copy — logger firmware — that costs a site visit to change. Sites with
 no bureau number (repeaters, radars, base stations — 18 of 3,174) publish under
@@ -898,7 +898,7 @@ because a duplicate would make *both* stations unroutable in silence.
 
 **`meganet.station_status` is keyed by whatever identity spoke, until it
 resolves.** Same reasoning as `reading.station_id` having no foreign key: a
-station that starts publishing before MegaNet has been told about it is exactly
+station that starts publishing before Flood-Net has been told about it is exactly
 the one whose silence matters, and a foreign key would refuse to record it.
 `station_id` is resolved where the key names a live station and left null where
 it does not. Since `0012` this table is no longer MQTT's alone — HTTP ingest
@@ -1146,7 +1146,7 @@ It is a sync rather than an append, and re-running it changes nothing. Each
 visit's primary key is a `uuid5` of its workbook address, so the same cell yields
 the same id on every run on any machine — which is what lets the whole load be
 one stream of SQL with nothing read back out of the database. Rows typed into
-MegaNet (`origin = 'form'`) are never touched by any statement in the output.
+Flood-Net (`origin = 'form'`) are never touched by any statement in the output.
 
 The section tables are filled afterwards by
 `meganet.project_inspection_measurements()`, driven by `meganet.measurement_field`
@@ -1313,18 +1313,18 @@ way.
 | | QLD | NSW |
 | --- | --- | --- |
 | SLS locations | 2,766 | 1,375 |
-| …that are MegaNet stations | 2,685 | 615 |
-| …automatic | 1,901, of which 1,889 are MegaNet stations | 1,338, of which 608 |
-| …manual, read by a person | 865, of which **796** are MegaNet stations | 37, of which 7 |
+| …that are Flood-Net stations | 2,685 | 615 |
+| …automatic | 1,901, of which 1,889 are Flood-Net stations | 1,338, of which 608 |
+| …manual, read by a person | 865, of which **796** are Flood-Net stations | 37, of which 7 |
 | …with flood class levels | 1,069 | 213 |
 
-3,253 of MegaNet's 4,873 stations are in one document or the other; 47 are in
+3,253 of Flood-Net's 4,873 stations are in one document or the other; 47 are in
 both.
 
-**The locations that are not MegaNet stations are kept anyway**, with a null
+**The locations that are not Flood-Net stations are kept anyway**, with a null
 `station_id`, and that is a decision rather than an oversight: 81 of
 Queensland's (69 manual gauges, 68 the Bureau's own, that telemeter nothing;
-12 automatic) and 760 of the NSW document's — MegaNet reaches the NSW North
+12 automatic) and 760 of the NSW document's — Flood-Net reaches the NSW North
 Coast and the border rivers, and the document covers the whole state and the
 ACT. None of them go into `stations.json` — the Bureau's own station indexes
 do not list them, and inventing rows for them would corrupt every count in the
@@ -1440,7 +1440,7 @@ numbered sections, every row keyed on the bureau number. Nine documents are in
 | URBS | 26/09/2026 | each river height station's URBS model label | `urbs_label` |
 
 `tools/ingest/river_height_stations.py` reads them into
-`data/river-height-stations.json` — every row, whether or not MegaNet has the
+`data/river-height-stations.json` — every row, whether or not Flood-Net has the
 station. The URBS details also print minor, moderate and major levels; they
 equal Section 4's on all 921 rows that print them, so they are not stored twice.
 
@@ -1477,10 +1477,10 @@ python3 tools/ingest/river_height_stations.py --sql \
 
 It is additive by construction, in four steps in one transaction:
 
-1. **The stations Sections 1–3 list that MegaNet has none for** are created —
+1. **The stations Sections 1–3 list that Flood-Net has none for** are created —
    matched by `bureau_key()` against every station, live or deleted, so a
    station somebody deleted stays deleted. A field station each, as the
-   editor's "+ New" makes one: the Bureau's name in MegaNet's style ("ALERT" as
+   editor's "+ New" makes one: the Bureau's name in Flood-Net's style ("ALERT" as
    "AL", title case), the number without its leading zeros, the Bureau's
    position (ddmmss to five decimal places, which loses nothing), the catchment
    and hub the position falls in, and no elevation.
@@ -1493,7 +1493,7 @@ It is additive by construction, in four steps in one transaction:
    transaction if one could not be created.
 
 A station's existing position, name and elevation are never written over.
-`--report` lists where the Bureau's position and MegaNet's disagree by a
+`--report` lists where the Bureau's position and Flood-Net's disagree by a
 kilometre or more, and the new stations that sit within 300 m of an existing
 one under the same name, for a person to look at. Running it again touches
 nothing; it moves each station's `updated_at` it writes to, so an editor
@@ -1573,7 +1573,7 @@ only where the station has no row from that sheet yet. Then refresh
 | …with at least one level (QLD 417, NSW 121) | 538 | 538 |
 | …with a same-stream slope (QLD 171, NSW 65) | 236 | 236 |
 
-Five of them are more than a kilometre from MegaNet's own position for the
+Five of them are more than a kilometre from Flood-Net's own position for the
 station, one (532150, which the sheet itself comments "Incorrect Coordinates")
 by 315 km; the levels are for the sheet's point, and the card says so.
 
@@ -1602,7 +1602,7 @@ interpreting nothing.
 
 They are kept **the way the SLS is, not the way the AEP levels are**: keyed on
 the bureau number and joined to `meganet.station` through `bureau_key()`, so
-the 170 gauges MegaNet has no station for keep their floods for the day it
+the 170 gauges Flood-Net has no station for keep their floods for the day it
 does; and written only by the loader, because they are the Bureau's record,
 not something an editor types. `save_station()` and `load_stations_doc()` read
 the lists they know by name, so a document carrying `flood_peaks` saves and
@@ -1663,7 +1663,7 @@ should have hashed, and took six seconds over all of them.
 | As loaded, 28/09/2026 extract | Gauges | Peaks |
 | --- | --- | --- |
 | In the extract | 1,536 | 61,039 |
-| …MegaNet stations | 1,366 | 54,858 |
+| …Flood-Net stations | 1,366 | 54,858 |
 | …placed in m AHD | 841 | 36,714 |
 | …zero that day not in AHD | | 12,681 |
 | …no surveyed zero | | 4,981 |

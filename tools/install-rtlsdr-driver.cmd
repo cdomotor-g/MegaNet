@@ -393,7 +393,7 @@ if ($Elevated) {
 # ---- list, ask, install ----------------------------------------------------
 
 Say ''
-Say 'MegaNet - WinUSB for RTL-SDR sticks' Cyan
+Say 'Flood-Net - WinUSB for RTL-SDR sticks' Cyan
 Say ''
 $sticks = @(Get-Sticks)
 if (-not $sticks.Count) {
@@ -411,7 +411,7 @@ if (-not $todo.Count) {
     Finish 1
   }
   Say 'Nothing to do: every stick already has WinUSB.' Green
-  Say 'In MegaNet: Serial Monitor > + RTL-SDR > Choose USB stick... (Chrome or Edge).'
+  Say 'In Flood-Net: Serial Monitor > + RTL-SDR > Choose USB stick... (Chrome or Edge).'
   Finish 0
 }
 
@@ -491,7 +491,7 @@ if (@($after | Where-Object { $_.State -notlike 'WinUSB - ready*' }).Count) {
   Say 'Not every stick is ready yet - see the notes above. Re-plugging a stick, then running this again, often settles it.' Yellow
   Finish 1
 }
-Say 'Done. In MegaNet: Serial Monitor > + RTL-SDR > Choose USB stick... (Chrome or Edge).' Green
+Say 'Done. In Flood-Net: Serial Monitor > + RTL-SDR > Choose USB stick... (Chrome or Edge).' Green
 Say 'The stick is listed by its own name (e.g. "RTL2832U" or "Blog V4"). The browser needs no restart;'
 Say 'if the stick is not in its list, unplug it and plug it back in.'
 Finish 0

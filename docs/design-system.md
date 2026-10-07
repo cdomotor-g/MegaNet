@@ -1,4 +1,4 @@
-# The MegaNet design system
+# The Flood-Net design system
 
 Written for [#109](https://github.com/cdomotor-g/MegaNet/issues/109), the
 foundation of [EPIC #107](https://github.com/cdomotor-g/MegaNet/issues/107).

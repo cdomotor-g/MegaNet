@@ -1,7 +1,7 @@
 # Base stations — checking in, being asked, and the team keys
 
 The **Base Stations** tab (in the Admin group, administrators only) lists every
-ingest point MegaNet has issued a token to, and for the base stations whose
+ingest point Flood-Net has issued a token to, and for the base stations whose
 software checks in, how each one is: whether it is checking in, its receivers
 and what they have decoded, its uplink and queue, its power, temperature, disk
 and clock, its software — beside the latest
@@ -19,7 +19,7 @@ station's software. The database side is
 and [`db/README.md`](../db/README.md); `tools/check_base_stations.sql` holds the
 functions to the contract described here.
 
-## MegaNet never connects to a base station
+## Flood-Net never connects to a base station
 
 ```
  base station ──HTTPS, X-Ingest-Token──▶ meganet.base_station_checkin()  ◀── the Base Stations tab
@@ -62,8 +62,8 @@ the reference agent does.
 **Never a shell, a file, a key, or a secret.** `config.set` may not touch the
 station's ingest token or where its readings go (of `meganet.*`, only `enabled`
 and `receptions`), its web page's password or port (`web.*`), or how much it
-lets MegaNet do (`remote.*`) — the database refuses such a patch, and so does the
-station. MegaNet cannot widen its own reach, and there is no power-off: a station
+lets Flood-Net do (`remote.*`) — the database refuses such a patch, and so does the
+station. Flood-Net cannot widen its own reach, and there is no power-off: a station
 on a hill that was told to shut down needs somebody to drive there.
 
 **Each request is done once.** The check-in hands a request over once (it is
@@ -75,7 +75,7 @@ handed over cannot be called back.
 
 ## The station decides how much
 
-The station's owner sets, on the station and never from here, what MegaNet may
+The station's owner sets, on the station and never from here, what Flood-Net may
 do (`remote.mode` in the reference agent):
 
 | | |
@@ -196,24 +196,24 @@ POST <project>/rest/v1/rpc/base_station_keys        (the same headers; body {"pa
 ```
 
 Fetch it hourly and whenever a check-in's `keys_hash` differs from the copy held.
-Keep the last good copy through a network outage; drop the list when MegaNet
+Keep the last good copy through a network outage; drop the list when Flood-Net
 refuses the token. Restrict the keys yourself (`from="10.0.0.0/8,…"` in
 `authorized_keys`) — the list carries none, since only the station knows what
 "local" means where it is.
 
-A `404` from either function is a MegaNet without `0049`: check in again an hour
-later. A `401` (`PT401`) is a token MegaNet does not accept: back off, and keep
+A `404` from either function is a Flood-Net without `0049`: check in again an hour
+later. A `401` (`PT401`) is a token Flood-Net does not accept: back off, and keep
 sending nothing else on it.
 
 ## Security, in one place
 
-- Nothing listens on a base station for MegaNet, and nothing MegaNet sends is
+- Nothing listens on a base station for Flood-Net, and nothing Flood-Net sends is
   run as a command: requests are one of a fixed list, checked twice.
-- The ingest token authenticates the station to MegaNet, as for its readings;
-  TLS authenticates MegaNet to the station. Only an administrator can ask
+- The ingest token authenticates the station to Flood-Net, as for its readings;
+  TLS authenticates Flood-Net to the station. Only an administrator can ask
   (`meganet.admin_require()`, first thing in every function the tab calls), and
   every request records who asked.
-- Someone who got into MegaNet as an administrator could do what administrators
+- Someone who got into Flood-Net as an administrator could do what administrators
   can: the requests above, of stations set to `manage`. They could not read a
   station's token or passwords, redirect its readings, set its web page's
   password, add a key to it, turn its management back on, or run a command; and

@@ -560,7 +560,7 @@ const badOrder = allPms.filter(p => !p.order.every((t, i) => PM_ORDER.includes(t
   && (i === 0 || PM_ORDER.indexOf(p.order[i - 1]) < PM_ORDER.indexOf(t))));
 ok('every placemark\'s children are in the KML 2.2 schema\'s order', badOrder.length === 0,
    badOrder.slice(0, 2).map(p => `${p.name}: ${p.order.join(',')}`).join('; '));
-ok('the caveat travels with the file', K.docDesc.includes(kmlIn.d.caveat) && /Exported from MegaNet on /.test(K.docDesc));
+ok('the caveat travels with the file', K.docDesc.includes(kmlIn.d.caveat) && /Exported from Flood-Net on /.test(K.docDesc));
 
 const nasty = 'Smith & Sons <b>"Hill"</b>';
 const Kn = await page.evaluate(parseKmlInPage, await page.evaluate(name => {
@@ -1104,7 +1104,7 @@ function parseKmlInPage(text) {
 
 // drawkml.mjs's normaliser: the one line of a file that is the time it was written.
 function undated(s) {
-  return s.replace(/Exported from MegaNet[\s\S]*?\]\]><\/description>/, '');
+  return s.replace(/Exported from Flood-Net[\s\S]*?\]\]><\/description>/, '');
 }
 
 // A store-only zip, read from the end record inwards: the central directory

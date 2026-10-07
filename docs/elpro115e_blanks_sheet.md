@@ -17,7 +17,7 @@ the result with the card. Twenty minutes, most of it in the broker console.
 ## §A · Already decided — copy these across as-is
 
 Nothing to fill in. They are here so the technician has every value on one page, and so
-you can see what has already been fixed by the MegaNet end.
+you can see what has already been fixed by the Flood-Net end.
 
 | Field | Value | Why it is this |
 |---|---|---|
@@ -25,7 +25,7 @@ you can see what has already been fixed by the MegaNet end.
 | **Device name** | `elpro` | Gives `meganet/v1/elpro_test/logger/reading/elpro`. Anything the unit appends after that — `/Station 1003`, the relayed ALERT2 station — is expected and lands; the `#` covers it (#169). |
 | **Device Type** | `General Purpose` | The type that exposes the `Register` IO-Type, which is how raw registers get published. |
 | **Slave address** | `0` | Only 115S expansion units need one. |
-| **Enable Sparkplug** | **OFF** | Not negotiable — see the card. With it on, the topic and payload both become something MegaNet cannot read, and it looks like it is working from the device end. |
+| **Enable Sparkplug** | **OFF** | Not negotiable — see the card. With it on, the topic and payload both become something Flood-Net cannot read, and it looks like it is working from the device end. |
 | **Queuing Mode** | `FIFO` | Replays an outage in the order it happened. |
 | **Node Update** | `600` (seconds) | The unit's own status/statistics interval. |
 | **Keep Alive** | `60` (seconds) | Fine for an Ethernet link. |
@@ -44,7 +44,7 @@ you can see what has already been fixed by the MegaNet end.
 | 2 | `9001` | `30005` | Supply voltage |
 | 3 | `9002` | `30001` | Analog input 1 — reads near zero unwired, which is fine |
 
-> **Payload Prefix is an address, not a register.** `9003` is the ALERT address MegaNet
+> **Payload Prefix is an address, not a register.** `9003` is the ALERT address Flood-Net
 > files the reading under; `30007` is where the device reads the number from. Swapping them
 > is the mistake worth watching for, and the card says so too.
 
@@ -151,7 +151,7 @@ They are free text. Pick something a person reading a broker log would recognise
 
 | Field | Suggested | Where to get it |
 |---|---|---|
-| **Owner Name (Group)** | `MegaNet` | Your call. Anything. Appears only in the unit's status messages. |
+| **Owner Name (Group)** | `Flood-Net` | Your call. Anything. Appears only in the unit's status messages. |
 | **Device Name (Node)** | `ELPRO-TEST-1` | Your call — **but make it unique across any other ELPRO gear you own.** The 115E-2 names its own data-log directories after it, and the manual warns that data from modules sharing a name collides. |
 | **Client ID** | `elpro-test-1` | Your call, but it **must be unique on the broker** — a duplicate makes the broker refuse the connection outright, and ELPRO calls this out specifically. Lowercase, no spaces. |
 

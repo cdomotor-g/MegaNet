@@ -41,8 +41,8 @@ up() {
   echo 0x01 > bDeviceProtocol
   mkdir -p strings/0x409
   serial > strings/0x409/serialnumber
-  echo "MegaNet" > strings/0x409/manufacturer
-  echo "MegaNet SDR Pi" > strings/0x409/product
+  echo "Flood-Net" > strings/0x409/manufacturer
+  echo "Flood-Net SDR Pi" > strings/0x409/product
   mkdir -p configs/c.1/strings/0x409
   echo "Serial" > configs/c.1/strings/0x409/configuration
   echo 500 > configs/c.1/MaxPower

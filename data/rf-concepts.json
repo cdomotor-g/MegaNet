@@ -1,8 +1,8 @@
 {
   "meta": {
-    "description": "RF concept explainers for the MegaNet education layer (Interference Workbench concept drawer and tooltips). Standalone data so entries can be extended without touching app.js and reused by other tabs.",
+    "description": "RF concept explainers for the Flood-Net education layer (Interference Workbench concept drawer and tooltips). Standalone data so entries can be extended without touching app.js and reused by other tabs.",
     "updated": "2026-07-23",
-    "writing_standard": "Every entry must state what the phenomenon looks like in MegaNet's data (in_your_data), not just what it is physically. 'IMD is a third-order mixing product' is textbook; 'corruption that is intermittent, worse after rain, and only when two co-sited transmitters key at once' is usable at 2am during a flood event."
+    "writing_standard": "Every entry must state what the phenomenon looks like in Flood-Net's data (in_your_data), not just what it is physically. 'IMD is a third-order mixing product' is textbook; 'corruption that is intermittent, worse after rain, and only when two co-sited transmitters key at once' is usable at 2am during a flood event."
   },
   "concepts": [
     {
@@ -65,7 +65,7 @@
       "id": "cochannel",
       "title": "Co-channel & adjacent-channel interference",
       "what": "Co-channel: another user transmitting on the same frequency — packets collide and the stronger signal captures the receiver. Adjacent-channel: a neighbour within ~50 kHz whose modulation sidebands splatter into your channel, raising the noise floor without ever being 'on' it.",
-      "in_your_data": "Co-channel looks like dropouts and occasional decoded garbage across every repeater sharing that RX frequency — 68 of MegaNet's 88 documented repeaters share 151.5 MHz, so a channel-wide cause touches many networks at once. Adjacent-channel looks like eroded margin: threshold-style bit errors on weak stations.",
+      "in_your_data": "Co-channel looks like dropouts and occasional decoded garbage across every repeater sharing that RX frequency — 68 of Flood-Net's 88 documented repeaters share 151.5 MHz, so a channel-wide cause touches many networks at once. Adjacent-channel looks like eroded margin: threshold-style bit errors on weak stations.",
       "next": "Compare affected fraction on the shared channel against its base rate (the Workbench's H3 does this — near-total sharing is uninformative because nearly everything shares the channel).",
       "see_also": ["capture", "ducting", "threshold_bits"]
     },

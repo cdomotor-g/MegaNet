@@ -1416,7 +1416,7 @@ const MapSites = (function () {
     const f1 = v => (v == null || !isFinite(v) ? '' : v.toFixed(1));
     const w = weights();
     const rows = [
-      '# MegaNet repeater site finder',
+      '# Flood-Net repeater site finder',
       `# search,${found.area.lat.toFixed(6)},${found.area.lon.toFixed(6)},${found.area.rKm.toFixed(2)} km`,
       `# repeater,${q(found.rep.sysName)},${found.rep.agl} m AGL,${found.f.toFixed(3)} MHz`,
       `# weights,elevation ${w.e},line of sight ${w.l},fade margin ${w.f},road reserve ${w.r}`,

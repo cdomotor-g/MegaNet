@@ -121,7 +121,7 @@ try {
   await dropFiles('.serial .panel-header h2', [file('radio.log')]);
   await until(async () => !!(await cardOf('quansheng')), 'a radio log makes a followed Quansheng card');
   let id = await cardOf('quansheng');
-  ok('the card offers to send to MegaNet', await page.evaluate(i => !!document.getElementById('ing-' + i), id));
+  ok('the card offers to send to Flood-Net', await page.evaluate(i => !!document.getElementById('ing-' + i), id));
   await page.evaluate(i => {
     SerialIngest.setToken(i, 'mgn_check-token');
     SerialIngest.setLocSource(i, 'manual');
@@ -274,7 +274,7 @@ try {
   pair.status = 'approved';
   await until(() => page.evaluate(t => JSON.parse(localStorage.getItem('mn-ingest')).token === t, asked), 'approved, the token it made is kept');
   await until(() => page.evaluate(i => Serial.findConn(i).ingest.on, id), '…and the card that asked starts sending by itself');
-  ok('…and says so, under the name MegaNet gave it', /Approved/.test(await ingText(id)) && /Field laptop/.test(await ingText(id)));
+  ok('…and says so, under the name Flood-Net gave it', /Approved/.test(await ingText(id)) && /Field laptop/.test(await ingText(id)));
   fs.appendFileSync(file('radio-old.log'), dec(5, null, 4110, 77) + '\r\n');
   await until(() => posts.slice(nA).some(p => p.headers['x-ingest-token'] === asked && (p.body.payload.readings || []).some(r => r.alert_id === 4110)),
     'a reading is then posted with the approved token');

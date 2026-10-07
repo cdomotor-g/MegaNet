@@ -1,5 +1,5 @@
 {
-  "_": "Workbook stations that match more than one MegaNet station. Listed rather than resolved arbitrarily — picking one would be a coin toss recorded as a fact. Written by tools/ingest/crosswalk.py; do not edit by hand.",
+  "_": "Workbook stations that match more than one Flood-Net station. Listed rather than resolved arbitrarily — picking one would be a coin toss recorded as a fact. Written by tools/ingest/crosswalk.py; do not edit by hand.",
   "count": 14,
   "entries": [
     {

@@ -250,7 +250,7 @@ const Packets = (function () {
     if (!el) return;
     if (fileStations === null) { el.textContent = fileLoading ? ' Loading ALERT address file…' : ''; return; }
     if (fileStations.loadError)
-      el.textContent = ' ALERT address file could not be loaded (' + fileStations.loadError + ') — decoding still works; names come from the MegaNet database only.';
+      el.textContent = ' ALERT address file could not be loaded (' + fileStations.loadError + ') — decoding still works; names come from the Flood-Net database only.';
     else
       el.textContent = ' Loaded ' + fileStations.size + ' addresses from the ALERT address file.';
   }
@@ -319,7 +319,7 @@ const Packets = (function () {
       if (f === 'A') {
         const s = stationName(v);
         extra = '<div>Station name: <span class="stn' + (s.none ? ' none' : '') + '">' + esc(s.text) + '</span>'
-              + (s.source === 'meganet' ? ' <span class="badge ok">MegaNet</span>' : '') + '</div>';
+              + (s.source === 'meganet' ? ' <span class="badge ok">Flood-Net</span>' : '') + '</div>';
       }
       if (f === 'HD') extra = '<div class="spec">Full 16-bit value = HD × 2048 + last transmitted 11-bit data value = ' + (v * 2048) + ' + data.</div>';
       if (f === 'S') extra = '<div class="spec">' + (v === 0
@@ -446,7 +446,7 @@ const Packets = (function () {
     if (isNaN(id)) { el.textContent = ''; return; }
     const s = stationName(id);
     el.innerHTML = 'Station name for ID ' + id + ': <span class="stn' + (s.none ? ' none' : '') + '">' + esc(s.text) + '</span>'
-      + (s.source === 'meganet' ? ' <span class="badge ok">MegaNet</span>' : '');
+      + (s.source === 'meganet' ? ' <span class="badge ok">Flood-Net</span>' : '');
   }
 
   function onFormatChange(fmt) {
@@ -541,7 +541,7 @@ const Packets = (function () {
         <p class="sub">Decode and encode event-reporting radio telemetry (ALERT) messages per the Bureau of
           Meteorology <em>ERTS Data Formats</em> specification (July 2003) — ALERT Binary (ABF), BCC Extended
           Check, Enhanced ALERT Binary (EAF) and Enhanced IFLOWS (EIF). Decoded addresses are matched against
-          the loaded MegaNet station database first, then the bundled national address file.</p>
+          the loaded Flood-Net station database first, then the bundled national address file.</p>
         <p class="sub pkt-sub-follow">A fifth layout, <b>A2C</b>, joins them for 32-bit input: the
           four-byte form the same address and value take inside an ALERT2 “ALERT concentration” payload, which
           is what an ELPRO ERT-A2 puts on RS232. Paste whole serial lines on the

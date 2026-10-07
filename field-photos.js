@@ -734,7 +734,7 @@ const FieldPhotos = (function () {
 
     const type = typeFor(file, meta.format);
     const heic = isHeic(file, meta.format);
-    if (!type && !heic) throw new Error(`${file.type || extensionOf(file.name) || 'that'} is not a kind of photo MegaNet stores`);
+    if (!type && !heic) throw new Error(`${file.type || extensionOf(file.name) || 'that'} is not a kind of photo Flood-Net stores`);
     if (S().queue.some(o => o !== item && o.sha === item.sha && o.status !== 'refused')) {
       throw new Error('the same photo is already in this list');
     }
@@ -897,7 +897,7 @@ const FieldPhotos = (function () {
     const failed = s.queue.filter(i => i.status === 'failed' && !i.told);
     [...done, ...already, ...failed].forEach(i => { i.told = true; });
     const bits = [`${done.length} uploaded`];
-    if (already.length) bits.push(`${already.length} already in MegaNet`);
+    if (already.length) bits.push(`${already.length} already in Flood-Net`);
     if (failed.length) bits.push(`${failed.length} failed — ${failed[0].note}`);
     say(`${bits.join(', ')}.`, failed.length ? 'error' : 'ok');
     announce(bits.join(', '));
@@ -991,7 +991,7 @@ const FieldPhotos = (function () {
     // rather than its bytes. The database refuses it anyway if two people race.
     const dup = await dbSelect(`field_photo?select=id,uploaded_by,created_at&sha256=eq.${item.sha}&limit=1`);
     if (dup.length) {
-      const e = new Error(`Already in MegaNet — added by ${dup[0].uploaded_by || 'someone'} on ${String(dup[0].created_at || '').slice(0, 10)}.`);
+      const e = new Error(`Already in Flood-Net — added by ${dup[0].uploaded_by || 'someone'} on ${String(dup[0].created_at || '').slice(0, 10)}.`);
       e.already = dup[0].id;
       throw e;
     }
@@ -1018,7 +1018,7 @@ const FieldPhotos = (function () {
       try { await dbRemoveObject(BUCKET, path); } catch (_) { /* swept later */ }
       if (thumb) { try { await dbRemoveObject(BUCKET, thumb); } catch (_) { /* swept later */ } }
       if (err && err.status === 409) {
-        const e = new Error('Already in MegaNet — somebody added the same photo a moment ago.');
+        const e = new Error('Already in Flood-Net — somebody added the same photo a moment ago.');
         e.already = err.details || true;
         throw e;
       }
@@ -1200,7 +1200,7 @@ const FieldPhotos = (function () {
 
   const STATUS = {
     waiting: 'Waiting', reading: 'Reading', ocr: 'Reading the overlay', ready: 'Ready', refused: 'Refused',
-    queued: 'Waiting to upload', uploading: 'Uploading', done: 'Uploaded', already: 'Already in MegaNet', failed: 'Failed',
+    queued: 'Waiting to upload', uploading: 'Uploading', done: 'Uploaded', already: 'Already in Flood-Net', failed: 'Failed',
   };
 
   // The zip packs, a line each, above the photos they held.

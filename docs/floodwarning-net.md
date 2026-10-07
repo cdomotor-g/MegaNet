@@ -1,7 +1,7 @@
-# floodwarning.net — moving the domain to MegaNet
+# floodwarning.net — moving the domain to Flood-Net
 
 `floodwarning.net` used to point at the FloodLab / ALERT1v3 project. It is being
-recycled: MegaNet takes the name, and FloodLab is retired from it.
+recycled: Flood-Net takes the name, and FloodLab is retired from it.
 
 This was written as a runbook. **Every step below is a dashboard action that
 needs a human with the Cloudflare account.** Nothing in this repository performs
@@ -102,7 +102,7 @@ Dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to 
   the build command is.
 - Build output directory (only if the flow asks for one): `/`
 
-MegaNet is static files with no build step. An empty build command is correct,
+Flood-Net is static files with no build step. An empty build command is correct,
 not a placeholder. The required deploy command is answered by two files at the
 repo root: `wrangler.toml` tells Wrangler this project is assets-only — no
 Worker script, the whole repository root served as static files — and
@@ -303,7 +303,7 @@ instead removes the class of problem:
    categorised: it draws itself from JavaScript, so anything that does not run
    scripts — a categorisation crawler, a proxy deciding what a name is — saw an
    empty document. Now `index.html` carries a `<meta name="description">`,
-   `about.html` is a self-contained page in plain HTML saying what MegaNet is
+   `about.html` is a self-contained page in plain HTML saying what Flood-Net is
    and what it is not, and `robots.txt` invites the crawl and names a
    `sitemap.xml`. Deliberately no stylesheet, font, script or CDN on that page:
    a page that has to fetch something first is a page that can arrive blank, and
@@ -311,7 +311,7 @@ instead removes the class of problem:
 
    The "what it is not" half is not boilerplate. This domain is named after a
    Bureau statutory function, and a reader — or a brand-protection rule — is
-   entitled to wonder. The page says plainly that MegaNet issues no warnings,
+   entitled to wonder. The page says plainly that Flood-Net issues no warnings,
    is not an official Bureau product, and points at the Bureau for the real
    thing. That is both true and the single most useful sentence on it.
 
@@ -346,7 +346,7 @@ The domain is only one of the things holding that project up. In order:
 3. **Archive the repository** rather than deleting it — GitHub's *Settings →
    Archive this repository* makes it read-only and unambiguous, and keeps the
    history. Put a line at the top of its README saying the domain moved to
-   MegaNet and when.
+   Flood-Net and when.
 4. **Cancel anything it was paying for** — a database, an uptime check, a
    certificate bought outside Cloudflare.
 5. **Leave DNS records you do not understand alone.** Especially `MX` and `TXT`.
