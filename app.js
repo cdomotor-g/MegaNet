@@ -7285,19 +7285,22 @@ function stnCardHtml(s) {
     <!-- A proposed station says so before anything else on its card (0039):
          nothing below it is about a station on the ground yet. -->
     ${stnCardProposalHtml(s)}
-    <!-- Its health (#218), next under its name because it is the line somebody
-         standing at the site came to the card for: when it was last heard, its
-         battery's night lows and what is wrong with it, each a door into the
-         Station Health tab on this station. One request, filled after it by
-         HealthGlance.ask, the way the SLS section is (health-glance.js).
-         Nothing for a proposed station, which has nothing to have heard. -->
-    ${HealthGlance.cardHtml(s)}
     <div class="acma-sect">
       <!-- Who owns it, first and always — "Not recorded" where nobody is on
            record (stnCardOwnerHtml). The SLS section below quotes the
            document's own "Station owner" row word for word. -->
       <div class="acma-row"><span>Owner</span><span id="${escAttr(ownerId)}"
           data-mn-owner="${escAttr(String(s.id))}">${stnCardOwnerHtml(s)}</span></div>
+    </div>
+    <!-- Its health (#218), straight after whose it is, because it is the line
+         somebody standing at the site came to the card for: when it was last
+         heard, its battery's night lows and what is wrong with it, each a door
+         into the Station Health tab on this station. One request, filled after
+         it by HealthGlance.ask, the way the SLS section is (health-glance.js).
+         Nothing for a proposed station, which has nothing to have heard. The
+         owner stays the card's first row, as it always is. -->
+    ${HealthGlance.cardHtml(s)}
+    <div class="acma-sect">
       ${acmaCardRow('Stn #', s.station_number ? esc(s.station_number)
         : s.proposed ? '<span class="txt-muted">none yet — proposed</span>' : null)}
       ${!s.proposed && s.station_type ? acmaCardRow('Type', esc(stationTypeLabel(s.station_type))) : ''}
