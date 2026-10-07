@@ -1245,6 +1245,12 @@ jobs:
       # kept on a duplicate — and a bad one stored as null, never a refusal.
       - name: check_reading_signal.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_reading_signal.sql
+      # The newest reading of every address (0057), which the agent API's
+      # /api/v1/readings/latest reads: one row per address, by the device's
+      # own time and the later received of a tie, agreeing with DISTINCT ON —
+      # and read by anon exactly as an editor reads it.
+      - name: check_reading_latest.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_reading_latest.sql
       # A base station asking for its token (0048): anon may ask, only the hash
       # of the device's own token is kept, only an administrator approves —
       # and the approved token opens the door with nothing to collect.

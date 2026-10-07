@@ -184,6 +184,7 @@ its cache at all (`PGRST002`).
 | `meganet.reading` | Every field-station reading. `addr` is the identity and the primary key is the deduplication — see **Telemetry**, below. `ingest_token_id` names the ingest point it came in through, or is null for a backfill or a manual edit. `freq_mhz`, `rssi_dbm`, `level_dbfs` and `snr_db` (`0050`) say on what frequency, and how strongly, the kept copy was heard — null when the adapter did not say. |
 | `meganet.reading_raw` | One row per `ingest()` call, holding the payload exactly as submitted. Ages out in 30 days. **The one table `anon` cannot read.** |
 | `meganet.reading_hourly`, `meganet.reading_daily` | The rollups, kept forever. Sums rather than means, so a day re-aggregates from its hours exactly — and goes on being right after the readings are gone. |
+| `meganet.reading_latest` | View (`0057`): one row per address, its newest reading in `meganet.reading` — the latest `reading_ts`, and of two at one instant the later received. Walks the primary key, so it costs the number of addresses rather than of readings. **Public**, like the readings under it: it is what the agent API's `GET /api/v1/readings/latest` reads. `security_invoker`. See **Telemetry**, below. |
 | `meganet.ingest_source`, `meganet.protocol`, `meganet.quality`, `meganet.unit` | The four vocabularies a reading is validated against. A new transport or protocol is an `insert` here, not a migration. |
 | `meganet.ingest(jsonb)` | The one way in. A batch, validated per row, deduplicated, partially accepted. `EXECUTE` revoked from `public` and never granted to `anon`. |
 | `meganet.resolve_station(int, text)` | Which station is this address, when exactly one answer exists? Null otherwise. |
@@ -620,6 +621,22 @@ remove somebody from. `anon` holds no `EXECUTE`: a grant there would make a tabl
 heading for millions of rows writable by anyone holding a key that is committed to
 a public repo. `ingest_http()`, added by `0007_ingest_http.sql`, is the one
 narrow exception — see below.
+
+**The newest reading of every address is a view, `meganet.reading_latest`
+(`0057`).** "What is every gauge saying now?" is `DISTINCT ON (addr)`, which
+PostgREST cannot say, and which written out plainly reads every row the table
+holds to keep one per address. The view walks the primary key instead — the
+first address, then each next one after it, an index probe each (a recursive
+CTE, the "loose index scan" Postgres does not do by itself) — and makes one
+backward probe per address for its newest reading. Two probes per address,
+however many readings there are: over 600,000 readings on 600 addresses it
+answers `anon` in about 20 ms where `DISTINCT ON` takes 470. Newest is the
+latest `reading_ts`, the device's own time; of two at one instant, the later
+`received_at`. It is public like the readings under it, `security_invoker` so
+their RLS answers, and it leaves out the bookkeeping (`dup_paths`, `raw_id`,
+the ingest point). The rollups could not stand in for it: they are only as
+fresh as the last `roll_up()`. The agent API's `GET /api/v1/readings/latest`
+is what reads it; `tools/check_reading_latest.sql` proves it.
 
 ### Proving it
 
