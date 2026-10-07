@@ -15517,7 +15517,7 @@ button.adm-danger:hover { border-color: var(--bad); }
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md);
   box-shadow: var(--shadow-2); padding: var(--sp-3); margin-top: .25rem;
 }
-@media (max-width: 640px) {
+@media (max-width: 700px) {
   .hl-ownpick-pop { position: static; width: auto; }
 }
 .hl-ownpick-head { display: flex; gap: var(--sp-2); align-items: center; }
