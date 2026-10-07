@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 2, date: '2026-10-07', items: [
+      '<strong>Flood classes on the charts.</strong> On <em>ARRO Data</em> and <em>Field Data</em>, a level series\' card '
+        + 'has <strong>Flood classes</strong> and <strong>AEP levels</strong>: tick either to draw the station\'s minor, '
+        + 'moderate and major levels, or its AEP levels, as labelled lines across the chart — and into the PNG and SVG '
+        + 'exports. Each is drawn in the series\' own datum, on the gauge or in metres AHD; one that cannot be placed '
+        + 'is left out, and the card says why.',
+    ] },
     { n: 1, date: '2026-10-07', items: [
       '<strong>The address bar says where you are</strong> — the tab, the station whose card is up and the map\'s '
         + 'view — so a bookmark, a reload or a link sent to somebody opens exactly that. <strong>🔗 Copy link</strong> on a '

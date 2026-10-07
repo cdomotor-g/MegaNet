@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-07** (revision 120 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-07** (revision 121 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -414,7 +414,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 - **#223** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 117** — in-app messages instead of browser pop-ups: 13 `alert()`, 24 `confirm()` and one `prompt()` become toasts and a Modal-based confirm; a browser without Web Serial or WebUSB is told so on the tab rather than by an `alert()` when a button is pressed; a phone sees which tabs need a desktop.
 - ~~**#224**~~ `[Standalone]` `[Sonnet5/Med]` — **CLOSED at revision 119, opened at 117** — **🌗 Theme** is four radios: **System** (the default, following the device as it changes), Light, Dark and **Sunlight** (black on white, the map's radio paths 1.6× heavier). A stored choice from before still stands; the one rule that asked the device behind the toggle's back asks the page now; `forced-colors` keeps the open tab marked. `npm run themes` holds it, and `npm run shell` holds Sunlight to the same contrast pairs as the other two. See revision 119 below.
 - **#225** `[Standalone]` `[Haiku4.5/Low]` — **OPEN, opened revision 117** — a **Directions** pill beside Street View on the station card and the map callout.
-- **#226** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 117** — flood classes as labelled lines on the ARRO Data and Field Data charts, drawn only where the series and the levels share a datum or `flood-stages.js` can convert between them, and carried into the PNG export.
+- ~~**#226**~~ `[Standalone]` `[Sonnet5/Med]` — **CLOSED at revision 121, opened at 117** — flood classes and AEP levels as labelled lines on the ARRO Data and Field Data charts, ticked per level series, each in **that series' own datum** (`FloodStages.lines()`): through the gauge zero only where it is surveyed in AHD, the lines that cannot be placed left out with a note naming them. The axis never moves for them unless asked; a level beyond it is named along that edge. Carried into the PNG and SVG exports. `npm run floodlines` holds it. See revision 121 below.
 - **#227** `[Standalone]` `[Opus5/Med]` — **OPEN, opened revision 117** — one **Export** in the header for whatever the current tab shows, filtered: an export registry each tab fills (in the shape of #142's), reusing the writers about thirty modules already have, with a check that holds every data tab to registering or being listed as exempt.
 - **#228** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 117** — accessibility follow-ups: `aria-invalid` (used nowhere today) tied to the error text on every validated field, the page behind an open Modal made `inert`, and a `?` shortcut sheet.
 - **#229** `[Standalone]` `[Opus5/Med]` — **OPEN, opened revision 117** — Station Health's briefing without a personal API key. `health-agent.js`' own comment keeps the key the person's "until that door has a lock (an Access-gated route is the obvious one)", and the site has been behind Access since revision 72. A Worker route that checks the Access JWT, editors and administrators only, rate-limited with a daily spend ceiling, and kept apart from the read-only agent API. One person-step: the secret.
@@ -532,6 +532,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and eight `[Human]` issues.
 >
+> **Revision 121 closes #226, and opens nothing** — flood classes and AEP levels on the ARRO Data and Field Data charts, each in its series' own datum, from the same request as revision 119. The Sonnet5 Med row loses one. Nothing for a person; one question offered to the owner rather than filed — whether a plain *Water Level* sensor on this network always reports height on the gauge (see below).
+>
 > **Revision 120 closes nothing and opens nothing** — two of #230's three parts shipped: every station's latest reading in one call, and GeoJSON for a map. The third (silent stations) is #215's findings made public, so #230 stays open, in the same row, for that. **One step for a person, offered to the owner rather than filed:** applying `0057` to the live database; until then the new route answers *not available yet* and every other route is unchanged.
 >
 > **Revision 119 closes #221, #222 and #224, and opens nothing** — three more of the review's Flood-Net items, built in the session that filed them at the owner's request ("all except 5, 7, 12 and 15" of the review's list): Ctrl+K finds a station, a place, a tab or an action; a first visit opens the guide once and ✨ What's new follows a release; the theme follows the device, with Sunlight for the field. The Sonnet5 Med row loses two and the Low row one. The same request has nine more in flight in this session — #213, #218, #219, #223, #226, #227, #229, #230 and #231 — and they close in later revisions as each lands.
@@ -606,7 +608,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 | Effort | Issues |
 |---|---|
 | High | **#209** (`alert2.js` misreads the ALERT2 header fields — self-reports thrown away) · **#217** (transmitter drift as a finding — *after #215 and the Pi's half*) |
-| Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters and drawings in 3-D) · **#201** (place a field photo on the map) · **#205** (tides and soils on the card beyond Queensland) · **#218** (health on the card and the map) · **#220** (maintenance due list) · **#223** (in-app messages instead of pop-ups) · **#226** (flood classes on the charts) · **#228** (accessibility follow-ups) · **#230** (agent API: silent stations — *after #215*; its other two parts shipped) |
+| Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters and drawings in 3-D) · **#201** (place a field photo on the map) · **#205** (tides and soils on the card beyond Queensland) · **#218** (health on the card and the map) · **#220** (maintenance due list) · **#223** (in-app messages instead of pop-ups) · **#228** (accessibility follow-ups) · **#230** (agent API: silent stations — *after #215*; its other two parts shipped) |
 | Low | **#231** (README drift) |
 
 ### AI agent — Haiku4.5
@@ -723,6 +725,22 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 121 — 2026-10-07: the flood classes, across the chart that measures against them — #226 closed
+
+From the same request as revision 119, built by a helper agent in its own clone and brought onto `main` as one commit.
+
+**What a person sees.** A level series' card on ARRO Data and Field Data has **Flood classes**, **AEP levels** and **stretch the axis**, all off by default — an untouched chart draws exactly what it did. Ticked, the station's levels are labelled lines across the chart ("Minor 7.0 m on the gauge", "1% AEP 102.69 m AHD"), each class with its own dash as well as its colour, a key per line in the strip under the chart, and named in the chart's accessible name. They are part of the SVG, so both exports carry them. The handler is `ArroData.setFlood(key, what, value)`; native checkboxes, focus kept through the rail's rebuild, the result said.
+
+**The decision the issue was about: which datum a series is in, and what may cross it.** `FloodStages.lines(station, datum)` (new, pure, in `flood-stages.js`) places every line in the series' own datum: a series on the gauge takes the classes as listed and the AEP levels brought down through the gauge zero in use; a series in m AHD the other way round. **Only a zero surveyed in AHD is crossed** — on an assumed, a State or an unknown datum, or with no survey, the lines that need it are not drawn (no element at all) and a note names each and why; a gauge series keeps its own classes regardless. A unit of `mAHD` decides the datum and nothing overrides it; a unit that is not metres draws nothing and says why (Field Data's counts, whose conversion is for display only); otherwise *auto* reads the sensor's type, label and file — "AHD" is AHD, "LGH" is the gauge, and **any other level sensor, plain "Water Level" among them, is taken as metres on the gauge**. That last is a convention, not something the data states (the register types its AHD sensors separately: 66 "Water Level - AHD", one "Water Level - LGH"), so the card says it was assumed and a per-series box overrides it. Readings that look like the other datum are warned of (where the zero is far enough from 0 m AHD to tell), and so is a gauge re-levelled inside the series (Bowen, 1990).
+
+**The axis never moves for a flood line unless asked.** A level beyond the readings is named along that edge ("▲ Above the chart: Major 15.0 m on the gauge"); *stretch the axis* is the opt-in. Labels sit at the left end of each line, on a plate the panel's colour — on the right they would cover the newest readings and sit under the chart's ↺ and ⛶.
+
+**Checks:** `npm run floodlines` (new, 75 assertions, a CI step after `adqual`, a `test/README.md` row): the arithmetic under Node on real records (Gatton's 87.54 m zero, Beaudesert's State-datum one, Bohle River's too-near-zero, Bowen's re-levelling), then in Chromium each line read back at the height **the chart's own axis ticks** give its figure, unplaceable lines absent, and **the PNG export decoded pixel by pixel**. Five deliberate breaks each went red (AEP levels not converted, classes carried through a non-AHD zero, `var()` colours in the export, the axis always stretched, plain "Water Level" taken as AHD). Run green on `main` after the merge: the cheap five, `floodlines`, `adqual`, `adnav`, `fieldkind`, `floodlevels`, `help`, `smoke` and `tabs`. Not verified: the PNG in Firefox or Safari (the label plate is an SVG filter).
+
+**Left out, and natural follow-ups if anyone asks:** historical peaks as lines, levels borrowed from a nearby station, and lines over Field Data's count series through the datastore's conversion.
+
+**A question for the owner, offered rather than filed:** whether a plain *Water Level* sensor on this network always reports height on the gauge. The per-series box covers a station where it does not.
+
 ### Revision 120 — 2026-10-07: every gauge's latest reading in one call, and the API draws on a map — #230's first two parts
 
 From the same request as revision 119, built by a helper agent in its own clone and brought onto `main` as its two commits.
@@ -735,7 +753,7 @@ From the same request as revision 119, built by a helper agent in its own clone 
 
 **Checks:** `npm run agentapi` 310 (was 251), `npm run agentdocs` 94 (was 88), `gate`, `dbproxy` and `help` green, and the db checks from zero on Postgres 16. 26 deliberate breaks — 4 of the view, 17 of the Worker, 5 of the docs — each went red on the assertion meant for it; two only after the check was strengthened (a station's channels heard at different times, so `latest_at` cannot pick the oldest; each parameter looked for in its own endpoint's section, not anywhere on the page).
 
-**One step for a person, offered to the owner rather than filed: apply `0057`** — the SQL Editor, or `psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f db/migrations/0057_reading_latest.sql` — then `curl -s 'https://floodwarning.net/api/v1/readings/latest?limit=1'` answers with a count. It takes the live `schema_version` from 52 to 57; a later `0053`–`0055` leaves it at 57. Not verified from here: the real PostgREST's answer for a missing relation (the 503 relies on its 404, exercised against the test stub), and mapping tools reading the GeoJSON live.
+**One step for a person, offered to the owner rather than filed: apply `0057`** — the SQL Editor, or `psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f db/migrations/0057_reading_latest.sql` — then `curl -s 'https://floodwarning.net/api/v1/readings/latest?limit=1'` answers with a count. It takes the live `schema_version` from 52 to 57; a later `0055` was tried and leaves it at 57. Not verified from here: the real PostgREST's answer for a missing relation (the 503 relies on its 404, exercised against the test stub), and mapping tools reading the GeoJSON live.
 
 ### Revision 119 — 2026-10-07: one box finds anything, a first visit is shown around, and the theme follows the device — #221, #222 and #224 closed
 
