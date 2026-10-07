@@ -744,23 +744,25 @@ const pin = await page.evaluate(() => {
 });
 ok('the file has a repeater to click', !!pin);
 
+// Where the renderer says the pin is, rather than where the arithmetic says
+// it should be: pins are billboarded circles standing on terrain, and the
+// question this check is asking is about what a *click* does.
+const pinOnScreen = t => page.evaluate((t) => {
+  const m = Map3D._map();
+  const p = m.project([t.lng, t.lat]);
+  const r = m.getCanvas().getBoundingClientRect();
+  const f = m.queryRenderedFeatures([p.x, p.y], { layers: ['mn-stations'] });
+  const hit = f.length ? f[0].properties.id : null;
+  const mk  = (state.mapMarkers || []).find(x => x.mnStationId === hit);
+  return { x: Math.round(r.left + p.x), y: Math.round(r.top + p.y), hit,
+           repeater: !!(mk && mk.mnStation && mk.mnStation.roles
+                        && mk.mnStation.roles.includes('repeater')) };
+}, t);
+
 if (pin) {
   await page.waitForTimeout(1200);
   await idle3d();
-  // Where the renderer says the pin is, rather than where the arithmetic says
-  // it should be: pins are billboarded circles standing on terrain, and the
-  // question this check is asking is about what a *click* does.
-  const where = await page.evaluate((t) => {
-    const m = Map3D._map();
-    const p = m.project([t.lng, t.lat]);
-    const r = m.getCanvas().getBoundingClientRect();
-    const f = m.queryRenderedFeatures([p.x, p.y], { layers: ['mn-stations'] });
-    const hit = f.length ? f[0].properties.id : null;
-    const mk  = (state.mapMarkers || []).find(x => x.mnStationId === hit);
-    return { x: Math.round(r.left + p.x), y: Math.round(r.top + p.y), hit,
-             repeater: !!(mk && mk.mnStation && mk.mnStation.roles
-                          && mk.mnStation.roles.includes('repeater')) };
-  }, pin);
+  const where = await pinOnScreen(pin);
   ok('the pin under the pointer is a station the 2-D map drew', where.hit != null,
      JSON.stringify(where));
 
@@ -819,14 +821,202 @@ if (pin) {
     // view is underneath it by the time it is open. `closeStnCard(false)`
     // clears the card and nothing else — the focus is the state under test and
     // it is left exactly as the first click set it.
+    //
+    // And the pin is found again rather than clicked where it was: a card
+    // opened over its own pin slides the camera until the pin is clear of it,
+    // so the leader has somewhere to go (MapLeader.reveal, the next section).
     await page.evaluate(() => closeStnCard(false));
     await page.waitForTimeout(150);
-    await page.mouse.click(where.x, where.y);
+    await idle3d();
+    const again = await pinOnScreen(pin);
+    await page.mouse.click(again.x, again.y);
     await page.waitForTimeout(400);
     ok('…and clicking it again clears the focus',
        await page.evaluate(() => state.mapFocusRepeaterId) == null);
   }
   await page.evaluate(() => { state.mapFocusRepeaterId = null; closeStnCard(false); });
+}
+
+// ── 7b. the card's gold leader, over the canvas ─────────────────────────────
+// In 2-D a gold leader runs from the station card's top edge to a ring round
+// its pin (map-leader.js). In 3-D it was simply not there: it is drawn in a
+// Leaflet pane, and every Leaflet pane is under the canvas. So it is drawn over
+// the canvas now, to where MapLibre stands the pin on the terrain, and what is
+// asserted is the geometry rather than the picture:
+//
+//   * it is *there* — the thing `elementFromPoint` finds along its own line,
+//     over the canvas, and not the canvas;
+//   * it ends on the pin the renderer drew — `project()` — and goes on ending
+//     there through a turn of the camera;
+//   * its ring clears the pin as MapLibre draws it, which is not the 2-D size:
+//     a circle layer scales with depth, so a pin at the foot of a steep view is
+//     drawn half as large again. That is measured with MapLibre's own hit-test
+//     (`queryRenderedFeatures`), which scales a circle by its depth in its own
+//     code, independently of the leader's arithmetic — and a ring at the 2-D
+//     size is shown to cut through the same pin, so the check is not passing
+//     on a pin too small to tell;
+//   * a pin the card covers gets no leader until the camera slides it clear
+//     (MapLeader.reveal), as a click on a pin there does;
+//   * and it goes with the card. Leaving 3-D gives it back to the 2-D pane —
+//     asserted below, where the camera section leaves 3-D.
+console.log('\nThe card’s gold leader reaches its pin in 3-D');
+
+// The leader as drawn, and the pin as the renderer has it, in the map
+// container's pixels — the canvas covers the container exactly.
+const leader3d = id => page.evaluate((id) => {
+  const m = Map3D._map();
+  const g = MapLeader.geometry();
+  const mk = state.mapMarkers.find(x => String(x.mnStationId) === String(id));
+  const ll = mk.getLatLng();
+  const p = m.project([ll.lng, ll.lat]);
+  const svg = document.querySelector('.mn-leader');
+  const cont = state.map.getContainer().getBoundingClientRect();
+  const c = document.getElementById('stn-card').getBoundingClientRect();
+  // The case is the widest of the three strokes: its inner edge is where the
+  // ring stops being clear ground.
+  const ring = document.querySelector('.mn-leader-case .mn-leader-ring');
+  const caseW = ring ? parseFloat(getComputedStyle(ring).strokeWidth) : NaN;
+  const hit = (x, y) => m.queryRenderedFeatures([x, y], { layers: ['mn-stations'] })
+    .some(f => String(f.properties.id) === String(id));
+  const out = {
+    g, pin: { x: p.x, y: p.y },
+    parent: svg && svg.parentNode ? (svg.parentNode.id || svg.parentNode.className) : null,
+    card: { left: c.left - cont.left, top: c.top - cont.top,
+            right: c.right - cont.left, bottom: c.bottom - cont.top },
+    // What a 2-D ring would be: Leaflet's radius and the leader's 6 px gap.
+    ring2d: mk.getRadius() + 6, caseW,
+  };
+  if (g) {
+    const inner = g.ring.r - caseW / 2 - 0.5;
+    const inner2d = out.ring2d - caseW / 2 - 0.5;
+    out.hitCentre = hit(g.ring.x, g.ring.y);
+    // Just inside the ring's inner edge, below the pin (towards the camera)
+    // and beside it.
+    out.clear = !hit(g.ring.x, g.ring.y + inner) && !hit(g.ring.x + inner, g.ring.y);
+    out.cut2d = hit(g.ring.x, g.ring.y + inner2d) || hit(g.ring.x + inner2d, g.ring.y);
+  }
+  return out;
+}, id);
+
+// The camera put somewhere with the station `at` a fraction of the canvas
+// from its middle — MapLibre's own offset, which stands the point itself there.
+const aim = (t, at, cam) => page.evaluate(({ t, at, cam }) => {
+  const m = Map3D._map(), c = m.getCanvas();
+  m.easeTo({ center: [t.lng, t.lat], ...cam, duration: 0,
+             offset: [at[0] * c.clientWidth, at[1] * c.clientHeight] });
+}, { t, at, cam });
+
+if (pin) {
+  await page.evaluate(() => { state.mapFocusRepeaterId = null; closeStnCard(false); });
+  await page.evaluate(t => Map3D._map().jumpTo({ center: [t.lng, t.lat], zoom: 12, pitch: 60, bearing: 0 }), pin);
+  await page.waitForTimeout(800);
+  await idle3d();
+  const at = await pinOnScreen(pin);
+  await page.mouse.click(at.x, at.y);
+  // The click may slide the camera: the card opens over the middle of the map.
+  await page.waitForTimeout(900);
+  await idle3d();
+
+  const a = await leader3d(pin.id);
+  ok('a pin clicked in 3-D gets the card’s leader, drawn for the 3-D view',
+     !!a.g && String(a.g.id) === String(pin.id) && a.g.view === '3d', JSON.stringify(a.g));
+  ok('…over the canvas, not on the 2-D pane under it', a.parent === 'map3d', String(a.parent));
+  if (a.g) {
+    ok('it ends on the pin where MapLibre stands it on the terrain',
+       near(a.g.ring.x, a.pin.x, 1.5) && near(a.g.ring.y, a.pin.y, 1.5),
+       JSON.stringify({ ring: a.g.ring, pin: a.pin }));
+    ok('…and leaves the card from its top outline',
+       a.g.from.y >= a.card.top - 0.5 && a.g.from.y <= a.card.top + 8.5
+       && a.g.from.x >= a.card.left - 0.5 && a.g.from.x <= a.card.right + 0.5,
+       JSON.stringify({ from: a.g.from, card: a.card }));
+    ok('…to a pin the card is not covering',
+       !(a.pin.x > a.card.left && a.pin.x < a.card.right && a.pin.y > a.card.top && a.pin.y < a.card.bottom),
+       JSON.stringify({ pin: a.pin, card: a.card }));
+    // The svg is never a click target (pointer-events: none), which also hides
+    // it from elementFromPoint — so it is made one for the length of the probe.
+    const painted = await page.evaluate(() => {
+      const g = MapLeader.geometry(), svg = document.querySelector('.mn-leader');
+      const cont = state.map.getContainer().getBoundingClientRect();
+      const x = cont.left + (g.from.x + g.to.x) / 2, y = cont.top + (g.from.y + g.to.y) / 2;
+      svg.style.pointerEvents = 'auto';
+      const t = document.elementFromPoint(x, y);
+      svg.style.pointerEvents = '';
+      return { line: !!(t && t.classList && t.classList.contains('mn-leader-line')),
+               got: t ? (t.getAttribute('class') || t.tagName) : null };
+    });
+    ok('…and it is what is painted along its own line, over the canvas',
+       painted.line, `got ${painted.got}`);
+  }
+
+  // A turn of the camera, which the 2-D map has no way to follow.
+  await page.evaluate(() => Map3D._map().jumpTo({ bearing: 25 }));
+  await page.waitForTimeout(400);
+  await idle3d();
+  const b = await leader3d(pin.id);
+  ok('it follows the pin through a turn of the camera',
+     !!b.g && near(b.g.ring.x, b.pin.x, 1.5) && near(b.g.ring.y, b.pin.y, 1.5),
+     JSON.stringify({ ring: b.g && b.g.ring, pin: b.pin }));
+
+  // The foot of a steep view: right of the card, low down, close to the camera.
+  await aim(pin, [0.2, 0.35], { zoom: 13, pitch: 70, bearing: 0 });
+  await page.waitForTimeout(800);
+  await idle3d();
+  const c = await leader3d(pin.id);
+  ok('close to the camera the pin is drawn larger than in 2-D, and the ring grows with it',
+     !!c.g && c.g.ring.r > c.ring2d && c.hitCentre,
+     JSON.stringify({ r: c.g && c.g.ring.r, ring2d: c.ring2d, hitCentre: c.hitCentre }));
+  ok('…where a ring at the 2-D size would cut through it (MapLibre’s own hit-test)',
+     c.cut2d === true, JSON.stringify({ ring2d: c.ring2d, caseW: c.caseW }));
+  ok('…and the leader’s ring clears it', c.clear === true,
+     JSON.stringify({ r: c.g && c.g.ring.r, caseW: c.caseW }));
+  ok('…still on the pin', !!c.g && near(c.g.ring.x, c.pin.x, 1.5) && near(c.g.ring.y, c.pin.y, 1.5),
+     JSON.stringify({ ring: c.g && c.g.ring, pin: c.pin }));
+
+  // And out towards the horizon, where it is drawn smaller.
+  await aim(pin, [0.2, -0.35], { zoom: 13, pitch: 70, bearing: 0 });
+  await page.waitForTimeout(800);
+  await idle3d();
+  const d = await leader3d(pin.id);
+  ok('towards the horizon the ring shrinks with the pin, and still clears it',
+     !!d.g && d.g.ring.r < d.ring2d && d.clear === true,
+     JSON.stringify({ r: d.g && d.g.ring.r, ring2d: d.ring2d, clear: d.clear }));
+
+  // Under the card: no leader, until reveal() — what a click on a pin there
+  // runs — slides the camera until the pin is out from under it.
+  await page.evaluate(t => {
+    const m = Map3D._map(), cv = m.getCanvas();
+    const cr = cv.getBoundingClientRect(), k = document.getElementById('stn-card').getBoundingClientRect();
+    const x = k.left + k.width / 2 - cr.left, y = k.top + k.height / 2 - cr.top;
+    m.easeTo({ center: [t.lng, t.lat], zoom: 12, pitch: 60, bearing: 0, duration: 0,
+               offset: [x - cv.clientWidth / 2, y - cv.clientHeight / 2] });
+  }, pin);
+  await page.waitForTimeout(800);
+  await idle3d();
+  const e = await leader3d(pin.id);
+  ok('a pin the card is covering gets no leader',
+     e.g === null && e.pin.x > e.card.left && e.pin.x < e.card.right
+     && e.pin.y > e.card.top && e.pin.y < e.card.bottom,
+     JSON.stringify({ g: e.g, pin: e.pin, card: e.card }));
+  await page.evaluate(() => MapLeader.reveal());
+  await page.waitForTimeout(900);
+  await idle3d();
+  const f = await leader3d(pin.id);
+  ok('…until reveal() slides the camera to bring it out, and then it has one',
+     !!f.g && f.g.view === '3d' && near(f.g.ring.x, f.pin.x, 1.5) && near(f.g.ring.y, f.pin.y, 1.5)
+     && !(f.pin.x > f.card.left && f.pin.x < f.card.right && f.pin.y > f.card.top && f.pin.y < f.card.bottom),
+     JSON.stringify({ g: f.g, pin: f.pin, card: f.card }));
+  const tilt = await page.evaluate(() => {
+    const m = Map3D._map();
+    return { pitch: m.getPitch(), bearing: m.getBearing(), zoom: m.getZoom() };
+  });
+  ok('…keeping the zoom, the tilt and the heading',
+     near(tilt.pitch, 60, 0.5) && near(tilt.bearing, 0, 0.5) && near(tilt.zoom, 12, 0.05),
+     JSON.stringify(tilt));
+
+  await page.evaluate(() => closeStnCard(false));
+  await page.waitForTimeout(150);
+  ok('closing the card takes the leader with it',
+     await page.evaluate(() => MapLeader.geometry()) === null);
 }
 
 // ── 8. the elevation drape, and the What is here bridge (#194) ──────────────
@@ -1445,6 +1635,37 @@ if (SA && SB && SC) {
   }, v8);
   ok('leaving 3-D shows the 2-D map where the camera was', flat.off <= 2, JSON.stringify(flat));
   ok('…with its own drag, wheel, double-click and keys back', flat.on === 6, `${flat.on} of 6`);
+
+  // The card's leader was drawn over the canvas, which has gone: it is back on
+  // the 2-D map's own pane, and draws there — a card on the station nearest the
+  // middle of the map, and the pan a pin click there would make.
+  const back = await page.evaluate(() => {
+    const svg = document.querySelector('.mn-leader');
+    const home = !!svg && svg.parentNode === state.map.getPane('mnLeader');
+    const mid = state.map.getSize().divideBy(2);
+    let best = null, bd = Infinity;
+    for (const m of state.mapMarkers) {
+      const p = state.map.latLngToContainerPoint(m.getLatLng());
+      const dd = Math.hypot(p.x - mid.x, p.y - mid.y);
+      if (dd < bd) { bd = dd; best = m; }
+    }
+    showStationCard(best.mnStationId);
+    MapLeader.reveal();
+    return { home, id: best.mnStationId };
+  });
+  await page.waitForTimeout(700);
+  const lead2 = await page.evaluate(id => {
+    const g = MapLeader.geometry();
+    const mk = state.mapMarkers.find(x => x.mnStationId === id);
+    const p = state.map.latLngToContainerPoint(mk.getLatLng());
+    return { g, pin: { x: p.x, y: p.y } };
+  }, back.id);
+  ok('leaving 3-D gives the card’s leader back to the 2-D map’s own pane', back.home);
+  ok('…where it is drawn to the 2-D pin',
+     !!lead2.g && lead2.g.view === '2d'
+     && near(lead2.g.ring.x, lead2.pin.x, 1.5) && near(lead2.g.ring.y, lead2.pin.y, 1.5),
+     JSON.stringify(lead2));
+  await page.evaluate(() => closeStnCard(false));
 
   // Back into 3-D for the teardown below, which is about leaving the tab with it on.
   await btn3d.click();

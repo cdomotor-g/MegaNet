@@ -6633,13 +6633,25 @@ hr {
   to   { transform: scale(1);   opacity: 1; }
 }
 
-/* Nothing to point at in 3-D or in the twin: the pins are not where the map
-   pane draws them. The overlays cover the pane anyway; this keeps the line
-   from showing through the 3-D view's half-transparent loading veil. */
-.mn-map-stage:has(#map3d.is-on) .mn-leader,
+/* Nothing to point at in the twin: its pins are not where either map draws
+   them. Nor while the 3-D renderer is still being fetched — the line is on
+   the 2-D pane then, and would show through the loading veil pointing at a
+   pin the view is about to move. The overlays cover the pane anyway. */
 .mn-map-stage:has(#map3d.is-loading) .mn-leader,
 .mn-map-stage:has(#map-twin.is-on) .mn-leader {
   visibility: hidden;
+}
+
+/* In 3-D the svg is moved over the canvas (MapLeader, Map3D.overlay), where
+   Leaflet's `.leaflet-pane > svg` no longer places it: laid over the canvas's
+   corner as it is over the pane's, over the canvas and its DOM pins — the
+   site finder's, the photos' — as the leader's pane is over the pins in 2-D,
+   and under MapLibre's control corners (z-index 2), as it is under Leaflet's. */
+#map3d > .mn-leader {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
 }
 
 /* The card's crown while a leader can hang from it: its top edge in the same

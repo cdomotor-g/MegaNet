@@ -12,7 +12,8 @@
 // PATH_DEFAULT_*), to map-controls.js for the panel it is opened from, to
 // map-sites.js for what the repeater site finder drew (MapSites.drawn, select,
 // dimOthers, modeChanged), to map-photos.js for the field photos' pins
-// (MapPhotos.drawn, badgeHtml, conePath, open), and to app.js for
+// (MapPhotos.drawn, badgeHtml, conePath, open), to map-leader.js for the
+// station card's leader (MapLeader.sync, reveal), and to app.js for
 // showStationCard and the base-map choice. Every one of those is called from
 // inside this file's own functions, so its position among the modules is free.
 //
@@ -1565,6 +1566,14 @@ const Map3D = (function () {
     map.on('rotate', syncCamera);
     map.on('pitch', syncCamera);
 
+    // The station card's leader (map-leader.js) is drawn over this canvas while
+    // it is up, to where MapLibre puts the pin (pinAt) — so it is redrawn in
+    // every frame MapLibre draws, which is every way the pin can move on
+    // screen: a drag, a tilt, an ease, and a terrain tile landing under it and
+    // lifting it. Not `move`: that is the camera only, and fires before the
+    // frame it changes, where `render` is that frame.
+    map.on('render', syncLeader);
+
     map.on('style.load', () => {
       ready = true;
       map.setTerrain({ source: 'mn-dem', exaggeration: state.map3dExag || 1 });
@@ -1710,6 +1719,9 @@ const Map3D = (function () {
         setMapFocusRepeater(state.mapFocusRepeaterId === st.id ? null : st.id);
       }
       if (typeof showStationCard === 'function') showStationCard(id);
+      // A card opened over the pin it is about slides the camera off it, so
+      // the leader has somewhere to go — the 2-D click's last step.
+      if (typeof MapLeader !== 'undefined') MapLeader.reveal();
     }
     // A path. The same two branches MapBackbone.onLineClick takes in 2-D, but
     // read off the properties linkFeatures() copied across rather than off
@@ -1739,6 +1751,35 @@ const Map3D = (function () {
     // the cursor is the hint, LINK_HIT_PX is the affordance.
     map.on('mouseenter', 'mn-links', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'mn-links', () => { map.getCanvas().style.cursor = ''; });
+  }
+
+  function syncLeader() {
+    if (typeof MapLeader !== 'undefined') MapLeader.sync();
+  }
+
+  // ── The station card's leader, over the canvas ──────────────────────────
+  // How large MapLibre draws a pin at this spot, as a multiple of its 2-D
+  // size — or null for a spot behind the camera, where project() answers with
+  // a point mirrored through it rather than with nothing.
+  //
+  // A circle layer scales with distance from the camera (`circle-pitch-scale`
+  // is left at its default, 'map'): the shader multiplies the radius by
+  // cameraToCenterDistance / w, w being the spot's depth in front of the
+  // camera. At 62° a pin at the foot of the view is drawn about 1.6 times its
+  // 2-D size and one out towards the horizon a fraction of it, so a ring at the
+  // 2-D radius would cut through the one and hang loose round the other.
+  // MapLibre has no public read of w, so it is the transform's own matrix —
+  // the one project() multiplies by — read one row further down, at the
+  // terrain height project() stands the spot on.
+  function pinScale(lngLat) {
+    const tr = map.transform;
+    const mx = tr && (map.terrain ? tr._pixelMatrix3D : tr._pixelMatrix);
+    const ws = tr && tr.worldSize, d = tr && tr.cameraToCenterDistance;
+    if (!mx || !ws || !d) return 1;
+    const mc = ml.MercatorCoordinate.fromLngLat(lngLat);
+    const z = map.terrain ? (map.queryTerrainElevation(lngLat) || 0) : 0;
+    const w = mx[3] * mc.x * ws + mx[7] * mc.y * ws + mx[11] * z + mx[15];
+    return w > 0 ? d / w : null;
   }
 
   function makeHost() {
@@ -1926,6 +1967,50 @@ const Map3D = (function () {
     },
 
     active() { return !!state.map3d; },
+
+    // ── For the station card's leader (map-leader.js) ──
+    // What it is drawn over while this view is up: the canvas's container,
+    // which lies edge to edge over the Leaflet one, so its pixels are the ones
+    // the card is measured in. Null until there is ground to draw on.
+    overlay() { return state.map3d && map && ready ? host : null; },
+
+    // Where a station's pin stands on this canvas, and how large: { x, y, r }.
+    // `r` is what Leaflet's getRadius() would say of a 2-D pin drawn the same
+    // size — its edge less half its stroke, Leaflet stroking across the radius
+    // — so the leader's ring stands the same gap off the pin's edge in both
+    // views. MapLibre strokes outside the radius, and scales the whole of it
+    // with depth (pinScale). Null when there is no map yet, or the spot is
+    // behind the camera.
+    pinAt(latlng, marker) {
+      if (!map || !ready || !latlng) return null;
+      const ll = new ml.LngLat(latlng.lng, latlng.lat);
+      const p = map.project(ll);
+      const k = pinScale(ll);
+      if (!p || !isFinite(p.x) || !isFinite(p.y) || k == null) return null;
+      // stationFeatures()' own numbers for this pin. A station the filters
+      // have taken off the map has none drawn, and is ringed as the 2-D
+      // leader rings it, as a bare 5 px dot.
+      if (!marker) return { x: p.x, y: p.y, r: 5 * k };
+      const w = marker.options.weight || 2;
+      return { x: p.x, y: p.y, r: ((marker.mnRadius || 5) + w) * k - w / 2 };
+    },
+
+    // Slide the camera — zoom, tilt and heading kept — until `latlng` stands
+    // at `pt` on the canvas: MapLeader.reveal(), bringing a pin out from under
+    // the card. A pan by the pixels of the gap would be the 2-D answer and on
+    // a tilted view it is the wrong one; MapLibre's `offset` puts the point
+    // itself there. freezeElevation for follow()'s reason, and the 2-D map
+    // follows when it stops (onCameraEnd), as it does after a drag.
+    panPinTo(latlng, pt) {
+      if (!map || !ready || !host) return;
+      const still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      map.easeTo({
+        center: [latlng.lng, latlng.lat],
+        offset: [pt.x - host.clientWidth / 2, pt.y - host.clientHeight / 2],
+        duration: still ? 0 : 300,
+        freezeElevation: true,
+      });
+    },
 
     // The ⛰️ corner button, and the panel's own switch.
     toggle() { return state.map3d ? (close(), Promise.resolve(false)) : open(); },
@@ -2242,6 +2327,9 @@ const Map3D = (function () {
       modeToSites();
       announce('3-D view off');
     }
+    // The leader was drawn over the canvas and went with it; it is put back
+    // on the 2-D map's own pane.
+    syncLeader();
   }
 })();
 if (typeof window !== 'undefined') window.Map3D = Map3D;

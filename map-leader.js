@@ -6,7 +6,9 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state`. Reached from app.js — initMap and
 // stopStationsMap, refreshMapLayers, repaintStnCard and closeStnCard, the pin
-// click, focusStationOnMap, focusRepeaterOnMap and stnCardFromPopup — all of it
+// click, focusStationOnMap, focusRepeaterOnMap and stnCardFromPopup — and from
+// map-3d.js, which redraws it with every frame of the 3-D view and answers
+// where a pin stands on the terrain (Map3D.overlay, pinAt, panPinTo). All of it
 // from inside its own functions, so this file's position among the modules is
 // free.
 //
@@ -55,6 +57,21 @@
 // the map's own rectangle on every redraw, so everything is drawn in the map
 // container's pixels, where the card is measured too.
 //
+// ── In 3-D ───────────────────────────────────────────────────────────────────
+//
+// The 3-D view is a MapLibre canvas laid edge to edge over the Leaflet
+// container (map-3d.js), so the leader's pane is under it there and the line
+// went with it: a card in 3-D pointed at nothing. So while that canvas is on
+// screen the same svg is moved into it, over the canvas and its DOM pins and
+// under MapLibre's own controls, and drawn in the same pixels — the canvas
+// covers the container exactly — and moved back when the view closes. Only
+// the pin's end changes: it is MapLibre's answer for where the pin stands on
+// the terrain and how large it is drawn there (Map3D.pinAt), since a pin on a
+// tilted view is neither where the flat map has it nor the size it is in 2-D.
+//
+// The twin draws its pins somewhere neither map can say, and no leader shows
+// over it (styles.css hides it).
+//
 // ── Keeping up ───────────────────────────────────────────────────────────────
 //
 // Redrawn on every `move` (a drag, a pan animation, a pinch), on `resize`, when
@@ -67,6 +84,11 @@
 // on `zoomanim` the pin's end is walked from where it was to where it will be
 // on the transition's own curve (leafletEase), frame by frame, and the line
 // arrives with the pin rather than jumping after it.
+//
+// In 3-D it is simpler: MapLibre fires `render` for every frame it draws — a
+// drag, a tilt, a camera ease, a terrain tile landing under the pin — and
+// Map3D redraws the leader in each, so the line is drawn in the same frame as
+// the ground it points at.
 const MapLeader = (function () {
   const PANE   = 'mnLeader';
   // Over the overlay pane (400, the canvas the pins and links are drawn on),
@@ -106,14 +128,38 @@ const MapLeader = (function () {
     catch (_) { return false; }
   }
 
-  // The 3-D view and the digital twin draw the pins somewhere the map pane
-  // does not, over the top of it: no leader shows there (styles.css hides it),
-  // and so no view is moved for one — in 3-D the camera follows the map's
-  // centre, and a centre nudged clear of a card would be a camera off its
-  // station.
-  function elsewhere() {
-    return (typeof Map3D !== 'undefined' && !!Map3D.active && Map3D.active())
-        || (typeof MapTwin !== 'undefined' && !!MapTwin.active && MapTwin.active());
+  // The digital twin draws the pins somewhere the map pane does not, over the
+  // top of it: no leader shows there (styles.css hides it), and so no view is
+  // moved for one.
+  function twin() {
+    return typeof MapTwin !== 'undefined' && !!MapTwin.active && MapTwin.active();
+  }
+
+  function solid() {
+    return typeof Map3D !== 'undefined' && !!Map3D.active && Map3D.active();
+  }
+
+  // What the leader is drawn over, and how a pin is found on it — `pin(latlng,
+  // marker)` is { x, y, r }, in that element's pixels, with `r` the pin's
+  // radius as Leaflet's getRadius() measures it, to the middle of its stroke.
+  //
+  //   2-D   the leader's own pane, with the zoom walk's answer while one runs;
+  //   3-D   the canvas Map3D draws, with MapLibre's (Map3D.pinAt). Null while
+  //         that view is still building: no line until there is ground to
+  //         stand its end on.
+  function view() {
+    if (solid()) {
+      const el = Map3D.overlay && Map3D.overlay();
+      return el ? { el, solid: true, pin: (ll, m) => Map3D.pinAt(ll, m) } : null;
+    }
+    const toPoint = at || (ll => map.latLngToContainerPoint(ll));
+    return {
+      el: map.getPane(PANE), solid: false,
+      pin: (ll, m) => {
+        const p = toPoint(ll);
+        return { x: p.x, y: p.y, r: m && m.getRadius ? m.getRadius() : 5 };
+      },
+    };
   }
 
   // Three strokes laid one over another — the dark case, the gold, the pale
@@ -167,10 +213,10 @@ const MapLeader = (function () {
     if (!id || !map) return null;
     let m = tracked && tracked.mnStationId === id && tracked._map ? tracked : null;
     if (!m) m = state.mapMarkers.find(x => x.mnStationId === id) || null;
-    if (m) return { id, marker: m, latlng: m.getLatLng(), r: m.getRadius ? m.getRadius() : 5 };
+    if (m) return { id, marker: m, latlng: m.getLatLng() };
     const s = state.data && state.data.stations.find(x => x.id === id);
     if (!s || s.lat == null || s.lon == null || !isFinite(s.lat) || !isFinite(s.lon)) return null;
-    return { id, marker: null, latlng: L.latLng(s.lat, s.lon), r: 5 };
+    return { id, marker: null, latlng: L.latLng(s.lat, s.lon) };
   }
 
   function follow(marker) {
@@ -282,33 +328,40 @@ const MapLeader = (function () {
     // ResizeObserver.
     const card = document.getElementById('stn-card');
     if (card) card.classList.toggle('mn-leader-card', !!t && !card.hidden);
-    const toPoint = at || (ll => map.latLngToContainerPoint(ll));
+    const v = view();
+    // Into the 3-D canvas while it is up, and back into the pane after.
+    if (v && svg.parentNode !== v.el) v.el.appendChild(svg);
     let on = false;
-    const box = t ? cardBox() : null;
-    if (t && box) {
-      const p = toPoint(t.latlng);
-      if (!covered(box, p)) { place(box, p, t.r); on = true; }
+    const box = t && v ? cardBox() : null;
+    if (box) {
+      const p = v.pin(t.latlng, t.marker);
+      if (p && !covered(box, p)) { place(box, p, p.r); on = true; }
     }
     if (!t) drawnId = null;
     const fresh = on && t.id !== drawnId;
     if (on) drawnId = t.id;
+    let pinged = false;
     for (const q of pings) {
-      const p = toPoint(q.marker.getLatLng());
+      const p = v && v.pin(q.marker.getLatLng(), q.marker);
+      q.g.style.display = p ? '' : 'none';
+      if (!p) continue;
+      pinged = true;
       for (const c of q.g.children) {
         c.setAttribute('cx', f(p.x));
         c.setAttribute('cy', f(p.y));
-        c.setAttribute('r', f(q.r));
+        c.setAttribute('r', f(p.r + RING_GAP));
       }
     }
-    const any = on || pings.length > 0;
+    const any = on || pinged;
     svg.style.display = any ? '' : 'none';
     svg.classList.toggle('is-on', on);
     if (!any) return;
     // The size only when it has changed — this runs on every frame of a drag.
+    // The 3-D canvas covers the container exactly, so it is the same size.
     const size = map.getSize();
     if (svg.getAttribute('width') !== String(size.x)) svg.setAttribute('width', size.x);
     if (svg.getAttribute('height') !== String(size.y)) svg.setAttribute('height', size.y);
-    L.DomUtil.setPosition(svg, map.containerPointToLayerPoint([0, 0]));
+    L.DomUtil.setPosition(svg, v.solid ? L.point(0, 0) : map.containerPointToLayerPoint([0, 0]));
     if (fresh) drawIn();
   }
 
@@ -322,7 +375,7 @@ const MapLeader = (function () {
   // map still answers with where everything is now; where it is going is the
   // same arithmetic at the target zoom and centre.
   function onZoomAnim(e) {
-    if (!map || !svg || svg.style.display === 'none') return;
+    if (!map || !svg || svg.style.display === 'none' || solid()) return;
     stopZoom();
     const half = map.getSize().divideBy(2);
     const z0 = map.getZoom(), c0 = map.getCenter();
@@ -403,6 +456,7 @@ const MapLeader = (function () {
       const c = parts.rings[0];
       return {
         id: drawnId,
+        view: solid() ? '3d' : '2d',
         from: n.length >= 4 ? { x: +n[0], y: +n[1] } : null,
         to:   n.length >= 4 ? { x: +n[2], y: +n[3] } : null,
         ring: { x: +c.getAttribute('cx'), y: +c.getAttribute('cy'), r: +c.getAttribute('r') },
@@ -412,25 +466,41 @@ const MapLeader = (function () {
     // Pan the map, if it has to, so the card is not covering the pin it is
     // about — the one place a leader has nowhere to go. A card opened over a
     // pin near its corner, or a phone's sheet over the pin that was tapped.
+    //
+    // In 3-D it is the camera that moves, and not by the same pixels: on a
+    // tilted view the ground near the foot of it slides further under a pan
+    // than the ground near the horizon, so the pin is sent to the spot clear of
+    // the card (Map3D.panPinTo) rather than the view shifted by the gap. The
+    // 2-D map follows the camera when it stops, as it does after a drag.
     reveal() {
-      if (!map || elsewhere()) return;
+      if (!map || twin()) return;
       const t = target();
-      const box = t && cardBox();
+      const v = t && view();
+      const box = v && cardBox();
       if (!box) return;
-      const d = clearance(box, map.latLngToContainerPoint(t.latlng), t.r);
-      if (d) map.panBy([-d.x, -d.y]);
+      const p = v.pin(t.latlng, t.marker);
+      const d = p && clearance(box, p, p.r);
+      if (!d) return;
+      if (v.solid) Map3D.panPinTo(t.latlng, { x: p.x + d.x, y: p.y + d.y });
+      else map.panBy([-d.x, -d.y]);
     },
 
     // The centre for a view that puts `latlng` in the middle of the map at
     // `zoom` — moved just far enough that the card is not over it, when it
     // would be. For focusStationOnMap, which sets the view before the leader
     // could ask for a pan.
+    //
+    // Not in 3-D or in the twin: there the camera follows the 2-D map's
+    // centre, at its own zoom and tilt, and a centre nudged by 2-D pixels is a
+    // camera off its station by some other amount. The station goes in the
+    // middle of the view, which the card does not reach on a desktop.
     centreFor(latlng, zoom) {
-      if (!map || elsewhere()) return latlng;
+      if (!map || solid() || twin()) return latlng;
       const t = target();
       const box = t && cardBox();
       if (!box) return latlng;
-      const d = clearance(box, map.getSize().divideBy(2), t.r);
+      const r = t.marker && t.marker.getRadius ? t.marker.getRadius() : 5;
+      const d = clearance(box, map.getSize().divideBy(2), r);
       if (!d) return latlng;
       return map.unproject(map.project(latlng, zoom).subtract([d.x, d.y]), zoom);
     },
@@ -443,7 +513,7 @@ const MapLeader = (function () {
       const g = el('g', { class: 'mn-leader-ping' }, parts.pings);
       el('circle', { class: 'mn-leader-case' }, g);
       el('circle', { class: 'mn-leader-gilt' }, g);
-      const q = { marker, g, r: (marker.getRadius ? marker.getRadius() : 5) + RING_GAP };
+      const q = { marker, g };
       q.timer = setTimeout(() => { dropPing(q); render(); }, PING_MS);
       pings.push(q);
       render();

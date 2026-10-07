@@ -1115,6 +1115,18 @@ not *did a card open*, not *is it displayed*, but **is the card the thing
 painted where the card is**. Every other signal read true the whole time it was
 buried.
 
+**The card's gold leader reaches its pin in 3-D too.** It is drawn in a Leaflet
+pane, so it was under the canvas with the rest of the 2-D map, and a card in
+3-D pointed at nothing. While the canvas is up the leader is now drawn over it —
+over the pins, under MapLibre's own controls — to where MapLibre stands the pin
+on the terrain, and it is redrawn in every frame MapLibre draws, so it stays on
+the pin through a drag, a tilt, a turn and a terrain tile landing under it. Its
+ring is sized to the pin as drawn there: a pin in 3-D grows towards the camera
+and shrinks towards the horizon, and a ring at the 2-D size would cut through
+the near ones. A pin opened under the card slides the camera — zoom, tilt and
+heading kept — until it is clear, as the 2-D map pans one clear, and leaving
+3-D hands the leader back to the 2-D map.
+
 Terrain is fetched for the view you are looking at and no further, which is what
 makes a whole-of-state network affordable to fly over; the sheets are capped at
 80 hops at a time and the panel says how many it left out, because an unsheeted
