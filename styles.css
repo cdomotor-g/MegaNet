@@ -13462,6 +13462,15 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 }
 .twin-borrow-line { margin: var(--sp-2) 0 0; }
 .twin-borrow-line:empty { display: none; }
+/* The datums the levels cross: the modal's line for this ground, its Datum
+   column (a lender whose zero is not AHD in the warning colour, since that
+   decides what can cross), and the Scene panel's From / Carried / Here. */
+.twin-borrow-here { margin: var(--sp-2) 0; }
+.twin-borrow-datum { white-space: normal; }
+.twin-borrow-datum.is-off { color: var(--warn); }
+.twin-datum-chain { display: grid; gap: var(--sp-1); margin-top: var(--sp-2); }
+.twin-datum-chain > span { display: block; }
+.twin-datum-chain strong { font-weight: 600; margin-right: .3em; }
 
 /* What else is in the patch (digital-twin.js, "the neighbours" and "the
    crossings"): the other stations by name — each a button to its own twin —
@@ -13498,6 +13507,15 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
    colour the water takes past it — the legend and the controls in one line. */
 .twin-flood { margin: var(--sp-1) 0 0; }
 .twin-flood-lead { color: var(--muted); }
+.twin-flood-datum {
+  display: inline-block;
+  padding: 0 .35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
 .twin-flood-play { font-weight: 600; }
 .twin-flood-now { font-variant-numeric: tabular-nums; }
 .twin-flood-level { white-space: nowrap; }

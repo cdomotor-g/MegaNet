@@ -30,8 +30,10 @@
 //   The .glb         header, chunks, the ground's positions read back out of
 //                    the binary and matched to the scene, the JPEG in it, the
 //                    station's coordinates in its header.
-//   The fallbacks    an empty raster → the ~30 m tiles, and a note that says
-//                    so; imagery aborted or blank → Esri; nothing at all → a
+//   The fallbacks    an empty raster → the ~30 m tiles, put into AHD from
+//                    EGM96 by the geoid grid, and a note that says so (no
+//                    grid: left in EGM96, said, no water on it, not cached);
+//                    imagery aborted or blank → Esri; nothing at all → a
 //                    stage that says so and an empty scene. Never flat ground.
 //   The station      the Type 3 pole or the tower, from the record; the kit
 //                    inside by telemetry; doors that open on approach; the
@@ -742,6 +744,33 @@ try {
     d.source === 'srtm' && d.qld === 'empty' && seen.srtm > 0 && d.notes.some(n => /SRTM/.test(n) && /holds nothing/.test(n)), `${d.source}: ${d.notes.join(' | ')}`);
   ok('the tiles\' ground has relief and the scene stands on it', d.built && d.max - d.min > 0.5 && near(d.pole.baseY, 0, 1e-6), `${d.min}–${d.max}`);
   ok('the status names the tiles', /SRTM ~30 m/.test(d.status), d.status);
+
+  // The tiles are heights above EGM96; everything the ground is measured
+  // against is AHD. The tile ground is put into AHD by AHD less EGM96 at the
+  // patch's middle (geoid.js), and says by how much — and where that number
+  // cannot be had the ground stays EGM96, says so, stands no flood level on
+  // itself, and is not remembered, so the next build asks again.
+  const sepHere = await page.evaluate(s => Geoid.ahdLessEgm96(s.lat, s.lon), st);
+  ok('…put into AHD from EGM96 by the geoid grid\'s own number for the place, and the notes say how far',
+    d.datum === 'AHD' && Number.isFinite(sepHere) && near(d.geoid, sepHere, 0.005)
+      && d.notes.some(n => /heights above the EGM96 geoid, not AHD/.test(n) && /AHD = EGM96 [−+] \d+\.\d\d m here/.test(n) && /put into AHD/.test(n)),
+    `${d.datum} ${d.geoid} vs ${sepHere}: ${d.notes.join(' | ')}`);
+  const ahdH0 = d.h0;
+  await page.route(/geoid-ahd-egm96\.json/, route => route.abort('blockedbyclient'));
+  await page.evaluate(() => { Geoid.seed(null); DigitalTwin.rebuild(); });
+  await settled();
+  d = await dbg();
+  ok('no geoid grid: the tile ground is left in EGM96 — exactly that far from the AHD one — and the notes say so',
+    d.datum === 'EGM96' && d.egm96 && d.geoid === null && near(ahdH0 - d.h0, sepHere, 0.002)
+      && d.notes.some(n => /left in EGM96/.test(n) && /no level in AHD is stood on it/.test(n)),
+    `${d.datum} Δ${(ahdH0 - d.h0).toFixed(4)} ${d.notes.join(' | ')}`);
+  ok('…and no flood water stands on it', !(d.flood && !d.flood.none), JSON.stringify(d.flood && d.flood.notes));
+  await page.unroute(/geoid-ahd-egm96\.json/);
+  await page.evaluate(() => DigitalTwin.rebuild());
+  await settled();
+  d = await dbg();
+  ok('…and an EGM96 ground is not remembered: the next build asks again and is in AHD',
+    d.datum === 'AHD' && near(d.h0, ahdH0, 1e-4), `${d.datum} ${d.h0} vs ${ahdH0}`);
 
   // A request that fails is a different fact from a patch the State holds
   // nothing for, and the note has to say which — one means the data is not

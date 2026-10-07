@@ -34,9 +34,11 @@
 // and a handful of tiles already covers a whole VHF hop.
 //
 // DATUM — terrarium heights are above the EGM96 geoid; a station's
-// `elevation_ahd` is Australian Height Datum. Over Australia the two agree to
-// about a metre, well inside the ~30 m sampling error, but they are not the
-// same datum and neither one is ellipsoidal height. So where a station's own
+// `elevation_ahd` is Australian Height Datum. Over the stations AHD = EGM96
+// − 2.07 m to + 0.64 m (geoid.js has the grid that measures it, and the
+// Digital Twin's ground is put into AHD with it), inside the ~30 m sampling
+// error for a radio path, but they are not the same datum and neither one is
+// ellipsoidal height. So where a station's own
 // elevation_ahd exists it wins for that *endpoint*, and tiles only ever supply
 // the ground *between* the ends. Everything drawn from this says so on screen.
 //

@@ -93,6 +93,8 @@ MegaNet/
 │                             the stations the way it faces pinned over the camera's
 │                             picture, its compass turned to true north by WMM2025
 ├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
+├── geoid.js                ← Geoid     — AHD less EGM96 at a point (AUSGeoid2020 and
+│                             EGM96, a 0.1° grid in data/): the tiles' heights into AHD
 ├── digital-twin.js         ← DigitalTwin — the digital twin (in the Stations map, its
 │                             settings the side panel's 🧊 pane): one station's ground in
 │                             3-D, the station as built, its neighbours and bridges,
@@ -102,7 +104,8 @@ MegaNet/
 │                             road reserve outlined and named
 ├── flood-stages.js         ← FloodStages — a station's flood classes, AEP levels
 │                             and peaks on one ladder in AHD, the colour the twin's
-│                             water takes past each, and its rise
+│                             water takes past each, and its rise; levels borrowed
+│                             from a nearby station, and the datums they cross
 ├── photo-meta.js           ← PhotoMeta — what a photo says about where it was taken:
 │                             EXIF/XMP in four containers, and the overlay a field
 │                             camera app printed on it, read by OCR (also the

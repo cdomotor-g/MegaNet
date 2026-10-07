@@ -129,10 +129,39 @@ height — terrain.js's rule, which reaches further here than in a profile.
 
 ### Datum
 
-The State's DTM is orthometric — **AHD**, the datum every surveyed
-`elevation_ahd` in `stations.json` is in. The tiles are heights above the
-**EGM96** geoid, within about a metre of AHD over Australia and not a survey.
-The Ground truth panel names which one the ground is standing on.
+The ground is in **AHD** — the datum every surveyed `elevation_ahd`, gauge
+zero, flood level and bridge deck in the app is in. The State's DTM is AHD
+already. The ~30 m tiles are heights above the **EGM96** geoid, and over
+Australia the two are not "within about a metre": at the 4,866 stations with
+a position, a point's AHD height is its EGM96 height **less 2.07 m**
+(Nuriootpa, in the Barossa) to **plus 0.64 m** (the upper Hunter) — less
+0.61 m on average, and less 0.34 m at Gatton (*AHD = EGM96 − 0.34 m*). A
+flood level in AHD stood on a tile ground in EGM96 is that far out before the
+tiles' own error is counted.
+
+So a tile height — the whole ground where the State holds nothing, or the
+State's gaps filled — is put into AHD by **AHD less EGM96** at the patch's
+middle (`geoid.js`), constant to a centimetre or two across a patch:
+
+    H(AHD) = H(EGM96) + [N(EGM96) − N(AUSGeoid2020)]
+
+`data/geoid-ahd-egm96.json` holds that number every 0.1° from 9° S to 44° S
+and 112° E to 154° E (~200 kB, fetched on the first tile ground of a
+session), made by `tools/build_geoid_grid.py` from AUSGeoid2020
+(© Geoscience Australia, CC BY 4.0) and EGM96 (NGA) as PROJ publishes them.
+Bilinear between its nodes it is within 1.6 cm of the two models on average
+at the stations, 8.5 cm at the 99th percentile and 21 cm at the worst — the
+file's meta records the measurement — an order of magnitude inside the
+tiles' own vertical error. The notes and the Ground truth panel say how far
+the tiles were moved (*AHD = EGM96 − 0.34 m here*), and the credit line names
+the two models.
+
+Where that number cannot be had — the grid would not load, or the patch is
+past where AUSGeoid2020 holds a value, ~30 km out to sea (three island
+gauges) — the tiles are left in EGM96, the notes and the panel say so, the
+ground is not cached (the next build asks again), and **no flood water is
+stood on it**: every level is in AHD. The `.glb` header carries the datum,
+and the separation where one was applied.
 
 ## The imagery
 
@@ -769,7 +798,10 @@ reaches major and stays magenta past it, rather than going back to red. The
 colour says how rare a flood the water has passed, and it never says less as
 the water rises. The tokens are `--flood-water-*` in `styles.css`.
 
-**The levels**, all on one ladder in metres AHD:
+**The levels**, all on one ladder in metres AHD — and stood only on a ground
+in AHD (see *Datum*; `FloodStages.onGround`). The flood line says it in a
+word (*in m AHD*) with the whole of it on hover, and the Scene panel names
+the ground the water stands on and its datum:
 
 - **The flood classes** (minor, moderate, major) are heights *on the gauge*,
   so they are put on the ground through the gauge zero in force — and only a
@@ -981,25 +1013,61 @@ bearing, its flood heights (the classes on its gauge, the AEP levels in AHD)
 and its catchment — the basin by name, the stream, and *same catchment* where
 it shares one. **Use these** draws that station's levels here.
 
+The dialog also has a **Datum** column — each lender's gauge zero and the
+datum it is on (*Gauge zero 87.54 m AHD (since 1929-09-01)*; *Gauge zero
+0.00 m, assumed datum — not AHD*, in the warning colour; *No surveyed gauge
+zero*), since that decides what can cross — and says the datum here: what
+this ground is and that it is AHD (*Queensland's DTM*, or *~30 m terrain
+tiles, put into AHD from EGM96 (AHD = EGM96 − 0.34 m here)*), the height of
+the channel by the gauge, and that every height drawn is in metres AHD.
+
 How the heights cross from there to here is the operator's choice, and the
 dialog asks:
 
 - **As heights on the gauge, laid over this station's channel** (the
   default). Each level becomes a height over the lowest ground by this gauge:
-  a minor class of 3.0 m is water 3.0 m over this channel's bed. A class is
-  already a gauge height; an AEP level is brought down to one through the
-  other gauge's AHD zero, and left out — with a note — where it has none. The
-  better guide across a river's fall, which on a creek is a metre a
-  kilometre.
+  a minor class of 3.0 m is water 3.0 m over this channel's bed — at
+  85.00 + 3.0 m AHD over a channel at 85.00 m AHD. Only heights *over* the
+  other gauge's zero cross, so the datum that zero is on does not matter for
+  a class. An AEP level or a recorded flood is in AHD, and is brought down to
+  a gauge height through the other gauge's zero — only an AHD one; where its
+  zero is not AHD its AEP levels are left out, with a note, and its floods
+  are taken at the gauge heights HDB recorded. The better guide across a
+  river's fall, which on a creek is a metre a kilometre. The reading says
+  *m over the channel*, not *on the gauge*: the gauge they are on is not here.
 - **As the same heights in metres AHD** — the other station's own ladder,
-  unchanged: right only a short way along the same reach.
+  unchanged: right only a short way along the same reach. Its classes cross
+  only through an AHD zero; its AEP levels and floods are AHD already. Its
+  gauge is not here, so 0 m is this channel and no level is called a height
+  on a gauge — a level's title says what it was on the lender's (*7.00 m on
+  Gatton's gauge*), and what the lender's own record says about itself is
+  marked as its (*From Gatton's record: …*).
+
+Either way the water is in metres AHD on this station's ground in AHD, and
+**every datum the levels crossed is said** (`FloodStages.datumWords`): a note
+*Datums of the borrowed levels —* with what the lender's heights are measured
+from, how they were carried and what they are in here, e.g.
+
+> Gatton: its flood classes are metres on its gauge, over a gauge zero of
+> 87.54 m AHD (since 1929-09-01); its AEP levels are metres AHD; the floods it
+> has recorded are metres AHD. Carried as heights on Gatton's gauge, 0 m laid
+> on this station's channel at 85.00 m AHD: a level h m on that gauge is drawn
+> at 85.00 + h m AHD here, whatever datum its zero is on; its AEP levels and
+> floods brought down to gauge heights through its AHD zero first. Drawn in
+> metres AHD on this station's ground — Queensland's DTM, in AHD.
+
+The same three lines are under *From*, *Carried* and *Here* in the Scene
+panel's *Flood water*, and the flood line's *in m AHD, over this channel* (or
+*in m AHD, as lent*) carries them on hover.
 
 A station whose own classes are on an assumed or a State datum — which the
 twin cannot put on the ground — is offered **its own** first, as heights over
-its own channel. Borrowed levels are drawn only in the twin and only for the
-session; nothing is saved to the station. The notes, the flood line and the
-Scene panel all say whose they are, how far off, and that they are a guide,
-not a model — and **change** or **stop** is on the line.
+its own channel, and its datums say that zero is not AHD. Borrowed levels are
+drawn only in the twin and only for the session; nothing is saved to the
+station. The notes, the flood line and the Scene panel all say whose they
+are, how far off, and that they are a guide, not a model — and **change** or
+**stop** is on the line. A new choice, or stopping, takes every note the last
+one brought with it.
 
 ## The Ground truth panel
 

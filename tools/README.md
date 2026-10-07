@@ -885,3 +885,28 @@ blender --python tools/blender/import_twin.py -- twin.glb          # and stay op
 ```
 
 `docs/digital-twin.md` has the file's layout and where its ground comes from.
+
+## The geoid grid: AHD from the tiles' EGM96
+
+`build_geoid_grid.py` writes `data/geoid-ahd-egm96.json`, the grid `geoid.js`
+reads to put the ~30 m terrain tiles (heights above the EGM96 geoid) into AHD,
+the datum every gauge zero and flood level is in. It is **AHD less EGM96**,
+`N(EGM96) − N(AUSGeoid2020)`, every 0.1° from 9° S to 44° S and 112° E to
+154° E, one byte a node to 2 cm, from the two models as PROJ publishes them on
+cdn.proj.org — AUSGeoid2020 (© Geoscience Australia, CC BY 4.0) and EGM96
+(NGA). Standard library only, like the rest of this directory: the GeoTIFFs'
+deflate and floating-point predictor are undone by hand, and only the tiles a
+node falls in are decoded (about four seconds). It measures what interpolating
+a 0.1° grid costs against the two models directly, at every station in
+`stations.json` and at 20,000 points over the land, and writes that into the
+file's meta — 1.6 cm on average at the stations, 21 cm at the worst. Over the
+stations the separation runs from −2.07 m (AHD = EGM96 − 2.07 m, in South
+Australia's mid-north) to +0.64 m (the upper Hunter).
+
+```bash
+python3 tools/build_geoid_grid.py                          # fetch both models
+python3 tools/build_geoid_grid.py --egm96 a.tif --ausgeoid b.tif
+```
+
+There is nothing to re-run it for unless a model changes; `npm run flood` holds
+the file to the numbers above.

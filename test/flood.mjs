@@ -22,7 +22,12 @@
 //      giving way first when the stage is short; and the scale's two
 //      measures — linear, and logarithmic in the depth below the top — with
 //      the bend a station's levels are fitted with and whether they warrant
-//      it (Gatton's twelve do, three classes metres apart do not).
+//      it (Gatton's twelve do, three classes metres apart do not). Then the
+//      datum under the water: every ladder in AHD and stood only on a ground
+//      in AHD, and geoid.js — the grid that puts the tiles' EGM96 into AHD —
+//      read from data/ as the app reads it: the shape, the numbers at places
+//      whose separation is known, no value out at sea, and the accuracy the
+//      file claims for itself.
 //
 //   2. The twin in Chromium (skipped without WebGL), standing the real Gatton
 //      record — minor 7, moderate 10, major 15 m on a gauge zero of 87.54 m
@@ -103,6 +108,13 @@ const GATTON_PEAKS = [
   { date: '1983-06',    height_m: 11.58, level_m_ahd: 99.12 },
 ];
 
+function loadGeoid() {
+  const ctx = { console, atob };
+  vm.createContext(ctx);
+  vm.runInContext(`${fs.readFileSync(repo('geoid.js'), 'utf8')}\n;this.Geoid = Geoid;`, ctx);
+  return ctx.Geoid;
+}
+
 function loadModule() {
   const ctx = { console };
   vm.createContext(ctx);
@@ -113,6 +125,51 @@ function loadModule() {
 // ═════════════════════════════════════════════════════════════════════════════
 // 1. flood-stages.js
 // ═════════════════════════════════════════════════════════════════════════════
+
+function datumHalf(FS) {
+  section('The datum under the water');
+
+  const L = FS.ladder(GATTON);
+  ok('a station\'s own ladder is in AHD', L.datum === 'AHD' && L.levels.length === 7);
+  ok('…stood on a ground in AHD, unchanged', FS.onGround(L, 'AHD') === L);
+  const off = FS.onGround(L, 'EGM96');
+  ok('…and on a ground in EGM96, no levels at all and a note that says why',
+    off.levels.length === 0 && off.top === null && off.offGround === 'EGM96'
+      && /in EGM96/.test(off.notes[off.notes.length - 1]) && /could not be put into AHD/.test(off.notes[off.notes.length - 1]), J(off.notes));
+  const bg = FS.borrowed(GATTON, 'gauge', 85, { km: 3 });
+  const ba = FS.borrowed(GATTON, 'ahd', 85, { km: 3 });
+  ok('a borrowed ladder is in AHD either way it is carried', bg.datum === 'AHD' && ba.datum === 'AHD');
+  ok('…and onGround holds it to the same rule', FS.onGround(bg, 'EGM96').levels.length === 0 && FS.onGround(ba, 'AHD') === ba);
+
+  // Geoid: the grid as the app fetches it, decoded by the app's own code.
+  const G = loadGeoid();
+  ok('before the grid is read, nothing is guessed', G.ahdLessEgm96(-27.55, 152.27) === null && !G.loaded());
+  const file = JSON.parse(fs.readFileSync(repo('data/geoid-ahd-egm96.json'), 'utf8'));
+  G.seed(file);
+  ok('the grid reads: 351 × 421 nodes every 0.1° from 9° S, 112° E', G.loaded() && file.rows === 351 && file.cols === 421 && file.step === 0.1
+    && file.lat0 === -9 && file.lon0 === 112);
+  // AHD less EGM96 where the build measured it — Gatton, the Barossa (the
+  // lowest at any station) and the upper Hunter (the highest), against the
+  // models it was made from, to the 2 cm the grid is stored to and the
+  // interpolation the file's meta says it costs.
+  const at = (lat, lon) => G.ahdLessEgm96(lat, lon);
+  ok('Gatton: AHD = EGM96 − 0.34 m', near(at(-27.554471, 152.274671), -0.34, 0.03), at(-27.554471, 152.274671));
+  ok('Nuriootpa: AHD = EGM96 − 2.07 m, the most of any station', near(at(-34.47, 138.999), -2.07, 0.05), at(-34.47, 138.999));
+  ok('Scone (Kingdon Ponds): AHD = EGM96 + 0.58 m, the most the other way', near(at(-32.05, 150.8528), 0.58, 0.05), at(-32.05, 150.8528));
+  ok('no value out at sea, past where AUSGeoid2020 holds any (Willis Island), nor off the grid (New Zealand)',
+    at(-16.288, 149.965) === null && at(-41.29, 174.78) === null && at(NaN, 150) === null);
+  const acc = file.meta && file.meta.accuracy && file.meta.accuracy.stations;
+  ok('the file says what the 0.1° grid costs at the stations, and it is inside a quarter of a metre',
+    acc && acc.points > 4000 && acc.max_m < 0.25 && acc.p99_m < 0.1 && acc.separation_min_m < -2 && acc.separation_max_m > 0.5, J(acc));
+  ok('a grid of the wrong size is refused, not read as zeros', (() => { try { G.seed({ ...file, rows: 350 }); return false; } catch (_) { return true; } })());
+  G.seed(file);
+  let every = 0, none = 0;
+  for (const s of STATIONS) {
+    if (s.lat == null || s.lon == null || !isFinite(s.lat) || !isFinite(s.lon)) continue;
+    if (at(s.lat, s.lon) == null) none++; else every++;
+  }
+  ok('every station but the three island gauges has a value', none <= 3 && every > 4800, `${every} with, ${none} without`);
+}
 
 function nodeHalf(FS) {
   section('The ladder — classes through the gauge zero, the AEP levels, the peaks');
@@ -1088,6 +1145,7 @@ async function browserHalf(FS) {
 try {
   const FS = loadModule();
   nodeHalf(FS);
+  datumHalf(FS);
   await browserHalf(FS);
 } catch (err) {
   failures++;

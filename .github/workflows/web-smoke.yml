@@ -72,6 +72,11 @@ on:
       # flood_peaks.py and loaded by the database job.
       - 'archive/flood-peaks/**'
       - 'data/flood-peaks.json'
+      # …and the geoid grid that puts the tiles' EGM96 into AHD for the
+      # Digital Twin (geoid.js), with the script that makes it: `npm run
+      # flood` holds the file to its numbers, `npm run twin` the ground to it.
+      - 'data/geoid-ahd-egm96.json'
+      - 'tools/build_geoid_grid.py'
       # The Service Level Specifications and what tools/ingest/sls.py reads out
       # of them (0028, 0034, 0038), and the check holding the database's merge
       # of them to the app's. Neither the PDFs nor the files were listed, so a
@@ -148,6 +153,11 @@ on:
       # flood_peaks.py and loaded by the database job.
       - 'archive/flood-peaks/**'
       - 'data/flood-peaks.json'
+      # …and the geoid grid that puts the tiles' EGM96 into AHD for the
+      # Digital Twin (geoid.js), with the script that makes it: `npm run
+      # flood` holds the file to its numbers, `npm run twin` the ground to it.
+      - 'data/geoid-ahd-egm96.json'
+      - 'tools/build_geoid_grid.py'
       # The Service Level Specifications and what tools/ingest/sls.py reads out
       # of them (0028, 0034, 0038), and the check holding the database's merge
       # of them to the app's. Neither the PDFs nor the files were listed, so a

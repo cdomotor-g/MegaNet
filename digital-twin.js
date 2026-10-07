@@ -93,9 +93,10 @@
 // x east, z south (three.js is right-handed with y up, so north is −z). The
 // lat/lon → metres step is the equirectangular one core.js already carries
 // (KM_PER_DEG_LAT, kmPerDegLon), which over a 1.6 km patch is exact to a few
-// centimetres. Heights are AHD from Queensland's service and EGM96 from the
-// tiles — the same metre-or-so apart terrain.js's header describes — and the
-// panel names which one the ground is standing on.
+// centimetres. Heights are AHD: Queensland's service is, and the tiles'
+// EGM96 is put into AHD through geoid.js — AHD = EGM96 − 2.07 m to
+// + 0.64 m over the stations (groundFor says why); the panel says by how
+// much here. The far sheets of the horizon are left as they come.
 //
 // Vertical exaggeration scales the relief only. The station is built at its
 // true size at every setting, and the figure is 1.75 m — they are the ruler.
@@ -671,13 +672,24 @@ const DigitalTwin = (function () {
   // and what was filled from where written on it. Resolves — never rejects —
   // to null only when nothing at all could be had, which the caller says out
   // loud rather than drawing.
+  //
+  // Always in AHD where it can be. The State's DTM is; the tiles are heights
+  // above the EGM96 geoid, and over the stations AHD = EGM96 − 2.07 m to
+  // + 0.64 m (geoid.js), so a tile height — the whole ground, or the State's
+  // holes filled — is put into AHD by AHD less EGM96 at the patch's centre,
+  // constant to a centimetre or two across a patch. Every level this ground
+  // is measured against (a gauge zero, a flood, a deck, a surveyed height) is
+  // AHD. Where that number cannot be had the tiles stay in EGM96, the ground
+  // says so (`datum`), the flood water refuses to stand AHD levels on it, and
+  // it is not cached, so the next build asks again.
   function groundFor(box) {
     const key = `${box.south.toFixed(6)},${box.west.toFixed(6)}|${box.size}`;
     if (groundCache.has(key)) return Promise.resolve(groundCache.get(key));
     return qldGround(box).then(q => {
-      if (q.kind === 'ok' && q.holes === 0) return finishGround(box, q.elev, 'qld', 0, 0, null, q);
+      if (q.kind === 'ok' && q.holes === 0) return finishGround(box, q.elev, 'qld', 0, 0, null, q, null);
       // Holes, or nothing: the tiles fill what the State does not hold.
-      return tileGround(box).then(t => {
+      return Promise.all([tileGround(box), geoidAt(box)]).then(([t, sep]) => {
+        if (t && sep.ok) for (let i = 0; i < t.elev.length; i++) t.elev[i] += sep.m;
         if (q.kind === 'ok') {
           let filled = 0;
           if (t) {
@@ -685,13 +697,13 @@ const DigitalTwin = (function () {
               if (!isFinite(q.elev[i]) && isFinite(t.elev[i])) { q.elev[i] = t.elev[i]; filled++; }
             }
           }
-          return finishGround(box, q.elev, 'qld', q.holes, filled, t, q);
+          return finishGround(box, q.elev, 'qld', q.holes, filled, t, q, filled ? sep : null);
         }
         if (!t) return null;
-        return finishGround(box, t.elev, 'srtm', 0, 0, t, q);
+        return finishGround(box, t.elev, 'srtm', 0, 0, t, q, sep);
       });
     }).then(g => {
-      if (g) {
+      if (g && !g.egm96) {
         groundCache.set(key, g);
         while (groundCache.size > CACHE_MAX) groundCache.delete(groundCache.keys().next().value);
       }
@@ -699,7 +711,16 @@ const DigitalTwin = (function () {
     });
   }
 
-  function finishGround(box, elev, source, holes, filled, tiles, q) {
+  // AHD less EGM96 at the middle of a box: { ok, m } or { ok: false, error }.
+  function geoidAt(box) {
+    if (typeof Geoid === 'undefined') return Promise.resolve({ ok: false, error: 'geoid.js is not loaded' });
+    return Geoid.at((box.south + box.north) / 2, (box.west + box.east) / 2).catch(err => ({ ok: false, error: String(err) }));
+  }
+
+  // `sep`: the geoid's answer where tile heights went into this ground (null
+  // where none did) — { ok: true, m } when they were put into AHD by m, else
+  // the reason they could not be, and the ground is EGM96 where they are.
+  function finishGround(box, elev, source, holes, filled, tiles, q, sep) {
     const c = elev[Math.floor(N / 2) * N + Math.floor(N / 2)];
     let min = Infinity, max = -Infinity, nan = 0;
     for (let i = 0; i < elev.length; i++) {
@@ -728,7 +749,14 @@ const DigitalTwin = (function () {
       // pixel, so the note says both), the tiles ~30 m whatever they were
       // sampled at.
       native_m: source === 'qld' ? 1 : (tiles && tiles.resolution_m) || 30,
-      datum: source === 'qld' ? 'AHD' : 'EGM96',
+      // AHD, unless tile heights went in and could not be put into it: then
+      // the whole ground is EGM96 (`egm96`), or — the State's holes filled
+      // in EGM96 — AHD with a note that the fill is not.
+      datum: source === 'srtm' && sep && !sep.ok ? 'EGM96' : 'AHD',
+      egm96: !!(sep && !sep.ok),
+      // AHD less EGM96 here, where tile heights were put into AHD by it.
+      geoid: sep && sep.ok ? { m: sep.m, model: sep.model || 'AUSGeoid2020 less EGM96' } : null,
+      geoidError: sep && !sep.ok ? sep.error : null,
       attribution: source === 'qld'
         ? (filled ? `${ATTR_QLD_DEM}; gaps: ${(tiles && tiles.attribution) || ''}` : ATTR_QLD_DEM)
         : (tiles && tiles.attribution) || '',
@@ -4502,7 +4530,9 @@ void main() {
         lad = FloodStages.borrowed(donor, pick.mode, seed ? seed.elev : null, info);
       }
     }
-    const notes = lad.borrowed ? [borrowNote(lad.borrowed), ...lad.notes] : lad.notes.slice();
+    // Every level is in AHD, and so must the ground be that it stands on.
+    lad = FloodStages.onGround(lad, g.datum);
+    const notes = lad.borrowed ? [...borrowNotes(lad), ...lad.notes] : lad.notes.slice();
     if (!lad.levels.length || lad.top == null) {
       tw.flood = { lad, none: true, notes, own };
       refreshFloodLine();
@@ -4511,7 +4541,7 @@ void main() {
     const start = FloodStages.start(lad, seed ? seed.elev : null);
     const fill = seed ? fillLevels(g.elev, seed.idx) : null;
     if (seed && seed.elev >= lad.top) {
-      notes.push(`Every flood level recorded here is below the lowest ground by the gauge in this patch (${seed.elev.toFixed(2)} m AHD against ${lad.top.toFixed(2)} m), so the water has nothing to cover.`);
+      notes.push(`Every flood level ${lad.borrowed ? 'borrowed' : 'recorded here'} is below the lowest ground by the gauge in this patch (${seed.elev.toFixed(2)} m AHD against ${lad.top.toFixed(2)} m AHD), so the water has nothing to cover.`);
     }
     // The scale's measure: the bend its levels would take and whether they
     // warrant it, and linear to begin with — or what the operator pressed for
@@ -4553,12 +4583,42 @@ void main() {
     const km = acmaHaversineKm(st.lat, st.lon, donor.lat, donor.lon);
     return { km, bearing: bearingDeg(st.lat, st.lon, donor.lat, donor.lon), same: sameCatchment(st, donor), self: false };
   }
-  function borrowNote(b) {
+  // Two notes for borrowed levels: whose, and the datums they crossed — what
+  // the other station's heights are measured from, how they were carried, and
+  // what they are in here (FloodStages.datumWords).
+  function borrowNotes(lad) {
+    const b = lad.borrowed;
     const how = b.mode === 'ahd' ? 'its levels in metres AHD, unchanged'
                                  : 'its heights on the gauge, laid over this station\'s channel';
-    if (b.self) return `These are this station's own flood classes, as heights over its channel: its gauge has no zero in AHD to put them on the ground by.`;
-    return `Flood levels borrowed from ${b.name}, ${fmtKm(b.km)} ${compassWord(b.bearing)}${b.same ? ', in the same catchment' : ', in another catchment'}: `
-         + `${how}. A guide, not a model — the river here is not the river there.`;
+    const whose = b.self
+      ? 'These are this station\'s own flood classes, as heights over its channel: its gauge has no zero in AHD to put them on the ground by.'
+      : `Flood levels borrowed from ${b.name}, ${fmtKm(b.km)} ${compassWord(b.bearing)}${b.same ? ', in the same catchment' : ', in another catchment'}: `
+        + `${how}. A guide, not a model — the river here is not the river there.`;
+    const w = floodDatumWords(lad);
+    return w ? [whose, `Datums of the borrowed levels — ${w.from} ${w.carried} ${w.here}`] : [whose];
+  }
+  const BORROW_NOTE_RE = /^Flood levels borrowed from|^These are this station's own flood classes|^Datums of the borrowed levels/;
+  // The notes less everything the levels borrowed last said — whose they were,
+  // their datums, and what the lender's own record said — so that a new
+  // choice, or none, does not leave the old one's words standing.
+  function withoutBorrowedNotes(notes) {
+    const F = tw.flood;
+    const said = new Set(F && F.lad && F.lad.borrowed ? F.notes : []);
+    return notes.filter(n => !said.has(n) && !BORROW_NOTE_RE.test(n));
+  }
+
+  // How the ground under the water is said where its datum is: what it is,
+  // and that it is AHD (and how it got there, for the tiles).
+  function groundDatumWords(g) {
+    if (!g) return 'this station\'s ground';
+    if (g.source === 'qld') {
+      return `this station's ground — Queensland's DTM, in AHD${g.filled ? (g.geoid ? `, its gaps filled from ~30 m tiles put into AHD (${geoidWords(g.geoid)})` : ', its gaps filled from ~30 m tiles in EGM96') : ''}`;
+    }
+    return g.geoid ? `this station's ground — ~30 m terrain tiles, put into AHD from EGM96 (${geoidWords(g.geoid)})`
+                   : 'this station\'s ground — ~30 m terrain tiles, in EGM96';
+  }
+  function floodDatumWords(lad) {
+    return FloodStages.datumWords(lad, { ground: groundDatumWords(tw.ground) });
   }
 
   // The stations nearest this one that have levels to lend, nearest first —
@@ -4595,34 +4655,50 @@ void main() {
     return parts.join('<br>');
   }
 
+  // A lender's gauge zero and its datum, for the modal's Datum column: what
+  // its classes are measured from, and whether it is AHD — which decides what
+  // can cross in each mode.
+  function donorZeroHtml(b) {
+    const z = b.zero;
+    if (!z) return '<span class="twin-borrow-datum is-off">No surveyed gauge zero</span>';
+    const when = z.from ? ` <span class="twin-borrow-fact">(since ${esc(String(z.from).slice(0, 10))})</span>` : '';
+    if (z.datum === 'AHD') return `<span class="twin-borrow-datum">Gauge zero ${esc(z.m.toFixed(2))} m AHD</span>${when}`;
+    return `<span class="twin-borrow-datum is-off">Gauge zero ${esc(z.m.toFixed(2))} m, ${esc(z.datum ? FloodStages.datumWord(z.datum) : 'no stated datum')} — not AHD</span>${when}`;
+  }
+
   function borrowModalHtml(st) {
     const donors = nearestDonors(st);
     if (!donors.length) return `<p>No station anywhere near ${esc(st.name)} has flood levels to lend.</p>`;
     const pick = floodBorrows.get(st.id);
     const mode = pick ? pick.mode : 'gauge';
+    const g = tw.ground;
+    const seed = g ? floodSeed(g) : null;
     const rows = donors.map(d => `
           <tr>
             <th scope="row"><strong>${esc(d.self ? `${d.s.name} (its own)` : d.s.name)}</strong>${d.s.station_number ? `<br><span class="twin-borrow-fact">${esc(d.s.station_number)}</span>` : ''}</th>
             <td>${d.self ? 'here' : `${esc(fmtKm(d.km))} ${esc(compassWord(d.bearing))}`}</td>
             <td>${donorHeightsHtml(d.b)}</td>
+            <td>${donorZeroHtml(d.b)}</td>
             <td>${esc(catchmentWords(d.s) || '—')}${d.self ? '' : d.same ? ' <span class="twin-borrow-same">same catchment</span>' : ''}</td>
             <td><button type="button" class="primary" onclick="DigitalTwin.useFloodFrom('${escAttr(d.s.id)}')">Use these</button></td>
           </tr>`).join('');
+    const ch = seed ? `${seed.elev.toFixed(2)} m ${g.datum}` : null;
     return `
-      <p>No flood heights are recorded for <strong>${esc(st.name)}</strong> that can be put on its ground. Here are the ${donors.filter(d => !d.self).length} nearest stations that have some — their distance, their flood heights and their catchment. Pick one to draw its levels as water over this station's ground.</p>
+      <p>No flood heights are recorded for <strong>${esc(st.name)}</strong> that can be put on its ground. Here are the ${donors.filter(d => !d.self).length} nearest stations that have some — their distance, their flood heights, the datum their gauge is on, and their catchment. Pick one to draw its levels as water over this station's ground.</p>
+      <p class="twin-borrow-here"><strong>Datum here:</strong> ${esc(groundDatumWords(g))}.${ch ? ` The channel by the gauge — the lowest ground within ${FLOOD_SEED_M} m — is at ${esc(ch)}.` : ''} Every height drawn is in metres AHD.</p>
       <fieldset class="twin-borrow-mode">
         <legend>Carry the heights across</legend>
-        <label class="check-label"><input type="radio" name="twin-borrow-mode" value="gauge" ${mode === 'gauge' ? 'checked' : ''}><span>As heights on the gauge, laid over this station's channel — the better guide across a river's fall</span></label>
-        <label class="check-label"><input type="radio" name="twin-borrow-mode" value="ahd" ${mode === 'ahd' ? 'checked' : ''}><span>As the same heights in metres AHD — only for a station on the same reach, a short way off</span></label>
+        <label class="check-label"><input type="radio" name="twin-borrow-mode" value="gauge" ${mode === 'gauge' ? 'checked' : ''}><span>As heights on the gauge, laid over this station's channel — the better guide across a river's fall. Only the heights over the other gauge's zero cross, so its zero's datum does not matter: h m on its gauge is drawn at ${ch ? `${esc(seed.elev.toFixed(2))} + h m AHD` : 'h m over the channel'}. Its AEP levels and floods cross only where its zero is AHD.</span></label>
+        <label class="check-label"><input type="radio" name="twin-borrow-mode" value="ahd" ${mode === 'ahd' ? 'checked' : ''}><span>As the same heights in metres AHD — only for a station on the same reach, a short way off. Its classes cross only where its zero is AHD; its AEP levels and floods are AHD already.</span></label>
       </fieldset>
       <div class="table-wrap" tabindex="0" role="region" aria-label="The nearest stations with flood levels">
         <table class="twin-borrow-table">
           <caption class="sr-only">The nearest stations with flood levels, nearest first</caption>
-          <thead><tr><th scope="col">Station</th><th scope="col">Distance</th><th scope="col">Flood heights</th><th scope="col">Catchment</th><th scope="col"><span class="sr-only">Use</span></th></tr></thead>
+          <thead><tr><th scope="col">Station</th><th scope="col">Distance</th><th scope="col">Flood heights</th><th scope="col">Datum</th><th scope="col">Catchment</th><th scope="col"><span class="sr-only">Use</span></th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
-      <p class="small">Borrowed levels are drawn only in this twin and only for this session — nothing is saved to the station. The notes under the view say whose levels they are.</p>`;
+      <p class="small">Borrowed levels are drawn only in this twin and only for this session — nothing is saved to the station. The notes under the view and the Scene panel say whose levels they are and every datum they crossed.</p>`;
   }
 
   function makeFlood() {
@@ -4936,10 +5012,14 @@ void main() {
   // Below the first level the water is named by the level it has yet to reach.
   function floodFirst(F) { return F.lad.levels.find(l => l.rank != null) || null; }
 
+  // "on the gauge", or — for heights borrowed from another gauge and laid
+  // over this channel — "over the channel": the gauge they are on is not here.
+  function floodGaugeWord(F) { return F && F.lad.borrowed ? 'over the channel' : 'on the gauge'; }
+
   function floodNowText() {
     const F = tw.flood;
     if (!F || F.none || F.level == null) return '';
-    const g = F.lad.ahdZero != null ? `${(F.level - F.lad.ahdZero).toFixed(1)} m on the gauge, ` : '';
+    const g = F.lad.ahdZero != null ? `${(F.level - F.lad.ahdZero).toFixed(1)} m ${floodGaugeWord(F)}, ` : '';
     const first = floodFirst(F);
     const where = F.band ? `past ${floodLevelName(F.band)}` : first ? `below ${floodLevelName(first)}` : 'below the first level';
     return `water ${g}${F.level.toFixed(2)} m AHD — ${where}`;
@@ -5027,13 +5107,21 @@ void main() {
 
   // Every level said in full, for a label's title and the track's reading.
   function floodLevelWords(l, onGauge) {
+    const F = tw.flood, b = F && F.lad.borrowed;
+    const where = floodGaugeWord(F);
+    // Whose a borrowed level is, and what it was on the gauge it came from.
+    const who = b ? (b.self ? 'its own gauge' : `${b.name}'s gauge`) : '';
+    const lent = !b ? '' : b.mode === 'ahd'
+      ? (l.lent != null ? ` — ${Number(l.lent).toFixed(2)} m on ${who}` : ` — ${b.self ? 'its own' : `${b.name}'s`}, in m AHD`)
+      : ` — ${l.gauge != null ? `${Number(l.gauge).toFixed(2)} m ` : ''}on ${who}, laid over this channel`;
     if (l.kind === 'peak') {
       const when = l.date || 'a date HDB does not give';
-      const rec = l.recorded != null ? `${Number(l.recorded).toFixed(2)} m on the gauge as it then stood; ` : '';
+      const rec = l.recorded != null ? `${Number(l.recorded).toFixed(2)} m on ${b ? who : 'the gauge'} as it then stood; ` : '';
       return `${l.highest ? 'The highest flood recorded' : 'A flood recorded'}, ${when}: ${rec}${FloodStages.ahdText(l.ahd)}`
-           + (onGauge && l.gauge != null ? `, ${FloodStages.gaugeText(l.gauge)} today` : '');
+           + (onGauge && l.gauge != null ? `, ${FloodStages.gaugeText(l.gauge, where)}${b ? '' : ' today'}` : '')
+           + (!b ? '' : b.mode === 'ahd' ? ', as lent in m AHD' : ', laid over this channel');
     }
-    return `${FloodStages.levelText(l)}${l.kind !== 'aep' && l.gauge != null ? ` (${FloodStages.ahdText(l.ahd)})` : l.gauge != null ? ` (${FloodStages.gaugeText(l.gauge)})` : ''}`;
+    return `${FloodStages.levelText(l)}${l.kind !== 'aep' && l.gauge != null ? `${b ? ` ${where}` : ''} (${FloodStages.ahdText(l.ahd)})` : l.gauge != null ? ` (${FloodStages.gaugeText(l.gauge, where)})` : ''}${lent}`;
   }
 
   // The marks, the labels and the lines between them, for the ladder on
@@ -5262,7 +5350,7 @@ void main() {
   // it can draw, and somebody near it (or its own classes) has some.
   function canBorrow() {
     const F = tw.flood, st = currentStation();
-    return !!(F && F.none && !F.lad.borrowed && st && nearestDonors(st, 1).length);
+    return !!(F && F.none && !F.lad.borrowed && !F.lad.offGround && tw.ground && tw.ground.datum === 'AHD' && st && nearestDonors(st, 1).length);
   }
 
   function floodLineHtml() {
@@ -5270,6 +5358,11 @@ void main() {
     if (typeof FloodStages === 'undefined' || !tw.ground || !F) return '';
     const st = currentStation();
     if (F.none) {
+      if (F.lad.offGround) {
+        return `<span class="twin-flood-lead"><span aria-hidden="true">🌊</span> Flood levels:</span> not drawn — the ground here is in ${esc(F.lad.offGround)} and could not be put into AHD, the datum every level is in. `
+             + `<button type="button" class="link-btn" data-flood="rebuild" onclick="DigitalTwin.rebuild()">Ask again</button>`
+             + (F.lad.borrowed ? ` · <button type="button" class="link-btn" data-flood="unborrow" onclick="DigitalTwin.stopBorrowingFlood()">Stop borrowing</button>` : '');
+      }
       if (F.lad.borrowed) {
         return `<span class="twin-flood-lead"><span aria-hidden="true">🌊</span> Flood levels:</span> ${esc(F.lad.borrowed.name)}'s leave no water to draw here. <button type="button" class="link-btn" data-flood="borrow" onclick="DigitalTwin.borrowFlood()">Pick another station…</button> · <button type="button" class="link-btn" data-flood="unborrow" onclick="DigitalTwin.stopBorrowingFlood()">Stop borrowing</button>`;
       }
@@ -5283,10 +5376,14 @@ void main() {
     const lead = from
       ? `<span class="twin-flood-lead"><span aria-hidden="true">🌊</span> Flood levels, ${from.self ? 'its own, over its channel' : `borrowed from ${esc(from.name)}`} (<button type="button" class="link-btn" data-flood="borrow" onclick="DigitalTwin.borrowFlood()">change</button> · <button type="button" class="link-btn" data-flood="unborrow" onclick="DigitalTwin.stopBorrowingFlood()">stop</button>):</span>`
       : `<span class="twin-flood-lead"><span aria-hidden="true">🌊</span> Flood levels:</span>`;
-    if (!on) return `${lead} the water is hidden. <button type="button" class="link-btn" data-flood="show" onclick="DigitalTwin.setFlood(true)">Show it</button>`;
+    // The datum, in a word on the line and in full on hover — the notes and
+    // the Scene panel say it in full for every reader.
+    const dw = floodDatumWords(F.lad);
+    const datum = `<span class="twin-flood-datum" title="${escAttr(dw ? `${dw.from} ${dw.carried} ${dw.here}` : `Every height in metres AHD, on ${groundDatumWords(tw.ground)}.`)}">in ${esc(dw ? dw.brief : 'm AHD')}</span>`;
+    if (!on) return `${lead} ${datum} · the water is hidden. <button type="button" class="link-btn" data-flood="show" onclick="DigitalTwin.setFlood(true)">Show it</button>`;
     const levels = F.lad.levels.map(l => `<button type="button" class="link-btn twin-flood-level" data-flood="${escAttr(l.key)}" onclick="DigitalTwin.floodAt('${escAttr(l.key)}')"
-                 title="Hold the water at ${escAttr(FloodStages.levelText(l))}${l.kind !== 'aep' && l.gauge != null ? ` (${escAttr(FloodStages.ahdText(l.ahd))})` : ''}"><span class="twin-flood-sw" style="--sw:${escAttr(FloodStages.colourOf(l, pal))}" aria-hidden="true"></span>${esc(FloodStages.levelText(l))}</button>`);
-    return `${lead} <button type="button" class="link-btn twin-flood-play" data-flood="play" onclick="DigitalTwin.toggleFloodAnim()">${anim ? '⏸ Pause the rise' : '▶ Play the rise'}</button>
+                 title="Hold the water at ${escAttr(from ? floodLevelWords(l, F.lad.levels.every(x => x.gauge != null)) : `${FloodStages.levelText(l)}${l.kind !== 'aep' && l.gauge != null ? ` (${FloodStages.ahdText(l.ahd)})` : ''}`)}"><span class="twin-flood-sw" style="--sw:${escAttr(FloodStages.colourOf(l, pal))}" aria-hidden="true"></span>${esc(FloodStages.levelText(l))}</button>`);
+    return `${lead} ${datum} <button type="button" class="link-btn twin-flood-play" data-flood="play" onclick="DigitalTwin.toggleFloodAnim()">${anim ? '⏸ Pause the rise' : '▶ Play the rise'}</button>
       <span class="twin-flood-now" id="twin-flood-now">${esc(floodNowText())}</span> · ${levels.join(' · ')}
       · <button type="button" class="link-btn" data-flood="hide" onclick="DigitalTwin.setFlood(false)">Hide the water</button>`;
   }
@@ -5310,7 +5407,7 @@ void main() {
         // the reading, which moves on while the tooltip would stand still.
         const F = tw.flood;
         el.title = !html ? '' : F.none ? el.textContent.replace(/\s+/g, ' ').trim() : (S().flood
-          ? `Flood levels${F.lad.borrowed ? ` (${F.lad.borrowed.self ? 'its own, over its channel' : `borrowed from ${F.lad.borrowed.name}`})` : ''}: ${F.lad.levels.map(l => FloodStages.levelText(l)).join(' · ')}. A level surface through the patch: a real flood slopes downstream, so the far edges of a wide patch are a guide, not a map.`
+          ? `Flood levels${F.lad.borrowed ? ` (${F.lad.borrowed.self ? 'its own, over its channel' : `borrowed from ${F.lad.borrowed.name}`})` : ''}: ${F.lad.levels.map(l => FloodStages.levelText(l)).join(' · ')}. ${(() => { const w = floodDatumWords(F.lad); return w ? `${w.from} ${w.carried} ${w.here}` : `Every height in metres AHD, on ${groundDatumWords(tw.ground)}.`; })()} A level surface through the patch: a real flood slopes downstream, so the far edges of a wide patch are a guide, not a map.`
           : 'Flood levels: the water is hidden.');
         if (had) {
           const back = el.querySelector(`[data-flood="${CSS.escape(had)}"]`) || el.querySelector('button');
@@ -5357,10 +5454,14 @@ void main() {
     const F = tw.flood;
     if (F && F.lad && F.lad.borrowed) {
       const b = F.lad.borrowed;
+      const w = floodDatumWords(F.lad);
       return `${b.self ? 'Its own classes, over its channel' : `Levels borrowed from <strong>${esc(b.name)}</strong>, ${esc(fmtKm(b.km))} ${esc(compassWord(b.bearing))}`}. `
-           + `<button type="button" class="link-btn" onclick="DigitalTwin.borrowFlood()">Change…</button> · <button type="button" class="link-btn" onclick="DigitalTwin.stopBorrowingFlood()">Stop borrowing</button>`;
+           + `<button type="button" class="link-btn" onclick="DigitalTwin.borrowFlood()">Change…</button> · <button type="button" class="link-btn" onclick="DigitalTwin.stopBorrowingFlood()">Stop borrowing</button>`
+           + (w ? `<span class="twin-datum-chain" role="group" aria-label="Datums of the borrowed levels"><span><strong>From</strong> ${esc(w.from)}</span><span><strong>Carried</strong> ${esc(w.carried)}</span><span><strong>Here</strong> ${esc(w.here)}</span></span>` : '');
     }
+    if (F && F.lad && F.lad.offGround) return `No flood levels drawn: the ground is in ${esc(F.lad.offGround)} and could not be put into AHD.`;
     if (canBorrow()) return `No flood heights recorded here. <button type="button" class="link-btn" onclick="DigitalTwin.borrowFlood()">Use a nearby station's levels…</button>`;
+    if (F && !F.none) return `Every height in metres AHD, on ${esc(groundDatumWords(tw.ground))}.`;
     return '';
   }
   function refreshBorrowLine() {
@@ -6260,8 +6361,13 @@ void main() {
       notes.push(ground.qld === 'failed'
         ? `Queensland's elevation service did not answer — ${ground.qldError || 'it could not be reached'} — so the ground is the ~30 m SRTM every profile in this app reads: the relief is smoothed and a channel narrower than a pixel is not there. Press Rebuild to ask it again.`
         : 'Queensland\'s elevation service holds nothing here, so the ground is the ~30 m SRTM every profile in this app reads — the relief is smoothed and a channel narrower than a pixel is not there. Elvis lists finer LiDAR for much of NSW; it is not yet a source this tab can read.');
+      notes.push(ground.geoid
+        ? `The tiles are heights above the EGM96 geoid, not AHD: ${geoidWords(ground.geoid)}, so the ground is put into AHD by that much — the datum the gauge zeros, the flood levels and the surveyed heights are in.`
+        : `The tiles are heights above the EGM96 geoid, not AHD, and how far apart the two are here could not be had (${ground.geoidError || 'no answer'}), so the ground is left in EGM96 — up to 2 m from AHD — and no level in AHD is stood on it. Press Rebuild to ask again.`);
     } else if (ground.filled) {
-      notes.push(`${ground.filled.toLocaleString()} of ${(N * N).toLocaleString()} samples were outside the State's data and were filled from ~30 m terrain tiles.`);
+      notes.push(`${ground.filled.toLocaleString()} of ${(N * N).toLocaleString()} samples were outside the State's data and were filled from ~30 m terrain tiles, `
+        + (ground.geoid ? `put into AHD from EGM96 (${geoidWords(ground.geoid)}).`
+                        : `in EGM96: how far that is from AHD here could not be had (${ground.geoidError || 'no answer'}), so the fill may stand up to 2 m off the State's ground.`));
     }
     if (tw.fit && tw.fit.widened) {
       notes.push(`The patch is ${tw.fit.size} m, not the ${tw.fit.size0} m asked for: a bridge runs to its edge or stands just past it, and the ground is widened to hold it whole so its deck has ground under both ends. The samples are ${ground.sample_m.toFixed(1)} m apart as a result; the Scene panel can turn this off.`);
@@ -6381,6 +6487,11 @@ void main() {
 
   // ── the panels ─────────────────────────────────────────────────────────────
   function fmtM(v, dp = 1) { return isFinite(v) ? `${v.toFixed(dp)} m` : '—'; }
+  // "AHD = EGM96 − 0.34 m here": the geoid's answer, said the way round a
+  // height is converted.
+  function geoidWords(geo) {
+    return `AHD = EGM96 ${geo.m < 0 ? '−' : '+'} ${Math.abs(geo.m).toFixed(2)} m here (${geo.model || 'AUSGeoid2020 less EGM96'})`;
+  }
 
   function truthHtml() {
     const st = currentStation();
@@ -6396,7 +6507,11 @@ void main() {
       rows.push(['Surveyed height', '<span class="small">none on file</span>']);
     }
     if (g) {
-      rows.push(['Ground at the pin', `${fmtM(g.h0, 2)} ${g.datum} <span class="small">(${g.source === 'qld' ? 'State DTM' : 'SRTM tiles'})</span>`]);
+      rows.push(['Ground at the pin', `${fmtM(g.h0, 2)} ${g.datum} <span class="small">(${g.source === 'qld' ? 'State DTM' : g.geoid ? 'SRTM tiles, from EGM96' : 'SRTM tiles'})</span>`]);
+      if (g.geoid || g.egm96) {
+        rows.push(['Datum', g.geoid ? `${esc(geoidWords(g.geoid))} <span class="small">— the tiles${g.source === 'qld' ? ' that filled the State\'s gaps' : ''} put into AHD by it</span>`
+                                    : `<span class="small">EGM96${g.source === 'qld' ? ' where the tiles filled the State\'s gaps' : ''}: AHD less EGM96 could not be had here — ${esc(g.geoidError || 'no answer')}</span>`]);
+      }
       if (surveyed != null) {
         const d = surveyed - g.h0;
         rows.push(['Difference', `${d >= 0 ? '+' : ''}${d.toFixed(2)} m <span class="small">recorded − ground</span>`]);
@@ -6419,7 +6534,9 @@ void main() {
     return `<dl class="twin-kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>
       <p class="small twin-truth-note">${g && g.source === 'qld'
         ? 'The State\'s DTM is bare earth in AHD, the datum every surveyed height in this file is in.'
-        : 'Terrain tiles are heights above the EGM96 geoid — within about a metre of AHD over Australia, and not a survey.'}
+        : g && g.geoid
+          ? 'Terrain tiles are heights above the EGM96 geoid, put into AHD here by AUSGeoid2020 less EGM96 (AHD = EGM96 − 2.07 m to + 0.64 m across the stations) — a datum made right, not a survey: the tiles are still ~30 m.'
+          : 'Terrain tiles are heights above the EGM96 geoid — up to 2 m from AHD over Australia, and not a survey.'}
         A recorded height well above the ground here usually means the coordinate is the gauge down in the channel and the mark is the hut on the bank — a flag on the position, not a correction to the height.</p>`;
   }
 
@@ -6756,6 +6873,7 @@ void main() {
     if (tw.horizon) for (const g of tw.horizon.grids) if (g) parts.push(g.attribution);
     if (tw.horizonImages) for (const im of tw.horizonImages) if (im) parts.push(im.attribution);
     if (typeof Elvis !== 'undefined') parts.push(Elvis.attribution);
+    if (tw.ground && tw.ground.geoid && typeof Geoid !== 'undefined') parts.push(Geoid.attribution);
     if (typeof TwinCadastre !== 'undefined') parts.push(TwinCadastre.attribution());
     return [...new Set(parts.filter(Boolean))].map(esc).join(' · ');
   }
@@ -6858,7 +6976,8 @@ void main() {
           station_id: st ? st.id : null, station_name: st ? st.name : null,
           station_number: st ? (st.station_number || null) : null,
           origin: { lat: tw.origin ? tw.origin.lat : st ? st.lat : null, lon: tw.origin ? tw.origin.lon : st ? st.lon : null,
-                    ground_m: g.h0, datum: g.datum, axes: 'x east, y up, z south; metres' },
+                    ground_m: g.h0, datum: g.datum, axes: 'x east, y up, z south; metres',
+                    ...(g.geoid ? { ahd_less_egm96_m: Number(g.geoid.m.toFixed(3)), datum_from: 'EGM96 (terrain tiles), by AUSGeoid2020 less EGM96' } : {}) },
           ground: { source: g.source, sample_m: g.sample_m, size_m: g.size, exaggeration: S().exag,
                     attribution: g.attribution },
           imagery: tw.image && S().imagery ? { source: tw.image.source, attribution: tw.image.attribution } : null,
@@ -7166,7 +7285,7 @@ void main() {
       const how = mode || (radio ? radio.value : 'gauge');
       floodBorrows.set(st.id, { donorId: id, mode: how === 'ahd' ? 'ahd' : 'gauge' });
       if (typeof Modal !== 'undefined') Modal.close();
-      const notes = horizonNotes(tw.notes).filter(n => !/^Flood levels borrowed from|^These are this station's own flood classes/.test(n));
+      const notes = horizonNotes(withoutBorrowedNotes(tw.notes));
       const said = buildFlood(st);
       setNotes([...notes, ...said.filter(n => !notes.includes(n))]);
       syncCanvasName();
@@ -7179,9 +7298,9 @@ void main() {
       const st = currentStation();
       if (!st) return;
       floodBorrows.delete(st.id);
-      const notes = tw.notes.filter(n => !/^Flood levels borrowed from|^These are this station's own flood classes/.test(n));
-      buildFlood(st);
-      setNotes(notes);
+      const notes = withoutBorrowedNotes(tw.notes);
+      const said = buildFlood(st);
+      setNotes([...notes, ...said.filter(n => !notes.includes(n))]);
       syncCanvasName();
       syncFloodControls();
       announce('No longer borrowing flood levels.');
@@ -7327,6 +7446,7 @@ void main() {
         stationId: tw.stationId, mode: rig.mode,
         size: g ? g.size : null, N, sample_m: g ? g.sample_m : null,
         source: g ? g.source : null, holes: g ? g.holes : null, filled: g ? g.filled : null, qld: g ? g.qld : null,
+        datum: g ? g.datum : null, geoid: g && g.geoid ? g.geoid.m : null, egm96: g ? !!g.egm96 : null,
         h0: g ? g.h0 : null, min: g ? g.min : null, max: g ? g.max : null,
         imagery: tw.image ? tw.image.source : null, mpp: tw.image ? tw.image.mpp : null,
         exag: S().exag, status: tw.status, notes: tw.notes.slice(),

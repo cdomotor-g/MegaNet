@@ -23,6 +23,13 @@
 // classes are named and left off the ladder, and the notes say why; its AEP
 // levels, being AHD already, still stand.
 //
+// Every `ahd` on a ladder is AHD — a station's own, and one borrowed from
+// another station either way it is carried (below) — and a ladder is only
+// stood on a ground in AHD (onGround). digital-twin.js puts the ~30 m tiles
+// into AHD through geoid.js before anything is measured against them; where
+// that cannot be done the water is not drawn, and the notes say why, rather
+// than a level being drawn up to 2 m from where it belongs.
+//
 // ── The colours ──────────────────────────────────────────────────────────────
 // Below the first class the water is a clear blue; past minor it is green,
 // moderate yellow, major red, and past the AEP levels magenta through to a
@@ -200,7 +207,7 @@ const FloodStages = (function () {
     levels.sort((a, b) => a.ahd - b.ahd || (a.rank ?? 99) - (b.rank ?? 99));
     const top = levels.length ? levels[levels.length - 1].ahd : null;
     return {
-      levels, zero, ahdZero, storage, top,
+      levels, zero, ahdZero, storage, top, datum: 'AHD',
       classesAsAt: classes ? classes.as_at || null : null,
       aepAsAt: row ? row.as_at || null : null,
       aepSource: row ? row.source || null : null,
@@ -226,7 +233,18 @@ const FloodStages = (function () {
   //            which is a metre a kilometre on a creek.
   //   'ahd'    — the other station's own ladder in metres AHD, unchanged: the
   //            right thing only a short way along the same reach, where the
-  //            water surface is nearly level.
+  //            water surface is nearly level. Its gauge is not here, so no
+  //            level is called a height on the gauge — each keeps what it was
+  //            on the other gauge (`lent`) for the words only — and 0 m is
+  //            this station's channel, not the other gauge's zero.
+  //
+  // Either way the ladder is in AHD, as long as this ground is (the channel
+  // is a height on it): 'gauge' needs no datum of the other gauge's zero —
+  // only heights over it cross — but its AEP levels and floods come down to
+  // gauge heights through that zero, so only an AHD one; 'ahd' needs the
+  // other gauge's zero in AHD for its classes, and nothing for the rest.
+  // `borrowed.datums` keeps what the words saying so are made from
+  // (datumWords).
   //
   // The floods the other river has reached (`flood_peaks`) are carried too,
   // as marks on the staff and the tower and never as colour: laid on as
@@ -251,22 +269,32 @@ const FloodStages = (function () {
 
   // The ladder the twin draws from a borrowed station's levels, for a
   // channel here at `channel` m AHD. The shape ladder() returns, with
-  // `borrowed` saying from whom and how.
+  // `borrowed` saying from whom and how, and in which datums.
   function borrowed(donor, mode, channel, info = {}) {
     const b = borrowable(donor);
     const notes = [];
     const levels = [];
     const ch = num(channel);
     const name = (donor && donor.name) || 'the other station';
-    if (!b) return { levels, zero: null, ahdZero: null, storage: false, top: null, classesAsAt: null, aepAsAt: null, aepSource: null,
-                     notes: [`${name} has no flood levels to borrow.`], borrowed: { id: donor && donor.id, name, mode, ...info } };
+    const datums = {
+      zero: b && b.zero ? { m: b.zero.m, datum: b.zero.datum, from: b.zero.from } : null,
+      classes: !!(b && b.classes.length), aeps: !!(b && b.aeps.length), peaks: !!(b && b.peaks.length),
+      channel: ch,
+    };
+    const tag = { id: donor && donor.id, name, mode, ...info, datums };
+    if (!b) return { levels, zero: null, ahdZero: null, storage: false, top: null, datum: 'AHD', classesAsAt: null, aepAsAt: null, aepSource: null,
+                     notes: [`${name} has no flood levels to borrow.`], borrowed: tag };
     if (mode === 'ahd') {
+      // Its levels where they are in AHD; heights on its gauge kept only to
+      // be said ("7.0 m on Gatton's gauge"), since that gauge is not here.
       const lad = ladder(donor);
-      return { ...lad, notes: lad.notes.slice(), borrowed: { id: donor.id, name, mode, ...info } };
+      return { ...lad, zero: null, ahdZero: null, storage: false,
+               levels: lad.levels.map(l => ({ ...l, gauge: null, lent: l.gauge })),
+               notes: lad.notes.map(n => `From ${name}'s record: ${n}`), borrowed: tag };
     }
     if (ch == null) {
-      return { levels, zero: null, ahdZero: null, storage: false, top: null, classesAsAt: null, aepAsAt: null, aepSource: null,
-               notes: ['There is no channel in this patch to lay borrowed gauge heights over.'], borrowed: { id: donor.id, name, mode, ...info } };
+      return { levels, zero: null, ahdZero: null, storage: false, top: null, datum: 'AHD', classesAsAt: null, aepAsAt: null, aepSource: null,
+               notes: ['There is no channel in this patch to lay borrowed gauge heights over.'], borrowed: tag };
     }
     for (const c of b.classes) levels.push({ key: c.key, kind: c.kind, label: c.label, ahd: ch + c.h, gauge: c.h, rank: c.rank });
     if (b.aeps.length && b.ahdZero == null) {
@@ -295,10 +323,61 @@ const FloodStages = (function () {
     }
     levels.sort((x, y) => x.ahd - y.ahd || (x.rank ?? 99) - (y.rank ?? 99));
     return {
-      levels, zero: null, ahdZero: ch, storage: false, top: levels.length ? levels[levels.length - 1].ahd : null,
+      levels, zero: null, ahdZero: ch, storage: false, top: levels.length ? levels[levels.length - 1].ahd : null, datum: 'AHD',
       classesAsAt: b.classesAsAt, aepAsAt: b.aepAsAt, aepSource: null, notes,
-      borrowed: { id: donor.id, name, mode, ...info },
+      borrowed: tag,
     };
+  }
+
+  // A ladder stood on a ground in `datum`: unchanged on AHD, and on anything
+  // else no levels at all, with the reason — a level in AHD on a ground in
+  // EGM96 is up to 2 m out over Australia, and one laid over its channel
+  // would be named in a datum the ground is not in.
+  function onGround(lad, datum) {
+    if (!lad || datum === 'AHD' || !lad.levels.length) return lad;
+    return { ...lad, levels: [], top: null, offGround: datum,
+             notes: [...lad.notes, `The ground here is in ${datum === 'EGM96' ? 'EGM96, the terrain tiles\' datum,' : datum} and could not be put into AHD, so no flood level is stood on it: every one is in AHD, and over Australia the two are up to 2 m apart.`] };
+  }
+
+  // The datums a borrowed ladder crosses, in words, for the twin to say
+  // wherever it draws one: what the other station's heights are measured
+  // from, how they were carried, and what they are in here.
+  //
+  //   datumWords(lad, { ground }) → { from, carried, here, brief } | null
+  //
+  // `ground` is how this ground's datum is said ("Queensland's LiDAR, in AHD").
+  // Null for a ladder that is not borrowed.
+  function datumWords(lad, { ground = 'this station\'s ground, in AHD' } = {}) {
+    const b = lad && lad.borrowed;
+    if (!b) return null;
+    const d = b.datums || {};
+    const who = b.self ? 'its own' : `${b.name}'s`;
+    const zero = d.zero;
+    const zeroWords = !zero ? 'a gauge with no surveyed zero'
+      : zero.datum === 'AHD' ? `a gauge zero of ${zero.m.toFixed(2)} m AHD${zero.from ? ` (since ${String(zero.from).slice(0, 10)})` : ''}`
+      : `a gauge zero of ${zero.m.toFixed(2)} m on ${zero.datum ? `the ${datumWord(zero.datum)}` : 'no stated datum'} — not AHD`;
+    const parts = [];
+    if (d.classes) parts.push(`its flood classes are metres on its gauge, over ${zeroWords}`);
+    else parts.push(`it has ${zeroWords}`);
+    if (d.aeps) parts.push('its AEP levels are metres AHD');
+    if (d.peaks) parts.push(`the floods it has recorded are metres AHD`);
+    const from = `${b.self ? 'This station' : b.name}: ${parts.join('; ')}.`;
+    const zeroAhd = !!(zero && zero.datum === 'AHD');
+    const ch = num(d.channel);
+    let carried;
+    if (b.mode === 'ahd') {
+      carried = `Carried as the same heights in metres AHD, unchanged — ${d.classes ? (zeroAhd ? `its classes through its zero (${zero.m.toFixed(2)} m AHD)` : 'its classes left out, its zero not being AHD') : 'no classes'}`
+              + `${d.aeps || d.peaks ? `, its ${[d.aeps && 'AEP levels', d.peaks && 'floods'].filter(Boolean).join(' and ')} as they stand` : ''}. Its gauge is not here: 0 m is this channel, and no level is called a height on the gauge.`;
+    } else {
+      const inAhd = [d.aeps && 'AEP levels', d.peaks && 'floods'].filter(Boolean).join(' and ');
+      const notAhd = [d.aeps && 'its AEP levels are left out', d.peaks && 'its floods are taken at the gauge heights recorded'].filter(Boolean).join(' and ');
+      carried = `Carried as heights on ${who} gauge, 0 m laid on this station's channel${ch != null ? ` at ${ch.toFixed(2)} m AHD` : ''}: a level h m on that gauge is drawn ${ch != null ? `at ${ch.toFixed(2)} + h m AHD` : 'h m over the channel'} here, whatever datum its zero is on`
+              + (!inAhd ? '' : zeroAhd ? `; its ${inAhd} brought down to gauge heights through its AHD zero first`
+                                       : `; ${notAhd} — its zero is not in AHD, so there is no AHD level to bring down to the gauge`) + '.';
+    }
+    const here = `Drawn in metres AHD on ${ground}.`;
+    const brief = b.mode === 'ahd' ? 'm AHD, as lent' : 'm AHD, over this channel';
+    return { from, carried, here, brief };
   }
 
   // "Feb 1893", "Jan 1947", "1887": when a flood was, as the scale says it.
@@ -528,7 +607,7 @@ const FloodStages = (function () {
   }
 
   // "7.0 m on the gauge", "102.69 m AHD" — how a level is said.
-  function gaugeText(m) { return num(m) == null ? '' : `${Number(m).toFixed(1)} m on the gauge`; }
+  function gaugeText(m, where = 'on the gauge') { return num(m) == null ? '' : `${Number(m).toFixed(1)} m ${where}`; }
   function ahdText(m) { return num(m) == null ? '' : `${Number(m).toFixed(2)} m AHD`; }
   function levelText(l) {
     if (!l) return '';
@@ -539,7 +618,7 @@ const FloodStages = (function () {
   return {
     CLASSES, COLOURS, RISE_S, HOLD_S, DRAIN_S, ZERO_MAX_BELOW, ZERO_MAX_ABOVE,
     ladder, start, passed, colourOf, mix, cycle, gaugeText, ahdText, levelText,
-    borrowable, borrowed, scale, spread, scaleText, peakWhen,
+    borrowable, borrowed, onGround, datumWords, datumWord, scale, spread, scaleText, peakWhen,
     curve, crowding, logFit, LOG_PX, LOG_GAP,
   };
 })();

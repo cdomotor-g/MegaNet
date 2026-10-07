@@ -36,10 +36,16 @@
 //                    crossing stands the same span at its banks; a road
 //                    network that will not answer is said out loud.
 //   Borrowed levels  a station with no levels offers the four nearest that
-//                    have some, with distance, heights and catchment; one
-//                    chosen is drawn over this channel as gauge heights, the
-//                    notes say whose; stopping puts it back. A station whose
-//                    own classes are on a State datum is offered its own.
+//                    have some, with distance, heights, the datum each
+//                    gauge's zero is on, and catchment, and says this
+//                    ground's datum and channel; one chosen is drawn over
+//                    this channel as gauge heights, the notes, the line and
+//                    the Scene panel say whose and every datum crossed
+//                    (from, carried, here — all AHD); carried in AHD instead,
+//                    no level is called a height on a gauge that is not
+//                    here; stopping puts it back. A station whose own classes
+//                    are on a State datum is offered its own, and the datums
+//                    say that zero is not AHD.
 //   The fold         open on arrival, folded after the delay (the check's
 //                    seam shortens it), put off while the pointer or the
 //                    focus is in it, and left alone once pressed — and the
@@ -143,6 +149,25 @@ function nodeHalf(FS) {
     pk.length === 2 && near(pk.find(l => l.highest).ahd, 85 + 97.54 - 87.54, 1e-9) && pk.every(l => l.rank === null), J(pk));
   ok('a station with only recorded floods still has something to lend', FS.borrowable({ id: 'y', name: 'Old', flood_peaks: [{ date: '1974-01-27', level_m_ahd: 50 }] }) !== null);
   ok('a station with nothing to lend lends nothing', FS.borrowable({ id: 'x', name: 'Nowhere' }) === null);
+
+  // The datums, carried with the ladder and said in words.
+  ok('a borrowed ladder is in AHD, and keeps the lender\'s zero and datum with it',
+    L.datum === 'AHD' && L.borrowed.datums.zero && L.borrowed.datums.zero.datum === 'STATE' && L.borrowed.datums.channel === 85, J(L.borrowed.datums));
+  const wl = FS.datumWords(L, { ground: 'this station\'s ground — Queensland\'s DTM, in AHD' });
+  ok('…said: Gleneagle\'s classes are over a zero on the State datum, not AHD — which does not matter laid over a channel, and the water is AHD here',
+    /on the State datum — not AHD/.test(wl.from) && /0 m laid on this station's channel at 85\.00 m AHD/.test(wl.carried)
+      && /whatever datum its zero is on/.test(wl.carried) && /^Drawn in metres AHD on this station's ground — Queensland's DTM, in AHD\.$/.test(wl.here)
+      && wl.brief === 'm AHD, over this channel', J(wl));
+  const wg = FS.datumWords(LG, {});
+  ok('Gatton\'s, carried on its gauge: its zero is 87.54 m AHD, and its AEP levels come down to the gauge through it',
+    /gauge zero of 87\.54 m AHD \(since 1929-09-01\)/.test(wg.from) && /AEP levels are metres AHD/.test(wg.from)
+      && /85\.00 \+ h m AHD/.test(wg.carried) && /brought down to gauge heights through its AHD zero/.test(wg.carried), J(wg));
+  ok('…carried in AHD: unchanged, the classes through its zero — and its gauge, not being here, names no level',
+    LA.ahdZero === null && LA.levels.every(l => l.gauge === null) && LA.levels.find(l => l.key === 'minor_m').lent === 7
+      && /unchanged — its classes through its zero \(87\.54 m AHD\)/.test(FS.datumWords(LA).carried) && FS.datumWords(LA).brief === 'm AHD, as lent', J(FS.datumWords(LA)));
+  ok('…and a State-datum lender carried in AHD lends no classes, and says why',
+    FS.borrowed(gleneagle, 'ahd', 85).levels.length === 0 && /its classes left out, its zero not being AHD/.test(FS.datumWords(FS.borrowed(gleneagle, 'ahd', 85)).carried));
+  ok('a station\'s own ladder is not borrowed and has no datum chain to say', FS.datumWords(FS.ladder(gatton)) === null);
 }
 
 // ── the page ─────────────────────────────────────────────────────────────────
@@ -404,8 +429,12 @@ async function browserHalf() {
     ok('the modal lists the four nearest stations with levels, nearest first',
       modal.length === 4 && donors.length === 4 && modal.every((r, i) => r.name.startsWith(byId(donors[i].id).name))
         && modal.every((r, i, a) => !i || kmOf(a[i - 1].cells[0]) <= kmOf(r.cells[0])), J({ modal: modal.map(r => [r.name, r.cells[0]]), donors }));
-    ok('…each with its distance and bearing, its flood heights, and its catchment',
-      modal.every(r => /\d.*(km|m) [NESW]{1,2}/.test(r.cells[0]) && /m (on the gauge|AHD)/.test(r.cells[1]) && r.cells[2].length > 1), J(modal));
+    ok('…each with its distance and bearing, its flood heights, the datum its gauge is on, and its catchment',
+      modal.every(r => /\d.*(km|m) [NESW]{1,2}/.test(r.cells[0]) && /m (on the gauge|AHD)/.test(r.cells[1])
+        && /^(Gauge zero -?[\d.]+ m( AHD|, .* — not AHD)|No surveyed gauge zero)/.test(r.cells[2]) && r.cells[3].length > 1), J(modal));
+    const here = await page.evaluate(() => document.querySelector('#app-modal .twin-borrow-here').textContent.replace(/\s+/g, ' ').trim());
+    ok('…and says this ground\'s datum and its channel, and that every height drawn is AHD',
+      /^Datum here: this station's ground — Queensland's DTM, in AHD\. The channel by the gauge — the lowest ground within 60 m — is at 85\.\d\d m AHD\. Every height drawn is in metres AHD\.$/.test(here), here);
     const first = byId(donors[0].id);
     await page.click('#app-modal .twin-borrow-table tbody tr:first-child button');
     await page.waitForFunction(() => { const f = DigitalTwin.debug().flood; return f && !f.none && f.level != null; }, null, { timeout: BUILD_TIMEOUT });
@@ -416,9 +445,31 @@ async function browserHalf() {
       d.flood.levels.some(l => l.key === 'minor_m' && near(l.ahd, seedElev + minorH.minor_m, 1e-9)) && near(seedElev, 85, 0.05), J({ levels: d.flood.levels, seedElev }));
     ok('…and says whose, how far, and that it is a guide', d.notes.some(n => n.startsWith(`Flood levels borrowed from ${first.name}`) && /A guide, not a model/.test(n))
       && /borrowed from/.test(await text('#twin-flood')), J(d.notes));
+    const chain = d.notes.find(n => n.startsWith('Datums of the borrowed levels — '));
+    ok('…and every datum the levels crossed: the lender\'s, how they were carried, and AHD here',
+      chain && chain.includes(`${first.name}: `) && /Carried as heights on .*'s gauge, 0 m laid on this station's channel at 85\.\d\d m AHD/.test(chain)
+        && /Drawn in metres AHD on this station's ground — Queensland's DTM, in AHD\.$/.test(chain), chain);
+    ok('…the line saying it in a word, the whole of it on hover',
+      /in m AHD, over this channel/.test(await text('#twin-flood .twin-flood-datum'))
+        && (await page.$eval('#twin-flood .twin-flood-datum', el => el.title)).startsWith(`${first.name}: `), await text('#twin-flood'));
+    ok('…and the reading saying the water\'s height over this channel, not on a gauge that is not here',
+      /m over the channel, \d+\.\d\d m AHD/.test(await text('#twin-flood-now')), await text('#twin-flood'));
+    // Carried in AHD instead: the lender's own ladder, no gauge named.
+    await page.evaluate(id => DigitalTwin.useFloodFrom(id, 'ahd'), first.id);
+    await page.waitForFunction(() => { const f = DigitalTwin.debug().flood; return f && (f.none || f.level != null); }, null, { timeout: BUILD_TIMEOUT });
+    d = await page.evaluate(() => DigitalTwin.debug());
+    const ahdChain = d.notes.find(n => n.startsWith('Datums of the borrowed levels — '));
+    ok('carried in AHD instead: the levels as lent, none called a height on a gauge, and the datums say so',
+      ahdChain && /Carried as the same heights in metres AHD, unchanged/.test(ahdChain) && /no level is called a height on the gauge/.test(ahdChain)
+        && (d.flood.none || (d.flood.levels.every(l => l.gauge === null) && d.flood.zero === null && !/on the gauge|over the channel/.test(await text('#twin-flood-now')))),
+      J({ chain: ahdChain, levels: d.flood.levels, now: await text('#twin-flood') }));
+    ok('…and only the new choice\'s notes: the earlier borrowing\'s are gone, the lender\'s own record said as its',
+      d.notes.filter(n => n.startsWith('Datums of the borrowed levels')).length === 1 && d.notes.filter(n => n.startsWith('Flood levels borrowed from')).length === 1
+        && !d.notes.some(n => /bring them down to heights on the gauge/.test(n))
+        && d.notes.filter(n => /flood classes are heights on the gauge|HDB records floods/.test(n)).every(n => n.startsWith(`From ${first.name}'s record: `)), J(d.notes));
     await page.$eval('#twin-flood button[data-flood="unborrow"]', b => b.click());
     d = await page.evaluate(() => DigitalTwin.debug());
-    ok('stopping takes the water away and the note with it', d.flood.none && !d.notes.some(n => /borrowed from/.test(n)), J(d.notes));
+    ok('stopping takes the water away and every note it brought with it', d.flood.none && !d.notes.some(n => /borrowed from|Datums of the borrowed/.test(n) || n.includes(first.name)), J(d.notes));
 
     d = await open('gleneagle');
     await page.evaluate(() => DigitalTwin.borrowFlood());
@@ -429,6 +480,8 @@ async function browserHalf() {
     await page.waitForFunction(() => { const f = DigitalTwin.debug().flood; return f && !f.none; }, null, { timeout: BUILD_TIMEOUT });
     d = await page.evaluate(() => DigitalTwin.debug());
     ok('…4.5, 8.5 and 9 m over the bed', J(d.flood.levels.map(l => Number((l.ahd - d.flood.seed.elev).toFixed(6)))) === J([4.5, 8.5, 9]), J(d.flood.levels));
+    ok('…and the datums say its zero is on the State datum, not AHD, and the water is AHD here',
+      d.notes.some(n => n.startsWith('Datums of the borrowed levels — This station: ') && /State datum — not AHD/.test(n) && /Drawn in metres AHD/.test(n)), J(d.notes));
     await page.evaluate(() => DigitalTwin.stopBorrowingFlood());
 
     // ═══════════════════════════════════════════════════════════════════════
