@@ -174,7 +174,12 @@ MegaNet/
 │                             the station whose card is up (or Station Health has
 │                             open) and the map's view, so a view can be linked to
 │                             and back and forward work (#211)
+├── pwa.js                  ← Pwa       — registers sw.js for the page's version, and
+│                             offers a newer one to a page from the kept copy (#213)
 ├── init.js                 ← the only code that runs at load; must stay last
+├── sw.js                   ← the service worker: the copy kept for opening with no
+│                             signal — the shell, the station list, the sheets' tables
+├── manifest.webmanifest    ← installable: Flood-Net, standalone, its icons (assets/)
 ├── maps-data.js            ← Radio Path Maps catalogue, QLD basin SVG + georeference
 ├── styles.css              ← the design system, then theme and layout
 │                             (tokens at the top; docs/design-system.md is the prose)
@@ -441,6 +446,34 @@ Two independent locks, and it is worth knowing which is which:
 
 Adding a domain, adding one person, and what to do when nobody can get in are all
 in [`docs/access.md`](docs/access.md).
+
+### With no signal
+
+A device that has opened Flood-Net before opens it again with no signal (#213).
+`sw.js`, a service worker registered by `pwa.js` for the version the page is,
+keeps the app — `index.html` and everything it loads, Leaflet included — and,
+as they arrive, the station list and the inspection and maintenance sheets'
+reference tables. With no network the app opens from that copy, and the header
+says so: **saved copy, 3 hours old — no signal**, never "from the datastore".
+An inspection or maintenance sheet can be started and its draft is saved on the
+device, as it always was.
+
+- **Pages are network-first.** The site is behind Cloudflare Access, so the copy
+  answers a page only when the network cannot (an error, or five seconds of
+  nothing); online, every page is the site's own, Access sign-in included, and
+  a page is never kept from the network. A version whose `index.html` is not the
+  app — Access's sign-in page, a redirect — is never kept: its worker does not
+  install, and the copy before it carries on.
+- **A new deploy is offered, never swapped in.** Each deploy's stamp is a new
+  worker, which keeps its own copy and drops the old. A page that came from the
+  copy finds, once it can reach the site, whether it has moved on, and says
+  *A newer version of Flood-Net is ready* with **Reload now** and **Later** — a
+  sheet half filled in is never reloaded from under its author.
+- **Installable.** `manifest.webmanifest` names Flood-Net, standalone, with
+  192, 512 and maskable icons; a phone's browser offers to add it to the home
+  screen.
+- **Not kept:** the datastore's other reads, the Worker's `/api/` routes,
+  sign-in and map tiles. A copy opened from `file://` is left exactly as it was.
 
 ### Reading it from an agent
 

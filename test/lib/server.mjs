@@ -25,6 +25,7 @@ const TYPES = {
   '.ico':  'image/x-icon',
   '.txt':  'text/plain; charset=utf-8',
   '.md':   'text/markdown; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
 };
 
 // `stream`, for a check that has to watch a body arrive (test/links.mjs, the
@@ -33,7 +34,12 @@ const TYPES = {
 // awaiting `wait(i)` before piece i when that returns a promise — which is how
 // a check holds a download part-way through for as long as it is looking.
 // Content-Length is still sent, so the page can know the size.
-export async function startServer(root = REPO_ROOT, { stream = null } = {}) {
+//
+// `rewrite`, for a check that has to see the site change under a page — a new
+// deploy (test/offline.mjs): called with each request's path and the file's
+// text, it answers null to send the file as it is, or the text to send in its
+// place. Only asked of text files.
+export async function startServer(root = REPO_ROOT, { stream = null, rewrite = null } = {}) {
   const server = http.createServer(async (req, res) => {
     let rel;
     try {
@@ -54,6 +60,20 @@ export async function startServer(root = REPO_ROOT, { stream = null } = {}) {
     try {
       const stat = await fsp.stat(file);
       if (!stat.isFile()) throw new Error('not a file');
+      if (rewrite && /\.(html|js|css|json|webmanifest)$/.test(file)) {
+        const text = await fsp.readFile(file, 'utf8');
+        const out = rewrite(rel, text);
+        if (out != null) {
+          const body = Buffer.from(out, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream',
+            'Content-Length': body.length,
+            'Cache-Control': 'no-store',
+          });
+          res.end(body);
+          return;
+        }
+      }
       const plan = stream && stream(rel);
       if (plan) {
         const body = await fsp.readFile(file);

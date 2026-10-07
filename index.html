@@ -17,6 +17,9 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
   <meta name="theme-color" content="#0b5cab">
+  <!-- Installable, and opens with no signal on a device that has opened it
+       before (#213): the manifest names it, sw.js keeps it — pwa.js says when. -->
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=20261007n">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
 </head>
@@ -602,6 +605,11 @@
        showStationCard, closeStnCard) and map-leader.js, which it calls at call
        time; nothing runs at load — init.js starts it, first thing. -->
   <script src="route.js?v=20261007n"></script>
+  <!-- The copy kept for opening with no signal (#213): registers sw.js for
+       this page's version and offers a newer one to a page that came from
+       the copy. Reads core.js's APP_VERSION at call time; nothing runs at
+       load — init.js starts it. -->
+  <script src="pwa.js?v=20261007n"></script>
   <script src="init.js?v=20261007n"></script>
 </body>
 </html>

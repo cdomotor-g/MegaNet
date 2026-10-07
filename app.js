@@ -185,7 +185,7 @@ async function loadFromUrl(url, { kind = 'github', announce = true } = {}) {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await readLoadText(res, kind);
-    applyStationDoc(text, { kind, ms: Math.round(_dbClock() - t0) });
+    applyStationDoc(text, { kind, ms: Math.round(_dbClock() - t0), kept: res.headers.get('X-FloodNet-Offline') });
   } catch (err) {
     if (announce) Toast.failed(`Could not load ${SOURCE_LABELS[kind] || url}: ${err && err.message || err}`);
     state.loadError = `${SOURCE_LABELS[kind] || url}: ${err && err.message || err}`;
@@ -242,7 +242,7 @@ async function loadFromApi({ announce = true } = {}) {
       throw new Error(detail);
     }
     const text = await readLoadText(res, 'api');
-    applyStationDoc(text, { kind: 'api', ms: Math.round(_dbClock() - t0) });
+    applyStationDoc(text, { kind: 'api', ms: Math.round(_dbClock() - t0), kept: res.headers.get('X-FloodNet-Offline') });
   } catch (err) {
     // Same rejection for DNS failure, CORS refusal, no network, and a project
     // paused for inactivity — the browser deliberately does not distinguish
@@ -453,6 +453,10 @@ function applyStationDoc(text, source) {
     // data?" — as opposed to `at`, which only says when it was fetched. A file
     // from GitHub is fresh and its contents may be a month old.
     dated: (data.meta && data.meta.updated) || null,
+    // With no signal, sw.js answers with the copy it kept and says when it
+    // kept it (#213): never passed off as current — the header says it is a
+    // saved copy, and how old.
+    kept: keptDate(source && source.kept),
   };
   // Cleared on success: whatever failed on the way to here has been superseded
   // by something that worked, and a stale error under a good load reads as a
@@ -508,7 +512,9 @@ function updateHeaderStats() {
   // every tab. "3174 stations · 88 repeaters" is identical whether it came from
   // the database or from a file committed a month ago, and telling those apart
   // should not require opening a tab and pressing a button.
-  const from = src ? ` · from ${SOURCE_LABELS[src.kind] || src.kind}` : '';
+  const from = !src ? ''
+    : src.kept ? ` · saved copy${src.kept instanceof Date ? `, ${keptAge(src.kept)} old` : ''} — no signal`
+    : ` · from ${SOURCE_LABELS[src.kind] || src.kind}`;
   el.textContent =
     `${s.length} stations · ${s.filter(x => x.roles.includes('repeater')).length} repeaters${from}`;
   el.title = src ? dataSourceSummary() : '';
@@ -517,10 +523,30 @@ function updateHeaderStats() {
 // One line of plain English about the loaded document: where it came from, when
 // it was fetched, and the date the data itself carries. That last one is the
 // number that matters — a file fetched a second ago can hold month-old data.
+// The time sw.js kept a copy, from its header — or true for a copy whose
+// time it did not record; null for a list that came from the network.
+function keptDate(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? true : d;
+}
+
+// "40 minutes", "5 hours", "3 days" — how old a kept copy is, said plainly.
+function keptAge(d) {
+  const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'}`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 48) return `${hrs} hour${hrs === 1 ? '' : 's'}`;
+  const days = Math.round(hrs / 24);
+  return `${days} day${days === 1 ? '' : 's'}`;
+}
+
 function dataSourceSummary() {
   const src = state.dataSource;
   if (!src) return 'Nothing loaded yet.';
-  const bits = [`Loaded from ${SOURCE_LABELS[src.kind] || src.kind}`];
+  const bits = src.kept
+    ? [`A copy kept on this device${src.kept instanceof Date ? `, saved ${src.kept.toLocaleString()}` : ''}: ${SOURCE_LABELS[src.kind] || src.kind} could not be reached`]
+    : [`Loaded from ${SOURCE_LABELS[src.kind] || src.kind}`];
   if (src.detail) bits.push(src.detail);
   if (src.ms != null) bits.push(`${src.ms} ms`);
   bits.push(`at ${src.at.toLocaleTimeString()}`);

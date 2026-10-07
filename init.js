@@ -29,6 +29,9 @@
   // ✨ What's new: shown if this device has something it has not seen, and a
   // device that has never been here has seen it all (whats-new.js, #222).
   WhatsNew.start();
+  // The copy kept for opening with no signal (#213), after everything above
+  // has drawn: registering a worker is the last thing a first paint needs.
+  Pwa.start();
   applyTheme({ repaint: false });
   // System follows the device as it changes — a phone that goes dark at
   // sunset takes the app with it (#224).

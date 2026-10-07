@@ -7563,6 +7563,31 @@ hr {
 .exm-sub { color: var(--muted); }
 .exm-none { margin: var(--sp-2) 0; }
 
+/* A newer version, offered to a page that came from the copy kept for no
+   signal (pwa.js, #213): a bar at the foot of the window, under any dialog,
+   that stays until somebody chooses. Never a reload on its own. */
+.pwa-update {
+  position: fixed;
+  left: 50%;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 1960;
+  width: min(36rem, calc(100vw - 2rem));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--r-md);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .28);
+}
+.pwa-update-text { margin: 0; flex: 1 1 18rem; }
+.pwa-update-acts { display: flex; gap: var(--sp-2); }
+
 /* 🌗 Theme (#224): the four as radios, each a row with what it is for. */
 .theme-pick { margin: 0; padding: 0; border: 0; display: grid; gap: var(--sp-2); }
 .theme-opt {

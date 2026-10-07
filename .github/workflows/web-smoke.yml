@@ -641,6 +641,18 @@ jobs:
         working-directory: test
         run: npm run exports
 
+      # Opens with no signal (#213), with a real service worker: installable;
+      # the whole shell kept for the page's version, then the station list and
+      # the inspection sheet's tables, the list still streamed to the loading
+      # card; a data file changed without a new stamp still the network's;
+      # offline, the app from the copy, its list labelled a saved copy with its
+      # age, a draft started and saved, an address that is not the app left
+      # alone; a new deploy offered, never swapped in; a page that is not the
+      # app (Access's sign-in) never kept; and no worker in every other check.
+      - name: Offline — opens with no signal, says how old, offers a new deploy
+        working-directory: test
+        run: npm run offline
+
       # Proposed stations (0039) in the editor, on the card and on the map,
       # against a stand-in for save_station() that holds the database's rules
       # (tools/check_proposed_stations.sql holds the real one to them): a
