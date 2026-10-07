@@ -115,7 +115,7 @@ const Admin = (function () {
           <h2>stations.json snapshot</h2>
           ${mayDl
             ? `<button id="btn-snapshot" class="exp-btn-sm" onclick="snapshotStationsJson()"
-                  title="Download the database's current station list as stations.json">Snapshot</button>`
+                  title="Download the database's current station list, as stations.json holds it (floodnet-stations.json)">Snapshot</button>`
             : `<button class="exp-btn-sm" onclick="Auth.open()"
                   title="Downloading the station document needs a signed-in session">Sign in to snapshot</button>`}
         </div>

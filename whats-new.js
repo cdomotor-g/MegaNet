@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 5, date: '2026-10-07', items: [
+      '<strong>⤓ Export</strong> in the banner: what the tab you are on can save as a file, in one place — the station '
+        + 'list as CSV, GeoJSON or KML (with the filters you have set), a chart, a table, a drawing. A tab with nothing '
+        + 'to save says so, and why.',
+      'Every file Flood-Net saves is named <strong>floodnet-…</strong>, so a download folder sorts them together.',
+    ] },
     { n: 4, date: '2026-10-07', items: [
       '<strong>A station\'s health on its card.</strong> Under its owner, a station\'s card on the Stations map says '
         + 'when it was last heard, how its battery is doing night to night, and what is wrong with it — each line opens '

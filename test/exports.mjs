@@ -12,7 +12,9 @@
 //   4. **The Stations tab** — signed out, the station list is not handed over
 //      (the Export tab's rule, #191); signed in, the filtered list as CSV,
 //      GeoJSON and KML, the GeoJSON's points exactly the filtered stations
-//      that have a place; the selection's CSV.
+//      that have a place — the filter takes in two that have none, so a
+//      writer that put them at [0, 0] is red — and the note says how many
+//      were left out; the selection's CSV.
 //   5. **Other tabs, on their own demo data** — ARRO Data, ALERT2, HFEM,
 //      Reception and Station Health each give a file through the banner.
 //   6. **Every file is floodnet-…** — including a writer whose own name was
@@ -167,21 +169,31 @@ async function main() {
     check('signed in: the station list as CSV, one row a station the filters leave, named floodnet-stations-…',
       /^floodnet-stations-\d{4}-\d{2}-\d{2}\.csv$/.test(F.name || '') && csvRows === want.n
         && /^id,name,station_number,roles,networks,alert_ids,lat,lon,elevation_ahd,elevation_source,enabled/.test(F.body), J({ name: F.name, csvRows, want, error: F.error }));
-    // Narrowed by a filter, and as GeoJSON.
-    await page.evaluate(() => { state.filters.roles = new Set(['repeater']); renderMain(); });
+    // Narrowed by a filter, and as GeoJSON. Repeaters and bases: every
+    // repeater in stations.json has a position and two of the bases (the
+    // workshop rigs) have none, so the filtered list holds stations a map
+    // file has to leave out — a fixture of only located stations would pass
+    // a writer that put the rest at [0, 0].
+    await page.evaluate(() => { state.filters.roles = new Set(['repeater', 'base']); renderMain(); });
     await page.waitForTimeout(300);
     const wantR = await page.evaluate(() => {
       const rows = filteredStations();
       return { ids: rows.filter(s => s.lat != null && s.lon != null).map(s => s.id).sort(), n: rows.length };
     });
+    check('the filtered list holds stations with no position, for the map files to leave out', wantR.n - wantR.ids.length >= 1,
+      J({ n: wantR.n, located: wantR.ids.length }));
     F = await take(page, 'The station list — GeoJSON');
     let gj = null;
     try { gj = JSON.parse(F.body); } catch (_) {}
     const gotIds = gj ? gj.features.map(f => f.properties.id).sort() : [];
-    const pt = gj && gj.features[0];
-    check('filtered to repeaters, the GeoJSON is a FeatureCollection of exactly those with a place, named -filtered-',
+    const pt = gj && gj.features.find(f => (f.properties.roles || []).includes('repeater'));
+    check('filtered, the GeoJSON is a FeatureCollection of exactly the stations left that have a place, named -filtered-',
       /^floodnet-stations-filtered-\d{4}-\d{2}-\d{2}\.geojson$/.test(F.name || '') && gj && gj.type === 'FeatureCollection'
         && J(gotIds) === J(wantR.ids) && wantR.n < want.all, J({ name: F.name, got: gotIds.length, want: wantR.ids.length, error: F.error }));
+    const lostSaid = await page.evaluate(() => [...document.querySelectorAll('#toasts .toast-text')].map(t => t.textContent).join(' | '));
+    check('…and the note says how many were left out, and where they are',
+      new RegExp(`${wantR.n - wantR.ids.length} with no position are in the CSV only`).test(lostSaid), lostSaid);
+    await page.evaluate(() => Toast.clear());
     check('…each a point at [lon, lat], its roles and ALERT ids with it', pt && pt.geometry.type === 'Point'
       && Math.abs(pt.geometry.coordinates[0]) > 100 && Math.abs(pt.geometry.coordinates[1]) < 50
       && Array.isArray(pt.properties.roles) && pt.properties.roles.includes('repeater') && Array.isArray(pt.properties.alert_ids), J(pt));
