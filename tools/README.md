@@ -104,6 +104,32 @@ editor cannot add one; Ed25519 and ECDSA are fingerprinted exactly as `ssh-keyge
 station fetches them with its token and nobody else can; a key taken off is no
 longer served, changes the hash, stays on the record, and can be added again.
 
+## `build_map_thumbs.py` — thumbnails and page facts for Radio Path Maps
+
+The Radio Path Maps catalogue shows each map with a thumbnail of the sheet and
+what the file says about itself. This builds both from the maps on disk:
+
+```sh
+python3 tools/build_map_thumbs.py            # write maps/thumbs/ and FILE_META
+python3 tools/build_map_thumbs.py --check    # exit 1 if a thumbnail or FILE_META is stale
+```
+
+It reads the catalogue out of `maps-data.js` (through `node`), renders page 1 of
+each map with poppler's `pdftoppm` (an image map is resized with Pillow), and
+writes a 288 px WebP to `maps/thumbs/<region>/<name>.webp` — about 7 KB each,
+300 KB for all 44. `pdfinfo` gives the pages, paper size (A-series by name),
+orientation with `/Rotate` applied, the PDF's own created and modified dates,
+and whether its producer was a scanner; those, the size on disk and the
+thumbnail's path go into the generated `FILE_META` block in `maps-data.js`,
+between its two marker comments — never edit that block by hand. A thumbnail no
+map uses any more is deleted.
+
+Run it after adding, replacing or removing a map. `--check` asks only whether a
+thumbnail exists, not whether its bytes match: another machine's poppler or
+libwebp renders different bytes from the same page. `npm run tabs` fails if a
+catalogued map has no thumbnail or one that will not load. Needs poppler-utils,
+Pillow and node.
+
 ## Map boundaries from a KMZ (#179)
 
 `kml_to_geojson.py` turns a KML or KMZ of polygons into a web-sized GeoJSON, with

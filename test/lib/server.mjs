@@ -22,6 +22,8 @@ const TYPES = {
   '.svg':  'image/svg+xml',
   '.png':  'image/png',
   '.jpg':  'image/jpeg',
+  '.webp': 'image/webp',
+  '.pdf':  'application/pdf',
   '.ico':  'image/x-icon',
   '.txt':  'text/plain; charset=utf-8',
   '.md':   'text/markdown; charset=utf-8',

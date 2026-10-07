@@ -976,6 +976,59 @@ try {
   check('and exactly one region chip reads as pressed', shortcut.pressed === 1,
     String(shortcut.pressed));
 
+  // ── The map catalogue: the right pane is the list until a map is opened ────
+  // Every catalogued map gets a row and a thumbnail that loads, and the left
+  // pane's filters are what the right pane lists — the claim the catalogue
+  // makes. A map added without rerunning tools/build_map_thumbs.py fails here.
+  console.log('\nThe map catalogue — every map listed with its thumbnail, filtered by the left pane\n');
+
+  const catalogue = await page.evaluate(async () => {
+    switchTab('maps');
+    Maps.clearFilters();
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const M = window.MegaNetMaps;
+    const files = Object.keys(M.FILE_PATH);
+    const shown = el => !!el && el.getClientRects().length > 0;
+    const rows = [...document.querySelectorAll('#maps-cat-list .maps-cat-open')].map(b => b.dataset.file);
+    const noMeta = files.filter(f => !(M.FILE_META[f] || {}).thumb);
+    const broken = [];
+    for (const f of files) {
+      const t = (M.FILE_META[f] || {}).thumb;
+      if (!t) continue;
+      const ok = await new Promise(res => {
+        const img = new Image();
+        img.onload = () => res(img.naturalWidth > 0);
+        img.onerror = () => res(false);
+        img.src = './' + t.split('/').map(encodeURIComponent).join('/');
+      });
+      if (!ok) broken.push(t);
+    }
+    const listShown = shown(document.getElementById('maps-catalogue'))
+      && !shown(document.getElementById('maps-viewer'));
+    Maps.setRegion('Far North');
+    const farNorth = [...document.querySelectorAll('#maps-cat-list .maps-cat-open')].map(b => b.dataset.file);
+    const farNorthWant = Object.values(M.MAP_CATALOG['Far North']).flat();
+    Maps.openFile(farNorth[0], false);
+    const viewing = shown(document.getElementById('maps-viewer')) && !shown(document.getElementById('maps-catalogue'));
+    Maps.setRegion('SE QLD');          // a filter change goes back to the list
+    const backOnFilter = shown(document.getElementById('maps-catalogue'));
+    Maps.clearFilters();
+    return { files: files.length, rows, noMeta, broken, listShown, farNorth, farNorthWant, viewing, backOnFilter };
+  });
+
+  check('the right pane opens on the catalogue, not a blank viewer', catalogue.listShown);
+  check(`and lists every catalogued map (${catalogue.files})`,
+    catalogue.rows.length === catalogue.files, `${catalogue.rows.length} rows`);
+  check('and every map has a thumbnail in FILE_META', catalogue.noMeta.length === 0,
+    catalogue.noMeta.slice(0, 3).join(', ') + ' — run tools/build_map_thumbs.py');
+  check('and every thumbnail loads', catalogue.broken.length === 0, catalogue.broken.slice(0, 3).join(', '));
+  check('a region chip filters the catalogue to that region',
+    catalogue.farNorth.length === catalogue.farNorthWant.length
+      && catalogue.farNorth.every(f => catalogue.farNorthWant.includes(f)),
+    catalogue.farNorth.join(', '));
+  check('opening a map swaps the list for the viewer', catalogue.viewing);
+  check('and changing a filter while one is open goes back to the list', catalogue.backOnFilter);
+
   // ── A chart's palette belongs to the document, not to a script ─────────────
   // The second pattern-level check, added by #141 for the same reason #137
   // added the first: the claim is about a pattern rather than about a tab, and

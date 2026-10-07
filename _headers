@@ -14,3 +14,15 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=31536000
+
+# The Radio Path Maps tab shows these PDFs in an <iframe> on this same site,
+# and the rule above (DENY / frame-ancestors 'none') stopped it: every map
+# opened as "refused to connect". Framing by the site itself only — another
+# site still cannot. A later rule's `!` detaches what /* attached, then the
+# same-origin values are set (Cloudflare joins two values for one header with
+# a comma otherwise).
+/maps/*
+  ! X-Frame-Options
+  ! Content-Security-Policy
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'

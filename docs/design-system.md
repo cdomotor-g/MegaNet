@@ -173,7 +173,7 @@ of the contrast contract for the same reason:
 
 | Set | Where it is drawn |
 |---|---|
-| `--maps-region-*` (8) | Radio Path Maps' basin drawing and its chips (#137) |
+| `--maps-region-*` (8) | Radio Path Maps' basin drawing and its chips (#137), and the region edge and dot on each catalogue row |
 | `--ad-series-*` (12) | the ARRO / Field Data chart (#141), and the station card's inspection-history chart, which draws from the first eight |
 | `--acma-mech-*` (7) | interference mechanisms — RF Environment, RF Changes, the transmitter card, the Workbench, the Stations map (#138) |
 | `--rfc-series-*` (8), `--rfc-class-*` (8) | the RF Changes timeline's data-quality series, and the snapshot-diff change classes (#138) |

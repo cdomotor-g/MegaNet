@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-07** (revision 131 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-07** (revision 132 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -532,6 +532,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and eight `[Human]` issues.
 >
+> **Revision 132 opens and closes nothing** — at the owner's request: Radio Path Maps' right-hand pane, blank until a map was opened, is now the map list itself, filtered by the left pane, a row per map with everything known about it and a thumbnail of the sheet. On the way, the maps open on floodwarning.net at all — the site-wide `X-Frame-Options: DENY` had been refusing the viewer its own PDFs. One thing for a person, offered rather than filed: `Callide Paths.pdf` has no radio paths or stations drawn on it (see revision 132 below).
+>
 > **Revision 131 opens and closes nothing** — at the owner's request, after watching somebody struggle to pan, tilt and zoom the 3-D map: ⛰️ 3-D now says how it is moved, at the foot of the view, and the digital twin is moved the same way (it was the other way round), with the side panel's 🧭 and tilt buttons driving whichever camera is on screen. Nothing for a person.
 >
 > **Revision 130 opens and closes nothing** — a new tab at the owner's request: **📲 Offline & Install**, under *Start here*, explaining #213's offline copy to somebody who has never heard the word PWA, with buttons that set a device up and install Flood-Net in the browser being used. On the way, #213's first visit is made enough on its own: it kept the app but not the station list, so revision 128's step for a person would have shown no stations — it is right as written from this revision on. Nothing for a person beyond that step.
@@ -744,6 +746,21 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 132 — 2026-10-07: Radio Path Maps — the right pane is the map list until a map is opened
+
+At the owner's request: "until the user selects a map the right pane remains blank … change that … such that the list of available maps is showing in its filtered state … give all the known information for the particulars of a given map … and on the far right of each row add a small image of the PDF map … if you see anything else worthwhile doing or adding here please do so." No issue was filed for it; this entry is its record.
+
+- **The catalogue** (`network-maps.js`): until a map is opened the right pane lists the maps, filtered by exactly what the left pane says — region, subregion, the search box. A row carries region › subregion with the region's colour down its edge, catchments with their basin numbers (from `stations.json`'s `catchments[]`), radio networks with how many stations are on each, the places it covers (`FILE_INFO.aliases` less the words that are not places), and the sheet — A3/A4, which way up, size on disk, the PDF's own date, and whether it is a scan — with a thumbnail at the far right. The name is the row's one control; its `::after` covers the row, so the thumbnail opens the map too without forty more tab stops, and the new-tab link sits above the cover. **Tiles** shows the thumbnails big, **Sort** orders by region, name or newest; both are remembered per device.
+- **One list, three readers.** `filteredFiles()` is what the catalogue, the compact list on the left and Prev / Next walk. A station search now adds the maps suggested for the matching stations even when the text names none of them — "Myola" had the suggestion cards offering the Far North sheets and the list saying "no maps match" — ranked first with the station and the reason on the row. The compact list on the left shows only while a map is open; with the catalogue up it was the same names twice.
+- **The viewer**: ‹ Back to list returns to the row it came from, focus on its name; opening from the list puts focus on the map's name rather than `<body>`; changing a filter while a map is open goes back to the list. The viewer is sized from `FILE_META` instead of fetching the whole PDF a second time to read its `/MediaBox`.
+- **A landing starts unfiltered.** Region, subregion and the open map last for the session (leaving the tab and coming back keeps them) but are no longer restored from `localStorage` across a reload; the last map opened on the device is marked instead of reopened. `mn-maps-region` and `mn-maps-sub` are no longer written.
+- **Thumbnails are built, not computed** — `tools/build_map_thumbs.py` renders page 1 of each of the 44 maps to a 288 px WebP under `maps/thumbs/` (300 KB in all, `loading="lazy"`) and writes the generated `FILE_META` block in `maps-data.js` from `pdfinfo`. `--check` reports a stale or missing one.
+- **The maps did not open on floodwarning.net at all.** `_headers` sent `X-Frame-Options: DENY` and `frame-ancestors 'none'` on every file, PDFs included, so the viewer's `<iframe>` was refused by the browser — on the live site, every map. `/maps/*` now detaches both and sets `SAMEORIGIN` / `frame-ancestors 'self'`: the site may frame its own maps, nobody else may. Checked under `wrangler dev` (4.148) with a copy of the file: one value each on a map, `DENY` / `'none'` unchanged everywhere else. GitHub Pages ignores `_headers` and was unaffected.
+
+**Found on the way, for a person:** `maps/central-qld/Callide Paths.pdf` (made 27 Feb 2018) has no radio paths, station symbols or station names drawn on it — rivers, the basin outline and the title block only. PDFium (Chrome's renderer) and poppler agree, so it is the file, not the thumbnail. `Callide_map_old.pdf` (2017) has them. Whether a complete 2018 sheet exists is a question for whoever holds the originals.
+
+**Checks:** `npm run tabs` +7 (590): the pane opens on the catalogue, lists every catalogued map, every map has a thumbnail in `FILE_META` and every thumbnail loads (red on a deliberately removed one), a region chip filters it, opening swaps in the viewer, and a filter change goes back. `test/lib/server.mjs` serves `.webp` and `.pdf` by type. Run green before the push: the cheap five, `tabs`, `help`. What's new entry 9; stamps to `20261007r`.
 
 ### Revision 131 — 2026-10-07: the 3-D views say how they are moved, and are moved the same way
 

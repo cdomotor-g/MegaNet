@@ -200,7 +200,8 @@ MegaNet/
 │   ├── wide-bay-burnett/   │  Fraser Coast, Burnett, Mary, Kanigan
 │   ├── se-qld/             │  Albert/Logan, Bremer/Lockyer, Caboolture, Maroochy, …
 │   ├── west-south-west/    │  Blackall, Charleville, Warrego, SWRED, Western Downs, …
-│   └── nsw-border/         │  NSW North Coast repeater maps
+│   ├── nsw-border/         │  NSW North Coast repeater maps
+│   └── thumbs/             │  page-1 thumbnails, one WebP per map (tools/build_map_thumbs.py)
 │
 ├── docs/                   ← reference documents
 │   ├── design-system.md                    (tokens, breakpoints, patterns, a11y primitives — #109)
@@ -318,7 +319,9 @@ MegaNet/
 > **bare filename** as each map's display name and lookup key; `MAPS_DIR` +
 > `REGION_DIR` build a `FILE_PATH` table (filename → `maps/<region>/<file>`) that
 > `app.js`'s `encPath()` uses to load the file. To add a map, drop it in the right
-> `maps/<region>/` folder and add its filename to `MAP_CATALOG` (and `FILE_INFO`).
+> `maps/<region>/` folder, add its filename to `MAP_CATALOG` (and `FILE_INFO`), then
+> run `python3 tools/build_map_thumbs.py` for its thumbnail and page facts —
+> `npm run tabs` fails on a catalogued map without one.
 
 ---
 
@@ -2615,8 +2618,22 @@ by region, and — new — suggests the relevant map(s) for any station.
   Wide Bay/Burnett, SE QLD, West/South West, plus an NSW Border group). The
   three NSW repeater maps, previously mislabelled, are corrected to their real
   filenames.
+- **Map catalogue** — until a map is opened, the right-hand pane *is* the map
+  list, filtered by whatever the left pane says (region, sub-region, the search
+  box — station suggestions included). Each row carries everything known about
+  the map — region › sub-region, catchments with their basin numbers, radio
+  networks with how many stations are on each, the places it covers, and the
+  sheet itself (A3/A4, which way up, file size, the date the PDF was made,
+  whether it is a scan of a paper copy) — with a thumbnail of the sheet at the
+  far right. **Tiles** swaps the rows for big thumbnails, for finding a sheet by
+  its look; **Sort** orders by region, name or newest. A landing starts
+  unfiltered with every map listed; the last map opened on the device is marked.
 - **Embedded viewer** — opens each `.pdf` in an inline frame (or `.jpg`/image
-  maps as pictures) with prev/next and an "open in new tab" link.
+  maps as pictures) with **‹ Back to list**, prev/next through the filtered list,
+  and an "open in new tab" link. Changing a filter while a map is open goes back
+  to the list. (`_headers` lets the site frame its own `maps/` files — the
+  site-wide `X-Frame-Options: DENY` had been stopping every map opening on
+  floodwarning.net.)
 - **Station-aware search** — type a **station name**, **ALERT ID**, or **site
   number** and the tool lists matching stations with their suggested maps.
   Suggestions are ranked from three signals:
@@ -2626,8 +2643,10 @@ by region, and — new — suggests the relevant map(s) for any station.
      projected onto the basin SVG and the containing catchment → region → map
      is found (approximate, see below);
   3. free-text keyword match against each map's catchment / town aliases.
-- Map data (catalogue, basin geometry, georeference) lives in `maps-data.js`,
-  loaded before `app.js`. The map browser works even before `stations.json` is
+- Map data (catalogue, basin geometry, georeference, and the generated
+  `FILE_META` page facts) lives in `maps-data.js`, loaded before `app.js`.
+  Thumbnails are `maps/thumbs/<region>/<name>.webp`, ~7 KB each, built with
+  `python3 tools/build_map_thumbs.py`. The map browser works even before `stations.json` is
   loaded; only the station suggestions require the dataset.
 
 > **Data sufficiency for station→map search.** Map *suggestions* are still derived

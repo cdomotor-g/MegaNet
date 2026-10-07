@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 9, date: '2026-10-07', items: [
+      '<strong>🗺️ Radio Path Maps lists the maps on the right</strong> instead of leaving it blank: every map, '
+        + 'each with its region, catchments, radio networks, the places it covers, its sheet size and date, and a '
+        + 'small picture of the sheet so you can spot one by its look. The basin drawing, the region chips and the '
+        + 'search box on the left filter the list; a station search puts the maps that station is likely to be on '
+        + 'first and says why. <strong>Tiles</strong> shows the pictures big, <strong>Sort</strong> orders by '
+        + 'region, name or newest, and <strong>‹ Back to list</strong> leaves a map.',
+      'Maps now open inside Flood-Net on floodwarning.net — the site had been refusing to show its own PDFs '
+        + 'in the viewer.',
+    ] },
     { n: 8, date: '2026-10-07', items: [
       '<strong>The 3-D map says how to move it.</strong> Opening ⛰️ 3-D puts a hint at the foot of the view — '
         + 'drag to move, right-drag or Ctrl-drag to turn and tilt, wheel to zoom (on a phone: pinch, twist, and two '

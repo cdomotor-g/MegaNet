@@ -830,10 +830,12 @@ const HELP = {
 
   maps: {
     summary: 'Browses the bundled Radio-path PDF maps by region, and suggests the relevant map for '
-           + 'a given station. The Queensland basin drawing is clickable — pick a basin, or a '
-           + 'region chip, to filter the list down to it. Type a station name, ALERT address or '
-           + 'site number instead and it lists the stations that match with the maps they are '
-           + 'likely to be on.',
+           + 'a given station. The right-hand side lists every map until you open one — with its '
+           + 'region, catchments, radio networks, places, sheet size and date, and a thumbnail of '
+           + 'the sheet — and the left-hand side filters that list: pick a basin on the Queensland '
+           + 'drawing or a region chip, or type a station name, ALERT address or site number to '
+           + 'put the maps it is likely to be on first. <strong>Tiles</strong> shows the '
+           + 'thumbnails big; <strong>‹ Back to list</strong> leaves a map.',
     watch: [
       'A suggested map is a <strong>suggestion</strong>. Only a station carrying a recorded radio '
       + 'network gets an authoritative answer; for everything else the station\'s coordinates are '

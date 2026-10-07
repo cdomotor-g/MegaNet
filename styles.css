@@ -9266,9 +9266,134 @@ code {
   flex-wrap: wrap;
 }
 .maps-current { min-width: 0; }
-.maps-current strong { display: block; }
-.maps-current .small { word-break: break-all; }
+.maps-current h2 { margin: 0; font-size: var(--fs-md); line-height: var(--lh-tight); word-break: break-word; }
+.maps-current .small { word-break: break-word; }
 .maps-toolbar-actions { flex-wrap: nowrap; flex: 0 0 auto; }
+/* `.button-row` and `.maps-viewer` are display:flex, which outranks the
+   browser's own [hidden] rule at the same specificity — the right pane is
+   one of two things at a time, and both halves have to actually go. */
+.maps-toolbar-actions[hidden],
+.maps-catalogue[hidden],
+.maps-viewer[hidden] { display: none; }
+/* The compact list on the left is the catalogue's list; while the catalogue
+   is on screen it would only be the same names twice. */
+.maps-layout[data-view="list"] .maps-file-list { display: none; }
+
+.maps-sort { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--muted); }
+.maps-sort select { font-size: var(--fs-sm); }
+.maps-layout-toggle { display: inline-flex; }
+.maps-layout-toggle button { font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-2); }
+.maps-layout-toggle button:first-child { border-radius: var(--r-md) 0 0 var(--r-md); }
+.maps-layout-toggle button:last-child { border-radius: 0 var(--r-md) var(--r-md) 0; margin-left: -1px; }
+.maps-layout-toggle button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--primary-text);
+  border-color: var(--accent);
+}
+
+/* catalogue — the right pane until a map is opened. Each row is a little
+   taller than the old list's, carries the region's colour down its left edge,
+   and keeps the sheet's thumbnail at the far right. The name is the one
+   control; its ::after stretches over the row so a click anywhere on it —
+   the thumbnail included — opens the map. */
+.maps-catalogue { padding: var(--sp-2) var(--sp-3) var(--sp-3); }
+.maps-cat-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.maps-cat-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-3);
+  align-items: start;
+  min-height: 7.5rem;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--region, var(--muted));
+  border-radius: var(--r-md);
+  background: var(--panel-sub);
+}
+.maps-cat-row:hover { background: color-mix(in srgb, var(--accent) 8%, var(--panel-sub)); }
+.maps-cat-row.suggested { background: color-mix(in srgb, var(--accent) 5%, var(--panel-sub)); }
+.maps-cat-row.selected {
+  border-color: var(--accent);
+  border-left-color: var(--region, var(--accent));
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel-sub));
+}
+.maps-cat-main { min-width: 0; }
+.maps-cat-name { margin: 0; font-size: var(--fs-md); line-height: var(--lh-tight); }
+.maps-cat-open {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  word-break: break-word;
+}
+.maps-cat-open::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+.maps-cat-open:hover { color: var(--accent); text-decoration: underline; }
+.maps-cat-where {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.maps-cat-why {
+  margin: var(--sp-1) 0 0;
+  padding: var(--sp-1) var(--sp-2);
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-size: var(--fs-sm);
+}
+.maps-cat-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--sp-2);
+  row-gap: 2px;
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-sm);
+}
+.maps-cat-facts > div { display: contents; }
+.maps-cat-facts dt { color: var(--muted); }
+.maps-cat-facts dd { margin: 0; word-break: break-word; }
+.maps-cat-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); margin-top: var(--sp-1); }
+/* Above the stretched name, so it is a link of its own. */
+.maps-cat-newtab { position: relative; z-index: 1; margin-left: auto; font-size: var(--fs-sm); color: var(--accent); }
+/* Paper is white in either theme, so the thumbnail's backing is too. */
+.maps-cat-thumb {
+  width: 9rem;
+  height: 7rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: #fff;
+}
+/* Sized by the box, not by its own pixels. The box is a plain block on
+   purpose: as a grid container its one auto row took the image's own height,
+   a percentage had nothing to resolve against, and a portrait sheet came out
+   cropped to its top half. */
+.maps-cat-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.maps-cat-thumb.empty { display: grid; place-items: center; background: var(--subtle); }
+.maps-cat-nothumb { font-size: var(--fs-xs); color: var(--muted); }
+.maps-cat-empty {
+  padding: var(--sp-4);
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+}
+.maps-cat-empty p { margin: 0 0 var(--sp-2); }
+
+/* Tiles: the thumbnail first and big, for finding a sheet by its look. The
+   facts give way to it; the name, the region and the suggestion stay. */
+.maps-cat-list[data-layout="tiles"] { grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); }
+.maps-cat-list[data-layout="tiles"] .maps-cat-row { grid-template-columns: minmax(0, 1fr); min-height: 0; gap: var(--sp-2); }
+.maps-cat-list[data-layout="tiles"] .maps-cat-thumb { order: -1; width: 100%; height: 12rem; }
+.maps-cat-list[data-layout="tiles"] .maps-cat-facts { display: none; }
 /* Sized from the opened file's real page proportions (set via --maps-aspect
    in JS once known) so an A3/A4 map isn't cropped when fit to width; the
    1:√2 fallback keeps it at least A4-shaped before that's detected. */
@@ -9282,15 +9407,6 @@ code {
 .maps-viewer > * { flex: 1; min-width: 0; min-height: 0; }
 .maps-view-frame { width: 100%; height: 100%; border: 0; display: block; }
 .maps-view-img { width: 100%; height: 100%; object-fit: contain; background: #fff; display: block; }
-.maps-empty {
-  display: grid;
-  place-items: center;
-  height: 100%;
-  text-align: center;
-  color: var(--muted);
-  padding: var(--sp-6);
-  background: var(--subtle);
-}
 
 @media (max-width: 1100px) {
   .maps-layout { grid-template-columns: 1fr; }
@@ -9313,6 +9429,18 @@ code {
      filename, Prev, Next and a link, and the wrap was landing the buttons under
      a path that had already broken across three lines. */
   .maps-toolbar-actions { width: 100%; justify-content: flex-start; }
+  /* A row at 375 px: the thumbnail shrinks rather than the text, and each
+     fact reads as one line, "Catchment: Barron", instead of two columns. */
+  .maps-catalogue { padding: var(--sp-2); }
+  .maps-cat-row { gap: var(--sp-2); padding: var(--sp-2); }
+  .maps-cat-thumb { width: 5.5rem; height: 4.25rem; }
+  .maps-cat-facts { display: block; }
+  .maps-cat-facts > div { display: block; }
+  .maps-cat-facts dt { display: inline; }
+  .maps-cat-facts dt::after { content: ': '; }
+  .maps-cat-facts dd { display: inline; }
+  .maps-cat-list[data-layout="tiles"] { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
+  .maps-cat-list[data-layout="tiles"] .maps-cat-thumb { width: 100%; height: 9rem; }
 }
 
 /* ── Pass Ranges tab (#137) ──────────────────────────────────────────────────
@@ -12362,7 +12490,9 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   .maps-reset,
   .maps-newtab,
   .maps-suggest-map,
-  .maps-file-actions button {
+  .maps-file-actions button,
+  .maps-layout-toggle button,
+  .maps-cat-newtab {
     min-height: 2.75rem;
     display: inline-flex;
     align-items: center;

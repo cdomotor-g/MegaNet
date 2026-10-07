@@ -51,6 +51,36 @@
 //   The search box got a label, the viewer's "open in new tab" link stops
 //   pointing at nothing before a map is open, and opening a map announces
 //   itself — the result of something the user did, which is rule 1.
+//
+// ── The catalogue: the right pane is never blank ─────────────────────────────
+// Until a map is opened the right pane is the map list itself, filtered by
+// exactly what the left pane says — region, subregion and the search box, the
+// station suggestions included — one row per map with everything known about
+// it and a thumbnail of the sheet on the far right, so a map can be found by
+// its look as well as its name. Opening one swaps the list for the viewer;
+// ‹ Back to list swaps it back, focus on the row it came from. Changing a
+// filter while a map is open goes back to the list, because the filter is a
+// question about the list.
+//
+//   One list, three readers. filteredFiles() is what the catalogue, the
+//   compact list on the left (shown only while a map is open — it is the same
+//   list) and Prev / Next all walk, so they cannot disagree on order or count.
+//   A station search adds the maps suggested for the matching stations even
+//   when the text matches none of them — "Myola" names no map, and the
+//   suggestion cards offered the Far North sheets while the list said "no maps
+//   match". Those rows are ranked first and say which station they are for
+//   and why.
+//
+//   A landing starts unfiltered. Region, subregion and the open map last for
+//   the session — leaving the tab and coming back keeps them — but not across
+//   a reload. The last map opened on this device is marked rather than
+//   reopened; sort and layout (rows or tiles) are remembered.
+//
+//   Thumbnails and page facts are built, not computed here:
+//   tools/build_map_thumbs.py renders page 1 of every catalogued map to a
+//   ~7 KB WebP under maps/thumbs/ and writes FILE_META in maps-data.js (size,
+//   pages, paper, orientation, the PDF's own date, scanned or not). A map with
+//   no entry gets a placeholder, so a missed run shows rather than breaks.
 
 // ── RADIO PATH MAPS tab (formerly "Network Maps"; see #108) ─────────────────────
 //
@@ -82,12 +112,22 @@ const Maps = (function () {
     'NSW Border':            'var(--maps-region-nsw)',
   };
 
+  const META = (MD && MD.FILE_META) || {};
+
+  const SORTS = { catalogue: 'Region', name: 'Name A–Z', newest: 'Newest first' };
+  const LAYOUTS = { rows: 'Rows', tiles: 'Tiles' };
+
+  // See "The catalogue" above for what lasts how long, and why.
   const mstate = {
-    region:    localStorage.getItem('mn-maps-region') || 'All files',
-    subregion: localStorage.getItem('mn-maps-sub')    || '_all',
-    file:      localStorage.getItem('mn-maps-file')   || '',
-    query:     '',
-    basins:    null,   // [{name, region, pts:[[x,y],...]}]  parsed once
+    region:     'All files',
+    subregion:  '_all',
+    file:       '',
+    view:       'list',  // 'list' — the catalogue; 'map' — the viewer
+    query:      '',
+    lastOpened: localStorage.getItem('mn-maps-file') || '',
+    sort:       SORTS[localStorage.getItem('mn-maps-sort')] ? localStorage.getItem('mn-maps-sort') : 'catalogue',
+    layout:     LAYOUTS[localStorage.getItem('mn-maps-layout')] ? localStorage.getItem('mn-maps-layout') : 'rows',
+    basins:     null,    // [{name, region, pts:[[x,y],...]}]  parsed once
   };
 
   // ── catalogue helpers ─────────────────────────────────────────────────────────
@@ -154,26 +194,126 @@ const Maps = (function () {
     ].join(' ').toLowerCase();
     return q.toLowerCase().split(/\s+/).filter(Boolean).every(tok => hay.includes(tok));
   }
-  function filteredFiles() { return rawFiles().filter(f => fileMatchesQuery(f, mstate.query)); }
+  // The one list the catalogue, the compact list and Prev / Next all walk:
+  // the region / subregion's maps that match the search text or are suggested
+  // for a station the search matches, suggestions first, then the chosen sort.
+  function filteredFiles() {
+    const sugg = suggestedMaps();
+    const files = rawFiles().filter(f => fileMatchesQuery(f, mstate.query) || sugg.has(f));
+    const order = new Map(allFiles().map((f, i) => [f, i]));
+    const pos = f => order.has(f) ? order.get(f) : Infinity;
+    const by = {
+      catalogue: (a, b) => pos(a) - pos(b),
+      name:      (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }),
+      newest:    (a, b) => ((META[b] || {}).made || '').localeCompare((META[a] || {}).made || '') || pos(a) - pos(b),
+    }[mstate.sort] || ((a, b) => pos(a) - pos(b));
+    return files.sort((a, b) => ((sugg.get(b) || {}).score || 0) - ((sugg.get(a) || {}).score || 0) || by(a, b));
+  }
+
+  // file -> { score, stations: [{ name, reasons }] } for the stations the
+  // search box matches — the same answer the suggestion cards on the left
+  // give, kept for as long as the query and the station file are the same.
+  let suggCache = { q: null, data: null, map: new Map() };
+  function suggestedMaps() {
+    const q = mstate.query.trim();
+    if (!q || typeof state === 'undefined' || !state.data) return new Map();
+    if (suggCache.q === q && suggCache.data === state.data) return suggCache.map;
+    const map = new Map();
+    for (const { s } of matchStations(q)) {
+      for (const m of mapsForStation(s)) {
+        const e = map.get(m.file) || { score: 0, stations: [] };
+        e.score = Math.max(e.score, m.score);
+        e.stations.push({ name: s.name, reasons: m.reasons });
+        map.set(m.file, e);
+      }
+    }
+    suggCache = { q, data: state.data, map };
+    return map;
+  }
 
   function ext(file)   { return file.split('.').pop().toUpperCase(); }
   function isImage(f)  { return /\.(png|jpe?g|gif|webp|svg)$/i.test(f); }
   // Resolve a catalogue filename to its on-disk location (files live in
   // per-region sub-folders under maps/, see maps-data.js FILE_PATH) and
   // URL-encode each path segment. Falls back to the bare name if unmapped.
-  function encPath(f)  {
-    const rel = (MD && MD.FILE_PATH && MD.FILE_PATH[f]) || f;
-    return './' + rel.split('/').map(encodeURIComponent).join('/');
-  }
+  function encPath(f)  { return encRel((MD && MD.FILE_PATH && MD.FILE_PATH[f]) || f); }
+  function encRel(rel) { return './' + rel.split('/').map(encodeURIComponent).join('/'); }
   function fileTags(file) {
     const info = (MD && MD.FILE_INFO[file]) || {};
+    const aliases = info.aliases || [];
     const out = [ext(file)];
     const n = file.toLowerCase();
     if (n.includes('network to')) out.push('backbone');
-    if (n.includes('old') || n.includes('blank')) out.push('legacy');
+    if (n.includes('blank')) out.push('base map');
+    else if (/(^|[^a-z])old([^a-z]|$)/.test(n) || aliases.includes('legacy')) out.push('legacy');
     if (n.includes('repeaters')) out.push('repeaters');
-    if ((info.networks || []).length) out.push('net-linked');
+    if ((META[file] || {}).scanned) out.push('scanned');
     return out;
+  }
+
+  // ── what is known about a map, as the catalogue says it ─────────────────────
+  // Search words that are not places — they stay searchable, they are just not
+  // listed under "Places".
+  const NOT_PLACES = new Set(['backbone', 'repeater path', 'far north backbone', 'legacy', 'old',
+    'blank', 'base map', 'image', 'update', 'original', 'repeaters', 'vhf', 'west', 'north east']);
+  const ACRONYMS = { nsw: 'NSW', sdrc: 'SDRC', swred: 'SWRED' };
+  function titleCase(s) {
+    return String(s).split(' ').map(w => ACRONYMS[w] || (w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
+  }
+  function placeNames(info) {
+    const catchments = new Set((info.catchments || []).map(slugBasin));
+    return (info.aliases || [])
+      .filter(a => !NOT_PLACES.has(a) && !/^\d+$/.test(a) && !catchments.has(slugBasin(a)))
+      .map(titleCase);
+  }
+  // "Border Rivers 1" and "border_rivers" are one catchment to the station file.
+  function catchmentKey(v) { return slugBasin(String(v).replace(/_/g, ' ')).replace(/ \d+$/, ''); }
+  function catchmentNames(names) {
+    const known = (typeof state !== 'undefined' && state.data && state.data.catchments) || [];
+    const seen = new Set(), out = [];
+    for (const n of names || []) {
+      const key = catchmentKey(n);
+      const c = known.find(k => catchmentKey(k.id) === key || catchmentKey(k.name) === key);
+      const label = c ? c.name : n;
+      if (seen.has(label)) continue;
+      seen.add(label);
+      out.push(c && c.basin_no ? `${label} (basin ${c.basin_no})` : label);
+    }
+    return out;
+  }
+  // Stations per radio network, counted once per station file.
+  let netCount = { data: null, counts: {} };
+  function networkNames(ids) {
+    const data = typeof state !== 'undefined' ? state.data : null;
+    if (data && netCount.data !== data) {
+      const counts = {};
+      for (const s of data.stations || []) for (const id of s.radio_network_ids || []) counts[id] = (counts[id] || 0) + 1;
+      netCount = { data, counts };
+    }
+    return (ids || []).map(id => {
+      const name = ((data && data.radio_networks) || []).find(n => n.id === id)?.name
+        || titleCase(id.replace(/_/g, ' '));
+      const n = data ? (netCount.counts[id] || 0) : 0;
+      return n ? `${name} (${n} station${n === 1 ? '' : 's'})` : name;
+    });
+  }
+  function fmtSize(bytes) {
+    return bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  }
+  function fmtDay(iso) {
+    const d = new Date(iso + 'T00:00:00Z');
+    return isNaN(d) ? iso : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  }
+  function sheetFacts(file) {
+    const m = META[file] || {};
+    const parts = [];
+    const shape = [m.paper, m.orient].filter(Boolean).join(' ');
+    if (shape) parts.push(shape);
+    if (m.pages > 1) parts.push(m.pages + ' pages');
+    parts.push(ext(file) + (m.bytes ? ', ' + fmtSize(m.bytes) : ''));
+    if (m.made) parts.push('PDF made ' + fmtDay(m.made) + (m.edited ? ', re-saved ' + fmtDay(m.edited) : ''));
+    if (m.scanned) parts.push('a scan of a paper copy');
+    return parts.join(' · ');
   }
 
   // ── station → map suggestion engine ───────────────────────────────────────────
@@ -343,18 +483,33 @@ const Maps = (function () {
       <div class="panel maps-viewer-panel">
         <div class="maps-viewer-toolbar">
           <div class="maps-current">
-            <strong id="maps-current-file">No map open</strong>
+            <h2 id="maps-current-file">Map catalogue</h2>
             <span class="small" id="maps-current-path"></span>
           </div>
-          <div class="button-row maps-toolbar-actions">
-            <button onclick="Maps.step(-1)" title="Previous map">‹ Prev</button>
-            <button onclick="Maps.step(1)" title="Next map">Next ›</button>
+          <div class="button-row maps-toolbar-actions" id="maps-cat-tools">
+            <label class="maps-sort small" for="maps-sort">Sort
+              <select id="maps-sort" onchange="Maps.setSort(this.value)">
+                ${Object.entries(SORTS).map(([v, l]) =>
+                  `<option value="${v}"${v === mstate.sort ? ' selected' : ''}>${esc(l)}</option>`).join('')}
+              </select></label>
+            <div class="maps-layout-toggle" role="group" aria-label="Show the list as">
+              ${Object.entries(LAYOUTS).map(([v, l]) =>
+                `<button data-layout="${v}" aria-pressed="${v === mstate.layout}"
+                   onclick="Maps.setLayout('${v}')">${esc(l)}</button>`).join('')}
+            </div>
+          </div>
+          <div class="button-row maps-toolbar-actions" id="maps-view-tools" hidden>
+            <button onclick="Maps.showList()">‹ Back to list</button>
+            <button onclick="Maps.step(-1)" title="Previous map in the list">‹ Prev</button>
+            <button onclick="Maps.step(1)" title="Next map in the list">Next ›</button>
             <a id="maps-newtab" class="maps-newtab" target="_blank" rel="noopener" hidden>Open in new tab ↗</a>
           </div>
         </div>
-        <div id="maps-viewer" class="maps-viewer">
-          <div class="maps-empty">Select a map from the list, or search for a station to get a suggestion.</div>
+        <div id="maps-catalogue" class="maps-catalogue">
+          <ul id="maps-cat-list" class="maps-cat-list" data-layout="${mstate.layout}"
+              aria-labelledby="maps-current-file"></ul>
         </div>
+        <div id="maps-viewer" class="maps-viewer" hidden></div>
       </div>
     </div>`;
   }
@@ -364,10 +519,11 @@ const Maps = (function () {
     injectBasinMap();
     renderRegionChips();
     renderSubregionChips();
-    renderList();
     renderSuggestions();
     updateTotal();
-    if (mstate.file && allFiles().includes(mstate.file)) openFile(mstate.file, false);
+    // Within a session, coming back to the tab finds it as it was left.
+    if (mstate.view === 'map' && mstate.file && allFiles().includes(mstate.file)) openFile(mstate.file, false);
+    else showList(false);
   }
 
   function updateTotal() {
@@ -474,6 +630,7 @@ const Maps = (function () {
     const files = filteredFiles();
     if (titleEl) titleEl.textContent = mstate.region + (mstate.subregion !== '_all' ? ' · ' + mstate.subregion : '');
     if (countEl) countEl.textContent = `${files.length} / ${rawFiles().length}`;
+    renderCatalogue(files);
     if (!files.length) {
       el.innerHTML = `<li class="maps-file"><div class="maps-file-name small">No maps match “${esc(mstate.query)}”.</div></li>`;
       return;
@@ -495,6 +652,115 @@ const Maps = (function () {
              ><span aria-hidden="true">↗</span><span class="sr-only">Open ${esc(f)} in a new tab</span></a>
         </div></li>`;
     }).join('');
+  }
+
+  // The right pane while no map is open: the same list as renderList(), one
+  // row per map with what is known about it. The name is the row's one
+  // control — its ::after covers the row, so the thumbnail and the facts
+  // open the map too without forty extra tab stops; the new-tab link sits
+  // above that cover.
+  function renderCatalogue(files) {
+    const el = document.getElementById('maps-cat-list');
+    if (!el) return;
+    el.dataset.layout = mstate.layout;
+    const sugg = suggestedMaps();
+    const total = allFiles().length;
+    const sub = document.getElementById('maps-current-path');
+    if (sub && mstate.view === 'list') {
+      const where = [mstate.region !== 'All files' ? mstate.region : '',
+                     mstate.subregion !== '_all' ? mstate.subregion : '',
+                     mstate.query.trim() ? `“${mstate.query.trim()}”` : ''].filter(Boolean).join(' · ');
+      sub.textContent = (files.length === total && !where ? `All ${total} maps` : `${files.length} of ${total} maps`)
+        + (where ? ' · ' + where : '')
+        + (sugg.size ? ' · maps suggested for a station first' : '');
+    }
+    if (!files.length) {
+      el.innerHTML = `<li class="maps-cat-empty">
+        <p>No maps match${mstate.query.trim() ? ` “${esc(mstate.query.trim())}”` : ''}${
+          mstate.region !== 'All files' ? ` in ${esc(mstate.region)}` : ''}.</p>
+        <button onclick="Maps.clearFilters()">Clear the search and show every region</button></li>`;
+      return;
+    }
+    el.innerHTML = files.map(f => catalogueRow(f, sugg.get(f))).join('');
+  }
+
+  function catalogueRow(f, sug) {
+    const info = (MD && MD.FILE_INFO[f]) || {};
+    const meta = META[f] || {};
+    const region = fileRegion(f);
+    const sub = fileSubregion(f);
+    const colour = (region && REGION_VAR[region]) || 'var(--muted)';
+    const facts = [];
+    const catchments = catchmentNames(info.catchments);
+    if (catchments.length) facts.push([catchments.length > 1 ? 'Catchments' : 'Catchment', catchments.join(', ')]);
+    const nets = networkNames(info.networks);
+    if (nets.length) facts.push([nets.length > 1 ? 'Radio networks' : 'Radio network', nets.join(', ')]);
+    const places = placeNames(info);
+    if (places.length) facts.push(['Places', places.join(', ')]);
+    facts.push(['Sheet', sheetFacts(f)]);
+    const tags = fileTags(f).slice(1);   // the extension is already in "Sheet"
+    if (f === mstate.lastOpened && f !== mstate.file) tags.push('last opened here');
+    const why = sug
+      ? `<p class="maps-cat-why">Suggested for ${sug.stations.slice(0, 3).map(s =>
+          `<strong>${esc(s.name)}</strong> — ${esc(s.reasons.join('; '))}`).join('<br>')}${
+          sug.stations.length > 3 ? `<br>and ${sug.stations.length - 3} more` : ''}</p>`
+      : '';
+    const thumb = meta.thumb
+      ? `<img src="${esc(encRel(meta.thumb))}" alt="" width="${meta.tw}" height="${meta.th}"
+           loading="lazy" decoding="async">`
+      : `<span class="maps-cat-nothumb">${esc(ext(f))}</span>`;
+    const open = f === mstate.file;
+    return `<li class="maps-cat-row${open ? ' selected' : ''}${sug ? ' suggested' : ''}"
+        style="--region:${colour}"${open ? ' aria-current="true"' : ''}>
+      <div class="maps-cat-main">
+        <h3 class="maps-cat-name"><button class="maps-cat-open" data-file="${esc(f)}"
+          onclick="Maps.openFile('${escAttr(f)}')">${esc(f)}<span class="sr-only"> — open in the viewer</span></button></h3>
+        <div class="maps-cat-where"><span class="maps-chip-dot" style="--dot:${colour}"></span>${
+          esc(region || 'Unfiled')}${sub ? ` › ${esc(sub)}` : ''}</div>
+        ${why}
+        <dl class="maps-cat-facts">${facts.map(([k, v]) =>
+          `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+        <div class="maps-cat-foot">
+          ${tags.map(t => `<span class="badge maps-badge">${esc(t)}</span>`).join('')}
+          <a class="maps-cat-newtab" href="${encPath(f)}" target="_blank" rel="noopener"
+            >New tab <span aria-hidden="true">↗</span><span class="sr-only"> — open ${esc(f)} in a new tab</span></a>
+        </div>
+      </div>
+      <div class="maps-cat-thumb${meta.thumb ? '' : ' empty'}" data-orient="${esc(meta.orient || '')}">${thumb}</div>
+    </li>`;
+  }
+
+  // Which of the two the right pane is showing, and the toolbar to match.
+  function setMode(view) {
+    mstate.view = view;
+    const list = view === 'list';
+    const toggle = (id, show) => { const el = document.getElementById(id); if (el) el.hidden = !show; };
+    toggle('maps-catalogue', list);
+    toggle('maps-cat-tools', list);
+    toggle('maps-viewer', !list);
+    toggle('maps-view-tools', !list);
+    const layout = document.querySelector('.maps-layout');
+    if (layout) layout.dataset.view = view;
+    const title = document.getElementById('maps-current-file');
+    if (title && list) title.textContent = 'Map catalogue';
+  }
+
+  // Back from the viewer. `focusRow` only when somebody pressed Back: a filter
+  // change also lands here, and must not take focus out of the search box.
+  function showList(focusRow = true) {
+    const wasMap = mstate.view === 'map';
+    setMode('list');
+    const host = document.getElementById('maps-viewer');
+    if (host) host.innerHTML = '';     // stop the PDF, free its memory
+    renderList();
+    if (!focusRow || !wasMap) return;
+    const btn = [...document.querySelectorAll('#maps-cat-list .maps-cat-open')]
+      .find(b => b.dataset.file === mstate.file);
+    if (btn) {
+      btn.focus({ preventScroll: true });
+      btn.closest('li').scrollIntoView({ block: 'center' });
+    }
+    announce(`Map catalogue, ${filteredFiles().length} maps`);
   }
 
   function renderSuggestions() {
@@ -526,21 +792,50 @@ const Maps = (function () {
   }
 
   // ── actions ───────────────────────────────────────────────────────────────────
+  // A filter is a question about the list, so changing one while a map is
+  // open goes back to the list (without taking focus from the control).
+  function filtersChanged() {
+    if (mstate.view === 'map') showList(false);
+    else renderList();
+  }
   function setRegion(region) {
     mstate.region = region;
     mstate.subregion = '_all';
-    localStorage.setItem('mn-maps-region', region);
-    localStorage.setItem('mn-maps-sub', '_all');
-    renderRegionChips(); renderSubregionChips(); renderList(); applyRegionHighlight();
+    renderRegionChips(); renderSubregionChips(); applyRegionHighlight();
+    filtersChanged();
   }
   function setSubregion(sub) {
     mstate.subregion = sub;
-    localStorage.setItem('mn-maps-sub', sub);
-    renderSubregionChips(); renderList();
+    renderSubregionChips();
+    filtersChanged();
   }
   function onSearch(v) {
     mstate.query = v;
-    renderList(); renderSuggestions();
+    renderSuggestions();
+    filtersChanged();
+  }
+  function clearFilters() {
+    mstate.query = '';
+    const input = document.getElementById('maps-search');
+    if (input) input.value = '';
+    renderSuggestions();
+    setRegion('All files');
+    announce(`Showing all ${allFiles().length} maps`);
+  }
+  function setSort(v) {
+    if (!SORTS[v]) return;
+    mstate.sort = v;
+    localStorage.setItem('mn-maps-sort', v);
+    renderList();
+  }
+  function setLayout(v) {
+    if (!LAYOUTS[v]) return;
+    mstate.layout = v;
+    localStorage.setItem('mn-maps-layout', v);
+    document.querySelectorAll('.maps-layout-toggle button').forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.layout === v)));
+    const el = document.getElementById('maps-cat-list');
+    if (el) el.dataset.layout = v;
   }
   // A4/A3 (and every ISO A-series) page shares a 1:√2 ratio — used as the
   // viewer's default shape until a file's real page size is known.
@@ -584,15 +879,19 @@ const Maps = (function () {
   }
 
   function openFile(file, scroll = true) {
+    const fromList = mstate.view === 'list';
     mstate.file = file;
+    mstate.lastOpened = file;
     localStorage.setItem('mn-maps-file', file);
+    setMode('map');
     const host = document.getElementById('maps-viewer');
     const nameEl = document.getElementById('maps-current-file');
     const pathEl = document.getElementById('maps-current-path');
     const linkEl = document.getElementById('maps-newtab');
     const path = encPath(file);
+    const region = fileRegion(file), sub = fileSubregion(file);
     if (nameEl) nameEl.textContent = file;
-    if (pathEl) pathEl.textContent = path;
+    if (pathEl) pathEl.textContent = [region, sub].filter(Boolean).join(' › ') + ' · ' + sheetFacts(file);
     // Hidden until there is somewhere to go: an <a> with no href is not a link
     // at all, so before the first map opened this was a tab stop that read as
     // "Open in new tab" and did nothing.
@@ -601,29 +900,43 @@ const Maps = (function () {
       linkEl.hidden = false;
       linkEl.setAttribute('aria-label', 'Open ' + file + ' in a new tab');
     }
+    // The page's shape is in FILE_META; reading it out of the PDF is the
+    // fallback for a map the thumbnail tool has not seen yet.
+    const known = (META[file] || {}).aspect;
     if (host) {
       if (isImage(file)) {
         host.innerHTML = `<img class="maps-view-img" alt="${escAttr(file)}" src="${path}">`;
-        setViewerAspect(null);
+        setViewerAspect(known || null);
         const img = host.querySelector('img');
-        if (img) img.addEventListener('load', () => {
+        if (img && !known) img.addEventListener('load', () => {
           if (mstate.file === file && img.naturalWidth && img.naturalHeight) {
             setViewerAspect(img.naturalWidth / img.naturalHeight);
           }
         }, { once: true });
       } else {
         host.innerHTML = `<iframe class="maps-view-frame" src="${path}#view=FitH" title="${escAttr(file)}"></iframe>`;
-        setViewerAspect(pdfAspectCache.get(file) || A4_RATIO);
-        loadPdfAspect(file, path);
+        setViewerAspect(known || pdfAspectCache.get(file) || A4_RATIO);
+        if (!known) loadPdfAspect(file, path);
       }
     }
     renderList();
     // The viewer is an <iframe> or an <img>, neither of which says anything on
     // its own — and on a phone it is below the fold. Announced only when the
-    // user asked for it: the restore-from-localStorage call passes scroll=false
-    // and is not the result of anything anybody just did (rule 1).
-    if (scroll) announce('Opened ' + file);
-    if (scroll && host) host.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    // user asked for it: the restore call from init() passes scroll=false and
+    // is not the result of anything anybody just did (rule 1).
+    if (!scroll) return;
+    announce('Opened ' + file);
+    // From the catalogue, the button that was pressed has just been hidden
+    // with the list; focus goes to the map's name rather than to <body>, and
+    // the pane's top comes back into view if the list had scrolled past it.
+    if (fromList && nameEl) {
+      nameEl.setAttribute('tabindex', '-1');
+      nameEl.focus({ preventScroll: true });
+      const panel = nameEl.closest('.maps-viewer-panel');
+      if (panel && panel.getBoundingClientRect().top < 0) panel.scrollIntoView({ block: 'start' });
+    } else if (host) {
+      host.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
   }
   function step(delta) {
     const files = filteredFiles();
@@ -632,6 +945,7 @@ const Maps = (function () {
     openFile(files[(i + delta + files.length) % files.length]);
   }
 
-  return { render, init, setRegion, setSubregion, onSearch, openFile, step };
+  return { render, init, setRegion, setSubregion, onSearch, clearFilters, setSort, setLayout,
+           openFile, showList, step };
 })();
 
