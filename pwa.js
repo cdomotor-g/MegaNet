@@ -80,9 +80,16 @@ const Pwa = (function () {
         <button type="button" class="primary" data-pwa="reload">Reload now</button>
         <button type="button" data-pwa="later">Later</button>
       </div>`;
+    // The notes at the foot of the window (toast.js) stand above the bar
+    // while it is up, never over its buttons: --pwa-lift is its height.
+    const root = document.documentElement;
+    const lift = () => root.style.setProperty('--pwa-lift', `${el.offsetHeight + 8}px`);
+    const away = () => { el.remove(); root.style.removeProperty('--pwa-lift'); window.removeEventListener('resize', lift); };
     el.querySelector('[data-pwa="reload"]').addEventListener('click', () => location.reload());
-    el.querySelector('[data-pwa="later"]').addEventListener('click', () => el.remove());
+    el.querySelector('[data-pwa="later"]').addEventListener('click', away);
     document.body.appendChild(el);
+    lift();
+    window.addEventListener('resize', lift);
   }
 
   return { start, check, offer, wanted };

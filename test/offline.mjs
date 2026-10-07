@@ -221,6 +221,12 @@ async function main() {
     await page.waitForFunction(() => !!state.data, null, { timeout: LOAD_TIMEOUT });
     // A data file the site changes under the same name, with no new stamp.
     const acmaBefore = await fetchText(page, ACMA.slice(1));
+    // The copy is written beside the answer, not before it: the site changes
+    // once there is one to be wrong about.
+    for (const end = Date.now() + 5_000; Date.now() < end;) {
+      if (await page.evaluate(u => caches.match(u).then(Boolean), `${server.origin}${ACMA}`)) break;
+      await page.waitForTimeout(100);
+    }
     refreshed = true;
     const acmaAfter = await fetchText(page, ACMA.slice(1));
     check('a data file the site changes without a new stamp is the network\'s, not a kept copy\'s',
@@ -278,6 +284,17 @@ async function main() {
     await page.waitForTimeout(1500);
     check('…and is not reloaded under its author: it is the same page, still the old version, until somebody says',
       await page.evaluate(v => APP_VERSION === v && !!document.getElementById('pwa-update'), STAMP));
+    // A note that stays (a failure) while the bar is up stands above it.
+    const stack = await page.evaluate(() => {
+      Toast.failed('A note for the check, while the bar is up.');
+      const t = document.querySelector('#toasts .toast'), b = document.getElementById('pwa-update');
+      const tr = t && t.getBoundingClientRect(), br = b.getBoundingClientRect();
+      const out = { toastBottom: tr && Math.round(tr.bottom), barTop: Math.round(br.top) };
+      Toast.clear();
+      return out;
+    });
+    check('…and a note shown while it is up stands above it, not over its buttons',
+      stack.toastBottom != null && stack.toastBottom <= stack.barTop, J(stack));
     await page.click('#pwa-update [data-pwa="reload"]');
     await page.waitForFunction(v => typeof APP_VERSION !== 'undefined' && APP_VERSION === v, NEXT, { timeout: LOAD_TIMEOUT });
     await page.waitForFunction(() => !!state.data, null, { timeout: LOAD_TIMEOUT });

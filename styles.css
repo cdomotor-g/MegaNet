@@ -9843,7 +9843,9 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 .toasts {
   position: fixed;
   left: 50%;
-  bottom: max(1rem, env(safe-area-inset-bottom));
+  /* --pwa-lift: the height of pwa.js's newer-version bar while it is up, so a
+     note stands above it rather than over its buttons (#213). */
+  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + var(--pwa-lift, 0px));
   transform: translateX(-50%);
   z-index: 2200;
   display: grid;
