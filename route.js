@@ -12,6 +12,15 @@
 // of leaving the app. Until this, the address never changed: every link
 // opened on Stations, a reload lost your place, and back left the site.
 //
+// Station Health names its station the same way (#218) —
+//
+//   ?tab=health&station=gatton_al
+//
+// — which is where a station card's health lines send you, so that view is
+// an address too. The tab holds it until its week of readings has been worked
+// out (Health.wantStation, Health.picked), and nothing else changes: a
+// station picked there replaces the step rather than adding one.
+//
 // ── The query string, not the fragment ──────────────────────────────────────
 // The site is behind Cloudflare Access, and a signed-out visitor is sent
 // through a sign-in page that only ever sees the path and the query. A
@@ -52,7 +61,8 @@
 // Exposes: start, sync, tabChanged, stationShown, attach, afterLoad, read,
 //          href, copyLink, newDevice, firstVisit.
 // Requires: core.js (state, TAB_LIST, announce, copyToClipboard), app.js
-//           (switchTab, showStationCard, closeStnCard), map-leader.js.
+//           (switchTab, showStationCard, closeStnCard), map-leader.js, and
+//           health.js (Health.picked, Health.wantStation) — all at call time.
 
 const Route = (() => {
   const TAB_KEY = 'mn-tab';           // the last tab used on this device
@@ -106,6 +116,11 @@ const Route = (() => {
     };
   }
 
+  // The station Station Health has open, or is holding for its readings.
+  const healthStation = () => (typeof Health !== 'undefined' && Health.picked ? Health.picked() : null);
+  // …and the address handing it one (or none) to hold.
+  const healthWant = id => { if (typeof Health !== 'undefined' && Health.wantStation) Health.wantStation(id); };
+
   // The Stations map's view, while there is one to give.
   function mapView() {
     if (state.activeTab !== 'stations' || !state.map) return null;
@@ -129,6 +144,10 @@ const Route = (() => {
         : (mapView() || (pending && pending.map) || null);
       if (station) mine.push('station=' + enc(station));
       if (map) mine.push('map=' + enc(fmtMap(map)));
+    }
+    if (tab === 'health') {
+      const station = over.station !== undefined ? over.station : healthStation();
+      if (station) mine.push('station=' + enc(station));
     }
     const theirs = (location.search || '').replace(/^\?/, '').split('&')
       .filter(p => p && !/^(tab|station|map)(=|$)/.test(p));
@@ -244,6 +263,8 @@ const Route = (() => {
     let tab = want.tab || (want.station || want.map ? 'stations' : null);
     if (!tab && /^#wb/.test(location.hash || '')) tab = 'workbench';
     if (!tab) return;                 // a step from before the app named one
+    // Before the switch, so the tab is drawn on the station the step named.
+    if (tab === 'health') healthWant(want.station);
     if (tab !== state.activeTab) {
       applying++;
       try { switchTab(tab); } finally { applying--; }
@@ -284,6 +305,8 @@ const Route = (() => {
     if (state.activeTab === 'stations' && (want.station || want.map)) {
       pending = { station: want.station, map: want.map };
     }
+    // Station Health holds a named station itself, until its week is in.
+    if (state.activeTab === 'health' && want.station) healthWant(want.station);
     window.addEventListener('popstate', onPop);
     sync();
   }

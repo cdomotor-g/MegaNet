@@ -4458,6 +4458,18 @@ function mapDisplayControlsHtml() {
              onchange="state.mapRelated=this.checked;stationsFilterChanged()">
       Include related repeaters
     </label>
+    <!-- Colour pins by health (#218): every pin OK, watch, fault or no data,
+         by when the station was last heard and — for one whose card has been
+         opened — by what its readings say. Off by default and remembered: it
+         costs one request a load, and an operator who turns it on wants the
+         map that way. The note under it says how many of each, and when. -->
+    <label class="filter-check"
+           title="Colour every station pin by its health instead of its role: OK, watch, fault or no data — by when Flood-Net last heard it, and by what its readings say once its card has been opened. Bigger is worse, and the ring says it again. One request for the whole network.">
+      <input type="checkbox" ${state.mapHealth ? 'checked' : ''}
+             onchange="HealthGlance.setPins(this.checked)">
+      Colour pins by health
+    </label>
+    <p class="filter-note" id="map-health-note">${HealthGlance.noteHtml()}</p>
     <label class="filter-check">
       <input type="checkbox" ${state.mapShowLinks ? 'checked' : ''}
              onchange="state.mapShowLinks=this.checked;rerenderMapDisplayControls();refreshMapLayers()">
@@ -4888,6 +4900,7 @@ function mapLinkNoteHtml() {
 // layer is switched.
 function mapLegendOffLayersHtml() {
   const off = [
+    !state.mapHealth          && 'Pins coloured by health',
     !state.mapElev            && 'Elevation shading',
     !state.mapSurvey          && 'Survey marks',
     !state.mapRivers          && 'River highlighting',
@@ -4994,8 +5007,13 @@ function mapWindLegendHtml() {
 }
 
 function mapLegendHtml() {
+  // With Colour pins by health on (#218) the fills are health, not role, so
+  // the role rows give way to its key — and a proposed station, hollow in a
+  // dashed ring of its role's colour, is a no-data pin like any other unheard
+  // one, so its row goes too.
+  const health = state.mapHealth;
   return `
-    ${Object.entries(ROLE_LABEL).map(([k, v]) => `
+    ${health ? HealthGlance.legendHtml() : Object.entries(ROLE_LABEL).map(([k, v]) => `
       <span class="legend-item">
         <span class="legend-dot" style="--dot:${roleVar(k)}"></span>
         <span class="small">${v}</span>
@@ -5010,10 +5028,10 @@ function mapLegendHtml() {
     </span>
     <!-- A proposed station (0039): hollow, in a dashed ring of its role's
          colour — planned, not built. -->
-    <span class="legend-item">
+    ${health ? '' : `<span class="legend-item">
       <span class="legend-dot legend-dot-proposed" style="--dot:${roleVar('field')}"></span>
       <span class="small">Proposed — not yet established</span>
-    </span>
+    </span>`}
     <!-- The plain link colour. With a colouring running it is not what a link
          normally looks like any more — it is what is left for the ones the
          colouring has no answer for — so the entry says which of the two it is
@@ -5584,6 +5602,9 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // frequency palette is dropped so a theme switch, which refreshes the map,
   // re-reads the tokens once instead of once per drawn link.
   MapFreq.reset();
+  // With Colour pins by health on (#218), the moment the one batch a load
+  // costs is asked for — or asked again, once it is stale (health-glance.js).
+  HealthGlance.reset();
 
   const located  = state.data.stations.filter(s => s.lat != null && s.lon != null);
   const active   = mapFilterActive();
@@ -5770,24 +5791,36 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     // in its role's colour — the way a map marks something planned rather than
     // built, and it keeps that ring's dashes whatever else rings it.
     const proposed = !!s.proposed;
+    // Colour pins by health (#218): the fill is the station's health, and the
+    // size and the ring say it again — bigger is worse, a dashed ring to
+    // watch, a heavy one at fault, hollow in a dotted ring for no data. A
+    // filter's or a pass range's ring still wins the ring; the size and the
+    // hollow carry the health through it. Null with the switch off, and
+    // until the one batch a load costs has answered. A lookup, not a
+    // judgement: HealthGlance works every class out when an answer lands.
+    const hg = HealthGlance.pinStyle(s);
+    const hgRadius = hg ? Math.max(3, radius + hg.grow) : radius;
     const base = {
-      radius,
-      color:       hit ? MAP_PIN_HIT : rel ? MAP_PIN_REL : proposed ? color : MAP_PIN_RING,
-      weight:      hit || rel || proposed ? 3 : 2,
-      dashArray:   rel ? '4,3' : proposed ? MAP_PIN_PROPOSED_DASH : null,
+      radius:      hgRadius,
+      color:       hit ? MAP_PIN_HIT : rel ? MAP_PIN_REL : hg ? hg.ring : proposed ? color : MAP_PIN_RING,
+      weight:      hit || rel ? 3 : hg && hg.weight ? hg.weight : proposed ? 3 : 2,
+      dashArray:   rel ? '4,3' : hg ? hg.dash : proposed ? MAP_PIN_PROPOSED_DASH : null,
       opacity:     dim ? 0.6 : 1,
       fillOpacity: dim ? 0.45 : 1,
     };
     const marker = L.circleMarker([s.lat, s.lon], {
       ...base,
-      fillColor:   proposed ? MAP_PIN_PROPOSED_FILL : color,
+      fillColor:   hg ? hg.fill : proposed ? MAP_PIN_PROPOSED_FILL : color,
       className:   hit ? 'mn-pin mn-pin-hit' : rel ? 'mn-pin mn-pin-rel' : 'mn-pin',
       bubblingMouseEvents: false,          // a pin click is not an empty-map click
     }).addTo(map);
     marker.mnStationId = s.id;             // lets the table below find its pin
     marker.mnStation   = s;                // and lets labels be re-picked on pan
-    marker.mnRadius    = radius;
+    marker.mnRadius    = hgRadius;
     marker.mnBaseStyle = base;
+    // Its health class while the pins wear it (#218), or null: what the map's
+    // name and test/healthcard.mjs read, the canvas having no DOM to ask.
+    marker.mnHealth    = hg ? hg.cls : null;
     // The classification, not just its numbers — the canvas renderer draws no
     // DOM node for a className to land on, but the name label is real DOM in
     // the tooltip pane, and applyMapLabels dims it off this flag.
@@ -5869,6 +5902,9 @@ function updateMapAltName(pins, links, backbone, matched, related) {
   }
   if (links)    bits.push(`${links} pass-range link${links === 1 ? '' : 's'}`);
   if (backbone) bits.push(`${backbone} backbone path${backbone === 1 ? '' : 's'}`);
+  // With Colour pins by health on, the headline is the health (#218).
+  const health = HealthGlance.altText();
+  if (health) bits.push(health);
   el.setAttribute('aria-label', 'Station map — ' + bits.join(', ')
     + '. The same stations are listed in the table below.');
 }
@@ -6983,6 +7019,9 @@ function repaintStnCard() {
   if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
   // And the station's history (station-history.js).
   if (typeof StationHistory !== 'undefined') StationHistory.cardAsk(s);
+  // Its health (#218): one request for its readings, kept per station for a
+  // few minutes, so a repaint asks nothing new (health-glance.js).
+  HealthGlance.ask(s);
   MapLeader.sync();
   // The trail's pill says whether its station's card is up, and its name,
   // which a save may just have changed.
@@ -7246,6 +7285,13 @@ function stnCardHtml(s) {
     <!-- A proposed station says so before anything else on its card (0039):
          nothing below it is about a station on the ground yet. -->
     ${stnCardProposalHtml(s)}
+    <!-- Its health (#218), next under its name because it is the line somebody
+         standing at the site came to the card for: when it was last heard, its
+         battery's night lows and what is wrong with it, each a door into the
+         Station Health tab on this station. One request, filled after it by
+         HealthGlance.ask, the way the SLS section is (health-glance.js).
+         Nothing for a proposed station, which has nothing to have heard. -->
+    ${HealthGlance.cardHtml(s)}
     <div class="acma-sect">
       <!-- Who owns it, first and always — "Not recorded" where nobody is on
            record (stnCardOwnerHtml). The SLS section below quotes the

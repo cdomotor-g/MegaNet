@@ -3131,6 +3131,41 @@ hr {
 .stn-card-exp-foot { margin: .3rem 0 0; overflow-wrap: anywhere; }
 .stn-card-exp-retry { margin-top: var(--sp-1); }
 
+/* The station's health on its card (#218, health-glance.js): the label/value
+   rows of the sections under it, under a heading that carries the station's
+   class — the class its pin wears, by construction — as a glyph and a word as
+   well as a colour. Each value is a door into Station Health, so it is a
+   .link-btn; it keeps the row's right alignment and wraps, because a finding's
+   title is a sentence and at 375 px an unbroken one would push the card
+   sideways. Tokens only; nothing here has a colour of its own. */
+.stn-card-health-body { display: block; }
+.hg-badge { font-weight: 600; margin-left: .3rem; white-space: nowrap; }
+.stn-card-health .hg-go { text-align: right; overflow-wrap: anywhere; }
+.hg-sev { margin-right: .1rem; }
+.stn-card-health-more { margin-top: .25rem; }
+.stn-card-health-more > summary { cursor: pointer; color: var(--muted); }
+.stn-card-health-list {
+  margin: .2rem 0 0;
+  padding-left: 1.1em;
+  font-size: .8rem;
+  overflow-wrap: anywhere;
+}
+.stn-card-health-list li + li { margin-top: .3rem; }
+.stn-card-health-list .small { display: block; }
+.hg-action { color: var(--muted); }
+
+/* The key to Colour pins by health, in the 🔑 legend: each swatch the pin's
+   second channel as well as its hue — bigger is worse, the ring dashed to
+   watch and heavy at fault, no data hollow in a dotted ring — because colour
+   is never the only channel. The ring is the map's black, as on the pins,
+   drawn against the swatch's own fill, so it reads on either theme's panel;
+   the fills are the status tokens, as the role key's are the role tokens. */
+.hg-key { box-sizing: border-box; display: inline-block; flex: none; border-radius: 999px; }
+.hg-key--ok     { width: 10px; height: 10px; background: var(--ok); }
+.hg-key--watch  { width: 14px; height: 14px; background: var(--warn); border: 2px dashed var(--map-backbone); }
+.hg-key--fault  { width: 18px; height: 18px; background: var(--bad); border: 3px solid var(--map-backbone); }
+.hg-key--nodata { width: 9px; height: 9px; background: var(--panel); border: 2px dotted var(--muted); }
+
 /* Manual, as a pill. The one fact in that block that changes what a person
    does: a gauge read by hand reports nothing over the radio, so silence from it
    is not a telemetry fault to go chasing. Amber rather than red — it is a

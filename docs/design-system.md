@@ -265,6 +265,22 @@ convention, and the one thing the tag, the band and the pin all share. The
 text holds `--warn`'s own contrast on its tint in both themes, the tint being
 12% of the same token over `--panel`.
 
+**A health pin is a status colour with a second channel** (#218,
+`health-glance.js`). *Colour pins by health* fills each Stations-map pin OK,
+watch, fault or no data with `--ok`, `--warn` and `--bad`'s light values — as
+literals, for `ROLE_COLOR`'s reason: they are Leaflet path options, and the base
+maps do not go dark with the app — while the legend's key takes the tokens on
+the panel, as the role key does. What carries the class without the colour is
+the size and the ring: bigger is worse (as on the Station Health tab's own map),
+a watch in a dashed ring, a fault in a heavy one, both black, and no data hollow
+in a dotted grey ring. **The ring is black because a dash has to show against
+the tiles** — the white ring every pin wears made a dash pattern invisible over
+the topo base. And **a dash has to outlive the round caps**: Leaflet strokes with
+`lineCap: round`, which lengthens every dash by half the weight at each end, so
+a gap no wider than the weight closes — `3,2` at weight 2 drew a solid ring;
+`2,4` draws dashes. A filter's or the selection's ring still wins the ring, being
+what somebody is doing now; the size and the hollow carry the class through it.
+
 ---
 
 ## 2. Breakpoints

@@ -98,6 +98,12 @@ const Health = (() => {
     A: null,                 // HealthAnalysis.run() result
     cat: 'all', showInfo: false,
     sel: null,               // the station open below
+    // A station asked for from another tab (showStation — the Stations card's
+    // health lines, #218), held until the analysis is in hand: { id, part }.
+    want: null,
+    // …and one asked for that the window holds nothing from: said so in the
+    // station panel rather than dropped in silence.
+    missing: null,
     lens: null,              // { id, t, kind: 'slot'|'reading', addr }
     map: null, layer: null,
     insp: new Map(),         // station id -> { visits, power } | 'loading' | { error }
@@ -263,7 +269,14 @@ const Health = (() => {
         if (typeof recordError === 'function') recordError({ kind: 'health', message: H.error, where: '', stack: (err && err.stack) || '' });
       }
       if (H.sel && (!H.A || !H.A.stations.has(H.sel))) { H.sel = null; H.lens = null; }
+      // One that was not heard in the last window is looked for again in this
+      // one — a longer window, pressed from the panel that said so.
+      if (H.missing && !H.want) H.want = { id: H.missing, part: null };
+      // A station another tab asked for lands now that there is an analysis
+      // to find it in: picked before the page is drawn, so it is drawn once.
+      const landing = takeWant();
       rerender();
+      if (landing) { focusPart(landing.part); syncRoute(); }
       if (H.A && !H.demo) announce(`Station health worked out from ${H.rows.length.toLocaleString()} readings: ${H.A.counts.attention} need attention.`);
       if (typeof HealthAgent !== 'undefined' && HealthAgent.dataChanged) HealthAgent.dataChanged();
     }, 30);
@@ -273,7 +286,7 @@ const Health = (() => {
     const w = HealthAnalysis.demoWorld();
     H.seq++;                       // a fetch still in flight must not land over it
     H.demo = true;
-    H.sel = null; H.lens = null;
+    H.sel = null; H.lens = null; H.want = null; H.missing = null;
     adopt(w.rows, { t0: w.t0, t1: w.t1, now: w.now });
   }
 
@@ -660,6 +673,23 @@ const Health = (() => {
 
   function stationHtml() {
     const S = H.sel && H.A && H.A.stations.get(H.sel);
+    // Asked for from another tab, and not in this window: said, with the way
+    // to a longer one and back to the station, rather than the placeholder.
+    const gone = !S && H.missing && H.A ? stationById(H.missing) : null;
+    if (gone) {
+      const w = WINDOWS.find(x => x[0] === H.win);
+      const longer = WINDOWS.filter(x => x[2] > (w ? w[2] : 7));
+      return `<div class="panel-header"><h3 id="hl-h-stn">${esc(gone.name)}</h3>
+          <span class="hl-sev txt-muted"><span aria-hidden="true">○</span> Not heard in this window</span></div>
+        <p class="small">Nothing from ${esc(gone.name)} in ${H.demo ? 'the demo week' : `the last ${esc(w ? w[1] : 'window')}`}, so there is
+          nothing here to work out. Its card on the Stations tab says when Flood-Net last heard it${longer.length && !H.demo
+            ? `, and a longer window may reach back to it` : ''}.</p>
+        <div class="button-group hl-stn-links">
+          ${!H.demo ? longer.map(([k, label]) => `<button class="ghost" onclick="Health.setWin('${k}')">Look back ${esc(label)}</button>`).join('') : ''}
+          <button class="ghost" onclick="goToStation('${escAttr(gone.id)}')">Show on the Stations tab</button>
+          <button class="ghost" onclick="Health.close()">Close</button>
+        </div>`;
+    }
     if (!S) {
       return `<div class="panel-header"><h3 id="hl-h-stn">A station</h3></div>
         <p class="small hl-empty">Pick a station — from Needs attention, the map, or Check signals — to see its check schedule slot by slot,
@@ -685,7 +715,7 @@ const Health = (() => {
         <button class="ghost" onclick="Health.openField('${escAttr(st.id)}')" title="Chart its sensors on the Field Data tab">Chart on Field Data</button>
         <button class="ghost" onclick="Health.close()">Close</button>
       </div>
-      ${S.findings.length ? `<h4>Findings</h4><ul class="hl-flist">${S.findings.map(f => `<li>${sevHtml(f.severity)} <b>${esc(f.title)}</b>
+      ${S.findings.length ? `<h4 id="hl-h-stnf">Findings</h4><ul class="hl-flist">${S.findings.map(f => `<li>${sevHtml(f.severity)} <b>${esc(f.title)}</b>
         <span class="small">${esc(f.detail)}</span>${f.action ? ` <span class="small hl-faction"><span aria-hidden="true">→</span> ${esc(f.action)}</span>` : ''}</li>`).join('')}</ul>` : ''}
       ${sch ? stripHtml(S) : ''}
       <div id="hl-lens">${lensHtml()}</div>
@@ -1138,14 +1168,17 @@ const Health = (() => {
     if (!H.A || !H.A.stations.has(id)) return;
     H.sel = id;
     H.lens = null;
+    H.missing = null;
+    H.want = null;               // a pick here outranks one still on its way
     rerenderStation();
     loadInspections(id);
+    syncRoute();
     const el = document.getElementById('hl-station');
     if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
     const h = document.getElementById('hl-h-stn');
     if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
   }
-  function close() { H.sel = null; H.lens = null; rerenderStation(); }
+  function close() { H.sel = null; H.lens = null; H.missing = null; H.want = null; rerenderStation(); syncRoute(); }
 
   function lensAt(id, t, kind, addr) {
     H.lens = { id, t: Number(t), kind: kind || 'slot', addr: addr || null };
@@ -1226,10 +1259,64 @@ const Health = (() => {
     switchTab('field');
     if (typeof ArroData !== 'undefined' && ArroData.fieldOpenStation) ArroData.fieldOpenStation(id);
   }
-  // From another tab: open this one on a station.
-  function showStation(id) {
-    H.sel = id; H.lens = null;
+  // From another tab: open this one on a station — the Stations card's health
+  // lines (#218, health-glance.js), each at the part of the station it was
+  // about: 'checks' (the slot strip), 'battery' (the chart) or 'findings'.
+  // With the analysis in hand it is picked before the tab is drawn; on the
+  // tab's first visit it is held until the week has been fetched and worked
+  // out (adopt). Either way the view goes to it and focus with it — and a
+  // station the window holds nothing from says so, rather than leaving the
+  // tab looking as though the press did nothing.
+  function showStation(id, part) {
+    if (!id) return;
+    H.want = { id, part: part || null };
+    const landing = takeWant();
     switchTab('health');
+    if (landing) focusPart(landing.part);
+  }
+
+  // The station the tab has open — or was asked for, while the week is still
+  // on its way — for the address bar: ?tab=health&station=<id> (route.js), so
+  // a link into the tab with a station picked is an address like any other,
+  // and a reload keeps it.
+  function picked() { return H.sel || H.missing || (H.want && H.want.id) || null; }
+  // The address naming a station (route.js, before the first render and on
+  // back and forward): held as showStation holds it, without switching tabs —
+  // the router is doing that. No station closes the one that is open.
+  function wantStation(id) {
+    if (!id) {
+      if (H.sel || H.missing || H.want) { H.sel = null; H.missing = null; H.want = null; H.lens = null; rerenderStation(); }
+      return;
+    }
+    if (picked() === id) return;
+    H.want = { id, part: null };
+    if (takeWant()) rerenderStation();
+  }
+  function syncRoute() { if (typeof Route !== 'undefined' && Route.sync) Route.sync(); }
+
+  // H.want → H.sel (heard in this window) or H.missing (not), once there is
+  // an analysis to look in. Returns what was wanted, or null.
+  function takeWant() {
+    const w = H.want;
+    if (!w || !H.A) return null;
+    H.want = null;
+    H.lens = null;
+    if (H.A.stations.has(w.id)) { H.sel = w.id; H.missing = null; }
+    else { H.sel = null; H.missing = w.id; }
+    return w;
+  }
+
+  const PART_HEAD = { checks: 'hl-h-strip', battery: 'hl-h-batt', findings: 'hl-h-stnf' };
+  // The heading of the part asked for, or of the station when it has no such
+  // part (no schedule learned, no battery heard, nothing found): scrolled to
+  // and focused, the way select() does it.
+  function focusPart(part) {
+    if (state.activeTab !== 'health') return;
+    const el = (part && document.getElementById(PART_HEAD[part])) || document.getElementById('hl-h-stn');
+    if (!el) return;
+    el.setAttribute('tabindex', '-1');
+    if (el.scrollIntoView) el.scrollIntoView({ block: 'start' });
+    el.focus({ preventScroll: true });
   }
 
   function exportCsv() {
@@ -1267,7 +1354,10 @@ const Health = (() => {
   }
 
   // What the agent reads. Plain data, not the DOM.
-  function state_() { return { A: H.A, rows: H.rows, sel: H.sel, win: H.win, demo: H.demo, owners: [...H.owners] }; }
+  function state_() {
+    return { A: H.A, rows: H.rows, sel: H.sel, win: H.win, demo: H.demo, owners: [...H.owners],
+             missing: H.missing, want: H.want ? Object.assign({}, H.want) : null };
+  }
   // A station's owner for the agent and the tests: { name, parties, source }, or null.
   function owner(st) {
     const o = ownerOf(st);
@@ -1277,7 +1367,7 @@ const Health = (() => {
   return {
     render, init, stop, run, refresh, demo, adopt,
     setWin, setCat, setInfo, toggleMatrix, select, close, lensAt, lensClose, stripClick,
-    openLog, openAddr, openField, openReception, showStation, exportCsv, fetchReadings,
+    openLog, openAddr, openField, openReception, showStation, picked, wantStation, exportCsv, fetchReadings,
     setOwner, clearOwners, findOwner, owner,
     state: state_,
   };

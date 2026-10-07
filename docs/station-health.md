@@ -188,6 +188,61 @@ address numbers recur across the country.
 | **Address does not read like its sensor** | note | more than half of a "battery" address's readings (4+) are not a 12 V battery | Fix the register: another sensor, or another station, is on this address. |
 | **Not heard at all** | note | registered, enabled stations on repeaters within reach that relayed others' traffic, with not one reading | Confirm whether they are decommissioned, or check them. |
 
+## On a station's card, and its pin
+
+The same rules reach the Stations tab (#218, `health-glance.js`), so somebody
+looking at one station does not have to come here to see that it went quiet on
+Tuesday.
+
+- **The station card** opens with a *Health* section: **Last heard** (when, how
+  long ago, and the check period its readings keep), the **Battery** (last
+  night's low and where the night lows are going), and the **Findings** worst
+  first, every one under a disclosure with its evidence and action. Its class —
+  OK, Watch, Fault or No data — is a glyph and a word beside the colour. Each line
+  opens this tab on the station, at its checks, its battery chart or its
+  findings, and the address says so: `?tab=health&station=<id>`. A station the
+  window holds nothing from is said to be so here, with a longer window one press
+  away.
+- **What the card works out from**: the station's newest readings — its own rows
+  and its own ALERT addresses, the newest 1,000 whatever their age, **one
+  request** — through `HealthAnalysis.run()`, over the last week it was on the air.
+  So the battery, the schedule and the copy rules are this tab's exactly. What
+  one station's readings cannot carry is everything that needs the rest of the
+  network: whether its receivers were listening, its neighbours' rain, a repeater
+  in common. Its silence is said as *Quiet for …*, not *Silent*, and says the
+  receivers are this tab's to weigh. A station with no readings left costs a
+  second, one-row look at `meganet.station_health`, so *never heard* is only said
+  when it is true.
+- **Colour pins by health**, in the Stations map's 🗺️ Map display (off by
+  default): every pin by when the ingest last heard it — `meganet.station_health`,
+  one request for the whole network a load, kept fifteen minutes — and, for a
+  station whose card has been opened, by what its readings say.
+
+| Class | When |
+| --- | --- |
+| **OK** | heard within two of its checks, nothing worse than a note |
+| **Watch** | quiet for two of its checks or more (this tab's bar for *Silent*), or a warning |
+| **Fault** | quiet for four of its checks or a day, whichever is first (this tab's bar for a critical silence), or a critical finding |
+| **No data** | never heard; heard across less than two of its checks with no schedule learned — too seldom to say it is overdue (the tab's *no schedule learned*); or the datastore could not be asked — never *OK* for want of an answer |
+
+A check is the station's own period once its card has been opened; until then it
+is taken as three hours, and a fault waits a whole day. How long a station has
+been heard comes from its card's oldest reading and from `station_health.since`,
+which on a row the HTTP ingest keeps (`online` null) never moves after the row is
+made — so it is when the station was first heard. Of the 503 stations the ingest
+had heard when this was built, 115 had been heard exactly once; without this rule
+ninety of them were red.
+
+On the map bigger is worse, as on this tab's map, and the ring says it again —
+dashed and black to watch, heavy and black at fault, hollow and dotted for no
+data — so the class never rests on colour alone.
+
+When the server works findings out itself (#215), the card and the pins read its
+open findings instead: `SOURCE.station` and `SOURCE.network` in
+`health-glance.js` (its header says how) are the whole of that swap, with the quiet rule
+(`quietFinding`) giving way to the server's own *silent past its interval*.
+`npm run healthcard` holds all of it.
+
 ## Limits
 
 - It reads only what the datastore holds: raw readings age out at about 90 days,

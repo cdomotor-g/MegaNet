@@ -373,6 +373,15 @@ const HELP = {
       + '<strong>🔗 Copy link</strong> on a station\'s card copies one. Back and forward move between '
       + 'the tabs and the stations you opened; moving the map is not a step, so back never replays '
       + 'your pans. A link opens the station\'s card without selecting it — the card\'s own pills do that.',
+      '<strong>A station\'s card opens with its health</strong> — when it was last heard, its battery\'s '
+      + 'night lows and where they are going, and what is wrong with it, worst first — and each line opens '
+      + 'the <strong>Station Health</strong> tab on that station, at that part of it. Its class, OK, Watch, '
+      + 'Fault or No data, is a word as well as a colour, and a datastore that cannot answer is No data, '
+      + 'never OK — as is a station heard only once, or too briefly to show a rhythm, whose silence says '
+      + 'nothing yet. <strong>Colour pins by health</strong>, in 🗺️ Map display, colours every pin the same '
+      + 'way — by when Flood-Net last heard it, and by what its readings say once its card has been '
+      + 'opened — for one request for the whole network. Bigger is worse, and the ring says it again: '
+      + 'dashed to watch, heavy at fault, hollow for no data.',
       '<strong>From zoom 17 the map offers the station\'s digital twin</strong> — the ground to '
       + '1 m where the State holds LiDAR, the aerial imagery, the station as built and the radio paths '
       + 'as this map colours them — whenever a station is under the view: the one on the card, the '
@@ -1398,6 +1407,10 @@ const HELP = {
       + 'back together, are reported as the repeater or the area, not as a dozen station faults. One '
       + 'that went at night and came back in daylight is the shape of a solar site that cannot carry '
       + 'itself through the night.',
+      '<strong>A station\'s card on the Stations tab carries the same rules</strong>: when it was last heard, '
+      + 'its battery\'s night lows and its findings, each line opening this tab on that station — its '
+      + 'checks, its battery or its findings — with the address naming it, so that view is a link too. '
+      + 'A station the window holds nothing from is said to be so, with a longer window one press away.',
       '<strong>Readings are public, so this tab needs no sign-in</strong> — and it reads only what the '
       + 'datastore holds: raw readings age out at about 90 days, and a station only one receiver can '
       + 'hear cannot be judged while that receiver is down.',
@@ -2775,6 +2788,13 @@ const state = {
   // MapContours and MapPeaks off until asked for does not apply. An operator
   // who turns them off means it.
   mapArrows:      (localStorage.getItem('mn-map-arrows') || 'on') === 'on',
+  // Colour pins by health (#218, health-glance.js): every station pin OK,
+  // watch, fault or no data in place of its role's colour. Off by default,
+  // because the role colours are how the map has always been read and the
+  // switch costs a request — one, for the whole network, per load — and
+  // remembered, on MapCatchments' terms: an operator who turns it on wants
+  // the map that way next time.
+  mapHealth:      localStorage.getItem('mn-map-health') === 'on',
   // Where green stops being green and yellow stops being yellow, in dB of fade
   // margin. Higher than the link budget card's own bands (10 / 3) on purpose:
   // the card asks "would this link work", the map asks "which of these would I

@@ -372,6 +372,17 @@ jobs:
         working-directory: test
         run: npm run health
 
+      # A station's health on its card and as its pin's colour (#218), against
+      # the demo week through the strict PostgREST stub: last heard, the
+      # battery's night lows and the findings, one request a card; each line a
+      # door into Station Health on that station, the address saying so; Colour
+      # pins by health off by default, one request a load however often the map
+      # is rebuilt, never colour alone; and no data said as no data — refused,
+      # unreachable, never heard — never as OK.
+      - name: A station's health on its card and its pin
+        working-directory: test
+        run: npm run healthcard
+
       - name: Smoke — every tab, clean console
         working-directory: test
         run: npm run smoke

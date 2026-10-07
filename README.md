@@ -164,11 +164,16 @@ MegaNet/
 ├── bug-report.js           ← BugReport — prefilled GitHub issue reporter
 ├── base-stations.js        ← BaseStations — Base Stations tab (every ingest point's
 │                             health; asking a base station that checks in, 0049)
+├── health-glance.js        ← HealthGlance — a station's health where people already
+│                             look (#218): last heard, its battery and its findings on
+│                             its card, each a door into Station Health, and Colour
+│                             pins by health on the Stations map
 ├── site-map.js             ← SiteMap   — Site Map tab (a guide to every other tab,
 │                             and the gold line from each to its button in the nav)
 ├── route.js                ← Route     — where you are, in the address bar: the tab,
-│                             the station whose card is up and the map's view, so a
-│                             view can be linked to and back and forward work (#211)
+│                             the station whose card is up (or Station Health has
+│                             open) and the map's view, so a view can be linked to
+│                             and back and forward work (#211)
 ├── init.js                 ← the only code that runs at load; must stay last
 ├── maps-data.js            ← Radio Path Maps catalogue, QLD basin SVG + georeference
 ├── styles.css              ← the design system, then theme and layout
@@ -666,7 +671,10 @@ see what every receiver and neighbour was doing at that moment. *Ask Claude*
 hands the findings to an agent (Claude Opus 5.5 — on Flood-Net's own key, behind
 Access, for editors and administrators, up to US$20 a day; anyone else on their
 own key) that investigates with tools over the same readings and writes the
-briefing.
+briefing. The
+same rules put a station's last-heard time, battery and findings on its card on
+the Stations map, each a door back into this tab, and can colour every pin by
+health (#218).
 [`docs/station-health.md`](docs/station-health.md) lists every finding, what
 triggers it and what to do. Each page links to the
 other per reading. The log is its rows, so it gets most of a screen: a
@@ -1013,6 +1021,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Pull the repeaters that carry a matched station onto the map and into the table with it (*Include related repeaters*)
 - Toggle individual link lines on/off, fade them with a slider, and cap how long a link may be before it is dropped (*Limit link/path length*)
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
+- **Colour pins by health** — every station OK, watch, fault or no data by when Flood-Net last heard it (and, once its card has been opened, by what its readings say), with its key in the legend; bigger is worse and the ring says it again, so colour is never the only channel; off by default, one request for the whole network a load
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
 - Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
 - **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, and the nearest station, repeater and survey mark
@@ -1322,6 +1331,45 @@ since #191, because uppercase small caps in `--muted` was the whole of the
 separation and an eye going down a single column of tick boxes reads a heading
 as one more row unless something physically stops it — and a first visit is told
 about the button once.
+
+**A station's health, on its card and its pin (#218, `health-glance.js`).** The
+card opens, under the station's name, with what somebody standing at the site
+came to it for: **Last heard** (when, how long ago, and the check period its
+readings keep), its **Battery** (last night's low and where the night lows are
+going — *falling 0.12 V a day, 11.8 V in about 3 days*), and its **Findings**,
+worst first, with every one of them, its evidence and what to do one disclosure
+down. The heading carries the station's class — **OK**, **Watch**, **Fault** or
+**No data** — as a glyph and a word as well as a colour. Each line is a door into
+the **Station Health** tab with the station picked, at the part it was about: its
+checks slot by slot, its battery chart, its findings — with the address saying so
+(`?tab=health&station=…`), so that view is a link too; a station the tab's window
+holds nothing from is said to be so, with a longer window one press away. It costs
+**one request a card** — the station's newest readings, whatever their age, worked
+out by the Station Health tab's own rules (`HealthAnalysis`), so the two cannot
+disagree about a battery — kept for five minutes, so a repaint asks nothing; a
+station with no readings left at all (they age out at about 90 days) costs a
+second, one-row look at when the ingest last heard it, so *never* is only said
+when it is true. What one station's readings cannot say is whether the receivers
+that hear it were listening while it was quiet: the card says so, and that is
+the tab's to weigh. A datastore that cannot be reached, or will not answer, is
+*no data* with *Try again* — never *OK*.
+**Colour pins by health**, under *Stations & links* in 🗺️ Map display and off
+by default, colours every pin by the same rules: by when Flood-Net last heard it
+(`meganet.station_health`, **one request for the whole network a load**, kept
+fifteen minutes, however often the map is rebuilt) and, for a station whose card
+has been opened, by what its readings say. A quiet station is a watch from two of
+its checks and a fault from four or a day — a check taken as three hours, and a
+fault waiting a whole day, until its own schedule is known — and a station heard
+across less than two of its checks is *no data*, not a fault: it has shown no
+rhythm to be overdue on (115 of the 503 stations the ingest had heard when this
+was built had been heard exactly once — a single frame, often weeks ago). Bigger is worse, as
+on Station Health's own map, and the ring says it again — a watch in a dashed
+black ring, a fault in a heavy one, no data hollow in a dotted grey ring — so
+colour is never the only channel; the legend's key replaces the role key while it
+is on, and the note under the switch, the legend and the map's accessible name
+carry how many of each. When the server works findings out itself (#215), the
+card and the pins read them there instead: the seam is `SOURCE` in
+`health-glance.js`, whose header says how.
 
 **The trail of stations looked at (`station-trail.js`).** Closing the card is a
 decision that holds, and nothing brought it back short of finding the pin again

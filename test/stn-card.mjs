@@ -327,7 +327,10 @@ async function main() {
         footer:     /Pin clicks show this card without changing the selection/.test(text),
         carried:    findRepeaterMatches(s).length,
         saysCarried: /Carried by \d+ repeater/.test(text),
-        noJump:     !card.querySelector('.link-btn'),
+        // The jump to Repeaters listening, by what it does: the card has other
+        // link buttons now — its health lines (#218) — so "any .link-btn" no
+        // longer means this one.
+        noJump:     !card.querySelector('button[onclick^="stnCardScrollToCarriers"]'),
       };
     });
     check('the card carries the position, as the same figure Copy hands over',
@@ -417,7 +420,7 @@ async function main() {
     check('while the map card stays, repainted for the selection', edited.cardThere);
 
     const jump = await page.evaluate(() => ({
-      offered: !!document.querySelector('#stn-card .link-btn'),
+      offered: !!document.querySelector('#stn-card button[onclick^="stnCardScrollToCarriers"]'),
       carried: findRepeaterMatches(state.data.stations.find(x => x.id === state.stnCard.id)).length,
     }));
     check('now selected, a carried station offers the jump to Repeaters listening',

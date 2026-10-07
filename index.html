@@ -565,6 +565,12 @@
   <script src="health-analysis.js?v=20261007l"></script>
   <script src="health.js?v=20261007l"></script>
   <script src="health-agent.js?v=20261007l"></script>
+  <!-- A station's health where people already look (#218): last heard, its
+       battery and its findings on its card, each a door into Station Health,
+       and Colour pins by health in Map display. Reads health-analysis.js and
+       opens health.js, both at call time; app.js calls it; nothing runs at
+       load. -->
+  <script src="health-glance.js?v=20261007l"></script>
   <!-- The Site Map tab: a guide to every other tab, and the gold line from
        each to its button in the nav. After app.js (switchTab, focusNavFind)
        and core.js (TABS, HELP), which it reads at call time; nothing runs at
