@@ -50,7 +50,9 @@ function createLogger({ level = 'info', bridgeId = 'bridge', stream = process.st
     // An error object serialises to `{}` through JSON.stringify, which is the
     // single most annoying way to lose the one field that mattered.
     if (fields.err instanceof Error) {
-      line.err = fields.err.message;
+      // redactUrl too: an error message often quotes the URL that failed, which
+      // for the broker carries the password (appraisal L-4).
+      line.err = redactUrl(fields.err.message);
       line.err_name = fields.err.name;
       if (fields.err.code) line.err_code = fields.err.code;
     }

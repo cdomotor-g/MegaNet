@@ -165,12 +165,14 @@ jobs:
         # bridge/ fails at the COPY line. --remote-only builds on Fly's
         # builders rather than this runner, which is what Fly's own CI guidance
         # recommends and keeps the runner out of the Docker business entirely.
+        env:
+          REGION: ${{ inputs.region }}
         run: |
           flyctl deploy . \
             --config bridge/fly.toml \
             --dockerfile bridge/Dockerfile \
             --app "$APP" \
-            --primary-region '${{ inputs.region }}' \
+            --primary-region "$REGION" \
             --remote-only \
             --wait-timeout 300
 

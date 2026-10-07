@@ -1,0 +1,15 @@
+# The only Docker build here is the MQTT bridge (bridge/Dockerfile), and its
+# build context is the repo root (see that file's header). Keep secrets and the
+# git metadata out of the context that is uploaded to Fly's remote builder —
+# .git/config in particular can hold a short-lived GitHub token (appraisal L-4).
+# The Dockerfile COPYs only bridge/** and hfem.js, so nothing here is needed by
+# the build.
+.git
+.github
+**/node_modules
+.env
+*.env
+**/.env
+.dev.vars
+.wrangler
+.acma-cache

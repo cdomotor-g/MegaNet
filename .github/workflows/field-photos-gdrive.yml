@@ -79,7 +79,7 @@ jobs:
       - name: Install the sync
         if: steps.linked.outputs.linked == 'true'
         working-directory: tools/field-photos
-        run: npm ci --omit=dev
+        run: npm ci --omit=dev --ignore-scripts
 
       - name: Sync
         if: steps.linked.outputs.linked == 'true'
