@@ -1214,6 +1214,16 @@ const HELP = {
       + 'seams — so a flood of one kind can be switched off to see the others. Each kind is drawn '
       + 'up to 25,000 marks in the window; past that the chart names which kinds were capped, and '
       + 'zooming in shows the rest.',
+      '<strong>Flood classes</strong> and <strong>AEP levels</strong>, ticked on a level series\' '
+      + 'card, draw its station\'s minor, moderate and major lines and its modelled AEP levels '
+      + 'across the chart, labelled, in the legend and in the PNG — each <strong>in the series\' '
+      + 'own datum</strong>. The classes are metres on the gauge and the AEP levels metres AHD, so '
+      + 'one or the other is carried across the gauge zero, and only a zero surveyed in AHD: where '
+      + 'there is none, those lines are left off and the card says why. Whether the readings are '
+      + 'on the gauge or in AHD comes from their unit, then the sensor; the card says which it '
+      + 'took, a box overrules it, and it warns when the readings look like the other one. The '
+      + 'vertical axis fits the readings and names any level beyond them along that edge; '
+      + '<em>stretch the axis</em> takes it over them all.',
     ],
     links: [
       { label: 'How the 357 filter works — the test, drawn', call: 'ArroData.explain()' },
@@ -1239,7 +1249,9 @@ const HELP = {
       'A silence longer than the station\'s own reporting interval is drawn as a gap, not ruled '
       + 'across. Missing data is the normal condition of a radio network.',
       'Readings arrive as <strong>counts</strong>, so the 3/5/7 thresholds are counts too. Any '
-      + 'conversion the datastore recorded is shown beside the count, never instead of it.',
+      + 'conversion the datastore recorded is shown beside the count, never instead of it — which '
+      + 'is also why a level drawn in counts gets no <strong>flood class</strong> lines: those are '
+      + 'metres, and are drawn only against readings that are.',
       'A window with nothing in it says so rather than drawing an empty axis — silence and a run '
       + 'of zeroes are different claims.',
       '<strong>Raw readings age out; the rollups do not.</strong> Ninety days back is as far as '

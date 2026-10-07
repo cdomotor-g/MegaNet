@@ -4,14 +4,18 @@
 //                 Bureau's flood classes, the modelled AEP flood levels and,
 //                 where there are any, the peaks it has actually reached —
 //                 put on one ladder in metres AHD, with the colour the water
-//                 takes as it passes each, for the Digital Twin's flood water.
+//                 takes as it passes each, for the Digital Twin's flood water;
+//                 and the same classes and AEP levels as lines across a
+//                 level series on the ARRO Data and Field Data charts, each
+//                 in that series' own datum (see "Lines on a chart").
 //
 // After core.js and flood-velocity.js, before init.js — index.html holds the
 // order and the reasons. Pure: it reads a station record and returns numbers
-// and words; digital-twin.js draws them. It reaches across to flood-velocity.js
-// for FloodVelocity.pickRow and LEVELS (which AEP row, and what its four levels
-// are called) at call time, so one rule picks the row the card and the twin
-// both read. The IIFE body only declares (`npm run toplevel`).
+// and words; digital-twin.js and arro-data.js draw them. It reaches across to
+// flood-velocity.js for FloodVelocity.pickRow and LEVELS (which AEP row, and
+// what its four levels are called) at call time, so one rule picks the row the
+// card, the twin and the chart all read. The IIFE body only declares (`npm run
+// toplevel`).
 //
 // ── One ladder, two datums ───────────────────────────────────────────────────
 // The flood classes (0031, Section 4) are heights *on the gauge*: metres above
@@ -615,11 +619,188 @@ const FloodStages = (function () {
     return `${l.label} ${l.gauge != null ? `${Number(l.gauge).toFixed(1)} m` : ahdText(l.ahd)}`;
   }
 
+  // ── Lines on a chart (#226) ────────────────────────────────────────────────
+  // ARRO Data and Field Data (arro-data.js) draw a river level against its
+  // station's flood classes and AEP levels: a horizontal line at each, at the
+  // height it stands at *in the series' own datum*. A level series is metres
+  // on the gauge or metres AHD, and the two sit the gauge zero apart — 87.54 m
+  // at Gatton, where a class drawn in the wrong one is off the chart, and
+  // 1.53 m at Alligator Creek, where it is on it, a metre and a half out, with
+  // nothing to say so. So every line is placed by the rule the ladder above
+  // keeps for the twin, turned round to face the series:
+  //
+  //                   classes (m on the gauge)       AEP levels (m AHD)
+  //   gauge series    as the list gives them         less the zero in force
+  //   AHD series      plus the zero in force         as the sheet gives them
+  //
+  // and only ever through a zero surveyed in AHD. Where the rule needs one and
+  // the gauge has none — its zero on an assumed, a State or an unknown datum,
+  // or never surveyed — the lines that needed it are not drawn, and `notes`
+  // names them and says why: never hung from that zero anyway, and never left
+  // out without a word. A series on the gauge needs no zero at all for its own
+  // classes, so a gauge on an assumed datum still gets those.
+  //
+  //   lines(s, datum, { classes, aep, typical, since })
+  //     → { datum, lines, notes, suspect, relevelled, zero, ahdZero,
+  //         classesAsAt, aepAsAt, has: { classes, aep } }
+  //
+  // `datum` is 'gauge' or 'AHD'; anything else draws nothing, and says so.
+  // `lines` is lowest first, each { key, kind, label, short, rank, value, own,
+  // ownDatum, converted, oneIn?, aepIndex?, aepCount? }: `value` the height in
+  // the series' datum, `own` and `ownDatum` the figure as the record gives it.
+  // `typical` — a reading typical of the series, its median — lets the answer
+  // say when the readings look like the *other* datum (`suspect`: { datum,
+  // words }), which is the one mistake the arithmetic cannot catch by itself;
+  // `since` — the series' first day, ISO — when the gauge was re-levelled
+  // inside it (`relevelled`: { from, was, now, words }).
+  const SUSPECT_SLACK = 5;     // m either side of where each datum's readings can be
+
+  function lines(s, datum, { classes: wantClasses = true, aep: wantAep = true, typical = null, since = null } = {}) {
+    const d = datum === 'gauge' || datum === 'AHD' ? datum : null;
+    const notes = [];
+    const out = [];
+    const zero = zeroOf(s);
+    const ahdZero = zero && zero.datum === 'AHD' ? zero.m : null;
+    const ed = newest(((s && s.flood_classes) || []).filter(r => r), 'as_at')[0] || null;
+    const cls = ed ? CLASSES.filter(c => num(ed[c.key]) != null) : [];
+    const row = aepRow(s);
+    const aeps = row ? aepLevels().filter(l => num(row[l.key]) != null) : [];
+    const res = {
+      datum: d, lines: out, notes, suspect: null, relevelled: null, zero, ahdZero,
+      classesAsAt: ed ? ed.as_at || null : null, aepAsAt: row ? row.as_at || null : null,
+      has: { classes: cls.length > 0, aep: aeps.length > 0 },
+    };
+    const useClasses = wantClasses && cls.length > 0;
+    const useAep = wantAep && aeps.length > 0;
+    if (!useClasses && !useAep) return res;
+    if (!d) {
+      notes.push('Nothing says whether the readings are metres on the gauge or metres AHD, so no level can be put on them.');
+      return res;
+    }
+
+    // Why the zero cannot carry a figure across, in the words the ladder's
+    // notes use for the same thing.
+    const noZero = zero
+      ? `the gauge's zero is on ${zero.datum ? `the ${datumWord(zero.datum)}` : 'no stated datum'} rather than AHD`
+      : 'the gauge has no surveyed zero';
+    if (useClasses) {
+      if (d === 'gauge' || ahdZero != null) {
+        for (const c of cls) {
+          const h = num(ed[c.key]);
+          out.push({ key: c.key, kind: c.kind, label: c.label, short: c.label, rank: c.rank,
+                     value: d === 'gauge' ? h : ahdZero + h, own: h, ownDatum: 'gauge', converted: d !== 'gauge' });
+        }
+      } else {
+        notes.push(`The flood classes are heights on the gauge, and ${noZero}, so they cannot be put in metres AHD: `
+          + `${cls.map(c => `${c.label.toLowerCase()} ${figure(ed[c.key], 1)} m`).join(', ')}.`);
+      }
+    }
+    if (useAep) {
+      if (d === 'AHD' || ahdZero != null) {
+        aeps.forEach((l, i) => {
+          const a = num(row[l.key]);
+          out.push({ key: l.key, kind: 'aep', label: `${l.label} AEP`, short: l.label, rank: 4 + i, oneIn: l.oneIn,
+                     aepIndex: i, aepCount: aeps.length,
+                     value: d === 'AHD' ? a : a - ahdZero, own: a, ownDatum: 'AHD', converted: d !== 'AHD' });
+        });
+      } else {
+        notes.push(`The AEP levels are metres AHD, and ${noZero}, so they cannot be brought down to heights on the gauge: `
+          + `${aeps.map(l => `${l.label} ${figure(row[l.key], 2)}`).join(', ')} m AHD.`);
+      }
+    }
+    out.sort((a, b) => a.value - b.value || a.rank - b.rank);
+
+    // Readings that look like the other datum. Where the zero is far enough
+    // from 0 m AHD that the two can be told apart — the heights on the gauge
+    // a river reaches, and the same heights over the zero, with room either
+    // side — a series whose middle sits in the other one's band is named for
+    // what it looks like. Only said, never acted on: the datum is the
+    // operator's to set, and the middle of a record is evidence, not proof.
+    const t = num(typical);
+    if (t != null && ahdZero != null && out.length) {
+      const onGauge = [...cls.map(c => num(ed[c.key])), ...aeps.map(l => num(row[l.key]) - ahdZero)];
+      const top = Math.max(0, ...onGauge);
+      if (Math.abs(ahdZero) > top + 2 * SUSPECT_SLACK) {
+        const inGauge = t >= -SUSPECT_SLACK && t <= top + SUSPECT_SLACK;
+        const inAhd = t >= ahdZero - SUSPECT_SLACK && t <= ahdZero + top + SUSPECT_SLACK;
+        const z = `${ahdZero.toFixed(2)} m AHD`;
+        if (d === 'gauge' && inAhd && !inGauge) {
+          res.suspect = { datum: 'AHD', words: `The readings sit around ${t.toFixed(2)} m — where this gauge's levels are in metres AHD, `
+            + `over its zero of ${z}, and far above any height on the gauge. They look like metres AHD.` };
+        } else if (d === 'AHD' && inGauge && !inAhd) {
+          res.suspect = { datum: 'gauge', words: `The readings sit around ${t.toFixed(2)} m — where this gauge's levels are as heights on the gauge, `
+            + `and far below its zero of ${z}. They look like heights on the gauge.` };
+        }
+      }
+    }
+
+    // A gauge re-levelled inside the series: readings before the day were
+    // taken against another zero, and the lines are on today's. Only a series
+    // on the gauge is moved by it — a level in AHD is the same water either
+    // side of the day. Its own words rather than a note: `notes` are the
+    // lines that could not be drawn, and these are drawn.
+    const day = since ? String(since).slice(0, 10) : '';
+    if (d === 'gauge' && day && zero && zero.from && day < String(zero.from).slice(0, 10)) {
+      const then = newest(((s && s.gauge_survey) || []).filter(r => num(r.gauge_zero_m) != null
+        && (!r.valid_from || r.valid_from <= day) && (!r.valid_to || r.valid_to > day)), 'valid_from')[0];
+      if (then && (num(then.gauge_zero_m) !== zero.m || (then.datum || null) !== zero.datum)) {
+        const was = { m: num(then.gauge_zero_m), datum: then.datum || null };
+        const from = String(zero.from).slice(0, 10);
+        const say = z => `${z.m.toFixed(2)} m ${z.datum === 'AHD' ? 'AHD' : `on ${z.datum ? `the ${datumWord(z.datum)}` : 'no stated datum'}`}`;
+        res.relevelled = { from, was, now: { m: zero.m, datum: zero.datum },
+          words: was.datum === zero.datum && zero.datum
+            ? `The gauge was re-levelled on ${from}, from a zero of ${say(was)} to ${say(zero)}: a reading before then is `
+              + `${Math.abs(was.m - zero.m).toFixed(2)} m ${was.m > zero.m ? 'lower' : 'higher'} than the same water reads on the gauge today, and the lines are on today's gauge.`
+            : `The gauge's zero changed on ${from}, from ${say(was)} to ${say(zero)}, so readings before then may not read against these lines as later ones do.` };
+      }
+    }
+    return res;
+  }
+
+  // A figure as the record gives it, padded to `minDp` decimals and never
+  // rounded: a class of 3.25 m is 3.25, not 3.3 (river-details.js's rule for
+  // the card).
+  function figure(v, minDp = 0) {
+    const n = num(v);
+    if (n == null) return '';
+    const dp = (String(n).split('.')[1] || '').length;
+    return n.toFixed(Math.max(dp, minDp));
+  }
+
+  // A line as the chart labels it — its name and its height in the series'
+  // datum: "Minor 7.0 m on the gauge", "1% AEP 15.15 m on the gauge",
+  // "Minor 94.54 m AHD". A figure carried across a zero is to the centimetre,
+  // which is what the zero and the AEP sheet are given to.
+  function lineFigure(l) {
+    return l.converted ? Number(l.value).toFixed(2) : figure(l.own, l.ownDatum === 'gauge' ? 1 : 2);
+  }
+  function lineText(l, datum) {
+    return `${l.label} ${lineFigure(l)} ${datum === 'AHD' ? 'm AHD' : 'm on the gauge'}`;
+  }
+
+  // …and in full, for the line's title: where the figure came from and, for
+  // one carried across, through which zero.
+  function lineHow(l, res) {
+    const z = res && res.zero;
+    const zeroWords = z ? `the gauge zero, ${z.m.toFixed(2)} m AHD${z.from ? ` (since ${String(z.from).slice(0, 10)})` : ''}` : 'the gauge zero';
+    if (l.kind === 'aep') {
+      const own = `${l.label} ${figure(l.own, 2)} m AHD`;
+      return l.converted
+        ? `${own}, less ${zeroWords}: ${Number(l.value).toFixed(2)} m on the gauge. Modelled — indicative.`
+        : `${own}, as the AEP sheet${res && res.aepAsAt ? ` of ${res.aepAsAt}` : ''} gives it. Modelled — indicative.`;
+    }
+    const own = `${l.label} ${figure(l.own, 1)} m on the gauge`;
+    return l.converted
+      ? `${own}, plus ${zeroWords}: ${Number(l.value).toFixed(2)} m AHD.`
+      : `${own}, as the Bureau's flood classification${res && res.classesAsAt ? ` of ${res.classesAsAt}` : ''} gives it.`;
+  }
+
   return {
     CLASSES, COLOURS, RISE_S, HOLD_S, DRAIN_S, ZERO_MAX_BELOW, ZERO_MAX_ABOVE,
     ladder, start, passed, colourOf, mix, cycle, gaugeText, ahdText, levelText,
     borrowable, borrowed, onGround, datumWords, datumWord, scale, spread, scaleText, peakWhen,
     curve, crowding, logFit, LOG_PX, LOG_GAP,
+    lines, lineText, lineFigure, lineHow, figure,
   };
 })();
 if (typeof window !== 'undefined') window.FloodStages = FloodStages;

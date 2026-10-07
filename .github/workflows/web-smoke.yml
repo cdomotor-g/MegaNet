@@ -974,6 +974,20 @@ jobs:
         working-directory: test
         run: npm run adqual
 
+      # A station's flood classes and AEP levels as lines across a level series
+      # on the ARRO Data and Field Data charts (#226). The classes are metres on
+      # the gauge, the AEP levels metres AHD, and a series is one or the other:
+      # every way this goes wrong draws a tidy, labelled line in the wrong
+      # place — carried across the gauge zero the wrong way, not at all, or
+      # through a zero on an assumed datum. So the arithmetic is held under
+      # Node against real records, and in Chromium each line is read back
+      # against the height the chart's own axis gives its figure, the ones that
+      # cannot be placed are asserted absent, and the PNG export is decoded and
+      # read pixel by pixel for them.
+      - name: Flood lines on the Arrow chart — each in the series' datum, and in the PNG
+        working-directory: test
+        run: npm run floodlines
+
       # A coordinate pasted into a latitude or longitude box (places.js). A pair
       # in either box splits across both; DMS or a hemisphere letter is
       # converted to decimal degrees. A paste handler that stops matching the

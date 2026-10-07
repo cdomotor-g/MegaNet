@@ -10,8 +10,9 @@
 // arroSiteId, arroSensorUrl, bucketSizeMm, dbHostLabel and registerTabTeardown
 // (#142 — this file declares that its ResizeObserver has to be dropped on the
 // way out, where app.js used to say so for it); across to app.js for
-// renderMain and renderTabs; to datastore.js for dbSelect; and to modal.js for
-// Modal.
+// renderMain and renderTabs; to datastore.js for dbSelect; to modal.js for
+// Modal; and to flood-stages.js for FloodStages, which places a station's
+// flood classes and AEP levels in a series' datum (#226).
 //
 // 3,272 lines, the largest of the fourteen and the subject of #128. Moving it
 // gave it a file; it did not decompose it, and the file size is not an
@@ -1082,6 +1083,10 @@ const ArroData = (function () {
         if (y > hi) hi = y;
       }
     }
+    // …and the flood lines an axis has been fitted to (#226), or the box the
+    // navigator draws for that axis would run off the track it is drawn on.
+    const fit = floodFit(shown());
+    if (fit) { if (fit.lo < lo) lo = fit.lo; if (fit.hi > hi) hi = fit.hi; }
     if (!isFinite(lo)) return null;
     if (hi <= lo) hi = lo + 1;
     // A hair of headroom, so a record whose maximum is also the window's
@@ -1160,6 +1165,10 @@ const ArroData = (function () {
         }
       }
     }
+    // A series whose card says *stretch the axis* takes its axis over its
+    // flood lines (#226) — the opt-in; see floodFit() for why it is one.
+    const fit = floodFit(list);
+    if (fit) { if (fit.lo < lo) lo = fit.lo; if (fit.hi > hi) hi = fit.hi; }
     if (!isFinite(lo)) return { lo: 0, hi: 1 };
     // Fixed, and the vertical navigator that speaks through it, govern the
     // **left** axis only. Two typed ranges and two navigators would be a second
@@ -1183,6 +1192,432 @@ const ArroData = (function () {
   function axisUnit(list) {
     const units = [...new Set(list.map(s => s.unit || '').filter(Boolean))];
     return units.length === 1 ? units[0] : '';
+  }
+
+  // ── Flood lines (#226) ──────────────────────────────────────────────────────
+  // A station's flood classes and AEP levels are on its card and on the twin's
+  // staff, and until this they were nowhere on the one picture somebody reads a
+  // rise off. A level series can now carry them: a line at minor, moderate and
+  // major, and at the AEP levels if asked for, each labelled with its name and
+  // its height in the series' datum — on the chart, in the legend under it,
+  // and in the PNG and SVG exports, which are the chart.
+  //
+  // **The datum is the whole job.** A level series is metres on the gauge or
+  // metres AHD, the classes are metres on the gauge and the AEP levels metres
+  // AHD, and the two sit the gauge zero apart. FloodStages.lines() does the
+  // arithmetic, and declines it where the zero is not in AHD, so this file has
+  // only to know which datum the *series* is in — and to say how it knows:
+  //
+  //   the unit      `mAHD` is the device saying so, and nothing overrules it.
+  //                 A unit that is not metres at all — counts with a display
+  //                 conversion on Field Data, millimetres — has nothing a flood
+  //                 level can be drawn against, and the card says so. No unit
+  //                 at all is taken as metres, and the card says that too.
+  //   by hand       the card's datum box, for a series in plain metres.
+  //   the words     the sensor's type, its label and the file's name. "AHD"
+  //                 there is AHD and "LGH" a local gauge height; any other
+  //                 level sensor — "Water Level" — is taken as metres on the
+  //                 gauge, because that is what the network's river heights
+  //                 are, and its AHD ones are typed apart (66 sensors in the
+  //                 registry are "Water Level - AHD", one "Water Level - LGH").
+  //                 The card says it was taken, and the box overrules it.
+  //   nothing       no datum, no lines, and a sentence asking for one.
+  //
+  // FloodStages also says when the readings look like the *other* datum — a
+  // zero of 87.54 m AHD puts the two 80 m apart — which is the one mistake no
+  // arithmetic downstream of the datum can catch, so it is said on the card
+  // beside the box that fixes it.
+  //
+  // **The vertical axis does not move for them unless asked.** A major class
+  // 6 m over a low river would squash the trace into the bottom tenth of the
+  // chart the moment the box was ticked — the opposite of what somebody
+  // reading a rise wants, and a change to the chart they did not ask for. So
+  // the axis fits the readings as it always has; a line inside it is drawn; a
+  // level beyond it is named along the edge it is beyond ("▲ Above the chart:
+  // major 15.0 m on the gauge"), on the chart so the export carries it, and in
+  // the legend. *Stretch the axis* on the card is the opt-in that takes the
+  // axis over them, for the question "how far below minor is it?".
+
+  // The paint: the station card's class colours — text-safe on --panel in both
+  // themes, which `npm run shell` holds them to — and --muted for the AEP
+  // levels, which are a model talking. Each has a dash of its own as well, so
+  // no level is told from another by its colour alone (WCAG 1.4.1), and the
+  // label names it besides. `cls` is the same colour as a class, for the HTML.
+  const AD_FLOOD_PAINT = {
+    minor:    { token: '--flood-minor',    hex: '#107c10', dash: '2 3',  width: 1.4, cls: 'rhs-minor' },
+    moderate: { token: '--flood-moderate', hex: '#806b00', dash: '7 3',  width: 1.4, cls: 'rhs-moderate' },
+    major:    { token: '--flood-major',    hex: '#b3261e', dash: '14 4', width: 1.6, cls: 'rhs-major' },
+    aep:      { token: '--muted',          hex: '#4f6478', dash: '1 3',  width: 1.3, cls: 'txt-muted' },
+  };
+  const AD_FLOOD_METRES = /^(m|metres?|meters?)$/i;
+  const AD_FLOOD_AHD_UNIT = /^m\s*AHD$/i;
+  // The height of a label, and so the nearest two may stand.
+  const AD_FLOOD_LABEL_GAP = 12;
+  // What a character of the 10 px type takes, near enough to break a note by,
+  // and the top right-hand corner of the plot the ↺ and ⛶ buttons sit over —
+  // HTML over the SVG, so the chart has to keep out of their way itself.
+  const AD_FLOOD_CHAR = 5.6;
+  const AD_FLOOD_CORNER = 90;
+
+  // Resolved literals, for the same reason theme() resolves its own: the SVG
+  // has to survive being turned into a PNG, where no var() means anything.
+  function floodPaints() {
+    const cs = typeof getComputedStyle === 'function' ? getComputedStyle(document.documentElement) : null;
+    const out = {};
+    for (const [k, p] of Object.entries(AD_FLOOD_PAINT)) {
+      out[k] = { ...p, col: (cs && (cs.getPropertyValue(p.token) || '').trim()) || p.hex };
+    }
+    return out;
+  }
+
+  // Could this series be a level at all? A level is what the filter was told
+  // it is, or what its unit says it is. A rain accumulator is not offered a
+  // flood line it could only be drawn against by accident.
+  function floodLevelish(s) {
+    const unit = String(s.unit || '').trim(), eng = String(s.engUnit || '').trim();
+    return s.kind === 'WL' || AD_FLOOD_METRES.test(unit) || AD_FLOOD_AHD_UNIT.test(unit)
+        || AD_FLOOD_METRES.test(eng) || AD_FLOOD_AHD_UNIT.test(eng);
+  }
+
+  // The datum the words about a series give it, with the words: the guess the
+  // card's datum box offers as "auto".
+  function floodGuess(s) {
+    const type = String(s.sensor?.type || '').trim();
+    const said = `${type} ${s.meta?.sensorLabel || ''} ${String(s.fileName || '').replace(/[_./:·]+/g, ' ')}`;
+    if (/\bAHD\b/i.test(said)) {
+      return { datum: 'AHD', why: /\bAHD\b/i.test(type) ? `the sensor is typed “${type}”` : 'its name says AHD' };
+    }
+    if (/\bLGH\b|gauge height|local gauge/i.test(said)) {
+      return { datum: 'gauge', why: /\bLGH\b/i.test(type) ? `the sensor is typed “${type}”, a local gauge height`
+                                                          : 'its name says it is a gauge height' };
+    }
+    if (/level|height|stage/i.test(said)) {
+      return { datum: 'gauge', why: `taken as metres on the gauge: ${type ? `a “${type}”` : 'a level'} sensor reads its height `
+                                  + 'on the gauge, and the network’s AHD ones are typed apart' };
+    }
+    return { datum: null, why: 'nothing about this series says which — choose one' };
+  }
+
+  // What the plotted numbers are measured from, and how that is known:
+  //   { metres, datum: 'gauge' | 'AHD' | null, how: 'unit' | 'hand' | 'words', why }
+  // `metres` false means the unit rules flood levels out altogether.
+  function floodDatum(s) {
+    const unit = String(s.unit || '').trim();
+    const eng = String(s.engUnit || '').trim();
+    if (AD_FLOOD_AHD_UNIT.test(unit)) return { metres: true, datum: 'AHD', how: 'unit', why: `their unit, ${unit}, says so` };
+    if (unit && !AD_FLOOD_METRES.test(unit)) {
+      const counts = /^count$/i.test(unit) && (AD_FLOOD_METRES.test(eng) || AD_FLOOD_AHD_UNIT.test(eng));
+      return { metres: false, datum: null, how: 'unit', why: counts
+        ? `Drawn in counts — the datastore’s conversion to ${eng} is shown beside each reading, not plotted — so there is nothing in metres to draw a flood level against.`
+        : `Drawn in ${unit}, and flood levels are metres, so none can be drawn against it.` };
+    }
+    // No unit at all — an export without the column — is taken as metres,
+    // which is what a level is, and the words say so.
+    const bare = unit ? '' : '; the readings carry no unit, and are taken as metres';
+    const set = s.flood && s.flood.datum;
+    if (set === 'gauge' || set === 'AHD') return { metres: true, datum: set, how: 'hand', why: `set by hand${bare}` };
+    const guess = floodGuess(s);
+    return { metres: true, datum: guess.datum, how: 'words', why: guess.why + bare };
+  }
+
+  // A reading typical of the series — the median of up to a thousand spread
+  // along it — for FloodStages to tell which datum the readings look like.
+  // Cached on the series and dropped by invalidate() with everything else an
+  // edit makes stale.
+  function floodTypical(s) {
+    if (!s.n) return null;
+    if (s.floodTyp && s.floodTyp.v === s.v && s.floodTyp.n === s.n) return s.floodTyp.at;
+    const step = Math.max(1, Math.floor(s.n / 1000));
+    const a = [];
+    for (let i = 0; i < s.n; i += step) if (isFinite(s.v[i])) a.push(s.v[i]);
+    a.sort((x, y) => x - y);
+    const at = a.length ? a[a.length >> 1] : null;
+    s.floodTyp = { v: s.v, n: s.n, at };
+    return at;
+  }
+
+  // Everything the card, the chart and the legend say about one series' flood
+  // lines, worked out in one place so the three cannot disagree.
+  //   { offer, dt, res } — `offer` false for a series that is not a level or
+  //   has no station; `res` is FloodStages.lines(), whose `has` says whether
+  //   the station has any classes or AEP levels to offer at all.
+  function floodState(s) {
+    if (!s || !s.station || typeof FloodStages === 'undefined' || !floodLevelish(s)) {
+      return { offer: false, dt: null, res: null };
+    }
+    const f = s.flood || {};
+    const dt = floodDatum(s);
+    const res = FloodStages.lines(s.station, dt.metres ? dt.datum : null, {
+      classes: !!f.classes && dt.metres, aep: !!f.aep && dt.metres,
+      typical: floodTypical(s),
+      since: s.n ? fmtFull(s.t[0]).slice(0, 10) : null,
+    });
+    return { offer: true, dt, res };
+  }
+
+  // The lines that are drawn, series by series, on the chart as it stands —
+  // none at all off Value: on Increment or Rate/h a point is a difference
+  // between two readings, and a flood level is not a height anything there is
+  // drawn at.
+  function floodDrawn() {
+    if (ad.transform !== 'value') return [];
+    return shown().map(s => ({ s, st: floodState(s) })).filter(x => x.st.res && x.st.res.lines.length);
+  }
+
+  // The span of the flood lines the series in `list` have been fitted to, or
+  // null. The opt-in that lets a line beyond the readings move the axis — see
+  // the head of this section for why nothing else does.
+  function floodFit(list) {
+    if (ad.transform !== 'value') return null;
+    let lo = Infinity, hi = -Infinity;
+    for (const s of list) {
+      if (!s.flood || !s.flood.fit) continue;
+      const st = floodState(s);
+      for (const l of (st.res ? st.res.lines : [])) { if (l.value < lo) lo = l.value; if (l.value > hi) hi = l.value; }
+    }
+    return isFinite(lo) ? { lo, hi } : null;
+  }
+
+  // Where one series' lines stand on the chart: each with its y, and whether
+  // it is above or below the plot rather than on it.
+  function floodPlaced(g, s, st) {
+    const sy = g.yOf(s);
+    return st.res.lines.map(l => {
+      const y = sy(l.value);
+      return { l, y, side: y < PADT - 0.5 ? 'above' : y > g.h - PADB + 0.5 ? 'below' : 'on' };
+    });
+  }
+
+  // "on the gauge" / "m AHD", after a figure.
+  const floodUnitWords = datum => (datum === 'AHD' ? 'm AHD' : 'm on the gauge');
+
+  // The lines, their labels and what is beyond the chart, as SVG — part of
+  // the picture, so the PNG and SVG exports carry all three. Lines go under
+  // the curves and the words over them.
+  //
+  // A label sits *on* its line, at the left-hand end just inside the axis, on
+  // a plate of the panel colour that the line runs into and out of: "····
+  // Minor 7.0 m on the gauge ·········". The right-hand end is where a
+  // hydrograph's newest readings are — the rise somebody is reading — and
+  // where the chart's own ↺ and ⛶ sit over the plot; the left is the end the
+  // eye goes to for a scale. The plate is an SVG filter rather than a
+  // rectangle because only the renderer knows how wide the words came out —
+  // in the page's font on screen and the default one in an exported PNG.
+  // Where labels crowd they are moved off their lines only as far as they
+  // must be — FloodStages.spread(), the twin's scale's rule — with a leader
+  // back, and they keep clear of the one-line notes of what is above and
+  // below the chart, which take the top and bottom of the same corner. Every
+  // element carries the series and the level it is, for anything reading the
+  // chart back.
+  function floodLayer(g, c) {
+    const out = { defs: '', under: '', over: '' };
+    const drawn = floodDrawn();
+    if (!drawn.length) return out;
+    // With more than one series' lines up, each label says whose: its station,
+    // or the series itself where two of them share one.
+    const names = drawn.map(x => x.s.station.name);
+    const whose = s => (drawn.length < 2 ? '' : ` · ${names.filter(n => n === s.station.name).length > 1 ? s.label : s.station.name}`);
+    const paint = floodPaints();
+    const xr = g.w - g.padR;
+    // sRGB, not the filter default of linearRGB, which composites a glyph's
+    // anti-aliased edge so that thin type comes out paler than its colour.
+    out.defs = `<filter id="ad-flood-plate" x="-0.03" y="-0.08" width="1.06" height="1.16"
+                        color-interpolation-filters="sRGB">
+                  <feFlood flood-color="${c.panel}" flood-opacity=".88"/>
+                  <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+    const plate = 'filter="url(#ad-flood-plate)"';
+    const labels = [], offs = [];
+    for (const { s, st } of drawn) {
+      const tag = whose(s);
+      const off = { above: [], below: [] };
+      for (const { l, y, side } of floodPlaced(g, s, st)) {
+        const p = paint[l.kind] || paint.aep;
+        if (side !== 'on') { off[side].push({ l, p }); continue; }
+        out.under += `<line class="ad-flood-line" data-series="${s.key}" data-key="${l.key}" data-value="${l.value}"
+                            x1="${PADL}" y1="${y.toFixed(1)}" x2="${xr}" y2="${y.toFixed(1)}" stroke="${p.col}"
+                            stroke-width="${p.width}" stroke-dasharray="${p.dash}"><title>${
+                              esc(FloodStages.lineHow(l, st.res) + tag)}</title></line>`;
+        labels.push({ y, text: FloodStages.lineText(l, st.res.datum) + tag, col: p.col, key: l.key, series: s.key });
+      }
+      for (const side of ['above', 'below']) if (off[side].length) offs.push({ s, st, tag, side, items: off[side] });
+    }
+    // The beyond-the-chart notes, one per series and edge — "▲ Above the
+    // chart: Major 15.0 · 1% AEP 15.15 m on the gauge" — each level in its
+    // colour. SVG text does not wrap, so a note longer than the plot is broken
+    // between its words by an estimate of their width, and an "above" note
+    // keeps clear of the corner the ↺ and ⛶ buttons sit over.
+    let above = 0, below = 0;
+    for (const { s, st, tag, side, items } of offs) {
+      const room = (g.pw - 12 - (side === 'above' ? AD_FLOOD_CORNER : 0)) / AD_FLOOD_CHAR;
+      const words = [
+        { text: side === 'above' ? '▲ Above the chart:' : '▼ Below the chart:', col: c.muted, sep: '' },
+        ...items.map(({ l, p }, i) => ({ text: `${l.label} ${FloodStages.lineFigure(l)}`, col: p.col, sep: i ? ' · ' : ' ' })),
+        { text: `${floodUnitWords(st.res.datum)}${tag}`, col: c.muted, sep: ' ' },
+      ];
+      const rows = [];
+      let used = Infinity;
+      for (const w of words) {
+        if (rows.length && used + w.sep.length + w.text.length <= room) {
+          rows[rows.length - 1].push(w); used += w.sep.length + w.text.length;
+        } else {
+          rows.push([{ ...w, sep: '' }]); used = 3 + w.text.length;
+        }
+      }
+      const first = side === 'above' ? PADT + 11 + AD_FLOOD_LABEL_GAP * above
+                                     : g.h - PADB - 5 - AD_FLOOD_LABEL_GAP * (below + rows.length - 1);
+      if (side === 'above') above += rows.length; else below += rows.length;
+      // A row's place goes on the tspan carrying its first word: x and y on an
+      // empty tspan position nothing.
+      const body = rows.map((row, k) => row.map((w, j) => (j
+        ? `<tspan fill="${c.muted}">${esc(w.sep)}</tspan><tspan fill="${w.col}">${esc(w.text)}</tspan>`
+        : `<tspan x="${PADL + (k ? 18 : 6)}" y="${(first + AD_FLOOD_LABEL_GAP * k).toFixed(1)}" fill="${w.col}">${esc(w.text)}</tspan>`)).join('')).join('');
+      out.over += `<text class="ad-flood-off" data-series="${s.key}" data-side="${side}"
+                         data-keys="${items.map(i => i.l.key).join(' ')}" font-size="10" fill="${c.muted}" ${plate}><title>${
+                           esc(items.map(i => FloodStages.lineHow(i.l, st.res)).join(' ') + tag)}</title>${body}</text>`;
+    }
+    labels.sort((a, b) => a.y - b.y);
+    // A label is centred on the point it is placed at, its baseline 3.5 px
+    // under it, so the band it may be placed in runs from half a label under
+    // the plot's top (or under the last "above" note) to half a label over its
+    // bottom (or over the first "below" note).
+    const half = AD_FLOOD_LABEL_GAP / 2;
+    const at = FloodStages.spread(labels.map(l => l.y), AD_FLOOD_LABEL_GAP,
+      PADT + half + AD_FLOOD_LABEL_GAP * above, g.h - PADB - half - AD_FLOOD_LABEL_GAP * below);
+    labels.forEach((lb, i) => {
+      const ly = at[i];
+      if (Math.abs(ly - lb.y) > 2) {
+        out.over += `<path class="ad-flood-leader" d="M${PADL + 3} ${lb.y.toFixed(1)}V${ly.toFixed(1)}h3"
+                           stroke="${lb.col}" stroke-width="1" opacity=".85" fill="none"/>`;
+      }
+      out.over += `<text class="ad-flood-label" data-series="${lb.series}" data-key="${lb.key}"
+                         x="${PADL + 8}" y="${(ly + 3.5).toFixed(1)}" font-size="10"
+                         fill="${lb.col}" ${plate}>${esc(lb.text)}</text>`;
+    });
+    return out;
+  }
+
+  // The legend: under the chart, after each series' own entry, a key per
+  // line — its dash in its colour, its name and its figure — and which are
+  // beyond the chart. currentColor and the card's own class colours, like the
+  // mark legend's shapes (adMarkSvg). A run of inline text rather than an
+  // .ad-stat, whose one-line flex row would push seven keys off a phone: it
+  // wraps between keys, and the non-breaking spaces keep each key whole.
+  function floodLegendHtml({ s, st }, g) {
+    if (!g) return '';
+    const nb = t => esc(t).replace(/ /g, '&nbsp;');
+    const items = floodPlaced(g, s, st).map(({ l, side }) => {
+      const p = AD_FLOOD_PAINT[l.kind] || AD_FLOOD_PAINT.aep;
+      return `<span class="${p.cls}" data-key="${l.key}" title="${escAttr(FloodStages.lineHow(l, st.res))}">`
+        + `<svg class="ad-mark" viewBox="0 0 22 8" width="22" height="8" aria-hidden="true" focusable="false">`
+        + `<path d="M0 4h22" stroke="currentColor" stroke-width="${p.width + 0.4}" stroke-dasharray="${p.dash}" fill="none"/></svg>`
+        + `&nbsp;${nb(`${l.label} ${FloodStages.lineFigure(l)}`)}${side === 'on' ? '' : ` <span class="small txt-muted">(${side} the chart)</span>`}</span>`;
+    });
+    return `
+      <span class="ad-flood-key" data-series="${s.key}">
+        <span class="small">${nb('Flood lines,')} ${nb(`${floodUnitWords(st.res.datum)}:`)}</span> ${items.join(' ')}
+      </span>`;
+  }
+
+  // The same, as a sentence, for the chart's accessible name.
+  function floodSentence(g) {
+    if (!g) return '';
+    return floodDrawn().map(({ s, st }) => {
+      const placed = floodPlaced(g, s, st);
+      const said = side => placed.filter(p => p.side === side)
+        .map(p => `${p.l.kind === 'aep' ? p.l.label : p.l.label.toLowerCase()} ${FloodStages.lineFigure(p.l)}`).join(', ');
+      const on = said('on'), up = said('above'), down = said('below');
+      return `Flood lines on ${s.label}, ${floodUnitWords(st.res.datum)}: `
+        + [on, up && `above the chart, ${up}`, down && `below it, ${down}`].filter(Boolean).join('; ') + '.';
+    }).join(' ');
+  }
+
+  // The card's flood block: the toggles, the datum and how it is known, what
+  // is drawn, and what is not and why. Native checkboxes, so each says its own
+  // state to the keyboard and to a screen reader; data-flood is how setFlood()
+  // puts the focus back on the one pressed after the rail is rebuilt under it.
+  function floodCardHtml(s) {
+    const st = floodState(s);
+    if (!st.offer) return '';
+    const name = s.station.name || 'this station';
+    const { has } = st.res;
+    if (!has.classes && !has.aep) {
+      return `<div class="small ad-series-meta ad-flood-none">No flood classes or AEP levels are recorded for ${esc(name)}.</div>`;
+    }
+    const f = s.flood || {};
+    const box = (what, label, ok, tip, aria) => `
+      <label class="ad-chk${ok ? '' : ' ad-chk--off'}" title="${escAttr(tip)}">
+        <input type="checkbox" data-flood="${s.key}:${what}" ${f[what] ? 'checked' : ''} ${ok ? '' : 'disabled'}
+               aria-label="${escAttr(aria)}"
+               onchange="ArroData.setFlood('${s.key}', '${what}', this.checked)"> ${esc(label)}</label>`;
+    const rows = [`
+      <div class="small ad-series-meta ad-flood" role="group" aria-label="Flood lines for ${escAttr(s.label)}">
+        ${box('classes', 'Flood classes', has.classes,
+          has.classes ? `Lines at ${name}'s minor, moderate and major flood classes, in this series' datum`
+                      : `No flood classes are recorded for ${name}`,
+          `Flood classes on the chart for ${s.label}`)}
+        ${box('aep', 'AEP levels', has.aep,
+          has.aep ? `Lines at ${name}'s modelled AEP flood levels — indicative — in this series' datum`
+                  : `No AEP flood levels are recorded for ${name}`,
+          `AEP levels on the chart for ${s.label}`)}
+        ${box('fit', 'stretch the axis', true,
+          'Stretch the vertical axis over these lines. Off, the axis fits the readings, and a level beyond them is named along the edge it is beyond.',
+          `Stretch the axis over the flood lines of ${s.label}`)}
+      </div>`];
+    if (!f.classes && !f.aep) return rows.join('');
+
+    const dt = st.dt;
+    if (!dt.metres) {
+      rows.push(`<div class="small ad-warn">${esc(dt.why)}</div>`);
+      return rows.join('');
+    }
+    if (dt.how === 'unit') {
+      rows.push(`<div class="small ad-series-meta">Readings in m AHD — ${esc(dt.why)}.</div>`);
+    } else {
+      const guess = floodGuess(s);
+      const words = d => (d === 'AHD' ? 'm AHD' : 'm on the gauge');
+      const auto = guess.datum ? `auto — ${words(guess.datum)}` : 'auto — not known';
+      const why = dt.how === 'hand'
+        ? `${dt.why}${guess.datum && guess.datum !== dt.datum ? `; auto would take them as ${words(guess.datum)}` : ''}`
+        : dt.why;
+      rows.push(`
+        <div class="small ad-series-meta">
+          <label title="What these readings are measured from: the gauge's own zero, or the Australian Height Datum. The flood classes are metres on the gauge and the AEP levels metres AHD, so this decides where each line goes.">readings in
+            <select data-flood="${s.key}:datum" aria-label="Readings in: what ${escAttr(s.label)} is measured from"
+                    onchange="ArroData.setFlood('${s.key}', 'datum', this.value)">
+              <option value="auto" ${f.datum === 'gauge' || f.datum === 'AHD' ? '' : 'selected'}>${esc(auto)}</option>
+              <option value="gauge" ${f.datum === 'gauge' ? 'selected' : ''}>m on the gauge</option>
+              <option value="AHD" ${f.datum === 'AHD' ? 'selected' : ''}>m AHD</option>
+            </select></label>
+          <span>— ${esc(why)}</span>
+        </div>`);
+    }
+    const res = st.res;
+    if (res.lines.length) {
+      // Only one kind is ever carried across: on the gauge the AEP levels
+      // come down through the zero, in AHD the classes go up through it.
+      const conv = res.lines.filter(l => l.converted);
+      const across = conv.length && res.zero
+        ? ` <span>— ${conv[0].kind === 'aep' ? 'the AEP levels' : 'the classes'} carried across the gauge zero, ${
+            esc(res.zero.m.toFixed(2))} m AHD</span>`
+        : '';
+      rows.push(`
+        <div class="small ad-series-meta ad-flood-drawn">Drawn, ${esc(floodUnitWords(res.datum))}:
+          ${res.lines.map(l => `<span class="${(AD_FLOOD_PAINT[l.kind] || AD_FLOOD_PAINT.aep).cls}">${
+            esc(`${l.kind === 'aep' ? l.label : l.label.toLowerCase()} ${FloodStages.lineFigure(l)}`)}</span>`).join(' · ')}${across}
+        </div>`);
+    }
+    if (ad.transform !== 'value') {
+      rows.push('<div class="small ad-series-meta">Drawn on <b>Value</b> only — on Increment or Rate/h a point is a difference between two readings, not a level.</div>');
+    }
+    for (const n of res.notes) rows.push(`<div class="small ad-warn ad-flood-note">Not drawn — ${esc(n.charAt(0).toLowerCase() + n.slice(1))}</div>`);
+    if (res.relevelled) rows.push(`<div class="small ad-warn ad-flood-relevel">${esc(res.relevelled.words)}</div>`);
+    if (res.suspect && dt.how !== 'unit') {
+      rows.push(`<div class="small ad-warn ad-flood-suspect">${esc(res.suspect.words)}
+        <button class="btn-link" onclick="ArroData.setFlood('${s.key}', 'datum', '${res.suspect.datum}')"
+                aria-label="${res.suspect.datum === 'AHD' ? 'Take them as m AHD' : 'Take them as m on the gauge'}: the readings of ${escAttr(s.label)}">${
+          res.suspect.datum === 'AHD' ? 'Take them as m AHD' : 'Take them as m on the gauge'}</button></div>`);
+    }
+    return rows.join('');
   }
 
   // ── axes ──
@@ -1534,6 +1969,11 @@ const ArroData = (function () {
       // before: the dash from the slot, the axis on the left.
       dash:     'auto',        // auto | solid | dash | dot | dashdot | long
       axis:     'left',        // left | right
+      // The station's flood classes and AEP levels across this series (#226),
+      // off until ticked so a chart nobody has touched draws what it always
+      // did; `datum` is what the readings are measured from — 'auto' takes it
+      // from the evidence, see floodDatum().
+      flood:    { classes: false, aep: false, fit: false, datum: 'auto' },
       visible:  true,
       // The longest silence the chart will draw a line across. Zero is off,
       // which is what every ARRO import gets: a CSV arrives whole, so a hole in
@@ -2883,6 +3323,10 @@ const ArroData = (function () {
                 <option value="right" ${axisOf(s) === 'right' ? 'selected' : ''}>Right</option>
               </select></label>
           </div>
+          <!-- The station's flood classes and AEP levels across this series
+               (#226): beside the line and axis because, like them, they are a
+               fact about this series — its station, and its datum. -->
+          ${floodCardHtml(s)}
           ${(s.warn || []).map(w => `<div class="small ad-warn">${esc(w)}</div>`).join('')}
         </div>`;
     }).join('');
@@ -3436,10 +3880,12 @@ const ArroData = (function () {
     const names = f.vis.slice(0, 3).map(s => s.label).join(', ')
                 + (f.vis.length > 3 ? ` and ${f.vis.length - 3} more` : '');
     const range = f.lo == null ? '' : `, ${fmtVal(f.lo)} to ${fmtVal(f.hi)} ${f.unit}`.trimEnd();
+    // The flood lines are part of the picture, so they are part of its name.
+    const flood = floodDrawn().length ? floodSentence(geom()) : '';
     return `${shape} of ${f.vis.length} series — ${names}. `
          + `${f.inView.toLocaleString()} reading${f.inView === 1 ? '' : 's'} shown, `
          + `${fmtFull(f.v.t0)} to ${fmtFull(f.v.t1)}${range}. `
-         + `${f.removed.toLocaleString()} removed by the filters in this window. ${how}`;
+         + `${f.removed.toLocaleString()} removed by the filters in this window. ${flood ? `${flood} ` : ''}${how}`;
   }
 
   function overviewName() {
@@ -4048,9 +4494,11 @@ const ArroData = (function () {
   }
 
   // Everything downstream of a reading's value is derived and cached, so an
-  // edit has to drop both caches or the chart redraws the numbers it had
-  // before. This is the only place that pairing is written down.
-  function invalidate(s) { s.filt = null; s.tracks = null; }
+  // edit has to drop every cache or the chart redraws the numbers it had
+  // before: the filter's verdict, the tracks drawn from it, and the reading
+  // the flood lines take as typical (floodTypical). This is the only place
+  // that list is written down.
+  function invalidate(s) { s.filt = null; s.tracks = null; s.floodTyp = null; }
 
   // A quality code, by label, added to the series' vocabulary if it is new.
   // qcodes is "the codes seen in this file, in first-seen order" and q[] indexes
@@ -4510,6 +4958,10 @@ const ArroData = (function () {
     const vis = shown();
     if (!vis.length) return '<span class="small">No series shown — tick one on the left.</span>';
     const v = view();
+    // The flood lines' keys follow their series' own entry (#226): this strip
+    // is the chart's legend, and those lines are on the chart.
+    const flood = floodDrawn();
+    const g = flood.length ? geom() : null;
     return `<div class="ad-stats">${vis.map(s => {
       const tr = tracks(s);
       const track = ad.mode === 'raw' ? tr.raw : tr.filt;
@@ -4517,13 +4969,14 @@ const ArroData = (function () {
       let lo = Infinity, hi = -Infinity, sum = 0, cnt = 0;
       for (let k = i0; k < i1; k++) { const y = track.y[k]; if (y < lo) lo = y; if (y > hi) hi = y; sum += y; cnt++; }
       const net = cnt && ad.transform === 'value' ? track.y[i1 - 1] - track.y[i0] : sum;
+      const fl = flood.find(x => x.s === s);
       return `
         <span class="ad-stat">
           <span class="ad-dot" style="--dot:${escAttr(s.color)}"></span>
           <b>${esc(s.label)}</b>
           <span class="small">${cnt.toLocaleString()} in view${cnt ? ` · ${fmtVal(lo)}–${fmtVal(hi)} ${esc(s.unit)}
             · ${ad.transform === 'value' ? 'net' : 'total'} ${fmtVal(net)}` : ''}</span>
-        </span>`;
+        </span>${fl ? floodLegendHtml(fl, g) : ''}`;
     }).join('')}</div>`;
   }
 
@@ -4865,10 +5318,15 @@ const ArroData = (function () {
     const { ticks, step } = timeTicks(g.v.t0, g.v.t1, Math.max(3, Math.round(g.pw / 110)));
     const yt = niceTicks(g.yr.lo, g.yr.hi, Math.max(2, Math.round(g.ph / 46)));
 
+    // The station's flood lines (#226): under the curves, their words over
+    // everything else in the plot, and the plate behind those words a filter
+    // in the defs — see floodLayer().
+    const flood = floodLayer(g, c);
+
     // Everything data-driven is clipped to the plot rectangle. Without it a
     // fixed or kept-only vertical range lets curves run across the axis labels.
     let out = `<defs><clipPath id="ad-clip"><rect x="${PADL}" y="${PADT}"
-                 width="${g.pw}" height="${g.ph}"/></clipPath></defs>
+                 width="${g.pw}" height="${g.ph}"/></clipPath>${flood.defs}</defs>
                <rect x="0" y="0" width="${g.w}" height="${g.h}" fill="${c.panel}"/>`;
 
     // The gridlines belong to the left axis; the right axis gets tick labels
@@ -4957,7 +5415,7 @@ const ArroData = (function () {
     }
     // What the filter took out, and what never made it in — after every series'
     // curve, so no line is drawn over a mark.
-    out += `<g clip-path="url(#ad-clip)">${series}${markers}${removalMarks(g, c, capped)}</g>`;
+    out += `<g clip-path="url(#ad-clip)">${flood.under}${series}${markers}${removalMarks(g, c, capped)}${flood.over}</g>`;
 
     // Crosshair and the nearest-reading halo.
     if (ad.hover) {
@@ -6212,6 +6670,34 @@ const ArroData = (function () {
     draw(); drawOv(); drawVov(); drawCompare(true);
   }
   function setKind(key, v) { const s = find(key); if (s) { s.kind = v; s.filt = null; s.tracks = null; redraw(true); } }
+
+  // One of a series' flood-line settings (#226): `what` is 'classes', 'aep' or
+  // 'fit' (on or off) or 'datum' ('auto', 'gauge' or 'AHD'). A new object
+  // rather than a write into the old one, the way setMark() does it. The rail
+  // is rebuilt — the card's words follow the setting — and the focus is put
+  // back on the control that was pressed, which the rebuild has just replaced;
+  // and the result is said, because a line drawn on a chart is news a screen
+  // reader would otherwise never hear.
+  function setFlood(key, what, v) {
+    const s = find(key);
+    if (!s) return;
+    const f = { ...(s.flood || {}) };
+    if (what === 'datum') f.datum = v === 'gauge' || v === 'AHD' ? v : 'auto';
+    else if (what === 'classes' || what === 'aep' || what === 'fit') f[what] = !!v;
+    else return;
+    s.flood = f;
+    renderSide();
+    draw(); drawOv(); renderReadout();
+    const back = document.querySelector(`[data-flood="${key}:${what}"]`);
+    if (back) back.focus();
+    const st = floodState(s);
+    if (!st.offer || (!f.classes && !f.aep)) { announce(`No flood lines on ${s.label}.`); return; }
+    const drawn = st.res ? st.res.lines.length : 0;
+    announce(drawn
+      ? `${drawn} flood level${drawn === 1 ? '' : 's'} on ${s.label}, ${floodUnitWords(st.res.datum)}.`
+        + (st.res.notes.length ? ` ${st.res.notes.length === 1 ? 'One set' : 'Some'} could not be drawn; the card says why.` : '')
+      : `No flood lines drawn on ${s.label}. ${(!st.dt.metres ? st.dt.why : st.res.notes[0]) || ''}`.trim());
+  }
   function solo(key) { ad.series.forEach(s => { s.visible = s.key === key; }); redraw(true); }
   function zoomTo(key) {
     const s = find(key);
@@ -6309,7 +6795,12 @@ const ArroData = (function () {
   }
 
   function setMode(v)      { ad.mode = v; renderMainOnly(); }
-  function setTransform(v) { ad.transform = v; for (const s of ad.series) s.tracks = null; renderMainOnly(); }
+  function setTransform(v) { ad.transform = v; for (const s of ad.series) s.tracks = null; renderMainOnly(); floodRailFollows(); }
+  // Flood lines are drawn on Value only, and a card with some ticked says so —
+  // so it has to hear when the chart moves on or off Value (#226).
+  function floodRailFollows() {
+    if (ad.series.some(s => s.flood && (s.flood.classes || s.flood.aep))) renderSide();
+  }
   function setChart(v)     { ad.chartType = v; renderMainOnly(); }
   // Choosing an axis mode — or typing into the range inputs — by hand drops
   // any stash a zoom gesture left behind: the operator has spoken since, and
@@ -6339,13 +6830,15 @@ const ArroData = (function () {
   // picking the wrong rows.
   function setDrag(v) {
     ad.dragMode = v;
-    if (v === 'select' && ad.transform !== 'value') {
+    const moved = v === 'select' && ad.transform !== 'value';
+    if (moved) {
       ad.transform = 'value';
       for (const s of ad.series) s.tracks = null;
       note('Showing Value — a reading can only be picked where it is drawn, and on '
          + 'Increment or Rate a point is the difference between two of them.');
     }
     renderMainOnly();
+    if (moved) floodRailFollows();
   }
   // The two edit fields keep what is typed without re-rendering under the
   // caret — which is what happens if the input's own value is state a render
@@ -6617,7 +7110,7 @@ const ArroData = (function () {
     // about the page's footprint, not about either tab.
     allSeries: () => Object.values(instances).flatMap(i => i.series),
     render, init, stop, repaint, importFiles, pick, loadDemo, setDemo,
-    toggle, setColor, colourToggle, setDash, setAxis, setKind, solo, zoomTo, remove, clearAll, showStation,
+    toggle, setColor, colourToggle, setDash, setAxis, setKind, setFlood, solo, zoomTo, remove, clearAll, showStation,
     setCfg, resetCfg, setQual, setMode, setTransform, setChart, setY, setYRange, setFlag, setMark, setDrag,
     resetView, toggleFull,
     // Editing readings (#191), and the selection it works over
