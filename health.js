@@ -82,6 +82,14 @@ const Health = (() => {
   function storedWin() {
     try { const k = localStorage.getItem('mn-hl-win'); return WINDOWS.some(w => w[0] === k) ? k : null; } catch (_) { return null; }
   }
+  // The owner filter, remembered on this device like the window: whoever
+  // looks after one council's stations wants that council's every morning.
+  function storedOwners() {
+    try {
+      const a = JSON.parse(localStorage.getItem('mn-hl-owners') || '[]');
+      return new Set(Array.isArray(a) ? a.filter(x => typeof x === 'string' && x) : []);
+    } catch (_) { return new Set(); }
+  }
 
   const H = {
     win: storedWin() || '7d',
@@ -94,6 +102,9 @@ const Health = (() => {
     map: null, layer: null,
     insp: new Map(),         // station id -> { visits, power } | 'loading' | { error }
     matrixAll: false,
+    owners: storedOwners(),  // the owners picked; empty is every owner
+    slsAsked: false,         // the SLS file, where most owners come from, sent for…
+    slsFailed: false,        // …and did not load
   };
 
   // ── small helpers ──────────────────────────────────────────────────────────
@@ -119,6 +130,72 @@ const Health = (() => {
   // "serial-monitor/rpi-6dfef7f4" wraps three times in a table cell.
   const hostLabel = h => String(h || '').replace(/^serial-monitor\//, '').replace(/^meganet\/v1\/([^/]+)\/logger\/reading\//, '$1 · ');
   const stationById = id => ((state.data && state.data.stations) || []).find(s => s.id === id) || null;
+
+  // ── who owns a station ─────────────────────────────────────────────────────
+  // The owner recorded on the station (0030) where there is one, and the
+  // Bureau's Service Level Specification's "Station owner" where there is not —
+  // which is most of them: four stations carry their own, the SLS names one
+  // for 3,253. The station card shows the two apart; here one answer is
+  // wanted, and the station's own record is the more specific statement.
+  //
+  // A joint owner is split into its parties for the filter — "Bureau/Seqwater"
+  // is Seqwater's station as much as the Bureau's, and somebody picking
+  // Seqwater expects it — and the documents' spellings of the same party are
+  // made one: the QLD SLS writes "Bureau", the NSW one "Bureau of
+  // Meteorology". Nothing else is renamed; the rest is the document's words.
+  const NO_OWNER = '(none on record)';
+  const PARTY_ALIAS = { 'Bureau': 'Bureau of Meteorology' };
+  function tidyParty(p) {
+    const t = String(p).replace(/\s+/g, ' ').replace(/(\S)\(/g, '$1 (').replace(/[\s\-–]+$/, '').trim();
+    return PARTY_ALIAS[t] || t;
+  }
+  const ownerMemo = new Map();
+  function parseOwner(raw, src) {
+    const k = src + '|' + raw;
+    if (!ownerMemo.has(k)) {
+      const parties = [...new Set(String(raw).split(/\s*[/,]\s*/).map(tidyParty).filter(Boolean))];
+      ownerMemo.set(k, parties.length ? { name: parties.join(' / '), parties, src } : null);
+    }
+    return ownerMemo.get(k);
+  }
+  // Whether every owner can be told yet: the SLS file is fetched on first need
+  // (sls.js), and until it lands a station with no owner of its own is not
+  // known to have none.
+  const ownersReady = () => typeof SLS === 'undefined' || SLS.loaded() || H.slsFailed;
+  // { name, parties, src } — or null: nobody on record, or not known yet.
+  function ownerOf(st) {
+    if (!st) return null;
+    if (st.owner && String(st.owner).trim()) return parseOwner(st.owner, 'recorded on the station');
+    if (typeof SLS === 'undefined' || !SLS.loaded()) return null;
+    const loc = SLS.forStation(st);
+    return loc && loc.owner ? parseOwner(loc.owner, `the Bureau's ${loc.jurisdiction ? loc.jurisdiction + ' ' : ''}Service Level Specification`) : null;
+  }
+  function ownerSmallHtml(st, cls) {
+    const o = ownerOf(st);
+    if (!o) return '';
+    return `<span class="hl-owner${cls ? ' ' + cls : ''}" title="${esc(`Owner: ${o.name} — ${o.src}`)}">${esc(o.name)}</span>`;
+  }
+
+  // The filter. Empty is everyone. A station matches when any of its parties
+  // was picked, or it has no owner on record and that was; a finding matches
+  // through its station, or its repeater — itself a station with an owner. A
+  // finding about a receiver, an address or the whole network belongs to no
+  // owner, and is set aside while the filter is on (the note under the status
+  // line says so, and the sections about the network below stay whole).
+  const filtering = () => H.owners.size > 0;
+  function stationMatches(st) {
+    if (!filtering()) return true;
+    const o = ownerOf(st);
+    if (o) return o.parties.some(p => H.owners.has(p));
+    return ownersReady() && H.owners.has(NO_OWNER);
+  }
+  function findingMatches(f) {
+    if (!filtering()) return true;
+    const st = f.stationId ? stationById(f.stationId) : f.repeaterId ? stationById(f.repeaterId) : null;
+    return !!st && stationMatches(st);
+  }
+  const ownedFindings = () => (H.A ? (filtering() ? H.A.findings.filter(findingMatches) : H.A.findings) : []);
+  const ownedStations = () => (H.A ? [...H.A.stations.values()].filter(S => stationMatches(S.st)) : []);
 
   function sevHtml(sev) {
     const s = SEV[sev] || SEV.info;
@@ -241,9 +318,10 @@ const Health = (() => {
               <button class="hl-chip${H.win === k ? ' hl-chip--on' : ''}" aria-pressed="${H.win === k}"
                       onclick="Health.setWin('${k}')">${esc(label)}</button>`).join('')}
             </span>
+            <span id="hl-ownpick-wrap">${ownerPickHtml()}</span>
             <button onclick="Health.refresh()" title="Fetch the window again and work it out afresh">Refresh</button>
             <button class="ghost" onclick="Health.demo()" title="A made-up week of real stations with one of every fault planted in it — what each finding looks like">Demo week</button>
-            <button class="ghost" onclick="Health.exportCsv()" title="Every finding, with its evidence, as a spreadsheet">Export findings</button>
+            <button class="ghost" onclick="Health.exportCsv()" title="Every finding, with its evidence and the station's owner, as a spreadsheet — only the owners picked, while the owner filter is on">Export findings</button>
           </div>
         </div>
         <p class="sub hl-sub">What the readings say about each field station and the network carrying them — learned check schedules
@@ -251,6 +329,7 @@ const Health = (() => {
           receivers and repeaters that went quiet, and stored readings that are corrupted copies rather than data.
           A missed check only counts against a station when a receiver that hears it was listening at the time.</p>
         <div id="hl-status" class="small hl-status" role="status">${statusHtml()}</div>
+        <div id="hl-ownnote" class="small hl-ownnote">${ownNoteHtml()}</div>
         <div id="hl-kpis">${kpisHtml()}</div>
       </section>
       <div id="hl-body">${bodyHtml()}</div>
@@ -299,12 +378,25 @@ const Health = (() => {
   function kpisHtml() {
     const A = H.A;
     if (!A) return '';
-    const c = A.counts;
+    // Under the owner filter the station counts are the picked owners'
+    // stations'; corrupted copies and receivers are the network's, and say so.
+    const own = filtering();
+    const F = ownedFindings();
+    let c = A.counts;
+    if (own) {
+      const sch = ownedStations().filter(S => S.schedule);
+      c = Object.assign({}, c, {
+        stationsHeard: ownedStations().length, scheduled: sch.length,
+        checksDue: sch.reduce((n, S) => n + S.schedule.counts.due, 0),
+        checksReceived: sch.reduce((n, S) => n + S.schedule.counts.hits + S.schedule.counts.partial, 0),
+        attention: F.filter(f => f.severity !== 'info').length,
+      });
+    }
     const chip = (k, v, sub, cls) => `<div class="qs-chip${cls ? ' ' + cls : ''}"><span class="qs-chip-k">${esc(k)}</span>`
       + `<span class="qs-chip-v">${v}</span>${sub ? `<span class="qs-chip-k">${sub}</span>` : ''}</div>`;
     const pct = c.checksDue ? Math.round(100 * c.checksReceived / c.checksDue) : null;
-    const silent = A.findings.filter(f => f.kind === 'silent').length;
-    const power = A.findings.filter(f => f.category === 'power' && f.severity !== 'info').length;
+    const silent = F.filter(f => f.kind === 'silent').length;
+    const power = F.filter(f => f.category === 'power' && f.severity !== 'info').length;
     const rxDown = A.findings.filter(f => f.kind === 'receiver-silent' && f.severity !== 'info').length;
     return `<div class="qs-status hl-kpis">
       ${chip('Stations heard', num(c.stationsHeard), `${num(c.scheduled)} on a learned schedule`)}
@@ -312,28 +404,158 @@ const Health = (() => {
       ${chip('Need attention', num(c.attention), 'critical and warnings', c.attention ? 'warn' : '')}
       ${chip('Silent now', num(silent), 'stations', silent ? 'bad' : '')}
       ${chip('Power', num(power), 'battery findings', power ? 'warn' : '')}
-      ${chip('Corrupted copies', num(c.corrupted + c.ghosts), `${num(c.ghosts)} under the wrong address`, '')}
-      ${chip('Receivers', num(c.receivers), rxDown ? `${rxDown} stopped` : 'delivering', rxDown ? 'bad' : '')}
+      ${chip('Corrupted copies', num(c.corrupted + c.ghosts), own ? 'whole network' : `${num(c.ghosts)} under the wrong address`, '')}
+      ${chip('Receivers', num(c.receivers), (rxDown ? `${rxDown} stopped` : 'delivering') + (own ? ' · whole network' : ''), rxDown ? 'bad' : '')}
     </div>`;
+  }
+
+  // ── the owner filter ───────────────────────────────────────────────────────
+  // A button in the header beside the window, opening a list of every owner
+  // with a station heard in the window — how many it has, and how many of
+  // those need attention — to tick. It narrows the KPIs, Needs attention, the
+  // map and Check signals; the receivers, repeaters and register stay the
+  // network's, because a receiver going quiet is everybody's problem.
+
+  function ownerSumHtml() {
+    const n = H.owners.size;
+    const one = n === 1 ? [...H.owners][0] : '';
+    const label = n === 0 ? 'All owners' : n === 1 ? (one === NO_OWNER ? 'No owner on record' : one) : `${n} owners`;
+    return `<span class="hl-ownpick-k">Owner:</span> <span class="hl-ownpick-v">${esc(label)}</span> <span aria-hidden="true">▾</span>`;
+  }
+  function ownerPickHtml() {
+    return `<details class="hl-ownpick${filtering() ? ' hl-ownpick--on' : ''}" id="hl-ownpick">
+      <summary id="hl-ownpick-sum" title="Show only the stations of the owners picked — remembered on this device">${ownerSumHtml()}</summary>
+      <div class="hl-ownpick-pop" id="hl-ownpick-pop" role="group" aria-label="Station owners to show">${ownerListHtml()}</div>
+    </details>`;
+  }
+
+  // Each owner party with a station heard: how many, and how many of them
+  // with a critical finding or a warning. A party picked but not heard this
+  // window stays listed, at nought, so it can be unpicked.
+  function ownerTally() {
+    const m = new Map();
+    if (H.A) {
+      H.A.stations.forEach(S => {
+        const o = ownerOf(S.st);
+        const parties = o ? o.parties : ownersReady() ? [NO_OWNER] : [];
+        parties.forEach(p => {
+          const t = m.get(p) || { n: 0, attn: 0 };
+          t.n++;
+          if (S.status === 'critical' || S.status === 'warn') t.attn++;
+          m.set(p, t);
+        });
+      });
+    }
+    H.owners.forEach(p => { if (!m.has(p)) m.set(p, { n: 0, attn: 0 }); });
+    return m;
+  }
+  function ownerListHtml() {
+    if (!H.A) return '<p class="small hl-empty">The owners are listed once the readings are worked out.</p>';
+    const list = [...ownerTally().entries()]
+      .sort((a, b) => ((a[0] === NO_OWNER) - (b[0] === NO_OWNER)) || (b[1].n - a[1].n) || a[0].localeCompare(b[0]));
+    const note = !ownersReady()
+      ? '<p class="small txt-muted">Looking up owners in the Bureau’s Service Level Specification…</p>'
+      : H.slsFailed ? '<p class="small txt-warn">The Service Level Specification file did not load, so only the owners recorded on stations are here.</p>' : '';
+    return `
+      <div class="hl-ownpick-head">
+        <button type="button" class="hl-chip hl-chip--sm" onclick="Health.clearOwners()">All owners</button>
+        ${list.length > 8 ? '<input type="search" class="hl-ownpick-find" placeholder="Find an owner" aria-label="Find an owner" oninput="Health.findOwner(this.value)">' : ''}
+      </div>
+      ${note}
+      <p class="small txt-muted hl-ownpick-key">stations heard · <span aria-hidden="true">⚠</span> of them needing attention</p>
+      <div class="hl-ownpick-list">${list.map(([p, t]) => `
+        <label class="hl-check hl-ownpick-row" data-find="${esc(p.toLowerCase())}">
+          <input type="checkbox" data-party="${esc(p)}" ${H.owners.has(p) ? 'checked' : ''} onchange="Health.setOwner(this.dataset.party, this.checked)">
+          <span class="hl-ownpick-name">${esc(p === NO_OWNER ? 'No owner on record' : p)}</span>
+          <span class="hl-count">${num(t.n)}${t.attn ? ` · <span class="txt-warn"><span aria-hidden="true">⚠</span><span class="sr-only">needing attention:</span> ${num(t.attn)}</span>` : ''}</span>
+        </label>`).join('') || '<p class="small hl-empty">No station heard in the window.</p>'}</div>`;
+  }
+
+  // Under the status line while the filter is on: what is shown, and what is not.
+  function ownNoteHtml() {
+    if (!filtering() || !H.A) return '';
+    const names = [...H.owners].map(p => (p === NO_OWNER ? 'no owner on record' : p));
+    const shown = ownedStations().length;
+    return `Showing the stations of <b>${esc(names.join(', '))}</b>: ${num(shown)} of ${num(H.A.stations.size)} heard, and their findings.
+      Receivers, repeaters and the register below are the whole network’s.
+      <button class="link-btn" onclick="Health.clearOwners()">Show every owner</button>`;
+  }
+
+  function ownerFactHtml(st) {
+    const o = ownerOf(st);
+    if (o) return `${esc(o.name)} <span class="small txt-muted">(${esc(o.src)})</span>`;
+    if (!ownersReady()) return '<span class="small txt-muted">looking it up in the Bureau’s Service Level Specification…</span>';
+    return `<span class="small txt-muted">none on record${H.slsFailed ? ' — the Service Level Specification file, where most owners come from, did not load' : ''}</span>`;
+  }
+
+  // Everything the filter narrows, painted again in place — not the header,
+  // so the list stays open and the keyboard stays on the box just ticked.
+  // `all` also repaints the list and the open station, for when the owners
+  // themselves have changed (the SLS file landing).
+  function repaintOwned(all) {
+    if (state.activeTab !== 'health' || !H.A) return;
+    const pick = document.getElementById('hl-ownpick');
+    if (pick) pick.classList.toggle('hl-ownpick--on', filtering());
+    const sum = document.getElementById('hl-ownpick-sum');
+    if (sum) sum.innerHTML = ownerSumHtml();
+    if (all) { const pop = document.getElementById('hl-ownpick-pop'); if (pop) pop.innerHTML = ownerListHtml(); }
+    const note = document.getElementById('hl-ownnote');
+    if (note) note.innerHTML = ownNoteHtml();
+    const k = document.getElementById('hl-kpis');
+    if (k) k.innerHTML = kpisHtml();
+    rerenderAttn();
+    const sec = document.querySelector('[aria-labelledby="hl-h-checks"]');
+    if (sec) sec.innerHTML = matrixHtml();
+    if (all) rerenderStation(); else drawMap();
+  }
+  function saveOwners() {
+    try { localStorage.setItem('mn-hl-owners', JSON.stringify([...H.owners])); } catch (_) {}
+  }
+  function setOwner(p, on) {
+    if (!p) return;
+    if (on) H.owners.add(p); else H.owners.delete(p);
+    document.querySelectorAll('#hl-ownpick-pop input[data-party]').forEach(c => { if (c.dataset.party === p) c.checked = !!on; });
+    saveOwners();
+    repaintOwned(false);
+    announce(filtering() ? `Showing the stations of ${H.owners.size} owner${H.owners.size === 1 ? '' : 's'}: ${ownedStations().length} heard.` : 'Showing every owner.');
+  }
+  function clearOwners() {
+    H.owners.clear();
+    saveOwners();
+    document.querySelectorAll('#hl-ownpick-pop input[type="checkbox"]').forEach(c => { c.checked = false; });
+    repaintOwned(false);
+    announce('Showing every owner.');
+  }
+  function findOwner(q) {
+    const t = String(q || '').trim().toLowerCase();
+    document.querySelectorAll('#hl-ownpick-pop .hl-ownpick-row').forEach(el => { el.hidden = !!t && !el.dataset.find.includes(t); });
+  }
+  // Most owners are in the SLS file, which nothing fetches until it is asked
+  // for; this tab asks when it opens, and repaints what the owners touch when
+  // the answer (or the failure) comes back.
+  function askOwners() {
+    if (typeof SLS === 'undefined' || SLS.loaded() || H.slsAsked) return;
+    H.slsAsked = true;
+    SLS.ensureData().then(() => repaintOwned(true), () => { H.slsFailed = true; repaintOwned(true); });
   }
 
   // ── needs attention ────────────────────────────────────────────────────────
 
   function visibleFindings() {
     if (!H.A) return [];
-    return H.A.findings.filter(f => (H.showInfo || f.severity !== 'info') && (H.cat === 'all' || f.category === H.cat));
+    return ownedFindings().filter(f => (H.showInfo || f.severity !== 'info') && (H.cat === 'all' || f.category === H.cat));
   }
   function attnCountText() {
-    const A = H.A;
-    const crit = A.findings.filter(f => f.severity === 'critical').length;
-    const warn = A.findings.filter(f => f.severity === 'warn').length;
-    const info = A.findings.filter(f => f.severity === 'info').length;
+    const F = ownedFindings();
+    const crit = F.filter(f => f.severity === 'critical').length;
+    const warn = F.filter(f => f.severity === 'warn').length;
+    const info = F.filter(f => f.severity === 'info').length;
     return `${crit} critical · ${warn} warnings · ${info} notes`;
   }
 
   function filtersHtml() {
     const counts = new Map();
-    H.A.findings.forEach(f => { if (H.showInfo || f.severity !== 'info') counts.set(f.category, (counts.get(f.category) || 0) + 1); });
+    ownedFindings().forEach(f => { if (H.showInfo || f.severity !== 'info') counts.set(f.category, (counts.get(f.category) || 0) + 1); });
     const total = [...counts.values()].reduce((a, b) => a + b, 0);
     return `<div class="hl-filters">
       <span class="hl-seg hl-seg--wrap" role="group" aria-label="Which kind of finding">
@@ -353,12 +575,12 @@ const Health = (() => {
   function whereHtml(f) {
     if (f.stationId && H.A.stations.has(f.stationId)) {
       return `<button class="link-btn" onclick="Health.select('${escAttr(f.stationId)}')"
-                title="Open ${escAttr(f.station || '')} below — its checks, battery, sensors and the context lens">${esc(f.station || f.stationId)}</button>`;
+                title="Open ${escAttr(f.station || '')} below — its checks, battery, sensors and the context lens">${esc(f.station || f.stationId)}</button>${ownerSmallHtml(stationById(f.stationId))}`;
     }
     if (f.host) return `<span class="mono small" title="${escAttr(f.host)}">${esc(hostLabel(f.host))}</span>`;
     if (f.repeaterId) {
       const st = stationById(f.repeaterId);
-      return st ? `<button class="link-btn" onclick="goToStation('${escAttr(st.id)}')" title="The repeater on the Stations tab">${esc(st.name)}</button>` : esc(f.repeaterId);
+      return st ? `<button class="link-btn" onclick="goToStation('${escAttr(st.id)}')" title="The repeater on the Stations tab">${esc(st.name)}</button>${ownerSmallHtml(st)}` : esc(f.repeaterId);
     }
     if (f.addr) return `<span class="mono">${esc(f.addr)}</span>`;
     return '<span class="small txt-muted">network</span>';
@@ -370,7 +592,9 @@ const Health = (() => {
   function findingsHtml() {
     const list = visibleFindings();
     if (!list.length) {
-      return `<p class="small hl-empty">${H.A.findings.length
+      return `<p class="small hl-empty">${filtering() && !ownedFindings().length
+        ? 'Nothing found at the stations of the owners picked — or none of them was heard in the window.'
+        : H.A.findings.length
         ? 'Nothing here at this level — tick “include notes” or pick another kind.'
         : 'Nothing found — every station heard is checking in, and nothing in the readings looks wrong.'}</p>`;
     }
@@ -429,16 +653,17 @@ const Health = (() => {
     const layer = H.layer = L.layerGroup().addTo(map);
     const pts = [];
     const rank = { critical: 0, warn: 1, info: 2, ok: 3, irregular: 4 };
-    const list = [...H.A.stations.values()].filter(S => S.st.lat != null && S.st.lon != null)
+    const list = [...H.A.stations.values()].filter(S => S.st.lat != null && S.st.lon != null && (S.st.id === H.sel || stationMatches(S.st)))
       .sort((a, b) => rank[b.status] - rank[a.status]);
     list.forEach(S => {
       const r = { critical: 9, warn: 7, info: 5, ok: 5, irregular: 4 }[S.status] || 4;
       const sel = H.sel === S.st.id;
+      const own = ownerOf(S.st);
       L.circleMarker([S.st.lat, S.st.lon], {
         radius: sel ? r + 3 : r, color: sel ? cssVar('--text', '#16202a') : cssVar('--panel', '#fff'), weight: sel ? 3 : 2,
         fillColor: statusColour(S.status), fillOpacity: 0.95,
       })
-        .bindTooltip(`${esc(S.st.name)} — ${esc((S.findings[0] && S.findings[0].title) || (S.status === 'irregular' ? 'no schedule learned' : 'nothing found'))}`)
+        .bindTooltip(`${esc(S.st.name)}${own ? ` · ${esc(own.name)}` : ''} — ${esc((S.findings[0] && S.findings[0].title) || (S.status === 'irregular' ? 'no schedule learned' : 'nothing found'))}`)
         .on('click', () => select(S.st.id))
         .addTo(layer);
       pts.push([S.st.lat, S.st.lon]);
@@ -471,6 +696,7 @@ const Health = (() => {
     const worst = S.findings.length ? sevHtml(S.findings.reduce((w, f) => (f.severity === 'critical' || (f.severity === 'warn' && w.severity === 'info') ? f : w), S.findings[0]).severity) : '<span class="hl-sev txt-ok"><span aria-hidden="true">✓</span> Nothing found</span>';
     const facts = [];
     facts.push(['Station', `${esc(st.station_number || '—')} · ALERT ${esc(stationAlertIds(st).join(', ') || '—')}`]);
+    facts.push(['Owner', ownerFactHtml(st)]);
     facts.push(['Checks', sch
       ? `every ${esc(HealthAnalysis.fmtPeriod(sch.P))}, at ${esc(phaseText(sch))} — ${num(sch.counts.hits)} received, ${num(sch.counts.partial)} with frames lost, ${num(sch.counts.misses)} missed${sch.counts.net ? `, ${num(sch.counts.net)} missed network-wide` : ''}${sch.counts.unknown ? `, ${num(sch.counts.unknown)} when nothing that hears it was listening` : ''}`
       : `no regular schedule learned from ${num(S.bursts.length)} report${S.bursts.length === 1 ? '' : 's'} — it may report on events only`]);
@@ -776,7 +1002,7 @@ const Health = (() => {
 
   function matrixHtml() {
     const A = H.A;
-    const list = [...A.stations.values()].filter(S => S.schedule && S.schedule.daily);
+    const list = [...A.stations.values()].filter(S => S.schedule && S.schedule.daily && stationMatches(S.st));
     const rank = { critical: 0, warn: 1, info: 2, ok: 3, irregular: 4 };
     list.sort((a, b) => (rank[a.status] - rank[b.status]) || (b.schedule.missRate - a.schedule.missRate) || a.st.name.localeCompare(b.st.name));
     const days = [];
@@ -795,7 +1021,7 @@ const Health = (() => {
     };
     return `
       <div class="panel-header"><h3 id="hl-h-checks">Check signals</h3>
-        <span class="small">${num(list.length)} stations with a learned schedule, worst first; the number in a day is its misses</span></div>
+        <span class="small">${num(list.length)} stations with a learned schedule${filtering() ? ' of the owners picked' : ''}, worst first; the number in a day is its misses</span></div>
       <div class="qs-legend">${['hit', 'partial', 'miss', 'net', 'unknown'].map(k => `<span><i class="hl-key ${OUTCOME[k].cls}" aria-hidden="true"></i>${esc(OUTCOME[k].label)}</span>`).join('')}</div>
       <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="hl-h-checks">
         <table class="hl-table hl-matrix">
@@ -804,7 +1030,7 @@ const Health = (() => {
           <thead><tr><th scope="col">Station</th><th scope="col">Every</th><th scope="col">Missed</th>
             ${days.map(d => `<th scope="col" class="hl-mday">${esc(fmtDay(d))}</th>`).join('')}</tr></thead>
           <tbody>${shown.map(S => `<tr>
-            <th scope="row"><button class="link-btn" onclick="Health.select('${escAttr(S.st.id)}')">${esc(S.st.name)}</button></th>
+            <th scope="row"><button class="link-btn" onclick="Health.select('${escAttr(S.st.id)}')">${esc(S.st.name)}</button>${ownerSmallHtml(S.st)}</th>
             <td>${esc(HealthAnalysis.fmtPeriod(S.schedule.P))}</td>
             <td>${Math.round(100 * S.schedule.missRate)}%</td>
             ${days.map(d => cell(S, d)).join('')}</tr>`).join('')}</tbody>
@@ -1035,14 +1261,20 @@ const Health = (() => {
 
   function exportCsv() {
     if (!H.A) return;
-    const head = ['severity', 'category', 'kind', 'station', 'station_id', 'receiver', 'repeater_id', 'address', 'title', 'detail', 'action', 'since', 'evidence'];
+    const head = ['severity', 'category', 'kind', 'station', 'station_id', 'owner', 'receiver', 'repeater_id', 'address', 'title', 'detail', 'action', 'since', 'evidence'];
     const lines = [head.join(',')];
-    H.A.findings.forEach(f => lines.push([
-      f.severity, f.category, f.kind, f.station || '', f.stationId || '', f.host || '', f.repeaterId || '', f.addr || '',
-      f.title, f.detail, f.action || '', f.since ? new Date(f.since).toISOString() : '', JSON.stringify(f.evidence || {}),
-    ].map(csvEscape).join(',')));
-    dlText(`meganet-station-health-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
-    announce(`Downloaded ${H.A.findings.length} findings as CSV.`);
+    const F = ownedFindings();
+    F.forEach(f => {
+      const id = f.stationId || f.repeaterId;
+      const o = id ? ownerOf(stationById(id)) : null;
+      lines.push([
+        f.severity, f.category, f.kind, f.station || '', f.stationId || '', o ? o.name : '', f.host || '', f.repeaterId || '', f.addr || '',
+        f.title, f.detail, f.action || '', f.since ? new Date(f.since).toISOString() : '', JSON.stringify(f.evidence || {}),
+      ].map(csvEscape).join(','));
+    });
+    const slug = filtering() ? '-' + [...H.owners].sort().join('-').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) : '';
+    dlText(`meganet-station-health${slug}-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
+    announce(`Downloaded ${F.length} findings as CSV${filtering() ? ', for the owners picked' : ''}.`);
   }
 
   // ── lifecycle ──────────────────────────────────────────────────────────────
@@ -1052,6 +1284,7 @@ const Health = (() => {
   function init() {
     // Safe to repeat: the registry replaces rather than stacks (#142).
     registerTabTeardown('Health', stop);
+    askOwners();
     afterRender();
     if (H.sel) loadInspections(H.sel);
     // The first visit fetches on its own, as the Message Log's does: the tab's
@@ -1061,12 +1294,18 @@ const Health = (() => {
   }
 
   // What the agent reads. Plain data, not the DOM.
-  function state_() { return { A: H.A, rows: H.rows, sel: H.sel, win: H.win, demo: H.demo }; }
+  function state_() { return { A: H.A, rows: H.rows, sel: H.sel, win: H.win, demo: H.demo, owners: [...H.owners] }; }
+  // A station's owner for the agent and the tests: { name, parties, source }, or null.
+  function owner(st) {
+    const o = ownerOf(st);
+    return o ? { name: o.name, parties: o.parties.slice(), source: o.src } : null;
+  }
 
   return {
     render, init, stop, run, refresh, demo, adopt,
     setWin, setCat, setInfo, toggleMatrix, select, close, lensAt, lensClose, stripClick,
     openLog, openAddr, openField, openReception, showStation, exportCsv, fetchReadings,
+    setOwner, clearOwners, findOwner, owner,
     state: state_,
   };
 })();

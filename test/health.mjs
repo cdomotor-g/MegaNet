@@ -252,6 +252,56 @@ try {
   ok('a filter shows one kind of finding', power.length >= 2 && power.every(t => /batter/i.test(t)), JSON.stringify(power));
   await page.evaluate(() => Health.setCat('all'));
 
+  // ── who owns each station, and the owner filter ────────────────────────────
+  await until(page, () => SLS.loaded() && document.querySelector('#hl-ownpick-pop input[data-party]'), null);
+  const own = await page.evaluate(async () => {
+    const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const A = Health.state().A;
+    const tally = new Map();
+    A.stations.forEach(S => { const o = Health.owner(S.st); if (o) o.parties.forEach(p => tally.set(p, (tally.get(p) || 0) + 1)); });
+    const pick = [...tally.entries()].sort((a, b) => b[1] - a[1]).find(([, n]) => n < A.stations.size);
+    const before = {
+      inHeader: !!document.querySelector('.panel-header .hl-tools #hl-ownpick summary'),
+      options: [...document.querySelectorAll('#hl-ownpick-pop input[data-party]')].map(i => i.dataset.party),
+      ownersShown: document.querySelectorAll('.hl-ftable .hl-fwhere .hl-owner').length,
+      matrix: document.querySelectorAll('.hl-matrix tbody tr').length,
+    };
+    Health.setOwner(pick[0], true);
+    await frame();
+    const where = [...document.querySelectorAll('.hl-ftable .hl-fwhere')];
+    const after = {
+      pick: pick[0], n: pick[1],
+      rows: where.length,
+      rowsOwned: where.every(th => { const o = th.querySelector('.hl-owner'); return !!o && Health.owner({ owner: o.textContent }).parties.includes(pick[0]); }),
+      heardKpi: document.querySelector('#hl-kpis .qs-chip-v').textContent,
+      note: document.getElementById('hl-ownnote').textContent.replace(/\s+/g, ' '),
+      summary: document.getElementById('hl-ownpick-sum').textContent,
+      on: document.getElementById('hl-ownpick').classList.contains('hl-ownpick--on'),
+      stored: localStorage.getItem('mn-hl-owners'),
+    };
+    const sid = [...A.stations.values()].find(S => { const o = Health.owner(S.st); return o && o.parties.includes(pick[0]); }).st.id;
+    Health.select(sid);
+    await frame();
+    const fact = [...document.querySelectorAll('#hl-station .hl-facts div')].find(d => /Owner/.test(d.querySelector('dt').textContent));
+    after.fact = fact ? fact.querySelector('dd').textContent.replace(/\s+/g, ' ') : null;
+    Health.close();
+    Health.clearOwners();
+    await frame();
+    after.cleared = { note: document.getElementById('hl-ownnote').textContent.trim(), stored: localStorage.getItem('mn-hl-owners'),
+      heardKpi: document.querySelector('#hl-kpis .qs-chip-v').textContent };
+    return { before, after, total: A.stations.size };
+  });
+  ok('the station owner sits under the station\'s name in Needs attention and Check signals',
+    own.before.ownersShown > 0 && own.before.options.length > 1, JSON.stringify(own.before).slice(0, 300));
+  ok('an owner filter button sits in the header with Refresh and the rest', own.before.inHeader, JSON.stringify(own.before.inHeader));
+  ok('…and picking an owner narrows the findings to that owner\'s stations, and says so',
+    own.after.rows > 0 && own.after.rowsOwned && own.after.heardKpi === String(own.after.n) && own.after.on
+      && own.after.note.includes(own.after.pick) && own.after.summary.includes(own.after.pick) && JSON.parse(own.after.stored)[0] === own.after.pick,
+    JSON.stringify(own.after));
+  ok('…the station opened says who owns it and where that came from', own.after.fact && own.after.fact.includes(own.after.pick) && /SLS|Service Level|recorded/.test(own.after.fact), own.after.fact);
+  ok('…and All owners puts the whole network back', !own.after.cleared.note && own.after.cleared.stored === '[]' && own.after.cleared.heardKpi === own.total.toLocaleString(),
+    JSON.stringify(own.after.cleared));
+
   const lens = await page.evaluate(async id => {
     Health.select(id);
     const S = Health.state().A.stations.get(id);

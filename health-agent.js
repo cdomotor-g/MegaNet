@@ -22,8 +22,8 @@
 // job the agent does, with the same views as tools:
 //
 //   list_findings      the analysis' findings, filtered
-//   station_detail     a station's schedule, battery, rain, level, sensors,
-//                      findings, neighbours and last site visit
+//   station_detail     a station's owner, schedule, battery, rain, level,
+//                      sensors, findings, neighbours and last site visit
 //   context_at         the context lens: the network at one moment
 //   station_readings   its transmissions in the window, with the corrupted
 //                      copies beside them
@@ -148,7 +148,7 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
         limit: { type: 'integer', minimum: 1, maximum: 150, description: 'At most this many (default 60).' },
       }, required: [] } },
     { name: 'station_detail',
-      description: "One station in full: position, roles and repeaters on file; its learned check schedule with checks received, partial, missed, missed network-wide and unknown, its silent spells and daily counts; its battery (night lows by night, trend in V/day, daily swing, latest); its rain gauge and level sensor; its sensors; its findings; the receivers that hear it; and its last site visit with the battery measured then.",
+      description: "One station in full: position, owner, roles and repeaters on file; its learned check schedule with checks received, partial, missed, missed network-wide and unknown, its silent spells and daily counts; its battery (night lows by night, trend in V/day, daily swing, latest); its rain gauge and level sensor; its sensors; its findings; the receivers that hear it; and its last site visit with the battery measured then.",
       input_schema: { type: 'object', properties: { station_id: S_ID }, required: ['station_id'] } },
     { name: 'context_at',
       description: 'The network around one moment for one station: which receivers that hear it were delivering, what its neighbours (repeater-mates within 60 km, stations within 25 km) did at their own check slots then, what it sent itself, and a verdict on whether a miss was its own, shared, or the network\'s.',
@@ -188,11 +188,21 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
   const r2 = v => (v == null || !isFinite(v) ? null : Math.round(v * 100) / 100);
   const iso = t => (t == null ? null : new Date(t).toISOString());
 
+  // Who owns the station (or the repeater) a finding is about — the owner on
+  // the station, else the Bureau's SLS (Health.owner). Null for a receiver,
+  // an address or the network, and while the SLS file is still on its way.
+  function findingOwner(f) {
+    const id = f.stationId || f.repeaterId;
+    const st = id && state.data && (state.data.stations || []).find(s => s.id === id);
+    const o = st && typeof Health !== 'undefined' && Health.owner ? Health.owner(st) : null;
+    return o ? o.name : null;
+  }
+
   function compactFinding(f) {
     return {
       severity: f.severity, category: f.category, kind: f.kind,
       station_id: f.stationId || null, station: f.station || null, receiver: f.host || null,
-      repeater_id: f.repeaterId || null, address: f.addr || null,
+      repeater_id: f.repeaterId || null, address: f.addr || null, owner: findingOwner(f),
       title: f.title, detail: f.detail, action: f.action, since: iso(f.since), evidence: f.evidence || {},
     };
   }
@@ -247,6 +257,7 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
         } catch (_) { visit = 'the inspection history did not answer'; }
         return {
           id: st.id, name: st.name, station_number: st.station_number || null, lat: st.lat, lon: st.lon,
+          owner: (typeof Health !== 'undefined' && Health.owner && Health.owner(st)) || 'none on record',
           roles: st.roles, alert_ids: stationAlertIds(st), repeaters_on_file: reps, heard_by: S.paths || [...S.hosts],
           last_heard: iso(S.lastHeard), status: S.status,
           schedule: sch ? {

@@ -15483,6 +15483,42 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-chip--sm { padding: .1rem .5rem; font-size: var(--fs-xs); margin: .1rem 0; }
 .hl-count { opacity: .75; font-variant-numeric: tabular-nums; }
 .hl-kpis { margin-top: var(--sp-1); }
+/* The owner filter: a dropdown in the header row — the Message Log's column
+   chooser's shape, with a button's face so it sits with Refresh and the rest.
+   On, it wears the accent edge, so a page narrowed to one council's stations
+   never passes for the whole network. Below 640 px the list drops into the
+   flow rather than hanging off a button that may be at either edge. */
+.hl-ownpick { position: relative; }
+.hl-ownpick summary {
+  list-style: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: .3rem; max-width: 20rem; white-space: nowrap;
+  border: 1px solid var(--ctl-border); border-radius: var(--r-md);
+  background: var(--panel); color: var(--text); padding: .55rem .8rem;
+}
+.hl-ownpick summary::-webkit-details-marker { display: none; }
+.hl-ownpick summary:hover, .hl-ownpick[open] summary { background: var(--subtle); }
+.hl-ownpick--on summary { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.hl-ownpick-k { color: var(--muted); }
+.hl-ownpick-v { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.hl-ownpick-pop {
+  position: absolute; left: 0; z-index: 40; width: min(22rem, 90vw); box-sizing: border-box;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md);
+  box-shadow: var(--shadow-2); padding: var(--sp-3); margin-top: .25rem;
+}
+@media (max-width: 640px) {
+  .hl-ownpick-pop { position: static; width: auto; }
+}
+.hl-ownpick-head { display: flex; gap: var(--sp-2); align-items: center; }
+.hl-ownpick-find { flex: 1; min-width: 0; }
+.hl-ownpick-key { margin: var(--sp-2) 0 .2rem; }
+.hl-ownpick-list { display: flex; flex-direction: column; gap: .1rem; max-height: 50vh; overflow-y: auto; }
+.hl-ownpick-row { display: flex; padding: .2rem 0; }
+.hl-ownpick-row[hidden] { display: none; }
+.hl-ownpick-name { flex: 1; min-width: 0; }
+.hl-ownnote { margin: 0 0 var(--sp-2); }
+.hl-ownnote:empty { display: none; }
+/* A station's owner, a quiet line under its name wherever the tab names it. */
+.hl-owner { display: block; font-size: var(--fs-xs); font-weight: 400; color: var(--muted); white-space: normal; }
 
 .hl-grid {
   display: grid; gap: var(--sp-3);
