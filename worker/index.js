@@ -45,9 +45,18 @@
 // A fourth: /api/photos/*, the field photos' bytes in Cloudflare R2 rather than
 // Supabase Storage — worker/photos.js, docs/field-photos.md ("Where the bytes
 // live").
+//
+// A fifth: /api/briefing, Station Health's Ask Claude on Flood-Net's own
+// Anthropic key, for editors and administrators — worker/briefing.js. It asks
+// Access who this is the way /api/session does (accessIdentity, below), and
+// keeps its day's spend in a Durable Object, BriefingLedger, exported from here
+// because a Durable Object class has to be exported by the Worker's main module.
 
 import { isApiPath, handleApi } from './api.js';
 import { isPhotoPath, handlePhotos } from './photos.js';
+import { isBriefingPath, handleBriefing } from './briefing.js';
+
+export { BriefingLedger } from './briefing.js';
 
 // Already public in core.js — the project ref is in the committed client config,
 // so keeping it here costs nothing and saves a binding the operator would have
@@ -153,6 +162,31 @@ function accessTokenFrom(request) {
   const cookie = request.headers.get('Cookie') || '';
   const m = /(?:^|;\s*)CF_Authorization=([^;]+)/.exec(cookie);
   return m ? m[1] : null;
+}
+
+// Who Cloudflare Access says is at the door: `{claims}`, verified, or `{status,
+// error}` saying why not. The session exchange below and the briefing route
+// (worker/briefing.js) both ask this, so the two doors check the same thing the
+// same way; the caller has already made sure ACCESS_TEAM_DOMAIN and ACCESS_AUD
+// are set.
+async function accessIdentity(request, env) {
+  const token = accessTokenFrom(request);
+  if (!token) {
+    // The ordinary answer for an origin Access does not cover. The app reads
+    // this as "no gate here" and falls back to the email-and-code panel.
+    return { status: 401, error: 'no Cloudflare Access identity on this request' };
+  }
+  try {
+    const keys = await fetchJwks(env.ACCESS_TEAM_DOMAIN);
+    const claims = await verifyAccessJwt(token, {
+      keys,
+      aud: env.ACCESS_AUD,
+      issuer: `https://${env.ACCESS_TEAM_DOMAIN}`,
+    });
+    return { claims };
+  } catch (err) {
+    return { status: 401, error: `Access identity refused: ${err.message}` };
+  }
 }
 
 function json(body, status) {
@@ -421,6 +455,12 @@ export default {
     // editor's Supabase token, the project's secret key, or a signed URL.
     if (isPhotoPath(url.pathname)) return handlePhotos(request, env);
 
+    // Ask Claude's model calls on Flood-Net's key (worker/briefing.js): an
+    // Access identity and an editor's or administrator's session in, the
+    // briefing's one request shape, a ceiling on the day. Not part of the agent
+    // API above, which it shares nothing with but two public constants.
+    if (isBriefingPath(url.pathname)) return handleBriefing(request, env, ctx, accessIdentity);
+
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.
     if (url.pathname !== '/api/session') {
@@ -438,24 +478,9 @@ export default {
       }
     }
 
-    const token = accessTokenFrom(request);
-    if (!token) {
-      // The ordinary answer for an origin Access does not cover. The app reads
-      // this as "no gate here" and falls back to the email-and-code panel.
-      return json({ error: 'no Cloudflare Access identity on this request' }, 401);
-    }
-
-    let claims;
-    try {
-      const keys = await fetchJwks(env.ACCESS_TEAM_DOMAIN);
-      claims = await verifyAccessJwt(token, {
-        keys,
-        aud: env.ACCESS_AUD,
-        issuer: `https://${env.ACCESS_TEAM_DOMAIN}`,
-      });
-    } catch (err) {
-      return json({ error: `Access identity refused: ${err.message}` }, 401);
-    }
+    const door = await accessIdentity(request, env);
+    if (!door.claims) return json({ error: door.error }, door.status);
+    const claims = door.claims;
 
     try {
       const session = await mintSession(claims.email, env.SUPABASE_SECRET_KEY);

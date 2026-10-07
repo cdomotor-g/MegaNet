@@ -663,8 +663,10 @@ silences or corrupted copies has in common — ranked by what needs doing, each
 with its evidence and the action. Pick a station for its checks slot by slot
 and its battery across its solar day, and pick any missed check or reading to
 see what every receiver and neighbour was doing at that moment. *Ask Claude*
-hands the findings to an agent (Claude Opus 5.5, the person's own API key) that
-investigates with tools over the same readings and writes the briefing.
+hands the findings to an agent (Claude Opus 5.5 — on Flood-Net's own key, behind
+Access, for editors and administrators, up to US$20 a day; anyone else on their
+own key) that investigates with tools over the same readings and writes the
+briefing.
 [`docs/station-health.md`](docs/station-health.md) lists every finding, what
 triggers it and what to do. Each page links to the
 other per reading. The log is its rows, so it gets most of a screen: a

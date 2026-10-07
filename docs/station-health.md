@@ -59,10 +59,23 @@ need, and what it could not tell. Follow-up questions continue the same
 conversation. *Thorough* or *quicker* sets its effort; the cost of each briefing
 is shown under it.
 
-The key is the person's own: floodwarning.net is a static site, and a key in a
-Worker secret would be spendable by anyone who can reach the page. It is typed
-on the tab, used from this browser to Anthropic's API, and held in memory unless
-*remember on this device* is ticked. The last briefing is kept on the device.
+**Whose key.** An editor or an administrator signed in at floodwarning.net needs
+none: the briefing runs on Flood-Net's own Anthropic key, held by the Worker
+behind Cloudflare Access (`/api/briefing`, `worker/briefing.js`). The tab keeps
+its tools and its loop; only the calls to Anthropic go through the Worker, which
+checks Access and the database's word that this is an editor, carries nothing
+but the briefing's own request, and stops at **US$20 a day** (Brisbane's day)
+— the panel says how much of today is spent. Setting the key up is in
+[`access.md` → Ask Claude on Flood-Net's key](access.md#ask-claude-on-flood-nets-key-229).
+
+Anyone else — signed out, a viewer, the github.io copy or a local checkout, or an
+editor once the day's allowance is spent — can still use their own key, typed
+on the tab and sent from this browser to Anthropic and nowhere else. It is held
+for the visit. Only where Flood-Net's key is not on offer is there a box to
+remember it, worded as what it is — *this is my own device* — and unticked: a
+remembered key is spent by whoever opens the page on that computer next, and no
+page can tell a shared computer from a personal one. The last briefing is kept
+on the device.
 
 ## How the readings are read
 

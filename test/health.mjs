@@ -28,6 +28,14 @@
 //   * Claude's briefing, its tool loop run against a scripted client: tools
 //     answered, a tool that does not exist refused, the briefing drawn with
 //     its station links
+//   * …on Flood-Net's key (#229), the route stood in for: a signed-in editor
+//     offered it with today's spend and no key field, nothing announced for
+//     asking; the call sent to the route with the session as it is now, a key
+//     planted in it dropped, and a body the Worker's own check accepts; the
+//     day spent turning the panel to the person's own key, which then runs
+//     on that key alone; a viewer, and the signed-out, offered their own key
+//     with the route not asked — and only there a box to remember it, about
+//     the device, unticked, honoured only when ticked
 //   * no sideways scroll at 375 px; no page errors
 //
 // Run:  npm run health
@@ -36,6 +44,7 @@
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { requestProblem } from '../worker/briefing.js';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -75,6 +84,11 @@ async function standIn(page) {
 }
 
 const until = async (page, fn, arg, timeout = 20_000) => page.waitForFunction(fn, arg, { timeout });
+// The same, for something only this side of the page can see (a route's log).
+const settles = async (fn, timeout = 10_000) => {
+  for (const t0 = Date.now(); !fn(); await new Promise(r => setTimeout(r, 50))) if (Date.now() - t0 > timeout) return false;
+  return true;
+};
 
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'Australia/Brisbane' });
@@ -395,6 +409,172 @@ try {
   ok('the agent runs its tool loop to a briefing', ag.turns === 3 && ag.tools && ag.tools.includes('station_detail'), JSON.stringify(ag));
   ok('…answering each tool it asks for, and refusing one that does not exist, saying why', ag.answered === 2 && ag.refused.length === 1 && /No tool called no_such_tool/.test(ag.refused[0]), JSON.stringify(ag));
   ok('…and the briefing links the station it names', ag.link && /Headline/.test(ag.heading || ''), JSON.stringify(ag));
+
+  // ── Flood-Net's key (#229): an editor with no key of their own ─────────────
+  // The route (worker/briefing.js) is stood in for at its two paths, answering
+  // as it answers — `npm run briefing` holds the Worker itself, with the real
+  // SDK. The session is a signed-in editor's, adopted the way auth.js adopts
+  // one, with the database's whoami stood in for. The stand-in client is handed
+  // the options the SDK would get, and on the route sends its call through
+  // them, as the SDK does.
+  const WHO = { signed_in: true, email: 'editor@bom.gov.au', role: 'editor', may_write: true, is_admin: false, schema_version: '57' };
+  const SPENT = { ok: true, model: 'claude-opus-5-5', email: WHO.email, role: 'editor', day: '2026-10-07', limit_usd: 20, spent_usd: 3.2,
+    held_usd: 0, left_usd: 16.8, calls: 4, resets_at: '2026-10-07T14:00:00.000Z', calls_per_minute: 20 };
+  const DAY_SPENT = { type: 'error', error: { type: 'daily_limit', message: 'x' }, code: 'daily_limit',
+    message: 'Flood-Net\'s Anthropic allowance for today (US$20.00) is spent — it starts again at midnight, Brisbane time. Your own key works meanwhile.' };
+  let routeDay = 'open';
+  const looked = [], sent = [];
+  // The first answer is held back until the check has looked at the panel
+  // while it waits.
+  let answerFirst;
+  const firstHeld = new Promise(r => { answerFirst = r; });
+  await page.route('**/rest/v1/rpc/whoami', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(WHO) }));
+  await page.route(u => new URL(u).pathname === '/api/briefing', async route => {
+    looked.push(route.request().headers().authorization || '');
+    if (looked.length === 1) await firstHeld;
+    return route.fulfill(routeDay === 'open'
+      ? { status: 200, contentType: 'application/json', body: JSON.stringify(SPENT) }
+      : { status: 429, contentType: 'application/json', body: JSON.stringify(DAY_SPENT) });
+  });
+  await page.route(u => new URL(u).pathname === '/api/briefing/v1/messages', route => {
+    const req = route.request();
+    sent.push({ url: req.url(), headers: req.headers(), body: req.postData() });
+    return route.fulfill(routeDay === 'open'
+      ? { status: 200, contentType: 'application/json', body: JSON.stringify({ role: 'assistant', stop_reason: 'end_turn',
+          content: [{ type: 'text', text: '## Headline\nWritten on Flood-Net\'s key.' }], usage: { input_tokens: 1200, output_tokens: 300 } }) }
+      : { status: 429, contentType: 'application/json', body: JSON.stringify(DAY_SPENT) });
+  });
+
+  await page.evaluate(() => {
+    window.__made = [];
+    window.__said = [];
+    const said = window.announce;
+    window.announce = m => { window.__said.push(m); said(m); };
+    HealthAgent._useClient((mode, opts) => {
+      window.__made.push({ mode, baseURL: opts.baseURL || null, apiKey: opts.apiKey === undefined ? 'unset' : opts.apiKey,
+        authToken: opts.authToken || null, fetch: typeof opts.fetch });
+      return { beta: { messages: { stream(params) {
+        const on = {};
+        const run = (async () => {
+          if (mode !== 'route') {
+            return { role: 'assistant', stop_reason: 'end_turn', content: [{ type: 'text', text: '## Headline\nWritten on your own key.' }],
+              usage: { input_tokens: 10, output_tokens: 5 } };
+          }
+          // What the SDK does with a request: betas to a header, stream on,
+          // the rest the body — and here a stale bearer and a key planted in
+          // the headers, which the page's fetch must replace and drop.
+          const { betas, ...body } = params;
+          const res = await opts.fetch(`${opts.baseURL}/v1/messages?beta=true`, { method: 'POST',
+            headers: { 'content-type': 'application/json', 'anthropic-beta': betas.join(','), authorization: 'Bearer stale', 'x-api-key': 'sk-must-not-leave' },
+            body: JSON.stringify(Object.assign(body, { stream: true })) });
+          const json = await res.json();
+          if (!res.ok) throw Object.assign(new Error(`${res.status} ${json.message}`), { status: res.status, error: json });
+          return json;
+        })();
+        return { on(ev, cb) { on[ev] = cb; return this; }, abort() {},
+          async finalMessage() { const m = await run; m.content.forEach(b => { if (b.type === 'text' && on.text) on.text(b.text, b.text); }); return m; } };
+      } } } };
+    });
+    localStorage.setItem('meganet.session', JSON.stringify({ access_token: 'editor-session-token', refresh_token: 'r',
+      expires_at: Date.now() + 3600 * 1000, email: 'editor@bom.gov.au' }));
+    Auth.start();
+  });
+  await until(page, () => Auth.role() === 'editor' && /Asking whether Flood-Net's key is on offer/.test((document.querySelector('#hl-agent .hl-agent-key') || {}).textContent || ''), null);
+  const waiting = await page.evaluate(() => ({ remember: !!document.getElementById('hl-key-mine'),
+    enabled: !![...document.querySelectorAll('#hl-agent button')].find(b => /Write the briefing/.test(b.textContent) && !b.disabled) }));
+  ok('while the route has yet to answer an editor: no box to remember a key, and nothing to press yet', !waiting.remember && !waiting.enabled, JSON.stringify(waiting));
+  answerFirst();
+  await until(page, () => /Flood-Net's Anthropic key/.test((document.querySelector('#hl-agent .hl-agent-key') || {}).textContent || ''), null);
+  const onKey = await page.evaluate(() => {
+    const box = document.querySelector('#hl-agent .hl-agent-key');
+    const field = document.getElementById('hl-key');
+    const btn = [...document.querySelectorAll('#hl-agent button')].find(b => /Write the briefing/.test(b.textContent));
+    return { text: box.textContent.replace(/\s+/g, ' ').trim(), fieldHidden: !!field && !!field.closest('details') && !field.closest('details').open,
+      remember: !!document.getElementById('hl-key-mine'), enabled: !!btn && !btn.disabled, said: window.__said.slice() };
+  });
+  ok('a signed-in editor is offered Flood-Net\'s key, with today\'s spend, and asked for no key', /no key of your own is needed/.test(onKey.text)
+    && /US\$3\.20 of US\$20\.00/.test(onKey.text) && onKey.fieldHidden && onKey.enabled, JSON.stringify(onKey));
+  ok('…the route asked with the session, not a key', looked.length === 1 && looked[0] === 'Bearer editor-session-token', JSON.stringify(looked));
+  ok('…no box to remember a key is offered where Flood-Net\'s is', !onKey.remember);
+  ok('…and asking was not announced — nobody asked for it', onKey.said.length === 0, JSON.stringify(onKey.said));
+
+  await page.click('#hl-agent button:has-text("Write the briefing")');
+  await until(page, () => /Written on Flood-Net's key/.test((document.querySelector('#hl-agent article.hl-brief') || {}).textContent || ''), null);
+  const brief = await page.evaluate(() => ({ made: window.__made.slice(), said: window.__said.slice(),
+    meta: (document.querySelector('#hl-agent article.hl-brief .txt-muted') || {}).textContent || '',
+    stored: localStorage.getItem('mn-hl-anthropic-key') }));
+  const m0 = brief.made[0] || {};
+  const call0 = sent[0] || { headers: {} };
+  ok('the briefing ran on the route: the Worker for a base URL, the session for a token, no key', m0.mode === 'route'
+    && m0.baseURL === `${server.origin}/api/briefing` && m0.apiKey === null && m0.authToken === 'editor-session-token' && m0.fetch === 'function', JSON.stringify(m0));
+  ok('…its call carried the session as it is now, and the key planted in it never left the page', /\/api\/briefing\/v1\/messages\?beta=true$/.test(call0.url)
+    && call0.headers.authorization === 'Bearer editor-session-token' && !('x-api-key' in call0.headers), JSON.stringify(call0.headers));
+  const why = call0.body ? requestProblem(JSON.parse(call0.body)) : 'nothing sent';
+  ok('…and is a request the Worker accepts as a briefing\'s', why === null, JSON.stringify(why));
+  ok('…the briefing says whose key it ran on, and the page stored no key', /on Flood-Net's key/.test(brief.meta) && brief.stored === null, JSON.stringify(brief));
+  ok('…the briefing was announced, as a result of pressing the button', brief.said.length === 1 && /briefing is ready/.test(brief.said[0]), JSON.stringify(brief.said));
+  ok('…and today\'s spend was asked again after it', await settles(() => looked.length === 2), `${looked.length}`);
+
+  // The day spent: the route refuses, and the panel turns to the person's own key.
+  routeDay = 'spent';
+  await page.click('#hl-agent button:has-text("Write the briefing")');
+  await until(page, () => /allowance for today/.test((document.getElementById('hl-agent-status') || {}).textContent || ''), null);
+  const spent = await page.evaluate(() => {
+    const field = document.getElementById('hl-key');
+    return { status: document.getElementById('hl-agent-status').textContent.trim(),
+      box: document.querySelector('#hl-agent .hl-agent-key').textContent.replace(/\s+/g, ' ').trim(),
+      fieldShown: !!field && !field.closest('details'), remember: !!document.getElementById('hl-key-mine') };
+  });
+  ok('the day spent: the panel says so, and why, and offers the person\'s own key', /starts again at midnight, Brisbane time/.test(spent.status)
+    && /Your own key works meanwhile/.test(spent.box) && !/allowance for today/.test(spent.box) && spent.fieldShown, JSON.stringify(spent));
+  ok('…without the box that remembers it: tomorrow Flood-Net\'s key is back', !spent.remember);
+
+  await page.fill('#hl-key', 'sk-ant-test-own-1234');
+  await page.click('#hl-agent button:has-text("Use this key")');
+  const before = sent.length;
+  await page.click('#hl-agent button:has-text("Write the briefing")');
+  await until(page, () => /Written on your own key/.test((document.querySelector('#hl-agent article.hl-brief') || {}).textContent || ''), null);
+  const ownKey = await page.evaluate(() => ({ made: window.__made[window.__made.length - 1], box: document.querySelector('#hl-agent .hl-agent-key').textContent.replace(/\s+/g, ' ').trim(),
+    stored: localStorage.getItem('mn-hl-anthropic-key') }));
+  ok('the fallback: the person\'s own key, for this visit only, and nothing through the route', ownKey.made.mode === 'own' && ownKey.made.apiKey === 'sk-ant-test-own-1234'
+    && ownKey.made.baseURL === null && sent.length === before && /ending …1234, for this visit only/.test(ownKey.box) && ownKey.stored === null, JSON.stringify(ownKey));
+
+  // A viewer: signed in, allowed to write, and still not somebody the route
+  // serves — so it is not even asked.
+  WHO.role = 'viewer';
+  routeDay = 'open';
+  await page.evaluate(() => { HealthAgent.forget(); Auth.start(); });
+  // Whichever the panel settles on: the person's own key, or (wrongly) the
+  // route's answer — anything but still asking.
+  await until(page, () => Auth.role() === 'viewer' && (!!document.getElementById('hl-key-mine')
+    || /Flood-Net's Anthropic key|allowance for today/.test((document.querySelector('#hl-agent .hl-agent-key') || {}).textContent || '')), null);
+  const viewer = await page.evaluate(() => document.querySelector('#hl-agent .hl-agent-key').textContent.replace(/\s+/g, ' ').trim());
+  ok('a viewer is offered the person\'s own key, and the route is not asked', /Editors and administrators signed in/.test(viewer) && looked.length === 2,
+    `${looked.length} — ${viewer.slice(0, 120)}`);
+  WHO.role = 'editor';
+
+  // Signed out: nobody the route serves. The own key, and only here the box.
+  await page.evaluate(async () => { HealthAgent.forget(); await Auth.signOut({ announce: false, suppressGate: false }); });
+  await until(page, () => !Auth.isSignedIn() && !!document.getElementById('hl-key-mine'), null);
+  const out = await page.evaluate(() => ({ box: document.querySelector('#hl-agent .hl-agent-key').textContent.replace(/\s+/g, ' ').trim(),
+    ticked: document.getElementById('hl-key-mine').checked }));
+  ok('signed out: the person\'s own key, a word on who gets Flood-Net\'s, and a box to remember it — about the device, unticked',
+    /Editors and administrators signed in at floodwarning\.net/.test(out.box) && /This is my own device/.test(out.box) && out.ticked === false
+      && looked.length === 2, JSON.stringify(out));
+  const kept = await page.evaluate(() => {
+    document.getElementById('hl-key').value = 'sk-ant-test-mine-5678';
+    HealthAgent.setKey();
+    const unticked = localStorage.getItem('mn-hl-anthropic-key');
+    HealthAgent.forget();
+    document.getElementById('hl-key').value = 'sk-ant-test-mine-5678';
+    document.getElementById('hl-key-mine').checked = true;
+    HealthAgent.setKey();
+    const ticked = localStorage.getItem('mn-hl-anthropic-key');
+    HealthAgent.forget();
+    return { unticked, ticked, after: localStorage.getItem('mn-hl-anthropic-key') };
+  });
+  ok('…a key is remembered only when the box is ticked, and forgotten with it', kept.unticked === null && kept.ticked === 'sk-ant-test-mine-5678'
+    && kept.after === null, JSON.stringify(kept));
 
   // ── narrow ─────────────────────────────────────────────────────────────────
   await page.setViewportSize({ width: 375, height: 800 });

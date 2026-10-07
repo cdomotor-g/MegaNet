@@ -1066,6 +1066,19 @@ jobs:
         working-directory: test
         run: npm run photostore
 
+      # And /api/briefing (worker/briefing.js): Station Health's Ask Claude on
+      # Flood-Net's own Anthropic key, the one server-side door that spends
+      # money. Who may (Access and the database's word that this is an editor
+      # or an administrator), what it may be spent on (the briefing's request
+      # and nothing else), and the day's ceiling all fail in silence — a
+      # briefing still arrives — so each is asserted here, with the real SDK
+      # the page pins driving the page's own request through the route.
+      # Offline: Anthropic, Access's keys and the database are stand-ins, the
+      # ledger the real Durable Object class over a Map.
+      - name: Ask Claude on Flood-Net's key — editors only, the briefing only, a ceiling on the day
+        working-directory: test
+        run: npm run briefing
+
       # The third server-side door: /api/v1 and /api/mcp (worker/api.js), public
       # and read-only, for AI agents and scripts. What it must never do fails in
       # silence — forward a caller's token, read a private relation, write

@@ -491,15 +491,18 @@ const Auth = (function () {
   // map were holding was fetched for the session that just ended or began.
   // The Admin tab (admin.js) is administrators-only (0042), and redraws its
   // users and allowlist — or its "sign in" — for the same reason; so is the
-  // Base Stations tab (0049); and a station's history and the deleted stations
-  // are editors-only (0056, station-history.js).
+  // Base Stations tab (0049); a station's history and the deleted stations
+  // are editors-only (0056, station-history.js); and Station Health's Ask
+  // Claude (health-agent.js) runs on Flood-Net's key for editors and
+  // administrators only (#229), so it asks again who may.
   function tabsAuthChanged() {
     for (const mod of [typeof FieldPhotos !== 'undefined' ? FieldPhotos : null,
                        typeof Admin       !== 'undefined' ? Admin       : null,
                        typeof AdminDash   !== 'undefined' ? AdminDash   : null,
                        typeof AdminTokens !== 'undefined' ? AdminTokens : null,
                        typeof BaseStations !== 'undefined' ? BaseStations : null,
-                       typeof StationHistory !== 'undefined' ? StationHistory : null]) {
+                       typeof StationHistory !== 'undefined' ? StationHistory : null,
+                       typeof HealthAgent !== 'undefined' ? HealthAgent : null]) {
       if (!mod || !mod.authChanged) continue;
       try { mod.authChanged(); } catch (_) { /* its own problem, not the sign-in's */ }
     }
@@ -681,6 +684,10 @@ const Auth = (function () {
     // Read by the editor and the Data source panel. Both ask the database in the
     // end; these only decide what to say before that round trip.
     isSignedIn: () => !!session,
+    // The session's bearer as it is now (refreshed in place), for this origin's
+    // own Worker routes that put it to the database rather than trust it — the
+    // briefing's (worker/briefing.js), as datastore.js does for /api/photos.
+    accessToken: () => (session && session.access_token) || null,
     mayWrite:   () => !!session && (who ? who.may_write !== false : true),
     email:      () => (who && who.email) || (session && session.email) || null,
     role:       () => (who && who.role) || null,

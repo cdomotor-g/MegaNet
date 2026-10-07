@@ -152,6 +152,80 @@ sign-in panel. That is the designed failure: no breakage, just no improvement.
 
 ---
 
+## Ask Claude on Flood-Net's key (#229)
+
+Station Health's *Ask Claude* used to need the person's own Anthropic API key,
+because a key held by the Worker would have been spendable by anyone who could
+reach the page. The site is behind Access now, so the key can be the Worker's:
+`/api/briefing` (`worker/briefing.js`) makes the briefing's model calls on
+**Flood-Net's** key, and an editor needs no key of their own. The tab keeps its
+tool loop; only the calls to Anthropic go through the Worker.
+
+**Who may spend it.** Both locks, on every call: an Access identity the Worker
+verifies itself (the same check as the gate above), *and* the database's own
+answer — `meganet.whoami()`, asked with the person's Supabase session — that
+the same address may write and is an **editor or an administrator**. A
+`viewer` (Admin tab) is refused here: the role records a wish for writes, but
+spending is decided by it. Signed out, on `workers.dev`, on the github.io copy
+or a local checkout, the route answers 401 and the tab offers the person's own
+key, as before.
+
+**What it may be spent on.** Only the briefing's own request. The model, the
+output limit, thinking and effort, the fallback, the caching, the system prompt
+and the nine tools are pinned in `worker/briefing.js`, and a conversation may
+carry text and tool results only — no images, documents, other tools or other
+models. It is not a general Anthropic proxy.
+
+**How much.** At most **US$20 a day** (Brisbane's day; `DAILY_LIMIT_USD` in
+`worker/briefing.js` is the one number to change). Every call reserves its
+worst case before it goes and settles at what Anthropic reports it used, so the
+ceiling holds with several calls in flight — and the last few dollars of a day
+can go unspent. Each person may also start 20 calls a minute and run 3 at
+once. When the day is spent the tab says so and offers the person's own key
+until midnight. The day's spend lives in a Durable Object (`BriefingLedger`)
+that `wrangler.toml` declares, so the deploy creates it: there is nothing to
+make in the dashboard for it.
+
+### Its one secret: `ANTHROPIC_API_KEY`
+
+Until it is set, `/api/briefing` answers 503 and *Ask Claude* works exactly as
+it did — on the person's own key. To set it:
+
+1. **A workspace for it** (an organisation admin of the Anthropic account, in
+   the Claude Console at <https://platform.claude.com>): **Settings →
+   Workspaces → Create workspace**, name it `Flood-Net`, **Create**. Then open
+   it → the **Spend limits** tab → set a monthly cap and an alert. The
+   Worker's ceiling allows at most thirty of its days in a month, so a cap
+   below that is a second ceiling under the daily one. (The Default Workspace
+   cannot have one, which is why this is a workspace of its own.)
+2. **A service account** (same person): **Settings → Service accounts** →
+   create one named `flood-net-worker`, and **Add to workspace** → `Flood-Net`.
+   A key linked to a person stops working when they leave the organisation; a
+   service account's does not.
+3. **The key:** **Settings → API keys → Create key**. Name `Flood-Net
+   Worker`; **Linked account:** `flood-net-worker`; **Workspace:**
+   `Flood-Net` — scope it to that one workspace, or every call is refused for
+   want of an `anthropic-workspace-id` header; **Expiration:** **Never** (and
+   rotate it by hand), or a date you will be reminded of. **Create**, and copy
+   the key (`sk-ant-api03-…`) — it is shown once.
+4. **Give it to the Worker.** Cloudflare dashboard → **Workers & Pages** →
+   **Overview** → the `meganet` Worker → **Settings** → under **Variables and
+   Secrets**, **Add** → **Type:** **Secret**, **Variable name:**
+   `ANTHROPIC_API_KEY`, **Value:** the key → **Deploy**. Or, from a checkout
+   signed in to Cloudflare: `npx wrangler secret put ANTHROPIC_API_KEY` and
+   paste it.
+5. **Check it.** Signed in at `floodwarning.net` as an editor, open **Station
+   Health**: *Ask Claude* says it runs on Flood-Net's Anthropic key, with no
+   key field, and **Write the briefing** writes one.
+
+To switch it off, delete the secret (the same page → **Variables and Secrets**
+→ the delete icon beside `ANTHROPIC_API_KEY` → **Deploy**): the route goes back
+to 503 and the tab to the person's own key. To stop one person, take their
+allowlist entry away or set them to `viewer` in the Admin tab — the route asks
+the database on every call, remembering its answer for a minute at most.
+
+---
+
 ## Layer 2 — Supabase Auth and the editors list
 
 This is the lock that matters. It is enforced inside Postgres, so it holds

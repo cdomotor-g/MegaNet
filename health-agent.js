@@ -7,10 +7,10 @@
 //                 register need, and what it could not tell.
 //
 // After health.js (Health.state()) and health-analysis.js (HealthAnalysis);
-// before init.js. Nothing here runs at load, and nothing is fetched until
-// somebody presses the button: the Anthropic SDK is imported then, pinned,
-// from jsDelivr, and every request goes from this browser to Anthropic's API
-// under the key the person gave it.
+// before init.js. Nothing here runs at load. Drawing the tab for a signed-in
+// editor asks /api/briefing whether Flood-Net's key is on offer and how much of
+// today is left; everything else waits for the button, when the Anthropic SDK
+// is imported, pinned, from jsDelivr.
 //
 // ── Why an agent, when the analysis already ranks everything ─────────────────
 // The analysis is rules: each one sound, each one blind to the others. It
@@ -34,18 +34,35 @@
 //
 // Every tool reads; none writes. A tool's answer is JSON, trimmed.
 //
-// ── Keys, and why this one is the person's ──────────────────────────────────
-// floodwarning.net is a static site with a Worker in front of it, and a key
-// in a Worker secret would be spendable by anyone who can reach the page.
-// Until that door has a lock (an Access-gated route is the obvious one), the
-// key is the person's own: typed here, used from here, held in memory unless
-// they ask for it to be remembered on this device. The SDK refuses to run in
-// a browser without `dangerouslyAllowBrowser`, which is exactly the decision
-// being made: this browser, this person's key.
+// ── Keys: Flood-Net's, or the person's own ──────────────────────────────────
+// A key in a Worker secret would be spendable by anyone who can reach the
+// page, so until that door had a lock the key was the person's own. It has one
+// now — Cloudflare Access, since roadmap revision 72 — and the door is
+// /api/briefing (worker/briefing.js, #229). For an editor or an administrator
+// signed in at floodwarning.net, the model calls go there: the Worker checks
+// Access and the database's own word that this is an editor, holds the request
+// to exactly this briefing, caps the day's spend, and calls Anthropic on
+// Flood-Net's key. The SDK is the same one, pointed at that route by baseURL
+// and sent the person's session instead of a key, so the loop below, its tools
+// and its answers do not change; the browser never holds the key.
+//
+// Everyone else — signed out, a viewer, a copy with no Worker in front of it
+// (github.io, a local checkout), or an editor once the day's allowance is spent
+// — can use their own key, as before: typed here, sent from this browser to
+// Anthropic and nowhere else, and held for this visit. It is remembered on the
+// device only if the person says the device is theirs, and that question is
+// put only where Flood-Net's key is not on offer: an editor who has the route
+// has no reason to leave a personal key in any browser, and no page can tell a
+// shared computer from a personal one, so it is asked of the one person who
+// can, unticked. The SDK refuses to run in a browser without
+// `dangerouslyAllowBrowser`; on the route that is a formality, and on the
+// person's own key it is exactly the decision being made: this browser, this
+// person's key.
 
 const HealthAgent = (() => {
 
   const MODEL = 'claude-opus-5-5';
+  const MAX_TOKENS = 64000;
   const SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm';
   // Server-side refusal fallback ("default" routes by refusal category), and
   // the progress notes a model writes between tool calls.
@@ -57,6 +74,13 @@ const HealthAgent = (() => {
   const LAST_STORE = 'mn-hl-briefing';
   // US$ per million tokens for claude-opus-5-5: input, output, cache read.
   const PRICE = { in: 4, out: 20, cacheRead: 0.2, cacheWrite: 5 };
+  // Flood-Net's key, behind this origin's Worker (worker/briefing.js).
+  const ROUTE = '/api/briefing';
+  // The route's refusals that take Flood-Net's key off the table for now, so the
+  // panel offers the person's own key with the reason above it. The rest (a
+  // minute's limit, a call already running) pass in a minute.
+  const ROUTE_OFF = ['not_configured', 'no_access', 'not_signed_in', 'not_permitted', 'daily_limit', 'key_refused'];
+  const ROUTE_FRESH_MS = 5 * 60 * 1000;
 
   function readStore(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
   function writeStore(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (_) {} }
@@ -72,7 +96,11 @@ const HealthAgent = (() => {
     answer: null,        // { md, at, win, usage }
     usage: { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 },
     error: '',
-    factory: null,       // test seam: () => client
+    factory: null,       // test seam: (mode, options) => client
+    route: null,         // what /api/briefing said: {ok: true, role, spent, limit} or {ok: false, code, text}
+    routeFor: '',        // …and to whom (address|role), so somebody else is asked afresh
+    routeAt: 0,
+    routeAsking: false,
   };
   // The last briefing, kept on this device — read the first time the tab draws.
   let restored = false;
@@ -86,14 +114,94 @@ const HealthAgent = (() => {
 
   let sdkPromise = null;
   let Sdk = null;
-  function loadClient() {
-    if (G.factory) return Promise.resolve(G.factory());
+  function loadClient(mode) {
+    const options = clientOptions(mode);
+    if (G.factory) return Promise.resolve(G.factory(mode, options));
     if (!sdkPromise) {
       sdkPromise = import(SDK_URL).then(m => { Sdk = m.default || m.Anthropic; return Sdk; })
         .catch(err => { sdkPromise = null; throw err; });
     }
-    return sdkPromise.then(A => new A({ apiKey: G.key, dangerouslyAllowBrowser: true, maxRetries: 2 }));
+    return sdkPromise.then(A => new A(options));
   }
+
+  // The SDK's options. On Flood-Net's key: this origin's Worker in place of
+  // api.anthropic.com, and the person's session in place of a key — which the
+  // route puts to the database, and which keeps a page on another origin from
+  // spending the key through this browser. On their own key: the key.
+  function clientOptions(mode) {
+    if (mode === 'route') {
+      return { baseURL: location.origin + ROUTE, apiKey: null, authToken: sessionToken() || '',
+               dangerouslyAllowBrowser: true, maxRetries: 2, fetch: routeFetch };
+    }
+    return { apiKey: G.key, dangerouslyAllowBrowser: true, maxRetries: 2 };
+  }
+
+  // Every call on the route carries the session as it is now — auth.js renews
+  // it while a long briefing runs — and never a key.
+  function routeFetch(url, init) {
+    const headers = new Headers((init && init.headers) || {});
+    const t = sessionToken();
+    if (t) headers.set('Authorization', `Bearer ${t}`);
+    headers.delete('x-api-key');
+    return fetch(url, Object.assign({}, init, { headers, credentials: 'same-origin', cache: 'no-store' }));
+  }
+
+  // ── Flood-Net's key ─────────────────────────────────────────────────────────
+
+  function sessionToken() {
+    return typeof Auth !== 'undefined' && Auth.accessToken ? Auth.accessToken() : null;
+  }
+
+  // Somebody the route could say yes to, as the app last heard from the
+  // database — signed in, allowed to write, an editor or an administrator, on a
+  // page served over http(s) — as "address|role"; '' for anybody else. The
+  // route decides; this only saves asking where the answer can only be no.
+  function routeCandidate() {
+    if (typeof location === 'undefined' || !/^https?:$/.test(location.protocol)) return '';
+    if (typeof Auth === 'undefined' || !Auth.isSignedIn() || !Auth.mayWrite()) return '';
+    const admin = !!(Auth.isAdmin && Auth.isAdmin());
+    const role = admin ? 'admin' : Auth.role();
+    return role === 'editor' || role === 'admin' ? `${Auth.email() || ''}|${role}` : '';
+  }
+
+  // Ask the route whether this person may use Flood-Net's key, and how much of
+  // today is left: when the tab is drawn (at most every few minutes), after a
+  // briefing on it, and when the sign-in changes. Never at load, and never
+  // announced — nobody asked for it.
+  async function askRoute(again) {
+    const who = routeCandidate();
+    if (!who) { G.route = null; G.routeFor = ''; G.routeAt = 0; return; }
+    if (G.routeAsking) return;
+    if (!again && G.routeFor === who && Date.now() - G.routeAt < ROUTE_FRESH_MS) return;
+    G.routeAsking = true;
+    let next;               // left undefined, the answer says nothing new
+    try {
+      const t = sessionToken();
+      const res = await fetch(ROUTE, { headers: t ? { Authorization: `Bearer ${t}` } : {}, cache: 'no-store', credentials: 'same-origin' });
+      const body = await res.json().catch(() => null);
+      if (res.ok && body && body.ok) {
+        next = { ok: true, role: body.role, spent: Number(body.spent_usd) || 0, limit: Number(body.limit_usd) || 0 };
+      } else if (body && ROUTE_OFF.includes(body.code)) {
+        next = { ok: false, code: body.code, text: String(body.message || '') };
+      } else if (res.status === 404) {
+        next = null;        // no Worker in front of this copy of the app
+      }
+    } catch (_) { /* a network that dropped it says nothing about the key */ }
+    G.routeAsking = false;
+    // Signed in as somebody else meanwhile: what was said was said to them.
+    if (routeCandidate() !== who) { askRoute(false); return; }
+    G.routeFor = who;
+    G.routeAt = Date.now();
+    if (next !== undefined) G.route = next;
+    paint();
+  }
+
+  // Flood-Net's key is the one on offer: the route said yes, and the person has
+  // not chosen their own.
+  function onRoute() { return !G.key && !!(G.route && G.route.ok); }
+  // A key to run on, either kind. (The checks' stand-in client is not a key:
+  // it stands in for the SDK, and the panel stays what a person would see.)
+  function ready() { return !!G.key || onRoute(); }
 
   // ── what the agent is told ─────────────────────────────────────────────────
 
@@ -416,24 +524,31 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
 
   // ── the loop ─────────────────────────────────────────────────────────────
 
+  // One call's request. On Flood-Net's key worker/briefing.js holds every field
+  // but the messages and the effort to exactly this, so a change here is a
+  // change there too — `npm run briefing` fails until they agree.
+  function requestParams(messages) {
+    return {
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      betas: BETAS,
+      fallbacks: 'default',
+      thinking: { type: 'adaptive', display: 'updates' },
+      output_config: { effort: G.effort },
+      cache_control: { type: 'ephemeral' },
+      system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+      tools: TOOLS,
+      messages,
+    };
+  }
+
   async function turnLoop(client, firstUser) {
     G.messages.push(firstUser);
     for (let turn = 0; turn < MAX_TURNS; turn++) {
       if (G.stopped) return null;
       G.live = '';
       const notes = new Map();
-      const stream = client.beta.messages.stream({
-        model: MODEL,
-        max_tokens: 64000,
-        betas: BETAS,
-        fallbacks: 'default',
-        thinking: { type: 'adaptive', display: 'updates' },
-        output_config: { effort: G.effort },
-        cache_control: { type: 'ephemeral' },
-        system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
-        tools: TOOLS,
-        messages: G.messages,
-      });
+      const stream = client.beta.messages.stream(requestParams(G.messages));
       G.stream = stream;
       stream.on('text', delta => { G.live += delta; paintLive(); });
       stream.on('thinking', (delta, snapshot) => {
@@ -489,9 +604,18 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
     throw new Error(`Stopped after ${MAX_TURNS} rounds of tool use without an answer.`);
   }
 
-  function errorText(err) {
+  function errorText(err, mode) {
     if (!err) return 'Something went wrong.';
     if (Sdk && err instanceof Sdk.APIUserAbortError || err.name === 'APIUserAbortError') return 'Stopped.';
+    if (mode === 'route') {
+      // The route's own refusals say what they mean (worker/briefing.js); what
+      // Anthropic said on the way through falls to the lines below.
+      if (err.error && typeof err.error === 'object' && err.error.code && err.error.message) return String(err.error.message);
+      if (err.status === 401 || err.status === 403) return 'Flood-Net\'s key could not be used from this page — reload it to sign in again, or use your own key.';
+      if (Sdk && err instanceof Sdk.APIConnectionError || err.name === 'APIConnectionError') {
+        return 'Could not reach Flood-Net\'s Worker — reload the page (the Access sign-in may have lapsed), or use your own key.';
+      }
+    }
     if (Sdk && err instanceof Sdk.AuthenticationError || err.status === 401) return 'Anthropic refused the API key. Check it, or make a new one in the Claude Console.';
     if (Sdk && err instanceof Sdk.PermissionDeniedError || err.status === 403) return 'The API key is not allowed to use this model.';
     if (Sdk && err instanceof Sdk.RateLimitError || err.status === 429) return 'Rate-limited by Anthropic — wait a minute and ask again.';
@@ -505,7 +629,8 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
   async function ask(question) {
     const { A, win, demo } = Health.state();
     if (!A || G.running) return;
-    if (!G.key && !G.factory) { G.error = 'An Anthropic API key is needed first.'; paint(); return; }
+    const mode = onRoute() ? 'route' : 'own';
+    if (mode === 'own' && !G.key && !G.factory) { G.error = 'An Anthropic API key is needed first.'; paint(); return; }
     G.running = true; G.stopped = false; G.error = ''; G.live = '';
     const followUp = !!question && G.messages.length > 0;
     if (!followUp) { G.messages = []; G.feed = []; G.usage = { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 }; }
@@ -519,20 +644,26 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
               + (question ? question + '\n\n' + FOLLOW_UP_NOTE : 'Investigate, then write the maintenance briefing.') },
         ] };
     try {
-      const client = await loadClient();
+      const client = await loadClient(mode);
       const md = await turnLoop(client, first);
       if (md != null) {
-        G.answer = { md, at: Date.now(), win, demo: !!demo, question: question || null, usage: Object.assign({}, G.usage) };
+        G.answer = { md, at: Date.now(), win, demo: !!demo, question: question || null, usage: Object.assign({}, G.usage), via: mode };
         if (!question) writeStore(LAST_STORE, JSON.stringify(G.answer));
         announce('Claude\'s briefing is ready.');
       }
     } catch (err) {
-      G.error = errorText(err);
+      G.error = errorText(err, mode);
       if (err && err.refusal) G.error = err.message;
+      // A refusal that takes Flood-Net's key off the table for now turns the
+      // panel to the person's own key, with the reason above it.
+      const code = mode === 'route' && err && err.error && typeof err.error === 'object' ? err.error.code : null;
+      if (code && ROUTE_OFF.includes(code)) G.route = { ok: false, code, text: String(err.error.message || G.error) };
     }
     if (G.stopped && !G.error) G.error = 'Stopped.';
     G.running = false; G.stream = null; G.live = '';
     paint();
+    // What it spent, for the line saying how much of today is left.
+    if (mode === 'route' && G.route && G.route.ok) askRoute(true);
   }
 
   function stop() {
@@ -588,10 +719,49 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
       f.kind === 'tool' ? '<span aria-hidden="true">🔎</span> ' : f.kind === 'note' ? '<span aria-hidden="true">💭</span> ' : ''}${esc(f.text)}</li>`).join('')}</ol>`;
   }
 
+  // The key field. The box that remembers the key is offered only where
+  // Flood-Net's key is not, and it asks about the device rather than the key.
+  function keyFieldHtml(offerRemember) {
+    return `<label class="hl-keyfield">Anthropic API key
+        <input id="hl-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" aria-describedby="hl-key-help"></label>
+      ${offerRemember ? '<label class="hl-check"><input id="hl-key-mine" type="checkbox"> This is my own device — remember the key on it</label>' : ''}
+      <button onclick="HealthAgent.setKey()">Use this key</button>
+      <p id="hl-key-help" class="small">From the Claude Console (console.anthropic.com → API keys). It goes from this browser to
+        api.anthropic.com and nowhere else, and is forgotten when the page closes${offerRemember
+          ? ' unless the box is ticked. Leave it unticked on a computer anyone else uses: a remembered key is spent by whoever opens this page there'
+          : ''}.</p>`;
+  }
+
+  // Whose key a briefing runs on, and the way to the other.
+  function keyHtml() {
+    const r = G.route;
+    if (G.key) {
+      return `<span class="small">Using your API key ending <span class="mono">…${esc(G.key.slice(-4))}</span>${G.remember ? ', remembered on this device' : ', for this visit only'}.</span>
+        <button class="ghost" onclick="HealthAgent.forget()">${r && r.ok ? 'Forget it, and use Flood-Net\'s key' : 'Forget the key'}</button>`;
+    }
+    if (onRoute()) {
+      return `<p class="small">Runs on Flood-Net's Anthropic key — you are signed in as ${r.role === 'admin' ? 'an administrator' : 'an editor'},
+          so no key of your own is needed. Today US$${r.spent.toFixed(2)} of US$${r.limit.toFixed(2)} is spent; the allowance starts again
+          at midnight, Brisbane time.</p>
+        <details class="hl-ownkey"><summary class="small">Use my own key instead</summary>${keyFieldHtml(false)}</details>`;
+    }
+    const who = routeCandidate();
+    const answered = !!who && !G.routeAsking && !!G.routeAt;
+    // The route's reason, unless the status line below is already saying it.
+    const why = r && r.ok === false && r.text ? `<p class="small">${r.text === G.error ? 'Your own key works meanwhile:' : esc(r.text)}</p>`
+      : who && !answered ? '<p class="small">Asking whether Flood-Net\'s key is on offer…</p>'
+      : who ? '<p class="small">Flood-Net\'s key is used through floodwarning.net; on this copy of the app, use your own.</p>'
+      : '<p class="small">Editors and administrators signed in at floodwarning.net use Flood-Net\'s key and need none of their own. Anybody can use their own:</p>';
+    // The box is for somebody Flood-Net's key does not serve: never while the
+    // route has yet to answer an editor, and not for one whose day ran out —
+    // the route serves them again tomorrow.
+    return why + keyFieldHtml(!who || (answered && !(r && r.code === 'daily_limit')));
+  }
+
   function render() {
     restore();
     const { A } = Health.state();
-    const keyed = !!G.key || !!G.factory;
+    const keyed = ready();
     const ans = G.answer;
     return `
       <div class="panel-header"><h3 id="hl-h-agent">Ask Claude</h3>
@@ -599,18 +769,9 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
       <p class="small">Claude gets what this tab worked out and the same views you have — a station in full, the network at a moment, a
         station's last 30 days, its neighbours, the receivers and repeaters — and decides which findings share a cause, checks the doubtful
         ones, and writes a briefing: which sites to visit first and why, what the network and the register need, and what it could not
-        tell. It reads; it changes nothing. The findings and readings it looks at are sent to Anthropic's API under the key below.</p>
-      <div class="hl-agent-key">
-        ${G.key ? `<span class="small">Using an API key ending <span class="mono">…${esc(G.key.slice(-4))}</span>${G.remember ? ', remembered on this device' : ', for this visit only'}.</span>
-            <button class="ghost" onclick="HealthAgent.forget()">Forget the key</button>`
-          : G.factory ? '<span class="small">Using a test client.</span>'
-          : `<label class="hl-keyfield">Anthropic API key
-              <input id="hl-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" aria-describedby="hl-key-help"></label>
-            <label class="hl-check"><input id="hl-key-remember" type="checkbox"> remember on this device</label>
-            <button onclick="HealthAgent.setKey()">Use this key</button>
-            <p id="hl-key-help" class="small">From the Claude Console (console.anthropic.com → API keys). It goes from this browser to
-              api.anthropic.com and nowhere else; unticked, it is gone when the page closes. Don't tick remember on a shared computer.</p>`}
-      </div>
+        tell. It reads; it changes nothing. The findings and readings it looks at are sent to Anthropic's API — through Flood-Net's Worker on
+        Flood-Net's key, or from this browser on your own.</p>
+      <div class="hl-agent-key">${keyHtml()}</div>
       <div class="button-group hl-agent-run">
         <label class="small">How hard to think
           <select onchange="HealthAgent.setEffort(this.value)">
@@ -626,7 +787,7 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
       ${!G.running && ans ? `
         <article class="hl-brief" aria-labelledby="hl-h-brief">
           <h4 id="hl-h-brief" class="sr-only">Claude's briefing</h4>
-          <p class="small txt-muted">${ans.question ? `Asked: “${esc(ans.question)}” · ` : ''}${esc(HealthAnalysis.fmtWhen(ans.at))}${ans.demo ? ' · from the demo week' : ''}${ans.usage ? ' · ' + esc(costText(ans.usage)) : ''}</p>
+          <p class="small txt-muted">${ans.question ? `Asked: “${esc(ans.question)}” · ` : ''}${esc(HealthAnalysis.fmtWhen(ans.at))}${ans.demo ? ' · from the demo week' : ''}${ans.usage ? ' · ' + esc(costText(ans.usage)) : ''}${ans.via === 'route' ? ' · on Flood-Net\'s key' : ''}</p>
           ${mdHtml(ans.md)}
           <div class="button-group"><button class="ghost" onclick="HealthAgent.copy()">Copy as text</button></div>
         </article>` : ''}
@@ -657,12 +818,14 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
     const v = el ? el.value.trim() : '';
     if (!v) { G.error = 'Paste the key first.'; paint(); return; }
     G.key = v;
-    G.remember = !!(document.getElementById('hl-key-remember') || {}).checked;
+    // Remembered only when the person says this device is theirs — a box shown
+    // only where Flood-Net's key is not on offer, and never ticked for them.
+    G.remember = !!(document.getElementById('hl-key-mine') || {}).checked;
     writeStore(KEY_STORE, G.remember ? v : null);
     G.error = '';
     paint();
   }
-  function forget() { G.key = ''; G.remember = false; writeStore(KEY_STORE, null); paint(); }
+  function forget() { G.key = ''; G.remember = false; writeStore(KEY_STORE, null); G.error = ''; paint(); }
   function setEffort(v) { G.effort = v === 'medium' ? 'medium' : 'high'; writeStore(EFFORT_STORE, G.effort); }
   function followUp() {
     const el = document.getElementById('hl-q');
@@ -678,13 +841,25 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
   // A new set of readings: a conversation about the old ones is over.
   function dataChanged() { G.messages = []; G.feed = []; paint(); }
 
-  function init() { /* rendered with the tab; nothing to start */ }
+  // Drawn with the tab: ask the route, if this is somebody it might serve.
+  function init() { askRoute(false); }
+
+  // Signed in, out, or as somebody else (auth.js): whatever the route said, it
+  // said to the last person.
+  function authChanged() {
+    G.route = null; G.routeFor = ''; G.routeAt = 0;
+    if (typeof state !== 'undefined' && state.activeTab === 'health') askRoute(false);
+    paint();
+  }
 
   return {
-    render, init, ask, stop, setKey, forget, setEffort, followUp, copy, dataChanged,
-    // Test seams: a client factory standing in for the SDK, and the tool runner.
+    render, init, ask, stop, setKey, forget, setEffort, followUp, copy, dataChanged, authChanged,
+    // Test seams: a client factory standing in for the SDK (handed the mode and
+    // the options the SDK would get), the tool runner, and the request and SDK
+    // options exactly as a call builds them.
     _useClient(factory) { G.factory = factory; },
     _runTool: runTool, _overview: overview, _mdHtml: mdHtml, _tools: TOOLS, _system: SYSTEM,
+    _params: requestParams, _clientOptions: clientOptions,
   };
 })();
 
