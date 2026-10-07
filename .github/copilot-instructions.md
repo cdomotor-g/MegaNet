@@ -22,6 +22,9 @@ See [`docs/agent-api.md`](../docs/agent-api.md).
 - Station ids are lowercase slugs (`abergowrie_br_al`); Bureau numbers also work.
   `get_station_dossier` (`/api/v1/stations/{id}/dossier`) returns everything
   about a station with sources and `ok` / `not recorded` / `unavailable` status.
+- `get_latest_readings` (`/api/v1/readings/latest`) is what every gauge
+  reporting into Flood-Net is saying now, in one call; `format=geojson` on it
+  and on station search answers GeoJSON for a map (`[lon, lat]`).
 - Flood classes are metres on the gauge, AEP levels modelled m AHD (indicative);
   quote each figure's source and datum.
 

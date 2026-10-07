@@ -13,9 +13,10 @@
 // every file to say the same: the base URL, the MCP URL, each rate limit as
 // "<limit> requests / <period> s", and a pointer to docs/agent-api.md. It also
 // holds wrangler.toml's [[ratelimits]] to RATE_LIMITS (a binding the code does
-// not expect is a limit nobody enforces), every OpenAPI path and every MCP tool
-// to the user doc, llms.txt to the llmstxt.org shape, and every relative link
-// in the docs to a file that exists.
+// not expect is a limit nobody enforces), every OpenAPI path, query parameter
+// and MCP tool to the user doc — and every tool to each agent file that lists
+// them — llms.txt to the llmstxt.org shape, and every relative link in the
+// docs to a file that exists.
 //
 // Node only, no browser, well under a second.
 //
@@ -71,15 +72,39 @@ for (const p of Object.keys(openapi.paths)) {
 for (const t of api.MCP_TOOLS) {
   check(`${DOC} documents the tool ${t.name}`, doc.includes(`\`${t.name}\``));
 }
-const agents = read('AGENTS.md') || '';
-check('AGENTS.md names every MCP tool', api.MCP_TOOLS.every(t => agents.includes(t.name)),
-  api.MCP_TOOLS.filter(t => !agents.includes(t.name)).map(t => t.name).join(', '));
+// Each endpoint's query parameters named in its own section — from its
+// "### `GET <path>`" heading to the next heading of that rank or higher — so a
+// parameter the page mentions only in passing elsewhere still counts as missing.
+const sectionOf = p => {
+  const start = doc.indexOf(`### \`GET ${p}\``);
+  if (start < 0) return '';
+  const rest = doc.slice(start + 4);
+  const end = rest.search(/^#{2,3} /m);
+  return end < 0 ? rest : rest.slice(0, end);
+};
+const undocumented = Object.entries(openapi.paths).flatMap(([p, item]) =>
+  (item.get.parameters || []).filter(x => x.in === 'query' && !sectionOf(p).includes(`\`${x.name}\``)).map(x => `${p} ${x.name}`));
+check(`${DOC} names every query parameter the OpenAPI document declares, in its endpoint's own section`,
+  undocumented.length === 0, undocumented.join('; '));
+// AGENTS.md is canonical; GEMINI.md and llms.txt list the tools too, so a tool
+// one of them leaves out is one that agent never learns exists.
+for (const file of ['AGENTS.md', 'GEMINI.md', 'llms.txt']) {
+  const text = read(file) || '';
+  check(`${file} names every MCP tool`, api.MCP_TOOLS.every(t => text.includes(t.name)),
+    api.MCP_TOOLS.filter(t => !text.includes(t.name)).map(t => t.name).join(', '));
+}
 check(`${DOC} states the reading windows the code enforces`,
   doc.includes(`raw ≤ ${api.LIMITS.windowMaxDays.raw} days`) && doc.includes(`hourly ≤ ${api.LIMITS.windowMaxDays.hourly} days`)
   && doc.includes(`daily ≤ ${api.LIMITS.windowMaxDays.daily} days`));
 check(`${DOC} states the page and row caps the code enforces`,
   doc.includes(`${api.LIMITS.listMax} rows per page`) && doc.includes(`${api.LIMITS.readingsMax.toLocaleString('en-AU')} readings per call`)
   && doc.includes(`${api.LIMITS.radiusMaxKm} km search radius`));
+// Whitespace collapsed, so a re-wrapped paragraph still says what it said.
+const docFlat = doc.replace(/\s+/g, ' ');
+check(`${DOC} states the latest readings' page, as the code sets it`,
+  docFlat.includes(`${api.LIMITS.latestMax.toLocaleString('en-AU')} stations per call of the latest readings (${api.LIMITS.latestDefault} by default)`)
+  && docFlat.includes(`${api.LIMITS.latestDefault} stations a page by default and at most ${api.LIMITS.latestMax.toLocaleString('en-AU')}`),
+  `${api.LIMITS.latestDefault} / ${api.LIMITS.latestMax}`);
 check(`${DOC} names the MCP protocol versions the server speaks`, api.MCP_VERSIONS.filter(v => v !== '2024-11-05').every(v => doc.includes(v)));
 check(`${DOC} carries the About page's disclaimer`, doc.includes('Flood-Net is not a flood warning service'));
 

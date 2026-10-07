@@ -1,5 +1,5 @@
 ---
-description: Flood-Net station data — the read-only REST API and MCP server at floodwarning.net, for looking up stations, flood levels, SLS entries and dossiers, or drafting assessment reports
+description: Flood-Net station data — the read-only REST API and MCP server at floodwarning.net, for looking up stations, flood levels, SLS entries, dossiers and the latest readings, mapping stations as GeoJSON, or drafting assessment reports
 alwaysApply: false
 ---
 
@@ -13,5 +13,6 @@ Full documentation: `docs/agent-api.md`. `AGENTS.md` is the canonical agent file
 - Read-only, public data only.
 - Rate limits: 60 requests / 60 s per client, 20 requests / 10 s per client (burst), 240 requests / 60 s per address. On 429 wait `Retry-After`.
 - Station ids are lowercase slugs (`abergowrie_br_al`); Bureau numbers also work. Search with `search_stations` / `stations_near`, then `get_station_dossier` for everything about one station, each section sourced and marked `ok`, `not recorded` or `unavailable`.
+- What every gauge is saying now: `get_latest_readings` (`/api/v1/readings/latest`, by network, basin, kind or `bbox=west,south,east,north`) in one call — only telemetry ingested into Flood-Net. `format=geojson` on it and on station search answers GeoJSON for a map, points at `[lon, lat]`.
 - Flood classes, crossings and flood effects are metres on the gauge (not AHD); AEP levels are modelled m AHD and indicative; the Bureau lists and the SLS give separate classes. Quote each figure's source and datum; "not recorded" is not zero.
 - Flood-Net is not a flood warning service; send people to the Bureau of Meteorology for warnings.

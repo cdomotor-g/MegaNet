@@ -44,10 +44,21 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     (`ok`, `not recorded`, `unavailable`). Start here for reports.
   - `get_readings` — `GET /api/v1/stations/{id}/readings` (raw ≤ 7 days,
     hourly ≤ 31, daily ≤ 731; ≤ 5,000 rows)
+  - `get_latest_readings` — `GET /api/v1/readings/latest?network=&basin=&type=&bbox=west,south,east,north`:
+    what every gauge is saying now — each station's newest reading on every
+    channel, with its age, in one call (100 stations a page, up to 1,000).
+    Use it rather than `get_readings` station by station. A 503 "not
+    available yet" means database migration 0057 has not been applied yet.
   - `get_flood_levels` — `GET /api/v1/stations/{id}/flood-levels`
   - `get_service_level` — `GET /api/v1/stations/{id}/service-level`
   - `list_catchments`, `get_catchment` — `GET /api/v1/catchments[/{id}]`
   - `list_networks` — `GET /api/v1/networks`
+- **For a map:** `format=geojson` on `/api/v1/stations` (search and `near`) and
+  on `/api/v1/readings/latest` — `format: "geojson"` on `search_stations`,
+  `stations_near` and `get_latest_readings` — answers a GeoJSON
+  FeatureCollection (`application/geo+json`): Point features at `[lon, lat]`,
+  longitude first, each feature's properties the JSON row; a station with no
+  position is left out and named in `omitted_without_position`.
 - **Provenance caveats — carry them into anything you write:**
   - flood classes, crossings and flood effects are **metres on the gauge**, not
     AHD; they convert to AHD only via a gauge zero surveyed in AHD;
@@ -62,14 +73,16 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     number (the dossier's `identity` and first lines say so, and search rows
     and the dossier's `nearby_stations` carry the flag); never report it as a
     station on the ground;
-  - health and readings are only what reached Flood-Net's own ingest — most
-    stations report through the Bureau's systems, so "not recorded" there says
-    nothing about whether a station works;
+  - health and readings, the latest readings included, are only what reached
+    Flood-Net's own ingest — most stations report through the Bureau's
+    systems, so "not recorded" there, or a station missing from the latest
+    readings, says nothing about whether a station works;
   - "not recorded" is never zero.
 - **Fair use:** cache what you fetch, and ask about the stations you need rather
   than walking the whole network — the API answers a station, or a page of
-  stations, at a time; taking the whole network as a file is a signed-in action
-  in the app's Export tab.
+  stations, at a time (the latest readings span the network, one newest
+  reading per channel); taking the whole network as a file is a signed-in
+  action in the app's Export tab.
 - Assessment-report templates will be added to `docs/agent-api.md` when example
   reports are provided; until then, draft from the dossier and cite its sources.
 

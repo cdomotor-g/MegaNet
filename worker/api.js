@@ -55,6 +55,12 @@
 // sizes and reading windows are capped, and a 200 is cached for 60 s at the
 // edge (caches.default, keyed by URL) so a burst of identical questions costs
 // the database one answer.
+//
+// ── Ahead of its database ────────────────────────────────────────────────────
+// The Worker deploys on every push; a migration lands when somebody applies
+// it. So a route can be live before the relation it reads is, and for that
+// while it answers 503 "not available yet", naming the relation and the
+// migration (ARRIVES_WITH), rather than a 502 that calls it a bug.
 
 // ── Where things are ─────────────────────────────────────────────────────────
 
@@ -107,6 +113,9 @@ export const LIMITS = Object.freeze({
   qMaxLength: 100,
   readingsDefault: 1000,
   readingsMax: 5000,
+  latestDefault: 100,          // stations per page of /readings/latest — an agent's context, not the database, is the limit
+  latestMax: 1000,             // …and "every gauge in one call" while no more than this many report
+  idsPerRead: 100,             // ids in one `in.(…)` list: a longer URL is one a proxy on the way may refuse
   windowMaxDays: Object.freeze({ raw: 7, hourly: 31, daily: 731 }),
   windowDefaultDays: Object.freeze({ raw: 1, hourly: 7, daily: 90 }),
   upstreamTimeoutMs: 10000,
@@ -131,12 +140,24 @@ export const READABLE_RELATIONS = Object.freeze(new Set([
   'catchment', 'hub', 'radio_network', 'rm_system',
   'crossing_type', 'gauge_datum', 'bureau_index',
   'station_health',
-  'reading', 'reading_hourly', 'reading_daily',
+  'reading', 'reading_hourly', 'reading_daily', 'reading_latest',
   'inspection_chart_visit', 'inspection_chart_power', 'inspection_chart_radio',
   'inspection_chart_gas', 'inspection_chart_water_level', 'inspection_chart_data',
   'inspection_chart_fade_margin',
   'link_fade_margin', 'app_meta',
 ]));
+
+// Relations on that list that a migration still to be applied to the live
+// database creates, with what to use until it is. Asked for one the database
+// does not have, PostgREST answers 404; Upstream.select turns that into a 503
+// naming the relation and the migration — a fact about the database, which
+// retrying in a minute will not change — where any other relation's 404 stays
+// the 502 it is: a query this file built wrong. An entry can go once its
+// migration is live; leaving it costs nothing.
+const ARRIVES_WITH = Object.freeze({
+  reading_latest: Object.freeze({ migration: 'db/migrations/0057_reading_latest.sql',
+    meanwhile: 'one station\'s own readings are at GET /api/v1/stations/{id}/readings' }),
+});
 
 const PAUSE_HINT =
   'Flood-Net\'s database is a Supabase free-tier project, which pauses after 7 days without activity; '
@@ -156,6 +177,19 @@ export class ApiError extends Error {
 }
 
 const bad = (detail, extra) => new ApiError(400, 'bad request', detail, extra);
+
+// A relation the database does not have yet (ARRIVES_WITH). retry: false, so
+// neither the Retry-After header nor a tool error suggests trying again soon.
+function notYetThere(relation) {
+  const a = ARRIVES_WITH[relation];
+  const err = new ApiError(503, 'not available yet',
+    `This answer is read from meganet.${relation}, which Flood-Net's database does not have yet: it arrives with `
+    + `${a.migration}, and that migration has not been applied. Nothing here needs to change for it to start `
+    + `working once it is. Until then, ${a.meanwhile}.`,
+    { missing_relation: `meganet.${relation}`, migration: a.migration });
+  err.retry = false;
+  return err;
+}
 
 const num = v => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 const round = (x, d = 2) => (x == null ? null : Math.round(x * 10 ** d) / 10 ** d);
@@ -335,6 +369,7 @@ class Upstream {
       if (res.status >= 500) {
         throw new ApiError(503, 'database unavailable', `The database answered ${said}. ${PAUSE_HINT}`);
       }
+      if (res.status === 404 && ARRIVES_WITH[relation]) throw notYetThere(relation);
       throw new ApiError(502, 'database refused the query',
         `The database refused a query this API built: ${said}. That is a bug in the API or a schema change it `
         + 'has not caught up with — please raise an issue at https://github.com/cdomotor-g/MegaNet/issues.');
@@ -680,10 +715,60 @@ function parseSlug(v, name) {
   return s;
 }
 
+// ── GeoJSON ──────────────────────────────────────────────────────────────────
+// "Give me this on a map": format=geojson on a list of stations answers RFC
+// 7946 — a FeatureCollection of Point features — which Leaflet, MapLibre,
+// QGIS, geojson.io and an agent's own plotting take as it comes. Three rules:
+//
+//   * [lon, lat]. GeoJSON's order, not near='s and not the rows' reading
+//     order; swapped, every station lands in the wrong hemisphere and still
+//     draws, so test/agent-api.mjs checks each one against its row.
+//   * A feature's properties are the row exactly as the JSON answer gives it,
+//     lat and lon included, so the two formats never say different things.
+//   * A station with no recorded position cannot be a feature. It is left out
+//     and named in omitted_without_position, so a map with fewer pins than
+//     `count` says why.
+//
+// Paging and notes stay as foreign members (RFC 7946 §6.1): next, total and
+// the rest mean what they mean in JSON. bbox, when there is a feature, is the
+// features' own [west, south, east, north].
+
+export const FORMATS = ['json', 'geojson'];
+
+function featureCollection(answer, key) {
+  const { [key]: rows = [], ...rest } = answer;
+  const placed = rows.filter(r => r.lat != null && r.lon != null);
+  const unplaced = rows.filter(r => r.lat == null || r.lon == null);
+  const features = placed.map(r => ({
+    type: 'Feature',
+    id: r.id,
+    geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
+    properties: r,
+  }));
+  const out = { type: 'FeatureCollection' };
+  if (placed.length) {
+    out.bbox = [Math.min(...placed.map(r => r.lon)), Math.min(...placed.map(r => r.lat)),
+      Math.max(...placed.map(r => r.lon)), Math.max(...placed.map(r => r.lat))];
+  }
+  const { notes, generated_at, ...paging } = rest;
+  return {
+    ...out,
+    ...paging,
+    omitted_without_position: { count: unplaced.length, ids: unplaced.map(r => r.id) },
+    features,
+    notes: [...(notes || []), ...(unplaced.length
+      ? [`${unplaced.length} of the ${rows.length} station(s) on this page have no recorded position, so are not features: ${unplaced.map(r => r.id).join(', ')}.`]
+      : [])],
+    generated_at,
+  };
+}
+
+const inFormat = (format, answer, key) => (format === 'geojson' ? featureCollection(answer, key) : answer);
+
 // ── GET /api/v1/stations ─────────────────────────────────────────────────────
 
 export const STATION_LIST_PARAMS = ['q', 'near', 'radius_km', 'basin', 'catchment', 'lga', 'hub', 'network',
-  'role', 'type', 'manual', 'limit', 'offset'];
+  'role', 'type', 'manual', 'format', 'limit', 'offset'];
 
 function parseStationFilters(params, notes) {
   const f = {};
@@ -708,6 +793,7 @@ function parseStationFilters(params, notes) {
   f.role = parseEnum(params.role, 'role', ['field', 'repeater', 'base']);
   f.type = parseEnum(params.type, 'type', ['rain', 'river', 'repeater', 'base']);
   f.manual = parseBool(params.manual, 'manual');
+  f.format = parseEnum(params.format, 'format', FORMATS);
   f.limit = parseIntParam(params.limit, 'limit', { min: 1, max: LIMITS.listMax, dflt: LIMITS.listDefault, clampMax: true }, notes);
   f.offset = parseIntParam(params.offset, 'offset', { min: 0, max: LIMITS.offsetMax, dflt: 0 });
   return f;
@@ -831,12 +917,12 @@ async function listStations(rc, params, { catchmentIds, path = '/stations' } = {
   const echo = stripNulls({
     q: f.q, near: f.near ? `${f.near.lat},${f.near.lon}` : undefined, radius_km: f.near ? f.radiusKm : undefined,
     basin: f.basin, catchment: f.catchment, lga: f.lga, hub: f.hub, network: f.network, role: f.role, type: f.type,
-    manual: f.manual, limit: f.limit, offset: f.offset,
+    manual: f.manual, format: f.format, limit: f.limit, offset: f.offset,
   });
-  const empty = note => ({
+  const empty = note => inFormat(f.format, {
     count: 0, total: 0, total_exact: true, limit: f.limit, offset: f.offset, next: null,
     query: echo, stations: [], notes: [...notes, note], generated_at: new Date().toISOString(),
-  });
+  }, 'stations');
 
   if (catchmentIds) {
     f.catchmentIds = catchmentIds;
@@ -931,7 +1017,7 @@ async function listStations(rc, params, { catchmentIds, path = '/stations' } = {
   const more = total != null ? nextOffset < total : stations.length === f.limit;
   if (f.near) notes.push(`Sorted by great-circle distance from ${f.near.lat},${f.near.lon}; radius ${f.radiusKm} km.`);
   else if (f.q) notes.push('Sorted by relevance to q: exact id, Bureau number and ALERT address first, then name.');
-  return {
+  return inFormat(f.format, {
     count: stations.length,
     total: total ?? null,
     total_exact: totalExact && total != null,
@@ -942,7 +1028,7 @@ async function listStations(rc, params, { catchmentIds, path = '/stations' } = {
     stations,
     notes,
     generated_at: new Date().toISOString(),
-  };
+  }, 'stations');
 }
 
 function echoToParams(echo, raw) {
@@ -1882,6 +1968,192 @@ async function readingsEndpoint(rc, rawId, params) {
   };
 }
 
+// ── GET /api/v1/readings/latest ──────────────────────────────────────────────
+// "What is every gauge saying now?" in one call, where the route above would
+// have an agent page through it station by station. One row per station Flood-
+// Net holds a reading for: each of its channels' newest reading and how old it
+// is, optionally only one radio network, basin, kind or bounding box.
+//
+// The newest reading per address is DISTINCT ON, which PostgREST cannot say,
+// so it is a view, meganet.reading_latest (0057), that walks the primary key —
+// its cost is the number of addresses, not of readings. Until 0057 is applied
+// to the live database this route answers 503 naming it (ARRIVES_WITH).
+//
+// Two reads at pilot scale, and a bounded handful at the network's:
+//   1. every address's newest reading (a read per thousand addresses);
+//   2. the stations those belong to, live and matching the filters, asked for
+//      by id a hundred to a read — while that is at most three reads;
+//   3. past that, the filtered station table's ids instead (≤ 5 reads, at
+//      today's 4,900 stations), then only the page's stations by id.
+// Stations come in id order — stable from one page to the next, which an order
+// by recency would not be while readings arrive.
+
+export const LATEST_PARAMS = ['network', 'basin', 'type', 'bbox', 'format', 'limit', 'offset'];
+
+const LATEST_SELECT = 'addr,alert_id,a2_station,a2_sensor,channel,station_id,reading_ts,received_at,'
+  + 'value_raw,value,unit,quality,path,dup_count,freq_mhz,rssi_dbm,level_dbfs,snr_db';
+const LATEST_STATION_SELECT = 'id,name,station_number,lat,lon,roles,location_types,alert_ids,stream,basin,'
+  + 'radio_network_ids,sensor(type,alert_id,alert2_sensor_id)';
+const LATEST_INLINE_READS = 3;           // step 2 by id while it takes no more reads than this; step 3 past it
+
+function parseBbox(v) {
+  if (v === undefined) return undefined;
+  const parts = String(v).split(',').map(s => s.trim());
+  if (parts.length !== 4 || parts.some(p => !/^-?\d+(\.\d+)?$/.test(p))) {
+    throw bad('"bbox" must be four numbers, west,south,east,north in decimal degrees — longitude first, as GeoJSON '
+      + 'has it — e.g. bbox=152.5,-28.2,153.6,-27.0.');
+  }
+  const [west, south, east, north] = parts.map(Number);
+  if ([west, east].some(x => x < -180 || x > 180)) throw bad('"bbox": west and east are longitudes, -180 to 180.');
+  if ([south, north].some(x => x < -90 || x > 90)) throw bad('"bbox": south and north are latitudes, -90 to 90.');
+  if (west >= east) throw bad('"bbox": west must be less than east (a box across the antimeridian is not taken).');
+  if (south >= north) throw bad('"bbox": south must be less than north.');
+  return { west, south, east, north };
+}
+
+// Station rows by id, LIMITS.idsPerRead to a read, side by side.
+async function stationRowsByIds(rc, ids, select, pairs) {
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += LIMITS.idsPerRead) chunks.push(ids.slice(i, i + LIMITS.idsPerRead));
+  const got = await Promise.all(chunks.map(c =>
+    rc.up.select('station', [['select', select], ...pairs, ['id', `in.${pgList(c)}`]])));
+  return got.flatMap(g => g.rows);
+}
+
+const minutesSince = (t, now) => Math.round((now - Date.parse(t)) / 60000);
+
+// A station and its channels' newest readings. A channel is labelled with the
+// station's sensor types on that address, as /readings labels its channels.
+function latestRow(st, readings, now) {
+  const types = new Map();
+  for (const s of st.sensor || []) {
+    for (const addr of [s.alert_id != null ? `a:${s.alert_id}` : null,
+      s.alert2_sensor_id != null ? `a2/${s.alert2_sensor_id}` : null]) {
+      if (!addr) continue;
+      if (!types.has(addr)) types.set(addr, []);
+      if (!types.get(addr).includes(s.type)) types.get(addr).push(s.type);
+    }
+  }
+  const typesOf = r => (r.alert_id != null ? types.get(`a:${r.alert_id}`)
+    : r.a2_sensor != null ? types.get(`a2/${r.a2_sensor}`) : null) || null;
+  const channels = readings.map(r => stripNulls({
+    addr: r.addr,
+    alert_id: r.alert_id ?? null,
+    a2_station: r.a2_station ?? null,
+    a2_sensor: r.a2_sensor ?? null,
+    channel: r.channel || null,
+    sensor_types: typesOf(r),
+    t: r.reading_ts,
+    minutes_since: minutesSince(r.reading_ts, now),
+    value_raw: num(r.value_raw),
+    value: num(r.value),
+    unit: r.unit,
+    quality: r.quality,
+    received_at: r.received_at,
+    path: r.path,
+    dup_count: r.dup_count || null,
+    freq_mhz: num(r.freq_mhz),
+    rssi_dbm: num(r.rssi_dbm),
+    level_dbfs: num(r.level_dbfs),
+    snr_db: num(r.snr_db),
+  }));
+  const newest = readings.reduce((m, r) => (m == null || Date.parse(r.reading_ts) > Date.parse(m) ? r.reading_ts : m), null);
+  return {
+    id: st.id,
+    name: st.name,
+    station_number: st.station_number || null,
+    lat: num(st.lat),
+    lon: num(st.lon),
+    kinds: stationKinds(st),
+    basin: st.basin || null,
+    stream: st.stream || null,
+    radio_network_ids: st.radio_network_ids || [],
+    latest_at: newest,
+    minutes_since_latest: newest ? minutesSince(newest, now) : null,
+    channels,
+  };
+}
+
+async function latestReadingsEndpoint(rc, params) {
+  const notes = [];
+  const f = {
+    network: parseSlug(params.network, 'network'),
+    basin: cleanText(params.basin, 'basin'),
+    type: parseEnum(params.type, 'type', ['rain', 'river', 'repeater', 'base']),
+    bbox: parseBbox(params.bbox),
+    format: parseEnum(params.format, 'format', FORMATS),
+    limit: parseIntParam(params.limit, 'limit', { min: 1, max: LIMITS.latestMax, dflt: LIMITS.latestDefault, clampMax: true }, notes),
+    offset: parseIntParam(params.offset, 'offset', { min: 0, max: LIMITS.offsetMax, dflt: 0 }),
+  };
+  const echo = stripNulls({ network: f.network, basin: f.basin, type: f.type,
+    bbox: f.bbox ? [f.bbox.west, f.bbox.south, f.bbox.east, f.bbox.north].join(',') : undefined,
+    format: f.format, limit: f.limit, offset: f.offset });
+
+  // The filters are /stations' own (type= the same rule as there), plus the box.
+  const filters = stationFilterPairs({ basin: f.basin, network: f.network, type: f.type });
+  if (f.type === 'rain' || f.type === 'river') filters.push(logicPair([TYPE_TERMS[f.type]]));
+  if (f.bbox) {
+    filters.push(['lat', `gte.${f.bbox.south}`], ['lat', `lte.${f.bbox.north}`],
+      ['lon', `gte.${f.bbox.west}`], ['lon', `lte.${f.bbox.east}`]);
+  }
+
+  // 1. Every address's newest reading, grouped by the station it was read for.
+  const latest = await rc.up.selectAll('reading_latest', [['select', LATEST_SELECT], ['order', 'addr.asc']],
+    LIMITS.candidateMax);
+  const byStation = new Map();
+  let unattributed = 0;
+  for (const r of latest.rows) {
+    if (!r.station_id) { unattributed++; continue; }
+    if (!byStation.has(r.station_id)) byStation.set(r.station_id, []);
+    byStation.get(r.station_id).push(r);
+  }
+  const heard = [...byStation.keys()].sort();
+
+  // 2. Which of them are live stations that match, and (3) the page's rows.
+  let candidates, rowsById = null, exact = !latest.truncated;
+  if (heard.length <= LIMITS.idsPerRead * LATEST_INLINE_READS) {
+    rowsById = byKey(await stationRowsByIds(rc, heard, LATEST_STATION_SELECT, filters));
+    candidates = heard.filter(id => rowsById.has(id));
+  } else {
+    const live = await rc.up.selectAll('station', [['select', 'id'], ...filters, ['order', 'id.asc']], LIMITS.candidateMax);
+    if (live.truncated) exact = false;
+    const keep = new Set(live.rows.map(r => r.id));
+    candidates = heard.filter(id => keep.has(id));
+  }
+  const pageIds = candidates.slice(f.offset, f.offset + f.limit);
+  if (!rowsById) rowsById = byKey(await stationRowsByIds(rc, pageIds, LATEST_STATION_SELECT, [['deleted_at', 'is.null']]));
+  const stations = pageIds.map(id => rowsById.get(id)).filter(Boolean)
+    .map(st => latestRow(st, byStation.get(st.id), rc.now));
+
+  notes.push('Telemetry ingested into Flood-Net only. Most stations report through the Bureau\'s own systems and so are not here — which says nothing about whether they work.');
+  notes.push('Each channel is its address\'s newest reading that meganet.reading still holds (90 days), by the station\'s own clock; minutes_since runs from that time to now, and a negative one is a clock running ahead. Stations are in id order.');
+  if (unattributed) {
+    notes.push(`${unattributed} address(es) heard belong to no single live station — an ALERT address more than one station carries, or a station not in the register — so are in no row here. That count is the whole network's, whatever the filters.`);
+  }
+  if (latest.truncated) {
+    notes.push(`More than ${LIMITS.candidateMax} addresses have readings; this answer covers the first ${LIMITS.candidateMax} by address, and its total is a floor.`);
+  }
+  const total = candidates.length;
+  const nextOffset = f.offset + stations.length;
+  const nextParams = {};
+  for (const k of LATEST_PARAMS) if (params[k] !== undefined) nextParams[k] = params[k];
+  nextParams.limit = String(f.limit);
+  return inFormat(f.format, {
+    count: stations.length,
+    total,
+    total_exact: exact,
+    limit: f.limit,
+    offset: f.offset,
+    next: stations.length && nextOffset < total ? pageLink(rc, '/readings/latest', nextParams, nextOffset) : null,
+    query: echo,
+    stations,
+    unattributed_addresses: unattributed,
+    notes,
+    source: 'meganet.reading_latest (each address\'s newest reading in meganet.reading); meganet.station',
+    generated_at: new Date().toISOString(),
+  }, 'stations');
+}
+
 // ── Catchments and networks ──────────────────────────────────────────────────
 
 async function catchmentsEndpoint(rc) {
@@ -1934,12 +2206,13 @@ async function networksEndpoint(rc) {
 export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/', op: 'getApiIndex', summary: 'What this API is, its endpoints, limits and links.' },
   { path: '/api/v1/openapi.json', op: 'getOpenApi', summary: 'This API as an OpenAPI 3.1 document.' },
-  { path: '/api/v1/stations', op: 'searchStations', summary: 'Search and filter stations; compact rows.' },
+  { path: '/api/v1/stations', op: 'searchStations', summary: 'Search and filter stations; compact rows, or GeoJSON with format=geojson.' },
   { path: '/api/v1/stations/{id}', op: 'getStation', summary: 'One station\'s full register record, its SLS rows and health.' },
   { path: '/api/v1/stations/{id}/dossier', op: 'getStationDossier', summary: 'Everything a report needs about one station, labelled with its sources.' },
   { path: '/api/v1/stations/{id}/readings', op: 'getStationReadings', summary: 'Telemetry ingested into Flood-Net: raw, hourly or daily, bounded windows.' },
   { path: '/api/v1/stations/{id}/flood-levels', op: 'getStationFloodLevels', summary: 'Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels and one AHD ladder.' },
   { path: '/api/v1/stations/{id}/service-level', op: 'getStationServiceLevel', summary: 'The station\'s entries in the Service Level Specifications (Queensland; New South Wales and the ACT).' },
+  { path: '/api/v1/readings/latest', op: 'getLatestReadings', summary: 'Every station\'s newest reading on each channel, in one call: by network, basin, kind or bounding box.' },
   { path: '/api/v1/catchments', op: 'listCatchments', summary: 'The 77 Queensland drainage basins.' },
   { path: '/api/v1/catchments/{id}', op: 'getCatchment', summary: 'One basin and its stations.' },
   { path: '/api/v1/networks', op: 'listNetworks', summary: 'Radio networks, maintenance hubs and Radio Mobile systems.' },
@@ -1966,6 +2239,7 @@ function apiIndex(rc) {
       radius_max_km: LIMITS.radiusMaxKm,
       readings_max_rows: LIMITS.readingsMax,
       readings_window_max_days: LIMITS.windowMaxDays,
+      latest_readings_max_stations: LIMITS.latestMax,
       cache_seconds: LIMITS.cacheSeconds,
     },
     station_ids: 'Lowercase slugs such as "abergowrie_br_al"; an all-digit id is also tried as a Bureau station number.',
@@ -1995,6 +2269,14 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
   const ok = (description, schema = { $ref: '#/components/schemas/Object' }) => ({
     200: { description, content: { 'application/json': { schema } } }, ...errors,
   });
+  // JSON by default; GeoJSON, under its own media type, with format=geojson.
+  const okOrGeo = (description, schema = { $ref: '#/components/schemas/Object' }) => ({
+    200: { description, content: { 'application/json': { schema },
+      'application/geo+json': { schema: { $ref: '#/components/schemas/FeatureCollection' } } } }, ...errors,
+  });
+  const formatParam = { name: 'format', in: 'query', required: false,
+    description: 'json (default), or geojson: a GeoJSON FeatureCollection (RFC 7946) of Point features at [lon, lat], each feature\'s properties the row the JSON answer gives. A station with no recorded position is left out and named in omitted_without_position.',
+    schema: { type: 'string', enum: FORMATS, default: 'json' } };
   const op = (operationId, summary, description, parameters, responses) =>
     ({ get: { operationId, summary, description, parameters, responses } });
   const q = (name, description, schema) => ({ name, in: 'query', required: false, description, schema });
@@ -2015,7 +2297,7 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
       '/api/v1/': op('getApiIndex', 'API index', 'What this API is: endpoints, rate limits, links to the docs, the MCP server and this document.', [], ok('The index.')),
       '/api/v1/openapi.json': op('getOpenApi', 'OpenAPI document', 'This document.', [], ok('An OpenAPI 3.1 document.')),
       '/api/v1/stations': op('searchStations', 'Search stations',
-        'Find stations by name, Bureau or AWRC number, or ALERT address; filter by catchment, basin, LGA, hub, network, role, kind or SLS gauge type; or list those near a point. Compact rows; page with "next".',
+        'Find stations by name, Bureau or AWRC number, or ALERT address; filter by catchment, basin, LGA, hub, network, role, kind or SLS gauge type; or list those near a point. Compact rows, or GeoJSON for a map; page with "next".',
         [
           q('q', 'Name words, a Bureau station number, an AWRC number or an ALERT address (2–100 characters; a number may be shorter). Ranked by relevance.', { type: 'string', minLength: 1, maxLength: LIMITS.qMaxLength }),
           q('near', 'A point as "lat,lon" in decimal degrees; results are sorted by distance and carry distance_km, bearing_deg and direction.', { type: 'string', pattern: '^-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?$' }),
@@ -2028,8 +2310,9 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
           q('role', 'The station\'s role in the network.', { type: 'string', enum: ['field', 'repeater', 'base'] }),
           q('type', 'A kind: rain or river (from ALERT addresses, location types and the Bureau\'s river height list), repeater or base.', { type: 'string', enum: ['rain', 'river', 'repeater', 'base'] }),
           q('manual', 'true: stations the Service Level Specification lists as Manual; false: as Automatic. Stations not in the SLS match neither.', { type: 'boolean' }),
+          formatParam,
           limitParam(LIMITS.listMax, LIMITS.listDefault), offsetParam,
-        ], ok('A page of compact station rows.', { $ref: '#/components/schemas/StationList' })),
+        ], okOrGeo('A page of compact station rows, or a GeoJSON FeatureCollection of them.', { $ref: '#/components/schemas/StationList' })),
       '/api/v1/stations/{id}': op('getStation', 'Get a station',
         'One station\'s full register record (the stations.json fragment), its Service Level Specification rows and its latest health row.',
         [idParam], ok('The station.')),
@@ -2052,6 +2335,16 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
       '/api/v1/stations/{id}/service-level': op('getStationServiceLevel', 'Get the SLS entries',
         'The station\'s entries in the Service Level Specifications (QLD; NSW and the ACT), one per document that lists it: gauge type, data type, priority, owner, schedules, flood classes and prediction — and the NSW gauge datum and AWRC number — with each edition.',
         [idParam], ok('The SLS entries.')),
+      '/api/v1/readings/latest': op('getLatestReadings', 'Get the latest readings',
+        'Every station Flood-Net holds telemetry for, each channel\'s newest reading and its age, in one call — filtered by radio network, basin, kind or bounding box. Most stations report through the Bureau\'s own systems and are absent.',
+        [
+          q('network', 'A radio network id. See /api/v1/networks.', { type: 'string' }),
+          q('basin', 'Words in the Bureau\'s basin name for the station, e.g. "Burdekin".', { type: 'string' }),
+          q('type', 'A kind: rain, river, repeater or base — the same rule as /api/v1/stations.', { type: 'string', enum: ['rain', 'river', 'repeater', 'base'] }),
+          q('bbox', 'A bounding box, "west,south,east,north" in decimal degrees — longitude first, as GeoJSON has it — e.g. 152.5,-28.2,153.6,-27.0.', { type: 'string', pattern: '^-?\\d+(\\.\\d+)?(,-?\\d+(\\.\\d+)?){3}$' }),
+          formatParam,
+          limitParam(LIMITS.latestMax, LIMITS.latestDefault), offsetParam,
+        ], okOrGeo('A page of stations, each with its channels\' newest readings; or a GeoJSON FeatureCollection of them.')),
       '/api/v1/catchments': op('listCatchments', 'List catchments', 'The 77 Queensland drainage basins with basin number, area and drainage division.', [], ok('Catchments.')),
       '/api/v1/catchments/{id}': op('getCatchment', 'Get a catchment and its stations', 'One basin (by id or name) and a page of its stations.',
         [{ name: 'id', in: 'path', required: true, description: 'Catchment id, e.g. "herbert".', schema: { type: 'string' } },
@@ -2089,6 +2382,17 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
           count: { type: 'integer' }, total: { type: ['integer', 'null'] }, limit: { type: 'integer' }, offset: { type: 'integer' },
           next: { type: ['string', 'null'] }, stations: { type: 'array', items: { $ref: '#/components/schemas/StationSummary' } },
           notes: { type: 'array', items: { type: 'string' } } } },
+        FeatureCollection: { type: 'object', required: ['type', 'features'], additionalProperties: true, properties: {
+          type: { type: 'string', enum: ['FeatureCollection'] },
+          bbox: { type: 'array', items: { type: 'number' }, minItems: 4, maxItems: 4 },
+          features: { type: 'array', items: { type: 'object', additionalProperties: true, properties: {
+            type: { type: 'string', enum: ['Feature'] }, id: { type: 'string' },
+            geometry: { type: 'object', properties: { type: { type: 'string', enum: ['Point'] },
+              coordinates: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, description: '[lon, lat]' } } },
+            properties: { type: 'object', additionalProperties: true } } } },
+          omitted_without_position: { type: 'object', additionalProperties: true, properties: {
+            count: { type: 'integer' }, ids: { type: 'array', items: { type: 'string' } } } },
+          next: { type: ['string', 'null'] }, notes: { type: 'array', items: { type: 'string' } } } },
       },
     },
   };
@@ -2119,6 +2423,9 @@ async function routeRest(rc, sub, params) {
       }
     }
   }
+  if (parts[0] === 'readings' && parts.length === 2 && parts[1] === 'latest') {
+    return latestReadingsEndpoint(rc, allowParams(params, LATEST_PARAMS));
+  }
   if (parts[0] === 'catchments') {
     if (parts.length === 1) { none(); return catchmentsEndpoint(rc); }
     if (parts.length === 2) return catchmentEndpoint(rc, parts[1], allowParams(params, ['limit', 'offset']));
@@ -2129,7 +2436,8 @@ async function routeRest(rc, sub, params) {
 
 function errorBody(err) {
   if (err instanceof ApiError) {
-    return { status: err.status, body: { error: err.error, ...(err.detail ? { detail: err.detail } : {}), ...(err.extra || {}) } };
+    return { status: err.status, retry: err.retry,
+      body: { error: err.error, ...(err.detail ? { detail: err.detail } : {}), ...(err.extra || {}) } };
   }
   return { status: 500, body: { error: 'internal error', detail: String((err && err.message) || err) } };
 }
@@ -2141,34 +2449,38 @@ function cacheKeyFor(origin, sub, params) {
 }
 
 // One route, through the edge cache: what both the REST door and every MCP
-// tool call go through, so the two share one answer per URL per minute.
+// tool call go through, so the two share one answer per URL per minute. The
+// answer's media type rides with it — GeoJSON is application/geo+json, and a
+// cached copy says so too — as does whether an error is worth retrying.
 async function cachedRoute(rc, sub, params) {
   const key = cacheKeyFor(rc.origin, sub, params);
   if (rc.cache) {
     try {
       const hit = await rc.cache.match(key);
-      if (hit) return { status: 200, text: await hit.text(), cache: 'hit' };
+      if (hit) return { status: 200, text: await hit.text(), cache: 'hit', type: hit.headers.get('Content-Type') || JSON_TYPE };
     } catch (_) { /* a miss */ }
   }
-  let status, body;
+  let status, body, retry;
   try {
     body = await routeRest(rc, sub, params);
     status = 200;
   } catch (err) {
-    ({ status, body } = errorBody(err));
+    ({ status, body, retry } = errorBody(err));
   }
   let text = JSON.stringify(body);
+  let type = status === 200 && body && body.type === 'FeatureCollection' ? GEOJSON_TYPE : JSON_TYPE;
   if (text.length > LIMITS.responseMaxBytes) {
     status = 413;
+    type = JSON_TYPE;
     text = JSON.stringify({ error: 'response too large', detail: `The answer would be over ${LIMITS.responseMaxBytes} bytes; ask for fewer rows or a shorter window.` });
   }
   if (status === 200 && rc.cache) {
     rc.waitUntil(rc.cache.put(key, new Response(text, { headers: {
-      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Type': type,
       'Cache-Control': `public, max-age=${LIMITS.cacheSeconds}`,
     } })));
   }
-  return { status, text, cache: rc.cache ? 'miss' : 'none' };
+  return { status, text, type, retry, cache: rc.cache ? 'miss' : 'none' };
 }
 
 function makeRc(env, ctx, url) {
@@ -2278,9 +2590,12 @@ function rateDetail(rate) {
 const EXPOSE = ['ETag', 'Retry-After', 'X-RateLimit-Policy', 'X-RateLimit-Limiter', CLIENT_HEADER,
   'X-FloodNet-Cache', 'X-FloodNet-Api-Version'].join(', ');
 
+const JSON_TYPE = 'application/json; charset=utf-8';
+const GEOJSON_TYPE = 'application/geo+json; charset=utf-8';     // RFC 7946's own media type
+
 function baseHeaders(extra = {}) {
   return {
-    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Type': JSON_TYPE,
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Expose-Headers': EXPOSE,
     'X-Content-Type-Options': 'nosniff',
@@ -2348,7 +2663,7 @@ async function handleRest(request, env, ctx, url) {
   const rc = makeRc(env, ctx, url);
   const sub = url.pathname.slice(API_PREFIX.length) || '/';
   const out = await cachedRoute(rc, sub.startsWith('/') ? sub : `/${sub}`, params);
-  const headers = { ...rateHeaders(rate), 'X-FloodNet-Cache': out.cache };
+  const headers = { ...rateHeaders(rate), 'X-FloodNet-Cache': out.cache, 'Content-Type': out.type };
   if (out.status === 200) {
     const etag = await etagFor(out.text);
     headers.ETag = etag;
@@ -2361,7 +2676,7 @@ async function handleRest(request, env, ctx, url) {
     }
   } else {
     headers['Cache-Control'] = 'no-store';
-    if (out.status === 503 || out.status === 504) headers['Retry-After'] = '30';
+    if ((out.status === 503 || out.status === 504) && out.retry !== false) headers['Retry-After'] = '30';
   }
   if (request.method === 'HEAD') return new Response(null, { status: out.status, headers: baseHeaders(headers) });
   return jsonResponse(out.status, out.text, headers);
@@ -2407,6 +2722,7 @@ const SERVER_INFO = Object.freeze({
 export const MCP_INSTRUCTIONS = [
   'Flood-Net (floodwarning.net) is the engineering register of the Bureau of Meteorology\'s Queensland (and neighbouring) flood-warning telemetry network: rainfall and river-height field stations, the repeaters that relay them, base stations, and the radio paths between. This server is READ-ONLY and serves only public data.',
   'Station ids are lowercase slugs such as "abergowrie_br_al" (a Bureau number also works). Find stations with search_stations or stations_near, then call get_station_dossier for everything about one station in a single call — identity, location, radio, telemetry and health, the Service Level Specification entry, the Bureau\'s flood classes, crossings and gauge zero, AEP levels, inspection numbers and nearby stations, each labelled with its source. Use get_flood_levels or get_service_level when only that is needed.',
+  'For what every gauge is saying now, call get_latest_readings once — by radio network, basin, kind or bounding box if you like — rather than get_readings station by station; it covers only telemetry ingested into Flood-Net, which most stations do not send. For a map, search_stations, stations_near and get_latest_readings answer GeoJSON with format "geojson".',
   'Heights: flood classes, crossings and flood effects are metres on the gauge, not AHD; AEP levels are modelled metres AHD and indicative only. Say which source a figure came from. Sections report status "ok", "not recorded" or "unavailable" — never read "not recorded" as zero.',
   `Be gentle: ${rateLimitWords().join('; ')}. Cache what you fetch and do not walk the whole network station by station.`,
   'Flood-Net is not a flood warning service. For current warnings and observations, send people to the Bureau of Meteorology (bom.gov.au).',
@@ -2426,6 +2742,8 @@ const listFilters = {
   type: { type: 'string', enum: ['rain', 'river', 'repeater', 'base'], description: 'Kind of station.' },
   manual: { type: 'boolean', description: 'true: SLS lists it as Manual; false: as Automatic.' },
 };
+const formatArg = { type: 'string', enum: FORMATS,
+  description: 'json (default), or geojson for a map: a GeoJSON FeatureCollection of Point features at [lon, lat], properties the same rows; a station with no position is left out and named.' };
 
 const pick = (a, keys) => Object.fromEntries(keys.filter(k => a[k] !== undefined).map(k => [k, String(a[k])]));
 const enc = encodeURIComponent;
@@ -2434,24 +2752,24 @@ export const MCP_TOOLS = Object.freeze([
   {
     name: 'search_stations',
     title: 'Search stations',
-    description: 'Find stations by name words, Bureau or AWRC number, or ALERT address, optionally filtered by catchment, basin, LGA, hub, radio network, role, kind (rain/river/repeater/base) or SLS gauge type. Returns compact rows (id, name, number, position, kinds, whether it is only proposed, SLS gauge type, flood-level flags) ranked by relevance. Pass a row\'s id to get_station_dossier.',
+    description: 'Find stations by name words, Bureau or AWRC number, or ALERT address, optionally filtered by catchment, basin, LGA, hub, radio network, role, kind (rain/river/repeater/base) or SLS gauge type. Returns compact rows (id, name, number, position, kinds, whether it is only proposed, SLS gauge type, flood-level flags) ranked by relevance — or, with format "geojson", the same rows as GeoJSON for a map. Pass a row\'s id to get_station_dossier.',
     inputSchema: { type: 'object', properties: {
       q: { type: 'string', maxLength: LIMITS.qMaxLength, description: 'Name words, a Bureau station number, an AWRC number or an ALERT address.' },
-      ...listFilters, limit: limitArg(LIMITS.listMax, LIMITS.listDefault), offset: offsetArg,
+      ...listFilters, format: formatArg, limit: limitArg(LIMITS.listMax, LIMITS.listDefault), offset: offsetArg,
     }, additionalProperties: false },
-    route: a => ['/stations', pick(a, ['q', 'catchment', 'basin', 'lga', 'hub', 'network', 'role', 'type', 'manual', 'limit', 'offset'])],
+    route: a => ['/stations', pick(a, ['q', 'catchment', 'basin', 'lga', 'hub', 'network', 'role', 'type', 'manual', 'format', 'limit', 'offset'])],
   },
   {
     name: 'stations_near',
     title: 'Stations near a point',
-    description: 'Stations within a radius of a latitude/longitude, nearest first, each with distance_km, bearing_deg and compass direction. Optional filters as search_stations.',
+    description: 'Stations within a radius of a latitude/longitude, nearest first, each with distance_km, bearing_deg and compass direction. Optional filters as search_stations, and format "geojson" for a map.',
     inputSchema: { type: 'object', properties: {
       lat: { type: 'number', minimum: -90, maximum: 90, description: 'Latitude, decimal degrees (negative south).' },
       lon: { type: 'number', minimum: -180, maximum: 180, description: 'Longitude, decimal degrees.' },
       radius_km: { type: 'number', minimum: 0.01, maximum: LIMITS.radiusMaxKm, description: `Radius in km (default ${LIMITS.radiusDefaultKm}, max ${LIMITS.radiusMaxKm}).` },
-      ...listFilters, limit: limitArg(LIMITS.listMax, LIMITS.listDefault), offset: offsetArg,
+      ...listFilters, format: formatArg, limit: limitArg(LIMITS.listMax, LIMITS.listDefault), offset: offsetArg,
     }, required: ['lat', 'lon'], additionalProperties: false },
-    route: a => ['/stations', { near: `${a.lat},${a.lon}`, ...pick(a, ['radius_km', 'catchment', 'basin', 'lga', 'hub', 'network', 'role', 'type', 'manual', 'limit', 'offset']) }],
+    route: a => ['/stations', { near: `${a.lat},${a.lon}`, ...pick(a, ['radius_km', 'catchment', 'basin', 'lga', 'hub', 'network', 'role', 'type', 'manual', 'format', 'limit', 'offset']) }],
   },
   {
     name: 'get_station',
@@ -2480,6 +2798,17 @@ export const MCP_TOOLS = Object.freeze([
       limit: limitArg(LIMITS.readingsMax, LIMITS.readingsDefault), offset: { type: 'integer', minimum: 0, maximum: 1000000, description: 'Rows to skip.' },
     }, required: ['id'], additionalProperties: false },
     route: a => [`/stations/${enc(a.id)}/readings`, pick(a, ['from', 'to', 'resolution', 'channel', 'limit', 'offset'])],
+  },
+  {
+    name: 'get_latest_readings',
+    title: 'Get the latest readings',
+    description: `What every gauge is saying now, in one call: each station Flood-Net holds telemetry for, with each channel's newest reading and how many minutes old it is — optionally only one radio network, basin, kind (rain/river/repeater/base) or bounding box. ${LIMITS.latestDefault} stations a page by default; limit up to ${LIMITS.latestMax} takes them all at once. Most stations report through the Bureau's own systems and are absent, which says nothing about them. format "geojson" answers for a map. Use this rather than get_readings station by station.`,
+    inputSchema: { type: 'object', properties: {
+      network: listFilters.network, basin: listFilters.basin, type: listFilters.type,
+      bbox: { type: 'string', maxLength: 100, description: 'A bounding box, "west,south,east,north" in decimal degrees — longitude first, as GeoJSON has it — e.g. "152.5,-28.2,153.6,-27.0".' },
+      format: formatArg, limit: limitArg(LIMITS.latestMax, LIMITS.latestDefault), offset: offsetArg,
+    }, additionalProperties: false },
+    route: a => ['/readings/latest', pick(a, ['network', 'basin', 'type', 'bbox', 'format', 'limit', 'offset'])],
   },
   {
     name: 'list_catchments',
@@ -2642,7 +2971,7 @@ async function callTool(rc, params) {
   if (out.status === 200) {
     return { result: { content: [{ type: 'text', text: out.text }], structuredContent: data, isError: false } };
   }
-  const retry = out.status === 503 || out.status === 504 ? ' It may be worth retrying in a minute.' : '';
+  const retry = (out.status === 503 || out.status === 504) && out.retry !== false ? ' It may be worth retrying in a minute.' : '';
   return { result: {
     content: [{ type: 'text', text: `${tool.name} failed (HTTP ${out.status}): ${data.error || 'error'}${data.detail ? ` — ${data.detail}` : ''}${retry}` }],
     structuredContent: { status: out.status, ...data },

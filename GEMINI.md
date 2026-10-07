@@ -35,6 +35,15 @@ Documentation: [`docs/agent-api.md`](docs/agent-api.md).
   sourced and marked `ok`, `not recorded` or `unavailable`. Also: `get_station`,
   `get_readings`, `get_flood_levels`, `get_service_level`, `list_catchments`,
   `get_catchment`, `list_networks`.
+- What every gauge is saying now: `get_latest_readings`
+  (`/api/v1/readings/latest`) — each station's newest reading on every
+  channel, in one call, by network, basin, kind or `bbox=west,south,east,north`.
+  It covers only telemetry ingested into Flood-Net; a 503 "not available yet"
+  means database migration 0057 has not been applied yet.
+- For a map, `format=geojson` (tool argument `format: "geojson"`) on station
+  search, `stations_near` and the latest readings answers a GeoJSON
+  FeatureCollection: points at `[lon, lat]`, properties the JSON row, stations
+  with no position left out and named.
 - Caveats: flood classes, crossings and flood effects are metres on the gauge,
   not AHD; AEP levels are modelled m AHD and indicative; the Bureau's lists and
   the SLS carry separate flood classes; heights say whether they are surveyed or

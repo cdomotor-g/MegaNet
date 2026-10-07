@@ -8,7 +8,8 @@ No sign-in or key. Rate limits: 60 requests / 60 s per client, 20 requests / 10 
 
 - [API index](https://floodwarning.net/api/v1/): version, endpoints, limits and links, as JSON
 - [OpenAPI 3.1 document](https://floodwarning.net/api/v1/openapi.json): every endpoint, for function-calling agents and ChatGPT Actions
-- [MCP server](https://floodwarning.net/api/mcp): Streamable HTTP (POST JSON-RPC), stateless, read-only; tools search_stations, stations_near, get_station, get_station_dossier, get_readings, get_flood_levels, get_service_level, list_catchments, get_catchment, list_networks
+- [Latest readings](https://floodwarning.net/api/v1/readings/latest): what every gauge reporting into Flood-Net is saying now, in one call — each station's newest reading on every channel, by network, basin, kind or bbox (west,south,east,north); add format=geojson for a map, as on /api/v1/stations
+- [MCP server](https://floodwarning.net/api/mcp): Streamable HTTP (POST JSON-RPC), stateless, read-only; tools search_stations, stations_near, get_station, get_station_dossier, get_readings, get_latest_readings, get_flood_levels, get_service_level, list_catchments, get_catchment, list_networks
 
 ## Docs
 

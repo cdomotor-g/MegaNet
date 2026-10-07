@@ -426,7 +426,8 @@ Station data can also be read by programs: a read-only REST API at
 `https://floodwarning.net/api/v1` (OpenAPI at `/api/v1/openapi.json`) and an
 MCP server at `https://floodwarning.net/api/mcp` (`worker/api.js`) — public
 data only, no sign-in, rate limited per client and per address, with a
-one-call station **dossier** for drafting assessment reports. It reads with the
+one-call station **dossier** for drafting assessment reports, every reporting
+station's **latest reading** in one call, and GeoJSON for a map. It reads with the
 same publishable key the page does, only from relations `anon` may already
 read, and never forwards anything from the caller. Setup for each agent (Claude
 Code, Codex, Gemini, Copilot, Cursor, or plain `curl`), every endpoint, the

@@ -5,7 +5,10 @@ AI agent (Claude, ChatGPT, Gemini, Copilot, Cursor, Codex…) or a script at it 
 it can pull **station-level information** — identity and location, networks and
 radio, sensors and health, the Service Level Specification entry, the Bureau's
 flood classes, crossings and gauge zero, AEP levels, inspection numbers and the
-stations nearby — with one call per station if it wants everything.
+stations nearby — with one call per station if it wants everything. It can also
+ask what every gauge reporting into Flood-Net is saying now, in one call
+([latest readings](#get-apiv1readingslatest)), and have any list of stations as
+[GeoJSON for a map](#geojson-for-a-map).
 
 It was built for drafting **assessment reports**, and the one-call
 [station dossier](#get-apiv1stationsiddossier) is shaped for that. It is not
@@ -60,7 +63,9 @@ or anything about users and editors.
 
 **Not a bulk export.** It answers one station, or one page of stations, at a
 time — the equivalent of looking a station up in the app. Please don't walk the
-whole network through it. Taking the whole network away as a file is a
+whole network through it. The [latest readings](#get-apiv1readingslatest) are
+the one answer that spans the network, and they are each channel's newest
+reading, not its history. Taking the whole network away as a file is a
 signed-in action in the app (the Export tab, #191), and that stays the way to do
 it.
 
@@ -209,11 +214,12 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 
 | Tool | What it answers | REST equivalent |
 |---|---|---|
-| `search_stations` | Find stations by name, Bureau/AWRC number or ALERT address; filter by catchment, basin, LGA, hub, network, role, kind, SLS gauge type | `GET /api/v1/stations` |
-| `stations_near` | Stations within a radius of a point, nearest first, with distance and bearing | `GET /api/v1/stations?near=` |
+| `search_stations` | Find stations by name, Bureau/AWRC number or ALERT address; filter by catchment, basin, LGA, hub, network, role, kind, SLS gauge type; `format: "geojson"` for a map | `GET /api/v1/stations` |
+| `stations_near` | Stations within a radius of a point, nearest first, with distance and bearing; `format: "geojson"` for a map | `GET /api/v1/stations?near=` |
 | `get_station` | One station's full register record, SLS rows and health | `GET /api/v1/stations/{id}` |
 | `get_station_dossier` | Everything a report needs about one station, in one call | `GET /api/v1/stations/{id}/dossier` |
 | `get_readings` | Telemetry ingested into Flood-Net: raw, hourly or daily | `GET /api/v1/stations/{id}/readings` |
+| `get_latest_readings` | What every gauge is saying now: each station's newest reading on every channel, in one call, by network, basin, kind or bounding box; `format: "geojson"` for a map | `GET /api/v1/readings/latest` |
 | `get_flood_levels` | Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels, one AHD ladder | `GET /api/v1/stations/{id}/flood-levels` |
 | `get_service_level` | The station's Service Level Specification entry | `GET /api/v1/stations/{id}/service-level` |
 | `list_catchments` | The 77 Queensland drainage basins | `GET /api/v1/catchments` |
@@ -242,6 +248,7 @@ a 429 and `candidates` where there is something to suggest:
 | 405 | not `GET`/`HEAD`: the API is read-only |
 | 429 | rate limited — wait `Retry-After` seconds ([Limits](#limits-and-fair-use)) |
 | 502 / 503 / 504 | the database was unreachable, answered with an error, or took over 10 s. The usual cause is the free-tier database pausing after 7 days idle; `detail` says so |
+| 503 `not available yet` | the route reads a relation a database migration has still to create — `missing_relation` and `migration` name them. No `Retry-After`: waiting will not apply a migration |
 
 Numbers in the examples below are Flood-Net's real data for Abergowrie Bridge AL,
 trimmed; readings and health are illustrative.
@@ -296,6 +303,7 @@ Search and filter; compact rows, 25 per page by default (at most 100), with a
 | `role` | `field`, `repeater` or `base` |
 | `type` | `rain`, `river`, `repeater` or `base` (see `kinds` below) |
 | `manual` | `true`: the SLS lists it as Manual; `false`: as Automatic. Stations the SLS does not list match neither |
+| `format` | `json` (the default) or `geojson` — see [GeoJSON, for a map](#geojson-for-a-map) |
 | `limit`, `offset` | paging; a `limit` over 100 is clamped to 100, with a note |
 
 ```sh
@@ -338,6 +346,42 @@ height list; `repeater`/`base` from its roles — and is exactly what `type=`
 filters on. ARRO sensor types are listed separately as
 `telemetry.sensor_types`. `has` says which flood-level records exist, so an agent
 knows which stations are worth a dossier.
+
+#### GeoJSON, for a map
+
+`format=geojson` — here, with or without `near`, and on
+[`/api/v1/readings/latest`](#get-apiv1readingslatest) — answers a GeoJSON
+FeatureCollection ([RFC 7946](https://www.rfc-editor.org/rfc/rfc7946),
+`Content-Type: application/geo+json`) in place of the JSON: one Point feature
+per station, at **`[lon, lat]` — longitude first**, as GeoJSON has it (unlike
+`near=lat,lon`), whose `properties` are exactly the row the JSON answer gives.
+A station with no recorded position cannot be a feature: it is left out of
+`features`, counted and named in `omitted_without_position`, and said in
+`notes`. The paging — `count`, `total`, `next` and the rest — is the JSON
+answer's (`count` includes the stations left out), `next` keeps asking for
+GeoJSON, and `bbox` is the features' own. Leaflet's `L.geoJSON`, MapLibre,
+QGIS and geojson.io take it as it comes.
+
+```sh
+curl -s 'https://floodwarning.net/api/v1/stations?q=tide&limit=100&format=geojson' > tide-gauges.geojson
+```
+
+```json
+{
+  "type": "FeatureCollection",
+  "bbox": [139.17083, -27.95, 153.4325, -10.19556],
+  "count": 50, "total": 50, "total_exact": true, "limit": 100, "offset": 0, "next": null,
+  "query": { "q": "tide", "format": "geojson", "limit": 100, "offset": 0 },
+  "omitted_without_position": { "count": 4, "ids": ["boigu_island_tide_tm", "dauan_island_tide_tm", "iama_island_tide_tm", "ugar_island_tide_tm"] },
+  "features": [
+    { "type": "Feature", "id": "auckland_point_tide_tm", "geometry": { "type": "Point", "coordinates": [151.25, -23.83306] },
+      "properties": { "id": "auckland_point_tide_tm", "name": "Auckland Point Tide TM", "station_number": "539033",
+                      "lat": -23.83306, "lon": 151.25, "kinds": ["river"], "stream": "TIDE GAUGE", "…": "…" } },
+    "…"
+  ],
+  "notes": ["Sorted by relevance to q: …", "4 of the 50 station(s) on this page have no recorded position, so are not features: boigu_island_tide_tm, …"]
+}
+```
 
 ### `GET /api/v1/stations/{id}`
 
@@ -447,6 +491,80 @@ curl -s 'https://floodwarning.net/api/v1/stations/abergowrie_br_al/readings?reso
   "source": "meganet.reading_hourly"
 }
 ```
+
+### `GET /api/v1/readings/latest`
+
+What every gauge is saying now, in one call: each station Flood-Net holds
+telemetry for, with every channel's newest reading and how old it is — where
+the route above would have an agent ask station by station. The same caveat
+applies: these are readings **ingested into Flood-Net**, and most stations
+report through the Bureau's own systems and are simply not in the answer,
+which says nothing about whether they work.
+
+| Parameter | Meaning |
+|---|---|
+| `network` | a radio network id — see `/api/v1/networks` |
+| `basin` | words in the Bureau's basin name for the station (`Burdekin`) |
+| `type` | `rain`, `river`, `repeater` or `base` — the same rule as [`/api/v1/stations`](#get-apiv1stations) |
+| `bbox` | a box, `west,south,east,north` in decimal degrees — **longitude first**, as GeoJSON and map tools have it (`152.5,-28.2,153.6,-27.0`); one written latitude-first is refused rather than read as somewhere else |
+| `format` | `json` (the default) or `geojson` — see [GeoJSON, for a map](#geojson-for-a-map) |
+| `limit`, `offset` | 100 stations a page by default and at most 1,000 — `limit=1000` takes them all at once while no more than that report; follow `next` |
+
+A row is a station: id, name, Bureau number, position, `kinds`, basin, stream
+and radio networks; `latest_at`, the newest of its channels, and
+`minutes_since_latest`; and `channels`, one per address it reported on —
+`addr` (`a:<ALERT address>`, `a2:<station>/<sensor>` for ALERT2,
+`s:<number>/<channel>` for satellite or cellular), the `sensor_types` the
+register gives that address, `t` (the reading's own time) and `minutes_since`,
+`value_raw` as transmitted, `value` and `unit` where Flood-Net had a
+conversion, `quality`, `received_at`, the `path` it came by, `dup_count`, and
+the frequency and signal (`freq_mhz`, `rssi_dbm`, `level_dbfs`, `snr_db`) where
+the receiver gave them. Stations come in id order, so pages hold still while
+readings arrive.
+
+```sh
+curl -s 'https://floodwarning.net/api/v1/readings/latest?type=river&bbox=145.5,-19,146.5,-18'
+```
+
+```json
+{
+  "count": 1, "total": 1, "total_exact": true, "limit": 100, "offset": 0, "next": null,
+  "query": { "type": "river", "bbox": "145.5,-19,146.5,-18", "limit": 100, "offset": 0 },
+  "stations": [{
+    "id": "abergowrie_br_al", "name": "Abergowrie Bridge AL", "station_number": "532028",
+    "lat": -18.5144, "lon": 146.0006, "kinds": ["rain", "river"], "basin": "Herbert River", "stream": "HERBERT RIVER",
+    "radio_network_ids": [], "latest_at": "2026-10-07T02:15:00+00:00", "minutes_since_latest": 12,
+    "channels": [
+      { "addr": "a:6038", "alert_id": 6038, "sensor_types": ["Rainfall", "Rainfall Increment"],
+        "t": "2026-10-07T00:45:00+00:00", "minutes_since": 102, "value_raw": 1262, "quality": 0,
+        "received_at": "2026-10-07T00:45:21+00:00" },
+      { "addr": "a:6039", "alert_id": 6039, "sensor_types": ["Water Level"],
+        "t": "2026-10-07T02:15:00+00:00", "minutes_since": 12, "value_raw": 1010, "quality": 0,
+        "received_at": "2026-10-07T02:15:20+00:00", "dup_count": 1 }
+    ]
+  }],
+  "unattributed_addresses": 2,
+  "notes": ["Telemetry ingested into Flood-Net only. …", "Each channel is its address's newest reading that meganet.reading still holds (90 days) …",
+            "2 address(es) heard belong to no single live station — …"],
+  "source": "meganet.reading_latest (each address's newest reading in meganet.reading); meganet.station"
+}
+```
+
+- **Newest by the station's own clock.** `t` is when the device says it read,
+  as everywhere in this API; `minutes_since` counts from it to now, so a
+  negative one is a station whose clock runs ahead. `received_at` is when
+  Flood-Net got it. Readings are kept 90 days: a channel silent for longer has
+  no reading here.
+- **`unattributed_addresses`** counts the addresses heard that no single live
+  station carries — an ALERT address more than one station uses, or a station
+  not yet in the register. Their readings are in no row, rather than guessed
+  into one, and the count is the whole network's whatever the filters say.
+- A station with no recorded position — the workshop test rigs — is a row in
+  JSON; in GeoJSON it is named in `omitted_without_position`.
+- It reads `meganet.reading_latest`, a view that keeps one row per address
+  (migration `0057`). Until that migration is applied to the live database the
+  route answers **503** `"not available yet"`, naming the relation and the
+  migration (see [For the owner](#apply-0057-for-the-latest-readings)).
 
 ### `GET /api/v1/stations/{id}/flood-levels`
 
@@ -581,10 +699,11 @@ The limiter is Cloudflare's rate limiting binding: counted per Cloudflare
 location and eventually consistent — a brake, not an exact quota.
 
 Other caps: 100 rows per page; a 250 km search radius; 5,000 readings per call;
-reading windows of 7 / 31 / 731 days (raw / hourly / daily); at most 5,000
-stations considered by one filtered search before paging; 32 database reads per
-request, six at a time, each with a 10-second timeout; MCP bodies up to 64 KB and
-batches of up to 10.
+reading windows of 7 / 31 / 731 days (raw / hourly / daily); 1,000 stations per
+call of the latest readings (100 by default); at most 5,000 stations considered
+by one filtered search before paging; 32 database reads per request, six at a
+time, each with a 10-second timeout; MCP bodies up to 64 KB and batches of up to
+10.
 
 **Fair use.** Cache what you fetch — a station's register record changes rarely,
 and identical questions within a minute are answered from the edge cache anyway.
@@ -622,9 +741,12 @@ quote it:
   height taken from a digital elevation model through Geoscience Australia's
   Elvis. A modelled height is not a survey mark.
 - **Health and readings are Flood-Net's own ingest.** `health` is when Flood-Net's
-  MQTT bridge or HTTP ingest last heard from the station; readings are what
-  reached that ingest. Most stations report through the Bureau's systems, so
-  "not recorded" here says nothing about whether a station works.
+  MQTT bridge or HTTP ingest last heard from the station; readings — and the
+  latest readings — are what reached that ingest. Most stations report through
+  the Bureau's systems, so "not recorded" here, or a station missing from the
+  latest readings, says nothing about whether a station works.
+- **Positions are `[lon, lat]` in GeoJSON** and `lat`, `lon` everywhere else —
+  including `near=lat,lon`. `bbox` is GeoJSON's order, west, south, east, north.
 - **Inspections are numbers only.** Remarks, who inspected and any free text
   are not public.
 - **`not recorded` is not zero**, and **`unavailable`** means a read failed —
@@ -704,6 +826,36 @@ MCP client above can set the same way it sets `X-FloodNet-Client`.
 
 The API is also on `meganet.<account>.workers.dev` if that is enabled (Access
 does not cover it; the same limits apply). GitHub Pages has no API.
+
+### Apply 0057, for the latest readings
+
+`GET /api/v1/readings/latest` (and the MCP tool `get_latest_readings`) reads
+`meganet.reading_latest`, a view `db/migrations/0057_reading_latest.sql`
+creates. The Worker deploys on push; the migration lands only when somebody
+applies it, and until then the route answers 503 `"not available yet"` naming
+the migration. Nothing else in the API depends on it. To apply it:
+
+1. In the Supabase dashboard, open the Flood-Net project → **SQL Editor** →
+   **New query**.
+2. Paste the whole of `db/migrations/0057_reading_latest.sql` and **Run**. It is
+   idempotent and checks itself at the end: it raises an error, and changes
+   nothing, if the view did not come out as it should. (Or, from a shell with
+   the connection string: `psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1
+   --single-transaction -f db/migrations/0057_reading_latest.sql`.)
+3. Check it from anywhere — the answer should have a `count`, not an `error`:
+
+   ```sh
+   curl -s 'https://floodwarning.net/api/v1/readings/latest?limit=1' | jq '{count, total, error}'
+   ```
+
+   `tools/check_reading_latest.sql` proves the view itself, in a transaction
+   that rolls back, so it is safe against the live database.
+
+It depends on nothing in `0053`–`0056`, so it can go in before or after them.
+Like every migration it raises `meganet.app_meta.schema_version` (to 57, never
+down), so `DB_SCHEMA_VERSION` in `core.js` follows it in a commit of its own;
+until then the app's Data source panel reports the database as newer than the
+app, which is true and harmless.
 
 ### Check which limiter is running
 

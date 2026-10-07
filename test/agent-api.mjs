@@ -70,6 +70,8 @@ const COLUMNS = Object.fromEntries(Object.entries({
   reading: 'alert_id station_number channel addr station_id reading_ts received_at value_raw value unit conversion quality protocol source path dup_count dup_paths last_dup_at raw_id ingest_token_id',
   reading_hourly: 'addr bucket alert_id station_number channel station_id unit n n_dup n_val raw_min raw_max raw_sum raw_last raw_mean val_min val_max val_sum val_last val_mean first_ts last_ts rolled_at',
   reading_daily: 'addr bucket alert_id station_number channel station_id unit n n_dup n_val raw_min raw_max raw_sum raw_last raw_mean val_min val_max val_sum val_last val_mean first_ts last_ts rolled_at',
+  // The view 0057 makes: the reading's own columns, none of its bookkeeping.
+  reading_latest: 'addr alert_id a2_station a2_sensor station_number channel station_id reading_ts received_at value_raw value unit conversion quality protocol source path dup_count freq_mhz rssi_dbm level_dbfs snr_db',
   inspection_chart_visit: 'id station_id inspected_on date_precision origin',
   inspection_chart_power: 'inspection_id battery_existing_v battery_existing_v_under_load lithium_battery_v dp_existing_v consumption_standby_ma consumption_transmit_ma consumption_sleep_ma consumption_operating_ma consumption_interrogation_ma telephone_socket_v solar_output_v solar_short_circuit_ma solar_regulator_v solar_charge_current_ma solar_step_up_v mains_charge_current_ma mains_regulated_v',
   inspection_chart_radio: 'inspection_id tx_size_w tx_deviation_khz existing_frequency_mhz existing_forward_w existing_reflected_w existing_swr replacement_forward_w replacement_reflected_w replacement_swr',
@@ -261,6 +263,58 @@ const [la, lb] = [RICH.id, REPEATER.id].sort();
 T.link_fade_margin.push({ station_a_id: la, station_b_id: lb, kind: 'field', margin_db: 17.5, margin_ab_db: 17.5, margin_ba_db: 19,
   distance_km: 21.4, freq_mhz: 170.2, verdict: 'clear', signature: 'sig', model: 'itm-v1', good_db: 15, ok_db: 6, band: 'good',
   computed_at: '2026-09-01T00:00:00+00:00', computed_by: null });
+
+// Latest readings (#230): besides RICH, a station in a radio network RICH is
+// not in, a rain gauge whose clock runs half an hour fast, the two test rigs —
+// placed nowhere, one reporting by satellite address — two addresses no
+// station can be named for, and the deleted twin, whose readings must not
+// bring it back.
+const firstAlert = s => (s.sensors || []).find(x => x.alert_id != null);
+const NETWORKED = live.find(s => (s.radio_network_ids || []).length && s.basin && s.basin !== RICH.basin && s.lat != null
+  && firstAlert(s) && !(RICH.radio_network_ids || []).some(n => s.radio_network_ids.includes(n)));
+const RAINY = NETWORKED && live.find(s => JSON.stringify(api.stationKinds(s)) === '["rain"]' && s.lat != null && firstAlert(s)
+  && s.basin !== RICH.basin && s.basin !== NETWORKED.basin && !(s.radio_network_ids || []).includes(NETWORKED.radio_network_ids[0]));
+const ELPRO = live.find(s => s.id === 'elpro_test');
+const BATESON = live.find(s => s.id === 'bateson_test');
+// …and a second ELPRO channel, last heard hours before the first: a station's
+// latest_at is the newest of its channels, which only differing channels show.
+const ELPRO_SECOND = ELPRO && firstAlert(ELPRO)
+  && (ELPRO.sensors || []).filter(x => x.alert_id != null && x.alert_id !== firstAlert(ELPRO).alert_id)[0];
+const latestFixtures = NETWORKED && RAINY && ELPRO && BATESON && ELPRO_SECOND && ELPRO.lat == null && BATESON.lat == null;
+check('the latest-readings fixtures exist in stations.json', latestFixtures,
+  `networked ${NETWORKED && NETWORKED.id}, rain-only ${RAINY && RAINY.id}, rigs ${ELPRO && ELPRO.id} ${BATESON && BATESON.id}`);
+if (!latestFixtures) {
+  console.log('\nFAIL — stations.json no longer has a station of every kind the latest-readings checks are about; see the predicates above.\n');
+  process.exit(1);
+}
+const plainReading = (addr, stationId, t, valueRaw, extra = {}) => ({ alert_id: /^a:/.test(addr) ? Number(addr.slice(2)) : null,
+  station_number: null, channel: '', addr, station_id: stationId, reading_ts: iso(t), received_at: iso(t + 20000),
+  value_raw: valueRaw, value: null, unit: null, quality: 0, protocol: 0, source: 0, path: null, dup_count: 0, dup_paths: [], ...extra });
+const NETWORKED_ADDR = `a:${firstAlert(NETWORKED).alert_id}`;
+const RAINY_ADDR = `a:${firstAlert(RAINY).alert_id}`;
+const ELPRO_ADDR = `a:${firstAlert(ELPRO).alert_id}`;
+const BATESON_ADDR = 's:999998/level_1';
+T.reading.push(
+  plainReading(`a:${ELPRO_SECOND.alert_id}`, ELPRO.id, NOW - 3 * hour, 17),
+  plainReading(NETWORKED_ADDR, NETWORKED.id, NOW - 3 * hour, 640), plainReading(NETWORKED_ADDR, NETWORKED.id, NOW - 2 * hour, 650),
+  plainReading(RAINY_ADDR, RAINY.id, NOW - 26 * hour, 11), plainReading(RAINY_ADDR, RAINY.id, NOW + 30 * 60000, 12),
+  plainReading(ELPRO_ADDR, ELPRO.id, NOW - 9 * 60000, 248, { path: 'meganet/v1/elpro_test/logger' }),
+  plainReading(BATESON_ADDR, BATESON.id, NOW - 70 * 60000, 1.21, { alert_id: null, station_number: '999998', channel: 'level_1', unit: 'm', value: 1.21 }),
+  plainReading(BATESON_ADDR, BATESON.id, NOW - 10 * 60000, 1.234, { alert_id: null, station_number: '999998', channel: 'level_1', unit: 'm', value: 1.234 }),
+  plainReading('a:7', null, NOW - 40 * 60000, 3),
+  plainReading('a2:1001/0', null, NOW - 5 * 60000, 248, { alert_id: null }),
+  plainReading('a:65000', deletedTwin.id, NOW - 60000, 1));
+// The view, by its own rule: per address, the newest reading_ts, then the
+// later received, then the larger value (tools/check_reading_latest.sql
+// proves the SQL keeps that rule; this only has to keep it too).
+function latestOf(readings) {
+  const best = new Map();
+  const later = (a, b) => (a.reading_ts !== b.reading_ts ? Date.parse(a.reading_ts) > Date.parse(b.reading_ts)
+    : a.received_at !== b.received_at ? Date.parse(a.received_at) > Date.parse(b.received_at) : a.value_raw > b.value_raw);
+  for (const r of readings) if (!best.has(r.addr) || later(r, best.get(r.addr))) best.set(r.addr, r);
+  return [...best.values()].map(r => Object.fromEntries([...COLUMNS.reading_latest].map(c => [c, r[c] ?? null])));
+}
+T.reading_latest = latestOf(T.reading);
 
 // ── The stub, the worker and a few ways to call it ───────────────────────────
 
@@ -777,7 +831,7 @@ section('Flood levels, SLS, readings');
   const big = await get(`/api/v1/stations/${RICH.id}/readings?resolution=raw&from=${encodeURIComponent(iso(NOW - 2 * 24 * hour))}&limit=9000`);
   stub.maxRows = 1000;
   check('a readings limit over 5,000 is clamped, and rows are paged upstream past the server\'s max-rows',
-    big.json.limit === 5000 && big.json.count === T.reading.filter(x => Date.parse(x.reading_ts) >= NOW - 2 * 24 * hour).length
+    big.json.limit === 5000 && big.json.count === T.reading.filter(x => x.station_id === RICH.id && Date.parse(x.reading_ts) >= NOW - 2 * 24 * hour).length
     && big.json.count > 100, `${big.json.count} rows`);
   const future = await get(`/api/v1/stations/${RICH.id}/readings?to=2099-01-01`);
   check('a window ending years ahead is refused', future.status === 400);
@@ -788,6 +842,289 @@ section('Flood levels, SLS, readings');
   const empty = await get(`/api/v1/stations/${SPARSE.id}/readings`);
   check('no readings is an empty answer that explains itself', empty.status === 200 && empty.json.count === 0
     && empty.json.notes.some(n => /ingested/.test(n)));
+}
+
+// ── Latest readings (#230) ───────────────────────────────────────────────────
+section('Latest readings');
+
+// What the route should answer, worked out from the fixtures rather than read
+// back from it: every live station with an address in the view, in id order,
+// kept by the same rules /stations filters with.
+const liveById = new Map(T.station.filter(s => !s.deleted_at).map(s => [s.id, s]));
+const heardIds = [...new Set(T.reading_latest.map(r => r.station_id).filter(id => id && liveById.has(id)))].sort();
+const expectLatest = (keep = () => true) => heardIds.filter(id => keep(liveById.get(id)));
+const inBox = ([w, s, e, n]) => st => st.lat != null && st.lon != null && st.lat >= s && st.lat <= n && st.lon >= w && st.lon <= e;
+const idsOf = r => ((r.json && (r.json.stations || (r.json.features || []).map(f => f.properties))) || []).map(s => s.id);
+const sameList = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// A row with its ages taken out, for comparing two answers a minute could fall between.
+const ageless = row => JSON.parse(JSON.stringify(row, (k, v) => (/^minutes_since/.test(k) ? undefined : v)));
+
+{
+  stub.requests = [];
+  const r = await get('/api/v1/readings/latest');
+  const reads = stub.requests.length;
+  const j = r.json || {};
+  check('GET /api/v1/readings/latest answers every live station with a reading, in id order, in one call', r.status === 200
+    && sameList(idsOf(r), heardIds) && j.total === heardIds.length && j.count === heardIds.length && j.total_exact === true
+    && heardIds.length >= 5, `${r.status} ${idsOf(r).join(' ')} ${j.detail || ''}`);
+  check('…in two database reads at this size: the view, and those stations by id', reads === 2, `${reads} reads`);
+  check('…never the deleted twin, though its address has the newest reading of all', !idsOf(r).includes(deletedTwin.id));
+  const unattributed = T.reading_latest.filter(x => !x.station_id).length;
+  check('…and counts the addresses no single station can be named for, rather than guessing',
+    unattributed === 2 && j.unattributed_addresses === unattributed && j.notes.some(n => /no single live station/.test(n)),
+    `${j.unattributed_addresses}`);
+  const keys = ['id', 'name', 'station_number', 'lat', 'lon', 'kinds', 'basin', 'stream', 'radio_network_ids', 'latest_at',
+    'minutes_since_latest', 'channels'];
+  check('a row has the latest-reading shape', (j.stations || []).every(s => keys.every(k => k in s)),
+    keys.filter(k => !(k in ((j.stations || [])[0] || {}))).join(', '));
+
+  const row = id => (j.stations || []).find(s => s.id === id);
+  const newestOf = addr => T.reading.filter(x => x.addr === addr).map(x => x.reading_ts).sort().pop();
+  const rich = row(RICH.id);
+  check('a station\'s row has each channel\'s newest reading, labelled with its sensor types', rich && rich.channels.length === 2
+    && rich.channels.every(c => c.t === newestOf(c.addr) && Array.isArray(c.sensor_types) && c.sensor_types.length)
+    && rich.channels.some(c => c.addr === WL_ADDR && c.sensor_types.includes(WL_SENSOR.type)), JSON.stringify(rich && rich.channels));
+  check('…latest_at is the newest of its channels, and the minutes since it count from now',
+    rich && rich.latest_at === [WL_ADDR, OTHER_ADDR].map(newestOf).sort().pop()
+      && Math.abs(rich.minutes_since_latest - (Date.now() - Date.parse(rich.latest_at)) / 60000) <= 1
+      && rich.channels.every(c => Math.abs(c.minutes_since - (Date.now() - Date.parse(c.t)) / 60000) <= 1),
+    rich && `${rich.latest_at} ${rich.minutes_since_latest}`);
+  const rainy = row(RAINY.id);
+  check('a clock running ahead is the newest reading still, and its minutes since are negative', rainy
+    && rainy.channels[0].value_raw === 12 && rainy.channels[0].minutes_since < 0 && rainy.minutes_since_latest < 0,
+    JSON.stringify(rainy && rainy.channels));
+  const bateson = row(BATESON.id);
+  const bc = bateson && bateson.channels[0];
+  check('a satellite address is a channel like any other: its channel name, value and unit', bc && bateson.channels.length === 1
+    && bc.addr === BATESON_ADDR && bc.channel === 'level_1' && bc.value_raw === 1.234 && bc.value === 1.234 && bc.unit === 'm'
+    && !('sensor_types' in bc) && bateson.lat === null, JSON.stringify(bateson));
+  const elpro = row(ELPRO.id);
+  check('…and a rig with no position is still a row, its ALERT address named by its sensor', elpro && elpro.lat === null
+    && JSON.stringify(elpro.channels[0].sensor_types) === JSON.stringify([firstAlert(ELPRO).type])
+    && elpro.channels[0].path === 'meganet/v1/elpro_test/logger', JSON.stringify(elpro));
+  check('a station\'s latest_at is the newest of its channels when they differ', elpro && elpro.channels.length === 2
+    && elpro.latest_at === newestOf(ELPRO_ADDR) && elpro.latest_at > elpro.channels[1].t
+    && JSON.stringify(elpro.channels[1].sensor_types) === JSON.stringify([ELPRO_SECOND.type])
+    && Math.abs(elpro.minutes_since_latest - 9) <= 1, elpro && `${elpro.latest_at} ${elpro.minutes_since_latest}`);
+  check('…and what the readings are, and are not, is said', j.notes.some(n => /Bureau/.test(n)) && /reading_latest/.test(j.source));
+}
+
+{
+  const net = NETWORKED.radio_network_ids[0];
+  const byNet = await get(`/api/v1/readings/latest?network=${net}`);
+  const wantNet = expectLatest(s => (s.radio_network_ids || []).includes(net));
+  check('network= keeps the stations in that radio network', byNet.status === 200 && sameList(idsOf(byNet), wantNet)
+    && wantNet.includes(NETWORKED.id) && wantNet.length < heardIds.length, `${idsOf(byNet).join(' ')} vs ${wantNet.join(' ')}`);
+  const word = NETWORKED.basin.split(' ')[0];
+  const byBasin = await get(`/api/v1/readings/latest?basin=${encodeURIComponent(word.toUpperCase())}`);
+  const wantBasin = expectLatest(s => (s.basin || '').toLowerCase().includes(word.toLowerCase()));
+  check('basin= keeps the stations whose basin names it, in any case', byBasin.status === 200 && sameList(idsOf(byBasin), wantBasin)
+    && wantBasin.includes(NETWORKED.id) && wantBasin.length < heardIds.length, `${idsOf(byBasin).join(' ')} vs ${wantBasin.join(' ')}`);
+  for (const type of ['rain', 'river', 'base']) {
+    const t = await get(`/api/v1/readings/latest?type=${type}`);
+    const want = expectLatest(s => api.stationKinds(s).includes(type));
+    check(`type=${type} keeps exactly the ${type} stations, by /stations' own rule`, t.status === 200 && sameList(idsOf(t), want)
+      && want.length > 0 && want.length < heardIds.length && t.json.stations.every(s => s.kinds.includes(type)),
+      `${idsOf(t).join(' ')} vs ${want.join(' ')}`);
+  }
+  const box = [RICH.lon - 0.05, RICH.lat - 0.05, RICH.lon + 0.05, RICH.lat + 0.05].map(x => Math.round(x * 1e4) / 1e4);
+  const inside = await get(`/api/v1/readings/latest?bbox=${box.join(',')}`);
+  check('bbox=west,south,east,north keeps the stations inside it, and none without a position', inside.status === 200
+    && sameList(idsOf(inside), expectLatest(inBox(box))) && idsOf(inside).includes(RICH.id) && !idsOf(inside).includes(BATESON.id),
+    `${inside.status} ${idsOf(inside).join(' ')} ${inside.json && inside.json.detail}`);
+  const both = await get(`/api/v1/readings/latest?type=rain&bbox=${box.join(',')}&network=${net}`);
+  check('filters combine', both.status === 200 && sameList(idsOf(both),
+    expectLatest(s => inBox(box)(s) && api.stationKinds(s).includes('rain') && (s.radio_network_ids || []).includes(net))));
+  const latFirst = await get(`/api/v1/readings/latest?bbox=${[box[1], box[0], box[3], box[2]].join(',')}`);
+  check('a box written lat-first is refused, saying longitude comes first', latFirst.status === 400
+    && /longitude first|latitudes/.test(latFirst.json.detail), latFirst.json && latFirst.json.detail);
+  for (const [b, why] of [['1,2,3', 'three numbers'], ['153,-27,152,-28', 'west east of east'], ['152,-28,153,-27,1', 'five numbers'],
+    ['x,y,z,w', 'words']]) {
+    const r = await get(`/api/v1/readings/latest?bbox=${b}`);
+    check(`a malformed bbox (${why}) is refused`, r.status === 400 && /bbox/.test(r.json.detail), r.json && r.json.detail);
+  }
+  const unknown = await get('/api/v1/readings/latest?station=x');
+  check('an unknown parameter is refused, naming the accepted ones', unknown.status === 400
+    && /Accepted: network, basin, type, bbox, format, limit, offset/.test(unknown.json.detail), unknown.json.detail);
+  const badType = await get('/api/v1/readings/latest?type=wind');
+  check('a kind there is no rule for is refused', badType.status === 400);
+}
+
+{
+  const all = [];
+  let next = '/api/v1/readings/latest?limit=2';
+  let pages = 0;
+  for (; pages < 10 && next; pages++) {
+    const p = await get(next.replace('https://floodwarning.net', ''));
+    all.push(...idsOf(p));
+    next = p.json.next;
+  }
+  check('following next pages through gives every station once, in order', sameList(all, heardIds) && pages === Math.ceil(heardIds.length / 2),
+    `${all.length} rows in ${pages} pages`);
+  const big = await get('/api/v1/readings/latest?limit=5000');
+  check(`a limit over ${api.LIMITS.latestMax} is clamped to it, with a note`, big.status === 200 && big.json.limit === api.LIMITS.latestMax
+    && big.json.notes.some(n => /maximum of 1000/.test(n)), big.json && big.json.notes.join(' '));
+  const past = await get('/api/v1/readings/latest?offset=50');
+  check('an offset past the end is an empty last page with the total', past.status === 200 && past.json.count === 0
+    && past.json.next === null && past.json.total === heardIds.length);
+}
+
+{
+  // Past a few hundred stations the second path: the filtered station table's
+  // ids read whole, then the page's stations by id, a hundred to a read.
+  const many = T.station.filter(s => !s.deleted_at && s.lat != null).slice(0, 350);
+  const manyReadings = [...many.map((s, i) => plainReading(`a:${20000 + i}`, s.id, NOW - (i + 1) * 60000, i)),
+    plainReading('a:19999', deletedTwin.id, NOW - 1000, 1), plainReading('a:19998', null, NOW - 1000, 1)];
+  const manyStub = new PostgrestStub({ base: api.SUPABASE_REST_URL, columns: COLUMNS, tables: { ...T, reading_latest: latestOf(manyReadings) } });
+  globalThis.fetch = (input, init) => manyStub.fetch(input, init);
+  try {
+    api.resetApiState();
+    const wantIds = many.map(s => s.id).sort();
+    const r = await get('/api/v1/readings/latest?limit=1000');
+    const reads = manyStub.requests.length;
+    check('past a few hundred stations, the same answer by the second path', r.status === 200 && sameList(idsOf(r), wantIds)
+      && r.json.total === wantIds.length && r.json.unattributed_addresses === 1 && r.json.total_exact === true,
+      `${r.status} ${r.json && (r.json.total ?? r.json.detail)}`);
+    const bound = 1 + Math.ceil(liveById.size / 1000) + Math.ceil(wantIds.length / api.LIMITS.idsPerRead);
+    check('…in a bounded number of reads, however many stations there are', reads <= bound && reads <= api.LIMITS.upstreamPerRequest,
+      `${reads} reads, bound ${bound}`);
+    const longest = Math.max(...manyStub.requests.map(q => ((new URL(q.url).searchParams.get('id') || '').match(/","/g) || []).length + 1));
+    check(`…and no id list longer than ${api.LIMITS.idsPerRead}`, longest <= api.LIMITS.idsPerRead, `${longest}`);
+    const rain = await get('/api/v1/readings/latest?type=rain&limit=1000');
+    check('…filtering by the same rule', rain.status === 200
+      && sameList(idsOf(rain), wantIds.filter(id => api.stationKinds(liveById.get(id)).includes('rain'))));
+    const page = await get('/api/v1/readings/latest?limit=100&offset=100');
+    check('…and paging', page.status === 200 && sameList(idsOf(page), wantIds.slice(100, 200)) && /offset=200/.test(page.json.next));
+  } finally {
+    globalThis.fetch = (input, init) => stub.fetch(input, init);
+    api.resetApiState();
+  }
+}
+
+{
+  // Nothing heard at all — the bridge down, say — is an empty answer, not an error.
+  const quietStub = new PostgrestStub({ base: api.SUPABASE_REST_URL, columns: COLUMNS, tables: { ...T, reading_latest: [] } });
+  globalThis.fetch = (input, init) => quietStub.fetch(input, init);
+  try {
+    api.resetApiState();
+    const r = await get('/api/v1/readings/latest?format=geojson');
+    check('no readings anywhere is an empty answer in one read, not an error', r.status === 200 && r.json.total === 0
+      && r.json.count === 0 && r.json.features.length === 0 && r.json.next === null && quietStub.requests.length === 1
+      && r.json.unattributed_addresses === 0, `${r.status} ${quietStub.requests.length} reads`);
+  } finally {
+    globalThis.fetch = (input, init) => stub.fetch(input, init);
+    api.resetApiState();
+  }
+}
+
+{
+  // The Worker deploys on push; 0057 lands when somebody applies it. Until
+  // then the route must say so — not 500, and not a 502 calling it a bug.
+  const { reading_latest: _notYet, ...before } = COLUMNS;
+  const beforeStub = new PostgrestStub({ base: api.SUPABASE_REST_URL, columns: before, tables: T });
+  globalThis.fetch = (input, init) => beforeStub.fetch(input, init);
+  try {
+    api.resetApiState();
+    const r = await get('/api/v1/readings/latest');
+    check('before 0057 is applied: a 503 naming the missing relation and the migration', r.status === 503
+      && r.json.error === 'not available yet' && r.json.missing_relation === 'meganet.reading_latest'
+      && r.json.migration === 'db/migrations/0057_reading_latest.sql' && /has not been applied/.test(r.json.detail),
+      `${r.status} ${r.json && JSON.stringify(r.json)}`);
+    check('…with no Retry-After, since a minute will not apply a migration', r.headers.get('retry-after') === null, r.headers.get('retry-after'));
+    const tool = await rpc('tools/call', { name: 'get_latest_readings', arguments: {} });
+    const text = (tool.json.result && tool.json.result.content[0].text) || '';
+    check('…and the tool says the same, without suggesting a retry', tool.json.result && tool.json.result.isError === true
+      && /not available yet/.test(text) && /0057_reading_latest/.test(text) && !/retrying/.test(text), text.slice(0, 200));
+    const other = await get(`/api/v1/stations/${RICH.id}/readings`);
+    check('…while every other route answers as before', other.status === 200);
+  } finally {
+    globalThis.fetch = (input, init) => stub.fetch(input, init);
+    api.resetApiState();
+  }
+  stub.fault = rel => (rel === 'catchment' ? new Response('{"code":"PGRST205","message":"Could not find the table"}', { status: 404 }) : null);
+  const vanished = await get('/api/v1/catchments');
+  stub.fault = null;
+  api.resetApiState();
+  check('a relation that should be there and is not is still the 502 it was', vanished.status === 502
+    && vanished.json.error === 'database refused the query', `${vanished.status}`);
+}
+
+// ── GeoJSON (#230) ───────────────────────────────────────────────────────────
+section('GeoJSON');
+
+const GEO = /^application\/geo\+json/;
+{
+  const plain = await get('/api/v1/stations?q=tide&limit=100');
+  const geo = await get('/api/v1/stations?q=tide&limit=100&format=geojson');
+  const rows = plain.json.stations;
+  const placed = rows.filter(s => s.lat != null && s.lon != null);
+  const unplaced = rows.filter(s => s.lat == null || s.lon == null);
+  const fc = geo.json || {};
+  check('stations with format=geojson: a FeatureCollection under application/geo+json; JSON stays the default',
+    geo.status === 200 && fc.type === 'FeatureCollection' && GEO.test(geo.headers.get('content-type'))
+      && /^application\/json/.test(plain.headers.get('content-type')) && !('type' in plain.json), geo.headers.get('content-type'));
+  const feats = fc.features || [];
+  check('…a Point per placed station, at [lon, lat] — longitude first — with the JSON row as its properties',
+    placed.length > 5 && feats.length === placed.length && feats.every((f, i) => f.type === 'Feature' && f.id === placed[i].id
+      && f.geometry.type === 'Point' && f.geometry.coordinates.length === 2
+      && f.geometry.coordinates[0] === placed[i].lon && f.geometry.coordinates[1] === placed[i].lat
+      && JSON.stringify(f.properties) === JSON.stringify(placed[i])), `${feats.length} features for ${placed.length} placed`);
+  check('…which in Queensland is east of 100° and south of the equator', feats.every(f => f.geometry.coordinates[0] > 100
+    && f.geometry.coordinates[1] < 0), JSON.stringify(feats[0] && feats[0].geometry));
+  check('…a station with no position left out, counted, named and said', unplaced.length > 0
+    && fc.omitted_without_position.count === unplaced.length
+    && sameList(fc.omitted_without_position.ids, unplaced.map(s => s.id)) && fc.notes.some(n => /no recorded position/.test(n)),
+    JSON.stringify(fc.omitted_without_position));
+  const lons = placed.map(s => s.lon), lats = placed.map(s => s.lat);
+  check('…the bbox the features\' own, west, south, east, north', sameList(fc.bbox,
+    [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)]), JSON.stringify(fc.bbox));
+  check('…and the paging and query of the JSON answer', fc.count === plain.json.count && fc.total === plain.json.total
+    && fc.next === plain.json.next && fc.query.format === 'geojson');
+
+  const near = await get(`/api/v1/stations?near=${RICH.lat},${RICH.lon}&radius_km=20&format=geojson`);
+  const nf = (near.json && near.json.features) || [];
+  check('near with format=geojson: nearest first, each feature carrying its distance and bearing', near.status === 200
+    && nf.length > 1 && nf[0].properties.distance_km === 0 && nf.some(f => f.id === RICH.id)
+    && nf.every((f, i) => i === 0 || f.properties.distance_km >= nf[i - 1].properties.distance_km)
+    && nf.every(f => typeof f.properties.bearing_deg === 'number') && near.json.omitted_without_position.count === 0);
+
+  const p1 = await get('/api/v1/stations?type=base&limit=2&format=geojson');
+  const p2 = p1.json.next ? await get(p1.json.next.replace('https://floodwarning.net', '')) : null;
+  check('…and a next link that asks for GeoJSON again', /format=geojson/.test(p1.json.next || '') && p2 && p2.json.type === 'FeatureCollection'
+    && GEO.test(p2.headers.get('content-type')), p1.json.next);
+  const empty = await get('/api/v1/stations?catchment=atlantis&format=geojson');
+  check('an empty answer is an empty FeatureCollection that still says why', empty.status === 200 && empty.json.type === 'FeatureCollection'
+    && empty.json.features.length === 0 && /No catchment/.test(empty.json.notes.join(' ')));
+  const kml = await get('/api/v1/stations?format=kml');
+  check('a format other than json or geojson is refused', kml.status === 400 && /json, geojson/.test(kml.json.detail), kml.json.detail);
+  const head = await send('/api/v1/stations?q=tide&format=geojson', { method: 'HEAD' });
+  check('HEAD says application/geo+json too', head.status === 200 && GEO.test(head.headers.get('content-type')));
+  const tool = await rpc('tools/call', { name: 'stations_near', arguments: { lat: RICH.lat, lon: RICH.lon, radius_km: 10, format: 'geojson' } });
+  check('the MCP tools take format too: stations_near answers a FeatureCollection', tool.json.result.isError === false
+    && tool.json.result.structuredContent.type === 'FeatureCollection' && tool.json.result.structuredContent.features.length > 0);
+}
+
+{
+  const plain = await get('/api/v1/readings/latest');
+  const geo = await get('/api/v1/readings/latest?format=geojson');
+  const rows = plain.json.stations;
+  const placed = rows.filter(s => s.lat != null && s.lon != null);
+  const fc = geo.json || {};
+  check('latest readings with format=geojson: a Point per placed station at [lon, lat], its row as properties',
+    geo.status === 200 && fc.type === 'FeatureCollection' && GEO.test(geo.headers.get('content-type'))
+      && fc.features.length === placed.length && fc.features.every((f, i) => f.id === placed[i].id
+        && f.geometry.coordinates[0] === placed[i].lon && f.geometry.coordinates[1] === placed[i].lat
+        && JSON.stringify(ageless(f.properties)) === JSON.stringify(ageless(placed[i]))), `${fc.features && fc.features.length} features`);
+  check('…the rigs with no position named in omitted_without_position, the total unchanged',
+    sameList([...fc.omitted_without_position.ids].sort(), [BATESON.id, ELPRO.id].sort()) && fc.total === heardIds.length
+      && fc.unattributed_addresses === plain.json.unattributed_addresses, JSON.stringify(fc.omitted_without_position));
+  const first = await get('/api/v1/readings/latest?format=geojson&limit=2');
+  const second = first.json.next ? await get(first.json.next.replace('https://floodwarning.net', '')) : null;
+  check('…its next link asking for GeoJSON again', /format=geojson/.test(first.json.next || '') && second
+    && second.json.type === 'FeatureCollection' && second.json.offset === 2, first.json.next);
+  const tool = await rpc('tools/call', { name: 'get_latest_readings', arguments: { type: 'river', format: 'geojson' } });
+  check('…and the tool answers GeoJSON with format "geojson"', tool.json.result.isError === false
+    && tool.json.result.structuredContent.type === 'FeatureCollection');
 }
 
 // ── Catchments and networks ──────────────────────────────────────────────────
@@ -833,7 +1170,9 @@ stub.requests = [];
 for (const p of ['/api/v1/', '/api/v1/stations?q=river&type=river', `/api/v1/stations?near=${RICH.lat},${RICH.lon}&manual=true`,
   `/api/v1/stations/${RICH.id}`, `/api/v1/stations/${RICH.id}/dossier`, `/api/v1/stations/${RICH.id}/readings?resolution=raw`,
   `/api/v1/stations/${RICH.id}/flood-levels`, `/api/v1/stations/${MANUAL.id}/service-level`, '/api/v1/catchments',
-  `/api/v1/catchments/${RICH.catchment_ids[0]}`, '/api/v1/networks', `/api/v1/stations/${RICH.station_number}/readings`]) {
+  `/api/v1/catchments/${RICH.catchment_ids[0]}`, '/api/v1/networks', `/api/v1/stations/${RICH.station_number}/readings`,
+  '/api/v1/readings/latest', `/api/v1/readings/latest?type=river&network=${NETWORKED.radio_network_ids[0]}&basin=river&format=geojson`,
+  `/api/v1/readings/latest?bbox=${RICH.lon - 1},${RICH.lat - 1},${RICH.lon + 1},${RICH.lat + 1}`, '/api/v1/stations?q=tide&format=geojson']) {
   api.resetApiState();
   await get(p);
 }
@@ -847,6 +1186,7 @@ function toolArgs(name) {
     case 'search_stations': return { q: RICH.name, limit: 3 };
     case 'stations_near': return { lat: RICH.lat, lon: RICH.lon, radius_km: 15, limit: 3 };
     case 'get_readings': return { id: RICH.id, resolution: 'daily', from: day(NOW - 10 * 24 * hour) };
+    case 'get_latest_readings': return { type: 'river', limit: 3 };
     case 'list_catchments': case 'list_networks': return {};
     case 'get_catchment': return { id: RICH.catchment_ids[0], limit: 3 };
     default: return { id: RICH.id };
@@ -1004,8 +1344,8 @@ section('MCP');
 
   const list = await rpc('tools/list', {}, { headers: { 'MCP-Protocol-Version': '2025-06-18' } });
   const tools = list.json.result.tools;
-  const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'list_catchments',
-    'get_catchment', 'get_flood_levels', 'get_service_level', 'list_networks'];
+  const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'get_latest_readings',
+    'list_catchments', 'get_catchment', 'get_flood_levels', 'get_service_level', 'list_networks'];
   check('tools/list has every tool', expected.every(n => tools.some(t => t.name === n)) && tools.length === expected.length, tools.map(t => t.name).join(', '));
   check('every tool is annotated read-only and has an object input schema', tools.every(t => t.annotations.readOnlyHint === true
     && t.annotations.destructiveHint === false && t.inputSchema.type === 'object' && t.description.length > 40));
@@ -1089,7 +1429,8 @@ section('MCP');
   check('an unsupported MCP-Protocol-Version header is 400 with the supported list', unsupported.status === 400
     && unsupported.json.error.code === -32022 && unsupported.json.error.data.supported.includes('2025-06-18'), JSON.stringify(unsupported.json.error));
   const noHeader = await rpc('tools/list', {});
-  check('no MCP-Protocol-Version header is taken as 2025-03-26 and served', noHeader.status === 200 && noHeader.json.result.tools.length === 10);
+  check('no MCP-Protocol-Version header is taken as 2025-03-26 and served', noHeader.status === 200
+    && noHeader.json.result.tools.length === api.MCP_TOOLS.length);
 }
 
 {
@@ -1189,6 +1530,14 @@ section('Edge cache');
   check('the vocabularies are cached at the edge too, by their upstream URL', vocabCached);
   const withClient = await call(`/api/v1/stations/${RICH.id}/dossier?client=someone`);
   check('?client= is not part of the cache key', withClient.headers.get('x-floodnet-cache') === 'hit');
+  const geoMiss = await call('/api/v1/readings/latest?format=geojson');
+  const geoHit = await call('/api/v1/readings/latest?format=geojson');
+  const jsonHit = await call('/api/v1/readings/latest');
+  check('a GeoJSON answer from the edge cache is application/geo+json still, and the JSON one its own entry',
+    geoMiss.headers.get('x-floodnet-cache') === 'miss' && geoHit.headers.get('x-floodnet-cache') === 'hit'
+      && /^application\/geo\+json/.test(geoHit.headers.get('content-type'))
+      && jsonHit.headers.get('x-floodnet-cache') === 'miss' && /^application\/json/.test(jsonHit.headers.get('content-type')),
+    `${geoHit.headers.get('x-floodnet-cache')} ${geoHit.headers.get('content-type')}`);
   stub.fault = () => new TypeError('fetch failed');
   const failed = await call(`/api/v1/stations/${SPARSE.id}`);
   stub.fault = null;
