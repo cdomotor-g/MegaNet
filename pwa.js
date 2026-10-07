@@ -75,7 +75,7 @@ const Pwa = (function () {
     el.id = 'pwa-update';
     el.className = 'pwa-update';
     el.innerHTML = `<p class="pwa-update-text"><strong>A newer version of Flood-Net is ready.</strong>
-        This one came from the copy kept on this device. Drafts are kept either way.</p>
+        This page is the version before it. Drafts are kept either way.</p>
       <div class="pwa-update-acts">
         <button type="button" class="primary" data-pwa="reload">Reload now</button>
         <button type="button" data-pwa="later">Later</button>

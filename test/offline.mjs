@@ -10,11 +10,16 @@
 //   2. **Kept** — the worker registered for the page's own version keeps the
 //      whole shell: every script index.html loads, styles.css, Leaflet; and,
 //      once it controls the page, the station document and the inspection
-//      sheet's reference tables, as they arrive.
+//      sheet's reference tables, as they arrive — without holding them up:
+//      held part-way, the list's download still counts its bytes on the
+//      loading card (#212). A data file the site changes without a new stamp
+//      (the monthly ACMA refresh) is the network's while there is one.
 //   3. **No signal** — offline, a reload opens the app from the copy: the
 //      stations are there, and the header says it is a saved copy and how old,
 //      never "from" a source it could not reach; an inspection sheet can be
-//      started and its draft saved on the device.
+//      started and its draft saved on the device; the data file's last copy
+//      answers; and an address that is not the app (a doc) is not answered
+//      with the app.
 //   4. **A new deploy** — back online, a page that came from the copy is
 //      offered the newer version, and only reloaded when somebody says so; a
 //      page from the network is offered nothing.
@@ -56,11 +61,18 @@ const J = v => JSON.stringify(v);
 const INDEX_HTML = fs.readFileSync(repo('index.html'), 'utf8');
 const STAMP = INDEX_HTML.match(/core\.js\?v=([0-9a-z]+)/)[1];
 const NEXT = `${STAMP}z`;
+const LIST_BYTES = fs.statSync(repo('stations.json')).size;
+const CHUNK = 512 * 1024;
+const ACMA = '/data/acma-snapshots.json';
 
 // The site as the test server serves it: as committed, as a new deploy (every
 // stamp moved on), or with an Access-like sign-in page in place of the app.
+// The ACMA index as committed, or as the monthly refresh leaves it — the same
+// name and no new stamp.
 let site = 'now';
+let refreshed = false;
 const rewrite = (rel, text) => {
+  if (rel === ACMA) return refreshed ? JSON.stringify({ ...JSON.parse(text), refreshedForTheCheck: true }) : null;
   if (rel !== '/index.html') return null;
   if (site === 'deployed') return text.replaceAll(`?v=${STAMP}`, `?v=${NEXT}`);
   if (site === 'signin') {
@@ -101,6 +113,18 @@ async function cacheState(page, version) {
   }, version);
 }
 
+// stations.json held after two pieces while a gate is set — links.mjs's way of
+// looking at a download part-way through.
+let gate = null;
+function newGate() {
+  let open;
+  const opened = new Promise(r => { open = r; });
+  gate = { opened, open: () => { open(); gate = null; } };
+  return gate;
+}
+
+const fetchText = (page, rel) => page.evaluate(r => fetch(r).then(x => x.text(), e => `failed: ${e.message}`), rel);
+
 async function main() {
   log('\n6. The sheets\' tables\n');
   {
@@ -120,7 +144,11 @@ async function main() {
     check(`sw.js keeps exactly the ${asked.size} tables the two sheets ask for`, !missing.length && !extra.length, J({ missing, extra }));
   }
 
-  const server = await startServer(undefined, { rewrite });
+  const server = await startServer(undefined, {
+    rewrite,
+    stream: rel => rel === '/stations.json' && gate
+      ? { chunk: CHUNK, wait: i => (i === 2 && gate ? gate.opened : null) } : null,
+  });
   const browser = await launchBrowser();
   const errors = [], natives = [];
   try {
@@ -179,6 +207,24 @@ async function main() {
       && C.data.some(u => /\/rest\/v1\/yes_no\?/.test(u)), J(C.data.filter(u => /rest/.test(u)).length));
     let H = await header(page);
     check('online, the header says where the list came from, as ever', /from stations\.json/.test(H.stats) && !/saved copy/.test(H.stats), J(H));
+    // The list goes through the worker as it arrives: held after two pieces,
+    // the loading card already counts them, of the whole.
+    const g = newGate();
+    await page.reload({ waitUntil: 'load', timeout: LOAD_TIMEOUT });
+    const heldAt = `${(2 * CHUNK / 1e6).toFixed(1)} MB of ${(LIST_BYTES / 1e6).toFixed(1)} MB`;
+    const counted = await page.waitForFunction(t => (document.getElementById('load-got') || {}).textContent === t,
+      heldAt, { timeout: 20_000 }).then(() => true, () => false);
+    const seen = await page.evaluate(() => (document.getElementById('load-got') || {}).textContent || null);
+    g.open();
+    check('…and still arrives as it downloads: held part-way, the loading card counts its bytes, of the whole (#212)',
+      counted && await page.evaluate(() => !!navigator.serviceWorker.controller), J({ seen, want: heldAt }));
+    await page.waitForFunction(() => !!state.data, null, { timeout: LOAD_TIMEOUT });
+    // A data file the site changes under the same name, with no new stamp.
+    const acmaBefore = await fetchText(page, ACMA.slice(1));
+    refreshed = true;
+    const acmaAfter = await fetchText(page, ACMA.slice(1));
+    check('a data file the site changes without a new stamp is the network\'s, not a kept copy\'s',
+      !/refreshedForTheCheck/.test(acmaBefore) && /refreshedForTheCheck/.test(acmaAfter), J({ before: acmaBefore.slice(0, 60), after: acmaAfter.slice(0, 60) }));
 
     // ═══════════════════════════════════════════════════════════════════════
     log('\n3. No signal\n');
@@ -203,6 +249,17 @@ async function main() {
       return { refs: true, cfg, drafts: Object.keys(all).length };
     });
     check('…and an inspection sheet starts from the kept tables, its draft saved on the device', draft.refs && draft.drafts >= 1, J(draft));
+    const acmaOffline = await fetchText(page, ACMA.slice(1));
+    check('…and a data file fetched online is there, as last fetched', /refreshedForTheCheck/.test(acmaOffline), acmaOffline.slice(0, 80));
+    {
+      const other = await context.newPage();
+      const went = await other.goto(server.url('/docs/agent-api.md'), { timeout: 15_000 })
+        .then(r => ({ status: r && r.status(), text: '' }), e => ({ error: String(e.message || e).split('\n')[0] }));
+      if (!went.error) went.text = (await other.content()).slice(0, 120);
+      await other.close();
+      check('…and an address that is not the app is not answered with the app', !!went.error && !/<script src="init\.js/.test(went.text || ''), J(went));
+    }
+    refreshed = false;
 
     // ═══════════════════════════════════════════════════════════════════════
     log('\n4. A new deploy\n');

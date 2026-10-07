@@ -458,12 +458,20 @@ says so: **saved copy, 3 hours old — no signal**, never "from the datastore".
 An inspection or maintenance sheet can be started and its draft is saved on the
 device, as it always was.
 
-- **Pages are network-first.** The site is behind Cloudflare Access, so the copy
-  answers a page only when the network cannot (an error, or five seconds of
-  nothing); online, every page is the site's own, Access sign-in included, and
-  a page is never kept from the network. A version whose `index.html` is not the
-  app — Access's sign-in page, a redirect — is never kept: its worker does not
-  install, and the copy before it carries on.
+- **The app's page is network-first.** The site is behind Cloudflare Access, so
+  the copy answers the page only when the network cannot (an error, or five
+  seconds of nothing); online, the page is the site's own, Access sign-in
+  included, and a page is never kept from the network. A version whose
+  `index.html` is not the app — Access's sign-in page, a redirect — is never
+  kept: its worker does not install, and the copy before it carries on. Any
+  other address a tab is pointed at (`/api/v1/…`, a doc) is the network's alone.
+- **Files of a version come from the copy; every other file from the network.**
+  A script or stylesheet with the deploy's `?v=` stamp is the same bytes for as
+  long as the version lives, so the copy answers first. A file without one — the
+  ACMA data a monthly refresh changes under the same name, the layers' GeoJSON —
+  is fetched as if there were no worker, with its last copy kept for when there
+  is no signal. Nothing waits on a copy being written: the first load's progress
+  still counts the station list's bytes as they arrive.
 - **A new deploy is offered, never swapped in.** Each deploy's stamp is a new
   worker, which keeps its own copy and drops the old. A page that came from the
   copy finds, once it can reach the site, whether it has moved on, and says
@@ -474,6 +482,10 @@ device, as it always was.
   screen.
 - **Not kept:** the datastore's other reads, the Worker's `/api/` routes,
   sign-in and map tiles. A copy opened from `file://` is left exactly as it was.
+- **Taking it off every device**, should a deploy ever need to: make `pwa.js`'s
+  `wanted()` return `false`, and give `sw.js` an `activate` that deletes every
+  `floodnet-` cache and calls `self.registration.unregister()`. Each device runs
+  that the next time it opens the site with a signal, and is left with no worker.
 
 ### Reading it from an agent
 

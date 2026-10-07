@@ -16,13 +16,22 @@
 //   into a cache named for the version. All or nothing: a file that will not
 //   come fails the install, and the worker before it carries on.
 //
-//   Pages — network first, always. The site is behind Cloudflare Access, and
-//   a page that came from the cache while the network was there would walk
-//   round the gate for anybody who had signed in once; so the cache answers
-//   a page only when the network cannot, after five seconds of nothing. A
-//   page is never written into the cache from the network either: what the
-//   network said might be Access's sign-in page, a redirect to it, or a newer
-//   index.html than the scripts this version kept.
+//   The app's page — network first, always. The site is behind Cloudflare
+//   Access, and a page that came from the cache while the network was there
+//   would walk round the gate for anybody who had signed in once; so the
+//   cache answers the page only when the network cannot, after five seconds
+//   of nothing. A page is never written into the cache from the network
+//   either: what the network said might be Access's sign-in page, a redirect
+//   to it, or a newer index.html than the scripts this version kept. Any
+//   other address a tab is pointed at — /api/v1/…, a doc, Access's own
+//   /cdn-cgi/ — is the network's alone.
+//
+//   A file of a version (?v=, and Leaflet, whose version is in its path) is
+//   the same bytes for as long as the version lives, so the kept copy answers
+//   first. Any other file of the site's — data/acma-*.json, which a monthly
+//   refresh changes without a new stamp, the layers' GeoJSON — is the
+//   network's whenever the network answers, exactly as if this worker were
+//   not here, with the last copy kept for when it does not.
 //
 //   The station document — stations.json and the datastore's stations_doc —
 //   network first, a copy kept on every answer with the time it was kept; with
@@ -37,6 +46,10 @@
 //
 //   Nothing else. The datastore's other reads, the Worker's /api routes,
 //   sign-in, map tiles: the network's, as if this worker were not here.
+//
+//   Nothing waits on a copy being kept: the page reads the network's answer
+//   as it arrives — the first load's progress (#212) counts real bytes — and
+//   the copy is written beside it.
 //
 // The update. A new worker takes over as soon as it has its shell
 // (skipWaiting, clients.claim) — the pages are network-first, so an open page
@@ -55,6 +68,8 @@ const SCOPE = new URL(self.registration.scope);
 // `/index.html`, which Cloudflare's static assets answer with a redirect to
 // `/` (auto-trailing-slash), and a redirect is never kept as the app.
 const INDEX = SCOPE.href;
+const APP_PAGES = new Set([SCOPE.pathname, `${SCOPE.pathname}index.html`]);
+const API = new URL('api/', SCOPE).pathname;
 const LEAFLET = /^https:\/\/unpkg\.com\/leaflet@[\d.]+\/dist\//;
 
 const REFERENCE = new Set([
@@ -103,11 +118,15 @@ self.addEventListener('install', event => {
     const res = await fetch(INDEX, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' });
     const html = res.ok ? await res.clone().text() : '';
     if (!isApp(res, html)) throw new Error('index.html did not come back as the app — not keeping it');
-    const cache = await caches.open(SHELL);
     // All or nothing, for this version: a file that will not come takes the
-    // whole copy with it, and the worker before this one carries on.
+    // copy with it, and the worker before this one carries on. The page goes
+    // in last, so a copy is never a page without its files. A copy this
+    // version already had — sw.js changed under the same stamp, and the
+    // browser is installing it again — is left as it was: it is the one the
+    // worker still running answers from.
+    const had = await caches.has(SHELL);
+    const cache = await caches.open(SHELL);
     try {
-      await cache.put(INDEX, res);
       await inTurn(shellUrls(html), 6, async u => {
         const cross = !u.startsWith(SCOPE.origin);
         const r = await fetch(new Request(u, cross
@@ -116,8 +135,9 @@ self.addEventListener('install', event => {
         if (!r.ok || (r.type !== 'basic' && r.type !== 'cors')) throw new Error(`${u}: ${r.status || r.type}`);
         await cache.put(u, r);
       });
+      await cache.put(INDEX, res);
     } catch (err) {
-      await caches.delete(SHELL);
+      if (!had) await caches.delete(SHELL);
       throw err;
     }
     await self.skipWaiting();
@@ -130,17 +150,6 @@ self.addEventListener('activate', event => {
       if (name.startsWith('floodnet-shell-') && name !== SHELL) await caches.delete(name);
     }
     await self.clients.claim();
-  })());
-});
-
-// pwa.js asks which version is keeping the shell, and how much of it.
-self.addEventListener('message', event => {
-  const m = event.data || {};
-  if (m.type !== 'status') return;
-  event.waitUntil((async () => {
-    const cache = await caches.open(SHELL);
-    const keys = await cache.keys();
-    event.source && event.source.postMessage({ type: 'status', version: VERSION, kept: keys.length });
   })());
 });
 
@@ -158,19 +167,25 @@ self.addEventListener('fetch', event => {
   const url = new URL(req.url);
   // pwa.js's look at what the site serves now goes straight to it.
   if (url.searchParams.has('floodnet-fresh')) return;
-  if (req.mode === 'navigate') { event.respondWith(page(req)); return; }
-  if (isStationDoc(url) || isReference(url)) { event.respondWith(kept(req)); return; }
-  if (url.origin === SCOPE.origin && !url.pathname.startsWith(new URL('api/', SCOPE).pathname)) {
-    event.respondWith(shell(req));
+  if (req.mode === 'navigate') {
+    if (url.origin === SCOPE.origin && APP_PAGES.has(url.pathname)) event.respondWith(page(req));
     return;
   }
-  if (LEAFLET.test(req.url)) event.respondWith(shell(req));
+  if (isStationDoc(url) || isReference(url)) { event.respondWith(kept(event)); return; }
+  if (LEAFLET.test(req.url)) { event.respondWith(versioned(event)); return; }
+  if (url.origin !== SCOPE.origin || url.pathname.startsWith(API) || url.pathname.startsWith('/cdn-cgi/')) return;
+  event.respondWith(url.searchParams.has('v') ? versioned(event) : file(event));
 });
+
+// A response worth keeping: whole, ours or Leaflet's, and not somewhere else's
+// answer (a redirect — Access's sign-in is one).
+const whole = res => res.status === 200 && (res.type === 'basic' || res.type === 'cors') && !res.redirected;
 
 // Network first; the kept index.html only when the network cannot answer —
 // an error, or nothing for PAGE_WAIT_MS.
 async function page(req) {
   const network = fetch(req);
+  network.catch(() => {});           // answered from the copy, its failure is nobody's
   const timeout = new Promise(resolve => setTimeout(() => resolve(null), PAGE_WAIT_MS));
   try {
     const res = await Promise.race([network, timeout]);
@@ -181,43 +196,69 @@ async function page(req) {
   return network;                    // nothing kept: whatever the network says, late or not
 }
 
-// The shell: the kept copy, else the network — and kept, if it is one of
-// ours and came back whole: a layer's data file fetched online is there
-// offline. Not a file of another version (a ?v= that is not this worker's):
-// while a new deploy's page loads through this worker, its files are the new
-// worker's to keep. And never into a copy that has gone — a newer worker
-// deletes this version's on taking over, and caches.open() would quietly
-// make it again.
-async function shell(req) {
+// A file of a version: the kept copy, else the network — and kept, if it is
+// this worker's version. Not a file of another (a ?v= that is not this
+// worker's): while a new deploy's page loads through this worker, its files
+// are the new worker's to keep. And never into a copy that has gone — a newer
+// worker deletes this version's on taking over, and caches.open() would
+// quietly make it again.
+async function versioned(event) {
+  const req = event.request;
   const hit = await caches.match(req, { cacheName: SHELL });
   if (hit) return hit;
   const res = await fetch(req);
   const v = new URL(req.url).searchParams.get('v');
-  if (res.ok && (res.type === 'basic' || res.type === 'cors') && !res.redirected && (v === null || v === VERSION)) {
+  if (whole(res) && (v === null || v === VERSION)) {
     const copy = res.clone();
-    caches.has(SHELL).then(has => has && caches.open(SHELL).then(c => c.put(req, copy))).catch(() => {});
+    event.waitUntil(caches.has(SHELL).then(has => has && caches.open(SHELL).then(c => c.put(req, copy))).catch(() => {}));
   }
   return res;
 }
 
-// Network first, a copy kept with when it was kept; with no network, the copy,
-// marked as one.
-async function kept(req) {
-  const cache = await caches.open(DATA);
+// Any other file of the site's: the network's, as if this worker were not
+// here — and a copy kept, across versions, for when there is no network.
+async function file(event) {
+  const req = event.request;
   try {
     const res = await fetch(req);
-    if (res.ok && (res.type === 'basic' || res.type === 'cors')) {
-      const body = await res.clone().arrayBuffer();
-      const headers = new Headers(res.headers);
-      headers.set('X-FloodNet-Kept', new Date().toISOString());
-      await cache.put(req.url, new Response(body, { status: 200, headers }));
+    if (whole(res)) {
+      const copy = res.clone();
+      event.waitUntil(caches.open(DATA).then(c => c.put(req, copy)).catch(() => {}));
     }
     return res;
   } catch (err) {
-    const hit = await cache.match(req.url);
+    const hit = await caches.match(req, { cacheName: DATA }) || await caches.match(req, { cacheName: SHELL });
+    if (hit) return hit;
+    throw err;
+  }
+}
+
+// The station document and the sheets' tables: the network's, with a copy
+// kept beside it and when it was kept; with no network, the copy, marked as
+// one — the loaders put its age in the header.
+async function kept(event) {
+  const req = event.request;
+  try {
+    const res = await fetch(req);
+    if (whole(res)) event.waitUntil(keepDated(req.url, res.clone()).catch(() => {}));
+    return res;
+  } catch (err) {
+    const hit = await caches.match(req.url, { cacheName: DATA });
     if (!hit) throw err;
     const headers = new Headers(hit.headers);
     headers.set(OFFLINE_HEADER, hit.headers.get('X-FloodNet-Kept') || 'unknown');
     return new Response(await hit.arrayBuffer(), { status: 200, headers });
   }
+}
+
+// The body as it arrived, decoded — so its length is the one said, and no
+// encoding is claimed for bytes that no longer carry it.
+async function keepDated(url, res) {
+  const body = await res.arrayBuffer();
+  const headers = new Headers(res.headers);
+  headers.delete('content-encoding');
+  headers.set('content-length', String(body.byteLength));
+  headers.set('X-FloodNet-Kept', new Date().toISOString());
+  const cache = await caches.open(DATA);
+  await cache.put(url, new Response(body, { status: 200, headers }));
 }
