@@ -985,7 +985,7 @@ Each entry in the `stations` array represents one node in the network. A node ca
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
 - Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
 - **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, and the nearest station, repeater and survey mark
-- **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
+- **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
 - Light up the watercourses whose names match the filter box, drawn beneath the pins from OpenStreetMap (*Highlight matching rivers*)
@@ -1071,6 +1071,24 @@ unnoticed. The pick now takes the coordinate the renderer computed, the Leaflet
 click is stopped so it cannot arrive with the other number, and the point is
 marked on the terrain in the same cyan ring the 2-D marker uses — a card that
 answers about a point you cannot see on the map is half an answer.
+
+**Property boundaries and road parcels are on the terrain too.** The two
+Queensland cadastre layers in 🗺️ Map display — the lot boundaries with their
+lot/plan, and the road reserve washed and outlined in yellow, the layers
+Queensland Globe draws as land parcels — were Leaflet panes, so they were under
+the canvas and gone the moment the map tilted. They are draped on the ground now,
+each off its own switch, between the elevation ramp and the links (roads over
+lots, as in 2-D). Each file hands the 3-D view its own export as tiles
+(`MapLots.tiles()`, `MapRoads.tiles()`), so the lines are that file's styling
+rather than a second copy; tiles rather than a mirror of the 2-D drawing because
+a tilted camera sees to the horizon, far past the one box the 2-D layer covers.
+They keep the 2-D zoom floors (about 1:36,000 for lots, 1:72,000 for roads). Two
+differences, both for legibility at a tilt: lot numbers come in a zoom later
+(about 1:2,500) and only on the ground's own lots of a house block or more, not
+on the easements and strata plans stacked over a town centre; and since there is
+no hover on a picture, road names are written in the reserve close in. A tile
+the service will not give is counted and said in the 3-D note — no line there is
+not no boundary there.
 
 **Pins are clickable here too (#193).** A pin in 3-D does what a pin in 2-D
 does, less the callout this mode has no way to draw: an armed link-budget

@@ -184,6 +184,18 @@ await page.route(/elevation-tiles-prod\/terrarium\/(\d+)\/(\d+)\/(\d+)\.png/, ro
 await page.route(/(tile\.openstreetmap\.org|tile\.opentopomap\.org|server\.arcgisonline\.com)/, route =>
   route.fulfill({ status: 200, contentType: 'image/png', body: baseTilePng(),
                   headers: { 'Access-Control-Allow-Origin': '*' } }));
+// The Queensland cadastre's export — the 2-D property boundaries' one image
+// and the 3-D view's tiles of it and of the road reserve. A flat picture, like
+// the base map's: what is asserted is what was asked for. `cadFail` drives the
+// loud-failure assertion, as `demBlocked` does for the terrain.
+const cadAsked = [];
+let cadFail = false;
+await page.route(/LandParcelPropertyFramework\/MapServer\/export\?/, route => {
+  cadAsked.push(route.request().url());
+  if (cadFail) return route.abort('blockedbyclient');
+  return route.fulfill({ status: 200, contentType: 'image/png', body: baseTilePng(),
+                         headers: { 'Access-Control-Allow-Origin': '*' } });
+});
 page.on('pageerror', e => errors.push(String(e)));
 
 await page.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
@@ -1043,6 +1055,112 @@ if (onPin) {
      after2.card === onPin.id && after2.here === null, JSON.stringify(after2));
 }
 await page.evaluate(() => { MapHere.close(); closeStnCard(false); });
+
+// ── the Queensland cadastre, draped (map-lots.js, map-roads.js) ──────────
+// Map display's property boundaries and road parcels — the layers Queensland
+// Globe draws — were Leaflet panes, under the canvas in this mode and so simply
+// gone. They come back as each file's own export, tiled: asserted here are the
+// seam (the template and its styling are those files', the lot lines the same
+// renderer as the 2-D image), the place in the stack, the zoom floors, the
+// switches, and a tile that will not come said out loud.
+console.log('\nProperty boundaries and road parcels are draped, off their own switches');
+
+const qldPin = await page.evaluate(() => {
+  const s = state.data.stations.find(x => x.lat < -26 && x.lat > -28.5 && x.lon > 151 && x.lon < 153);
+  return s ? [s.lon, s.lat] : null;
+});
+const cadLook = () => page.evaluate(() => {
+  const m = Map3D._map(), st = m.getStyle();
+  const src = id => st.sources[id] || null;
+  return { order: st.layers.map(l => l.id).filter(id => /^mn-(base|elev|lots|roads|links)$/.test(id)),
+           lots: src('mn-lots'), roads: src('mn-roads'),
+           note: (document.getElementById('map-3d-note') || {}).textContent || '' };
+});
+await page.evaluate(() => { MapElevation.setEnabled(false); MapLots.setEnabled(true); MapRoads.setEnabled(true); });
+await page.evaluate(c => Map3D._map().jumpTo({ center: c, zoom: 15, pitch: 55, bearing: 0 }), qldPin);
+await page.waitForFunction(() => !!Map3D._map().getLayer('mn-lots') && !!Map3D._map().getLayer('mn-roads'),
+  null, { timeout: GL_TIMEOUT }).catch(() => {});
+await page.waitForTimeout(2500);
+const cad = await cadLook();
+ok('with both switches on, both are layers of their own — roads over lots, under the links',
+   JSON.stringify(cad.order) === JSON.stringify(['mn-base', 'mn-lots', 'mn-roads', 'mn-links']), JSON.stringify(cad.order));
+const tpl = s => (s && s.tiles && s.tiles[0]) || '';
+const dyn = s => { try { return JSON.parse(new URL(tpl(s).replace('{bbox-epsg-3857}', '0,0,1,1')).searchParams.get('dynamicLayers')); } catch (_) { return null; } };
+ok('each is the cadastre service’s export, 512 px, with MapLibre’s bbox placeholder left whole',
+   [cad.lots, cad.roads].every(x => /LandParcelPropertyFramework\/MapServer\/export\?/.test(tpl(x))
+     && tpl(x).endsWith('&bbox={bbox-epsg-3857}') && /size=512%2C512/.test(tpl(x)) && x.tileSize === 512),
+   JSON.stringify([tpl(cad.lots).slice(-60), tpl(cad.roads).slice(-60)]));
+ok('…at the zoom floors the 2-D layers keep — 1:36,000 for lots, 1:72,000 for roads',
+   cad.lots.minzoom === 13 && cad.roads.minzoom === 12, JSON.stringify([cad.lots.minzoom, cad.roads.minzoom]));
+ok('…each carrying the State’s credit', [cad.lots, cad.roads].every(x => /State of Queensland/.test(x.attribution || '')));
+const lotsDyn = dyn(cad.lots), roadsDyn = dyn(cad.roads);
+// The 2-D layer's own colour, asked of it rather than written down here.
+const roadRgb = await page.evaluate(() => { const n = parseInt(MapRoads.legendColour().slice(1), 16);
+                                            return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
+// The 2-D image's own request, from the 2-D map under the canvas (it follows
+// the camera): the same renderer for the casing and the line, which is what
+// "one style in both modes" means.
+const twoD = cadAsked.map(u => new URL(u)).find(u => u.searchParams.get('size') !== '512,512');
+const twoDDyn = twoD ? JSON.parse(twoD.searchParams.get('dynamicLayers')) : null;
+ok('the lot lines are the 2-D image’s own renderer — casing and line',
+   !!lotsDyn && !!twoDDyn && lotsDyn.length === 2
+     && lotsDyn.every((l, i) => JSON.stringify(l.drawingInfo.renderer) === JSON.stringify(twoDDyn[i].drawingInfo.renderer)),
+   JSON.stringify([lotsDyn && lotsDyn.map(l => l.id), twoDDyn && twoDDyn.map(l => l.id)]));
+const lab = lotsDyn && lotsDyn[0].drawingInfo.labelingInfo && lotsDyn[0].drawingInfo.labelingInfo[0];
+ok('…labelled closer in than 2-D, and only on the ground’s own lots',
+   !!lab && lab.minScale === 2500 && /cover_typ = 'Base'/.test(lab.where || '')
+     && twoDDyn[0].drawingInfo.labelingInfo[0].minScale === 5000 && !twoDDyn[0].drawingInfo.labelingInfo[0].where,
+   JSON.stringify(lab));
+ok('the road reserve is the same two parcel types the 2-D layer asks for, in its colour',
+   !!roadsDyn && roadsDyn[0].definitionExpression === "parcel_typ IN ('Road Type Parcel','Unlinked parcel or inter')"
+     && JSON.stringify(roadsDyn[0].drawingInfo.renderer.symbol.outline.color.slice(0, 3)) === JSON.stringify(roadRgb),
+   JSON.stringify(roadsDyn && roadsDyn[0].drawingInfo.renderer));
+const tileZ = u => { const b = (new URL(u).searchParams.get('bbox') || '').split(',').map(Number);
+                     return Math.log2(40075016.686 / (b[2] - b[0])); };
+const tiles3d = cadAsked.filter(u => /size=512%2C512/.test(u));
+ok('tiles were asked for, the bbox filled in at whole zooms at or past the floors',
+   tiles3d.length > 0 && tiles3d.every(u => { const z = tileZ(u); return Math.abs(z - Math.round(z)) < 1e-6 && Math.round(z) >= 12; }),
+   `${tiles3d.length} tiles; zooms ${[...new Set(tiles3d.map(u => Math.round(tileZ(u))))].join(',')}`);
+
+// Out past both floors: nothing more is asked.
+await page.evaluate(c => Map3D._map().jumpTo({ center: c, zoom: 10.5, pitch: 0, bearing: 0 }), qldPin);
+await page.waitForTimeout(1500);
+const before = cadAsked.filter(u => /size=512%2C512/.test(u)).length;
+await page.evaluate(c => Map3D._map().jumpTo({ center: [c[0] + 0.3, c[1]], zoom: 10.5, pitch: 0, bearing: 0 }), qldPin);
+await page.waitForTimeout(1500);
+ok('zoomed out past both floors, a pan asks for no cadastre tile',
+   cadAsked.filter(u => /size=512%2C512/.test(u)).length === before);
+
+// The switches, and the order surviving whatever is added after.
+await page.evaluate(() => MapLots.setEnabled(false));
+await page.waitForTimeout(300);
+const offLots = await cadLook();
+ok('property boundaries off in Map display takes them off the 3-D view, and only them',
+   !offLots.order.includes('mn-lots') && offLots.order.includes('mn-roads') && !offLots.lots, JSON.stringify(offLots.order));
+await page.evaluate(() => { MapLots.setEnabled(true); MapElevation.setEnabled(true); });
+await page.waitForFunction(() => !!Map3D._map().getLayer('mn-lots') && !!Map3D._map().getLayer('mn-elev'),
+  null, { timeout: GL_TIMEOUT }).catch(() => {});
+const back = await cadLook();
+ok('…on again puts them back under the roads, and the elevation ramp goes under both',
+   JSON.stringify(back.order) === JSON.stringify(['mn-base', 'mn-elev', 'mn-lots', 'mn-roads', 'mn-links']), JSON.stringify(back.order));
+await page.evaluate(() => { Map3D.baseChanged(); });
+const rebased = await cadLook();
+ok('…and a base map swapped in goes under all of it',
+   JSON.stringify(rebased.order) === JSON.stringify(['mn-base', 'mn-elev', 'mn-lots', 'mn-roads', 'mn-links']), JSON.stringify(rebased.order));
+await page.evaluate(() => MapElevation.setEnabled(false));
+
+// A tile that will not come is a stretch of ground with no boundary on it,
+// which reads as one big lot: counted and said.
+cadFail = true;
+await page.evaluate(c => Map3D._map().jumpTo({ center: [c[0] - 0.05, c[1] + 0.05], zoom: 15.5, pitch: 50, bearing: 30 }), qldPin);
+await page.waitForFunction(() => /could not be\s+fetched from the Queensland spatial service/.test(
+  (document.getElementById('map-3d-note') || {}).textContent || ''), null, { timeout: GL_TIMEOUT }).catch(() => {});
+const failNote = (await cadLook()).note;
+ok('a cadastre tile that will not come is said out loud, never left as bare ground',
+   /tiles? could not be\s+fetched from the Queensland spatial service/.test(failNote) && /no line there is not no\s+boundary there/.test(failNote),
+   failNote.slice(0, 200));
+cadFail = false;
+await page.evaluate(() => Map3D._map().jumpTo({ zoom: 10.5, pitch: 0 }));
 
 // ── 9. leaving the tab takes the GL context with it ─────────────────────────
 // ── a path clicked in 3-D opens the card its 2-D line opens (#196) ────────

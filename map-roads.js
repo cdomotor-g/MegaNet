@@ -75,6 +75,17 @@
 // intersection's corners are the roads that meet there. Hovering a junction
 // names them — "Chardonnay Street / Miranda Drive intersection" — which is an
 // answer the road strips on either side could not give.
+//
+// ── The 3-D view ────────────────────────────────────────────────────────────
+// A tilted camera sees to the horizon, far past the box the 2-D map under it
+// asks for, so map-3d.js draws the reserve from `tiles()`: the service's own
+// export of the same sublayer under the same WHERE, filled and outlined in
+// LINE_COLOR at the 2-D numbers. Two differences, both said here. The export
+// cannot join a junction to its roads, so every 'Unlinked parcel or inter' is
+// drawn — the floor above, which has never yet refused one in 1,269. And there
+// is no hover on a picture, so the road's name is written in it, close in
+// (ROAD_LABEL_SCALE, about one label a block) and never the DCDB's bare
+// "Road", which is no name at all.
 const MapRoads = (function () {
   // The Land Parcel Property Framework — the DCDB published as a map service,
   // the same platform the survey marks and contours come from.
@@ -140,6 +151,13 @@ const MapRoads = (function () {
   //     default, so it tints the ground under this layer for most of the
   //     network; both were rendered together before this colour was settled.
   const LINE_COLOR = '#f9a825';
+
+  // The 3-D tiles: 512 px, as map-lots.js's. MIN_ZOOM 13 on Leaflet's 256 px
+  // tiles is zoom 12 on 512 px ones — the same 1:72,000.
+  const TILE_PX          = 512;
+  const TILE_MINZOOM     = MIN_ZOOM - 1;
+  const TILE_MAXZOOM     = 19;
+  const ROAD_LABEL_SCALE = 2500;
   const UNNAMED    = 'Unnamed road reserve';
   const UNNAMED_X  = 'Road intersection';
 
@@ -313,6 +331,31 @@ const MapRoads = (function () {
   function cachePut(key, v) {
     cache.set(key, v);
     while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+  }
+
+  // The 2-D style, as the export's dynamicLayers for the 3-D tiles. ArcGIS
+  // line widths are points: 0.9 pt is Leaflet's 1.2 px at 96 dpi.
+  function exportLayers(id) {
+    const n = parseInt(LINE_COLOR.slice(1), 16);
+    const rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    return JSON.stringify([{
+      id: 1, source: { type: 'mapLayer', mapLayerId: id },
+      definitionExpression: WHERE,
+      drawingInfo: {
+        renderer: { type: 'simple',
+          symbol: { type: 'esriSFS', style: 'esriSFSSolid', color: [...rgb, Math.round(0.14 * 255)],
+                    outline: { type: 'esriSLS', style: 'esriSLSSolid', color: [...rgb, Math.round(0.95 * 255)], width: 0.9 } } },
+        showLabels: true,
+        labelingInfo: [{
+          labelExpressionInfo: { expression: "IIf($feature.feat_name == 'Road', '', $feature.feat_name)" },
+          labelPlacement: 'esriServerPolygonPlacementAlwaysHorizontal',
+          minScale: ROAD_LABEL_SCALE,
+          symbol: { type: 'esriTS', color: [255, 255, 255, 255],
+                    haloColor: [70, 45, 0, 230], haloSize: 1.5,
+                    font: { family: 'Arial', size: 9 } },
+        }],
+      },
+    }]);
   }
 
   function clearHover() {
@@ -558,6 +601,23 @@ const MapRoads = (function () {
     // The legend's swatch colour, so the key and the map cannot drift apart.
     legendColour() { return LINE_COLOR; },
 
+    // The road reserve as tiles, for the 3-D view (see the header). The bbox
+    // goes on the end unencoded for map-lots.js's reason.
+    tiles() {
+      return resolveLayer().then(id => {
+        const params = new URLSearchParams({
+          f: 'image', format: 'png32', transparent: 'true', dpi: '96',
+          bboxSR: '3857', imageSR: '3857', size: `${TILE_PX},${TILE_PX}`,
+          dynamicLayers: exportLayers(id),
+        });
+        return {
+          url: `${SERVICE_URL}/export?${params}&bbox={bbox-epsg-3857}`,
+          size: TILE_PX, minzoom: TILE_MINZOOM, maxzoom: TILE_MAXZOOM,
+          opacity: 1, attribution: ATTRIBUTION,
+        };
+      });
+    },
+
     // Is this point in a road reserve, and if not, how far is the nearest one?
     // Asked by the repeater site finder (map-sites.js) of a handful of
     // candidate masts, so it is the layer's own query — the same service, the
@@ -631,6 +691,7 @@ const MapRoads = (function () {
     setEnabled(on) {
       state.mapRoads = on;
       try { localStorage.setItem('mn-roads', on ? 'on' : 'off'); } catch (_) {}
+      if (typeof Map3D !== 'undefined' && Map3D.cadastreChanged) Map3D.cadastreChanged();
       if (!on) { clearTimeout(timer); clearLayer(); setNote('off'); return; }
       setNote(map && map.getZoom() >= MIN_ZOOM ? 'loading' : 'zoom');
       sync();

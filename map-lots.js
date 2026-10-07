@@ -33,6 +33,13 @@
 // Nothing here takes the pointer: it is an image, in a pane under the shared
 // pins-and-links canvas, and a lot is a target the size of the map. The label
 // carries what a callout would have said.
+//
+// ── The 3-D view ────────────────────────────────────────────────────────────
+// The same export, as tiles: `tiles()` hands map-3d.js a template with
+// MapLibre's `{bbox-epsg-3857}` in it, built by the same exportParams() and
+// the same dynamicLayers() as the 2-D image, so a lot line is one style in both
+// modes. Tiles rather than this file's one padded image because a tilted camera
+// sees to the horizon, far past the box the 2-D map under it covers.
 const MapLots = (function () {
   const SERVICE_URL = 'https://spatial-gis.information.qld.gov.au/arcgis/rest/services/PlanningCadastre/LandParcelPropertyFramework/MapServer';
   // Resolved by name at runtime — MapRoads' probe, for the same sublayer.
@@ -56,6 +63,23 @@ const MapLots = (function () {
   const LABEL_SCALE = 5000;
   const PAD         = 0.3;
   const MAX_PX      = 2048;
+  // The 3-D view's tiles (tiles()): 512 px, MapLibre's own tile size. A 512 px
+  // tile at zoom z is drawn at 295,829,355 / 2^z, so z13 (1:36,000) is the
+  // first zoom inside MAX_SCALE. Past z19 a tile is drawing the same lines
+  // larger.
+  //
+  // The labels come in a zoom later than in 2-D — z17, 1:2,250 — and only on
+  // the ground's own lots of a house block or more, because a tilted camera
+  // sees several times the ground a flat one does and draped text is squashed
+  // by the tilt. Over Toowoomba's centre at 60° the 2-D labelling was a mat of
+  // numbers to the horizon, most of them easements, building plans and strata
+  // lots stacked on the same few blocks. The export applies both itself, per
+  // tile; the lines are every parcel, as in 2-D.
+  const TILE_PX          = 512;
+  const TILE_MINZOOM     = 13;
+  const TILE_MAXZOOM     = 19;
+  const TILE_LABEL_SCALE = 2500;
+  const TILE_LABEL_WHERE = "cover_typ = 'Base' AND lot_area >= 400";
   const OPACITY     = 0.9;
   const DEBOUNCE_MS = 200;
   const TIMEOUT_MS  = 20000;
@@ -95,7 +119,7 @@ const MapLots = (function () {
 
   // The same sublayer twice: a dark casing, then the white line over it (and
   // the labels on that one). Ids are the request's own, not the service's.
-  function dynamicLayers(id) {
+  function dynamicLayers(id, labelScale = LABEL_SCALE, labelWhere = null) {
     const outline = (color, width) => ({
       type: 'simple',
       symbol: { type: 'esriSFS', style: 'esriSFSNull',
@@ -109,7 +133,8 @@ const MapLots = (function () {
           labelingInfo: [{
             labelExpressionInfo: { expression: '$feature.lotplan' },
             labelPlacement: 'esriServerPolygonPlacementAlwaysHorizontal',
-            minScale: LABEL_SCALE,
+            minScale: labelScale,
+            ...(labelWhere ? { where: labelWhere } : {}),
             symbol: { type: 'esriTS', color: [255, 255, 255, 255],
                       haloColor: [20, 20, 20, 220], haloSize: 1.5,
                       font: { family: 'Arial', size: 9 } },
@@ -118,6 +143,18 @@ const MapLots = (function () {
       { id: 0, source: { type: 'mapLayer', mapLayerId: id },
         drawingInfo: { renderer: outline([20, 20, 20, 150], 2.4), showLabels: false } },
     ]);
+  }
+
+  // The export's parameters, for the 2-D image and the 3-D tiles alike.
+  // png32, not MapContours' png8: the casing is translucent, and png8's
+  // one-bit alpha would turn it into a solid black band.
+  function exportParams(id, w, h, labelScale, labelWhere) {
+    return new URLSearchParams({
+      f: 'image', format: 'png32', transparent: 'true', dpi: '96',
+      bboxSR: '3857', imageSR: '3857',
+      size: `${w},${h}`,
+      dynamicLayers: dynamicLayers(id, labelScale, labelWhere),
+    });
   }
 
   function clearOverlay() {
@@ -174,15 +211,8 @@ const MapLots = (function () {
       const over = Math.max(w, h) / MAX_PX;
       if (over > 1) { w = Math.round(w / over); h = Math.round(h / over); }
 
-      // png32, not MapContours' png8: the casing is translucent, and png8's
-      // one-bit alpha would turn it into a solid black band.
-      const params = new URLSearchParams({
-        f: 'image', format: 'png32', transparent: 'true', dpi: '96',
-        bbox: `${sw.x},${sw.y},${ne.x},${ne.y}`,
-        bboxSR: '3857', imageSR: '3857',
-        size: `${w},${h}`,
-        dynamicLayers: dynamicLayers(id),
-      });
+      const params = exportParams(id, w, h);
+      params.set('bbox', `${sw.x},${sw.y},${ne.x},${ne.y}`);
       const url = `${SERVICE_URL}/export?${params}`;
 
       const img = new Image();
@@ -235,6 +265,17 @@ const MapLots = (function () {
     // Does the legend claim a property-boundary key right now?
     active() { return !!overlay; },
 
+    // The same lines as tiles, for the 3-D view (see the header). The bbox
+    // goes on the end unencoded: MapLibre fills `{bbox-epsg-3857}` in itself,
+    // and URLSearchParams would escape the braces out of it.
+    tiles() {
+      return resolveLayer().then(id => ({
+        url: `${SERVICE_URL}/export?${exportParams(id, TILE_PX, TILE_PX, TILE_LABEL_SCALE, TILE_LABEL_WHERE)}&bbox={bbox-epsg-3857}`,
+        size: TILE_PX, minzoom: TILE_MINZOOM, maxzoom: TILE_MAXZOOM,
+        opacity: OPACITY, attribution: ATTRIBUTION,
+      }));
+    },
+
     noteHtml,
 
     // On by default and remembered, on MapRoads' terms: the scale gate keeps a
@@ -244,6 +285,9 @@ const MapLots = (function () {
     setEnabled(on) {
       state.mapLots = on;
       try { localStorage.setItem('mn-property-boundaries', on ? 'on' : 'off'); } catch (_) {}
+      // The 3-D view draws them too, off the same switch — a no-op unless it
+      // is open, as MapElevation's call is.
+      if (typeof Map3D !== 'undefined' && Map3D.cadastreChanged) Map3D.cadastreChanged();
       if (!on) { clearTimeout(timer); clearOverlay(); setNote('off'); return; }
       setNote(map && viewScale() <= MAX_SCALE ? 'loading' : 'zoom');
       sync();

@@ -71,6 +71,15 @@
 // `MapMovePin.moveTo()` / `pick()` with MapLibre's own coordinate for it —
 // never Leaflet's, which for a pixel on a tilted view is somewhere else.
 //
+// The Queensland cadastre — Map display's property boundaries (map-lots.js)
+// and road parcels (map-roads.js), the layers Queensland Globe draws — is
+// draped like the elevation ramp rather than mirrored like the pins: each of
+// those files hands over a tile template for its own export, styled by its own
+// code (`tiles()`), and this file adds it as a raster source when that layer's
+// switch is on (syncCadastre). Not a mirror of what they drew in 2-D, because
+// that is one box around the middle of the view and a tilted camera sees to
+// the horizon.
+//
 // ── Why the library is fetched rather than listed in index.html ──────────────
 // MapLibre is ~1 MB of WebGL renderer. Leaflet is in index.html because half
 // the tabs are unusable without it; this is one optional mode on one tab, and
@@ -171,6 +180,9 @@ const Map3D = (function () {
   let demFails = 0;      // DEM tiles the renderer could not fetch
   let elevReg  = false;  // the elevation protocol, registered once per page
   let elevKey  = null;   // the tile template the drape is currently built on
+  let cadKeys  = {};     // cadastre layer id → the tile template it is built on (syncCadastre)
+  let cadGen   = 0;      // bumped per syncCadastre, so a template resolved late is dropped
+  let cadFails = {};     // cadastre layer id → tiles the service would not give
   let sheets   = { rows: [], pick: [], queue: [], running: 0, gen: 0,
                    done: 0, failed: 0, dropped: 0, inView: 0 };
   let buf      = null;   // { pos, clr, count } — the sheet geometry, in mercator
@@ -1304,11 +1316,65 @@ const Map3D = (function () {
         // on top of it — the same place it occupies in 2-D, where its pane sits
         // at 245 between the base tiles and the overlays.
         map.addLayer({ id: 'mn-elev', type: 'raster', source: 'mn-elev',
-                       paint: { 'raster-opacity': elevOpacity() } }, 'mn-links');
+                       paint: { 'raster-opacity': elevOpacity() } }, under('mn-elev'));
       }
       return;
     }
     if (key) map.setPaintProperty('mn-elev', 'raster-opacity', elevOpacity());
+  }
+
+  // ── The Queensland cadastre (map-lots.js, map-roads.js) ────────────────
+  // Draped between the elevation ramp and the links, roads over lots — the
+  // order their panes take in 2-D (336 and 338, over the ramp at 245 and under
+  // the network). Each is on when its Map display switch is, and each file's
+  // tiles() says what to fetch and how it is styled, so the lines here are the
+  // lines there. Called when the style loads and from either switch.
+  //
+  // Their own zoom floors, as tile minzooms: past them nothing is asked, and a
+  // far slope that would need a coarser tile is left bare — at that distance a
+  // property line is a smear, and a smear of lot lines reads as texture.
+  const CAD = [
+    { id: 'mn-lots',  name: 'property boundary', on: () => !!state.mapLots,
+      mod: () => (typeof MapLots !== 'undefined' ? MapLots : null) },
+    { id: 'mn-roads', name: 'road parcel', on: () => !!state.mapRoads,
+      mod: () => (typeof MapRoads !== 'undefined' ? MapRoads : null) },
+  ];
+  // The ground's raster stack, bottom up: a layer added later goes under the
+  // first of the ones above it that exists, so the order never depends on
+  // which was added first.
+  const GROUND = ['mn-base', 'mn-elev', 'mn-lots', 'mn-roads', 'mn-links'];
+
+  function under(id) {
+    const above = GROUND.slice(GROUND.indexOf(id) + 1);
+    return above.find(l => map.getLayer(l)) || 'mn-links';
+  }
+
+  function dropCadastre(id) {
+    if (map.getLayer(id)) map.removeLayer(id);
+    if (map.getSource(id)) map.removeSource(id);
+    delete cadKeys[id];
+  }
+
+  function syncCadastre() {
+    if (!map || !ready) return;
+    const gen = ++cadGen;
+    for (const c of CAD) {
+      const mod = c.mod();
+      if (!c.on() || !mod || typeof mod.tiles !== 'function') { dropCadastre(c.id); continue; }
+      mod.tiles().then(t => {
+        if (gen !== cadGen || !map || !ready || !c.on()) return;
+        if (cadKeys[c.id] === t.url && map.getLayer(c.id)) return;
+        dropCadastre(c.id);
+        cadFails[c.id] = 0;
+        map.addSource(c.id, { type: 'raster', tiles: [t.url], tileSize: t.size,
+                              minzoom: t.minzoom, maxzoom: t.maxzoom, attribution: t.attribution });
+        map.addLayer({ id: c.id, type: 'raster', source: c.id,
+                       paint: { 'raster-opacity': t.opacity } }, under(c.id));
+        cadKeys[c.id] = t.url;
+        setNote();
+      }).catch(() => {});
+    }
+    setNote();
   }
 
   // Keep a click off the 2-D map underneath. The canvas is a child of the
@@ -1504,6 +1570,7 @@ const Map3D = (function () {
       map.setTerrain({ source: 'mn-dem', exaggeration: state.map3dExag || 1 });
       map.addLayer(sheetLayer);
       syncElevation();
+      syncCadastre();
       // The finder may have drawn before 3-D was opened, and its pins are DOM
       // markers that the style cannot declare — so they are added here, and
       // the slider's factor is read once the layers it applies to exist.
@@ -1525,6 +1592,9 @@ const Map3D = (function () {
     map.on('error', e => {
       const src = e && e.sourceId;
       if (src === 'mn-dem') { demFails++; setNote(); }
+      // A cadastre tile that will not come is a stretch of ground with no
+      // boundaries on it, which reads as one big lot. Counted and said.
+      if (src in cadKeys) { cadFails[src] = (cadFails[src] || 0) + 1; setNote(); }
     });
     map.on('moveend', () => { if (state.map3dSheets) queueSheets(); });
     // The 2-D map under the canvas goes where the camera stopped (see "One
@@ -1814,6 +1884,13 @@ const Map3D = (function () {
                  could not be fetched — that ground is drawn flat, which reads as
                  a clear path and is not one.</span>`);
     }
+    for (const c of CAD) {
+      const n = cadFails[c.id] || 0;
+      if (!n || !cadKeys[c.id]) continue;
+      bits.push(`<span class="txt-warn">${n} ${c.name} tile${n === 1 ? '' : 's'} could not be
+                 fetched from the Queensland spatial service — no line there is not no
+                 boundary there.</span>`);
+    }
     if (state.map3dSheets) {
       if (sheets.done) bits.push(`${sheets.done} hop${sheets.done === 1 ? '' : 's'} sheeted`);
       const pending = sheets.queue.length + sheets.running;
@@ -1900,16 +1977,19 @@ const Map3D = (function () {
       if (map.getSource('mn-base')) map.removeSource('mn-base');
       map.addSource('mn-base', { type: 'raster', tiles: base.tiles, tileSize: 256,
                                  maxzoom: base.maxzoom, attribution: base.attribution });
-      // Under the elevation drape when there is one, and under the links
-      // either way — a base re-added over the top of the ramp would put the
-      // picker's choice where Map display's overlay belongs.
-      map.addLayer({ id: 'mn-base', type: 'raster', source: 'mn-base' },
-                   map.getLayer('mn-elev') ? 'mn-elev' : 'mn-links');
+      // Under the elevation drape and the cadastre when they are there, and
+      // under the links either way — a base re-added over the top of the ramp
+      // would put the picker's choice where Map display's overlays belong.
+      map.addLayer({ id: 'mn-base', type: 'raster', source: 'mn-base' }, under('mn-base'));
     },
 
     // Map display's elevation switch, its opacity slider or its relief toggle
     // moved (map-elevation.js). A no-op unless 3-D is actually open.
     elevationChanged() { syncElevation(); },
+
+    // Map display's property boundaries or road parcels switch moved
+    // (map-lots.js, map-roads.js). A no-op unless 3-D is actually open.
+    cadastreChanged() { syncCadastre(); },
 
     // What is here picked a point, or closed. Same shape, and for the same
     // reason: the pick is that tool's and this view is only showing it.
@@ -2014,7 +2094,9 @@ const Map3D = (function () {
             colouring, the same hidden and culled sets. So are the field photos’ 📷 — the
             ones around the middle of the view, which is where the 2-D map is: it follows
             the camera, and a photo out towards the horizon is drawn once the camera goes
-            to it.</p>
+            to it. Property boundaries and road parcels — the Queensland cadastre, as
+            Queensland Globe draws it — are on when their switches in Map display are, and
+            drawn closer in than about 1:36,000 and 1:72,000, the same as in 2-D.</p>
           <p class="filter-note" id="map-3d-note">${noteHtml()}</p>
         </div>`;
     },
@@ -2144,6 +2226,9 @@ const Map3D = (function () {
     ready = false;
     buf = null;
     elevKey = null;   // the drape goes with the map; the next one builds its own
+    cadKeys = {};     // and so do the cadastre's
+    cadFails = {};
+    cadGen++;
     // Hundreds of samples a hop, and every one of them re-derivable from tiles
     // Terrain still has cached. It goes with the map.
     sheetMem.clear();
