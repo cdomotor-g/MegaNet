@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-07** (revision 129 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-07** (revision 130 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -532,6 +532,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and eight `[Human]` issues.
 >
+> **Revision 130 opens and closes nothing** — a new tab at the owner's request: **📲 Offline & Install**, under *Start here*, explaining #213's offline copy to somebody who has never heard the word PWA, with buttons that set a device up and install Flood-Net in the browser being used. On the way, #213's first visit is made enough on its own: it kept the app but not the station list, so revision 128's step for a person would have shown no stations — it is right as written from this revision on. Nothing for a person beyond that step.
+>
 > **Revision 129 closes #231, and opens nothing** — the README says what shipped, what is tracked and what was not built, from the same request as revision 119; the help's Pass Ranges entry stops promising what the tab does not do. The Sonnet5 Low row is empty. Nothing for a person; the items the README now says were never built and are not tracked are listed below for the owner to file or leave.
 >
 > **Revision 128 closes #213, and opens nothing** — Flood-Net opens with no signal on a device that has opened it before, from the same request as revision 119. The Opus5 High row loses one. **One step for a person, offered to the owner rather than filed:** on the live site, open it once through Access, then again in flight mode — the part no check here can reach, because the test server is not behind Access.
@@ -740,6 +742,25 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 130 — 2026-10-07: 📲 Offline & Install — the offline copy explained, and a device set up in one press
+
+At the owner's request, after #213 was explained in chat for somebody new to it: "a new left tab that documents all this PWA business, with buttons to make setup easy, browser detection where it helps, and the limitations". No issue was filed for it; this entry is its record.
+
+**The tab** (`offline-tab.js`, `OfflineTab`) sits under *Start here*, after the Site Map — the other thing done before the work rather than as part of it — so the Site Map now has a first stop, *Getting set up*, and a job, *Get a phone ready for a site with no signal*.
+
+- **This device**: what it has kept, read rather than remembered — the signal, the browser, whether it was opened as a tab or the installed app, this version's files (how many), the station list (how long ago, from which source), the inspection and maintenance sheets' pick-lists (how many of fifteen), the space the site uses and whether the browser has promised not to clear it — under one line that says Ready, Not ready yet, Turned off, or why this browser cannot. Every mark is a glyph and a word as well as a colour.
+- **Get this device ready for no signal**: this version's worker installed and answering the page (asked to take a page a hard reload sent past it), the station list asked for again through it from the source the page had it from, the fifteen pick-lists by the sheets' own calls, and the browser asked to keep them (`navigator.storage.persist()`) — each step said as it happens, the result announced.
+- **Put it on your home screen**: Chromium's `beforeinstallprompt` held — no strip of the browser's own at the foot of a phone — and offered as **📲 Install**; every other browser shown its own steps first, and told plainly where it cannot: Firefox on a computer, Chrome or Edge on an iPhone older than iOS 16.4 (sent to Safari), and another app's built-in browser — the one a link from mail or chat opens in — which is given the page's address to take elsewhere. An iPhone or iPad is told its home-screen icon keeps a copy and a sign-in of its own, to set up from the icon. Every other browser's steps are one press away, and the page says menus move between versions.
+- **With no signal** (what works, what needs a signal), **Updates** (with *Check for a newer version*, which says what it found), **Good to know** (the first visit and sign-in need a signal; a weak signal can be slower than none, and flight mode is the fix; the iPhone's separate copy; each browser keeps its own and a private window forgets; clearing the site's data takes the copy and unsent drafts; what is kept; per version), **How it works**, and **Start again** — which removes the worker and every copy it kept (drafts are separate, and stay), and with *do not keep a copy on this device again* keeps it off for a shared computer (`localStorage` `mn-sw` = `off`) until somebody presses Get ready there.
+
+**Which browser** is a reading of the user-agent string, because that is the only place most of it is said, and the page says it is a guess. Two traps it handles: iPadOS presents itself as a Mac (a Mac with a touch screen is an iPad), and an iPhone's home-screen app carries no `Safari/` — exactly like an app's built-in browser — and is told apart by `navigator.standalone`.
+
+**One visit is enough now.** #213's first visit kept the app and not the station list: the list was on its way before the worker existed, and a page is only ever answered by a worker that was there when it loaded. So the step revision 128 offered a person — open it once through Access, then flight mode — would have shown no stations. Found while explaining the feature in chat. When the worker first takes a page over, `pwa.js` now asks for the list and the pick-lists again, through it (about 300 KB, once per device); revision 128's step is right as written from this revision on.
+
+**On the way:** `stationDocRequest()` (`app.js`) is the one statement of how the load chain asks each source for the station document, so the copy `pwa.js` has kept is the one the chain asks for with no signal; `Inspections.refPaths()` and `Maintenance.refPaths()` do the same for the pick-lists. `sw.js` takes a `claim` message. `Pwa.check()` says what it found, and *Later* on the newer-version bar now means "not again unasked" rather than "not again this visit".
+
+**Checks:** `npm run offlinetab` (new, a CI step after `offline`), 29 assertions: where the tab is and that it draws with no list; `detect()` against seventeen real user-agent strings; emulated devices each shown their own steps (and the old iPhone, Firefox and an app's browser told they cannot); the install prompt held, offered, accepted, dismissed, and focus kept in its section; no signal and back; Check; and, with a real worker, one visit keeping everything, Ready, Start again kept off across a reload, and Get ready back to Ready. Thirteen deliberate breaks, each red — among them the install prompt left to the browser, an iPad read as a Mac, the home-screen app read as an app's browser, the first visit keeping nothing, Start again forgetting "do not keep one", and focus dropped when its button goes. Two of those runs also turned an unrelated assertion red: the check read the page after its first repaint and before the last words were said — it now waits for the words. `npm run tabs` holds the tab as it opens and with an install prompt held and every browser's steps open. Run green on `main` before the push: the cheap five, `offlinetab`, `offline`, `tabs`, `help`, `nav`, `smoke`, `shell`, `exports`, `palette`, `registry`, `dialogs`, `firstvisit`, `links`, `insp` and `maint`.
 
 ### Revision 129 — 2026-10-07: the README says what shipped, what is tracked and what was not built — #231 closed
 

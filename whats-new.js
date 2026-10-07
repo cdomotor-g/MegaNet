@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 7, date: '2026-10-07', items: [
+      '<strong>📲 Offline &amp; Install</strong>, a new tab under <em>Start here</em>: what Flood-Net does with no '
+        + 'signal, what this device has saved and when, <strong>Get this device ready for no signal</strong> to save '
+        + 'the rest in one go, and how to put Flood-Net on your home screen in the browser you are using — with an '
+        + '<strong>Install</strong> button where the browser offers one. It also says plainly what does not work with '
+        + 'no signal.',
+      'One visit with a signal is now enough: the station list and the inspection sheets\' pick-lists are saved '
+        + 'along with the app.',
+    ] },
     { n: 6, date: '2026-10-07', items: [
       '<strong>Opens with no signal.</strong> A device that has opened Flood-Net before opens it again out of range, '
         + 'with the station list it last had — the header says it is a <strong>saved copy</strong>, and how old — and '
