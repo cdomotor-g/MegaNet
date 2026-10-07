@@ -183,6 +183,8 @@ const Palette = (() => {
         run: copyHere },
       { icon: '📂', label: 'Load a stations.json from this device', find: 'load open file stations json import device',
         run: () => { const f = document.getElementById('file-input'); if (f) f.click(); } },
+      { icon: '⤓', label: 'Export what this tab shows, as a file', find: 'export save download file csv geojson kml png svg this tab view',
+        run: () => ExportMenu.open() },
       { icon: '📤', label: 'Export Radio Mobile CSVs', find: 'export csv radio mobile download networks backup',
         run: () => switchTab('export') },
       { icon: '🌗', label: dark ? 'Switch to the light theme' : 'Switch to the dark theme',

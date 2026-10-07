@@ -1816,7 +1816,7 @@ function fitAllStations() {
 function dlBlob(name, content, type) {
   const a = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(new Blob([content], { type })),
-    download: name,
+    download: floodnetName(name),
   });
   a.click();
   URL.revokeObjectURL(a.href);

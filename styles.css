@@ -7537,6 +7537,32 @@ hr {
 .pal-count, .pal-hint { margin: var(--sp-2) var(--sp-2) 0; }
 .pal-count:empty { display: none; }
 
+/* ⤓ Export (#227): what the tab can save, a row each — the offer and, under
+   it, what it holds or why it cannot run yet. An offer that cannot run is
+   dimmed and says why in words, so the dimming is never the only signal. */
+.exm-lede { margin: 0 0 var(--sp-2); }
+.exm-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-1); }
+.exm-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .15rem;
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+.exm-opt:hover { background: var(--subtle); }
+.exm-opt[aria-disabled="true"] { cursor: default; background: var(--subtle); }
+.exm-opt[aria-disabled="true"] .exm-label { color: var(--muted); }
+.exm-label { font-weight: 600; }
+.exm-sub { color: var(--muted); }
+.exm-none { margin: var(--sp-2) 0; }
+
 /* 🌗 Theme (#224): the four as radios, each a row with what it is for. */
 .theme-pick { margin: 0; padding: 0; border: 0; display: grid; gap: var(--sp-2); }
 .theme-opt {

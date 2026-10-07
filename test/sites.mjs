@@ -578,7 +578,8 @@ ok('a site named with & and < survives, as its own name',
 // ── 2c. the KMZ and the KML, downloaded ──────────────────────────────────────
 console.log('\nThe KMZ and the KML, downloaded');
 
-const base = await page.evaluate(() => `repeater-sites-${slug(MapSites.targets()[0].name) || 'sites'}-${MapSites.targets().length}`);
+// floodnet-…, as every file the app writes is (core.js's floodnetName, #227).
+const base = await page.evaluate(() => `floodnet-repeater-sites-${slug(MapSites.targets()[0].name) || 'sites'}-${MapSites.targets().length}`);
 const plain = await page.evaluate(() => sitesKml(MapSites.exportSites()));
 const btns = await page.evaluate(() => {
   const z = document.getElementById('sites-kmz'), l = document.getElementById('sites-kml');

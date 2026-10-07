@@ -248,7 +248,7 @@ const SerialSdr = (function () {
     const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([m.buf], { type: 'application/octet-stream' })),
-      download: 'alert-' + mhz + 'MHz-' + (m.rate / 1000) + 'k-' + stamp + '.iq8',
+      download: floodnetName('alert-' + mhz + 'MHz-' + (m.rate / 1000) + 'k-' + stamp + '.iq8'),
     });
     a.click();
     URL.revokeObjectURL(a.href);

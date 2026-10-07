@@ -632,6 +632,15 @@ jobs:
         working-directory: test
         run: npm run dialogs
 
+      # One Export for what the tab shows (#227): every tab offers something
+      # or is exempt with a reason, every offer names a writer the app has,
+      # the Stations list gated as the Export tab is, the filtered list as
+      # CSV / GeoJSON / KML, five other tabs on their own demo data, and every
+      # file named floodnet-….
+      - name: Exports — the banner's Export, and every file floodnet-…
+        working-directory: test
+        run: npm run exports
+
       # Proposed stations (0039) in the editor, on the card and on the map,
       # against a stand-in for save_station() that holds the database's rules
       # (tools/check_proposed_stations.sql holds the real one to them): a

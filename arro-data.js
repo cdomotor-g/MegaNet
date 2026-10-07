@@ -7068,7 +7068,7 @@ const ArroData = (function () {
     if (fmt === 'svg') {
       const a = Object.assign(document.createElement('a'), {
         href: URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' })),
-        download: `${base}.svg`,
+        download: floodnetName(`${base}.svg`),
       });
       a.click();
       URL.revokeObjectURL(a.href);
@@ -7086,7 +7086,7 @@ const ArroData = (function () {
       canvas.toBlob(b => {
         if (!b) { note('The browser would not render the chart to PNG — the SVG download works.', true); return; }
         const a = Object.assign(document.createElement('a'), {
-          href: URL.createObjectURL(b), download: `${base}.png`,
+          href: URL.createObjectURL(b), download: floodnetName(`${base}.png`),
         });
         a.click();
         URL.revokeObjectURL(a.href);

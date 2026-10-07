@@ -77,6 +77,12 @@
       </button>
       <!-- One box for a station, a place, a tab or an action (palette.js); the
            same as Ctrl/Cmd+K, for anybody who has not met the chord. -->
+      <!-- ⤓ Export: what this tab can save of what it shows, as a file — the
+           same writers as its own buttons, in one place (export-menu.js). -->
+      <button id="btn-export" class="hdr-btn" onclick="ExportMenu.open()"
+              title="Export what this tab shows, as a file">
+        <span class="hdr-ico" aria-hidden="true">⤓</span><span class="hdr-label">Export</span>
+      </button>
       <button id="btn-palette" class="hdr-btn" onclick="Palette.open()"
               title="Search for a station, a place, a tab or an action (Ctrl+K)">
         <span class="hdr-ico" aria-hidden="true">🔎</span><span class="hdr-label">Search</span>
@@ -576,6 +582,11 @@
        and core.js (TABS, HELP), which it reads at call time; nothing runs at
        load. -->
   <script src="site-map.js?v=20261007m"></script>
+  <!-- ⤓ Export in the banner (#227): what the open tab can save of what is
+       on screen, through the writers its own buttons call — export.js,
+       arro-data.js and the rest, named at call time; nothing runs at
+       load. -->
+  <script src="export-menu.js?v=20261007m"></script>
   <!-- Ctrl/Cmd+K and 🔎 Search in the banner: one box for a station, a place,
        a tab or an action (#221). After app.js (the station search and the nav's
        scoring), modal.js, places.js and station-trail.js, which it reads at

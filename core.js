@@ -3500,10 +3500,26 @@ function slug(s) {
   return (s || '').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0, 64);
 }
 
+// Every file the app writes is named floodnet-… (CLAUDE.md; #227): a downloads
+// folder is where these are found again a fortnight later, and "stations.json"
+// or "receptions-2026-10-07.csv" says nothing about where it came from. A name
+// that already says so — floodnet-… or floodnet_… — is left as it is. The
+// writers keep choosing their own names; this is where they are made good, at
+// dlText and at the few that write a blob of their own.
+//
+// It also counts what it names (floodnetName.count): the banner's Export
+// (export-menu.js) asks whether a writer wrote anything, since most say
+// nothing when they have nothing to write.
+function floodnetName(name) {
+  floodnetName.count = (floodnetName.count || 0) + 1;
+  const n = String(name || 'export');
+  return /^floodnet[-_]/i.test(n) ? n : `floodnet-${n}`;
+}
+
 function dlText(name, content) {
   const a = Object.assign(document.createElement('a'), {
     href:     URL.createObjectURL(new Blob([content], { type: 'text/csv' })),
-    download: name,
+    download: floodnetName(name),
   });
   a.click();
   URL.revokeObjectURL(a.href);

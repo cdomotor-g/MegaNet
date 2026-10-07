@@ -6297,6 +6297,12 @@ function applyMapFocusStyles() {
 function exportMapSelection() {
   const rows = selectedStations();
   if (!rows.length) return;
+  dlText(`floodnet-selection-${new Date().toISOString().slice(0, 10)}.csv`, stationsCsvText(rows));
+}
+
+// The columns, for any set of stations — the selection above, and the Stations
+// tab's whole filtered list from the banner's Export (#227).
+function stationsCsvText(rows) {
   // elevation_source rides beside the height: an export that dropped it would
   // hand somebody 2,330 modelled figures with nothing to say they are modelled.
   const lines = ['id,name,station_number,roles,networks,alert_ids,lat,lon,elevation_ahd,elevation_source,enabled'];
@@ -6312,7 +6318,7 @@ function exportMapSelection() {
       s.enabled ? 1 : 0,
     ].join(','));
   }
-  dlText(`floodnet-selection-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
+  return lines.join('\n');
 }
 
 // ── Station name labels ──────────────────────────────────────────────────────

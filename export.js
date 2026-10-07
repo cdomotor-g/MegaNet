@@ -574,6 +574,94 @@ ${[linkFolder('Pass-range links', passes, 'mnPass', '→'),
 `;
 }
 
+// ── The Stations tab's list, from the banner's Export (#227) ────────────────
+// The stations the filters leave, in three shapes: the selection's columns
+// (stationsCsvText, app.js), GeoJSON for a GIS, and KML for Google Earth with a
+// pin per station in its role's colour. Gated as this tab's own buttons are
+// (#191, exportMayDownload above): with the filters untouched this is the whole
+// network leaving as a file, which is what that rule is about.
+//
+// A station with no position is in the CSV and nowhere else — a point needs a
+// place — and the message after the save says how many that left out.
+
+// Google's own paddles, as stationKml's are: a pin in a colour Earth has never
+// shown reads as a bug.
+const STATIONS_KML_PADDLE = {
+  base:     'red-diamond',
+  repeater: 'blu-stars',
+  satcom:   'purple-circle',
+  field:    'grn-circle',
+};
+
+function stationsKmlRole(s) {
+  const r = s.roles || [];
+  return r.includes('base') ? 'base' : r.includes('repeater') ? 'repeater' : r.includes('satcom') ? 'satcom' : 'field';
+}
+
+const stationLocated = s => s && s.lat != null && s.lon != null && Number.isFinite(+s.lat) && Number.isFinite(+s.lon);
+
+function stationsGeoJson(rows) {
+  return JSON.stringify({
+    type: 'FeatureCollection',
+    features: rows.filter(stationLocated).map(s => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [+s.lon, +s.lat] },
+      properties: {
+        id: s.id,
+        name: s.name,
+        station_number: s.station_number || null,
+        roles: s.roles || [],
+        networks: (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean),
+        alert_ids: stationAlertIds(s),
+        elevation_ahd: s.elevation_ahd ?? null,
+        elevation_source: s.elevation_source ?? null,
+        enabled: !!s.enabled,
+      },
+    })),
+  }) + '\n';
+}
+
+function stationsKml(rows, what) {
+  const styles = Object.entries(STATIONS_KML_PADDLE).map(([role, icon]) => `  <Style id="mnRole-${role}">
+    <IconStyle><scale>1.0</scale>
+      <Icon><href>https://maps.google.com/mapfiles/kml/paddle/${icon}.png</href></Icon>
+    </IconStyle>
+  </Style>`).join('\n');
+  const marks = rows.filter(stationLocated).map(s => kmlPlacemark(s, `mnRole-${stationsKmlRole(s)}`, [
+    ['Networks', (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean).join(', ')],
+  ])).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>${kmlEsc(what)} — Flood-Net</name>
+  <description><![CDATA[Exported from Flood-Net on ${kmlEsc(new Date().toLocaleString())}. Pins are by role:
+    base stations red, repeaters blue, satellite stations purple, field stations green.]]></description>
+${styles}
+${marks}
+</Document>
+</kml>
+`;
+}
+
+function exportStationsView(fmt) {
+  if (!exportMayDownload()) {
+    Toast.note('Sign in to take the station list away as a file — the Export tab\'s rule, and the station editor\'s.');
+    return;
+  }
+  const rows = filteredStations();
+  if (!rows.length) { Toast.note('No station is left by the filters — there is nothing to save.'); return; }
+  const all = state.data.stations.length;
+  const what = rows.length === all ? 'Every station' : `${rows.length.toLocaleString()} of ${all.toLocaleString()} stations, as filtered`;
+  const ext = fmt === 'geojson' ? 'geojson' : fmt === 'kml' ? 'kml' : 'csv';
+  const name = `floodnet-stations${rows.length === all ? '' : '-filtered'}-${new Date().toISOString().slice(0, 10)}.${ext}`;
+  if (ext === 'csv') dlText(name, stationsCsvText(rows));
+  else if (ext === 'geojson') dlText(name, stationsGeoJson(rows));
+  else dlText(name, stationsKml(rows, what));
+  const lost = ext === 'csv' ? 0 : rows.filter(s => !stationLocated(s)).length;
+  Toast.done(`Saved ${rows.length - lost} station${rows.length - lost === 1 ? '' : 's'} as ${name}`
+    + (lost ? ` — ${lost} with no position are in the CSV only.` : '.'));
+}
+
 // The pill's click. Named for the station and dated, because a downloads folder
 // is where these go to be found again a fortnight later.
 //
@@ -1404,7 +1492,7 @@ function sitesExportData() {
 
 // Named the way the CSV is, so the three files of one answer sort together.
 function sitesExportName(d, ext) {
-  return `repeater-sites-${slug(d.targets[0].name) || 'sites'}-${d.targets.length}.${ext}`;
+  return floodnetName(`repeater-sites-${slug(d.targets[0].name) || 'sites'}-${d.targets.length}.${ext}`);
 }
 
 // history.js's download: the anchor attached, clicked, removed, and the URL
@@ -1414,7 +1502,7 @@ function sitesDownloadBlob(name, part, type) {
   const url = URL.createObjectURL(new Blob([part], { type }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = name;
+  a.download = floodnetName(name);
   document.body.appendChild(a);
   a.click();
   a.remove();

@@ -7101,7 +7101,7 @@ void main() {
     const st = currentStation();
     buildGlb().then(buf => {
       if (!buf) { setStatus('Nothing to export yet — build a twin first.'); return; }
-      const name = `twin-${(st && st.id) || 'station'}-${tw.ground ? tw.ground.size : S().size}m.glb`;
+      const name = floodnetName(`twin-${(st && st.id) || 'station'}-${tw.ground ? tw.ground.size : S().size}m.glb`);
       const a = Object.assign(document.createElement('a'), {
         href: URL.createObjectURL(new Blob([buf], { type: 'model/gltf-binary' })),
         download: name,

@@ -516,7 +516,7 @@ const SerialRadio = (function () {
     if (!r || !r.table) return;
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([r.table.blob], { type: 'application/octet-stream' })),
-      download: 'stations-' + r.table.source.replace(/[^A-Za-z0-9]+/g, '-') + '.bin',
+      download: floodnetName('stations-' + r.table.source.replace(/[^A-Za-z0-9]+/g, '-') + '.bin'),
     });
     a.click();
     URL.revokeObjectURL(a.href);
@@ -592,7 +592,7 @@ const SerialRadio = (function () {
     if (!cv || !cv.toBlob) return;
     cv.toBlob(b => {
       if (!b) return;
-      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(b), download: 'radio-screen.png' });
+      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(b), download: floodnetName('radio-screen.png') });
       a.click();
       URL.revokeObjectURL(a.href);
     });
