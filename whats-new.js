@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 4, date: '2026-10-07', items: [
+      '<strong>A station\'s health on its card.</strong> Under its owner, a station\'s card on the Stations map says '
+        + 'when it was last heard, how its battery is doing night to night, and what is wrong with it — each line opens '
+        + '<em>Station Health</em> on that station.',
+      '<strong>Colour pins by health</strong>, in 🗺️ Map display: every pin OK, watch, fault or no data — with its size '
+        + 'and a ring as well as its colour, and a key in the legend.',
+    ] },
     { n: 3, date: '2026-10-07', items: [
       '<strong>No more browser pop-ups.</strong> Where the browser used to stop the page to ask <em>OK or Cancel?</em>, '
         + 'Flood-Net asks in a dialog of its own, and the button that acts says what it does — <em>Delete the station</em>, '
