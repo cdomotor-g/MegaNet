@@ -45,6 +45,7 @@
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { answer } from './lib/ask.mjs';
 import { READABLE_RELATIONS } from '../worker/api.js';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
@@ -69,7 +70,7 @@ function fakeDatabase(lists) {
   const col = k => (k === 'TBRGbucketSize' ? 'tbrg_bucket_size' : k);
   const db = {
     missing: false, docs: {}, stamps: {}, changes: {}, deleted: [], refuse: {},
-    requests: [], saves: [], restores: [], dialogs: [], dismissNext: false, nextId: 100,
+    requests: [], saves: [], restores: [], dialogs: [], nextId: 100,
   };
   db.install = page => page.route('**://*.supabase.co/rest/v1/**', async route => {
     const req = route.request();
@@ -242,10 +243,15 @@ async function main() {
     await db.install(page);
     // A click on something a broken build never drew fails in seconds, not 30.
     page.setDefaultTimeout(10_000);
-    page.on('dialog', d => {
-      db.dialogs.push(d.message());
-      if (db.dismissNext) { db.dismissNext = false; d.dismiss(); } else d.accept();
-    });
+    // Every Restore asks first, in the app's own dialog (#223, confirmDialog):
+    // reply() answers it the way a person would and keeps what it said. A native
+    // dialog would be a regression, so one is an error.
+    page.on('dialog', d => { errors.push(`a native dialog: ${d.message()}`); d.dismiss().catch(() => {}); });
+    const reply = async (yes = true) => {
+      const q = await answer(page, yes);
+      db.dialogs.push(`${q.title}\n\n${q.text}`);
+      return q;
+    };
 
     // The register as the stand-in holds it: Gatton as its changes have left
     // it, Laidley an established proposal, and two stations deleted.
@@ -372,13 +378,15 @@ async function main() {
     // ═══════════════════════════════════════════════════════════════════════
     await part('A field back', async () => {
       const lat = '#mn-hist-card-gatton .stn-hist-entry[data-change="7"] .stn-hist-row[data-field="lat"] button.stn-hist-put';
-      db.dismissNext = true;
       await page.click(lat);
+      const q0 = await reply(false);
       await page.waitForTimeout(200);
       check('Restore asks first, saying what goes back — and a "no" sends nothing',
         /^Put Latitude back to “-27\.55” on Gatton Weir\?/.test(db.dialogs[0] || '') && db.saves.length === 0
           && reqs(db, 'station_json').length === 0, db.dialogs[0]);
+      check('…in words of its own: the button that acts says what it puts back', q0.yes === 'Put Latitude back' && !q0.danger, J(q0));
       await page.click(lat);
+      await reply(true);
       await page.waitForFunction(() => /Restored:/.test((document.querySelector('#mn-hist-card-gatton .stn-hist-msg') || {}).textContent || ''),
                                  null, { timeout: 10_000 });
       sent = db.saves[db.saves.length - 1];
@@ -411,6 +419,9 @@ async function main() {
     // ═══════════════════════════════════════════════════════════════════════
     await part('A version back', async () => {
       await page.click('#mn-hist-card-gatton .stn-hist-entry[data-change="12"] button.stn-hist-version');
+      const q12 = await reply(true);
+      check('a version that undoes later changes asks as the dangerous kind, and its button counts them',
+        q12.danger && q12.yes === 'Put back 3 changes', J(q12));
       await page.waitForFunction(() => /Restored: Gatton Weir put back as it was before/.test(
         (document.querySelector('#mn-hist-card-gatton .stn-hist-msg') || {}).textContent || ''), null, { timeout: 10_000 });
       const ask = db.dialogs[db.dialogs.length - 1];
@@ -429,6 +440,7 @@ async function main() {
         return li && li.dataset.change === '102';
       }, null, { timeout: 10_000 });
       await page.click('#mn-hist-card-gatton .stn-hist-entry[data-change="7"] button.stn-hist-version');
+      await reply(true);
       await page.waitForFunction(() => /put back as it was before/.test(
         (document.querySelector('#mn-hist-card-gatton .stn-hist-msg') || {}).textContent || '')
         && (document.querySelector('#mn-hist-card-gatton .stn-hist-entry') || {}).dataset?.change === '103',
@@ -448,6 +460,7 @@ async function main() {
       await page.click('#mn-hist-card-laidley summary');
       const nSaves = db.saves.length;
       await page.click('#mn-hist-card-laidley .stn-hist-row[data-field="proposed"] button.stn-hist-put');
+      await reply(true);
       await page.waitForFunction(() => /Not restored/.test((document.querySelector('#mn-hist-card-laidley .stn-hist-msg') || {}).textContent || ''),
                                  null, { timeout: 10_000 });
       S = await section(page, 'laidley');
@@ -494,6 +507,7 @@ async function main() {
         P.head === 'Deleted stations 2' && P.rows[0].id === '_gone_a' && P.rows[1].id === '_gone_b'
           && ['Old Creek AL', '_gone_a', '540999', '4 Oct 2026, 12:00 pm', 'by alice@example.test'].every(t => P.rows[0].text.includes(t)), J(P));
       await page.click('#adm-deleted tr[data-deleted="_gone_a"] button');
+      await reply(true);
       await page.waitForFunction(() => /Restored Old Creek AL/.test((document.querySelector('#adm-deleted .adm-deleted-msg') || {}).textContent || ''),
                                  null, { timeout: 10_000 });
       P = await panel();
@@ -510,6 +524,7 @@ async function main() {
         message: 'station "_gone_b" cannot come back holding station number 40716: Laidley (laidley) has it now',
         hint: 'renumber or delete that station first, then restore this one' };
       await page.click('#adm-deleted tr[data-deleted="_gone_b"] button');
+      await reply(true);
       await page.waitForFunction(() => /Not restored/.test((document.querySelector('#adm-deleted .adm-deleted-msg') || {}).textContent || ''),
                                  null, { timeout: 10_000 });
       P = await panel();
@@ -520,6 +535,7 @@ async function main() {
       delete db.refuse._gone_b;
       db.missing = true;
       await page.click('#adm-deleted tr[data-deleted="_gone_b"] button');
+      await reply(true);
       await page.waitForFunction(() => /0056/.test((document.querySelector('#adm-deleted .adm-deleted-msg') || {}).textContent || ''),
                                  null, { timeout: 10_000 });
       P = await panel();

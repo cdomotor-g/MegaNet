@@ -381,17 +381,19 @@ const StationHistory = (function () {
 
   // ── Restoring ──────────────────────────────────────────────────────────────
 
-  function restoreField(sid, cid, field) {
+  async function restoreField(sid, cid, field) {
     const c = cards[sid];
     const r = c && (c.rows || []).find(x => x.id === cid);
     if (!r || !r.before || !(field in r.before) || FIXED[field] || busy[sid]) return;
     const s = station(sid);
     const was = r.before[field];
-    if (!confirm(`Put ${label(field)} back to ${quoted(field, was)}${s ? ` on ${s.name}` : ''}?\n\n${saying(sid)}`)) return;
+    if (!(await confirmDialog({ title: `Put ${label(field)} back to ${quoted(field, was)}${s ? ` on ${s.name}` : ''}?`,
+      message: saying(sid), confirm: `Put ${label(field)} back` }))) return;
+    if (busy[sid]) return;
     save(sid, { [docKey(field)]: was }, [field], `${label(field)} put back to ${quoted(field, was)}`);
   }
 
-  function restoreVersion(sid, cid) {
+  async function restoreVersion(sid, cid) {
     if (busy[sid]) return;
     const p = plan(sid, cid);
     const c = cards[sid];
@@ -399,11 +401,16 @@ const StationHistory = (function () {
     if (!p || !r || !p.labels.length) return;
     const s = station(sid);
     const names = p.labels.map(label).join(', ');
-    if (!confirm(`Put ${s ? s.name : 'this station'} back as it was before the change of ${when(r.changed_at)}?\n\n`
-        + `${p.labels.length} field${p.labels.length === 1 ? '' : 's'}: ${names}.`
+    // The answer is a question of its own (#223): its button says what it
+    // puts back, and a version that undoes later changes is the dangerous kind.
+    if (!(await confirmDialog({
+      title: `Put ${s ? s.name : 'this station'} back as it was before the change of ${when(r.changed_at)}?`,
+      message: `${p.labels.length} field${p.labels.length === 1 ? '' : 's'}: ${names}.`
         + (p.later ? `\nThis undoes the ${p.later} later change${p.later === 1 ? '' : 's'} listed above it as well.` : '')
         + (p.fixed.length ? `\n${p.fixed.map(label).join(', ')} stay${p.fixed.length === 1 ? 's' : ''} as now — the editor's save does not write ${p.fixed.length === 1 ? 'it' : 'them'}.` : '')
-        + `\n\n${saying(sid)}`)) return;
+        + `\n\n${saying(sid)}`,
+      confirm: p.later ? `Put back ${p.later + 1} changes` : 'Put it back', danger: !!p.later }))) return;
+    if (busy[sid]) return;
     save(sid, p.fields, p.labels, `${s ? s.name : 'The station'} put back as it was before ${when(r.changed_at)} (${names})`);
   }
 
@@ -541,9 +548,12 @@ const StationHistory = (function () {
   async function restoreStation(id) {
     const r = (del || []).find(x => x.id === id);
     if (!r || delBusy || !editor()) return;
-    if (!confirm(`Restore “${r.name || r.id}”?\n\nIt comes back on the map and in the station list as it was when it`
+    if (!(await confirmDialog({ title: `Restore “${r.name || r.id}”?`,
+      message: 'It comes back on the map and in the station list as it was when it'
         + ' was deleted — its sensors, its repeater and its lists with it — saved now, as you, through the'
-        + ' station editor\'s own save.')) return;
+        + ' station editor\'s own save.',
+      confirm: 'Restore the station' }))) return;
+    if (delBusy) return;
     delBusy = id; delMsg = { kind: 'busy', text: `Restoring ${r.name || r.id}…` };
     adminPaint();
     try {
