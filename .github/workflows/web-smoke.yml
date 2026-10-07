@@ -373,6 +373,15 @@ jobs:
         working-directory: test
         run: npm run health
 
+      # Node-only and fast. Station Health with nobody's browser open (#215):
+      # tools/health/report.mjs runs the same health-analysis.js over the demo
+      # week and reports exactly the analysis' own findings of the kinds it
+      # reports — the planted silent station among them, the stations left
+      # alone not — to a stand-in for meganet.report_station_findings().
+      - name: Station Health reported — the browser's analysis, run unattended
+        working-directory: test
+        run: npm run healthreport
+
       # Node-only and fast. The Airtime panel's reasoning on networks built
       # for it: the circle two checks share (the gcd of their periods), how a
       # logger keeps time (steady, drifting, jumped, randomised), damage
@@ -1365,6 +1374,14 @@ jobs:
       # fingerprinted as ssh-keygen prints them, fetched only with a live token.
       - name: check_base_stations.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_base_stations.sql
+      # The network's health kept by the database (0059): a base station that
+      # stops checking in and a receiver that runs but decodes nothing each a
+      # finding on the next run, held while its station is away, cleared when
+      # it recovers; the station analysis' reports opened, updated, refused
+      # when stale and cleared only when complete; a base station's findings
+      # for administrators only.
+      - name: check_health_findings.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_health_findings.sql
       - name: check_inspections.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
       - name: check_inspection_history.sql

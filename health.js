@@ -111,6 +111,11 @@ const Health = (() => {
     owners: storedOwners(),  // the owners picked; empty is every owner
     slsAsked: false,         // the SLS file, where most owners come from, sent for…
     slsFailed: false,        // …and did not load
+    // The server's own last look (#215, 0059): this file's analysis, run every
+    // fifteen minutes with nobody's browser open, its findings about a present
+    // condition kept in meganet.health_finding. { at, findings }, { missing }
+    // for a database without it, or null before it is asked.
+    server: null,
   };
 
   // ── small helpers ──────────────────────────────────────────────────────────
@@ -225,8 +230,24 @@ const Health = (() => {
     return got.rows;
   }
 
+  // What the server last found, asked for alongside the readings: two small
+  // reads, so it is on the screen while the week is still arriving.
+  async function loadServer() {
+    try {
+      const [runs, open] = await Promise.all([
+        dbSelect('health_refresh?select=at&source=eq.stations'),
+        dbSelect('health_finding?select=kind,subject,station_id,severity,title,first_seen&source=eq.stations&cleared_at=is.null&limit=500'),
+      ]);
+      H.server = { at: runs[0] ? Date.parse(runs[0].at) : null, findings: open };
+    } catch (_) {
+      H.server = { missing: true };
+    }
+    renderStatus();
+  }
+
   async function run() {
     const seq = ++H.seq;
+    loadServer();
     const t1 = Date.now(), t0 = t1 - windowMs();
     H.loading = true; H.error = ''; H.fetched = 0; H.capped = false; H.demo = false;
     renderStatus();
@@ -348,15 +369,41 @@ const Health = (() => {
       <section class="panel" id="hl-agent" aria-labelledby="hl-h-agent">${typeof HealthAgent !== 'undefined' ? HealthAgent.render() : ''}</section>`;
   }
 
+  // The server's last look, in a sentence: while the week loads, what it found
+  // (the answer, before this tab has worked it out); after, how fresh it is —
+  // and when its schedule has stopped, that it has.
+  const SERVER_LATE = 45 * MIN;
+  function serverHtml() {
+    const S = H.server;
+    if (H.demo || !S || S.missing || S.at == null) return '';
+    const ago = esc(fmtAgo(S.at));
+    if (H.loading) {
+      const worst = S.findings.filter(f => f.severity !== 'info')
+        .sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1));
+      if (!worst.length) return ` Meanwhile, the server's last look (${ago}) found nothing that needs attention.`;
+      const crit = worst.filter(f => f.severity === 'critical').length;
+      const named = worst.slice(0, 4).map(f => {
+        const st = f.station_id ? stationById(f.station_id) : null;
+        return esc((st ? st.name + ': ' : '') + f.title);
+      });
+      return ` Meanwhile, the server's last look (${ago}): ${num(crit)} critical, ${num(worst.length - crit)} warning${worst.length - crit === 1 ? '' : 's'} — `
+        + named.join('; ') + (worst.length > named.length ? `; and ${num(worst.length - named.length)} more` : '') + '.';
+    }
+    return Date.now() - S.at > SERVER_LATE
+      ? ` <span class="txt-warn">The server has not looked since ${esc(fmtWhen(S.at))} — its every-fifteen-minutes check may have stopped, and nothing is being noticed while this tab is closed.</span>`
+      : ` The server looks every fifteen minutes too; last ${ago}.`;
+  }
+
   function statusHtml(msg) {
     if (msg) return esc(msg);
     if (H.error) return `<span class="txt-bad">${esc(H.error)}</span>`;
-    if (H.loading) return `Fetching readings from ${esc(dbHostLabel())}… ${H.fetched ? `${H.fetched.toLocaleString()} so far` : ''}`;
+    if (H.loading) return `Fetching readings from ${esc(dbHostLabel())}… ${H.fetched ? `${H.fetched.toLocaleString()} so far.` : ''}${serverHtml()}`;
     if (!H.rows) return 'Nothing fetched yet.';
     const span = H.t0 != null ? `${fmtTs(H.t0)} to ${fmtTs(H.t1)}` : 'the readings given';
     const src = H.demo ? '<strong>Demo week</strong> — made-up readings of real stations, with one of every fault planted' : esc(dbHostLabel());
     return `${num(H.rows.length)} readings, ${esc(span)}, from ${src}. Worked out ${esc(fmtAgo(H.at))}.`
-      + (H.capped ? ` <span class="txt-warn">Stopped at ${num(MAX_ROWS)} readings — pick a shorter window for the rest.</span>` : '');
+      + (H.capped ? ` <span class="txt-warn">Stopped at ${num(MAX_ROWS)} readings — pick a shorter window for the rest.</span>` : '')
+      + serverHtml();
   }
   function renderStatus(msg) {
     const el = document.getElementById('hl-status');

@@ -10,8 +10,9 @@
 //
 //   * signed out, and signed in without being an administrator, the tab says
 //     what it is for and asks the database nothing
-//   * the list: each station's state worked out on the database's clock, what
-//     needs a look, and "not managed" for one that only posts
+//   * the list: each station's state worked out on the database's clock — or,
+//     since 0059, the state the database says — what needs a look, a receiver
+//     the database found deaf among it, and "not managed" for one that only posts
 //   * opening a station asks it for its whole status and starts the fast
 //     check-ins; its health, receivers, uplink, software, SSH access, settings,
 //     log and requests are drawn from what it sent
@@ -137,7 +138,12 @@ const db = {
   keysHash: 'h1',
   stations: [
     row({ id: 11, label: 'Mt Stuart base', host_station_id: '533000', host_station: 'Mt Stuart', status: LIST_STATUS, beat: BEAT,
-      access: { available: true, meganet_keys: true, keys: 2, ssh: true } }),
+      access: { available: true, meganet_keys: true, keys: 2, ssh: true }, state: 'online',
+      // 0059: its first stick runs, and has decoded nothing for seven hours.
+      findings: [{ id: 501, kind: 'receiver-deaf', rx_key: STICK_1.slice(-80), severity: 'warn',
+        title: 'Mt Stuart base — North stick: nothing decoded for 7 h', detail: 'It is running…',
+        evidence: { name: 'North stick', state: 'running', decoded: 412, changed_at: ago(7 * 3600) },
+        first_seen: ago(3600), last_seen: ago(60) }] }),
     row({ id: 12, label: 'Hut reporter', mode: 'report', last_seen_at: ago(70), status: { name: 'Hut reporter', receivers: [] },
       beat: { up: 1000, temp: 41, uv: false, uv_boot: false, clock: true, q: 0, hold: 0, rx: [] } }),
     row({ id: 14, label: 'Creek gauge base', last_seen_at: ago(3 * 3600), status: { name: 'Creek gauge base', receivers: [] },
@@ -280,6 +286,15 @@ try {
         // A station that checks in every 15 minutes is not quiet at 20 of them.
         B._liveness({ managed: true, mode: 'manage', idle_s: 900, last_seen_at: t(1200) }).k,
       ],
+      // The database's word (0059) over this tab's own reckoning.
+      told: [
+        B._liveness({ managed: true, mode: 'manage', idle_s: 60, last_seen_at: t(20), state: 'quiet' }).k,
+        B._liveness({ managed: true, mode: 'manage', idle_s: 60, last_seen_at: t(7200), state: 'online' }).k,
+        B._liveness({ managed: false, state: 'unmanaged' }).k,
+      ],
+      deaf: B._flags({ beat: { rx: [['a', 'running', 5, null]] }, status: { receivers: [{ key: 'a', kind: 'sdr', name: 'Stick A' }] },
+        findings: [{ kind: 'receiver-deaf', rx_key: 'a', severity: 'critical', evidence: { name: 'Stick A', changed_at: t(26 * 3600) } },
+                   { kind: 'base-station-quiet', severity: 'warn', evidence: {} }] }),
       flags: B._flags({ beat: { uv: true, temp: 77, clock: false, q: 600, rx: [['a', 'error', 0, null]] },
         status: { meganet: { token_refused: true }, receivers: [{ key: 'a', kind: 'sdr', name: 'x' }, { key: 'g', kind: 'gps', state: 'error' }] } }).map(x => x[1]),
       same, changed, bad,
@@ -288,6 +303,9 @@ try {
   }, [CONFIG, STICK_1, ODD_KEY]);
   ok('a station is online, quiet, offline, turned off or not managed by when it last checked in',
     pure.liveness.join() === 'online,quiet,offline,off,unmanaged,online', pure.liveness.join());
+  ok('the database says which state a station is in, where it says (0059)', pure.told.join() === 'quiet,online,unmanaged', pure.told.join());
+  ok('a receiver the database found deaf is something to look at, as bad as it found it — and a quiet station is its state, not a flag',
+    pure.deaf.length === 1 && pure.deaf[0][0] === 'txt-bad' && pure.deaf[0][1] === 'Stick A has decoded nothing for 26 h', JSON.stringify(pure.deaf));
   ok('what needs a look: a refused token, power, heat, the clock, the queue, a receiver down — and not the GPS',
     pure.flags.join('|') === 'token refused|under-voltage now|77 °C|clock not set|600 readings waiting|1 receiver not receiving', pure.flags.join('|'));
   ok('the settings form untouched is no change at all', pure.same.patch && Object.keys(pure.same.patch).length === 0, JSON.stringify(pure.same));
@@ -326,6 +344,7 @@ try {
   ok('…the one checking in online, on the database\'s clock, with its host station and receivers',
     /Mt Stuart base/.test(list[0]) && /online/.test(list[0]) && /checked in (just now|\d+ s ago)/.test(list[0]) && /at Mt Stuart/.test(list[0]) && /1 of 3 receiving/.test(list[0]), list[0]);
   ok('…and what needs a look on it', /under-voltage since boot/.test(list[0]) && /2 receivers not receiving/.test(list[0]), list[0]);
+  ok('…a stick that runs and hears nothing among it, as the database found it', /North stick has decoded nothing for 7 h/.test(list[0]), list[0]);
   ok('…the one that only reports, said so', /Hut reporter/.test(list[1]) && /reports only/.test(list[1]), list[1]);
   ok('…the one gone quiet, offline, with its heat, power and clock', /offline/.test(list[2]) && /77 °C/.test(list[2]) && /under-voltage now/.test(list[2]) && /clock not set/.test(list[2]), list[2]);
   ok('…and the one that only posts, not managed, with its receiver', /not managed/.test(list[3]) && /last posted 5 min ago/.test(list[3]) && /Quansheng radio/.test(list[3]), list[3]);
@@ -347,6 +366,8 @@ try {
     && /its other channel is set on the station/.test(detail), detail.slice(detail.indexOf('Receivers'), detail.indexOf('Receivers') + 400));
   ok('its receivers, with the heartbeat\'s state over the status\'s', /RTL-SDR 1/.test(detail) && /receiving/.test(detail) && /151\.5000 MHz/.test(detail)
     && /usb_claim_interface error -6/.test(detail) && /412 decoded/.test(detail), detail.slice(0, 600));
+  ok('…the one the database found deaf saying so beside what it has decoded',
+    /412 decoded\s*(data [^ ]+ [^ ]+\s*)?nothing new for 7 h/.test(detail), (detail.match(/412 decoded.{0,60}/) || [''])[0]);
   ok('its uplink', /Waiting to send 3 · 12 receptions/.test(detail) && /floodwarning\.net/.test(detail));
   ok('its software', /0\.6\.0/.test(detail) && /installed when asked/.test(detail) && /Version 0\.6\.0 installed/.test(detail));
   ok('…with the latest release beside its version, linked to it', /Version 0\.6\.0 · latest release 0\.7\.0/.test(detail)

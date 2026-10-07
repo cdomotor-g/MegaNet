@@ -804,6 +804,14 @@ const HealthAnalysis = (() => {
     'not-heard':         'Confirm whether these are decommissioned, or check them — their repeaters were relaying others.',
   };
 
+  // The findings about a present condition — what is wrong *now* — as against
+  // history (a spell that came back) and slow diagnosis (a marginal path).
+  // These are what tools/health/report.mjs reports to the database every
+  // fifteen minutes with nobody's browser open (#215, 0059), and what the
+  // station card and its pin take from there (health-glance.js).
+  const CURRENT_KINDS = ['silent', 'repeater-down', 'area-silence', 'receiver-silent',
+    'battery-critical', 'battery-low', 'battery-no-charge'];
+
   const CATEGORY = {
     'battery-critical': 'power', 'battery-low': 'power', 'battery-falling': 'power', 'battery-no-charge': 'power',
     'battery-float': 'power', 'battery-overcharge': 'power',
@@ -2000,7 +2008,7 @@ const HealthAnalysis = (() => {
     // The arithmetic, for test/health.mjs.
     _detectSchedule: detectSchedule, _theilSen: theilSen, _batteryOf: batteryOf, _rainOf: rainOf,
     _transmissions: transmissions, _normalise: normalise, _pop: pop,
-    fmtWhen, fmtSpan, fmtPeriod, ACTION, CATEGORY,
+    fmtWhen, fmtSpan, fmtPeriod, ACTION, CATEGORY, CURRENT_KINDS,
     PERIODS, COPY_WINDOW, BURST_WINDOW,
   };
 })();

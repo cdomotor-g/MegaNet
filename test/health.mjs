@@ -39,6 +39,9 @@
 //     on that key alone; a viewer, and the signed-out, offered their own key
 //     with the route not asked — and only there a box to remember it, about
 //     the device, unticked, honoured only when ticked
+//   * the server's own last look (#215, 0059): while the week arrives, what it
+//     found, worst first and notes left out; after, how fresh it is — and a
+//     server that has stopped looking said to have
 //   * no sideways scroll at 375 px; no page errors
 //
 // Run:  npm run health
@@ -84,7 +87,20 @@ async function standIn(page) {
     const body = rows.slice(off, off + lim).map(r => Object.fromEntries(cols.map(k => [k, r[k] === undefined ? null : r[k]])));
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
+  // The server's own last look (0059): when the station analysis last ran
+  // unattended, and what it found that is still open.
+  await page.route('**/rest/v1/health_refresh?*', route => route.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify([{ at: new Date(Date.now() - SERVER_AGO).toISOString() }]) }));
+  await page.route('**/rest/v1/health_finding?*', route => route.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify(WORLD ? [
+      { kind: 'silent', subject: 'silent:' + WORLD.roles.silent, station_id: WORLD.roles.silent, severity: 'critical',
+        title: 'Silent — missed its last 4 checks', first_seen: new Date(Date.now() - 3600e3).toISOString() },
+      { kind: 'battery-low', subject: 'battery-low:' + WORLD.roles.fading, station_id: WORLD.roles.fading, severity: 'warn',
+        title: 'Battery low — 12.1 V', first_seen: new Date(Date.now() - 7200e3).toISOString() },
+      { kind: 'receiver-silent', subject: 'receiver-silent:x', station_id: null, severity: 'info', title: 'a session', first_seen: null },
+    ] : []) }));
 }
+let SERVER_AGO = 6 * 60e3;
 
 const until = async (page, fn, arg, timeout = 20_000) => page.waitForFunction(fn, arg, { timeout });
 // The same, for something only this side of the page can see (a route's log).
@@ -248,8 +264,23 @@ try {
   ok('two stations\' frames that only look alike are both kept', gh && gh.lookAlikeKept && gh.lookAlikeGhosts === 0, JSON.stringify(gh));
 
   // ── the tab ────────────────────────────────────────────────────────────────
+  // Every sentence the status line says, kept: what it said while the week was
+  // still arriving is gone by the time the analysis is drawn.
+  await page.evaluate(() => {
+    window.__status = [];
+    window.__statusWatch = new MutationObserver(() => { const el = document.getElementById('hl-status'); if (el) window.__status.push(el.textContent.replace(/\s+/g, ' ')); });
+    window.__statusWatch.observe(document.getElementById('main-content') || document.body, { subtree: true, childList: true, characterData: true });
+  });
   await page.evaluate(() => { try { localStorage.setItem('mn-hl-win', '7d'); } catch (_) {} switchTab('health'); });
   await until(page, () => document.querySelector('.hl-ftable tbody tr') && Health.state().A, null, 60_000);
+  const said = await page.evaluate(() => { window.__statusWatch.disconnect(); return { log: window.__status, now: document.getElementById('hl-status').textContent.replace(/\s+/g, ' ') }; });
+  const silentName = await page.evaluate(id => (state.data.stations.find(s => s.id === id) || {}).name, WORLD.roles.silent);
+  const meanwhile = said.log.find(t => /Meanwhile/.test(t)) || '';
+  ok('while the week arrives, the server\'s last look says what it found — the worst first, notes left out',
+    meanwhile.includes(`Meanwhile, the server's last look (6 min ago): 1 critical, 1 warning — ${silentName}: Silent — missed its last 4 checks;`)
+      && /Battery low — 12\.1 V\./.test(meanwhile) && !/a session/.test(meanwhile), meanwhile || said.log.slice(-3).join(' | '));
+  ok('…and once the tab has worked it out, how fresh the server\'s look is',
+    /The server looks every fifteen minutes too; last 6 min ago\./.test(said.now), said.now);
   const tab = await page.evaluate(() => {
     const st = Health.state();
     return {
@@ -267,6 +298,16 @@ try {
     `${tab.rows} of ${inWin} rows in its window (${WORLD.rows.length} built) in ${pages.length} requests`);
   ok('…and lists what needs attention, worst first', tab.findings >= 5 && /hl-frow--critical/.test(tab.first), JSON.stringify(tab));
   ok('…and maps the stations', tab.markers >= 10, 'markers: ' + tab.markers);
+
+  // A server whose schedule has stopped says so, rather than looking fresh.
+  SERVER_AGO = 3 * 3600e3;
+  await page.evaluate(() => Health.refresh());
+  await until(page, () => /has not looked since/.test(document.getElementById('hl-status').textContent) && !Health.state().loading, null, 60_000)
+    .catch(() => {});
+  const late = await page.evaluate(() => document.getElementById('hl-status').textContent.replace(/\s+/g, ' '));
+  ok('a server that has not looked for three hours is said to have stopped, and what that means',
+    /The server has not looked since .+ — its every-fifteen-minutes check may have stopped, and nothing is being noticed while this tab is closed\./.test(late), late);
+  SERVER_AGO = 6 * 60e3;
 
   // ── the Airtime panel ──────────────────────────────────────────────────────
   // The demo week plants one clash: steady2's check starts 0.9 s after the

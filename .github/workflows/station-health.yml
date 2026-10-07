@@ -1,0 +1,104 @@
+# Station Health with nobody's browser open (#215, 0059): every fifteen
+# minutes, the last week of readings is read from the database and worked out
+# by health-analysis.js — the same file, the same function, the Station Health
+# tab runs — and what it finds wrong now (a station silent past its checks, a
+# repeater or an area gone quiet together, a receiver that stopped delivering,
+# a battery low or not charging) is reported to meganet.report_station_findings(),
+# which opens, updates and clears it in meganet.health_finding.
+# tools/health/report.mjs is the run; docs/station-health.md is the rest.
+#
+# Why a scheduled workflow. The rules are the browser's and must stay one copy,
+# so whatever runs them runs JavaScript; working a week out takes over a second
+# of CPU, which the Worker's cron on the Workers Free plan (10 ms) cannot give;
+# and GitHub already runs things now and then for this repository, as the field
+# photo syncs do. A station is called silent only after two missed checks — two
+# hours at the shortest — so a quarter of an hour, or a schedule running late,
+# is well inside what the finding is about. Base stations, where minutes do
+# matter, are worked out in the database itself (pg_cron, every five minutes).
+#
+# Until the secret exists it does nothing and says so: a notice, not a red run
+# every fifteen minutes. What it needs (Settings → Secrets and variables →
+# Actions → Repository secrets):
+#
+#   SUPABASE_SECRET_KEY    the project's secret key (Supabase → Project Settings → API Keys)
+#                          — the same one the field photo syncs use
+#
+# The secret key is used for one call only: report_station_findings(), which
+# takes nothing but findings and checks their shape. The readings and the
+# register are read with the publishable key, as the page reads them.
+
+name: Station health
+
+on:
+  schedule:
+    - cron: '11-59/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time; a report older than the last one accepted is refused
+# anyway, so a run that waits loses nothing.
+concurrency:
+  group: station-health
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      # The findings' clock times and dates, as a person in Queensland reads them.
+      TZ: Australia/Brisbane
+      LANG: en_AU.UTF-8
+    steps:
+      - name: Is there a key to report with?
+        id: key
+        run: |
+          if [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "::notice::SUPABASE_SECRET_KEY is not set — nothing is reported. docs/station-health.md ('Setting it up') has the steps."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The four files tools/health/report.mjs reads (its FILES), the register's
+      # snapshot it falls back on, and itself — not the whole 357 MB tree.
+      # test/healthreport.mjs holds this list to FILES and SNAPSHOT.
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.ok == 'true'
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /core.js
+            /app.js
+            /sensor-values.js
+            /health-analysis.js
+            /stations.json
+            /tools/health/
+
+      - uses: actions/setup-node@v4
+        if: steps.key.outputs.ok == 'true'
+        with:
+          node-version: '22'
+
+      # The register (870 KB compressed) and the whole week (1.1 MB) are read
+      # once per six-hour slot and kept here; the runs between ask only for the
+      # readings received since. Read whole every fifteen minutes they would be
+      # near 6 GB a month of the database's egress, more than the free plan
+      # allows for everything (tools/health/report.mjs, "the database").
+      - name: Which six hours
+        if: steps.key.outputs.ok == 'true'
+        id: slot
+        run: echo "n=$(( $(date +%s) / 21600 ))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        if: steps.key.outputs.ok == 'true'
+        with:
+          path: .health-cache
+          key: station-health-${{ steps.slot.outputs.n }}
+
+      - name: Work it out, and report it
+        if: steps.key.outputs.ok == 'true'
+        run: node tools/health/report.mjs --cache .health-cache

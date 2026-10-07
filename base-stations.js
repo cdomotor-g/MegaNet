@@ -129,8 +129,19 @@ const BaseStations = (function () {
   // ── what a station's state is ────────────────────────────────────────────
 
   // online · quiet · offline · off · not managed — from when it last checked in,
-  // against how often it says it checks in.
+  // against how often it says it checks in. The database says which since 0059
+  // (meganet.base_station_state(), `state` on each station): the same
+  // definition its health findings are opened on, so this tab and an alert
+  // cannot disagree. Worked out here only from a database without it.
+  const STATES = {
+    unmanaged: { k: 'unmanaged', label: 'not managed', cls: 'txt-muted' },
+    off:       { k: 'off', label: 'turned off on the station', cls: 'txt-muted' },
+    online:    { k: 'online', label: 'online', cls: 'txt-ok' },
+    quiet:     { k: 'quiet', label: 'quiet', cls: 'txt-warn' },
+    offline:   { k: 'offline', label: 'offline', cls: 'txt-bad' },
+  };
   function liveness(s) {
+    if (s.state && STATES[s.state]) return STATES[s.state];
     if (!s.managed) return { k: 'unmanaged', label: 'not managed', cls: 'txt-muted' };
     if (s.mode === 'off') return { k: 'off', label: 'turned off on the station', cls: 'txt-muted' };
     const age = now() - Date.parse(s.last_seen_at);
@@ -155,7 +166,19 @@ const BaseStations = (function () {
     const rx = receiversOf(s).filter(r => r.kind !== 'gps');
     const down = rx.filter(r => r.state !== 'running' && r.state !== 'disabled');
     if (down.length) out.push(['txt-warn', down.length + ' receiver' + (down.length === 1 ? '' : 's') + ' not receiving']);
+    // What only the database can know: a receiver whose count of decoded
+    // frames has not moved for hours, running or not (0059).
+    deafOf(s).forEach(f => out.push([f.severity === 'critical' ? 'txt-bad' : 'txt-warn', deafText(f)]));
     return out;
+  }
+
+  // The open receiver-deaf findings on a station, and one for a receiver.
+  function deafOf(s) { return (s.findings || []).filter(f => f.kind === 'receiver-deaf'); }
+  function deafFor(s, key) { return deafOf(s).find(f => f.rx_key === String(key).slice(-80)) || null; }
+  function deafText(f) {
+    const ev = f.evidence || {};
+    const since = Date.parse(ev.changed_at);
+    return (ev.name || f.rx_key) + ' has decoded nothing for ' + (isFinite(since) ? span((now() - since) / 1000) : 'hours');
   }
 
   // The receivers the station's status names, with the heartbeat's live state
@@ -317,7 +340,7 @@ const BaseStations = (function () {
           <th scope="row">${esc(r.name)} <span class="small qs-dim">${esc(r.kind)}</span></th>
           <td class="small"><span class="${r.state === 'running' ? 'txt-ok' : r.state === 'unplugged' || r.state === 'error' ? 'txt-bad' : 'txt-warn'}">${esc(r.state === 'running' ? 'receiving' : r.state)}</span>${r.error ? `<div class="txt-warn">${esc(r.error)}</div>` : ''}</td>
           <td class="small">${esc(rxDetail(r)) || '—'}</td>
-          <td class="small">${r.decoded != null ? esc(r.decoded) + ' decoded' : ''}${r.dataAgoS != null ? `<div class="qs-dim">data ${esc(span(r.dataAgoS).replace(/^0 min$/, 'just now'))}</div>` : ''}</td>
+          <td class="small">${r.decoded != null ? esc(r.decoded) + ' decoded' : ''}${r.dataAgoS != null ? `<div class="qs-dim">data ${esc(span(r.dataAgoS).replace(/^0 min$/, 'just now'))}</div>` : ''}${deafFor(s, r.key) ? `<div class="${deafFor(s, r.key).severity === 'critical' ? 'txt-bad' : 'txt-warn'}">nothing new for ${esc(span((now() - Date.parse((deafFor(s, r.key).evidence || {}).changed_at)) / 1000))}</div>` : ''}</td>
           <td class="adm-row-acts">${!ask ? '' : r.state === 'unplugged'
             ? askBtn('device.forget', { key: r.key }, 'Remove ' + r.name + '? The station forgets it — its name, its own settings and its Flood-Net receiver id.', 'Remove…', 'exp-btn-sm adm-danger', 'Remove ' + r.name)
             : askBtn('device.restart', { key: r.key }, null, 'Restart', 'exp-btn-sm', 'Restart ' + r.name)}</td>

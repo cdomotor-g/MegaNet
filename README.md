@@ -286,6 +286,7 @@ MegaNet/
 │   ├── proposed.mjs         (proposed stations: + Propose, the pin and card, who may establish)
 │   ├── stationhistory.mjs   (the station card's History and the Admin tab's Deleted stations: who changed what, Restore)
 │   ├── basestations.mjs     (the Base Stations tab: the list, a station's panel, what each button sends)
+│   ├── healthreport.mjs     (Station Health run unattended: the browser's analysis over the demo week, reported as the database takes it)
 │   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
 │   ├── syntax-check.mjs     (node --check over every script index.html loads)
@@ -302,6 +303,8 @@ MegaNet/
 │   ├── check_flood_peaks_from.sql (psql: prove a station taking its flood history from another (0041) — 23 checks, rolls back)
 │   ├── check_station_history.sql (psql: prove the station history, who it names and the way back (0056) — 50 checks, rolls back)
 │   ├── check_base_stations.sql (psql: prove base stations checking in, being asked, and the team keys (0049) — 48 checks, rolls back)
+│   ├── check_health_findings.sql (psql: prove the health findings kept between visits — base stations, receivers, station reports (0059) — 39 checks, rolls back)
+│   ├── health/report.mjs    (Station Health's own health-analysis.js, run every fifteen minutes by station-health.yml, its findings reported to the database)
 │   ├── field-photos/        (the Dropbox and Google Drive → Flood-Net photo sync, run by field-photos-dropbox.yml and field-photos-gdrive.yml)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
@@ -750,6 +753,12 @@ to change — the nearest clear check time for one of two stations that keep
 meeting, said for that kind of logger, and the repeater pairs to give different
 delays — with the hour folded to show the busy minutes. Together means within
 3 s, the resolution a base station's decode-time stamps have.
+The same analysis also runs every fifteen minutes with nobody's browser open,
+and the database keeps what it finds wrong now — a station silent, a repeater
+or an area gone quiet, a battery low — while it works out for itself which
+base stations have stopped checking in and which receivers run but have decoded
+nothing for hours (#215); the tab shows the server's last look while its own
+week loads.
 [`docs/station-health.md`](docs/station-health.md) lists every finding, what
 triggers it and what to do. Each page links to the
 other per reading. The log is its rows, so it gets most of a screen: a

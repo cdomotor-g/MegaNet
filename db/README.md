@@ -206,6 +206,7 @@ its cache at all (`PGRST002`).
 | `meganet.admin_ingest_tokens()`, `meganet.admin_create_ingest_token(text, text)`, `meganet.admin_revoke_ingest_token(bigint)` | The Admin tab's **Ingest tokens** panel (`0046`): list every token (never its hash) with the receivers behind it, mint one through `create_ingest_token()` (shown once; a label unique among live tokens), revoke one (immediate; nothing un-revokes). **Administrators only** (`admin_require()`); granted to `authenticated`, not `anon`. |
 | `meganet.ingest_token_request`, `meganet.request_ingest_token(jsonb)`, `meganet.ingest_token_request_status(jsonb)`, `meganet.withdraw_ingest_token_request(jsonb)`, `meganet.admin_ingest_token_requests()`, `meganet.admin_approve_ingest_token_request(bigint, text, text, bigint)`, `meganet.admin_deny_ingest_token_request(bigint)` | **A base station asking for its token** (`0048`), the device grant of RFC 8628: the device makes its own `mgn_` token, asks with it in `X-Ingest-Token`, and shows an eight-consonant code; an administrator approves it on the Admin tab, and the device's own hash becomes an `ingest_token` — nothing to collect afterwards. The table has RLS on, no policy and no grant; only the hash is kept. The device's three functions are `anon` (30 minutes a request, at most 20 waiting, `PT429` beyond); the three `admin_*` are **administrators only**. Approving can replace a live token of the same label in the same step. See **HTTP ingest → A base station that asks for its token**. |
 | `meganet.base_station`, `meganet.base_station_command`, `meganet.base_station_key`, `meganet.base_station_checkin(jsonb)`, `meganet.base_station_keys(jsonb)`, `meganet.admin_base_stations()`, `meganet.admin_base_station(bigint)`, `meganet.admin_base_station_command(bigint, text, jsonb)`, `meganet.admin_base_station_cancel(bigint)`, `meganet.admin_base_station_watch(bigint, boolean)`, `meganet.admin_base_station_keys()`, `meganet.admin_base_station_key_add(text, text)`, `meganet.admin_base_station_key_remove(bigint)` | **The Base Stations tab** (`0049`): a base station checks in about once a minute with its token (`base_station_checkin()`, `anon`, token-checked) — a heartbeat every time, its whole status when it changed — and collects what an administrator asked of it: one of a fixed list of requests (`base_station_verb_check()`), handed over once, expired after ten minutes, at most 20 waiting (`PT429`). `config.set` can never reach the token, where readings go, the station's web password or its own remote settings. The station says whether it manages, only reports or is off, and nothing here can change that. `base_station_key` is the team's SSH **public** keys, served to a station holding a live token (`base_station_keys()`) and installed only if its owner allows it. All three tables have RLS on, no policy and no grant; the eight `admin_*` functions are **administrators only**. See **Base stations checking in**. |
+| `meganet.health_finding`, `meganet.health_refresh`, `meganet.health_receiver`, `meganet.base_station_state(text, integer, timestamptz, timestamptz)`, `meganet.refresh_base_station_findings(timestamptz)`, `meganet.report_station_findings(jsonb)` | **The network's health with nobody's browser open** (`0059`, #215): one row per finding — `first_seen`, `last_seen`, `cleared_at`, at most one open per (source, kind, subject). `source` `stations` is what Station Health's own `health-analysis.js` finds, run every fifteen minutes by `.github/workflows/station-health.yml` and reported through `report_station_findings()` (**the secret key only**; refuses a report older than the last, clears only on a complete one); `base-stations` is `refresh_base_station_findings()` — a base station quiet or offline by `base_station_state()`, a receiver whose decode count has not moved for 6 h (SDR, ERT-A2) or 12 h — on `pg_cron` every five minutes, `health_receiver` its memory of each count. **Station findings are public**, like the readings they come from; **base station findings are administrators only** (a policy); `health_refresh` (when each run last happened) is public; `health_receiver` has RLS on, no policy and no grant. `base_station_row()` now carries each station's `state` and open findings. See **Health findings**. |
 | `meganet.reception`, `meganet.report_receptions(jsonb)`, `meganet.reception_window(timestamptz, timestamptz, int)` | Every frame a Serial Monitor receiver heard, good or bad, with level and position (`0047`) — the Reception Map's raw material, kept because deduplicated readings throw away the corrupted copies that find a bad repeater. Posted token-checked (≤ 1,000 a batch, each row on its own, a retry stored once); **only a `gps` position stored as exact**; **editors only** to read. See `docs/reception-map.md`. |
 | `meganet.survey_list()`, `meganet.survey_receptions(text, int)`, `meganet.survey_summary(text, int)` | **Site surveys** (`0051`): receptions an RPi ALERT base station left at a candidate site sent with `{ survey, survey_name }` in their detail (indexed, `reception_survey_idx`). The list; one survey's receptions in `reception_window()`'s shape; and each address it heard beside what `meganet.reading` stored over the same days — transmissions sent while it listened, how many it heard, how many it heard that the network did not. **Editors only**. See `docs/reception-map.md`. |
 | `meganet.report_ingest_point(jsonb)` | The door to the above (`0045`), token-checked like `bridge_heartbeat()`: `PT401` without a live token, `22023` naming the field for a bad report. Granted to `anon` because the token, not the role, authorises it. |
@@ -903,6 +904,51 @@ psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_base_stations.sql
 48 checks in a transaction that rolls back. What the tab shows, and the protocol
 for whoever writes a base station's software, are
 [`docs/base-stations.md`](../docs/base-stations.md).
+
+### Health findings
+
+`0059_health_findings.sql`, #215. Station Health and the Base Stations tab said
+what was wrong only while somebody had them open, so nothing could tell anybody
+(#216). Now the database keeps findings between visits, from two runs, each
+where its one definition lives:
+
+- **Stations** (`source = 'stations'`): `.github/workflows/station-health.yml`
+  runs `tools/health/report.mjs` every fifteen minutes — the browser's own
+  `health-analysis.js`, loaded in Node, over the last week of readings and the
+  register, both read with the publishable key. It reports the findings about a
+  present condition (silent, repeater-down, area-silence, receiver-silent,
+  battery-critical, battery-low, battery-no-charge) to
+  `report_station_findings()`, the one call it makes with the secret key. The
+  function checks only the shape — a kind, a subject (the analysis' own finding
+  id), a severity, a title, evidence under 8 KB — and keeps the record: opens
+  what is new, updates what holds, clears what a **complete** report no longer
+  names (a capped read clears nothing), and refuses a report older than the last
+  accepted. Rules were not ported to SQL: a port was measured against the
+  browser on the live week and disagreed where the subtleties decide.
+- **Base stations** (`source = 'base-stations'`): `refresh_base_station_findings()`
+  on `pg_cron` every five minutes (`meganet-base-station-health`, scheduled by
+  the migration where the server has `pg_cron`). A station quiet (warning) or
+  offline (critical) by `base_station_state()` — the one definition, which
+  `base_station_row()` now hands the Base Stations tab as `state` — and a
+  receiver whose decode count has not moved for 6 hours (SDR, ERT-A2) or 12
+  (anything else), critical at a day. `health_receiver` remembers each count and
+  when it last moved; a receiver on a station that is away is held, not judged.
+
+Every run answers which findings opened, got worse and cleared, and records
+itself in `health_refresh`. Cleared rows are kept 90 days.
+
+**Who reads it:** station findings, and when each run last happened, are public
+— the readings they come from are. Base station findings are administrators
+only (`health_finding_read_admins`), as the base stations are. Nothing a browser
+holds can write either table or run either function.
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_health_findings.sql
+```
+
+39 checks in a transaction that rolls back. What a person does once — apply the
+migration, give the workflow the secret key — is in
+[`docs/station-health.md`](../docs/station-health.md#setting-it-up).
 
 ## MQTT ingest
 

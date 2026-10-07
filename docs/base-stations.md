@@ -99,13 +99,45 @@ A station that posts readings but whose software does not check in is listed as
 | **not managed** | it has never checked in |
 
 Ages are worked out on the database's clock, which every answer carries, so a
-laptop whose clock is five minutes out does not call every station quiet.
+laptop whose clock is five minutes out does not call every station quiet. Since
+`0059` the database says which state a station is in
+(`meganet.base_station_state()`), and the tab shows that — the same definition
+its findings below are opened on, so the tab and an alert cannot disagree.
 
 **Needs a look** says, worst first: a refused token, under-voltage now or since
 boot (a weak supply drops USB receivers), a temperature of 65 °C or more (75 is
 red), throttling, a clock not set yet (readings are held until it is), under
-500 MB of disk, over 500 readings waiting to be sent, and receivers that are not
-receiving.
+500 MB of disk, over 500 readings waiting to be sent, receivers that are not
+receiving, and a receiver that has **decoded nothing for hours** — which the
+receiver's own row says too, beside its count.
+
+## Noticed with the tab closed
+
+Every five minutes the database works out, by itself (`pg_cron`,
+`meganet.refresh_base_station_findings()`, `0059`):
+
+- **A base station not heard from** — quiet is a warning, offline is critical,
+  by the states above. A station turned off on the station is not a fault, and
+  a revoked token is forgotten.
+- **A receiver that runs and hears nothing.** A heartbeat carries each
+  receiver's count of decoded frames but not when the last one was — an SDR's
+  "seconds since data" is empty — so a stick running with its antenna off passed
+  every test there was. The database now remembers each count and when it last
+  moved: an SDR or an ERT-A2 whose count has not moved for **6 hours** is a
+  warning (a busy channel decodes something every few minutes), any other
+  receiver after 12, and a day is critical. A restart resets the count, which
+  counts as a move. A GPS, and a receiver set aside on the station, are not
+  judged; one the station stops naming is forgotten.
+
+Each is a row in `meganet.health_finding` that opens on the run it is first
+true, is kept up to date while it stays true, and clears on the run it stops —
+what #216's alerts act on. While a base station is away, nothing new is known
+about its receivers: what was found about them stands, and nothing is added.
+These findings are about equipment only administrators see, so only
+administrators can read them.
+
+`tools/check_health_findings.sql` proves each — opening, getting worse, held,
+cleared — against Postgres.
 
 ## The team SSH keys
 

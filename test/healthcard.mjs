@@ -31,7 +31,11 @@
 //   5. **No data, honestly** — a datastore that refuses this browser, and one
 //      that cannot be reached: the card says which and offers Try again, every
 //      pin is hollow, nothing says OK.
-//   6. **A phone** — the card's health lines inside a 375 px screen.
+//   6. **The server's findings** (#215, 0059) — while the server's last run is
+//      fresh, the card and the pins take what it keeps: its silence in place
+//      of the card's own, the kinds it keeps from it, the rest worked out
+//      here; stale, the card's own rules again.
+//   7. **A phone** — the card's health lines inside a 375 px screen.
 //
 // Why a check of its own: every failure here is a page that looks right. A pin
 // coloured green for want of an answer, a card that asks the datastore on every
@@ -533,6 +537,80 @@ try {
       && (state.mapMarkers.find(x => x.mnStationId === id) || {}).mnHealth === 'fault', R.silent);
     check('…and ↻ Ask again in the note asks the network once more, and the pins follow', followed && count('network') === 2, `${count('network')}`);
     await ctx.close();
+  }
+
+  // ── 6b. The server's look (0059) ──────────────────────────────────────
+  // What the server keeps (#215), stood in for: when its station analysis last
+  // ran, and its open findings. While it is fresh it is the one home for
+  // silence, and the kinds it keeps come from it; stale, the card's own rules.
+  log('\n6b. The server\'s findings, fresh and stale\n');
+  {
+    const SERVER = {
+      [R.silent]: [{ kind: 'silent', subject: 'silent:' + R.silent, station_id: R.silent, severity: 'critical',
+        title: 'Silent — missed its last 12 checks', detail: 'Checks every 3 h; nothing heard since …, while the receivers that hear it kept delivering other traffic.',
+        evidence: { action: 'Check power and radio at the station.', since: new Date(Date.now() - 36 * 3600e3).toISOString(), category: 'comms' },
+        first_seen: new Date(Date.now() - 30 * 3600e3).toISOString() }],
+      [R.steady]: [{ kind: 'battery-low', subject: 'battery-low:' + R.steady, station_id: R.steady, severity: 'warn',
+        title: 'Battery low — 12.1 V', detail: 'Its night lows sit under 12.2 V.', evidence: { category: 'power' },
+        first_seen: new Date(Date.now() - 3600e3).toISOString() }],
+    };
+    const serverAsked = [];
+    const withServer = async (ctx, ranAgo) => {
+      const p = await open(ctx);
+      await p.route('**://*.supabase.co/rest/v1/**', route => {
+        const u = new URL(route.request().url());
+        const rel = u.pathname.replace(/^.*\/rest\/v1\//, '');
+        if (rel === 'health_refresh') return route.fulfill({ status: 200, contentType: 'application/json',
+          body: J([{ at: new Date(Date.now() - ranAgo).toISOString() }]) });
+        if (rel !== 'health_finding') return route.fallback();
+        serverAsked.push(decodeURIComponent(u.search));
+        const one = (u.searchParams.get('station_id') || '').replace(/^eq\./, '');
+        const all = Object.values(SERVER).flat();
+        return route.fulfill({ status: 200, contentType: 'application/json',
+          body: J(u.searchParams.get('station_id') === 'not.is.null' ? all.map(f => ({ station_id: f.station_id, severity: f.severity })) : (SERVER[one] || [])) });
+      });
+      return p;
+    };
+
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'Australia/Brisbane' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('mn-map-health', 'on'); localStorage.setItem('mn-tab', 'stations'); } catch (_) {} });
+    const p = await withServer(ctx, 5 * 60e3);
+    asked = [];
+    await loaded(p, '/index.html?tab=stations');
+    await toStations(p);
+    const pins = await waitTrue(p, () => HealthGlance._state().net.status === 'ok' && state.mapMarkers.every(m => m.mnHealth));
+    const pin = await p.evaluate(ids => Object.fromEntries(ids.map(id => [id, (state.mapMarkers.find(x => x.mnStationId === id) || {}).mnHealth])),
+      [R.silent, R.steady]);
+    check('the pins take the server\'s findings in the same one request a load: its battery warning makes a quiet-free station a watch',
+      pins && pin[R.steady] === 'watch' && pin[R.silent] === 'fault' && serverAsked.filter(q => /station_id=not\.is\.null/.test(q)).length === 1, J(pin));
+
+    const silent2 = await card(p, R.silent);
+    check('a fresh server is the one home for silence: the card shows its finding, not one of its own, and says whose look it is',
+      /Fault/.test(silent2.badge || '') && /Silent — missed its last 12 checks/.test(silent2.findings || '') && !/Quiet for/.test(silent2.text)
+        && silent2.cls === 'fault' && /as the server last worked it out over every receiver’s week — 5 min ago/.test(silent2.text),
+      J({ badge: silent2.badge, findings: silent2.findings, text: silent2.text.slice(-220) }));
+    const steady2 = await card(p, R.steady);
+    check('…the kinds it keeps come from it — a battery warning the card\'s own week did not find',
+      /Watch/.test(steady2.badge || '') && /Battery low — 12\.1 V/.test(steady2.findings || '') && steady2.cls === 'watch',
+      J({ badge: steady2.badge, findings: steady2.findings }));
+    const falling2 = await card(p, R.falling);
+    check('…and the kinds it does not keep are still worked out here', falling2.items.some(t => /Battery falling/.test(t))
+      && !falling2.items.some(t => /Battery low/.test(t)), J(falling2.items));
+    check('…one small request a card for the station\'s own findings', serverAsked.filter(q => /station_id=eq\./.test(q)).length === 3,
+      J(serverAsked));
+    await ctx.close();
+
+    // A server that has not run for two hours is not the one home for anything.
+    const ctx2 = await browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'Australia/Brisbane' });
+    const p2 = await withServer(ctx2, 2 * 3600e3);
+    serverAsked.length = 0;
+    await loaded(p2, '/index.html?tab=stations');
+    await toStations(p2);
+    const stale = await card(p2, R.silent);
+    check('a stale server: the card\'s own rules again — its quiet line, and the receivers Station Health\'s to weigh — and its findings not asked for',
+      /Quiet for/.test(stale.findings || '') && /Station Health’s to weigh/.test(stale.text) && stale.cls === 'fault' && serverAsked.length === 0,
+      J({ findings: stale.findings, asked: serverAsked }));
+    await ctx2.close();
   }
 
   // ── 7. A phone ────────────────────────────────────────────────────────

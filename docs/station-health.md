@@ -331,11 +331,83 @@ On the map bigger is worse, as on this tab's map, and the ring says it again —
 dashed and black to watch, heavy and black at fault, hollow and dotted for no
 data — so the class never rests on colour alone.
 
-When the server works findings out itself (#215), the card and the pins read its
-open findings instead: `SOURCE.station` and `SOURCE.network` in
-`health-glance.js` (its header says how) are the whole of that swap, with the quiet rule
-(`quietFinding`) giving way to the server's own *silent past its interval*.
+**The server's findings, where it has them** (#215, [below](#with-the-tab-closed)).
+While the server's last run is fresh — within three quarters of an hour — the
+card and the pins take what it keeps: the card asks for the station's open
+findings beside its readings, and the pins' one request a load brings the worst
+per station. For a station heard within the week the server reads, its silence
+is the server's verdict alone — worked out over every receiver, with whether they
+were listening — and *Quiet for …* and the assumed three hours stand down. The
+kinds the server keeps (silent, a battery low, critical or not charging, and the
+network's) come from it; the rest (a battery falling, a blocked gauge …) are still
+worked out on the card. A station last heard before that week, or a server that
+has not looked lately, gets the card's own rules as above.
 `npm run healthcard` holds all of it.
+
+## With the tab closed
+
+The tab works its findings out when somebody opens it. Since `0059` (#215) the
+same findings are also worked out **every fifteen minutes with nobody's browser
+open**, and kept by the database, so that something can tell people (#216) and
+the agent API can say which stations are silent (#230).
+
+**The same rules, not a copy of them.** `.github/workflows/station-health.yml`
+runs `tools/health/report.mjs`, which reads the last week of readings and the
+register exactly as this tab does and runs this tab's own `health-analysis.js`
+over them — the file itself, loaded in Node, not a port. A SQL version was built
+and measured against it on the live week first: it disagreed exactly where the
+subtleties decide (an address several stations share, a ghost that makes a
+silent station look alive, misses counted from before a receiver died), so the
+rules stay in one file and run in two places.
+
+**What it costs.** The register and the whole week are read once every six
+hours and kept in the workflow's cache; the runs between ask only for the
+readings received since — a few hundred rows, two seconds. Read whole every
+fifteen minutes they would have been near 6 GB a month of the database's
+egress, more than the free plan allows for everything together.
+
+**What is kept.** The findings about a present condition — *silent*, a repeater
+or an area whose stations went quiet together, a receiver that stopped
+delivering, a battery low, critical or not charging — at the severity the
+analysis gave, in `meganet.health_finding`: one row each, with when it was first
+seen, when last, and when it cleared. They are public, like the readings they
+come from. History (a spell that came back) and slow diagnosis (a marginal path)
+stay on the tab.
+
+**What the tab shows of it.** While the week is still arriving, the status line
+gives the server's last look — what it found, worst first. Once the tab has
+worked it out, the line says how long ago the server last looked, and if that is
+more than three quarters of an hour, that its schedule may have stopped and
+nothing is being noticed while the tab is closed.
+
+Base stations are watched with the tab closed too, by the database itself every
+five minutes — [docs/base-stations.md](base-stations.md#noticed-with-the-tab-closed).
+
+### Setting it up
+
+Two things, once, both needing a person:
+
+1. **Apply `db/migrations/0059_health_findings.sql`** to the live database, in
+   number order after `0053`–`0058` (#210 has the queue and the steps). It
+   switches on `pg_cron` for the base station checks.
+2. **Give the workflow the project's secret key**, unless the field photo syncs
+   already have it:
+   1. Supabase dashboard → the project (ref `jjprlritvhdqpvphfrnu`) → **Project Settings** →
+      **API Keys** → under **Secret keys**, copy the key (or **Create new secret
+      key**, named `github-actions`).
+   2. GitHub → this repository → **Settings** → **Secrets and variables** →
+      **Actions** → **New repository secret**. Name `SUPABASE_SECRET_KEY`, value
+      the key → **Add secret**.
+
+Then check it: GitHub → **Actions** → **Station health** → **Run workflow**.
+The run's log ends `Reported: N open — …`, and
+`select * from meganet.health_refresh` shows a `stations` row from a minute ago.
+Until the secret is there, every run says so in a notice and does nothing else.
+
+`npm run healthreport` holds the run to the demo week: what it reports is exactly
+this tab's findings of those kinds, the planted silent station among them.
+`tools/check_health_findings.sql` holds the database to what it does with a
+report.
 
 ## Limits
 
