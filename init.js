@@ -96,15 +96,16 @@
     if (!state.navCollapsed) setNavCollapsed(true);
     if (drawer)              dockDrawerClose();
   });
-  // Ctrl/Cmd+K — jump to a tab without going to the nav to find it (#108).
-  // Registered here rather than on the nav because the whole value of it is that
-  // it works from wherever you are, including with the rail collapsed and on a
-  // phone where the nav is not on screen at all. preventDefault() because
-  // Firefox gives the same chord to its search bar.
+  // Ctrl/Cmd+K — one box for a station, a place, a tab or an action, from
+  // wherever you are (palette.js, #221; it was the nav's find box, #108, which
+  // the rail's 🔎 still opens). Registered here rather than on any one surface
+  // because the whole value of it is that it works from everywhere, including
+  // with the rail collapsed and on a phone where the nav is not on screen at
+  // all. preventDefault() because Firefox gives the same chord to its search bar.
   document.addEventListener('keydown', e => {
     if ((e.key !== 'k' && e.key !== 'K') || !(e.ctrlKey || e.metaKey) || e.altKey) return;
     e.preventDefault();
-    focusNavFind();
+    Palette.open();
   });
   // A coordinate pair pasted into any latitude or longitude box splits across
   // both (places.js).

@@ -7411,6 +7411,49 @@ hr {
 
 #tab-nav .tab-btn.active .nav-enter { color: inherit; }
 
+/* Ctrl/Cmd+K (palette.js, #221): the box, then the four groups. The option
+   Enter would open is marked the way the nav marks its ↵ — the subtle fill and
+   a border — and says ↵ too, so the mark is never colour alone. */
+.pal-q {
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-md);
+}
+.pal-list { margin-top: var(--sp-2); max-height: min(60vh, 28rem); overflow-y: auto; overscroll-behavior: contain; }
+.pal-group + .pal-group { margin-top: var(--sp-2); }
+.pal-group-title {
+  margin: 0 0 var(--sp-1);
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pal-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.pal-opt.is-active { background: var(--subtle); border-color: var(--border); }
+.pal-ico { flex: none; width: 1.4em; text-align: center; }
+.pal-text { display: flex; flex-direction: column; min-width: 0; }
+.pal-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-sub { font-size: var(--fs-xs); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-enter { margin-left: auto; padding-left: var(--sp-2); font-size: var(--fs-xs); color: var(--muted); }
+.pal-none { margin: var(--sp-3) var(--sp-2); }
+.pal-count, .pal-hint { margin: var(--sp-2) var(--sp-2) 0; }
+.pal-count:empty { display: none; }
+
 .nav-heading {
   margin: 0 0 .25rem;
   padding: 0 .45rem;

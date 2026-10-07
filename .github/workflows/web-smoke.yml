@@ -584,6 +584,15 @@ jobs:
         working-directory: test
         run: npm run links
 
+      # Ctrl/Cmd+K and 🔎 Search (palette.js, #221): a station, a place, a tab
+      # or an action from any tab. A station ranked below its namesakes, an
+      # arrow key that moves the highlight but not what Enter opens, a pick
+      # that leaves two history steps, a place typed into a box that is not
+      # there: none of them throws.
+      - name: The palette — Ctrl+K finds a station, a place, a tab or an action
+        working-directory: test
+        run: npm run palette
+
       # Proposed stations (0039) in the editor, on the card and on the map,
       # against a stand-in for save_station() that holds the database's rules
       # (tools/check_proposed_stations.sql holds the real one to them): a

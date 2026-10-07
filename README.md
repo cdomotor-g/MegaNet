@@ -2710,10 +2710,20 @@ and the ticks that scope an export live on the Export tab's own rail. `networks`
 as a *word* survives as a find term on Stations and Export, which is where the
 answer now is.
 
-#### Find a tab
+#### Find a tab — and Search
 Nineteen tabs is past the size where a column of labels is something you scan, so
-the nav carries a find box — **Ctrl/Cmd+K** from anywhere, or 🔎 on the collapsed
-rail, both of which open the nav with the cursor already in it.
+the nav carries a find box — 🔎 on the collapsed rail opens the nav with the cursor
+already in it.
+
+**Ctrl/Cmd+K** from anywhere — or 🔎 **Search** in the banner — opens one box for
+everything (`palette.js`, #221): **stations** by name, station number, ALERT
+address or address window (the Stations filter's own matching, Ck/Creek and all),
+**places** handed to 📍 Find a place (a coordinate, a town, a river, a catchment,
+a council), **tabs** by the nav's own scoring below, and a few **actions** (the
+Site Map, help for this tab, a link to where you are, a file, an export, the
+theme, a bug report). With nothing typed it offers the stations looked at this
+session. Enter opens a station through `goToStation()` — one step in the
+browser's history, its card up and the map on it.
 
 - It matches the **label, the group heading and the tab's `find` words**, so
   "packet decoder", "com port", "contrail" and "pdf" all land where the label

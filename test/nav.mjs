@@ -283,20 +283,30 @@ try {
   check('the find box is off the rail, and its button is on it',
     rail.searchHidden && rail.findBtn);
 
-  // Ctrl+K is the whole reason the box is worth having from a tab rather than
-  // from the nav, and it is registered on the document in init.js — nothing else
-  // here would notice if that listener stopped being added.
-  const chord = await page.evaluate(async () => {
+  // The rail's 🔎 is the way back to the box from the rail. Ctrl+K used to be
+  // too; it opens the palette now (palette.js, #221, held by `npm run palette`),
+  // and it is registered on the document in init.js — nothing else here would
+  // notice if that listener stopped being added.
+  const railFind = await page.evaluate(async () => {
     setNavCollapsed(true);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+    document.querySelector('#tab-nav .nav-find-btn').click();
     await new Promise(r => setTimeout(r, 50));
     return {
       open: !state.navCollapsed,
       focused: document.activeElement === document.getElementById('nav-search'),
     };
   });
-  check('Ctrl+K opens the nav from the rail', chord.open);
-  check('and puts the cursor in the find box', chord.focused);
+  check('the rail\'s 🔎 opens the nav', railFind.open);
+  check('and puts the cursor in the find box', railFind.focused);
+  const chord = await page.evaluate(async () => {
+    setNavCollapsed(true);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    const out = { palette: document.activeElement === document.getElementById('pal-q') };
+    Modal.close();
+    return out;
+  });
+  check('Ctrl+K opens the palette, the cursor in its box', chord.palette);
 
   // ── The site map ──────────────────────────────────────────────────────────
   // The nav's guide, so it is held here: a card for every tab the nav lists,

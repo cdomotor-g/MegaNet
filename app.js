@@ -1547,7 +1547,7 @@ function renderTabs() {
                spellcheck="false" aria-label="Find a tab" placeholder="Find a tab…"
                value="${escAttr(state.navQuery)}"
                oninput="navFind(this.value)" onkeydown="navFindKey(event)">
-        <button class="nav-find-btn" onclick="focusNavFind()" title="Find a tab (Ctrl+K)">
+        <button class="nav-find-btn" onclick="focusNavFind()" title="Find a tab">
           <span class="nav-icon" aria-hidden="true">🔎</span>
           <span class="nav-label">Find a tab</span>
         </button>
@@ -1596,8 +1596,9 @@ function navFindKey(e) {
   }
 }
 
-// Ctrl/Cmd+K from anywhere, and the rail's 🔎 button. Opening the nav first is
-// the point on the rail and on a phone: there is no box to type in until it is.
+// The rail's 🔎 button (Ctrl/Cmd+K opens the palette now — palette.js). Opening
+// the nav first is the point on the rail and on a phone: there is no box to type
+// in until it is.
 function focusNavFind() {
   if (state.navCollapsed) setNavCollapsed(false);
   const el = document.getElementById('nav-search');

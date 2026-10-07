@@ -69,6 +69,12 @@
       <input type="file" id="file-input" accept=".json" style="display:none" onchange="onFileLoad(this)">
       <!-- Sign-in is only needed to edit; the label becomes the signed-in
            person's name once there is one (Auth.syncHeader). -->
+      <!-- One box for a station, a place, a tab or an action (palette.js); the
+           same as Ctrl/Cmd+K, for anybody who has not met the chord. -->
+      <button id="btn-palette" class="hdr-btn" onclick="Palette.open()"
+              title="Search for a station, a place, a tab or an action (Ctrl+K)">
+        <span class="hdr-ico" aria-hidden="true">🔎</span><span class="hdr-label">Search</span>
+      </button>
       <button id="btn-auth" class="hdr-btn" onclick="Auth.open()" title="Sign in to edit stations">
         <span class="hdr-ico" aria-hidden="true">🔑</span><span class="hdr-label">Sign in</span>
       </button>
@@ -546,6 +552,11 @@
        and core.js (TABS, HELP), which it reads at call time; nothing runs at
        load. -->
   <script src="site-map.js?v=20261007g"></script>
+  <!-- Ctrl/Cmd+K and 🔎 Search in the banner: one box for a station, a place,
+       a tab or an action (#221). After app.js (the station search and the nav's
+       scoring), modal.js, places.js and station-trail.js, which it reads at
+       call time; nothing runs at load — init.js's chord opens it. -->
+  <script src="palette.js?v=20261007g"></script>
   <!-- Where you are, in the address bar: the tab, the station whose card is
        up and the Stations map's view, so a view can be linked to and back and
        forward move between tabs (#211). After app.js (switchTab,
