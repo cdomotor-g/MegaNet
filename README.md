@@ -121,6 +121,9 @@ MegaNet/
 │                             the library) and the carousel every door opens
 ├── photo-review.js         ← PhotoReview — the tab's Review panel, equipment
 │                             suggestions, the station card's Equipment section
+├── station-history.js      ← StationHistory — the station card's History: who
+│                             changed what and when, a field or a version put
+│                             back; the Admin tab's Deleted stations, restored
 ├── site-exposure.js        ← SiteExposure — the station card's tides and soils:
 │                             tidal water, Water Act limits, coastal hazard areas,
 │                             acid sulfate soils, from the State's map services
@@ -268,6 +271,7 @@ MegaNet/
 │   ├── twinpin.mjs          (move pin in the twin's tab, the map's twin and ⛰️ 3-D)
 │   ├── trail.mjs            (the stations looked at: the pill, its list, a pick, the twin, a phone)
 │   ├── proposed.mjs         (proposed stations: + Propose, the pin and card, who may establish)
+│   ├── stationhistory.mjs   (the station card's History and the Admin tab's Deleted stations: who changed what, Restore)
 │   ├── basestations.mjs     (the Base Stations tab: the list, a station's panel, what each button sends)
 │   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
@@ -283,6 +287,7 @@ MegaNet/
 │   ├── check_proposed_stations.sql (psql: prove proposed stations and who may add or establish one (0039) — 40 checks, rolls back)
 │   ├── check_tower_height.sql (psql: prove a tower's platform height, 3.0 or 4.5 m, and who may record it (0040) — 18 checks, rolls back)
 │   ├── check_flood_peaks_from.sql (psql: prove a station taking its flood history from another (0041) — 23 checks, rolls back)
+│   ├── check_station_history.sql (psql: prove the station history, who it names and the way back (0056) — 50 checks, rolls back)
 │   ├── check_base_stations.sql (psql: prove base stations checking in, being asked, and the team keys (0049) — 48 checks, rolls back)
 │   ├── field-photos/        (the Dropbox and Google Drive → Flood-Net photo sync, run by field-photos-dropbox.yml and field-photos-gdrive.yml)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
@@ -377,7 +382,15 @@ it:
   somebody's afternoon.
 * **Delete is recoverable.** It is a soft delete: the station leaves the list,
   and the record — with its sensors, repeater and pass ranges — stays in the
-  database until somebody with SQL access says otherwise.
+  database. An editor puts it back with **Restore** on the Admin tab's
+  **Deleted stations**, through the same save and the same checks as an edit
+  (`0056`).
+* **Every change is kept.** The station card's **History** section, for an
+  editor, lists who changed the station, when and what — each field as it was
+  and as it became, newest first — and puts back one field, or the whole
+  station as it was before a change, through the editor's own save. The
+  station's own fields are recorded; its sensors, repeater ranges and the
+  Bureau's lists are not yet. See `db/README.md`, *Station history*.
 * **Saving needs a signed-in session.** The database refuses anonymous writes.
   Signed out, the editor still opens and still shows everything — the Save button
   reads **Sign in to save** and opens the sign-in panel rather than failing at the

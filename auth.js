@@ -9,7 +9,8 @@
 // across to app.js for setHeaderLabel and rerenderStationEditorCard; to
 // field-photos.js for FieldPhotos.authChanged, because every photo it holds was
 // fetched for one session (0035 makes them editors-only); to admin.js for
-// Admin.authChanged (0042, administrators only); and to
+// Admin.authChanged (0042, administrators only); to station-history.js for
+// StationHistory.authChanged (0056, editors only); and to
 // datastore.js for dbSetAccessToken. datastore.js and station-editor.js call
 // back into Auth, so this is a cycle — which is fine in one shared global scope
 // and would not be under ESM, one of the four reasons #129 gives for classic
@@ -490,13 +491,15 @@ const Auth = (function () {
   // map were holding was fetched for the session that just ended or began.
   // The Admin tab (admin.js) is administrators-only (0042), and redraws its
   // users and allowlist — or its "sign in" — for the same reason; so is the
-  // Base Stations tab (0049).
+  // Base Stations tab (0049); and a station's history and the deleted stations
+  // are editors-only (0056, station-history.js).
   function tabsAuthChanged() {
     for (const mod of [typeof FieldPhotos !== 'undefined' ? FieldPhotos : null,
                        typeof Admin       !== 'undefined' ? Admin       : null,
                        typeof AdminDash   !== 'undefined' ? AdminDash   : null,
                        typeof AdminTokens !== 'undefined' ? AdminTokens : null,
-                       typeof BaseStations !== 'undefined' ? BaseStations : null]) {
+                       typeof BaseStations !== 'undefined' ? BaseStations : null,
+                       typeof StationHistory !== 'undefined' ? StationHistory : null]) {
       if (!mod || !mod.authChanged) continue;
       try { mod.authChanged(); } catch (_) { /* its own problem, not the sign-in's */ }
     }

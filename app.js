@@ -6980,6 +6980,8 @@ function repaintStnCard() {
   SiteLand.ask(`mn-land-card-${s.id}`, s);
   // The equipment register, for a signed-in editor, on the same terms.
   if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
+  // And the station's history (station-history.js).
+  if (typeof StationHistory !== 'undefined') StationHistory.cardAsk(s);
   MapLeader.sync();
   // The trail's pill says whether its station's card is up, and its name,
   // which a save may just have changed.
@@ -7264,6 +7266,10 @@ function stnCardHtml(s) {
          editors only, filled after the fetch by PhotoReview.cardAsk, and
          not drawn at all when the register has nothing. -->
     ${typeof PhotoReview !== 'undefined' ? PhotoReview.cardHtml(s) : ''}
+    <!-- Who changed the station, what and when, with Restore (0056,
+         station-history.js): signed-in editors only, shut until opened, and
+         filled after the fetch by StationHistory.cardAsk. -->
+    ${typeof StationHistory !== 'undefined' ? StationHistory.cardHtml(s) : ''}
     <!-- Every action the station offers, Station details first, in their
          groups — each its own wrapping row with a rule between
          (stationActionGroups). The rules are full-bleed, like the section

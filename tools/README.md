@@ -715,6 +715,32 @@ and wants the stations loaded, as CI has them.
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_station_facing.sql
 ```
 
+## `check_station_history.sql` — prove the station history and the way back
+
+50 checks over `0056`, in a transaction that rolls back: the change log, its RLS
+and its one policy, the three statement-level triggers that write it and the
+grants; an editor's save that changes nothing writing nothing and one that
+changes two fields writing one `edited` row holding those two, pinned on the
+editor at the instant the station was stamped; a number with more digits, the
+station's place in the document and its stamp alone writing nothing; a
+hand-run `UPDATE` pinned on the connection and a stamped one on its stamp; a
+delete and `restore_station()` — refused to anon, a stranger, a missing or
+stale stamp, and the station back with its sensors and one `restored` row —
+and four restores refused where a save would be (a station number and an ALERT2
+address another station now holds, named; a withdrawn network, 0053's guard; a
+gauge it borrows floods from, still deleted, `save_station()`'s own sentence);
+a field put back through `save_station()` as the History panel does, and
+`proposed` put back refused an editor; the whole register through
+`load_stations_doc()` — one row for a renamed station and none for the
+thousands it only re-placed, nothing the second time, a station dropped for
+real kept in the log; and who may read it and write it (editors; nobody). It
+signs up one editor through the real signup triggers (0005) and wants the
+stations loaded, as CI has them.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_station_history.sql
+```
+
 ## `check_flood_peaks_from.sql` — prove a station taking another's flood history
 
 23 checks over `0041`, in a transaction that rolls back: with the stations and

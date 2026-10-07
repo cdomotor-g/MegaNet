@@ -171,6 +171,8 @@ its cache at all (`PGRST002`).
 | `meganet.load_stations_from_url(text)` | Fetches `stations.json` over HTTP and hands it to the above. Defaults to the copy on `main`. Needs the `http` extension; says so plainly if it is missing. |
 | `meganet.save_station(jsonb, timestamptz)` | The write path. One station and everything hanging off it, in one transaction. Refuses a stale write. Returns the saved fragment and its new `updated_at`. |
 | `meganet.delete_station(text, timestamptz)` | Soft delete: stamps `deleted_at`, keeps every row. |
+| `meganet.restore_station(text, timestamptz)` | The soft delete undone (`0056`): editors, the stamp the list was read with or `PT409`, `deleted_at` cleared and the station then saved through `save_station()`, so a restore is refused wherever a save would be — a station number or ALERT2 address another station holds now is named in the sentence. The Admin tab's **Deleted stations**. |
+| `meganet.station_change`, `meganet.station_change_log()` | The station history (`0056`): a row per station per statement that changed it — `created`, `edited`, `deleted`, `restored`, or `removed` by a sync — with when, who, and only the fields that moved, `before` and `after`, by column name. Written by three statement-level triggers on `meganet.station`, so every way in is covered, the loaders included, and a write that changes nothing writes nothing. **Editors only** (RLS); not `anon`, and not in the agent API. See **Station history**, below. |
 | `meganet.editor_allow` | Who may write — an email, or a domain with its at-sign. No policy and no grant to any role a browser can reach; readable only through the function below. |
 | `meganet.is_editor()`, `meganet.email_allowed(text)`, `meganet.actor()` | The gate, the list lookup behind it, and who a write gets attributed to. |
 | `meganet.app_user` | One row per person who has signed in, provisioned by trigger from `auth.users`. Carries a `role` column that nothing reads yet. You can select your own row and nobody else's. |
@@ -280,7 +282,8 @@ they are the words printed on a blank form and say nothing about a site. So are
 the *readings*, since `0023`: `meganet.inspection_chart_visit` and the six
 `inspection_chart_*` views beside it carry the numbers a visit recorded and the
 date it happened, and no column anybody wrote. The tables under them are as
-private as they ever were.
+private as they ever were. The station history (`0056`) is editors-only too: the
+station is public, but a record of who changed it, when, is a record of people.
 
 Nothing is *writable* by `anon` or by `authenticated`: no table grants either of
 them a write verb, and the only ways in are the functions above — see **Writing**
@@ -375,8 +378,10 @@ Added by `0004_station_writes.sql`, for the station editor. Four things about it
 are worth knowing before touching any of it.
 
 **There are exactly two ways in, and they are functions.** `save_station()` and
-`delete_station()`. No table grants `anon` or `authenticated` an insert, update or
-delete, so there is no `PATCH /station?id=eq.x` to be had. That is deliberate: a
+`delete_station()`. `0056`'s `restore_station()` undoes a delete and then calls
+`save_station()`, so it adds no third way of writing a station's fields. No
+table grants `anon` or `authenticated` an insert, update or delete, so there is
+no `PATCH /station?id=eq.x` to be had. That is deliberate: a
 station is a row *plus* its sensors *plus* its repeater *plus* that repeater's
 pass ranges, and a repeater whose ranges half-saved is worse than one that did not
 save at all. One function call is one transaction.
@@ -398,16 +403,22 @@ started from. The refusal carries SQLSTATE `PT409`, which PostgREST returns as
 HTTP 409, so the app can tell "somebody got there first" from "the network is
 down" without reading the message.
 
-**Delete is soft, and undone with one line.**
+**Delete is soft, and undone from the Admin tab.** The row, its sensors, its
+repeater and its ranges are all still there — `meganet.station_json` simply
+stops carrying it. Since `0056` an editor puts it back with **Restore** on the
+Admin tab's **Deleted stations**, which is `meganet.restore_station()`: the
+line below, and then the station saved through `save_station()`, so it comes
+back only if a save of it would be accepted. The line on its own still works,
+as it did before `0056`, held to nothing but 0053's guard and the indexes:
 
 ```sql
 update meganet.station set deleted_at = null where id = 'the_station';
 ```
 
-The row, its sensors, its repeater and its ranges are all still there —
-`meganet.station_json` simply stops carrying it. Note that a *full reload* is a
-sync, so loading a document that no longer mentions a soft-deleted station
-removes it for real; take a snapshot before reloading if that matters.
+Note that a *full reload* is a sync, so loading a document that no longer
+mentions a soft-deleted station removes it for real; take a snapshot before
+reloading if that matters. The history keeps a `removed` row with the whole of
+it either way.
 
 **Who may write is the database's decision, not the browser's.** `is_editor()`
 answers it: never for `anon`, always for `service_role`, and for `authenticated`
@@ -1749,6 +1760,99 @@ its establishment, an administrator establishing it (the flag gone, the type
 and year kept), a stale tab told it is stale first — and the whole register
 back through `load_stations_doc()` with a proposal in it, rewriting nothing
 else.
+
+## Station history
+
+`0056`, issue #219. Station writes have stamped `updated_by` since `0004`, and
+deletes have been soft, but nothing kept what a station said before an edit or
+who changed what — and a deleted station came back only by somebody with SQL.
+`meganet.station_change` is the record; the station card's **History** section
+and the Admin tab's **Deleted stations** (`station-history.js`) are where it is
+read and acted on.
+
+**A trigger, so every way in is covered.** Three statement-level `AFTER`
+triggers on `meganet.station` — 0037's pattern, transition tables read once —
+write a row for each station a statement changed, whether the statement was
+`save_station()`, `delete_station()`, `restore_station()`, either loader, the
+Bureau lists' SQL or a hand-run `UPDATE`. A loader writing 4,873 stations in
+one statement costs one `INSERT … SELECT`, not 4,873 trigger calls.
+
+**Only what changed, and nothing for a write that changes nothing.** The old
+and new rows are compared as jsonb, column by column, and only the columns
+that moved go into `before` and `after` — so 94.50 written over 94.5 is the
+same number and not a change. `updated_at`, `updated_by` and `ord` are never
+compared: the first two are the bookkeeping this replaces, and `ord` moves for
+every station after one inserted in the middle of the document.
+`save_station()` restamps every station it saves, so this is the rule that
+keeps the log to what people did. A creation records no values — the station
+as created is the station now with every later change's `before` put back,
+which is how the History panel works out any earlier version — and a `removed`
+row keeps the whole row, since after it there is nothing to work back from.
+
+**Who** is the `updated_by` the write stamped where it stamped a new one —
+which is how a loader names itself (`load_stations_doc`,
+`import_stations_json.py`) — and otherwise `meganet.actor()`, the identity
+station writes have always recorded: the token's email, or the database role.
+A stamp that did not move is not believed, so a hand-run `UPDATE` that leaves
+`updated_by` alone is pinned on the connection, not on whoever saved the
+station last. The cost of that is a loader's *second* change to a station it
+stamped last time, which reads as the connection that ran it (`postgres`)
+rather than as the loader.
+
+**What it costs.** A full `stations.json` import into an empty database
+writes one `created` row per station and no values — 4,871 rows (`elpro_test`
+and `bateson_test` are made by migrations, before the triggers exist), about
+1 MB, half of it the index. Re-running either loader over an unchanged
+document writes nothing; over a newer snapshot, one row per station that moved,
+holding what moved. An edit is one row of a few hundred bytes. Nothing prunes
+it, and at that rate nothing needs to.
+
+**Who reads it:** editors, under RLS (`meganet.is_editor()`), and no grant to
+`anon` — it is not in `READABLE_RELATIONS` (`worker/api.js`), and is not to
+be. Nobody is granted a write verb; the trigger, `security definer`, is the
+only writer.
+
+**The way back goes through the write path, never around it.** A field, or
+the whole station as it was before a change, is put back by the History panel
+through `stationSaveFields()` — the database's current copy of the station,
+the earlier values put in, saved through `save_station()` with the stamp it
+read — so a value that would be refused if it were typed is refused when it is
+restored, and the restore is itself a row in the log. Three columns are never
+offered, because that save does not write them or works them out: `hub_id`,
+`alert_ids` and `document_managed`. A deleted station comes back through
+`meganet.restore_station()`, above.
+
+**What it does not record yet: the lists.** A station's sensors, its
+repeater's ranges and the Bureau's lists (`0031`–`0033`) are rows of their own
+tables, replaced wholesale by every save that sends them, so a statement-level
+log of them would be a delete and an identical insert per save; netting a
+transaction out is a design of its own. What the station row carries of them
+is recorded — `alert_ids`, which the sensors give it, and `roles`.
+
+**What a later station migration has to respect.** Nothing has to be
+restated: a column added to `meganet.station` is in the history from the
+moment it exists, under its own name. A new *bookkeeping* column belongs in
+the ignored list in `station_change_log()`, in the migration that adds it, or
+every write that touches it is a change; and a bulk `UPDATE` of
+`meganet.station` in a migration is a recorded change to every station it
+moves.
+
+```sh
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_station_history.sql
+```
+
+50 checks, in a transaction that rolls back: the table, RLS, the policy, the
+three triggers and the grants; an editor's save that changes nothing (nothing
+written) and one that changes two fields (one row, those two); a number with
+more digits, the document order and the stamp alone (nothing); whom a hand-run
+and a stamped `UPDATE` are pinned on; a delete and its restore, refused to
+anon, a stranger, a missing or stale stamp; four restores refused where a save
+would be — a number and an ALERT2 address now another station's, a withdrawn
+network, a gauge it borrows floods from that is still deleted; a field put
+back, and `proposed` refused an editor; the whole register through
+`load_stations_doc()` — one row for a rename, none for the thousands it only
+re-placed, none again, and a station dropped for real with its history kept;
+and who may read it.
 
 ## Checking it from outside
 

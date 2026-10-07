@@ -10,7 +10,9 @@
 // DB_SCHEMA_VERSION; across to app.js for loadFromGitHub, dataSourceSummary,
 // docUrl and switchTab; to datastore.js for dbRpc, dbCheck, renderDbStatusHtml,
 // reloadFromDatastore and snapshotStationsJson; to export.js for
-// exportMayDownload; to auth.js for Auth; and to mem-meter.js for MemMeter.
+// exportMayDownload; to auth.js for Auth; to mem-meter.js for MemMeter; and to
+// station-history.js for StationHistory, whose Deleted stations panel it draws
+// under Station data and loads from init().
 // Nothing here runs at load. auth.js calls Admin.authChanged() on every sign-in
 // and sign-out.
 //
@@ -46,13 +48,13 @@ const Admin = (function () {
   const PRIVILEGES = [
     { who: 'Anyone (not signed in)', how: 'Behind Cloudflare Access only',
       may: 'Read stations, the maps, telemetry, inspection charts and every tab that reads. Load a stations.json from a file or GitHub.',
-      not: 'Save anything; download the station document or the Radio Mobile set; see field photos or inspection records.' },
+      not: 'Save anything; download the station document or the Radio Mobile set; see field photos, inspection records or a station\'s history.' },
     { who: 'Viewer', how: 'app_user.role = viewer',
       may: 'Everything an editor may, today — the role is recorded but not enforced yet.',
       not: 'To stop somebody writing, remove their allowlist entry rather than making them a viewer.',
       note: 'not enforced' },
     { who: 'Editor', how: 'On the allowlist (by address or domain), signed in',
-      may: 'Edit and delete stations, record inspections and maintenance, upload and place field photos, propose equipment, snapshot stations.json, generate exports.',
+      may: 'Edit, delete and restore stations, and see and put back what a station said before; record inspections and maintenance, upload and place field photos, propose equipment, snapshot stations.json, generate exports.',
       not: 'Approve equipment suggestions, prune the upload log, manage users.' },
     { who: 'Administrator', how: 'An editor whose app_user.role = admin',
       may: 'Everything an editor may, plus: approve or reject equipment suggestions, prune the photo upload log, and manage users and the allowlist on this tab.',
@@ -404,6 +406,7 @@ const Admin = (function () {
         <div class="adm-grid">
           <div class="stack">
             ${dataHtml()}
+            ${typeof StationHistory !== 'undefined' ? StationHistory.adminHtml() : ''}
             <div class="panel">
               <div class="panel-header"><h2>Your access</h2></div>
               <div id="adm-access">${accessHtml()}</div>
@@ -423,6 +426,9 @@ const Admin = (function () {
   function init() {
     if (!state.dbStatus) dbCheck();
     if (isAdmin() && users === null && !loading) load();
+    // The deleted stations, for an editor (station-history.js): asked again
+    // every visit, since a delete anywhere since is the point of the list.
+    if (typeof StationHistory !== 'undefined') StationHistory.adminLoad();
     if (typeof AdminDash !== 'undefined') AdminDash.start();
     if (typeof AdminTokens !== 'undefined' && isAdmin()) AdminTokens.load();
   }

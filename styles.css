@@ -14661,6 +14661,43 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 .stn-card-equip:empty { display: none; }
 .stn-card-equip-h { display: block; margin-bottom: .25rem; }
 
+/* The station card's History (station-history.js, 0056): a disclosure, shut
+   until opened, a change to an entry — what kind, when, who — and under it the
+   fields that moved, was over became, each with its Restore. Was and became are
+   <del> and <ins> because that is what they are; the arrow between them is for
+   the eye and the screen reader is told in words. The Admin tab's Deleted
+   stations is .adm-table's, and needs only its empty slot gone and a muted
+   second line in a cell — a station's number and id, who deleted it. */
+.stn-hist-box > summary { cursor: pointer; }
+.stn-hist-title { font-weight: 600; }
+.stn-hist-sum { color: var(--muted); font-size: var(--fs-sm); }
+.stn-hist-msg { margin: var(--sp-1) 0 0; }
+.stn-hist-msg:empty { display: none; }
+.stn-hist-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; }
+.stn-hist-entry { padding: var(--sp-2) 0; border-top: 1px solid var(--border); }
+.stn-hist-head { margin: 0; font-size: var(--fs-sm); color: var(--muted); overflow-wrap: anywhere; }
+.stn-hist-kind { font-weight: 600; color: var(--text); margin-right: var(--sp-1); }
+.stn-hist-kind-deleted,
+.stn-hist-kind-removed { color: var(--bad); }
+.stn-hist-kind-restored { color: var(--ok); }
+.stn-hist-gone { margin: var(--sp-1) 0 0; }
+.stn-hist-diff { margin: var(--sp-1) 0 0; }
+.stn-hist-row { padding: .15rem 0; }
+.stn-hist-row > dt { color: var(--muted); font-size: var(--fs-xs); }
+.stn-hist-row > dd { margin: 0; overflow-wrap: anywhere; }
+.stn-hist-row del { color: var(--bad); }
+.stn-hist-row ins { color: var(--ok); text-decoration: none; }
+.stn-hist-none { font-style: italic; }
+.stn-hist-same,
+.stn-hist-fixed { color: var(--muted); font-size: var(--fs-xs); margin-left: var(--sp-1); }
+.stn-hist-put { margin-left: var(--sp-1); }
+.stn-hist-acts { margin-top: var(--sp-1); }
+.stn-hist-note { margin: var(--sp-2) 0 0; color: var(--muted); }
+.stn-hist-off { margin: 0; color: var(--muted); }
+.adm-deleted-slot:empty { display: none; }
+.adm-deleted-msg:empty { display: none; }
+.adm-deleted-sub { display: block; color: var(--muted); font-size: var(--fs-xs); overflow-wrap: anywhere; }
+
 /* ── Field photos on the Stations map (map-photos.js) ── */
 .mn-photo-icon { background: none; border: 0; }
 /* The dot sits on the point; the badge stands up and to the right of it, so a
