@@ -291,6 +291,35 @@ try {
       heardKpi: document.querySelector('#hl-kpis .qs-chip-v').textContent };
     return { before, after, total: A.stations.size };
   });
+  // The list open and stretched to reach down over the map, with something
+  // in Leaflet's tile pane under it (the tiles themselves are not fetched
+  // here): the list is on top.
+  const over = await page.evaluate(async () => {
+    const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const det = document.getElementById('hl-ownpick');
+    const pop = document.getElementById('hl-ownpick-pop');
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;left:-5000px;top:-5000px;width:10000px;height:10000px;background:#888';
+    document.querySelector('#hl-map .leaflet-tile-pane').appendChild(probe);
+    det.open = true;
+    pop.style.minHeight = '900px';
+    await frame();
+    const box = () => {
+      const a = pop.getBoundingClientRect(), b = document.getElementById('hl-map').getBoundingClientRect();
+      return { a, b, overlap: a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom,
+        x: (Math.max(a.left, b.left) + Math.min(a.right, b.right)) / 2, y: (Math.max(a.top, b.top) + Math.min(a.bottom, b.bottom)) / 2 };
+    };
+    let o = box();
+    if (o.overlap) { window.scrollBy(0, o.y - innerHeight / 2); await frame(); o = box(); }
+    const el = o.overlap ? document.elementFromPoint(o.x, o.y) : null;
+    const res = { overlap: o.overlap, top: el ? (el.closest('#hl-ownpick-pop') ? 'list' : el.closest('#hl-map') ? 'map' : el.tagName + '.' + el.className) : null };
+    probe.remove();
+    pop.style.minHeight = '';
+    det.open = false;
+    window.scrollTo(0, 0);
+    return res;
+  });
+  ok('the owner list opens over the map, not under it', !over.overlap || over.top === 'list', JSON.stringify(over));
   ok('the station owner sits under the station\'s name in Needs attention and Check signals',
     own.before.ownersShown > 0 && own.before.options.length > 1, JSON.stringify(own.before).slice(0, 300));
   ok('an owner filter button sits in the header with Refresh and the rest', own.before.inHeader, JSON.stringify(own.before.inHeader));

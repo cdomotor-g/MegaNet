@@ -15542,7 +15542,9 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-frow--critical > td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
 .hl-frow--warn > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
 
-.hl-map { height: 440px; border-radius: var(--r-md); border: 1px solid var(--border); }
+/* isolation keeps Leaflet's panes and controls (z-index 400 to 1000) inside
+   the map, so the header's owner list opens over it rather than under it. */
+.hl-map { height: 440px; border-radius: var(--r-md); border: 1px solid var(--border); isolation: isolate; }
 @media (max-width: 700px) { .hl-map { height: 320px; } }
 .hl-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--border); }
 .hl-dot--critical { background: var(--bad); width: 16px; height: 16px; }
