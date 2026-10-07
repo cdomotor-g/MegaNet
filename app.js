@@ -221,18 +221,29 @@ function loadFromGitHub() {
 // header name, so fetch() will not let this code set it. Every browser sends it
 // anyway and PostgREST honours it, so the document arrives gzipped without
 // anyone asking — roughly 2.3 MB becoming a few hundred KB.
-async function loadFromApi({ announce = true } = {}) {
-  loadStep('api');
-  const t0 = _dbClock();
-  try {
-    const res = await fetch(`${DB_URL}/rpc/stations_doc`, {
+// The station document as the load chain asks each source for it — one
+// place, because sw.js keeps a copy under the address it was asked at, and
+// pwa.js asks again through the worker to have one kept (#213): the request
+// it makes has to be the request the chain will make with no signal.
+function stationDocRequest(kind) {
+  if (kind === 'api') {
+    return [`${DB_URL}/rpc/stations_doc`, {
       headers: {
         apikey: DB_ANON_KEY,
         'Accept-Profile': DB_SCHEMA,
         Accept: 'application/json',
       },
       cache: 'no-store',
-    });
+    }];
+  }
+  return [kind === 'github' ? GITHUB_RAW_URL : 'stations.json', {}];
+}
+
+async function loadFromApi({ announce = true } = {}) {
+  loadStep('api');
+  const t0 = _dbClock();
+  try {
+    const res = await fetch(...stationDocRequest('api'));
     if (!res.ok) {
       let detail = `HTTP ${res.status}`;
       try {
@@ -3297,7 +3308,9 @@ function renderMain() {
   // list is the database's, and names a host station only as text. The Site
   // Map is about the tabs, not the stations, and is most needed by somebody
   // who has not loaded anything yet.
-  const noDataTabs = ['sitemap', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'admin', 'basestations'];
+  // Offline & Install as well: it is about the device, and is most wanted on
+  // one that has not got a list yet.
+  const noDataTabs = ['sitemap', 'offline', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'admin', 'basestations'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -3322,6 +3335,7 @@ function renderMain() {
                        syncStationsCardsHome({ instant: true, remeasure: false });
                        initStationFilters(); initMap(); break;
     case 'sitemap':    el.innerHTML = SiteMap.render();       SiteMap.init();      break;
+    case 'offline':    el.innerHTML = OfflineTab.render();    OfflineTab.init();   break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
     case 'passranges': el.innerHTML = renderPassRangesHtml();             break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;

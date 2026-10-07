@@ -159,6 +159,7 @@ const ExportMenu = (function () {
   // file, not a line here.
   const EXEMPT = {
     sitemap:     'The guide to every other tab — it holds nothing of its own to save.',
+    offline:     'This device\'s setup for working with no signal — nothing on it is a record to keep as a file.',
     maps:        'The printed sheets are the files: each one opens as its own PDF.',
     passranges:  'Worked out from the station list, which Stations saves; the ranges travel with each station\'s record in that file.',
     bitflipper:  'A calculator: the variants of one address, on screen to read or copy.',

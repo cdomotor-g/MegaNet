@@ -554,6 +554,18 @@ const PHOTO_FIXTURE = {
 // through the tab's own Open. "Administrator" is stood in for only while this
 // tab is the one on screen, so no other entry here is measured signed in.
 // test/basestations.mjs holds what the tab does; this holds how it is built.
+// 📲 Offline & Install with the browser's install prompt held (a stand-in
+// for Chromium's beforeinstallprompt), the other browsers' steps unfolded and
+// Get ready's four steps on the page — every surface the tab draws at once.
+const SEED_OFFLINE = `async () => {
+  const e = new Event('beforeinstallprompt', { cancelable: true });
+  e.prompt = async () => {};
+  e.userChoice = Promise.resolve({ outcome: 'dismissed' });
+  window.dispatchEvent(e);
+  await OfflineTab.refresh();
+  document.querySelectorAll('#ot-page details').forEach(d => { d.open = true; });
+}`;
+
 const SEED_BS_OUT = `() => {
   if (window.__bsAuth) { Object.assign(Auth, window.__bsAuth); delete window.__bsAuth; }
   BaseStations.authChanged();
@@ -712,6 +724,8 @@ const CONVERTED = [
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },
   { id: 'sitemap',    label: 'Site Map',        issue: 'born converted' },
+  { id: 'offline',    label: 'Offline & Install — as it opens', issue: 'born converted' },
+  { id: 'offline',    label: 'Offline & Install — an install prompt held, every browser\'s steps open', issue: 'born converted', seed: SEED_OFFLINE },
 ];
 
 

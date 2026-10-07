@@ -316,6 +316,11 @@ const Maintenance = (function () {
 
   // ── Reference data ─────────────────────────────────────────────────────────
 
+  // A list's path, as loadRefs asks for it — and, through refPaths(), as
+  // pwa.js asks for it again to have the worker keep a copy (#213).
+  const refPath = t => `${t}?select=*&order=ord`;
+  const refPaths = () => LOOKUPS.map(refPath);
+
   // Fetched once per session. Never rejects: every caller wants to render the
   // failure, not catch it.
   function loadRefs() {
@@ -326,7 +331,7 @@ const Maintenance = (function () {
     repaint();
 
     Promise.all(LOOKUPS.map(t =>
-      dbSelect(`${t}?select=*&order=ord`).then(rows => [t, rows])))
+      dbSelect(refPath(t)).then(rows => [t, rows])))
       .then(pairs => {
         const refs = {};
         pairs.forEach(([name, rows]) => { refs[name] = rows; });
@@ -1468,5 +1473,7 @@ const Maintenance = (function () {
     ensureRefs, recordModel,
     refsReady: () => !!S().refs,
     refsError: () => S().refsError,
+    // #213: the lists' paths, for pwa.js to have the worker keep them.
+    refPaths,
   };
 })();

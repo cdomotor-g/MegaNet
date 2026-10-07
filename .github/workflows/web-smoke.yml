@@ -653,6 +653,15 @@ jobs:
         working-directory: test
         run: npm run offline
 
+      # The 📲 Offline & Install tab: where it is; which browser, from real
+      # user-agent strings and three emulated devices, each shown its own way
+      # to install (or told it cannot); the browser's install prompt held and
+      # offered as a button; no signal; and, with a real worker, one visit
+      # keeping the list and the sheets' lists, Start again, and Get ready.
+      - name: Offline & Install tab — this device, getting it ready, installing
+        working-directory: test
+        run: npm run offlinetab
+
       # Proposed stations (0039) in the editor, on the card and on the map,
       # against a stand-in for save_station() that holds the database's rules
       # (tools/check_proposed_stations.sql holds the real one to them): a

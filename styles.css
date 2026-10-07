@@ -7588,6 +7588,59 @@ hr {
 .pwa-update-text { margin: 0; flex: 1 1 18rem; }
 .pwa-update-acts { display: flex; gap: var(--sp-2); }
 
+/* 📲 Offline & Install (offline-tab.js): the device's state as facts, each a
+   glyph and a word as well as a colour; Get ready's steps as they happen; and
+   the install steps for this browser, the rest folded away. Tokens only — the
+   three themes redefine them, and Sunlight's heavier ink comes with them. */
+.ot-page h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); line-height: var(--lh-tight); }
+.ot-page h4 { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-md); }
+.ot-page p { margin: 0 0 var(--sp-3); max-width: 60rem; line-height: var(--lh-body); }
+.ot-hero { display: grid; gap: var(--sp-2); }
+.ot-page .button-group { margin: 0 0 var(--sp-3); }
+.ot-page .button-group:last-child { margin-bottom: 0; }
+.ot-title { margin: 0; font-size: var(--fs-xl); line-height: var(--lh-tight); }
+.ot-hero .ot-lede { margin: 0; font-size: var(--fs-md); }
+.ot-mark { display: inline-block; min-width: 1.1em; font-weight: 700; text-align: center; }
+.ot-verdict {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  border-radius: var(--r-md);
+  background: var(--subtle);
+  font-weight: 600;
+}
+.ot-verdict--ok   { border-left-color: var(--ok); }
+.ot-verdict--warn { border-left-color: var(--warn); }
+.ot-verdict--bad  { border-left-color: var(--bad); }
+.ot-facts { margin: 0 0 var(--sp-3); display: grid; gap: var(--sp-1); }
+.ot-fact {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) minmax(0, 1fr);
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+  border-bottom: 1px solid var(--border);
+}
+.ot-fact dt { color: var(--muted); }
+.ot-fact dd { margin: 0; overflow-wrap: anywhere; }
+.ot-aside { display: block; color: var(--muted); font-size: var(--fs-sm); }
+.ot-page p.ot-aside { margin: var(--sp-2) 0 0; }
+.ot-note { padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); background: var(--subtle); }
+.ot-steps { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: var(--sp-1); }
+.ot-step { display: flex; gap: var(--sp-2); align-items: baseline; }
+.ot-list, .ot-how { margin: 0 0 var(--sp-3); padding-left: 1.3rem; line-height: var(--lh-body); }
+.ot-list li + li, .ot-how li + li { margin-top: var(--sp-1); }
+.ot-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+.ot-cols h4 { margin-top: 0; }
+details.ot-more { margin-top: var(--sp-2); }
+details.ot-more > summary { cursor: pointer; font-weight: 600; padding: var(--sp-1) 0; }
+details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
+@media (max-width: 700px) {
+  .ot-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .ot-fact { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+
 /* 🌗 Theme (#224): the four as radios, each a row with what it is for. */
 .theme-pick { margin: 0; padding: 0; border: 0; display: grid; gap: var(--sp-2); }
 .theme-opt {

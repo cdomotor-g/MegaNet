@@ -176,6 +176,8 @@ MegaNet/
 │                             and back and forward work (#211)
 ├── pwa.js                  ← Pwa       — registers sw.js for the page's version, and
 │                             offers a newer one to a page from the kept copy (#213)
+├── offline-tab.js          ← OfflineTab — 📲 Offline & Install: what this device has
+│                             kept, getting it ready, installing it in this browser
 ├── init.js                 ← the only code that runs at load; must stay last
 ├── sw.js                   ← the service worker: the copy kept for opening with no
 │                             signal — the shell, the station list, the sheets' tables
@@ -267,7 +269,7 @@ MegaNet/
 │   └── QldBasin_2009Nov_reduced.svg, Qld Major Streams, queensland-outline, all_2009Nov
 │
 ├── test/                   ← the web app's safety net (see test/README.md, and Testing below)
-│   ├── smoke.mjs            (headless Chromium: load, open all 27 tabs, clean console)
+│   ├── smoke.mjs            (headless Chromium: load, open all 28 tabs, clean console)
 │   ├── dup-names.mjs        (no duplicate top-level names across the loaded scripts)
 │   ├── inspections.mjs      (the six sheets, against the migration's own seed data)
 │   ├── maintenance.mjs      (the Council sheet, against the workbook's filled example)
@@ -452,10 +454,18 @@ in [`docs/access.md`](docs/access.md).
 ### With no signal
 
 A device that has opened Flood-Net before opens it again with no signal (#213).
+The **📲 Offline & Install** tab, under *Start here*, is the page for people: what
+this device has kept and when, **Get this device ready for no signal** to keep the
+rest in one go, how to install Flood-Net in the browser being used (with the
+browser's own **Install** button where it offers one, and a plain "this one
+cannot" where it does not), and what does and does not work with no signal.
 `sw.js`, a service worker registered by `pwa.js` for the version the page is,
 keeps the app — `index.html` and everything it loads, Leaflet included — and,
 as they arrive, the station list and the inspection and maintenance sheets'
-reference tables. With no network the app opens from that copy, and the header
+reference tables. A first visit's list goes past the worker (it was not there
+yet when the page loaded), so when the worker first takes the page over, the
+list and the sheets' lists are asked for again through it: one visit with a
+signal is enough. With no network the app opens from that copy, and the header
 says so: **saved copy, 3 hours old — no signal**, never "from the datastore" (and
 with a signal but no answer from its source — a paused datastore fails the same
 way — *no answer from the datastore* instead).
@@ -486,6 +496,10 @@ device, as it always was.
   screen.
 - **Not kept:** the datastore's other reads, the Worker's `/api/` routes,
   sign-in and map tiles. A copy opened from `file://` is left exactly as it was.
+- **Taking it off one device**: the tab's **Start again** removes the worker and
+  every copy it kept (drafts are separate, and stay); ticking *do not keep a copy
+  on this device again* keeps it off — for a shared computer — until somebody
+  presses **Get this device ready** there.
 - **Taking it off every device**, should a deploy ever need to: make `pwa.js`'s
   `wanted()` return `false`, and give `sw.js` an `activate` that deletes every
   `floodnet-` cache and calls `self.registration.unregister()`. Each device runs
@@ -4496,7 +4510,7 @@ Tabs / panels:
 
 Technology: Vanilla JS (no framework), same stack as current `app.js`.
 
-The shell has grown well past this list: 27 tabs in seven groups now, which
+The shell has grown well past this list: 28 tabs in seven groups now, which
 `TABS` in `core.js` describes and the 🗂️ Site Map tab draws.
 
 ### Phase 3 — Map & Link Visualisation

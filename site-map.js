@@ -58,6 +58,14 @@ const SiteMap = (function () {
   // what: one sentence. use: the jobs somebody would come to it for. note: the
   // one thing about access worth knowing before you go. Plain text; escaped.
   const GUIDE = {
+    offline: {
+      what: 'Flood-Net with no signal: what this device has saved, a button that saves the rest, and how to put it on your home screen.',
+      use: [
+        'Get a phone or laptop ready before heading out of signal',
+        'Install Flood-Net as an app, with the steps for your browser',
+        'See what works with no signal, and what does not',
+      ],
+    },
     stations: {
       what: 'The whole network on one map, with the station list, its filters and every station\'s details in the side panel beside it.',
       use: [
@@ -256,6 +264,8 @@ const SiteMap = (function () {
   // actually transmitted, what the sensors said, and what we did about it on
   // site"; `step` is that sentence, cut at the commas.
   const GROUPS = {
+    'Start here': { step: 'Getting set up',
+      blurb: 'Before the work: getting a phone or laptop ready for a site with no signal, and putting Flood-Net on its home screen.' },
     'Stations & networks': { step: 'What is out there',
       blurb: 'The stations themselves, the radio paths between them, and the maps and files made from them. Most days start here.' },
     'Interference': { step: 'What is stepping on it',
@@ -285,6 +295,7 @@ const SiteMap = (function () {
     { text: 'Work out what is interfering with a repeater', tab: 'workbench' },
     { text: 'Listen to ALERT off the air',                 tab: 'serial' },
     { text: 'Fill in a site inspection',                   tab: 'inspections' },
+    { text: 'Get a phone ready for a site with no signal', tab: 'offline' },
     { text: 'File the photos from a field trip',           tab: 'photos' },
     { text: 'Print a map for a field trip',                tab: 'mapgen' },
   ];
@@ -298,7 +309,9 @@ const SiteMap = (function () {
   const tabOf = id => TAB_LIST.find(t => t.id === id);
 
   // The groups as the cards show them: every tab but this one, under its own
-  // heading, and a group left with nothing (Start here) left out.
+  // heading, and a group left with nothing left out. Start here keeps Offline
+  // & Install, and is the first stop: getting a device ready comes before the
+  // work.
   function workGroups() {
     return TABS
       .map(g => ({ group: g.group, slug: slug(g.group), tabs: g.tabs.filter(t => t.id !== SELF) }))

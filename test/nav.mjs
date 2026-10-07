@@ -67,6 +67,9 @@ const PROBES = [
   { q: 'radio mobile',          want: 'export',      why: 'what the output is for' },
   { q: 'guide',                 want: 'sitemap',     why: 'what a newcomer looks for' },
   { q: 'what does each tab do', want: 'sitemap',     why: 'the question, typed as asked' },
+  { q: 'install',               want: 'offline',     why: 'the job, not the label' },
+  { q: 'no signal',             want: 'offline',     why: 'the situation, typed as said' },
+  { q: 'home screen',           want: 'offline',     why: 'where it ends up' },
 ];
 
 const server  = await startServer();

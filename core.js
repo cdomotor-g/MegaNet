@@ -114,10 +114,19 @@
 // deliberately none that another tab owns: "user" and "new" would tie with
 // Admin's users and RF Changes' new licences, and the tie goes to the first
 // group, which is this one.
+//
+// 📲 Offline & Install (offline-tab.js) is the other thing done before the
+// work rather than as part of it: getting a phone or laptop ready for a site
+// with no signal, and putting Flood-Net on its home screen. Its find words
+// are the ones somebody setting a device up types — "install", "home screen",
+// "flight mode", "no signal" — and "offline", which Station Health also
+// answers to for a station gone quiet: both are listed, this one first.
 const TABS = [
   { group: 'Start here', tabs: [
     { id: 'sitemap',    label: 'Site Map',               icon: '🗂️',
       find: 'guide overview tour index directory contents orientation beginner introduction getting started help what does each every tab do explained' },
+    { id: 'offline',    label: 'Offline & Install',      icon: '📲',
+      find: 'offline no signal no reception flight mode airplane mode install app add to home screen homescreen icon pwa progressive web app phone tablet saved cache ready set up device update new version' },
   ] },
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
@@ -296,6 +305,28 @@ const HELP = {
       + 'the other places the same job is usually carried on. Point at one and the line goes to it.',
     ],
     related: ['stations', 'health', 'admin'],
+  },
+  offline: {
+    summary: 'Flood-Net keeps a copy of itself on the device, so it opens where there is no signal — and '
+           + 'it can be installed, to sit on the home screen like any other app. This tab says what this '
+           + 'device has saved (the app, the station list and the inspection and maintenance sheets\' '
+           + 'pick-lists, each with when), saves it all in one go with <strong>Get this device ready for '
+           + 'no signal</strong>, and shows how to install Flood-Net in the browser you are using — with an '
+           + '<strong>📲 Install</strong> button where the browser offers one. It also says plainly what does '
+           + 'not work with no signal.',
+    watch: [
+      'The first visit needs a signal, and so does signing in. After that, with no signal, Flood-Net '
+      + 'opens from the saved copy and the header says <em>saved copy, … old — no signal</em>.',
+      'On an iPhone or iPad, the home-screen icon keeps a copy and a sign-in of its own, separate from '
+      + 'the browser\'s: open it from the icon with a signal and get it ready there too.',
+      'A weak signal can be slower than none: on one bar Flood-Net may wait a while before it uses the '
+      + 'copy. Flight mode makes it use the copy straight away.',
+      'Clearing the browser\'s data for this site removes the copy, and any sheet drafts not yet sent.',
+    ],
+    related: ['sitemap', 'inspections', 'maintenance'],
+    links: [
+      { label: 'With no signal — what is kept, and how (README)', href: 'README.md#with-no-signal' },
+    ],
   },
   stations: {
     summary: 'The map fills the page, and its cards sit beside it in the <strong>side panel</strong> '

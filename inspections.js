@@ -695,6 +695,18 @@ const Inspections = (function () {
   // Fetched once per session. Never rejects: every caller wants to render the
   // failure, not catch it, and a tab that throws on a blocked network is a tab
   // that fails the smoke test for the wrong reason.
+  // What loadRefs asks for, by name and path — and, through refPaths(), what
+  // pwa.js asks for again to have the worker keep a copy (#213): the same
+  // paths, so a sheet started with no signal finds every list it reads.
+  function refWant() {
+    return [
+      ['form',     'inspection_form?select=*&order=config_key,ord'],
+      ...TABLES.map(t => [t, `${t}?select=*&order=ord`]),
+      ...LOOKUPS.map(t => [t, `${t}?select=*&order=ord`]),
+    ];
+  }
+  const refPaths = () => refWant().map(([, path]) => path);
+
   function loadRefs() {
     const s = S();
     if (s.refs || s.refsLoading) return;
@@ -702,13 +714,7 @@ const Inspections = (function () {
     s.refsError = null;
     repaint();
 
-    const want = [
-      ['form',     'inspection_form?select=*&order=config_key,ord'],
-      ...TABLES.map(t => [t, `${t}?select=*&order=ord`]),
-      ...LOOKUPS.map(t => [t, `${t}?select=*&order=ord`]),
-    ];
-
-    Promise.all(want.map(([name, path]) =>
+    Promise.all(refWant().map(([name, path]) =>
       dbSelect(path).then(rows => [name, rows])))
       .then(pairs => {
         const refs = {};
@@ -2484,5 +2490,7 @@ const Inspections = (function () {
     ensureRefs, recordModel, configLabel, configs,
     refsReady: () => !!S().refs,
     refsError: () => S().refsError,
+    // #213: the lists' paths, for pwa.js to have the worker keep them.
+    refPaths,
   };
 })();

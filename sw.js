@@ -153,6 +153,13 @@ self.addEventListener('activate', event => {
   })());
 });
 
+// pwa.js asks a worker already in charge of the site to take a page it is not
+// answering — one loaded with the worker bypassed, as a hard reload does — so
+// what that page asks for next is kept.
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'claim') event.waitUntil(self.clients.claim());
+});
+
 function isStationDoc(url) {
   return /\/rpc\/stations_doc$/.test(url.pathname) || /(^|\/)stations\.json$/.test(url.pathname);
 }
