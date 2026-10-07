@@ -24,6 +24,8 @@
 //   * a station that only reports offers nothing to ask
 //   * a queued request can be cancelled; team keys added and taken off
 //   * a database without 0049 is told so, rather than shown as an error
+//   * the latest RPi ALERT release (GitHub, stood in for too) beside the
+//     station's version, in the list and the panel, asked for once
 //
 // Run:  npm run basestations
 //       npm run basestations -- -v    also print what passed
@@ -238,6 +240,12 @@ try {
     const out = h(args);
     return Array.isArray(out) ? json(route, out[1], out[0]) : json(route, out);
   });
+  // GitHub's latest RPi ALERT release, a step ahead of the station's 0.6.0.
+  let releaseAsks = 0;
+  await page.route('https://api.github.com/repos/cdomotor-g/RPi_ALERT/releases/latest', route => {
+    releaseAsks++;
+    return json(route, { tag_name: 'v0.7.0', html_url: 'https://github.com/cdomotor-g/RPi_ALERT/releases/tag/v0.7.0' });
+  });
   page.on('pageerror', e => errors.push(e.message));
 
   await page.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
@@ -274,6 +282,7 @@ try {
       flags: B._flags({ beat: { uv: true, temp: 77, clock: false, q: 600, rx: [['a', 'error', 0, null]] },
         status: { meganet: { token_refused: true }, receivers: [{ key: 'a', kind: 'sdr', name: 'x' }, { key: 'g', kind: 'gps', state: 'error' }] } }).map(x => x[1]),
       same, changed, bad,
+      versions: [B._cmpVersion('0.9.0', '0.10.0'), B._cmpVersion('v0.9.0', '0.9.0'), B._cmpVersion('1.0.0', '0.9.9'), B._cmpVersion('0.9', '0.9.0')],
     };
   }, [CONFIG, STICK_1, ODD_KEY]);
   ok('a station is online, quiet, offline, turned off or not managed by when it last checked in',
@@ -291,6 +300,7 @@ try {
     devs.length === 2 && devs.some(d => d.key === STICK_1 && d.name === 'North stick' && Object.keys(d).length === 2)
       && devs.some(d => d.key === ODD_KEY && d.name === 'Second stick' && d.ppm === 3 && d.freqHz === undefined),
     JSON.stringify(devs));
+  ok('versions compare part by part as numbers, a "v" ignored', pure.versions.join() === '-1,0,1,0', pure.versions.join());
   ok('a frequency out of range is refused with the reason, not sent', !!pure.bad.error && /24–1766 MHz/.test(pure.bad.error), JSON.stringify(pure.bad));
 
   // ── Signed out, and not an administrator ─────────────────────────────────────
@@ -303,11 +313,15 @@ try {
   await page.waitForTimeout(300);
   ok('signed in without being an administrator, it says this needs one', /needs an administrator/.test(await text('#main-content')));
   ok('…and neither asked the database anything', calls.length === 0, calls.map(c => c.fn).join(','));
+  ok('…nor GitHub', releaseAsks === 0, String(releaseAsks));
 
   // ── An administrator: the list ───────────────────────────────────────────────
   await page.evaluate(() => { Auth.isAdmin = () => true; Auth.role = () => 'admin'; BaseStations.authChanged(); });
   await until(() => page.evaluate(() => document.querySelectorAll('#bs-list tbody tr').length === 4), 'an administrator gets the list, one row per ingest point');
+  await until(() => page.evaluate(() => /0\.7\.0 is out/.test(document.querySelector('#bs-list tbody tr')?.textContent || '')),
+    'a station behind the latest release says so in the list');
   const list = await page.evaluate(() => [...document.querySelectorAll('#bs-list tbody tr')].map(tr => tr.textContent.replace(/\s+/g, ' ').trim()));
+  ok('…and one that does not check in, with no version, does not', !/is out/.test(list[3]), list[3]);
   ok('…the one checking in online, on the database\'s clock, with its host station and receivers',
     /Mt Stuart base/.test(list[0]) && /online/.test(list[0]) && /checked in (just now|\d+ s ago)/.test(list[0]) && /at Mt Stuart/.test(list[0]) && /1 of 3 receiving/.test(list[0]), list[0]);
   ok('…and what needs a look on it', /under-voltage since boot/.test(list[0]) && /2 receivers not receiving/.test(list[0]), list[0]);
@@ -334,6 +348,9 @@ try {
     && /usb_claim_interface error -6/.test(detail) && /412 decoded/.test(detail), detail.slice(0, 600));
   ok('its uplink', /Waiting to send 3 · 12 receptions/.test(detail) && /floodwarning\.net/.test(detail));
   ok('its software', /0\.6\.0/.test(detail) && /installed when asked/.test(detail) && /Version 0\.6\.0 installed/.test(detail));
+  ok('…with the latest release beside its version, linked to it', /Version 0\.6\.0 · latest release 0\.7\.0/.test(detail)
+    && await page.evaluate(() => !!document.querySelector('#bs-detail .txt-warn a[href="https://github.com/cdomotor-g/RPi_ALERT/releases/tag/v0.7.0"]')),
+    detail.slice(detail.indexOf('Software'), detail.indexOf('Software') + 200));
   ok('who may log in over SSH, by fingerprint and whose — never a key',
     /SHA256:VeBIQNSQYe0Ge\+JIo/.test(detail) && /jo@laptop/.test(detail) && /team keys/.test(detail) && /private networks/.test(detail)
       && /ssh alert@192\.168\.1\.40/.test(detail) && /passwords accepted/.test(detail), detail.slice(detail.indexOf('SSH access'), detail.indexOf('SSH access') + 900));
@@ -457,6 +474,7 @@ try {
   await page.evaluate(() => { BaseStations.authChanged(); switchTab('basestations'); });
   await until(async () => /apply db\/migrations\/0049_base_stations\.sql/.test(await text('#main-content')), 'a database without 0049 is told so');
 
+  ok('GitHub was asked for the latest release once, however often the tab started', releaseAsks === 1, String(releaseAsks));
   ok('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 } finally {
   await browser.close();

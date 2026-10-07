@@ -4,7 +4,9 @@ The **Base Stations** tab (in the Admin group, administrators only) lists every
 ingest point MegaNet has issued a token to, and for the base stations whose
 software checks in, how each one is: whether it is checking in, its receivers
 and what they have decoded, its uplink and queue, its power, temperature, disk
-and clock, its software and its settings. Open one and you can ask it to change
+and clock, its software — beside the latest
+[RPi ALERT release](https://github.com/cdomotor-g/RPi_ALERT/releases/latest),
+in amber when it is behind — and its settings. Open one and you can ask it to change
 a setting, restart a receiver or itself, look for receivers, install an update,
 fetch its SSH keys again, or show its log — without going to site.
 
