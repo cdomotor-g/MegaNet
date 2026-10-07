@@ -27,7 +27,13 @@ const TYPES = {
   '.md':   'text/markdown; charset=utf-8',
 };
 
-export async function startServer(root = REPO_ROOT) {
+// `stream`, for a check that has to watch a body arrive (test/links.mjs, the
+// first load's progress): called with each request's path, it answers null to
+// send the file whole, or { chunk, wait } to send it in `chunk`-byte pieces,
+// awaiting `wait(i)` before piece i when that returns a promise — which is how
+// a check holds a download part-way through for as long as it is looking.
+// Content-Length is still sent, so the page can know the size.
+export async function startServer(root = REPO_ROOT, { stream = null } = {}) {
   const server = http.createServer(async (req, res) => {
     let rel;
     try {
@@ -48,6 +54,23 @@ export async function startServer(root = REPO_ROOT) {
     try {
       const stat = await fsp.stat(file);
       if (!stat.isFile()) throw new Error('not a file');
+      const plan = stream && stream(rel);
+      if (plan) {
+        const body = await fsp.readFile(file);
+        res.writeHead(200, {
+          'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream',
+          'Content-Length': body.length,
+          'Cache-Control': 'no-store',
+        });
+        for (let i = 0, at = 0; at < body.length; i++, at += plan.chunk) {
+          const held = plan.wait && plan.wait(i);
+          if (held) await held;
+          if (res.destroyed) return;
+          res.write(body.subarray(at, at + plan.chunk));
+        }
+        res.end();
+        return;
+      }
       res.writeHead(200, {
         'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream',
         'Content-Length': stat.size,

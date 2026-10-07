@@ -292,7 +292,10 @@ async function main() {
     await page.evaluate(() => switchTab('stations'));
     await page.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
     const reloaded = await page.evaluate(() => ({ ids: StationTrail.ids(), hidden: document.getElementById('stn-trail').hidden, card: state.stnCard.id }));
-    check('a reload keeps the trail and the pill — the session is the tab\'s', reloaded.ids.length === 4 && !reloaded.hidden && reloaded.card === null, J(reloaded));
+    // The card comes back too since #211: the address names the station whose
+    // card was up (route.js), and a reload is the address opened again.
+    check('a reload keeps the trail and the pill — the session is the tab\'s — and the card the address names',
+      reloaded.ids.length === 4 && !reloaded.hidden && reloaded.card === b, J(reloaded));
     const cap = await page.evaluate(() => {
       for (const s of state.data.stations.slice(0, StationTrail.max + 5)) StationTrail.visit(s.id);
       return StationTrail.ids().length;

@@ -23,6 +23,9 @@
 // ── Init ───────────────────────────────────────────────────────────────────────
 
 (function init() {
+  // The tab the address names, or the last one used on this device, before
+  // anything is drawn — and back and forward from here on (route.js, #211).
+  Route.start();
   document.documentElement.setAttribute('data-theme', state.theme);
   setHeaderLabel('btn-theme', state.theme === 'dark' ? 'Light' : 'Dark');
   renderTabs();

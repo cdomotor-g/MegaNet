@@ -7150,6 +7150,15 @@ hr {
 .empty-actions { margin-top: var(--sp-5); }
 .filter-field--spaced { margin-top: var(--sp-2); }
 
+/* The same card while the station list is on its way, and when it could not
+   be had (#212): which source is being asked and how far through it is, then
+   what was tried. The bar is the platform's own <progress>, as the Quansheng
+   upload's is — indeterminate until the response says its size. */
+.load-card .load-bar { width: 100%; margin-top: var(--sp-3); accent-color: var(--accent); }
+.load-tried { list-style: none; margin: var(--sp-4) 0 0; padding: 0; text-align: left; }
+.load-tried li + li { margin-top: var(--sp-1); }
+.load-also { margin-top: var(--sp-4); }
+
 /* A wrapping row of pills since #170, not a column of links — the layout comes
    from .pill-row, which this carries alongside; what is left here is the rule
    that separates the actions from the station's own details above them. */

@@ -574,6 +574,16 @@ jobs:
         working-directory: test
         run: npm run trail
 
+      # Where you are, in the address bar (route.js, #211), and the first load
+      # saying what it is doing (#212). A link that opens on the wrong tab, a
+      # back button that skips a step or replays every pan, a reload that loses
+      # the card, a loading card that says nothing is coming: none of them
+      # throws. The server holds stations.json part-way through so the loading
+      # card can be read, and every history call is counted.
+      - name: Links and the first load — the address says where you are, and loading says so
+        working-directory: test
+        run: npm run links
+
       # Proposed stations (0039) in the editor, on the card and on the map,
       # against a stand-in for save_station() that holds the database's rules
       # (tools/check_proposed_stations.sql holds the real one to them): a

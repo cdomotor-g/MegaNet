@@ -348,6 +348,11 @@ const HELP = {
            + 'the address out of the box rather than off the saved record, so a row you have '
            + 'retyped sends you to the number on screen.',
     watch: [
+      '<strong>The address bar says where you are</strong> — this tab, the station whose card is up '
+      + 'and the map\'s view — so a bookmark, a reload or a link sent to somebody opens exactly this. '
+      + '<strong>🔗 Copy link</strong> on a station\'s card copies one. Back and forward move between '
+      + 'the tabs and the stations you opened; moving the map is not a step, so back never replays '
+      + 'your pans. A link opens the station\'s card without selecting it — the card\'s own pills do that.',
       '<strong>From zoom 17 the map offers the station\'s digital twin</strong> — the ground to '
       + '1 m where the State holds LiDAR, the aerial imagery, the station as built and the radio paths '
       + 'as this map colours them — whenever a station is under the view: the one on the card, the '
@@ -2950,6 +2955,14 @@ const state = {
   // Why the datastore was not used, when it was not. Kept after a fallback so
   // the Export tab can say what went wrong rather than only that something did.
   loadError:      null,
+  // The automatic load while it is under way, and what it tried (app.js,
+  // autoLoad; #212): { busy, kind, got, total, about, retry,
+  // tried: [{ kind, error }] } — `total` the exact size when it can be known,
+  // `about` the size this source had last time on this device.
+  // Null until it starts. What a data tab shows before the list arrives is
+  // read from here — loading, from where and how far, or what failed — so
+  // "No data loaded" is never said while data is on its way.
+  load:           null,
   bfInput:        '',
   bfBits:         '1',
   bfOnlyMatches:  false,

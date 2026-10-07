@@ -116,15 +116,17 @@ async function loadFromUrl(url, { kind = 'github', announce = true } = {}) {
   const btn = document.getElementById('btn-load-gh');
   if (announce && btn) btn.disabled = true;
   if (announce) setHeaderLabel('btn-load-gh', 'Loading…');
+  loadStep(kind);
   const t0 = _dbClock();
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
+    const text = await readLoadText(res, kind);
     applyStationDoc(text, { kind, ms: Math.round(_dbClock() - t0) });
   } catch (err) {
     if (announce) alert(`Failed to load from URL: ${err.message}`);
     state.loadError = `${SOURCE_LABELS[kind] || url}: ${err && err.message || err}`;
+    loadFailed(kind, err);
     return false;
   } finally {
     if (announce && btn) btn.disabled = false;
@@ -157,6 +159,7 @@ function loadFromGitHub() {
 // anyway and PostgREST honours it, so the document arrives gzipped without
 // anyone asking — roughly 2.3 MB becoming a few hundred KB.
 async function loadFromApi({ announce = true } = {}) {
+  loadStep('api');
   const t0 = _dbClock();
   try {
     const res = await fetch(`${DB_URL}/rpc/stations_doc`, {
@@ -175,7 +178,7 @@ async function loadFromApi({ announce = true } = {}) {
       } catch (_) { /* not JSON; the status line stands */ }
       throw new Error(detail);
     }
-    const text = await res.text();
+    const text = await readLoadText(res, 'api');
     applyStationDoc(text, { kind: 'api', ms: Math.round(_dbClock() - t0) });
   } catch (err) {
     // Same rejection for DNS failure, CORS refusal, no network, and a project
@@ -183,6 +186,7 @@ async function loadFromApi({ announce = true } = {}) {
     // them. Record what is known and let the caller fall back.
     state.loadError = `the datastore: ${err && err.message || err}`;
     if (announce) alert(`Failed to load from the datastore: ${err && err.message || err}`);
+    loadFailed('api', err);
     return false;
   }
   renderAfterLoad();
@@ -197,16 +201,170 @@ async function loadFromApi({ announce = true } = {}) {
 // paused. Falling back to the committed stations.json turns that from "no data"
 // into "yesterday's data" — which is only acceptable because the header then
 // says so rather than letting a stale file pass for the database.
+//
+// Each step says so as it happens (#212): until a list lands, a data tab shows
+// which source is being asked and how far through it is, and if none answers,
+// what was tried and why each failed — never "No data loaded" while data is on
+// its way.
 async function autoLoad() {
-  if (await loadFromApi({ announce: false })) return;
+  state.load = { busy: true, kind: null, got: 0, total: null, about: null, tried: [], retry: false };
+  updateHeaderStats();
+  const ok = await loadFromApi({ announce: false })
+    // The copy committed next to the app. Same file as GitHub raw, one less
+    // hop, and it is what this app loaded from before there was a datastore.
+    // No such thing over file://, where there is no server to ask.
+    || (location.protocol !== 'file:'
+        && await loadFromUrl('stations.json', { kind: 'bundled', announce: false }))
+    || await loadFromUrl(GITHUB_RAW_URL, { kind: 'github', announce: false });
+  loadFinished(ok);
+}
 
-  // The copy committed next to the app. Same file as GitHub raw, one less hop,
-  // and it is what this app loaded from before there was a datastore. No such
-  // thing over file://, where there is no server to ask.
-  if (location.protocol !== 'file:'
-      && await loadFromUrl('stations.json', { kind: 'bundled', announce: false })) return;
+// ── The first load, said as it happens (#212) ────────────────────────────────
+//
+// Until autoLoad() lands a list, every data tab is drawn from state.load: the
+// source being asked, how much of it has arrived, and the sources that have
+// already failed. The steps below are no-ops outside the automatic chain — a
+// button press has its own way of saying what happened.
 
-  await loadFromUrl(GITHUB_RAW_URL, { kind: 'github', announce: false });
+// The source being asked, as the card says it.
+const LOAD_ASKING = {
+  api:     'the datastore',
+  bundled: 'the copy of stations.json on this site',
+  github:  'the copy of stations.json on GitHub',
+};
+
+function loadStep(kind) {
+  const ld = state.load;
+  if (!ld || !ld.busy) return;
+  ld.kind = kind;
+  ld.got = 0;
+  ld.total = null;
+  ld.about = null;
+  paintLoad();
+}
+
+function loadFailed(kind, err) {
+  const ld = state.load;
+  if (!ld || !ld.busy) return;
+  ld.tried.push({ kind, error: String((err && err.message) || err) });
+  paintLoad();
+}
+
+// The body, read as it arrives so the card can say how far through it is.
+//
+// A size is only believed when the bytes it counts are the bytes being read.
+// A compressed response's Content-Length is the compressed size while the
+// stream hands over the expanded one — and a cross-origin response hides
+// whether it is compressed at all — so the exact size is taken only from a
+// same-origin answer that says it is not encoded. Failing that, the size this
+// source had last time on this device stands in as an "about", and a count
+// that runs past it drops back to saying how much has arrived.
+async function readLoadText(res, kind) {
+  const ld = state.load;
+  if (!(ld && ld.busy && ld.kind === kind) || !res.body || typeof res.body.getReader !== 'function'
+      || typeof TextDecoder === 'undefined') {
+    return res.text();
+  }
+  const len = Number(res.headers.get('Content-Length')) || 0;
+  const exact = res.type === 'basic' && len > 0 && !res.headers.get('Content-Encoding') ? len : null;
+  const sizeKey = `mn-load-bytes-${kind}`;
+  let about = null;
+  try { about = Number(localStorage.getItem(sizeKey)) || null; } catch (_) {}
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  const parts = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    got += value.byteLength;
+    parts.push(decoder.decode(value, { stream: true }));
+    ld.got = got;
+    ld.total = exact && got <= exact ? exact : null;
+    ld.about = !ld.total && about && got <= about ? about : null;
+    paintLoad();
+  }
+  parts.push(decoder.decode());
+  try { localStorage.setItem(sizeKey, String(got)); } catch (_) {}
+  return parts.join('');
+}
+
+// The chain is over: either a list landed (and was drawn on the way), or
+// nothing answered and the card turns into one that says so.
+//
+// What a screen reader is told keeps to the live region's first rule (core.js,
+// announce): the list arriving by itself is not news, so a load that works
+// says nothing; a load that fails says so once, because the page it leaves is
+// not the one that was opened; and Try again, which somebody pressed, says how
+// it went either way.
+function loadFinished(ok) {
+  const ld = state.load;
+  if (!ld) return;
+  ld.busy = false;
+  if (ok) {
+    if (ld.retry && state.data) announce(`Station list loaded — ${state.data.stations.length} stations`);
+    return;
+  }
+  // A list loaded by hand while the chain was failing is still a list.
+  if (state.data) return;
+  updateHeaderStats();
+  // Only the card is redrawn: a tab that needs no station list (the Serial
+  // Monitor with a radio on it) is not torn down to say that one did not come.
+  if (document.getElementById('load-card')) renderMain();
+  announce('The station list could not be loaded — every source failed. Try again, or load a file.');
+}
+
+// The failure card's ↻ Try again: the whole chain, from the datastore.
+function retryLoad() {
+  if (state.data || (state.load && state.load.busy)) return;
+  autoLoad();
+  state.load.retry = true;
+  renderMain();
+}
+
+// Repaints the card in place, once a frame at most — the body arrives in
+// hundreds of chunks.
+let loadPaintQueued = false;
+function paintLoad() {
+  if (loadPaintQueued) return;
+  loadPaintQueued = true;
+  const run = () => {
+    loadPaintQueued = false;
+    const card = document.getElementById('load-card');
+    if (card && !state.data && state.load && state.load.busy) card.innerHTML = loadCardInner();
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+  else setTimeout(run, 16);
+}
+
+const _mb = n => n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`;
+
+// What the loading card says: the source, the bar, the count, and what has
+// already failed. Before autoLoad() has started — the first render comes a
+// moment before it — it says it is starting.
+function loadCardInner() {
+  const ld = state.load || { kind: null, got: 0, total: null, about: null, tried: [] };
+  const asking = LOAD_ASKING[ld.kind] || ld.kind;
+  const step = !ld.kind ? 'Starting…'
+    : ld.tried.length ? `Trying ${asking} instead…` : `Asking ${asking}…`;
+  const size = ld.total || ld.about;
+  const bar = size ? `value="${ld.got}" max="${size}"` : '';
+  const count = !ld.got ? ''
+    : ld.total ? `${_mb(ld.got)} of ${_mb(ld.total)}`
+    : ld.about ? `${_mb(ld.got)} of about ${_mb(ld.about)}`
+    : `${_mb(ld.got)} received`;
+  return `
+        <h2>Loading the station list…</h2>
+        <p class="small" id="load-step">${esc(step)}</p>
+        <progress class="load-bar" id="load-bar" ${bar} aria-label="Station list download"></progress>
+        <p class="small txt-muted" id="load-got">${count ? esc(count) : '&nbsp;'}</p>
+        ${loadTriedHtml(ld.tried)}`;
+}
+
+function loadTriedHtml(tried) {
+  if (!tried || !tried.length) return '';
+  return `<ul class="load-tried small">${tried.map(t =>
+    `<li><span class="txt-bad" aria-hidden="true">✗</span> ${esc(SOURCE_LABELS[t.kind] || t.kind)} — <span class="txt-muted">${esc(t.error)}</span></li>`).join('')}</ul>`;
 }
 
 // Loading and drawing are deliberately two functions, and the seam between them
@@ -258,6 +416,9 @@ function renderAfterLoad() {
   MemMeter.render();
   renderTabs();
   renderMain();
+  // The station and the view a link named, now that there are stations to put
+  // them on the map with (route.js, #211).
+  if (typeof Route !== 'undefined') Route.afterLoad();
 }
 
 // Parse-and-draw, as it always was. onFileLoad() and anything outside this file
@@ -269,7 +430,15 @@ function loadJson(text, source) {
 
 function updateHeaderStats() {
   const el = document.getElementById('hdr-stats');
-  if (!el || !state.data) return;
+  if (!el) return;
+  // Before a list has landed, the line says which of the two it is (#212): on
+  // its way, or not coming — on every tab, the ones that need no list included.
+  if (!state.data) {
+    const failed = !!(state.load && !state.load.busy);
+    el.textContent = failed ? 'Station list not loaded' : 'Loading stations…';
+    el.title = failed ? 'Every source failed — the Stations tab says what was tried, with Try again' : '';
+    return;
+  }
   const s = state.data.stations;
   const src = state.dataSource;
   // The source rides along with the counts because this line is on screen on
@@ -1506,6 +1675,10 @@ function switchTab(id) {
   // registry now, and each module registers itself — core.js and #142 say why.
   runTabTeardowns();
   state.activeTab = id;
+  // A step in the browser's history, and the address saying where you are
+  // (route.js, #211) — before the render, so a render that finds something
+  // to say about the address writes over this step rather than the last.
+  if (typeof Route !== 'undefined') Route.tabChanged();
   // Counted once per tab per page (admin-dashboard.js) — which tabs people
   // actually open is one of the dashboard's questions.
   if (typeof AdminDash !== 'undefined') AdminDash.beacon(id);
@@ -3024,7 +3197,13 @@ function renderMain() {
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
   // and two copies of one id is a page where getElementById finds the stale one.
   dropStationsCards();
-  if (!state.data && !noDataTabs.includes(state.activeTab)) { el.innerHTML = renderEmpty(); return; }
+  // No list yet: on its way (the loading card) or not coming (what was tried),
+  // read off state.load — #212.
+  if (!state.data && !noDataTabs.includes(state.activeTab)) {
+    el.innerHTML = state.load && !state.load.busy ? renderEmpty() : renderLoading();
+    if (typeof Route !== 'undefined') Route.sync();
+    return;
+  }
   switch (state.activeTab) {
     // The cards go to wherever they belong before anything paints into them or
     // measures them, and before the map is built — so the side panel is at its
@@ -3066,25 +3245,53 @@ function renderMain() {
     default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }
   updateChromeHeight();     // three tabs size their own scrollers off it
+  // The address says where the app is now, without a new step (route.js).
+  if (typeof Route !== 'undefined') Route.sync();
 }
 
 // ── Empty state ────────────────────────────────────────────────────────────────
 
-function renderEmpty() {
+// While the list is on its way: the card loadCardInner() fills, and
+// paintLoad() repaints as the bytes arrive. aria-busy, so a screen reader
+// waits for the outcome rather than reading every count — loadFinished()
+// says the outcome once.
+function renderLoading() {
   return `
     <div class="page empty-page" style="--page-max:600px">
-      <div class="panel empty-card">
-        <h2>No data loaded</h2>
-        <p class="small">Load a <strong>stations.json</strong> file to get started.
-          If you haven't created one yet, use the
-          <a href="migrate.html">Migration Tool</a> to convert your existing CSVs.</p>
+      <div class="panel empty-card load-card" id="load-card" aria-busy="true">${loadCardInner()}
+      </div>
+    </div>`;
+}
+
+// When nothing could be had: what was tried and why each failed, and the
+// ways on — the whole chain again, a file from this device, GitHub on its
+// own, or the Admin tab's data source panel. The Migration Tool is still
+// here for somebody starting from old CSVs, but it no longer leads: nobody
+// opening the app needs it, and it used to be the first thing a slow
+// connection showed them.
+function renderEmpty() {
+  const tried = (state.load && state.load.tried) || [];
+  const failed = tried.length > 0;
+  return `
+    <div class="page empty-page" style="--page-max:600px">
+      <div class="panel empty-card load-card" id="load-card">
+        <h2>${failed ? 'The station list could not be loaded' : 'No data loaded'}</h2>
+        ${failed
+          ? `<p class="small">Every source was tried, in this order:</p>
+        ${loadTriedHtml(tried)}
+        <p class="small load-also">Check the connection and try again, or load a copy of
+          <strong>stations.json</strong> from this device.</p>`
+          : `<p class="small">Load a <strong>stations.json</strong> file to get started.</p>`}
         <div class="empty-actions">
-          <button class="primary" onclick="document.getElementById('file-input').click()">
+          ${failed ? '<button class="primary" onclick="retryLoad()">↻ Try again</button>' : ''}
+          <button${failed ? '' : ' class="primary"'} onclick="document.getElementById('file-input').click()">
             Load stations.json
           </button>
           <button onclick="loadFromGitHub()">Load from GitHub</button>
           <button onclick="switchTab('admin')">🛠️ Admin</button>
         </div>
+        <p class="small txt-muted load-also">Starting from CSVs instead? The
+          <a href="migrate.html">Migration Tool</a> turns them into a stations.json.</p>
       </div>
     </div>`;
 }
@@ -5112,6 +5319,8 @@ function initMap() {
   // (station-trail.js). After MapTwin, whose stage it stands in while the
   // twin is up, and before the card's repaint below, which says it again.
   StationTrail.attach(state.map);
+  // The address follows the view once the map stops moving (route.js, #211).
+  if (typeof Route !== 'undefined') Route.attach(state.map);
   // Before MapDraw, for MapMovePin's reason: the tools that take a map click
   // have to know which map before anybody arms one.
   MapHere.attach(state.map);
@@ -5737,6 +5946,9 @@ function stationActionGroups(s) {
            title="Select this station in the Stations list ${stationsCardsWhere()}">🗒️ Show in the list ${stationsCardsArrow()}</button>`,
       `<button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
            title="Zoom the map all the way in on this station — where the map offers its digital twin">🔍 Zoom to station</button>`,
+      // A link that opens this card on this view for somebody else (#211).
+      `<button type="button" class="pill mn-copy-link" onclick="Route.copyLink(this, '${escAttr(s.id)}')"
+           title="Copy a link to this station — it opens the Stations map here, with this card up">🔗 Copy link</button>`,
       fieldDataPillHtml(s),
       twinPillHtml(s),
       fieldPhotosPillHtml(s),
@@ -6627,6 +6839,9 @@ function showStationCard(id, { takeFocus = false, opener = document.activeElemen
   // map's top row names and lists (station-trail.js).
   StationTrail.visit(id);
   repaintStnCard();
+  // …and a step in the browser's history: back goes to what was up before it
+  // (route.js, #211).
+  if (typeof Route !== 'undefined') Route.stationShown(id);
   if (takeFocus) {
     const el = document.getElementById('stn-card');
     if (el) el.focus();
@@ -6662,6 +6877,7 @@ function repaintStnCard() {
     state.stnCard.id = null; el.hidden = true; el.innerHTML = '';
     MapLeader.sync();
     StationTrail.sync();
+    if (typeof Route !== 'undefined') Route.sync();
     return;
   }
   const controls = () => [...el.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')];
@@ -6730,6 +6946,9 @@ function closeStnCard(refocus = true) {
   el.innerHTML = '';
   MapLeader.sync();                         // and the leader goes with it
   StationTrail.sync();                      // whose pill now brings it back
+  // The address drops the station, in place: closing is not a step to go
+  // back through (route.js).
+  if (typeof Route !== 'undefined') Route.sync();
   const back = state.stnCard.opener;
   state.stnCard.opener = null;
   if (!refocus) return;
