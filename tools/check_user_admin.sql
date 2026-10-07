@@ -53,10 +53,10 @@ insert into meganet.editor_allow (entry, note) values
   ('@ua-domain.test',        'check_user_admin — rolled back')
 on conflict (entry) do nothing;
 
-insert into auth.users (id, email) values
-  ('00000000-0000-4000-8000-00000000ad01', 'ua-editor@example.test'),
-  ('00000000-0000-4000-8000-00000000ad02', 'ua-admin@example.test'),
-  ('00000000-0000-4000-8000-00000000ad03', 'ua-other@ua-domain.test')
+insert into auth.users (id, email, email_confirmed_at) values
+  ('00000000-0000-4000-8000-00000000ad01', 'ua-editor@example.test', now()),
+  ('00000000-0000-4000-8000-00000000ad02', 'ua-admin@example.test', now()),
+  ('00000000-0000-4000-8000-00000000ad03', 'ua-other@ua-domain.test', now())
 on conflict (id) do nothing;
 
 -- Only this script's administrator, so "the last administrator" is testable
@@ -152,10 +152,10 @@ $$;
 insert into meganet.editor_allow (entry, note, initial_role) values
   ('ua-newadmin@example.test', 'check_user_admin — rolled back', 'admin'),
   ('@ua-viewers.test',         'check_user_admin — rolled back', 'viewer');
-insert into auth.users (id, email) values
-  ('00000000-0000-4000-8000-00000000ad04', 'ua-newadmin@example.test'),
-  ('00000000-0000-4000-8000-00000000ad05', 'someone@ua-viewers.test'),
-  ('00000000-0000-4000-8000-00000000ad06', 'plain@ua-domain.test');
+insert into auth.users (id, email, email_confirmed_at) values
+  ('00000000-0000-4000-8000-00000000ad04', 'ua-newadmin@example.test', now()),
+  ('00000000-0000-4000-8000-00000000ad05', 'someone@ua-viewers.test', now()),
+  ('00000000-0000-4000-8000-00000000ad06', 'plain@ua-domain.test', now());
 
 do $$
 begin

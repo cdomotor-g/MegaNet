@@ -113,9 +113,9 @@ insert into meganet.editor_allow (entry, note) values
   ('proposed-admin@example.test',  'check_proposed_stations — rolled back')
 on conflict (entry) do nothing;
 
-insert into auth.users (id, email) values
-  ('00000000-0000-4000-8000-0000000c0f01', 'proposed-editor@example.test'),
-  ('00000000-0000-4000-8000-0000000c0f02', 'proposed-admin@example.test')
+insert into auth.users (id, email, email_confirmed_at) values
+  ('00000000-0000-4000-8000-0000000c0f01', 'proposed-editor@example.test', now()),
+  ('00000000-0000-4000-8000-0000000c0f02', 'proposed-admin@example.test', now())
 on conflict (id) do nothing;
 
 update meganet.app_user set role = 'admin' where id = '00000000-0000-4000-8000-0000000c0f02';

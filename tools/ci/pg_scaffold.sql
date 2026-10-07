@@ -37,10 +37,10 @@ create table if not exists auth.users (
   raw_user_meta_data jsonb default '{}'::jsonb,
   created_at timestamptz default now(),
   last_sign_in_at timestamptz,
-  -- Supabase's is null until the address is confirmed, and since 0054
-  -- is_editor() requires it. The checks' synthetic users stand for people who
-  -- have confirmed theirs, so here it defaults to the moment they were made.
-  email_confirmed_at timestamptz default now()
+  -- Null until the address is confirmed, as in Supabase, and since 0054
+  -- is_editor() requires it. No default here: a check whose user is meant to
+  -- edit says it is confirmed, exactly as it would have to against the real one.
+  email_confirmed_at timestamptz
 );
 
 -- The three claim readers, in their modern claims-JSON form — the form the

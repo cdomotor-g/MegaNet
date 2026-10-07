@@ -145,10 +145,10 @@ insert into meganet.editor_allow (entry, note) values
   ('review-former@example.test', 'check_photo_review — rolled back')
 on conflict (entry) do nothing;
 
-insert into auth.users (id, email) values
-  ('00000000-0000-4000-8000-0000000c0e01', 'review-editor@example.test'),
-  ('00000000-0000-4000-8000-0000000c0e02', 'review-admin@example.test'),
-  ('00000000-0000-4000-8000-0000000c0e03', 'review-former@example.test')
+insert into auth.users (id, email, email_confirmed_at) values
+  ('00000000-0000-4000-8000-0000000c0e01', 'review-editor@example.test', now()),
+  ('00000000-0000-4000-8000-0000000c0e02', 'review-admin@example.test', now()),
+  ('00000000-0000-4000-8000-0000000c0e03', 'review-former@example.test', now())
 on conflict (id) do nothing;
 
 update meganet.app_user set role = 'admin'

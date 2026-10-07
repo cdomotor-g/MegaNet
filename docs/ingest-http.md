@@ -371,10 +371,13 @@ curl -sS "$URL/rest/v1/rpc/ingest_token_request_status" \
 # => {"status":"approved","label":"Mt Stuart base"} — now post readings with $TOKEN
 ```
 
-The status is one of `pending`, `approved`, `denied`, `expired`, `withdrawn` (the
-device called `withdraw_ingest_token_request` to stop waiting), `revoked` or
+The status is one of `pending`, `approved`, `denied`, `expired`, `revoked` or
 `unknown`. A token asks once: after a denial or an expiry, make a new one and ask
-again. `429` means 20 requests are already waiting — try again in a few minutes.
+again. To stop waiting, call `withdraw_ingest_token_request` the same way: a
+waiting request is deleted and the answer is `withdrawn` (asked again, the status
+reads `unknown`, because nothing is left); a request already decided is left
+alone and the answer is its status — so a device that gives up just after it was
+approved is told `approved`, and keeps its token. `429` means 20 requests are already waiting — try again in a few minutes.
 `payload.host_station_id` may name the station the device sits at; the
 administrator sees it as a suggestion.
 

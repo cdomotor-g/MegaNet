@@ -112,9 +112,9 @@ insert into meganet.editor_allow (entry, note) values
   ('req-editor@example.test', 'check_ingest_token_requests — rolled back'),
   ('req-admin@example.test',  'check_ingest_token_requests — rolled back')
 on conflict (entry) do nothing;
-insert into auth.users (id, email) values
-  ('00000000-0000-4000-8000-0000000dc601', 'req-editor@example.test'),
-  ('00000000-0000-4000-8000-0000000dc602', 'req-admin@example.test')
+insert into auth.users (id, email, email_confirmed_at) values
+  ('00000000-0000-4000-8000-0000000dc601', 'req-editor@example.test', now()),
+  ('00000000-0000-4000-8000-0000000dc602', 'req-admin@example.test', now())
 on conflict (id) do nothing;
 update meganet.app_user set role = 'admin' where id = '00000000-0000-4000-8000-0000000dc602';
 
@@ -371,11 +371,15 @@ declare
   v_w jsonb;
 begin
   v_w := pg_temp.as_device_keep(pg_temp.tok(5), 'select meganet.withdraw_ingest_token_request()::text')::jsonb;
+  -- Since 0053 a withdrawn request is deleted, not kept as 'withdrawn' for 30
+  -- days: request-then-withdraw in a loop must leave nothing behind (H-3).
   perform pg_temp.check_that('a device that stops waiting withdraws its request, and it cannot then be approved',
     v_w ->> 'status' = 'withdrawn'
-      and pg_temp.as_role('authenticated', c_admin, format('select meganet.admin_approve_ingest_token_request(%s)::text', v5)) = 'ERROR 22023'
-      and exists (select 1 from jsonb_array_elements(pg_temp.as_role('authenticated', c_admin, 'select meganet.admin_ingest_token_requests()::text')::jsonb) e
-                   where e ->> 'id' = v5 and e ->> 'status' = 'withdrawn'), v_w::text);
+      and pg_temp.as_role('authenticated', c_admin, format('select meganet.admin_approve_ingest_token_request(%s)::text', v5)) = 'ERROR 22023', v_w::text);
+  perform pg_temp.check_that('…and leaves nothing behind: no row, and nothing on the Admin tab''s list (0053)',
+    not exists (select 1 from meganet.ingest_token_request where id = v5::bigint)
+      and not exists (select 1 from jsonb_array_elements(pg_temp.as_role('authenticated', c_admin, 'select meganet.admin_ingest_token_requests()::text')::jsonb) e
+                       where e ->> 'id' = v5));
   perform pg_temp.check_that('withdrawing an approved request leaves it approved',
     (pg_temp.as_device(pg_temp.tok(3), 'select meganet.withdraw_ingest_token_request()::text')::jsonb ->> 'status') = 'approved');
 
@@ -385,9 +389,10 @@ begin
       and exists (select 1 from jsonb_array_elements(pg_temp.as_role('authenticated', c_admin, 'select meganet.admin_ingest_token_requests()::text')::jsonb) e
                    where e ->> 'id' = v6 and e ->> 'status' = 'expired')
       and pg_temp.as_role('authenticated', c_admin, format('select meganet.admin_approve_ingest_token_request(%s)::text', v6)) = 'ERROR 22023');
-  perform pg_temp.check_that('a token that has asked before cannot ask again — denied, withdrawn or expired (23505)',
+  -- A withdrawn request is gone (0053), so its token is not on this list: it has
+  -- no decision a second request could be mistaken for.
+  perform pg_temp.check_that('a token that has been decided cannot ask again — denied or expired (23505)',
     pg_temp.as_device(pg_temp.tok(4), $q$select meganet.request_ingest_token('{"label":"again"}')::text$q$) = 'ERROR 23505'
-      and pg_temp.as_device(pg_temp.tok(5), $q$select meganet.request_ingest_token('{"label":"again"}')::text$q$) = 'ERROR 23505'
       and pg_temp.as_device(pg_temp.tok(6), $q$select meganet.request_ingest_token('{"label":"again"}')::text$q$) = 'ERROR 23505');
 
   -- A day past its expiry, a request is swept by the next one to arrive.

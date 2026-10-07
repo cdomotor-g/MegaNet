@@ -105,8 +105,17 @@ on conflict (id) do nothing;
 update meganet.station set deleted_at = now() where id = '_check_fp_gone';
 
 insert into meganet.editor_allow (entry, note)
-values ('photo-editor@example.test', 'check_field_photos — rolled back')
+values ('photo-editor@example.test', 'check_field_photos — rolled back'),
+       ('photo-unconfirmed@example.test', 'check_field_photos — rolled back')
 on conflict (entry) do nothing;
+
+-- Since 0054 an editor is proven by auth.users, not by the token's claims: the
+-- token's sub must be a user whose address is confirmed. The second user is
+-- allowed but has not confirmed, so the allow list alone must not let it in.
+insert into auth.users (id, email, email_confirmed_at) values
+  ('00000000-0000-4000-8000-0000000f0e01', 'photo-editor@example.test', now()),
+  ('00000000-0000-4000-8000-0000000f0e02', 'photo-unconfirmed@example.test', null)
+on conflict (id) do nothing;
 
 create temporary table _ids (k text primary key, id uuid, sha text) on commit drop;
 
@@ -384,9 +393,13 @@ begin
     format('select meganet.add_field_photo(%L::jsonb)::text', pg_temp.photo()));
   perform pg_temp.check_that('a signed-in address that is not an editor cannot add one', v_res like 'ERROR 42501', v_res);
 
-  v_res := pg_temp.as_role('authenticated', '{"role":"authenticated","email":"photo-editor@example.test"}',
+  v_res := pg_temp.as_role('authenticated', '{"role":"authenticated","sub":"00000000-0000-4000-8000-0000000f0e01","email":"photo-editor@example.test"}',
     format('select meganet.add_field_photo(%L::jsonb) ->> %L', pg_temp.photo(), 'uploaded_by'));
   perform pg_temp.check_that('an editor can, and is recorded as the one who did', v_res = 'photo-editor@example.test', v_res);
+
+  v_res := pg_temp.as_role('authenticated', '{"role":"authenticated","sub":"00000000-0000-4000-8000-0000000f0e02","email":"photo-unconfirmed@example.test"}',
+    format('select meganet.add_field_photo(%L::jsonb)::text', pg_temp.photo()));
+  perform pg_temp.check_that('an allowed address that is not confirmed cannot (0054)', v_res like 'ERROR 42501', v_res);
 
   v_res := pg_temp.as_role('service_role', '{"role":"service_role"}',
     format('select meganet.add_field_photo(%L::jsonb) ->> %L',
@@ -495,11 +508,11 @@ begin
     v_out ->> 'id' is not null and v_out ->> 'origin' = 'upload');
 
   if exists (select 1 from pg_catalog.pg_roles where rolname = 'authenticated') then
-    v_res := pg_temp.as_role('authenticated', '{"role":"authenticated","email":"photo-editor@example.test"}',
+    v_res := pg_temp.as_role('authenticated', '{"role":"authenticated","sub":"00000000-0000-4000-8000-0000000f0e01","email":"photo-editor@example.test"}',
       format('select count(*)::text from meganet.field_photo where id = %L', v_id));
     perform pg_temp.check_that('an editor does not see the tombstone', v_res = '0', v_res);
 
-    v_res := pg_temp.as_role('authenticated', '{"role":"authenticated","email":"photo-editor@example.test"}',
+    v_res := pg_temp.as_role('authenticated', '{"role":"authenticated","sub":"00000000-0000-4000-8000-0000000f0e01","email":"photo-editor@example.test"}',
       format('select count(*)::text from meganet.field_photo where id = %L', (select id from _ids where k = 'unplaced')));
     perform pg_temp.check_that('…and does see a live photo', v_res = '1', v_res);
 
@@ -510,7 +523,7 @@ begin
     v_res := pg_temp.as_role('anon', '{"role":"anon"}', 'select count(*)::text from meganet.field_photo');
     perform pg_temp.check_that('anonymous cannot read the table at all', v_res = 'ERROR 42501', v_res);
 
-    v_res := pg_temp.as_role('authenticated', '{"role":"authenticated","email":"photo-editor@example.test"}',
+    v_res := pg_temp.as_role('authenticated', '{"role":"authenticated","sub":"00000000-0000-4000-8000-0000000f0e01","email":"photo-editor@example.test"}',
       'select count(*)::text from meganet.field_photo_sync_cursor');
     perform pg_temp.check_that('not even an editor can read the sync''s cursor', v_res = 'ERROR 42501', v_res);
   end if;

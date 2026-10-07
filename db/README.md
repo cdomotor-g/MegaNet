@@ -818,8 +818,10 @@ partial unique index means two waiting requests never show the same code.
 request lasts 30 minutes, at most 20 wait at once (`PT429`, HTTP 429, beyond that),
 a description is at most 4 KB, and until approved the token opens nothing. A retry
 while it waits answers the same request and code; a token that has asked once and
-been denied, withdrawn or expired cannot ask again (`23505`) — the device makes a new
-one. The status call answers only about the caller's own token and never names the
+been denied or expired cannot ask again (`23505`) — the device makes a new one.
+Withdrawing deletes a waiting request outright (`0053`, so request-then-withdraw in a
+loop leaves nothing behind) and answers `withdrawn`; a decided request is left alone
+and the answer is its status (`0058`). The status call answers only about the caller's own token and never names the
 approver. Requests a day past expiry, and decisions a month old, are swept by the
 next request.
 

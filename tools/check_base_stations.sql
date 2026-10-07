@@ -109,9 +109,9 @@ insert into meganet.editor_allow (entry, note) values
   ('bs-editor@example.test', 'check_base_stations — rolled back'),
   ('bs-admin@example.test',  'check_base_stations — rolled back')
 on conflict (entry) do nothing;
-insert into auth.users (id, email) values
-  ('00000000-0000-4000-8000-0000000dc701', 'bs-editor@example.test'),
-  ('00000000-0000-4000-8000-0000000dc702', 'bs-admin@example.test')
+insert into auth.users (id, email, email_confirmed_at) values
+  ('00000000-0000-4000-8000-0000000dc701', 'bs-editor@example.test', now()),
+  ('00000000-0000-4000-8000-0000000dc702', 'bs-admin@example.test', now())
 on conflict (id) do nothing;
 update meganet.app_user set role = 'admin' where id = '00000000-0000-4000-8000-0000000dc702';
 

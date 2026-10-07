@@ -105,8 +105,8 @@ insert into meganet.editor_allow (entry, note) values
   ('facing-editor@example.test', 'check_station_facing — rolled back')
 on conflict (entry) do nothing;
 
-insert into auth.users (id, email) values
-  ('00000000-0000-4000-8000-0000000c0f41', 'facing-editor@example.test')
+insert into auth.users (id, email, email_confirmed_at) values
+  ('00000000-0000-4000-8000-0000000c0f41', 'facing-editor@example.test', now())
 on conflict (id) do nothing;
 
 create temporary table _who (k text primary key, role text, claims text) on commit drop;
