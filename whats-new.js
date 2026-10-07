@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 6, date: '2026-10-07', items: [
+      '<strong>Opens with no signal.</strong> A device that has opened Flood-Net before opens it again out of range, '
+        + 'with the station list it last had — the header says it is a <strong>saved copy</strong>, and how old — and '
+        + 'the inspection and maintenance sheets ready to start. On a phone it can be added to the home screen, and '
+        + 'opens like an app.',
+      'A page opened from the saved copy looks, once there is a signal, for a newer version, and says when there is '
+        + 'one — <strong>Reload now</strong> or <strong>Later</strong>. It never reloads by itself, so a sheet half '
+        + 'filled in is never lost.',
+    ] },
     { n: 5, date: '2026-10-07', items: [
       '<strong>⤓ Export</strong> in the banner: what the tab you are on can save as a file, in one place — the station '
         + 'list as CSV, GeoJSON or KML (with the filters you have set), a chart, a table, a drawing. A tab with nothing '
