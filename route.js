@@ -30,7 +30,13 @@
 //
 // ── With nothing in the address ─────────────────────────────────────────────
 // The last tab used on this device opens, rather than always Stations. A link
-// that names a station or a map view and no tab means the Stations tab.
+// that names a station or a map view and no tab means the Stations tab. And a
+// device that has never opened the app at all — no `mn-` key in its storage —
+// opens on the Site Map, the app's own guide, once (#222): firstVisit() says
+// so, and site-map.js greets them. A brand-new device that arrived by a link
+// goes where the link says; newDevice() is true for both, and is what keeps
+// What's new from announcing every change ever made to somebody who has just
+// arrived (whats-new.js).
 //
 // ── Before the station list has arrived ─────────────────────────────────────
 // A station and a view can only be shown on a map with stations on it, and
@@ -44,7 +50,7 @@
 // gets an app that works and an address that does not follow it.
 //
 // Exposes: start, sync, tabChanged, stationShown, attach, afterLoad, read,
-//          href, copyLink.
+//          href, copyLink, newDevice, firstVisit.
 // Requires: core.js (state, TAB_LIST, announce, copyToClipboard), app.js
 //           (switchTab, showStationCard, closeStnCard), map-leader.js.
 
@@ -61,6 +67,8 @@ const Route = (() => {
   let pending = null;
   let mapTimer = null;
   let rememberedTab = null;
+  let newDevice = false;
+  let firstVisit = false;
 
   const validTab = id => typeof id === 'string' && TAB_LIST.some(t => t.id === id);
 
@@ -91,6 +99,10 @@ const Route = (() => {
       tab: validTab(tab) ? tab : null,
       station: q.get('station') || null,
       map: parseMap(q.get('map')),
+      // Whether the address names anything of ours at all, sound or not: a
+      // link that does — even to a tab that has since gone — is a link, and
+      // not a first visit.
+      named: q.has('tab') || q.has('station') || q.has('map'),
     };
   }
 
@@ -254,11 +266,19 @@ const Route = (() => {
     // A Workbench case shared without a tab (every link made before this file)
     // is a link to the Workbench.
     if (!tab && /^#wb/.test(location.hash || '')) tab = 'workbench';
-    if (!tab) {
-      let last = null;
-      try { last = localStorage.getItem(TAB_KEY); } catch (_) {}
-      if (validTab(last)) tab = last;
-    }
+    // Asked before anything below writes a key. Storage that refuses to be
+    // read is not a new device: a browser that blocks it would otherwise be
+    // greeted by the guide on every visit.
+    let last = null;
+    try {
+      last = localStorage.getItem(TAB_KEY);
+      newDevice = true;
+      for (let i = 0; i < localStorage.length; i++) {
+        if (String(localStorage.key(i)).startsWith('mn-')) { newDevice = false; break; }
+      }
+    } catch (_) { newDevice = false; }
+    if (!tab && validTab(last)) tab = last;
+    if (!tab && newDevice && !want.named && !location.hash) { tab = 'sitemap'; firstVisit = true; }
     if (tab) state.activeTab = tab;
     rememberedTab = validTab(state.activeTab) ? state.activeTab : null;
     if (state.activeTab === 'stations' && (want.station || want.map)) {
@@ -303,5 +323,6 @@ const Route = (() => {
       : flash('✗ Copy failed', 'Could not copy the link to the clipboard'));
   }
 
-  return { start, sync, tabChanged, stationShown, attach, afterLoad, read, href, copyLink };
+  return { start, sync, tabChanged, stationShown, attach, afterLoad, read, href, copyLink,
+           newDevice: () => newDevice, firstVisit: () => firstVisit };
 })();

@@ -141,7 +141,9 @@ async function runtimePhase() {
     page.on('pageerror', e => errors.push(e.message));
     page.on('dialog', d => d.dismiss().catch(() => {}));
 
-    await page.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
+    // On Stations by name: a first visit's bare address opens the Site Map
+    // (#222), and the load-time registrations below are the Stations tab's.
+    await page.goto(server.origin + '/index.html?tab=stations', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(
       () => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations),
       null, { timeout: LOAD_TIMEOUT });
@@ -150,7 +152,8 @@ async function runtimePhase() {
 
     console.log('\nRuntime — each map registers itself, keyed by name\n');
 
-    // init.js renders the Stations tab at load, so its map is already up.
+    // init.js renders the tab the address names at load — Stations here — so
+    // its map is already up.
     check('Stations map registered at load',
       await eq(page, `_liveMaps.has('Stations') && !!_liveMaps.get('Stations')()`));
     check('Stations teardown registered',

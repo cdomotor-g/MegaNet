@@ -374,8 +374,8 @@ async function main() {
       const first = (await open(browser, server, errors, server.url(), {}, ctx)).page;
       await loaded(first);
       const fresh = await where(first);
-      check('a first visit with a bare address opens on Stations, and says so',
-        fresh.active === 'stations' && fresh.tab === 'stations', J(fresh));
+      check('a first visit with a bare address opens the Site Map guide once (#222), and says so',
+        fresh.active === 'sitemap' && fresh.tab === 'sitemap', J(fresh));
       await first.evaluate(() => switchTab('export'));
       await first.close();
       const again = (await open(browser, server, errors, server.url(), {}, ctx)).page;
@@ -417,7 +417,9 @@ async function main() {
       await p.route('**/stations.json', route => refuse
         ? route.fulfill({ status: 503, contentType: 'text/plain', body: 'Service Unavailable' })
         : route.fallback());
-      await p.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+      // On Stations by name: a first visit's bare address is the Site Map,
+      // which needs no list and so shows no loading card.
+      await p.goto(server.url('/index.html?tab=stations'), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
       await p.waitForFunction(() => /could not be loaded/.test((document.querySelector('#load-card h2') || {}).textContent || '')
         && /could not be loaded/.test(document.getElementById('app-status').textContent), null, { timeout: LOAD_TIMEOUT });
       const f = await p.evaluate(() => {

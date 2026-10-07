@@ -96,7 +96,8 @@ async function main() {
     await page.addInitScript(COUNT_STEPS);
     await applyNetworkPolicy(page, server.origin);
     page.on('pageerror', e => errors.push(String(e)));
-    await page.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+    // On Stations by name: a first visit's bare address is the Site Map (#222).
+    await page.goto(server.url('/index.html?tab=stations'), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
     await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data && !!state.map, null, { timeout: LOAD_TIMEOUT });
 
     // ═══════════════════════════════════════════════════════════════════════

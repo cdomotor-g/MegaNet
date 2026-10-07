@@ -319,6 +319,7 @@ const SiteMap = (function () {
     const tabCount = groups.reduce((n, g) => n + g.tabs.length, 0);
     return `
     <div class="page sm-page" id="sm-page" style="--page-max:1180px">
+      ${welcomeHtml()}
       <div class="sm-hero">
         <h2 class="sm-title" id="sm-h"><span aria-hidden="true">🗂️</span> Site map</h2>
         <p class="sm-lede">Every tab in the bar on the left, what it is for, and when you would
@@ -327,7 +328,7 @@ const SiteMap = (function () {
         <ul class="sm-facts" aria-label="At a glance">
           <li><strong>${tabCount}</strong> tabs</li>
           <li><strong>${groups.length}</strong> groups</li>
-          <li><kbd>Ctrl</kbd>+<kbd>K</kbd> finds any of them by what it does</li>
+          <li><kbd>Ctrl</kbd>+<kbd>K</kbd> finds any of them by what it does — and any station or place</li>
         </ul>
       </div>
       ${anatomyHtml()}
@@ -346,6 +347,38 @@ const SiteMap = (function () {
         </div>
       </section>
     </div>`;
+  }
+
+  // A first visit lands here (route.js, #222), and is told why, once: what
+  // this page is, that it will not happen again, and the way to where most
+  // work starts. Got it puts the greeting away for the rest of the visit;
+  // leaving the tab does the same, since a first visit happens once a page.
+  let welcomed = false;
+  function welcomeHtml() {
+    if (welcomed || typeof Route === 'undefined' || !Route.firstVisit()) return '';
+    return `
+      <section class="panel sm-welcome" id="sm-welcome" aria-labelledby="sm-welcome-h">
+        <h3 id="sm-welcome-h">Welcome to Flood-Net</h3>
+        <p>This page is the app's own guide: a card for every tab, what it is for, and a line to
+          its button. It opened by itself because this is the first time this browser has been
+          here — from now on the app opens on the tab you used last. Most work starts on
+          <strong>Stations</strong>.</p>
+        <div class="button-group">
+          <button type="button" class="primary" onclick="SiteMap.dismissWelcome(); switchTab('stations')">📍 Go to Stations</button>
+          <button type="button" onclick="SiteMap.dismissWelcome()">Got it</button>
+        </div>
+      </section>`;
+  }
+
+  function dismissWelcome() {
+    welcomed = true;
+    const el = document.getElementById('sm-welcome');
+    if (!el) return;
+    // Focus that was on its buttons goes to the page's own heading rather
+    // than to <body> with the card it was in.
+    const had = el.contains(document.activeElement);
+    el.remove();
+    if (had) { const h = document.getElementById('sm-h'); if (h) { h.tabIndex = -1; h.focus(); } }
   }
 
   // The screen, drawn: banner, nav, the open tab, the side panel, numbered to
@@ -826,6 +859,9 @@ const SiteMap = (function () {
   // Leaving the tab: the line, the ring, the lit button and the loop, all of
   // them — the svg is on <body>, where the next tab's render does not reach.
   function stop() {
+    // Leaving the page the greeting was on ends it (welcomeHtml): `root` is
+    // only set while this tab is the one drawn.
+    if (root) welcomed = true;
     clearTimeout(hideTimer);
     hoverEl = focusEl = null;
     hide();
@@ -834,5 +870,5 @@ const SiteMap = (function () {
     root = anat = null;
   }
 
-  return { render, init, jump, help, guide: GUIDE, tasks: TASKS };
+  return { render, init, jump, help, dismissWelcome, guide: GUIDE, tasks: TASKS };
 })();

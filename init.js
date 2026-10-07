@@ -26,6 +26,9 @@
   // The tab the address names, or the last one used on this device, before
   // anything is drawn — and back and forward from here on (route.js, #211).
   Route.start();
+  // ✨ What's new: shown if this device has something it has not seen, and a
+  // device that has never been here has seen it all (whats-new.js, #222).
+  WhatsNew.start();
   document.documentElement.setAttribute('data-theme', state.theme);
   setHeaderLabel('btn-theme', state.theme === 'dark' ? 'Light' : 'Dark');
   renderTabs();

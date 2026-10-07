@@ -891,6 +891,15 @@ header p {
   border-color: rgba(255, 255, 255, .5);
 }
 
+/* ✨ What's new (whats-new.js, #222): shown only while there is something this
+   device has not looked at, so it is allowed to stand out the way the
+   signed-in button does — the same lift on the banner, carried by the button
+   and not its label, which the narrow banner hides. */
+.hdr-btn.hdr-new {
+  background: rgba(255, 255, 255, .22);
+  border-color: rgba(255, 255, 255, .5);
+}
+
 /* The icon is decoration while the label is showing, and the whole button once
    the label is gone — it grows to match at the breakpoint below. */
 .hdr-ico {
@@ -15757,6 +15766,30 @@ button.adm-danger:hover { border-color: var(--bad); }
 .sm-hero {
   display: grid;
   gap: var(--sp-2);
+}
+
+/* A first visit's greeting (#222), above the hero: the guide says why it
+   opened by itself, and where most work starts. */
+.sm-welcome { margin-bottom: var(--sp-4); border-left: 4px solid var(--accent); }
+.sm-welcome h3 { margin: 0 0 var(--sp-2); }
+.sm-welcome p { margin: 0 0 var(--sp-3); max-width: 60rem; line-height: var(--lh-body); }
+
+/* What's new, in its dialog: an entry a date, its lines a list; the ones this
+   device had not seen say "new" in words. */
+.wn-entry + .wn-entry { margin-top: var(--sp-4); }
+.wn-date { margin: 0 0 var(--sp-2); font-size: var(--fs-md); }
+.wn-entry ul { margin: 0; padding-left: 1.2rem; line-height: var(--lh-body); }
+.wn-entry li + li { margin-top: var(--sp-1); }
+.wn-tag {
+  display: inline-block;
+  margin-left: var(--sp-1);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  vertical-align: middle;
 }
 
 .sm-title {

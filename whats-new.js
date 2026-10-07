@@ -1,0 +1,86 @@
+// MegaNet — whats-new.js
+//
+// WhatsNew — ✨ What's new in the banner, after a release with changes
+// somebody using the app would notice (#222).
+//
+// The list is written here, for the people using the app, a line each: what
+// changed on screen and where to find it. Not the roadmap's revision notes,
+// which are written for whoever works on the code and say why; not the commit
+// log either. An entry is added in the same push as the change it describes,
+// with the next number — the number, not the date, is what "seen" remembers,
+// because two releases can share a day.
+//
+// The pill shows only while an entry is unseen on this device, and pressing it
+// is seeing them all. A device that has never opened the app (Route's
+// newDevice) has seen everything already: a list of what changed is news only
+// to somebody who knew what it was before.
+//
+// Nothing runs at load. init.js calls start().
+//
+// Exposes: start, open, entries.
+// Requires: core.js (esc), modal.js, route.js.
+
+const WhatsNew = (() => {
+  const SEEN_KEY = 'mn-whats-new';
+
+  // Newest first. `html` is trusted markup — it is written here, not typed in.
+  const ENTRIES = [
+    { n: 1, date: '2026-10-07', items: [
+      '<strong>The address bar says where you are</strong> — the tab, the station whose card is up and the map\'s '
+        + 'view — so a bookmark, a reload or a link sent to somebody opens exactly that. <strong>🔗 Copy link</strong> on a '
+        + 'station\'s card makes one. Back and forward move between tabs and stations.',
+      '<strong>🔎 Search</strong> in the banner, or <kbd>Ctrl</kbd>+<kbd>K</kbd> anywhere: a station by name, number or '
+        + 'ALERT address, a place, a tab or an action, in one box.',
+      '<strong>Loading says what it is doing</strong> — which source it is asking and how much has arrived — and if '
+        + 'nothing answers, what was tried, with <em>Try again</em>.',
+      'A first visit opens the <strong>Site Map</strong>, the app\'s guide to every tab. After that the app opens on '
+        + 'the tab you used last.',
+    ] },
+  ];
+
+  const latest = () => ENTRIES.length ? ENTRIES[0].n : 0;
+
+  function seen() {
+    try { return Number(localStorage.getItem(SEEN_KEY)) || 0; } catch (_) { return latest(); }
+  }
+
+  function markSeen() {
+    try { localStorage.setItem(SEEN_KEY, String(latest())); } catch (_) {}
+    sync();
+  }
+
+  const unseen = () => ENTRIES.filter(e => e.n > seen());
+
+  function sync() {
+    const btn = document.getElementById('btn-whatsnew');
+    if (btn) btn.hidden = !unseen().length;
+  }
+
+  function dateText(iso) {
+    const d = new Date(`${iso}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? iso
+      : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  // Every entry, newest first, the unseen ones marked — then they are seen.
+  function open() {
+    const fresh = new Set(unseen().map(e => e.n));
+    Modal.open({
+      title: 'What\'s new in Flood-Net',
+      html: `<div class="wn">${ENTRIES.map(e => `
+        <section class="wn-entry${fresh.has(e.n) ? ' is-new' : ''}">
+          <h3 class="wn-date">${esc(dateText(e.date))}${fresh.has(e.n) ? ' <span class="wn-tag">new</span>' : ''}</h3>
+          <ul>${e.items.map(i => `<li>${i}</li>`).join('')}</ul>
+        </section>`).join('')}</div>`,
+    });
+    markSeen();
+  }
+
+  // init.js, once.
+  function start() {
+    if (typeof Route !== 'undefined' && Route.newDevice()) markSeen();
+    else sync();
+  }
+
+  return { start, open, entries: ENTRIES };
+})();

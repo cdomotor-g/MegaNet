@@ -593,6 +593,15 @@ jobs:
         working-directory: test
         run: npm run palette
 
+      # A first visit and What's new (#222): a browser that has never been here
+      # opens the Site Map once, greeted; one that came by a link goes where it
+      # says; What's new is shown only to a device with something it has not
+      # seen. A greeting that comes back every visit, or one that vanishes when
+      # the list lands, would throw nothing.
+      - name: A first visit and What's new — the guide once, and only news that is news
+        working-directory: test
+        run: npm run firstvisit
+
       # Proposed stations (0039) in the editor, on the card and on the map,
       # against a stand-in for save_station() that holds the database's rules
       # (tools/check_proposed_stations.sql holds the real one to them): a

@@ -69,6 +69,12 @@
       <input type="file" id="file-input" accept=".json" style="display:none" onchange="onFileLoad(this)">
       <!-- Sign-in is only needed to edit; the label becomes the signed-in
            person's name once there is one (Auth.syncHeader). -->
+      <!-- ✨ What's new: shown while this device has changes it has not looked
+           at (whats-new.js), hidden otherwise — which is most of the time. -->
+      <button id="btn-whatsnew" class="hdr-btn hdr-new" onclick="WhatsNew.open()"
+              title="What's new in Flood-Net since you last looked" hidden>
+        <span class="hdr-ico" aria-hidden="true">✨</span><span class="hdr-label">What's new</span>
+      </button>
       <!-- One box for a station, a place, a tab or an action (palette.js); the
            same as Ctrl/Cmd+K, for anybody who has not met the chord. -->
       <button id="btn-palette" class="hdr-btn" onclick="Palette.open()"
@@ -557,6 +563,10 @@
        scoring), modal.js, places.js and station-trail.js, which it reads at
        call time; nothing runs at load — init.js's chord opens it. -->
   <script src="palette.js?v=20261007g"></script>
+  <!-- ✨ What's new in the banner (#222): the changes since this device last
+       looked, written for the people using the app. Reads route.js's
+       newDevice at call time; nothing runs at load — init.js starts it. -->
+  <script src="whats-new.js?v=20261007g"></script>
   <!-- Where you are, in the address bar: the tab, the station whose card is
        up and the Stations map's view, so a view can be linked to and back and
        forward move between tabs (#211). After app.js (switchTab,
