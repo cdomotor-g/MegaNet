@@ -280,6 +280,13 @@ const cam = await page.evaluate(() => {
     hostOn:   document.getElementById('map3d').classList.contains('is-on'),
   };
 });
+// The hint at the foot of the view, as the mode opens (section 6b has the rest).
+const hudOpen = await page.evaluate(() => {
+  const hud = document.getElementById('map3d-hud'), q = document.getElementById('map3d-hud-q');
+  return { up: !!hud && !hud.classList.contains('is-folded') && hud.parentNode === document.getElementById('map3d'),
+           q: !!q && q.getAttribute('aria-expanded') === 'true',
+           says: !!hud && hud.textContent.startsWith(viewMoveWords(matchMedia('(pointer: coarse)').matches)) };
+});
 ok('the renderer is now loaded',            cam.lib === 'object', `typeof = ${cam.lib}`);
 ok('…and it is the version map-3d.js pins', cam.version === '5.24.0', String(cam.version));
 ok('the mode is on',                        cam.on === true);
@@ -294,6 +301,8 @@ ok('…and can go to 85°',                    cam.maxPitch === 85, String(cam.m
 ok('drag-rotate is on',                     cam.rotate);
 ok('the keyboard can tilt it too',          cam.keyboard);
 ok('and a touch screen can',                cam.touch);
+ok('…and the view says how, at its foot, as it opens — with a "?" for later', hudOpen.up && hudOpen.q && hudOpen.says,
+   JSON.stringify(hudOpen));
 // The two depictions the feature is for: a line across the ground, and the
 // sheet layer that rises from it.
 ok('the links are drawn as a layer',        cam.layers.includes('mn-links'), cam.layers.join(', '));
@@ -699,6 +708,81 @@ const panelBtn = await page.evaluate(() => {
 });
 ok('and the panel offers the way out', panelBtn && /Leave 3-D/.test(panelBtn.text),
    JSON.stringify(panelBtn));
+
+// ── 6b. How to move it ───────────────────────────────────────────────────────
+// Somebody new to the mode was watched failing to find the tilt: a drag pans,
+// and nothing on screen said the other half of the camera is on the right
+// button. So the view says how it is moved, at its foot, in the words the
+// digital twin's hint uses (viewMoveWords, core.js — the twin's half is in
+// `npm run twin`), and folds to a "?" that brings it back. Read off the page:
+// where it stands, what it says, that it does not take the drag it describes.
+const hudNow = () => page.evaluate(() => {
+  const hud = document.getElementById('map3d-hud'), q = document.getElementById('map3d-hud-q');
+  const box = el => { if (!el) return null; const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; };
+  const hb = box(hud);
+  const under = hb ? document.elementFromPoint((hb.left + hb.right) / 2, (hb.top + hb.bottom) / 2) : null;
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  return {
+    inHost: !!hud && hud.parentNode === document.getElementById('map3d') && !!q && q.parentNode === hud.parentNode,
+    text: hud ? hud.textContent : null, words: viewMoveWords(coarse),
+    shown: !!hud && getComputedStyle(hud).visibility !== 'hidden' && Number(getComputedStyle(hud).opacity) > 0.5,
+    folded: !!hud && hud.classList.contains('is-folded'),
+    q: q ? { expanded: q.getAttribute('aria-expanded'), name: q.getAttribute('aria-label'), box: box(q),
+             shown: getComputedStyle(q).display !== 'none' } : null,
+    passesThrough: !!under && under.classList.contains('maplibregl-canvas'),
+    hud: hb, scale: box(document.querySelector('#map3d .maplibregl-ctrl-scale')),
+    attrib: box(document.querySelector('#map3d .maplibregl-ctrl-attrib')),
+    nav: box(document.querySelector('#map3d .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group')),
+    canvasName: (document.querySelector('#map3d canvas.maplibregl-canvas') || {}).getAttribute?.('aria-label') || '',
+    keys: viewKeyWords(),
+    panel: (document.querySelector('#map-3d-panel-body .map3d-moving') || {}).textContent || '',
+    mouse: viewMoveWords(false), touch: viewMoveWords(true),
+  };
+});
+let H = await hudNow();
+ok('minutes after 3-D opened, the hint has folded by itself to its "?", which says so',
+   H.inHost && H.folded && !H.shown && H.q && H.q.shown && H.q.expanded === 'false' && H.q.name === 'How to move the view',
+   JSON.stringify({ inHost: H.inHost, folded: H.folded, shown: H.shown, q: H.q }));
+await page.click('#map3d-hud-q');
+await page.waitForTimeout(450);   // the fade in (.3 s)
+H = await hudNow();
+ok('…and the "?" brings it back', H.shown && !H.folded && H.q.expanded === 'true', JSON.stringify({ shown: H.shown, q: H.q }));
+ok('…saying how the view is moved in the twin\'s own words, and where the compass and tilt buttons are',
+   !!H.text && H.text.startsWith(H.words) && /compass and tilt buttons under ⛰️/.test(H.text), H.text);
+ok('…standing above the credits and the scale bar, and clear of the zoom and compass in the other corner',
+   !!H.hud && !!H.scale && !!H.attrib && !!H.nav && H.hud.bottom <= Math.min(H.scale.top, H.attrib.top) + 0.5
+     && H.hud.right <= H.nav.left + 0.5, JSON.stringify({ hud: H.hud, scale: H.scale, attrib: H.attrib, nav: H.nav }));
+// The credits open across the foot when the map is built and close to an ⓘ on
+// the first drag (MapLibre's compact attribution): the hint goes down with them.
+const credits = open => page.evaluate(o => document.querySelector('#map3d .maplibregl-ctrl-attrib').classList.toggle('maplibregl-compact-show', o), open);
+await credits(true);
+await page.waitForTimeout(200);
+const raised = await hudNow();
+await credits(false);
+await page.waitForTimeout(200);
+const dropped = await hudNow();
+ok('…and goes down with the credits when they close to their ⓘ',
+   dropped.hud.bottom > raised.hud.bottom + 10 && dropped.hud.bottom <= Math.min(dropped.scale.top, dropped.attrib.top) + 0.5,
+   JSON.stringify({ open: raised.hud.bottom, closed: dropped.hud.bottom, attrib: dropped.attrib }));
+ok('…and a drag that starts on it is a drag of the map: it takes no pointer', H.passesThrough);
+ok('the canvas\'s name says how the keys move it', H.canvasName.includes(H.keys), H.canvasName);
+ok('the 3-D panel says it too, for a mouse, a finger and the keys',
+   H.panel.includes(H.mouse) && H.panel.includes(H.touch) && H.panel.includes(H.keys), H.panel.replace(/\s+/g, ' '));
+// Its few seconds, made short; "?" pressed while it is up puts it away at once,
+// and pressed again brings it back for its few seconds.
+await page.evaluate(() => { Map3D._hud(1200); Map3D.toggleHud(); });
+H = await hudNow();
+const shutAtOnce = H.folded && H.q.expanded === 'false' && H.q.name === 'How to move the view';
+await page.click('#map3d-hud-q');
+await page.waitForTimeout(450);   // the fade in (.3 s) done, well inside its 1.2 s
+const backUp = await hudNow();
+await page.waitForTimeout(1400);
+H = await hudNow();
+ok('"?" pressed while the hint is up puts it away, and pressed again brings it back',
+   shutAtOnce && backUp.shown && backUp.q.expanded === 'true', JSON.stringify({ shutAtOnce, back: backUp.shown }));
+ok('…for its few seconds, after which it folds to the "?", which says so',
+   H.folded && !H.shown && H.q.shown && H.q.expanded === 'false', JSON.stringify({ folded: H.folded, shown: H.shown, q: H.q }));
+await page.evaluate(() => Map3D._hud(null));
 
 // ── 7. a pin clicked in 3-D paints a card that is on screen (#193) ──────────
 // The section above asks whether the *controls* survive the canvas. This asks

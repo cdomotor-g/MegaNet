@@ -1142,8 +1142,13 @@ to see.
 **The map in three dimensions.** Press ⛰️ in the side panel's strip and the same map
 tilts: the ground gets its real relief, the base map you were already on is
 draped over it, and the pins and links you were already looking at come with
-them. Drag to pan, right-drag (or Ctrl-drag, or two fingers) to tilt and rotate,
-scroll to zoom — up to 85° of pitch, which is nearly along the ground.
+them. Drag to move, right-drag (or Ctrl-drag) to turn and tilt, scroll to zoom;
+on a touch screen drag, pinch, twist to turn and slide two fingers to tilt; from
+the keyboard the arrows move and Shift with them turns and tilts — up to 85° of
+pitch, which is nearly along the ground. A hint at the foot of the view says
+so when the mode opens, folds to a **?** after a few seconds, and the **?**
+brings it back. The digital twin is moved exactly the same way, and says so in
+the same words.
 
 It is the *same* map, not a second one. The 3-D view does not work out for
 itself which stations to draw or what colour a link should be: it mirrors the
@@ -1375,7 +1380,9 @@ the flat map — Leaflet has no pitch and no bearing, so there is no camera to
 reset, and a button that can do nothing is not shown. In the side panel's
 strip, where there is no split button to be half of, the settings are a button
 of their own under ⛰️ and wear 🎚️ rather than a second mountain — at every
-width, a phone's rail included.
+width, a phone's rail included. While a digital twin is up the pair drive the
+twin's camera instead, over a flat map as well, so the same two buttons do the
+same two things in both views.
 
 **The station card, and the leader to its pin (#175).** Clicking a pin
 paints a card in the map's bottom-left corner — the station's number,

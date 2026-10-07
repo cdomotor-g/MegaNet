@@ -6,8 +6,9 @@
 //           drawn as a vertical sheet between the ray and the ground under it.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for `state`, cssVar, announce, esc, destPoint and
-// acmaHaversineKm; across to terrain.js for the ground profile, to
+// Reaches back to core.js for `state`, cssVar, announce, esc, destPoint,
+// acmaHaversineKm and the words for moving a 3-D view (viewMoveWords,
+// viewKeyWords); across to terrain.js for the ground profile, to
 // path-profile.js for the physics (pathAnalyse, earthBulge, rmSystemOf,
 // PATH_DEFAULT_*), to map-controls.js for the panel it is opened from, to
 // map-sites.js for what the repeater site finder drew (MapSites.drawn, select,
@@ -1555,6 +1556,9 @@ const Map3D = (function () {
     });
     map.addControl(new ml.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new ml.ScaleControl({ unit: 'metric' }), 'bottom-left');
+    // The canvas is what takes focus and the keys, and MapLibre names it
+    // "Map". Its name says how it is driven, as the twin's canvas does.
+    map.getCanvas().setAttribute('aria-label', `Three-dimensional map. ${viewKeyWords()}`);
 
     // The two camera buttons in the ⛰️ cluster are a readout as well as a
     // control — the needle points where north has gone and the quad shows how
@@ -1807,6 +1811,107 @@ const Map3D = (function () {
     return h;
   }
 
+  // ── How to move it: the hint at the foot of the view ────────────────────
+  // Somebody new to this mode was watched failing to find the tilt: a drag
+  // pans, as it does on the flat map, and nothing on screen said that the
+  // other half of the camera is on the right button. So the view says how it
+  // is moved, in the words the digital twin's hint uses (viewMoveWords,
+  // core.js — the two views move the same way, and say so the same way), at
+  // the foot of the canvas where the twin's is, with the same "?".
+  //
+  // It is up in full when the mode opens and folds to its "?" after HUD_MS,
+  // on every device — unlike the twin's, which folds only on a phone. The twin
+  // is a few minutes at one site on a stage that keeps a strip for it; this is
+  // the network map, looked at for an hour, whose foot is the scale and the
+  // zoom. The "?" brings it back for as long again, and pressed while it is up
+  // puts it away. Not a toast: a toast here is the outcome of something done,
+  // at the foot of the window rather than of the view, and gone for good.
+  //
+  // It takes no pointer, so a drag that starts on it still moves the camera;
+  // the "?" does, and its clicks are kept off the 2-D map under it, whose own
+  // click would clear the focused repeater.
+  const HUD_MS = 12000;
+  let hudMs = HUD_MS;    // the check's seam: sooner (Map3D._hud)
+  let hudTimer = 0;
+  let hudRo = null;      // keeps the hint above the foot's furniture (placeHud)
+
+  function coarse() {
+    return typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  }
+
+  function hudWords() {
+    return `${viewMoveWords(coarse())} The compass and tilt buttons under ⛰️ put north up and the camera overhead again.`;
+  }
+
+  function addHud() {
+    if (!host) return;
+    const hud = document.createElement('p');
+    hud.className = 'map3d-hud';
+    hud.id = 'map3d-hud';
+    hud.textContent = hudWords();
+    const q = document.createElement('button');
+    q.type = 'button';
+    q.className = 'map3d-hud-q';
+    q.id = 'map3d-hud-q';
+    q.textContent = '?';
+    q.setAttribute('aria-controls', 'map3d-hud');
+    q.addEventListener('click', toggleHud);
+    if (typeof L !== 'undefined' && L.DomEvent) L.DomEvent.disableClickPropagation(q);
+    host.appendChild(hud);
+    host.appendChild(q);
+    // Stood on whatever is at the foot of the view. MapLibre's credits open
+    // across most of it when the map is built — four lines on a phone — and
+    // close to an ⓘ on the first drag; the hint sits above them either way,
+    // and drops when they close.
+    if (typeof ResizeObserver === 'function') {
+      hudRo = new ResizeObserver(placeHud);
+      for (const el of host.querySelectorAll('.maplibregl-ctrl-attrib, .maplibregl-ctrl-scale')) hudRo.observe(el);
+      hudRo.observe(host);
+    }
+    placeHud();
+    // Its few seconds start once there is a map to read it over: a slow
+    // phone can take that long to draw the first frame of terrain.
+    hudShow({ wait: true });
+    if (map) map.once('load', () => { if (hudTimer === -1) hudShow(); });
+  }
+
+  // How far up the foot's furniture reaches, as `--map3d-foot` on the host,
+  // which the stylesheet stands the hint and its "?" on.
+  function placeHud() {
+    if (!host) return;
+    const hb = host.getBoundingClientRect();
+    let top = hb.bottom;
+    for (const el of host.querySelectorAll('.maplibregl-ctrl-attrib, .maplibregl-ctrl-scale')) {
+      const r = el.getBoundingClientRect();
+      if (r.height) top = Math.min(top, r.top);
+    }
+    host.style.setProperty('--map3d-foot', `${Math.max(0, Math.round(hb.bottom - top))}px`);
+  }
+
+  // `wait`: up, with no clock yet (hudTimer -1) until the map has drawn.
+  function hudShow({ wait = false } = {}) {
+    clearTimeout(hudTimer);
+    const hud = document.getElementById('map3d-hud'), q = document.getElementById('map3d-hud-q');
+    if (hud) hud.classList.remove('is-folded');
+    if (q) { q.setAttribute('aria-expanded', 'true'); q.title = 'Hide how to move the view'; q.setAttribute('aria-label', q.title); }
+    hudTimer = wait ? -1 : setTimeout(hudFold, hudMs);
+  }
+
+  function hudFold() {
+    clearTimeout(hudTimer);
+    hudTimer = 0;
+    const hud = document.getElementById('map3d-hud'), q = document.getElementById('map3d-hud-q');
+    if (hud) hud.classList.add('is-folded');
+    if (q) { q.setAttribute('aria-expanded', 'false'); q.title = 'How to move the view'; q.setAttribute('aria-label', q.title); }
+  }
+
+  // The "?": the hint for another HUD_MS, or — pressed while it is up — away now.
+  function toggleHud() {
+    const hud = document.getElementById('map3d-hud');
+    if (hud && !hud.classList.contains('is-folded')) hudFold();
+    else hudShow();
+  }
+
   // The note only. Called on every sheet that lands and every DEM tile that
   // does not, so it must not rebuild the panel under a pointer that is using it.
   function setNote() {
@@ -1870,20 +1975,37 @@ const Map3D = (function () {
          + ` 14,12.6 2,12.6"/></svg>`;
   }
 
+  // The digital twin is the other camera these two buttons drive. While it is
+  // up (map-twin.js) it covers this canvas and the 2-D map alike, so it is the
+  // camera on screen, and a 🧭 that turned the hidden 3-D map under it — or
+  // was not there at all over a flat one — would be the same button doing a
+  // different thing in each view. So the buttons read and drive the twin then
+  // (DigitalTwin.camera, faceNorth, toggleTilt), and MapTwin tells this file
+  // when it goes up and down.
+  function twinUp() {
+    return typeof MapTwin !== 'undefined' && MapTwin.active() && typeof DigitalTwin !== 'undefined'
+      && typeof DigitalTwin.camera === 'function';
+  }
+
   // Both buttons, redrawn and relabelled from the camera. Called on every
   // rotate and every pitch while 3-D is open, and by repaintPanel() when the
-  // mode itself changes — which is what shows them and what puts them away.
+  // mode itself changes — which is what shows them and what puts them away —
+  // and by the twin when its camera moves or it comes and goes.
   function syncCamera() {
-    const on = !!state.map3d && !!map;
-    const b  = on ? Math.round(((map.getBearing() % 360) + 360) % 360) % 360 : 0;
-    const p  = on ? Math.round(map.getPitch()) : 0;
+    const twin = twinUp();
+    const tc = twin ? DigitalTwin.camera() : null;
+    const on = twin || (!!state.map3d && !!map);
+    const b  = tc ? tc.bearing : (on && !twin ? Math.round(((map.getBearing() % 360) + 360) % 360) % 360 : 0);
+    const p  = tc ? tc.pitch : (on && !twin ? Math.round(map.getPitch()) : 0);
+    const home = tc ? tc.home : PITCH_HOME;
+    const what = twin ? 'view' : 'map';
     for (const el of document.querySelectorAll('.mn-map-north')) {
       el.hidden = !on;
       const ico = el.querySelector('.mn-mapctl-ico');
       if (ico) ico.innerHTML = northIcon(b);
       // The label carries the reading, because the needle does not: an operator
       // who cannot see it has no other way to be told the map is turned.
-      label(el, b ? `Face north again — the map is turned ${b}°` : 'Facing north already');
+      label(el, b ? `Face north again — the ${what} is turned ${b}°` : 'Facing north already');
     }
     for (const el of document.querySelectorAll('.mn-map-tilt')) {
       el.hidden = !on;
@@ -1893,8 +2015,9 @@ const Map3D = (function () {
       // is. A reset that only ever flattens leaves the operator who pressed it
       // by accident with no way back that does not involve discovering the
       // right-drag; the second press is that way back.
-      label(el, p > 1 ? `Look straight down — the camera is tilted ${p}°`
-                      : `Tilt back to ${PITCH_HOME}°`);
+      label(el, tc && tc.pov ? 'Look straight down — out of the POV, from overhead'
+              : p > 1 ? `Look straight down — the camera is tilted ${p}°`
+              : `Tilt back to ${home}°`);
     }
   }
 
@@ -1915,8 +2038,7 @@ const Map3D = (function () {
     if (!state.map3d) {
       return `Tilt the map and see the ground it is drawn on. The same base map,
               the same pins and the same links, draped over ~30 m SRTM terrain.
-              Drag to pan, right-drag (or Ctrl-drag) to tilt and rotate, scroll to
-              zoom. Terrain and tiles are fetched for the view you are looking at,
+              Terrain and tiles are fetched for the view you are looking at,
               so a session costs what you look at and no more.`;
     }
     const bits = [];
@@ -2114,8 +2236,10 @@ const Map3D = (function () {
       if (map) map.easeTo({ pitch: 0, bearing: 0, duration: 400 });
     },
 
-    // North, keeping whatever tilt the operator has chosen. The 🧭 button.
+    // North, keeping whatever tilt the operator has chosen. The 🧭 button —
+    // the twin's camera while the twin is up (twinUp).
     resetNorth() {
+      if (twinUp()) { DigitalTwin.faceNorth(); return; }
       if (!map) return;
       map.easeTo({ bearing: 0, duration: 400 });
       announce('Facing north');
@@ -2127,6 +2251,7 @@ const Map3D = (function () {
     // control somebody presses once and then has to find the right-drag to
     // undo, which is the gesture they were avoiding by reaching for a button.
     resetTilt() {
+      if (twinUp()) { DigitalTwin.toggleTilt(); return; }
       if (!map) return;
       const flat = map.getPitch() <= 1;
       map.easeTo({ pitch: flat ? PITCH_HOME : 0, duration: 400 });
@@ -2137,6 +2262,15 @@ const Map3D = (function () {
     // needle and a foreshortened quad lives with the camera it describes rather
     // than in the file that decides where in the corner they go.
     northIcon, tiltIcon,
+
+    // The twin's camera moved, or the twin came up or went (digital-twin.js,
+    // map-twin.js): the two buttons redrawn from whichever camera is showing.
+    cameraChanged() { syncCamera(); },
+
+    // The "?" at the foot of the view.
+    toggleHud,
+    // For the check: how long the hint stays up before it folds.
+    _hud(ms) { hudMs = ms == null ? HUD_MS : ms; },
 
     // The 3-D panel, in the idiom every other on-map panel is written in:
     // `.filter-check` switches, a `.filter-range` slider, bare buttons and a
@@ -2173,6 +2307,11 @@ const Map3D = (function () {
                    ${on ? '' : 'disabled'}
                    oninput="Map3D.setExaggeration(this.value)">
           </label>
+          <p class="filter-note map3d-moving"><strong>Moving it</strong> — the digital twin
+            moves the same way, and the ? at the foot of the view says it again.<br>
+            Mouse: ${esc(viewMoveWords(false))}<br>
+            Touch: ${esc(viewMoveWords(true))}<br>
+            Keys, once the view is clicked: ${esc(viewKeyWords())}</p>
           <p class="filter-note">The base map is the one 🗺️ Map display has on — the most
             opaque of them, if several are blended — and the
             pins and links are the ones the 2-D map has drawn — the same filters, the same
@@ -2270,7 +2409,8 @@ const Map3D = (function () {
       holdLeaflet();
       repaintPanel();
       modeToSites();
-      announce('3-D view on. Right-drag or Ctrl-drag to tilt and rotate.');
+      addHud();
+      announce(`3-D view on. ${viewMoveWords(coarse())} ${viewKeyWords()}`);
       return true;
     }).catch(() => {
       host.classList.remove('is-loading');
@@ -2306,6 +2446,9 @@ const Map3D = (function () {
     pinDragging = false;
     standing = false;   // a chain waiting on this map's next frame waits for ever
     dimK = 1;
+    clearTimeout(hudTimer);   // the hint goes with the host it is drawn on
+    hudTimer = 0;
+    if (hudRo) { hudRo.disconnect(); hudRo = null; }
     if (map) { try { map.remove(); } catch (_) {} }
     map = null;
     ready = false;

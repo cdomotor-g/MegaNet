@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-07** (revision 130 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-07** (revision 131 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -532,6 +532,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and eight `[Human]` issues.
 >
+> **Revision 131 opens and closes nothing** — at the owner's request, after watching somebody struggle to pan, tilt and zoom the 3-D map: ⛰️ 3-D now says how it is moved, at the foot of the view, and the digital twin is moved the same way (it was the other way round), with the side panel's 🧭 and tilt buttons driving whichever camera is on screen. Nothing for a person.
+>
 > **Revision 130 opens and closes nothing** — a new tab at the owner's request: **📲 Offline & Install**, under *Start here*, explaining #213's offline copy to somebody who has never heard the word PWA, with buttons that set a device up and install Flood-Net in the browser being used. On the way, #213's first visit is made enough on its own: it kept the app but not the station list, so revision 128's step for a person would have shown no stations — it is right as written from this revision on. Nothing for a person beyond that step.
 >
 > **Revision 129 closes #231, and opens nothing** — the README says what shipped, what is tracked and what was not built, from the same request as revision 119; the help's Pass Ranges entry stops promising what the tab does not do. The Sonnet5 Low row is empty. Nothing for a person; the items the README now says were never built and are not tracked are listed below for the owner to file or leave.
@@ -742,6 +744,20 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 131 — 2026-10-07: the 3-D views say how they are moved, and are moved the same way
+
+At the owner's request, having watched somebody fail to work out the 3-D map's pan, tilt and zoom: "add some helper text, possibly even as a toast … for 3-D mode on the stations map … and for the digital twin mode, and if there are any discrepancies in the controls, standardise across the two modes — the same buttons do the same things for both." No issue was filed for it; this entry is its record.
+
+**The discrepancy was real and total.** The 3-D map is MapLibre's camera: a drag pans, a right-drag or Ctrl-drag turns and tilts, the arrows pan and Shift with them turns and tilts, one finger pans and two pinch, twist and tilt. The twin was three.js-orbit-style: a drag orbited, a right-drag (or Shift- or Ctrl-drag) panned, the arrows orbited, one finger orbited and two panned. Ctrl-drag did opposite things in the two. Standardised on **the map's** scheme, because the twin is opened from the map (by zooming in on it) and the flat map already pans on a drag — so 2-D, 3-D and the twin all agree that a drag moves the ground.
+
+- **The twin** (`digital-twin.js`): drag moves the ground; right-drag or Ctrl-drag turns and tilts (up towards the horizon, as MapLibre's); the arrows move it and Shift with them turns and tilts (↑ towards the horizon, as MapLibre's — it was the reverse); `W A S D`, `R`, `T`, `F`/`P`, `+`/`−` and `Esc` as before; a double-click zooms in on the ground under it (Shift-double-click out). A finger: one moves the ground, a pinch zooms, a twist turns, and two fingers slid up or down together tilt — the tilt waits for both fingers to have moved the same way, so a pinch or a twist is never read as one. The POV is unchanged.
+- **The side panel's 🧭 and tilt buttons** read and drive the twin's camera while it is up (`Map3D.cameraChanged`, `DigitalTwin.camera`/`faceNorth`/`toggleTilt`), and are shown over a flat map then too — before, they were hidden, or with 3-D on turned the hidden map under the twin. Tilt is two presses as on the map: straight down, then back to the opening 60°; from the POV it is the way out, overhead. The twin's own **Orientation** button wore 🧭 too, for a different thing; it is **🔄** now.
+- **The words**: `viewMoveWords(touch)` and `viewKeyWords()` (core.js) are the one statement of how a 3-D view is moved, and both hints say them. The 3-D map gets the twin's hint and "?" in the same dress (`map-3d.js`, `.map3d-hud`), standing above MapLibre's credits and scale (they open across the foot and close to an ⓘ on the first drag; a `ResizeObserver` keeps the hint above them), up as the mode opens and folding to its "?" twelve seconds after the map has drawn — on every device, where the twin's folds only on a phone: the twin is a few minutes at one site on a stage with a strip kept for it, this is the network map, looked at for an hour. Not a toast: here a toast is the outcome of something done, at the foot of the window, and gone for good. The 🎚️ panel lists mouse, touch and keys; the canvas's name carries the keys; the announcement says it all.
+
+**What still differs, on purpose:** Shift-drag is a box zoom on the map (MapLibre's and Leaflet's) and an ordinary drag in the twin, which has no box to zoom to; a double-click on the map eases, in the twin it steps.
+
+**Checks:** `npm run map3d` (+11, 161 in all: the hint as the mode opens, its words, its place above the credits and scale and its drop when they close, that it takes no pointer, folded by itself and back by its "?", the canvas's name, the panel), `npm run twin` (+10: drag, right-drag, Ctrl-drag, the arrows and Shift-arrows, the double-click, the strip's buttons up, reading and driving the twin, the Orientation icon, the hint's words), and `npm run flood`'s phone-hint assertion held to the new words. Run green before the push: the cheap five, `map3d`, `twin`, `flood`, `help`. What's new entry 8; stamps to `20261007q`.
 
 ### Revision 130 — 2026-10-07: 📲 Offline & Install — the offline copy explained, and a device set up in one press
 

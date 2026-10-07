@@ -434,15 +434,27 @@ reads as a place rather than a model on a table:
 
 **The camera.**
 
+The orbit is moved exactly as the Stations map's ⛰️ 3-D view is — the map's
+buttons and keys (MapLibre's), since the twin is opened from the map — so a
+hand that has learnt one has learnt the other. Until October 2026 it was the
+other way round: a drag orbited and a right-drag panned.
+
 | Mode | Pointer | Keys |
 |---|---|---|
-| Orbit (default) | drag to orbit; wheel to zoom; right-drag, Shift-drag or two fingers to pan; pinch to zoom | arrows orbit; `+`/`−` zoom; `W A S D` pan; `R` reset; `T` top-down; `F` or `P` for the POV; inside the Stations map, a wheel out past the edge or `Esc` hands back to the map |
+| Orbit (default) | drag to move the ground; right-drag or Ctrl-drag to turn and tilt (up towards the horizon); wheel to zoom; double-click to zoom in (Shift to zoom out). A finger: drag to move, pinch to zoom, twist to turn, slide two fingers up or down to tilt | arrows move; Shift with the arrows turns (`←` `→`) and tilts (`↑` towards the horizon, `↓` overhead); `+`/`−` zoom; `W A S D` move too; `R` reset; `T` top-down; `F` or `P` for the POV; inside the Stations map, a wheel out past the edge or `Esc` hands back to the map |
 | POV | drag to look; wheel to step; Point (a latch) to point | `W A S D` / arrows move at 3.2 m/s, Shift runs at 9; `Q`/`E` turn; Space held points; `Esc` back to orbit |
 
-The hint along the stage's foot says the same in a finger's words on a touch
-screen — drag, pinch, two fingers, tap, and *← Map* rather than a wheel or
-`Esc` — and on a phone folds to a **?** after five seconds (see *On a phone*
-under the scale, below).
+Inside the Stations map the side panel's **compass** and **tilt** buttons (the
+pair under ⛰️) drive the twin's camera while it is up, whether or not the 3-D
+map is on: the compass faces north, the tilt looks straight down and, pressed
+again, tilts back to the opening view's 60° — from the POV it is the way out of
+it, overhead. Both read the twin's camera as they read the map's.
+
+The hint along the stage's foot says how to move it in the 3-D map's own words
+(`viewMoveWords`, core.js — the two hints cannot drift apart), in a finger's
+words on a touch screen — drag, pinch, twist, two fingers, tap, and *← Map*
+rather than a wheel or `Esc` — and on a phone folds to a **?** after five
+seconds (see *On a phone* under the scale, below).
 
 The POV eye is 1.70 m above whatever is under it — the ground, a rung, the
 grating — and the orbit camera is never let under the hill between it and
@@ -569,7 +581,8 @@ the way it faces (`facing_deg`, migration `0044`): the bearing its front looks
 out, clockwise from true north. Where nothing is recorded it is drawn facing
 south (180°), as before.
 
-- **🧭 Orientation**, on the twin's bar, opens a panel in Move pin's corner (the two are never open
+- **🔄 Orientation**, on the twin's bar (🧭 until October 2026 — the compass is
+  the side panel's Face north, which drives the twin too), opens a panel in Move pin's corner (the two are never open
   together; the station trail stands down while it is up). The model turns as
   the numbers change: the bearing box, **⟲ 15° / 15° ⟳**, the slider,
   **👁 Face the view** (orbit round to where the front should be, then press:

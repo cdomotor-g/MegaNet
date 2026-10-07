@@ -1507,6 +1507,91 @@ try {
   await sleep(500);
   await page.waitForFunction(id => MapTwin.active() && MapTwin.station() === id, linked.id, { timeout: BUILD_TIMEOUT });
 
+  // ── The 3-D map's controls, in the twin ──────────────────────────────────
+  // The twin is opened from the map and moves the way the map's 3-D view
+  // does (MapLibre's buttons and keys): a drag moves the ground, a right-drag
+  // or a Ctrl-drag turns and tilts, the arrows move it, Shift with them turns
+  // and tilts, a double-click zooms in — and the side panel's 🧭 and tilt
+  // buttons drive this camera while it is up. It used to be the other way
+  // round (a drag orbited, a right-drag panned), which somebody arriving from
+  // the map had no way to guess. Driven with a real pointer and real keys, and
+  // read back off the rig.
+  const rigNow = () => page.evaluate(() => DigitalTwin._rig());
+  const paint = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const shifted = (a, b) => Math.hypot(a.target.x - b.target.x, a.target.z - b.target.z);
+  const same = (a, b) => Math.abs(a - b) < 1e-9;
+  await page.evaluate(() => DigitalTwin.resetView());
+  await paint();
+  const cvb = await page.locator('#twin-canvas').boundingBox();
+  const cvMid = { x: cvb.x + cvb.width / 2, y: cvb.y + cvb.height / 2 };
+  const drag = async (dx, dy, button = 'left') => {
+    await page.mouse.move(cvMid.x, cvMid.y);
+    await page.mouse.down({ button });
+    await page.mouse.move(cvMid.x + dx, cvMid.y + dy, { steps: 6 });
+    await page.mouse.up({ button });
+    await paint();
+  };
+  const c0 = await rigNow();
+  await drag(90, 40);
+  const c1 = await rigNow();
+  ok('in the twin a drag moves the ground, as on the 3-D map — and keeps the turn and the tilt',
+    shifted(c0, c1) > 0.5 && same(c0.theta, c1.theta) && same(c0.phi, c1.phi), JSON.stringify({ c0, c1 }));
+  await drag(90, -40, 'right');
+  const c2 = await rigNow();
+  ok('…a right-drag turns and tilts it — up, towards the horizon — about the same ground',
+    !same(c1.theta, c2.theta) && c2.phi > c1.phi && shifted(c1, c2) < 1e-9, JSON.stringify({ c1, c2 }));
+  await page.keyboard.down('Control');
+  await drag(-60, 30);
+  await page.keyboard.up('Control');
+  const c3 = await rigNow();
+  ok('…and so does a Ctrl-drag, for a mouse with one button', !same(c2.theta, c3.theta) && c3.phi < c2.phi && shifted(c2, c3) < 1e-9,
+    JSON.stringify({ c2, c3 }));
+  await page.focus('#twin-canvas');
+  await page.keyboard.press('ArrowUp');
+  const k1 = await rigNow();
+  await page.keyboard.press('Shift+ArrowUp');
+  await page.keyboard.press('Shift+ArrowLeft');
+  const k2 = await rigNow();
+  ok('the arrows move it as the map\'s do, and with Shift they tilt (↑ towards the horizon) and turn',
+    shifted(c3, k1) > 0.1 && same(c3.theta, k1.theta) && same(c3.phi, k1.phi)
+      && k2.phi > k1.phi && k2.theta > k1.theta && shifted(k1, k2) < 1e-9, JSON.stringify({ c3, k1, k2 }));
+  await page.mouse.dblclick(cvMid.x, cvMid.y);
+  await paint();
+  const z1 = await rigNow();
+  ok('a double-click zooms in, as on the map', z1.radius < k2.radius * 0.6 && z1.mode === 'orbit', JSON.stringify({ before: k2.radius, after: z1.radius }));
+  // The side panel's camera pair: shown over a flat map while the twin is up,
+  // reading this camera, and driving it.
+  const strip = () => page.evaluate(() => {
+    const n = document.querySelector('.mn-map-north'), t = document.querySelector('.mn-map-tilt');
+    return { flat3d: !state.map3d, north: n && { hidden: n.hidden, label: n.getAttribute('aria-label') },
+             tilt: t && { hidden: t.hidden, label: t.getAttribute('aria-label') }, cam: DigitalTwin.camera(),
+             orient: (document.getElementById('twin-orient-btn') || {}).textContent || '' };
+  });
+  const s0 = await strip();
+  ok('the side panel\'s 🧭 and tilt buttons are up while the twin is, the 3-D map shut, and read this camera',
+    s0.flat3d && s0.north && !s0.north.hidden && s0.tilt && !s0.tilt.hidden && !!s0.cam
+      && (s0.cam.bearing ? s0.north.label.includes(`turned ${s0.cam.bearing}°`) : /Facing north/.test(s0.north.label))
+      && s0.tilt.label.includes(`tilted ${s0.cam.pitch}°`), JSON.stringify(s0));
+  ok('…and the twin\'s own Orientation button no longer wears the 🧭 that means face north', !/🧭/.test(s0.orient), s0.orient);
+  await page.evaluate(() => document.querySelector('.mn-map-north').click());
+  await paint();
+  const s1 = await strip();
+  await page.evaluate(() => document.querySelector('.mn-map-tilt').click());
+  await paint();
+  const s2 = await strip(), t2 = await rigNow();
+  await page.evaluate(() => document.querySelector('.mn-map-tilt').click());
+  await paint();
+  const s3 = await strip(), t3 = await rigNow();
+  ok('🧭 turns the twin to face north', s1.cam.bearing === 0 && /Facing north already/.test(s1.north.label), JSON.stringify(s1));
+  ok('…the tilt button looks straight down, and pressed again tilts back to the opening view',
+    s2.cam.pitch === 0 && t2.phi < 0.07 && /Tilt back to 60°/.test(s2.tilt.label)
+      && Math.abs(t3.phi - 1.05) < 1e-9 && s3.tilt.label.includes('tilted 60°'), JSON.stringify({ s2: s2.tilt, t2: t2.phi, t3: t3.phi }));
+  const hudWords = await page.evaluate(() => ({ hud: document.getElementById('twin-hud').textContent,
+                                                words: viewMoveWords(matchMedia('(pointer: coarse)').matches) }));
+  ok('the twin\'s hint says how it is moved in the 3-D map\'s own words', hudWords.hud.startsWith(hudWords.words), JSON.stringify(hudWords));
+  await page.evaluate(() => DigitalTwin.resetView());
+  await paint();
+
   // Out again by the wheel: past the widest orbit, the map takes over one
   // level out.
   const wheeled = await page.evaluate(async () => {

@@ -25,6 +25,19 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 8, date: '2026-10-07', items: [
+      '<strong>The 3-D map says how to move it.</strong> Opening ⛰️ 3-D puts a hint at the foot of the view — '
+        + 'drag to move, right-drag or Ctrl-drag to turn and tilt, wheel to zoom (on a phone: pinch, twist, and two '
+        + 'fingers up or down to tilt) — which folds to a <strong>?</strong> after a few seconds; the '
+        + '<strong>?</strong> brings it back. The 🎚️ 3-D panel lists the mouse, touch and keyboard controls too.',
+      '<strong>The digital twin now moves the same way as the 3-D map.</strong> A drag moves the ground and a '
+        + 'right-drag (or Ctrl-drag) turns and tilts — it used to be the other way round. The arrow keys move it, '
+        + 'Shift with them turns and tilts, a double-click zooms in, and on a phone one finger moves it, a twist '
+        + 'turns it and two fingers slid up or down tilt it.',
+      'The <strong>compass</strong> and <strong>tilt</strong> buttons under ⛰️ now work on the digital twin '
+        + 'too: face north, look straight down, and back. The twin\'s Orientation button is now '
+        + '<strong>🔄</strong>, so 🧭 means "face north" everywhere.',
+    ] },
     { n: 7, date: '2026-10-07', items: [
       '<strong>📲 Offline &amp; Install</strong>, a new tab under <em>Start here</em>: what Flood-Net does with no '
         + 'signal, what this device has saved and when, <strong>Get this device ready for no signal</strong> to save '

@@ -13379,7 +13379,8 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
    to the marks on its track the same way, and a tap on the track brings them
    back (digital-twin.js, "a phone's stage, kept clear"). Everywhere else
    neither folds and the "?" is not drawn. */
-.twin-hud-q {
+.twin-hud-q,
+.map3d-hud-q {
   position: absolute;
   left: var(--sp-2);
   bottom: calc(var(--twin-caveat-h) + var(--sp-2));
@@ -13402,11 +13403,13 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 }
 
 .twin-hud-q[hidden] { display: none; }
-.twin-hud-q:hover { background: var(--panel); }
+.twin-hud-q:hover,
+.map3d-hud-q:hover { background: var(--panel); }
 
 /* A finger's worth to aim at round a mark drawn small: the corner has nothing
    else in it, and the scale's foot is further off than this reaches. */
-.twin-hud-q::after {
+.twin-hud-q::after,
+.map3d-hud-q::after {
   content: '';
   position: absolute;
   inset: -.4rem;
@@ -13430,6 +13433,46 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   visibility: hidden;
   transition: opacity .3s ease, visibility 0s linear .3s;
 }
+
+/* ── How to move the 3-D map (map-3d.js, "the hint at the foot of the view")
+   The twin's hint and its "?" in the same dress, so the two views say how
+   they are moved in the same place and the same way. On the 3-D map it stands
+   on MapLibre's scale bar (bottom left), clear of its zoom and compass (bottom
+   right), and it folds to the "?" on every device after its few seconds — the
+   twin's only folds on a phone (map-3d.js says why). It takes no pointer, so
+   a drag that starts on it still moves the camera. `--map3d-foot` is how far
+   up MapLibre's credits and scale reach (map-3d.js placeHud): open across the
+   foot when the map is built, an ⓘ after the first drag. */
+.map3d-hud {
+  position: absolute;
+  left: calc(var(--sp-2) + 2.45rem);
+  right: 3.6rem;
+  bottom: calc(var(--map3d-foot, 2rem) + var(--sp-2));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  max-width: 38rem;
+  min-height: 2rem;
+  margin: 0;
+  padding: .25rem .55rem;
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  pointer-events: none;
+  transition: opacity .3s ease;
+}
+
+.map3d-hud.is-folded {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .3s ease, visibility 0s linear .3s;
+}
+
+.map3d-hud-q { bottom: calc(var(--map3d-foot, 2rem) + var(--sp-2)); }
 
 /* What the stage says while there is nothing to draw: no station, no ground,
    no renderer. Over the canvas rather than instead of it, so the canvas the

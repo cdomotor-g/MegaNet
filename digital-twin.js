@@ -11,12 +11,14 @@
 //
 // After core.js and terrain.js, before init.js — index.html holds the order and
 // the reasons. Reaches back to core.js for state, esc, escAttr, announce,
-// cssVar, registerTabTeardown, KM_PER_DEG_LAT and kmPerDegLon; across to
+// cssVar, registerTabTeardown, KM_PER_DEG_LAT, kmPerDegLon, and the 3-D
+// map's words for moving a view (viewMoveWords, viewKeyWords); across to
 // terrain.js for the ~30 m fallback ground, to elvis.js for the AHD height at
 // the pin, to field-photos.js for the field photos taken in the patch (and the
 // viewer they open in), to twin-cadastre.js for the property boundaries, lot
 // numbers and road reserve drawn on the ground, to map-twin.js for the map it
-// is drawn in, and to app.js for switchTab and primaryRole (from inline
+// is drawn in, to map-3d.js for the side panel's camera buttons it drives
+// (Map3D.cameraChanged), and to app.js for switchTab and primaryRole (from inline
 // handlers). Every one of those is a runtime call from inside this file's own
 // functions, so its position among the modules is free. Nothing executes at
 // load (`npm run toplevel`).
@@ -4298,7 +4300,7 @@ void main() {
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     const label = btn.querySelector('.map-twin-label');
     if (label) label.textContent = on ? ' Turning…' : ' Orientation';
-    else btn.textContent = on ? '🧭 Turning…' : '🧭 Orientation';
+    else btn.textContent = on ? '🔄 Turning…' : '🔄 Orientation';
   }
   function openOrient() {
     const st = currentStation();
@@ -5490,8 +5492,61 @@ void main() {
   function resetOrbit() {
     rig.mode = 'orbit';
     if (rig.target) rig.target.set(0, 1, 0);
-    rig.radius = 26; rig.theta = 0.65; rig.phi = 1.05;
+    rig.radius = 26; rig.theta = 0.65; rig.phi = HOME_PHI;
     syncModeUi();
+  }
+
+  // ── the map's camera buttons, on this camera ──
+  // 🧭 and the tilt quad in the side panel's strip (map-3d.js syncCamera)
+  // read and drive whichever camera is on screen, and inside the Stations map
+  // that is this one while the twin is up — so they are the same two buttons
+  // doing the same two things in both views. The reading is what they draw:
+  // the heading, 0 looking north, and the tilt from straight down — the
+  // orbit's own angle, or in the POV the gaze's, from looking at your feet
+  // to the horizon at 90°.
+  function cameraReading() {
+    if (!sc.camera) return null;
+    const v = new THREE.Vector3();
+    sc.camera.getWorldDirection(v);
+    const heading = Math.atan2(v.x, -v.z) * 180 / Math.PI;
+    const pov = rig.mode === 'walk';
+    const flat = !pov && rig.phi <= PHI_MIN + 1e-3;
+    return {
+      bearing: Math.round(((heading % 360) + 360) % 360) % 360,
+      pitch: flat ? 0 : Math.round(pov ? Math.max(0, Math.min(85, 90 + rig.pitch * 180 / Math.PI)) : rig.phi * 180 / Math.PI),
+      home: Math.round(HOME_PHI * 180 / Math.PI),
+      pov,
+    };
+  }
+
+  // Told only when what the buttons would draw has changed, since this runs
+  // for every frame the camera moves in.
+  let cameraKey = '';
+  function syncCameraButtons() {
+    if (!tw.hooks || typeof Map3D === 'undefined' || !Map3D.cameraChanged) return;
+    const c = cameraReading();
+    const key = c ? `${c.bearing}|${c.pitch}|${c.pov}` : '';
+    if (key === cameraKey) return;
+    cameraKey = key;
+    Map3D.cameraChanged();
+  }
+
+  // 🧭: north, keeping the tilt — in the POV, the visitor turned to face it.
+  function faceNorth() {
+    if (rig.mode === 'walk') rig.yaw = 0;
+    else rig.theta = 0;
+    requestFrame();
+    announce('Facing north');
+  }
+
+  // The tilt button: straight down, and pressed again the opening tilt — the
+  // map's two presses. From the POV it is the way out of it, overhead.
+  function toggleTilt() {
+    if (rig.mode === 'walk') leaveWalk();
+    const flat = rig.phi <= PHI_MIN + 1e-3;
+    rig.phi = flat ? HOME_PHI : PHI_MIN;
+    syncModeUi();
+    announce(flat ? `Tilted back to ${Math.round(HOME_PHI * 180 / Math.PI)} degrees` : 'Looking straight down');
   }
 
   function lookDown() {
@@ -5566,6 +5621,7 @@ void main() {
       cam.lookAt(rig.target);
     }
     syncCompass();
+    syncCameraButtons();
   }
 
   // The camera's heading, for the compass rose: 0 looking north. The rose is
@@ -5707,20 +5763,22 @@ void main() {
       // A touch screen's words on a touch screen: there is no wheel, no right
       // button and no Escape on a phone, and the hint that named them was the
       // most text on its screen. What a finger does is what attachControls()
-      // does with one or two pointers: one orbits (or looks, in the POV), two
-      // pinch to zoom and slide to pan (or walk).
+      // does with one or two pointers: one moves the ground (or looks, in the
+      // POV), two pinch to zoom, twist to turn and slide to tilt (or walk).
+      // The moving itself is said in the 3-D map's own words (viewMoveWords,
+      // core.js), because it is the 3-D map's own scheme.
       const touch = coarsePointer();
       const ladder = tw.model && tw.model.ladder ? ' Walk into the ladder to climb it.' : '';
       const spots = tw.photos && tw.photos.spots && tw.photos.spots.length;
+      const move = viewMoveWords(touch);
       hud.textContent = rig.mode === 'walk'
         ? (touch
           ? `POV at eye height: drag to look, slide two fingers up to walk and down to step back, 👁 to leave.${ladder}${spots ? ' Tap a 📷 for its photos.' : ''}`
           : `POV at eye height: W A S D or the arrow keys move, drag to look, Shift to hurry, Space points, Esc to leave.${ladder}${spots ? ' Walk up to a 📷 and press Enter for its photos.' : ''}`)
         : tw.hooks
-          ? (touch ? 'Drag to orbit, pinch to zoom, two fingers to pan; tap the ground for its height, a 📷 for its photos. ← Map for the map.'
-                   : 'Drag to orbit, wheel to zoom, right-drag to pan; click the ground for its height, a 📷 for its photos. Wheel out past the edge, or Esc, for the map.')
-          : (touch ? 'Drag to orbit, pinch to zoom, two fingers to pan. Tap the ground for its height, a 📷 for the photos taken there.'
-                   : 'Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height, a 📷 for the photos taken there.');
+          ? (touch ? `${move} Tap the ground for its height, a 📷 for its photos. ← Map for the map.`
+                   : `${move} Click the ground for its height, a 📷 for its photos. Wheel out past the edge, or Esc, for the map.`)
+          : `${move} ${touch ? 'Tap' : 'Click'} the ground for its height, a 📷 for the photos taken there.`;
       // A new mode says its words in full — on a phone for a few seconds,
       // then back to the "?" (see "a phone's stage, kept clear").
       if (hud.dataset.mode !== rig.mode) {
@@ -5810,7 +5868,8 @@ void main() {
       }
       if (rig.pointers.size === 2) {
         const [a, b] = [...rig.pointers.values()];
-        rig.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+        rig.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), a: Math.atan2(b.y - a.y, b.x - a.x),
+                      mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, ya: a.y, yb: b.y };
       }
       cv.focus({ preventScroll: true });
     });
@@ -5826,29 +5885,66 @@ void main() {
         requestFrame();
         return;
       }
+      // Two fingers, as on the 3-D map (MapLibre's own touch gestures): a
+      // pinch zooms, a twist turns the view with the fingers, and both
+      // sliding up or down together tilts it. One finger pans, below. The
+      // tilt waits until both fingers have moved a few pixels the same way
+      // since it last acted — the events come a finger at a time, and a pinch
+      // or a twist moves them opposite ways, which is not a tilt.
       if (rig.pointers.size === 2 && rig.pinch) {
         const [a, b] = [...rig.pointers.values()];
         const d = Math.hypot(a.x - b.x, a.y - b.y);
+        const ang = Math.atan2(b.y - a.y, b.x - a.x);
         const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        let { ya, yb } = rig.pinch;
         if (rig.mode === 'orbit') {
           if (rig.pinch.d > 0) dolly(Math.log(rig.pinch.d / Math.max(1, d)));
-          pan(mx - rig.pinch.mx, my - rig.pinch.my);
+          let da = ang - rig.pinch.a;
+          if (da > Math.PI) da -= 2 * Math.PI; else if (da < -Math.PI) da += 2 * Math.PI;
+          rig.theta += da;
+          const va = a.y - ya, vb = b.y - yb;
+          if (Math.abs(va) > 3 && Math.abs(vb) > 3) {
+            if (Math.sign(va) === Math.sign(vb)) tilt((va + vb) / 2);
+            ya = a.y; yb = b.y;
+          }
         } else {
           walkStep((rig.pinch.my - my) * 0.02, 0);
         }
-        rig.pinch = { d, mx, my };
+        rig.pinch = { d, a: ang, mx, my, ya, yb };
         requestFrame();
         return;
       }
+      // One pointer: the map's buttons (map-3d.js) — a drag moves the ground
+      // under it, a right-drag or a Ctrl-drag turns and tilts the view.
       if (rig.mode === 'walk') {
         rig.yaw   += dx * 0.004;
         rig.pitch  = Math.max(-1.2, Math.min(1.2, rig.pitch - dy * 0.003));
-      } else if (p.b === 2 || e.shiftKey || e.ctrlKey || e.metaKey) {
-        pan(dx, dy);
-      } else {
+      } else if (p.b === 2 || e.ctrlKey) {
         rig.theta -= dx * 0.005;
-        rig.phi    = Math.max(0.06, Math.min(1.53, rig.phi - dy * 0.005));
+        tilt(dy);
+      } else {
+        pan(dx, dy);
       }
+      requestFrame();
+    });
+
+    // A double-click zooms in on the ground under it, as the map's does —
+    // Shift with it zooms out. The ground point stays where it was on the
+    // screen, near enough: the target moves towards it as far as the camera
+    // closes in. Two clicks are also two picks of the ground's height, which
+    // is what they would be anyway.
+    on(cv, 'dblclick', e => {
+      if (rig.mode !== 'orbit' || !rig.target) return;
+      e.preventDefault();
+      const out = e.shiftKey;
+      const hit = out ? null : groundHit(e.clientX, e.clientY);
+      if (hit) {
+        const lim = tw.ground ? tw.ground.half : 200;
+        rig.target.x = Math.max(-lim, Math.min(lim, (rig.target.x + hit.x) / 2));
+        rig.target.z = Math.max(-lim, Math.min(lim, (rig.target.z + hit.z) / 2));
+        rig.target.y = yAt(rig.target.x, rig.target.z) + 1;
+      }
+      dolly(out ? Math.LN2 : -Math.LN2);
       requestFrame();
     });
 
@@ -5921,18 +6017,28 @@ void main() {
         return;
       }
       if (k === 'Escape' && tw.hooks && tw.hooks.leave) { e.preventDefault(); tw.hooks.leave('escape'); return; }
-      const step = 0.08;
+      // The map's keys (MapLibre's): the arrows move the ground, and with
+      // Shift they turn (← →) and tilt (↑ towards the horizon, ↓ overhead).
+      // W A S D move it too, as they always have here.
+      const step = 0.08, move = 48;
+      if (e.shiftKey && k.startsWith('Arrow')) {
+        switch (k) {
+          case 'ArrowLeft':  rig.theta += step; break;
+          case 'ArrowRight': rig.theta -= step; break;
+          case 'ArrowUp':    rig.phi = Math.min(PHI_MAX, rig.phi + step); break;
+          case 'ArrowDown':  rig.phi = Math.max(PHI_MIN, rig.phi - step); break;
+        }
+        e.preventDefault();
+        requestFrame();
+        return;
+      }
       switch (k) {
-        case 'ArrowLeft':  rig.theta += step; break;
-        case 'ArrowRight': rig.theta -= step; break;
-        case 'ArrowUp':    rig.phi = Math.max(0.06, rig.phi - step); break;
-        case 'ArrowDown':  rig.phi = Math.min(1.53, rig.phi + step); break;
+        case 'ArrowUp':   case 'w': pan(0, move); break;
+        case 'ArrowDown': case 's': pan(0, -move); break;
+        case 'ArrowLeft': case 'a': pan(move, 0); break;
+        case 'ArrowRight': case 'd': pan(-move, 0); break;
         case '+': case '=': dolly(-0.2); break;
         case '-': case '_': dolly(0.2); break;
-        case 'w': pan(0, 24); break;
-        case 's': pan(0, -24); break;
-        case 'a': pan(24, 0); break;
-        case 'd': pan(-24, 0); break;
         case 'r': resetOrbit(); break;
         case 't': lookDown(); break;
         case 'f': case 'p': enterWalk(); break;
@@ -5948,6 +6054,28 @@ void main() {
   function maxRadius() { return tw.ground ? tw.ground.size * 2.2 : 400; }
   function dolly(amount) {
     rig.radius = Math.min(maxRadius(), Math.max(1.5, rig.radius * Math.exp(amount)));
+  }
+
+  // How far the orbit camera tilts: from all but straight overhead (exactly
+  // overhead, lookAt has no way to tell which way is up) to just above the
+  // horizon.
+  const PHI_MIN = 0.06, PHI_MAX = 1.53;
+  const HOME_PHI = 1.05;   // the opening view's tilt, ~60° — the tilt button's way back
+  // A tilt by a drag of `dy` pixels: up tips the camera towards the horizon,
+  // down lifts it overhead — which way the map's right-drag tilts it.
+  function tilt(dy) {
+    rig.phi = Math.max(PHI_MIN, Math.min(PHI_MAX, rig.phi - dy * 0.005));
+  }
+
+  // Where a screen point meets the ground, in the scene's metres, or null.
+  function groundHit(clientX, clientY) {
+    if (!sc.terrain || !sc.camera || !sc.canvas) return null;
+    const r = sc.canvas.getBoundingClientRect();
+    const nd = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    const rc = new THREE.Raycaster();
+    rc.setFromCamera(nd, sc.camera);
+    const hit = rc.intersectObject(sc.terrain, false)[0];
+    return hit ? hit.point : null;
   }
 
   // Pan the orbit target across the ground, screen-relative: the ground follows
@@ -6082,14 +6210,10 @@ void main() {
   // the digital twin's "what is here".
   function pickGround(e) {
     if (!sc.terrain || !sc.camera) return;
-    const r = sc.canvas.getBoundingClientRect();
-    const nd = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-    const rc = new THREE.Raycaster();
-    rc.setFromCamera(nd, sc.camera);
-    const hit = rc.intersectObject(sc.terrain, false)[0];
+    const hit = groundHit(e.clientX, e.clientY);
     const out = document.getElementById('twin-pick');
     if (!hit) { if (out) out.textContent = ''; return; }
-    const x = hit.point.x, z = hit.point.z;
+    const x = hit.x, z = hit.z;
     const h = heightAt(x, z);
     tw.picked = { x, z, h };
     if (out) {
@@ -6480,7 +6604,7 @@ void main() {
            + (sc.horizon ? `, the country round it to ${HORIZON_M / 1000} km under a sky` : '')
            + (tw.flood && !tw.flood.none && sc.flood && S().flood ? `, and water at its flood levels, up to ${FloodStages.ahdText(tw.flood.top)}. ` : '. ')
            + (rig.mode === 'walk' ? 'POV: W A S D move, drag looks, Escape leaves.'
-                                  : 'Drag to orbit, arrow keys turn, plus and minus zoom, F walks, T looks down, R resets.');
+                                  : `${viewKeyWords()} F walks, T looks down, R resets.`);
     }
     cv.setAttribute('aria-label', name);
   }
@@ -6854,7 +6978,7 @@ void main() {
           <div class="twin-compass" id="twin-compass" aria-hidden="true" style="--twin-heading:0deg">N</div>
           <button type="button" class="twin-flood-pill" id="twin-flood-pill" hidden onclick="DigitalTwin.floodPill()"></button>
           ${floodScaleHtml()}
-          <p class="twin-hud" id="twin-hud">Drag to orbit, wheel to zoom, right-drag or Shift-drag to pan. Click the ground for its height.</p>
+          <p class="twin-hud" id="twin-hud">${esc(viewMoveWords(coarsePointer()))} Click the ground for its height.</p>
           <button type="button" class="twin-hud-q" id="twin-hud-q" aria-controls="twin-hud" aria-expanded="true"
                   aria-label="How to move the view" title="How to move the view" onclick="DigitalTwin.toggleHud()" hidden>?</button>
           ${caveatHtml()}
@@ -6903,6 +7027,7 @@ void main() {
     sc.renderer = null; sc.scene = null; sc.camera = null; sc.canvas = null; sc.stage = null;
     sc.sun = null; sc.hemi = null;
     tw.hooks = null;
+    cameraKey = '';   // the next twin tells the camera buttons where it stands
     tw.paths = null;
     tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false;
     tw.model = null;
@@ -7234,6 +7359,11 @@ void main() {
     resetView() { resetOrbit(); requestFrame(); },
     topView()   { lookDown(); requestFrame(); },
     toggleWalk() { if (rig.mode === 'walk') leaveWalk(); else enterWalk(); requestFrame(); },
+    // The side panel's 🧭 and tilt buttons, while the twin is up in the map
+    // (map-3d.js routes them here, and reads cameraReading back).
+    camera() { return cameraReading(); },
+    faceNorth() { faceNorth(); },
+    toggleTilt() { toggleTilt(); },
     rebuild() {
       const st = currentStation();
       if (st && located(st)) {
@@ -7379,7 +7509,9 @@ void main() {
     // A save moved a station: a twin centred on its old spot is rebuilt on
     // the new one.
     stationMoved(id) { if (tw.live && tw.stationId === id) init(); },
-    // The 🧭 Orientation tool: the button on the overlay's bar, and its panel's controls.
+    // The 🔄 Orientation tool: the button on the overlay's bar, and its panel's controls.
+    // (It wore 🧭 once, which in the side panel's strip is Face north — the
+    // camera's button, which drives the twin too.)
     toggleOrient() { if (tw.orient) closeOrient(); else openOrient(); },
     orientTo,
     orientBy(d) { if (tw.orient) orientTo(tw.orient.deg + Number(d)); },
@@ -7807,6 +7939,12 @@ void main() {
       placeCamera();
       requestFrame();
       return sc.camera ? { x: sc.camera.position.x, y: sc.camera.position.y, z: sc.camera.position.z } : null;
+    },
+    // Where the orbit stands, for the check that drives it with a pointer and
+    // the keys: the angles and the ground point it turns about.
+    _rig() {
+      return { mode: rig.mode, radius: rig.radius, theta: rig.theta, phi: rig.phi, yaw: rig.yaw,
+               target: rig.target ? { x: rig.target.x, y: rig.target.y, z: rig.target.z } : null };
     },
     // Forget what the State said about bridges, so a check can change its answer.
     _forgetBridges() { bridgeCache.clear(); },

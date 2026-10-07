@@ -430,8 +430,12 @@ const HELP = {
       + 'twin\'s own bar opens it. How the twin works is at the foot of the pane.',
       '<strong>3-D view</strong> — ⛰️ in the side panel\'s strip, or the panel of the same name — '
       + 'tilts the map onto the ground it is drawn on: the base map you are already on (the most opaque one, if you have blended several), draped over '
-      + '~30 m terrain, with the pins and links you are already looking at on it. Drag to pan, '
-      + 'right-drag (or Ctrl-drag, or two fingers) to tilt and rotate. It is the same map and the '
+      + '~30 m terrain, with the pins and links you are already looking at on it. Drag to move, '
+      + 'right-drag (or Ctrl-drag) to turn and tilt, scroll to zoom; on a touch screen pinch to zoom, '
+      + 'twist to turn and slide two fingers up or down to tilt; from the keyboard the arrows move '
+      + 'and Shift with them turns and tilts. A hint at the foot of the view says so as it opens, '
+      + 'and its <strong>?</strong> brings it back. The digital twin moves exactly the same way. '
+      + 'It is the same map and the '
       + 'same controls, so a filter changed while it is tilted is the same filter — and the pins '
       + 'are still pins: click one and its card paints in the corner, click a repeater and its '
       + 'focus dim comes on, exactly as in 2-D. <strong>Elevation shading</strong> is draped on '
@@ -444,7 +448,8 @@ const HELP = {
       + 'while it is on: a <strong>compass</strong> that shows which way north has gone and puts '
       + 'you back facing it, and a <strong>tilt</strong> button that shows how far the camera has '
       + 'dropped, flattens it to straight down on one press and returns it to 62° on the next. '
-      + 'Neither is offered on the flat map, where there is no camera to reset. Tick '
+      + 'Neither is offered on the flat map, where there is no camera to reset — except while a '
+      + 'digital twin is up, when the same two buttons turn and tilt the twin. Tick '
       + '<strong>Line-of-sight sheets</strong> and each hop also grows a vertical surface between '
       + 'its line of sight and the ground under it, green where the path clears the 60% Fresnel '
       + 'zone and red where the ground is above the line — the profile card\'s own geometry, so the '
@@ -1814,13 +1819,18 @@ const TWIN_HELP = {
     + 'Escape gives it back at the same zoom. 🧊 Digital twin on a station\'s card, or a station '
     + 'picked in this pane, goes straight there. This pane is the rest of it: the settings, the '
     + 'Ground truth panel and the .glb — ⚙ Settings on the twin\'s bar opens it.',
+    '<strong>It moves the way the 3-D map does.</strong> Drag to move the ground, right-drag or '
+    + 'Ctrl-drag to turn and tilt, wheel or double-click to zoom; on a touch screen drag, pinch, '
+    + 'twist to turn and slide two fingers up or down to tilt; the arrows move it, and Shift with '
+    + 'them turns and tilts. The compass and tilt buttons under ⛰️ in the side panel face it north '
+    + 'and look straight down, as they do on the map. The hint along the foot of the stage says so.',
     '<strong>📍 Move pin</strong> puts the station where it stands: drag the amber post across the '
     + 'ground, or click where the station is, and a panel on the stage reads the new position to the '
     + 'centimetre. Round the station and the pin the State\'s finest imagery is draped again — 10 cm '
     + 'over most towns, where the rest of the patch is 0.39 m. Save writes the position (and nothing '
     + 'else) through the station editor\'s own save, then rebuilds the twin on the new spot. The '
     + 'same mode works on the 2-D map and in ⛰️ 3-D.',
-    '<strong>🧭 Orientation</strong> turns the station to the way it faces on the ground — the side '
+    '<strong>🔄 Orientation</strong> turns the station to the way it faces on the ground — the side '
     + 'its enclosure door or a tower\'s ladder is on. Turn it with the bearing box, the 15° buttons '
     + 'or the slider, or orbit round to where the front should be and press Face the view. Save '
     + 'writes the bearing on the station for everybody; a station with none recorded is drawn facing '
@@ -3488,6 +3498,26 @@ function announce(message) {
   // A microtask is not enough — the region has to be observed empty between
   // the two writes, and that means a frame.
   requestAnimationFrame(() => { el.textContent = text; });
+}
+
+// ── Moving a 3-D view ──────────────────────────────────────────────────────────
+// The Stations map's ⛰️ 3-D view (map-3d.js) and the digital twin
+// (digital-twin.js) are moved the same way, and it is the map's way — the twin
+// is opened from the map, and the flat map already pans on a drag — so a hand
+// that has learnt one has learnt the other. These are the one statement of it:
+// both hints say these words, so the two cannot drift apart. `touch` is a
+// finger rather than a mouse; there is no wheel, right button or Ctrl on a
+// phone, and naming them there is the most text on its screen.
+function viewMoveWords(touch) {
+  return touch
+    ? 'Drag to move, pinch to zoom, twist to turn, slide two fingers up or down to tilt.'
+    : 'Drag to move, right-drag or Ctrl-drag to turn and tilt, wheel to zoom.';
+}
+
+// …and the keys, for whoever drives the view from the keyboard (the canvas
+// has to be focused first, in both views).
+function viewKeyWords() {
+  return 'Arrow keys move, Shift with the arrows turns and tilts, plus and minus zoom.';
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────────

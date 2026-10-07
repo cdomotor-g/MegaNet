@@ -1069,9 +1069,11 @@ async function browserHalf(FS) {
       };
     });
     let P = await stageNow();
+    // The words the 3-D map's hint says for a finger too (core.js): the two views move alike.
+    const viewWords = await hp.evaluate(() => viewMoveWords(true));
     ok('in the map\'s twin on a phone the stage says it is one: the "?" at its foot, and the hint beside it in a finger\'s words',
       P.compact.on && P.compact.staged && P.qShown && P.qExpanded === 'true' && P.hudShown
-        && /pinch to zoom, two fingers to pan/.test(P.hudText) && !/wheel/.test(P.hudText)
+        && P.hudText.startsWith(viewWords) && /pinch to zoom, twist to turn/.test(P.hudText) && !/wheel/.test(P.hudText)
         && P.q.left >= P.stage.left && P.q.bottom <= P.stage.bottom, J({ compact: P.compact, q: P.q, hud: P.hudText }));
     ok('…and the scale up beside it, every name a line tall and none on another, its foot above the "?"',
       P.namesOpacity === 1 && P.namesTouchable && P.labels.length === 7 && P.labels.every(l => l.height <= 18)

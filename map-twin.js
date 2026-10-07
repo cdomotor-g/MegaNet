@@ -324,7 +324,7 @@ const MapTwin = (function () {
             <button type="button" id="twin-movepin-btn" aria-pressed="false" onclick="DigitalTwin.toggleMovePin()"
                     title="Move this station's pin to where the station stands on the imagery, and save the position"><span aria-hidden="true">📍</span><span class="map-twin-label"> Move pin</span><span class="sr-only">Move this station's pin</span></button>
             <button type="button" id="twin-orient-btn" aria-pressed="false" onclick="DigitalTwin.toggleOrient()"
-                    title="Turn the station to the way it faces on the ground — the side its door or ladder is on — and save the bearing"><span aria-hidden="true">🧭</span><span class="map-twin-label"> Orientation</span><span class="sr-only">Turn this station to the way it faces</span></button>
+                    title="Turn the station to the way it faces on the ground — the side its door or ladder is on — and save the bearing"><span aria-hidden="true">🔄</span><span class="map-twin-label"> Orientation</span><span class="sr-only">Turn this station to the way it faces</span></button>
             <button type="button" class="map-twin-wide" onclick="MapTwin.openPane()"
                     title="The twin's settings, the ground truth and the .glb for Blender — the 🧊 pane of the side panel"><span aria-hidden="true">⚙</span><span class="map-twin-label"> Settings</span><span class="sr-only">The twin's settings, in the side panel</span></button>
             ${DigitalTwin.infoToggleHtml()}
@@ -361,6 +361,9 @@ const MapTwin = (function () {
     // `why` is the twin's own way out: 'wheel' for a wheel past the widest
     // orbit, 'escape' for the key.
     DigitalTwin.mountAt(st.id, { leave: why => leave(why === 'wheel') });
+    // The side panel's 🧭 and tilt buttons are this camera's now (map-3d.js
+    // syncCamera) — shown, even over a flat map, and reading the twin.
+    if (typeof Map3D !== 'undefined') Map3D.cameraChanged();
     // A twin opened is a station looked at, and the trail's pill moves to the
     // top of this stage, beside the flood scale (station-trail.js).
     if (typeof StationTrail !== 'undefined') StationTrail.visit(st.id);
@@ -383,6 +386,8 @@ const MapTwin = (function () {
     DigitalTwin.stop();
     if (host) { host.classList.remove('is-on'); host.innerHTML = ''; }
     releaseLeaflet();
+    // …and the camera buttons the map's again: put away over a flat map.
+    if (typeof Map3D !== 'undefined') Map3D.cameraChanged();
     // …and back beside the zoom buttons, which are back on the map.
     if (typeof StationTrail !== 'undefined') StationTrail.sync();
     // A snap, not a slide: the twin has just covered the map, so there is no
