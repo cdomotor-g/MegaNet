@@ -208,6 +208,7 @@ const SiteMap = (function () {
       use: [
         'Start the day with the "needs attention" list',
         'Look into silent stations, sliding batteries or blocked gauges',
+        'See whose check signals land on top of each other, and which check time or repeater delay to change',
         'Ask Claude to investigate and write the briefing',
       ],
     },

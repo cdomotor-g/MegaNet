@@ -249,6 +249,9 @@ async function main() {
     F = await take(page, 'The findings — CSV');
     check('Station Health: the demo week\'s findings, as CSV', /^floodnet-station-health.*\.csv$/.test(F.name || '') && (F.body || '').split('\n').length > 3,
       J({ name: F.name, error: F.error }));
+    F = await take(page, 'Check times — CSV');
+    check('Station Health: every station\'s check time and the move suggested, as CSV', /^floodnet-check-times-.*\.csv$/.test(F.name || '')
+      && (F.body || '').split('\n').length > 10 && /\d\d:\d\d:\d\d, then every 3 h/.test(F.body || ''), J({ name: F.name, error: F.error }));
 
     // ═══════════════════════════════════════════════════════════════════════
     log('\n6. Every file floodnet-…\n');

@@ -16097,8 +16097,8 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-empty { color: var(--muted); padding: var(--sp-2) 0; }
 
 .hl-table td, .hl-table th { vertical-align: top; }
-.hl-ftable td, .hl-ftable th { white-space: normal; }
-.hl-ftable .hl-fwhere { min-width: 8rem; font-weight: 600; }
+.hl-ftable td, .hl-ftable th, .hl-airtable td, .hl-airtable th { white-space: normal; }
+.hl-ftable .hl-fwhere, .hl-airtable .hl-fwhere { min-width: 8rem; font-weight: 600; }
 .hl-fwhat b { display: block; }
 .hl-fdetail, .hl-faction { display: block; margin-top: .15rem; }
 .hl-faction { color: var(--muted); }
@@ -16192,6 +16192,29 @@ button.adm-danger:hover { border-color: var(--bad); }
 /* A receiver's readings an hour, across the window. */
 .hl-spark { display: block; }
 .hl-spark path { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; }
+/* Airtime (health-airtime.js): the hour folded — transmissions a day in each
+   half-minute, the checks among them in the accent, a dot where one came with
+   a corrupted copy, and a tick under the axis for each station's check, in
+   the warning colour where it falls together with another's. */
+.hl-air-sub { max-width: 70rem; }
+.hl-air-kpis { margin: .4rem 0 .6rem; padding-left: 1.1rem; display: grid; gap: .25rem; font-size: var(--fs-sm); }
+.hl-air-kind { display: block; color: var(--muted); }
+.hl-air-paths { margin: .2rem 0 .4rem; }
+.hl-air-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.hl-air-bar { fill: color-mix(in srgb, var(--muted) 45%, var(--panel)); }
+.hl-air-bar--check { fill: var(--accent); }
+.hl-air-dmg { fill: var(--bad); }
+.hl-air-base { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.hl-air-tick { stroke: var(--muted); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.hl-air-tick--clash { stroke: var(--warn); stroke-width: 3; }
+.hl-air-axis { display: flex; justify-content: space-between; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hl-air-key { display: inline-block; width: 12px; height: 12px; border-radius: 2px; background: color-mix(in srgb, var(--muted) 45%, var(--panel)); }
+.hl-air-key--check { background: var(--accent); }
+.hl-air-key--dmg { background: var(--bad); border-radius: 50%; width: 9px; height: 9px; }
+.hl-air-key--tick { width: 2px; background: var(--muted); border-radius: 0; }
+.hl-air-key--clash { width: 3px; background: var(--warn); border-radius: 0; }
+.hl-air-tools { margin-top: var(--sp-2); }
+
 /* Headings the tab moves focus to (a station opened, the lens): a target for
    a screen reader, not a control — no ring for a mouse, the ring for a
    keyboard, as #main-content does. */
@@ -16199,7 +16222,7 @@ button.adm-danger:hover { border-color: var(--bad); }
 /* On a phone the severity keeps its sign and gives its word to a screen
    reader, so the finding itself gets the width. */
 @media (max-width: 560px) {
-  .hl-ftable .hl-sev-word {
+  .hl-ftable .hl-sev-word, .hl-airtable .hl-sev-word {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }

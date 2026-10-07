@@ -24,6 +24,9 @@
 //   * the tab fetching page by page from the datastore (stood in for here),
 //     findings worst first, a filter, a station opened and a missed check
 //     put in its context
+//   * the Airtime panel: the demo week's one planted clash found, said to
+//     hurt, the station coming off worse moved somewhere clear — and nothing
+//     else (airtime.mjs holds the rules themselves, in Node)
 //   * the door to the Reception Map carrying the same readings over
 //   * Claude's briefing, its tool loop run against a scripted client: tools
 //     answered, a tool that does not exist refused, the briefing drawn with
@@ -250,16 +253,74 @@ try {
   const tab = await page.evaluate(() => {
     const st = Health.state();
     return {
-      rows: st.rows.length, findings: document.querySelectorAll('.hl-ftable tbody tr').length,
+      rows: st.rows.length, t0: st.A.t0, t1: st.A.t1, findings: document.querySelectorAll('.hl-ftable tbody tr').length,
       first: (document.querySelector('.hl-ftable tbody tr') || {}).className || '',
       markers: document.querySelectorAll('.leaflet-container .leaflet-interactive').length,
     };
   });
   const pages = asked.filter(s => /offset=/.test(s));
-  ok('the tab reads the week from the datastore, twelve hours at a time, every row', tab.rows === WORLD.rows.length && pages.length >= 14,
-    `${tab.rows} of ${WORLD.rows.length} rows in ${pages.length} requests`);
+  // Every row in the week the tab asked for — built seconds before the tab
+  // asked, the demo week can have a frame in the seconds its window has
+  // since moved past.
+  const inWin = WORLD.rows.filter(r => { const t = Date.parse(r.reading_ts); return t >= tab.t0 && t < tab.t1; }).length;
+  ok('the tab reads the week from the datastore, twelve hours at a time, every row', tab.rows === inWin && inWin >= WORLD.rows.length - 20 && pages.length >= 14,
+    `${tab.rows} of ${inWin} rows in its window (${WORLD.rows.length} built) in ${pages.length} requests`);
   ok('…and lists what needs attention, worst first', tab.findings >= 5 && /hl-frow--critical/.test(tab.first), JSON.stringify(tab));
   ok('…and maps the stations', tab.markers >= 10, 'markers: ' + tab.markers);
+
+  // ── the Airtime panel ──────────────────────────────────────────────────────
+  // The demo week plants one clash: steady2's check starts 0.9 s after the
+  // partial station's battery frame, the frame that goes missing on a third of
+  // its checks. The panel has to find that pair, say it hurts, and move the
+  // one coming off worse. Any other clash has to be one the week really has:
+  // the later stations' phases move with the window (roles.phases says so),
+  // and two can land on one minute by chance — so every clash reported is
+  // held to the phases the week was built with, and none may be missing.
+  const air = await page.evaluate(W => {
+    const R = HealthAirtime.state().R;
+    const ids = [W.roles.partial, W.roles.steady2];
+    const clash = R && R.clashes.find(c => ids.includes(c.a) && ids.includes(c.b));
+    const moves = R ? R.suggestions.filter(s => s.kind === 'move-check') : [];
+    const el = document.getElementById('hl-airtime');
+    // The oracle: two roles whose checks were built within half a minute of
+    // each other, every three hours, clash; any further apart do not.
+    const P = 3 * 3600e3, idOf = r => W.roles[r];
+    const roles = Object.keys(W.roles.phases).filter(r => idOf(r));
+    const want = new Set();
+    roles.forEach(a => roles.forEach(b => {
+      if (a >= b) return;
+      const d = ((W.roles.phases[a] - W.roles.phases[b]) % P + P) % P;
+      if (Math.min(d, P - d) <= 30e3) want.add([idOf(a), idOf(b)].sort().join());
+    }));
+    const got = new Set(R ? R.clashes.map(c => [c.a, c.b].sort().join()) : []);
+    const inClash = new Set(R ? R.clashes.flatMap(c => [c.a, c.b]) : []);
+    return {
+      clash: clash ? { hurts: clash.hurts, together: clash.together, damaged: clash.damaged, every: clash.everyMs / 3600e3 } : null,
+      want: [...want].sort(), got: [...got].sort(),
+      moves: moves.map(m => ({ id: m.stationId, sev: m.severity, toMs: m.evidence.toMs, clearMs: m.evidence.clearMs })),
+      checks: R ? R.checks.length : 0,
+      steadyClock: R ? R.checks.filter(c => c.behaviour === 'steady').length : 0,
+      planted: R ? (R.pairs.find(p => [p.a, p.b].sort().join() === ids.slice().sort().join()) || { n: 0 }).n : 0,
+      svg: !!(el && el.querySelector('svg.hl-air-svg rect.hl-air-bar--check')),
+      rows: el ? el.querySelectorAll('.hl-airtable tbody tr').length : 0,
+      ticks: el ? el.querySelectorAll('.hl-air-tick--clash').length : 0, inClash: inClash.size,
+    };
+  }, WORLD);
+  ok('the Airtime panel finds the planted clash, every 3 hours, and that it hurts', air.clash && air.clash.hurts && air.clash.every === 3 && air.clash.together >= 40,
+    JSON.stringify(air.clash));
+  ok('…and every clash it reports is one the week was built with, and none is missing', air.want.join(' ') === air.got.join(' ') && air.want.length >= 1,
+    JSON.stringify({ want: air.want, got: air.got }));
+  const plantedMove = air.moves.find(m => m.id === WORLD.roles.partial);
+  ok('…moves the station coming off worse, as a change to make, to somewhere clear by minutes',
+    plantedMove && plantedMove.sev === 'warn' && plantedMove.clearMs >= 2 * 60e3 && !air.moves.some(m => m.id === WORLD.roles.steady2)
+      && air.moves.length === air.got.length, JSON.stringify(air.moves));
+  ok('…reads every station\'s check time, and the demo\'s clocks as kept', air.checks >= 10 && air.steadyClock === air.checks, `${air.steadyClock} of ${air.checks}`);
+  // Seen together only when the partial station's battery frame arrived —
+  // about two checks in three; the third time there was nothing to pile up
+  // with, which is the collision's story too.
+  ok('…counts the planted pair landing together whenever the frame they meet on arrived', air.planted >= 25 && air.planted <= 50, 'times: ' + air.planted);
+  ok('…and draws it: the folded hour, a tick for each station in a clash, a suggestion for each move', air.svg && air.ticks === air.inClash && air.rows === air.moves.length,
+    JSON.stringify(air));
 
   await page.evaluate(() => Health.setCat('power'));
   const power = await page.evaluate(() => [...document.querySelectorAll('.hl-ftable tbody tr .hl-fwhat b')].map(b => b.textContent));

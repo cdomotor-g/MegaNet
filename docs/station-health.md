@@ -14,7 +14,7 @@ twelve hours at a time, a few seconds) and works everything out in the browser
 in a few hundred milliseconds. **Demo week** shows what it does with a made-up
 week of real stations, one of every fault planted in it.
 
-## Four ways in
+## Five ways in
 
 - **Needs attention** — the findings, worst first: what is wrong, the evidence,
   and what to do. Filter by kind (power, check signals, network, sensors, data
@@ -29,6 +29,10 @@ week of real stations, one of every fault planted in it.
   upload lag and its corrupted copies; each repeater with the stations heard
   behind it, how many are silent now, and the corrupted copies it could have
   carried.
+- **Airtime** — which stations' transmissions land on top of each other at each
+  receiver and whether it costs them, each station's check time and how its
+  logger keeps it, and what to change: a check time, or a pair of repeaters'
+  delays. [Below](#airtime-transmissions-landing-together).
 
 ### A station
 
@@ -187,6 +191,96 @@ address numbers recur across the country.
 | **Address shared here** | note | two stations near each other share the address, so its readings cannot be attributed | Fix the register. |
 | **Address does not read like its sensor** | note | more than half of a "battery" address's readings (4+) are not a 12 V battery | Fix the register: another sensor, or another station, is on this address. |
 | **Not heard at all** | note | registered, enabled stations on repeaters within reach that relayed others' traffic, with not one reading | Confirm whether they are decommissioned, or check them. |
+
+## Airtime: transmissions landing together
+
+ALERT is ALOHA. A station transmits when its logger says to, nobody listens
+first, and two stations heard at one receiver at once spoil each other — one
+lost, both lost, or a frame decoded with bits flipped. The **Airtime** panel
+(below *Check signals*; `airtime-analysis.js`, drawn by `health-airtime.js`)
+reads the same window for who lands on top of whom, whether it costs anything,
+and what to change.
+
+**What the times can say.** A legacy ALERT frame is 133 ms on the air (40 bits
+at 300 baud), a keying with its lead-in about half a second. The times stored
+are coarser: an RPi ALERT base station stamps a reading when its RTL-SDR's
+decoder *finishes* — half a second to three seconds after the burst, varying
+with the backlog on that channel — a Quansheng when its line reaches the Pi, an
+ERT-A2 in whole seconds. So **together** means two stations' frames stamped
+within **3 s** of each other at one receiver channel; nothing finer is claimed.
+Two stamped within 0.3 s were decoded out of one squelch opening — back to back
+or over each other on the air — and that is said, except on a channel whose
+times are whole seconds. Repeater delays are under a second, too fine for these
+times to measure at all.
+
+**Does crowding cost anything?** Every transmission is *together* or *alone*,
+and *damaged* if it came with a corrupted copy or a ghost. The panel puts the
+two damage rates side by side: crowding that costs nothing needs no change.
+Each clash (below) is held, separately, to its own slots — a frame lost, the
+check missed, or a corrupted copy — against every check in the network that
+shared its moment with nobody.
+
+**The hour, folded.** Per receiver channel, every hour of the window laid over
+one: transmissions a day in each half-minute, the checks among them, a dot
+where one came with a corrupted copy, a tick for each station's check — in the
+warning colour where it falls together with another's — and the five busiest
+minutes past the hour with who checks in them. A 3-hour station and another an
+hour after it stack in this picture without ever meeting; the clashes are worked
+out on each pair's own cycle.
+
+**Check signals: when each goes out.** Each station's learned check, as the time
+it is heard (the first after midnight and the period, or the minutes past every
+hour), how far it strays, and **how its logger keeps the time** — read off how
+far each check landed from its slot, check after check, because the register
+records no logger model or firmware:
+
+| Its clock | When | What moves it |
+| --- | --- | --- |
+| **keeps its time** | on its slot to within 15 s | a logger timing its checks off its clock: change its timed-report offset or start time |
+| **keeps its time loosely** | within 45 s | the same, with a wider guard |
+| **drifting** | walking 5 s a day or more, well past its own scatter | a clock running free: set the clock (and its battery), or turn on time sync, before moving anything — a new offset will not stay put |
+| **jumped to a new time** | stepped 30 s or more between two checks and stayed | the pattern of a logger that counts its interval from power-up, so a restart moved it: restart it at the new time, or set it to clock-timed checks |
+| **randomised** | wandering more than 45 s about its slot | checks dithered by the logger: nothing to move, and left out of the clashes |
+| **too few to tell** | fewer than six checks heard | confirm the time on the logger first |
+
+**Clashes.** Two stations heard at a common receiver channel, or both within
+120 km of a repeater that passes both, clash when their checks fall together:
+on a circle as long as the greatest common divisor of their periods (a 1-hour
+and a 3-hour station meet every 3 hours if they meet at all; two 3-hour stations
+an hour apart never do), the stretch each check occupies — first frame to last,
+and half a second more — comes within 3 s and both stations' own spread of the
+other's.
+
+**What to change**, most pressing first:
+
+- **Move a check.** In each group of stations that clash, the ones that cannot
+  usefully be moved (drifting, too few to tell) stay, then the ones doing best;
+  each one left clashing is offered the nearest whole half-minute that clears
+  every check heard at its receivers and repeaters by five minutes (an eighth of
+  a short period), the quieter of two equally near — or the middle of the widest
+  gap when nothing is that clear. Moves are planned in turn, so two stations are
+  never sent to one gap. A **Change** when the shared slots came off worse —
+  twice the network's rate and ten points above it, over four or more — else a
+  **Consider**. The *how* is the table above, for that station's clock.
+- **A clock walking into a clash** — said before it arrives, with when.
+- **Stagger two repeaters.** A pair passing the same stations, sending on the
+  same channel, with no delay on file or delays under 150 ms apart, whose shared
+  stations' transmissions came with corrupted copies at 3% or more and twice the
+  network's rate: a frame both accept is re-sent by both in the same instant.
+  The values offered are the Backbone's (`map-backbone.js`, from where the
+  repeaters are); each repeater is in one pair at most, and a repeater already
+  named for relaying with bit errors is the likelier cause.
+
+**Who lands together, again and again.** Every two stations in a pile-up, each
+moment once however many channels heard it, with the minute past the hour it
+usually happens at — the same minute every time is two checks meeting;
+scattered, it is events — and the moments three stations or more landed at
+once.
+
+*Export check times* (and ⤓ Export → *Check times — CSV*) downloads every
+station's check time, its clock, who it falls together with and the move
+suggested. `npm run airtime` holds the rules to networks built for each, in
+Node; `npm run health` holds the panel to the demo week's one planted clash.
 
 ## On a station's card, and its pin
 

@@ -1735,6 +1735,10 @@ const HealthAnalysis = (() => {
         attention: findings.filter(f => f.severity !== 'info').length,
       },
       stations: new Map(allStations.map(S => [S.st.id, S])),
+      // Every transmission, its copies, its corrupted ones and its ghosts —
+      // what the Airtime panel (airtime-analysis.js) reads who landed on top
+      // of whom from.
+      txs,
       receivers: rx,
       repeaters: repStats.sort((a, b) => b.blame - a.blame || b.members.length - a.members.length),
       netEvents,
@@ -1917,10 +1921,17 @@ const HealthAnalysis = (() => {
     // Background traffic so the receiver is demonstrably listening between
     // checks: a station's level every 20 min (event reports), on the steady
     // stations.
+    const phases = {};
     pool.forEach((o, i) => {
       const role = order[i] || 'steady';
       roles[role] = o.s.id;
-      const phase = Math.round(rnd() * 170) * MIN + 41 * 1000;
+      let phase = Math.round(rnd() * 170) * MIN + 41 * 1000;
+      // One clash for the Airtime panel: steady2's check starts 0.9 s after
+      // the partial station's battery frame — the frame that goes missing on
+      // a third of its checks. The draw above is still made, so every other
+      // station's week is the one it always was.
+      if (role === 'steady2' && phases.partial != null) phase = phases.partial + 10800 + 900;
+      phases[role] = phase;
       let rainCount = Math.floor(rnd() * 1500);
       for (let k = Math.ceil((t0 - phase) / P); phase + k * P < now - 5 * MIN; k++) {
         const t = phase + k * P;
@@ -1972,6 +1983,11 @@ const HealthAnalysis = (() => {
       const t = rows.find(r => r.alert_id === steady.by.battery && Date.parse(r.reading_ts) > t0 + 4 * DAY);
       if (ghostAid != null && t) { push(ghostAid, Date.parse(t.reading_ts) + 2100, t.value_raw); roles.ghost = ghostAid; }
     }
+    // Each role's check phase: the oracle for the Airtime panel's clashes. The
+    // draws after a role whose loop draws per slot (fading, partial, corrupt)
+    // move with the window, so two of the later stations can land on one
+    // minute by chance — a clash as real as the planted one.
+    roles.phases = phases;
     roles.spell = { from: spellFrom, to: spellTo };
     roles.outage = { from: outageFrom, to: outageTo };
     roles.storm = storm;

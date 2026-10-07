@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 10, date: '2026-10-07', items: [
+      '<strong>Airtime</strong>, in <em>Station Health</em>: which stations\' transmissions land on top of each other at '
+        + 'each base station, and whether the ones that do come with more corrupted copies. Every hour of the week laid '
+        + 'over one shows the busy minutes — often the top of the hour — and who checks in them.',
+      'Each station\'s <strong>check time</strong>, learned from what was heard, and how its logger seems to keep it: '
+        + 'steady, drifting, jumped after a restart, or randomised. Where two stations\' checks keep landing together, '
+        + 'it suggests the <strong>nearest clear time to move one to</strong>, and how to set it for that kind of '
+        + 'logger — and which pairs of repeaters to give <strong>different delays</strong>. <strong>Export check '
+        + 'times</strong> saves the list as a spreadsheet.',
+    ] },
     { n: 9, date: '2026-10-07', items: [
       '<strong>🗺️ Radio Path Maps lists the maps on the right</strong> instead of leaving it blank: every map, '
         + 'each with its region, catchments, radio networks, the places it covers, its sheet size and date, and a '

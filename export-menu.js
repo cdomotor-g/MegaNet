@@ -130,6 +130,9 @@ const ExportMenu = (function () {
     health: () => [
       { label: 'The findings — CSV', sub: 'every finding, with its evidence and the station\'s owner', call: ['Health.exportCsv'],
         empty: 'There are no findings yet — the week is still being read, or nothing was found.' },
+      { label: 'Check times — CSV', sub: 'each station\'s learned check time, how its logger keeps it, who it falls together with, and the move suggested',
+        call: ['HealthAirtime.exportCsv'],
+        empty: 'There are no check times yet — the week is still being read.' },
     ],
     history: () => [
       { label: 'The records listed — CSV', sub: 'the inspection and maintenance records, as filtered', call: ['History.exportList'],

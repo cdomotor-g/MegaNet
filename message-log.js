@@ -1760,6 +1760,10 @@ const MessageLog = (() => {
   // the way seriesData/adoptSeries are on the ARRO module — a table the tests
   // can fill is a table the app can fill.
   function adoptRows(rows) {
+    // Whatever fetch is still in flight is superseded, as Station Health's
+    // adopt() has it: the tab's first visit asks the datastore, and an answer
+    // landing after these rows would put its own in their place.
+    ml.seq++;
     ml.rows = Array.isArray(rows) ? rows : [];
     ml.loading = false;
     ml.error = '';

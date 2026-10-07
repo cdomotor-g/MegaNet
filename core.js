@@ -1418,7 +1418,10 @@ const HELP = {
            + 'each with its evidence and what to do about it. Pick a station for its '
            + '<strong>checks slot by slot</strong>, its <strong>battery across its solar day</strong>, '
            + 'its sensors, and the <strong>context lens</strong>: pick a missed check or a reading and '
-           + 'see what every receiver and neighbour was doing at that moment. <strong>Ask Claude</strong> '
+           + 'see what every receiver and neighbour was doing at that moment. <strong>Airtime</strong> '
+           + 'shows whose transmissions land on top of each other at each receiver and whether it costs them, '
+           + 'when each station\'s check signal goes out and how its logger keeps that time, and the check '
+           + 'time or repeater delay to change. <strong>Ask Claude</strong> '
            + 'hands the findings to an agent that investigates and writes the briefing.',
     watch: [
       '<strong>Check schedules are learned, not assumed.</strong> Most stations send every sensor '
@@ -1440,6 +1443,13 @@ const HELP = {
       + 'anything is worked out, and both count against the repeaters within reach that could have '
       + 'carried them; a rain gauge tipping every few seconds through a storm is reporting, not being '
       + 'corrupted. <em>Weigh the copies on the Reception Map</em> takes them further.',
+      '<strong>Airtime works at the resolution the times have.</strong> A frame is 133 ms on the air, '
+      + 'but a base station stamps a reading when it finishes decoding it — half a second to three '
+      + 'seconds later — so <em>together</em> means within 3 s at one receiver channel, and repeater '
+      + 'delays (under a second) cannot be measured; the delays offered are the Backbone\'s, for the '
+      + 'repeater pairs the corrupted copies point at. How each station\'s logger keeps time — steady, '
+      + 'drifting, jumped after a restart, randomised — is read off its checks, because the register '
+      + 'records no logger model or firmware, and it decides how a check is moved.',
       '<strong>Silences that happen together are one finding.</strong> Stations behind one repeater '
       + 'that went quiet inside one check period of each other, or that went silent together and came '
       + 'back together, are reported as the repeater or the area, not as a dozen station faults. One '

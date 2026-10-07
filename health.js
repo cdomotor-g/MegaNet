@@ -312,7 +312,8 @@ const Health = (() => {
         </div>
         <p class="sub hl-sub">What the readings say about each field station and the network carrying them — learned check schedules
           and the checks that went missing, batteries across their solar day, rain gauges and levels against their neighbours,
-          receivers and repeaters that went quiet, and stored readings that are corrupted copies rather than data.
+          receivers and repeaters that went quiet, stored readings that are corrupted copies rather than data, and which stations' checks
+          land on top of each other — with the check time or repeater delay to change.
           A missed check only counts against a station when a receiver that hears it was listening at the time.</p>
         <div id="hl-status" class="small hl-status" role="status">${statusHtml()}</div>
         <div id="hl-ownnote" class="small hl-ownnote">${ownNoteHtml()}</div>
@@ -341,6 +342,7 @@ const Health = (() => {
       </div>
       <section class="panel" id="hl-station" aria-labelledby="hl-h-stn">${stationHtml()}</section>
       <section class="panel" aria-labelledby="hl-h-checks">${matrixHtml()}</section>
+      <section class="panel" id="hl-airtime" aria-labelledby="hl-h-air">${typeof HealthAirtime !== 'undefined' ? HealthAirtime.render() : ''}</section>
       <section class="panel" aria-labelledby="hl-h-net">${networkHtml()}</section>
       <section class="panel" aria-labelledby="hl-h-reg">${registerHtml()}</section>
       <section class="panel" id="hl-agent" aria-labelledby="hl-h-agent">${typeof HealthAgent !== 'undefined' ? HealthAgent.render() : ''}</section>`;

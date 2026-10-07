@@ -367,10 +367,21 @@ jobs:
       # (battery 133 → 13.3 V); the copy, storm and ghost rules on readings
       # built for each; the tab fetched, filtered, a station and a missed check
       # opened; the door to the Reception Map; the agent's tool loop against a
-      # scripted client; 375 px.
+      # scripted client; 375 px. And the Airtime panel: the demo week's one
+      # planted clash found, said to hurt, its station moved, nothing else.
       - name: Station Health — every planted fault found where it was planted
         working-directory: test
         run: npm run health
+
+      # Node-only and fast. The Airtime panel's reasoning on networks built
+      # for it: the circle two checks share (the gcd of their periods), how a
+      # logger keeps time (steady, drifting, jumped, randomised), damage
+      # together against alone, one burst and whole seconds, three on one slot
+      # moved clear of each other, a drift said before it arrives, repeater
+      # pairs to stagger, and Station Health's ghosts and unfiled sensors.
+      - name: Airtime — who lands on top of whom, and what to move
+        working-directory: test
+        run: npm run airtime
 
       # A station's health on its card and as its pin's colour (#218), against
       # the demo week through the strict PostgREST stub: last heard, the

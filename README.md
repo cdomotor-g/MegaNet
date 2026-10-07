@@ -742,7 +742,14 @@ own key) that investigates with tools over the same readings and writes the
 briefing. The
 same rules put a station's last-heard time, battery and findings on its card on
 the Stations map, each a door back into this tab, and can colour every pin by
-health (#218).
+health (#218). Its *Airtime* panel reads the same window for which stations'
+transmissions land on top of each other at each receiver and whether the ones
+that do come with more corrupted copies, each station's check time and how its
+logger keeps it (steady, drifting, jumped after a restart, randomised), and what
+to change — the nearest clear check time for one of two stations that keep
+meeting, said for that kind of logger, and the repeater pairs to give different
+delays — with the hour folded to show the busy minutes. Together means within
+3 s, the resolution a base station's decode-time stamps have.
 [`docs/station-health.md`](docs/station-health.md) lists every finding, what
 triggers it and what to do. Each page links to the
 other per reading. The log is its rows, so it gets most of a screen: a

@@ -82,6 +82,15 @@ const ACCEPTED = {
          + 'nothing below it.',
     },
   ],
+  'airtime-analysis.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = AirtimeAnalysis;",
+      why: 'The Airtime panel\'s reasoning, required by test/airtime.mjs so the '
+         + 'rules the browser runs are the rules the check holds to networks '
+         + 'built for them in Node. Guarded so the browser, where `module` is '
+         + 'undefined, never runs it. Constrains nothing below it.',
+    },
+  ],
   'hfem.js': [
     {
       match: "if (typeof module !== 'undefined' && module.exports) module.exports = HFEM;",
