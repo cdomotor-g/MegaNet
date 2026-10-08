@@ -7782,8 +7782,8 @@
       "id": "ben_avon_al",
       "name": "Ben Avon AL",
       "station_number": "531082",
-      "lat": -17.8072,
-      "lon": 145.325,
+      "lat": -17.80726,
+      "lon": 145.325017,
       "elevation_ahd": 661.5,
       "roles": [
         "field"
@@ -16129,7 +16129,8 @@
       "lon": 153.4729,
       "elevation_ahd": 45,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -16143,6 +16144,19 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 169,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 3480,
+            "high": 3490
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Mullumbimby (Chincogan)."
+      },
       "site": {
         "db_id": 1498,
         "number": "558083",
@@ -23335,7 +23349,8 @@
       "lon": 153.596,
       "elevation_ahd": 123,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -23351,6 +23366,27 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 253,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 7546,
+            "high": 7547
+          },
+          {
+            "low": 7550,
+            "high": 7555
+          },
+          {
+            "low": 7582,
+            "high": 7582
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Mullumbimby (Chincogan)."
+      },
       "site": {
         "db_id": 1518,
         "number": "558109",
@@ -34707,8 +34743,8 @@
       "id": "gatton",
       "name": "Gatton",
       "station_number": "40444",
-      "lat": -27.554471,
-      "lon": 152.274671,
+      "lat": -27.553062,
+      "lon": 152.275931,
       "elevation_ahd": 107.6,
       "roles": [
         "field"
@@ -37482,7 +37518,8 @@
       "lon": 153.3175,
       "elevation_ahd": 194,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -37496,6 +37533,31 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 420,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 7091,
+            "high": 7200
+          },
+          {
+            "low": 7531,
+            "high": 7584
+          },
+          {
+            "low": 7470,
+            "high": 7475
+          },
+          {
+            "low": 3450,
+            "high": 3490
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Point Lookout and Lismore Shire Council."
+      },
       "site": {
         "db_id": 1479,
         "number": "558035",
@@ -54259,8 +54321,8 @@
       "id": "main_camp_rd_al",
       "name": "Main Camp Ck AL",
       "station_number": "540717",
-      "lat": -27.8336,
-      "lon": 152.3144,
+      "lat": -27.831873,
+      "lon": 152.315606,
       "elevation_ahd": 596.3,
       "roles": [
         "field"
@@ -54269,7 +54331,10 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 4070,
+        "battery": 4071
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -64488,7 +64553,8 @@
       "lon": 153.4723,
       "elevation_ahd": 235.5,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -64502,6 +64568,31 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 716,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 3450,
+            "high": 3490
+          },
+          {
+            "low": 7148,
+            "high": 7200
+          },
+          {
+            "low": 7470,
+            "high": 7473
+          },
+          {
+            "low": 7531,
+            "high": 7584
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Goonellabah (Wyreema Rd) and Point Lookout."
+      },
       "site": {
         "db_id": 1472,
         "number": "558025",
@@ -64984,8 +65075,8 @@
       "id": "munna_ck_glenbar_ti",
       "name": "Munna Ck (Glenbar Tiaro Rd) Alert",
       "station_number": "140025",
-      "lat": -25.7474,
-      "lon": 152.2966,
+      "lat": -25.748398,
+      "lon": 152.296751,
       "elevation_ahd": 93,
       "roles": [
         "field"
@@ -64995,7 +65086,9 @@
         "mary"
       ],
       "alert_ids": {
-        "rainfall": 850
+        "rainfall": 848,
+        "battery": 850,
+        "water_level": 849
       },
       "satcom": {
         "enabled": false,
@@ -65037,7 +65130,8 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
-      ]
+      ],
+      "facing_deg": 250.0
     },
     {
       "id": "munna_ck_al",
@@ -66715,8 +66809,8 @@
       "id": "neabul_ck",
       "name": "Neabul Ck",
       "station_number": "44238",
-      "lat": -27.5955,
-      "lon": 147.7925,
+      "lat": -27.595859,
+      "lon": 147.791841,
       "elevation_ahd": 232.2,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
@@ -68278,7 +68372,8 @@
       "lon": 153.2483,
       "elevation_ahd": 134.1,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -68294,6 +68389,19 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 756,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 3452,
+            "high": 3459
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Murwillumbah (Hartigans Hill) and Tweed Heads (Duranbah)."
+      },
       "site": {
         "db_id": 1496,
         "number": "558081",
@@ -78613,10 +78721,11 @@
     },
     {
       "id": "running_ck_bells",
-      "name": "Running Ck (Bells",
+      "name": "Running Ck (Bells Bridge)",
       "station_number": "140846",
-      "lat": -28.3183,
-      "lon": 152.9216,
+      "station_type": "auto_water_level",
+      "lat": -28.318178,
+      "lon": 152.921509,
       "elevation_ahd": 176.8,
       "roles": [
         "field"
@@ -78641,7 +78750,10 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
-      ]
+      ],
+      "inspection_config_key": "datalogger_old",
+      "tower_height": 3.0,
+      "facing_deg": 153.0
     },
     {
       "id": "running_ck_tm",
@@ -90866,7 +90978,8 @@
       "lon": 153.4842,
       "elevation_ahd": 136.4,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -90882,6 +90995,39 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 1003,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 7091,
+            "high": 7100
+          },
+          {
+            "low": 7111,
+            "high": 7122
+          },
+          {
+            "low": 7133,
+            "high": 7138
+          },
+          {
+            "low": 7470,
+            "high": 7475
+          },
+          {
+            "low": 7531,
+            "high": 7552
+          },
+          {
+            "low": 7558,
+            "high": 7584
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Goonellabah (Wyreema Rd)."
+      },
       "site": {
         "db_id": 1489,
         "number": "558071",
@@ -91710,7 +91856,8 @@
       "lon": 153.5267,
       "elevation_ahd": 85.6,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -91726,6 +91873,31 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 1013,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 7148,
+            "high": 7169
+          },
+          {
+            "low": 7171,
+            "high": 7175
+          },
+          {
+            "low": 7177,
+            "high": 7199
+          },
+          {
+            "low": 3450,
+            "high": 3459
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Murwillumbah (Hartigans Hill), Mullumbimby (Chincogan) and Tweed Shire Council."
+      },
       "site": {
         "db_id": 1464,
         "number": "558011",
@@ -94906,8 +95078,8 @@
       "id": "upper_tenthill_al",
       "name": "Upper Tenthill AL",
       "station_number": "540519",
-      "lat": -27.8094,
-      "lon": 152.2867,
+      "lat": -27.809145,
+      "lon": 152.286472,
       "elevation_ahd": 359.3,
       "roles": [
         "field"
@@ -94917,7 +95089,8 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 4024
+        "rainfall": 4024,
+        "battery": 4025
       },
       "satcom": {
         "enabled": false,
@@ -100440,7 +100613,8 @@
       "elevation_ahd": 322.28,
       "elevation_source": "Elvis 1 m (NSW Government)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -100456,6 +100630,23 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 1978,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 7830,
+            "high": 7836
+          },
+          {
+            "low": 7839,
+            "high": 7849
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Point Lookout."
+      },
       "site": {
         "db_id": 1486,
         "number": "558068",
@@ -105125,7 +105316,8 @@
       "elevation_ahd": 53.08,
       "elevation_source": "Elvis 1 m (CSIRO and NEMA)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -105140,6 +105332,27 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 3450,
+            "high": 3459
+          },
+          {
+            "low": 7148,
+            "high": 7183
+          },
+          {
+            "low": 7185,
+            "high": 7199
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Mullumbimby (Chincogan) and Tweed Heads (Duranbah)."
+      },
       "site": {
         "db_id": 1199,
         "number": "58215",
@@ -127069,7 +127282,8 @@
       "elevation_ahd": 569.68,
       "elevation_source": "Elvis 2 m (NSW Government)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -127085,6 +127299,27 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 7300,
+            "high": 7315
+          },
+          {
+            "low": 7317,
+            "high": 7339
+          },
+          {
+            "low": 7700,
+            "high": 7800
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Point Lookout."
+      },
       "site": {
         "db_id": 1536,
         "number": "559022",
@@ -127910,7 +128145,8 @@
       "elevation_ahd": 877.52,
       "elevation_source": "Elvis 2 m (NSW Government)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -127926,6 +128162,47 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 7091,
+            "high": 7211
+          },
+          {
+            "low": 7300,
+            "high": 7339
+          },
+          {
+            "low": 7470,
+            "high": 7475
+          },
+          {
+            "low": 7511,
+            "high": 7617
+          },
+          {
+            "low": 7700,
+            "high": 7800
+          },
+          {
+            "low": 7820,
+            "high": 7849
+          },
+          {
+            "low": 3450,
+            "high": 3480
+          },
+          {
+            "low": 3850,
+            "high": 3880
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds the Coffs Harbour profiler and Bellingen Shire Council."
+      },
       "site": {
         "db_id": 1219,
         "number": "59138",
@@ -147390,7 +147667,8 @@
       "elevation_ahd": 795.82,
       "elevation_source": "Elvis 1 m (CSIRO and NEMA)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -147406,6 +147684,23 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 7585,
+            "high": 7612
+          },
+          {
+            "low": 7615,
+            "high": 7617
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Point Lookout."
+      },
       "site": {
         "db_id": 1531,
         "number": "559015",
@@ -148554,7 +148849,8 @@
       "elevation_ahd": 203.81,
       "elevation_source": "Elvis 1 m (NSW Government)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -148570,6 +148866,31 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 7091,
+            "high": 7091
+          },
+          {
+            "low": 7094,
+            "high": 7097
+          },
+          {
+            "low": 7101,
+            "high": 7113
+          },
+          {
+            "low": 7126,
+            "high": 7132
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Mullumbimby (Chincogan)."
+      },
       "site": {
         "db_id": 1475,
         "number": "558031",
@@ -160532,8 +160853,8 @@
       "id": "gympie_al",
       "name": "Gympie AL",
       "station_number": "40993",
-      "lat": -26.192,
-      "lon": 152.655,
+      "lat": -26.191276,
+      "lon": 152.656472,
       "elevation_ahd": 37.31,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
@@ -171925,7 +172246,8 @@
       "elevation_ahd": 63.26,
       "elevation_source": "Elvis 1 m (CSIRO and NEMA)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -171941,6 +172263,27 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 7157,
+            "high": 7166
+          },
+          {
+            "low": 7169,
+            "high": 7169
+          },
+          {
+            "low": 7173,
+            "high": 7173
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Mullumbimby (Chincogan)."
+      },
       "site": {
         "db_id": 1181,
         "number": "58129",
@@ -175472,7 +175815,8 @@
       "elevation_ahd": 100.84,
       "elevation_source": "Elvis 2 m (NSW Government)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -175488,6 +175832,23 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 3467,
+            "high": 3469
+          },
+          {
+            "low": 7157,
+            "high": 7159
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Murwillumbah (Hartigans Hill)."
+      },
       "site": {
         "db_id": 1476,
         "number": "558032",
@@ -192592,8 +192953,8 @@
       "id": "mt_stanley_al",
       "name": "Mt Stanley AL",
       "station_number": "540488",
-      "lat": -26.682,
-      "lon": 152.204,
+      "lat": -26.682032,
+      "lon": 152.205231,
       "elevation_ahd": 168.98,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
@@ -204625,7 +204986,8 @@
       "elevation_ahd": 1521.81,
       "elevation_source": "Elvis 2 m (NSW Government)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [],
@@ -204641,6 +205003,47 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 7091,
+            "high": 7200
+          },
+          {
+            "low": 7302,
+            "high": 7339
+          },
+          {
+            "low": 7470,
+            "high": 7475
+          },
+          {
+            "low": 7511,
+            "high": 7617
+          },
+          {
+            "low": 7700,
+            "high": 7800
+          },
+          {
+            "low": 7820,
+            "high": 7849
+          },
+          {
+            "low": 3450,
+            "high": 3480
+          },
+          {
+            "low": 3850,
+            "high": 3880
+          }
+        ],
+        "exclusions": [],
+        "notes": "North Coast ERTS pass-range diagram, 01/10/2019. Feeds Bowra Sugarloaf and the Coffs Harbour profiler."
+      },
       "site": {
         "db_id": 1172,
         "number": "57124",
@@ -240067,8 +240470,8 @@
       "id": "allora",
       "name": "Allora",
       "station_number": "41345",
-      "lat": -28.03667,
-      "lon": 151.98667,
+      "lat": -28.036688,
+      "lon": 151.986789,
       "elevation_ahd": null,
       "roles": [
         "field"
@@ -285831,8 +286234,8 @@
       "id": "gympie_2",
       "name": "Gympie",
       "station_number": "40426",
-      "lat": -26.19250,
-      "lon": 152.65500,
+      "lat": -26.192393,
+      "lon": 152.655904,
       "elevation_ahd": null,
       "roles": [
         "field"
@@ -285904,17 +286307,17 @@
       "flood_effects": [
         {
           "as_at": "2026-09-26",
-          "height_m": 4.00,
+          "height_m": 4,
           "effect": "Preliminary Flood Level"
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 6.00,
+          "height_m": 6,
           "effect": "Crops/Grazing"
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 6.00,
+          "height_m": 6,
           "effect": "Minor Flood Level"
         },
         {
@@ -285924,7 +286327,7 @@
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 9.90,
+          "height_m": 9.9,
           "effect": "Bridge",
           "detail": "Kidd Bridge"
         },
@@ -285935,18 +286338,18 @@
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 12.00,
+          "height_m": 12,
           "effect": "Moderate Flood Level"
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 13.10,
+          "height_m": 13.1,
           "effect": "Bells Bridge (Bruce Highway, on south side of Gympie)"
         },
         {
           "as_at": "2026-09-26",
           "height_m": 13.41,
-          "effect": "Madill's Garage Floor"
+          "effect": "Madill\\'s Garage Floor"
         },
         {
           "as_at": "2026-09-26",
@@ -285955,12 +286358,12 @@
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 16.00,
+          "height_m": 16,
           "effect": "Approx 5 commercial properties inundated"
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 17.00,
+          "height_m": 17,
           "effect": "Major Flood Level"
         },
         {
@@ -285975,7 +286378,7 @@
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 18.00,
+          "height_m": 18,
           "effect": "Approx 34 commercial properties flooded."
         },
         {
@@ -285985,7 +286388,7 @@
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 20.00,
+          "height_m": 20,
           "effect": "Approx 81 commercial properties flooded."
         },
         {
@@ -285995,17 +286398,17 @@
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 22.00,
+          "height_m": 22,
           "effect": "Approx 116 commercial properties flooded"
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 24.00,
+          "height_m": 24,
           "effect": "Approx 168 commercial properties flooded"
         },
         {
           "as_at": "2026-09-26",
-          "height_m": 26.00,
+          "height_m": 26,
           "effect": "Approx 195 commercial properties flooded"
         }
       ],
@@ -286041,8 +286444,8 @@
       "id": "gympie_weir_tm",
       "name": "Gympie Weir TM",
       "station_number": "540215",
-      "lat": -26.19444,
-      "lon": 152.65694,
+      "lat": -26.195407,
+      "lon": 152.66152,
       "elevation_ahd": null,
       "roles": [
         "field"
@@ -352929,6 +353332,127 @@
           "level_m_ahd": 93.21
         }
       ]
+    },
+    {
+      "id": "proposed_gatton_auto",
+      "name": "Proposed Gatton Auto",
+      "station_number": "",
+      "proposed": true,
+      "station_type": "auto_water_level",
+      "proposed_year": 2026,
+      "lat": -27.554456,
+      "lon": 152.274684,
+      "elevation_ahd": null,
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [],
+      "alert_ids": {
+        "water_level": 9999
+      },
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "",
+      "sensors": [
+        {
+          "alert_id": 9999,
+          "type": "Water Level",
+          "sensor_id": "proposed_gatton_auto:9999",
+          "device_id": null
+        }
+      ],
+      "TBRGbucketSize": 0.2,
+      "inspection_config_key": "alert",
+      "flood_classes": [
+        {
+          "as_at": "2026-09-25",
+          "first_report_m": 3.0,
+          "crossing_height_m": 3.90,
+          "crossing_type": "B",
+          "minor_m": 7.0,
+          "crops_grazing_m": 13.0,
+          "moderate_m": 10.0,
+          "towns_m": 18.3,
+          "major_m": 15.0,
+          "note": "Copied from Gatton (40444, id gatton) on 2026-09-29 for the proposed station beside it; not surveyed or assessed at this site."
+        },
+        {
+          "as_at": "2014-01-15",
+          "first_report_m": 3.0,
+          "crossing_height_m": 3.9,
+          "crossing_type": "B",
+          "minor_m": 7.0,
+          "crops_grazing_m": 13.0,
+          "moderate_m": 10.0,
+          "towns_m": 18.3,
+          "major_m": 15.0,
+          "note": "Copied from Gatton (40444, id gatton) on 2026-09-29 for the proposed station beside it; not surveyed or assessed at this site."
+        }
+      ],
+      "gauge_survey": [
+        {
+          "valid_from": "1929-09-01",
+          "gauge_zero_m": 87.54,
+          "datum": "AHD",
+          "amtd_km": 72.0,
+          "catchment_area_km2": 1550.00,
+          "note": "Copied from Gatton (40444, id gatton) on 2026-09-29 for the proposed station beside it; not surveyed or assessed at this site. The gauge zero is 40444's, so the copied heights on the gauge read as they do there."
+        }
+      ],
+      "aep_levels": [
+        {
+          "as_at": "2026-09-26",
+          "source": "QLD_AEP_Levels_1.xlsx (FWIN_QLD_V9_2)",
+          "point_lat": -27.555,
+          "point_lon": 152.275,
+          "ground_m": 101.62,
+          "aep_1_m": 102.69,
+          "aep_0_5_m": 103.11,
+          "aep_0_2_m": 103.47,
+          "aep_0_066_m": 103.75,
+          "data_quality": 3,
+          "level_difference": 3,
+          "confidence": 9,
+          "slope": 0.00172,
+          "slope_basis": "1% AEP water surface from Ma Ma Creek Alert, 20.0 km upstream, to Glenore Grove Alert, 20.2 km downstream: 69.22 m over 40.2 km (AMTD and straight line × 1.3)",
+          "note": "Copied from Gatton (40444, id gatton) on 2026-09-29 for the proposed station beside it; not surveyed or assessed at this site."
+        }
+      ],
+      "flood_peaks": [
+        {
+          "date": "1893-02-04",
+          "height_m": 16.33,
+          "level_m_ahd": 103.87
+        },
+        {
+          "date": "2011-01-11",
+          "height_m": 15.38,
+          "level_m_ahd": 102.92
+        },
+        {
+          "date": "1974-01-27",
+          "height_m": 14.63,
+          "level_m_ahd": 102.17
+        },
+        {
+          "date": "1959-02-18",
+          "height_m": 12.80,
+          "level_m_ahd": 100.34
+        },
+        {
+          "date": "1983-06",
+          "height_m": 11.58,
+          "level_m_ahd": 99.12
+        }
+      ],
+      "flood_peaks_from": "gatton",
+      "flood_peaks_gauge": "40444"
     }
   ]
 }
