@@ -25,6 +25,10 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 12, date: '2026-10-08', items: [
+      '<strong>Reset north in the digital twin.</strong> The compass in the top right of the 3-D view is now a '
+        + 'button: press it to turn the view back to face north, keeping its tilt.',
+    ] },
     { n: 11, date: '2026-10-08', items: [
       '<strong>Ask Claude</strong>, in <em>Station Health</em>, is now the <strong>AI briefing</strong>, and works with '
         + 'the AI of your choice. Where Claude cannot be reached — a network that blocks Anthropic — or you use '

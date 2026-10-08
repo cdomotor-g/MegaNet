@@ -13445,24 +13445,33 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 }
 
 /* A compass rose, turned so its N points where north is on screen. The
-   heading is written as a custom property from the frame loop. */
+   heading is written as a custom property from the frame loop. It is a
+   button too — reset north, as a map's compass is: pressed, the view turns
+   to face north and keeps its tilt (DigitalTwin.faceNorth). */
 .twin-compass {
   position: absolute;
   top: var(--sp-2);
   right: var(--sp-2);
+  z-index: 3;
   width: 2.4rem;
   height: 2.4rem;
+  margin: 0;
+  padding: 0;
   border-radius: 50%;
   display: grid;
   place-items: center;
+  font: inherit;
   font-size: var(--fs-sm);
   font-weight: 700;
+  line-height: 1;
   color: var(--text);
   background: color-mix(in srgb, var(--panel) 82%, transparent);
   border: 1px solid var(--border);
   transform: rotate(var(--twin-heading, 0deg));
-  pointer-events: none;
+  cursor: pointer;
 }
+
+.twin-compass:hover { background: var(--panel); }
 
 .twin-compass::before {
   content: '';

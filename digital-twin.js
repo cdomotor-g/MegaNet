@@ -5625,7 +5625,8 @@ void main() {
   }
 
   // The camera's heading, for the compass rose: 0 looking north. The rose is
-  // turned the other way so its N points where north is on screen.
+  // turned the other way so its N points where north is on screen. It is
+  // also the stage's own reset-north button: pressed, it is 🧭's faceNorth().
   function syncCompass() {
     const el = document.getElementById('twin-compass');
     if (!el || !sc.camera) return;
@@ -6975,7 +6976,8 @@ void main() {
   function stageHtml() {
     return `<div class="twin-stage" id="twin-stage">
           <canvas id="twin-canvas" tabindex="0" aria-label="Three-dimensional view. Nothing is built yet."></canvas>
-          <div class="twin-compass" id="twin-compass" aria-hidden="true" style="--twin-heading:0deg">N</div>
+          <button type="button" class="twin-compass" id="twin-compass" style="--twin-heading:0deg"
+                  aria-label="Reset the view to face north" title="Reset to north" onclick="DigitalTwin.faceNorth()"><span aria-hidden="true">N</span></button>
           <button type="button" class="twin-flood-pill" id="twin-flood-pill" hidden onclick="DigitalTwin.floodPill()"></button>
           ${floodScaleHtml()}
           <p class="twin-hud" id="twin-hud">${esc(viewMoveWords(coarsePointer()))} Click the ground for its height.</p>

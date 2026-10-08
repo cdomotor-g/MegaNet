@@ -1586,6 +1586,18 @@ try {
   ok('…the tilt button looks straight down, and pressed again tilts back to the opening view',
     s2.cam.pitch === 0 && t2.phi < 0.07 && /Tilt back to 60°/.test(s2.tilt.label)
       && Math.abs(t3.phi - 1.05) < 1e-9 && s3.tilt.label.includes('tilted 60°'), JSON.stringify({ s2: s2.tilt, t2: t2.phi, t3: t3.phi }));
+  // The stage's own compass is the same reset north, pressed where it is
+  // drawn: a real click on the rose, not under anything of the map's.
+  await drag(120, 0, 'right');
+  const r0 = await rigNow(), b0 = (await strip()).cam.bearing;
+  await page.locator('#twin-compass').click();
+  await paint();
+  const r1 = await rigNow(), b1 = (await strip()).cam.bearing;
+  const rose = await page.evaluate(() => { const c = document.getElementById('twin-compass');
+    return { tag: c.tagName, label: c.getAttribute('aria-label'), turn: c.style.getPropertyValue('--twin-heading') }; });
+  ok('the compass on the stage is a reset-north button: pressed, the twin faces north and keeps its tilt',
+    b0 !== 0 && b1 === 0 && same(r0.phi, r1.phi) && rose.tag === 'BUTTON' && /north/i.test(rose.label) && /^-?0\.0deg$/.test(rose.turn),
+    JSON.stringify({ b0, b1, phi0: r0.phi, phi1: r1.phi, rose }));
   const hudWords = await page.evaluate(() => ({ hud: document.getElementById('twin-hud').textContent,
                                                 words: viewMoveWords(matchMedia('(pointer: coarse)').matches) }));
   ok('the twin\'s hint says how it is moved in the 3-D map\'s own words', hudWords.hud.startsWith(hudWords.words), JSON.stringify(hudWords));
