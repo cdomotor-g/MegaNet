@@ -133,6 +133,9 @@ const ExportMenu = (function () {
       { label: 'Check times — CSV', sub: 'each station\'s learned check time, how its logger keeps it, who it falls together with, and the move suggested',
         call: ['HealthAirtime.exportCsv'],
         empty: 'There are no check times yet — the week is still being read.' },
+      { label: 'The briefing pack for another AI — text', sub: 'the AI briefing\'s instructions, the findings and the stations that need attention in full, to attach to a chat with Copilot, ChatGPT or any other',
+        call: ['HealthAgent.downloadPack'],
+        empty: 'There are no findings yet — the week is still being read.' },
     ],
     history: () => [
       { label: 'The records listed — CSV', sub: 'the inspection and maintenance records, as filtered', call: ['History.exportList'],

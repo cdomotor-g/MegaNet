@@ -273,7 +273,7 @@ function canon(v) {
 const SYSTEM_SENT = canon([{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }]);
 const TOOLS_SENT = canon(TOOLS.map(t => Object.assign({ eager_input_streaming: true }, t)));
 
-const STALE = 'This page is running an older Ask Claude than the one Flood-Net\'s key serves — reload the page and ask again.';
+const STALE = 'This page is running an older AI briefing than the one Flood-Net\'s key serves — reload the page and ask again.';
 
 // What Claude may have said, as the SDK hands it back to be returned unchanged:
 // text, its thinking (the progress notes are thinking blocks), its tool calls,

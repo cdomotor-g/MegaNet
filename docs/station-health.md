@@ -50,9 +50,13 @@ around it was heard, *something they share* when its neighbours missed too, or
 *nobody was listening* when the receivers were down. For a reading, it shows the
 station's own readings around it and the copies heard of it.
 
-### Ask Claude
+### AI briefing
 
-*Ask Claude* hands the findings to an agent — Claude Opus 5.5 — with tools over
+The *AI briefing* card (it was *Ask Claude*) gets the findings to an AI that
+writes the morning's briefing — Claude, on the tab, or whichever AI the person
+can use, from a file.
+
+**With Claude, here.** The card hands the findings to an agent — Claude Opus 5.5 — with tools over
 the same readings (`list_findings`, `station_detail`, `context_at`,
 `station_readings`, `station_history` up to 30 days, `stations_near`,
 `receivers`, `repeaters`, `find_station`). Every tool reads; none writes. It
@@ -70,7 +74,7 @@ its tools and its loop; only the calls to Anthropic go through the Worker, which
 checks Access and the database's word that this is an editor, carries nothing
 but the briefing's own request, and stops at **US$20 a day** (Brisbane's day)
 — the panel says how much of today is spent. Setting the key up is in
-[`access.md` → Ask Claude on Flood-Net's key](access.md#ask-claude-on-flood-nets-key-229).
+[`access.md` → Claude on Flood-Net's key](access.md#claude-on-flood-nets-key-229).
 
 Anyone else — signed out, a viewer, the github.io copy or a local checkout, or an
 editor once the day's allowance is spent — can still use their own key, typed
@@ -80,6 +84,26 @@ remember it, worded as what it is — *this is my own device* — and unticked: 
 remembered key is spent by whoever opens the page on that computer next, and no
 page can tell a shared computer from a personal one. The last briefing is kept
 on the device.
+
+**With another AI, from a file.** Where the browser cannot reach
+`api.anthropic.com` (or `cdn.jsdelivr.net`, where the SDK comes from) — a
+network that blocks it — or the AI a person may use is another one (Copilot,
+for the Bureau's staff), *⤓ Download the briefing pack* saves
+`floodnet-health-briefing-pack-<date>.txt`, also offered under ⤓ Export. It is
+one text file: how to use it, the instructions Claude gets here with its two
+paragraphs about tools swapped for what the file holds, the overview, every
+finding that needs attention with its evidence, the notes a line each, the
+receivers and repeaters, and each station with a warning or worse in full (up
+to 25, worst first) — what `station_detail` answers, with the eight nearest
+stations from `stations_near`. Attach it to a chat with any AI and ask it to
+follow the instructions in it. The AI cannot look further than the file (a
+station's 30 days, the network at a moment, transmissions one by one), and is
+told so. Making the pack asks the datastore for each station's last site visit,
+as the tool does, and sends nothing anywhere else. *Paste its answer here* takes
+the AI's briefing back: it is drawn where Claude's would be, each
+`[[station_id]]` a link to the station, marked *pasted from another AI*, and
+kept on the device like Claude's. When Claude cannot be reached, the error on
+the card points to the pack.
 
 ## How the readings are read
 

@@ -165,9 +165,9 @@ Skip this and nothing breaks: the Worker answers 503 and the old email-and-code
 panel keeps working.
 
 A fourth, on its own: `ANTHROPIC_API_KEY`, which lets editors use Station
-Health's *Ask Claude* on Flood-Net's key rather than their own — the steps, the
-key to make and the daily ceiling are in [`access.md` → Ask Claude on
-Flood-Net's key](access.md#ask-claude-on-flood-nets-key-229). Skip it and the tab
+Health's *AI briefing* on Flood-Net's key rather than their own — the steps, the
+key to make and the daily ceiling are in [`access.md` → Claude on
+Flood-Net's key](access.md#claude-on-flood-nets-key-229). Skip it and the tab
 asks for the person's own key, as it always did. Its daily ledger (a Durable
 Object) needs nothing: `wrangler.toml` declares it and the deploy creates it.
 

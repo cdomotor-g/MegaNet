@@ -1421,8 +1421,9 @@ const HELP = {
            + 'see what every receiver and neighbour was doing at that moment. <strong>Airtime</strong> '
            + 'shows whose transmissions land on top of each other at each receiver and whether it costs them, '
            + 'when each station\'s check signal goes out and how its logger keeps that time, and the check '
-           + 'time or repeater delay to change. <strong>Ask Claude</strong> '
-           + 'hands the findings to an agent that investigates and writes the briefing.',
+           + 'time or repeater delay to change. <strong>AI briefing</strong> '
+           + 'hands the findings to Claude, which investigates and writes the briefing — or packs them into a file '
+           + 'for the AI of your choice (Copilot, ChatGPT…) where Claude cannot be reached.',
     watch: [
       '<strong>Check schedules are learned, not assumed.</strong> Most stations send every sensor '
       + 'every three hours, some every two or every half hour; the period is read off the gaps '
@@ -3589,9 +3590,9 @@ function floodnetName(name) {
   return /^floodnet[-_]/i.test(n) ? n : `floodnet-${n}`;
 }
 
-function dlText(name, content) {
+function dlText(name, content, type = 'text/csv') {
   const a = Object.assign(document.createElement('a'), {
-    href:     URL.createObjectURL(new Blob([content], { type: 'text/csv' })),
+    href:     URL.createObjectURL(new Blob([content], { type })),
     download: floodnetName(name),
   });
   a.click();

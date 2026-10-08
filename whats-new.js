@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 11, date: '2026-10-08', items: [
+      '<strong>Ask Claude</strong>, in <em>Station Health</em>, is now the <strong>AI briefing</strong>, and works with '
+        + 'the AI of your choice. Where Claude cannot be reached — a network that blocks Anthropic — or you use '
+        + 'another AI, such as Copilot, <strong>⤓ Download the briefing pack</strong>: one text file with the '
+        + 'instructions, the findings and the stations that need attention in full. Attach it to a chat and ask the '
+        + 'AI to follow it, then paste its answer back into the card to see the stations as links. It is under '
+        + '⤓ Export too.',
+    ] },
     { n: 10, date: '2026-10-07', items: [
       '<strong>Airtime</strong>, in <em>Station Health</em>: which stations\' transmissions land on top of each other at '
         + 'each base station, and whether the ones that do come with more corrupted copies. Every hour of the week laid '

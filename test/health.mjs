@@ -31,6 +31,11 @@
 //   * Claude's briefing, its tool loop run against a scripted client: tools
 //     answered, a tool that does not exist refused, the briefing drawn with
 //     its station links
+//   * …or another AI, from the briefing pack: Anthropic out of reach said so
+//     and pointed to it; the pack holding each station with a warning in
+//     full, under Claude's own instructions with the tools taken out;
+//     downloaded as floodnet-…; and the other AI's answer pasted back drawn
+//     as the briefing, its stations links
 //   * …on Flood-Net's key (#229), the route stood in for: a signed-in editor
 //     offered it with today's spend and no key field, nothing announced for
 //     asking; the call sent to the route with the session as it is now, a key
@@ -511,6 +516,69 @@ try {
   ok('the agent runs its tool loop to a briefing', ag.turns === 3 && ag.tools && ag.tools.includes('station_detail'), JSON.stringify(ag));
   ok('…answering each tool it asks for, and refusing one that does not exist, saying why', ag.answered === 2 && ag.refused.length === 1 && /No tool called no_such_tool/.test(ag.refused[0]), JSON.stringify(ag));
   ok('…and the briefing links the station it names', ag.link && /Headline/.test(ag.heading || ''), JSON.stringify(ag));
+
+  // ── Another AI, from the briefing pack ─────────────────────────────────────
+  // Anthropic out of reach: the status says so, and points to the pack.
+  const blocked = await page.evaluate(async () => {
+    HealthAgent._useClient(() => ({ beta: { messages: { stream() {
+      return { on() { return this; }, abort() {},
+        async finalMessage() { throw Object.assign(new Error('Connection error.'), { name: 'APIConnectionError' }); } };
+    } } } }));
+    await HealthAgent.ask();
+    return document.getElementById('hl-agent-status').textContent.trim();
+  });
+  ok('Anthropic out of reach: the card says so, and points to the briefing pack', /Could not reach api\.anthropic\.com/.test(blocked)
+    && /briefing pack under "With another AI"/.test(blocked), blocked);
+
+  const pack = await page.evaluate(async () => {
+    const A = Health.state().A;
+    const want = [...new Set(A.findings.filter(f => f.severity !== 'info' && f.stationId).map(f => f.stationId))];
+    const P = await HealthAgent._packText();
+    const prompt = HealthAgent._packPrompt, sys = HealthAgent._system;
+    const sections = s => s.split('\n\n').map(p => p.split('\n')[0]);
+    return {
+      stations: P.stations, want: Math.min(25, want.length), kb: Math.round(P.text.length / 1000),
+      every: want.slice(0, 25).every(id => P.text.includes(`— [[${id}]]`)),
+      detail: (P.text.match(/"last_site_visit"/g) || []).length, near: (P.text.match(/"nearby_within_30_km"/g) || []).length,
+      promptIn: P.text.includes(prompt), sameSections: JSON.stringify(sections(prompt)) === JSON.stringify(sections(sys)),
+      kept: prompt.split('\n\n').filter(p => sys.includes(p)).length, of: sys.split('\n\n').length,
+      tools: HealthAgent._tools.map(t => t.name).filter(n => n.includes('_') && prompt.includes(n)),
+      format: /## Visit first/.test(prompt) && /\[\[station_id\]\]/.test(prompt),
+      overview: /## Overview\n\n```json\n\{"window"/.test(P.text), noKey: !/sk-ant-/.test(P.text),
+    };
+  });
+  ok('the briefing pack holds each station with a warning or worse in full, with its last visit and its neighbours',
+    pack.stations === pack.want && pack.stations > 3 && pack.every && pack.detail === pack.stations && pack.near === pack.stations, JSON.stringify(pack));
+  ok('…its instructions Claude\'s own, the two paragraphs about tools swapped for what the file holds',
+    pack.promptIn && pack.sameSections && pack.kept === pack.of - 2 && pack.tools.length === 0 && pack.format, JSON.stringify(pack));
+  ok('…with the overview, and no key in it', pack.overview && pack.noKey, JSON.stringify(pack));
+
+  const [packDl] = await Promise.all([
+    page.waitForEvent('download', { timeout: 15_000 }).catch(() => null),
+    page.click('#hl-pack-btn'),
+  ]);
+  let packBody = '';
+  if (packDl) { const chunks = []; for await (const c of await packDl.createReadStream()) chunks.push(c); packBody = Buffer.concat(chunks).toString('utf8'); }
+  await until(page, () => /^Downloaded/.test((document.getElementById('hl-pack-status') || {}).textContent || ''), null);
+  const packSaid = await page.evaluate(() => document.getElementById('hl-pack-status').textContent.trim());
+  ok('⤓ Download the briefing pack saves it as floodnet-health-briefing-pack-….txt, and says what it holds',
+    !!packDl && /^floodnet-health-briefing-pack-\d{4}-\d\d-\d\d\.txt$/.test(packDl.suggestedFilename()) && /^# Flood-Net station health — briefing pack/.test(packBody)
+      && new RegExp(`and ${pack.stations} stations in full`).test(packSaid), `${packDl && packDl.suggestedFilename()} — ${packSaid}`);
+
+  // The other AI's answer pasted back: drawn as Claude's, its stations links.
+  // What is pasted survives the card being drawn again before it is shown.
+  await page.click('#hl-agent details.hl-paste summary');
+  await page.fill('#hl-paste', `## Headline\nPasted from Copilot.\n## Visit first\n1. [[${WORLD.roles.falling}]] — battery sliding. Confidence: high`);
+  await page.evaluate(() => { document.getElementById('hl-agent').innerHTML = HealthAgent.render(); });
+  await page.click('#hl-agent button:has-text("Show it here")');
+  const pasted = await page.evaluate(id => {
+    const brief = document.querySelector('#hl-agent article.hl-brief');
+    return { text: brief ? brief.textContent : '', link: brief ? !!brief.querySelector(`button[onclick*="${id}"]`) : false,
+      meta: (document.querySelector('#hl-agent article.hl-brief .txt-muted') || {}).textContent || '',
+      followUp: !!document.getElementById('hl-q'), box: (document.getElementById('hl-paste') || {}).value };
+  }, WORLD.roles.falling);
+  ok('another AI\'s answer pasted back is shown as the briefing, its station a link, and said to be pasted', /Pasted from Copilot/.test(pasted.text)
+    && pasted.link && /pasted from another AI/.test(pasted.meta) && !pasted.followUp && pasted.box === '', JSON.stringify(pasted));
 
   // ── Flood-Net's key (#229): an editor with no key of their own ─────────────
   // The route (worker/briefing.js) is stood in for at its two paths, answering

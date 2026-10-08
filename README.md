@@ -738,11 +738,13 @@ through its neighbours' storm, which receiver stopped, which repeater a run of
 silences or corrupted copies has in common — ranked by what needs doing, each
 with its evidence and the action. Pick a station for its checks slot by slot
 and its battery across its solar day, and pick any missed check or reading to
-see what every receiver and neighbour was doing at that moment. *Ask Claude*
+see what every receiver and neighbour was doing at that moment. *AI briefing*
 hands the findings to an agent (Claude Opus 5.5 — on Flood-Net's own key, behind
 Access, for editors and administrators, up to US$20 a day; anyone else on their
 own key) that investigates with tools over the same readings and writes the
-briefing. The
+briefing — or, where Anthropic is out of reach or another AI is the one allowed,
+saves them as a briefing pack to give Copilot, ChatGPT or any other, and shows
+its answer pasted back. The
 same rules put a station's last-heard time, battery and findings on its card on
 the Stations map, each a door back into this tab, and can colour every pin by
 health (#218). Its *Airtime* panel reads the same window for which stations'

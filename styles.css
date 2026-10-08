@@ -16228,7 +16228,11 @@ button.adm-danger:hover { border-color: var(--bad); }
   }
 }
 
-/* Ask Claude. */
+/* AI briefing: Claude here, or another AI from the briefing pack. */
+.hl-agent-way { margin-top: var(--sp-3); }
+.hl-paste { margin: var(--sp-2) 0; }
+.hl-paste[open] { display: grid; gap: .3rem; }
+.hl-paste textarea { width: 100%; min-height: 8rem; }
 .hl-agent-key { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: flex-end; margin: var(--sp-2) 0; }
 .hl-agent-key p { flex-basis: 100%; margin: 0; }
 .hl-keyfield { display: flex; flex-direction: column; gap: .2rem; font-size: var(--fs-sm); }

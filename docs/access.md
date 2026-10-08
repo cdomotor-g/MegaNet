@@ -152,9 +152,9 @@ sign-in panel. That is the designed failure: no breakage, just no improvement.
 
 ---
 
-## Ask Claude on Flood-Net's key (#229)
+## Claude on Flood-Net's key (#229)
 
-Station Health's *Ask Claude* used to need the person's own Anthropic API key,
+Station Health's *AI briefing* used to need the person's own Anthropic API key,
 because a key held by the Worker would have been spendable by anyone who could
 reach the page. The site is behind Access now, so the key can be the Worker's:
 `/api/briefing` (`worker/briefing.js`) makes the briefing's model calls on
@@ -188,7 +188,7 @@ make in the dashboard for it.
 
 ### Its one secret: `ANTHROPIC_API_KEY`
 
-Until it is set, `/api/briefing` answers 503 and *Ask Claude* works exactly as
+Until it is set, `/api/briefing` answers 503 and the *AI briefing* works exactly as
 it did — on the person's own key. To set it:
 
 1. **A workspace for it** (an organisation admin of the Anthropic account, in
@@ -215,7 +215,7 @@ it did — on the person's own key. To set it:
    signed in to Cloudflare: `npx wrangler secret put ANTHROPIC_API_KEY` and
    paste it.
 5. **Check it.** Signed in at `floodwarning.net` as an editor, open **Station
-   Health**: *Ask Claude* says it runs on Flood-Net's Anthropic key, with no
+   Health**: the *AI briefing* says it runs on Flood-Net's Anthropic key, with no
    key field, and **Write the briefing** writes one.
 
 To switch it off, delete the secret (the same page → **Variables and Secrets**

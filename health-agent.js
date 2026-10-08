@@ -58,6 +58,18 @@
 // `dangerouslyAllowBrowser`; on the route that is a formality, and on the
 // person's own key it is exactly the decision being made: this browser, this
 // person's key.
+//
+// ── Or another AI, from a file ───────────────────────────────────────────────
+// Neither key helps where the network blocks api.anthropic.com (or the CDN the
+// SDK comes from), and some people may use only the AI their organisation
+// allows — Copilot, for the Bureau's staff. For them the card writes the
+// briefing pack: one text file holding the same instructions, the overview, the
+// findings, the receivers and repeaters, and what station_detail and
+// stations_near would have said for each station with a warning or worse. It is
+// attached to a chat with whichever AI, which writes the briefing from it; the
+// answer pasted back into the card is shown as Claude's would be, its
+// [[station_id]]s turned into links. Making the pack sends nothing anywhere but
+// the datastore, asked for each station's last site visit as the tool asks.
 
 const HealthAgent = (() => {
 
@@ -101,6 +113,9 @@ const HealthAgent = (() => {
     routeFor: '',        // …and to whom (address|role), so somebody else is asked afresh
     routeAt: 0,
     routeAsking: false,
+    packing: false,      // the briefing pack being put together
+    packNote: '',        // …and what became of it, or of a pasted answer
+    paste: '',           // another AI's answer, as far as it is pasted — kept through a redraw
   };
   // The last briefing, kept on this device — read the first time the tab draws.
   let restored = false;
@@ -243,6 +258,20 @@ The limits of what the readings show.
 Refer to every station as [[station_id]] (its id, not its name) so the app can link it; never write a bare id otherwise. Keep the whole briefing under about 700 words.`;
 
   const FOLLOW_UP_NOTE = 'Answer the question directly, using the tools as needed. Same conventions: numbers from the tools, stations as [[station_id]], say what you could not tell. No fixed sections; keep it short.';
+
+  // The same instructions for an AI with no tools, reading the briefing pack:
+  // SYSTEM with its two paragraphs about tools swapped for these. The rest —
+  // the network, the sections, [[station_id]] — is word for word.
+  const PACK_HAVE = `What you have
+- A deterministic analysis has already run over the readings and produced findings with evidence. Its rules are sound but blind to each other. Your job is the judgement across them.
+- This file holds, as JSON: the overview of the analysed window, every finding that needs attention and the notes, the receivers, the repeaters, and each station with a warning or worse in full — its schedule, battery night lows, rain, level, sensors, findings, the receivers that hear it, its last site visit, and the stations around it. Nothing you do changes anything.
+- You cannot fetch more. Not in this file: a station's history beyond the analysed window, its transmissions one by one, and what the network did at a given moment.`;
+  const PACK_WORK = `How to work
+- Start from the overview and the findings. Before calling anything a station fault, ask whether it shares a cause with others: the same repeater, the same receiver, the same area, the same hours. Each station's repeaters_on_file, heard_by and nearby stations, and the repeaters section, are for that.
+- A station heard only now and then from far away is not "silent" in the same way as a local one that stopped.
+- Rank site visits by consequence for flood warning and by confidence: a river level station that has stopped reporting matters more than a slow battery decline; a battery heading for 11.8 V within days matters more than one that is merely low.
+- Be concrete: cite the numbers in this file. Say plainly what you could not establish, and what that is not in this file would have settled it. Never invent stations, readings, visits or history.`;
+  const PACK_PROMPT = SYSTEM.split('\n\n').map(p => (/^What you have\n/.test(p) ? PACK_HAVE : /^How to work\n/.test(p) ? PACK_WORK : p)).join('\n\n');
 
   // ── the tools ─────────────────────────────────────────────────────────────
 
@@ -604,6 +633,9 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
     throw new Error(`Stopped after ${MAX_TURNS} rounds of tool use without an answer.`);
   }
 
+  // Said where Claude cannot be reached from this browser at all.
+  const PACK_INSTEAD = 'The briefing pack under "With another AI" needs neither: download it and give it to the AI you can use.';
+
   function errorText(err, mode) {
     if (!err) return 'Something went wrong.';
     if (Sdk && err instanceof Sdk.APIUserAbortError || err.name === 'APIUserAbortError') return 'Stopped.';
@@ -620,9 +652,9 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
     if (Sdk && err instanceof Sdk.PermissionDeniedError || err.status === 403) return 'The API key is not allowed to use this model.';
     if (Sdk && err instanceof Sdk.RateLimitError || err.status === 429) return 'Rate-limited by Anthropic — wait a minute and ask again.';
     if (Sdk && err instanceof Sdk.BadRequestError || err.status === 400) return `Anthropic rejected the request: ${err.message}`;
-    if (Sdk && err instanceof Sdk.APIConnectionError || err.name === 'APIConnectionError') return 'Could not reach api.anthropic.com from this browser — a network that blocks it, or no connection.';
+    if (Sdk && err instanceof Sdk.APIConnectionError || err.name === 'APIConnectionError') return `Could not reach api.anthropic.com from this browser — a network that blocks it, or no connection. ${PACK_INSTEAD}`;
     if (err.status >= 500) return `Anthropic's API had a problem (${err.status}) — try again shortly.`;
-    if (/import|module|Failed to fetch dynamically/i.test(String(err.message))) return 'Could not load the Anthropic SDK from cdn.jsdelivr.net — a network that blocks it, or no connection.';
+    if (/import|module|Failed to fetch dynamically/i.test(String(err.message))) return `Could not load the Anthropic SDK from cdn.jsdelivr.net — a network that blocks it, or no connection. ${PACK_INSTEAD}`;
     return err.message || String(err);
   }
 
@@ -669,6 +701,109 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
   function stop() {
     G.stopped = true;
     if (G.stream && G.stream.abort) { try { G.stream.abort(); } catch (_) {} }
+  }
+
+  // ── the briefing pack ─────────────────────────────────────────────────────
+
+  const PACK_STATIONS = 25;           // stations in full, worst first
+  const PACK_NEAR = 8;                // …each with this many of its nearest
+
+  // The pack's text, and how many stations it holds in full; null before the
+  // readings are worked out. Each station is what the agent's own tools answer
+  // (station_detail, and stations_near cut to the nearest few), trimmed alike.
+  async function packText() {
+    const { A, win, demo } = Health.state();
+    if (!A) return null;
+    // A station is trimmed as a tool's answer is; the lists are whole.
+    const json = v => { const s = JSON.stringify(v); return s.length > MAX_RESULT ? s.slice(0, MAX_RESULT) + '… (trimmed)' : s; };
+    const block = (title, v) => `## ${title}\n\n\`\`\`json\n${JSON.stringify(v)}\n\`\`\`\n`;
+    const ids = [];
+    A.findings.forEach(f => { if (f.severity !== 'info' && f.stationId && A.stations.has(f.stationId) && !ids.includes(f.stationId)) ids.push(f.stationId); });
+    const picked = ids.slice(0, PACK_STATIONS);
+    const full = await Promise.all(picked.map(async id => {
+      const detail = await runTool('station_detail', { station_id: id });
+      const near = await runTool('stations_near', { station_id: id, radius_km: 30 });
+      if (near && near.stations) detail.nearby_within_30_km = near.stations.slice(0, PACK_NEAR);
+      return `### ${detail.name || id} — [[${id}]]\n\n\`\`\`json\n${json(detail)}\n\`\`\`\n`;
+    }));
+    const O = overview(A, win);
+    delete O.findings_needing_attention;
+    const att = A.findings.filter(f => f.severity !== 'info');
+    const notes = A.findings.filter(f => f.severity === 'info');
+    const made = new Date();
+    const text = [
+      '# Flood-Net station health — briefing pack',
+      '',
+      `Made ${made.toISOString()} from Flood-Net's Station Health tab (${typeof location !== 'undefined' ? location.origin : 'floodwarning.net'}), over ${win}${demo ? ' of demo readings' : ''}.`,
+      '',
+      'To use it: attach this file to a chat with the AI of your choice (Copilot, ChatGPT, Gemini, Claude…) and ask it to "follow the instructions in this file". Ask follow-up questions in the same chat. Paste its briefing into the AI briefing card on Station Health to see each [[station_id]] as a link to the station.',
+      '',
+      '---',
+      '',
+      '## Instructions for the AI',
+      '',
+      PACK_PROMPT,
+      '',
+      (demo ? 'These are demo readings: real stations, a made-up week with faults planted in it. Treat it as practice.\n' : '')
+        + 'Investigate what follows, then write the maintenance briefing.',
+      '',
+      '---',
+      '',
+      block('Overview', O),
+      block(`Findings needing attention (${att.length})`, att.map(compactFinding)),
+      // A note is a line, not its evidence: there can be hundreds.
+      block(`Notes (${notes.length}${notes.length > 150 ? ', the first 150' : ''})`, notes.slice(0, 150).map(f => {
+        const c = compactFinding(f);
+        return { kind: c.kind, category: c.category, station_id: c.station_id, receiver: c.receiver, address: c.address, title: c.title };
+      })),
+      block('Receivers', (await runTool('receivers', {})).receivers),
+      block('Repeaters', (await runTool('repeaters', { limit: 60 })).repeaters),
+      `## Stations in full (${picked.length})\n\nEach station with a warning or worse, worst first${ids.length > picked.length ? `: the first ${picked.length} of ${ids.length} — the rest are in the findings above` : ''}.\n`,
+      ...full,
+    ].join('\n');
+    return { text, stations: picked.length, made };
+  }
+
+  function paintPack() {
+    const el = document.getElementById('hl-pack-status');
+    if (el) el.innerHTML = packStatusHtml();
+    const btn = document.getElementById('hl-pack-btn');
+    if (btn) { btn.disabled = !Health.state().A || G.packing; btn.textContent = G.packing ? 'Putting it together…' : '⤓ Download the briefing pack'; }
+  }
+
+  async function downloadPack() {
+    if (G.packing) return;
+    G.packing = true; G.packNote = '';
+    paintPack();
+    try {
+      const P = await packText();
+      if (P) {
+        dlText(`floodnet-health-briefing-pack-${P.made.toISOString().slice(0, 10)}.txt`, P.text, 'text/plain;charset=utf-8');
+        G.packNote = `Downloaded: the instructions, the findings and ${P.stations} station${P.stations === 1 ? '' : 's'} in full, about ${Math.max(1, Math.round(P.text.length / 1000))} kB. Attach it to a chat and ask the AI to follow the instructions in it.`;
+      }
+    } catch (err) {
+      G.packNote = `The briefing pack could not be put together: ${(err && err.message) || err}`;
+    }
+    G.packing = false;
+    paintPack();
+  }
+
+  // Another AI's answer, pasted in: shown as Claude's would be. It ends any
+  // conversation with Claude — a follow-up would be about another briefing.
+  function draftPaste(v) { G.paste = String(v || ''); }
+  function showPasted() {
+    const el = document.getElementById('hl-paste');
+    const md = el ? el.value.trim() : '';
+    if (!md) { G.packNote = 'Paste the AI\'s answer into the box first.'; paintPack(); return; }
+    const { win, demo } = Health.state();
+    G.answer = { md, at: Date.now(), win, demo: !!demo, question: null, usage: null, via: 'pasted' };
+    G.messages = []; G.feed = []; G.error = ''; G.packNote = ''; G.paste = '';
+    writeStore(LAST_STORE, JSON.stringify(G.answer));
+    paint();
+    // The briefing is drawn above the box it was pasted into.
+    const art = document.querySelector('#hl-agent article.hl-brief');
+    if (art && art.scrollIntoView) art.scrollIntoView({ block: 'start' });
+    announce('The pasted briefing is shown.');
   }
 
   // ── rendering ─────────────────────────────────────────────────────────────
@@ -758,19 +893,48 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
     return why + keyFieldHtml(!who || (answered && !(r && r.code === 'daily_limit')));
   }
 
+  function packStatusHtml() {
+    return G.packNote ? esc(G.packNote) : '';
+  }
+
+  // The other way to a briefing, at the foot of the card: the pack out, the
+  // answer back in (drawn above, where Claude's would be).
+  function packHtml() {
+    const { A } = Health.state();
+    return `
+      <h4 class="hl-agent-way">With another AI</h4>
+      <p class="small">Copilot, ChatGPT, Gemini, Claude.ai — whichever you can use, and where this browser cannot reach Anthropic. The
+        briefing pack is one text file: the instructions Claude gets here, what this tab found, and each station with a warning or worse
+        in full (up to ${PACK_STATIONS}). Attach it to a chat and ask the AI to follow the instructions in it. The AI cannot look further
+        than the file — a station's 30 days, the network at a moment — so its briefing says what it could not tell. Downloading the pack
+        sends none of it anywhere; the AI you give it to sees all of it.</p>
+      <div class="button-group">
+        <button id="hl-pack-btn" onclick="HealthAgent.downloadPack()" ${!A || G.packing ? 'disabled' : ''}>${G.packing ? 'Putting it together…' : '⤓ Download the briefing pack'}</button>
+      </div>
+      <div id="hl-pack-status" role="status" class="small">${packStatusHtml()}</div>
+      <details class="hl-paste" ${G.paste ? 'open' : ''}>
+        <summary class="small">Paste its answer here, to see the stations as links</summary>
+        <label for="hl-paste" class="small">The AI's briefing — copy it with the AI's own copy button, which keeps the headings</label>
+        <textarea id="hl-paste" rows="6" spellcheck="false" placeholder="## Headline&#10;…" oninput="HealthAgent.draftPaste(this.value)">${esc(G.paste)}</textarea>
+        <div class="button-group"><button onclick="HealthAgent.showPasted()">Show it here</button></div>
+      </details>`;
+  }
+
   function render() {
     restore();
     const { A } = Health.state();
     const keyed = ready();
     const ans = G.answer;
     return `
-      <div class="panel-header"><h3 id="hl-h-agent">Ask Claude</h3>
-        <span class="small">${esc(MODEL)} · reads the findings, investigates, writes the briefing</span></div>
-      <p class="small">Claude gets what this tab worked out and the same views you have — a station in full, the network at a moment, a
-        station's last 30 days, its neighbours, the receivers and repeaters — and decides which findings share a cause, checks the doubtful
-        ones, and writes a briefing: which sites to visit first and why, what the network and the register need, and what it could not
-        tell. It reads; it changes nothing. The findings and readings it looks at are sent to Anthropic's API — through Flood-Net's Worker on
-        Flood-Net's key, or from this browser on your own.</p>
+      <div class="panel-header"><h3 id="hl-h-agent">AI briefing</h3>
+        <span class="small">reads the findings, investigates, writes the briefing — Claude here, or the AI of your choice</span></div>
+      <p class="small">An AI is handed what this tab worked out, decides which findings share a cause, checks the doubtful ones, and writes
+        a briefing: which sites to visit first and why, what the network and the register need, and what it could not tell. It reads; it
+        changes nothing.</p>
+      <h4 class="hl-agent-way">With Claude, here</h4>
+      <p class="small">Claude (${esc(MODEL)}) gets the same views you have as tools — a station in full, the network at a moment, a station's
+        last 30 days, its neighbours, the receivers and repeaters — and looks where it needs to as it goes. The findings and readings it looks
+        at are sent to Anthropic's API — through Flood-Net's Worker on Flood-Net's key, or from this browser on your own.</p>
       <div class="hl-agent-key">${keyHtml()}</div>
       <div class="button-group hl-agent-run">
         <label class="small">How hard to think
@@ -786,18 +950,19 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
       <div id="hl-agent-live" class="hl-brief">${G.running && G.live ? mdHtml(G.live) : ''}</div>
       ${!G.running && ans ? `
         <article class="hl-brief" aria-labelledby="hl-h-brief">
-          <h4 id="hl-h-brief" class="sr-only">Claude's briefing</h4>
-          <p class="small txt-muted">${ans.question ? `Asked: “${esc(ans.question)}” · ` : ''}${esc(HealthAnalysis.fmtWhen(ans.at))}${ans.demo ? ' · from the demo week' : ''}${ans.usage ? ' · ' + esc(costText(ans.usage)) : ''}${ans.via === 'route' ? ' · on Flood-Net\'s key' : ''}</p>
+          <h4 id="hl-h-brief" class="sr-only">The briefing</h4>
+          <p class="small txt-muted">${ans.question ? `Asked: “${esc(ans.question)}” · ` : ''}${esc(HealthAnalysis.fmtWhen(ans.at))}${ans.demo ? ' · from the demo week' : ''}${ans.usage ? ' · ' + esc(costText(ans.usage)) : ''}${ans.via === 'route' ? ' · on Flood-Net\'s key' : ans.via === 'pasted' ? ' · pasted from another AI' : ''}</p>
           ${mdHtml(ans.md)}
           <div class="button-group"><button class="ghost" onclick="HealthAgent.copy()">Copy as text</button></div>
         </article>` : ''}
       ${G.messages.length && !G.running ? `
         <div class="hl-followup">
-          <label for="hl-q" class="small">Ask a follow-up — it remembers this conversation</label>
+          <label for="hl-q" class="small">Ask Claude a follow-up — it remembers this conversation</label>
           <div class="button-group"><input id="hl-q" type="text" placeholder="e.g. Is Upper Springbrook's silence its battery?"
             onkeydown="if (event.key === 'Enter') HealthAgent.followUp()">
           <button onclick="HealthAgent.followUp()" ${keyed ? '' : 'disabled'}>Ask</button></div>
-        </div>` : ''}`;
+        </div>` : ''}
+      ${packHtml()}`;
   }
 
   function paint() {
@@ -853,13 +1018,13 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
   }
 
   return {
-    render, init, ask, stop, setKey, forget, setEffort, followUp, copy, dataChanged, authChanged,
+    render, init, ask, stop, setKey, forget, setEffort, followUp, copy, dataChanged, authChanged, downloadPack, draftPaste, showPasted,
     // Test seams: a client factory standing in for the SDK (handed the mode and
-    // the options the SDK would get), the tool runner, and the request and SDK
-    // options exactly as a call builds them.
+    // the options the SDK would get), the tool runner, the request and SDK
+    // options exactly as a call builds them, and the pack's text and prompt.
     _useClient(factory) { G.factory = factory; },
     _runTool: runTool, _overview: overview, _mdHtml: mdHtml, _tools: TOOLS, _system: SYSTEM,
-    _params: requestParams, _clientOptions: clientOptions,
+    _params: requestParams, _clientOptions: clientOptions, _packText: packText, _packPrompt: PACK_PROMPT,
   };
 })();
 
