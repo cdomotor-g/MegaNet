@@ -20,7 +20,7 @@
 // executes at load.
 //
 // ⚠ This file carries one of the app's 4 literal NUL bytes — U+0000 inside a
-// string literal at line 859, used as a compound-key separator (#129).
+// string literal at line 1229, used as a compound-key separator (#129).
 // Any tool that round-trips this file as text and normalises control characters
 // destroys that key silently. `npm run concat` in test/ is what catches it.
 //
@@ -28,30 +28,36 @@
 
 // ── ALERT2 / ERT-A2 tab ─────────────────────────────────────────────────────────
 //
-// Decoder for the "ALERT2 ASCII Protocol" an ELPRO ERT-A2 writes to its RS232
-// port: one comma-separated line per received ALERT2 frame, 24 fixed fields of
-// receiver metadata followed by the frame's payload as hex bytes.
+// Decoder for what an ELPRO ERT-A2 writes to its RS232 port: the NHWC ALERT2
+// IND API's MANT PDU string (IND API v1.1 §5.2, the "N" string) — one
+// comma-separated line per received ALERT2 frame, 24 fixed fields of receiver
+// and MANT header followed by the frame's payload as hex bytes.
 //
 //   ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00
-//   └ tag  │ │    │     │ │ └──── ERT-A2 clock ──┘ └── status ──┘ │  │  │    └── payload ──────┘
-//          │ │    │     │ └ constant                              │  │  └ source address
-//          │ │    │     └ frame type                              │  └ payload length, bytes
-//          │ │    └ agency id                                     └ reception quality
-//          │ └ decoder address (this ERT-A2)
-//          └ interface version
+//   └ tag  │ │    │     │ │ └─ arrival time ─────┘ └─ MANT header ──┘ │  │    └── payload ──────┘
+//          │ │    │     │ └ time quality (1 = receiver clock locked)  │  └ source address
+//          │ │    │     └ string type: N, the MANT PDU               └ payload length, bytes
+//          │ │    └ agency id
+//          │ └ IND source address (this ERT-A2)
+//          └ API version
 //
-// The payload is an ALERT2 "ALERT concentration" element — IND type 0x74, two
-// bytes of seconds-since-midnight, then any number of four-byte records each
-// carrying one legacy 13-bit ALERT address and its 11-bit value. So the modern
-// frame is a wrapper: what comes out the other end is the same ID-and-value pair
-// the ALERT Packets tab has always decoded, which is why both tabs agree on a
-// reading and why station lookup is shared between them.
+// The fields were first named from a 444-frame capture, because no spec was to
+// hand, and four of those names were wrong in ways that lost data (#209). They
+// are the spec's now: IND API v1.1 §5.2 for the line, MANT v1.2 Fig 2-2 for the
+// header bits, Application Layer v1.3 §2–3 for the payload.
 //
-// Nothing here is guesswork about the payload: the field meanings below were
-// derived by decoding a 444-frame capture from a test ERT-A2 and checking every
-// address, value and timestamp against the same traffic decoded by ELPRO's own
-// Ranger software. Where a field's meaning could not be established that way it
-// says so rather than inventing one — see REFERENCE at the bottom of the tab.
+// Two things in the header decide how the rest is read. **Field 18 is the MANT
+// port**: 1 is ALERT concentration — a repeater's bundle of legacy ALERT
+// readings, each a 13-bit address and an 11-bit value, the same pair the ALERT
+// Packets tab decodes, which is why both tabs agree on a reading — and 0 is a
+// self-report, an ALERT2 gauge's own report of its sensors. Neither says the
+// frame is clean or dirty; the line carries no such verdict. And fields 14, 16
+// and 17 say whether a PDU ID, a list of the repeaters the frame came through
+// and a destination address sit between field 24 and the payload.
+//
+// The payload opens with an application control byte (version, whether a time
+// stamp follows, a test flag, an optional PDU id) and, usually, a 16-bit time
+// stamp counting seconds from the most recent 00:00 or 12:00 — see placeStamp.
 //
 // Live capture is the destination, not the starting point. Web Serial is closed
 // off on managed machines, so this ingests what an operator can get today: text
@@ -66,73 +72,134 @@ const Alert2 = (function () {
   // ── protocol ──────────────────────────────────────────────────────────────────
 
   const TAG = 'ALERT2A';
-  const IND_ALERT_CONC = 0x74;     // payload byte 0 on every frame in the capture
-  const HDR_BYTES = 3;             // IND + 2 bytes of seconds-since-midnight
-  const REC_BYTES = 4;
+  const PORT_SELF = 0;             // MANT port: Application Layer self-reporting protocol
+  const PORT_CONC = 1;             // MANT port: ALERT concentration
+  const REC_BYTES = 4;             // one concentration record
+  const HALF_DAY = 43200;          // seconds the payload's time stamp counts up to
+  const STAMP_TOL_MS = 10 * 60000; // how far a placed stamp may sit from its reference
 
-  // The 24 fixed fields, in order. `role` drives the colour of the chip in the
-  // frame anatomy; `sure` marks what the Ranger cross-check actually established
-  // as against what was merely constant across every frame observed.
+  // The 24 fixed fields of the MANT PDU string, in order (IND API v1.1 §5.2).
+  // `role` drives the colour of the chip in the frame anatomy; `sure` is true
+  // where the meaning is established — by the spec, for every field here now.
   const FIELDS = [
     { k: 'tag',      label: 'Protocol tag',      role: 'ident', sure: true,
-      note: 'Always ALERT2A. ELPRO calls this the ALERT2 ASCII Protocol; the binary protocol is a different, longer framing this tab does not read.' },
-    { k: 'version',  label: 'Interface version', role: 'ident', sure: false,
-      note: '1 on every frame observed.' },
-    { k: 'decoder',  label: 'Decoder address',   role: 'addr',  sure: true,
-      note: 'The ERT-A2 doing the receiving — the unit this serial cable is plugged into. Configured on the unit itself.' },
+      note: 'Always ALERT2A — the ALERT2 IND API\'s ASCII output. ELPRO calls it the ALERT2 ASCII Protocol; the binary protocol on the USB port is a different, longer framing (method 2).' },
+    { k: 'version',  label: 'API version',       role: 'ident', sure: true,
+      note: 'The IND API version the line follows. 1 on every frame observed.' },
+    { k: 'decoder',  label: 'IND source address', role: 'addr', sure: true,
+      note: 'The receiver — the ERT-A2 this serial cable is plugged into. Configured on the unit itself.' },
     { k: 'agency',   label: 'Agency ID',         role: 'ident', sure: true,
-      note: 'ALERT2 agency string carried in the frame. ELPRO here.' },
-    { k: 'frameType', label: 'Frame type',       role: 'ident', sure: false,
-      note: 'N on every frame observed.' },
-    { k: 'const6',   label: 'Field 6',           role: 'ident', sure: false,
-      note: '1 on every frame observed; meaning not established.' },
+      note: 'The receiver\'s agency string. ELPRO here.' },
+    { k: 'frameType', label: 'String type',      role: 'ident', sure: true,
+      note: 'N — the MANT PDU string, the one this tab reads. The API also defines P (the AirLink PDU), C and A (concentration already decoded) and S (status).' },
+    { k: 'timeLock', label: 'Time quality',      role: 'time',  sure: true, num: true,
+      note: '1 when the receiver\'s clock is locked (NTP), 0 when it is not — fields 7–12 are worth comparing with the frame\'s own stamp only on a 1.' },
     { k: 'year',     label: 'Year',              role: 'time',  sure: true, num: true },
     { k: 'month',    label: 'Month',             role: 'time',  sure: true, num: true },
     { k: 'day',      label: 'Day',               role: 'time',  sure: true, num: true },
     { k: 'hour',     label: 'Hour',              role: 'time',  sure: true, num: true },
     { k: 'minute',   label: 'Minute',            role: 'time',  sure: true, num: true },
     { k: 'second',   label: 'Second',            role: 'time',  sure: true, num: true,
-      note: 'Fractional, to milliseconds. Fields 7–12 are the ERT-A2\'s own real-time clock, which is not necessarily right — compare it with the ALERT2 time in the payload.' },
-    { k: 'st13',     label: 'Status 13',         role: 'status', sure: false },
-    { k: 'st14',     label: 'Status 14',         role: 'status', sure: false },
-    { k: 'st15',     label: 'Status 15',         role: 'status', sure: false },
-    { k: 'st16',     label: 'Status 16',         role: 'status', sure: false },
-    { k: 'st17',     label: 'Status 17',         role: 'status', sure: false },
-    { k: 'frameOk',  label: 'Frame valid',       role: 'status', sure: true, num: true,
-      note: '1 on all 443 good frames in the reference capture and 0 on the single corrupt one, whose records also carried non-zero status bytes and addresses matching no station. Read as a frame-valid flag.' },
-    { k: 'st19',     label: 'Status 19',         role: 'status', sure: false },
-    { k: 'st20',     label: 'Status 20',         role: 'status', sure: false },
-    { k: 'st21',     label: 'Status 21',         role: 'status', sure: false },
-    { k: 'quality',  label: 'Reception quality', role: 'status', sure: false, num: true,
-      note: '7 on every good frame and 1 on the corrupt one. Tracks frame health; the scale is not established, and it is not RSSI — no field in the ASCII line carries the dBm figure Ranger reports.' },
+      note: 'Fractional, to milliseconds. Fields 7–12 are when the frame arrived at the receiver, by the receiver\'s own clock — zeros if it has none. The transmitter\'s time is the stamp in the payload.' },
+    { k: 'mantVer',  label: 'MANT version',      role: 'status', sure: true, num: true,
+      note: 'Two bits. 0 is the only version defined.' },
+    { k: 'protoId',  label: 'Protocol ID',       role: 'status', sure: true, num: true,
+      note: '0 best efforts; 1 the end-to-end reliable datagram service, which puts a MANT PDU ID after the source address.' },
+    { k: 'tsReq',    label: 'Time-stamp request', role: 'status', sure: true, num: true,
+      note: '1 asks the first IND with good time to stamp the payload on its way.' },
+    { k: 'pathReq',  label: 'Add-path request',  role: 'status', sure: true, num: true,
+      note: '1 asks every repeater to add its address: a count and the addresses then follow the source address — which repeaters this copy came through.' },
+    { k: 'daInHdr',  label: 'Destination in header', role: 'status', sure: true, num: true,
+      note: '1 puts a destination address straight after the source address.' },
+    { k: 'port',     label: 'Port',              role: 'ident', sure: true, num: true,
+      note: 'Which application protocol the payload is: 0 a self-report (an ALERT2 gauge\'s own report), 1 ALERT concentration (legacy ALERT readings a repeater gathered). It decides how the payload is read, and says nothing about whether the frame is clean.' },
+    { k: 'reserved', label: 'Reserved bits',     role: 'status', sure: true, num: true,
+      note: 'Three bits, 0. MANT 1.2 (2025) takes the top one as an encrypted-payload flag.' },
+    { k: 'ack',      label: 'EERDS ACK',         role: 'status', sure: true, num: true,
+      note: 'Acknowledges a reliable-datagram PDU.' },
+    { k: 'addedHdr', label: 'Added header',      role: 'status', sure: true, num: true,
+      note: 'Kept for extensions; 0 means the payload follows the header directly.' },
+    { k: 'hopLimit', label: 'Hop limit',         role: 'status', sure: true, num: true,
+      note: 'How many more repeats the frame may take; 7 means no limit. It is not a reception quality — no field of this line is a signal level or a verdict.' },
     { k: 'payLen',   label: 'Payload length',    role: 'len',   sure: true, num: true,
-      note: 'Payload size in bytes. Matched the number of trailing hex fields on all 444 frames, so it is what tells a wrapped or truncated line from a complete one.' },
+      note: 'Payload size in bytes — which is what tells a wrapped or truncated line from a complete one.' },
     { k: 'source',   label: 'Source address',    role: 'addr',  sure: true, num: true,
-      note: 'The ALERT2 node that transmitted the frame. On a unit configured as a repeater this is the repeater\'s own address, so it equals the decoder address and says nothing about which field station the readings came from — that identity is in the payload, as the ALERT id of each record.' },
+      note: 'The IND that originated the frame: for a self-report, the gauge; for ALERT concentration, the repeater that gathered the legacy readings — whose own identities are the ALERT ids inside. A unit concentrating what it hears itself carries its own address here, the same as field 3.' },
   ];
   const N_FIELDS = FIELDS.length;   // 24
+
+  // The recommended sensor IDs (Application Layer §2.2.2, Fig 2-5). Recommended,
+  // not mandatory: a site may number its sensors otherwise, so a station's own
+  // record wins where it has one (resolve).
+  const SENSOR_NAMES = {
+    0: 'Rain', 1: 'Air temperature', 2: 'Relative humidity', 3: 'Barometric pressure',
+    4: 'Wind speed', 5: 'Wind direction', 6: 'Peak wind speed', 7: 'Stage', 8: 'Battery voltage',
+    201: 'Clock status', 202: 'IND temperature', 203: 'Messages received', 204: 'Messages sent', 205: 'Status bits',
+    255: 'Time stamp',
+  };
+  const REPORT_TYPES = {
+    1: 'General Sensor Report', 2: 'Tipping Bucket Rain Gauge Report',
+    3: 'Multi-Sensor Report (US units)', 4: 'Multi-Sensor Report (metric)', 5: 'Multi-Sensor Report (IND)',
+    7: 'Time Series Data Report', 250: 'SET command', 251: 'GET command',
+  };
 
   // ── one four-byte concentration record ────────────────────────────────────────
   //
   //   byte 0   AAAAAAAA   address bits 7–0
   //   byte 1   DDDAAAAA   data bits 10–8, then address bits 12–8
   //   byte 2   DDDDDDDD   data bits 7–0
-  //   byte 3   SSSSSSSS   status; 0 on every valid record observed
+  //   byte 3   TTTTTTTT   time offset: seconds the reading was held before the
+  //                       frame was exported (Application Layer §3.3.2)
   //
   // Same 13-bit address and 11-bit value as ABF/EIF, packed into bytes instead of
   // async words. FORMATS.a2c on the ALERT Packets tab draws this same layout.
+  // There is no status in it: whether a record is good is the frame's to say
+  // (readPayload), and its fourth byte only says when the reading was taken.
   function decodeRecord(b, off) {
     return {
       off,
       bytes:   [b[0], b[1], b[2], b[3]],
       alertId: ((b[1] & 0x1f) << 8) | b[0],
       value:   ((b[1] >> 5) << 8) | b[2],
-      status:  b[3],
-      ok:      b[3] === 0,
+      offset:  b[3],
+      ok:      true,
     };
   }
 
   const FULL_SCALE = 2047;          // 11 bits all set: over-range or a dead sensor
+
+  // ── the frame's own time ──────────────────────────────────────────────────────
+  //
+  // The payload's time stamp counts seconds from the most recent 00:00 or 12:00
+  // (Application Layer §2.1.2 and §3.2.2): sixteen bits cannot hold a day, so it
+  // is a half-day count, and read as seconds since midnight every frame stamped
+  // after noon lands twelve hours early. The spec says the half-days are UTC's.
+  // Whether this network's devices keep UTC or local time is #157 Part 5's open
+  // question, so neither is assumed: the stamp is put on the half-day nearest a
+  // reference — when the frame arrived — once counting from UTC's 00:00 and
+  // 12:00 and once from local time's, and whichever lands within ten minutes of
+  // the reference is the frame's time, with which of the two it was. Both is a
+  // computer on UTC (or twelve hours from it), where the two are one; neither is
+  // a clock more than ten minutes out, and the caller decides what that means —
+  // `utc` and `local` are the two placements either way.
+  function placeStamp(stamp, refMs, tolMs) {
+    if (stamp == null || refMs == null || !isFinite(refMs)) return null;
+    const tol = tolMs == null ? STAMP_TOL_MS : tolMs;
+    const ms = stamp * 1000, h = HALF_DAY * 1000;
+    // The epoch is a UTC midnight, so UTC's half-days are whole multiples of 12 h.
+    const u0 = Math.floor(refMs / h) * h;
+    const utc = nearest([u0 - h, u0, u0 + h].map(t => t + ms), refMs);
+    // Local half-days from the calendar, so a day a clock change makes 23 or 25
+    // hours long still starts at its own 00:00 and turns at its own 12:00.
+    const d = new Date(refMs);
+    const local = nearest([-1, 0, 1].flatMap(k => [0, 12].map(hr =>
+      new Date(d.getFullYear(), d.getMonth(), d.getDate() + k, hr).getTime() + ms)), refMs);
+    const okU = Math.abs(utc - refMs) <= tol, okL = Math.abs(local - refMs) <= tol;
+    const base = okU && okL ? (utc === local ? 'either' : Math.abs(utc - refMs) <= Math.abs(local - refMs) ? 'utc' : 'local')
+               : okU ? 'utc' : okL ? 'local' : null;
+    return { ms: base === 'local' ? local : base ? utc : null, base, utc, local };
+  }
+  function nearest(ts, ref) { return ts.reduce((a, b) => Math.abs(b - ref) < Math.abs(a - ref) ? b : a); }
 
   // ── capture ingest ────────────────────────────────────────────────────────────
 
@@ -171,6 +238,26 @@ const Alert2 = (function () {
   // starts with one, or is bare hex pairs.
   const HEX_TAIL = /^,?(?:[0-9A-Fa-f]{1,2})(?:\s*,\s*[0-9A-Fa-f]{1,2})*,?$/;
 
+  // The fields between field 24 and the payload, there only when the header's
+  // flags say so (§5.2 items 15–18), in this order: the destination address
+  // (field 17 = 1), the MANT PDU ID (field 14, the protocol ID, = 1), and the
+  // number of repeater addresses appended followed by the addresses (field
+  // 16 = 1). How many there are, or null while the line is too short to say.
+  function optionalCount(v) {
+    if (v.length < N_FIELDS) return null;
+    const on = i => Number(v[i]) === 1;
+    let n = 0;
+    if (on(16)) n++;
+    if (on(13)) n++;
+    if (on(15)) {
+      if (v.length <= N_FIELDS + n) return null;
+      const c = Number(v[N_FIELDS + n]);
+      if (!Number.isInteger(c) || c < 0) return null;
+      n += 1 + c;
+    }
+    return n;
+  }
+
   // How many payload bytes a frame is still waiting for. This is what stops the
   // tail-gluing from being a guess: a complete frame never adopts the next line,
   // however much that line looks like hex. The reference capture has a PuTTY
@@ -179,8 +266,10 @@ const Alert2 = (function () {
   function shortfall(text) {
     const f = text.split(',');
     if (f.length <= N_FIELDS) return Infinity;          // header itself is incomplete
+    const opt = optionalCount(f);
+    if (opt == null) return Infinity;                   // still inside the optional fields
     const want = Number(f[N_FIELDS - 2]);               // field 23, the payload length
-    return Number.isFinite(want) ? want - (f.length - N_FIELDS) : 0;
+    return Number.isFinite(want) ? want - (f.length - N_FIELDS - opt) : 0;
   }
 
   // Split a capture into frame texts. Returns the pieces in file order along with
@@ -190,7 +279,6 @@ const Alert2 = (function () {
     const frames = [];              // { text, lineNo, prefix, wrapped }
     const banners = [];             // { lineNo, ms }
     const junk = [];                // { lineNo, text, why }
-    let blank = 0;
 
     String(text || '').split(/\r?\n/).forEach((rawLine, i) => {
       const lineNo = i + 1;
@@ -232,12 +320,25 @@ const Alert2 = (function () {
 
   // ── frame parse ───────────────────────────────────────────────────────────────
 
+  function blankFrame(o) {
+    return Object.assign({ warn: [], error: null, damaged: null, hdr: {}, payload: null,
+                           records: [], reports: [], sensors: [] }, o);
+  }
+
+  // Something about the frame's structure does not add up — a payload shorter or
+  // longer than its header says, bytes left over after the last whole record, a
+  // report running off the end. Its readings are kept and shown, and are not
+  // vouched for: they are `ok: false`, and nothing sends them.
+  function damage(f, why) {
+    (f.damaged || (f.damaged = [])).push(why);
+    f.warn.push(why);
+  }
+
   function parseFrame(src, seq) {
-    const f = {
+    const f = blankFrame({
       seq, lineNo: src.lineNo, raw: src.text, wrapped: src.wrapped, prefix: src.prefix,
       fields: src.text.split(',').map(s => s.trim()),
-      warn: [], error: null, hdr: {}, payload: null, records: [],
-    };
+    });
     const v = f.fields;
 
     if (v[0] !== TAG) { f.error = 'does not start with ' + TAG; return f; }
@@ -251,61 +352,208 @@ const Alert2 = (function () {
     const h = f.hdr;
     FIELDS.forEach((spec, i) => { h[spec.k] = spec.num ? num(i) : v[i]; });
 
-    // The ERT-A2's own clock. Built as local time because that is how the unit
-    // reports it and how an operator reading the log will think about it.
-    if ([h.year, h.month, h.day, h.hour, h.minute, h.second].every(x => x !== null)) {
+    // When the frame arrived, by the receiver's own clock. Built as local time
+    // because that is how an operator reading the log will think about it —
+    // which is why placeStamp's answer here is about the stamp *against this
+    // clock*, and the Serial Monitor's, against the computer's, is the one that
+    // can say UTC or local outright.
+    if ([h.year, h.month, h.day, h.hour, h.minute, h.second].every(x => x !== null) && h.year > 0) {
       const s = Math.floor(h.second);
       h.clockMs = new Date(h.year, h.month - 1, h.day, h.hour, h.minute, s,
                            Math.round((h.second - s) * 1000)).getTime();
       h.clockSod = h.hour * 3600 + h.minute * 60 + h.second;
     } else {
       h.clockMs = null; h.clockSod = null;
-      f.warn.push('the date/time fields did not parse as numbers');
+      if (h.year !== 0) f.warn.push('the date/time fields did not parse as numbers');
     }
-    if (h.frameOk !== 1) f.warn.push('frame-valid flag (field 18) is ' + v[17] + ', not 1 — the receiver did not consider this frame clean');
 
-    // Payload.
-    const hex = v.slice(N_FIELDS);
+    // The optional fields, then the payload.
+    let at = N_FIELDS;
+    if (h.daInHdr === 1) h.dest = num(at++);
+    if (h.protoId === 1) h.pduId = num(at++);
+    if (h.pathReq === 1) {
+      const n = num(at);
+      if (n == null || !Number.isInteger(n) || n < 0 || at + 1 + n > v.length) {
+        f.error = 'field ' + (at + 1) + ' should count the repeater addresses the add-path service appended, and reads ' + v[at];
+        return f;
+      }
+      h.path = v.slice(at + 1, at + 1 + n).map(Number);
+      at += 1 + n;
+      if (h.path.some(x => !Number.isInteger(x))) { f.error = 'an appended repeater address is not a number'; return f; }
+    }
+    f.payAt = at;
+
+    const hex = v.slice(at);
     const bad = hex.findIndex(x => !/^[0-9A-Fa-f]{1,2}$/.test(x));
-    if (bad >= 0) { f.error = 'payload field ' + (N_FIELDS + bad + 1) + ' is not a hex byte (' + v[N_FIELDS + bad] + ')'; return f; }
+    if (bad >= 0) { f.error = 'payload field ' + (at + bad + 1) + ' is not a hex byte (' + v[at + bad] + ')'; return f; }
     const bytes = hex.map(x => parseInt(x, 16));
 
     if (h.payLen !== bytes.length) {
-      f.warn.push('payload length says ' + h.payLen + ' byte' + (h.payLen === 1 ? '' : 's')
-                + ' but ' + bytes.length + ' arrived — the line is ' + (bytes.length < h.payLen ? 'cut short' : 'over-long'));
+      damage(f, 'payload length says ' + h.payLen + ' byte' + (h.payLen === 1 ? '' : 's')
+              + ' but ' + bytes.length + ' arrived — the line is ' + (bytes.length < h.payLen ? 'cut short' : 'over-long'));
     }
     readPayload(f, bytes);
     return f;
   }
 
-  // The IND payload, and the readings inside it. Identical on both wire formats
-  // — the ASCII line spells these bytes out one hex field at a time and the
-  // binary frame carries them whole, but from `0x74` on it is the same element,
-  // so both paths decode it here.
+  // The application-layer payload, and the readings inside it. Identical on
+  // both wire formats — the ASCII line spells these bytes out one hex field at
+  // a time and the binary frame carries them whole — so both paths decode it
+  // here, routed by the port the MANT header named.
+  //
+  //   control   bits 0–1 version (0), bit 2 a time stamp follows, bit 3 test
+  //             data, bits 4–6 an application PDU id (7 = off), bit 7 a second
+  //             control byte follows — §2.1.1, the same for both protocols
+  //   [stamp]   16 bits, seconds since the most recent 00:00 or 12:00
+  //   then      four-byte concentration records (port 1), or self-report
+  //             reports, each type / length / value (port 0)
   function readPayload(f, bytes) {
-    if (bytes.length < HDR_BYTES) { f.error = 'payload is only ' + bytes.length + ' byte(s); ' + HDR_BYTES + ' are needed before any reading'; return f; }
-
-    const ind = bytes[0];
-    const sod = (bytes[1] << 8) | bytes[2];
-    f.payload = { bytes, ind, sod, body: bytes.slice(HDR_BYTES) };
-
-    if (ind !== IND_ALERT_CONC) {
-      f.error = 'payload type 0x' + ind.toString(16).toUpperCase().padStart(2, '0')
-              + ' is not the ALERT concentration type (0x74) this decoder knows';
+    if (!bytes.length) { f.error = 'no payload bytes'; return f; }
+    const c = bytes[0];
+    const ctl = { byte: c, version: c & 3, ts: !!(c & 4), test: !!(c & 8), apdu: (c >> 4) & 7, ext: !!(c & 0x80) };
+    f.payload = { bytes, ctl, stamp: null, hdrLen: 1, body: [] };
+    if (ctl.version !== 0) {
+      f.error = 'the control byte 0x' + hx(c) + ' says application layer version ' + ctl.version + '; only version 0 is defined';
       return f;
     }
+    let at = 1;
+    if (ctl.ext) {
+      if (bytes.length < 2) { f.error = 'the control byte promises a second one, and the payload ends'; return f; }
+      ctl.byte2 = bytes[at++];
+    }
+    if (ctl.ts) {
+      if (bytes.length < at + 2) { f.error = 'the payload ends before the time stamp its control byte promises'; return f; }
+      f.payload.stamp = (bytes[at] << 8) | bytes[at + 1];
+      at += 2;
+      if (f.payload.stamp >= HALF_DAY) f.warn.push('the time stamp reads ' + f.payload.stamp + ' s, past the 43,199 a half-day count can reach');
+    }
+    f.payload.hdrLen = at;
+    f.payload.body = bytes.slice(at);
 
-    const body = f.payload.body;
-    const whole = Math.floor(body.length / REC_BYTES);
-    if (body.length % REC_BYTES) f.warn.push((body.length % REC_BYTES) + ' byte(s) left over after the last complete reading');
-    for (let i = 0; i < whole; i++) {
-      const r = decodeRecord(body.slice(i * REC_BYTES, i * REC_BYTES + REC_BYTES), HDR_BYTES + i * REC_BYTES);
-      r.frame = f; r.idx = i;
-      if (!r.ok) f.warn.push('reading ' + (i + 1) + ' has status byte 0x'
-                           + r.status.toString(16).toUpperCase().padStart(2, '0') + ', not 0 — treat it as corrupt');
-      f.records.push(r);
+    const port = f.hdr.port;
+    if (port === PORT_SELF) readSelfReport(f);
+    else if (port === PORT_CONC || port == null) {
+      if (port == null) f.warn.push('no MANT header to name the port — read as ALERT concentration');
+      readConcentration(f);
+    } else {
+      f.warn.push('port ' + port + ' is not one this decoder reads (0 self-report, 1 ALERT concentration) — its bytes are shown raw');
+    }
+    if (f.damaged) {
+      f.records.forEach(r => { r.ok = false; });
+      f.sensors.forEach(s => { s.ok = false; });
     }
     return f;
+  }
+
+  function readConcentration(f) {
+    const p = f.payload, body = p.body;
+    const whole = Math.floor(body.length / REC_BYTES);
+    if (body.length % REC_BYTES) damage(f, (body.length % REC_BYTES) + ' byte(s) left over after the last complete reading');
+    for (let i = 0; i < whole; i++) {
+      const r = decodeRecord(body.slice(i * REC_BYTES, i * REC_BYTES + REC_BYTES), p.hdrLen + i * REC_BYTES);
+      r.frame = f; r.idx = i;
+      f.records.push(r);
+    }
+  }
+
+  // Self-reports (§2.1): one or more reports, each a type, an extensible length
+  // (one byte to 127; above that the top bit is set and the next fifteen bits
+  // are the length) and that many bytes. The General Sensor Report and the
+  // tipping bucket report are read into sensor values; every other type is kept
+  // as its bytes, named, and is not an error — the spec adds types as it goes.
+  function readSelfReport(f) {
+    const p = f.payload, b = p.body;
+    let at = 0;
+    while (at < b.length) {
+      const start = at, type = b[at++];
+      if (at >= b.length) { damage(f, 'the report at payload byte ' + (p.hdrLen + start) + ' has a type and no length'); break; }
+      let len = b[at++];
+      if (len & 0x80) {
+        if (at >= b.length) { damage(f, 'the report at payload byte ' + (p.hdrLen + start) + ' is cut short inside its length'); break; }
+        len = ((len & 0x7f) << 8) | b[at++];
+      }
+      if (at + len > b.length) {
+        damage(f, 'the report at payload byte ' + (p.hdrLen + start) + ' claims ' + len + ' bytes and ' + (b.length - at) + ' remain');
+        break;
+      }
+      const rep = { off: p.hdrLen + start, valOff: p.hdrLen + at, type, len,
+                    name: REPORT_TYPES[type] || 'report type ' + type, bytes: b.slice(start, at + len), sensors: [] };
+      const val = b.slice(at, at + len);
+      if (type === 1) readGsr(f, rep, val);
+      else if (type === 2) readTbrg(f, rep, val);
+      else rep.kept = true;
+      f.reports.push(rep);
+      at += len;
+    }
+    f.reports.forEach(rep => rep.sensors.forEach(s => f.sensors.push(s)));
+  }
+
+  function sensorValue(f, rep, id, fl, bytes, off) {
+    return Object.assign({ frame: f, report: rep, source: f.hdr.source, sensor: id,
+                           name: SENSOR_NAMES[id] || null, fl, bytes, off, ok: true }, flValue(fl, bytes));
+  }
+
+  // General Sensor Report (§2.2): sensor id, value format/length, value — again
+  // and again to the end of the report.
+  function readGsr(f, rep, v) {
+    let at = 0;
+    while (at < v.length) {
+      if (at + 2 > v.length) { damage(f, 'a sensor in the General Sensor Report at payload byte ' + (rep.valOff + at) + ' is cut short'); return; }
+      const id = v[at], fl = v[at + 1], n = fl & 0x0f;
+      if (at + 2 + n > v.length) { damage(f, 'sensor ' + id + ' claims ' + n + ' value bytes and ' + (v.length - at - 2) + ' remain'); return; }
+      rep.sensors.push(sensorValue(f, rep, id, fl, v.slice(at + 2, at + 2 + n), rep.valOff + at));
+      at += 2 + n;
+    }
+  }
+
+  // Tipping bucket (§2.3): sensor id, format/length, the bucket's running count,
+  // then one byte per tip in the report period — seconds before the report.
+  function readTbrg(f, rep, v) {
+    if (v.length < 2) { damage(f, 'the tipping bucket report is cut short'); return; }
+    const id = v[0], fl = v[1], n = fl & 0x0f;
+    if (2 + n > v.length) { damage(f, 'the tipping bucket count claims ' + n + ' bytes and ' + (v.length - 2) + ' remain'); return; }
+    const s = sensorValue(f, rep, id, fl, v.slice(2, 2 + n), rep.valOff);
+    s.tips = v.slice(2 + n);
+    rep.sensors.push(s);
+  }
+
+  // A value's format and length byte (§2.2.3): the high nibble the format, the
+  // low nibble the length in bytes. A combination the spec does not define is
+  // skipped by its length, as §2.2.4 says, rather than failing the report.
+  function flValue(fl, b) {
+    const fmt = fl >> 4, n = fl & 0x0f;
+    const uint = () => b.reduce((a, x) => a * 256 + x, 0);
+    const sized = [1, 2, 3, 4, 8].includes(n);
+    if (fmt === 0x1 && sized) return { value: uint(), type: n + '-byte unsigned' };
+    if (fmt === 0x2 && sized) {
+      const u = uint(), span = Math.pow(2, 8 * n);
+      return { value: u >= span / 2 ? u - span : u, type: n + '-byte signed' };
+    }
+    if (fmt === 0x3 && n === 2) return fp2(b);
+    if (fmt === 0x3 && (n === 4 || n === 8)) {
+      const dv = new DataView(Uint8Array.from(b).buffer);
+      return { value: n === 4 ? dv.getFloat32(0) : dv.getFloat64(0), type: n === 4 ? 'float32' : 'float64', float: true };
+    }
+    if (fmt === 0x4 && n >= 1) {
+      let text;
+      try { text = new TextDecoder('utf-8').decode(Uint8Array.from(b)); } catch (_) { text = b.map(hx).join(' '); }
+      return { value: null, text, type: 'text' };
+    }
+    if (fl === 0xD1) return { value: b[0], type: 'seconds before transmission', time: true };
+    if (fl === 0xE2) return { value: uint(), type: 'half-day time stamp', time: true };
+    if (fl === 0xF4) return { value: uint(), type: 'POSIX time', time: true };
+    return { value: null, type: 'format/length 0x' + hx(fl) + ', which the spec does not define — skipped by its length' };
+  }
+
+  // FP2 (Application Layer appendix 3): sign, a two-bit negative decimal
+  // exponent, a thirteen-bit mantissa to 7,999 — so every value it holds is
+  // exact in decimal, which is why it is rounded back to that here.
+  function fp2(b) {
+    const w = (b[0] << 8) | b[1], s = w >> 15, e = (w >> 13) & 3, m = w & 0x1fff;
+    if (e === 0 && m === 8191) return { value: s ? -Infinity : Infinity, type: 'FP2', float: true };
+    if (s && e === 0 && m === 8190) return { value: NaN, type: 'FP2', float: true };
+    if (m > 7999) return { value: null, type: 'FP2 with mantissa ' + m + ', past the 7,999 it allows' };
+    return { value: (s ? -1 : 1) * Number((m / Math.pow(10, e)).toFixed(e)), type: 'FP2', float: true };
   }
 
   // ── the second wire format: ELPRO's binary framing (USB) ──────────────────────
@@ -352,10 +600,10 @@ const Alert2 = (function () {
               note: 'Fixed ' + BIN_BUF + '-byte buffer: a two-byte length, the PDU, then 0xA1 fill to the end. The PDU here was byte-identical to the split copy in the decoded element on every frame.' },
     '8412': { label: 'Field 8412', role: 'status', kind: 'u8', sure: false,
               note: '0 on every frame observed; meaning not established.' },
-    '8400': { label: 'MANT header', role: 'time', kind: 'mant', sure: false,
-              note: 'The six bytes in front of the payload: three constant (00 10 70), then the payload length, then the source address. The constant three are where the ASCII line\'s status and quality fields must sit, but nothing in this capture varies enough to separate them.' },
+    '8400': { label: 'MANT header', role: 'time', kind: 'mant', sure: true,
+              note: 'The MANT header (MANT v1.2 Fig 2-2), the same bits the ASCII line spells out as fields 13–24: version, protocol ID and the three request flags; the port and the reserved and ACK bits; the added-header bit, the hop limit and the top of the payload length; the rest of the length; the source address — then a destination address, a PDU ID and the appended repeater addresses, when their flags are set. 00 10 70 on every frame captured so far: port 1, ALERT concentration, hop limit 7.' },
     '8401': { label: 'Payload', role: 'ident', kind: 'payload', sure: true,
-              note: 'The ALERT2 IND element — the same 0x74 concentration payload the ASCII line spells out one hex field at a time.' },
+              note: 'The application-layer payload — the same bytes the ASCII line spells out one hex field at a time, read by the port the header names.' },
     '9C2F': { label: 'RSSI', role: 'rssi', kind: 'i8', sure: true,
               note: 'Signed 8-bit, dBm. Equalled Ranger\'s RSSI column exactly on all 44 cross-checked frames — no scaling, no offset. This is the field the ASCII protocol has no equivalent of.' },
   };
@@ -450,24 +698,58 @@ const Alert2 = (function () {
   function u16(v, i) { return (v[i] << 8) | v[i + 1]; }
   function i8(b)     { return b > 127 ? b - 256 : b; }
 
+  // The MANT header's bits (MANT v1.2 Fig 2-2), most significant first — the
+  // same fields the ASCII line gives one at a time as 13–24 and after:
+  //
+  //   byte 0   VV PPP T A D   version, protocol ID, time-stamp request,
+  //                           add-path request, destination address in header
+  //   byte 1   OOOO RRR K     port, reserved (MANT 1.2: encrypted + two), ACK
+  //   byte 2   H LLL NNNN     added header, hop limit, payload length 11–8
+  //   byte 3   NNNNNNNN       payload length 7–0
+  //   4–5      source address
+  //   then     [destination address, 2] [PDU ID, 1] [count, 1 + addresses, 2 each]
+  function readMant(v, f) {
+    const fields = {
+      mantVer: v[0] >> 6, protoId: (v[0] >> 3) & 7, tsReq: (v[0] >> 2) & 1, pathReq: (v[0] >> 1) & 1, daInHdr: v[0] & 1,
+      port: v[1] >> 4, reserved: (v[1] >> 1) & 7, ack: v[1] & 1,
+      addedHdr: v[2] >> 7, hopLimit: (v[2] >> 4) & 7,
+    };
+    const out = { fields, payLen: ((v[2] & 0x0f) << 8) | v[3], addr: u16(v, 4), len: v.length };
+    let at = 6;
+    const need = (n, what) => {
+      if (at + n <= v.length) return true;
+      f.warn.push('the MANT header\'s flags promise ' + what + ', and the header ends');
+      return false;
+    };
+    if (fields.daInHdr && need(2, 'a destination address')) { fields.dest = u16(v, at); at += 2; }
+    if (fields.protoId === 1 && need(1, 'a PDU ID')) { fields.pduId = v[at]; at += 1; }
+    if (fields.pathReq && need(1, 'a count of repeater addresses')) {
+      const n = v[at]; at += 1;
+      if (need(2 * n, n + ' repeater address' + (n === 1 ? '' : 'es'))) {
+        fields.path = [];
+        for (let k = 0; k < n; k++, at += 2) fields.path.push(u16(v, at));
+      }
+    }
+    return out;
+  }
+
   // One binary frame, from the sync byte to the end of its declared length.
   function parseBinFrame(bytes, at, lineNo, seq) {
     const len   = bytes[at + 6];
     const end   = at + 7 + len;
     const raw   = bytes.slice(at, end);
-    const f = {
+    const f = blankFrame({
       seq, lineNo, kind: 'bin', byteOff: at, bytes: raw,
       raw: raw.map(hx).join(' '),
-      wrapped: false, prefix: null, fields: [],
-      warn: [], error: null, hdr: {}, payload: null, records: [], tlv: [],
-    };
+      wrapped: false, prefix: null, fields: [], tlv: [],
+    });
     const h = f.hdr;
     // Nothing in the binary frame is the receiver's own clock — the ASCII line's
     // date and time fields have no counterpart here, and Ranger's own display
     // stamps its rows from the PC. So the only time a binary capture has is the
     // one inside the payload, and the skew check has nothing to compare.
-    h.clockMs = null; h.clockSod = null; h.frameOk = null;
-    h.decoder = null; h.quality = null; h.rssi = null;
+    h.clockMs = null; h.clockSod = null; h.port = null;
+    h.decoder = null; h.hopLimit = null; h.rssi = null;
 
     const err = tlvRead(raw, 7, raw.length, 0, f.tlv);
     if (err) { f.error = err; return f; }
@@ -496,8 +778,9 @@ const Alert2 = (function () {
 
     const mant = top['8400'];
     if (mant && mant.len >= 6) {
-      h.mant = { flags: mant.val.slice(0, 3), payLen: mant.val[3], addr: u16(mant.val, 4) };
-      h.payLen = mant.val[3];
+      h.mant = readMant(mant.val, f);
+      Object.assign(h, h.mant.fields);
+      h.payLen = h.mant.payLen;
       if (h.source == null) h.source = h.mant.addr;
       else if (h.mant.addr !== h.source)
         f.warn.push('the MANT header address (' + h.mant.addr + ') and the frame\'s source address (' + h.source + ') disagree');
@@ -599,8 +882,8 @@ const Alert2 = (function () {
     const split = splitBinary(text);
     const frames = split.frames;
     const good = frames.filter(f => !f.error);
-    const recs = [];
-    good.forEach(f => f.records.forEach(r => recs.push(r)));
+    const recs = [], sensors = [];
+    good.forEach(f => { f.records.forEach(r => recs.push(r)); f.sensors.forEach(x => sensors.push(x)); });
     const s = split.stats;
 
     const ingest = [];
@@ -612,7 +895,7 @@ const Alert2 = (function () {
     if (split.tail)  ingest.push('the capture stops ' + (split.tail.want - split.tail.got) + ' byte(s) into a frame at line ' + split.tail.lineNo);
 
     return {
-      text, mode: 'bin', frames, records: recs,
+      text, mode: 'bin', frames, records: recs, sensors,
       stats: {
         mode: 'bin',
         frames: frames.length,
@@ -620,13 +903,16 @@ const Alert2 = (function () {
         errors: frames.filter(f => f.error).length,
         warned: good.filter(f => f.warn.length).length,
         records: recs.length,
-        badRecords: recs.filter(r => !r.ok).length,
+        sensors: sensors.length,
+        selfReports: good.filter(f => f.hdr.port === PORT_SELF).length,
+        tests: good.filter(f => f.payload && f.payload.ctl.test).length,
+        badRecords: recs.filter(r => !r.ok).length + sensors.filter(x => !x.ok).length,
         banners: 0, junk: s.junk,
         bytes: split.total, stray: split.stray, ingest,
         decoders: [], agencies: [...new Set(good.map(f => f.hdr.agency).filter(Boolean))],
         sources: [...new Set(good.map(f => f.hdr.source).filter(x => x != null))],
         firstMs: null, lastMs: null,
-        skew: null, skewN: 0, skewSpread: null,
+        skew: null, skewN: 0, skewSpread: null, bases: null,
       },
     };
   }
@@ -645,19 +931,30 @@ const Alert2 = (function () {
     const frames = split.frames.map((src, i) => parseFrame(src, i));
 
     const good = frames.filter(f => !f.error);
-    const recs = [];
-    good.forEach(f => f.records.forEach(r => recs.push(r)));
+    const recs = [], sensors = [];
+    good.forEach(f => { f.records.forEach(r => recs.push(r)); f.sensors.forEach(x => sensors.push(x)); });
 
-    // How far the ERT-A2's clock sits from the ALERT2 frame time. Measured on
-    // frames the receiver flagged clean, since the corrupt ones carry a payload
-    // time that may itself be nonsense.
-    const skews = good.filter(f => f.hdr.frameOk === 1 && f.hdr.clockSod !== null && f.payload)
-                      .map(f => f.hdr.clockSod - f.payload.sod);
+    // Each frame's stamp, put on the half-day nearest when the receiver says it
+    // arrived (placeStamp), and how far the receiver's clock sits from it.
+    // Measured on frames whose structure adds up, from a receiver whose clock
+    // is set: a damaged frame's stamp may itself be nonsense.
+    const bases = { local: 0, utc: 0, either: 0, none: 0 };
+    const skews = [];
+    good.forEach(f => {
+      if (!f.payload || f.payload.stamp == null || !f.hdr.clockMs) return;
+      f.time = placeStamp(f.payload.stamp, f.hdr.clockMs);
+      if (f.damaged) return;
+      bases[f.time.base || 'none']++;
+      // Against the placement that matched — or, where neither did, against the
+      // half-day the receiver's own clock is counting, which is the reading the
+      // old seconds-since-midnight one was trying to be, less its twelve hours.
+      skews.push((f.hdr.clockMs - (f.time.ms != null ? f.time.ms : f.time.local)) / 1000);
+    });
     const skew = median(skews);
 
     const clocks = good.map(f => f.hdr.clockMs).filter(x => x);
     return {
-      text, mode: 'ascii', frames, records: recs,
+      text, mode: 'ascii', frames, records: recs, sensors,
       stats: {
         mode:      'ascii',
         frames:    frames.length,
@@ -666,7 +963,10 @@ const Alert2 = (function () {
         errors:    frames.filter(f => f.error).length,
         warned:    good.filter(f => f.warn.length).length,
         records:   recs.length,
-        badRecords: recs.filter(r => !r.ok).length,
+        sensors:   sensors.length,
+        selfReports: good.filter(f => f.hdr.port === PORT_SELF).length,
+        tests:     good.filter(f => f.payload && f.payload.ctl.test).length,
+        badRecords: recs.filter(r => !r.ok).length + sensors.filter(x => !x.ok).length,
         banners:   split.banners.length,
         junk:      split.junk,
         decoders:  [...new Set(good.map(f => f.hdr.decoder))],
@@ -676,6 +976,7 @@ const Alert2 = (function () {
         lastMs:    clocks.length ? Math.max(...clocks) : null,
         skew, skewN: skews.length,
         skewSpread: skews.length ? Math.max(...skews) - Math.min(...skews) : null,
+        bases,
       },
     };
   }
@@ -723,12 +1024,21 @@ const Alert2 = (function () {
 
   const GAP_KM = 100;   // how much closer the winner must be before it is called resolved
 
-  const idx = { src: null, byId: null };
+  const idx = { src: null, byId: null, byA2: null };
   function alertIndex() {
     if (!state.data || !Array.isArray(state.data.stations)) return new Map();
     if (idx.src !== state.data) {
       idx.src = state.data;
       idx.byId = new Map();
+      // An ALERT2 gauge is named by its own address — the station's
+      // alert2_station_id — and a sensor by its slot on it (0024).
+      idx.byA2 = new Map();
+      state.data.stations.forEach(s => {
+        if (s.alert2_station_id == null) return;
+        const k = Number(s.alert2_station_id);
+        if (!idx.byA2.has(k)) idx.byA2.set(k, []);
+        idx.byA2.get(k).push(s);
+      });
       state.data.stations.forEach(s => {
         const types = new Map();
         stationSensors(s).forEach(se => {
@@ -800,10 +1110,31 @@ const Alert2 = (function () {
                      // ids MegaNet has never heard of.
                      fileName: cands.length ? null : Packets.stationName(aid) });
     });
-    return { byAlertId: out, centre, anchors: anchors.length,
+    // Self-report values, by gauge and sensor slot. No geography to settle:
+    // an ALERT2 address is the gauge's own, set when it was commissioned, so it
+    // matches one station or none — two is a database to fix, and says so.
+    const byA2 = new Map();
+    (parsed.sensors || []).forEach(x => {
+      const key = a2Key(x.source, x.sensor);
+      const e = byA2.get(key);
+      if (e) { e.count++; return; }
+      const sts = (idx.byA2 && x.source != null ? idx.byA2.get(Number(x.source)) : null) || [];
+      const st = sts.length === 1 ? sts[0] : null;
+      const se = st ? stationSensors(st).find(z => z && z.alert2_sensor_id != null && Number(z.alert2_sensor_id) === x.sensor) : null;
+      const types = se && se.type ? [se.type] : [];
+      byA2.set(key, { key, count: 1, cands: sts.map(z => ({ station: z, types: [] })),
+                      chosen: st ? { station: st, types } : null,
+                      conf: !sts.length ? 'unknown' : st ? 'sole' : 'ambiguous',
+                      kind: kindOf(types.length ? types : [SENSOR_NAMES[x.sensor] || '']), fileName: null, a2: true });
+    });
+    return { byAlertId: out, byA2, centre, anchors: anchors.length,
              ambiguous: [...out.values()].filter(r => r.conf === 'ambiguous' || r.conf === 'likely').length,
-             unknown: [...out.values()].filter(r => r.conf === 'unknown').length };
+             unknown: [...out.values()].filter(r => r.conf === 'unknown').length
+                    + [...byA2.values()].filter(r => r.conf === 'unknown').length };
   }
+
+  // The identity a self-report value is stored under (0024): a2:<gauge>/<sensor>.
+  function a2Key(source, sensor) { return source + '/' + sensor; }
 
   function kindOf(types) {
     const t = (types || []).join(' ').toLowerCase();
@@ -903,6 +1234,9 @@ const Alert2 = (function () {
     return a.parsed;
   }
 
+  // One row per reading: a concentration record's ALERT id and value, or a
+  // self-report's gauge, sensor and value — in capture order, so a frame's
+  // readings stay together whichever kind it carried.
   function rowsFor(p, res) {
     const a = state.a2;
     const rows = [];
@@ -916,8 +1250,56 @@ const Alert2 = (function () {
         if (a.hideUnknown && !st) return;
         rows.push({ r, f, info, st, kind, key: selKey(st, r.alertId), eng: engValue(kind, r.value, st) });
       });
+      f.sensors.forEach(x => {
+        const info = res.byA2 ? res.byA2.get(a2Key(x.source, x.sensor)) : null;
+        const st = info && info.chosen ? info.chosen.station : null;
+        const kind = info ? info.kind : null;
+        if (a.onlyErrors && x.ok && !f.warn.length) return;
+        if (a.hideUnknown && !st) return;
+        rows.push({ x, r: x, f, info, st, kind, key: selKey(st, 'a2:' + a2Key(x.source, x.sensor)),
+                    eng: a2Eng(x, kind, st) });
+      });
     });
     return rows;
+  }
+
+  // A self-report value carries its own units — the gauge's, whatever it was
+  // set up to send — so the counts-to-units scales are offered only where the
+  // value is a whole count, the way the concentration records' always are.
+  function a2Eng(x, kind, st) {
+    return x.value != null && !x.float && !x.time && Number.isInteger(x.value) ? engValue(kind, x.value, st) : null;
+  }
+
+  // How a self-report value reads, with its format where that is not obvious.
+  function a2ValueText(x) {
+    if (x.text != null) return '"' + x.text + '"';
+    if (x.value == null) return '—';
+    return String(x.value);
+  }
+
+  // When a reading was taken, as one shows it: the clock time the frame's
+  // stamp was placed at (placeStamp), less the seconds a repeater held it — or,
+  // with nothing to place it against (the USB framing carries no clock), the
+  // half-day count read both ways, since it cannot say which half it is. `sort`
+  // orders readings either way.
+  function readingWhen(f, offset) {
+    const t = f.payload && f.payload.stamp;
+    if (t == null) return f.hdr.clockMs ? { text: clockText(f.hdr.clockMs).slice(11), sort: f.hdr.clockMs } : { text: '—', sort: null };
+    if (f.time) {
+      const ms = (f.time.ms != null ? f.time.ms : f.time.local) - (offset || 0) * 1000;
+      return { text: clockText(ms).slice(11), sort: ms, iso: isoText(ms) };
+    }
+    const h = (((t - (offset || 0)) % HALF_DAY) + HALF_DAY) % HALF_DAY;
+    return { text: hms(h) + ' or ' + hms(h + HALF_DAY), sort: h };
+  }
+
+  // A concentration record's own time in the half-day: the frame's stamp less
+  // the seconds the repeater held the reading (its fourth byte). Null for a
+  // frame that carries no stamp.
+  function recStamp(f, r) {
+    const t = f.payload && f.payload.stamp;
+    if (t == null) return null;
+    return (((t - ((r && r.offset) || 0)) % HALF_DAY) + HALF_DAY) % HALF_DAY;
   }
 
   // What the table and the map agree to call one thing. A station carries three
@@ -936,22 +1318,39 @@ const Alert2 = (function () {
         let e = by.get(r.alertId);
         if (!e) by.set(r.alertId, e = { aid: r.alertId, n: 0, first: null, last: null, min: Infinity, max: -Infinity, lastVal: null, rssi: [] });
         e.n++;
-        const sod = f.payload.sod;
-        if (e.first === null || sod < e.first) e.first = sod;
-        if (e.last === null || sod >= e.last) { e.last = sod; e.lastVal = r.value; }
+        const w = readingWhen(f, r.offset);
+        if (w.sort != null && (e.first === null || w.sort < e.first.sort)) e.first = w;
+        if (w.sort == null || e.last === null || w.sort >= e.last.sort) { e.last = w; e.lastVal = r.value; }
         e.min = Math.min(e.min, r.value);
         e.max = Math.max(e.max, r.value);
         if (f.hdr.rssi != null) e.rssi.push(f.hdr.rssi);
       });
     });
+    p.frames.forEach(f => {
+      if (f.error) return;
+      f.sensors.forEach(x => {
+        if (!x.ok || x.value == null || !Number.isFinite(x.value)) return;
+        const aid = 'a2:' + a2Key(x.source, x.sensor);
+        let e = by.get(aid);
+        if (!e) by.set(aid, e = { aid, a2: x, n: 0, first: null, last: null, min: Infinity, max: -Infinity, lastVal: null, rssi: [] });
+        e.n++;
+        const w = readingWhen(f, 0);
+        if (w.sort != null && (e.first === null || w.sort < e.first.sort)) e.first = w;
+        if (w.sort == null || e.last === null || w.sort >= e.last.sort) { e.last = w; e.lastVal = x.value; }
+        e.min = Math.min(e.min, x.value);
+        e.max = Math.max(e.max, x.value);
+        if (f.hdr.rssi != null) e.rssi.push(f.hdr.rssi);
+      });
+    });
     return [...by.values()].map(e => {
-      const info = res.byAlertId.get(e.aid);
+      const info = e.a2 ? (res.byA2 ? res.byA2.get(a2Key(e.a2.source, e.a2.sensor)) : null) : res.byAlertId.get(e.aid);
       const st = info && info.chosen ? info.chosen.station : null;
       return Object.assign(e, { info, st, key: selKey(st, e.aid),
                                 kind: info ? info.kind : null, eng: engValue(info ? info.kind : null, e.lastVal, st),
                                 rssiMed: median(e.rssi), rssiBest: e.rssi.length ? Math.max(...e.rssi) : null,
                                 rssiWorst: e.rssi.length ? Math.min(...e.rssi) : null });
-    }).sort((x, y) => x.aid - y.aid);
+    }).sort((x, y) => (typeof x.aid === 'number' ? 0 : 1) - (typeof y.aid === 'number' ? 0 : 1)
+                    || (typeof x.aid === 'number' ? x.aid - y.aid : String(x.aid).localeCompare(String(y.aid), undefined, { numeric: true })));
   }
 
   // ── RSSI ──────────────────────────────────────────────────────────────────────
@@ -1026,13 +1425,19 @@ const Alert2 = (function () {
   }
 
   function valueCell(row) {
+    if (row.x) {
+      const eng = row.eng ? '<div class="spec a2-follow" title="' + esc(row.eng.rule) + '">' + esc(row.eng.text) + '</div>' : '';
+      return '<span class="val">' + esc(a2ValueText(row.x)) + '</span> <span class="spec">' + esc(row.x.type) + '</span>' + eng;
+    }
     const full = row.r.value === FULL_SCALE
       ? ' <span class="badge warn" title="11 bits all set — over-range, or a sensor reading nothing">full scale</span>' : '';
     const eng = row.eng ? '<div class="spec a2-follow" title="' + esc(row.eng.rule) + '">' + esc(row.eng.text) + '</div>' : '';
     return '<span class="val">' + row.r.value + '</span>' + full + eng;
   }
 
-  function typeCell(info) {
+  function typeCell(info, x) {
+    if (x && (!info || !info.chosen || !info.chosen.types.length))
+      return '<span class="spec">' + esc(x.name ? x.name + (x.sensor <= 8 ? ' (usual ID)' : '') : 'sensor ' + x.sensor) + '</span>';
     if (!info || !info.chosen) return '<span class="spec">—</span>';
     return '<span class="spec">' + esc(info.chosen.types.join(', ') || '—') + '</span>';
   }
@@ -1087,10 +1492,16 @@ const Alert2 = (function () {
     if (kind === 'u16' && e.len >= 2) return '<b>' + u16(e.val, 0) + '</b> ' + raw;
     if (kind === 'i8'  && e.len >= 1) return rssiCell(i8(e.val[0])) + ' ' + raw;
     if (kind === 'ascii') return '<b>' + esc(String.fromCharCode.apply(null, e.val)) + '</b> ' + raw;
-    if (kind === 'mant' && e.len >= 6)
-      return '<code>' + e.val.slice(0, 3).map(hx).join(' ') + '</code> <span class="spec">constant</span> · '
-           + '<b>' + e.val[3] + '</b> <span class="spec">payload bytes</span> · '
-           + '<b>' + u16(e.val, 4) + '</b> <span class="spec">source</span>';
+    if (kind === 'mant' && e.len >= 6) {
+      const m = readMant(e.val, { warn: [] }), x = m.fields;
+      return 'port <b>' + x.port + '</b> <span class="spec">(' + (x.port === PORT_SELF ? 'self-report' : x.port === PORT_CONC ? 'ALERT concentration' : 'unknown') + ')</span> · '
+           + 'hop limit <b>' + x.hopLimit + '</b> · '
+           + '<b>' + m.payLen + '</b> <span class="spec">payload bytes</span> · '
+           + '<b>' + m.addr + '</b> <span class="spec">source</span>'
+           + (x.dest != null ? ' · destination <b>' + x.dest + '</b>' : '')
+           + (x.pduId != null ? ' · PDU ID <b>' + x.pduId + '</b>' : '')
+           + (x.path ? ' · via <b>' + (x.path.join(' → ') || 'none yet') + '</b>' : '') + ' ' + raw;
+    }
     if (kind === 'buf' && e.len >= 2) {
       const n = u16(e.val, 0);
       const pad = Math.max(0, e.len - 2 - n);
@@ -1106,24 +1517,43 @@ const Alert2 = (function () {
     const cell = (txt, lbl, cls, attrs) =>
       '<span class="a2-byte ' + cls + '"' + (attrs || '') + '><b>' + esc(txt) + '</b><i>' + esc(lbl) + '</i></span>';
     let html = '<div class="a2-bytes">';
-    html += '<span class="a2-bgroup">'
-          + cell(hx(p.bytes[0]), 'type', 'r-ident')
-          + cell(hx(p.bytes[1]), 'time hi', 'r-time')
-          + cell(hx(p.bytes[2]), 'time lo', 'r-time')
-          + '</span>';
+    html += '<span class="a2-bgroup">' + cell(hx(p.bytes[0]), 'control', 'r-ident');
+    let at = 1;
+    if (p.ctl.ext) html += cell(hx(p.bytes[at++]), 'control 2', 'r-ident');
+    if (p.ctl.ts) { html += cell(hx(p.bytes[at]), 'time hi', 'r-time') + cell(hx(p.bytes[at + 1]), 'time lo', 'r-time'); }
+    html += '</span>';
     f.records.forEach((r, i) => {
       const at = ' data-rec="' + i + '"';
       html += '<span class="a2-bgroup" data-rec="' + i + '">'
             + cell(hx(r.bytes[0]), 'id lo', 'r-addr', at)
             + cell(hx(r.bytes[1]), 'val hi + id hi', 'r-pack', at)
             + cell(hx(r.bytes[2]), 'val lo', 'r-data', at)
-            + cell(hx(r.bytes[3]), 'status', r.ok ? 'r-status' : 'r-status bad', at)
+            + cell(hx(r.bytes[3]), 'offset', r.ok ? 'r-status' : 'r-status bad', at)
             + '</span>';
     });
-    const spare = p.body.length % REC_BYTES;
-    if (spare) {
+    f.reports.forEach((rep, i) => {
+      const at = ' data-rec="r' + i + '"';
+      const hdr = rep.bytes.length - rep.len;
+      html += '<span class="a2-bgroup" data-rec="r' + i + '">'
+            + cell(hx(rep.bytes[0]), 'type', 'r-ident', at)
+            + rep.bytes.slice(1, hdr).map(b => cell(hx(b), 'length', 'r-len', at)).join('');
+      if (rep.sensors.length && !rep.kept) {
+        rep.sensors.forEach(x => {
+          const k = x.off - rep.valOff;
+          const v = rep.bytes.slice(hdr + k, hdr + k + 2 + x.bytes.length);
+          html += cell(hx(v[0]), 'sensor', 'r-addr', at) + cell(hx(v[1]), 'format', 'r-len', at)
+                + v.slice(2).map(b => cell(hx(b), 'value', x.ok ? 'r-data' : 'r-bad', at)).join('');
+          (x.tips || []).forEach(t => { html += cell(hx(t), 'tip', 'r-time', at); });
+        });
+      } else {
+        html += rep.bytes.slice(hdr).map(b => cell(hx(b), 'kept', 'r-status', at)).join('');
+      }
+      html += '</span>';
+    });
+    const used = p.hdrLen + f.records.length * REC_BYTES + f.reports.reduce((a, r) => a + r.bytes.length, 0);
+    if (used < p.bytes.length && (f.records.length || f.reports.length || f.damaged)) {
       html += '<span class="a2-bgroup">';
-      p.bytes.slice(p.bytes.length - spare).forEach(b => { html += cell(hx(b), 'spare', 'r-bad'); });
+      p.bytes.slice(used).forEach(b => { html += cell(hx(b), 'spare', 'r-bad'); });
       html += '</span>';
     }
     html += '</div>';
@@ -1160,15 +1590,85 @@ const Alert2 = (function () {
       +       ' <code>(0x' + hx(b1) + ' &gt;&gt; 5) &lt;&lt; 8 | 0x' + hx(b2) + '</code> = <span class="val">' + r.value + '</span>'
       +       (eng ? ' &nbsp;<b>' + esc(eng.text) + '</b> <span class="spec">(' + esc(eng.rule) + ')</span>' : '')
       +       (r.value === FULL_SCALE ? ' <span class="badge warn">full scale</span>' : '') + '</div>'
-      +     '<div><span class="swatch" style="--dot:var(--c-status)"></span>Status <code>0x' + hx(b3) + '</code> — '
-      +       (r.ok ? '<span class="txt-ok">valid</span>' : '<span class="txt-bad">non-zero, treat the reading as corrupt</span>') + '</div>'
+      +     '<div><span class="swatch" style="--dot:var(--c-status)"></span>Time offset <code>0x' + hx(b3) + '</code> = '
+      +       '<span class="val">' + b3 + ' s</span> — held ' + b3 + ' s before the frame was exported'
+      +       (recStamp(r.frame, r) != null ? ', so it was taken at <b>' + esc(readingWhen(r.frame, r.offset).text) + '</b>' : '')
+      +       (r.ok ? '' : ' · <span class="txt-bad">the frame around it does not add up, so the reading is not vouched for</span>') + '</div>'
       +   '</div>'
       + '</div></div>';
+  }
+
+  // A self-report's report: its readings by sensor, or — for a type this tab
+  // does not read — its name and its bytes, kept.
+  function reportBlock(f, rep, i, res) {
+    let html = '<div class="a2-rec" data-rec="r' + i + '">'
+      + '<div class="a2-rec-head">' + esc(rep.name) + ' <span class="spec">type ' + rep.type + ', ' + rep.len
+      + ' byte' + (rep.len === 1 ? '' : 's') + ' at payload byte ' + rep.off + ' · <code>' + rep.bytes.map(hx).join(' ') + '</code></span></div>'
+      + '<div class="a2-rec-body"><div class="a2-rec-maths">';
+    if (rep.kept) html += '<div class="spec">Kept as its bytes — not a report type this tab reads, and not an error.</div>';
+    rep.sensors.forEach(x => {
+      const info = res.byA2 ? res.byA2.get(a2Key(x.source, x.sensor)) : null;
+      const st = info && info.chosen ? info.chosen.station : null;
+      const eng = a2Eng(x, info ? info.kind : null, st);
+      html += '<div><span class="swatch" style="--dot:var(--c-addr)"></span>Sensor <b>' + x.sensor + '</b>'
+        + (x.name ? ' <span class="spec">(' + esc(x.name) + (x.sensor <= 8 ? ', the spec\'s usual ID' : '') + ')</span>' : '')
+        + ' · format <code>0x' + hx(x.fl) + '</code> ' + esc(x.type)
+        + ' = <span class="val">' + esc(a2ValueText(x)) + '</span>'
+        + (eng ? ' &nbsp;<b>' + esc(eng.text) + '</b> <span class="spec">(' + esc(eng.rule) + ')</span>' : '')
+        + (x.tips ? ' <span class="spec">· ' + x.tips.length + ' tip' + (x.tips.length === 1 ? '' : 's') + ' this period'
+            + (x.tips.length ? ', ' + x.tips.join(', ') + ' s before the report' : '') + '</span>' : '')
+        + ' &nbsp;' + (info ? stationCell(info) : '') + typeCellInline(info)
+        + ' <span class="spec">· stored as <code>a2:' + esc(a2Key(x.source, x.sensor)) + '</code></span>' + '</div>';
+    });
+    return html + '</div></div></div>';
   }
 
   function typeCellInline(info) {
     if (!info || !info.chosen || !info.chosen.types.length) return '';
     return ' <span class="spec">' + esc(info.chosen.types.join(', ')) + '</span>';
+  }
+
+  // The frame's time, as short as it can be said: the clock time it was placed
+  // at, or the half-day count alone where there is nothing to place it against.
+  function frameTimeText(f) {
+    if (!f.payload || f.payload.stamp == null) return 'no stamp';
+    if (f.time && f.time.ms != null) return clockText(f.time.ms).slice(11);
+    return hms(f.payload.stamp) + ' into the half-day';
+  }
+
+  function controlText(c) {
+    return 'Control byte <code>0x' + hx(c.byte) + '</code>: version ' + c.version + ', '
+      + (c.ts ? 'a time stamp follows' : 'no time stamp') + ', '
+      + (c.test ? '<b>test data</b> (sent while the site was set up or serviced)' : 'not test data') + ', '
+      + (c.apdu === 7 ? 'PDU id off' : 'PDU id ' + c.apdu)
+      + (c.ext ? ', a second control byte <code>0x' + hx(c.byte2) + '</code> follows' : '') + '.';
+  }
+
+  // The stamp, and where it lands against the receiver's clock (placeStamp).
+  function stampText(f) {
+    const t = f.payload.stamp;
+    if (t == null) return 'The frame carries no time stamp of its own'
+      + (f.hdr.clockMs ? ', so it is timed by when the receiver says it arrived, <b>' + clockText(f.hdr.clockMs) + '</b>.' : '.');
+    let out = 'Time stamp <b>' + hms(t) + '</b> into the half-day (' + t + ' s since the most recent 00:00 or 12:00).';
+    if (!f.hdr.clockMs) return out;
+    const p = f.time;
+    out += ' The receiver says it arrived at <b>' + clockText(f.hdr.clockMs) + '</b>';
+    if (p && p.base === 'local')       out += ', which puts it at <b>' + clockText(p.ms) + '</b>, counting from the same 00:00 and 12:00 as the receiver\'s clock.';
+    else if (p && p.base === 'utc')    out += ', which puts it at <b>' + clockText(p.ms) + '</b> — counting from UTC\'s 00:00 and 12:00, this computer\'s UTC offset away from the receiver\'s clock.';
+    else if (p && p.base === 'either') out += ', which puts it at <b>' + clockText(p.ms) + '</b>. This computer is on UTC (or twelve hours from it), so the frame cannot say whether the stamp is UTC or local time.';
+    else out += ' — more than ten minutes from where the stamp lands on either UTC\'s half-days or local time\'s, so one of the two clocks is wrong.';
+    return out;
+  }
+
+  // What the header says beyond the fixed fields: a destination, a PDU id, the
+  // repeaters a copy came through.
+  function headerText(f) {
+    const h = f.hdr, bits = [];
+    if (h.hopLimit != null) bits.push('hop limit ' + h.hopLimit + (h.hopLimit === 7 ? ' (no limit)' : ''));
+    if (h.dest != null) bits.push('destination ' + h.dest);
+    if (h.pduId != null) bits.push('PDU ID ' + h.pduId);
+    if (h.path) bits.push(h.path.length ? 'came through ' + h.path.join(' → ') : 'add-path asked, no repeater yet');
+    return bits.length ? ' Header: ' + bits.join(' · ') + '.' : '';
   }
 
   function frameCard(f, res, open) {
@@ -1180,12 +1680,18 @@ const Alert2 = (function () {
 
     const bin = f.kind === 'bin';
     if (bin) badges.push('<span class="badge ok" title="Read from the binary framing the USB port emits">USB</span>');
+    const self = f.hdr.port === PORT_SELF;
+    if (self) badges.push('<span class="badge" title="Port 0 — an ALERT2 gauge\'s own report">self-report</span>');
+    if (f.payload && f.payload.ctl.test)
+      badges.push('<span class="badge warn" title="The control byte\'s test flag: sent while the site was being set up or serviced">test</span>');
 
+    const n = f.records.length + f.sensors.length;
     const summary = f.error
       ? esc(f.error)
-      : hms(f.payload.sod) + ' · ' + f.records.length + ' reading' + (f.records.length === 1 ? '' : 's')
+      : frameTimeText(f) + ' · ' + n + ' reading' + (n === 1 ? '' : 's')
         + (f.hdr.rssi != null ? ' · ' + f.hdr.rssi + ' dBm' : '')
-        + ' · ' + f.records.map(r => r.alertId + ':' + r.value).join('  ');
+        + ' · ' + f.records.map(r => r.alertId + ':' + r.value)
+                   .concat(f.sensors.map(x => 'a2:' + a2Key(x.source, x.sensor) + '=' + a2ValueText(x))).join('  ');
 
     let body = '<div class="a2-raw"><code>' + esc(f.raw) + '</code></div>';
     if (f.prefix) {
@@ -1204,18 +1710,19 @@ const Alert2 = (function () {
               + 'constant across every frame cross-checked against Ranger, so their meaning is recorded but not established.</div>';
       } else {
         body += '<h5 class="a2-h">Header fields</h5>' + fieldChips(f);
-        body += '<div class="spec">Faded chips are fields that were constant across every frame in the reference capture, so their meaning is recorded but not established.</div>';
+        body += '<div class="spec">Every field named from the ALERT2 IND API v1.1 §5.2 — hover a chip for what it says.</div>';
       }
-      body += '<h5 class="a2-h">Payload — ALERT concentration, ' + f.payload.bytes.length + ' bytes</h5>' + payloadStrip(f);
-      body += '<div class="spec">Frame time <b>' + hms(f.payload.sod) + '</b> (' + f.payload.sod
-            + ' s since midnight, from the two time bytes). '
+      const what = self ? 'self-report' : f.hdr.port === PORT_CONC || f.hdr.port == null ? 'ALERT concentration' : 'port ' + f.hdr.port;
+      body += '<h5 class="a2-h">Payload — ' + what + ', ' + f.payload.bytes.length + ' bytes</h5>' + payloadStrip(f);
+      body += '<div class="spec">' + controlText(f.payload.ctl) + ' ' + stampText(f)
             + (bin
-                ? 'Received at <b>' + (f.hdr.rssi != null ? f.hdr.rssi + ' dBm' : 'an unreported level')
-                  + '</b>. This framing carries no receiver clock, so the payload time is the only time in it.'
-                : 'ERT-A2 clock <b>' + clockText(f.hdr.clockMs) + '</b>.')
-            + '</div>';
+                ? ' Received at <b>' + (f.hdr.rssi != null ? f.hdr.rssi + ' dBm' : 'an unreported level')
+                  + '</b>. This framing carries no receiver clock, so the payload\'s stamp is the only time in it.'
+                : '')
+            + headerText(f) + '</div>';
       body += f.records.map((r, i) => recordBlock(r, i, res)).join('');
-      if (!f.records.length) body += '<p class="spec">No complete readings in this payload.</p>';
+      body += f.reports.map((rep, i) => reportBlock(f, rep, i, res)).join('');
+      if (!f.records.length && !f.reports.length) body += '<p class="spec">No complete readings in this payload.</p>';
     }
     // A <details>, not a div with a click handler (#140): same reasoning as the
     // ALERT Packets cards — a div's onclick is a mouse-only affordance, where
@@ -1238,8 +1745,10 @@ const Alert2 = (function () {
     const rssis = p.frames.filter(f => !f.error && f.hdr.rssi != null).map(f => f.hdr.rssi);
     const chips =
         statChip(s.frames - s.errors, 'frames decoded')
-      + statChip(s.records, 'readings')
+      + statChip(s.records + (s.sensors || 0), 'readings')
       + statChip(res.byAlertId.size, 'ALERT addresses')
+      + (s.selfReports ? statChip(s.selfReports, 'self-reports') : '')
+      + (s.tests ? statChip(s.tests, 'test frames', 'warn') : '')
       + (rssis.length ? statChip(median(rssis) + ' dBm', 'median RSSI') : '')
       + statChip(res.unknown, 'unmatched addresses', res.unknown ? 'warn' : '')
       + statChip(res.ambiguous, 'need a choice', res.ambiguous ? 'warn' : '')
@@ -1282,6 +1791,7 @@ const Alert2 = (function () {
               + s.skewN + ' frame' + (s.skewN === 1 ? '' : 's') + spread + '. '
               + 'The frame time comes from the transmitting network and the header time from the receiver\'s own RTC, '
               + 'so it is the unit\'s clock that needs setting — not the readings.')
+        + ' ' + basesText(s.bases)
         + '</div>';
     }
 
@@ -1311,6 +1821,26 @@ const Alert2 = (function () {
         ${anchors}
         ${clock}
       </div>`;
+  }
+
+  // Which half-days the frame stamps count from, against the receiver's clock
+  // (placeStamp). The receiver's clock is read as this computer's local time,
+  // so "the same half-days" is the stamp agreeing with that clock, and "UTC's"
+  // is the two being this computer's UTC offset apart. The Serial Monitor,
+  // which holds the stamps against this computer's own clock, can say UTC or
+  // local outright — #157 Part 5 is that question.
+  function basesText(b) {
+    if (!b) return '';
+    const n = b.local + b.utc + b.either;
+    if (!n) return '';
+    const fr = k => k + ' frame' + (k === 1 ? '' : 's');
+    if (b.either && !b.local && !b.utc)
+      return 'This computer is on UTC (or twelve hours from it), so this capture cannot say whether the stamps are UTC or local time.';
+    const parts = [];
+    if (b.local) parts.push('<b>' + fr(b.local) + '</b> count from the same 00:00 and 12:00 as the receiver\'s clock');
+    if (b.utc) parts.push('<b>' + fr(b.utc) + '</b> from UTC\'s, this computer\'s UTC offset away from it — so one of the two keeps UTC and the other local time, and the spec says the stamps are UTC');
+    if (b.none) parts.push(fr(b.none) + ' land more than ten minutes from both');
+    return 'Frame stamps count seconds from the most recent 00:00 or 12:00: ' + parts.join('; ') + '.';
   }
 
   // Columns only one of the two formats can fill are dropped when the capture is
@@ -1350,16 +1880,19 @@ const Alert2 = (function () {
       + '<caption class="sr-only">Decoded readings — one row per reading, in capture order</caption>'
       + '<thead><tr>'
       + '<th scope="col">FRAME TIME</th>' + (c.clock ? '<th scope="col">ERT-A2 CLOCK</th>' : '')
-      + '<th scope="col">ALERT ID</th><th scope="col">STATION</th><th scope="col">SENSOR</th><th scope="col">VALUE</th>'
+      + '<th scope="col">ID</th><th scope="col">STATION</th><th scope="col">SENSOR</th><th scope="col">VALUE</th>'
       + (c.rssi ? '<th scope="col">RSSI</th>' : '') + '<th scope="col">' + (p.stats.mode === 'bin' ? 'FRAME' : 'LINE') + '</th>'
       + '</tr></thead><tbody>';
     shown.forEach(row => {
+      const w = readingWhen(row.f, row.x ? 0 : row.r.offset);
+      const id = row.x ? 'a2:' + a2Key(row.x.source, row.x.sensor) : row.r.alertId;
       html += '<tr' + rowAttrs(row.key, row.r.ok ? '' : 'a2-badrow') + '>'
-        + '<td><code>' + hms(row.f.payload.sod) + '</code></td>'
+        + '<td><code>' + esc(w.text) + '</code>'
+        + (row.f.payload.ctl.test ? ' <span class="badge warn" title="Sent as test data">test</span>' : '') + '</td>'
         + (c.clock ? '<td><span class="spec">' + esc(clockText(row.f.hdr.clockMs)) + '</span></td>' : '')
-        + '<td>' + rowOpenBtn(row.key, '<b>' + row.r.alertId + '</b>') + '</td>'
+        + '<td>' + rowOpenBtn(row.key, '<b>' + esc(String(id)) + '</b>') + '</td>'
         + '<td>' + stationCell(row.info) + '</td>'
-        + '<td>' + typeCell(row.info) + '</td>'
+        + '<td>' + typeCell(row.info, row.x) + '</td>'
         + '<td>' + valueCell(row) + '</td>'
         + (c.rssi ? '<td>' + rssiCell(row.f.hdr.rssi) + '</td>' : '')
         + '<td><button type="button" class="link-btn a2-link" onclick="event.stopPropagation();Alert2.openFrame(' + row.f.seq + ')" '
@@ -1379,23 +1912,23 @@ const Alert2 = (function () {
   function stationsView(p, res) {
     const c = cols(p);
     const roll = stationRollup(p, res);
-    let html = '<p class="sub">One row per ALERT address heard, newest value last. This is the view that answers '
+    let html = '<p class="sub">One row per ALERT address or ALERT2 sensor heard, newest value last. This is the view that answers '
              + '“is that station still reporting, and what is it saying”'
              + (c.rssi ? ' — and, from the USB capture, how well it is being heard.' : '.') + '</p>'
              + '<div class="table-wrap a2-tablewrap"><table class="fields a2-table">'
              + '<caption class="sr-only">Stations heard — one row per ALERT address, newest value last</caption>'
              + '<thead><tr>'
-             + '<th scope="col">ALERT ID</th><th scope="col">STATION</th><th scope="col">SENSOR</th><th scope="col">HEARD</th>'
+             + '<th scope="col">ID</th><th scope="col">STATION</th><th scope="col">SENSOR</th><th scope="col">HEARD</th>'
              + '<th scope="col">FIRST → LAST</th><th scope="col">RANGE</th><th scope="col">LATEST</th>'
              + (c.rssi ? '<th scope="col">RSSI MEDIAN</th><th scope="col">BEST / WORST</th>' : '')
              + '</tr></thead><tbody>';
     roll.forEach(e => {
       html += '<tr' + rowAttrs(e.key) + '>'
-        + '<td>' + rowOpenBtn(e.key, '<b>' + e.aid + '</b>') + '</td>'
+        + '<td>' + rowOpenBtn(e.key, '<b>' + esc(String(e.aid)) + '</b>') + '</td>'
         + '<td>' + stationCell(e.info) + '</td>'
-        + '<td>' + typeCell(e.info) + '</td>'
+        + '<td>' + typeCell(e.info, e.a2) + '</td>'
         + '<td>' + e.n + '</td>'
-        + '<td><code>' + hms(e.first) + '</code> → <code>' + hms(e.last) + '</code></td>'
+        + '<td><code>' + esc(e.first ? e.first.text : '—') + '</code> → <code>' + esc(e.last ? e.last.text : '—') + '</code></td>'
         + '<td><span class="spec">' + e.min + ' – ' + e.max + '</span></td>'
         + '<td><span class="val">' + e.lastVal + '</span>'
         + (e.eng ? ' <span class="spec">' + esc(e.eng.text) + '</span>' : '') + '</td>'
@@ -1480,6 +2013,18 @@ const Alert2 = (function () {
         let e = by.get(st.id);
         if (!e) by.set(st.id, e = { st, key: selKey(st, r.alertId), aids: new Set(), n: 0, rssi: [], conf: info.conf });
         e.aids.add(r.alertId);
+        e.n++;
+        if (f.hdr.rssi != null) e.rssi.push(f.hdr.rssi);
+      });
+      f.sensors.forEach(x => {
+        if (!x.ok) return;
+        const info = res.byA2 ? res.byA2.get(a2Key(x.source, x.sensor)) : null;
+        const st = info && info.chosen ? info.chosen.station : null;
+        if (!st || st.lat == null || st.lon == null) return;
+        const id = 'a2:' + a2Key(x.source, x.sensor);
+        let e = by.get(st.id);
+        if (!e) by.set(st.id, e = { st, key: selKey(st, id), aids: new Set(), n: 0, rssi: [], conf: info.conf });
+        e.aids.add(id);
         e.n++;
         if (f.hdr.rssi != null) e.rssi.push(f.hdr.rssi);
       });
@@ -1590,7 +2135,7 @@ const Alert2 = (function () {
   }
 
   function mapPopup(e) {
-    const ids = [...e.aids].sort((x, y) => x - y).join(', ');
+    const ids = [...e.aids].sort((x, y) => String(x).localeCompare(String(y), undefined, { numeric: true })).join(', ');
     return '<b>' + esc(e.st.name) + '</b>'
       + (e.st.station_number ? '<br><span class="spec">' + esc(e.st.station_number) + '</span>' : '')
       + '<br>' + e.n + ' reading' + (e.n === 1 ? '' : 's') + ' on address' + (e.aids.size === 1 ? ' ' : 'es ') + ids
@@ -1677,9 +2222,8 @@ const Alert2 = (function () {
             <ul class="pkt-cheat">
               <li><b>Gives you</b> the receiver's clock, so a frame can be dated as well as timed, and a line that
                 reads as text in any terminal.</li>
-              <li><b>Does not give you RSSI.</b> None of the 24 fields is a signal level; field 22 is a reception
-                quality that read 7 on every good frame in a 444-frame capture and 1 on the bad one, which is a
-                health flag, not a measurement in dBm.</li>
+              <li><b>Does not give you RSSI.</b> None of the 24 fields is a signal level, and none is a verdict on the
+                frame: field 18 is the MANT port and field 22 the hop limit (ALERT2 IND API v1.1 §5.2).</li>
               <li><b>Capture it with</b> PuTTY or any terminal on the RS232 port, and paste or load the log.</li>
             </ul>
           </div>
@@ -1694,7 +2238,7 @@ const Alert2 = (function () {
                 −108 dBm.</li>
               <li><b>Does not give you the receiver's clock.</b> There is no date or time of day in the framing at
                 all; Ranger stamps its own display from the PC. The only time in a binary capture is the payload's
-                own seconds-since-midnight.</li>
+                own time stamp, seconds into the half-day.</li>
               <li><b>Capture it with</b> a terminal on the USB port, or by copying the hex straight out of Ranger's
                 Serial Data pane. Paste it here — space-delimited, run together, wrapped mid-frame, it does not
                 matter, because the frames are found by the <code>ALERT2</code> sync rather than by the line breaks.</li>
@@ -1713,9 +2257,11 @@ const Alert2 = (function () {
         <details>
           <summary class="pkt-summary">Method 1 — ALERT2 ASCII protocol, field reference</summary>
 
-          <p class="spec">Every line is <code>ALERT2A</code>, 23 more fixed fields, then the frame payload as
-            hex bytes — one field per byte. Field 23 gives the payload length, which is what distinguishes a
-            complete line from one the terminal wrapped or cut short.</p>
+          <p class="spec">Every line is the IND API's MANT PDU string (ALERT2 IND API v1.1 §5.2): <code>ALERT2A</code>,
+            23 more fixed fields, then — only when fields 17, 14 and 16 say so — a destination address, a MANT PDU ID
+            and a count of repeater addresses followed by the addresses, and then the frame payload as hex bytes, one
+            field per byte. Field 23 gives the payload length, which is what distinguishes a complete line from one
+            the terminal wrapped or cut short.</p>
 
           <div class="table-wrap a2-tablewrap"><table class="fields a2-table">
             <caption class="sr-only">The 24 fields of an ALERT2 ASCII line, in order, with how well each meaning is established</caption>
@@ -1765,41 +2311,61 @@ const Alert2 = (function () {
         <details>
           <summary class="pkt-summary">Shared by both — the payload, and what the readings mean</summary>
 
-          <h4 class="a2-h">Payload — ALERT concentration</h4>
+          <h4 class="a2-h">Payload — the control byte and the time stamp</h4>
           <ul class="pkt-cheat">
-            <li>Byte 1 — <b>0x74</b>, the element type. Every frame observed carried this one; ELPRO's Ranger
-              labels the same traffic <em>ALERT (Conc)</em>. Any other value is reported rather than guessed at.</li>
-            <li>Bytes 2–3 — <b>seconds since midnight</b>, big-endian, of the originating ALERT2 frame. Checked
-              against Ranger's own “Received:” column, which matched to the second on every frame compared.
-              Sixteen bits only reach 18:12:15, so a frame later in the day must carry the time some other way;
-              the reference capture ends before that and cannot say how.</li>
-            <li>Bytes 4 on — <b>four bytes per reading</b>, repeated to the end of the payload. A frame carries
-              one to four readings, usually the rainfall, water level and battery of one field station.</li>
+            <li>Byte 1 — the <b>application control byte</b> (Application Layer v1.3 §2.1.1, §3.2.1): bits 0–1 the
+              version (0), bit 2 a time stamp follows, bit 3 <b>test data</b> — sent while a site is set up or
+              serviced — bits 4–6 an optional PDU id (7 is off), bit 7 a second control byte follows.
+              <code>0x74</code>, on almost every frame, is version 0 with a stamp, not test, PDU id off;
+              <code>0x7C</code> is the same flagged as test; <code>0x70</code> carries no stamp.</li>
+            <li>Then, when bit 2 says so, the <b>time stamp</b>: sixteen bits of seconds since the most recent 00:00
+              or 12:00 — a half-day count, because sixteen bits cannot hold a day. The spec says UTC. Whether this
+              network keeps UTC or local time is the open question in #157, so the tab puts the stamp on the
+              half-day nearest when the receiver says the frame arrived, in both, and says which one fits.</li>
+            <li>Then, by the port the header names: <b>ALERT concentration</b> records (port 1), or the
+              <b>self-report</b> a gauge sends of its own sensors (port 0).</li>
           </ul>
 
-          <h4 class="a2-h">One reading, four bytes</h4>
+          <h4 class="a2-h">ALERT concentration — one reading, four bytes</h4>
           <ul class="pkt-cheat">
             <li><code>byte 0</code> — ALERT address, low 8 bits.</li>
             <li><code>byte 1</code> — <code>DDDAAAAA</code>: value bits 10–8 on top, address bits 12–8 below.
               This is the only part of the encoding that is not obvious by eye — a byte that looks like part of
               the address is carrying the top of the value as well.</li>
             <li><code>byte 2</code> — value, low 8 bits.</li>
-            <li><code>byte 3</code> — status. 0 on all 541 valid readings in the reference capture; the four
-              non-zero ones sat in the single frame the receiver had already flagged bad, and decoded to
-              addresses no station has.</li>
+            <li><code>byte 3</code> — <b>time offset</b>: the seconds the repeater held the reading before it
+              exported the frame (§3.3.2), so the reading's own time is the stamp less this. Not a status — no part
+              of a record says whether it is good.</li>
             <li>So address is 13 bits (0–8191) and value 11 bits (0–2047) — the same widths a legacy ALERT
               sensor transmits, which is why the ALERT Packets tab decodes one of these records to the same
-              id and value under its <b>A2C</b> layout.</li>
+              id and value under its <b>A2C</b> layout. A frame carries one reading or many, repeated to the end
+              of the payload, usually the rainfall, water level and battery of one field station.</li>
+          </ul>
+
+          <h4 class="a2-h">Self-reports — an ALERT2 gauge's own readings</h4>
+          <ul class="pkt-cheat">
+            <li>One or more reports, each a type, a length (one byte to 127; above that the top bit is set and the
+              length is the next fifteen bits) and that many bytes (§2.1).</li>
+            <li><b>Type 1, the General Sensor Report</b> (§2.2): sensor id, a format/length byte, the value — again and
+              again. The format is the high nibble: 1 unsigned, 2 signed, 3 floating point (FP2, IEEE single or
+              double), 4 text; the low nibble is how many bytes. Sensor ids 0–8 are usually rain, air temperature,
+              humidity, pressure, wind speed, direction and gust, stage and battery voltage — recommended by the spec,
+              not required, so a station's own record of its sensors wins.</li>
+            <li><b>Type 2, the tipping bucket</b> (§2.3): sensor id, format/length, the bucket's running count, then a
+              byte per tip in the period — seconds before the report.</li>
+            <li>Any other type is shown as its bytes, named, and is not an error. Each value is stored under the
+              gauge's own ALERT2 address and its sensor id, <code>a2:&lt;gauge&gt;/&lt;sensor&gt;</code> — the
+              identity Flood-Net keeps relayed ALERT2 readings under (0024).</li>
           </ul>
 
           <h4 class="a2-h">How this was established</h4>
-          <p class="spec">A 444-frame capture from a test ERT-A2 was decoded and compared against the same
-            traffic decoded by ELPRO's Ranger software. All 444 payload lengths matched the field count; every
-            payload after the three-byte header was a whole number of four-byte records; addresses and values
-            matched Ranger's decoded output record for record, including multi-reading frames; and the payload
-            times matched Ranger's received times exactly. 339 of the 348 addresses heard matched a station in
-            Flood-Net. Fields with no such evidence behind them are marked “constant only” above, and the
-            engineering scales below are interpretations, not part of the protocol.</p>
+          <p class="spec">From the NHWC specifications: ALERT2 IND API v1.1 §5.2 (Feb 2016) for the line, MANT v1.2
+            Fig 2-2 (Jan 2025) for the header bits, and Application Layer v1.3 §2–3 (Nov 2019) for the payload. They
+            were checked against a 444-frame capture from a test ERT-A2 and the same traffic decoded by ELPRO's Ranger
+            software: addresses, values and times matched Ranger's record for record. The one frame of the 444 the
+            first decoder called corrupt is the test rig's own General Sensor Report — port 0, hop limit 1: battery
+            129, stage −1247, rain 8 — byte for byte. 339 of the 348 addresses heard matched a station in Flood-Net.
+            The engineering scales below are interpretations, not part of the protocol.</p>
 
           <h4 class="a2-h">Engineering values</h4>
 
@@ -1857,8 +2423,9 @@ const Alert2 = (function () {
   // ── sample ────────────────────────────────────────────────────────────────────
   // Real lines from a test ERT-A2, chosen to exercise every ingest path: plain
   // frames, a multi-reading frame, a line the terminal wrapped, a PuTTY banner
-  // dropped mid-capture, a line carrying a terminal timestamp, the one corrupt
-  // frame from the reference capture, and a line cut off at the end of the log.
+  // dropped mid-capture, a line carrying a terminal timestamp, the rig's own
+  // self-report, and a line cut off at the end of the log. Every one was
+  // received after noon, so every stamp counts from 12:00.
   const SAMPLE = [
     'ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00',
     'ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,28,32.582,0,0,0,0,0,1,0,0,0,7,11,9999,74,69,20,2D,13,8A,00,2C,13,0C,00',
@@ -1869,8 +2436,9 @@ const Alert2 = (function () {
     ',1E,08,02,00',
     '[2026-06-08 19:39:43.586] ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,39,43.586,0,0,0,0,0,1,0,0,0,7,15,9999,74,6B,BE,65,08,86,00,66,C8,2F,00,69,08,00,00',
     'ALERT2A,1,9999,ELPRO,N,1,2026,6,8,20,19,13.761,0,0,0,0,0,1,0,0,0,7,11,9999,74,75,00,B5,08,84,00,24,08,08,00',
-    // The one frame in 444 the receiver flagged bad: field 18 reads 0, field 22
-    // drops to 1, and every reading in it carries a non-zero status byte.
+    // The one frame in 444 the first decoder called corrupt, and it is not: port
+    // 0 (field 18), hop limit 1 (field 22), and a General Sensor Report — the
+    // test rig's battery 129, stage −1247 and rain 8 (#209).
     'ALERT2A,1,9999,ELPRO,N,1,2026,6,8,20,51,10.161,0,0,0,0,0,0,0,0,0,1,19,9999,74,7C,7E,01,0E,08,11,81,07,23,FF,FB,21,00,14,00,00,00,08',
     'A=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.08.10 14:35:06 =~=~=~=~=~=~=~=~=~=~=~=',
     'ALERT2A,1,9999,ELPRO,N,1,2026,6,8,21,14,57.981,0,0,0,0,0,1,0,0,0,7,7,9999,74,86,1C,0E,10,0A,00',
@@ -2230,45 +2798,71 @@ const Alert2 = (function () {
     if (!p) return [];
     const res = resolve(p);
     const out = [];
-    // The frame carries a time of day but no date, and the receiver carries a
-    // date but a clock that may be hours out. Pairing the receiver's date with
-    // the frame's time of day is exact for the time and right for the date on
-    // any frame whose clock error does not straddle midnight — which beats
-    // correcting everything by one capture-wide offset when that offset drifts.
-    const stamp = f => {
-      if (!f.hdr.clockMs || !f.payload) return '';
-      const d = new Date(f.hdr.clockMs);
-      d.setHours(0, 0, 0, 0);
-      return isoText(d.getTime() + f.payload.sod * 1000);
+    // The stamp put on the half-day the receiver's clock says it arrived in
+    // (placeStamp) — or, where it lands more than ten minutes from that clock
+    // on both UTC's half-days and local time's, on the receiver's own half-day,
+    // so a clock that is out still dates the readings, and stamp_base says so.
+    const when = (f, offset) => {
+      if (!f.time) return '';
+      const ms = f.time.ms != null ? f.time.ms : f.time.local;
+      return isoText(ms - (offset || 0) * 1000);
     };
+    const common = f => ({
+      format: f.kind === 'bin' ? 'usb-binary' : 'rs232-ascii',
+      line: f.lineNo,
+      ert_a2_clock: isoText(f.hdr.clockMs),
+      stamp_base: f.time ? (f.time.base || 'none') : '',
+      decoder: f.hdr.decoder == null ? '' : f.hdr.decoder,
+      source: f.hdr.source == null ? '' : f.hdr.source,
+      port: f.hdr.port == null ? '' : f.hdr.port,
+      hop_limit: f.hdr.hopLimit == null ? '' : f.hdr.hopLimit,
+      path: f.hdr.path ? f.hdr.path.join(' ') : '',
+      test: f.payload && f.payload.ctl.test ? 'yes' : '',
+      rssi_dbm: f.hdr.rssi == null ? '' : f.hdr.rssi,
+    });
+    const place = (info, st) => ({
+      station: st ? st.name : (info && info.fileName && !info.fileName.none ? info.fileName.text : ''),
+      station_number: st ? (st.station_number || '') : '',
+      lat: st && st.lat != null ? st.lat : '',
+      lon: st && st.lon != null ? st.lon : '',
+      match: info ? info.conf : 'unknown',
+      sensor: info && info.chosen ? info.chosen.types.join(' / ') : '',
+    });
     p.frames.forEach(f => {
       if (f.error) return;
       f.records.forEach(r => {
         const info = res.byAlertId.get(r.alertId);
         const st = info && info.chosen ? info.chosen.station : null;
         const eng = engValue(info ? info.kind : null, r.value, st);
-        out.push({
-          format: f.kind === 'bin' ? 'usb-binary' : 'rs232-ascii',
-          line: f.lineNo,
-          frame_time: hms(f.payload.sod),
-          ert_a2_clock: isoText(f.hdr.clockMs),
-          alert2_datetime: stamp(f),
-          decoder: f.hdr.decoder == null ? '' : f.hdr.decoder,
-          source: f.hdr.source == null ? '' : f.hdr.source,
-          quality: f.hdr.quality == null ? '' : f.hdr.quality,
-          rssi_dbm: f.hdr.rssi == null ? '' : f.hdr.rssi,
-          alert_id: r.alertId,
-          station: st ? st.name : (info && info.fileName && !info.fileName.none ? info.fileName.text : ''),
-          station_number: st ? (st.station_number || '') : '',
-          lat: st && st.lat != null ? st.lat : '',
-          lon: st && st.lon != null ? st.lon : '',
-          match: info ? info.conf : 'unknown',
-          sensor: info && info.chosen ? info.chosen.types.join(' / ') : '',
+        const t = recStamp(f, r);
+        out.push(Object.assign({ frame_time: t == null ? '' : readingWhen(f, r.offset).text, stamp_s: t == null ? '' : t,
+                                 alert2_datetime: when(f, r.offset) }, common(f), {
+          alert_id: r.alertId, a2_sensor: '',
+        }, place(info, st), {
           value: r.value,
           engineering: eng ? eng.text : '',
-          status: '0x' + hx(r.status),
+          time_offset_s: r.offset,
+          ok: r.ok ? 'yes' : 'no',
           bytes: r.bytes.map(hx).join(' '),
-        });
+        }));
+      });
+      f.sensors.forEach(x => {
+        const info = res.byA2 ? res.byA2.get(a2Key(x.source, x.sensor)) : null;
+        const st = info && info.chosen ? info.chosen.station : null;
+        const eng = a2Eng(x, info ? info.kind : null, st);
+        const pl = place(info, st);
+        if (!pl.sensor && x.name) pl.sensor = x.name;
+        out.push(Object.assign({ frame_time: f.payload.stamp == null ? '' : readingWhen(f, 0).text,
+                                 stamp_s: f.payload.stamp == null ? '' : f.payload.stamp,
+                                 alert2_datetime: when(f, 0) }, common(f), {
+          alert_id: '', a2_sensor: x.sensor,
+        }, pl, {
+          value: x.text != null ? x.text : x.value == null ? '' : x.value,
+          engineering: eng ? eng.text : '',
+          time_offset_s: '',
+          ok: x.ok ? 'yes' : 'no',
+          bytes: x.bytes.map(hx).join(' '),
+        }));
       });
     });
     return out;
@@ -2289,8 +2883,9 @@ const Alert2 = (function () {
     dlText('alert2-readings.json', JSON.stringify({
       generated: new Date().toISOString(),
       capture: { format: p.stats.mode === 'bin' ? 'usb-binary' : 'rs232-ascii',
-                 frames: p.stats.frames, records: p.stats.records, errors: p.stats.errors,
-                 clock_skew_seconds: p.stats.skew,
+                 frames: p.stats.frames, records: p.stats.records, self_report_values: p.stats.sensors || 0,
+                 errors: p.stats.errors,
+                 clock_skew_seconds: p.stats.skew, stamp_bases: p.stats.bases,
                  rssi_dbm: rssis.length
                    ? { n: rssis.length, median: median(rssis), best: Math.max(...rssis), worst: Math.min(...rssis) }
                    : null },
@@ -2349,6 +2944,7 @@ const Alert2 = (function () {
            // for the Serial Monitor's ERT-A2 card (serial-ert.js), which decodes
            // the same two wire formats as they arrive rather than pasted whole
            parseBinBytes, hexStream, resolve, engValue, stationCell, rssiCell,
+           placeStamp, a2Key, a2Eng, a2ValueText, PORT_SELF, PORT_CONC,
            samples: () => ({ ascii: SAMPLE, bin: SAMPLE_BIN }) };
 })();
 

@@ -2615,7 +2615,7 @@ specification (July 2003).
   to highlight its bits).
 - **A2C** — a fifth layout, offered for 32-bit input only: the four-byte form the same address and
   value take inside an ALERT2 concentration payload, as delivered by an ELPRO ERT-A2. No framing and
-  no CRC — its integrity claim is a status byte that reads 0 on every valid record. Whole serial
+  no CRC, and no check of its own: the fourth byte is a time offset, not a status. Whole serial
   lines are decoded on the ALERT2 / ERT-A2 tab; this page decodes one reading at a time.
 - **Encode** — pick a format, enter the sensor ID and raw value(s), and get the message back
   (40-bit framed, 32-bit payload and hex) with CRC/FCS computed automatically. ABF, BCC, EAF and EIF
@@ -3808,8 +3808,12 @@ been given.
 #### Two ways in
 
 **1 · ALERT2 ASCII protocol — secondary RS232 port.** One comma-delimited line
-per received frame: 24 fixed fields of receiver metadata, including the unit's
-own real-time clock, then the frame payload as hex bytes.
+per received frame — the NHWC ALERT2 IND API's MANT PDU string (v1.1 §5.2): 24
+fixed fields of receiver and MANT header, including when the receiver's own clock
+says the frame arrived, then the frame payload as hex bytes. Field 18 is the
+**port** (1 ALERT concentration, 0 a gauge's own self-report) and field 22 the
+**hop limit** — neither is a verdict on the frame, and nothing in the line is
+(#209).
 
 ```
 ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00
@@ -3828,7 +3832,7 @@ bytes, a length, then tag/length/value elements:
 | --- | --- | --- |
 | RSSI | — | **yes**, element `9C2F`, signed byte, dBm |
 | Receiver clock | yes | — (no date or time of day in the framing at all) |
-| Frame time | payload, seconds since midnight | same |
+| Frame time | payload, seconds since the most recent 00:00 or 12:00 | same |
 | Source, agency, payload | yes | yes |
 
 The binary frame nests two containers: `15` holds the air-link PDU as it landed
@@ -3844,17 +3848,38 @@ own reference says exactly that rather than claiming a secret command was found.
 
 #### The payload, on both
 
-The payload is an ALERT2 *ALERT concentration* element: type byte `0x74`, two
-bytes of seconds-since-midnight, then four bytes per reading. Each reading is
-the same 13-bit ALERT address and 11-bit value a legacy sensor transmits, packed
-into bytes rather than async words:
+The payload opens with an application **control byte** (Application Layer v1.3
+§2.1.1): the version, whether a time stamp follows, a **test** flag, an optional
+PDU id. `0x74` — stamp, not test — is almost every frame; `0x7C` is the same
+flagged as test data, sent while a site is set up or serviced, and `0x70` has no
+stamp. The **time stamp** is two bytes of seconds since the most recent 00:00 or
+12:00 — a half-day count, since sixteen bits cannot hold a day. The spec says
+UTC; whether this network keeps UTC or local time is the open question in #157,
+so the tab puts the stamp on the half-day nearest when the frame arrived, in
+both, and says which fits. The Serial Monitor's card, holding it against the
+computer's own clock, says UTC or local outright.
+
+Then, by the port: on port 1, **ALERT concentration** — four bytes per reading,
+each the same 13-bit ALERT address and 11-bit value a legacy sensor transmits,
+packed into bytes rather than async words:
 
 | Byte | Contents |
 | --- | --- |
 | 0 | address bits 7–0 |
 | 1 | `DDDAAAAA` — value bits 10–8, then address bits 12–8 |
 | 2 | value bits 7–0 |
-| 3 | status; `0` on every valid record observed |
+| 3 | time offset — seconds the repeater held the reading before export; not a status |
+
+On port 0, a **self-report**: an ALERT2 gauge's own report of its sensors, as
+type / length / value reports (§2.1). The General Sensor Report (sensor id, a
+format/length byte, the value — unsigned, signed, FP2 or IEEE float, text) and
+the tipping bucket report are read into values, stored under the gauge's address
+and the sensor's slot, `a2:<gauge>/<sensor>` (0024); any other type is shown as
+its bytes. The one frame of the reference capture the first decoder called
+corrupt is the test rig's General Sensor Report — battery 129, stage −1247, rain
+8. What makes a frame's readings untrustworthy is structure that does not add up
+— a payload longer or shorter than its header says, bytes left over — never a
+field.
 
 That last packed byte is the only part of the encoding that is not obvious by
 eye — a byte that looks like address is carrying the top of the value too — so

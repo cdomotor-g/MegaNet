@@ -552,20 +552,21 @@ program cannot parse what it is sending*, and those two have nothing in common.
 | `RxStep` | **The one to read.** The last step the pipeline completed — where this stops being what you expect is the step that is broken. |
 | `RxHex` | The first 40 bytes of the last frame, in hex. |
 | `FrLenByte`, `FrTotal` | Byte 7, and `6 + byte 7` — the whole frame length. |
-| `FrElemVia` | How the concentration element was found: `1` the `84 01 <len> 74` anchor, `2` the loose scan, **`0` neither, and the frame carries no element at all**. Read this first when a frame produces no readings. |
-| `FrElemOff`, `FrElemLen`, `FrTimeSecs` | Where the element starts, its length, and the seconds-since-midnight inside it. |
-| `FrRecords`, `FrGood`, `FrBad` | Four-byte records in the frame, how many decoded, and how many had a non-zero status byte or an impossible address. |
+| `FrElemVia` | How the concentration element was found: `1` the `84 01 <len>` anchor with a version-0 control byte behind it, `2` the loose scan, **`0` neither, and the frame carries no element at all**. Read this first when a frame produces no readings. |
+| `FrElemOff`, `FrElemLen`, `FrTimeSecs` | Where the element starts, its length, and the time stamp inside it — seconds since the most recent 00:00 or 12:00. |
+| `FrRecords`, `FrGood`, `FrBad` | Four-byte records in the frame, how many decoded, and how many had an impossible address or came while the clock was not set. A record's fourth byte is a time offset, not a status (v3.1, #209). |
+| `RxOtherPort` | Frames on a MANT port other than ALERT concentration — 0 is a gauge's self-report. Decoded by Flood-Net's ALERT2 tab and Serial Monitor; this program posts ALERT addresses only (v3.1). |
 | `RxLastRecHex` | The four bytes the last reading came out of — enough to redo the bit-unpacking by hand against the table in `ParseAlert2`. |
 | `RxLastId`, `RxLastValue` | And what they decoded to. |
 | `RxLastJson` | The reading as it will be posted, byte for byte. |
 | `RxFrames`, `RxReadings`, `RxBadFrames`, `RxBadRecords` | The running totals, all four in `Diag` every five minutes. |
 | `RxLastWhy`, `whyCode`, `RxLastBad` | Why the last frame or line was rejected, as a sentence, as a number, and the first 120 characters of the thing itself. |
-| `RxFrameSkew` | Seconds between the frame's own ALERT2 time and this logger's clock. See *Which clock stamps the reading*. |
+| `RxFrameSkew` | Seconds between the frame's own ALERT2 time and this logger's clock, within the half-day the stamp counts (v3.1). See *Which clock stamps the reading*. |
 
 `whyCode` is the reason as a number, which is what survives when the sentence is
-truncated: 1 short line, 2 frame flagged invalid, 3 payload length disagrees with
-the hex, 4 payload size, 5 not whole records, 6 payload not hex, 7 not a
-concentration element, 8 clock not set, 9 ALERT id out of range, 10 unrecognised
+truncated: 1 short line, 2 a repeater-path count that is not usable, 3 payload
+length disagrees with the hex, 4 payload size, 5 not whole records, 6 payload not
+hex, 7 a control byte that is not version 0, 8 clock not set, 9 ALERT id out of range, 10 unrecognised
 line, 12 fields are not numbers, 13 no element in frame, 14 element length is not
 whole records.
 
@@ -729,7 +730,8 @@ ERT-A2 at this base station does not emit the ALERT2 ASCII lines that
 | --- | --- |
 | Total frame = `6 + byte 7` | `0x56` → 92 bytes, `0x52` → 88 bytes. Exact on every reference frame. |
 | Byte 7 read as text is `V`, `R`, … | Which is why a terminal shows `ALERT2V` / `ALERT2R`, and why looking for the literal text `ALERT2A` never matched one. |
-| The readings sit behind `84 01 <len> 74` | Same offset in every reference frame, and `(len-3) MOD 4 = 0` on all of them. |
+| The readings sit behind `84 01 <len>` | Same offset in every reference frame. The byte after it is the application control byte — `0x74` on all of them, but any version-0 value is valid (`0x7C` test, `0x70` unstamped), so v3.1 reads any, and finds the records after the control byte and its stamp. |
+| The port is in the `84 00` header | Its second byte's top nibble: 1 ALERT concentration, 0 a gauge's self-report (v3.1, #209). |
 | The records are unchanged | Same four-byte shape the ASCII path decodes — so the table at `ParseAlert2` still applies. |
 
 Decoded, the reference frames give `alert_id 2439 = 140`, `2438 = 352` and
@@ -941,13 +943,14 @@ The base station's own, and this is a decision rather than a default.
 
 There are three clocks in play: this logger's, the ERT-A2's real-time clock
 (fields 7–12 of every ASCII line), and the ALERT2 frame time carried in the
-payload as seconds since midnight. The receiver's RTC is demonstrably not
-reliable — the 444-frame reference capture behind `alert2.js` has it twelve
-hours out, an AM/PM error on the unit. The frame time comes from the
-transmitting network and is the better of the two, but **nothing in the frame or
-in ELPRO's documentation says which zone it counts from**, and a base station
-that guessed wrong would silently shift every reading it ever posted by a whole
-number of hours.
+payload as seconds since the most recent 00:00 or 12:00. The "twelve hours out"
+the 444-frame reference capture once showed was the decoder's, not the unit's: it
+read that half-day count as seconds since midnight (#209), and read properly the
+receiver's clock agrees with the frame time to about a second. The frame time
+comes from the transmitting network and is the better of the two, but **which
+zone this network counts its half-days from is not established** — the spec says
+UTC, and #157 Part 5 is the field check — and a base station that guessed wrong
+would silently shift every reading it ever posted by a whole number of hours.
 
 So the reading is stamped with this logger's NTP-disciplined UTC clock at the
 moment the line arrives — receive latency at a base station is seconds — and the

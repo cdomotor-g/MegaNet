@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 14, date: '2026-10-08', items: [
+      '<strong>ALERT2 / ERT-A2</strong> now reads the receiver\'s lines by the ALERT2 specification. An ALERT2 '
+        + 'gauge\'s own report — battery, stage, rain and the rest — is decoded and sent instead of being thrown away '
+        + 'as corrupt, frames received after noon keep their own time instead of landing twelve hours early, and '
+        + 'test frames are shown as test. The Serial Monitor\'s ERT-A2 card does the same, and says whether the '
+        + 'network\'s time stamps are UTC or local time.',
+    ] },
     { n: 13, date: '2026-10-08', items: [
       '<strong>🚗 Directions</strong> on the station card, beside <em>Copy lat, lon</em>: one press opens driving '
         + 'directions to the station from wherever you are — in Apple Maps on an iPhone, iPad or Mac, and in Google '

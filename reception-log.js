@@ -24,8 +24,11 @@
 //   RTL-SDR     each accepted reading (ok, with its votes), each bit-flip
 //               shadow the decoder set aside (fault 'shadow'), each burst
 //               with nothing decoded
-//   ERT-A2      each reading (fault 'status' when its status byte is set), and
-//               each frame that would not decode (fault 'frame')
+//   ERT-A2      each reading (fault 'frame' when the frame around it does not
+//               add up — a record's fourth byte is a time offset, not a status,
+//               since #209, so 'status' is only on older rows), each frame
+//               that would not decode (fault 'frame'), and a self-report as one
+//               entry for its frame
 //
 // Where the receiver was, best first: a GPS card's fix (under 10 s old) —
 // source 'gps'; this device's own location while "Track position" is on —

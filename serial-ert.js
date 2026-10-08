@@ -42,6 +42,7 @@ const SerialErt = (function () {
       fmt: null, dec: new TextDecoder(), text: '', bin: [], stray: 0,
       recs: [], frames: 0, bad: 0, warned: 0, lastAt: 0, lastFrame: null,
       clock: null, skew: null, agencies: new Set(), sources: new Set(),
+      bases: { utc: 0, local: 0, either: 0, none: 0 }, selfReports: 0, tests: 0,
       capture: [], captureLen: 0, res: null, dirty: true,
       pending: {}, raf: 0,
     };
@@ -151,74 +152,116 @@ const SerialErt = (function () {
     if (f.warn.length) { e.warned++; Serial.logLine(c, '↳ ' + f.warn.join('; '), 'sys'); }
     if (f.hdr.agency) e.agencies.add(f.hdr.agency);
     if (f.hdr.source != null) e.sources.add(f.hdr.source);
+    if (f.hdr.port === Alert2.PORT_SELF) e.selfReports++;
+    const test = !!(f.payload && f.payload.ctl.test);
+    if (test) e.tests++;
     if (f.hdr.clockMs) {
       e.clock = f.hdr.clockMs;
-      if (f.hdr.frameOk === 1 && f.payload) {
-        // Signed as the ALERT2 tab reports it (an AM/PM error reads +12 h), and
-        // folded only across midnight, where a raw difference is a day out.
-        let d = f.hdr.clockSod - f.payload.sod;
-        if (d > 46800) d -= 86400; else if (d < -46800) d += 86400;
-        e.skew = d;
+      if (!f.damaged && f.payload && f.payload.stamp != null) {
+        // Signed as the ALERT2 tab reports it: the receiver's clock against
+        // where the frame's half-day stamp lands (Alert2.placeStamp) — or,
+        // where it lands near neither, against the receiver's own half-day.
+        const p = Alert2.placeStamp(f.payload.stamp, f.hdr.clockMs);
+        e.skew = (f.hdr.clockMs - (p.ms != null ? p.ms : p.local)) / 1000;
       }
     }
+    const kind = f.kind === 'bin' ? 'bin' : 'ascii';
+    // When each reading was taken, for the table: the frame's half-day stamp
+    // put on the half-day nearest when it arrived — by the receiver's clock
+    // where the line carries one, by this computer's otherwise — less the
+    // seconds a repeater held it. What is sent is timed by frameTime(), below.
+    const stamp = f.payload ? f.payload.stamp : null;
+    const placed = stamp == null ? null : Alert2.placeStamp(stamp, f.hdr.clockMs || t);
+    const ft = off => placed ? (placed.ms != null ? placed.ms : placed.local) - (off || 0) * 1000 : null;
     f.records.forEach(r => {
-      e.recs.push({ t, alertId: r.alertId, value: r.value, ok: r.ok, status: r.status,
-        sod: f.payload ? f.payload.sod : null, rssi: f.hdr.rssi, kind: f.kind === 'bin' ? 'bin' : 'ascii',
-        source: f.hdr.source, warn: f.warn.length > 0 });
+      e.recs.push({ t, alertId: r.alertId, value: r.value, ok: r.ok, offset: r.offset, test,
+        ft: ft(r.offset), rssi: f.hdr.rssi, kind, source: f.hdr.source, warn: f.warn.length > 0 });
+    });
+    // A self-report's sensors, under the gauge's own address and the sensor's
+    // slot — a2:<gauge>/<sensor>, the identity they are stored under (0024).
+    f.sensors.forEach(x => {
+      e.recs.push({ t, alertId: null, a2: { source: x.source, sensor: x.sensor, name: x.name, x }, value: x.value,
+        text: Alert2.a2ValueText(x), ok: x.ok, offset: null, test,
+        ft: ft(0), rssi: f.hdr.rssi, kind, source: f.hdr.source, warn: f.warn.length > 0 });
     });
     if (e.recs.length > MAX_RECS) e.recs.splice(0, e.recs.length - MAX_RECS);
-    if (f.records.length) e.dirty = true;
+    if (f.records.length || f.sensors.length) e.dirty = true;
     ingest(c, f, text);
     mark(c, 'status', 'readings', 'stations');
   }
 
-  // To MegaNet, when the card is set to send (serial-ingest.js). Only a frame
-  // the receiver called clean, and only its clean readings. The time is the
-  // frame's own (seconds since midnight, the network's clock) — which is what
-  // lets two receivers hearing one frame agree on it — put on the right day:
-  // the day nearest to when it arrived, live; the receiver's own date, out of
-  // a log's history. A live frame whose time of day cannot be squared with
-  // this computer's clock (more than ten minutes out — a timezone, a drifted
-  // network clock) is timed by arrival instead, and the card says so. A binary
-  // frame out of history carries no date at all, and is not sent.
+  // To MegaNet, when the card is set to send (serial-ingest.js). Every
+  // reading of a frame whose structure adds up: a concentration record under
+  // its ALERT address, a self-report's sensor under its gauge and slot — and a
+  // frame flagged as test data goes too, marked suspect, which is what the
+  // database calls a reading its source flagged. The time is the frame's own,
+  // less the seconds a repeater held a record (Alert2.placeStamp): put on the
+  // half-day nearest when it arrived, in UTC and in local time, whichever lands
+  // within ten minutes — live; against the receiver's own clock, out of a log's
+  // history. A live frame whose stamp fits neither is timed by arrival instead,
+  // and the card says so; which of the two fits is #157 Part 5's answer, and
+  // the card says that too. A binary frame out of history carries no date at
+  // all, and is not sent.
   function ingest(c, f, text) {
     if (typeof SerialIngest === 'undefined' || !f.payload) return;
     const ts = frameTime(c, f);
-    // Every reading to the reception log, the bad ones too — a frame the
-    // receiver called dirty and a status byte that is set are what finding a
-    // corrupting transmitter is made of.
-    if (typeof RxLog !== 'undefined') f.records.forEach(r => RxLog.add(c, { t: ts, protocol: 'alert2', alert_id: r.alertId, value_raw: r.value,
-      payload_hex: r.bytes.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase(),
-      ok: r.ok && f.hdr.frameOk !== 0, fault: !r.ok ? 'status' : f.hdr.frameOk === 0 ? 'frame' : null,
-      rssi_dbm: f.hdr.rssi, detail: { source: f.hdr.source, quality: f.hdr.quality } }));
-    if (f.hdr.frameOk === 0) return;
-    const recs = f.records.filter(r => r.ok);
-    if (!recs.length) return;
+    const at = off => ts == null ? null : ts - (off || 0) * 1000;
+    // Every reading to the reception log, the ones from a frame that does not
+    // add up too — they are what finding a corrupting transmitter is made of.
+    // A self-report is one entry for the frame: the log is of ALERT addresses,
+    // and a gauge's sensors are not.
+    if (typeof RxLog !== 'undefined') {
+      f.records.forEach(r => RxLog.add(c, { t: at(r.offset), protocol: 'alert2', alert_id: r.alertId, value_raw: r.value,
+        payload_hex: r.bytes.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase(),
+        ok: r.ok, fault: r.ok ? null : 'frame',
+        rssi_dbm: f.hdr.rssi, detail: { source: f.hdr.source, port: f.hdr.port, hop_limit: f.hdr.hopLimit, offset_s: r.offset } }));
+      if (f.reports.length) RxLog.add(c, { t: ts, protocol: 'alert2', alert_id: null, ok: !f.damaged, fault: f.damaged ? 'frame' : null,
+        rssi_dbm: f.hdr.rssi, detail: { source: f.hdr.source, port: f.hdr.port, hop_limit: f.hdr.hopLimit, self_report: f.sensors.length } });
+    }
+    const quality = f.payload.ctl.test ? 'suspect' : undefined;
+    const items = [];
+    f.records.filter(r => r.ok).forEach(r => items.push({ alert_id: r.alertId, value_raw: r.value, ts: at(r.offset),
+      protocol: 'alert2', rssi_dbm: f.hdr.rssi, quality }));
+    // Sensor 255 is the spec's marker that a time stamp follows, not a sensor,
+    // and the database refuses it as one; a text value has no number to keep.
+    f.sensors.filter(x => x.ok && x.sensor !== 255 && x.value != null && Number.isFinite(x.value) && f.hdr.source != null)
+      .forEach(x => items.push({ a2_station: f.hdr.source, a2_sensor: x.sensor, value_raw: x.value, ts,
+        protocol: 'alert2', rssi_dbm: f.hdr.rssi, quality }));
+    if (!items.length) return;
     // The frame's RSSI is the ERT-A2's own, in dBm (0050); it does not say its frequency.
-    SerialIngest.add(c, recs.map((r, i) => ({ alert_id: r.alertId, value_raw: r.value, ts, protocol: 'alert2', line: i ? null : text,
-      rssi_dbm: f.hdr.rssi })));
+    items[0].line = text;
+    SerialIngest.add(c, items);
   }
   function frameTime(c, f) {
-    const sod = f.payload.sod, live = SerialIngest.arrival(c);
-    let ts = null;
+    const stamp = f.payload.stamp, live = SerialIngest.arrival(c);
     if (live != null) {
-      ts = onDay(sod, live, true);
-      if (Math.abs(ts - live) > 10 * 60000) {
-        SerialIngest.note(c, 'Frame times are ' + Math.round((ts - live) / 60000) + ' min from this computer\'s clock, so readings are timed by when they arrived.');
-        ts = live;
+      if (stamp == null) return live;
+      const p = Alert2.placeStamp(stamp, live);
+      c.ert.bases[p.base || 'none']++;
+      if (p.base == null) {
+        const off = Math.min(Math.abs(p.utc - live), Math.abs(p.local - live));
+        SerialIngest.note(c, 'Frame times are ' + Math.round(off / 60000) + ' min from this computer\'s clock on both UTC and local time, so readings are timed by when they arrived.');
+        return live;
       }
-    } else if (f.hdr.clockMs) {
-      ts = onDay(sod, f.hdr.clockMs, false);
-      if (ts > Date.now() + 5 * 60000) ts -= 86400000;
+      SerialIngest.note(c, baseNote(c.ert.bases));
+      return p.ms;
     }
+    if (!f.hdr.clockMs) return null;
+    if (stamp == null) return f.hdr.clockMs;
+    const p = Alert2.placeStamp(stamp, f.hdr.clockMs);
+    let ts = p.ms != null ? p.ms : p.local;
+    if (ts > Date.now() + 5 * 60000) ts -= 86400000;
     return ts;
   }
-  function onDay(sod, refMs, nearest) {
-    const d = new Date(refMs);
-    d.setHours(0, 0, 0, 0);
-    const t = d.getTime() + sod * 1000;
-    if (!nearest) return t;
-    return [t - 86400000, t, t + 86400000].reduce((a, b) => Math.abs(b - refMs) < Math.abs(a - refMs) ? b : a);
+
+  // What the stamps have turned out to count from — the question #157 Part 5
+  // asks, answered by every frame this card has timed live.
+  function baseNote(b) {
+    const n = b.utc + b.local;
+    if (!n) return b.either ? 'This computer is on UTC (or twelve hours from it), so a frame cannot say whether its stamp is UTC or local time.' : '';
+    if (b.utc && !b.local) return 'Frame stamps are UTC, as the ALERT2 spec says — ' + b.utc + ' frame' + (b.utc === 1 ? '' : 's') + ' timed by them.';
+    if (b.local && !b.utc) return 'Frame stamps are local time — the ALERT2 spec says UTC — ' + b.local + ' frame' + (b.local === 1 ? '' : 's') + ' timed by them.';
+    return 'Frame stamps disagree: ' + b.utc + ' fit UTC and ' + b.local + ' local time — more than one transmitter, keeping different time.';
   }
 
   function keep(e, text) {
@@ -258,19 +301,19 @@ const SerialErt = (function () {
     const c = conn(id), e = c && c.ert;
     if (!e || !e.recs.length) return;
     const res = resolved(e);
-    const cols = ['received', 'frame_time', 'format', 'source', 'alert_id', 'station', 'station_number', 'match', 'value', 'engineering', 'rssi_dbm', 'status'];
+    const cols = ['received', 'frame_time', 'format', 'source', 'alert_id', 'a2_sensor', 'station', 'station_number', 'match', 'value', 'engineering', 'rssi_dbm', 'time_offset_s', 'test', 'ok'];
     const lines = [cols.join(',')];
     e.recs.forEach(r => {
-      const info = res.byAlertId.get(r.alertId);
+      const info = infoFor(res, r);
       const st = info && info.chosen ? info.chosen.station : null;
-      const eng = Alert2.engValue(info ? info.kind : null, r.value, st);
+      const eng = engFor(r, info, st);
       const row = {
-        received: new Date(r.t).toISOString(), frame_time: hms(r.sod), format: r.kind === 'bin' ? 'usb-binary' : 'rs232-ascii',
-        source: r.source == null ? '' : r.source, alert_id: r.alertId,
+        received: new Date(r.t).toISOString(), frame_time: r.ft == null ? '' : new Date(r.ft).toISOString(), format: r.kind === 'bin' ? 'usb-binary' : 'rs232-ascii',
+        source: r.source == null ? '' : r.source, alert_id: r.alertId == null ? '' : r.alertId, a2_sensor: r.a2 ? r.a2.sensor : '',
         station: st ? st.name : (info && info.fileName && !info.fileName.none ? info.fileName.text : ''),
         station_number: st ? (st.station_number || '') : '', match: info ? info.conf : 'unknown',
-        value: r.value, engineering: eng ? eng.text : '', rssi_dbm: r.rssi == null ? '' : r.rssi,
-        status: '0x' + r.status.toString(16).toUpperCase().padStart(2, '0'),
+        value: r.a2 ? r.text : r.value, engineering: eng ? eng.text : '', rssi_dbm: r.rssi == null ? '' : r.rssi,
+        time_offset_s: r.offset == null ? '' : r.offset, test: r.test ? 'yes' : '', ok: r.ok ? 'yes' : 'no',
       };
       lines.push(cols.map(k => csvEscape(row[k])).join(','));
     });
@@ -307,16 +350,22 @@ const SerialErt = (function () {
   }
 
   function resolved(e) {
-    if (e.dirty || !e.res) { e.res = Alert2.resolve({ records: e.recs }); e.dirty = false; }
+    if (e.dirty || !e.res) {
+      e.res = Alert2.resolve({ records: e.recs.filter(r => r.alertId != null),
+                               sensors: e.recs.filter(r => r.a2).map(r => r.a2) });
+      e.dirty = false;
+    }
     return e.res;
   }
-
-  function pad2(n) { return String(n).padStart(2, '0'); }
-  function hms(sod) {
-    if (sod == null) return '';
-    const s = Math.floor(sod);
-    return pad2(Math.floor(s / 3600)) + ':' + pad2(Math.floor(s / 60) % 60) + ':' + pad2(s % 60);
+  // Which station a reading is, by its ALERT address or its gauge and slot.
+  function infoFor(res, r) {
+    return r.a2 ? (res.byA2 ? res.byA2.get(Alert2.a2Key(r.a2.source, r.a2.sensor)) : null) : res.byAlertId.get(r.alertId);
   }
+  function engFor(r, info, st) {
+    return r.a2 ? Alert2.a2Eng(r.a2.x, info ? info.kind : null, st) : Alert2.engValue(info ? info.kind : null, r.value, st);
+  }
+  function idText(r) { return r.a2 ? 'a2:' + Alert2.a2Key(r.a2.source, r.a2.sensor) : String(r.alertId); }
+
   function durText(sec) {
     const neg = sec < 0; let s = Math.round(Math.abs(sec));
     const h = Math.floor(s / 3600); s -= h * 3600;
@@ -349,6 +398,11 @@ const SerialErt = (function () {
     chips.push(chip('Readings', e.recs.length + ' · ' + res.byAlertId.size + ' address' + (res.byAlertId.size === 1 ? '' : 'es')
       + (res.unknown ? ' · ' + res.unknown + ' unmatched' : '')));
     chips.push(chip('Last frame', e.lastAt ? ago(e.lastAt) : dim('—')));
+    if (e.selfReports || e.tests) chips.push(chip('ALERT2', (e.selfReports ? e.selfReports + ' self-report' + (e.selfReports === 1 ? '' : 's') : '')
+      + (e.selfReports && e.tests ? ' · ' : '') + (e.tests ? e.tests + ' test' : ''), e.tests ? 'warn' : ''));
+    const bn = e.bases.utc + e.bases.local;
+    if (bn) chips.push(chip('Frame stamps', e.bases.utc && !e.bases.local ? 'UTC' : e.bases.local && !e.bases.utc ? 'local time — the spec says UTC' : esc(e.bases.utc + ' UTC · ' + e.bases.local + ' local'),
+      e.bases.local ? 'warn' : ''));
     const rssis = e.recs.filter(r => r.rssi != null).slice(-50).map(r => r.rssi);
     if (e.fmt === 'bin' || e.fmt === 'hex' || rssis.length) {
       const sorted = rssis.slice().sort((a, b) => a - b);
@@ -384,18 +438,19 @@ const SerialErt = (function () {
     const rows = [];
     for (let i = e.recs.length - 1; i >= 0 && rows.length < MAX_ROWS; i--) {
       const r = e.recs[i];
-      const info = res.byAlertId.get(r.alertId);
+      const info = infoFor(res, r);
       const st = info && info.chosen ? info.chosen.station : null;
-      const eng = Alert2.engValue(info ? info.kind : null, r.value, st);
+      const eng = engFor(r, info, st);
       rows.push('<tr' + (r.ok ? '' : ' class="ert-row-bad"') + '>'
         + '<td class="qs-time">' + SerialViz.hhmm(r.t, true) + '</td>'
-        + '<td class="qs-time col-optional">' + (r.sod == null ? '—' : hms(r.sod)) + '</td>'
-        + '<td class="qs-num">' + r.alertId + '</td>'
+        + '<td class="qs-time col-optional">' + (r.ft == null ? '—' : SerialViz.hhmm(r.ft, true)) + '</td>'
+        + '<td class="qs-num">' + esc(idText(r)) + '</td>'
         + '<td>' + stationHtml(info) + '</td>'
-        + '<td class="qs-num">' + r.value + (eng ? ' <span class="qs-dim" title="' + esc(eng.rule) + '">' + esc(eng.text) + '</span>' : '') + '</td>'
+        + '<td class="qs-num">' + esc(r.a2 ? r.text : String(r.value)) + (eng ? ' <span class="qs-dim" title="' + esc(eng.rule) + '">' + esc(eng.text) + '</span>' : '') + '</td>'
         + '<td>' + Alert2.rssiCell(r.rssi) + '</td>'
-        + '<td class="col-optional">' + (r.ok ? '<span class="txt-ok">ok</span>' : '<span class="txt-bad">status 0x'
-          + r.status.toString(16).toUpperCase().padStart(2, '0') + '</span>') + '</td></tr>');
+        + '<td class="col-optional">' + (!r.ok ? '<span class="txt-bad" title="The frame around it does not add up">frame</span>'
+          : r.test ? '<span class="txt-warn" title="Sent as test data — stored as suspect">test</span>' : '<span class="txt-ok">ok</span>')
+        + (r.offset ? ' <span class="qs-dim" title="Held this long before the frame was exported">−' + r.offset + ' s</span>' : '') + '</td></tr>');
     }
     body.innerHTML = rows.join('');
   }
@@ -407,20 +462,21 @@ const SerialErt = (function () {
     const by = new Map();
     e.recs.forEach(r => {
       if (!r.ok) return;
-      let s = by.get(r.alertId);
-      if (!s) { s = { aid: r.alertId, n: 0, rssi: [] }; by.set(r.alertId, s); }
+      const id = idText(r);
+      let s = by.get(id);
+      if (!s) { s = { aid: id, r, n: 0, rssi: [] }; by.set(id, s); }
       s.n++; s.last = r;
       if (r.rssi != null) { s.rssi.push(r.rssi); if (s.rssi.length > 24) s.rssi.shift(); }
     });
     if (!by.size) { body.innerHTML = '<tr><td colspan="6" class="qs-dim">No stations heard yet.</td></tr>'; return; }
     const res = resolved(e);
     body.innerHTML = [...by.values()].sort((a, b) => b.last.t - a.last.t).map(s => {
-      const info = res.byAlertId.get(s.aid);
+      const info = infoFor(res, s.r);
       const st = info && info.chosen ? info.chosen.station : null;
-      const eng = Alert2.engValue(info ? info.kind : null, s.last.value, st);
+      const eng = engFor(s.last, info, st);
       const med = s.rssi.length ? s.rssi.slice().sort((a, b) => a - b)[s.rssi.length >> 1] : null;
-      return '<tr><td class="qs-num">' + s.aid + '</td><td>' + stationHtml(info) + '</td>'
-        + '<td class="qs-num">' + s.last.value + (eng ? ' <span class="qs-dim">' + esc(eng.text) + '</span>' : '') + '</td>'
+      return '<tr><td class="qs-num">' + esc(s.aid) + '</td><td>' + stationHtml(info) + '</td>'
+        + '<td class="qs-num">' + esc(s.last.a2 ? s.last.text : String(s.last.value)) + (eng ? ' <span class="qs-dim">' + esc(eng.text) + '</span>' : '') + '</td>'
         + '<td class="qs-num">' + s.n + '</td><td>' + Alert2.rssiCell(med) + '</td>'
         + '<td class="qs-time col-optional">' + ago(s.last.t) + '</td></tr>';
     }).join('');
@@ -443,7 +499,7 @@ const SerialErt = (function () {
       + '<colgroup><col style="width: 11%"><col class="col-optional" style="width: 11%"><col style="width: 8%"><col style="width: 34%">'
       + '<col style="width: 14%"><col style="width: 12%"><col class="col-optional" style="width: 10%"></colgroup><thead><tr>'
       + '<th scope="col">Received</th><th scope="col" class="col-optional">Frame time</th><th scope="col">ID</th><th scope="col">Station</th>'
-      + '<th scope="col">Value</th><th scope="col">RSSI</th><th scope="col" class="col-optional">Status</th></tr></thead>'
+      + '<th scope="col">Value</th><th scope="col">RSSI</th><th scope="col" class="col-optional">Reading</th></tr></thead>'
       + '<tbody id="ert-dec-' + id + '"></tbody></table></div>'
       + '<p class="qs-hint">Stations are matched as the ALERT2 tab matches them: an address shared by several stations goes to '
       + 'the one near the rest of what this receiver hears, and a pin set on that tab applies here too. '

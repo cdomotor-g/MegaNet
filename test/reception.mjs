@@ -25,7 +25,7 @@
 //   * NMEA: GGA and RMC from any talker, checksums enforced, hemispheres signed
 //   * a GPS card fed a real NMEA stream: its fix, its accuracy, and that fix
 //     stamped on what a receiver card hears — as 'gps', exact
-//   * a receiver card's receptions logged, good and bad (an ERT-A2 status byte)
+//   * a receiver card's receptions logged, good and bad (an ERT-A2 frame that does not add up)
 //   * the log exported as CSV and loaded back as a file, the same analysis out
 //   * the tab drawing its map, a suspect picked, no page errors
 //   * a site survey (0051, stood in for): the list, one opened — its receptions
@@ -103,13 +103,15 @@ try {
     const gc = Serial.findConn(g), ec = Serial.findConn(e);
     gc.phase = 'open'; ec.phase = 'open';
     Serial.feed(gc, new TextEncoder().encode(cs('$GNGGA,092751.00,2733.6360,S,15157.0420,E,1,10,1.2,690.0,M,40.0,M,,') + '\r\n'));
-    // two ERT-A2 frames: one clean, one with a status byte set
+    // two ERT-A2 frames: one clean, one whose payload runs a byte past its
+    // last record. A record's fourth byte is a time offset, not a status (#209),
+    // so what makes a reception bad now is a frame that does not add up.
     Serial.feed(ec, new TextEncoder().encode('ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00\r\n'
-      + 'ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,42.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,01\r\n'));
+      + 'ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,42.296,0,0,0,0,0,1,0,0,0,7,8,9999,74,64,F0,7E,18,15,01,FF\r\n'));
   }, [gpsId, ertId]);
   const rx = await page.evaluate(() => RxLog.all().map(e => ({ src: e.location_source, approx: e.location_approx, lat: e.lat, acc: e.accuracy_m, ok: e.ok, fault: e.fault, rc: e.receiver })));
   ok('the GPS card has a fix, with accuracy from HDOP', await page.evaluate(g => { const f = SerialGps.fix(false); return f && Math.abs(f.lat + 27.5606) < 1e-3 && f.accuracy_m === 6; }, gpsId));
-  ok('a receiver\'s receptions are logged, the bad one too', rx.length === 2 && rx.filter(e => e.ok).length === 1 && rx.some(e => e.fault === 'status'), JSON.stringify(rx));
+  ok('a receiver\'s receptions are logged, the bad one too', rx.length === 2 && rx.filter(e => e.ok).length === 1 && rx.some(e => e.fault === 'frame'), JSON.stringify(rx));
   ok('…each placed by the GPS card, exact', rx.every(e => e.src === 'gps' && e.approx === false && Math.abs(e.lat + 27.5606) < 1e-3 && e.acc === 6), JSON.stringify(rx));
   await page.evaluate(() => Serial.renderList());
   ok('the card shows its reception log', await page.evaluate(e => /2 heard, 1 bad, 2 placed/.test((document.getElementById('rx-sum-' + e) || {}).textContent || ''), ertId));

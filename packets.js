@@ -52,7 +52,7 @@ const Packets = (function () {
     VCO: { label: 'VCO error flag',            cls: 'f-VCO' },
     DE:  { label: 'Data error flag',           cls: 'f-DE' },
     HD:  { label: 'High data bits (D11–D15)',  cls: 'f-HD' },
-    S:   { label: 'Record status byte',        cls: 'f-S' },
+    S:   { label: 'Time offset (s before export)', cls: 'f-S' },
     frame: { label: 'Start / stop bits',       cls: 'f-frame' },
   };
 
@@ -85,17 +85,18 @@ const Packets = (function () {
     // legacy ALERT sensor puts on the air as four 10-bit async words; A2C is how
     // that same 13-bit address and 11-bit value are re-packed as four plain bytes
     // inside an ALERT2 concentration frame, which is what an ELPRO ERT-A2 hands
-    // out over RS232. No start/stop bits and no CRC — the ALERT2 MANT layer below
-    // it has already checked the frame, so all this carries is a status byte that
-    // reads 0 on every good record. Layout mirrors Alert2.decodeRecord(); the two
-    // are the same three lines of arithmetic written declaratively and directly.
-    a2c: { key: 'a2c', name: 'ALERT2 concentration record (A2C)', short: 'A2C', bytesOnly: true,
+    // out over RS232. No start/stop bits and no CRC — the ALERT2 layers below it
+    // have already checked the frame, and the fourth byte is a time offset, the
+    // seconds the repeater held the reading before exporting it (Application
+    // Layer v1.3 §3.3.2) — not a status, so nothing in the four bytes can pass
+    // or fail (#209). Layout mirrors Alert2.decodeRecord(); the two are the same
+    // three lines of arithmetic written declaratively and directly.
+    a2c: { key: 'a2c', name: 'ALERT2 concentration record (A2C)', short: 'A2C', bytesOnly: true, unchecked: true,
       map: [A(7), A(6), A(5), A(4), A(3), A(2), A(1), A(0),
             D(10), D(9), D(8), A(12), A(11), A(10), A(9), A(8),
             D(7), D(6), D(5), D(4), D(3), D(2), D(1), D(0),
             S(7), S(6), S(5), S(4), S(3), S(2), S(1), S(0)],
-      validate: v => v.S === 0,
-      abits: 13, note: 'One sensor reading inside an ALERT2 “ALERT concentration” payload, as delivered by an ELPRO ERT-A2. Four bytes: address low byte, then a packed byte holding the top 3 data bits and the top 5 address bits, then the data low byte, then a status byte (0 on every valid record observed). Address and data are the same 13 + 11 bits as the legacy formats, so a reading decodes to the same ID and value either way. See the ALERT2 / ERT-A2 tab to decode whole serial lines.' },
+      abits: 13, note: 'One sensor reading inside an ALERT2 “ALERT concentration” payload, as delivered by an ELPRO ERT-A2. Four bytes: address low byte, then a packed byte holding the top 3 data bits and the top 5 address bits, then the data low byte, then a time offset — the seconds the repeater held the reading before exporting the frame. Address and data are the same 13 + 11 bits as the legacy formats, so a reading decodes to the same ID and value either way. There are no check bits: the ALERT2 frame around it carried the checks. See the ALERT2 / ERT-A2 tab to decode whole serial lines.' },
   };
 
   function normaliseInput(raw) {
@@ -133,6 +134,7 @@ const Packets = (function () {
     if (fmtKey === 'eif') { out.crcExpected = eifCrc(num.A, num.D);         out.crcOk = out.crcExpected === num.R; }
     if (fmtKey === 'eaf') { out.crcExpected = eafCrc(num.A, num.D, num.B);  out.crcOk = out.crcExpected === num.C; out.crcAssumed = true; }
     if (fmt.validate) out.extraOk = !!fmt.validate(num);
+    if (fmt.unchecked) out.unchecked = true;
     out.valid = identOk && (out.crcOk !== false) && (out.extraOk !== false);
     return out;
   }
@@ -322,9 +324,8 @@ const Packets = (function () {
               + (s.source === 'meganet' ? ' <span class="badge ok">Flood-Net</span>' : '') + '</div>';
       }
       if (f === 'HD') extra = '<div class="spec">Full 16-bit value = HD × 2048 + last transmitted 11-bit data value = ' + (v * 2048) + ' + data.</div>';
-      if (f === 'S') extra = '<div class="spec">' + (v === 0
-        ? '<span class="txt-ok">0 — the value every valid record carries ✓</span>'
-        : '<span class="txt-bad">non-zero ✗</span> — records with a non-zero status byte in the reference capture also carried addresses matching no station, so treat the reading as corrupt.') + '</div>';
+      if (f === 'S') extra = '<div class="spec">' + v + ' s — how long the repeater held the reading before exporting the frame; '
+        + 'the reading was taken that long before the frame\'s time stamp. Not a status: any value is valid.</div>';
       if ((f === 'R' || f === 'C') && dec.crcExpected !== undefined) {
         extra = '<div class="spec">Computed ' + (f === 'R' ? 'FCS' : 'CRC') + ': ' + dec.crcExpected + ' — '
           + (dec.crcOk ? '<span class="txt-ok">matches ✓</span>' : '<span class="txt-bad">mismatch ✗</span>')
@@ -375,9 +376,11 @@ const Packets = (function () {
     ordered.forEach(r => {
       const fmt = FORMATS[r.format];
       const badges = [];
-      // A2C has no check bits to pass or fail — its integrity claim is the status
-      // byte, so it says that instead of a "check bits ✓" it never earned.
-      if (r.extraOk !== undefined)
+      // A2C has no check bits to pass or fail — the ALERT2 frame around it was
+      // checked — so it says that instead of a "check bits ✓" it never earned.
+      if (r.unchecked)
+        badges.push('<span class="badge warn" title="Four plain bytes: nothing in them can be checked, the ALERT2 frame around them was">no check bits</span>');
+      else if (r.extraOk !== undefined)
         badges.push(r.extraOk ? '<span class="badge ok">status byte 0 ✓</span>' : '<span class="badge bad">status byte non-zero ✗</span>');
       else
         badges.push(r.identOk ? '<span class="badge ok">check bits ✓</span>' : '<span class="badge bad">check bits ✗</span>');
@@ -622,9 +625,10 @@ const Packets = (function () {
             <li>All fields are transmitted least-significant bit first; each 10-bit word is start bit + 8 payload bits + stop bit.</li>
             <li><b>A2C</b> — ALERT2 concentration record, the modern carrier for the same reading. Four bytes,
               no framing and no CRC: address low byte, a packed byte of <code>DDD AAAAA</code> (data bits 10–8,
-              address bits 12–8), the data low byte, then a status byte that is 0 on every valid record. Offered
+              address bits 12–8), the data low byte, then a time offset — seconds the repeater held the reading
+              before exporting the frame. No check bits: the ALERT2 frame around it carried them. Offered
               only for 32-bit input, since these bytes come out of an ALERT2 payload rather than off the air as
-              async words. An ERT-A2 concatenates several of them behind a three-byte header —
+              async words. An ERT-A2 concatenates several of them behind a control byte and a two-byte time stamp —
               see the <button type="button" class="link-btn" onclick="switchTab('alert2')">ALERT2 / ERT-A2</button> tab.</li>
           </ul>
         </details>

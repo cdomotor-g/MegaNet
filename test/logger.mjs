@@ -30,8 +30,13 @@
 // so the decoder under test is the decoder in use. The check builds it byte for
 // byte the way `TestInject` does and walks it through the gates `TakeFrames`
 // and `DecodeFrame` actually apply: the signature, the ASCII/binary
-// discriminator, the length byte against `FRAME_MIN_LEN`, the `84 01 <len> 74`
-// anchor, and `(elemlen - 3) % 4`.
+// discriminator, the length byte against `FRAME_MIN_LEN`, the port in an
+// `84 00` MANT header if there is one, the `84 01 <len>` anchor and the
+// version-0 control byte behind it, and whole four-byte records after the
+// control byte and stamp. As of v3.1 (#209) that is the spec's reading: the
+// port decides what a frame is, any version-0 control byte is read, a
+// test-flagged frame is posted as suspect, and a record's fourth byte is a
+// time offset that decides nothing.
 //
 // **The packed timestamp**, also new at v3.0 and the single largest saving in
 // it: a queue slot holds one Long instead of a 24-character ISO string, and
@@ -253,19 +258,32 @@ check('the stamp rebuilt from the packed Long is the stamp that was packed',
 
 // ── 4 · The ALERT2 round trip, through the binary frame ──────────────────────
 
-const ELEM_CONCENTRATION = 116;
+const CTL_STAMPED = constNum('CTL_STAMPED');
+const PORT_CONCENTRATION = constNum('PORT_CONCENTRATION');
+const HALF_DAY = constNum('HALF_DAY');
 const SIG = [65, 76, 69, 82, 84, 50];          // "ALERT2"
 const FRAME_MIN_LEN = constNum('FRAME_MIN_LEN');
 const FRAME_MAX = constNum('FRAME_MAX');
 
-// TestInject, restated byte for byte.
+// TestInject, restated byte for byte — with the half-day stamp v3.1 sends.
 function injectFrame(id, value, secs) {
   const b0 = id % 256;
   const b1 = Math.floor(id / 256) + Math.floor(value / 256) * 32;
   const b2 = value % 256;
-  return [...SIG, 12, 0, 132, 1, 7, ELEM_CONCENTRATION,
-          Math.floor(secs / 256), secs % 256, b0, b1, b2, 0];
+  const half = secs % HALF_DAY;
+  return [...SIG, 12, 0, 132, 1, 7, CTL_STAMPED,
+          Math.floor(half / 256), half % 256, b0, b1, b2, 0];
 }
+
+// A frame the way the ERT-A2 sends one: an 84 00 MANT header naming the port,
+// then the payload element, behind the control byte given.
+function realFrame({ port = 1, ctl = CTL_STAMPED, secs = 0, records }) {
+  const half = secs % HALF_DAY;
+  const pay = [ctl, ...((ctl >> 2) & 1 ? [Math.floor(half / 256), half % 256] : []), ...records.flat()];
+  const body = [0x75, 1, 1, 132, 0, 6, 0, port * 16, 0x70, pay.length, 0x27, 0x0f, 132, 1, pay.length, ...pay];
+  return [...SIG, body.length, ...body];
+}
+const rec = (id, value, offset = 0) => [id % 256, Math.floor(id / 256) + Math.floor(value / 256) * 32, value % 256, offset];
 
 // TakeFrames' framing and DecodeFrame's unpacking, restated.
 function decodeFrame(buf, loggerSecs) {
@@ -278,21 +296,31 @@ function decodeFrame(buf, loggerSecs) {
   const lenByte = buf[sig + 6], total = 6 + lenByte, end = sig + total - 1;
   if (lenByte < FRAME_MIN_LEN || total > FRAME_MAX) return { why: 'implausible length byte' };
   if (end >= buf.length) return { why: 'frame incomplete' };
+  let port = PORT_CONCENTRATION;
+  for (let fk = sig + 7; fk <= end - 5; fk++)
+    if (buf[fk] === 132 && buf[fk + 1] === 0 && buf[fk + 2] >= 6) { port = Math.floor(buf[fk + 4] / 16); break; }
+  if (port !== PORT_CONCENTRATION) return { other: port, readings: [] };
   let elem = -1, elemLen = 0, via = 0;
   for (let fk = sig + 7; fk <= end - 4; fk++)
-    if (buf[fk] === 132 && buf[fk + 1] === 1 && buf[fk + 3] === ELEM_CONCENTRATION) {
+    if (buf[fk] === 132 && buf[fk + 1] === 1 && buf[fk + 3] % 4 === 0) {
       elemLen = buf[fk + 2]; elem = fk + 3; via = 1; break;
     }
   if (elem < 0) return { why: 'no concentration element' };
-  if (elemLen < 7 || elemLen > 32 || (elemLen - 3) % 4 !== 0)
+  const ctl = buf[elem], ts = Math.floor(ctl / 4) % 2, test = Math.floor(ctl / 8) % 2, ext = Math.floor(ctl / 128) % 2;
+  const recAt = 1 + ext + (ts ? 2 : 0);
+  if (elemLen < recAt + 4 || elemLen > 32 || (elemLen - recAt) % 4 !== 0)
     return { why: 'element length is not whole records' };
   const readings = [];
-  for (let rec = elem + 3; rec < elem + elemLen; rec += 4) {
-    if (buf[rec + 3] !== 0) continue;            // non-zero status: counted, not posted
-    readings.push({ id: (buf[rec + 1] % 32) * 256 + buf[rec],
-                    value: Math.floor(buf[rec + 1] / 32) * 256 + buf[rec + 2] });
+  for (let r = elem + recAt; r < elem + elemLen; r += 4)
+    readings.push({ id: (buf[r + 1] % 32) * 256 + buf[r],
+                    value: Math.floor(buf[r + 1] / 32) * 256 + buf[r + 2], suspect: !!test });
+  let skew = null;
+  if (ts) {
+    skew = buf[elem + recAt - 2] * 256 + buf[elem + recAt - 1] - loggerSecs % HALF_DAY;
+    if (skew > HALF_DAY / 2) skew -= HALF_DAY;
+    if (skew < -HALF_DAY / 2) skew += HALF_DAY;
   }
-  return { readings, skew: buf[elem + 1] * 256 + buf[elem + 2] - loggerSecs, via, total, end };
+  return { readings, skew, via, total, end };
 }
 
 const T_SECS = 4 * 3600 + 15 * 60 + 7;
@@ -308,7 +336,7 @@ for (const [id, value] of [[TEST_ID, 21], [TEST_ID, 0], [TEST_ID, 2047],
 
 const ref = decodeFrame(injectFrame(TEST_ID, 21, T_SECS), T_SECS);
 check('it is framed as binary, which is what this receiver speaks', ref.via === 1);
-check('the anchor is the 84 01 <len> 74 one, not the loose scan', ref.via === 1);
+check('the anchor is the 84 01 <len> one, not the loose scan', ref.via === 1);
 check('the frame is 18 bytes and ends where its length byte says',
       ref.total === 18 && ref.end === 17, `total ${ref.total}, end ${ref.end}`);
 check('its length byte clears FRAME_MIN_LEN, so the framer does not step past it',
@@ -317,6 +345,28 @@ check("it carries this logger's own time, so RxFrameSkew reads 0 on a good clock
       ref.skew === 0);
 check('the program builds exactly the eighteen bytes this check decodes',
       /tstFrame\(18\) = 0/.test(PROG) && /tstFrame\(7\) = 12/.test(PROG));
+
+// v3.1, the spec's reading (#209).
+const EVENING = 20 * 3600 + 51 * 60 + 10;
+const eve = decodeFrame(injectFrame(TEST_ID, 21, EVENING), EVENING);
+check('an evening self-test stamps the half-day, so its time bytes fit and RxFrameSkew still reads 0',
+      injectFrame(TEST_ID, 21, EVENING).slice(12, 14).every(b => b <= 255) && eve.skew === 0, JSON.stringify(eve));
+check('and the program sends the half-day', /tstSecs = \(rTime\(4\) \* 3600 \+ rTime\(5\) \* 60 \+ rTime\(6\)\) MOD HALF_DAY/.test(PROG));
+const held = decodeFrame(realFrame({ secs: EVENING, records: [rec(6270, 21, 30)] }), EVENING);
+check('a record held 30 s is a reading, not a corrupt record', held.readings.length === 1 && held.readings[0].id === 6270, JSON.stringify(held));
+const t7c = decodeFrame(realFrame({ ctl: 0x7C, secs: EVENING, records: [rec(6270, 21)] }), EVENING);
+check('a test-flagged frame (0x7C) is read, and its reading posted as suspect',
+      t7c.readings.length === 1 && t7c.readings[0].suspect, JSON.stringify(t7c));
+check('and the program posts it so', /If ctlTest = 1 Then suspect = 1/.test(PROG));
+const t70 = decodeFrame(realFrame({ ctl: 0x70, records: [rec(6270, 21)] }), 0);
+check('an unstamped frame (0x70) is read, its records starting at the byte after the control byte',
+      t70.readings.length === 1 && t70.readings[0].id === 6270 && t70.skew === null, JSON.stringify(t70));
+const self = decodeFrame(realFrame({ port: 0, records: [[0x01, 0x03, 0x08, 0x11, 0x81]] }), 0);
+check('a self-report (port 0) is left alone — not posted, not called bad', self.other === 0 && !self.why);
+check('the program counts it rather than rejecting it', /RxOtherPort = RxOtherPort \+ 1/.test(PROG)
+      && !/frameOk/.test(PROG) && !/If pay\(i \+ 3\) <> 0/.test(PROG) && !/If rxByte\(frRec \+ 3\) <> 0/.test(PROG));
+check('the ASCII path skips the optional fields before the payload',
+      /optN = fld\(17\)/.test(PROG) && /optN = fld\(14\)/.test(PROG) && /optN = fld\(16\)/.test(PROG) && /hexIn = fld\(payAt \+ i\)/.test(PROG));
 
 // The trap. 9001 is the shape of address 0021 gave the ELPRO bench unit, and it
 // does not fit on the wire: it decodes as something else entirely rather than

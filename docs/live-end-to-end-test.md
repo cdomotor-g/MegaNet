@@ -101,7 +101,7 @@ Read them in this order:
 | `RxHex` | **the same bytes.** Not similar — the same. They went into the byte buffer and came back out of the framer |
 | `RxFrameMode` | `binary` |
 | `FrLenByte` / `FrTotal` | `12` / `18` |
-| `FrElemVia` | `1` — found by the `84 01 <len> 74` anchor, not by the loose scan |
+| `FrElemVia` | `1` — found by the `84 01 <len>` anchor, not by the loose scan |
 | `FrElemLen` / `FrRecords` | `7` / `1` |
 | `FrGood` / `FrBad` | `1` / `0` |
 | `RxLastRecHex` | `A5 1F 15 00` — the four bytes this reading came out of |

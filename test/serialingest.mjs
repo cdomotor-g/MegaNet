@@ -13,8 +13,9 @@
 //   * a live reading goes with source serial, the card's protocol, the
 //     receiver's path, and the time it arrived
 //   * out of a followed log's history, a reading goes only with its own time:
-//     the radio's clock, or the ERT-A2 frame's time of day on the receiver's
-//     date — one with neither is counted and skipped, never stamped "now"
+//     the radio's clock, or the ERT-A2 frame's half-day stamp on the half-day
+//     the receiver's clock is in — one with neither is counted and skipped,
+//     never stamped "now"
 //   * the same receiver keeps its id across cards, and sending resumes
 //   * a refused token stops sending, says so, and keeps what was waiting
 //   * a demo card never sends
@@ -63,6 +64,9 @@ const dec = (seq, epoch, id, value) =>
 const ERT = [
   'ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00',
   'ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,28,32.582,0,0,0,0,0,1,0,0,0,7,11,9999,74,69,20,2D,13,8A,00,2C,13,0C,00',
+  // The rig's own self-report (port 0): battery 129, stage −1247, rain 8 —
+  // the frame the first decoder threw away as corrupt (#209).
+  'ALERT2A,1,9999,ELPRO,N,1,2026,6,8,20,51,10.161,0,0,0,0,0,0,0,0,0,1,19,9999,74,7C,7E,01,0E,08,11,81,07,23,FF,FB,21,00,14,00,00,00,08',
 ];
 
 const server  = await startServer();
@@ -213,18 +217,27 @@ try {
   const nP = posts.length;
   fs.writeFileSync(file('ert.log'), ERT.join('\r\n') + '\r\n');
   await dropFiles('.serial .panel-header h2', [file('ert.log')]);
-  await until(() => posts.length > nP && posts.slice(nP).some(p => p.body.payload.protocol === 'alert2'), 'an ERT-A2 log\'s readings are posted');
-  const ep = posts.slice(nP).find(p => p.body.payload.protocol === 'alert2');
+  const ertPosts = () => posts.slice(nP).filter(p => p.body.payload.protocol === 'alert2');
+  await until(() => ertPosts().reduce((n, p) => n + p.body.payload.readings.length, 0) >= 6, 'an ERT-A2 log\'s readings are posted');
+  const ep = ertPosts()[0];
+  const ertRd = ertPosts().flatMap(p => p.body.payload.readings);
   const expect = await page.evaluate(() => {
     const at = (y, m, d, sod) => { let t = new Date(y, m - 1, d).getTime() + sod * 1000; if (t > Date.now() + 300000) t -= 86400000; return t; };
-    return [at(2026, 6, 8, 0x64F0), at(2026, 6, 8, 0x6920)];
+    // Both received after noon (19:10 and 19:28 by the receiver), and the
+    // stamps count from the most recent 00:00 or 12:00 — so 12:00 plus each
+    // (#209), where seconds since midnight put them twelve hours early.
+    return [at(2026, 6, 8, 43200 + 0x64F0), at(2026, 6, 8, 43200 + 0x6920), at(2026, 6, 8, 43200 + 0x7C7E)];
   });
-  const ets = ep ? [...new Set(ep.body.payload.readings.map(r => r.reading_ts))].sort() : [];
-  ok('…as ALERT2, every clean reading, on the receiver\'s path', ep && ep.body.payload.readings.length === 3 && ep.body.payload.path === 'serial-monitor/ert-check01', ep && JSON.stringify(ep.body.payload).slice(0, 300));
-  ok('…timed by each frame\'s own time of day on the receiver\'s date', JSON.stringify(ets) === JSON.stringify(expect), JSON.stringify(ets) + ' vs ' + JSON.stringify(expect));
+  const ets = [...new Set(ertRd.map(r => r.reading_ts))].sort();
+  const conc = ertRd.filter(r => r.alert_id != null), a2 = ertRd.filter(r => r.a2_station != null);
+  ok('…as ALERT2, every reading, on the receiver\'s path', conc.length === 3 && ep && ep.body.payload.path === 'serial-monitor/ert-check01', ep && JSON.stringify(ep.body.payload).slice(0, 300));
+  ok('…the self-report too, under the gauge and the sensor slot, with no ALERT address',
+    JSON.stringify(a2.map(r => [r.a2_station, r.a2_sensor, r.value_raw])) === JSON.stringify([[9999, 8, 129], [9999, 7, -1247], [9999, 0, 8]])
+      && a2.every(r => !('alert_id' in r) || r.alert_id == null), JSON.stringify(a2));
+  ok('…timed by each frame\'s own stamp, on the half-day the receiver\'s clock is in', JSON.stringify(ets) === JSON.stringify(expect), JSON.stringify(ets) + ' vs ' + JSON.stringify(expect));
   ok('…with the signal the frame gave as a number, or none — never null or NaN on the wire',
-    ep && ep.body.payload.readings.every(r => ['freq_mhz', 'rssi_dbm', 'level_dbfs', 'snr_db'].every(k => !(k in r) || Number.isFinite(r[k]))),
-    ep && JSON.stringify(ep.body.payload.readings));
+    ertRd.length && ertRd.every(r => ['freq_mhz', 'rssi_dbm', 'level_dbfs', 'snr_db'].every(k => !(k in r) || Number.isFinite(r[k]))),
+    JSON.stringify(ertRd));
   ok('…and a receiver that gave no location reports none', reports.some(r => r.body.payload.point_id === 'ert-check01' && r.body.payload.location_source === 'none' && r.body.payload.lat === undefined));
 
   // ── a demo ─────────────────────────────────────────────────────────────────

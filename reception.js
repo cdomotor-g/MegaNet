@@ -59,7 +59,7 @@
 // address no station carries, within two bits of one heard clean, is a ghost
 // — unless that address keeps turning up on its own, which makes it a station
 // MegaNet does not know about. Plus whatever a card itself refused — the radio's unreported
-// frames, the SDR's shadows, an ERT-A2 status byte or frame flag. A burst
+// frames, the SDR's shadows, an ERT-A2 frame that did not add up. A burst
 // nothing decoded from counts for coverage, never as blame.
 //
 // Where a copy was heard bounds what could have sent it: a repeater further
@@ -866,7 +866,7 @@ const Reception = (function () {
     const long = t1 - t0 > 20 * 3600e3;
     const rows = a.bad.slice().sort((x, y) => y.e.t - x.e.t).slice(0, 300).map(b => {
       const st = (b.event && b.event.station) || stationOf(b.truth.alert_id);
-      const what = { flipped: 'flipped', ghost: 'ghost address', rejected: 'radio rejected', shadow: 'decoder shadow', status: 'status byte', frame: 'frame flagged', undecoded: 'undecoded' }[b.why] || b.why;
+      const what = { flipped: 'flipped', ghost: 'ghost address', rejected: 'radio rejected', shadow: 'decoder shadow', status: 'status byte (before #209)', frame: 'frame did not add up', undecoded: 'undecoded' }[b.why] || b.why;
       return '<tr><td class="qs-time">' + esc(when(b.e.t, long)) + '</td><td class="qs-num">' + b.e.alert_id + ' = ' + b.e.value_raw + '</td>'
         + '<td class="qs-num">' + b.truth.alert_id + ' = ' + b.truth.value_raw + '</td><td>' + stLink(st) + '</td>'
         + '<td class="qs-num">' + (b.bits.total ? b.bits.addr + ' addr · ' + b.bits.value + ' value' : '—') + '</td>'

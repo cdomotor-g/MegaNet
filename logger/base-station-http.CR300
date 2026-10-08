@@ -11,6 +11,34 @@
 ' guide, including the Device Configuration Utility settings that have to be
 ' right before either half of this can deliver anything at all.
 '
+' --- Version 3.1: the ALERT2 fields, read from the spec (#209) --------------
+'
+' v3.0 named the ERT-A2's fields from a capture, before any spec was to hand,
+' and four names were wrong. The NHWC documents (IND API v1.1 5.2, MANT v1.2
+' Fig 2-2, Application Layer v1.3 2-3) say: field 18 is the MANT PORT -- 1 is
+' ALERT concentration, 0 a gauge's own self-report -- not a frame-valid flag;
+' field 22 is the hop limit; the payload's first byte is a control byte, of
+' which 0x74 is one value of many (0x7C is the same flagged as test data, 0x70
+' carries no time stamp); the two time bytes count from the most recent 00:00
+' OR 12:00; and a record's fourth byte is a time offset -- seconds the repeater
+' held the reading -- not a status. So at v3.1:
+'
+'   - nothing is rejected for field 18; a frame on any port but 1 is counted
+'     in RxOtherPort and left for Flood-Net's own tabs, which decode a
+'     self-report -- this program posts ALERT addresses only
+'   - the destination, PDU ID and repeater-path fields that fields 14, 16 and
+'     17 announce are skipped, so the payload is found where it really starts
+'   - any version-0 control byte is read, in both shapes; a test-flagged frame
+'     is posted with quality "suspect", the database's word for a reading its
+'     source flagged
+'   - no record is counted bad for its fourth byte. The offset is not taken
+'     off the reading's time: this program times a reading by its own clock as
+'     it arrives, which is already the later of the two
+'   - RxFrameSkew is folded to the half-day, so an afternoon frame no longer
+'     reads twelve hours out
+'
+' None of it has been through CRBasic Editor: #157 Part 1 lists the lines.
+'
 ' --- Version 3.0: what came OUT, and why ------------------------------------
 '
 ' **v2.1 would not fit on a CR300.** It compiled and ran out of memory, and the
@@ -222,7 +250,7 @@ Const PROTOCOL = "alert2"
 ' Reported in the MQTT status message, so "which loggers are still on the old
 ' program" is answerable from the database rather than from a site visit. Bump
 ' it when you change this file in a way a field technician would care about.
-Const FW_VERSION = "3.0"
+Const FW_VERSION = "3.1"
 
 ' --- the serial port ---------------------------------------------------------
 '
@@ -432,9 +460,19 @@ Const FULL_SCALE = 2047
 Const N_FIELDS = 24
 Const FIELD_MAX = 60
 
-' Payload byte 0 of an ALERT2 "ALERT concentration" element. Decimal 116, which
-' is 0x74 -- written in decimal so there is no doubt what the compiler read.
-Const ELEM_CONCENTRATION = 116
+' Payload byte 0 as almost every frame carries it: the application control
+' byte with version 0, a time stamp following, not test data, PDU id off.
+' Decimal 116, which is 0x74 -- written in decimal so there is no doubt what the
+' compiler read. It is what the self-test sends and what the loose scan in
+' DecodeFrame looks for; the anchor itself takes any version-0 control byte.
+Const CTL_STAMPED = 116
+
+' The MANT port of ALERT concentration -- legacy ALERT readings a repeater
+' gathered, which is all this program posts. 0 is a gauge's self-report.
+Const PORT_CONCENTRATION = 1
+
+' The payload's time stamp counts seconds from the most recent 00:00 or 12:00.
+Const HALF_DAY = 43200
 
 ' --- the ERT-A2's BINARY framing ---------------------------------------------
 '
@@ -454,9 +492,13 @@ Const ELEM_CONCENTRATION = 116
 ' because "ALERT2A," is a letter A followed by a comma and a length byte cannot
 ' be.
 '
-' Inside the frame, the ALERT concentration element sits behind a fixed anchor:
+' Inside the frame, the payload element sits behind an anchor, 84 01 <len>,
+' and opens with the control byte:
 '
-'   84 01 <len> 74 <time hi> <time lo> then <len-3>/4 four-byte records
+'   84 01 <len> <control> [<time hi> <time lo>] then four-byte records
+'
+' and an 84 00 element ahead of it is the MANT header, whose second byte's top
+' four bits are the port.
 Const SIG_LEN = 6                  'the length of "ALERT2"
 Const BUF_MAX = 400                'the byte buffer, in bytes. One longest frame
                                    'and a third, which is what a 1-second scan
@@ -542,16 +584,17 @@ Public RxHex As String * 124       'the first 40 bytes of the last frame, in hex
 Public FrLenByte                   'byte 7, the length
 Public FrTotal                     '6 + FrLenByte, the whole frame
 Public FrElemVia                   'how the concentration element was found:
-                                   '1 the 84 01 <len> 74 anchor, 2 the loose
+                                   '1 the 84 01 <len> anchor, 2 the loose
                                    'scan, 0 neither -- read this first when a
                                    'frame produces no readings
 Public FrElemOff                   'where it starts, from the frame start
 Public FrElemLen                   'its length byte
-Public FrTimeSecs                  'the two time bytes inside it
+Public FrTimeSecs                  'the two time bytes inside it, seconds into
+                                   'the half-day
 Public FrRecords                   'four-byte records it carries
 Public FrGood                      'of those, how many decoded
-Public FrBad                       'and how many had a non-zero status byte or
-                                   'an implausible address
+Public FrBad                       'and how many had an implausible address,
+                                   'or came while the clock was not set
 
 Public RxLastLine As String * 250  'the last complete TEXT line, verbatim
 Public RxLastShape As String * 16  'what it was taken to be: ALERT2A, plain, or
@@ -573,12 +616,16 @@ Public whyCode As Long             'the same reason as a number -- see the list
 Public RxFrames                    'frames that decoded
 Public RxReadings                  'readings extracted from them
 Public RxBadFrames                 'frames or lines rejected
-Public RxBadRecords                'records inside good frames whose status byte
-                                   'was non-zero or whose address was impossible
+Public RxBadRecords                'records inside good frames whose address
+                                   'was impossible
+Public RxOtherPort                 'frames on a port other than ALERT
+                                   'concentration -- 0 is a gauge's self-report.
+                                   'Decoded, not posted (v3.1)
 Public RxFrameSkew                 'seconds between the frame's own ALERT2 time
-                                   'and this logger's clock. Near zero means the
-                                   'two agree and the frame time is UTC; parked
-                                   'at a whole number of hours is a finding
+                                   'and this logger's clock, within the half-day
+                                   'the stamp counts. Near zero means the two
+                                   'agree; parked at a whole number of hours is
+                                   'a finding -- one keeps UTC, the other local
 
 '--- the local sensors on this logger's terminals -----------------------------
 '
@@ -822,7 +869,13 @@ Dim fld(FIELD_MAX) As String * 12
 Dim nFld As Long
 Dim pay(32) As Long                'payload bytes, decoded from hex
 Dim nPay As Long
-Dim frameOk As Long
+Dim mantPort As Long               'field 18, or the 84 00 header's port
+Dim payAt As Long                  'the field the payload starts after
+Dim optN As Long                   'a field's value, read to skip the optional ones
+Dim recAt As Long                  'where the records start, past control and stamp
+Dim ctlTs As Long                  'the control byte: a time stamp follows
+Dim ctlTest As Long                'the control byte: test data
+Dim ctlExt As Long                 'the control byte: a second one follows
 Dim payLen As Long
 Dim frameSecs As Long
 Dim loggerSecs As Long
@@ -1437,11 +1490,12 @@ EndSub
 '   8      00                  one pad byte. The anchor search starts at
 '                              frSigAt + SIG_LEN + 1, which is this byte
 '   9-11   84 01 07            the anchor, and the element length
-'   12     74                  ELEM_CONCENTRATION
-'   13-14  <hi> <lo>           seconds since midnight, from this logger's clock,
-'                              so RxFrameSkew comes out at 0
+'   12     74                  CTL_STAMPED, the control byte: version 0, a
+'                              time stamp follows, not test, PDU id off
+'   13-14  <hi> <lo>           seconds into the half-day, from this logger's
+'                              clock, so RxFrameSkew comes out at 0
 '   15-17  <b0> <b1> <b2>      the record: address and value, packed
-'   18     00                  the status byte. Non-zero is a corrupt record
+'   18     00                  the time offset: held no time before export
 '
 ' The packing is DecodeFrame's table run backwards, and it is the one part worth
 ' checking by eye against that table:
@@ -1491,7 +1545,10 @@ Sub TestInject()
     ExitSub
   EndIf
 
-  tstSecs = rTime(4) * 3600 + rTime(5) * 60 + rTime(6)
+  'Seconds into the half-day, as a real stamp counts them (v3.1). Seconds
+  'since midnight passed what two bytes hold at 18:12:16, and an evening
+  'shot's high byte overflowed.
+  tstSecs = (rTime(4) * 3600 + rTime(5) * 60 + rTime(6)) MOD HALF_DAY
   tstB0 = TestId MOD 256
   tstB1 = INT(TestId / 256) + INT(TestValue / 256) * 32
   tstB2 = TestValue MOD 256
@@ -1507,7 +1564,7 @@ Sub TestInject()
   tstFrame(9) = 132                              '84 -- the anchor
   tstFrame(10) = 1
   tstFrame(11) = 7                               'element length
-  tstFrame(12) = ELEM_CONCENTRATION
+  tstFrame(12) = CTL_STAMPED
   tstFrame(13) = INT(tstSecs / 256)
   tstFrame(14) = tstSecs MOD 256
   tstFrame(15) = tstB0
@@ -1536,12 +1593,15 @@ EndSub
 ' number in whyCode before the call.
 '
 '   1 short line              8 clock not set
-'   2 frame flagged invalid   9 alert id out of range
+'   2 bad repeater path count 9 alert id out of range
 '   3 payload len vs hex     10 unrecognised line
 '   4 payload size           12 fields are not numbers
 '   5 not whole records      13 no element in frame
 '   6 payload not hex        14 element len not records
-'   7 not concentration elem
+'   7 control byte not version 0
+'
+' A frame on a port other than ALERT concentration is not a rejection: it is
+' counted in RxOtherPort (v3.1).
 '
 ' The per-reason tally v2.1 kept (RxWhyCount(14)) came out at v3.0: "which
 ' rejection, how many times" is the question a capture is run to answer, and the
@@ -1608,44 +1668,66 @@ Sub ParseAlert2()
     ExitSub
   EndIf
 
-  'Field 18 was 1 on all 443 good frames in the reference capture and 0 on the
-  'single corrupt one, whose records also carried addresses matching no station.
-  'So this is a gate rather than a warning.
-  frameOk = fld(18)
-  If frameOk <> 1 Then
-    RxLastWhy = "receiver flagged the frame invalid"
-    whyCode = 2
-    Call RejectLine()
+  'Field 18 is the MANT port (IND API v1.1 5.2), not a verdict on the frame:
+  '1 is ALERT concentration, 0 a gauge's self-report. v3.0 read it as
+  '"frame valid" and threw every self-report away as corrupt (#209). Only
+  'concentration carries ALERT addresses, which is all this program posts, so
+  'any other port is counted and left -- not rejected.
+  mantPort = fld(18)
+  If mantPort <> PORT_CONCENTRATION Then
+    RxOtherPort = RxOtherPort + 1
+    RxStep = "5 other port - not posted"
     ExitSub
+  EndIf
+
+  'Between field 24 and the payload, only when their flags are set: a
+  'destination address (field 17), a MANT PDU ID (field 14, the protocol ID,
+  '= 1), and a count of repeater addresses followed by the addresses (field
+  '16). payAt is the field the payload starts after.
+  payAt = N_FIELDS
+  optN = fld(17)
+  If optN = 1 Then payAt = payAt + 1
+  optN = fld(14)
+  If optN = 1 Then payAt = payAt + 1
+  optN = fld(16)
+  If optN = 1 Then
+    If payAt + 1 > nFld Then
+      RxLastWhy = "short line - wrapped or truncated"
+      whyCode = 1
+      Call RejectLine()
+      ExitSub
+    EndIf
+    optN = fld(payAt + 1)
+    If optN < 0 OR optN > 20 Then
+      RxLastWhy = "repeater path count is not usable"
+      whyCode = 2
+      Call RejectLine()
+      ExitSub
+    EndIf
+    payAt = payAt + 1 + optN
   EndIf
 
   'Field 23 is the payload length in bytes, and it matched the number of
   'trailing hex fields on all 444 frames -- so it is what tells a complete line
   'from one a narrow terminal wrapped.
   payLen = fld(23)
-  nPay = nFld - N_FIELDS
+  nPay = nFld - payAt
   If payLen <> nPay Then
     RxLastWhy = "payload length disagrees with the hex"
     whyCode = 3
     Call RejectLine()
     ExitSub
   EndIf
-  If nPay < 7 OR nPay > 32 Then
+  If nPay < 5 OR nPay > 32 Then
     RxLastWhy = "payload too short or too long"
     whyCode = 4
-    Call RejectLine()
-    ExitSub
-  EndIf
-  If ((nPay - 3) MOD 4) <> 0 Then
-    RxLastWhy = "payload is not whole records"
-    whyCode = 5
     Call RejectLine()
     ExitSub
   EndIf
 
   'Hex to bytes. pay(1) is payload byte 0 -- CRBasic arrays start at 1.
   For i = 1 To nPay
-    hexIn = fld(N_FIELDS + i)
+    hexIn = fld(payAt + i)
     Call HexByte()
     If hexVal < 0 OR hexVal > 255 Then
       RxLastWhy = "payload byte is not hex"
@@ -1657,9 +1739,23 @@ Sub ParseAlert2()
   Next i
   RxStep = "5 payload decoded"
 
-  If pay(1) <> ELEM_CONCENTRATION Then
-    RxLastWhy = "not an ALERT concentration element"
+  'The control byte (Application Layer v1.3 3.2.1): bits 0-1 the version,
+  'bit 2 a time stamp follows, bit 3 test data, bit 7 a second control byte
+  'follows. Version 0 is the only one defined; 0x74 is one value of many.
+  If (pay(1) MOD 4) <> 0 Then
+    RxLastWhy = "control byte is not version 0"
     whyCode = 7
+    Call RejectLine()
+    ExitSub
+  EndIf
+  ctlTs = INT(pay(1) / 4) MOD 2
+  ctlTest = INT(pay(1) / 8) MOD 2
+  ctlExt = INT(pay(1) / 128) MOD 2
+  recAt = 2 + ctlExt
+  If ctlTs = 1 Then recAt = recAt + 2
+  If ((nPay - recAt + 1) MOD 4) <> 0 OR recAt > nPay Then
+    RxLastWhy = "payload is not whole records"
+    whyCode = 5
     Call RejectLine()
     ExitSub
   EndIf
@@ -1674,32 +1770,33 @@ Sub ParseAlert2()
 
   RxFrames = RxFrames + 1
 
-  'The frame's own clock, against ours. See the note above.
-  frameSecs = pay(2) * 256 + pay(3)
-  loggerSecs = rTime(4) * 3600 + rTime(5) * 60 + rTime(6)
-  RxFrameSkew = frameSecs - loggerSecs
-  If RxFrameSkew > 43200 Then RxFrameSkew = RxFrameSkew - 86400
-  If RxFrameSkew < -43200 Then RxFrameSkew = RxFrameSkew + 86400
+  'The frame's own clock, against ours. The stamp counts seconds from the most
+  'recent 00:00 or 12:00, so it is compared within the half-day and folded to
+  'the nearer side: an afternoon frame no longer reads twelve hours out.
+  RxFrameSkew = NAN
+  If ctlTs = 1 Then
+    frameSecs = pay(recAt - 2) * 256 + pay(recAt - 1)
+    loggerSecs = rTime(4) * 3600 + rTime(5) * 60 + rTime(6)
+    RxFrameSkew = frameSecs - (loggerSecs MOD HALF_DAY)
+    If RxFrameSkew > HALF_DAY / 2 Then RxFrameSkew = RxFrameSkew - HALF_DAY
+    If RxFrameSkew < -HALF_DAY / 2 Then RxFrameSkew = RxFrameSkew + HALF_DAY
+  EndIf
 
-  For i = 4 To nPay Step 4
+  For i = recAt To nPay Step 4
     Sprintf (RxLastRecHex,"%02X %02X %02X %02X",pay(i),pay(i + 1),pay(i + 2),pay(i + 3))
-    If pay(i + 3) <> 0 Then
-      'A non-zero status byte marked corrupt records in the reference capture,
-      'and those records carried addresses matching no station. Counted, not
-      'posted.
-      RxBadRecords = RxBadRecords + 1
+    'The fourth byte is a time offset -- seconds the repeater held the reading
+    '-- not a status: v3.0 counted a non-zero one as corrupt (#209).
+    RxLastId = (pay(i + 1) MOD 32) * 256 + pay(i)
+    RxLastValue = INT(pay(i + 1) / 32) * 256 + pay(i + 2)
+    RxStep = "6 reading decoded"
+    If RxLastId >= 1 AND RxLastId <= 65535 Then
+      suspect = 0
+      If RxLastValue = FULL_SCALE Then suspect = 1
+      If ctlTest = 1 Then suspect = 1             'test data: posted, flagged
+      pushChan = 0                                 'a radio reading
+      Call QueuePush()
     Else
-      RxLastId = (pay(i + 1) MOD 32) * 256 + pay(i)
-      RxLastValue = INT(pay(i + 1) / 32) * 256 + pay(i + 2)
-      RxStep = "6 reading decoded"
-      If RxLastId >= 1 AND RxLastId <= 65535 Then
-        suspect = 0
-        If RxLastValue = FULL_SCALE Then suspect = 1
-        pushChan = 0                               'a radio reading
-        Call QueuePush()
-      Else
-        RxBadRecords = RxBadRecords + 1
-      EndIf
+      RxBadRecords = RxBadRecords + 1
     EndIf
   Next i
 EndSub
@@ -1779,13 +1876,31 @@ Sub DecodeFrame()
   Call HexDump()
   RxStep = "5 frame captured"
 
-  'The anchor: 84 01 <len> 74. Present on every frame in the reference capture,
-  'at the same offset, and the length it carries satisfied (len-3) MOD 4 = 0 on
-  'all of them.
+  'The MANT header, if the frame carries one: 84 00 <len> then its bytes, the
+  'second of which holds the port in its top four bits. A port other than ALERT
+  'concentration is a gauge's self-report (0) or something newer -- counted and
+  'left, not rejected. The self-test's frame carries no header, and is taken
+  'as concentration, which is what it is.
+  mantPort = PORT_CONCENTRATION
+  For fk = frSigAt + SIG_LEN + 1 To frEnd - 5
+    If rxByte(fk) = 132 AND rxByte(fk + 1) = 0 AND rxByte(fk + 2) >= 6 Then
+      mantPort = INT(rxByte(fk + 4) / 16)
+      ExitFor
+    EndIf
+  Next fk
+  If mantPort <> PORT_CONCENTRATION Then
+    RxOtherPort = RxOtherPort + 1
+    RxStep = "6 other port - not posted"
+    ExitSub
+  EndIf
+
+  'The anchor: 84 01 <len>, then a version-0 control byte (its low two bits
+  'clear). v3.0 asked for exactly 0x74 there, and so missed a test-flagged
+  '0x7C, an unstamped 0x70 and any frame with its PDU id switched on (#209).
   frElemAt = 0
   For fk = frSigAt + SIG_LEN + 1 To frEnd - 4
     If rxByte(fk) = 132 Then
-      If rxByte(fk + 1) = 1 AND rxByte(fk + 3) = ELEM_CONCENTRATION Then
+      If rxByte(fk + 1) = 1 AND (rxByte(fk + 3) MOD 4) = 0 Then
         FrElemLen = rxByte(fk + 2)
         frElemAt = fk + 3
         FrElemVia = 1
@@ -1799,7 +1914,7 @@ Sub DecodeFrame()
   'its readings instead of yielding nothing.
   If frElemAt = 0 Then
     For fk = frSigAt + SIG_LEN + 2 To frEnd - 6
-      If rxByte(fk) = ELEM_CONCENTRATION Then
+      If rxByte(fk) = CTL_STAMPED Then
         FrElemLen = rxByte(fk - 1)
         If FrElemLen >= 7 AND FrElemLen <= 32 Then
           If ((FrElemLen - 3) MOD 4) = 0 AND fk + FrElemLen - 1 <= frEnd Then
@@ -1820,8 +1935,15 @@ Sub DecodeFrame()
     ExitSub
   EndIf
 
+  'The control byte: a time stamp, test data, a second control byte.
+  ctlTs = INT(rxByte(frElemAt) / 4) MOD 2
+  ctlTest = INT(rxByte(frElemAt) / 8) MOD 2
+  ctlExt = INT(rxByte(frElemAt) / 128) MOD 2
+  recAt = 1 + ctlExt
+  If ctlTs = 1 Then recAt = recAt + 2
+
   FrElemOff = frElemAt - frSigAt + 1
-  If FrElemLen < 7 OR FrElemLen > 32 OR ((FrElemLen - 3) MOD 4) <> 0 Then
+  If FrElemLen < recAt + 4 OR FrElemLen > 32 OR ((FrElemLen - recAt) MOD 4) <> 0 Then
     RxLastWhy = "element length is not whole records"
     whyCode = 14
     RxBadFrames = RxBadFrames + 1
@@ -1832,28 +1954,30 @@ Sub DecodeFrame()
   RxStep = "6 element decoded"
 
   'The frame's own clock, against ours -- the same comparison the ASCII path
-  'makes, and the same open question. See ParseAlert2.
-  FrTimeSecs = rxByte(frElemAt + 1) * 256 + rxByte(frElemAt + 2)
-  loggerSecs = rTime(4) * 3600 + rTime(5) * 60 + rTime(6)
-  RxFrameSkew = FrTimeSecs - loggerSecs
-  If RxFrameSkew > 43200 Then RxFrameSkew = RxFrameSkew - 86400
-  If RxFrameSkew < -43200 Then RxFrameSkew = RxFrameSkew + 86400
+  'makes, within the half-day the stamp counts. See ParseAlert2.
+  RxFrameSkew = NAN
+  FrTimeSecs = 0
+  If ctlTs = 1 Then
+    FrTimeSecs = rxByte(frElemAt + recAt - 2) * 256 + rxByte(frElemAt + recAt - 1)
+    loggerSecs = rTime(4) * 3600 + rTime(5) * 60 + rTime(6)
+    RxFrameSkew = FrTimeSecs - (loggerSecs MOD HALF_DAY)
+    If RxFrameSkew > HALF_DAY / 2 Then RxFrameSkew = RxFrameSkew - HALF_DAY
+    If RxFrameSkew < -HALF_DAY / 2 Then RxFrameSkew = RxFrameSkew + HALF_DAY
+  EndIf
 
-  FrRecords = (FrElemLen - 3) / 4
-  For frRec = frElemAt + 3 To frElemAt + FrElemLen - 1 Step 4
+  FrRecords = (FrElemLen - recAt) / 4
+  For frRec = frElemAt + recAt To frElemAt + FrElemLen - 1 Step 4
     Sprintf (RxLastRecHex,"%02X %02X %02X %02X",rxByte(frRec),rxByte(frRec + 1),rxByte(frRec + 2),rxByte(frRec + 3))
 
     'Same unpacking as the ASCII path: the middle byte carries the top three
     'bits of the value and the top five bits of the address. Read straight out
     'of the byte buffer -- v2.1 copied the four bytes into four Publics so a
-    'table could sample them, and that table went at v3.0.
+    'table could sample them, and that table went at v3.0. The fourth byte is
+    'a time offset, not a status (#209), so it decides nothing here.
     RxLastId = (rxByte(frRec + 1) MOD 32) * 256 + rxByte(frRec)
     RxLastValue = INT(rxByte(frRec + 1) / 32) * 256 + rxByte(frRec + 2)
 
-    If rxByte(frRec + 3) <> 0 Then
-      FrBad = FrBad + 1
-      RxBadRecords = RxBadRecords + 1
-    ElseIf RxLastId < 1 OR RxLastId > 65535 Then
+    If RxLastId < 1 OR RxLastId > 65535 Then
       FrBad = FrBad + 1
       RxBadRecords = RxBadRecords + 1
     ElseIf NOT ClockOK Then
@@ -1863,6 +1987,7 @@ Sub DecodeFrame()
     Else
       suspect = 0
       If RxLastValue = FULL_SCALE Then suspect = 1
+      If ctlTest = 1 Then suspect = 1             'test data: posted, flagged
       pushChan = 0                                 'a radio reading
       Call QueuePush()
       FrGood = FrGood + 1

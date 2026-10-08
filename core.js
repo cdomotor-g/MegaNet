@@ -1073,10 +1073,10 @@ const HELP = {
       'Several formats can decode the same bits — the one highlighted is the <strong>best '
       + 'match</strong>, being the one whose check bits and CRC all pass, not the only reading. '
       + 'The others stay on screen for that reason.',
-      '<strong>A2C is decode-only, and its integrity claim is thin.</strong> It is offered for '
+      '<strong>A2C is decode-only, and nothing in it can be checked.</strong> It is offered for '
       + '32-bit input alone: the four-byte form an address and value take inside an ALERT2 '
-      + 'concentration payload, with no framing and no CRC — just a status byte that reads zero on '
-      + 'every valid record seen. Whole serial lines of it belong on the ALERT2 tab.',
+      + 'concentration payload, with no framing and no CRC — its fourth byte is a time offset, the '
+      + 'seconds a repeater held the reading, not a status. Whole serial lines of it belong on the ALERT2 tab.',
       'A decoded address is matched against the <strong>loaded Flood-Net file first</strong> (shown '
       + 'with a badge) and only then against the bundled 2021 national address list. An address is '
       + 'unique within a region and not nationally, so a name here is a candidate rather than an '

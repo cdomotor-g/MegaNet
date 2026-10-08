@@ -138,16 +138,28 @@ const SerialIngest = (function () {
     return o;
   }
 
+  // The ALERT2 pair, when a reading is a gauge's own (both or neither — the
+  // database refuses half a pair), and a quality the source stated: an ERT-A2
+  // frame flagged as test data is 'suspect'.
+  function named(it) {
+    const o = {};
+    if (it.a2_station != null && it.a2_sensor != null) { o.a2_station = it.a2_station; o.a2_sensor = it.a2_sensor; }
+    if (it.quality) o.quality = it.quality;
+    return o;
+  }
+
   // From a card: [{ alert_id, value_raw, ts (ms) | null, protocol, line?,
-  // freq_mhz?, rssi_dbm?, level_dbfs?, snr_db? }]. `ts` null is a reading with
-  // no time this card can stand behind.
+  // freq_mhz?, rssi_dbm?, level_dbfs?, snr_db?, quality? }] — or, for an
+  // ALERT2 gauge's own report, a2_station and a2_sensor in place of alert_id
+  // (0024). `ts` null is a reading with no time this card can stand behind.
   function add(c, items) {
     if (!c || isDemo(c) || !RECEIVER[kindOf(c)]) return;
     const g = state_(c);
     if (!g.on) return;
     items.forEach(it => {
       if (it.ts == null || !isFinite(it.ts)) { g.skipped++; return; }
-      g.queue.push(Object.assign({ alert_id: it.alert_id, reading_ts: Math.round(it.ts), value_raw: it.value_raw, protocol: it.protocol || 'alert' }, heard(it)));
+      g.queue.push(Object.assign({ alert_id: it.alert_id, reading_ts: Math.round(it.ts), value_raw: it.value_raw, protocol: it.protocol || 'alert' },
+        named(it), heard(it)));
       if (it.line) { g.frames.push(it.line); if (g.frames.length > 200) g.frames.shift(); }
     });
     if (g.queue.length > QUEUE_MAX) { g.dropped += g.queue.length - QUEUE_MAX; g.queue.splice(0, g.queue.length - QUEUE_MAX); }
@@ -187,7 +199,7 @@ const SerialIngest = (function () {
     const body = { payload: {
       source: 'serial', protocol: proto, path: 'serial-monitor/' + point(c).pointId,
       frame: g.frames.join('\n').slice(-32768) || undefined,
-      readings: same.map(r => Object.assign({ alert_id: r.alert_id, reading_ts: r.reading_ts, value_raw: r.value_raw }, heard(r))),
+      readings: same.map(r => Object.assign({ alert_id: r.alert_id, reading_ts: r.reading_ts, value_raw: r.value_raw }, named(r), heard(r))),
     } };
     let res, out;
     try {
@@ -208,7 +220,7 @@ const SerialIngest = (function () {
       (out.rejected || []).forEach(x => {
         g.rejected++;
         const r = same[x.i];
-        g.reasons.unshift((r ? 'ID ' + r.alert_id + ': ' : '') + x.why);
+        g.reasons.unshift((r ? (r.a2_station != null ? 'a2:' + r.a2_station + '/' + r.a2_sensor : 'ID ' + r.alert_id) + ': ' : '') + x.why);
       });
       g.reasons = g.reasons.slice(0, 4);
       g.lastAt = Date.now(); g.err = ''; g.backoff = 0;

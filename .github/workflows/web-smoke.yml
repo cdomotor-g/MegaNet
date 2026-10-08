@@ -275,6 +275,14 @@ jobs:
         working-directory: test
         run: npm run hfem
 
+      # Node-only and fast. The ALERT2 decoder held to the NHWC specifications
+      # it is read from (#209): the reference capture's "corrupt" frame is the
+      # rig's General Sensor Report, an afternoon stamp keeps its own time, and
+      # nothing calls a frame bad from field 18, field 22 or a record's offset.
+      - name: ALERT2 decoder — the spec's examples and the capture's self-report
+        working-directory: test
+        run: npm run alert2
+
       # Node-only and fast. The Longley–Rice port has one honest oracle — the
       # NTIA reference library's own numbers — and 53 of them are recorded in
       # test/baseline/itm-vectors.json. A port that drifts by 1e-6 dB fails.

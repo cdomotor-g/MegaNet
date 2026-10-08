@@ -17,7 +17,7 @@ what finding a corrupting repeater needs.
 | --- | --- | --- |
 | Quansheng | each DEC, with RSSI and noise floor | frames the radio's own burst bits show it heard and did not report (`rejected`); bursts nothing decoded from (`undecoded`) |
 | RTL-SDR | each accepted reading, with votes and burst level (dBFS) | bit-flip shadows the decoder set aside (`shadow`); undecoded bursts |
-| ERT-A2 | each reading, with RSSI on the USB port | readings with a status byte (`status`); frames the receiver flagged (`frame`) |
+| ERT-A2 | each reading, with RSSI on the USB port | readings from a frame that does not add up, and frames that would not decode (`frame`). A record's fourth byte is a time offset, not a status (#209); `status` is only on rows from before |
 
 **Position**, best first: a **GPS card** on the Serial Monitor (fix under 10 s
 old — recorded as exact); this device's own location while *track this device's
