@@ -316,6 +316,27 @@ async function main() {
           const g = groups.find(x => x.getAttribute('aria-label') === 'Imagery and terrain');
           return g ? [...g.children].map(e => e.textContent.trim().replace(/^\S+\s/, '')) : [];
         })(),
+        // Directions (#225): in the Position group, a link off the site to a
+        // drive that ends at the station's own coordinate — Google's here,
+        // because this Chromium is not an Apple device, and Apple's on one.
+        directions: (() => {
+          const g = groups.find(x => x.getAttribute('aria-label') === 'Position');
+          const a = g && g.querySelector('a.mn-directions');
+          return a ? { href: a.getAttribute('href'), target: a.target,
+                       label: a.textContent.trim(), title: a.title } : null;
+        })(),
+        dirCoord:   encodeURIComponent(`${s.lat},${s.lon}`),
+        dirGoogle:  stationDirectionsUrl(s, false),
+        dirApple:   stationDirectionsUrl(s, true),
+        dirNone:    stationDirectionsUrl({ lat: null, lon: null }) === null
+                    && directionsPillHtml({ name: 'Nowhere' }) === '',
+        dirUas:     [
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 Version/17.4 Mobile/15E148 Safari/604.1',
+          // iPadOS asks for the desktop site as a Mac.
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.4 Safari/605.1.15',
+          'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36',
+        ].map(ua => appleDevice(ua)),
         field:      !!acts.querySelector('.mn-field-data'),
         editFirst:  kids[0] && kids[0].classList.contains('mn-edit-station')
                     && kids[0].tagName === 'BUTTON' && kids[0].type === 'button',
@@ -347,6 +368,18 @@ async function main() {
     check('the imagery group is the two street views, then the two Google Earths',
       rows.imagery.join(' | ') === 'Google Street View ↗ | Apple Maps ↗ | Google Earth KML ⬇ | Google Earth ↗',
       rows.imagery.join(' | '));
+    check('the Position group offers Directions, leaving the site for a map app',
+      !!rows.directions && rows.directions.label === '🚗 Directions ↗'
+        && rows.directions.target === '_blank' && /Google Maps/.test(rows.directions.title),
+      JSON.stringify(rows.directions));
+    check('a drive that ends at the station’s own coordinate, not a search for its name',
+      !!rows.directions && rows.directions.href === rows.dirGoogle
+        && rows.dirGoogle === `https://www.google.com/maps/dir/?api=1&destination=${rows.dirCoord}&travelmode=driving`
+        && rows.dirApple === `https://maps.apple.com/?daddr=${rows.dirCoord}&dirflg=d`,
+      JSON.stringify({ href: rows.directions && rows.directions.href, apple: rows.dirApple }));
+    check('in Apple Maps on an iPhone, iPad or Mac, Google Maps on anything else',
+      rows.dirUas.join() === 'true,true,false,false', rows.dirUas.join());
+    check('and none for a station with no position', rows.dirNone);
     check('and a station with a position offers Field data', rows.field);
     check('and the rows together are every action the station offers, no more and no less',
       rows.hasCopy && rows.hasList && rows.count === rows.expect,

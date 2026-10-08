@@ -697,7 +697,9 @@ const HELP = {
       + 'and zooms, and if the card opens over its own pin the map moves the pin clear. The '
       + 'card stays put while the filters change; <em>Station details</em> on it selects the '
       + 'station and jumps to its details card — in the side panel, or under the map when the '
-      + 'cards are there. Picking a repeater in <em>Repeaters listening</em> puts the map on '
+      + 'cards are there. <em>Directions</em> on it opens a drive to the station from wherever '
+      + 'you are, in Apple Maps on an iPhone, iPad or Mac and in Google Maps anywhere else. '
+      + 'Picking a repeater in <em>Repeaters listening</em> puts the map on '
       + 'it and pulses a gold ring round its pin. On a phone a tap opens a small callout with '
       + '<em>Details &amp; actions</em> and <em>Copy lat, lon</em>, and the card opens as a '
       + 'sheet across the bottom of the map, with the leader up to the pin.',
@@ -2226,6 +2228,43 @@ function stationMapLinkUrls(s) {
     earth:  `https://earth.google.com/web/@${encodeURIComponent(s.lat)},${encodeURIComponent(s.lon)},0a,2000d,35y,0h,0t,0r`,
     apple:  `https://maps.apple.com/?ll=${encodeURIComponent(coord)}&q=${encodeURIComponent(s.name || '')}`,
   };
+}
+
+// Turn-by-turn driving directions to a station (#225), from wherever the person
+// pressing it is. On an iPhone, iPad or Mac the link is Apple Maps', which those
+// open in the Maps app itself; everywhere else it is Google's, which a phone with
+// Google Maps installed opens in the app and anything else opens on the web. The
+// destination is the coordinate, never the name, so the route ends at the pin
+// and not wherever a geocoder puts the name. Null for a station with no
+// position: there is nowhere to drive to.
+function stationDirectionsUrl(s, apple = appleDevice()) {
+  if (s == null || s.lat == null || s.lon == null) return null;
+  const coord = encodeURIComponent(`${s.lat},${s.lon}`);
+  return apple
+    ? `https://maps.apple.com/?daddr=${coord}&dirflg=d`
+    : `https://www.google.com/maps/dir/?api=1&destination=${coord}&travelmode=driving`;
+}
+
+// An iPhone, iPad or Mac, read off the user-agent string. iPadOS presents itself
+// as a Mac, so "Macintosh" is what catches an iPad as well as a Mac — and both
+// open a maps.apple.com link in Maps (offline-tab.js reads the same string).
+function appleDevice(ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '') {
+  return /iPhone|iPad|iPod|Macintosh/.test(ua);
+}
+
+// The pill for it, or '' for a station with no position. It sits in the station
+// card's Position group, beside Copy lat, lon and Move pin, rather than among
+// the imagery: those pills show somebody else's picture of the ground, and this
+// one — like the two beside it — is something done with the position itself.
+// Not on the editor card: that card's coordinate is the boxes, which Copy reads
+// at the click, and a link drawn from the saved record beside it would send a
+// crew to the pin as it was before somebody dragged it.
+function directionsPillHtml(s) {
+  const apple = appleDevice();
+  const url = stationDirectionsUrl(s, apple);
+  if (!url) return '';
+  return `<a class="pill mn-directions" href="${esc(url)}" target="_blank" rel="noopener"
+       title="Driving directions to this location from wherever you are, in ${apple ? 'Apple' : 'Google'} Maps">🚗 Directions ↗</a>`;
 }
 
 // The links above, rendered as the row of pills used in both the map popup and

@@ -88,7 +88,9 @@ const MG_BASES = {
   'none':          null,
   'OSM-Topo':      { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', sub: 'abc', max: 17,
                      attr: '© OpenStreetMap contributors, SRTM · © OpenTopoMap (CC-BY-SA)' },
-  'OpenStreetMap': { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', sub: 'abc', max: 19,
+  // The bare host, as the 2-D and 3-D maps ask for it — the OSMF tile policy
+  // asks for exactly this URL (#189, map-controls.js says why).
+  'OpenStreetMap': { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', sub: '', max: 19,
                      attr: '© OpenStreetMap contributors' },
   'Satellite':     { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', sub: '', max: 19,
                      attr: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics' },

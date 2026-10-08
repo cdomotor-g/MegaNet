@@ -220,8 +220,7 @@ const Map3D = (function () {
       // policy asks for exactly this URL and says the subdomain forms "may be
       // slower or withdrawn without notice" — they are a leftover from HTTP/1.1
       // connection limits that HTTP/2 made pointless. The 2-D layer in
-      // map-controls.js still uses Leaflet's `{s}` form; that is older than this
-      // and is left alone here rather than changed in passing.
+      // map-controls.js asks for the same URL (#189).
       tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
       maxzoom: 19,
       attribution: '© OpenStreetMap contributors',

@@ -6063,7 +6063,7 @@ function stationPopupHtml(s) {
       </div>`;
 }
 
-// The 7–11 actions a station offers, in four groups. One builder for the two
+// The 7–12 actions a station offers, in four groups. One builder for the two
 // surfaces that draw them — the station card (#175), and the editor card its
 // own subset — and test/movepin.mjs pins the shapes once, not per surface.
 // (The desktop callout's row was a third, flattened, until the callout went.)
@@ -6077,7 +6077,7 @@ function stationPopupHtml(s) {
 //
 //   In MegaNet          what this app can do with the station — edit it,
 //                       find it in the list, zoom to it, arm the blast styling
-//   Position            the coordinate itself: copy it, or move it
+//   Position            the coordinate itself: copy it, drive to it, or move it
 //   Imagery & terrain   somebody else's picture of the ground, KML included
 //   Records             the paperwork — ARRO's admin page, the two libraries
 //
@@ -6112,8 +6112,10 @@ function stationActionGroups(s) {
       fieldPhotosPillHtml(s),
       MapBlast.popupLinkHtml(s),
     ] },
+    // The position handed over, driven to (#225), and moved.
     { label: 'Position', pills: [
       copyLatLonPillHtml(s),
+      directionsPillHtml(s),
       MapMovePin.popupLinkHtml(s),
     ] },
     // Two pairs, which is what the row wraps into at the card's width: the two

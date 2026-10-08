@@ -128,7 +128,15 @@ function makeBaseLayers() {
       attribution: 'Map data: © OpenStreetMap contributors, SRTM | Style: © OpenTopoMap (CC-BY-SA)',
       maxZoom: 17,
     }),
-    'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // The bare host, with no `{s}` for Leaflet to fill with a/b/c (#189). The
+    // OSMF tile policy asks for exactly this URL and says the subdomain forms
+    // "may be slower or withdrawn without notice" — on a base map that means
+    // tiles that quietly stop arriving. Spreading tiles over a., b. and c. was
+    // a way round HTTP/1.1's few connections per host; over HTTP/2 one host
+    // already carries every tile at once, so the subdomains buy nothing and are
+    // not an optimisation to put back. OSM-Topo above keeps its `{s}`: that is
+    // OpenTopoMap's own published form, under a different policy.
+    'OpenStreetMap': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors', maxZoom: 19,
     }),
     // The labels credit covers the two Reference/* services that ride along

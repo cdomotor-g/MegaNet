@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 13, date: '2026-10-08', items: [
+      '<strong>🚗 Directions</strong> on the station card, beside <em>Copy lat, lon</em>: one press opens driving '
+        + 'directions to the station from wherever you are — in Apple Maps on an iPhone, iPad or Mac, and in Google '
+        + 'Maps anywhere else.',
+    ] },
     { n: 12, date: '2026-10-08', items: [
       '<strong>Reset north in the digital twin.</strong> The compass in the top right of the 3-D view is now a '
         + 'button: press it to turn the view back to face north, keeping its tilt.',
