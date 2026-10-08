@@ -1129,6 +1129,16 @@ jobs:
         working-directory: test
         run: npm run review
 
+      # Node, then Chromium. The 🎓 Radio Propagation tab (propagation-*.js):
+      # its physics against figures worked by hand, its ALERT frame against
+      # packets.js's own decoder, each of the made-up catchment's stories
+      # against the outcome it tells, and the tab driven — drawn, its stories
+      # and sliders saying what happened, taken down on the way out, and still
+      # at the outcome for a device that asks for reduced motion.
+      - name: Radio Propagation — the lesson's physics, frames and stories
+        working-directory: test
+        run: npm run propagation
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each

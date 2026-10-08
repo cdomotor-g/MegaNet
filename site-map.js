@@ -66,6 +66,14 @@ const SiteMap = (function () {
         'See what works with no signal, and what does not',
       ],
     },
+    propagation: {
+      what: 'A lesson in how radio carries a reading from a gauge to a base — waves, shadows, trees, echoes, collisions and repeater delays — in pictures that move.',
+      use: [
+        'See a wave spread over a 3-D catchment, round a mountain and off a building',
+        'Understand why a bit flips, and how a reading ends up on a ghost address',
+        'Learn why repeaters wait, and why trees barely matter at 150 MHz',
+      ],
+    },
     stations: {
       what: 'The whole network on one map, with the station list, its filters and every station\'s details in the side panel beside it.',
       use: [
@@ -283,7 +291,7 @@ const SiteMap = (function () {
   // site"; `step` is that sentence, cut at the commas.
   const GROUPS = {
     'Start here': { step: 'Getting set up',
-      blurb: 'Before the work: getting a phone or laptop ready for a site with no signal, and putting Flood-Net on its home screen.' },
+      blurb: 'Before the work: getting a phone or laptop ready for a site with no signal, putting Flood-Net on its home screen, and a lesson in how the radio carries a reading home.' },
     'Stations & networks': { step: 'What is out there',
       blurb: 'The stations themselves, the radio paths between them, and the maps and files made from them. Most days start here.' },
     'Interference': { step: 'What is stepping on it',
@@ -318,6 +326,7 @@ const SiteMap = (function () {
     { text: 'File the photos from a field trip',           tab: 'photos' },
     { text: 'Print a map for a field trip',                tab: 'mapgen' },
     { text: 'Review a radio network\'s design',            tab: 'review' },
+    { text: 'Learn how radio gets a reading home',         tab: 'propagation' },
   ];
 
   const SELF = 'sitemap';

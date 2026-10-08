@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 18, date: '2026-10-08', items: [
+      '<strong>🎓 Radio Propagation</strong>, a new tab under <em>Start here</em>: how radio carries a reading from a '
+        + 'gauge to a base, in pictures that move. A 3-D catchment shows the wave spreading in every direction, the '
+        + 'shadow behind a mountain, trees that are nearly transparent at 150 MHz, echoes off silos and a scarp, and '
+        + 'repeaters relaying what they heard — a flipped bit becoming a ghost address. Below it: echoes adding up or '
+        + 'cancelling, a path over a ridge at four frequencies, two keyings colliding bit by bit, and why repeaters wait.',
+    ] },
     { n: 17, date: '2026-10-08', items: [
       '<strong>Fade margins, calibrated against the field.</strong> The link budget card, the fade-margin map, the '
         + 'profile\'s readout and polar coverage now price a path with Longley–Rice over the terrain, less a '

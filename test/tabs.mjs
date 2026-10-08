@@ -619,6 +619,13 @@ const SEED_NR = `async () => {
   for (const d of document.querySelectorAll('#main-content details')) d.open = true;
 }`;
 
+// The Radio Propagation tab, born converted: the echo story, so the Town
+// base's table and its phasor are on the page too, and every disclosure open.
+const SEED_RP = `async () => {
+  Propagation.scenario('echo');
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
 const SEED_BS_OUT = `() => {
   if (window.__bsAuth) { Object.assign(Auth, window.__bsAuth); delete window.__bsAuth; }
   BaseStations.authChanged();
@@ -778,6 +785,7 @@ const CONVERTED = [
   { id: 'basestations', label: 'Base Stations — the list, a station open, and the team keys', issue: 'born converted', seed: SEED_BS },
   { id: 'review',     label: 'Network Review — signed out', issue: 'born converted', seed: SEED_NR_OUT },
   { id: 'review',     label: 'Network Review — a matrix of two repeaters and a proposed site', issue: 'born converted', seed: SEED_NR },
+  { id: 'propagation', label: 'Radio Propagation — the lesson, the echo story and every drawing', issue: 'born converted', seed: SEED_RP },
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },
   { id: 'sitemap',    label: 'Site Map',        issue: 'born converted' },

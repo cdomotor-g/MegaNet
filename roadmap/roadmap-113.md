@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-08** (revision 142 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-08** (revision 143 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -750,6 +750,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 143 — 2026-10-08: 🎓 Radio Propagation — a lesson in how a reading gets home
+
+At the owner's request: an educational tab on radio propagation and what it means for ALERT transmission and reception, as visual as possible and animated — a 3-D simulation with field stations transmitting, repeaters relaying and base stations receiving, showing bursts interfering constructively and destructively, bits flipping at repeaters and bases, transmission delays, land cover and trees half transparent at 150 MHz, propagation in three dimensions rather than along a line, and reflections off buildings and mountains. No issue was filed for it; this entry is its record.
+
+- **`propagation-physics.js` (`PropPhysics`)**, pure: wavelength, flight time, free-space loss, Fresnel zones, Earth bulge and horizon (k = 4/3), the knife-edge parameter and P.526's loss, foliage after P.833 (illustrative), phasor sums, the ALERT Binary frame (packets.js's ABF map) and a receiver with FM capture at 6 dB and seeded bit errors near equal strength.
+- **`propagation-scene.js` (`PropScene`)**: a made-up 30 km catchment drawn on a plain 2-D canvas (no library, opens offline) — terrain, forest, river, town, silos, a scarp; six stations; wavefronts with their radio shadows, paths direct or bent over a ridge and tinted through trees, echoes off the silos, the scarp and the ground by the image method; four stories (*a reading goes home*, *two repeaters, one delay*, *two stations at once*, *echoes in town*) in which repeaters store and forward what they decoded, flips and all; a warped clock (flights 35,000× slower, bursts 6×); a timeline of every keying.
+- **`propagation.js` (`Propagation`)**, 🎓 under *Start here*: the scene with its controls (story, playback, view, layers including the Fresnel zone and a coverage drape, both repeaters' delays, the Town base's mast), the story in words, a card per receiver with each frame's bits; then interference (two waves, and the standing pattern before a wall with a receiver to walk), the side-on path at four frequencies, two keyings colliding bit by bit, repeater delays on a timeline, and links to the tabs where it all shows up. Reduced motion: every drawing still, at its outcome.
+
+**Checks:** `npm run propagation` (new, a CI step: 65 assertions — the physics to figures worked by hand, the frame to packets.js's own decoder, the receiver, each story's outcome, and the tab driven in Chromium); `npm run tabs` (+1 entry), `npm run smoke` (31 tabs). Run green before the push: the cheap five, `propagation`, `tabs`, `smoke`, `nav`, `help`, `exports`, `registry`, `firstvisit`, `palette`, `dock`, `shell`, `offline`. What's new entry 18; stamps to `20261008i`.
 
 ### Revision 142 — 2026-10-08: the attenuator's 3 dB steps, honoured — the field allowance falls to 16 dB
 

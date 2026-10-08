@@ -121,12 +121,24 @@
 // are the ones somebody setting a device up types — "install", "home screen",
 // "flight mode", "no signal" — and "offline", which Station Health also
 // answers to for a station gone quiet: both are listed, this one first.
+//
+// 🎓 Radio Propagation (propagation.js) is the third: a lesson, not a tool —
+// how a reading travels from a gauge to a base, with drawings that move. It is
+// read before the work, or beside it when a link misbehaves, so it sits here.
+// Its find words are the ideas it teaches ("fresnel", "multipath", "capture
+// effect", "ghost") and the words somebody wanting a lesson types ("learn",
+// "how radio works"). None may start with "the" (nav.mjs holds that no tab
+// answers to it), and none is "signal", "mobile", "network", "mount" or
+// "decode": filed first, a lesson that tied with the tab a probe in nav.mjs or
+// palette.mjs is asking for would win the tie.
 const TABS = [
   { group: 'Start here', tabs: [
     { id: 'sitemap',    label: 'Site Map',               icon: '🗂️',
       find: 'guide overview tour index directory contents orientation beginner introduction getting started help what does each every tab do explained' },
     { id: 'offline',    label: 'Offline & Install',      icon: '📲',
       find: 'offline no signal no reception flight mode airplane mode install app add to home screen homescreen icon pwa progressive web app phone tablet saved cache ready set up device update new version' },
+    { id: 'propagation', label: 'Radio Propagation',     icon: '🎓',
+      find: 'learn learning lesson teach tutorial education educational explainer course training basics physics how radio works waves wavefront rf propagation vhf uhf 150 mhz 151.5 wavelength frequency fresnel zone line of sight los multipath echo echoes reflection reflections bounce diffraction bending shadow hills ridge buildings silos trees foliage forest land cover fading null interference constructive destructive phase phasor collision collisions capture effect bit flip flipped bits ghost repeater delay delays timing aloha store and forward simulation 3d three dimensional animation animated earth curvature bulge horizon' },
   ] },
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
@@ -331,6 +343,29 @@ const HELP = {
     links: [
       { label: 'With no signal — what is kept, and how (README)', href: 'README.md#with-no-signal' },
     ],
+  },
+  propagation: {
+    summary: 'A lesson in how radio carries a reading from a gauge to a base station, and the ways it goes wrong on '
+           + 'the way — with pictures that move. A <strong>3-D catchment</strong> with field stations, hilltop repeaters '
+           + 'and bases shows the wave leaving in every direction, the shadow a mountain throws, the trees it passes '
+           + 'through, the echoes off silos, a scarp and the ground, and repeaters relaying what they heard — bits flipped '
+           + 'and all. Below it: two waves <strong>adding up or cancelling</strong>, a path <strong>over a ridge and '
+           + 'through a forest</strong> at four frequencies, two keyings <strong>colliding bit by bit</strong>, and '
+           + '<strong>repeater delays</strong> on a timeline. Nothing on it needs a signal.',
+    watch: [
+      '<strong>The 3-D catchment is made up</strong>, so that every effect shows at once. Its radio is worked out properly '
+      + '(free-space loss, the knife edge over a ridge, trees after ITU-R P.833, echoes by the image method, the link '
+      + 'budget card\'s field allowance); only the heights are drawn four times taller than they are.',
+      '<strong>Time runs on two clocks.</strong> A wave crosses the scene in about 100 µs and a keying lasts half a '
+      + 'second, so flights are shown 35,000 times slower and everything else six times slower. The clock in '
+      + 'the corner says which.',
+      '<strong>The receiver is a model.</strong> FM capture at 6 dB, and bit errors that rise as two signals near the same '
+      + 'strength: the shape real receivers follow, not any one radio\'s figures. The flips are drawn at random from a '
+      + 'fixed seed, so a picture is always the same picture — 🎲 tries another moment.',
+      'A device set to reduce motion starts every drawing still, at its most telling moment; ▶ Play runs it.',
+    ],
+    related: ['stations', 'bitflipper', 'reception'],
+    links: [{ label: 'How Flood-Net\'s fade margin was calibrated against the field', href: 'docs/network-review.md' }],
   },
   stations: {
     summary: 'The map fills the page, and its cards sit beside it in the <strong>side panel</strong> '

@@ -3366,6 +3366,7 @@ function renderMain() {
     case 'admin':      el.innerHTML = Admin.render();         Admin.init();        break;
     case 'basestations': el.innerHTML = BaseStations.render(); BaseStations.init(); break;
     case 'review':     el.innerHTML = NetworkReview.render(); NetworkReview.init(); break;
+    case 'propagation': el.innerHTML = Propagation.render(); Propagation.init(); break;
     default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }
   updateChromeHeight();     // three tabs size their own scrollers off it

@@ -172,6 +172,13 @@ MegaNet/
 ├── network-review.js       ← NetworkReview — Network Review tab (administrators: the
 │                             fade margin matrix of a network beside the attenuator's,
 │                             Flood-Net against Radio Mobile, the design principles)
+├── propagation-physics.js  ← PropPhysics — the 🎓 Radio Propagation tab's arithmetic
+│                             (wavelength, Fresnel, knife edge, foliage, phasors, the
+│                             ALERT Binary frame, a receiver with FM capture); pure
+├── propagation-scene.js    ← PropScene — its 3-D catchment on a plain 2-D canvas:
+│                             wavefronts, shadows, echoes, repeaters relaying, ghosts
+├── propagation.js          ← Propagation — the Radio Propagation tab itself, and its
+│                             2-D drawings (interference, path, bit lanes, delays)
 ├── health-glance.js        ← HealthGlance — a station's health where people already
 │                             look (#218): last heard, its battery and its findings on
 │                             its card, each a door into Station Health, and Colour
@@ -4619,6 +4626,48 @@ the register's own faults: repeaters on an assumed mast, pass-range links longer
 than 150 km, stations surveyed below the terrain model.
 
 `docs/network-review.md` has the rest; `npm run review` holds it.
+
+### 27. Radio Propagation (How a Reading Gets Home, in Pictures That Move)
+
+🎓 **Radio Propagation**, under **Start here**, is a lesson rather than a tool:
+how radio carries a reading from a gauge to a base station, and the ways it goes
+wrong on the way. Nothing on it needs a signal or a library — every drawing is a
+plain canvas, the 3-D one included — so it opens offline like the rest.
+
+1. **The network in three dimensions.** A made-up catchment thirty kilometres
+   across — two field stations, two hilltop repeaters, two base stations, a
+   mountain, a forest, a river, a town with grain silos and a scarp — with the
+   radio crossing it: the wavefront spreading in every direction at once, faint
+   and dashed where it is in a radio shadow, paths bent over a ridge, tinted
+   where they pass through trees, and echoes off the silos, the scarp and the
+   ground found by the image method. Four stories: *a reading goes home* (two
+   clean copies by two repeaters), *two repeaters, one delay* (their copies land
+   bit on bit at the Town base and a reading is filed under 2563, one bit from
+   2051 — until Hill B is given a delay of its own), *two stations at once*
+   (ALOHA: Hill A stores and forwards a ghost) and *echoes in town* (four copies
+   at the Town base, their phases, and the sum swinging as the mast moves). Drag
+   to turn it; the delays, the mast, the Fresnel zone and a coverage drape are
+   controls beside it. Time runs on two clocks — flights shown 35,000× slower,
+   bursts 6× — and the canvas says which. The story is told in words under it, a
+   timeline shows every keying, and a card per receiver shows each frame's 32
+   bits with any flipped.
+2. **Waves add up — or cancel**: a direct wave and an echo, and the standing
+   pattern in front of a wall with a receiver to drag or walk.
+3. **Over hills, through trees**: the side-on path with its Fresnel zone, a
+   ridge and a forest, at 151.5 MHz, 450 MHz, 900 MHz and 2.4 GHz.
+4. **Collisions, capture and flipped bits**: two keyings, bit by bit — capture
+   at 6 dB, flips when they are close, a check bit catching one and an address
+   bit not.
+5. **Why repeaters wait**: store and forward, and each repeater's delay on a
+   timeline.
+6. **Where this shows up in Flood-Net**, with a button to each tab.
+
+The radio is worked out, not drawn: free-space loss, the knife edge (ITU-R
+P.526), foliage after ITU-R P.833 (illustrative), the link budget card's field
+allowance, and a receiver with FM capture at 6 dB. A device that asks for
+reduced motion gets every drawing still, at its outcome. `npm run propagation`
+holds the physics to figures worked by hand, the ALERT frame to the ALERT
+Packets tab's own decoder, and each story to the outcome it tells.
 
 ---
 
