@@ -3309,8 +3309,10 @@ function renderMain() {
   // Map is about the tabs, not the stations, and is most needed by somebody
   // who has not loaded anything yet.
   // Offline & Install as well: it is about the device, and is most wanted on
-  // one that has not got a list yet.
-  const noDataTabs = ['sitemap', 'offline', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'admin', 'basestations'];
+  // one that has not got a list yet. And the Field Camera: a photo taken with
+  // no list is still stamped and kept, and filed by the database by distance —
+  // only the station suggestions wait for the list.
+  const noDataTabs = ['sitemap', 'offline', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'admin', 'basestations'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -3359,6 +3361,7 @@ function renderMain() {
     case 'maintenance': el.innerHTML = Maintenance.render();  Maintenance.init(); break;
     case 'history':    el.innerHTML = History.render();       History.init();      break;
     case 'photos':     el.innerHTML = FieldPhotos.render();   FieldPhotos.init();  break;
+    case 'camera':     el.innerHTML = FieldCamera.render();   FieldCamera.init();  break;
     case 'export':     el.innerHTML = renderExportHtml();                      break;
     case 'admin':      el.innerHTML = Admin.render();         Admin.init();        break;
     case 'basestations': el.innerHTML = BaseStations.render(); BaseStations.init(); break;

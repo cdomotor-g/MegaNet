@@ -234,6 +234,14 @@ const SiteMap = (function () {
       ],
       note: 'Sign in to read the records.',
     },
+    camera: {
+      what: 'Take site photos stamped like Solocator\'s — heading, position and ±, height, station and time — that upload by themselves.',
+      use: [
+        'Photograph a site with the station suggested from where you stand and which way you face',
+        'Keep shooting with no signal — the photos wait on the phone and go up later',
+      ],
+      note: 'Sign in to upload; photos taken signed out wait on the device.',
+    },
     photos: {
       what: 'Photos from the field, filed by where they were taken — from the camera\'s GPS, or read off the picture.',
       use: [
@@ -297,6 +305,7 @@ const SiteMap = (function () {
     { text: 'Listen to ALERT off the air',                 tab: 'serial' },
     { text: 'Fill in a site inspection',                   tab: 'inspections' },
     { text: 'Get a phone ready for a site with no signal', tab: 'offline' },
+    { text: 'Take site photos stamped with where and which way', tab: 'camera' },
     { text: 'File the photos from a field trip',           tab: 'photos' },
     { text: 'Print a map for a field trip',                tab: 'mapgen' },
   ];

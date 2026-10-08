@@ -8,7 +8,8 @@
 // Reaches back to core.js for AUTH_URL, DB_URL, DB_ANON_KEY, DB_SCHEMA and esc;
 // across to app.js for setHeaderLabel and rerenderStationEditorCard; to
 // field-photos.js for FieldPhotos.authChanged, because every photo it holds was
-// fetched for one session (0035 makes them editors-only); to admin.js for
+// fetched for one session (0035 makes them editors-only); to field-camera.js for
+// FieldCamera.authChanged, which sends the photos waiting on the device; to admin.js for
 // Admin.authChanged (0042, administrators only); to station-history.js for
 // StationHistory.authChanged (0056, editors only); and to
 // datastore.js for dbSetAccessToken. datastore.js and station-editor.js call
@@ -494,9 +495,12 @@ const Auth = (function () {
   // Base Stations tab (0049); a station's history and the deleted stations
   // are editors-only (0056, station-history.js); and Station Health's Ask
   // Claude (health-agent.js) runs on Flood-Net's key for editors and
-  // administrators only (#229), so it asks again who may.
+  // administrators only (#229), so it asks again who may. The Field Camera
+  // (field-camera.js) sends the photos it has kept on this device as soon as
+  // somebody is signed in to send them as.
   function tabsAuthChanged() {
     for (const mod of [typeof FieldPhotos !== 'undefined' ? FieldPhotos : null,
+                       typeof FieldCamera !== 'undefined' ? FieldCamera : null,
                        typeof Admin       !== 'undefined' ? Admin       : null,
                        typeof AdminDash   !== 'undefined' ? AdminDash   : null,
                        typeof AdminTokens !== 'undefined' ? AdminTokens : null,

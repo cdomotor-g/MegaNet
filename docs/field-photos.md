@@ -9,7 +9,9 @@ those opens the same viewer: a carousel over the photos taken at that spot,
 with when, where, which way and how each of those was known.
 
 It is `photo-meta.js` (reading a photo), `field-photos.js` (the tab and the
-viewer), `photo-zip.js` (a zip of photos, opened in the browser),
+viewer), `field-camera.js` and `photo-stamp.js` (the 📸 Field Camera: photos
+taken in the app, stamped, kept on the device and sent by themselves),
+`photo-zip.js` (a zip of photos, opened in the browser),
 `photo-equipment.js` and `photo-review.js` (reading equipment labels, and the
 Review panel where what came in and what the labels say are looked over),
 `map-photos.js` (the map's layer), the twin's markers in `digital-twin.js`,
@@ -19,7 +21,7 @@ and its suggestions, and who is an administrator), `tools/storage_bucket.sql`
 (the private bucket) and `tools/field-photos/` with
 `.github/workflows/field-photos-dropbox.yml` and `field-photos-gdrive.yml` (the
 Dropbox and Google Drive syncs). `npm run photos`, `npm run photozip`,
-`npm run photoreview`, `tools/check_field_photos.sql`,
+`npm run photoreview`, `npm run camera`, `tools/check_field_photos.sql`,
 `tools/check_photo_review.sql` and the sync's own tests hold it (see the end).
 
 ---
@@ -118,6 +120,149 @@ Shared Drive — shared with the sync's own Google account: a second scheduled
 workflow, the same run, the same `photo-meta.js`. *Linking a Google Drive
 folder* below is the setup. In either folder a **zip of photos** is opened and
 each photo in it filed as one of its own (*Zip packs in a linked folder*).
+
+### Taken in Flood-Net
+
+The **📸 Field Camera** tab takes them itself, stamped, and sends them in by
+itself — the next section.
+
+---
+
+## Taking photos in Flood-Net
+
+**📸 Field Camera** is under *Site visits*, beside Field Photos
+(`field-camera.js`, with the stamp and the EXIF in `photo-stamp.js`). Press
+**📸 Start the camera** — the GPS and the compass start with it, and an iPhone
+asks for the compass then — and the picture fills the panel with the stamp
+drawn over it exactly as it will be burnt into the photo. The shutter is the
+round button under it.
+
+### The stamp
+
+Solocator's panel, line for line, because most of the photos already in
+Flood-Net are Solocator's and the crews read it at a glance — proportions,
+colours and word order measured off the two Solocator photos in
+`test/fixtures/photos`:
+
+```
+ ┌ blue compass ribbon: 180  S  210  SW  240 ▌ 270  W  300  NW ┐  ← the green needle on the way the camera faced
+ ❂ 242°SW (T)  ◉ -27.554294°, 152.274116° ±4m  ▲ 134m (HAE)      ← the pale bar
+ ...
+ Logger cabinet                                 Gatton AL (540156)
+ Gatton                                                  BoM-FWIN
+                                        2026-06-24, 12:26:08 AEST
+```
+
+- **The heading** is the back camera's, from the phone's compass — Android's
+  absolute orientation, or an iPhone's gyro kept on north by its compass, the
+  AR station finder's way of reading both — turned from magnetic to **true**
+  by the World Magnetic Model where the phone stands (about 11° at Gatton), and
+  printed as Solocator prints it, `242°SW (T)`. Pointed nearly straight up or
+  down, or on a device with no compass (most computers), no heading is printed
+  and no ribbon drawn, rather than a wrong one.
+- **The position** to six places, and its **±** — under the picture as it
+  settles, red past 7 m (the viewer's *rough fix*).
+- **The height, always with its datum.** A phone's GPS gives height above the
+  ellipsoid on Android (`HAE`) and above sea level on an iPhone, iPad or Mac
+  (`MSL`) — about 40 m apart in Queensland — so the label is never left off.
+  Where the GPS gives no height (a computer, a weak fix) the **ground's height
+  in AHD** is printed instead: Elvis's LiDAR where the State has some, else the
+  terrain tiles put into AHD by the geoid grid. The ground's AHD height is kept
+  with every photo either way (`meta.capture.ground`).
+- **Bottom right**: the **station** (name and number), the **project** (the
+  crews' Solocator project, `BoM-FWIN`, until it is changed in Settings), and
+  the **time** — the phone's clock with its zone (`AEST`, or `UTC+10:00` where
+  the zone has no name the overlay reader knows).
+- **Bottom left**: the **caption**, if one is given (the chips under the
+  picture — *Logger cabinet*, *Staff gauge*, *Upstream*… — or typed), and the
+  **town or locality**, asked of OpenStreetMap where the phone stands (one ask
+  per few hundred metres, kept on the device for the next visit with no
+  signal; *Settings* switches it off, and then nothing is asked).
+
+**The same facts are in the file's EXIF** — the GPS block (position, ±,
+altitude, true heading, the GPS clock), the shutter's local time with its
+offset (`OffsetTimeOriginal`, so no reader guesses the zone), the pixel size,
+and *Flood-Net Field Camera* as the software — so Google Photos, QGIS and
+exiftool read them, and the Field Photos tab places the photo from its EXIF
+like any phone photo. And because the panel is Solocator's, **a copy stripped
+of its EXIF** on its way through Messages or a chat app is still placed when
+it comes back in: the overlay reader reads this stamp as it reads Solocator's
+(`npm run camera` reads one back with the real OCR engine).
+
+### Which station
+
+Suggested from where the phone is and which way it faces, best first, each
+with how far and which way:
+
+1. the station **you're at** — within 60 m, or within the fix's ±;
+2. the **last photo's** station, within 2 km — a visit is twenty photos of one
+   site;
+3. stations **in view** — within 33° of the heading (half a phone camera's
+   view) and 2 km;
+4. the rest, **nearest** first — within 5 km, or out to 25 km where nothing is
+   nearer.
+
+With nothing picked, the stamp carries **the nearest within a kilometre** —
+the database's own rule (`meganet.field_photo_station_for`), so a photo is
+filed where it would have been anyway. Tap a suggestion, or find a station by
+name, number or ALERT ID, to pick another; a station picked by hand stays
+picked until the phone is 2 km from it, and the tab says when it lets go.
+*No station* files the photos under nobody.
+
+**What is on the stamp is what the photo is filed under**: the station is sent
+to `meganet.add_field_photo` as `station_id` (so `station_auto` is false — a
+person chose it, or accepted it on the screen), and *No station* as a null.
+Only a photo with no station on it that nobody chose is left to the database,
+whose rule is the same one. How it was chosen, and what was suggested, are kept
+in `meta.capture.station`.
+
+### Kept on the device, then sent by itself
+
+Every photo is written to the device first — IndexedDB, the stamped JPEG, its
+480 px thumbnail and its record — so a site with no signal, a locked phone or a
+closed page loses nothing, and the list at the foot of the tab (*On this
+device*) says where each one is. It is sent when the device is signed in as an
+editor and the network answers: one at a time, oldest first, by the Field
+Photos tab's own doors — the hash asked of the database first (the same photo
+twice is one photo), the bytes, the thumbnail, then the row, and a refused row
+takes its bytes down again — and its outcome logged for the Review panel like
+any upload. It is tried again when the browser says the network is back, when
+somebody signs in, when the app is opened, and on a back-off of 15 seconds to
+10 minutes. Once a photo is in Flood-Net its bytes are let go on the device and
+its line stays a week (*Clear the uploaded* takes them sooner); *Show it* opens
+it in the Field Photos viewer.
+
+Signed out, the camera still works and the photos wait (*Sign in to upload*).
+A photo the database refuses is said, and kept: a station deleted since the
+device's list was loaded can be sent **filed under no station** (the stamp
+keeps the name; the viewer's *File under…* puts it right), and an account that
+is not on the editors list is told so. *Save a copy* downloads a waiting photo
+— stamp and EXIF and all — as `floodnet-<station>-<date>-<time>.jpg`; Settings
+can do that for every photo as it is taken. The tab asks the browser to keep
+its storage through a clear-out (`navigator.storage.persist`).
+
+### From the phone's camera app
+
+**📷** opens the phone's own camera app (or its gallery), for its full sensor,
+zoom, HDR and flash. The photo that comes back is stamped and kept the same
+way, with **its own EXIF winning** where it has a position, a heading, a height
+or a time — the camera app knew the shutter, the tab only knows when the photo
+arrived — and its station suggested for where it says it was taken. A heading
+it does not carry is left off, not read off a phone that has since been
+lowered. A photo with no position of its own is given the phone's only when
+it was just taken; one from the gallery more than ten minutes old is stamped
+with no position rather than with where the phone is now, and the phone's town
+and height are left off a photo whose own GPS puts it elsewhere.
+
+### What it needs
+
+The browser's permission for the **camera** and for **location** (and on an
+iPhone, the **compass**, asked the first time Start is pressed); the screen is
+kept awake while the camera is up. Leaving the tab lets the camera, the GPS and
+the compass go; coming back takes them up again, and ✕ stops them until Start
+is pressed again. A HEIC from the camera app is drawn by the browser where it
+can (Safari) — in Chrome or Firefox choose *Settings → Camera → Formats → Most
+Compatible* on the iPhone.
 
 ---
 
@@ -972,6 +1117,8 @@ Check it: open a photo on the Field Photos tab and look at the image's address
 | `www.dropbox.com`, `api.dropboxapi.com` | linking Dropbox, once, from the tab | only for whoever sets it up; the sync itself runs on GitHub |
 | `oauth2.googleapis.com`, `www.googleapis.com` | the Google Drive sync: its hour's token, and the folder's listing and files | from GitHub's runners only — nothing in the browser talks to Google |
 | `console.cloud.google.com`, `drive.google.com` | linking a Google Drive folder, once | only for whoever sets it up |
+| `nominatim.openstreetmap.org` | the Field Camera's town or locality, one ask per few hundred metres | the same service 📍 Find a place uses; off in the camera's Settings |
+| `api-elevation.fsdf.org.au` (Elvis), `s3.amazonaws.com` (terrain tiles) | the ground's height in AHD under a Field Camera photo | already allowed for the Stations map's elevation tools |
 
 ## The checks
 
@@ -992,6 +1139,16 @@ Check it: open a photo on the Field Photos tab and look at the image's address
   Chromium cannot draw, decoded, placed from its EXIF and uploaded as a JPEG
   whose pixels are the picture. Under Node, a Solocator file's missing ±
   taken from its overlay, and only for the same fix.
+- **`npm run camera`** (test/) — `photo-stamp.js` under Node: the EXIF it
+  writes read back by `PhotoMeta.read`, the panel's words, and the panel as
+  text read back by the overlay parser; then the Field Camera in Chromium as a
+  phone (the fake camera, a set GPS fix, Android's and an iPhone's compass)
+  against a fake project: the heading true, the stations suggested and the one
+  on the stamp, photos kept on the device signed out and through a reload and
+  sent by themselves once signed in — filed under the station on the stamp —
+  every way one cannot go and the way back, a camera-app photo placed by its
+  own EXIF, and that photo stripped of its EXIF read back by the real OCR
+  engine into the same place, heading, ±, height, time and station.
 - **`npm run photozip`** (test/) — `photo-zip.js` under Node against zips
   built byte by byte (stored and deflated entries, a folder, `__MACOSX` junk,
   UTF-8 and CP437 names, a data descriptor, something in front of the zip),

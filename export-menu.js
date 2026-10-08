@@ -175,6 +175,7 @@ const ExportMenu = (function () {
     inspections: 'A sheet being filled in: once saved it is a record, and Inspection History exports those.',
     maintenance: 'A sheet being filled in: once saved it is a record, and Inspection History exports those.',
     photos:      'The photos are the files — each one opens full size from the viewer — and they live in Dropbox or Drive as well.',
+    camera:      'Each photo is a file already — Save a copy keeps it on this device, stamp and EXIF and all — and once uploaded it is in Field Photos.',
     basestations: 'The fleet\'s live state, for administering it — nothing here is a record to keep as a file.',
   };
 

@@ -183,6 +183,8 @@ const TABS = [
       find: 'council tasks form condition owner contact vegetation access' },
     { id: 'history',    label: 'Inspection History',     icon: '📋',
       find: 'past records read back print a4 csv timeline previous visits' },
+    { id: 'camera',     label: 'Field Camera',           icon: '📸',
+      find: 'take photo picture shoot snap capture stamp stamped watermark solocator overlay gps coordinates position compass heading bearing accuracy elevation altitude height geotag timestamp station name suggest upload offline no signal phone' },
     { id: 'photos',     label: 'Field Photos',           icon: '📷',
       find: 'pictures camera gps exif ocr overlay solocator geotag position heading upload bulk folder dropbox carousel unplaced' },
   ] },
@@ -1597,6 +1599,43 @@ const HELP = {
     related: ['inspections', 'maintenance', 'stations'],
   },
 
+  camera: {
+    summary: 'Take site photos <strong>in Flood-Net</strong>, each stamped as Solocator stamps them: a '
+           + 'compass ribbon across the top with the way the camera faced (true north), the position and '
+           + 'its ±, the height and its datum, and in the corners the town, the <strong>station</strong>, '
+           + 'the project and the time. The station is <strong>suggested</strong> from where you stand and '
+           + 'which way the camera faces — the one you are at, the last photo\'s, the ones in view, the '
+           + 'nearest — and what the stamp says is what the photo is filed under. Every photo is kept on '
+           + 'this device first, then <strong>uploads by itself</strong> into Field Photos as soon as there '
+           + 'is a signal, with the same facts in its EXIF.',
+    watch: [
+      '<strong>Wait for the ±.</strong> The fix is under the picture; past ±7 m it turns red — the Field '
+      + 'Photos viewer flags those as rough. A few seconds in the open usually brings it under 5 m.',
+      '<strong>Hold the phone up.</strong> The heading is the back camera\'s, corrected from magnetic to '
+      + 'true by the World Magnetic Model. Pointed straight up or down, or on a device with no compass '
+      + '(most computers), no heading is printed rather than a wrong one. An iPhone asks for the compass '
+      + 'the first time you press <em>Start the camera</em>.',
+      '<strong>Height has a datum.</strong> Android\'s GPS gives height above the ellipsoid (HAE), an '
+      + 'iPhone\'s above sea level (MSL) — about 40 m apart in Queensland — and the stamp says which. With no '
+      + 'GPS height the ground\'s height in AHD is printed instead, from Elvis\'s LiDAR or the terrain.',
+      '<strong>No signal is fine.</strong> Photos wait on this device (and survive the phone locking or the '
+      + 'page closing) and go up when the network is back and you are signed in — the list at the foot says '
+      + 'where each one is. Signed out, they wait.',
+      'Pick a station by tapping a suggestion or finding it by name; it stays picked until you are 2 km '
+      + 'from it. With nothing picked the stamp carries the nearest within a kilometre — the database\'s own '
+      + 'rule. <em>No station</em> files the photos under nobody.',
+      '<strong>📷 Use the camera app</strong> for the phone\'s full camera (zoom, HDR, the flash): the photo '
+      + 'comes back and is stamped the same way, its own GPS and heading used where the file has them.',
+      'The town in the corner is asked of OpenStreetMap where you stand; switch it off in Settings to send '
+      + 'nothing. Each name is kept on the device for the next visit with no signal.',
+    ],
+    related: ['photos', 'inspections', 'stations'],
+    links: [
+      { label: 'Taking photos in Flood-Net — the stamp, the station, and how they upload',
+        href: 'docs/field-photos.md#taking-photos-in-flood-net' },
+    ],
+  },
+
   photos: {
     summary: 'Photos from the field, <strong>filed by where they were taken</strong> — drop in a '
            + 'handful, a whole folder or a zip of them, and each one is placed on the ground it shows: from the '
@@ -1645,7 +1684,7 @@ const HELP = {
       + '(Solocator prints height above the ellipsoid, some 40 m off AHD here). The marker in the twin '
       + 'stands on the twin\'s own ground.',
     ],
-    related: ['stations', 'inspections', 'history'],
+    related: ['camera', 'stations', 'inspections', 'history'],
     links: [
       { label: 'Field photos — how a position is read, the Dropbox sync, and setting it up',
         href: 'docs/field-photos.md' },

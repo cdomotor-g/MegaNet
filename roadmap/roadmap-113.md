@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-08** (revision 139 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-08** (revision 140 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -532,6 +532,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and eight `[Human]` issues.
 >
+> **Revision 140 opens and closes nothing** — a new tab at the owner's request: **📸 Field Camera**, under *Site visits*, takes site photos in Flood-Net stamped as Solocator stamps them (the compass ribbon and true heading, the position and its ±, the height and its datum, the town, the station and the time), suggests the station from where the phone is and which way it faces, files each photo under the station on its stamp, and keeps every photo on the device until it has uploaded itself. No migration: it goes in by the Field Photos tab's own doors. One step for a person is offered rather than filed: try it on a real iPhone and a real Android phone at a site (see revision 140 below).
+>
 > **Revision 133 opens and closes nothing** — at the owner's request, having watched transmissions pile up on a Pi's dashboard: Station Health gains an **Airtime** panel — who lands on top of whom at each receiver and whether it costs them, each station's learned check time and how its logger keeps it, and the check time or repeater delay to change. Two follow-ups are offered, not filed: the Pi stamping readings when the burst began rather than when its decode finished (which is what would let sub-second overlaps and repeater delays be measured), and a place in the register for a station's logger and its check setting. Nothing for a person.
 >
 > **Revision 132 opens and closes nothing** — at the owner's request: Radio Path Maps' right-hand pane, blank until a map was opened, is now the map list itself, filtered by the left pane, a row per map with everything known about it and a thumbnail of the sheet. On the way, the maps open on floodwarning.net at all — the site-wide `X-Frame-Options: DENY` had been refusing the viewer its own PDFs. One thing for a person, offered rather than filed: `Callide Paths.pdf` has no radio paths or stations drawn on it (see revision 132 below).
@@ -744,6 +746,18 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 140 — 2026-10-08: 📸 Field Camera — photos taken in the app, stamped, and filed by themselves
+
+At the owner's request: a tab for taking photos in the field, stamped with the GPS position, the compass heading, the fix's accuracy and the height — the markings most photos in the database already carry, which are Solocator's — with the app suggesting the station to print on the photo and the photo linked to that station in the database, uploaded automatically. No issue was filed for it; this entry is its record.
+
+- **`photo-stamp.js` (`PhotoStamp`)**, pure: Solocator's panel, its geometry and colours measured off the two Solocator fixtures — the blue compass ribbon with the green needle, the pale bar (`❂ 242°SW (T) ◉ -27.554294°, 152.274116° ±4m ▲ 134m (HAE)`), and green corner text (caption and town left; station, project, time right) with a dark edge Solocator lacks, for green on green. Everything inside the top and bottom fifth the overlay reader looks in. And the same facts as an EXIF APP1 written by hand (GPS block, `OffsetTimeOriginal`, software, description), spliced after JFIF and replaced rather than doubled.
+- **`field-camera.js` (`FieldCamera`)**: the live picture with the stamp drawn over it at the photo's scale; the heading the back camera's, by station-ar.js's compass reading and World Magnetic Model, turned to true and left off when the camera points at the sky or the ground; the height with its datum (HAE from Android's GPS, MSL from Apple's), or the ground's in AHD from Elvis or the terrain where the GPS gives none; the town from OpenStreetMap (`Places.locality`, new — one ask per ~500 m cell, kept on the device). **Stations suggested** — where you stand, the last photo's, in view, nearest — and with nothing picked the nearest within a kilometre (the database's own rule); what is on the stamp is sent as `station_id`, *No station* as a null. **Kept, then sent**: IndexedDB first, then the Field Photos tab's doors — hash, bytes, thumbnail, `add_field_photo`, the Review panel's log — when signed in and the network answers, retried on a back-off and at once when the browser says the network is back, after a sign-in, or when the app is opened (`init.js` boots it). 📷 takes a photo from the phone's own camera app instead, its EXIF winning for where, which way and when.
+- **No migration.** The photos go in as `origin = 'upload'`; *Flood-Net Field Camera* in `meta.camera.software` and `meta.capture` say how each was taken. A `camera` origin would be one insert into `meganet.field_photo_origin` — left until somebody wants to filter by it, since the live database is still at 52 with `0053`–`0059` queued (#210).
+
+**Checks:** `npm run camera` (new, a CI step: 98 assertions — under Node the EXIF read back by `PhotoMeta.read` and the panel's text by `PhotoMeta.vote`; then a phone in Chromium against a fake project, ending with a camera-app photo stripped of its EXIF read back by the real OCR engine into the same place, heading, ±, height, time and station; red on three deliberate breaks — the declination's sign, the GPS left running, the station left to the database); `npm run tabs` (+2 entries), `npm run smoke` (29 tabs). Run green before the push: the cheap five, `camera`, `tabs`, `smoke`, `nav`, `help`, `exports`, `palette`, `offline`, `offlinetab`, `firstvisit`, `shell`, `dialogs`, `registry`, `dock`, `photos`. What's new entry 16; stamps to `20261008f`.
+
+**What a person could do (offered, not filed):** take it to a site on a real iPhone and a real Android phone — the fake camera and dispatched compass readings stand in for both here — and check three things against the paper: that the heading on the stamp matches a hand compass corrected to true; that the height's datum label matches the phone (HAE on Android, MSL on the iPhone); and that photos taken out of signal upload by themselves once back in it.
 
 ### Revision 139 — 2026-10-08: the polar plot lies on the terrain — #188 closed
 

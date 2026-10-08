@@ -110,6 +110,15 @@ const ACCEPTED = {
          + 'never runs it. Constrains nothing below it.',
     },
   ],
+  'photo-stamp.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = PhotoStamp;",
+      why: 'The Field Camera\'s stamp and EXIF writer, required by test/camera.mjs so '
+         + 'the panel the check reads back with PhotoMeta — and the EXIF it reads back '
+         + 'with PhotoMeta.read — is the one the camera draws and writes. Guarded so the '
+         + 'browser, where `module` is undefined, never runs it. Constrains nothing below it.',
+    },
+  ],
   'photo-zip.js': [
     {
       match: "if (typeof module !== 'undefined' && module.exports) module.exports = PhotoZip;",

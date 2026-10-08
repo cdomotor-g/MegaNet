@@ -69,6 +69,11 @@
 //
 // Failure is quiet and says so: no network, a blocked host or a rate limit
 // leaves the file's own answers standing and puts one line in the list.
+//
+// The same service answers the other way round for the Field Camera
+// (field-camera.js): locality() names the town or locality a point is in, for
+// the corner of a photo's stamp — through the same throttle, a few hundred
+// metres to an ask, and kept on the device for the next visit with no signal.
 const Places = (function () {
   const URL_BASE   = 'https://nominatim.openstreetmap.org/search';
   const ATTRIB     = 'Place names © OpenStreetMap contributors (Nominatim)';
@@ -557,6 +562,59 @@ const Places = (function () {
     });
   }
 
+  // ── The other way round: the name of where a point is ──────────────────────
+  // The town, suburb or locality a point is in, as the Field Camera prints it
+  // in a photo's corner (Solocator's "Gatton"). Nominatim's reverse lookup, on
+  // the same terms as the search: the same throttle, one ask per few hundred
+  // metres (a cell of 0.005°), and the answers kept on this device as well as
+  // in the page — so a site visited with a signal is named at the next visit
+  // without one. Resolves — never rejects — to { ok, name, credit } or
+  // { ok: false, error }.
+  const REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse';
+  const NAMES_KEY = 'mn-localities';
+  const NAMES_MAX = 300;
+  let names = null;
+  function namesKept() {
+    if (names) return names;
+    try { names = JSON.parse(localStorage.getItem(NAMES_KEY) || '{}') || {}; } catch (_) { names = {}; }
+    return names;
+  }
+  function keepName(key, name) {
+    const n = namesKept();
+    delete n[key];
+    n[key] = name;
+    const keys = Object.keys(n);
+    for (let i = 0; i < keys.length - NAMES_MAX; i++) delete n[keys[i]];
+    try { localStorage.setItem(NAMES_KEY, JSON.stringify(n)); } catch (_) { /* full, or private */ }
+  }
+  function locality(lat, lon) {
+    if (!isFinite(lat) || !isFinite(lon)) return Promise.resolve({ ok: false, error: 'no position' });
+    const key = `${(Math.round(lat / 0.005) * 0.005).toFixed(3)},${(Math.round(lon / 0.005) * 0.005).toFixed(3)}`;
+    const kept = namesKept()[key];
+    if (typeof kept === 'string') return Promise.resolve({ ok: !!kept, name: kept, credit: ATTRIB, cached: true });
+    const at = Math.max(Date.now(), lastAt + MIN_RATE_MS);
+    lastAt = at;
+    return new Promise(resolve => setTimeout(resolve, at - Date.now())).then(() => {
+      const params = new URLSearchParams({
+        lat: String(lat), lon: String(lon), format: 'jsonv2', zoom: '14', addressdetails: '1', 'accept-language': 'en',
+      });
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+      return fetch(`${REVERSE_URL}?${params}`, { signal: ctl.signal, headers: { Accept: 'application/json' } })
+        .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+        .then(j => {
+          const a = (j && j.address) || {};
+          const name = a.suburb || a.town || a.village || a.hamlet || a.locality || a.city
+                    || a.municipality || a.county || '';
+          keepName(key, name);
+          return name ? { ok: true, name, credit: ATTRIB } : { ok: false, error: 'no place named there' };
+        })
+        .catch(e => ({ ok: false, error: e && e.name === 'AbortError' ? 'the lookup timed out'
+                                         : 'the place-name service could not be reached' }))
+        .finally(() => clearTimeout(t));
+    });
+  }
+
   // ── On the map ──────────────────────────────────────────────────────────────
 
   function markerHtml(p) {
@@ -858,6 +916,7 @@ const Places = (function () {
     // latitude and longitude box, including ones rendered later.
     bindCoordPaste() { document.addEventListener('paste', onCoordPaste); },
     attribution: ATTRIB,
+    locality,
     paneHtml,
     input,
     key,

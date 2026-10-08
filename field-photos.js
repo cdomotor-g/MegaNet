@@ -1194,7 +1194,9 @@ const FieldPhotos = (function () {
           has it, and otherwise from the position a field camera app printed on the picture (Solocator, GPS Map
           Camera and the like), read off it by OCR. Nothing is uploaded until you press Upload — check the
           positions first. A photo nothing can place still uploads, into <em>Unplaced</em>. A zip is opened
-          here and its photos queued one by one, each saying which zip it came from.</p>
+          here and its photos queued one by one, each saying which zip it came from. At a site, the
+          <button type="button" class="link-btn" onclick="switchTab('camera')">📸 Field Camera</button> takes them
+          stamped and uploads them by itself.</p>
         <label class="fp-labels-opt small"><input type="checkbox" id="fp-read-labels" ${s.readLabels ? 'checked' : ''}
                onchange="FieldPhotos.setReadLabels(this.checked)">
           Read equipment labels after upload — makes, models and serial numbers, suggested for the station's
@@ -2673,6 +2675,8 @@ const FieldPhotos = (function () {
     inBox, spots, sign, thumbOf, urlFor, paintThumbs, row: id => S().byId[id] || null,
     authChanged, changed, signedIn,
     nearestStation, whenText, headingText,
+    // The SHA-256 a photo is known by — the Field Camera hashes its own with it.
+    sha256,
     dbxKey, dbxOpen, dbxFinish, dbxCopy,
     readLabels, setReadLabels,
     // For the Review panel (photo-review.js): the station finder, the words

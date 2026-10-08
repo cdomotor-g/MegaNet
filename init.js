@@ -125,6 +125,9 @@
   // Before autoLoad(), so that a tab returning from a magic link has taken the
   // session out of the URL fragment before anything else reads location.
   Auth.start();
+  // The photos the Field Camera kept on this device, and any still waiting to
+  // go up — sent once somebody is signed in, whichever tab is open.
+  FieldCamera.boot();
   autoLoad();
   // The visit count (admin-dashboard.js): once for opening the app, a few
   // seconds on so a saved session has been adopted and it counts as its person.

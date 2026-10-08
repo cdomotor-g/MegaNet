@@ -119,6 +119,11 @@ MegaNet/
 ├── photo-equipment.js      ← PhotoEquipment — make, model, serial off a photo's labels
 ├── field-photos.js         ← FieldPhotos — Field Photos tab (bulk upload, placing,
 │                             the library) and the carousel every door opens
+├── photo-stamp.js          ← PhotoStamp — the stamp a photo taken in Flood-Net
+│                             carries (Solocator's panel) and the same facts as EXIF
+├── field-camera.js         ← FieldCamera — Field Camera tab: photos taken in the
+│                             app, stamped, the station suggested, kept on the
+│                             device and uploaded by themselves
 ├── photo-review.js         ← PhotoReview — the tab's Review panel, equipment
 │                             suggestions, the station card's Equipment section
 ├── station-history.js      ← StationHistory — the station card's History: who
@@ -2916,7 +2921,7 @@ on a narrow window.
 | **Interference** | RF Environment · RF Changes · Interference Workbench |
 | **ALERT** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · HFEM Messages · Serial Monitor |
 | **Data** | ARRO Launcher · ARRO Data · Field Data · Message Log |
-| **Site visits** | Inspections · Site Maintenance · Inspection History · Field Photos |
+| **Site visits** | Inspections · Site Maintenance · Inspection History · Field Camera · Field Photos |
 
 #### Where the grouping comes from
 Three groups held these tabs until #108, and one of the three held eight of the
@@ -4516,6 +4521,53 @@ for it. The tabs, their groups and their icons are read from the nav itself, so
 a new tab is on the page the moment it is added; what each card says is
 `site-map.js`'s own, and `npm run nav` fails on a tab it has not written up.
 Every other tab's ❔ Help ends with a pointer back here.
+
+### 25. Field Camera (Photos Taken in the App, Stamped, Filed as They Are Taken)
+
+📸 **Field Camera**, under *Site visits* beside Field Photos, takes site photos
+in Flood-Net itself. Press **📸 Start the camera** and the picture fills the
+panel with the stamp drawn over it exactly as it will be burnt into the photo —
+**Solocator's panel, line for line**, because most of the photos already in
+Flood-Net are Solocator's: a blue compass ribbon with a green needle on the way
+the camera faced, a pale bar reading `❂ 242°SW (T) ◉ -27.554294°, 152.274116°
+±4m ▲ 134m (HAE)`, and green text in the corners — the caption and the town on
+the left; the **station**, the project and the time on the right.
+
+The heading is the back camera's, from the phone's compass, turned to **true
+north** by the World Magnetic Model the AR station finder carries; pointed at
+the sky or the ground, or with no compass, no heading is printed rather than a
+wrong one. The height always carries its datum — Android's GPS gives height
+above the ellipsoid, an iPhone's above sea level, about 40 m apart here — and
+where the GPS gives none the ground's height in AHD is printed instead (Elvis's
+LiDAR, or the terrain put into AHD). The town is asked of OpenStreetMap (and
+can be switched off); the time is the phone's clock with its zone. The same
+facts go into the file's **EXIF**, so every other program reads them — and
+because the panel is Solocator's, a copy stripped of its EXIF by a chat app is
+still placed by the Field Photos tab's overlay reader when it comes back in.
+
+**The station is suggested** from where the phone is and which way it faces —
+the one you are at, the last photo's, the ones in view, then the nearest, each
+with how far and which way — and with nothing picked the stamp carries the
+nearest within a kilometre, the database's own rule. Tap another, find one by
+name or number, or say *No station*. **What is on the stamp is what the photo
+is filed under**: it is sent to the database as the photo's station, never left
+to it to work out.
+
+**Kept, then sent by itself.** Every photo is written to the device first
+(IndexedDB) so a site with no signal, a locked phone or a closed page loses
+nothing, then uploaded into Field Photos by the same doors that tab uses — the
+hash first, the bytes, the thumbnail, the row — as soon as the device is signed
+in and the network answers, retried with a back-off and the moment the network
+comes back. The list on the tab says where each photo is; *Save a copy* keeps
+one on the device as `floodnet-…jpg`. **📷** uses the phone's own camera app
+instead, and the photo it returns is stamped the same way, its own EXIF winning
+for where, which way and when.
+
+`docs/field-photos.md`, *Taking photos in Flood-Net*, has the rest;
+`npm run camera` holds the stamp and its EXIF under Node, then the tab on a
+phone in Chromium — the station on the stamp, photos kept signed out and sent
+signed in, every way one cannot go, and a stamped photo stripped of its EXIF
+read back by the real OCR engine.
 
 ---
 

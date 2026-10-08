@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 16, date: '2026-10-08', items: [
+      '<strong>📸 Field Camera</strong>, a new tab under <em>Site visits</em>: take site photos in Flood-Net, each '
+        + 'stamped the way Solocator stamps them — the compass ribbon and the heading (true north), the position and its '
+        + '±, the height and its datum, the town and the time — with the <strong>station</strong> on it too. The station '
+        + 'is suggested from where you stand and which way the camera faces; tap another to change it.',
+      'Every photo is kept on the phone first, so a site with no signal loses nothing, then <strong>uploads by '
+        + 'itself</strong> into Field Photos under that station as soon as there is a signal and you are signed in — the '
+        + 'list on the tab says where each one is. <strong>📷</strong> uses the phone\'s own camera app instead, and is '
+        + 'stamped the same way.',
+    ] },
     { n: 15, date: '2026-10-08', items: [
       '<strong>📡 Polar radio coverage in 3-D.</strong> A coverage plot now lies on the ground when you tilt the map '
         + 'with ⛰️ — running up the valleys and stopping at the ridges — in the same colours, and a new threshold '

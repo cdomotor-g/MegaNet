@@ -524,6 +524,33 @@ const SEED_PHOTOS = `async () => {
   for (const d of document.querySelectorAll('#main-content details')) d.open = true;
 }`;
 
+// 📸 The Field Camera, born converted. As it opens it is a Start button on a
+// dark stage, the station and caption sections and an empty list. With photos
+// kept on the device — two through the camera app's door, signed out, since
+// the harness has no camera and no fix — it is the waiting list with every
+// action a photo has, the sign-in it waits for, and a station search's hits.
+// test/camera.mjs holds what the tab does; this holds how it is built.
+const SEED_CAMERA = `async () => {
+  dbSetAccessToken(null);
+  const make = async name => {
+    const cv = document.createElement('canvas');
+    cv.width = 1200; cv.height = 900;
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#6b7b55'; cx.fillRect(0, 0, 1200, 900);
+    const b = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.8));
+    return new File([b], name, { type: 'image/jpeg' });
+  };
+  const n0 = FieldCamera._debug().shots.length;
+  await FieldCamera.fromFiles([await make('IMG_0001.jpg'), await make('IMG_0002.jpg')]);
+  await new Promise(res => {
+    const t0 = Date.now();
+    const tick = () => (FieldCamera._debug().shots.length >= n0 + 2 || Date.now() - t0 > 5000 ? res() : setTimeout(tick, 50));
+    tick();
+  });
+  FieldCamera.findStation('Gatton');
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
 const PHOTO_FIXTURE = {
   attachment_type: [{ content_type: 'image/jpeg', ord: 1, label: 'JPEG photo', extensions: ['jpg', 'jpeg'], max_bytes: 25165824 }],
   field_photo: [
@@ -719,6 +746,8 @@ const CONVERTED = [
   { id: 'stations',   label: 'Stations — the 🔭 AR station finder pane', issue: 'new with the tool', seed: SEED_AR_PANE },
   { id: 'photos',     label: 'Field Photos — signed out', issue: 'born converted', seed: SEED_PHOTOS_OUT },
   { id: 'photos',     label: 'Field Photos — a queue, the place editor, the library and the sync', issue: 'born converted', seed: SEED_PHOTOS },
+  { id: 'camera',     label: 'Field Camera — as it opens', issue: 'born converted' },
+  { id: 'camera',     label: 'Field Camera — photos kept on the device, a station search', issue: 'born converted', seed: SEED_CAMERA },
   { id: 'basestations', label: 'Base Stations — signed out', issue: 'born converted', seed: SEED_BS_OUT },
   { id: 'basestations', label: 'Base Stations — the list, a station open, and the team keys', issue: 'born converted', seed: SEED_BS },
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },

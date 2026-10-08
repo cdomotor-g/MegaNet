@@ -1103,6 +1103,20 @@ jobs:
         working-directory: test
         run: npm run ar
 
+      # The Field Camera (field-camera.js, photo-stamp.js): photos taken in the
+      # app, stamped as Solocator stamps them and uploaded by themselves. The
+      # EXIF it writes and the panel it prints are read back under Node by
+      # photo-meta.js; then on a phone (Chromium's fake camera, a set GPS fix,
+      # compass readings dispatched) the station suggested and stamped, photos
+      # kept on the device signed out and through a reload, sent by themselves
+      # once signed in — hash, bytes, thumbnail, row — filed under the station
+      # on the stamp, and every way one cannot go (no network, refused, already
+      # there); and a photo stripped of its EXIF read back by the real OCR
+      # engine into the same place, heading, height and time.
+      - name: Field Camera — the stamp, the station on it, kept on the device and sent by itself
+        working-directory: test
+        run: npm run camera
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each
