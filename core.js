@@ -196,6 +196,8 @@ const TABS = [
       find: 'administration users accounts people roles privileges permissions groups allowlist editors sign in access database datastore data source schema load stations.json github file snapshot backup settings storage reset migration dashboard health stats statistics visitors analytics last seen online active size tables volume connections' },
     { id: 'basestations', label: 'Base Stations',        icon: '🖥️',
       find: 'ingest points receivers fleet devices heartbeat check-in checking in uptime temperature under-voltage uplink queue remote manage restart reboot update upgrade release log ssh keys login maintenance team public key' },
+    { id: 'review',     label: 'Network Review',         icon: '📐',
+      find: 'network review design audit planning fade margin matrix radio mobile rm comparison calibration calibrate attenuator path margin measured field test redundancy two paths second path gateways repeater relocation move proposed site hops tdma alert2 frequency principles licence' },
   ] },
 ];
 
@@ -1794,6 +1796,34 @@ const HELP = {
             { label: 'Ingest tokens, and base stations that ask for one', href: 'docs/ingest-http.md' }],
     related: ['admin', 'msglog', 'health'],
   },
+
+  review: {
+    summary: 'A radio network reviewed the way a planner reviews one. Pick the <strong>repeaters and bases</strong> '
+           + 'it runs through — and any <strong>proposed site</strong>, which is only a pin — and every field station '
+           + 'they carry gets a row: its <strong>fade margin to each</strong>, its best path, how many paths are good, '
+           + 'and what the <strong>attenuator found on site</strong> when it was last tested, with how far the model and '
+           + 'the field agree for this network. Below it: how Flood-Net\'s figures relate to <strong>Radio Mobile\'s</strong> '
+           + 'and how far to trust each, the <strong>design principles</strong> a network is checked against, and the '
+           + 'register\'s own faults that skew a review. Administrators only.',
+    watch: [
+      '<strong>The margins are the link budget card\'s.</strong> Each cell is the worse of the two directions over the '
+      + 'same 256-sample profile the card and the fade-margin map use, so the three can never give two figures for one '
+      + 'link. The card\'s propagation settings — the model, the field allowance, the repeater mast — change all three.',
+      '<strong>Field-calibrated, not physical.</strong> The default model is Longley–Rice over the bare terrain less a '
+      + 'field allowance fitted to attenuator tests on site; the land-cover model it replaced read tens of decibels '
+      + 'pessimistic against the same tests. Right on average across a network — any one path can be ±10 dB.',
+      '<strong>Radio Mobile reads higher.</strong> By a median 7 dB for the same path, because it is calibrated against '
+      + 'nothing and still reads about 5 dB above the attenuator. A figure read off a display that tops out — every '
+      + 'strong path the same ceiling, say 49 dB — is clipped, and means “at least that”.',
+      '<strong>Measured margins are end to end.</strong> An attenuator test to base takes whatever path the station '
+      + 'actually uses, so it is set against the best cell in the row, and a reading at the attenuator\'s 30 dB limit '
+      + 'says only “at least 30”.',
+      'Every repeater and base on a radio system with a field station\'s 4 m antenna is computed on an assumed mast '
+      + '(10 m unless the card says otherwise). Its real height, on a radio system of its own, takes the assumption away.',
+    ],
+    links: [{ label: 'Network review, and how the fade margin was calibrated', href: 'docs/network-review.md' }],
+    related: ['stations', 'passranges', 'basestations'],
+  },
 };
 
 // ── The breakpoint scale (#109) ──────────────────────────────────────────────
@@ -2607,6 +2637,37 @@ const RM_NET_DEFAULTS = {
   Topology: 1, 'Max Rebro': 0, '%Urban or Tree': 0,
 };
 
+// Flood-Net's own model settings, beside Radio Mobile's. Every fade margin in
+// the app — the link budget card, the fade-margin map, the profile's readout,
+// the site finder and the Network Review tab — is priced on these, through
+// pathPropOf() (path-profile.js), and the card's propagation settings can
+// change any of them for a session.
+//
+//   model      'field' — Longley–Rice over the bare terrain, less a field
+//              allowance calibrated against margins measured on site.
+//              'cover' — the land cover stood on the profile and ITU-R P.2108
+//              terminal clutter at each end: the physical model the app ran
+//              until the calibration below, kept one click away.
+//   allowance  dB the field model takes off the bare-terrain loss.
+//   mastAgl    m, the least antenna height a repeater or base is modelled at.
+//
+// Where the numbers come from (the Network Review tab has the working, and
+// re-runs it on demand): 54 field stations whose path margin to base was
+// measured with an attenuator in 2018–20, against the margin each model
+// predicted for the same path. The land-cover model came out 41 dB below what
+// the attenuator found, on average, and was no better at ranking the paths
+// after that bias was taken away. Longley–Rice over the bare terrain ranked
+// them well but read 19 dB high — the masts' own surroundings, feeders and
+// connectors, receivers in a crowded site — so that is the allowance: 18.9 dB
+// fitted, 16–22 dB at 90 % confidence, leaving a mean error of ±6.7 dB.
+//
+// mastAgl is there because every station in the register is on the 4 m field
+// station radio system, repeaters and bases included. A repeater on a hilltop
+// modelled with a 4 m whip sits in the terrain model's own summit pixels; at
+// 10 m it is where the mast puts it. The register is the fix — a repeater
+// whose radio system says higher keeps its own figure.
+const FN_MODEL_DEFAULTS = { model: 'field', allowance: 19, mastAgl: 10 };
+
 // ── Diagnostics & error capture ─────────────────────────────────────────────────
 // Registered as early as possible so a bug report can carry what actually went
 // wrong (recent runtime errors), not just what the user managed to describe.
@@ -3132,6 +3193,11 @@ const state = {
       time:       RM_NET_DEFAULTS['%Time'],
       location:   RM_NET_DEFAULTS['%Location'],
       situation:  RM_NET_DEFAULTS['%Situation'],
+      // Flood-Net's own three (FN_MODEL_DEFAULTS): which model prices the
+      // path, the field model's allowance, and the least mast at a repeater.
+      model:      FN_MODEL_DEFAULTS.model,        // 'field' | 'cover'
+      allowance:  FN_MODEL_DEFAULTS.allowance,    // dB, the field model only
+      mastAgl:    FN_MODEL_DEFAULTS.mastAgl,      // m, repeaters and bases
     },
     // Which of the card's disclosures are open: the propagation settings and
     // the cover-height table. Shut by default — they are the premises, and the

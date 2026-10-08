@@ -10,11 +10,11 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm, acmaHaversineKm and
-// RM_NET_DEFAULTS; across to app.js for mapNote, dockReveal (to open the
+// RM_NET_DEFAULTS and FN_MODEL_DEFAULTS; across to app.js for mapNote, dockReveal (to open the
 // side panel on this card before scrolling to it), stationsSplitActive (to say
 // where the Stations list is from here) and for the search the whole
 // app shares — prepareSearch, stationMatchesSearch, markHits and
-// tableStations; and sideways to path-profile.js for PATH_DEFAULT_MHZ,
+// tableStations; and sideways to path-profile.js for stationAntenna, pathPropOf, PATH_DEFAULT_MHZ,
 // PATH_DEFAULT_AGL, PATH_VERDICT, fsplDb, wattsToDbm, rmSystemOf and
 // PathProfile, to map-draw.js for MapDraw and to terrain.js for Terrain. See
 // path-profile.js's header for why the mutual reference constrains nothing.
@@ -26,10 +26,11 @@
 // `bubblingMouseEvents: false`.
 //
 // The number this produces is a model output — Longley–Rice over sampled
-// terrain and land cover, the model Radio Mobile runs — and not a measurement;
-// the banner that cannot be dismissed and the comparison table under it are
-// there so the figure cannot be read as more than it is. Do not quietly make it
-// look more confident.
+// terrain, the model Radio Mobile runs, less an allowance calibrated against
+// margins measured in the field — and not a measurement; the banner that
+// cannot be dismissed and the comparison table under it are there so the
+// figure cannot be read as more than it is. Do not quietly make it look more
+// confident.
 //
 // Moved out of app.js byte-for-byte by M3 (#134) of #129; rebuilt on the
 // Longley–Rice port (itm.js) and the land-cover layer (land-cover.js) since.
@@ -41,13 +42,18 @@
 // hilltop nobody has been to yet and see what the path would do.
 //
 // The loss is Longley–Rice (ITM) point-to-point over the elevation profile —
-// terrain, land cover stood on it, climate, ground constants, polarisation and
-// the statistical allowance for the reliability asked — plus ITU-R P.2108's
-// terminal-clutter term at an end whose antenna is under the trees. That is
-// what Radio Mobile computes, from a better land-cover map. What it still
-// leaves out (antenna patterns above all) *reduces* real margin, hence the
-// banner that cannot be dismissed and the comparison table underneath it: the
-// card is built so the figure cannot be read as more than it is.
+// terrain, climate, ground constants, polarisation and the statistical
+// allowance for the reliability asked — and then, under the field model that
+// is the default, a field allowance: the decibels by which that bare-terrain
+// figure was found to overstate path margins measured with an attenuator on
+// site (FN_MODEL_DEFAULTS, core.js, and the Network Review tab, which re-runs
+// the comparison). The land-cover model is one setting away — the cover stood
+// on the profile and ITU-R P.2108's terminal clutter at an end under the trees,
+// which is how this card priced every path until the measurements showed it
+// tens of decibels pessimistic at VHF. What either leaves out (antenna
+// patterns above all) is why the banner cannot be dismissed and the
+// comparison table sits underneath it: the card is built so the figure cannot
+// be read as more than it is.
 
 // The bands are read against a margin that already carries the statistical
 // allowance for the reliability asked (70% of situations by default), so they
@@ -83,6 +89,9 @@ const LinkBudget = (function () {
   function stationEndpoint(st) {
     const sys = rmSystemOf(st);
     const rep = st.repeater || null;
+    // A repeater or base stands on a mast where its system gives it a field
+    // station's whip (stationAntenna, path-profile.js); the box says so.
+    const ant = stationAntenna(st, sys);
     return {
       kind: 'station', sid: st.id, name: st.name,
       lat: st.lat, lon: st.lon,
@@ -90,11 +99,12 @@ const LinkBudget = (function () {
       groundSrc: st.elevation_ahd != null ? 'elevation_ahd (AHD)' : null,
       sysName: sys ? sys.name : null,
       freq: rep && rep.rx_mhz > 0 ? rep.rx_mhz : null,
+      mast: ant.mast ? ant.sysAgl : null,
       def: {
         tx_w:     sys && sys.tx_power_w != null ? sys.tx_power_w : null,
         loss_db:  sys && sys.line_loss_db != null ? sys.line_loss_db : null,
         gain_dbi: sys && sys.antenna_gain_dbi != null ? sys.antenna_gain_dbi : null,
-        agl_m:    sys && sys.antenna_height_m != null ? sys.antenna_height_m : PATH_DEFAULT_AGL,
+        agl_m:    ant.agl,
         rx_dbm:   sys && sys.rx_threshold_dbm != null ? sys.rx_threshold_dbm : null,
       },
       over: {},
@@ -533,11 +543,15 @@ const LinkBudget = (function () {
     const clutA = an && an.coverUsed ? an.clutterA_db : null;
     const clutB = an && an.coverUsed ? an.clutterB_db : null;
     const floor = itm ? an.floor_db : 0;
+    // The field model's allowance (pathAnalyse): what the bare-terrain figure
+    // was found to be short of the attenuator on site. Nought under the cover
+    // model, which prices the same things as cover and clutter instead.
+    const allow = itm && an.model === 'field' ? an.allowance_db : 0;
     // The knife-edge proxy is what stands in when the profile exists but the
     // model refused it (a 400 m hop, say, or a mast under 0.5 m).
     const proxy = an && !itm ? an.diffraction_db : null;
     const pathLoss = itm
-      ? fspl + aref + avar + (clutA || 0) + (clutB || 0) + floor
+      ? fspl + aref + avar + (clutA || 0) + (clutB || 0) + floor + allow
       : fspl + (proxy || 0);
 
     const rxDbm = eirp == null || rxG == null || rxL == null ? null
@@ -568,10 +582,10 @@ const LinkBudget = (function () {
     const efieldReq = thr == null || rxG == null || rxL == null ? null : thr + rxL + 77.2 + 20 * Math.log10(fMhz) - rxG;
     const sysGain = eirp == null || rxG == null || rxL == null || thr == null ? null : eirp + rxG - rxL - thr;
 
-    return { dKm, fMhz, txW, txDbm, eirp, fspl, aref, avar, clutA, clutB, floor, proxy, pathLoss,
+    return { dKm, fMhz, txW, txDbm, eirp, fspl, aref, avar, clutA, clutB, floor, allow, proxy, pathLoss,
              rxDbm, thr, margin, an, itm, uV, efield, efieldReq, sysGain,
              // kept for the radio-path card, which reads them
-             diff: itm ? aref + avar + (clutA || 0) + (clutB || 0) + floor : proxy,
+             diff: itm ? aref + avar + (clutA || 0) + (clutB || 0) + floor + allow : proxy,
              zero, missing, fsplOnly: an == null };
   }
 
@@ -598,6 +612,7 @@ const LinkBudget = (function () {
                  onchange="LinkBudget.setField('${which}','${k}',this.value)">
           <b class="lb-flag">${over ? 'edited'
             : e.def[k] == null ? ''
+            : k === 'agl_m' && e.mast != null ? `mast · system says ${e.mast} m`
             : e.kind === 'station' ? 'default'
             // A hypothetical site's figures came from nowhere but this code, so
             // they are marked as the guesses they are rather than borrowing the
@@ -628,6 +643,17 @@ const LinkBudget = (function () {
           ${f('rx_dbm',   'RX threshold',    '0.1',  'dBm')}
         </div>
       </div>`;
+  }
+
+  // An end the model stood on the terrain's surface rather than its surveyed
+  // height (pathAnalyse's ends), said where the terrain term is.
+  function liftNote(an, a, b) {
+    const bits = [[an.liftA_m, a], [an.liftB_m, b]].filter(([m]) => m > 0.5)
+      .map(([m, e]) => `${esc(e.name)} ${m.toFixed(1)} m`);
+    return bits.length
+      ? `; ${bits.length === 1 ? 'one end' : 'both ends'} stood on the terrain model's surface, above the survey
+         (${bits.join(', ')}) — the tiles round it read higher than the ground was surveyed at`
+      : '';
   }
 
   // Every term is signed, so the column reads as an addition that visibly comes
@@ -690,7 +716,9 @@ const LinkBudget = (function () {
               ${budgetRow('Terrain', -r.aref, 'dB',
                 `Longley–Rice reference attenuation, <strong>${esc(itm.modeLabel.toLowerCase())}</strong> regime over
                  ${fmtAglPair(val(a, 'agl_m'), val(b, 'agl_m'))}, Δh ${Math.round(itm.delta_h_m)} m${
-                 an.coverUsed ? ', cover stood on the profile' : ', <span class="txt-warn">bare ground</span>'}`)}
+                 an.model === 'field' ? ', bare terrain — the field model'
+                 : an.coverUsed ? ', cover stood on the profile' : ', <span class="txt-warn">bare ground</span>'}${
+                 liftNote(an, a, b)}`)}
               ${budgetRow('Statistics', -r.avar, 'dB',
                 `${esc(ITM.CLIMATE[P_.climate])} climate, ${esc(ITM.MDVAR[P_.mdvar] || '')} mode, ${pct}${
                  r.avar < 0 ? ' — below the median, a gain' : ''}`)}
@@ -698,7 +726,12 @@ const LinkBudget = (function () {
                 `the model's ${esc(itm.modeLabel.toLowerCase())} regime prices this profile at ${r.aref.toFixed(1)} dB over free space, but
                  the line is cut and one knife edge over the worst obstruction${an.v != null ? ` (v=${an.v.toFixed(2)})` : ''} costs
                  ${an.diffraction_db.toFixed(1)} dB — the loss is held to at least that`) : ''}
-              ${an.coverUsed ? `
+              ${an.model === 'field'
+                ? budgetRow('Field allowance', -r.allow, 'dB',
+                    `what Longley–Rice over bare terrain was found to read above path margins measured on site — the
+                     trees and roofs round the masts, feeders and connectors, receivers at busy sites. Calibrated, not
+                     modelled; <button class="lb-link" onclick="LinkBudget.setModel('cover')">price the land cover instead</button>`)
+                : an.coverUsed ? `
                 ${budgetRow(`Ground cover at ${esc(a.name)}`, -r.clutA, 'dB', coverNote('A', a, an.coverA, an.R_A, val(a, 'agl_m'), r.clutA))}
                 ${budgetRow(`Ground cover at ${esc(b.name)}`, -r.clutB, 'dB', coverNote('B', b, an.coverB, an.R_B, val(b, 'agl_m'), r.clutB))}`
               : `<tr class="lb-missing"><th scope="row">Ground cover</th><td class="lb-num">—</td><td class="lb-unit">dB</td>
@@ -740,8 +773,12 @@ const LinkBudget = (function () {
                       m ? ` however “${m.label.toLowerCase()}” it looks` : ''}: one knife edge stands in for a
                       blocked path, and it understates it badly.`
                   : itm
-                    ? `${esc(m.note)} This is the margin above the threshold at ${pct} — Radio Mobile's “Rx relative” —
-                       not the margin above the median.`
+                    ? (an.model === 'field'
+                      ? `${esc(m.note)} This is the margin above the threshold at ${pct}, after the field allowance —
+                         the figure an attenuator test on site should find. Radio Mobile's “Rx relative” for the same
+                         path leaves the allowance out and reads higher.`
+                      : `${esc(m.note)} This is the margin above the threshold at ${pct} — Radio Mobile's “Rx relative” —
+                         not the margin above the median.`)
                     : r.fsplOnly
                       ? 'Free space only — no terrain, no cover, no statistics. Optimistic by whatever the ground costs.'
                       : esc(m.note)}</span></td>
@@ -753,7 +790,10 @@ const LinkBudget = (function () {
         <p class="small lb-eval">Terrain${an.coverUsed ? ' and cover' : ''} say <strong>${PATH_VERDICT[an.verdict].label.toLowerCase()}</strong>:
           ${esc(PATH_VERDICT[an.verdict].note)}
           ${an.intrusion_m > 0 ? `Worst intrusion ${Math.round(an.intrusion_m)} m into the 60% zone at ${fmtKm(an.worst.d1 / 1000)}.` : ''}
-          ${an.verdict === 'obstructed' && itm ? 'The model has priced the obstruction; the margin above is what is left after it.' : ''}</p>` : ''}
+          ${an.verdict === 'obstructed' && itm ? 'The model has priced the obstruction; the margin above is what is left after it.' : ''}
+          ${an.model === 'field' && itm && an.coverUsed && an.verdictBare !== an.verdict
+            ? `On the bare ground it is <strong>${PATH_VERDICT[an.verdictBare].label.toLowerCase()}</strong> — the ground the
+               field model prices, its allowance carrying what the cover costs on average.` : ''}</p>` : ''}
       ${readoutHtml(r)}
       ${divergenceHtml(r)}`;
   }
@@ -906,11 +946,32 @@ const LinkBudget = (function () {
         ${on ? flag(P_[key], key === 'time' ? D['%Time'] : key === 'location' ? D['%Location'] : D['%Situation'])
              : '<b class="lb-flag">not read in this mode</b>'}
       </label>`;
+    // Flood-Net's own three, flagged against FN_MODEL_DEFAULTS rather than the
+    // Radio Mobile export: they are not Radio Mobile settings at all.
+    const F = FN_MODEL_DEFAULTS;
+    const fieldModel = P_.model !== 'cover';
+    const modelSel = `
+      <label class="draw-field">
+        <span>Model</span>
+        <select id="lb-prop-model" onchange="LinkBudget.setModel(this.value)">
+          <option value="field" ${fieldModel ? 'selected' : ''}>Field-calibrated — bare terrain less the allowance</option>
+          <option value="cover" ${fieldModel ? '' : 'selected'}>Land cover — trees and roofs on the profile, P.2108 at the masts</option>
+        </select>
+        <b class="lb-flag">${P_.model === F.model ? 'default · Flood-Net' : 'edited'}</b>
+      </label>`;
     return `
       <details class="lb-propset" ${S().propOpen ? 'open' : ''} ontoggle="LinkBudget.setPropOpen(this.open)">
-        <summary class="small">Propagation settings — climate, ground, reliability
-          <span class="txt-muted">(${esc(ITM.CLIMATE[P_.climate])}, ${esc(ITM.MDVAR[P_.mdvar] || '')}, ${P_.situation}% of situations)</span></summary>
+        <summary class="small">Propagation settings — model, climate, ground, reliability
+          <span class="txt-muted">(${fieldModel ? `field-calibrated, ${P_.allowance} dB` : 'land cover'}, ${esc(ITM.CLIMATE[P_.climate])}, ${esc(ITM.MDVAR[P_.mdvar] || '')}, ${P_.situation}% of situations)</span></summary>
         <div class="lb-prop">
+          ${modelSel}
+          <label class="draw-field${fieldModel ? '' : ' is-unused'}">
+            <span>Field allowance <em>dB</em></span>
+            <input type="number" id="lb-prop-allowance" step="0.5" min="0" max="60" value="${P_.allowance}" ${fieldModel ? '' : 'disabled'}
+                   onchange="LinkBudget.setProp('allowance', this.value)">
+            ${fieldModel ? flag(P_.allowance, F.allowance) : '<b class="lb-flag">not read by this model</b>'}
+          </label>
+          ${num('mastAgl', 'Repeater &amp; base mast', 0.5, 0, 100, F.mastAgl, 'm')}
           ${sel('climate', 'Radio climate', Object.entries(ITM.CLIMATE), D.Climate)}
           ${num('N0', 'Surface refractivity', 1, 250, 400, D.Refractivity, 'N-units')}
           ${num('epsilon', 'Ground permittivity', 1, 1, 100, D.Permittivity, 'ε<sub>r</sub>')}
@@ -921,10 +982,16 @@ const LinkBudget = (function () {
           ${pctField('location', '% of locations', usesLoc)}
           ${pctField('situation', '% of situations', true)}
         </div>
-        <p class="filter-hint">Longley–Rice's own inputs, one for one with Radio Mobile's network properties.
+        <p class="filter-hint">The <strong>model</strong> decides what the land cover is for. Field-calibrated, the default,
+          prices the bare terrain and takes off an allowance fitted to path margins measured on site — the land-cover
+          model came out tens of decibels pessimistic against the same measurements, and no better at ranking the
+          paths. The <strong>mast</strong> is the least height a repeater or base is modelled at: the register puts every
+          station on the 4 m field-station system, and a system that says more keeps its own. The rest are
+          Longley–Rice's own inputs, one for one with Radio Mobile's network properties.
           Refractivity 301 is k = 4/3; average ground is ε<sub>r</sub> 15, σ 0.005 S/m (poor 4 / 0.001, good 25 / 0.02,
           sea water 81 / 5). Spot mode reads only % of situations; Accidental and Mobile add % of time;
           Broadcast reads all three. Higher percentages ask for a more reliable link and cost margin.
+          The field allowance was fitted at the defaults, so a change to the reliability is a change to the figure.
           <button type="button" class="lb-link" onclick="LinkBudget.resetProp()">Reset to the network defaults</button></p>
       </details>`;
   }
@@ -938,10 +1005,17 @@ const LinkBudget = (function () {
     const rows = [
       ['Propagation model', 'Longley–Rice ITM v1.2.2, point-to-point — NTIA’s reference code ported line for line and held to it at 10<sup>−6</sup> dB',
        'The same ITM, except line-of-sight paths, where Radio Mobile substitutes its own two-ray method'],
-      ['Terrain', 'SRTM/GMTED ~30 m tiles, 256 samples along the great circle', 'Its own DEM (SRTM 3″ or 1″), up to 500 samples'],
-      ['Land cover', 'Sentinel-2 10 m classes, a height per class (editable), stood on the profile; measured canopy heights for trees',
-       'GlobCover ~300 m classes with a height and a “density” per class, plus unpublished forest and urban loss terms'],
-      ['Terminal in trees or town', 'ITU-R P.2108 §3.1 height-gain loss when the antenna is below the cover', 'Part of the same unpublished clutter term'],
+      ['Terrain', 'SRTM/GMTED ~30 m tiles, 256 samples along the great circle; an end is never stood below the tile under it',
+       'Its own DEM (SRTM 3″ or 1″), up to 500 samples; a unit takes its height from the same DEM unless typed in'],
+      ['Land cover', 'Field model (default): <em>not stood on the profile</em> — its average cost is in the field allowance. '
+       + 'Land-cover model: Sentinel-2 10 m classes, a height per class (editable), measured canopy heights for trees',
+       'GlobCover ~300 m classes with a height and a “density” per class, plus unpublished forest and urban loss terms — usually switched off'],
+      ['Terminal in trees or town', 'Field model: in the field allowance. Land-cover model: ITU-R P.2108 §3.1 height-gain loss when the antenna is below the cover',
+       'Part of the same unpublished clutter term'],
+      ['Calibration', `Field model: ${FN_MODEL_DEFAULTS.allowance} dB off the bare-terrain loss, fitted to path margins measured with an attenuator on site — mean error ±7 dB`,
+       'None — the figures are the model’s own; on the same measured paths they read about 5 dB high on average'],
+      ['Repeater &amp; base antennas', `At least a ${FN_MODEL_DEFAULTS.mastAgl} m mast (a setting), or the radio system’s height where it is more`,
+       'Each unit’s own height, typed in per system or per unit'],
       ['Climate &amp; refractivity', 'Modelled — the same seven climates and N<sub>s</sub>', `Modelled (export writes climate ${N.Climate}, N ${N.Refractivity})`],
       ['Statistical reliability', 'Modelled — %time / %locations / %situations by mode', `Modelled (export writes ${N['%Time']} / ${N['%Location']} / ${N['%Situation']})`],
       ['Ground constants, polarisation', 'Modelled', 'Modelled'],
@@ -954,10 +1028,11 @@ const LinkBudget = (function () {
       <details class="lb-compare">
         <summary>What this models, next to Radio Mobile — and what neither does</summary>
         <p class="small">The figure is a <strong>model output</strong>: the same public-domain propagation model Radio
-          Mobile runs, over ~30 m terrain and 10 m land cover, with representative heights standing in for the
-          trees and buildings a survey would measure. It is as good as its inputs. The rows that say
-          <em>not modelled</em> all cost real margin, and an antenna pattern pointed the wrong way costs more than
-          any of them — confirm on air before anything is built on it.</p>
+          Mobile runs, over ~30 m terrain, less an allowance calibrated on margins measured in the field — so it reads
+          a few decibels <em>below</em> Radio Mobile's “Rx relative” for the same path, and close to what an
+          attenuator on site finds. It is as good as its inputs. The rows that say <em>not modelled</em> are where
+          one path can stray from the average, and an antenna pattern pointed the wrong way costs more than any of
+          them — confirm on air before anything is built on it.</p>
         <div class="table-wrap">
           <table class="lb-compare-table">
             <caption class="sr-only">What this budget models against what Radio Mobile models, term by term</caption>
@@ -976,8 +1051,9 @@ const LinkBudget = (function () {
     const r = compute();
     return `
       <div class="lb-disclaimer" role="alert">
-        ⚠️ <strong>A model, not a measurement.</strong> Longley–Rice over sampled terrain and land cover, at the
-        reliability set below. Antenna patterns, interference and the trees the map missed are not in it.
+        ⚠️ <strong>A model, not a measurement.</strong> ${pathPropOf().model === 'cover'
+          ? 'Longley–Rice over sampled terrain and land cover, at the reliability set below. Antenna patterns, interference and the trees the map missed are not in it.'
+          : 'Longley–Rice over sampled terrain, less an allowance fitted to path margins measured on site, at the reliability set below. Right on average across a network; any one path can be ±10 dB, and antenna patterns and interference are not in it.'}
         Confirm on air before building on the figure.
       </div>
       <div class="lb-controls">
@@ -1054,7 +1130,7 @@ const LinkBudget = (function () {
                ontoggle="LinkBudget.setOpen(this.open)">
         <summary>
           <h3>Link budget <span class="lb-badge">modelled</span></h3>
-          <span class="small">Fade margin between two points — Longley–Rice over terrain and cover</span>
+          <span class="small">Fade margin between two points — Longley–Rice over terrain, field-calibrated</span>
           <!-- The answer, in the corner the eye lands on first. It is the same
                figure the table foot carries and is deliberately not a second
                opinion: both come from one compute(). It stays legible with the
@@ -1064,6 +1140,18 @@ const LinkBudget = (function () {
         </summary>
         <div class="lb-body">${S().open ? bodyHtml() : ''}</div>
       </details>`;
+  }
+
+  // A propagation setting moved: the card, the profile drawn above it and the
+  // radio-path card that quotes them follow at once. The fade-margin map
+  // follows too — its saved rows carry the settings they were computed on, so
+  // they stop matching and the layer recomputes — but only when it is on, and
+  // only by redrawing the lines it already has.
+  function propChanged() {
+    rerender();
+    PathProfile.rerender();
+    MapBackbone.profileChanged();
+    if (state.mapFade && state.map && typeof refreshMapLayers === 'function') refreshMapLayers({ skipFit: true });
   }
 
   function rerender() {
@@ -1284,24 +1372,27 @@ const LinkBudget = (function () {
     // because its earth curvature is the refractivity's.
     setProp(key, v) {
       const P_ = S().prop;
-      if (!(key in P_)) return;
+      if (!(key in P_) || key === 'model') return;
       const n = Number(v);
       if (!isFinite(n)) return;
       P_[key] = key === 'climate' || key === 'pol' || key === 'mdvar' ? Math.round(n) : n;
-      rerender();
-      PathProfile.rerender();
-      MapBackbone.profileChanged();
+      propChanged();
+    },
+    // The model, which is a word rather than a number, so not setProp's.
+    setModel(v) {
+      if (v !== 'field' && v !== 'cover') return;
+      S().prop.model = v;
+      propChanged();
     },
     resetProp() {
-      const D = RM_NET_DEFAULTS;
+      const D = RM_NET_DEFAULTS, F = FN_MODEL_DEFAULTS;
       S().prop = {
         climate: D.Climate, N0: D.Refractivity, epsilon: D.Permittivity, sigma: D.Conductivity,
         pol: D.Polarization, mdvar: D['Stat. mode'],
         time: D['%Time'], location: D['%Location'], situation: D['%Situation'],
+        model: F.model, allowance: F.allowance, mastAgl: F.mastAgl,
       };
-      rerender();
-      PathProfile.rerender();
-      MapBackbone.profileChanged();
+      propChanged();
     },
     setPropOpen(v) { S().propOpen = !!v; },
     setField(which, k, v) {

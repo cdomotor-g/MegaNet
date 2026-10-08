@@ -593,6 +593,32 @@ const SEED_OFFLINE = `async () => {
   document.querySelectorAll('#ot-page details').forEach(d => { d.open = true; });
 }`;
 
+// The Network Review tab, born converted: signed out a paragraph and a
+// button; as an administrator the matrix, its tiles and the three panels
+// under it. The terrain is unreachable here, so every cell is the "could not
+// be computed" dash — which is markup the tab has to get right as well — and
+// "administrator" is stood in for only while this tab is the one on screen.
+const SEED_NR_OUT = `() => {
+  if (window.__nrAuth) { Object.assign(Auth, window.__nrAuth); delete window.__nrAuth; }
+  NetworkReview.authChanged();
+}`;
+
+const SEED_NR = `async () => {
+  if (!window.__nrAuth) {
+    const real = { isSignedIn: Auth.isSignedIn, isAdmin: Auth.isAdmin, role: Auth.role };
+    window.__nrAuth = real;
+    const here = () => state.activeTab === 'review';
+    Auth.isSignedIn = () => here() || real.isSignedIn();
+    Auth.isAdmin = () => here() || (real.isAdmin ? real.isAdmin() : false);
+    Auth.role = () => here() ? 'admin' : real.role();
+  }
+  NetworkReview.setHubs([{ kind: 'station', id: 'mt_stuart_al' }, { kind: 'station', id: 'castle_hill_al' },
+                         { kind: 'site', key: 'site-1', name: 'A proposed site', lat: -19.3, lon: 146.85, agl: 12 }]);
+  await NetworkReview.compute();
+  NetworkReview.convert('24');
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
 const SEED_BS_OUT = `() => {
   if (window.__bsAuth) { Object.assign(Auth, window.__bsAuth); delete window.__bsAuth; }
   BaseStations.authChanged();
@@ -750,6 +776,8 @@ const CONVERTED = [
   { id: 'camera',     label: 'Field Camera — photos kept on the device, a station search', issue: 'born converted', seed: SEED_CAMERA },
   { id: 'basestations', label: 'Base Stations — signed out', issue: 'born converted', seed: SEED_BS_OUT },
   { id: 'basestations', label: 'Base Stations — the list, a station open, and the team keys', issue: 'born converted', seed: SEED_BS },
+  { id: 'review',     label: 'Network Review — signed out', issue: 'born converted', seed: SEED_NR_OUT },
+  { id: 'review',     label: 'Network Review — a matrix of two repeaters and a proposed site', issue: 'born converted', seed: SEED_NR },
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },
   { id: 'sitemap',    label: 'Site Map',        issue: 'born converted' },

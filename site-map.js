@@ -265,6 +265,15 @@ const SiteMap = (function () {
       ],
       note: 'Administrators only.',
     },
+    review: {
+      what: 'A network reviewed the way a planner does it: every station\'s fade margin to every repeater, base or proposed site, beside what the attenuator found on site.',
+      use: [
+        'See which stations have two good paths, one, or none',
+        'Try a repeater on a different hill before anybody climbs it',
+        'Read a Radio Mobile figure against Flood-Net\'s, and both against the field',
+      ],
+      note: 'Administrators only.',
+    },
   };
 
   // ── The groups, in the order the work moves through them ──────────────────
@@ -286,7 +295,7 @@ const SiteMap = (function () {
     'Site visits': { step: 'What we did on site',
       blurb: 'The paperwork of a visit, digitised — inspections, council maintenance, the record of both, and the photos.' },
     'Admin': { step: 'Keeping it running',
-      blurb: 'Where the station data comes from, who may sign in, and the base stations that receive it all.' },
+      blurb: 'Where the station data comes from, who may sign in, the base stations that receive it all, and the review of a network\'s design.' },
   };
 
   // ── Everyday jobs ──────────────────────────────────────────────────────────
@@ -308,6 +317,7 @@ const SiteMap = (function () {
     { text: 'Take site photos stamped with where and which way', tab: 'camera' },
     { text: 'File the photos from a field trip',           tab: 'photos' },
     { text: 'Print a map for a field trip',                tab: 'mapgen' },
+    { text: 'Review a radio network\'s design',            tab: 'review' },
   ];
 
   const SELF = 'sitemap';

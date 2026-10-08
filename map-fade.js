@@ -9,7 +9,7 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state`, cssVar and acmaHaversineKm; across to
 // terrain.js for Terrain.profile, to land-cover.js for LandCover.sample, to
-// path-profile.js for pathAnalyse, rmSystemOf, wattsToDbm and the
+// path-profile.js for pathAnalyse, pathPropOf, rmSystemOf, stationAntenna, wattsToDbm and the
 // PATH_DEFAULT_* constants, and to datastore.js for dbSelect, dbRpc and
 // dbCanWrite. All of it from inside MapFade's own functions, so this file's
 // position among the modules is free.
@@ -29,6 +29,16 @@
 // this number, it is a different and always kinder one, and a link that reads
 // green because nobody told it about the trees is worse than a link with no
 // colour at all.
+//
+// That rule is the land-cover model's, and still holds under it. The default
+// since the field calibration (FN_MODEL_DEFAULTS, core.js) is the field model:
+// Longley–Rice over the bare terrain less an allowance measured on site — the
+// cover is in that allowance, as the average of what the trees and roofs
+// round real masts were found to cost, rather than in the profile. It needs no
+// land cover at all, so under it the sweep asks the land-cover service for
+// nothing, and a link is coloured as soon as its terrain is in. The card asks
+// the same model the same question, cover or no cover on its chart, so the two
+// still cannot disagree.
 //
 // ── Why this is not just MapLos with more colours ────────────────────────────
 //
@@ -104,7 +114,10 @@ const MapFade = (function () {
   // old figures to be read as new ones. /2 is 256 samples and land cover, which
   // together moved one real link from 17.3 dB to 2.1 — from the top of green to
   // the bottom of red, and the card had been saying 2.2 all along.
-  const MODEL       = 'itm-p2p/2';
+  // /3 is the field calibration: ends stood on the terrain model's surface
+  // rather than in a pit under it, repeaters and bases on a mast, and the
+  // field model's allowance in place of the cover — every saved row stale.
+  const MODEL       = 'itm-p2p/3';
 
   let mem = null;           // Map sig → { m, ab, ba, v, t }  (this session + localStorage)
   let saved = null;         // Map pairKey → row, as read from the datastore
@@ -135,7 +148,7 @@ const MapFade = (function () {
     const sys = rmSystemOf(s);
     return {
       elev: s.elevation_ahd != null ? s.elevation_ahd : null,
-      agl:  sys && sys.antenna_height_m != null ? sys.antenna_height_m : PATH_DEFAULT_AGL,
+      agl:  stationAntenna(s, sys).agl,
       txW:  sys && sys.tx_power_w != null ? sys.tx_power_w : null,
       gain: sys && sys.antenna_gain_dbi != null ? sys.antenna_gain_dbi : null,
       loss: sys && sys.line_loss_db != null ? sys.line_loss_db : null,
@@ -165,7 +178,8 @@ const MapFade = (function () {
     // Ends in pair order, so a→b and b→a produce one signature for one line.
     const ends = a.id < b.id ? [end(a, pa), end(b, pb)] : [end(b, pb), end(a, pa)];
     return [
-      MODEL, ends[0], ends[1], freqFor(a, b), SAMPLES, 'cover',
+      MODEL, ends[0], ends[1], freqFor(a, b), SAMPLES,
+      p.model === 'cover' ? 'cover' : `field-${p.allowance}`,
       p.climate, p.N0, p.epsilon, p.sigma, p.pol, p.mdvar, p.time, p.location, p.situation,
     ].join('|');
   }
@@ -446,13 +460,16 @@ const MapFade = (function () {
     // obstruction it is not true in one direction either — so a partial profile
     // is refused outright (terrain.js's loud-failure rule, at its strictest).
     if (prof.partial) return null;
-    const res = await LandCover.sample(prof.lat, prof.lon);
-    if (!res || !res.ok) return null;
+    // The field model prices the bare terrain and asks for no cover; the
+    // land-cover model will not answer without it.
+    const coverModel = pathPropOf().model === 'cover';
+    const res = coverModel ? await LandCover.sample(prof.lat, prof.lon) : null;
+    if (coverModel && (!res || !res.ok)) return null;
     const pa = endSys(a), pb = endSys(b);
     const an = pathAnalyse(prof, {
       elevA: pa.elev, elevB: pb.elev, aglA: pa.agl, aglB: pb.agl,
       freqMhz: freqFor(a, b),
-      cover: res.cls, canopy: res.canopyOk ? res.canopy : null,
+      cover: res ? res.cls : null, canopy: res && res.canopyOk ? res.canopy : null,
     });
     if (!an.ok) return null;
     const m = marginPair(an, a, b);
@@ -482,11 +499,14 @@ const MapFade = (function () {
   }
 
   function noteHtml() {
-    const caveat = 'Longley–Rice over ~30 m terrain with the land cover standing on it, at the '
-      + 'reliability the link budget card is set to, both ends&rsquo; filed radios, the worse of the '
-      + 'two directions. The same arithmetic the card runs, over the same 256 samples, so a colour '
-      + 'here and a figure there cannot disagree. Indicative, like the card &mdash; and every bit as '
-      + 'much a model, not a measurement.';
+    const P_ = pathPropOf();
+    const caveat = (P_.model === 'cover'
+        ? 'Longley–Rice over ~30 m terrain with the land cover standing on it'
+        : `Longley–Rice over ~30 m terrain, less the ${P_.allowance} dB field allowance measured on site`)
+      + ', at the reliability the link budget card is set to, both ends&rsquo; filed radios (a repeater or base '
+      + `on at least a ${P_.mastAgl} m mast), the worse of the two directions. The same arithmetic the card `
+      + 'runs, over the same 256 samples, so a colour here and a figure there cannot disagree. Indicative, '
+      + 'like the card &mdash; and every bit as much a model, not a measurement.';
     if (!state.mapFade) {
       return `Colour every link by its fade margin instead of one flat orange: green at
               ${G()} dB or better, yellow at ${O()}, red below. Turning it on computes what the
@@ -499,14 +519,14 @@ const MapFade = (function () {
     if (note.pending) bits.push(`${note.pending} still computing…`);
     if (note.stale)   bits.push(`<span class="txt-warn">${note.stale} saved ${note.stale === 1 ? 'figure has' : 'figures have'} gone stale — the radios or the positions moved since</span>`);
     if (note.noRadio) bits.push(`${note.noRadio} with no radio system on file — no margin to give`);
-    if (note.failed)  bits.push(`<span class="txt-warn">${note.failed} could not be computed — terrain or land cover unreachable, or the model refused the path</span>`);
+    if (note.failed)  bits.push(`<span class="txt-warn">${note.failed} could not be computed — ${P_.model === 'cover' ? 'terrain or land cover' : 'terrain'} unreachable, or the model refused the path</span>`);
     // The one way left for the map and the card to disagree, said out loud
     // where it happens. These figures always have the cover in them; the card
     // follows the operator's switch, so with cover off it is answering about
     // bare ground and will read higher — by 12 dB on a path with two antennas
     // under the canopy. The map does not follow the switch on purpose: it
     // states the network as filed, and cover-off is a what-if (MapLos's rule).
-    if (!state.path.cover) {
+    if (P_.model === 'cover' && !state.path.cover) {
       bits.push('<span class="txt-warn">ground cover is switched off on the profile card, so its figures'
               + ' are bare-ground ones and will read higher than these</span>');
     }

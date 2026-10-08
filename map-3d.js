@@ -9,7 +9,7 @@
 // Reaches back to core.js for `state`, cssVar, announce, esc, destPoint,
 // acmaHaversineKm and the words for moving a 3-D view (viewMoveWords,
 // viewKeyWords); across to terrain.js for the ground profile, to
-// path-profile.js for the physics (pathAnalyse, earthBulge, rmSystemOf,
+// path-profile.js for the physics (pathAnalyse, pathPropOf, stationAntenna, earthBulge, rmSystemOf,
 // PATH_DEFAULT_*), to map-controls.js for the panel it is opened from, to
 // map-sites.js for what the repeater site finder drew (MapSites.drawn, select,
 // dimOthers, modeChanged), to map-photos.js for the field photos' pins
@@ -402,7 +402,8 @@ const Map3D = (function () {
     const sys = typeof rmSystemOf === 'function' ? rmSystemOf(s) : null;
     return {
       elev: s && s.elevation_ahd != null ? s.elevation_ahd : null,
-      agl:  sys && sys.antenna_height_m != null ? sys.antenna_height_m : PATH_DEFAULT_AGL,
+      agl:  s && typeof stationAntenna === 'function' ? stationAntenna(s, sys).agl
+          : sys && sys.antenna_height_m != null ? sys.antenna_height_m : PATH_DEFAULT_AGL,
     };
   }
 
@@ -2189,10 +2190,12 @@ const Map3D = (function () {
     // The plot's own caveat travels with it (#188): draped on real relief it
     // looks more like an answer than it did as a flat wash, and is exactly as
     // optimistic as it was.
+    const P_ = typeof pathPropOf === 'function' ? pathPropOf({}) : { model: 'cover' };
     const polar = polarGen === null ? '' : `Polar radio coverage is draped on the ground:
-      bare terrain, no antenna patterns, no trees and no terminal clutter — the
-      best case. The elevation profile card is the authority for any path about
-      to be built.<br>`;
+      bare terrain${P_.model === 'cover' ? '' : ` less the ${P_.allowance} dB field allowance`},
+      no antenna patterns, no trees and no terminal clutter — ${P_.model === 'cover'
+        ? 'the best case' : 'the field model’s average, which a mast under a canopy can fall short of'}.
+      The elevation profile card is the authority for any path about to be built.<br>`;
     const caveat = `A pin behind a hill is hidden by it — which is worth knowing both
       ways round: a station you cannot see from here has no line of sight from here,
       and a station you are looking for may be over the next ridge rather than absent.

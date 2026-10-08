@@ -4,13 +4,16 @@
 //                 between two points, what stands on it, and the Fresnel zone
 //                 over it.
 //   the path      fresnelR1, earthBulge, fresnelV, knifeEdgeDb, fsplDb,
-//   physics       wattsToDbm, rmSystemOf, kFactorFor, terminalClutterDb,
-//                 pathAnalyse, PATH_VERDICT and the PATH_* constants. Shared
-//                 with link-budget.js and map-los.js, which is why they travel
+//   physics       wattsToDbm, rmSystemOf, stationIsMast, stationAntenna,
+//                 kFactorFor, terminalClutterDb, pathPropOf, pathAnalyse,
+//                 PATH_VERDICT and the PATH_* constants. Shared with
+//                 link-budget.js, map-los.js, map-fade.js, map-polar.js,
+//                 map-3d.js and network-review.js, which is why they travel
 //                 with this file rather than with the budget.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, escAttr, fmtKm and RM_NET_DEFAULTS;
+// Reaches back to core.js for state, esc, escAttr, fmtKm, RM_NET_DEFAULTS and
+// FN_MODEL_DEFAULTS;
 // sideways to terrain.js for Terrain, land-cover.js for LandCover, itm.js for
 // ITM, map-draw.js for MapDraw and link-budget.js for LinkBudget and
 // lbMarginClass — the fade-margin row in the profile readout bands against
@@ -121,6 +124,25 @@ function rmSystemOf(st) {
   return (state.data.rm_systems || []).find(r => r.id === st.rm_system_id) || null;
 }
 
+// Whether a station is one that stands on a mast: a repeater or a base.
+function stationIsMast(st) {
+  return !!(st && Array.isArray(st.roles) && (st.roles.includes('repeater') || st.roles.includes('base')));
+}
+
+// The antenna height a station is modelled at: its radio system's, raised to
+// the propagation settings' mast height at a repeater or a base. Every station
+// in the register is on the 4 m field-station system, repeaters included, and
+// a repeater modelled with a 4 m whip on a summit sits among the terrain
+// model's own summit pixels — 20 to 40 dB of diffraction that no mast on that
+// hill suffers (FN_MODEL_DEFAULTS has the measurements). A system that says
+// more than the mast height wins, so a register that records the real mast
+// is never overruled. { agl, sysAgl, mast } — mast true when it was raised.
+function stationAntenna(st, sys) {
+  const own = sys && sys.antenna_height_m != null ? Number(sys.antenna_height_m) : PATH_DEFAULT_AGL;
+  const mastAgl = stationIsMast(st) ? pathPropOf().mastAgl : 0;
+  return mastAgl > own ? { agl: mastAgl, sysAgl: own, mast: true } : { agl: own, sysAgl: own, mast: false };
+}
+
 // The effective-earth factor a path's refractivity implies. ITM reduces the
 // sea-level N_0 to the surface refractivity N_s at the path's own mean height
 // (the middle 80% of the profile, as the reference does) and derives the
@@ -164,11 +186,12 @@ function terminalClutterDb(hAgl, R, fMhz, ws) {
   return a > 0 ? a : 0;
 }
 
-// The propagation inputs in play: the card's own, else the network's defaults.
+// The propagation inputs in play: the card's own, else the network's defaults —
+// Radio Mobile's for the propagation, Flood-Net's for the model (core.js).
 function pathPropOf(opt) {
-  const p = (opt && opt.prop) || (state.link && state.link.prop) || {};
-  const D = RM_NET_DEFAULTS;
-  const num = (v, d) => (v != null && isFinite(v) ? Number(v) : d);
+  const p = (opt && opt.prop) || (typeof state !== 'undefined' && state.link && state.link.prop) || {};
+  const D = RM_NET_DEFAULTS, F = FN_MODEL_DEFAULTS;
+  const num = (v, d) => (v != null && v !== '' && isFinite(v) ? Number(v) : d);
   return {
     climate:   num(p.climate, D.Climate),
     N0:        num(p.N0, D.Refractivity),
@@ -179,6 +202,9 @@ function pathPropOf(opt) {
     time:      num(p.time, D['%Time']),
     location:  num(p.location, D['%Location']),
     situation: num(p.situation, D['%Situation']),
+    model:     p.model === 'cover' || p.model === 'field' ? p.model : F.model,
+    allowance: Math.max(0, num(p.allowance, F.allowance)),
+    mastAgl:   Math.max(0, num(p.mastAgl, F.mastAgl)),
   };
 }
 
@@ -188,12 +214,18 @@ function pathPropOf(opt) {
 // Longley–Rice loss over the same profile.
 //
 // `elevA`/`elevB` override the sampled ground at the ends — a snapped station's
-// own elevation_ahd beats a tile pixel, and mixing them is the datum compromise
-// the UI declares rather than hides.
+// own elevation_ahd beats a tile pixel, unless it is below one (see the ends,
+// below), and mixing them is the datum compromise the UI declares rather than
+// hides.
 //
 // `cover` is the LandCover class per sample (or null for none); `coverOff`
 // says the operator turned it off, which is a different thing from not having
-// it and is reported as one. `prop` is the ITM parameter set (pathPropOf).
+// it and is reported as one. `prop` is the ITM parameter set (pathPropOf),
+// and its `model` decides what the cover is for: under 'cover' it stands on
+// the profile and P.2108 prices the terminals in it; under 'field' — the
+// default — the geometry still shows it (the chart, the verdict) but the loss
+// is Longley–Rice over the bare terrain plus the field allowance, the
+// combination the field measurements bore out (FN_MODEL_DEFAULTS, core.js).
 function pathAnalyse(prof, opt) {
   const o = opt || {};
   const fMhz = o.freqMhz > 0 ? o.freqMhz : PATH_DEFAULT_MHZ;
@@ -201,9 +233,21 @@ function pathAnalyse(prof, opt) {
   const g    = prof.terrain_m.slice();
   const last = g.length - 1;
 
-  // The ends: a station's surveyed height where we have one, the tile otherwise.
-  const groundA = o.elevA != null ? o.elevA : g[0];
-  const groundB = o.elevB != null ? o.elevB : g[last];
+  // The ends: a station's surveyed height where we have one, the tile
+  // otherwise — and never below the tile. The ground between the ends is the
+  // terrain model's, which is a surface: on a summit it carries the summit's
+  // own pixels, in a town or a forest whatever the radar saw of the roofs and
+  // the canopy. A surveyed height a few metres under that surface puts the
+  // antenna in a pit the model dug: one repeater, surveyed at 572 m among
+  // 584–587 m tiles, lost 40 dB to its own first three samples. So the end
+  // stands on the surface its neighbours were measured on, and the lift is
+  // reported (liftA_m / liftB_m) so the readout can say it happened.
+  const tileA = g[0], tileB = g[last];
+  const endOn = (survey, tile) => (survey == null ? tile : tile == null ? survey : Math.max(survey, tile));
+  const groundA = endOn(o.elevA, tileA);
+  const groundB = endOn(o.elevB, tileB);
+  const liftA = o.elevA != null && tileA != null && tileA > o.elevA ? tileA - o.elevA : 0;
+  const liftB = o.elevB != null && tileB != null && tileB > o.elevB ? tileB - o.elevB : 0;
   if (groundA != null) g[0] = groundA;
   if (groundB != null) g[last] = groundB;
   if (groundA == null || groundB == null) {
@@ -235,8 +279,12 @@ function pathAnalyse(prof, opt) {
   const endH = cls ? LandCover.heights([cls[0], cls[last]], canopy ? [canopy[0], canopy[last]] : null) : [null, null];
   const R_A = endH[0], R_B = endH[1];
 
+  const field = prop.model !== 'cover';
   const pts = [];
   let worst = null, maxIntrusion = 0, maxV = -Infinity, coverMissing = 0;
+  // The same geometry over the bare ground, which is what the field model
+  // prices: its worst clearance (in first-Fresnel radii) and its knife edge.
+  let worstBare = null, maxVBare = -Infinity;
   for (let i = 0; i < g.length; i++) {
     const d1 = prof.distance_m[i], d2 = D - d1;
     const los = txZ + (rxZ - txZ) * (D > 0 ? d1 / D : 0);
@@ -263,6 +311,12 @@ function pathAnalyse(prof, opt) {
         if (v > maxV) maxV = v;
       }
     }
+    if (p.bulged != null && r1 > 0) {
+      const cb = los - p.bulged;
+      if (worstBare == null || cb / r1 < worstBare) worstBare = cb / r1;
+      const vb = fresnelV(-cb, d1, d2, fMhz);
+      if (vb > maxVBare) maxVBare = vb;
+    }
     pts.push(p);
   }
   if (!worst) return { ok: false, error: 'No usable terrain samples along this path.' };
@@ -271,6 +325,9 @@ function pathAnalyse(prof, opt) {
   // sweep still quotes, and the figure shown when the model cannot run.
   const diffractionDb = isFinite(maxV) ? knifeEdgeDb(maxV) : 0;
   const verdict = worst.ratio >= 0.6 ? 'clear' : worst.ratio >= 0 ? 'marginal' : 'obstructed';
+  const verdictOf = ratio => (ratio == null ? null : ratio >= 0.6 ? 'clear' : ratio >= 0 ? 'marginal' : 'obstructed');
+  const verdictBare = verdictOf(worstBare) || verdict;
+  const diffractionBareDb = isFinite(maxVBare) ? knifeEdgeDb(maxVBare) : 0;
 
   // Every run of samples standing above the line, worst first — Radio Mobile's
   // "Obstructions" list, with what each one is made of.
@@ -296,17 +353,19 @@ function pathAnalyse(prof, opt) {
   // ── the loss ──
   // The PFL the model wants is evenly spaced heights end to end. A tile gap in
   // the middle is bridged for the model only — the chart still shows the gap —
-  // and the result says it stood on interpolated ground.
+  // and the result says it stood on interpolated ground. The field model runs
+  // over the bare terrain and the cover model over the cover standing on it.
+  const lossGround = field ? g : surface;
   let itm = null, itmError = null, bridged = 0;
   if (typeof ITM !== 'undefined' && D > 0) {
     const pfl = [last, D / last];
     for (let i = 0; i <= last; i++) {
-      let h = surface[i];
+      let h = lossGround[i];
       if (h == null) {
         let a = i - 1, b = i + 1;
-        while (a > 0 && surface[a] == null) a--;
-        while (b < last && surface[b] == null) b++;
-        h = surface[a] + (surface[b] - surface[a]) * (i - a) / (b - a);
+        while (a > 0 && lossGround[a] == null) a--;
+        while (b < last && lossGround[b] == null) b++;
+        h = lossGround[a] + (lossGround[b] - lossGround[a]) * (i - a) / (b - a);
         bridged++;
       }
       pfl.push(h);
@@ -319,8 +378,10 @@ function pathAnalyse(prof, opt) {
     });
     if (r.ok) itm = r; else itmError = r.error;
   }
-  const clutterA = coverUsed && LandCover.standsUp(coverAtA) ? terminalClutterDb(aglA, R_A, fMhz) : 0;
-  const clutterB = coverUsed && LandCover.standsUp(coverAtB) ? terminalClutterDb(aglB, R_B, fMhz) : 0;
+  // P.2108's terminal clutter is the cover model's; the field model carries a
+  // mast's surroundings in its allowance, measured rather than modelled.
+  const clutterA = !field && coverUsed && LandCover.standsUp(coverAtA) ? terminalClutterDb(aglA, R_A, fMhz) : 0;
+  const clutterB = !field && coverUsed && LandCover.standsUp(coverAtB) ? terminalClutterDb(aglB, R_B, fMhz) : 0;
 
   // The obstruction floor. ITM chooses its regime by the smooth-earth horizon
   // distance, not by what actually stands in the way: two 4 m masts have a
@@ -332,14 +393,23 @@ function pathAnalyse(prof, opt) {
   // less than one knife edge over the worst obstruction would cost, the loss
   // is held to that knife edge. It is a floor, not a replacement: on most
   // obstructed paths the model is already well above it and the row is nought.
-  const knife = verdict === 'obstructed' ? diffractionDb : 0;
+  // The field model holds it to the bare ground's knife edge — the ground it
+  // was run over.
+  const knife = field ? (verdictBare === 'obstructed' ? diffractionBareDb : 0)
+                      : (verdict === 'obstructed' ? diffractionDb : 0);
   const floor = itm && knife > itm.A_ref_db ? knife - itm.A_ref_db : 0;
-  const pathLoss = itm ? itm.A_db + clutterA + clutterB + floor : null;
+  // The field allowance: what the bare-terrain figure is short of the margins
+  // measured on site, on average (FN_MODEL_DEFAULTS, core.js).
+  const allowance = field ? prop.allowance : 0;
+  const pathLoss = itm ? itm.A_db + clutterA + clutterB + floor + allowance : null;
 
   return {
     ok: true, pts, worst, verdict, fMhz,
     D, txZ, rxZ, groundA, groundB, aglA, aglB,
     k, N_s, hSys, prop,
+    model: field ? 'field' : 'cover', allowance_db: allowance,
+    verdictBare, diffractionBare_db: diffractionBareDb,
+    liftA_m: liftA, liftB_m: liftB,
     intrusion_m: Math.max(0, maxIntrusion),
     diffraction_db: diffractionDb,
     v: isFinite(maxV) ? maxV : null,
@@ -460,7 +530,8 @@ const PathProfile = (function () {
       name: st ? st.name : `${sh.pts[i][0].toFixed(4)}, ${sh.pts[i][1].toFixed(4)}`,
       isStation: !!st,
       elev: st && st.elevation_ahd != null ? st.elevation_ahd : null,
-      agl: sys && sys.antenna_height_m != null ? sys.antenna_height_m : PATH_DEFAULT_AGL,
+      // A repeater's or base's mast, where its system says less (stationAntenna).
+      agl: st ? stationAntenna(st, sys).agl : PATH_DEFAULT_AGL,
     };
   }
 
@@ -1217,8 +1288,12 @@ const PathProfile = (function () {
   // there is none — the loud-failure rule, so a bare profile is never mistaken
   // for a clear one.
   function coverStatusHtml(an) {
+    const fieldModel = pathPropOf().model !== 'cover';
     if (!P().cover) {
-      return `<span class="txt-warn">Off — the profile is bare ground, and a bare profile reads clear through a forest.</span>`;
+      return fieldModel
+        ? `<span class="txt-warn">Off — the chart is bare ground, and a bare chart reads clear through a forest.</span>
+           The fade margin is the field model's either way: it prices the bare terrain and carries the cover's average cost in its allowance.`
+        : `<span class="txt-warn">Off — the profile is bare ground, and a bare profile reads clear through a forest.</span>`;
     }
     switch (cur.coverStatus) {
       case 'loading': return 'Sampling land cover along the path…';
@@ -1236,6 +1311,11 @@ const PathProfile = (function () {
               : `${tag}: ${esc(LandCover.CLASSES[cls].label)}${R > 0 ? ` ${R} m` : ''}${
                   db > 0 ? ` — antenna at ${agl} m is <strong>under it</strong>, ${db.toFixed(1)} dB terminal loss` : ''}`);
           bits.push(`At the ends — ${ends.join(' · ')}.`);
+        }
+        if (fieldModel) {
+          bits.push('The cover is drawn on the chart and read into the verdict; the fade margin is the field model’s, '
+            + 'which prices the bare terrain and carries the cover’s average cost in its allowance — switch the model '
+            + 'to land cover in the link budget’s propagation settings to price it here instead.');
         }
         return bits.join(' ');
       }
@@ -1356,11 +1436,15 @@ const PathProfile = (function () {
     const an = pathAnalyse(prof, mainOpts(a, b));
     if (!an.ok) return `<p class="filter-note">${esc(an.error)}</p>`;
 
+    const lifted = [[an.liftA_m, a], [an.liftB_m, b]].filter(([m]) => m > 0.5)
+      .map(([m, e]) => `${esc(e.name)} ${m.toFixed(1)} m`);
     const datum = (a.elev != null || b.elev != null) ? `
       <p class="filter-hint">Ends use the station's surveyed <code>elevation_ahd</code> (AHD);
         the ground between comes from tiles referenced to the EGM96 geoid. The two agree to
         about a metre over Australia — inside the ~${prof.resolution_m} m sampling error, but not the
-        same datum. Treat every height here as indicative.</p>` : `
+        same datum. Treat every height here as indicative.${lifted.length ? ` Where a survey is below
+        the tile under it, the end is stood on the tile instead (${lifted.join(', ')} higher) — the
+        tiles round it are a surface, and an antenna below it would start the path in a pit.` : ''}</p>` : `
       <p class="filter-hint">All heights are sampled from tiles (EGM96 geoid, not AHD) — neither
         end is snapped to a station with a surveyed elevation.</p>`;
 

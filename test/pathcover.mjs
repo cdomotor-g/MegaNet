@@ -114,6 +114,8 @@ await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: LOA
 // the middle two fifths of the path and rangeland everywhere else; a second
 // seed, switched in later, puts end A inside the trees as well.
 const HOP = { latA: -27.50, lonA: 152.40, latB: -27.50, lonB: 152.50 };
+// The network's field allowance, read off the page rather than restated here.
+const FN_ALLOWANCE = await page.evaluate(() => FN_MODEL_DEFAULTS.allowance);
 
 await page.evaluate(({ latA, lonA, latB, lonB }) => {
   window.__coverMode = 'middle';
@@ -128,6 +130,11 @@ await page.evaluate(({ latA, lonA, latB, lonB }) => {
     return cls;
   });
   state.path.cover = true;
+  // Everything up to "The field model" below is about the land-cover model,
+  // which is no longer the default: the field model prices the bare terrain
+  // and leaves the cover to the chart. Chosen through the card, the way an
+  // operator would.
+  LinkBudget.setModel('cover');
   MapDraw.addLine([[latA, lonA], [latB, lonB]], [null, null]);
   PathProfile.setOpen(true);
   LinkBudget.fromProfile();
@@ -163,6 +170,7 @@ const read = () => page.evaluate(() => {
     clutA: r ? r.clutA : null, clutB: r ? r.clutB : null, floor: r ? r.floor : null, pathLoss: r ? r.pathLoss : null,
     mode: r && r.itm ? r.itm.modeLabel : null,
     k: an ? an.k : null,
+    model: an ? an.model : null, allow: r ? r.allow : null, verdictBare: an ? an.verdictBare : null,
     bands, keys, rows, readout,
     verdictText: (document.querySelector('#path-profile-panel .path-verdict strong') || {}).textContent,
     status: (document.getElementById('path-cover-status') || {}).textContent || '',
@@ -248,6 +256,40 @@ ok('…and the margin fell by at least that', (withTrees.margin - s.margin) > s.
 ok('…with the row printing the figure', Math.abs(num(label(s.rows, /Ground cover at/).value) + s.clutA) < 0.01);
 const underTrees = s;
 
+// ── the field model ──────────────────────────────────────────────────────────
+// The default since the field calibration (FN_MODEL_DEFAULTS): the same path,
+// the same trees on the chart, but the loss is Longley–Rice over the bare
+// terrain plus the field allowance — no cover rows, an allowance row, and a
+// Terrain row that is the bare ground's whatever the cover says.
+console.log('\nThe field model');
+await page.evaluate(() => LinkBudget.setModel('field'));
+await page.waitForTimeout(150);
+s = await read();
+ok('the field model is the one that ran', s.model === 'field' && s.prop.model === 'field', `${s.model} / ${s.prop.model}`);
+ok('…the cover is still on the chart and in the verdict', s.coverUsed === true && s.bands.includes('var(--cover-trees)') && s.verdict === 'obstructed', s.verdict);
+ok('…but the loss is over the bare ground: its Terrain row is cover-off’s', Math.abs(s.aref - bare.aref) < 1e-6,
+   `${s.aref.toFixed(3)} vs bare ${bare.aref.toFixed(3)} dB`);
+ok('…no Ground cover rows, and a Field allowance row instead',
+   !s.rows.some(r => /^Ground cover/.test(r.label)) && !!label(s.rows, /^Field allowance$/));
+ok('…the allowance is the network default', Math.abs(s.allow - FN_ALLOWANCE) < 1e-9 && Math.abs(num(label(s.rows, /^Field allowance$/).value) + FN_ALLOWANCE) < 0.01,
+   `${s.allow} dB`);
+ok('…no terminal clutter even with end A in the trees', s.clutA === 0 && s.clutB === 0);
+ok('…and the subtotal is still the sum of its rows',
+   Math.abs(s.pathLoss - (s.fspl + s.aref + s.avar + s.floor + s.allow)) < 1e-6,
+   `${s.pathLoss} vs ${s.fspl}+${s.aref}+${s.avar}+${s.floor}+${s.allow}`);
+ok('…the verdict on the bare ground is cover-off’s', s.verdictBare === bare.verdict, `${s.verdictBare} vs ${bare.verdict}`);
+await page.evaluate(() => LinkBudget.setProp('allowance', 10));
+await page.waitForTimeout(150);
+const at10 = await read();
+ok('a smaller allowance is a bigger margin, decibel for decibel', Math.abs((at10.margin - s.margin) - (FN_ALLOWANCE - 10)) < 1e-6,
+   `${s.margin.toFixed(2)} → ${at10.margin.toFixed(2)}`);
+ok('…and the allowance box is flagged edited', await page.evaluate(() => /edited/.test(document.getElementById('lb-prop-allowance').parentElement.textContent)));
+await page.evaluate(() => { LinkBudget.setProp('allowance', FN_MODEL_DEFAULTS.allowance); LinkBudget.setModel('cover'); });
+await page.waitForTimeout(150);
+s = await read();
+ok('back on the land-cover model, the figure is what it was', s.model === 'cover' && Math.abs(s.margin - underTrees.margin) < 1e-6,
+   `${s.margin} vs ${underTrees.margin}`);
+
 // ── the height table ─────────────────────────────────────────────────────────
 await page.evaluate(() => PathProfile.setCoverHeight(2, 2));
 await page.waitForTimeout(150);
@@ -278,7 +320,11 @@ ok('…and the chart legend follows it', await page.evaluate(() => /k=1\.[4-9]/.
 await page.evaluate(() => LinkBudget.resetProp());
 await page.waitForTimeout(150);
 s = await read();
-ok('reset returns to the network defaults', s.prop.N0 === 301 && s.prop.situation === 70 && Math.abs(s.margin - underTrees.margin) < 1e-6);
+ok('reset returns to the network defaults — the field model among them', s.prop.N0 === 301 && s.prop.situation === 70 && s.prop.model === 'field');
+await page.evaluate(() => LinkBudget.setModel('cover'));
+await page.waitForTimeout(150);
+s = await read();
+ok('…and on the land-cover model the figure is the one before the edits', Math.abs(s.margin - underTrees.margin) < 1e-6);
 ok('in Spot mode the time and location boxes are disabled',
    await page.evaluate(() => document.getElementById('lb-prop-time').disabled && document.getElementById('lb-prop-location').disabled
                           && !document.getElementById('lb-prop-situation').disabled));

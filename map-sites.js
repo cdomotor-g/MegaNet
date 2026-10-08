@@ -12,7 +12,7 @@
 // bearingDeg, acmaHaversineKm, cssVar, slug, dlText, announce,
 // stationLatLonText, copyLatLonPillHtml and mapViewPills; across to terrain.js
 // for Terrain.grid and Terrain.profile, land-cover.js for LandCover.sample,
-// path-profile.js for pathAnalyse, rmSystemOf, wattsToDbm and the
+// path-profile.js for pathAnalyse, pathPropOf, rmSystemOf, wattsToDbm and the
 // PATH_DEFAULT_* constants, map-roads.js for MapRoads.near, map-draw.js for
 // MapDraw, places.js for Places.parse, map-controls.js for MapChrome.panel,
 // map-3d.js for Map3D.active (the circle is 2-D only), and app.js for
@@ -1007,7 +1007,12 @@ const MapSites = (function () {
   function sourceText(s) {
     const bits = [];
     if (s.cover) bits.push(`${s.cover} with the land cover on`);
-    if (s.bare)  bits.push(`<span class="txt-warn">${s.bare} over bare ground — cover unreachable, so kinder than the card</span>`);
+    // Under the field model the card prices the bare ground too, so a figure
+    // the cover never reached is the card's own; only the land-cover model
+    // makes it a kinder one.
+    if (s.bare)  bits.push(pathPropOf().model === 'cover'
+      ? `<span class="txt-warn">${s.bare} over bare ground — cover unreachable, so kinder than the card</span>`
+      : `${s.bare} with no land cover to draw — the field model's figure regardless`);
     if (s.grid)  bits.push(`<span class="txt-warn">${s.grid} screened only — the tiles for the full profile would not load</span>`);
     if (s.failed) bits.push(`<span class="txt-warn">${s.failed} could not be computed</span>`);
     return bits.join(' · ');

@@ -837,19 +837,39 @@ ok('the switch comes back on, because it is remembered',
 ok('an empty table is read once, not once per redraw for ever',
    asked > 0 && asked <= 3, `asked ${asked} times`);
 
-// The land-cover service is off-origin and the sweep will not produce a figure
-// without it — deliberately, since a margin over bare earth is a different and
-// kinder number than the card's. So the first pass here finds none, which is
-// itself the right behaviour and is asserted; then the service is answered from
-// LandCover's own test seam and the switch re-armed, which is the only way to
-// seed a module whose sweep starts before any test code can run.
+// The land-cover service is off-origin here. The field model — the default
+// since the field calibration (FN_MODEL_DEFAULTS) — prices the bare terrain and
+// asks the land-cover service for nothing, so the sweep paints from the
+// terrain alone, and that is asserted first.
 const bare = await page2.evaluate(() => ({
+  model: pathPropOf().model,
   painted: state.mapLines.filter(l => l.mnFadeBand).length,
   note: (document.getElementById('map-fade-note') || {}).textContent.replace(/\s+/g, ' '),
 }));
-ok('no land cover, no figure — the sweep does not fall back to bare earth',
-   bare.painted === 0 && /could not be computed/.test(bare.note),
-   `${bare.painted} coloured · ${bare.note.slice(0, 120)}`);
+ok('the field model needs no land cover: the sweep paints from the terrain alone',
+   bare.model === 'field' && bare.painted > 0,
+   `${bare.model} · ${bare.painted} coloured · ${bare.note.slice(0, 120)}`);
+ok('…saying which model it is', /field allowance/.test(bare.note), bare.note.slice(-260));
+
+// The land-cover model will not produce a figure without the cover —
+// deliberately, since a margin over bare earth is a different and kinder number
+// than the card's under that model. So switched to it, the sweep finds none,
+// which is itself the right behaviour and is asserted; then the service is
+// answered from LandCover's own test seam and the switch re-armed, which is
+// the only way to seed a module whose sweep starts before any test code can run.
+const coverless = await page2.evaluate(async () => {
+  LinkBudget.setModel('cover');
+  MapFade.setEnabled(false);
+  MapFade.setEnabled(true);
+  await new Promise(r => setTimeout(r, 5000));
+  return {
+    painted: state.mapLines.filter(l => l.mnFadeBand).length,
+    note: (document.getElementById('map-fade-note') || {}).textContent.replace(/\s+/g, ' '),
+  };
+});
+ok('the land-cover model: no land cover, no figure — the sweep does not fall back to bare earth',
+   coverless.painted === 0 && /could not be computed/.test(coverless.note),
+   `${coverless.painted} coloured · ${coverless.note.slice(0, 120)}`);
 
 const cold = await page2.evaluate(async () => {
   // Trees down the middle, grass at the ends: enough that the classes differ
@@ -910,6 +930,26 @@ ok('the card produced a figure for a link the map has coloured',
 ok('…and it is the same figure the map is coloured by',
    !agree.error && Math.abs(agree.mapDb - agree.cardDb) < 0.05,
    `map ${agree.mapDb} dB vs card ${agree.cardDb} dB on ${agree.aId} → ${agree.bId}`);
+
+// And under the field model, which is the one the network runs on: the card's
+// model setting is the map's, so switching it re-sweeps the map, and the two
+// still give one figure for the link.
+const agreeField = await page2.evaluate(async ({ aId, bId }) => {
+  LinkBudget.setModel('field');
+  for (let i = 0; i < 80; i++) {
+    const line = state.mapLines.find(l => l.mnFadeMargin != null
+      && l.mnLinkStationId === aId && l.mnLinkRepeaterId === bId && !l.mnLinkRepeaterId2);
+    const r = LinkBudget.current();
+    if (line && r && r.an && r.an.model === 'field' && r.margin != null) {
+      return { mapDb: line.mnFadeMargin, cardDb: r.margin, allow: r.allow };
+    }
+    await new Promise(r2 => setTimeout(r2, 250));
+  }
+  return { error: 'the field model never coloured the link or the card never priced it' };
+}, { aId: agree.aId, bId: agree.bId });
+ok('under the field model the map and the card still give one figure',
+   !agreeField.error && Math.abs(agreeField.mapDb - agreeField.cardDb) < 0.05 && agreeField.allow > 0,
+   JSON.stringify(agreeField));
 
 await empty.close();
 

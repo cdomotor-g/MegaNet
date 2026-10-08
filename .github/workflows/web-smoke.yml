@@ -1117,6 +1117,18 @@ jobs:
         working-directory: test
         run: npm run camera
 
+      # Chromium. The Network Review tab (network-review.js), administrators
+      # only: signed out and not an administrator it draws no control and asks
+      # nothing; as one, two repeaters' pass ranges make a matrix over the
+      # hilly world whose cells are the link budget card's own figures under
+      # the field-calibrated model, a proposed site is a column at its typed
+      # mast, the measured margins (two public inspection views, stood in for)
+      # are read with nought as "not tested" and 30 dB as "at least", and the
+      # CSV carries the model it was computed on.
+      - name: Network Review — the matrix, the card's figures, the field beside them
+        working-directory: test
+        run: npm run review
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each

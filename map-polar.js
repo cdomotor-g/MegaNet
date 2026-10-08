@@ -7,7 +7,7 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm, destPoint,
 // acmaHaversineKm, cssVar, slug and dlText; across to terrain.js for
-// Terrain.grid, itm.js for ITM.pointToPoint, path-profile.js for rmSystemOf,
+// Terrain.grid, itm.js for ITM.pointToPoint, path-profile.js for rmSystemOf, stationAntenna, pathPropOf,
 // pathPropOf, wattsToDbm and the PATH_DEFAULT_* constants, map-controls.js
 // for MapChrome.panel, and app.js for rerenderMapLegend and mapNote. All of it
 // from inside its own functions, so this file's position among the modules is
@@ -167,7 +167,9 @@ const MapPolar = (function () {
       name: st ? st.name : 'the middle of the map',
       txW:  sys.tx_power_w, gain: sys.antenna_gain_dbi,
       loss: sys.line_loss_db, thr: sys.rx_threshold_dbm,
+      // A repeater or base at the centre is on its mast (stationAntenna).
       agl:  cfg.centreAgl != null ? cfg.centreAgl
+            : st ? stationAntenna(st, sys).agl
             : (sys.antenna_height_m != null ? sys.antenna_height_m : PATH_DEFAULT_AGL),
       elev: st && st.elevation_ahd != null ? st.elevation_ahd : null,
       sysName: sys.name,
@@ -337,6 +339,10 @@ const MapPolar = (function () {
       const pfl = new Float64Array(RAY_SAMPLES + 3);
       pfl[1] = dxM;
       const prop = pathPropOf({});
+      // The field model's allowance, so a cell here and the profile card's
+      // figure for the same path are one model's (pathAnalyse). Nought under
+      // the land-cover model, where this plot is the bare-ground best case.
+      const allow = prop.model === 'cover' ? 0 : prop.allowance;
       const f = freqMhz();
       const ends = endsFor(c, m);
       // The mast has to be standing on something. A surveyed height wins; the
@@ -344,7 +350,11 @@ const MapPolar = (function () {
       // than drawn off a centre at an invented sea level — every level in it
       // would be wrong by whatever the hill under the centre is worth, and
       // nothing on screen would say so.
-      const centreGround = c.elev != null ? c.elev : sampleGrid(g, box, ll[0], ll[1]);
+      // And never below the grid under it — pathAnalyse's rule for the ends:
+      // the grid is a surface, and a survey under it starts every radial in a pit.
+      const gridAtCentre = sampleGrid(g, box, ll[0], ll[1]);
+      const centreGround = c.elev != null && isFinite(gridAtCentre) ? Math.max(c.elev, gridAtCentre)
+                         : c.elev != null ? c.elev : gridAtCentre;
       if (!isFinite(centreGround)) {
         job = null;
         setStatus('blocked', 'No ground height at the centre — the terrain tile under it is missing.');
@@ -391,7 +401,7 @@ const MapPolar = (function () {
               time: prop.time, location: prop.location, situation: prop.situation,
             });
             if (!res.ok) continue;
-            const L = levelsFrom(res.A_db, ends);
+            const L = levelsFrom(res.A_db + allow, ends);
             const at = i * RINGS + k;
             lvlTx[at] = L.tx.rx;  mgTx[at] = L.tx.margin;
             lvlRx[at] = L.rx.rx;  mgRx[at] = L.rx.margin;
@@ -406,7 +416,7 @@ const MapPolar = (function () {
         job = null;
         plot = { lat, lon, nR, rings: RINGS, lvlTx, lvlRx, mgTx, mgRx, box,
                  centre: ll, res: g.resolution_m, tiles: g.tiles, missing: g.missing,
-                 bad, fMhz: f, cName: c.name, mName: m.name, cAgl: c.agl, mAgl: m.agl,
+                 bad, fMhz: f, cName: c.name, mName: m.name, cAgl: c.agl, mAgl: m.agl, allow,
                  rMinKm: bandI[0] * dxM / 1000, rMaxKm: cfg.rMaxKm,
                  az: { min: cfg.azMin, span: ray.span, step: ray.span / nR } };
         paint();
@@ -565,8 +575,8 @@ const MapPolar = (function () {
       `# radial_km,${plot.rMinKm.toFixed(3)},${plot.rMaxKm}`,
       `# azimuth_deg,${plot.az.min},${plot.az.span},${plot.az.step.toFixed(3)}`,
       `# terrain,~${plot.res} m over ${plot.tiles} tiles, ${plot.missing} missing`,
-      `# model,Longley-Rice point-to-point over bare terrain; no antenna patterns,`
-        + ` no land cover, no terminal clutter — the best case`,
+      `# model,Longley-Rice point-to-point over bare terrain${plot.allow ? ` less the ${plot.allow} dB field allowance` : ''}; no antenna patterns,`
+        + ` no land cover, no terminal clutter${plot.allow ? '' : ' — the best case'}`,
       'azimuth_deg,range_km,lat,lon,rx_dbm_centre_tx,margin_db_centre_tx,rx_dbm_centre_rx,margin_db_centre_rx',
     ];
     for (let i = 0; i < plot.nR; i++) {
@@ -765,14 +775,26 @@ const MapPolar = (function () {
                   title="Every cell as a row — where it is, and all four figures the run computed">Save data (CSV)</button>
         </div>
         <p class="filter-note" id="polar-status">${statusHtml()}</p>
-        <p class="filter-note">${esc(CAVEAT)}</p>
+        <p class="filter-note">${esc(caveat())}</p>
       </div>`;
   }
 
-  const CAVEAT = 'Longley–Rice over bare ~30 m terrain, omnidirectional at both ends. '
-    + 'No antenna patterns, no trees, no terminal clutter — every one of which only ever '
-    + 'takes coverage away, so this is the best case and the elevation profile card is the '
-    + 'authority for any path you are about to build.';
+  // Under the field model (the default) every cell carries the field
+  // allowance, as the profile card's figure does; under the land-cover model
+  // this is the bare-ground best case. The caveat says which, at the time it
+  // is read.
+  function caveat() {
+    const P_ = pathPropOf({});
+    return P_.model === 'cover'
+      ? 'Longley–Rice over bare ~30 m terrain, omnidirectional at both ends. '
+        + 'No antenna patterns, no trees, no terminal clutter — every one of which only ever '
+        + 'takes coverage away, so this is the best case and the elevation profile card is the '
+        + 'authority for any path you are about to build.'
+      : `Longley–Rice over bare ~30 m terrain less the ${P_.allowance} dB field allowance, omnidirectional `
+        + 'at both ends — the field model the profile card runs, so a cell and the card agree on average. '
+        + 'No antenna patterns, and no trees beyond that average: a mast in a gully or under a canopy '
+        + 'can lose more, so the elevation profile card is the authority for any path you are about to build.';
+  }
 
   function render() {
     if (body) body.innerHTML = panelHtml();

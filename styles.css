@@ -17026,3 +17026,47 @@ button.adm-danger:hover { border-color: var(--bad); }
   color: var(--muted);
   font-size: var(--fs-sm);
 }
+
+/* ── Network Review tab (network-review.js) ──────────────────────────────────
+   The hub picker and the proposed-site form as rows of fields that wrap on a
+   narrow screen; the chosen hubs as a plain list; the matrix as an admin table
+   whose margin cells carry the fade-margin map's three bands as a tinted
+   background *and* a coloured figure, so the band survives a mono print. */
+.nr-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  margin: var(--sp-2) 0;
+}
+.nr-controls .draw-field { min-width: 10rem; }
+.nr-controls .draw-field input,
+.nr-controls .draw-field select { display: block; width: 100%; margin-top: .2rem; }
+.nr-pick { flex: 1 1 18rem; }
+.nr-radius { flex: 0 1 12rem; }
+.nr-hubs { list-style: none; margin: var(--sp-2) 0; padding: 0; }
+.nr-hubs li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.nr-hubs li .exp-btn-sm { margin-left: auto; }
+.nr-site { margin: var(--sp-2) 0; }
+.table-wrap table.nr-matrix { min-width: 40rem; }
+.table-wrap table.nr-acc,
+.table-wrap table.nr-steps { min-width: 32rem; }
+.nr-matrix th[scope="row"] { text-align: left; min-width: 10rem; }
+.nr-hub-col { min-width: 7rem; }
+.nr-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nr-good { background: color-mix(in srgb, var(--ok) 14%, transparent);   color: var(--ok); }
+.nr-ok   { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+.nr-bad  { background: color-mix(in srgb, var(--bad) 12%, transparent);  color: var(--bad); }
+.nr-good .txt-muted, .nr-ok .txt-muted, .nr-bad .txt-muted { color: var(--muted); }
+.nr-principles { margin: var(--sp-2) 0 0; padding-left: 1.4rem; }
+.nr-principles li { margin-bottom: var(--sp-3); }
+.nr-principles h3 { font-size: 1rem; margin: 0 0 .2rem; }
+.nr-principles p { margin: .2rem 0; }
+.nr-status-line { color: var(--text); }

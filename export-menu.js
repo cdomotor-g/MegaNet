@@ -145,6 +145,12 @@ const ExportMenu = (function () {
       { label: 'The station document — stations.json', sub: 'the whole register, as the datastore holds it now', call: ['snapshotStationsJson'],
         ready: gated },
     ],
+    review: () => [
+      { label: 'The path margin matrix — CSV', sub: 'every field station\'s margin to each hub, its best path, the measured margin and the flags',
+        call: ['NetworkReview.exportCsv'],
+        ready: () => (typeof NetworkReview !== 'undefined' && NetworkReview.matrix()) ? ''
+          : 'No matrix yet — add a repeater or base and press Compute margins.' },
+    ],
   };
 
   function arroOffers(what) {

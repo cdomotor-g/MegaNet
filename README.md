@@ -169,6 +169,9 @@ MegaNet/
 ├── bug-report.js           ← BugReport — prefilled GitHub issue reporter
 ├── base-stations.js        ← BaseStations — Base Stations tab (every ingest point's
 │                             health; asking a base station that checks in, 0049)
+├── network-review.js       ← NetworkReview — Network Review tab (administrators: the
+│                             fade margin matrix of a network beside the attenuator's,
+│                             Flood-Net against Radio Mobile, the design principles)
 ├── health-glance.js        ← HealthGlance — a station's health where people already
 │                             look (#218): last heard, its battery and its findings on
 │                             its card, each a door into Station Health, and Colour
@@ -219,6 +222,7 @@ MegaNet/
 │   ├── floodwarning-net.md                 (moving the domain to Flood-Net — runbook)
 │   ├── agent-api.md                        (station data for AI agents — REST API and MCP server)
 │   ├── base-stations.md                    (the Base Stations tab — checking in, what may be asked, team SSH keys)
+│   ├── network-review.md                   (the Network Review tab, and how the fade margin was calibrated against the field)
 │   ├── site-exposure.md                    (tides and soils on the station card — rows, sources, limits)
 │   ├── site-land.md                        (the land — tenure, council, address — on the station and What is here cards)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
@@ -291,6 +295,7 @@ MegaNet/
 │   ├── proposed.mjs         (proposed stations: + Propose, the pin and card, who may establish)
 │   ├── stationhistory.mjs   (the station card's History and the Admin tab's Deleted stations: who changed what, Restore)
 │   ├── basestations.mjs     (the Base Stations tab: the list, a station's panel, what each button sends)
+│   ├── review.mjs           (the Network Review tab: administrators only, the matrix's cells the card's figures, the field beside them)
 │   ├── healthreport.mjs     (Station Health run unattended: the browser's analysis over the demo week, reported as the database takes it)
 │   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
@@ -3271,7 +3276,9 @@ EIRP           = tx_power_dbm + tx_gain_dbi − tx_losses_db
 Free space     = 32.45 + 20·log10(f_MHz) + 20·log10(d_km)
 Terrain        = A_ref, the Longley–Rice reference attenuation over the profile
 Statistics     = the climate's median shift + the variability for the reliability asked
+Field allowance = 19 dB, fitted to attenuator tests on site       (the field model — the default)
 Ground cover   = ITU-R P.2108 §3.1 terminal loss at an end whose antenna is under the cover
+                                                                 (the land-cover model instead)
 Obstruction floor = knife-edge over the worst obstruction, where the model's regime prices it lower
 = Path loss    = the sum of those
 RX predicted   = EIRP − path loss + rx_gain_dbi − rx_losses_db
@@ -3280,6 +3287,24 @@ Fade margin    = RX predicted − rx_sensitivity_dbm     (Radio Mobile's "Rx rel
 
 Every term is its own row, signed, and visibly adds up to the received level —
 never a single number.
+
+**Field-calibrated, by default.** The card's *Model* setting has two answers.
+The **field model**, the default, runs Longley–Rice over the bare terrain and
+takes off a **field allowance** — 19 dB, the bare-terrain figure's average
+shortfall against path margins measured with an attenuator on site (54 stations,
+2018–20: mean error 0 dB, typical error ±6.7 dB). The **land-cover model** stands
+the land cover on the profile and charges P.2108 at a mast under it, as
+described below; against the same measurements it read 41 dB too low, because at
+VHF a canopy is largely transparent and it charged the same trees twice. Under
+both, an end whose surveyed height is below the terrain tile under it is stood on
+the tile — the tiles are a surface, and an antenna below it starts the path in a
+pit — and a repeater or base is modelled on at least a 10 m mast (*Repeater &
+base mast*), because every station in the register is on the 4 m field-station
+radio system. The fade-margin map, the profile's readout, the site finder, the
+Network Review tab and polar coverage all follow the card's setting.
+[docs/network-review.md](docs/network-review.md) has the measurements, each
+step's effect, and how a Flood-Net figure reads against a Radio Mobile one
+(about 7 dB lower for the same path).
 
 **The propagation model is Radio Mobile's.** `itm.js` is the ITS Irregular
 Terrain Model (Longley–Rice) in point-to-point mode, ported function for
@@ -3302,8 +3327,8 @@ elevation angles, worst Fresnel, obstructions, k and N_s, propagation regime,
 received level in µV, E-field and the field the receiver needs, system gain —
 and the model's own warnings in words.
 
-Two things here are deliberately *more* than Radio Mobile does. The terminal
-term: where an antenna stands below the cover around it, ITU-R **P.2108 §3.1**'s
+Under the land-cover model, two things here are deliberately *more* than Radio
+Mobile does. The terminal term: where an antenna stands below the cover around it, ITU-R **P.2108 §3.1**'s
 height-gain loss (a knife edge at the clutter's edge, 27 m away — ~13 dB for a
 4 m antenna under 15 m trees at 150 MHz, ~18 dB at 450) is charged at that end,
 applied only for cover that stands up, since open ground's height gain is
@@ -4568,6 +4593,29 @@ for where, which way and when.
 phone in Chromium — the station on the stamp, photos kept signed out and sent
 signed in, every way one cannot go, and a stamped photo stripped of its EXIF
 read back by the real OCR engine.
+
+### 26. Network Review (a Network's Fade Margins, Beside the Field's)
+
+📐 **Network Review**, under *Admin* and for administrators only, reviews a
+radio network the way a planner does. Pick the **repeaters and bases** it runs
+through — and any **proposed site**, which is only a pin and a mast height — and
+every field station they carry gets a row: its **fade margin to each**, its best
+path, how many paths are 15 dB or better, and the margin the **attenuator found
+on site** at its last tests. Each cell is the link budget card's own figure for
+that path, so a move from one hill to another is two columns side by side, and
+the tiles over the table count the stations with two good paths, one, a marginal
+one, or none worth building on. The matrix saves as
+`floodnet-network-review-….csv`.
+
+Below it the tab sets out how Flood-Net's fade margins relate to **Radio
+Mobile's** and to the field — the measurements the model was calibrated on (see
+*Field-calibrated, by default* under §17), what each step changed, and a
+converter for one figure — the **design principles** a network is reviewed
+against, with this network's standing under each where the matrix can say, and
+the register's own faults: repeaters on an assumed mast, pass-range links longer
+than 150 km, stations surveyed below the terrain model.
+
+`docs/network-review.md` has the rest; `npm run review` holds it.
 
 ---
 

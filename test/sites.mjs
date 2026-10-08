@@ -335,13 +335,18 @@ const cross = await page.evaluate(async () => {
   const one = (a, b) => wattsToDbm(a.tx_power_w) + a.antenna_gain_dbi - a.line_loss_db
     - an.pathLoss_db + b.antenna_gain_dbi - b.line_loss_db - b.rx_threshold_dbm;
   return { quoted: r.figs[k].margin, verdict: r.figs[k].verdict, mine: Math.min(one(rep, fld), one(fld, rep)),
-           mineVerdict: an.verdict, clutter: an.clutterA_db + an.clutterB_db };
+           mineVerdict: an.verdict, clutter: an.clutterA_db + an.clutterB_db,
+           model: an.model, allow: an.allowance_db };
 });
 ok('the margin quoted is the link budget card\'s arithmetic over the same path',
    cross.quoted != null && Math.abs(cross.quoted - cross.mine) < 1e-9 && cross.verdict === cross.mineVerdict,
    JSON.stringify(cross));
-ok('…with the trees in it — a terminal-clutter term is being charged', cross.clutter > 5,
-   `${cross.clutter.toFixed(1)} dB`);
+// The trees are priced the model's way: under the field model (the default,
+// FN_MODEL_DEFAULTS) by its allowance and no terminal clutter; under the
+// land-cover model by P.2108 at the mast in the trees.
+ok('…with the trees in it — priced by the model in force',
+   cross.model === 'field' ? (cross.allow > 0 && cross.clutter === 0) : cross.clutter > 5,
+   `${cross.model}: allowance ${cross.allow} dB, clutter ${cross.clutter.toFixed(1)} dB`);
 
 const drawn = await page.evaluate(() => {
   let lines = 0;

@@ -6,7 +6,7 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state` and cssVar; across to terrain.js for
-// Terrain.profile and to path-profile.js for pathAnalyse, rmSystemOf and the
+// Terrain.profile and to path-profile.js for pathAnalyse, rmSystemOf, stationAntenna and the
 // PATH_DEFAULT_* constants — the same physics, the same endpoint rules, so
 // this layer and the profile card can never argue about what "obstructed"
 // means. All of it called from inside MapLos' own functions only, so this
@@ -90,7 +90,7 @@ const MapLos = (function () {
     const sys = rmSystemOf(s);
     return {
       elev: s.elevation_ahd != null ? s.elevation_ahd : null,
-      agl:  sys && sys.antenna_height_m != null ? sys.antenna_height_m : PATH_DEFAULT_AGL,
+      agl:  stationAntenna(s, sys).agl,
     };
   }
 
@@ -108,6 +108,9 @@ const MapLos = (function () {
       a.lat.toFixed(5), a.lon.toFixed(5), pa.elev == null ? '' : pa.elev, pa.agl,
       b.lat.toFixed(5), b.lon.toFixed(5), pb.elev == null ? '' : pb.elev, pb.agl,
       freqFor(a, b), SAMPLES,
+      // Ends stood on the terrain model's surface, never in a pit under it
+      // (pathAnalyse): verdicts cached before that are not this layer's.
+      'ends2',
     ].join('|');
   }
 
