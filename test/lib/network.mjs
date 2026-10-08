@@ -16,9 +16,9 @@
 // unlike Leaflet it is absent from every check that does not open 3-D, which is
 // all of them but one — and that is itself a property worth having, because it
 // is the whole justification for loading it that way. `npm run map3d` asserts
-// that `window.maplibregl` is undefined until the button is pressed.
+// that the library is not imported until the button is pressed.
 //
-// Served from the `maplibre-gl` devDependency, pinned to the same 5.24.0
+// Served from the `maplibre-gl` devDependency, pinned to the same 6.13.0
 // map-3d.js asks for. Real MapLibre, real WebGL, no network.
 //
 // three.js (the Digital Twin), Tesseract.js (the field photos' OCR) and
@@ -56,8 +56,10 @@ function leafletDist() {
 // The same, for the 3-D renderer. Resolved lazily rather than at module load:
 // every check imports this file and only one of them opens 3-D, so a harness
 // without the package installed must still run the other forty.
+// 6.x is ESM only and its `exports` map has no `main`, so the package is found
+// by its package.json and `dist/` taken from there.
 function maplibreDist() {
-  return path.dirname(require.resolve('maplibre-gl/dist/maplibre-gl.js'));
+  return path.join(path.dirname(require.resolve('maplibre-gl/package.json')), 'dist');
 }
 
 // And for the Digital Twin's renderer, three.js, on the same terms: fetched by
@@ -113,6 +115,8 @@ function installedVersion(name) {
 
 const CONTENT_TYPE = {
   '.js':  'text/javascript; charset=utf-8',
+  // A module is refused under any other type, so `.mjs` is named, not guessed.
+  '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
@@ -151,9 +155,10 @@ export async function applyNetworkPolicy(page, origin) {
       }
     }
 
-    // `dist/` and everything under it — maplibre-gl.js and maplibre-gl.css. The
-    // UMD build carries its own worker as an inline blob, so nothing else off
-    // this host is asked for (blob: is allowed above).
+    // `dist/` and everything under it — maplibre-gl.mjs, maplibre-gl.css, and
+    // maplibre-gl-worker.mjs, which the library asks for beside itself and
+    // starts through a same-origin blob: worker that imports it (map-3d.js says
+    // why). The worker's own request carries a `?v=` the pattern stops before.
     const maplibre = url.match(/unpkg\.com\/maplibre-gl@[\d.]+\/dist\/([^?#]+)/);
     if (maplibre) {
       let dist3d = null;
@@ -164,6 +169,9 @@ export async function applyNetworkPolicy(page, origin) {
           status: 200,
           contentType: CONTENT_TYPE[path.extname(file)] || 'application/octet-stream',
           body: fs.readFileSync(file),
+          // As unpkg answers: the module, its worker and the page's own fetch
+          // of that worker (file://, map-3d.js) are all cross-origin requests.
+          headers: { 'Access-Control-Allow-Origin': '*' },
         });
       }
     }

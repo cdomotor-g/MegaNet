@@ -46,7 +46,7 @@
 //
 //   The teardown    leaving the tab takes the GL context with it.
 //
-//   The lazy load   `window.maplibregl` is undefined until ⛰️ is pressed. This
+//   The lazy load   the library is not imported until ⛰️ is pressed. This
 //                   is the whole justification for fetching a megabyte of
 //                   renderer outside index.html's script list, and it is the
 //                   kind of claim that decays the first time somebody adds a
@@ -60,12 +60,20 @@
 //   node --run map3d        (or: npm run map3d)
 //       npm run map3d -- -v    also print what passed
 
+import fs from 'node:fs';
 import zlib from 'node:zlib';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
+// The version map-3d.js pins, read from it, and the one the harness serves:
+// they move together (#190), and a pin that drifts from the devDependency
+// would be answered by a different MapLibre than the page asked for.
+const MAPLIBRE_VER = (fs.readFileSync(new URL('../map-3d.js', import.meta.url), 'utf8')
+  .match(/const LIB_VER\s*=\s*'([^']+)'/) || [])[1];
+const MAPLIBRE_DEV = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+  .devDependencies['maplibre-gl'];
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
 const GL_TIMEOUT   = Number(process.env.MAP3D_TIMEOUT || 45_000);
 
@@ -226,14 +234,17 @@ if (!gl2) {
 // ── 1. the renderer is not fetched until it is asked for ────────────────────
 console.log('\nThe renderer is fetched on demand, not at load');
 
+const libRequests = [];
+page.on('request', r => { if (/unpkg\.com\/maplibre-gl@[^/]+\/dist\/maplibre-gl\.mjs/.test(r.url())) libRequests.push(r.url()); });
 const beforePress = await page.evaluate(() => ({
-  lib:    typeof window.maplibregl,
+  lib:    Map3D._lib() === null ? 'undefined' : typeof Map3D._lib(),
   script: !!document.querySelector('script[src*="maplibre-gl"]'),
   mode:   state.map3d,
   host:   !!document.getElementById('map3d'),
 }));
-ok('the page has loaded and opened the map without maplibregl',
-   beforePress.lib === 'undefined', `typeof maplibregl = ${beforePress.lib}`);
+ok('the page has loaded and opened the map without MapLibre',
+   beforePress.lib === 'undefined' && libRequests.length === 0,
+   `library: ${beforePress.lib}, ${libRequests.length} request(s)`);
 ok('…and without a script tag for it',  beforePress.script === false);
 ok('3-D is off until it is asked for',  beforePress.mode === false);
 ok('and there is no canvas over the map', beforePress.host === false);
@@ -261,12 +272,14 @@ await page.waitForFunction(() => {
 const cam = await page.evaluate(() => {
   const m = Map3D._map();
   return {
-    lib:      typeof window.maplibregl,
-    version:  window.maplibregl && maplibregl.getVersion ? maplibregl.getVersion() : null,
+    lib:      Map3D._lib() ? typeof Map3D._lib() : 'undefined',
+    version:  Map3D._lib() && Map3D._lib().getVersion ? Map3D._lib().getVersion() : null,
+    global:   typeof window.maplibregl,
+    worker:   Map3D._lib() && Map3D._lib().getWorkerUrl ? (Map3D._lib().getWorkerUrl() || '') : null,
     on:       state.map3d,
     terrain:  m.getTerrain(),
     pitch:    m.getPitch(),
-    maxPitch: m.transform ? m.transform.maxPitch : null,
+    maxPitch: m.getMaxPitch(),
     rotate:   !!(m.dragRotate && m.dragRotate.isEnabled()),
     keyboard: !!(m.keyboard && m.keyboard.isEnabled()),
     touch:    !!(m.touchPitch && m.touchPitch.isEnabled()),
@@ -288,12 +301,56 @@ const hudOpen = await page.evaluate(() => {
            says: !!hud && hud.textContent.startsWith(viewMoveWords(matchMedia('(pointer: coarse)').matches)) };
 });
 ok('the renderer is now loaded',            cam.lib === 'object', `typeof = ${cam.lib}`);
-ok('…and it is the version map-3d.js pins', cam.version === '5.24.0', String(cam.version));
+ok('…and it is the version map-3d.js pins', !!MAPLIBRE_VER && cam.version === MAPLIBRE_VER
+   && MAPLIBRE_DEV === MAPLIBRE_VER, `${cam.version}; map-3d.js ${MAPLIBRE_VER}; devDependency ${MAPLIBRE_DEV}`);
+// 6.x is ESM only, imported by map-3d.js (#190): the module's exports are the
+// library, and nothing is left on window for another file to start leaning on.
+ok('…imported as a module, leaving no global behind', cam.global === 'undefined', cam.global);
+// Over http(s) the worker is MapLibre's own, started however it starts it. The
+// classic copy is for file:// only (section 10).
+ok('…and over http its worker is the library\u2019s own', cam.worker === '', String(cam.worker).slice(0, 40));
 ok('the mode is on',                        cam.on === true);
 ok('there is a WebGL canvas over the map',  cam.canvas && cam.hostOn);
 ok('terrain is set, from the DEM source',   !!cam.terrain && cam.terrain.source === 'mn-dem',
    JSON.stringify(cam.terrain));
 ok('the DEM tiles were actually fetched',   demHits > 0, `${demHits} tiles`);
+
+// How large a pin is drawn where it stands — the leader's ring is sized by it.
+// 6.0 took away `map.transform`, which pinScale() read the depth out of; it now
+// works the depth out from the camera the map describes (#190). Held against
+// the depth MapLibre itself draws with: the transform it still keeps
+// internally, read here the way pinScale() used to. If a later MapLibre moves
+// that too, these checks say so rather than passing on nothing.
+await page.waitForFunction(() => Map3D._map().areTilesLoaded(), null, { timeout: GL_TIMEOUT }).catch(() => {});
+const scale = await page.evaluate(() => {
+  const m = Map3D._map(), ml = Map3D._lib();
+  const tr = m._camera && m._camera.transform;
+  const mx = tr && (m.getTerrain() ? tr._pixelMatrix3D : tr._pixelMatrix);
+  const own = ll => {
+    const mc = ml.MercatorCoordinate.fromLngLat(ll), ws = tr.worldSize;
+    const z = m.getTerrain() ? (m.queryTerrainElevation(ll) || 0) : 0;
+    const w = mx[3] * mc.x * ws + mx[7] * mc.y * ws + mx[11] * z + mx[15];
+    return w > 0 ? tr.cameraToCenterDistance / w : null;
+  };
+  const cv = m.getCanvas().getBoundingClientRect();
+  // The middle, the foot and the far edge of the view, and two off to the
+  // sides — where the ground under each is whatever the surface puts there.
+  const spots = [[0.5, 0.5], [0.5, 0.92], [0.5, 0.12], [0.1, 0.7], [0.9, 0.3]]
+    .map(([fx, fy]) => m.unproject([cv.width * fx, cv.height * fy]));
+  return {
+    oracle: !!mx,
+    rows: spots.map(ll => ({ mine: Map3D._pinScale(ll), own: mx ? own(ll) : null })),
+    centre: Map3D._pinScale(m.getCenter()),
+    pitch: m.getPitch(),
+  };
+});
+ok('a pin at the centre of the view is drawn at its 2-D size',
+   Math.abs(scale.centre - 1) < 1e-6, String(scale.centre));
+ok('…larger at the foot of a tilted view and smaller towards the horizon',
+   scale.rows[1].mine > 1.2 && scale.rows[2].mine < 0.9, JSON.stringify(scale.rows.map(r => r.mine)));
+ok('…by exactly the depth MapLibre draws it at, across the view',
+   scale.oracle && scale.rows.every(r => r.mine != null && r.own != null && Math.abs(r.mine / r.own - 1) < 1e-3),
+   JSON.stringify(scale));
 ok('the base map is draped over it',        cam.baseSrc);
 // The camera the whole feature was asked for.
 ok('the camera starts tilted',              cam.pitch > 30, `${cam.pitch}°`);
@@ -1249,12 +1306,16 @@ const bridge = await page.evaluate(() => {
   // Well off centre and high in a pitched view, where the two projections have
   // no reason to agree — near the middle of a tilted map they nearly do, which
   // is how this went unnoticed.
-  const p = { x: Math.round(r.width * 0.32), y: Math.round(r.height * 0.34) };
-  const gl = m.unproject([p.x, p.y]);
+  // The page pixel the mouse will press, rounded first and then taken back
+  // into each map's own frame — not the other way round. The canvas can sit
+  // at a fractional offset (77.17 px down, under 6.x), and a point rounded in
+  // the canvas's frame is then a fifth of a pixel from the one clicked, which
+  // this far up a tilted view is tens of metres.
+  const cx = Math.round(r.left + r.width * 0.32), cy = Math.round(r.top + r.height * 0.34);
+  const gl = m.unproject([cx - r.left, cy - r.top]);
   const c  = document.getElementById('leaflet-map').getBoundingClientRect();
-  const lf = state.map.containerPointToLatLng([r.left + p.x - c.left, r.top + p.y - c.top]);
-  return { cx: Math.round(r.left + p.x), cy: Math.round(r.top + p.y),
-           gl: [gl.lat, gl.lng], lf: [lf.lat, lf.lng] };
+  const lf = state.map.containerPointToLatLng([cx - c.left, cy - c.top]);
+  return { cx, cy, gl: [gl.lat, gl.lng], lf: [lf.lat, lf.lng] };
 });
 // Degrees are enough: the two answers are kilometres apart here, and the check
 // is which one the card got rather than how far apart they are.
@@ -1790,12 +1851,75 @@ ok('coming back and pressing ⛰️ again works',
 ok('…and the mirror is rebuilt against the new map',
    again.pins === again.markers && again.pins > 0, `${again.pins} pins`);
 
-// The renderer is fetched once, not once per press.
+// The renderer is fetched once, not once per press: a module is imported
+// once per page however many times it is asked for, and loadLib() holds it.
 const scripts = await page.evaluate(() =>
   document.querySelectorAll('script[src*="maplibre-gl"]').length);
-ok('the renderer was injected once, not once per press', scripts === 1, `${scripts} tags`);
+ok('the renderer was fetched once, not once per press',
+   libRequests.length === 1 && scripts === 0, `${libRequests.length} request(s), ${scripts} script tag(s)`);
 
 await page.evaluate(() => { Map3D.stop(); });
+
+// ── 10. from a page opened as a file (#190) ─────────────────────────────────
+// file:// is a supported way to run this app (README.md in this folder says
+// why it is not the way to *test* it), and it is the one place MapLibre 6 does
+// not start on its own: Chromium will not start a module worker from a blob:
+// there, so map-3d.js hands the library its worker as a classic script. So the
+// repo's own index.html is opened as a file, with the stations from where a
+// file:// page gets them — GitHub raw, answered here from the committed file —
+// and the same world as above.
+console.log('\nFrom a page opened as a file');
+
+const fpage = await context.newPage();
+const ferrors = [];
+fpage.on('pageerror', e => ferrors.push(String(e)));
+fpage.on('console', m => { if (m.type() === 'error' && /worker/i.test(m.text())) ferrors.push(m.text()); });
+await applyNetworkPolicy(fpage, 'file://');
+await fpage.route(/raw\.githubusercontent\.com\/cdomotor-g\/MegaNet\/main\/stations\.json/, route =>
+  route.fulfill({ status: 200, contentType: 'application/json; charset=utf-8',
+                  body: fs.readFileSync(new URL('../stations.json', import.meta.url)),
+                  headers: { 'Access-Control-Allow-Origin': '*' } }));
+await fpage.route(/elevation-tiles-prod\/terrarium\/(\d+)\/(\d+)\/(\d+)\.png/, route => {
+  const m = /terrarium\/(\d+)\/(\d+)\/(\d+)\.png/.exec(route.request().url());
+  return route.fulfill({ status: 200, contentType: 'image/png', body: terrariumPng(+m[1], +m[2], +m[3]),
+                         headers: { 'Access-Control-Allow-Origin': '*' } });
+});
+await fpage.route(/(tile\.openstreetmap\.org|tile\.opentopomap\.org|server\.arcgisonline\.com)/, route =>
+  route.fulfill({ status: 200, contentType: 'image/png', body: baseTilePng(),
+                  headers: { 'Access-Control-Allow-Origin': '*' } }));
+await fpage.goto(new URL('../index.html', import.meta.url).href, { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+await fpage.waitForFunction(
+  () => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations),
+  null, { timeout: LOAD_TIMEOUT });
+await fpage.evaluate(() => switchTab('stations'));
+await fpage.waitForFunction(() => !!state.map && state.mapMarkers.length > 0,
+  null, { timeout: LOAD_TIMEOUT });
+await fpage.waitForFunction(() => !state.map._animatingZoom, null, { timeout: LOAD_TIMEOUT });
+await fpage.locator('.mn-map-3d').click();
+const fileOpened = await fpage.waitForFunction(() => {
+  const m = typeof Map3D !== 'undefined' && Map3D._map();
+  return !!m && m.isStyleLoaded() && !!m.getTerrain();
+}, null, { timeout: GL_TIMEOUT }).then(() => true, () => false);
+// The pins are a GeoJSON source, which MapLibre tiles in its worker: pins that
+// can be queried back are a worker that started and answered.
+const fileWorked = fileOpened && await fpage.waitForFunction(() => {
+  const m = Map3D._map();
+  return m.isSourceLoaded('mn-stations') && m.querySourceFeatures('mn-stations').length > 0;
+}, null, { timeout: GL_TIMEOUT }).then(() => true, () => false);
+const fileRun = await fpage.evaluate(() => ({
+  protocol: location.protocol,
+  worker:   Map3D._lib() ? (Map3D._lib().getWorkerUrl() || '').slice(0, 32) : null,
+  pins:     Map3D._map() ? Map3D._map().querySourceFeatures('mn-stations').length : 0,
+}));
+ok('the 3-D view opens from a page opened as a file',
+   fileRun.protocol === 'file:' && fileOpened, JSON.stringify(fileRun));
+ok('…and its worker answers: the pins come back out of it',
+   fileWorked && fileRun.pins > 0, JSON.stringify(fileRun));
+ok('…handed over as a classic script', /^data:text\/javascript/.test(fileRun.worker || ''), String(fileRun.worker));
+ok('…and nothing on that page threw or said its worker failed', ferrors.length === 0,
+   ferrors.slice(0, 3).join(' | '));
+await fpage.evaluate(() => { if (typeof Map3D !== 'undefined') Map3D.stop(); });
+await fpage.close();
 
 // ── the console ─────────────────────────────────────────────────────────────
 ok('nothing threw on the page', errors.length === 0, errors.slice(0, 3).join(' | '));

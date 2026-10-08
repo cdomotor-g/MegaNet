@@ -1097,12 +1097,13 @@ the bank** — a flag on the position, not a correction to the height.
 
 three.js, ~750 KB of WebGL, fetched on the first visit to the tab and never
 for a session that does not come here — MapLibre's terms in `map-3d.js`.
-Unlike MapLibre it has no UMD build any more: r160 was the last, and it
+Like MapLibre 6 it has no UMD build any more: r160 was the last, and it
 prints a deprecation warning on every load. So it arrives by a dynamic
 `import()` of the pinned ESM build (`three@0.185.1/build/three.module.min.js`,
-the last release that ships a minified one) from inside the module. That is
-the one place this app uses a module, and it is a call from inside a
-function, not a change to what kind of page this is (#129): `index.html`
+the last release that ships a minified one) from inside the module, as
+`map-3d.js` brings in MapLibre (#190). Those are the two places this app uses
+a module, and each is a call from inside a function, not a change to what
+kind of page this is (#129): `index.html`
 stays classic scripts in one global scope, and `npm run toplevel`, `names`
 and `smoke` parse and run `digital-twin.js` as such. The build imports its
 core by a relative path, so no import map is needed and file:// still works.

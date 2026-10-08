@@ -85,17 +85,51 @@
 // ── Why the library is fetched rather than listed in index.html ──────────────
 // MapLibre is ~1 MB of WebGL renderer. Leaflet is in index.html because half
 // the tabs are unusable without it; this is one optional mode on one tab, and
-// most sessions never open it. So it is injected on the first ⛰️ press and
+// most sessions never open it. So it is imported on the first ⛰️ press and
 // never again — which also means `npm run smoke`, which opens all twenty tabs
 // and never presses anything, does not pay for it and is not exposed to it.
 //
-// The version is pinned to a **UMD** build for the same reason every other
-// script here is a classic script (#129): it defines one global and needs no
-// module graph, no import map and no build step. MapLibre 6 ships ESM only,
-// which is why this is pinned to the last 5.x rather than to `latest` — and why
-// the pin is a deliberate decision with a reason rather than a number that
-// drifted. Upgrading past 5.x means either `import()` or a bundler, and both
-// are bigger decisions than this file.
+// ── Why it is imported, and pinned to 6.x (#190) ─────────────────────────────
+// MapLibre 6 ships ESM only: `dist/maplibre-gl.mjs`, no UMD file, nothing a
+// plain `<script src>` can load. 5.24.0 was the last UMD build, and it was this
+// file's pin until #190 — when 5.x had gone five months without a release while
+// 6.x had shipped thirteen minors, so staying put was already staying on a line
+// nobody fixes. A bundler was never on the table (docs/floodwarning-net.md: no
+// build step; #129 says why). What was left is what digital-twin.js already
+// does for three.js: a dynamic `import()` of the pinned build from inside
+// loadLib(). `import()` is a call made from a function, not a change to what
+// kind of page this is — index.html stays classic scripts in one global scope,
+// and `npm run toplevel`, `names` and `smoke` still parse and run this file as
+// one. The module's exports are what `ml` holds; there is no `maplibregl`
+// global any more, and nothing here wants one.
+//
+// The two things that wanted checking rather than assuming, and how they came
+// out:
+//   * **The worker.** The ESM build finds `maplibre-gl-worker.mjs` beside
+//     itself (import.meta.url), and a page may not start a worker from another
+//     origin. MapLibre 6 handles that itself: a worker URL on another origin is
+//     started as a same-origin `blob:` module worker whose one line imports the
+//     real file, over CORS, which unpkg answers with `*`. So nothing is set
+//     here — no setWorkerUrl, no copy of the worker on this origin.
+//   * **file://.** The module itself imports from a file:// page as from any
+//     other: it is on https://unpkg.com with `*` on it. Its worker does not.
+//     On a file:// page Chromium will not start a *module* worker from a
+//     `blob:` URL at all — not MapLibre's, not a one-line one — though it
+//     starts a classic one, which is all 5.x ever used. So off http(s) this
+//     file fetches the worker itself, takes off the one line that makes it a
+//     module (its closing `export{…}`: it has no imports and no
+//     import.meta), and hands it to MapLibre as a classic script — a data: URL
+//     whose last word is `.cjs`, the ending MapLibre reads as "classic", which
+//     it then starts from a `blob:` as it would any other worker on another
+//     origin (classicWorker below). Over http(s) none of that runs and the
+//     worker is MapLibre's own. test/map3d.mjs opens the 3-D view from a
+//     file:// page as well, so a MapLibre that changes how it starts its
+//     worker fails there rather than in a field laptop's browser.
+//
+// What would move the pin: a 6.x minor is an ordinary upgrade (the version
+// below, the `maplibre-gl` devDependency in test/package.json, and
+// `npm run map3d`). A 7.0 is a reading of its changelog first — 6.0 removed
+// `map.transform`, which pinScale() used to read.
 //
 // ── Every failure here is loud ───────────────────────────────────────────────
 // terrain.js's rule, and it reaches further in 3-D than it does in a profile:
@@ -106,12 +140,12 @@
 // picture on screen.
 const Map3D = (function () {
   // ── the library ──
-  // 5.24.0 is the last release with a UMD build (`dist/maplibre-gl.js`, one
-  // global `maplibregl`). See the header: 6.x is ESM-only, which this page
-  // cannot load without changing what kind of page it is.
-  const LIB_VER = '5.24.0';
-  const LIB_JS  = `https://unpkg.com/maplibre-gl@${LIB_VER}/dist/maplibre-gl.js`;
+  // The ESM build, imported (see the header). It starts its worker from
+  // `maplibre-gl-worker.mjs` in the same directory, so the two are one pin.
+  const LIB_VER = '6.13.0';
+  const LIB_JS  = `https://unpkg.com/maplibre-gl@${LIB_VER}/dist/maplibre-gl.mjs`;
   const LIB_CSS = `https://unpkg.com/maplibre-gl@${LIB_VER}/dist/maplibre-gl.css`;
+  const LIB_WORKER = `https://unpkg.com/maplibre-gl@${LIB_VER}/dist/maplibre-gl-worker.mjs`;
 
   // The same terrarium tiles terrain.js already decodes for every elevation
   // profile in this app — same host, same encoding, same ~30 m SRTM, same
@@ -172,7 +206,7 @@ const Map3D = (function () {
   const SHEET_CONC    = 3;    // profiles in flight; Terrain dedups tiles beneath
   const SHEET_MAX     = 80;   // hops given a sheet at once — see sheetBudget()
 
-  let ml       = null;   // the maplibregl global, once loaded
+  let ml       = null;   // the library's module namespace, once imported
   let libP     = null;   // the in-flight load, so two presses fetch once
   let libErr   = null;   // why the library could not be had, if it could not
   let map      = null;   // the MapLibre map, while 3-D is open
@@ -302,29 +336,32 @@ const Map3D = (function () {
     });
   }
 
+  // A module that failed to fetch is remembered as failed by the browser's
+  // module map: import() of the same URL again rejects at once, with no
+  // request. So each try after a failure keys the URL with a query — a fresh
+  // specifier, a fresh fetch — which unpkg ignores (digital-twin.js does the
+  // same). The worker's URL is the module's own directory, so the key does not
+  // follow it there.
+  let libTry = 0;
   function loadLib() {
     if (ml) return Promise.resolve(ml);
     if (libP) return libP;
-    libP = new Promise((resolve, reject) => {
-      if (!document.getElementById('mn-maplibre-css')) {
-        const css = document.createElement('link');
-        css.id = 'mn-maplibre-css';
-        css.rel = 'stylesheet';
-        css.href = LIB_CSS;
-        document.head.appendChild(css);
-      }
-      const s = document.createElement('script');
-      s.src = LIB_JS;
-      s.async = true;
-      s.onload = () => {
-        if (window.maplibregl) {
-          ml = window.maplibregl;
-          registerElevProtocol();
-          resolve(ml);
-        } else reject(new Error('the 3-D renderer loaded but defined nothing'));
-      };
-      s.onerror = () => reject(new Error('the 3-D renderer could not be fetched'));
-      document.head.appendChild(s);
+    if (!document.getElementById('mn-maplibre-css')) {
+      const css = document.createElement('link');
+      css.id = 'mn-maplibre-css';
+      css.rel = 'stylesheet';
+      css.href = LIB_CSS;
+      document.head.appendChild(css);
+    }
+    const url = libTry ? `${LIB_JS}?r=${libTry}` : LIB_JS;
+    libP = import(url).catch(() => {
+      throw new Error('the 3-D renderer could not be fetched');
+    }).then(async m => {
+      if (!m || typeof m.Map !== 'function') throw new Error('the 3-D renderer loaded but defined nothing');
+      if (!/^https?:$/.test(location.protocol)) m.setWorkerUrl(await classicWorker());
+      ml = m;
+      registerElevProtocol();
+      return ml;
     }).catch(err => {
       // A failed fetch is remembered as a failure but not as an answer: the
       // next press tries again, because "offline for a moment" is the common
@@ -332,9 +369,26 @@ const Map3D = (function () {
       // request is worse than one that retries.
       libErr = err.message || String(err);
       libP = null;
+      libTry++;
       throw err;
     });
     return libP;
+  }
+
+  // The worker as a classic script, for a page that cannot start a module one
+  // (file://; the header says why). The `\n//.cjs` is a comment to the
+  // script and, as the URL's last four characters, MapLibre's sign that it is
+  // classic. A worker that no longer ends in one `export{…}` is not one this
+  // knows how to turn, and says so rather than starting something broken.
+  async function classicWorker() {
+    let res;
+    try { res = await fetch(LIB_WORKER); } catch (_) { res = null; }
+    if (!res || !res.ok) throw new Error('the 3-D renderer\u2019s worker could not be fetched');
+    const src = (await res.text()).replace(/;?\s*export\s*\{[^}]*\}\s*;?(\s*\/\/# sourceMappingURL=\S*)?\s*$/, ';\n');
+    if (/\bexport\s*\{/.test(src.slice(-400))) {
+      throw new Error('the 3-D renderer\u2019s worker cannot be started from a page opened as a file');
+    }
+    return 'data:text/javascript;charset=utf-8,' + encodeURIComponent(src + '\n//.cjs');
   }
 
   // ── the ground under a hop ───────────────────────────────────────────────
@@ -1771,17 +1825,36 @@ const Map3D = (function () {
   // camera. At 62° a pin at the foot of the view is drawn about 1.6 times its
   // 2-D size and one out towards the horizon a fraction of it, so a ring at the
   // 2-D radius would cut through the one and hang loose round the other.
-  // MapLibre has no public read of w, so it is the transform's own matrix —
-  // the one project() multiplies by — read one row further down, at the
-  // terrain height project() stands the spot on.
+  //
+  // MapLibre has no public read of w, and since 6.0 no `map.transform` to read
+  // it from either (this used to take the transform's pixel matrix one row
+  // down). So it is worked out from what the map does say. w is the spot's
+  // depth along the camera's line of sight, and the camera stands d pixels
+  // back from the centre of the view along that line — d being what makes a
+  // pixel at the centre a pixel on the ground, (height / 2) / tan(fov / 2) —
+  // so w = d + (spot − centre) · ahead, every term in world pixels at this
+  // zoom: across by the Mercator distance times the world's size (512-pixel
+  // tiles), up by metres times the same scale at the centre's latitude, which
+  // is how MapLibre stands its terrain. `ahead` is the line of sight, tipped
+  // `pitch` off straight down towards the bearing. Roll turns the picture
+  // about that line and leaves depths alone. A spot behind the camera has
+  // w ≤ 0, and is null, as project() mirrors it.
   function pinScale(lngLat) {
-    const tr = map.transform;
-    const mx = tr && (map.terrain ? tr._pixelMatrix3D : tr._pixelMatrix);
-    const ws = tr && tr.worldSize, d = tr && tr.cameraToCenterDistance;
-    if (!mx || !ws || !d) return 1;
-    const mc = ml.MercatorCoordinate.fromLngLat(lngLat);
-    const z = map.terrain ? (map.queryTerrainElevation(lngLat) || 0) : 0;
-    const w = mx[3] * mc.x * ws + mx[7] * mc.y * ws + mx[11] * z + mx[15];
+    const ll = ml.LngLat.convert(lngLat), c = map.getCenter();
+    const h = map.getContainer().clientHeight;
+    const fov = map.getVerticalFieldOfView() * Math.PI / 180;
+    if (!h || !(fov > 0)) return 1;
+    const d = (h / 2) / Math.tan(fov / 2);
+    const world = 512 * Math.pow(2, map.getZoom());
+    const perM = world / (2 * Math.PI * 6371008.8 * Math.cos(c.lat * Math.PI / 180));
+    const mp = ml.MercatorCoordinate.fromLngLat(ll), mc = ml.MercatorCoordinate.fromLngLat(c);
+    const zp = map.getTerrain() ? (map.queryTerrainElevation(ll) || 0) : 0;
+    const zc = map.getTerrain() ? map.getCenterElevation() : 0;
+    const pitch = map.getPitch() * Math.PI / 180, brg = map.getBearing() * Math.PI / 180;
+    // x east, y south (Mercator's y runs down the map), z up.
+    const ahead = [Math.sin(brg) * Math.sin(pitch), -Math.cos(brg) * Math.sin(pitch), -Math.cos(pitch)];
+    const w = d + ahead[0] * (mp.x - mc.x) * world + ahead[1] * (mp.y - mc.y) * world
+                + ahead[2] * (zp - zc) * perM;
     return w > 0 ? d / w : null;
   }
 
@@ -2388,6 +2461,10 @@ const Map3D = (function () {
     // numbers rather than against a copy of them.
     _sheetFor(a, b) { return sheetFor(a, b); },
     _map() { return map; },
+    // The imported library, or null before the first ⛰️ press (#190): with no
+    // `maplibregl` global any more, this is how the check sees the lazy load.
+    _lib() { return ml; },
+    _pinScale(ll) { return map && ml ? pinScale(ll) : null; },
   };
 
   // ── open / close ─────────────────────────────────────────────────────────

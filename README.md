@@ -1276,8 +1276,10 @@ heading kept — until it is clear, as the 2-D map pans one clear, and leaving
 Terrain is fetched for the view you are looking at and no further, which is what
 makes a whole-of-state network affordable to fly over; the sheets are capped at
 80 hops at a time and the panel says how many it left out, because an unsheeted
-hop is not a clear one. The renderer itself (MapLibre GL, ~1 MB of WebGL) is
-fetched the first time you press ⛰️ and never for a session that does not. A
+hop is not a clear one. The renderer itself (MapLibre GL 6, ~1 MB of WebGL) is
+fetched the first time you press ⛰️ and never for a session that does not — a
+dynamic `import()` of its ESM build, which works from a copy opened as a file
+too (`map-3d.js` says how, #190). A
 terrain tile that will not load is said out loud rather than drawn as flat
 ground, for the reason the elevation profile gives at length: flat ground
 between two stations reads as a clear path, and that is the one wrong answer
@@ -4224,8 +4226,8 @@ coordinate is the gauge in the channel and the mark is the hut on the bank.
 
 **The renderer is three.js, fetched on the first visit** and never for a
 session that does not come here — MapLibre's terms — by a dynamic
-`import()` of the pinned ESM build, because three has shipped no UMD build
-since r160. The page stays classic scripts; the call is from inside a
+`import()` of the pinned ESM build, as MapLibre is, because three has shipped
+no UMD build since r160. The page stays classic scripts; the call is from inside a
 function. The `.glb` is written by the module itself (metres, y up, origin
 on the ground at the pole, the station's coordinates and datum in its
 header; the imagery embedded) and `tools/blender/import_twin.py` sets the

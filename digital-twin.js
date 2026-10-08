@@ -80,11 +80,12 @@
 //
 // three.js is ~750 KB of WebGL. Like MapLibre for the 3-D map it is fetched on
 // the first visit to this tab and never for a session that does not come here.
-// Unlike MapLibre it has no UMD build any more — three r160 was the last, and
-// it prints a deprecation warning on every load — so it is brought in with a
-// dynamic `import()` of the pinned ESM build. That is the one place this app
-// uses a module: `import()` is a call from inside a function, not a change to
-// what kind of page this is (#129) — index.html stays classic scripts in one
+// Like MapLibre it has no UMD build any more — three r160 was the last, and it
+// prints a deprecation warning on every load — so it is brought in with a
+// dynamic `import()` of the pinned ESM build, as map-3d.js brings in MapLibre
+// 6 (#190). Those are the two places this app uses a module, and in both
+// `import()` is a call from inside a function, not a change to what kind of
+// page this is (#129) — index.html stays classic scripts in one
 // global scope, and `npm run toplevel`, `names` and `smoke` all parse and run
 // this file as such. The build imports its core by a relative path, so no
 // import map is needed and file:// still works.
