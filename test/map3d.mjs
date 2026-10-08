@@ -1497,6 +1497,110 @@ ok('a cadastre tile that will not come is said out loud, never left as bare grou
 cadFail = false;
 await page.evaluate(() => Map3D._map().jumpTo({ zoom: 10.5, pitch: 0 }));
 
+// ── polar radio coverage, draped (map-polar.js, #188) ─────────────────────
+// The polar plot was a Leaflet image overlay, under the canvas in this mode and
+// so simply gone. It comes back as the same picture, lying on the relief — so
+// what is asserted is the seam (the 2-D overlay's own image, its own four
+// corners, its own opacity), the place in the ground's stack, the caveat on the
+// panel, and the property `npm run terrain` holds in 2-D: a new threshold is a
+// repaint of levels already in hand, and not one terrain tile is asked again —
+// through the 3-D path as well, where the renderer's own DEM is on the same
+// counter. Then leaving 3-D, which must leave the 2-D plot exactly as it was.
+console.log('\nPolar radio coverage lies on the terrain (#188)');
+
+const polarPin = await page.evaluate(() => {
+  const s = state.data.stations.find(x => x.id === 'beenleigh_al');
+  return s ? [s.lon, s.lat] : null;
+});
+await page.evaluate(c => Map3D._map().jumpTo({ center: c, zoom: 10.5, pitch: 55, bearing: 20 }), polarPin);
+const polarOn = await page.evaluate(async () => {
+  // A short range and a coarse step, as terrainkit draws it: the assertion is
+  // about the seam, not the model.
+  MapPolar.set('centre', 'station');
+  MapPolar.pickCentre('beenleigh_al');
+  MapPolar.set('rMaxKm', 12);
+  MapPolar.set('azStep', 6);
+  MapPolar.set('unit', 'dbm');
+  MapPolar.set('fromDbm', -120);
+  MapPolar.set('toDbm', -60);
+  MapPolar.draw();
+  const until = Date.now() + 60000;
+  while (Date.now() < until && !MapPolar.active()) await new Promise(r => setTimeout(r, 250));
+  return MapPolar.active();
+});
+ok('a polar plot drawn with the 3-D view up', polarOn === true);
+await page.waitForFunction(() => !!Map3D._map().getLayer('mn-polar'), null, { timeout: GL_TIMEOUT }).catch(() => {});
+await idle3d();
+const polarLook = () => page.evaluate(() => {
+  const m = Map3D._map(), st = m.getStyle();
+  const layer = st.layers.find(l => l.id === 'mn-polar');
+  const src = st.sources['mn-polar'];
+  const img = document.querySelector('.leaflet-pane.leaflet-mnPolar-pane img');
+  const d = MapPolar.drawn();
+  return {
+    order: st.layers.map(l => l.id).filter(id => /^mn-(base|elev|polar|lots|roads|links)$/.test(id)),
+    type: layer ? layer.type : null, srcType: src ? src.type : null,
+    url: src ? src.url : null, coords: src ? src.coordinates : null,
+    opacity: layer && layer.paint ? layer.paint['raster-opacity'] : null,
+    twoD: img ? { src: img.src, opacity: Number(getComputedStyle(img).opacity) } : null,
+    box: d ? d.box : null, terrain: !!m.getTerrain(),
+    note: (document.getElementById('map-3d-note') || {}).textContent.replace(/\s+/g, ' ') || '',
+  };
+});
+const pl = await polarLook();
+ok('it lies on the ground: an image raster under the terrain, over the base, under the cadastre and the links',
+   pl.type === 'raster' && pl.srcType === 'image' && pl.terrain
+     && JSON.stringify(pl.order) === JSON.stringify(['mn-base', 'mn-polar', 'mn-lots', 'mn-roads', 'mn-links']),
+   JSON.stringify({ type: pl.type, src: pl.srcType, order: pl.order }));
+ok('…the 2-D overlay’s own picture, not a second computation', !!pl.twoD && pl.url === pl.twoD.src,
+   `${(pl.url || '').slice(0, 30)}… vs ${(pl.twoD && pl.twoD.src || '').slice(0, 30)}…`);
+const corners = b => b && [[b.west, b.north], [b.east, b.north], [b.east, b.south], [b.west, b.south]];
+ok('…over the same four corners', JSON.stringify(pl.coords) === JSON.stringify(corners(pl.box)), JSON.stringify(pl.coords));
+ok('…at the same opacity', !!pl.twoD && Math.abs(pl.opacity - pl.twoD.opacity) < 1e-6, `${pl.opacity} vs ${pl.twoD && pl.twoD.opacity}`);
+ok('the caveat travels: bare terrain, no patterns, no trees, no clutter — and the profile card decides',
+   /no antenna patterns, no trees and no terminal clutter/.test(pl.note) && /profile card is the authority/.test(pl.note),
+   pl.note.slice(0, 160));
+
+// Re-banding, through the 3-D path: the image changes, the terrain is not
+// asked for — neither by terrain.js for the model nor by the renderer.
+const polarBefore = demHits;
+await page.evaluate(() => MapPolar.set('toDbm', -80));
+await page.waitForTimeout(500);
+await idle3d();
+const rb = await polarLook();
+ok('a new threshold re-colours the draped plot', !!rb.url && rb.url !== pl.url && !!rb.twoD && rb.url === rb.twoD.src,
+   `${rb.url === pl.url ? 'unchanged' : 'changed'}; matches 2-D: ${!!rb.twoD && rb.url === rb.twoD.src}`);
+ok('…in place, under the cadastre still', JSON.stringify(rb.order) === JSON.stringify(pl.order), JSON.stringify(rb.order));
+ok('…without fetching a single terrain tile', demHits === polarBefore, `${demHits - polarBefore} extra tile(s)`);
+
+// Leaving 3-D: the 2-D plot is exactly as it was.
+await page.evaluate(() => Map3D.stop());
+const after2d = await page.evaluate(() => {
+  const img = document.querySelector('.leaflet-pane.leaflet-mnPolar-pane img');
+  const d = MapPolar.drawn();
+  return { active: MapPolar.active(), src: img ? img.src : null,
+           opacity: img ? Number(getComputedStyle(img).opacity) : null, box: d ? d.box : null };
+});
+ok('leaving 3-D leaves the 2-D plot exactly as it was',
+   after2d.active && after2d.src === rb.url && Math.abs(after2d.opacity - rb.opacity) < 1e-6
+     && JSON.stringify(after2d.box) === JSON.stringify(rb.box), JSON.stringify({ a: after2d.active, same: after2d.src === rb.url }));
+
+// A plot drawn before 3-D was opened is draped as it opens; cleared in 2-D, it
+// goes from the 3-D view too, and its caveat with it.
+await page.locator('.mn-map-3d').click();
+await page.waitForFunction(() => !!Map3D._map() && Map3D._map().isStyleLoaded() && !!Map3D._map().getLayer('mn-polar'),
+  null, { timeout: GL_TIMEOUT }).catch(() => {});
+const reopened = await polarLook();
+ok('opening 3-D over a plot already drawn drapes it', reopened.type === 'raster' && reopened.url === rb.url,
+   JSON.stringify({ type: reopened.type, same: reopened.url === rb.url }));
+await page.evaluate(() => MapPolar.clear());
+await page.waitForTimeout(200);
+const cleared = await polarLook();
+ok('clearing the plot takes it off the 3-D view, and its caveat with it',
+   cleared.type === null && cleared.srcType === null && !/no antenna patterns/.test(cleared.note),
+   JSON.stringify({ type: cleared.type, src: cleared.srcType }));
+await page.evaluate(() => { MapLots.setEnabled(false); MapRoads.setEnabled(false); });
+
 // ── 9. leaving the tab takes the GL context with it ─────────────────────────
 // ── a path clicked in 3-D opens the card its 2-D line opens (#196) ────────
 console.log('\nA radio path clicked in 3-D opens the path card');

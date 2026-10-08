@@ -99,6 +99,8 @@ const MapPolar = (function () {
   let map = null, overlay = null, body = null;
   let job = null;        // the run in flight: { cancelled, done, total }
   let plot = null;       // the finished run: { level, margin, lattice, box, … }
+  let drawn = null;      // what paint() last put on the map: { url, box, opacity, gen }
+  let paintGen = 0;
   let status = { kind: 'idle', text: '' };
   let hitQ = '';
 
@@ -506,12 +508,23 @@ const MapPolar = (function () {
       }
     }
 
-    overlay = L.imageOverlay(cv.toDataURL('image/png'), b,
+    const url = cv.toDataURL('image/png');
+    overlay = L.imageOverlay(url, b,
                              { pane: PANE, opacity: cfg.opacity, interactive: false }).addTo(map);
+    drawn = { url, box: Object.assign({}, plot.box), opacity: cfg.opacity, gen: ++paintGen };
+    tell3d();
   }
 
   function clearOverlay() {
     if (overlay) { overlay.remove(); overlay = null; }
+    if (drawn) { drawn = null; tell3d(); }
+  }
+
+  // The 3-D view drapes the same picture on the terrain (map-3d.js, #188), so
+  // every paint and every clear is news to it. Asked for by `typeof`, because
+  // the module loads after this one and is not on every page this runs in.
+  function tell3d() {
+    if (typeof Map3D !== 'undefined' && Map3D.polarChanged) Map3D.polarChanged();
   }
 
   // A setting that changes *what would be computed* has to take the drawn plot
@@ -805,6 +818,13 @@ const MapPolar = (function () {
     },
 
     active() { return !!overlay; },
+
+    // What is painted on the 2-D map, for the 3-D view to drape (#188): the
+    // overlay's own image — a canvas in Web Mercator over the plot's box —
+    // its bounds and its opacity, with a number that changes on every paint.
+    // The picture, not the levels: a threshold moved in either view is a
+    // repaint here and a new image there, and the terrain is not asked again.
+    drawn() { return drawn; },
 
     // For the map legend: what is drawn, in one line, plus its key.
     legend() {

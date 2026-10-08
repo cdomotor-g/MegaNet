@@ -13,7 +13,8 @@
 // PATH_DEFAULT_*), to map-controls.js for the panel it is opened from, to
 // map-sites.js for what the repeater site finder drew (MapSites.drawn, select,
 // dimOthers, modeChanged), to map-photos.js for the field photos' pins
-// (MapPhotos.drawn, badgeHtml, conePath, open), to map-leader.js for the
+// (MapPhotos.drawn, badgeHtml, conePath, open), to map-polar.js for the polar
+// coverage plot's image (MapPolar.drawn), to map-leader.js for the
 // station card's leader (MapLeader.sync, reveal), and to app.js for
 // showStationCard and the base-map choice. Every one of those is called from
 // inside this file's own functions, so its position among the modules is free.
@@ -216,6 +217,7 @@ const Map3D = (function () {
   let demFails = 0;      // DEM tiles the renderer could not fetch
   let elevReg  = false;  // the elevation protocol, registered once per page
   let elevKey  = null;   // the tile template the drape is currently built on
+  let polarGen = null;   // which of MapPolar's paints is draped (#188), or null
   let cadKeys  = {};     // cadastre layer id → the tile template it is built on (syncCadastre)
   let cadGen   = 0;      // bumped per syncCadastre, so a template resolved late is dropped
   let cadFails = {};     // cadastre layer id → tiles the service would not give
@@ -1397,7 +1399,7 @@ const Map3D = (function () {
   // The ground's raster stack, bottom up: a layer added later goes under the
   // first of the ones above it that exists, so the order never depends on
   // which was added first.
-  const GROUND = ['mn-base', 'mn-elev', 'mn-lots', 'mn-roads', 'mn-links'];
+  const GROUND = ['mn-base', 'mn-elev', 'mn-polar', 'mn-lots', 'mn-roads', 'mn-links'];
 
   function under(id) {
     const above = GROUND.slice(GROUND.indexOf(id) + 1);
@@ -1429,6 +1431,47 @@ const Map3D = (function () {
         setNote();
       }).catch(() => {});
     }
+    setNote();
+  }
+
+  // ── Polar radio coverage (map-polar.js, #188) ──────────────────────────
+  // The plot MapPolar painted for the 2-D map, draped on the relief: coverage
+  // running up a valley and stopping at a ridge, with the ridge in view — the
+  // picture the plot was always trying to be. The same picture, not a second
+  // computation: one image in Web Mercator over the plot's box, which an image
+  // source stretches over the same four corners Leaflet's overlay does, and
+  // the terrain then carries like any other raster, so it lies on the ground
+  // rather than over it. Moving the threshold is a repaint of levels MapPolar
+  // already holds (its own separation, and MapFade's) — a new image here and
+  // not one terrain tile asked for again.
+  //
+  // Between the elevation ramp and the cadastre, the order the 2-D panes take
+  // (245, 332, 336). Called when the style loads and on every paint or clear.
+  function syncPolar() {
+    if (!map || !ready) return;
+    const d = typeof MapPolar !== 'undefined' && MapPolar.drawn ? MapPolar.drawn() : null;
+    if (!d) {
+      if (map.getLayer('mn-polar')) map.removeLayer('mn-polar');
+      if (map.getSource('mn-polar')) map.removeSource('mn-polar');
+      if (polarGen !== null) { polarGen = null; setNote(); }
+      return;
+    }
+    if (d.gen === polarGen && map.getLayer('mn-polar')) return;
+    const b = d.box;
+    const coordinates = [[b.west, b.north], [b.east, b.north], [b.east, b.south], [b.west, b.south]];
+    const src = map.getSource('mn-polar');
+    if (src && src.updateImage && map.getLayer('mn-polar')) {
+      // In place: a repaint swaps the picture without the layer blinking out.
+      src.updateImage({ url: d.url, coordinates });
+      map.setPaintProperty('mn-polar', 'raster-opacity', d.opacity);
+    } else {
+      if (map.getLayer('mn-polar')) map.removeLayer('mn-polar');
+      if (src) map.removeSource('mn-polar');
+      map.addSource('mn-polar', { type: 'image', url: d.url, coordinates });
+      map.addLayer({ id: 'mn-polar', type: 'raster', source: 'mn-polar',
+                     paint: { 'raster-opacity': d.opacity, 'raster-fade-duration': 0 } }, under('mn-polar'));
+    }
+    polarGen = d.gen;
     setNote();
   }
 
@@ -1637,6 +1680,8 @@ const Map3D = (function () {
       map.addLayer(sheetLayer);
       syncElevation();
       syncCadastre();
+      // A polar plot drawn before 3-D was opened is draped now (#188).
+      syncPolar();
       // The finder may have drawn before 3-D was opened, and its pins are DOM
       // markers that the style cannot declare — so they are added here, and
       // the slider's factor is read once the layers it applies to exist.
@@ -2141,6 +2186,13 @@ const Map3D = (function () {
       }
       if (!bits.length) bits.push('no hops in view to sheet');
     }
+    // The plot's own caveat travels with it (#188): draped on real relief it
+    // looks more like an answer than it did as a flat wash, and is exactly as
+    // optimistic as it was.
+    const polar = polarGen === null ? '' : `Polar radio coverage is draped on the ground:
+      bare terrain, no antenna patterns, no trees and no terminal clutter — the
+      best case. The elevation profile card is the authority for any path about
+      to be built.<br>`;
     const caveat = `A pin behind a hill is hidden by it — which is worth knowing both
       ways round: a station you cannot see from here has no line of sight from here,
       and a station you are looking for may be over the next ridge rather than absent.
@@ -2148,7 +2200,7 @@ const Map3D = (function () {
       Path profile tool’s own geometry — k-factor earth, filed antenna heights,
       no trees. Green clears the 60% Fresnel zone, amber is inside it, red is
       blocked. Indicative, like the profile.`;
-    return `${bits.length ? bits.join(' · ') + '<br>' : ''}${caveat}`;
+    return `${bits.length ? bits.join(' · ') + '<br>' : ''}${polar}${caveat}`;
   }
 
   return {
@@ -2269,6 +2321,8 @@ const Map3D = (function () {
     // Map display's property boundaries or road parcels switch moved
     // (map-lots.js, map-roads.js). A no-op unless 3-D is actually open.
     cadastreChanged() { syncCadastre(); },
+    // From MapPolar: the 2-D plot was painted or cleared (#188).
+    polarChanged() { syncPolar(); },
 
     // What is here picked a point, or closed. Same shape, and for the same
     // reason: the pick is that tool's and this view is only showing it.
@@ -2530,6 +2584,7 @@ const Map3D = (function () {
     ready = false;
     buf = null;
     elevKey = null;   // the drape goes with the map; the next one builds its own
+    polarGen = null;  // and the polar plot's
     cadKeys = {};     // and so do the cadastre's
     cadFails = {};
     cadGen++;

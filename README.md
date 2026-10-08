@@ -1129,7 +1129,7 @@ here.
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
 - Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
 - **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, and the nearest station, repeater and survey mark
-- **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
+- **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, a polar coverage plot lying on the relief, pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
 - Light up the watercourses whose names match the filter box, drawn beneath the pins from OpenStreetMap (*Highlight matching rivers*)
@@ -1238,6 +1238,19 @@ on the easements and strata plans stacked over a town centre; and since there is
 no hover on a picture, road names are written in the reserve close in. A tile
 the service will not give is counted and said in the 3-D note — no line there is
 not no boundary there.
+
+**Polar radio coverage lies on the terrain (#188).** A plot drawn in 📡 Polar radio
+coverage was a Leaflet image overlay, so it too was under the canvas the moment the
+map tilted. It is draped on the ground now — coverage running up a valley and
+stopping at a ridge, with the ridge in view — between the elevation ramp and the
+cadastre, the order the 2-D panes take. It is the same picture, not a second
+computation: `MapPolar.drawn()` hands over the 2-D overlay's own image, bounds and
+opacity, and an image source stretches it over the same four corners. So moving
+the threshold — a repaint of levels already in hand — re-colours it in both views
+without one terrain tile asked for again, and leaving 3-D leaves the 2-D plot as it
+was. Its caveat comes with it on the 3-D panel: bare terrain, no antenna patterns,
+no trees and no terminal clutter — the best case, and the elevation profile card
+is the authority for any path about to be built.
 
 **Pins are clickable here too (#193).** A pin in 3-D does what a pin in 2-D
 does, less the callout this mode has no way to draw: an armed link-budget

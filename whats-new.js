@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 15, date: '2026-10-08', items: [
+      '<strong>📡 Polar radio coverage in 3-D.</strong> A coverage plot now lies on the ground when you tilt the map '
+        + 'with ⛰️ — running up the valleys and stopping at the ridges — in the same colours, and a new threshold '
+        + 're-colours it in place. It is still the best case: no antenna patterns, no trees.',
+    ] },
     { n: 14, date: '2026-10-08', items: [
       '<strong>ALERT2 / ERT-A2</strong> now reads the receiver\'s lines by the ALERT2 specification. An ALERT2 '
         + 'gauge\'s own report — battery, stage, rain and the rest — is decoded and sent instead of being thrown away '
