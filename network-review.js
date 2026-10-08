@@ -53,20 +53,26 @@ const NetworkReview = (function () {
   const MEASURE_SINCE = '2010-01-01';
   const MEASURE_VISITS = 3;     // the latest visits a station's measured margin is the median of
   const ATTEN_MAX = 30;         // most field attenuators stop here: a reading at it means "at least"
+  const ATTEN_STEP = 3;         // and they step in 3 dB: a reading r means the link carried r and not r + 3
 
   // ── what the calibration was set from ──
   // Aggregates only. Every path behind them is in the register and every
   // measurement in the inspection history, so the matrix below can re-derive
   // them for any network; these are the figures the defaults were chosen on.
+  // Each reading is taken as the 3 dB step it is (see loadMeasured): read as
+  // exact figures, the same tests fitted an allowance of `exact` dB, and they
+  // flattered Flood-Net against Radio Mobile. `order` is the share of pairs of
+  // stations the attenuator can tell apart that a model puts the right way round.
   const EVIDENCE = {
     measured: { stations: 54, years: '2018–20' },
     accuracy: [
-      { model: 'Flood-Net, land-cover model — the default until this calibration', bias: -40.8, mae: 42.1, rmse: 45.7, w6: 4, w10: 9 },
-      { model: 'Radio Mobile, as configured for the same paths', bias: 5.3, mae: 6.9, rmse: 10.0, w6: 57, w10: 64 },
-      { model: 'Flood-Net, field-calibrated — the default now', bias: 0.0, mae: 6.7, rmse: 9.4, w6: 48, w10: 74 },
+      { model: 'Flood-Net, land-cover model — the default until this calibration', bias: -41.0, mae: 41.9, rmse: 45.7, w6: 6, w10: 9, order: 30 },
+      { model: 'Radio Mobile, as configured for the same paths', bias: 2.3, mae: 3.9, rmse: 7.1, w6: 77, w10: 87, order: 76 },
+      { model: 'Flood-Net, field-calibrated — the default now', bias: 0.1, mae: 4.9, rmse: 8.1, w6: 63, w10: 81, order: 64 },
     ],
-    allowance: { fit: 18.9, lo: 16.3, hi: 21.8 },
-    rm: { paths: 134, median: 6.9, p10: 1.6, p90: 18.9, rankBefore: 0.08, rankAfter: 0.86, bandsBefore: 10, bandsAfter: 77, settings: 12 },
+    allowance: { fit: 16.2, lo: 13.1, hi: 19.4, exact: 18.9, leaning: 12 },
+    rm: { paths: 134, median: 3.9, p10: -1.4, p90: 15.9, rankBefore: 0.08, rankAfter: 0.86, bandsBefore: 10, bandsAfter: 81, settings: 12,
+          misses: { of: 53, both: 11, fnOnly: 8, fnOnlyLow: 7, rmOnly: 1 } },
     steps: [
       { what: 'Land cover stood on the profile as solid edges — trees and roofs a VHF signal largely passes through',
         mean: 19.9, p10: 4.3, p90: 42.0 },
@@ -76,7 +82,7 @@ const NetworkReview = (function () {
         mean: 13.6, p10: 0, p90: 42.9 },
       { what: 'Repeaters and bases on the field station\'s 4 m antenna rather than a mast',
         mean: 5.0, p10: 0, p90: 27.5 },
-      { what: 'The field allowance, fitted to the attenuator', mean: -19.0, p10: -19.0, p90: -19.0 },
+      { what: 'The field allowance, fitted to the attenuator', mean: -16.0, p10: -16.0, p90: -16.0 },
     ],
   };
 
@@ -88,7 +94,7 @@ const NetworkReview = (function () {
   let job = null;               // { gen, done, total } while computing
   let gen = 0;
   let note = null;              // { cls, text } — the last thing worth saying
-  let measured = null;          // Map station id → { m, n, at, censored } | null
+  let measured = null;          // Map station id → { m, hi, n, at, censored } | null
   let measuredState = 'idle';   // idle | loading | ready | failed
   let measuredError = '';
   let siteSeq = 0;
@@ -295,6 +301,13 @@ const NetworkReview = (function () {
   // own rule), and a station's is the median of its latest MEASURE_VISITS.
   // Nought is read as "not tested" — the imported sheets carry it in blank
   // boxes — and anything over 60 dB as a slip of the pen.
+  //
+  // A figure is a step, not a point. The attenuator goes up in ATTEN_STEP dB,
+  // so a visit that carried 24 dB and not 27 says the margin is 24–27, and one
+  // at ATTEN_MAX says only "at least 30". The median is monotone, so the
+  // station's margin lies between the median of the visits' lower ends (`m`)
+  // and the median of their upper ends (`hi`) — and a median that leans on an
+  // "at least" is one too: 27 and ≥30 is ≥28.5, not 28.5.
   async function loadMeasured(ids) {
     measured = null;
     measuredState = 'loading';
@@ -328,9 +341,8 @@ const NetworkReview = (function () {
       }
       measured = new Map();
       for (const [id, e] of out) {
-        const s = e.all.slice().sort((a, b) => a - b);
-        const mid = s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
-        measured.set(id, { m: mid, n: s.length, at: e.at, censored: mid >= ATTEN_MAX });
+        const m = median(e.all), hi = median(e.all.map(v => (v >= ATTEN_MAX ? Infinity : v + ATTEN_STEP)));
+        measured.set(id, { m, hi, n: e.all.length, at: e.at, censored: hi === Infinity });
       }
       measuredState = 'ready';
     } catch (err) {
@@ -339,6 +351,15 @@ const NetworkReview = (function () {
     }
     repaintLive();
   }
+
+  function median(xs) {
+    const s = xs.slice().sort((a, b) => a - b);
+    return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+  }
+
+  const fmtStep = x => String(Math.round(x * 10) / 10);
+  // "24–27", or "≥30" — what a station's tests say its margin is.
+  const measuredText = m => (m.censored ? `≥${fmtStep(m.m)}` : `${fmtStep(m.m)}–${fmtStep(m.hi)}`);
 
   // ── reading the matrix ──
 
@@ -362,17 +383,16 @@ const NetworkReview = (function () {
     return out;
   }
 
-  // Measured against modelled, for the rows that have both. A reading at the
-  // attenuator's limit says only "at least that much", so a model figure above
-  // it is no error and one below it is an error of the shortfall.
+  // Measured against modelled, for the rows that have both. The tests say the
+  // margin lies in a step — 24–27, or at least 30 — so a model figure anywhere
+  // in it is no error, and one outside it is an error of the distance to it.
   function fieldCheck() {
     if (!matrix || !measured) return null;
     const pairs = [];
     for (const r of matrix.rows) {
       const s = rowSummary(r), m = measured.get(r.id);
       if (s.pending || s.best == null || !m) continue;
-      const e = m.censored ? (s.best >= m.m ? 0 : s.best - m.m) : s.best - m.m;
-      pairs.push(e);
+      pairs.push(s.best < m.m ? s.best - m.m : s.best > m.hi ? s.best - m.hi : 0);
     }
     if (!pairs.length) return { n: 0 };
     const mean = pairs.reduce((a, b) => a + b, 0) / pairs.length;
@@ -406,17 +426,18 @@ const NetworkReview = (function () {
     };
     const head = ['station', 'station_number'];
     for (const h of matrix.hubs) head.push(`${h.name} margin_db`, `${h.name} km`);
-    head.push('best_margin_db', `paths_at_least_${G()}_db`, 'measured_margin_db', 'measured_visits', 'flags');
+    head.push('best_margin_db', `paths_at_least_${G()}_db`, 'measured_margin_from_db', 'measured_margin_to_db', 'measured_visits', 'flags');
     const lines = [
       `# Flood-Net network review — ${matrix.model === 'cover' ? 'land-cover model' : `field-calibrated model, ${matrix.allowance} dB allowance`}, repeaters and bases on at least a ${matrix.mastAgl} m mast`,
       `# computed ${matrix.at.toISOString()}; each cell the worse of the two directions, as the link budget card and the fade-margin map give it`,
+      `# measured: the attenuator steps in ${ATTEN_STEP} dB, so a station's tests put its margin between from and to; no "to" means at least "from"`,
       head.map(q).join(','),
     ];
     for (const r of matrix.rows) {
       const s = rowSummary(r), m = measured && measured.get(r.id);
       const cells = [r.name, r.number];
       r.figs.forEach(f => { cells.push(f && f.m != null ? f.m.toFixed(1) : '', f && f.dKm != null ? f.dKm.toFixed(2) : ''); });
-      cells.push(s.best != null ? s.best.toFixed(1) : '', s.good, m ? `${m.censored ? '>=' : ''}${m.m}` : '', m ? m.n : '',
+      cells.push(s.best != null ? s.best.toFixed(1) : '', s.good, m ? fmtStep(m.m) : '', m && !m.censored ? fmtStep(m.hi) : '', m ? m.n : '',
         flagsOf(r, s).map(f => f.text).join('; '));
       lines.push(cells.map(q).join(','));
     }
@@ -542,7 +563,7 @@ const NetworkReview = (function () {
         ${r.figs.map(cell).join('')}
         <td class="nr-num nr-${bandOf(s.best) || 'none'}"><strong>${fmtDb(s.best)}</strong></td>
         <td class="nr-num">${s.pending ? '…' : s.good}</td>
-        <td class="nr-num">${m ? `${m.censored ? '≥' : ''}${m.m}<span class="small txt-muted"> ${esc(String(m.at).slice(0, 4))}${m.n > 1 ? `, ${m.n} visits` : ''}</span>`
+        <td class="nr-num">${m ? `${measuredText(m)}<span class="small txt-muted"> ${esc(String(m.at).slice(0, 4))}${m.n > 1 ? `, ${m.n} visits` : ''}</span>`
           : measuredState === 'loading' ? '…' : '<span class="txt-muted">—</span>'}</td>
         <td class="small">${flags.map(f => `<span class="txt-${f.cls}">${esc(f.text)}</span>`).join(' · ')}</td>
       </tr>`;
@@ -561,8 +582,10 @@ const NetworkReview = (function () {
       <p class="filter-hint">Each cell is the fade margin in dB, the worse of the two directions — the link budget card's
         figure for that path, and the fade-margin map's colour. Green is ${G()} dB or better, amber ${O()}–${G()}, red
         below (the map's bands). <em>Measured</em> is the median of the station's last ${MEASURE_VISITS} attenuator tests to
-        base since ${MEASURE_SINCE.slice(0, 4)}; ≥ marks a reading at the attenuator's ${ATTEN_MAX} dB limit. A measured
-        margin is end to end, through whichever path the station actually takes, so it is set against the best cell.</p>`;
+        base since ${MEASURE_SINCE.slice(0, 4)}. The attenuator steps in ${ATTEN_STEP} dB, so a test that carried 24 dB and
+        not 27 puts the margin at 24–27; ≥ marks one that reached the attenuator's ${ATTEN_MAX} dB limit, or a median that
+        leans on one. A measured margin is end to end, through whichever path the station actually takes, so it is set
+        against the best cell.</p>`;
   }
 
   function matrixPanelHtml() {
@@ -595,16 +618,20 @@ const NetworkReview = (function () {
     const E = EVIDENCE, A = E.allowance, R = E.rm;
     const acc = E.accuracy.map(r => `<tr><th scope="row">${esc(r.model)}</th>
       <td class="nr-num">${r.bias > 0 ? '+' : ''}${r.bias.toFixed(1)}</td><td class="nr-num">${r.mae.toFixed(1)}</td>
-      <td class="nr-num">${r.rmse.toFixed(1)}</td><td class="nr-num">${r.w6} %</td><td class="nr-num">${r.w10} %</td></tr>`).join('');
+      <td class="nr-num">${r.rmse.toFixed(1)}</td><td class="nr-num">${r.w6} %</td><td class="nr-num">${r.w10} %</td>
+      <td class="nr-num">${r.order} %</td></tr>`).join('');
     const steps = E.steps.map(s => `<tr><th scope="row">${esc(s.what)}</th>
       <td class="nr-num">${s.mean > 0 ? '+' : ''}${s.mean.toFixed(1)}</td>
       <td class="nr-num">${s.p10 === s.p90 ? '—' : `${s.p10 > 0 ? '+' : ''}${s.p10.toFixed(1)} to ${s.p90 > 0 ? '+' : ''}${s.p90.toFixed(1)}`}</td></tr>`).join('');
     const rm = Number(rmIn);
+    const onSite = rm - E.accuracy[1].bias;
+    const reads = Math.max(0, Math.floor(onSite / ATTEN_STEP) * ATTEN_STEP);
     const conv = rmIn !== '' && isFinite(rm) ? `
       <p class="small" id="nr-conv-out" role="status">Radio Mobile's <strong>${rm.toFixed(1)} dB</strong> is about
         <strong>${(rm - R.median).toFixed(1)} dB</strong> in Flood-Net (between ${(rm - R.p90).toFixed(1)} and
-        ${(rm - R.p10).toFixed(1)} for eight paths in ten), and about <strong>${(rm - E.accuracy[1].bias).toFixed(1)} dB</strong>
-        on an attenuator on site${rm - E.accuracy[1].bias >= ATTEN_MAX ? ` — past most attenuators' ${ATTEN_MAX} dB, which would read “${ATTEN_MAX}+”` : ''}.
+        ${(rm - R.p10).toFixed(1)} for eight paths in ten), and a margin of about <strong>${onSite.toFixed(1)} dB</strong> on
+        site${onSite >= ATTEN_MAX ? ` — past most attenuators' ${ATTEN_MAX} dB, which would read “${ATTEN_MAX}+”`
+          : onSite > 0 ? `, which an attenuator stepping in ${ATTEN_STEP} dB would read as <strong>${reads}</strong>` : ''}.
         ${rm >= 49 ? 'If that figure is a display\'s ceiling — every strong path reading the same — it is clipped, and means “at least that”.' : ''}</p>`
       : '<p class="small" id="nr-conv-out" role="status"></p>';
     return `
@@ -619,12 +646,17 @@ const NetworkReview = (function () {
           <table class="adm-table nr-acc">
             <caption class="sr-only">Each model's figures against the margin measured on site</caption>
             <thead><tr><th scope="col">Model</th><th scope="col">Mean error</th><th scope="col">Typical error</th>
-              <th scope="col">RMS error</th><th scope="col">Within ±6 dB</th><th scope="col">Within ±10 dB</th></tr></thead>
+              <th scope="col">RMS error</th><th scope="col">Within ±6 dB</th><th scope="col">Within ±10 dB</th>
+              <th scope="col">Pairs in order</th></tr></thead>
             <tbody>${acc}</tbody>
           </table>
         </div>
         <p class="filter-hint">Errors in dB, model minus measured: positive is a model more hopeful than the attenuator.
-          A reading at the attenuator's limit counts as “at least that”, so a model at or above it is no error.</p>
+          The attenuator steps in ${ATTEN_STEP} dB, so a test puts the margin in a step — one that carried 24 dB and not 27
+          says 24–27 — and a model figure anywhere in that step is no error; a reading at the attenuator's ${ATTEN_MAX} dB
+          limit counts as “at least ${ATTEN_MAX}”. <em>Pairs in order</em>: of the pairs of stations the attenuator can tell
+          apart, the share the model puts the right way round. Flood-Net's allowance was fitted to these same stations, so
+          its mean error is near nought by construction; the other columns are its accuracy.</p>
 
         <h3>Where the difference came from</h3>
         <p class="small">Set path for path against Radio Mobile over ${R.paths} VHF paths of 2 to 70 km, Flood-Net's old
@@ -647,18 +679,26 @@ const NetworkReview = (function () {
           figure's average shortfall against the attenuator (${A.fit} dB fitted, ${A.lo}–${A.hi} dB at 90 % confidence): the
           masts' own surroundings, feeders and connectors, receivers at busy sites. It is measured, not modelled, and it is
           the same for every path; one path can stray from it by the typical error above.</p>
+        <p class="small">It was fitted with each test read as the ${ATTEN_STEP} dB step it is. Read as exact figures, the same
+          tests gave ${A.exact} dB: a test that carried 24 dB and not 27 was taken for a margin of exactly 24, charging the
+          model for up to ${ATTEN_STEP} dB it never lost. A fit that leans harder on the stations reading “at least
+          ${ATTEN_MAX}” would put it lower still, nearer ${A.leaning} dB, so ${FN_MODEL_DEFAULTS.allowance} dB sits on the
+          cautious side.</p>
 
         <h3>Reading one against the other</h3>
-        <p class="small">Calibrated, Flood-Net now ranks paths the way Radio Mobile does (rank correlation
+        <p class="small">Calibrated, Flood-Net ranks paths much as Radio Mobile does (rank correlation
           ${R.rankAfter.toFixed(2)}) and puts ${R.bandsAfter} % of them in the same green, amber or red band (${R.bandsBefore} %
-          before). It reads lower by a median <strong>${R.median} dB</strong> — ${R.p10} to ${R.p90} dB for eight paths in
-          ten — because Radio Mobile is shown its link settings and nothing else: those settings already sat about
-          ${R.settings} dB below Flood-Net's defaults, and Radio Mobile still read ${E.accuracy[1].bias} dB above the
-          attenuator on average. So a path's margin is, to within the typical error:</p>
+          before). It reads lower by a median <strong>${R.median} dB</strong> — from ${R.p10 < 0 ? `${-R.p10} dB higher` : `${R.p10} dB lower`}
+          to ${R.p90} dB lower for eight paths in ten — because Radio Mobile is shown its link settings and nothing else:
+          those settings sat about
+          ${R.settings} dB below Flood-Net's defaults, most of the allowance but not all of it, and Radio Mobile read
+          ${E.accuracy[1].bias} dB above the attenuator on average. So a path's margin is, to within the typical error:</p>
         <ul class="small">
-          <li><strong>attenuator on site ≈ Flood-Net</strong> (field-calibrated);</li>
-          <li><strong>attenuator on site ≈ Radio Mobile − ${E.accuracy[1].bias} dB</strong>;</li>
-          <li><strong>Flood-Net ≈ Radio Mobile − ${R.median} dB</strong>.</li>
+          <li><strong>margin on site ≈ Flood-Net</strong> (field-calibrated);</li>
+          <li><strong>margin on site ≈ Radio Mobile − ${E.accuracy[1].bias} dB</strong>;</li>
+          <li><strong>Flood-Net ≈ Radio Mobile − ${R.median} dB</strong>;</li>
+          <li>and an attenuator stepping in ${ATTEN_STEP} dB reads the step at or below the margin — on average
+            ${ATTEN_STEP / 2} dB under it.</li>
         </ul>
         <div class="nr-controls">
           <label class="draw-field"><span>A Radio Mobile fade margin <em>dB</em></span>
@@ -666,12 +706,17 @@ const NetworkReview = (function () {
                    oninput="NetworkReview.convert(this.value)"></label>
         </div>
         ${conv}
-        <p class="filter-hint">Is Flood-Net the better of the two? On the measured paths, calibrated, it is as good as
-          Radio Mobile at ranking them and better on average, because it is calibrated against the field and Radio
-          Mobile is not — and it computes every link in the register, both ways round, from the register as it stands
-          today. It is not better on any one path: neither models antenna patterns, interference or the tree that grew
-          last year. The calibration is checked again for any network in the matrix above, against whatever the
-          attenuator has found since.</p>
+        <p class="filter-hint">Is Flood-Net the better of the two? Not path for path. On the measured paths Radio Mobile —
+          set up one path at a time by whoever designed the network — is a little nearer the attenuator (typical error
+          ${E.accuracy[1].mae} dB against ${E.accuracy[2].mae}) and puts more pairs of stations in the right order
+          (${E.accuracy[1].order} % against ${E.accuracy[2].order} %), though it reads ${E.accuracy[1].bias} dB hopeful on average.
+          Of ${R.misses.of} paths both modelled, both miss by more than 6 dB on ${R.misses.both}; Flood-Net misses
+          ${R.misses.fnOnly} more, ${R.misses.fnOnlyLow} of them on the cautious side, and Radio Mobile ${R.misses.rmOnly}.
+          Flood-Net's strengths are elsewhere: it computes every link in the register, both ways round, from the register
+          as it stands today, with nobody setting a path up — and the calibration is checked again for any network in the
+          matrix above, against whatever the attenuator has found since. Where the two disagree by much on one path,
+          check the register's position and height for both ends before trusting either; neither models antenna
+          patterns, interference or the tree that grew last year.</p>
       </div>`;
   }
 

@@ -28,10 +28,11 @@ const WhatsNew = (() => {
     { n: 17, date: '2026-10-08', items: [
       '<strong>Fade margins, calibrated against the field.</strong> The link budget card, the fade-margin map, the '
         + 'profile\'s readout and polar coverage now price a path with Longley–Rice over the terrain, less a '
-        + '<strong>19 dB field allowance</strong> fitted to attenuator tests on site — instead of standing the land cover '
+        + '<strong>16 dB field allowance</strong> fitted to attenuator tests on site — instead of standing the land cover '
         + 'on the profile, which read tens of decibels too low. Repeaters and bases are modelled on a 10 m mast, and an '
         + 'end surveyed below the terrain tiles is stood on them. Most figures go up, and now sit within a few decibels '
-        + 'of what the attenuator finds; the old land-cover model is still in the card\'s propagation settings.',
+        + 'of what the attenuator finds — read as the 3 dB steps it finds them in; the old land-cover model is still in '
+        + 'the card\'s propagation settings.',
       '<strong>📐 Network Review</strong>, a new tab for administrators under <em>Admin</em>: every field station\'s '
         + 'fade margin to every repeater, base or proposed site at once, beside what the attenuator last measured — and '
         + 'how Flood-Net\'s figures compare with Radio Mobile\'s.',

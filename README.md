@@ -3276,7 +3276,7 @@ EIRP           = tx_power_dbm + tx_gain_dbi − tx_losses_db
 Free space     = 32.45 + 20·log10(f_MHz) + 20·log10(d_km)
 Terrain        = A_ref, the Longley–Rice reference attenuation over the profile
 Statistics     = the climate's median shift + the variability for the reliability asked
-Field allowance = 19 dB, fitted to attenuator tests on site       (the field model — the default)
+Field allowance = 16 dB, fitted to attenuator tests on site       (the field model — the default)
 Ground cover   = ITU-R P.2108 §3.1 terminal loss at an end whose antenna is under the cover
                                                                  (the land-cover model instead)
 Obstruction floor = knife-edge over the worst obstruction, where the model's regime prices it lower
@@ -3290,9 +3290,12 @@ never a single number.
 
 **Field-calibrated, by default.** The card's *Model* setting has two answers.
 The **field model**, the default, runs Longley–Rice over the bare terrain and
-takes off a **field allowance** — 19 dB, the bare-terrain figure's average
+takes off a **field allowance** — 16 dB, the bare-terrain figure's average
 shortfall against path margins measured with an attenuator on site (54 stations,
-2018–20: mean error 0 dB, typical error ±6.7 dB). The **land-cover model** stands
+2018–20: mean error 0 dB, typical error ±5 dB). The attenuator steps in 3 dB, so
+each test is read as the step it is — one that carried 24 dB and not 27 is a
+margin of 24–27 — rather than as an exact figure, which would charge the model
+up to 3 dB it never lost. The **land-cover model** stands
 the land cover on the profile and charges P.2108 at a mast under it, as
 described below; against the same measurements it read 41 dB too low, because at
 VHF a canopy is largely transparent and it charged the same trees twice. Under

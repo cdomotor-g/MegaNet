@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-08** (revision 141 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-08** (revision 142 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -532,6 +532,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and eight `[Human]` issues.
 >
+> **Revision 142 opens and closes nothing** — the owner asked whether the calibration allowed for the attenuators' **3 dB steps**. It allowed for the 30 dB ceiling and took every other reading as exact; now each test is read as its step (carried 24 dB and not 27: a margin of 24–27), and a station's median that leans on an "at least 30" as one too. The field allowance falls from 19 to **16 dB** (13–19 at 90 %), every field-model figure rises 3 dB, and the comparison turns: path for path **Radio Mobile is a little nearer the attenuator** than Flood-Net (typical error 3.9 dB against 4.9; pairs of stations in the right order 76 % against 64 %), so the tab, the help and the docs now say Flood-Net is the screen — every link in the register, both ways — and not the better model on one path. Nothing new for a person; revision 141's sweep-and-save is still owed (see revision 142 below).
+
 > **Revision 141 opens and closes nothing** — at the owner's request: the fade margin is **calibrated against the field**. Against attenuator tests at 54 stations the land-cover model read 41 dB too low on average; the default is now Longley–Rice over the bare terrain less a 19 dB field allowance (mean error 0, typical ±6.7 dB), with ends never below the terrain tile under them and repeaters and bases on a 10 m mast — every figure in the app moves, and every saved fade-margin row is stale until an editor sweeps and saves the layer again. And a new administrators' tab, **📐 Network Review**: a network's fade-margin matrix beside the attenuator's, Flood-Net against Radio Mobile, the design principles and the register's faults. Three steps for a person are offered rather than filed (see revision 141 below).
 >
 > **Revision 140 opens and closes nothing** — a new tab at the owner's request: **📸 Field Camera**, under *Site visits*, takes site photos in Flood-Net stamped as Solocator stamps them (the compass ribbon and true heading, the position and its ±, the height and its datum, the town, the station and the time), suggests the station from where the phone is and which way it faces, files each photo under the station on its stamp, and keeps every photo on the device until it has uploaded itself. No migration: it goes in by the Field Photos tab's own doors. One step for a person is offered rather than filed: try it on a real iPhone and a real Android phone at a site (see revision 140 below).
@@ -748,6 +750,18 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 142 — 2026-10-08: the attenuator's 3 dB steps, honoured — the field allowance falls to 16 dB
+
+At the owner's question: did the calibration allow for the attenuators working in 3 dB steps, the field truth having only that resolution? It allowed for the 30 dB ceiling ("at least 30") and took every other reading as an exact figure — and that mattered more than half a step.
+
+- **A reading is a step.** The sheet's PATH MARGIN scale runs 0–30 dB in eleven loads and a visit's figure is the largest load still carried, so 24 means 24–27. Read as exact, a test is the bottom of its step and the fit charged the model for up to 3 dB it never lost: the step alone moves the allowance from 18.9 to 17.4 dB. A station's median of steps runs from the median of the lower ends to the median of the upper ends, so a median leaning on an "at least" is one too (27 and ≥30 is ≥28.5, not 28.5) — eleven of the 54 stations, another 1.2 dB: **16.2 dB fitted, 13.1–19.4 at 90 % by bootstrap**, and `FN_MODEL_DEFAULTS.allowance` is now **16**. A censored-likelihood fit that leans on the 32 stations whose figure is open-ended ("at least") would say nearer 12; 16 keeps to the cautious side, and the docs say so.
+- **The comparison moved more than the allowance.** Read as exact figures, Radio Mobile and Flood-Net looked level against the attenuator (typical error 6.9 against 6.7 dB), and revision 141 said Flood-Net ranked as well and was better on average. As steps: Radio Mobile typical error 3.9 dB, 77 % within ±6 dB, 76 % of pairs in order; Flood-Net 4.9 dB, 63 %, 64 % (the ranking gap is 4–20 points by bootstrap, so it is real; "ranks as well" had leant on Flood-Net's agreement with Radio Mobile, not with the field). Radio Mobile reads 2.3 dB hopeful on average, and of the 8 paths Flood-Net misses by more than 6 dB that Radio Mobile does not, 7 are cautious. Flood-Net ≈ Radio Mobile − 4 dB (median 3.9), the margin on site ≈ Radio Mobile − 2 dB, and the two put 81 % of paths in the same band. The tab, `core.js`'s help, the link budget card's comparison table, the README and [`docs/network-review.md`](../docs/network-review.md) now say Flood-Net is the screen — every link in the register, both ways, nobody setting a path up — and not the better model path for path.
+- **`network-review.js`**: `loadMeasured` keeps each station's step (`m` to `hi`, `hi` infinite for "at least"); the Measured column shows *24–27* or *≥30*; `fieldCheck` counts a model figure inside the step as no error and one outside it as the distance to it; the CSV carries `measured_margin_from_db` and `measured_margin_to_db`; the accuracy table gains *Pairs in order*; the converter says what a stepped attenuator would read.
+
+**Checks:** `npm run review` (47 assertions, from 43: the step, the median leaning on an "at least", the in-step error rule, the CSV's two columns, the converter's figures; the allowance now read off the page rather than restated), plus the cheap five, `pathcover`, `linkbudget`, `mapfade`, `sites`, `help`, `tabs` and `exports`. Stamps to `20261008h`.
+
+**What a person could do:** nothing new. Revision 141's three steps stand — and the fade-margin sweep-and-save is still owed: the allowance is part of a saved row's signature, so a row saved under 19 dB is stale under 16.
 
 ### Revision 141 — 2026-10-08: the fade margin, calibrated against the field — and 📐 Network Review
 

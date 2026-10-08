@@ -1812,12 +1812,15 @@ const HELP = {
       '<strong>Field-calibrated, not physical.</strong> The default model is Longley–Rice over the bare terrain less a '
       + 'field allowance fitted to attenuator tests on site; the land-cover model it replaced read tens of decibels '
       + 'pessimistic against the same tests. Right on average across a network — any one path can be ±10 dB.',
-      '<strong>Radio Mobile reads higher.</strong> By a median 7 dB for the same path, because it is calibrated against '
-      + 'nothing and still reads about 5 dB above the attenuator. A figure read off a display that tops out — every '
-      + 'strong path the same ceiling, say 49 dB — is clipped, and means “at least that”.',
-      '<strong>Measured margins are end to end.</strong> An attenuator test to base takes whatever path the station '
-      + 'actually uses, so it is set against the best cell in the row, and a reading at the attenuator\'s 30 dB limit '
-      + 'says only “at least 30”.',
+      '<strong>Radio Mobile reads higher.</strong> By a median 4 dB for the same path: its link settings carry most of '
+      + 'the field allowance but not all of it, and it reads about 2 dB above the attenuator. Path for path it is a little '
+      + 'nearer the attenuator than Flood-Net — Flood-Net\'s edge is every link in the register, both ways, with nobody '
+      + 'setting a path up. A figure read off a display that tops out — every strong path the same ceiling, say 49 dB — '
+      + 'is clipped, and means “at least that”.',
+      '<strong>Measured margins are end to end, and in steps.</strong> An attenuator test to base takes whatever path '
+      + 'the station actually uses, so it is set against the best cell in the row. The attenuator steps in 3 dB, so a '
+      + 'test that carried 24 dB and not 27 puts the margin at 24–27 and a model figure anywhere in that step is no '
+      + 'error; a reading at its 30 dB limit says only “at least 30”.',
       'Every repeater and base on a radio system with a field station\'s 4 m antenna is computed on an assumed mast '
       + '(10 m unless the card says otherwise). Its real height, on a radio system of its own, takes the assumption away.',
     ],
@@ -2656,17 +2659,21 @@ const RM_NET_DEFAULTS = {
 // measured with an attenuator in 2018–20, against the margin each model
 // predicted for the same path. The land-cover model came out 41 dB below what
 // the attenuator found, on average, and was no better at ranking the paths
-// after that bias was taken away. Longley–Rice over the bare terrain ranked
-// them well but read 19 dB high — the masts' own surroundings, feeders and
-// connectors, receivers in a crowded site — so that is the allowance: 18.9 dB
-// fitted, 16–22 dB at 90 % confidence, leaving a mean error of ±6.7 dB.
+// after that bias was taken away. Longley–Rice over the bare terrain put far
+// more of them in the right order but read 16 dB high — the masts' own
+// surroundings, feeders and connectors, receivers in a crowded site — so that
+// is the allowance: 16.2 dB fitted, 13–19 dB at 90 % confidence, leaving a
+// typical error of ±5 dB. The attenuator steps in 3 dB, so each test was read
+// as the step it is — carried 24 dB and not 27 is a margin of 24–27, and one
+// at the attenuator's 30 dB is "at least 30"; read as exact figures, the same
+// tests gave 19 dB, charging the model for margin it never lost.
 //
 // mastAgl is there because every station in the register is on the 4 m field
 // station radio system, repeaters and bases included. A repeater on a hilltop
 // modelled with a 4 m whip sits in the terrain model's own summit pixels; at
 // 10 m it is where the mast puts it. The register is the fix — a repeater
 // whose radio system says higher keeps its own figure.
-const FN_MODEL_DEFAULTS = { model: 'field', allowance: 19, mastAgl: 10 };
+const FN_MODEL_DEFAULTS = { model: 'field', allowance: 16, mastAgl: 10 };
 
 // ── Diagnostics & error capture ─────────────────────────────────────────────────
 // Registered as early as possible so a bug report can carry what actually went

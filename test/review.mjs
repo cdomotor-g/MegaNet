@@ -17,11 +17,14 @@
 //   A site          a proposed site, only a pin, gets a column of its own at
 //                   the mast typed in.
 //   The field       the measured margins are read, a visit's figure is its
-//                   largest load, nought is "not tested", the attenuator's
-//                   30 dB is "at least", and the check against the model is
-//                   computed only over rows that have both.
+//                   largest load, nought is "not tested", a figure is the
+//                   attenuator's 3 dB step (24 is 24–27), its 30 dB is "at
+//                   least", a median leaning on an "at least" is one too, and
+//                   the check against the model is computed only over rows
+//                   that have both.
 //   The file        the CSV is named floodnet-…, carries the model it was
-//                   computed on, a column per hub and a row per station.
+//                   computed on, a column per hub, the measured step as two
+//                   columns and a row per station.
 //   The rest        the converter does its arithmetic, the register checks
 //                   count what they say, and the model setting on the card
 //                   is the model the tab says it is using.
@@ -76,11 +79,13 @@ await page.route(/inspection_chart_visit\?/, route => {
   const ids = inList(route.request().url(), 'station_id');
   const out = [];
   for (const id of ids) {
-    if (!visitsFor.has(id) && visitsFor.size < 2) {
-      visitsFor.set(id, visitsFor.size === 0
-        ? [{ id: `v-${id}-1`, at: '2020-09-28', load: [21] }, { id: `v-${id}-2`, at: '2019-10-03', load: [27, 12] },
-           { id: `v-${id}-3`, at: '2018-09-20', load: [0] }]
-        : [{ id: `v-${id}-1`, at: '2020-09-18', load: [30] }]);
+    if (!visitsFor.has(id) && visitsFor.size < 3) {
+      visitsFor.set(id, [
+        [{ id: `v-${id}-1`, at: '2020-09-28', load: [21] }, { id: `v-${id}-2`, at: '2019-10-03', load: [27, 12] },
+         { id: `v-${id}-3`, at: '2018-09-20', load: [0] }],
+        [{ id: `v-${id}-1`, at: '2020-09-18', load: [30] }],
+        [{ id: `v-${id}-1`, at: '2020-08-11', load: [30] }, { id: `v-${id}-2`, at: '2019-08-02', load: [27] }],
+      ][visitsFor.size]);
     }
     for (const v of visitsFor.get(id) || []) out.push({ id: v.id, station_id: id, inspected_on: v.at });
   }
@@ -219,7 +224,9 @@ const agree = await page.evaluate(async ({ hub }) => {
 ok('the card prices the same path', !agree.error, JSON.stringify(agree).slice(0, 200));
 ok('…to the same figure the cell holds', !agree.error && Math.abs(agree.cell - agree.card) < 0.05,
    `cell ${agree.cell} vs card ${agree.card} — ${agree.station}`);
-ok('…the field model on both, with its allowance', agree.model === 'field' && agree.allow === 19, `${agree.model}, ${agree.allow} dB`);
+const defaultAllowance = await page.evaluate(() => FN_MODEL_DEFAULTS.allowance);
+ok('…the field model on both, with its allowance', agree.model === 'field' && agree.allow === defaultAllowance,
+   `${agree.model}, ${agree.allow} dB against the default ${defaultAllowance}`);
 ok('…the repeater on its assumed mast on both', agree.aglB === 10, `${agree.aglB} m`);
 // The rows themselves are pathcover.mjs's; here, the sum they print.
 ok('…its path loss free space, terrain, statistics, floor and allowance, with no terminal clutter',
@@ -240,12 +247,26 @@ const field = await page.evaluate(() => {
            tile: [...document.querySelectorAll('#nr-kpis .adm-kpi-label')].some(l => /Against the attenuator/.test(l.textContent)) };
 });
 ok('the measured margins were asked for once the matrix ran', visitAsks >= 1 && marginAsks >= 1, `${visitAsks} / ${marginAsks}`);
-ok('two stations have one', field.n === 2, JSON.stringify(field.values));
+ok('three stations have one', field.n === 3, JSON.stringify(field.values));
 ok('…a visit\'s figure is its largest load, and nought is not a test: the median of 21 and 27',
    field.values.some(v => v.m === 24 && v.n === 2 && !v.censored), JSON.stringify(field.values));
+ok('…and a figure is the attenuator\'s 3 dB step: 21–24 and 27–30 make 24–27', field.values.some(v => v.m === 24 && v.hi === 27)
+   && field.cells.some(c => /^24–27/.test(c || '')), field.cells.join(' | '));
 ok('…a reading at the attenuator\'s limit is "at least"', field.values.some(v => v.m === 30 && v.censored)
    && field.cells.some(c => /^≥30/.test(c || '')), field.cells.join(' | '));
-ok('…and the model is checked against both', field.check && field.check.n === 2 && isFinite(field.check.mean), JSON.stringify(field.check));
+ok('…and a median that leans on one is "at least" too: 27 and ≥30 is ≥28.5', field.values.some(v => v.m === 28.5 && v.censored)
+   && field.cells.some(c => /^≥28\.5/.test(c || '')), field.cells.join(' | '));
+ok('…and the model is checked against all three', field.check && field.check.n === 3 && isFinite(field.check.mean), JSON.stringify(field.check));
+const inStep = await page.evaluate(() => {
+  // A model figure inside the step is no error; outside, the error is the distance to it.
+  const m = NetworkReview.matrix(), meas = NetworkReview.measured();
+  return m.rows.filter(r => meas.has(r.id)).map(r => {
+    const best = Math.max(...r.figs.filter(f => f && f.m != null).map(f => f.m)), v = meas.get(r.id);
+    return best < v.m ? best - v.m : best > v.hi ? best - v.hi : 0;
+  });
+});
+ok('…a model figure inside a step being no error, and one outside it the distance to it',
+   Math.abs(inStep.reduce((a, b) => a + b, 0) / inStep.length - field.check.mean) < 1e-9, `${inStep} vs ${JSON.stringify(field.check)}`);
 ok('…on a tile of its own', field.tile);
 
 // ── a proposed site ──────────────────────────────────────────────────────────
@@ -285,7 +306,11 @@ const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#main
 const csv = fs.readFileSync(await dl.path(), 'utf8').split('\n').filter(Boolean);
 const head = csv.find(l => /^station,/.test(l)) || '';
 ok('named floodnet-network-review-…csv', /^floodnet-network-review-\d{8}\.csv$/.test(dl.suggestedFilename()), dl.suggestedFilename());
-ok('…saying the model it was computed on', /field-calibrated model, 19 dB allowance/.test(csv[0]), csv[0]);
+ok('…saying the model it was computed on', csv[0].includes(`field-calibrated model, ${defaultAllowance} dB allowance`), csv[0]);
+ok('…and the measured step as two columns, the second empty for "at least"',
+   head.includes('measured_margin_from_db,measured_margin_to_db')
+   && csv.some(l => /,24,27,2,/.test(l)) && csv.some(l => /,30,,1,/.test(l)) && csv.some(l => /,28\.5,,2,/.test(l)),
+   csv.filter(l => !l.startsWith('#')).slice(0, 4).join(' / '));
 ok('…a margin and a distance column per hub', ['Mt Stuart AL margin_db', 'Castle Hill AL margin_db', 'The next hill margin_db', 'The next hill km']
   .every(c => head.includes(c)), head.slice(0, 200));
 ok('…and a row per station', csv.filter(l => !l.startsWith('#')).length - 1 === site.n, `${csv.length} lines`);
@@ -296,7 +321,8 @@ const conv = await page.evaluate(() => {
   NetworkReview.convert('24');
   return document.getElementById('nr-conv-out').textContent.replace(/\s+/g, ' ');
 });
-ok('a Radio Mobile 24 dB reads as 17.1 in Flood-Net and 18.7 on the attenuator', /17\.1 dB/.test(conv) && /18\.7 dB/.test(conv), conv);
+ok('a Radio Mobile 24 dB is 20.1 in Flood-Net and 21.7 on site, which the attenuator reads as 21',
+   /20\.1 dB/.test(conv) && /21\.7 dB/.test(conv) && /read as 21\b/.test(conv), conv);
 const reg = await page.evaluate(() => {
   const c = NetworkReview.registerChecks();
   const masts = state.data.stations.filter(s => stationIsMast(s));
