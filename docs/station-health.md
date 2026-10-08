@@ -390,8 +390,8 @@ Two things, once, both needing a person:
 1. **Apply `db/migrations/0059_health_findings.sql`** to the live database, in
    number order after `0053`–`0058` (#210 has the queue and the steps). It
    switches on `pg_cron` for the base station checks.
-2. **Give the workflow the project's secret key**, unless the field photo syncs
-   already have it:
+2. **Give the workflow the project's secret key** (#210, step 4), unless the
+   field photo syncs already have it:
    1. Supabase dashboard → the project (ref `jjprlritvhdqpvphfrnu`) → **Project Settings** →
       **API Keys** → under **Secret keys**, copy the key (or **Create new secret
       key**, named `github-actions`).
