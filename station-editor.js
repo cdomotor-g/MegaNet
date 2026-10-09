@@ -1027,6 +1027,11 @@ function editorSaveErrorText(err) {
   // may edit, and adding a station outright or establishing a proposal is an
   // administrator's. The detail line is what tells the two apart, and the
   // instruction is different — nothing an administrator has to do to the list.
+  if (err.details === 'administrator' && /gauge zero/i.test(err.message || '')) {
+    return 'Not saved — only an administrator changes a station\'s gauge zero, its datum or the dates it applies'
+      + ' between. Put those back as they were — the AMTD, the catchment area and the notes are yours to'
+      + ' change — or record the survey on the Level Survey tab for an administrator to apply. Your edits are still here.';
+  }
   if (err.details === 'administrator') {
     return state.editorId
       ? 'Not saved — only an administrator establishes a proposed station, or takes an established one back to'

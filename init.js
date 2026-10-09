@@ -128,6 +128,9 @@
   // The photos the Field Camera kept on this device, and any still waiting to
   // go up — sent once somebody is signed in, whichever tab is open.
   FieldCamera.boot();
+  // …and the level surveys and two-peg tests kept on it (level-store.js):
+  // whatever is waiting goes once somebody is signed in, whichever tab is open.
+  LevelStore.boot();
   autoLoad();
   // The visit count (admin-dashboard.js): once for opening the app, a few
   // seconds on so a saved session has been adopted and it counts as its person.

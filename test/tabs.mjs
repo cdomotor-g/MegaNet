@@ -551,6 +551,43 @@ const SEED_CAMERA = `async () => {
   for (const d of document.querySelectorAll('#main-content details')) d.open = true;
 }`;
 
+// 📏 Level Survey, 🎯 Two-Peg Test and 📖 How to Survey, born converted. The
+// survey sheet draws next to nothing until there is a survey, so the seeds open
+// the one the tab itself offers — the worked example — on its run as a level
+// book, with a row open in the editor, on the datum, and at the final check;
+// the test with a failing set of readings; the guide with every section open.
+// test/levels.mjs holds what the tabs do; this holds how they are built.
+const SEED_LV_RUN = `async () => {
+  await LevelSurvey.practise();
+  LevelSurvey.toggleTable(true);
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+const SEED_LV_ROW = `async () => {
+  await LevelSurvey.practise();
+  const d = LevelStore.list('surveys').find(x => x.practice);
+  LevelSurvey.editRow(d.rows[3].id);
+}`;
+const SEED_LV_DATUM = `async () => {
+  await LevelSurvey.practise();
+  LevelSurvey.go('datum');
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+const SEED_LV_CHECK = `async () => {
+  await LevelSurvey.practise();
+  LevelSurvey.go('water');
+  LevelSurvey.go('check');
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+const SEED_TP = `async () => {
+  const t = await TwoPeg.start();
+  for (const [k, v] of [['a1', 1.2], ['b1', 1.3], ['a2', 1.5], ['b2', 1.604]]) TwoPeg.set(k, String(v), true);
+  TwoPeg.open(t.id);
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+const SEED_SG = `() => {
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
 const PHOTO_FIXTURE = {
   attachment_type: [{ content_type: 'image/jpeg', ord: 1, label: 'JPEG photo', extensions: ['jpg', 'jpeg'], max_bytes: 25165824 }],
   field_photo: [
@@ -791,6 +828,13 @@ const CONVERTED = [
   { id: 'sitemap',    label: 'Site Map',        issue: 'born converted' },
   { id: 'offline',    label: 'Offline & Install — as it opens', issue: 'born converted' },
   { id: 'offline',    label: 'Offline & Install — an install prompt held, every browser\'s steps open', issue: 'born converted', seed: SEED_OFFLINE },
+  { id: 'levels',     label: 'Level Survey — the list', issue: 'born converted' },
+  { id: 'levels',     label: 'Level Survey — the worked example\'s run, as a level book', issue: 'born converted', seed: SEED_LV_RUN },
+  { id: 'levels',     label: 'Level Survey — a change point open in the row editor', issue: 'born converted', seed: SEED_LV_ROW },
+  { id: 'levels',     label: 'Level Survey — the datum and its benchmark', issue: 'born converted', seed: SEED_LV_DATUM },
+  { id: 'levels',     label: 'Level Survey — check and send', issue: 'born converted', seed: SEED_LV_CHECK },
+  { id: 'twopeg',     label: 'Two-Peg Test — a test that fails', issue: 'born converted', seed: SEED_TP },
+  { id: 'surveyguide', label: 'How to Survey — every section open', issue: 'born converted', seed: SEED_SG },
 ];
 
 

@@ -151,7 +151,10 @@ const RiverDetails = (function () {
           + 're-levelled, give the old row a <em>To</em> date and add a row <em>From</em> that '
           + 'date. <abbr title="Adopted Middle Thread Distance">AMTD</abbr> is kilometres '
           + 'along the middle of the stream from its mouth up to the gauge; the catchment '
-          + 'area is the area draining to it.',
+          + 'area is the area draining to it. Gauge zero, its datum and its dates are an '
+          + 'administrator\'s to change: record a re-levelling as a <strong>Level Survey</strong> '
+          + 'and an administrator applies it. The AMTD, the area and the notes are anybody\'s '
+          + 'who may edit.',
       fields: [
         { key: 'valid_from',         label: 'From',                  kind: 'date' },
         { key: 'valid_to',           label: 'To',                    kind: 'date' },

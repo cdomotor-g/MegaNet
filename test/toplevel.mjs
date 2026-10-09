@@ -110,6 +110,31 @@ const ACCEPTED = {
          + 'never runs it. Constrains nothing below it.',
     },
   ],
+  'levelling.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = Levelling;",
+      why: 'The level survey\'s arithmetic — rise and fall, the three checks, the datums, the '
+         + 'boards, the two-peg test and every export\'s rows — required by test/levels.mjs so '
+         + 'the sums the check holds are the sums a phone shows. Guarded so the browser, where '
+         + '`module` is undefined, never runs it. Constrains nothing below it.',
+    },
+  ],
+  'xlsx-write.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = XlsxWrite;",
+      why: 'The workbook writer\'s CommonJS registration, so a check can read the XML parts it '
+         + 'writes without a browser. Guarded so the browser, where `module` is undefined, never '
+         + 'runs it. Constrains nothing below it.',
+    },
+  ],
+  'level-camera.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = LevelCamera;",
+      why: 'The reading camera\'s pure readers — numbers off a level\'s display, a plate\'s make, '
+         + 'model and serial, where the text is in a picture — required by test/levels.mjs. Guarded '
+         + 'so the browser, where `module` is undefined, never runs it. Constrains nothing below it.',
+    },
+  ],
   'photo-stamp.js': [
     {
       match: "if (typeof module !== 'undefined' && module.exports) module.exports = PhotoStamp;",

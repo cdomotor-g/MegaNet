@@ -1,13 +1,15 @@
--- storage_bucket.sql — The two private buckets and the four policies on each:
--- `inspections` (0010: a form's photos and pasted screenshots) and
--- `field-photos` (0035: pictures filed by where they were taken).
+-- storage_bucket.sql — The three private buckets and the four policies on each:
+-- `inspections` (0010: a form's photos and pasted screenshots),
+-- `field-photos` (0035: pictures filed by where they were taken) and
+-- `level-surveys` (0060: the pictures behind a level survey's readings).
 --
 --   psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/storage_bucket.sql
 --
 -- Unlike every other file under tools/ this one **writes**, and it does not roll
 -- back. It is idempotent and safe to re-run: each bucket is an upsert and each
 -- policy is dropped before it is created. Running it again after 0035 is how a
--- project that already had the first bucket gets the second.
+-- project that already had the first bucket gets the second, and after 0060
+-- the third.
 --
 -- ── Why this is not a migration ──────────────────────────────────────────────
 --
@@ -132,9 +134,47 @@ create policy field_photos_delete_editors on storage.objects
   for delete to authenticated
   using (bucket_id = 'field-photos' and meganet.is_editor());
 
+-- ── The level surveys' pictures (0060) ───────────────────────────────────────
+-- A crop of a level's display for each reading taken off it by the camera, a
+-- label read for a serial number, a photo of a benchmark or a gauge board —
+-- the evidence behind a survey's numbers. The same four policies on the same
+-- people as the other two, for the same reasons: a benchmark's photo and its
+-- coordinates are a site's, and the crews' names travel with them. Private,
+-- read through signed URLs. Ten megabytes an object: the tab crops and
+-- compresses every picture to tens of kilobytes, and a photo of a point to a
+-- few hundred, so anything near the limit is not one of its pictures.
+
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('level-surveys', 'level-surveys', false, 10485760)
+on conflict (id) do update set
+  public          = false,
+  file_size_limit = excluded.file_size_limit;
+
+drop policy if exists level_surveys_read_editors   on storage.objects;
+drop policy if exists level_surveys_insert_editors on storage.objects;
+drop policy if exists level_surveys_update_editors on storage.objects;
+drop policy if exists level_surveys_delete_editors on storage.objects;
+
+create policy level_surveys_read_editors on storage.objects
+  for select to authenticated
+  using (bucket_id = 'level-surveys' and meganet.is_editor());
+
+create policy level_surveys_insert_editors on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'level-surveys' and meganet.is_editor());
+
+create policy level_surveys_update_editors on storage.objects
+  for update to authenticated
+  using (bucket_id = 'level-surveys' and meganet.is_editor())
+  with check (bucket_id = 'level-surveys' and meganet.is_editor());
+
+create policy level_surveys_delete_editors on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'level-surveys' and meganet.is_editor());
+
 -- ── The verdict ──────────────────────────────────────────────────────────────
 -- The three things #145's Part B could get wrong, asserted rather than eyeballed
--- in a dashboard, for both buckets: it exists, it is private, and all four of
+-- in a dashboard, for every bucket: it exists, it is private, and all four of
 -- its policies are there. Raises rather than printing a row, so a scripted run
 -- fails loudly.
 
@@ -145,7 +185,7 @@ declare
   v_public   boolean;
   v_policies integer;
 begin
-  foreach v_bucket in array array['inspections', 'field-photos'] loop
+  foreach v_bucket in array array['inspections', 'field-photos', 'level-surveys'] loop
     v_prefix := pg_catalog.replace(v_bucket, '-', '_');
     select public into v_public from storage.buckets where id = v_bucket;
     if v_public is null then

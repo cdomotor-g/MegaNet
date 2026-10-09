@@ -145,6 +145,23 @@ const ExportMenu = (function () {
       { label: 'The station document — stations.json', sub: 'the whole register, as the datastore holds it now', call: ['snapshotStationsJson'],
         ready: gated },
     ],
+    levels: () => {
+      const why = () => (typeof LevelSurvey !== 'undefined' ? LevelSurvey.openWhy() : 'The Level Survey tab is not loaded.');
+      return [
+        { label: 'This survey — Excel workbook', sub: 'the sheet as a workbook: the site, the datum, the run with its sums and closure, the boards, the checks and the photos listed',
+          call: ['LevelSurvey.exportOpen', 'xlsx'], ready: why },
+        { label: 'This survey — CSV', sub: 'one row a sight, every column, each row carrying its station and date', call: ['LevelSurvey.exportOpen', 'csv'], ready: why },
+        { label: 'This survey — package (.zip)', sub: 'the workbook, the CSV, the survey file and every picture and photo', call: ['LevelSurvey.exportOpen', 'zip'], ready: why },
+        { label: 'This survey — survey file (.json)', sub: 'to open it in Flood-Net on another device', call: ['LevelSurvey.exportOpen', 'json'], ready: why },
+      ];
+    },
+    twopeg: () => {
+      const why = () => (typeof TwoPeg !== 'undefined' ? TwoPeg.openWhy() : 'The Two-Peg Test tab is not loaded.');
+      return [
+        { label: 'This test — Excel', sub: 'the readings, the differences, the error and the result', call: ['TwoPeg.exportOpen', 'xlsx'], ready: why },
+        { label: 'This test — CSV', sub: 'the same, as one row', call: ['TwoPeg.exportOpen', 'csv'], ready: why },
+      ];
+    },
     review: () => [
       { label: 'The path margin matrix — CSV', sub: 'every field station\'s margin to each hub, its best path, the measured margin and the flags',
         call: ['NetworkReview.exportCsv'],
@@ -183,6 +200,7 @@ const ExportMenu = (function () {
     maintenance: 'A sheet being filled in: once saved it is a record, and Inspection History exports those.',
     photos:      'The photos are the files — each one opens full size from the viewer — and they live in Dropbox or Drive as well.',
     camera:      'Each photo is a file already — Save a copy keeps it on this device, stamp and EXIF and all — and once uploaded it is in Field Photos.',
+    surveyguide: 'A refresher to read — the worked example on it opens as a practice survey, which Level Survey exports like any other.',
     basestations: 'The fleet\'s live state, for administering it — nothing here is a record to keep as a file.',
   };
 

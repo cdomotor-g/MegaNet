@@ -25,6 +25,22 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 20, date: '2026-10-09', items: [
+      '<strong>📏 Level Survey</strong>, in a new group, <em>Surveying</em>: a station\'s levels surveyed on a phone. Book the '
+        + 'run rise and fall a sight at a time and it is reduced as you go — the three checks, the misclose, the gauge boards '
+        + 'against their face values, the water check — with a final field check saying what is left. It works with no '
+        + 'signal, keeps everything on the phone, and sends it to Flood-Net, filed under its station, when there is one.',
+      '<strong>📷 Read it off the display.</strong> Beside every reading, the camera reads the number off a digital level\'s '
+        + 'screen for you to accept or correct, and keeps the picture — cut to the screen and compressed to tens of '
+        + 'kilobytes — as the evidence behind the number. It reads a level\'s serial plate the same way, and your levels '
+        + 'and staffs are kept in a list to pick from.',
+      '<strong>🎯 Two-Peg Test</strong> and <strong>📖 How to Survey</strong>: the collimation check with its error worked out '
+        + 'as you go, linked to the surveys done with that level; and a step-by-step refresher, with a worked example to '
+        + 'practise on.',
+      'Surveys export as an <strong>Excel workbook</strong>, a CSV, or a package with every photo. An administrator reviews a '
+        + 'filed survey and applies what it found — gauge zero, benchmarks, the sensor reference, an offset correction — to '
+        + 'the station; gauge zero is now an administrator\'s to change.',
+    ] },
     { n: 19, date: '2026-10-09', items: [
       '<strong>Fade margins, calibrated against the whole network.</strong> The field allowance is now fitted to every '
         + 'station\'s attenuator tests on file — several hundred stations, not one region\'s — and is '

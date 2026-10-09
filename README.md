@@ -128,6 +128,23 @@ MegaNet/
 ├── field-camera.js         ← FieldCamera — Field Camera tab: photos taken in the
 │                             app, stamped, the station suggested, kept on the
 │                             device and uploaded by themselves
+├── levelling.js            ← Levelling — a level survey's arithmetic: rise and fall
+│                             in whole units of 10 µm, the misclose, AHD and the
+│                             gauge's own datum, boards, the water check, the
+│                             two-peg test, the final field check, CSV and workbook
+├── xlsx-write.js           ← XlsxWrite — an .xlsx written by hand (sheets, styles,
+│                             formulas with their answers), for the survey workbook
+├── level-store.js          ← LevelStore — surveys, two-peg tests, levels and staffs
+│                             and every reading's picture kept on the device
+│                             (IndexedDB), and sent to the database in turn
+├── level-camera.js         ← LevelCamera — the reading camera: a number read off a
+│                             level's display or a serial plate by OCR, the picture
+│                             cut to the display and kept small as evidence
+├── level-survey.js         ← LevelSurvey — Level Survey tab: the sheet, the station
+│                             suggested from the GPS, the exports, and the
+│                             administrator's panel that applies a survey
+├── two-peg.js              ← TwoPeg    — Two-Peg Test tab (the level's collimation)
+├── survey-guide.js         ← SurveyGuide — How to Survey tab: the refresher
 ├── photo-review.js         ← PhotoReview — the tab's Review panel, equipment
 │                             suggestions, the station card's Equipment section
 ├── station-history.js      ← StationHistory — the station card's History: who
@@ -4689,6 +4706,54 @@ allowance, and a receiver with FM capture at 6 dB. A device that asks for
 reduced motion gets every drawing still, at its outcome. `npm run propagation`
 holds the physics to figures worked by hand, the ALERT frame to the ALERT
 Packets tab's own decoder, and each story to the outcome it tells.
+
+### 28. Level Survey (a Station's Levels, Surveyed on a Phone)
+
+📏 **Level Survey**, 🎯 **Two-Peg Test** and 📖 **How to Survey**, under
+**Surveying**, are a station's level survey done in the field on a phone, with
+no signal, and filed under the station afterwards.
+
+**The sheet** goes a step at a time — the site (the station suggested from
+where the phone is, or found by number or name), the crew and the kit (levels
+and staffs kept in a list to pick from, the two-peg test linked), the datum and
+the primary benchmark, the run, the water check, and a final field check — and
+holds the points a gauging station needs levelled: benchmarks, the gauge boards,
+the sensor reference (CTR, orifice or outlet), cease to flow and the water
+surface. The run is booked **rise and fall** a sight at a time and reduced as it
+goes in, in whole units of 10 µm, so ΣBS − ΣFS, ΣRise − ΣFall and last − first
+agree exactly or the row that broke them is named. Every level is given **both
+in AHD (or the assumed datum) and on the gauge**, gauge zero being given or
+found from a board you nominate; each board is held to its face value, the
+water check sets the levelled water surface beside the board and the logger,
+and the misclose is held to its limit before anyone leaves the site.
+
+**The reading camera.** 📷 beside any reading reads the number off a digital
+level's display by OCR — framed to the display's shape, cut to the text, read
+in up to three passes (the third with the strokes thickened, for a seven-segment
+display) — and nothing goes in until it is accepted. The picture is kept as the
+**evidence** for the number: grey, cut to the display, WebP at most 960 px
+across with a strip saying which row, which sight, the value, when and where —
+15–40 kB each. A level's serial plate is read the same way. The OCR engine is
+fetched once and kept for no signal.
+
+**Kept, sent, applied.** Everything is in the phone's own storage the moment it
+is typed, and goes to the database when the phone is signed in and has a
+signal: the kit, the two-peg test, the survey, then each picture. Anyone may
+survey and file a survey against a station; **only an administrator applies
+what it found** — gauge zero, the benchmarks, the sensor reference, cease to
+flow, the boards and an offset correction — to the station, from a panel that
+sets each beside what the station holds, and each change is logged with what it
+replaced. The station editor's gauge zero is an administrator's to change too
+(0060). A survey exports as an **Excel workbook** (the run with its sums as
+formulas, the boards, the checks, the photos, the two-peg test), a **CSV**, the
+survey file, or a **zip** with every picture, all named `floodnet-level-survey-…`.
+
+The two-peg test works out the error as the four readings go in and says, for a
+level that fails, what it should have read; How to Survey is the refresher, with
+a worked example to open as a practice survey. `docs/level-surveys.md` has the
+rest; `npm run levels` holds the arithmetic to a worked example and drives the
+tabs on a phone-sized page, a real OCR read included, and
+`tools/check_level_surveys.sql` holds the database's rules.
 
 ---
 

@@ -1508,6 +1508,9 @@ const PhotoMeta = (function () {
     if (libP) return libP;
     libP = new Promise((resolve, reject) => {
       const s = document.createElement('script');
+      // Asked for with CORS, so the answer is one sw.js may keep (an opaque
+      // one it would not) and the OCR starts with no signal.
+      s.crossOrigin = 'anonymous';
       s.src = OCR_LIB;
       s.async = true;
       s.onload = () => (window.Tesseract ? resolve(window.Tesseract) : reject(new Error('the OCR library loaded but defined nothing')));
@@ -1518,10 +1521,92 @@ const PhotoMeta = (function () {
   }
   function worker() {
     if (workerP) return workerP;
-    workerP = loadTesseract().then(T => T.createWorker('eng', 1, {
-      workerPath: OCR_WORKER, corePath: OCR_CORE, langPath: OCR_LANG, gzip: true,
-    })).catch(err => { workerP = null; throw err; });
+    workerP = loadTesseract().then(async T => T.createWorker('eng', 1, Object.assign({
+      langPath: OCR_LANG, gzip: true,
+    }, await workerPaths()))).catch(err => { workerP = null; throw err; });
     return workerP;
+  }
+
+  // Where the worker and the engine's core come from. Left to itself,
+  // Tesseract.js starts a worker that fetches its own core — a request a
+  // page's service worker answers only where the browser lets it see a blob
+  // worker's requests, which not every one does, so with no signal the OCR
+  // would not start even with every file kept (sw.js keeps them). So the page
+  // fetches the two itself, through the service worker, and hands the engine
+  // one same-origin script — the core first, which defines TesseractCore, so
+  // the worker never asks for it. The core is the variant this browser runs,
+  // chosen as Tesseract.js would (SIMD or not, LSTM only — the mode it is
+  // started in). Failing any of that, the plain paths, as before.
+  async function workerPaths() {
+    const plain = { workerPath: OCR_WORKER, corePath: OCR_CORE };
+    try {
+      if (typeof fetch !== 'function' || typeof Blob === 'undefined' || !(URL && URL.createObjectURL)) return plain;
+      const core = `${OCR_CORE}/${simd() ? 'tesseract-core-simd-lstm.wasm.js' : 'tesseract-core-lstm.wasm.js'}`;
+      const text = async u => { const r = await fetch(u); if (!r.ok) throw new Error(`${u}: ${r.status}`); return r.text(); };
+      const [w, c] = await Promise.all([text(OCR_WORKER), text(core)]);
+      return { workerPath: URL.createObjectURL(new Blob([c, '\n;\n', w], { type: 'text/javascript' })), corePath: core };
+    } catch (_) {
+      return plain;
+    }
+  }
+  // wasm-feature-detect's SIMD probe, the one Tesseract.js's worker runs.
+  function simd() {
+    try {
+      return WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Start the engine now, for a caller getting a device ready for no signal:
+  // everything it fetches is then kept — the files by sw.js, the language
+  // model by Tesseract.js itself (IndexedDB). True when it is ready.
+  async function ocrWarm() {
+    busy++;
+    clearTimeout(idleTimer);
+    try {
+      await worker();
+      return true;
+    } finally {
+      busy--;
+      releaseSoon();
+    }
+  }
+
+  // One grey picture read as it is, in the session's one worker, in turn — for
+  // a caller that has cut and cleaned its own picture (level-camera.js reads a
+  // level's display this way). `params` hold for this read only: what it set
+  // is put back to Tesseract's default before the turn ends, so a digits-only
+  // whitelist never reaches the overlay reader's next read.
+  const PARAM_DEFAULTS = { tessedit_char_whitelist: '', tessedit_char_blacklist: '', preserve_interword_spaces: '0' };
+  async function ocrGrey(v, psm = 6, params = {}) {
+    busy++;
+    clearTimeout(idleTimer);
+    try {
+      const w = await worker();
+      const cv = document.createElement('canvas');
+      cv.width = v.width; cv.height = v.height;
+      const cx = cv.getContext('2d');
+      const id = cx.createImageData(v.width, v.height);
+      for (let i = 0, p = 0; i < v.gray.length; i++, p += 4) {
+        id.data[p] = id.data[p + 1] = id.data[p + 2] = v.gray[i]; id.data[p + 3] = 255;
+      }
+      cx.putImageData(id, 0, 0);
+      return await inTurn(async () => {
+        await w.setParameters(Object.assign({ tessedit_pageseg_mode: String(psm), debug_file: '/dev/null' }, params));
+        try {
+          const r = await w.recognize(cv, {}, { text: true, blocks: true });
+          return r && r.data ? { text: r.data.text || '', lines: linesOf(r.data), confidence: r.data.confidence } : { text: '', lines: [] };
+        } finally {
+          const back = {};
+          for (const k of Object.keys(params)) back[k] = Object.prototype.hasOwnProperty.call(PARAM_DEFAULTS, k) ? PARAM_DEFAULTS[k] : '';
+          if (Object.keys(back).length) await w.setParameters(back);
+        }
+      });
+    } finally {
+      busy--;
+      releaseSoon();
+    }
   }
   function releaseSoon() {
     clearTimeout(idleTimer);
@@ -1732,7 +1817,7 @@ const PhotoMeta = (function () {
 
   return {
     read, parseOverlay, vote, readOverlay, ocrImage, needsOcr, printsAccuracy, overlayAccuracy, reconcile, record,
-    readLabels, ocrLabels, labelPlan, greyStretch,
+    readLabels, ocrLabels, labelPlan, greyStretch, ocrGrey, ocrWarm,
     utmToLatLon, auZone, compassPoint, fovFrom35, instant: utcIso,
     bandPlan, prepare, resample, orient, pgm, normalise, linesOf, cropLine,
     OCR: { lib: OCR_LIB, worker: OCR_WORKER, core: OCR_CORE, lang: OCR_LANG, version: OCR_VER },

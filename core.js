@@ -200,6 +200,17 @@ const TABS = [
     { id: 'photos',     label: 'Field Photos',           icon: '📷',
       find: 'pictures camera gps exif ocr overlay solocator geotag position heading upload bulk folder dropbox carousel unplaced' },
   ] },
+  // A survey is a site visit too, but its three tabs would have made that
+  // group eight; filed on their own, the sheet, the level's check and the
+  // refresher sit together.
+  { group: 'Surveying', tabs: [
+    { id: 'levels',     label: 'Level Survey',           icon: '📏',
+      find: 'levelling leveling level run height survey surveying rise and fall booking level book benchmark bm gauge zero datum ahd lgh assumed reduced level rl change point backsight foresight intermediate staff gauge boards orifice ctr cease to flow ctf misclose closure water check logger offset digital level lcd read reading ocr serial workbook excel xlsx' },
+    { id: 'twopeg',     label: 'Two-Peg Test',           icon: '🎯',
+      find: 'two peg 2-peg collimation line of sight level check instrument error tilt pegs adjust adjustment' },
+    { id: 'surveyguide', label: 'How to Survey',         icon: '📖',
+      find: 'how to reference refresher instructions procedure steps levelling reminder booking rise fall datum benchmark two peg' },
+  ] },
   // Last, so it sits at the foot of the nav: nobody's daily work, and the one
   // group whose tab the header's load buttons and the Export tab's Data source
   // and snapshot panels moved into.
@@ -1728,6 +1739,67 @@ const HELP = {
       { label: 'Reviewing uploads, and approving equipment suggestions — who is an administrator',
         href: 'docs/field-photos.md#reviewing-what-came-in' },
     ],
+  },
+
+  levels: {
+    summary: 'Survey a station\'s levels <strong>on a phone</strong>: the site and crew, the level and staff from your own list, '
+           + 'the datum and its benchmark, then the run — booked rise and fall a sight at a time and <strong>reduced as you '
+           + 'go</strong>, so the three checks and the misclose are on screen before you pack up — the gauge boards against '
+           + 'their face values, the water check, and a final field check that says what is left. Everything is kept on the '
+           + 'phone with no signal and <strong>sent to Flood-Net</strong> when there is one, filed under its station. 📷 beside '
+           + 'a reading <strong>reads it off the level\'s display</strong> and keeps the picture as evidence. Export a survey as '
+           + 'an Excel workbook, a CSV, or a package with every photo. An administrator reviews a filed survey here and '
+           + '<strong>applies</strong> what it found — gauge zero, benchmarks, the sensor reference, an offset correction — to '
+           + 'the station.',
+    watch: [
+      '<strong>Check what the camera read.</strong> The number goes in only when you accept it, and the picture it came from '
+      + 'is kept beside it — a reading changed afterwards says so on its thumbnail.',
+      '<strong>Get it ready before you lose the signal.</strong> The reading camera\'s engine (about 7 MB) is fetched once — '
+      + 'press <em>Get it ready</em> on this tab with a signal and it works with none.',
+      '<strong>Signed out is fine in the field.</strong> Surveys wait on the phone until somebody signs in to send them; '
+      + 'nothing is lost if a sign-in runs out while you are out of range.',
+      'Only an <strong>administrator</strong> changes a station from a survey, and once applied a survey is a record — a '
+      + 'correction is a new survey. Gauge zero is an administrator\'s to change in the station editor too.',
+      'A practice survey (🎓) is fictional and never sent — use it to learn the sheet, or to show somebody how booking works.',
+    ],
+    related: ['twopeg', 'surveyguide', 'camera', 'stations'],
+    links: [
+      { label: 'Level surveys — the sheet, the reading camera, sending and applying', href: 'docs/level-surveys.md' },
+    ],
+  },
+
+  twopeg: {
+    summary: 'Check a level\'s <strong>line of sight</strong> the way it is done in the field: two pegs about 50 m apart, the '
+           + 'level midway, then close to one of them. The four readings give the <strong>error</strong> as they go in, held '
+           + 'to its tolerance — pass or fail — with how far the line of sight tilts over 30 m and, for a level that is out, '
+           + 'what it should have read. Tests are kept on the phone, sent to Flood-Net with a signal, and linked from each '
+           + 'survey done with that level.',
+    watch: [
+      'Test before every trip and again after any knock — a survey links the latest test for its level, and its final check '
+      + 'flags one that failed or is more than a month older than the survey.',
+      'Read both set-ups in the same order, A then B. The sheet takes set-up 2 to be between the pegs, close to A, at the '
+      + 'distance you give it.',
+      '📷 reads each staff reading off the display, as the survey sheet does, and keeps the picture with the test.',
+    ],
+    related: ['levels', 'surveyguide'],
+    links: [
+      { label: 'Level surveys — the two-peg test', href: 'docs/level-surveys.md#the-two-peg-test' },
+    ],
+  },
+
+  surveyguide: {
+    summary: 'A <strong>refresher</strong> on doing a station\'s level survey and the two-peg test, in the order the work '
+           + 'goes: what to have before you go, the crew and the kit, the test, choosing the datum, benchmarks, running and '
+           + 'booking the levels (with a worked example reduced by the sheet\'s own arithmetic), what to level and how to '
+           + 'describe it, the gauge boards, photos, the water check, checking before you leave, the reading camera, and what '
+           + 'happens once a survey is sent.',
+    watch: [
+      'Each step of the Level Survey sheet has a <em>How this part is done</em> note, and its link opens the matching '
+      + 'section here.',
+      'It is a reminder for somebody who knows how, not a course — the site\'s own instructions and figures come first '
+      + 'wherever they differ.',
+    ],
+    related: ['levels', 'twopeg'],
   },
 
   export: {

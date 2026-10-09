@@ -498,10 +498,15 @@ const Auth = (function () {
   // Claude (health-agent.js) runs on Flood-Net's key for editors and
   // administrators only (#229), so it asks again who may. The Field Camera
   // (field-camera.js) sends the photos it has kept on this device as soon as
-  // somebody is signed in to send them as.
+  // somebody is signed in to send them as, and the level surveys and two-peg
+  // tests (level-store.js) theirs; the Level Survey tab shows an
+  // administrator the filed surveys waiting for a decision (0060).
   function tabsAuthChanged() {
     for (const mod of [typeof FieldPhotos !== 'undefined' ? FieldPhotos : null,
                        typeof FieldCamera !== 'undefined' ? FieldCamera : null,
+                       typeof LevelStore  !== 'undefined' ? LevelStore  : null,
+                       typeof LevelSurvey !== 'undefined' ? LevelSurvey : null,
+                       typeof TwoPeg      !== 'undefined' ? TwoPeg      : null,
                        typeof Admin       !== 'undefined' ? Admin       : null,
                        typeof AdminDash   !== 'undefined' ? AdminDash   : null,
                        typeof AdminTokens !== 'undefined' ? AdminTokens : null,

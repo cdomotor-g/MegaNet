@@ -1147,6 +1147,20 @@ jobs:
         working-directory: test
         run: npm run propagation
 
+      # Node, then Chromium on a phone-sized page. The Level Survey, Two-Peg
+      # Test and How to Survey tabs (levelling.js, level-*.js, two-peg.js,
+      # survey-guide.js, xlsx-write.js): the rise-and-fall arithmetic against a
+      # worked example to the tenth of a millimetre, the booking mistakes it
+      # must catch, both datums, the two-peg sums, the CSV and the workbook
+      # read back cell by cell; then the sheet driven at 375 px — a survey made
+      # from a station search and Near me, a reading taken by the camera from a
+      # rendered LCD with its evidence kept small, kept over a reload, exported,
+      # sent in order (and held, not lost, when Flood-Net is not ready or the
+      # phone is offline), and an administrator's apply panel.
+      - name: Level surveys — the arithmetic, the camera's readings, the sheet on a phone
+        working-directory: test
+        run: npm run levels
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each
@@ -1467,6 +1481,12 @@ jobs:
       # triggers as an administrator, an editor and a stranger.
       - name: check_photo_review.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_photo_review.sql
+      # Level surveys and two-peg tests (0060): editors file them, the database
+      # works out a test's error and a survey's misclose for itself, pictures
+      # are filed where they belong, and only an administrator applies a survey
+      # to its station — or changes a station's gauge zero in the editor.
+      - name: check_level_surveys.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_level_surveys.sql
       # Proposed stations (0039): what a proposal has to say, the station
       # document gaining nothing for a station that is not one, and who may
       # propose, add outright and establish — signed up through 0005's own

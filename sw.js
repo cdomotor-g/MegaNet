@@ -44,6 +44,14 @@
 //   offline` holds the two to each other) the same way: a sheet cannot be
 //   started without them, and a draft is the point of opening with no signal.
 //
+//   The OCR engine — Tesseract.js, its core and its English model, from unpkg
+//   (photo-meta.js) — kept the first time a page asks for each file, and
+//   answered from the copy after that: the Level Survey tab reads a level's
+//   display with it, and a gauging station is where the signal is not. Every
+//   file's version is in its path, so a copy is right for as long as it is
+//   asked for; they go in a cache of their own (floodnet-libs) that outlives a
+//   deploy, because ~7 MB is not something to fetch again with every stamp.
+//
 //   Nothing else. The datastore's other reads, the Worker's /api routes,
 //   sign-in, map tiles: the network's, as if this worker were not here.
 //
@@ -71,6 +79,8 @@ const INDEX = SCOPE.href;
 const APP_PAGES = new Set([SCOPE.pathname, `${SCOPE.pathname}index.html`]);
 const API = new URL('api/', SCOPE).pathname;
 const LEAFLET = /^https:\/\/unpkg\.com\/leaflet@[\d.]+\/dist\//;
+const OCR = /^https:\/\/unpkg\.com\/(?:tesseract\.js|tesseract\.js-core|@tesseract\.js-data\/eng)@[\d.]+\//;
+const LIBS = 'floodnet-libs';
 
 const REFERENCE = new Set([
   // inspections.js — TABLES, LOOKUPS and the form itself
@@ -180,6 +190,7 @@ self.addEventListener('fetch', event => {
   }
   if (isStationDoc(url) || isReference(url)) { event.respondWith(kept(event)); return; }
   if (LEAFLET.test(req.url)) { event.respondWith(versioned(event)); return; }
+  if (OCR.test(req.url)) { event.respondWith(library(event)); return; }
   if (url.origin !== SCOPE.origin || url.pathname.startsWith(API) || url.pathname.startsWith('/cdn-cgi/')) return;
   event.respondWith(url.searchParams.has('v') ? versioned(event) : file(event));
 });
@@ -218,6 +229,20 @@ async function versioned(event) {
   if (whole(res) && (v === null || v === VERSION)) {
     const copy = res.clone();
     event.waitUntil(caches.has(SHELL).then(has => has && caches.open(SHELL).then(c => c.put(req, copy))).catch(() => {}));
+  }
+  return res;
+}
+
+// A library file whose version is in its path: the kept copy, else the
+// network's — kept for next time.
+async function library(event) {
+  const req = event.request;
+  const hit = await caches.match(req, { cacheName: LIBS });
+  if (hit) return hit;
+  const res = await fetch(req);
+  if (whole(res)) {
+    const copy = res.clone();
+    event.waitUntil(caches.open(LIBS).then(c => c.put(req, copy)).catch(() => {}));
   }
   return res;
 }

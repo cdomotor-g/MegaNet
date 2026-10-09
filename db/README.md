@@ -268,6 +268,13 @@ its cache at all (`PGRST002`).
 | `meganet.station.flood_peaks_from` | The station this one **takes its flood history from** (`0041`): for a station with no gauge of its own in the HDB extract — a proposal beside an existing gauge — `station_flood_peaks()` gives it that station's gauge's peaks, placed through *that* station's zero and checked against its levels, and rebuilds it whenever that station's inputs change. A gauge of its own always wins. In the document: `flood_peaks_from`, and `flood_peaks_gauge` (the bureau number its floods came from) only where they are not its own. Set by an editor in the station editor. `tools/check_flood_peaks_from.sql` proves it. |
 | `meganet.station.facing_deg` | The **way a station faces** (`0044`): the bearing its front — the side its enclosure door, or a tower's ladder, is on — faces, in degrees clockwise from true north, 0 up to but not 360 (360 is saved as 0). Null is not recorded, and the Digital Twin draws it facing south, as it always has. An optional key in the document, absent where null. Recorded by an editor, in the station editor or with the twin's ↻ Orientation tool. `tools/check_station_facing.sql` proves it. |
 | `meganet.is_admin()` | May this request decide (`0036`)? Anon never; `service_role` always; `authenticated` when it is an editor **and** its `meganet.app_user` row says `role = 'admin'` — the first reader of that column. The owner grants it with `update meganet.app_user set role = 'admin' where lower(email) = lower('…')` (docs/field-photos.md, *Administrators*). |
+| `meganet.level_equipment`, `meganet.level_equipment_save(jsonb)` | The levels and staffs survey crews use (`0060`): kind, make, model, serial number, service date, picked from a list on the Level Survey and Two-Peg Test tabs rather than typed again. Any editor keeps one; a unit entered on two phones before either had a signal is one unit — the second is answered with the first (`duplicate_of`). `retired` takes it off the list. **Editors only**. |
+| `meganet.two_peg_test`, `meganet.two_peg_test_save(jsonb)` | Two-peg tests of a level's line of sight (`0060`): the four readings as columns, and `error_m` and `passed` **worked out here** (generated columns) from them and the test's tolerance, whatever the phone said. The rest of the phone's document in `doc`. Editors file them; a test is its filer's or an administrator's to change; practice tests are refused. **Editors only**. |
+| `meganet.level_survey`, `meganet.level_survey_save(jsonb)` | Level surveys filed from the field (`0060`): the whole document the Level Survey tab kept (`doc` — site, crew, kit, datum and control, every row of the rise-and-fall run, the water check), with the columns a list is drawn from. `sum_bs` and `sum_fs` are summed here from `doc`'s rows, and a survey that says it closed must carry the misclose they give (ΣBS − ΣFS) or it is refused; `outcome` is `pass`, `fail` or `open`. `status`: `submitted`, `applied` (an administrator adopted something from it — it no longer changes, `55000`), `returned` (sent back for completion; sending it again puts it back). Editors file; a survey is its filer's or an administrator's to change. **Editors only**. See **Level surveys**, below. |
+| `meganet.level_evidence`, `meganet.level_evidence_add(jsonb)` | The pictures behind a survey or a two-peg test (`0060`): the crop of a level's display a reading was taken from (with what the OCR read and the value accepted), a label read for a serial number, a photo of a point. Bytes in the private `level-surveys` bucket at `<survey\|two-peg>/<owner id>/<id>.<webp\|jpg\|png>` and nowhere else; recorded once its owner is filed, by its owner's crew. **Editors only**. |
+| `meganet.station_level_point`, `meganet.station_level_offset` | What a station holds once an administrator adopts it from a survey (`0060`): its benchmarks (one primary), sensor reference (CTR), cease to flow, gauge boards and other surveyed points — each with its level in the survey's datum, on the gauge (`rl_lgh`) and in AHD where known, current until a later adoption supersedes it (the old row stays) — and each change made to the logger's offset. Written only by `meganet.level_survey_apply()`. **Editors only**. |
+| `meganet.level_survey_apply(uuid, jsonb, text)`, `meganet.level_survey_return(uuid, text)`, `meganet.level_survey_decision` | The administrator's decision (`0060`). `apply` takes the changes ticked — a gauge zero (a new `station_gauge_survey` row from the survey's date, the open one closed the day before, never behind a later one; the station's stamp moves so an open editor reloads), points, offset corrections — in one transaction; `return` sends a survey back with why. **Administrators only** (`42501`, detail `administrator`). Every decision, with each change's before and after, is a row of `level_survey_decision`: station history (`0056`) logs the station's own columns, and gauge zero is not one. |
+| `meganet.level_num(jsonb)` | A reading as a phone sent it — a JSON number, or a string holding one — as numeric, else null (`0060`). Internal. |
 
 Everything is readable by `anon` **except `meganet.reading_raw`, the whole
 inspection domain — bar the numbers, which `0023` publishes as views — and the
@@ -285,6 +292,8 @@ the *readings*, since `0023`: `meganet.inspection_chart_visit` and the six
 date it happened, and no column anybody wrote. The tables under them are as
 private as they ever were. The station history (`0056`) is editors-only too: the
 station is public, but a record of who changed it, when, is a record of people.
+So are the level surveys (`0060`) — a benchmark's description and position, a
+crew's names — and what a station holds from them.
 
 Nothing is *writable* by `anon` or by `authenticated`: no table grants either of
 them a write verb, and the only ways in are the functions above — see **Writing**
@@ -1901,6 +1910,50 @@ back, and `proposed` refused an editor; the whole register through
 `load_stations_doc()` — one row for a rename, none for the thousands it only
 re-placed, none again, and a station dropped for real with its history kept;
 and who may read it.
+
+## Level surveys
+
+`0060` is where a level survey from the field goes, and the line the owner drew
+around it: **anybody who may write files a survey under a station; only an
+administrator changes the station from it.** The Level Survey and Two-Peg Test
+tabs (`level-survey.js`, `two-peg.js`) book the run on a phone, reduce it as it
+is entered (`levelling.js`), and keep it on the device until there is a signal
+and somebody signed in to send it as.
+
+- **What the database works out for itself.** A two-peg test's error and pass
+  are generated columns over its four readings. A survey's ΣBS and ΣFS are summed
+  from its rows on every save, and a survey that says it closed must carry the
+  misclose those give — closing on the opening benchmark makes it ΣBS − ΣFS —
+  or it is refused (`22023`). Everything else about the run (its shape, rise and
+  fall, the datums, the boards, the water check) is the sheet's, held by
+  `test/levels.mjs`, and travels in `doc.result`.
+- **Practice surveys stay on the device.** The worked example the tab offers is
+  marked `practice` and refused here.
+- **The pictures** — a crop of the level's display for each reading the camera
+  took, a label read for a serial number, a photo of a point — go in the private
+  `level-surveys` bucket, created by `tools/storage_bucket.sql` like the other
+  two, at `<survey|two-peg>/<owner id>/<id>.<ext>`. The bytes go first, then the
+  survey, then a `level_evidence` row each; every step can be sent again.
+- **Applying.** `meganet.level_survey_apply()` takes the changes an
+  administrator ticked and makes them in one transaction: a gauge zero is a new
+  row in `station_gauge_survey` (`0031`, where gauge zero has always lived) from
+  the survey's date, the open row closed the day before and its AMTD and
+  catchment area carried forward — which re-reads the station's flood peaks
+  through the new zero (`0037`'s triggers); points (benchmarks, the CTR, cease to
+  flow, the boards) supersede the station's current point of the same kind and
+  name; an offset correction is recorded. Each change's before and after goes
+  in `level_survey_decision`, and the survey becomes `applied` — a record that
+  no longer changes. A correction is a new survey.
+- **Gauge zero is an administrator's in the station editor too.** `0060`
+  restates `save_station()` (`0044`'s, word for word) with one check: somebody who
+  is not an administrator may send `gauge_survey` only if its rows' dates, gauge
+  zeros and datums come out as the station already has them, compared as a set
+  (`94.50` is `94.5`, and order is not a change). The AMTD, catchment area and
+  notes are still any editor's. The refusal carries detail `administrator`, as
+  `0039`'s does.
+
+`tools/check_level_surveys.sql` proves all of it against a real Postgres, as an
+editor, a second editor, an administrator, a stranger and nobody signed in.
 
 ## Checking it from outside
 

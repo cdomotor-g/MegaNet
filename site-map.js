@@ -282,6 +282,29 @@ const SiteMap = (function () {
       ],
       note: 'Administrators only.',
     },
+    levels: {
+      what: 'A station\'s levels surveyed on a phone: the run booked rise and fall and reduced as you go, kept with no signal, filed under the station.',
+      use: [
+        'Survey the benchmark, the gauge boards, the sensor reference and cease to flow, and see the misclose before you leave',
+        'Read each staff reading off the level\'s display with the camera, the picture kept as evidence',
+        'Export the survey as an Excel workbook, a CSV or a package with every photo',
+      ],
+      note: 'Sending files it under its station; only an administrator applies what it found to the station.',
+    },
+    twopeg: {
+      what: 'A level\'s line of sight checked with two pegs: the error worked out as the readings go in, against its tolerance.',
+      use: [
+        'Test a level before a trip, or after a knock',
+        'Link the test to the surveys done with that level',
+      ],
+    },
+    surveyguide: {
+      what: 'How a level survey and the two-peg test are done, step by step, as a refresher.',
+      use: [
+        'Remind yourself how to book rise and fall, choose the datum or describe a point',
+        'Open the worked example as a practice survey',
+      ],
+    },
   };
 
   // ── The groups, in the order the work moves through them ──────────────────
@@ -302,6 +325,8 @@ const SiteMap = (function () {
       blurb: 'The readings: charted, logged as they arrive, and read for what they say about each station\'s health.' },
     'Site visits': { step: 'What we did on site',
       blurb: 'The paperwork of a visit, digitised — inspections, council maintenance, the record of both, and the photos.' },
+    'Surveying': { step: 'How high it all is',
+      blurb: 'A station\'s levels on a phone: the survey sheet that reduces the run as it is read, the level\'s own two-peg check, and a refresher on doing both.' },
     'Admin': { step: 'Keeping it running',
       blurb: 'Where the station data comes from, who may sign in, the base stations that receive it all, and the review of a network\'s design.' },
   };
@@ -324,6 +349,8 @@ const SiteMap = (function () {
     { text: 'Get a phone ready for a site with no signal', tab: 'offline' },
     { text: 'Take site photos stamped with where and which way', tab: 'camera' },
     { text: 'File the photos from a field trip',           tab: 'photos' },
+    { text: 'Survey a station\'s gauge zero and benchmarks', tab: 'levels' },
+    { text: 'Check a level with a two-peg test',           tab: 'twopeg' },
     { text: 'Print a map for a field trip',                tab: 'mapgen' },
     { text: 'Review a radio network\'s design',            tab: 'review' },
     { text: 'Learn how radio gets a reading home',         tab: 'propagation' },
