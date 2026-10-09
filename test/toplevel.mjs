@@ -82,6 +82,15 @@ const ACCEPTED = {
          + 'nothing below it.',
     },
   ],
+  'plot-lines.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = PlotLines;",
+      why: 'The Plots chart\'s function parser and curve fits, required by '
+         + 'test/plotlines.mjs so the parser the browser runs is the one the '
+         + 'check holds to its refusals. Guarded so the browser, where `module` '
+         + 'is undefined, never runs it. Constrains nothing below it.',
+    },
+  ],
   'airtime-analysis.js': [
     {
       match: "if (typeof module !== 'undefined' && module.exports) module.exports = AirtimeAnalysis;",

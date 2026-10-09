@@ -179,8 +179,8 @@ const TABS = [
   { group: 'Data', tabs: [
     { id: 'arro',       label: 'ARRO Launcher',          icon: '🚀',
       find: 'contrail telemetry open station site raw id jump launch' },
-    { id: 'arrodata',   label: 'ARRO Data',              icon: '📊',
-      find: 'csv telemetry file chart plot sensor continuity 3-5-7 filter noise drop demo' },
+    { id: 'arrodata',   label: 'Plots',                  icon: '📊',
+      find: 'arro data csv telemetry file chart plot graph sensor continuity 3-5-7 filter noise drop demo draw line function fit curve regression trend ruler slope' },
     { id: 'field',      label: 'Field Data',             icon: '🌡️',
       find: 'readings telemetry datastore sensors chart plot window rainfall level quality' },
     { id: 'msglog',     label: 'Message Log',            icon: '📨',
@@ -1343,6 +1343,16 @@ const HELP = {
       + 'took, a box overrules it, and it warns when the readings look like the other one. The '
       + 'vertical axis fits the readings and names any level beyond them along that edge; '
       + '<em>stretch the axis</em> takes it over them all.',
+      '<strong>Your own lines, over the readings.</strong> <b>ƒ(t) function</b> on the toolbar draws a '
+      + 'function you type — <code>t</code> is hours from the start of the record, <code>d</code> days, '
+      + 'and a plain number is a horizontal line. It is read by a calculator\'s grammar, never run as '
+      + 'code. To <strong>fit a curve</strong>, Select some readings and pick a fit in the strip under '
+      + 'the chart: straight line, quadratic, cubic, exponential, recession to a baseline, or the best '
+      + 'of them by AIC — one per series, drawn solid over the readings it was fitted to and dashed '
+      + 'where it is extrapolating, with its equation, r² and RMS. <b>Draw</b> and <b>Ruler</b> on '
+      + '<em>Drag does</em> draw on the chart itself; a ruled line is labelled with its slope per hour. '
+      + 'Lines are never readings: no filter sees them, they do not move the vertical axis, they are '
+      + 'in the PNG and SVG and in no CSV, and they last as long as the tab.',
     ],
     links: [
       { label: 'How the 357 filter works — the test, drawn', call: 'ArroData.explain()' },
@@ -1354,7 +1364,7 @@ const HELP = {
 
   field: {
     summary: 'Plots readings that field stations sent us, out of the Flood-Net datastore, using the '
-           + 'same chart and the same 3-5-7 filter as the ARRO Data tab. Pick a station, its '
+           + 'same chart and the same 3-5-7 filter as the Plots tab. Pick a station, its '
            + 'sensors and a window; the readings are fetched and drawn.',
     watch: [
       '<strong>This is not ARRO data and is never mixed with it.</strong> The chart says which '
@@ -1382,7 +1392,7 @@ const HELP = {
       + 'discarding them</strong>. That count is the only place this network\'s real path '
       + 'redundancy is visible.',
       '<strong>Readings as a table</strong>, under the chart, is the same numbers without a mouse — '
-      + 'the ARRO Data tab\'s, unchanged, and capped at 300 rows with the cap stated.',
+      + 'the Plots tab\'s, unchanged, and capped at 300 rows with the cap stated.',
     ],
     links: [
       { label: 'How the 357 filter works — the test, drawn', call: 'ArroData.explain()' },

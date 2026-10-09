@@ -298,6 +298,20 @@ jobs:
         working-directory: test
         run: npm run lidar
 
+      # Node-only and fast. plot-lines.js — the parser behind a function typed
+      # on the Plots chart, and the curve fits — against answers known in
+      # advance, and the parser refusing anything outside its grammar.
+      - name: Plots — typed functions and curve fits
+        working-directory: test
+        run: npm run plotlines
+
+      # Chromium. "Your lines" on the Plots chart by hand: a function typed and
+      # Entered, readings boxed and fitted, a freehand stroke, a ruled line and
+      # its slope — each reaching the chart, following a pan, and going away.
+      - name: Plots — your own lines on the chart
+        working-directory: test
+        run: npm run plotdraw
+
       # Node-only and fast. The base station program is the one file here no CI
       # can compile — CRBasic Editor is a Windows application — so this holds it
       # to the two things that can be held without one: that it and

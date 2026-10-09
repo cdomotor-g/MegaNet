@@ -11025,6 +11025,46 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 .ad-edit-note { margin: 0; color: var(--muted); }
 .ad-picked-n { color: var(--accent); }
 
+/* ── Your lines ──────────────────────────────────────────────────────────────
+   Functions, fitted curves, strokes and rulers a person adds over the chart
+   (arro-data.js, "Your lines"). Folded like the comparison and the table under
+   it, because it is the same kind of thing: more about the chart above. */
+.ad-lines { margin-top: .6rem; border-top: 1px solid var(--border); padding-top: .4rem; }
+.ad-lines > summary {
+  cursor: pointer; font-size: .85rem; font-weight: 600;
+  padding: .2rem 0; list-style-position: outside;
+}
+.ad-lines > summary .small { font-weight: 400; color: var(--muted); }
+.ad-lines-fn {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.ad-fn-lab { display: flex; align-items: center; gap: .35rem; flex-wrap: nowrap; white-space: nowrap; }
+.ad-fn-in {
+  width: min(26rem, 70vw);
+  font-family: var(--font-mono);
+}
+.ad-fn-name { width: 9rem; }
+.ad-fn-err { margin: var(--sp-1) 0 0; color: var(--bad); font-size: .85rem; }
+.ad-lines-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: grid; gap: var(--sp-1); }
+.ad-line-row {
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel);
+}
+.ad-line-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); }
+.ad-line-head input[type="color"] { width: 1.8rem; height: 1.4rem; padding: 0; border: 0; background: none; }
+.ad-line-name { flex: 1 1 10rem; min-width: 0; }
+.ad-line-kind { color: var(--muted); }
+.ad-line-head .ad-x { margin-left: auto; }
+.ad-line-what { margin-top: .2rem; color: var(--muted); overflow-wrap: anywhere; }
+.ad-line-what code { color: var(--text); }
+.ad-line-origin { display: block; }
+.ad-line-away { display: block; color: var(--warn); }
+.ad-lines-acts { margin: var(--sp-2) 0 0; }
+/* Draw and Ruler take the pointer for themselves — on a touch screen the
+   page must not scroll out from under a stroke. */
+.ad-stage--pen svg { cursor: crosshair; touch-action: none; }
+
 /* A picked row, and an edited one. Two channels because they stack: a row can
    be both, and a background that means two things at once means neither. */
 .ad-row--picked  > td { background: var(--subtle); }

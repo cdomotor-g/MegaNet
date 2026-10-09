@@ -1,6 +1,6 @@
 // MegaNet — arro-data.js
 //
-//   ArroData   the ARRO Data tab: reads ARRO's per-sensor CSV exports in the
+//   ArroData   the Plots tab (once "ARRO Data"): reads ARRO's per-sensor CSV exports in the
 //              browser — nothing is uploaded — links each file back to the
 //              station that produced it, runs the Bureau's 3-5-7 continuity
 //              filter over it, and draws raw against filtered.
@@ -251,7 +251,7 @@ function adMarkSvg(kind) {
 
 const ArroData = (function () {
 
-  // One module, two tabs. ARRO Data reads CSV exports; Field Data (#114) reads
+  // One module, two tabs. Plots (the ARRO Data tab, renamed) reads CSV exports; Field Data (#114) reads
   // meganet.reading out of the datastore. Everything between a parsed series and
   // a drawn pixel is identical, and building a second copy of it was explicitly
   // not the job — so the chart, the 357 filter and the export are shared and the
@@ -325,7 +325,19 @@ const ArroData = (function () {
       // of them because panning is the state people spend most of their time
       // in. The Shift and Alt modifiers still outrank whatever is set here, so
       // either zoom is always reachable without touching the toolbar.
-      dragMode:  'pan',          // pan | box | y
+      dragMode:  'pan',          // pan | box | y | select | draw | ruler
+      // The lines a person adds to the chart themselves — a typed function, a
+      // curve fitted to picked readings, a freehand stroke, a ruled line. See
+      // "Your lines" below draw(). Per instance like everything else here, and
+      // never part of a series: they are drawn over the readings, are in the
+      // SVG and PNG exports, and are in no CSV.
+      lines:     [],
+      lineSeq:   0,
+      linesOpen: false,          // the "Your lines" panel under the chart
+      fitKind:   'best',         // what the Fit button in the selection strip asks for
+      fnDraft:   '',             // the function box, kept across re-renders
+      fnLabel:   '',
+      fnErr:     '',
       // The chart taking the whole viewport (#191). Session-only and per
       // instance, like the map's own: it is something somebody is doing right
       // now, not a preference.
@@ -2745,7 +2757,7 @@ const ArroData = (function () {
       <div class="panel ad-panel">
         <div class="panel-header"><h2 id="ad-field-h">Field readings</h2>
           <span class="small"
-                title="Every reading on this tab comes from the Flood-Net datastore. ARRO exports live on the ARRO Data tab and the two are never mixed."
+                title="Every reading on this tab comes from the Flood-Net datastore. ARRO exports live on the Plots tab and the two are never mixed."
                 >${esc(dbHostLabel())}</span></div>
 
         <label class="ad-cfg-row ad-cfg-row--block">
@@ -3949,7 +3961,7 @@ const ArroData = (function () {
                   title="${ad.full ? 'Exit full screen (Escape)' : 'Full screen'}"
                   aria-label="${ad.full ? 'Exit full screen' : 'Chart full screen'}">⛶</button>
         </div>
-        <div class="ad-stage" id="ad-stage" tabindex="0"
+        <div class="ad-stage${ad.dragMode === 'draw' || ad.dragMode === 'ruler' ? ' ad-stage--pen' : ''}" id="ad-stage" tabindex="0"
              aria-label="Chart window — arrow keys to step, + and − to zoom, Shift+scroll to pan sideways, 0 to reset both axes, Escape to unpin">
           <svg id="ad-svg" role="img" aria-label="${escAttr(chartName())}"></svg>
           <div class="ad-tip" id="ad-tip" hidden></div>
@@ -3960,6 +3972,7 @@ const ArroData = (function () {
              aria-label="${escAttr(overviewName())}"></svg>
       </div>
       <div id="ad-readout" class="ad-readout">${readoutHtml()}</div>
+      ${linesHtml()}
       ${tableDetailsHtml()}
       ${compareHtml()}`;
   }
@@ -4198,6 +4211,332 @@ const ArroData = (function () {
   // which is a different question, and the one somebody asks when deciding
   // whether the settings are right. Folded away by default: it is a second
   // look, not the main one.
+  // ── Your lines ─────────────────────────────────────────────────────────────
+  // Lines a person puts on the chart themselves, four ways: a function typed in
+  // the panel, a curve fitted to picked readings, a freehand stroke (Drag does:
+  // Draw) and a ruled straight line (Drag does: Ruler). The arithmetic — the
+  // parser, which never hands the text to JavaScript, and the fits — is
+  // PlotLines in plot-lines.js; this is the drawing and the clicks.
+  //
+  // **They are not readings.** A line is never a series, never fed to a
+  // filter, never in a CSV, and never part of the vertical axis's fit — a
+  // runaway exponential must not be able to squash the record it was drawn
+  // over. They are in the SVG and PNG exports, because those are pictures of
+  // what is on screen, and they last as long as the tab does, like an edit.
+  //
+  // Each line remembers which Reading it was made on (Value, Increment or
+  // Rate/h) and is drawn only there: a stroke drawn over a rate means nothing
+  // laid over the values it came from.
+  const AD_LINE_COLORS = ['#e06c00', '#7c35a3', '#00838f', '#ad1457', '#107c10', '#3949ab', '#b8860b'];
+  const AD_LINE_KIND = { fn: 'function', fit: 'fit', sketch: 'drawn', ruler: 'ruler' };
+  const AD_READING_WORD = { value: 'Value', increment: 'Increment', rate: 'Rate/h' };
+
+  function addLine(line) {
+    const n = ++ad.lineSeq;
+    const l = { id: n, visible: true, axis: 'left', transform: ad.transform,
+                color: AD_LINE_COLORS[(n - 1) % AD_LINE_COLORS.length], ...line };
+    // Functions and fits are both drawn from source text in PlotLines'
+    // language; a fit's is its coefficients at full precision.
+    if (l.src != null) l.f = PlotLines.compile(l.src).f || null;
+    ad.lines.push(l);
+    return l;
+  }
+  const lineById = id => ad.lines.find(l => l.id === +id);
+  const lineOnChart = l => l.visible && l.transform === ad.transform;
+
+  // The unit a line's slope is quoted in: the left axis's, per hour.
+  function lineUnit() {
+    const u = axisUnit(axisSides().left) || shown()[0]?.unit || '';
+    return ad.transform === 'value' ? u
+         : ad.transform === 'increment' ? `${u}/reading` : `${u}/h`;
+  }
+  function rulerSlope(l) {
+    const [[t0, v0], [t1, v1]] = l.pts;
+    const h = (t1 - t0) / PlotLines.HOUR;
+    return h ? (v1 - v0) / h : NaN;
+  }
+  const slopeWords = (sl, unit) => (Number.isFinite(sl)
+    ? `${sl > 0 ? '+' : ''}${fmtVal(sl)}${unit ? ` ${unit}` : ''} per hour` : 'vertical');
+
+  // A function line sampled across the plot every two pixels between pxA and
+  // pxB, as path data; breaks wherever it is undefined. Values far off the
+  // plot are clamped a few heights out so the path's numbers stay short and
+  // the clip still cuts it at the edge.
+  function lineSample(l, g, sy, pxA, pxB) {
+    const top = PADT - g.ph * 3, bot = g.h - PADB + g.ph * 3;
+    let d = '', pen = false, last = null;
+    const at = px => {
+      const y = l.f((g.tOf(px) - l.origin) / PlotLines.HOUR);
+      if (!Number.isFinite(y)) { pen = false; return; }
+      const py = Math.max(top, Math.min(bot, sy(y)));
+      d += `${pen ? 'L' : 'M'}${px.toFixed(1)} ${py.toFixed(1)}`;
+      pen = true;
+      if (py >= PADT && py <= g.h - PADB) last = [px, py];
+    };
+    for (let px = pxA; px < pxB; px += 2) at(px);
+    at(pxB);
+    return { d, last };
+  }
+
+  // Every line on the chart, and the one being drawn. Called inside the
+  // plot's clip, over the readings and their marks.
+  function linesLayer(g, c) {
+    const live = ad.drag && (ad.drag.mode === 'draw' || ad.drag.mode === 'ruler') ? ad.drag : null;
+    const list = ad.lines.filter(lineOnChart);
+    if (!list.length && !live) return '';
+    const x0 = PADL, x1 = g.w - g.padR;
+    const halo = `stroke="${c.panel}" stroke-width="3" paint-order="stroke" stroke-linejoin="round"`;
+    const label = (px, py, text, col, anchor = 'end') => `
+      <text x="${px.toFixed(1)}" y="${(py - 6).toFixed(1)}" font-size="10.5" font-weight="600"
+            text-anchor="${anchor}" fill="${escAttr(col)}" ${halo}>${esc(text)}</text>`;
+    let out = '';
+    for (const l of list) {
+      const sy = l.axis === 'right' && g.yrR ? g.yR : g.y;
+      const paint = `stroke="${escAttr(l.color)}" fill="none" stroke-linejoin="round" stroke-linecap="round"`;
+      if (l.f) {
+        if (l.kind === 'fit') {
+          // Dashed where it is extrapolating, solid over the readings it was
+          // fitted to — a curve carried past its data is a guess, and has to
+          // look like one.
+          const all = lineSample(l, g, sy, x0, x1);
+          const a = Math.max(x0, g.x(l.origin + l.from * PlotLines.HOUR));
+          const b = Math.min(x1, g.x(l.origin + l.to * PlotLines.HOUR));
+          out += `<path class="ad-line ad-line--fit" data-line="${l.id}" d="${all.d}" ${paint}
+                        stroke-width="1.5" stroke-dasharray="6 4" opacity=".75"/>`;
+          let lab = all.last;
+          if (b > a) {
+            const fitted = lineSample(l, g, sy, a, b);
+            out += `<path class="ad-line ad-line--fit-in" d="${fitted.d}" ${paint} stroke-width="2.4"/>`;
+            lab = fitted.last || lab;
+          }
+          if (lab) out += label(lab[0], lab[1], l.label, l.color);
+        } else {
+          const s = lineSample(l, g, sy, x0, x1);
+          out += `<path class="ad-line ad-line--fn" data-line="${l.id}" d="${s.d}" ${paint} stroke-width="2"/>`;
+          if (s.last) out += label(s.last[0], s.last[1], l.label, l.color);
+        }
+        continue;
+      }
+      if (!l.pts || l.pts.length < 2) continue;
+      const pts = l.pts.map(([t, v]) => [g.x(t), sy(v)]);
+      const d = pts.map(([px, py], i) => `${i ? 'L' : 'M'}${px.toFixed(1)} ${py.toFixed(1)}`).join('');
+      out += `<path class="ad-line ad-line--${l.kind}" data-line="${l.id}" d="${d}" ${paint}
+                    stroke-width="${l.kind === 'ruler' ? 2 : 2.2}"/>`;
+      if (l.kind === 'ruler') {
+        for (const [px, py] of pts) out += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3" fill="${escAttr(l.color)}"/>`;
+        const mx = (pts[0][0] + pts[1][0]) / 2, my = (pts[0][1] + pts[1][1]) / 2;
+        out += label(mx, my, slopeWords(rulerSlope(l), lineUnit()), l.color, 'middle');
+      } else {
+        const [ex, ey] = pts[pts.length - 1];
+        out += label(ex, ey, l.label, l.color, ex > x1 - 60 ? 'end' : 'start');
+      }
+    }
+    if (live) {
+      const col = AD_LINE_COLORS[ad.lineSeq % AD_LINE_COLORS.length];
+      if (live.mode === 'ruler') {
+        out += `<line x1="${live.x0.toFixed(1)}" y1="${live.y0.toFixed(1)}" x2="${live.x1.toFixed(1)}"
+                      y2="${live.y1.toFixed(1)}" stroke="${col}" stroke-width="2" stroke-dasharray="5 3"/>`;
+        const sl = rulerSlope({ pts: [[g.tOf(live.x0), g.valOf(live.y0)], [g.tOf(live.x1), g.valOf(live.y1)]] });
+        out += label((live.x0 + live.x1) / 2, (live.y0 + live.y1) / 2, slopeWords(sl, lineUnit()), col, 'middle');
+      } else if (live.pts.length > 1) {
+        out += `<path d="${live.pts.map(([t, v], i) => `${i ? 'L' : 'M'}${g.x(t).toFixed(1)} ${g.y(v).toFixed(1)}`).join('')}"
+                      stroke="${col}" stroke-width="2.2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`;
+      }
+    }
+    return out;
+  }
+
+  // What each function line reads at the crosshair, for the tooltip.
+  function lineTipHtml(t) {
+    return ad.lines.filter(l => lineOnChart(l) && l.f).map(l => {
+      const y = l.f((t - l.origin) / PlotLines.HOUR);
+      if (!Number.isFinite(y)) return '';
+      return `<div class="ad-tip-r ad-tip-line"><span class="ad-dot" style="--dot:${escAttr(l.color)}"></span>
+                ${esc(l.label)} <b>${esc(fmtVal(y))}</b></div>`;
+    }).join('');
+  }
+
+  // One line's row in the panel: what it is, the numbers that describe it,
+  // and the four things that can be done to it.
+  function lineRowHtml(l) {
+    const unit = l.unit != null ? l.unit : '';
+    let what = '';
+    if (l.kind === 'fn') {
+      what = `ƒ(t) = <code>${esc(l.src)}</code>`;
+    } else if (l.kind === 'fit') {
+      what = `<code>${esc(l.eq)}</code> · r² ${esc(l.r2.toFixed(4))} · RMS ${esc(fmtVal(l.rmse))}${
+        unit ? ' ' + esc(unit) : ''} · ${l.n.toLocaleString()} readings${l.note ? ` · ${esc(l.note)}` : ''}`;
+    } else if (l.kind === 'ruler') {
+      what = `${esc(slopeWords(rulerSlope(l), lineUnit()))} · from ${esc(fmtFull(l.pts[0][0]))} to ${
+        esc(fmtFull(l.pts[1][0]))}`;
+    } else {
+      what = `${l.pts.length.toLocaleString()} points, from ${esc(fmtFull(l.pts[0][0]))}`;
+    }
+    const origin = l.origin != null
+      ? `<span class="small ad-line-origin">t is hours from ${esc(fmtFull(l.origin))}</span>` : '';
+    const elsewhere = l.transform !== ad.transform
+      ? `<span class="small ad-line-away">drawn on ${esc(AD_READING_WORD[l.transform] || l.transform)} — switch Reading to see it</span>` : '';
+    const right = l.kind === 'fn' && axisSides().right.length ? `
+      <select aria-label="Axis for ${escAttr(l.label)}" onchange="ArroData.lineAxis(${l.id}, this.value)">
+        <option value="left" ${l.axis !== 'right' ? 'selected' : ''}>left axis</option>
+        <option value="right" ${l.axis === 'right' ? 'selected' : ''}>right axis</option>
+      </select>` : '';
+    return `
+      <li class="ad-line-row" data-line="${l.id}">
+        <div class="ad-line-head">
+          <input type="checkbox" ${l.visible ? 'checked' : ''} aria-label="Show ${escAttr(l.label)}"
+                 onchange="ArroData.lineToggle(${l.id}, this.checked)">
+          <input type="color" value="${escAttr(l.color)}" aria-label="Colour of ${escAttr(l.label)}"
+                 onchange="ArroData.lineColor(${l.id}, this.value)">
+          <input type="text" class="ad-line-name" value="${escAttr(l.label)}" aria-label="Name of this line"
+                 onchange="ArroData.lineName(${l.id}, this.value)">
+          <span class="ad-line-kind small">${esc(AD_LINE_KIND[l.kind] || l.kind)}</span>
+          ${right}
+          <button class="ad-x" onclick="ArroData.lineRemove(${l.id})"
+                  aria-label="Remove ${escAttr(l.label)}" title="Remove this line">✕</button>
+        </div>
+        <div class="small ad-line-what">${what} ${origin} ${elsewhere}</div>
+      </li>`;
+  }
+
+  function linesHtml() {
+    const ex = extent();
+    const n = ad.lines.length;
+    return `
+      <details class="ad-lines" id="ad-lines" ${ad.linesOpen ? 'open' : ''}
+               ontoggle="ArroData.linesToggle(this)">
+        <summary>Your lines <span class="small">— ${n ? `${n} drawn over the readings` :
+          'functions, fitted curves and your own drawing, over the readings'}</span></summary>
+        <div class="ad-lines-fn">
+          <label class="ad-fn-lab">ƒ(t) =
+            <input type="text" id="ad-fn" class="ad-fn-in" value="${escAttr(ad.fnDraft)}"
+                   spellcheck="false" autocomplete="off"
+                   placeholder="e.g. 2.4 + 0.05t    3·exp(−t/36)    1.8"
+                   aria-describedby="ad-fn-help${ad.fnErr ? ' ad-fn-err' : ''}"
+                   ${ad.fnErr ? 'aria-invalid="true"' : ''}
+                   oninput="ArroData.setFnDraft(this.value)"
+                   onkeydown="if (event.key === 'Enter') { event.preventDefault(); ArroData.lineAddFn(); }"></label>
+          <label class="ad-fn-lab small">Name
+            <input type="text" id="ad-fn-name" class="ad-fn-name" value="${escAttr(ad.fnLabel)}"
+                   placeholder="optional" oninput="ArroData.setFnLabel(this.value)"
+                   onkeydown="if (event.key === 'Enter') { event.preventDefault(); ArroData.lineAddFn(); }"></label>
+          <button onclick="ArroData.lineAddFn()">Draw it</button>
+        </div>
+        ${ad.fnErr ? `<p class="ad-fn-err" id="ad-fn-err" role="alert">${esc(ad.fnErr)}</p>` : ''}
+        <p class="small ad-cfg-note" id="ad-fn-help">
+          <b>t</b> is hours from the start of the record${ex ? ` (${esc(fmtFull(ex.t0))})` : ''} and
+          <b>d</b> is days. Use + − × ÷ ^ and brackets, <code>sin cos tan exp ln log sqrt abs
+          min max pow floor round step</code>, <code>pi</code> and <code>e</code>; <code>2t</code>
+          means 2×t. A plain number is a horizontal line.
+        </p>
+        ${n ? `<ul class="ad-lines-list">${ad.lines.map(lineRowHtml).join('')}</ul>
+          <p class="ad-lines-acts"><button onclick="ArroData.linesClear()">Remove every line</button></p>` : ''}
+        <p class="small ad-cfg-note">
+          <b>Draw</b> and <b>Ruler</b> on <em>Drag does</em> draw on the chart itself; a ruled line is
+          labelled with its slope. To fit a curve, set <em>Drag does</em> to <b>Select</b>, drag a box
+          over the readings, then <b>fit a curve</b> in the strip under the chart — solid over the
+          readings it was fitted to, dashed where it carries on past them. Lines are in the SVG and PNG
+          downloads, never in a CSV, and last as long as this tab.
+        </p>
+      </details>`;
+  }
+
+  function renderLines() {
+    const el = document.getElementById('ad-lines');
+    if (el) el.outerHTML = linesHtml();
+  }
+  function linesChanged() { renderLines(); draw(); }
+
+  function linesToggle(el) { ad.linesOpen = !!el.open; }
+  function linesOpenFn() {
+    ad.linesOpen = true;
+    renderLines();
+    const box = document.getElementById('ad-fn');
+    if (box) { box.scrollIntoView({ block: 'nearest' }); box.focus(); }
+  }
+  // Kept without re-rendering under the caret, like the edit boxes.
+  function setFnDraft(v) { ad.fnDraft = String(v == null ? '' : v); }
+  function setFnLabel(v) { ad.fnLabel = String(v == null ? '' : v); }
+
+  function lineAddFn() {
+    const src = ad.fnDraft.trim();
+    const ex = extent();
+    const c = PlotLines.compile(src);
+    if (c.error || !ex) {
+      ad.fnErr = c.error || 'Load some readings first — t is measured from the start of the record.';
+      renderLines();
+      document.getElementById('ad-fn')?.focus();
+      return;
+    }
+    const l = addLine({ kind: 'fn', src, origin: ex.t0,
+                        label: ad.fnLabel.trim() || (c.constant ? `y = ${src}` : `ƒ = ${src}`) });
+    ad.fnDraft = ''; ad.fnLabel = ''; ad.fnErr = '';
+    ad.linesOpen = true;
+    linesChanged();
+    document.getElementById('ad-fn')?.focus();
+    announce(`${l.label} drawn on the chart.`);
+  }
+
+  function setFitKind(v) { ad.fitKind = v; }
+
+  // One fit per series among the picked readings: a selection across a level
+  // and a rain gauge is two questions, and one curve through both would answer
+  // neither. Times are hours from each series' first picked reading.
+  function fitPicked() {
+    const by = pickedBySeries();
+    if (!by.size) {
+      note('Pick readings to fit first: set Drag does to Select and drag a box over them, or press all in view.');
+      return;
+    }
+    const said = [], bad = [];
+    for (const [s, rows] of by) {
+      const origin = s.t[rows[0]];
+      const xs = rows.map(i => (s.t[i] - origin) / PlotLines.HOUR);
+      const ys = rows.map(i => s.v[i]);
+      const r = PlotLines.fit(ad.fitKind, xs, ys);
+      if (r.error) { bad.push(`${s.label}: ${r.error}`); continue; }
+      const l = addLine({
+        kind: 'fit', src: r.src, eq: r.eq, origin, from: r.from, to: r.to,
+        r2: r.r2, rmse: r.rmse, n: r.n, note: r.note || '', fitKind: r.kind,
+        unit: s.unit, axis: axisOf(s), seriesKey: s.key, transform: 'value',
+        label: `${PlotLines.fitLabel(r.kind)} · ${s.label}`,
+      });
+      said.push(`${l.label}: ${r.eq}, r² ${r.r2.toFixed(3)}`);
+    }
+    if (said.length) {
+      ad.linesOpen = true;
+      linesChanged();
+      announce(`Fitted ${said.join('; ')}.`);
+    }
+    if (bad.length) note(bad.join(' '), true);
+    else if (ad.transform !== 'value') note('Fitted to the values — switch Reading to Value to see the curve.');
+    else note(`Fitted ${said.join('; ')}. Listed under Your lines.`);
+  }
+
+  function lineToggle(id, on) { const l = lineById(id); if (l) { l.visible = !!on; draw(); } }
+  function lineColor(id, v)   { const l = lineById(id); if (l && /^#[0-9a-f]{6}$/i.test(v)) { l.color = v; draw(); } }
+  function lineAxis(id, v)    { const l = lineById(id); if (l) { l.axis = v === 'right' ? 'right' : 'left'; draw(); } }
+  function lineName(id, v) {
+    const l = lineById(id);
+    if (!l) return;
+    l.label = String(v || '').trim() || `Line ${l.id}`;
+    draw();
+  }
+  function lineRemove(id) {
+    const l = lineById(id);
+    if (!l) return;
+    ad.lines = ad.lines.filter(x => x !== l);
+    linesChanged();
+    announce(`${l.label} removed.`);
+  }
+  async function linesClear() {
+    if (!ad.lines.length) return;
+    if (ad.lines.length > 1 && !(await confirmDialog({ title: `Remove all ${ad.lines.length} lines?`,
+      message: 'The readings are not touched.', confirm: 'Remove them', danger: true }))) return;
+    ad.lines = [];
+    linesChanged();
+  }
+
   function compareHtml() {
     const vis = shown();
     const tot  = vis.reduce((a, s) => a + s.n, 0);
@@ -4262,9 +4601,9 @@ const ArroData = (function () {
         <h2>Our own telemetry</h2>
         <p>Readings that field stations sent us, out of the Flood-Net datastore — pick a station,
            its sensors and a window on the left.</p>
-        <p>The chart, the Bureau's 3-5-7 continuity filter and the inspector are the ARRO Data
+        <p>The chart, the Bureau's 3-5-7 continuity filter and the inspector are the Plots
            tab's, unchanged. What is different is where the numbers came from, and this tab never
-           mixes the two: ARRO exports stay on the ARRO Data tab, and every chart and export here
+           mixes the two: ARRO exports stay on the Plots tab, and every chart and export here
            says so on its face.</p>
         <p class="small">
           Readings arrive as counts, so the 3/5/7 thresholds are counts too and the filter runs on
@@ -4396,8 +4735,20 @@ const ArroData = (function () {
             ['pan',    'Pan',      'Drag moves the window along the record. Shift or Alt still reach either zoom.'],
             ['box',    'Box zoom', 'Drag a box to zoom to it — time and value together. Or hold Shift while dragging.'],
             ['y',      'Vertical', 'Drag up or down to rescale the vertical axis to that span; time stays put. Or hold Alt while dragging.'],
-            ['select', 'Select',   'Drag a box to pick every reading in it, removed ones included, then edit or delete them. Click a picked reading and drag it up or down to move it.'],
+            ['select', 'Select',   'Drag a box to pick every reading in it, removed ones included, then edit or delete them — or fit a curve to them. Click a picked reading and drag it up or down to move it.'],
+            ['draw',   'Draw',     'Draw freehand on the chart. The stroke stays where you drew it as you pan and zoom, and is listed under Your lines.'],
+            ['ruler',  'Ruler',    'Drag a straight line between two points. It is labelled with its slope — a rate per hour you can read straight off the chart.'],
           ], 'setDrag'))}
+          ${grp('Lines', `
+            <span class="ad-tool-grp">
+              <button onclick="ArroData.linesOpenFn()"
+                      title="Type a function of time — t is hours, d is days — and draw it over the readings">ƒ(t) function</button>
+              <!-- Never disabled: a lasso changes the selection without
+                   re-rendering this row, so a disabled state here would go
+                   stale. With nothing picked it says how to pick instead. -->
+              <button onclick="ArroData.fitPicked()"
+                      title="Fit a curve to the picked readings — pick them with Drag does: Select">Fit picked</button>
+            </span>`)}
           ${ad.picked.size ? `
           ${grp('Picked', `
             <span class="ad-tool-grp">
@@ -4744,6 +5095,16 @@ const ArroData = (function () {
                   title="Add this to every picked reading — negative subtracts. The way to undo a datum shift across a stretch.">move by</button>
           <button onclick="ArroData.editValue('scale', document.getElementById('ad-edit-val').value)"
                   title="Multiply every picked reading by this — the way to fix a unit, 0.001 for mm read as µm">×</button>
+        </div>
+        <div class="ad-edit-row">
+          <label class="small">Fit
+            <select id="ad-fit-kind" aria-label="Kind of curve to fit to the picked readings"
+                    onchange="ArroData.setFitKind(this.value)">
+              ${PlotLines.FIT_KINDS.map(([k, l, tip]) => `<option value="${k}" title="${escAttr(tip)}"
+                  ${ad.fitKind === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+            </select></label>
+          <button onclick="ArroData.fitPicked()"
+                  title="Fit this kind of curve to the picked readings, one per series, and draw it over the chart. Nothing about the readings changes.">fit a curve</button>
         </div>
         <div class="ad-edit-row">
           <label class="small">Quality
@@ -5419,6 +5780,10 @@ const ArroData = (function () {
     // What the filter took out, and what never made it in — after every series'
     // curve, so no line is drawn over a mark.
     out += `<g clip-path="url(#ad-clip)">${flood.under}${series}${markers}${removalMarks(g, c, capped)}${flood.over}</g>`;
+    // The lines a person added (see "Your lines"), over everything the data
+    // put there, so a fitted curve is never hidden under the record it fits.
+    const own = linesLayer(g, c);
+    if (own) out += `<g class="ad-lines-g" clip-path="url(#ad-clip)">${own}</g>`;
 
     // Crosshair and the nearest-reading halo.
     if (ad.hover) {
@@ -6032,7 +6397,8 @@ const ArroData = (function () {
       + ad.hover.rows.slice(0, 6).map(r => `
         <div class="ad-tip-r"><span class="ad-dot" style="--dot:${escAttr(r.color)}"></span>
           ${esc(r.label)} <b>${esc(fmtVal(r.y))}</b> ${esc(r.unit)}</div>
-        ${tipDeltas(r)}`).join('');
+        ${tipDeltas(r)}`).join('')
+      + lineTipHtml(ad.hover.t);
     const r = stage.getBoundingClientRect();
     const lx = ev.clientX - r.left, ly = ev.clientY - r.top;
     tip.hidden = false;
@@ -6127,6 +6493,17 @@ const ArroData = (function () {
           draw();
           return;
         }
+        if (ad.drag.mode === 'draw') {
+          // A point every couple of pixels of travel is as fine as a hand
+          // draws; anything denser is the same stroke with more numbers in it.
+          if (Math.hypot(px - ad.drag.x1, py - ad.drag.y1) >= 2) {
+            const g2 = geom();
+            if (g2) ad.drag.pts.push([g2.tOf(px), g2.valOf(py)]);
+            ad.drag.x1 = px; ad.drag.y1 = py;
+            draw();
+          }
+          return;
+        }
         if (ad.drag.mode !== 'pan') { ad.drag.x1 = px; ad.drag.y1 = py; draw(); return; }
         const g = geom();
         if (!g) return;
@@ -6182,6 +6559,9 @@ const ArroData = (function () {
         }
       }
       ad.drag = { px, py, x0: px, y0: py, x1: px, y1: py, t0: g.v.t0, t1: g.v.t1, mode, hold };
+      // A stroke is kept in time and value rather than pixels, so it stays on
+      // the readings it was drawn over when the chart is panned or zoomed.
+      if (mode === 'draw') ad.drag.pts = [[g.tOf(px), g.valOf(py)]];
     };
     svg.onpointerup = ev => {
       const d = ad.drag;
@@ -6214,6 +6594,22 @@ const ArroData = (function () {
           afterEdit(`${d.hold.rows.length.toLocaleString()} reading${
             d.hold.rows.length === 1 ? '' : 's'} moved on the chart.`);
         }
+        return;
+      }
+      // Draw and Ruler: a stroke becomes a line. A click without movement
+      // falls through to the pin below, as in every other mode.
+      if (moved && d.mode === 'draw' && d.pts.length > 1) {
+        d.pts.push([g.tOf(px), g.valOf(py)]);
+        const l = addLine({ kind: 'sketch', pts: d.pts, label: `Drawn ${ad.lineSeq + 1}` });
+        linesChanged();
+        announce(`${l.label} added to Your lines.`);
+        return;
+      }
+      if (moved && d.mode === 'ruler') {
+        const l = addLine({ kind: 'ruler', label: `Ruler ${ad.lineSeq + 1}`,
+                            pts: [[g.tOf(d.x0), g.valOf(d.y0)], [g.tOf(px), g.valOf(py)]] });
+        linesChanged();
+        announce(`${l.label}: ${slopeWords(rulerSlope(l), lineUnit())}.`);
         return;
       }
       if (moved && d.mode === 'select') {
@@ -6338,6 +6734,9 @@ const ArroData = (function () {
         // Escape gives back the most recent thing claimed: the selection first,
         // then the pin. One key, unwound in the order they were made.
         case 'Escape':
+          if (ad.drag && (ad.drag.mode === 'draw' || ad.drag.mode === 'ruler')) {
+            ev.preventDefault(); ad.drag = null; draw(); return;
+          }
           if (ad.picked.size) { ev.preventDefault(); pickClear(); return; }
           ad.pin = null;
           break;
@@ -6747,7 +7146,7 @@ const ArroData = (function () {
         && !(await confirmDialog({ title: `Remove all ${ad.series.length} ${what}?`, message: extra.trim(),
           confirm: 'Remove them all', danger: true }))) return;
     forgetPicks(ad.series.map(s => s.key));
-    ad.series = []; ad.pin = null; ad.hover = null; ad.view = null;
+    ad.series = []; ad.pin = null; ad.hover = null; ad.view = null; ad.lines = [];
     renderAll();
   }
 
@@ -7119,6 +7518,9 @@ const ArroData = (function () {
     toggle, setColor, colourToggle, setDash, setAxis, setKind, setFlood, solo, zoomTo, remove, clearAll, showStation,
     setCfg, resetCfg, setQual, setMode, setTransform, setChart, setY, setYRange, setFlag, setMark, setDrag,
     resetView, toggleFull,
+    // Your lines: typed functions, fitted curves, drawing and rulers
+    linesToggle, linesOpenFn, setFnDraft, setFnLabel, lineAddFn, setFitKind, fitPicked,
+    lineToggle, lineColor, lineAxis, lineName, lineRemove, linesClear,
     // Editing readings (#191), and the selection it works over
     pickToggle, pickClear, pickAllInView, editValue, editQuality, editDelete,
     revertSeries, setEditVal, setEditQ, editCell, openTableModal, closeTableModal,

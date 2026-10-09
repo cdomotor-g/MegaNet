@@ -79,7 +79,8 @@ MegaNet/
 ├── bit-flipper.js          ← Bit Flipper tab
 ├── network-view.js         ← NetworkView — Ghosting Graph tab (the knowledge graph)
 ├── arro-launcher.js        ← ARRO Launcher tab
-├── arro-data.js            ← ArroData  — ARRO Data tab (CSV import, 357 filter, plots)
+├── plot-lines.js           ← PlotLines — the typed functions and curve fits drawn on the Plots charts
+├── arro-data.js            ← ArroData  — Plots tab (CSV import, 357 filter, plots, your own lines)
 ├── datastore.js            ← the browser's PostgREST client: ping, reads, writes, snapshot
 ├── export.js               ← Export tab
 ├── station-editor.js       ← the station editor card on the Stations tab
@@ -600,7 +601,7 @@ refreshed on write is the fix — worth knowing before the write path lands.
 
 The station list is what the network *is*. This is what it *reports*, and it is a
 completely separate source of truth from ARRO — the same charting machinery (the
-**Field Data** tab is the ARRO Data chart over these rows), different data.
+**Field Data** tab is the Plots chart over these rows), different data.
 
 Everything that will ever write a reading goes through **one function**:
 
@@ -2955,7 +2956,7 @@ on a narrow window.
 | **Stations & networks** | Stations · Radio Path Maps · Pass Ranges · Export · Map Generator |
 | **Interference** | RF Environment · RF Changes · Interference Workbench |
 | **ALERT** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · HFEM Messages · Serial Monitor |
-| **Data** | ARRO Launcher · ARRO Data · Field Data · Message Log |
+| **Data** | ARRO Launcher · Plots · Field Data · Message Log |
 | **Site visits** | Inspections · Site Maintenance · Inspection History · Field Camera · Field Photos |
 
 #### Where the grouping comes from
@@ -3590,7 +3591,7 @@ the flat map under the 3-D view.
 
 ---
 
-### 18. ARRO Data (CSV Import, 357 Filter & Plotting)
+### 18. Plots (CSV Import, 357 Filter & Plotting) — once "ARRO Data"
 
 A tab for looking at what the sensors actually sent. ARRO exports one CSV per
 sensor; this reads them in the browser, links each one back to its station, runs
@@ -3881,6 +3882,34 @@ desktop — there is no demo code path in the chart.
 
 > The specification is in `docs/` (v2.1, May 2009, and the 1998 first edition),
 > along with the sample export used to develop this.
+
+#### Your own lines — functions, fitted curves, drawing
+
+Four ways to put a line of your own over the readings, all listed in the
+**Your lines** panel under the chart (show/hide, colour, rename, remove):
+
+- **ƒ(t) function** — type a function of time. `t` is hours from the start of
+  the record and `d` is days; `+ − × ÷ ^`, brackets, `sin cos tan exp ln log
+  sqrt abs min max pow floor round step`, `pi` and `e`; `2t` means 2×t, and a
+  plain number is a horizontal line. The text is parsed by a calculator grammar
+  in `plot-lines.js` and turned into closures over `Math` — it is never handed
+  to JavaScript, so the box cannot run code.
+- **Fit a curve** — pick readings with *Drag does: Select*, then choose a fit in
+  the selection strip: straight line, quadratic, cubic, exponential (log-linear),
+  recession `c + a·e^(−t/k)` (golden-section on k, least squares for a and c), or
+  *best of these* by AIC. One fit per series, timed from its first picked
+  reading; drawn solid over the readings it was fitted to and dashed where it
+  extrapolates, with its equation, r², RMS residual and n.
+- **Draw** — freehand on the chart, kept in time and value so it stays put
+  through pan and zoom.
+- **Ruler** — a straight line between two points, labelled with its slope per
+  hour.
+
+Lines are not readings: no filter sees them, they never move the vertical
+axis, they are in the PNG/SVG downloads and in no CSV, and each is drawn only
+on the *Reading* (Value / Increment / Rate) it was made on. They live in the
+tab, like edits. `npm run plotlines` holds the parser and the fits to known
+answers.
 
 ### 19. ALERT2 / ERT-A2 Serial Decoder
 

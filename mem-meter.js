@@ -55,7 +55,7 @@ const MemMeter = (function () {
     // each, the canvas 4–16 MB — kept so a station looked at twice costs no
     // second fetch. Releasable for terrain's reason: the next twin re-fetches.
     { key: 'twin',      label: 'Digital twin patches',    color: '--accent',        releasable: true  },
-    { key: 'arro',      label: 'ARRO Data series',        color: '--role-field',    releasable: true  },
+    { key: 'arro',      label: 'Plots series',            color: '--role-field',    releasable: true  },
     { key: 'a2',        label: 'ALERT2 capture',          color: '--draw',         releasable: false },
     { key: 'storage',   label: 'localStorage',            color: '--muted',        releasable: false },
   ];

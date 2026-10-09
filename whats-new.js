@@ -25,6 +25,18 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 21, date: '2026-10-09', items: [
+      '<strong>📊 ARRO Data is now <em>Plots</em></strong> — same place in <em>Data</em>, same chart, and it can now be '
+        + 'drawn on. <strong>ƒ(t) function</strong> on the toolbar draws a function you type over the readings '
+        + '(<code>t</code> is hours, <code>d</code> days — <code>2.4 + 0.05t</code>, <code>3·exp(−t/36)</code>, or a '
+        + 'plain number for a horizontal line).',
+      '<strong>Fit a curve to readings you pick.</strong> Set <em>Drag does</em> to <b>Select</b>, drag a box over a '
+        + 'stretch, and <b>fit a curve</b>: a straight line, quadratic, cubic, exponential, a recession to a baseline, or '
+        + 'whichever of them fits best — drawn solid over the readings and dashed past them, with its equation and r². '
+        + '<b>Draw</b> sketches freehand on the chart and <b>Ruler</b> rules a straight line labelled with its slope per '
+        + 'hour. All of them are listed under <em>Your lines</em> and go into the PNG and SVG downloads; Field Data has '
+        + 'them too.',
+    ] },
     { n: 20, date: '2026-10-09', items: [
       '<strong>📏 Level Survey</strong>, in a new group, <em>Surveying</em>: a station\'s levels surveyed on a phone. Book the '
         + 'run rise and fall a sight at a time and it is reduced as you go — the three checks, the misclose, the gauge boards '

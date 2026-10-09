@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-09** (revision 145 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-09** (revision 146 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -536,6 +536,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and twelve `[Human]` issues.
 >
+> **Revision 146 opens and closes nothing** — at the owner's request: the ARRO Data tab is renamed **📊 Plots**, and its chart (and Field Data's, the same module) can be drawn on — a function typed in `t` (hours) and `d` (days), a curve fitted to picked readings (straight line, quadratic, cubic, exponential, recession to a baseline, or the best by AIC), a freehand stroke, and a ruled line labelled with its slope per hour. Nothing for a person (see revision 146 below).
+
 > **Revision 145 opens four `[Human]` issues and closes nothing** — the register's corrections out of revision 144, at the owner's request: #234 (the real masts and antennas of the 15 hubs the attenuator tests disagree with), #233 (the 29 repeaters and bases the LiDAR disagrees with), #235 (re-sweep and save the fade-margin map under 12 dB) and #236 (378 pass-range pairs between 150 and 1,000 km — relays or errors). With them, an account of where the fade margin stands: from 41 dB low to within a few decibels of Radio Mobile, which still ranks the paths better — and Flood-Net matches it once given the same site heights and positions, so the rest is the register's (see revision 145 below and sequencing item 29).
 >
 > **Revision 144 opens and closes nothing** — at the owner's request, two of the suggestions that followed revision 142. **The model against every attenuator test**: a Network Review panel (`network-history.js`) prices every station tested since 2010 — 681 the register can price — and fits the allowance network-wide: **12 dB** (12.2, 11.0–13.5 at 90 %, over the 473 stations whose best path is ≤35 km), replacing one region's 16; by distance the field reads 22–27 dB everywhere while the model falls away (long links were built with more than the register records), and 15 of 37 hubs sit 10 dB or more off the network — register entries short of a mast, an antenna or a position. **LiDAR where it matters** (`lidar-profile.js`): 5 m LiDAR round each end and wherever the ground comes within 30 m of the line of sight (or the Fresnel zone), in shared 0.01° tiles, masts stood on their tops — built as the link budget card's *Ground* setting and tested against the same 681 stations: it was **no better** than the tiles (typical error 12.5 against 10.6 dB), because 5 m ground prices the register's rounded positions exactly, so the tiles stay the default and LiDAR checks the register instead (every repeater and base against the grid). Readings off the 3 dB grid are now 1 dB steps; datastore reads are paged past the 1,000-row cap. Nothing new for a person beyond what is offered below (see revision 144).
@@ -761,6 +763,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 146 — 2026-10-09: 📊 ARRO Data becomes Plots, and the chart can be drawn on
+
+At the owner's request: rename the ARRO Data tab "Plots", and let a person add their own lines and functions to a plot — by typing a function, by drawing on it, or by picking readings and having Flood-Net fit a function to them. No issue opened or closed.
+
+- **The rename** is the nav label and every sentence a person reads (help, the Field Data tab's cross-references, the Site Map, the Message Log, the memory meter, README). The tab id stays `arrodata` and the module stays `ArroData`, so links, saved state and the checks that name it are untouched; the search words keep "arro data".
+- **`plot-lines.js` (`PlotLines`)**, new and pure: a calculator grammar for typed functions — numbers, `+ − × ÷ ^`, brackets, implicit multiplication, a closed list of functions, `pi`, `e`, `t` (hours from an origin) and `d` (days) — built into closures over `Math`. **The text never reaches `eval` or `Function`**; anything outside the grammar is refused with the position it stopped at. And least-squares fits: polynomials to degree 3 (fitted in a scaled variable, expanded back), log-linear exponential, recession `c + a·e^(−t/k)` (golden-section on log k, linear least squares for a and c), and best-of by AIC, each with r², RMS and n.
+- **`arro-data.js`, "Your lines"**: *Drag does* gains **Draw** (freehand, kept in time and value so it follows pan and zoom) and **Ruler** (two points, labelled with the slope per hour); the toolbar gains **ƒ(t) function** and **Fit picked**; the selection strip gains a fit picker. A fit is one per series, timed from its first picked reading, drawn solid over the readings it was fitted to and dashed where it extrapolates. A panel under the chart lists every line — show, colour, rename, axis for a function, remove — and the tooltip reads each function at the crosshair. Lines are never readings: no filter sees them, they do not move the vertical axis, they are in the SVG/PNG and in no CSV, each is drawn only on the *Reading* it was made on, and they last as long as the tab.
+
+**Checks:** `npm run plotlines` (new, Node-only, a CI step: 58 assertions — expressions against their values on paper, sixteen inputs refused, every fit recovering the coefficients it was built from, each fit's source compiling back to its own curve); `npm run plotdraw` (new, Chromium, a CI step: 22 — the tab is called Plots, a refused function draws nothing, a function, a boxed-and-fitted curve, a stroke and a ruler each reach the chart, follow a pan, hide, go, and stay off the Increment view); `toplevel` accepts `plot-lines.js`'s guarded CommonJS export, as it does `itm.js`'s; the cheap five, `adnav`, `adqual`, `tabs`, `help`, `search` and `nav`.
 
 ### Revision 145 — 2026-10-09: four `[Human]` issues for the register, and where the fade margin stands against Radio Mobile
 

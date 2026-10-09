@@ -197,7 +197,7 @@ const SiteMap = (function () {
       ],
     },
     field: {
-      what: 'Charts the readings stations sent to the Flood-Net datastore, with the same chart and filter as ARRO Data.',
+      what: 'Charts the readings stations sent to the Flood-Net datastore, with the same chart and filter as Plots.',
       use: [
         'Plot a station\'s rainfall or river level over any window',
         'Put a station\'s sensors side by side',
