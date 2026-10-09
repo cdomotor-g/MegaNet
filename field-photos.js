@@ -1094,11 +1094,24 @@ const FieldPhotos = (function () {
     const item = S().queue.find(i => i.key === key);
     const st = stationById(id);
     if (!item || !located(st)) return;
-    if (!item.pos) item.pos = { lat: st.lat, lon: st.lon, placement: 'station', accuracy: null };
+    placeAt(item, st);
+    remember(st.id);
+    repaintQueueRow(item);
+  }
+  // A station chosen for one: put at the station's position if nothing else
+  // placed it (or only another station did), filed under it if something did.
+  function placeAt(item, st) {
+    if (!item.pos || item.pos.placement === 'station') item.pos = { lat: st.lat, lon: st.lon, placement: 'station', accuracy: null };
     item.station = { id: st.id, auto: false, m: metres(item.pos.lat, item.pos.lon, st.lat, st.lon) };
+    item.stationCleared = false;
     item.editing = false;
     if (item.status === 'ready') item.note = item.pos.placement === 'station' ? `Placed at ${st.name}.` : `Filed under ${st.name}.`;
-    repaintQueueRow(item);
+  }
+  // The stations chosen this session, latest first — a batch from a site
+  // visit is one station's photos, or two, so the next pick is one of these.
+  function remember(id) {
+    const s = S();
+    s.recentStations = [id, ...(s.recentStations || []).filter(x => x !== id)].slice(0, 4);
   }
   function queueNoStation(key) {
     const item = S().queue.find(i => i.key === key);
@@ -1125,6 +1138,120 @@ const FieldPhotos = (function () {
     item.find = String(text || '');
     const el = document.getElementById(`fp-hits-${key}`);
     if (el) el.innerHTML = stationHitsHtml(item.find, id => `FieldPhotos.queueAtStation('${escAttr(key)}','${escAttr(id)}')`);
+  }
+
+  // ── Placing many at once ───────────────────────────────────────────────────
+  //
+  // A folder from a site visit is one station's photos, or two. Tick them —
+  // shift-click ticks a run, "Select unplaced" the ones nothing could place —
+  // pick the station once, and each is placed as queueAtStation places one.
+  // The ticks go once they are used, so the next lot can go to the next station.
+
+  let lastPick = null;
+  function placeable(i) { return i.status === 'ready' || i.status === 'failed'; }
+  function picked() { return S().queue.filter(i => i.picked && placeable(i)); }
+  function syncPickBox(item) {
+    const el = document.getElementById(`fp-pick-${item.key}`);
+    if (el) el.checked = !!item.picked;
+  }
+  function queuePick(key, on, range) {
+    const q = S().queue;
+    const at = q.findIndex(i => i.key === key);
+    if (at < 0) return;
+    const from = range && lastPick ? q.findIndex(i => i.key === lastPick) : -1;
+    const a = from < 0 ? at : Math.min(from, at), b = from < 0 ? at : Math.max(from, at);
+    for (let n = a; n <= b; n++) if (placeable(q[n])) { q[n].picked = !!on; syncPickBox(q[n]); }
+    lastPick = key;
+    repaintBulk();
+  }
+  function queuePickAll(which) {
+    for (const i of S().queue) {
+      i.picked = placeable(i) && (which === 'all' || (which === 'unplaced' && !i.pos));
+      syncPickBox(i);
+    }
+    lastPick = null;
+    repaintBulk();
+  }
+  function bulkFind(text) {
+    S().bulkFind = String(text || '');
+    const el = document.getElementById('fp-bulk-hits');
+    if (el) el.innerHTML = stationHitsHtml(S().bulkFind, id => `FieldPhotos.bulkAtStation('${escAttr(id)}')`);
+  }
+  function bulkAtStation(id) {
+    const st = stationById(id), list = picked();
+    if (!located(st)) return;
+    if (!list.length) { say('Tick the photos to put there first.', 'warn'); return; }
+    let put = 0;
+    for (const item of list) {
+      placeAt(item, st);
+      if (item.pos.placement === 'station') put++;
+      item.picked = false;
+    }
+    remember(st.id);
+    S().bulkFind = '';
+    lastPick = null;
+    const n = list.length, filed = n - put;
+    say(`${n} photo${n === 1 ? '' : 's'} filed under ${st.name}`
+      + (put && filed ? ` — ${put} with no position of their own put at the station's, ${filed} kept where they were taken.`
+        : put ? ', at the station\'s position.' : ', each kept where it was taken.'), 'ok');
+    repaintQueue();
+  }
+  // Stations to offer the ticked photos in one click: the ones chosen lately,
+  // and the ones around where the ticked photos were taken.
+  function bulkQuickHtml(list) {
+    if (!list.length) return '';
+    const recent = (S().recentStations || []).map(stationById).filter(located);
+    const near = new Map();
+    for (const i of list.filter(x => x.pos).slice(0, 20)) {
+      for (const { s, m } of stationsAround(i.pos.lat, i.pos.lon, NEAR_KM, 5)) {
+        if (!near.has(s.id) || near.get(s.id).m > m) near.set(s.id, { s, m });
+      }
+    }
+    const around = [...near.values()].filter(x => !recent.includes(x.s)).sort((a, b) => a.m - b.m).slice(0, 6);
+    const btn = (s, extra) => `<button type="button" class="fp-hit" onclick="FieldPhotos.bulkAtStation('${escAttr(s.id)}')">${esc(s.name)} <span class="small">${esc(extra)}</span></button>`;
+    return (recent.length ? `<p class="small">Chosen lately:</p><div class="fp-hits">${recent.map(s => btn(s, s.station_number || '')).join('')}</div>` : '')
+         + (around.length ? `<p class="small">Around where they were taken:</p><div class="fp-hits">${around.map(({ s, m }) => btn(s, fmtM(m))).join('')}</div>` : '');
+  }
+  function bulkCountText(n, of) {
+    return n ? `${n} of ${of} selected` : `${of} photo${of === 1 ? '' : 's'} can be placed — none selected`;
+  }
+  function bulkHtml() {
+    const all = S().queue.filter(placeable), list = picked();
+    return `
+      <div class="fp-bulk" id="fp-bulk" role="group" aria-labelledby="fp-bulk-count" ${all.length ? '' : 'hidden'}>
+        <div class="fp-bulk-head">
+          <strong id="fp-bulk-count">${esc(bulkCountText(list.length, all.length))}</strong>
+          <span class="button-group">
+            <button type="button" onclick="FieldPhotos.queuePickAll('all')">Select all</button>
+            <button type="button" onclick="FieldPhotos.queuePickAll('unplaced')">Select unplaced</button>
+            <button type="button" onclick="FieldPhotos.queuePickAll('none')">Clear</button>
+          </span>
+        </div>
+        <p class="small txt-muted">Photos from one station? Tick them — shift-click ticks a run — and choose the station
+          once. Those with no position of their own are put at the station; the rest are filed under it, kept
+          where they were taken.</p>
+        <label class="fp-place-field">Put the selected photos at a station
+          <input type="search" id="fp-bulk-find" value="${escAttr(S().bulkFind || '')}" placeholder="name or station number"
+                 autocomplete="off" oninput="FieldPhotos.bulkFind(this.value)" ${list.length ? '' : 'disabled'}>
+        </label>
+        <div id="fp-bulk-hits">${list.length ? stationHitsHtml(S().bulkFind || '', id => `FieldPhotos.bulkAtStation('${escAttr(id)}')`) : ''}</div>
+        <div id="fp-bulk-quick">${bulkQuickHtml(list)}</div>
+      </div>`;
+  }
+  // The bar, without redrawing the search box somebody may be typing in.
+  function repaintBulk() {
+    const el = document.getElementById('fp-bulk');
+    if (!el) return;
+    const all = S().queue.filter(placeable), list = picked();
+    el.hidden = !all.length;
+    const count = document.getElementById('fp-bulk-count');
+    if (count) count.textContent = bulkCountText(list.length, all.length);
+    const find = document.getElementById('fp-bulk-find');
+    if (find) find.disabled = !list.length;
+    const hits = document.getElementById('fp-bulk-hits');
+    if (hits) hits.innerHTML = list.length ? stationHitsHtml(S().bulkFind || '', id => `FieldPhotos.bulkAtStation('${escAttr(id)}')`) : '';
+    const quick = document.getElementById('fp-bulk-quick');
+    if (quick) quick.innerHTML = bulkQuickHtml(list);
   }
 
   // ── Rendering: the tab ─────────────────────────────────────────────────────
@@ -1235,6 +1362,7 @@ const FieldPhotos = (function () {
         <button type="button" onclick="FieldPhotos.clearFinished()" ${finished ? '' : 'disabled'}>Clear finished</button>
         ${busy ? '<span class="small txt-muted">Working…</span>' : ''}
       </div>
+      ${bulkHtml()}
       <div class="table-wrap">
         <table class="fp-queue-table">
           <caption class="sr-only">Photos to upload: where each was taken, the station it is of, and whether it has gone</caption>
@@ -1271,7 +1399,8 @@ const FieldPhotos = (function () {
     if (item.status === 'done' && item.row) actions.push(`<button type="button" class="link-btn" onclick="FieldPhotos.openOne('${escAttr(item.row.id)}')">Show it</button>`);
     if (!['uploading', 'queued', 'reading', 'ocr'].includes(item.status)) actions.push(`<button type="button" class="link-btn" onclick="FieldPhotos.removeFromQueue('${escAttr(item.key)}')" aria-label="Take ${escAttr(item.name)} off the list">Remove</button>`);
     return `
-      <td class="fp-q-photo">${item.thumbUrl ? `<img class="fp-q-thumb" src="${esc(item.thumbUrl)}" alt="">` : '<span class="fp-q-thumb fp-thumb-missing" aria-hidden="true"></span>'}
+      <td class="fp-q-photo">${canEdit ? `<input type="checkbox" class="fp-q-pick" id="fp-pick-${escAttr(item.key)}" ${item.picked ? 'checked' : ''}
+          aria-label="Select ${escAttr(item.name)}" onclick="FieldPhotos.queuePick('${escAttr(item.key)}',this.checked,event.shiftKey)">` : ''}${item.thumbUrl ? `<img class="fp-q-thumb" src="${esc(item.thumbUrl)}" alt="">` : '<span class="fp-q-thumb fp-thumb-missing" aria-hidden="true"></span>'}
         <span class="fp-q-name">${esc(item.name)}</span> <span class="small txt-muted">${esc(mb(item.size))}</span>
         ${item.from ? `<span class="small txt-muted fp-q-from">from ${esc(item.from)}</span>` : ''}</td>
       <td>${item.taken ? `${esc(fmtLocal(item.taken.local))}${item.taken.zone === 'assumed' ? ' <span class="small txt-muted">(zone assumed)</span>' : ''}` : '<span class="txt-muted">—</span>'}</td>
@@ -1603,6 +1732,7 @@ const FieldPhotos = (function () {
       up.disabled = !n;
       up.textContent = `⬆ Upload ${n} photo${n === 1 ? '' : 's'}`;
     }
+    repaintBulk();
   }
   function repaintLib() {
     const el = document.getElementById('fp-lib');
@@ -2668,6 +2798,7 @@ const FieldPhotos = (function () {
     render, init, stop,
     addFiles, uploadAll, clearFinished, removeFromQueue, retry, more, setShow,
     queuePlace, queueAtStation, queueNoStation, queueEdit, queueFind,
+    queuePick, queuePickAll, bulkFind, bulkAtStation,
     dragOver, dragLeave, drop,
     view, close, isOpen, go, goTo, rotate, openFromLib, openOne, openSpot, openStation, pillHtml,
     setCaption, editPlace, moveTo, moveTyped, moveWith, fileUnder, removePhoto, openOriginal, showOnMap, showInTwin,
@@ -2693,7 +2824,7 @@ const FieldPhotos = (function () {
       from: i.from || null, pack: i.pack || null, held: !!(i.file || i.uploadBlob), bytes: i.uploadBytes || null,
       pos: i.pos ? { ...i.pos } : null, heading: i.heading ? { ...i.heading } : null,
       altitude: i.altitude ? { ...i.altitude } : null, taken: i.taken ? { ...i.taken } : null,
-      station: i.station ? { ...i.station } : null, ocr: i.ocr ? { confidence: i.ocr.confidence, votes: i.ocr.votes, passes: i.ocr.passes } : null,
+      station: i.station ? { ...i.station } : null, picked: !!i.picked, ocr: i.ocr ? { confidence: i.ocr.confidence, votes: i.ocr.votes, passes: i.ocr.passes } : null,
       width: i.width, height: i.height, contentType: i.contentType, ext: i.ext, converted: !!i.converted,
       decoder: i.decoder || null,
       thumb: !!i.thumbBlob, row: i.row ? { id: i.row.id } : null, existingId: i.existingId || null,

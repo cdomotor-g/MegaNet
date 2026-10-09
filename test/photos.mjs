@@ -939,6 +939,60 @@ async function browserHalf() {
     ok('…which finds it already there', one.status === 'already', J(one));
     await page.click('button:has-text("Clear finished")');
 
+    // ── Placing many at once ─────────────────────────────────────────────────
+    section('Placing many at once — ticked, and one station chosen for them all');
+    const up0 = store.uploads.length;
+    await page.setInputFiles('#fp-files', [
+      { name: 'paddock-1.jpg', mimeType: 'image/jpeg', buffer: blanks[0] },
+      { name: 'IMG_1187.jpg', mimeType: 'image/jpeg', buffer: GPS_JPG },
+      { name: 'paddock-2.jpg', mimeType: 'image/jpeg', buffer: blanks[1] },
+    ]);
+    await settledQueue();
+    q = await queue();
+    const [b1, bGps, b2] = ['paddock-1.jpg', 'IMG_1187.jpg', 'paddock-2.jpg'].map(n => q.find(i => i.name === n));
+    ok('the bar is up, a box on each row, nothing ticked, and nowhere to search until something is',
+      !(await page.$eval('#fp-bulk', e => e.hidden)) && (await page.$$eval('.fp-q-pick', e => e.length)) === 3
+        && /^3 photos can be placed — none selected$/.test(await text('#fp-bulk-count')) && (await page.$eval('#fp-bulk-find', e => e.disabled)),
+      await text('#fp-bulk-count'));
+    await page.click('#fp-bulk button:has-text("Select unplaced")');
+    q = await queue();
+    ok('"Select unplaced" ticks the two nothing could place, and not the one its GPS placed',
+      J(q.filter(i => i.picked).map(i => i.key).sort()) === J([b1.key, b2.key].sort()) && /^2 of 3 selected$/.test(await text('#fp-bulk-count')),
+      await text('#fp-bulk-count'));
+    await page.fill('#fp-bulk-find', '40444');
+    await page.click('#fp-bulk-hits .fp-hit:has-text("Gatton")');
+    q = await queue();
+    let bPair = [b1, b2].map(b => q.find(i => i.key === b.key));
+    ok('one station chosen puts both at it — its position, chosen, not the nearest — and the ticks go',
+      bPair.every(i => i.pos && i.pos.placement === 'station' && i.pos.lat === GATTON.lat && i.pos.lon === GATTON.lon
+        && i.station && i.station.id === 'gatton' && !i.station.auto && !i.picked),
+      J(bPair.map(i => ({ p: i.pos, s: i.station, k: i.picked }))));
+    ok('…and the line says what became of them',
+      /^2 photos filed under Gatton, at the station's position\.$/.test(await page.evaluate(() => state.photos.msg && state.photos.msg.text)),
+      await page.evaluate(() => state.photos.msg && state.photos.msg.text));
+    await page.click(`#fp-pick-${b1.key}`);
+    await page.click(`#fp-pick-${b2.key}`, { modifiers: ['Shift'] });
+    q = await queue();
+    ok('a shift-click ticks the run between', q.every(i => i.picked) && /^3 of 3 selected$/.test(await text('#fp-bulk-count')), await text('#fp-bulk-count'));
+    ok('the station chosen lately is offered in one click, and so are the stations around them',
+      /Chosen lately:\s*Gatton 40444/.test(await text('#fp-bulk-quick')) && /Around where they were taken:.*Gatton AL/.test(await text('#fp-bulk-quick')),
+      await text('#fp-bulk-quick'));
+    await page.click('#fp-bulk-quick .fp-hit:has-text("Gatton AL")');
+    q = await queue();
+    const gpsNow = q.find(i => i.key === bGps.key);
+    bPair = [b1, b2].map(b => q.find(i => i.key === b.key));
+    const recs = await page.evaluate(ks => ks.map(k => FieldPhotos._record(k)), [b1.key, bGps.key, b2.key]);
+    ok('all three filed under Gatton AL: the two put at a station move to this one, the GPS photo stays where it was taken',
+      bPair.every(i => i.pos.placement === 'station' && i.pos.lat === PINNED.gatton_al.lat && i.station.id === 'gatton_al' && !i.station.auto)
+        && gpsNow.pos.placement === 'exif' && at2(gpsNow.pos, GPS_AT.lat, GPS_AT.lon, 1e-7) && gpsNow.station.id === 'gatton_al' && !gpsNow.station.auto
+        && recs.every(r => r.station_id === 'gatton_al') && q.every(i => !i.picked),
+      J({ pair: bPair.map(i => ({ p: i.pos, s: i.station })), gps: gpsNow.pos, recs: recs.map(r => r.station_id) }));
+    ok('…with nothing sent until Upload is pressed', store.uploads.length === up0, `${store.uploads.length - up0} upload(s)`);
+    audit = await auditHandlers(page);
+    ok(`the bulk bar: all ${audit.checked} handler(s) resolve`, audit.unresolved.length === 0, audit.unresolved.map(u => u.path).join(', '));
+    await page.evaluate(() => FieldPhotos._queue().forEach(i => FieldPhotos.removeFromQueue(i.key)));
+    ok('taken off the list, the bar goes with them', (await queue()).length === 0 && !(await page.$('#fp-bulk')));
+
     // ── The library ──────────────────────────────────────────────────────────
     section('The library');
     await page.waitForFunction(() => document.querySelectorAll('#fp-lib .fp-card').length === 5, null, { timeout: LOAD_TIMEOUT });

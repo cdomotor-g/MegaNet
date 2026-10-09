@@ -14557,6 +14557,23 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 
 .fp-msg { min-height: 1.2em; margin: var(--sp-2) 0; }
 .fp-queue-actions { margin-bottom: var(--sp-2); align-items: center; }
+.fp-bulk {
+  display: grid;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--subtle);
+}
+.fp-bulk[hidden] { display: none; }
+.fp-bulk p { margin: 0; }
+.fp-bulk-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.fp-bulk .fp-place-field { max-width: 44rem; }
+.fp-q-pick { margin: 0 var(--sp-2) 0 0; vertical-align: middle; width: 1.1rem; height: 1.1rem; }
+@media (pointer: coarse) {
+  .fp-q-pick { width: 1.5rem; height: 1.5rem; }
+}
 
 .fp-queue-table td { vertical-align: top; }
 .fp-q-photo { min-width: 12rem; }

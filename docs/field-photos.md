@@ -60,6 +60,15 @@ and so on), pick a station round it, find one by name or number, or say
 *No station*. A photo nothing can place still uploads; it lands in
 *Unplaced*, and is placed from there later.
 
+**Many at once.** A folder from a site visit is usually one station's photos,
+or two, so they need not be placed one by one. Each row has a tick box, and
+the bar above the table has *Select all*, *Select unplaced* and *Clear*;
+shift-click ticks a run of rows. Choose the station once — found by name or
+number, or one click on a station chosen lately or one around where the
+ticked photos were taken — and every ticked photo is filed under it: one with
+no position of its own is put at the station's, one with a position keeps it.
+The ticks then go, so the next lot can be ticked for the next station.
+
 **The same photo twice is one photo.** Twice in one drop, the second is
 refused before it is read further. Already in Flood-Net, the upload asks the
 database by hash first and sends nothing: *Already in Flood-Net — added by …
@@ -1125,7 +1134,8 @@ Check it: open a photo on the Field Photos tab and look at the image's address
 - **`npm run photos`** (test/) — `photo-meta.js` under Node against photos
   built byte by byte and the overlay formats above, then the app in Chromium
   against a fake project with the real OCR engine and the real HEIC decoder:
-  eight files dropped at once and read, one placed by hand, the upload's order
+  eight files dropped at once and read, one placed by hand, three ticked and
+  placed at one station together, the upload's order
   and records, the same photo refused three ways with its bytes taken back
   down, the library, the carousel by keyboard, Dropbox's PKCE link end to end,
   the map's pins and cones, the same pins tilted into 3-D and pressed there,
