@@ -4577,7 +4577,7 @@ function mapDisplayControlsHtml() {
     <div class="map-display-h">Link colour</div>
     <div role="radiogroup" aria-label="What the link colours mean">
       ${[['freq',  'By frequency',   'The channel the hop runs on, off the repeater at its end — recorded, so every link has one the moment the file loads'],
-         ['fade',  'By fade margin', 'Green, yellow or red by how many decibels of headroom the path has. Computed per link over terrain and land cover, and saved to the datastore'],
+         ['fade',  'By fade margin', 'Green, yellow or red by how many decibels of headroom the path has. Computed per link by the link budget card\'s model, and saved to the datastore'],
          ['plain', 'Plain',          'One colour for every link, as the map drew them before either colouring existed']].map(([v, label, hint]) => `
         <label class="filter-check" title="${escAttr(hint)}">
           <input type="radio" name="map-link-colour" value="${v}"
