@@ -6147,7 +6147,7 @@ function stationActionGroups(s) {
     { label: 'Records', pills: [
       arroUrl ? `<a class="pill" href="${esc(arroUrl)}" target="_blank" rel="noopener"
            title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
-           >⚙️ Open in ARRO admin ↗</a>` : '',
+           >📊 Open in ARRO admin ↗</a>` : '',
       ...docSearchPills(s),
     ] },
   ].map(g => ({ label: g.label, pills: g.pills.filter(Boolean) }))
