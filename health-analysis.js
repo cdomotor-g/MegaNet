@@ -1718,7 +1718,9 @@ const HealthAnalysis = (() => {
 
     // ── assemble ──
     allStations.forEach(S => {
-      S.status = S.findings.reduce((w, f) => (SEV_RANK[f.severity] < SEV_RANK[w] ? f.severity : w), 'ok');
+      // 'ok' ranks below every severity: SEV_RANK has no entry for it, and a
+      // comparison with undefined is always false, which left every pin green.
+      S.status = S.findings.reduce((w, f) => (SEV_RANK[f.severity] < (SEV_RANK[w] ?? 3) ? f.severity : w), 'ok');
       if (S.status === 'ok' && !S.schedule) S.status = 'irregular';
     });
     const findings = [];

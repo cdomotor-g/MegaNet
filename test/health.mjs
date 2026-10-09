@@ -184,10 +184,12 @@ try {
       spell: !!(at('shared-spell', r.steady3) && at('shared-spell', r.steady4) && at('shared-spell', r.steady5)),
       ghosts: (A.findings.find(f => f.kind === 'ghosts') || { evidence: {} }).evidence.ghosts || 0,
       quiet, order: A.findings.map(f => f.severity),
+      silentStatus: (A.stations.get(r.silent) || {}).status,
       period: [...A.stations.values()].filter(S => S.schedule).map(S => S.schedule.P / 60000),
     };
   }, WORLD);
   ok('the station that stopped is silent', dw.silent);
+  ok('…and its pin takes the colour of its worst finding', dw.silentStatus === 'critical', dw.silentStatus);
   ok('the battery sliding 0.12 V a night is falling', dw.falling);
   ok('the battery held at 12.4 V day and night has no charge', dw.flat);
   ok('the station missing more checks each day is rising', dw.fading);
