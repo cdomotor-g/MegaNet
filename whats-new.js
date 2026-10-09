@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 22, date: '2026-10-09', items: [
+      '<strong>📈 Station Health: All stations — sparklines.</strong> A new card lists every sensor heard in the window, a row '
+        + 'each — the station\'s number and name, the sensor, and a sparkline of its readings across the same days — with '
+        + 'the latest reading beside it. A sensor or station with a warning is highlighted the way the rest of the tab '
+        + 'highlights it, its worst finding named, and those come first: a battery whose night lows are sliding shows its '
+        + 'trend line and how fast it is falling. Pick a kind of sensor, show only those needing attention, or find a '
+        + 'station by name or number; point at a line for a reading, and press a station\'s name to open it at that sensor.',
+    ] },
     { n: 21, date: '2026-10-09', items: [
       '<strong>📊 ARRO Data is now <em>Plots</em></strong> — same place in <em>Data</em>, same chart, and it can now be '
         + 'drawn on. <strong>ƒ(t) function</strong> on the toolbar draws a function you type over the readings '

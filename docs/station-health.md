@@ -14,7 +14,7 @@ twelve hours at a time, a few seconds) and works everything out in the browser
 in a few hundred milliseconds. **Demo week** shows what it does with a made-up
 week of real stations, one of every fault planted in it.
 
-## Five ways in
+## Six ways in
 
 - **Needs attention** — the findings, worst first: what is wrong, the evidence,
   and what to do. Filter by kind (power, check signals, network, sensors, data
@@ -25,6 +25,10 @@ week of real stations, one of every fault planted in it.
 - **Check signals** — every scheduled station's checks over the window, slot by
   slot: received, received with frames missing, missed, missed network-wide, or
   nobody listening. Worst first; a row opens the station.
+- **All stations — sparklines** — every sensor heard at a station, a row each:
+  the station's number and name, the sensor (its register type and ALERT
+  address), its readings across the window as a sparkline, the latest, and the
+  worst finding about it. [Below](#all-stations--sparklines).
 - **Receivers and repeaters** — each base station's delivery hour by hour, its
   upload lag and its corrupted copies; each repeater with the stations heard
   behind it, how many are silent now, and the corrupted copies it could have
@@ -216,12 +220,62 @@ address numbers recur across the country.
 | **Address does not read like its sensor** | note | more than half of a "battery" address's readings (4+) are not a 12 V battery | Fix the register: another sensor, or another station, is on this address. |
 | **Not heard at all** | note | registered, enabled stations on repeaters within reach that relayed others' traffic, with not one reading | Confirm whether they are decommissioned, or check them. |
 
+## All stations — sparklines
+
+Every sensor heard at a station in the window, a row each (below *Check
+signals*; `health.js`): the station's number and name, the sensor — its type in
+the register and its ALERT address — its readings across the window as a
+sparkline, the latest reading, and the worst finding about it. Every row is
+drawn over the same days, left to right, so the rows read together: a gap in
+every row at once is a receiver that stopped, a line that stops early is its
+station, and a battery whose night lows walk down its box is one to visit.
+
+**What each line is.**
+
+- A **battery**, in volts, with its corrupted copies and one-reading spikes
+  left out — the series the station's battery chart draws. Every battery is on
+  one scale, 11.5 to 14.5 V (wider only where a reading falls outside it), so
+  one row's slope reads against the next. 12.2 V, about half charge, is dashed
+  across it, and so is the trend through its night lows; when they are going
+  somewhere, the row says so under the line (*↘ falling 0.12 V a day*).
+- A **rain gauge**, as the rain fallen since the window began, counted from the
+  tips the analysis kept (garbage frames, flipped bits and resets out): a storm
+  is a step, a dry week a flat line along the bottom. The box is at least
+  10 mm tall, so a passing shower does not fill it.
+- A **water level**, without its one-reading spikes, and **any other sensor**
+  as it was heard — both in raw counts, each on a scale of its own, at least
+  ten counts tall so a wobble of a count stays a wobble.
+- A silence longer than the station's checks allow (two and a half check
+  periods, and at least four hours) is a gap in the line, not a line across it.
+  The dot is the latest reading.
+
+**What is highlighted.** A row wears the worst finding about the sensor itself
+— a battery low, falling, not charging or held too high; a gauge dry through its
+neighbours' storm; a level stuck — or about its whole station: silent, missing
+more checks, its transmissions corrupted. They are the same findings *Needs
+attention*, the map and the station are drawn from. A warning or worse colours
+the line and the row's edge, and the finding is said in words beside it, with
+the next worst under it (*Also: …*). Incomplete checks are pinned to the sensor
+whose frame goes missing most. The rows of concern come first, worst first, then
+the rest station by station.
+
+**Using it.** Pick a kind of sensor (battery, rainfall, water level, other),
+tick *only those needing attention*, or find a station by name or number. The
+first 60 rows show, and *Show all* the rest. Point at a line for the reading
+under the pointer and when it was heard. A station's name opens the station
+above at that sensor's chart. The owner filter narrows it to the owners picked.
+On a phone the number and the sensor fold under the station's name, so the line
+sits beside it.
+
+Addresses heard that no station on file can be given are counted under the
+table; *The register and the data* says which and why.
+
 ## Airtime: transmissions landing together
 
 ALERT is ALOHA. A station transmits when its logger says to, nobody listens
 first, and two stations heard at one receiver at once spoil each other — one
 lost, both lost, or a frame decoded with bits flipped. The **Airtime** panel
-(below *Check signals*; `airtime-analysis.js`, drawn by `health-airtime.js`)
+(below *All stations — sparklines*; `airtime-analysis.js`, drawn by `health-airtime.js`)
 reads the same window for who lands on top of whom, whether it costs anything,
 and what to change.
 
@@ -451,4 +505,7 @@ report.
 
 `npm run health` holds the analysis to the demo week — every planted fault found
 where it was planted, the stations left alone clean — and each rule above to
-readings built for it.
+readings built for it; and *All stations — sparklines* to a row for every
+sensor heard, the planted faults highlighted on their sensors' rows (the sliding
+battery's trend line sloping down, the dry gauge flat along the bottom) and the
+stations left alone not.

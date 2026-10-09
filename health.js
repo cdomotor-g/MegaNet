@@ -21,10 +21,13 @@
 // common, which quarter-hour the whole network missed at once, and which
 // stored readings are corrupted copies rather than data.
 //
-// Three ways in, for three jobs:
+// Four ways in, for four jobs:
 //
 //   Needs attention   the findings, worst first, each with its evidence and
 //                     what to do about it. The morning's list.
+//   Every sensor      All stations, sparklines: every sensor heard, a row
+//                     each, its readings across the window as a sparkline —
+//                     the network's trends at a glance, those of concern first.
 //   A station         its check schedule slot by slot, its battery across its
 //                     solar day, its sensors, and the context lens: pick a
 //                     missed check or a reading and see what every receiver
@@ -34,7 +37,7 @@
 //   The network       receivers, repeaters, the register — the places one
 //                     fault shows up as many.
 //
-// And a fourth, in health-agent.js: Claude, handed these findings and tools
+// And a fifth, in health-agent.js: Claude, handed these findings and tools
 // over the same readings, asked to investigate and write the briefing.
 //
 // Readings are public (0006), so this tab needs no sign-in. Seven days of the
@@ -108,6 +111,11 @@ const Health = (() => {
     map: null, layer: null,
     insp: new Map(),         // station id -> { visits, power } | 'loading' | { error }
     matrixAll: false,
+    // All stations, sparklines: the kind of sensor shown, only those needing
+    // attention, a station looked for by name or number, and every row rather
+    // than the first sixty. ssMemo holds the rows worked out for H.A.
+    ss: { kind: 'all', attn: false, find: '', all: false },
+    ssMemo: null,
     owners: storedOwners(),  // the owners picked; empty is every owner
     slsAsked: false,         // the SLS file, where most owners come from, sent for…
     slsFailed: false,        // …and did not load
@@ -363,6 +371,7 @@ const Health = (() => {
       </div>
       <section class="panel" id="hl-station" aria-labelledby="hl-h-stn">${stationHtml()}</section>
       <section class="panel" aria-labelledby="hl-h-checks">${matrixHtml()}</section>
+      <section class="panel" id="hl-ss" aria-labelledby="hl-h-ss">${sparkCardHtml()}</section>
       <section class="panel" id="hl-airtime" aria-labelledby="hl-h-air">${typeof HealthAirtime !== 'undefined' ? HealthAirtime.render() : ''}</section>
       <section class="panel" aria-labelledby="hl-h-net">${networkHtml()}</section>
       <section class="panel" aria-labelledby="hl-h-reg">${registerHtml()}</section>
@@ -541,6 +550,7 @@ const Health = (() => {
     rerenderAttn();
     const sec = document.querySelector('[aria-labelledby="hl-h-checks"]');
     if (sec) sec.innerHTML = matrixHtml();
+    paintSpark();
     if (all) rerenderStation(); else drawMap();
   }
   function saveOwners() {
@@ -994,7 +1004,7 @@ const Health = (() => {
     const nb = (S.rainNeighbours || []).slice().sort((a, b) => a.km - b.km).slice(0, 6);
     const aside = R0.outliers + R0.flips + R0.jumps;
     return `
-      <h4>Rain gauge — ALERT ${esc(String(R0.aid))}</h4>
+      <h4 id="hl-h-rain">Rain gauge — ALERT ${esc(String(R0.aid))}</h4>
       <p class="small">${R0.mm} mm in the window (${num(R0.tips)} tips × ${R0.mmPerTip} mm${R0.recorded ? '' : ', assumed — no bucket size recorded'})${aside ? `; ${aside} count${aside === 1 ? '' : 's'} set aside as not rain (garbage frames, flipped bits, impossible jumps)` : ''}${R0.resets ? `; the counter went backwards ${R0.resets} time${R0.resets === 1 ? '' : 's'}` : ''}.</p>
       ${nb.length ? `<div class="table-wrap"><table class="hl-table"><caption class="sr-only">Rain at the nearest gauges over the same window</caption>
         <thead><tr><th scope="col">Nearest gauges</th><th scope="col">Distance</th><th scope="col">Rain in the window</th></tr></thead>
@@ -1004,7 +1014,7 @@ const Health = (() => {
 
   function levelHtml(S) {
     const Lv = S.level;
-    return `<h4>Water level — ALERT ${esc(String(Lv.aid))}</h4>
+    return `<h4 id="hl-h-level">Water level — ALERT ${esc(String(Lv.aid))}</h4>
       <p class="small">${num(Lv.n)} readings, ${num(Lv.distinct)} distinct values, median ${esc(String(Lv.median))} (raw counts — its scale is set per site and not on file)${Lv.spikes ? `; ${Lv.spikes} one-reading spike${Lv.spikes === 1 ? '' : 's'}` : ''}${Lv.flat ? '; it did not move at all' : ''}.</p>`;
   }
 
@@ -1090,6 +1100,413 @@ const Health = (() => {
       </div>
       ${list.length > 40 ? `<button class="ghost hl-more" onclick="Health.toggleMatrix()" aria-expanded="${H.matrixAll}">${H.matrixAll ? 'Show the worst 40' : `Show all ${num(list.length)}`}</button>` : ''}`;
   }
+
+  // ── all stations, sparklines ───────────────────────────────────────────────
+  // Every sensor heard at a station, a row each — the station's number and
+  // name, what the register says the sensor is — with its readings across the
+  // window as a sparkline. Every row is drawn over the same days, so the rows
+  // read as small multiples: a gap in every row at once is a receiver, a line
+  // that stops early is its station, a battery whose night lows walk down its
+  // box is the one to visit before it browns out. A row wears the worst
+  // finding about its sensor (the battery, the gauge, the level) or its
+  // station (gone silent, missing checks) — the findings Needs attention, the
+  // map and the station above are drawn from — and the rows of concern come
+  // first. The owner filter narrows it like the other sections on stations.
+
+  const SS_KINDS = [['all', 'Every sensor'], ['battery', 'Battery'], ['rain', 'Rainfall'], ['level', 'Water level'], ['other', 'Other']];
+  const SS_KIND_ORDER = { battery: 0, rain: 1, level: 2, other: 3 };
+  const SS_SEV = { critical: 0, warn: 1, info: 2, ok: 3, irregular: 3 };
+  const SS_FIRST = 60;
+  // The sparkline's box in px: drawn at this size (on a phone, scaled evenly)
+  // and never stretched, with room round the line for its latest reading's dot.
+  const SS_W = 180, SS_H = 34, SS_PX = 5, SS_PY = 6;
+  // Every battery on one scale, so one row's slope reads against the next; a
+  // reading outside it widens that row's box rather than leaving it.
+  const SS_BATT = [11.5, 14.5];
+  const SS_HALF_V = 12.2;   // about half charge at rest: health-analysis.js's BATT_WARN_V
+  const SS_PART_LABEL = { battery: 'its battery chart', rain: 'its rain gauge', level: 'its water level', sensors: 'its sensors' };
+
+  const ssKindOf = x => (x.kind === 'battery' || x.kind === 'rain' || x.kind === 'level' ? x.kind : 'other');
+
+  // The findings a sensor's row wears: those about its own address, and those
+  // about its whole station, which every one of its sensors shares — except
+  // that incomplete checks are about the sensor whose frame goes missing most,
+  // when the finding says which. Worst first; the sensor's own first among
+  // equals.
+  function sensorFindings(S, x) {
+    const ownAddr = f => f.addr || (f.kind === 'partial-checks' && f.evidence && f.evidence.mostOftenMissing) || null;
+    return S.findings.filter(f => { const a = ownAddr(f); return !a || a === x.addr; })
+      .sort((a, b) => (SS_SEV[a.severity] - SS_SEV[b.severity]) || ((ownAddr(a) ? 0 : 1) - (ownAddr(b) ? 0 : 1)));
+  }
+
+  // What a row draws, { pts: [{t, v}], lo, hi, fmt, … }: a battery in volts,
+  // its corrupted copies and one-reading spikes already out (the series the
+  // station's battery chart draws), with the trend through its night lows; a
+  // rain gauge as the rain fallen since the window began, from the tips it
+  // kept — a storm is a step, a dry week a flat line; a level without its
+  // one-reading spikes; anything else as it was heard. Levels and the rest
+  // are raw counts, each on a scale of its own.
+  function sparkSeries(S, x) {
+    const k = ssKindOf(x);
+    const range = pts => pts.reduce((r, p) => [Math.min(r[0], p.v), Math.max(r[1], p.v)], [Infinity, -Infinity]);
+    if (k === 'battery') {
+      const B = S.battery && S.battery.addr === x.addr ? S.battery : null;
+      const pts = B ? (B.series || []).map(p => ({ t: p.t, v: p.V })) : x.txs.map(tx => ({ t: tx.t, v: tx.v / 10 }));
+      const [lo, hi] = range(pts);
+      let trend = null;
+      if (B && B.slope != null && (B.nights || []).length >= 3) {
+        const tm = B.nights.reduce((a, n) => a + n.t, 0) / B.nights.length;
+        const vm = B.nights.reduce((a, n) => a + n.v, 0) / B.nights.length;
+        const at = t => ({ t, v: vm + B.slope * (t - tm) / DAY });
+        trend = { a: at(B.nights[0].t), b: at(B.nights[B.nights.length - 1].t), slope: B.slope };
+      }
+      return { pts, lo: Math.min(SS_BATT[0], lo), hi: Math.max(SS_BATT[1], hi), thr: SS_HALF_V, trend,
+               left: B ? B.spikes || 0 : 0, fmt: v => `${v.toFixed(1)} V` };
+    }
+    if (k === 'rain' && S.rain && S.rain.addr === x.addr) {
+      const R = S.rain;
+      let i = 0, tips = 0;
+      const pts = x.txs.map(tx => {
+        while (i < R.steps.length && R.steps[i].t <= tx.t) tips += R.steps[i++].tips;
+        return { t: tx.t, v: Math.round(tips * R.mmPerTip * 10) / 10 };
+      });
+      const fell = pts.length ? pts[pts.length - 1].v : 0;
+      // At least 10 mm tall, so a passing shower does not fill the box.
+      return { pts, lo: 0, hi: Math.max(10, fell), fallen: true, fmt: v => `${v} mm` };
+    }
+    const skip = k === 'level' && S.level && S.level.addr === x.addr ? new Set(S.level.spikeAt || []) : null;
+    const pts = x.txs.filter(tx => !skip || !skip.has(tx.t)).map(tx => ({ t: tx.t, v: tx.v }));
+    let [lo, hi] = pts.length ? range(pts) : [0, 1];
+    // A count or two either way is a wobble, not a trend: the box is at least
+    // ten counts tall (half a unit, for a value sent as an engineering one).
+    const span = pts.every(p => Number.isInteger(p.v)) ? 10 : 0.5;
+    if (hi - lo < span) { const m = (lo + hi) / 2; lo = m - span / 2; hi = m + span / 2; }
+    return { pts, lo, hi, raw: true, left: skip ? skip.size : 0, fmt: v => String(v) };
+  }
+
+  // Every sensor of every station heard, worked out once an analysis: the
+  // rows of concern first, worst first, then station by station.
+  function sparkRows() {
+    const A = H.A;
+    if (!A) return [];
+    if (H.ssMemo && H.ssMemo.A === A) return H.ssMemo.rows;
+    const rows = [];
+    A.stations.forEach(S => {
+      // A silence longer than the station's checks allow is a gap in its line.
+      const gap = S.schedule ? Math.max(2.5 * S.schedule.P, 4 * HOUR) : 12 * HOUR;
+      S.sensors.forEach(x => {
+        const kind = ssKindOf(x);
+        const F = sensorFindings(S, x);
+        const part = kind === 'battery' && S.battery && S.battery.addr === x.addr && (S.battery.series || []).length >= 2 ? 'battery'
+          : kind === 'rain' && S.rain && S.rain.addr === x.addr ? 'rain'
+          : kind === 'level' && S.level && S.level.addr === x.addr ? 'level' : 'sensors';
+        rows.push({
+          key: S.st.id + '|' + x.addr, S, st: S.st, x, kind, part, gap, F,
+          sev: F.length ? F[0].severity : 'ok',
+          label: (x.types && x.types[0]) || SensorValues.kindLabel(x.kind) || 'Sensor',
+          find: `${S.st.name || ''} ${S.st.station_number || ''} ${S.st.id}`.toLowerCase(),
+          ser: sparkSeries(S, x),
+        });
+      });
+    });
+    rows.sort((a, b) => (SS_SEV[a.sev] - SS_SEV[b.sev]) || (SS_SEV[a.S.status] - SS_SEV[b.S.status])
+      || String(a.st.name || '').localeCompare(String(b.st.name || '')) || a.st.id.localeCompare(b.st.id)
+      || (SS_KIND_ORDER[a.kind] - SS_KIND_ORDER[b.kind]) || ((a.x.aid || 0) - (b.x.aid || 0)) || a.x.addr.localeCompare(b.x.addr));
+    // The addresses heard that no station on file could be given — the
+    // register's to explain, and counted under the table, so "every sensor"
+    // says what it leaves out. Ghosts are not sensors.
+    const given = new Set(rows.map(r => r.x.addr));
+    const loose = (A.addresses || []).filter(nt => !given.has(nt.addr) && nt.txs.some(tx => !tx.ghostOf)).length;
+    H.ssMemo = { A, rows, byKey: new Map(rows.map(r => [r.key, r])), loose };
+    return rows;
+  }
+
+  // The rows the filters leave: the owners picked, the station looked for,
+  // only those needing attention — and, unless anyKind, the kind of sensor.
+  function sparkVisible(anyKind) {
+    const q = H.ss.find.trim().toLowerCase();
+    return sparkRows().filter(r => stationMatches(r.st)
+      && (!q || r.find.includes(q))
+      && (!H.ss.attn || r.sev === 'critical' || r.sev === 'warn')
+      && (anyKind || H.ss.kind === 'all' || r.kind === H.ss.kind));
+  }
+  function sparkCountText(rows) {
+    const n = new Set(rows.map(r => r.st.id)).size;
+    return `${num(rows.length)} sensor${rows.length === 1 ? '' : 's'} at ${num(n)} station${n === 1 ? '' : 's'}`
+      + `${filtering() ? ' of the owners picked' : ''}, those of concern first`;
+  }
+
+  function sparkCardHtml() {
+    if (!H.A) return '';
+    const rows = sparkVisible();
+    return `
+      <div class="panel-header"><h3 id="hl-h-ss">All stations — sparklines</h3>
+        <span class="small" id="hl-ss-count">${esc(sparkCountText(rows))}</span></div>
+      <p class="small hl-ss-sub">Every sensor heard in the window, a row each, its readings drawn across the same days — so a gap in
+        every row at once is a receiver, a line that stops early is its station, and a battery whose night lows walk down is one to visit.
+        A row takes the colour of the worst finding about the sensor or its station, the same findings as Needs attention, and those come
+        first. Batteries share one scale, ${SS_BATT[0]} to ${SS_BATT[1]} V; a rain gauge shows the rain fallen since the window began; a level,
+        or anything else, is in raw counts on a scale of its own. Point at a line for its readings; a station's name opens it above, at that sensor.</p>
+      ${sparkLegendHtml()}
+      <div class="hl-filters hl-ss-tools">
+        <span class="hl-seg hl-seg--wrap" role="group" aria-label="Which sensors" id="hl-ss-kinds">${sparkKindsHtml()}</span>
+        <label class="hl-check"><input type="checkbox" ${H.ss.attn ? 'checked' : ''} onchange="Health.ssAttn(this.checked)">
+          only those needing attention</label>
+        <input type="search" class="hl-ss-find" placeholder="Find a station — name or number" aria-label="Find a station by name or number"
+               value="${escAttr(H.ss.find)}" oninput="Health.ssFind(this.value)">
+      </div>
+      <div id="hl-ss-list">${sparkListHtml(rows)}</div>
+      <div class="hl-tip hl-ss-tip" id="hl-ss-tip" hidden></div>`;
+  }
+
+  // Each kind with a sensor the other filters leave, and how many; the one
+  // picked stays, at nought, so it can be unpicked.
+  function sparkKindsHtml() {
+    const any = sparkVisible(true);
+    const c = { all: any.length };
+    any.forEach(r => { c[r.kind] = (c[r.kind] || 0) + 1; });
+    return SS_KINDS.filter(([k]) => k === 'all' || c[k] || H.ss.kind === k).map(([k, label]) => `
+      <button class="hl-chip${H.ss.kind === k ? ' hl-chip--on' : ''}" aria-pressed="${H.ss.kind === k}" data-kind="${k}"
+              onclick="Health.ssKind('${k}')">${esc(label)} <span class="hl-count">${num(c[k] || 0)}</span></button>`).join('');
+  }
+
+  function sparkLegendHtml() {
+    const key = (inner, text, cls) => `<span${cls ? ` class="${cls}"` : ''}><svg class="hl-ss-key" viewBox="0 0 24 12" width="24" height="12"
+      aria-hidden="true">${inner}</svg>${esc(text)}</span>`;
+    const wave = '<path class="hl-ss-line" d="M2 9L8 5L14 7L22 3"/>';
+    return `<div class="qs-legend hl-ss-legend">
+      ${key(wave, 'readings')}
+      ${key('<circle class="hl-ss-end" cx="12" cy="6" r="4"/>', 'the latest')}
+      ${key('<path class="hl-ss-trend" d="M2 3L22 9"/>', 'trend through a battery\'s night lows')}
+      ${key('<line class="hl-ss-thr" x1="2" x2="22" y1="6" y2="6"/>', `${SS_HALF_V} V, about half charge`)}
+      ${key(wave, 'Warning', 'hl-ss-svg--warn')}
+      ${key(wave, 'Critical', 'hl-ss-svg--critical')}
+    </div>`;
+  }
+
+  function sparkListHtml(rows) {
+    const memo = H.ssMemo;
+    const loose = !filtering() && memo && memo.loose
+      ? `<p class="small txt-muted hl-ss-loose">${num(memo.loose)} more address${memo.loose === 1 ? ' was' : 'es were'} heard in the window that no station
+          on file can be given — <i>The register and the data</i>, below, says which and why.</p>` : '';
+    if (!rows.length) {
+      const q = H.ss.find.trim();
+      return `<p class="small hl-empty">${q ? `No station heard in the window matches “${esc(q)}”.`
+        : H.ss.attn ? 'None of these sensors needs attention.'
+        : filtering() ? 'No sensor was heard at the stations of the owners picked.'
+        : 'No sensor was heard at a station in the window.'}</p>${loose}`;
+    }
+    const shown = H.ss.all ? rows : rows.slice(0, SS_FIRST);
+    // A station's next sensor in the row below its last says its number and
+    // name quietly: the rows read as one station's, and stay whole for a
+    // screen reader.
+    const tr = (r, i) => {
+      const same = i > 0 && shown[i - 1].st.id === r.st.id;
+      const addr = r.x.aid != null ? `ALERT ${r.x.aid}` : r.x.addr;
+      // On a phone the number and the sensor fold into the station's cell, so
+      // the line sits beside the name rather than a scroll away.
+      return `<tr class="hl-frow hl-frow--${r.sev}${same ? ' hl-ss-same' : ''}">
+        <td class="mono hl-ss-num col-optional">${esc(r.st.station_number || '—')}</td>
+        <th scope="row" class="hl-ss-stn"><button class="link-btn" onclick="Health.select('${escAttr(r.st.id)}', '${r.part}')"
+          title="${escAttr(`Open ${r.st.name} above, at ${SS_PART_LABEL[r.part]}`)}">${esc(r.st.name)}</button>${same ? '' : ownerSmallHtml(r.st)}
+          <span class="hl-ss-narrow">${esc([r.st.station_number, r.label, addr].filter(Boolean).join(' · '))}</span></th>
+        <td class="col-optional">${esc(r.label)}<span class="small mono hl-ss-addr">${esc(addr)}</span></td>
+        <td class="hl-ss-spark">${sparkSvg(r)}${sparkTrendHtml(r)}</td>
+        <td class="hl-ss-now">${sparkNowHtml(r)}</td>
+        <td class="hl-ss-worst">${sparkWorstHtml(r)}</td>
+      </tr>`;
+    };
+    return `
+      <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="hl-h-ss">
+        <table class="hl-table hl-sstable">
+          <caption class="sr-only">Every sensor heard at a station in the window: the station's number and name, the sensor, its readings
+            across the window, the latest, and the worst finding about it or its station</caption>
+          <colgroup><col style="width:5.5rem"><col style="width:14rem"><col style="width:9rem"><col style="width:${SS_W + 20}px"><col style="width:9rem"><col></colgroup>
+          <thead><tr><th scope="col" class="col-optional">No.</th><th scope="col">Station</th><th scope="col" class="col-optional">Sensor</th>
+            <th scope="col">Over the window<span class="hl-ss-axis" aria-hidden="true"><span>${esc(fmtDay(H.A.t0))}</span><span>${esc(fmtDay(H.A.t1))}</span></span></th>
+            <th scope="col">Latest</th><th scope="col">Worst finding</th></tr></thead>
+          <tbody>${shown.map(tr).join('')}</tbody>
+        </table>
+      </div>
+      ${rows.length > SS_FIRST ? `<button class="ghost hl-more" onclick="Health.ssMore()" aria-expanded="${H.ss.all}">${H.ss.all ? `Show the first ${SS_FIRST}` : `Show all ${num(rows.length)}`}</button>` : ''}
+      ${loose}`;
+  }
+
+  // The latest reading — for a rain gauge, the rain that fell in the window —
+  // and how long ago.
+  function sparkNowHtml(r) {
+    const s = r.ser, p = s.pts[s.pts.length - 1];
+    if (!p) return `<span class="small hl-ss-when">${esc(fmtAgo(r.x.last.t))}</span>`;
+    return `<b>${esc(s.fmt(p.v))}${s.fallen ? ' fell' : ''}</b>${s.raw ? ' <span class="small txt-muted">raw</span>' : ''}`
+      + `<span class="small hl-ss-when">${esc(fmtAgo(p.t))}</span>`;
+  }
+
+  // A battery's night lows, said under its line when they are going
+  // somewhere — a few pixels of slope in a box this size is easy to miss,
+  // and this is the number the row is read for. The line's own name says it
+  // already, for a screen reader.
+  function sparkTrendHtml(r) {
+    const T = r.ser.trend;
+    if (!T || Math.abs(T.slope) < 0.02) return '';
+    return `<span class="small hl-ss-trendtxt" aria-hidden="true">${T.slope < 0 ? '↘ falling' : '↗ rising'} ${Math.abs(T.slope).toFixed(2)} V a day</span>`;
+  }
+
+  // The worst finding, and the next worst named under it: a battery both low
+  // and falling says both.
+  function sparkWorstHtml(r) {
+    const F = r.F;
+    if (!F.length) return '';
+    const all = F.map(f => `${(SEV[f.severity] || SEV.info).label}: ${f.title}`).join('\n');
+    const also = F.length > 1 ? `<span class="small txt-muted hl-ss-also">Also: ${esc(F[1].title)}${F.length > 2 ? `, and ${num(F.length - 2)} more` : ''}</span>` : '';
+    return `<span title="${escAttr(all)}">${sevHtml(F[0].severity)} ${esc(F[0].title)}</span>${also}`;
+  }
+
+  function sparkScale(s) {
+    const t0 = H.A.t0, t1 = H.A.t1;
+    return {
+      X: t => SS_PX + (SS_W - 2 * SS_PX) * (t - t0) / ((t1 - t0) || 1),
+      Y: v => SS_PY + (SS_H - 2 * SS_PY) * (1 - (v - s.lo) / ((s.hi - s.lo) || 1)),
+    };
+  }
+
+  // A few points a pixel at most: a gauge that reported every tip of a storm
+  // has thousands, and a line keeps its shape from each column's first, last,
+  // highest and lowest.
+  function sparkThin(pts, X) {
+    if (pts.length <= 3 * SS_W) return pts;
+    const out = [];
+    let col = null, run = [];
+    const flush = () => {
+      if (!run.length) return;
+      let lo = run[0], hi = run[0];
+      run.forEach(p => { if (p.v < lo.v) lo = p; if (p.v > hi.v) hi = p; });
+      const keep = new Set([run[0], lo, hi, run[run.length - 1]]);
+      run.forEach(p => { if (keep.has(p)) out.push(p); });
+      run = [];
+    };
+    pts.forEach(p => { const c = Math.floor(X(p.t)); if (c !== col) { flush(); col = c; } run.push(p); });
+    flush();
+    return out;
+  }
+
+  // The line, broken where the readings stop for longer than the station's
+  // checks allow — a silence is a gap, not a straight line across it — and a
+  // reading alone between two gaps drawn as a dot.
+  function sparkLine(pts, X, Y, gap) {
+    let d = '';
+    pts.forEach((p, i) => {
+      const q = pts[i - 1], n = pts[i + 1];
+      const start = !q || p.t - q.t > gap;
+      d += `${start ? 'M' : 'L'}${X(p.t).toFixed(1)} ${Y(p.v).toFixed(1)}`;
+      if (start && (!n || n.t - p.t > gap)) d += 'h0.1';
+    });
+    return d;
+  }
+
+  function sparkSvg(r) {
+    const s = r.ser;
+    if (!s.pts.length) return '<span class="small txt-muted">nothing it could draw</span>';
+    const { X, Y } = sparkScale(s);
+    const f = v => v.toFixed(1);
+    const last = s.pts[s.pts.length - 1];
+    let g = '';
+    if (s.thr != null && s.thr > s.lo && s.thr < s.hi) g += `<line class="hl-ss-thr" x1="${SS_PX}" x2="${SS_W - SS_PX}" y1="${f(Y(s.thr))}" y2="${f(Y(s.thr))}"/>`;
+    g += `<path class="hl-ss-line" d="${sparkLine(sparkThin(s.pts, X), X, Y, r.gap)}"/>`;
+    // Over the line, not under it: the trend is what the row is read for.
+    if (s.trend) g += `<path class="hl-ss-trend" d="M${f(X(s.trend.a.t))} ${f(Y(s.trend.a.v))}L${f(X(s.trend.b.t))} ${f(Y(s.trend.b.v))}"/>`;
+    g += `<circle class="hl-ss-end" cx="${f(X(last.t))}" cy="${f(Y(last.v))}" r="4"/>`
+       + `<line class="hl-ss-cross" x1="0" x2="0" y1="1" y2="${SS_H - 1}" visibility="hidden"/>`
+       + '<circle class="hl-ss-dot" cx="0" cy="0" r="4" visibility="hidden"/>';
+    return `<svg class="hl-ss-svg hl-ss-svg--${r.sev}" viewBox="0 0 ${SS_W} ${SS_H}" width="${SS_W}" height="${SS_H}" role="img"
+      data-k="${escAttr(r.key)}" aria-label="${escAttr(sparkSummary(r))}">${g}</svg>`;
+  }
+
+  // What the line says, in words: its accessible name.
+  function sparkSummary(r) {
+    const s = r.ser, last = s.pts[s.pts.length - 1];
+    let lo = Infinity, hi = -Infinity;
+    s.pts.forEach(p => { if (p.v < lo) lo = p.v; if (p.v > hi) hi = p.v; });
+    const bits = [];
+    if (s.fallen) bits.push(last.v ? `${s.fmt(last.v)} of rain in the window` : 'no rain in the window');
+    else bits.push(`${s.fmt(last.v)}${s.raw ? ' raw' : ''} the latest`, `${s.fmt(lo)} to ${s.fmt(hi)} over the window`);
+    if (s.trend) {
+      bits.push(Math.abs(s.trend.slope) < 0.01 ? 'night lows steady'
+        : `night lows ${s.trend.slope > 0 ? 'rising' : 'falling'} ${Math.abs(s.trend.slope).toFixed(2)} V a day`);
+    }
+    if (s.left) bits.push(`${s.left} one-reading spike${s.left === 1 ? '' : 's'} left out`);
+    bits.push(`last heard ${fmtWhen(r.x.last.t)}`);
+    return `${r.label}, ${r.st.name}: ${bits.join('; ')}`;
+  }
+
+  // The readout: over whichever line the pointer is on, a crosshair on the
+  // nearest reading and its value and time. Every value is also in the
+  // station above — its charts, and the tables under them — for a keyboard.
+  function nearestPt(pts, t) {
+    let lo = 0, hi = pts.length - 1;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (pts[m].t < t) lo = m + 1; else hi = m; }
+    const a = pts[lo - 1], b = pts[lo];
+    return a && (!b || t - a.t < b.t - t) ? a : b;
+  }
+  function wireSpark() {
+    const sec = document.getElementById('hl-ss');
+    if (!sec || sec.dataset.wired) return;
+    sec.dataset.wired = '1';
+    let on = null;
+    const off = () => {
+      if (on) on.querySelectorAll('.hl-ss-cross, .hl-ss-dot').forEach(el => el.setAttribute('visibility', 'hidden'));
+      on = null;
+      const tip = document.getElementById('hl-ss-tip');
+      if (tip) tip.hidden = true;
+    };
+    sec.addEventListener('pointermove', e => {
+      const svg = e.target && e.target.closest ? e.target.closest('svg.hl-ss-svg') : null;
+      const r = svg && H.A && H.ssMemo && H.ssMemo.A === H.A ? H.ssMemo.byKey.get(svg.getAttribute('data-k')) : null;
+      if (!r || !r.ser.pts.length) { off(); return; }
+      if (on !== svg) off();
+      on = svg;
+      const box = svg.getBoundingClientRect();
+      const { X, Y } = sparkScale(r.ser);
+      const px = (e.clientX - box.left) * SS_W / (box.width || SS_W);
+      const p = nearestPt(r.ser.pts, H.A.t0 + (px - SS_PX) / (SS_W - 2 * SS_PX) * (H.A.t1 - H.A.t0));
+      const x = X(p.t).toFixed(1), y = Y(p.v).toFixed(1);
+      const cross = svg.querySelector('.hl-ss-cross'), dot = svg.querySelector('.hl-ss-dot');
+      cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('visibility', 'visible');
+      dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.setAttribute('visibility', 'visible');
+      const tip = document.getElementById('hl-ss-tip');
+      if (!tip) return;
+      tip.textContent = `${r.ser.fmt(p.v)}${r.ser.fallen ? ' since the window began' : r.ser.raw ? ' raw' : ''} — ${fmtWhen(p.t)}`;
+      tip.hidden = false;
+      tip.style.left = `${Math.max(4, Math.min(window.innerWidth - tip.offsetWidth - 4, e.clientX + 12))}px`;
+      tip.style.top = `${Math.max(4, e.clientY - tip.offsetHeight - 10)}px`;
+    });
+    sec.addEventListener('pointerleave', off);
+    sec.addEventListener('scroll', off, true);
+  }
+
+  // The filters, painted again in place — the kinds, the count and the rows —
+  // so the box being typed in keeps the keyboard, and a chip or Show all
+  // pressed gets it back.
+  function paintSpark() {
+    if (state.activeTab !== 'health' || !H.A) return;
+    const rows = sparkVisible();
+    const kinds = document.getElementById('hl-ss-kinds');
+    const list = document.getElementById('hl-ss-list');
+    const was = document.activeElement;
+    const chip = was && kinds && kinds.contains(was) ? was.dataset.kind : null;
+    const more = !!(was && list && list.contains(was) && was.classList.contains('hl-more'));
+    if (kinds) kinds.innerHTML = sparkKindsHtml();
+    const n = document.getElementById('hl-ss-count');
+    if (n) n.textContent = sparkCountText(rows);
+    if (list) list.innerHTML = sparkListHtml(rows);
+    const tip = document.getElementById('hl-ss-tip');
+    if (tip) tip.hidden = true;
+    const back = chip ? kinds.querySelector(`[data-kind="${chip}"]`) : more ? list.querySelector('.hl-more') : null;
+    if (back) back.focus();
+  }
+  function ssKind(k) { if (!SS_KINDS.some(([x]) => x === k)) return; H.ss.kind = k; paintSpark(); }
+  function ssAttn(v) { H.ss.attn = !!v; paintSpark(); }
+  function ssFind(q) { H.ss.find = String(q || ''); paintSpark(); }
+  function ssMore() { H.ss.all = !H.ss.all; paintSpark(); }
 
   // ── receivers and repeaters ─────────────────────────────────────────────────
 
@@ -1189,6 +1606,7 @@ const Health = (() => {
   function afterRender() {
     drawMap();
     wireCharts();
+    wireSpark();
     if (typeof HealthAgent !== 'undefined' && HealthAgent.init) HealthAgent.init();
   }
 
@@ -1213,7 +1631,9 @@ const Health = (() => {
     if (sec) sec.innerHTML = matrixHtml();
   }
 
-  function select(id) {
+  // `part` (PART_HEAD's keys) opens it at that part rather than its top: a
+  // sparkline's row opens its station at that sensor's chart or section.
+  function select(id, part) {
     if (!H.A || !H.A.stations.has(id)) return;
     H.sel = id;
     H.lens = null;
@@ -1222,9 +1642,10 @@ const Health = (() => {
     rerenderStation();
     loadInspections(id);
     syncRoute();
-    const el = document.getElementById('hl-station');
+    const at = part && PART_HEAD[part] ? document.getElementById(PART_HEAD[part]) : null;
+    const el = at || document.getElementById('hl-station');
     if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    const h = document.getElementById('hl-h-stn');
+    const h = at || document.getElementById('hl-h-stn');
     if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
   }
   function close() { H.sel = null; H.lens = null; H.missing = null; H.want = null; rerenderStation(); syncRoute(); }
@@ -1355,7 +1776,10 @@ const Health = (() => {
     return w;
   }
 
-  const PART_HEAD = { checks: 'hl-h-strip', battery: 'hl-h-batt', findings: 'hl-h-stnf' };
+  // The rain, level and sensors parts are where a row of All stations,
+  // sparklines opens its station (select).
+  const PART_HEAD = { checks: 'hl-h-strip', battery: 'hl-h-batt', findings: 'hl-h-stnf',
+                      rain: 'hl-h-rain', level: 'hl-h-level', sensors: 'hl-h-sens' };
   // The heading of the part asked for, or of the station when it has no such
   // part (no schedule learned, no battery heard, nothing found): scrolled to
   // and focused, the way select() does it.
@@ -1416,6 +1840,7 @@ const Health = (() => {
   return {
     render, init, stop, run, refresh, demo, adopt,
     setWin, setCat, setInfo, toggleMatrix, select, close, lensAt, lensClose, stripClick,
+    ssKind, ssAttn, ssFind, ssMore,
     openLog, openAddr, openField, openReception, showStation, picked, wantStation, exportCsv, fetchReadings,
     setOwner, clearOwners, findOwner, owner,
     state: state_,

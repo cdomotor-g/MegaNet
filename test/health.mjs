@@ -27,6 +27,14 @@
 //   * the Airtime panel: the demo week's one planted clash found, said to
 //     hurt, the station coming off worse moved somewhere clear — and nothing
 //     else (airtime.mjs holds the rules themselves, in Node)
+//   * All stations, sparklines: every sensor of every station heard, a row
+//     each with its station's number and name and its line; the planted
+//     faults highlighted on their sensors' rows — the silent station's every
+//     sensor critical, the sliding battery's trend line sloping down, the dry
+//     gauge flat along the bottom — and the stations left alone not; a kind
+//     picked, only those needing attention, a station found by its number
+//     with the box keeping the keyboard, the reading under the pointer, a
+//     name opening its station at that sensor's chart, and the owner filter
 //   * the door to the Reception Map carrying the same readings over
 //   * Claude's briefing, its tool loop run against a scripted client: tools
 //     answered, a tool that does not exist refused, the briefing drawn with
@@ -375,6 +383,102 @@ try {
   ok('a filter shows one kind of finding', power.length >= 2 && power.every(t => /batter/i.test(t)), JSON.stringify(power));
   await page.evaluate(() => Health.setCat('all'));
 
+  // ── All stations, sparklines ───────────────────────────────────────────────
+  // Every sensor of every station heard, a row each — its station's number
+  // and name, the sensor, its line — the planted faults wearing their
+  // findings and the stations left alone not; then the filters, the readout
+  // and the door to the station.
+  const ss = await page.evaluate(async W => {
+    const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const A = Health.state().A;
+    const more = document.querySelector('#hl-ss .hl-more');
+    if (more) { more.click(); await frame(); }
+    const rows = [...document.querySelectorAll('#hl-ss tbody tr')].map(tr => {
+      const svg = tr.querySelector('svg.hl-ss-svg');
+      const line = svg && svg.querySelector('.hl-ss-line');
+      const trend = svg && svg.querySelector('.hl-ss-trend');
+      const ys = line ? [...line.getAttribute('d').matchAll(/[ML][\d.]+ ([\d.]+)/g)].map(m => Number(m[1])) : [];
+      return {
+        k: svg ? svg.getAttribute('data-k') : null, cls: tr.className,
+        num: tr.cells[0].textContent.trim(), name: tr.cells[1].querySelector('button').textContent.trim(), sensor: tr.cells[2].textContent.trim(),
+        n: ys.length, lo: Math.min(...ys), hi: Math.max(...ys),
+        trend: trend ? trend.getAttribute('d').match(/[\d.]+/g).map(Number) : null,
+        worst: tr.cells[5].textContent.replace(/\s+/g, ' ').trim(), label: svg ? svg.getAttribute('aria-label') : '',
+      };
+    });
+    const sensors = [];
+    A.stations.forEach(S => S.sensors.forEach(x => sensors.push({ k: S.st.id + '|' + x.addr, num: S.st.station_number || '—', name: S.st.name,
+      type: (x.types && x.types[0]) || SensorValues.kindLabel(x.kind) })));
+    const addrOf = (id, kind) => (A.stations.get(id).sensors.find(x => x.kind === kind) || {}).addr;
+    return { rows, sensors, falling: W.roles.falling + '|' + addrOf(W.roles.falling, 'battery'), blocked: W.roles.blocked + '|' + addrOf(W.roles.blocked, 'rain') };
+  }, WORLD);
+  const ssRow = k => ss.rows.find(y => y.k === k) || { cls: '', worst: '', label: '' };
+  const ssOf = id => ss.rows.filter(y => y.k.startsWith(id + '|'));
+  const SEV_AT = c => (/--critical/.test(c) ? 0 : /--warn/.test(c) ? 1 : /--info/.test(c) ? 2 : 3);
+  ok('All stations, sparklines: every sensor of every station heard, a row each',
+    ss.rows.length === ss.sensors.length && ss.sensors.every(x => ss.rows.filter(y => y.k === x.k).length === 1), `${ss.rows.length} rows, ${ss.sensors.length} sensors`);
+  ok('…each with its station\'s number and name, what the sensor is, and its line drawn',
+    ss.sensors.every(x => { const y = ssRow(x.k); return y.num === x.num && y.name === x.name && y.sensor.startsWith(x.type) && y.n >= 2; }),
+    JSON.stringify(ss.rows.slice(0, 2)));
+  ok('…those of concern first, worst first', ss.rows.every((y, i) => i === 0 || SEV_AT(ss.rows[i - 1].cls) <= SEV_AT(y.cls)), ss.rows.map(y => SEV_AT(y.cls)).join(''));
+  ok('…the silent station\'s every sensor highlighted critical, saying so',
+    ssOf(WORLD.roles.silent).length >= 2 && ssOf(WORLD.roles.silent).every(y => /hl-frow--critical/.test(y.cls) && /Silent/.test(y.worst)), JSON.stringify(ssOf(WORLD.roles.silent)));
+  const fall = ssRow(ss.falling);
+  ok('…the sliding battery highlighted, its fall named, and its trend line sloping down',
+    /hl-frow--(warn|critical)/.test(fall.cls) && /Battery falling/.test(fall.worst) && fall.trend && fall.trend[3] > fall.trend[1] + 2
+      && /night lows falling 0\.1\d V a day/.test(fall.label), JSON.stringify(fall));
+  const dry = ssRow(ss.blocked);
+  ok('…the gauge dry through its neighbours\' storm highlighted, its line flat along the bottom',
+    /hl-frow--warn/.test(dry.cls) && /No rain recorded while its neighbours had rain/.test(dry.worst) && dry.lo === dry.hi && dry.lo >= 27, JSON.stringify(dry));
+  ok('…and the stations left alone not highlighted', [WORLD.roles.steady, WORLD.roles.steady2].every(id => ssOf(id).length && ssOf(id).every(y => SEV_AT(y.cls) >= 2)),
+    JSON.stringify([WORLD.roles.steady, WORLD.roles.steady2].map(ssOf)));
+
+  // The filters: a kind, only those needing attention, a station by its number
+  // — typed, the box keeping the keyboard as the rows change under it.
+  const ssKinds = await page.evaluate(async () => {
+    const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const A = Health.state().A;
+    const kinds = () => [...document.querySelectorAll('#hl-ss tbody svg.hl-ss-svg')].map(s => {
+      const [id, addr] = s.getAttribute('data-k').split('|');
+      return A.stations.get(id).sensors.find(x => x.addr === addr).kind;
+    });
+    const batteries = [...A.stations.values()].reduce((n, S) => n + S.sensors.filter(x => x.kind === 'battery').length, 0);
+    Health.ssKind('battery'); await frame();
+    const batt = kinds(), on = !!document.querySelector('#hl-ss-kinds [data-kind="battery"].hl-chip--on');
+    Health.ssKind('all'); Health.ssAttn(true); await frame();
+    const attn = [...document.querySelectorAll('#hl-ss tbody tr')].map(tr => tr.className);
+    Health.ssAttn(false); await frame();
+    return { batt, batteries, on, attn };
+  });
+  ok('…a kind of sensor picked shows those alone', ssKinds.on && ssKinds.batt.length === ssKinds.batteries && ssKinds.batt.every(k => k === 'battery'), JSON.stringify(ssKinds.batt));
+  ok('…"only those needing attention" leaves the warnings and worse', ssKinds.attn.length >= 4 && ssKinds.attn.every(c => /hl-frow--(warn|critical)/.test(c)), JSON.stringify(ssKinds.attn));
+  const fallSt = await page.evaluate(id => { const st = Health.state().A.stations.get(id).st; return st.station_number || st.name; }, WORLD.roles.falling);
+  await page.click('#hl-ss .hl-ss-find');
+  await page.keyboard.type(fallSt);
+  const ssFound = await page.evaluate(() => ({
+    ids: [...document.querySelectorAll('#hl-ss tbody svg.hl-ss-svg')].map(s => s.getAttribute('data-k').split('|')[0]),
+    kept: document.activeElement && document.activeElement.classList.contains('hl-ss-find'),
+    count: document.getElementById('hl-ss-count').textContent,
+  }));
+  ok('…a station found by its number, the box keeping the keyboard as the rows change',
+    ssFound.ids.length >= 2 && ssFound.ids.every(id => id === WORLD.roles.falling) && ssFound.kept && /at 1 station\b/.test(ssFound.count), JSON.stringify(ssFound));
+  await page.fill('#hl-ss .hl-ss-find', '');
+
+  // The readout, and the door: pointing at the sliding battery's line says a
+  // reading and when; its station's name opens the station at its battery.
+  const fallSvg = page.locator(`#hl-ss svg.hl-ss-svg[data-k="${ss.falling}"]`);
+  await fallSvg.scrollIntoViewIfNeeded();
+  await fallSvg.hover({ position: { x: 90, y: 17 } });
+  const ssTip = await page.evaluate(k => {
+    const tip = document.getElementById('hl-ss-tip'), svg = document.querySelector(`#hl-ss svg.hl-ss-svg[data-k="${k}"]`);
+    return { hidden: tip.hidden, text: tip.textContent, cross: svg.querySelector('.hl-ss-cross').getAttribute('visibility') };
+  }, ss.falling);
+  ok('…pointing at a line says the reading under it and when', !ssTip.hidden && /^1\d\.\d V — \d\d:\d\d /.test(ssTip.text) && ssTip.cross === 'visible', JSON.stringify(ssTip));
+  await page.locator(`#hl-ss tr:has(svg[data-k="${ss.falling}"]) th button`).click();
+  const ssDoor = await page.evaluate(() => ({ sel: Health.state().sel, focus: document.activeElement && document.activeElement.id }));
+  ok('…and a station\'s name opens it above, at that sensor\'s chart', ssDoor.sel === WORLD.roles.falling && ssDoor.focus === 'hl-h-batt', JSON.stringify(ssDoor));
+  await page.evaluate(() => Health.close());
+
   // ── who owns each station, and the owner filter ────────────────────────────
   await until(page, () => SLS.loaded() && document.querySelector('#hl-ownpick-pop input[data-party]'), null);
   const own = await page.evaluate(async () => {
@@ -401,7 +505,9 @@ try {
       summary: document.getElementById('hl-ownpick-sum').textContent,
       on: document.getElementById('hl-ownpick').classList.contains('hl-ownpick--on'),
       stored: localStorage.getItem('mn-hl-owners'),
+      ssRows: [...document.querySelectorAll('#hl-ss tbody svg.hl-ss-svg')].map(s => s.getAttribute('data-k').split('|')[0]),
     };
+    after.ssOwned = after.ssRows.length > 0 && after.ssRows.every(id => { const o = Health.owner(A.stations.get(id).st); return !!o && o.parties.includes(pick[0]); });
     const sid = [...A.stations.values()].find(S => { const o = Health.owner(S.st); return o && o.parties.includes(pick[0]); }).st.id;
     Health.select(sid);
     await frame();
@@ -411,7 +517,7 @@ try {
     Health.clearOwners();
     await frame();
     after.cleared = { note: document.getElementById('hl-ownnote').textContent.trim(), stored: localStorage.getItem('mn-hl-owners'),
-      heardKpi: document.querySelector('#hl-kpis .qs-chip-v').textContent };
+      heardKpi: document.querySelector('#hl-kpis .qs-chip-v').textContent, ssRows: document.querySelectorAll('#hl-ss tbody tr').length };
     return { before, after, total: A.stations.size };
   });
   // The list open and stretched to reach down over the map, with something
@@ -450,6 +556,9 @@ try {
     own.after.rows > 0 && own.after.rowsOwned && own.after.heardKpi === String(own.after.n) && own.after.on
       && own.after.note.includes(own.after.pick) && own.after.summary.includes(own.after.pick) && JSON.parse(own.after.stored)[0] === own.after.pick,
     JSON.stringify(own.after));
+  ok('…and All stations, sparklines to that owner\'s sensors, and back to every sensor after',
+    own.after.ssOwned && own.after.ssRows.length < ss.rows.length && own.after.cleared.ssRows === ss.rows.length,
+    JSON.stringify({ owned: own.after.ssOwned, rows: own.after.ssRows.length, cleared: own.after.cleared.ssRows, all: ss.rows.length }));
   ok('…the station opened says who owns it and where that came from', own.after.fact && own.after.fact.includes(own.after.pick) && /SLS|Service Level|recorded/.test(own.after.fact), own.after.fact);
   ok('…and All owners puts the whole network back', !own.after.cleared.note && own.after.cleared.stored === '[]' && own.after.cleared.heardKpi === own.total.toLocaleString(),
     JSON.stringify(own.after.cleared));

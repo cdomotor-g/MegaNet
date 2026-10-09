@@ -1314,7 +1314,10 @@ const HealthAnalysis = (() => {
         const med = median(vals.map(p => p.v));
         const spikes = spikesOf(vals, Math.max(10, 0.1 * Math.abs(med)));
         const distinct = new Set(vals.map(p => p.v)).size;
+        // spikeAt: when each spike was, so a sparkline (health.js) can leave
+        // them out as the battery's series leaves its own out.
         S.level = { addr: lev.addr, aid: lev.aid, n: vals.length, median: med, distinct, spikes: spikes.length,
+                    spikeAt: spikes.map(p => p.t),
                     flat: distinct === 1 && vals.length >= 8 && vals[vals.length - 1].t - vals[0].t >= 2 * DAY,
                     zero: distinct === 1 && vals[0].v === 0 };
         if (spikes.length >= 2) {
