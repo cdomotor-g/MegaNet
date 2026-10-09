@@ -7394,10 +7394,32 @@ hr {
   max-height: calc(100dvh - var(--mn-chrome, 96px));
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* What a focused tab is scrolled clear of: .nav-head, stuck over the top of
+     this box. Without it ↑ walked the focus up under the head, out of sight. */
+  scroll-padding-top: 6.5rem;
   padding: .5rem .45rem 1rem;
   display: flex;
   flex-direction: column;
   gap: .1rem;
+}
+
+/* The collapse toggle and the find box, held at the top of the scroller while
+   the tabs scroll under them — both are how you get somewhere else, and neither
+   should take a scroll back up to reach. The negative margin takes it over
+   .nav-inner's top padding, so nothing scrolling under it shows through that
+   strip; the background and the rule beneath are what the list disappears
+   behind. `top` matches that margin because a sticky box is held inside its
+   scroller's padding — at 0 it stuck .5rem down, with the list showing through
+   above it. */
+.nav-head {
+  position: sticky;
+  top: -.5rem;
+  z-index: 1;
+  margin-top: -.5rem;
+  padding: .5rem 0 .4rem;
+  margin-bottom: .3rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
 }
 
 .nav-group + .nav-group {
@@ -7412,10 +7434,6 @@ hr {
    is no room for a box, so it is the one rail button that opens the nav with
    the cursor already in it (app.js: focusNavFind). Ctrl+K does the same from
    anywhere. */
-
-.nav-find {
-  margin-bottom: .4rem;
-}
 
 .nav-search {
   width: 100%;

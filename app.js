@@ -1650,23 +1650,29 @@ function renderTabs() {
   // On the rail there is no room for a text box, so the find box becomes the one
   // button that re-opens the nav with the cursor already in it. Same errand,
   // 56 px of it.
+  //
+  // The toggle and the find box are .nav-head, which sticks to the top of the
+  // nav's scroller: the list scrolls under them, so neither is ever scrolled
+  // out of reach of somebody halfway down the tabs (styles.css).
   nav.innerHTML = `
     <div class="nav-inner" onkeydown="navKey(event)">
-      <button class="nav-toggle" onclick="toggleNav()" aria-controls="tab-nav"
-              aria-expanded="${collapsed ? 'false' : 'true'}"
-              title="${toggleWord.title}">
-        <span class="nav-icon" aria-hidden="true">${toggleWord.icon}</span>
-        <span class="nav-label">${toggleWord.label}</span>
-      </button>
-      <div class="nav-find">
-        <input id="nav-search" class="nav-search" type="search" autocomplete="off"
-               spellcheck="false" aria-label="Find a tab" placeholder="Find a tab…"
-               value="${escAttr(state.navQuery)}"
-               oninput="navFind(this.value)" onkeydown="navFindKey(event)">
-        <button class="nav-find-btn" onclick="focusNavFind()" title="Find a tab">
-          <span class="nav-icon" aria-hidden="true">🔎</span>
-          <span class="nav-label">Find a tab</span>
+      <div class="nav-head">
+        <button class="nav-toggle" onclick="toggleNav()" aria-controls="tab-nav"
+                aria-expanded="${collapsed ? 'false' : 'true'}"
+                title="${toggleWord.title}">
+          <span class="nav-icon" aria-hidden="true">${toggleWord.icon}</span>
+          <span class="nav-label">${toggleWord.label}</span>
         </button>
+        <div class="nav-find">
+          <input id="nav-search" class="nav-search" type="search" autocomplete="off"
+                 spellcheck="false" aria-label="Find a tab" placeholder="Find a tab…"
+                 value="${escAttr(state.navQuery)}"
+                 oninput="navFind(this.value)" onkeydown="navFindKey(event)">
+          <button class="nav-find-btn" onclick="focusNavFind()" title="Find a tab">
+            <span class="nav-icon" aria-hidden="true">🔎</span>
+            <span class="nav-label">Find a tab</span>
+          </button>
+        </div>
       </div>
       <div id="nav-groups">${navGroupsHtml()}</div>
       <p id="nav-found" class="nav-found" role="status" aria-live="polite">${esc(navFoundText())}</p>

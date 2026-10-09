@@ -745,9 +745,14 @@ const SiteMap = (function () {
     if (!inner || inner === el) return;
     const ir = inner.getBoundingClientRect(), r = el.getBoundingClientRect();
     if (!r.height || !ir.height) return;             // put away: a phone's drawer, shut
+    // The toggle and find box stick over the scroller's top (.nav-head), so a
+    // button is only in view below them; the head itself never scrolls away.
+    const head = inner.querySelector('.nav-head');
+    if (head && head.contains(el)) return;
+    const top = head ? head.getBoundingClientRect().bottom : ir.top;
     const pad = 10;
-    if (r.top < ir.top + pad) inner.scrollTop -= ir.top + pad - r.top;
-    else if (r.bottom > ir.bottom - pad) inner.scrollTop += Math.min(r.bottom - (ir.bottom - pad), r.top - (ir.top + pad));
+    if (r.top < top + pad) inner.scrollTop -= top + pad - r.top;
+    else if (r.bottom > ir.bottom - pad) inner.scrollTop += Math.min(r.bottom - (ir.bottom - pad), r.top - (top + pad));
   }
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
