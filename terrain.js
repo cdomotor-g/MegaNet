@@ -235,8 +235,14 @@ const Terrain = (function () {
     //   { ok: true, distance_m[], terrain_m[], …} terrain_m holds null wherever
     //                                             a tile was missing, and
     //                                             `partial` says it happened
-    profile(pts, n) {
-      const count = Math.max(2, Math.min(1024, n || 256));
+    //
+    // 1024 samples is the ceiling unless the caller raises it with
+    // opt.maxSamples — LidarProfile does, because its splice wants the tiles
+    // at the LiDAR's own 5 m spacing (a 40 km path is 8,000 samples), and the
+    // tile count is the same either way: the zoom tops out at MAX_ZOOM.
+    profile(pts, n, opt) {
+      const cap = opt && opt.maxSamples > 1024 ? Math.min(opt.maxSamples, 50000) : 1024;
+      const count = Math.max(2, Math.min(cap, n || 256));
       if (!pts || pts.length < 2) {
         return Promise.resolve({ ok: false, error: 'A path needs at least two points.' });
       }

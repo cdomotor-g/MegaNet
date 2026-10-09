@@ -100,6 +100,8 @@ MegaNet/
 │                             the stations the way it faces pinned over the camera's
 │                             picture, its compass turned to true north by WMM2025
 ├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
+├── lidar-profile.js        ← LidarProfile — 5 m LiDAR (Geoscience Australia) round a
+│                             path's ends and obstacles, spliced into the tiles' profile
 ├── geoid.js                ← Geoid     — AHD less EGM96 at a point (AUSGeoid2020 and
 │                             EGM96, a 0.1° grid in data/): the tiles' heights into AHD
 ├── digital-twin.js         ← DigitalTwin — the digital twin (in the Stations map, its
@@ -174,6 +176,8 @@ MegaNet/
 ├── network-review.js       ← NetworkReview — Network Review tab (administrators: the
 │                             fade margin matrix of a network beside the attenuator's,
 │                             Flood-Net against Radio Mobile, the design principles)
+├── network-history.js      ← NetworkHistory — the Network Review's check of the model
+│                             against every attenuator test on file, by hub and basin
 ├── propagation-physics.js  ← PropPhysics — the 🎓 Radio Propagation tab's arithmetic
 │                             (wavelength, Fresnel, knife edge, foliage, phasors, the
 │                             ALERT Binary frame, a receiver with FM capture); pure
@@ -3285,7 +3289,7 @@ EIRP           = tx_power_dbm + tx_gain_dbi − tx_losses_db
 Free space     = 32.45 + 20·log10(f_MHz) + 20·log10(d_km)
 Terrain        = A_ref, the Longley–Rice reference attenuation over the profile
 Statistics     = the climate's median shift + the variability for the reliability asked
-Field allowance = 16 dB, fitted to attenuator tests on site       (the field model — the default)
+Field allowance = 12 dB, fitted to every attenuator test on file  (the field model — the default)
 Ground cover   = ITU-R P.2108 §3.1 terminal loss at an end whose antenna is under the cover
                                                                  (the land-cover model instead)
 Obstruction floor = knife-edge over the worst obstruction, where the model's regime prices it lower
@@ -3299,12 +3303,14 @@ never a single number.
 
 **Field-calibrated, by default.** The card's *Model* setting has two answers.
 The **field model**, the default, runs Longley–Rice over the bare terrain and
-takes off a **field allowance** — 16 dB, the bare-terrain figure's average
-shortfall against path margins measured with an attenuator on site (54 stations,
-2018–20: mean error 0 dB, typical error ±5 dB). The attenuator steps in 3 dB, so
-each test is read as the step it is — one that carried 24 dB and not 27 is a
-margin of 24–27 — rather than as an exact figure, which would charge the model
-up to 3 dB it never lost. The **land-cover model** stands
+takes off a **field allowance** — 12 dB, the bare-terrain figure's average
+shortfall against every path margin measured with an attenuator since 2010 (the
+473 stations whose best path is 35 km or less: mean error 0 dB, typical error
+±8 dB; hubs differ, and the Network Review's history check names the ones that
+do). Each test is read as the step it is — most attenuators step in 3 dB, so one
+that carried 24 dB and not 27 is a margin of 24–27, and a reading off that grid
+came from a 1 dB attenuator — rather than as an exact figure, which would charge
+the model for up to a step it never lost. The **land-cover model** stands
 the land cover on the profile and charges P.2108 at a mast under it, as
 described below; against the same measurements it read 41 dB too low, because at
 VHF a canopy is largely transparent and it charged the same trees twice. Under
@@ -3313,10 +3319,16 @@ the tile — the tiles are a surface, and an antenna below it starts the path in
 pit — and a repeater or base is modelled on at least a 10 m mast (*Repeater &
 base mast*), because every station in the register is on the 4 m field-station
 radio system. The fade-margin map, the profile's readout, the site finder, the
-Network Review tab and polar coverage all follow the card's setting.
+Network Review tab and polar coverage all follow the card's setting. The card's
+*Ground* setting prices a path over the ~30 m tiles (the default) or over
+Geoscience Australia's 5 m LiDAR round its ends and wherever the ground comes
+near the line of sight (`lidar-profile.js`, through `pathGround` in
+`path-profile.js`), with a repeater or base stood on the highest LiDAR ground
+within its registered position's rounding; held against the field's tests it was
+no better than the tiles, so it is for studying one site, not the default.
 [docs/network-review.md](docs/network-review.md) has the measurements, each
-step's effect, and how a Flood-Net figure reads against a Radio Mobile one
-(about 7 dB lower for the same path).
+step's effect, the LiDAR results, and how a Flood-Net figure reads against a
+Radio Mobile one (within a dB or so for the same path).
 
 **The propagation model is Radio Mobile's.** `itm.js` is the ITS Irregular
 Terrain Model (Longley–Rice) in point-to-point mode, ported function for
@@ -4619,13 +4631,20 @@ the tiles over the table count the stations with two good paths, one, a marginal
 one, or none worth building on. The matrix saves as
 `floodnet-network-review-….csv`.
 
-Below it the tab sets out how Flood-Net's fade margins relate to **Radio
-Mobile's** and to the field — the measurements the model was calibrated on (see
-*Field-calibrated, by default* under §17), what each step changed, and a
-converter for one figure — the **design principles** a network is reviewed
-against, with this network's standing under each where the matrix can say, and
-the register's own faults: repeaters on an assumed mast, pass-range links longer
-than 150 km, stations surveyed below the terrain model.
+Under it, **the model against every attenuator test** on file: one button
+prices every tested station's paths (`network-history.js`) and gives the
+allowance the field asks for, how far the model is out by distance, by hub and
+by basin, and the hubs whose stations all read 10 dB or more better or worse than
+modelled — a mast, an antenna or a position the register is missing. It saves as
+`floodnet-attenuator-history-check-….csv`, and its fit can be taken up for the
+session. Below that the tab sets out how Flood-Net's fade margins relate to
+**Radio Mobile's** and to the field (see *Field-calibrated, by default* under
+§17), what each step changed, what LiDAR did, and a converter for one figure —
+the **design principles** a network is reviewed against, with this network's
+standing under each where the matrix can say, and the register's own faults:
+repeaters on an assumed mast, pass-range links longer than 150 km, stations
+surveyed below the terrain model, and each repeater and base checked against the
+5 m LiDAR.
 
 `docs/network-review.md` has the rest; `npm run review` holds it.
 

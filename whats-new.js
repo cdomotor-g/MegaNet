@@ -25,6 +25,20 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 19, date: '2026-10-09', items: [
+      '<strong>Fade margins, calibrated against the whole network.</strong> The field allowance is now fitted to every '
+        + 'station\'s attenuator tests on file — several hundred stations, not one region\'s — and is '
+        + '<strong>12 dB</strong>. Most figures go up a few decibels. A test is read as the step its attenuator took: '
+        + '3 dB on most, 1 dB where a reading is off that grid.',
+      '<strong>📐 Network Review: the model against every attenuator test.</strong> One button prices every tested '
+        + 'station\'s paths and shows how far the model is out — by distance, by hub and by basin — and names the hubs '
+        + 'whose stations all read 10 dB better or worse than modelled: a mast, an antenna or a position the register '
+        + 'is missing. The register panel also checks each repeater and base against the 5 m LiDAR.',
+      '<strong>LiDAR, where it matters.</strong> The link budget card can price a path over Geoscience Australia\'s '
+        + '5 m LiDAR round its ends and wherever the ground comes near the line of sight, with ~30 m terrain between. '
+        + 'It is a setting, not the default: held against the field\'s tests it was no better, until the register\'s '
+        + 'positions and heights are as sharp as the ground.',
+    ] },
     { n: 18, date: '2026-10-08', items: [
       '<strong>🎓 Radio Propagation</strong>, a new tab under <em>Start here</em>: how radio carries a reading from a '
         + 'gauge to a base, in pictures that move. A 3-D catchment shows the wave spreading in every direction, the '

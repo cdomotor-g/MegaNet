@@ -180,6 +180,9 @@ const MapFade = (function () {
     return [
       MODEL, ends[0], ends[1], freqFor(a, b), SAMPLES,
       p.model === 'cover' ? 'cover' : `field-${p.allowance}`,
+      // The ground only when it is not the tiles, so every row saved before
+      // LiDAR was a setting still matches its own signature.
+      ...(p.ground === 'lidar' ? ['lidar'] : []),
       p.climate, p.N0, p.epsilon, p.sigma, p.pol, p.mdvar, p.time, p.location, p.situation,
     ].join('|');
   }
@@ -454,8 +457,15 @@ const MapFade = (function () {
   // optimistic one — so cover that cannot be fetched is a link that cannot be
   // computed, and says so, rather than one quietly answered from bare earth.
   async function computeOne(a, b) {
-    const prof = await Terrain.profile([[a.lat, a.lon], [b.lat, b.lon]], SAMPLES);
-    if (!prof || !prof.ok) return null;
+    const pa = endSys(a), pb = endSys(b);
+    // pathGround (path-profile.js) decides the ground — the tiles, or LiDAR at
+    // the ends and the obstacles — and is where the card and the Network
+    // Review get theirs, so the three price a link over the same ground.
+    const got = await pathGround({ lat: a.lat, lon: a.lon, elev: pa.elev, agl: pa.agl, mast: stationIsMast(a) },
+                                 { lat: b.lat, lon: b.lon, elev: pb.elev, agl: pb.agl, mast: stationIsMast(b) },
+                                 { samples: SAMPLES, freqMhz: freqFor(a, b) });
+    if (!got.ok) return null;
+    const prof = got.prof, ea = got.ends.a, eb = got.ends.b;
     // A margin over bridged gaps is a guess dressed as a figure, and unlike an
     // obstruction it is not true in one direction either — so a partial profile
     // is refused outright (terrain.js's loud-failure rule, at its strictest).
@@ -465,9 +475,8 @@ const MapFade = (function () {
     const coverModel = pathPropOf().model === 'cover';
     const res = coverModel ? await LandCover.sample(prof.lat, prof.lon) : null;
     if (coverModel && (!res || !res.ok)) return null;
-    const pa = endSys(a), pb = endSys(b);
     const an = pathAnalyse(prof, {
-      elevA: pa.elev, elevB: pb.elev, aglA: pa.agl, aglB: pb.agl,
+      elevA: ea.elev, elevB: eb.elev, aglA: pa.agl, aglB: pb.agl,
       freqMhz: freqFor(a, b),
       cover: res ? res.cls : null, canopy: res && res.canopyOk ? res.canopy : null,
     });

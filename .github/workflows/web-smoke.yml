@@ -290,6 +290,14 @@ jobs:
         working-directory: test
         run: npm run itm
 
+      # Node-only and fast. lidar-profile.js with its tiles answered by its test
+      # seam: the GeoTIFF it reads, where it puts LiDAR on a path (the ends and
+      # the obstacles, nothing where the ground is clear), the splice and its
+      # ramp, a mast stood on its top, and a dead host failing loudly.
+      - name: LiDAR where it matters — the grid, the zones, the splice
+        working-directory: test
+        run: npm run lidar
+
       # Node-only and fast. The base station program is the one file here no CI
       # can compile — CRBasic Editor is a Windows application — so this holds it
       # to the two things that can be held without one: that it and

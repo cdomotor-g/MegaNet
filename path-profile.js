@@ -203,9 +203,61 @@ function pathPropOf(opt) {
     location:  num(p.location, D['%Location']),
     situation: num(p.situation, D['%Situation']),
     model:     p.model === 'cover' || p.model === 'field' ? p.model : F.model,
+    ground:    p.ground === 'lidar' || p.ground === '30m' ? p.ground : F.ground,
     allowance: Math.max(0, num(p.allowance, F.allowance)),
     mastAgl:   Math.max(0, num(p.mastAgl, F.mastAgl)),
   };
+}
+
+// ── The ground a path is priced over ─────────────────────────────────────────
+// One place decides it, so the link budget card, the fade-margin map and the
+// Network Review cannot price one link over two different grounds. Set by
+// pathPropOf().ground:
+//
+//   '30m'    the ~30 m terrain tiles at `samples` points — what every figure in
+//            the app was computed on before LiDAR, and still the default.
+//   'lidar'  the same tiles at LidarProfile.STEP_M, with Geoscience Australia's
+//            5 m LiDAR spliced in round both ends and at the obstacles, and a
+//            repeater or base stood on the highest LiDAR ground within its
+//            registered position's rounding (lidar-profile.js has where, and
+//            why only there).
+//
+// Why not LiDAR by default, when it is the better ground: held against ~700
+// stations' attenuator tests it did not make the figures better (docs/
+// network-review.md has the numbers). Ground at 5 m is only as good as the
+// antenna position laid on it, and the register's positions and heights are
+// not that good yet — a repeater registered fifty metres off its summit, an
+// end surveyed metres from where the LiDAR finds the ground. The coarser
+// ground averages over that; the finer one prices it. So LiDAR is the setting
+// for studying one site whose position is known, and for checking the
+// register, until the register is fit for it.
+//
+// a / b: { lat, lon, elev, agl, mast } — `mast` lets a repeater or base be
+// stood on its top. opt: { samples, freqMhz, prop }. Resolves — never rejects —
+// to { ok: true, prof, lidar: report | null, ends: { a, b } } (the ends as
+// priced: a stood mast has moved) or { ok: false, error }.
+async function pathGround(a, b, opt) {
+  const o = opt || {};
+  const P_ = pathPropOf(o);
+  const flat = (pts, n, more) => Terrain.profile(pts, n, more);
+  // The land-cover model stands cover on every sample, and at 5 m that is a
+  // land-cover request for thousands of points: it runs on the tiles.
+  if (P_.ground !== 'lidar' || P_.model === 'cover' || typeof LidarProfile === 'undefined') {
+    const prof = await flat([[a.lat, a.lon], [b.lat, b.lon]], o.samples || 256);
+    return prof && prof.ok ? { ok: true, prof, lidar: null, ends: { a, b } } : { ok: false, error: (prof && prof.error) || 'No terrain.' };
+  }
+  const stand = async e => {
+    if (!e.mast) return e;
+    const top = await LidarProfile.highest(e.lat, e.lon, LidarProfile.roundingOf(e.lat, e.lon));
+    return top && top.moved_m > 1 ? { ...e, lat: top.lat, lon: top.lon, elev: top.ground, stood_m: top.moved_m, rose_m: top.ground - (top.from_m ?? top.ground) } : e;
+  };
+  const [A, B] = await Promise.all([stand(a), stand(b)]);
+  const D = acmaHaversineKm(A.lat, A.lon, B.lat, B.lon) * 1000;
+  const n = Math.min(LidarProfile.MAX_SAMPLES, Math.max(2, Math.ceil(D / LidarProfile.STEP_M) + 1));
+  const base = await flat([[A.lat, A.lon], [B.lat, B.lon]], n, { maxSamples: LidarProfile.MAX_SAMPLES });
+  if (!base || !base.ok) return { ok: false, error: (base && base.error) || 'No terrain.' };
+  const r = await LidarProfile.refine(base, { elevA: A.elev, elevB: B.elev, aglA: A.agl, aglB: B.agl, freqMhz: o.freqMhz });
+  return { ok: true, prof: r.ok ? r.prof : base, lidar: r.ok ? r.report : null, ends: { a: A, b: B } };
 }
 
 // Turn a terrain profile into the geometry both features read off — line of
@@ -477,6 +529,9 @@ const PATH_VERDICT = {
 
 const PathProfile = (function () {
   const SAMPLES = 256;
+  // Past this many samples the chart draws the highest per half-pixel (see
+  // chartSvg) — a LiDAR ground is a sample every 5 m.
+  const THIN_AT = 1600;
   // The second opinion (#199): how many of those 256 points get asked of Elvis.
   // One request per point, ~2.5 s each, so 64 at six in flight is about twenty
   // seconds — the most that can be asked of somebody waiting for an answer
@@ -509,7 +564,14 @@ const PathProfile = (function () {
   }
 
   function sigOf(sh) {
-    return sh ? sh.id + ':' + sh.pts.map(p => p[0].toFixed(5) + ',' + p[1].toFixed(5)).join(';') : null;
+    return sh ? sh.id + ':' + sh.pts.map(p => p[0].toFixed(5) + ',' + p[1].toFixed(5)).join(';') + (lidarFor(sh) ? ':lidar' : '') : null;
+  }
+
+  // LiDAR ground for this line: the setting asks for it, the field model is
+  // pricing, and the line is one hop (pathGround is a two-ended thing).
+  function lidarFor(sh) {
+    const P_ = pathPropOf();
+    return !!sh && sh.pts.length === 2 && P_.ground === 'lidar' && P_.model !== 'cover' && typeof LidarProfile !== 'undefined';
   }
 
   function stationOf(sh, end) {
@@ -558,6 +620,9 @@ const PathProfile = (function () {
   function fetchCover(mine) {
     const prof = cur.prof;
     if (!prof || !P().cover) { cur.coverStatus = 'off'; cur.cover = null; return; }
+    // At 5 m the cover would be thousands of samples, for a model that does
+    // not price it: the LiDAR ground is drawn bare, and says so.
+    if (cur.lidar) { cur.coverStatus = 'lidar'; cur.cover = null; return; }
     cur.coverStatus = 'loading';
     LandCover.sample(prof.lat, prof.lon).then(res => {
       if (cur.sig !== mine) return;
@@ -585,10 +650,21 @@ const PathProfile = (function () {
     rerender();
     if (!sh) return;
     const mine = sig;
-    Terrain.profile(sh.pts, SAMPLES).then(res => {
+    // pathGround decides LiDAR ground for the card as it does for the map and
+    // the Network Review; the tiles are asked for directly otherwise, because
+    // a drawn line may have more than two points.
+    const ask = lidarFor(sh)
+      ? pathGround(...[0, 1].map(end => {
+          const e = endpoint(sh, end), i = end === 0 ? 0 : sh.pts.length - 1;
+          return { lat: sh.pts[i][0], lon: sh.pts[i][1], elev: e.elev, agl: e.agl, mast: !!(e.station && stationIsMast(e.station)) };
+        }), { samples: SAMPLES, freqMhz: freqFor(endpoint(sh, 0), endpoint(sh, 1)) })
+      : Terrain.profile(sh.pts, SAMPLES).then(res => (res.ok ? { ok: true, prof: res, lidar: null, ends: null } : res));
+    ask.then(res => {
       if (cur.sig !== mine) return;                 // the line moved on while we fetched
       cur.status = res.ok ? 'ready' : 'failed';
-      cur.prof   = res.ok ? res : null;
+      cur.prof   = res.ok ? res.prof : null;
+      cur.lidar  = res.ok ? res.lidar : null;
+      cur.ends   = res.ok ? res.ends : null;
       cur.error  = res.ok ? '' : res.error;
       rerender();
       announce();
@@ -770,6 +846,23 @@ const PathProfile = (function () {
 
   // The cover classes to analyse with, or null; and whether that is because
   // the switch is off.
+  // What the LiDAR setting did to this path, in words: how much of it is 5 m
+  // ground and where, and any mast stood on its top. Empty on the tiles.
+  function lidarNote() {
+    const r = cur.lidar;
+    if (!r) {
+      return pathPropOf().ground === 'lidar' && pathPropOf().model !== 'cover' && cur.prof && !cur.prof.lidar
+        ? ' The LiDAR setting is on, but the grid holds nothing along this path: it is the tiles throughout.' : '';
+    }
+    const obst = r.zones.filter(z => z.kind === 'obstacle').length;
+    const stood = cur.ends ? [cur.ends.a, cur.ends.b].filter(e => e && e.stood_m) : [];
+    return ` ${esc(r.attribution)}: ${Math.round(r.lidarShare * 100)} % of the path — ${
+      r.zones.some(z => z.kind === 'end') ? 'the ends' : ''}${obst ? ` and ${obst} obstacle${obst === 1 ? '' : 's'}` : ''}, ${r.tiles} tile${r.tiles === 1 ? '' : 's'}${
+      r.covered < 1 ? `, ${Math.round(r.covered * 100)} % of it held by the grid` : ''}${r.failed ? `, ${r.failed} not answered` : ''}.${
+      stood.map(e => ` A mast stood on the highest LiDAR ground within its position's rounding: ${e.stood_m.toFixed(0)} m from where it is registered, ${
+        (e.rose_m || 0).toFixed(1)} m higher.`).join('')}`;
+  }
+
   function coverFor() {
     if (!P().cover) return { cover: null, coverOff: true };
     const c = cur.coverStatus === 'ready' && cur.cover ? cur.cover : null;
@@ -804,6 +897,26 @@ const PathProfile = (function () {
     const x = d => L + (D > 0 ? d / D : 0) * iw;
     const y = m => T + (1 - (m - lo) / (hi - lo)) * ih;
 
+    // What is drawn. A LiDAR ground is a sample every 5 m — eight thousand on a
+    // 40 km hop, far more than the chart has pixels — so past THIN_AT samples
+    // the drawing keeps, per half-pixel, the sample standing highest: a ridge
+    // or a crest is never thinned away, and the figures above are the whole
+    // profile's either way.
+    const keep = [];
+    if (an.pts.length <= THIN_AT) for (let i = 0; i < an.pts.length; i++) keep.push(i);
+    else {
+      const buckets = 2 * iw, top = new Map();
+      an.pts.forEach((p, i) => {
+        const k = Math.min(buckets - 1, Math.floor((D > 0 ? p.d1 / D : 0) * buckets));
+        const h = p.surfBulged != null ? p.surfBulged : p.bulged;
+        const j = top.get(k);
+        if (j == null || (h != null && (an.pts[j].surfBulged ?? an.pts[j].bulged ?? -Infinity) < h)) top.set(k, i);
+      });
+      keep.push(0, ...[...top.values()].filter(i => i !== 0 && i !== an.pts.length - 1), an.pts.length - 1);
+      keep.sort((a, b) => a - b);
+    }
+    const pts = keep.map(i => an.pts[i]);
+
     // Everything the cursor needs, frozen against the chart being built here —
     // the scales it was drawn to and one row per sample. `y` is the ground
     // line and not the top of the cover: the dot rides the terrain, the way
@@ -812,16 +925,20 @@ const PathProfile = (function () {
     // ground and no y, and sampleAt() steps past it rather than inventing one.
     hoverGeom = {
       W, L, T, iw, ih, D,
-      pts: an.pts.map((p, i) => ({
-        d1:     p.d1,
-        x:      x(p.d1),
-        y:      p.bulged == null ? null : y(p.bulged),
-        ground: p.ground,
-        cover:  p.cover,
-        cls:    p.cls,
-        lat:    prof.lat ? prof.lat[i] : null,
-        lon:    prof.lon ? prof.lon[i] : null,
-      })),
+      pts: keep.map(i => {
+        const p = an.pts[i];
+        return {
+          d1:     p.d1,
+          x:      x(p.d1),
+          y:      p.bulged == null ? null : y(p.bulged),
+          ground: p.ground,
+          cover:  p.cover,
+          cls:    p.cls,
+          lat:    prof.lat ? prof.lat[i] : null,
+          lon:    prof.lon ? prof.lon[i] : null,
+          lidar:  !!(prof.lidar && prof.lidar[i]),
+        };
+      }),
     };
 
     // The plot area, painted. It was transparent, so "above the ground" was the
@@ -845,7 +962,7 @@ const PathProfile = (function () {
     // costs a metre and a half there, and bows up hard on a 100 km one because
     // it costs 150. A curve drawn to look impressive at every length would be
     // a decoration; this one is a reading.
-    const arc = an.pts.filter(p => p.bulge != null)
+    const arc = pts.filter(p => p.bulge != null)
                       .map(p => `${x(p.d1).toFixed(1)},${y(lo + p.bulge).toFixed(1)}`);
     const earth = arc.length < 2 ? '' : `
       <path d="M${x(0).toFixed(1)},${(T + ih).toFixed(1)} L${arc.join(' L')} L${x(D).toFixed(1)},${(T + ih).toFixed(1)} Z"
@@ -854,17 +971,32 @@ const PathProfile = (function () {
                 stroke="var(--profile-earth-line)" stroke-width="1.5"/>`;
     // What the curve is worth at mid-path, for the legend: the figure the arc
     // is drawn to, so nobody has to measure it off the picture.
-    const sag = an.pts.reduce((mx, p) => p.bulge > mx ? p.bulge : mx, 0);
+    const sag = pts.reduce((mx, p) => p.bulge > mx ? p.bulge : mx, 0);
 
     // Ground, as an area down to the axis. Gaps where a tile was missing are
     // left as gaps — a bridged gap would be invented ground.
     const runs = [];
     let run = [];
-    for (const p of an.pts) {
+    for (const p of pts) {
       if (p.bulged == null) { if (run.length) runs.push(run); run = []; }
       else run.push(p);
     }
     if (run.length) runs.push(run);
+
+    // The stretches read off the 5 m LiDAR, traced over the ground line.
+    const lidarRuns = [];
+    if (prof.lidar) {
+      let lr = [];
+      keep.forEach((i, k) => {
+        const p = pts[k];
+        if (prof.lidar[i] && p.bulged != null) lr.push(p);
+        else if (lr.length) { lidarRuns.push(lr); lr = []; }
+      });
+      if (lr.length) lidarRuns.push(lr);
+    }
+    const lidarLine = lidarRuns.filter(r => r.length > 1).map(r => `<polyline points="${
+      r.map(p => `${x(p.d1).toFixed(1)},${y(p.bulged).toFixed(1)}`).join(' ')}" fill="none"
+      stroke="var(--profile-lidar)" stroke-width="2.5"/>`).join('');
     const ground = runs.map(r => {
       const top = r.map(p => `${x(p.d1).toFixed(1)},${y(p.bulged).toFixed(1)}`).join(' L');
       return `<path d="M${x(r[0].d1).toFixed(1)},${(T + ih).toFixed(1)} L${top} L${x(r[r.length - 1].d1).toFixed(1)},${(T + ih).toFixed(1)} Z"
@@ -895,8 +1027,8 @@ const PathProfile = (function () {
       seg = null;
     };
     if (an.coverUsed) {
-      for (let i = 0; i < an.pts.length; i++) {
-        const p = an.pts[i];
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
         const c = p.cls;
         const usable = c != null && p.bulged != null && p.surfBulged != null;
         if (!usable) { flush(); continue; }
@@ -914,7 +1046,7 @@ const PathProfile = (function () {
     // Where the surface is inside the 60% zone, drawn over the top of it.
     const bad = [];
     let bseg = [];
-    for (const p of an.pts) {
+    for (const p of pts) {
       const intruding = p.surfBulged != null && p.clearance != null && p.clearance < 0.6 * p.r1;
       if (intruding) bseg.push(p);
       else if (bseg.length) { bad.push(bseg); bseg = []; }
@@ -925,9 +1057,9 @@ const PathProfile = (function () {
     }" fill="none" stroke="var(--bad)" stroke-width="2.5"/>`).join('');
 
     const radio = flat ? '' : `
-      <polyline points="${an.pts.map(p => `${x(p.d1).toFixed(1)},${y(p.los + 0.6 * p.r1).toFixed(1)}`).join(' ')}"
+      <polyline points="${pts.map(p => `${x(p.d1).toFixed(1)},${y(p.los + 0.6 * p.r1).toFixed(1)}`).join(' ')}"
                 fill="none" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3" opacity=".7"/>
-      <polyline points="${an.pts.map(p => `${x(p.d1).toFixed(1)},${y(p.los - 0.6 * p.r1).toFixed(1)}`).join(' ')}"
+      <polyline points="${pts.map(p => `${x(p.d1).toFixed(1)},${y(p.los - 0.6 * p.r1).toFixed(1)}`).join(' ')}"
                 fill="none" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3" opacity=".7"/>
       <line x1="${x(0)}" y1="${y(an.txZ).toFixed(1)}" x2="${x(D).toFixed(1)}" y2="${y(an.rxZ).toFixed(1)}"
             stroke="var(--accent)" stroke-width="1.8"/>`;
@@ -1014,6 +1146,7 @@ const PathProfile = (function () {
           ${grid.join('')}
           ${radio}
           ${ground}
+          ${lidarLine}
           ${bands.join('')}
           <!-- Over the ground, not under it: the terrain area fills all the way
                down to the axis, so an arc drawn first would be buried by it. On
@@ -1033,13 +1166,14 @@ const PathProfile = (function () {
             <span><i class="path-key-los"></i> Line of sight</span>
             <span><i class="path-key-fres"></i> 60% Fresnel zone</span>`}
           <span><i class="path-key-gnd"></i> Ground (curvature k=${an.k.toFixed(2)} included)</span>
+          ${lidarLine ? '<span><i class="path-key-lidar"></i> 5 m LiDAR</span>' : ''}
           ${earth ? `<span><i class="path-key-earth"></i> Earth curvature${sag > 0.5 ? ` · ${Math.round(sag)} m at mid-path` : ''}</span>` : ''}
           ${flat ? '' : '<span><i class="path-key-obs"></i> Inside the Fresnel zone</span>'}
           ${coverKey}
         </div>
-        <p class="filter-hint">${esc(prof.attribution)} · sampled every
-          ~${prof.resolution_m} m at zoom ${prof.zoom} over ${prof.tiles} tile${prof.tiles === 1 ? '' : 's'}${
-          prof.capped ? ', zoom reduced to stay inside the tile budget for a path this long' : ''}.${
+        <p class="filter-hint">${esc(prof.attribution)} · ${prof.lidar ? `~${prof.resolution_m} m tiles read every ${
+          Math.round(prof.distance_m[1] - prof.distance_m[0])} m` : `sampled every ~${prof.resolution_m} m`} at zoom ${prof.zoom} over ${prof.tiles} tile${prof.tiles === 1 ? '' : 's'}${
+          prof.capped ? ', zoom reduced to stay inside the tile budget for a path this long' : ''}.${lidarNote()}${
           an.coverUsed && cur.cover ? ` ${esc(LandCover.attribution)}${cur.cover.year !== 'seeded' ? ` (${cur.cover.year})` : ''}, on the same sample points.${
           an.canopyUsed ? ` ${esc(LandCover.canopyAttribution)}.` : ''}` : ''}</p>
       </div>`;
@@ -1296,6 +1430,8 @@ const PathProfile = (function () {
         : `<span class="txt-warn">Off — the profile is bare ground, and a bare profile reads clear through a forest.</span>`;
     }
     switch (cur.coverStatus) {
+      case 'lidar':   return 'Not drawn on the LiDAR ground — at 5 m it would be thousands of samples, and the field model '
+                           + 'prices the bare terrain either way. The ~30 m ground setting draws it.';
       case 'loading': return 'Sampling land cover along the path…';
       case 'failed':  return `<span class="txt-bad">Unavailable — ${esc(cur.coverError)}</span> The profile is drawn bare and the budget has no cover terms.`;
       case 'ready': {

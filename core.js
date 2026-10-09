@@ -1837,25 +1837,35 @@ const HELP = {
            + 'it runs through — and any <strong>proposed site</strong>, which is only a pin — and every field station '
            + 'they carry gets a row: its <strong>fade margin to each</strong>, its best path, how many paths are good, '
            + 'and what the <strong>attenuator found on site</strong> when it was last tested, with how far the model and '
-           + 'the field agree for this network. Below it: how Flood-Net\'s figures relate to <strong>Radio Mobile\'s</strong> '
-           + 'and how far to trust each, the <strong>design principles</strong> a network is checked against, and the '
-           + 'register\'s own faults that skew a review. Administrators only.',
+           + 'the field agree for this network. Under it, <strong>the model against every attenuator test</strong> on '
+           + 'file — network-wide, by distance, by hub and by basin; then how Flood-Net\'s figures relate to '
+           + '<strong>Radio Mobile\'s</strong>, the <strong>design principles</strong> a network is checked against, and the '
+           + 'register\'s own faults that skew a review — with each repeater and base checked against the LiDAR. '
+           + 'Administrators only.',
     watch: [
       '<strong>The margins are the link budget card\'s.</strong> Each cell is the worse of the two directions over the '
-      + 'same 256-sample profile the card and the fade-margin map use, so the three can never give two figures for one '
-      + 'link. The card\'s propagation settings — the model, the field allowance, the repeater mast — change all three.',
+      + 'same ground the card and the fade-margin map use, so the three can never give two figures for one link. The '
+      + 'card\'s propagation settings — the model, the ground, the field allowance, the repeater mast — change all three.',
       '<strong>Field-calibrated, not physical.</strong> The default model is Longley–Rice over the bare terrain less a '
-      + 'field allowance fitted to attenuator tests on site; the land-cover model it replaced read tens of decibels '
-      + 'pessimistic against the same tests. Right on average across a network — any one path can be ±10 dB.',
-      '<strong>Radio Mobile reads higher.</strong> By a median 4 dB for the same path: its link settings carry most of '
-      + 'the field allowance but not all of it, and it reads about 2 dB above the attenuator. Path for path it is a little '
-      + 'nearer the attenuator than Flood-Net — Flood-Net\'s edge is every link in the register, both ways, with nobody '
-      + 'setting a path up. A figure read off a display that tops out — every strong path the same ceiling, say 49 dB — '
-      + 'is clipped, and means “at least that”.',
+      + 'field allowance fitted to every attenuator test on file (paths up to 35 km); the land-cover model it replaced '
+      + 'read tens of decibels pessimistic against the same tests. Right on average across the network — any one path '
+      + 'can be ±10 dB, and a long link built with a better antenna than the register records reads better than modelled.',
+      '<strong>A hub far from the network is a register entry.</strong> The history check fits the allowance hub by hub; '
+      + 'one whose stations all read 10 dB better or worse than modelled is short of something in the register — a mast, '
+      + 'an antenna, a position — and fixing that is what makes the next run agree.',
+      '<strong>Radio Mobile and Flood-Net agree on average.</strong> At the network\'s allowance they read within a dB of '
+      + 'each other for the same path, and both about 2 dB above the attenuator where both were checked. Path for path '
+      + 'Radio Mobile is a little nearer, because it was given each site\'s own antenna and mast; given the same, '
+      + 'Flood-Net matches it. A figure read off a display that tops out — every strong path the same ceiling, say '
+      + '49 dB — is clipped, and means “at least that”.',
       '<strong>Measured margins are end to end, and in steps.</strong> An attenuator test to base takes whatever path '
-      + 'the station actually uses, so it is set against the best cell in the row. The attenuator steps in 3 dB, so a '
-      + 'test that carried 24 dB and not 27 puts the margin at 24–27 and a model figure anywhere in that step is no '
-      + 'error; a reading at its 30 dB limit says only “at least 30”.',
+      + 'the station actually uses, so it is set against the best cell in the row. Most attenuators step in 3 dB, so a '
+      + 'test that carried 24 dB and not 27 puts the margin at 24–27 (a reading off that grid came from a 1 dB '
+      + 'attenuator: a 1 dB step); a model figure anywhere in the step is no error, and a reading at the 30 dB limit '
+      + 'says only “at least 30”.',
+      '<strong>LiDAR is a setting, not the default.</strong> The card can price a path over 5 m LiDAR at its ends and '
+      + 'obstacles; held against the tests it was no better, because 5 m ground prices the register\'s rounded '
+      + 'positions exactly. It is for studying one site whose position is known, and for checking the register.',
       'Every repeater and base on a radio system with a field station\'s 4 m antenna is computed on an assumed mast '
       + '(10 m unless the card says otherwise). Its real height, on a radio system of its own, takes the assumption away.',
     ],
@@ -2686,29 +2696,42 @@ const RM_NET_DEFAULTS = {
 //              'cover' — the land cover stood on the profile and ITU-R P.2108
 //              terminal clutter at each end: the physical model the app ran
 //              until the calibration below, kept one click away.
+//   ground     '30m' — the ~30 m terrain tiles; 'lidar' — Geoscience
+//              Australia's 5 m LiDAR at the ends and the obstacles, spliced
+//              in by pathGround (path-profile.js). The tiles are the default,
+//              for the reason below.
 //   allowance  dB the field model takes off the bare-terrain loss.
 //   mastAgl    m, the least antenna height a repeater or base is modelled at.
 //
 // Where the numbers come from (the Network Review tab has the working, and
-// re-runs it on demand): 54 field stations whose path margin to base was
-// measured with an attenuator in 2018–20, against the margin each model
-// predicted for the same path. The land-cover model came out 41 dB below what
-// the attenuator found, on average, and was no better at ranking the paths
-// after that bias was taken away. Longley–Rice over the bare terrain put far
-// more of them in the right order but read 16 dB high — the masts' own
-// surroundings, feeders and connectors, receivers in a crowded site — so that
-// is the allowance: 16.2 dB fitted, 13–19 dB at 90 % confidence, leaving a
-// typical error of ±5 dB. The attenuator steps in 3 dB, so each test was read
-// as the step it is — carried 24 dB and not 27 is a margin of 24–27, and one
-// at the attenuator's 30 dB is "at least 30"; read as exact figures, the same
-// tests gave 19 dB, charging the model for margin it never lost.
+// re-runs it on demand). Every station whose path margin to base has been
+// tested with an attenuator since 2010 — 681 of them the register can price —
+// against its best modelled path. The land-cover model the app ran before came
+// out tens of dB pessimistic and no better at ranking the paths after that
+// bias was taken away. Longley–Rice over the bare terrain ranks them far
+// better but reads high — the masts' own surroundings, feeders and
+// connectors, receivers in a crowded site — so that is the allowance: 12.2 dB
+// fitted over the 473 stations whose best path is 35 km or less (11.0–13.5 dB
+// at 90 %), typical error ±8 dB. Longer paths are shown, not fitted: the
+// network was built so each station works, a long link was given a better
+// antenna or a taller mast than the register records, and the field reads the
+// same 22–27 dB at every distance while the model falls away. Each test is
+// read as the step it is — 3 dB on most attenuators, 1 dB where a reading is
+// off that grid; ≥30 means "at least 30". One region fitted alone (the 54
+// stations round Mt Stuart, which first set this) asked for 16 dB; hubs range
+// a good deal either side, and the Network Review's history check names them.
+//
+// LiDAR is the setting, not the default, because held against the same tests
+// it was no better: ground at 5 m is only as good as the antenna position laid
+// on it, and finer ground also has Longley–Rice — a model built on coarse
+// terrain profiles — read every bank beside a 4 m antenna as a horizon.
 //
 // mastAgl is there because every station in the register is on the 4 m field
 // station radio system, repeaters and bases included. A repeater on a hilltop
 // modelled with a 4 m whip sits in the terrain model's own summit pixels; at
 // 10 m it is where the mast puts it. The register is the fix — a repeater
 // whose radio system says higher keeps its own figure.
-const FN_MODEL_DEFAULTS = { model: 'field', allowance: 16, mastAgl: 10 };
+const FN_MODEL_DEFAULTS = { model: 'field', ground: '30m', allowance: 12, mastAgl: 10 };
 
 // ── Diagnostics & error capture ─────────────────────────────────────────────────
 // Registered as early as possible so a bug report can carry what actually went
@@ -3235,9 +3258,11 @@ const state = {
       time:       RM_NET_DEFAULTS['%Time'],
       location:   RM_NET_DEFAULTS['%Location'],
       situation:  RM_NET_DEFAULTS['%Situation'],
-      // Flood-Net's own three (FN_MODEL_DEFAULTS): which model prices the
-      // path, the field model's allowance, and the least mast at a repeater.
+      // Flood-Net's own (FN_MODEL_DEFAULTS): which model prices the path,
+      // the ground it prices it over, the field model's allowance, and the
+      // least mast at a repeater.
       model:      FN_MODEL_DEFAULTS.model,        // 'field' | 'cover'
+      ground:     FN_MODEL_DEFAULTS.ground,       // '30m' | 'lidar' — pathGround, path-profile.js
       allowance:  FN_MODEL_DEFAULTS.allowance,    // dB, the field model only
       mastAgl:    FN_MODEL_DEFAULTS.mastAgl,      // m, repeaters and bases
     },

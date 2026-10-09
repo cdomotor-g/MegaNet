@@ -959,12 +959,23 @@ const LinkBudget = (function () {
         </select>
         <b class="lb-flag">${P_.model === F.model ? 'default · Flood-Net' : 'edited'}</b>
       </label>`;
+    const lidar = P_.ground === 'lidar';
+    const groundSel = `
+      <label class="draw-field${fieldModel ? '' : ' is-unused'}">
+        <span>Ground</span>
+        <select id="lb-prop-ground" onchange="LinkBudget.setGround(this.value)" ${fieldModel ? '' : 'disabled'}>
+          <option value="30m" ${lidar ? '' : 'selected'}>~30 m terrain tiles</option>
+          <option value="lidar" ${lidar ? 'selected' : ''}>5 m LiDAR at the ends and obstacles</option>
+        </select>
+        ${fieldModel ? `<b class="lb-flag">${(P_.ground || '30m') === F.ground ? 'default · Flood-Net' : 'edited'}</b>` : '<b class="lb-flag">tiles under this model</b>'}
+      </label>`;
     return `
       <details class="lb-propset" ${S().propOpen ? 'open' : ''} ontoggle="LinkBudget.setPropOpen(this.open)">
         <summary class="small">Propagation settings — model, climate, ground, reliability
-          <span class="txt-muted">(${fieldModel ? `field-calibrated, ${P_.allowance} dB` : 'land cover'}, ${esc(ITM.CLIMATE[P_.climate])}, ${esc(ITM.MDVAR[P_.mdvar] || '')}, ${P_.situation}% of situations)</span></summary>
+          <span class="txt-muted">(${fieldModel ? `field-calibrated, ${P_.allowance} dB${lidar ? ', LiDAR' : ''}` : 'land cover'}, ${esc(ITM.CLIMATE[P_.climate])}, ${esc(ITM.MDVAR[P_.mdvar] || '')}, ${P_.situation}% of situations)</span></summary>
         <div class="lb-prop">
           ${modelSel}
+          ${groundSel}
           <label class="draw-field${fieldModel ? '' : ' is-unused'}">
             <span>Field allowance <em>dB</em></span>
             <input type="number" id="lb-prop-allowance" step="0.5" min="0" max="60" value="${P_.allowance}" ${fieldModel ? '' : 'disabled'}
@@ -985,7 +996,12 @@ const LinkBudget = (function () {
         <p class="filter-hint">The <strong>model</strong> decides what the land cover is for. Field-calibrated, the default,
           prices the bare terrain and takes off an allowance fitted to path margins measured on site — the land-cover
           model came out tens of decibels pessimistic against the same measurements, and no better at ranking the
-          paths. The <strong>mast</strong> is the least height a repeater or base is modelled at: the register puts every
+          paths. The <strong>ground</strong> is the ~30 m tiles, or Geoscience Australia's 5 m LiDAR spliced in round both
+          ends and wherever the ground comes near the line of sight, with a repeater or base stood on the highest LiDAR
+          ground within its registered position's rounding — sharper, but held against the field's tests it was no better
+          until the register's positions and heights are, so it is for studying one site, not the default; the card, the
+          fade-margin map and the Network Review all follow it (coverage plots and sight lines stay on the tiles).
+          The <strong>mast</strong> is the least height a repeater or base is modelled at: the register puts every
           station on the 4 m field-station system, and a system that says more keeps its own. The rest are
           Longley–Rice's own inputs, one for one with Radio Mobile's network properties.
           Refractivity 301 is k = 4/3; average ground is ε<sub>r</sub> 15, σ 0.005 S/m (poor 4 / 0.001, good 25 / 0.02,
@@ -1005,15 +1021,15 @@ const LinkBudget = (function () {
     const rows = [
       ['Propagation model', 'Longley–Rice ITM v1.2.2, point-to-point — NTIA’s reference code ported line for line and held to it at 10<sup>−6</sup> dB',
        'The same ITM, except line-of-sight paths, where Radio Mobile substitutes its own two-ray method'],
-      ['Terrain', 'SRTM/GMTED ~30 m tiles, 256 samples along the great circle; an end is never stood below the tile under it',
+      ['Terrain', 'SRTM/GMTED ~30 m tiles, 256 samples along the great circle; an end is never stood below the tile under it — or, as a setting, Geoscience Australia’s 5 m LiDAR at the ends and obstacles, a repeater or base stood on its top',
        'Its own DEM (SRTM 3″ or 1″), up to 500 samples; a unit takes its height from the same DEM unless typed in'],
       ['Land cover', 'Field model (default): <em>not stood on the profile</em> — its average cost is in the field allowance. '
        + 'Land-cover model: Sentinel-2 10 m classes, a height per class (editable), measured canopy heights for trees',
        'GlobCover ~300 m classes with a height and a “density” per class, plus unpublished forest and urban loss terms — usually switched off'],
       ['Terminal in trees or town', 'Field model: in the field allowance. Land-cover model: ITU-R P.2108 §3.1 height-gain loss when the antenna is below the cover',
        'Part of the same unpublished clutter term'],
-      ['Calibration', `Field model: ${FN_MODEL_DEFAULTS.allowance} dB off the bare-terrain loss, fitted to path margins measured with an attenuator on site, each read as the 3 dB step it is — typical error ±5 dB`,
-       'None — the figures are the model’s own; on the same measured paths they read about 2 dB high on average, typical error ±4 dB'],
+      ['Calibration', `Field model: ${FN_MODEL_DEFAULTS.allowance} dB off the bare-terrain loss, fitted to every station's attenuator tests on file (paths up to 35 km, each test read as the step it is) — typical error ±8 dB network-wide`,
+       'None — the figures are the model’s own; on the paths where both were checked they read about 2 dB high on average, as Flood-Net does'],
       ['Repeater &amp; base antennas', `At least a ${FN_MODEL_DEFAULTS.mastAgl} m mast (a setting), or the radio system’s height where it is more`,
        'Each unit’s own height, typed in per system or per unit'],
       ['Climate &amp; refractivity', 'Modelled — the same seven climates and N<sub>s</sub>', `Modelled (export writes climate ${N.Climate}, N ${N.Refractivity})`],
@@ -1372,7 +1388,7 @@ const LinkBudget = (function () {
     // because its earth curvature is the refractivity's.
     setProp(key, v) {
       const P_ = S().prop;
-      if (!(key in P_) || key === 'model') return;
+      if (!(key in P_) || key === 'model' || key === 'ground') return;
       const n = Number(v);
       if (!isFinite(n)) return;
       P_[key] = key === 'climate' || key === 'pol' || key === 'mdvar' ? Math.round(n) : n;
@@ -1384,13 +1400,19 @@ const LinkBudget = (function () {
       S().prop.model = v;
       propChanged();
     },
+    // The ground, likewise a word: the tiles, or LiDAR where it matters.
+    setGround(v) {
+      if (v !== '30m' && v !== 'lidar') return;
+      S().prop.ground = v;
+      propChanged();
+    },
     resetProp() {
       const D = RM_NET_DEFAULTS, F = FN_MODEL_DEFAULTS;
       S().prop = {
         climate: D.Climate, N0: D.Refractivity, epsilon: D.Permittivity, sigma: D.Conductivity,
         pol: D.Polarization, mdvar: D['Stat. mode'],
         time: D['%Time'], location: D['%Location'], situation: D['%Situation'],
-        model: F.model, allowance: F.allowance, mastAgl: F.mastAgl,
+        model: F.model, ground: F.ground, allowance: F.allowance, mastAgl: F.mastAgl,
       };
       propChanged();
     },

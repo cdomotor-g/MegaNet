@@ -53,26 +53,50 @@ const NetworkReview = (function () {
   const MEASURE_SINCE = '2010-01-01';
   const MEASURE_VISITS = 3;     // the latest visits a station's measured margin is the median of
   const ATTEN_MAX = 30;         // most field attenuators stop here: a reading at it means "at least"
-  const ATTEN_STEP = 3;         // and they step in 3 dB: a reading r means the link carried r and not r + 3
+  const ATTEN_STEP = 3;         // most step in 3 dB: a reading r means the link carried r and not r + 3 …
+  const FINE_STEP = 1;          // … and a reading off that grid came from a 1 dB attenuator
+  const PAGE = 1000;            // the datastore answers at most this many rows to one read
 
   // ── what the calibration was set from ──
   // Aggregates only. Every path behind them is in the register and every
-  // measurement in the inspection history, so the matrix below can re-derive
-  // them for any network; these are the figures the defaults were chosen on.
-  // Each reading is taken as the 3 dB step it is (see loadMeasured): read as
-  // exact figures, the same tests fitted an allowance of `exact` dB, and they
-  // flattered Flood-Net against Radio Mobile. `order` is the share of pairs of
+  // measurement in the inspection history, so the history check
+  // (network-history.js) re-derives the network's for whatever is on file;
+  // these are the figures the defaults were chosen on. Each reading is taken as
+  // the step it is (see loadMeasured). `order` is the share of pairs of
   // stations the attenuator can tell apart that a model puts the right way round.
   const EVIDENCE = {
-    measured: { stations: 54, years: '2018–20' },
+    // Every station tested since 2010 that the register can price, against its
+    // best path at the allowance in force — the fit is over paths up to `km`.
+    network: { stations: 681, fitted: 473, km: 35, fit: 12.2, lo: 11.0, hi: 13.5, mean: 0.2, typical: 8.0, w6: 51, order: 65,
+               hubs: 37, hubsOff: 15, hubsOffDb: 10 },
+    distance: [
+      { band: 'under 10 km', n: 101, mean: 4.9, asks: 20.0, model: 38.2, field: 27.0 },
+      { band: '10–20 km', n: 191, mean: 0.0, asks: 12.0, model: 28.8, field: 24.0 },
+      { band: '20–35 km', n: 181, mean: -2.3, asks: 9.1, model: 22.6, field: 22.0 },
+      { band: '35–50 km', n: 102, mean: -11.0, asks: -0.7, model: 11.7, field: 24.0 },
+      { band: 'over 50 km', n: 106, mean: -21.1, asks: -8.0, model: 3.5, field: 22.8 },
+    ],
+    // The same stations' paths over five grounds (each at its own fitted
+    // allowance): the tiles as priced today, the tiles every 5 m, LiDAR at the
+    // ends and the obstacles, the same with repeaters and bases stood on their
+    // tops, and today's tiles with LiDAR crests at the obstacles only.
+    lidar: [
+      { ground: '~30 m tiles, 256 points — the default', typical: 10.6, w6: 46, order: 62 },
+      { ground: '~30 m tiles, a point every 5 m', typical: 12.4, w6: 44, order: 61 },
+      { ground: '5 m LiDAR at the ends and the obstacles', typical: 12.8, w6: 42, order: 58 },
+      { ground: '… with repeaters and bases stood on their tops — the LiDAR setting', typical: 12.5, w6: 42, order: 61 },
+      { ground: '~30 m tiles with LiDAR crest heights at the obstacles', typical: 10.7, w6: 45, order: 62 },
+    ],
+    // One region, against Radio Mobile: the stations round Mt Stuart whose path
+    // margin was measured in 2018–20, at the network's allowance.
+    measured: { stations: 54, years: '2018–20', fit: 16.3, lo: 13.3, hi: 19.5, exact: 18.9 },
     accuracy: [
       { model: 'Flood-Net, land-cover model — the default until this calibration', bias: -41.0, mae: 41.9, rmse: 45.7, w6: 6, w10: 9, order: 30 },
-      { model: 'Radio Mobile, as configured for the same paths', bias: 2.3, mae: 3.9, rmse: 7.1, w6: 77, w10: 87, order: 76 },
-      { model: 'Flood-Net, field-calibrated — the default now', bias: 0.1, mae: 4.9, rmse: 8.1, w6: 63, w10: 81, order: 64 },
+      { model: 'Radio Mobile, as configured for the same paths', bias: 2.3, mae: 4.0, rmse: 7.2, w6: 77, w10: 87, order: 76 },
+      { model: 'Flood-Net, field-calibrated — the default now', bias: 2.4, mae: 5.2, rmse: 8.8, w6: 70, w10: 74, order: 63 },
     ],
-    allowance: { fit: 16.2, lo: 13.1, hi: 19.4, exact: 18.9, leaning: 12 },
-    rm: { paths: 134, median: 3.9, p10: -1.4, p90: 15.9, rankBefore: 0.08, rankAfter: 0.86, bandsBefore: 10, bandsAfter: 81, settings: 12,
-          misses: { of: 53, both: 11, fnOnly: 8, fnOnlyLow: 7, rmOnly: 1 } },
+    rm: { paths: 134, median: -0.1, p10: -5.4, p90: 11.9, rankBefore: 0.08, rankAfter: 0.86, bandsBefore: 10, bandsAfter: 89, settings: 12,
+          misses: { of: 53, both: 12, fnOnly: 3, rmOnly: 0 } },
     steps: [
       { what: 'Land cover stood on the profile as solid edges — trees and roofs a VHF signal largely passes through',
         mean: 19.9, p10: 4.3, p90: 42.0 },
@@ -82,7 +106,7 @@ const NetworkReview = (function () {
         mean: 13.6, p10: 0, p90: 42.9 },
       { what: 'Repeaters and bases on the field station\'s 4 m antenna rather than a mast',
         mean: 5.0, p10: 0, p90: 27.5 },
-      { what: 'The field allowance, fitted to the attenuator', mean: -16.0, p10: -16.0, p90: -16.0 },
+      { what: 'The field allowance, fitted to the attenuator network-wide', mean: -12.0, p10: -12.0, p90: -12.0 },
     ],
   };
 
@@ -148,6 +172,7 @@ const NetworkReview = (function () {
       lat: st.lat, lon: st.lon,
       elev: st.elevation_ahd != null ? st.elevation_ahd : null,
       agl: stationAntenna(st, sys).agl,
+      mast: stationIsMast(st),
       txW: sys && sys.tx_power_w != null ? Number(sys.tx_power_w) : null,
       gain: sys && sys.antenna_gain_dbi != null ? Number(sys.antenna_gain_dbi) : null,
       loss: sys && sys.line_loss_db != null ? Number(sys.line_loss_db) : null,
@@ -216,15 +241,18 @@ const NetworkReview = (function () {
     if ([A.txW, A.gain, A.loss, A.thr, B.txW, B.gain, B.loss, B.thr].some(v => v == null || !isFinite(v))) {
       return { err: 'radio' };
     }
-    const prof = await Terrain.profile([[A.lat, A.lon], [B.lat, B.lon]], SAMPLES);
-    if (!prof || !prof.ok || prof.partial) return { err: 'terrain' };
+    // The ground as pathGround decides it (path-profile.js): the tiles, or
+    // LiDAR at the ends and the obstacles — the card's and the map's ground.
+    const got = await pathGround(A, B, { samples: SAMPLES, freqMhz: fMhz });
+    if (!got.ok || got.prof.partial) return { err: 'terrain' };
+    const prof = got.prof, EA = got.ends.a, EB = got.ends.b;
     let cov = null;
     if (pathPropOf().model === 'cover') {
       cov = await LandCover.sample(prof.lat, prof.lon);
       if (!cov || !cov.ok) return { err: 'cover' };
     }
     const an = pathAnalyse(prof, {
-      elevA: A.elev, elevB: B.elev, aglA: A.agl, aglB: B.agl, freqMhz: fMhz,
+      elevA: EA.elev, elevB: EB.elev, aglA: A.agl, aglB: B.agl, freqMhz: fMhz,
       cover: cov ? cov.cls : null, canopy: cov && cov.canopyOk ? cov.canopy : null,
     });
     if (!an.ok || an.pathLoss_db == null) return { err: 'model' };
@@ -302,12 +330,14 @@ const NetworkReview = (function () {
   // Nought is read as "not tested" — the imported sheets carry it in blank
   // boxes — and anything over 60 dB as a slip of the pen.
   //
-  // A figure is a step, not a point. The attenuator goes up in ATTEN_STEP dB,
+  // A figure is a step, not a point. Most attenuators go up in ATTEN_STEP dB,
   // so a visit that carried 24 dB and not 27 says the margin is 24–27, and one
-  // at ATTEN_MAX says only "at least 30". The median is monotone, so the
-  // station's margin lies between the median of the visits' lower ends (`m`)
-  // and the median of their upper ends (`hi`) — and a median that leans on an
-  // "at least" is one too: 27 and ≥30 is ≥28.5, not 28.5.
+  // at ATTEN_MAX says only "at least 30". A reading off the 3 dB grid — 22, 25,
+  // 13 — cannot have come from one of those: about one test in four since 2016
+  // was read on a 1 dB attenuator, and its step is FINE_STEP. The median is
+  // monotone, so the station's margin lies between the median of the visits'
+  // lower ends (`m`) and the median of their upper ends (`hi`) — and a median
+  // that leans on an "at least" is one too: 27 and ≥30 is ≥28.5, not 28.5.
   async function loadMeasured(ids) {
     measured = null;
     measuredState = 'loading';
@@ -316,15 +346,15 @@ const NetworkReview = (function () {
       const visits = [];
       for (let i = 0; i < ids.length; i += 80) {
         const part = ids.slice(i, i + 80).map(encodeURIComponent).join(',');
-        visits.push(...await dbSelect(`inspection_chart_visit?select=id,station_id,inspected_on`
-          + `&station_id=in.(${part})&inspected_on=gte.${MEASURE_SINCE}&order=inspected_on.desc&limit=5000`));
+        visits.push(...await selectAll(`inspection_chart_visit?select=id,station_id,inspected_on`
+          + `&station_id=in.(${part})&inspected_on=gte.${MEASURE_SINCE}&order=inspected_on.desc,id.asc`));
       }
       const byVisit = new Map();
       const vIds = visits.map(v => v.id);
       for (let i = 0; i < vIds.length; i += 60) {
         const part = vIds.slice(i, i + 60).join(',');
-        const rows = await dbSelect(`inspection_chart_fade_margin?select=inspection_id,load_db`
-          + `&inspection_id=in.(${part})&phase=eq.this_visit&limit=5000`);
+        const rows = await selectAll(`inspection_chart_fade_margin?select=inspection_id,load_db`
+          + `&inspection_id=in.(${part})&phase=eq.this_visit&order=inspection_id.asc,load_db.asc`);
         for (const r of rows) {
           const v = Number(r.load_db);
           if (!(v > 0) || v > 60) continue;
@@ -341,8 +371,7 @@ const NetworkReview = (function () {
       }
       measured = new Map();
       for (const [id, e] of out) {
-        const m = median(e.all), hi = median(e.all.map(v => (v >= ATTEN_MAX ? Infinity : v + ATTEN_STEP)));
-        measured.set(id, { m, hi, n: e.all.length, at: e.at, censored: hi === Infinity });
+        measured.set(id, { ...stepOf(e.all), n: e.all.length, at: e.at });
       }
       measuredState = 'ready';
     } catch (err) {
@@ -355,6 +384,27 @@ const NetworkReview = (function () {
   function median(xs) {
     const s = xs.slice().sort((a, b) => a - b);
     return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+  }
+
+  // One reading's step: 3 dB on the 3 dB grid, 1 dB off it.
+  const stepFor = v => (Math.abs(v / ATTEN_STEP - Math.round(v / ATTEN_STEP)) < 1e-9 ? ATTEN_STEP : FINE_STEP);
+  // A station's readings (one per visit) → where its margin lies: { m, hi, censored }.
+  function stepOf(readings) {
+    const m = median(readings), hi = median(readings.map(v => (v >= ATTEN_MAX ? Infinity : v + stepFor(v))));
+    return { m, hi, censored: hi === Infinity };
+  }
+
+  // Every row of a read, a page at a time: the datastore answers at most PAGE
+  // rows to one request and says nothing about the rest, so a read that might
+  // run past it asks again from where the last page ended. `path` must order
+  // its rows, or the pages can overlap.
+  async function selectAll(path) {
+    const out = [];
+    for (let offset = 0; ; offset += PAGE) {
+      const rows = await dbSelect(`${path}&limit=${PAGE}&offset=${offset}`);
+      out.push(...rows);
+      if (rows.length < PAGE) return out;
+    }
   }
 
   const fmtStep = x => String(Math.round(x * 10) / 10);
@@ -430,7 +480,7 @@ const NetworkReview = (function () {
     const lines = [
       `# Flood-Net network review — ${matrix.model === 'cover' ? 'land-cover model' : `field-calibrated model, ${matrix.allowance} dB allowance`}, repeaters and bases on at least a ${matrix.mastAgl} m mast`,
       `# computed ${matrix.at.toISOString()}; each cell the worse of the two directions, as the link budget card and the fade-margin map give it`,
-      `# measured: the attenuator steps in ${ATTEN_STEP} dB, so a station's tests put its margin between from and to; no "to" means at least "from"`,
+      `# measured: an attenuator steps in ${ATTEN_STEP} dB (1 dB for a reading off that grid), so a station's tests put its margin between from and to; no "to" means at least "from"`,
       head.map(q).join(','),
     ];
     for (const r of matrix.rows) {
@@ -582,9 +632,9 @@ const NetworkReview = (function () {
       <p class="filter-hint">Each cell is the fade margin in dB, the worse of the two directions — the link budget card's
         figure for that path, and the fade-margin map's colour. Green is ${G()} dB or better, amber ${O()}–${G()}, red
         below (the map's bands). <em>Measured</em> is the median of the station's last ${MEASURE_VISITS} attenuator tests to
-        base since ${MEASURE_SINCE.slice(0, 4)}. The attenuator steps in ${ATTEN_STEP} dB, so a test that carried 24 dB and
-        not 27 puts the margin at 24–27; ≥ marks one that reached the attenuator's ${ATTEN_MAX} dB limit, or a median that
-        leans on one. A measured margin is end to end, through whichever path the station actually takes, so it is set
+        base since ${MEASURE_SINCE.slice(0, 4)}. Most attenuators step in ${ATTEN_STEP} dB, so a test that carried 24 dB
+        and not 27 puts the margin at 24–27 (a reading off that grid, such as 22, came from a 1 dB attenuator: 22–23);
+        ≥ marks one that reached the attenuator's ${ATTEN_MAX} dB limit, or a median that leans on one. A measured margin is end to end, through whichever path the station actually takes, so it is set
         against the best cell.</p>`;
   }
 
@@ -615,33 +665,68 @@ const NetworkReview = (function () {
   // ── the reconciliation ──
 
   function reconcileHtml() {
-    const E = EVIDENCE, A = E.allowance, R = E.rm;
+    const E = EVIDENCE, N = E.network, M = E.measured, R = E.rm, RMrow = E.accuracy[1], FNrow = E.accuracy[2];
+    const sg = v => `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
     const acc = E.accuracy.map(r => `<tr><th scope="row">${esc(r.model)}</th>
-      <td class="nr-num">${r.bias > 0 ? '+' : ''}${r.bias.toFixed(1)}</td><td class="nr-num">${r.mae.toFixed(1)}</td>
+      <td class="nr-num">${sg(r.bias)}</td><td class="nr-num">${r.mae.toFixed(1)}</td>
       <td class="nr-num">${r.rmse.toFixed(1)}</td><td class="nr-num">${r.w6} %</td><td class="nr-num">${r.w10} %</td>
       <td class="nr-num">${r.order} %</td></tr>`).join('');
-    const steps = E.steps.map(s => `<tr><th scope="row">${esc(s.what)}</th>
-      <td class="nr-num">${s.mean > 0 ? '+' : ''}${s.mean.toFixed(1)}</td>
-      <td class="nr-num">${s.p10 === s.p90 ? '—' : `${s.p10 > 0 ? '+' : ''}${s.p10.toFixed(1)} to ${s.p90 > 0 ? '+' : ''}${s.p90.toFixed(1)}`}</td></tr>`).join('');
+    const dist = E.distance.map(d => `<tr><th scope="row">${esc(d.band)}</th><td class="nr-num">${d.n}</td>
+      <td class="nr-num">${d.model.toFixed(1)}</td><td class="nr-num">${d.field.toFixed(1)}</td>
+      <td class="nr-num">${sg(d.mean)}</td><td class="nr-num">${d.asks.toFixed(1)}</td></tr>`).join('');
+    const grounds = E.lidar.map(g => `<tr><th scope="row">${esc(g.ground)}</th><td class="nr-num">${g.typical.toFixed(1)}</td>
+      <td class="nr-num">${g.w6} %</td><td class="nr-num">${g.order} %</td></tr>`).join('');
+    const steps = E.steps.map(st => `<tr><th scope="row">${esc(st.what)}</th>
+      <td class="nr-num">${sg(st.mean)}</td>
+      <td class="nr-num">${st.p10 === st.p90 ? '—' : `${st.p10 > 0 ? '+' : ''}${st.p10.toFixed(1)} to ${st.p90 > 0 ? '+' : ''}${st.p90.toFixed(1)}`}</td></tr>`).join('');
     const rm = Number(rmIn);
-    const onSite = rm - E.accuracy[1].bias;
+    const onSite = rm - RMrow.bias;
     const reads = Math.max(0, Math.floor(onSite / ATTEN_STEP) * ATTEN_STEP);
+    const fn = rm - R.median;
     const conv = rmIn !== '' && isFinite(rm) ? `
       <p class="small" id="nr-conv-out" role="status">Radio Mobile's <strong>${rm.toFixed(1)} dB</strong> is about
-        <strong>${(rm - R.median).toFixed(1)} dB</strong> in Flood-Net (between ${(rm - R.p90).toFixed(1)} and
+        <strong>${fn.toFixed(1)} dB</strong> in Flood-Net (between ${(rm - R.p90).toFixed(1)} and
         ${(rm - R.p10).toFixed(1)} for eight paths in ten), and a margin of about <strong>${onSite.toFixed(1)} dB</strong> on
         site${onSite >= ATTEN_MAX ? ` — past most attenuators' ${ATTEN_MAX} dB, which would read “${ATTEN_MAX}+”`
           : onSite > 0 ? `, which an attenuator stepping in ${ATTEN_STEP} dB would read as <strong>${reads}</strong>` : ''}.
         ${rm >= 49 ? 'If that figure is a display\'s ceiling — every strong path reading the same — it is clipped, and means “at least that”.' : ''}</p>`
       : '<p class="small" id="nr-conv-out" role="status"></p>';
+    const between = `from ${R.p10 < 0 ? `${(-R.p10).toFixed(1)} dB higher` : `${R.p10.toFixed(1)} dB lower`} to ${R.p90.toFixed(1)} dB lower`;
     return `
       <div class="panel">
         <div class="panel-header"><h2>Flood-Net, Radio Mobile and the field</h2></div>
-        <p class="small">Both run the same propagation model — Longley–Rice — over much the same terrain, and yet their
-          fade margins for one path could differ by tens of decibels. The differences are not in the model but in what
-          each feeds it and what each adds on top, and the way to tell which is nearer the truth is the margin the
-          attenuator finds on site. ${E.measured.stations} field stations whose path margin to base was measured in
-          ${E.measured.years} settle it:</p>
+        <p class="small">Flood-Net and Radio Mobile run the same propagation model — Longley–Rice — over much the same
+          terrain, and yet their fade margins for one path could differ by tens of decibels. The differences are in what
+          each is told and what each adds on top, and the way to tell which is nearer the truth is the margin the
+          attenuator finds on site.</p>
+
+        <h3>Against the field, network-wide</h3>
+        <p class="small">Every station whose path margin has been tested since 2010 — ${N.stations} the register can price —
+          against its best path. The allowance that fits the ${N.fitted} whose best path is ${N.km} km or less is
+          <strong>${N.fit} dB</strong> (${N.lo}–${N.hi} dB at 90 %), and that is the default:
+          <strong>${FN_MODEL_DEFAULTS.allowance} dB</strong>. Over those stations the model is out by ±${N.typical} dB typically,
+          within ±6 dB for ${N.w6} %, and puts ${N.order} % of the pairs of stations the attenuator can tell apart the right
+          way round. The panel above re-runs this on whatever is on file.</p>
+        <div class="table-wrap">
+          <table class="adm-table nr-acc">
+            <caption class="sr-only">Model and measured margins by the length of each station's best path</caption>
+            <thead><tr><th scope="col">Best path</th><th scope="col">Stations</th><th scope="col">Model, median dB</th>
+              <th scope="col">Measured, median dB</th><th scope="col">Mean error at ${FN_MODEL_DEFAULTS.allowance} dB</th>
+              <th scope="col">Allowance it asks for, dB</th></tr></thead>
+            <tbody>${dist}</tbody>
+          </table>
+        </div>
+        <p class="filter-hint">The field reads 22–27 dB at every distance; the model falls from 38 to 4. That is the
+          network's design, not the model's physics: every station was built to work, and a long link was given a
+          directional antenna or a taller mast that the register does not record — so past ${N.km} km the model, which
+          knows only the register's omni on a 4 m pole, is pessimistic, and the allowance is fitted short of that. Hub by
+          hub the allowance asked for ranges widely: ${N.hubsOff} of the ${N.hubs} hubs with five tested stations or more are
+          ${N.hubsOffDb} dB or more from the network's. Each is a register entry short of something — a mast, an antenna, a
+          position — and the history check names them.</p>
+
+        <h3>Against Radio Mobile, in one region</h3>
+        <p class="small">${M.stations} stations round Mt Stuart whose path margin to base was measured in ${M.years} were
+          also modelled in Radio Mobile. Each model against the same tests, Flood-Net at the network's allowance:</p>
         <div class="table-wrap">
           <table class="adm-table nr-acc">
             <caption class="sr-only">Each model's figures against the margin measured on site</caption>
@@ -652,11 +737,13 @@ const NetworkReview = (function () {
           </table>
         </div>
         <p class="filter-hint">Errors in dB, model minus measured: positive is a model more hopeful than the attenuator.
-          The attenuator steps in ${ATTEN_STEP} dB, so a test puts the margin in a step — one that carried 24 dB and not 27
-          says 24–27 — and a model figure anywhere in that step is no error; a reading at the attenuator's ${ATTEN_MAX} dB
-          limit counts as “at least ${ATTEN_MAX}”. <em>Pairs in order</em>: of the pairs of stations the attenuator can tell
-          apart, the share the model puts the right way round. Flood-Net's allowance was fitted to these same stations, so
-          its mean error is near nought by construction; the other columns are its accuracy.</p>
+          Most attenuators step in ${ATTEN_STEP} dB, so a test puts the margin in a step — one that carried 24 dB and not 27
+          says 24–27 — and a model figure anywhere in that step is no error; a reading off the 3 dB grid came from a 1 dB
+          attenuator and is a 1 dB step; a reading at the attenuator's ${ATTEN_MAX} dB limit counts as
+          “at least ${ATTEN_MAX}”. <em>Pairs in order</em>: of the pairs of stations the attenuator can tell apart, the share
+          the model puts the right way round. This region fitted alone asks for ${M.fit} dB (${M.lo}–${M.hi} at 90 %) — read as
+          exact figures, ${M.exact} — so at the network's ${FN_MODEL_DEFAULTS.allowance} dB Flood-Net reads
+          ${sg(FNrow.bias)} dB here, as Radio Mobile does.</p>
 
         <h3>Where the difference came from</h3>
         <p class="small">Set path for path against Radio Mobile over ${R.paths} VHF paths of 2 to 70 km, Flood-Net's old
@@ -674,29 +761,22 @@ const NetworkReview = (function () {
           prices every forested or suburban path as though it ran through a hill. The third is the terrain model's: its
           tiles are a surface, and a station surveyed a few metres under that surface (a summit, a town, a tree line) put
           its antenna in a pit of the model's own making. The fourth is the register's: every repeater and base is on the
-          field station's radio system, 4 m antenna and all.</p>
-        <p class="small">What remains is a <strong>field allowance of ${FN_MODEL_DEFAULTS.allowance} dB</strong> — the bare-terrain
-          figure's average shortfall against the attenuator (${A.fit} dB fitted, ${A.lo}–${A.hi} dB at 90 % confidence): the
-          masts' own surroundings, feeders and connectors, receivers at busy sites. It is measured, not modelled, and it is
-          the same for every path; one path can stray from it by the typical error above.</p>
-        <p class="small">It was fitted with each test read as the ${ATTEN_STEP} dB step it is. Read as exact figures, the same
-          tests gave ${A.exact} dB: a test that carried 24 dB and not 27 was taken for a margin of exactly 24, charging the
-          model for up to ${ATTEN_STEP} dB it never lost. A fit that leans harder on the stations reading “at least
-          ${ATTEN_MAX}” would put it lower still, nearer ${A.leaning} dB, so ${FN_MODEL_DEFAULTS.allowance} dB sits on the
-          cautious side.</p>
+          field station's radio system, 4 m antenna and all. What remains is the <strong>field allowance</strong> — the
+          bare-terrain figure's average shortfall against the attenuator: the masts' own surroundings, feeders and
+          connectors, receivers at busy sites. It is measured, not modelled, and the same for every path; one path can stray
+          from it by the typical error above.</p>
 
         <h3>Reading one against the other</h3>
         <p class="small">Calibrated, Flood-Net ranks paths much as Radio Mobile does (rank correlation
           ${R.rankAfter.toFixed(2)}) and puts ${R.bandsAfter} % of them in the same green, amber or red band (${R.bandsBefore} %
-          before). It reads lower by a median <strong>${R.median} dB</strong> — from ${R.p10 < 0 ? `${-R.p10} dB higher` : `${R.p10} dB lower`}
-          to ${R.p90} dB lower for eight paths in ten — because Radio Mobile is shown its link settings and nothing else:
-          those settings sat about
-          ${R.settings} dB below Flood-Net's defaults, most of the allowance but not all of it, and Radio Mobile read
-          ${E.accuracy[1].bias} dB above the attenuator on average. So a path's margin is, to within the typical error:</p>
+          before). At the network's allowance it reads within a median <strong>${Math.abs(R.median).toFixed(1)} dB</strong> of
+          Radio Mobile — ${between} for eight paths in ten: Radio Mobile is told its link settings and nothing else, and
+          those settings sat about ${R.settings} dB below Flood-Net's defaults, about the allowance. So, in this region and to
+          within the typical error:</p>
         <ul class="small">
-          <li><strong>margin on site ≈ Flood-Net</strong> (field-calibrated);</li>
-          <li><strong>margin on site ≈ Radio Mobile − ${E.accuracy[1].bias} dB</strong>;</li>
-          <li><strong>Flood-Net ≈ Radio Mobile − ${R.median} dB</strong>;</li>
+          <li><strong>Flood-Net ≈ Radio Mobile</strong>;</li>
+          <li><strong>margin on site ≈ either, less ${RMrow.bias.toFixed(0)} dB</strong> — and network-wide, margin on site ≈
+            Flood-Net, which is how the allowance was fitted;</li>
           <li>and an attenuator stepping in ${ATTEN_STEP} dB reads the step at or below the margin — on average
             ${ATTEN_STEP / 2} dB under it.</li>
         </ul>
@@ -706,17 +786,39 @@ const NetworkReview = (function () {
                    oninput="NetworkReview.convert(this.value)"></label>
         </div>
         ${conv}
-        <p class="filter-hint">Is Flood-Net the better of the two? Not path for path. On the measured paths Radio Mobile —
-          set up one path at a time by whoever designed the network — is a little nearer the attenuator (typical error
-          ${E.accuracy[1].mae} dB against ${E.accuracy[2].mae}) and puts more pairs of stations in the right order
-          (${E.accuracy[1].order} % against ${E.accuracy[2].order} %), though it reads ${E.accuracy[1].bias} dB hopeful on average.
-          Of ${R.misses.of} paths both modelled, both miss by more than 6 dB on ${R.misses.both}; Flood-Net misses
-          ${R.misses.fnOnly} more, ${R.misses.fnOnlyLow} of them on the cautious side, and Radio Mobile ${R.misses.rmOnly}.
-          Flood-Net's strengths are elsewhere: it computes every link in the register, both ways round, from the register
-          as it stands today, with nobody setting a path up — and the calibration is checked again for any network in the
-          matrix above, against whatever the attenuator has found since. Where the two disagree by much on one path,
-          check the register's position and height for both ends before trusting either; neither models antenna
-          patterns, interference or the tree that grew last year.</p>
+        <p class="filter-hint">Is Flood-Net the better of the two? Not path for path. On these paths Radio Mobile — set up
+          one path at a time by whoever designed the network, with each site's own antenna and mast — is a little nearer
+          the attenuator (typical error ${RMrow.mae} dB against ${FNrow.mae}) and puts more pairs of stations in the right
+          order (${RMrow.order} % against ${FNrow.order} %). Given the same site details, Flood-Net matches it: the gap is the
+          register's, not the model's. Of ${R.misses.of} paths both modelled, both miss by more than 6 dB on
+          ${R.misses.both}; Flood-Net misses ${R.misses.fnOnly} more, Radio Mobile ${R.misses.rmOnly}. Flood-Net's strengths
+          are elsewhere: it computes every link in the register, both ways round, from the register as it stands today,
+          with nobody setting a path up; it is calibrated against the whole network's tests; and it says which hubs
+          the field disagrees with. Where the two disagree by much on one path, check the register's position and height
+          for both ends before trusting either; neither models antenna patterns, interference or the tree that grew last
+          year.</p>
+
+        <h3>The ground: LiDAR, where it matters</h3>
+        <p class="small">The link budget card's propagation settings can price a path over Geoscience Australia's 5 m LiDAR
+          instead of the ~30 m tiles — fetched only round the two ends and wherever the tiles' ground comes within 30 m of
+          the line of sight (or the first Fresnel zone, where that is wider), with the tiles between, and a repeater or base
+          stood on the highest LiDAR ground within its registered position's rounding. Held against the same stations'
+          tests, each ground at its own fitted allowance:</p>
+        <div class="table-wrap">
+          <table class="adm-table nr-acc">
+            <caption class="sr-only">The model over five grounds against the attenuator</caption>
+            <thead><tr><th scope="col">Ground</th><th scope="col">Typical error, dB</th><th scope="col">Within ±6 dB</th>
+              <th scope="col">Pairs in order</th></tr></thead>
+            <tbody>${grounds}</tbody>
+          </table>
+        </div>
+        <p class="filter-hint">Sharper ground did not make sharper figures. At 5 m the model prices the exact spot the
+          register puts each antenna — and the register's positions are rounded and its heights surveyed elsewhere, so a
+          repeater fifty metres off its summit, or a field station beside a bank, is priced exactly wrongly; and
+          Longley–Rice, built on coarse profiles, reads every bank beside a 4 m antenna as a horizon. Standing the masts on
+          their tops wins back most of it, and LiDAR at the obstacles alone changes nothing measurable. So the tiles stay the
+          default, LiDAR is the setting for studying one site whose position is known, and the register check below asks it
+          where each repeater and base really stands.</p>
       </div>`;
   }
 
@@ -793,6 +895,80 @@ const NetworkReview = (function () {
     return { masts: masts.length, assumed, long, mastAgl: P_.mastAgl };
   }
 
+  // ── the hubs against the LiDAR ──
+  // Where each repeater and base stands, read off the 5 m LiDAR grid: the ground
+  // at its registered position against its survey, and the highest ground
+  // within LIDAR_REACH_M. A survey metres off the LiDAR ground, or a top a few
+  // metres higher a stone's throw away, is a position or a height in the
+  // register that is not where the antenna is — and on a summit, that is worth
+  // more to a margin than any amount of terrain detail along the path.
+  const LIDAR_REACH_M = 100, LIDAR_FLAG_M = 5;
+  let lidarCheck = null;      // { phase, done, total, rows: [...] }
+
+  async function checkHubsLidar() {
+    if (!isAdmin() || !state.data || typeof LidarProfile === 'undefined') return;
+    if (lidarCheck && lidarCheck.phase === 'running') return;
+    const hubsAll = state.data.stations.filter(s => !s.deleted_at && stationIsMast(s) && s.lat != null && s.lon != null);
+    lidarCheck = { phase: 'running', done: 0, total: hubsAll.length, rows: [] };
+    repaint();
+    let next = 0;
+    const worker = async () => {
+      while (next < hubsAll.length) {
+        const st = hubsAll[next++];
+        const top = await LidarProfile.highest(st.lat, st.lon, LIDAR_REACH_M);
+        const at = top ? top.from_m : null;
+        const survey = st.elevation_ahd != null ? Number(st.elevation_ahd) : null;
+        lidarCheck.rows.push({ id: st.id, name: st.name, survey, at, top: top ? top.ground : null, away: top ? top.moved_m : null,
+          off: survey != null && at != null ? survey - at : null, rise: top && at != null ? top.ground - at : null });
+        lidarCheck.done++;
+        if (lidarCheck.done % 10 === 0) repaintLidar();
+      }
+    };
+    await Promise.all(Array.from({ length: 4 }, worker));
+    lidarCheck.phase = 'done';
+    lidarCheck.rows.sort((a, b) => Math.max(Math.abs(b.off || 0), b.rise || 0) - Math.max(Math.abs(a.off || 0), a.rise || 0));
+    repaintLidar();
+  }
+
+  function lidarCheckHtml() {
+    if (typeof LidarProfile === 'undefined') return '';
+    const c = lidarCheck;
+    const flagged = c ? c.rows.filter(r => (r.off != null && Math.abs(r.off) > LIDAR_FLAG_M) || (r.rise != null && r.rise > LIDAR_FLAG_M)) : [];
+    const none = c ? c.rows.filter(r => r.at == null).length : 0;
+    const f1 = v => (v == null ? '—' : v.toFixed(1));
+    const body = !c ? ''
+      : c.phase === 'running' ? `<p class="small" role="status">Reading the LiDAR round ${c.done} of ${c.total} repeaters and bases…</p>`
+      : `<p class="small" role="status">${c.total} repeaters and bases: ${flagged.length} worth a second look, ${c.total - flagged.length - none}
+          where the register and the LiDAR agree, ${none} where the LiDAR holds nothing.</p>
+        ${flagged.length ? `<div class="table-wrap" role="region" tabindex="0" aria-label="Repeaters and bases the LiDAR disagrees with">
+          <table class="adm-table nr-acc"><caption class="sr-only">Repeaters and bases whose registered height or position the LiDAR disagrees with</caption>
+            <thead><tr><th scope="col">Hub</th><th scope="col">Surveyed, m AHD</th><th scope="col">LiDAR there, m</th>
+              <th scope="col">Survey − LiDAR, m</th><th scope="col">Highest within ${LIDAR_REACH_M} m</th><th scope="col">Higher by, m</th></tr></thead>
+            <tbody>${flagged.map(r => `<tr><th scope="row"><button type="button" class="link-btn" onclick="NetworkReview.openStation('${escAttr(r.id)}')">${esc(r.name)}</button></th>
+              <td class="nr-num">${f1(r.survey)}</td><td class="nr-num">${f1(r.at)}</td><td class="nr-num">${r.off == null ? '—' : `${r.off > 0 ? '+' : ''}${r.off.toFixed(1)}`}</td>
+              <td class="nr-num">${f1(r.top)}<span class="small txt-muted"> ${r.away != null ? `${Math.round(r.away)} m away` : ''}</span></td>
+              <td class="nr-num">${f1(r.rise)}</td></tr>`).join('')}</tbody>
+          </table></div>` : ''}`;
+    return `
+        <h3>Repeaters and bases against the LiDAR</h3>
+        <p class="small">Where Geoscience Australia's 5 m LiDAR grid holds the ground, each repeater's and base's surveyed height
+          against the LiDAR ground at its registered position, and the highest ground within ${LIDAR_REACH_M} m. A survey more
+          than ${LIDAR_FLAG_M} m off, or a top more than ${LIDAR_FLAG_M} m higher close by, is a register entry that is not where
+          the antenna is — and a few metres at a summit move every margin to it.
+          <button type="button" class="link-btn" onclick="NetworkReview.checkHubsLidar()" ${c && c.phase === 'running' ? 'disabled' : ''}>Check them</button></p>
+        <div id="nr-lidar">${body}</div>`;
+  }
+
+  function repaintLidar() {
+    const el = typeof document !== 'undefined' && document.getElementById('nr-lidar');
+    if (el) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = lidarCheckHtml();
+      const inner = tmp.querySelector('#nr-lidar');
+      el.innerHTML = inner ? inner.innerHTML : '';
+    } else repaint();
+  }
+
   function registerHtml() {
     const c = registerChecks();
     if (!c) return '';
@@ -816,12 +992,14 @@ const NetworkReview = (function () {
         <p class="small">A station surveyed more than a few metres under the terrain tiles round it is lifted onto them
           before its path is priced — otherwise its antenna starts in a pit of the model's making. The matrix flags each
           one it meets (“surveyed … below the terrain model”): worth a second look at the survey, or at the position.</p>
+        ${lidarCheckHtml()}
       </div>`;
   }
 
   function render() {
     const body = !isAdmin() ? outsideHtml()
-      : [matrixPanelHtml(), reconcileHtml(), principlesHtml(), registerHtml()].join('');
+      : [matrixPanelHtml(), typeof NetworkHistory !== 'undefined' ? NetworkHistory.panelHtml() : '',
+         reconcileHtml(), principlesHtml(), registerHtml()].join('');
     return `<div class="page" style="--page-max:1200px"><h2 class="sr-only">Network Review</h2><div class="stack" id="nr-page">${body}</div></div>`;
   }
 
@@ -848,6 +1026,15 @@ const NetworkReview = (function () {
     render,
     init() { /* nothing to start: every run is asked for */ },
     authChanged() { repaint(); },
+    repaintAll: repaint,
+    checkHubsLidar,
+    lidarCheck: () => lidarCheck,
+    // Shared with network-history.js, so its stations are priced and read
+    // exactly as the matrix's are.
+    pathMargin,
+    radioOfStation,
+    stepOf,
+    selectAll,
     exportCsv,
     compute,
     stop,

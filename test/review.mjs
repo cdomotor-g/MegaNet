@@ -52,9 +52,12 @@ const ok = (name, cond, detail = '') => {
 const HUB_A = 'mt_stuart_al', HUB_B = 'castle_hill_al';
 
 // ── the datastore, for the two views the tab reads ──────────────────────────
-// The first two stations asked about get visits: one with two readings (21
-// and 27, so a median of 24) and a nought that is "not tested"; the other one
-// reading at the attenuator's 30 dB limit. Everybody else has none.
+// The first four stations asked about get visits: one with two readings (21
+// and 27, so a median of 24) and a nought that is "not tested"; one reading at
+// the attenuator's 30 dB limit; one with 27 and 30 (≥28.5); and one reading 22,
+// off the 3 dB grid — a 1 dB attenuator's. Everybody else has none. A read with
+// no station or visit filter — the history check's — gets every visit there is,
+// a page at a time as the datastore answers it.
 const visitsFor = new Map();
 let visitAsks = 0, marginAsks = 0;
 const json = (route, body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body),
@@ -74,30 +77,53 @@ await page.route(/elevation-tiles-prod\/terrarium\/\d+\/\d+\/\d+\.png/, route =>
   return route.fulfill({ status: 200, contentType: 'image/png', body: hillyTerrariumPng(+m[1], +m[2], +m[3]),
                          headers: { 'Access-Control-Allow-Origin': '*' } });
 });
+// The datastore's own cap: at most 1000 rows to a read, from `offset`.
+const paged = (url, rows) => {
+  const u = decodeURIComponent(url);
+  const limit = Math.min(1000, Number((u.match(/[?&]limit=(\d+)/) || [])[1] || 1000));
+  const offset = Number((u.match(/[?&]offset=(\d+)/) || [])[1] || 0);
+  return rows.slice(offset, offset + limit);
+};
 await page.route(/inspection_chart_visit\?/, route => {
   visitAsks++;
-  const ids = inList(route.request().url(), 'station_id');
+  const url = route.request().url();
+  if (!/station_id=in\./.test(decodeURIComponent(url))) {
+    const all = [];
+    for (const [id, vs] of visitsFor) for (const v of vs) all.push({ id: v.id, station_id: id, inspected_on: v.at });
+    return json(route, paged(url, all));
+  }
+  const ids = inList(url, 'station_id');
   const out = [];
   for (const id of ids) {
-    if (!visitsFor.has(id) && visitsFor.size < 3) {
+    if (!visitsFor.has(id) && visitsFor.size < 4) {
       visitsFor.set(id, [
         [{ id: `v-${id}-1`, at: '2020-09-28', load: [21] }, { id: `v-${id}-2`, at: '2019-10-03', load: [27, 12] },
          { id: `v-${id}-3`, at: '2018-09-20', load: [0] }],
         [{ id: `v-${id}-1`, at: '2020-09-18', load: [30] }],
         [{ id: `v-${id}-1`, at: '2020-08-11', load: [30] }, { id: `v-${id}-2`, at: '2019-08-02', load: [27] }],
+        [{ id: `v-${id}-1`, at: '2021-05-12', load: [22] }],
       ][visitsFor.size]);
     }
     for (const v of visitsFor.get(id) || []) out.push({ id: v.id, station_id: id, inspected_on: v.at });
   }
-  return json(route, out);
+  return json(route, paged(url, out));
 });
 await page.route(/inspection_chart_fade_margin\?/, route => {
   marginAsks++;
-  const ids = new Set(inList(route.request().url(), 'inspection_id'));
+  const url = route.request().url();
+  if (!/inspection_id=in\./.test(decodeURIComponent(url))) {
+    const all = [];
+    for (const vs of visitsFor.values()) for (const v of vs) for (const l of v.load) if (l > 0) all.push({ inspection_id: v.id, load_db: l });
+    return json(route, paged(url, all));
+  }
+  const ids = new Set(inList(url, 'inspection_id'));
   const out = [];
   for (const vs of visitsFor.values()) for (const v of vs) if (ids.has(v.id)) for (const l of v.load) out.push({ inspection_id: v.id, load_db: l });
   return json(route, out);
 });
+// A table longer than one read, to hold selectAll to every row of it.
+const PROBE = Array.from({ length: 2345 }, (_, i) => ({ n: i }));
+await page.route(/paging_probe\?/, route => json(route, paged(route.request().url(), PROBE)));
 const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
 
@@ -247,7 +273,7 @@ const field = await page.evaluate(() => {
            tile: [...document.querySelectorAll('#nr-kpis .adm-kpi-label')].some(l => /Against the attenuator/.test(l.textContent)) };
 });
 ok('the measured margins were asked for once the matrix ran', visitAsks >= 1 && marginAsks >= 1, `${visitAsks} / ${marginAsks}`);
-ok('three stations have one', field.n === 3, JSON.stringify(field.values));
+ok('four stations have one', field.n === 4, JSON.stringify(field.values));
 ok('…a visit\'s figure is its largest load, and nought is not a test: the median of 21 and 27',
    field.values.some(v => v.m === 24 && v.n === 2 && !v.censored), JSON.stringify(field.values));
 ok('…and a figure is the attenuator\'s 3 dB step: 21–24 and 27–30 make 24–27', field.values.some(v => v.m === 24 && v.hi === 27)
@@ -256,7 +282,9 @@ ok('…a reading at the attenuator\'s limit is "at least"', field.values.some(v 
    && field.cells.some(c => /^≥30/.test(c || '')), field.cells.join(' | '));
 ok('…and a median that leans on one is "at least" too: 27 and ≥30 is ≥28.5', field.values.some(v => v.m === 28.5 && v.censored)
    && field.cells.some(c => /^≥28\.5/.test(c || '')), field.cells.join(' | '));
-ok('…and the model is checked against all three', field.check && field.check.n === 3 && isFinite(field.check.mean), JSON.stringify(field.check));
+ok('…a reading off the 3 dB grid came from a 1 dB attenuator: 22 is 22–23', field.values.some(v => v.m === 22 && v.hi === 23)
+   && field.cells.some(c => /^22–23/.test(c || '')), field.cells.join(' | '));
+ok('…and the model is checked against all four', field.check && field.check.n === 4 && isFinite(field.check.mean), JSON.stringify(field.check));
 const inStep = await page.evaluate(() => {
   // A model figure inside the step is no error; outside, the error is the distance to it.
   const m = NetworkReview.matrix(), meas = NetworkReview.measured();
@@ -309,7 +337,8 @@ ok('named floodnet-network-review-…csv', /^floodnet-network-review-\d{8}\.csv$
 ok('…saying the model it was computed on', csv[0].includes(`field-calibrated model, ${defaultAllowance} dB allowance`), csv[0]);
 ok('…and the measured step as two columns, the second empty for "at least"',
    head.includes('measured_margin_from_db,measured_margin_to_db')
-   && csv.some(l => /,24,27,2,/.test(l)) && csv.some(l => /,30,,1,/.test(l)) && csv.some(l => /,28\.5,,2,/.test(l)),
+   && csv.some(l => /,24,27,2,/.test(l)) && csv.some(l => /,30,,1,/.test(l)) && csv.some(l => /,28\.5,,2,/.test(l))
+   && csv.some(l => /,22,23,1,/.test(l)),
    csv.filter(l => !l.startsWith('#')).slice(0, 4).join(' / '));
 ok('…a margin and a distance column per hub', ['Mt Stuart AL margin_db', 'Castle Hill AL margin_db', 'The next hill margin_db', 'The next hill km']
   .every(c => head.includes(c)), head.slice(0, 200));
@@ -321,8 +350,8 @@ const conv = await page.evaluate(() => {
   NetworkReview.convert('24');
   return document.getElementById('nr-conv-out').textContent.replace(/\s+/g, ' ');
 });
-ok('a Radio Mobile 24 dB is 20.1 in Flood-Net and 21.7 on site, which the attenuator reads as 21',
-   /20\.1 dB/.test(conv) && /21\.7 dB/.test(conv) && /read as 21\b/.test(conv), conv);
+ok('a Radio Mobile 24 dB is 24.1 in Flood-Net and 21.7 on site, which the attenuator reads as 21',
+   /24\.1 dB/.test(conv) && /21\.7 dB/.test(conv) && /read as 21\b/.test(conv), conv);
 const reg = await page.evaluate(() => {
   const c = NetworkReview.registerChecks();
   const masts = state.data.stations.filter(s => stationIsMast(s));
@@ -335,6 +364,94 @@ ok('every repeater and base on a radio system under the mast is counted as assum
    `${reg.assumed} of ${reg.masts}, expected ${reg.want}`);
 ok('…and the panel says how many', new RegExp(`${reg.assumed} of the register's ${reg.masts}`).test(reg.text), reg.text.slice(0, 200));
 ok('pass-range links over 150 km are counted, longest first', reg.long === 0 || reg.longest > 150, `${reg.long}, longest ${reg.longest} km`);
+
+// ── every row of a long read ─────────────────────────────────────────────────
+const probe = await page.evaluate(async () => (await NetworkReview.selectAll('paging_probe?select=n&order=n.asc')).length);
+ok('a read longer than the datastore\'s 1000 rows comes back whole', probe === 2345, String(probe));
+
+// ── the model against every attenuator test ─────────────────────────────────
+console.log('\nThe history check');
+const hist = await page.evaluate(async () => {
+  const before = pathPropOf().allowance;
+  NetworkHistory.start();
+  for (let i = 0; i < 900; i++) {
+    const r = NetworkHistory.run();
+    if (r && (r.phase === 'done' || r.phase === 'failed')) break;
+    await new Promise(res => setTimeout(res, 200));
+  }
+  const r = NetworkHistory.run();
+  const panel = [...document.querySelectorAll('#nr-page .panel')].find(p => /The model against every attenuator test/.test(p.textContent));
+  return { phase: r && r.phase, error: r && r.error, stations: r ? r.stations.length : 0, priced: r ? r.stations.filter(x => x.best).length : 0,
+           summary: !!(r && r.summary && r.summary.all), n: r && r.summary && r.summary.all ? r.summary.all.n : 0,
+           tiles: panel ? [...panel.querySelectorAll('.adm-kpi-label')].map(l => l.textContent.trim()) : [],
+           tables: panel ? panel.querySelectorAll('table').length : 0, before,
+           fit: r && r.summary ? r.summary.fitNear : null };
+});
+ok('a run reads every test on file and finishes', hist.phase === 'done', `${hist.phase} ${hist.error || ''}`);
+ok('…pricing each tested station\'s paths', hist.stations === 4 && hist.priced === 4, `${hist.priced} of ${hist.stations}`);
+ok('…and summing them up network-wide, on tiles and tables', hist.summary && hist.n === 4
+   && hist.tiles.includes('Stations priced') && hist.tables >= 1, JSON.stringify(hist.tiles));
+const used = await page.evaluate(() => {
+  const r = NetworkHistory.run();
+  NetworkHistory.useFit();
+  const after = pathPropOf().allowance;
+  LinkBudget.resetProp();
+  return { after, want: r.summary.fitNear == null ? null : Math.max(0, Math.round((r.allowance + r.summary.fitNear) * 2) / 2) };
+});
+ok('its fit can be taken up for the session, to the half-decibel', used.want != null && used.after === used.want, JSON.stringify(used));
+await page.evaluate(() => NetworkReview.authChanged());
+const [hdl] = await Promise.all([page.waitForEvent('download'), page.evaluate(() => NetworkHistory.exportCsv())]);
+const hcsv = fs.readFileSync(await hdl.path(), 'utf8').split('\n').filter(Boolean);
+ok('…and it saves as floodnet-attenuator-history-check-….csv, a row per station', /^floodnet-attenuator-history-check-\d{8}\.csv$/.test(hdl.suggestedFilename())
+   && hcsv.filter(l => !l.startsWith('#')).length === 5, `${hdl.suggestedFilename()} · ${hcsv.length} lines`);
+
+// ── LiDAR ────────────────────────────────────────────────────────────────────
+// The tiles are answered by LidarProfile's seam with the hilly world itself,
+// so the LiDAR ground is the tiles' ground at 5 m, and every hub is surveyed
+// somewhere the hilly world is not.
+console.log('\nLiDAR');
+await page.evaluate(() => {
+  const EARTH_KM = 40075.017, HILL_KM = 8, K = 2 * Math.PI * EARTH_KM / HILL_KM;
+  const hAt = (lat, lon) => {
+    const r = lat * Math.PI / 180, wx = (lon + 180) / 360, wy = (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2;
+    const a = Math.sin(wx * K) * Math.sin(wy * K), b = Math.sin(wx * K / 9.7 + 0.6) * Math.cos(wy * K / 11.3 + 1.1), c = Math.sin(wx * K / 41 + 2.2);
+    return 180 + 380 * a * a + 220 * b + 90 * c;
+  };
+  LidarProfile.seed(t => {
+    const data = new Float32Array(t.W * t.H);
+    for (let y = 0; y < t.H; y++) for (let x = 0; x < t.W; x++) {
+      data[y * t.W + x] = hAt(t.n - (y + 0.5) * (t.n - t.s) / t.H, t.w + (x + 0.5) * (t.e - t.w) / t.W);
+    }
+    return { W: t.W, H: t.H, data };
+  });
+});
+const lid = await page.evaluate(async () => {
+  const st = state.data.stations.find(s => s.id === NetworkReview.matrix().rows[0].id), hub = state.data.stations.find(s => s.id === 'mt_stuart_al');
+  const A = NetworkReview.radioOfStation(st), B = NetworkReview.radioOfStation(hub);
+  const tiles = await NetworkReview.pathMargin(A, B, 152.4);
+  LinkBudget.setGround('lidar');
+  const g = await pathGround(A, B, { freqMhz: 152.4 });
+  const lidar = await NetworkReview.pathMargin(A, B, 152.4);
+  const asked = LidarProfile.stats().asked;
+  LinkBudget.setGround('30m');
+  return { tiles: tiles.m, lidar: lidar.m, err: lidar.err, asked, share: g.lidar ? g.lidar.lidarShare : null,
+           n: g.prof.terrain_m.length, stood: g.ends.b.stood_m != null, zones: g.lidar ? g.lidar.zones.map(z => z.kind) : [] };
+});
+ok('under the LiDAR setting a path is priced over 5 m LiDAR at its ends and obstacles', lid.err == null && isFinite(lid.lidar)
+   && lid.asked > 0 && lid.share > 0 && lid.n > 1024 && lid.zones.filter(z => z === 'end').length >= 1, JSON.stringify(lid));
+ok('…a figure of its own, beside the tiles\' one', isFinite(lid.tiles) && lid.tiles !== lid.lidar, `${lid.tiles} vs ${lid.lidar}`);
+ok('…and the repeater stood on its top', lid.stood, JSON.stringify(lid));
+const hubsCheck = await page.evaluate(async () => {
+  await NetworkReview.checkHubsLidar();
+  const c = NetworkReview.lidarCheck();
+  const masts = state.data.stations.filter(s => !s.deleted_at && stationIsMast(s) && s.lat != null).length;
+  const el = document.getElementById('nr-lidar');
+  return { phase: c.phase, rows: c.rows.length, masts, flagged: el ? el.querySelectorAll('tbody tr').length : -1,
+           said: el ? el.textContent.replace(/\s+/g, ' ').slice(0, 160) : '' };
+});
+ok('every repeater and base is checked against the LiDAR', hubsCheck.phase === 'done' && hubsCheck.rows === hubsCheck.masts, JSON.stringify(hubsCheck));
+ok('…and the ones whose survey the LiDAR disagrees with are tabled', hubsCheck.flagged > 0 && /worth a second look/.test(hubsCheck.said), hubsCheck.said);
+await page.evaluate(() => LidarProfile.seed(null));
 
 const cover = await page.evaluate(() => {
   LinkBudget.setModel('cover');

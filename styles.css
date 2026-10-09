@@ -5241,6 +5241,18 @@ hr {
   --profile-earth-line: #9a917c;
 }
 
+/* The stretches of a profile read off the 5 m LiDAR grid (lidar-profile.js),
+   traced over the ground line: a green that is neither the terrain's earth
+   tones nor the radio geometry's accent, so where the sharp ground is reads at
+   a glance without competing with the line of sight. */
+:root {
+  --profile-lidar: #1f8a4c;
+}
+
+[data-theme="dark"] {
+  --profile-lidar: #4cc985;
+}
+
 /* Ground cover on the profile (see LandCover). One token per Sentinel-2
    land-cover class, in Esri's own legend hues so the band reads the same as
    the map anyone checks it against — lifted a little in the dark theme so the
@@ -5666,6 +5678,7 @@ hr {
   border: 1px solid color-mix(in srgb, var(--dot, var(--muted)) 60%, var(--text));
 }
 .path-key-mast { border-top: 2px solid var(--map-repeater); }
+.path-key-lidar { border-top: 3px solid var(--profile-lidar); }
 
 /* The curvature arc's chip, built like the ground one so the two read as a
    pair: the ground of this path, and the ground of the planet under it. */
