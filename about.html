@@ -10,11 +10,12 @@
        A canonical naming the redirecting form points a crawler back at the hop
        it just followed. GitHub Pages serves both, so this is right there too. -->
   <link rel="canonical" href="https://floodwarning.net/about">
-  <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
   <meta name="theme-color" content="#0b5cab">
 
   <!-- Deliberately self-contained: no stylesheet, no font, no script, no image
-       beyond the icon. This page exists to be read by things that are not a
+       beyond the icon and the logo — and the page reads the same without it. This page exists to be read by things that are not a
        browser on a fast connection — a categorisation crawler, a proxy that
        fetches a page to decide what it is, somebody on a filtered network where
        every CDN in styles.css is refused. Anything it had to fetch first is a
@@ -38,6 +39,12 @@
       color: var(--ink); background: var(--bg);
     }
     main { max-width: 46rem; margin: 0 auto; }
+    /* The logo's lettering is navy on nothing: on a dark page it sits on a
+       white card of its own, or the word mark disappears. */
+    .logo { display: block; width: 15rem; max-width: 70%; height: auto; margin: 0 0 1.2rem; }
+    @media (prefers-color-scheme: dark) {
+      .logo { background: #ffffff; border-radius: 10px; padding: .8rem 1rem; }
+    }
     h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .3rem; }
     h2 { font-size: 1.15rem; margin: 2.4rem 0 .6rem; color: var(--brand); }
     .lede { font-size: 1.08rem; color: var(--dim); margin: 0 0 2rem; }
@@ -62,6 +69,7 @@
 <body>
 <main>
 
+  <img class="logo" src="assets/logo.webp" alt="" width="640" height="536">
   <h1>Flood-Net</h1>
   <p class="lede">
     A browser-based tool for planning and maintaining radio and satellite

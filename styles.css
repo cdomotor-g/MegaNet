@@ -871,6 +871,16 @@ header h1 {
   white-space: nowrap;
 }
 
+/* The logo's mark, its "floodwarning.net" lettering cropped off — the name
+   beside it says Flood-Net. It carries its own white backing, so it reads on
+   the banner's blue in either theme. */
+.header-logo {
+  height: 1.75rem;
+  width: auto;
+  margin-right: .5rem;
+  vertical-align: middle;
+}
+
 header p {
   margin: 0;
   opacity: .95;
@@ -12728,6 +12738,7 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .header-logo { height: 1.45rem; margin-right: .35rem; }
 
   /* One line, whatever it says. "4873 stations · 91 repeaters · from the
      datastore" wrapped to four under the name, which made the banner the
@@ -12812,6 +12823,7 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
    shrinks rather than pushing a button off the edge. */
 @media (max-width: 380px) {
   header h1 { font-size: .95rem; }
+  .header-logo { display: none; }      /* the name keeps the room */
   .hdr-btn,
   .hdr-nav,
   .hdr-side { width: 2.1rem; height: 2.1rem; }
