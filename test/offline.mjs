@@ -158,11 +158,11 @@ async function main() {
       const m = JSON.parse(fs.readFileSync(repo('manifest.webmanifest'), 'utf8'));
       const icons = m.icons || [];
       const has = (size, purpose) => icons.some(i => i.sizes === size && (purpose ? i.purpose === purpose : !i.purpose)
-        && fs.existsSync(repo(i.src)));
+        && fs.existsSync(repo(i.src.split('?')[0])));
       check('the manifest names Flood-Net, standalone, scoped to the site', m.name === 'Flood-Net' && m.short_name === 'Flood-Net'
         && m.display === 'standalone' && m.start_url === './' && m.scope === './', J(m));
       check('…with 192 and 512 icons that exist, and a maskable one', has('192x192') && has('512x512') && has('512x512', 'maskable'), J(icons));
-      check('index.html links it', /<link rel="manifest" href="manifest\.webmanifest">/.test(INDEX_HTML));
+      check('index.html links it', /<link rel="manifest" href="manifest\.webmanifest(?:\?v=[^"]+)?"[^>]*>/.test(INDEX_HTML));
     }
 
     // ═══════════════════════════════════════════════════════════════════════
