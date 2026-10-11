@@ -871,9 +871,9 @@ header h1 {
   white-space: nowrap;
 }
 
-/* The logo's mark, its "floodwarning.net" lettering cropped off — the name
-   beside it says Flood-Net. It carries its own white backing, so it reads on
-   the banner's blue in either theme. */
+/* The small mark (assets/icon-small.svg) — the logo cut down to what reads
+   at this size; the name beside it says Flood-Net. Its white rim lets it
+   read on the banner's blue in either theme. */
 .header-logo {
   height: 1.75rem;
   width: auto;

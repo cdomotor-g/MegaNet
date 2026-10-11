@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- The small Flood-Net mark: the full logo (logo.webp, icon-512.png) cut
+       down to what still reads at 16-48 px: the round frame, the gauge board
+       standing in the water, two wave crests, and a few network nodes. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e88e5"/>
+      <stop offset="1" stop-color="#90d4ff"/>
+    </linearGradient>
+    <clipPath id="disc"><circle cx="32" cy="32" r="28.5"/></clipPath>
+  </defs>
+  <circle cx="32" cy="32" r="31.5" fill="#fff"/>
+  <g clip-path="url(#disc)">
+    <rect width="64" height="64" fill="url(#sky)"/>
+    <path d="M37 12 L51 17 L45 30 L58 34 M37 12 L45 30 M51 17 L58 34" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+    <rect x="14" y="13" width="12" height="36" rx="1.8" fill="#0d1b2e"/>
+    <rect x="16.5" y="15.5" width="7" height="33" fill="#fff"/>
+    <g fill="#0d1b2e">
+      <rect x="16.5" y="18.5" width="5.5" height="3"/>
+      <rect x="16.5" y="24.5" width="3.5" height="3"/>
+      <rect x="16.5" y="30.5" width="5.5" height="3"/>
+    </g>
+    <path d="M0 40 C10 35 18 44 30 41 S50 34 64 39 V64 H0Z" fill="#1976d2"/>
+    <path d="M0 49 C12 45 22 54 36 50 S54 45 64 48 V64 H0Z" fill="#0d47a1"/>
+    <path d="M-1 40 C10 35 18 44 30 41 S50 34 65 39" fill="none" stroke="#fff" stroke-width="2.8"/>
+    <path d="M-1 49 C12 45 22 54 36 50 S54 45 65 48" fill="none" stroke="#fff" stroke-width="2" opacity=".8"/>
+  </g>
+  <g fill="#1565c0" stroke="#fff" stroke-width="1.8">
+    <circle cx="37" cy="12" r="3"/>
+    <circle cx="51" cy="17" r="3.8"/>
+    <circle cx="45" cy="30" r="3.4"/>
+    <circle cx="58.5" cy="34" r="3.6"/>
+  </g>
+</svg>
