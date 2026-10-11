@@ -429,15 +429,18 @@ const SiteMap = (function () {
     <div class="page sm-page" id="sm-page" style="--page-max:1180px">
       ${welcomeHtml()}
       <div class="sm-hero">
-        <h2 class="sm-title" id="sm-h"><span aria-hidden="true">🗂️</span> Site map</h2>
-        <p class="sm-lede">Every tab in the bar on the left, what it is for, and when you would
-          reach for it. <strong>Point at any card</strong> — or move to it with the keyboard — and a
-          gold line shows where its button is.</p>
-        <ul class="sm-facts" aria-label="At a glance">
-          <li><strong>${tabCount}</strong> tabs</li>
-          <li><strong>${groups.length}</strong> groups</li>
-          <li><kbd>Ctrl</kbd>+<kbd>K</kbd> finds any of them by what it does — and any station or place</li>
-        </ul>
+        <img class="sm-logo" src="assets/icon-512.png" alt="" width="512" height="512">
+        <div class="sm-hero-text">
+          <h2 class="sm-title" id="sm-h"><span aria-hidden="true">🗂️</span> Site map</h2>
+          <p class="sm-lede">Every tab in the bar on the left, what it is for, and when you would
+            reach for it. <strong>Point at any card</strong> — or move to it with the keyboard — and a
+            gold line shows where its button is.</p>
+          <ul class="sm-facts" aria-label="At a glance">
+            <li><strong>${tabCount}</strong> tabs</li>
+            <li><strong>${groups.length}</strong> groups</li>
+            <li><kbd>Ctrl</kbd>+<kbd>K</kbd> finds any of them by what it does — and any station or place</li>
+          </ul>
+        </div>
       </div>
       ${anatomyHtml()}
       ${journeyHtml(groups)}

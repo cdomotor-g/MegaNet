@@ -16691,7 +16691,24 @@ button.adm-danger:hover { border-color: var(--bad); }
 
 .sm-hero {
   display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.sm-hero-text {
+  display: grid;
   gap: var(--sp-2);
+  min-width: 0;
+}
+/* The detailed logo: here there is room for it. The banner and the tab carry
+   the small mark (icon-small.svg), which reads at 16-28 px. */
+.sm-logo {
+  width: 8.5rem;
+  height: auto;
+}
+@media (max-width: 600px) {
+  .sm-hero { grid-template-columns: 1fr; justify-items: start; }
+  .sm-logo { width: 6rem; }
 }
 
 /* A first visit's greeting (#222), above the hero: the guide says why it

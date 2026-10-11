@@ -396,6 +396,9 @@ try {
     `on ${L.on}, lit ${L.lit.join(', ')}`);
 
   // The keyboard gets the same line: focus on a card's button is pointing at it.
+  // The pointer is parked in the banner first: left on the heading, the scroll
+  // to the focused card can slide another card under it, and hover would win.
+  await page.mouse.move(1, 1);
   await page.focus('#sm-card-rf .sm-open');
   await settle();
   L = await lead();
