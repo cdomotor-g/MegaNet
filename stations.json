@@ -105452,8 +105452,8 @@
       "id": "gatton_lvrc_enviromon_basestation",
       "name": "GATTON LVRC ENVIROMON BASESTATION",
       "station_number": "260122",
-      "lat": -27.5588,
-      "lon": 152.2762,
+      "lat": -27.559429,
+      "lon": 152.276993,
       "elevation_ahd": 108.39,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
