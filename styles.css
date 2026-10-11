@@ -11411,10 +11411,22 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   align-items: center; gap: var(--sp-1) var(--sp-2);
 }
 .ad-tool-grp { display: flex; gap: .25rem; align-items: center; flex-wrap: wrap; }
+/* Window, Lines, Picked and Export are plain buttons, which at the global
+   .55rem padding stood twice the height of the segmented controls beside them
+   — the toolbar's rows were sized by its least important buttons and pushed
+   the plot down. Same box as an .ad-seg button; touch keeps its 44 px below. */
+.ad-toolbar .ad-tool-grp button { padding: .26rem .55rem; font-size: .78rem; border-radius: 7px; }
 .ad-num { width: 76px; }
 /* The two Fixed-range boxes only exist while Fixed is chosen, so they arrive
-   beside the axis buttons rather than under them. */
-.ad-yrange { gap: var(--sp-1); }
+   beside the axis buttons rather than under them. Sized for the five-digit
+   numbers a range ever holds, and padded to the height of the segmented
+   buttons beside them: the global `input[type="number"]` rule outranks a bare
+   .ad-num, so these were 100 % wide and stacked min / to / max down the
+   toolbar, three field-heights of chrome above the plot. */
+.ad-yrange { gap: var(--sp-1); flex-wrap: nowrap; }
+.ad-yrange .ad-num {
+  width: 6rem; padding: .26rem .4rem; font-size: .78rem;
+}
 .ad-chk { display: flex; align-items: center; gap: .25rem; font-size: .78rem; color: var(--muted); }
 /* A tick whose filter is not running. The control is `disabled` too, so this is
    the visible half of a state the accessibility tree already has. */
