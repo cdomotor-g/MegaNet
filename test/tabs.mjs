@@ -835,6 +835,11 @@ const CONVERTED = [
   { id: 'levels',     label: 'Level Survey — check and send', issue: 'born converted', seed: SEED_LV_CHECK },
   { id: 'twopeg',     label: 'Two-Peg Test — a test that fails', issue: 'born converted', seed: SEED_TP },
   { id: 'surveyguide', label: 'How to Survey — every section open', issue: 'born converted', seed: SEED_SG },
+  { id: 'kbstaff',    label: 'Staff Simulator — as it opens', issue: 'born converted' },
+  { id: 'kblogbook',  label: 'Survey Logbook — as it opens', issue: 'born converted' },
+  { id: 'kblifecycle', label: 'Site Lifecycle — as it opens', issue: 'born converted' },
+  { id: 'kblevel',    label: 'Levelling Day — as it opens', issue: 'born converted' },
+  { id: 'kbriver',    label: 'River Visit Day — as it opens', issue: 'born converted' },
 ];
 
 

@@ -305,6 +305,41 @@ const SiteMap = (function () {
         'Open the worked example as a practice survey',
       ],
     },
+    kbstaff: {
+      what: 'Practice at reading a levelling staff through the level — the crosshair, the stadia hairs, heat haze, a rocked staff and wind — marked as you go.',
+      use: [
+        'Get your eye in on an E-pattern staff before a survey',
+        'Teach somebody new why a staff is rocked and when haze means stop',
+      ],
+    },
+    kblogbook: {
+      what: 'How a level book is kept, and practice books to fill in and reduce, with the arithmetic checks marked.',
+      use: [
+        'Practise booking and reducing a run before doing it on Level Survey',
+        'Learn the three checks and what a misclose says',
+      ],
+    },
+    kblifecycle: {
+      what: 'The life of a monitoring site, from deciding it is needed to closing it, with real-world scenarios to decide your way through.',
+      use: [
+        'See where a site visit fits in the whole life of a station',
+        'Work through a scenario and compare your call with the explanation',
+      ],
+    },
+    kblevel: {
+      what: 'A day of levelling at a gauging station, step by step — the jobs in order, each with a short practice task.',
+      use: [
+        'Walk through a level survey day before your first one',
+        'Refresh the order of the jobs and the checks between them',
+      ],
+    },
+    kbriver: {
+      what: 'A routine visit to a river station, step by step — the jobs in order, each with a practice reading or decision.',
+      use: [
+        'Walk through a routine site visit before your first one',
+        'Practise the gauge-against-logger check and when to correct it',
+      ],
+    },
   };
 
   // ── The groups, in the order the work moves through them ──────────────────
@@ -314,7 +349,7 @@ const SiteMap = (function () {
   // site"; `step` is that sentence, cut at the commas.
   const GROUPS = {
     'Start here': { step: 'Getting set up',
-      blurb: 'Before the work: getting a phone or laptop ready for a site with no signal, putting Flood-Net on its home screen, and a lesson in how the radio carries a reading home.' },
+      blurb: 'Before the work: getting a phone or laptop ready for a site with no signal, and putting Flood-Net on its home screen.' },
     'Stations & networks': { step: 'What is out there',
       blurb: 'The stations themselves, the radio paths between them, and the maps and files made from them. Most days start here.' },
     'Interference': { step: 'What is stepping on it',
@@ -327,6 +362,8 @@ const SiteMap = (function () {
       blurb: 'The paperwork of a visit, digitised — inspections, council maintenance, the record of both, and the photos.' },
     'Surveying': { step: 'How high it all is',
       blurb: 'A station\'s levels on a phone: the survey sheet that reduces the run as it is read, the level\'s own two-peg check, and a refresher on doing both.' },
+    'Knowledge base': { step: 'Learning how',
+      blurb: 'Lessons and practice rather than tools: how radio carries a reading home, and re-tellings of Mallee HydroTech\'s open training tools — reading a staff, keeping a level book, the life of a site, and a day on the level and on the river.' },
     'Admin': { step: 'Keeping it running',
       blurb: 'Where the station data comes from, who may sign in, the base stations that receive it all, and the review of a network\'s design.' },
   };
@@ -354,6 +391,8 @@ const SiteMap = (function () {
     { text: 'Print a map for a field trip',                tab: 'mapgen' },
     { text: 'Review a radio network\'s design',            tab: 'review' },
     { text: 'Learn how radio gets a reading home',         tab: 'propagation' },
+    { text: 'Practise reading a levelling staff',          tab: 'kbstaff' },
+    { text: 'Walk through a routine river station visit',  tab: 'kbriver' },
   ];
 
   const SELF = 'sitemap';

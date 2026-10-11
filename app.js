@@ -3318,7 +3318,7 @@ function renderMain() {
   // one that has not got a list yet. And the Field Camera: a photo taken with
   // no list is still stamped and kept, and filed by the database by distance —
   // only the station suggestions wait for the list.
-  const noDataTabs = ['sitemap', 'offline', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'admin', 'basestations'];
+  const noDataTabs = ['sitemap', 'offline', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -3371,6 +3371,11 @@ function renderMain() {
     case 'levels':     el.innerHTML = LevelSurvey.render();   LevelSurvey.init();  break;
     case 'twopeg':     el.innerHTML = TwoPeg.render();        TwoPeg.init();       break;
     case 'surveyguide': el.innerHTML = SurveyGuide.render();  SurveyGuide.init();  break;
+    case 'kbstaff':     el.innerHTML = KbStaff.render();      KbStaff.init();      break;
+    case 'kblogbook':   el.innerHTML = KbLogbook.render();    KbLogbook.init();    break;
+    case 'kblifecycle': el.innerHTML = KbLifecycle.render();  KbLifecycle.init();  break;
+    case 'kblevel':     el.innerHTML = KbLevel.render();      KbLevel.init();      break;
+    case 'kbriver':     el.innerHTML = KbRiver.render();      KbRiver.init();      break;
     case 'export':     el.innerHTML = renderExportHtml();                      break;
     case 'admin':      el.innerHTML = Admin.render();         Admin.init();        break;
     case 'basestations': el.innerHTML = BaseStations.render(); BaseStations.init(); break;

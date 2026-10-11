@@ -201,6 +201,11 @@ const ExportMenu = (function () {
     photos:      'The photos are the files — each one opens full size from the viewer — and they live in Dropbox or Drive as well.',
     camera:      'Each photo is a file already — Save a copy keeps it on this device, stamp and EXIF and all — and once uploaded it is in Field Photos.',
     surveyguide: 'A refresher to read — the worked example on it opens as a practice survey, which Level Survey exports like any other.',
+    kbstaff:     'A practice drill — the readings are made up on the spot and marked there; nothing on it is a record to keep as a file.',
+    kblogbook:   'A lesson with practice books to fill in — made-up figures, marked on screen; a real survey is booked and exported on Level Survey.',
+    kblifecycle: 'A lesson with scenarios to work through — nothing on it is a record to keep as a file.',
+    kblevel:     'A walkthrough of a day\'s levelling, practised on made-up figures — nothing on it is a record to keep as a file.',
+    kbriver:     'A walkthrough of a routine site visit, practised on made-up figures — nothing on it is a record to keep as a file.',
     basestations: 'The fleet\'s live state, for administering it — nothing here is a record to keep as a file.',
   };
 

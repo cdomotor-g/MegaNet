@@ -146,6 +146,13 @@ MegaNet/
 │                             administrator's panel that applies a survey
 ├── two-peg.js              ← TwoPeg    — Two-Peg Test tab (the level's collimation)
 ├── survey-guide.js         ← SurveyGuide — How to Survey tab: the refresher
+├── knowledge-base.js       ← KnowledgeBase — the Knowledge base group's sources and
+│                             the credit panel on each adapted lesson
+├── kb-staff.js             ← KbStaff — Staff Simulator tab (after Mallee HydroTech)
+├── kb-logbook.js           ← KbLogbook — Survey Logbook tab (after Mallee HydroTech)
+├── kb-lifecycle.js         ← KbLifecycle — Site Lifecycle tab (after Mallee HydroTech)
+├── kb-level.js             ← KbLevel — Levelling Day tab (after Mallee HydroTech)
+├── kb-river.js             ← KbRiver — River Visit Day tab (after Mallee HydroTech)
 ├── photo-review.js         ← PhotoReview — the tab's Review panel, equipment
 │                             suggestions, the station card's Equipment section
 ├── station-history.js      ← StationHistory — the station card's History: who
@@ -4696,7 +4703,7 @@ surveyed below the terrain model, and each repeater and base checked against the
 
 ### 27. Radio Propagation (How a Reading Gets Home, in Pictures That Move)
 
-🎓 **Radio Propagation**, under **Start here**, is a lesson rather than a tool:
+🎓 **Radio Propagation**, under **📚 Knowledge base**, is a lesson rather than a tool:
 how radio carries a reading from a gauge to a base station, and the ways it goes
 wrong on the way. Nothing on it needs a signal or a library — every drawing is a
 plain canvas, the 3-D one included — so it opens offline like the rest.
@@ -4783,6 +4790,29 @@ a worked example to open as a practice survey. `docs/level-surveys.md` has the
 rest; `npm run levels` holds the arithmetic to a worked example and drives the
 tabs on a phone-sized page, a real OCR read included, and
 `tools/check_level_surveys.sql` holds the database's rules.
+
+### 29. Knowledge base (Lessons, and Mallee HydroTech's Training Tools)
+
+**📚 Knowledge base** is the group for lessons rather than tools: 🎓 Radio
+Propagation, Flood-Net's own, and five lessons adapted
+with permission from [Mallee HydroTech](https://malleehydrotech.com.au/)'s open
+training tools:
+
+| Tab | Adapted from |
+|---|---|
+| 🪧 **Staff Simulator** — reading a levelling staff through the level, marked as you go | [Survey Staff Simulator](https://github.com/MalleeHydroTech/survey-staff-simulator) |
+| 📓 **Survey Logbook** — keeping a level book, with practice books to reduce | [Survey Logbook](https://github.com/MalleeHydroTech/survey-logbook) |
+| ♻️ **Site Lifecycle** — the life of a monitoring site, with scenarios to decide | [Site Operations Lifecycle](https://github.com/MalleeHydroTech/site-operations-lifecycle) |
+| 🏞️ **Levelling Day** — a day of levelling, step by step | [Hydrographer: A Day on the Level](https://github.com/MalleeHydroTech/hydrographer-day-on-the-level) |
+| 🛶 **River Visit Day** — a routine river station visit, step by step | [Hydrographer: A Day on the River](https://github.com/MalleeHydroTech/hydrographer-day-on-the-river) |
+
+The originals are React, Next.js and three.js apps; Flood-Net's versions are
+rewrites in its own plain JavaScript and SVG that teach the same content and
+work offline like every other tab. No file of the originals is copied; the
+arithmetic of their practice models is ported under the MIT licence. Each tab ends with a **Source and credit** panel naming the
+original, its owner, its licences (MIT for code, CC BY 4.0 for training
+material) and what was changed; the licence notices are kept in full in
+`docs/third-party/mallee-hydrotech/`.
 
 ---
 
@@ -5253,3 +5283,7 @@ when a tab is added.
 ## License
 
 MIT © cdomotor-g, 2026
+
+The Knowledge base's adapted lessons credit their sources — Mallee HydroTech's
+training tools, MIT and CC BY 4.0 — on each tab and in
+`docs/third-party/mallee-hydrotech/`.

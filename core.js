@@ -122,23 +122,21 @@
 // "flight mode", "no signal" — and "offline", which Station Health also
 // answers to for a station gone quiet: both are listed, this one first.
 //
-// 🎓 Radio Propagation (propagation.js) is the third: a lesson, not a tool —
-// how a reading travels from a gauge to a base, with drawings that move. It is
-// read before the work, or beside it when a link misbehaves, so it sits here.
-// Its find words are the ideas it teaches ("fresnel", "multipath", "capture
-// effect", "ghost") and the words somebody wanting a lesson types ("learn",
-// "how radio works"). None may start with "the" (nav.mjs holds that no tab
+// 🎓 Radio Propagation (propagation.js) was the third, and has moved to the
+// Knowledge base group with the other lessons: a lesson, not a tool — how a
+// reading travels from a gauge to a base, with drawings that move. Its find
+// words are the ideas it teaches ("fresnel", "multipath", "capture effect",
+// "ghost") and the words somebody wanting a lesson types ("learn", "how radio
+// works"). None of a lesson's may start with "the" (nav.mjs holds that no tab
 // answers to it), and none is "signal", "mobile", "network", "mount" or
-// "decode": filed first, a lesson that tied with the tab a probe in nav.mjs or
-// palette.mjs is asking for would win the tie.
+// "decode": a lesson that tied with the tab a probe in nav.mjs or palette.mjs
+// is asking for must not be the answer.
 const TABS = [
   { group: 'Start here', tabs: [
     { id: 'sitemap',    label: 'Site Map',               icon: '🗂️',
       find: 'guide overview tour index directory contents orientation beginner introduction getting started help what does each every tab do explained' },
     { id: 'offline',    label: 'Offline & Install',      icon: '📲',
       find: 'offline no signal no reception flight mode airplane mode install app add to home screen homescreen icon pwa progressive web app phone tablet saved cache ready set up device update new version' },
-    { id: 'propagation', label: 'Radio Propagation',     icon: '🎓',
-      find: 'learn learning lesson teach tutorial education educational explainer course training basics physics how radio works waves wavefront rf propagation vhf uhf 150 mhz 151.5 wavelength frequency fresnel zone line of sight los multipath echo echoes reflection reflections bounce diffraction bending shadow hills ridge buildings silos trees foliage forest land cover fading null interference constructive destructive phase phasor collision collisions capture effect bit flip flipped bits ghost repeater delay delays timing aloha store and forward simulation 3d three dimensional animation animated earth curvature bulge horizon' },
   ] },
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
@@ -202,7 +200,8 @@ const TABS = [
   ] },
   // A survey is a site visit too, but its three tabs would have made that
   // group eight; filed on their own, the sheet, the level's check and the
-  // refresher sit together.
+  // refresher sit together. The refresher stays here rather than in Knowledge
+  // base: the sheet's own notes open it mid-survey, and that group is full.
   { group: 'Surveying', tabs: [
     { id: 'levels',     label: 'Level Survey',           icon: '📏',
       find: 'levelling leveling level run height survey surveying rise and fall booking level book benchmark bm gauge zero datum ahd lgh assumed reduced level rl change point backsight foresight intermediate staff gauge boards orifice ctr cease to flow ctf misclose closure water check logger offset digital level lcd read reading ocr serial workbook excel xlsx' },
@@ -210,6 +209,26 @@ const TABS = [
       find: 'two peg 2-peg collimation line of sight level check instrument error tilt pegs adjust adjustment' },
     { id: 'surveyguide', label: 'How to Survey',         icon: '📖',
       find: 'how to reference refresher instructions procedure steps levelling reminder booking rise fall datum benchmark two peg' },
+  ] },
+  // Things to learn rather than tools to work with: read before the work, or
+  // beside it when something misbehaves. 🎓 Radio Propagation (from Start here)
+  // is Flood-Net's own lesson; the five after it are Flood-Net re-tellings of Mallee HydroTech's open training
+  // tools, credited on each tab — see knowledge-base.js. Filed after the work
+  // groups and before Admin, so a lesson's find words lose a tie to the tab a
+  // job is done on.
+  { group: 'Knowledge base', tabs: [
+    { id: 'propagation', label: 'Radio Propagation',     icon: '🎓',
+      find: 'learn learning lesson teach tutorial education educational explainer course training basics physics how radio works waves wavefront rf propagation vhf uhf 150 mhz 151.5 wavelength frequency fresnel zone line of sight los multipath echo echoes reflection reflections bounce diffraction bending shadow hills ridge buildings silos trees foliage forest land cover fading null interference constructive destructive phase phasor collision collisions capture effect bit flip flipped bits ghost repeater delay delays timing aloha store and forward simulation 3d three dimensional animation animated earth curvature bulge horizon' },
+    { id: 'kbstaff',    label: 'Staff Simulator',        icon: '🪧',
+      find: 'staff reading levelling staff e staff e pattern crosshair central hair stadia hairs sight length dumpy heat haze shimmer wind gusts rocking rock plumb eyepiece reticle focus drill millimetre simulator' },
+    { id: 'kblogbook',  label: 'Survey Logbook',         icon: '📓',
+      find: 'logbook level book field book booking practice backsight foresight intermediate height of instrument hpc reduced level change point misclose closure arithmetic check cross-section cross section chainage weir recover missing readings' },
+    { id: 'kblifecycle', label: 'Site Lifecycle',        icon: '♻️',
+      find: 'lifecycle site operations routine visit visit priority triage hydrometric gauging rating decommissioning decommission site selection arrival readings departure readings safety assessment risk controls flood operations high flow adcp bubbler dissolved oxygen tipping bucket rain gauge shaft encoder workflow flowchart escalate' },
+    { id: 'kblevel',    label: 'Levelling Day',          icon: '🏞️',
+      find: 'day hydrographer levelling game walkthrough foot screws bubble e-face barcode bm01 weir cross-section close loop height of collimation sdl50 practice day policy tolerance peg spacing' },
+    { id: 'kbriver',    label: 'River Visit Day',        icon: '🛶',
+      find: 'river site visit routine visit hydrographer staff gauge gauge plate gauge board logger offset plate correction raw head gco bubbler hs40 sensor exchange calibration certificate gauging adcp adv flowtracker rating control debris departure arrival spot check discharge' },
   ] },
   // Last, so it sits at the foot of the nav: nobody's daily work, and the one
   // group whose tab the header's load buttons and the Export tab's Data source
@@ -1795,6 +1814,61 @@ const HELP = {
     links: [
       { label: 'Level surveys — the two-peg test', href: 'docs/level-surveys.md#the-two-peg-test' },
     ],
+  },
+
+  kbstaff: {
+    summary: 'Practise reading a levelling staff through a level in seven short modules: the central hair, the stadia hairs and the distance they give, readings at several distances, then <strong>heat haze</strong>, <strong>wind</strong> and <strong>rocking the staff</strong>, and one complete <strong>two-peg test</strong>. Each module explains the idea, then shows an E-pattern staff behind the crosshairs: focus it, type the reading in metres to the millimetre, and it is marked. Adapted from Mallee HydroTech\'s <em>Survey Staff Simulator</em>.',
+    watch: [
+      'Focus the crosshairs first, then the staff. The crosshairs stay focused between examples; the staff needs refocusing each time.',
+      'In the wind and rocking drills any lean makes the reading higher, so book the lowest reading, seen as the staff passes upright.',
+      'In the two-peg drill you must look at Staff B before the answers can be checked. Differences are entered as absolute (positive) values.',
+      'Each tab of the Knowledge base that is adapted from Mallee HydroTech ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+    ],
+    related: ['levels', 'twopeg', 'surveyguide'],
+  },
+
+  kblogbook: {
+    summary: 'The <strong>Survey Logbook</strong> teaches the field book of a level run on one practice gauging station. You book the readings as you take them, reduce them by rise and fall and by height of instrument, recover missing readings, and close the run (ΣBS − ΣFS = ΣRise − ΣFall = last − first, with the misclose against a 1 + √n mm limit). It finishes with a weir cross-section booked from the three hairs. Every cell is marked, and the sums come from the same levelling code as the Level Survey sheet.',
+    watch: [
+      'At a change point, the foresight goes on the old set-up\'s HI and the backsight on the new one; the staff\'s foot stays put until the backsight is booked.',
+      'Rise and fall compares each reading with the previous reading from the same set-up, so after a move it starts again from the new backsight.',
+      'The exercise\'s misclose limit (1 + √n mm) is not the Level Survey sheet\'s default of ±3 mm. Use your site\'s figure.',
+      'Each tab of the Knowledge base that is adapted from Mallee HydroTech ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+    ],
+    related: ['levels', 'surveyguide', 'kbstaff'],
+  },
+
+  kblifecycle: {
+    summary: 'Running a hydrometric monitoring site from start to finish, re-told from Mallee HydroTech\'s <em>Site Operations Lifecycle</em>. Tap a phase on the <strong>lifecycle</strong> drawing (from site selection to decommissioning) for what is done in it and why. Walk a <strong>routine visit</strong> one decision at a time. Then <strong>practise</strong> sorting eight call-outs into urgent, high, planned or lower priority, and review the reasons.',
+    watch: [
+      'It is learning material, not a procedure: anything tagged <em>Your workplace\'s call</em> depends on your organisation, client, equipment or jurisdiction, and the site\'s own procedure comes first.',
+      'The priority answers rest on each scenario\'s stated backup and service assumptions — change an assumption and the priority can change, which is why every card has its full situation.',
+      'The drawings are shortcuts: every phase and step can also be reached from the buttons and the <em>Go to a step</em> list under them. On a phone the drawings scroll sideways inside their own box.',
+      'Each tab of the Knowledge base that is adapted from Mallee HydroTech ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+    ],
+    related: ['inspections', 'maintenance', 'health'],
+  },
+
+  kblevel: {
+    summary: 'A day\'s levelling practice from Mallee HydroTech\'s <em>Hydrographer: A Day on the Level</em>, told one step at a time: set your limits, level the instrument, read an E-face staff, run a two-peg test, then plan, book and close a cross-section of a practice weir. Each step has a drawing and a short task marked as you go, using the game\'s own site, route and tolerances.',
+    watch: [
+      'Nothing here is a real survey — the site is fictional, and the figures are for practice only.',
+      'The two-peg and misclose verdicts follow the policy you save in step 2; with none saved, the honest answer is <em>No tolerance recorded</em>.',
+      'Your step, policy and ticks are kept only in this browser; <strong>New practice</strong> clears them.',
+      'Each tab of the Knowledge base that is adapted from Mallee HydroTech ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+    ],
+    related: ['twopeg', 'levels', 'kbstaff'],
+  },
+
+  kbriver: {
+    summary: 'One routine visit to a river gauging station, step by step: <strong>book the staff gauge and logger before touching anything</strong>, survey the plate from the benchmark, correct it, exchange the sensor that is due for calibration, check the raw head, gauge before clearing the control, then book the departure pair. Each step has a drawing and a practice reading or decision, marked as the original game marks it. Adapted from Mallee HydroTech\'s <em>Hydrographer: A Day on the River</em>.',
+    watch: [
+      '<strong>It is a training fixture, not a station.</strong> Station 425010 Red Gum Reach and every figure are the game\'s own, and its 1 mm, 5 minute and 2 mm limits are the game\'s design assumptions, not an operating standard.',
+      '<strong>Progress stays on this device.</strong> The step, answers and plate position are kept in this browser only; <em>Start the visit again</em> clears them.',
+      '<strong>The level book is Flood-Net\'s arithmetic.</strong> Step 3\'s sums come from the same code as the Level Survey sheet, so the two always agree.',
+      'Each tab of the Knowledge base that is adapted from Mallee HydroTech ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+    ],
+    related: ['inspections', 'camera', 'health'],
   },
 
   surveyguide: {

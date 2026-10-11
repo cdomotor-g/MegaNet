@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 23, date: '2026-10-11', items: [
+      '<strong>📚 Knowledge base</strong>, a new group in the bar on the left, for lessons rather than tools. '
+        + '<strong>🎓 Radio Propagation</strong> has moved into it from <em>Start here</em>.',
+      'Five new lessons in it, adapted with permission from Mallee HydroTech\'s open training tools and credited on each '
+        + 'tab: <strong>🪧 Staff Simulator</strong> (reading a levelling staff, marked as you go), <strong>📓 Survey '
+        + 'Logbook</strong> (keeping and reducing a level book), <strong>♻️ Site Lifecycle</strong> (the life of a '
+        + 'monitoring site, with scenarios to decide), and <strong>🏞️ Levelling Day</strong> and <strong>🛶 River Visit '
+        + 'Day</strong> (a survey day and a routine site visit, step by step).',
+    ] },
     { n: 22, date: '2026-10-09', items: [
       '<strong>📈 Station Health: All stations — sparklines.</strong> A new card lists every sensor heard in the window, a row '
         + 'each — the station\'s number and name, the sensor, and a sparkline of its readings across the same days — with '
