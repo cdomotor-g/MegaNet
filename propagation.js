@@ -250,8 +250,8 @@ const Propagation = (function () {
       <canvas class="rp-sum" id="rp-sum" role="img" aria-label="Three waves drawn one above the other: the direct wave, the echo, and their sum. The figures beside the sliders say the same in numbers."></canvas>
       <p class="rp-readout" id="rp-sum-read">${sumRead()}</p>
       <h4>Standing in front of a wall</h4>
-      <p>Now the whole picture, seen from above: a wave arriving from the left meets a wall along the top and bounces
-        back. Direct and reflected waves cross everywhere, and the sum makes stripes — bands where they reinforce, and
+      <p>Now the whole picture, seen from above: a wave from a far-off transmitter, arriving from the lower left, meets
+        a wall along the top and bounces back as an echo. Direct and reflected waves cross everywhere, and the sum makes stripes — bands where they reinforce, and
         <em>nulls</em> where they cancel, about a metre apart. Drag the receiver (or focus it and use the arrow keys), or
         let it walk towards the wall, and watch the meter: that flicker is what <strong>fading</strong> is. It is why moving
         an antenna a metre can turn a bad site good, and why a car driving past a station can make its signal stutter.</p>
@@ -266,7 +266,7 @@ const Propagation = (function () {
       </div>
       <div class="rp-field-wrap">
         <canvas class="rp-field" id="rp-field" tabindex="0" role="img"
-          aria-label="Top-down view of a wave and its reflection from a wall, with a receiver you can move with the arrow keys. Its signal is read out beside the picture."></canvas>
+          aria-label="Top-down view of a wave from a far-off transmitter at the lower left striking a wall along the top, and its echo, with a receiver you can move with the arrow keys. Its signal is read out beside the picture."></canvas>
         <div class="rp-meter" aria-hidden="true"><span class="rp-meter-fill" id="rp-meter-fill"></span></div>
       </div>
       <div class="button-group">
@@ -335,7 +335,7 @@ const Propagation = (function () {
       </div>
       <label class="rp-check" for="rp-p-curve"><input type="checkbox" id="rp-p-curve" ${p.curve ? 'checked' : ''}
         onchange="Propagation.set('prof.curve', this.checked)">Draw the Earth's curve</label>
-      <canvas class="rp-prof" id="rp-prof" role="img" aria-label="A side view of the path: the repeater on its hill at the left, the gauge in a forest at the right, a ridge between them and the Fresnel zone round the line. The table below gives the numbers."></canvas>
+      <canvas class="rp-prof" id="rp-prof" role="img" aria-label="A side view of the path: the gauge in a forest at the left sending, the repeater on its hill at the right listening, a ridge between them and the Fresnel zone round the line. The table below gives the numbers."></canvas>
       <div class="table-wrap">
         <table class="rp-table" id="rp-prof-table">${profTable()}</table>
       </div>
@@ -386,7 +386,7 @@ const Propagation = (function () {
         <td><strong>${f1(g.fspl + g.diff + g.trees)} dB</strong></td></tr>`;
     }).join('');
     return `<caption>The same path at four frequencies — ${S.prof.km} km, a ridge ${num(S.prof.clear, 0)} m against the line,
-        ${f1(profGeom().canopy, 0)} m of canopy on the way in</caption>
+        ${f1(profGeom().canopy, 0)} m of canopy on the way out</caption>
       <thead><tr><th scope="col">Frequency</th><th scope="col">Wavelength</th><th scope="col">Fresnel zone at the ridge</th>
         <th scope="col">Ridge in zones</th><th scope="col">Bending over</th><th scope="col">Trees</th>
         <th scope="col">Spreading out</th><th scope="col">All three</th></tr></thead>
@@ -844,8 +844,11 @@ const Propagation = (function () {
 
   // The field in front of a wall: a plane wave arriving at `angle` to the
   // wall (along the top edge) and its reflection, as complex amplitudes on a
-  // grid of cells. The picture is 24 m across.
-  const FIELD_W = 24, FIELD_COLS = 192;
+  // grid of cells. The picture is 24 m across; how deep it is depends on the
+  // canvas's shape, so the drawing sets fieldDepth and the meter reads it.
+  // The wall is a hatched band FIELD_WALL px tall across the top.
+  const FIELD_W = 24, FIELD_COLS = 192, FIELD_WALL = 22;
+  let fieldDepth = FIELD_W * 2 / 5;
   function fieldGrid(rows) {
     const key = [S.field.angle, S.field.refl, rows].join('|');
     if (field && field.key === key) return field;
@@ -855,7 +858,8 @@ const Propagation = (function () {
     const cols = FIELD_COLS, cell = FIELD_W / cols;
     const re = new Float32Array(cols * rows), im = new Float32Array(cols * rows);
     // The wall is at y = 0 (top); y grows down, away from it. The incoming
-    // wave travels right and up (towards the wall); the reflection right and down.
+    // wave travels right and up (towards the wall); the reflection right and
+    // down. Time runs as e^{-iωt}, so the drawing's crests move that way too.
     const kx = k * Math.cos(th), ky = k * Math.sin(th);
     const G = S.field.refl;
     let max = 0;
@@ -864,7 +868,7 @@ const Propagation = (function () {
       for (let i = 0; i < cols; i++) {
         const x = (i + 0.5) * cell;
         // incoming e^{i(kx x - ky y)}, reflected −G e^{i(kx x + ky y)}
-        const p1 = kx * x + ky * y, p2 = kx * x - ky * y;
+        const p1 = kx * x - ky * y, p2 = kx * x + ky * y;
         const r = Math.cos(p1) - G * Math.cos(p2), m = Math.sin(p1) - G * Math.sin(p2);
         re[j * cols + i] = r; im[j * cols + i] = m;
         const a = Math.hypot(r, m);
@@ -879,14 +883,13 @@ const Propagation = (function () {
     const lam = PH().wavelengthM();
     const k = 2 * Math.PI / lam;
     const th = S.field.angle * Math.PI / 180;
-    const H = FIELD_W / 2;
-    const ph = 2 * k * Math.sin(th) * yFrac * H;
+    const ph = 2 * k * Math.sin(th) * yFrac * fieldDepth;
     const amp = Math.hypot(1 - S.field.refl * Math.cos(ph), S.field.refl * Math.sin(ph));
     return amp > 1e-9 ? 20 * Math.log10(amp) : -Infinity;
   }
   function fieldRead() {
     const db = fieldAt(S.field.rx);
-    const m = S.field.rx * FIELD_W / 2;
+    const m = S.field.rx * fieldDepth;
     return `The receiver is ${f1(m, 2)} m from the wall: ${dbTxt(db)} against the direct wave alone.
       Nulls come every ${f1(PH().wavelengthM() / (2 * Math.sin(S.field.angle * Math.PI / 180)), 2)} m.`;
   }
@@ -897,8 +900,10 @@ const Propagation = (function () {
     if (!g) return;
     const { ctx, w, h } = g;
     const C = pal();
-    const rows = Math.round(FIELD_COLS * (h / w));
+    const top = FIELD_WALL, fh = h - top;
+    const rows = Math.round(FIELD_COLS * (fh / w));
     const F = fieldGrid(rows);
+    fieldDepth = F.rows * F.cell;
     // Paint the cells into a small image, then stretch it.
     if (!F.img || F.img.height !== rows) {
       F.cv = document.createElement('canvas');
@@ -906,9 +911,9 @@ const Propagation = (function () {
       F.img = F.cv.getContext('2d').createImageData(F.cols, rows);
     }
     const d = F.img.data;
-    const wv = rgbOf(C.wave), wall = rgbOf(C.text);
+    const wv = rgbOf(C.wave);
     const bg = rgbOf(C.panel);
-    const om = time / 260;
+    const om = -time / 260;
     const c = Math.cos(om), s = Math.sin(om);
     for (let q = 0; q < F.cols * rows; q++) {
       let v;
@@ -922,24 +927,42 @@ const Propagation = (function () {
     }
     F.cv.getContext('2d').putImageData(F.img, 0, 0);
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(F.cv, 0, 0, w, h);
-    // The wall.
-    ctx.fillStyle = `rgb(${wall.join(',')})`;
-    ctx.fillRect(0, 0, w, 5);
+    ctx.drawImage(F.cv, 0, top, w, fh);
     ctx.font = '12px system-ui, -apple-system, Segoe UI, sans-serif';
+    // The wall: a hatched band, as a wall is drawn in a plan.
+    ctx.fillStyle = C.subtle;
+    ctx.fillRect(0, 0, w, top);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, w, top); ctx.clip();
+    ctx.strokeStyle = C.muted; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let x = -top; x < w + top; x += 7) { ctx.moveTo(x, top); ctx.lineTo(x + top, 0); }
+    ctx.stroke();
+    ctx.restore();
     ctx.fillStyle = C.text;
-    ctx.fillText('wall', 6, 18);
-    // Where the wave comes from.
+    ctx.fillRect(0, top - 3, w, 3);
+    tag(ctx, C, 'Wall', 8, top / 2 + 4);
+    // The two rays: the direct wave from a far-off transmitter, striking the
+    // wall, and its echo leaving at the same angle, fainter as the wall
+    // reflects less.
     const th = S.field.angle * Math.PI / 180;
-    ctx.strokeStyle = C.text; ctx.lineWidth = 2;
-    const ax = 16, ay = h - 16, L = 44;
-    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + L * Math.cos(th), ay - L * Math.sin(th)); ctx.stroke();
-    ctx.fillText('from the transmitter', ax + 4, ay + 12 > h - 2 ? ay - 4 : ay + 12);
+    const cs = Math.cos(th), sn = Math.sin(th);
+    const hx = Math.max(60, w * 0.24), hy = top;
+    const L = Math.max(30, Math.min(cs > 0.01 ? (hx - 34) / cs : Infinity, (fh - 46) / sn));
+    const tx = hx - L * cs, ty = hy + L * sn;
+    ray(ctx, C, tx, ty, hx, hy - 1, C.text, 1);
+    if (S.field.refl >= 0.05) {
+      const Le = L * 0.6;
+      ray(ctx, C, hx, hy, hx + Le * cs, hy + Le * sn, C.echo, 0.35 + 0.65 * S.field.refl);
+      tag(ctx, C, 'Echo', hx + Le * cs * 0.6 + 10, hy + Le * sn * 0.6 + 4);
+    }
+    tower(ctx, C, tx, ty);
+    tag(ctx, C, w < 560 ? 'Transmitter' : 'From the transmitter, far off', tx + 12, Math.min(h - 6, ty + 18));
     // The receiver, and its path when walking.
-    const rx = w * 0.5, ry = S.field.rx * h;
+    const rx = w * 0.5, ry = top + S.field.rx * fh;
     ctx.setLineDash([4, 4]);
     ctx.strokeStyle = C.muted; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(rx, h); ctx.lineTo(rx, 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rx, h); ctx.lineTo(rx, top); ctx.stroke();
     ctx.setLineDash([]);
     ctx.beginPath(); ctx.arc(rx, ry, 8, 0, Math.PI * 2);
     ctx.fillStyle = C.base; ctx.fill();
@@ -959,6 +982,54 @@ const Propagation = (function () {
     }
   }
 
+  // A label on a pale pill, so it reads over the stripes.
+  function tag(ctx, C, text, x, y) {
+    const tw = ctx.measureText(text).width;
+    ctx.fillStyle = C.panel;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(x - 4, y - 12, tw + 8, 16);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = C.text;
+    ctx.fillText(text, x, y);
+  }
+  // An arrow from (x0, y0) to (x1, y1), haloed so it reads over the stripes.
+  function ray(ctx, C, x0, y0, x1, y1, col, alpha) {
+    const a = Math.atan2(y1 - y0, x1 - x0), hl = 11;
+    const path = () => {
+      ctx.beginPath();
+      ctx.moveTo(x0, y0); ctx.lineTo(x1 - hl * 0.6 * Math.cos(a), y1 - hl * 0.6 * Math.sin(a));
+    };
+    const head = () => {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x1 - hl * Math.cos(a - 0.45), y1 - hl * Math.sin(a - 0.45));
+      ctx.lineTo(x1 - hl * Math.cos(a + 0.45), y1 - hl * Math.sin(a + 0.45));
+      ctx.closePath();
+    };
+    ctx.globalAlpha = alpha;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = C.panel; ctx.lineWidth = 7; path(); ctx.stroke();
+    ctx.lineWidth = 4; head(); ctx.stroke();
+    ctx.strokeStyle = col; ctx.lineWidth = 3; path(); ctx.stroke();
+    ctx.fillStyle = col; head(); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'butt';
+  }
+  // A small mast with waves leaving it, standing for the transmitter.
+  function tower(ctx, C, x, y) {
+    ctx.beginPath(); ctx.arc(x, y, 15, 0, Math.PI * 2);
+    ctx.fillStyle = C.panel; ctx.fill();
+    ctx.strokeStyle = C.text; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x - 6, y + 10); ctx.lineTo(x, y - 7); ctx.lineTo(x + 6, y + 10);
+    ctx.moveTo(x - 4, y + 4); ctx.lineTo(x + 4, y + 4);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y - 8, 2, 0, Math.PI * 2); ctx.fillStyle = C.text; ctx.fill();
+    for (const r of [5, 9]) {
+      ctx.beginPath(); ctx.arc(x, y - 8, r, -Math.PI * 0.75, -Math.PI * 0.25); ctx.stroke();
+    }
+  }
+
   function drawTrace() {
     const g = fit(document.getElementById('rp-trace'));
     if (!g) return;
@@ -975,7 +1046,7 @@ const Propagation = (function () {
       ctx.strokeStyle = C.border; ctx.beginPath(); ctx.moveTo(pad, y(db)); ctx.lineTo(w - 6, y(db)); ctx.stroke();
     }
     ctx.fillText('at the wall', w - 70, h - 4);
-    ctx.fillText(`${FIELD_W / 2} m out`, pad, h - 4);
+    ctx.fillText(`${f1(fieldDepth, 1)} m out`, pad, h - 4);
     ctx.beginPath();
     for (let x = pad; x <= w - 6; x++) {
       const frac = 1 - (x - pad) / (w - 6 - pad);
@@ -1005,7 +1076,10 @@ const Propagation = (function () {
     const P = PH();
     const padL = 10, padR = 10, top = 16, bot = 22;
     const zMax = 680;
-    const X = km => padL + (w - padL - padR) * km / G.L;
+    // Distances run from the repeater, as in profGeom, but the picture is
+    // drawn mirrored: the gauge at the left sends, the repeater on its hill at
+    // the right listens. Radio paths are reciprocal, so the losses are the same.
+    const X = km => padL + (w - padL - padR) * (1 - km / G.L);
     const Y = m => top + (h - top - bot) * (1 - m / zMax);
     const bulge = km => (S.prof.curve ? P.earthBulgeM(km, G.L - km) : 0);
     // The ground: the repeater's hill, the valley, the ridge, the gauge's flat.
@@ -1067,21 +1141,21 @@ const Propagation = (function () {
     ctx.beginPath(); ctx.moveTo(X(0), Y(G.zT)); ctx.lineTo(X(G.L), Y(G.zR));
     ctx.strokeStyle = C.muted; ctx.stroke();
     ctx.setLineDash([]);
-    // Wave crests travelling down the path: dimmer past the ridge by its
-    // loss, dimmer again through the trees; bent round the ridge top when it
-    // blocks the line.
+    // Wave crests leaving the gauge for the repeater: dimmer once through the
+    // trees, dimmer again past the ridge by its loss; bent round the ridge top
+    // when it blocks the line.
     const spacing = { 151.5: 34, 450: 20, 900: 14, 2400: 9 }[S.prof.f] || 20;
-    const pxLen = X(G.L) - X(0);
+    const pxLen = X(0) - X(G.L);
     const shift = (time / 18) % spacing;
     const afterRidge = Math.pow(10, -G.diff / 20);
     for (let s = shift; s < pxLen; s += spacing) {
-      const km = G.L * s / pxLen;
+      const km = G.L * (1 - s / pxLen);
       let a = 1;
-      if (km > ridgeKm) a *= afterRidge;
+      if (km < ridgeKm) a *= afterRidge;
       const f0 = G.L - S.prof.forest / 1000;
-      if (km > f0 && S.prof.forest > 0) {
-        const into = Math.min((km - f0) * 1000, G.canopy);
-        a *= Math.pow(10, -P.foliageDb(into, S.prof.f) / 20);
+      if (S.prof.forest > 0) {
+        const through = Math.min((G.L - Math.max(km, f0)) * 1000, G.canopy);
+        a *= Math.pow(10, -P.foliageDb(through, S.prof.f) / 20);
       }
       const r = Math.max(P.fresnelM(km, G.L - km, S.prof.f), 6);
       const yc = G.lineAt(km);
@@ -1089,7 +1163,7 @@ const Propagation = (function () {
       ctx.globalAlpha = Math.max(0.08, a);
       ctx.lineWidth = 2;
       ctx.beginPath();
-      if (G.h > 0 && km > ridgeKm) {
+      if (G.h > 0 && km < ridgeKm) {
         // Round the ridge top: arcs centred on the edge.
         const cx = X(ridgeKm), cy = Y(ridgeTop);
         const rad = X(km) - cx;
@@ -1111,8 +1185,8 @@ const Propagation = (function () {
       const tw = ctx.measureText(label).width;
       ctx.fillText(label, Math.max(4, Math.min(w - tw - 4, X(km) - tw / 2)), Y(zTop) - 10);
     };
-    mast(0, G.zT, C.repeater, 'Repeater');
-    mast(G.L, G.zR, C.field, 'Gauge');
+    mast(0, G.zT, C.repeater, 'Repeater — listens');
+    mast(G.L, G.zR, C.field, 'Gauge — sends');
     ctx.font = '11px system-ui, -apple-system, Segoe UI, sans-serif';
     ctx.fillStyle = C.muted;
     ctx.fillText(`${G.L} km · heights ×${Math.round((G.L * 1000 / zMax) * ((h - top - bot) / (w - padL - padR)))}`, padL, h - 6);
@@ -1352,7 +1426,8 @@ const Propagation = (function () {
     let dragging = false;
     const setRx = e => {
       const r = fieldCv.getBoundingClientRect();
-      S.field.rx = Math.max(0.02, Math.min(0.98, (e.clientY - r.top) / r.height));
+      const y = (e.clientY - r.top - FIELD_WALL) / Math.max(1, r.height - FIELD_WALL);
+      S.field.rx = Math.max(0.02, Math.min(0.98, y));
       S.field.walking = false;
       const out = document.getElementById('rp-field-read');
       if (out) out.innerHTML = fieldRead();
