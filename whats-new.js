@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 24, date: '2026-10-11', items: [
+      '<strong>📊 Plots: filters per series.</strong> Each series you load has its own filters — the 3-5-7 test, rollovers, '
+        + 'rate limits, quality codes and min/max. With more than one loaded, <em>Filters for</em> at the top of the Filters '
+        + 'panel picks which series you are setting, and <em>Apply to all series</em> copies its settings to the rest.',
+      '<strong>📊 Plots: Horizontal drag.</strong> A new <em>Drag does</em> choice: drag left or right to zoom the time axis to '
+        + 'that span, leaving the vertical axis as it is.',
+      '<strong>📊 Plots: a slimmer toolbar.</strong> The Fixed axis min/max boxes now sit on one line beside the axis buttons, '
+        + 'and the toolbar buttons are shorter, so the chart gets more of the screen.',
+    ] },
     { n: 23, date: '2026-10-11', items: [
       '<strong>📚 Knowledge base</strong>, a new group in the bar on the left, for lessons rather than tools. '
         + '<strong>🎓 Radio Propagation</strong> has moved into it from <em>Start here</em>.',

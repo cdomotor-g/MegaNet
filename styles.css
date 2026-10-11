@@ -11280,6 +11280,10 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
    beside a number box — a station name does not fit in 84 px. Same class, one
    modifier, so the two read as the same kind of row. */
 .ad-cfg-row--block  { display: block; }
+/* Which series the Filters panel is editing, once there is more than one. */
+.ad-cfg-for { margin-bottom: var(--sp-2); }
+.ad-cfg-for .ad-cfg-row > span { display: block; margin-bottom: .2rem; }
+.ad-cfg-for .ad-cfg-note { margin: .3rem 0 0; }
 .ad-cfg-row--spaced { margin-top: var(--sp-1); }
 /* Scoped, because `.ad-cfg-row input` above is (0,1,1) and would otherwise hold
    a station-name box at the 84 px a number box wants. */

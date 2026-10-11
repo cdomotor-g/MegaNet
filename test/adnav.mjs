@@ -719,6 +719,54 @@ try {
   ok('…linked to Tyalgum Bridge, with the preset on', real.station === 'Tyalgum Bridge' && real.preset,
      JSON.stringify(real));
 
+  // ── 10. Filters are per series ────────────────────────────────────────────
+  // Durikai (loaded at the top) and the Tyalgum export each keep their own
+  // settings: a change to one leaves the other alone until Apply to all copies
+  // it across, and a fresh import arrives on the defaults rather than on
+  // whatever the panel was last showing.
+  const per = await page.evaluate(async () => {
+    const A = window.ArroData, ad = A.ad;
+    const ty = ad.series.filter(x => /Tyalgum/.test(x.fileName)).pop();
+    const du = ad.series.find(x => !/Tyalgum/.test(x.fileName));
+    const out = { panelOnTy: ad.cfg === ty.cfg };
+    const tyGood = A.runFilter(ty, ty.cfg).stats.good;
+    A.setCfgFor(du.key);
+    A.resetCfg();
+    A.setCfg('large', 2);
+    out.duChanged = du.cfg.large === 2;
+    out.tyUntouched = ty.cfg.large === 8 && ty.cfg.rateOn && A.runFilter(ty, ty.cfg).stats.good === tyGood;
+    out.picker = document.querySelector('.ad-cfg-for select')?.value === du.key;
+    A.setCfgFor(ty.key);
+    out.panelMoved = ad.cfg === ty.cfg
+      && document.querySelector('.ad-cfg-for select').value === ty.key;
+    A.applyCfgAll();
+    out.applied = du.cfg.large === 8 && du.cfg.rateOn && du.cfg !== ty.cfg
+      && du.cfg.qualCut !== ty.cfg.qualCut;
+    out.sameNote = /filtered the same way/.test(document.querySelector('.ad-cfg-for').textContent);
+    return out;
+  });
+  ok('a change in the panel reaches only the series it is on',
+     per.panelOnTy && per.duChanged && per.tyUntouched, JSON.stringify(per));
+  ok('…the panel can be pointed at either series', per.picker && per.panelMoved, JSON.stringify(per));
+  ok('…and Apply to all copies one series\' filters onto every series',
+     per.applied && per.sameNote, JSON.stringify(per));
+
+  const nBefore = await page.evaluate(() => window.ArroData.ad.series.length);
+  const fresh = ['Reading,Receive,Value,Unit'];
+  for (let i = 0; i < 50; i++) {
+    const d = new Date(Date.UTC(2026, 2, 1) + i * 300000).toISOString().slice(0, 19).replace('T', ' ');
+    fresh.push(`${d},${d},${i},mm`);
+  }
+  await page.setInputFiles('#ad-file', { name: 'per_series_check.csv', mimeType: 'text/csv',
+                                         buffer: Buffer.from(fresh.join('\n')) });
+  await page.waitForFunction(n => window.ArroData.ad.series.length > n, nBefore, { timeout: LOAD_TIMEOUT });
+  const added = await page.evaluate(() => {
+    const ad = window.ArroData.ad, s = ad.series[ad.series.length - 1];
+    return { onIt: ad.cfg === s.cfg, large: s.cfg.large, rateOn: s.cfg.rateOn };
+  });
+  ok('a new import arrives on the defaults, and the panel moves to it',
+     added.onIt && added.large === 7 && !added.rateOn, JSON.stringify(added));
+
   ok('nothing threw', errors.length === 0, errors.join(' | '));
 
   await context.close();
@@ -733,5 +781,5 @@ console.log(failures
     + '       wheel pans sideways and steps evenly, and both the balloon and the\n'
     + '       callout say what the reading did either side of itself; every mark\n'
     + '       kind has its own tick and its own cap; and the demo picker loads\n'
-    + '       Tyalgum with its preset.');
+    + '       Tyalgum with its preset; filters are per series.');
 process.exit(failures ? 1 : 0);

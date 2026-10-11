@@ -273,9 +273,21 @@ const ArroData = (function () {
       source,                  // 'arro' | 'field' — provenance, and never inferred
       series:    [],
       seq:       0,
+      // Filters are per series: every series carries its own `cfg`, and the
+      // Filters panel edits one of them at a time — the one `cfgFor` names, or
+      // the first. `ad.cfg` reads and writes *that* series' settings, so the
+      // panel, its handlers and the 357 explainer all speak about the series on
+      // screen in the panel; everything that filters or draws a series reads
+      // the series' own `s.cfg`. `cfgBase` is what a new series starts from.
       // A fresh qualCut per instance: spreading the defaults copies the array
       // *reference*, and the two tabs would then share one list of ticked codes.
-      cfg:       { ...AD_CFG_DEFAULT, qualCut: [] },
+      cfgBase:   { ...AD_CFG_DEFAULT, qualCut: [] },
+      cfgFor:    null,
+      get cfg() { const s = cfgSeries(this); return s ? s.cfg : this.cfgBase; },
+      set cfg(v) {
+        const s = cfgSeries(this);
+        if (s) { s.cfg = v; s.filt = null; s.tracks = null; } else this.cfgBase = v;
+      },
       view:      null,           // {t0,t1} visible window, ms; null = full extent
       // Filtered, not both (#191). "Both" draws every series twice — the filtered
       // line solid over a ghost of the raw — which is the right picture for the
@@ -357,6 +369,12 @@ const ArroData = (function () {
       demoSet:   'durikai',      // which AD_DEMO_SETS entry the Demo data button loads
     };
   }
+
+  // The series whose filters the panel is editing.
+  function cfgSeries(inst) {
+    return inst.series.find(s => s.key === inst.cfgFor) || inst.series[0] || null;
+  }
+  const copyCfg = c => ({ ...c, qualCut: [...(c.qualCut || [])] });
 
   const instances = { arro: newState('arro'), field: newState('field') };
 
@@ -1054,9 +1072,9 @@ const ArroData = (function () {
   }
 
   function tracks(s) {
-    const key = trackKey(s, ad.cfg);
+    const key = trackKey(s, s.cfg);
     if (s.tracks && s.tracks.key === key) return s.tracks;
-    const f = runFilter(s, ad.cfg);
+    const f = runFilter(s, s.cfg);
     const all = new Int32Array(s.n);
     for (let i = 0; i < s.n; i++) all[i] = i;
     const kept = [];
@@ -1929,8 +1947,9 @@ const ArroData = (function () {
         // The preset goes on only once the series is in: a file that failed to
         // load must not leave the panel set up for a record that is not there.
         if (added && set.cfg) {
+          // Onto the series just added only (the accessor targets it): a
+          // preset is a fact about that gauge, not about whatever else is open.
           inst.cfg = { ...AD_CFG_DEFAULT, ...set.cfg, qualCut: [...(set.cfg.qualCut || [])] };
-          for (const s of inst.series) { s.filt = null; s.tracks = null; }
         }
       } finally { ad = was; }
     } catch (err) {
@@ -2005,8 +2024,13 @@ const ArroData = (function () {
       warn:     data.warn, wasDescending: data.desc,
       bytesPerRow: ident.bytesPerRow || 0,
       filt: null, tracks: null,
+      // Its own filters, from the defaults — a second import is a different
+      // gauge and gets a clean panel, not whatever the first was tuned to.
+      // "Apply to all" in the Filters panel is the way to share one setting.
+      cfg:      copyCfg(ad.cfgBase),
     };
     ad.series.push(s);
+    ad.cfgFor = s.key;
     return s;
   }
 
@@ -3214,7 +3238,7 @@ const ArroData = (function () {
   function seriesHtml() {
     if (!ad.series.length) return '';
     const rows = ad.series.map(s => {
-      const f = runFilter(s, ad.cfg);
+      const f = runFilter(s, s.cfg);
       const st = f.stats;
       const linkTxt = s.station
         ? `<a class="btn-link" href="#" onclick="ArroData.showStation('${escAttr(s.station.id)}');return false"
@@ -3224,7 +3248,7 @@ const ArroData = (function () {
               : 'The filename did not contain a sensor id')}">not linked</span>`;
       const arro = s.station && arroSensorUrl(arroSiteId(s.station), s.sensor?.device_id);
       return `
-        <div class="ad-series${ad.sel === s.key ? ' ad-series--sel' : ''}">
+        <div class="ad-series${ad.series.length > 1 && cfgSeries(ad) === s ? ' ad-series--sel' : ''}">
           <div class="ad-series-top">
             <input type="checkbox" ${s.visible ? 'checked' : ''} title="Show on the chart"
                    aria-label="Show ${escAttr(s.label)} on the chart"
@@ -3277,7 +3301,7 @@ const ArroData = (function () {
             </div>` : ''}
           <div class="small ad-series-meta">
             <span title="Readings kept by the filters">${st.good.toLocaleString()} kept</span> ·
-            <button class="ad-inline-link txt-bad" onclick="ArroData.explain()"
+            <button class="ad-inline-link txt-bad" onclick="ArroData.explain('${s.key}')"
                     title="Readings the 357 test rejected — click for what the test does">${st.bad.toLocaleString()} removed</button> ·
             <span title="Repeat or out-of-sequence timestamps, excluded before filtering">${st.oos.toLocaleString()} repeats</span>
             ${st.range ? ` · <span class="txt-warn" title="Readings outside the minimum / maximum you set">${st.range.toLocaleString()} out of range</span>` : ''}
@@ -3388,8 +3412,27 @@ const ArroData = (function () {
         <div class="ad-filt-body">${body}${note ? `<p class="small ad-cfg-note">${note}</p>` : ''}</div>
       </div>`;
 
-    const unit = ad.series[0]?.unit || 'units';
+    const es = cfgSeries(ad);
+    const unit = es?.unit || 'units';
     const tally = qualityTally();
+    const many = ad.series.length > 1;
+    const same = many && ad.series.every(x => cfgKey(x.cfg, '') === cfgKey(es.cfg, ''));
+    // Which series this panel is editing, when there is a choice. A select
+    // rather than a row of tabs: series labels are long, and the rail is narrow.
+    const forHtml = many ? `
+        <div class="ad-cfg-for">
+          <label class="ad-cfg-row ad-cfg-row--block"><span>Filters for</span>
+            <select aria-label="Which series these filters apply to"
+                    onchange="ArroData.setCfgFor(this.value)">
+              ${ad.series.map(x => `<option value="${escAttr(x.key)}" ${x === es ? 'selected' : ''}>${
+                esc(x.label)}</option>`).join('')}
+            </select></label>
+          <p class="small ad-cfg-note">${same
+            ? 'Every series is filtered the same way.'
+            : 'Each series has its own filters — changes here apply to this one only.'}
+            <button class="ad-inline-link" onclick="ArroData.applyCfgAll()" ${same ? 'disabled' : ''}
+                    title="Copy these settings, ticked quality codes included, to every loaded series">Apply to all series</button></p>
+        </div>` : '';
 
     // One row per code in the file: how many readings carry it, what values they
     // span, and a tick. The counts are the point of the control as much as the
@@ -3421,8 +3464,9 @@ const ArroData = (function () {
             <button class="btn-link" onclick="ArroData.explain()"
                     title="What the 3-5-7 continuity test does, and why it removed what it did">How the 357 filter works</button>
             <button class="btn-link" onclick="ArroData.resetCfg()"
-                    aria-label="Reset every filter to the Bureau's defaults">defaults</button>
+                    aria-label="Reset every filter${many ? ' on this series' : ''} to the Bureau's defaults">defaults</button>
           </span></div>
+        ${forHtml}
 
         ${block('use357', '3-5-7 continuity test',
           'The Bureau\'s continuity filter. Off leaves every reading the other filters kept.',
@@ -3467,7 +3511,7 @@ const ArroData = (function () {
           `The mirror of the one above, and a separate figure on purpose: the fastest
            credible <em>fall</em> at a site is rarely the fastest credible rise — a level
            climbs with the catchment and falls with the channel draining.
-           ${ad.series.some(s => s.kind === 'RA')
+           ${es?.kind === 'RA'
               ? '<b>An accumulator does not normally need this.</b> It cannot fall except '
                 + 'by wrapping or by corruption, and the rollover and 357 tests already own '
                 + 'both — turn it on only to see what it would take.'
@@ -3479,11 +3523,11 @@ const ArroData = (function () {
           'Remove readings by the Data Quality code the exporting system gave them',
           tally.length
             ? `<p class="small ad-filt-lede">
-                 Every code in ${ad.series.length === 1 ? 'this import' : 'these imports'}, with how many
+                 Every code in ${many ? esc(es.label) : 'this import'}, with how many
                  readings carry it and the values they span. Tick the ones to leave out.</p>
                ${qualRows}`
             : `<p class="small ad-filt-lede">No <b>Data Quality</b> column in ${
-                 ad.series.length === 1 ? 'this import' : 'these imports'} — nothing to exclude by.</p>`,
+                 many ? esc(es.label) : 'this import'} — nothing to exclude by.</p>`,
           tally.length
             ? `The exporting system's own verdict, which every other filter here ignores: these
                letters are ARRO's, not this app's, and <b>nothing is removed until you tick one</b>.
@@ -3504,10 +3548,10 @@ const ArroData = (function () {
       </div>`;
   }
 
-  // Every quality code across every loaded series, with its count and the values
-  // it covers. Over `ad.series` rather than `shown()` because one filter panel
-  // governs every import in the tab, and a code that vanished from the list when
-  // a series was unticked would take its exclusion with it invisibly.
+  // Every quality code in the series the Filters panel is editing, with its
+  // count and the values it covers. Filters are per series, so the codes are
+  // too — and the series is the panel's whether or not it is ticked visible, so
+  // an exclusion never vanishes with its row.
   //
   // Sorted by count, commonest first: the code somebody is looking for is nearly
   // always either the bulk of the file or the handful of spikes in it, and
@@ -3515,7 +3559,7 @@ const ArroData = (function () {
   function qualityTally() {
     const cut = new Set((ad.cfg.qualCut || []).map(String));
     const by = new Map();
-    for (const s of ad.series) {
+    for (const s of [cfgSeries(ad)].filter(Boolean)) {
       if (!s.q || !s.qcodes) continue;
       for (let i = 0; i < s.n; i++) {
         const code = String(s.qcodes[s.q[i]] ?? '');
@@ -3721,8 +3765,10 @@ const ArroData = (function () {
       </svg>`;
   }
 
-  function explain() {
-    const c = ad.cfg;
+  // `key` names the series whose settings to quote — a series card's own
+  // "removed" count — and otherwise it is the series the Filters panel is on.
+  function explain(key) {
+    const c = (key && find(key) || {}).cfg || ad.cfg;
     const tweaked = c.small !== 3 || c.medium !== 5 || c.large !== 7;
     Modal.open({
       title: 'How the 357 filter works',
@@ -3859,7 +3905,7 @@ const ArroData = (function () {
         if (y > shi) shi = y;
         sum += y;
       }
-      const f = runFilter(s, ad.cfg);
+      const f = runFilter(s, s.cfg);
       const j0 = lower(s.t, s.n, v.t0), j1 = lower(s.t, s.n, v.t1);
       let cut = 0;
       for (let i = j0; i < j1; i++) if (adCut(f.status[i])) cut++;
@@ -4198,7 +4244,7 @@ const ArroData = (function () {
     if (!box || !box.open || !body) return;
     if (!force && (ad.drag || ad.ovDrag || ad.vovDrag)) return;
     const v = view();
-    const sig = [ad.mode, ad.transform, cfgKey(ad.cfg, 'tbl'),
+    const sig = [ad.mode, ad.transform, ad.series.map(s => cfgKey(s.cfg, 'tbl')).join(';'),
                  v ? `${Math.round(v.t0)}-${Math.round(v.t1)}` : '',
                  shown().map(s => s.key).join(',')].join('|');
     if (!force && sig === ad.tableSig) return;
@@ -4540,7 +4586,7 @@ const ArroData = (function () {
   function compareHtml() {
     const vis = shown();
     const tot  = vis.reduce((a, s) => a + s.n, 0);
-    const kept = vis.reduce((a, s) => a + runFilter(s, ad.cfg).stats.good, 0);
+    const kept = vis.reduce((a, s) => a + runFilter(s, s.cfg).stats.good, 0);
     return `
       <details class="ad-compare" id="ad-compare" ${ad.compare ? 'open' : ''}
                ontoggle="ArroData.compareToggle(this)">
@@ -5055,7 +5101,7 @@ const ArroData = (function () {
   // ── readout / inspector ────────────────────────────────────────────────────
 
   function statusOf(s, i) {
-    const f = runFilter(s, ad.cfg);
+    const f = runFilter(s, s.cfg);
     return f.status[i];
   }
 
@@ -5210,7 +5256,7 @@ const ArroData = (function () {
     // over-allocated buffer would otherwise be given a neighbour made of
     // whatever was left in it.
     if (j < 0 || j >= s.n) return null;
-    const f = runFilter(s, ad.cfg);          // cached on the series by cfg key
+    const f = runFilter(s, s.cfg);          // cached on the series by cfg key
     // `raw` overrides the mode for a point that came off the *raw* layer while
     // the filtered one is also on screen — a removal drawn as a ✕, which the
     // chart plots from s.v. Without it a ✕ hovered either side of a rainfall
@@ -5270,20 +5316,21 @@ const ArroData = (function () {
   }
 
   function pinHtml(s, i) {
-    const f = runFilter(s, ad.cfg);
+    const f = runFilter(s, s.cfg);
     const st = f.status[i];
-    const lim = [bound(ad.cfg.rangeMin) !== null ? `below ${ad.cfg.rangeMin}` : '',
-                 bound(ad.cfg.rangeMax) !== null ? `above ${ad.cfg.rangeMax}` : ''].filter(Boolean).join(' or ');
+    const c = s.cfg;
+    const lim = [bound(c.rangeMin) !== null ? `below ${c.rangeMin}` : '',
+                 bound(c.rangeMax) !== null ? `above ${c.rangeMax}` : ''].filter(Boolean).join(' or ');
     const why = st === AD_GOOD
-        ? (ad.cfg.use357 ? 'Passed the 357 test.'
+        ? (c.use357 ? 'Passed the 357 test.'
                          : 'Kept — the 357 test is switched off, so nothing here was tested for continuity.')
       : st === AD_OOS ? 'Dropped before filtering — this timestamp does not advance the clock, so it is a repeat of an earlier reading rather than a new observation.'
       : st === AD_RANGE ? `Outside the limits you set — anything ${lim || 'outside the range'} is removed before the 357 test runs.`
-      : st === AD_RATE ? `Climbed faster than ${ad.cfg.rateMax} ${s.unit}/h from the reading before it, so it was removed before the 357 test ran.`
-      : st === AD_FALL ? `Dropped faster than ${ad.cfg.fallMax} ${s.unit}/h from the reading before it, so it was removed before the 357 test ran.`
+      : st === AD_RATE ? `Climbed faster than ${c.rateMax} ${s.unit}/h from the reading before it, so it was removed before the 357 test ran.`
+      : st === AD_FALL ? `Dropped faster than ${c.fallMax} ${s.unit}/h from the reading before it, so it was removed before the 357 test ran.`
       : st === AD_QUAL ? `Coded ${s.qcodes[s.q[i]] || '(no code)'} by ${
           ad.source === 'field' ? 'the datastore' : 'ARRO'}, which is one of the codes you are excluding — so it was removed before the 357 test ran and got no vote on its neighbours.`
-      : `Failed the 357 test against the readings that follow it — not within ${ad.cfg.small} of the next, ${ad.cfg.medium} of the next-next, or ${ad.cfg.large} of the one after that.`;
+      : `Failed the 357 test against the readings that follow it — not within ${c.small} of the next, ${c.medium} of the next-next, or ${c.large} of the one after that.`;
     const badge = st === AD_GOOD ? 'ok' : st === AD_OOS ? 'dup'
                 : (st === AD_RANGE || st === AD_RATE || st === AD_FALL || st === AD_QUAL) ? 'warn' : 'bad';
     const rolled = f.rolls.includes(i);
@@ -5497,7 +5544,7 @@ const ArroData = (function () {
     const kinds = markKinds().filter(k => k !== 'rollover' && markOn(k));
     if (!kinds.length) return '';
     const vis = shown();
-    const fs = vis.map(s => runFilter(s, ad.cfg));
+    const fs = vis.map(s => runFilter(s, s.cfg));
     const sig = [g.v.t0, g.v.t1, g.w, g.h, g.padR, g.yr.lo, g.yr.hi,
                  g.yrR ? `${g.yrR.lo},${g.yrR.hi}` : '', kinds.join(), c.bad, c.warn, c.muted,
                  vis.map(s => `${s.key}${s.axis}`).join()].join('|');
@@ -5590,16 +5637,19 @@ const ArroData = (function () {
   // Why a shape cannot currently appear, or '' if it can: the filter that
   // produces it is switched off. Said in the tick's tooltip, and the tick is
   // dimmed, but it keeps its state — see the Mark group in the toolbar.
+  // Filters are per series, so a shape is idle only when no series on the
+  // chart runs the filter that draws it.
   function markIdle(k) {
-    const c = ad.cfg;
+    const cs = (shown().length ? shown() : ad.series).map(s => s.cfg);
+    const any = f => (cs.length ? cs : [ad.cfg]).some(f);
     switch (k) {
-      case 'removed':  return c.use357 ? '' : 'the 3-5-7 test is off';
-      case 'range':    return c.rangeOn ? '' : 'the minimum/maximum filter is off';
-      case 'rate':     return c.rateOn ? '' : 'the rate-of-rise filter is off';
-      case 'fall':     return c.fallOn ? '' : 'the rate-of-fall filter is off';
-      case 'qual':     return c.qualOn && (c.qualCut || []).length ? '' : 'no quality code is being excluded';
-      case 'repeat':   return c.oosOn || c.dedupeOn ? '' : 'repeat timestamps are not being dropped';
-      case 'rollover': return c.rolloverOn ? '' : 'rollover correction is off';
+      case 'removed':  return any(c => c.use357) ? '' : 'the 3-5-7 test is off';
+      case 'range':    return any(c => c.rangeOn) ? '' : 'the minimum/maximum filter is off';
+      case 'rate':     return any(c => c.rateOn) ? '' : 'the rate-of-rise filter is off';
+      case 'fall':     return any(c => c.fallOn) ? '' : 'the rate-of-fall filter is off';
+      case 'qual':     return any(c => c.qualOn && (c.qualCut || []).length) ? '' : 'no quality code is being excluded';
+      case 'repeat':   return any(c => c.oosOn || c.dedupeOn) ? '' : 'repeat timestamps are not being dropped';
+      case 'rollover': return any(c => c.rolloverOn) ? '' : 'rollover correction is off';
     }
     return '';
   }
@@ -5723,7 +5773,7 @@ const ArroData = (function () {
       let d = '', n = 0;
       const seen = new Set();
       for (const s of shown()) {
-        const f = runFilter(s, ad.cfg);
+        const f = runFilter(s, s.cfg);
         for (const i of f.rolls) {
           if (s.t[i] < g.v.t0 || s.t[i] > g.v.t1) continue;
           const px = Math.round(g.x(s.t[i]) * 2) / 2;
@@ -6142,7 +6192,7 @@ const ArroData = (function () {
     const h = Math.round(Math.max(160, Math.min(300, w * 0.62)));
     const sig = [v.t0, v.t1, w, h, ad.transform, ad.chartType, markKinds().map(k => (ad.marks[k] ? 1 : 0)).join(''),
                  ad.yMode, ad.yMin, ad.yMax,
-                 cfgKey(ad.cfg, 'cmp'),
+                 ad.series.map(s => cfgKey(s.cfg, 'cmp')).join(';'),
                  vis.map(s => `${s.key}${s.color}${s.kind}${s.axis}${s.dash}`).join(',')].join('|');
     // The childNodes test matters: re-rendering the main column hands back a
     // pair of empty <svg>s whose inputs have not changed, and a signature check
@@ -6250,7 +6300,7 @@ const ArroData = (function () {
       // The removals belong on the "as recorded" side: that pane is the record
       // they were removed from.
       if (kind === 'raw' && ad.transform === 'value') {
-        const f = runFilter(s, ad.cfg);
+        const f = runFilter(s, s.cfg);
         const j0 = lower(s.t, s.n, v.t0), j1 = lower(s.t, s.n, v.t1);
         // The same per-type ticks as the main chart, and the same per-type
         // budget, smaller: these are circles with a tooltip each, in a pane a
@@ -7202,6 +7252,27 @@ const ArroData = (function () {
     redraw(true);
   }
 
+  // Point the Filters panel at another series. Nothing is filtered differently;
+  // only which settings the panel shows and edits.
+  function setCfgFor(key) {
+    if (!find(key)) return;
+    ad.cfgFor = key;
+    renderSide();
+  }
+
+  // The panel's settings onto every series — the "one filter for the lot"
+  // that used to be the only way, now one click away instead of the default.
+  function applyCfgAll() {
+    const src = cfgSeries(ad);
+    if (!src) return;
+    for (const s of ad.series) {
+      if (s !== src) s.cfg = copyCfg(src.cfg);
+      s.filt = null; s.tracks = null;
+    }
+    redraw(true);
+    note(`${src.label}'s filters applied to all ${ad.series.length} series.`);
+  }
+
   function setMode(v)      { ad.mode = v; renderMainOnly(); }
   function setTransform(v) { ad.transform = v; for (const s of ad.series) s.tracks = null; renderMainOnly(); floodRailFollows(); }
   // Flood lines are drawn on Value only, and a card with some ticked says so —
@@ -7363,7 +7434,7 @@ const ArroData = (function () {
     const lines = [head.join(',')];
     let rows = 0;
     for (const s of vis) {
-      const f = runFilter(s, ad.cfg);
+      const f = runFilter(s, s.cfg);
       for (let i = 0; i < s.n; i++) {
         if (which === 'kept' && f.status[i] !== AD_GOOD) continue;
         const r = [fmtFull(s.t[i]), fmtFull(s.tr[i]), s.v[i], s.unit,
@@ -7395,7 +7466,7 @@ const ArroData = (function () {
     const lines = [head.join(',')];
     let rows = 0;
     for (const s of vis) {
-      const f = runFilter(s, ad.cfg);
+      const f = runFilter(s, s.cfg);
       const e = s.extra || {};
       const p = s.prov || {};
       const roll = p.res && p.res !== 'raw';
@@ -7527,7 +7598,7 @@ const ArroData = (function () {
     // Editing readings (#191), and the selection it works over
     pickToggle, pickClear, pickAllInView, editValue, editQuality, editDelete,
     revertSeries, setEditVal, setEditQ, editCell, openTableModal, closeTableModal,
-    preset, unpin, exportCsv, exportImg, explain, compareToggle, tableToggle, dropAll,
+    preset, unpin, setCfgFor, applyCfgAll, exportCsv, exportImg, explain, compareToggle, tableToggle, dropAll,
     // the Field Data tab (#114)
     fieldSetStation, fieldToggleSensor, fieldAllSensors, fieldSetWindow,
     fieldSetRes, fieldSetDate, fieldRun, fieldClearError,
