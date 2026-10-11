@@ -61,40 +61,95 @@ const KbRiver = (function () {
     return `<svg class="kr-svg ${cls}" viewBox="${viewBox}" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title>${inner}</svg>`;
   }
 
-  // The site as the game lays it out (its world plan, scaled down): the track
-  // from the vehicle to the benchmark, the shelter and the river; the far bank
-  // reached only at the crossing; the long grass the snake lives in.
+  // ── The site plan ─────────────────────────────────────────────────────────
+  // North up, the river running north to south, drawn from the game's own
+  // geometry (its section-geometry.ts and site.ts), in metres: x east, z
+  // south, the game's world origin near the staff gauge. BANKS is the water's
+  // edge at the visit's stage (0.456 m) every 2 m down the reach — [z, west,
+  // east] — worked from the game's channel centre, half-width and bank-slope
+  // functions; TRACK_UP is its bank track, 2 m back from the west bank, from
+  // the staff gauge up to the wading section. Computed once from the game's
+  // functions and kept as figures, so nothing here re-runs its terrain model.
+  const BANKS = [[-68,14.4,27.5],[-66,12.7,25.9],[-64,11.1,24.3],[-62,9.4,22.7],[-60,7.8,21.1],[-58,6.3,19.5],[-56,4.7,17.9],[-54,3.2,16.4],[-52,1.6,14.7],[-50,0.1,12.9],[-48,-1.2,11],[-46,-2.4,8.1],[-44,-3.3,6.5],[-42,-4.1,5.6],[-40,-4.6,5.5],[-38,-4.9,5.7],[-36,-4.9,5.6],[-34,-4.8,5.7],[-32,-4.6,5.7],[-30,-4.3,5.7],[-28,-4.1,5.9],[-26,-3.9,6.2],[-24,-3.6,6.4],[-22,-3.4,6.6],[-20,-3.2,6.9],[-18,-3,7.1],[-16,-2.7,7.3],[-14,-2.5,7.5],[-12,-2.3,7.7],[-10,-2.1,7.9],[-8,-1.9,8],[-6,-1.7,8.1],[-4,-1.2,8],[-2,-1,8.3],[0,-0.8,8.6],[2,-0.6,8.9],[4,-0.3,9.1],[6,0,9.3],[8,0.1,9.7],[10,0.3,10],[12,2.2,8.9],[14,0.8,10.1],[16,1,10.3],[18,1.2,10.8],[20,1.5,11.1],[22,1.7,11.4]];
+  const TRACK_UP = [[-2.1,-1.1],[-2.5,-5.1],[-3.1,-9.1],[-3.6,-13.1],[-4,-17.1],[-4.5,-21.1],[-4.9,-25.1],[-5.4,-29.1],[-5.9,-33.1],[-6.1,-37.1],[-5.6,-41.1],[-4.3,-45.1],[-2.2,-49.1],[0.6,-53.1],[3.8,-57.1],[4.5,-58]];
+  // [x, z, label, label anchor ('l' left of the point, 'r' in the right-hand
+  // margin with a leader, 'b' below)]
   const SITES = {
-    vehicle: [57.5, 51.7, 'Vehicle', 57.5, 62, 'middle'],
-    benchmark: [90.7, 48.6, 'BMGS425010', 90.7, 42, 'middle'],
-    shelter: [111.9, 67.5, 'Shelter', 104, 74, 'end'],
-    tbm: [120.4, 78.3, 'TBM 01', 116, 88, 'end'],
-    gauge: [154, 104.3, 'Staff gauge', 145, 107, 'end'],
-    shallow: [163.6, 47.8, 'Wading (ADV)', 203, 46, 'start'],
-    deep: [158.7, 80.3, 'Deep (ADCP)', 215, 84, 'start'],
-    control: [161.7, 124.3, 'Control', 154, 127, 'end'],
+    vehicle:   [-13, 9, 'Vehicle', 'b'],
+    benchmark: [-18.4, -12.9, 'BMGS425010', 'bl'],
+    shelter:   [-8.5, -3, 'Shelter', 'lb'],
+    tbm:       [0, 5.5, 'TBM 01', 'l'],
+    gco:       [-2.6, -2.7, 'GCO', 'r'],
+    gauge:     [-1.65, -1.1, 'Staff gauge', 'r'],
+    shallow:   [5.2, -58, 'Wading section', 'r'],
+    deep:      [-2.4, -9.1, 'Gauging section', 'r'],
+    control:   [2, 11.8, 'Bedrock control', 'r'],
   };
+  // Where each section crosses the water, and the rock bar's extent.
+  const SECTIONS = { shallow: [-58, 6.3, 19.5], deep: [-9.1, -2.0, 7.9] };
+  const BAR = { z0: 10.5, z1: 13.4, x0: 0.6, x1: 10.4 };
+  const PX = x => +(40 + (x + 22) * 3.4).toFixed(1);
+  const PY = z => +(10 + (z + 68) * 3.4).toFixed(1);
+
   function siteMap(here = []) {
-    const west = [[183, 0], [162.5, 19.2], [169.6, 38.3], [165.4, 57.5], [164.2, 76.7], [155.8, 95.8], [160.4, 114.6], [164.6, 124.3], [177.9, 133.9], [199.2, 152.9]];
-    const east = [[195.8, 0], [193.3, 19.2], [192.5, 38.3], [195.8, 57.5], [207.5, 76.7], [213.3, 95.8], [224.2, 114.6], [228.3, 124.3], [235.4, 133.9], [254.6, 152.9]];
-    const river = [...west, ...east.reverse()].map(p => p.join(',')).join(' ');
+    const pt = ([x, z]) => `${PX(x)},${PY(z)}`;
+    const water = [...BANKS.map(([z, w]) => pt([w, z])), ...BANKS.slice().reverse().map(([z, , e]) => pt([e, z]))].join(' ');
+    const westEdge = BANKS.map(([z, w]) => pt([w, z])).join(' ');
+    const eastEdge = BANKS.map(([z, , e]) => pt([e, z])).join(' ');
     const S = SITES;
-    const track = [['vehicle', 'benchmark'], ['benchmark', 'shelter'], ['shelter', 'deep'], ['deep', 'shallow'], ['shelter', 'gauge'], ['gauge', 'control']]
-      .map(([a, b]) => `<line x1="${S[a][0]}" y1="${S[a][1]}" x2="${S[b][0]}" y2="${S[b][1]}" class="kr-track"/>`).join('');
-    const leaders = ['shallow', 'deep'].map(k => `<line x1="${S[k][0]}" y1="${S[k][1]}" x2="${S[k][3] - 2}" y2="${S[k][4] - 3}" class="kr-leader"/>`).join('');
-    const marks = Object.entries(S).map(([k, [x, y, lab, lx, ly, a]]) => {
-      const on = here.includes(k);
-      return `${on ? `<circle cx="${x}" cy="${y}" r="6" class="kr-here"/>` : ''}<circle cx="${x}" cy="${y}" r="2.4" class="kr-pt${on ? ' kr-pt-on' : ''}"/>
-        <text x="${lx}" y="${ly}" text-anchor="${a}" class="kr-ts${on ? ' kr-tb' : ''}">${lab}</text>`;
+    const at = k => [S[k][0], S[k][1]];
+    const track = [
+      [[-10.6, 10.2], at('vehicle'), [-9, 4], at('shelter'), at('benchmark')],
+      [at('shelter'), at('gauge'), ...TRACK_UP.map(([x, z]) => [x, z])],
+      [at('gauge'), at('tbm'), [-0.7, 9], at('control')],
+    ].map(line => `<polyline points="${line.map(pt).join(' ')}" class="kr-track"/>`).join('');
+    // The long grass beside the bank track, between it and the benchmark —
+    // the game's snake lies 3 m west of the bank, at z −15.
+    const grass = [[-15, -12.4], [-9, -11.9], [-4.7, -13], [-4.6, -19], [-7, -22.5], [-13, -22], [-16.2, -17.6]];
+    const sec = Object.entries(SECTIONS).map(([k, [z, w, e]]) =>
+      `<line x1="${PX(w)}" y1="${PY(z)}" x2="${PX(e)}" y2="${PY(z)}" class="kr-secline${here.includes(k) ? ' kr-secline-on' : ''}"/>`).join('');
+    let ry = { shallow: 40, deep: 206, gco: 222, gauge: 240, control: 270 };
+    const marks = Object.entries(S).map(([k, [x, z, lab, side]]) => {
+      const on = here.includes(k), cx = PX(x), cy = PY(z);
+      let t;
+      if (side === 'r') {
+        const y = ry[k];
+        t = `<polyline points="${cx + 3},${cy} ${k === 'shallow' || k === 'deep' ? PX(SECTIONS[k][2]) + 2 : cx + 8},${k === 'shallow' || k === 'deep' ? cy : y} 226,${y}" class="kr-leader"/>
+          <text x="229" y="${y + 2.5}" class="kr-ts${on ? ' kr-tb' : ''}">${lab}</text>`;
+      } else if (side === 'l') {
+        t = `<text x="${cx - 5}" y="${cy + 2.5}" text-anchor="end" class="kr-ts${on ? ' kr-tb' : ''}">${lab}</text>`;
+      } else if (side === 'bl') {
+        t = `<text x="4" y="${cy + 12}" class="kr-ts${on ? ' kr-tb' : ''}">${lab}</text>`;
+      } else if (side === 'lb') {
+        t = `<text x="${cx - 4}" y="${cy + 9}" text-anchor="end" class="kr-ts${on ? ' kr-tb' : ''}">${lab}</text>`;
+      } else {
+        t = `<text x="${Math.max(cx, 26)}" y="${cy + 10}" text-anchor="middle" class="kr-ts${on ? ' kr-tb' : ''}">${lab}</text>`;
+      }
+      return `${on ? `<circle cx="${cx}" cy="${cy}" r="5.5" class="kr-here"/>` : ''}<circle cx="${cx}" cy="${cy}" r="2.2" class="kr-pt${on ? ' kr-pt-on' : ''}"/>${t}`;
     }).join('');
-    return svg(`Site plan of ${F.name}: the track from the vehicle past benchmark BMGS425010 to the shelter, TBM 01 and the staff gauge on the near bank; the wading and deep gauging sections upstream, the control downstream, the crossing below it, long grass off the track.${here.length ? ` This step: ${here.map(k => S[k][2]).join(', ')}.` : ''}`,
-      '40 20 222 128', `
-      <polygon points="${river}" class="kr-water"/>
-      <rect x="158.3" y="120.8" width="93.3" height="12.1" class="kr-crossing"/>
-      <text x="212" y="141" text-anchor="middle" class="kr-ts">Crossing</text>
-      <ellipse cx="142" cy="30" rx="16" ry="7" class="kr-grass"/>
-      <text x="142" y="32.5" text-anchor="middle" class="kr-ts">long grass</text>
-      ${track}${leaders}${marks}`, 'kr-map');
+    const label = `Site plan of ${F.name}, north up, the river running north to south: the vehicle and the shelter on the west bank, `
+      + 'benchmark BMGS425010 north-west of the shelter, the staff gauge and the GCO at the water\'s edge below the shelter and TBM 01 '
+      + 'downstream of them; the bank track runs up the west bank to the wading section 57 m upstream, past the gauging section 8 m '
+      + 'upstream of the gauge; long grass lies between the track and the benchmark; the bedrock control crosses the river 13 m below '
+      + `the gauge, and the crossing is on it.${here.length ? ` This step: ${here.map(k => S[k][2]).join(', ')}.` : ''}`;
+    return svg(label, '0 0 330 324', `
+      <polygon points="${grass.map(pt).join(' ')}" class="kr-grass"/>
+      <text x="${PX(-10.2)}" y="${PY(-17.4)}" text-anchor="middle" class="kr-ts">long</text>
+      <text x="${PX(-10.2)}" y="${PY(-17.4) + 8}" text-anchor="middle" class="kr-ts">grass</text>
+      <polygon points="${water}" class="kr-water"/>
+      <polyline points="${westEdge}" class="kr-edge"/><polyline points="${eastEdge}" class="kr-edge"/>
+      <rect x="${PX(BAR.x0)}" y="${PY(BAR.z0)}" width="${(PX(BAR.x1) - PX(BAR.x0)).toFixed(1)}" height="${(PY(BAR.z1) - PY(BAR.z0)).toFixed(1)}" class="kr-rockbar${here.includes('control') ? ' kr-rockbar-on' : ''}"/>
+      <text x="${PX(BAR.x1) + 3}" y="${PY(BAR.z1) + 9}" class="kr-ts">the crossing</text>
+      ${sec}${track}
+      <path d="M${PX(2.6)} ${PY(-36)} v18 m-4 -6 l4 6 l4 -6" class="kr-flow"/>
+      <path d="M${PX(5.6)} ${PY(15.5)} v14 m-4 -6 l4 6 l4 -6" class="kr-flow"/>
+      <text x="${PX(2.6) + 7}" y="${PY(-28)}" class="kr-ts">flow</text>
+      <path d="M16 30 V12 M12 18 L16 12 L20 18" class="kr-north"/><text x="16" y="40" text-anchor="middle" class="kr-ts kr-tb">N</text>
+      <line x1="10" y1="316" x2="${10 + 34}" y2="316" class="kr-scale"/><text x="48" y="318.5" class="kr-ts">10 m</text>
+      ${marks}
+      <text x="229" y="${ry.shallow + 11}" class="kr-ts">13 m wide, 0.35 m deep</text>
+      <text x="229" y="${ry.deep + 11}" class="kr-ts">10 m wide, 1.4 m deep</text>
+      <text x="229" y="${ry.control + 11}" class="kr-ts">crest 0.40 m</text>`, 'kr-map');
   }
 
   // A 0–1 m flat staff-gauge plate (10 mm divisions, as the original's
@@ -210,38 +265,101 @@ const KbRiver = (function () {
       <text x="4" y="${Y(F.orifice) + 3}" class="kr-ts">orifice −0.250</text>`);
   }
 
+  // ── The two gauging sections, across the river ──────────────────────────
+  // Each as the game shapes it — its GAUGING_REACHES (a flat bed between
+  // banks that rise to 1.49 m over 3.5 m) — sampled every 0.5 m across, in
+  // metres from the channel's centre, west negative. Drawn looking
+  // downstream, so the left bank (east) is on the left, both to one scale:
+  // 7 px a metre across, 35 px a metre up — the vertical stretched five times.
+  const WADE = [[-10,1.49],[-9.5,1.49],[-9,1.49],[-8.5,1.427],[-8,1.239],[-7.5,0.974],[-7,0.68],[-6.5,0.405],[-6,0.198],[-5.5,0.107],[-5,0.106],[-4.5,0.106],[-4,0.106],[-3.5,0.106],[-3,0.106],[-2.5,0.106],[-2,0.106],[-1.5,0.106],[-1,0.106],[-0.5,0.106],[0,0.106],[0.5,0.106],[1,0.106],[1.5,0.106],[2,0.106],[2.5,0.106],[3,0.106],[3.5,0.106],[4,0.106],[4.5,0.106],[5,0.106],[5.5,0.107],[6,0.198],[6.5,0.405],[7,0.68],[7.5,0.974],[8,1.239],[8.5,1.427],[9,1.49],[9.5,1.49],[10,1.49]];
+  const DEEP = [[-10,1.49],[-9.5,1.49],[-9,1.49],[-8.5,1.49],[-8,1.49],[-7.5,1.49],[-7,1.49],[-6.5,1.489],[-6,1.329],[-5.5,0.964],[-5,0.481],[-4.5,-0.037],[-4,-0.503],[-3.5,-0.834],[-3,-0.944],[-2.5,-0.944],[-2,-0.944],[-1.5,-0.944],[-1,-0.944],[-0.5,-0.944],[0,-0.944],[0.5,-0.944],[1,-0.944],[1.5,-0.944],[2,-0.944],[2.5,-0.944],[3,-0.944],[3.5,-0.834],[4,-0.503],[4.5,-0.037],[5,0.481],[5.5,0.964],[6,1.329],[6.5,1.489],[7,1.49],[7.5,1.49],[8,1.49],[8.5,1.49],[9,1.49],[9.5,1.49],[10,1.49]];
   function gaugingSvg() {
-    return svg('Two gauging sections in cross-section. Left, the wading section: max depth 0.35 m, velocity 0.40 m/s, firm bed — an ADV (FlowTracker2) on a wading rod. Right, the deep section: max depth 1.4 m — an ADCP on a tethered float, after its configuration and moving-bed checks.',
-      '0 0 300 150', `
-      <path d="M8 46 Q70 78 132 46 Z" class="kr-water"/><path d="M8 46 H132" class="kr-wline"/>
-      <path d="M2 38 L8 46 Q70 78 132 46 L138 38" class="kr-ground"/>
-      <line x1="70" y1="20" x2="70" y2="62" class="kr-leg"/><rect x="66" y="55" width="12" height="5" class="kr-inst"/>
-      <circle cx="58" cy="16" r="4" class="kr-person"/><path d="M58 20 V40 M58 40 L52 56 M58 40 L64 56 M58 26 L70 30" class="kr-leg"/>
-      <text x="70" y="84" text-anchor="middle" class="kr-ts kr-tb">Wading section · ADV</text>
-      <text x="70" y="96" text-anchor="middle" class="kr-ts">depth 0.35 m · 0.40 m/s</text>
-      <path d="M158 46 Q226 130 294 46 Z" class="kr-water"/><path d="M158 46 H294" class="kr-wline"/>
-      <path d="M152 38 L158 46 Q226 130 294 46 L298 38" class="kr-ground"/>
-      <path d="M212 40 H240 L236 47 H216 Z" class="kr-inst"/>
-      <path d="M220 47 L208 80 M232 47 L244 80" class="kr-beam"/>
-      <path d="M152 36 Q190 30 214 40" class="kr-tube"/>
-      <text x="226" y="112" text-anchor="middle" class="kr-ts kr-tb">Deep section · ADCP</text>
-      <text x="226" y="124" text-anchor="middle" class="kr-ts">max depth 1.4 m</text>`);
+    const panel = (prof, ox, o) => {
+      const X = x => +(ox + (10 - x) * 7).toFixed(1);      // looking downstream: east (x > 0) on the left
+      const Y = el => +(22 + (1.6 - el) * 35).toFixed(1);
+      const bed = prof.map(([x, el]) => `${X(x)},${Y(el)}`).join(' ');
+      const [wL, wR] = o.edges;                               // wet edges, east then west
+      const wl = Y(F.stage);
+      return `<polygon points="${bed} ${X(10)},${Y(-1.15)} ${X(-10)},${Y(-1.15)}" class="kr-bank"/>
+        <polygon points="${X(wL)},${wl} ${prof.filter(([x, el]) => el < F.stage && x <= wL && x >= wR).reverse().map(([x, el]) => `${X(x)},${Y(el)}`).join(' ')} ${X(wR)},${wl}" class="kr-water"/>
+        <line x1="${X(wL)}" y1="${wl}" x2="${X(wR)}" y2="${wl}" class="kr-wline"/>
+        <polyline points="${bed}" class="kr-bed"/>
+        ${o.inst(X, Y)}
+        <line x1="${X(wL)}" y1="${wl - 7}" x2="${X(wR)}" y2="${wl - 7}" class="kr-dim"/>
+        <line x1="${X(wL)}" y1="${wl - 10}" x2="${X(wL)}" y2="${wl - 4}" class="kr-dim"/><line x1="${X(wR)}" y1="${wl - 10}" x2="${X(wR)}" y2="${wl - 4}" class="kr-dim"/>
+        <text x="${ox + 70}" y="${wl - 10}" text-anchor="middle" class="kr-ts kr-mono">${o.width}</text>
+        <text x="${ox + 2}" y="${Y(1.49) - 4}" class="kr-ts">LB</text><text x="${ox + 138}" y="${Y(1.49) - 4}" text-anchor="end" class="kr-ts">RB</text>
+        <text x="${ox + 70}" y="12" text-anchor="middle" class="kr-ts kr-tb">${o.title}</text>
+        <text x="${ox + 70}" y="${Y(-1.15) + 12}" text-anchor="middle" class="kr-ts">${o.note}</text>`;
+    };
+    const wade = panel(WADE, 6, {
+      title: 'Wading section · ADV', width: '13.2 m', edges: [6.6, -6.7], note: 'max depth 0.35 m · 0.40 m/s',
+      inst: (X, Y) => {
+        // Verticals across the section; the rod at one of them, the ADV probe at 0.6 of the depth below the surface.
+        let v = '';
+        for (let x = -6; x <= 6; x += 1) v += `<line x1="${X(x)}" y1="${Y(F.stage)}" x2="${X(x)}" y2="${Y(0.106)}" class="kr-vertical"/>`;
+        return `${v}<line x1="${X(-1)}" y1="${Y(1.2)}" x2="${X(-1)}" y2="${Y(0.106)}" class="kr-rod"/>
+          <rect x="${X(-1) - 3}" y="${Y(F.stage - 0.6 * 0.35) - 1.5}" width="7" height="3" class="kr-inst"/>
+          <text x="${X(-1) - 4}" y="${Y(1.2) + 2}" text-anchor="end" class="kr-ts">wading rod</text>`;
+      },
+    });
+    const deep = panel(DEEP, 168, {
+      title: 'Gauging section · ADCP', width: '9.9 m', edges: [4.96, -4.98], note: 'max depth 1.40 m',
+      inst: (X, Y) => `<path d="M${X(0.4) - 9} ${Y(F.stage) - 3} h18 l-3 4 h-12 z" class="kr-inst"/>
+          <path d="M${X(0.4) - 3} ${Y(F.stage) + 1} L${X(0.4) - 16} ${Y(-0.944)} M${X(0.4) + 3} ${Y(F.stage) + 1} L${X(0.4) + 16} ${Y(-0.944)}" class="kr-beam"/>
+          <path d="M${X(0.4) + 9} ${Y(F.stage) - 2} Q${X(-4)} ${Y(F.stage) - 14} ${X(-7.5)} ${Y(1.49)}" class="kr-tube"/>
+          <text x="${X(-2.6)}" y="${Y(F.stage) - 20}" text-anchor="middle" class="kr-ts">tether</text>`,
+    });
+    return svg('The two gauging sections across the river, looking downstream, to one scale (the vertical stretched five times). '
+      + 'Left, the wading section 57 m upstream of the gauge: 13.2 m wide at the water, a flat firm bed 0.35 m under it, flowing at about 0.40 m/s, '
+      + 'gauged with an ADV on a wading rod, vertical by vertical. Right, the gauging section 8 m upstream of the gauge: 9.9 m wide, 1.40 m deep '
+      + 'over its flat bed, gauged with an ADCP on a float tethered from the bank. Both have the water at 0.456 m on the gauge.',
+      '0 0 330 150', `${wade}${deep}
+      <text x="165" y="146" text-anchor="middle" class="kr-ts">looking downstream · vertical ×5</text>`);
   }
 
+  // ── The control, along the river ────────────────────────────────────────
+  // A long-section down the channel's centre line, flow left to right, from
+  // the game's bed (LONG: [z, level]; the gauge is at z −1.1, the bedrock bar's
+  // crest, 0.40 m, at z 12) and its water: the pool standing level back past
+  // the gauge and the gauging section, falling over the bar to 0.19 m below
+  // it. 9 px a metre along, 80 px a metre up — the vertical stretched nine
+  // times, so the 50 mm the log holds the pool up can be seen at all.
+  const LONG = [[-12,-0.944],[-11,-0.944],[-10,-0.944],[-9,-0.944],[-8,-0.944],[-7,-0.944],[-6,-0.936],[-5,-0.915],[-4,-0.882],[-3,-0.84],[-2,-0.791],[-1,-0.738],[0,-0.682],[1,-0.626],[2,-0.573],[3,-0.524],[4,-0.482],[5,-0.449],[6,-0.428],[7,-0.42],[8,-0.42],[9,-0.42],[9.25,-0.42],[9.5,-0.42],[9.75,-0.42],[10,-0.412],[10.25,-0.365],[10.5,-0.226],[10.75,-0.007],[11,0.201],[11.25,0.332],[11.5,0.386],[11.75,0.399],[12,0.4],[12.25,0.399],[12.5,0.387],[12.75,0.335],[13,0.213],[13.25,0.019],[13.5,-0.194],[13.75,-0.343],[14,-0.405],[14.25,-0.419],[14.5,-0.42],[14.75,-0.42],[15,-0.42],[16,-0.42],[17,-0.42],[18,-0.42],[19,-0.42],[20,-0.42],[21,-0.42],[22,-0.42]];
   function controlSvg() {
-    const Y = rl => 140 - (rl - 0.25) * 500;
-    return svg('The control, side on, looking across the river: a bedrock bar with a loose log lying on it. With the log, the pool upstream stands at 0.456 m on the gauge, spilling over the log; once the log is removed and the pool has drained and settled, it stands at 0.406 m — 50 mm lower.',
-      '0 0 300 150', `
-      <path d="M0 ${Y(F.stage)} H158 Q176 ${Y(F.stage)} 186 ${Y(0.42)} Q205 ${Y(0.3)} 300 ${Y(0.27)} V150 H0 Z" class="kr-water"/>
-      <path d="M0 ${Y(F.stage)} H158 Q176 ${Y(F.stage)} 186 ${Y(0.42)} Q205 ${Y(0.3)} 300 ${Y(0.27)}" class="kr-wline"/>
-      <line x1="0" y1="${Y(F.settled)}" x2="166" y2="${Y(F.settled)}" class="kr-settled"/>
-      <path d="M0 146 L120 140 L158 ${Y(0.38)} L192 ${Y(0.38)} L215 ${Y(0.3)} L300 ${Y(0.26)} V150 H0 Z" class="kr-rock"/>
-      <circle cx="174" cy="${Y(0.38) - 11}" r="11" class="kr-log"/>
-      <text x="6" y="${Y(F.stage) - 5}" class="kr-ts kr-mono">with the log 0.456</text>
-      <text x="6" y="${Y(F.settled) + 12}" class="kr-ts kr-mono">log removed, settled 0.406</text>
-      <text x="196" y="${Y(0.38) - 18}" class="kr-ts kr-tb">loose log</text>
-      <text x="226" y="146" class="kr-ts">bedrock bar</text>
-      <text x="294" y="14" text-anchor="end" class="kr-ts">flow →</text>`);
+    const X = z => +(8 + (z + 12) * 9).toFixed(1);
+    const Y = el => +(22 + (0.75 - el) * 80).toFixed(1);
+    const TAIL = 0.19;
+    const surf = lvl => [[-12, lvl], [12, lvl], [12.6, lvl - (lvl - TAIL) * 0.11], [13.2, lvl - (lvl - TAIL) * 0.44], [13.8, TAIL], [22, TAIL]];
+    const bed = LONG.map(([z, el]) => `${X(z)},${Y(el)}`).join(' ');
+    const water = surf(F.stage);
+    const wpoly = `${water.map(([z, el]) => `${X(z)},${Y(el)}`).join(' ')} ${LONG.slice().reverse().map(([z, el]) => `${X(z)},${Y(el)}`).join(' ')}`;
+    const crest = Y(0.4);
+    return svg('Long-section down the river through the control, flow left to right, the vertical stretched nine times. The pool upstream '
+      + 'is 1.4 m deep at the gauging section and shoals towards a bedrock bar whose crest is at 0.40 m on the gauge; below the bar the '
+      + 'water falls to 0.19 m. A loose log lies across the crest. With it there, the pool — and so the staff gauge, 13 m upstream — '
+      + 'stands at 0.456 m; once the log is removed and the pool has drained and settled, it stands at 0.406 m, 50 mm lower, just over the crest.',
+      '0 0 330 190', `
+      <polygon points="${wpoly}" class="kr-water"/>
+      <polygon points="${bed} ${X(22)},178 ${X(-12)},178" class="kr-bank"/>
+      <polyline points="${bed}" class="kr-bed"/>
+      <path d="${LONG.filter(([z]) => z >= 10 && z <= 14).map(([z, el], i) => `${i ? 'L' : 'M'}${X(z)} ${Y(el)}`).join(' ')}" class="kr-rockedge"/>
+      <polyline points="${water.map(([z, el]) => `${X(z)},${Y(el)}`).join(' ')}" class="kr-wline"/>
+      <line x1="${X(-12)}" y1="${Y(F.settled)}" x2="${X(12.2)}" y2="${Y(F.settled)}" class="kr-settled"/>
+      <ellipse cx="${X(12)}" cy="${crest - 5}" rx="6" ry="5" class="kr-log"/>
+      <line x1="${X(-1.1)}" y1="${Y(0.72)}" x2="${X(-1.1)}" y2="${Y(-0.1)}" class="kr-gaugepost"/>
+      <text x="${X(-1.1) + 4}" y="${Y(0.72) + 6}" class="kr-ts">staff gauge</text>
+      <line x1="${X(-9.1)}" y1="${Y(0.72)}" x2="${X(-9.1)}" y2="${Y(-0.944)}" class="kr-datum"/>
+      <text x="${X(-9.1) + 3}" y="${Y(0.72) + 6}" class="kr-ts">gauging section</text>
+      <text x="${X(-0.4)}" y="${Y(F.stage) - 4}" class="kr-ts kr-mono">0.456 with the log</text>
+      <text x="${X(-0.4)}" y="${Y(F.settled) + 10}" class="kr-ts kr-mono">0.406 log removed</text>
+      <text x="${X(12) + 8}" y="${crest - 13}" class="kr-ts kr-tb">loose log</text>
+      <text x="${X(12) + 10}" y="${Y(0.0)}" class="kr-ts">bedrock bar,</text>
+      <text x="${X(12) + 10}" y="${Y(0.0) + 10}" class="kr-ts">crest 0.40</text>
+      <text x="${X(22) - 2}" y="${Y(TAIL) - 4}" text-anchor="end" class="kr-ts kr-mono">0.19 below</text>
+      <text x="${X(-12) + 2}" y="${Y(-0.944) + 12}" class="kr-ts">pool, bed −0.94</text>
+      <path d="M${X(16)} 12 h22 m-5 -4 l5 4 l-5 4" class="kr-flow"/><text x="${X(16) - 3}" y="15" text-anchor="end" class="kr-ts">flow</text>
+      <text x="165" y="188" text-anchor="middle" class="kr-ts">long-section down the centre line · vertical ×9</text>`);
   }
 
   const RUBRIC = [
@@ -428,7 +546,7 @@ const KbRiver = (function () {
         ],
       },
       {
-        id: 'gco', title: 'Check the raw head at the GCO', here: ['gauge'],
+        id: 'gco', title: 'Check the raw head at the GCO', here: ['gco', 'gauge'],
         figs: () => `<figure>${gcoSvg()}<figcaption class="small">The fixed chamber on its driven galvanised posts.</figcaption></figure>`,
         body: () => `
           <p>An independent check of what the sensor reports. The river line ends in a fixed gas-purge chamber (GCO) on driven posts. Measure

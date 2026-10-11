@@ -232,7 +232,7 @@ const KbLogbook = (function () {
     return `<svg viewBox="-20 0 900 352" role="img" aria-labelledby="kl-stn-t" class="kl-svg kl-scene">
       <title id="kl-stn-t">The gauging station side-on. Set-up ${st.setup}: the level on the bank, the staff on ${esc(r.point)}.</title>
       <path d="${ground}" class="kl-ground"/>
-      <path d="M590 292H880V331L825 330L680 312Z" class="kl-water"/>
+      <path d="M601.2 292H880V331L825 330L680 312Z" class="kl-water"/>
       <text x="872" y="284" text-anchor="end" class="kl-lab">WL</text>
       <rect x="64" y="${y(BM_RL)}" width="42" height="${r3(119 - y(BM_RL))}" class="kl-bm"/>
       <text x="85" y="142" text-anchor="middle" class="kl-lab">BMGS</text>
@@ -261,11 +261,17 @@ const KbLogbook = (function () {
     }).join('');
     const ticks = [0, 2, 4, 6, 8, 10, 12, 14].map(c => `<line x1="${x(c)}" y1="266" x2="${x(c)}" y2="272" class="kl-tick"/><text x="${x(c)}" y="286" text-anchor="middle" class="kl-lab kl-lab-s">${c}</text>`).join('');
     const ix = x(15), gy = y(5), iy = y(data().xbook.find(s => s.sight === 'bs' && s.setup === 2).hi);
-    return `<svg viewBox="0 -40 720 335" role="img" aria-labelledby="kl-xs-t" class="kl-svg kl-scene">
-      <title id="kl-xs-t">The weir cross-section: left bank, concrete wings sealed against both banks with a cut-out between 5.5 and 8.5 m, right bank. Set-up 2 stands on the right bank; set-ups 1 and 3 are off the drawing at chainage −10 and 40.</title>
+    return `<svg viewBox="-34 -40 754 335" role="img" aria-labelledby="kl-xs-t" class="kl-svg kl-scene">
+      <title id="kl-xs-t">The weir cross-section, looking downstream: banks at RL 5.0 sloping to a natural bed at RL 0.0 between chainage 4 and 10; across the channel a concrete weir with its crest at RL 3.0, sealed against both banks (CPWL at 2.8 m, CPWR at 11.2 m), and a cut-out between 5.5 and 8.5 m down to RL 2.0 with a little water in it. Set-up 2 stands on the right bank; set-ups 1 and 3 are off the drawing at chainage −10 and 40.</title>
       <path d="M${x(-0.5)} ${y(5)}H${x(2)}L${x(4)} ${y(0)}H${x(10)}L${x(12)} ${y(5)}H${x(16)}V262H${x(-0.5)}Z" class="kl-ground"/>
       <path d="M${x(2.8)} ${y(3)}H${x(5.5)}V${y(2)}H${x(8.5)}V${y(3)}H${x(11.2)}L${x(10)} ${y(0)}H${x(4)}Z" class="kl-wall"/>
       <path d="M${x(5.5)} ${y(2.2)}H${x(8.5)}V${y(2)}H${x(5.5)}Z" class="kl-water"/>
+      <path d="M${x(2)} ${y(5)}L${x(4)} ${y(0)}H${x(10)}L${x(12)} ${y(5)}" class="kl-bedline"/>
+      <text x="${x(7)}" y="${y(1)}" text-anchor="middle" class="kl-lab kl-lab-s">concrete weir, crest RL 3.0</text>
+      <text x="${x(7)}" y="${y(0) - 5}" text-anchor="middle" class="kl-lab kl-lab-s">natural bed RL 0.0</text>
+      <text x="${x(7)}" y="${y(2.2) - 5}" text-anchor="middle" class="kl-lab kl-lab-s">cut-out, RL 2.0</text>
+      ${[0, 1, 2, 3, 4, 5].map(v => `<line x1="${x(-0.5) - 6}" y1="${y(v)}" x2="${x(-0.5)}" y2="${y(v)}" class="kl-tick"/><text x="${x(-0.5) - 9}" y="${y(v) + 4}" text-anchor="end" class="kl-lab kl-lab-s">${v}</text>`).join('')}
+      <text x="${x(-0.5) - 9}" y="${y(5.6)}" text-anchor="end" class="kl-lab kl-lab-s">RL</text>
       ${pts}
       <line x1="${ix}" y1="${iy + 6}" x2="${ix - 10}" y2="${gy}" class="kl-leg"/><line x1="${ix}" y1="${iy + 6}" x2="${ix + 10}" y2="${gy}" class="kl-leg"/>
       <rect x="${ix - 10}" y="${iy - 5}" width="20" height="10" rx="2" class="kl-inst"/>

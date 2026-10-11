@@ -234,43 +234,97 @@ const KbLevel = (function () {
   const ROUTE_KM = (18 + 17 + 5 + 5 + 17 + 18) / 1000;
 
   // ── Drawings ───────────────────────────────────────────────────────────────
-  // The weir section: chainage across, RL up, the vertical scale stretched.
-  const X = c => 24 + c * 320 / 98;
-  const Y = h => 170 - (h - 99.6) * 25;
-  const XY = (c, h) => `${X(c).toFixed(1)},${Y(h).toFixed(1)}`;
+  // The weir section along the game's section line, which runs along the
+  // control's crest: natural ground from bank to bank, and between chainage 38
+  // and 50 the concrete control the game builds (concrete-control.ts) — two
+  // wing blocks with their crest at 100.6 and the 2 m low-flow notch between
+  // them, chainage 43–45, at 100.0 — founded at 98.75. The pool upstream stands
+  // at 100.10 (weir-flow.ts), so on this line water shows only in the notch.
+  // Drawn twice in one figure: the whole section (the vertical stretched about
+  // eight times, as a section usually is), and below it the control close up
+  // (stretched twice), where the notch is wide enough to see what a staff in
+  // it can and cannot reach.
+  const CONTROL = { from: 38, to: 50, crest: 100.6, notchFrom: 43, notchTo: 45, notch: 100.0, base: 98.75 };
+  const WHOLE = { c0: 0, c1: 98, h0: 98.6, h1: 105.2, x: 34, y: 18, w: 352, h: 150 };
+  const CLOSE = { c0: 35, c1: 53, h0: 98.6, h1: 102.2, x: 34, y: 226, w: 352, h: 100 };
 
-  function sectionSvg(o) {
-    const ground = `${PROFILE.map(([c, h]) => XY(c, h)).join(' ')} ${X(98).toFixed(1)},192 ${X(0).toFixed(1)},192`;
+  function sectionPanel(o, P, id) {
+    const sx = P.w / (P.c1 - P.c0), sy = P.h / (P.h1 - P.h0);
+    const X = c => +(P.x + (c - P.c0) * sx).toFixed(1);
+    const Y = h => +(P.y + (P.h1 - h) * sy).toFixed(1);
+    const bottom = Y(P.h0);
     const parts = [];
-    parts.push(`<polygon points="${ground}" class="kv-ground"/>`);
-    parts.push(`<rect x="${X(43).toFixed(1)}" y="${Y(POOL).toFixed(1)}" width="${(X(45) - X(43)).toFixed(1)}" height="${(Y(100) - Y(POOL)).toFixed(1)}" class="kv-water"/>`);
-    if (o.collimation != null) {
-      parts.push(`<line x1="${X(0)}" y1="${Y(o.collimation).toFixed(1)}" x2="${X(98)}" y2="${Y(o.collimation).toFixed(1)}" class="kv-sight"/>`);
+    const ground = PROFILE.map(([c, h]) => `${X(c)},${Y(h)}`).join(' ');
+    parts.push(`<polygon points="${ground} ${X(98)},${bottom} ${X(0)},${bottom}" class="kv-earth"/>`);
+    const C = CONTROL;
+    parts.push(`<polygon points="${[[C.from, C.crest], [C.notchFrom, C.crest], [C.notchFrom, C.notch], [C.notchTo, C.notch], [C.notchTo, C.crest], [C.to, C.crest], [C.to, C.base], [C.from, C.base]]
+      .map(([c, h]) => `${X(c)},${Math.min(Y(h), bottom)}`).join(' ')}" class="kv-concrete"/>`);
+    parts.push(`<rect x="${X(C.notchFrom)}" y="${Y(POOL)}" width="${(X(C.notchTo) - X(C.notchFrom)).toFixed(1)}" height="${(Y(C.notch) - Y(POOL)).toFixed(1)}" class="kv-water"/>`);
+    parts.push(`<polyline points="${ground}" class="kv-surface"/>`);
+    // RL ticks up the left, chainage along the foot.
+    const step = P === WHOLE ? 1 : 0.5;
+    for (let h = Math.ceil(P.h0 / step) * step; h <= P.h1 + 1e-9; h += step) {
+      const t = Math.round(h * 10) / 10;
+      parts.push(`<line x1="${P.x - 4}" y1="${Y(t)}" x2="${P.x}" y2="${Y(t)}" class="kv-tick"/>`
+        + (P === WHOLE || Math.abs(t - Math.round(t)) < 1e-9 ? `<text x="${P.x - 6}" y="${Y(t) + 3}" text-anchor="end" class="kv-tiny">${t.toFixed(P === WHOLE ? 0 : 1)}</text>` : ''));
     }
-    for (const s of o.sights || []) {
-      const hy = Y(groundAt(s.from) + EYE).toFixed(1);
-      parts.push(`<line x1="${X(s.from).toFixed(1)}" y1="${hy}" x2="${X(s.to).toFixed(1)}" y2="${hy}" class="kv-sight"/>`);
+    const cstep = P === WHOLE ? 10 : 2;
+    for (let c = Math.ceil(P.c0 / cstep) * cstep; c <= P.c1; c += cstep) {
+      parts.push(`<line x1="${X(c)}" y1="${bottom}" x2="${X(c)}" y2="${bottom + 4}" class="kv-tick"/><text x="${X(c)}" y="${bottom + 13}" text-anchor="middle" class="kv-tiny">${c}</text>`);
+    }
+    if (o.collimation != null) {
+      parts.push(`<line x1="${P.x}" y1="${Y(o.collimation)}" x2="${P.x + P.w}" y2="${Y(o.collimation)}" class="kv-sight"/>`);
+    }
+    for (const sgt of o.sights || []) {
+      const hy = Y(groundAt(sgt.from) + EYE);
+      parts.push(`<line x1="${X(sgt.from)}" y1="${hy}" x2="${X(sgt.to)}" y2="${hy}" class="kv-sight"/>`);
     }
     for (const c of o.staffs || []) {
-      const g = groundAt(c);
-      const top = Math.max(2, Y(g + STAFF));
-      parts.push(`<rect x="${(X(c) - 2).toFixed(1)}" y="${top.toFixed(1)}" width="4" height="${(Y(g) - top).toFixed(1)}" class="kv-staff"/>`);
+      const g = groundAt(c), w = Math.max(3, 0.08 * sx);
+      parts.push(`<rect x="${(X(c) - w / 2).toFixed(1)}" y="${Y(g + STAFF)}" width="${w.toFixed(1)}" height="${(Y(g) - Y(g + STAFF)).toFixed(1)}" class="kv-staff"/>`);
     }
     for (const c of o.setups || []) {
-      const g = groundAt(c), x = X(c), top = Y(g + EYE), gy = Y(g);
-      parts.push(`<g class="kv-level"><line x1="${x.toFixed(1)}" y1="${(top + 4).toFixed(1)}" x2="${(x - 7).toFixed(1)}" y2="${gy.toFixed(1)}" class="kv-leg"/>`
-        + `<line x1="${x.toFixed(1)}" y1="${(top + 4).toFixed(1)}" x2="${(x + 7).toFixed(1)}" y2="${gy.toFixed(1)}" class="kv-leg"/>`
-        + `<rect x="${(x - 8).toFixed(1)}" y="${(top - 4).toFixed(1)}" width="16" height="8" rx="2" class="kv-inst"/></g>`);
+      const g = groundAt(c), x = X(c), top = Y(g + EYE), gy = Y(g), spread = P === WHOLE ? 5 : 9;
+      parts.push(`<g class="kv-level"><line x1="${x}" y1="${top + 3}" x2="${x - spread}" y2="${gy}" class="kv-leg"/>`
+        + `<line x1="${x}" y1="${top + 3}" x2="${x + spread}" y2="${gy}" class="kv-leg"/>`
+        + `<rect x="${x - 6}" y="${top - 3}" width="12" height="6" rx="1.5" class="kv-inst"/></g>`);
     }
-    if (o.features) PROFILE.forEach(([c, h]) => parts.push(`<circle cx="${X(c).toFixed(1)}" cy="${Y(h).toFixed(1)}" r="2.5" class="kv-feature"/>`));
-    for (const p of o.points || []) parts.push(`<circle cx="${X(p.ch).toFixed(1)}" cy="${Y(p.rl).toFixed(1)}" r="3.5" class="kv-pt"/>`);
-    parts.push(`<path d="M${X(BM.ch).toFixed(1)} ${(Y(BM.rl) - 1).toFixed(1)} l-5 -9 h10 z" class="kv-bm"/>`
-      + `<text x="${X(BM.ch).toFixed(1)}" y="${(Y(BM.rl) - 13).toFixed(1)}" text-anchor="middle" class="kv-lab">BM01</text>`);
-    parts.push(`<text x="${X(0)}" y="205" text-anchor="start" class="kv-lab">LB · ch 0</text>`
-      + `<text x="${X(98)}" y="205" text-anchor="end" class="kv-lab">RB · ch 98</text>`);
-    for (const t of o.labels || []) parts.push(`<text x="${X(t.ch).toFixed(1)}" y="${t.y}" text-anchor="middle" class="kv-num">${esc(t.text)}</text>`);
-    return `<svg viewBox="0 0 368 212" role="img" aria-labelledby="kv-s-${o.id}" class="kv-svg">
-      <title id="kv-s-${o.id}">${esc(o.title)}</title>${parts.join('')}</svg>`;
+    for (const t of o.labels || []) parts.push(`<text x="${X(t.ch)}" y="${Y(groundAt(t.ch) + EYE) - 7}" text-anchor="middle" class="kv-num">${esc(t.text)}</text>`);
+    if (o.features) PROFILE.forEach(([c, h]) => parts.push(`<circle cx="${X(c)}" cy="${Y(h)}" r="2.6" class="kv-feature"/>`));
+    for (const p of o.points || []) parts.push(`<circle cx="${X(p.ch)}" cy="${Y(p.rl)}" r="3.4" class="kv-pt"/>`);
+    return `<g clip-path="url(#kv-clip-${id})">${parts.join('')}</g>`;
+  }
+
+  function sectionSvg(o) {
+    const W = WHOLE, C = CLOSE, X = c => W.x + (c - W.c0) * W.w / (W.c1 - W.c0), Yw = h => W.y + (W.h1 - h) * W.h / (W.h1 - W.h0);
+    const XC = c => C.x + (c - C.c0) * C.w / (C.c1 - C.c0), YC = h => C.y + (C.h1 - h) * C.h / (C.h1 - C.h0);
+    const clip = (P, k) => `<clipPath id="kv-clip-${o.id}-${k}"><rect x="${P.x - 40}" y="${P.y - 16}" width="${P.w + 44}" height="${P.h + 34}"/></clipPath>`;
+    const notes = [];
+    // BM01 and the banks, on the whole section.
+    notes.push(`<path d="M${X(BM.ch).toFixed(1)} ${(Yw(BM.rl) - 1).toFixed(1)} l-4 -8 h8 z" class="kv-bm"/>`
+      + `<text x="${X(BM.ch).toFixed(1)}" y="${(Yw(BM.rl) - 12).toFixed(1)}" text-anchor="middle" class="kv-lab">BM01</text>`
+      + `<text x="${W.x}" y="${W.y - 6}" class="kv-lab">LB · ch 0</text><text x="${W.x + W.w}" y="${W.y - 6}" text-anchor="end" class="kv-lab">RB · ch 98</text>`
+      + `<text x="${X(53)}" y="${Yw(99.3)}" class="kv-tiny">concrete control</text>`);
+    // The close-up's frame on the whole section, and leaders down to the close-up.
+    notes.push(`<rect x="${X(C.c0).toFixed(1)}" y="${Yw(C.h1).toFixed(1)}" width="${(X(C.c1) - X(C.c0)).toFixed(1)}" height="${(Yw(C.h0) - Yw(C.h1)).toFixed(1)}" class="kv-frame"/>`
+      + `<line x1="${X(C.c0).toFixed(1)}" y1="${Yw(C.h0).toFixed(1)}" x2="${C.x}" y2="${C.y - 14}" class="kv-frame"/>`
+      + `<line x1="${X(C.c1).toFixed(1)}" y1="${Yw(C.h0).toFixed(1)}" x2="${C.x + C.w}" y2="${C.y - 14}" class="kv-frame"/>`);
+    // Names on the close-up.
+    notes.push(`<text x="${XC(40.5)}" y="${YC(CONTROL.crest) + 14}" text-anchor="middle" class="kv-tiny">crest 100.6</text>`
+      + `<text x="${XC(47.5)}" y="${YC(CONTROL.crest) + 14}" text-anchor="middle" class="kv-tiny">crest 100.6</text>`
+      + `<text x="${XC(44)}" y="${YC(CONTROL.notch) + 14}" text-anchor="middle" class="kv-tiny">notch 100.0</text>`
+      + `<text x="${C.x + C.w}" y="${C.y + C.h + 27}" text-anchor="end" class="kv-tiny">the control close up · chainage ${C.c0}–${C.c1} · vertical ×2</text>`
+      + `<text x="${W.x + W.w}" y="${W.y + W.h + 27}" text-anchor="end" class="kv-tiny">whole section · vertical ×8</text>`);
+    if ((o.staffs || []).length) {
+      const c = o.staffs.find(s => s >= C.c0 && s <= C.c1);
+      if (c != null) notes.push(`<text x="${XC(c) + 6}" y="${Math.max(YC(groundAt(c) + STAFF), C.y) + 10}" class="kv-tiny">4 m staff</text>`);
+    }
+    if (o.collimation != null) {
+      notes.push(`<text x="${W.x + W.w - 2}" y="${Yw(o.collimation) - 3}" text-anchor="end" class="kv-tiny">line of sight ${o.collimation.toFixed(4)}</text>`);
+    }
+    const whole = sectionPanel(o, W, `${o.id}-w`), close = sectionPanel(o, C, `${o.id}-c`);
+    return `<svg viewBox="0 0 400 362" role="img" aria-labelledby="kv-s-${o.id}" class="kv-svg">
+      <title id="kv-s-${o.id}">${esc(o.title)}</title><defs>${clip(W, 'w')}${clip(C, 'c')}</defs>${whole}${close}${notes.join('')}</svg>`;
   }
 
   // The telescope on an E-face: 1 cm bars, an E every 5 cm, three hairs.
@@ -572,7 +626,7 @@ const KbLevel = (function () {
     const doc = routeDoc(CLOSE_READS[0]);
     const r = doc.rows;
     const cell = v => (v == null ? '' : `<td class="kv-mono">${esc(String(v))}</td>`);
-    return `<div class="kv-cols">${fig(sectionSvg({ id: 'book', title: 'The checked route: the level at chainage 26 reads BM01 and the notch corner; moved to chainage 38 it reads the corner and the right concrete edge, then returns to 26 and closes on BM01', setups: [26, 38], staffs: [8, 43, 50], sights: [{ from: 26, to: 8 }, { from: 26, to: 43 }, { from: 38, to: 50 }], labels: [{ ch: 26, y: 40, text: '1, 3' }, { ch: 38, y: 100, text: '2' }] }),
+    return `<div class="kv-cols">${fig(sectionSvg({ id: 'book', title: 'The checked route: the level at chainage 26 reads BM01 and the notch corner; moved to chainage 38 it reads the corner and the right concrete edge, then returns to 26 and closes on BM01', setups: [26, 38], staffs: [8, 43, 50], sights: [{ from: 26, to: 8 }, { from: 26, to: 43 }, { from: 38, to: 50 }], labels: [{ ch: 26, text: '1, 3' }, { ch: 38, text: '2' }] }),
       'Set-ups 1 and 3 at chainage 26, set-up 2 at chainage 38. The change point is the top of the left low-flow wall.')}
       <div class="kv-text">
         <p>This is the run the game's own checks use — a mix of digital readings (to 0.1 mm) and E-face readings (to the millimetre):</p>
