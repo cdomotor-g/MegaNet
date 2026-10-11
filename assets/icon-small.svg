@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <!-- The small Flood-Net mark: the full logo (logo.webp, icon-512.png) cut
        down to what still reads at 16-48 px: the round frame, the gauge board
-       standing in the water, two wave crests, and a few network nodes. -->
+       standing in the water, two wave crests, and the network reaching
+       down the right side, with nodes on the rim. -->
   <defs>
     <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#1e88e5"/>
@@ -12,8 +13,7 @@
   <circle cx="32" cy="32" r="31.5" fill="#fff"/>
   <g clip-path="url(#disc)">
     <rect width="64" height="64" fill="url(#sky)"/>
-    <path d="M37 12 L51 17 L45 30 L58 34 M37 12 L45 30 M51 17 L58 34" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
-    <rect x="14" y="13" width="12" height="36" rx="1.8" fill="#0d1b2e"/>
+        <rect x="14" y="13" width="12" height="36" rx="1.8" fill="#0d1b2e"/>
     <rect x="16.5" y="15.5" width="7" height="33" fill="#fff"/>
     <g fill="#0d1b2e">
       <rect x="16.5" y="18.5" width="5.5" height="3"/>
@@ -24,11 +24,16 @@
     <path d="M0 49 C12 45 22 54 36 50 S54 45 64 48 V64 H0Z" fill="#0d47a1"/>
     <path d="M-1 40 C10 35 18 44 30 41 S50 34 65 39" fill="none" stroke="#fff" stroke-width="2.8"/>
     <path d="M-1 49 C12 45 22 54 36 50 S54 45 65 48" fill="none" stroke="#fff" stroke-width="2" opacity=".8"/>
+    <path d="M37 12 L54.8 12.8 M37 12 L45 28 M54.8 12.8 L45 28 M54.8 12.8 L61.5 36.1 M45 28 L61.5 36.1 M45 28 L49 43 M61.5 36.1 L49 43 M61.5 36.1 L53.1 53.1 M49 43 L53.1 53.1 M49 43 L37 52 M53.1 53.1 L37 52 M37 52 L38.2 61.1 M53.1 53.1 L38.2 61.1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
   </g>
   <g fill="#1565c0" stroke="#fff" stroke-width="1.8">
     <circle cx="37" cy="12" r="3"/>
-    <circle cx="51" cy="17" r="3.8"/>
-    <circle cx="45" cy="30" r="3.4"/>
-    <circle cx="58.5" cy="34" r="3.6"/>
+    <circle cx="54.8" cy="12.8" r="3.6"/>
+    <circle cx="45" cy="28" r="3.4"/>
+    <circle cx="61.5" cy="36.1" r="3.6"/>
+    <circle cx="49" cy="43" r="3"/>
+    <circle cx="53.1" cy="53.1" r="3.4"/>
+    <circle cx="37" cy="52" r="2.8"/>
+    <circle cx="38.2" cy="61.1" r="3"/>
   </g>
 </svg>
