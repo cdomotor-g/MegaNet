@@ -122,6 +122,8 @@
   // both (places.js).
   Places.bindCoordPaste();
   MemMeter.start();
+  // ↑ Back to top, once the page has been scrolled a screen down (app.js).
+  toTopStart();
   // Before autoLoad(), so that a tab returning from a magic link has taken the
   // session out of the URL fragment before anything else reads location.
   Auth.start();

@@ -7840,6 +7840,61 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
   }
 }
 
+/* ── Back to top (#to-top) ───────────────────────────────────────────────────
+   app.js (toTopSync) shows it once the page is a screen down and hides it near
+   the top. On a wide screen it is a round 44 px button in the page's
+   bottom-right corner, 1 rem clear of the side panel — --to-top-right is the
+   panel's measured width, rail and open pane together. Below the toasts and
+   the nav backdrop, so a drawer dims it with everything else. */
+.to-top {
+  position: fixed;
+  right: calc(var(--to-top-right, 56px) + 1rem);
+  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + var(--pwa-lift, 0px));
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .18);
+  cursor: pointer;
+}
+
+.to-top:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.to-top[hidden] {
+  display: none;
+}
+
+/* On a phone's edge tab it is a second tab on the same edge, dressed as ❔'s
+   (the edge-tab rules under the 560 px query below) and a clear gap under it:
+   ❔ is centred at 50% and 2.9 rem tall, so its foot is at 50% + 1.45 rem. */
+.to-top.is-edge {
+  top: calc(50% + 1.45rem + .9rem);
+  right: 0;
+  bottom: auto;
+  width: 2rem;
+  height: 2.6rem;
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+  font-size: 1.15rem;
+}
+
+@media print {
+  .to-top { display: none !important; }
+}
+
 /* ── The side panel (#help-panel) ───────────────────────────────────────────
    The right-hand counterpart to the nav rail: a strip of buttons on the outer
    edge and, open, one pane beside it — the help for this tab, the Stations

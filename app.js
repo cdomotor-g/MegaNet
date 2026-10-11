@@ -1741,6 +1741,71 @@ function focusMain(e) {
   main.scrollIntoView({ block: 'start' });
 }
 
+// ── Back to top ──────────────────────────────────────────────────────────────
+// A fixed button (#to-top, index.html) that takes the page back to its top. It
+// is only there once the page has been scrolled about a screen down — near the
+// top it would be a button for nothing — and it goes again on the way back up,
+// with a band between the two thresholds so it does not flicker at the edge.
+//
+// Where it stands follows the side panel. On a phone's edge tab (every tab but
+// Stations) it is a second, smaller tab on the same edge, a gap below ❔, and
+// it stands down while the help drawer is out over it. Everywhere else it is a
+// round button in the bottom-right corner of the page, kept clear of the
+// panel's rail or open pane by measuring them, since the pane's width is the
+// operator's. A full-screen map has no page to scroll, so it is not there.
+function toTopSync() {
+  const btn = document.getElementById('to-top');
+  if (!btn) return;
+  const y = window.scrollY || document.documentElement.scrollTop || 0;
+  const vh = window.innerHeight || 800;
+  const was = !btn.hidden;
+  let show = was ? y > vh * 0.4 : y > vh * 0.8;
+  const panel = document.getElementById('help-panel');
+  const edge = isPhoneNav() && !!panel && !panel.classList.contains('has-map-tools');
+  if (edge && !panel.classList.contains('collapsed')) show = false;
+  if (document.querySelector('.map-panel.is-full')) show = false;
+  btn.classList.toggle('is-edge', edge);
+  if (show && !edge && panel) {
+    let left = panel.getBoundingClientRect().left;
+    const strip = panel.querySelector('.dock-strip');
+    if (strip && strip.offsetWidth) left = Math.min(left, strip.getBoundingClientRect().left);
+    const gap = Math.max(0, Math.round(window.innerWidth - left));
+    btn.style.setProperty('--to-top-right', gap + 'px');
+  }
+  if (show !== was) btn.hidden = !show;
+}
+
+// Up to the top, smoothly unless the device asks for less motion, and focus to
+// the top of the main content so a keyboard user carries on from there rather
+// than from <body> — the button they pressed is about to go.
+function toTopGo() {
+  const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const main = document.getElementById('main-content');
+  if (main) main.focus({ preventScroll: true });
+  window.scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' });
+}
+
+// Called once from init.js. The scroll and resize listeners are passive and
+// coalesced to a frame; the observers catch the side panel changing shape — a
+// pane opened, a width dragged, a tab switch that turns a phone's rail into its
+// edge tab — which moves the button without any scroll at all.
+function toTopStart() {
+  let queued = false;
+  const queue = () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => { queued = false; toTopSync(); });
+  };
+  window.addEventListener('scroll', queue, { passive: true });
+  window.addEventListener('resize', queue, { passive: true });
+  const panel = document.getElementById('help-panel');
+  if (panel) {
+    if (typeof ResizeObserver === 'function') new ResizeObserver(queue).observe(panel);
+    new MutationObserver(queue).observe(panel, { attributes: true, attributeFilter: ['class'] });
+  }
+  queue();
+}
+
 // Where focus goes when the open tab changes (#109), and why it has to go
 // anywhere at all: renderTabs() replaces the nav's innerHTML, so the button
 // that was just clicked does not exist by the time the switch has finished. A
