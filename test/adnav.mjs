@@ -840,6 +840,40 @@ try {
   ok('a wheel zoom is undone by Ctrl+Z', zoomed !== wz.view && back === wz.view,
      `${wz.view} → ${zoomed} → ${back}`);
 
+  // ── 12. Style: Points rides with Line or Step ─────────────────────────────
+  const sty = await page.evaluate(async () => {
+    const A = window.ArroData, ad = A.ad;
+    const tick = () => new Promise(r => setTimeout(r, 30));
+    const on = () => [...document.querySelectorAll('[aria-label^="Chart style:"]')]
+      .filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.textContent.trim()).join('+');
+    const paths = () => document.querySelectorAll('#ad-svg g[clip-path] path[stroke-linejoin="round"]').length;
+    const out = {};
+    A.setChart('line'); await tick();
+    if (ad.points) { A.setChart('dots'); await tick(); }
+    out.line = on();
+    A.setChart('dots'); await tick();
+    out.linePts = on(); out.linePtsPaths = paths() > 0;
+    A.setChart('step'); await tick();
+    out.stepPts = on();
+    A.setChart('step'); await tick();
+    out.ptsOnly = on(); out.ptsOnlyPaths = paths();
+    A.setChart('dots'); await tick();
+    out.lastStays = on();
+    A.setChart('line'); await tick();
+    out.back = on();
+    A.setChart('dots'); await tick();
+    out.end = on();
+    return out;
+  });
+  ok('Points switches on beside Line, and the line is still drawn',
+     sty.line === 'Line' && sty.linePts === 'Line+Points' && sty.linePtsPaths, JSON.stringify(sty));
+  ok('…moves with the join to Step', sty.stepPts === 'Step+Points', JSON.stringify(sty));
+  ok('…stands alone when the join is switched off, with no line drawn',
+     sty.ptsOnly === 'Points' && sty.ptsOnlyPaths === 0, JSON.stringify(sty));
+  ok('…and the last style on cannot be switched off', sty.lastStays === 'Points', JSON.stringify(sty));
+  ok('…Line comes back with Points still on, and Points goes off on its own',
+     sty.back === 'Line+Points' && sty.end === 'Line', JSON.stringify(sty));
+
   ok('nothing threw', errors.length === 0, errors.join(' | '));
 
   await context.close();

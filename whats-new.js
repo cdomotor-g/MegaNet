@@ -25,6 +25,10 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 26, date: '2026-10-11', items: [
+      '<strong>📊 Plots: line and points together.</strong> In <em>Style</em>, <em>Points</em> now switches on beside '
+        + '<em>Line</em> or <em>Step</em>, so the line carries a mark on every reading. Switch the line off to get points alone.',
+    ] },
     { n: 25, date: '2026-10-11', items: [
       '<strong>📊 Plots: Undo and Redo.</strong> The first buttons on the chart toolbar step back through what you did on the '
         + 'tab — a filter, a toolbar choice, a pan or zoom, a drawn line, moved, edited or deleted readings, a removed series '

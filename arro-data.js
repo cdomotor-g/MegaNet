@@ -305,6 +305,9 @@ const ArroData = (function () {
       mode:      'filtered',     // raw | filtered | both
       transform: 'value',        // value | increment | rate
       chartType: 'line',
+      // Marks on every reading as well as the line or step. chartType 'dots'
+      // is points with nothing joined; this is points *and* a join.
+      points:    false,
       yMode:     'auto',         // auto | zero | manual
       yMin:      '', yMax: '',
       // One switch per mark shape (AD_MARKS), where there used to be three —
@@ -3946,7 +3949,8 @@ const ArroData = (function () {
               + 'Hovering a reading names the difference either side of it. '
               + 'Every value is in the readings table below the chart.';
     if (!f) return `Chart, empty — no series is shown. ${how}`;
-    const shape = ad.chartType === 'dots' ? 'Point chart' : ad.chartType === 'step' ? 'Step chart' : 'Line chart';
+    const shape = ad.chartType === 'dots' ? 'Point chart'
+                : (ad.chartType === 'step' ? 'Step chart' : 'Line chart') + (ad.points ? ' with points' : '');
     const names = f.vis.slice(0, 3).map(s => s.label).join(', ')
                 + (f.vis.length > 3 ? ` and ${f.vis.length - 3} more` : '');
     const range = f.lo == null ? '' : `, ${fmtVal(f.lo)} to ${fmtVal(f.hi)} ${f.unit}`.trimEnd();
@@ -4706,6 +4710,24 @@ const ArroData = (function () {
       <div class="ad-grp-body">${body}</div>
     </div>`;
 
+  // Line and Step are one choice — a reading is joined to the next one way or
+  // the other — and Points is a switch beside it, so a line can carry a mark on
+  // every reading. Each button toggles; at least one stays on, because a chart
+  // drawing nothing is not a style.
+  function styleSeg() {
+    const ptsOn = ad.chartType === 'dots' || ad.points;
+    const b = (v, label, tip, on) => `
+        <button class="${on ? 'on' : ''}" title="${escAttr(tip)}" aria-pressed="${on}"
+                aria-label="Chart style: ${escAttr(label)}"
+                onclick="ArroData.setChart('${v}')">${esc(label)}</button>`;
+    return `
+      <div class="ad-seg">
+        ${b('line', 'Line', 'Straight between readings', ad.chartType === 'line')}
+        ${b('step', 'Step', 'Hold each reading until the next — how an accumulator behaves', ad.chartType === 'step')}
+        ${b('dots', 'Points', 'A mark on every reading — with the line or step, or on its own', ptsOn)}
+      </div>`;
+  }
+
   function toolbarHtml() {
     const anyFilt = ad.mode !== 'raw';
     return `
@@ -4733,11 +4755,7 @@ const ArroData = (function () {
             ['increment', 'Increment', 'Step between consecutive readings'],
             ['rate', 'Rate/h', 'Step divided by the hours between readings'],
           ], 'setTransform'))}
-          ${grp('Style', seg('Chart style', ad.chartType, [
-            ['line', 'Line', 'Straight between readings'],
-            ['step', 'Step', 'Hold each reading until the next — how an accumulator behaves'],
-            ['dots', 'Points', 'One mark per reading, nothing joined'],
-          ], 'setChart'))}
+          ${grp('Style', styleSeg())}
           ${grp('Vertical axis',
             seg('Vertical axis', ad.yMode, [
               ['auto', 'Auto', 'Fit everything on screen, spikes included'],
@@ -5813,7 +5831,8 @@ const ArroData = (function () {
     }
 
     const stepped = ad.chartType === 'step';
-    const dots = ad.chartType === 'dots';
+    const joined = ad.chartType !== 'dots';
+    const dots = !joined || ad.points;
     let markers = '';
     let series = '';
 
@@ -5832,7 +5851,8 @@ const ArroData = (function () {
         if (dots) {
           markers += pts.slice(0, DOT_CAP).map(p =>
             shapeMark(shape, p[0], sy(p[1]), ghost ? 1.3 : 2, escAttr(s.color), ghost ? .3 : .9)).join('');
-        } else {
+        }
+        if (joined) {
           // The dash is the series' identity without its colour — see AD_DASH.
           // It rides on the ghost too: raw and filtered are one series drawn
           // twice, and giving them different dashes would say otherwise.
@@ -6212,7 +6232,7 @@ const ArroData = (function () {
 
     const w = Math.max(240, Math.round(a.parentElement.getBoundingClientRect().width));
     const h = Math.round(Math.max(160, Math.min(300, w * 0.62)));
-    const sig = [v.t0, v.t1, w, h, ad.transform, ad.chartType, markKinds().map(k => (ad.marks[k] ? 1 : 0)).join(''),
+    const sig = [v.t0, v.t1, w, h, ad.transform, ad.chartType, ad.points, markKinds().map(k => (ad.marks[k] ? 1 : 0)).join(''),
                  ad.yMode, ad.yMin, ad.yMax,
                  ad.series.map(s => cfgKey(s.cfg, 'cmp')).join(';'),
                  vis.map(s => `${s.key}${s.color}${s.kind}${s.axis}${s.dash}`).join(',')].join('|');
@@ -7132,7 +7152,7 @@ const ArroData = (function () {
   // Everything restore() puts back, as one comparable string.
   function stateSig(inst) {
     return JSON.stringify([
-      inst.view, inst.yMode, inst.yMin, inst.yMax, inst.mode, inst.transform, inst.chartType,
+      inst.view, inst.yMode, inst.yMin, inst.yMax, inst.mode, inst.transform, inst.chartType, inst.points,
       inst.marks, inst.dragMode, inst.cfgBase,
       inst.lines.map(l => [l.id, l.visible, l.color, l.axis, l.label, l.src, l.pts && l.pts.length]),
       inst.series.map(s => [s.key, s.cfg, s.flood, s.visible, s.color, s.colorSet, s.dash, s.axis,
@@ -7146,7 +7166,7 @@ const ArroData = (function () {
       inst, label, at: Date.now(), sig: stateSig(inst),
       view: inst.view && { ...inst.view }, yMode: inst.yMode, yMin: inst.yMin, yMax: inst.yMax,
       yStash: inst.yStash && { ...inst.yStash }, mode: inst.mode, transform: inst.transform,
-      chartType: inst.chartType, marks: { ...inst.marks }, dragMode: inst.dragMode,
+      chartType: inst.chartType, points: inst.points, marks: { ...inst.marks }, dragMode: inst.dragMode,
       cfgFor: inst.cfgFor, cfgBase: copyCfg(inst.cfgBase),
       lines: inst.lines.map(cloneLine), lineSeq: inst.lineSeq,
       series: inst.series.map(snapSeries),
@@ -7190,7 +7210,7 @@ const ArroData = (function () {
     Object.assign(inst, {
       view: snap.view && { ...snap.view }, yMode: snap.yMode, yMin: snap.yMin, yMax: snap.yMax,
       yStash: snap.yStash && { ...snap.yStash }, mode: snap.mode, transform: snap.transform,
-      chartType: snap.chartType, marks: { ...snap.marks }, dragMode: snap.dragMode,
+      chartType: snap.chartType, points: snap.points, marks: { ...snap.marks }, dragMode: snap.dragMode,
       cfgFor: snap.cfgFor, cfgBase: copyCfg(snap.cfgBase),
       lines: snap.lines.map(cloneLine), lineSeq: snap.lineSeq,
     });
@@ -7509,7 +7529,24 @@ const ArroData = (function () {
   function floodRailFollows() {
     if (ad.series.some(s => s.flood && (s.flood.classes || s.flood.aep))) renderSide();
   }
-  function setChart(v)     { ad.chartType = v; renderMainOnly(); }
+  // See styleSeg(): Line and Step exclude each other, Points rides with either,
+  // and the last thing drawn cannot be switched off.
+  function setChart(v) {
+    const ptsOn = ad.chartType === 'dots' || ad.points;
+    if (v === 'dots') {
+      if (!ptsOn) ad.points = true;
+      else if (ad.chartType !== 'dots') ad.points = false;
+      else return;
+    } else if (v === 'line' || v === 'step') {
+      if (ad.chartType === v) {
+        if (!ptsOn) return;
+        ad.chartType = 'dots'; ad.points = false;
+      } else {
+        ad.chartType = v; ad.points = ptsOn;
+      }
+    } else return;
+    renderMainOnly();
+  }
   // Choosing an axis mode — or typing into the range inputs — by hand drops
   // any stash a zoom gesture left behind: the operator has spoken since, and
   // reset must not overrule them with older state.
