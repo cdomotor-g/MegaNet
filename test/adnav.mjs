@@ -767,6 +767,79 @@ try {
   ok('a new import arrives on the defaults, and the panel moves to it',
      added.onIt && added.large === 7 && !added.rateOn, JSON.stringify(added));
 
+  // ── 11. Undo and redo ─────────────────────────────────────────────────────
+  const un = await page.evaluate(async () => {
+    const A = window.ArroData, ad = A.ad, out = {};
+    const tick = () => new Promise(r => setTimeout(r, 30));
+    const s = ad.series[0];
+    A.setCfgFor(s.key);
+    // A filter change, undone and redone.
+    const large0 = s.cfg.large, n0 = ad.undo.length;
+    A.setCfg('large', large0 + 5);
+    out.stepAdded = ad.undo.length === n0 + 1;
+    A.undo();
+    out.filterBack = s.cfg.large === large0 && ad.redo.length === 1;
+    A.redo();
+    out.filterRedone = s.cfg.large === large0 + 5;
+    A.undo();
+    // A choice that changes nothing is not a step.
+    const n1 = ad.undo.length;
+    A.setMode(ad.mode);
+    out.noopNoStep = ad.undo.length === n1;
+    // Two value edits, then two undos: the readings come back exactly, so a
+    // snapshot is never written through by a later in-place edit.
+    const i = 10, v0 = s.v[i];
+    A.pickClear(); A.pickToggle(s.key, i);
+    A.editValue('by', 5);
+    A.editValue('by', 7);
+    out.edited = s.v[i] === v0 + 12;
+    A.undo();
+    out.oneBack = s.v[i] === v0 + 5;
+    A.undo();
+    out.twoBack = s.v[i] === v0 && !(s.edited && s.edited[i]);
+    // A removed series comes back.
+    const keys = ad.series.map(x => x.key).join();
+    await A.remove(ad.series[ad.series.length - 1].key);
+    out.removed = ad.series.length === keys.split(',').length - 1;
+    A.undo();
+    out.seriesBack = ad.series.map(x => x.key).join() === keys;
+    // A function line goes away again.
+    const l0 = ad.lines.length;
+    A.setFnDraft('t'); A.lineAddFn();
+    out.lineAdded = ad.lines.length === l0 + 1;
+    A.undo();
+    out.lineGone = ad.lines.length === l0;
+    await tick();
+    out.button = !document.getElementById('ad-undo').disabled && !document.getElementById('ad-redo').disabled;
+    return out;
+  });
+  for (const [k, w] of [['stepAdded', 'a filter change is one Undo step'],
+                        ['filterBack', '…Undo puts the filter back'], ['filterRedone', '…and Redo reapplies it'],
+                        ['noopNoStep', 'a choice that changes nothing is not a step'],
+                        ['edited', 'two value edits land'], ['oneBack', '…Undo takes back the second'],
+                        ['twoBack', '…and the first, to the exact reading as loaded'],
+                        ['removed', 'a removed series is removed'], ['seriesBack', '…and Undo brings it back'],
+                        ['lineAdded', 'a function line is added'], ['lineGone', '…and Undo takes it away'],
+                        ['button', 'the Undo and Redo buttons are live once there is something to step to']]) {
+    ok(w, un[k], JSON.stringify(un));
+  }
+
+  // A wheel zoom on the chart, then Ctrl+Z from the keyboard.
+  const wz = await page.evaluate(() => {
+    const r = document.getElementById('ad-svg').getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, view: JSON.stringify(window.ArroData.ad.view) };
+  });
+  await page.mouse.move(wz.x, wz.y);
+  await page.mouse.wheel(0, -240);
+  await page.waitForTimeout(150);
+  const zoomed = await page.evaluate(() => JSON.stringify(window.ArroData.ad.view));
+  await page.evaluate(() => document.activeElement && document.activeElement.blur());
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(150);
+  const back = await page.evaluate(() => JSON.stringify(window.ArroData.ad.view));
+  ok('a wheel zoom is undone by Ctrl+Z', zoomed !== wz.view && back === wz.view,
+     `${wz.view} → ${zoomed} → ${back}`);
+
   ok('nothing threw', errors.length === 0, errors.join(' | '));
 
   await context.close();
@@ -781,5 +854,5 @@ console.log(failures
     + '       wheel pans sideways and steps evenly, and both the balloon and the\n'
     + '       callout say what the reading did either side of itself; every mark\n'
     + '       kind has its own tick and its own cap; and the demo picker loads\n'
-    + '       Tyalgum with its preset; filters are per series.');
+    + '       Tyalgum with its preset; filters are per series; and Undo steps back.');
 process.exit(failures ? 1 : 0);

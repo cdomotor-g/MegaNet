@@ -283,6 +283,10 @@ const ArroData = (function () {
       // *reference*, and the two tabs would then share one list of ticked codes.
       cfgBase:   { ...AD_CFG_DEFAULT, qualCut: [] },
       cfgFor:    null,
+      // Undo and redo: snapshots of everything the operator can change — see
+      // "Undo" below. Per instance, like everything else here.
+      undo:      [],
+      redo:      [],
       get cfg() { const s = cfgSeries(this); return s ? s.cfg : this.cfgBase; },
       set cfg(v) {
         const s = cfgSeries(this);
@@ -1974,6 +1978,9 @@ const ArroData = (function () {
   // to read lives here, so adding a source is a query and a label rather than a
   // checklist of fields to remember.
   function adoptSeries(data, ident) {
+    // One step per batch: a drop of five files, or a field query that brings
+    // in six sensors, undoes as one import.
+    if (checkpoint(ad, 'adopt', 'import')) ad.redo = [];
     const s = {
       key:      `ad${++ad.seq}`,
       // Stamped from the instance, not passed in: a series cannot claim to be
@@ -2665,6 +2672,11 @@ const ArroData = (function () {
     // anything came back, so a chart is never left showing last question's
     // answer under this question's window.
     const replacing = new Set(addrs);
+    // The replaced series are part of the step the new ones arrive in, so one
+    // Undo puts the previous answer back.
+    if (inst.series.some(s => s.prov && replacing.has(s.prov.addr)) && checkpoint(inst, 'adopt', 'field load')) {
+      inst.redo = [];
+    }
     inst.series = inst.series.filter(s => !(s.prov && replacing.has(s.prov.addr)));
 
     if (!out.rows.length) {
@@ -4702,6 +4714,15 @@ const ArroData = (function () {
              read off it, pick how to draw it, pick the scale it is drawn
              against. Four choices, in the order somebody makes them. -->
         <div class="ad-toolbar-row">
+          ${grp('Undo', `
+            <span class="ad-tool-grp">
+              <button id="ad-undo" onclick="ArroData.undo()" ${ad.undo.length ? '' : 'disabled'}
+                      aria-label="Undo"
+                      title="${escAttr(ad.undo.length ? `Undo the ${ad.undo[ad.undo.length - 1].label} (Ctrl+Z)` : 'Nothing to undo')}">↶ Undo</button>
+              <button id="ad-redo" onclick="ArroData.redo()" ${ad.redo.length ? '' : 'disabled'}
+                      aria-label="Redo"
+                      title="${escAttr(ad.redo.length ? `Redo the ${ad.redo[ad.redo.length - 1].label} (Ctrl+Shift+Z)` : 'Nothing to redo')}">↷ Redo</button>
+            </span>`)}
           ${grp('Series', seg('Which series', ad.mode, [
             ['raw', 'Raw', 'Everything as exported'],
             ['filtered', 'Filtered', 'Only what passed the 357 test'],
@@ -4887,6 +4908,7 @@ const ArroData = (function () {
 
   // Taken once, at the first edit, and never again — see the note above.
   function keepOriginal(s) {
+    ownArrays(s);
     if (!s.orig) s.orig = { v: Float64Array.from(s.v), q: Uint8Array.from(s.q) };
     if (!s.edited) s.edited = new Uint8Array(s.n);
   }
@@ -6526,6 +6548,17 @@ const ArroData = (function () {
     const stage = document.getElementById('ad-stage');
     const svg = document.getElementById('ad-svg');
     if (!stage || !svg) return;
+    undoGuard(svg, () => AD_GESTURE_WORD[ad.drag && ad.drag.mode] || 'pan or zoom');
+    undoGuard(document.getElementById('ad-ov'), () => 'pan or zoom');
+    undoGuard(document.getElementById('ad-vov'), () => 'vertical zoom');
+    if (!stage._undoKeys) {
+      stage._undoKeys = 1;
+      stage.addEventListener('keydown', ev => {
+        if (!['ArrowLeft', 'ArrowRight', '+', '=', '-', '_', '0'].includes(ev.key)) return;
+        const m = checkpoint(ad, 'key', 'pan or zoom');
+        setTimeout(() => settle(m), 0);
+      }, true);
+    }
 
     svg.onpointermove = ev => {
       const { x: px, y: py } = svgPt(ev, svg);
@@ -6604,6 +6637,9 @@ const ArroData = (function () {
             // its shape instead of collapsing onto one value.
             const rows = [];
             for (const [ser, idx] of pickedBySeries()) {
+              // Before the first live write, so the undo snapshot taken at this
+              // press keeps the values as they were, and so does Revert.
+              keepOriginal(ser);
               for (const i of idx) rows.push({ s: ser, i, v0: ser.v[i] });
             }
             hold = { rows, from: g.valOf(py) };
@@ -7016,6 +7052,7 @@ const ArroData = (function () {
     // app.js's stop-list, is #142; re-registering on every render is harmless
     // because the registry is keyed by name.
     registerTabTeardown('ArroData', stop);
+    bindUndoKeys();
     if (ad.ro) { ad.ro.disconnect(); ad.ro = null; }
     measure();
     bind();
@@ -7041,6 +7078,195 @@ const ArroData = (function () {
     cancelDrawSoon();
     ad.full = false;
     syncFullEsc();
+  }
+
+  // ── Undo ───────────────────────────────────────────────────────────────────
+  // One step back through whatever the operator did on this tab: a filter, a
+  // toolbar choice, a series' colour or axis, a pan or zoom, a drawn line, a
+  // moved, edited or deleted reading, a removed series, an import. Not the
+  // selection, the pin or which panels are open — those are where you are, not
+  // what you did.
+  //
+  // A step is a snapshot taken *before* the action and kept only if the action
+  // changed something (settle()), so a cancelled confirm or a click that moved
+  // nothing never costs an Undo press. Snapshots copy the small things and keep
+  // references to the big per-reading arrays; every in-place edit goes through
+  // keepOriginal() → ownArrays(), which gives the series fresh copies first, so
+  // a reference in an older snapshot is never written through. The memory cost
+  // is one copy of a series' arrays per step that edited it, capped by AD_UNDO_MAX.
+  const AD_UNDO_MAX = 50;
+  const AD_GESTURE_WORD = { pan: 'pan', box: 'box zoom', x: 'horizontal zoom', y: 'vertical zoom',
+                            movept: 'moved readings', draw: 'drawing', ruler: 'ruler' };
+  const AD_UNDO_WORD = {
+    toggle: 'show or hide', setColor: 'colour change', setDash: 'line style', setAxis: 'axis change',
+    setKind: 'reads-as change', setFlood: 'flood lines', solo: 'solo', zoomTo: 'fit to series',
+    remove: 'removed series', clearAll: 'clear all', setCfg: 'filter change', resetCfg: 'filter defaults',
+    setQual: 'quality code', applyCfgAll: 'apply to all', setMode: 'series choice',
+    setTransform: 'reading choice', setChart: 'style change', setY: 'vertical axis',
+    setYRange: 'vertical range', setMark: 'mark choice', setDrag: 'drag choice', resetView: 'reset view',
+    preset: 'window', lineAddFn: 'function line', fitPicked: 'fitted curve', lineToggle: 'show or hide line',
+    lineColor: 'line colour', lineAxis: 'line axis', lineName: 'line name', lineRemove: 'removed line',
+    linesClear: 'cleared lines', editValue: 'value edit', editQuality: 'quality edit',
+    editDelete: 'deleted readings', revertSeries: 'revert', editCell: 'table edit',
+  };
+
+  // Identity for arrays, so the signature can tell "same array" from "copied".
+  const adIds = new WeakMap();
+  let adIdSeq = 0;
+  const idOf = o => {
+    if (!o || typeof o !== 'object') return 0;
+    if (!adIds.has(o)) adIds.set(o, ++adIdSeq);
+    return adIds.get(o);
+  };
+  const cloneLine = l => ({ ...l, pts: l.pts ? l.pts.map(p => [...p]) : l.pts });
+
+  function snapSeries(s) {
+    return {
+      s, cfg: copyCfg(s.cfg), flood: { ...(s.flood || {}) }, extra: { ...(s.extra || {}) },
+      qcodes: s.qcodes ? [...s.qcodes] : s.qcodes,
+      f: { visible: s.visible, color: s.color, colorSet: s.colorSet, slot: s.slot, dash: s.dash,
+           axis: s.axis, kind: s.kind, gapMs: s.gapMs, n: s.n, t: s.t, tr: s.tr, v: s.v, raw: s.raw,
+           q: s.q, edited: s.edited, orig: s.orig, eng: s.eng, deleted: s.deleted },
+    };
+  }
+  // Everything restore() puts back, as one comparable string.
+  function stateSig(inst) {
+    return JSON.stringify([
+      inst.view, inst.yMode, inst.yMin, inst.yMax, inst.mode, inst.transform, inst.chartType,
+      inst.marks, inst.dragMode, inst.cfgBase,
+      inst.lines.map(l => [l.id, l.visible, l.color, l.axis, l.label, l.src, l.pts && l.pts.length]),
+      inst.series.map(s => [s.key, s.cfg, s.flood, s.visible, s.color, s.colorSet, s.dash, s.axis,
+        s.kind, s.gapMs, s.n, s.deleted, s.qcodes && s.qcodes.length,
+        [s.t, s.tr, s.v, s.raw, s.q, s.edited, s.orig, s.eng].map(idOf),
+        Object.values(s.extra || {}).map(idOf)]),
+    ]);
+  }
+  function capture(inst, label) {
+    return {
+      inst, label, at: Date.now(), sig: stateSig(inst),
+      view: inst.view && { ...inst.view }, yMode: inst.yMode, yMin: inst.yMin, yMax: inst.yMax,
+      yStash: inst.yStash && { ...inst.yStash }, mode: inst.mode, transform: inst.transform,
+      chartType: inst.chartType, marks: { ...inst.marks }, dragMode: inst.dragMode,
+      cfgFor: inst.cfgFor, cfgBase: copyCfg(inst.cfgBase),
+      lines: inst.lines.map(cloneLine), lineSeq: inst.lineSeq,
+      series: inst.series.map(snapSeries),
+    };
+  }
+
+  // Before an action. Returns the snapshot, or null when it was folded into
+  // the one before — a run of wheel notches or arrow presses is one step.
+  function checkpoint(inst, tag, label) {
+    const top = inst.undo[inst.undo.length - 1];
+    if (tag && top && top.tag === tag && Date.now() - top.at < 1000) { top.at = Date.now(); return null; }
+    const snap = capture(inst, label || 'change');
+    snap.tag = tag || '';
+    // From here a series' arrays are shared with this snapshot.
+    for (const x of inst.series) x.undoShared = true;
+    inst.undo.push(snap);
+    if (inst.undo.length > AD_UNDO_MAX) inst.undo.shift();
+    return snap;
+  }
+  // After it: drop the snapshot if nothing changed, else it is a step and
+  // anything that was redoable no longer follows from here.
+  function settle(snap) {
+    if (!snap) return;
+    const inst = snap.inst, top = inst.undo[inst.undo.length - 1];
+    if (top !== snap) return;
+    if (stateSig(inst) === snap.sig) inst.undo.pop();
+    else inst.redo = [];
+    syncUndo();
+  }
+
+  // Copy-on-write for the arrays an edit writes into in place.
+  function ownArrays(s) {
+    if (!s.undoShared) return;
+    s.v = Float64Array.from(s.v);
+    s.q = s.q && s.q.slice();
+    if (s.edited) s.edited = s.edited.slice();
+    s.undoShared = false;
+  }
+
+  function restore(inst, snap) {
+    Object.assign(inst, {
+      view: snap.view && { ...snap.view }, yMode: snap.yMode, yMin: snap.yMin, yMax: snap.yMax,
+      yStash: snap.yStash && { ...snap.yStash }, mode: snap.mode, transform: snap.transform,
+      chartType: snap.chartType, marks: { ...snap.marks }, dragMode: snap.dragMode,
+      cfgFor: snap.cfgFor, cfgBase: copyCfg(snap.cfgBase),
+      lines: snap.lines.map(cloneLine), lineSeq: snap.lineSeq,
+    });
+    const before = new Map(inst.series.map(x => [x.key, x.n]));
+    inst.series = snap.series.map(e => {
+      Object.assign(e.s, e.f, { cfg: copyCfg(e.cfg), flood: { ...e.flood }, extra: { ...e.extra },
+        qcodes: e.qcodes ? [...e.qcodes] : e.qcodes, undoShared: true,
+        filt: null, tracks: null, floodTyp: null });
+      return e.s;
+    });
+    // A pick is a row index, so it only survives where the rows did.
+    const lost = [...before.keys()].filter(k => !inst.series.some(x => x.key === k && x.n === before.get(k)));
+    if (lost.length || inst.series.some(x => !before.has(x.key))) inst.picked.clear();
+    inst.pin = null; inst.hover = null; inst.drag = null; inst.tableSig = '';
+  }
+
+  function stepUndo(from, to, verb) {
+    const snap = ad[from].pop();
+    if (!snap) { note(`Nothing to ${verb.toLowerCase()}.`); return; }
+    const now = capture(ad, snap.label);
+    ad[to].push(now);
+    restore(ad, snap);
+    renderAll();
+    if (adTableModalOpen) renderTableModal();
+    note(`${verb === 'Undo' ? 'Undid' : 'Redid'} the ${snap.label}.`);
+  }
+  function undo() { stepUndo('undo', 'redo', 'Undo'); }
+  function redo() { stepUndo('redo', 'undo', 'Redo'); }
+
+  // The two buttons follow the stacks without a toolbar re-render, which would
+  // drop the pointer mid-gesture.
+  function syncUndo() {
+    const u = document.getElementById('ad-undo'), r = document.getElementById('ad-redo');
+    const top = a => a[a.length - 1];
+    if (u) { u.disabled = !ad.undo.length; u.title = ad.undo.length ? `Undo the ${top(ad.undo).label} (Ctrl+Z)` : 'Nothing to undo'; }
+    if (r) { r.disabled = !ad.redo.length; r.title = ad.redo.length ? `Redo the ${top(ad.redo).label} (Ctrl+Shift+Z)` : 'Nothing to redo'; }
+  }
+
+  // A drag on the chart or either navigator is a step: snapshot at the press,
+  // settle once the handlers have finished with the release. Capture phase, so
+  // the snapshot is taken before the chart's own handler starts the gesture.
+  function undoGuard(el, word) {
+    if (!el || el._undoGuard) return;
+    el._undoGuard = 1;
+    let g = null;
+    el.addEventListener('pointerdown', ev => { if (!ev.button) g = checkpoint(ad, '', 'pan or zoom'); }, true);
+    const end = () => { const m = g; g = null; if (m) setTimeout(() => settle(m), 0); };
+    el.addEventListener('pointerup', () => { if (g) g.label = word(); end(); }, true);
+    el.addEventListener('pointercancel', end, true);
+    el.addEventListener('dblclick', () => {
+      const m = checkpoint(ad, '', 'reset view');
+      setTimeout(() => settle(m), 0);
+    }, true);
+    el.addEventListener('wheel', () => {
+      const m = checkpoint(ad, 'wheel', 'zoom');
+      setTimeout(() => settle(m), 0);
+    }, true);
+  }
+
+  // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y while the tab is on screen — but not in a
+  // text field, where the browser's own undo is the one somebody means.
+  let adUndoKeys = false;
+  function bindUndoKeys() {
+    if (adUndoKeys) return;
+    adUndoKeys = true;
+    document.addEventListener('keydown', ev => {
+      if (!(ev.ctrlKey || ev.metaKey) || ev.altKey) return;
+      const k = ev.key.toLowerCase();
+      if (k !== 'z' && k !== 'y') return;
+      if (!document.getElementById('ad-stage')) return;
+      const t = ev.target;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (document.querySelector('.modal-overlay') && !adTableModalOpen) return;
+      ev.preventDefault();
+      if (k === 'y' || ev.shiftKey) redo(); else undo();
+    });
   }
 
   function renderAll() {
@@ -7210,8 +7436,11 @@ const ArroData = (function () {
     if (!total) return;
     if (total > 1 && !(await confirmDialog({ title: `Remove all ${total} loaded series, on both data tabs?`,
       confirm: 'Remove them all', danger: true }))) return;
+    // The undo history goes too: its snapshots hold the very arrays this is
+    // here to let go of.
     for (const i of Object.values(instances)) {
       i.series = []; i.pin = null; i.hover = null; i.view = null; i.picked.clear();
+      i.undo = []; i.redo = [];
     }
     renderAll();
   }
@@ -7580,7 +7809,22 @@ const ArroData = (function () {
     draw(); drawOv(); drawCompare(true);
   }
 
-  return {
+  // Every exported action the operator can take is a step: a snapshot before,
+  // kept if it changed anything. Done here, once, rather than in forty
+  // handlers, so a new action is undoable by being named in AD_UNDO_WORD.
+  // Async ones (a confirm first) settle when they finish, so a Cancel is no step.
+  const undoable = (name, fn) => function (...args) {
+    const mark = checkpoint(ad, '', AD_UNDO_WORD[name]);
+    const done = () => settle(mark);
+    const r = fn.apply(this, args);
+    if (r && typeof r.then === 'function') r.then(done, done); else done();
+    return r;
+  };
+  function wrapUndoable(o) {
+    for (const name of Object.keys(AD_UNDO_WORD)) o[name] = undoable(name, o[name]);
+    return o;
+  }
+  const api = {
     // The instance on screen. A getter rather than a property because `ad` is a
     // binding that moves with the active tab, and a captured reference would go
     // stale the first time the operator opened the other one.
@@ -7615,7 +7859,9 @@ const ArroData = (function () {
     fieldAddrs, fieldNoAddr, fieldChannelId,
     // the series boundary both sources cross
     seriesData, adoptSeries,
+    undo, redo,
   };
+  return wrapUndoable(api);
 })();
 if (typeof window !== 'undefined') window.ArroData = ArroData;
 

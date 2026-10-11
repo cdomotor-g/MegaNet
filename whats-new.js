@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 25, date: '2026-10-11', items: [
+      '<strong>📊 Plots: Undo and Redo.</strong> The first buttons on the chart toolbar step back through what you did on the '
+        + 'tab — a filter, a toolbar choice, a pan or zoom, a drawn line, moved, edited or deleted readings, a removed series '
+        + 'or an import — and forward again. Ctrl+Z and Ctrl+Shift+Z (or Ctrl+Y) do the same; hover the button to see what '
+        + 'it will undo.',
+    ] },
     { n: 24, date: '2026-10-11', items: [
       '<strong>📊 Plots: filters per series.</strong> Each series you load has its own filters — the 3-5-7 test, rollovers, '
         + 'rate limits, quality codes and min/max. With more than one loaded, <em>Filters for</em> at the top of the Filters '
