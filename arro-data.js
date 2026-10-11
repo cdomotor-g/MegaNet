@@ -325,7 +325,7 @@ const ArroData = (function () {
       // of them because panning is the state people spend most of their time
       // in. The Shift and Alt modifiers still outrank whatever is set here, so
       // either zoom is always reachable without touching the toolbar.
-      dragMode:  'pan',          // pan | box | y | select | draw | ruler
+      dragMode:  'pan',          // pan | box | x | y | select | draw | ruler
       // The lines a person adds to the chart themselves — a typed function, a
       // curve fitted to picked readings, a freehand stroke, a ruled line. See
       // "Your lines" below draw(). Per instance like everything else here, and
@@ -4734,6 +4734,7 @@ const ArroData = (function () {
           ${grp('Drag does', seg('What dragging the chart does', ad.dragMode, [
             ['pan',    'Pan',      'Drag moves the window along the record. Shift or Alt still reach either zoom.'],
             ['box',    'Box zoom', 'Drag a box to zoom to it — time and value together. Or hold Shift while dragging.'],
+            ['x',      'Horizontal', 'Drag left or right to zoom the time axis to that span; the vertical axis stays put.'],
             ['y',      'Vertical', 'Drag up or down to rescale the vertical axis to that span; time stays put. Or hold Alt while dragging.'],
             ['select', 'Select',   'Drag a box to pick every reading in it, removed ones included, then edit or delete them — or fit a curve to them. Click a picked reading and drag it up or down to move it.'],
             ['draw',   'Draw',     'Draw freehand on the chart. The stroke stays where you drew it as you pan and zoom, and is listed under Your lines.'],
@@ -5824,8 +5825,9 @@ const ArroData = (function () {
                         stroke="${c.accent}" stroke-width="2"/>`;
       }
     }
-    // The rubber band, in three shapes matching the three committed gestures:
-    // a vertical-axis drag shows a full-width band, a box brush shows the box
+    // The rubber band, in four shapes matching the committed gestures: a
+    // vertical-axis drag shows a full-width band, a horizontal one a
+    // full-height band, a box brush shows the box
     // it will zoom to — unless its vertical throw is under AD_BOX_EPS, in
     // which case the feedback goes full-height, honestly promising the x-only
     // zoom the commit will deliver.
@@ -5845,7 +5847,7 @@ const ArroData = (function () {
       if (ad.drag.mode === 'y') {
         out += `<rect x="${PADL}" y="${ya.toFixed(1)}" width="${g.pw}" height="${(yb - ya).toFixed(1)}"
                       fill="${c.accent}" opacity=".14"/>`;
-      } else if (Math.abs(ad.drag.y1 - ad.drag.y0) <= AD_BOX_EPS) {
+      } else if (ad.drag.mode === 'x' || Math.abs(ad.drag.y1 - ad.drag.y0) <= AD_BOX_EPS) {
         out += `<rect x="${a.toFixed(1)}" y="${PADT}" width="${(b - a).toFixed(1)}" height="${g.ph}"
                       fill="${c.accent}" opacity=".14"/>`;
       } else {
@@ -6621,13 +6623,14 @@ const ArroData = (function () {
         draw();
         return;
       }
-      if (moved && d.mode === 'box') {
+      if (moved && (d.mode === 'box' || d.mode === 'x')) {
         const a = g.v.t0 + (Math.min(d.x0, px) - PADL) / g.pw * (g.v.t1 - g.v.t0);
         const b = g.v.t0 + (Math.max(d.x0, px) - PADL) / g.pw * (g.v.t1 - g.v.t0);
         if (b - a > 1000) ad.view = { t0: a, t1: b };
         // The vertical side only commits past AD_BOX_EPS — a flat sweep stays
-        // the x-only zoom it always was.
-        if (dy > AD_BOX_EPS) {
+        // the x-only zoom it always was. Horizontal never touches it, however
+        // much the hand wanders up or down on the way across.
+        if (d.mode === 'box' && dy > AD_BOX_EPS) {
           yDone = commitY(g.valOf(cl(Math.max(d.y0, py))), g.valOf(cl(Math.min(d.y0, py))));
         }
       } else if (moved && d.mode === 'y') {

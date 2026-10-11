@@ -291,7 +291,7 @@ try {
   // The wheel is one gesture whatever "Drag does" is set to — it never consulted
   // that setting, and this is what keeps it that way.
   const perMode = {};
-  for (const mode of ['pan', 'box', 'y', 'select']) {
+  for (const mode of ['pan', 'box', 'x', 'y', 'select']) {
     perMode[mode] = await page.evaluate(async (m) => {
       const A = window.ArroData;
       A.setDrag(m);
@@ -307,9 +307,38 @@ try {
                         / (perMode[mode].before.t1 - perMode[mode].before.t0);
   }
   const ratios = Object.values(perMode).map(m => m.ratio);
-  ok('one wheel notch is the same step in all four "Drag does" modes',
+  ok('one wheel notch is the same step in every "Drag does" mode',
      Math.max(...ratios) - Math.min(...ratios) < 0.001,
      Object.entries(perMode).map(([k, m]) => `${k}=${m.ratio.toFixed(4)}`).join(' '));
+
+  // Drag does: Horizontal zooms time to the span dragged across and leaves the
+  // vertical axis as it was — however far the hand wanders up or down on the
+  // way, which is the difference from a Box zoom.
+  const hz = await page.evaluate(async () => {
+    const A = window.ArroData;
+    A.setDrag('x');
+    await new Promise(r => setTimeout(r, 60));
+    const r = document.getElementById('ad-svg').getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2,
+             view: { ...A.ad.view }, yMode: A.ad.yMode, yMin: A.ad.yMin, yMax: A.ad.yMax };
+  });
+  await page.mouse.move(hz.x - 100, hz.y - 40);
+  await page.mouse.down();
+  await page.mouse.move(hz.x + 100, hz.y + 60, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(120);
+  const hzAfter = await page.evaluate(() => {
+    const A = window.ArroData;
+    return { view: { ...A.ad.view }, yMode: A.ad.yMode, yMin: A.ad.yMin, yMax: A.ad.yMax };
+  });
+  const hzSpan = (hzAfter.view.t1 - hzAfter.view.t0) / (hz.view.t1 - hz.view.t0);
+  ok('a Horizontal drag zooms time to the span dragged across',
+     hzSpan > 0.05 && hzSpan < 0.6 && hzAfter.view.t0 > hz.view.t0 && hzAfter.view.t1 < hz.view.t1,
+     `span ratio ${hzSpan.toFixed(3)}`);
+  ok('…and leaves the vertical axis alone',
+     hzAfter.yMode === hz.yMode && hzAfter.yMin === hz.yMin && hzAfter.yMax === hz.yMax,
+     `${hz.yMode} → ${hzAfter.yMode}`);
+  await page.evaluate(() => window.ArroData.setDrag('pan'));
 
   // ── 5. The balloon says it too, at a glance ───────────────────────────────
   // The hover balloon is where the question is actually asked — the pointer is
