@@ -81,6 +81,7 @@ const SiteMap = (function () {
         'Draw a line between two sites for its elevation profile and link budget',
         'Tilt the map into 3-D, or open a station\'s digital twin from close in',
         'Edit a station\'s record, or propose a new site (sign in first)',
+        'Map a station\'s orifice outlet, pits, benchmarks, boards and orifice run (sign in first)',
       ],
     },
     maps: {
@@ -387,6 +388,7 @@ const SiteMap = (function () {
     { text: 'Take site photos stamped with where and which way', tab: 'camera' },
     { text: 'File the photos from a field trip',           tab: 'photos' },
     { text: 'Survey a station\'s gauge zero and benchmarks', tab: 'levels' },
+    { text: 'Map where a station\'s pits and orifice run are', tab: 'stations' },
     { text: 'Check a level with a two-peg test',           tab: 'twopeg' },
     { text: 'Print a map for a field trip',                tab: 'mapgen' },
     { text: 'Review a radio network\'s design',            tab: 'review' },

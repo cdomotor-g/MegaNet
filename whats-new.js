@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 28, date: '2026-10-12', items: [
+      '<strong>📌 Site features.</strong> Signed in, a station\'s card has a <em>Site features</em> pill beside '
+        + '<em>Move pin</em>: put its orifice outlet, inspection pits, benchmarks and gauge boards on the map, and draw '
+        + 'its orifice run from the shelter through the pits — click by click, by your phone\'s position, or as typed '
+        + 'coordinates. The card lists what is mapped, and from zoom 16 the map draws every station\'s (🗺️ Map display, '
+        + '<em>Site features</em>). <em>⬇ GeoJSON</em> takes a station\'s to QGIS or Google Earth.',
+    ] },
     { n: 27, date: '2026-10-12', items: [
       '<strong>⛰️ 3-D view: Draw &amp; measure works there too.</strong> Lines, circles, boxes, pins and notes drawn on '
         + 'the Stations map now show in the 3-D view, laid over the ground with their measurements. The ✏️ tools work in '

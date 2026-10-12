@@ -21,7 +21,8 @@
 // once the card is on screen, because the heard-slots list reads the readings
 // rather than state.data; to
 // map-move-pin.js for the button that moves this station's pin on the map above
-// the card, which writes back into the two coordinate boxes; to auth.js for
+// the card, which writes back into the two coordinate boxes; to site-features.js
+// for the one beside it that maps the station's site features (0061); to auth.js for
 // Auth; and to
 // datastore.js for dbCanWrite, dbSaveStation, dbDeleteStation, dbSelect,
 // setEditorStatus, editorStatusHtml and editorWritesGoToDatabase; to inspections.js for
@@ -294,6 +295,11 @@ function editorForm(s) {
   // (#176, export.js), and it is the same pill the map's own card carries.
   const links   = [mapLinksHtml(s), stationKmlPillHtml(s)].filter(Boolean).join('\n    ');
   const movePin = MapMovePin.editorButtonHtml(s);
+  // Where the station's outlet, pits, benchmarks, boards and orifice run are
+  // (site-features.js, 0061): the same mode the card's 📌 pill arms, beside
+  // Move pin because both are the station's place on the ground. Signed-in
+  // editors only, and nothing for a "+ New" draft, which has no id yet.
+  const siteFeat = typeof SiteFeatures !== 'undefined' ? SiteFeatures.editorButtonHtml(s) : '';
   // Same pill the station card on the map carries (and a phone's callout),
   // from the same builder — but pointed at
   // editorCopyLatLon(), which reads the two boxes rather than the record. The
@@ -364,7 +370,7 @@ function editorForm(s) {
            being written somewhere else. Both belong to the two boxes above, so
            they sit on one row directly under them rather than in the links row
            below, which is five things that all leave the site. -->
-      ${movePin || copyLL ? `<div class="full ef-movepin pill-row">${movePin}${copyLL}</div>` : ''}
+      ${movePin || copyLL || siteFeat ? `<div class="full ef-movepin pill-row">${movePin}${copyLL}${siteFeat}</div>` : ''}
       ${links ? `<div class="full small ef-links">${links}</div>` : ''}
       <label>Elevation AHD (m)<input type="number" step="any" id="ef-elev" value="${s.elevation_ahd ?? ''}"></label>
       <!-- Read-only because it is not a property of the station: it is where the

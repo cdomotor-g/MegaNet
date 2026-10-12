@@ -94,6 +94,9 @@ MegaNet/
 ├── map-locate.js           ← MapLocate — GPS dot, accuracy ring, compass cone
 ├── map-move-pin.js         ← MapMovePin — drag one station's pin to where the
 │                             station is, and save the coordinates
+├── site-features.js        ← SiteFeatures — a station's orifice outlet, pits,
+│                             benchmarks, gauge boards and orifice run: drawn on the
+│                             map, listed on its card, placed and drawn (0061)
 ├── station-trail.js        ← StationTrail — the stations looked at this session:
 │                             a pill in the map's top row that brings a closed
 │                             card back and goes back to any of them
@@ -2942,6 +2945,10 @@ Side panel or modal showing full station record:
   search (`site-land.js`; `docs/site-land.md` has what each row means)
 - **Equipment**, for signed-in editors: what the station's register says is
   fitted there, once an administrator has approved it (`photo-review.js`)
+- **Site features**, for signed-in editors: where its orifice outlet, pits,
+  benchmarks, gauge boards and orifice run are, a row each that shows its
+  feature on the map, and the **📌 Site features** pill that maps them
+  (`site-features.js`, `0061`; see §30)
 
 ### 13. In-App Bug / Idea Reporter
 The **🐞 Report a Bug** button in the header lets any user flag a problem or
@@ -4828,6 +4835,55 @@ arithmetic of their practice models is ported under the MIT licence. Each tab en
 original, its owner, its licences (MIT for code, CC BY 4.0 for training
 material) and what was changed; the licence notices are kept in full in
 `docs/third-party/mallee-hydrotech/`.
+
+### 30. Site Features (Where a Station's Outlet, Pits, Benchmarks, Boards and Orifice Run Are)
+
+A station is one pin, and the site round it is not: the orifice line leaves the
+shelter, runs through its pits and ends at an outlet in the stream; the
+benchmarks are on a headwall, a tree, a State mark up the road; the boards step
+down the bank. **📌 Site features**, a pill on a station's card beside *Move pin*
+and a button in its editor, puts them on the map — signed-in editors only, the
+way the levels behind them are (`0060`): where a benchmark is, is not for the
+open internet.
+
+**Points and lines.** The orifice outlet, inspection pits, benchmarks, gauge
+boards and crest gauges are points; the orifice run (and a cable run) is a line;
+an *Other point* or *Other line* is anything else worth finding again, named.
+The kinds are a vocabulary in the database (`meganet.station_feature_kind`), so
+a new one is an insert. Each is drawn as the shape a plan uses for it — a ringed
+dot the outlet, a crossed square a pit, a triangle a benchmark, a staff a board
+— so the shape says the kind before the colour does, and a click says what it
+is, where, and how it was placed.
+
+**Drawing.** The mode is armed for one station at a time, as Move pin is, and
+nothing moves until it is. A point is a click on the map, a drag, *Use my
+position* standing on it (the fix's ± kept; a fix worse than 100 m places
+nothing), or its coordinates typed. A line is clicked out a point at a time —
+from the shelter, through each pit, to the outlet — and a click within 14 px of
+the station or one of its points lands on it exactly, so a run passes exactly
+through the pits it was drawn through. Double-click, Enter or *Finish* ends it;
+Backspace takes a point back; then its points drag, a ＋ between two adds one, a
+point picked is taken out with Delete, and *Points as coordinates* is the whole
+line as text to type over or paste a survey into (the keyboard's way in). On a
+phone the panel folds to its head and its Save while a feature is put on the
+ground, and the twin's offer waits.
+
+**Saving.** One feature at a time, through `meganet.save_station_feature()` and
+`delete_station_feature()`, with the stamp it was read with: a save over
+somebody else's newer change is refused, what was drawn stays on screen, and
+*Reload* opens their version. How the position was got goes with it — `map`,
+`gps` with its ±, `typed`, or `mixed` — and the database holds the geometry to
+one shape (GeoJSON, longitude first, seven places), a kind to its shape, and a
+feature to within 10 km of its station's pin. Delete is soft. *⬇ GeoJSON* takes
+a station's features, with the station, to QGIS or Google Earth, named
+`floodnet-site-features-…` and carrying nobody's address.
+
+From zoom 16 the map draws the features of the stations in view (🗺️ Map
+display, *Site features*); the card lists a station's, each row showing its
+feature on the map. `docs/site-features.md` has the rest; `npm run sitefeatures`
+drives it in a browser and `tools/check_station_features.sql` holds the
+database's rules. The migration, `0061`, waits to be applied to the live
+database with `0053`–`0060`; until it is, the card and the panel say so.
 
 ---
 

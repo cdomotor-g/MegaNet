@@ -1175,6 +1175,16 @@ jobs:
         working-directory: test
         run: npm run levels
 
+      # A station's site features (site-features.js, 0061), against a stand-in
+      # datastore: the kinds held to the migration's seed rows, nothing signed
+      # out, a pit placed and an orifice run clicked out through it — snapped
+      # to the pin and the pit exactly, never to a press on the panel — a
+      # point dragged, a stale save refused with Reload, typed coordinates, a
+      # GPS fix, delete, the GeoJSON, a database without 0061, and a phone.
+      - name: Site features — placed, drawn, refused when stale, on a phone
+        working-directory: test
+        run: npm run sitefeatures
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each
@@ -1501,6 +1511,12 @@ jobs:
       # to its station — or changes a station's gauge zero in the editor.
       - name: check_level_surveys.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_level_surveys.sql
+      # A station's site features (0061): what a geometry may be, each kind's
+      # shape held by a foreign key, editors adding, changing and deleting
+      # with the stamp they read, a point on the wrong station's map refused,
+      # and nobody signed out reading any of it.
+      - name: check_station_features.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_station_features.sql
       # Proposed stations (0039): what a proposal has to say, the station
       # document gaining nothing for a station that is not one, and who may
       # propose, add outright and establish — signed up through 0005's own

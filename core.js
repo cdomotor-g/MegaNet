@@ -140,7 +140,7 @@ const TABS = [
   ] },
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
-      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb' },
+      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson' },
     { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
       find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
     { id: 'passranges', label: 'Pass Ranges',            icon: '🔗',
@@ -744,6 +744,22 @@ const HELP = {
       + 'would put it — and <strong>inside the digital twin</strong>, where the pin is an amber post '
       + 'you drag across the ground with the State\'s finest imagery (10 cm over most towns) draped '
       + 'round it: the closest look this app has at where a station really stands.',
+      '<strong>📌 Site features</strong>, beside Move pin on a station\'s card and in its editor, maps '
+      + 'what is round the station — the <strong>orifice outlet</strong>, the <strong>inspection pits</strong>, '
+      + 'the <strong>benchmarks</strong>, the <strong>gauge boards</strong> and a crest gauge as points, and the '
+      + '<strong>orifice run</strong> (or a cable run) as a line through them. Pick what to add and put it on '
+      + 'the map: a point is a click, a drag, <em>Use my position</em> standing on it, or its coordinates '
+      + 'typed; a line is a click at each point — from the shelter, through each pit, to the outlet — and a '
+      + 'click within a finger\'s width of the station or one of its points lands on it exactly. '
+      + 'Double-click, Enter or <em>Finish</em> ends a line; Backspace takes a point back; then its points '
+      + 'drag, a ＋ between two adds one, and <em>Points as coordinates</em> is the whole line as text to '
+      + 'type over or paste a survey into. Save keeps one feature at a time, with how it was placed — on the '
+      + 'map, by GPS with its ±, or typed — and a save over somebody else\'s newer change is refused with '
+      + '<em>Reload</em>. <em>⬇ GeoJSON</em> takes the station\'s features to QGIS or Google Earth. From zoom '
+      + '16 the map draws every station\'s features in view (🗺️ Map display, <em>Site features</em>); each '
+      + 'shape says its kind — a ringed dot the outlet, a crossed square a pit, a triangle a benchmark, a '
+      + 'staff a board — and a click says what it is. Signed-in editors only, as the levels are: where a '
+      + 'benchmark is, is not for the open internet.',
       'The two <strong>document searches</strong> do not send the station\'s name as written. A '
       + 'library search box requires <em>every</em> term to match, so a site filed as "Upper Sandy '
       + 'Ck" would be unreachable from a search that said "Creek" — the wrong half of the pair '
@@ -3738,6 +3754,10 @@ const state = {
   // draws nothing for a session that is not signed in, and a photo somebody
   // took is the first thing they will look for.
   mapPhotos:     localStorage.getItem('mn-field-photos') !== 'off',
+  // The Stations map's 📌 site features (site-features.js, 0061): a
+  // station's orifice outlet, pits, benchmarks, boards and orifice run. On
+  // unless switched off, for the photos' reason: signed out it asks nothing.
+  mapSiteFeatures: localStorage.getItem('mn-site-features') !== 'off',
   // The theme picked, and what it comes to: every module reads `theme`, which
   // is 'light', 'dark' or 'sunlight' — never 'system' — so `=== 'dark'` stays
   // the right question everywhere it is asked (#224).

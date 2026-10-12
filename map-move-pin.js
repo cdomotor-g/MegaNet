@@ -12,7 +12,8 @@
 // card's pill; to station-editor.js for editorSave, stationSavePosition and the
 // #ef-lat / #ef-lon boxes it writes into; to map-draw.js, link-budget.js and
 // map-here.js, to take the map's other interactive modes off before it takes
-// the clicks; to datastore.js for dbCanWrite,
+// the clicks, and to site-features.js for the one it will not take the map
+// from while a feature is half drawn; to datastore.js for dbCanWrite,
 // editorWritesGoToDatabase and setEditorStatus; and to map-3d.js and
 // digital-twin.js, which draw the pin in their own scenes from drawn() and
 // are told when it changes.
@@ -334,6 +335,19 @@ const MapMovePin = (function () {
     // press was enough to reach it.
     if (stationId === id) return;
     if (stationId && stationId !== id) teardown();   // one station at a time
+
+    // The site features mode (site-features.js) is the other mode one station
+    // at a time is in, and the two do not share the map: it is closed outright
+    // when nothing is half drawn, and left alone when something is, rather
+    // than thrown away by a press that was about something else.
+    if (typeof SiteFeatures !== 'undefined' && SiteFeatures.armed && SiteFeatures.armed()) {
+      if (SiteFeatures.dirty()) {
+        mapNote('Save or cancel the site feature being drawn first — then move the pin.', 6000);
+        announce('Save or cancel the site feature being drawn first, then move the pin.');
+        return;
+      }
+      SiteFeatures.stop({ force: true });
+    }
 
     stationId = id;
     onMap = !!map;

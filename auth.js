@@ -12,7 +12,8 @@
 // FieldCamera.authChanged, which sends the photos waiting on the device; to admin.js for
 // Admin.authChanged (0042, administrators only); to network-review.js for
 // NetworkReview.authChanged (administrators only); to station-history.js for
-// StationHistory.authChanged (0056, editors only); and to
+// StationHistory.authChanged (0056, editors only); to site-features.js for
+// SiteFeatures.authChanged (0061, editors only); and to
 // datastore.js for dbSetAccessToken. datastore.js and station-editor.js call
 // back into Auth, so this is a cycle — which is fine in one shared global scope
 // and would not be under ESM, one of the four reasons #129 gives for classic
@@ -494,7 +495,8 @@ const Auth = (function () {
   // The Admin tab (admin.js) is administrators-only (0042), and redraws its
   // users and allowlist — or its "sign in" — for the same reason; so is the
   // Base Stations tab (0049), and the Network Review tab; a station's history and the deleted stations
-  // are editors-only (0056, station-history.js); and Station Health's Ask
+  // are editors-only (0056, station-history.js), and so are a station's site
+  // features (0061, site-features.js); and Station Health's Ask
   // Claude (health-agent.js) runs on Flood-Net's key for editors and
   // administrators only (#229), so it asks again who may. The Field Camera
   // (field-camera.js) sends the photos it has kept on this device as soon as
@@ -513,6 +515,7 @@ const Auth = (function () {
                        typeof BaseStations !== 'undefined' ? BaseStations : null,
                        typeof NetworkReview !== 'undefined' ? NetworkReview : null,
                        typeof StationHistory !== 'undefined' ? StationHistory : null,
+                       typeof SiteFeatures !== 'undefined' ? SiteFeatures : null,
                        typeof HealthAgent !== 'undefined' ? HealthAgent : null]) {
       if (!mod || !mod.authChanged) continue;
       try { mod.authChanged(); } catch (_) { /* its own problem, not the sign-in's */ }

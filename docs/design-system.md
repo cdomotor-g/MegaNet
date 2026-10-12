@@ -281,6 +281,19 @@ a gap no wider than the weight closes — `3,2` at weight 2 drew a solid ring;
 `2,4` draws dashes. A filter's or the selection's ring still wins the ring, being
 what somebody is doing now; the size and the hollow carry the class through it.
 
+**A site feature is a plan symbol in a categorical colour** (`site-features.js`,
+`0061`): the orifice outlet a ringed dot, a pit a crossed square, a benchmark a
+triangle, a gauge board a staff, a crest gauge a diamond, and the orifice and
+cable runs coloured lines in a near-black casing. The colours are literals in
+`SITE_FEATURE_KINDS`, out of the contrast contract for the wind fills' reasons —
+they reach an inline SVG's attributes and Leaflet's path options, which take no
+`var()`, over base maps that do not go dark with the app — and the outlet and
+the orifice run share a blue because they are one system. What carries the kind
+without the colour is the shape, the dash on the cable run and the *other*
+line, and the words: the panel, the card and the popup name every one. The ring
+round a picked feature and the point being placed is `MAP_PIN_HIT`'s amber,
+which on this map means "this one".
+
 ---
 
 ## 2. Breakpoints

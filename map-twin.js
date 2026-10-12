@@ -12,8 +12,9 @@
 // holds the order and the reasons. Reaches back to core.js for `state`,
 // esc, escAttr, announce and acmaHaversineKm; across to digital-twin.js for
 // the scene (DigitalTwin.stageHtml, mountAt, stop, prefetch, patchSize), to
-// app.js for the Leaflet map it is attached to, and to station-trail.js for
-// the pill that stands at the top of its stage. Every one of those is a
+// app.js for the Leaflet map it is attached to, to station-trail.js for
+// the pill that stands at the top of its stage, and to site-features.js,
+// whose mode the offer waits for. Every one of those is a
 // runtime call from inside this file's own functions, so its position among
 // the modules is free. Nothing executes at load (`npm run toplevel`).
 //
@@ -151,7 +152,11 @@ const MapTwin = (function () {
     // The switch in Map display is the offer's: a twin opened by name (the
     // card's pill, the side panel's pane) stays up with it off.
     const cand = candidate();
-    const st = enabled() ? cand : null;
+    // Nor while a station's site features are being mapped (site-features.js):
+    // that is work on the flat map at this zoom, and a card across the top of
+    // it is a tap meant for the ground that opens the twin instead.
+    const mapping = typeof SiteFeatures !== 'undefined' && SiteFeatures.armed && !!SiteFeatures.armed();
+    const st = enabled() && !mapping ? cand : null;
     // Zoomed out past the offer: every × is forgotten, so the next time in
     // the card comes up again.
     if (z < ZOOM) dismissed.clear();

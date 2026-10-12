@@ -275,6 +275,9 @@ its cache at all (`PGRST002`).
 | `meganet.station_level_point`, `meganet.station_level_offset` | What a station holds once an administrator adopts it from a survey (`0060`): its benchmarks (one primary), sensor reference (CTR), cease to flow, gauge boards and other surveyed points — each with its level in the survey's datum, on the gauge (`rl_lgh`) and in AHD where known, current until a later adoption supersedes it (the old row stays) — and each change made to the logger's offset. Written only by `meganet.level_survey_apply()`. **Editors only**. |
 | `meganet.level_survey_apply(uuid, jsonb, text)`, `meganet.level_survey_return(uuid, text)`, `meganet.level_survey_decision` | The administrator's decision (`0060`). `apply` takes the changes ticked — a gauge zero (a new `station_gauge_survey` row from the survey's date, the open one closed the day before, never behind a later one; the station's stamp moves so an open editor reloads), points, offset corrections — in one transaction; `return` sends a survey back with why. **Administrators only** (`42501`, detail `administrator`). Every decision, with each change's before and after, is a row of `level_survey_decision`: station history (`0056`) logs the station's own columns, and gauge zero is not one. |
 | `meganet.level_num(jsonb)` | A reading as a phone sent it — a JSON number, or a string holding one — as numeric, else null (`0060`). Internal. |
+| `meganet.station_feature_kind` | What a station's site feature can be (`0061`): the orifice outlet, inspection pit, benchmark, gauge board, crest gauge and *other point* as `Point`, the orifice run, cable run and *other line* as `LineString`, whether it has to be named (the two *other*s), its order and a sentence. A new kind is an insert. Public, like every vocabulary. |
+| `meganet.station_feature` | Where a station's ancillary features are (`0061`): station, kind, name, note, `geom` — GeoJSON, longitude first, WGS84, seven places, nothing but `type` and `coordinates` (a check over `station_feature_geom_problem()`) — `placed` (`map`, `gps`, `typed`, `mixed`) and the GPS's `accuracy_m`, who added and last changed it, and a soft delete. The kind and the shape are tied by a foreign key over a generated `geom_type`, so a benchmark cannot be a line however it is written; two live features of one kind at a station do not share a name. **Editors only** (RLS hides tombstones); nothing for `anon`. See **Site features**, below. |
+| `meganet.save_station_feature(jsonb, timestamptz)`, `meganet.delete_station_feature(uuid, timestamptz)` | The two doors (`0061`). Any editor. Add (no id) or change (the id and the stamp it was read with, else `PT409`; unmentioned keys kept); refused in words (`22023`) for a bad geometry, a kind that is not one or is the other shape, an *other* with no name, an unknown key, a deleted station, or a point more than 10 km from the station's pin. Delete is soft, with the stamp, and a second delete answers the tombstone. |
 
 Everything is readable by `anon` **except `meganet.reading_raw`, the whole
 inspection domain — bar the numbers, which `0023` publishes as views — and the
@@ -293,7 +296,9 @@ date it happened, and no column anybody wrote. The tables under them are as
 private as they ever were. The station history (`0056`) is editors-only too: the
 station is public, but a record of who changed it, when, is a record of people.
 So are the level surveys (`0060`) — a benchmark's description and position, a
-crew's names — and what a station holds from them.
+crew's names — and what a station holds from them; and so are a station's site
+features (`0061`), for the same reason: where its benchmarks are, and where a
+line runs that somebody might dig through.
 
 Nothing is *writable* by `anon` or by `authenticated`: no table grants either of
 them a write verb, and the only ways in are the functions above — see **Writing**
@@ -1954,6 +1959,38 @@ and somebody signed in to send it as.
 
 `tools/check_level_surveys.sql` proves all of it against a real Postgres, as an
 editor, a second editor, an administrator, a stranger and nobody signed in.
+
+## Site features
+
+`0061` keeps where a station's ancillary features are — the orifice outlet, the
+inspection pits, the benchmarks, the gauge boards, the crest gauge, and the
+orifice run as a line through them — mapped on the Stations map
+(`site-features.js`). Any editor maps them; `0060`'s levels are where the
+*levels* of the same benchmarks and boards go, by an administrator, and the two
+meet on the name.
+
+- **GeoJSON in a jsonb, not PostGIS.** Nothing in this schema uses PostGIS and
+  the CI database does not have it; nothing here needs the database to do
+  geometry. It checks the shape (`station_feature_geom_problem()`, which backs
+  both the table's check and the save's refusal, in words), rounds every
+  coordinate to seven places with no trailing zeros (`station_feature_round()`),
+  and measures the farthest point from the station's pin on the flat
+  (`station_feature_reach_m()`, as `field_photo_station_for()` measures).
+- **The kind is the shape.** `geom_type` is generated from the geometry, and
+  `(kind, geom_type)` is a foreign key into `(key, geometry)`: the vocabulary,
+  not the browser, says a benchmark is a point. The key cannot change shape
+  under features that use it.
+- **10 km.** A point farther than that from its station's pin is refused as the
+  wrong station's map; a State mark up the road is well inside it. A station
+  with no pin has nothing to be far from.
+- **Stamps.** A change or a delete carries the `updated_at` it was read with
+  and is refused (`PT409`) when the row has moved, as `save_station()` refuses;
+  a save that changes nothing writes nothing and keeps the stamp. Delete is
+  soft: undo it by hand (`update meganet.station_feature set deleted_at = null,
+  deleted_by = null where id = …`).
+
+`tools/check_station_features.sql` proves all of it against a real Postgres, as
+two editors, a stranger, nobody signed in and the service key.
 
 ## Checking it from outside
 

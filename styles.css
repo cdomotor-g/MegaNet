@@ -18602,3 +18602,213 @@ select.kl-in { width: auto; font-family: inherit; }
   .lv-dl { grid-template-columns: minmax(0, 1fr); }
   .lc-head { padding-right: 2.25rem; }   /* clear of the phone's ❔ help tab */
 }
+
+/* ── Site features (site-features.js, 0061) ────────────────────────────────
+   A station's orifice outlet, pits, benchmarks, gauge boards and orifice run
+   on the Stations map, and the panel of the mode that maps them. The kinds'
+   colours are literals in site-features.js, for the wind fills' reason: they
+   reach an SVG attribute or a Leaflet path option, which take no var(), over
+   base maps that do not go dark with the app. What carries the kind without
+   the colour is the glyph's shape — and the panel, the card and the popup,
+   which name it in words. */
+
+.mn-sf-pt {
+  background: none;
+  border: none;
+}
+.mn-sf-pt svg {
+  display: block;
+  margin: 2px;
+  filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, .9)) drop-shadow(0 1px 2px rgba(0, 0, 0, .45));
+}
+/* Picked in the list, or shown from the card: a ring the amber of the map's
+   "this one" (MAP_PIN_HIT), round the glyph. */
+.mn-sf-pt.is-sel { border-radius: 50%; box-shadow: 0 0 0 3px #ffc400, 0 0 0 5px rgba(0, 0, 0, .45); }
+/* The point being placed: held, so the hand says so. */
+.mn-sf-pt.is-edit { cursor: grab; border-radius: 50%; box-shadow: 0 0 0 3px #ffc400; }
+.mn-sf-pt.is-edit:active { cursor: grabbing; }
+
+/* A line's points while it is edited: squares to take hold of, its two ends
+   bigger, the one picked ringed amber; a ＋ halfway along each stretch. */
+.mn-sf-handle { background: none; border: none; cursor: grab; }
+.mn-sf-handle i {
+  display: block;
+  width: 10px; height: 10px;
+  margin: 3px;
+  background: #fff;
+  border: 2px solid #14181c;
+  border-radius: 2px;
+}
+.mn-sf-handle.is-end i { width: 12px; height: 12px; margin: 2px; }
+.mn-sf-handle.is-sel i { background: #ffc400; box-shadow: 0 0 0 3px rgba(255, 196, 0, .45); }
+.mn-sf-mid { background: none; border: none; cursor: copy; }
+.mn-sf-mid i {
+  display: grid;
+  place-items: center;
+  width: 14px; height: 14px;
+  margin: 1px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .78);
+  border: 1px solid #14181c;
+  color: #14181c;
+  font: 700 12px/1 system-ui, sans-serif;
+  font-style: normal;
+}
+
+/* Placing a point, or clicking out a line: every click has to reach the map,
+   the pins' and the links' included — the station pin is where a run starts.
+   Draw & measure's .mn-drawing rule for its reason: every interactive layer
+   named, because Leaflet puts pointer-events back on each one. The point
+   being placed is the one thing still held. */
+.leaflet-container.mn-sf-placing,
+.leaflet-container.mn-sf-drawing { cursor: crosshair; }
+.leaflet-container.mn-sf-placing .leaflet-overlay-pane,
+.leaflet-container.mn-sf-placing .leaflet-marker-pane,
+.leaflet-container.mn-sf-placing .leaflet-interactive,
+.leaflet-container.mn-sf-placing .leaflet-marker-icon,
+.leaflet-container.mn-sf-drawing .leaflet-overlay-pane,
+.leaflet-container.mn-sf-drawing .leaflet-marker-pane,
+.leaflet-container.mn-sf-drawing .leaflet-interactive,
+.leaflet-container.mn-sf-drawing .leaflet-marker-icon {
+  pointer-events: none;
+}
+.leaflet-container.mn-sf-placing .leaflet-mnSiteFeatEdit-pane .leaflet-marker-icon { pointer-events: auto; }
+
+/* The mode's panel, bottom left, where Move pin's goes — the two are never
+   up together. Wider than Move pin's, for a list and a form, and no taller
+   than the map can spare: it scrolls inside itself, and ▾ folds it to its
+   head and its Save. */
+.mn-sf-panel {
+  width: min(21rem, calc(100vw - 4rem));
+  max-height: min(62vh, 34rem);
+  overflow: auto;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .22);
+  font-size: .85rem;
+  cursor: auto;
+}
+.mn-sf-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-1);
+}
+.mn-sf-title { display: flex; flex-direction: column; gap: .1rem; flex: 1 1 auto; min-width: 0; }
+.mn-sf-name { color: var(--muted); overflow-wrap: anywhere; }
+.mn-sf-icon {
+  flex: none;
+  width: 2rem; height: 2rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+.mn-sf-hint { margin: 0 0 var(--sp-2); color: var(--muted); font-size: .8rem; }
+.mn-sf-doing { margin: 0 0 .15rem; display: flex; align-items: center; gap: .35rem; }
+
+.mn-sf-glyph { flex: none; vertical-align: -.2em; }
+
+.mn-sf-list { list-style: none; margin: 0 0 var(--sp-2); padding: 0; }
+.mn-sf-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px;
+  border-radius: var(--r-md);
+}
+.mn-sf-row.is-sel { background: color-mix(in srgb, #ffc400 22%, var(--panel)); }
+.mn-sf-pick {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: .4rem;
+  padding: .25rem .35rem;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+.mn-sf-pick .mn-sf-glyph { margin-top: .1rem; }
+.mn-sf-what { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.mn-sf-edit { flex: none; }
+
+.mn-sf-add {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.mn-sf-add .mn-sf-field { flex: 1 1 9rem; margin: 0; }
+/* The draft's form: its kind and its name side by side, the rest the full
+   width — a short form in a panel that has a map to leave room for. */
+.mn-sf-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: var(--sp-2);
+}
+.mn-sf-wide { grid-column: 1 / -1; }
+.mn-sf-field { display: grid; gap: .15rem; margin: 0 0 var(--sp-2); min-width: 0; }
+.mn-sf-field > span { color: var(--muted); font-size: .8rem; }
+/* A note is a line, mostly — the house 90 px is for a paragraph — and grows
+   when it is more. */
+.mn-sf-field textarea { resize: vertical; min-height: 2.4rem; }
+.mn-sf-pts .mn-sf-field textarea { min-height: 5.5rem; }
+.mn-sf-coords { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+.mn-sf-coords input { font-variant-numeric: tabular-nums; }
+.mn-sf-line { margin-bottom: var(--sp-2); }
+.mn-sf-pts { margin: 0 0 var(--sp-2); }
+.mn-sf-pts > summary { cursor: pointer; color: var(--muted); font-size: .8rem; margin-bottom: var(--sp-1); }
+.mn-sf-pts textarea { font-family: var(--font-mono); font-size: .8rem; white-space: pre; }
+
+/* Label / value pairs, as Move pin's: a few facts, and a <dl> is what a few
+   labelled facts are. */
+.mn-sf-read {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .1rem var(--sp-2);
+  margin: 0 0 var(--sp-2);
+}
+.mn-sf-read dt { color: var(--muted); }
+.mn-sf-read dd { margin: 0; font-variant-numeric: tabular-nums; }
+.mn-sf-actions { margin-top: var(--sp-1); }
+.mn-sf-del { margin-left: auto; }
+.mn-sf-msg { margin: var(--sp-1) 0 0; }
+.mn-sf-msg:empty { display: none; }
+
+/* Under the twin the twin is the map, and the panel stands down with Move
+   pin's. */
+.mn-map-stage:has(#map-twin.is-on) .leaflet-control.mn-sf-panel { display: none; }
+
+@media (pointer: coarse) {
+  .mn-sf-panel .pill, .mn-sf-pick, .mn-sf-icon { min-height: 2.75rem; }
+  .mn-sf-icon { width: 2.75rem; }
+  .mn-sf-panel input, .mn-sf-panel select, .mn-sf-panel textarea { font-size: 16px; }
+}
+
+/* A feature's popup on the map, and its line's tooltip. */
+.mn-sf-pop p { margin: 0 0 var(--sp-1); }
+.mn-sf-pop-head { display: flex; align-items: center; gap: .35rem; }
+.mn-sf-pop-note { white-space: pre-line; }
+
+/* The station card's section: gone until its rows arrive (site-features.js
+   draws it empty and fills it), as the Equipment section is. */
+.stn-card-sitefeat:empty { display: none; }
+.stn-card-sf-h { display: block; margin-bottom: .25rem; }
+.stn-card-sf-kind { display: inline-flex; align-items: center; gap: .3rem; }
+
+/* The legend's line: each kind drawn in view, its glyph and its name. */
+.legend-sf-kind { display: inline-flex; align-items: center; gap: .2rem; margin-right: .5rem; white-space: nowrap; }
+
+/* A phone: the panel no taller than half the screen (it folds itself while a
+   feature is put on the ground — site-features.js, narrow()). */
+@media (max-width: 560px) {
+  .mn-sf-panel { max-height: 48vh; }
+}

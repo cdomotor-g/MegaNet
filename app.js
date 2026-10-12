@@ -4827,6 +4827,17 @@ function mapDisplayControlsHtml() {
       Field photos (📷)
     </label>
     <p class="filter-note" id="map-photos-note">${MapPhotos.noteHtml()}</p>
+    <!-- A station's site features (site-features.js, 0061): its orifice
+         outlet, pits, benchmarks, gauge boards and orifice run. Beside the
+         photos because they are the same ground at the same scale, and
+         editors-only for the same reason. -->
+    <label class="filter-check"
+           title="Each station's orifice outlet, inspection pits, benchmarks, gauge boards and orifice run, where an editor has mapped them. Signed-in editors only, from zoom 16 in. 📌 Site features on a station's card maps them.">
+      <input type="checkbox" ${state.mapSiteFeatures ? 'checked' : ''}
+             onchange="SiteFeatures.setEnabled(this.checked)">
+      Site features (📌)
+    </label>
+    <p class="filter-note" id="map-sitefeat-note">${SiteFeatures.noteHtml()}</p>
     <!-- The highest ground in view (#184). It sits with the contours because
          it is the same question asked the other way round — those draw the
          shape of the ground, this names the top of it — and because both are
@@ -5077,6 +5088,7 @@ function mapLegendOffLayersHtml() {
     !state.mapRoads           && 'Road parcels',
     !state.mapLots            && 'Property boundaries',
     !state.mapPhotos          && 'Field photos',
+    !state.mapSiteFeatures    && 'Site features',
     !state.mapWind            && 'Wind regions',
     !state.mapCatchments      && 'River catchments',
     !state.mapHubs            && 'Maintenance hubs',
@@ -5281,6 +5293,7 @@ function mapLegendHtml() {
       <span class="small">Field photos — where each was taken, a cone the way the camera faced.
         Click one for the photos taken there</span>
     </span>` : ''}
+    ${SiteFeatures.active() ? SiteFeatures.legendHtml() : ''}
     ${MapRoads.active() ? `
     <span class="legend-item">
       <span class="legend-sq" style="--dot:${MapRoads.legendColour()}"></span>
@@ -5436,6 +5449,7 @@ function stopStationsMap() {
   MapLeader.detach();
   MapLocate.detach();
   MapMovePin.detach();
+  SiteFeatures.detach();
   MapArrows.detach();
   MapElevation.detach();
   MapHere.detach();
@@ -5552,6 +5566,10 @@ function initMap() {
   // it is attached for the same reason MapSpider is: it needs to know which map
   // it would be moving a pin on before anybody asks it to.
   MapMovePin.attach(state.map);
+  // A station's site features (0061): drawn for a signed-in editor from zoom
+  // 16, and the mode that places them — which, unlike Move pin's, outlives
+  // the rebuild, so a line half clicked out is put back on the new map.
+  SiteFeatures.attach(state.map);
   // Before the first refresh: refreshMapLayers ends by scheduling a redraw of
   // the arrow canvas, and a schedule with no canvas to draw on is a no-op that
   // never comes back.
@@ -6235,6 +6253,9 @@ function stationActionGroups(s) {
       copyLatLonPillHtml(s),
       directionsPillHtml(s),
       MapMovePin.popupLinkHtml(s),
+      // Where the station's outlet, pits, benchmarks and boards are, and its
+      // orifice run (site-features.js, 0061) — signed-in editors only.
+      SiteFeatures.pillHtml(s),
     ] },
     // Two pairs, which is what the row wraps into at the card's width: the two
     // ways to stand on the ground (Street View, Apple Maps — Look Around is one
@@ -7193,6 +7214,9 @@ function repaintStnCard() {
   SiteLand.ask(`mn-land-card-${s.id}`, s);
   // The equipment register, for a signed-in editor, on the same terms.
   if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
+  // …and its site features (site-features.js), kept per station for two
+  // minutes, so a repaint asks nothing new.
+  if (typeof SiteFeatures !== 'undefined') SiteFeatures.cardAsk(s);
   // And the station's history (station-history.js).
   if (typeof StationHistory !== 'undefined') StationHistory.cardAsk(s);
   // Its health (#218): one request for its readings, kept per station for a
@@ -7565,6 +7589,12 @@ function stnCardHtml(s) {
          editors only, filled after the fetch by PhotoReview.cardAsk, and
          not drawn at all when the register has nothing. -->
     ${typeof PhotoReview !== 'undefined' ? PhotoReview.cardHtml(s) : ''}
+    <!-- Where its ancillary features are — the orifice outlet, the pits, the
+         benchmarks, the gauge boards, the orifice run (0061,
+         site-features.js): signed-in editors only, filled after the fetch by
+         SiteFeatures.cardAsk, each row showing its feature on the map. The
+         📌 Site features pill below maps them. -->
+    ${typeof SiteFeatures !== 'undefined' ? SiteFeatures.cardHtml(s) : ''}
     <!-- Who changed the station, what and when, with Restore (0056,
          station-history.js): signed-in editors only, shut until opened, and
          filled after the fetch by StationHistory.cardAsk. -->
