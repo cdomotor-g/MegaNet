@@ -14,8 +14,10 @@
 // why it can now leave without taking them with it. Across to app.js for
 // mapNote and addToMapSelection, to export.js for downloadDrawingKml (the
 // panel's Google Earth button, #183), and sideways to path-profile.js for
-// PathProfile, which reaches back here for MapDraw. All mutual, and all free:
-// the IIFE body only defines.
+// PathProfile, which reaches back here for MapDraw, and to map-3d.js for
+// Map3D, which draws what this file drew on its terrain and hands its own
+// pointer back through click3d() and move3d(). All mutual, and all free: the
+// IIFE body only defines.
 //
 // Moved out of app.js byte-for-byte by M3 (#134) of #129.
 
@@ -39,6 +41,26 @@
 // drawn in, with the stations it encloses or runs between attached. Before
 // that the only answer was the operating system's screen-clipping tool, which
 // keeps a picture of the drawing and nothing about the ground under it.
+//
+// ── In 3-D ───────────────────────────────────────────────────────────────────
+// The 3-D view (map-3d.js) is a second camera over the same rectangle, and a
+// drawing has to be the same drawing in both. So nothing here forks: the
+// shapes are the shapes in state, and Map3D reads them off drawn() as ground
+// — a circle as the ring the KML export uses, a line as its vertices — and
+// drapes them on the terrain, the way it mirrors the network off the 2-D
+// map's own layers. What is being clicked out (the dashed ghost, the snap's
+// ring and the profile cursor) comes across the same way, from drawnLive().
+//
+// The tools take their clicks off whichever camera is in front. The 3-D
+// canvas is a child of the Leaflet container, so every pointer event on it
+// also reaches the flat map underneath — carrying the flat map's coordinate
+// for that pixel, which after a tilt is kilometres from the ground under the
+// pointer. So in 3-D the Leaflet handlers here stand down (in3d), and Map3D
+// calls click3d() and move3d() with the terrain's own coordinate instead, and
+// a `view` saying how its camera sees the ground: the snap to a station and
+// the profile cursor are judged in that camera's pixels, against the pins it
+// drew, which is the only way "within 15 px of the pin" means the pin the
+// operator is looking at.
 //
 // Where the panel is drawn changed at #164 and nothing else did. It was a panel
 // in the Stations sidebar; it is a MapChrome panel now (map-controls.js),
@@ -101,6 +123,8 @@ const MapDraw = (function () {
   let pending = null;      // shape being clicked out: { kind, pts: [[lat,lon], …], sids: […] }
   let keyHandler = null;
   let snapHint = null;     // ring round the station the next click would land on
+  let hintAt = null;       // …as ground, for the 3-D view: { at, name, ring } (drawnLive)
+  let ghostAt = null;      // where the ghost was last drawn to — the pointer, snapped
   let snapCache = null;    // station pins projected once per zoom (see snapPoints)
 
   // How close to a station pin a click has to be to land on it. Screen pixels,
@@ -109,6 +133,19 @@ const MapDraw = (function () {
   const SNAP_PX = 15;
 
   const D = () => state.draw;
+
+  // Whether the 3-D view is in front of the map — see "In 3-D" in the header.
+  // While it is, the Leaflet handlers below stand down and Map3D drives the
+  // tools through click3d() and move3d().
+  const in3d = () => typeof Map3D !== 'undefined' && !!Map3D.active && Map3D.active();
+
+  // Tell the 3-D view what this file drew changed: the shapes or the armed
+  // tool (Map3D re-reads drawn()), or with `live` only what is being clicked
+  // out — the ghost, the snap's ring, the profile cursor — which moves with
+  // every mousemove and is the cheap half (drawnLive()).
+  function tell3d(live) {
+    if (typeof Map3D !== 'undefined' && Map3D.drawChanged) Map3D.drawChanged(!!live);
+  }
 
   // ── colour ──
   // The theme's own drawing colour: the fallback for shapes drawn before a
@@ -224,6 +261,25 @@ const MapDraw = (function () {
     }
   }
 
+  // ── how a camera sees the ground ──
+  // Two things here are judged in screen pixels rather than on the ground —
+  // the snap to a station and the profile cursor's "on the line" — because
+  // that is how the eye judges them. A pixel is a different thing in each
+  // camera, so both ask a `view`: where the pointer is on that camera's
+  // screen (`at`), where a point on the ground lands on it (`px`, or null for
+  // a point it cannot place), and the station pins worth measuring against
+  // (`stations`, as snapPoints() answers). This is the flat map's: Leaflet's
+  // projection at the current zoom. The 3-D view hands over its own with
+  // every click3d() and move3d() (map-3d.js, drawView).
+  function flatView(latlng) {
+    const z = map.getZoom();
+    return {
+      at:       map.project(latlng, z),
+      px:       (lat, lon) => map.project([lat, lon], z),
+      stations: () => snapPoints(),
+    };
+  }
+
   // ── snap to stations ──
   // Station pins projected at the current zoom. Comparing projected pixels is
   // the same comparison as container pixels, and doing it from a cache keeps
@@ -252,14 +308,15 @@ const MapDraw = (function () {
   //
   // Drawn pins are few, so they are projected per call rather than cached; the
   // pin tool itself does not snap to them, since a pin on a pin is a duplicate.
-  function snapTarget(latlng) {
+  function snapTarget(latlng, view) {
     if (!D().snap || !map) return null;
-    const z = map.getZoom();
-    const c = map.project(latlng, z);
+    const v = view || flatView(latlng);
+    const c = v.at;
     let best = null, bestD = SNAP_PX;
     if (state.mapMarkers.length) {
-      const { list, pts } = snapPoints();
+      const { list, pts } = v.stations(SNAP_PX);
       for (let i = 0; i < pts.length; i++) {
+        if (!pts[i]) continue;
         const d = Math.hypot(pts[i].x - c.x, pts[i].y - c.y);
         if (d <= bestD) { bestD = d; best = list[i]; }
       }
@@ -272,7 +329,8 @@ const MapDraw = (function () {
     if (D().tool !== 'pin') {
       for (const sh of D().shapes) {
         if (sh.kind !== 'pin') continue;
-        const p = map.project([sh.lat, sh.lon], z);
+        const p = v.px(sh.lat, sh.lon);
+        if (!p) continue;
         const d = Math.hypot(p.x - c.x, p.y - c.y);
         if (d <= bestD) {
           bestD = d;
@@ -290,6 +348,7 @@ const MapDraw = (function () {
     if (snapHint && t && snapHint._mnFor === t.key) return;
     clearSnapHint();
     if (!t || !map) return;
+    hintAt = { at: t.ll.slice(), name: t.name || '', ring: t.ring };
     snapHint = L.circleMarker(t.ll, {
       radius: t.ring, color: colour(), weight: 2, dashArray: '4,3', fill: false, interactive: false,
     }).addTo(map);
@@ -297,10 +356,12 @@ const MapDraw = (function () {
     snapHint.bindTooltip(esc(t.name), {
       permanent: true, direction: 'top', className: 'mn-draw-label', offset: [0, -6],
     }).openTooltip();
+    tell3d(true);
   }
 
   function clearSnapHint() {
     if (snapHint) { snapHint.remove(); snapHint = null; }
+    if (hintAt) { hintAt = null; tell3d(true); }
   }
 
   // ── the elevation profile's cursor, on the ground ──
@@ -326,9 +387,11 @@ const MapDraw = (function () {
   // costs a misplaced shape.
   const PROFILE_SNAP_PX = 18;
   let profileDot = null;
+  let dotAt = null;        // …as ground, for the 3-D view: { at, label } (drawnLive)
 
   function clearProfileDot() {
     if (profileDot) { profileDot.remove(); profileDot = null; }
+    if (dotAt) { dotAt = null; tell3d(true); }
   }
 
   // Where along a line the pointer is, in metres from its first point, or null
@@ -340,11 +403,12 @@ const MapDraw = (function () {
   // point of doing the last step separately: the chart's x-axis is real ground
   // distance, so a fraction measured on a Mercator screen would land the dot
   // slightly off on any line long enough for the projection to matter.
-  function alongLine(pts, latlng) {
+  function alongLine(pts, latlng, view) {
     if (!map || !pts || pts.length < 2) return null;
-    const z = map.getZoom();
-    const px = pts.map(pt => map.project(pt, z));
-    const c  = map.project(latlng, z);
+    const v  = view || flatView(latlng);
+    const px = pts.map(pt => v.px(pt[0], pt[1]));
+    const c  = v.at;
+    if (px.some(p => !p)) return null;
     let best = null;
     for (let i = 0; i < px.length - 1; i++) {
       const a = px[i], b = px[i + 1];
@@ -363,8 +427,8 @@ const MapDraw = (function () {
 
   // Resolve a map click to the point the shape should actually use, and to the
   // station it came from when it snapped (directly, or by way of a drawn pin).
-  function resolve(latlng) {
-    const t = snapTarget(latlng);
+  function resolve(latlng, view) {
+    const t = snapTarget(latlng, view);
     return t
       ? { ll: t.ll.slice(), sid: t.sid }
       : { ll: [latlng.lat, latlng.lng], sid: null };
@@ -463,13 +527,21 @@ const MapDraw = (function () {
     if (!group) return;
     group.clearLayers();
     D().shapes.forEach(draw);
+    tell3d();
   }
 
-  function clearGhost() { if (ghost) { ghost.remove(); ghost = null; } }
+  function clearGhost() {
+    const had = ghost || ghostAt;
+    if (ghost) { ghost.remove(); ghost = null; }
+    ghostAt = null;
+    if (had) tell3d(true);
+  }
 
   // Dashed preview of the shape being clicked out, following the cursor.
   function showGhost(to) {
-    clearGhost();
+    if (ghost) { ghost.remove(); ghost = null; }
+    ghostAt = to ? to.slice() : null;
+    tell3d(true);
     if (!pending || !map) return;
     const c = colour(), a = pending.pts[0];
     const opts = { color: c, weight: 2, dashArray: '5,5', fill: false, interactive: false };
@@ -483,6 +555,44 @@ const MapDraw = (function () {
       ghost = L.rectangle([a, to], opts);
     }
     if (ghost) ghost.addTo(map);
+  }
+
+  // The same preview as ground, for the 3-D view: the points the dashed line
+  // runs through, closed for the shapes with an inside — the circle as the
+  // ring its finished shape will be (ringFor), the box as its four corners.
+  function ghostPath() {
+    if (!pending) return null;
+    const a = pending.pts[0], to = ghostAt;
+    if (pending.kind === 'line') {
+      const pts = to ? pending.pts.concat([to]) : pending.pts;
+      return pts.length < 2 ? null : pts.map(p => p.slice());
+    }
+    if (!to) return null;
+    if (pending.kind === 'circle') {
+      return ringFor({ kind: 'circle', lat: a[0], lon: a[1], radiusKm: acmaHaversineKm(a[0], a[1], to[0], to[1]) });
+    }
+    if (pending.kind === 'rect') return ringFor(rectFromCorners(a, to));
+    return null;
+  }
+
+  // Where a shape's measurement stands, as ground: on the pin, in the middle
+  // of a circle or a box, and half way along a line — by distance, as
+  // Leaflet's tooltip finds a polyline's middle, so a long first leg does not
+  // drag the label off towards the start.
+  function labelPoint(sh) {
+    if (sh.kind !== 'line') return [sh.lat, sh.lon];
+    const pts = sh.pts;
+    let left = lineKm(pts) / 2;
+    for (let i = 1; i < pts.length; i++) {
+      const leg = acmaHaversineKm(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
+      if (leg >= left && leg > 0) {
+        const t = left / leg;
+        return [pts[i - 1][0] + t * (pts[i][0] - pts[i - 1][0]),
+                pts[i - 1][1] + t * (pts[i][1] - pts[i - 1][1])];
+      }
+      left -= leg;
+    }
+    return pts[pts.length - 1].slice();
   }
 
   // ── shape list ──
@@ -600,9 +710,15 @@ const MapDraw = (function () {
   }
 
   function onClick(e) {
+    if (in3d()) return;                     // the 3-D view routes its own (click3d)
+    clickAt(e.latlng);
+  }
+
+  // A click on the ground at `latlng`, as `view` sees it (flat when absent).
+  function clickAt(latlng, view) {
     const tool = D().tool;
     if (!tool || !map) return;
-    const { ll, sid } = resolve(e.latlng);
+    const { ll, sid } = resolve(latlng, view);
     if (tool === 'pin') { add({ kind: 'pin', lat: ll[0], lon: ll[1], snappedTo: [sid] }); return; }
     if (tool === 'text') {
       promptDialog({ title: 'Add a note to the map', label: 'Text, placed where you clicked',
@@ -632,12 +748,17 @@ const MapDraw = (function () {
   }
 
   function onMove(e) {
+    if (in3d()) return;                     // the 3-D view routes its own (move3d)
+    moveAt(e.latlng);
+  }
+
+  function moveAt(latlng, view) {
     if (!map) return;
     // The ghost follows the point the click would actually use, so the preview
     // and the result are the same thing.
-    const t = D().tool ? snapTarget(e.latlng) : null;
+    const t = D().tool ? snapTarget(latlng, view) : null;
     showSnapHint(t);
-    if (pending) showGhost(t ? t.ll : [e.latlng.lat, e.latlng.lng]);
+    if (pending) showGhost(t ? t.ll : [latlng.lat, latlng.lng]);
 
     // The profile cursor, from the map's side: running the pointer along the
     // profiled line moves the dot on the chart and tags it with the ground
@@ -646,12 +767,13 @@ const MapDraw = (function () {
     // profile is actually of, which is PathProfile's answer and not this
     // module's guess at it.
     const sh = D().tool ? null : PathProfile.target();
-    const d  = sh && sh.kind === 'line' ? alongLine(sh.pts, e.latlng) : null;
+    const d  = sh && sh.kind === 'line' ? alongLine(sh.pts, latlng, view) : null;
     if (d != null) PathProfile.hoverAt(d);
     else if (profileDot) PathProfile.hoverOff();
   }
 
   function onDblClick(e) {
+    if (in3d()) return;                     // the 3-D view finishes its own
     if (D().tool === 'line' && pending) { L.DomEvent.stop(e); finishLine(); }
   }
 
@@ -674,8 +796,7 @@ const MapDraw = (function () {
       // ACMA squares would otherwise swallow the one near the site you are
       // trying to draw around.
       map.getContainer().classList.toggle('mn-drawing', !!D_.tool);
-      if (D_.tool === 'line') map.doubleClickZoom.disable();
-      else                    map.doubleClickZoom.enable();
+      syncDblZoom();
     }
     if (D_.tool && !keyHandler) {
       keyHandler = onKey;
@@ -686,6 +807,21 @@ const MapDraw = (function () {
     }
     mapNote(D_.tool ? DRAW_TOOLS[D_.tool].hint : '', 0);
     rerenderPanel();
+    // The 3-D view's cursor, and its double-click zoom while a line is out.
+    tell3d();
+  }
+
+  // A double click finishes a line, so the map's own double-click zoom is off
+  // while the line tool is armed. Not touched while the 3-D view is up: it
+  // holds every Leaflet handler off for as long as it is open and hands them
+  // back as they were when it opened (map-3d.js, holdLeaflet) — so a tool
+  // armed or put down in 3-D would otherwise switch a held handler back on
+  // under the canvas, or be undone on the way out. Map3D calls flatAgain()
+  // once it has let go, and the zoom is set then for whatever is armed.
+  function syncDblZoom() {
+    if (!map || in3d()) return;
+    if (D().tool === 'line') map.doubleClickZoom.disable();
+    else                     map.doubleClickZoom.enable();
   }
 
   // ── typed-in shapes ──
@@ -1062,6 +1198,7 @@ const MapDraw = (function () {
       map   = m;
       group = L.layerGroup().addTo(m);
       pending = null; ghost = null; snapHint = null; snapCache = null; profileDot = null;
+      ghostAt = null; hintAt = null; dotAt = null;
       m.on('click', onClick);
       m.on('mousemove', onMove);
       m.on('dblclick', onDblClick);
@@ -1125,6 +1262,62 @@ const MapDraw = (function () {
     // second, subtly different one.
     resolveClick(latlng) { return resolve(latlng); },
 
+    // ── For the 3-D view (map-3d.js) ──
+    // It has closed and given Leaflet its handlers back (see syncDblZoom).
+    flatAgain() { syncDblZoom(); },
+
+    // What this file drew, as ground, for Map3D to drape on its terrain: each
+    // shape in its own colour, with the ring a circle or a box is (ringFor),
+    // the vertices of a line, the measurement it carries on the map when
+    // labels are on and where that stands, and whether it is the selected
+    // one. Plain numbers and strings — no Leaflet layer crosses — and a copy,
+    // for exportShapes()' reason. `tool` is there because the 3-D view's
+    // cursor and double-click follow it.
+    drawn() {
+      const D_ = D();
+      return {
+        tool: D_.tool || '',
+        shapes: D_.shapes.map(sh => ({
+          id:      sh.id,
+          kind:    sh.kind,
+          colour:  colourOf(sh),
+          sel:     sh.id === D_.selectedId,
+          name:    rowText(sh),
+          text:    sh.kind === 'text' ? sh.text : '',
+          point:   sh.kind === 'line' ? null : [sh.lat, sh.lon],
+          path:    sh.kind === 'line' ? sh.pts.map(pt => pt.slice()) : null,
+          ring:    ringFor(sh),
+          label:   D_.showLabels && sh.kind !== 'text' ? measure(sh) : '',
+          labelAt: labelPoint(sh),
+        })),
+      };
+    },
+
+    // …and what is being clicked out, which changes with every mousemove: the
+    // dashed preview of the pending shape, the ring round the station the next
+    // click would land on, and the elevation profile's cursor on its line.
+    drawnLive() {
+      const g = ghostPath();
+      return {
+        ghost: g ? { colour: colour(), path: g } : null,
+        hint:  hintAt ? { ...hintAt, at: hintAt.at.slice(), colour: colour() } : null,
+        dot:   dotAt ? { at: dotAt.at.slice(), label: dotAt.label, colour: PROFILE_DOT } : null,
+      };
+    },
+
+    // The 3-D view's pointer, on the ground its own renderer puts under it —
+    // the What is here bridge (#194) for the draw tools. `view` is how that
+    // camera sees the ground (see flatView), so the snap and the profile
+    // cursor are judged against what is on screen there.
+    click3d(lat, lon, view) {
+      if (!isFinite(lat) || !isFinite(lon)) return;
+      clickAt({ lat, lng: lon }, view);
+    },
+    move3d(lat, lon, view) {
+      if (!isFinite(lat) || !isFinite(lon)) return;
+      moveAt({ lat, lng: lon }, view);
+    },
+
     // The elevation profile's cursor on the ground. PathProfile calls both of
     // these; nothing else has any business with them.
     showProfilePoint(lat, lon, label) {
@@ -1142,6 +1335,8 @@ const MapDraw = (function () {
         profileDot.setLatLng([lat, lon]);
       }
       profileDot.setTooltipContent(esc(label || ''));
+      dotAt = { at: [lat, lon], label: String(label || '') };
+      tell3d(true);
     },
 
     clearProfilePoint() { clearProfileDot(); },

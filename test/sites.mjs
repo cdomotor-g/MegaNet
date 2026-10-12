@@ -788,7 +788,9 @@ if (!gl2) {
      s3.dim === 0.2 && JSON.stringify(s3.paint.links) === '["*",["get","op"],0.2]'
      && JSON.stringify(s3.paint.st) === '["*",["get","op"],0.2]' && JSON.stringify(s3.paint.stroke) === '["*",["get","op"],0.2]'
      && s3.paint.here === 0.2, JSON.stringify(s3.paint));
-  ok('Draw a circle is off in 3-D, and says why', s3.circle.off === true && /Leave 3-D/.test(s3.circle.title),
+  // On in 3-D: Draw & measure takes its clicks off the terrain there
+  // (MapDraw.click3d), so the circle lands on the ground under the pointer.
+  ok('Draw a circle stays on in 3-D', s3.circle.off === false && /middle of the area/.test(s3.circle.title),
      JSON.stringify(s3.circle));
 
   // A real pointer on pin #3. The camera is put straight over it first, so the
@@ -836,7 +838,7 @@ if (!gl2) {
   }));
   ok('leaving 3-D takes its pins and marks with it, and leaves 2-D\'s', !gone3.host && gone3.markers === 0 && gone3.pins === 0
      && gone3.flat === R.length, JSON.stringify(gone3));
-  ok('…and Draw a circle comes back', gone3.circle.off === false && /middle of the area/.test(gone3.circle.title),
+  ok('…and Draw a circle is still on', gone3.circle.off === false && /middle of the area/.test(gone3.circle.title),
      JSON.stringify(gone3.circle));
 }
 await page.evaluate(() => MapSites.select(1));

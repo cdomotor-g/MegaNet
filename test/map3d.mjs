@@ -1391,6 +1391,228 @@ if (onPin) {
 }
 await page.evaluate(() => { MapHere.close(); closeStnCard(false); });
 
+// ── Draw & measure, drawn and driven in 3-D ─────────────────────────────────
+// Two halves, each of which failed silently before. The shapes were Leaflet
+// layers, under the canvas with every other 2-D pane, so a line drawn in 2-D
+// was simply not there once the map was tilted. And the tools took their
+// clicks off the Leaflet map, which in this mode is a different camera: a
+// vertex clicked on a hillside landed wherever that pixel was on the flat map
+// — What is here's defect (#194), above, in a tool that keeps what it is
+// given. So: the shapes are the same ground in both views, and a click here
+// lands where the renderer says the pointer is, judged against the pins drawn
+// here.
+console.log('\nDraw & measure is drawn on the terrain, and its tools work in 3-D');
+
+const drawLook = () => page.evaluate(() => {
+  const m = Map3D._map(), d = Map3D._draw();
+  return { ...d, layers: ['mn-draw-fill', 'mn-draw-line', 'mn-draw-ghost', 'mn-draw-hint', 'mn-draw-dot'].map(id => !!m.getLayer(id)),
+           types: { fill: m.getLayer('mn-draw-fill') && m.getLayer('mn-draw-fill').type,
+                    line: m.getLayer('mn-draw-line') && m.getLayer('mn-draw-line').type } };
+});
+// Each shape at the middle of the parked view, as MapDraw holds it.
+await page.evaluate(() => {
+  MapDraw.setTool('');
+  state.draw.shapes = []; state.draw.selectedId = null; state.draw.showLabels = true;
+  const c = Map3D._map().getCenter();
+  state.draw.shapes.push(
+    { id: 'd901', kind: 'circle', lat: c.lat + 0.02, lon: c.lng + 0.03, radiusKm: 2.5, colour: '#00b0ff', snappedTo: null },
+    { id: 'd902', kind: 'pin',    lat: c.lat - 0.01, lon: c.lng - 0.02, colour: '#ff6d00', snappedTo: null },
+    { id: 'd903', kind: 'text',   lat: c.lat - 0.02, lon: c.lng + 0.01, text: 'flood watch', colour: '', snappedTo: null });
+  MapDraw.addLine([[c.lat + 0.01, c.lng - 0.04], [c.lat - 0.015, c.lng + 0.035]], [null, null]);
+  MapDraw.focus('d901');
+});
+await page.waitForTimeout(600);
+const d0 = await drawLook();
+const ex0 = await page.evaluate(() => MapDraw.exportShapes());
+const feat = id => (d0.shapes && d0.shapes.features || []).find(f => f.properties.id === id);
+const circle0 = feat('d901'), line0 = feat(ex0.find(s => s.kind === 'line').id);
+const sameRing = (f, ring) => !!f && !!ring && f.geometry.coordinates[0].length === ring.length
+  && f.geometry.coordinates[0].every((p, i) => near(p[0], ring[i][1], 1e-9) && near(p[1], ring[i][0], 1e-9));
+ok('Draw & measure has its own sources and five layers in 3-D', d0.layers.every(Boolean), JSON.stringify(d0.layers));
+ok('a circle drawn in 2-D is draped here as the ring its KML export is',
+   sameRing(circle0, ex0.find(s => s.id === 'd901').ring) && circle0.geometry.type === 'Polygon',
+   circle0 ? `${circle0.geometry.coordinates[0].length} points` : 'missing');
+// #187's acceptance, the way `npm run drawkml` holds the KML: every vertex of
+// the draped ring is the radius from the centre on the sphere, measured by a
+// haversine written here rather than the app's — a circle layer would be a
+// screen-space disc of the wrong ground radius almost everywhere.
+const havKm = (a1, o1, a2, o2) => {
+  const r = Math.PI / 180, dA = (a2 - a1) * r, dO = (o2 - o1) * r;
+  const h = Math.sin(dA / 2) ** 2 + Math.cos(a1 * r) * Math.cos(a2 * r) * Math.sin(dO / 2) ** 2;
+  return 2 * 6371.0088 * Math.asin(Math.sqrt(h));
+};
+const ringWorst = circle0 ? circle0.geometry.coordinates[0].reduce((w, [lon, lat]) =>
+  Math.max(w, Math.abs(havKm(ex0.find(s => s.id === 'd901').point[0], ex0.find(s => s.id === 'd901').point[1], lat, lon) - 2.5)), 0) : Infinity;
+ok('…every vertex 2.5 km from the centre on the ground', ringWorst < 2.5 * 0.005, `worst error ${ringWorst.toFixed(4)} km`);
+ok('…and it is draped, as fill and line layers are, not a disc standing at sea level',
+   d0.types.fill === 'fill' && d0.types.line === 'line', JSON.stringify(d0.types));
+ok('…in its own colour, and at the selected width',
+   circle0 && circle0.properties.colour === '#00b0ff' && circle0.properties.width === 4, JSON.stringify(circle0 && circle0.properties));
+ok('a line is its own vertices',
+   !!line0 && line0.geometry.type === 'LineString'
+   && JSON.stringify(line0.geometry.coordinates) === JSON.stringify(ex0.find(s => s.kind === 'line').path.map(p => [p[1], p[0]])),
+   JSON.stringify(line0 && line0.geometry.coordinates));
+ok('pins and notes are not in the draped source — they stand on the ground as markers',
+   d0.shapes.features.length === 2, `${d0.shapes.features.length} features`);
+const pinM = d0.pins.find(p => p.id === 'd902'), noteM = d0.pins.find(p => p.id === 'd903');
+ok('the pin is a marker wearing 2-D\'s markup, where 2-D has it',
+   !!pinM && /\bmn-draw-pin\b/.test(pinM.cls) && near(pinM.lat, ex0.find(s => s.id === 'd902').point[0], 1e-9),
+   JSON.stringify(pinM));
+ok('…and so is the note, with its text', !!noteM && /\bmn-draw-textbox\b/.test(noteM.cls) && noteM.text === 'flood watch',
+   JSON.stringify(noteM));
+const labels = d0.pins.filter(p => /\bmn-draw-label\b/.test(p.cls)).map(p => p.text).sort();
+const measures = ex0.filter(s => s.kind !== 'text').map(s => s.measure).sort();
+ok('every shape but the note carries its measurement, as in 2-D', JSON.stringify(labels) === JSON.stringify(measures),
+   JSON.stringify(labels));
+await page.evaluate(() => MapDraw.toggleLabels(false));
+await page.waitForTimeout(200);
+ok('…and Show measurements off takes them away here too',
+   (await drawLook()).pins.filter(p => /\bmn-draw-label\b/.test(p.cls)).length === 0);
+await page.evaluate(() => MapDraw.toggleLabels(true));
+
+// A real pointer, off centre and high in the pitched view where the two
+// cameras disagree about the ground — the bridge's own test, above, for a
+// tool that keeps the answer. Snapping off, so the vertices are the pixels
+// pressed and nothing else.
+await page.evaluate(() => {
+  MapDraw.setTool(''); state.draw.shapes = []; state.draw.selectedId = null; MapDraw.render(); MapDraw.rerenderPanel();
+  state.draw.snap = false;
+  MapHere.close(); closeStnCard(false);
+  window.__lfDrawClicks = 0;
+  state.map.on('click', () => window.__lfDrawClicks++);
+  MapDraw.setTool('line');
+});
+await page.waitForTimeout(300);
+const pix = await page.evaluate(() => {
+  const m = Map3D._map();
+  const r = m.getCanvas().getBoundingClientRect();
+  const c = document.getElementById('leaflet-map').getBoundingClientRect();
+  const at = (fx, fy) => {
+    const x = Math.round(r.left + r.width * fx), y = Math.round(r.top + r.height * fy);
+    const gl = m.unproject([x - r.left, y - r.top]);
+    const lf = state.map.containerPointToLatLng([x - c.left, y - c.top]);
+    return { x, y, gl: [gl.lat, gl.lng], lf: [lf.lat, lf.lng] };
+  };
+  return { a: at(0.30, 0.38), b: at(0.62, 0.52), dbl: m.doubleClickZoom.isEnabled(), zoom: m.getZoom(),
+           cursor: getComputedStyle(m.getCanvasContainer()).cursor };
+});
+ok('the line tool, armed, makes a double click here finish rather than zoom',
+   pix.dbl === false && (await drawLook()).dblZoom === false);
+ok('…and the pointer is a crosshair over the terrain, as on the flat map', pix.cursor === 'crosshair', pix.cursor);
+await page.mouse.click(pix.a.x, pix.a.y);
+await page.waitForTimeout(250);
+await page.mouse.move(pix.b.x, pix.b.y, { steps: 4 });
+await page.waitForTimeout(400);
+const ghost = await drawLook();
+const g = (ghost.live && ghost.live.features || []).find(f => f.properties.kind === 'ghost');
+ok('a vertex down, the dashed ghost follows the pointer across the terrain',
+   !!g && g.geometry.coordinates.length === 2
+   && near(g.geometry.coordinates[0][1], pix.a.gl[0], 1e-4) && near(g.geometry.coordinates[1][1], pix.b.gl[0], 1e-4),
+   JSON.stringify(g && g.geometry.coordinates));
+await page.mouse.dblclick(pix.b.x, pix.b.y);
+await page.waitForTimeout(500);
+const drew = await page.evaluate(() => ({
+  shapes: state.draw.shapes.map(s => ({ kind: s.kind, pts: s.pts })),
+  tool: state.draw.tool, lf: window.__lfDrawClicks, zoom: Map3D._map().getZoom(),
+}));
+const ln = drew.shapes.find(s => s.kind === 'line');
+const samePt = (a, b) => !!a && !!b && near(a[0], b[0], 1e-4) && near(a[1], b[1], 1e-4);
+ok('the double click finished the line, and the tool stays armed for the next',
+   drew.shapes.length === 1 && !!ln && drew.tool === 'line', JSON.stringify(drew.shapes));
+ok('its ends are where the renderer put the pointer on the terrain, not where the 2-D map would',
+   !!ln && samePt(ln.pts[0], pix.a.gl) && samePt(ln.pts[ln.pts.length - 1], pix.b.gl)
+   && !samePt(ln.pts[0], pix.a.lf), JSON.stringify(ln && ln.pts));
+ok('…every click answered here alone — none reached the 2-D map underneath', drew.lf === 0, `${drew.lf} Leaflet click(s)`);
+ok('…and the double click did not zoom the camera', near(drew.zoom, pix.zoom, 1e-6), `${pix.zoom} → ${drew.zoom}`);
+const drew3 = await drawLook();
+ok('the finished line is draped here at once', (drew3.shapes.features || []).some(f => f.geometry.type === 'LineString'));
+
+// The snap, judged on this canvas: a pin dropped beside a station's pin as
+// the renderer drew it lands on that station. The pin is found by asking the
+// hit test, for the What is here precedence check's reason.
+await page.evaluate(() => { MapDraw.setTool(''); state.draw.snap = true; MapDraw.setTool('pin'); });
+const snapPin = await page.evaluate(() => {
+  const m = Map3D._map();
+  const r = m.getCanvas().getBoundingClientRect();
+  const mid = { x: r.width / 2, y: r.height / 2 };
+  const seen = m.queryRenderedFeatures({ layers: ['mn-stations'] })
+    .map(f => ({ id: f.properties.id, p: m.project(f.geometry.coordinates) }))
+    .sort((a, b) => Math.hypot(a.p.x - mid.x, a.p.y - mid.y) - Math.hypot(b.p.x - mid.x, b.p.y - mid.y));
+  for (const { id, p } of seen.slice(0, 40)) {
+    // Six pixels off the pin, inside the snap's fifteen.
+    if (!m.queryRenderedFeatures([p.x, p.y], { layers: ['mn-stations'] }).length) continue;
+    return { id, x: Math.round(r.left + p.x + 6), y: Math.round(r.top + p.y) };
+  }
+  return null;
+});
+ok('there is a station pin on screen to snap to', !!snapPin);
+if (snapPin) {
+  await page.mouse.move(snapPin.x, snapPin.y);
+  await page.waitForTimeout(400);
+  const hint = await drawLook();
+  ok('hovering beside it rings it, and names it', (hint.live.features || []).some(f => f.properties.kind === 'hint') && !!hint.hint,
+     JSON.stringify(hint.hint));
+  await page.mouse.click(snapPin.x, snapPin.y);
+  await page.waitForTimeout(400);
+  // On *a* station — the one beside the pointer, or a neighbour standing
+  // nearer the pixel pressed — exactly, and named for it.
+  const sp = await page.evaluate(() => state.draw.shapes.filter(s => s.kind === 'pin').map(s => {
+    const mk = state.mapMarkers.find(x => s.snappedTo && x.mnStationId === s.snappedTo[0]);
+    return { at: [s.lat, s.lon], to: s.snappedTo, st: mk ? [mk.mnStation.lat, mk.mnStation.lon] : null };
+  }));
+  ok('…and the pin lands on the station itself, named for it',
+     sp.length === 1 && !!sp[0].st && near(sp[0].at[0], sp[0].st[0], 1e-12) && near(sp[0].at[1], sp[0].st[1], 1e-12),
+     JSON.stringify(sp));
+}
+
+// Picked off the terrain with no tool armed, as a click on it does in 2-D.
+await page.evaluate(() => { MapDraw.setTool(''); state.draw.selectedId = null; MapDraw.render(); });
+await page.waitForTimeout(400);
+const onLine = await page.evaluate(() => {
+  const m = Map3D._map(), r = m.getCanvas().getBoundingClientRect();
+  const sh = state.draw.shapes.find(s => s.kind === 'line');
+  for (const t of [0.5, 0.4, 0.6, 0.3, 0.7]) {
+    const lat = sh.pts[0][0] + t * (sh.pts[1][0] - sh.pts[0][0]);
+    const lon = sh.pts[0][1] + t * (sh.pts[1][1] - sh.pts[0][1]);
+    const p = m.project([lon, lat]);
+    if (m.queryRenderedFeatures([p.x, p.y], { layers: ['mn-stations'] }).length) continue;
+    const box = [[p.x - 3, p.y - 3], [p.x + 3, p.y + 3]];
+    if (!m.queryRenderedFeatures(box, { layers: ['mn-draw-line'] }).length) continue;
+    return { id: sh.id, x: Math.round(r.left + p.x), y: Math.round(r.top + p.y) };
+  }
+  return null;
+});
+ok('there is a stretch of the drawn line the hit test agrees about', !!onLine);
+if (onLine) {
+  await page.mouse.click(onLine.x, onLine.y);
+  await page.waitForTimeout(500);
+  const sel = await page.evaluate(() => ({ sel: state.draw.selectedId, w: (Map3D._draw().shapes.features || [])
+    .filter(f => f.properties.id === state.draw.selectedId).map(f => f.properties.width) }));
+  ok('a click on a drawn line here selects it, and it thickens', sel.sel === onLine.id && sel.w[0] === 4, JSON.stringify(sel));
+}
+
+// The elevation profile's cursor, which path-profile.js puts on the map
+// through MapDraw: here too, with its reading.
+const dotAt = await page.evaluate(() => {
+  const c = Map3D._map().getCenter();
+  MapDraw.showProfilePoint(c.lat, c.lng, '123 m');
+  return [c.lat, c.lng];
+});
+await page.waitForTimeout(300);
+const dot = await drawLook();
+const df = (dot.live.features || []).find(f => f.properties.kind === 'dot');
+ok('the profile cursor stands on the terrain with its reading',
+   !!df && samePt([df.geometry.coordinates[1], df.geometry.coordinates[0]], dotAt) && dot.dot === '123 m',
+   JSON.stringify({ f: df && df.geometry.coordinates, label: dot.dot }));
+await page.evaluate(() => MapDraw.clearProfilePoint());
+await page.waitForTimeout(200);
+ok('…and goes when the pointer leaves the chart', !(await drawLook()).live.features.some(f => f.properties.kind === 'dot'));
+
+await page.evaluate(() => {
+  MapDraw.setTool(''); state.draw.shapes = []; state.draw.selectedId = null;
+  MapDraw.render(); MapDraw.rerenderPanel();
+});
+
 // ── the Queensland cadastre, draped (map-lots.js, map-roads.js) ──────────
 // Map display's property boundaries and road parcels — the layers Queensland
 // Globe draws — were Leaflet panes, under the canvas in this mode and so simply

@@ -4889,6 +4889,19 @@ hr {
   pointer-events: none;
 }
 
+/* The same over the 3-D view, which is inside that container (map-3d.js):
+   its canvas sets a grab cursor of its own, and its DOM markers — the
+   finder's pins, the photos' badges, the drawn pins and notes — would take
+   the click meant for the ground beside them. The canvas answers the click
+   with the terrain's coordinate (MapDraw.click3d). */
+.leaflet-container.mn-drawing #map3d .maplibregl-canvas-container.maplibregl-interactive {
+  cursor: crosshair;
+}
+
+.leaflet-container.mn-drawing #map3d .maplibregl-marker {
+  pointer-events: none;
+}
+
 .mn-draw-pin {
   background: none;
   border: none;
@@ -4909,6 +4922,18 @@ hr {
 .mn-draw-textbox.sel span {
   outline: 2px solid var(--draw);
   outline-offset: 3px;
+}
+
+/* In 3-D the pin is a MapLibre marker rather than a Leaflet divIcon, so its
+   box is set here instead of by iconSize; both views stand it on its foot. */
+.mn-draw-pin.mn-draw-3d {
+  width: 16px;
+  height: 16px;
+}
+
+.mn-draw-pin.mn-draw-3d,
+.mn-draw-textbox.mn-draw-3d {
+  cursor: pointer;
 }
 
 /* free text annotation — its own label, so it carries no measurement */
@@ -4933,8 +4958,10 @@ hr {
   box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
 }
 
-/* the length / radius / area a shape carries on the map */
-.leaflet-tooltip.mn-draw-label {
+/* the length / radius / area a shape carries on the map — a Leaflet tooltip
+   in 2-D, a MapLibre marker in 3-D (map-3d.js) */
+.leaflet-tooltip.mn-draw-label,
+.mn-draw-label.mn-draw-3d {
   background: rgba(255, 255, 255, .92);
   color: #1a1a1a;
   border: 1px solid var(--draw);
@@ -4956,7 +4983,8 @@ hr {
    its contrast over satellite imagery and over the light topo base alike, which
    is the deal every permanent label on this map takes. Blue border rather than
    the draw magenta, because the dot it belongs to is not a drawn shape. */
-.leaflet-tooltip.mn-profile-label {
+.leaflet-tooltip.mn-profile-label,
+.mn-profile-label.mn-draw-3d {
   background: rgba(255, 255, 255, .94);
   color: #0d2b45;
   border: 1px solid #2196f3;

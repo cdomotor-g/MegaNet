@@ -9,14 +9,13 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm, destPoint,
-// bearingDeg, acmaHaversineKm, cssVar, slug, dlText, announce,
-// stationLatLonText, copyLatLonPillHtml and mapViewPills; across to terrain.js
-// for Terrain.grid and Terrain.profile, land-cover.js for LandCover.sample,
-// path-profile.js for pathAnalyse, pathPropOf, rmSystemOf, wattsToDbm and the
-// PATH_DEFAULT_* constants, map-roads.js for MapRoads.near, map-draw.js for
-// MapDraw, places.js for Places.parse, map-controls.js for MapChrome.panel,
-// map-3d.js for Map3D.active (the circle is 2-D only), and app.js for
-// parseSearchTerms, parseIdRange, prepareSearch, stationMatchesSearch,
+// bearingDeg, acmaHaversineKm, cssVar, slug, dlText, stationLatLonText,
+// copyLatLonPillHtml and mapViewPills; across to terrain.js for Terrain.grid
+// and Terrain.profile, land-cover.js for LandCover.sample, path-profile.js for
+// pathAnalyse, pathPropOf, rmSystemOf, wattsToDbm and the PATH_DEFAULT_*
+// constants, map-roads.js for MapRoads.near, map-draw.js for MapDraw,
+// places.js for Places.parse, map-controls.js for MapChrome.panel, and app.js
+// for parseSearchTerms, parseIdRange, prepareSearch, stationMatchesSearch,
 // stationAlertIds, rerenderMapLegend and mapNote. Its two Google Earth
 // buttons call export.js's downloadSitesKmz and downloadSitesKml, which read
 // the answer back through exportSites(); and it tells map-3d.js's Map3D when
@@ -1103,8 +1102,6 @@ const MapSites = (function () {
       </label>`;
   }
 
-  function in3d() { return typeof Map3D !== 'undefined' && Map3D.active(); }
-
   // The drawn shapes that have an inside, each offering its stations. The
   // same "Select inside" answer Draw & measure gives — the stations the map is
   // showing inside it, so a filter that hides a site hides it here too.
@@ -1113,20 +1110,15 @@ const MapSites = (function () {
     try { shapes = MapDraw.exportShapes().filter(s => s.kind === 'circle' || s.kind === 'rect'); }
     catch (_) { shapes = []; }
     const armed = !!awaitCircle;
-    // Not in 3-D. Draw & measure takes its clicks off the *Leaflet* map, which
-    // is underneath the 3-D canvas with a camera of its own — so a click on a
-    // hillside in 3-D is a vertex on whatever flat ground that pixel happens
-    // to be over in 2-D, which after a tilt is kilometres away. What is here
-    // had the same defect and was bridged (#194); a circle is two clicks with a
-    // drag between them and is not, so the button says why it is off instead.
-    const flatOnly = in3d();
+    // In 3-D too. It was off there until Draw & measure took its clicks off
+    // the 3-D view's own terrain (MapDraw.click3d, map-3d.js) rather than off
+    // the flat map under the canvas, where a click on a hillside landed
+    // wherever that pixel was in 2-D — kilometres away after a tilt.
     return `
       <div class="sites-row">
         <button type="button" id="sites-circle" class="${armed ? 'is-armed' : ''}"
-                onclick="MapSites.drawCircle()" ${flatOnly ? 'disabled' : ''}
-                title="${flatOnly
-                  ? 'Leave 3-D to draw a circle — its clicks are placed on the flat map under the 3-D view, so here they would land on the wrong ground'
-                  : 'Click the middle of the area on the map, then click again at its edge — the stations inside it become the sites to serve'}"
+                onclick="MapSites.drawCircle()"
+                title="Click the middle of the area on the map, then click again at its edge — the stations inside it become the sites to serve"
                 >◯ ${armed ? 'Drawing — click the map' : 'Draw a circle'}</button>
         <button type="button" onclick="MapSites.useSelection()"
                 ${state.mapSelection && state.mapSelection.size ? '' : 'disabled'}
@@ -1562,9 +1554,6 @@ const MapSites = (function () {
         render();
         return;
       }
-      // The button is disabled in 3-D (shapesHtml says why); this is the same
-      // refusal for anybody calling it from the console.
-      if (in3d()) { announce('Leave 3-D to draw a circle — its clicks would land on the flat map underneath.'); return; }
       awaitCircle = new Set(state.draw.shapes.map(s => s.id));
       if (state.draw.tool !== 'circle') MapDraw.setTool('circle');
       if (map) mapNote('Click the middle of the area, then click again at its edge — the stations inside become the sites to serve. Esc stops.', 0);
@@ -1587,20 +1576,6 @@ const MapSites = (function () {
             return;
           }
         }
-      }
-      const el = document.getElementById('sites-shapes');
-      if (el) el.innerHTML = shapesHtml();
-    },
-
-    // Map3D's hook, on entering and on leaving 3-D: the circle button turns
-    // off and on with the mode, and a circle armed from here in 2-D is put
-    // down rather than left waiting for clicks that would land on the wrong
-    // ground. Only the button's row is redrawn — the rest of the panel may be
-    // under the pointer that pressed ⛰️'s own switch.
-    modeChanged() {
-      if (awaitCircle && in3d()) {
-        awaitCircle = null;
-        if (state.draw.tool === 'circle') MapDraw.setTool('');
       }
       const el = document.getElementById('sites-shapes');
       if (el) el.innerHTML = shapesHtml();

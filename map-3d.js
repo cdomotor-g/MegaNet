@@ -12,8 +12,9 @@
 // path-profile.js for the physics (pathAnalyse, pathPropOf, stationAntenna, earthBulge, rmSystemOf,
 // PATH_DEFAULT_*), to map-controls.js for the panel it is opened from, to
 // map-sites.js for what the repeater site finder drew (MapSites.drawn, select,
-// dimOthers, modeChanged), to map-photos.js for the field photos' pins
-// (MapPhotos.drawn, badgeHtml, conePath, open), to map-polar.js for the polar
+// dimOthers), to map-draw.js for Draw & measure (MapDraw.drawn, drawnLive,
+// click3d, move3d, select, finishLine, flatAgain), to map-photos.js for the
+// field photos' pins (MapPhotos.drawn, badgeHtml, conePath, open), to map-polar.js for the polar
 // coverage plot's image (MapPolar.drawn), to map-leader.js for the
 // station card's leader (MapLeader.sync, reveal), and to app.js for
 // showStationCard and the base-map choice. Every one of those is called from
@@ -73,6 +74,19 @@
 // draggable DOM marker, and a drag or a click on the terrain is handed to
 // `MapMovePin.moveTo()` / `pick()` with MapLibre's own coordinate for it —
 // never Leaflet's, which for a pixel on a tilted view is somewhere else.
+//
+// Draw & measure (map-draw.js) is the fifth, and talks back the most. What it
+// drew — pins, lines, circles, boxes, notes and their measurements — is read
+// off `MapDraw.drawn()` as ground and draped on the terrain (`mn-draw`), with
+// the pins, notes and labels as DOM markers wearing 2-D's own markup; what is
+// being clicked out — the dashed ghost, the snap's ring, the profile cursor —
+// comes off `drawnLive()` into a source of its own (`mn-draw-live`), because
+// it changes with every mousemove and the shapes do not. And the tools are
+// driven from here while this view is up: an armed tool takes the click ahead
+// of everything else, as it does in 2-D, and the click, the pointer's moves
+// and the double click that finishes a line go to MapDraw with the terrain's
+// own coordinate and a `view` of this camera (drawView), so a vertex lands
+// on the hillside under the pointer and the snap is to the pin drawn there.
 //
 // The Queensland cadastre — Map display's property boundaries (map-lots.js)
 // and road parcels (map-roads.js), the layers Queensland Globe draws — is
@@ -229,6 +243,12 @@ const Map3D = (function () {
   let photoKey  = null;  // what they were last built from, so a pan that finds the same photos rebuilds nothing
   let pinMarker = null;  // the move-pin mode's pin, draggable on the terrain (syncMovePin)
   let pinDragging = false; // …while a drag of it is under way, when the mode's own echo must not move it
+  let drawPins  = [];    // Draw & measure's pins, notes and measurements, as ml.Markers (syncDrawPins)
+  let drawKey   = null;  // what they and the `mn-draw` source were last built from
+  let drawTool  = null;  // the tool the cursor and the double click were last set for
+  let liveHint  = null;  // the snap's station name, as an ml.Marker (syncDrawLive)
+  let liveHintKey = null; // …and what it was built for
+  let liveDot   = null;  // the profile cursor's reading, likewise
   let dimK     = 1;      // MapSites.dimOthers(), as last applied — 1 when idle
   let lfHeld   = [];     // Leaflet's own handlers this file switched off (holdLeaflet)
   let lfMoving = false;  // the 2-D map was moved, and the camera has not followed yet
@@ -805,6 +825,224 @@ const Map3D = (function () {
     standOnGround();
   }
 
+  // ── Draw & measure (map-draw.js) ────────────────────────────────────────
+  // The sketches, as ground. A line is its vertices; a circle is the ring of
+  // points its Google Earth export is (MapDraw's ringFor — the circle on the
+  // sphere, not Leaflet's screen-space one, as the finder's search area is
+  // here); a box is its four corners. All of it is draped on the terrain in
+  // one block with the network's links, so a path drawn across a valley
+  // follows the valley floor and a circle lies on the hills it takes in. The
+  // ring is one Polygon feature that both the fill and the line layer read —
+  // a line layer draws a polygon's outline.
+  function drawFeatures(d) {
+    const out = [];
+    for (const s of d.shapes) {
+      const props = { id: s.id, colour: s.colour, width: s.sel ? 4 : 2.5 };
+      if (s.ring) {
+        out.push({ type: 'Feature', properties: props,
+                   geometry: { type: 'Polygon', coordinates: [s.ring.map(p => [p[1], p[0]])] } });
+      } else if (s.path && s.path.length >= 2) {
+        out.push({ type: 'Feature', properties: props,
+                   geometry: { type: 'LineString', coordinates: s.path.map(p => [p[1], p[0]]) } });
+      }
+    }
+    return { type: 'FeatureCollection', features: out };
+  }
+
+  // What is being clicked out: the dashed preview, the ring round the station
+  // the next click would land on (2-D's, less the stroke Leaflet centres on
+  // the radius and MapLibre puts outside it), and the profile cursor's dot.
+  function liveFeatures(l) {
+    const out = [];
+    const pt = (p, props) => out.push({ type: 'Feature', properties: props,
+                                        geometry: { type: 'Point', coordinates: [p[1], p[0]] } });
+    if (l.ghost) {
+      out.push({ type: 'Feature', properties: { kind: 'ghost', colour: l.ghost.colour },
+                 geometry: { type: 'LineString', coordinates: l.ghost.path.map(p => [p[1], p[0]]) } });
+    }
+    if (l.hint) pt(l.hint.at, { kind: 'hint', colour: l.hint.colour, r: Math.max(1, l.hint.ring - 1) });
+    if (l.dot)  pt(l.dot.at,  { kind: 'dot', colour: l.dot.colour });
+    return { type: 'FeatureCollection', features: out };
+  }
+
+  // Whether a draw tool is armed, which is when every click here is a vertex.
+  function drawArmed() {
+    return !!(state.draw && state.draw.tool) && typeof MapDraw !== 'undefined' && !!MapDraw.click3d;
+  }
+
+  // How this camera sees the ground, for MapDraw's snap and profile cursor —
+  // the three answers its own flatView() gives for Leaflet (map-draw.js). The
+  // pins worth measuring are the ones the renderer drew inside the snap's box
+  // round the pointer, asked of its own index rather than by projecting all
+  // ~3,174 on every mousemove, each placed where it stands on the terrain.
+  // A point the camera cannot place — behind it, where project() answers
+  // with a mirror image — is null, and is never the nearest thing.
+  function drawView(point) {
+    const at = { x: point.x, y: point.y };
+    const place = (lat, lon) => {
+      const ll = new ml.LngLat(lon, lat);
+      const p = map.project(ll);
+      return p && isFinite(p.x) && isFinite(p.y) && pinScale(ll) != null ? { x: p.x, y: p.y } : null;
+    };
+    return {
+      at,
+      px: place,
+      stations(r) {
+        const list = [], pts = [], seen = new Set();
+        if (dimK === 0) return { list, pts };    // out of sight is out of reach (see the click)
+        const box = [[at.x - r, at.y - r], [at.x + r, at.y + r]];
+        for (const f of map.queryRenderedFeatures(box, { layers: ['mn-stations'] })) {
+          const id = f.properties && f.properties.id;
+          if (id == null || seen.has(id)) continue;
+          seen.add(id);
+          const m = (state.mapMarkers || []).find(x => x.mnStationId === id);
+          if (!m || !m.mnStation) continue;
+          list.push(m);
+          pts.push(place(m.mnStation.lat, m.mnStation.lon));
+        }
+        return { list, pts };
+      },
+    };
+  }
+
+  // Everything MapDraw drew, or with `live` only what is being clicked out.
+  // The shapes are rebuilt only when they changed — this runs on every
+  // mousemove while a shape is being clicked out, and rebuilding the markers
+  // then would drop a keyboard user's focus for no change at all.
+  function syncDraw(live) {
+    if (!map || !ready || typeof MapDraw === 'undefined' || !MapDraw.drawn) return;
+    syncDrawLive();
+    if (live) return;
+    const d = MapDraw.drawn();
+    syncDrawTool(d.tool);
+    const key = JSON.stringify(d.shapes);
+    if (key === drawKey) return;
+    drawKey = key;
+    const s = map.getSource('mn-draw');
+    if (s) s.setData(drawFeatures(d));
+    syncDrawPins(d);
+  }
+
+  // The cursor says a tool is armed, as 2-D's crosshair does (styles.css,
+  // `.mn-drawing`, which reaches in here) — so a pointer left over a pin when
+  // the tool went up is not left saying "click me". And a double click
+  // finishes a line rather than zooming, which in 2-D is the map's own
+  // double-click zoom switched off while the line tool is armed.
+  function syncDrawTool(tool) {
+    if (tool === drawTool) return;
+    drawTool = tool;
+    if (tool) map.getCanvas().style.cursor = '';
+    if (tool === 'line') map.doubleClickZoom.disable();
+    else map.doubleClickZoom.enable();
+  }
+
+  // The pins and notes, and every shape's measurement, as DOM markers wearing
+  // 2-D's markup and classes — so styles.css draws them here as it does
+  // there, and a pin is recognisably the same pin in both views. DOM rather
+  // than a symbol layer for syncSitePins' reasons: a symbol needs a glyphs
+  // host for its font, and cannot be pressed or reached by the keyboard. A
+  // pin or a note pressed selects it, as a click on it does in 2-D (where the
+  // panel's row is the keyboard's way to it; here the marker is focusable
+  // too), and stops there, for the finder's pins' reason. While a tool is
+  // armed they let the click through to the ground (styles.css), as 2-D's do.
+  // The colour is set on the element rather than written into its markup.
+  function syncDrawPins(d) {
+    const was = document.activeElement && document.activeElement.dataset
+      ? document.activeElement.dataset.mnDrawId : null;
+    for (const m of drawPins) m.remove();
+    drawPins = [];
+    if (!map || !ml) return;
+    let refocus = null;
+    const add = (el, at, opts) => drawPins.push(
+      new ml.Marker({ element: el, opacityWhenCovered: '0.35', ...opts }).setLngLat([at[1], at[0]]).addTo(map));
+    for (const s of d.shapes) {
+      if (s.kind === 'pin' || s.kind === 'text') {
+        const el = document.createElement('div');
+        const ink = document.createElement(s.kind === 'pin' ? 'i' : 'span');
+        if (s.kind === 'pin') {
+          el.className = `mn-draw-pin mn-draw-3d${s.sel ? ' sel' : ''}`;
+          ink.style.background = s.colour;
+          ink.style.outlineColor = s.colour;
+        } else {
+          el.className = `mn-draw-textbox mn-draw-3d${s.sel ? ' sel' : ''}`;
+          ink.style.borderColor = s.colour;
+          ink.textContent = s.text;
+        }
+        el.appendChild(ink);
+        el.title = s.name;
+        el.setAttribute('aria-label', s.name);
+        el.setAttribute('aria-pressed', String(!!s.sel));
+        el.setAttribute('role', 'button');
+        el.tabIndex = 0;
+        el.dataset.mnDrawId = s.id;
+        const pick = e => { e.stopPropagation(); e.preventDefault(); MapDraw.select(s.id); };
+        el.addEventListener('click', pick);
+        el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') pick(e); });
+        if (was === s.id) refocus = el;
+        // A pin hangs off its point (2-D's iconAnchor is its foot); a note's
+        // box centres itself on its point in CSS, so its corner goes there.
+        add(el, s.point, { anchor: s.kind === 'pin' ? 'bottom' : 'top-left' });
+      }
+      if (s.label && s.labelAt) {
+        const el = document.createElement('div');
+        el.className = 'mn-draw-label mn-draw-3d';
+        el.style.borderColor = s.colour;
+        el.textContent = s.label;
+        // Over a pin, as 2-D's tooltip is; on the middle of everything else.
+        const pin = s.kind === 'pin';
+        add(el, s.labelAt, { anchor: pin ? 'bottom' : 'center', offset: pin ? [0, -18] : [0, 0] });
+      }
+    }
+    if (refocus) refocus.focus({ preventScroll: true });
+    standOnGround();
+  }
+
+  // The live half: the source every mousemove, and two labels — the name of
+  // the station a click would snap to, rebuilt only when that station
+  // changes, and the profile cursor's ground height, moved and re-worded in
+  // place, as 2-D's tooltip is.
+  function syncDrawLive() {
+    const l = MapDraw.drawnLive();
+    const src = map.getSource('mn-draw-live');
+    if (src) src.setData(liveFeatures(l));
+    const hk = l.hint ? JSON.stringify([l.hint.at, l.hint.name, l.hint.colour]) : null;
+    if (hk !== liveHintKey) {
+      liveHintKey = hk;
+      if (liveHint) { liveHint.remove(); liveHint = null; }
+      if (l.hint && l.hint.name && ml) {
+        const el = document.createElement('div');
+        el.className = 'mn-draw-label mn-draw-3d';
+        el.style.borderColor = l.hint.colour;
+        el.textContent = l.hint.name;
+        liveHint = new ml.Marker({ element: el, anchor: 'bottom', offset: [0, -(l.hint.ring + 2)] })
+          .setLngLat([l.hint.at[1], l.hint.at[0]]).addTo(map);
+      }
+    }
+    if (!l.dot) {
+      if (liveDot) { liveDot.remove(); liveDot = null; }
+    } else if (ml) {
+      if (!liveDot) {
+        const el = document.createElement('div');
+        el.className = 'mn-profile-label mn-draw-3d';
+        liveDot = new ml.Marker({ element: el, anchor: 'bottom', offset: [0, -8] }).setLngLat([l.dot.at[1], l.dot.at[0]]).addTo(map);
+      }
+      const el = liveDot.getElement();
+      el.textContent = l.dot.label;
+      el.hidden = !l.dot.label;
+      liveDot.setLngLat([l.dot.at[1], l.dot.at[0]]);
+    }
+  }
+
+  function dropDraw() {
+    for (const m of drawPins) { try { m.remove(); } catch (_) {} }
+    drawPins = [];
+    if (liveHint) { try { liveHint.remove(); } catch (_) {} }
+    if (liveDot)  { try { liveDot.remove(); } catch (_) {} }
+    liveHint = null; liveDot = null; liveHintKey = null;
+    drawKey = null;
+    drawTool = null;
+  }
+
   // ── Standing the DOM markers on the ground ──────────────────────────────
   // A marker is placed on the ground as far as the terrain has loaded when it
   // is added, and MapLibre places its markers again as tiles land only for the
@@ -825,6 +1063,7 @@ const Map3D = (function () {
       if (!map) { standing = false; return; }
       for (const m of sitePins) m.setLngLat(m.getLngLat());
       for (const p of photoPins) p.marker.setLngLat(p.marker.getLngLat());
+      for (const m of drawPins) m.setLngLat(m.getLngLat());
       if (pinMarker && !pinDragging) pinMarker.setLngLat(pinMarker.getLngLat());
       if (map.loaded() && !map.isMoving()) { standing = false; return; }
       map.once('render', again);
@@ -1219,6 +1458,11 @@ const Map3D = (function () {
         'mn-photos':   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
         // The move-pin mode's leader and "was here" ring (syncMovePin).
         'mn-movepin':  { type: 'geojson', data: movePinFeatures(null) },
+        // Draw & measure's shapes, and what is being clicked out (syncDraw).
+        // Empty here and filled once the style has loaded, as the photos are,
+        // so the one place they are built is the one place they are rebuilt.
+        'mn-draw':      { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+        'mn-draw-live': { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
       },
       layers: [
         { id: 'mn-base', type: 'raster', source: 'mn-base' },
@@ -1266,6 +1510,23 @@ const Map3D = (function () {
                    'line-opacity': ['get', 'op'],
                    'line-dasharray': ['case', ['==', ['get', 'dash'], 1],
                                       ['literal', [2.33, 2]], ['literal', [1, 0]]] } },
+        // ── Draw & measure (map-draw.js, syncDraw) ───────────────────────
+        // Over the network and the finder, as a sketch is drawn over the map
+        // it is about, and draped in the same block as them. 2-D's styling:
+        // a 12% fill, a 2.5 px line (4 when it is the selected shape), and the
+        // ghost's '5,5' dash at 2 px, which in MapLibre's units of the line's
+        // width is 2.5 and 2.5.
+        { id: 'mn-draw-fill', type: 'fill', source: 'mn-draw',
+          filter: ['==', ['geometry-type'], 'Polygon'],
+          paint: { 'fill-color': ['get', 'colour'], 'fill-opacity': 0.12 } },
+        { id: 'mn-draw-line', type: 'line', source: 'mn-draw',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': ['get', 'colour'], 'line-width': ['get', 'width'] } },
+        { id: 'mn-draw-ghost', type: 'line', source: 'mn-draw-live',
+          filter: ['==', ['get', 'kind'], 'ghost'],
+          layout: { 'line-join': 'round' },
+          paint: { 'line-color': ['get', 'colour'], 'line-width': 2,
+                   'line-dasharray': ['literal', [2.5, 2.5]] } },
         { id: 'mn-sites-targets', type: 'circle', source: 'mn-sites',
           filter: ['==', ['get', 'kind'], 'target'],
           paint: { 'circle-radius': ['get', 'r'], 'circle-color': 'rgba(0,0,0,0)',
@@ -1339,6 +1600,16 @@ const Map3D = (function () {
         { id: 'mn-movepin-ghost', type: 'circle', source: 'mn-movepin', filter: ['==', ['get', 'kind'], 'ghost'],
           paint: { 'circle-radius': 9, 'circle-color': 'rgba(0,0,0,0)',
                    'circle-stroke-color': cssVar('--muted', '#6b7a89'), 'circle-stroke-width': 2 } },
+        // ── Draw & measure, live: the ring round the station a click would
+        // snap to, and the elevation profile's cursor — 2-D's blue dot with
+        // its white casing, over everything, as each is the thing being
+        // pointed at. Their labels are DOM markers (syncDrawLive).
+        { id: 'mn-draw-hint', type: 'circle', source: 'mn-draw-live', filter: ['==', ['get', 'kind'], 'hint'],
+          paint: { 'circle-radius': ['get', 'r'], 'circle-color': 'rgba(0,0,0,0)',
+                   'circle-stroke-color': ['get', 'colour'], 'circle-stroke-width': 2 } },
+        { id: 'mn-draw-dot', type: 'circle', source: 'mn-draw-live', filter: ['==', ['get', 'kind'], 'dot'],
+          paint: { 'circle-radius': 4, 'circle-color': ['get', 'colour'],
+                   'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2, 'circle-stroke-opacity': 0.95 } },
       ],
       sky: {
         'sky-color': cssVar('--map3d-sky', '#7fb3e8'),
@@ -1693,6 +1964,8 @@ const Map3D = (function () {
       syncPhotos();
       // And a pin being moved, armed before 3-D was opened.
       syncMovePin();
+      // And whatever Draw & measure has on the map, with its tool if armed.
+      syncDraw();
       applyDim();
       queueSheets();
       setNote();
@@ -1742,6 +2015,18 @@ const Map3D = (function () {
     // layer-scoped listener and a plain one both fire, in registration order —
     // so the order is written out here instead of relied upon.
     map.on('click', e => {
+      // Draw & measure, armed: the click is a vertex wherever it lands — on a
+      // pin, on a path or on bare ground — ahead of everything below, because
+      // in 2-D arming a tool takes every pin and line out of the pointer's way
+      // (`.mn-drawing`) so that the click beside a site reaches the map. With
+      // the terrain's coordinate, never the 2-D map's, and this camera's view
+      // of the ground for the snap (drawView). The move-pin mode and What is
+      // here each disarm the tools on the way in, so neither is passed over.
+      if (drawArmed()) {
+        MapDraw.click3d(e.lngLat.lat, e.lngLat.lng, drawView(e.point));
+        stopBubbling(e);
+        return;
+      }
       // With the site finder's "everything else" slider at nought the network
       // is drawn at zero opacity, and MapLibre still hit-tests a feature it
       // draws invisibly — so the pins and paths are left out of the question
@@ -1773,8 +2058,25 @@ const Map3D = (function () {
       const pad  = LINK_HIT_PX;
       const near = [[e.point.x - pad, e.point.y - pad],
                     [e.point.x + pad, e.point.y + pad]];
+      // A drawn line or outline is a target as thin as a path, and is asked
+      // first: a line drawn along a link — the link budget's "Profile this
+      // path" draws exactly that — would otherwise be the one shape on the
+      // map that could not be picked off it.
+      const drawn = id => {
+        if (typeof MapDraw === 'undefined') return false;
+        stopBubbling(e);
+        MapDraw.select(id);
+        return true;
+      };
+      const stroke = map.queryRenderedFeatures(near, { layers: ['mn-draw-line'] })[0];
+      if (stroke && stroke.properties && drawn(stroke.properties.id)) return;
       const line = hid ? null : map.queryRenderedFeatures(near, { layers: ['mn-links'] })[0];
       if (line && line.properties) { clickedLink(line.properties, e); return; }
+      // Then the inside of a drawn circle or box, which in 2-D is the shape's
+      // too and selects it — after the paths, since a link crossing a circle
+      // is the more particular thing under the pointer.
+      const area = map.queryRenderedFeatures(e.point, { layers: ['mn-draw-fill'] })[0];
+      if (area && area.properties && drawn(area.properties.id)) return;
       // Empty ground, with the pick armed: this is the bridge (#194). The 2-D
       // map's own click carries `latlng` for that pixel on the *Leaflet* map,
       // and in this mode that is a different camera — its own centre, zoom,
@@ -1793,6 +2095,24 @@ const Map3D = (function () {
       // focused repeater and the ACMA highlight. Neither of those reads a
       // coordinate, so the wrong projection cannot hurt them — and they are
       // the one thing in the 2-D click that is still worth having here.
+    });
+
+    // The pointer's moves, for Draw & measure: the ghost and the snap's ring
+    // follow it while a tool is armed, and with none armed, running it along
+    // the profiled line moves the profile's cursor — each judged on this
+    // camera (drawView), as the click is. Leaflet's own mousemove arrives from
+    // under the canvas too, and MapDraw ignores it while this view is up.
+    map.on('mousemove', e => {
+      if (typeof MapDraw === 'undefined' || !MapDraw.move3d) return;
+      MapDraw.move3d(e.lngLat.lat, e.lngLat.lng, drawView(e.point));
+    });
+    // A double click finishes a line, as in 2-D. Its two clicks have already
+    // gone in as vertices, as they do there.
+    map.on('dblclick', e => {
+      if (!drawArmed() || state.draw.tool !== 'line') return;
+      stopBubbling(e);
+      if (e.preventDefault) e.preventDefault();
+      MapDraw.finishLine();
     });
 
     // A pin. The same things onStationClick() in app.js does, less the Leaflet
@@ -1846,14 +2166,20 @@ const Map3D = (function () {
       if (p.rid2 != null) MapBackbone.open('backbone', p.rid, p.rid2);
       else if (p.sid != null && p.rid != null) MapBackbone.open('field', p.sid, p.rid);
     }
-    map.on('mouseenter', 'mn-stations', () => { map.getCanvas().style.cursor = 'pointer'; });
+    // Not while a draw tool is armed: a pin is not what a click would do then,
+    // and the crosshair is (syncDrawTool).
+    const pointer = () => { if (!drawArmed()) map.getCanvas().style.cursor = 'pointer'; };
+    map.on('mouseenter', 'mn-stations', pointer);
     map.on('mouseleave', 'mn-stations', () => { map.getCanvas().style.cursor = ''; });
     // The lines say they are clickable too. MapLibre scopes these to the
     // layer's own rendered geometry, with no tolerance to give them, so the
     // pointer appears a pixel or two later than the click box would take it —
     // the cursor is the hint, LINK_HIT_PX is the affordance.
-    map.on('mouseenter', 'mn-links', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseenter', 'mn-links', pointer);
     map.on('mouseleave', 'mn-links', () => { map.getCanvas().style.cursor = ''; });
+    // And the drawn shapes, which a click selects.
+    map.on('mouseenter', 'mn-draw-line', pointer);
+    map.on('mouseleave', 'mn-draw-line', () => { map.getCanvas().style.cursor = ''; });
   }
 
   function syncLeader() {
@@ -2356,6 +2682,10 @@ const Map3D = (function () {
     photosChanged() { syncPhotos(); },
     // The move-pin mode's pin changed: armed, moved, saved or cancelled.
     movePinChanged() { syncMovePin(); },
+    // Draw & measure drew again (MapDraw.render, setTool), or with `live`
+    // only what is being clicked out moved — the ghost, the snap's ring, the
+    // profile cursor. Two early returns while 3-D is shut.
+    drawChanged(live) { syncDraw(!!live); },
 
     // Put the camera back overhead without leaving 3-D — the gesture that gets
     // somebody un-lost after a rotate, and the one thing a tilted map makes
@@ -2493,6 +2823,22 @@ const Map3D = (function () {
         features: data && data.features ? data.features.map(f => ({ kind: f.properties.kind, coordinates: f.geometry.coordinates })) : [],
       };
     },
+    // For the check: Draw & measure here — what the two sources hold, and
+    // the markers standing for the pins, notes and measurements.
+    _draw() {
+      const data = id => { const s = map && map.getSource(id); return s ? s.serialize().data : null; };
+      return {
+        shapes: data('mn-draw'), live: data('mn-draw-live'),
+        pins: drawPins.map(m => {
+          const ll = m.getLngLat(), el = m.getElement();
+          return { lat: ll.lat, lon: ll.lng, cls: el.className, text: el.textContent,
+                   id: el.dataset.mnDrawId || null };
+        }),
+        hint: liveHint ? liveHint.getElement().textContent : null,
+        dot:  liveDot ? liveDot.getElement().textContent : null,
+        dblZoom: !!(map && map.doubleClickZoom.isEnabled()),
+      };
+    },
     _photos() {
       const src = map && map.getSource('mn-photos');
       return {
@@ -2541,7 +2887,6 @@ const Map3D = (function () {
       build();
       holdLeaflet();
       repaintPanel();
-      modeToSites();
       addHud();
       announce(`3-D view on. ${viewMoveWords(coarse())} ${viewKeyWords()}`);
       return true;
@@ -2551,13 +2896,6 @@ const Map3D = (function () {
       announce('The 3-D view could not start.');
       return false;
     });
-  }
-
-  // The site finder's circle button is 2-D only (map-sites.js says why), so
-  // it is told whenever the mode changes. Asked for by `typeof` for symmetry
-  // with every other reach across from here, though map-sites.js loads first.
-  function modeToSites() {
-    if (typeof MapSites !== 'undefined' && MapSites.modeChanged) MapSites.modeChanged();
   }
 
   function close() {
@@ -2577,6 +2915,9 @@ const Map3D = (function () {
     if (pinMarker) { try { pinMarker.remove(); } catch (_) {} }
     pinMarker = null;
     pinDragging = false;
+    // And Draw & measure's markers; its shapes are in state and come back
+    // with the next map.
+    dropDraw();
     standing = false;   // a chain waiting on this map's next frame waits for ever
     dimK = 1;
     clearTimeout(hudTimer);   // the hint goes with the host it is drawn on
@@ -2601,8 +2942,10 @@ const Map3D = (function () {
     if (state.map3d) {
       state.map3d = false;
       repaintPanel();
-      modeToSites();
       announce('3-D view off');
+      // Leaflet's handlers are back as they were when 3-D opened; Draw &
+      // measure sets its double click again for whichever tool is armed now.
+      if (typeof MapDraw !== 'undefined' && MapDraw.flatAgain) MapDraw.flatAgain();
     }
     // The leader was drawn over the canvas and went with it; it is put back
     // on the 2-D map's own pane.

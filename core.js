@@ -511,7 +511,9 @@ const HELP = {
       + 'the terrain with its opacity slider and relief switch live, and <strong>ℹ️ What is '
       + 'here</strong> picks the ground the <em>camera</em> is looking at rather than the point '
       + 'underneath it on the flat map — which on a tilted view are not the same place, and can '
-      + 'be kilometres apart. The one thing the tilted map cannot draw is the callout balloon on '
+      + 'be kilometres apart. <strong>✏️ Draw &amp; measure</strong> works there as well: what you '
+      + 'have drawn lies on the ground with its measurements, and the tools draw on the terrain '
+      + 'under the pointer, snapping to the pins you can see. The one thing the tilted map cannot draw is the callout balloon on '
       + 'the pin itself. Press the mountain to tilt, and 🎚️ under it for everything about the '
       + 'tilt — and two more buttons appear under them '
       + 'while it is on: a <strong>compass</strong> that shows which way north has gone and puts '
@@ -571,8 +573,8 @@ const HELP = {
       + 'others\' off so they can be compared one at a time, plus the sites and the search area; '
       + '<em>KML</em> is the same file as plain text, with Google\'s own numbered pins. In ⛰️ 3-D '
       + 'the search area, the rings, the chosen candidate\'s paths and the numbered pins stand on '
-      + 'the terrain, and a pin click picks that candidate there too — only <em>Draw a circle</em> '
-      + 'waits for 2-D, because its clicks land on the flat map.',
+      + 'the terrain, and a pin click picks that candidate there too — and <em>Draw a circle</em> '
+      + 'draws its circle on the terrain.',
       '<strong>Find a place</strong> (the blue 📍 in the strip) is where a place is looked for, '
       + 'not the filter box — which filters the stations, and would have cut the network down to '
       + 'the stations named after a town while you were only looking for the town. Paste a '
@@ -891,7 +893,9 @@ const HELP = {
       ],
       caption: 'A two-point line also feeds the elevation profile and the link budget under the '
              + 'map. Esc cancels the shape in progress; Esc again puts the tool away. Nothing here '
-             + 'is saved — reloading clears it — so a drawing worth keeping goes out as a KML.',
+             + 'is saved — reloading clears it — so a drawing worth keeping goes out as a KML. '
+             + 'All of it works in ⛰️ 3-D too: the drawing lies on the terrain, and a click lands '
+             + 'on the ground under the pointer.',
     },
     links: [{ label: 'Who may edit, and what to do when nobody can get in', href: 'docs/access.md' },
             { label: 'Site exposure on the station card — what each row means, its sources and limits',

@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 27, date: '2026-10-12', items: [
+      '<strong>⛰️ 3-D view: Draw &amp; measure works there too.</strong> Lines, circles, boxes, pins and notes drawn on '
+        + 'the Stations map now show in the 3-D view, laid over the ground with their measurements. The ✏️ tools work in '
+        + '3-D as well: click the terrain to draw, double-click (or press Enter) to finish a line, and clicks snap to the '
+        + 'station pins you can see. The repeater site finder\'s <em>Draw a circle</em> works in 3-D now too.',
+    ] },
     { n: 26, date: '2026-10-11', items: [
       '<strong>📊 Plots: line and points together.</strong> In <em>Style</em>, <em>Points</em> now switches on beside '
         + '<em>Line</em> or <em>Step</em>, so the line carries a mark on every reading. Switch the line off to get points alone.',
