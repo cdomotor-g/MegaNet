@@ -2808,7 +2808,7 @@ const DB_SCHEMA = 'meganet';
 // connection timed out on every write.
 // 51: site surveys (survey_list, survey_receptions, survey_summary).
 // 52: a station last seen when it was heard (ingest_http's station_status).
-const DB_SCHEMA_VERSION = 52;
+const DB_SCHEMA_VERSION = 57;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
