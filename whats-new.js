@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 29, date: '2026-10-12', items: [
+      '<strong>📍 Pins say what a station is.</strong> On the Stations map a river height gauge is now a '
+        + '<strong>triangle</strong> and a rain gauge stays a circle (a station that measures both is a triangle); a gauge '
+        + 'read by hand is <strong>grey</strong>; and the Bureau\'s forecast and information locations are outlined in '
+        + '<strong>purple</strong> and <strong>pink</strong>, as on its own flood maps. Each is a switch under '
+        + '<em>Station pins</em> in 🗺️ Map display, and the legend keys them.',
+      '<strong>👤 Owner.</strong> The Stations filters have an <em>Owner</em> block — the Bureau, Seqwater, any council, '
+        + 'with a box to find one — and a <em>Gauge</em> block: what a station measures, who reads it, and whether the '
+        + 'Bureau forecasts for it. In 🗺️ Map display, <em>Owner</em> draws one owner\'s stations alone, or everyone\'s '
+        + 'but theirs.',
+    ] },
     { n: 28, date: '2026-10-12', items: [
       '<strong>📌 Site features.</strong> Signed in, a station\'s card has a <em>Site features</em> pill beside '
         + '<em>Move pin</em>: put its orifice outlet, inspection pits, benchmarks and gauge boards on the map, and draw '

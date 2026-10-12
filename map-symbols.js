@@ -1,0 +1,669 @@
+// MegaNet — map-symbols.js
+//
+//   MapSymbols   What a station's pin says about the station beyond its role.
+//                Its shape is what it measures: a triangle for a water level
+//                (a river height gauge), a circle for a rain gauge and the
+//                rest. Grey is a gauge read by hand. A purple or a pink outline
+//                is the Bureau's forecast or information location, in the
+//                Bureau's own colours. And whose stations the map draws at all.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js (state, esc, escAttr, announce, FILTER_NONE,
+// stationSensors), to app.js (stationOwner, filterOptions, refreshMapLayers,
+// rerenderMapLegend, updateMapMatchNote and the filter panel's redraws) and to
+// sls.js (SLS), all from inside its own functions, so this file's position
+// among the modules is free. Leaflet is reached the same way: the pin's shape
+// goes into its canvas renderer the first time a pin is made, never at load
+// (npm run toplevel).
+//
+// ── Why the pin changed ──────────────────────────────────────────────────────
+// For its whole life a pin said one thing — its role, as a colour: field green,
+// repeater blue, base orange — and 4,854 of the 4,874 stations are field
+// stations, so on the map nearly every pin said the same thing. What somebody
+// looking at a catchment wants to know first is the next question down: which
+// of these are river gauges and which are rain gauges, which ones does the
+// Bureau forecast, and which ones does nobody hear over the radio because a
+// person reads them. The Bureau's own flood maps answer the first two with
+// shape and outline — river heights are triangles, its forecast locations are
+// outlined in purple and its information locations in pink — and this follows
+// that key rather than inventing another, so a map read here reads the same as
+// one read there.
+//
+//   shape    A triangle for a station that measures a water level — a river
+//            height gauge, and a storage or tide gauge with it, since a height
+//            of water is what all three record. A circle for everything else,
+//            the rain gauges first among them. A station that measures both is
+//            a triangle: the river height is the rarer and the more urgent
+//            reading, and a combined site is a river gauge with a rain gauge
+//            beside it, not the other way round.
+//   fill     Grey for a gauge read by hand. Silence from it is not a fault —
+//            nothing reports it over the radio — and grey is what says so from
+//            across the map, before anybody opens a card to find out why
+//            Flood-Net has never heard it.
+//   outline  The Bureau's forecast location (Schedule 2 of its Service Level
+//            Specification — somebody predicts a height for it) in purple, its
+//            information location (Schedule 3 — reported and classified, not
+//            predicted) in pink. Drawn round the outside of the pin's own white
+//            ring, not instead of it, so a match's amber, a selection's violet
+//            and a health ring still have the ring to say themselves with.
+//
+// Each of the three is a switch in 🗺️ Map display (Station pins), on by
+// default and remembered, on MapArrows' terms: none of them costs anything the
+// map is not already paying for, and an operator who turns one off means it.
+// Colour pins by health takes the fill when it is on — the fill is health then
+// — and leaves the shape and the outline alone, because neither says anything
+// health does.
+//
+// ── Where each answer comes from ─────────────────────────────────────────────
+// No one field says any of it, so kind() reads every field that says some of
+// it, the same evidence the Digital Twin builds a station's structure from
+// (digital-twin.js, stationKind) and to the same rules where the two overlap:
+//
+//   water level  a Water Level or Gas Pressure sensor (a gas-purge bubbler is a
+//                water level gauge), a water_level ALERT address, a station
+//                type of *_water_level, a Water Level, Reservoir or Tide
+//                location type, the Bureau's river height index (Section 3 of
+//                its Queensland flood warning station lists), or the SLS saying
+//                River, or naming it a forecast, information or river data
+//                location — all three are river height locations.
+//   rainfall     a Rainfall sensor or address, *_rain_gauge, a Rain Gauge
+//                location type, the Bureau's rainfall indexes (Sections 1 and
+//                2), or the SLS saying Rainfall.
+//   by hand      the station type says manual_*; or, where it does not say
+//                auto_*, the SLS calls the gauge Manual; or, where neither says
+//                either way, the Bureau reads it daily (Section 2) and nothing
+//                in the record says a radio does. The twin's rule, with a
+//                repeater's or a base's role counted as a radio, as it is.
+//   by radio     the station type says auto_*, or there is an ALERT address,
+//                an AL, ALERT or TM on the end of the name, a satellite
+//                terminal, a telemetry form, a repeater's or a base's role — or
+//                the SLS calls the gauge Automatic.
+//   SLS role     forecast beats information beats river data, as the card says
+//                it (sls.js, roleText), across both documents for a station on
+//                the border.
+//
+// ── What it costs ────────────────────────────────────────────────────────────
+// The SLS file. sls.js fetches it once, the first time something asks, and
+// never at page load; the Stations map now asks once it is drawn — the grey,
+// the outlines and the owners all come from it — and paints the pins again when
+// it lands. 1.2 MB of schedule is 90 KB on the wire, and the pins are on the
+// screen the whole time: a pin that is grey or outlined a second late is a
+// better trade than a first paint held back for it. A file that does not load
+// leaves the record's own evidence — the shapes are nearly all from the record
+// anyway — and the notes under the switches and the owner say what is missing.
+//
+// ── Whose stations ───────────────────────────────────────────────────────────
+// The other half of this file is a question about the map rather than about a
+// station: an operator who works for one council, or only on the Bureau's
+// network, can have the map draw only that owner's stations — or every owner's
+// but theirs. One owner, picked from the same list (and the same counts) as the
+// Filters' Owner block, which is where to go for two or more. It is the map's
+// and only the map's: the station list and the filters are untouched, as they
+// are by Hide stations that don't match, and like that switch it is
+// session-only — a map that opens next week missing three quarters of the
+// network, over a choice made today, reads as data that has gone. The note
+// under the Filters' match line says how many it is not drawing.
+//
+// Exposes: kind, pin, radius, marker, reset, ownersReady, askSls, slsFailed,
+//          ownerDrawn, ownerHiding, ownerNoteShort, ownerPhrase, ownerParties,
+//          sectionHtml, ownerHtml, noteHtml, legendHtml, legendOff, setShapes,
+//          setManual, setOutlines, setOwner, setOwnerMode, and the colours
+//          FORECAST, INFORMATION and MANUAL and the triangle's TRI_SCALE.
+const MapSymbols = (function () {
+  // Sampled off the Bureau's own key for its flood warning map, and literals
+  // for the reason the ACMA squares' are: they are that key's colours and mean
+  // what they mean there, so a theme does not restyle them.
+  const FORECAST    = '#8400a8';
+  const INFORMATION = '#ff00c5';
+  // A gauge read by hand. A mid grey that is none of the role fills, not the
+  // hollow white of a proposed or unheard pin, and still a fill under the white
+  // ring every pin wears, so it reads on a satellite base as well as a topo.
+  const MANUAL      = '#7b8189';
+  // The outline's own weight. Heavier than a pin's ring (2) so it reads as a
+  // second shape round the first rather than as a thicker ring, and lighter
+  // than a selection's (4), which outranks it.
+  const OUTLINE_W   = 2.5;
+  // A triangle's circumradius against the circle it replaces. At 1 the
+  // triangle inside a 5 px circle is a speck beside its neighbours: a triangle
+  // covers 41% of its circumcircle. At 1.4 it is the circle's height and a
+  // little wider, which is what reads as the same size of pin. The radius a
+  // triangle pin carries *is* its circumradius, so every caller that sizes off
+  // getRadius() — the click target, the leader's ring, the labels' offset, the
+  // selection's grow — gets the triangle's real extent without knowing it is
+  // one.
+  const TRI_SCALE   = 1.4;
+
+  // station → { gen, k }. A rebuild asks for every pin's kind and every filter
+  // keystroke for every station's, so it is worked out once; `gen` moves when
+  // the SLS lands and when a station is saved (refreshFilterOptions), which
+  // are the two things that change an answer.
+  let kinds = new WeakMap();
+  let gen = 0;
+  // The SLS file: sent for, and failed. Failed is worth knowing apart from not
+  // yet asked — it is the difference between "looking it up" and "it did not
+  // load" in every note that depends on it.
+  let slsAsked = false;
+  let slsFailed = false;
+
+  const slsLoaded = () => typeof SLS !== 'undefined' && SLS.loaded();
+  // Whether every owner can be told yet — Health's ownersReady, for the same
+  // reason: until the file lands a station with no owner of its own is not
+  // known to have none.
+  const ownersReady = () => typeof SLS === 'undefined' || slsLoaded() || slsFailed;
+
+  // ── What a station is ──────────────────────────────────────────────────────
+
+  function kind(s) {
+    if (!s) return null;
+    const hit = kinds.get(s);
+    if (hit && hit.gen === gen) return hit.k;
+    const k = work(s);
+    kinds.set(s, { gen, k });
+    return k;
+  }
+
+  function work(s) {
+    const sensors = typeof stationSensors === 'function' ? stationSensors(s) : (s.sensors || []);
+    const types = sensors.map(x => String((x && x.type) || ''));
+    const aids = s.alert_ids || {};
+    const locs = Array.isArray(s.location_types) ? s.location_types.map(String) : [];
+    const stype = String(s.station_type || '');
+    const cfg = String(s.inspection_config_key || '');
+    const sections = (Array.isArray(s.bureau_listings) ? s.bureau_listings : [])
+      .map(b => String(b && b.section));
+    // Every document's entry: a station on the border is in both, and the
+    // purple outline belongs to it if either forecasts for it.
+    const sls = slsLoaded() && SLS.entriesFor ? SLS.entriesFor(s) : [];
+    const first = sls[0] || null;
+    const slsData = sls.map(e => String(e.data_type || '')).join(' ');
+    const role = sls.some(e => e.forecast_location) ? 'forecast'
+      : sls.some(e => e.information_location) ? 'information'
+      : sls.some(e => e.river_data_location) ? 'river_data' : null;
+
+    const river = types.some(t => /^(Water Level|Gas Pressure)/i.test(t))
+      || aids.water_level != null || /_water_level$/.test(stype) || cfg === 'gas_only'
+      || locs.some(l => /^(Water Level|Reservoir|Tide)/i.test(l))
+      || sections.includes('3') || /river/i.test(slsData) || role != null;
+    const rain = types.some(t => /^Rainfall/i.test(t)) || aids.rainfall != null
+      || /_rain_gauge$/.test(stype) || locs.includes('Rain Gauge')
+      || sections.includes('1') || sections.includes('2') || /rainfall/i.test(slsData);
+
+    // The SLS's first entry, as the twin reads it — the two documents have
+    // never disagreed about a gauge's type, and if they ever do the more
+    // specific statement of service is the one quoted everywhere else.
+    const slsGauge = String((first && first.gauge_type) || '');
+    const typeManual = /^manual_/.test(stype), typeAuto = /^auto_/.test(stype);
+    const roles = Array.isArray(s.roles) ? s.roles : [];
+    const radio = sensors.some(x => x && x.alert_id != null) || Object.keys(aids).length > 0
+      || /\s(AL|ALERT|TM)$/i.test(String(s.name || '').trim())
+      || !!(s.satcom && s.satcom.enabled)
+      || ['alert', 'campbell_datalogger', 'datalogger_old', 'mace', 'gas_only', 'base_station'].includes(cfg)
+      || roles.includes('repeater') || roles.includes('base');
+    const manual = typeManual
+      || (!typeAuto && (/^manual$/i.test(slsGauge)
+        || (!/^automatic$/i.test(slsGauge) && !radio && sections.includes('2'))));
+    const auto = !manual && (typeAuto || radio || /^automatic$/i.test(slsGauge));
+    return { river, rain, manual, auto, role, sls: sls.length > 0 };
+  }
+
+  // What the pin wears, with the switches applied. `outline` is a colour or
+  // null; the fill is the caller's, which knows about health and proposals.
+  function pin(s) {
+    const k = kind(s);
+    return {
+      triangle: !!(state.mapPinShapes && k && k.river),
+      manual:   !!(state.mapPinManual && k && k.manual),
+      outline:  state.mapPinSls && k
+        ? (k.role === 'forecast' ? FORECAST : k.role === 'information' ? INFORMATION : null)
+        : null,
+    };
+  }
+
+  // The radius a pin of this circle's size is drawn at.
+  function radius(r, sym) {
+    return sym && sym.triangle ? Math.round(r * TRI_SCALE * 10) / 10 : r;
+  }
+
+  // ── The pin ────────────────────────────────────────────────────────────────
+  // A CircleMarker that may be a triangle and may carry an outline: two options
+  // (`mnShape`, `mnOutline`) and one drawing routine on the canvas renderer the
+  // Stations map draws with (preferCanvas, app.js initMap). Everything else is
+  // CircleMarker's own, which is the point — setStyle, setRadius, the click
+  // test, setLatLng for the fan-out, the 3-D mirror reading `options` — every
+  // caller that restyles a pin goes on doing exactly what it did.
+  //
+  // The click target stays the circumcircle: a triangle's corners are where a
+  // finger lands short of its middle, and a target a little larger than the
+  // mark is what every pin here has always had (the renderer's tolerance).
+  // The outline widens the pin's bounds, so a redraw of the canvas round a pin
+  // clears and repaints the whole of it rather than leaving its edges behind.
+  let Pin = null;
+
+  // An equilateral triangle, point up, its centroid on the station.
+  function triPath(ctx, x, y, r) {
+    const w = r * Math.sqrt(3) / 2;
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + w, y + r / 2);
+    ctx.lineTo(x - w, y + r / 2);
+    ctx.closePath();
+  }
+
+  // Where the outline runs: just outside the ring, stroke against stroke. A
+  // triangle's edges are half its circumradius from its middle, so it has to
+  // grow twice as far as a circle to clear the same ring by the same width.
+  function outlineR(r, weight, tri) {
+    const gap = (weight || 0) / 2 + OUTLINE_W / 2;
+    return tri ? r + 2 * gap : r + gap;
+  }
+
+  function pinClass() {
+    if (Pin) return Pin;
+    L.Canvas.include({
+      _updateMnPin(layer) {
+        if (!this._drawing || layer._empty()) return;
+        const p = layer._point, ctx = this._ctx, o = layer.options;
+        const tri = o.mnShape === 'triangle';
+        const r = Math.max(layer._radius, 1);
+        if (o.mnOutline && o.stroke !== false) {
+          ctx.beginPath();
+          if (tri) triPath(ctx, p.x, p.y, outlineR(r, o.weight, true));
+          else ctx.arc(p.x, p.y, outlineR(r, o.weight, false), 0, Math.PI * 2, false);
+          if (ctx.setLineDash) ctx.setLineDash([]);
+          ctx.globalAlpha = o.opacity;
+          ctx.lineWidth = OUTLINE_W;
+          ctx.strokeStyle = o.mnOutline;
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+        }
+        ctx.beginPath();
+        if (tri) triPath(ctx, p.x, p.y, r);
+        else ctx.arc(p.x, p.y, Math.max(Math.round(r), 1), 0, Math.PI * 2, false);
+        this._fillStroke(ctx, layer);
+      },
+    });
+    Pin = L.CircleMarker.extend({
+      // A renderer without the routine (an SVG fallback) draws the circle it
+      // always drew, which is a pin with less to say rather than no pin.
+      _updatePath() {
+        if (this._renderer._updateMnPin) this._renderer._updateMnPin(this);
+        else this._renderer._updateCircle(this);
+      },
+      _updateBounds() {
+        L.CircleMarker.prototype._updateBounds.call(this);
+        const o = this.options;
+        if (!o.mnOutline || !this._pxBounds) return;
+        const reach = outlineR(this._radius, o.weight, o.mnShape === 'triangle') + OUTLINE_W / 2
+          + this._clickTolerance();
+        this._pxBounds.extend(this._point.subtract([reach, reach]));
+        this._pxBounds.extend(this._point.add([reach, reach]));
+      },
+    });
+    return Pin;
+  }
+
+  function marker(latlng, options) {
+    const P = pinClass();
+    return new P(latlng, options);
+  }
+
+  // ── The SLS, sent for when something here needs it ────────────────────────
+  // Needed by the grey and the outline, and by the Filters' Owner and Gauge
+  // blocks; the shapes need it only for a handful the record does not say.
+  function needSls() {
+    return state.mapPinManual || state.mapPinSls;
+  }
+
+  function askSls(force) {
+    if (typeof SLS === 'undefined' || slsLoaded()) return;
+    if (slsAsked && !force) return;
+    slsAsked = true;
+    slsFailed = false;
+    paintNotes();
+    SLS.ensureData().then(arrived, () => { slsFailed = true; arrived(); });
+  }
+
+  // The answer changes kind() for 3,253 stations — the outlines and the grey
+  // appear, the owners are known — so everything that reads it is asked again:
+  // the pins (once, as Colour pins by health repaints them when its answer
+  // lands), the filters' option lists and whatever of them is filtering, the
+  // legend and the notes. The filter panel is not redrawn wholesale: somebody
+  // may be typing in its search box, and only the two blocks that waited for
+  // the file have anything new to show.
+  function arrived() {
+    gen++;
+    if (typeof state === 'undefined' || !state.data) return;
+    state.filterOpts = null;
+    if (state.activeTab === 'stations') {
+      if (typeof rerenderFilterGroup === 'function') rerenderFilterGroup('owners');
+      if (typeof rerenderFilterGauge === 'function') rerenderFilterGauge();
+      const f = state.filters;
+      const filtering = f.owners.size || f.measures || f.readBy || f.slsRole;
+      if (filtering && typeof stationsFilterChanged === 'function') stationsFilterChanged();
+      else if (state.map && typeof refreshMapLayers === 'function') refreshMapLayers({ skipFit: true });
+      if (typeof updateFilterChrome === 'function') updateFilterChrome();
+    }
+    paintOwnerControl();
+    paintNotes();
+    if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+  }
+
+  // A station saved or deleted: its answer may have moved.
+  function reset() {
+    gen++;
+    kinds = new WeakMap();
+  }
+
+  // ── Whose stations the map draws ───────────────────────────────────────────
+
+  function ownerParties(s) {
+    const o = typeof stationOwner === 'function' ? stationOwner(s) : null;
+    if (o) return o.parties;
+    return ownersReady() ? [FILTER_NONE] : [];
+  }
+
+  function ownerHiding() {
+    return !!state.mapOwner;
+  }
+
+  function ownerDrawn(s) {
+    if (!state.mapOwner) return true;
+    const has = ownerParties(s).includes(state.mapOwner);
+    return state.mapOwnerMode === 'except' ? !has : has;
+  }
+
+  function ownerLabel(v) {
+    return v === FILTER_NONE ? 'no owner on record' : v;
+  }
+
+  // "Seqwater's" / "every owner's but Seqwater's", for the notes and the map's
+  // name. The none-on-record bucket is said in words, never as an apostrophe.
+  function ownerPhrase() {
+    const v = state.mapOwner;
+    if (!v) return '';
+    if (v === FILTER_NONE) {
+      return state.mapOwnerMode === 'except'
+        ? 'only stations with an owner on record' : 'only stations with no owner on record';
+    }
+    return state.mapOwnerMode === 'except' ? `every owner's stations but ${v}'s` : `only ${v}'s stations`;
+  }
+
+  function hiddenCount() {
+    if (!state.mapOwner || !state.data) return 0;
+    let n = 0;
+    for (const s of state.data.stations) {
+      if (s.lat != null && s.lon != null && !ownerDrawn(s)) n++;
+    }
+    return n;
+  }
+
+  // The Filters' match line's half: said wherever the station count is said,
+  // because a map missing pins with nothing on screen saying why reads as a
+  // file that failed to load.
+  function ownerNoteShort() {
+    if (!state.mapOwner) return '';
+    const n = hiddenCount();
+    return ` · the map is drawing ${esc(ownerPhrase())} — <strong>${n.toLocaleString()}</strong> not drawn (🗺️ Map display)`;
+  }
+
+  function ownerOptions() {
+    if (!ownersReady() || typeof filterOptions !== 'function') return [];
+    return (filterOptions().owners || []);
+  }
+
+  function ownerControlHtml() {
+    const opts = ownerOptions();
+    const cur = state.mapOwner;
+    const on = !!cur;
+    // A choice that is no longer on offer — a station saved with a new owner
+    // took the last of someone's — is kept on the list, at nought, rather than
+    // being quietly swapped for a different answer.
+    const list = cur && !opts.some(o => o.value === cur)
+      ? opts.concat([{ value: cur, label: cur === FILTER_NONE ? 'No owner on record' : cur, count: 0 }])
+      : opts;
+    const sel = ownersReady()
+      ? `<select id="map-owner" aria-label="Owner whose stations the map draws, or leaves off"
+                 onchange="MapSymbols.setOwner(this.value)">
+          <option value="">Every owner's stations</option>
+          ${list.map(o => `<option value="${esc(o.value)}" ${cur === o.value ? 'selected' : ''}>${
+            esc(o.value === FILTER_NONE ? 'No owner on record' : o.label)} (${Number(o.count).toLocaleString()})</option>`).join('')}
+        </select>`
+      : `<select id="map-owner" aria-label="Owner whose stations the map draws, or leaves off" disabled>
+          <option>Looking up the owners…</option>
+        </select>`;
+    return `
+      <label class="filter-field"
+             title="Draw one owner's stations and leave everyone else's off the map — or the other way round. The owner recorded on the station, else the one the Bureau's Service Level Specification names; a joint owner counts under each party. The station list and the filters are not changed: the Filters' Owner block is the way to filter by owner, and to pick two or more.">
+        <span>Owner</span>
+        ${sel}
+      </label>
+      <div class="mapd-owner-mode" role="radiogroup" aria-label="Draw that owner's stations, or every other owner's">
+        ${[['only', 'Only theirs'], ['except', 'Everyone’s but theirs']].map(([v, l]) => `
+          <label class="filter-check${on ? '' : ' is-off'}">
+            <input type="radio" name="map-owner-mode" value="${v}"
+                   ${state.mapOwnerMode === v ? 'checked' : ''} ${on ? '' : 'disabled'}
+                   onchange="MapSymbols.setOwnerMode('${v}')">
+            ${l}
+          </label>`).join('')}
+      </div>
+      <p class="filter-note" id="map-owner-note">${ownerNoteHtml()}</p>`;
+  }
+
+  function ownerNoteHtml() {
+    if (!ownersReady()) {
+      return 'Most owners come from the Bureau’s Service Level Specification, which is being looked up.';
+    }
+    if (!state.mapOwner) {
+      return slsFailed
+        ? 'The Service Level Specification did not load, so only the owners recorded on stations are listed.'
+        : 'Every owner’s stations are drawn.';
+    }
+    const n = hiddenCount();
+    return `Drawing ${esc(ownerPhrase())}: <strong>${n.toLocaleString()}</strong> station${
+      n === 1 ? '' : 's'} not drawn. The list and the filters are as they were.`;
+  }
+
+  function paintOwnerControl() {
+    const el = document.getElementById('map-owner-block');
+    if (el) el.innerHTML = ownerControlHtml();
+  }
+
+  // ── Map display ───────────────────────────────────────────────────────────
+  // Its own section, under its own heading, ahead of Stations & links: what a
+  // pin looks like comes before which pins and lines are drawn.
+  function sectionHtml() {
+    if (needSls()) askSls();
+    return `
+    <div class="map-display-h">Station pins</div>
+    <label class="filter-check"
+           title="A station that measures a water level — a river height gauge, or a storage or tide gauge — is a triangle. A rain gauge, or a station that measures neither, is a circle. A station that measures both is a triangle.">
+      <input type="checkbox" ${state.mapPinShapes ? 'checked' : ''}
+             onchange="MapSymbols.setShapes(this.checked)">
+      Triangles for river height (water level) gauges
+    </label>
+    <label class="filter-check"
+           title="A gauge a person reads, not a radio: the station type says manual, the Bureau's Service Level Specification calls it Manual, or the Bureau reads it daily and nothing says a radio does. It reports nothing over the radio, so silence from it is not a fault.">
+      <input type="checkbox" ${state.mapPinManual ? 'checked' : ''}
+             onchange="MapSymbols.setManual(this.checked)">
+      Grey for gauges read by hand (manual)
+    </label>
+    <label class="filter-check"
+           title="The Bureau's own key: its forecast locations (Schedule 2 of the Service Level Specification — a height is predicted) outlined in purple, its information locations (Schedule 3 — reported and classified, not predicted) in pink.">
+      <input type="checkbox" ${state.mapPinSls ? 'checked' : ''}
+             onchange="MapSymbols.setOutlines(this.checked)">
+      Outline the Bureau's forecast &amp; information locations
+    </label>
+    <p class="filter-note" id="map-symbols-note">${noteHtml()}</p>`;
+  }
+
+  // The Stations & links half: the owner, beside Hide stations that don't
+  // match, because both decide which pins are drawn.
+  function ownerHtml() {
+    if (!ownersReady()) askSls();
+    return `<div id="map-owner-block" class="mapd-owner">${ownerControlHtml()}</div>`;
+  }
+
+  function counts() {
+    const out = { tri: 0, manual: 0, forecast: 0, information: 0 };
+    if (!state.data) return out;
+    for (const s of state.data.stations) {
+      const k = kind(s);
+      if (!k) continue;
+      if (k.river) out.tri++;
+      if (k.manual) out.manual++;
+      if (k.role === 'forecast') out.forecast++;
+      else if (k.role === 'information') out.information++;
+    }
+    return out;
+  }
+
+  function noteHtml() {
+    const c = counts();
+    const n = v => `<strong>${v.toLocaleString()}</strong>`;
+    const bits = [`${n(c.tri)} river height gauge${c.tri === 1 ? '' : 's'}`];
+    if (slsLoaded()) {
+      bits.push(`${n(c.manual)} read by hand`);
+      bits.push(`${n(c.forecast)} forecast and ${n(c.information)} information location${c.information === 1 ? '' : 's'}`);
+    }
+    const tail = slsLoaded() ? ''
+      : slsFailed ? ' The Bureau’s Service Level Specification did not load, so the outlines are missing and only the manual gauges the record names are grey. <button type="button" class="link-btn" onclick="MapSymbols.askSls(true)">Try again</button>'
+      : needSls() ? ' Looking up the forecast, information and manual gauges in the Bureau’s Service Level Specification…'
+      : '';
+    return `In the file: ${bits.join(' · ')}.${tail}`;
+  }
+
+  function paintNotes() {
+    const el = document.getElementById('map-symbols-note');
+    if (el) el.innerHTML = noteHtml();
+    const own = document.getElementById('map-owner-note');
+    if (own) own.innerHTML = ownerNoteHtml();
+  }
+
+  // ── The legend ─────────────────────────────────────────────────────────────
+  // The swatches are small SVGs, drawn as the map draws the marks: a triangle
+  // with the white ring, and the two outlines alone as the Bureau's key shows
+  // them — hollow, with a white casing under the colour so the purple still
+  // reads on the dark theme's panel.
+  function triSvg(fill, stroke, w) {
+    return `<svg class="legend-tri" viewBox="0 0 16 15" width="16" height="15" aria-hidden="true" focusable="false">
+      <polygon points="8,2 14.2,12.75 1.8,12.75" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round"/></svg>`;
+  }
+
+  function outlineSvg(colour) {
+    return `<svg class="legend-tri" viewBox="0 0 16 15" width="16" height="15" aria-hidden="true" focusable="false">
+      <polygon points="8,2 14.2,12.75 1.8,12.75" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linejoin="round"/>
+      <polygon points="8,2 14.2,12.75 1.8,12.75" fill="none" stroke="${colour}" stroke-width="2.5" stroke-linejoin="round"/></svg>`;
+  }
+
+  function legendHtml({ health = false } = {}) {
+    const fieldFill = typeof ROLE_COLOR !== 'undefined' ? ROLE_COLOR.field : '#107c10';
+    const rows = [];
+    if (state.mapPinShapes) {
+      rows.push(`
+    <span class="legend-item">
+      ${triSvg(health ? '#ffffff' : fieldFill, health ? '#5c6670' : '#ffffff', 1.5)}
+      <span class="small">River height (water level) gauge — a rain gauge, or a station that measures neither, is a circle</span>
+    </span>`);
+    }
+    if (state.mapPinManual && !health) {
+      rows.push(`
+    <span class="legend-item">
+      <span class="legend-dot" style="--dot:${MANUAL}"></span>
+      <span class="small">Read by hand — a manual gauge, silent on the radio</span>
+    </span>`);
+    }
+    if (state.mapPinSls) {
+      rows.push(`
+    <span class="legend-item">
+      ${outlineSvg(FORECAST)}
+      <span class="small">Forecast location (Bureau SLS)</span>
+    </span>
+    <span class="legend-item">
+      ${outlineSvg(INFORMATION)}
+      <span class="small">Information location (Bureau SLS)</span>
+    </span>`);
+    }
+    return rows.join('');
+  }
+
+  // The switches that are off, for the legend's "Also available" line.
+  function legendOff() {
+    return [
+      !state.mapPinShapes && 'Triangles for river height gauges',
+      !state.mapPinManual && 'Grey for manual gauges',
+      !state.mapPinSls    && 'Forecast and information outlines',
+    ].filter(Boolean);
+  }
+
+  // ── The switches ───────────────────────────────────────────────────────────
+  // Remembered, and repainted in place: the pins, the legend and the note. The
+  // block itself is left standing — it is under the pointer that just clicked
+  // it, and nothing else in it changed.
+  function store(key, on) {
+    try { localStorage.setItem(key, on ? 'on' : 'off'); } catch (_) {}
+  }
+
+  function repaint() {
+    paintNotes();
+    if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+    if (state.map && typeof refreshMapLayers === 'function') refreshMapLayers({ skipFit: true });
+  }
+
+  function setShapes(on) {
+    state.mapPinShapes = !!on;
+    store('mn-pin-shapes', on);
+    repaint();
+    announce(on ? 'River height gauges are triangles on the map.' : 'Every station pin is a circle.');
+  }
+
+  function setManual(on) {
+    state.mapPinManual = !!on;
+    store('mn-pin-manual', on);
+    if (on) askSls();
+    repaint();
+    announce(on ? 'Gauges read by hand are grey on the map.' : 'Gauges read by hand are back in their role’s colour.');
+  }
+
+  function setOutlines(on) {
+    state.mapPinSls = !!on;
+    store('mn-pin-sls', on);
+    if (on) askSls();
+    repaint();
+    announce(on ? 'Forecast locations are outlined in purple and information locations in pink.'
+                : 'Forecast and information locations are no longer outlined.');
+  }
+
+  function ownerChanged() {
+    paintOwnerControl();
+    if (typeof updateMapMatchNote === 'function') updateMapMatchNote();
+    if (state.map && typeof refreshMapLayers === 'function') refreshMapLayers({ skipFit: true });
+    announce(state.mapOwner
+      ? `The map is drawing ${ownerPhrase()}: ${hiddenCount().toLocaleString()} stations not drawn.`
+      : 'The map is drawing every owner’s stations.');
+  }
+
+  function setOwner(v) {
+    state.mapOwner = String(v || '');
+    ownerChanged();
+    // The select was just redrawn under the pointer; focus goes back to it so
+    // a keyboard can carry on down the list.
+    const sel = document.getElementById('map-owner');
+    if (sel) sel.focus();
+  }
+
+  function setOwnerMode(mode) {
+    state.mapOwnerMode = mode === 'except' ? 'except' : 'only';
+    ownerChanged();
+    const box = document.querySelector(`#map-owner-block input[name="map-owner-mode"][value="${state.mapOwnerMode}"]`);
+    if (box) box.focus();
+  }
+
+  return {
+    FORECAST, INFORMATION, MANUAL, TRI_SCALE,
+    kind, pin, radius, marker, reset,
+    ownersReady, askSls, ownerDrawn, ownerHiding, ownerNoteShort, ownerPhrase, ownerParties,
+    sectionHtml, ownerHtml, legendHtml, legendOff, noteHtml,
+    setShapes, setManual, setOutlines, setOwner, setOwnerMode,
+    slsFailed: () => slsFailed,
+  };
+})();
+if (typeof window !== 'undefined') window.MapSymbols = MapSymbols;

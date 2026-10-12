@@ -1185,6 +1185,18 @@ jobs:
         working-directory: test
         run: npm run sitefeatures
 
+      # The Stations map's pins (map-symbols.js), against stations.json and
+      # data/sls-locations.json read in Node: a triangle for every river height
+      # gauge, the Bureau's purple and pink outlines for its forecast and
+      # information locations, grey for a gauge the SLS calls Manual — read
+      # back off the canvas, not only off the options. The Filters' Owner and
+      # Gauge blocks picking out exactly those pins, Map display's owner choice
+      # (one owner, or everyone's but theirs, gone after a reload), the three
+      # switches remembered, and the SLS file neither waited for nor missed.
+      - name: Station pins — shapes, outlines, grey, owners, and the filters that agree
+        working-directory: test
+        run: npm run pins
+
       # The only check here that guards a *server-side* door. worker/index.js
       # turns a Cloudflare Access token into a Supabase session, so its verifier
       # is what stands between the front gate and a token that can write. Each

@@ -485,11 +485,17 @@ const Map3D = (function () {
     return { type: 'FeatureCollection', features: out };
   }
 
-  // The pins, likewise: `fillColor` is the role colour, `color` the ring the
-  // filter put on it (white, amber for a match, cyan for a station a pass range
-  // pulled in), and the opacities are the focus dim. Circles rather than
-  // MapLibre Markers on purpose — a Marker is a DOM node each, and this map
-  // draws ~3,174 of them.
+  // The pins, likewise: `fillColor` is the role colour (grey for a gauge read
+  // by hand), `color` the ring the filter put on it (white, amber for a match,
+  // cyan for a station a pass range pulled in), `mnOutline` the Bureau's
+  // purple or pink for its forecast and information locations, and the
+  // opacities are the focus dim. Circles rather than MapLibre Markers on
+  // purpose — a Marker is a DOM node each, and this map draws ~3,174 of them —
+  // and so a river height gauge's 2-D triangle is a circle here, of the size
+  // its circle would have been (pinR). Every click, snap, dim and leader in
+  // this view reads this one circle layer, whose depth test against the
+  // terrain is measured (styleSpec, below); the grey and the outline carry
+  // over, and the shape is the one thing 3-D leaves to 2-D.
   // The What is here pick, as nothing or as one point. Read off MapHere rather
   // than kept here: the pick belongs to that tool and this view is showing it,
   // which is the same relationship the pins and links have with the 2-D map.
@@ -500,6 +506,17 @@ const Map3D = (function () {
       features: p ? [{ type: 'Feature', properties: {},
                        geometry: { type: 'Point', coordinates: [p[1], p[0]] } }] : [],
     };
+  }
+
+  // A pin's radius as a circle. A river height gauge is a triangle in 2-D
+  // (map-symbols.js), drawn round a circle of this size and so carrying a
+  // larger radius; MapLibre has no triangle to draw, so here it is the circle
+  // it would have been — a river gauge the same size as its neighbours rather
+  // than a fatter dot.
+  function pinR(m) {
+    const r = m.mnRadius || 5;
+    return m.mnSymbol && m.mnSymbol.triangle && typeof MapSymbols !== 'undefined'
+      ? r / MapSymbols.TRI_SCALE : r;
   }
 
   function stationFeatures() {
@@ -513,9 +530,11 @@ const Map3D = (function () {
           id:   m.mnStationId,
           fill: m.options.fillColor || '#1565c0',
           ring: m.options.color || '#ffffff',
-          r:    m.mnRadius || 5,
+          r:    pinR(m),
           w:    m.options.weight || 2,
           op:   m.options.fillOpacity == null ? 1 : m.options.fillOpacity,
+          // The Bureau's purple or pink outline (map-symbols.js), or ''.
+          outline: m.options.mnOutline || '',
         },
         geometry: { type: 'Point', coordinates: [ll.lng, ll.lat] },
       });
@@ -1090,6 +1109,7 @@ const Map3D = (function () {
     set('mn-links', 'line-opacity', op);
     set('mn-stations', 'circle-opacity', op);
     set('mn-stations', 'circle-stroke-opacity', op);
+    set('mn-stations-outline', 'circle-stroke-opacity', op);
     set('mn-here-ring', 'circle-stroke-opacity', dimK);
     set('mn-here-dot', 'circle-opacity', dimK);
     set('mn-here-dot', 'circle-stroke-opacity', dimK);
@@ -1551,6 +1571,21 @@ const Map3D = (function () {
                    'circle-stroke-color': cssVar('--photo-ink', '#3a2a00'), 'circle-stroke-width': 1.5,
                    'circle-opacity-transition':        { duration: 0, delay: 0 },
                    'circle-stroke-opacity-transition': { duration: 0, delay: 0 } } },
+        // The Bureau's forecast and information locations' outlines
+        // (map-symbols.js): 2-D's purple or pink, as a ring round the pin's
+        // own. MapLibre strokes outside the radius, so the pin reaches r + w
+        // and the outline starts there. Under the pins and never a target —
+        // a click is the pin's.
+        { id: 'mn-stations-outline', type: 'circle', source: 'mn-stations',
+          filter: ['!=', ['get', 'outline'], ''],
+          paint: {
+            'circle-radius':       ['+', ['get', 'r'], ['get', 'w']],
+            'circle-color':        'rgba(0,0,0,0)',
+            'circle-stroke-color': ['get', 'outline'],
+            'circle-stroke-width': 2.5,
+            'circle-stroke-opacity': ['get', 'op'],
+            'circle-stroke-opacity-transition': { duration: 0, delay: 0 },
+          } },
         { id: 'mn-stations', type: 'circle', source: 'mn-stations',
           paint: {
             'circle-color':        ['get', 'fill'],
@@ -2567,7 +2602,7 @@ const Map3D = (function () {
       // leader rings it, as a bare 5 px dot.
       if (!marker) return { x: p.x, y: p.y, r: 5 * k };
       const w = marker.options.weight || 2;
-      return { x: p.x, y: p.y, r: ((marker.mnRadius || 5) + w) * k - w / 2 };
+      return { x: p.x, y: p.y, r: (pinR(marker) + w) * k - w / 2 };
     },
 
     // Slide the camera — zoom, tilt and heading kept — until `latlng` stands

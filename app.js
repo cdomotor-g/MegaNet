@@ -1165,6 +1165,44 @@ function stationSensorTypeKeys(s) {
   return types.size ? [...types] : [FILTER_NONE];
 }
 
+// Whose station it is, as the station card's Owner row says it (stationOwner):
+// each party of a joint owner, so "Bureau/Seqwater" is found under either, or
+// the none-on-record bucket. Empty until the SLS — where nearly every owner
+// comes from — has answered, which is not the same as none: the Owner block
+// waits for it rather than offering 4,870 stations as having no owner.
+function stationOwnerKeys(s) {
+  return MapSymbols.ownerParties(s);
+}
+
+// The Gauge block's three questions, against the same answers the pins are
+// drawn from (MapSymbols.kind), so "River height" is exactly the triangles,
+// "Read by a person" exactly the grey pins and "Forecast location" exactly the
+// purple outlines.
+function gaugeMatches(f, s) {
+  const k = MapSymbols.kind(s);
+  if (f.measures) {
+    const ok = f.measures === 'river'    ? k.river
+             : f.measures === 'rain'     ? k.rain
+             : f.measures === 'rainOnly' ? k.rain && !k.river
+             :                             !k.river && !k.rain;
+    if (!ok) return false;
+  }
+  if (f.readBy) {
+    const ok = f.readBy === 'manual' ? k.manual
+             : f.readBy === 'auto'   ? k.auto
+             :                         !k.manual && !k.auto;
+    if (!ok) return false;
+  }
+  if (f.slsRole) {
+    const ok = f.slsRole === 'either' ? k.role === 'forecast' || k.role === 'information'
+             : f.slsRole === 'listed' ? k.sls
+             : f.slsRole === FILTER_NONE ? !k.sls
+             :                            k.role === f.slsRole;
+    if (!ok) return false;
+  }
+  return true;
+}
+
 // Does a station clear one grouped filter? An empty Set is the default and
 // constrains nothing. `matchAll` is the sensor group's "must carry all of
 // these" mode — otherwise any one ticked value is enough. FILTER_EMPTY is never
@@ -1189,12 +1227,18 @@ function valueMatches(want, value) {
 // function happens to mutate state.filters next.
 let _filteredCache = null, _filteredCacheSig = null, _filteredCacheData = null;
 
+// The owners and the Gauge block answer from the SLS as well as the file, so
+// the file landing is a change of answer like any selection: it is in the
+// signature, or a list filtered while it was on its way would stay filtered
+// against what was known before it.
 function filtersSignature(f) {
   return JSON.stringify([
     f.searches, f.searchMode,
     f.enabledOnly, f.sensorsAll, f.basin, f.lga, f.hasCoords, f.hasAlertId,
     [...f.roles].sort(), [...f.networks].sort(), [...f.regions].sort(),
     [...f.catchments].sort(), [...f.sensors].sort(),
+    [...f.owners].sort(), f.measures, f.readBy, f.slsRole,
+    typeof SLS !== 'undefined' && SLS.loaded(),
   ]);
 }
 
@@ -1224,6 +1268,8 @@ function computeFilteredStations() {
     if (f.regions.size    && !groupMatches(f.regions,    stationRegionKeys(s)))       return false;
     if (f.catchments.size && !groupMatches(f.catchments, groupKeys(s.catchment_ids))) return false;
     if (f.sensors.size    && !groupMatches(f.sensors, stationSensorTypeKeys(s), f.sensorsAll)) return false;
+    if (f.owners.size     && !groupMatches(f.owners,     stationOwnerKeys(s)))        return false;
+    if ((f.measures || f.readBy || f.slsRole) && !gaugeMatches(f, s)) return false;
     if (!valueMatches(f.basin, s.basin)) return false;
     if (!valueMatches(f.lga,   s.lga))   return false;
     if (f.hasCoords) {
@@ -4614,6 +4660,10 @@ function mapDisplayControlsHtml() {
     </div>
     <p class="filter-note" id="map-display-find-none" hidden></p>
     ${state.map && state.map.mnBases ? state.map.mnBases.html() : ''}
+    <!-- What a pin's shape, fill and outline say (map-symbols.js): a triangle
+         for a river height gauge, grey for one read by hand, the Bureau's
+         purple and pink outlines for its forecast and information locations. -->
+    ${MapSymbols.sectionHtml()}
     <div class="map-display-h">Stations &amp; links</div>
     <label class="filter-check"
            title="Takes the non-matching pins off the map, and the link lines that run to them with them. Tick &quot;Include related repeaters&quot; to keep the carriers and their lines.">
@@ -4626,6 +4676,10 @@ function mapDisplayControlsHtml() {
              onchange="state.mapRelated=this.checked;stationsFilterChanged()">
       Include related repeaters
     </label>
+    <!-- One owner's stations, or everyone's but theirs (map-symbols.js). Beside
+         Hide stations that don't match, because both decide which pins are
+         drawn; unlike it, it answers to no filter. -->
+    ${MapSymbols.ownerHtml()}
     <!-- Colour pins by health (#218): every pin OK, watch, fault or no data,
          by when the station was last heard and — for one whose card has been
          opened — by what its readings say. Off by default and remembered: it
@@ -5079,6 +5133,7 @@ function mapLinkNoteHtml() {
 // layer is switched.
 function mapLegendOffLayersHtml() {
   const off = [
+    ...MapSymbols.legendOff(),
     !state.mapHealth          && 'Pins coloured by health',
     !state.mapElev            && 'Elevation shading',
     !state.mapSurvey          && 'Survey marks',
@@ -5198,6 +5253,10 @@ function mapLegendHtml() {
         <span class="legend-dot" style="--dot:${roleVar(k)}"></span>
         <span class="small">${v}</span>
       </span>`).join('')}
+    <!-- The pin's shape, its grey and its outline (map-symbols.js), each while
+         its switch is on. Under health the fill is health's, so the grey row
+         gives way as the role rows do. -->
+    ${MapSymbols.legendHtml({ health })}
     <span class="legend-item">
       <span class="legend-dot legend-dot-hit" style="--dot:${roleVar('field')}"></span>
       <span class="small">Matches filter</span>
@@ -5715,18 +5774,22 @@ function mapFilterActive() {
   return anyStationFilterActive();
 }
 
+// The owner choice in Map display (MapSymbols.ownerNoteShort) is said here
+// too, after whatever the filters are doing: it is the other thing that takes
+// pins off the map, and this line is where the station count is read.
 function mapMatchNoteHtml() {
   if (!state.data) return '';
   const total = state.data.stations.length;
-  if (!mapFilterActive()) return `Showing all <strong>${total}</strong> stations.`;
+  const owner = MapSymbols.ownerNoteShort();
+  if (!mapFilterActive()) return `Showing all <strong>${total}</strong> stations${owner}.`;
   const matched = filteredStations();
-  if (!matched.length) return 'No stations match — all pins shown unhighlighted.';
+  if (!matched.length) return `No stations match — all pins shown unhighlighted${owner}.`;
   const located = matched.filter(s => s.lat != null && s.lon != null).length;
   const related = relatedStations().length;
   return `<strong>${matched.length}</strong> of ${total} stations match` +
          (related ? ` · <strong>${related}</strong> more via pass range` : '') +
          (located < matched.length ? ` · ${matched.length - located} without a position` : '') +
-         (located > MAP_LABEL_CAP ? ` · labels on the closest ${MAP_LABEL_CAP}` : '');
+         (located > MAP_LABEL_CAP ? ` · labels on the closest ${MAP_LABEL_CAP}` : '') + owner;
 }
 
 function updateMapMatchNote() {
@@ -5792,7 +5855,12 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // costs is asked for — or asked again, once it is stale (health-glance.js).
   HealthGlance.reset();
 
-  const located  = state.data.stations.filter(s => s.lat != null && s.lon != null);
+  // The owner choice in Map display (MapSymbols.ownerDrawn) comes first and
+  // takes a station off the map entirely — its pin, its links, its place in
+  // the fit — as if it had no position: it is the map being told which
+  // network to draw, before any filter asks which of it matches.
+  const located  = state.data.stations.filter(s => s.lat != null && s.lon != null
+                                                 && MapSymbols.ownerDrawn(s));
   const active   = mapFilterActive();
   const matchIds = active ? new Set(filteredStations().map(s => s.id)) : null;
   const matched  = active ? located.filter(s => matchIds.has(s.id)) : [];
@@ -5955,7 +6023,13 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
 
   for (const s of stations) {
     const role   = primaryRole(s);
-    const color  = ROLE_COLOR[role] || ROLE_COLOR.field;
+    // What the pin says beyond its role (map-symbols.js): a triangle for a
+    // river height gauge, grey for one read by hand, the Bureau's purple or
+    // pink outline for its forecast and information locations. Grey takes the
+    // role's place as the colour, so everything below that paints "the
+    // station's colour" — the fill, a proposal's dashed ring — paints grey.
+    const sym    = MapSymbols.pin(s);
+    const color  = sym.manual ? MapSymbols.MANUAL : (ROLE_COLOR[role] || ROLE_COLOR.field);
     const isRpt  = s.roles.includes('repeater');
     const hit    = active && matchIds.has(s.id);
     const rel    = active && !hit && relIds.has(s.id);
@@ -5985,7 +6059,10 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     // until the one batch a load costs has answered. A lookup, not a
     // judgement: HealthGlance works every class out when an answer lands.
     const hg = HealthGlance.pinStyle(s);
-    const hgRadius = hg ? Math.max(3, radius + hg.grow) : radius;
+    // A triangle is drawn round the circle it replaces, a little larger
+    // (MapSymbols.radius), and its radius is that triangle's — so the click
+    // target, the leader's ring and a selection's grow all fit the mark drawn.
+    const hgRadius = MapSymbols.radius(hg ? Math.max(3, radius + hg.grow) : radius, sym);
     const base = {
       radius:      hgRadius,
       color:       hit ? MAP_PIN_HIT : rel ? MAP_PIN_REL : hg ? hg.ring : proposed ? color : MAP_PIN_RING,
@@ -5994,16 +6071,25 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
       opacity:     dim ? 0.6 : 1,
       fillOpacity: dim ? 0.45 : 1,
     };
-    const marker = L.circleMarker([s.lat, s.lon], {
+    // A CircleMarker that can be a triangle and carry an outline
+    // (MapSymbols.marker): every restyle below and in the modules that
+    // restyle pins — selection, focus, blast, the fan-out — is CircleMarker's
+    // own, and the shape and the outline ride along untouched.
+    const marker = MapSymbols.marker([s.lat, s.lon], {
       ...base,
       fillColor:   hg ? hg.fill : proposed ? MAP_PIN_PROPOSED_FILL : color,
       className:   hit ? 'mn-pin mn-pin-hit' : rel ? 'mn-pin mn-pin-rel' : 'mn-pin',
       bubblingMouseEvents: false,          // a pin click is not an empty-map click
+      mnShape:     sym.triangle ? 'triangle' : 'circle',
+      mnOutline:   sym.outline,
     }).addTo(map);
     marker.mnStationId = s.id;             // lets the table below find its pin
     marker.mnStation   = s;                // and lets labels be re-picked on pan
     marker.mnRadius    = hgRadius;
     marker.mnBaseStyle = base;
+    // What the pin is wearing, for the 3-D mirror and test/pins.mjs — the
+    // canvas has no DOM to ask.
+    marker.mnSymbol    = sym;
     // Its health class while the pins wear it (#218), or null: what the map's
     // name and test/healthcard.mjs read, the canvas having no DOM to ask.
     marker.mnHealth    = hg ? hg.cls : null;
@@ -6042,6 +6128,9 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
 
   applyMapSelectionStyles();
   applyMapFocusStyles();
+  // The grey and the outlines come from the Bureau's SLS: drawn without it
+  // first, then again when it lands (MapSymbols.askSls — once a session).
+  if (state.mapPinManual || state.mapPinSls) MapSymbols.askSls();
   MapSpider.setPins('stations', state.mapMarkers);
   // The 3-D view mirrors the lines and pins this function has just drawn rather
   // than deriving its own, so a rebuild of them is a rebuild of it — and it goes
@@ -6091,6 +6180,8 @@ function updateMapAltName(pins, links, backbone, matched, related) {
   // With Colour pins by health on, the headline is the health (#218).
   const health = HealthGlance.altText();
   if (health) bits.push(health);
+  // And whose stations they are, when Map display is drawing only some.
+  if (MapSymbols.ownerHiding()) bits.push(MapSymbols.ownerPhrase());
   el.setAttribute('aria-label', 'Station map — ' + bits.join(', ')
     + '. The same stations are listed in the table below.');
 }
@@ -7859,6 +7950,28 @@ const FILTER_GROUPS = {
     hint: `Networks are still being mapped, so most stations sit in "${FILTER_NONE_LABEL}" — ` +
           'they stay visible unless you untick that bucket.',
   },
+  // Whose station it is. A hundred-odd owners — the Bureau, Seqwater, the water
+  // department, eighty councils — so the rows come with a box to find one in,
+  // and "only" beside each is the one click to see a single owner's network.
+  // Most owners are the SLS's, so the block waits for that file, saying so,
+  // rather than listing everyone it has not heard about yet as owner-less.
+  owners: {
+    title: 'Owner',
+    hint: 'The owner recorded on the station, else the one the Bureau\'s Service Level ' +
+          'Specification names. A joint owner is listed under each of its parties.',
+    noneLabel: 'No owner on record',
+    find: 'Find an owner',
+    // Health's wording for the same failure: without the SLS the owners are
+    // the handful recorded on stations, and the bucket below them is
+    // everything else — which the block must not pass off as owner-less.
+    extra: () => (MapSymbols.slsFailed()
+      ? '<p class="filter-hint txt-warn">The Bureau\u2019s Service Level Specification did not load, so only ' +
+        'the owners recorded on stations are here.</p>'
+      : ''),
+    pending: () => !MapSymbols.ownersReady(),
+    pendingHtml: () => '<p class="filter-hint">Looking up the owners in the Bureau’s Service ' +
+                       'Level Specification…</p>',
+  },
   regions: {
     title: 'Region',
     hint: 'From the station\'s catchment. Regions are still being assigned.',
@@ -7898,6 +8011,7 @@ function stationFiltersHtml() {
     </div>
     <div class="filter-groups">
       ${Object.keys(FILTER_GROUPS).map(filterGroupHtml).join('')}
+      ${filterGaugeHtml()}
       ${filterAreaHtml()}
       ${filterDataHtml()}
     </div>`;
@@ -8189,6 +8303,7 @@ function searchTermsNoteHtml(i) {
 // option outright), so the cached lists are dropped and the panel redrawn.
 function refreshFilterOptions() {
   state.filterOpts  = null;
+  MapSymbols.reset();         // what a station measures, who owns it, who reads it
   state.searchIdx   = null;
   state.repeaterIdx = null;
   state.passRelIdx  = null;   // an edited pass range re-wires the relation
@@ -8199,19 +8314,40 @@ function refreshFilterOptions() {
 
 function filterGroupHtml(key) {
   const cfg  = FILTER_GROUPS[key];
-  const opts = filterOptions()[key];
-  if (!opts.length) return '';
+  // A block whose answers are still on their way (the owners, from the SLS)
+  // is drawn saying so, under its own id, so the answer landing can redraw it
+  // in place (MapSymbols' arrived → rerenderFilterGroup).
+  const pending = !!(cfg.pending && cfg.pending());
+  if (pending) MapSymbols.askSls();
+  const opts = pending ? [] : filterOptions()[key];
+  if (!opts.length && !pending) return '';
   const head = `
     <span class="filter-title">${esc(cfg.title)}</span>
-    <span class="filter-state" id="filter-state-${key}">${filterGroupState(key)}</span>`;
-  const body = `
+    <span class="filter-state" id="filter-state-${key}">${pending ? 'All' : filterGroupState(key)}</span>`;
+  // A list this long gets a box to find a row in. It hides the rows that do
+  // not match and changes nothing about which are ticked: All, None and the
+  // ticks still mean the whole list.
+  // Rows are hidden by a term only while the box is there to clear it from.
+  const finding = !!cfg.find && opts.length > 8;
+  const rowCfg = finding ? cfg : { ...cfg, find: null };
+  const find = finding ? `
+    <input type="search" class="filter-find" id="filter-find-${key}"
+           placeholder="${esc(cfg.find)}" aria-label="${esc(cfg.find)}"
+           aria-controls="filter-list-${key}" spellcheck="false"
+           value="${esc(filterFindText[key] || '')}"
+           oninput="setFilterFind('${key}', this.value)">` : '';
+  const body = pending ? `
+    ${cfg.hint ? `<p class="filter-hint">${cfg.hint}</p>` : ''}
+    ${cfg.pendingHtml ? cfg.pendingHtml() : ''}` : `
     ${cfg.hint ? `<p class="filter-hint">${cfg.hint}</p>` : ''}
     <div class="filter-actions">
       <button onclick="setGroupFilter('${key}','all')">All</button>
       <button onclick="setGroupFilter('${key}','none')">None</button>
     </div>
     ${cfg.extra ? cfg.extra() : ''}
-    <div class="filter-list">${opts.map(o => filterRowHtml(key, o, cfg)).join('')}</div>`;
+    ${find}
+    <div class="filter-list" id="filter-list-${key}">${opts.map(o => filterRowHtml(key, o, rowCfg)).join('')}</div>
+    ${find ? `<p class="filter-hint" id="filter-find-none-${key}" hidden></p>` : ''}`;
   return cfg.alwaysOpen
     ? `<div class="filter-block filter-group" id="filter-group-${key}">
          <div class="filter-head">${head}</div>${body}
@@ -8230,8 +8366,9 @@ function filterRowHtml(key, o, cfg) {
   const dot  = cfg.dots && ROLE_COLOR[o.value]
     ? `<span class="legend-dot" style="--dot:${roleVar(o.value)}"></span>` : '';
   const none = o.value === FILTER_NONE ? ' filter-row-none' : '';
+  const hide = cfg.find && !filterFindMatches(key, o.label) ? ' hidden' : '';
   return `
-    <div class="filter-row">
+    <div class="filter-row"${cfg.find ? ` data-find="${esc(String(o.label).toLowerCase())}"` : ''}${hide}>
       <label class="filter-row-label${none}">
         <input type="checkbox" ${on ? 'checked' : ''}
                onchange="toggleGroupFilter('${key}','${escAttr(o.value)}',this.checked)">
@@ -8260,6 +8397,95 @@ function filterAreaHtml() {
       ${filterSelectHtml('basin', 'Drainage basin', opts.basins)}
       ${filterSelectHtml('lga',   'Local government area', opts.lgas)}
     </details>`;
+}
+
+// The find box over a long tick list (the owners). Session-only and not in
+// state.filters, for the reason the Map display's Find box is not in `state`:
+// it narrows what is on screen, not what is ticked, so it is a thing somebody
+// is doing rather than a filter — and filtersSignature, the Clear buttons and
+// "3 of 15" have nothing to say about it.
+const filterFindText = {};
+
+function filterFindMatches(key, label) {
+  const terms = String(filterFindText[key] || '').toLowerCase().split(/\s+/).filter(Boolean);
+  const text = String(label || '').toLowerCase();
+  return terms.every(t => text.includes(t));
+}
+
+// Hides the rows in place: redrawing the block would take the caret out of
+// the box being typed in.
+function setFilterFind(key, value) {
+  filterFindText[key] = String(value || '');
+  const list = document.getElementById(`filter-list-${key}`);
+  if (!list) return;
+  let shown = 0;
+  for (const row of list.querySelectorAll('.filter-row')) {
+    const ok = filterFindMatches(key, row.dataset.find || '');
+    row.hidden = !ok;
+    if (ok) shown++;
+  }
+  const none = document.getElementById(`filter-find-none-${key}`);
+  if (none) {
+    none.hidden = shown > 0;
+    none.textContent = shown ? '' : `Nothing here matches “${filterFindText[key].trim()}”.`;
+  }
+}
+
+// What a gauge is, read by a person or a radio, and what the Bureau does with
+// it — the three things a pin's shape, its grey and its outline say on the map
+// (map-symbols.js), as three single-answer questions. Dropdowns rather than
+// tick boxes because each has a handful of answers that do not overlap, and
+// they are ANDed: "a river height gauge, read by hand, that the Bureau
+// forecasts for" is one question. Two of the three lean on the Bureau's SLS,
+// which is sent for when the block is drawn and redraws it when it lands.
+const GAUGE_CHOICES = {
+  measures: ['Measures', [
+    ['',          'Any'],
+    ['river',     'River height (water level) — a triangle'],
+    ['rain',      'Rainfall — any rain gauge'],
+    ['rainOnly',  'Rainfall, no water level — a circle'],
+    [FILTER_NONE, 'Neither on record'],
+  ]],
+  readBy: ['Read by', [
+    ['',          'Any'],
+    ['auto',      'A radio — automatic'],
+    ['manual',    'A person — manual, grey on the map'],
+    [FILTER_NONE, 'Not on record'],
+  ]],
+  slsRole: ['Flood warning role', [
+    ['',            'Any'],
+    ['forecast',    'Forecast location — outlined purple'],
+    ['information', 'Information location — outlined pink'],
+    ['either',      'Forecast or information location'],
+    ['river_data',  'River data location'],
+    ['listed',      'In the Bureau’s SLS, any role'],
+    [FILTER_NONE,   'Not in the Bureau’s SLS'],
+  ]],
+};
+const GAUGE_KEYS = Object.keys(GAUGE_CHOICES);
+
+function filterGaugeHtml() {
+  const waiting = typeof SLS !== 'undefined' && !SLS.loaded();
+  if (waiting) MapSymbols.askSls();
+  return `
+    <details class="filter-block" id="filter-group-gauge" ${state.filterOpen.gauge ? 'open' : ''}
+             ontoggle="state.filterOpen.gauge=this.open">
+      <summary class="filter-head">
+        <span class="filter-title">Gauge</span>
+        <span class="filter-state" id="filter-state-gauge">${valueGroupState(GAUGE_KEYS)}</span>
+      </summary>
+      <p class="filter-hint">What it measures, who reads it and what the Bureau does with it —
+        the shape, the grey and the outline of its pin on the map.</p>
+      ${GAUGE_KEYS.map(k => filterChoiceHtml(k, GAUGE_CHOICES[k][0], GAUGE_CHOICES[k][1])).join('')}
+      ${waiting ? `<p class="filter-hint" id="filter-gauge-wait">${MapSymbols.slsFailed()
+        ? 'The Bureau’s Service Level Specification did not load, so the manual gauges and the flood warning roles come from the station records alone.'
+        : 'Looking up the manual gauges and the flood warning roles in the Bureau’s Service Level Specification…'}</p>` : ''}
+    </details>`;
+}
+
+function rerenderFilterGauge() {
+  const el = document.getElementById('filter-group-gauge');
+  if (el) el.outerHTML = filterGaugeHtml();
 }
 
 // Gap-hunting rather than day-to-day filtering: which sites have no position,
@@ -8337,6 +8563,8 @@ function updateFilterChrome() {
   if (clear) clear.hidden = !anySearchText();
   const area = document.getElementById('filter-state-area');
   if (area) area.textContent = valueGroupState(['basin', 'lga']);
+  const gauge = document.getElementById('filter-state-gauge');
+  if (gauge) gauge.textContent = valueGroupState(GAUGE_KEYS);
   const data = document.getElementById('filter-state-data');
   if (data) data.textContent = valueGroupState(['hasCoords', 'hasAlertId', 'enabledOnly']);
   const idle = stationsResetIdle();
@@ -8393,6 +8621,13 @@ function filterOptions() {
     networks: build(tally(stationNetworkKeys),
                     (state.data?.radio_networks || []).map(n => ({ value: n.id, label: n.name }))),
     regions:  build(tally(stationRegionKeys), regionNames.map(r => ({ value: r, label: r }))),
+    // Most first, so the Bureau and the water authorities lead and a council
+    // with two gauges is found with the box rather than scrolled to. Nothing
+    // until the owners can all be told (MapSymbols.ownersReady).
+    owners:   MapSymbols.ownersReady()
+      ? build(tally(stationOwnerKeys), [], { sort: 'count' })
+          .map(o => o.value === FILTER_NONE ? { ...o, label: FILTER_GROUPS.owners.noneLabel } : o)
+      : [],
     basins:   build(tally(s => groupKeys(s.basin ? [s.basin] : [])), []),
     lgas:     build(tally(s => groupKeys(s.lga   ? [s.lga]   : [])), []),
   };
@@ -8462,7 +8697,8 @@ function rerenderFilterGroup(key) {
 function anyStationFilterActive() {
   const f = state.filters;
   return !!(anySearchActive() || f.roles.size || f.sensors.size || f.networks.size ||
-            f.regions.size || f.catchments.size || f.basin || f.lga ||
+            f.regions.size || f.catchments.size || f.owners.size || f.basin || f.lga ||
+            f.measures || f.readBy || f.slsRole ||
             f.hasCoords || f.hasAlertId || f.enabledOnly);
 }
 
@@ -8472,8 +8708,9 @@ function resetStationFilters() {
   state.filters = {
     searches: [newSearchRow()], searchMode: 'any',
     roles: new Set(), sensors: new Set(), networks: new Set(),
-    regions: new Set(), catchments: new Set(), sensorsAll: false,
+    regions: new Set(), catchments: new Set(), owners: new Set(), sensorsAll: false,
     basin: '', lga: '', hasCoords: '', hasAlertId: '', enabledOnly: false,
+    measures: '', readBy: '', slsRole: '',
     acma: state.filters.acma,
   };
 }

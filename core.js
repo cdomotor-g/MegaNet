@@ -686,6 +686,22 @@ const HELP = {
       + 'what is left is only the subset you filtered for. Tick <strong>Include related '
       + 'repeaters</strong> to bring the carriers — and their lines — back with it. Names are '
       + 'capped at 60 either way, and the panel says when the cap is in effect.',
+      'A pin\'s <strong>shape is what the station measures</strong>: a triangle for a river '
+      + 'height (water level) gauge, a circle for a rain gauge or anything else — and a triangle '
+      + 'for a station that measures both. <strong>Grey</strong> is a gauge read by hand: nothing '
+      + 'reports it over the radio, so silence from it is not a fault. A <strong>purple</strong> '
+      + 'outline is one of the Bureau\'s forecast locations and a <strong>pink</strong> one an '
+      + 'information location, as the Bureau\'s own flood maps draw them, from its Service Level '
+      + 'Specifications. Each is a switch under <em>Station pins</em> in 🗺️ <strong>Map '
+      + 'display</strong>, and the Filters\' <em>Gauge</em> block picks out exactly the same pins — '
+      + 'what a station measures, who reads it and what the Bureau does with it.',
+      '<strong>Owner</strong> is in the Filters — tick the owners you want, or press '
+      + '<em>only</em> beside one, with a box to find one council among a hundred — and in 🗺️ '
+      + '<strong>Map display</strong>, where <em>Owner</em> draws one owner\'s stations alone, or '
+      + 'everyone\'s but theirs, and leaves the list alone. A station with no owner of its own '
+      + 'takes the one the Bureau\'s Service Level Specification names, and a joint owner counts '
+      + 'under each party. The Map display choice lasts the session; the line under the filters '
+      + 'says how many stations it is not drawing.',
       'A name is read <strong>both ways round</strong>. This file writes the same word two ways — '
       + '243 stations say <em>Ck</em> and 218 say <em>Creek</em>, 196 say <em>Rd</em> and 63 '
       + '<em>Road</em>, 117 <em>Mt</em> and 60 <em>Mount</em> — so typing either spelling finds '
@@ -3019,12 +3035,27 @@ const state = {
     regions:      new Set(),
     catchments:   new Set(),
     sensorsAll:   false,   // sensor group: station must carry ALL ticked types, not any
+    // Whose station it is (stationOwner, app.js): a party of its owner, or
+    // FILTER_NONE for none on record. A grouped filter like the four above.
+    owners:       new Set(),
     // Single-value filters. '' = any; FILTER_NONE = only stations missing the field.
     basin:        '',
     lga:          '',
     hasCoords:    '',      // '' | 'yes' | 'no'
     hasAlertId:   '',      // '' | 'yes' | 'no'
     enabledOnly:  false,
+    // The Gauge block (MapSymbols.kind, map-symbols.js), the same answers the
+    // pins are drawn from, so a filter can pick out exactly the triangles, the
+    // grey pins or the purple outlines:
+    //   measures  '' | 'river' (a water level — a triangle) | 'rain' (any
+    //             rainfall) | 'rainOnly' (rainfall and no water level — a
+    //             circle) | FILTER_NONE (neither recorded)
+    //   readBy    '' | 'auto' (a radio) | 'manual' (a person) | FILTER_NONE
+    //   slsRole   '' | 'forecast' | 'information' | 'either' | 'river_data'
+    //             | 'listed' (in either SLS at all) | FILTER_NONE (in neither)
+    measures:     '',
+    readBy:       '',
+    slsRole:      '',
     acma: {
       show:        true,                        // on by default; the ~1.4 MB core
                                                 // data is fetched the first time
@@ -3041,7 +3072,8 @@ const state = {
   },
   // Which filter groups are expanded, and the option lists (with per-option
   // station counts) built from the loaded file — rebuilt on load, not per render.
-  filterOpen:     { sensors: false, networks: false, regions: false, area: false, data: false },
+  filterOpen:     { sensors: false, networks: false, owners: false, regions: false, gauge: false,
+                    area: false, data: false },
   filterOpts:     null,
   searchIdx:      null,    // flat name / number / address corpus, for pasted-list reporting
   repeaterIdx:    null,    // cached repeater-only subset, for pass-range matching
@@ -3229,6 +3261,23 @@ const state = {
   // remembered, on MapCatchments' terms: an operator who turns it on wants
   // the map that way next time.
   mapHealth:      localStorage.getItem('mn-map-health') === 'on',
+  // What a pin's shape, fill and outline say about the station (map-symbols.js):
+  // a triangle for a river height (water level) gauge, grey for a gauge read
+  // by hand, the Bureau's purple and pink outlines for its forecast and
+  // information locations. On by default and remembered, on mapArrows' terms —
+  // they were asked for, their one cost is the SLS file the station card reads
+  // (fetched once, after the pins are drawn), and an operator who turns one
+  // off means it.
+  mapPinShapes:   (localStorage.getItem('mn-pin-shapes') || 'on') === 'on',
+  mapPinManual:   (localStorage.getItem('mn-pin-manual') || 'on') === 'on',
+  mapPinSls:      (localStorage.getItem('mn-pin-sls') || 'on') === 'on',
+  // Whose stations the map draws (map-symbols.js): '' for everyone's, else one
+  // owner party (or FILTER_NONE, none on record), drawn alone ('only') or left
+  // off ('except'). Session-only, for mapHideOthers' reason: it takes stations
+  // off the map, and a map that opens next week missing most of the network
+  // over a choice made today reads as data that has gone.
+  mapOwner:       '',
+  mapOwnerMode:   'only',
   // Where green stops being green and yellow stops being yellow, in dB of fade
   // margin. Higher than the link budget card's own bands (10 / 3) on purpose:
   // the card asks "would this link work", the map asks "which of these would I

@@ -1165,14 +1165,20 @@ here.
 ### 2. Interactive Map
 - Plot all stations by role, each role in its own colour — field station green,
   repeater blue, base station red; a station with several roles takes base over
-  repeater over field. Two splits the plan drew were not built, and no issue asks
-  for either: a field station's pin does not say whether it measures rainfall,
-  water level or both (the *Sensor type* filter does), and satcom terminals have
-  no pin of their own — *Satcom* is in the legend and among the editor's roles,
-  but no station in `stations.json` carries it
+  repeater over field. Satcom terminals have no pin of their own — *Satcom* is in
+  the legend and among the editor's roles, but no station in `stations.json`
+  carries it
+- **Station pins say what the station is** (🗺️ Map display, *Station pins*, each
+  switch on by default and remembered): a **triangle** for a river height (water
+  level) gauge and a **circle** for a rain gauge or anything else — a station that
+  measures both is a triangle; **grey** for a gauge read by hand; and the
+  Bureau's own key for its flood warning service — a **purple outline** round a
+  forecast location and a **pink** one round an information location, from its
+  Service Level Specifications. See *Reading the map* below
 - Draw signal path lines between field stations and the repeaters/base stations their AlertID passes through
 - Click a station to see its full detail panel
-- Filter map display by role, sensor type, radio network, region, basin/council or data completeness (see *Filtering & Exploration*)
+- Filter map display by role, sensor type, radio network, owner, region, gauge (what it measures, who reads it, the Bureau's flood warning role), basin/council or data completeness (see *Filtering & Exploration*)
+- Draw only one owner's stations — the Bureau's, Seqwater's, one council's — or everyone's but theirs (🗺️ Map display, *Owner*); the list and the filters are left alone
 - Pull the repeaters that carry a matched station onto the map and into the table with it (*Include related repeaters*)
 - Toggle the link lines on/off (the backbone paths have a switch of their own), fade them with a slider, and cap how long a link may be before it is dropped (*Limit link/path length*)
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
@@ -1201,6 +1207,29 @@ here.
 
 **Reading the map.** Every pin carries a white ring so it separates from the
 base map and from its neighbours; ACMA transmitter squares carry the same ring.
+Its colour is its role and its **shape is what it measures**: a triangle for a
+station that measures a water level — a river height gauge, or a storage or tide
+gauge — and a circle for a rain gauge or anything else; a station that measures
+both is a triangle. The answer is read from everything that says any of it: the
+sensors and ALERT addresses, the location types, the station type, the Bureau's
+river height and rainfall indexes and its SLS. **Grey** is a gauge read by hand
+— the station type says manual, the SLS calls it Manual, or the Bureau reads it
+daily and nothing says a radio does — so silence from it is not a fault. A
+**purple outline** round a pin is one of the Bureau's forecast locations (SLS
+Schedule 2: a height is predicted) and a **pink** one an information location
+(Schedule 3: reported and classified, not predicted), as the Bureau's own flood
+maps key them; the outline is drawn outside the white ring, so a match's amber
+and a selection's violet still show inside it. The grey and the outlines come
+from the SLS file, which the map asks for once its pins are drawn and paints in
+when it lands. Each of the three is a switch under *Station pins* in 🗺️ Map
+display, on by default and remembered; with *Colour pins by health* on, the fill
+is health's and the shape and outline stay. In the 3-D view a river gauge is a
+circle of its circle's size, with its grey and its outline.
+**Whose stations are drawn** is the *Owner* choice under *Stations & links*: one
+owner's stations alone, or everyone's but theirs. It takes the others off the
+map — pins, links and all — and leaves the station list and the filters as they
+were; the line under the filters says how many it is not drawing. It lasts the
+session, as *Hide stations that don't match* does.
 The filter box **highlights instead of hiding**: all pins stay on the map,
 matches get an amber ring, their names appear underneath, and the map zooms to
 the extent of the matches so every one of them is on screen. Typing narrows the
@@ -2480,7 +2509,9 @@ number of stations behind it and nothing is offered that no station uses:
 | Station type | `roles[]` — field / repeater / base / satcom | tick boxes |
 | Sensor type | every sensor type present in the file — rainfall, water level, battery, water quality, … | tick boxes, plus *must have all ticked types* for "rain **and** level" |
 | Radio network | `radio_network_ids[]` | tick boxes |
+| Owner | who owns the station — the owner recorded on it, else the one the Bureau's Service Level Specification names, a joint owner under each of its parties — most stations first, with *No owner on record* last | tick boxes, with a box to find an owner in |
 | Region | the region of the station's catchment | tick boxes |
+| Gauge | what it measures (river height, rainfall, rainfall only, neither), who reads it (a radio or a person) and the Bureau's flood warning role (forecast, information or river data location, in the SLS at all, or not) — the same answers the pins' shape, grey and outline are drawn from | dropdowns |
 | Basin & council | `basin` and `lga` | dropdowns |
 | Data completeness | missing lat/lon, missing ALERT address, disabled stations | dropdowns |
 

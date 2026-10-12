@@ -360,7 +360,12 @@ try {
   await page.waitForTimeout(200);
   const pins = await page.evaluate(([R, aged, never, once]) => {
     const m = id => state.mapMarkers.find(x => x.mnStationId === id);
-    const style = id => { const x = m(id); return x && { cls: x.mnHealth, r: x.options.radius, ring: x.options.color, w: x.options.weight,
+    // A river height gauge is a triangle (map-symbols.js), drawn round the
+    // circle it replaces and carrying the triangle's radius — so its size is
+    // read here as that circle's, which is the size the health grows.
+    const radiusOf = x => (x.options.mnShape === 'triangle'
+      ? Math.round(x.options.radius / MapSymbols.TRI_SCALE * 10) / 10 : x.options.radius);
+    const style = id => { const x = m(id); return x && { cls: x.mnHealth, r: radiusOf(x), ring: x.options.color, w: x.options.weight,
       dash: x.options.dashArray || null, fill: x.options.fillColor, base: x.mnStation.roles.includes('repeater') ? MAP_PIN_R_RPT : MAP_PIN_R_FIELD }; };
     const tally = {};
     state.mapMarkers.forEach(x => { tally[x.mnHealth] = (tally[x.mnHealth] || 0) + 1; });

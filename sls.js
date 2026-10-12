@@ -128,8 +128,9 @@ const SLS = (function () {
   }
 
   // Fetched once, when something first asks — never at page load. 1.2 MB of
-  // schedule is not part of opening the app, and most sessions never open a
-  // station card at all.
+  // schedule (90 KB on the wire) is not part of opening the app: the station
+  // card asks when it opens, and the Stations map once its pins are drawn,
+  // for their grey, their outlines and the owners (map-symbols.js).
   function ensureData() {
     if (data) return Promise.resolve(data);
     if (loading) return loading;

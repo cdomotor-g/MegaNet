@@ -1797,6 +1797,48 @@ details.filter-block[open] > .filter-head .filter-title::before {
   flex-shrink: 0;
 }
 
+/* A radio or a switch that has nothing to act on yet — the owner mode in Map
+   display before an owner is picked. Dimmed like a disabled slider's row. */
+.filter-check.is-off {
+  opacity: .5;
+}
+
+/* The box over a long tick list (the Filters' Owner block): the width of the
+   block, in Map display's find box's dress. It hides rows with the `hidden`
+   attribute, which .filter-row's own `display: flex` would otherwise beat —
+   the trap .mapd-find-box's note below describes. */
+.filter-find {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: .4rem;
+  padding: .3rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--panel-sub);
+  color: var(--text);
+  font: inherit;
+  font-size: .82rem;
+}
+
+.filter-find::placeholder { color: var(--muted); }
+
+.filter-row[hidden] { display: none; }
+
+/* Map display's owner choice: the two radios on one line under the select. */
+.mapd-owner-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+}
+
+/* The pin's triangle and the Bureau's two outlines in the legend — small SVGs
+   drawn as the map draws them (map-symbols.js). */
+.legend-tri {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
 /* Slider with its value in the label above it (max TX distance, and anything
    else that wants the same shape). */
 .filter-range {
