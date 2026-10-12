@@ -170,6 +170,11 @@ async function main() {
         label: bar && bar.getAttribute('aria-label'),
         header: document.getElementById('hdr-stats').textContent,
         search: location.search, active: state.activeTab, data: !!state.data,
+        logo: (() => {
+          const l = document.getElementById('load-logo');
+          return l && { inCard: card.contains(l), inBody: !!l.closest('#load-body'), hidden: l.getAttribute('aria-hidden'),
+            nodes: l.querySelectorAll('i').length, p: Number(l.style.getPropertyValue('--p')) };
+        })(),
       };
     });
     check('a data tab shows the loading card while the list is on its way, not "No data loaded"',
@@ -181,6 +186,9 @@ async function main() {
     check('…how much of how much has arrived, with the bar agreeing',
       mid.got === heldAt && mid.value === 2 * CHUNK && mid.max === FILE_BYTES && mid.label === 'Station list download',
       J({ got: mid.got, value: mid.value, max: mid.max }));
+    check('…under the logo, filled as far as the list has come, and outside the part each chunk repaints',
+      mid.logo && mid.logo.inCard && !mid.logo.inBody && mid.logo.hidden === 'true' && mid.logo.nodes === 12
+        && Math.abs(mid.logo.p - 2 * CHUNK / FILE_BYTES) < 0.002, J(mid.logo));
     check('the header says it is loading', mid.header === 'Loading stations…', mid.header);
     check('the station and view the link named stay in the address while the list loads',
       mid.active === 'stations' && new URLSearchParams(mid.search).get('station') === A.id

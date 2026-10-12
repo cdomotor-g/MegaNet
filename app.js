@@ -396,22 +396,53 @@ function retryLoad() {
   renderMain();
 }
 
-// Repaints the card in place, once a frame at most — the body arrives in
-// hundreds of chunks.
+// Repaints the card's words and bar in place, and the logo's fill, once a
+// frame at most — the body arrives in hundreds of chunks.
 let loadPaintQueued = false;
 function paintLoad() {
   if (loadPaintQueued) return;
   loadPaintQueued = true;
   const run = () => {
     loadPaintQueued = false;
-    const card = document.getElementById('load-card');
-    if (card && !state.data && state.load && state.load.busy) card.innerHTML = loadCardInner();
+    const body = document.getElementById('load-body');
+    if (!body || state.data || !state.load || !state.load.busy) return;
+    body.innerHTML = loadCardInner();
+    const logo = document.getElementById('load-logo');
+    if (logo) logo.style.setProperty('--p', loadFraction().toFixed(3));
   };
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
   else setTimeout(run, 16);
 }
 
 const _mb = n => n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`;
+
+// How much of the list has arrived, 0..1; 0 while its size is not known.
+function loadFraction() {
+  const ld = state.load;
+  const size = ld && (ld.total || ld.about);
+  return size ? Math.min(1, ld.got / size) : 0;
+}
+
+// The detailed logo heading the loading card: it fills from pale to vivid as
+// the list arrives (--p, kept by paintLoad), breathes while it waits, and a
+// sparkle runs down the network's nodes, top of the mesh first. Drawn once,
+// outside the part paintLoad repaints, so the animation is never restarted
+// mid-download. Each node is [x %, y %, size %] in icon-512.png; the negative
+// delays put every one somewhere in its 3 s cycle from the first frame.
+const LOAD_LOGO_NODES = [
+  [77.1, 14.4, 4.7], [57.4, 17.0, 2.7], [67.6, 26.6, 3.7], [92.0, 32.4, 6.1],
+  [75.1, 42.4, 5.9], [61.5, 42.9, 2.7], [97.9, 46.0, 2.7], [85.7, 54.0, 2.7],
+  [71.2, 61.0, 2.7], [92.8, 63.4, 5.9], [82.4, 75.4, 3.7], [68.8, 81.5, 2.8]
+];
+function loadLogoHtml() {
+  const nodes = LOAD_LOGO_NODES.map(([x, y, s], i) =>
+    `<i style="--x:${x}%;--y:${y}%;--s:${s}%;--d:${(i * 0.18 - 3).toFixed(2)}s"></i>`).join('');
+  return `<div class="load-logo" id="load-logo" aria-hidden="true" style="--p:${loadFraction().toFixed(3)}">
+        <img class="ll-pale" src="assets/icon-512.png" alt="">
+        <div class="ll-fill"><img class="ll-vivid" src="assets/icon-512.png" alt=""></div>
+        <span class="ll-sheen"></span>${nodes}
+      </div>`;
+}
 
 // What the loading card says: the source, the bar, the count, and what has
 // already failed. Before autoLoad() has started — the first render comes a
@@ -3455,14 +3486,17 @@ function renderMain() {
 
 // ── Empty state ────────────────────────────────────────────────────────────────
 
-// While the list is on its way: the card loadCardInner() fills, and
-// paintLoad() repaints as the bytes arrive. aria-busy, so a screen reader
-// waits for the outcome rather than reading every count — loadFinished()
-// says the outcome once.
+// While the list is on its way: the logo, then the body loadCardInner()
+// fills, which paintLoad() repaints as the bytes arrive. aria-busy, so a
+// screen reader waits for the outcome rather than reading every count —
+// loadFinished() says the outcome once.
 function renderLoading() {
   return `
     <div class="page empty-page" style="--page-max:600px">
-      <div class="panel empty-card load-card" id="load-card" aria-busy="true">${loadCardInner()}
+      <div class="panel empty-card load-card" id="load-card" aria-busy="true">
+      ${loadLogoHtml()}
+      <div id="load-body">${loadCardInner()}
+      </div>
       </div>
     </div>`;
 }
