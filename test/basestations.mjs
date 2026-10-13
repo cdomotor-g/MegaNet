@@ -27,6 +27,7 @@
 //   * a database without 0049 is told so, rather than shown as an error
 //   * the latest RPi ALERT release (GitHub, stood in for too) beside the
 //     station's version, in the list and the panel, asked for once
+//   * a last update run that found nothing says when, not the release it saw
 //
 // Run:  npm run basestations
 //       npm run basestations -- -v    also print what passed
@@ -298,6 +299,11 @@ try {
       flags: B._flags({ beat: { uv: true, temp: 77, clock: false, q: 600, rx: [['a', 'error', 0, null]] },
         status: { meganet: { token_refused: true }, receivers: [{ key: 'a', kind: 'sdr', name: 'x' }, { key: 'g', kind: 'gps', state: 'error' }] } }).map(x => x[1]),
       same, changed, bad,
+      lastInstall: [
+        B._lastInstall({ last: { state: 'current', at: Date.now() / 1000 - 9 * 3600, message: 'RPi ALERT 0.9.0 is the latest release.' } }),
+        B._lastInstall({ last: { state: 'ok', at: Date.now() / 1000 - 3600, message: 'Version 0.10.0 installed.' } }),
+        B._lastInstall({}),
+      ],
       versions: [B._cmpVersion('0.9.0', '0.10.0'), B._cmpVersion('v0.9.0', '0.9.0'), B._cmpVersion('1.0.0', '0.9.9'), B._cmpVersion('0.9', '0.9.0')],
     };
   }, [CONFIG, STICK_1, ODD_KEY]);
@@ -319,6 +325,10 @@ try {
     devs.length === 2 && devs.some(d => d.key === STICK_1 && d.name === 'North stick' && Object.keys(d).length === 2)
       && devs.some(d => d.key === ODD_KEY && d.name === 'Second stick' && d.ppm === 3 && d.freqHz === undefined),
     JSON.stringify(devs));
+  ok('a last update run that found nothing to install says when, not the release the station saw then',
+    /^nothing newer when it checked \d+ (h|min) ago$/.test(pure.lastInstall[0]) && !/0\.9\.0/.test(pure.lastInstall[0]), pure.lastInstall[0]);
+  ok('…one that installed something, or failed, keeps what the station said', /^ok .* ago: Version 0\.10\.0 installed\.$/.test(pure.lastInstall[1])
+    && pure.lastInstall[2] === 'no install from here yet', pure.lastInstall.slice(1).join(' | '));
   ok('versions compare part by part as numbers, a "v" ignored', pure.versions.join() === '-1,0,1,0', pure.versions.join());
   ok('a frequency out of range is refused with the reason, not sent', !!pure.bad.error && /24–1766 MHz/.test(pure.bad.error), JSON.stringify(pure.bad));
 

@@ -58,11 +58,13 @@ const BaseStations = (function () {
   // The newest RPi ALERT release, as GitHub says: what a station's "Install the
   // latest release" and its nightly timer fetch (rpi-alert-update asks the same
   // URL). { version, url }, or { version: null } when GitHub could not be asked;
-  // null is "not asked yet". Asked at most hourly — GitHub answers 60 requests
-  // an hour per address without a token — and again in ten minutes after a miss.
+  // null is "not asked yet". Asked every five minutes while the tab is open, so
+  // a new release shows within minutes of going out — 12 an hour, well inside
+  // the 60 an hour GitHub answers per address without a token — and again in
+  // ten minutes after a miss.
   let latest = null, latestAt = 0;
   const RELEASE_URL = 'https://api.github.com/repos/cdomotor-g/RPi_ALERT/releases/latest';
-  const LATEST_MS = 3600000, LATEST_RETRY_MS = 600000;
+  const LATEST_MS = 300000, LATEST_RETRY_MS = 600000;
 
   const LIST_MS = 30000, BUSY_MS = 3000, IDLE_MS = 15000, WATCH_MS = 60000;
   const FORMATS = { BINARY: 'ALERT Binary', ENHANCED_IFLOWS: 'Enhanced iFLOWS', ASCII: 'ALERT ASCII' };
@@ -360,9 +362,20 @@ const BaseStations = (function () {
     return `<h3>Uplink</h3><dl class="adm-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
   }
 
+  // The station's last update run. One that found nothing to install says only
+  // when: its message names the release it saw then ("RPi ALERT 0.9.0 is the
+  // latest release."), which is out of date once a newer one is out — the
+  // latest release beside the version above is GitHub's, asked just now.
+  function lastInstall(u) {
+    const l = u && u.last;
+    if (!l) return 'no install from here yet';
+    if (l.state === 'current') return 'nothing newer when it checked ' + ago(l.at * 1000);
+    return `${l.state} ${ago(l.at * 1000)}: ${l.message || ''}`;
+  }
+
   function softwareHtml(s) {
     const u = (s.status || {}).update || {};
-    const last = u.last ? `${esc(u.last.state)} ${esc(ago(u.last.at * 1000))}: ${esc(u.last.message || '')}` : 'no install from here yet';
+    const last = esc(lastInstall(u));
     const ask = canAsk(s) && u.available !== false;
     return `<h3>Software</h3>
       <dl class="adm-dl"><dt>Version</dt><dd>${versionHtml(s.version)}</dd>
@@ -974,7 +987,7 @@ const BaseStations = (function () {
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
            keyField, addKey, removeKey, authChanged,
            // Pure, for test/basestations.mjs.
-           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _cmpVersion: cmpVersion };
+           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _cmpVersion: cmpVersion, _lastInstall: lastInstall };
 })();
 
 if (typeof window !== 'undefined') window.BaseStations = BaseStations;
