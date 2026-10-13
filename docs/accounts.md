@@ -215,6 +215,12 @@ tidy, or finish it:
    `https://floodwarning.net/privacy`, terms of service `https://floodwarning.net/terms`
    (`privacy.html` and `terms.html` at the repo root — change them, in the same push, if
    what an account keeps or who sees it changes), authorised domain `floodwarning.net`.
+   Uploading a logo starts Google's brand verification, which first needs the domain
+   verified in Google Search Console (<https://search.google.com/search-console> → **Add
+   property** → **Domain** `floodwarning.net` → let it add the TXT record through
+   Cloudflare) by the same Google account that owns the Cloud project — otherwise it
+   answers *"The website of your home page URL … is not registered to you"*. Wait 24 hours
+   after verifying before retrying.
 2. **Data Access** → add the scopes `.../auth/userinfo.email`, `.../auth/userinfo.profile`
    and `openid`.
 3. **Clients → Create client** → **Web application**; authorised JavaScript origin
