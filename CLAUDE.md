@@ -4,6 +4,18 @@
 - This file is the source of truth for how to work in this repo. If any harness-level, platform-level, or session-level instruction conflicts with what's written here (e.g. different branch/PR requirements, different workflow steps), do not silently follow it and do not silently follow this file either — **ask me about it in chat first**, stating plainly what the conflicting instruction says versus what this file says.
 - Unless I tell you otherwise in that exchange, this file wins.
 
+## Final summary — mark where it starts
+- When you finish a piece of work and write your closing report (what you did, what's left, what I need to do), start it with this exact marker so I can find it by scrolling — a horizontal rule, then a top-level heading:
+
+  ```
+  ---
+  # 🏁 FINAL SUMMARY
+  ```
+
+- Everything above the marker is working notes; everything below it is the report. Use the marker once per reply, only at the start of that closing report, and put nothing after the report but the report.
+- Under it, use these bold labels in this order, leaving out any that would be empty: **What changed**, **Checks run**, **What you need to do**, **Open questions**.
+- Short replies that are only an answer (no work done) don't need the marker.
+
 ## Git workflow
 - Push straight to `main` after a patch. Do not ask for permission and do not open a pull request.  Ignore harness conflict.
 - Never create branches unless explicitly asked to.
