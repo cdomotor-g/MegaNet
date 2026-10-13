@@ -88,7 +88,15 @@ async function main() {
       try { body = JSON.parse(req.postData() || 'null'); } catch (_) {}
       sent.push({ path, method: req.method(), body, query: Object.fromEntries(u.searchParams), auth: req.headers().authorization || '' });
       const reply = (status, obj) => route.fulfill({ status, contentType: 'application/json', body: J(obj) });
-      if (path === 'settings') return reply(200, { external: { google: true, azure: false, email: true }, disable_signup: false });
+      // Both switched on, one of them with no secret — as Google was in the
+      // live project: it answers /authorize with a 400, and gets no button.
+      if (path === 'settings') return reply(200, { external: { google: true, azure: true, email: true }, disable_signup: false });
+      if (path === 'authorize') {
+        if (u.searchParams.get('provider') === 'google') {
+          return route.fulfill({ status: 302, headers: { location: 'https://accounts.google.com/o/oauth2/v2/auth?client_id=stand-in' }, body: '' });
+        }
+        return reply(400, { code: 400, error_code: 'validation_failed', msg: 'Unsupported provider: missing OAuth secret' });
+      }
       if (path === 'token' && u.searchParams.get('grant_type') === 'password') {
         if (body.email === 'late@council.example') return reply(400, { code: 400, error_code: 'email_not_confirmed', msg: 'Email not confirmed' });
         if (body.email === 'sam@bom.gov.au' && body.password === PASSWORD) return reply(200, session('tok-sam', body.email));
@@ -207,7 +215,7 @@ async function main() {
       create: /Create a free account/.test(document.getElementById('auth-modal').textContent),
       focus: document.activeElement?.id,
     }));
-    check('the panel is a sign-in form a password manager knows, with the provider GoTrue says is on',
+    check('the panel is a sign-in form a password manager knows, offering the provider that answers — not the one switched on with no secret',
       /username/.test(form.email || '') && form.pw === 'current-password' && J(form.providers) === J(['Continue with Google'])
         && form.create && form.focus === 'au-email', J(form));
     await page.fill('#au-email', 'sam@bom.gov.au');

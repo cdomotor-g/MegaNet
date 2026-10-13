@@ -127,9 +127,10 @@ const Auth = (function () {
   // otherwise take the typing with it. A password is the exception — it is
   // read off its box when the form is sent and never kept.
   let ui = fresh('signin');
-  // GoTrue's /settings answer, once asked: which external providers are on.
-  // null until it answers, and it stays {} if it never does — a panel with no
-  // provider buttons is the email and password panel, not a fault.
+  // Which of Google and Microsoft can be offered, once asked (loadProviders):
+  // switched on in GoTrue's /settings and answering /authorize with a redirect.
+  // null until then, and {} if neither — a panel with no provider buttons is
+  // the email and password panel, not a fault.
   let external = null;
   // The notes said once a page: an account waiting for approval, and an
   // administrator with accounts waiting for them.
@@ -321,14 +322,33 @@ const Auth = (function () {
 
   // ── Google and Microsoft ──
 
+  // /settings says which providers are switched on, not which work: Google was
+  // on in this project with no client secret, and its button opened a page of
+  // JSON. So each one switched on is asked to start — /authorize, not followed
+  // — and offered only if it answers with the redirect to its sign-in page (to
+  // fetch, an opaque redirect). A 400 ("missing OAuth secret") or no answer at
+  // all leaves its button off; the email and password are always there.
+  async function answers(provider) {
+    try {
+      const res = await fetch(`${AUTH_URL}/authorize?provider=${provider}`, {
+        redirect: 'manual', cache: 'no-store', credentials: 'omit',
+      });
+      return res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400);
+    } catch (_) { return false; }
+  }
+
   async function loadProviders() {
     if (external) return external;
+    let on = {};
     try {
       const res = await fetch(`${AUTH_URL}/settings`, {
         headers: { apikey: DB_ANON_KEY }, cache: 'no-store',
       });
-      external = res.ok ? ((await res.json()).external || {}) : {};
-    } catch (_) { external = {}; }
+      on = res.ok ? ((await res.json()).external || {}) : {};
+    } catch (_) { on = {}; }
+    const keys = Object.keys(PROVIDERS).filter(k => on[k]);
+    const work = await Promise.all(keys.map(answers));
+    external = Object.fromEntries(keys.map((k, i) => [k, work[i]]));
     return external;
   }
 

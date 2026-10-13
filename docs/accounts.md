@@ -50,18 +50,24 @@ words; a password manager is the best answer of all.
   is friction for little gain — what they can reach is photos and their own views. It is
   worth turning on for **administrators** (who can approve anybody) once there are more
   of them; it is a separate piece of work.
-* **Google / Microsoft sign-in** are the lowest-friction of all, and the panel shows a
-  button for each provider Supabase says is on. **Google is switched on in this project
-  today** — check step F.
+* **Google / Microsoft sign-in** are the lowest-friction of all. The panel shows a
+  provider's button only when Supabase has it switched on **and** its `/authorize` answers
+  with a redirect to the provider — so one switched on without its secret (Google, in
+  this project today) gets no button rather than a broken one. See step F.
 
 ---
 
-## The human steps (about 40 minutes, once)
+## The human steps (about 45 minutes, once)
 
 None of these can be done from the app or from a migration: they are Supabase dashboard
 settings and a mail provider's account. **Until step A is done, strangers cannot sign up**
-— Supabase's built-in mail only delivers to members of the project's own team, so the
-confirmation email never reaches anybody else.
+— Supabase's built-in mail only delivers to members of the project's own team (two an
+hour), so the confirmation email never reaches anybody else.
+
+Issue [#237](https://github.com/cdomotor-g/MegaNet/issues/237) has the same steps click
+by click, with a direct link into the project for each and a test drive at the end. The
+dashboard's own links: replace `_` in `https://supabase.com/dashboard/project/_/…` with
+the project ref, `jjprlritvhdqpvphfrnu`.
 
 ### 0. Finish the database migration — check first, ~3 minutes
 
@@ -87,71 +93,79 @@ safe to run again.
 
 ### A. Email that reaches people (required) — Resend, ~15 minutes
 
-Resend is the provider Supabase lists first and works on the free plan for this volume
-(3,000 emails a month). Any SMTP provider works the same way (Postmark, AWS SES, Brevo).
+Resend is the provider Supabase's own guide lists first, and its free plan covers this
+volume (100 emails a day, 3,000 a month). Any SMTP provider works the same way (Postmark,
+AWS SES, Brevo).
 
-1. Go to <https://resend.com> → **Sign up** (use the owner's address) → confirm it.
-2. **Domains → Add domain** → enter `floodwarning.net` → region **Tokyo (ap-northeast-1)**
-   or the closest offered → **Add**.
-3. Resend shows three or four DNS records (an MX and TXT records for SPF, and a DKIM
-   record). If it offers **Sign in to Cloudflare** / *Auto configure*, use it. Otherwise:
-   Cloudflare dashboard → **floodwarning.net** → **DNS → Records → Add record**, and add
-   each record exactly as Resend shows it (**Proxy status: DNS only** for each).
-4. Back in Resend, press **Verify DNS records**. Wait until the domain says **Verified**
-   (minutes, occasionally an hour).
-5. **API Keys → Create API key** → name `Flood-Net Supabase` → permission **Sending
-   access** → domain `floodwarning.net` → **Add**. Copy the key (`re_…`) — it is shown once.
-6. Supabase dashboard → project **MegaNet** → **Authentication → Emails → SMTP Settings**
-   (on some dashboards: **Project Settings → Authentication → SMTP Settings**) → switch
-   **Enable custom SMTP** on, and fill in:
-   * **Sender email**: `noreply@floodwarning.net`
+1. <https://resend.com/signup> (the owner's address) → confirm it.
+2. <https://resend.com/domains> → **Add domain** → `floodwarning.net` → region **Tokyo
+   (ap-northeast-1)**, the closest to Australia → **Add**.
+3. Resend lists the DNS records. **Sign in to Cloudflare** on that page adds them through
+   Domain Connect; use it. By hand instead: Cloudflare dashboard → **floodwarning.net** →
+   **DNS → Records → Add record**, once for each — `MX` `send` (priority 10), `TXT` `send`
+   (the SPF line), `TXT` `resend._domainkey` (the DKIM key), and `TXT` `_dmarc`
+   `v=DMARC1; p=none;` if Resend suggests one. Type the name alone (`send`, not
+   `send.floodwarning.net`). MX and TXT records have no proxy switch. They sit on the
+   `send.` subdomain and the DKIM name, so nothing else on the domain changes — and in
+   October 2026 the domain had no MX, SPF or DMARC record of its own to collide with.
+4. Back in Resend, **Verify DNS records**, and wait for **Verified** (minutes, now and
+   then an hour).
+5. <https://resend.com/api-keys> → **Create API key** → name `Flood-Net Supabase` →
+   permission **Sending access** → domain `floodwarning.net` → **Add**. Copy the key
+   (`re_…`); it is shown once.
+6. Supabase → **Authentication** → *Notifications*: **Email** → **SMTP Settings**
+   (`/dashboard/project/_/auth/smtp`) → **Enable custom SMTP** on, then:
+   * **Sender email address**: `noreply@floodwarning.net`
    * **Sender name**: `Flood-Net`
-   * **Host**: `smtp.resend.com`
-   * **Port**: `465`
-   * **Username**: `resend`
-   * **Password**: the `re_…` key from step 5
-   * **Minimum interval between emails**: leave the default
+   * **Host**: `smtp.resend.com` · **Port number**: `465`
+   * **Username**: `resend` · **Password**: the `re_…` key from step 5
+   * **Minimum interval per user**: leave it
    → **Save**.
-7. Same area → **Rate limits** → **Rate limit for sending emails**: set to `100` per hour
-   (custom SMTP starts at 30).
-8. Test: open <https://floodwarning.net> in a private window → **Sign in → Create a free
-   account** with a personal address → the confirmation email should arrive within a
-   minute (check junk mail the first time).
+7. The rate limit (`/dashboard/project/_/auth/rate-limits`, **Rate limit for sending
+   emails**) starts at 30 an hour with custom SMTP. Leave it unless a crowd is expected;
+   then no more than 100, Resend's free daily allowance.
+8. Test: <https://floodwarning.net> in a private window → **Sign in → Create a free
+   account** with a personal address → the confirmation email arrives within a minute
+   (junk mail, the first time).
 
 ### B. Password rules — ~3 minutes
 
-Supabase dashboard → **Authentication → Sign In / Providers → Email** (the Email provider's
-settings):
+Supabase dashboard → **Authentication → Sign In / Providers → Email**
+(`/dashboard/project/_/auth/providers?provider=Email`):
 
-1. **Confirm email**: **on** (it is — leave it).
-2. **Secure email change**: **on** (both the old and new address must confirm a change).
-3. **Minimum password length**: `10`.
-4. **Password requirements**: **No required characters** (length and the breach check do
-   the work).
-5. **Prevent use of leaked passwords**: **on** (Pro plan — the project is on it).
-6. **Secure password change** and **Require current password when updating**: leave **off**
+1. **Secure email change**: **on** (both the old and new address must confirm a change).
+2. **Minimum password length**: `10`.
+3. **Password requirements**: **No required characters (default)** — length and the breach
+   check do the work.
+4. **Prevent use of leaked passwords**: **on** (Pro plan — the project is on it).
+5. **Secure password change** and **Require current password when updating**: leave **off**
    — the panel's *Set a new password* sends the new password only.
+6. **Email OTP length**: `6`, the code the panel asks for.
 7. **Save**.
+8. On the same *Sign In / Providers* page, under **User Signups**: **Allow new users to
+   sign up** and **Confirm email** stay **on**, as they are.
 
 ### C. The emails' wording — ~5 minutes
 
-Supabase dashboard → **Authentication → Emails → Templates**. The panel accepts a typed
-six-digit code as well as the link, which matters on a phone and when the email opens in a
-different browser — but the code is only in the email if the template carries `{{ .Token }}`.
+Supabase dashboard → **Authentication → Email → Templates**
+(`/dashboard/project/_/auth/templates`). The panel accepts a typed six-digit code as well
+as the link, which matters on a phone and when the email opens in a different browser —
+but the code is only in the email if the template carries `{{ .Token }}`.
 
 * **Confirm signup** — Subject `Confirm your Flood-Net account`, body:
   ```html
-  <p>Welcome to Flood-Net.</p>
-  <p>Your confirmation code is <strong>{{ .Token }}</strong> — or
-     <a href="{{ .ConfirmationURL }}">confirm your address here</a>.</p>
-  <p>A Bureau address is approved as soon as it is confirmed. Any other is approved by an
-     administrator, and you will get an email when it is.</p>
+  <h2>Welcome to Flood-Net</h2>
+  <p>Your confirmation code is <strong>{{ .Token }}</strong></p>
+  <p>Type it into the Flood-Net window, or <a href="{{ .ConfirmationURL }}">confirm your address here</a>.</p>
+  <p>A Bureau (@bom.gov.au) address is approved as soon as it is confirmed. Any other address is approved by an administrator, and you will get an email when it is.</p>
+  <p>If you did not create a Flood-Net account, ignore this email.</p>
   ```
 * **Reset password** — Subject `Reset your Flood-Net password`, body:
   ```html
-  <p>Your code is <strong>{{ .Token }}</strong> — or
-     <a href="{{ .ConfirmationURL }}">choose a new password here</a>.</p>
-  <p>If you did not ask for this, ignore it: nothing changes.</p>
+  <h2>Reset your Flood-Net password</h2>
+  <p>Your code is <strong>{{ .Token }}</strong></p>
+  <p>Type it into the Flood-Net window, or <a href="{{ .ConfirmationURL }}">choose a new password here</a>.</p>
+  <p>If you did not ask for this, ignore this email: nothing changes.</p>
   ```
 * **Magic link** — keep the one [`access.md`](access.md#the-email-template) describes (it
   already carries `{{ .Token }}`).
@@ -169,9 +183,12 @@ The Admin tab always shows the accounts waiting (a red count on **Admin** in the
 and a note on arrival). To be **emailed** as well — and for each approved person to be
 emailed that they are in — give the database the same Resend key:
 
-1. Supabase dashboard → **Project Settings → Vault** (or **Integrations → Vault**) →
-   **Secrets → Add new secret**.
-2. **Name**: `resend_api_key` · **Secret**: the `re_…` key from A5 → **Save**.
+1. Supabase dashboard → **Integrations → Vault → Secrets**
+   (`/dashboard/project/_/integrations/vault/secrets`) → **Add new secret**.
+2. **Name**: `resend_api_key` · **Description**: `Resend key for Flood-Net account emails`
+   · **Secret value**: the `re_…` key from A5 → save.
+3. Check in the SQL editor: `select meganet.send_account_mail();` answers
+   `{"approvals_sent": 0, "admins_told_about": 0}` while nobody is waiting.
 
 That is all: `meganet.send_account_mail()` runs every five minutes (pg_cron job
 `meganet-account-mail`) and starts sending once the secret exists. It sends from
@@ -183,14 +200,30 @@ insert into meganet.app_meta (key, value) values ('mail_from', 'Flood-Net <accou
 on conflict (key) do update set value = excluded.value;
 ```
 
-### F. Google sign-in — check, ~2 minutes
+### F. Google sign-in — optional, ~20 minutes
 
-**Authentication → Sign In / Providers → Google** is **on** in this project, so the panel
-offers *Continue with Google*. Make sure it actually works: open the site in a private
-window → **Sign in → Continue with Google**. If it errors, either finish its setup (a
-Google Cloud OAuth client whose authorised redirect URI is
-`https://jjprlritvhdqpvphfrnu.supabase.co/auth/v1/callback`) or switch it **off** — the
-button disappears by itself.
+**Authentication → Sign In / Providers → Google** is **on** in this project but has no
+client secret: GoTrue answers `/authorize?provider=google` with *"Unsupported provider:
+missing OAuth secret"*. The panel asks that question before it offers the button, so
+nobody sees a Google button that cannot work. Either leave it, switch it **off** to be
+tidy, or finish it:
+
+1. Google Cloud console → a project of its own (`Flood-Net`) → **Google Auth Platform**
+   (<https://console.cloud.google.com/auth/overview>) → **Get started**: app name
+   `Flood-Net`, the owner's address, audience **External**.
+2. **Data Access** → add the scopes `.../auth/userinfo.email`, `.../auth/userinfo.profile`
+   and `openid`.
+3. **Clients → Create client** → **Web application**; authorised JavaScript origin
+   `https://floodwarning.net`; authorised redirect URI
+   `https://jjprlritvhdqpvphfrnu.supabase.co/auth/v1/callback`. Keep the client ID and
+   secret.
+4. **Audience → Publish app** — until then only listed test users can sign in. The three
+   basic scopes need no review by Google.
+5. Supabase → the Google provider (`/dashboard/project/_/auth/providers?provider=Google`)
+   → **Client IDs**, **Client Secret (for OAuth)** → **Save**. The panel offers *Continue
+   with Google* from the next page load.
+
+"Sign in with Microsoft" is [#207](https://github.com/cdomotor-g/MegaNet/issues/207).
 
 ---
 
@@ -211,7 +244,7 @@ button disappears by itself.
 | Symptom | Cause, and fix |
 |---|---|
 | *Approve* says "The database cannot decide about accounts yet", or the Admin tab says the app expects v62 | Step 0. |
-| Sign-up says sent, no email arrives | Step A not done (Supabase's own mail only reaches the project's team), or the email is in junk. Resend → **Logs** shows whether it was sent. |
+| Sign-up says sent, no email arrives | Step A not done (Supabase's own mail only reaches the project's team), or the email is in junk. <https://resend.com/emails> shows whether it was sent: nothing listed is Supabase not reaching Resend (A6), *failed* or *bounced* a domain not yet verified (A4). |
 | "Too many emails have gone out for now" | Step A7's rate limit. |
 | The panel says *New accounts are open only to listed addresses* | Sign-up is closed (Admin tab switch, or `app_meta` `signup = 'allowlist'`). |
 | Approved, but no photos | The person needs to sign out and in again only if their tab was open for over an hour; otherwise check the Worker is deployed (its photo route asks `rpc/is_member`). |
