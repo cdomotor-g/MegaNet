@@ -16,13 +16,13 @@
 //      pick put the list away, and focus that was in it lands on the pill.
 //      The arrow keys walk it. A station the filters leave out is picked all
 //      the same, the filters narrowed to it.
-//   4. **The twin** (skipped without WebGL) — the pill at the top of the
-//      twin's stage, right of the flood scale's column, the card's top kept
+//   4. **The twin** (skipped without WebGL) — the pill at the top left of the
+//      twin's stage, the flood scale on the right under the compass, the card's top kept
 //      below it; a pick from the list takes the twin to that station; the map
 //      back, the pill back beside the zoom buttons.
 //   5. **The phone** — a tapped pin's callout goes on the trail, the pill is a
 //      zoom button's height and a finger's reach, and the list stays on the
-//      map, in the twin moved left to fit.
+//      map, in the twin too.
 //
 // Why a check of its own: every failure here is a page that looks right. A
 // trail that forgets a station, lists one twice, or keeps the order of the
@@ -325,12 +325,12 @@ async function main() {
         await page.waitForFunction(() => { const b = document.getElementById('twin-flood-scale'); return b && !b.hidden; }, null, { timeout: BUILD_TIMEOUT });
         await page.waitForTimeout(300);
         let T = await g();
-        check('the twin up: the pill at the top of its stage, right of the flood scale\'s column',
-          !T.hidden && Math.abs(T.pill.top - (T.twinStage.top + 8)) <= 1.5 && T.pill.left >= T.scale.right + 4 && T.pill.left <= T.scale.right + 12,
-          J({ pill: T.pill, stage: T.twinStage, scale: T.scale }));
-        check('…level with the scale\'s head, and short of the compass', Math.abs(T.pill.top - T.scaleHead.top) <= 2 && T.pill.right <= T.compass.left - 4,
-          J({ pill: T.pill, head: T.scaleHead, compass: T.compass }));
-        check('…the scale where it was, at the stage\'s top left', Math.abs(T.scale.left - (T.twinStage.left + 8)) <= 1.5 && Math.abs(T.scale.top - (T.twinStage.top + 8)) <= 1.5);
+        check('the twin up: the pill at the top left of its stage',
+          !T.hidden && Math.abs(T.pill.top - (T.twinStage.top + 8)) <= 1.5 && Math.abs(T.pill.left - (T.twinStage.left + 8)) <= 1.5,
+          J({ pill: T.pill, stage: T.twinStage }));
+        check('…short of the compass', T.pill.right <= T.compass.left - 4, J({ pill: T.pill, compass: T.compass }));
+        check('…the scale on the stage\'s right, under the compass', Math.abs(T.scale.right - (T.twinStage.right - 8)) <= 1.5
+          && T.scale.top >= T.twinStage.top + 8 + 38 && T.scaleHead.right <= T.twinStage.right - 7, J({ scale: T.scale, compass: T.compass, stage: T.twinStage }));
         check('…and the card\'s top kept below the pill', T.card && T.card.top >= T.pill.bottom, J({ card: T.card, pill: T.pill }));
         await page.click('#stn-trail-pill');
         T = await g();
@@ -388,14 +388,13 @@ async function main() {
         await page.waitForTimeout(300);
         await page.evaluate(() => closeStnCard());
         P = await g();
-        check('in a phone\'s twin the pill is between the scale\'s column and the compass, the name alone on it',
-          P.pill.left >= P.twinStage.left + 8 && P.pill.right <= P.compass.left - 4
-            && await page.evaluate(() => getComputedStyle(document.querySelector('#stn-trail .stn-trail-ico')).display === 'none'),
+        check('in a phone\'s twin the pill is between the stage\'s left and the compass',
+          P.pill.left >= P.twinStage.left + 8 && P.pill.right <= P.compass.left - 4,
           J({ pill: P.pill, compass: P.compass, stage: P.twinStage }));
         await page.tap('#stn-trail-pill');
         P = await g();
-        check('…and its list moved left until it is on the map, as wide as the names want', P.drop && P.drop.right <= P.stage.right + 0.5
-          && P.drop.left < P.pill.left && P.drop.width >= 280, J({ drop: P.drop, pill: P.pill, stage: P.stage }));
+        check('…and its list on the map, as wide as the names want', P.drop && P.drop.right <= P.stage.right + 0.5
+          && P.drop.left >= P.stage.left && P.drop.width >= 280, J({ drop: P.drop, pill: P.pill, stage: P.stage }));
       } else {
         log('  SKIP — no WebGL for the phone\'s twin.');
       }

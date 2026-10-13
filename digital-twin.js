@@ -5039,7 +5039,7 @@ void main() {
     return `${h} · ${band}`;
   }
 
-  // The pill on the stage, top left: for a station with no levels of its own
+  // The pill on the stage, top right, under the compass: for a station with no levels of its own
   // and some to borrow, the offer — on a phone's map, where the line has no
   // row, it is the only way to ask. Where there is water, the scale below is
   // the water's control and the pill stands down.
@@ -5058,7 +5058,7 @@ void main() {
   }
 
   // ── the scale on the stage ──
-  // The water's control, stood up the left of the stage: ⏸ or ▶ and how high
+  // The water's control, stood up the right of the stage, under the compass: ⏸ or ▶ and how high
   // at its head, and under it a track from 0 m on the gauge at the foot to the
   // highest level at the head — the water filling it in its colour — with a
   // mark at every level, to scale, and its name beside it. Labels are moved
@@ -5192,12 +5192,13 @@ void main() {
     // A line from each mark out to its label — straight across where the label
     // is at its mark, a dog-leg where it had to move.
     const b = body.getBoundingClientRect(), t = track.getBoundingClientRect();
-    const x0 = t.right - b.left, y0 = t.top - b.top;
-    const lx = labels.getBoundingClientRect().left - b.left;
+    // The track is on the scale's right edge, the names to its left.
+    const x0 = t.left - b.left, y0 = t.top - b.top;
+    const lx = labels.getBoundingClientRect().right - b.left;
     svg.setAttribute('width', String(Math.round(b.width)));
     svg.setAttribute('height', String(Math.round(b.height)));
     svg.innerHTML = pos.filter(p => p.shown).map(p => {
-      const ya = y0 + p.mark, yb = y0 + p.at, xm = x0 + Math.max(2, (lx - x0) * 0.45);
+      const ya = y0 + p.mark, yb = y0 + p.at, xm = x0 - Math.max(2, (x0 - lx) * 0.45);
       return `<polyline points="${x0.toFixed(1)},${ya.toFixed(1)} ${xm.toFixed(1)},${ya.toFixed(1)} ${lx.toFixed(1)},${yb.toFixed(1)}"/>`;
     }).join('');
     syncFloodScale();

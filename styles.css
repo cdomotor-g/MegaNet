@@ -6934,8 +6934,8 @@ hr {
 
 /* ── The station trail (station-trail.js) ────────────────────────────────────
    The stations looked at this session, as a pill in the Stations map's top
-   row: right of the zoom buttons on the map and in 3-D, right of the flood
-   scale's column in the twin. The script measures where that is and hands it
+   row: right of the zoom buttons on the map and in 3-D, at the top left of
+   the stage in the twin (the flood scale is on its right). The script measures where that is and hands it
    over — --trail-x and --trail-y from the stage's top-left corner and the room
    before the top-right corner's control (--trail-room), and for the list its
    width, how far left it has to start to stay on the map and the height under
@@ -7080,9 +7080,8 @@ hr {
   }
 }
 
-/* …the pill that offers a nearby station's flood levels, which has the twin's
-   corner where there is no scale, keeps to the scale's column, so it ends
-   where the trail begins… */
+/* …the pill that offers a nearby station's flood levels, on the twin's right
+   under the compass where there is no scale, keeps to the scale's column… */
 .mn-map-stage:has(.stn-trail:not([hidden])) #map-twin .twin-flood-pill {
   max-width: min(12rem, calc(50% - var(--sp-2)));
 }
@@ -14573,14 +14572,15 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 }
 .twin-flood-set legend { padding: 0 var(--sp-1); font-weight: 600; }
 
-/* The pill on the stage, top left (the compass has the right): for a
-   station with no flood levels of its own, the offer to borrow a nearby
-   station's — on a phone's map, where the line under the stage has no row,
-   the only way to ask. Where there is water, the scale below has the corner. */
+/* The pill on the stage, top right under the compass (the station trail and
+   the card have the left): for a station with no flood levels of its own,
+   the offer to borrow a nearby station's — on a phone's map, where the line
+   under the stage has no row, the only way to ask. Where there is water, the
+   scale below has the spot. */
 .twin-flood-pill {
   position: absolute;
-  top: var(--sp-2);
-  left: var(--sp-2);
+  top: calc(2 * var(--sp-2) + 2.4rem);
+  right: var(--sp-2);
   max-width: calc(100% - 4.4rem);
   display: inline-flex;
   align-items: center;
@@ -14607,7 +14607,8 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 }
 
 /* The flood scale (digital-twin.js, "the scale on the stage"): the water's
-   control, stood up the left of the stage. ⏸ or ▶ and how high at the head;
+   control, stood up the right of the stage under the compass — the left is
+   the station trail's and the station card's. ⏸ or ▶ and how high at the head;
    under it a track from 0 m on the gauge at its foot to the highest level at
    its head, the water filling it in the colour it has, a mark at every level
    to scale and the level's name beside it, a line from each mark to its name.
@@ -14617,14 +14618,15 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
    The box takes no pointer itself — a drag between two names still turns the
    view — and its parts do: the head, the track and the names. It stops above
    the hint along the stage's foot, whose height the script hands the stage as
-   --twin-hud-h, and it steps aside while the pin is being moved, whose panel
-   has this corner then. */
+   --twin-hud-h, and it steps aside while the pin is being moved. The track is
+   on its right edge, the names to the left of it. */
 .twin-flood-scale {
   --scale-gap: 18px;             /* SCALE_GAP: a label's height, and half of it pads each end */
   --scale-hit: 1.5rem;           /* the track's width to a pointer */
   position: absolute;
-  top: var(--sp-2);
-  left: var(--sp-2);
+  top: calc(2 * var(--sp-2) + 2.4rem);   /* under the compass */
+  right: var(--sp-2);
+  align-items: flex-end;
   bottom: calc(var(--twin-hud-h, 1.6rem) + var(--twin-caveat-h) + 2 * var(--sp-2));
   z-index: 1;
   display: flex;
@@ -14655,6 +14657,7 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   border-radius: var(--r-pill);
   pointer-events: auto;
 }
+.twin-scale-head { align-self: flex-end; }
 .twin-scale-play {
   flex: 0 0 auto;
   display: inline-grid;
@@ -14682,7 +14685,7 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   display: flex;
   align-items: center;
   gap: .3rem;
-  align-self: flex-start;
+  align-self: flex-end;
   max-width: 100%;
   min-width: 0;
 }
@@ -14722,6 +14725,7 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 .twin-scale-body {
   position: relative;
   flex: 1 1 auto;
+  align-self: stretch;
   min-height: 0;
 }
 
@@ -14731,7 +14735,7 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   position: absolute;
   top: calc(var(--scale-gap) / 2);
   bottom: calc(var(--scale-gap) / 2);
-  left: 0;
+  right: 0;
   width: var(--scale-hit);
   pointer-events: auto;
   touch-action: none;
@@ -14800,14 +14804,14 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   position: absolute;
   top: calc(var(--scale-gap) / 2);
   bottom: calc(var(--scale-gap) / 2);
-  left: calc(var(--scale-hit) + .9rem);
-  right: 0;
+  left: 0;
+  right: calc(var(--scale-hit) + .9rem);
   pointer-events: none;
 }
 .twin-scale-label {
   position: absolute;
   top: var(--y);
-  left: 0;
+  right: 0;
   max-width: 100%;
   transform: translateY(-50%);
   display: inline-flex;

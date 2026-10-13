@@ -40,10 +40,9 @@
 // In the top row of the viewing window, beside whatever holds its top-left
 // corner, since it folds to one row and nothing else there does: on the map
 // (and in ⛰️ 3-D, whose controls are the map's) right of the zoom buttons; in
-// the twin, whose zoom corner stands down, right of the flood scale at the top
-// of the stage. The scale stays where it was. It is the scale's *column* the
-// pill stands beside rather than the scale itself, so the pill does not move
-// as the water comes and goes, or as the scale's reading changes width.
+// the twin, whose zoom corner stands down, at the top left of the stage. The
+// flood scale stands up the stage's right, under the compass, clear of the
+// pill and of the station card under it.
 //
 // It is a child of the map's stage (.mn-map-stage), not of the Leaflet
 // container and not of the twin's overlay, for the station card's reason: its
@@ -141,12 +140,7 @@ const StationTrail = (function () {
     let x = GAP, y = GAP, right = GAP;
     if (tw) {
       const t = tw.getBoundingClientRect();
-      // The flood scale's column — .twin-flood-scale's width, never more than
-      // half the stage (its max-width) — whether or not the scale is up.
-      const scale = tw.querySelector('#twin-flood-scale');
-      const w = (scale && parseFloat(getComputedStyle(scale).width)) || 192;
-      const col = Math.max(0, Math.min(w, t.width / 2 - GAP));
-      x = t.left - s.left + GAP + col + GAP;
+      x = t.left - s.left + GAP;
       y = t.top - s.top + GAP;
       // …and short of the compass, top right.
       const compass = tw.querySelector('#twin-compass');
@@ -165,14 +159,13 @@ const StationTrail = (function () {
     root.style.setProperty('--trail-x', px(x));
     root.style.setProperty('--trail-y', px(y));
     root.style.setProperty('--trail-room', px(room));
-    // Short of room — a phone's twin, between the scale and the compass — the
-    // name has the pill to itself.
+    // Short of room — a phone's twin, short of the compass — the name has the
+    // pill to itself.
     root.classList.toggle('is-tight', room < 10 * rem());
     // The list is not held to the pill's row: it drops below the corner's
     // controls, so it may be as wide as a name needs and the map allows, and
     // where the pill is too far right for that, it is moved left until it is
-    // on the map (a phone's twin again, over the scale's names — which have
-    // stood down there by then).
+    // on the map.
     const p = pill();
     const ph = p ? p.offsetHeight : 0;
     const w = Math.min(DROP_REM * rem(), s.width - 2 * GAP);
