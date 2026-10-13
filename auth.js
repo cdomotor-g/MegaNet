@@ -892,6 +892,16 @@ const Auth = (function () {
         <p class="au-or" aria-hidden="true"><span>or with your email</span></p>`;
   }
 
+  // The terms and the privacy policy, said where an account is made — on the
+  // Create form, and under Sign in, where Continue with Google can make one
+  // too. A new tab, so following the link does not lose what was typed.
+  function legalHtml(verb) {
+    return `
+        <p class="small au-legal">${verb} means you agree to the
+          <a href="/terms" target="_blank" rel="noopener">terms of use</a>. The
+          <a href="/privacy" target="_blank" rel="noopener">privacy policy</a> says what is kept, and why.</p>`;
+  }
+
   // What an account is for — said where it is decided, on the Create form, and
   // in the visitor note.
   function benefitsHtml() {
@@ -1018,6 +1028,7 @@ const Auth = (function () {
             <summary>What an account gives you</summary>
             ${benefitsHtml()}
           </details>
+          ${legalHtml('Creating an account')}
         </form>`;
     } else if (ui.step === 'confirm') {
       title = 'Confirm your address';
@@ -1107,6 +1118,7 @@ const Auth = (function () {
             <button type="button" onclick="Auth.go('signin')" ${busy ? 'disabled' : ''}>Back</button>
             <button type="submit" class="primary" ${busy ? 'disabled' : ''}>Email me a code</button>
           </div>
+          ${legalHtml('Signing in')}
         </form>`;
     } else {
       body = `
@@ -1126,6 +1138,7 @@ const Auth = (function () {
           <p class="small au-new">New to Flood-Net?
             <button type="button" class="link-btn" onclick="Auth.go('signup')">Create a free account</button>
             — it shows you the field photos and keeps your own views.</p>
+          ${legalHtml('Signing in')}
         </form>`;
     }
 

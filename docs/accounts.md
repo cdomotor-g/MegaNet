@@ -211,6 +211,10 @@ tidy, or finish it:
 1. Google Cloud console → a project of its own (`Flood-Net`) → **Google Auth Platform**
    (<https://console.cloud.google.com/auth/overview>) → **Get started**: app name
    `Flood-Net`, the owner's address, audience **External**.
+   **Branding**: application home page `https://floodwarning.net`, privacy policy
+   `https://floodwarning.net/privacy`, terms of service `https://floodwarning.net/terms`
+   (`privacy.html` and `terms.html` at the repo root — change them, in the same push, if
+   what an account keeps or who sees it changes), authorised domain `floodwarning.net`.
 2. **Data Access** → add the scopes `.../auth/userinfo.email`, `.../auth/userinfo.profile`
    and `openid`.
 3. **Clients → Create client** → **Web application**; authorised JavaScript origin

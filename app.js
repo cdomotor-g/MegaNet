@@ -1772,6 +1772,10 @@ function renderTabs() {
   // The toggle and the find box are .nav-head, which sticks to the top of the
   // nav's scroller: the list scrolls under them, so neither is ever scrolled
   // out of reach of somebody halfway down the tabs (styles.css).
+  //
+  // .nav-legal is the app's link to its privacy policy and terms: Google's
+  // sign-in branding wants the home page to carry one, and this is the home
+  // page. Plain links to the static pages beside it, so they leave the app.
   nav.innerHTML = `
     <div class="nav-inner" onkeydown="navKey(event)">
       <div class="nav-head">
@@ -1795,6 +1799,7 @@ function renderTabs() {
       </div>
       <div id="nav-groups">${navGroupsHtml()}</div>
       <p id="nav-found" class="nav-found" role="status" aria-live="polite">${esc(navFoundText())}</p>
+      <p class="nav-legal"><a href="/about">About</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
     </div>`;
 }
 

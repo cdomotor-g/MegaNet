@@ -7779,6 +7779,17 @@ hr {
 .nav-found:empty { display: none; }
 #tab-nav.collapsed .nav-found { display: none; }
 
+/* About · Privacy · Terms, at the foot of the list (app.js renderTabs). Quiet,
+   and gone on the rail, where there is no room for words. */
+.nav-legal {
+  margin: 1rem .45rem .4rem;
+  font-size: .72rem;
+  color: var(--muted);
+}
+.nav-legal a { color: var(--muted); }
+.nav-legal a:hover { color: var(--text); }
+#tab-nav.collapsed .nav-legal { display: none; }
+
 .nav-none {
   margin: .3rem .45rem;
   font-size: .82rem;

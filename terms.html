@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Terms of use — Flood-Net</title>
+  <meta name="description" content="The terms for using Flood-Net at floodwarning.net: an engineering tool for telemetry radio networks, not a flood warning service. Accounts, acceptable use, what you upload, the agent API, Ask Claude, and the limits of what the site promises.">
+  <!-- /terms, not /terms.html: Cloudflare's static assets answer the extension
+       with a 307 to the bare path (see about.html). This is the URL given to
+       Google's OAuth consent screen as the terms of service link, so it has to
+       stay where it is. -->
+  <link rel="canonical" href="https://floodwarning.net/terms">
+  <link rel="icon" type="image/svg+xml" href="assets/icon-small.svg?v=20261013c">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=20261013c">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=20261013c">
+  <meta name="theme-color" content="#0b5cab">
+
+  <!-- Self-contained for the same reason as about.html: no stylesheet, font or
+       script to fetch first, so a crawler, a reviewer or a filtered network
+       reads the whole page or nothing. Keep the style block in step with
+       about.html and privacy.html. -->
+  <style>
+    :root {
+      --ink: #16202a; --dim: #5a6772; --bg: #ffffff; --panel: #f4f7fa;
+      --line: #d6dee6; --brand: #0b5cab; --link: #0b5cab;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ink: #e6edf3; --dim: #9bacba; --bg: #0d1319; --panel: #151d25;
+        --line: #27333d; --brand: #4a9eff; --link: #6fb4ff;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 2rem 1rem 4rem;
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink); background: var(--bg);
+    }
+    main { max-width: 46rem; margin: 0 auto; }
+    .crumb { margin: 0 0 1.5rem; font-size: .95rem; }
+    h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .3rem; }
+    h2 { font-size: 1.15rem; margin: 2.4rem 0 .6rem; color: var(--brand); }
+    .lede { font-size: 1.08rem; color: var(--dim); margin: 0 0 2rem; }
+    .stamp { color: var(--dim); font-size: .95rem; margin: 0 0 1.5rem; }
+    a { color: var(--link); overflow-wrap: anywhere; }
+    ul { padding-left: 1.2rem; }
+    li { margin: .35rem 0; }
+    .note {
+      background: var(--panel); border: 1px solid var(--line);
+      border-left: 3px solid var(--brand);
+      padding: 1rem 1.15rem; margin: 1.5rem 0; border-radius: 4px;
+    }
+    .note p:first-child { margin-top: 0; }
+    .note p:last-child { margin-bottom: 0; }
+    footer {
+      margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+      color: var(--dim); font-size: .92rem;
+    }
+  </style>
+</head>
+<body>
+<main>
+
+  <p class="crumb"><a href="/">Flood-Net</a> &rsaquo; Terms of use</p>
+  <h1>Terms of use</h1>
+  <p class="stamp">Last updated 13 October 2026</p>
+  <p class="lede">
+    These terms cover using Flood-Net at <a href="https://floodwarning.net/">floodwarning.net</a>:
+    the web application, its sign-in, and its read-only agent API. By using the
+    site you agree to them. They are written to be read, so they are short.
+  </p>
+
+  <div class="note">
+    <p>
+      <strong>Flood-Net is not a flood warning service.</strong> It does not issue
+      warnings, forecasts or public alerts, and nothing on it is an official
+      statement about flooding, river conditions or public safety. Readings shown
+      here can be late, wrong or missing. Never use Flood-Net to decide whether you
+      or anybody else is safe.
+    </p>
+    <p>
+      For official warnings, go to
+      <a href="http://www.bom.gov.au/australia/flood/">the Bureau of Meteorology</a>
+      and your state's emergency service. In an emergency, call <strong>000</strong>;
+      for flood or storm help from the SES, call <strong>132 500</strong>.
+    </p>
+  </div>
+
+  <h2>Who runs it</h2>
+  <p>
+    Flood-Net is an independent open-source project, run by the maintainer of
+    <a href="https://github.com/cdomotor-g/MegaNet">cdomotor-g/MegaNet</a> on GitHub
+    (“we”, “us”). It is not a product of, and is not endorsed by, the Bureau of
+    Meteorology or any other agency. Contact details are at the end of this page.
+  </p>
+
+  <h2>Using the site</h2>
+  <p>
+    Reading needs no account: the station list, the maps and the tools are open to
+    anyone. An account adds what is described when you create one — your own
+    left-bar views, and, once approved, the field photos. Editing station records
+    is limited to people an administrator has approved as editors.
+  </p>
+  <p>
+    The source code is MIT licensed, and you may run your own copy on those terms.
+    These terms cover the hosted service at floodwarning.net, not your use of the
+    code.
+  </p>
+
+  <h2>Your account</h2>
+  <ul>
+    <li>Give an email address you control, and keep your password to yourself. An
+      account is for one person.</li>
+    <li>You can sign in with an email and password, a one-time code by email, or
+      Google. Signing in with Google is also covered by Google's own terms.</li>
+    <li>Approving an account, and deciding who may edit, is at the administrators'
+      discretion. We may decline, suspend or delete an account that breaks these
+      terms or puts the service or its data at risk.</li>
+    <li>You can stop using Flood-Net at any time, and ask us to delete your account
+      (see the <a href="/privacy">privacy policy</a>).</li>
+  </ul>
+
+  <h2>Acceptable use</h2>
+  <p>Please don't:</p>
+  <ul>
+    <li>try to get past the sign-in, the approval step or the database's access
+      rules, or use somebody else's account;</li>
+    <li>interfere with the service — flooding it with requests, working around
+      the agent API's rate limits, or probing for vulnerabilities without
+      permission (report security problems privately, using the contact below);</li>
+    <li>upload anything unlawful, anything you do not have the right to share, or
+      malware;</li>
+    <li>enter false information into station records, inspections or surveys;</li>
+    <li>use the site to harass anyone, or collect other people's personal
+      information from it.</li>
+  </ul>
+
+  <h2>What you add</h2>
+  <p>
+    You keep ownership of what you upload or type — photographs, inspection
+    records, survey bookings, notes. You give us permission to store it, process
+    it (for example, reading a photo's date and position, or making a thumbnail),
+    and show it to the people the site's access rules allow, for as long as it is
+    part of the service. You confirm that you are entitled to share it.
+  </p>
+  <p>
+    Site photographs show access routes, locks and sometimes people, and
+    inspection forms can carry landholders' contact details. Treat them as
+    confidential, add only what the work needs, and avoid photographing people
+    who have not agreed to it.
+  </p>
+  <p>
+    Changes to records are attributed to the account that made them, and kept in
+    the record's history. See the <a href="/privacy">privacy policy</a> for who can
+    see that.
+  </p>
+
+  <h2>Data from other sources</h2>
+  <p>
+    Flood-Net shows data it does not own: radio licence records from the ACMA,
+    elevation and mapping from government and commercial providers, map tiles from
+    OpenStreetMap and others, and telemetry from the networks themselves. That data
+    stays subject to its owners' licences and attribution requirements, which the
+    site credits where it is shown. It is provided as received, and may be
+    incomplete, out of date or wrong.
+  </p>
+
+  <h2>The agent API</h2>
+  <p>
+    The read-only API at <code>/api/v1</code> and <code>/api/mcp</code> is open for
+    scripts and AI assistants to read public station data, under the rate limits
+    described in its <a href="https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md">documentation</a>.
+    Identify your client as that page asks, keep within the limits, and don't
+    present what it returns as an official warning or forecast. We may block a
+    client or address that misuses it.
+  </p>
+
+  <h2>Ask Claude</h2>
+  <p>
+    Station Health's <em>Ask Claude</em> briefing uses an AI model from Anthropic.
+    Its answers are generated, can be wrong, and are a starting point for an
+    engineer's judgement rather than a substitute for it. Use on Flood-Net's key is
+    for approved editors and is limited per person and per day. If you use your own
+    Anthropic key instead, that use is between you and Anthropic, under their terms
+    and at your cost.
+  </p>
+
+  <h2>No guarantees</h2>
+  <p>
+    Flood-Net is provided free, as it is and as available. We work to keep it
+    accurate and running, but we do not promise that it will be uninterrupted,
+    error-free or suitable for any particular purpose, and we may change, suspend
+    or stop any part of it at any time. Check anything that matters — a frequency,
+    a position, a level — against its source before relying on it.
+  </p>
+  <p>
+    To the extent the law allows, we are not liable for any loss or damage arising
+    from using the site or relying on anything shown on it, including indirect or
+    consequential loss and loss of data. Nothing in these terms excludes, restricts
+    or modifies any right or remedy you have under the Australian Consumer Law, or
+    any other law, that cannot lawfully be excluded.
+  </p>
+
+  <h2>Changes to these terms</h2>
+  <p>
+    We may update these terms. The date at the top says when they last changed,
+    and the history of every change is public in the
+    <a href="https://github.com/cdomotor-g/MegaNet/commits/main/terms.html">repository</a>.
+    If a change is significant, we will say so in the app. Using the site after a
+    change means you accept the new terms.
+  </p>
+
+  <h2>Governing law</h2>
+  <p>
+    These terms are governed by the laws of Queensland, Australia, and the courts
+    of Queensland have jurisdiction over any dispute about them.
+  </p>
+
+  <h2>Contact</h2>
+  <p>
+    Email <a href="mailto:privacy@floodwarning.net">privacy@floodwarning.net</a>
+    about these terms, your account, or a security problem. For bugs and
+    suggestions, use the app's <em>Report a Bug</em> button or
+    <a href="https://github.com/cdomotor-g/MegaNet/issues">GitHub issues</a> —
+    but don't put personal information in a public issue.
+  </p>
+
+  <footer>
+    <p>
+      <a href="/">Open the application</a> &middot;
+      <a href="/about">About</a> &middot;
+      <a href="/privacy">Privacy policy</a> &middot;
+      <a href="https://github.com/cdomotor-g/MegaNet">Source on GitHub</a>
+    </p>
+    <p>An independent open-source project. Not an official warning service.</p>
+  </footer>
+
+</main>
+</body>
+</html>

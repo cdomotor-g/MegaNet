@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Two pages, which is genuinely all there is: Flood-Net is a single-page
-  application, so every tab beyond the first is a state of "/" rather than a URL
-  a crawler could fetch. Listing them would be listing the same document under
-  twenty names. See docs/floodwarning-net.md.
+  The application and the three pages beside it, which is genuinely all there
+  is: Flood-Net is a single-page application, so every tab beyond the first is a
+  state of "/" rather than a URL a crawler could fetch. Listing them would be
+  listing the same document under twenty names. See docs/floodwarning-net.md.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -17,5 +17,17 @@
     <lastmod>2026-09-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://floodwarning.net/privacy</loc>
+    <lastmod>2026-10-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://floodwarning.net/terms</loc>
+    <lastmod>2026-10-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
 </urlset>

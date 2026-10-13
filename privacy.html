@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Privacy policy — Flood-Net</title>
+  <meta name="description" content="What Flood-Net at floodwarning.net keeps about the people who use it, why, who it is shared with, how long it is kept, and how to have it deleted — including what signing in with Google shares.">
+  <!-- /privacy, not /privacy.html: Cloudflare's static assets answer the
+       extension with a 307 to the bare path (see about.html). This is the URL
+       given to Google's OAuth consent screen as the privacy policy link, so it
+       has to stay where it is. -->
+  <link rel="canonical" href="https://floodwarning.net/privacy">
+  <link rel="icon" type="image/svg+xml" href="assets/icon-small.svg?v=20261013c">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=20261013c">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=20261013c">
+  <meta name="theme-color" content="#0b5cab">
+
+  <!-- Self-contained for the same reason as about.html: no stylesheet, font or
+       script to fetch first, so a crawler, a reviewer or a filtered network
+       reads the whole page or nothing. Keep the style block in step with
+       about.html and terms.html.
+
+       Every claim here is a claim about the code: the visit log is 0043, the
+       account tables 0005 and 0062, attribution meganet.actor() in 0004, the
+       briefing ledger worker/briefing.js, the API limiter worker/api.js. A
+       change to any of those that changes what is kept, who sees it or for how
+       long has to change this page in the same push. -->
+  <style>
+    :root {
+      --ink: #16202a; --dim: #5a6772; --bg: #ffffff; --panel: #f4f7fa;
+      --line: #d6dee6; --brand: #0b5cab; --link: #0b5cab;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ink: #e6edf3; --dim: #9bacba; --bg: #0d1319; --panel: #151d25;
+        --line: #27333d; --brand: #4a9eff; --link: #6fb4ff;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 2rem 1rem 4rem;
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink); background: var(--bg);
+    }
+    main { max-width: 46rem; margin: 0 auto; }
+    .crumb { margin: 0 0 1.5rem; font-size: .95rem; }
+    h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .3rem; }
+    h2 { font-size: 1.15rem; margin: 2.4rem 0 .6rem; color: var(--brand); }
+    h3 { font-size: 1rem; margin: 1.6rem 0 .4rem; }
+    .lede { font-size: 1.08rem; color: var(--dim); margin: 0 0 2rem; }
+    .stamp { color: var(--dim); font-size: .95rem; margin: 0 0 1.5rem; }
+    a { color: var(--link); overflow-wrap: anywhere; }
+    ul { padding-left: 1.2rem; }
+    li { margin: .35rem 0; }
+    dt { font-weight: 600; margin-top: .9rem; }
+    dd { margin: .15rem 0 0; color: var(--dim); }
+    .note {
+      background: var(--panel); border: 1px solid var(--line);
+      border-left: 3px solid var(--brand);
+      padding: 1rem 1.15rem; margin: 1.5rem 0; border-radius: 4px;
+    }
+    .note p:first-child { margin-top: 0; }
+    .note p:last-child { margin-bottom: 0; }
+    footer {
+      margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+      color: var(--dim); font-size: .92rem;
+    }
+  </style>
+</head>
+<body>
+<main>
+
+  <p class="crumb"><a href="/">Flood-Net</a> &rsaquo; Privacy policy</p>
+  <h1>Privacy policy</h1>
+  <p class="stamp">Last updated 13 October 2026</p>
+  <p class="lede">
+    What Flood-Net at <a href="https://floodwarning.net/">floodwarning.net</a> keeps
+    about the people who use it, why, who else handles it, how long it stays, and
+    how to have it removed.
+  </p>
+
+  <div class="note">
+    <p>
+      <strong>The short version.</strong> You can read everything without an
+      account, and then we keep almost nothing: a random browser number and which
+      tabs it opened, for counting visits. If you make an account we keep your
+      email address, the name you give, and your account's settings, and if you
+      edit a station your address is shown on it. We do not sell anything, show
+      advertising, or use tracking cookies, and we do not use your information
+      for anything but running Flood-Net.
+    </p>
+  </div>
+
+  <h2>Who we are</h2>
+  <p>
+    Flood-Net is an independent open-source project, run by the maintainer of
+    <a href="https://github.com/cdomotor-g/MegaNet">cdomotor-g/MegaNet</a> on GitHub
+    (“we”, “us”). It is not run by the Bureau of Meteorology or any other agency.
+    Write to <a href="mailto:privacy@floodwarning.net">privacy@floodwarning.net</a>
+    about anything on this page.
+  </p>
+
+  <h2>If you only read</h2>
+  <dl>
+    <dt>A visit count</dt>
+    <dd>
+      The app makes up a random number for your browser, keeps it in the
+      browser's storage, and records against it, once a day: that it visited,
+      which tabs it opened, and whether the screen is phone, tablet or desktop
+      sized. Nothing in it names you unless you are signed in, when the row is
+      linked to your account so administrators can see when it was last active;
+      otherwise they see only totals. Rows older than 400 days are deleted.
+      Clearing the site's data in your browser starts a new number.
+    </dd>
+
+    <dt>Server and network logs</dt>
+    <dd>
+      Like any website, the services that carry the site — Cloudflare, which
+      serves it, and Supabase, which hosts its database — see your IP address and
+      browser details with each request, and keep short-lived logs for security
+      and to keep the service running. We do not combine these with anything else.
+    </dd>
+
+    <dt>The agent API</dt>
+    <dd>
+      To rate-limit the read-only API, the server hashes your IP address (with the
+      client name you send, if any) and counts requests against the hash for a
+      minute. The address itself is not stored.
+    </dd>
+  </dl>
+
+  <h2>If you make an account</h2>
+  <dl>
+    <dt>Your account</dt>
+    <dd>
+      Your email address; the name you give, if you give one; when the account
+      was created, last signed in, and approved or declined, and by which
+      administrator; and your role. Your password is never seen by Flood-Net:
+      it goes straight to our sign-in provider, Supabase, which keeps only a
+      salted bcrypt hash of it. For each signed-in session, Supabase also records
+      the browser it came from and its IP address; administrators can see the
+      browser and when the account was last active.
+    </dd>
+
+    <dt>Your settings</dt>
+    <dd>
+      The left-bar views you make, so they follow you to other devices.
+    </dd>
+
+    <dt>What you change</dt>
+    <dd>
+      When an editor saves a change to a station, inspection, survey, photo or
+      site feature, the record notes the email address of the account that made
+      it, and the change is kept in the record's history.
+      <strong>Station records are public</strong>, so the address of whoever last
+      changed a station can be read alongside it, through the app's open
+      database. Inspections, surveys, site features and the station history
+      are visible to editors only, and photos to approved members.
+    </dd>
+
+    <dt>Emails we send</dt>
+    <dd>
+      Confirmation codes, sign-in links, password resets, and notes that your
+      account was approved. They are sent through Resend, our email provider, from
+      <code>noreply@floodwarning.net</code>. We do not send newsletters or
+      marketing.
+    </dd>
+  </dl>
+
+  <h2>Signing in with Google</h2>
+  <p>
+    If you choose <em>Continue with Google</em>, Google asks your permission to
+    share your <strong>name, email address and profile picture</strong> with
+    Flood-Net (the <code>openid</code>, <code>email</code> and
+    <code>profile</code> scopes) — nothing else: no contacts, no files, no
+    calendar, no Gmail. Our sign-in provider, Supabase, receives them and keeps
+    them with your account.
+  </p>
+  <ul>
+    <li><strong>How we use it.</strong> Your email address is your identity in
+      Flood-Net: it is what an administrator approves, what decides whether you may
+      edit, and what is recorded against changes you make. Your name is shown to
+      you and to administrators. The profile picture is stored by Supabase with
+      the rest of what Google sends, but Flood-Net does not display or use it.</li>
+    <li><strong>Who it is shared with.</strong> Only the providers named below
+      that run the service for us, and other users only as this page describes:
+      your address on public station records you edit, and the part before the @
+      in the digital twin. We never sell it, never use it for advertising, and
+      never use it to train AI models.</li>
+    <li><strong>How long.</strong> As long as you have an account. Deleting the
+      account deletes it (see <a href="#deletion">deleting your data</a>).</li>
+    <li>You can revoke Flood-Net's access at any time from your Google account's
+      <a href="https://myaccount.google.com/connections">third-party connections</a>
+      page. That stops new sign-ins with Google; it does not delete the account,
+      which you can ask us to do.</li>
+  </ul>
+  <p>
+    Flood-Net's use of information received from Google APIs adheres to the
+    <a href="https://developers.google.com/terms/api-services-user-data-policy">Google
+    API Services User Data Policy</a>, including the Limited Use requirements.
+  </p>
+
+  <h2 id="photos">Field photos, surveys and your location</h2>
+  <p>
+    Some tools record where you are, because where a photo or a reading was taken
+    is the point of it:
+  </p>
+  <ul>
+    <li><strong>The Field Camera</strong> writes your position, heading, height and
+      the time into the photo, both in its file data (EXIF) and as a visible
+      stamp. Photos you upload from elsewhere keep whatever position data the
+      file already carries.</li>
+    <li><strong>Level surveys, site features and reception logs</strong> save the
+      position you were at, or chose, with the record.</li>
+    <li><strong>The map's <em>where am I</em> dot and the AR view</strong> use your
+      position on your device only; they do not send it anywhere.</li>
+  </ul>
+  <p>
+    Your browser asks before any page can use your location or camera, and you
+    can refuse. The microphone is never used. Photos and their positions, and
+    surveys, site features and reception logs, are visible only to approved
+    members or editors, and each records which account added it. Photo files are
+    stored in Cloudflare R2, or Supabase Storage, and served only through links
+    that check you are approved.
+  </p>
+
+  <h2 id="twin">Exploring the digital twin together</h2>
+  <p>
+    While <em>Explore together</em> is on (it is a setting in the digital twin,
+    on by default), other people looking at the same station's digital twin can
+    see you there: your name, which is the part of your email address before the
+    @ if you are signed in or a <q>Visitor</q> number if you are not; your
+    avatar's colours; and where you are standing in the model, relative to the
+    station. Nothing else is shared, and nothing is kept on our side: it passes
+    between open pages through Supabase's realtime service and is gone when you
+    leave. Turn the setting off to explore alone.
+  </p>
+
+  <h2 id="claude">Ask Claude</h2>
+  <p>
+    Station Health's <em>Ask Claude</em> sends what the tab has worked out about
+    the stations — readings, findings, station details such as the owning
+    organisation and the last visit — and the questions you type, to
+    <a href="https://www.anthropic.com/legal/privacy">Anthropic</a>, whose model
+    writes the briefing. Your name and email address are not sent with it.
+  </p>
+  <ul>
+    <li><strong>On Flood-Net's key</strong> (editors), the request passes through
+      our server, which checks you are allowed and counts your calls against a
+      per-minute and a daily limit. The counts are kept by email address for a
+      minute; only the day's totals are kept longer. The request itself is not
+      stored.</li>
+    <li><strong>On your own key</strong>, your browser talks to Anthropic directly,
+      and the key never reaches our server. It is kept in your browser only if you
+      tick the box saying the device is your own.</li>
+  </ul>
+  <p>
+    Anthropic's commercial terms say that what is sent through its API is not
+    used to train its models.
+  </p>
+
+  <h2 id="bugs">Bug reports</h2>
+  <p>
+    <em>Report a Bug</em> fills in a new GitHub issue for you — the tab you were on,
+    the app's version, your browser, screen size and language, and any recent
+    errors — and opens it on GitHub, or copies it for you. Nothing is sent until
+    you submit it yourself, and you can edit it first. GitHub issues are public,
+    so leave out anything personal.
+  </p>
+
+  <h2 id="device">On your device</h2>
+  <p>
+    Flood-Net sets no tracking or advertising cookies. The only cookie is
+    Cloudflare Access's sign-in cookie, where that gate is in use. The app does
+    keep things in your browser's own storage, which stays on your device:
+  </p>
+  <ul>
+    <li>your sign-in session, so you stay signed in until you sign out;</li>
+    <li>the random visitor number described above, and your settings, views and
+      preferences;</li>
+    <li>drafts of inspection and maintenance forms you have not saved yet — which
+      can include a landholder's or council contact's name, email and phone;</li>
+    <li>Field Camera photos and level surveys until they upload, and receptions
+      logged by the serial monitor;</li>
+    <li>a copy of the app, the station list and map data, so it opens with no
+      signal.</li>
+  </ul>
+  <p>
+    Signing out ends the session. Clearing this site's data in your browser
+    removes the rest — so upload or save anything you are working on first,
+    especially on a shared computer.
+  </p>
+
+  <h2 id="third-parties">Services that handle data for us</h2>
+  <p>
+    These providers run parts of Flood-Net. Each handles only what its part
+    needs, under its own privacy policy.
+  </p>
+  <dl>
+    <dt>Cloudflare</dt>
+    <dd>Serves the site and the server code, stores field photos (R2), and, where
+      it is switched on, runs the Access sign-in gate.</dd>
+    <dt>Supabase</dt>
+    <dd>The database, sign-in and file storage. The database is in Sydney,
+      Australia.</dd>
+    <dt>Google</dt>
+    <dd>Sign-in, if you choose <em>Continue with Google</em>.</dd>
+    <dt>Resend</dt>
+    <dd>Sends the account emails.</dd>
+    <dt>Anthropic</dt>
+    <dd>Ask Claude, as described above.</dd>
+    <dt>GitHub</dt>
+    <dd>Hosts the source code and the issue tracker where bug reports go.</dd>
+  </dl>
+  <p>
+    The maps and the tools fetch map tiles, elevation and public datasets
+    directly from their publishers as you use them, so those services see your
+    IP address and the area or point being looked up. They include
+    OpenTopoMap, OpenStreetMap (map tiles, Overpass and the Nominatim place
+    search, which also names the place where a Field Camera photo was taken),
+    Esri, NSW Spatial Services, the Queensland Government's spatial services,
+    Geoscience Australia's elevation services, and the public terrain tiles on
+    Amazon Web Services. Code libraries load from the unpkg and jsDelivr
+    content networks.
+  </p>
+  <p>
+    Some of these providers are outside Australia, mostly in the United States,
+    so information can be handled overseas.
+  </p>
+
+  <h2 id="deletion">Deleting your data, and your other rights</h2>
+  <p>
+    Email <a href="mailto:privacy@floodwarning.net">privacy@floodwarning.net</a>
+    from the address on your account to:
+  </p>
+  <ul>
+    <li>get a copy of what we hold about you;</li>
+    <li>correct it; or</li>
+    <li>delete your account. Deleting it removes your account, your name, your
+      settings and what Supabase holds about your sign-ins, within 30 days.
+      Records you changed stay, because other people rely on them; your email
+      address stays in their history unless you ask us to remove it, which we
+      will do wherever it does not leave a record unaccountable.</li>
+  </ul>
+  <p>
+    We answer within 30 days. You can also complain to the
+    <a href="https://www.oaic.gov.au/privacy/privacy-complaints">Office of the
+    Australian Information Commissioner</a>, or to the data protection authority
+    where you live.
+  </p>
+
+  <h2>Security</h2>
+  <p>
+    Everything travels over HTTPS. Who may read and change what is enforced
+    inside the database, not just by the page, and the code that does it is
+    public for anyone to check. No system is perfectly secure; if we learn of a
+    breach that is likely to harm you, we will tell you.
+  </p>
+
+  <h2>Children</h2>
+  <p>
+    Flood-Net is a tool for people who work on telemetry networks. It is not
+    meant for children, and we do not knowingly hold information about anyone
+    under 16.
+  </p>
+
+  <h2>Changes to this policy</h2>
+  <p>
+    The date at the top says when this page last changed, and every change is
+    public in the
+    <a href="https://github.com/cdomotor-g/MegaNet/commits/main/privacy.html">repository</a>.
+    If we start keeping something new about you, or using it in a new way, we
+    will say so in the app first.
+  </p>
+
+  <footer>
+    <p>
+      <a href="/">Open the application</a> &middot;
+      <a href="/about">About</a> &middot;
+      <a href="/terms">Terms of use</a> &middot;
+      <a href="https://github.com/cdomotor-g/MegaNet">Source on GitHub</a>
+    </p>
+    <p>An independent open-source project. Not an official warning service.</p>
+  </footer>
+
+</main>
+</body>
+</html>

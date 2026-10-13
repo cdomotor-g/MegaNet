@@ -12,8 +12,8 @@
 // string or template literal to say MegaNet, and none to start a file name with
 // `meganet-` / `meganet_` (the downloads are `floodnet-…`). Comments are not
 // read. Then the pages and agent files a person or an agent reads as they are:
-// index.html and about.html outside their comments, llms.txt, robots.txt, the
-// five agent instruction files and docs/agent-api.md.
+// index.html, about.html, privacy.html and terms.html outside their comments,
+// llms.txt, robots.txt, the five agent instruction files and docs/agent-api.md.
 //
 // What may still say it, and why:
 //   cdomotor-g/MegaNet               the repository's own name, in its URLs
@@ -78,7 +78,7 @@ for (const file of SCRIPTS) {
 
 // ── Pages and agent files ────────────────────────────────────────────────────
 
-const PAGES = ['index.html', 'about.html', 'llms.txt', 'robots.txt', 'docs/agent-api.md',
+const PAGES = ['index.html', 'about.html', 'privacy.html', 'terms.html', 'llms.txt', 'robots.txt', 'docs/agent-api.md',
   'AGENTS.md', 'GEMINI.md', '.github/copilot-instructions.md', '.cursor/rules/floodnet-api.mdc'];
 for (const file of PAGES) {
   let text = fs.readFileSync(repo(file), 'utf8');
