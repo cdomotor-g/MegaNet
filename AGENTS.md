@@ -110,10 +110,11 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   The repository keeps its earlier name, MegaNet, as do internal identifiers —
   the `meganet` schema, storage keys, MQTT topics. Code comments still say
   it; never copy it into a string. `npm run brand` checks.
-- **Final summary:** start your closing report with a horizontal rule and the
-  heading `# 🏁 FINAL SUMMARY`, so the owner can find it by scrolling; then
-  **What changed**, **Checks run**, **What you need to do**, **Open
-  questions** (skip empty ones).
+- **Run summary:** start your closing report with a horizontal rule and the
+  heading `# 🏁 THIS RUN SUMMARY (Run N)` — N is 1 for the chat's first
+  summary and one more than the last marker after that — so the owner can find
+  it by scrolling; then **What changed**, **Checks run**, **What you need to
+  do**, **Open questions** (skip empty ones).
 - **Leftover human work:** if human tasks remain or fall out of scope at the end,
   ask whether to open a `[Human]` issue with explicit, click-by-click steps.
 - **Closing issues:** when your work closes an issue, close it with a comment
