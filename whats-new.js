@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 30, date: '2026-10-13', items: [
+      '<strong>◉ Survey marks are circles now.</strong> With a river gauge\'s pin now a triangle, the survey marks '
+        + 'layer draws the circles a survey plan uses: a <strong>ring round a dot</strong> for a benchmark (a mark with '
+        + 'an AHD height), a <strong>bold empty ring</strong> for a permanent survey mark with no height, and a larger, '
+        + 'glowing ringed dot for a CORS site. A benchmark mapped as a station\'s site feature is a red bullseye. The '
+        + 'legend keys the ones in view.',
+    ] },
     { n: 29, date: '2026-10-12', items: [
       '<strong>📍 Pins say what a station is.</strong> On the Stations map a river height gauge is now a '
         + '<strong>triangle</strong> and a rain gauge stays a circle (a station that measures both is a triangle); a gauge '

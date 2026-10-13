@@ -2091,7 +2091,13 @@ failure mode — no network means no rivers, and nothing else on the tab changes
 display** panel, draws the Department of Resources' permanent survey marks and
 CORS sites once you are zoomed in close enough for them to be more than
 scatter — for the field crew doing a height or levelling check near a site,
-each mark carries its register number and AHD height. **On by default**, and
+each mark carries its register number and AHD height. Each is drawn as the
+circle a survey plan uses — a **ring round a dot** for a benchmark (a mark the
+register holds an AHD height for), a **bold empty ring** for a permanent survey
+mark with no AHD height, and the benchmark's symbol **larger and glowing** for a
+CORS site — so they never read as a river gauge's triangle; the legend keys the
+ones in view. Temporary benchmarks are not in the State's register: a crew's own
+TBM is mapped as a station's site feature. **On by default**, and
 remembered between visits the way the rivers switch is: a crew standing at a
 site should not have to go find a checkbox first, and an operator who switches
 the marks off means it. Default-on still costs nothing at page load — the
@@ -4882,7 +4888,7 @@ boards and crest gauges are points; the orifice run (and a cable run) is a line;
 an *Other point* or *Other line* is anything else worth finding again, named.
 The kinds are a vocabulary in the database (`meganet.station_feature_kind`), so
 a new one is an insert. Each is drawn as the shape a plan uses for it — a ringed
-dot the outlet, a crossed square a pit, a triangle a benchmark, a staff a board
+dot the outlet, a crossed square a pit, a bullseye a benchmark, a staff a board
 — so the shape says the kind before the colour does, and a click says what it
 is, where, and how it was placed.
 

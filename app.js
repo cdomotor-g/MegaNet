@@ -5309,11 +5309,16 @@ function mapLegendHtml() {
       <span class="legend-line legend-line-river"></span>
       <span class="small">Matching watercourse (OpenStreetMap)</span>
     </span>` : ''}
-    ${MapSurvey.active() ? `
+    ${MapSurvey.active() ? [
+      // The survey layer's own pins as their keys, only for the kinds drawn.
+      ['bm',   'Qld benchmark — a survey mark with an AHD height'],
+      ['psm',  'Qld permanent survey mark, no AHD height'],
+      ['cors', 'Qld CORS site'],
+    ].filter(([k]) => MapSurvey.drawnKinds().has(k)).map(([k, label]) => `
     <span class="legend-item">
-      <span class="legend-dot legend-dot-survey"></span>
-      <span class="small">Survey mark / CORS site (Qld Dept of Resources)</span>
-    </span>` : ''}
+      <span class="mn-survey-pin mn-survey-${k} legend-survey" aria-hidden="true"></span>
+      <span class="small">${label}</span>
+    </span>`).join('') : ''}
     ${MapElevation.active() ? `
     <span class="legend-item">
       <span class="legend-sq" style="--dot:${MapElevation.colourAt(600)}"></span>

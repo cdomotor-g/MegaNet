@@ -23,7 +23,7 @@ internet, the same call `0060` made for the levels.
 |---|---|---|
 | Orifice outlet | point | a ringed dot — where the line ends and the water is read |
 | Inspection pit | point | a crossed square, the plan symbol for a pit |
-| Benchmark | point | a triangle, the survey mark's |
+| Benchmark | point | a bullseye — a ring round a dot, the survey layer's benchmark symbol |
 | Gauge board | point | a staff with its metre marks |
 | Crest gauge | point | a diamond |
 | Other point | point | a dot — **needs a name** |

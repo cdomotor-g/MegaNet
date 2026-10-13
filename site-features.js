@@ -186,14 +186,16 @@ const SiteFeatures = (function () {
 
   // ── The glyphs ─────────────────────────────────────────────────────────────
   // Plan symbols, so the shape says the kind before the colour does: a ringed
-  // dot where the line ends, the crossed square a drawing uses for a pit, the
-  // survey mark's triangle, a staff with its metre marks, a diamond for the
-  // crest gauge's tube, and a plain dot for anything else. A dark edge on every
-  // one, for the white of a sandbank and the yellow of a board alike.
+  // dot where the line ends, the crossed square a drawing uses for a pit, a
+  // bullseye for a benchmark (the survey layer's benchmark symbol; it was a
+  // triangle until a triangle became a river height gauge's pin), a staff with
+  // its metre marks, a diamond for the crest gauge's tube, and a plain dot for
+  // anything else. A dark edge on every one, for the white of a sandbank and
+  // the yellow of a board alike.
   const GLYPH = {
     outlet:    c => `<circle cx="10" cy="10" r="6.6" fill="${c}" stroke="#14181c" stroke-width="1.6"/><circle cx="10" cy="10" r="2.3" fill="#fff"/>`,
     pit:       c => `<rect x="3.6" y="3.6" width="12.8" height="12.8" fill="${c}" stroke="#14181c" stroke-width="1.6"/><path d="M3.6 3.6L16.4 16.4M16.4 3.6L3.6 16.4" stroke="#14181c" stroke-width="1.3"/>`,
-    benchmark: c => `<path d="M10 2.3L18 16.6H2Z" fill="${c}" stroke="#14181c" stroke-width="1.6" stroke-linejoin="round"/><circle cx="10" cy="11.7" r="2" fill="#fff"/>`,
+    benchmark: c => `<circle cx="10" cy="10" r="7.4" fill="${c}" stroke="#14181c" stroke-width="1.6"/><circle cx="10" cy="10" r="5" fill="#fff"/><circle cx="10" cy="10" r="2.5" fill="${c}" stroke="#14181c" stroke-width="1"/>`,
     board:     c => `<rect x="6.4" y="1.8" width="7.2" height="16.4" fill="${c}" stroke="#14181c" stroke-width="1.6"/><path d="M6.4 6h3.6M6.4 10h3.6M6.4 14h3.6" stroke="#14181c" stroke-width="1.3"/>`,
     crest:     c => `<path d="M10 2.2L17.8 10L10 17.8L2.2 10Z" fill="${c}" stroke="#14181c" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 6.2v7.6" stroke="#14181c" stroke-width="1.6"/>`,
     dot:       c => `<circle cx="10" cy="10" r="6" fill="${c}" stroke="#14181c" stroke-width="1.6"/>`,

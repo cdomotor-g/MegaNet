@@ -23,6 +23,17 @@
 // drawn into an SVG with a colour baked in at fetch time, so a theme switch
 // repaints it for free.
 //
+// The symbol says what kind of mark it is, in the circles a survey plan uses
+// rather than the triangle this layer first drew — a triangle on this map is a
+// river height gauge's pin now (map-symbols.js). A ring round a dot is a
+// benchmark: a mark the register holds an AHD height for. A bold ring with
+// nothing in it is a permanent survey mark with no AHD height — horizontal
+// control only, no use to a levelling check. A CORS site is the benchmark's
+// symbol, larger and glowing. The split costs nothing: the AHD height is one of
+// the two fields the bbox query already asks for. Temporary benchmarks are not
+// in the State's register at all — a TBM is a crew's own, and is mapped as a
+// station's site feature (site-features.js), not here.
+//
 // Each mark's callout carries a launch link to its Survey Control Mark Report
 // (#174): a PDF holding the administrative details, the coordinate and AHD
 // blocks, the survey connections and — when the mark carries a Form 6 sketch —
@@ -366,6 +377,22 @@ const MapSurvey = (function () {
     rerenderMapLegend();
   }
 
+  // What the pin is drawn as: 'cors', 'bm' (a benchmark — the register holds
+  // an AHD height for it) or 'psm' (a permanent survey mark with none). The
+  // height is read off the bbox row itself, so the fallback service, whose
+  // field names nobody captured, draws every mark it cannot find a height on
+  // as a plain survey mark rather than guessing.
+  function markKind(p) {
+    if (p.category === 'cors') return 'cors';
+    return p.ahd != null ? 'bm' : 'psm';
+  }
+
+  // Each kind's pin, in px, square — styles.css draws the circle inside it.
+  const PIN_PX = { bm: 12, psm: 13, cors: 16 };
+
+  // The callout's word for each, matching the legend's.
+  const KIND_WORD = { bm: 'Benchmark', psm: 'Permanent survey mark', cors: 'CORS site' };
+
   // The hover name: the mark number on its own, because that is what the pin
   // is and a floating label has room for nothing else.
   function markLabel(p) {
@@ -510,12 +537,15 @@ const MapSurvey = (function () {
     layer = L.layerGroup().addTo(map);
     if (map.attributionControl) map.attributionControl.addAttribution(ATTRIBUTION);
     for (const p of points) {
-      const isCors = p.category === 'cors';
+      const kind = markKind(p);
+      const size = PIN_PX[kind];
       const icon = L.divIcon({
         className: 'mn-survey-div',
-        html: `<div class="mn-survey-pin ${isCors ? 'mn-survey-cors' : 'mn-survey-mark'}"></div>`,
-        iconSize:   isCors ? [14, 13] : [10, 9],
-        iconAnchor: isCors ? [7, 10]  : [5, 7],
+        html: `<div class="mn-survey-pin mn-survey-${kind}"></div>`,
+        // Centred: a circle's middle is the mark, where a triangle's was the
+        // point the old anchor sat on.
+        iconSize:   [size, size],
+        iconAnchor: [size / 2, size / 2],
       });
       // Explicitly non-interactive, with nothing bound to the marker: the
       // shared pins-and-links canvas above this pane owns every DOM event on
@@ -564,8 +594,9 @@ const MapSurvey = (function () {
   // useful.
   function calloutHtml(p, status) {
     const d       = markDetail(p) || {};
-    const isCors  = p.category === 'cors';
-    const kind    = isCors ? 'CORS site' : 'Survey control mark';
+    // The legend's word for the symbol drawn, so the callout says what the
+    // ring or the ringed dot means.
+    const kind    = KIND_WORD[markKind(p)];
     const where   = d.locality || d.town;
     const visited = fmtDate(d.lastVisit);
     const grade   = [d.ahdClass, d.ahdOrder].filter(Boolean).join(' / ');
@@ -798,6 +829,14 @@ const MapSurvey = (function () {
     // Does the legend claim a survey-mark key right now? Same gate MapRivers
     // uses for its own legend entry.
     active() { return !!layer; },
+
+    // Which symbols are on the map — 'bm', 'psm', 'cors' — so the legend keys
+    // only the ones a reader can actually see.
+    drawnKinds() {
+      const kinds = new Set();
+      if (layer) for (const p of drawnPoints) kinds.add(markKind(p));
+      return kinds;
+    },
 
     // The drawn mark nearest a point, with how far away it is — for the
     // what-is-here card (#186). Deliberately only what is *drawn*: this layer

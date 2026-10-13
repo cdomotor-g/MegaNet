@@ -288,13 +288,28 @@ try {
     return {
       total: icons.length,
       inView: inView.length,
-      cors: document.querySelectorAll('.mn-survey-cors').length,
+      // On the map: the legend wears the same classes as its keys.
+      cors: document.querySelectorAll('.mn-survey-div .mn-survey-cors').length,
+      bm:   document.querySelectorAll('.mn-survey-div .mn-survey-bm').length,
+      psm:  document.querySelectorAll('.mn-survey-div .mn-survey-psm').length,
+      // A circle, not the triangle a river gauge's pin is: rounded, and no
+      // CSS-border triangle's zero width.
+      round: icons.every((el) => {
+        const cs = getComputedStyle(el.firstElementChild);
+        return cs.borderRadius === '50%' && parseFloat(cs.width) > 0;
+      }),
+      legend: [...document.querySelectorAll('.legend-survey')].map((el) =>
+        [...el.classList].find((c) => /^mn-survey-(bm|psm|cors)$/.test(c)).slice(10)).join(','),
       interactive: document.querySelectorAll('.leaflet-mnSurvey-pane .leaflet-interactive').length,
       note: document.getElementById('map-survey-note').textContent.trim(),
     };
   });
   check('all six fixture points draw — four marks and two CORS sites', drawn.total === 6 && drawn.cors === 2,
     JSON.stringify(drawn));
+  // 10552 and 10554 carry an AHD height, 10553 and 10555 none.
+  check('a mark with an AHD height is a benchmark\u2019s ringed dot, one without is a bold ring',
+    drawn.bm === 2 && drawn.psm === 2 && drawn.round, JSON.stringify(drawn));
+  check('the legend keys each of the three symbols drawn', drawn.legend === 'bm,psm,cors', drawn.legend);
   check('five of them are inside the viewport — the sixth sits in the bbox margin',
     drawn.inView === 5, `${drawn.inView} in viewport`);
   check('the note counts only what the viewport shows', /\b5\b\s*marks in view/.test(drawn.note), drawn.note);
@@ -364,7 +379,7 @@ try {
   // 5 px off the mark: inside HIT_PX, outside the 10 px icon.
   const popA = await page.evaluate(() => window.__surveyClick([-20.0, 147.0], 5));
   check('a click near a mark opens its callout with the real AHD height',
-    !!popA && popA.includes('10552') && popA.includes('Survey control mark') && popA.includes('52.38 m AHD'),
+    !!popA && popA.includes('10552') && popA.includes('Benchmark') && popA.includes('52.38 m AHD'),
     String(popA));
 
   // ── The report link, and the details behind it (#174) ─────────────────────
@@ -383,7 +398,7 @@ try {
     text: window.__popupText(), pills: window.__popupPills(), note: window.__popupNoteTitle(),
   }));
   check('the lookup fills in what the mark physically is and where it is',
-    full.text.includes('Survey control mark · STAND')
+    full.text.includes('Benchmark · STAND')
       && full.text.includes('QUEEN ST/EIGHTH AVE-HOME HILL')
       && full.text.includes('Also BCC12419 BCC 66/103'),
     JSON.stringify(full.text));
@@ -459,7 +474,7 @@ try {
   const bare = await page.evaluate(() => ({ text: window.__popupText(), pills: window.__popupPills() }));
   check('a mark with only a number prints only what is there, and derives its report link',
     bare.text.includes('Mark 10555')
-      && bare.text.includes('Survey control mark')
+      && bare.text.includes('Permanent survey mark')
       && !bare.text.includes(' · ')
       && !bare.text.includes('unavailable')
       && bare.pills.some((a) => a.href === 'https://qspatial.information.qld.gov.au/SurveyReport/SCR010555.pdf'),
@@ -550,7 +565,7 @@ try {
   });
   check('on the fallback service the callout is complete the moment it opens — nothing to look up',
     !!fbPop.text
-      && fbPop.text.includes('Survey control mark · STAND')
+      && fbPop.text.includes('Benchmark · STAND')
       && fbPop.text.includes('GOOD · last visited 3 Nov 2023')
       && !/Looking up mark details|unavailable/.test(fbPop.text),
     JSON.stringify(fbPop.text));

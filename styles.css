@@ -3032,7 +3032,6 @@ hr {
   display: inline-block;
   vertical-align: middle;
 }
-.legend-dot-survey { background: var(--map-survey); }
 /* SoRT's warmed burnt orange for LiDAR contour lines — a hard-coded colour on
    purpose: the swatch matches the server-rendered image (MapContours draws the
    MapServer's own symbology), which no theme token can restyle. */
@@ -6285,37 +6284,66 @@ hr {
 .acma-help { margin-top: var(--sp-1); }
 
 /* ── Survey marks & CORS sites (#120) ────────────────────────────────────────
-   A CSS-border triangle rather than a circle (station pins) or a square (ACMA
-   transmitters) — the map already has two dot shapes with a colour meaning of
-   their own, and a third needs a silhouette, not just a hue, to read as
-   distinct at a glance. It also happens to be the conventional GIS symbol for
-   a trig/survey point.
+   Circles, in the symbols a survey plan uses: a ring round a dot for a
+   benchmark (a mark with an AHD height), a bold empty ring for a permanent
+   survey mark with no height, and the benchmark's ringed dot larger and
+   glowing for a CORS site. The layer first drew a triangle, the GIS trig
+   symbol — but a triangle on this map is a river height gauge's pin now
+   (map-symbols.js), and a station pin is a filled disc, so the white-centred
+   rings here read as survey marks by their silhouette and not only their hue.
    Unlike MapRivers and the ACMA squares, the colour is `var(--map-survey)`
-   directly in the rule below rather than resolved in JS at draw time: a
+   directly in the rules below rather than resolved in JS at draw time: a
    divIcon is a real DOM node against this stylesheet, so a theme switch
-   repaints it for free and MapSurvey needs no repaint() hook in toggleTheme(). */
+   repaints it for free and MapSurvey needs no repaint() hook in toggleTheme().
+   The pins' sizes are MapSurvey's PIN_PX; the legend wears the same classes
+   (.legend-survey) at those sizes. */
 .mn-survey-div { background: none; border: none; }
 
 .mn-survey-pin {
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-bottom: 9px solid var(--map-survey);
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--map-survey);
+  /* White inside the ring, so the dot and the empty centre both read over
+     imagery as well as over the street map. */
+  background: #fff;
   /* Dark outline then a light halo, the same two-layer trick the station pins'
      white ring and the ACMA squares' box-shadow use to separate a small shape
      from whatever basemap is under it. */
   filter: drop-shadow(0 0 1px rgba(0, 0, 0, .6)) drop-shadow(0 0 1.5px rgba(255, 255, 255, .9));
 }
 
+/* Benchmark: a thin ring, a white gap, a solid dot. */
+.mn-survey-bm {
+  border-width: 1.5px;
+  background: radial-gradient(circle, var(--map-survey) 0 2.2px, #fff 2.7px);
+}
+
+/* Permanent survey mark: a bold ring with nothing in it, a size up so the
+   hole reads as a hole and not as a white dot. */
+.mn-survey-psm {
+  width: 13px;
+  height: 13px;
+  border-width: 3px;
+}
+
 /* CORS sites are the rarer, more significant mark — bigger, and a glow in its
    own colour rather than a second DOM node to keep the divIcon to one element. */
 .mn-survey-cors {
-  border-left-width: 7px;
-  border-right-width: 7px;
-  border-bottom-width: 13px;
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  background: radial-gradient(circle, var(--map-survey) 0 3px, #fff 3.5px);
   filter: drop-shadow(0 0 1px rgba(0, 0, 0, .6)) drop-shadow(0 0 2px rgba(255, 255, 255, .95))
           drop-shadow(0 0 3px var(--map-survey));
+}
+
+/* The same pins as keys in the map legend. */
+.legend-survey {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
 }
 
 /* ── RF Environment tab (#138) ───────────────────────────────────────────────

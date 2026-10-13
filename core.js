@@ -773,7 +773,7 @@ const HELP = {
       + 'map, by GPS with its ±, or typed — and a save over somebody else\'s newer change is refused with '
       + '<em>Reload</em>. <em>⬇ GeoJSON</em> takes the station\'s features to QGIS or Google Earth. From zoom '
       + '16 the map draws every station\'s features in view (🗺️ Map display, <em>Site features</em>); each '
-      + 'shape says its kind — a ringed dot the outlet, a crossed square a pit, a triangle a benchmark, a '
+      + 'shape says its kind — a ringed dot the outlet, a crossed square a pit, a bullseye a benchmark, a '
       + 'staff a board — and a click says what it is. Signed-in editors only, as the levels are: where a '
       + 'benchmark is, is not for the open internet.',
       'The two <strong>document searches</strong> do not send the station\'s name as written. A '
