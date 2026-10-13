@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 32, date: '2026-10-13', items: [
+      '<strong>🌊 Flood velocity in the digital twin.</strong> The 🧊 pane has a <em>Flood velocity</em> panel: '
+        + 'the station card\'s indicative velocity worked out on the twin\'s own ground, in the channel by the gauge '
+        + 'and at the station, for whatever level the water is at. Change the slope (the card\'s, one read along the '
+        + 'channel, or your own) and the roughness (Chow\'s table, by what the site looks like) and the figures follow. '
+        + '<em>Colour the water by its speed</em> shades the flood from pale (slow) to deep blue (fast), with a key on '
+        + 'the stage, and <em>The flow line</em> — the channel the slope is read along — can be drawn on the ground, arrows downstream. '
+        + 'From a station card: <em>How the velocity is worked out → 🧊 Work it out in the digital twin</em>. '
+        + 'Indicative, and nothing is saved to the station.',
+    ] },
     { n: 31, date: '2026-10-13', items: [
       '<strong>🎛️ Views for the left bar.</strong> A <em>View</em> box at the top of the bar picks what it lists: '
         + '<strong>All</strong>, <strong>Simple</strong> (no Export, Map Generator or Interference group), or '

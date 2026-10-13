@@ -207,6 +207,26 @@
   --flood-water-aep-first: #e020e0;
   --flood-water-aep-last:  #15227a;
   --flood-water-peak:      #ffffff;
+  /* The same water coloured by its speed instead (flood-velocity.js SPEEDS):
+     under 0.5 m/s, 0.5–1, 1–1.5, 1.5–2, 2–3, and 3 and over. One blue from
+     pale to deep — a magnitude, so one hue whose lightness says more, never a
+     rainbow — in even steps of lightness (monotone, every step at least 0.06
+     apart in OKLCH L). Scene colours and legend swatches like the water's
+     own, one set for both themes; the palest is 1.7:1 on a white panel, so
+     every swatch has the border .twin-flood-sw gives it and every band is
+     named in text beside it. */
+  --flood-speed-1: #9ec5f4;
+  --flood-speed-2: #6da7ec;
+  --flood-speed-3: #3987e5;
+  --flood-speed-4: #256abf;
+  --flood-speed-5: #184f95;
+  --flood-speed-6: #0d366b;
+  /* The flow line the twin traces along the channel (digital-twin.js): a
+     white ribbon cased in a near-black, which reads on aerial imagery, on
+     the water's level colours and on its speed blues alike. Scene colours,
+     one set for both themes. */
+  --twin-flow:      #ffffff;
+  --twin-flow-edge: #10202a;
   /* Side nav: expanded, and collapsed to an icon rail. The expanded width is
      set by the longest label, "Interference Workbench" — a nav that ellipsises
      its own tab names is worse than a wider one. */
@@ -14571,6 +14591,100 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   border-radius: var(--r-md);
 }
 .twin-flood-set legend { padding: 0 var(--sp-1); font-weight: 600; }
+
+/* ── The flood velocity (digital-twin.js, "the flood velocity") ────────────
+   The 🧊 pane's Flood velocity panel: the two figures for the water on
+   screen, the switch that colours the water by speed with its key, the slope
+   and the roughness as choices, the flow line with its profile, a table of
+   every level, and what went in. */
+.twin-vel-lead { margin-top: 0; }
+.twin-vel-at { margin: 0 0 var(--sp-1); }
+.twin-vel-figs { display: grid; gap: var(--sp-1); margin: 0 0 var(--sp-2); }
+.twin-vel-figs div { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 var(--sp-2); }
+.twin-vel-figs dt { font-size: var(--fs-sm); color: var(--muted); }
+.twin-vel-figs dd { margin: 0; font-variant-numeric: tabular-nums; }
+.twin-vel-set {
+  display: grid;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  min-width: 0;
+}
+.twin-vel-set legend { padding: 0 var(--sp-1); font-weight: 600; }
+.twin-vel-set select { width: 100%; min-width: 0; }
+.twin-vel-set p { margin: 0; }
+.twin-vel-entered { align-items: center; }
+.twin-vel-entered input[type="number"] { width: 6.5rem; font-variant-numeric: tabular-nums; }
+.twin-vel-beds, .twin-vel-card { margin-bottom: var(--sp-2); }
+.twin-speed-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  margin: 0 0 var(--sp-2);
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.twin-speed-unit { color: var(--muted); }
+.twin-vel-table { width: 100%; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.twin-vel-table th[scope="row"] { font-weight: 400; text-align: left; }
+.twin-vel-table td { white-space: nowrap; }
+
+/* The profile of the ground along the flow line: thin marks, recessive axes,
+   text in the text tokens. */
+.twin-vel-prof { margin: 0; }
+.twin-vel-prof svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+.twin-vel-prof figcaption { margin-top: var(--sp-1); color: var(--muted); }
+.twin-vel-prof-axis { stroke: var(--border); stroke-width: 1; }
+.twin-vel-prof-ground { fill: none; stroke: var(--text); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.twin-vel-prof-fit { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.twin-vel-prof-gauge { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; }
+.twin-vel-prof-cross { stroke: var(--accent); stroke-width: 1.5; }
+.twin-vel-prof-tick { font-size: 10px; fill: var(--muted); }
+
+/* The key on the stage, bottom left on the scale's own foot: the water's
+   speed bands in a bar, the gauge's speed beside its title and a mark over
+   the band it is in. Up only while the water is coloured by speed. */
+.twin-speed-key {
+  position: absolute;
+  left: var(--sp-2);
+  bottom: calc(var(--twin-hud-h, 1.6rem) + var(--twin-caveat-h) + 2 * var(--sp-2));
+  z-index: 1;
+  width: 11rem;
+  max-width: calc(50% - 2 * var(--sp-2));
+  margin: 0;
+  padding: .25rem .45rem .2rem;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border-radius: var(--r-sm);
+  pointer-events: none;
+}
+.twin-speed-key[hidden] { display: none; }
+.twin-stage:has(.twin-movepin-panel:not([hidden])) .twin-speed-key { display: none; }
+.twin-speed-head { display: flex; justify-content: space-between; gap: var(--sp-1); margin: 0 0 .2rem; }
+.twin-speed-gauge { font-weight: 600; white-space: nowrap; }
+.twin-speed-bar { position: relative; display: flex; height: .7rem; border: 1px solid var(--border); border-radius: 2px; }
+.twin-speed-bin { flex: 1 1 0; background: var(--sw); }
+.twin-speed-mark {
+  position: absolute;
+  top: -.35rem;
+  left: calc(var(--at, 0) * 100%);
+  width: 0;
+  height: 0;
+  margin-left: -.3rem;
+  border: .3rem solid transparent;
+  border-top-color: var(--text);
+  border-bottom: 0;
+}
+.twin-speed-mark[hidden] { display: none; }
+.twin-speed-ticks { position: relative; height: 1.25em; margin: .1rem 0 0; color: var(--muted); }
+.twin-speed-ticks span { position: absolute; left: calc(var(--k) * 100%); transform: translateX(-50%); }
 
 /* The pill on the stage, top right under the compass (the station trail and
    the card have the left): for a station with no flood levels of its own,

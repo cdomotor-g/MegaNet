@@ -122,6 +122,15 @@ function loadModule() {
   return ctx.FloodStages;
 }
 
+// flood-velocity.js on its own, for the figures the twin's velocity panel
+// should show.
+function loadVelocity() {
+  const ctx = { console };
+  vm.createContext(ctx);
+  vm.runInContext(`${fs.readFileSync(repo('flood-velocity.js'), 'utf8')}\n;this.FloodVelocity = FloodVelocity;`, ctx);
+  return ctx.FloodVelocity;
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // 1. flood-stages.js
 // ═════════════════════════════════════════════════════════════════════════════
@@ -739,6 +748,157 @@ async function browserHalf(FS) {
     const audit = await auditHandlers(page);
     ok(`the tab's controls: all ${audit.checked} handler(s) resolve`, audit.unresolved.length === 0, audit.unresolved.map(u => u.path).join(', '));
     ok('the canvas\'s name says there is water, and how high it goes', /water at its flood levels, up to 103\.75 m AHD/.test(await page.evaluate(() => document.getElementById('twin-canvas').getAttribute('aria-label'))));
+
+    // The flood velocity on the same valley: the card's equation over the
+    // twin's ground, the water coloured by it, the flow line and the
+    // assumptions — every figure worked out here by the module itself.
+    section('The flood velocity');
+    const FV = loadVelocity();
+    const S_CARD = FV.estimate(GATTON).slope.used;
+    const vel = () => page.evaluate(() => DigitalTwin.debug().velocity);
+    const velText = () => text('#twin-panel-velocity');
+    await page.evaluate(() => DigitalTwin.floodAt('major_m'));
+    await page.waitForFunction(() => DigitalTwin.debug().flood.band === 'major_m', null, { timeout: LOAD_TIMEOUT });
+    let V = await vel();
+    const PIN = valley(0, 0);
+    ok('what goes in: the gauge zero for the channel\'s bed, the twin\'s ground at the pin, the card\'s slope and roughnesses',
+      V.inputs && V.inputs.bed === 87.54 && V.inputs.bedBasis === 'the gauge zero' && near(V.inputs.ground, PIN, 1e-3)
+        && V.inputs.slope.source === 'card' && near(V.inputs.slope.used, S_CARD, 1e-12)
+        && V.inputs.nChannel.n === 0.04 && V.inputs.nChannel.source === 'default' && V.inputs.nPlain.n === 0.06, J(V.inputs));
+    let vWant = FV.atLevel(102.54, { bed: 87.54, ground: V.inputs.ground, slope: S_CARD, nChannel: 0.04, nPlain: 0.06 });
+    ok('at major, the two figures are the module\'s: in the channel 15.0 m deep, and at the station\'s ground',
+      V.now && near(V.now.channel.v, vWant.channel.v, 1e-9) && near(V.now.channel.depth, 15, 1e-9) && near(V.now.ground.v, vWant.ground.v, 1e-9),
+      J({ twin: V.now, vWant }));
+    let vPanel = await velText();
+    ok('…and the panel says them, with the card\'s slope chosen in its own words',
+      vPanel.includes(`≈ ${FV.speed(vWant.channel.v)} m/s`) && vPanel.includes('15.0 m deep') && vPanel.includes(`≈ ${FV.speed(vWant.ground.v)} m/s`)
+        && vPanel.includes(FV.slopeRatio(FV.estimate(GATTON).slope.raw)) && vPanel.includes(FV.estimate(GATTON).slope.basis)
+        && await page.evaluate(() => document.querySelector('input[name="twin-vel-slope"]:checked').value) === 'card', vPanel.slice(0, 400));
+    ok('…beside the card\'s own figures', vPanel.includes(`On the station card: channel ≈ ${FV.speed(FV.estimate(GATTON).settings[0].max.v)} m/s`), vPanel.slice(-400));
+    ok('coloured by the level it has passed until asked: no speed texture, the key on the stage put away',
+      V.colour === 'level' && !V.textured && V.key && V.key.hidden, J({ colour: V.colour, textured: V.textured, key: V.key }));
+
+    await page.click('#twin-vel-colour');
+    V = await vel();
+    const SPEED_HEX = await page.evaluate(() => FloodVelocity.SPEEDS.map(b => (cssVar(b.token, b.hex) || b.hex).toLowerCase()));
+    ok('"Colour the water by its speed": the speed texture on, the water more opaque, the choice remembered',
+      V.colour === 'speed' && V.textured && near(V.opacity, 0.8, 1e-9)
+        && await page.evaluate(() => JSON.parse(localStorage.getItem('mn-twin')).waterColour) === 'speed', J({ colour: V.colour, textured: V.textured, opacity: V.opacity }));
+    ok('…and the key up at the stage\'s foot, the gauge\'s speed beside its title',
+      V.key && !V.key.hidden && V.key.gauge === `gauge ≈ ${FV.speed(vWant.channel.v)}`
+        && await page.evaluate(() => { const k = document.getElementById('twin-speed-key').getBoundingClientRect(), s = document.getElementById('twin-stage').getBoundingClientRect();
+          return k.left >= s.left && k.right <= s.right && k.bottom <= s.bottom && k.top >= s.top; }), J(V.key));
+    // The water as drawn, read through the plane's own UVs: each sample its
+    // own depth, the channel's roughness below the ground at the pin and the
+    // floodplain's above it, and dry ground the palest band under the mask.
+    // n null is a spot the water does not reach: the palest band under the mask.
+    const speedHex = (x, z, n, S = S_CARD, L = 102.54) => (n == null ? SPEED_HEX[0] : SPEED_HEX[FV.speedBand(FV.manning(L - valley(x, z), S, n).v)]);
+    const texel = (x, z) => page.evaluate(([x, z]) => DigitalTwin._speedAt(x, z), [x, z]);
+    const spots = [[-30, 0, 0.04], [-30, -150, 0.04], [-22, 0, 0.04], [170, 0, 0.06], [180, 60, 0.06], [195, 0, null], [80, 40, null]];
+    const vDrawn = [];
+    for (const [x, z, n] of spots) vDrawn.push({ x, z, got: await texel(x, z), want: speedHex(x, z, n) });
+    ok('the water as drawn is coloured by each sample\'s own speed — the channel\'s bed, its side, the rising ground — and the dry ground the palest band',
+      vDrawn.every(d => d.got === d.want) && speedHex(-22, 0, 0.04) !== speedHex(-22, 0, 0.06), J(vDrawn));
+    ok('…the dry ones are dry under the mask too: the hollow behind its bank, still under major, and the high ground over it',
+      !(await wet(80, 40)) && valley(80, 40) < 102.54 && !(await wet(195, 0)) && valley(195, 0) > 102.54 && await wet(170, 0));
+
+    // A roughness picked from Chow's table, for the session.
+    await page.selectOption('#twin-vel-n-channel', '0.07');
+    V = await vel();
+    vWant = FV.atLevel(102.54, { bed: 87.54, ground: V.inputs.ground, slope: S_CARD, nChannel: 0.07, nPlain: 0.06 });
+    ok('n 0.070 in the channel — sluggish and weedy — slows the channel by 0.04/0.07, and not the station\'s ground',
+      V.inputs.nChannel.n === 0.07 && V.inputs.nChannel.source === 'here' && near(V.now.channel.v, vWant.channel.v, 1e-9) && near(V.now.ground.v, vWant.ground.v, 1e-9)
+        && /sluggish and weedy/.test(await velText()), J(V.now));
+    ok('…and the water is repainted with it', await texel(-22, 0) === speedHex(-22, 0, 0.07), `${await texel(-22, 0)} ${speedHex(-22, 0, 0.07)}`);
+
+    // A slope entered, one in a thousand.
+    await page.check('input[name="twin-vel-slope"][value="entered"]');
+    await page.fill('#twin-vel-entered', '1000');
+    await page.press('#twin-vel-entered', 'Tab');
+    V = await vel();
+    vWant = FV.atLevel(102.54, { bed: 87.54, ground: V.inputs.ground, slope: 0.001, nChannel: 0.07, nPlain: 0.06 });
+    ok('a slope entered, 1:1,000: the figures and the water follow, and the choice shows as entered',
+      V.inputs.slope.source === 'entered' && near(V.inputs.slope.used, 0.001, 1e-12) && near(V.now.channel.v, vWant.channel.v, 1e-9)
+        && await texel(-30, 0) === speedHex(-30, 0, 0.07, 0.001)
+        && await page.evaluate(() => document.querySelector('input[name="twin-vel-slope"]:checked').value) === 'entered', J(V.inputs.slope));
+
+    // The flow line on this valley: the channel at x = −30 is level from end
+    // to end, so it is a channel that falls too little to read a slope from.
+    const LN = V.line;
+    ok('the flow line is traced from the channel by the gauge along its bed, north–south, to the ring by the patch\'s edge',
+      LN && LN.ok && LN.from === 'gauge' && near(LN.start.cell.x, -30, 1e-6) && near(LN.ends.up.x, -30, 2) && near(LN.ends.down.x, -30, 2)
+        && near(Math.abs(LN.ends.up.z - LN.ends.down.z), 2 * Math.sqrt(180 * 180 - 30 * 30), 6) && LN.stands, J(LN));
+    ok('…and says it falls too little to read a slope from: the bed is level', !LN.falls && !LN.clear && LN.slope < 1e-6 && /falls too little/.test(await velText()));
+    await page.check('input[name="twin-vel-slope"][value="line"]');
+    V = await vel();
+    ok('its slope chosen: read as 1:10,000, the flattest this uses, and the panel says so',
+      V.inputs.slope.source === 'line' && V.inputs.slope.used === FV.SLOPE_MIN && V.inputs.slope.bounded && /Read as 1:10,000, the flattest this uses/.test(await velText()), J(V.inputs.slope));
+    ok('…and its profile is drawn, the gauge marked on it', await page.evaluate(() => { const s = document.getElementById('twin-vel-prof-svg'); return !!(s && s.querySelector('.twin-vel-prof-ground') && s.querySelector('.twin-vel-prof-gauge')); }));
+
+    // Drawn on the ground: a ribbon with arrowheads, riding the water where it
+    // is over it, and not in the .glb.
+    ok('the flow line is not drawn until asked', V.drawn && !V.drawn.visible && !V.flowLineOn);
+    await page.click('#twin-vel-line-on');
+    V = await vel();
+    ok('"Draw it on the ground": the ribbon, its edge and the arrowheads, on the water over the channel',
+      V.drawn.visible && V.flowLineOn && J(V.drawn.parts) === J(['flow line edge', 'flow line', 'flow arrow edge', 'flow arrow'])
+        && near(V.drawn.first.y, Math.max(V.drawn.first.ground, V.drawn.first.water) + V.drawn.first.lift, 1e-4) && V.drawn.first.water > V.drawn.first.ground, J(V.drawn));
+    const glbNames = await page.evaluate(async () => {
+      const buf = await DigitalTwin.buildGlb();
+      const dv = new DataView(buf);
+      return JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, dv.getUint32(12, true)))).meshes.map(m => m.name);
+    });
+    ok('…none of it in the .glb', !V.drawn.exported && !glbNames.some(n => /flow/.test(n)) && glbNames.includes('ground'), glbNames.filter(n => /flow/.test(n)).join(', '));
+
+    // Traced from a point clicked on the ground — up the channel, here.
+    await page.evaluate(() => DigitalTwin.topView());
+    await page.waitForTimeout(300);
+    const clickAt = await page.evaluate(() => {
+      const cv = document.getElementById('twin-canvas');
+      for (const [x, z] of [[-30, 110], [-30, 90], [-30, 130], [-30, -100]]) {
+        const p = DigitalTwin._screen(x, DigitalTwin._heightAt(x, z) - DigitalTwin.debug().h0, z);
+        if (p && p.inFront && document.elementFromPoint(p.x, p.y) === cv) return { ...p, x0: x, z0: z };
+      }
+      return null;
+    });
+    if (clickAt) await page.mouse.click(clickAt.x, clickAt.y);
+    await page.waitForFunction(() => !document.getElementById('twin-vel-trace-pick').disabled, null, { timeout: LOAD_TIMEOUT }).catch(() => {});
+    await page.click('#twin-vel-trace-pick');
+    V = await vel();
+    ok('"Trace from the point clicked": the line starts on the lowest ground within 12 m of the click, in the channel',
+      clickAt && V.line.ok && V.line.from === 'picked' && near(V.line.start.cell.x, -30, 1e-6) && Math.abs(V.line.start.cell.z - clickAt.z0) <= 12.5,
+      J({ clickAt, start: V.line && V.line.start }));
+    await page.click('#twin-panel-velocity button:has-text("Trace from the gauge")');
+    ok('…and "Trace from the gauge" puts it back', (await vel()).line.from === 'gauge');
+
+    await page.click('#twin-panel-velocity button:has-text("Back to the card\'s assumptions")');
+    V = await vel();
+    vWant = FV.atLevel(102.54, { bed: 87.54, ground: V.inputs.ground, slope: S_CARD, nChannel: 0.04, nPlain: 0.06 });
+    ok('"Back to the card\'s assumptions": the card\'s slope and roughnesses again, and its figures',
+      V.inputs.slope.source === 'card' && V.inputs.nChannel.n === 0.04 && near(V.now.channel.v, vWant.channel.v, 1e-9)
+        && await page.evaluate(() => document.querySelector('input[name="twin-vel-slope"]:checked').value) === 'card', J(V.inputs));
+
+    // The way in from the station card: its workings open the twin coloured
+    // by speed, the line drawn, the pane at the panel.
+    await page.evaluate(() => { DigitalTwin.setWaterColour('level'); DigitalTwin.setFlowLine(false); });
+    const cardLink = await page.evaluate(() => {
+      const html = typeof RiverDetails !== 'undefined' ? RiverDetails.aepCardHtml(state.data.stations.find(s => s.id === 'gatton')) : '';
+      const box = document.createElement('div'); box.id = 'vel-card-probe'; box.innerHTML = html; document.body.appendChild(box);
+      const b = [...box.querySelectorAll('.stn-card-aep-how button')].find(x => /Work it out in the digital twin/.test(x.textContent));
+      return b ? b.getAttribute('onclick') : null;
+    });
+    ok('the station card\'s workings carry the way to the twin', cardLink === "DigitalTwin.openVelocity('gatton')", String(cardLink));
+    await page.evaluate(() => { setDockTab('help'); const b = document.querySelector('#vel-card-probe .stn-card-aep-how button'); b.click(); document.getElementById('vel-card-probe').remove(); });
+    await settled();
+    V = await vel();
+    const dock = await page.evaluate(() => ({ tab: state.dockTab, open: state.dockOpen, panel: !!document.getElementById('twin-panel-velocity') }));
+    ok('…which opens it coloured by speed with the line drawn, and the side panel on the 🧊 pane at its Flood velocity',
+      V.colour === 'speed' && V.flowLineOn && V.textured && V.drawn.visible && dock.tab === 'twin' && dock.open && dock.panel, J({ colour: V.colour, line: V.flowLineOn, dock }));
+
+    // Put back as the sections after this one expect it.
+    await page.evaluate(() => { DigitalTwin.setWaterColour('level'); DigitalTwin.setFlowLine(false); DigitalTwin.resetVelocity(); DigitalTwin.resetView(); });
+    V = await vel();
+    ok('coloured by level again, the band\'s colour back on the water', V.colour === 'level' && !V.textured && (await fl()).colour === pal.major, J({ colour: V.colour, water: (await fl()).colour }));
 
     // An assumed datum: the AEP water stands; the classes are named, not drawn.
     section('A zero on an assumed datum');

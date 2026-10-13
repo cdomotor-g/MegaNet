@@ -858,7 +858,9 @@ const HELP = {
       + 'Manning\'s equation, in the channel and on the floodplain until somebody records which '
       + 'the station is, with its slope, roughness and depths under <em>How the velocity is '
       + 'worked out</em>. The setting, slope and roughness are editable on the AEP row in the '
-      + 'details card.',
+      + 'details card, and <em>🧊 Work it out in the digital twin</em> there works it again on the '
+      + 'station\'s own ground — the slope along the channel, the roughness by what the site looks '
+      + 'like, and the water coloured by its speed.',
       'Every station in Queensland has a <strong>Site exposure — tides and soils</strong> section, '
       + 'asked of the Queensland Government\'s maps when its card opens: whether it is in or near '
       + 'tidal water, the nearest Water Act tidal limit, the coastal management district and storm '
@@ -2280,6 +2282,18 @@ const TWIN_HELP = {
     + 'are drawn over this channel as heights on its gauge (or, if you say so, as the same metres '
     + 'AHD). Only in the twin, only for the session, and every place that draws them says whose '
     + 'they are.',
+    '<strong>Flood velocity, on the ground.</strong> The station card\'s indicative velocity — '
+    + 'Manning\'s equation — is worked out again in this pane\'s Flood velocity panel on the twin\'s '
+    + 'own ground: in the channel by the gauge and at the station\'s feet, for whatever level the '
+    + 'water is at. The slope (the card\'s, the flow line\'s, or one you enter) and the roughness of '
+    + 'the channel and the floodplain (any row of Chow\'s table) are yours to change for the session. '
+    + '<em>Colour the water by its speed</em> gives every sample of the water its own depth in the '
+    + 'same equation, in six blues from pale (under 0.5 m/s) to deep (3 and over), with a key at the '
+    + 'stage\'s foot. <strong>The flow line</strong> is traced along the lowest ground from the '
+    + 'channel by the gauge to the patch\'s edge both ways, and the slope is read along it — over a '
+    + 'short reach a pool reads flat, so the 1,600 m patch reads it better; it says so when it finds '
+    + 'no channel or too little fall, and it can be traced again from a point you click. Nothing is '
+    + 'saved to the station.',
     '<strong>A 📷 on the ground is where somebody stood with a camera</strong> — a post at chest '
     + 'height, the camera turned the way it faced and a pale wedge for each way a photo from there '
     + 'looked. Click it, pick it from the line under the stage, or walk up to it in the POV and '

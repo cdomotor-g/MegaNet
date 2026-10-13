@@ -131,6 +131,109 @@ function arithmetic(FV) {
       && FV.speed(2.449) === '2.4' && FV.speed(0.04) === '<0.1' && FV.speed(0) === '0');
 }
 
+// A patch of the twin's own shape (digital-twin.js): 201 × 201 samples over
+// `size` m, row 0 the north edge, x east and z south of the station at the
+// middle sample — the grid FloodVelocity.flowLine is handed there.
+function patch(size, f) {
+  const n = 201, step = size / (n - 1), half = size / 2, elev = new Float32Array(n * n);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) elev[j * n + i] = f(-half + i * step, -half + j * step);
+  return { elev, n, size };
+}
+// A channel 4 m deep and ~10 m wide whose middle is at x = c(z).
+const channel = (x, z, c) => 4 * Math.exp(-(((x - c) / 5) ** 2));
+
+function twinArithmetic(FV) {
+  log('\nIn the digital twin: the flow line, the two figures, the bands\n');
+
+  // A straight channel at x = −20 running north–south, its bed and the ground
+  // either side falling 1:500 to the north.
+  const straight = patch(400, (x, z) => 100 + 0.002 * z - channel(x, z, -20));
+  const a = FV.flowLine(straight);
+  const mid = a.ok ? a.points.slice(Math.floor(a.points.length * 0.05), Math.ceil(a.points.length * 0.95)) : [];
+  check('a straight channel: traced along its bed, 4 m under the ground beside it, round the station',
+    a.ok && a.stands && mid.every(p => Math.abs(p.x + 20) < 2.5) && Math.abs(a.start.x + 20) < 2.5,
+    JSON.stringify(a.ok ? { start: a.start, worst: Math.max(...mid.map(p => Math.abs(p.x + 20))) } : a));
+  check('…from its upstream end to its downstream one, north, as the bed falls',
+    a.ok && a.points[0].z > 0 && a.points[a.points.length - 1].z < 0 && (a.bearing < 3 || a.bearing > 357) && a.falls,
+    a.ok ? `bearing ${a.bearing.toFixed(1)}, heading ${a.heading.toFixed(1)}` : '');
+  check('…to the ring 20 m in from the patch\'s edge, both ways: 358 m of it',
+    a.ok && a.length > 340 && a.length < 370 && near(a.ring, 180), a.ok ? `${a.length.toFixed(1)} m` : '');
+  check('…and its slope is the bed\'s, 1:500, to 2%',
+    a.ok && near(a.slope, 0.002, 0.002 * 0.02) && FV.slopeRatio(a.slope) === '1:500', a.ok ? `${a.slope}` : '');
+
+  // The same fall, but the channel meanders: x = 50 sin(2πz / 250). The slope
+  // along the bed is the valley's over the sinuosity.
+  const bend = z => 50 * Math.sin(2 * Math.PI * z / 250);
+  const meander = patch(400, (x, z) => 100 + 0.002 * z - channel(x, z, bend(z)));
+  const m = FV.flowLine(meander);
+  const off = m.ok ? m.points.slice(Math.floor(m.points.length * 0.05), Math.ceil(m.points.length * 0.95)).map(p => Math.abs(p.x - bend(p.z))) : [];
+  check('a meander: the line keeps to the bed round every bend, where a straight one would climb the banks',
+    m.ok && m.stands && off.length && Math.max(...off) < 4 && m.sinuosity > 1.2, m.ok ? `worst ${Math.max(...off).toFixed(2)} m off, sinuosity ${m.sinuosity.toFixed(2)}` : JSON.stringify(m));
+  const fallM = m.ok ? 0.002 * (m.points[0].z - m.points[m.points.length - 1].z) : 0;
+  check('…and its slope is the fall along the bed over the length of the bed, not of the valley',
+    m.ok && m.falls && near(m.slope, fallM / m.length, (fallM / m.length) * 0.05) && m.slope < 0.0018,
+    m.ok ? `${m.slope} against ${fallM / m.length}` : '');
+
+  // A weir: a metre-high sill across the channel at z = 60. Theil–Sen is the
+  // median of the pairs' slopes, which a step moves little.
+  const weir = patch(400, (x, z) => 100 + 0.002 * z - channel(x, z, -20) + (Math.abs(z - 60) < 3 && Math.abs(x + 20) < 12 ? 1 : 0));
+  const w = FV.flowLine(weir);
+  check('a metre-high weir across it moves the slope less than 5%', w.ok && near(w.slope, 0.002, 0.0001), w.ok ? `${w.slope}` : JSON.stringify(w));
+
+  // A pool: the bed level from end to end, as LiDAR reads a pool's water.
+  const pool = FV.flowLine(patch(400, (x, z) => 100 - channel(x, z, -20)));
+  check('a pool, flat end to end: a channel, but one that falls too little to say which way',
+    pool.ok && pool.stands && !pool.falls && !pool.clear && pool.slope < 1e-6, JSON.stringify(pool.ok ? { slope: pool.slope, agree: pool.agree } : pool));
+
+  // No channel: a plane tilted 1:200 to the east.
+  const plane = FV.flowLine(patch(400, (x, z) => 100 - 0.005 * x));
+  check('a plane with no channel in it: traced, and said to have none standing out',
+    plane.ok && !plane.stands && !plane.clear, JSON.stringify(plane.ok ? plane.contrast : plane));
+
+  // Two channels: the gauge's 60 m reach a flat drain 1 m deep at x = 10, and
+  // the river, 4 m deep and falling 1:500, is at x = −100. Traced from the
+  // gauge the line follows the drain; from a point clicked on the river, the
+  // river — the lowest ground within the 12 m the twin gives a click.
+  const two = patch(400, (x, z) => 100 + 0.002 * z * (Math.abs(x + 100) < 30 ? 1 : 0) - channel(x, z, -100)
+    - 1 * Math.exp(-(((x - 10) / 3) ** 2)));
+  const drain = FV.flowLine(two), river = FV.flowLine(two, { from: { x: -97, z: 40 }, near: 12 });
+  check('from the gauge, the drain its 60 m reach; from a point clicked on the river, the river and its fall',
+    drain.ok && Math.abs(drain.start.cell.x - 10) < 3 && river.ok && Math.abs(river.start.cell.x + 100) < 3
+      && river.stands && river.falls && near(river.slope, 0.002, 0.0002),
+    JSON.stringify({ drain: drain.ok && drain.start.cell, river: river.ok && { start: river.start.cell, slope: river.slope } }));
+  check('nothing to trace on is said, not guessed', FV.flowLine({ elev: new Float32Array(9), n: 3, size: 4 }).ok === false
+    && FV.flowLine(patch(400, () => NaN)).ok === false);
+
+  // The two figures at a level: each Manning over its own depth, the one slope.
+  const at = FV.atLevel(102, { bed: 90, ground: 99, slope: 0.001, nChannel: 0.04, nPlain: 0.06 });
+  check('the two figures at a station: the channel over its bed, the station\'s ground at the floodplain\'s roughness',
+    near(at.channel.depth, 12) && near(at.channel.v, FV.manning(12, 0.001, 0.04).v) && near(at.ground.depth, 3)
+      && near(at.ground.v, FV.manning(3, 0.001, 0.06).v) && at.ground.v < at.channel.v, JSON.stringify(at));
+  check('…and the ground over the water is dry, not slow', FV.atLevel(98, { bed: 90, ground: 99, slope: 0.001, nChannel: 0.04, nPlain: 0.06 }).ground.v === 0);
+  check('a slope is held between 1:10,000 and 1:50 wherever it came from',
+    FV.bound(0.00001).used === FV.SLOPE_MIN && FV.bound(0.00001).bounded && FV.bound(0.1).used === FV.SLOPE_MAX && !FV.bound(0.001).bounded);
+
+  // The bands, and the copies of their colours in styles.css.
+  check('the speed bands: under 0.5, by halves to 2, 2–3, and 3 and over',
+    JSON.stringify(FV.SPEEDS.map((_, i) => FV.speedBandWords(i))) === JSON.stringify(['under 0.5', '0.5–1', '1–1.5', '1.5–2', '2–3', '3 and over'])
+      && FV.speedBand(0) === 0 && FV.speedBand(0.499) === 0 && FV.speedBand(0.5) === 1 && FV.speedBand(2.999) === 4 && FV.speedBand(3) === 5 && FV.speedBand(40) === 5);
+  const css = fs.readFileSync(repo('styles.css'), 'utf8');
+  const tokenOk = FV.SPEEDS.every(b => new RegExp(`${b.token}:\\s*${b.hex}\\b`, 'i').test(css));
+  check('…their colours are the --flood-speed-* tokens in styles.css, one blue paling to deep',
+    tokenOk && FV.SPEEDS.every((b, i) => i === 0 || parseInt(b.hex.slice(1), 16) !== parseInt(FV.SPEEDS[i - 1].hex.slice(1), 16)),
+    FV.SPEEDS.map(b => `${b.token} ${b.hex}`).join(', '));
+
+  // Chow's table: the card's two defaults are rows of it, in its words.
+  const ch = FV.ROUGHNESS.channel, fp = FV.ROUGHNESS.floodplain;
+  check('the roughness tables are Chow\'s, the card\'s defaults among them in its words',
+    FV.roughnessWords('channel', 0.04) === 'clean and winding, some pools and shoals'
+      && FV.roughnessWords('floodplain', 0.06) === 'light brush and trees'
+      && FV.SETTINGS.every(t => FV.ROUGHNESS[t.key].some(r => r.n === t.n)) && FV.roughnessWords('channel', 0.0423) === null);
+  check('…every n inside the bounds 0033 holds manning_n to, and in order',
+    [ch, fp].every(t => t.every((r, i) => r.n >= FV.N_MIN && r.n <= FV.N_MAX && (i === 0 || r.n > t[i - 1].n)))
+      && /manning_n between 0\.01 and 0\.3/.test(SQL) && FV.N_MIN === 0.01 && FV.N_MAX === 0.3);
+}
+
 async function openStations(browser, server, errors, contextOpts) {
   const context = await browser.newContext(contextOpts);
   const page = await context.newPage();
@@ -149,6 +252,7 @@ async function openStations(browser, server, errors, contextOpts) {
 async function main() {
   const FV = loadModule();
   arithmetic(FV);
+  twinArithmetic(FV);
 
   // Picked from the file, so the checks follow the data: a station whose sheet
   // point is far from its own, one with a slope from a neighbour, one with an
@@ -160,8 +264,11 @@ async function main() {
   const none = STATIONS.find(s => !s.aep_levels && s.lat != null);
 
   log('\nThe copies agree\n');
+  // 701 the ingest attaches, and since the snapshot of 2026-10-08 Proposed
+  // Gatton Auto, the proposal beside Gatton, with Gatton's.
   const n = STATIONS.filter(s => s.aep_levels).length;
-  check('stations.json carries the AEP rows the ingest attaches (701 stations)', n === 701, String(n));
+  check('stations.json carries the AEP rows the ingest attaches (701 stations), and the proposal beside Gatton its own copy',
+    n === 702 && STATIONS.find(s => s.id === 'proposed_gatton_auto').aep_levels.length === 1, String(n));
 
   const server = await startServer();
   const browser = await launchBrowser();
@@ -189,9 +296,11 @@ async function main() {
       showStationCard(id);
       const card = document.getElementById('stn-card');
       const sect = card.querySelector('.stn-card-aep');
-      const top = [...card.querySelector('.acma-card-head + .acma-sect').children];
-      const wind = top.findIndex(e => e.textContent.trim().startsWith('Wind region'));
       const vel = card.querySelector('.stn-card-vel');
+      // The rows round the velocity's own: the card has grown sections ahead
+      // of this one (the owner's), so it is found by the row it holds.
+      const top = vel ? [...vel.parentElement.children] : [];
+      const wind = top.findIndex(e => e.textContent.trim().startsWith('Wind region'));
       return {
         section: !!sect,
         head: sect ? sect.querySelector('.stn-card-rhs-head').textContent.trim() : '',

@@ -5,8 +5,9 @@ from the best public elevation model there is, the aerial imagery draped over
 it, a **2 m × 300 mm pole** where the station stands and a **1.75 m figure**
 beside it for scale. Orbit it, look straight down on it, or walk about in it
 at eye height; click the ground for its height; watch the station's flood
-levels rise over it as water; and download the whole scene as a `.glb` that
-Blender opens in one step.
+levels rise over it as water, coloured by the level it has passed or by its
+speed; and download the whole scene as a `.glb` that Blender opens in one
+step.
 
 It is `digital-twin.js`, drawn **inside the Stations map** (`map-twin.js`
 hosts it: the map offers it from zoom 17, and the 🧊 pill on the card of every
@@ -1082,6 +1083,116 @@ are, how far off, and that they are a guide, not a model — and **change** or
 **stop** is on the line. A new choice, or stopping, takes every note the last
 one brought with it.
 
+## Flood velocity
+
+The station card's indicative flood velocity (`flood-velocity.js`: Manning's
+equation, V = (1/n)·R^⅔·S^½, R taken as the depth, held to critical flow) is
+worked out again in the twin on the ground the twin can see, in the **Flood
+velocity** panel of the 🧊 pane, with every assumption the operator's to
+change. The card's *How the velocity is worked out* has a way in: **🧊 Work it
+out in the digital twin** opens the station's twin with the water coloured by
+its speed, the flow line drawn and the pane at the panel.
+
+**At the station** the panel gives two figures for the water on screen, and
+they move with it as it rises — *in the channel by the gauge*, over the twin's
+0 m (the gauge zero where it sits at the channel, else the lowest ground
+within 60 m; the panel says which), and *at the station's ground*, the twin's
+height at the pin. Those are the card's channel and floodplain, measured on
+this ground rather than on the sheet's one ground height, which can be at a
+point 29 km away. *At every level* tables both for each level the water is
+drawn at (the classes, the AEP levels, the floods recorded), each level a
+button that holds the water there, and the panel ends with the card's own
+figures for comparison.
+
+**The assumptions**, each kept for that station for the session — nothing is
+saved to the station, and the panel says to enter on the AEP row in the
+station editor whatever should stand; **Back to the card's assumptions** drops
+them all:
+
+- **Slope**: the card's (the sheets' same-stream figure, or the default for
+  the ground height, said as the card says it); the flow line's (below); or
+  one entered, *1:N*. Whichever it is is held between 1:10,000 and 1:50, and
+  the panel says when it was.
+- **Roughness**, Manning's n for the channel and for the floodplain, each a
+  row of Chow's table (*Open-Channel Hydraulics*, 1959, table 5-6, the
+  "normal" values): a channel from *clean and straight, full stage* (0.030)
+  through the card's *clean and winding, some pools and shoals* (0.040) to
+  *very weedy, deep pools, or a floodway with heavy timber* (0.100); a
+  floodplain from *short pasture* (0.030) through the card's *light brush and
+  trees* (0.060) to *dense willows* (0.150). A roughness the station records
+  for its setting (`manning_n`) is where its own setting starts.
+
+**Coloured by speed.** *Colour the water by its speed* (a setting, kept like
+the others) gives every sample of the water the same equation with its own
+depth — the level less the ground there — and the channel's roughness where
+it is under water before the river reaches the station's own feet (its fill
+level below the ground at the pin), the floodplain's elsewhere. That is how a
+one-dimensional model shares a cross-section's flow among its slices — one
+slope, each strip its own depth and roughness — laid over the patch, and no
+more than that: no momentum, no backwater, no direction. The bands are
+**under 0.5 m/s, 0.5–1, 1–1.5, 1.5–2, 2–3, and 3 and over**, one blue from
+pale to deep (`--flood-speed-*`, checked for even steps of lightness): a
+magnitude, so a single hue whose depth says more, never a rainbow. The water
+is drawn a little more opaque (0.8) so the colours read, a dry sample carries
+the palest band so the water's filtered edge fades to slow water as it should,
+and a key stands at the stage's foot on the left, above the hint: the bands in
+a bar, the speed in the channel by the gauge beside its title (*gauge ≈ 2.4*)
+and a mark over the band it is in. The scale on the right still colours its
+track by the levels passed. A speed band says nothing of hazard, which is
+depth and speed together: this is not a flood map or a hazard map, and the
+caveat along the stage's foot stays.
+
+**The flow line.** A line through the station parallel to the flow is the
+obvious thing to read a slope along, and on real ground a straight one fails
+more often than it works: a river bends inside 400 m, the station stands 20 to
+100 m from the channel, and a straight line out of a bend climbs the valley
+side. So the line follows the channel (`FloodVelocity.flowLine`): the path of
+least cost from the channel by the gauge out to the patch's edge both ways,
+where a step costs more the higher it stands above the lowest ground within
+20 m of it, and above where the line began. That keeps it on the bed of
+whatever channel the gauge is in, round every bend. Its two ends are the two
+cheapest places it reaches on a ring near the patch's edge, at least 100°
+apart seen from where it started; the lower end is downstream. The slope is
+the median of the slopes between pairs of points along it (Theil–Sen), which
+a bridge deck, a weir or a pool's flat water moves little. Drawn (*Draw it on
+the ground, with arrows downstream*, a setting), it is a white ribbon cased in
+near-black with eight arrowheads, riding on the water wherever the water is
+over it; the panel has its profile — the ground along it from the upstream end
+to the downstream, the fitted slope dashed, the gauge marked, and a pointer
+reading off any point.
+
+Two things the line says about itself:
+
+- **No channel stands out** when, at either end, reaching the ring there cost
+  less than twice what a metre of the ring typically costs. The usual reason
+  is the gauge's 60 m reaching a drain or a gully rather than its river — at
+  Waterford and Beenleigh it does. **Trace from the point clicked** traces it
+  again from the lowest ground within 12 m of the last point clicked on the
+  ground: click the river, then press it. **Trace from the gauge** puts it
+  back.
+- **It falls too little to tell** when fewer than 60% of its pairs of points
+  agree which way it falls — a pool, whose flat water the LiDAR reads as
+  ground.
+
+**What the ground can and cannot say.** LiDAR does not see through water: in a
+pool its "bed" is the water surface on the day it was flown, flat between
+riffles. Measured at 27 Queensland stations against the slope the sheets'
+modelled 1% AEP flood surface gives between same-stream gauges, the line's
+slope was within a factor of two of the sheets' at 9 of 24 over a 400 m patch
+— Gatton's reads 1:5,000 against the sheets' 1:580 — and at 17 of 27 over a
+1,600 m one, 13 of the 20 there that it calls clear. The card's default for
+the ground height is within a factor of two at 57% of the rows that have a
+sheet slope. So the line's slope is offered beside the card's, never in its
+place, the panel says how long a reach it was read over, and on a patch under
+1,600 m it offers **Read it over 1,600 m**, which rebuilds the twin on the
+widest patch. Tracing it costs about 50 ms on a 201 × 201 ground.
+
+**What it is not.** R is the depth, so a deep, narrow channel reads fast — the
+card's own caution above 5 m/s — and there is no cross-section, no
+discharge, no flow direction off the line, and one level surface through the
+patch. It is the card's equation with the twin's ground under it. None of it is
+in the `.glb`.
+
 ## The Ground truth panel
 
 Side by side: the station's recorded height (surveyed, or modelled with its
@@ -1243,4 +1354,11 @@ not the wall's — SwiftShader draws a handful of frames a second, so what is
 asserted is that each frame puts the water where the cycle says for the
 moment it was drawn; and the pause, the pill, hiding it, the Stations map's
 line (and on a phone its pill), reduced motion, an assumed-datum zero, and
-nothing of it in the `.glb`.
+nothing of it in the `.glb`. The flood velocity is held on the same valley:
+the two figures at the station are the module's own, the water coloured by
+speed is read texel by texel through the plane's UVs against each sample's
+own depth and roughness, and the flow line, the roughness, the slope entered,
+the trace from a clicked point and the way in from the station card are each
+driven for real. `npm run floodlevels` holds `FloodVelocity.flowLine` under
+Node on patches of the twin's own shape — a straight channel, a meander, a
+weir, a pool, a plane, and a drain against a river.

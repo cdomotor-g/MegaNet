@@ -12,8 +12,10 @@
 //                  editor.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for esc, escAttr and acmaHaversineKm, and across to
-// flood-velocity.js for FloodVelocity. Two files reach into this one: app.js,
+// Reaches back to core.js for esc, escAttr and acmaHaversineKm, across to
+// flood-velocity.js for FloodVelocity, and to digital-twin.js for
+// DigitalTwin.openVelocity (from an inline handler on the velocity's
+// workings, so only when pressed). Two files reach into this one: app.js,
 // whose stnCardHtml() places cardHtml(), aepCardHtml() and velocityRowHtml(),
 // and station-editor.js, whose
 // editorForm() places editorHtml() and whose editorReadForm()/editorSave() call
@@ -597,8 +599,9 @@ const RiverDetails = (function () {
   }
 
   // The workings, as sentences rather than label/value rows: they are read,
-  // not scanned, and a right-aligned paragraph is hard to read.
-  function workings(est) {
+  // not scanned, and a right-aligned paragraph is hard to read. `s` is the
+  // station, for the way to its twin.
+  function workings(est, s) {
     const sl = est.slope;
     const bounded = sl.bounded
       ? ` — read as ${FloodVelocity.slopeRatio(sl.used)}, the ${sl.used === FloodVelocity.SLOPE_MIN ? 'flattest' : 'steepest'} this uses`
@@ -623,6 +626,12 @@ const RiverDetails = (function () {
     }
     if (!est.recorded) {
       lines.push(line('Setting', 'Not recorded, so both are given. Set it on the AEP row in the station editor to keep one.'));
+    }
+    // The way to the same equation on the station's own ground, where every
+    // one of these assumptions can be changed and the water is coloured by it.
+    if (s && s.lat != null && s.lon != null && typeof DigitalTwin !== 'undefined' && DigitalTwin.openVelocity) {
+      lines.push(line('On the ground', `<button type="button" class="link-btn" onclick="DigitalTwin.openVelocity('${escAttr(s.id)}')">🧊 Work it out in the digital twin</button> `
+        + esc('— the slope along the channel, the roughness by what the site looks like, and the water coloured by its speed.')));
     }
     return `<details class="stn-card-rhs-earlier stn-card-aep-how">
           <summary class="small">How the velocity is worked out</summary>
@@ -665,7 +674,7 @@ const RiverDetails = (function () {
               title="Modelled water levels at the station in the 1%, 0.5%, 0.2% and 0.066% annual exceedance probability floods, in metres AHD">Flood levels (AEP)</span>
         <span class="stn-card-rhs-snap mn-pop-note">Modelled — indicative${src ? ` · ${esc(src)}` : ''}</span>
         ${rows.join('')}
-        ${est ? velocityBlock(est) + workings(est) : ''}
+        ${est ? velocityBlock(est) + workings(est, s) : ''}
         ${others.length ? `<details class="stn-card-rhs-earlier">
           <summary class="small">Other sheets — ${others.length}</summary>
           ${others.map(r => row(r.as_at ? date(r.as_at) : 'Undated', esc(summaryText('aep_levels', r)))).join('')}

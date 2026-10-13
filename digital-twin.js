@@ -239,6 +239,7 @@ const DigitalTwin = (function () {
     photoNear: -1,         // the spot the POV visitor is standing at, or −1
     focusPhotoId: null,    // a photo to stand the camera behind once the markers are up (the viewer's "In the twin")
     flood: null,           // the flood water: { lad, start, top, seed, fill, level, band, … } — see buildFlood
+    vel: null,             // the flow line: { line: FloodVelocity.flowLine(…), from: 'gauge' | 'picked' } — see "the flood velocity"
     infoOpen: true,        // the lines over the stage: open, or folded under the bar
     infoPinned: false,     // the operator pressed the fold: it stays as they left it
     infoFor: null,         // the station the fold was last opened for — a new one opens it again
@@ -271,7 +272,8 @@ const DigitalTwin = (function () {
     neighbours: null, // the other stations in the patch, built
     bridges: null,    // the bridges' decks
     sharp: null,      // the sharp drape round the station or the pin: { mesh, x, z, mpp }
-    flood: null,      // the flood water and its staff: { water, staff, tex, data, mat, palette }
+    flood: null,      // the flood water and its staff: { water, staff, tex, data, mat, palette, speed }
+    flowLine: null,   // the flow line's ribbons and arrowheads
     off: [],          // listener removers
   };
 
@@ -295,9 +297,11 @@ const DigitalTwin = (function () {
 
   // `floodAnim` null is "as the browser prefers": animated, unless it asks for
   // reduced motion. `floodHold` is where still water stands — a level's key,
-  // or a fraction of the way from 0 m to the top.
+  // or a fraction of the way from 0 m to the top. `waterColour` is what the
+  // water's colour says — the level it has passed, or its speed — and
+  // `flowLine` whether the flow line is drawn (see "the flood velocity").
   const DEFAULTS = { size: 400, exag: 1, imagery: true, figure: true, label: true, wire: false, horizon: true,
-                     flood: true, floodAnim: null, floodHold: null, fitBridges: true };
+                     flood: true, floodAnim: null, floodHold: null, fitBridges: true, waterColour: 'level', flowLine: false };
 
   function loadSettings() {
     let s = {};
@@ -306,7 +310,8 @@ const DigitalTwin = (function () {
     if (SIZES.includes(Number(s.size))) out.size = Number(s.size);
     const ex = Number(s.exag);
     if (isFinite(ex) && ex >= 1 && ex <= 3) out.exag = ex;
-    for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon', 'flood', 'fitBridges']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon', 'flood', 'fitBridges', 'flowLine']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    if (s.waterColour === 'speed' || s.waterColour === 'level') out.waterColour = s.waterColour;
     if (typeof s.floodAnim === 'boolean') out.floodAnim = s.floodAnim;
     if ((typeof s.floodHold === 'number' && s.floodHold >= 0 && s.floodHold <= 1) || (typeof s.floodHold === 'string' && s.floodHold)) out.floodHold = s.floodHold;
     return out;
@@ -1029,6 +1034,7 @@ const DigitalTwin = (function () {
     removeHorizon();
     removePhotoMarkers();
     removeFlood();
+    removeFlowLine();
     removeMovePin();
     removeNeighbours();
     removeBridges();
@@ -4507,6 +4513,7 @@ void main() {
       sc.scene.remove(sc.flood.water); sc.scene.remove(sc.flood.staff);
       disposeObject(sc.flood.water); disposeObject(sc.flood.staff);
       if (sc.flood.tex) sc.flood.tex.dispose();
+      if (sc.flood.speed) sc.flood.speed.tex.dispose();
     }
     sc.flood = null;
   }
@@ -4539,6 +4546,7 @@ void main() {
     if (!lad.levels.length || lad.top == null) {
       tw.flood = { lad, none: true, notes, own };
       refreshFloodLine();
+      refreshVelPanel();
       return notes;
     }
     const start = FloodStages.start(lad, seed ? seed.elev : null);
@@ -4558,7 +4566,9 @@ void main() {
                  fit, logK, curve: FloodStages.curve(start.m, lad.top, logK), scaleChosen: !!chose, scaleAutoDone: false };
     if (sc.scene && THREE) { makeFlood(); buildTowerMarks(); }
     settleFlood();
+    applyWaterColour();
     refreshFloodLine();
+    refreshVelPanel();
     return notes;
   }
 
@@ -4771,6 +4781,7 @@ void main() {
     sc.flood.water.visible = on;
     sc.flood.staff.visible = on;
     if (sc.towerMarks) sc.towerMarks.visible = on;
+    placeFlowLine();
     requestFrame();
   }
 
@@ -4915,10 +4926,12 @@ void main() {
     if (sc.flood) {
       sc.flood.water.position.y = floodY(L);
       if (F.maskLevel == null || Math.abs(L - F.maskLevel) >= 0.01 || key !== F.bandKey) floodMask(L);
-      if (key !== F.bandKey) {
+      // Coloured by speed, the colour is the texture's and stays white.
+      if (key !== F.bandKey && !(speedOn() && sc.flood.mat.map)) {
         sc.flood.mat.color.set(FloodStages.colourOf(band, sc.flood.palette));
         sc.flood.mat.opacity = band ? FLOOD_ALPHA.level : FLOOD_ALPHA.below;
       }
+      if (sc.flowLine && sc.flowLine.visible) placeFlowLine();
     } else if (F.fill) {
       let n = 0;
       for (let i = 0; i < F.fill.length; i++) if (F.fill[i] < L) n++;
@@ -4951,6 +4964,7 @@ void main() {
     sc.flood.tex.needsUpdate = true;
     F.maskLevel = L;
     F.flooded = n;
+    if (speedOn() && sc.flood.mat.map) paintSpeed(L);
   }
 
   // Where still water stands: the level chosen, else the top.
@@ -5143,6 +5157,7 @@ void main() {
       // Up: its names are too, for their few seconds on a phone.
       if (on) scaleNamesShow();
     }
+    syncSpeedKey();
     if (!on) return;
     // Up, and untouched: in a few seconds, logarithmic if the levels warrant it.
     armScaleAuto();
@@ -5438,6 +5453,7 @@ void main() {
     if (out) out.textContent = F && !F.none && F.level != null ? `${F.level.toFixed(2)} m AHD` : '';
     syncFloodPill();
     syncFloodScale();
+    syncVelReading();
   }
 
   // The panel's controls, where the setting changed somewhere else (the line).
@@ -5488,6 +5504,571 @@ void main() {
           </label>
           <p class="small twin-borrow-line" id="twin-borrow-line">${borrowLineHtml()}</p>
         </fieldset>`;
+  }
+
+  // ── the flood velocity ─────────────────────────────────────────────────────
+  // The station card's indicative velocity (flood-velocity.js), worked out
+  // again on the ground the twin can see, with every assumption the
+  // operator's to change for the session — and the water coloured by it.
+  //
+  // At the station, for whatever level the water is at: Manning's equation,
+  // wide flow, held to critical, twice — in the channel by the gauge, over the
+  // twin's 0 m (the gauge zero where it sits at the channel, else the lowest
+  // ground within FLOOD_SEED_M; FloodStages.start says which), and at the
+  // station's own ground, the twin's at the pin. Those are the card's two
+  // settings, measured on this ground rather than on the sheet's one number,
+  // which can be a point 29 km off. The slope is the card's to begin with —
+  // the sheets' same-stream figure, or the default for the ground height —
+  // and can be the flow line's (below) or one entered here. The roughness is
+  // the card's, n 0.040 in the channel and 0.060 on the floodplain unless the
+  // station records one, and either can be any row of Chow's table.
+  //
+  // Coloured by speed, every sample of the water gets the same equation with
+  // its own depth: the level less the ground there, and the channel's
+  // roughness where the sample is under water before the river reaches the
+  // station's own feet (its fill level below the ground at the pin), the
+  // floodplain's elsewhere. That is how a one-dimensional model shares a
+  // cross-section's flow among its slices — one slope, each strip its own
+  // depth and roughness — laid over the patch, and it is no more than that:
+  // no momentum, no backwater, the water going whichever way the ground
+  // falls. A second DataTexture beside the mask, the band colour of each
+  // sample's speed (FloodVelocity.SPEEDS); the mask still cuts the water, so
+  // the dry ground under the colours never shows, and a dry texel carries
+  // the slowest band so the filtered edge fades to slow water, as it is.
+  //
+  // The flow line is FloodVelocity.flowLine on the twin's own ground, from
+  // the channel by the gauge — or from a point the operator clicked, for a
+  // gauge whose 60 m reaches a drain rather than its river. Drawn, it is a
+  // white ribbon with arrowheads downstream, cased dark so it reads on the
+  // imagery and on the water alike, riding on the water where the water is
+  // over it. Its slope is read over the patch as built, so a 400 m patch
+  // gives a short reach (and a pooled one reads flat); the panel says how
+  // long, and offers the 1,600 m patch.
+  //
+  // Nothing of it is saved to the station: the choices are kept per station
+  // for the session, like borrowed levels, and the panel says to enter on the
+  // AEP row whatever should stand. The colouring and the line's visibility
+  // are settings (`waterColour`, `flowLine`), kept like the rest. Not in the
+  // .glb.
+  const SPEED_ALPHA = 0.8;          // the water's opacity coloured by speed — the colours are the reading
+  const LINE_LIFT_M = 0.08;         // the flow line over the ground, or over the water, metres
+  const LINE_PICK_NEAR = 12;        // m: a clicked start takes the lowest ground this close to the click
+  const LINE_ARROWS = 8;            // arrowheads along the line
+  const velChoices = new Map();     // station id → { slope, entered, nChannel, nPlain, from }
+
+  function velChoice(st) {
+    if (!st) return { slope: null, entered: null, nChannel: null, nPlain: null, from: null };
+    if (!velChoices.has(st.id)) velChoices.set(st.id, { slope: null, entered: null, nChannel: null, nPlain: null, from: null });
+    return velChoices.get(st.id);
+  }
+
+  // The ground at the pin, m AHD — the station's own feet.
+  function velGround() { return tw.ground ? heightAt(0, 0) : null; }
+
+  // The channel's bed: the twin's 0 m where there is water, else the channel
+  // by the gauge.
+  function velBed() {
+    const F = tw.flood, g = tw.ground;
+    if (!g) return null;
+    if (F && !F.none && F.start != null) return { m: F.start, basis: F.startBasis };
+    const seed = floodSeed(g);
+    return seed ? { m: seed.elev, basis: `the lowest ground within ${FLOOD_SEED_M} m of the gauge` } : null;
+  }
+
+  // The card's slope: its estimate's where the station has an AEP row, else
+  // the default for the twin's ground at the pin.
+  function cardSlope(st) {
+    const est = st ? FloodVelocity.estimate(st) : null;
+    if (est) return { raw: est.slope.raw, used: est.slope.used, bounded: est.slope.bounded, source: 'card',
+                      assumed: est.slope.source === 'default', words: est.slope.basis };
+    const g = velGround();
+    const d = g != null ? FloodVelocity.defaultSlope(g) : null;
+    if (d == null) return null;
+    return { ...FloodVelocity.bound(d), source: 'default', assumed: true, words: FloodVelocity.defaultWords(g) };
+  }
+
+  function lineOk() { return !!(tw.vel && tw.vel.line && tw.vel.line.ok); }
+
+  // The slope in force: chosen, else the card's.
+  function velSlope(st) {
+    const c = velChoice(st);
+    if (c.slope === 'line' && lineOk()) {
+      return { ...FloodVelocity.bound(tw.vel.line.slope), source: 'line', assumed: false, words: lineSlopeWords(tw.vel.line) };
+    }
+    if (c.slope === 'entered' && c.entered > 0) {
+      return { ...FloodVelocity.bound(c.entered), source: 'entered', assumed: false, words: 'entered here, for this session' };
+    }
+    return cardSlope(st);
+  }
+
+  // A roughness in force: chosen here, else the station's own for its
+  // recorded setting, else the card's default.
+  function velN(st, key) {
+    const c = velChoice(st), own = key === 'channel' ? c.nChannel : c.nPlain;
+    if (own != null) return { n: own, source: 'here' };
+    const row = st ? FloodVelocity.pickRow(st) : null;
+    const rec = row && row.setting === key && row.manning_n != null && isFinite(Number(row.manning_n)) ? Number(row.manning_n) : null;
+    if (rec != null) return { n: rec, source: 'station' };
+    return { n: FloodVelocity.SETTINGS.find(t => t.key === key).n, source: 'default' };
+  }
+
+  // Everything the equation takes, for the station on screen, or null.
+  function velInputs() {
+    const st = currentStation(), bed = velBed(), ground = velGround(), slope = st && velSlope(st);
+    if (!st || !bed || ground == null || !slope) return null;
+    return { st, bed, ground, slope, nChannel: velN(st, 'channel'), nPlain: velN(st, 'floodplain') };
+  }
+
+  function velAt(level) {
+    const a = velInputs();
+    if (!a || level == null) return null;
+    return FloodVelocity.atLevel(level, { bed: a.bed.m, ground: a.ground, slope: a.slope.used, nChannel: a.nChannel.n, nPlain: a.nPlain.n });
+  }
+
+  function speedText(v) { return v > 0 ? `≈ ${FloodVelocity.speed(v)} m/s` : 'dry'; }
+
+  // ── the water, coloured by speed ──
+  function hexRgb(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+    const v = m ? parseInt(m[1], 16) : 0;
+    return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+  }
+  function speedColours() { return FloodVelocity.SPEEDS.map(b => cssVar(b.token, b.hex) || b.hex); }
+  function speedOn() { return S().waterColour === 'speed'; }
+
+  // The colour texture, one texel per sample in the mask's own order, so the
+  // plane's UVs that sample the one sample the other.
+  function speedTex() {
+    if (!sc.flood.speed) {
+      const data = new Uint8Array(N * N * 4);
+      const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+      tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      // The bands' colours, read once: one set for both themes.
+      sc.flood.speed = { tex, data, level: null, rgb: speedColours().map(hexRgb) };
+    }
+    return sc.flood.speed;
+  }
+
+  // The colour texture for a level: each wet sample its speed's band, each dry
+  // one the slowest. Kept beside the mask (sc.flood.speed).
+  function paintSpeed(L) {
+    const F = tw.flood, g = tw.ground, a = velInputs();
+    if (!F || F.none || !sc.flood || !g || !a || L == null) return;
+    const sp = speedTex(), d = sp.data, fill = F.fill, e = g.elev, rgb = sp.rgb;
+    const root = Math.sqrt(a.slope.used), kc = root / a.nChannel.n, kp = root / a.nPlain.n, bank = a.ground;
+    const edges = FloodVelocity.SPEEDS.map(b => (b.below == null ? Infinity : b.below));
+    for (let i = 0, o = 0; i < N * N; i++, o += 4) {
+      let band = 0;
+      if (fill && fill[i] < L && isFinite(e[i])) {
+        const depth = L - e[i];
+        if (depth > 0) {
+          let v = (fill[i] < bank ? kc : kp) * Math.cbrt(depth * depth);
+          const crit = Math.sqrt(9.81 * depth);
+          if (v > crit) v = crit;
+          while (v >= edges[band]) band++;
+        }
+      }
+      const c = rgb[band];
+      d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+    }
+    sp.tex.needsUpdate = true;
+    sp.level = L;
+  }
+
+  // The water's look for the setting: its band colour, or white under the
+  // speed texture, and the opacity that goes with each.
+  function applyWaterColour() {
+    const F = tw.flood;
+    if (!F || F.none || !sc.flood) return;
+    const m = sc.flood.mat;
+    if (speedOn() && velInputs()) {
+      const sp = speedTex();
+      if (F.level != null) paintSpeed(F.level);
+      if (m.map !== sp.tex) { m.map = sp.tex; m.needsUpdate = true; }
+      m.color.set(0xffffff);
+      m.opacity = SPEED_ALPHA;
+    } else {
+      if (m.map) { m.map = null; m.needsUpdate = true; }
+      m.color.set(FloodStages.colourOf(F.band, sc.flood.palette));
+      m.opacity = F.band ? FLOOD_ALPHA.level : FLOOD_ALPHA.below;
+    }
+    syncSpeedKey();
+    requestFrame();
+  }
+
+  // ── the flow line, traced and drawn ──
+  function traceFlowLine(st) {
+    tw.vel = { line: null, from: null };
+    const g = tw.ground;
+    if (!g || !st || typeof FloodVelocity === 'undefined' || !FloodVelocity.flowLine) return;
+    const c = velChoice(st), seed = floodSeed(g);
+    const step = g.size / (N - 1);
+    const from = c.from || (seed ? { x: seed.x, z: seed.z } : { x: 0, z: 0 });
+    tw.vel.from = c.from ? 'picked' : 'gauge';
+    tw.vel.line = FloodVelocity.flowLine({ elev: g.elev, n: N, size: g.size },
+                                        { from, near: c.from ? LINE_PICK_NEAR : seed ? step / 2 : FLOOD_SEED_M });
+  }
+
+  function removeFlowLine() {
+    if (sc.flowLine) {
+      if (sc.flowLine.parent) sc.flowLine.parent.remove(sc.flowLine);
+      disposeObject(sc.flowLine);
+    }
+    sc.flowLine = null;
+  }
+
+  // The ribbons and the arrowheads, as geometry whose heights placeFlowLine
+  // sets: a dark edge under a white core, both a strip along the line.
+  function makeFlowLine() {
+    removeFlowLine();
+    if (!lineOk() || !sc.scene || !THREE || !tw.ground) return;
+    const L = tw.vel.line, pts = L.points, g = tw.ground;
+    const core = Math.max(0.4, g.size * 0.0015), edge = core * 1.9, arrow = core * 5;
+    const grp = new THREE.Group();
+    grp.name = 'flow line group';
+    const along = i => {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+      const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz) || 1;
+      return { tx: dx / len, tz: dz / len };
+    };
+    const strip = (w, colour, order, name) => {
+      const pos = new Float32Array(pts.length * 2 * 3), idx = [];
+      const base = [];
+      for (let i = 0; i < pts.length; i++) {
+        const { tx, tz } = along(i);
+        base.push(pts[i].x - tz * w / 2, pts[i].z + tx * w / 2, pts[i].x + tz * w / 2, pts[i].z - tx * w / 2);
+        if (i) { const k = 2 * i; idx.push(k - 2, k - 1, k, k - 1, k + 1, k); }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setIndex(idx);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: colour, side: THREE.DoubleSide,
+        polygonOffset: true, polygonOffsetFactor: -2 - order, polygonOffsetUnits: -2 - order }));
+      mesh.name = name;
+      mesh.renderOrder = 3 + order;
+      mesh.userData.xz = base;
+      grp.add(mesh);
+    };
+    const ink = cssVar('--twin-flow-edge', '#10202a') || '#10202a', white = cssVar('--twin-flow', '#ffffff') || '#ffffff';
+    strip(edge, ink, 0, 'flow line edge');
+    strip(core, white, 1, 'flow line');
+    // Arrowheads every eighth of the way, pointing downstream (the points run
+    // from the upstream end): a dark one with a white one on it.
+    const heads = (size, colour, order, name) => {
+      const xz = [], at = [];
+      for (let k = 1; k <= LINE_ARROWS; k++) {
+        const s = (k - 0.5) * L.length / LINE_ARROWS;
+        let i = 0;
+        while (i < pts.length - 1 && pts[i].s < s) i++;
+        const { tx, tz } = along(i), p = pts[i];
+        xz.push(p.x + tx * size, p.z + tz * size,
+                p.x - tx * size * 0.5 - tz * size * 0.7, p.z - tz * size * 0.5 + tx * size * 0.7,
+                p.x - tx * size * 0.5 + tz * size * 0.7, p.z - tz * size * 0.5 - tx * size * 0.7);
+        at.push(i);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(xz.length / 2 * 3), 3));
+      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: colour, side: THREE.DoubleSide,
+        polygonOffset: true, polygonOffsetFactor: -4 - order, polygonOffsetUnits: -4 - order }));
+      mesh.name = name;
+      mesh.renderOrder = 5 + order;
+      mesh.userData.xz = xz;
+      grp.add(mesh);
+    };
+    heads(arrow * 1.35, ink, 0, 'flow arrow edge');
+    heads(arrow, white, 1, 'flow arrow');
+    grp.traverse(o => { o.userData.export = false; });
+    grp.visible = !!S().flowLine;
+    sc.flowLine = grp;
+    sc.scene.add(grp);
+    placeFlowLine();
+  }
+
+  // Heights for the exaggeration and the water: on the ground, or on the
+  // water where the water is over it.
+  function placeFlowLine() {
+    if (!sc.flowLine) return;
+    const F = tw.flood;
+    const wet = F && !F.none && F.level != null && S().flood ? floodY(F.level) : -Infinity;
+    for (const mesh of sc.flowLine.children) {
+      const xz = mesh.userData.xz, pos = mesh.geometry.attributes.position;
+      const lift = LINE_LIFT_M * (mesh.name.startsWith('flow arrow') ? 1.5 : 1);
+      for (let i = 0; i < pos.count; i++) {
+        const x = xz[2 * i], z = xz[2 * i + 1];
+        pos.setXYZ(i, x, Math.max(yAt(x, z), wet) + lift, z);
+      }
+      pos.needsUpdate = true;
+      mesh.geometry.computeBoundingSphere();
+    }
+    sc.flowLine.visible = !!S().flowLine;
+    requestFrame();
+  }
+
+  // ── the words ──
+  function lineSlopeWords(L) {
+    const km = L.length >= 1000 ? `${(L.length / 1000).toFixed(1)} km` : `${Math.round(L.length)} m`;
+    return `the ground along the flow line, ${L.slope > 0 ? `${(L.slope * L.length).toFixed(2)} m of fall` : 'no fall'} over ${km} of channel`;
+  }
+
+  // The line's own sentence: where it starts, which way it runs, how long and
+  // how steep, and what can be trusted of it.
+  function lineWords() {
+    const v = tw.vel, L = v && v.line;
+    if (!L) return 'Not traced: there is no ground to trace it on.';
+    if (!L.ok) return `Not traced: ${L.why}.`;
+    const from = v.from === 'picked' ? 'from the point clicked' : `from the channel by the gauge (the lowest ground within ${FLOOD_SEED_M} m)`;
+    const km = L.length >= 1000 ? `${(L.length / 1000).toFixed(1)} km` : `${Math.round(L.length)} m`;
+    const parts = [`Traced along the lowest ground ${from}, ${km} to the patch's edge both ways, running ${Math.round(L.heading)}° (${compassWord(L.heading)}) past the station`
+      + `${L.sinuosity > 1.15 ? `, ${L.sinuosity.toFixed(2)} times the straight distance between its ends` : ''}.`];
+    parts.push(L.slope > 0 ? `It falls ${(L.slope * L.length).toFixed(2)} m: ${FloodVelocity.slopeRatio(L.slope)}.` : 'It does not fall along its length.');
+    if (tw.ground && tw.ground.source === 'srtm') parts.push('The ground here is the ~30 m tiles, where the channel a gauge sits in is not there: the line follows the valley floor at best.');
+    if (!L.stands) parts.push('No channel stands out from the ground round it here: the gauge\'s 60 m may reach a drain rather than its river. Click the river and trace from there.');
+    else if (!L.falls) parts.push('It falls too little over its length to say which way the water runs or how steeply — a pool\'s flat water, which LiDAR reads as ground.');
+    if (L.length < 1000) parts.push('A short reach: pools and riffles do not average out over it. The 1,600 m patch reads one four times as long.');
+    return parts.join(' ');
+  }
+
+  // ── the profile ──
+  // The ground along the line, upstream on the left: the ground as a 2 px
+  // line, the fit dashed, the gauge marked. Scaled to the ground alone — it
+  // is the fall the slope is read from, and water metres over it would flatten
+  // that to a line along the foot. A pointer over it reads off a point.
+  const PROF = { W: 320, H: 132, pl: 40, pr: 8, pt: 8, pb: 22 };   // the profile's box and margins, in its own units
+  function profileHtml() {
+    if (!lineOk()) return '';
+    const L = tw.vel.line, pts = L.points;
+    const { W, H, pl, pr, pt, pb } = PROF;
+    const hs = pts.map(p => p.h).filter(isFinite);
+    let lo = Math.min(...hs), hi = Math.max(...hs);
+    if (!(hi > lo)) { hi = lo + 1; }
+    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+    const x = s => pl + (s / L.length) * (W - pl - pr), y = h => pt + (1 - (h - lo) / (hi - lo)) * (H - pt - pb);
+    const every = Math.max(1, Math.ceil(pts.length / 240));
+    const line = pts.filter((_, i) => i % every === 0 || i === pts.length - 1).map(p => `${x(p.s).toFixed(1)},${y(p.h).toFixed(1)}`).join(' ');
+    const fit = `${x(0).toFixed(1)},${y(L.fit.intercept).toFixed(1)} ${x(L.length).toFixed(1)},${y(L.fit.intercept - L.fit.slope * L.length).toFixed(1)}`;
+    const g = x(L.start.s);
+    const label = `The ground along the flow line, ${Math.round(L.length)} m from its upstream end to its downstream end: from ${hs[0].toFixed(2)} to ${hs[hs.length - 1].toFixed(2)} m AHD, `
+      + `${FloodVelocity.slopeRatio(L.slope)} on the line fitted through it.`;
+    return `<figure class="twin-vel-prof">
+        <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escAttr(label)}" id="twin-vel-prof-svg"
+             onpointermove="DigitalTwin.velProfileAt(event)" onpointerleave="DigitalTwin.velProfileAt(null)">
+          <line class="twin-vel-prof-axis" x1="${pl}" y1="${H - pb}" x2="${W - pr}" y2="${H - pb}"/>
+          <text class="twin-vel-prof-tick" x="${pl - 4}" y="${(y(hi - pad) + 4).toFixed(1)}" text-anchor="end">${(hi - pad).toFixed(1)}</text>
+          <text class="twin-vel-prof-tick" x="${pl - 4}" y="${(y(lo + pad) + 4).toFixed(1)}" text-anchor="end">${(lo + pad).toFixed(1)}</text>
+          <text class="twin-vel-prof-tick" x="${pl}" y="${H - 6}">upstream</text>
+          <text class="twin-vel-prof-tick" x="${W - pr}" y="${H - 6}" text-anchor="end">downstream · ${Math.round(L.length)} m</text>
+          <polyline class="twin-vel-prof-fit" points="${fit}"/>
+          <polyline class="twin-vel-prof-ground" points="${line}"/>
+          <line class="twin-vel-prof-gauge" x1="${g.toFixed(1)}" y1="${pt}" x2="${g.toFixed(1)}" y2="${H - pb}"/>
+          <text class="twin-vel-prof-tick" x="${(g + 3).toFixed(1)}" y="${pt + 9}">gauge</text>
+          <line class="twin-vel-prof-cross" id="twin-vel-prof-cross" x1="0" y1="${pt}" x2="0" y2="${H - pb}" visibility="hidden"/>
+        </svg>
+        <figcaption class="small" id="twin-vel-prof-read">m AHD along the line; the dashed line is the slope fitted through it. Point at it to read it.</figcaption>
+      </figure>`;
+  }
+
+  // ── the panel ──
+  function nOptions(key, cur) {
+    const rows = FloodVelocity.ROUGHNESS[key];
+    const has = rows.some(r => Math.abs(r.n - cur.n) < 1e-9);
+    const def = FloodVelocity.SETTINGS.find(t => t.key === key).n;
+    return (has ? '' : `<option value="${cur.n}" selected>${cur.n.toFixed(3)} — ${cur.source === 'station' ? 'entered on the station' : 'entered'}</option>`)
+      + rows.map(r => `<option value="${r.n}" ${Math.abs(r.n - cur.n) < 1e-9 ? 'selected' : ''}>${r.n.toFixed(3)} — ${esc(r.words)}${Math.abs(r.n - def) < 1e-9 ? ' (the card\'s)' : ''}</option>`).join('');
+  }
+
+  function velPanelHtml() {
+    const st = currentStation();
+    const head = `<div class="panel-header"><h2>Flood velocity <span class="small txt-muted">indicative</span></h2></div>`;
+    if (!tw.live || !st) return `${head}<p class="small">Open a station's twin to work its flood velocity out on its ground.</p>`;
+    const a = velInputs();
+    if (!a) return `${head}<p class="small">Not worked out: the twin has no ground at the station to measure a depth from${tw.ground ? ', or no slope for it' : ''}.</p>`;
+    const s = S(), c = velChoice(st), F = tw.flood, L = lineOk() ? tw.vel.line : null;
+    const card = cardSlope(st);
+    const radio = (v, label, on, dis = false) => `<label class="check-label"><input type="radio" name="twin-vel-slope" value="${v}" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''} onchange="DigitalTwin.setVelSlope(this.value)"><span>${label}</span></label>`;
+    const inForce = a.slope.source;
+    const cardLabel = card ? `${card.source === 'card' ? 'The station card\'s' : 'The default for its height'}: <strong>${esc(FloodVelocity.slopeRatio(card.raw))}</strong>${card.assumed ? ' (assumed)' : ''} — ${esc(card.words)}` : 'The station card\'s: none';
+    const lineLabel = L ? `Along the flow line: <strong>${esc(FloodVelocity.slopeRatio(L.slope))}</strong> over ${L.length >= 1000 ? `${(L.length / 1000).toFixed(1)} km` : `${Math.round(L.length)} m`}${L.clear ? '' : ' <span class="txt-warn">— see below</span>'}`
+                        : 'Along the flow line: not traced';
+    const entered = c.entered > 0 ? Math.round(1 / c.entered) : '';
+    const none = !F || F.none;
+    return `${head}
+      <p class="small twin-vel-lead">The station card's estimate, worked out on this ground: Manning's equation, V = (1/n)·R<sup>⅔</sup>·S<sup>½</sup>, R taken as the depth, held to critical flow. Every choice here is for this twin and this session — enter on the station's AEP row in the station editor whatever should stand.</p>
+      <div class="twin-vel-now" id="twin-vel-now" aria-live="off">${velNowHtml()}</div>
+      <label class="check-label"><input type="checkbox" id="twin-vel-colour" ${s.waterColour === 'speed' ? 'checked' : ''} ${none ? 'disabled' : ''} onchange="DigitalTwin.setWaterColour(this.checked ? 'speed' : 'level')"><span>Colour the water by its speed, not by the level it has passed</span></label>
+      <div class="twin-vel-key-panel" id="twin-vel-key-panel">${speedKeyRows()}</div>
+      <fieldset class="twin-vel-set">
+        <legend>Slope</legend>
+        ${radio('card', cardLabel, inForce === 'card' || inForce === 'default')}
+        ${radio('line', lineLabel, inForce === 'line', !L)}
+        <label class="check-label twin-vel-entered"><input type="radio" name="twin-vel-slope" value="entered" ${inForce === 'entered' ? 'checked' : ''} onchange="DigitalTwin.setVelSlope(this.value)"><span>Entered: 1:</span><input type="number" id="twin-vel-entered" min="50" max="10000" step="10" value="${entered}" inputmode="numeric" aria-label="Slope entered, one in how many"
+               onchange="DigitalTwin.setVelSlopeEntered(this.value)"></label>
+        ${a.slope.bounded ? `<p class="small txt-warn">Read as ${esc(FloodVelocity.slopeRatio(a.slope.used))}, the ${a.slope.used === FloodVelocity.SLOPE_MIN ? 'flattest' : 'steepest'} this uses.</p>` : ''}
+      </fieldset>
+      <fieldset class="twin-vel-set">
+        <legend>Roughness, Manning's n (Chow 1959)</legend>
+        <label class="twin-field">In the channel
+          <select id="twin-vel-n-channel" onchange="DigitalTwin.setVelN('channel', this.value)">${nOptions('channel', a.nChannel)}</select>
+        </label>
+        <label class="twin-field">On the floodplain, and at the station's ground
+          <select id="twin-vel-n-plain" onchange="DigitalTwin.setVelN('floodplain', this.value)">${nOptions('floodplain', a.nPlain)}</select>
+        </label>
+      </fieldset>
+      <fieldset class="twin-vel-set">
+        <legend>The flow line</legend>
+        <p class="small" id="twin-vel-line">${esc(lineWords())}</p>
+        <div id="twin-vel-prof">${profileHtml()}</div>
+        <label class="check-label"><input type="checkbox" id="twin-vel-line-on" ${s.flowLine ? 'checked' : ''} ${L ? '' : 'disabled'} onchange="DigitalTwin.setFlowLine(this.checked)"><span>Draw it on the ground, with arrows downstream</span></label>
+        <div class="button-group">
+          <button type="button" id="twin-vel-trace-pick" onclick="DigitalTwin.traceFromPick()" ${tw.picked ? '' : 'disabled'} title="${tw.picked ? 'Trace the flow line from the point last clicked on the ground' : 'Click the ground on the river first'}">Trace from the point clicked</button>
+          ${c.from ? '<button type="button" onclick="DigitalTwin.traceFromGauge()">Trace from the gauge</button>' : ''}
+          ${tw.ground && tw.ground.size < SIZES[SIZES.length - 1] ? `<button type="button" onclick="DigitalTwin.setSize(${SIZES[SIZES.length - 1]})" title="Rebuild the twin on the ${SIZES[SIZES.length - 1]} m patch, which reads the slope over a reach four times as long">Read it over ${SIZES[SIZES.length - 1].toLocaleString('en-AU')} m</button>` : ''}
+        </div>
+      </fieldset>
+      <details class="twin-details" id="twin-vel-levels-box">
+        <summary>At every level</summary>
+        <div id="twin-vel-levels">${velLevelsHtml()}</div>
+      </details>
+      <p class="small twin-vel-beds">${velBedsWords(a)}</p>
+      <p class="small twin-vel-card">${velCardWords(st)}</p>
+      <div class="button-group"><button type="button" onclick="DigitalTwin.resetVelocity()" ${c.slope || c.entered || c.nChannel != null || c.nPlain != null || c.from ? '' : 'disabled'}>Back to the card's assumptions</button></div>`;
+  }
+
+  // The two figures for the water on screen.
+  function velNowHtml() {
+    const F = tw.flood;
+    if (!F || F.none || F.level == null) return '<p class="small">No water to work it out for: the twin draws none at this station.</p>';
+    const v = velAt(F.level);
+    if (!v) return '';
+    const deep = d => (d > 0 ? `${d.toFixed(1)} m deep` : 'dry');
+    return `<p class="small twin-vel-at">At the water on screen, ${esc(F.level.toFixed(2))} m AHD${F.band ? ` — past ${esc(floodLevelName(F.band))}` : ''}:</p>
+      <dl class="twin-vel-figs">
+        <div><dt>In the channel by the gauge</dt><dd><strong>${esc(speedText(v.channel.v))}</strong> <span class="small txt-muted">${esc(deep(v.channel.depth))}${v.channel.capped ? ', held to critical' : ''}</span></dd></div>
+        <div><dt>At the station's ground</dt><dd><strong>${esc(speedText(v.ground.v))}</strong> <span class="small txt-muted">${esc(deep(v.ground.depth))}${v.ground.capped ? ', held to critical' : ''}</span></dd></div>
+      </dl>`;
+  }
+
+  function velLevelsHtml() {
+    const F = tw.flood;
+    if (!F || F.none) return '<p class="small">No levels to work it out at.</p>';
+    const rows = F.lad.levels.map(l => {
+      const v = velAt(l.ahd);
+      if (!v) return '';
+      const cell = x => (x.v > 0 ? `${esc(FloodVelocity.speed(x.v))} <span class="txt-muted">· ${esc(x.depth.toFixed(1))} m</span>` : '<span class="txt-muted">dry</span>');
+      return `<tr><th scope="row"><button type="button" class="link-btn" onclick="DigitalTwin.floodAt('${escAttr(l.key)}')" title="Hold the water at ${escAttr(FloodStages.levelText(l))}">${esc(FloodStages.scaleText(l, F.lad.levels.every(x => x.gauge != null)))}</button></th><td>${cell(v.channel)}</td><td>${cell(v.ground)}</td></tr>`;
+    }).join('');
+    return `<div class="table-wrap" tabindex="0" role="region" aria-label="The flood velocity at every level">
+        <table class="twin-vel-table">
+          <caption class="sr-only">Speed in metres a second, and depth, at every level the twin draws</caption>
+          <thead><tr><th scope="col">Level</th><th scope="col">Channel, m/s</th><th scope="col">Station, m/s</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  function velBedsWords(a) {
+    const nw = (key, x) => {
+      const words = FloodVelocity.roughnessWords(key, x.n);
+      return `n ${x.n.toFixed(3)}${words ? ` (${words})` : ''}${x.source === 'station' ? ', entered on the station' : x.source === 'here' ? ', chosen here' : ''}`;
+    };
+    return `The channel's bed is ${esc(a.bed.m.toFixed(2))} m AHD, ${esc(a.bed.basis)}; the station's ground ${esc(a.ground.toFixed(2))} m AHD, the twin's at the pin. `
+      + `Channel ${esc(nw('channel', a.nChannel))}; floodplain ${esc(nw('floodplain', a.nPlain))}. Coloured by speed, the water below the station's ground is the channel's and the rest the floodplain's.`;
+  }
+
+  // The card's own figure beside the twin's, so the two can be told apart.
+  function velCardWords(st) {
+    const est = FloodVelocity.estimate(st);
+    if (!est) return 'The station card has no velocity for this station: it has no AEP flood levels. Worked out here on the twin\'s levels and ground.';
+    const bits = est.settings.map(t => `${t.short} ≈ ${FloodVelocity.speed(t.max.v)} m/s at ${t.max.label} AEP`);
+    return `On the station card: ${esc(bits.join(', '))} — its slope, n ${est.settings.map(t => t.n.toFixed(3)).join(' and ')}, and beds from the sheet's ground${est.settings.some(t => t.bedBasis === 'the gauge zero') ? ' and the gauge zero' : ''}.`;
+  }
+
+  // ── the key on the stage ──
+  function speedKeyRows() {
+    const col = speedColours();
+    return `<ul class="twin-speed-rows" aria-label="Speed of the water, metres a second"><li class="twin-speed-unit">Speed, m/s:</li>${FloodVelocity.SPEEDS.map((b, i) =>
+      `<li><span class="twin-flood-sw" style="--sw:${escAttr(col[i])}" aria-hidden="true"></span>${esc(FloodVelocity.speedBandWords(i))}</li>`).join('')}</ul>`;
+  }
+
+  function speedKeyHtml() {
+    return `<div class="twin-speed-key" id="twin-speed-key" role="group" aria-label="Speed of the water" hidden>
+        <p class="twin-speed-head"><span>Speed, m/s</span> <span class="twin-speed-gauge" id="twin-speed-gauge"></span></p>
+        <div class="twin-speed-bar" id="twin-speed-bar">
+          ${FloodVelocity.SPEEDS.map((b, i) => `<span class="twin-speed-bin" style="--sw:var(${b.token}, ${b.hex})" title="${escAttr(FloodVelocity.speedBandWords(i))} m/s"></span>`).join('')}
+          <span class="twin-speed-mark" id="twin-speed-mark" aria-hidden="true"></span>
+        </div>
+        <p class="twin-speed-ticks" aria-hidden="true">${FloodVelocity.SPEEDS.slice(0, -1).map((b, i) => `<span style="--k:${((i + 1) / FloodVelocity.SPEEDS.length).toFixed(4)}">${b.below}</span>`).join('')}</p>
+      </div>`;
+  }
+
+  // Up when the water is coloured by speed and the scale is up; the gauge's
+  // speed beside its title and a mark over its band.
+  function syncSpeedKey() {
+    const el = document.getElementById('twin-speed-key');
+    if (!el) return;
+    const on = speedOn() && floodScaleOn() && !!velInputs();
+    if (el.hidden !== !on) el.hidden = !on;
+    if (!on) return;
+    const v = velAt(tw.flood.level);
+    const gauge = document.getElementById('twin-speed-gauge'), mark = document.getElementById('twin-speed-mark');
+    const speed = v ? v.channel.v : 0;
+    const words = v ? (speed > 0 ? `gauge ≈ ${FloodVelocity.speed(speed)}` : 'gauge dry') : '';
+    if (gauge && gauge.textContent !== words) gauge.textContent = words;
+    if (mark) {
+      const bands = FloodVelocity.SPEEDS, i = FloodVelocity.speedBand(speed);
+      const lo = i ? bands[i - 1].below : 0, hi = bands[i].below != null ? bands[i].below : lo + 1;
+      const f = (i + Math.min(1, Math.max(0, (speed - lo) / (hi - lo)))) / bands.length;
+      mark.style.setProperty('--at', f.toFixed(4));
+      mark.hidden = !(speed > 0);
+    }
+  }
+
+  // ── keeping it all true ──
+  // After a build, a choice, a new level ladder: the line traced (when asked),
+  // drawn, the water repainted and the panel rewritten.
+  function refreshVelocity(retrace) {
+    const st = currentStation();
+    if (retrace) { traceFlowLine(st); makeFlowLine(); }
+    applyWaterColour();
+    refreshVelPanel();
+  }
+
+  // The panel rewritten, the focus put back on the control that had it — but
+  // not under a caret: while the slope is being typed, its choices are set in
+  // place and the figures follow.
+  function refreshVelPanel() {
+    const el = document.getElementById('twin-panel-velocity');
+    if (!el) return;
+    const a = document.activeElement;
+    if (a && el.contains(a) && a.tagName === 'INPUT' && a.type === 'number') { syncVelControls(); syncVelReading(); return; }
+    const had = a && el.contains(a) ? a.id : null;
+    const open = !!(document.getElementById('twin-vel-levels-box') || {}).open;
+    el.innerHTML = velPanelHtml();
+    const box = document.getElementById('twin-vel-levels-box');
+    if (box && open) box.open = true;
+    if (had) { const back = document.getElementById(had); if (back) back.focus(); }
+    syncSpeedKey();
+  }
+
+  // The slope's choice and the roughnesses as they stand, set on the controls
+  // that are there.
+  function syncVelControls() {
+    const st = currentStation(), a = st && velInputs();
+    if (!a) return;
+    const src = a.slope.source === 'default' ? 'card' : a.slope.source;
+    for (const r of document.querySelectorAll('input[name="twin-vel-slope"]')) r.checked = r.value === src;
+    for (const [id, key] of [['twin-vel-n-channel', 'nChannel'], ['twin-vel-n-plain', 'nPlain']]) {
+      const sel = document.getElementById(id);
+      if (sel && [...sel.options].some(o => Number(o.value) === a[key].n)) sel.value = [...sel.options].find(o => Number(o.value) === a[key].n).value;
+    }
+  }
+
+  // What moves with the water: the two figures, the key, the line riding it.
+  function syncVelReading() {
+    const now = document.getElementById('twin-vel-now');
+    if (now) now.innerHTML = velNowHtml();
+    syncSpeedKey();
   }
 
   // ── the camera ─────────────────────────────────────────────────────────────
@@ -6219,6 +6800,8 @@ void main() {
     const x = hit.x, z = hit.z;
     const h = heightAt(x, z);
     tw.picked = { x, z, h };
+    const trace = document.getElementById('twin-vel-trace-pick');
+    if (trace) { trace.disabled = false; trace.title = 'Trace the flow line from the point last clicked on the ground'; }
     if (out) {
       const ew = x >= 0 ? `${x.toFixed(1)} m E` : `${(-x).toFixed(1)} m W`;
       const ns = z <= 0 ? `${(-z).toFixed(1)} m N` : `${z.toFixed(1)} m S`;
@@ -6397,7 +6980,7 @@ void main() {
       tw.ground = null; tw.image = null; tw.elvis = null; tw.picked = null; tw.origin = null;
       tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = ''; tw.model = null;
       tw.photos = null;
-      tw.flood = null;
+      tw.flood = null; tw.vel = null;
       tw.neighbours = null; tw.bridges = null; tw.bridgesFound = null; tw.tier = null;
       if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
       clearScene();
@@ -6406,7 +6989,7 @@ void main() {
       setStatus(status);
       showPlaceholder(placeholder);
       refreshTruth(); refreshTable(); syncCanvasName(); syncExportButton(); refreshAttrib(); refreshPathsLine(); refreshPeersLine();
-      refreshPhotosLine(); syncPhotoPrompt(); refreshFloodLine();
+      refreshPhotosLine(); syncPhotoPrompt(); refreshFloodLine(); refreshVelPanel();
       const pk = document.getElementById('twin-pick');
       if (pk) pk.textContent = '';
     };
@@ -6462,6 +7045,7 @@ void main() {
     tw.origin = ground ? { lat: Number(st.lat), lon: Number(st.lon) } : null;
     tw.image = null;
     tw.elvis = null;
+    tw.vel = null;
     tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = ''; tw.model = null;
 
     if (!ground) {
@@ -6472,7 +7056,7 @@ void main() {
       tw.flood = null;
       clearScene();
       requestFrame();
-      refreshPhotosLine(); syncPhotoPrompt(); refreshFloodLine();
+      refreshPhotosLine(); syncPhotoPrompt(); refreshFloodLine(); refreshVelPanel();
       setStatus('No ground could be read for this patch — offline, or every elevation service is blocked.');
       setNotes([...notes, 'Neither Queensland\'s elevation service nor the terrain tiles answered. Nothing is drawn: a flat patch would read as flat ground, and that is the one wrong answer worth refusing.']);
       showPlaceholder('<p>No ground could be read. Check the network, then press <strong>Rebuild</strong>.</p>');
@@ -6522,6 +7106,7 @@ void main() {
       loadBridges(st, seq, notes, askP);
       loadCadastre(seq);
       notes.push(...buildFlood(st));
+      refreshVelocity(true);
       // A pin being moved, armed before this build — on the map before the
       // twin was opened, or on this station before a rebuild.
       movePinChanged();
@@ -6530,6 +7115,7 @@ void main() {
       requestFrame();
     } else if (lib) {
       buildFlood(st);
+      refreshVelocity(true);
       notes.push('A WebGL context could not be created on this canvas, so nothing is drawn; the numbers below are still the ground.');
       showPlaceholder('<p>WebGL is not available here. The ground has been read and is tabled below.</p>');
     } else if (gl) {
@@ -6876,6 +7462,7 @@ void main() {
         <p class="small twin-flood" id="twin-pane-flood" hidden></p>
       </div>
       <div class="panel" id="twin-panel-scene">${scenePanelHtml()}</div>
+      <div class="panel twin-vel" id="twin-panel-velocity">${velPanelHtml()}</div>
       <div class="panel">
         <div class="panel-header"><h2>Ground truth</h2></div>
         <div id="twin-truth">${truthHtml()}</div>
@@ -6939,7 +7526,7 @@ void main() {
       if (b) b.disabled = !tw.live;
     }
     if (!tw.live) { const pk = document.getElementById('twin-pick'); if (pk) pk.textContent = ''; }
-    refreshTruth(); refreshTable(); syncExportButton(); refreshPhotosLine(); refreshFloodLine();
+    refreshTruth(); refreshTable(); syncExportButton(); refreshPhotosLine(); refreshFloodLine(); refreshVelPanel();
   }
 
   // The fold's button, for the map overlay's bar:
@@ -6982,6 +7569,7 @@ void main() {
                   aria-label="Reset the view to face north" title="Reset to north" onclick="DigitalTwin.faceNorth()"><span aria-hidden="true">N</span></button>
           <button type="button" class="twin-flood-pill" id="twin-flood-pill" hidden onclick="DigitalTwin.floodPill()"></button>
           ${floodScaleHtml()}
+          ${speedKeyHtml()}
           <p class="twin-hud" id="twin-hud">${esc(viewMoveWords(coarsePointer()))} Click the ground for its height.</p>
           <button type="button" class="twin-hud-q" id="twin-hud-q" aria-controls="twin-hud" aria-expanded="true"
                   aria-label="How to move the view" title="How to move the view" onclick="DigitalTwin.toggleHud()" hidden>?</button>
@@ -7036,7 +7624,7 @@ void main() {
     tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false;
     tw.model = null;
     tw.photos = null; tw.photoNear = -1;
-    tw.flood = null;
+    tw.flood = null; tw.vel = null;
     tw.neighbours = null; tw.bridges = null; tw.bridgesFound = null;
     rig.pointLatch = false; rig.pointing = false;
     // The next build is an opening: the lines open again, and fold again.
@@ -7663,6 +8251,33 @@ void main() {
           laser: a.laser.visible ? { len: a.laser.scale.y, dot: { x: a.dot.position.x, y: a.dot.position.y, z: a.dot.position.z } } : null,
         })),
         presence: typeof TwinPresence !== 'undefined' ? TwinPresence.debug() : null,
+        // The flood velocity: what goes into the equation, the two figures
+        // for the water on screen, the flow line and how it is drawn.
+        velocity: (() => {
+          const a = velInputs(), F = tw.flood, L = tw.vel && tw.vel.line;
+          return {
+            colour: S().waterColour, flowLineOn: !!S().flowLine,
+            inputs: a ? { bed: a.bed.m, bedBasis: a.bed.basis, ground: a.ground, slope: { ...a.slope },
+                          nChannel: { ...a.nChannel }, nPlain: { ...a.nPlain } } : null,
+            now: F && !F.none && F.level != null ? velAt(F.level) : null,
+            line: L ? (L.ok ? { ok: true, slope: L.slope, length: L.length, straight: L.straight, sinuosity: L.sinuosity, bearing: L.bearing,
+                                heading: L.heading, agree: L.agree, stands: L.stands, falls: L.falls, clear: L.clear,
+                                start: { ...L.start }, count: L.points.length, from: tw.vel.from,
+                                ends: { up: { ...L.points[0] }, down: { ...L.points[L.points.length - 1] } } }
+                          : { ok: false, why: L.why }) : null,
+            drawn: sc.flowLine ? { visible: sc.flowLine.visible, parts: sc.flowLine.children.map(c => c.name),
+                                   exported: (() => { let any = false; sc.flowLine.traverse(o => { if (o.userData.export !== false) any = true; }); return any; })(),
+                                   // The core ribbon's first vertex, and the ground and the water under it.
+                                   first: (() => {
+                                     const core = sc.flowLine.children.find(c => c.name === 'flow line'), p = core && core.geometry.attributes.position;
+                                     if (!p) return null;
+                                     const x = p.getX(0), z = p.getZ(0);
+                                     return { x, y: p.getY(0), z, ground: yAt(x, z), water: F && !F.none && F.level != null ? floodY(F.level) : null, lift: LINE_LIFT_M };
+                                   })() } : null,
+            textured: !!(sc.flood && sc.flood.mat.map), opacity: sc.flood ? sc.flood.mat.opacity : null,
+            key: (() => { const el = document.getElementById('twin-speed-key'); return el ? { hidden: el.hidden, gauge: (document.getElementById('twin-speed-gauge') || {}).textContent || '' } : null; })(),
+          };
+        })(),
         flood: tw.flood ? (() => {
           const F = tw.flood;
           if (F.none) return { none: true, notes: F.notes.slice(), levels: [] };
@@ -7847,6 +8462,110 @@ void main() {
     // the scale's head, which turns it to the other.
     setFloodScale(mode) { setScaleMode(mode === 'log' ? 'log' : 'lin'); },
     toggleFloodScale() { const F = tw.flood; setScaleMode(F && !F.none && F.logK != null ? 'lin' : 'log'); },
+
+    // ── The flood velocity (see "the flood velocity") ──
+    // What the water's colour says, remembered: 'level' or 'speed'.
+    setWaterColour(v) {
+      S().waterColour = v === 'speed' ? 'speed' : 'level'; saveSettings();
+      applyWaterColour();
+      refreshVelPanel();
+      announce(speedOn() ? 'The water is coloured by its speed.' : 'The water is coloured by the level it has passed.');
+    },
+    // The flow line drawn or not, remembered.
+    setFlowLine(on) {
+      S().flowLine = !!on; saveSettings();
+      if (on && !sc.flowLine && lineOk()) makeFlowLine();
+      placeFlowLine();
+      const box = document.getElementById('twin-vel-line-on');
+      if (box) box.checked = !!on;
+    },
+    // The slope for this station, this session: 'card', 'line' or 'entered'.
+    setVelSlope(kind) {
+      const c = velChoice(currentStation());
+      c.slope = kind === 'line' || kind === 'entered' ? kind : null;
+      // Entered, with nothing entered yet: the card's, until there is.
+      if (c.slope === 'entered' && !(c.entered > 0)) {
+        const card = cardSlope(currentStation());
+        if (card) c.entered = card.used;
+      }
+      refreshVelocity(false);
+    },
+    // One in how many, as typed.
+    setVelSlopeEntered(v) {
+      const r = Number(String(v).replace(/[^0-9.]/g, ''));
+      const c = velChoice(currentStation());
+      if (!(r >= 1)) { c.entered = null; if (c.slope === 'entered') c.slope = null; }
+      else { c.entered = 1 / r; c.slope = 'entered'; }
+      refreshVelocity(false);
+    },
+    // A roughness for the channel or the floodplain, this session.
+    setVelN(key, v) {
+      const n = Number(v), c = velChoice(currentStation());
+      if (!(n >= FloodVelocity.N_MIN && n <= FloodVelocity.N_MAX)) return;
+      if (key === 'channel') c.nChannel = n;
+      else if (key === 'floodplain') c.nPlain = n;
+      refreshVelocity(false);
+    },
+    // The flow line traced from where the ground was last clicked — the river,
+    // where the gauge's own 60 m reach a drain — or from the gauge again.
+    traceFromPick() {
+      const st = currentStation();
+      if (!st || !tw.picked) return;
+      velChoice(st).from = { x: tw.picked.x, z: tw.picked.z };
+      refreshVelocity(true);
+      announce(lineOk() ? `Flow line traced from the point clicked: ${FloodVelocity.slopeRatio(tw.vel.line.slope)} over ${Math.round(tw.vel.line.length)} m.` : 'No flow line could be traced from there.');
+    },
+    traceFromGauge() {
+      const st = currentStation();
+      if (!st) return;
+      velChoice(st).from = null;
+      refreshVelocity(true);
+    },
+    // Every choice for this station dropped: the card's assumptions again.
+    resetVelocity() {
+      const st = currentStation();
+      if (!st) return;
+      const had = velChoice(st).from;
+      velChoices.delete(st.id);
+      refreshVelocity(!!had);
+      announce('Back to the station card\'s assumptions.');
+    },
+    // From the station card's velocity: the station's twin, coloured by speed
+    // with its flow line drawn, and the pane open at the velocity panel.
+    openVelocity(id) {
+      S().waterColour = 'speed'; S().flowLine = true; saveSettings();
+      // The twin already up on this station is not built again: it is
+      // repainted where it stands.
+      if (tw.live && tw.stationId === id) {
+        if (lineOk() && !sc.flowLine) makeFlowLine();
+        placeFlowLine();
+        applyWaterColour();
+        refreshVelPanel();
+      }
+      this.openStation(id);
+      if (typeof setDockTab === 'function') setDockTab('twin');
+      setTimeout(() => {
+        const el = document.getElementById('twin-panel-velocity');
+        if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' });
+      }, 0);
+    },
+    // The profile's pointer: the point nearest it along the line, read out
+    // and marked; null when the pointer leaves.
+    velProfileAt(ev) {
+      const svg = document.getElementById('twin-vel-prof-svg'), cross = document.getElementById('twin-vel-prof-cross');
+      const read = document.getElementById('twin-vel-prof-read');
+      if (!svg || !cross || !read || !lineOk()) return;
+      if (!ev) { cross.setAttribute('visibility', 'hidden'); read.textContent = 'm AHD along the line; the dashed line is the slope fitted through it. Point at it to read it.'; return; }
+      const L = tw.vel.line, r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal;
+      const px = (ev.clientX - r.left) / r.width * vb.width;
+      const { pl, pr } = PROF;
+      const s = Math.max(0, Math.min(L.length, (px - pl) / (vb.width - pl - pr) * L.length));
+      const p = L.points.reduce((b, q) => (Math.abs(q.s - s) < Math.abs(b.s - s) ? q : b), L.points[0]);
+      const x = pl + p.s / L.length * (vb.width - pl - pr);
+      cross.setAttribute('x1', x.toFixed(1)); cross.setAttribute('x2', x.toFixed(1)); cross.setAttribute('visibility', 'visible');
+      const off = p.s - L.start.s;
+      read.textContent = `${Math.round(Math.abs(off))} m ${off < 0 ? 'upstream of' : 'downstream of'} the gauge: ground ${p.h.toFixed(2)} m AHD.`;
+    },
     // The check's seam: the scale turns itself `ms` after it comes up rather
     // than four seconds, or never (null); `forget` drops the Log choices the
     // operator pressed, as a new session would.
@@ -7903,6 +8622,27 @@ void main() {
       // three reads an alpha map's green channel.
       return sc.flood.data[(tj * N + ti) * 4 + 1] > 0;
     },
+    // The speed colour the water as drawn has at a scene point — the texel
+    // of the speed texture the plane samples there, found through the
+    // plane's own UVs like the mask's — as '#rrggbb', or null.
+    _speedAt(x, z) {
+      if (!sc.flood || !sc.flood.speed || sc.flood.mat.map !== sc.flood.speed.tex) return null;
+      const geo = sc.flood.water.geometry, pos = geo.attributes.position, uv = geo.attributes.uv;
+      let bx = -1, bz = -1;
+      for (let k = 1; k < pos.count; k++) {
+        if (bx < 0 && pos.getX(k) !== pos.getX(0)) bx = k;
+        if (bz < 0 && pos.getZ(k) !== pos.getZ(0)) bz = k;
+      }
+      if (bx < 0 || bz < 0) return null;
+      const u = uv.getX(0) + (x - pos.getX(0)) / (pos.getX(bx) - pos.getX(0)) * (uv.getX(bx) - uv.getX(0));
+      const v = uv.getY(0) + (z - pos.getZ(0)) / (pos.getZ(bz) - pos.getZ(0)) * (uv.getY(bz) - uv.getY(0));
+      const ti = Math.floor(u * N), tj = Math.floor(v * N);
+      if (ti < 0 || tj < 0 || ti >= N || tj >= N) return null;
+      const d = sc.flood.speed.data, o = (tj * N + ti) * 4;
+      return `#${[d[o], d[o + 1], d[o + 2]].map(c => c.toString(16).padStart(2, '0')).join('')}`;
+    },
+    // The ground grid the twin stands on, for a check to trace on itself.
+    _ground() { const g = tw.ground; return g ? { elev: Array.from(g.elev), n: N, size: g.size } : null; },
     // The others in the room, driven by twin-presence.js.
     remote: { set: remoteSet, pose: remotePose, remove: remoteRemove, clear: remoteClear },
     presenceChanged() { refreshPeersLine(); },
@@ -7955,7 +8695,7 @@ void main() {
     // Forget the station, so a check can measure the tab with nothing chosen.
     _clear() {
       tw.stationId = null; tw.ground = null; tw.image = null; tw.elvis = null;
-      tw.status = ''; tw.notes = []; tw.picked = null; tw.paths = null;
+      tw.status = ''; tw.notes = []; tw.picked = null; tw.paths = null; tw.vel = null;
     },
   };
 })();
