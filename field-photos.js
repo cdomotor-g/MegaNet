@@ -1294,12 +1294,33 @@ const FieldPhotos = (function () {
   </div>`;
   }
 
+  // What an account the database has answered for may do here (0062): see the
+  // photos once approved — a member — and add them as an editor. Until whoami
+  // has answered (or where the session is the datastore's alone, as in the
+  // checks) nothing is assumed either way and the panel is the signed-in one;
+  // the database decides what comes back regardless.
+  function waiting() { return typeof Auth !== 'undefined' && Auth.known && Auth.known() && !Auth.isMember(); }
+  function lookOnly() {
+    return typeof Auth !== 'undefined' && Auth.known && Auth.known() && Auth.isMember() && !Auth.mayWrite();
+  }
+  function waitingHtml() {
+    return `<p class="small">Your account is waiting for an administrator's approval. The field photos appear here as
+      soon as it is approved — you will get an email when it is.</p>`;
+  }
+
   function addHtml() {
     const s = S();
     if (!signedIn()) {
-      return `<p class="small">Field photos are private to signed-in editors — the pictures, and where they were
-        taken, are kept in a private bucket and only ever shown through a link that expires.
-        <button type="button" class="link-btn" onclick="Auth.open()">Sign in</button> to add photos or see them.</p>`;
+      return `<p class="small">Field photos are private to approved accounts — the pictures, and where they were
+        taken, are kept in a private bucket and only ever shown through a link that expires. A Bureau address is
+        approved as soon as it is confirmed; any other once an administrator has looked at it.
+        <button type="button" class="link-btn" onclick="Auth.open()">Sign in</button> or
+        <button type="button" class="link-btn" onclick="Auth.open({mode:'signup'})">create an account</button> to see them.</p>`;
+    }
+    if (waiting()) return waitingHtml();
+    if (lookOnly()) {
+      return `<p class="small">Adding photos is for editors — Bureau staff, and the people an administrator adds. The
+        photos below are yours to look through.</p>`;
     }
     if (s.typesError) {
       return `<p class="small txt-bad">The list of what may be uploaded could not be loaded — ${esc(s.typesError)}.
@@ -1474,6 +1495,7 @@ const FieldPhotos = (function () {
   function libHtml() {
     const s = S();
     if (!signedIn()) return '<p class="small txt-muted">Sign in to see the photos.</p>';
+    if (waiting()) return '<p class="small txt-muted">The photos appear here once your account is approved.</p>';
     if (s.libLoading && !s.lib) return '<p class="small">Loading…</p>';
     if (s.libError) {
       const missing = /field_photo/.test(s.libError) && /(does not exist|schema cache|not find)/i.test(s.libError);

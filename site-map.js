@@ -66,6 +66,15 @@ const SiteMap = (function () {
         'See what works with no signal, and what does not',
       ],
     },
+    views: {
+      what: 'What the bar on the left lists: All, Simple without the desk-bound radio work, Field for a site visit, or a view of your own.',
+      use: [
+        'Pick Field on a phone so the bar lists only what a site visit needs',
+        'Make a view of your own — rename groups, move tabs, take out what you never use',
+        'Have the same views on every device you sign in on',
+      ],
+      note: 'Picking a view needs no account; making one is saved to yours.',
+    },
     propagation: {
       what: 'A lesson in how radio carries a reading from a gauge to a base — waves, shadows, trees, echoes, collisions and repeater delays — in pictures that move.',
       use: [
@@ -82,6 +91,14 @@ const SiteMap = (function () {
         'Tilt the map into 3-D, or open a station\'s digital twin from close in',
         'Edit a station\'s record, or propose a new site (sign in first)',
         'Map a station\'s orifice outlet, pits, benchmarks, boards and orifice run (sign in first)',
+      ],
+    },
+    lookaround: {
+      what: 'Hold a phone up and turn round: the stations the way it faces are pinned over the camera\'s picture, nearest first.',
+      use: [
+        'Work out which way a station is from where you stand, and how far',
+        'Tell which mast on the skyline is which repeater',
+        'Tap a pin for the station\'s number and ALERT IDs, then open it on the map',
       ],
     },
     maps: {
@@ -350,7 +367,7 @@ const SiteMap = (function () {
   // site"; `step` is that sentence, cut at the commas.
   const GROUPS = {
     'Start here': { step: 'Getting set up',
-      blurb: 'Before the work: getting a phone or laptop ready for a site with no signal, and putting Flood-Net on its home screen.' },
+      blurb: 'Before the work: getting a phone or laptop ready for a site with no signal, putting Flood-Net on its home screen, and choosing what the bar on the left lists.' },
     'Stations & networks': { step: 'What is out there',
       blurb: 'The stations themselves, the radio paths between them, and the maps and files made from them. Most days start here.' },
     'Interference': { step: 'What is stepping on it',
@@ -386,6 +403,8 @@ const SiteMap = (function () {
     { text: 'Fill in a site inspection',                   tab: 'inspections' },
     { text: 'Get a phone ready for a site with no signal', tab: 'offline' },
     { text: 'Take site photos stamped with where and which way', tab: 'camera' },
+    { text: 'See which way a station is from where you stand', tab: 'lookaround' },
+    { text: 'Make the bar on the left list only what you use', tab: 'views' },
     { text: 'File the photos from a field trip',           tab: 'photos' },
     { text: 'Survey a station\'s gauge zero and benchmarks', tab: 'levels' },
     { text: 'Map where a station\'s pits and orifice run are', tab: 'stations' },

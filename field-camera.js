@@ -997,12 +997,19 @@ const FieldCamera = (function () {
 
   function waiting() { return shots.filter(s => s.status === 'waiting' || s.status === 'failed'); }
 
+  // Whether the database has said this account may not add photos (0062: an
+  // account waiting for approval, or a member who is not an editor). Until it
+  // has answered nothing is assumed — the upload itself is what is refused.
+  function notAnEditor() {
+    return typeof Auth !== 'undefined' && Auth.known && Auth.known() && !Auth.mayWrite();
+  }
+
   // One at a time, oldest first, whenever there is something to send and
-  // somebody signed in to send it as.
+  // somebody signed in who may send it.
   async function pump(force) {
     if (pumping) return;
     clearTimeout(pumpTimer);
-    if (!signedIn() || (!prefs().auto && !force)) { paintOutbox(); return; }
+    if (!signedIn() || notAnEditor() || (!prefs().auto && !force)) { paintOutbox(); return; }
     pumping = true;
     const logged = [];
     try {
@@ -1463,7 +1470,8 @@ const FieldCamera = (function () {
     if (!shots.length) return '';
     const bits = [];
     if (up) bits.push('uploading…');
-    if (w) bits.push(`${w} waiting${!signedIn() ? ' — sign in to send' : !prefs().auto ? ' — Upload now sends them' : ''}`);
+    if (w) bits.push(`${w} waiting${!signedIn() ? ' — sign in to send' : notAnEditor() ? ' — kept on this device'
+      : !prefs().auto ? ' — Upload now sends them' : ''}`);
     if (refused) bits.push(`<span class="txt-bad">${refused} refused</span>`);
     if (!bits.length) bits.push('<span class="txt-ok">all uploaded</span>');
     return bits.join(' · ');
@@ -1473,7 +1481,7 @@ const FieldCamera = (function () {
     const w = waiting().length;
     const done = shots.filter(s => s.status === 'done' || s.status === 'already').length;
     return `
-      ${w && signedIn() ? '<button type="button" class="primary" onclick="FieldCamera.sendNow()">Upload now</button>' : ''}
+      ${w && signedIn() && !notAnEditor() ? '<button type="button" class="primary" onclick="FieldCamera.sendNow()">Upload now</button>' : ''}
       ${w && !signedIn() ? '<button type="button" class="primary" onclick="Auth.open()">Sign in to upload</button>' : ''}
       ${done ? `<button type="button" onclick="FieldCamera.clearDone()">Clear the ${done} uploaded</button>` : ''}`;
   }
@@ -1490,9 +1498,11 @@ const FieldCamera = (function () {
       return `${head}<p class="small txt-muted">No photos taken on this device yet. Each one is kept here until it is in Flood-Net,
         so a site with no signal loses nothing.</p>`;
     }
-    const signed = signedIn()
-      ? ''
-      : '<p class="small txt-warn">Signed out: the photos below wait on this device and go up when you <button type="button" class="link-btn" onclick="Auth.open()">sign in</button>.</p>';
+    const signed = !signedIn()
+      ? '<p class="small txt-warn">Signed out: the photos below wait on this device and go up when you <button type="button" class="link-btn" onclick="Auth.open()">sign in</button>.</p>'
+      : notAnEditor()
+        ? '<p class="small txt-warn">Adding photos to Flood-Net is for editors — Bureau staff, and the people an administrator adds. The photos below stay on this device; Save a copy keeps any of them.</p>'
+        : '';
     const kept = shots.filter(s => s.status !== 'done' && s.status !== 'already').reduce((n, s) => n + (s.bytes || 0), 0);
     return `${head}${signed}
       ${kept ? `<p class="small txt-muted">${mb(kept)} of photos waiting on this device.</p>` : ''}

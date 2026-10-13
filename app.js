@@ -1602,30 +1602,53 @@ function navScore(text, terms) {
   return terms.reduce((n, t) => n + (navHasTerm(text, t) ? 1 : 0), 0);
 }
 
-// TABS, with the losing tabs removed and any group left empty removed with them,
-// plus the id of the one Enter should open. `groups: []` means the query matched
-// nothing anywhere — distinct from an empty query, which returns every group
-// untouched and no pick.
+// The groups of the view the bar is showing (nav-views.js) — TABS itself under
+// All, which is every device's view until somebody picks another. A tab the
+// view leaves out is still a tab: the one open now is listed under "Not in this
+// view" rather than vanishing from the bar it was opened from, and a query is
+// answered from every tab, the view's own first and the rest under that same
+// heading, so a view can hide a tab from the list but never from the find box.
+function navViewGroups() {
+  return typeof NavViews !== 'undefined'
+    ? NavViews.navGroups()
+    : TABS.map(g => ({ group: g.group, tabs: g.tabs }));
+}
+
+// The view's groups with the losing tabs removed and any group left empty
+// removed with them, plus the id of the one Enter should open. `groups: []`
+// means the query matched nothing anywhere — distinct from an empty query,
+// which returns every group of the view untouched and no pick.
 function navFiltered() {
+  const view = navViewGroups();
+  const inView = new Set(view.flatMap(g => g.tabs.map(t => t.id)));
+  const outside = typeof NavViews !== 'undefined' ? NavViews.outsideLabel() : 'Not in this view';
   const terms = navTerms(state.navQuery);
-  if (!terms.length) return { groups: TABS.map(g => ({ group: g.group, tabs: g.tabs })), bestId: null };
+  if (!terms.length) {
+    const groups = view.map(g => ({ group: g.group, tabs: g.tabs }));
+    const open = TAB_LIST.find(t => t.id === state.activeTab);
+    if (open && !inView.has(open.id)) groups.push({ group: outside, tabs: [open], outside: true });
+    return { groups, bestId: null };
+  }
+  // Matched against the group the tab is listed under here, and — for one the
+  // view leaves out — against the group TABS files it under, which is where
+  // its find words were written to be read.
+  const rest = TABS.flatMap(g => g.tabs.filter(t => !inView.has(t.id)).map(t => ({ t, home: g.group })));
   let best = 0;
-  const scored = TABS.map(g => ({
-    group: g.group,
-    tabs: g.tabs.map(tab => {
-      const score = navScore(navHaystack(tab, g.group), terms);
-      if (score > best) best = score;
-      return { tab, score, label: navScore(tab.label.toLowerCase(), terms) };
-    }),
-  }));
+  const score = (tab, group) => {
+    const n = navScore(navHaystack(tab, group), terms);
+    if (n > best) best = n;
+    return { tab, score: n, label: navScore(tab.label.toLowerCase(), terms) };
+  };
+  const scored = view.map(g => ({ group: g.group, tabs: g.tabs.map(t => score(t, g.group)) }));
+  if (rest.length) scored.push({ group: outside, outside: true, tabs: rest.map(x => score(x.t, x.home)) });
   if (!best) return { groups: [], bestId: null };
   const won = scored
-    .map(g => ({ group: g.group, tabs: g.tabs.filter(x => x.score === best) }))
+    .map(g => ({ group: g.group, outside: g.outside, tabs: g.tabs.filter(x => x.score === best) }))
     .filter(g => g.tabs.length);
   let pick = null;
   for (const g of won) for (const x of g.tabs) if (!pick || x.label > pick.label) pick = x;
   return {
-    groups: won.map(g => ({ group: g.group, tabs: g.tabs.map(x => x.tab) })),
+    groups: won.map(g => ({ group: g.group, outside: g.outside, tabs: g.tabs.map(x => x.tab) })),
     bestId: pick ? pick.tab.id : null,
   };
 }
@@ -1636,13 +1659,18 @@ function navFiltered() {
 function navGroupsHtml() {
   const collapsed = state.navCollapsed;
   const { groups, bestId } = navFiltered();
+  // A view of somebody's own may call two groups by one name; the second
+  // heading's id is told apart so the page keeps one element per id.
+  const used = new Set();
   const html = groups.map(g => {
-    const hid = 'nav-h-' + slug(g.group);
+    let hid = 'nav-h-' + slug(g.group);
+    for (let n = 2; used.has(hid); n++) hid = `nav-h-${slug(g.group)}-${n}`;
+    used.add(hid);
     // role="group" rather than nothing, because collapsed the heading is
     // clipped: it is still the group's accessible name, and without the
     // association a screen reader on the rail gets twenty ungrouped buttons.
     return `
-    <div class="nav-group" role="group" aria-labelledby="${hid}">
+    <div class="nav-group${g.outside ? ' nav-outside' : ''}" role="group" aria-labelledby="${hid}">
       <h2 class="nav-heading" id="${hid}">${esc(g.group)}</h2>
       <ul class="nav-list">
         ${g.tabs.map(t => {
@@ -1668,6 +1696,7 @@ function navGroupsHtml() {
                   ${on ? 'aria-current="page"' : ''} title="${esc(cannot ? `${tip} — ${cannot}` : tip)}">
             <span class="nav-icon" aria-hidden="true">${t.icon}</span>
             <span class="nav-label">${esc(t.label)}</span>
+            ${navCountHtml(t.id)}
             ${cannot ? `<span class="nav-needs" aria-hidden="true">🖥️</span><span class="sr-only"> — ${esc(cannot)}</span>` : ''}
             ${pick ? '<span class="nav-enter" aria-hidden="true">↵</span>' : ''}
           </button>
@@ -1679,6 +1708,18 @@ function navGroupsHtml() {
   // A filter that matches nothing says so. Silence would read as a nav that had
   // broken rather than as a query with no answer.
   return html || `<p class="nav-none">No tab matches <strong>${esc(state.navQuery)}</strong>.</p>`;
+}
+
+// A count on a tab's button that is waiting for somebody: on Admin, to an
+// administrator, the accounts waiting for approval (0062, whoami's
+// approvals_waiting). Said in the button's name as well as drawn, since a
+// number on its own is a mark nobody can read aloud.
+function navCountHtml(id) {
+  if (id !== 'admin' || typeof Auth === 'undefined' || !Auth.approvalsWaiting) return '';
+  const n = Auth.approvalsWaiting();
+  if (!n) return '';
+  return `<span class="nav-count" aria-hidden="true">${n}</span>`
+       + `<span class="sr-only"> — ${n} account${n === 1 ? '' : 's'} waiting for approval</span>`;
 }
 
 // What the live region announces, and what sighted users read under the list.
@@ -1740,6 +1781,7 @@ function renderTabs() {
           <span class="nav-icon" aria-hidden="true">${toggleWord.icon}</span>
           <span class="nav-label">${toggleWord.label}</span>
         </button>
+        ${typeof NavViews !== 'undefined' ? NavViews.navHeadHtml() : ''}
         <div class="nav-find">
           <input id="nav-search" class="nav-search" type="search" autocomplete="off"
                  spellcheck="false" aria-label="Find a tab" placeholder="Find a tab…"
@@ -2104,11 +2146,9 @@ function invalidateMapSizes(delay) {
 //                  clicked radio path, the site finder's worst path).
 //   🧊 Twin        the digital twin's finder and settings (digital-twin.js),
 //                  on that tab at every width, like 📍 Places.
-//   🔭 AR          the AR station finder (station-ar.js): its way in, its
-//                  distance and its types. The view it opens is the whole
-//                  screen — a phone held up, the stations the way it faces
-//                  pinned over the camera's picture — so the pane is only the
-//                  door to it and the settings it shares. At every width too.
+//                  (🔭 the AR station finder stood here too, until it became
+//                  a tab of its own in the left bar — 🔭 Look Around, where a
+//                  phone in the field can reach it without opening the map.)
 //   the Stations map's own controls, all of them but ↺ — everything MapChrome
 //                  would otherwise have put in the map's top-right corner, in
 //                  the same groups and the same order, a hairline between
@@ -2376,9 +2416,6 @@ function dockSkeleton(panel) {
         <div class="dock-pane dock-pane-map dock-pane-twin" id="${dockPaneId('twin')}" data-dock="twin" hidden>
           ${DigitalTwin.paneHtml()}
         </div>
-        <div class="dock-pane dock-pane-map dock-pane-ar" id="${dockPaneId('ar')}" data-dock="ar" hidden>
-          ${StationAR.paneHtml()}
-        </div>
       </div>
     </div>`;
 }
@@ -2452,7 +2489,7 @@ function dockMapListed(e) {
 function dockHas(id) {
   if (id === 'help') return true;
   if (id === 'stations' || id === 'paths') return dockStationsHere();
-  if (id === 'places' || id === 'twin' || id === 'ar') return dockHoldsMapTools();
+  if (id === 'places' || id === 'twin') return dockHoldsMapTools();
   if (!id.startsWith('map-') || state.activeTab !== 'stations') return false;
   const e = dockMapItems.get(id);
   if (e) return dockMapListed(e);
@@ -2466,9 +2503,12 @@ function dockHas(id) {
 // the Stations tab opening with the side panel shut for no reason anyone could
 // see; it reads as the default instead. A panel handed back to the map's
 // corner is not that case: its entry is 'away', not gone, and the preference
-// is kept for when it comes back.
+// is kept for when it comes back. 'ar' is the same case by name: the AR
+// station finder's pane, which is the 🔭 Look Around tab now, so a browser
+// that last left the side panel on it opens on the Stations cards instead.
 function dockPreferred() {
   const t = state.dockTab || 'stations';
+  if (t === 'ar') return 'stations';
   return t.startsWith('map-') && dockMapBuilt && !dockMapItems.has(t) ? 'stations' : t;
 }
 
@@ -2569,12 +2609,6 @@ function dockStripGroups() {
   if (dockHoldsMapTools()) {
     side.push({ key: 'twin', kind: 'tab', icon: '🧊',
                 label: 'Digital twin — open a station\'s twin, its scene settings, ground truth and the .glb for Blender' });
-  }
-  // The AR station finder (station-ar.js): its pane holds the way in, the
-  // distance and the types; the view itself is the whole screen.
-  if (dockHoldsMapTools()) {
-    side.push({ key: 'ar', kind: 'tab', icon: '🔭',
-                label: 'AR station finder — hold a phone up and see which stations lie the way it faces' });
   }
   const groups = [{ name: 'side', label: '', items: side }];
   const map = [...dockMapItems.values()]
@@ -2717,8 +2751,6 @@ function renderDock(opts = {}) {
   // one of the moments it is brought up to date (a stations file loaded since,
   // a twin opened or put away while it was shut).
   if (showing === 'twin' && dockLastShowing !== 'twin') DigitalTwin.syncPane();
-  // …and the AR finder's says how many stations the map's filters leave it.
-  if (showing === 'ar' && dockLastShowing !== 'ar') StationAR.syncPane();
   syncHelpChrome();
 
   // Same reason renderTabs() does this — a map built on the opening render must
@@ -3460,7 +3492,8 @@ function renderMain() {
   // one that has not got a list yet. And the Field Camera: a photo taken with
   // no list is still stamped and kept, and filed by the database by distance —
   // only the station suggestions wait for the list.
-  const noDataTabs = ['sitemap', 'offline', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations'];
+  // The Views tab is about the nav, not the stations, so it is here too.
+  const noDataTabs = ['sitemap', 'offline', 'views', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -3486,6 +3519,8 @@ function renderMain() {
                        initStationFilters(); initMap(); break;
     case 'sitemap':    el.innerHTML = SiteMap.render();       SiteMap.init();      break;
     case 'offline':    el.innerHTML = OfflineTab.render();    OfflineTab.init();   break;
+    case 'views':      el.innerHTML = NavViews.render();      NavViews.init();     break;
+    case 'lookaround': el.innerHTML = StationAR.render();     StationAR.init();    break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
     case 'passranges': el.innerHTML = renderPassRangesHtml();             break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;
@@ -4875,7 +4910,7 @@ function mapDisplayControlsHtml() {
          same ground at the same scale — from zoom 17 they are markers in the
          twin, and short of that they are pins here. -->
     <label class="filter-check"
-           title="A 📷 pin where each field photo was taken, with a cone the way the camera faced. Click one for the photos taken there. Signed-in editors only, from zoom 12 in.">
+           title="A 📷 pin where each field photo was taken, with a cone the way the camera faced. Click one for the photos taken there. Approved accounts only, from zoom 12 in.">
       <input type="checkbox" ${state.mapPhotos ? 'checked' : ''}
              onchange="MapPhotos.setEnabled(this.checked)">
       Field photos (📷)
@@ -5485,6 +5520,19 @@ function anySearchText() {
 // them changed here at the time. Since the base maps became a blend, initMap()
 // calls it with { panel: false } and Map display carries the section instead.
 
+// Where the map was looking, noted as the tab is left and before the map goes:
+// 🔭 Look Around's "From the map's centre" stands there from its own tab
+// (station-ar.js), and it outlives a reload under 'mn-map-view'.
+function noteStationsView() {
+  const m = state.map;
+  if (!m) return;
+  try {
+    const c = m.getCenter();
+    state.mapLastView = { lat: c.lat, lng: c.lng, zoom: m.getZoom() };
+    localStorage.setItem('mn-map-view', JSON.stringify(state.mapLastView));
+  } catch (_) { /* a map half built, or private mode — the GPS still works */ }
+}
+
 // Take the Stations map down: on the way out of the tab, and again at the top
 // of every render of it.
 //
@@ -5567,7 +5615,7 @@ function initMap() {
   // was inside a pane, the strip's scroll) belongs to a map that is not
   // coming back until somebody returns — and then focus would be thrown onto a
   // strip button nobody pressed. So leaving forgets it.
-  registerTabTeardown('Stations', () => { stopStationsMap(); dockForgetRebuild(); });
+  registerTabTeardown('Stations', () => { noteStationsView(); stopStationsMap(); dockForgetRebuild(); });
   // The cards, when they are in the side panel: leaving the tab has to take
   // them out of it, for the reasons at dropStationsCards(). The pane's button
   // goes with them in the repaint switchTab() makes straight after, which is

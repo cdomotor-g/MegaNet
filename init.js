@@ -33,6 +33,10 @@
   // has drawn: registering a worker is the last thing a first paint needs.
   Pwa.start();
   applyTheme({ repaint: false });
+  // The views an account keeps (nav-views.js), from this device's copy of
+  // them, before the bar is drawn — so a view picked here does not open on
+  // All and change once the database answers.
+  NavViews.start();
   // System follows the device as it changes — a phone that goes dark at
   // sunset takes the app with it (#224).
   try {

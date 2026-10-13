@@ -1,9 +1,11 @@
 // MegaNet — admin.js
 //
 //   Admin   the Admin tab: where the station data comes from and how to load
-//           it, who is signed in and what they may do, the people who may sign
-//           in (users and the allowlist, 0042), the roles and what each one
-//           grants, and the housekeeping tools that had no other home.
+//           it, who is signed in and what they may do, the accounts waiting
+//           for an administrator's approval and whether anybody may sign up
+//           (0062), the people who may sign in (users and the allowlist,
+//           0042), the roles and what each one grants, and the housekeeping
+//           tools that had no other home.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, announce, APP_VERSION and
@@ -32,6 +34,8 @@ const Admin = (function () {
   // What the database last said. null is "not asked yet"; the arrays are the
   // answers of admin_users() and admin_allowlist().
   let users   = null;
+  // Which pending accounts are mid-decision, so their buttons hold still.
+  const deciding = new Set();
   let allow   = null;
   let loading = false;
   let error   = null;
@@ -46,9 +50,15 @@ const Admin = (function () {
   // recorded and not yet enforced (0005), which the panel says rather than
   // leaving it to be discovered.
   const PRIVILEGES = [
-    { who: 'Anyone (not signed in)', how: 'Behind Cloudflare Access only',
-      may: 'Read stations, the maps, telemetry, inspection charts and every tab that reads. Load a stations.json from a file or GitHub.',
+    { who: 'Anyone (not signed in)', how: 'Nothing — reading needs no account',
+      may: 'Read stations, the maps, telemetry, inspection charts and every tab that reads. Load a stations.json from a file or GitHub. Pick All, Simple or Field for the left bar.',
       not: 'Save anything; download the station document or the Radio Mobile set; see field photos, inspection records or a station\'s history.' },
+    { who: 'Account, waiting', how: 'Signed up and confirmed its address; not approved yet (0062)',
+      may: 'Everything anyone may, and keep its own left-bar views on every device.',
+      not: 'See field photos, or anything an editor may — until an administrator approves it below.' },
+    { who: 'Member', how: 'Approved — automatically for an address on the allowlist (any @bom.gov.au), or by an administrator here',
+      may: 'Everything an account may, and see the field photos.',
+      not: 'Edit anything, unless the allowlist also lets it in (Approve as editor does both).' },
     { who: 'Viewer', how: 'app_user.role = viewer',
       may: 'Everything an editor may, today — the role is recorded but not enforced yet.',
       not: 'To stop somebody writing, remove their allowlist entry rather than making them a viewer.',
@@ -152,6 +162,87 @@ const Admin = (function () {
       <div class="button-group"><button onclick="Auth.open()">Account…</button></div>`;
   }
 
+  // ── Accounts waiting, and who may sign up (0062) ──
+
+  // The confirmed accounts nobody has decided about yet and the allowlist does
+  // not approve on its own — the ones an administrator was emailed about —
+  // newest first; and, folded away under them, the sign-ups that have not
+  // confirmed their address, which nobody need act on.
+  function waitingHtml() {
+    if (!users) return '';
+    const waiting = users.filter(u => u.status === 'pending')
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const unconfirmed = users.filter(u => u.status === 'unconfirmed');
+    const row = u => {
+      const busy = deciding.has(u.id);
+      return `
+        <li class="adm-wait-row" data-user="${escAttr(u.id)}">
+          <div class="adm-wait-who">
+            <strong>${esc(u.display_name || u.email)}</strong>
+            ${u.display_name ? `<span class="small txt-muted">${esc(u.email)}</span>` : ''}
+            <span class="small txt-muted">signed up ${when(u.created_at)}${u.confirmed_at ? ` · confirmed ${when(u.confirmed_at)}` : ''}</span>
+          </div>
+          <div class="button-group adm-wait-acts">
+            <button type="button" class="primary" ${busy ? 'disabled' : ''}
+                    onclick="Admin.decide('${escAttr(u.id)}','approve')"
+                    title="A member from now on: the field photos, and its own views">Approve</button>
+            <button type="button" ${busy ? 'disabled' : ''}
+                    onclick="Admin.decide('${escAttr(u.id)}','approve',true)"
+                    title="Approve, and put the address on the allowlist so it may edit as well">Approve as editor</button>
+            <button type="button" class="adm-danger" ${busy ? 'disabled' : ''}
+                    onclick="Admin.decide('${escAttr(u.id)}','decline')"
+                    title="Locked out: it cannot sign in again unless you undo this">Decline</button>
+          </div>
+        </li>`;
+    };
+    return `
+      <div class="panel adm-waiting" id="adm-waiting">
+        <div class="panel-header">
+          <h2 id="adm-wait-h">Waiting for approval <span class="badge${waiting.length ? ' adm-badge-hot' : ''}">${waiting.length}</span></h2>
+        </div>
+        ${waiting.length ? `
+        <p class="small">These accounts confirmed their address, and it is not one the allowlist approves on its own.
+          <strong>Approve</strong> makes one a member — it sees the field photos and keeps its own views;
+          <strong>Approve as editor</strong> also lets it edit; <strong>Decline</strong> locks it out. Each person
+          approved is emailed once the mail is set up (docs/accounts.md).</p>
+        <ul class="adm-wait-list" aria-labelledby="adm-wait-h">${waiting.map(row).join('')}</ul>`
+        : '<p class="small table-empty">Nobody is waiting. Bureau addresses are approved as soon as they are confirmed, so only other addresses ever appear here.</p>'}
+        ${unconfirmed.length ? `
+        <details class="adm-unconfirmed">
+          <summary>${unconfirmed.length} sign-up${unconfirmed.length === 1 ? '' : 's'} not confirmed yet</summary>
+          <p class="small">An address that has not been confirmed counts for nothing, so there is nothing to decide until it is.
+            A sign-up nobody confirms is a typo or a robot.</p>
+          <ul class="adm-unconf-list">${unconfirmed.map(u => `<li class="small">${esc(u.email)} — ${when(u.created_at)}
+            <button type="button" class="exp-btn-sm adm-danger" onclick="Admin.decide('${escAttr(u.id)}','decline')">Decline</button></li>`).join('')}</ul>
+        </details>` : ''}
+        ${signupHtml()}
+      </div>`;
+  }
+
+  // Open, or allowlist only: app_meta signup (0062), as whoami() last said it.
+  function signupHtml() {
+    const open = typeof Auth === 'undefined' || !Auth.signupOpen || Auth.signupOpen();
+    return `
+        <fieldset class="adm-signup">
+          <legend>Who may create an account</legend>
+          <label class="check-inline"><input type="radio" name="adm-signup" value="open" ${open ? 'checked' : ''}
+            onchange="Admin.setSignup(true)"> <span><strong>Anybody</strong> — Bureau addresses are approved as soon as they are
+            confirmed, everybody else waits for an administrator</span></label>
+          <label class="check-inline"><input type="radio" name="adm-signup" value="allowlist" ${open ? '' : 'checked'}
+            onchange="Admin.setSignup(false)"> <span><strong>Only addresses on the allowlist</strong> — for when strangers'
+            sign-ups are more than you want to sort through</span></label>
+        </fieldset>`;
+  }
+
+  // The word for an account's standing, in the users table.
+  const STANDING = {
+    automatic:   ['approved', 'txt-ok', 'Approved by the allowlist — its address or its domain is on it'],
+    approved:    ['approved', 'txt-ok', 'Approved by an administrator'],
+    pending:     ['waiting', 'txt-warn', 'Confirmed, and waiting for an administrator'],
+    declined:    ['declined', 'txt-bad', 'Declined — it cannot sign in'],
+    unconfirmed: ['unconfirmed', 'txt-muted', 'Has not confirmed its address'],
+  };
+
   // ── Users and the allowlist ──
 
   function peopleHtml() {
@@ -168,7 +259,7 @@ const Admin = (function () {
     }
     const status = loading ? '<p class="small">Loading…</p>'
       : error ? `<p class="small txt-bad">${esc(error)}</p>` : '';
-    return `${usersHtml(status)}${allowHtml()}`;
+    return `${waitingHtml()}${usersHtml(status)}${allowHtml()}`;
   }
 
   function usersHtml(status) {
@@ -179,20 +270,20 @@ const Admin = (function () {
           <h2 id="adm-users-h">Users <span class="badge">${list.length}</span></h2>
           <button class="exp-btn-sm" onclick="Admin.load()">Refresh</button>
         </div>
-        <p class="small">Everybody who has signed in, most recently seen first. A person appears here the first time they
-          do; to add somebody, put their address on the allowlist below with the role they
-          should arrive with. <strong>Viewer</strong> is recorded but not enforced yet — to stop
-          somebody editing, remove their allowlist entry.</p>
+        <p class="small">Every account, most recently seen first. Anybody may sign up; to let somebody edit, put their
+          address on the allowlist below with the role they should arrive with (or approve them as an editor above).
+          <strong>Viewer</strong> is recorded but not enforced yet — to stop somebody editing, remove their allowlist
+          entry.</p>
         ${status}
         ${list.length ? `
         <div class="table-wrap" role="region" tabindex="0" aria-labelledby="adm-users-h">
           <table class="adm-table">
             <caption class="sr-only">Signed-in users, their roles, and whether the allowlist lets them edit</caption>
-            <colgroup><col style="width:30%"><col style="width:20%"><col style="width:7.5rem">
-              <col style="width:4.5rem"><col style="width:20%"><col style="width:9.5rem"></colgroup>
+            <colgroup><col style="width:26%"><col style="width:18%"><col style="width:7.5rem">
+              <col style="width:6.5rem"><col style="width:4.5rem"><col style="width:16%"><col style="width:9.5rem"></colgroup>
             <thead><tr>
               <th scope="col">Email</th><th scope="col">Display name</th><th scope="col">Role</th>
-              <th scope="col">May edit</th><th scope="col" class="col-optional">Last seen</th>
+              <th scope="col">Standing</th><th scope="col">May edit</th><th scope="col" class="col-optional">Last seen</th>
               <th scope="col"><span class="sr-only">Actions</span></th>
             </tr></thead>
             <tbody>
@@ -204,6 +295,7 @@ const Admin = (function () {
                   <td><select data-f="role" aria-label="Role for ${escAttr(u.email)}">
                     ${ROLES.map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${r}</option>`).join('')}
                   </select></td>
+                  <td>${standingCell(u)}</td>
                   <td>${u.may_edit ? '<span class="txt-ok">yes</span>' : '<span class="txt-bad">no</span>'}</td>
                   <td class="small col-optional" title="${escAttr(lastSeenTitle(u))}">${u.active_sessions
                     ? '<span class="adm-online">● online</span>'
@@ -211,6 +303,8 @@ const Admin = (function () {
                     ${u.visits_30d ? `<br><span class="txt-muted">${u.visits_30d} day${u.visits_30d === 1 ? '' : 's'} in 30</span>` : ''}</td>
                   <td class="adm-row-acts">
                     <button class="exp-btn-sm" onclick="Admin.saveUser('${escAttr(u.id)}')">Save</button>
+                    ${u.status === 'declined' ? `<button class="exp-btn-sm" onclick="Admin.decide('${escAttr(u.id)}','reset')"
+                        title="Undo the decline: unlocked, and waiting again">Undo decline</button>` : ''}
                     ${u.is_you ? '' : `<button class="exp-btn-sm adm-danger"
                         onclick="Admin.deleteUser('${escAttr(u.id)}')">Delete</button>`}
                   </td>
@@ -219,6 +313,13 @@ const Admin = (function () {
           </table>
         </div>` : (users ? '<p class="small table-empty">Nobody has signed in yet.</p>' : '')}
       </div>`;
+  }
+
+  function standingCell(u) {
+    const st = STANDING[u.status];
+    if (!st) return '—';
+    const by = u.status === 'approved' && u.decided_by ? ` by ${u.decided_by}` : '';
+    return `<span class="${st[1]}" title="${escAttr(st[2] + by)}">${esc(st[0])}</span>`;
   }
 
   // The hover on "Last seen": the absolute times, and what browser the latest
@@ -316,8 +417,8 @@ const Admin = (function () {
             </tbody>
           </table>
         </div>
-        <p class="small">The perimeter is Cloudflare Access; the enforcement is the database
-          (<code>meganet.is_editor()</code>, <code>meganet.is_admin()</code>). This app only asks.</p>
+        <p class="small">The enforcement is the database — <code>meganet.is_editor()</code>,
+          <code>meganet.is_member()</code>, <code>meganet.is_admin()</code> — whatever this page shows. This app only asks.</p>
       </div>`;
   }
 
@@ -469,6 +570,48 @@ const Admin = (function () {
     }
   }
 
+  // One decision about one account (0062: admin_user_decide). Declining is
+  // asked first — it locks the person out — and approving is not: it can be
+  // undone from the users table, and nobody is harmed by it meanwhile.
+  async function decide(id, decision, editor = false) {
+    const u = (users || []).find(x => x.id === id);
+    if (!u || deciding.has(id)) return;
+    if (decision === 'decline' && !(await confirmDialog({ title: `Decline ${u.email}?`,
+      message: 'The account is locked out: it cannot sign in, and a session it already has stops counting at once. '
+        + 'Undo decline in the users table lets it back in.',
+      confirm: 'Decline the account', danger: true }))) return;
+    deciding.add(id);
+    repaint('people');
+    try {
+      await dbRpc('admin_user_decide', { p_id: id, p_decision: decision, p_make_editor: !!editor });
+      announce(decision === 'approve' ? `Approved ${u.email}${editor ? ' as an editor' : ''}.`
+             : decision === 'decline' ? `Declined ${u.email}.` : `${u.email} is waiting again.`);
+      if (decision === 'approve' && typeof Toast !== 'undefined') {
+        Toast.done(`Approved ${u.email}${editor ? ' as an editor' : ''}. They are emailed once the mail is set up.`);
+      }
+    } catch (err) {
+      Toast.failed(err.status === 404
+        ? 'The database cannot decide about accounts yet — apply db/migrations/0062_open_accounts_and_views.sql.'
+        : err.message);
+    }
+    deciding.delete(id);
+    await load();
+    if (typeof Auth !== 'undefined' && Auth.recheck) Auth.recheck();
+  }
+
+  async function setSignup(open) {
+    try {
+      const now = await dbRpc('admin_set_signup', { p_open: !!open });
+      announce(now === 'open' ? 'Anybody may sign up now.' : 'Only addresses on the allowlist may sign up now.');
+      Toast.done(now === 'open' ? 'Sign-up is open: anybody may make an account, and waits for approval.'
+                                : 'Sign-up is closed to everybody but the allowlist.');
+    } catch (err) {
+      Toast.failed(err.message);
+    }
+    if (typeof Auth !== 'undefined' && Auth.recheck) await Auth.recheck();
+    repaint('people');
+  }
+
   function saveUser(id) {
     const row = document.querySelector(`tr[data-user="${CSS.escape(id)}"]`);
     if (!row) return;
@@ -552,6 +695,6 @@ const Admin = (function () {
   }
 
   return { render, init, load, authChanged, saveUser, deleteUser, formField,
-           saveEntry, editEntry, removeEntry, forgetKey, clearLocal };
+           saveEntry, editEntry, removeEntry, forgetKey, clearLocal, decide, setSignup };
 })();
 if (typeof window !== 'undefined') window.Admin = Admin;

@@ -7440,10 +7440,8 @@ hr {
   28%  { opacity: 0; transform: scale(.3) rotate(90deg); }
   100% { opacity: 0; transform: scale(.2) rotate(90deg); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .ll-vivid, .ll-sheen, .load-logo i::before, .load-logo i::after { animation: none; }
-  .ll-sheen, .load-logo i { display: none; }
-}
+/* Still for a device that asks for less motion: in the one reduced-motion
+   block, further down, with everything else that moves. */
 
 /* A wrapping row of pills since #170, not a column of links — the layout comes
    from .pill-row, which this carries alongside; what is left here is the rule
@@ -7676,6 +7674,77 @@ hr {
 }
 
 #tab-nav.collapsed .nav-search { display: none; }
+
+/* ── The view (nav-views.js) ─────────────────────────────────────────────────
+   What the bar lists — All, Simple, Field or an account's own — picked at the
+   top of the bar, under the collapse toggle and over the find box: a labelled
+   select and ✎ to the Views tab. On the icon rail there is no room for a
+   select, so the view's own icon stands in for it, shaped as a .tab-btn like
+   🔎 is, and opens the nav with the cursor on the select. */
+.nav-view {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  margin-bottom: .4rem;
+}
+.nav-view-label {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  flex: 0 0 auto;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.nav-view-ico { font-size: 1rem; letter-spacing: 0; }
+.nav-view-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: .3rem .4rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.nav-view-edit {
+  flex: 0 0 auto;
+  min-width: 2rem;
+  padding: .28rem .4rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text);
+  font-size: .9rem;
+  line-height: 1;
+}
+.nav-view-edit:hover { background: var(--subtle); }
+.nav-view-btn {
+  display: none;
+  align-items: center;
+  gap: .55rem;
+  width: 100%;
+  margin-bottom: .2rem;
+  padding: .42rem .45rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: .92rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.nav-view-btn:hover { background: var(--subtle); border-color: var(--border); }
+#tab-nav.collapsed .nav-view { display: none; }
+#tab-nav.collapsed .nav-view-btn { display: flex; justify-content: center; gap: 0; }
+
+/* The open tab, or a match, that the view leaves out: listed under its own
+   heading, set apart so it does not read as part of the view. */
+.nav-outside .nav-heading { font-style: italic; }
 #tab-nav.collapsed .nav-find-btn { display: flex; justify-content: center; gap: 0; }
 
 /* How many of the nineteen survived the query, for whoever cannot see that the
@@ -10255,6 +10324,100 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   flex-wrap: wrap;
   gap: .5rem;
   margin-top: 1.1rem;
+}
+
+/* ── The sign-in panel's accounts (auth.js, 0062) ──────────────────────────
+   A password box with Show beside it, the provider buttons over a rule that
+   says "or with your email", the line under the address saying how it will be
+   approved, and what an account gives. */
+.au-pw { display: flex; gap: .35rem; align-items: stretch; }
+.au-pw input { flex: 1 1 auto; min-width: 0; }
+.au-show { flex: 0 0 auto; min-width: 4rem; }
+.au-providers { display: grid; gap: .45rem; }
+.au-provider { width: 100%; justify-content: center; font-weight: 600; }
+.au-or {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin: .2rem 0 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.au-or::before, .au-or::after { content: ''; flex: 1 1 auto; border-top: 1px solid var(--border); }
+.au-msg, .au-check, .au-standing { margin: 0; }
+.au-alt, .au-new { margin: .2rem 0 0; color: var(--muted); }
+.au-benefits { margin: .4rem 0 0; padding-left: 0; list-style: none; display: grid; gap: .35rem; font-size: var(--fs-sm); }
+.au-benefits li { display: grid; grid-template-columns: 1.5rem 1fr; gap: .3rem; }
+.au-why > summary, .au-change > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-sm); }
+.au-change .modal-form { margin-top: .5rem; }
+
+/* The banner's button while the account waits for an administrator. */
+#btn-auth.is-waiting .hdr-ico { opacity: .7; }
+
+/* ── The visitor note (auth.js) ─────────────────────────────────────────────
+   Arriving without an account: a card at the foot of the window, on the left
+   where the toasts (centred) and the side panel (right) are not. It takes no
+   focus and asks nothing; × and Not now put it away for a fortnight. On a
+   phone it is the width of the screen, over the foot of the page. */
+.signin-nudge {
+  position: fixed;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + var(--pwa-lift, 0px));
+  z-index: 2150;
+  width: min(25rem, calc(100vw - 2rem));
+  padding: .9rem 1rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, .28);
+}
+.signin-nudge-h { margin: 0 1.8rem .3rem 0; font-size: 1rem; line-height: var(--lh-tight); }
+.signin-nudge p { margin: 0; }
+.signin-nudge .button-group { margin-top: .75rem; }
+.signin-nudge-x {
+  position: absolute;
+  top: .35rem;
+  right: .4rem;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: .1rem .35rem;
+  cursor: pointer;
+}
+.signin-nudge-x:hover { color: var(--text); }
+
+@media (max-width: 560px) {
+  .signin-nudge { left: 1rem; right: 1rem; width: auto; }
+}
+
+/* A count on a tab's button in the nav (navCountHtml, app.js): accounts
+   waiting for an administrator on Admin. On the icon rail it sits on the
+   icon's corner. */
+.nav-count {
+  margin-left: auto;
+  min-width: 1.35rem;
+  padding: 0 .35rem;
+  border-radius: 999px;
+  background: var(--bad);
+  color: var(--panel);
+  font-size: .72rem;
+  font-weight: 700;
+  line-height: 1.35rem;
+  text-align: center;
+}
+#tab-nav .tab-btn { position: relative; }
+#tab-nav.collapsed .nav-count {
+  position: absolute;
+  top: .1rem;
+  right: .1rem;
+  min-width: 1rem;
+  padding: 0 .2rem;
+  font-size: .6rem;
+  line-height: 1rem;
 }
 
 /* The generic shell (Modal.open) — a card with a scrolling body, for the times
@@ -15472,6 +15635,11 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
     transition: none;
   }
 
+  /* The loading card's logo (#212's card, its detailed mark brought to life):
+     no sheen sweeping it and no stars, just the logo. */
+  .ll-vivid, .ll-sheen, .load-logo i::before, .load-logo i::after { animation: none; }
+  .ll-sheen, .load-logo i { display: none; }
+
   *,
   *::before,
   *::after {
@@ -15900,8 +16068,9 @@ button.adm-danger:hover { border-color: var(--bad); }
 .twin-help-list li + li { margin-top: var(--sp-1); }
 
 /* ── 🔭 The AR station finder (station-ar.js) ────────────────────────────────
-   Two things: a pane in the Stations side panel, which is the way in and the
-   settings, and the view it opens over the whole screen — the camera's
+   Two things: the 🔭 Look Around tab's page (it was a pane in the Stations
+   side panel until it took a place of its own in the left bar), which is the
+   way in and the settings, and the view it opens over the whole screen — the camera's
    picture, a pin for each direction standing on the horizon, the heading and
    a little circle of the directions from above at the top, the distance and
    the types at the foot, and a station's sheet rising over them.
@@ -15936,8 +16105,10 @@ button.adm-danger:hover { border-color: var(--bad); }
 }
 
 .ar-pane-head { margin-bottom: 0; }
+.ar-pane-title { margin: 0; font-size: var(--fs-xl); line-height: var(--lh-tight); }
 .ar-pane-lead,
 .ar-pane-note { margin: 0; }
+.ar-page .ar-pane { gap: var(--sp-3); }
 .ar-pane-how > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 600; }
 .ar-pane-how p { margin: var(--sp-2) 0 0; }
 
@@ -16890,7 +17061,7 @@ button.adm-danger:hover { border-color: var(--bad); }
   width: 8.5rem;
   height: auto;
 }
-@media (max-width: 600px) {
+@media (max-width: 560px) {
   .sm-hero { grid-template-columns: 1fr; justify-items: start; }
   .sm-logo { width: 6rem; }
 }
@@ -18882,3 +19053,147 @@ select.kl-in { width: auto; font-family: inherit; }
 @media (max-width: 560px) {
   .mn-sf-panel { max-height: 48vh; }
 }
+
+/* ── 🎛️ The Views tab (nav-views.js) ─────────────────────────────────────────
+   The views on the left, the one open on the right: its groups as boxes, each
+   a list of tab rows with ↑ ↓, Move to… and ✕, which a mouse can also drag;
+   then the tabs the view leaves out, each with Add to…. One column below the
+   tablet step. */
+.vw-page { --page-max: 1100px; }
+.vw-title { margin: 0; font-size: var(--fs-xl); line-height: var(--lh-tight); }
+.vw-lead { margin: 0; font-size: var(--fs-md); }
+.vw-signin p { margin: 0 0 var(--sp-2); }
+.vw-grid {
+  display: grid;
+  grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+.vw-list-panel h3, .vw-editor h3 { margin: 0 0 var(--sp-2); }
+.vw-list { list-style: none; margin: 0 0 var(--sp-2); padding: 0; display: grid; gap: var(--sp-1); }
+.vw-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+}
+.vw-item:hover { background: var(--subtle); }
+.vw-item.is-open { border-color: var(--accent); background: var(--subtle); }
+.vw-item-ico { flex: 0 0 1.4rem; text-align: center; }
+.vw-item-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vw-item-count { margin-left: auto; font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; }
+.vw-in-use { white-space: nowrap; }
+.vw-ed-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.vw-ed-title { margin: 0; }
+.vw-about { margin: var(--sp-2) 0; color: var(--muted); }
+.vw-name { display: grid; gap: var(--sp-1); max-width: 24rem; margin: var(--sp-2) 0 var(--sp-3); font-size: var(--fs-sm); font-weight: 600; }
+.vw-name-input, .vw-group-name {
+  padding: .35rem .5rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.vw-groups { display: grid; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.vw-group {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  min-width: 0;
+}
+.vw-group-head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.vw-group-name { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+.vw-group-title { margin: 0; font-size: var(--fs-md); }
+.vw-group-acts, .vw-tab-acts { display: inline-flex; align-items: center; gap: .25rem; flex: 0 0 auto; }
+.vw-tabs, .vw-missing-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .2rem; min-height: 1.5rem; }
+.vw-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: .3rem .4rem;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--subtle);
+}
+.vw-tab[draggable="true"] { cursor: grab; }
+.vw-tab.is-dragging { opacity: .45; }
+.vw-tab.vw-drop-before { box-shadow: inset 0 3px 0 var(--accent); }
+.vw-tabs.vw-drop-end { box-shadow: inset 0 -3px 0 var(--accent); }
+.vw-grip { color: var(--muted); font-size: .9rem; }
+.vw-tab-ico { flex: 0 0 1.4rem; text-align: center; }
+.vw-tab-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vw-home { color: var(--muted); font-size: var(--fs-sm); }
+.vw-ico-btn {
+  min-width: 2rem;
+  padding: .2rem .4rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--text);
+  line-height: 1.2;
+}
+.vw-ico-btn:hover:not(:disabled) { background: var(--subtle); }
+.vw-ico-btn:disabled { opacity: .45; }
+.vw-danger { color: var(--bad); }
+.vw-to-group, .vw-add {
+  max-width: 9rem;
+  padding: .2rem .3rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.vw-empty { margin: var(--sp-1) 0 0; color: var(--muted); }
+.vw-missing { margin-top: var(--sp-3); }
+.vw-missing h4 { margin: 0 0 var(--sp-2); }
+.vw-missing .vw-tab { background: transparent; border-color: var(--border); }
+.vw-missing-none { color: var(--muted); }
+.vw-save { margin: 0; min-height: 1.2em; }
+.vw-save[data-state="failed"] { color: var(--bad); }
+.vw-save[data-state="saved"] { color: var(--ok); }
+
+@media (max-width: 900px) {
+  .vw-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .vw-tab { flex-wrap: wrap; }
+  .vw-tab-acts { margin-left: auto; }
+  .vw-group-head { flex-wrap: wrap; }
+}
+
+/* ── The Admin tab's accounts waiting for approval (admin.js, 0062) ──────────
+   One row per account: who, when, and the three decisions; the sign-ups not
+   confirmed folded under; and the switch for who may sign up at all. */
+.adm-wait-list, .adm-unconf-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: grid; gap: var(--sp-2); }
+.adm-wait-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warn);
+  border-radius: var(--r-md);
+}
+.adm-wait-who { display: grid; gap: .1rem; min-width: 0; }
+.adm-wait-who > * { overflow-wrap: anywhere; }
+.adm-badge-hot { background: var(--warn); color: var(--panel); }
+.adm-unconfirmed { margin-top: var(--sp-3); }
+.adm-unconfirmed > summary { cursor: pointer; font-size: var(--fs-sm); color: var(--muted); }
+.adm-unconf-list li { display: flex; align-items: center; gap: var(--sp-2); }
+.adm-signup { margin: var(--sp-3) 0 0; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
+.adm-signup legend { padding: 0 .3rem; font-size: var(--fs-sm); font-weight: 600; }
+.adm-signup .check-inline { display: flex; align-items: flex-start; gap: .5rem; margin: .3rem 0; font-size: var(--fs-sm); }
+.adm-signup input { margin-top: .2rem; }

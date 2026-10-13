@@ -25,6 +25,20 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 31, date: '2026-10-13', items: [
+      '<strong>🎛️ Views for the left bar.</strong> A <em>View</em> box at the top of the bar picks what it lists: '
+        + '<strong>All</strong>, <strong>Simple</strong> (no Export, Map Generator or Interference group), or '
+        + '<strong>Field</strong> — what a site visit needs on a phone. Signed in, the new <em>Views</em> tab makes your '
+        + 'own: rename groups, move tabs (or drag them), take out what you never use. They are saved to your account, so '
+        + 'they follow you to every device. A tab a view leaves out is never lost — the find box still finds it.',
+      '<strong>🔭 Look Around has a tab of its own.</strong> The AR station finder — hold a phone up and the stations '
+        + 'the way it faces are pinned over the camera — is in the left bar now, under Stations & networks, instead of '
+        + 'in the Stations map\'s side panel.',
+      '<strong>🔑 Accounts for everyone.</strong> Anybody can now create a free account with an email address and a '
+        + 'password. A Bureau address is approved as soon as it is confirmed; any other is approved by an administrator. '
+        + 'An approved account sees the <strong>field photos</strong> and keeps its own views; forgot your password? '
+        + 'Reset it from <em>Sign in</em>.',
+    ] },
     { n: 30, date: '2026-10-13', items: [
       '<strong>◉ Survey marks are circles now.</strong> With a river gauge\'s pin now a triangle, the survey marks '
         + 'layer draws the circles a survey plan uses: a <strong>ring round a dot</strong> for a benchmark (a mark with '

@@ -100,9 +100,9 @@ MegaNet/
 ├── station-trail.js        ← StationTrail — the stations looked at this session:
 │                             a pill in the map's top row that brings a closed
 │                             card back and goes back to any of them
-├── station-ar.js           ← StationAR — 🔭 the AR station finder: a phone held up,
-│                             the stations the way it faces pinned over the camera's
-│                             picture, its compass turned to true north by WMM2025
+├── station-ar.js           ← StationAR — 🔭 Look Around, the AR station finder: a phone
+│                             held up, the stations the way it faces pinned over the
+│                             camera's picture, its compass turned to true north by WMM2025
 ├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
 ├── lidar-profile.js        ← LidarProfile — 5 m LiDAR (Geoscience Australia) round a
 │                             path's ends and obstacles, spliced into the tiles' profile
@@ -219,6 +219,9 @@ MegaNet/
 │                             pins by health on the Stations map
 ├── site-map.js             ← SiteMap   — Site Map tab (a guide to every other tab,
 │                             and the gold line from each to its button in the nav)
+├── nav-views.js            ← NavViews  — what the left bar lists: All, Simple, Field,
+│                             or a view an account makes on the 🎛️ Views tab, kept in
+│                             the database (0062: user_pref, save_my_views)
 ├── route.js                ← Route     — where you are, in the address bar: the tab,
 │                             the station whose card is up (or Station Health has
 │                             open) and the map's view, so a view can be linked to
@@ -3020,11 +3023,25 @@ on a narrow window.
 
 | Group | Tabs |
 | --- | --- |
-| **Stations & networks** | Stations · Radio Path Maps · Pass Ranges · Export · Map Generator |
+| **Start here** | Site Map · Offline & Install · Views |
+| **Stations & networks** | Stations · Radio Path Maps · Pass Ranges · Export · Map Generator · Look Around |
 | **Interference** | RF Environment · RF Changes · Interference Workbench |
 | **ALERT** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · HFEM Messages · Serial Monitor |
 | **Data** | ARRO Launcher · Plots · Field Data · Message Log |
 | **Site visits** | Inspections · Site Maintenance · Inspection History · Field Camera · Field Photos |
+
+#### Views — what the bar lists (0062)
+A **View** box at the top of the bar picks what it lists. **All** is every tab, as
+the table above files them, and cannot be changed or deleted. **Simple** is All less
+Export, the Map Generator and the Interference group — a subtraction, so a tab added
+later is in it. **Field** is what a site visit needs on a phone: Stations and 🔭 Look
+Around, the camera and photos, the forms, the surveys, and the Message Log and Station
+Health. Which view shows is the device's own choice (`mn-view`). Signed in, the 🎛️
+**Views** tab makes views of your own — rename a group, move a tab up, down or into
+another group (or drag it), take a tab out, add one back — saved to the account
+(`meganet.user_pref`), so they follow it to every device. A view only decides what the
+bar *lists*: the tab you have open is always in it (under *Not in this view* if the
+view leaves it out), and the find box answers from every tab. `npm run views` holds it.
 
 #### Where the grouping comes from
 Three groups held these tabs until #108, and one of the three held eight of the
@@ -4132,7 +4149,8 @@ One column on the right of every tab, the *side panel* (`#help-panel`, called
 pane beside it. ❔ is the help described below; 📍, on the Stations tab, is the
 Stations cards (the red pin, a station's wherever the app draws one); the blue 📍
 under it is Find a place; 〽️ is the path tools (the elevation profile and the link budget);
-🧊 is the digital twin's pane and 🔭 the AR station finder's;
+🧊 is the digital twin's pane (🔭 the AR station finder was beside it until it became the
+Look Around tab, §23);
 and under them, on that tab, every one of the Stations map's own
 controls — its panels as panes with a button each, its buttons as themselves.
 It is the help rail and the Stations tab's right-hand column of cards merged
@@ -4612,7 +4630,9 @@ twin and the HEIC decoder; `npm run photozip` the zip packs and
 
 ### 23. AR Station Finder (Hold a Phone Up, See Which Way the Stations Are)
 
-🔭 in the Stations tab's side panel, in its first group after 🧊. Press **Look
+🔭 **Look Around**, a tab in the left bar under *Stations & networks* (it was a pane
+of the Stations tab's side panel until October 2026, and moved so that a phone in the
+field — under the 🥾 Field view, §14 — reaches it in one press). Press **Look
 around** on a phone and hold it up: the camera's picture fills the screen and the
 stations the way it faces are pinned over it, each pin a callout on a stem whose
 foot stands on the horizon at the station's bearing. A pin names the station and

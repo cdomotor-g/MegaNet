@@ -1,7 +1,7 @@
 // MegaNet — station-ar.js
 //
-//   StationAR   🔭 the AR station finder, a tool in the Stations tab's side
-//               panel: hold a phone up, turn round, and the stations that lie
+//   StationAR   🔭 the AR station finder — the 🔭 Look Around tab in the left
+//               bar: hold a phone up, turn round, and the stations that lie
 //               the way it faces are pinned over the camera's picture — one
 //               pin a direction, the nearest station in it named, its type in
 //               one letter (F field, R repeater, B base, in the map's own
@@ -14,9 +14,19 @@
 // Reaches back to core.js for state, esc, escAttr, announce, fmtKm, bearingDeg,
 // acmaHaversineKm, ROLE_LABEL, proposedTagHtml and registerTabTeardown; across
 // to app.js for filteredStations, primaryRole, stationAlertIdTypes,
-// focusStationOnMap, isPhoneNav and shutDock. All of it from inside its own
-// functions, so this file's position among the modules is free. Nothing
-// executes at load (`npm run toplevel`).
+// focusStationOnMap and switchTab. All of it from inside its own functions, so
+// this file's position among the modules is free. Nothing executes at load
+// (`npm run toplevel`). renderMain() calls render() and init() for the tab.
+//
+// ── A tab of its own ─────────────────────────────────────────────────────────
+// It began as a pane of the Stations tab's side panel, and moved to the left
+// bar (October 2026) because the person who needs it is standing in a paddock
+// with a phone: one press from the bar, under 🥾 Field as much as under All,
+// rather than the Stations map opened, its side panel brought out and a strip
+// of map tools searched for the telescope. The map is not built on this tab, so
+// "From the map's centre" stands where the Stations map was last looking
+// (state.mapLastView, kept by app.js as that tab is left), and "Show on the
+// map" takes the station back to the Stations tab with its card up.
 //
 // ── One pin a direction ──────────────────────────────────────────────────────
 // Thirty kilometres from a town in the south-east is two hundred stations, and
@@ -61,7 +71,7 @@
 //
 // ── Where you are standing, and the picture ──────────────────────────────────
 // The GPS, or — for a desktop, or a look at a site before driving to it — the
-// middle of the map. The camera is asked for only on a phone or a tablet and
+// middle of the map, or where the Stations map was last looking. The camera is asked for only on a phone or a tablet and
 // only when standing where the GPS says: the picture is the place the pins
 // describe. A pin's place on the picture assumes the main camera sees about
 // 66° along its long side (most phones' 1×); there is no browser API to ask.
@@ -473,46 +483,55 @@ const StationAR = (function () {
                class="ar-letter" aria-hidden="true">${LETTER[r]}</span>${esc(SHORT[r])}</button>`).join('')}</div>`;
   }
 
-  // The pane's markup, once, for the side panel's skeleton (app.js,
-  // dockSkeleton): what the tool does, the two ways in, the distance and the
-  // types, and how it works.
-  function paneHtml() {
+  // The tab's page (renderMain): what the finder does, the two ways in, the
+  // distance and the types, and how it works. The ids keep the names they had
+  // as the Stations side panel's pane (ar-pane-*), which the view's own
+  // controls are kept in step with (syncControls) and the checks find them by.
+  function render() {
     loadSettings();
+    const centre = mapCentre();
     return `
-      <div class="ar-pane">
-        <div class="mn-mapctl-head ar-pane-head">
-          <h2 class="mn-mapctl-title" id="ar-pane-h"><span aria-hidden="true">🔭</span> AR station finder</h2>
+      <div class="page ar-page" style="--page-max:760px">
+        <div class="ar-pane">
+          <h2 class="ar-pane-title" id="ar-pane-h"><span aria-hidden="true">🔭</span> Look Around</h2>
+          <p class="ar-pane-lead">Hold your phone up and turn round: the stations the way it faces are pinned over the
+            camera's picture, each with its type — <strong>F</strong> field, <strong>R</strong> repeater, <strong>B</strong> base.
+            One pin a direction: the nearest station that way, and how many more stand behind it. Tap a pin for its station
+            number and ALERT IDs, and the way to it on the map.</p>
+          <div class="button-group ar-pane-go">
+            <button type="button" class="primary" id="ar-pane-gps" onclick="StationAR.open('gps')"
+                    title="Your position by GPS, the way you face by the compass, and the camera's picture">🔭 Look around</button>
+            <button type="button" id="ar-pane-map" onclick="StationAR.open('map')" ${centre ? '' : 'disabled aria-describedby="ar-pane-map-why"'}
+                    title="Stand where the Stations map was last looking instead — no GPS and no camera; turn by the compass, by dragging or with the arrow keys">From the map's centre</button>
+          </div>
+          ${centre ? '' : `<p class="small ar-pane-note" id="ar-pane-map-why">From the map's centre stands where the Stations
+            map was last looking — open the Stations tab once and this button wakes up.</p>`}
+          ${rangeHtml('ar-pane')}
+          ${rolesHtml()}
+          <p class="small ar-pane-note" id="ar-pane-note"></p>
+          <details class="ar-pane-how">
+            <summary>How it works</summary>
+            <p class="small">Your position comes from the GPS and the way the phone faces from its compass, turned to
+              <strong>true north</strong> by the World Magnetic Model — about 11° east of magnetic north in Brisbane, 6° in
+              Cairns. Phone compasses are often 5–15° out, more beside a vehicle: aim at a station you can see, tap its pin,
+              and press <em>I'm facing it</em> to bring every pin into line.</p>
+            <p class="small">It shows the stations the Stations tab's filters leave — set a filter there and it applies here
+              too. Stations are gathered by direction, nearest first, so a pin is the nearest station that way and its number
+              counts the rest; the pin's sheet lists them. The little circle is the same directions from above, the way you
+              face at the top.</p>
+            <p class="small">The camera's picture is drawn on your screen and goes nowhere else — nothing is recorded or
+              sent. On a computer, <em>From the map's centre</em> stands where the Stations map was last looking and turns
+              by dragging or with ← and →.</p>
+          </details>
         </div>
-        <p class="small ar-pane-lead">Hold your phone up and turn round: the stations the way it faces are pinned over the
-          camera's picture, each with its type — <strong>F</strong> field, <strong>R</strong> repeater, <strong>B</strong> base.
-          One pin a direction: the nearest station that way, and how many more stand behind it. Tap a pin for its station
-          number and ALERT IDs.</p>
-        <div class="button-group ar-pane-go">
-          <button type="button" class="primary" id="ar-pane-gps" onclick="StationAR.open('gps')"
-                  title="Your position by GPS, the way you face by the compass, and the camera's picture">🔭 Look around</button>
-          <button type="button" id="ar-pane-map" onclick="StationAR.open('map')"
-                  title="Stand in the middle of the map instead — no GPS and no camera; turn by the compass, by dragging or with the arrow keys">From the map's centre</button>
-        </div>
-        ${rangeHtml('ar-pane')}
-        ${rolesHtml()}
-        <p class="small ar-pane-note" id="ar-pane-note"></p>
-        <details class="ar-pane-how">
-          <summary>How it works</summary>
-          <p class="small">Your position comes from the GPS and the way the phone faces from its compass, turned to
-            <strong>true north</strong> by the World Magnetic Model — about 11° east of magnetic north in Brisbane, 6° in
-            Cairns. Phone compasses are often 5–15° out, more beside a vehicle: aim at a station you can see, tap its pin,
-            and press <em>I'm facing it</em> to bring every pin into line.</p>
-          <p class="small">It shows the stations the map does — the map's filters apply here too. Stations are gathered
-            by direction, nearest first, so a pin is the nearest station that way and its number counts the rest; the
-            pin's sheet lists them. The little circle is the same directions from above, the way you face at the top.</p>
-          <p class="small">The camera's picture is drawn on your screen and goes nowhere else — nothing is recorded or
-            sent. On a computer, <em>From the map's centre</em> turns by dragging or with ← and →.</p>
-        </details>
       </div>`;
   }
 
-  // What the pane says about what it will show, brought up to date whenever it
-  // comes into view (app.js, renderDock).
+  // The tab coming into view: what the page says about what it will show.
+  function init() { syncPane(); }
+
+  // What the page says about what it will show, brought up to date whenever it
+  // is drawn (init).
   function syncPane() {
     loadSettings();
     syncControls();
@@ -523,8 +542,8 @@ const StationAR = (function () {
         const all = state.data.stations.filter(hasPos).length;
         const shown = candidates().length;
         note.textContent = shown < all
-          ? `The map's filters are on: ${shown.toLocaleString()} of the ${all.toLocaleString()} stations with a position, and the finder shows those.`
-          : `${all.toLocaleString()} stations with a position. Filters set on the map apply here too.`;
+          ? `The Stations tab's filters are on: ${shown.toLocaleString()} of the ${all.toLocaleString()} stations with a position, and the finder shows those.`
+          : `${all.toLocaleString()} stations with a position. Filters set on the Stations tab apply here too.`;
       }
     }
   }
@@ -609,7 +628,7 @@ const StationAR = (function () {
   // Open it — from a press, which is what lets an iPhone be asked for its
   // compass (the ask has to be made inside the gesture, before anything waits).
   function open(src) {
-    if (view || !state.data || (src === 'map' && !state.map)) return;
+    if (view || !state.data || (src === 'map' && !mapCentre())) return;
     loadSettings();
     source = src === 'map' ? 'map' : 'gps';
     opener = document.activeElement;
@@ -673,9 +692,12 @@ const StationAR = (function () {
 
   // ── Where the view stands ──────────────────────────────────────────────────
 
+  // The middle of the Stations map if it is up, else where it was last looking
+  // when its tab was left (app.js, noteStationsView) — the Look Around tab has
+  // no map of its own. Null on a device that has never shown the map.
   function mapCentre() {
-    const c = state.map && state.map.getCenter();
-    return c ? { lat: c.lat, lon: c.lng, acc: 0 } : null;
+    const c = state.map ? state.map.getCenter() : state.mapLastView;
+    return c && isFinite(c.lat) && isFinite(c.lng) ? { lat: c.lat, lon: c.lng, acc: 0 } : null;
   }
 
   function startGps() {
@@ -1021,7 +1043,7 @@ const StationAR = (function () {
     el.textContent = parts.join(' · ');
     view.classList.toggle('is-manual', !sensorLive());
     const useMap = $('ar-use-map');
-    if (useMap) useMap.hidden = !(source === 'gps' && gpsError && state.map);
+    if (useMap) useMap.hidden = !(source === 'gps' && gpsError && mapCentre());
     const un = $('ar-unalign');
     if (un) {
       un.hidden = !align;
@@ -1236,16 +1258,16 @@ const StationAR = (function () {
     return at ? at.m : null;
   }
 
-  // Off to the map with it: the station's card, the map on its pin. On a phone
-  // the side panel's pane is a drawer over the map, so it goes too.
+  // Off to the map with it: the Stations tab, the station's card, the map on
+  // its pin. Switching tabs builds the map (renderMain → initMap) before the
+  // card is asked for; the button pressed here is gone by then, so the card
+  // has no opener to hand focus back to.
   function showOnMap() {
     const m = pickedStation();
     if (!m) return;
-    const drawer = typeof isPhoneNav === 'function' && isPhoneNav() && typeof shutDock === 'function';
-    // Focus goes back to Look around — except into a drawer that is going.
-    close({ refocus: !drawer });
-    if (drawer) shutDock({ instant: true });
-    if (typeof focusStationOnMap === 'function') focusStationOnMap(m.s);
+    close({ refocus: false });
+    if (state.activeTab !== 'stations' && typeof switchTab === 'function') switchTab('stations');
+    if (typeof focusStationOnMap === 'function') focusStationOnMap(m.s, null);
   }
 
   // "I'm facing it": north moved so that the picked station is dead ahead.
@@ -1281,7 +1303,7 @@ const StationAR = (function () {
   // No GPS to be had: stand in the middle of the map instead. The picture
   // goes with the GPS — it would be of somewhere else.
   function useMap() {
-    if (!view || !state.map) return;
+    if (!view || !mapCentre()) return;
     stopGps();
     stopCamera();
     source = 'map';
@@ -1343,7 +1365,8 @@ const StationAR = (function () {
   }
 
   return {
-    paneHtml,
+    render,
+    init,
     syncPane,
     open,
     close,

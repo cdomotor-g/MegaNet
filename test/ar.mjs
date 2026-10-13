@@ -1,4 +1,4 @@
-// The AR station finder (station-ar.js) — 🔭 in the Stations side panel.
+// The AR station finder (station-ar.js) — the 🔭 Look Around tab in the left bar.
 //
 // Everything it shows is arithmetic on readings nobody else can see. A heading
 // eleven degrees out still draws a tidy row of pins; a station gathered into
@@ -23,7 +23,9 @@
 // harness sets, compass readings dispatched as the browser would) and on a
 // desktop:
 //
-//   🔭 in the side panel's first group, and its pane; Look around opening the
+//   🔭 Look Around a tab of the left bar, beside Stations (no longer a pane
+//   of the Stations side panel), reached from ☰ on a phone, and its page;
+//   Look around opening the
 //   view with the camera, the GPS and the compass; every station the map shows
 //   within the distance — measured here by a haversine that is not the app's —
 //   in exactly one direction; the heading true north by the declination where
@@ -37,8 +39,10 @@
 //   the same heading, following a turn, and shrugging off a spike; Escape
 //   putting the sheet down, then the view — the camera's tracks ended, the GPS
 //   watch cleared, the compass listeners gone, focus back on Look around; Show
-//   on the map handing the station to its card; and on a desktop the map's
-//   centre, no camera asked for, ← → and a drag turning the view.
+//   on the map taking the station to the Stations tab with its card up; and on
+//   a desktop the centre the Stations map was left at, from the Look Around
+//   tab where there is no map, no camera asked for, ← → and a drag turning the
+//   view.
 //
 //   npm run ar        (-v to print what passed)
 
@@ -279,23 +283,30 @@ try {
     window.removeEventListener = (t, fn, o) => { if (/^deviceorientation/.test(t)) window.__orient.delete(t); return rem(t, fn, o); };
   });
 
-  // ⋮ brings the rail out; 🔭 is in its first group, after 🧊.
+  // 🔭 Look Around is a tab of its own now, last under Stations & networks —
+  // and the Stations side panel has no 🔭 left in its strip.
   if (await page.isVisible('#btn-side')) await page.click('#btn-side');
-  const side = await page.evaluate(() => [...document.querySelectorAll('#help-panel .dock-group[data-group="side"] .dock-tab')]
-    .map(b => b.dataset.dock));
-  check('🔭 is in the side panel\'s first group, after 🧊', JSON.stringify(side.slice(-2)) === '["twin","ar"]', JSON.stringify(side));
-  await page.click('#help-panel .dock-tab[data-dock="ar"]');
+  const where = await page.evaluate(() => {
+    const g = TABS.find(x => x.tabs.some(t => t.id === 'lookaround'));
+    return { group: g && g.group, last: g && g.tabs[g.tabs.length - 1].id,
+             strip: [...document.querySelectorAll('#help-panel .dock-tab')].map(b => b.dataset.dock) };
+  });
+  check('🔭 Look Around is a tab under Stations & networks, and gone from the Stations side panel',
+    where.group === 'Stations & networks' && where.last === 'lookaround' && !where.strip.includes('ar'), JSON.stringify(where));
+  // A phone reaches it the way it reaches any tab: ☰, then the button.
+  await page.click('#btn-nav');
+  await page.click('#tab-nav .tab-btn[data-tab="lookaround"]');
   await page.waitForTimeout(300);
   const pane = await page.evaluate(() => ({
-    showing: dockShowing(),
+    tab: state.activeTab,
     h: document.getElementById('ar-pane-h')?.textContent.trim(),
     range: document.getElementById('ar-pane-range')?.value,
     out: document.getElementById('ar-pane-range-out')?.textContent,
     note: document.getElementById('ar-pane-note')?.textContent,
-    roles: [...document.querySelectorAll('#dock-pane-ar .ar-role')].map(b => `${b.textContent.trim()}:${b.getAttribute('aria-pressed')}`),
+    roles: [...document.querySelectorAll('#main-content .ar-role')].map(b => `${b.textContent.trim()}:${b.getAttribute('aria-pressed')}`),
   }));
-  check('its pane opens: the finder, 30 km, three types on, and what it will show',
-    pane.showing === 'ar' && /AR station finder/.test(pane.h) && pane.out === '30 km'
+  check('its page opens: the finder, 30 km, three types on, and what it will show',
+    pane.tab === 'lookaround' && /Look Around/.test(pane.h) && pane.out === '30 km'
       && JSON.stringify(pane.roles) === '["FField:true","RRepeater:true","BBase:true"]' && /stations with a position/.test(pane.note),
     JSON.stringify(pane));
 
@@ -422,10 +433,10 @@ try {
   check('Escape puts the sheet down, focus on its pin', once.open && once.pick === null && once.focus === nearest[0], JSON.stringify(once));
   await page.keyboard.press('Escape');
   const shut = await page.evaluate(() => ({ view: !!document.getElementById('ar-view'), tracks: window.__tracks.map(t => t.readyState),
-    watching: window.__geo.size, orient: window.__orient.size, focus: document.activeElement?.id, drawer: dockShowing() }));
+    watching: window.__geo.size, orient: window.__orient.size, focus: document.activeElement?.id, tab: state.activeTab }));
   check('…and again shuts the view: the camera\'s tracks ended, the GPS watch cleared, the compass let go, focus on Look around',
     !shut.view && shut.tracks.length > 0 && shut.tracks.every(s => s === 'ended') && shut.watching === 0 && shut.orient === 0
-      && shut.focus === 'ar-pane-gps' && shut.drawer === 'ar', JSON.stringify(shut));
+      && shut.focus === 'ar-pane-gps' && shut.tab === 'lookaround', JSON.stringify(shut));
 
   // An iPhone: the gyro's alpha has no north in it; webkitCompassHeading does.
   console.log('\nAn iPhone\'s compass\n');
@@ -446,16 +457,17 @@ try {
   const spike = await page.evaluate(() => StationAR.debug().heading);
   check('…and a 20° spike in the compass moves it by less than 3.5°', Math.abs(wrap(spike - (m0 + 30 + decl))) < 3.5, String(spike));
 
-  // Show on the map: the station's card, the drawer put away.
+  // Show on the map: the Stations tab, the station's card, no drawer over it.
   await iphone(page, m0 + 30, 37, m0 + 30, 60);
   await absolute(page, nearest[1].b, decl);   // an absolute reading takes over, as it would
   await frames(page);
   await page.tap(`.ar-pin[data-id="${nearest[0]}"] .ar-pin-box`);
   await page.click('#ar-detail .ar-detail-actions button.primary');
   await page.waitForTimeout(400);
-  const handed = await page.evaluate(() => ({ view: !!document.getElementById('ar-view'), card: state.stnCard.id, drawer: dockShowing() }));
-  check('Show on the map: the view shut, the station\'s card open, the drawer put away',
-    !handed.view && handed.card === nearest[0] && handed.drawer === null, JSON.stringify(handed));
+  const handed = await page.evaluate(() => ({ view: !!document.getElementById('ar-view'), card: state.stnCard.id,
+    tab: state.activeTab, drawer: dockShowing() }));
+  check('Show on the map: the view shut, the Stations tab open on the station\'s card, no drawer over it',
+    !handed.view && handed.card === nearest[0] && handed.tab === 'stations' && handed.drawer === null, JSON.stringify(handed));
   await phone.close();
 
   // ── A desktop ──────────────────────────────────────────────────────────────
@@ -475,7 +487,10 @@ try {
     const md = navigator.mediaDevices;
     if (md) { const gum = md.getUserMedia.bind(md); md.getUserMedia = (...a) => { window.__gum++; return gum(...a); }; }
   }, CENTRE);
-  await dp.click('#help-panel .dock-tab[data-dock="ar"]');
+  // The tab has no map: leaving Stations is what keeps where it was looking.
+  await dp.click('#tab-nav .tab-btn[data-tab="lookaround"]');
+  await dp.waitForFunction(() => state.activeTab === 'lookaround' && !state.map
+    && !!document.getElementById('ar-pane-map') && !document.getElementById('ar-pane-map').disabled, null, { timeout: 10_000 });
   await dp.click('#ar-pane-map');
   await dp.waitForFunction(() => StationAR.debug().compass === 'none', null, { timeout: 10_000 });
   dbg = await dp.evaluate(() => StationAR.debug());

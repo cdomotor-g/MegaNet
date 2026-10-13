@@ -467,13 +467,20 @@ const SEED_TWIN_NONE = `async () => {
   for (const d of document.querySelectorAll('#main-content details, #dock-pane-twin details')) d.open = true;
 }`;
 
-// The 🔭 AR station finder's pane (station-ar.js): the way in, the distance and
-// the types, with "How it works" opened so what is inside it is measured too.
-// The view the pane opens is the whole screen and wants a camera, a GPS and a
-// compass this harness does not give it; `npm run ar` drives that.
-const SEED_AR_PANE = `async () => {
-  setDockTab('ar');
-  for (const d of document.querySelectorAll('#main-content details, #dock-pane-ar details')) d.open = true;
+// The 🔭 Look Around tab (station-ar.js) — the AR station finder's page, once
+// a pane of the Stations side panel: the way in, the distance and the types,
+// with "How it works" opened so what is inside it is measured too. The view
+// it opens is the whole screen and wants a camera, a GPS and a compass this
+// harness does not give it; `npm run ar` drives that.
+const SEED_AR_PAGE = `async () => {
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
+// 🎛️ Views (nav-views.js), signed out: the three built-in views, Field open in
+// the editor — its groups and the tabs it leaves out — and the sign-in offer.
+const SEED_VIEWS = `async () => {
+  NavViews.edit('field');
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 }`;
 
 const SEED_TWIN = `async () => {
@@ -813,7 +820,7 @@ const CONVERTED = [
   { id: 'hfem',       label: 'HFEM Messages — the spec\'s ten examples decoded', issue: 'born converted at #154', seed: SEED_HFEM },
   { id: 'stations',   label: 'Stations — the 🧊 digital twin pane, no twin open', issue: 'the Digital Twin tab, folded in', seed: SEED_TWIN_NONE },
   { id: 'stations',   label: 'Stations — a station\'s twin on the map, its ground unreachable, the pane beside it', issue: 'the Digital Twin tab, folded in', seed: SEED_TWIN },
-  { id: 'stations',   label: 'Stations — the 🔭 AR station finder pane', issue: 'new with the tool', seed: SEED_AR_PANE },
+  { id: 'lookaround', label: 'Look Around — the 🔭 AR station finder\'s page', issue: 'new with the tool; a tab of its own with 0062', seed: SEED_AR_PAGE },
   { id: 'photos',     label: 'Field Photos — signed out', issue: 'born converted', seed: SEED_PHOTOS_OUT },
   { id: 'photos',     label: 'Field Photos — a queue, the place editor, the library and the sync', issue: 'born converted', seed: SEED_PHOTOS },
   { id: 'camera',     label: 'Field Camera — as it opens', issue: 'born converted' },
@@ -826,6 +833,8 @@ const CONVERTED = [
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },
   { id: 'sitemap',    label: 'Site Map',        issue: 'born converted' },
+  { id: 'views',      label: 'Views — as it opens, on All', issue: 'born converted' },
+  { id: 'views',      label: 'Views — Field open, signed out', issue: 'born converted', seed: SEED_VIEWS },
   { id: 'offline',    label: 'Offline & Install — as it opens', issue: 'born converted' },
   { id: 'offline',    label: 'Offline & Install — an install prompt held, every browser\'s steps open', issue: 'born converted', seed: SEED_OFFLINE },
   { id: 'levels',     label: 'Level Survey — the list', issue: 'born converted' },

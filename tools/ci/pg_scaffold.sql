@@ -43,6 +43,11 @@ create table if not exists auth.users (
   email_confirmed_at timestamptz
 );
 
+-- Supabase's ban, which GoTrue reads on every sign-in and refresh. 0062 sets
+-- it on a declined account and editor_email() reads it, so the column has to
+-- be here for that function to be created at all.
+alter table auth.users add column if not exists banned_until timestamptz;
+
 -- The three claim readers, in their modern claims-JSON form — the form the
 -- checks' synthetic sessions set (`request.jwt.claims`), not the per-claim
 -- GUCs of older PostgREST.

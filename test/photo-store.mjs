@@ -36,8 +36,10 @@ function bucket() {
   };
 }
 
-// The project: `editor-token` is an editor, `reader-token` is signed in but not
-// one, `sb_secret_ok` is the secret key. Everything else is refused.
+// The project: `editor-token` is an editor, `member-token` an approved account
+// that is not one (0062: may see the photos, may not change them),
+// `reader-token` signed in but neither, `sb_secret_ok` the secret key.
+// Everything else is refused.
 const asked = [];
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
@@ -45,6 +47,11 @@ globalThis.fetch = async (url, init = {}) => {
   asked.push(u);
   if (u.endsWith('/rest/v1/rpc/is_editor')) {
     if (auth === 'Bearer editor-token') return new Response('true', { status: 200 });
+    if (auth === 'Bearer reader-token' || auth === 'Bearer member-token') return new Response('false', { status: 200 });
+    return new Response('{"message":"JWT invalid"}', { status: 401 });
+  }
+  if (u.endsWith('/rest/v1/rpc/is_member')) {
+    if (auth === 'Bearer editor-token' || auth === 'Bearer member-token') return new Response('true', { status: 200 });
     if (auth === 'Bearer reader-token') return new Response('false', { status: 200 });
     return new Response('{"message":"JWT invalid"}', { status: 401 });
   }
@@ -97,6 +104,7 @@ const env = { PHOTOS: bucket() };
 check('no token: no upload', (await put(env, P, null)).status === 401);
 check('a forged token: no upload', (await put(env, P, 'forged')).status === 401);
 check('signed in but not an editor: no upload', (await put(env, P, 'reader-token')).status === 401);
+check('a member — may look, not change — no upload', (await put(env, P, 'member-token')).status === 401);
 check('nothing was stored by any of those', env.PHOTOS.m.size === 0);
 check('an SVG is refused', (await put(env, P, 'editor-token', { type: 'image/svg+xml' })).status === 415);
 check('an HTML page is refused', (await put(env, P, 'editor-token', { type: 'text/html' })).status === 415);
@@ -111,7 +119,12 @@ check('create-only: the same path again is a 409', (await put(env, P, 'editor-to
 
 // ── Signing and reading ──────────────────────────────────────────────────────
 check('no token: nothing signed', (await sign(env, null, [P])).status === 401);
-check('not an editor: nothing signed', (await sign(env, 'reader-token', [P])).status === 401);
+check('signed in, not approved: nothing signed', (await sign(env, 'reader-token', [P])).status === 401);
+{
+  const r = await sign(env, 'member-token', [P]);
+  const b = await r.json();
+  check('a member (0062) gets URLs: seeing the photos is what approval is for', r.status === 200 && !!b.urls[P], `${r.status}`);
+}
 const missingP = 'photo/11111111-2222-4333-8444-555555555555.jpg';
 const sr = await sign(env, 'editor-token', [P, T, missingP, '../x']);
 const signed = await sr.json();
@@ -149,6 +162,7 @@ const get = u => handlePhotos(new Request(u), env);
 // ── Removing ──────────────────────────────────────────────────────────────────
 const del = (token) => handlePhotos(req('DELETE', `/api/photos/field-photos/${P}`, { token }), env);
 check('not an editor: nothing removed', (await del('reader-token')).status === 401 && env.PHOTOS.m.has(`field-photos/${P}`));
+check('a member: nothing removed either', (await del('member-token')).status === 401 && env.PHOTOS.m.has(`field-photos/${P}`));
 check('an editor removes', (await del('editor-token')).status === 200 && !env.PHOTOS.m.has(`field-photos/${P}`));
 check('and its old URL no longer serves', (await get(signed.urls[P])).status === 404);
 

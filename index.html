@@ -533,14 +533,14 @@
        and map-leader.js, whose card and centre it uses. All runtime calls
        (#154). -->
   <script src="station-trail.js?v=20261013a"></script>
-  <!-- 🔭 The AR station finder, a tool in the Stations side panel: a phone held
-       up, the stations the way it faces pinned over the camera's picture, with
-       the compass turned to true north by the World Magnetic Model whose
-       coefficients it carries. After app.js, whose filters, station card and
-       side panel it uses, and beside station-trail.js because it is the same
-       kind of thing — a way to a station that is not the list. All runtime
-       calls (#154); the camera, the GPS and the compass are opened by a press
-       and closed with the view. -->
+  <!-- 🔭 The AR station finder, the Look Around tab in the left bar (it was a
+       pane of the Stations side panel): a phone held up, the stations the way
+       it faces pinned over the camera's picture, with the compass turned to
+       true north by the World Magnetic Model whose coefficients it carries.
+       After app.js, whose filters and station card it uses, and beside
+       station-trail.js because it is the same kind of thing — a way to a
+       station that is not the list. All runtime calls (#154); the camera, the
+       GPS and the compass are opened by a press and closed with the view. -->
   <script src="station-ar.js?v=20261013a"></script>
   <!-- 📸 The Field Camera tab: photos taken in the app, stamped at the shutter
        with where, which way, how high, the station and the time, kept on the
@@ -685,6 +685,12 @@
        and core.js (TABS, HELP), which it reads at call time; nothing runs at
        load. -->
   <script src="site-map.js?v=20261013a"></script>
+  <!-- 🎛️ Views: what the left bar lists — All, Simple, Field, or a view an
+       account makes for itself on the Views tab, kept in the database (0062).
+       Beside the Site Map because both are about the nav; it reads TABS and
+       calls app.js, auth.js and datastore.js at call time, and nothing runs at
+       load — init.js asks it what to draw before the first renderTabs(). -->
+  <script src="nav-views.js?v=20261013a"></script>
   <!-- ⤓ Export in the banner (#227): what the open tab can save of what is
        on screen, through the writers its own buttons call — export.js,
        arro-data.js and the rest, named at call time; nothing runs at

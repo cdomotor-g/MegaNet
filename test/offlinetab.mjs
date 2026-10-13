@@ -149,8 +149,10 @@ async function main() {
         heading: (document.querySelector('#ot-page h2') || {}).textContent,
         button: !!document.querySelector('#tab-nav .tab-btn[data-tab="offline"]'),
       }));
+      // 🎛️ Views joined Start here after it (0062): what the bar lists is
+      // set up before the work too.
       check('📲 Offline & Install is under Start here, after the Site Map, and has its button in the nav',
-        nav.group === 'Start here' && J(nav.order) === J(['sitemap', 'offline']) && nav.button, J(nav));
+        nav.group === 'Start here' && J(nav.order) === J(['sitemap', 'offline', 'views']) && nav.button, J(nav));
       check('?tab=offline opens it', nav.active === 'offline' && /Offline & install/.test(nav.heading || ''), J(nav));
       const bare = await page.evaluate(() => {
         const had = state.data;

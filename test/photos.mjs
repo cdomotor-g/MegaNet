@@ -714,7 +714,7 @@ async function browserHalf() {
     await page.evaluate(() => switchTab('photos'));
     await page.waitForTimeout(200);
     ok('signed out, the tab says the photos are for signed-in editors, and offers no way to add any',
-      /private to signed-in editors/.test(await text('#fp-add-panel')) && !(await page.$('#fp-files')), await text('#fp-add-panel'));
+      /private to approved accounts/.test(await text('#fp-add-panel')) && !(await page.$('#fp-files')), await text('#fp-add-panel'));
     ok('…and asks the project for nothing', db.selects.length === 0 && store.uploads.length === 0, `${db.selects.length} select(s)`);
     ok('the OCR engine is not fetched until a photo needs it', tessRequests.length === 0 && !(await page.evaluate(() => !!window.Tesseract)));
     ok('…nor the HEIC decoder until a HEIC does', heifRequests.length === 0 && !(await page.evaluate(() => !!window.libheif)));

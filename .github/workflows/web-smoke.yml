@@ -712,6 +712,23 @@ jobs:
         working-directory: test
         run: npm run offlinetab
 
+      # The left bar's views (nav-views.js, 0062): All, Simple and Field, a
+      # tab the view leaves out never lost from the bar or the find box, the
+      # Views tab signed out and signed in — an account's own view made,
+      # changed, used, saved in the shape the database accepts, reset and
+      # deleted — with whoami, my_prefs and save_my_views stood in for.
+      - name: Views — what the left bar lists, and an account's own
+        working-directory: test
+        run: npm run views
+
+      # Accounts (auth.js, admin.js, 0062) against a stand-in for Supabase
+      # Auth: the visitor note, a password sign-in, a new account confirmed by
+      # its code and left waiting, a forgotten password and a reset link, an
+      # address not confirmed, and an administrator approving and declining.
+      - name: Accounts — sign-up, sign-in, reset, and approval
+        working-directory: test
+        run: npm run accounts
+
       # Proposed stations (0039) in the editor, on the card and on the map,
       # against a stand-in for save_station() that holds the database's rules
       # (tools/check_proposed_stations.sql holds the real one to them): a
@@ -1110,7 +1127,7 @@ jobs:
         working-directory: test
         run: npm run coordpaste
 
-      # The AR station finder (station-ar.js), 🔭 in the Stations side panel.
+      # The AR station finder (station-ar.js), the 🔭 Look Around tab.
       # Nothing above opens it — the view waits for a press, and wants a camera,
       # a GPS and a compass — and everything it shows is arithmetic nobody can
       # see go wrong: a heading 11° out still draws a tidy row of pins. The World
@@ -1556,6 +1573,13 @@ jobs:
       # a first sign-in arrives with, and the guards against locking everybody out.
       - name: check_user_admin.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_user_admin.sql
+      # Accounts for anybody (0062): sign-up open or closed to the allowlist, a
+      # member approved automatically or by an administrator, a decline that
+      # locks the door at once, the field photos a member's, an account's own
+      # views kept in the shape the app sends, and the grants a stranger with
+      # an account must not have.
+      - name: check_accounts.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_accounts.sql
       # The Admin tab's dashboard (0043): administrators only, and the visit
       # log's anonymous write held to one row a visitor a day, 5,000 a day.
       - name: check_admin_dashboard.sql

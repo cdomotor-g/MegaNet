@@ -10,16 +10,17 @@
 //
 // ── Who may do what ──────────────────────────────────────────────────────────
 //
-// The same people the Supabase bucket let in (tools/storage_bucket.sql:
-// `meganet.is_editor()` for read, write and delete), decided the same way: the
-// caller's own Supabase token is put to `rpc/is_editor` on the project, and the
-// project answers. Nothing here reads a token's claims and trusts them; the
-// database verifies the signature and gives the verdict. The scheduled Dropbox
-// and Google Drive syncs, and the one-off move out of Supabase, carry the
-// project's secret key instead, which the project also verifies (an admin
-// endpoint answers 200 to it and to nothing else).
+// Seeing a photo is a member's (0062: an approved account — every editor is
+// one); adding or removing one is still an editor's. Decided the way the
+// Supabase bucket decided (tools/storage_bucket.sql): the caller's own
+// Supabase token is put to `rpc/is_editor`, and then `rpc/is_member`, on the
+// project, and the project answers. Nothing here reads a token's claims and
+// trusts them; the database verifies the signature and gives the verdict. The
+// scheduled Dropbox and Google Drive syncs, and the one-off move out of
+// Supabase, carry the project's secret key instead, which the project also
+// verifies (an admin endpoint answers 200 to it and to nothing else).
 //
-//   POST   /api/photos/sign                  editor: {bucket, paths, expiresIn}
+//   POST   /api/photos/sign                  member, editor or sync: {bucket, paths, expiresIn}
 //                                            → {urls: {path: url}, missing: [path]}
 //   PUT    /api/photos/<bucket>/<path>       editor or sync: the bytes, create-only
 //   DELETE /api/photos/<bucket>/<path>       editor or sync
@@ -152,8 +153,11 @@ export async function verifyPath(key, bucket, path, exp, sig, now = Date.now()) 
   return diff === 0;
 }
 
-// Who is this bearer: 'editor', 'service', or null. Asked of the project, and
-// remembered for a minute so a page of sixty thumbnails is one question.
+// Who is this bearer: 'editor', 'member' (0062: may see, may not change),
+// 'service', or null. Asked of the project, and remembered for a minute so a
+// page of sixty thumbnails is one question — the whole verdict, so that the
+// routes that admit a member and the ones that do not never disagree about one
+// token. A database before 0062 has no is_member and answers 404: no member.
 async function whoIs(request, fetchImpl = fetch) {
   const m = /^Bearer\s+(\S+)$/i.exec(request.headers.get('Authorization') || '');
   if (!m) return null;
@@ -173,6 +177,17 @@ async function whoIs(request, fetchImpl = fetch) {
       });
       if (res.ok && (await res.json()) === true) who = 'editor';
     } catch (_) { /* not answered: not admitted */ }
+    if (!who) {
+      try {
+        const res = await fetchImpl(`${SUPABASE_URL}/rest/v1/rpc/is_member`, {
+          method: 'POST',
+          headers: { apikey: PUBLISHABLE_KEY, Authorization: `Bearer ${token}`,
+                     'Content-Profile': 'meganet', 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        if (res.ok && (await res.json()) === true) who = 'member';
+      } catch (_) { /* not answered: not admitted */ }
+    }
   }
   if (!who) {
     // A secret key (new `sb_secret_…` or a legacy service_role JWT) is the only
@@ -189,8 +204,12 @@ async function whoIs(request, fetchImpl = fetch) {
   return who;
 }
 
+// May change what is stored: an editor, or the syncs' secret key — never a
+// member, who may only look.
+function mayChange(who) { return who === 'editor' || who === 'service'; }
+
 async function sign(request, env, url) {
-  if (!(await whoIs(request))) return json({ error: 'sign in as an editor to see field photos' }, 401);
+  if (!(await whoIs(request))) return json({ error: 'sign in with an approved account to see field photos' }, 401);
   let body;
   try { body = await request.json(); } catch (_) { return json({ error: 'expected a JSON body' }, 400); }
   const bucket = body && body.bucket;
@@ -237,7 +256,10 @@ async function serve(request, env, url, t) {
 }
 
 async function put(request, env, t) {
-  if (!(await whoIs(request))) return json({ error: 'sign in as an editor to add field photos' }, 401);
+  const who = await whoIs(request);
+  if (!mayChange(who)) {
+    return json({ error: who === 'member' ? 'adding field photos is for editors' : 'sign in as an editor to add field photos' }, 401);
+  }
   let type = (request.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
   if (!type || type === 'application/octet-stream') type = typeOfPath(t.path);
   if (!TYPES.includes(type)) return json({ error: `not a photo type this store keeps: ${type || 'none given'}` }, 415);
@@ -257,7 +279,10 @@ async function put(request, env, t) {
 }
 
 async function remove(request, env, t) {
-  if (!(await whoIs(request))) return json({ error: 'sign in as an editor to remove field photos' }, 401);
+  const who = await whoIs(request);
+  if (!mayChange(who)) {
+    return json({ error: who === 'member' ? 'removing field photos is for editors' : 'sign in as an editor to remove field photos' }, 401);
+  }
   await env.PHOTOS.delete(`${t.bucket}/${t.path}`);
   return json({ ok: true }, 200);
 }

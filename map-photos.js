@@ -204,7 +204,7 @@ const MapPhotos = (function () {
       case 'off':
         return 'A 📷 where each field photo was taken, with a cone the way the camera faced. Click one for the photos.';
       case 'signed-out':
-        return 'Field photos are for signed-in editors — sign in to see where they were taken.';
+        return 'Field photos are for approved accounts — sign in to see where they were taken.';
       case 'zoom':
         return `Zoom in (to level ${MIN_ZOOM} or closer) to see where field photos were taken.`;
       case 'loading':

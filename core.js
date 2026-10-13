@@ -137,6 +137,8 @@ const TABS = [
       find: 'guide overview tour index directory contents orientation beginner introduction getting started help what does each every tab do explained' },
     { id: 'offline',    label: 'Offline & Install',      icon: '📲',
       find: 'offline no signal no reception flight mode airplane mode install app add to home screen homescreen icon pwa progressive web app phone tablet saved cache ready set up device update new version' },
+    { id: 'views',      label: 'Views',                  icon: '🎛️',
+      find: 'layout customise customize personalise personalize arrange rearrange reorder order hide hidden show sidebar left bar menu preset presets simple field fewer declutter favourites favorites my own group groups rename drag drop choose pick switch' },
   ] },
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
@@ -149,6 +151,8 @@ const TABS = [
       find: 'csv radio mobile networks clusters download stations.json backup escape hatch data source' },
     { id: 'mapgen',     label: 'Map Generator',          icon: '🖨️',
       find: 'print paper a4 svg laser cut engrave k40 whisperer contour elevation layers billet plate title block scale bar graticule sheet' },
+    { id: 'lookaround', label: 'Look Around',            icon: '🔭',
+      find: 'ar augmented reality station finder which way direction directions nearby near me around bearing distance compass phone hold up turn facing horizon overlay sighting where is find stations' },
   ] },
   { group: 'Interference', tabs: [
     { id: 'rf',         label: 'RF Environment',         icon: '📶',
@@ -374,6 +378,25 @@ const HELP = {
       { label: 'With no signal — what is kept, and how (README)', href: 'README.md#with-no-signal' },
     ],
   },
+  views: {
+    summary: 'What the bar on the left lists. A <strong>view</strong> is a choice of tabs, put into groups and an '
+           + 'order, and the <strong>View</strong> box at the top of the bar picks one: <strong>All</strong> is every '
+           + 'tab, <strong>Simple</strong> leaves out Export, the Map Generator and the Interference group, and '
+           + '<strong>Field</strong> is what a site visit needs on a phone — Stations, Look Around, the camera and '
+           + 'photos, the forms, the surveys and whether a station is reporting. Signed in, this tab makes views '
+           + 'of your own: rename a group, move a tab up, down or into another group (or drag it), take a tab '
+           + 'out, add one back, and they are kept with your account on every device you sign in on.',
+    watch: [
+      'Which view is showing is this device\'s choice: a phone can stay on Field while the desk you share an '
+      + 'account with stays on All. A device that has never picked starts on the view you last picked anywhere.',
+      'A view only changes what the bar <em>lists</em>. The tab you have open is always in the bar — under '
+      + '<em>Not in this view</em> if the view leaves it out — and the find box at the top answers from every tab.',
+      '<strong>All</strong> cannot be changed or deleted, so nothing is ever lost from the app. Changing '
+      + '<strong>Simple</strong> or <strong>Field</strong> makes it yours; <em>Reset</em> puts the built-in back.',
+      'Picking a view needs no account. Making or changing one does — they are saved to it, not to the browser.',
+    ],
+    related: ['sitemap', 'offline'],
+  },
   propagation: {
     summary: 'A lesson in how radio carries a reading from a gauge to a base station, and the ways it goes wrong on '
            + 'the way — with pictures that move. A <strong>3-D catchment</strong> with field stations, hilltop repeaters '
@@ -404,8 +427,9 @@ const HELP = {
            + 'one column that scrolls on its own; the blue 📍 under it for <strong>Find a place</strong>; '
            + 'and 〽️ for the path tools — the '
            + '<strong>radio path</strong> you clicked, the <strong>elevation profile</strong> and the '
-           + '<strong>link budget</strong> with its fade margin — in a pane of their own; and, under 🧊 '
-           + 'the digital twin, 🔭 the <strong>AR station finder</strong>. Press the '
+           + '<strong>link budget</strong> with its fade margin — in a pane of their own; and 🧊 '
+           + 'the digital twin. (The 🔭 AR station finder is a tab of its own now, <strong>Look Around</strong>, '
+           + 'in the left bar.) Press the '
            + 'button of the pane that is showing and the side panel shuts, giving the map the '
            + 'width; drag its left edge (or focus it and use the arrow keys) to make it wider or '
            + 'narrower. The map\'s own controls are in that strip too, below the side panel\'s own buttons, in groups with a '
@@ -587,19 +611,6 @@ const HELP = {
       + 'catchment is drawn in outline, a river along its course where OpenStreetMap has it, and a '
       + 'river from the file is the stretch its stations span. A lookup that cannot be made says '
       + 'so and leaves the rest of the list standing.',
-      '<strong>🔭 AR station finder</strong> — on a phone, press <em>Look around</em> and hold the phone '
-      + 'up: the stations the way it faces are pinned over the camera\'s picture, each with its type in '
-      + 'a letter of its colour — <strong>F</strong> field (green), <strong>R</strong> repeater (blue), '
-      + '<strong>B</strong> base (red). One pin a direction: the nearest station that way, named, with a '
-      + 'count of how many more stand behind it. The slider sets how far out it looks, and the letters at '
-      + 'the foot switch a type off. Tap a pin for the station\'s number, its ALERT IDs, how far and '
-      + 'which way, the rest of that direction, and <em>Show on the map</em>. North is <em>true</em> '
-      + 'north: the compass is corrected by the World Magnetic Model\'s declination, about 11° in '
-      + 'Brisbane. Phone compasses are often 5–15° out — aim at a station you can see, tap its pin and '
-      + 'press <em>I\'m facing it</em> to bring every pin into line. It shows what the map shows, so the '
-      + 'map\'s filters apply. <em>From the map\'s centre</em> does the same without GPS or the camera; '
-      + 'on a computer, drag or press ← and → to turn. The picture stays on the phone: nothing is '
-      + 'recorded or sent.',
       '<strong>Limit link length</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
       + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 100 km; '
@@ -935,6 +946,28 @@ const HELP = {
     related: ['passranges', 'maps', 'inspections'],
   },
 
+  lookaround: {
+    summary: 'Hold a phone up and turn round: the stations the way it faces are pinned over the camera\'s '
+           + 'picture, each with its type in a letter of its colour — <strong>F</strong> field (green), '
+           + '<strong>R</strong> repeater (blue), <strong>B</strong> base (red). One pin a direction: the nearest '
+           + 'station that way, named, with a count of how many more stand behind it. The slider sets how far out '
+           + 'it looks, and the letters at the foot switch a type off. Tap a pin for the station\'s number, its '
+           + 'ALERT IDs, how far and which way, the rest of that direction, and <em>Show on the map</em>, which '
+           + 'opens the Stations tab on it.',
+    watch: [
+      'North is <em>true</em> north: the compass is corrected by the World Magnetic Model\'s declination, '
+      + 'about 11° in Brisbane. Phone compasses are often 5–15° out — aim at a station you can see, tap its pin '
+      + 'and press <em>I\'m facing it</em> to bring every pin into line.',
+      'It shows the stations the Stations tab\'s filters leave, so a filter set there applies here — and a '
+      + 'station that seems to be missing may simply be filtered out.',
+      '<em>From the map\'s centre</em> does the same without GPS or the camera, standing where the Stations map '
+      + 'was last looking; on a computer, drag or press ← and → to turn. It wakes up once the Stations tab has '
+      + 'been opened on this device.',
+      'The camera\'s picture stays on the phone: nothing is recorded or sent. The view keeps the screen awake '
+      + 'while it is open and lets it sleep again when it closes.',
+    ],
+    related: ['stations', 'camera', 'photos'],
+  },
   maps: {
     summary: 'Browses the bundled Radio-path PDF maps by region, and suggests the relevant map for '
            + 'a given station. The right-hand side lists every map until you open one — with its '
@@ -2824,7 +2857,9 @@ const DB_SCHEMA = 'meganet';
 // connection timed out on every write.
 // 51: site surveys (survey_list, survey_receptions, survey_summary).
 // 52: a station last seen when it was heard (ingest_http's station_status).
-const DB_SCHEMA_VERSION = 61;
+// 62: open accounts, approval and views (0062) — bumped in its own commit,
+// because a database still on 61 then says so on the Admin tab.
+const DB_SCHEMA_VERSION = 62;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
@@ -2994,6 +3029,17 @@ function themeStored() {
   let v = null;
   try { v = localStorage.getItem('mn-theme'); } catch (_) {}
   return THEME_CHOICES.includes(v) ? v : 'system';
+}
+
+// Where the Stations map was last looking, as noteStationsView() (app.js) kept
+// it when the tab was left: { lat, lng, zoom }, or null. 🔭 Look Around's
+// "From the map's centre" stands there from its own tab (station-ar.js),
+// where the map itself has been taken down.
+function storedMapView() {
+  try {
+    const v = JSON.parse(localStorage.getItem('mn-map-view') || 'null');
+    return v && isFinite(v.lat) && isFinite(v.lng) ? { lat: +v.lat, lng: +v.lng, zoom: +v.zoom || 0 } : null;
+  } catch (_) { return null; }
 }
 
 function themeResolve(choice) {
@@ -3812,6 +3858,9 @@ const state = {
   // the right question everywhere it is asked (#224).
   themeChoice: themeStored(),
   theme: themeResolve(themeStored()),
+  // The Stations map's last centre and zoom, kept as the tab is left
+  // (noteStationsView, app.js) — see storedMapView() above.
+  mapLastView: storedMapView(),
 };
 
 // ── Module registries ─────────────────────────────────────────────────────────

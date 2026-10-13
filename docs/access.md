@@ -9,6 +9,14 @@ before changing either, and the page to open when somebody cannot get in.
   may *change* a station. It is `db/migrations/0004_station_writes.sql` and
   `0005_auth.sql`, and it holds whether or not Cloudflare is in front.
 
+> **Accounts changed in October 2026 (0062).** Anybody may now make an account with an
+> email address and a password; a Bureau address is approved as soon as it is confirmed,
+> anybody else by an administrator; an approved account (a *member*) sees the field
+> photos; and who may *edit* is still the allowlist below. The model, the setup steps
+> (email delivery, password rules, templates) and the day-to-day are in
+> [`accounts.md`](accounts.md). Where this page says the gate refuses an unlisted
+> address, read "while sign-up is closed to the allowlist" — the Admin tab's switch.
+
 The second one is the one that actually protects the data. The first one is
 convenience and tidiness: it keeps the app off the open internet, and it is the
 one an organisation's IT department will eventually replace with their own.
@@ -33,8 +41,9 @@ than a sign-in panel, and it starts with the repository, not with Cloudflare.
 
 - Reading is open. The station list, the maps, the ARRO tools and the ACMA data
   all work with nobody signed in, and that is intended, not an oversight.
-- Signing in exists to *write*. Attribution (`updated_by`) and the ability to
-  save at all are what a session buys.
+- Signing in exists to *write* — and, since 0062, to see the field photos once
+  approved, and to keep your own left-bar views. Attribution (`updated_by`) and the
+  ability to save at all are what an editor's session buys ([`accounts.md`](accounts.md)).
 - The allowlist's contents are not a secret worth engineering around. See
   "Deliberate leak", below.
 
@@ -246,9 +255,10 @@ somebody who has bypassed Cloudflare entirely by using the github.io URL.
 - `meganet.is_editor()` — see `0004_station_writes.sql` — decides. It refuses
   `anon` unconditionally, and for an authenticated request it checks the token's
   verified email against **`meganet.editor_allow`**.
-- `meganet.auth_user_gate()` — see `0005_auth.sql` — refuses to create an account
-  at all for an address that is not on that list. An unlisted person does not get
-  a session to be refused later; they never become a user.
+- `meganet.auth_user_gate()` — see `0005_auth.sql` and `0062` — refuses to create an
+  account for an address that is not on that list *while sign-up is closed to the
+  allowlist*. Open (the default since 0062), anybody becomes an account, and what it may
+  do is `is_member()`'s and `is_editor()`'s to say — see [`accounts.md`](accounts.md).
 
 ### Reached through this origin
 
@@ -403,9 +413,11 @@ for. `auth.js` shows the button only once GoTrue's own `/settings` reports the
 the email-and-code flow described above. The session comes back in the URL
 fragment, the same way a magic link's does, and is adopted by the same code.
 
-**Who may edit does not change.** `auth_user_gate()` still refuses to create an
-account for an address that is not on `editor_allow`, and `is_editor()` still
-reads the token's email. Microsoft only proves who the person is.
+**Who may edit does not change.** `is_editor()` still reads the token's confirmed
+email against `editor_allow`; a Microsoft account from outside it is an account like any
+other since 0062 — waiting for approval unless the allowlist approves it (and refused at
+the door while sign-up is closed to the allowlist). Microsoft only proves who the person
+is.
 
 **The provider must be pinned to the Bureau's tenant.** An Entra ID account's
 email claim is whatever its tenant's administrator typed, so an app open to
