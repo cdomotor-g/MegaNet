@@ -219,9 +219,14 @@ const Alert2Plan = (function () {
   function saveScenario() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(sc)); } catch (_) { /* a private window: it still works, unremembered */ }
   }
+  // Whether a scenario is not the proposal. A catchment unticked under
+  // another scope is remembered for when that scope comes back, but makes no
+  // difference to this one, so only the scope's own catchments are compared.
   function differs(a, b) {
-    return Object.keys(DEFAULTS).some(k => a[k] !== b[k]) || JSON.stringify(a.order || []) !== JSON.stringify(b.order || [])
-      || JSON.stringify(a.excluded || []) !== JSON.stringify(b.excluded || []);
+    if (Object.keys(DEFAULTS).some(k => a[k] !== b[k]) || JSON.stringify(a.order || []) !== JSON.stringify(b.order || [])) return true;
+    const C = catalogue();
+    const ea = new Set(a.excluded || []), eb = new Set(b.excluded || []);
+    return C ? C.flat.some(c => ea.has(c.key) !== eb.has(c.key)) : ea.size !== eb.size;
   }
 
   // ── formatting ──
@@ -353,9 +358,11 @@ const Alert2Plan = (function () {
       if (!inScope(s)) continue;
       const roles = s.roles || [];
       const p = placeOf.get(s.id);
-      // A catchment's key: its id for a Queensland basin, and the council
-      // area (marked, so it cannot meet a basin id) for anything outside one.
-      const key = p.cid || `x:${p.catchment}`;
+      // A catchment's key: its id for a Queensland basin; outside one, the
+      // region and the council area together (marked, so it cannot meet a
+      // basin id) — one council area, or none ("—"), turns up under several
+      // hubs, and each is a box of its own.
+      const key = p.cid || `x:${p.region}|${p.catchment}`;
       const hi = priorityOf(s) === 'High';
       if (roles.includes('base')) bases.push({ s, p, key });
       if (roles.includes('repeater')) {
@@ -1028,8 +1035,13 @@ const Alert2Plan = (function () {
     refreshCats();
     repaintLive();
     if (focusKey) {
+      // The box pressed, or — when the press came from outside a folded
+      // picker (the empty plan's own button) — the picker's summary, so focus
+      // is never left on the page itself.
       const el = document.querySelector(`#a2p-cats-body [data-k="${CSS.escape(focusKey)}"]`);
-      if (el && !el.disabled) el.focus();
+      const open = document.getElementById('a2p-cats');
+      if (el && !el.disabled && open && open.open) el.focus();
+      else if (open) open.querySelector('summary').focus();
     }
     if (said) announce(said);
   }
@@ -1066,7 +1078,7 @@ const Alert2Plan = (function () {
           slow.gate.includes('review') ? 'another review team' : slow.gate.includes('repeaters') ? 'another tower crew' : 'faster acquisition'} would shorten it.`
       : `The field crews set the pace: ${s.fieldCrews} crew${s.fieldCrews === 1 ? '' : 's'} take about ${mo(M.fieldMonths)} to reach every station, and nothing else holds them up.`;
     return sec('sum', '1. Summary', `
-      <p>The register lists <strong>${nf(M.nField)} ALERT field stations</strong> (${nf(M.nRain)} rainfall, ${nf(M.nLevel)} river height),
+      <p>${I.partial ? `The ${nf(I.catchmentCount)} catchments ticked hold` : 'The register lists'} <strong>${nf(M.nField)} ALERT field stations</strong> (${nf(M.nRain)} rainfall, ${nf(M.nLevel)} river height),
         <strong>${nf(M.nRep0)} repeaters</strong> — ${nf(M.bbCount)} of them carrying the backbone — and the network is received at
         <strong>${nf(M.nBases)} base stations</strong>, across ${regions} region${regions === 1 ? '' : 's'} and ${nf(I.catchmentCount)} catchments.
         This draft moves all of them from legacy ALERT to ALERT2.${I.partial
@@ -1155,7 +1167,8 @@ const Alert2Plan = (function () {
         Base stations are counted from the register's ${I.radioNetworks} radio networks${sc.basesN ? ` — overridden on the card to ${sc.basesN}`
           : I.partial ? `, scaled to the stations ticked (${nf(M.nBases)})` : ''};
         the register marks ${I.registerBases} site${I.registerBases === 1 ? '' : 's'} with the base role${I.partial ? ' in the catchments ticked' : ''}.${I.partial
-          ? ` ${nf(I.catchmentsInScope - I.catchmentCount)} catchment${I.catchmentsInScope - I.catchmentCount === 1 ? ' is' : 's are'} unticked on the card, and grey on the map.` : ''}</p>
+          ? ` ${nf(I.catchmentsInScope - I.catchmentCount)} catchment${I.catchmentsInScope - I.catchmentCount === 1 ? ' is' : 's are'} unticked on the card${
+            sc.scope === 'qld' ? ', and grey on the map' : ' — the Queensland basins among them grey on the map'}.` : ''}</p>
       <div class="a2p-two">
         ${mapSvg(I, M)}
         ${regionBarsSvg(M)}
@@ -1597,7 +1610,7 @@ const Alert2Plan = (function () {
         </tbody></table></div>
       <h4>Open questions</h4>
       <ul class="a2p-points">
-        <li>Which base stations receive which networks today, and which will receive ALERT2 — the register counts ${I.radioNetworks} radio networks and marks ${I.registerBases} bases.</li>
+        <li>Which base stations receive which networks today, and which will receive ALERT2 — the register counts ${I.radioNetworks} radio networks and marks ${I.registerBases} bases${I.partial ? ' in the catchments ticked' : ''}.</li>
         <li>Who owns each backbone site with no owner on record, and on what terms the Bureau could take it.</li>
         <li>Whether the stations the Bureau does not own convert at the owner's cost, the Bureau's, or shared.</li>
         <li>Supplier pricing at volume, lead time, and the support and warranty terms.</li>
@@ -1738,15 +1751,23 @@ const Alert2Plan = (function () {
     });
     return rows;
   }
+  function exportWhy() {
+    const C = cur();
+    if (!C) return 'An administrator, with the station register loaded, first.';
+    if (emptyPlan(C.I)) return 'No catchment is ticked under Catchments in the plan.';
+    return '';
+  }
   function exportCsv() {
     const C = cur();
-    if (!C) { announce('Load the station register first.'); return; }
+    const why = exportWhy();
+    if (why) { announce(why); return; }
     dlText('alert2-plan-quantities.csv', csvRows(C.M).map(r => r.map(csvEscape).join(',')).join('\r\n') + '\r\n');
     announce('Saved the quantities by catchment as CSV.');
   }
   function exportXlsx() {
     const C = cur();
-    if (!C || typeof XlsxWrite === 'undefined') { announce('The workbook cannot be made yet.'); return; }
+    const why = exportWhy();
+    if (why || typeof XlsxWrite === 'undefined') { announce(why || 'The workbook cannot be made yet.'); return; }
     const { M } = C, s = sc;
     const t = (v, st) => ({ v, s: st });
     const sheets = [
@@ -1809,13 +1830,18 @@ const Alert2Plan = (function () {
     move(i, dir) {
       const C = cur();
       if (!C) return;
-      const order = C.M.order.slice();
+      const order = C.M.order;
       const j = i + dir;
       if (j < 0 || j >= order.length) return;
-      [order[i], order[j]] = [order[j], order[i]];
-      sc.order = order;
+      // The two swap places in the order of every region in the scope, so a
+      // region the ticks have taken out keeps its place for when it is back.
+      const full = regionOrder(inventoryFor([]), sc).slice();
+      const a = full.indexOf(order[i]), b = full.indexOf(order[j]);
+      if (a < 0 || b < 0) return;
+      [full[a], full[b]] = [full[b], full[a]];
+      sc.order = full.concat((sc.order || []).filter(n => !full.includes(n)));
       saveScenario();
-      const name = order[j];
+      const name = order[i];
       repaintLive(`${dir < 0 ? 'up' : 'down'}:${name}`);
       announce(`${name} is now number ${j + 1} in the order.`);
     },
@@ -1849,7 +1875,8 @@ const Alert2Plan = (function () {
         const hot = new Set(C.field.filter(f => f.high).map(f => f.key));
         setExcluded(C.flat.filter(c => !hot.has(c.key)).map(c => c.key));
       } else return;
-      const n = C.flat.length - (sc.excluded || []).length;
+      const ex = new Set(sc.excluded || []);
+      const n = C.flat.filter(c => !ex.has(c.key)).length;
       catsChanged(`cats:${which}`, `${n} of ${C.flat.length} catchments in the plan.`);
     },
     catsToggled(open) { catsOpen = !!open; if (open) syncPartial(); },
@@ -1863,6 +1890,7 @@ const Alert2Plan = (function () {
     },
     exportCsv,
     exportXlsx,
+    exportWhy,
     // For the tests: the scenario, the inventory and the plan as they stand.
     scenario: () => ({ ...sc }),
     defaults: () => ({ ...DEFAULTS }),

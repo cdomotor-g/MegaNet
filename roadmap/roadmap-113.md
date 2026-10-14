@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-14** (revision 152 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-14** (revision 153 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -538,6 +538,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and thirteen `[Human]` issues.
 >
+> **Revision 153 opens and closes nothing** — the catchment picker of revision 152, reviewed by an adversarial workflow and five defects fixed. See revision 153 below.
+>
 > **Revision 152 opens and closes nothing** — at the owner's request, **Catchments in the plan** on the ALERT2 Transition Plan's card: a box for every catchment and region, so the plan covers the catchments chosen rather than the whole of a scope. See revision 152 below.
 >
 > **Revision 151 opens and closes nothing** — at the owner's request: **🧭 ALERT2 Transition Plan**, a tab under *Admin* listed to administrators and nobody else (`tabShown`, `core.js`): a draft for management of the equipment (ERT-A2, 115E-2), where the work is by region and catchment, the network reviews, the backbone repeaters to acquire and remediate first, the timeline, the FTE and the cost by financial year — every figure worked from the register under a card of sliders and switches that re-works it live. See revision 150 below.
@@ -782,6 +784,20 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 153 — 2026-10-14: 🧭 The catchment picker, reviewed — five fixes
+
+Revision 152's picker went through a review workflow (three reviewers — the selection logic, the picker's interaction and accessibility, the document and exports — each finding put to a skeptic told to refute it). Confirmed and fixed in `alert2-plan.js`:
+
+- **One place name under several hubs was one box.** Outside the Queensland basins a catchment was keyed by its council area alone, so in *Everything in the register* the seven hubs' "—" (no council area) shared a key: unticking one unticked all seven, and *Clear every catchment* announced "6 of 75". The key now carries the region; the count is read off the list.
+- **A tick from another scope made the card say "not the proposal"** while every figure read "same as the proposal". The comparison now counts only the scope's own catchments; the tick is still remembered for when that scope comes back.
+- **Reordering regions while one was unticked lost its place** — it came back last. ▲ ▼ now swap within the order of every region in the scope.
+- **With nothing ticked the exports wrote a $604k, 13-month plan for no stations.** They now refuse, and the Export menu says why.
+- **The empty plan's own button dropped focus on the page** when the picker was folded; it now lands on the picker. And three sentences said "the register" of counts that were the selection's, and "grey on the map" of council areas that have no basin.
+
+The review also refuted one claim (a stale picker after a change of scope, already fixed in 152).
+
+**Checks:** `npm run a2plan` 53 → 59, one per fix; `exports`, `help`, `tabs`, `smoke` and the cheap five.
 
 ### Revision 152 — 2026-10-14: 🧭 Choosing the catchments the ALERT2 plan covers
 

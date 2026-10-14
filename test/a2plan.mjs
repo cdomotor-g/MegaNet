@@ -23,7 +23,10 @@
 //                   focus, its region shows a dash, its basin goes grey); a
 //                   region's box clears all of its catchments; a repeater
 //                   outside the ticks stays only if it carries a ticked station;
-//                   nothing ticked says so; presets leave the ticks alone.
+//                   nothing ticked says so and writes no file; presets leave the
+//                   ticks alone; a place name under two hubs is two boxes; a tick
+//                   from another scope is no difference to this one; reordering
+//                   keeps a hidden region's place.
 //   The files       the workbook and the CSV are floodnet-… and carry the plan.
 //
 // Run:  npm run a2plan
@@ -346,6 +349,79 @@ try {
   await page.evaluate(() => { Alert2Plan.catchments('all'); Alert2Plan.preset('proposed'); });
   const all = await page.evaluate(() => Alert2Plan.plan().total);
   ok('"Tick every catchment" and the proposal put the plan back as it was', near(all, cat0.total, 0.01), `${all} against ${cat0.total}`);
+
+  // What the review of the picker found, held.
+  const wide = await page.evaluate(() => {
+    Alert2Plan.reset();   // the regions moved above are a difference of their own
+    Alert2Plan.set('scope', 'all');
+    const C = Alert2Plan.catalogue();
+    const keys = C.flat.map(c => c.key);
+    // Two boxes with the same place name under two hubs are two catchments.
+    const byName = new Map();
+    C.flat.forEach((c, i) => { if (!byName.has(c.name)) byName.set(c.name, []); byName.get(c.name).push(i); });
+    const twin = [...byName.values()].find(l => l.length > 1) || [];
+    let other = null;
+    if (twin.length) {
+      Alert2Plan.catchment(twin[0], false);
+      other = document.querySelector(`#a2p-cats-body input[data-k="cat:${twin[1]}"]`).checked;
+      Alert2Plan.catchment(twin[0], true);
+    }
+    Alert2Plan.catchments('none');
+    const zero = document.getElementById('a2p-cats-n').textContent;
+    Alert2Plan.catchments('all');
+    // A catchment unticked here, then back in Queensland: nothing there differs.
+    const x = C.flat.findIndex(c => c.key.startsWith('x:'));
+    Alert2Plan.catchment(x, false);
+    Alert2Plan.set('scope', 'qld');
+    Alert2Plan.preset('proposed');
+    const note = document.querySelector('.a2p-controls > p.small').textContent;
+    const kept = Alert2Plan.scenario().excluded.length;
+    Alert2Plan.set('scope', 'all');
+    const remembered = !document.querySelector(`#a2p-cats-body input[data-k="cat:${x}"]`).checked;
+    Alert2Plan.catchments('all');
+    Alert2Plan.set('scope', 'qld');
+    return { n: keys.length, unique: new Set(keys).size, twin: twin.length, other, zero, note, kept, remembered };
+  });
+  ok('in the whole register every box is its own catchment — one place name under two hubs is two boxes, and unticking one leaves the other',
+    wide.unique === wide.n && (wide.twin === 0 || wide.other === true), JSON.stringify({ n: wide.n, unique: wide.unique, twin: wide.twin, other: wide.other }));
+  ok('"Clear every catchment" says none is ticked', /^0 of \d+$/.test(wide.zero), wide.zero);
+  ok('a catchment unticked under another scope is remembered there, and is no difference here: the proposal is the proposal',
+    /This is the proposal as drafted/.test(wide.note) && wide.kept === 1 && wide.remembered, JSON.stringify({ note: wide.note.replace(/^.*?(This is[^.:]*).*$/s, '$1'), kept: wide.kept, remembered: wide.remembered }));
+
+  const place = await page.evaluate(() => {
+    const M0 = Alert2Plan.plan();
+    const C = Alert2Plan.catalogue();
+    // A region past the first two, unticked whole; the first two swapped; the
+    // region ticked again — it is where it was.
+    const R = M0.order[3];
+    const gi = C.groups.findIndex(g => g.region === R);
+    Alert2Plan.region(gi, false);
+    const btn = document.querySelector('#a2p-out button[aria-label^="Convert"][aria-label$="later"]');
+    btn.click();
+    Alert2Plan.region(gi, true);
+    const M1 = Alert2Plan.plan();
+    return { R, before: M0.order.indexOf(R), after: M1.order.indexOf(R), swapped: M1.order[0] === M0.order[1] && M1.order[1] === M0.order[0] };
+  });
+  ok('reordering while a region is unticked keeps that region\'s place for when it is back', place.after === place.before && place.swapped, JSON.stringify(place));
+
+  const emptyFiles = await page.evaluate(async () => {
+    document.getElementById('a2p-cats').open = false;
+    Alert2Plan.catsToggled(false);
+    Alert2Plan.catchments('none');
+    const why = Alert2Plan.exportWhy();
+    const named = floodnetName.count || 0;
+    Alert2Plan.exportCsv(); Alert2Plan.exportXlsx();
+    const after = floodnetName.count || 0;
+    const btn = document.querySelector('#a2p-out .a2p-empty button');
+    btn.focus(); btn.click();
+    await new Promise(r => setTimeout(r, 30));
+    const f = document.activeElement;
+    return { why, wrote: after - named, focus: f && f.tagName + (f.closest('#a2p-cats') ? ' in the picker' : ''),
+             back: document.getElementById('a2p-cats-n').textContent };
+  });
+  ok('nothing ticked: neither file is written, and the export menu says why', emptyFiles.wrote === 0 && /No catchment is ticked/.test(emptyFiles.why), JSON.stringify(emptyFiles));
+  ok('the empty plan\'s own button ticks everything and leaves focus on the picker, not the page', /^all /.test(emptyFiles.back) && emptyFiles.focus === 'SUMMARY in the picker', emptyFiles.focus);
+  await page.evaluate(() => { Alert2Plan.preset('proposed'); });
 
   // ── what the page draws ──
   console.log('\nWhat it draws\n');

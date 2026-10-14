@@ -163,7 +163,7 @@ const ExportMenu = (function () {
       ];
     },
     a2plan: () => {
-      const why = () => (typeof Alert2Plan !== 'undefined' && Alert2Plan.plan()) ? '' : 'An administrator, with the station register loaded, first.';
+      const why = () => (typeof Alert2Plan !== 'undefined' ? Alert2Plan.exportWhy() : 'The ALERT2 Transition Plan tab is not loaded.');
       return [
         { label: 'The plan — Excel workbook', sub: 'the summary, the equipment, the regions, the timeline, the cost by financial year and every assumption',
           call: ['Alert2Plan.exportXlsx'], ready: why },
