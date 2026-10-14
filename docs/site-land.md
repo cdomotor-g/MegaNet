@@ -7,10 +7,12 @@ street address, the rural property's name and what the land is mapped as being
 used for.
 
 It is `site-land.js`. `stnCardHtml()` in `app.js` places it right after the
-card's first section — beside the *Owner* row, because it answers the other
-ownership question: whose ground, not whose station. `map-here.js` places it
-between the ground's facts and the nearest stations. `npm run land` holds both
-(see the end).
+station's own facts — it answers the other ownership question to the card's
+*Owner* row: whose ground, not whose station. `map-here.js` places it between
+the ground's facts and the nearest stations. On both cards the **Road and
+bridge** section (`site-roads.js`, [road-owners.md](road-owners.md)) sits
+directly under it and finishes its answer for a road reserve: "council or TMR"
+here, which of the two there. `npm run land` holds both (see the end).
 
 It was asked for in these words: *"we need to know details of the land like
 whether it is council owned or that sort of thing."*

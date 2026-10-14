@@ -3263,6 +3263,13 @@ const state = {
   // "back to the default"; read under this default, it would keep the lines
   // hidden from exactly the people who had tried them once.
   mapLots:        localStorage.getItem('mn-property-boundaries') !== 'off',
+  // Who manages each road and bridge (see MapRoadOwners). Off by default and
+  // remembered, on the catchments' terms rather than the road parcels': it
+  // recolours every road on the map, which is a way of reading the map
+  // somebody chooses rather than one every session should open in, and at a
+  // regional scale it draws — the State-controlled network from about 1:3M —
+  // so its scale gate does not keep a cold load free the way MapRoads' does.
+  mapRoadOwners:  localStorage.getItem('mn-road-owners') === 'on',
   // The 77 Queensland drainage basins (see MapCatchments). Off by default and
   // remembered, on MapContours' terms rather than MapWind's: nothing else in
   // the app asks data/qld-basins.geojson for anything, so unlike the wind

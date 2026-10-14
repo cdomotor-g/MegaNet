@@ -3058,6 +3058,14 @@ hr {
 .legend-line-contour { border-top-color: rgb(214, 104, 26); }
 /* The lot line is white over a dark casing, as MapLots draws it. */
 .legend-line-lot { border-top-color: #fff; box-shadow: 0 0 0 1px rgba(20, 20, 20, .6); }
+/* A road keyed by who manages it (map-road-owners.js): the class's colour
+   through --road, set inline from the same table the server-rendered image is
+   drawn from. A private road is dashed, as on the map; the State-controlled
+   one wears the map's white casing as a ring, which also holds the maroon off
+   the dark theme's panel. */
+.legend-line-owner { border-top-color: var(--road, var(--muted)); }
+.legend-line-owner.is-dashed { border-top-style: dashed; }
+.legend-line-owner.is-cased { box-shadow: 0 0 0 1px #fff, 0 0 0 2px rgba(20, 20, 20, .25); }
 /* The line-of-sight verdict in the legend (#175): the obstructed-link colour,
    through the same token the drawn links take, so the two agree in both
    themes. */
@@ -3314,6 +3322,44 @@ hr {
   pointer-events: none;
 }
 .leaflet-tooltip.mn-road-label::before { display: none; }
+
+/* A bridge's name and whose it is, on hover (map-road-owners.js). The road
+   label's deal — its own near-white ground and fixed dark ink, because it sits
+   over imagery as often as over a street map — with the border in the
+   State-controlled maroon the pins and the roads are keyed in. Anchored on the
+   pin, not the cursor: a bridge is a point. */
+.leaflet-tooltip.mn-bridge-label {
+  background: rgba(255, 255, 255, .95);
+  color: #3a1220;
+  font-size: .72rem;
+  font-weight: 600;
+  border: 1px solid rgba(142, 21, 55, .5);
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  padding: 0 5px;
+  line-height: 1.6;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.leaflet-tooltip.mn-bridge-label::before { display: none; }
+
+/* The bridge pin: a deck with an arch under it, filled with the owner's colour
+   (maroon for Transport and Main Roads, slate for everybody else) and drawn in
+   white over it. The colours are the module's literals, inline in the SVG, so
+   the pin, the road it sits on and the legend are one table; what holds the
+   small shape off any base map is MapSurvey's two-layer shadow. */
+.mn-bridge-div { background: none; border: none; }
+.mn-bridge-pin {
+  display: block;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, .7)) drop-shadow(0 0 1.5px rgba(255, 255, 255, .9));
+}
+.legend-bridge {
+  display: inline-block;
+  flex: none;
+  line-height: 0;
+  vertical-align: middle;
+}
+.legend-bridge .mn-bridge-pin { filter: drop-shadow(0 0 1px rgba(0, 0, 0, .5)); }
 
 /* #150: the permanent name a named river carries on the map. Unlike the sticky
    hover tooltip above, this sits on the line over both basemaps, so it takes

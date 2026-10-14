@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 33, date: '2026-10-14', items: [
+      '<strong>🛣️ Who manages each road and bridge.</strong> Turn on <em>Road &amp; bridge owners (Qld)</em> in '
+        + '🗺️ Map display and every Queensland road is coloured by who manages it: <strong>maroon</strong> for a '
+        + 'State-controlled road (Transport and Main Roads), slate for the council\'s — or, where the State has not '
+        + 'recorded an owner, the council\'s or private — green for national parks and State forests, brown dashed '
+        + 'for private roads. Zoom in and every bridge gets a pin: hover it for whose it is, click it for who to call. '
+        + 'The station card and <em>What is here</em> have a new <em>Road and bridge</em> section under the land: '
+        + 'the nearest road and bridge, who manages each, and the TMR district or council\'s phone number and email.',
+    ] },
     { n: 32, date: '2026-10-13', items: [
       '<strong>🌊 Flood velocity in the digital twin.</strong> The 🧊 pane has a <em>Flood velocity</em> panel: '
         + 'the station card\'s indicative velocity worked out on the twin\'s own ground, in the channel by the gauge '

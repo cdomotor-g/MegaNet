@@ -503,6 +503,19 @@ jobs:
         working-directory: test
         run: npm run roads
 
+      # Who manages each road and bridge (map-road-owners.js, site-roads.js).
+      # The State's Roads and Tracks, TMR's bridge register and QLDTraffic's
+      # road lookup are stubbed with a highway, a council road, an unowned
+      # track, a private lane and three bridges — one of them in both bridge
+      # sets — and the check asserts the image is asked for by owner at each
+      # scale, the duplicate bridge is merged, the pins name their manager,
+      # a callout says who to call, and the card section answers on the
+      # highway, on the council road past a closer footpath, and with the
+      # lookup down.
+      - name: Road and bridge owners — keyed by manager, with who to call
+        working-directory: test
+        run: npm run roadowners
+
       # The QLD SurveyControl service answers any query carrying
       # resultRecordCount with an empty feature set — HTTP 200, no error field
       # — so a per-layer cap made every mark invisible while the note counted

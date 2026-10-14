@@ -273,11 +273,14 @@ try {
   const here = await read(page, 'mn-land-here');
   check('the What is here card carries the land section, keyed by the position to five places',
     !!here && here.key === `${Number(Y.lat).toFixed(5)},${Number(Y.lon).toFixed(5)}`, JSON.stringify(here && here.key));
-  check('…between the ground’s facts and the nearest stations',
+  // The road and bridge section (site-roads.js) sits directly under it: it
+  // finishes the land's answer for a road reserve, "council or TMR".
+  check('…between the ground’s facts and the nearest stations, the road and bridge section under it',
     await page.evaluate(() => {
       const kids = [...document.getElementById('here-card').children];
       const i = kids.findIndex(e => e.id === 'mn-land-here');
-      return i > 0 && /Ground height/.test(kids[i - 1].textContent) && /Nearest station/.test(kids[i + 1].textContent);
+      return i > 0 && /Ground height/.test(kids[i - 1].textContent) && kids[i + 1].id === 'mn-roads-here'
+        && /Nearest station/.test(kids[i + 2].textContent);
     }));
   check('the lot on its plan, with the State’s free SmartMap of it',
     /^Lot 192 on ML2222 SmartMap/.test(here.rows['Lot on plan'] || '')
@@ -310,11 +313,15 @@ try {
     await page.evaluate(() => document.getElementById('here-card').hidden));
   check('the station card’s section answers the same, from the same cache — nothing asked',
     asked.length === beforeCard && JSON.stringify(yan.rows) === JSON.stringify(here.rows), `${asked.length - beforeCard} new`);
-  check('…placed right after the card’s first section, beside the station’s Owner row',
+  // Right after the station's own facts. The Owner row has a section of its
+  // own now, first on the card, with the health section after it, so "right
+  // after the first section" stopped being where this is; what is held is the
+  // order the card means — the station, then its ground, then its road.
+  check('…placed right after the station’s own facts, the road and bridge section under it',
     await page.evaluate(() => {
       const kids = [...document.getElementById('stn-card').children];
       const i = kids.findIndex(e => e.id && e.id.startsWith('mn-land-card-'));
-      return i > 0 && kids[i - 1].matches('.acma-card-head + .acma-sect');
+      return i > 0 && /Stn #/.test(kids[i - 1].textContent) && /^mn-roads-card-/.test(kids[i + 1].id || '');
     }));
   check('the sources name each dataset asked, its custodian and its licence',
     yan.sources.some(t => /Cadastral data — Queensland series/.test(t) && /CC BY 4\.0/.test(t))

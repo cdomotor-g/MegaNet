@@ -6,8 +6,8 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state`, esc/escAttr, acmaHaversineKm,
 // stationLatLonText and copyLatLonPillHtml; across to terrain.js, land-cover.js,
-// map-wind.js, map-catchments.js, map-hubs.js, map-survey.js and site-land.js
-// for the answers,
+// map-wind.js, map-catchments.js, map-hubs.js, map-survey.js, site-land.js and
+// site-roads.js for the answers,
 // to app.js for the card furniture it shares with the station card, and to
 // station-editor.js for the proposed station it opens at the point. All of
 // it from inside its own functions, so this file's position among the modules
@@ -68,6 +68,8 @@ const MapHere = (function () {
   // The land section's element (site-land.js): the station card's section, for
   // a point. Its own id, so a fill meant for a station can never land here.
   const LAND_ID = 'mn-land-here';
+  // The road and bridge section (site-roads.js), on the same terms.
+  const ROADS_ID = 'mn-roads-here';
   // How far apart the two land-cover samples are, in degrees of longitude —
   // about 20 m, which is two pixels of a 10 m raster. The service samples a
   // path rather than a point, so it is asked for the shortest honest path
@@ -312,6 +314,12 @@ const MapHere = (function () {
            section, asked about this point instead (site-land.js). -->
       <div class="acma-sect" id="${LAND_ID}"
            data-mn-land="${escAttr(SiteLand.key(here))}">${SiteLand.html(here)}</div>
+      <!-- Whose road: the nearest road and bridge, who manages each and who to
+           call — the station card's road section, asked about this point
+           (site-roads.js). A pick on a road is how the map answers "whose road
+           is this?", which the road owners layer only colours. -->
+      <div class="acma-sect" id="${ROADS_ID}"
+           data-mn-roads="${escAttr(SiteRoads.key(here))}">${SiteRoads.html(here)}</div>
       <div class="acma-sect">
         ${awayRow('Nearest station', near, `MapHere.goToStation('${near ? escAttr(near.s.id) : ''}')`,
                   'Show this station on the map and open its card')}
@@ -354,6 +362,7 @@ const MapHere = (function () {
     // Asked after the paint, as repaintStnCard asks: the section fills itself
     // in as the answers land, and a repaint with them in hand asks nothing.
     SiteLand.ask(LAND_ID, landPoint());
+    SiteRoads.ask(ROADS_ID, landPoint());
   }
 
   // ── Arming ─────────────────────────────────────────────────────────────────

@@ -4957,6 +4957,17 @@ function mapDisplayControlsHtml() {
       Road parcels (Qld cadastre)
     </label>
     <p class="filter-note" id="map-roads-note">${MapRoads.noteHtml()}</p>
+    <!-- Who manages each road and bridge (map-road-owners.js). Beside the road
+         parcels because it answers the question they leave open: the parcel
+         says where the road reserve is and whose council area it is in, this
+         says whether the road in it is the council's or the State's. -->
+    <label class="filter-check"
+           title="Every Queensland road coloured by who manages it — Transport and Main Roads for a State-controlled road, the council, the Parks and Wildlife Service, a private owner — and every bridge a pin that says whose it is. Click a bridge for who to call. State-controlled roads from about 1:3,000,000, every road from about 1:150,000.">
+      <input type="checkbox" ${state.mapRoadOwners ? 'checked' : ''}
+             onchange="MapRoadOwners.setEnabled(this.checked);rerenderMapLegend()">
+      Road &amp; bridge owners (Qld)
+    </label>
+    <p class="filter-note" id="map-road-owners-note">${MapRoadOwners.noteHtml()}</p>
     <label class="filter-check"
            title="Every lot in the Queensland cadastre (DCDB) — the land parcels Queensland Globe draws — with its lot/plan written in once you are close enough to read it.">
       <input type="checkbox" ${state.mapLots ? 'checked' : ''}
@@ -5181,6 +5192,7 @@ function mapLegendOffLayersHtml() {
     !state.mapContours        && 'LiDAR contours',
     !state.mapPeaks           && 'Highest ground in view',
     !state.mapRoads           && 'Road parcels',
+    !state.mapRoadOwners      && 'Road & bridge owners',
     !state.mapLots            && 'Property boundaries',
     !state.mapPhotos          && 'Field photos',
     !state.mapSiteFeatures    && 'Site features',
@@ -5403,6 +5415,7 @@ function mapLegendHtml() {
       <span class="legend-sq" style="--dot:${MapRoads.legendColour()}"></span>
       <span class="small">Road parcel — the road reserve, not the road (Qld cadastre). Hover for its name</span>
     </span>` : ''}
+    ${MapRoadOwners.active() ? MapRoadOwners.legendHtml() : ''}
     ${MapCatchments.active() ? mapCatchmentLegendHtml() : ''}
     ${MapHubs.active() ? mapHubLegendHtml() : ''}
     ${state.mapWind ? mapWindLegendHtml() : ''}
@@ -5583,6 +5596,7 @@ function stopStationsMap() {
   MapSites.detach();
   Places.detach();
   MapRoads.detach();
+  MapRoadOwners.detach();
   MapLots.detach();
   MapPhotos.detach();
   MapWind.detach();
@@ -5752,6 +5766,7 @@ function initMap() {
   // it was showing again on a map built new.
   Places.attach(state.map);
   MapRoads.attach(state.map);
+  MapRoadOwners.attach(state.map);
   MapLots.attach(state.map);
   MapPhotos.attach(state.map);
   MapWind.attach(state.map);
@@ -7361,6 +7376,8 @@ function repaintStnCard() {
   SiteExposure.ask(`mn-exposure-card-${s.id}`, s);
   // The land section, on the same terms (site-land.js).
   SiteLand.ask(`mn-land-card-${s.id}`, s);
+  // …and the road and bridge beside it, on the same terms (site-roads.js).
+  SiteRoads.ask(`mn-roads-card-${s.id}`, s);
   // The equipment register, for a signed-in editor, on the same terms.
   if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
   // …and its site features (site-features.js), kept per station for two
@@ -7616,6 +7633,7 @@ function stnCardHtml(s) {
   const slsId    = `mn-sls-card-${s.id}`;
   const expId    = `mn-exposure-card-${s.id}`;
   const landId   = `mn-land-card-${s.id}`;
+  const roadsId  = `mn-roads-card-${s.id}`;
   const ownerId  = `mn-owner-card-${s.id}`;
   const nets     = (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean).join(', ');
   const isRpt    = s.roles.includes('repeater');
@@ -7703,6 +7721,14 @@ function stnCardHtml(s) {
          exposure section below is; a station outside Queensland is told so. -->
     ${located ? `<div class="acma-sect" id="${escAttr(landId)}"
          data-mn-land="${escAttr(SiteLand.key(s))}">${SiteLand.html(s)}</div>` : ''}
+    <!-- The road and the bridge at the station, and who manages them — TMR,
+         the council, a park, a private owner — with who to call
+         (site-roads.js). Under the land because it finishes its answer: a
+         road reserve there is "council or TMR", and this says which. Filled by
+         SiteRoads.ask, the way the land section is; a station outside
+         Queensland is told so. -->
+    ${located ? `<div class="acma-sect" id="${escAttr(roadsId)}"
+         data-mn-roads="${escAttr(SiteRoads.key(s))}">${SiteRoads.html(s)}</div>` : ''}
     <!-- The flood classes, crossing and gauge survey recorded on the station
          (0031), from the Bureau's river height station lists and whatever an
          editor has added since. Its own section, like the SLS below it, and

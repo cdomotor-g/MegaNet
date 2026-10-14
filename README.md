@@ -167,6 +167,13 @@ MegaNet/
 ├── site-land.js            ← SiteLand  — the land at a station or a picked point:
 │                             lot, tenure, who holds it, council, address, land use,
 │                             from the Queensland cadastre
+├── site-roads.js           ← SiteRoads — the road and bridge at a station or a picked
+│                             point: who manages each (TMR, the council, a park,
+│                             private) and who to call, from the State's road data
+│                             and QLDTraffic's road lookup
+├── map-road-owners.js      ← MapRoadOwners — the Stations map's Road & bridge owners:
+│                             every Qld road coloured by its manager, bridge pins
+│                             that say whose they are and who to call
 ├── map-photos.js           ← MapPhotos — the Stations map's 📷 pins, a cone each
 │                             way the camera faced
 ├── modal.js                ← Modal     — the shared dialog shell, and confirmDialog /
@@ -269,6 +276,7 @@ MegaNet/
 │   ├── network-review.md                   (the Network Review tab, and how the fade margin was calibrated against the field)
 │   ├── site-exposure.md                    (tides and soils on the station card — rows, sources, limits)
 │   ├── site-land.md                        (the land — tenure, council, address — on the station and What is here cards)
+│   ├── road-owners.md                      (who manages each road and bridge — the map layer, the card section, sources, limits, what else QLDTraffic has)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
 │   ├── 357 Filter doco.doc                  (the 1998 first edition of the same spec)
@@ -2211,6 +2219,29 @@ image per view rather than vectors, because a suburban screenful is thousands
 of lots; nothing in it takes the pointer, and the lot/plan label says what a
 callout would have.
 
+**Road and bridge owners.** *Road & bridge owners (Qld)*, in the same **Map
+display** panel, colours every Queensland road by who manages it — **maroon**
+over a white casing for a State-controlled road (Transport and Main Roads),
+dark slate for the council's, a thinner, lighter slate for the roads the State
+has recorded no owner for (the council's or private — most roads, and not
+guessed), green for national parks and State forests, brown dashed for private
+roads and teal for ports, water and utility authorities — and draws every
+bridge as a pin: maroon for a bridge on TMR's register, slate for any other,
+which goes with the road it carries and is normally the council's. Hover a
+bridge for its name, its manager and the road it carries; click it for TMR's
+structure number and who to call — the TMR district, the council, or the
+road's own operator — from QLDTraffic's road lookup. **Off by default**, and
+remembered: it recolours the whole road network, which is a reading of the map
+somebody chooses. Wider than about 1:3,000,000 it draws nothing, to about
+1:150,000 only the State-controlled network, and closer in every road (no
+footpaths, bikeways, ferries or proposed roads); the bridges from zoom 13. The
+roads are one server-rendered image per view — a city's screenful is thousands
+of road segments — so they take no pointer; **What is here** on a road says
+whose it is, in the same *Road and bridge* section the station card carries.
+The sources are the State's Queensland Roads and Tracks (CC BY 4.0) and TMR's
+bridge register (CC BY 3.0 AU); Queensland only. `docs/road-owners.md` has the
+classes, the sources, the limits and what else QLDTraffic publishes.
+
 **Wind loading regions.** *Wind regions (AS/NZS 1170.2)*, another **Map
 display** switch, draws the Standard's wind loading regions — A0–A5, B1, B2,
 C and D — under the pins, on the severity ramp the Standard's own map uses:
@@ -2983,6 +3014,13 @@ Side panel or modal showing full station record:
   rural property's name and the mapped land use. Queensland does not publish
   owners, so freehold says the owner is on the title and links to a title
   search (`site-land.js`; `docs/site-land.md` has what each row means)
+- **Road and bridge — who manages them** (Queensland), under the land: the
+  nearest road and whether it is State-controlled (Transport and Main Roads),
+  the council's, a park's or private — most roads have no owner recorded, and
+  those say *the council's, or private* rather than a guess — the nearest
+  bridge and whether it is on TMR's register (with its structure number), and
+  who to call: the TMR district, the council or the road's own operator, from
+  QLDTraffic's road lookup (`site-roads.js`; `docs/road-owners.md`)
 - **Equipment**, for signed-in editors: what the station's register says is
   fitted there, once an administrator has approved it (`photo-review.js`)
 - **Site features**, for signed-in editors: where its orifice outlet, pits,
