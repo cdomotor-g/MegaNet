@@ -19412,6 +19412,30 @@ select.kl-in { width: auto; font-family: inherit; }
 .a2p-out-v { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .a2p-switch { align-items: flex-start; color: var(--text); }
 .a2p-switch input { margin-top: .2rem; }
+/* The catchment picker: a region's box in its legend, its catchments' boxes
+   in a grid that reflows to one column on a phone. */
+.a2p-cats { margin-top: var(--sp-1); }
+.a2p-cats > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 600; }
+.a2p-cat-acts { margin: var(--sp-2) 0; }
+.a2p-cat-regs { display: grid; gap: var(--sp-3); }
+.a2p-cat-reg {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  min-width: 0;
+}
+.a2p-cat-reg legend { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem var(--sp-2); padding: 0 .3rem; }
+.a2p-cat-all { color: var(--text); }
+.a2p-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
+  gap: .3rem var(--sp-3);
+}
+.a2p-cat { color: var(--text); align-items: flex-start; min-width: 0; }
+.a2p-cat input { margin-top: .2rem; }
+.a2p-cat > span { overflow-wrap: anywhere; }
+.a2p-empty h3 { margin-top: 0; }
 .a2p-rates { margin-top: var(--sp-3); }
 .a2p-rates > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 600; }
 .a2p-rate-grid {

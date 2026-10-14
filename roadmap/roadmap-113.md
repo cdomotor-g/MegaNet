@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-14** (revision 151 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-14** (revision 152 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -538,6 +538,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and thirteen `[Human]` issues.
 >
+> **Revision 152 opens and closes nothing** — at the owner's request, **Catchments in the plan** on the ALERT2 Transition Plan's card: a box for every catchment and region, so the plan covers the catchments chosen rather than the whole of a scope. See revision 152 below.
+>
 > **Revision 151 opens and closes nothing** — at the owner's request: **🧭 ALERT2 Transition Plan**, a tab under *Admin* listed to administrators and nobody else (`tabShown`, `core.js`): a draft for management of the equipment (ERT-A2, 115E-2), where the work is by region and catchment, the network reviews, the backbone repeaters to acquire and remediate first, the timeline, the FTE and the cost by financial year — every figure worked from the register under a card of sliders and switches that re-works it live. See revision 150 below.
 >
 > **Revision 150 edits #237 and closes nothing** — at the owner's request, after a Bureau password reset that "never arrived": the auth log showed the email sent and its link opened four minutes later from a cloud address, the Bureau's mail scanner using it up. Email links now open the app on a **Continue** button and verify only when it is pressed (`auth.js`); #237's Part 5 has the templates that send them. See revision 150 below.
@@ -780,6 +782,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 152 — 2026-10-14: 🧭 Choosing the catchments the ALERT2 plan covers
+
+At the owner's request: *"add an ability to select which catchments we're going to remediate, rather than just the 3 kinda all or nothing options"*. Nothing opened or closed.
+
+- **Catchments in the plan** (`alert2-plan.js`, on the 🎛️ card): every catchment in the scope under its region, a box each; a region's box ticks or clears all of its catchments and shows a dash for some; *Tick every catchment*, *Clear every catchment* and *Only those with High-priority SLS sites*. The box pressed keeps its focus while the plan is worked again. The choice is kept on the device as the catchments left out, so one the register gains later starts ticked.
+- **What a tick decides**: the register count is now a catalogue of the scope, cut to the ticks. An unticked catchment's field stations and bases leave the plan and its basin goes grey on the map. **A repeater outside the ticks stays in when it carries a ticked station** (by its pass ranges, within 150 km — Network Review's rule), because that station's readings reach a base through it; the plan marks it as outside. The bases scale to the share of stations ticked unless the card sets them. The five figures compare against the proposal over every catchment, so "▼ $5.4m less than the proposal" answers "what if we only did these". Presets leave the ticks alone. Nothing ticked says so rather than drawing a plan of zeros. The summary, the assumptions table, the CSV (a *Ticked* column) and the workbook say what was ticked.
+
+**Checks:** `npm run a2plan` (37 → 53: the picker lists every catchment once, and is redrawn when the scope changes; unticking one takes exactly its stations out, keeps focus, dashes its region, greys its basin and is kept; ticking it again restores the plan exactly; a region's box; one catchment alone with the repeaters that carry it; nothing ticked; High-priority only; presets and leaving the tab keep the ticks). `npm run tabs` (the picker open at 375, 768 and 1440 in both themes), `smoke`, and the cheap five.
 
 ### Revision 151 — 2026-10-14: 🧭 ALERT2 Transition Plan — a draft for management, and a nav that can hide a tab
 

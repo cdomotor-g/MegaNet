@@ -5009,6 +5009,14 @@ from the station register as loaded:
   cost** by category and by financial year; the assumptions, risks, open questions,
   the decisions sought, and the sources.
 
+**Catchments in the plan**, on the card, has a box for every catchment in the scope under
+its region (a region's own box ticks or clears all of them, and shows a dash for some),
+with *Tick every catchment*, *Clear every catchment* and *Only those with High-priority
+SLS sites*: an unticked catchment's stations leave the plan and its basin goes grey on the
+map. A repeater outside the ticked catchments stays in when it carries a station inside
+them, marked as outside; the bases scale to the share of the network ticked unless the
+card sets them.
+
 Above it, **🎛️ Try it another way**: sliders and switches for the scope, crews,
 pace, the backbone-first and review switches, the wet season, stations converted
 on FWIN upgrade visits, acquisitions, contingency and every unit rate, with

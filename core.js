@@ -2122,13 +2122,17 @@ const HELP = {
            + 'the <strong>backbone repeaters</strong> to acquire and remediate first, the <strong>timeline</strong>, the '
            + '<strong>effort in FTE</strong> and the <strong>cost</strong> by financial year. Every figure is worked from the '
            + 'station register as loaded, under <strong>🎛️ Try it another way</strong> — sliders and switches that work the '
-           + 'whole plan again as they move. Listed to administrators only.',
+           + 'whole plan again as they move, and <strong>Catchments in the plan</strong>, a box for every catchment and region '
+           + 'to choose which are remediated. Listed to administrators only.',
     watch: [
       '<strong>It is an estimate, and says so.</strong> The quantities are counted from the register; the rates, '
       + 'durations and unit prices are the draft\'s proposals, and a supplier\'s quote replaces them under '
       + '<em>Unit costs and rates</em>.',
-      '<strong>The scenario is kept on this device only.</strong> “The proposal” puts it back; the five figures at the '
-      + 'top say how far any other scenario moved from it.',
+      '<strong>The scenario is kept on this device only.</strong> “The proposal” puts the sliders back and leaves the '
+      + 'catchments ticked as they are; the five figures at the top say how far any scenario is from the proposal over '
+      + 'every catchment.',
+      '<strong>A repeater outside the catchments ticked stays in the plan</strong> when it carries a station inside them — '
+      + 'that station\'s readings reach a base through it — and the plan marks it as outside.',
       '<strong>The backbone is map-backbone.js\'s rule</strong> — repeaters sharing an open pass-range window with another, '
       + 'or with a base, within the hop distance on the card. Owners come from the station record or the SLS, and a site '
       + 'with neither is counted as “no owner on record”, not guessed.',

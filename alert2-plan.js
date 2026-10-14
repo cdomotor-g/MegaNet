@@ -175,10 +175,13 @@ const Alert2Plan = (function () {
     'West / South West': 'west', 'NSW Border': 'nsw',
   };
   const REMOTE = new Set(['Far North', 'West / South West', 'Gulf and Cape York']);
+  const LONG_LINK_KM = 150;         // a pass-range link longer than this is an address collision
 
   // ── state ──
   let sc = loadScenario();
-  let inv = null, invKey = null;
+  let cat = null, catKey = null;     // the scope, before the catchment ticks
+  const cuts = new Map();            // …and after them, by selection: what a plan is worked from
+  let catsOpen = false;              // the catchment picker, folded or not
   let slsWanted = false, slsReady = false;
   let basins = null;               // parsed basin polygons, once
 
@@ -205,6 +208,11 @@ const Alert2Plan = (function () {
         else if (k === 'scope') { if (['qld', 'hubs', 'all'].includes(v)) out[k] = v; }
       }
       if (Array.isArray(raw.order)) out.order = raw.order.filter(x => typeof x === 'string').slice(0, 40);
+      // The catchments left out — kept as what is left out, so a catchment
+      // the register gains later is in the plan until somebody unticks it.
+      if (Array.isArray(raw.excluded)) {
+        out.excluded = [...new Set(raw.excluded.filter(x => typeof x === 'string' && x.length <= 120))].sort().slice(0, 500);
+      }
     }
     return out;
   }
@@ -212,7 +220,8 @@ const Alert2Plan = (function () {
     try { localStorage.setItem(LS_KEY, JSON.stringify(sc)); } catch (_) { /* a private window: it still works, unremembered */ }
   }
   function differs(a, b) {
-    return Object.keys(DEFAULTS).some(k => a[k] !== b[k]) || JSON.stringify(a.order || []) !== JSON.stringify(b.order || []);
+    return Object.keys(DEFAULTS).some(k => a[k] !== b[k]) || JSON.stringify(a.order || []) !== JSON.stringify(b.order || [])
+      || JSON.stringify(a.excluded || []) !== JSON.stringify(b.excluded || []);
   }
 
   // ── formatting ──
@@ -268,10 +277,12 @@ const Alert2Plan = (function () {
     return loc && loc.priority ? String(loc.priority) : '';
   }
 
-  function inventory() {
+  // Everything in the scope, before the card's catchment ticks: what the
+  // picker lists and counts, and what a selection is cut from.
+  function catalogue() {
     if (!state.data) return null;
     const key = [sc.scope, sc.backboneKm, sc.allBackbone, slsReady].join('|');
-    if (inv && invKey === key && inv.data === state.data) return inv;
+    if (cat && catKey === key && cat.data === state.data) return cat;
     const stations = state.data.stations.filter(s => !s.deleted_at && s.lat != null && s.lon != null && !isTestRig(s));
     const cats = new Map((state.data.catchments || []).map(c => [c.id, c]));
     const regionName = c => c.region || (c.division === 'Gulf' ? 'Gulf and Cape York' : 'North East Coast (other)');
@@ -337,42 +348,122 @@ const Alert2Plan = (function () {
       }
       return regions.get(name);
     };
-    const catOf = (r, p) => {
-      const k = p.cid || p.catchment;
-      if (!r.cats.has(k)) r.cats.set(k, { name: p.catchment, rain: 0, level: 0, repeaters: 0, backbone: 0, bases: 0, high: 0 });
-      return r.cats.get(k);
-    };
     const field = [], reps = [], bases = [];
     for (const s of stations) {
       if (!inScope(s)) continue;
       const roles = s.roles || [];
-      const p = placeOf.get(s.id), r = region(p.region), c = catOf(r, p);
+      const p = placeOf.get(s.id);
+      // A catchment's key: its id for a Queensland basin, and the council
+      // area (marked, so it cannot meet a basin id) for anything outside one.
+      const key = p.cid || `x:${p.catchment}`;
       const hi = priorityOf(s) === 'High';
-      if (roles.includes('base')) { bases.push({ s, p }); r.bases++; c.bases++; }
+      if (roles.includes('base')) bases.push({ s, p, key });
       if (roles.includes('repeater')) {
-        const bb = sc.allBackbone || backbone.has(s.id);
-        const own = ownerOf(s);
-        reps.push({ s, p, backbone: bb, owner: own, carries: (carried.get(s.id) || []).length });
-        r.repeaters++; c.repeaters++;
-        if (bb) { r.backbone++; c.backbone++; r.owners[own.cls]++; }
+        // The stations it carries, as the pass ranges say — a "link" past
+        // LONG_LINK_KM is an address that happens to fall in a window, not a
+        // station this repeater hears (Network Review's rule).
+        const near = (carried.get(s.id) || []).filter(f => f.lat != null && acmaHaversineKm(s.lat, s.lon, f.lat, f.lon) <= LONG_LINK_KM);
+        reps.push({ s, p, key, backbone: sc.allBackbone || backbone.has(s.id), owner: ownerOf(s), carries: near.length,
+                    carriedIds: new Set(near.map(f => f.id)) });
       } else if (!roles.includes('base') && roles.includes('field') && hasAlert(s)) {
-        const lvl = !!(s.alert_ids && s.alert_ids.water_level != null);
-        field.push({ s, p, level: lvl, high: hi });
-        r.field++; if (lvl) { r.level++; c.level++; } else { r.rain++; c.rain++; }
-        if (hi) { r.high++; c.high++; }
+        field.push({ s, p, key, level: !!(s.alert_ids && s.alert_ids.water_level != null), high: hi });
       }
     }
-    const nets = (state.data.radio_networks || []).length;
-    inv = {
+    // The picker's list: every catchment in the scope, under its region, with
+    // what is in it.
+    const groups = new Map();
+    const entry = (p, key) => {
+      if (!groups.has(p.region)) groups.set(p.region, new Map());
+      const g = groups.get(p.region);
+      if (!g.has(key)) g.set(key, { key, name: p.catchment, region: p.region, field: 0, repeaters: 0, bases: 0 });
+      return g.get(key);
+    };
+    for (const f of field) entry(f.p, f.key).field++;
+    for (const r of reps) entry(r.p, r.key).repeaters++;
+    for (const b of bases) entry(b.p, b.key).bases++;
+    const list = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([region, m]) => ({ region, cats: [...m.values()].sort((a, b) => a.name.localeCompare(b.name)) }));
+    cat = {
       data: state.data, field, reps, bases, links: links.filter(p => inScope(p.a) && inScope(p.b)),
-      regions: [...regions.values()].filter(r => r.field || r.repeaters || r.bases),
-      catchmentCount: new Set(field.concat(reps).map(x => x.p.cid || x.p.catchment)).size,
-      radioNetworks: nets,
-      registerBases: bases.length,
+      groups: list, flat: list.flatMap(g => g.cats),
+      radioNetworks: (state.data.radio_networks || []).length,
       asAt: (state.data.meta && state.data.meta.updated) || '',
     };
-    invKey = key;
+    catKey = key;
+    return cat;
+  }
+
+  // The plan's inventory: the catalogue cut to the catchments ticked on the
+  // card. A field station or base is in when its catchment is. A repeater is
+  // in when its catchment is — or when it carries a station that is, because
+  // that station's readings reach a base through it whichever catchment its
+  // hill is in; those are marked, and the plan says how many.
+  function inventory() { return inventoryFor(sc.excluded || []); }
+  function inventoryFor(excluded) {
+    const C = catalogue();
+    if (!C) return null;
+    const ex = new Set(excluded);
+    const key = catKey + '|' + [...ex].sort().join('\u0001');
+    if (cuts.has(key) && cuts.get(key).data === state.data) return cuts.get(key);
+    const field = C.field.filter(f => !ex.has(f.key));
+    const ids = new Set(field.map(f => f.s.id));
+    const reps = [];
+    for (const r of C.reps) {
+      const inside = !ex.has(r.key);
+      const serves = !inside && [...r.carriedIds].some(id => ids.has(id));
+      if (inside || serves) reps.push({ ...r, outside: !inside });
+    }
+    const bases = C.bases.filter(b => !ex.has(b.key));
+    const regions = new Map();
+    const region = name => {
+      if (!regions.has(name)) {
+        regions.set(name, { name, cats: new Map(), rain: 0, level: 0, field: 0, repeaters: 0, backbone: 0, bases: 0, high: 0,
+                            remote: REMOTE.has(name), owners: { bureau: 0, joint: 0, other: 0, unknown: 0 } });
+      }
+      return regions.get(name);
+    };
+    const catOf = (r, x) => {
+      if (!r.cats.has(x.key)) r.cats.set(x.key, { name: x.p.catchment, rain: 0, level: 0, repeaters: 0, backbone: 0, bases: 0, high: 0, outside: ex.has(x.key) });
+      return r.cats.get(x.key);
+    };
+    for (const f of field) {
+      const r = region(f.p.region), c = catOf(r, f);
+      r.field++; if (f.level) { r.level++; c.level++; } else { r.rain++; c.rain++; }
+      if (f.high) { r.high++; c.high++; }
+    }
+    for (const x of reps) {
+      const r = region(x.p.region), c = catOf(r, x);
+      r.repeaters++; c.repeaters++;
+      if (x.backbone) { r.backbone++; c.backbone++; r.owners[x.owner.cls]++; }
+    }
+    for (const b of bases) { const r = region(b.p.region); r.bases++; catOf(r, b).bases++; }
+    const inPlan = new Set(reps.map(r => r.s.id).concat(bases.map(b => b.s.id)));
+    const ticked = C.flat.filter(c => !ex.has(c.key)).length;
+    const inv = {
+      data: state.data, field, reps, bases,
+      links: C.links.filter(p => inPlan.has(p.a.id) && inPlan.has(p.b.id)),
+      regions: [...regions.values()],
+      catchmentCount: ticked, catchmentsInScope: C.flat.length, partial: ticked < C.flat.length,
+      outsideReps: reps.filter(r => r.outside).length,
+      share: C.field.length ? field.length / C.field.length : 0,
+      radioNetworks: C.radioNetworks,
+      registerBases: bases.length,
+      asAt: C.asAt,
+    };
+    // Two are wanted at a time — the card's selection and the whole scope,
+    // which the five figures compare against — so a few are kept.
+    if (cuts.size > 6) cuts.clear();
+    cuts.set(key, inv);
     return inv;
+  }
+
+  // The bases a plan equips when the card does not say: one a radio network
+  // for the whole scope; for part of it, the networks in proportion to the
+  // stations ticked — at least the register's bases in it, and none for none.
+  function basesDefault(I) {
+    if (!I.field.length && !I.reps.length) return 0;
+    if (!I.partial) return Math.max(I.radioNetworks, I.registerBases);
+    return Math.max(1, I.registerBases, Math.ceil(I.radioNetworks * I.share));
   }
 
   // The order the regions are converted in: the card's, then any region it
@@ -438,7 +529,7 @@ const Alert2Plan = (function () {
     const added = I.regions.reduce((a, r) => a + addOf(r), 0);
     const removed = I.regions.reduce((a, r) => a + remOf(r), 0);
     const nRep = Math.max(0, nRep0 + added - removed);
-    const nBases = s.basesN > 0 ? s.basesN : Math.max(I.radioNetworks, I.registerBases);
+    const nBases = s.basesN > 0 ? s.basesN : basesDefault(I);
     const chains = s.dupBases ? 2 : 1;
     const bb = I.reps.filter(r => r.backbone);
     const own = { bureau: 0, joint: 0, other: 0, unknown: 0 };
@@ -745,14 +836,16 @@ const Alert2Plan = (function () {
     const I = inventory();
     if (!I) return null;
     const M = model(I, sc);
-    const D = differs(sc, DEFAULTS) ? model(I, sanitize({ ...DEFAULTS })) : null;
+    // The proposal, over every catchment in the scope: what the five figures
+    // say a scenario is more or less than.
+    const D = differs(sc, DEFAULTS) ? model(inventoryFor([]), sanitize({ ...DEFAULTS })) : null;
     return { I, M, D };
   }
   // Worked once per scenario: a repaint reads the plan a dozen times.
   let memo = null, memoKey = '';
   function cur() {
     const k = JSON.stringify(sc) + '|' + slsReady;
-    if (!memo || memoKey !== k || !inv || inv.data !== state.data) { memo = current(); memoKey = k; }
+    if (!memo || memoKey !== k || !cat || cat.data !== state.data) { memo = current(); memoKey = k; }
     return memo;
   }
 
@@ -778,16 +871,21 @@ const Alert2Plan = (function () {
   function delta(now, was, kind) {
     if (was == null) return '';
     const d = now - was;
-    const tiny = kind === 'money' ? Math.abs(d) < 5000 : Math.abs(d) < 0.05;
+    const tiny = kind === 'money' ? Math.abs(d) < 5000 : kind === 'int' ? Math.abs(d) < 0.5 : Math.abs(d) < 0.05;
     if (tiny) return '<span class="a2p-delta">same as the proposal</span>';
     const up = d > 0;
-    const txt = kind === 'money' ? money(Math.abs(d)) : kind === 'months' ? mo(Math.abs(d)) : nf1(Math.abs(d));
+    const txt = kind === 'money' ? money(Math.abs(d)) : kind === 'months' ? mo(Math.abs(d)) : kind === 'int' ? nf(Math.abs(d)) : nf1(Math.abs(d));
     return `<span class="a2p-delta ${up ? 'a2p-up' : 'a2p-down'}">${up ? '▲' : '▼'} ${txt} ${up ? 'more' : 'less'} than the proposal</span>`;
   }
+
+  // Nothing ticked: nothing to convert, and the page says so rather than
+  // drawing a plan of zeros.
+  const emptyPlan = I => !I.field.length && !I.reps.length && !I.bases.length;
 
   function kpisHtml() {
     const C = cur();
     if (!C) return '';
+    if (emptyPlan(C.I)) return '';
     const { M, D } = C;
     const s = sc;
     const tile = (label, value, sub, d, cls = '') => `<div class="adm-kpi a2p-kpi ${cls}">
@@ -797,7 +895,7 @@ const Alert2Plan = (function () {
       ${tile('Estimated cost', money(M.total), `including ${pct(s.contingency)} contingency`, D && delta(M.total, D.total, 'money'))}
       ${tile('Duration', mo(M.end), `${monthLabel(s, 0)} to ${endLabel(s, M.end)}`, D && delta(M.end, D.end, 'months'))}
       ${tile('Effort', `${nf1(M.fteTotal)} <small>FTE-years</small>`, `peak ${nf1(M.peak)} FTE`, D && delta(M.fteTotal, D.fteTotal, 'n'))}
-      ${tile('Equipment', `${nf(M.units.ertA2)} <small>ERT-A2</small>`, `${nf(M.units.e115)} ELPRO 115E-2 gateways`, D && delta(M.units.ertA2, D.units.ertA2, 'n'))}
+      ${tile('Equipment', `${nf(M.units.ertA2)} <small>ERT-A2</small>`, `${nf(M.units.e115)} ELPRO 115E-2 gateways`, D && delta(M.units.ertA2, D.units.ertA2, 'int'))}
       ${tile('Sites', nf(M.nField + M.nRep0 + M.nBases), `${nf(M.nField)} field · ${nf(M.nRep0)} repeaters · ${nf(M.nBases)} bases`, '')}
     </div>`;
   }
@@ -827,7 +925,7 @@ const Alert2Plan = (function () {
   function ctlValue(c, v) {
     if (c.zero && Number(v) === 0) {
       const I = inventory();
-      return I ? `${Math.max(I.radioNetworks, I.registerBases)}, ${c.zero}` : c.zero;
+      return I ? `${basesDefault(I)}, ${I.partial ? 'scaled to the catchments ticked' : c.zero}` : c.zero;
     }
     return `${Number.isInteger(c.step) ? nf(v) : nf1(v)}${c.unit || ''}`;
   }
@@ -840,11 +938,15 @@ const Alert2Plan = (function () {
           ${PRESETS.map(p => `<button type="button" class="exp-btn-sm" onclick="Alert2Plan.preset('${p.id}')">${esc(p.label)}</button>`).join('')}
         </div></div>
       <p class="small">Every slider and switch works the plan again at once — the figures above and the document below.
-        ${changed ? '<strong>This is not the proposal</strong>: the five figures say how far it moved.' : 'This is the proposal as drafted.'}
+        ${changed ? '<strong>This is not the proposal</strong>: the five figures say how far it moved from the proposal over every catchment.' : 'This is the proposal as drafted.'}
         Your scenario is kept on this device only.</p>
       <div class="a2p-ctl-grid">
         ${CONTROLS.map(g => `<fieldset class="a2p-fs"><legend>${esc(g.group)}</legend>${g.items.map(ctlHtml).join('')}</fieldset>`).join('')}
       </div>
+      <details class="a2p-cats" id="a2p-cats"${catsOpen ? ' open' : ''} ontoggle="Alert2Plan.catsToggled(this.open)">
+        <summary>Catchments in the plan — <span id="a2p-cats-n">${esc(catsCountText())}</span></summary>
+        <div id="a2p-cats-body">${catsBodyHtml()}</div>
+      </details>
       <details class="a2p-rates">
         <summary>Unit costs and rates (AUD, excluding GST)</summary>
         <div class="a2p-rate-grid">
@@ -857,10 +959,94 @@ const Alert2Plan = (function () {
     </section>`;
   }
 
+  // ── the catchment picker ──
+  // Every catchment in the scope, under its region: a box for each, and a box
+  // for the region that ticks or clears all of its catchments at once (and
+  // shows a dash when only some are ticked). The boxes are numbered off the
+  // catalogue's flat list, so no name has to survive a trip through an
+  // onclick attribute.
+  function catsCountText() {
+    const C = catalogue();
+    if (!C) return '';
+    const ex = new Set(sc.excluded || []);
+    const n = C.flat.filter(c => !ex.has(c.key)).length;
+    return n === C.flat.length ? `all ${n}` : `${n} of ${C.flat.length}`;
+  }
+  function catsBodyHtml() {
+    const C = catalogue();
+    if (!C) return '';
+    const ex = new Set(sc.excluded || []);
+    let i = 0;
+    const regs = C.groups.map((g, gi) => {
+      const on = g.cats.filter(c => !ex.has(c.key)).length;
+      const stations = g.cats.reduce((a, c) => a + c.field + c.repeaters, 0);
+      const boxes = g.cats.map(c => {
+        const k = i++;
+        return `<label class="check-label a2p-cat"><input type="checkbox" data-k="cat:${k}" ${ex.has(c.key) ? '' : 'checked'}
+            onchange="Alert2Plan.catchment(${k}, this.checked)"><span>${esc(c.name)} <span class="txt-muted">${nf(c.field + c.repeaters)}</span></span></label>`;
+      }).join('');
+      return `<fieldset class="a2p-cat-reg">
+        <legend><label class="check-label a2p-cat-all"><input type="checkbox" data-k="reg:${gi}" ${on ? 'checked' : ''}
+            data-partial="${on && on < g.cats.length ? '1' : ''}" onchange="Alert2Plan.region(${gi}, this.checked)"
+            aria-describedby="a2p-reg-${gi}-n"><span><span class="a2p-swatch" style="--c:${regionVar(g.region)}" aria-hidden="true"></span><strong>${esc(g.region)}</strong></span></label>
+          <span class="small txt-muted" id="a2p-reg-${gi}-n">${on} of ${g.cats.length} catchment${g.cats.length === 1 ? '' : 's'} · ${nf(stations)} sites</span></legend>
+        <div class="a2p-cat-grid">${boxes}</div>
+      </fieldset>`;
+    }).join('');
+    return `<p class="small">Untick a catchment to leave it out: its field stations, repeaters and bases leave the plan, and every figure
+        follows. A repeater outside the ticked catchments stays in if it carries a station inside them, and the plan says so. The number
+        beside each catchment is its field stations and repeaters.</p>
+      <div class="button-group a2p-cat-acts">
+        <button type="button" class="exp-btn-sm" data-k="cats:all" onclick="Alert2Plan.catchments('all')">Tick every catchment</button>
+        <button type="button" class="exp-btn-sm" data-k="cats:none" onclick="Alert2Plan.catchments('none')">Clear every catchment</button>
+        <button type="button" class="exp-btn-sm" data-k="cats:high" onclick="Alert2Plan.catchments('high')"${slsReady ? '' : ' disabled'}>Only those with High-priority SLS sites</button>
+      </div>
+      <div class="a2p-cat-regs">${regs}</div>`;
+  }
+  // A box shows a dash for "some": a property, not an attribute, so it is set
+  // after every paint of the picker.
+  function syncPartial() {
+    for (const el of document.querySelectorAll('#a2p-cats-body input[data-partial]')) el.indeterminate = el.dataset.partial === '1';
+  }
+  // The ticks changed: the picker and the card's few words that depend on
+  // them are rewritten in place, the box that was pressed keeps its focus,
+  // and the figures and the document are worked again.
+  // The picker and the words that depend on what it lists, rewritten in
+  // place. Also after the scope changes: the boxes are numbered off the
+  // catalogue, so a list drawn for another scope must not stay clickable.
+  function refreshCats() {
+    const body = document.getElementById('a2p-cats-body');
+    if (body) { body.innerHTML = catsBodyHtml(); syncPartial(); }
+    const n = document.getElementById('a2p-cats-n');
+    if (n) n.textContent = catsCountText();
+    const c = CONTROLS.flatMap(g => g.items).find(x => x.k === 'basesN');
+    const out = document.getElementById('a2p-c-basesN-o');
+    if (c && out) { out.textContent = ctlValue(c, sc.basesN); document.getElementById('a2p-c-basesN').setAttribute('aria-valuetext', out.textContent); }
+  }
+  function catsChanged(focusKey, said) {
+    saveScenario();
+    refreshCats();
+    repaintLive();
+    if (focusKey) {
+      const el = document.querySelector(`#a2p-cats-body [data-k="${CSS.escape(focusKey)}"]`);
+      if (el && !el.disabled) el.focus();
+    }
+    if (said) announce(said);
+  }
+  function setExcluded(keys) {
+    sc.excluded = [...new Set(keys)].sort();
+    sc = sanitize(sc);
+  }
+
   // ── the document ──
   function outHtml() {
     const C = cur();
     if (!C) return '';
+    if (emptyPlan(C.I)) {
+      return `<div class="panel a2p-empty"><h3>No catchment is ticked</h3>
+        <p class="small">With nothing ticked under <strong>Catchments in the plan</strong> there is nothing to convert. Tick a catchment, a region,
+          or <button type="button" class="link-btn" onclick="Alert2Plan.catchments('all')">every catchment</button>, and the plan is worked again.</p></div>`;
+    }
     return [summaryHtml(C), whyHtml(), whereHtml(C), equipmentHtml(C), backboneHtml(C), reviewsHtml(C),
             timelineHtml(C), effortHtml(C), costHtml(C), risksHtml(C), decisionsHtml(C), sourcesHtml()].join('');
   }
@@ -883,7 +1069,9 @@ const Alert2Plan = (function () {
       <p>The register lists <strong>${nf(M.nField)} ALERT field stations</strong> (${nf(M.nRain)} rainfall, ${nf(M.nLevel)} river height),
         <strong>${nf(M.nRep0)} repeaters</strong> — ${nf(M.bbCount)} of them carrying the backbone — and the network is received at
         <strong>${nf(M.nBases)} base stations</strong>, across ${regions} region${regions === 1 ? '' : 's'} and ${nf(I.catchmentCount)} catchments.
-        This draft moves all of them from legacy ALERT to ALERT2.</p>
+        This draft moves all of them from legacy ALERT to ALERT2.${I.partial
+          ? ` <strong>It covers ${nf(I.catchmentCount)} of the ${nf(I.catchmentsInScope)} catchments in scope</strong> — the ones ticked on the card${
+            I.outsideReps ? `, and ${nf(I.outsideReps)} repeater${I.outsideReps === 1 ? '' : 's'} outside them that carr${I.outsideReps === 1 ? 'ies' : 'y'} their stations` : ''}.` : ''}</p>
       <ul class="a2p-points">
         <li><strong>Cost:</strong> about <strong>${money(M.total)}</strong>, including ${pct(s.contingency)} contingency — ${money(M.breakdown[0].v)} of it equipment.</li>
         <li><strong>Time:</strong> about <strong>${mo(M.end)}</strong>, from approval in ${monthLabel(s, 0)} to close-out in ${endLabel(s, M.end)}.</li>
@@ -958,14 +1146,16 @@ const Alert2Plan = (function () {
           <td class="a2p-num col-optional">${slsReady ? nf(I.regions.reduce((a, r) => a + r.high, 0)) : '…'}</td><td></td></tr>
       </tbody></table></div>`;
     const catRows = rows.flatMap(x => [...x.r.cats.values()].sort((a, b) => (b.rain + b.level + b.repeaters) - (a.rain + a.level + a.repeaters))
-      .map(c => `<tr><td>${esc(x.name)}</td><th scope="row">${esc(c.name)}</th><td class="a2p-num">${nf(c.rain)}</td><td class="a2p-num">${nf(c.level)}</td>
+      .map(c => `<tr><td>${esc(x.name)}</td><th scope="row">${esc(c.name)}${c.outside ? ' <span class="small txt-muted">— unticked; its repeaters carry ticked stations</span>' : ''}</th><td class="a2p-num">${nf(c.rain)}</td><td class="a2p-num">${nf(c.level)}</td>
         <td class="a2p-num">${nf(c.repeaters)}</td><td class="a2p-num">${nf(c.backbone)}</td><td class="a2p-num">${nf(c.bases)}</td></tr>`));
     return sec('where', '3. Where the work is', `
       <p>${nf(M.nField)} field stations and ${nf(M.nRep0)} repeaters in ${I.regions.length} regions and ${nf(I.catchmentCount)} catchments, converted one region at a time in the order below
         (▲ ▼ change it — the timeline follows). The order proposed puts the regions with the most High-priority SLS sites first;
         ${s.pilot ? `the pilot network is the first ${nf(Math.min(s.pilotSites, M.nField))} stations of the first region.` : 'there is no pilot in this scenario.'}
-        Base stations are counted from the register's ${I.radioNetworks} radio networks${sc.basesN ? ` — overridden on the card to ${sc.basesN}` : ''};
-        the register marks ${I.registerBases} site${I.registerBases === 1 ? '' : 's'} with the base role.</p>
+        Base stations are counted from the register's ${I.radioNetworks} radio networks${sc.basesN ? ` — overridden on the card to ${sc.basesN}`
+          : I.partial ? `, scaled to the stations ticked (${nf(M.nBases)})` : ''};
+        the register marks ${I.registerBases} site${I.registerBases === 1 ? '' : 's'} with the base role${I.partial ? ' in the catchments ticked' : ''}.${I.partial
+          ? ` ${nf(I.catchmentsInScope - I.catchmentCount)} catchment${I.catchmentsInScope - I.catchmentCount === 1 ? ' is' : 's are'} unticked on the card, and grey on the map.` : ''}</p>
       <div class="a2p-two">
         ${mapSvg(I, M)}
         ${regionBarsSvg(M)}
@@ -1007,11 +1197,13 @@ const Alert2Plan = (function () {
     if (!B.box) return '';
     const [x0, y0, x1, y1] = B.box;
     const pad = 12, w = x1 - x0 + pad * 2, h = y1 - y0 + pad * 2;
-    const regionOfBasin = new Map((state.data.catchments || []).map(c => [c.name.toLowerCase(), c.region]));
+    const basinOf = new Map((state.data.catchments || []).map(c => [c.name.toLowerCase(), c]));
     const active = new Set(I.regions.map(r => r.name));
+    const ex = new Set(sc.excluded || []);
     const polys = B.list.map(b => {
-      const reg = regionOfBasin.get(b.name.toLowerCase());
-      const on = reg && active.has(reg);
+      const c = basinOf.get(b.name.toLowerCase());
+      const reg = c && c.region;
+      const on = reg && active.has(reg) && !ex.has(c.id);
       return `<polygon class="a2p-basin${on ? '' : ' a2p-basin-off'}" points="${b.points}"${on ? ` style="--c:${regionVar(reg)}"` : ''}/>`;
     }).join('');
     const pt = (s) => project(s.lat, s.lon);
@@ -1104,7 +1296,7 @@ const Alert2Plan = (function () {
     }).join('');
     const legend = segs.map(k => `<li><span class="a2p-swatch a2p-own-${k}" aria-hidden="true"></span>${esc(OWN[k])}: <strong>${M.own[k]}</strong></li>`).join('');
     const top = bb.slice(0, 25);
-    const row = r => `<tr><th scope="row">${esc(r.s.name)}</th><td>${esc(r.p.region)}</td><td class="a2p-num">${nf(r.carries)}</td>
+    const row = r => `<tr><th scope="row">${esc(r.s.name)}${r.outside ? ' <span class="small txt-muted">— outside the catchments ticked</span>' : ''}</th><td>${esc(r.p.region)}</td><td class="a2p-num">${nf(r.carries)}</td>
       <td>${esc(r.owner.name || OWN[r.owner.cls])}</td><td class="col-optional">${r.s.repeater && r.s.repeater.acma_licence ? esc(r.s.repeater.acma_licence) : '<span class="txt-warn">none on file</span>'}</td></tr>`;
     const head = `<thead><tr><th scope="col">Repeater</th><th scope="col">Region</th><th scope="col" class="a2p-num">Stations carried</th>
       <th scope="col">Owner</th><th scope="col" class="col-optional">ACMA licence</th></tr></thead>`;
@@ -1112,7 +1304,8 @@ const Alert2Plan = (function () {
     return sec('bb', '5. Backbone repeaters — acquire and remediate them first', `
       <p>The backbone is the chain of hilltop repeaters every reading travels along to reach a base — by the register,
         <strong>${nf(M.bbCount)} of the ${nf(M.nRep0)} repeaters</strong> share a pass-range window with another repeater or a base
-        within ${s.backboneKm} km. Whatever happens in the field, these sites carry it, legacy and ALERT2 alike. The plan treats them as a
+        within ${s.backboneKm} km${I.partial ? ` — counting only the repeaters in the plan: those in the catchments ticked, and ${nf(I.outsideReps)} outside them that carry their stations` : ''}.
+        Whatever happens in the field, these sites carry it, legacy and ALERT2 alike. The plan treats them as a
         stream of work of their own that can, and should, start ahead of everything else:</p>
       <ol class="a2p-points">
         <li><strong>It needs no ALERT2 equipment.</strong> Acquisition is property and legal work; remediation is power, masts,
@@ -1394,6 +1587,7 @@ const Alert2Plan = (function () {
         <tbody>${CONTROLS.flatMap(g => g.items).map(c => `<tr><th scope="row">${esc(c.label)}</th><td>${esc(c.kind === 'switch' ? (sc[c.k] ? 'yes' : 'no')
           : c.kind === 'select' ? (c.options.find(o => o[0] === sc[c.k]) || ['', sc[c.k]])[1] : c.kind === 'month' ? monthLabel(sc, 0) : ctlValue(c, sc[c.k]))}</td></tr>`).join('')}
           ${RATES.map(r => `<tr><th scope="row">${esc(r.label)}</th><td>${money(sc[r.k], true)}</td></tr>`).join('')}
+          <tr><th scope="row">Catchments in the plan</th><td>${esc(unticked(I))}</td></tr>
           <tr><th scope="row">Procurement and supply</th><td>${s.procureMonths} months</td></tr>
           <tr><th scope="row">Pilot</th><td>${s.pilot ? `${s.pilotMonths} months, ${s.pilotSites} stations` : 'none'}</td></tr>
           <tr><th scope="row">Remediation, per backbone site</th><td>${s.remediateDays} crew-days</td></tr>
@@ -1466,6 +1660,7 @@ const Alert2Plan = (function () {
     if (state.activeTab !== 'a2plan') return;
     const el = document.getElementById('main-content');
     if (el) el.innerHTML = render();
+    syncPartial();
   }
   // Only what the scenario moves is rewritten: the five figures and the
   // document. The card stays as it is, so the slider being dragged keeps
@@ -1499,6 +1694,7 @@ const Alert2Plan = (function () {
     else sc[k] = String(v);
     sc = sanitize(sc);
     saveScenario();
+    if (k === 'scope') refreshCats();
     const c = CONTROLS.flatMap(g => g.items).find(x => x.k === k);
     if (c && c.kind === 'range') {
       const out = document.getElementById(`a2p-c-${k}-o`);
@@ -1512,21 +1708,33 @@ const Alert2Plan = (function () {
 
   function init() {
     if (!isAdmin()) return;
+    syncPartial();
     // The owners and priorities come from the SLS, fetched once on first ask.
     if (!slsReady && !slsWanted && typeof SLS !== 'undefined' && SLS.ensureData) {
       slsWanted = true;
-      SLS.ensureData().then(() => { slsReady = true; inv = null; memo = null; repaint(); }, () => { slsWanted = false; });
+      SLS.ensureData().then(() => { slsReady = true; cat = null; cuts.clear(); memo = null; repaint(); }, () => { slsWanted = false; });
     } else if (typeof SLS !== 'undefined' && SLS.loaded && SLS.loaded() && !slsReady) {
-      slsReady = true; inv = null; memo = null; repaint();
+      slsReady = true; cat = null; cuts.clear(); memo = null; repaint();
     }
   }
 
   // ── exports ──
+  // The catchments left out, in words: for the assumptions table and the
+  // workbook, where the card's ticks are not there to read.
+  function unticked(I) {
+    const C = catalogue();
+    if (!I.partial || !C) return `all ${I.catchmentsInScope}`;
+    const ex = new Set(sc.excluded || []);
+    const out = C.flat.filter(c => ex.has(c.key)).map(c => c.name);
+    return `${I.catchmentCount} of ${I.catchmentsInScope} — left out: ${out.length > 15 ? `${out.slice(0, 15).join(', ')} and ${out.length - 15} more` : out.join(', ')}`;
+  }
+
   function csvRows(M) {
-    const head = ['Order', 'Region', 'Catchment', 'Rainfall stations', 'River stations', 'Repeaters', 'Backbone repeaters', 'Bases'];
+    const head = ['Order', 'Region', 'Catchment', 'Rainfall stations', 'River stations', 'Repeaters', 'Backbone repeaters', 'Bases', 'Ticked'];
     const rows = [head];
     M.regionRows.forEach((x, i) => {
-      for (const c of x.r.cats.values()) rows.push([i + 1, x.name, c.name, c.rain, c.level, c.repeaters, c.backbone, c.bases]);
+      for (const c of x.r.cats.values()) rows.push([i + 1, x.name, c.name, c.rain, c.level, c.repeaters, c.backbone, c.bases,
+        c.outside ? 'no — its repeaters carry ticked stations' : 'yes']);
     });
     return rows;
   }
@@ -1570,6 +1778,7 @@ const Alert2Plan = (function () {
       { name: 'Assumptions', cols: [70, 18], rows: [
         ['Assumption', 'Value'].map(h => t(h, 'head')),
         ...Object.keys(DEFAULTS).map(k => [k, String(s[k])]),
+        ['catchments', unticked(C.I)],
       ] },
     ];
     const data = XlsxWrite.build(sheets, { title: 'ALERT2 Transition Plan' });
@@ -1587,12 +1796,12 @@ const Alert2Plan = (function () {
   return {
     render,
     init,
-    authChanged() { inv = null; memo = null; if (isAdmin()) init(); repaint(); },
+    authChanged() { cat = null; cuts.clear(); memo = null; if (isAdmin()) init(); repaint(); },
     set,
     preset(id) {
       const p = PRESETS.find(x => x.id === id);
       if (!p) return;
-      sc = sanitize({ ...DEFAULTS, ...p.set, order: sc.order });
+      sc = sanitize({ ...DEFAULTS, ...p.set, order: sc.order, excluded: sc.excluded });
       saveScenario();
       repaint();
       announce(`${p.label}: the plan is worked again.`);
@@ -1612,6 +1821,40 @@ const Alert2Plan = (function () {
     },
     // The folded tables go on paper too: opened for the print and folded
     // again after, so the screen is left as it was.
+    // The catchment picker: one box, a region's boxes, or all of them.
+    catchment(i, on) {
+      const C = catalogue();
+      const c = C && C.flat[i];
+      if (!c) return;
+      const ex = new Set(sc.excluded || []);
+      if (on) ex.delete(c.key); else ex.add(c.key);
+      setExcluded(ex);
+      catsChanged(`cat:${i}`, `${c.name} ${on ? 'is in' : 'is out of'} the plan.`);
+    },
+    region(gi, on) {
+      const C = catalogue();
+      const g = C && C.groups[gi];
+      if (!g) return;
+      const ex = new Set(sc.excluded || []);
+      for (const c of g.cats) { if (on) ex.delete(c.key); else ex.add(c.key); }
+      setExcluded(ex);
+      catsChanged(`reg:${gi}`, `${g.region}: ${on ? `all ${g.cats.length} catchments in` : 'every catchment out of'} the plan.`);
+    },
+    catchments(which) {
+      const C = catalogue();
+      if (!C) return;
+      if (which === 'all') setExcluded([]);
+      else if (which === 'none') setExcluded(C.flat.map(c => c.key));
+      else if (which === 'high') {
+        const hot = new Set(C.field.filter(f => f.high).map(f => f.key));
+        setExcluded(C.flat.filter(c => !hot.has(c.key)).map(c => c.key));
+      } else return;
+      const n = C.flat.length - (sc.excluded || []).length;
+      catsChanged(`cats:${which}`, `${n} of ${C.flat.length} catchments in the plan.`);
+    },
+    catsToggled(open) { catsOpen = !!open; if (open) syncPartial(); },
+    // For the tests: the picker's list.
+    catalogue,
     print() {
       if (typeof window === 'undefined' || !window.print) return;
       const shut = [...document.querySelectorAll('#a2p-out details.a2p-more:not([open])')];
@@ -1626,7 +1869,7 @@ const Alert2Plan = (function () {
     inventory,
     plan: () => { const C = cur(); return C ? C.M : null; },
     model: (scenario) => { const I = inventory(); return I ? model(I, sanitize(scenario || {})) : null; },
-    reset() { sc = sanitize({}); saveScenario(); repaint(); },
+    reset() { sc = sanitize({}); saveScenario(); repaint(); syncPartial(); },
   };
 })();
 if (typeof window !== 'undefined') window.Alert2Plan = Alert2Plan;

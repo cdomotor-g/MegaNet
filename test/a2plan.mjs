@@ -18,6 +18,12 @@
 //                   the cost, the backbone-first switch and the reviews switch
 //                   do what they say, a preset changes the figures and says how
 //                   far from the proposal, and ▲ ▼ reorder the regions.
+//   Catchments      the picker lists every catchment once under its region;
+//                   unticking one takes exactly its stations out (its box keeps
+//                   focus, its region shows a dash, its basin goes grey); a
+//                   region's box clears all of its catchments; a repeater
+//                   outside the ticks stays only if it carries a ticked station;
+//                   nothing ticked says so; presets leave the ticks alone.
 //   The files       the workbook and the CSV are floodnet-… and carry the plan.
 //
 // Run:  npm run a2plan
@@ -215,6 +221,132 @@ try {
   const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('meganet.a2plan.scenario') || '{}').order || []);
   ok('the scenario is kept on this device', kept[0] === mv.after[0], kept.slice(0, 2).join(', '));
 
+  // ── catchments in the plan ──
+  console.log('\nCatchments in the plan\n');
+  await page.evaluate(() => { const d = document.getElementById('a2p-cats'); d.open = true; });
+  const cat0 = await page.evaluate(() => {
+    const C = Alert2Plan.catalogue();
+    const boxes = [...document.querySelectorAll('#a2p-cats-body input[data-k^="cat:"]')];
+    const regs = [...document.querySelectorAll('#a2p-cats-body input[data-k^="reg:"]')];
+    return { flat: C.flat.length, boxes: boxes.length, regs: regs.length, groups: C.groups.length,
+             keys: new Set(C.flat.map(c => c.key)).size,
+             sumField: C.flat.reduce((a, c) => a + c.field, 0), sumReps: C.flat.reduce((a, c) => a + c.repeaters, 0),
+             field: C.field.length, reps: C.reps.length, allTicked: boxes.every(b => b.checked),
+             count: document.getElementById('a2p-cats-n').textContent, total: Alert2Plan.plan().total };
+  });
+  ok('the picker lists every catchment in the scope once, under its region, every one ticked',
+    cat0.boxes === cat0.flat && cat0.keys === cat0.flat && cat0.regs === cat0.groups && cat0.allTicked && /^all \d+$/.test(cat0.count), JSON.stringify(cat0));
+  ok('…and its catchments hold every field station and repeater in the scope', cat0.sumField === cat0.field && cat0.sumReps === cat0.reps);
+
+  // One catchment unticked by its box, as a person would: the biggest one in
+  // a region of several, so the region's own box is left half-ticked.
+  const pick = await page.evaluate(() => {
+    const C = Alert2Plan.catalogue();
+    let gi = -1, best = null;
+    C.groups.forEach((g, i) => { if (g.cats.length < 2) return; for (const c of g.cats) if (!best || c.field > best.field) { best = c; gi = i; } });
+    return { i: C.flat.indexOf(best), gi, key: best.key, name: best.name, field: best.field };
+  });
+  const offBasins0 = await page.evaluate(() => document.querySelectorAll('#a2p-out .a2p-basin-off').length);
+  await page.click(`#a2p-cats-body input[data-k="cat:${pick.i}"]`);
+  const one = await page.evaluate(([pick]) => {
+    const I = Alert2Plan.inventory();
+    const box = document.querySelector(`#a2p-cats-body input[data-k="cat:${pick.i}"]`);
+    const reg = document.querySelector(`#a2p-cats-body input[data-k="reg:${pick.gi}"]`);
+    return { field: I.field.length, none: !I.field.some(f => f.key === pick.key), focused: document.activeElement === box, checked: box.checked,
+             partial: reg.indeterminate, count: document.getElementById('a2p-cats-n').textContent,
+             kept: (JSON.parse(localStorage.getItem('meganet.a2plan.scenario') || '{}').excluded || []).includes(pick.key),
+             kpi: document.getElementById('a2p-kpis').textContent, offBasins: document.querySelectorAll('#a2p-out .a2p-basin-off').length,
+             summary: document.querySelector('#a2p-out .a2p-sec').textContent };
+  }, [pick]);
+  ok(`unticking ${pick.name} takes its ${pick.field} field stations out of the plan, and the box keeps its focus`,
+    one.field === cat0.field - pick.field && one.none && one.focused && !one.checked, JSON.stringify({ field: one.field, focused: one.focused }));
+  ok('…its region\'s box shows a dash for "some", and the count says how many of how many',
+    one.partial && one.count === `${cat0.flat - 1} of ${cat0.flat}`, one.count);
+  ok('…the five figures say how far that is from the proposal over every catchment, and the summary says what it covers',
+    /less than the proposal/.test(one.kpi) && /covers \d+ of the \d+ catchments/.test(one.summary));
+  ok('…it is kept on this device, and its basin goes grey on the map', one.kept && one.offBasins > offBasins0, `${offBasins0} → ${one.offBasins}`);
+  await page.click(`#a2p-cats-body input[data-k="cat:${pick.i}"]`);
+  const back = await page.evaluate(() => ({ total: Alert2Plan.plan().total, count: document.getElementById('a2p-cats-n').textContent }));
+  ok('ticking it again puts the plan back exactly', near(back.total, cat0.total, 0.01) && /^all /.test(back.count), `${back.total} against ${cat0.total}`);
+
+  // A whole region by its own box.
+  const reg = await page.evaluate(async ([gi]) => {
+    const C = Alert2Plan.catalogue();
+    const g = C.groups[gi];
+    const box = document.querySelector(`#a2p-cats-body input[data-k="reg:${gi}"]`);
+    box.click();
+    await new Promise(r => setTimeout(r, 30));
+    const I = Alert2Plan.inventory();
+    const ids = new Set(I.field.map(f => f.s.id));
+    const keys = new Set(g.cats.map(c => c.key));
+    const theirs = I.reps.filter(r => keys.has(r.key));
+    return { region: g.region, n: g.cats.length,
+             allOff: [...document.querySelectorAll(`#a2p-cats-body input[data-k^="cat:"]`)].filter(b => keys.has(C.flat[Number(b.dataset.k.slice(4))].key)).every(b => !b.checked),
+             noField: !I.field.some(f => keys.has(f.key)),
+             repsServe: theirs.every(r => r.outside && [...r.carriedIds].some(id => ids.has(id))), kept: theirs.length,
+             focused: document.activeElement && document.activeElement.dataset.k === `reg:${gi}` };
+  }, [pick.gi]);
+  ok(`the region box takes all ${reg.n} of ${reg.region}'s catchments out at once, and keeps its focus`, reg.allOff && reg.noField && reg.focused, JSON.stringify(reg));
+  ok('…a repeater of theirs stays only if it carries a station still ticked, marked as outside', reg.repsServe, `${reg.kept} kept`);
+  await page.evaluate(([gi]) => document.querySelector(`#a2p-cats-body input[data-k="reg:${gi}"]`).click(), [pick.gi]);
+
+  // One catchment alone: every repeater in the plan is in it or carries one of its stations.
+  const alone = await page.evaluate(([i]) => {
+    Alert2Plan.catchments('none');
+    Alert2Plan.catchment(i, true);
+    const I = Alert2Plan.inventory();
+    const ids = new Set(I.field.map(f => f.s.id));
+    const C = Alert2Plan.catalogue();
+    return { field: I.field.length, want: C.flat[i].field, reps: I.reps.length, outside: I.outsideReps,
+             ok: I.reps.every(r => !r.outside || [...r.carriedIds].some(id => ids.has(id))),
+             inside: I.reps.filter(r => !r.outside).length === C.flat[i].repeaters, bases: Alert2Plan.plan().nBases };
+  }, [pick.i]);
+  ok('one catchment alone: its field stations, its repeaters, and the repeaters outside it that carry them',
+    alone.field === alone.want && alone.ok && alone.inside, JSON.stringify(alone));
+  ok('…and the bases scaled to it rather than the whole network\'s', alone.bases >= 1 && alone.bases < 15, String(alone.bases));
+
+  const scoped = await page.evaluate(() => {
+    Alert2Plan.catchments('all');
+    const n0 = document.querySelectorAll('#a2p-cats-body input[data-k^="cat:"]').length;
+    const sel = document.getElementById('a2p-c-scope');
+    sel.value = 'hubs'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+    const n1 = document.querySelectorAll('#a2p-cats-body input[data-k^="cat:"]').length;
+    const flat = Alert2Plan.catalogue().flat.length;
+    const last = document.querySelectorAll('#a2p-cats-body input[data-k^="cat:"]');
+    const lastName = last[last.length - 1].closest('label').textContent.trim();
+    const want = Alert2Plan.catalogue().flat[flat - 1].name;
+    sel.value = 'qld'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+    return { n0, n1, flat, lastName, want, back: document.querySelectorAll('#a2p-cats-body input[data-k^="cat:"]').length };
+  });
+  ok('changing the scope redraws the picker for the new scope, so no box acts on another scope\'s catchment',
+    scoped.n1 === scoped.flat && scoped.n1 > scoped.n0 && scoped.lastName.startsWith(scoped.want) && scoped.back === scoped.n0, JSON.stringify(scoped));
+
+  const none = await page.evaluate(() => {
+    Alert2Plan.catchments('none');
+    return { tiles: document.querySelectorAll('#a2p-kpis .a2p-kpi').length, empty: !!document.querySelector('#a2p-out .a2p-empty'),
+             secs: document.querySelectorAll('#a2p-out .a2p-sec').length, count: document.getElementById('a2p-cats-n').textContent };
+  });
+  ok('nothing ticked: the page says so, with no figures and no plan of zeros', none.tiles === 0 && none.empty && none.secs === 0 && /^0 of/.test(none.count), JSON.stringify(none));
+  const high = await page.evaluate(() => {
+    Alert2Plan.catchments('high');
+    const I = Alert2Plan.inventory(), C = Alert2Plan.catalogue();
+    const hot = new Set(C.field.filter(f => f.high).map(f => f.key));
+    return { n: I.catchmentCount, hot: hot.size, every: I.field.every(f => hot.has(f.key)) };
+  });
+  ok('"Only those with High-priority SLS sites" ticks exactly those', high.n === high.hot && high.every && high.n > 0, JSON.stringify(high));
+  const ticks = await page.evaluate(() => {
+    const before = Alert2Plan.scenario().excluded.length;
+    Alert2Plan.preset('faster');
+    const after = Alert2Plan.scenario().excluded.length;
+    switchTab('stations'); switchTab('a2plan');
+    const dash = [...document.querySelectorAll('#a2p-cats-body input[data-k^="reg:"]')].some(b => b.indeterminate);
+    return { before, after, dash, count: document.getElementById('a2p-cats-n').textContent };
+  });
+  ok('a preset leaves the ticks alone, and they survive leaving the tab — dashes and all', ticks.before === ticks.after && ticks.before > 0 && ticks.dash, JSON.stringify(ticks));
+  await page.evaluate(() => { Alert2Plan.catchments('all'); Alert2Plan.preset('proposed'); });
+  const all = await page.evaluate(() => Alert2Plan.plan().total);
+  ok('"Tick every catchment" and the proposal put the plan back as it was', near(all, cat0.total, 0.01), `${all} against ${cat0.total}`);
+
   // ── what the page draws ──
   console.log('\nWhat it draws\n');
   const drawn = await page.evaluate(() => {
@@ -245,7 +377,7 @@ try {
   const [csv] = await Promise.all([page.waitForEvent('download'), page.evaluate(() => Alert2Plan.exportCsv())]);
   const text = fs.readFileSync(await csv.path(), 'utf8');
   const rows = text.trim().split(/\r?\n/);
-  const csvField = rows.slice(1).reduce((a, r) => { const c = r.split(','); return a + Number(c[c.length - 5]) + Number(c[c.length - 4]); }, 0);
+  const csvField = rows.slice(1).reduce((a, r) => { const c = r.split(','); return a + Number(c[3]) + Number(c[4]); }, 0);
   ok('the CSV is floodnet-…, a row a catchment, and its stations add up to the plan\'s',
     csv.suggestedFilename() === 'floodnet-alert2-plan-quantities.csv' && /^Order,Region,Catchment/.test(rows[0]) && csvField === inv.field,
     `${csv.suggestedFilename()}, ${rows.length - 1} rows, ${csvField} stations`);
