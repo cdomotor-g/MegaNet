@@ -84,6 +84,15 @@
 // links and the providers come back through the same URL-fragment landing
 // (consumeHash), so nothing downstream can tell the ways apart.
 //
+// **An emailed link waits for a click (consumeLink).** A Bureau mailbox's
+// scanner opens every link in an email before the person sees it, and a link
+// straight to GoTrue's /verify is used up by that visit — the person's reset
+// then fails, and the scanner briefly holds their session (seen in the auth
+// log, 14 Oct 2026). The templates in docs/accounts.md (step C) link to the
+// app with ?token_hash=…&type=…, and the app verifies it only when a person
+// presses Continue. Opening a page is what a scanner does; pressing a button is
+// not.
+//
 // **localStorage, not sessionStorage — the trade was re-judged.** 0004 and the
 // original #B8 build kept this per-tab: a token that outlives the tab it was
 // obtained in is a token left behind on a shared machine. That priced sign-in
@@ -139,8 +148,9 @@ const Auth = (function () {
   // What had focus when the panel opened, to have it back when it closes.
   let opener = null;
 
+  // `link`: the emailed link waiting for Continue, { hash, type, failed }.
   function fresh(step) {
-    return { step, email: '', name: '', code: '', busy: false, msg: null, show: false, check: null };
+    return { step, email: '', name: '', code: '', busy: false, msg: null, show: false, check: null, link: null };
   }
 
   // ── session plumbing ──
@@ -629,9 +639,15 @@ const Auth = (function () {
         : errorText(err, ui.email));
     }
     adopt(fromTokenResponse(body, ui.email));
+    toNewPassword('Code accepted — you are signed in. Choose a new password.');
+  }
+
+  // Signed in by a recovery — the code or the link — and on to the one thing
+  // the person came for.
+  function toNewPassword(note) {
     setBusy(false);
     ui.step = 'newpw';
-    setMsg('ok', 'Code accepted — you are signed in. Choose a new password.');
+    setMsg('ok', note);
     document.getElementById('au-password')?.focus();
     syncHeader();
     tabsAuthChanged();
@@ -710,7 +726,9 @@ const Auth = (function () {
     }
     adopt(null);
     who = null;
-    ui  = fresh('signin');
+    // A stored session found stale behind a link waiting for Continue must not
+    // take the link with it.
+    if (ui.step !== 'link') ui = fresh('signin');
     told.pending = told.approvals = false;
     // Best effort, and deliberately after the local state is already gone: if
     // this fails the token is still forgotten here, which is the part that
@@ -766,6 +784,53 @@ const Auth = (function () {
       setTimeout(open, 0);
     }
     return true;
+  }
+
+  // The links docs/accounts.md's templates send, by the `type` GoTrue's verify
+  // takes: `email` for a sign-up's confirmation and a sign-in link alike, and
+  // `recovery` for a reset. `again` is the form that sends a fresh one.
+  const LINK_KINDS = {
+    recovery: { title: 'Reset your password', button: 'Continue to a new password', again: 'forgot',
+                lead: 'This is the link from your Flood-Net password reset email.' },
+    email:    { title: 'Sign in to Flood-Net', button: 'Continue', again: 'otp',
+                lead: 'This is the link from your Flood-Net email.' },
+  };
+
+  // A link that came back as ?token_hash=…&type=…: taken out of the address
+  // bar, as the fragment's tokens are, and held for Continue — nothing is
+  // verified here. The rest of the query (the tab, say) stays.
+  function consumeLink() {
+    const q = new URLSearchParams(location.search);
+    const hash = q.get('token_hash');
+    const type = q.get('type');
+    if (!hash || !LINK_KINDS[type]) return;
+    q.delete('token_hash');
+    q.delete('type');
+    history.replaceState(null, '', location.pathname + (q.toString() ? `?${q}` : '') + location.hash);
+    ui = fresh('link');
+    ui.link = { hash, type, failed: false };
+    setTimeout(open, 0);
+  }
+
+  // Continue: the link verified now, by the person who pressed it.
+  async function followLink(e) {
+    if (e) e.preventDefault();
+    const link = ui.link;
+    if (!link) return go('signin');
+    setBusy(true, 'Checking the link…');
+    let body;
+    try {
+      body = await post('verify', { type: link.type, token_hash: link.hash });
+    } catch (err) {
+      link.failed = true;
+      setBusy(false);
+      return setMsg('error', err.status === 401 || err.status === 403 || err.code === 'otp_expired'
+        ? 'That link has been used already, or it has expired. Send yourself a new one.'
+        : errorText(err, ''));
+    }
+    adopt(fromTokenResponse(body, null));
+    if (link.type === 'recovery') return toNewPassword('You are signed in from the reset email. Choose a new password.');
+    await arrived('Address confirmed — you are signed in.');
   }
 
   // ── header ──
@@ -1076,6 +1141,25 @@ const Auth = (function () {
             <button type="submit" class="primary" ${busy ? 'disabled' : ''}>Continue</button>
           </div>
         </form>`;
+    } else if (ui.step === 'link') {
+      const kind = LINK_KINDS[ui.link && ui.link.type] || LINK_KINDS.email;
+      const failed = ui.link && ui.link.failed;
+      title = kind.title;
+      sub = '';
+      body = `
+        <form class="modal-form" onsubmit="Auth.followLink(event)" novalidate>
+          <p>${esc(kind.lead)}</p>
+          ${msg}
+          <p class="small">One more click, on purpose: work email systems open the links in an email to check them,
+            and a link that worked on its own would be used up before you got to it.</p>
+          <div class="modal-foot">
+            ${failed
+              ? `<button type="button" onclick="Auth.close()" ${busy ? 'disabled' : ''}>Close</button>
+                 <button type="button" class="primary" onclick="Auth.go('${kind.again}')" ${busy ? 'disabled' : ''}>Send a new email</button>`
+              : `<button type="button" onclick="Auth.close()" ${busy ? 'disabled' : ''}>Not now</button>
+                 <button type="submit" class="primary" ${busy ? 'disabled' : ''}>${esc(kind.button)}</button>`}
+          </div>
+        </form>`;
     } else if (ui.step === 'newpw') {
       title = 'Choose a new password';
       sub = '';
@@ -1194,7 +1278,9 @@ const Auth = (function () {
     }
     const was = root.style.display === 'flex';
     if (!was) opener = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
-    if (session && ui.step !== 'in' && ui.step !== 'newpw') { ui.step = 'in'; ui.msg = null; }
+    // A link waiting for Continue keeps the panel even for somebody signed in:
+    // it may be for another account, and it is what they came to press.
+    if (session && ui.step !== 'in' && ui.step !== 'newpw' && ui.step !== 'link') { ui.step = 'in'; ui.msg = null; }
     else if (!session && (mode === 'signup' || mode === 'signin')) {
       const keep = ui.email;
       ui = fresh(mode);
@@ -1230,6 +1316,8 @@ const Auth = (function () {
     document.removeEventListener('keydown', onKey);
     ui.busy = false;
     if (ui.step === 'newpw' && session) { ui.step = 'in'; ui.msg = null; }
+    // Not now on a link lets it go: the panel opens as usual next time.
+    if (ui.step === 'link') ui = fresh('signin');
     // Focus back to whatever opened the panel, or to the banner's button when
     // that has gone in the meantime (a tab redrawn by the sign-in, say).
     const back = opener && document.contains(opener) && opener.getClientRects().length
@@ -1278,6 +1366,8 @@ const Auth = (function () {
   // would be a hundred chances to cover what they measure.
   function nudgeWanted() {
     if (session) return false;
+    // Not over the panel — an emailed link's Continue opens it on arrival.
+    if (document.getElementById('auth-modal')?.style.display === 'flex') return false;
     let until = 0, flag = null;
     try { until = Number(localStorage.getItem(NUDGE_KEY)) || 0; flag = localStorage.getItem('mn-nudge'); } catch (_) {}
     if (flag === 'off') return false;
@@ -1335,6 +1425,7 @@ const Auth = (function () {
   // app drawing: a person who never signs in must not wait on an auth server to
   // see the station list.
   function start() {
+    consumeLink();
     const landed = consumeHash();
     if (!landed) {
       const s = load();
@@ -1370,7 +1461,7 @@ const Auth = (function () {
 
   return {
     start, open, close, back, go, render,
-    signIn, signUp, confirmCode, resend, forgot, recoverCode, setPassword,
+    signIn, signUp, confirmCode, resend, forgot, recoverCode, setPassword, followLink,
     requestCode, verifyCode, signInWith, signInMicrosoft, signOut,
     togglePassword, checkAddress, snooze, recheck,
     // Read by the editor and the Data source panel. Both ask the database in the

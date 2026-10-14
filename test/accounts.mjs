@@ -18,7 +18,10 @@
 //   4. **A forgotten password** — the reset sent, its code taking the person
 //      to a new password, a short one refused, the new one saved; and a
 //      reset link landing on the page opening the panel on it, the tokens
-//      gone from the address.
+//      gone from the address. A link from docs/accounts.md's templates
+//      (?token_hash=…) verified only when Continue is pressed — a mail
+//      scanner opening it uses nothing up — a used one saying so and offering
+//      a new email, and a sign-in link (type email) waiting the same way.
 //   5. **An address not confirmed** — signing in says so and offers the email
 //      again; Send it again asks for it.
 //   6. **An administrator** — the count on Admin in the bar, a note, and on
@@ -105,6 +108,12 @@ async function main() {
       if (path === 'token') return reply(200, session(String(body.refresh_token || '').replace(/^r-/, ''), null));
       if (path === 'signup') return reply(200, { id: 'id-new', email: body.email, confirmation_sent_at: '2026-10-13T00:00:00Z', identities: [{}] });
       if (path === 'verify') {
+        // A link from docs/accounts.md's templates: a token_hash and no address.
+        if (body.token_hash) {
+          if (body.token_hash === 'hash-rec' && body.type === 'recovery') return reply(200, session('tok-rec', 'sam@bom.gov.au'));
+          if (body.token_hash === 'hash-in' && body.type === 'email') return reply(200, session('tok-sam', 'sam@bom.gov.au'));
+          return reply(403, { code: 403, error_code: 'otp_expired', msg: 'Email link is invalid or has expired' });
+        }
         if (body.token !== '123456') return reply(403, { code: 403, error_code: 'otp_expired', msg: 'Token has expired or is invalid' });
         if (body.type === 'recovery') return reply(200, session('tok-rec', body.email));
         return reply(200, session('tok-pat', body.email));
@@ -331,6 +340,58 @@ async function main() {
         box: !!document.getElementById('au-password'), signedIn: Auth.isSignedIn() }));
       check('a reset link landing on the page opens the panel on choosing a new password, the tokens gone from the address',
         /Choose a new password/.test(land.title) && land.hash === '' && land.box && land.signedIn, J(land));
+      await context.close();
+    }
+
+    // The templates' links (?token_hash=…&type=…) wait for a person: a mail
+    // scanner opening the page must not use the link up.
+    const shown = async pl => {
+      await pl.waitForFunction(() => document.getElementById('auth-modal')?.style.display === 'flex', null, { timeout: 10_000 });
+      return pl.evaluate(() => ({ title: document.getElementById('au-title')?.textContent.trim(), search: location.search,
+        buttons: [...document.querySelectorAll('#auth-modal .modal-foot button')].map(b => b.textContent.trim()),
+        signedIn: Auth.isSignedIn() }));
+    };
+    {
+      const b = sent.length;
+      const { context, page: pl } = await open(server.url('/index.html?tab=stations&token_hash=hash-rec&type=recovery'));
+      const wait = await shown(pl);
+      await pl.waitForTimeout(500);
+      check('a reset link from the new template waits for Continue: nothing verified by opening it, the token gone from the address, the tab kept',
+        /Reset your password/.test(wait.title) && wait.buttons.includes('Continue to a new password') && sentTo('verify', b).length === 0
+          && !wait.signedIn && /tab=stations/.test(wait.search) && !/token_hash|type=/.test(wait.search), J(wait));
+      await pl.click('#auth-modal button[type="submit"]');
+      await pl.waitForSelector('#au-password');
+      const v = sentTo('verify', b).pop();
+      const after = await modal(pl);
+      check('Continue verifies it as a recovery (the token hash, no address) and leads to choosing a new password',
+        v && v.body.type === 'recovery' && v.body.token_hash === 'hash-rec' && !('email' in v.body)
+          && /Choose a new password/.test(after.title) && await pl.evaluate(() => Auth.isSignedIn()), J({ body: v && v.body, after }));
+      await context.close();
+    }
+    {
+      const { context, page: pl } = await open(server.url('/index.html?tab=stations&token_hash=used-up&type=recovery'));
+      await shown(pl);
+      await pl.click('#auth-modal button[type="submit"]');
+      await pl.waitForFunction(() => /used already/.test(document.querySelector('#auth-modal .au-msg')?.textContent || ''));
+      const used = await shown(pl);
+      await pl.click('#auth-modal button:has-text("Send a new email")');
+      const again = await modal(pl);
+      check('a link already used says so plainly and offers a new email, which is the reset form',
+        used.buttons.includes('Send a new email') && !used.signedIn && /Reset your password/.test(again.title)
+          && await pl.evaluate(() => !!document.getElementById('au-email')), J({ used, again: again.title }));
+      await context.close();
+    }
+    {
+      const b = sent.length;
+      const { context, page: pl } = await open(server.url('/index.html?tab=stations&token_hash=hash-in&type=email'));
+      const wait = await shown(pl);
+      await pl.click('#auth-modal button[type="submit"]');
+      await pl.waitForFunction(() => /Address confirmed/.test(document.querySelector('#auth-modal .au-msg')?.textContent || ''));
+      const v = sentTo('verify', b).pop();
+      const after = await modal(pl);
+      check('a sign-up or sign-in link (type email) waits the same way, then signs in on Continue',
+        /Sign in to Flood-Net/.test(wait.title) && wait.buttons.includes('Continue') && v && v.body.type === 'email'
+          && v.body.token_hash === 'hash-in' && /Your account/.test(after.title), J({ wait, body: v && v.body, after: after.title }));
       await context.close();
     }
 

@@ -364,11 +364,15 @@ where the email opens in a different browser — but the code is only in the ema
 if the template asks for it.
 
 Dashboard → **Authentication** → **Email Templates** → **Magic Link**, and
-include the token somewhere in the body:
+include the token somewhere in the body. The template to paste is in
+[`accounts.md` → step C](accounts.md#c-the-emails-wording--5-minutes), with the
+other two; its link goes to Flood-Net with `?token_hash=…&type=email` rather than
+to `{{ .ConfirmationURL }}`, because a work mailbox's link scanner uses a
+`{{ .ConfirmationURL }}` up before the person gets to it:
 
 ```html
-<p>Your Flood-Net sign-in code is <strong>{{ .Token }}</strong>.</p>
-<p>Or click here: <a href="{{ .ConfirmationURL }}">sign in</a></p>
+<p>Your sign-in code is <strong>{{ .Token }}</strong></p>
+<p>Type it into the Flood-Net window, or <a href="{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=email">sign in here</a>.</p>
 ```
 
 Also set **Authentication → URL Configuration → Redirect URLs** to include the

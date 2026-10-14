@@ -148,15 +148,26 @@ Supabase dashboard → **Authentication → Sign In / Providers → Email**
 ### C. The emails' wording — ~5 minutes
 
 Supabase dashboard → **Authentication → Email → Templates**
-(`/dashboard/project/_/auth/templates`). The panel accepts a typed six-digit code as well
-as the link, which matters on a phone and when the email opens in a different browser —
-but the code is only in the email if the template carries `{{ .Token }}`.
+(`/dashboard/project/_/auth/templates`). Two things matter in each template:
+
+* **The link goes to Flood-Net, not to Supabase**, and Flood-Net acts on it only when the
+  person presses **Continue**. A work mailbox (the Bureau's included) has a scanner that
+  opens every link in an email before the person sees it; Supabase's own
+  `{{ .ConfirmationURL }}` is used up by that visit, and the person's link then fails. This
+  happened to a Bureau reset on 14 October 2026 — the auth log shows the link opened from a
+  cloud address four minutes after it was sent. Opening a page is what a scanner does;
+  pressing a button is not.
+* **The six-digit code**, `{{ .Token }}`, which the panel accepts as well as the link —
+  what matters on a phone and when the email opens in a different browser.
+
+The links use **Site URL** (step D), so it must be `https://floodwarning.net`. Copy each body
+exactly — `type=email` and `type=recovery` are what the app reads.
 
 * **Confirm signup** — Subject `Confirm your Flood-Net account`, body:
   ```html
   <h2>Welcome to Flood-Net</h2>
   <p>Your confirmation code is <strong>{{ .Token }}</strong></p>
-  <p>Type it into the Flood-Net window, or <a href="{{ .ConfirmationURL }}">confirm your address here</a>.</p>
+  <p>Type it into the Flood-Net window, or <a href="{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=email">confirm your address here</a>.</p>
   <p>A Bureau (@bom.gov.au) address is approved as soon as it is confirmed. Any other address is approved by an administrator, and you will get an email when it is.</p>
   <p>If you did not create a Flood-Net account, ignore this email.</p>
   ```
@@ -164,11 +175,21 @@ but the code is only in the email if the template carries `{{ .Token }}`.
   ```html
   <h2>Reset your Flood-Net password</h2>
   <p>Your code is <strong>{{ .Token }}</strong></p>
-  <p>Type it into the Flood-Net window, or <a href="{{ .ConfirmationURL }}">choose a new password here</a>.</p>
+  <p>Type it into the Flood-Net window, or <a href="{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=recovery">choose a new password here</a>.</p>
   <p>If you did not ask for this, ignore this email: nothing changes.</p>
   ```
-* **Magic link** — keep the one [`access.md`](access.md#the-email-template) describes (it
-  already carries `{{ .Token }}`).
+* **Magic link** — Subject `Your Flood-Net sign-in code`, body:
+  ```html
+  <h2>Sign in to Flood-Net</h2>
+  <p>Your sign-in code is <strong>{{ .Token }}</strong></p>
+  <p>Type it into the Flood-Net window, or <a href="{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=email">sign in here</a>.</p>
+  <p>If you did not ask to sign in, ignore this email.</p>
+  ```
+
+Test: **Forgot your password?** with a Bureau address. The email's link opens Flood-Net on
+*Reset your password* with a **Continue to a new password** button, and pressing it goes
+on to choosing one. An email that still opens straight onto *Choose a new password* is
+the old template.
 
 ### D. Where links come back to — check only
 
@@ -256,6 +277,7 @@ tidy, or finish it:
 | *Approve* says "The database cannot decide about accounts yet", or the Admin tab says the app expects v62 | Step 0. |
 | Sign-up says sent, no email arrives | Step A not done (Supabase's own mail only reaches the project's team), or the email is in junk. <https://resend.com/emails> shows whether it was sent: nothing listed is Supabase not reaching Resend (A6), *failed* or *bounced* a domain not yet verified (A4). |
 | "Too many emails have gone out for now" | Step A7's rate limit. |
+| A work address's link says it *has expired* or *has been used*, though nobody used it | The mail scanner used it first: the templates still link to `{{ .ConfirmationURL }}`. Step C. Meanwhile the email's six-digit code still works, if the template has one. |
 | The panel says *New accounts are open only to listed addresses* | Sign-up is closed (Admin tab switch, or `app_meta` `signup = 'allowlist'`). |
 | Approved, but no photos | The person needs to sign out and in again only if their tab was open for over an hour; otherwise check the Worker is deployed (its photo route asks `rpc/is_member`). |
 | Administrators are not emailed | Step E: the Vault secret's name must be exactly `resend_api_key`. `select meganet.send_account_mail();` in the SQL editor returns how many it told. |
