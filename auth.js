@@ -1033,6 +1033,21 @@ const Auth = (function () {
           ${who.is_member && !who.may_write ? '<p class="small">Editing is for Bureau staff and the people an administrator adds — ask one if you should be able to.</p>' : ''}`;
   }
 
+  // Every form that waits on an email has a way out of it: the email may never
+  // come, and the person may have a password, Google or Microsoft after all.
+  function backHtml() {
+    return `<p class="small au-alt"><button type="button" class="link-btn" onclick="Auth.go('signin')">Back to sign in</button>
+              — your password, or another way in</p>`;
+  }
+
+  // What to do about an email that has not come. A work address is the usual
+  // reason: its mail system can hold an email from a sender it has not seen
+  // before (quarantine) where junk mail does not show it.
+  function notArrivedHtml() {
+    return `<p class="small">Not there after a few minutes? Look in junk mail. A work address may have held it
+              back as a precaution: its quarantine, or whoever looks after its email, can release it.</p>`;
+  }
+
   function template() {
     const busy = ui.busy;
     const msg  = msgHtml();
@@ -1112,7 +1127,7 @@ const Auth = (function () {
             <button type="button" onclick="Auth.resend()" ${busy ? 'disabled' : ''}>Send it again</button>
             <button type="submit" class="primary" ${busy ? 'disabled' : ''}>Confirm</button>
           </div>
-          <p class="small"><button type="button" class="link-btn" onclick="Auth.go('signin')">Back to sign in</button></p>
+          ${backHtml()}
         </form>`;
     } else if (ui.step === 'forgot') {
       title = 'Reset your password';
@@ -1137,10 +1152,12 @@ const Auth = (function () {
             <input type="text" id="au-code" inputmode="numeric" autocomplete="one-time-code"
                    placeholder="123456" value="${escAttr(ui.code)}" ${busy ? 'disabled' : ''}>
           </label>
+          ${notArrivedHtml()}
           <div class="modal-foot">
             <button type="button" onclick="Auth.go('forgot')" ${busy ? 'disabled' : ''}>Send another</button>
             <button type="submit" class="primary" ${busy ? 'disabled' : ''}>Continue</button>
           </div>
+          ${backHtml()}
         </form>`;
     } else if (ui.step === 'link') {
       const kind = LINK_KINDS[ui.link && ui.link.type] || LINK_KINDS.email;
@@ -1186,10 +1203,12 @@ const Auth = (function () {
           <p class="small">The email also contains a link. Clicking it signs you in in whichever
              tab it opens, and you can ignore this box.</p>
           ${msg}
+          ${notArrivedHtml()}
           <div class="modal-foot">
             <button type="button" onclick="Auth.go('otp')" ${busy ? 'disabled' : ''}>Use a different address</button>
             <button type="submit" class="primary" ${busy ? 'disabled' : ''}>Sign in</button>
           </div>
+          ${backHtml()}
         </form>`;
     } else if (ui.step === 'otp') {
       title = 'Sign in with a code';

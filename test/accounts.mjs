@@ -16,7 +16,8 @@
 //      code (a wrong one refused, the right one signing in), and the account
 //      then waiting: the panel, the banner and a note saying so.
 //   4. **A forgotten password** — the reset sent, its code taking the person
-//      to a new password, a short one refused, the new one saved; and a
+//      to a new password, a short one refused, the new one saved; Back to
+//      sign in out of the code box, for an email that never comes; and a
 //      reset link landing on the page opening the panel on it, the tokens
 //      gone from the address. A link from docs/accounts.md's templates
 //      (?token_hash=…) verified only when Continue is pressed — a mail
@@ -332,6 +333,25 @@ async function main() {
     check('the new one is saved to the account (PUT /user, with the recovery session)',
       put && put.method === 'PUT' && put.body.password === 'a much longer pass phrase' && put.auth === 'Bearer tok-rec', J(put));
     await c3.close();
+
+    {
+      // An email that never comes must not trap the person on the code box.
+      const { context, page: pb } = await open(server.url('/index.html?tab=stations'));
+      await pb.click('#btn-auth');
+      await pb.click('#auth-modal button:has-text("Forgot your password?")');
+      await pb.fill('#au-email', 'sam@bom.gov.au');
+      await pb.click('#auth-modal button[type="submit"]');
+      await pb.waitForSelector('#au-code');
+      const waiting = await modal(pb);
+      await pb.click('#auth-modal button:has-text("Back to sign in")');
+      await pb.waitForSelector('#au-password');
+      const backTo = await pb.evaluate(() => ({ title: document.getElementById('au-title')?.textContent.trim(),
+        email: document.getElementById('au-email')?.value }));
+      check('waiting for the reset code, the panel says where an email that has not come may be, and Back to sign in leads out with the address kept',
+        /junk mail/.test(waiting.text) && /quarantine/.test(waiting.text) && /Sign in to Flood-Net/.test(backTo.title)
+          && backTo.email === 'sam@bom.gov.au', J({ waiting: waiting.text.slice(0, 300), backTo }));
+      await context.close();
+    }
 
     {
       const { context, page: pl } = await open(server.url('/index.html?tab=stations#access_token=tok-rec&refresh_token=r-tok-rec&expires_in=3600&token_type=bearer&type=recovery'));
