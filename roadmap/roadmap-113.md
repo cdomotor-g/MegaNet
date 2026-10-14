@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-14** (revision 150 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-14** (revision 151 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -538,8 +538,10 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and thirteen `[Human]` issues.
 >
+> **Revision 151 opens and closes nothing** — at the owner's request: **🧭 ALERT2 Transition Plan**, a tab under *Admin* listed to administrators and nobody else (`tabShown`, `core.js`): a draft for management of the equipment (ERT-A2, 115E-2), where the work is by region and catchment, the network reviews, the backbone repeaters to acquire and remediate first, the timeline, the FTE and the cost by financial year — every figure worked from the register under a card of sliders and switches that re-works it live. See revision 150 below.
+>
 > **Revision 150 edits #237 and closes nothing** — at the owner's request, after a Bureau password reset that "never arrived": the auth log showed the email sent and its link opened four minutes later from a cloud address, the Bureau's mail scanner using it up. Email links now open the app on a **Continue** button and verify only when it is pressed (`auth.js`); #237's Part 5 has the templates that send them. See revision 150 below.
-
+>
 > **Revision 149 opens #238 (`[Sonnet5/High]`) and closes nothing** — at the owner's request, after a look at QLDTraffic: **🛣️ road and bridge owners** — every Queensland road coloured by who manages it (Transport and Main Roads, the council, a park, private; most have no owner recorded and are not guessed), every bridge a pin that says whose it is and who to call, and a *Road and bridge* section on the station card and What is here (`map-road-owners.js`, `site-roads.js`). QLDTraffic's flood events and flood cameras are #238. See revision 149 below.
 >
 > **Revision 148 opens #237 (`[Human]`) and closes nothing** — at the owner's request: **🎛️ views** in the left bar (All, Simple, Field and an account's own, kept in the database), **🔭 Look Around** out of the Stations side panel and into a tab of its own, and **accounts anybody can make** — a Bureau address approved once confirmed, anybody else by an administrator, an approved account seeing the field photos (`0062`, `8984338`). The dashboard half is #237: the rest of `0062`, email that reaches people, and the sign-in settings. See revision 148 below.
@@ -778,6 +780,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 151 — 2026-10-14: 🧭 ALERT2 Transition Plan — a draft for management, and a nav that can hide a tab
+
+At the owner's request: *"a new tab … visible only to the highest level of administrator … a draft ALERT2 transition plan … to submit to management"* — the type and quantity of equipment (ERT-A2s, 115E units for base stations), where the work is by catchment, how long and how many FTE, the cost, network reviews, the timelines, and the acquisition and remediation of backbone repeaters ahead of the rest; then, mid-run, *"controls … sliders and switches … to see the effect … on timelines and costs"*. Nothing opened or closed.
+
+- **The tab** (`alert2-plan.js`, new; 🧭 under *Admin*): three layers kept apart — `inventory()` counts field stations (rainfall or river), repeaters, the backbone (map-backbone.js's rule at the card's hop distance) and bases by region and catchment, with each repeater's owner from the record or the SLS; `model()` walks the months of a handful of lanes (procurement, reviews, acquisition owner by owner, contract remediation and ALERT2 fit-out region by region, the pilot, the bases, the field crews region by region with the wet season slowed, close-out) into dates, person-days by role and cost by month; the page is the plan as a document — summary, why ALERT2 and how it fits FWIN, a basin map, equipment, the backbone case, the reviews, a Gantt chart, the FTE profile, cost by category and financial year, risks, decisions sought and twelve cited sources from the open web. **🎛️ Try it another way** above it: scope, crews, pace, backbone-first, reviews, pilot, wet season, FWIN share, acquisitions, contingency, every unit rate, six presets, ▲ ▼ for the region order — the five figures at the top say how far any scenario is from the proposal. Prints as a document; saves as a workbook and a CSV.
+- **The proposal, as drafted** (Queensland, the register as at 2026-07-31): 1,159 field stations and 90 repeaters (87 on the backbone, 15 radio networks' bases), about **$27.8m with 25% contingency over about 40 months, 22.5 FTE-years, 1,344 ERT-A2 and 30 115E-2**; the backbone acquisitions (55 sites from about 25 owners) set the end date. Unit prices are planning figures — ELPRO publishes none.
+- **Hiding a tab** (`tabShown` in `core.js`): a `who: 'admin'` tab is left out of the bar, the find box and its count, Ctrl+K, every view and the Site Map for any session that is not an administrator's, and auth.js re-renders the nav when that changes; the tab's own render refuses anybody else. **Hidden is not secret** — the words are in this public repository, which the tab's help says.
+
+**Checks:** `npm run a2plan` (new, a CI step: 37); `npm run nav` (+6 — runs its coverage as an administrator and checks the other half signed out and as an editor, Ctrl+K included); `npm run views` (+1 — no view of a non-administrator's holds the tab); `npm run smoke` (42 tabs); `npm run tabs` (two new rows, born converted). The cheap five, `help`, `exports` and `palette`.
 
 ### Revision 150 — 2026-10-14: 📧 Email links wait for Continue — a Bureau mail scanner was using them up; #237's Part 5 rewritten
 

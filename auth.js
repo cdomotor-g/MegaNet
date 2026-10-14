@@ -13,8 +13,8 @@
 // photo it holds was fetched for one session (0035, 0062: members only); to
 // field-camera.js for FieldCamera.authChanged, which sends the photos waiting
 // on the device; to admin.js for Admin.authChanged (0042, administrators
-// only); to network-review.js for NetworkReview.authChanged (administrators
-// only); to station-history.js for StationHistory.authChanged (0056, editors
+// only); to network-review.js for NetworkReview.authChanged and alert2-plan.js
+// for Alert2Plan.authChanged (administrators only); to station-history.js for StationHistory.authChanged (0056, editors
 // only); to site-features.js for SiteFeatures.authChanged (0061, editors only);
 // to nav-views.js for NavViews.authChanged (0062: an account's own views); to
 // toast.js for the once-a-page notes; and to datastore.js for dbSetAccessToken.
@@ -887,6 +887,7 @@ const Auth = (function () {
                        typeof AdminTokens !== 'undefined' ? AdminTokens : null,
                        typeof BaseStations !== 'undefined' ? BaseStations : null,
                        typeof NetworkReview !== 'undefined' ? NetworkReview : null,
+                       typeof Alert2Plan !== 'undefined' ? Alert2Plan : null,
                        typeof StationHistory !== 'undefined' ? StationHistory : null,
                        typeof SiteFeatures !== 'undefined' ? SiteFeatures : null,
                        typeof HealthAgent !== 'undefined' ? HealthAgent : null,

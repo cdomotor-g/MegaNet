@@ -663,6 +663,29 @@ const SEED_NR = `async () => {
   for (const d of document.querySelectorAll('#main-content details')) d.open = true;
 }`;
 
+// The ALERT2 Transition Plan, born converted: as an administrator would see
+// it — the SLS loaded so the owners are filled in, and every disclosure open,
+// the unit costs and the catchment and backbone tables with them.
+const SEED_A2_OUT = `() => {
+  if (window.__a2Auth) { Object.assign(Auth, window.__a2Auth); delete window.__a2Auth; }
+  Alert2Plan.authChanged();
+}`;
+
+const SEED_A2 = `async () => {
+  if (!window.__a2Auth) {
+    const real = { isSignedIn: Auth.isSignedIn, isAdmin: Auth.isAdmin, role: Auth.role };
+    window.__a2Auth = real;
+    const here = () => state.activeTab === 'a2plan';
+    Auth.isSignedIn = () => here() || real.isSignedIn();
+    Auth.isAdmin = () => here() || (real.isAdmin ? real.isAdmin() : false);
+    Auth.role = () => here() ? 'admin' : real.role();
+  }
+  try { await SLS.ensureData(); } catch (_) { /* the plan draws without owners */ }
+  Alert2Plan.authChanged();
+  await new Promise(r => setTimeout(r, 50));
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+
 // The Radio Propagation tab, born converted: the echo story, so the Town
 // base's table and its phasor are on the page too, and every disclosure open.
 const SEED_RP = `async () => {
@@ -829,6 +852,8 @@ const CONVERTED = [
   { id: 'basestations', label: 'Base Stations — the list, a station open, and the team keys', issue: 'born converted', seed: SEED_BS },
   { id: 'review',     label: 'Network Review — signed out', issue: 'born converted', seed: SEED_NR_OUT },
   { id: 'review',     label: 'Network Review — a matrix of two repeaters and a proposed site', issue: 'born converted', seed: SEED_NR },
+  { id: 'a2plan',     label: 'ALERT2 Transition Plan — signed out', issue: 'born converted', seed: SEED_A2_OUT },
+  { id: 'a2plan',     label: 'ALERT2 Transition Plan — the plan, every table open', issue: 'born converted', seed: SEED_A2 },
   { id: 'propagation', label: 'Radio Propagation — the lesson, the echo story and every drawing', issue: 'born converted', seed: SEED_RP },
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },

@@ -162,6 +162,15 @@ const ExportMenu = (function () {
         { label: 'This test — CSV', sub: 'the same, as one row', call: ['TwoPeg.exportOpen', 'csv'], ready: why },
       ];
     },
+    a2plan: () => {
+      const why = () => (typeof Alert2Plan !== 'undefined' && Alert2Plan.plan()) ? '' : 'An administrator, with the station register loaded, first.';
+      return [
+        { label: 'The plan — Excel workbook', sub: 'the summary, the equipment, the regions, the timeline, the cost by financial year and every assumption',
+          call: ['Alert2Plan.exportXlsx'], ready: why },
+        { label: 'The quantities — CSV', sub: 'stations, repeaters and bases by region and catchment, in conversion order',
+          call: ['Alert2Plan.exportCsv'], ready: why },
+      ];
+    },
     review: () => [
       { label: 'The path margin matrix — CSV', sub: 'every field station\'s margin to each hub, its best path, the measured margin and the flags',
         call: ['NetworkReview.exportCsv'],

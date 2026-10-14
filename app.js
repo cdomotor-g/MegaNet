@@ -1611,7 +1611,7 @@ function navScore(text, terms) {
 function navViewGroups() {
   return typeof NavViews !== 'undefined'
     ? NavViews.navGroups()
-    : TABS.map(g => ({ group: g.group, tabs: g.tabs }));
+    : TABS.map(g => ({ group: g.group, tabs: g.tabs.filter(tabShown) })).filter(g => g.tabs.length);
 }
 
 // The view's groups with the losing tabs removed and any group left empty
@@ -1626,13 +1626,13 @@ function navFiltered() {
   if (!terms.length) {
     const groups = view.map(g => ({ group: g.group, tabs: g.tabs }));
     const open = TAB_LIST.find(t => t.id === state.activeTab);
-    if (open && !inView.has(open.id)) groups.push({ group: outside, tabs: [open], outside: true });
+    if (open && !inView.has(open.id) && tabShown(open)) groups.push({ group: outside, tabs: [open], outside: true });
     return { groups, bestId: null };
   }
   // Matched against the group the tab is listed under here, and — for one the
   // view leaves out — against the group TABS files it under, which is where
   // its find words were written to be read.
-  const rest = TABS.flatMap(g => g.tabs.filter(t => !inView.has(t.id)).map(t => ({ t, home: g.group })));
+  const rest = TABS.flatMap(g => g.tabs.filter(t => !inView.has(t.id) && tabShown(t)).map(t => ({ t, home: g.group })));
   let best = 0;
   const score = (tab, group) => {
     const n = navScore(navHaystack(tab, group), terms);
@@ -1728,7 +1728,7 @@ function navCountHtml(id) {
 function navFoundText() {
   if (!navTerms(state.navQuery).length) return '';
   const n = navFiltered().groups.reduce((sum, g) => sum + g.tabs.length, 0);
-  return `${n} of ${TAB_LIST.length} tabs`;
+  return `${n} of ${TAB_LIST.filter(tabShown).length} tabs`;
 }
 
 function renderTabs() {
@@ -3562,6 +3562,7 @@ function renderMain() {
     case 'admin':      el.innerHTML = Admin.render();         Admin.init();        break;
     case 'basestations': el.innerHTML = BaseStations.render(); BaseStations.init(); break;
     case 'review':     el.innerHTML = NetworkReview.render(); NetworkReview.init(); break;
+    case 'a2plan':     el.innerHTML = Alert2Plan.render();    Alert2Plan.init();    break;
     case 'propagation': el.innerHTML = Propagation.render(); Propagation.init(); break;
     default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }

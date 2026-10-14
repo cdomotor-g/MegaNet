@@ -121,7 +121,11 @@ async function main() {
     log('\n1. Picking a view\n');
     const { context: ctx, page } = await open(server.url('/index.html?tab=stations'));
     let b = await bar(page);
-    const all = await page.evaluate(() => TAB_LIST.map(t => t.id));
+    // Every tab this session is offered: a tab for administrators only
+    // (tabShown, core.js) is in no view of anybody else's.
+    const all = await page.evaluate(() => TAB_LIST.filter(tabShown).map(t => t.id));
+    check('a tab for administrators only is left out of every view of a session that is not one',
+      await page.evaluate(() => TAB_LIST.some(t => t.who === 'admin') && NavViews.views().every(v => v.groups.every(g => g.tabs.every(t => t.who !== 'admin')))));
     check('a device that has never picked is on All, and All lists every tab once',
       b.view === 'all' && J(ids(b)) === J(all) && !b.groups.some(g => g.outside), J({ view: b.view, n: ids(b).length }));
     check('the View box, at the top of the bar, offers All, Simple and Field in that order',

@@ -244,6 +244,8 @@ const TABS = [
       find: 'ingest points receivers fleet devices heartbeat check-in checking in uptime temperature under-voltage uplink queue remote manage restart reboot update upgrade release log ssh keys login maintenance team public key' },
     { id: 'review',     label: 'Network Review',         icon: '📐',
       find: 'network review design audit planning fade margin matrix radio mobile rm comparison calibration calibrate attenuator path margin measured field test redundancy two paths second path gateways repeater relocation move proposed site hops tdma alert2 frequency principles licence' },
+    { id: 'a2plan',     label: 'ALERT2 Transition Plan', icon: '🧭',     who: 'admin',
+      find: 'alert2 transition migration upgrade plan proposal business case management submission erta2 ert-a2 elpro 115e base station repeater backbone acquisition remediation equipment quantity cost estimate budget fte effort staff crews timeline gantt schedule duration catchment basin region scenario what if sliders network review' },
   ] },
 ];
 
@@ -269,6 +271,20 @@ const TAB_NEEDS = {
 function tabCannot(t) {
   const n = t && t.needs && TAB_NEEDS[t.needs];
   return n && !n.has() ? n.why : '';
+}
+
+// Whether the nav lists a tab for this session. A tab with `who: 'admin'` is
+// listed to an administrator and to nobody else — not in the bar, the find
+// box, Ctrl+K, a view or the Site Map — where Base Stations and Network Review
+// are listed to everyone and say who they are for once opened. It is still a
+// tab (TAB_LIST holds it, and ?tab= opens it), so the module's own render is
+// what refuses anybody else; this decides only whether it is offered. The
+// database is not asked anything new: Auth.isAdmin() is whoami()'s answer, and
+// auth.js re-renders the nav whenever that answer changes.
+function tabShown(t) {
+  if (!t || t.who !== 'admin') return true;
+  return typeof Auth !== 'undefined' && Auth.isSignedIn()
+    && !!((Auth.isAdmin && Auth.isAdmin()) || Auth.role() === 'admin');
 }
 
 // What the help panel says, keyed by the same tab ids TABS uses. Kept beside
@@ -2098,6 +2114,30 @@ const HELP = {
     ],
     links: [{ label: 'Network review, and how the fade margin was calibrated', href: 'docs/network-review.md' }],
     related: ['stations', 'passranges', 'basestations'],
+  },
+  a2plan: {
+    summary: 'A draft plan for management of moving the ALERT networks to ALERT2: the <strong>equipment</strong> '
+           + 'and how much of it (ELPRO ERT-A2 at every field station, repeater and base, a 115E-2 gateway behind each '
+           + 'base receiver), <strong>where the work is</strong> by region and catchment, the <strong>network reviews</strong>, '
+           + 'the <strong>backbone repeaters</strong> to acquire and remediate first, the <strong>timeline</strong>, the '
+           + '<strong>effort in FTE</strong> and the <strong>cost</strong> by financial year. Every figure is worked from the '
+           + 'station register as loaded, under <strong>🎛️ Try it another way</strong> — sliders and switches that work the '
+           + 'whole plan again as they move. Listed to administrators only.',
+    watch: [
+      '<strong>It is an estimate, and says so.</strong> The quantities are counted from the register; the rates, '
+      + 'durations and unit prices are the draft\'s proposals, and a supplier\'s quote replaces them under '
+      + '<em>Unit costs and rates</em>.',
+      '<strong>The scenario is kept on this device only.</strong> “The proposal” puts it back; the five figures at the '
+      + 'top say how far any other scenario moved from it.',
+      '<strong>The backbone is map-backbone.js\'s rule</strong> — repeaters sharing an open pass-range window with another, '
+      + 'or with a base, within the hop distance on the card. Owners come from the station record or the SLS, and a site '
+      + 'with neither is counted as “no owner on record”, not guessed.',
+      '<strong>Hidden is not secret.</strong> The tab is left out of the nav for anybody but an administrator, but its '
+      + 'words are in a public repository. Nothing that must stay private belongs in it.',
+    ],
+    links: [{ label: 'Network review and the design principles', href: 'docs/network-review.md' },
+            { label: 'The ELPRO 115E-2 as a base-station gateway', href: 'docs/elpro115e_mqtt.md' }],
+    related: ['review', 'alert2', 'basestations'],
   },
 };
 

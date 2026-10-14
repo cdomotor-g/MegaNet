@@ -1181,6 +1181,14 @@ jobs:
         working-directory: test
         run: npm run review
 
+      # Chromium. The ALERT2 Transition Plan tab (alert2-plan.js), listed to
+      # administrators only: the inventory adds up to the register, the plan
+      # to its parts, every slider and switch moves it the way the card says,
+      # and the workbook and CSV are floodnet-….
+      - name: ALERT2 Transition Plan — the inventory, the plan's sums, the card
+        working-directory: test
+        run: npm run a2plan
+
       # Node, then Chromium. The 🎓 Radio Propagation tab (propagation-*.js):
       # its physics against figures worked by hand, its ALERT frame against
       # packets.js's own decoder, each of the made-up catchment's stories

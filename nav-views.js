@@ -155,8 +155,10 @@ const NavViews = (function () {
         groups = [];
       }
     }
+    // A tab this session is not offered (tabShown, core.js) is left out of
+    // every view here, so the bar, the count and the editor agree on it.
     const seen = new Set();
-    for (const g of groups) g.tabs = g.tabs.filter(t => !seen.has(t.id) && seen.add(t.id));
+    for (const g of groups) g.tabs = g.tabs.filter(t => tabShown(t) && !seen.has(t.id) && seen.add(t.id));
     return {
       id: v.id, name: meta.name, icon: meta.icon, about: meta.about,
       preset: v.preset || null, edited: !!(v.preset && v.groups), fixed: v.id === 'all',
@@ -624,7 +626,7 @@ const NavViews = (function () {
     const mine = signedIn() && !v.fixed;
     const vid = escAttr(v.id);
     const shown = new Set(v.groups.flatMap(g => g.tabs.map(t => t.id)));
-    const missing = TAB_LIST.filter(t => !shown.has(t.id));
+    const missing = TAB_LIST.filter(t => !shown.has(t.id) && tabShown(t));
     const groupOpts = (except) => v.groups.map((g, i) => i === except ? ''
       : `<option value="${i}">${esc(g.group)}</option>`).join('');
 

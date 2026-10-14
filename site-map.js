@@ -300,6 +300,15 @@ const SiteMap = (function () {
       ],
       note: 'Administrators only.',
     },
+    a2plan: {
+      what: 'A draft plan for management of moving the network to ALERT2 — equipment, where, when, how many people and how much — worked from the register.',
+      use: [
+        'Put the equipment, timeline, FTE and cost in front of management',
+        'Ask "what if we did it another way" with sliders, and see the plan move',
+        'Print it, or take it away as a workbook',
+      ],
+      note: 'Administrators only.',
+    },
     levels: {
       what: 'A station\'s levels surveyed on a phone: the run booked rise and fall and reduced as you go, kept with no signal, filed under the station.',
       use: [
@@ -430,7 +439,7 @@ const SiteMap = (function () {
   // work.
   function workGroups() {
     return TABS
-      .map(g => ({ group: g.group, slug: slug(g.group), tabs: g.tabs.filter(t => t.id !== SELF) }))
+      .map(g => ({ group: g.group, slug: slug(g.group), tabs: g.tabs.filter(t => t.id !== SELF && tabShown(t)) }))
       .filter(g => g.tabs.length)
       .map((g, i) => ({ ...g, n: i + 1, hue: 'sm-g' + ((i % HUES) + 1) }));
   }

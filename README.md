@@ -213,6 +213,9 @@ MegaNet/
 │                             Flood-Net against Radio Mobile, the design principles)
 ├── network-history.js      ← NetworkHistory — the Network Review's check of the model
 │                             against every attenuator test on file, by hub and basin
+├── alert2-plan.js          ← Alert2Plan — ALERT2 Transition Plan tab (administrators
+│                             only: the draft for management, worked from the register
+│                             under a scenario card of sliders and switches)
 ├── propagation-physics.js  ← PropPhysics — the 🎓 Radio Propagation tab's arithmetic
 │                             (wavelength, Fresnel, knife edge, foliage, phasors, the
 │                             ALERT Binary frame, a receiver with FM capture); pure
@@ -348,6 +351,7 @@ MegaNet/
 │   ├── stationhistory.mjs   (the station card's History and the Admin tab's Deleted stations: who changed what, Restore)
 │   ├── basestations.mjs     (the Base Stations tab: the list, a station's panel, what each button sends)
 │   ├── review.mjs           (the Network Review tab: administrators only, the matrix's cells the card's figures, the field beside them)
+│   ├── a2plan.mjs           (the ALERT2 Transition Plan tab: administrators only, the inventory and the plan add up, the card moves it)
 │   ├── healthreport.mjs     (Station Health run unattended: the browser's analysis over the demo week, reported as the database takes it)
 │   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
@@ -4979,6 +4983,44 @@ feature on the map. `docs/site-features.md` has the rest; `npm run sitefeatures`
 drives it in a browser and `tools/check_station_features.sql` holds the
 database's rules. The migration, `0061`, waits to be applied to the live
 database with `0053`–`0060`; until it is, the card and the panel say so.
+
+### 31. ALERT2 Transition Plan (a Draft for Management, With the Sliders to Argue With)
+
+🧭 **ALERT2 Transition Plan**, under *Admin*, is listed to administrators and to
+nobody else — it is left out of the bar, the find box, Ctrl+K, every view and the
+Site Map for any other session, and says who it is for if opened by its address.
+It is a draft plan for management of moving the ALERT networks to ALERT2, worked
+from the station register as loaded:
+
+* **The equipment** — an ELPRO ERT-A2 at every field station, repeater and base
+  receive chain, a 115E-2 gateway behind each base receiver, the site kit, power
+  upgrades and test sets — in quantities, at unit costs the card can change.
+* **Where the work is** — field stations (rainfall and river), repeaters, the
+  backbone and bases by region and catchment, on a basin map and in a table whose
+  ▲ ▼ set the order the regions are converted in.
+* **The backbone repeaters to acquire and remediate first** — the backbone by the
+  Stations map's own rule, each repeater's owner from the register or the SLS, the
+  ones carrying the most stations, and why that stream can and should start ahead
+  of everything else.
+* **The network reviews**, region by region, against the Network Review's design
+  principles, and what they are expected to add and retire.
+* **The timeline** as a Gantt chart with the wet season shaded, each network's own
+  dates and what it waits for; **the effort** in FTE by role over time; **the
+  cost** by category and by financial year; the assumptions, risks, open questions,
+  the decisions sought, and the sources.
+
+Above it, **🎛️ Try it another way**: sliders and switches for the scope, crews,
+pace, the backbone-first and review switches, the wet season, stations converted
+on FWIN upgrade visits, acquisitions, contingency and every unit rate, with
+presets ("Faster", "Leaner", "Backbone with each region", "Like for like", "Work
+through the wet season"). Each move works the whole plan again at once, and the
+five figures at the top say how far it is from the proposal. The scenario is kept
+on the device. It prints as a document (the card left off, the assumptions table
+saying what it was set to), and saves as `floodnet-alert2-transition-plan.xlsx`
+and `floodnet-alert2-plan-quantities.csv`.
+
+Its words are in this public repository: anything that must stay private belongs
+in the database, not the tab. `npm run a2plan` holds it.
 
 ---
 

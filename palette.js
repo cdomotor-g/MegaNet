@@ -157,6 +157,7 @@ const Palette = (() => {
     const scored = [];
     for (const g of TABS) {
       for (const tab of g.tabs) {
+        if (!tabShown(tab)) continue;
         const score = navScore(navHaystack(tab, g.group), terms);
         if (!score) continue;
         best = Math.max(best, score);

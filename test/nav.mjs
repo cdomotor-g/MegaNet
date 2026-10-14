@@ -31,6 +31,12 @@
 //                  rail. A filter left running behind a nav that cannot show its
 //                  own box is a nav that has silently lost fifteen tabs.
 //
+//   Who sees what. A tab marked `who: 'admin'` (tabShown, core.js) is listed to
+//                  an administrator and to nobody else — not in the bar, the find
+//                  box, Ctrl+K or the Site Map. So the coverage above runs as an
+//                  administrator, where every tab is listed, and the end of the
+//                  file signs out and checks the other half.
+//
 // Run:  npm run nav
 //       npm run nav -- -v    also print what passed
 
@@ -91,6 +97,15 @@ try {
   // this context is fresh, so it is expanded. Said out loud because every
   // assertion below about the find box depends on it.
   await page.evaluate(() => setNavCollapsed(false));
+
+  // An administrator, as whoami() would say: every tab is listed to one, so
+  // "every tab is in the nav" is a claim about this session. The other kind of
+  // session is checked at the end.
+  await page.evaluate(() => {
+    window.__auth = { isSignedIn: Auth.isSignedIn, isAdmin: Auth.isAdmin, role: Auth.role };
+    Auth.isSignedIn = () => true; Auth.isAdmin = () => true; Auth.role = () => 'admin';
+    renderTabs();
+  });
 
   // ── Coverage ──────────────────────────────────────────────────────────────
   console.log('\nCoverage — every tab is in the nav, once, under one heading\n');
@@ -441,6 +456,45 @@ try {
   L = await lead();
   check('and once the banner has scrolled away, no line at all rather than one off the screen',
     !L.on, `on ${L.on}, lit ${L.lit.join(', ')}`);
+
+  // ── Who sees what ─────────────────────────────────────────────────────────
+  console.log('\nWho sees what — a tab for administrators is listed to nobody else\n');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const adminOnly = await page.evaluate(() => TAB_LIST.filter(t => t.who === 'admin').map(t => ({ id: t.id, label: t.label })));
+  check('at least one tab is listed to administrators only', adminOnly.length > 0, adminOnly.map(t => t.id).join(', '));
+  const seen = () => page.evaluate((ids) => {
+    setNavCollapsed(false);
+    navFind('');
+    const bar = [...document.querySelectorAll('#tab-nav .tab-btn')].map(b => b.dataset.tab);
+    const found = ids.map(t => { navFind(t.label); const got = [...document.querySelectorAll('#tab-nav .tab-btn')].map(b => b.dataset.tab); navFind(''); return got.includes(t.id); });
+    switchTab('sitemap');
+    const cards = [...document.querySelectorAll('#main-content .sm-card')].map(c => c.dataset.tab);
+    return { bar: ids.map(t => bar.filter(x => x === t.id).length), found, cards: ids.map(t => cards.includes(t.id)),
+             count: (navFind('a'), document.getElementById('nav-found').textContent) };
+  }, adminOnly);
+  let w = await seen();
+  check('an administrator has each of them in the bar once, finds it by name, and has its Site Map card',
+    w.bar.every(n => n === 1) && w.found.every(Boolean) && w.cards.every(Boolean), JSON.stringify(w));
+  await page.evaluate(() => { navFind(''); Auth.isSignedIn = () => false; Auth.isAdmin = () => false; Auth.role = () => null; renderTabs(); });
+  w = await seen();
+  check('signed out, none of them is in the bar, the find box or the Site Map',
+    w.bar.every(n => n === 0) && !w.found.some(Boolean) && !w.cards.some(Boolean), JSON.stringify(w));
+  const total = await page.evaluate(() => TAB_LIST.length);
+  check('and the find box counts only the tabs it could list', new RegExp(`of ${total - adminOnly.length} tabs`).test(w.count), w.count);
+  await page.evaluate(() => { navFind(''); Auth.isSignedIn = () => true; Auth.isAdmin = () => false; Auth.role = () => 'editor'; renderTabs(); });
+  w = await seen();
+  check('signed in without being an administrator, the same', w.bar.every(n => n === 0) && !w.found.some(Boolean) && !w.cards.some(Boolean), JSON.stringify(w));
+  const inPalette = (admin) => page.evaluate(([ids, admin]) => {
+    Auth.isSignedIn = () => admin; Auth.isAdmin = () => admin; Auth.role = () => (admin ? 'admin' : null);
+    return ids.map(t => Palette.results(t.label).some(x => x.kind === 'tab' && x.label === t.label));
+  }, [adminOnly, admin]);
+  const palOut = await inPalette(false), palIn = await inPalette(true);
+  check('Ctrl+K offers it to an administrator and to nobody else', palIn.every(Boolean) && !palOut.some(Boolean),
+    `admin ${palIn.join(',')}, signed out ${palOut.join(',')}`);
+  await page.evaluate(() => { Auth.isSignedIn = () => true; Auth.isAdmin = () => false; Auth.role = () => 'editor'; renderTabs(); });
+  const opened = await page.evaluate(() => { navFind(''); switchTab(TAB_LIST.find(t => t.who === 'admin').id); return document.getElementById('main-content').textContent; });
+  check('opened by its address, it says who it is for and shows nothing more', /administrators only/i.test(opened) && opened.length < 600, opened.slice(0, 160));
+  await page.evaluate(() => { navFind(''); switchTab('stations'); });
 
   if (errors.length) check('no uncaught page errors', false, errors.join(' | '));
 } finally {
