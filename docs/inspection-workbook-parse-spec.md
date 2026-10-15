@@ -165,7 +165,7 @@ trailing `.0`) — never for storage.
 | `battery_alert_id` | `Batt = <digits>` | `Batt = 5860` |
 | `mace_id` / `logger_id` | `Mace = …` / `Logger = …` | `Mace = 7246` |
 | `orifice_level_raw` | `Orifice level = …` | `Orifice level = 0.844metres/ 162.694m AHD as at Aug 2020` |
-| `key_number_raw` | `Key# …` | `Key# DNR 20101` |
+| `key_number_raw` | `Key# …` | `Key# DNR …` (a site's key or code — editors-only in the database, never quoted here) |
 | `phone_no_raw` | `Phone No. …` | `Phone No. [phone removed]` — every number is redacted in the committed workbook (§8) |
 
 The last three stay **raw strings**. `Orifice level = 0.844metres/ 162.694m AHD

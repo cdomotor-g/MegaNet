@@ -10,6 +10,14 @@ wrangler.toml
 .assetsignore
 worker
 
+# The historical inspection workbook and everything derived from it. Remarks and
+# notes in it carry gate combinations, logger security codes and key numbers —
+# editors-only in the database, so never a public file on floodwarning.net.
+# Nothing in the app fetches these; the ingest tools read them from the checkout.
+archive/QLD All Site Inspections.xlsx
+data/inspections
+tools/ingest/inspection_extract_sample.json
+
 # Never ship local secrets as static assets, even if one is present in the
 # working tree at deploy time (appraisal L-12).
 .env

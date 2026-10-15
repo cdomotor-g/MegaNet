@@ -260,7 +260,10 @@ $$;
 -- fact's (block, kind, ord), a visit's uuid5 id with origin = 'import' (a visit
 -- typed into the app is never touched), a derived event's id.
 
--- Blocks: the ID line, the notes and the annotation rows (78).
+-- Blocks: the ID line, the notes and the annotation rows (78). Three of the
+-- notes carry a site's logger security code beside the phone number; those
+-- merge the one changed key rather than restate the note, so the code is never
+-- written into this public file.
 update meganet.inspection_block set annotations = '[{"row": 427, "text": "Site access call energyq (scada and telecommunications systems) STOC [phone removed]"}]'::jsonb where ref = 'qld-all-site-inspections:Brisbane!:392';
 update meganet.inspection_block set ids_raw = 'ID''s | Rn = 7113 | Batt = 7016 | Phone No. [phone removed]' where ref = 'qld-all-site-inspections:Brisbane!:1464';
 update meganet.inspection_block set notes = '{"phone_no": "[phone removed]", "stray_point_row_above_header": "row 305"}'::jsonb where ref = 'qld-all-site-inspections:Border!:303';
@@ -325,7 +328,7 @@ update meganet.inspection_block set ids_raw = 'ID''s | Rn = 7654 | Batt = 7653 |
 update meganet.inspection_block set ids_raw = 'ID''s | Rn = 7859 | Rv = 7860 | Batt = 7861 | Phone No: [phone removed] | Orifice Level = 0.370m GH' where ref = 'qld-all-site-inspections:Closed stations:642';
 update meganet.inspection_block set ids_raw = 'ID''s | Rn = 7856 | Rv = 7857 | Batt = 7858 | Phone No: [phone removed] | Orifice Level = 0.500m GH' where ref = 'qld-all-site-inspections:Closed stations:663';
 update meganet.inspection_block set ids_raw = 'ID''s | Rv = 7132 | Batt = 7915 | Phone No: [phone removed]' where ref = 'qld-all-site-inspections:Closed stations:683';
-update meganet.inspection_block set notes = '{"absorbed_value_in_header": "River Calibration (metres): 1", "group_row_note": "Security Code = 20101", "phone_no": "[phone removed]"}'::jsonb where ref = 'qld-all-site-inspections:Closed stations:704';
+update meganet.inspection_block set notes = notes || '{"phone_no": "[phone removed]"}'::jsonb where ref = 'qld-all-site-inspections:Closed stations:704';
 update meganet.inspection_block set ids_raw = 'ID''s | Rn = 7692 | Rv = 7693 | Batt = 7696 | Phone No: [phone removed] | Orifice RL = 0.000m (Assumed)' where ref = 'qld-all-site-inspections:Closed stations:735';
 update meganet.inspection_block set ids_raw = 'ID''s | Rn = 7143 | Rv = 7142 | Batt = 7786 | Phone No: [phone removed] | Orifice RL = 0.390m GH' where ref = 'qld-all-site-inspections:Closed stations:767';
 update meganet.inspection_block set ids_raw = 'ID''s | Rn = 7281 | Rv = 7280 | Batt = 7792 | Phone No: [phone removed] (was L/L [phone removed]) | Orifice RL = 1.12m GH' where ref = 'qld-all-site-inspections:Closed stations:781';
@@ -335,8 +338,8 @@ update meganet.inspection_block set notes = '{"phone_no": "[phone removed] as at
 update meganet.inspection_block set ids_raw = 'ID''s | Rn = | Rv = 7744 | Batt = 7742 | Phone No: [phone removed] | Orifice RL = 298.080m AHD (-1.085m GH)' where ref = 'qld-all-site-inspections:Closed stations:962';
 update meganet.inspection_block set notes = '{"group_row_note": "Orifice RL = 0.859m GH", "phone_no": "[phone removed]"}'::jsonb where ref = 'qld-all-site-inspections:Closed stations:990';
 update meganet.inspection_block set ids_raw = 'ID''s | Rn = 7754 | Rv = 7755 | Phone No: [phone removed] | Orifice RL = 1.163m GH (273.663m AHD)' where ref = 'qld-all-site-inspections:Closed stations:1011';
-update meganet.inspection_block set notes = '{"absorbed_value_in_header": "River Calibration (metres): 1", "group_row_note": "Logger Security code: 250", "phone_no": "[phone removed]"}'::jsonb where ref = 'qld-all-site-inspections:Closed stations:1045';
-update meganet.inspection_block set notes = '{"absorbed_value_in_header": "River Calibration (metres): 1", "group_row_note": "Logger Security code: 250", "phone_no": "[phone removed]"}'::jsonb where ref = 'qld-all-site-inspections:Closed stations:1064';
+update meganet.inspection_block set notes = notes || '{"phone_no": "[phone removed]"}'::jsonb where ref = 'qld-all-site-inspections:Closed stations:1045';
+update meganet.inspection_block set notes = notes || '{"phone_no": "[phone removed]"}'::jsonb where ref = 'qld-all-site-inspections:Closed stations:1064';
 update meganet.inspection_block set ids_raw = 'ID''s | Rn = 7223 | Rv = 7222 | Batt = 7791 | Phone No: [phone removed] | Orifice RL = 0.60m GH(after Feb 2010)' where ref = 'qld-all-site-inspections:Closed stations:1082';
 update meganet.inspection_block set ids_raw = 'ID''s | Rn = | 7622 | Batt = | 7623 | Phone No: [phone removed]' where ref = 'qld-all-site-inspections:Closed stations:1115';
 
