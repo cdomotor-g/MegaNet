@@ -367,7 +367,7 @@ def strip_block_note(label: str) -> tuple[str, tuple[str, str] | None]:
 
     The group row is not only group labels: technicians parked phone numbers,
     key numbers, repeater windows and frequencies on it, and those end up
-    prefixed onto the column label underneath. `Phone No: 07 4676 4290 Lithium
+    prefixed onto the column label underneath. `Phone No: [phone removed] Lithium
     Batter Voltage (v)` is one column and one fact about the station.
     """
     for name, pattern in BLOCK_NOTES:

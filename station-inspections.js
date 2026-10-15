@@ -51,7 +51,7 @@
 // off those tables directly, and that is what makes this section visible
 // without a sign-in. The tables are still editors-only and nothing here changed
 // that: 0009 withholds them because an inspection's remarks carry site-access
-// notes and the Council form carries landowner phone numbers, which is a fact
+// notes and the Council form carries council contacts' phone numbers, a fact
 // about the *words* on a visit. The views carry the numbers and the date and
 // nothing else — no remarks, no inspector, no comments column — so there is
 // nothing left in them to withhold. What they contain, and the two assertions

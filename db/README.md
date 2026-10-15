@@ -222,7 +222,7 @@ its cache at all (`PGRST002`).
 | `meganet.inspection_config`, `meganet.inspection_section`, `meganet.inspection_config_section` | The form, as data: six configurations, fourteen sections, and which configuration prints which. **A section absent from the matrix is a section that form does not have** — a different fact from a section table with no row. |
 | `meganet.inspection` | One station visit. The details panel and the remarks; every banner-headed block hangs off it. |
 | `meganet.inspection_serial`, `meganet.inspection_data`, `meganet.inspection_data_value`, `meganet.inspection_power`, `meganet.inspection_rain_gauge`, `meganet.inspection_water_level`, `meganet.inspection_gas`, `meganet.inspection_radio`, `meganet.inspection_fade_margin`, `meganet.inspection_calibration`, `meganet.inspection_data_quality`, `meganet.inspection_admin` | The sections. Each carries a trigger refusing a row whose configuration's form does not print that section. |
-| `meganet.maintenance_activity`, `meganet.maintenance_asset`, `meganet.maintenance_data_quality` | The Council Site Maintenance Tasks form. `inspection_id` is the printed cross-reference at the foot of every inspection sheet, as a foreign key. |
+| `meganet.maintenance_activity`, `meganet.maintenance_asset`, `meganet.maintenance_data_quality` | The Council Site Maintenance Tasks form. `inspection_id` is the printed cross-reference at the foot of every inspection sheet, as a foreign key. The sheet's Landowner block has no columns (dropped in `0063`): Flood-Net holds no landholder contact details. |
 | `meganet.attachment` | Photos and pasted screenshots, for an inspection or a maintenance activity — exactly one of the two. The bytes are in Supabase Storage; this is the index. |
 | `meganet.attachment_type` | What may be uploaded, and how large, per content type. A vocabulary rather than a check constraint, so a new camera format is an insert. Public: it describes a blank form, not a site. The browser reads it to build the file picker and to refuse a file *before* uploading it. |
 | `meganet.attach_file(…)`, `meganet.update_attachment(uuid, jsonb)`, `meganet.detach_file(uuid)` | The attachment write path (0010). Three functions rather than a `grant`, because the object path has to agree with the owner it is filed under, the object name has to be one the app generated rather than one a phone supplied, and `uploaded_by` has to be the caller — none of which is a fact about the row. `update_attachment()` takes a patch so that clearing a caption and leaving it alone are different requests. |
@@ -233,7 +233,7 @@ its cache at all (`PGRST002`).
 | `meganet.save_inspection(jsonb, timestamptz)`, `meganet.save_maintenance_activity(jsonb, timestamptz)` | The write paths. One call is one transaction; children are replaced, not merged; a stale write is refused with `PT409`. |
 | `meganet.delete_inspection(uuid, timestamptz)`, `meganet.delete_maintenance_activity(uuid, timestamptz)` | Soft delete, as for stations. |
 | `meganet.form_write(text, jsonb)` | Internal: inserts one section row from a JSON object, over a closed table list, skipping generated columns. Granted to nothing a browser can reach. |
-| `meganet.inspection_block` | One station block on one worksheet — the unit the historical workbook (#122) is actually built from: a banner, an `ID's` line, a stacked header, then that station's visits. Carries the resolved header it was read under, so a suspicious value can be checked without reopening a 7 MB spreadsheet. 1,093 of them. |
+| `meganet.inspection_block` | One station block on one worksheet — the unit the historical workbook (#122) is actually built from: a banner, an `ID's` line, a stacked header, then that station's visits. Carries the resolved header it was read under, so a suspicious value can be checked without reopening a 7 MB spreadsheet. 1,093 of them. The sheet's `Property Owner:` line is not kept (`property_owner` dropped in `0063`), and the workbook itself was scrubbed of landholders' names, phone numbers and emails first. |
 | `meganet.inspection_block_fact`, `meganet.block_fact_kind` | The `ID's` line, split: rain/river/battery ALERT addresses, orifice level, key number, phone number. Per *block* rather than per station, because a station written up on two sheets in two decades may have been re-surveyed in between — which is also why the orifice level carries an `as_at`. |
 | `meganet.measurement_field` | Every field the historical extractor can emit, and the column on 0009's tables that holds the same fact. **The reason the historical load is not a parallel schema**: the correspondence is data, `project_inspection_measurements()` reads it, and the smoke test reads it. An empty `home_table` means the current form has no box for that field — a real answer, and not a reason to drop the value. |
 | `meganet.inspection_measurement` | One workbook cell — 151,532 of them — as it was written and as far as it could honestly be read. `raw` is the column of record and is never null; `value` is an interpretation and is null wherever the rules did not license one. A fade margin of `>30` is stored as operator `>`, bound 30, value null. |
@@ -291,8 +291,9 @@ locks and often a colleague. `reading_raw` holds whatever a device or an adapter
 sent, unread — a debugging artefact rather than a publication, and the day an
 adapter puts a header or a device key in its payload is the day the difference
 matters. The inspection tables are withheld for a different reason: the Council
-form carries landowner names, emails and phone numbers, and inspection remarks
-carry site access notes. Editors and `service_role` can read both. The inspection
+form carries council contacts' names, emails and phone numbers, and inspection
+remarks carry site access notes. Landholders' contact details are not kept at
+all (`0063`). Editors and `service_role` can read both. The inspection
 domain's *vocabularies* — the pick-lists and the form matrix — are public, because
 they are the words printed on a blank form and say nothing about a site. So are
 the *readings*, since `0023`: `meganet.inspection_chart_visit` and the six
@@ -1124,7 +1125,7 @@ a save function. Its table list is closed, every identifier goes through
 
 **Nothing here is readable with the anon key.** The anon key is committed to this
 repo and served from GitHub Pages, so "readable by anon" means "published", and
-this domain holds landowner contact details and site access notes. Editors only —
+this domain holds council contact details and site access notes. Editors only —
 which is who fills the forms in. The vocabularies and the form matrix *are*
 public: they are the words on a blank form.
 

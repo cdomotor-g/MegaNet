@@ -329,7 +329,7 @@ def build(out, chunks=None):
     # ── Blocks ───────────────────────────────────────────────────────────────
     block_cols = ['ref', 'source', 'sheet', 'banner_row', 'end_row', 'block_index',
                   'family', 'config_key', 'station_name', 'cbm_no', 'station_id',
-                  'station_key', 'station_match', 'property_owner', 'ids_raw',
+                  'station_key', 'station_match', 'ids_raw',
                   'header_rows', 'date_column', 'inherited_header', 'columns',
                   'calibration_points', 'notes', 'annotations', 'comments']
     facts = []
@@ -345,7 +345,7 @@ def build(out, chunks=None):
                 c(b.get('family') or ''), c(b.get('inspection_config')),
                 c(b.get('station_name') or ''), c(b.get('cbm_no') or ''),
                 c(station_id), c(key), c(tier),
-                c(b.get('property_owner') or ''), c(b.get('ids_raw') or ''),
+                c(b.get('ids_raw') or ''),
                 cints(b.get('header_rows') or []), c(b.get('date_column') or ''),
                 c(bool(b.get('inherited_header'))),
                 cjson(b.get('columns') or {}), cjson(b.get('calibration_points') or {}),
@@ -539,7 +539,7 @@ create temporary table _block (
   ref text, source text, sheet text, banner_row integer, end_row integer,
   block_index integer, family text, config_key text, station_name text,
   cbm_no text, station_id text, station_key text, station_match text,
-  property_owner text, ids_raw text, header_rows integer[], date_column text,
+  ids_raw text, header_rows integer[], date_column text,
   inherited_header boolean, columns jsonb, calibration_points jsonb,
   notes jsonb, annotations jsonb, comments jsonb
 ) on commit drop;
@@ -549,12 +549,12 @@ create temporary table _block (
 UPSERT_BLOCK = """
 insert into meganet.inspection_block (
   ref, source, sheet, banner_row, end_row, block_index, family, config_key,
-  station_name, cbm_no, station_id, station_key, station_match, property_owner,
+  station_name, cbm_no, station_id, station_key, station_match,
   ids_raw, header_rows, date_column, inherited_header, columns,
   calibration_points, notes, annotations, comments)
 select ref, source, sheet, banner_row, end_row, block_index, family, config_key,
        station_name, cbm_no, station_id, station_key, station_match,
-       property_owner, ids_raw, header_rows, date_column, inherited_header,
+       ids_raw, header_rows, date_column, inherited_header,
        columns, calibration_points, notes, annotations, comments
   from _block
 on conflict (ref) do update set
@@ -563,7 +563,7 @@ on conflict (ref) do update set
   family = excluded.family, config_key = excluded.config_key,
   station_name = excluded.station_name, cbm_no = excluded.cbm_no,
   station_id = excluded.station_id, station_key = excluded.station_key,
-  station_match = excluded.station_match, property_owner = excluded.property_owner,
+  station_match = excluded.station_match,
   ids_raw = excluded.ids_raw, header_rows = excluded.header_rows,
   date_column = excluded.date_column, inherited_header = excluded.inherited_header,
   columns = excluded.columns, calibration_points = excluded.calibration_points,

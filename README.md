@@ -905,8 +905,9 @@ that inspection has been saved, because the link is a foreign key and needs a ro
 to point at.
 
 Unlike the station list and the readings, **none of this is readable with the
-published anon key**: the council form carries landowner contact details and
-inspection remarks carry site access notes. The pick-lists and the form matrix
+published anon key**: the council form carries council contact details and
+inspection remarks carry site access notes. Landholder contact details are not
+kept at all (`0063`) — they stay with the Bureau and its contractors. The pick-lists and the form matrix
 are public — they are the words on a blank form. So is one more thing since
 `0023`: the **numbers** a visit recorded, and the date it happened, through
 seven `inspection_chart_*` views that carry no free text at all. That is what

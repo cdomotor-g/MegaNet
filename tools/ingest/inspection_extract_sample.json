@@ -21,7 +21,6 @@
           "c:535095",
           "n:rileyscrossing"
         ],
-        "property_owner": "DERM/CHRC",
         "owner_row": 1,
         "ids": {
           "orifice_level_raw": "0.844metres/ 162.694m AHD as at Aug 2020",
@@ -705,12 +704,11 @@
           "c:41547",
           "n:wallangarratm"
         ],
-        "property_owner": "Telstra Phone:",
         "owner_row": 302,
         "ids": {},
         "ids_raw": "",
         "notes": {
-          "phone_no": "07 4684 3986",
+          "phone_no": "[phone removed]",
           "stray_point_row_above_header": "row 305"
         },
         "header_rows": [
@@ -1060,7 +1058,7 @@
       ],
       "workbook_cells": {
         "302": {
-          "B": "Property owner: Telstra                                  Phone:"
+          "B": "Property owner: [removed]"
         },
         "303": {
           "B": "DATA LOGGER INSPECTION SUMMARY",
@@ -1146,7 +1144,6 @@
           "c:40896",
           "n:teddingtonweirhwtm"
         ],
-        "property_owner": "M'Bor.Council 4123 8853 Phone: [on site] Bill Gibson 4129 7299 Property owner: Nathan Bursle (Caretaker) Phone: 07 4675 1152",
         "owner_row": 1005,
         "ids": {},
         "ids_raw": "",
@@ -1499,8 +1496,8 @@
       ],
       "workbook_cells": {
         "1005": {
-          "B": "Property owner: M'Bor.Council 4123 8853    Phone: [on site] Bill Gibson 4129 7299",
-          "O": "Property owner:  Nathan Bursle (Caretaker)                             Phone: 07 4675 1152"
+          "B": "Property owner: [removed]",
+          "O": "Property owner: [removed]"
         },
         "1006": {
           "B": "CR800 INSPECTION SUMMARY",
@@ -1585,7 +1582,6 @@
           "c:40777",
           "n:imbiltm"
         ],
-        "property_owner": "Phone:",
         "owner_row": 173,
         "ids": {},
         "ids_raw": "",
@@ -1847,7 +1843,7 @@
       ],
       "workbook_cells": {
         "173": {
-          "A": "Property owner:                                       Phone:"
+          "A": "Property owner: [removed]"
         },
         "174": {
           "A": "RRDL3 INSPECTION SUMMARY",
@@ -1938,15 +1934,14 @@
           "c:40858",
           "n:boonahtm"
         ],
-        "property_owner": "Phone: Boonah Council",
         "owner_row": 1,
         "ids": {
           "river_alert_id": "7246",
           "battery_alert_id": "7912",
-          "phone_no_raw": "07 5463 2831",
+          "phone_no_raw": "[phone removed]",
           "orifice_level_raw": "-0.003m. gauge height"
         },
-        "ids_raw": "ID's | Rv = 7246 | Batt = 7912 | Phone No. 07 5463 2831 | Orifice Level = -0.003m. gauge height",
+        "ids_raw": "ID's | Rv = 7246 | Batt = 7912 | Phone No. [phone removed] | Orifice Level = -0.003m. gauge height",
         "notes": {
           "absorbed_value_in_header": "River Calibration (metres): 0"
         },
@@ -2272,7 +2267,7 @@
       ],
       "workbook_cells": {
         "1": {
-          "A": "Property owner:                                      Phone:",
+          "A": "Property owner: [removed]",
           "C": "Boonah Council"
         },
         "2": {
@@ -2373,7 +2368,6 @@
           "c:40838",
           "n:threemilebridgealert"
         ],
-        "property_owner": "",
         "owner_row": null,
         "ids": {
           "river_alert_id": "2158",
@@ -2729,7 +2723,6 @@
         "station_keys": [
           "n:coolmundadamtw"
         ],
-        "property_owner": "",
         "owner_row": null,
         "ids": {
           "river_alert_id": "4517",
@@ -3506,7 +3499,6 @@
           "c:40836",
           "n:onemilebridgealert"
         ],
-        "property_owner": "",
         "owner_row": null,
         "ids": {
           "rain_alert_id": "2160",
@@ -3830,7 +3822,6 @@
           "c:540310",
           "n:tewantinalert"
         ],
-        "property_owner": "",
         "owner_row": null,
         "ids": {
           "rain_alert_id": "6908",
@@ -4147,7 +4138,6 @@
           "c:40901",
           "n:marburgradarbasestation"
         ],
-        "property_owner": "",
         "owner_row": null,
         "ids": {},
         "ids_raw": "",
@@ -4466,7 +4456,6 @@
           "c:40831",
           "n:ipswichalert"
         ],
-        "property_owner": "",
         "owner_row": null,
         "ids": {
           "river_alert_id": "2168",

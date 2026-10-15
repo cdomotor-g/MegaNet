@@ -334,21 +334,19 @@ def band_for(bands, row):
     return bands[0]
 
 
-def owner_text(sheet, row):
-    text = survey.norm(' '.join(c.text for c in sheet.row_cells(row)))
-    return re.sub(r'^.*?property\s*owner\s*[:.]?\s*', '', text, flags=re.I).strip()
-
-
 def owners_by_block(sheet, blocks):
-    """`Property Owner:` lines that belong to the block below them.
+    """`Property Owner:` lines that belong to the block below them, by row.
 
     `read_rows` classifies the line at the foot of the *previous* block, and
     spec §8 says to attach it to the block it names — the next banner down the
     sheet. In this workbook all 516 of them sit directly above that banner and
     `find_blocks` has already attached them, so this is the fallback for the one
     that does not; `counts.json` records how often it fires, which is how a
-    workbook refresh that starts leaving a blank row in between becomes visible
-    rather than silently costing 500 owners.
+    workbook refresh that starts leaving a blank row in between becomes visible.
+
+    Only the row number is kept, never what the line says. It named the
+    landholder and their phone number, and Flood-Net holds no landholder contact
+    details: those stay with the Bureau and the councils who maintain the sites.
     """
     banners = [b.banner_row for b in blocks]
     found = {}
@@ -358,8 +356,26 @@ def owners_by_block(sheet, blocks):
                 continue
             nxt = next((r for r in banners if r > record['row']), None)
             if nxt is not None:
-                found.setdefault(nxt, owner_text(sheet, record['row']))
+                found.setdefault(nxt, record['row'])
     return found
+
+
+# A phone number or an email address anywhere in what the extractor writes. The
+# workbook was scrubbed of landholder contact details (names, phones, emails)
+# before it was committed, and this is what stops a refreshed copy bringing them
+# back: --check and a plain run both fail, naming the record but not the text.
+# Spaced or labelled numbers only — an unspaced ten-digit string is as often a
+# canister serial (0302220022) as a mobile.
+CONTACT = re.compile(
+    r'[\w.+-]+@[\w-]+(?:\.[\w-]+)+'
+    r'|(?<![\d.])(?:\(?0[2378]\)?[ -]+\d{4}[ -]+\d{4}|04\d{2}[ -]+\d{3}[ -]+\d{3})(?!\d)'
+    r'|\b(?:ph(?:one)?|mob(?:ile)?)\b\W{0,12}\(?0?\d{4}[ -]?\d{4}', re.I)
+
+
+def contact_details(records):
+    """The refs of records whose text carries a phone number or an email."""
+    return sorted({r['ref'] for r in records
+                   if CONTACT.search(json.dumps(r, ensure_ascii=False))})
 
 
 def block_record(sheet, block, comments, owners):
@@ -386,11 +402,7 @@ def block_record(sheet, block, comments, owners):
             entry['unmapped'] = str(why)
         columns[letter] = entry
 
-    owner = owner_text(sheet, block.owner_row) if block.owner_row else ''
-    from_fallback = False
-    if not owner and block.banner_row in owners:
-        owner = owners[block.banner_row]
-        from_fallback = bool(owner) and not block.owner_row
+    from_fallback = not block.owner_row and block.banner_row in owners
 
     annotations = [{'row': r['row'], 'text': r.get('text', '')}
                    for r in block.rows if r['class'] == 'annotation']
@@ -408,9 +420,8 @@ def block_record(sheet, block, comments, owners):
         'station_name': survey.norm(block.station_name),
         'cbm_no': survey.norm(block.cbm_no),
         'station_keys': sorted(survey.station_keys(block)),
-        # An owner line left blank is not the same as no owner line at all, so
-        # the row number is kept beside the name.
-        'property_owner': owner,
+        # Where the sheet's `Property Owner:` line is. What it said is not
+        # carried: see owners_by_block().
         'owner_row': block.owner_row,
         'ids': {k: v for k, v in block.ids.items() if k != 'raw'},
         'ids_raw': block.ids.get('raw', ''),
@@ -848,7 +859,6 @@ def build_counts(per_sheet, blocks, inspections, rejects, duplicates,
             b['inspection_config'] for b in blocks).most_common()),
         'blocks_without_cbm': sum(1 for b in blocks if not b['cbm_no']),
         'blocks_with_an_owner_row': sum(1 for b in blocks if b['owner_row']),
-        'blocks_with_a_named_owner': sum(1 for b in blocks if b['property_owner']),
         'owners_taken_from_a_next_block_owner_row': sum(
             1 for b in blocks if b.get('owner_from_next_block_owner_row')),
         'inspections_by_decade': dict(sorted(collections.Counter(
@@ -1049,6 +1059,12 @@ def main():
     if not counts['against_the_survey']['agrees']:
         failures.append('the extract disagrees with the survey: '
                         f'{counts["against_the_survey"]}')
+    carrying = contact_details(result['blocks'] + result['inspections']
+                              + result['rejects'] + result['duplicates'])
+    if carrying:
+        failures.append(f'{len(carrying)} records carry a phone number or an email '
+                        f'(first: {carrying[0]}) — scrub the workbook, Flood-Net '
+                        'holds no landholder contact details')
 
     if args.check:
         failures += check(result, args.out)

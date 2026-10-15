@@ -210,8 +210,6 @@ function buildMtKanigan(tables, cells) {
     council_key: null,
     council_contact_name: '', council_contact_email: '', council_contact_phone: '',
     council_comments: '',
-    landowner_contact_name: '', landowner_contact_email: '', landowner_contact_phone: '',
-    landowner_comments: '',
     benchmark_present: null,
     gauge_boards_comments: '',
     access_whs_comments: '',

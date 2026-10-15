@@ -471,7 +471,9 @@ begin
     'visited_on',    current_date::text,
     'council_key',   'burdekin',
     'trigger_reason', 'poor_on_departure',
+    -- What a copy of the app from before 0063 still sends. Ignored, not refused.
     'landowner_contact_name', 'A. Landowner',
+    'landowner_contact_phone', '0400 000 000',
     'assets', jsonb_build_array(
       jsonb_build_object('asset', 'rainfall',    'rain_instrument_type_key', 'tbrg_0_2mm',
                          'condition_key', 'fair', 'owner_key', 'council'),
@@ -484,6 +486,13 @@ begin
     (select has_maintenance_activity from meganet.inspection_needs_maintenance
       where inspection_id = v_id and parameter = 'water_level'),
     'the sentence printed at the foot of every sheet, answered');
+
+  perform pg_temp.check_that('a landholder''s contact sent with the form is not kept (0063)',
+    not exists (select 1 from meganet.maintenance_activity m
+                 where m.inspection_id = v_id
+                   and pg_catalog.to_jsonb(m) ?| array['landowner_contact_name', 'landowner_contact_email',
+                                                       'landowner_contact_phone', 'landowner_comments']),
+    'Flood-Net holds no landholder contact details');
 
   perform pg_temp.check_that('a rainfall panel cannot carry a comms method',
     pg_temp.raises(

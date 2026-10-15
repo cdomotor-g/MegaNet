@@ -238,21 +238,17 @@ const Maintenance = (function () {
     contacts: [
       {
         title: 'Council',
+        // The paper sheet also prints a Landowner block (name, email, phone).
+        // Flood-Net leaves it off on purpose: landholder contact details stay
+        // with the Bureau and the contractors who maintain the site (0063).
+        note: 'The paper sheet’s Landowner box is not recorded here — landholder contact details '
+            + 'stay with the Bureau and its contractors, not in Flood-Net.',
         fields: [
           F('select', 'council_key', 'Council name', { opts: 'council' }),
           F('text', 'council_contact_name', 'Council contact name'),
           F('email', 'council_contact_email', 'Email'),
           F('tel', 'council_contact_phone', 'Phone #'),
           F('area', 'council_comments', 'Comments', { full: true }),
-        ],
-      },
-      {
-        title: 'Landowner',
-        fields: [
-          F('text', 'landowner_contact_name', 'Landowner contact name'),
-          F('email', 'landowner_contact_email', 'Email'),
-          F('tel', 'landowner_contact_phone', 'Phone #'),
-          F('area', 'landowner_comments', 'Comments', { full: true }),
         ],
       },
     ],
@@ -395,8 +391,6 @@ const Maintenance = (function () {
       council_key: null,
       council_contact_name: '', council_contact_email: '', council_contact_phone: '',
       council_comments: '',
-      landowner_contact_name: '', landowner_contact_email: '', landowner_contact_phone: '',
-      landowner_comments: '',
       gauge_boards_present: null,
       gauge_boards_condition_key: null,
       gauge_boards_owner_key: null,
@@ -691,7 +685,7 @@ const Maintenance = (function () {
         <div class="panel">
           <div class="panel-header"><h3>Recent maintenance forms</h3></div>
           <p class="small mnt-muted">Past forms are editors-only, and this family more so than the
-            inspections one — it carries named contacts' phone numbers and site-access notes, and
+            inspections one — it carries council contacts' phone numbers and site-access notes, and
             the anon key this app ships with is published.
             <a href="#" onclick="Auth.open();return false">Sign in</a> to see them.</p>
         </div>`;

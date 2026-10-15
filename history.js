@@ -50,7 +50,7 @@
 //
 // Every record table in 0009 is readable by editors and nobody else — an
 // inspection's remarks carry site-access notes and the Council form carries
-// named landowners' phone numbers, and the anon key this app ships with is
+// council contacts' phone numbers, and the anon key this app ships with is
 // published. So this whole tab is behind a session, and says so rather than
 // showing an empty list to somebody who would see rows if they signed in.
 //

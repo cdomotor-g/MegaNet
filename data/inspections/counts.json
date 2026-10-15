@@ -498,7 +498,6 @@
   },
   "blocks_without_cbm": 32,
   "blocks_with_an_owner_row": 536,
-  "blocks_with_a_named_owner": 311,
   "owners_taken_from_a_next_block_owner_row": 0,
   "inspections_by_decade": {
     "1980s": 37,

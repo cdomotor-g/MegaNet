@@ -166,7 +166,7 @@ trailing `.0`) — never for storage.
 | `mace_id` / `logger_id` | `Mace = …` / `Logger = …` | `Mace = 7246` |
 | `orifice_level_raw` | `Orifice level = …` | `Orifice level = 0.844metres/ 162.694m AHD as at Aug 2020` |
 | `key_number_raw` | `Key# …` | `Key# DNR 20101` |
-| `phone_no_raw` | `Phone No. …` | `Phone No. 07 5463 2831` |
+| `phone_no_raw` | `Phone No. …` | `Phone No. [phone removed]` — every number is redacted in the committed workbook (§8) |
 
 The last three stay **raw strings**. `Orifice level = 0.844metres/ 162.694m AHD
 as at Aug 2020` carries a level, a datum, a second level and a date, in prose,
@@ -176,7 +176,7 @@ it is lost.
 
 **Notes that ride on the group row.** Technicians parked per-station facts on
 the header row, where they end up prefixed onto the column label underneath:
-`Phone No: 07 4676 4290 Lithium Batter Voltage (v)` is one column and one fact.
+`Phone No: [phone removed] Lithium Batter Voltage (v)` is one column and one fact.
 The survey splits them (`strip_block_note`) and attaches the fact to the block:
 36 phone numbers, 8 repeater windows, 55 ALERT-id notes (`Rain: 4004`), plus 139
 notes that match no pattern and are kept as `group_row_note`.
@@ -427,7 +427,7 @@ the block, and the extractor's rejects file should carry the same labels.
 |---|---|---|
 | `marker` | 1,856 | ignore — `ENTER ANY NEW DATA…`, `END IF DATA…`, `STATION CLOSED …` |
 | `error_only` | 630 | ignore — the `#VALUE!` under a spill formula |
-| `next_block_owner` | 592 | the following block's `Property owner:` row; attach it to that block |
+| `next_block_owner` | 592 | the following block's `Property owner:` row; attach its row number to that block — never its words (below) |
 | `annotation` | 336 | **keep** — "Station not inspected by BoM in 2020 due to COVID restrictions", "No maintenance agreement - not inspected since commissioning", "Station ownership handed over from LVRC to SEQWater". These are the reason a gap exists, and they exist nowhere else |
 | `calibration_point_row` | 199 | §4 rule 3 — redefines the points below |
 | `unresolved` | 75 | **reject with the row reference** |
@@ -439,6 +439,20 @@ the block, and the extractor's rejects file should carry the same labels.
 **147 of them are in the sheets #124 actually loads**, against 15,207 rows. That
 is the number #124 reconciles: loaded + rejected = every row inside every block,
 with nothing in between.
+
+**Landholder contact details are not read, and are not in the workbook.**
+Flood-Net holds none: who owns the land at a site, and how to reach them, stays
+with the Bureau and the councils and contractors who maintain it. The committed
+copy of `QLD All Site Inspections.xlsx` was scrubbed on 15 October 2026 (`0063`):
+every `Property owner:` line reads `Property owner: [removed]` (the label stays,
+because it is how the line is found), every phone number reads `[phone removed]`
+— the telephone-telemetry `Phone No.` values too, since at least one was the
+landholder's own mobile — every email `[email removed]`, and the landholders and
+site hosts named in remarks and notes `[name removed]`. Bureau, council and
+contractor staff named in remarks are left as they are. The extractor keeps the
+owner line's row number and nothing else, and refuses to write any record that
+carries an email address or a spaced or labelled phone number, so a refreshed
+workbook has to be scrubbed the same way before it will load.
 
 ---
 

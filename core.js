@@ -2917,7 +2917,10 @@ const DB_SCHEMA = 'meganet';
 // 52: a station last seen when it was heard (ingest_http's station_status).
 // 62: open accounts, approval and views (0062) — bumped in its own commit,
 // because a database still on 61 then says so on the Admin tab.
-const DB_SCHEMA_VERSION = 62;
+// 63: no landholder contact details (0063) — the Council form's Landowner
+// columns and the archive's Property Owner line dropped. Bumped with the file,
+// the same way.
+const DB_SCHEMA_VERSION = 63;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
