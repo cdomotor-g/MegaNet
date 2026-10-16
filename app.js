@@ -425,22 +425,56 @@ function loadFraction() {
 
 // The detailed logo heading the loading card: it fills from pale to vivid as
 // the list arrives (--p, kept by paintLoad), breathes while it waits, and a
-// sparkle runs down the network's nodes, top of the mesh first. Drawn once,
+// green pulse races through the mesh — out of the node nearest the gauge,
+// along every link, each node flaring as the pulse reaches it. Drawn once,
 // outside the part paintLoad repaints, so the animation is never restarted
-// mid-download. Each node is [x %, y %, size %] in icon-512.png; the negative
-// delays put every one somewhere in its 3 s cycle from the first frame.
+// mid-download. Each node is [x %, y %, size %] in icon-512.png; each link a
+// pair of nodes, with a control point where the line in the picture bends (the
+// bottom link, and the rim from the top node round to the right).
 const LOAD_LOGO_NODES = [
   [77.1, 14.4, 4.7], [57.4, 17.0, 2.7], [67.6, 26.6, 3.7], [92.0, 32.4, 6.1],
   [75.1, 42.4, 5.9], [61.5, 42.9, 2.7], [97.9, 46.0, 2.7], [85.7, 54.0, 2.7],
   [71.2, 61.0, 2.7], [92.8, 63.4, 5.9], [82.4, 75.4, 3.7], [68.8, 81.5, 2.8]
 ];
+const LOAD_LOGO_LINKS = [
+  [0, 1], [0, 2], [1, 2], [2, 5], [2, 4], [4, 5], [3, 4], [3, 6], [3, 7], [4, 7],
+  [4, 8], [7, 8], [7, 9], [8, 9], [6, 9], [8, 10], [9, 10], [10, 11, 74.9, 76.9],
+  [0, 3, 86.1, 22.1]
+];
+const LOAD_LOGO_SOURCE = 5;   // the node beside the gauge
+// How fast the pulse runs, in % of the logo a second. ll-shoot (styles.css)
+// moves each link's dash 230 % in its 2.4 s cycle, so the two agree only
+// while this is 230 / 2.4.
+const LOAD_LOGO_SPEED = 230 / 2.4;
 function loadLogoHtml() {
-  const nodes = LOAD_LOGO_NODES.map(([x, y, s], i) =>
-    `<i style="--x:${x}%;--y:${y}%;--s:${s}%;--d:${(i * 0.18 - 3).toFixed(2)}s"></i>`).join('');
+  // When the pulse reaches each node: the shortest way to it along the links.
+  const N = LOAD_LOGO_NODES;
+  const far = (a, b) => Math.hypot(N[a][0] - N[b][0], N[a][1] - N[b][1]);
+  const at = N.map((_, i) => i === LOAD_LOGO_SOURCE ? 0 : Infinity);
+  const left = new Set(N.keys());
+  while (left.size) {
+    let u = -1;
+    for (const i of left) if (u < 0 || at[i] < at[u]) u = i;
+    left.delete(u);
+    for (const [a, b] of LOAD_LOGO_LINKS) {
+      const v = a === u ? b : b === u ? a : -1;
+      if (v >= 0) at[v] = Math.min(at[v], at[u] + far(u, v));
+    }
+  }
+  const sec = d => `${(d / LOAD_LOGO_SPEED).toFixed(3)}s`;
+  // Each link carries its pulse once, from whichever end it reaches first.
+  const links = LOAD_LOGO_LINKS.map(([a, b, cx, cy]) => {
+    if (at[b] < at[a]) [a, b] = [b, a];
+    const d = `M${N[a][0]} ${N[a][1]} ${cx == null ? 'L' : `Q${cx} ${cy} `}${N[b][0]} ${N[b][1]}`;
+    return `<path class="ll-trail" d="${d}" style="--d:${sec(at[a])}"/><path class="ll-spark" d="${d}" style="--d:${sec(at[a])}"/>`;
+  }).join('');
+  const nodes = N.map(([x, y, s], i) =>
+    `<i style="--x:${x}%;--y:${y}%;--s:${s}%;--d:${sec(at[i])}"></i>`).join('');
   return `<div class="load-logo" id="load-logo" aria-hidden="true" style="--p:${loadFraction().toFixed(3)}">
         <img class="ll-pale" src="assets/icon-512.png" alt="">
         <div class="ll-fill"><img class="ll-vivid" src="assets/icon-512.png" alt=""></div>
-        <span class="ll-sheen"></span>${nodes}
+        <span class="ll-sheen"></span>
+        <svg class="ll-mesh" viewBox="0 0 100 100">${links}</svg>${nodes}
       </div>`;
 }
 

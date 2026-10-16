@@ -7431,8 +7431,9 @@ hr {
 /* The logo coming to life while the station list arrives (app.js,
    loadLogoHtml). Two copies of the detailed mark: a pale one underneath, the
    vivid one over it, filling in as the bytes arrive (--p, 0..1, set by
-   paintLoad) and breathing all the while; a sheen crossing it, and a sparkle
-   running down the network's nodes. Reduced motion keeps only the fill. */
+   paintLoad) and breathing all the while; a sheen crossing it, and a green
+   pulse racing through the network — along each link (.ll-mesh), each node
+   flaring as it arrives. Reduced motion keeps only the fill. */
 .load-logo {
   --p: 0;
   position: relative;
@@ -7442,7 +7443,8 @@ hr {
 }
 .load-logo img,
 .load-logo .ll-fill,
-.load-logo .ll-sheen {
+.load-logo .ll-sheen,
+.load-logo .ll-mesh {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -7470,7 +7472,34 @@ hr {
   0%       { background-position: 120% 0; }
   60%, 100% { background-position: -20% 0; }
 }
-/* A node: a glow, and a four-pointed star turning as it flares. */
+/* The pulse, one cycle every 2.4 s. Each link is drawn from the end the pulse
+   reaches first, and carries two dashes heads-together: a short white-hot
+   spark and a longer, fainter trail lighting the link behind it. Both run at
+   the one speed (230 in the cycle — app.js's LOAD_LOGO_SPEED is that over
+   2.4 s), starting when the pulse reaches their link's first node (--d), so a
+   spark lands on the next node just as it flares. The gap after each dash is
+   longer than the run, so a link carries one pulse a cycle. */
+.ll-mesh {
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 0 .8px #5dff8c) drop-shadow(0 0 2.5px rgba(30, 235, 95, .85));
+}
+.ll-mesh path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: var(--dl) 300px;
+  stroke-dashoffset: calc(var(--dl) + 1px);
+  animation: ll-shoot 2.4s linear infinite backwards;
+  animation-delay: var(--d);
+}
+.ll-trail { --dl: 13px; stroke: #2bff6a; stroke-width: 1.5; stroke-opacity: .55; }
+.ll-spark { --dl: 3.5px; stroke: #eaffef; stroke-width: 1.9; }
+@keyframes ll-shoot {
+  from { stroke-dashoffset: calc(var(--dl) + 1px); }
+  to   { stroke-dashoffset: calc(var(--dl) + 1px - 230px); }
+}
+/* A node: a halo and a hot core, flaring green when the pulse reaches it
+   (--d) and dying away before the next. */
 .load-logo i {
   position: absolute;
   left: var(--x);
@@ -7484,26 +7513,25 @@ hr {
 .load-logo i::after {
   content: "";
   position: absolute;
+  border-radius: 50%;
   opacity: 0;
-  animation: ll-twinkle 3s ease-out infinite;
+  animation: ll-flare 2.4s ease-out infinite backwards;
   animation-delay: var(--d);
 }
 .load-logo i::before {
-  inset: -110%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, .95) 0 14%, rgba(150, 225, 255, .75) 30%, rgba(80, 180, 255, 0) 68%);
+  inset: -150%;
+  background: radial-gradient(circle, rgba(225, 255, 232, .95) 0 12%, rgba(70, 255, 120, .9) 24%, rgba(25, 230, 90, .45) 42%, rgba(25, 230, 90, 0) 68%);
 }
 .load-logo i::after {
-  inset: -190%;
-  background: #fff;
-  clip-path: polygon(50% 0, 55% 45%, 100% 50%, 55% 55%, 50% 100%, 45% 55%, 0 50%, 45% 45%);
-  filter: drop-shadow(0 0 2px rgba(160, 230, 255, .9));
+  inset: -6%;
+  background: radial-gradient(circle, #fff 0 22%, #8dffa9 45%, #1ee35e 80%);
+  box-shadow: 0 0 3px 1px #3dff76, 0 0 8px 2px rgba(30, 235, 95, .7);
 }
-@keyframes ll-twinkle {
-  0%   { opacity: 0; transform: scale(.2) rotate(0deg); }
-  10%  { opacity: 1; transform: scale(1) rotate(45deg); }
-  28%  { opacity: 0; transform: scale(.3) rotate(90deg); }
-  100% { opacity: 0; transform: scale(.2) rotate(90deg); }
+@keyframes ll-flare {
+  0%   { opacity: 0; transform: scale(.3); }
+  4%   { opacity: 1; transform: scale(1.15); }
+  14%  { opacity: .8; transform: scale(1); }
+  36%, 100% { opacity: 0; transform: scale(.85); }
 }
 /* Still for a device that asks for less motion: in the one reduced-motion
    block, further down, with everything else that moves. */
@@ -15811,9 +15839,9 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   }
 
   /* The loading card's logo (#212's card, its detailed mark brought to life):
-     no sheen sweeping it and no stars, just the logo. */
-  .ll-vivid, .ll-sheen, .load-logo i::before, .load-logo i::after { animation: none; }
-  .ll-sheen, .load-logo i { display: none; }
+     no sheen sweeping it and no pulse through it, just the logo. */
+  .ll-vivid, .ll-sheen, .ll-mesh path, .load-logo i::before, .load-logo i::after { animation: none; }
+  .ll-sheen, .ll-mesh, .load-logo i { display: none; }
 
   *,
   *::before,
