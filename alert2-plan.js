@@ -70,6 +70,18 @@
 // The model is an estimate and says so on every page it draws. Its defaults
 // are a proposal to argue with, not measurements; the card is there so the
 // argument can be had with the numbers moving.
+//
+// ── What is kept, and where ──────────────────────────────────────────────────
+// The card as it stands is kept on the device (localStorage), so a slider
+// moved yesterday is still there. Two things are kept in the database instead
+// (0065), read once when the tab opens through a2plan_read() and written one
+// change at a time:
+//
+//   site conditions  what each repeater site needs, as somebody knows it — one
+//                    answer per site, the same for every administrator.
+//   scenarios        the card saved under a name: private to whoever saved it
+//                    until they share it, then every administrator may load it;
+//                    only its author changes, shares or removes it.
 
 const Alert2Plan = (function () {
   const LS_KEY = 'meganet.a2plan.scenario';
@@ -209,12 +221,44 @@ const Alert2Plan = (function () {
   const WORKS_LABEL = { fit: 'Fit-out only', retrofit: 'Retrofit', rebuild: 'Rebuild the structure' };
 
   // ── state ──
+  // Site conditions set before they were kept in the database (one revision
+  // kept them on the device, inside the card): carried over once the shared
+  // store answers, then forgotten.
+  let legacySites = null;
   let sc = loadScenario();
   let cat = null, catKey = null;     // the scope, before the catchment ticks
   const cuts = new Map();            // …and after them, by selection: what a plan is worked from
   let catsOpen = false;              // the catchment picker, folded or not
   let slsWanted = false, slsReady = false;
   let basins = null;               // parsed basin polygons, once
+
+  // ── the shared store (0065) ──
+  // What a2plan_read() answered, and where the card came from. `store` says
+  // whether it has: 'idle' until the tab is opened by an administrator,
+  // 'loading', 'ready', or 'failed' with the reason in storeError.
+  const LS_LOADED = 'meganet.a2plan.loaded';
+  let conditions = {};               // station id → 'fit' | 'retrofit' | 'rebuild'
+  const condBy = new Map();          // station id → { by, at }: who set it, and when
+  let condStamp = 0;                 // moves whenever a condition does, so the plan is worked again
+  let scenarios = [];                // every saved scenario this administrator may see
+  let store = 'idle', storeError = '';
+  let scenFormOpen = false;          // "Save as a new scenario" unfolded
+  let busy = false;                  // a write on its way: the buttons wait for it
+  // The scenario the card was last loaded from or saved as: its id, and the
+  // card as it was then, so "changed since" can be said.
+  let loaded = loadLoaded();
+  function loadLoaded() {
+    try {
+      const v = JSON.parse(localStorage.getItem(LS_LOADED) || 'null');
+      return v && typeof v.id === 'string' && typeof v.snap === 'string' ? { id: v.id, snap: v.snap } : null;
+    } catch (_) { return null; }
+  }
+  function saveLoaded() {
+    try {
+      if (loaded) localStorage.setItem(LS_LOADED, JSON.stringify(loaded));
+      else localStorage.removeItem(LS_LOADED);
+    } catch (_) { /* unremembered, as the card is in a private window */ }
+  }
 
   function isAdmin() {
     return typeof Auth !== 'undefined' && Auth.isSignedIn()
@@ -225,7 +269,10 @@ const Alert2Plan = (function () {
   function loadScenario() {
     let got = null;
     try { got = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (_) { got = null; }
-    return sanitize(got);
+    const out = sanitize(got);
+    if (out.sites && Object.keys(out.sites).length) legacySites = out.sites;
+    delete out.sites;
+    return out;
   }
   function sanitize(raw) {
     const out = { ...DEFAULTS };
@@ -241,9 +288,10 @@ const Alert2Plan = (function () {
       if (Array.isArray(raw.order)) out.order = raw.order.filter(x => typeof x === 'string').slice(0, 40);
       // The catchments' order within their regions, by key.
       if (Array.isArray(raw.catOrder)) out.catOrder = [...new Set(raw.catOrder.filter(x => typeof x === 'string' && x.length <= 120))].slice(0, 500);
-      // What a repeater site needs, as somebody who has been there says: by
-      // station id, a fit-out, a retrofit or the structure rebuilt. A site not
-      // here is unassessed, audited first and costed at the card's mix.
+      // Site conditions handed to model() in place of the shared ones — the
+      // tests' way of asking "what if every site were known" — and, from the
+      // one revision that kept them inside the card, the conditions to carry
+      // over. By station id: a fit-out, a retrofit or the structure rebuilt.
       if (raw.sites && typeof raw.sites === 'object' && !Array.isArray(raw.sites)) {
         const sites = {};
         for (const [id, v] of Object.entries(raw.sites).slice(0, 1000)) {
@@ -260,19 +308,103 @@ const Alert2Plan = (function () {
     return out;
   }
   function saveScenario() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(sc)); } catch (_) { /* a private window: it still works, unremembered */ }
+    const keep = { ...sc };
+    delete keep.sites;
+    try { localStorage.setItem(LS_KEY, JSON.stringify(keep)); } catch (_) { /* a private window: it still works, unremembered */ }
   }
   // Whether a scenario is not the proposal. A catchment unticked under
   // another scope is remembered for when that scope comes back, but makes no
   // difference to this one, so only the scope's own catchments are compared.
-  // What the card says of a repeater site is not a lever but what is known of
-  // it, so the proposal is worked with it too and it is no difference.
+  // A site condition is not a lever but what is known of the site, so the
+  // proposal is worked with them too and they are no difference.
   function differs(a, b) {
     if (Object.keys(DEFAULTS).some(k => a[k] !== b[k]) || JSON.stringify(a.order || []) !== JSON.stringify(b.order || [])
         || JSON.stringify(a.catOrder || []) !== JSON.stringify(b.catOrder || [])) return true;
     const C = catalogue();
     const ea = new Set(a.excluded || []), eb = new Set(b.excluded || []);
     return C ? C.flat.some(c => ea.has(c.key) !== eb.has(c.key)) : ea.size !== eb.size;
+  }
+
+  // ── reading and writing the shared store ──
+  function setCondition(row) {
+    if (!row || typeof row.station_id !== 'string') return;
+    if (WORKS.includes(row.condition)) {
+      conditions[row.station_id] = row.condition;
+      condBy.set(row.station_id, { by: row.by || '', at: row.updated_at || '' });
+    } else {
+      delete conditions[row.station_id];
+      condBy.delete(row.station_id);
+    }
+  }
+  async function loadStore() {
+    if (!isAdmin() || typeof dbRpc !== 'function' || store === 'loading') return;
+    store = 'loading'; storeError = '';
+    refreshStore();
+    try {
+      const got = await dbRpc('a2plan_read', {});
+      conditions = {}; condBy.clear();
+      for (const r of (got && Array.isArray(got.sites) ? got.sites : [])) setCondition(r);
+      scenarios = (got && Array.isArray(got.scenarios) ? got.scenarios : []).filter(x => x && typeof x.id === 'string');
+      if (loaded && !scenarios.some(x => x.id === loaded.id)) { loaded = null; saveLoaded(); }
+      await carryLegacySites();
+      store = 'ready';
+    } catch (e) {
+      store = 'failed';
+      storeError = e && e.message ? e.message : String(e);
+    }
+    condStamp++;
+    memo = null;
+    repaint();
+  }
+  // Conditions set when they were kept inside the card, on this device:
+  // saved for every administrator, except where somebody has already said.
+  async function carryLegacySites() {
+    const old = legacySites;
+    legacySites = null;
+    if (!old) return;
+    let n = 0;
+    for (const [id, v] of Object.entries(old)) {
+      if (!WORKS.includes(v) || conditions[id]) continue;
+      try { setCondition(await dbRpc('a2plan_site_set', { p_station_id: id, p_condition: v })); n++; } catch (_) { /* a station gone from the register */ }
+    }
+    // The card is written again without them, so they are carried once.
+    saveScenario();
+    if (n) announce(`${n} site condition${n === 1 ? '' : 's'} kept on this device ${n === 1 ? 'is' : 'are'} now saved for every administrator.`);
+  }
+
+  // The card as a scenario keeps it: every setting, the regions' and
+  // catchments' order and the catchments left out — not the site conditions,
+  // which are the sites', not the scenario's.
+  function cardSettings(s = sc) {
+    const out = { v: 1 };
+    for (const k of Object.keys(DEFAULTS)) out[k] = s[k];
+    for (const k of ['order', 'catOrder', 'excluded']) if (Array.isArray(s[k]) && s[k].length) out[k] = s[k].slice();
+    return out;
+  }
+  const snapOf = s => JSON.stringify(cardSettings(s));
+  const loadedScenario = () => (loaded ? scenarios.find(x => x.id === loaded.id) || null : null);
+  const changedSinceLoad = () => !!loaded && snapOf(sc) !== loaded.snap;
+  function putScenario(row) {
+    const i = scenarios.findIndex(x => x.id === row.id);
+    if (i >= 0) scenarios[i] = row; else scenarios.unshift(row);
+    scenarios.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+  }
+  // A write to the store: the buttons wait, the panel says what happened, and
+  // a refusal is said in the database's own words.
+  async function write(what, fn, focusKey) {
+    if (busy) return null;
+    busy = true;
+    refreshStore(focusKey);
+    try {
+      const out = await fn();
+      return out;
+    } catch (e) {
+      announce(`${what} did not work: ${e && e.message ? e.message : e}`);
+      return null;
+    } finally {
+      busy = false;
+      refreshStore(focusKey);
+    }
   }
 
   // ── formatting ──
@@ -668,26 +800,26 @@ const Alert2Plan = (function () {
   }
 
   // What each catchment's backbone takes: the repeaters it needs that no
-  // catchment before it has, and what each of those sites needs. A site the
-  // card has an answer for is taken at its word and not audited; a backbone
-  // site it has none for is audited first, and costed at the card's mix —
+  // catchment before it has, and what each of those sites needs. A site with a
+  // condition set is taken at its word and not audited; a backbone site with
+  // none is audited first, and costed at the card's mix —
   // allotted catchment by catchment in the order they go, so the totals are
   // whole sites and the first catchments are not all luck. A repeater that
   // is not backbone is fitted out as it stands.
   function siteWorks(I, s, cats) {
     const pRebuild = Math.min(100, s.rebuildPct) / 100;
     const pAny = Math.min(100, s.rebuildPct + s.retrofitPct) / 100;
-    const marks = s.sites || {};
+    const known = s.sites || conditions;
     const repById = new Map(I.reps.map(r => [r.s.id, r]));
     const doneBy = new Map();
     let U = 0, gotR = 0, gotS = 0;
     return cats.map((c, ci) => {
       const fresh = c.needs.filter(id => !doneBy.has(id));
       fresh.forEach(id => doneBy.set(id, ci));
-      const w = { fit: 0, retrofit: 0, rebuild: 0, audit: 0, marked: 0, assumed: { fit: 0, retrofit: 0, rebuild: 0 } };
+      const w = { fit: 0, retrofit: 0, rebuild: 0, audit: 0, known: 0, assumed: { fit: 0, retrofit: 0, rebuild: 0 } };
       for (const id of fresh) {
-        const m = marks[id];
-        if (m) { w[m]++; w.marked++; } else if (repById.get(id).backbone) w.audit++; else w.fit++;
+        const m = known[id];
+        if (WORKS.includes(m)) { w[m]++; w.known++; } else if (repById.get(id).backbone) w.audit++; else w.fit++;
       }
       const u = w.audit;
       U += u;
@@ -747,7 +879,7 @@ const Alert2Plan = (function () {
     const nOwners = s.acquireOther ? owners.size + Math.ceil(unknownAcq / perOwner) : 0;
     const works = siteWorks(I, s, cats);
     const tally = k => works.reduce((a, x) => a + x.w[k], 0);
-    const nAudit = tally('audit'), nRetro = tally('retrofit'), nRebuild = tally('rebuild'), nFitOnly = tally('fit'), nMarked = tally('marked');
+    const nAudit = tally('audit'), nRetro = tally('retrofit'), nRebuild = tally('rebuild'), nFitOnly = tally('fit'), nKnown = tally('known');
     const nRemed = nRetro + nRebuild;
 
     // What is bought, in whole units — the equipment table and the spend are
@@ -1088,7 +1220,7 @@ const Alert2Plan = (function () {
     const shared = I.reps.filter(r => r.cats.size > 1).length;
     return {
       s, order, nField, nLevel, nRain: nField - nLevel, nRep0, nRep, added, removed, nBases, chains, baseRx,
-      bbCount: bb.length, own, nAcq, nOwners, nRemed, nAudit, nRetro, nRebuild, nFitOnly, nMarked, shared,
+      bbCount: bb.length, own, nAcq, nOwners, nRemed, nAudit, nRetro, nRebuild, nFitOnly, nKnown, shared,
       acqEnd, bbStart, bbReady, firstCut, pilotEnd, P, fieldEnd, end, months: N, bf, fieldOn,
       acts, ms, regionRows, cats: rows, review, why, waits, fieldMonths, critical,
       fte: fteMonth, fteYears, fteTotal: Object.values(fteYears).reduce((a, v) => a + v, 0), peak,
@@ -1121,16 +1253,16 @@ const Alert2Plan = (function () {
     const I = inventory();
     if (!I) return null;
     const M = model(I, sc);
-    // The proposal, over every catchment in the scope and with what the card
-    // says of the repeater sites: what the figures say a scenario is more or
-    // less than.
-    const D = differs(sc, DEFAULTS) ? model(inventoryFor([]), sanitize({ ...DEFAULTS, sites: sc.sites })) : null;
+    // The proposal, over every catchment in the scope and with the site
+    // conditions as they are: what the figures say a scenario is more or less
+    // than.
+    const D = differs(sc, DEFAULTS) ? model(inventoryFor([]), sanitize({ ...DEFAULTS })) : null;
     return { I, M, D };
   }
   // Worked once per scenario: a repaint reads the plan a dozen times.
   let memo = null, memoKey = '';
   function cur() {
-    const k = JSON.stringify(sc) + '|' + slsReady;
+    const k = JSON.stringify(sc) + '|' + slsReady + '|' + condStamp;
     if (!memo || memoKey !== k || !cat || cat.data !== state.data) { memo = current(); memoKey = k; }
     return memo;
   }
@@ -1150,8 +1282,17 @@ const Alert2Plan = (function () {
         is, the network reviews, the backbone repeaters to acquire and remediate first, the timeline, the effort and the
         cost. <strong>Every figure is an estimate</strong>, worked from the station register${asAt} and the scenario
         below; move a slider and the whole plan is worked again.</p>
+      <div id="a2p-scen-line">${scenLineHtml()}</div>
       <p class="small txt-muted">Listed to administrators only. ${slsReady ? '' : 'Owners and SLS priorities are still loading — the backbone ownership figures fill in when they arrive.'}</p>
     </div>`;
+  }
+
+  // The scenario this document is, said where it is printed.
+  function scenLineHtml() {
+    const L = loadedScenario();
+    if (!L) return '';
+    return `<p class="small a2p-scen-line">Scenario: <strong>${esc(L.name)}</strong>${L.mine ? '' : ` by ${esc(L.by || 'another administrator')}`}${
+      changedSinceLoad() ? ' — changed since it was saved' : ''}${L.notes ? ` · ${esc(L.notes)}` : ''}</p>`;
   }
 
   function delta(now, was, kind) {
@@ -1228,7 +1369,8 @@ const Alert2Plan = (function () {
         </div></div>
       <p class="small">Every slider and switch works the plan again at once — the figures above and the document below.
         ${changed ? '<strong>This is not the proposal</strong>: the figures above say how far it moved from the proposal over every catchment.' : 'This is the proposal as drafted.'}
-        Your scenario is kept on this device only.</p>
+        The card is kept on this device; save it as a scenario to keep it for you, and share it when it is ready.</p>
+      <section class="a2p-scen" id="a2p-scen" aria-labelledby="a2p-scen-h"><h4 id="a2p-scen-h">📁 Scenarios</h4>${scenHtml()}</section>
       <div class="a2p-ctl-grid">
         ${CONTROLS.map(g => `<fieldset class="a2p-fs"><legend>${esc(g.group)}</legend>${g.items.map(ctlHtml).join('')}</fieldset>`).join('')}
       </div>
@@ -1246,6 +1388,88 @@ const Alert2Plan = (function () {
         <p class="small txt-muted">Indicative figures for planning, not quotes — see Sources. A supplier's quote replaces them.</p>
       </details>
     </section>`;
+  }
+
+  // ── saved scenarios ──
+  // Where the card came from, the buttons to save it, and every scenario this
+  // administrator may load: their own, private or shared, and the ones the
+  // others have shared. Rows are numbered off `scenarios`, so no name has to
+  // survive a trip through an onclick attribute.
+  let scenListOpen = true;
+  function scenHtml() {
+    if (store === 'idle' || store === 'loading') return '<p class="small txt-muted">Loading the saved scenarios and site conditions…</p>';
+    if (store === 'failed') {
+      return `<p class="small"><span class="txt-warn">The saved scenarios and site conditions could not be loaded</span> — ${esc(storeError)}.
+        <button type="button" class="link-btn" data-k="scen:retry" onclick="Alert2Plan.retryStore()">Try again</button></p>`;
+    }
+    const L = loadedScenario();
+    const changed = changedSinceLoad();
+    const dis = busy ? ' disabled' : '';
+    const now = L
+      ? `Working from <strong>${esc(L.name)}</strong> — ${L.mine ? 'yours' : `by ${esc(L.by || 'another administrator')}`}, ${L.shared ? 'shared with every administrator' : 'private to you'}${
+        changed ? '; <strong>changed since it was loaded</strong>' : ''}.${L.mine ? '' : ' Only its author can change it: save your own copy to keep your changes.'}`
+      : 'The card is not saved as a scenario.';
+    const mineN = scenarios.filter(x => x.mine).length, theirsN = scenarios.length - mineN;
+    const row = (x, i) => `<tr${L && L.id === x.id ? ' class="a2p-scen-on"' : ''}>
+        <th scope="row">${esc(x.name)}${x.notes ? `<span class="small txt-muted a2p-scen-notes">${esc(x.notes)}</span>` : ''}</th>
+        <td>${x.mine ? 'You' : esc(x.by || '—')}</td>
+        <td>${x.shared ? '<span class="badge a2p-shared">Shared</span>' : '<span class="badge a2p-private">Private</span>'}</td>
+        <td class="small col-optional">${esc(whenText(x.updated_at))}</td>
+        <td><span class="button-group a2p-scen-acts">
+          <button type="button" class="exp-btn-sm" data-k="sload:${esc(x.id)}" onclick="Alert2Plan.scen('load', ${i})"${dis} aria-label="Load ${escAttr(x.name)}">Load</button>
+          ${x.mine ? `<button type="button" class="exp-btn-sm" data-k="sshare:${esc(x.id)}" onclick="Alert2Plan.scen('share', ${i})"${dis}
+              aria-label="${x.shared ? 'Make' : 'Share'} ${escAttr(x.name)}${x.shared ? ' private' : ' with every administrator'}">${x.shared ? 'Make private' : 'Share'}</button>
+            <button type="button" class="exp-btn-sm" data-k="sdel:${esc(x.id)}" onclick="Alert2Plan.scen('delete', ${i})"${dis} aria-label="Remove ${escAttr(x.name)}">Remove…</button>` : ''}
+        </span></td></tr>`;
+    const form = scenFormOpen ? `<form class="a2p-scen-form" id="a2p-scen-form" onsubmit="event.preventDefault(); Alert2Plan.scen('save')">
+        <label class="a2p-ctl" for="a2p-scen-name"><span>Name</span>
+          <input type="text" id="a2p-scen-name" maxlength="80" autocomplete="off" value="${escAttr(L && !changed ? '' : (L ? `${L.name} (changed)` : ''))}"></label>
+        <label class="a2p-ctl" for="a2p-scen-notes"><span>Notes <span class="txt-muted">(optional)</span></span>
+          <textarea id="a2p-scen-notes" maxlength="2000" rows="2"></textarea></label>
+        <label class="check-label a2p-switch"><input type="checkbox" id="a2p-scen-share"><span>Share it with every administrator now — otherwise only you see it until you share it</span></label>
+        <div class="button-group">
+          <button type="submit" class="primary exp-btn-sm" data-k="scen:save"${dis}>Save the scenario</button>
+          <button type="button" class="exp-btn-sm" data-k="scen:cancel" onclick="Alert2Plan.scen('cancel')">Cancel</button>
+        </div></form>` : '';
+    return `<p class="small" id="a2p-scen-now">${now}</p>
+      <div class="button-group">
+        ${L && L.mine ? `<button type="button" class="primary exp-btn-sm" data-k="scen:update" onclick="Alert2Plan.scen('update')"${changed && !busy ? '' : ' disabled'}>Save changes to “${esc(L.name)}”</button>` : ''}
+        <button type="button" class="exp-btn-sm" data-k="scen:new" aria-expanded="${scenFormOpen}" onclick="Alert2Plan.scen('form')"${dis}>Save as a new scenario…</button>
+      </div>
+      ${form}
+      ${scenarios.length ? `<details class="a2p-scen-list" id="a2p-scen-list"${scenListOpen ? ' open' : ''} ontoggle="Alert2Plan.scenListToggled(this.open)">
+        <summary>Saved scenarios — ${mineN} yours, ${theirsN} shared by other administrators</summary>
+        <div class="table-wrap"><table class="a2p-table a2p-scen-table">
+          <caption class="sr-only">Saved scenarios you may load: your own, and the ones other administrators have shared</caption>
+          <thead><tr><th scope="col">Scenario</th><th scope="col">By</th><th scope="col">Who sees it</th><th scope="col" class="col-optional">Saved</th><th scope="col">Actions</th></tr></thead>
+          <tbody>${scenarios.map(row).join('')}</tbody></table></div></details>`
+        : '<p class="small txt-muted">No scenario is saved yet. A private one is seen by nobody but you; a shared one by every administrator.</p>'}`;
+  }
+  // The panel drawn again in place — after a load, a save or a change of
+  // what is on its way — with what was typed in its form kept, and the
+  // control pressed (or the one standing in for it) given focus back.
+  function refreshStore(focusKey) {
+    if (typeof document === 'undefined' || state.activeTab !== 'a2plan') return;
+    const el = document.getElementById('a2p-scen');
+    if (!el) return;
+    const typed = {};
+    for (const id of ['a2p-scen-name', 'a2p-scen-notes']) { const f = document.getElementById(id); if (f) typed[id] = f.value; }
+    // Drawn again under somebody's hand: the control they are on stays theirs.
+    const on = document.activeElement;
+    if (!focusKey && on && el.contains(on)) focusKey = on.dataset && on.dataset.k ? on.dataset.k : (on.id ? `#${on.id}` : '');
+    const box = document.getElementById('a2p-scen-share');
+    const shareTicked = box ? box.checked : null;
+    const h = el.querySelector('h4');
+    el.innerHTML = (h ? h.outerHTML : '') + scenHtml();
+    for (const [id, v] of Object.entries(typed)) { const f = document.getElementById(id); if (f) f.value = v; }
+    const line = document.getElementById('a2p-scen-line');
+    if (line) line.innerHTML = scenLineHtml();
+    if (shareTicked != null) { const b = document.getElementById('a2p-scen-share'); if (b) b.checked = shareTicked; }
+    if (focusKey) {
+      const f = (focusKey[0] === '#' ? document.getElementById(focusKey.slice(1)) : el.querySelector(`[data-k="${CSS.escape(focusKey)}"]`))
+        || el.querySelector('[data-k="scen:new"]');
+      if (f && !f.disabled) f.focus();
+    }
   }
 
   // ── the catchment picker ──
@@ -1590,9 +1814,21 @@ const Alert2Plan = (function () {
     return I.reps.slice().sort((a, b) => a.p.region.localeCompare(b.p.region) || String(a.s.name).localeCompare(String(b.s.name)) || String(a.s.id).localeCompare(String(b.s.id)));
   }
   function worksText(r) {
-    const m = (sc.sites || {})[r.s.id];
+    const m = conditions[r.s.id];
     if (m) return WORKS_LABEL[m];
     return r.backbone ? 'Not assessed — audited first' : 'Fit-out (not backbone)';
+  }
+  function whenText(at) {
+    const d = at ? new Date(at) : null;
+    return d && !isNaN(d) ? d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  }
+  // Who set a site's condition, and when — or that it is on its way.
+  function setByText(id) {
+    const b = condBy.get(id);
+    if (!b) return '';
+    if (b.pending) return 'saving…';
+    const when = whenText(b.at);
+    return `set by ${b.by || 'an administrator'}${when ? `, ${when}` : ''}`;
   }
   function roleText(r) {
     return r.conc && r.relay ? 'Concentrator and relay' : r.conc ? 'Concentrator' : r.relay ? 'Relay to a base' : 'On a ticked catchment\'s ground';
@@ -1622,23 +1858,23 @@ const Alert2Plan = (function () {
       <td class="a2p-num">${nf(r.cats.size)}</td><td>${esc(worksText(r))}</td>
       <td>${esc(r.owner.name || OWN[r.owner.cls])}</td><td class="col-optional">${r.s.repeater && r.s.repeater.acma_licence ? esc(r.s.repeater.acma_licence) : '<span class="txt-warn">none on file</span>'}</td></tr>`;
     const head = `<thead><tr><th scope="col">Repeater</th><th scope="col">Region</th><th scope="col" class="a2p-num">Stations carried</th>
-      <th scope="col" class="a2p-num">Catchments</th><th scope="col">Site works</th>
+      <th scope="col" class="a2p-num">Catchments</th><th scope="col">Site condition</th>
       <th scope="col">Owner</th><th scope="col" class="col-optional">ACMA licence</th></tr></thead>`;
     const noLicence = bb.filter(r => !(r.s.repeater && r.s.repeater.acma_licence)).length;
     const mix = mixOf(s);
-    const marks = s.sites || {};
     const list = sitesOf(I);
+    const ready = store === 'ready';
     const siteRow = (r, i) => {
-      const m = marks[r.s.id] || '';
+      const m = conditions[r.s.id] || '';
       const id = `a2p-site-${i}`;
       const needs = [...r.cats].map(k => catName.get(k)).filter(Boolean);
       return `<tr><th scope="row">${esc(r.s.name)}${r.outside ? ' <span class="small txt-muted">— outside the ticks</span>' : ''}</th>
         <td>${esc(r.p.region)}</td><td>${esc(roleText(r))}${r.backbone ? '' : ' <span class="small txt-muted">· not backbone</span>'}${r.routed || !r.conc ? '' : ' <span class="small txt-warn">· no path to a base on record</span>'}</td>
         <td class="small">${esc(needs.length > 4 ? `${needs.slice(0, 4).join(', ')} and ${needs.length - 4} more` : needs.join(', '))}</td>
-        <td><select id="${id}" data-k="site:${i}" aria-label="What ${escAttr(r.s.name)} needs" onchange="Alert2Plan.site(${i}, this.value)">
+        <td><select id="${id}" data-k="site:${i}" aria-label="Site condition of ${escAttr(r.s.name)}" aria-describedby="${id}-by" onchange="Alert2Plan.site(${i}, this.value)"${ready ? '' : ' disabled'}>
           <option value=""${m ? '' : ' selected'}>Not assessed</option>
           ${WORKS.map(k => `<option value="${k}"${m === k ? ' selected' : ''}>${esc(WORKS_LABEL[k])}</option>`).join('')}
-        </select></td>
+        </select><span class="small txt-muted a2p-site-by" id="${id}-by">${esc(setByText(r.s.id))}</span></td>
         <td>${esc(r.owner.name || OWN[r.owner.cls])}</td></tr>`;
     };
     return sec('bb', '5. The backbone — remediated and moved to ALERT2 first, catchment by catchment', `
@@ -1669,9 +1905,9 @@ const Alert2Plan = (function () {
       </ul>
       <p>A site nobody has assessed is <strong>audited first</strong> — a rigger's climb and a structural report, about ${money(s.cAudit)} — and
         until then is costed at the card's mix: ${pct(mix.fit)} fit-out only, ${pct(mix.ret)} retrofit, ${pct(mix.reb)} rebuilt, allotted
-        catchment by catchment. ${M.nMarked
-          ? `<strong>${nf(M.nMarked)} site${M.nMarked === 1 ? ' is' : 's are'} marked</strong> below from what is known of ${M.nMarked === 1 ? 'it' : 'them'}, and costed at that.`
-          : 'When you know what a site needs, mark it in the table below: it is costed at that rather than the mix, it skips the audit, and the plan follows.'}</p>
+        catchment by catchment. ${M.nKnown
+          ? `<strong>${nf(M.nKnown)} site${M.nKnown === 1 ? ' has its' : 's have their'} site condition set</strong> below from what is known, and ${M.nKnown === 1 ? 'is' : 'are'} costed at that.`
+          : 'When you know what a site needs, set its site condition in the table below: it is costed at that rather than the mix, it skips the audit, and the plan follows.'}</p>
       <h4>Why the backbone goes first</h4>
       <ol class="a2p-points">
         <li><strong>Most of it needs no ALERT2 equipment.</strong> Acquisition is property and legal work; audits, retrofits and
@@ -1705,14 +1941,16 @@ const Alert2Plan = (function () {
       <div class="table-wrap"><table class="a2p-table">
         <caption>The backbone repeaters carrying the most stations${bb.length > top.length ? ` — ${top.length} of ${bb.length}` : ''}</caption>
         ${head}<tbody>${top.map(row).join('')}</tbody></table></div>
-      <details class="a2p-more" id="a2p-sites"><summary>What each repeater site needs — all ${nf(list.length)} in the plan, to mark from what you know</summary>
-        <p class="small">A site marked here is costed at what it is marked, and not audited. A backbone site left <em>Not assessed</em> is audited and costed at the card's mix;
+      <details class="a2p-more" id="a2p-sites"><summary>Site conditions — what each of the ${nf(list.length)} repeaters in the plan needs, as known</summary>
+        <p class="small">A site with its condition set is costed at that, and not audited. A backbone site left <em>Not assessed</em> is audited and costed at the card's mix;
           a repeater that is not backbone is fitted out as it stands.
-          The marks are kept on this device with the scenario; presets and “The proposal” leave them as they are.</p>
+          ${ready ? 'Site conditions are kept in the database — one answer per site, the same for every administrator — whatever scenario is loaded.'
+            : store === 'failed' ? `<span class="txt-warn">The site conditions could not be loaded (${esc(storeError)}), so none can be set.</span>`
+            : 'The site conditions are loading.'}</p>
         <div class="table-wrap medium" role="region" tabindex="0" aria-label="What each repeater site needs"><table class="a2p-table">
-          <caption class="sr-only">Every repeater in the plan: its role, the catchments that need it, and what its site needs</caption>
+          <caption class="sr-only">Every repeater in the plan: its role, the catchments that need it, and its site condition</caption>
           <thead><tr><th scope="col">Repeater</th><th scope="col">Region</th><th scope="col">Role</th><th scope="col">Catchments that need it</th>
-            <th scope="col">Site works</th><th scope="col">Owner</th></tr></thead>
+            <th scope="col">Site condition</th><th scope="col">Owner</th></tr></thead>
           <tbody>${list.map(siteRow).join('')}</tbody></table></div></details>`);
   }
 
@@ -2085,7 +2323,7 @@ const Alert2Plan = (function () {
         <li><strong>Structures worse than assumed.</strong> How many sites need their structure rebuilt is the largest swing in the cost — each is about
           ${money(s.cRebuild + s.cTemp)} against ${money(s.cRemed)} for a retrofit — and nobody knows it until the sites are audited. ${M.nAudit
             ? `${nf(M.nAudit)} backbone site${M.nAudit === 1 ? ' is' : 's are'} unassessed and costed at the card's mix; the audits come first so the figure firms up early.`
-            : 'Every site in the plan is marked on the card, so the figure is as good as the marks.'}
+            : 'Every site in the plan has its site condition set, so the figure is as good as they are.'}
           A rebuild needs a structural design, landholder consent and approvals (and on some hills cultural heritage and vegetation clearance) before it starts, and
           takes the site off the air while it is done: a temporary repeater carries the catchment, and no structure comes down in the wet season.</li>
         <li><strong>Anyone else listening.</strong> Councils, dam operators and other agencies that hear a catchment's ALERT1 off the air lose it at the cut-over
@@ -2111,7 +2349,8 @@ const Alert2Plan = (function () {
           <tr><th scope="row">Catchments in the plan</th><td>${esc(unticked(I))}</td></tr>
           <tr><th scope="row">Procurement and supply</th><td>${s.procureMonths} months</td></tr>
           <tr><th scope="row">Pilot</th><td>${s.pilot ? `${s.pilotMonths} months, ${s.pilotSites} stations` : 'none'}</td></tr>
-          <tr><th scope="row">Repeater sites marked on the card</th><td>${esc(marksText(M))}</td></tr>
+          <tr><th scope="row">Scenario</th><td>${esc(scenarioText())}</td></tr>
+          <tr><th scope="row">Site conditions set</th><td>${esc(conditionsText(M))}</td></tr>
           <tr><th scope="row">Works on a site another owner holds</th><td>go ahead under an access agreement while its acquisition is negotiated</td></tr>
           <tr><th scope="row">Condition audit, per unassessed backbone site</th><td>${s.auditDays} contract crew-day${s.auditDays === 1 ? '' : 's'}, one team</td></tr>
           <tr><th scope="row">Retrofit, per backbone site</th><td>${s.remediateDays} crew-days</td></tr>
@@ -2204,6 +2443,8 @@ const Alert2Plan = (function () {
     k.innerHTML = kpisHtml();
     o.innerHTML = outHtml();
     for (const id of open) { const d = document.getElementById(id); if (d && o.contains(d)) d.open = true; }
+    // "Changed since it was loaded" moves with the card.
+    if (!busy) refreshStore();
     const note = document.querySelector('.a2p-controls > p.small');
     if (note) {
       const fresh = document.createElement('div');
@@ -2244,6 +2485,8 @@ const Alert2Plan = (function () {
   function init() {
     if (!isAdmin()) return;
     syncPartial();
+    // The site conditions and the saved scenarios, once a visit (0065).
+    if (store === 'idle') loadStore();
     // The owners and priorities come from the SLS, fetched once on first ask.
     if (!slsReady && !slsWanted && typeof SLS !== 'undefined' && SLS.ensureData) {
       slsWanted = true;
@@ -2264,12 +2507,19 @@ const Alert2Plan = (function () {
     return `${I.catchmentCount} of ${I.catchmentsInScope} — left out: ${out.length > 15 ? `${out.slice(0, 15).join(', ')} and ${out.length - 15} more` : out.join(', ')}`;
   }
 
-  // The repeater sites the card says something of, in words.
-  function marksText(M) {
-    const marks = Object.values(sc.sites || {});
-    if (!marks.length) return 'none — every backbone site is audited, and costed at the mix';
-    const n = k => marks.filter(v => v === k).length;
-    return `${marks.length}: ${WORKS.map(k => `${n(k)} ${WORKS_LABEL[k].toLowerCase()}`).join(', ')}${M.nMarked < marks.length ? ` (${M.nMarked} of them in this plan)` : ''}`;
+  // The scenario the card is, in words: for the assumptions and the workbook.
+  function scenarioText() {
+    const L = loadedScenario();
+    if (!L) return 'not saved as a scenario';
+    return `${L.name}${L.mine ? '' : ` (by ${L.by || 'another administrator'})`}, ${L.shared ? 'shared with every administrator' : 'private'}${changedSinceLoad() ? ' — changed since it was saved' : ''}`;
+  }
+
+  // The site conditions set, in words.
+  function conditionsText(M) {
+    const all = Object.values(conditions);
+    if (!all.length) return 'none — every backbone site is audited, and costed at the mix';
+    const n = k => all.filter(v => v === k).length;
+    return `${all.length}: ${WORKS.map(k => `${n(k)} ${WORKS_LABEL[k].toLowerCase()}`).join(', ')}${M.nKnown < all.length ? ` (${M.nKnown} of them in this plan)` : ''}`;
   }
 
   function csvRows(M) {
@@ -2308,6 +2558,7 @@ const Alert2Plan = (function () {
       { name: 'Summary', cols: [46, 22], rows: [
         [t('Flood-Net — ALERT2 Transition Plan (draft)', 'title')],
         [t(`Worked from the station register; an estimate for planning, not a quote.`, 'sub')], [],
+        [t('Scenario', 'label'), scenarioText()],
         [t('Estimated cost, with contingency', 'label'), Math.round(M.total)],
         [t('Contingency', 'label'), `${s.contingency}%`],
         [t('Duration (months)', 'label'), Math.round(M.end * 10) / 10],
@@ -2350,7 +2601,7 @@ const Alert2Plan = (function () {
         ['Assumption', 'Value'].map(h => t(h, 'head')),
         ...Object.keys(DEFAULTS).map(k => [k, String(s[k])]),
         ['catchments', unticked(C.I)],
-        ['repeater sites marked', marksText(M)],
+        ['site conditions set', conditionsText(M)],
       ] },
     ];
     const data = XlsxWrite.build(sheets, { title: 'ALERT2 Transition Plan' });
@@ -2368,12 +2619,23 @@ const Alert2Plan = (function () {
   return {
     render,
     init,
-    authChanged() { cat = null; cuts.clear(); memo = null; if (isAdmin()) init(); repaint(); },
+    authChanged() {
+      cat = null; cuts.clear(); memo = null;
+      // Another person, or nobody: what the last one could see goes with them.
+      store = 'idle'; storeError = ''; conditions = {}; condBy.clear(); scenarios = []; condStamp++; scenFormOpen = false;
+      if (isAdmin()) init();
+      repaint();
+    },
+    retryStore() { if (store === 'failed') { store = 'idle'; return loadStore(); } return null; },
+    // For the tests: read the shared store again, and say where it stands.
+    reloadStore() { store = 'idle'; return loadStore(); },
+    storeState: () => ({ store, error: storeError, conditions: { ...conditions }, scenarios: scenarios.map(x => ({ ...x })), loaded: loaded ? { ...loaded } : null }),
+    scenListToggled(open) { scenListOpen = !!open; },
     set,
     preset(id) {
       const p = PRESETS.find(x => x.id === id);
       if (!p) return;
-      sc = sanitize({ ...DEFAULTS, ...p.set, order: sc.order, catOrder: sc.catOrder, excluded: sc.excluded, sites: sc.sites });
+      sc = sanitize({ ...DEFAULTS, ...p.set, order: sc.order, catOrder: sc.catOrder, excluded: sc.excluded });
       saveScenario();
       repaint();
       announce(`${p.label}: the plan is worked again.`);
@@ -2418,17 +2680,117 @@ const Alert2Plan = (function () {
     },
     // What a repeater site needs, as somebody who knows it says: '' for not
     // assessed, or one of the works. Numbered off sitesOf().
+    // A site's condition, set from its select: the plan follows at once, and
+    // the database is told — every administrator's plan follows it. Refused,
+    // it goes back to what it was and says why.
     site(i, v) {
       const I = inventory();
       const r = I && sitesOf(I)[i];
-      if (!r) return;
-      const sites = { ...(sc.sites || {}) };
-      if (WORKS.includes(v)) sites[r.s.id] = v; else delete sites[r.s.id];
-      sc.sites = sites;
-      sc = sanitize(sc);
-      saveScenario();
+      if (!r || store !== 'ready') return;
+      const id = r.s.id, want = WORKS.includes(v) ? v : '';
+      const was = conditions[id] || '', wasBy = condBy.get(id);
+      if (want === was) return;
+      if (want) { conditions[id] = want; condBy.set(id, { pending: true }); } else { delete conditions[id]; condBy.delete(id); }
+      condStamp++;
       repaintLive(`site:${i}`);
-      announce(`${r.s.name}: ${WORKS.includes(v) ? WORKS_LABEL[v].toLowerCase() : 'not assessed — audited first'}. The plan is worked again.`);
+      const said = `${r.s.name}: ${want ? WORKS_LABEL[want].toLowerCase() : 'not assessed — audited first'}`;
+      return dbRpc('a2plan_site_set', { p_station_id: id, p_condition: want || null }).then(row => {
+        setCondition(row);
+        const by = document.getElementById(`a2p-site-${i}-by`);
+        if (by) by.textContent = setByText(id);
+        announce(`${said}. Saved for every administrator.`);
+      }, e => {
+        if (was) { conditions[id] = was; if (wasBy) condBy.set(id, wasBy); } else { delete conditions[id]; condBy.delete(id); }
+        condStamp++;
+        const f = document.activeElement;
+        repaintLive(f && f.dataset ? f.dataset.k : undefined);
+        announce(`${r.s.name}'s site condition was not saved: ${e && e.message ? e.message : e}`);
+      });
+    },
+    // The scenarios panel's buttons. `i` numbers a row of `scenarios`.
+    async scen(action, i) {
+      if (store !== 'ready') return;
+      const x = typeof i === 'number' ? scenarios[i] : null;
+      if (action === 'form' || action === 'cancel') {
+        scenFormOpen = action === 'form' ? !scenFormOpen : false;
+        refreshStore(scenFormOpen ? 'scen:new' : 'scen:new');
+        if (scenFormOpen) { const f = document.getElementById('a2p-scen-name'); if (f) f.focus(); }
+        return;
+      }
+      if (action === 'save') {
+        const nameEl = document.getElementById('a2p-scen-name');
+        const name = nameEl ? nameEl.value.trim() : '';
+        if (!name) { announce('A scenario needs a name.'); if (nameEl) nameEl.focus(); return; }
+        const notes = (document.getElementById('a2p-scen-notes') || {}).value || '';
+        const share = !!(document.getElementById('a2p-scen-share') || {}).checked;
+        await write('Saving the scenario', async () => {
+          const row = await dbRpc('a2plan_scenario_save', { p_id: null, p_name: name, p_notes: notes, p_shared: share, p_settings: cardSettings() });
+          putScenario(row);
+          loaded = { id: row.id, snap: snapOf(sc) };
+          saveLoaded();
+          scenFormOpen = false;
+          announce(`Saved “${row.name}”, ${row.shared ? 'shared with every administrator' : 'private to you'}.`);
+        }, 'scen:new');
+        repaintLive();
+        return;
+      }
+      if (action === 'update') {
+        const L = loadedScenario();
+        if (!L || !L.mine) return;
+        await write(`Saving “${L.name}”`, async () => {
+          const row = await dbRpc('a2plan_scenario_save', { p_id: L.id, p_name: null, p_notes: null, p_shared: null, p_settings: cardSettings() });
+          putScenario(row);
+          loaded = { id: row.id, snap: snapOf(sc) };
+          saveLoaded();
+          announce(`Saved the changes to “${row.name}”.`);
+        }, 'scen:new');
+        repaintLive();
+        return;
+      }
+      if (!x) return;
+      if (action === 'share') {
+        await write(`Sharing “${x.name}”`, async () => {
+          const row = await dbRpc('a2plan_scenario_save', { p_id: x.id, p_name: null, p_notes: null, p_shared: !x.shared, p_settings: null });
+          putScenario(row);
+          announce(row.shared ? `“${row.name}” is shared: every administrator can load it.` : `“${row.name}” is private: only you can see it.`);
+        }, `sshare:${x.id}`);
+        repaintLive();
+        return;
+      }
+      if (action === 'delete') {
+        const ok = await confirmDialog({
+          title: `Remove “${x.name}”?`,
+          message: x.shared ? 'It is shared, so every administrator loses it too. This cannot be undone.' : 'Only you can see it. This cannot be undone.',
+          confirm: 'Remove scenario', danger: true,
+        });
+        if (!ok) { refreshStore(`sdel:${x.id}`); return; }
+        await write(`Removing “${x.name}”`, async () => {
+          await dbRpc('a2plan_scenario_delete', { p_id: x.id });
+          scenarios = scenarios.filter(y => y.id !== x.id);
+          if (loaded && loaded.id === x.id) { loaded = null; saveLoaded(); }
+          announce(`Removed “${x.name}”.`);
+        }, 'scen:new');
+        repaintLive();
+        return;
+      }
+      if (action === 'load') {
+        // The card as it is would be lost: ask first, unless it is exactly
+        // the scenario it came from or the proposal.
+        const unsaved = loaded ? changedSinceLoad() : differs(sc, DEFAULTS);
+        if (unsaved && !(await confirmDialog({
+          title: `Load “${x.name}”?`,
+          message: 'It replaces every setting on the card, the catchments ticked and their order. The card as it is now is not saved as a scenario, so it will be lost.',
+          confirm: 'Load scenario',
+        }))) { refreshStore(`sload:${x.id}`); return; }
+        sc = sanitize({ ...x.settings });
+        delete sc.sites;
+        loaded = { id: x.id, snap: snapOf(sc) };
+        saveScenario();
+        saveLoaded();
+        repaint();
+        refreshStore(`sload:${x.id}`);
+        announce(`Loaded “${x.name}”${x.mine ? '' : ` by ${x.by || 'another administrator'}`}: the plan is worked again.`);
+      }
     },
     // The folded tables go on paper too: opened for the print and folded
     // again after, so the screen is left as it was.
@@ -2482,7 +2844,7 @@ const Alert2Plan = (function () {
     inventory,
     plan: () => { const C = cur(); return C ? C.M : null; },
     model: (scenario) => { const I = inventory(); return I ? model(I, sanitize(scenario || {})) : null; },
-    reset() { sc = sanitize({}); saveScenario(); repaint(); syncPartial(); },
+    reset() { sc = sanitize({}); loaded = null; saveLoaded(); saveScenario(); repaint(); syncPartial(); },
   };
 })();
 if (typeof window !== 'undefined') window.Alert2Plan = Alert2Plan;

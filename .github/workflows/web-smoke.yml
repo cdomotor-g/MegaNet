@@ -1574,6 +1574,11 @@ jobs:
       # log's anonymous write held to one row a visitor a day, 5,000 a day.
       - name: check_admin_dashboard.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_admin_dashboard.sql
+      # The ALERT2 Transition Plan's shared stores (0065): site conditions for
+      # every administrator, and scenarios private to their author until
+      # shared — read, changed and removed by nobody else.
+      - name: check_alert2_plan.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_alert2_plan.sql
       # …and the same for the AEP sheets' SQL (0033): it attaches rows by
       # number and by position into columns only it and the editor write.
       - name: The AEP levels' SQL still fits the schema

@@ -65,11 +65,80 @@ const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
 await applyNetworkPolicy(page, server.origin);
 
+// The shared store (0065) stood in for: the four functions, with the rules
+// tools/check_alert2_plan.sql holds the real ones to — a scenario private to
+// its author until shared, changed and removed by its author only — and a
+// switch to refuse one, or to fail the read. Registered after the network
+// policy, so it answers first.
+const fake = {
+  me: '00000000-0000-4000-8000-00000000a201', other: '00000000-0000-4000-8000-00000000a202',
+  sites: new Map(), scenarios: [], calls: [], refuse: null, failRead: false, n: 0,
+};
+fake.scenarios.push({ id: 'aaaaaaaa-0000-4000-8000-000000000001', owner: fake.other, name: 'Eight crews, wet season worked', notes: 'From the Townsville meeting',
+  shared: true, settings: { v: 1, fieldCrews: 8, wet: false }, created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-02T00:00:00Z' });
+fake.scenarios.push({ id: 'aaaaaaaa-0000-4000-8000-000000000002', owner: fake.other, name: 'Somebody else\'s private one', notes: null,
+  shared: false, settings: { v: 1, fieldCrews: 1 }, created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-03T00:00:00Z' });
+const byName = id => (id === fake.me ? 'Test Admin' : 'Other Admin');
+const scenOut = x => ({ id: x.id, name: x.name, notes: x.notes, shared: x.shared, mine: x.owner === fake.me, by: byName(x.owner),
+                        settings: x.settings, created_at: x.created_at, updated_at: x.updated_at });
+await page.route('**/rpc/a2plan_*', async route => {
+  const fn = route.request().url().split('/rpc/')[1].split('?')[0];
+  const a = JSON.parse(route.request().postData() || '{}');
+  fake.calls.push({ fn, a });
+  const json = (status, body) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+  const no = (status, code, message) => json(status, { code, message });
+  if (fake.refuse === fn) return no(403, '42501', 'only an administrator may say what a site needs');
+  const now = new Date(Date.UTC(2026, 9, 16, 12, 0, fake.n++)).toISOString();
+  if (fn === 'a2plan_read') {
+    if (fake.failRead) return no(500, 'XX000', 'the database is having a moment');
+    return json(200, { sites: [...fake.sites.values()],
+      scenarios: fake.scenarios.filter(x => x.owner === fake.me || x.shared).sort((x, y) => y.updated_at.localeCompare(x.updated_at)).map(scenOut) });
+  }
+  if (fn === 'a2plan_site_set') {
+    if (!a.p_condition) { fake.sites.delete(a.p_station_id); return json(200, { station_id: a.p_station_id, condition: null }); }
+    if (!['fit', 'retrofit', 'rebuild'].includes(a.p_condition)) return no(400, '22023', 'a site condition is fit, retrofit or rebuild');
+    const row = { station_id: a.p_station_id, condition: a.p_condition, updated_at: now, by: 'Test Admin' };
+    fake.sites.set(a.p_station_id, row);
+    return json(200, row);
+  }
+  if (fn === 'a2plan_scenario_save') {
+    if (a.p_id == null) {
+      const x = { id: `bbbbbbbb-0000-4000-8000-${String(fake.n).padStart(12, '0')}`, owner: fake.me, name: a.p_name.trim(), notes: (a.p_notes || '').trim() || null,
+                  shared: !!a.p_shared, settings: a.p_settings, created_at: now, updated_at: now };
+      fake.scenarios.push(x);
+      return json(200, scenOut(x));
+    }
+    const x = fake.scenarios.find(y => y.id === a.p_id);
+    if (!x || (x.owner !== fake.me && !x.shared)) return no(404, 'P0002', 'no such scenario');
+    if (x.owner !== fake.me) return no(403, '42501', 'only the administrator who saved a scenario may change it — save your own copy');
+    if (a.p_name != null) x.name = a.p_name.trim();
+    if (a.p_notes != null) x.notes = a.p_notes.trim() || null;
+    if (a.p_shared != null) x.shared = a.p_shared;
+    if (a.p_settings != null) x.settings = a.p_settings;
+    x.updated_at = now;
+    return json(200, scenOut(x));
+  }
+  if (fn === 'a2plan_scenario_delete') {
+    const x = fake.scenarios.find(y => y.id === a.p_id);
+    if (!x) return json(200, false);
+    if (x.owner !== fake.me) return no(403, '42501', 'only the administrator who saved a scenario may remove it');
+    fake.scenarios = fake.scenarios.filter(y => y !== x);
+    return json(200, true);
+  }
+  return no(404, 'PGRST202', 'no such function');
+});
+
 try {
   await page.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
   await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations),
     null, { timeout: LOAD_TIMEOUT });
-  await page.evaluate(() => { try { localStorage.removeItem('meganet.a2plan.scenario'); } catch (_) {} });
+  await page.evaluate(() => { try { localStorage.removeItem('meganet.a2plan.scenario'); localStorage.removeItem('meganet.a2plan.loaded'); } catch (_) {} });
+  // A site condition kept on the device, inside the card, as the revision
+  // before 0065 kept them: carried to the database when the store answers.
+  await page.evaluate(() => localStorage.setItem('meganet.a2plan.scenario', JSON.stringify({ fieldCrews: 4, sites: { amiens_knob_al: 'rebuild' } })));
+  await page.reload({ waitUntil: 'load', timeout: LOAD_TIMEOUT });
+  await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations),
+    null, { timeout: LOAD_TIMEOUT });
 
   // ── who it is for ──
   console.log('\nWho it is for\n');
@@ -92,7 +161,21 @@ try {
     try { await SLS.ensureData(); } catch (_) {}
     Alert2Plan.authChanged();
   });
-  await page.waitForFunction(() => !!document.getElementById('a2p-out'), null, { timeout: 20_000 });
+  await page.waitForFunction(() => !!document.getElementById('a2p-out') && Alert2Plan.storeState().store === 'ready', null, { timeout: 20_000 });
+
+  // ── the shared store ──
+  console.log('\nThe shared store\n');
+  const carried = await page.evaluate(() => ({ state: Alert2Plan.storeState(),
+    kept: JSON.parse(localStorage.getItem('meganet.a2plan.scenario') || '{}') }));
+  ok('opened by an administrator, the tab reads the shared store once',
+    fake.calls.filter(c => c.fn === 'a2plan_read').length === 1 && carried.state.store === 'ready', JSON.stringify(fake.calls.map(c => c.fn)));
+  ok('a site condition kept on the device the old way is saved for every administrator, then forgotten on the device',
+    fake.sites.get('amiens_knob_al')?.condition === 'rebuild' && carried.state.conditions.amiens_knob_al === 'rebuild' && !('sites' in carried.kept),
+    JSON.stringify({ fake: [...fake.sites.keys()], kept: Object.keys(carried.kept) }));
+  ok('…the others\' shared scenarios are listed, and nobody else\'s private one',
+    carried.state.scenarios.length === 1 && carried.state.scenarios[0].name === 'Eight crews, wet season worked' && !carried.state.scenarios[0].mine);
+  fake.sites.clear();
+  await page.evaluate(() => Alert2Plan.reloadStore());
 
   // ── the inventory ──
   console.log('\nThe inventory\n');
@@ -289,7 +372,7 @@ try {
   ok('a longer design and approvals lead puts the backbone no sooner', heavy.rc >= heavy.ra - 1e-6);
   ok('retrofits and rebuilds together never pass every unassessed site', heavy.over <= heavy.overAudit, JSON.stringify(heavy));
 
-  // A site marked by its select, as a person would, in the folded site table.
+  // A site condition set by its select, as a person would, in the folded site table.
   const mark = await page.evaluate(async () => {
     const d = document.getElementById('a2p-sites');
     d.open = true;
@@ -300,21 +383,44 @@ try {
     sel.value = 'rebuild';
     sel.dispatchEvent(new Event('change', { bubbles: true }));
     await new Promise(r => setTimeout(r, 30));
-    const after = Alert2Plan.plan();
     const now = document.querySelector(`#a2p-sites select[data-k="${k}"]`);
-    return { k, audit: [before.nAudit, after.nAudit], marked: after.nMarked, total: [before.total, after.total],
-             focused: document.activeElement === now, value: now.value, open: document.getElementById('a2p-sites').open,
-             kept: Object.values(JSON.parse(localStorage.getItem('meganet.a2plan.scenario') || '{}').sites || {}),
+    const pending = document.getElementById(`${now.id}-by`).textContent;
+    await new Promise(r => setTimeout(r, 300));
+    const after = Alert2Plan.plan();
+    const again = document.querySelector(`#a2p-sites select[data-k="${k}"]`);
+    return { k, audit: [before.nAudit, after.nAudit], known: after.nKnown, total: [before.total, after.total],
+             focused: document.activeElement === again, value: again.value, open: document.getElementById('a2p-sites').open,
+             by: document.getElementById(`${again.id}-by`).textContent, pending,
+             device: JSON.parse(localStorage.getItem('meganet.a2plan.scenario') || '{}').sites,
              proposal: /This is the proposal as drafted/.test(document.querySelector('.a2p-controls').textContent),
              kpi: document.getElementById('a2p-kpis').textContent };
   });
-  ok('a site marked "Rebuild the structure" by its select is costed at that and not audited, and the select keeps its focus with its table open',
-    mark.audit[1] === mark.audit[0] - 1 && mark.marked === 1 && mark.total[1] !== mark.total[0] && mark.focused && mark.value === 'rebuild' && mark.open,
-    JSON.stringify({ audit: mark.audit, marked: mark.marked, focused: mark.focused, open: mark.open }));
-  ok('…the mark is kept on this device, and is what is known rather than a lever: still the proposal', mark.kept.includes('rebuild') && mark.proposal && !/than the proposal/.test(mark.kpi));
-  const marks = await page.evaluate(() => {
+  const sent = fake.calls.filter(c => c.fn === 'a2plan_site_set').pop();
+  ok('a site condition set to "Rebuild the structure" by its select is costed at that and not audited, and the select keeps its focus with its table open',
+    mark.audit[1] === mark.audit[0] - 1 && mark.known === 1 && mark.total[1] !== mark.total[0] && mark.focused && mark.value === 'rebuild' && mark.open,
+    JSON.stringify({ audit: mark.audit, known: mark.known, focused: mark.focused, open: mark.open }));
+  ok('…it is saved in the database for every administrator, says who set it and when, and nothing is kept on the device',
+    sent && sent.a.p_condition === 'rebuild' && fake.sites.size === 1 && /^set by Test Admin, 16 Oct 2026$/.test(mark.by) && mark.device === undefined,
+    JSON.stringify({ sent: sent && sent.a, by: mark.by, pending: mark.pending }));
+  ok('…and it is what is known rather than a lever: still the proposal', mark.proposal && !/than the proposal/.test(mark.kpi));
+
+  fake.refuse = 'a2plan_site_set';
+  const refused = await page.evaluate(async () => {
+    const sel = document.querySelector('#a2p-sites select[data-k^="site:"]');
+    sel.focus();
+    sel.value = 'fit';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 300));
+    const now = document.querySelector(`#a2p-sites select[data-k="${sel.dataset.k}"]`);
+    return { value: now.value, known: Alert2Plan.storeState().conditions, said: document.getElementById('app-status').textContent };
+  });
+  fake.refuse = null;
+  ok('a site condition the database refuses goes back to what it was, and says so', refused.value === 'rebuild'
+    && Object.values(refused.known).includes('rebuild') && !Object.values(refused.known).includes('fit') && /was not saved/.test(refused.said), JSON.stringify(refused));
+
+  const marks = await page.evaluate(async () => {
     Alert2Plan.preset('faster');
-    const kept = Object.keys(Alert2Plan.scenario().sites || {}).length;
+    const kept = Object.keys(Alert2Plan.storeState().conditions).length;
     Alert2Plan.preset('proposed');
     const I = Alert2Plan.inventory();
     const base = Alert2Plan.plan();
@@ -322,10 +428,11 @@ try {
     const sel = document.querySelector('#a2p-sites select[data-k^="site:"]');
     sel.value = '';
     sel.dispatchEvent(new Event('change', { bubbles: true }));
-    return { kept, audit: all.nAudit, remed: all.nRetro + all.nRebuild, cheaper: all.total < base.total, cleared: Object.keys(Alert2Plan.scenario().sites || {}).length };
+    await new Promise(r => setTimeout(r, 300));
+    return { kept, audit: all.nAudit, remed: all.nRetro + all.nRebuild, cheaper: all.total < base.total, cleared: Object.keys(Alert2Plan.storeState().conditions).length };
   });
-  ok('a preset leaves the marks alone; every site marked fit-out is no audit, retrofit or rebuild, and cheaper; "Not assessed" clears the mark',
-    marks.kept === 1 && marks.audit === 0 && marks.remed === 0 && marks.cheaper && marks.cleared === 0, JSON.stringify(marks));
+  ok('a preset leaves the site conditions alone; every site fit-out only is no audit, retrofit or rebuild, and cheaper; "Not assessed" clears one, in the database too',
+    marks.kept === 1 && marks.audit === 0 && marks.remed === 0 && marks.cheaper && marks.cleared === 0 && fake.sites.size === 0, JSON.stringify(marks));
 
   const stage = await page.evaluate(() => {
     const d = Alert2Plan.defaults();
@@ -356,6 +463,130 @@ try {
   });
   ok('▼ on a catchment swaps it with the next in its region, ▲ is off at the top of one, focus stays on the control and the order is kept',
     mc.swapped && mc.topOff && mc.focused && mc.kept, JSON.stringify(mc));
+  await page.evaluate(() => Alert2Plan.reset());
+
+  // ── saved scenarios ──
+  console.log('\nSaved scenarios\n');
+  await page.evaluate(() => Alert2Plan.reset());
+  const sv = await page.evaluate(async () => {
+    const panel = () => document.getElementById('a2p-scen');
+    const before = panel().textContent;
+    document.querySelector('#a2p-scen [data-k="scen:new"]').click();
+    await new Promise(r => setTimeout(r, 30));
+    const nameFocused = document.activeElement && document.activeElement.id === 'a2p-scen-name';
+    // A slider moved first, so the scenario is not the proposal.
+    const el = document.getElementById('a2p-c-fieldCrews');
+    el.value = '6'; el.dispatchEvent(new Event('input', { bubbles: true }));
+    document.getElementById('a2p-scen-name').value = 'Six crews';
+    document.getElementById('a2p-scen-notes').value = 'For the board';
+    document.querySelector('#a2p-scen [data-k="scen:save"]').click();
+    await new Promise(r => setTimeout(r, 300));
+    return { before, after: panel().textContent, head: document.getElementById('a2p-scen-line').textContent,
+             st: Alert2Plan.storeState(), focus: document.activeElement && document.activeElement.dataset.k };
+  });
+  const saved = fake.calls.filter(c => c.fn === 'a2plan_scenario_save').pop();
+  ok('the card says it is not saved as a scenario, and "Save as a new scenario…" opens a form with the name ready to type',
+    /not saved as a scenario/.test(sv.before), sv.before.slice(0, 120));
+  ok('saving it sends the card, private, with its name and notes — and no site conditions',
+    saved && saved.a.p_id === null && saved.a.p_name === 'Six crews' && saved.a.p_notes === 'For the board' && saved.a.p_shared === false
+    && saved.a.p_settings.fieldCrews === 6 && saved.a.p_settings.v === 1 && !('sites' in saved.a.p_settings), JSON.stringify(saved && saved.a).slice(0, 200));
+  ok('…the card is then working from it, private to you, the document says so, and focus is not lost',
+    /Working from Six crews — yours, private to you/.test(sv.after) && /Scenario: Six crews/.test(sv.head) && !!sv.focus
+    && sv.st.scenarios.some(x => x.name === 'Six crews' && x.mine && !x.shared), JSON.stringify({ after: sv.after.slice(0, 160), head: sv.head, focus: sv.focus }));
+
+  const upd = await page.evaluate(async () => {
+    const el = document.getElementById('a2p-c-contingency');
+    el.value = '30'; el.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 30));
+    const changed = document.getElementById('a2p-scen').textContent;
+    const btn = document.querySelector('#a2p-scen [data-k="scen:update"]');
+    const off = btn.disabled;
+    btn.click();
+    await new Promise(r => setTimeout(r, 300));
+    return { changed, off, after: document.getElementById('a2p-scen').textContent, btnOff: document.querySelector('#a2p-scen [data-k="scen:update"]').disabled };
+  });
+  const updated = fake.calls.filter(c => c.fn === 'a2plan_scenario_save').pop();
+  ok('a slider moved says the card has changed since it was loaded, and "Save changes" saves it to the same scenario',
+    /changed since it was loaded/.test(upd.changed) && !upd.off && updated.a.p_id === sv.st.loaded.id && updated.a.p_settings.contingency === 30
+    && !/changed since/.test(upd.after) && upd.btnOff, JSON.stringify({ off: upd.off, id: updated.a.p_id }));
+
+  const sh = await page.evaluate(async () => {
+    const id = Alert2Plan.storeState().loaded.id;
+    const btn = document.querySelector(`#a2p-scen [data-k="sshare:${id}"]`);
+    btn.click();
+    await new Promise(r => setTimeout(r, 300));
+    const row = [...document.querySelectorAll('#a2p-scen tbody tr')].find(tr => /Six crews/.test(tr.textContent));
+    return { row: row && row.textContent.replace(/\s+/g, ' '), focus: document.activeElement && document.activeElement.dataset.k === `sshare:${id}`,
+             now: document.getElementById('a2p-scen-now').textContent };
+  });
+  const sharedCall = fake.calls.filter(c => c.fn === 'a2plan_scenario_save').pop();
+  ok('"Share" shares it with every administrator, and nothing else about it is sent again; focus stays on the button',
+    sharedCall.a.p_shared === true && sharedCall.a.p_settings === null && sharedCall.a.p_name === null && /Shared/.test(sh.row) && /Make private/.test(sh.row)
+    && /shared with every administrator/.test(sh.now) && sh.focus, JSON.stringify(sh));
+
+  const ld = await page.evaluate(async () => {
+    const st = Alert2Plan.storeState();
+    const theirs = st.scenarios.find(x => !x.mine);
+    document.querySelector(`#a2p-scen [data-k="sload:${theirs.id}"]`).click();
+    await new Promise(r => setTimeout(r, 100));
+    const dialog = !!document.querySelector('[data-ask="yes"]');
+    return { dialog, crews: Alert2Plan.scenario().fieldCrews, wet: Alert2Plan.scenario().wet, slider: document.getElementById('a2p-c-fieldCrews').value,
+             now: document.getElementById('a2p-scen-now').textContent, head: document.getElementById('a2p-scen-line').textContent,
+             update: !!document.querySelector('#a2p-scen [data-k="scen:update"]'), mine: !!document.querySelector(`#a2p-scen [data-k="sshare:${theirs.id}"]`) };
+  });
+  ok('loading another administrator\'s shared scenario asks nothing when the card is saved, and the card and plan follow it',
+    !ld.dialog && ld.crews === 8 && ld.wet === false && ld.slider === '8', JSON.stringify(ld));
+  ok('…it says whose it is and that only its author can change it, offers no "Save changes", "Share" or "Remove"',
+    /by Other Admin/.test(ld.now) && /Only its author can change it/.test(ld.now) && /by Other Admin/.test(ld.head) && !ld.update && !ld.mine, ld.now);
+
+  const ask = await page.evaluate(async () => {
+    const el = document.getElementById('a2p-c-fieldCrews');
+    el.value = '3'; el.dispatchEvent(new Event('input', { bubbles: true }));
+    const mine = Alert2Plan.storeState().scenarios.find(x => x.mine);
+    document.querySelector(`#a2p-scen [data-k="sload:${mine.id}"]`).click();
+    await new Promise(r => setTimeout(r, 100));
+    const yes = document.querySelector('[data-ask="yes"]');
+    const text = yes ? yes.closest('[role="alertdialog"], [role="dialog"], .modal-card, .modal').textContent : '';
+    if (yes) yes.click();
+    await new Promise(r => setTimeout(r, 100));
+    return { asked: !!yes, text: text.replace(/\s+/g, ' ').slice(0, 200), crews: Alert2Plan.scenario().fieldCrews, contingency: Alert2Plan.scenario().contingency };
+  });
+  ok('loading over a changed card asks first, saying what is lost; yes loads it', ask.asked && /will be lost/.test(ask.text) && ask.crews === 6 && ask.contingency === 30, JSON.stringify(ask));
+
+  const rm = await page.evaluate(async () => {
+    const mine = Alert2Plan.storeState().scenarios.find(x => x.mine);
+    document.querySelector(`#a2p-scen [data-k="sdel:${mine.id}"]`).click();
+    await new Promise(r => setTimeout(r, 100));
+    const card = document.querySelector('[data-ask="yes"]');
+    const danger = card && card.classList.contains('btn-danger');
+    const text = card ? card.closest('[role="alertdialog"], [role="dialog"], .modal-card, .modal').textContent.replace(/\s+/g, ' ') : '';
+    if (card) card.click();
+    await new Promise(r => setTimeout(r, 300));
+    return { danger, text: text.slice(0, 200), left: Alert2Plan.storeState().scenarios.map(x => x.name), loaded: Alert2Plan.storeState().loaded,
+             now: document.getElementById('a2p-scen-now').textContent };
+  });
+  ok('"Remove…" asks, as something that cannot be undone, warning that a shared one goes for everybody; then it is gone and the card is unsaved',
+    rm.danger && /every administrator loses it/.test(rm.text) && !rm.left.includes('Six crews') && rm.loaded === null && /not saved as a scenario/.test(rm.now)
+    && fake.calls.some(c => c.fn === 'a2plan_scenario_delete'), JSON.stringify(rm));
+
+  const own = await page.evaluate(() => Alert2Plan.storeState().scenarios.map(x => x.name));
+  ok('nobody else\'s private scenario was ever listed', !own.includes('Somebody else\'s private one'), own.join(', '));
+
+  fake.failRead = true;
+  const failed = await page.evaluate(async () => {
+    await Alert2Plan.reloadStore();
+    const sel = document.querySelector('#a2p-sites select[data-k^="site:"]');
+    return { text: document.getElementById('a2p-scen').textContent.replace(/\s+/g, ' '), off: sel ? sel.disabled : null,
+             retry: !!document.querySelector('#a2p-scen [data-k="scen:retry"]') };
+  });
+  fake.failRead = false;
+  const retried = await page.evaluate(async () => {
+    document.querySelector('#a2p-scen [data-k="scen:retry"]').click();
+    await new Promise(r => setTimeout(r, 300));
+    return Alert2Plan.storeState().store;
+  });
+  ok('when the store cannot be read the card says so and why, no site condition can be set, and "Try again" reads it again',
+    /could not be loaded/.test(failed.text) && /having a moment/.test(failed.text) && failed.off === true && failed.retry && retried === 'ready', JSON.stringify(failed));
   await page.evaluate(() => Alert2Plan.reset());
 
   // ── catchments in the plan ──

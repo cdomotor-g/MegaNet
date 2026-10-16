@@ -19556,6 +19556,20 @@ select.kl-in { width: auto; font-family: inherit; }
 .a2p-table select { max-width: 100%; font-size: var(--fs-sm); }
 /* Too many columns to crush on a phone: it scrolls in its frame instead. */
 .a2p-cut-table { min-width: 36rem; }
+/* Saved scenarios, on the card: where the card came from, the buttons that
+   keep it, and the list to load from. */
+.a2p-scen { margin: var(--sp-2) 0 var(--sp-3); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
+.a2p-scen > h4 { margin: 0 0 var(--sp-1); font-size: var(--fs-md); }
+.a2p-scen-form { display: grid; gap: var(--sp-2); margin: var(--sp-2) 0; max-width: 40rem; }
+.a2p-scen-form textarea { width: 100%; resize: vertical; font: inherit; }
+.a2p-scen-list { margin-top: var(--sp-2); }
+.a2p-scen-list > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 600; }
+.a2p-scen-notes { display: block; font-weight: 400; overflow-wrap: anywhere; }
+.a2p-scen-on th[scope="row"] { box-shadow: inset 3px 0 0 var(--accent); }
+.a2p-scen-acts { flex-wrap: wrap; gap: .25rem; }
+.a2p-shared  { background: var(--accent); color: var(--panel); }
+.a2p-private { background: var(--subtle); color: var(--text); }
+.a2p-site-by { display: block; margin-top: .15rem; }
 
 @media (max-width: 560px) {
   .a2p-cols { columns: 1; }

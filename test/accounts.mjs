@@ -62,14 +62,14 @@ const PASSWORD = 'correct horse battery';
 // Who each bearer is, as whoami() would say.
 const WHO = {
   'tok-pat': { signed_in: true, email: 'pat@council.example', display_name: 'Pat Example', role: 'editor',
-               may_write: false, is_admin: false, is_member: false, status: 'pending', signup: 'open', schema_version: '64' },
+               may_write: false, is_admin: false, is_member: false, status: 'pending', signup: 'open', schema_version: '65' },
   'tok-sam': { signed_in: true, email: 'sam@bom.gov.au', display_name: null, role: 'editor',
-               may_write: true, is_admin: false, is_member: true, status: 'automatic', signup: 'open', schema_version: '64' },
+               may_write: true, is_admin: false, is_member: true, status: 'automatic', signup: 'open', schema_version: '65' },
   'tok-rec': { signed_in: true, email: 'sam@bom.gov.au', display_name: null, role: 'editor',
-               may_write: true, is_admin: false, is_member: true, status: 'automatic', signup: 'open', schema_version: '64' },
+               may_write: true, is_admin: false, is_member: true, status: 'automatic', signup: 'open', schema_version: '65' },
   'tok-admin': { signed_in: true, email: 'boss@bom.gov.au', display_name: 'Boss', role: 'admin',
                may_write: true, is_admin: true, is_member: true, status: 'automatic', signup: 'open',
-               approvals_waiting: 2, schema_version: '64' },
+               approvals_waiting: 2, schema_version: '65' },
 };
 const session = (tok, email) => ({ access_token: tok, refresh_token: `r-${tok}`, expires_in: 3600, token_type: 'bearer',
   user: { id: `id-${tok}`, email } });

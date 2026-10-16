@@ -2129,16 +2129,21 @@ const HELP = {
       '<strong>It is an estimate, and says so.</strong> The quantities are counted from the register; the rates, '
       + 'durations and unit prices are the draft\'s proposals, and a supplier\'s quote replaces them under '
       + '<em>Unit costs and rates</em>.',
-      '<strong>The scenario is kept on this device only.</strong> “The proposal” puts the sliders back and leaves the '
-      + 'catchments ticked, their order and the repeater sites marked as they are; the figures at the top say how far any '
-      + 'scenario is from the proposal over every catchment.',
+      '<strong>The card is kept on this device; a scenario in the database.</strong> Under <em>📁 Scenarios</em>, '
+      + '<em>Save as a new scenario…</em> keeps the card under a name — private, seen by nobody but you, until you press '
+      + '<em>Share</em>, when every administrator can load it. Only its author saves changes to it, shares it again or '
+      + 'removes it; anybody else loading it saves their own copy. “The proposal” puts the sliders back and leaves the '
+      + 'catchments ticked and their order as they are; the figures at the top say how far any scenario is from the '
+      + 'proposal over every catchment.',
       '<strong>A catchment is cut over on the backbone in one step.</strong> It needs the repeaters that hear its stations '
       + '(fitted as concentrators: ALERT1 in, ALERT2 on) and every repeater from them to a base, by the fewest backbone hops on '
       + 'record; a repeater shared with an earlier catchment is done once. Where the register has no way to a base, the relays are '
       + 'not counted and the plan says so.',
-      '<strong>What a repeater site needs</strong> — fit-out only, a retrofit, or the structure rebuilt — is marked in section 5\'s '
-      + 'site table. A marked site is costed at that and not audited; one left <em>Not assessed</em> is audited first and costed at '
-      + 'the card\'s mix. A mark is what is known, not a lever: the proposal is worked with it too.',
+      '<strong>A site condition</strong> — fit-out only, a retrofit, or the structure rebuilt — is set in section 5\'s '
+      + '<em>Site conditions</em> table and kept in the database: one answer per site, the same for every administrator, '
+      + 'whatever scenario is loaded, with who set it and when. A site with its condition set is costed at that and not '
+      + 'audited; one left <em>Not assessed</em> is audited first and costed at the card\'s mix. It is what is known, not a '
+      + 'lever: the proposal is worked with it too.',
       '<strong>A repeater outside the catchments ticked stays in the plan</strong> when it carries a station inside them — '
       + 'that station\'s readings reach a base through it — or relays one of those to a base, and the plan marks it as outside.',
       '<strong>The backbone is map-backbone.js\'s rule</strong> — repeaters sharing an open pass-range window with another, '
@@ -2930,7 +2935,9 @@ const DB_SCHEMA = 'meganet';
 // the same way.
 // 64: approved accounts read the inspection and maintenance records (0064), so
 // contractors see the site codes in them; editors still write.
-const DB_SCHEMA_VERSION = 64;
+// 65: the ALERT2 Transition Plan's site conditions and saved scenarios (0065),
+// administrators only; a scenario private to its author until shared.
+const DB_SCHEMA_VERSION = 65;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

@@ -5007,8 +5007,9 @@ from the station register as loaded:
   antenna, enclosure, earthing, access), or the **structure rebuilt** (mast or
   tower, footings, shelter — a design, approvals and a temporary repeater first,
   and not before its network's review). A site nobody has assessed is audited
-  first and costed at the card's mix; the site table in section 5 has a select a
-  repeater to mark what it is known to need, and the plan is worked with the mark.
+  first and costed at the card's mix. The **site conditions** table in section 5
+  sets what each repeater is known to need; it is kept in the database (`0065`),
+  one answer per site for every administrator, with who set it and when.
 * **The cut-over, catchment by catchment** — a catchment comes onto ALERT2 in one
   step on the backbone, its ALERT1 stations untouched: every repeater that hears
   one of them is fitted as a **concentrator** (ALERT1 in, ALERT2 on), every
@@ -5042,8 +5043,11 @@ acquisitions, contingency and every unit rate, with presets ("Faster", "Leaner",
 "Backbone only — field stations stay ALERT1", "More structures rebuilt", "Backbone
 with each catchment", "Like for like", "Work through the wet season"). Each move
 works the whole plan again at once, and the figures at the top — the backbone's
-date among them — say how far it is from the proposal. The scenario, the
-catchments' order and the repeater sites marked are kept on the device. It prints as a document (the card left off, the assumptions table
+date among them — say how far it is from the proposal. The card is kept on the
+device. **📁 Scenarios** keeps it in the database under a name (`0065`): private
+to whoever saved it until they press *Share*, then every administrator can load
+it; only its author saves changes, shares or makes it private, or removes it, and
+anybody else saves their own copy. The document says which scenario it is. It prints as a document (the card left off, the assumptions table
 saying what it was set to), and saves as `floodnet-alert2-transition-plan.xlsx`
 and `floodnet-alert2-plan-quantities.csv`.
 
