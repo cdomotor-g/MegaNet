@@ -36,6 +36,12 @@
 - The repository keeps its earlier name, MegaNet, and so do identifiers nobody reads as a name: the `meganet` schema, storage keys, MQTT topics, the Worker and R2 bucket, the Pi's service names and the Quansheng station-table tag. Code comments still say MegaNet; don't copy it into a string.
 - `npm run brand` (in the cheap checks above) fails on a string literal, page or agent file that says MegaNet.
 
+## Private data — landholders, site codes and the inspection archive
+- Flood-Net holds **no landholder contact details** — no names, phone numbers or email addresses of the people who own the land at a site, in the database, forms, data files, docs, issues or commit messages. They stay with the Bureau and its contractors (`0063`).
+- **Site codes** (gate combinations, padlock and logger codes, key numbers) live only in the database's inspection records: approved accounts read them, editors write them (`0064`). Never quote one in a doc, issue, commit message, test fixture or anything public.
+- The historical **inspection archive** (the workbook and its derived `data/inspections/` files) lives in the private `cdomotor-g/flood-net-private` repository, never here — `.gitignore` refuses it. The ingest tools find it through `tools/ingest/private.py`; its checks run in that repository. A session that needs it attaches that repository and clones it beside this one.
+- **Pending, #239:** this repository's git history still holds the old archive until the owner runs the rewrite (Part 2). Until then, don't pull content out of old commits, and expect every commit ID to change when it runs — the follow-up on #239 translates the IDs cited in the roadmap and docs.
+
 ## Raising issues for AI agents
 - If a new issue is something an AI coding agent (e.g. Claude Code) could pick up and complete, recommend a model and effort level for it.
 - Put the recommendation as a tag at the very start of the issue title, so it's visible at a glance in issue lists — no need to open the issue to see it. Format: `[<Model>/<Effort>] <title>`.

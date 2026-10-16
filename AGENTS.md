@@ -125,6 +125,14 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   `[Standalone] [Sonnet5/Med] Fix flaky login test`) or `[Human]` for work that
   needs credentials, physical access or a person's judgment. Restate the
   recommendation on the body's first line (`Recommended: Sonnet5 / Med`).
+- **Private data:** Flood-Net holds no landholder contact details (names,
+  phones, emails) anywhere — they stay with the Bureau and its contractors.
+  Site codes (gates, padlocks, loggers, key numbers) live only in the
+  database's inspection records (approved accounts read, editors write); never
+  quote one in a doc, issue, commit message or test. The inspection archive
+  lives in the private `cdomotor-g/flood-net-private` repository, never here
+  (`tools/ingest/private.py`). Until #239's history rewrite runs, don't pull
+  content out of old commits, and expect every commit ID to change when it does.
 - **Roadmap:** issue #113 is the single view of what is open, who does it and in
   what order. Its body is `roadmap/roadmap-113.md`, synced by CI on push — edit
   the file, never the issue. Whenever you open, close or edit an issue, update
