@@ -32,3 +32,8 @@ __pycache__/
 .dev.vars
 .wrangler/
 
+# The inspection archive lives in the private cdomotor-g/flood-net-private
+# repository: it carries site access codes (0064). tools/ingest/private.py.
+/archive/QLD All Site Inspections.xlsx
+/data/inspections/
+/tools/ingest/inspection_extract_sample.json

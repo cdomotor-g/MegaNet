@@ -481,6 +481,7 @@ def main():
                         help='re-run and fail if the checked-in files have drifted')
     parser.add_argument('--out', default=OUT_DIR)
     args = parser.parse_args()
+    extract.private.require(os.path.join(OUT_DIR, 'blocks.jsonl'))
 
     result = crosswalk()
     print(summarise(result['report']), file=sys.stderr)

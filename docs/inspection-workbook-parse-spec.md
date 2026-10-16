@@ -1,8 +1,11 @@
 # Parsing `QLD All Site Inspections.xlsx`
 
 This is the specification #123 (H1) exists to produce: the rules an extractor
-has to implement to turn `archive/QLD All Site Inspections.xlsx` into rows, and
-the reasons behind each one. It is written to be implemented from — #124 (H2)
+has to implement to turn `QLD All Site Inspections.xlsx` into rows, and
+the reasons behind each one. The workbook and everything derived from it live in
+the private `cdomotor-g/flood-net-private` repository (`inspections/`), because
+they carry site access codes; `tools/ingest/private.py` says where the tools
+look for it. It is written to be implemented from — #124 (H2)
 should not have to open the workbook to guess at anything on this page.
 
 It has four companions, all machine-readable, all written by
@@ -626,12 +629,12 @@ rules, and it writes five files:
 
 | File | What it is |
 |---|---|
-| `data/inspections/blocks.jsonl` | 1,093 station blocks — the facts that belong to the site, and the resolved column layout its rows were read under |
-| `data/inspections/inspections.jsonl` | 14,982 visits, each with the source string beside every value and a provenance ref |
-| `data/inspections/rejects.jsonl` | 153 rows that are not loaded, each with a reason that is a category |
-| `data/inspections/duplicates.jsonl` | the 221 `ALERTS` rows already recorded on a basin block |
-| `data/inspections/counts.json` | the reconciliation, per sheet and in total |
-| [`tools/ingest/inspection_extract_sample.json`](../tools/ingest/inspection_extract_sample.json) | the hand-checked sample: 13 entries, each holding the extracted records **and** the workbook cells they were read from |
+| `inspections/data/blocks.jsonl` (private repo) | 1,093 station blocks — the facts that belong to the site, and the resolved column layout its rows were read under |
+| `inspections/data/inspections.jsonl` (private repo) | 14,982 visits, each with the source string beside every value and a provenance ref |
+| `inspections/data/rejects.jsonl` (private repo) | 153 rows that are not loaded, each with a reason that is a category |
+| `inspections/data/duplicates.jsonl` (private repo) | the 221 `ALERTS` rows already recorded on a basin block |
+| `inspections/data/counts.json` (private repo) | the reconciliation, per sheet and in total |
+| `inspections/inspection_extract_sample.json` (private repo) | the hand-checked sample: 13 entries, each holding the extracted records **and** the workbook cells they were read from |
 
 `python3 tools/ingest/extract.py --check` re-runs it and fails on any drift; CI
 runs that beside the survey's own check. The run fails rather than reporting

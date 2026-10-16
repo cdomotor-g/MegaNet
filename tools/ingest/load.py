@@ -94,14 +94,17 @@ import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-DATA = os.path.join(REPO, 'data', 'inspections')
+sys.path.insert(0, HERE)
+import private  # noqa: E402  (same directory, deliberately not a package)
+# In the private repository, not this one: see private.py.
+DATA = private.DATA
 
 # The namespace the visit UUIDs are derived in. Fixed forever: changing it would
 # make every row on the next run a new row, and orphan every row already loaded.
 NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL,
                        'https://github.com/cdomotor-g/MegaNet/inspection')
 
-WORKBOOK = 'archive/QLD All Site Inspections.xlsx'
+WORKBOOK = private.WORKBOOK_NAME
 SOURCE = 'qld-all-site-inspections'
 
 # #125's tiers, as meganet.inspection.station_match spells them. The crosswalk
@@ -894,6 +897,7 @@ def main():
                     help='data chunk size bound in bytes (default 900000 — '
                          'small enough for one HTTPS request each)')
     args = ap.parse_args()
+    private.require(os.path.join(DATA, 'blocks.jsonl'))
 
     if args.chunks:
         counts, writer = build_chunks(args.chunks, args.chunk_bytes)

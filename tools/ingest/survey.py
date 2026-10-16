@@ -43,11 +43,13 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import xlsx  # noqa: E402  (same directory, deliberately not a package)
+import private  # noqa: E402  (same directory, deliberately not a package)
+import xlsx  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-WORKBOOK = os.path.join(REPO, 'archive', 'QLD All Site Inspections.xlsx')
+# In the private repository, not this one: see private.py.
+WORKBOOK = private.WORKBOOK
 
 # ── The shapes on the page ───────────────────────────────────────────────────
 
@@ -933,6 +935,7 @@ def _date_col_of(info, row_record):
 
 
 def survey():
+    private.require(WORKBOOK)
     wb = xlsx.load(WORKBOOK)
     sheets = {s.name: s for s in wb.sheets}
 
@@ -1170,7 +1173,7 @@ def survey():
         parsed, {e['sheet'] for e in manifest if e['disposition'] == 'ingest'})
 
     counts = {
-        'workbook': 'archive/QLD All Site Inspections.xlsx',
+        'workbook': private.WORKBOOK_NAME,
         'sheets': len(wb.sheets),
         'visible': sum(1 for s in wb.sheets if not s.hidden),
         'hidden': sum(1 for s in wb.sheets if s.hidden),

@@ -53,7 +53,10 @@ import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-DATA = os.path.join(REPO, 'data', 'inspections')
+sys.path.insert(0, HERE)
+import private  # noqa: E402  (same directory, deliberately not a package)
+# In the private repository, not this one: see private.py.
+DATA = private.DATA
 
 # The same namespace and derivation as load.py: an event's id is stable across
 # runs and machines, so loading is an upsert and a re-run changes nothing.
@@ -468,6 +471,7 @@ def main():
     ap.add_argument('--sql', action='store_true',
                     help='emit the events as a re-runnable SQL sync on stdout')
     args = ap.parse_args()
+    private.require(DATA)
     if args.check:
         return check()
     if args.sample:

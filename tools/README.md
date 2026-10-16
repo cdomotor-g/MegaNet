@@ -337,7 +337,7 @@ meganet.load_flood_peaks_from_url();`. Then refresh `stations.json`
 
 `ingest/xlsx.py` is a read-only .xlsx reader with nothing but the standard
 library, and `ingest/survey.py` is #123's survey of
-`archive/QLD All Site Inspections.xlsx` — 59 worksheets, 1,420 stacked station
+`QLD All Site Inspections.xlsx` (private: `flood-net-private/inspections/`, see `ingest/private.py`) — 59 worksheets, 1,420 stacked station
 blocks and 20,407 dated inspection rows going back to 1980.
 
 ```bash
@@ -355,7 +355,7 @@ provenance, and the three questions still open for @cdomotor-g — is
 [`docs/inspection-workbook-parse-spec.md`](../docs/inspection-workbook-parse-spec.md).
 
 `ingest/extract.py` is #124's extractor and `ingest/crosswalk.py` is #125's
-station attribution; both write to `data/inspections/` and neither opens a
+station attribution; both write to `inspections/data/` in the private repository and neither opens a
 database connection either. **`ingest/load.py` is where all of it reaches
 Postgres** (#126):
 

@@ -51,14 +51,10 @@ on:
       # check them (#105).
       - 'docs/**'
       - 'db/README.md'
-      # #123's survey artefacts and #124's staging rows are both derived from
-      # the historical workbook and from the tools next to it, so a change to
-      # any of them has to re-derive both — otherwise a checked-in manifest
-      # quietly stops describing the file it claims to describe, or a staging
-      # row stops matching the cell it came from.
+      # The ingest tools and what they derive. The inspection workbook and its
+      # staging rows are no longer here (flood-net-private, which checks them
+      # with these same tools), but the other sources below still are.
       - 'tools/ingest/**'
-      - 'data/inspections/**'
-      - 'archive/QLD All Site Inspections.xlsx'
       # The Bureau's flood warning station lists and what tools/ingest/
       # river_height_stations.py reads out of them (0031, 0032): the same
       # derived-file rule, one document further on.
@@ -132,14 +128,10 @@ on:
       # check them (#105).
       - 'docs/**'
       - 'db/README.md'
-      # #123's survey artefacts and #124's staging rows are both derived from
-      # the historical workbook and from the tools next to it, so a change to
-      # any of them has to re-derive both — otherwise a checked-in manifest
-      # quietly stops describing the file it claims to describe, or a staging
-      # row stops matching the cell it came from.
+      # The ingest tools and what they derive. The inspection workbook and its
+      # staging rows are no longer here (flood-net-private, which checks them
+      # with these same tools), but the other sources below still are.
       - 'tools/ingest/**'
-      - 'data/inspections/**'
-      - 'archive/QLD All Site Inspections.xlsx'
       # The Bureau's flood warning station lists and what tools/ingest/
       # river_height_stations.py reads out of them (0031, 0032): the same
       # derived-file rule, one document further on.
@@ -1296,36 +1288,13 @@ jobs:
         working-directory: test
         run: npm run agentdocs
 
-      # Python, no browser, no dependencies, and the only check in this file
-      # that is about a *data* artefact rather than about the app: #123's sheet
-      # manifest, field map and layout table are derived from the historical
-      # workbook, and a derived file that nobody re-derives is a file that
-      # quietly stops being true. This re-runs the survey and diffs.
-      - name: Inspection workbook survey — the artefacts still match the workbook
-        run: python3 tools/ingest/survey.py --check
-
-      # #124's extract, on the same footing and for the same reason. The check
-      # is not only "the files still match": the run reconciles against the
-      # survey's counts and fails if a row or a cell goes missing between the
-      # workbook and the staging files, so a rule that quietly stops matching
-      # shows up here rather than in the load.
-      - name: Inspection extract — the staging rows still reconcile
-        run: python3 tools/ingest/extract.py --check
-
-      # #125's crosswalk is derived from the extract *and* from stations.json,
-      # so it is the one artefact here that a change to the registry can
-      # invalidate. The weekly snapshot re-derives it in its own pull request;
-      # this check is what makes a hand edit to either side re-derive it too.
-      - name: Station crosswalk — the identities still resolve
-        run: python3 tools/ingest/crosswalk.py --check
-
-      # #127's derived events, on the same footing: events.jsonl is what the
-      # rules derive from the extraction, coverage is a counted claim (every
-      # remark classified, observed or unclassified — no silent skips), and a
-      # rule edit that changes the reading re-derives the artefact or fails
-      # here.
-      - name: Remarks mining — the derived events still match the rules
-        run: python3 tools/ingest/remarks.py --check
+      # The inspection archive's derived-artefact checks (#123's survey, #124's
+      # extract, #125's crosswalk, #127's mined events) used to run here. The
+      # workbook and its staging rows carry site access codes, so they moved to
+      # the private cdomotor-g/flood-net-private repository, and so did these
+      # four checks: its own workflow checks this repository's tools/ingest/ out
+      # beside the archive and runs them on every push there and daily
+      # (tools/ingest/private.py).
 
       # The Elvis parser, offline. The service returns everything as prose with
       # the unit stuck on, and answers "No Data" — HTTP 200, all five fields —

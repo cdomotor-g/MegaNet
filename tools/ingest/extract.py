@@ -45,7 +45,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import survey  # noqa: E402  (same directory, deliberately not a package)
+import private  # noqa: E402  (same directory, deliberately not a package)
+import survey  # noqa: E402
 import xlsx  # noqa: E402
 
 HERE = survey.HERE
@@ -53,8 +54,9 @@ REPO = survey.REPO
 WORKBOOK = survey.WORKBOOK
 MANIFEST = os.path.join(HERE, 'inspection_sheet_manifest.json')
 SURVEY_COUNTS = os.path.join(HERE, 'inspection_survey_counts.json')
-SAMPLE = os.path.join(HERE, 'inspection_extract_sample.json')
-OUT_DIR = os.path.join(REPO, 'data', 'inspections')
+# Both in the private repository, not this one: see private.py.
+SAMPLE = private.SAMPLE
+OUT_DIR = private.DATA
 
 # The workbook this extract came from. A second historical workbook is not
 # unimaginable, so the prefix is part of every provenance ref (spec §10).
@@ -557,6 +559,7 @@ def inspection_record(sheet, row_record, *, ref, sheet_name, banner_row, columns
 
 def extract():
     manifest = load_manifest()
+    private.require(WORKBOOK)
     wb = xlsx.load(WORKBOOK)
 
     blocks_out, inspections, rejects, duplicates = [], [], [], []
@@ -821,7 +824,7 @@ def build_counts(per_sheet, blocks, inspections, rejects, duplicates,
         '_': 'Rows read / emitted / rejected / dropped, per sheet, and the '
              'reconciliation against tools/ingest/inspection_survey_counts.json. '
              'Written by tools/ingest/extract.py; do not edit by hand.',
-        'workbook': os.path.relpath(WORKBOOK, REPO),
+        'workbook': private.WORKBOOK_NAME,
         'sheets_ingested': len(per_sheet),
         'blocks': len(blocks),
         'inspection_rows': inspection_rows,
@@ -968,7 +971,7 @@ def build_sample(result, wb):
              'records and the workbook cells they were read from, so a drift in '
              'the reading shows up here as a diff between the two halves of the '
              'same file. Written by tools/ingest/extract.py; do not edit by hand.',
-        'workbook': os.path.relpath(WORKBOOK, REPO),
+        'workbook': private.WORKBOOK_NAME,
         'checked_against_the_workbook_on': '2026-08-15',
         'samples': samples,
     }

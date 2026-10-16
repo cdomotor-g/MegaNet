@@ -147,8 +147,11 @@ if [ -n "$HERE" ]; then
   say "Using the copy of Flood-Net at $DIR"
   [ "$MODE" = update ] && run git -C "$DIR" pull --ff-only
 elif [ -d "$DIR/.git" ]; then
+  # Fetch and reset rather than pull: the Pi never edits its copy, and a pull
+  # cannot follow a rewritten history (October 2026's) where this always can.
   say "Updating Flood-Net in $DIR"
-  run git -C "$DIR" pull --ff-only
+  run git -C "$DIR" fetch --depth 1 origin main
+  run git -C "$DIR" reset --hard FETCH_HEAD
 else
   say "Fetching Flood-Net into $DIR"
   run git clone --depth 1 --filter=blob:none --sparse "$REPO_URL" "$DIR"

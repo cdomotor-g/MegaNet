@@ -12,8 +12,9 @@ worker
 
 # The historical inspection workbook and everything derived from it. Remarks and
 # notes in it carry gate combinations, logger security codes and key numbers —
-# editors-only in the database, so never a public file on floodwarning.net.
-# Nothing in the app fetches these; the ingest tools read them from the checkout.
+# approved accounts only in the database, so never a public file here. They live
+# in the private flood-net-private repository now (.gitignore keeps them out of
+# this one); these lines are for a copy somebody drops into a checkout anyway.
 archive/QLD All Site Inspections.xlsx
 data/inspections
 tools/ingest/inspection_extract_sample.json
