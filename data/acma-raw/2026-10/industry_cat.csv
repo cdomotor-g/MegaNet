@@ -1,0 +1,16 @@
+CAT_ID,DESCRIPTION,NAME
+1,"Agriculture, Forestry and Fishing",Agriculture/Forestry/Fishing
+2,Mining,Mining
+3,Manufacturing,Manufacturing
+4,"Electricity, Gas or Water Supply",Electricity/Gas/Water Supply
+5,Construction,Construction
+6,Wholesale or Retail Trade,Wholesale/Retail Trade
+7,Transport and Storage,Transport/Storage
+8,Communications Services,Communications Services
+9,Finance and Insurance,Finance/Insurance
+10,General Government,General Government
+11,Education,Education
+12,Health Services,Health Services
+13,Safety Services,Safety Services
+14,Recreational and Amateur Activities,Recreational/Amateur Activities
+15,Other,Other
