@@ -222,7 +222,7 @@ const TABS = [
   // job is done on.
   { group: 'Knowledge base', tabs: [
     { id: 'propagation', label: 'Radio Propagation',     icon: '🎓',
-      find: 'learn learning lesson teach tutorial education educational explainer course training basics physics how radio works waves wavefront rf propagation vhf uhf 150 mhz 151.5 wavelength frequency fresnel zone line of sight los multipath echo echoes reflection reflections bounce diffraction bending shadow hills ridge buildings silos trees foliage forest land cover fading null interference constructive destructive phase phasor collision collisions capture effect bit flip flipped bits ghost repeater delay delays timing aloha store and forward simulation 3d three dimensional animation animated earth curvature bulge horizon' },
+      find: 'learn learning lesson teach tutorial education educational explainer course training basics physics how radio works waves wavefront rf propagation vhf uhf 150 mhz 151.5 wavelength frequency fresnel zone line of sight los multipath echo echoes reflection reflections bounce diffraction bending shadow hills ridge buildings silos trees foliage forest land cover fading null interference constructive destructive phase phasor collision collisions capture effect bit flip flipped bits ghost repeater delay delays timing aloha store and forward simulation 3d three dimensional animation animated earth curvature bulge horizon fade margin attenuator step attenuator path margin test steps decibel decibels dbm watts budget transmit power antenna gain unity collinear yagi dbd dbi' },
     { id: 'kbstaff',    label: 'Staff Simulator',        icon: '🪧',
       find: 'staff reading levelling staff e staff e pattern crosshair central hair stadia hairs sight length dumpy heat haze shimmer wind gusts rocking rock plumb eyepiece reticle focus drill millimetre simulator' },
     { id: 'kblogbook',  label: 'Survey Logbook',         icon: '📓',
@@ -420,7 +420,10 @@ const HELP = {
            + 'through, the echoes off silos, a scarp and the ground, and repeaters relaying what they heard — bits flipped '
            + 'and all. Below it: two waves <strong>adding up or cancelling</strong>, a path <strong>over a ridge and '
            + 'through a forest</strong> at four frequencies, two keyings <strong>colliding bit by bit</strong>, and '
-           + '<strong>repeater delays</strong> on a timeline. Nothing on it needs a signal.',
+           + '<strong>repeater delays</strong> on a timeline, and a <strong>fade-margin test bench</strong>: a step '
+           + 'attenuator in the feeder of a 1, 5 or 25 W station, run in 3 dB or 5 dB steps by itself or by hand, with '
+           + 'where the decibels go, how far each set-up reaches and what the step size does to the reading. Nothing on '
+           + 'it needs a signal.',
     watch: [
       '<strong>The 3-D catchment is made up</strong>, so that every effect shows at once. Its radio is worked out properly '
       + '(free-space loss, the knife edge over a ridge, trees after ITU-R P.833, echoes by the image method, the link '
@@ -431,6 +434,10 @@ const HELP = {
       '<strong>The receiver is a model.</strong> FM capture at 6 dB, and bit errors that rise as two signals near the same '
       + 'strength: the shape real receivers follow, not any one radio\'s figures. The flips are drawn at random from a '
       + 'fixed seed, so a picture is always the same picture — 🎲 tries another moment.',
+      '<strong>The fade-margin bench is a model too.</strong> The arithmetic between the boxes is exact — watts to dBm, '
+      + 'the attenuator, the antennas, what a test in steps reads — but the path is Okumura–Hata over three kinds of '
+      + 'country, with ITU-R P.526\'s smooth Earth past the radio horizon. A real path is priced by the link budget card '
+      + 'on the Stations map.',
       'A device set to reduce motion starts every drawing still, at its most telling moment; ▶ Play runs it.',
     ],
     related: ['stations', 'bitflipper', 'reception'],

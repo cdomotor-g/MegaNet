@@ -2,7 +2,7 @@
 //
 //   Propagation   the 🎓 Radio Propagation tab: how a reading gets from a gauge
 //                 in a gully to a base station in town, taught with pictures
-//                 that move. Six sections, each a drawing you can change:
+//                 that move. Seven sections, each a drawing you can change:
 //
 //                   1  the network in three dimensions (PropScene) — waves
 //                      spreading, shadows, echoes, repeaters relaying, ghosts
@@ -13,11 +13,15 @@
 //                   4  collisions, capture and flipped bits — two keyings on
 //                      top of each other, bit by bit
 //                   5  why repeaters wait — the delays, on a timeline
-//                   6  where all of this shows up in the rest of Flood-Net
+//                   6  the fade-margin test — a bench with a step attenuator,
+//                      run in 3 dB or 5 dB steps (propagation-fade.js)
+//                   7  where all of this shows up in the rest of Flood-Net
 //
-// After propagation-physics.js and propagation-scene.js, before init.js.
+// After propagation-physics.js, propagation-scene.js and propagation-fade.js,
+// before init.js. Section 6 is PropFade's own: render() puts its page in, and
+// init() and the teardown mount and unmount it.
 // Reaches back to core.js for esc, registerTabTeardown, cssVar and announce,
-// and to app.js for switchTab (from the links in section 6, at click time).
+// and to app.js for switchTab (from the links in section 7, at click time).
 // Nothing runs at load: renderMain() calls render() and init().
 //
 // ── How it is drawn ──────────────────────────────────────────────────────────
@@ -128,7 +132,8 @@ const Propagation = (function () {
   function tocHtml() {
     const items = [['rp-3d', '1 · In three dimensions'], ['rp-waves', '2 · Adding up or cancelling'],
                    ['rp-path', '3 · Hills and trees'], ['rp-bits', '4 · Flipped bits'],
-                   ['rp-timing', '5 · Why repeaters wait'], ['rp-more', '6 · In Flood-Net']];
+                   ['rp-timing', '5 · Why repeaters wait'], ['rp-fade', '6 · Fade-margin test'],
+                   ['rp-more', '7 · In Flood-Net']];
     return `<nav class="rp-toc" aria-label="On this page">${items.map(([id, t]) =>
       `<button type="button" class="rp-toc-btn" onclick="Propagation.go('${id}')">${t}</button>`).join('')}</nav>`;
   }
@@ -538,7 +543,7 @@ const Propagation = (function () {
       <span aria-hidden="true">${icon}</span> ${label}</button><span class="rp-aside">${why}</span></li>`;
     return `
     <section class="panel rp-sec" id="rp-more" aria-labelledby="rp-more-h">
-      <h3 id="rp-more-h" tabindex="-1">6 · Where this shows up in Flood-Net</h3>
+      <h3 id="rp-more-h" tabindex="-1">7 · Where this shows up in Flood-Net</h3>
       <ul class="rp-ideas">
         <li><strong>Radio goes everywhere at once</strong>, and weakens as it spreads — every doubling of the distance costs 6 dB.</li>
         <li><strong>Hills cast shadows</strong>, but the wave bends over their edges; the further it has to bend, the weaker it gets.</li>
@@ -546,6 +551,8 @@ const Propagation = (function () {
         <li><strong>Echoes add up or cancel</strong>, and a metre decides which: move the antenna, not the station.</li>
         <li><strong>Collisions flip bits</strong>, and ALERT Binary's check bits do not catch a flipped address: that is a ghost.</li>
         <li><strong>Delays keep repeaters apart</strong>; capture rescues the stronger copy when they are not.</li>
+        <li><strong>A fade margin is a step, not a point</strong> — an attenuator in 3 dB steps reads within 3 dB, in
+          5 dB steps within 5 — and decibels add where watts multiply.</li>
       </ul>
       <ul class="rp-links">
         ${link('stations', '📍', 'Stations', 'Draw a line between two sites for its elevation profile, Fresnel zone and link budget; the 3-D view; the radio-path card with each repeater\'s delay.')}
@@ -574,6 +581,7 @@ const Propagation = (function () {
       ${pathHtml()}
       ${bitsHtml()}
       ${timingHtml()}
+      ${PropFade.render()}
       ${moreHtml()}
     </div>`;
   }
@@ -1401,6 +1409,7 @@ const Propagation = (function () {
     loop = 0; last = 0;
     S.field.walking = false;
     if (typeof PropScene !== 'undefined') PropScene.unmount();
+    if (typeof PropFade !== 'undefined') PropFade.unmount();
     if (!wired) return;
     wired.io && wired.io.disconnect();
     wired.ro && wired.ro.disconnect();
@@ -1466,6 +1475,7 @@ const Propagation = (function () {
     if (ro) ['rp-trace', 'rp-timecv', 'rp-phasor', 'rp-field'].forEach(id => { const el = document.getElementById(id); if (el) ro.observe(el); });
     wired = { io, ro, fieldCv, down, move, up, key };
     requestAnimationFrame(() => { drawAll(); kick(); });
+    PropFade.mount();
   }
 
   // ── The controls ───────────────────────────────────────────────────────────

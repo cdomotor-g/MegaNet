@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 34, date: '2026-10-16', items: [
+      '<strong>🎚️ The fade-margin test, as a bench you can run.</strong> 🎓 Radio Propagation has a new section 6: a '
+        + 'field station sending its test through a step attenuator (0–30 dB in 1 dB clicks) to a repeater on a hill. '
+        + '<em>Auto</em> runs the test as it is done on site, one 3 dB step at a time; touch the attenuator and it is '
+        + 'yours. Try 1, 5 or 25 W, a unity whip, a 3 dB collinear or a Yagi, and three kinds of country, and see '
+        + 'where the decibels go (in watts too), the received power at every step for all three transmitters, how far '
+        + 'each reaches, and — for the 3 dB-or-5 dB question — what each step size reads for the same link.',
+    ] },
     { n: 33, date: '2026-10-14', items: [
       '<strong>🛣️ Who manages each road and bridge.</strong> Turn on <em>Road &amp; bridge owners (Qld)</em> in '
         + '🗺️ Map display and every Queensland road is coloured by who manages it: <strong>maroon</strong> for a '

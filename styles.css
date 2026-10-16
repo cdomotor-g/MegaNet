@@ -18096,6 +18096,101 @@ details.rp-more[open] > summary { margin-bottom: var(--sp-2); }
 .rp-links li { display: grid; gap: var(--sp-1); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
 .rp-link { justify-self: start; font-weight: 600; }
 
+/* Section 6, the fade-margin test (propagation-fade.js): the bench, its tiles
+   and log, the decibel ladder, the power × attenuation table, the range bars
+   (widths and marks set by custom property, never by inline style) and the
+   3 dB / 5 dB drawings. Band colours are the app's --ok, --warn and --bad. */
+.rp-fm-how { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--sp-3) var(--sp-4); align-items: start; }
+.rp-fm-how h4 { margin-top: 0; }
+.rp-fm-proc { margin: 0; padding-left: 1.4rem; line-height: var(--lh-body); }
+.rp-fm-proc li { margin-bottom: var(--sp-1); padding: 2px var(--sp-2) 2px 0; border-radius: var(--r-sm); transition: background .2s; }
+.rp-fm-proc li.is-now { background: var(--subtle); box-shadow: inset 3px 0 0 var(--rp-wave); padding-left: var(--sp-2); }
+.rp-fm-note { padding: var(--sp-2) var(--sp-3); border-left: 4px solid var(--accent); background: var(--subtle); border-radius: var(--r-sm); }
+.rp-page .rp-fm-note p { margin-bottom: var(--sp-2); }
+.rp-page .rp-fm-note p:last-child { margin-bottom: 0; }
+.rp-page p.rp-fm-status { margin-bottom: var(--sp-2); min-height: 1.5em; }
+.rp-fm-bench {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  min-height: 230px;
+  max-height: 400px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--rp-sky);
+}
+.rp-fm-ranges { margin-top: var(--sp-3); }
+.rp-fm-pickers { display: flex; flex-wrap: wrap; gap: 0 var(--sp-4); }
+.rp-fm-pickers .rp-chips { margin-bottom: var(--sp-2); }
+.rp-fm-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: var(--sp-2); margin: var(--sp-3) 0; }
+.rp-fm-tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--sp-2);
+  align-content: start;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  min-width: 0;
+}
+.rp-fm-tile-icon { grid-row: span 3; font-size: 1.2rem; }
+.rp-fm-tile-what { font-size: var(--fs-sm); font-weight: 600; }
+.rp-fm-tile-big { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.rp-fm-tile-small { font-size: var(--fs-sm); color: var(--muted); line-height: 1.3; overflow-wrap: anywhere; }
+.rp-fm-tile--ok   { border-left-color: var(--ok); }
+.rp-fm-tile--warn { border-left-color: var(--warn); }
+.rp-fm-tile--bad  { border-left-color: var(--bad); }
+.rp-fm-log { margin: var(--sp-2) 0 var(--sp-3); padding-left: 1.6rem; columns: 2 19rem; column-gap: var(--sp-4); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.rp-fm-log[hidden] { display: none; }
+.rp-fm-log li { break-inside: avoid; margin-bottom: 2px; }
+.rp-fm-log-a { display: inline-block; min-width: 3.2rem; font-weight: 600; color: var(--text); }
+.rp-fm-log-pass { color: var(--ok); }
+.rp-fm-log-miss { color: var(--bad); }
+.rp-fm-ladder { display: block; width: 100%; height: 310px; }
+.rp-fm-db { list-style: none; margin: 0 0 var(--sp-3); padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: var(--sp-2); }
+.rp-fm-db li { display: grid; gap: 2px; padding: var(--sp-1) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); }
+.rp-fm-db-big { font-weight: 700; font-variant-numeric: tabular-nums; }
+.rp-fm-db-why { color: var(--muted); font-size: var(--fs-sm); line-height: 1.3; }
+.rp-table th .rp-aside { display: block; font-weight: 400; }
+.rp-table td.rp-fm-c { line-height: 1.3; box-shadow: inset 4px 0 0 var(--border); }
+.rp-fm-c > span { display: block; font-size: var(--fs-sm); }
+.rp-table td.rp-fm-c--good { box-shadow: inset 4px 0 0 var(--ok); }
+.rp-table td.rp-fm-c--marginal { box-shadow: inset 4px 0 0 var(--warn); }
+.rp-table td.rp-fm-c--poor, .rp-table td.rp-fm-c--miss { box-shadow: inset 4px 0 0 var(--bad); }
+.rp-table td.rp-fm-c--miss { color: var(--muted); }
+.rp-table td.rp-fm-c--here { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rp-fm-rlist { list-style: none; margin: 0 0 var(--sp-2); padding: 0; display: grid; gap: var(--sp-2); }
+.rp-fm-rrow { display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: 2px var(--sp-2); align-items: center; }
+.rp-fm-rname { font-weight: 700; }
+.rp-fm-rrow.is-on .rp-fm-rname { color: var(--accent); }
+.rp-fm-rtxt { grid-column: 2; font-size: var(--fs-sm); color: var(--muted); }
+.rp-fm-bar { position: relative; height: 20px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--subtle); overflow: hidden; }
+.rp-fm-seg { position: absolute; left: 0; top: 0; bottom: 0; width: var(--w, 0%); }
+.rp-fm-seg--edge  { background: color-mix(in srgb, var(--bad) 45%, transparent); }
+.rp-fm-seg--floor { background: var(--warn); }
+.rp-fm-seg--good  { background: var(--ok); }
+.rp-fm-hz, .rp-fm-at { position: absolute; top: 0; bottom: 0; left: var(--at, 0%); width: 0; }
+.rp-fm-hz { border-left: 2px dashed var(--text); }
+.rp-fm-at { border-left: 3px solid var(--accent); }
+.rp-fm-rkey { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); margin-bottom: var(--sp-2); font-size: var(--fs-sm); color: var(--muted); }
+.rp-fm-rkey span { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.rp-sw--fm-good  { background: var(--ok); }
+.rp-sw--fm-floor { background: var(--warn); }
+.rp-sw--fm-edge  { background: color-mix(in srgb, var(--bad) 45%, transparent); }
+.rp-sw--fm-hz    { width: 0; border-left: 2px dashed var(--text); border-radius: 0; background: none; }
+.rp-sw--fm-at    { width: 0; border-left: 3px solid var(--accent); border-radius: 0; background: none; }
+.rp-fm-steps { display: block; width: 100%; height: 180px; }
+.rp-fm-stair { display: block; width: 100%; height: 270px; margin: var(--sp-2) 0 var(--sp-3); }
+
+@media (max-width: 700px) {
+  .rp-fm-how { grid-template-columns: minmax(0, 1fr); }
+  .rp-fm-bench { aspect-ratio: 4 / 3; }
+  .rp-fm-ladder { height: 270px; }
+  .rp-fm-stair { height: 240px; }
+}
+
 @media (max-width: 700px) {
   .rp-echo-grid { grid-template-columns: minmax(0, 1fr); }
   .rp-scene { aspect-ratio: 4 / 3; }
