@@ -906,13 +906,15 @@ to point at.
 
 Unlike the station list and the readings, **none of this is readable with the
 published anon key**: the council form carries council contact details and
-inspection remarks carry site access notes. Landholder contact details are not
-kept at all (`0063`) — they stay with the Bureau and its contractors. The pick-lists and the form matrix
+inspection remarks carry site access notes and gate, padlock and logger codes.
+Approved accounts read them — the field crews, editors or not — and only editors
+write them (`0064`). Landholder contact details are not kept at all (`0063`) —
+they stay with the Bureau and its contractors. The pick-lists and the form matrix
 are public — they are the words on a blank form. So is one more thing since
 `0023`: the **numbers** a visit recorded, and the date it happened, through
 seven `inspection_chart_*` views that carry no free text at all. That is what
 lets the station card's chart draw without a sign-in while the records behind it
-stay editors-only — the words are what was being withheld, and a fade margin of
+stay behind a sign-in — the words are what was being withheld, and a fade margin of
 18 dB in 1997 says nothing about who owns the paddock.
 
 Reading one back is the **Inspection History** tab. A station's past visits and

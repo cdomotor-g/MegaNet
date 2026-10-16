@@ -2920,7 +2920,9 @@ const DB_SCHEMA = 'meganet';
 // 63: no landholder contact details (0063) — the Council form's Landowner
 // columns and the archive's Property Owner line dropped. Bumped with the file,
 // the same way.
-const DB_SCHEMA_VERSION = 63;
+// 64: approved accounts read the inspection and maintenance records (0064), so
+// contractors see the site codes in them; editors still write.
+const DB_SCHEMA_VERSION = 64;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

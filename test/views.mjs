@@ -217,7 +217,7 @@ async function main() {
     // ═══════════════════════════════════════════════════════════════════════
     log('\n4. An account\'s own views\n');
     db.who = { signed_in: true, email: 'pat@council.example', role: 'editor', may_write: false, is_admin: false,
-               is_member: true, status: 'approved', signup: 'open', schema_version: '63' };
+               is_member: true, status: 'approved', signup: 'open', schema_version: '64' };
     db.prefs = null;
     const session = { access_token: 'member-token', refresh_token: 'r', expires_at: Date.now() + 3600e3, email: 'pat@council.example' };
     const { context: ctx2, page: p2 } = await open(server.url('/index.html?tab=views'), { session });

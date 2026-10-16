@@ -49,15 +49,16 @@
 //
 // Since 0023 it reads them through the `inspection_chart_*` views rather than
 // off those tables directly, and that is what makes this section visible
-// without a sign-in. The tables are still editors-only and nothing here changed
-// that: 0009 withholds them because an inspection's remarks carry site-access
-// notes and the Council form carries council contacts' phone numbers, a fact
+// without a sign-in. The tables still need an approved account and nothing here
+// changed that: 0009 and 0064 withhold them because an inspection's remarks carry
+// site-access notes and codes and the Council form carries council contacts'
+// phone numbers, a fact
 // about the *words* on a visit. The views carry the numbers and the date and
 // nothing else — no remarks, no inspector, no comments column — so there is
 // nothing left in them to withhold. What they contain, and the two assertions
 // that keep it true, are written out at the head of that migration.
 //
-// The pill above the chart still goes somewhere editors-only: Inspection
+// The pill above the chart still goes somewhere sign-in only: Inspection
 // History renders the sheets as they were written, which is the half that
 // carries the words. The lead paragraph says so when nobody is signed in,
 // rather than letting the pill lead to a locked door without warning.
@@ -456,8 +457,8 @@ const StationInspections = (function () {
       the numbers each one recorded. The pill above opens the full records — the sheets as they were
       written, printable and exportable — with this station already in the history's filter box.${
         dbCanWrite() ? '' : `
-      The chart needs no sign-in; the full records do, because an inspection's remarks carry
-      site-access notes.`}
+      The chart needs no sign-in; the full records need an approved account, because an
+      inspection's remarks carry site-access notes and codes.`}
     </p>
     <div id="si-body">${bodyHtml()}</div>`;
   }

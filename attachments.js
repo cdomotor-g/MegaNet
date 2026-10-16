@@ -225,8 +225,9 @@ const Attachments = (function () {
     }
     if (!s.types) return `${head}<p class="small att-muted">Loading…</p>`;
 
-    // Editors only, both halves: the index is granted to `authenticated` and the
-    // bucket's policies ask meganet.is_editor(). Say so before the file picker
+    // Approved accounts read and editors write, both halves: the index's policies
+    // and the bucket's ask meganet.is_member() to read and meganet.is_editor() to
+    // write (0064, tools/storage_bucket.sql). Say so before the file picker
     // rather than after the upload.
     if (!dbCanWrite()) {
       return `${head}

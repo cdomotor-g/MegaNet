@@ -292,14 +292,16 @@ sent, unread — a debugging artefact rather than a publication, and the day an
 adapter puts a header or a device key in its payload is the day the difference
 matters. The inspection tables are withheld for a different reason: the Council
 form carries council contacts' names, emails and phone numbers, and inspection
-remarks carry site access notes. Landholders' contact details are not kept at
-all (`0063`). Editors and `service_role` can read both. The inspection
+remarks carry site access notes and gate, padlock and logger codes. Landholders'
+contact details are not kept at all (`0063`). Approved accounts (`is_member()`)
+and `service_role` can read both since `0064` — the people who maintain the
+sites need the codes — and only editors write them. The inspection
 domain's *vocabularies* — the pick-lists and the form matrix — are public, because
 they are the words printed on a blank form and say nothing about a site. So are
 the *readings*, since `0023`: `meganet.inspection_chart_visit` and the six
 `inspection_chart_*` views beside it carry the numbers a visit recorded and the
 date it happened, and no column anybody wrote. The tables under them are as
-private as they ever were. The station history (`0056`) is editors-only too: the
+private as they ever were. The station history (`0056`) is editors-only: the
 station is public, but a record of who changed it, when, is a record of people.
 So are the level surveys (`0060`) — a benchmark's description and position, a
 crew's names — and what a station holds from them; and so are a station's site
@@ -1125,8 +1127,9 @@ a save function. Its table list is closed, every identifier goes through
 
 **Nothing here is readable with the anon key.** The anon key is committed to this
 repo and served from GitHub Pages, so "readable by anon" means "published", and
-this domain holds council contact details and site access notes. Editors only —
-which is who fills the forms in. The vocabularies and the form matrix *are*
+this domain holds council contact details, site access notes and lock codes.
+Approved accounts read it (`0064`; editors until then) — the crews who visit the
+sites — and editors write it. The vocabularies and the form matrix *are*
 public: they are the words on a blank form.
 
 **And, since `0023`, the numbers.** Seven `inspection_chart_*` views publish what

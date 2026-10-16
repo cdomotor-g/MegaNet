@@ -101,9 +101,9 @@
 // `updated_at` it loaded, and a save that would overwrite somebody else's work
 // is refused rather than won.
 //
-// This family is editors-only *and more so than the inspections one* — 0009
-// says the reason out loud: "Assess and WHS" is site-access and safety notes,
-// and the contact block is named people's phone numbers and email addresses.
+// This family is for approved accounts only (0009, widened to members by 0064)
+// — "Assess and WHS" is site-access and safety notes, and the contact block is
+// a council contact's phone number and email address.
 // The anon key this app ships with is published. So the vocabularies render
 // signed out and the blank form fills in signed out; the recent list, the
 // outstanding list and Save need a session, and say so rather than failing at
@@ -255,7 +255,7 @@ const Maintenance = (function () {
     access_whs: [
       {
         note: 'Access and safety notes. This is the single most sensitive box on the form — it is '
-            + 'why the whole maintenance family is readable by editors only.',
+            + 'why the whole maintenance family is readable by approved accounts only.',
         fields: [F('area', 'access_whs_comments', 'Comments', { full: true })],
       },
     ],
@@ -684,9 +684,9 @@ const Maintenance = (function () {
       return `
         <div class="panel">
           <div class="panel-header"><h3>Recent maintenance forms</h3></div>
-          <p class="small mnt-muted">Past forms are editors-only, and this family more so than the
-            inspections one — it carries council contacts' phone numbers and site-access notes, and
-            the anon key this app ships with is published.
+          <p class="small mnt-muted">Past forms are for approved accounts — they carry council
+            contacts' phone numbers and site-access notes, and the anon key this app ships with is
+            published.
             <a href="#" onclick="Auth.open();return false">Sign in</a> to see them.</p>
         </div>`;
     }

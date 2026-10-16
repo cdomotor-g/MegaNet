@@ -71,8 +71,8 @@
 // sent straight back out; meganet.form_write() skips them by definition, so
 // nothing has to remember to strip them here.
 //
-// The records are editors-only — the anon key is published, and inspection
-// remarks carry site access notes (0009's foot). So the vocabularies and the
+// The records are for approved accounts — the anon key is published, and
+// inspection remarks carry site access notes and codes (0009's foot, 0064). So the vocabularies and the
 // matrix render signed out and the form fills in signed out; the recent-visits
 // list and Save need a session, and say so rather than failing at the network.
 //
@@ -1212,8 +1212,8 @@ const Inspections = (function () {
       return `
         <div class="panel">
           <div class="panel-header"><h3>Recent inspections</h3></div>
-          <p class="small insp-muted">Past visits are editors-only — an inspection's remarks carry
-            site access notes, and the anon key this app ships with is published.
+          <p class="small insp-muted">Past visits are for approved accounts — an inspection's remarks
+            carry site access notes and codes, and the anon key this app ships with is published.
             <a href="#" onclick="Auth.open();return false">Sign in</a> to see them.</p>
         </div>`;
     }

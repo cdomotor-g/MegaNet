@@ -46,13 +46,15 @@
 // It costs the four shared edits #113's constraint 3 says a tab costs: a `TABS`
 // entry, a `HELP` entry, a `state.hist` block and one line in renderMain().
 //
-// ── Editors only, and it says so before it asks ──────────────────────────────
+// ── Approved accounts only, and it says so before it asks ────────────────────
 //
-// Every record table in 0009 is readable by editors and nobody else — an
-// inspection's remarks carry site-access notes and the Council form carries
-// council contacts' phone numbers, and the anon key this app ships with is
-// published. So this whole tab is behind a session, and says so rather than
-// showing an empty list to somebody who would see rows if they signed in.
+// Every record table is readable by approved accounts and nobody else (0009,
+// widened from editors to members by 0064) — an inspection's remarks carry
+// site-access notes and gate, padlock and logger codes, the Council form
+// carries council contacts' phone numbers, and the anon key this app ships with
+// is published. So this whole tab is behind a session, and says so rather than
+// showing an empty list to somebody who would see rows if they signed in — or
+// to somebody whose account an administrator has not approved yet.
 //
 // ── Signed URLs are not cached anywhere durable ──────────────────────────────
 //
@@ -352,6 +354,7 @@ const History = (function () {
       <div class="hist-page">
         ${headHtml()}
         ${!dbCanWrite() ? signedOutHtml()
+          : waitingApproval() ? waitingHtml()
           : s.open ? recordHtml()
           : `${pickerHtml()}${listHtml()}`}
       </div>`;
@@ -379,13 +382,30 @@ const History = (function () {
   function signedOutHtml() {
     return `
       <div class="panel hist-note">
-        <strong>Past records are editors-only.</strong>
-        <p class="small">An inspection's remarks carry site-access notes and the Council form carries
-          named contacts' phone numbers, so 0009 grants every record table to editors and to nobody
-          else — and the anon key this app ships with is published.
+        <strong>Past records are for approved accounts.</strong>
+        <p class="small">An inspection's remarks carry site-access notes and gate, padlock and logger
+          codes, and the Council form carries council contacts' phone numbers, so the records are
+          read by the people who maintain the sites and nobody else — and the anon key this app
+          ships with is published.
           <a href="#" onclick="Auth.open();return false">Sign in</a> to read them.</p>
         <p class="small hist-muted">The <em>form</em> itself is public and fills in signed out; it is
           the filled-in records that are not.</p>
+      </div>`;
+  }
+
+  // Signed in, and whoami() has answered that this account is not approved yet.
+  // Before it answers, the list loads as usual and the database decides.
+  function waitingApproval() {
+    return typeof Auth !== 'undefined' && Auth.known && Auth.known() && !Auth.isMember();
+  }
+
+  function waitingHtml() {
+    return `
+      <div class="panel hist-note">
+        <strong>Your account is waiting for approval.</strong>
+        <p class="small">Past records are for approved accounts, because they carry site-access
+          notes and gate, padlock and logger codes. An administrator approves new accounts; once
+          yours is, the records show here.</p>
       </div>`;
   }
 

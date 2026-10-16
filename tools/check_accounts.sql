@@ -1,6 +1,7 @@
 -- check_accounts.sql — Prove 0062 against a real database: anybody may make an
 -- account, a Bureau address is approved as soon as it is confirmed and any
--- other waits, an approved account (a member) sees the field photos, a
+-- other waits, an approved account (a member) sees the field photos and reads
+-- the inspection records with the site codes in them but cannot write one (0064), a
 -- declined one is locked out at once, an administrator decides, sign-up can be
 -- closed to the allowlist, and an account keeps its own left-bar views.
 --
@@ -110,6 +111,12 @@ values ('00000000-0000-4000-8000-0000000acf01', 'photo/00000000-0000-4000-8000-0
         repeat('a', 64), 'check_accounts')
 on conflict do nothing;
 
+-- A visit whose remark carries a site's gate code, for what a member reads (0064).
+insert into meganet.inspection (id, config_key, inspected_on, remarks)
+values ('00000000-0000-4000-8000-0000000acf11', 'alert', current_date,
+        'Gate combination 0000 (check_accounts)')
+on conflict do nothing;
+
 -- ── 1. Sign-up ───────────────────────────────────────────────────────────────
 
 do $$
@@ -188,6 +195,15 @@ begin
   v := pg_temp.as_role('authenticated', (select claims from _who where k = 'pat'),
          $q$select count(*)::text from meganet.field_photo$q$);
   perform pg_temp.check_that('an account waiting for approval reads none', v = '0', v);
+
+  v := pg_temp.as_role('authenticated', (select claims from _who where k = 'staff'),
+         $q$select remarks from meganet.inspection where id = '00000000-0000-4000-8000-0000000acf11'$q$);
+  perform pg_temp.check_that('a member reads an inspection''s remarks, gate code and all (0064)', v like 'Gate combination%', coalesce(v, '<null>'));
+  v := pg_temp.as_role('authenticated', (select claims from _who where k = 'pat'),
+         $q$select count(*)::text from meganet.inspection$q$);
+  perform pg_temp.check_that('an account waiting for approval reads no inspection', v = '0', v);
+  v := pg_temp.as_role('anon', (select claims from _who where k = 'anon'), $q$select count(*)::text from meganet.inspection$q$);
+  perform pg_temp.check_that('anonymous cannot read the inspections at all', v like 'ERROR%', v);
   v := pg_temp.as_role('anon', (select claims from _who where k = 'anon'), $q$select count(*)::text from meganet.field_photo$q$);
   perform pg_temp.check_that('anonymous cannot read the table at all', v like 'ERROR%', v);
 
@@ -230,6 +246,12 @@ begin
   perform pg_temp.check_that('…who sees the field photo', v = '1', v);
   v := pg_temp.as_role('authenticated', (select claims from _who where k = 'pat'), 'select meganet.is_editor()::text');
   perform pg_temp.check_that('…and is still not an editor', v = 'false', v);
+  v := pg_temp.as_role('authenticated', (select claims from _who where k = 'pat'),
+         $q$select remarks from meganet.inspection where id = '00000000-0000-4000-8000-0000000acf11'$q$);
+  perform pg_temp.check_that('…who reads the site''s codes in an inspection''s remarks (0064)', v like 'Gate combination%', coalesce(v, '<null>'));
+  v := pg_temp.as_role('authenticated', (select claims from _who where k = 'pat'),
+         $q$select meganet.save_inspection('{"config_key":"alert","inspected_on":"2026-10-16"}'::jsonb)::text$q$);
+  perform pg_temp.check_that('…but cannot save one', v = 'ERROR 42501', v);
   select coalesce(decided_by, '<null>') || ' ' || (user_told_at is null)::text into v
     from meganet.app_user where id = '00000000-0000-4000-8000-0000000ac002';
   perform pg_temp.check_that('…the decision is the administrator''s, and the approval email is owed', v = 'admin@acc-bureau.test true', v);

@@ -61,9 +61,12 @@ on conflict (id) do update set
   file_size_limit = excluded.file_size_limit;
 
 -- ── Who may read and write the objects ───────────────────────────────────────
--- Exactly the people meganet.is_editor() already allows — the same list as the
--- station editor and the same list as every inspection table, so there is one
--- list to take somebody off rather than three. is_editor() is `security
+-- Reading: any approved account, meganet.is_member() — the same people who
+-- read the inspection and maintenance records these files hang off (0064), so a
+-- contractor's crew who can open a record can open its photos too. Writing:
+-- exactly the people meganet.is_editor() already allows — the same list as the
+-- station editor and every inspection table's writes, so there is one list to
+-- take somebody off rather than three. is_editor() is `security
 -- invoker` and granted to `authenticated` (0004, revised by 0007), and
 -- meganet.email_allowed() underneath it is `security definer`, so the editors
 -- list itself stays unreadable from here.
@@ -73,13 +76,14 @@ on conflict (id) do update set
 -- an object to remove and it must be able to.
 
 drop policy if exists inspections_read_editors   on storage.objects;
+drop policy if exists inspections_read_members   on storage.objects;
 drop policy if exists inspections_insert_editors on storage.objects;
 drop policy if exists inspections_update_editors on storage.objects;
 drop policy if exists inspections_delete_editors on storage.objects;
 
-create policy inspections_read_editors on storage.objects
+create policy inspections_read_members on storage.objects
   for select to authenticated
-  using (bucket_id = 'inspections' and meganet.is_editor());
+  using (bucket_id = 'inspections' and meganet.is_member());
 
 create policy inspections_insert_editors on storage.objects
   for insert to authenticated

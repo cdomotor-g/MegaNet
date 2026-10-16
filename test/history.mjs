@@ -4,7 +4,7 @@
 //
 // The same reason `insp` and `maint` are: smoke's network policy aborts every
 // off-origin request, and this tab renders *from* the datastore. It is worse
-// here than on either form tab, because the records are editors-only — under
+// here than on either form tab, because the records need an approved account — under
 // smoke this tab correctly renders "sign in to read them", which is a true
 // result about the gate and silence about everything behind it.
 //
@@ -672,7 +672,7 @@ async function main() {
       rows: document.querySelectorAll('.hist-table tbody tr').length,
     }));
     check('signed out, the tab shows the gate and no record',
-      /editors-only/i.test(gated.text) && gated.rows === 0,
+      /approved accounts/i.test(gated.text) && gated.rows === 0,
       `${gated.rows} row(s)`);
 
     check('nothing threw and the console stayed clean', errors.length === 0,
