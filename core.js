@@ -2119,7 +2119,8 @@ const HELP = {
     summary: 'A draft plan for management of moving the ALERT networks to ALERT2: the <strong>equipment</strong> '
            + 'and how much of it (ELPRO ERT-A2 at every field station, repeater and base, a 115E-2 gateway behind each '
            + 'base receiver), <strong>where the work is</strong> by region and catchment, the <strong>network reviews</strong>, '
-           + 'the <strong>backbone repeaters</strong> to acquire and remediate first, the <strong>timeline</strong>, the '
+           + 'the <strong>backbone repeaters</strong> to acquire, audit, retrofit or rebuild first, the <strong>cut-over</strong> '
+           + 'of each catchment onto an ALERT2 backbone in concentration mode (its ALERT1 stations untouched), the <strong>timeline</strong>, the '
            + '<strong>effort in FTE</strong> and the <strong>cost</strong> by financial year. Every figure is worked from the '
            + 'station register as loaded, under <strong>🎛️ Try it another way</strong> — sliders and switches that work the '
            + 'whole plan again as they move, and <strong>Catchments in the plan</strong>, a box for every catchment and region '
@@ -2129,10 +2130,17 @@ const HELP = {
       + 'durations and unit prices are the draft\'s proposals, and a supplier\'s quote replaces them under '
       + '<em>Unit costs and rates</em>.',
       '<strong>The scenario is kept on this device only.</strong> “The proposal” puts the sliders back and leaves the '
-      + 'catchments ticked as they are; the five figures at the top say how far any scenario is from the proposal over '
-      + 'every catchment.',
+      + 'catchments ticked, their order and the repeater sites marked as they are; the figures at the top say how far any '
+      + 'scenario is from the proposal over every catchment.',
+      '<strong>A catchment is cut over on the backbone in one step.</strong> It needs the repeaters that hear its stations '
+      + '(fitted as concentrators: ALERT1 in, ALERT2 on) and every repeater from them to a base, by the fewest backbone hops on '
+      + 'record; a repeater shared with an earlier catchment is done once. Where the register has no way to a base, the relays are '
+      + 'not counted and the plan says so.',
+      '<strong>What a repeater site needs</strong> — fit-out only, a retrofit, or the structure rebuilt — is marked in section 5\'s '
+      + 'site table. A marked site is costed at that and not audited; one left <em>Not assessed</em> is audited first and costed at '
+      + 'the card\'s mix. A mark is what is known, not a lever: the proposal is worked with it too.',
       '<strong>A repeater outside the catchments ticked stays in the plan</strong> when it carries a station inside them — '
-      + 'that station\'s readings reach a base through it — and the plan marks it as outside.',
+      + 'that station\'s readings reach a base through it — or relays one of those to a base, and the plan marks it as outside.',
       '<strong>The backbone is map-backbone.js\'s rule</strong> — repeaters sharing an open pass-range window with another, '
       + 'or with a base, within the hop distance on the card. Owners come from the station record or the SLS, and a site '
       + 'with neither is counted as “no owner on record”, not guessed.',

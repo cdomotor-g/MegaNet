@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-16** (revision 154 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-16** (revision 155 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -539,6 +539,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and fourteen `[Human]` issues.
 >
+> **Revision 155 opens and closes nothing** — at the owner's request, the ALERT2 Transition Plan moves the backbone first **catchment by catchment**: each catchment cut over in one step to an ALERT2 backbone in concentration mode (its ALERT1 stations untouched), the repeaters it needs audited, retrofitted or their structures rebuilt, and a site table to mark what each repeater is known to need. See revision 155 below.
+>
 > **Revision 154 opens #239 (`[Human]`) and closes nothing** — at the owner's request, the privacy clean-up: landholder contact details out of everything Flood-Net holds (`0063`), the site codes kept for the people who maintain the sites (`0064`), and the inspection archive moved to the private `flood-net-private`. What is left needs the dashboard and the owner's own computer, and is parked until there is time. See revision 154 below.
 >
 > **Revision 153 opens and closes nothing** — the catchment picker of revision 152, reviewed by an adversarial workflow and five defects fixed. See revision 153 below.
@@ -788,6 +790,20 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 155 — 2026-10-16: 🧭 The ALERT2 plan, backbone first and catchment by catchment — concentration, retrofits and rebuilt structures
+
+At the owner's request: *"remediate the backbone first … very likely per catchment … new equipment capable of ALERT2 … receive ALERT1, feed that into the ALERT2 backbone … in concentration mode … in some cases I may have to retrofit or remediate … the whole physical structure of the repeater"*. Nothing opened or closed.
+
+- **The cut-over, catchment by catchment** (`alert2-plan.js`, new section 6): a catchment comes onto ALERT2 in one step on the backbone. It needs every repeater that hears one of its stations — fitted with an ERT-A2 as a **concentrator**, ALERT1 in, ALERT2 on — and every repeater from there to a base, by the fewest backbone hops on record (an ALERT1 repeater cannot carry ALERT2), and its bases receiving ALERT2. A repeater shared with an earlier catchment is done once (49 of Queensland's 90 are shared). A table of every catchment (the repeaters it needs and how many are new to it, its site works and their cost, its date on the ALERT2 backbone, what it waits for, ▲ ▼ within its region) and a chart of the stations on the ALERT2 backbone over time beside the stations converted themselves. A repeater outside the ticks now also stays in the plan when it relays a ticked catchment to a base.
+- **What each repeater site needs** (section 5, rewritten): fit-out only; a **retrofit** (power for the ERT-A2's draw, antenna, enclosure, earthing, access); or the **structure rebuilt** (mast or tower, footings, shelter — a design and approvals first, not before its network's review, with a temporary repeater while it is down). An unassessed backbone site is audited first and costed at the card's mix, allotted catchment by catchment in whole sites; a select on every repeater in the site table marks what it is known to need — costed at that, not audited, kept on the device, and no difference from the proposal (the proposal is worked with the marks).
+- **The model**: four backbone lanes a catchment at a time — condition audits (one contract team from day one), retrofits (contract crews), rebuilds (structural crews, after the design lead and the region's review) and the fit-out on the tower crews, which cuts a catchment over once its site works are done, the pilot has proved concentration and its share of the bases receives ALERT2. The field crews follow a catchment at a time, each once its backbone is ALERT2. A catchment no repeater on record carries has no cut-over, and the 291 field stations no repeater carries are said so.
+- **The card**: *Convert the field stations too* (off: they stay ALERT1, concentrated — no field equipment or crews); retrofit and rebuild shares replace the single remediation share; rebuild crews and design lead; rates for an audit, a rebuild and a temporary repeater. Presets *Backbone only — field stations stay ALERT1* and *More structures rebuilt*; *Backbone with each region* is now *… each catchment*. A sixth figure at the top: when every catchment is on the ALERT2 backbone.
+- **Words and files**: summary, timeline, risks (structures worse than assumed; councils and others who listen to ALERT1 off the air; the first hop still ALERT1), open questions (whether a concentrator needs a second receiver), decisions and assumptions follow; the workbook gains *Cut-over* and *Repeaters* sheets, the CSV a date column. Sections renumber 6–12.
+
+The proposal as drafted, Queensland: about **$29.9m** over about 40 months; the first catchment on the ALERT2 backbone about 11 months in and every one by about month 24; 87 backbone sites audited, about 39 retrofitted and 13 rebuilt. With the field stations left on ALERT1, the backbone's date is unchanged and the cost falls.
+
+**Checks:** `npm run a2plan` 59 → 75 (the backbone, catchment by catchment: every repeater fitted once; a catchment's needs; the mix to the site; cut-overs after their site works, bases and pilot; rebuilds after their lead and review; a site marked by its select; the field-stage switch; ▲ ▼ on catchments; the region gate check now per catchment; relays outside the ticks); `help`, `exports` and the cheap five.
 
 ### Revision 154 — 2026-10-16: 🔒 No landholder contact details; site codes behind the login; the archive goes private — #239 parked for later
 

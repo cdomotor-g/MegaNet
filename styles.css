@@ -19527,7 +19527,7 @@ select.kl-in { width: auto; font-family: inherit; }
 .a2p-base { fill: var(--bad); stroke: var(--panel); stroke-width: 1.5; }
 .a2p-wet { fill: var(--accent); fill-opacity: .07; }
 .a2p-bar { fill: var(--muted); }
-.a2p-bar-reg { fill: var(--c); }
+.a2p-bar.a2p-bar-reg { fill: var(--c); }
 .a2p-bar-procure  { fill: var(--ad-series-9); }
 .a2p-bar-acquire  { fill: var(--ad-series-7); }
 .a2p-bar-remediate{ fill: var(--ad-series-5); }
@@ -19547,12 +19547,21 @@ select.kl-in { width: auto; font-family: inherit; }
 .a2p-own-other   { fill: var(--warn); } span.a2p-own-other   { background: var(--warn); }
 .a2p-own-unknown { fill: var(--muted); } span.a2p-own-unknown { background: var(--muted); }
 .a2p-own-t { fill: var(--panel); font-size: 13px; font-weight: 700; }
+/* The cut-over chart: a step a catchment as its stations come onto the ALERT2
+   backbone, and the stations converted themselves following behind. */
+.a2p-l1 { fill: none; stroke: var(--ad-series-1); stroke-width: 2; stroke-linejoin: round; }
+.a2p-l2 { fill: none; stroke: var(--ad-series-5); stroke-width: 2; stroke-dasharray: 6 4; stroke-linejoin: round; }
+.a2p-cut { fill: var(--ad-series-1); stroke: var(--panel); stroke-width: 2; }
+.a2p-lab { fill: var(--text); font-size: 12px; dominant-baseline: middle; }
+.a2p-table select { max-width: 100%; font-size: var(--fs-sm); }
+/* Too many columns to crush on a phone: it scrolls in its frame instead. */
+.a2p-cut-table { min-width: 36rem; }
 
 @media (max-width: 560px) {
   .a2p-cols { columns: 1; }
 }
 
-/* On paper: the document, not the card. The assumptions table in section 10
+/* On paper: the document, not the card. The assumptions table in section 11
    carries what the card was set to, so nothing is lost by leaving it off. */
 @media print {
   .a2p-controls,

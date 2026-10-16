@@ -11,8 +11,18 @@
 //                   backbone is a subset of the repeaters.
 //   The plan        the cost is its categories plus contingency, the FTE-years
 //                   are the roles', the financial years add to the total, and
-//                   every region's field work starts no earlier than the gates
-//                   it says it waits for.
+//                   every catchment's field work starts no earlier than the
+//                   gates it says it waits for.
+//   The backbone    catchment by catchment: every repeater in the plan is
+//                   fitted once, a catchment needs its concentrators and every
+//                   repeater from them to a base, its cut-over waits for its
+//                   site works, its bases and the pilot, a rebuild for its
+//                   design and its review; more rebuilds cost more; a site
+//                   marked by its select is costed at that and not audited
+//                   (the select keeps focus, its table stays open, the mark is
+//                   kept and is no difference from the proposal); without the
+//                   field stage nothing in the field is bought or done and the
+//                   backbone is unchanged; ▲ ▼ reorder catchments in a region.
 //   The card        a slider re-works the plan in place (the slider keeps its
 //                   focus), more crews is never slower, contingency moves only
 //                   the cost, the backbone-first switch and the reviews switch
@@ -117,7 +127,7 @@ try {
     const cats = Object.keys(M.cost);
     const fyTotal = M.fy.reduce((a, r) => a + r.total, 0);
     const equip = M.equipment.reduce((a, e) => a + e.total, 0);
-    const gates = M.regionRows.map(r => ({ name: r.name, start: r.start, review: r.review ? r.review.end : null, fit: r.fit ? r.fit.end : null }));
+    const gates = M.cats.map(c => ({ name: c.name, start: c.start, review: M.review.has(c.region) ? M.review.get(c.region).end : null, fit: c.cutover }));
     return {
       total: M.total, base: M.base, contingency: M.contingency, cont: s.contingency, cats: cats.map(k => [k, sum(M.cost[k])]),
       breakdown: M.breakdown.reduce((a, b) => a + b.v, 0), fyTotal, equip, equipCat: sum(M.cost.equip),
@@ -133,7 +143,7 @@ try {
   ok('the FTE-years are the roles\'', near(P.fteTotal, P.fteRoles, 1e-6));
   ok('an ERT-A2 for every field station, with the spares', P.units.ertA2 >= Math.ceil(P.nField * (1 + P.spares / 100)));
   ok('every region is in the order once', P.rows === P.order.length && new Set(P.order).size === P.order.length);
-  ok('no region\'s field work starts before its review, its repeaters or the pilot',
+  ok('no catchment\'s field work starts before its region\'s review, its backbone on ALERT2 or the pilot',
     P.gates.every(g => g.start >= P.pilotEnd - 1e-6 && (g.review == null || g.start >= g.review - 1e-6) && (g.fit == null || g.start >= g.fit - 1e-6)),
     JSON.stringify(P.gates.map(g => [g.name, g.start.toFixed(1), g.review && g.review.toFixed(1), g.fit && g.fit.toFixed(1)])));
   ok('the program ends after the last field station', P.end > P.fieldEnd);
@@ -172,11 +182,11 @@ try {
     const d = Alert2Plan.defaults();
     const on = Alert2Plan.model(d), off = Alert2Plan.model({ ...d, backboneFirst: false });
     return { on: on.end, off: off.end, onFit: on.acts.some(a => a.row === 'fit'), offFit: off.acts.some(a => a.row === 'fit'),
-             onStart: Math.min(...on.acts.filter(a => a.row === 'remediate' || a.row === 'acquire').map(a => a.start)),
+             onStart: Math.min(...on.acts.filter(a => a.row === 'audit' || a.row === 'acquire').map(a => a.start)),
              offStart: Math.min(...off.acts.filter(a => a.row === 'acquire').map(a => a.start)), P: on.P };
   });
   ok('backbone first starts the backbone on day one, ahead of the equipment', bb.onStart === 0 && bb.onFit, JSON.stringify(bb));
-  ok('without it, the backbone waits for the equipment and goes with each region', bb.offStart >= bb.P && !bb.offFit, JSON.stringify(bb));
+  ok('without it, the backbone waits for the equipment and goes with each catchment', bb.offStart >= bb.P && !bb.offFit, JSON.stringify(bb));
 
   const rv = await page.evaluate(() => {
     const d = Alert2Plan.defaults();
@@ -223,6 +233,130 @@ try {
     mv.after[0] === mv.before[1] && mv.after[1] === mv.before[0] && mv.tableFirst === mv.after[0] && mv.focused, JSON.stringify(mv));
   const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('meganet.a2plan.scenario') || '{}').order || []);
   ok('the scenario is kept on this device', kept[0] === mv.after[0], kept.slice(0, 2).join(', '));
+
+  // ── the backbone, catchment by catchment ──
+  console.log('\nThe backbone, catchment by catchment\n');
+  await page.evaluate(() => Alert2Plan.reset());
+  const bk = await page.evaluate(() => {
+    const M = Alert2Plan.plan(), I = Alert2Plan.inventory(), C = Alert2Plan.catalogue(), s = Alert2Plan.scenario();
+    const keyOf = new Map(I.field.map(f => [f.s.id, f.key]));
+    // A catchment needs every repeater in the plan that carries one of its
+    // stations, and every repeater on the way from those to a base.
+    const missing = [];
+    for (const c of M.cats) {
+      const needs = new Set(c.needs);
+      for (const r of I.reps) {
+        if (![...r.carriedIds].some(id => keyOf.get(id) === c.key)) continue;
+        if (!needs.has(r.s.id)) missing.push(`${c.name}: ${r.s.name}`);
+        for (const p of C.pathOf.get(r.s.id) || []) if (!needs.has(p)) missing.push(`${c.name}: relay ${p}`);
+      }
+    }
+    const gates = M.cats.filter(c => c.cutover != null).map(c => ({ name: c.name, cut: c.cutover,
+      after: Math.max(c.retroEnd || 0, c.rebuildEnd || 0, c.baseReady, M.pilotEnd) }));
+    const rebuilds = M.cats.filter(c => c.rebuildStart != null).map(c => ({ name: c.name, start: c.rebuildStart,
+      after: Math.max(c.audited + s.rebuildLeadMonths, M.review.has(c.region) ? M.review.get(c.region).end : 0) }));
+    const unheard = M.cats.filter(c => !c.needs.length);
+    return {
+      fresh: M.cats.reduce((a, c) => a + c.fresh, 0), reps: I.reps.length, missing: missing.slice(0, 5), nMissing: missing.length,
+      classes: M.nRetro + M.nRebuild + M.nFitOnly, audit: M.nAudit, bbUnmarked: I.reps.filter(r => r.backbone).length,
+      rebuild: M.nRebuild, rebuildPct: s.rebuildPct, retro: M.nRetro, retrofitPct: s.retrofitPct,
+      lateGates: gates.filter(g => g.cut < g.after - 1e-6).map(g => g.name), nGates: gates.length,
+      lateRebuilds: rebuilds.filter(r => r.start < r.after - 1e-6).map(r => r.name), nRebuilds: rebuilds.length,
+      unheard: unheard.every(c => c.cutover == null && (c.start == null || c.start >= c.baseReady - 1e-6)),
+      first: M.firstCut, ready: M.bbReady, shared: M.shared,
+      kpi: document.getElementById('a2p-kpis').textContent,
+    };
+  });
+  ok('every repeater in the plan is fitted once, by the first catchment that needs it', bk.fresh === bk.reps, `${bk.fresh} of ${bk.reps}`);
+  ok('a catchment needs the repeaters that carry its stations and every repeater from them to a base', bk.nMissing === 0, bk.missing.join(' | '));
+  ok('every site is one of fit-out, retrofit or rebuild, and with nothing marked every backbone site is audited first',
+    bk.classes === bk.reps && bk.audit === bk.bbUnmarked, JSON.stringify({ classes: bk.classes, audit: bk.audit }));
+  ok('…and the unassessed are allotted at the card\'s mix, to the site', Math.abs(bk.rebuild - bk.audit * bk.rebuildPct / 100) <= 1
+    && Math.abs(bk.rebuild + bk.retro - bk.audit * (bk.rebuildPct + bk.retrofitPct) / 100) <= 1, JSON.stringify({ rebuild: bk.rebuild, retro: bk.retro, audit: bk.audit }));
+  ok('no catchment is cut over before its site works, its bases and the pilot', bk.nGates > 10 && bk.lateGates.length === 0, bk.lateGates.join(', '));
+  ok('no structure is rebuilt before its design lead from its audit and its network\'s review', bk.nRebuilds > 0 && bk.lateRebuilds.length === 0, bk.lateRebuilds.join(', '));
+  ok('a catchment no repeater carries has no cut-over, and its field work waits for its bases', bk.unheard);
+  ok('the figures say when the backbone is on ALERT2, the first catchment before the last', bk.first < bk.ready && /Backbone on ALERT2/.test(bk.kpi) && bk.shared > 0, JSON.stringify({ first: bk.first, ready: bk.ready }));
+
+  const heavy = await page.evaluate(() => {
+    const d = Alert2Plan.defaults();
+    const a = Alert2Plan.model(d), b = Alert2Plan.model({ ...d, rebuildPct: 35 }), c = Alert2Plan.model({ ...d, rebuildLeadMonths: 14 });
+    const over = Alert2Plan.model({ ...d, retrofitPct: 90, rebuildPct: 30 });
+    return { a: a.total, b: b.total, ra: a.bbReady, rb: b.bbReady, rc: c.bbReady, nb: b.nRebuild, na: a.nRebuild,
+             over: over.nRetro + over.nRebuild, overAudit: over.nAudit };
+  });
+  ok('more structures rebuilt costs more and puts the backbone no sooner', heavy.b > heavy.a && heavy.nb > heavy.na && heavy.rb >= heavy.ra - 1e-6, JSON.stringify(heavy));
+  ok('a longer design and approvals lead puts the backbone no sooner', heavy.rc >= heavy.ra - 1e-6);
+  ok('retrofits and rebuilds together never pass every unassessed site', heavy.over <= heavy.overAudit, JSON.stringify(heavy));
+
+  // A site marked by its select, as a person would, in the folded site table.
+  const mark = await page.evaluate(async () => {
+    const d = document.getElementById('a2p-sites');
+    d.open = true;
+    const before = Alert2Plan.plan();
+    const sel = document.querySelector('#a2p-sites select[data-k^="site:"]');
+    const k = sel.dataset.k;
+    sel.focus();
+    sel.value = 'rebuild';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 30));
+    const after = Alert2Plan.plan();
+    const now = document.querySelector(`#a2p-sites select[data-k="${k}"]`);
+    return { k, audit: [before.nAudit, after.nAudit], marked: after.nMarked, total: [before.total, after.total],
+             focused: document.activeElement === now, value: now.value, open: document.getElementById('a2p-sites').open,
+             kept: Object.values(JSON.parse(localStorage.getItem('meganet.a2plan.scenario') || '{}').sites || {}),
+             proposal: /This is the proposal as drafted/.test(document.querySelector('.a2p-controls').textContent),
+             kpi: document.getElementById('a2p-kpis').textContent };
+  });
+  ok('a site marked "Rebuild the structure" by its select is costed at that and not audited, and the select keeps its focus with its table open',
+    mark.audit[1] === mark.audit[0] - 1 && mark.marked === 1 && mark.total[1] !== mark.total[0] && mark.focused && mark.value === 'rebuild' && mark.open,
+    JSON.stringify({ audit: mark.audit, marked: mark.marked, focused: mark.focused, open: mark.open }));
+  ok('…the mark is kept on this device, and is what is known rather than a lever: still the proposal', mark.kept.includes('rebuild') && mark.proposal && !/than the proposal/.test(mark.kpi));
+  const marks = await page.evaluate(() => {
+    Alert2Plan.preset('faster');
+    const kept = Object.keys(Alert2Plan.scenario().sites || {}).length;
+    Alert2Plan.preset('proposed');
+    const I = Alert2Plan.inventory();
+    const base = Alert2Plan.plan();
+    const all = Alert2Plan.model({ ...Alert2Plan.defaults(), sites: Object.fromEntries(I.reps.map(r => [r.s.id, 'fit'])) });
+    const sel = document.querySelector('#a2p-sites select[data-k^="site:"]');
+    sel.value = '';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    return { kept, audit: all.nAudit, remed: all.nRetro + all.nRebuild, cheaper: all.total < base.total, cleared: Object.keys(Alert2Plan.scenario().sites || {}).length };
+  });
+  ok('a preset leaves the marks alone; every site marked fit-out is no audit, retrofit or rebuild, and cheaper; "Not assessed" clears the mark',
+    marks.kept === 1 && marks.audit === 0 && marks.remed === 0 && marks.cheaper && marks.cleared === 0, JSON.stringify(marks));
+
+  const stage = await page.evaluate(() => {
+    const d = Alert2Plan.defaults();
+    const on = Alert2Plan.model(d), off = Alert2Plan.model({ ...d, fieldStage: false });
+    const q = (M, i) => M.equipment[i].qty;
+    return { field: off.acts.filter(a => a.row === 'field').length, ert: q(off, 0), power: q(off, 5), onErt: q(on, 0),
+             cheaper: off.total < on.total, sooner: off.end <= on.end + 1e-6, ready: [on.bbReady, off.bbReady], fieldFte: [on.fteYears.field, off.fteYears.field] };
+  });
+  ok('without the field stage: no field work, no field ERT-A2 or power upgrade, cheaper and no longer, and the backbone cut over just the same',
+    stage.field === 0 && stage.ert === 0 && stage.power === 0 && stage.onErt > 0 && stage.cheaper && stage.sooner && Math.abs(stage.ready[0] - stage.ready[1]) < 1e-6,
+    JSON.stringify(stage));
+
+  const mc = await page.evaluate(async () => {
+    const M0 = Alert2Plan.plan();
+    const i = M0.cats.findIndex((c, j) => j + 1 < M0.cats.length && M0.cats[j + 1].region === c.region);
+    const a = M0.cats[i].key, b = M0.cats[i + 1].key;
+    const top = document.querySelector(`#a2p-out button[data-k="cup:${CSS.escape(String(a))}"]`);
+    const btn = document.querySelector(`#a2p-out button[data-k="cdown:${CSS.escape(String(a))}"]`);
+    const topOff = top.disabled;
+    btn.click();
+    await new Promise(r => setTimeout(r, 30));
+    const M1 = Alert2Plan.plan();
+    const f = document.activeElement;
+    const kept = JSON.parse(localStorage.getItem('meganet.a2plan.scenario') || '{}').catOrder || [];
+    return { swapped: M1.cats[i].key === b && M1.cats[i + 1].key === a, topOff,
+             focused: !!f && f.tagName === 'BUTTON' && /^c(up|down):/.test(f.dataset.k || ''),
+             kept: kept.indexOf(String(b)) < kept.indexOf(String(a)) || kept.indexOf(b) < kept.indexOf(a) };
+  });
+  ok('▼ on a catchment swaps it with the next in its region, ▲ is off at the top of one, focus stays on the control and the order is kept',
+    mc.swapped && mc.topOff && mc.focused && mc.kept, JSON.stringify(mc));
+  await page.evaluate(() => Alert2Plan.reset());
 
   // ── catchments in the plan ──
   console.log('\nCatchments in the plan\n');
@@ -286,11 +420,11 @@ try {
     return { region: g.region, n: g.cats.length,
              allOff: [...document.querySelectorAll(`#a2p-cats-body input[data-k^="cat:"]`)].filter(b => keys.has(C.flat[Number(b.dataset.k.slice(4))].key)).every(b => !b.checked),
              noField: !I.field.some(f => keys.has(f.key)),
-             repsServe: theirs.every(r => r.outside && [...r.carriedIds].some(id => ids.has(id))), kept: theirs.length,
+             repsServe: theirs.every(r => r.outside && (r.relay || [...r.carriedIds].some(id => ids.has(id)))), kept: theirs.length,
              focused: document.activeElement && document.activeElement.dataset.k === `reg:${gi}` };
   }, [pick.gi]);
   ok(`the region box takes all ${reg.n} of ${reg.region}'s catchments out at once, and keeps its focus`, reg.allOff && reg.noField && reg.focused, JSON.stringify(reg));
-  ok('…a repeater of theirs stays only if it carries a station still ticked, marked as outside', reg.repsServe, `${reg.kept} kept`);
+  ok('…a repeater of theirs stays only if it carries a station still ticked, or relays one to a base, marked as outside', reg.repsServe, `${reg.kept} kept`);
   await page.evaluate(([gi]) => document.querySelector(`#a2p-cats-body input[data-k="reg:${gi}"]`).click(), [pick.gi]);
 
   // One catchment alone: every repeater in the plan is in it or carries one of its stations.
@@ -301,10 +435,10 @@ try {
     const ids = new Set(I.field.map(f => f.s.id));
     const C = Alert2Plan.catalogue();
     return { field: I.field.length, want: C.flat[i].field, reps: I.reps.length, outside: I.outsideReps,
-             ok: I.reps.every(r => !r.outside || [...r.carriedIds].some(id => ids.has(id))),
+             ok: I.reps.every(r => !r.outside || r.relay || [...r.carriedIds].some(id => ids.has(id))),
              inside: I.reps.filter(r => !r.outside).length === C.flat[i].repeaters, bases: Alert2Plan.plan().nBases };
   }, [pick.i]);
-  ok('one catchment alone: its field stations, its repeaters, and the repeaters outside it that carry them',
+  ok('one catchment alone: its field stations, its repeaters, and the repeaters outside it that carry them or relay them to a base',
     alone.field === alone.want && alone.ok && alone.inside, JSON.stringify(alone));
   ok('…and the bases scaled to it rather than the whole network\'s', alone.bases >= 1 && alone.bases < 15, String(alone.bases));
 
@@ -433,11 +567,12 @@ try {
       sections: [...document.querySelectorAll('#a2p-out .a2p-sec h3')].map(h => h.textContent),
       basins: document.querySelectorAll('#a2p-out .a2p-basin').length,
       bars: document.querySelectorAll('#a2p-out .a2p-gantt .a2p-bar').length,
+      cut: /on the ALERT2 backbone/.test((document.querySelector('#a2p-out .a2p-cutover title') || {}).textContent || ''),
       refs: document.querySelectorAll('#a2p-out .a2p-refs li').length,
       cites: [...document.querySelectorAll('#a2p-out sup a')].every(a => !!document.getElementById(a.getAttribute('href').slice(1))),
     };
   });
-  ok('every chart is an image named with its headline', drawn.n >= 6 && drawn.named, `${drawn.n} chart(s)`);
+  ok('every chart is an image named with its headline, the cut-over chart among them', drawn.n >= 7 && drawn.named && drawn.cut, `${drawn.n} chart(s)`);
   ok('the document has its sections, in order', drawn.sections.length >= 11 && /^1\. Summary/.test(drawn.sections[0]) && /Sources/.test(drawn.sections[drawn.sections.length - 1]), drawn.sections.join(' | '));
   ok('the map draws the basins, and the timeline its bars', drawn.basins > 50 && drawn.bars > 10, `${drawn.basins} basins, ${drawn.bars} bars`);
   ok('every citation lands on a source', drawn.refs >= 8 && drawn.cites, `${drawn.refs} source(s)`);
@@ -449,7 +584,7 @@ try {
   const xpath = await xl.path();
   const fs = await import('node:fs');
   const zip = fs.readFileSync(xpath);
-  ok('…and is a zip with its six sheets', zip.slice(0, 2).toString() === 'PK' && (zip.toString('latin1').match(/xl\/worksheets\/sheet\d+\.xml/g) || []).length >= 6);
+  ok('…and is a zip with its eight sheets, the cut-over and the repeaters among them', zip.slice(0, 2).toString() === 'PK' && new Set(zip.toString('latin1').match(/xl\/worksheets\/sheet\d+\.xml/g) || []).size >= 8);
   const [csv] = await Promise.all([page.waitForEvent('download'), page.evaluate(() => Alert2Plan.exportCsv())]);
   const text = fs.readFileSync(await csv.path(), 'utf8');
   const rows = text.trim().split(/\r?\n/);

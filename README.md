@@ -5001,14 +5001,28 @@ from the station register as loaded:
 * **Where the work is** — field stations (rainfall and river), repeaters, the
   backbone and bases by region and catchment, on a basin map and in a table whose
   ▲ ▼ set the order the regions are converted in.
-* **The backbone repeaters to acquire and remediate first** — the backbone by the
-  Stations map's own rule, each repeater's owner from the register or the SLS, the
-  ones carrying the most stations, and why that stream can and should start ahead
-  of everything else.
+* **The backbone first, catchment by catchment** — the backbone by the Stations
+  map's own rule, each repeater's owner from the register or the SLS, and what each
+  site needs: a **fit-out** only, a **retrofit** (power for the ERT-A2's draw,
+  antenna, enclosure, earthing, access), or the **structure rebuilt** (mast or
+  tower, footings, shelter — a design, approvals and a temporary repeater first,
+  and not before its network's review). A site nobody has assessed is audited
+  first and costed at the card's mix; the site table in section 5 has a select a
+  repeater to mark what it is known to need, and the plan is worked with the mark.
+* **The cut-over, catchment by catchment** — a catchment comes onto ALERT2 in one
+  step on the backbone, its ALERT1 stations untouched: every repeater that hears
+  one of them is fitted as a **concentrator** (ALERT1 in, ALERT2 on), every
+  repeater from there to a base (the fewest backbone hops on record) repeats
+  ALERT2, and its bases receive it. A repeater shared with an earlier catchment is
+  done once. A table of every catchment — the repeaters it needs and how many are
+  new to it, the site works and their cost, the date it is on the ALERT2 backbone,
+  what it waits for, its ▲ ▼ within its region — and a chart of the stations on
+  the ALERT2 backbone over time, beside the stations converted themselves.
 * **The network reviews**, region by region, against the Network Review's design
   principles, and what they are expected to add and retire.
-* **The timeline** as a Gantt chart with the wet season shaded, each network's own
-  dates and what it waits for; **the effort** in FTE by role over time; **the
+* **The timeline** as a Gantt chart with the wet season shaded (the audits,
+  retrofits, rebuilds, cut-overs and field work a bar a catchment), each network's
+  own dates; **the effort** in FTE by role over time; **the
   cost** by category and by financial year; the assumptions, risks, open questions,
   the decisions sought, and the sources.
 
@@ -5017,16 +5031,19 @@ its region (a region's own box ticks or clears all of them, and shows a dash for
 with *Tick every catchment*, *Clear every catchment* and *Only those with High-priority
 SLS sites*: an unticked catchment's stations leave the plan and its basin goes grey on the
 map. A repeater outside the ticked catchments stays in when it carries a station inside
-them, marked as outside; the bases scale to the share of the network ticked unless the
-card sets them.
+them, or relays one of those to a base, marked as outside; the bases scale to the share
+of the network ticked unless the card sets them.
 
-Above it, **🎛️ Try it another way**: sliders and switches for the scope, crews,
-pace, the backbone-first and review switches, the wet season, stations converted
-on FWIN upgrade visits, acquisitions, contingency and every unit rate, with
-presets ("Faster", "Leaner", "Backbone with each region", "Like for like", "Work
-through the wet season"). Each move works the whole plan again at once, and the
-five figures at the top say how far it is from the proposal. The scenario is kept
-on the device. It prints as a document (the card left off, the assumptions table
+Above it, **🎛️ Try it another way**: sliders and switches for the scope, crews
+(field, tower, retrofit and rebuild), pace, the backbone-first, field-stage and
+review switches, the share of unassessed sites needing a retrofit or a rebuild and
+a rebuild's design lead, the wet season, stations converted on FWIN upgrade visits,
+acquisitions, contingency and every unit rate, with presets ("Faster", "Leaner",
+"Backbone only — field stations stay ALERT1", "More structures rebuilt", "Backbone
+with each catchment", "Like for like", "Work through the wet season"). Each move
+works the whole plan again at once, and the figures at the top — the backbone's
+date among them — say how far it is from the proposal. The scenario, the
+catchments' order and the repeater sites marked are kept on the device. It prints as a document (the card left off, the assumptions table
 saying what it was set to), and saves as `floodnet-alert2-transition-plan.xlsx`
 and `floodnet-alert2-plan-quantities.csv`.
 

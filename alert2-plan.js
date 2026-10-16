@@ -4,11 +4,12 @@
 //                nobody else: a draft for management of what moving the
 //                network from ALERT to ALERT2 takes — the equipment and how
 //                much of it, where the work is by region and catchment, the
-//                network reviews, the backbone repeaters to acquire and
-//                remediate first, the timeline, the effort in FTE and the
-//                cost — every figure worked from the station register as it is
-//                loaded, under a scenario card whose sliders and switches
-//                re-run the whole plan as they move.
+//                network reviews, the backbone repeaters to acquire, audit,
+//                retrofit or rebuild first, the cut-over of each catchment
+//                onto an ALERT2 backbone in concentration mode, the timeline,
+//                the effort in FTE and the cost — every figure worked from the
+//                station register as it is loaded, under a scenario card whose
+//                sliders and switches re-run the whole plan as they move.
 //
 // After core.js, maps-data.js, map-backbone.js, sls.js, xlsx-write.js and
 // auth.js; before init.js. Nothing runs at load: renderMain() calls render()
@@ -41,12 +42,28 @@
 //                repeater and how many High-priority sites each region holds.
 //   model()      what converting it takes under a scenario: a month-by-month
 //                walk of a handful of lanes (procurement, reviews, backbone
-//                acquisition, remediation and fit-out, the pilot, the bases,
-//                field crews region by region, close-out), each consuming its
+//                acquisition; then, catchment by catchment, condition audits,
+//                retrofits, structural rebuilds and the ALERT2 fit-out of the
+//                repeaters each catchment needs; the pilot, the bases, field
+//                crews catchment by catchment, close-out), each consuming its
 //                own capacity, the field lanes slowed in the wet season. Out
 //                of it come the dates, the person-days by role and the costs
 //                by month, which the FTE profile and the financial-year cash
 //                flow are sums of. Pure: inventory and scenario in, plan out.
+//
+// ── The backbone, catchment by catchment ─────────────────────────────────────
+// A catchment comes onto ALERT2 in one step on the backbone, before any of its
+// field stations is touched: every repeater that hears one of its stations is
+// fitted with an ERT-A2 as a concentrator (it hears legacy ALERT and sends it
+// on in its own ALERT2 slot), every repeater from there to a base is fitted to
+// repeat ALERT2 — an ALERT1 repeater cannot carry it — and the base receives
+// ALERT2. Those repeaters are what the catchment "needs"; one already done for
+// an earlier catchment is not done again. Each site is first audited unless
+// the card says what it needs: a fit-out only, a retrofit (power, antenna,
+// enclosure, earthing, access), or the structure itself rebuilt (mast or
+// tower, footings, shelter), which needs a design and approvals first and a
+// temporary repeater while it is down. An unassessed site is costed at the
+// card's mix, allotted catchment by catchment so the totals are whole sites.
 //   the page     the plan as a document for management, every number read
 //                off the model, with the scenario card above it.
 //
@@ -69,9 +86,10 @@ const Alert2Plan = (function () {
     start: '2027-07',
     procureMonths: 6,
     pilot: true, pilotMonths: 4, pilotSites: 20,
-    backboneFirst: true, backboneKm: 100, allBackbone: false,
+    backboneFirst: true, backboneKm: 100, allBackbone: false, fieldStage: true,
     acquireOther: true, unknownAcqPct: 50, acqLeadMonths: 9, acqParallel: 6,
-    remediatePct: 60, remediateDays: 4, remedCrews: 2, fitDays: 1.5, backboneCrews: 1,
+    auditDays: 1, retrofitPct: 45, remediateDays: 4, remedCrews: 2, fitDays: 1.5, backboneCrews: 1,
+    rebuildPct: 15, rebuildDays: 20, rebuildCrews: 2, rebuildLeadMonths: 6,
     reviews: true, reviewTeams: 1, addRepPct: 10, removeRepPct: 5,
     basesN: 0, dupBases: true, baseDays: 4,
     fieldCrews: 4, staffPerCrew: 2, crewDays: 14,
@@ -80,7 +98,7 @@ const Alert2Plan = (function () {
     closeMonths: 3, pmFte: 1, benchHours: 2,
     spares: 5, contingency: 25, powerPct: 25,
     cErtA2: 6500, cErtRep: 7500, cErtBase: 6500, c115e: 3500, cKit: 1500, cPower: 3000, cTestKit: 25000,
-    cAcq: 30000, cRemed: 45000, cNewRep: 180000, cRemove: 5000, cLicence: 1500,
+    cAcq: 30000, cAudit: 4000, cRemed: 45000, cRebuild: 140000, cTemp: 8000, cNewRep: 180000, cRemove: 5000, cLicence: 1500,
     rateField: 150000, rateEng: 185000, ratePm: 200000, rateSupport: 140000, travelDay: 700,
   };
 
@@ -89,8 +107,10 @@ const Alert2Plan = (function () {
   const PRESETS = [
     { id: 'proposed', label: 'The proposal', set: {} },
     { id: 'faster', label: 'Faster — more crews', set: { fieldCrews: 6, backboneCrews: 2, remedCrews: 3, reviewTeams: 2, acqParallel: 10 } },
-    { id: 'lean', label: 'Leaner — fewer crews', set: { fieldCrews: 2, backboneCrews: 1, remedCrews: 1 } },
-    { id: 'together', label: 'Backbone with each region', set: { backboneFirst: false } },
+    { id: 'lean', label: 'Leaner — fewer crews', set: { fieldCrews: 2, backboneCrews: 1, remedCrews: 1, rebuildCrews: 1 } },
+    { id: 'backbone', label: 'Backbone only — field stations stay ALERT1', set: { fieldStage: false } },
+    { id: 'rebuilds', label: 'More structures rebuilt', set: { retrofitPct: 45, rebuildPct: 35 } },
+    { id: 'together', label: 'Backbone with each catchment', set: { backboneFirst: false } },
     { id: 'minimal', label: 'Like for like — no reviews', set: { reviews: false, addRepPct: 0, removeRepPct: 0, pilot: false } },
     { id: 'allyear', label: 'Work through the wet season', set: { wet: false } },
   ];
@@ -111,7 +131,8 @@ const Alert2Plan = (function () {
       { k: 'spares', kind: 'range', label: 'Spare units bought', min: 0, max: 20, step: 1, unit: '%' },
     ] },
     { group: 'How the work is done', items: [
-      { k: 'backboneFirst', kind: 'switch', label: 'Backbone first — acquire, remediate and fit repeaters ahead of the field work' },
+      { k: 'backboneFirst', kind: 'switch', label: 'Backbone first — each catchment cut over to an ALERT2 backbone in concentration mode, ahead of its field work' },
+      { k: 'fieldStage', kind: 'switch', label: 'Convert the field stations too — otherwise they stay ALERT1, concentrated at their first repeater' },
       { k: 'reviews', kind: 'switch', label: 'Review each network before converting it' },
       { k: 'pilot', kind: 'switch', label: 'Pilot one network first' },
       { k: 'wet', kind: 'switch', label: 'Slow field work in the wet season (December to March)' },
@@ -127,7 +148,8 @@ const Alert2Plan = (function () {
       { k: 'levelDays', kind: 'range', label: 'Crew-days per river station, travel included', min: 0.5, max: 4, step: 0.25, unit: ' d' },
       { k: 'remoteMult', kind: 'range', label: 'Remote regions take longer by', min: 1, max: 3, step: 0.1, unit: '×' },
       { k: 'backboneCrews', kind: 'range', label: 'Crews fitting ALERT2 to repeaters', min: 1, max: 5, step: 1, unit: '' },
-      { k: 'remedCrews', kind: 'range', label: 'Contract crews remediating backbone sites', min: 1, max: 6, step: 1, unit: '' },
+      { k: 'remedCrews', kind: 'range', label: 'Contract crews retrofitting backbone sites', min: 1, max: 6, step: 1, unit: '' },
+      { k: 'rebuildCrews', kind: 'range', label: 'Contract crews rebuilding repeater structures', min: 1, max: 6, step: 1, unit: '' },
       { k: 'reviewTeams', kind: 'range', label: 'Network review teams', min: 1, max: 4, step: 1, unit: '' },
     ] },
     { group: 'Backbone and network changes', items: [
@@ -135,7 +157,9 @@ const Alert2Plan = (function () {
       { k: 'unknownAcqPct', kind: 'range', label: 'Of sites with no owner on record, share that turn out to need acquiring', min: 0, max: 100, step: 5, unit: '%' },
       { k: 'acqLeadMonths', kind: 'range', label: 'Months to settle one owner\'s sites', min: 2, max: 24, step: 1, unit: ' mo' },
       { k: 'acqParallel', kind: 'range', label: 'Owners negotiated with at once', min: 1, max: 15, step: 1, unit: '' },
-      { k: 'remediatePct', kind: 'range', label: 'Backbone sites needing remediation', min: 0, max: 100, step: 5, unit: '%' },
+      { k: 'retrofitPct', kind: 'range', label: 'Unassessed backbone sites that need a retrofit — power, antenna, enclosure, earthing', min: 0, max: 100, step: 5, unit: '%' },
+      { k: 'rebuildPct', kind: 'range', label: 'Unassessed backbone sites whose structure must be rebuilt — mast or tower, footings, shelter', min: 0, max: 100, step: 5, unit: '%' },
+      { k: 'rebuildLeadMonths', kind: 'range', label: 'Months from a site\'s audit to its rebuild starting — design, approvals, fabrication', min: 1, max: 18, step: 1, unit: ' mo' },
       { k: 'addRepPct', kind: 'range', label: 'Repeaters the reviews add', min: 0, max: 40, step: 1, unit: '%' },
       { k: 'removeRepPct', kind: 'range', label: 'Repeaters the reviews retire', min: 0, max: 40, step: 1, unit: '%' },
     ] },
@@ -156,7 +180,10 @@ const Alert2Plan = (function () {
     { k: 'cPower', label: 'Solar and battery upgrade, per station' },
     { k: 'cTestKit', label: 'Test and bench equipment, per crew' },
     { k: 'cAcq', label: 'Acquiring one backbone site (legal, valuation, transfer)' },
-    { k: 'cRemed', label: 'Remediating one backbone site (materials and contract works)' },
+    { k: 'cAudit', label: 'Condition audit of one backbone site (a rigger\'s climb and a structural report)' },
+    { k: 'cRemed', label: 'Retrofitting one backbone site — power, antenna, enclosure, earthing (materials and contract works)' },
+    { k: 'cRebuild', label: 'Rebuilding one repeater structure — mast or tower, footings, shelter (design and contract works)' },
+    { k: 'cTemp', label: 'Temporary repeater while a structure is rebuilt, per site' },
     { k: 'cNewRep', label: 'Building one new repeater site' },
     { k: 'cRemove', label: 'Retiring one repeater site' },
     { k: 'cLicence', label: 'Licensing and frequency coordination, per repeater or base' },
@@ -176,6 +203,10 @@ const Alert2Plan = (function () {
   };
   const REMOTE = new Set(['Far North', 'West / South West', 'Gulf and Cape York']);
   const LONG_LINK_KM = 150;         // a pass-range link longer than this is an address collision
+
+  // What a repeater site needs before it carries ALERT2, least to most.
+  const WORKS = ['fit', 'retrofit', 'rebuild'];
+  const WORKS_LABEL = { fit: 'Fit-out only', retrofit: 'Retrofit', rebuild: 'Rebuild the structure' };
 
   // ── state ──
   let sc = loadScenario();
@@ -208,6 +239,18 @@ const Alert2Plan = (function () {
         else if (k === 'scope') { if (['qld', 'hubs', 'all'].includes(v)) out[k] = v; }
       }
       if (Array.isArray(raw.order)) out.order = raw.order.filter(x => typeof x === 'string').slice(0, 40);
+      // The catchments' order within their regions, by key.
+      if (Array.isArray(raw.catOrder)) out.catOrder = [...new Set(raw.catOrder.filter(x => typeof x === 'string' && x.length <= 120))].slice(0, 500);
+      // What a repeater site needs, as somebody who has been there says: by
+      // station id, a fit-out, a retrofit or the structure rebuilt. A site not
+      // here is unassessed, audited first and costed at the card's mix.
+      if (raw.sites && typeof raw.sites === 'object' && !Array.isArray(raw.sites)) {
+        const sites = {};
+        for (const [id, v] of Object.entries(raw.sites).slice(0, 1000)) {
+          if (id.length <= 80 && WORKS.includes(v)) sites[id] = v;
+        }
+        out.sites = sites;
+      }
       // The catchments left out — kept as what is left out, so a catchment
       // the register gains later is in the plan until somebody unticks it.
       if (Array.isArray(raw.excluded)) {
@@ -222,8 +265,11 @@ const Alert2Plan = (function () {
   // Whether a scenario is not the proposal. A catchment unticked under
   // another scope is remembered for when that scope comes back, but makes no
   // difference to this one, so only the scope's own catchments are compared.
+  // What the card says of a repeater site is not a lever but what is known of
+  // it, so the proposal is worked with it too and it is no difference.
   function differs(a, b) {
-    if (Object.keys(DEFAULTS).some(k => a[k] !== b[k]) || JSON.stringify(a.order || []) !== JSON.stringify(b.order || [])) return true;
+    if (Object.keys(DEFAULTS).some(k => a[k] !== b[k]) || JSON.stringify(a.order || []) !== JSON.stringify(b.order || [])
+        || JSON.stringify(a.catOrder || []) !== JSON.stringify(b.catOrder || [])) return true;
     const C = catalogue();
     const ea = new Set(a.excluded || []), eb = new Set(b.excluded || []);
     return C ? C.flat.some(c => ea.has(c.key) !== eb.has(c.key)) : ea.size !== eb.size;
@@ -390,8 +436,10 @@ const Alert2Plan = (function () {
     for (const b of bases) entry(b.p, b.key).bases++;
     const list = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))
       .map(([region, m]) => ({ region, cats: [...m.values()].sort((a, b) => a.name.localeCompare(b.name)) }));
+    const scoped = links.filter(p => inScope(p.a) && inScope(p.b));
+    const route = routesToBase(reps, bases, scoped);
     cat = {
-      data: state.data, field, reps, bases, links: links.filter(p => inScope(p.a) && inScope(p.b)),
+      data: state.data, field, reps, bases, links: scoped, pathOf: route.pathOf, baseOf: route.baseOf,
       groups: list, flat: list.flatMap(g => g.cats),
       radioNetworks: (state.data.radio_networks || []).length,
       asAt: (state.data.meta && state.data.meta.updated) || '',
@@ -400,11 +448,62 @@ const Alert2Plan = (function () {
     return cat;
   }
 
+  // The way each repeater's traffic reaches a base: the fewest backbone hops,
+  // over the links the card counts (a repeater sharing an open pass-range
+  // window with another, or within the hop distance of a base). A breadth-
+  // first walk out from every base at once; each repeater's next hop is the
+  // nearest neighbour one hop closer, so the answer is the same every time.
+  // pathOf maps a repeater to the repeaters after it on the way (the base, if
+  // it is a repeater too, included); baseOf to the base it ends at. A repeater
+  // with no way to a base on record is in neither.
+  function routesToBase(reps, bases, links) {
+    const adj = new Map();
+    const add = (a, b, km) => { if (!adj.has(a)) adj.set(a, []); adj.get(a).push({ id: b, km }); };
+    for (const p of links) { add(p.a.id, p.b.id, p.km); add(p.b.id, p.a.id, p.km); }
+    const name = new Map(reps.map(r => [r.s.id, r.s.name || '']).concat(bases.map(b => [b.s.id, b.s.name || ''])));
+    const order = (x, y) => (x.km - y.km) || String(name.get(x.id) || '').localeCompare(String(name.get(y.id) || '')) || String(x.id).localeCompare(String(y.id));
+    for (const l of adj.values()) l.sort(order);
+    const dist = new Map(), next = new Map();
+    const queue = [];
+    for (const b of bases.slice().sort((x, y) => String(x.s.name).localeCompare(String(y.s.name)))) {
+      if (dist.has(b.s.id)) continue;
+      dist.set(b.s.id, 0); queue.push(b.s.id);
+    }
+    for (let i = 0; i < queue.length; i++) {
+      const x = queue[i];
+      for (const { id } of adj.get(x) || []) {
+        if (dist.has(id)) continue;
+        dist.set(id, dist.get(x) + 1); next.set(id, x); queue.push(id);
+      }
+    }
+    // The next hop as the nearest neighbour one hop closer, not merely the
+    // first one the walk happened to reach it from.
+    for (const [id, d] of dist) {
+      if (!d) continue;
+      const best = (adj.get(id) || []).find(n => dist.get(n.id) === d - 1);
+      if (best) { next.set(id, best.id); }
+    }
+    const repIds = new Set(reps.map(r => r.s.id));
+    const pathOf = new Map(), baseOf = new Map();
+    for (const r of reps) {
+      const id = r.s.id;
+      if (!dist.has(id)) continue;
+      const path = [];
+      let x = id, guard = 0;
+      while (dist.get(x) > 0 && guard++ < 64) { x = next.get(x); if (repIds.has(x)) path.push(x); }
+      pathOf.set(id, path);
+      baseOf.set(id, x);
+    }
+    return { pathOf, baseOf };
+  }
+
   // The plan's inventory: the catalogue cut to the catchments ticked on the
   // card. A field station or base is in when its catchment is. A repeater is
   // in when its catchment is — or when it carries a station that is, because
   // that station's readings reach a base through it whichever catchment its
-  // hill is in; those are marked, and the plan says how many.
+  // hill is in, or when it is on the way from one of those to a base, because
+  // an ALERT1 repeater cannot carry ALERT2; those are marked, and the plan
+  // says how many.
   function inventory() { return inventoryFor(sc.excluded || []); }
   function inventoryFor(excluded) {
     const C = catalogue();
@@ -413,12 +512,30 @@ const Alert2Plan = (function () {
     const key = catKey + '|' + [...ex].sort().join('\u0001');
     if (cuts.has(key) && cuts.get(key).data === state.data) return cuts.get(key);
     const field = C.field.filter(f => !ex.has(f.key));
-    const ids = new Set(field.map(f => f.s.id));
+    const keyOf = new Map(field.map(f => [f.s.id, f.key]));
+    // What each ticked catchment needs on the backbone: the repeaters on its
+    // own ground, the ones that hear its stations (its concentrators), and
+    // every repeater on the way from those to a base.
+    const needs = new Map();
+    const need = (k, id) => { if (!needs.has(k)) needs.set(k, new Set()); needs.get(k).add(id); };
+    const carries = new Map(), relays = new Set();
+    for (const r of C.reps) {
+      const ks = new Set();
+      for (const id of r.carriedIds) { const k = keyOf.get(id); if (k != null) ks.add(k); }
+      carries.set(r.s.id, ks);
+      if (!ex.has(r.key)) need(r.key, r.s.id);
+      for (const k of ks) {
+        need(k, r.s.id);
+        for (const p of C.pathOf.get(r.s.id) || []) { need(k, p); relays.add(p); }
+      }
+    }
+    const neededBy = new Map();
+    for (const [k, set] of needs) for (const id of set) { if (!neededBy.has(id)) neededBy.set(id, new Set()); neededBy.get(id).add(k); }
     const reps = [];
     for (const r of C.reps) {
-      const inside = !ex.has(r.key);
-      const serves = !inside && [...r.carriedIds].some(id => ids.has(id));
-      if (inside || serves) reps.push({ ...r, outside: !inside });
+      if (!neededBy.has(r.s.id)) continue;
+      reps.push({ ...r, outside: ex.has(r.key), conc: carries.get(r.s.id).size > 0, relay: relays.has(r.s.id),
+                  routed: C.pathOf.has(r.s.id), cats: neededBy.get(r.s.id) });
     }
     const bases = C.bases.filter(b => !ex.has(b.key));
     const regions = new Map();
@@ -446,19 +563,39 @@ const Alert2Plan = (function () {
     for (const b of bases) { const r = region(b.p.region); r.bases++; catOf(r, b).bases++; }
     const inPlan = new Set(reps.map(r => r.s.id).concat(bases.map(b => b.s.id)));
     const ticked = C.flat.filter(c => !ex.has(c.key)).length;
+    // The ticked catchments, each with what it holds and what it needs: the
+    // unit the backbone is cut over in.
+    const byKey = new Map(reps.map(r => [r.s.id, r]));
+    const heard = new Set();
+    for (const r of reps) for (const id of r.carriedIds) heard.add(id);
+    const catList = C.flat.filter(c => !ex.has(c.key)).map(c => {
+      const mine = field.filter(f => f.key === c.key);
+      const ids = [...(needs.get(c.key) || [])].filter(id => byKey.has(id));
+      const conc = ids.filter(id => carries.get(id).has(c.key));
+      return { key: c.key, name: c.name, region: c.region, remote: REMOTE.has(c.region),
+               field: mine.length, level: mine.filter(f => f.level).length, rain: mine.filter(f => !f.level).length,
+               high: mine.filter(f => f.high).length, needs: ids, conc: conc.length,
+               // Its stations a repeater on record carries: the ones the
+               // backbone can concentrate. The rest are heard by a base
+               // directly, or their path is not on record.
+               carried: mine.filter(f => heard.has(f.s.id)).length,
+               noPath: conc.filter(id => !C.pathOf.has(id)).length };
+    });
     const inv = {
       data: state.data, field, reps, bases,
       links: C.links.filter(p => inPlan.has(p.a.id) && inPlan.has(p.b.id)),
       regions: [...regions.values()],
       catchmentCount: ticked, catchmentsInScope: C.flat.length, partial: ticked < C.flat.length,
       outsideReps: reps.filter(r => r.outside).length,
+      relayOnly: reps.filter(r => r.outside && !r.conc).length,
+      catList,
       share: C.field.length ? field.length / C.field.length : 0,
       radioNetworks: C.radioNetworks,
       registerBases: bases.length,
       asAt: C.asAt,
     };
     // Two are wanted at a time — the card's selection and the whole scope,
-    // which the five figures compare against — so a few are kept.
+    // which the figures at the top compare against — so a few are kept.
     if (cuts.size > 6) cuts.clear();
     cuts.set(key, inv);
     return inv;
@@ -480,6 +617,21 @@ const Alert2Plan = (function () {
     const byWeight = I.regions.slice().sort((a, b) => (b.high - a.high) || (b.field - a.field) || a.name.localeCompare(b.name)).map(r => r.name);
     const given = (s.order || []).filter(n => names.includes(n));
     return given.concat(byWeight.filter(n => !given.includes(n)));
+  }
+
+  // The order the catchments are cut over in: region by region in the
+  // regions' order, and within a region the card's order, then the most
+  // High-priority sites, then the most stations.
+  function catOrder(I, s, regions) {
+    const given = new Map((s.catOrder || []).map((k, i) => [k, i]));
+    const weight = (a, b) => (b.high - a.high) || (b.field - a.field) || a.name.localeCompare(b.name);
+    const out = [];
+    for (const reg of regions) {
+      const mine = I.catList.filter(c => c.region === reg);
+      out.push(...mine.filter(c => given.has(c.key)).sort((a, b) => given.get(a.key) - given.get(b.key)),
+               ...mine.filter(c => !given.has(c.key)).sort(weight));
+    }
+    return out;
   }
 
   // ── 2. the model ──────────────────────────────────────────────────────────
@@ -515,6 +667,39 @@ const Alert2Plan = (function () {
     }
   }
 
+  // What each catchment's backbone takes: the repeaters it needs that no
+  // catchment before it has, and what each of those sites needs. A site the
+  // card has an answer for is taken at its word and not audited; a backbone
+  // site it has none for is audited first, and costed at the card's mix —
+  // allotted catchment by catchment in the order they go, so the totals are
+  // whole sites and the first catchments are not all luck. A repeater that
+  // is not backbone is fitted out as it stands.
+  function siteWorks(I, s, cats) {
+    const pRebuild = Math.min(100, s.rebuildPct) / 100;
+    const pAny = Math.min(100, s.rebuildPct + s.retrofitPct) / 100;
+    const marks = s.sites || {};
+    const repById = new Map(I.reps.map(r => [r.s.id, r]));
+    const doneBy = new Map();
+    let U = 0, gotR = 0, gotS = 0;
+    return cats.map((c, ci) => {
+      const fresh = c.needs.filter(id => !doneBy.has(id));
+      fresh.forEach(id => doneBy.set(id, ci));
+      const w = { fit: 0, retrofit: 0, rebuild: 0, audit: 0, marked: 0, assumed: { fit: 0, retrofit: 0, rebuild: 0 } };
+      for (const id of fresh) {
+        const m = marks[id];
+        if (m) { w[m]++; w.marked++; } else if (repById.get(id).backbone) w.audit++; else w.fit++;
+      }
+      const u = w.audit;
+      U += u;
+      const dR = Math.max(0, Math.min(u, Math.round(U * pRebuild) - gotR));
+      const dS = Math.max(dR, Math.min(u, Math.round(U * pAny) - gotS));
+      gotR += dR; gotS += dS;
+      w.assumed = { rebuild: dR, retrofit: dS - dR, fit: u - dS };
+      w.rebuild += dR; w.retrofit += dS - dR; w.fit += u - dS;
+      return { c, fresh, w };
+    });
+  }
+
   function model(I, s) {
     const wetOf = m => {
       if (!s.wet) return 1;
@@ -523,16 +708,24 @@ const Alert2Plan = (function () {
     };
     const order = regionOrder(I, s);
     const R = new Map(I.regions.map(r => [r.name, r]));
+    const cats = catOrder(I, s, order);
     const spare = 1 + s.spares / 100;
     const dayRate = { field: s.rateField / WORK_DAYS_YEAR, eng: s.rateEng / WORK_DAYS_YEAR, pm: s.ratePm / WORK_DAYS_YEAR, support: s.rateSupport / WORK_DAYS_YEAR };
+    // The field stations are converted in this program, or left on ALERT1 for
+    // their concentrators to carry. Without field crews nobody fits the
+    // repeaters but the backbone stream, so it runs whatever the switch says.
+    const fieldOn = !!s.fieldStage;
+    const bf = s.backboneFirst || !fieldOn;
 
     // Quantities.
     const nField = I.field.length;
     const nLevel = I.field.filter(f => f.level).length;
     const nRep0 = I.reps.length;
-    // What the reviews change, region by region; the totals are their sum.
-    const addOf = r => (s.reviews ? Math.round(r.repeaters * s.addRepPct / 100) : 0);
-    const remOf = r => (s.reviews ? Math.round(r.repeaters * s.removeRepPct / 100) : 0);
+    // What the reviews change, region by region — in a region with a
+    // catchment ticked; the totals are their sum.
+    const withCats = new Set(cats.map(c => c.region));
+    const addOf = r => (s.reviews && withCats.has(r.name) ? Math.round(r.repeaters * s.addRepPct / 100) : 0);
+    const remOf = r => (s.reviews && withCats.has(r.name) ? Math.round(r.repeaters * s.removeRepPct / 100) : 0);
     const added = I.regions.reduce((a, r) => a + addOf(r), 0);
     const removed = I.regions.reduce((a, r) => a + remOf(r), 0);
     const nRep = Math.max(0, nRep0 + added - removed);
@@ -552,15 +745,18 @@ const Alert2Plan = (function () {
     const unknownAcq = Math.round(own.unknown * s.unknownAcqPct / 100);
     const nAcq = s.acquireOther ? knownSites + unknownAcq : 0;
     const nOwners = s.acquireOther ? owners.size + Math.ceil(unknownAcq / perOwner) : 0;
-    const nRemed = Math.round(bb.length * s.remediatePct / 100);
+    const works = siteWorks(I, s, cats);
+    const tally = k => works.reduce((a, x) => a + x.w[k], 0);
+    const nAudit = tally('audit'), nRetro = tally('retrofit'), nRebuild = tally('rebuild'), nFitOnly = tally('fit'), nMarked = tally('marked');
+    const nRemed = nRetro + nRebuild;
 
     // What is bought, in whole units — the equipment table and the spend are
     // both read off these, so they cannot disagree.
-    const qField = Math.ceil(nField * spare);
+    const qField = fieldOn ? Math.ceil(nField * spare) : 0;
     const qRep = Math.ceil(nRep * spare);
     const baseRx = nBases * chains;
-    const qPower = Math.round(nField * s.powerPct / 100);
-    const qTest = Math.max(1, s.fieldCrews) + Math.max(1, s.backboneCrews);
+    const qPower = fieldOn ? Math.round(nField * s.powerPct / 100) : 0;
+    const qTest = (fieldOn ? Math.max(1, s.fieldCrews) : 0) + Math.max(1, s.backboneCrews);
     const fieldKit = qField * (s.cErtA2 + s.cKit) + qPower * s.cPower;
 
     // Monthly ledgers.
@@ -578,7 +774,8 @@ const Alert2Plan = (function () {
     ms.push({ at: 0, label: 'Approval' }, { at: P, label: 'First equipment delivered' });
 
     // Network reviews, region by region in conversion order, on the desk
-    // teams; each fixes its network before its field work may start.
+    // teams; each fixes its network before its field work may start, and
+    // before any structure in it is rebuilt.
     const review = new Map();
     const reviewDays = r => 5 + 0.05 * r.field + 1.0 * r.repeaters + 2 * Math.max(1, r.bases);
     if (s.reviews) {
@@ -594,9 +791,8 @@ const Alert2Plan = (function () {
       }
     }
 
-    // The backbone: acquisition (a property and legal lane, many at once),
-    // then remediation and ALERT2 fit-out on the tower crews.
-    const bbStart = s.backboneFirst ? 0 : P;
+    // The backbone's acquisitions: a property and legal lane, many at once.
+    const bbStart = bf ? 0 : P;
     const acqEnd = nOwners ? bbStart + s.acqLeadMonths * Math.max(1, nOwners / Math.max(1, s.acqParallel)) : bbStart;
     if (nAcq) {
       acts.push({ row: 'acquire', label: 'Backbone sites acquired', start: bbStart, end: acqEnd });
@@ -604,107 +800,167 @@ const Alert2Plan = (function () {
       spread(fte.support, bbStart, acqEnd, 0.5 * WORK_DAYS_MONTH * (acqEnd - bbStart));
       spread(cost.labour, bbStart, acqEnd, 0.5 * WORK_DAYS_MONTH * (acqEnd - bbStart) * dayRate.support);
     }
-    // Remediation is contract work — power, masts, enclosures, earthing,
-    // access — paid by the site (cRemed), region by region from day one. The
-    // ALERT2 fit-out is the Bureau's own tower-qualified crews, region by
-    // region once the equipment is in and the pilot has proved it, and once
-    // that region's remediation is done.
+
+    // Bases: an ALERT2 receive chain beside the legacy one, so both run while
+    // the network moves over. They are equipped in the order the catchments
+    // need them, so a catchment waits for its share of the bases — the share
+    // of the plan's stations cut over by the time it is.
+    const Lb = lane(nBases * chains * s.baseDays, DESK_DAYS_MONTH, P);
+    acts.push({ row: 'bases', label: 'Base stations receive ALERT2', start: Lb.start, end: Lb.end });
+    pd('eng', Lb.by);
+    Lb.by.forEach((v, m) => addInto(cost.travel, m, v * s.travelDay * 0.5));
+    const fieldTicked = cats.reduce((a, c) => a + c.field, 0);
+    let cum = 0;
+    const baseReady = cats.map((c, i) => {
+      cum += c.field;
+      if (!nBases) return P;
+      const share = fieldTicked ? cum / fieldTicked : (i + 1) / cats.length;
+      return Lb.start + (Lb.end - Lb.start) * Math.min(1, Math.ceil(nBases * share - 1e-9) / nBases);
+    });
+
+    // The pilot: the first catchment's backbone in concentration mode, proved
+    // end to end, and — when the field is in the plan — some of its stations.
+    const pilotEnd = s.pilot ? P + s.pilotMonths : P;
+    if (s.pilot) {
+      acts.push({ row: 'pilot', label: 'Pilot network', start: P, end: pilotEnd });
+      spread(fte.eng, P, pilotEnd, WORK_DAYS_MONTH * s.pilotMonths);
+      spread(cost.labour, P, pilotEnd, WORK_DAYS_MONTH * s.pilotMonths * dayRate.eng);
+      if (fieldOn) {
+        // Its stations are converted by one crew, at the network's average pace.
+        const avg = nField ? ((nField - nLevel) * s.rainDays + nLevel * s.levelDays) / nField : s.rainDays;
+        const crewDays = Math.min(s.pilotSites, nField) * avg;
+        spread(fte.field, P, pilotEnd, crewDays * s.staffPerCrew);
+        spread(cost.labour, P, pilotEnd, crewDays * s.staffPerCrew * dayRate.field);
+        spread(cost.travel, P, pilotEnd, crewDays * s.travelDay);
+      }
+      ms.push({ at: pilotEnd, label: 'Pilot accepted' });
+    }
+
+    // The backbone, catchment by catchment. Four lanes, each taking the
+    // catchments in order: the condition audits (one contract team, from day
+    // one — none of it needs ALERT2 equipment), the retrofits (contract crews,
+    // once a catchment's sites are audited), the rebuilds (structural
+    // contractors, once a site's design and approvals are through and its
+    // network's review has kept it), and the ALERT2 fit-out on the Bureau's
+    // tower crews — concentrators and relays, once the equipment is in, the
+    // pilot has proved it, the catchment's site works are done and its bases
+    // receive ALERT2. When the last of its repeaters is fitted, the catchment
+    // is cut over: its stations' readings travel as ALERT2 from their first
+    // repeater on, without a visit to one of them.
+    const auditPerMonth = s.crewDays;
     const remPerMonth = Math.max(1, s.remedCrews) * s.crewDays;
+    const rebPerMonth = Math.max(1, s.rebuildCrews) * s.crewDays;
     const towerPerMonth = Math.max(1, s.backboneCrews) * s.crewDays;
-    const remEnd = new Map(), fitEnd = new Map();
-    let bbReady = bbStart;
+    const fitFrom = s.pilot ? pilotEnd : P;
     const towerLabour = (L) => {
       const arr = [];
       L.by.forEach((v, m) => { if (v) arr[m] = v * s.staffPerCrew; });
       pd('field', arr);
       L.by.forEach((v, m) => { if (v) addInto(cost.travel, m, v * s.travelDay); });
     };
-    if (s.backboneFirst) {
-      let tr = bbStart, tf = P + (s.pilot ? s.pilotMonths : 0);
-      for (const name of order) {
-        const r = R.get(name);
-        const nr = Math.round(r.backbone * s.remediatePct / 100);
-        const Lr = lane(nr * s.remediateDays * (r.remote ? s.remoteMult : 1), remPerMonth, tr, wetOf);
-        if (nr) {
-          acts.push({ row: 'remediate', region: name, label: `Backbone remediation — ${name}`, start: Lr.start, end: Lr.end });
-          spread(cost.backbone, Lr.start, Math.max(Lr.end, Lr.start + 0.5), nr * s.cRemed);
-        }
-        remEnd.set(name, Lr.end);
-        tr = Lr.end;
-        const n = Math.max(0, r.repeaters + addOf(r) - remOf(r));
-        const L = lane(n * s.fitDays * (r.remote ? s.remoteMult : 1), towerPerMonth, Math.max(tf, Lr.end), wetOf);
-        if (n) {
-          acts.push({ row: 'fit', region: name, label: `Repeaters to ALERT2 — ${name}`, start: L.start, end: L.end });
-          towerLabour(L);
-        }
-        fitEnd.set(name, L.end);
-        tf = L.end;
+    let ta = bbStart, tr = bbStart, tb = bbStart, tf = fitFrom, worksEnd = bbStart;
+    const fitAt = new Map();
+    const seenRegion = new Set();
+    const rows = works.map(({ c, fresh, w }, ci) => {
+      const mult = c.remote ? s.remoteMult : 1;
+      // The repeaters the region's review adds, and retires, go with its first catchment.
+      let netAdd = 0, netRem = 0;
+      if (!seenRegion.has(c.region)) { seenRegion.add(c.region); const r = R.get(c.region); if (r) { netAdd = addOf(r); netRem = remOf(r); } }
+      const nFit = Math.max(0, fresh.length + netAdd - netRem);
+      const worksCost = w.audit * s.cAudit + w.retrofit * s.cRemed + w.rebuild * (s.cRebuild + s.cTemp);
+      const row = { ...c, fresh: fresh.length, shared: c.needs.length - fresh.length, w, nFit, added: netAdd, removed: netRem,
+                    worksCost, baseReady: baseReady[ci], audited: null, retroEnd: null, rebuildEnd: null, cutStart: null, cutover: null };
+      if (!bf) return row;
+      const La = lane(w.audit * s.auditDays * mult, auditPerMonth, ta, wetOf);
+      if (w.audit) {
+        acts.push({ row: 'audit', region: c.region, label: `Condition audits — ${c.name}`, start: La.start, end: La.end });
+        spread(cost.backbone, La.start, Math.max(La.end, La.start + 0.25), w.audit * s.cAudit);
+        ta = La.end;
       }
-      bbReady = tf;
-      ms.push({ at: bbReady, label: 'Backbone on ALERT2' });
-      // A contract manager looks after the remediation contracts while they run.
-      spread(fte.support, bbStart, tr, 0.3 * WORK_DAYS_MONTH * (tr - bbStart));
-      spread(cost.labour, bbStart, tr, 0.3 * WORK_DAYS_MONTH * (tr - bbStart) * dayRate.support);
+      const audited = w.audit ? La.end : bbStart;
+      row.audited = audited;
+      const Lr = lane(w.retrofit * s.remediateDays * mult, remPerMonth, Math.max(tr, audited), wetOf);
+      if (w.retrofit) {
+        acts.push({ row: 'remediate', region: c.region, label: `Retrofits — ${c.name}`, start: Lr.start, end: Lr.end });
+        spread(cost.backbone, Lr.start, Math.max(Lr.end, Lr.start + 0.5), w.retrofit * s.cRemed);
+        tr = Lr.end;
+        row.retroEnd = Lr.end;
+      }
+      if (!c.needs.length) { row.cutGate = 'no repeater carries its stations on record'; return row; }
+      const rev = s.reviews && review.has(c.region) ? review.get(c.region).end : 0;
+      const Lx = lane(w.rebuild * s.rebuildDays * mult, rebPerMonth, Math.max(tb, audited + s.rebuildLeadMonths, rev), wetOf);
+      if (w.rebuild) {
+        acts.push({ row: 'rebuild', region: c.region, label: `Structures rebuilt — ${c.name}`, start: Lx.start, end: Lx.end });
+        spread(cost.backbone, Lx.start, Math.max(Lx.end, Lx.start + 0.5), w.rebuild * s.cRebuild);
+        addInto(cost.backbone, Math.floor(Lx.start), w.rebuild * s.cTemp);
+        tb = Lx.end;
+        row.rebuildStart = Lx.start;
+        row.rebuildEnd = Lx.end;
+      }
+      worksEnd = Math.max(worksEnd, ta, tr, tb);
+      const ready = Math.max(audited, row.retroEnd || 0, row.rebuildEnd || 0);
+      const gates = [[s.pilot ? 'the pilot' : 'the equipment', fitFrom], ['its site works', ready], ['its bases receiving ALERT2', baseReady[ci]]];
+      if (nFit) gates.push(['the tower crews', tf]);
+      const gate = gates.reduce((a, b) => (b[1] > a[1] + 1e-9 ? b : a));
+      const Lf = lane(nFit * s.fitDays * mult, towerPerMonth, gate[1], wetOf);
+      if (nFit) {
+        acts.push({ row: 'fit', region: c.region, label: `Backbone cut-over — ${c.name}`, start: Lf.start, end: Lf.end });
+        towerLabour(Lf);
+        tf = Lf.end;
+      }
+      // A catchment whose repeaters were fitted for others before it is on
+      // the backbone when they are, and its bases.
+      fresh.forEach(id => fitAt.set(id, Lf.end));
+      const prior = Math.max(0, ...c.needs.map(id => fitAt.get(id) || 0));
+      row.cutStart = Lf.start;
+      row.cutGate = prior > Lf.end + 1e-9 ? 'its repeaters, fitted for a catchment before it' : gate[0];
+      row.cutover = Math.max(Lf.end, prior);
+      addInto(cost.network, Math.floor(Math.max(0, Lf.start - 1)), netAdd * s.cNewRep + netRem * s.cRemove + nFit * s.cLicence);
+      return row;
+    });
+    if (bf) {
+      // A contract manager looks after the audit, retrofit and rebuild contracts while they run.
+      spread(fte.support, bbStart, worksEnd, 0.3 * WORK_DAYS_MONTH * (worksEnd - bbStart));
+      spread(cost.labour, bbStart, worksEnd, 0.3 * WORK_DAYS_MONTH * (worksEnd - bbStart) * dayRate.support);
     }
 
-    // The pilot: one network end to end, in the first region.
-    const pilotEnd = s.pilot ? P + s.pilotMonths : P;
-    if (s.pilot) {
-      acts.push({ row: 'pilot', label: 'Pilot network', start: P, end: pilotEnd });
-      spread(fte.eng, P, pilotEnd, WORK_DAYS_MONTH * s.pilotMonths);
-      spread(cost.labour, P, pilotEnd, WORK_DAYS_MONTH * s.pilotMonths * dayRate.eng);
-      // Its stations are converted by one crew, at the network's average pace.
-      const avg = nField ? ((nField - nLevel) * s.rainDays + nLevel * s.levelDays) / nField : s.rainDays;
-      const crewDays = Math.min(s.pilotSites, nField) * avg;
-      spread(fte.field, P, pilotEnd, crewDays * s.staffPerCrew);
-      spread(cost.labour, P, pilotEnd, crewDays * s.staffPerCrew * dayRate.field);
-      spread(cost.travel, P, pilotEnd, crewDays * s.travelDay);
-      ms.push({ at: pilotEnd, label: 'Pilot accepted' });
-    }
-
-    // Bases: an ALERT2 receive chain beside the legacy one, so both run while
-    // the field moves over.
-    const Lb = lane(nBases * chains * s.baseDays, DESK_DAYS_MONTH, P);
-    acts.push({ row: 'bases', label: 'Base stations receive ALERT2', start: Lb.start, end: Lb.end });
-    pd('eng', Lb.by);
-    Lb.by.forEach((v, m) => addInto(cost.travel, m, v * s.travelDay * 0.5));
-
-    // Field conversion, region by region, on every field crew. Without the
-    // backbone first, a region's repeaters are remediated and fitted by the
-    // same crews, and none starts before the acquisitions are done.
+    // Field conversion, catchment by catchment, on every field crew, each
+    // once its backbone is ALERT2 — an ALERT1 repeater cannot carry an ALERT2
+    // station. Without the backbone first, the field crews fit a catchment's
+    // repeaters themselves, its site works are contracted as it starts, and
+    // none starts before the acquisitions are done.
     const fieldPerMonth = Math.max(1, s.fieldCrews) * s.crewDays;
-    const regionRows = [];
     let prev = pilotEnd;
-    let pilotLeft = s.pilot ? Math.min(s.pilotSites, nField) : 0;
+    let pilotLeft = s.pilot && fieldOn ? Math.min(s.pilotSites, nField) : 0;
     const why = [];
-    for (const name of order) {
-      const r = R.get(name);
-      const mult = r.remote ? s.remoteMult : 1;
-      const pilotHere = Math.min(pilotLeft, r.field);
+    rows.forEach((row, ci) => {
+      if (!fieldOn) { row.start = row.end = null; row.work = 0; row.by = []; row.pilotHere = 0; row.gate = ''; return; }
+      const mult = row.remote ? s.remoteMult : 1;
+      const pilotHere = Math.min(pilotLeft, row.field);
       pilotLeft -= pilotHere;
-      const share = r.field ? (r.field - pilotHere) / r.field : 0;
+      const share = row.field ? (row.field - pilotHere) / row.field : 0;
       // A station the FWIN program is already visiting to upgrade gets its
       // ERT-A2 on that visit: the crew-days of fitting it, not of getting there.
       const f = s.fwinPct / 100;
-      let work = ((r.rain * s.rainDays + r.level * s.levelDays) * mult * (1 - f) + r.field * f * s.fwinDays) * share;
-      const nRepHere = Math.max(0, r.repeaters + addOf(r) - remOf(r));
-      // Without the backbone first, the field crews fit the region's repeaters
-      // themselves, and its remediation is contracted as the region starts.
-      const remHere = s.backboneFirst ? 0 : Math.round(r.backbone * s.remediatePct / 100);
-      if (!s.backboneFirst) work += nRepHere * s.fitDays * mult;
-      const gates = [[regionRows.length ? 'the region before' : (s.pilot ? 'the pilot' : 'the equipment'), prev]];
-      if (s.reviews && review.has(name)) gates.push(['its network review', review.get(name).end]);
-      if (s.backboneFirst && fitEnd.has(name)) gates.push(['its repeaters on ALERT2', fitEnd.get(name)]);
-      if (!s.backboneFirst && nAcq) gates.push(['the backbone acquisitions', acqEnd]);
+      let work = ((row.rain * s.rainDays + row.level * s.levelDays) * mult * (1 - f) + row.field * f * s.fwinDays) * share;
+      if (!bf) work += row.nFit * s.fitDays * mult;
+      const gates = [[ci ? 'the catchment before' : (s.pilot ? 'the pilot' : 'the equipment'), prev]];
+      if (s.reviews && review.has(row.region)) gates.push(['its network review', review.get(row.region).end]);
+      if (bf && row.cutover != null) gates.push(['its backbone on ALERT2', row.cutover]);
+      else {
+        if (!bf && nAcq) gates.push(['the backbone acquisitions', acqEnd]);
+        gates.push(['its bases receiving ALERT2', row.baseReady]);
+      }
       const gate = gates.reduce((a, b) => (b[1] > a[1] + 1e-9 ? b : a));
       const st = gate[1];
-      if (remHere) addInto(cost.backbone, Math.floor(st), remHere * s.cRemed);
+      if (!bf) {
+        addInto(cost.backbone, Math.floor(st), row.worksCost);
+        addInto(cost.network, Math.floor(Math.max(0, st - 1)), row.added * s.cNewRep + row.removed * s.cRemove + row.nFit * s.cLicence);
+      }
       const L = lane(work, fieldPerMonth, st, wetOf);
       // Field units are bought as the crews use them — in tranches over the
-      // region's work, so the spend follows the field; new repeaters are built
-      // ahead of the region's conversion.
-      const fieldUnits = r.field * spare;
-      const kit = nField ? fieldKit * r.field / nField : 0;
+      // catchment's work, so the spend follows the field.
+      const kit = nField ? fieldKit * row.field / nField : 0;
       const arr = [];
       L.by.forEach((v, m) => {
         if (!v) return;
@@ -714,20 +970,39 @@ const Alert2Plan = (function () {
       });
       if (!work) addInto(cost.equip, Math.floor(st), kit);
       pd('field', arr);
-      const addHere = addOf(r), remHere2 = remOf(r);
-      addInto(cost.network, Math.floor(Math.max(0, st - 1)), addHere * s.cNewRep + remHere2 * s.cRemove + nRepHere * s.cLicence);
       if (L.end > L.start || work > 0) {
-        acts.push({ row: 'field', region: name, label: `Field stations — ${name}`, start: L.start, end: L.end });
+        acts.push({ row: 'field', region: row.region, label: `Field stations — ${row.name}`, start: L.start, end: L.end });
       }
-      if (gate !== gates[0] && st > prev + 0.05) why.push({ region: name, gate: gate[0], wait: st - prev });
-      regionRows.push({
-        name, r, review: review.get(name) || null, fit: s.backboneFirst ? { end: fitEnd.get(name) } : null,
-        start: L.start, end: L.end, work, gate: gate[0], units: Math.ceil(fieldUnits), nRep: nRepHere, added: addHere, removed: remHere2,
-      });
+      if (gate !== gates[0] && st > prev + 0.05) why.push({ region: row.region, name: row.name, gate: gate[0], wait: st - prev });
+      Object.assign(row, { start: L.start, end: L.end, work, by: L.by, pilotHere, gate: gate[0] });
+      if (!bf && row.needs.length) { row.cutover = L.end; row.cutStart = L.start; }
       prev = Math.max(prev, L.end);
+    });
+    const cutovers = rows.map(r => r.cutover).filter(v => v != null);
+    const bbReady = cutovers.length ? Math.max(...cutovers) : bbStart;
+    const firstCut = cutovers.length ? Math.min(...cutovers) : bbStart;
+    if (bf && rows.length) {
+      ms.push({ at: firstCut, label: 'First catchment on the ALERT2 backbone' });
+      ms.push({ at: bbReady, label: 'Every catchment on the ALERT2 backbone' });
     }
-    const fieldEnd = prev;
-    ms.push({ at: fieldEnd, label: 'Last field station on ALERT2' });
+    const fieldEnd = fieldOn ? prev : bbReady;
+    if (fieldOn) ms.push({ at: fieldEnd, label: 'Last field station on ALERT2' });
+
+    // Each region's own timeline: its catchments', taken together.
+    const regionRows = order.map(name => {
+      const r = R.get(name);
+      const mine = rows.filter(x => x.region === name);
+      const cut = mine.map(x => x.cutover).filter(v => v != null);
+      const go = mine.filter(x => x.start != null);
+      return {
+        name, r, cats: mine.length, review: review.get(name) || null,
+        fit: bf && cut.length ? { end: Math.max(...cut) } : null,
+        cutFirst: cut.length ? Math.min(...cut) : null, cutLast: cut.length ? Math.max(...cut) : null,
+        start: go.length ? Math.min(...go.map(x => x.start)) : null, end: go.length ? Math.max(...go.map(x => x.end)) : null,
+        work: mine.reduce((a, x) => a + (x.work || 0), 0), gate: mine.length ? mine[0].gate || mine[0].cutGate || '' : '',
+        units: Math.ceil(r.field * spare), added: addOf(r), removed: remOf(r),
+      };
+    });
 
     // Repeater and base equipment, bought on delivery.
     addInto(cost.equip, P, qRep * (s.cErtRep + s.cKit) + baseRx * (s.cErtBase + s.c115e) + nBases * s.cKit + qTest * s.cTestKit);
@@ -742,11 +1017,11 @@ const Alert2Plan = (function () {
     // register and licences put right, the lessons written up.
     const lastWork = Math.max(fieldEnd, bbReady, Lb.end, acqEnd);
     // What sets the end date: whichever stream finishes last.
-    const critical = [['the field crews reaching the last station', fieldEnd], ['the backbone acquisitions', acqEnd],
-                      ['the repeaters going to ALERT2', bbReady], ['the base stations', Lb.end]]
-      .reduce((a, b) => (b[1] > a[1] + 1e-9 ? b : a))[0];
+    const streams = [['the backbone acquisitions', acqEnd], ['the last catchment cut over to the ALERT2 backbone', bbReady], ['the base stations', Lb.end]];
+    if (fieldOn) streams.unshift(['the field crews reaching the last station', fieldEnd]);
+    const critical = streams.reduce((a, b) => (b[1] > a[1] + 1e-9 ? b : a))[0];
     const end = lastWork + s.closeMonths;
-    acts.push({ row: 'close', label: 'Legacy ALERT retired, close-out', start: lastWork, end });
+    acts.push({ row: 'close', label: fieldOn ? 'Legacy ALERT retired, close-out' : 'Legacy repeaters retired, close-out', start: lastWork, end });
     spread(fte.field, lastWork, end, s.closeMonths * s.crewDays * 0.5 * s.staffPerCrew);
     spread(cost.labour, lastWork, end, s.closeMonths * s.crewDays * 0.5 * s.staffPerCrew * dayRate.field);
     ms.push({ at: end, label: 'Program closed' });
@@ -760,12 +1035,12 @@ const Alert2Plan = (function () {
     // Totals, contingency on the lot, and the monthly and yearly views.
     const N = Math.ceil(end);
     const sum = arr => arr.reduce((a, v) => a + (v || 0), 0);
-    const cats = Object.keys(cost);
-    const base = cats.reduce((a, k) => a + sum(cost[k]), 0);
+    const costCats = Object.keys(cost);
+    const base = costCats.reduce((a, k) => a + sum(cost[k]), 0);
     const contingency = base * s.contingency / 100;
     cost.contingency = [];
     for (let m = 0; m < N; m++) {
-      const here = cats.reduce((a, k) => a + (cost[k][m] || 0), 0);
+      const here = costCats.reduce((a, k) => a + (cost[k][m] || 0), 0);
       if (here) cost.contingency[m] = here * s.contingency / 100;
     }
     const fteMonth = [];
@@ -786,14 +1061,15 @@ const Alert2Plan = (function () {
         row[k] += v; row.total += v;
       });
     }
+    const stay = `none — the ${nf(nField)} stations stay ALERT1, carried by their concentrators`;
     const equipment = [
-      { item: 'ELPRO ERT-A2 — field station transmitter', qty: qField, unit: s.cErtA2, note: `${nf(nField)} stations${s.spares ? ` and ${pct(s.spares)} spares` : ''}` },
-      { item: 'ELPRO ERT-A2 — repeater (ALERT2 repeat, legacy concentration)', qty: qRep, unit: s.cErtRep, note: `${nf(nRep0)} repeaters${added || removed ? ` ${added ? `+ ${added} added` : ''}${removed ? ` − ${removed} retired` : ''} by the reviews` : ''}${s.spares ? `, ${pct(s.spares)} spares` : ''}` },
+      { item: 'ELPRO ERT-A2 — field station transmitter', qty: qField, unit: s.cErtA2, note: fieldOn ? `${nf(nField)} stations${s.spares ? ` and ${pct(s.spares)} spares` : ''}` : stay },
+      { item: 'ELPRO ERT-A2 — repeater (concentrator: ALERT1 in, ALERT2 on)', qty: qRep, unit: s.cErtRep, note: `${nf(nRep0)} repeaters${added || removed ? ` ${added ? `+ ${added} added` : ''}${removed ? ` − ${removed} retired` : ''} by the reviews` : ''}${s.spares ? `, ${pct(s.spares)} spares` : ''}` },
       { item: 'ELPRO ERT-A2 — base station receiver', qty: baseRx, unit: s.cErtBase, note: `${nBases} bases × ${chains}` },
       { item: 'ELPRO 115E-2 gateway with ALERT2 licence key', qty: baseRx, unit: s.c115e, note: `${nBases} bases × ${chains}` },
-      { item: 'Antenna, coax, surge protection and GPS kit', qty: qField + qRep + nBases, unit: s.cKit, note: 'every site, and the spares' },
-      { item: 'Solar panel, regulator and battery upgrade', qty: qPower, unit: s.cPower, note: `${pct(s.powerPct)} of field stations` },
-      { item: 'Test set and bench equipment', qty: qTest, unit: s.cTestKit, note: 'one per field and fit-out crew' },
+      { item: 'Antenna, coax, surge protection and GPS kit', qty: qField + qRep + nBases, unit: s.cKit, note: fieldOn ? 'every site, and the spares' : 'every repeater and base, and the spares' },
+      { item: 'Solar panel, regulator and battery upgrade', qty: qPower, unit: s.cPower, note: fieldOn ? `${pct(s.powerPct)} of field stations` : 'none — no field station is visited' },
+      { item: 'Test set and bench equipment', qty: qTest, unit: s.cTestKit, note: fieldOn ? 'one per field and fit-out crew' : 'one per fit-out crew' },
     ];
     equipment.forEach(e => { e.total = e.qty * e.unit; });
     const units2 = { ertA2: equipment.slice(0, 3).reduce((a, e) => a + e.qty, 0), e115: baseRx };
@@ -801,18 +1077,20 @@ const Alert2Plan = (function () {
       { k: 'equip', label: 'Equipment', v: sum(cost.equip) },
       { k: 'labour', label: 'Staff time', v: sum(cost.labour) },
       { k: 'travel', label: 'Travel and vehicles', v: sum(cost.travel) },
-      { k: 'backbone', label: 'Backbone acquisition and remediation', v: sum(cost.backbone) },
+      { k: 'backbone', label: 'Backbone sites — acquired, audited, retrofitted, rebuilt', v: sum(cost.backbone) },
       { k: 'network', label: 'Network changes and licensing', v: sum(cost.network) },
       { k: 'contingency', label: `Contingency (${pct(s.contingency)})`, v: contingency },
     ];
 
     // What set the pace: the lane whose end is the field's end, said plainly.
-    const fieldMonths = regionRows.reduce((a, r) => a + (r.end - r.start), 0);
+    const fieldMonths = rows.reduce((a, r) => a + ((r.end || 0) - (r.start || 0)), 0);
     const waits = why.reduce((a, w) => a + w.wait, 0);
+    const shared = I.reps.filter(r => r.cats.size > 1).length;
     return {
       s, order, nField, nLevel, nRain: nField - nLevel, nRep0, nRep, added, removed, nBases, chains, baseRx,
-      bbCount: bb.length, own, nAcq, nOwners, nRemed, acqEnd, bbStart, bbReady, pilotEnd, P, fieldEnd, end, months: N,
-      acts, ms, regionRows, review, why, waits, fieldMonths, critical,
+      bbCount: bb.length, own, nAcq, nOwners, nRemed, nAudit, nRetro, nRebuild, nFitOnly, nMarked, shared,
+      acqEnd, bbStart, bbReady, firstCut, pilotEnd, P, fieldEnd, end, months: N, bf, fieldOn,
+      acts, ms, regionRows, cats: rows, review, why, waits, fieldMonths, critical,
       fte: fteMonth, fteYears, fteTotal: Object.values(fteYears).reduce((a, v) => a + v, 0), peak,
       cost, base, contingency, total: base + contingency, breakdown, fy: [...fy.values()], equipment, units: units2,
       reviewDays: s.reviews ? [...review.values()].reduce((a, L) => a + L.by.reduce((x, v) => x + (v || 0), 0), 0) : 0,
@@ -843,9 +1121,10 @@ const Alert2Plan = (function () {
     const I = inventory();
     if (!I) return null;
     const M = model(I, sc);
-    // The proposal, over every catchment in the scope: what the five figures
-    // say a scenario is more or less than.
-    const D = differs(sc, DEFAULTS) ? model(inventoryFor([]), sanitize({ ...DEFAULTS })) : null;
+    // The proposal, over every catchment in the scope and with what the card
+    // says of the repeater sites: what the figures say a scenario is more or
+    // less than.
+    const D = differs(sc, DEFAULTS) ? model(inventoryFor([]), sanitize({ ...DEFAULTS, sites: sc.sites })) : null;
     return { I, M, D };
   }
   // Worked once per scenario: a repaint reads the plan a dozen times.
@@ -898,9 +1177,10 @@ const Alert2Plan = (function () {
     const tile = (label, value, sub, d, cls = '') => `<div class="adm-kpi a2p-kpi ${cls}">
         <div class="adm-kpi-label">${label}</div><div class="adm-kpi-value">${value}</div>
         <div class="adm-kpi-sub">${sub}</div>${d ? `<div class="adm-kpi-sub">${d}</div>` : ''}</div>`;
-    return `<div class="adm-kpis a2p-kpis" role="group" aria-label="The plan in five figures">
+    return `<div class="adm-kpis a2p-kpis" role="group" aria-label="The plan in six figures">
       ${tile('Estimated cost', money(M.total), `including ${pct(s.contingency)} contingency`, D && delta(M.total, D.total, 'money'))}
       ${tile('Duration', mo(M.end), `${monthLabel(s, 0)} to ${endLabel(s, M.end)}`, D && delta(M.end, D.end, 'months'))}
+      ${M.cats.length ? tile('Backbone on ALERT2', endLabel(s, M.bbReady), `every catchment · the first ${endLabel(s, M.firstCut)}`, D && delta(M.bbReady, D.bbReady, 'months')) : ''}
       ${tile('Effort', `${nf1(M.fteTotal)} <small>FTE-years</small>`, `peak ${nf1(M.peak)} FTE`, D && delta(M.fteTotal, D.fteTotal, 'n'))}
       ${tile('Equipment', `${nf(M.units.ertA2)} <small>ERT-A2</small>`, `${nf(M.units.e115)} ELPRO 115E-2 gateways`, D && delta(M.units.ertA2, D.units.ertA2, 'int'))}
       ${tile('Sites', nf(M.nField + M.nRep0 + M.nBases), `${nf(M.nField)} field · ${nf(M.nRep0)} repeaters · ${nf(M.nBases)} bases`, '')}
@@ -930,6 +1210,8 @@ const Alert2Plan = (function () {
              oninput="Alert2Plan.set('${c.k}', this.value)" aria-valuetext="${escAttr(ctlValue(c, v))}"></label>`;
   }
   function ctlValue(c, v) {
+    // Retrofits are what is left after the rebuilds: the two cannot pass 100%.
+    if (c.k === 'retrofitPct' && Number(v) + Math.min(100, sc.rebuildPct) > 100) return `${nf(v)}% — ${nf(100 - Math.min(100, sc.rebuildPct))}% after the rebuilds`;
     if (c.zero && Number(v) === 0) {
       const I = inventory();
       return I ? `${basesDefault(I)}, ${I.partial ? 'scaled to the catchments ticked' : c.zero}` : c.zero;
@@ -945,7 +1227,7 @@ const Alert2Plan = (function () {
           ${PRESETS.map(p => `<button type="button" class="exp-btn-sm" onclick="Alert2Plan.preset('${p.id}')">${esc(p.label)}</button>`).join('')}
         </div></div>
       <p class="small">Every slider and switch works the plan again at once — the figures above and the document below.
-        ${changed ? '<strong>This is not the proposal</strong>: the five figures say how far it moved from the proposal over every catchment.' : 'This is the proposal as drafted.'}
+        ${changed ? '<strong>This is not the proposal</strong>: the figures above say how far it moved from the proposal over every catchment.' : 'This is the proposal as drafted.'}
         Your scenario is kept on this device only.</p>
       <div class="a2p-ctl-grid">
         ${CONTROLS.map(g => `<fieldset class="a2p-fs"><legend>${esc(g.group)}</legend>${g.items.map(ctlHtml).join('')}</fieldset>`).join('')}
@@ -1059,7 +1341,7 @@ const Alert2Plan = (function () {
         <p class="small">With nothing ticked under <strong>Catchments in the plan</strong> there is nothing to convert. Tick a catchment, a region,
           or <button type="button" class="link-btn" onclick="Alert2Plan.catchments('all')">every catchment</button>, and the plan is worked again.</p></div>`;
     }
-    return [summaryHtml(C), whyHtml(), whereHtml(C), equipmentHtml(C), backboneHtml(C), reviewsHtml(C),
+    return [summaryHtml(C), whyHtml(), whereHtml(C), equipmentHtml(C), backboneHtml(C), cutoverHtml(C), reviewsHtml(C),
             timelineHtml(C), effortHtml(C), costHtml(C), risksHtml(C), decisionsHtml(C), sourcesHtml()].join('');
   }
 
@@ -1073,26 +1355,33 @@ const Alert2Plan = (function () {
     const slow = M.why.slice().sort((a, b) => b.wait - a.wait)[0];
     const ends = `What sets the end date is <strong>${M.critical}</strong>${M.critical.includes('acquisitions')
       ? ` — ${nf(M.nOwners)} owners, ${s.acqParallel} at a time; more negotiated at once would bring it in` : ''}. `;
-    const pace = slow && M.waits > 1
-      ? `The field crews wait about ${mo(M.waits)} in all for other work to be ready — longest in ${esc(slow.region)}, for ${esc(slow.gate)} — so ${
-          slow.gate.includes('review') ? 'another review team' : slow.gate.includes('repeaters') ? 'another tower crew' : 'faster acquisition'} would shorten it.`
+    const pace = !M.fieldOn ? ''
+      : slow && M.waits > 1
+      ? `The field crews wait about ${mo(M.waits)} in all for other work to be ready — longest before ${esc(slow.name)}, for ${esc(slow.gate)} — so ${
+          slow.gate.includes('review') ? 'another review team' : slow.gate.includes('backbone') || slow.gate.includes('bases') ? 'more crews on the backbone' : 'faster acquisition'} would shorten it.`
       : `The field crews set the pace: ${s.fieldCrews} crew${s.fieldCrews === 1 ? '' : 's'} take about ${mo(M.fieldMonths)} to reach every station, and nothing else holds them up.`;
+    const ncat = M.cats.filter(c => c.cutover != null).length;
     return sec('sum', '1. Summary', `
       <p>${I.partial ? `The ${nf(I.catchmentCount)} catchments ticked hold` : 'The register lists'} <strong>${nf(M.nField)} ALERT field stations</strong> (${nf(M.nRain)} rainfall, ${nf(M.nLevel)} river height),
         <strong>${nf(M.nRep0)} repeaters</strong> — ${nf(M.bbCount)} of them carrying the backbone — and the network is received at
         <strong>${nf(M.nBases)} base stations</strong>, across ${regions} region${regions === 1 ? '' : 's'} and ${nf(I.catchmentCount)} catchments.
-        This draft moves all of them from legacy ALERT to ALERT2.${I.partial
+        This draft moves the backbone to ALERT2 first, one catchment at a time, ${M.fieldOn ? 'and then the field stations behind it' : 'and leaves the field stations on ALERT1, carried by ALERT2 concentrators'}.${I.partial
           ? ` <strong>It covers ${nf(I.catchmentCount)} of the ${nf(I.catchmentsInScope)} catchments in scope</strong> — the ones ticked on the card${
-            I.outsideReps ? `, and ${nf(I.outsideReps)} repeater${I.outsideReps === 1 ? '' : 's'} outside them that carr${I.outsideReps === 1 ? 'ies' : 'y'} their stations` : ''}.` : ''}</p>
+            I.outsideReps ? `, and ${nf(I.outsideReps)} repeater${I.outsideReps === 1 ? '' : 's'} outside them that carr${I.outsideReps === 1 ? 'ies' : 'y'} their stations or relay${I.outsideReps === 1 ? 's' : ''} them to a base` : ''}.` : ''}</p>
       <ul class="a2p-points">
-        <li><strong>Cost:</strong> about <strong>${money(M.total)}</strong>, including ${pct(s.contingency)} contingency — ${money(M.breakdown[0].v)} of it equipment.</li>
+        <li><strong>Cost:</strong> about <strong>${money(M.total)}</strong>, including ${pct(s.contingency)} contingency — ${money(M.breakdown[0].v)} of it equipment, ${money(M.breakdown[3].v)} the backbone sites.</li>
         <li><strong>Time:</strong> about <strong>${mo(M.end)}</strong>, from approval in ${monthLabel(s, 0)} to close-out in ${endLabel(s, M.end)}.</li>
         <li><strong>Effort:</strong> <strong>${nf1(M.fteTotal)} FTE-years</strong>, peaking at ${nf1(M.peak)} FTE — ${nf1(M.fteYears.field)} of them in the field.</li>
-        <li><strong>Equipment:</strong> ${nf(M.units.ertA2)} ELPRO ERT-A2 units (field, repeater and base) and ${nf(M.units.e115)} ELPRO 115E-2 gateways.</li>
-        <li><strong>Backbone first:</strong> ${M.nAcq ? `acquire about ${nf(M.nAcq)} backbone repeater site${M.nAcq === 1 ? '' : 's'} the Bureau does not own, from about ${nf(M.nOwners)} owner${M.nOwners === 1 ? '' : 's'}, and ` : ''}remediate about
-          ${nf(M.nRemed)}, starting ${s.backboneFirst ? 'now — none of it needs ALERT2 equipment' : `with the equipment in ${monthLabel(s, M.P)}`}.</li>
-        ${s.reviews ? `<li><strong>Network reviews:</strong> each region's network is reviewed before it is converted — expected to add about ${M.added} repeater${M.added === 1 ? '' : 's'} and retire about ${M.removed}.</li>` : ''}
-        ${s.fwinPct ? `<li><strong>With FWIN:</strong> about ${nf(M.nField * s.fwinPct / 100)} field stations (${pct(s.fwinPct)}) take their ERT-A2 on a visit the Bureau's FWIN upgrade program is already making, rather than one of their own.</li>` : ''}
+        <li><strong>Equipment:</strong> ${nf(M.units.ertA2)} ELPRO ERT-A2 units (${M.fieldOn ? 'field, repeater and base' : 'repeater and base'}) and ${nf(M.units.e115)} ELPRO 115E-2 gateways.</li>
+        <li><strong>The backbone first, catchment by catchment:</strong> ${M.nAcq ? `acquire about ${nf(M.nAcq)} backbone repeater site${M.nAcq === 1 ? '' : 's'} the Bureau does not own, from about ${nf(M.nOwners)} owner${M.nOwners === 1 ? '' : 's'}; ` : ''}audit
+          ${nf(M.nAudit)} site${M.nAudit === 1 ? '' : 's'} not yet assessed, retrofit about ${nf(M.nRetro)} and rebuild the structure of about ${nf(M.nRebuild)}, starting
+          ${M.bf ? 'now — none of it needs ALERT2 equipment' : `with the equipment in ${monthLabel(s, M.P)}`}. ${M.bf && ncat
+            ? `The first catchment is on the ALERT2 backbone in <strong>${endLabel(s, M.firstCut)}</strong> and ${ncat === M.cats.length ? `all ${nf(ncat)}` : `all ${nf(ncat)} a repeater on record carries`} by <strong>${endLabel(s, M.bbReady)}</strong> —
+               their stations' readings travel as ALERT2 from the first repeater on, before a field station is touched.` : ''}</li>
+        ${M.fieldOn ? `<li><strong>Then the field:</strong> each catchment's field stations take an ERT-A2 once its backbone is ALERT2, the last in ${endLabel(s, M.fieldEnd)}.</li>`
+          : `<li><strong>The field stations stay ALERT1</strong> in this scenario, concentrated at their first repeater; they take an ERT-A2 on an FWIN visit or at renewal, outside this plan.</li>`}
+        ${s.reviews ? `<li><strong>Network reviews:</strong> each region's network is reviewed before its field work, and before any structure in it is rebuilt — expected to add about ${M.added} repeater${M.added === 1 ? '' : 's'} and retire about ${M.removed}.</li>` : ''}
+        ${s.fwinPct && M.fieldOn ? `<li><strong>With FWIN:</strong> about ${nf(M.nField * s.fwinPct / 100)} field stations (${pct(s.fwinPct)}) take their ERT-A2 on a visit the Bureau's FWIN upgrade program is already making, rather than one of their own.</li>` : ''}
       </ul>
       <p>${ends}${pace}</p>
       <p class="small txt-muted">An estimate for planning (in the order of −30% to +50%), not a quote. The quantities are counted from the register,
@@ -1120,8 +1409,8 @@ const Alert2Plan = (function () {
       <p>The equipment is made in Brisbane. ELPRO Technologies' <strong>ERT-A2</strong> is one unit that is the field transmitter,
         the repeater and the base receiver, on a connector wired like the ALERT1 canister it replaces; the <strong>115E-2</strong>
         gateway takes ALERT1 and ALERT2 from a base receiver onto the data network.<sup><a href="#a2p-ref-ert">[5]</a></sup> Flood-Net
-        already decodes ALERT2, has taken readings from a 115E-2 trial and the workshop's ERT-A2, and stores them — the data side is
-        proven before the radio side starts.</p>
+        already decodes ALERT2 — the concentration records an ERT-A2 sends on for an ALERT1 station among it — has taken readings from a
+        115E-2 trial and the workshop's ERT-A2, and stores them: the data side is proven before the radio side starts.</p>
       <h4>How it fits with FWIN</h4>
       <p>The Bureau's Flood Warning Infrastructure Network program — up to $236 million over ten years from 2023 — is taking
         ownership of priority gauges from their owners and upgrading them. In Queensland that is about 1,100 sites from 62 council
@@ -1161,9 +1450,9 @@ const Alert2Plan = (function () {
       .map(c => `<tr><td>${esc(x.name)}</td><th scope="row">${esc(c.name)}${c.outside ? ' <span class="small txt-muted">— unticked; its repeaters carry ticked stations</span>' : ''}</th><td class="a2p-num">${nf(c.rain)}</td><td class="a2p-num">${nf(c.level)}</td>
         <td class="a2p-num">${nf(c.repeaters)}</td><td class="a2p-num">${nf(c.backbone)}</td><td class="a2p-num">${nf(c.bases)}</td></tr>`));
     return sec('where', '3. Where the work is', `
-      <p>${nf(M.nField)} field stations and ${nf(M.nRep0)} repeaters in ${I.regions.length} regions and ${nf(I.catchmentCount)} catchments, converted one region at a time in the order below
-        (▲ ▼ change it — the timeline follows). The order proposed puts the regions with the most High-priority SLS sites first;
-        ${s.pilot ? `the pilot network is the first ${nf(Math.min(s.pilotSites, M.nField))} stations of the first region.` : 'there is no pilot in this scenario.'}
+      <p>${nf(M.nField)} field stations and ${nf(M.nRep0)} repeaters in ${I.regions.length} regions and ${nf(I.catchmentCount)} catchments, taken a region at a time in the order below
+        (▲ ▼ change it — the timeline follows), and within a region a catchment at a time (section 6). The order proposed puts the regions with the most High-priority SLS sites first;
+        ${s.pilot ? `the pilot network is the first catchment's backbone${M.fieldOn ? ` and the first ${nf(Math.min(s.pilotSites, M.nField))} of its stations` : ''}.` : 'there is no pilot in this scenario.'}
         Base stations are counted from the register's ${I.radioNetworks} radio networks${sc.basesN ? ` — overridden on the card to ${sc.basesN}`
           : I.partial ? `, scaled to the stations ticked (${nf(M.nBases)})` : ''};
         the register marks ${I.registerBases} site${I.registerBases === 1 ? '' : 's'} with the base role${I.partial ? ' in the catchments ticked' : ''}.${I.partial
@@ -1277,9 +1566,10 @@ const Alert2Plan = (function () {
   function equipmentHtml({ M }) {
     const tot = M.equipment.reduce((a, e) => a + e.total, 0);
     return sec('equip', '4. Equipment', `
-      <p>One ELPRO ERT-A2 goes to every field station, every repeater and every base receive chain; one ELPRO 115E-2 sits
+      <p>One ELPRO ERT-A2 goes to every repeater — configured as a concentrator where it hears ALERT1 stations, to repeat ALERT2 where it
+        relays — and to every base receive chain${M.fieldOn ? ', and then to every field station' : '; the field stations keep their ALERT1 encoders in this scenario'}. One ELPRO 115E-2 sits
         behind each base receiver as its gateway to the data network (its ALERT2 gateway needs a licence key and firmware 2.33 or later).
-        River stations keep their level sensors, which the ERT-A2 reads. The quantities follow the card.</p>
+        ${M.fieldOn ? 'River stations keep their level sensors, which the ERT-A2 reads. ' : ''}The quantities follow the card; the site works at the repeaters are in section 5.</p>
       <div class="table-wrap"><table class="a2p-table">
         <caption class="sr-only">Equipment to buy</caption>
         <thead><tr><th scope="col">Item</th><th scope="col" class="a2p-num">Quantity</th><th scope="col" class="a2p-num">Each</th>
@@ -1293,6 +1583,24 @@ const Alert2Plan = (function () {
 
   // ── backbone ──
   const OWN = { bureau: 'The Bureau', joint: 'The Bureau with another owner', other: 'A council or another owner', unknown: 'No owner on record' };
+  // Every repeater in the plan in the order the site table lists them — by
+  // region, then name — so a site's select is numbered off this list and no
+  // id has to survive a trip through an onchange attribute.
+  function sitesOf(I) {
+    return I.reps.slice().sort((a, b) => a.p.region.localeCompare(b.p.region) || String(a.s.name).localeCompare(String(b.s.name)) || String(a.s.id).localeCompare(String(b.s.id)));
+  }
+  function worksText(r) {
+    const m = (sc.sites || {})[r.s.id];
+    if (m) return WORKS_LABEL[m];
+    return r.backbone ? 'Not assessed — audited first' : 'Fit-out (not backbone)';
+  }
+  function roleText(r) {
+    return r.conc && r.relay ? 'Concentrator and relay' : r.conc ? 'Concentrator' : r.relay ? 'Relay to a base' : 'On a ticked catchment\'s ground';
+  }
+  function mixOf(s) {
+    const reb = Math.min(100, s.rebuildPct), ret = Math.min(s.retrofitPct, 100 - reb);
+    return { reb, ret, fit: 100 - reb - ret };
+  }
   function backboneHtml({ I, M }) {
     const s = sc;
     const bb = I.reps.filter(r => r.backbone).sort((a, b) => (b.carries - a.carries) || a.s.name.localeCompare(b.s.name));
@@ -1309,28 +1617,73 @@ const Alert2Plan = (function () {
     }).join('');
     const legend = segs.map(k => `<li><span class="a2p-swatch a2p-own-${k}" aria-hidden="true"></span>${esc(OWN[k])}: <strong>${M.own[k]}</strong></li>`).join('');
     const top = bb.slice(0, 25);
+    const catName = new Map(I.catList.map(c => [c.key, c.name]));
     const row = r => `<tr><th scope="row">${esc(r.s.name)}${r.outside ? ' <span class="small txt-muted">— outside the catchments ticked</span>' : ''}</th><td>${esc(r.p.region)}</td><td class="a2p-num">${nf(r.carries)}</td>
+      <td class="a2p-num">${nf(r.cats.size)}</td><td>${esc(worksText(r))}</td>
       <td>${esc(r.owner.name || OWN[r.owner.cls])}</td><td class="col-optional">${r.s.repeater && r.s.repeater.acma_licence ? esc(r.s.repeater.acma_licence) : '<span class="txt-warn">none on file</span>'}</td></tr>`;
     const head = `<thead><tr><th scope="col">Repeater</th><th scope="col">Region</th><th scope="col" class="a2p-num">Stations carried</th>
+      <th scope="col" class="a2p-num">Catchments</th><th scope="col">Site works</th>
       <th scope="col">Owner</th><th scope="col" class="col-optional">ACMA licence</th></tr></thead>`;
     const noLicence = bb.filter(r => !(r.s.repeater && r.s.repeater.acma_licence)).length;
-    return sec('bb', '5. Backbone repeaters — acquire and remediate them first', `
+    const mix = mixOf(s);
+    const marks = s.sites || {};
+    const list = sitesOf(I);
+    const siteRow = (r, i) => {
+      const m = marks[r.s.id] || '';
+      const id = `a2p-site-${i}`;
+      const needs = [...r.cats].map(k => catName.get(k)).filter(Boolean);
+      return `<tr><th scope="row">${esc(r.s.name)}${r.outside ? ' <span class="small txt-muted">— outside the ticks</span>' : ''}</th>
+        <td>${esc(r.p.region)}</td><td>${esc(roleText(r))}${r.backbone ? '' : ' <span class="small txt-muted">· not backbone</span>'}${r.routed || !r.conc ? '' : ' <span class="small txt-warn">· no path to a base on record</span>'}</td>
+        <td class="small">${esc(needs.length > 4 ? `${needs.slice(0, 4).join(', ')} and ${needs.length - 4} more` : needs.join(', '))}</td>
+        <td><select id="${id}" data-k="site:${i}" aria-label="What ${escAttr(r.s.name)} needs" onchange="Alert2Plan.site(${i}, this.value)">
+          <option value=""${m ? '' : ' selected'}>Not assessed</option>
+          ${WORKS.map(k => `<option value="${k}"${m === k ? ' selected' : ''}>${esc(WORKS_LABEL[k])}</option>`).join('')}
+        </select></td>
+        <td>${esc(r.owner.name || OWN[r.owner.cls])}</td></tr>`;
+    };
+    return sec('bb', '5. The backbone — remediated and moved to ALERT2 first, catchment by catchment', `
       <p>The backbone is the chain of hilltop repeaters every reading travels along to reach a base — by the register,
         <strong>${nf(M.bbCount)} of the ${nf(M.nRep0)} repeaters</strong> share a pass-range window with another repeater or a base
-        within ${s.backboneKm} km${I.partial ? ` — counting only the repeaters in the plan: those in the catchments ticked, and ${nf(I.outsideReps)} outside them that carry their stations` : ''}.
-        Whatever happens in the field, these sites carry it, legacy and ALERT2 alike. The plan treats them as a
-        stream of work of their own that can, and should, start ahead of everything else:</p>
+        within ${s.backboneKm} km${I.partial ? ` — counting only the repeaters in the plan: those in the catchments ticked, and ${nf(I.outsideReps)} outside them that carry their stations or relay them to a base` : ''}.
+        Whatever happens in the field, these sites carry it, legacy and ALERT2 alike. The plan treats them as a stream of work of its
+        own that starts ahead of everything else, and moves the network over on it one catchment at a time.</p>
+      <h4>Concentration: ALERT1 in, ALERT2 on</h4>
+      <p>The field stations are left as they are. Every repeater that hears one of a catchment's stations is fitted with an ERT-A2
+        configured as a <strong>concentrator</strong>: it hears the station's legacy ALERT burst and sends the reading on in its own
+        GPS-timed ALERT2 slot. Every repeater from there to a base is fitted to repeat ALERT2 — an ALERT1 repeater cannot carry it, so
+        the whole way has to be done — and the base receives ALERT2 through a 115E-2. When the last of them is done the catchment is
+        <strong>cut over</strong>: its readings travel as ALERT2 from their first repeater on, without a visit to one of its stations.
+        Section 6 sets out each catchment's.${M.fieldOn ? ' Its field stations then take their own ERT-A2s, to finish the job.' : ''}</p>
+      <h4>What each site needs</h4>
+      <ul class="a2p-points">
+        <li><strong>Fit-out only</strong> — the site is sound: the ERT-A2 in place of the ALERT1 repeater, a GPS antenna for its slot,
+          the antenna and coax checked. Bureau tower crews, ${nf1(s.fitDays)} crew-days a site. <em>${nf(M.nFitOnly)} site${M.nFitOnly === 1 ? '' : 's'} in this scenario.</em></li>
+        <li><strong>Retrofit</strong> — the structure stands but the site needs work before it carries the network on: solar and batteries
+          sized for the ERT-A2's draw, antenna and coax, the enclosure, earthing and surge protection, access. Contract crews,
+          ${nf1(s.remediateDays)} crew-days and about ${money(s.cRemed)} a site. <em>${nf(M.nRetro)} site${M.nRetro === 1 ? '' : 's'}.</em></li>
+        <li><strong>Rebuild the structure</strong> — the mast or tower, its footings or guys, or the shelter is not fit to carry the network
+          another twenty years, and is remediated or replaced. A structural design, approvals and fabrication first (${s.rebuildLeadMonths}
+          months from its audit${s.reviews ? ', and not before its network\'s review has kept the site' : ''}), then ${nf(s.rebuildDays)} crew-days of
+          structural contract works and about ${money(s.cRebuild)}, with a temporary repeater on a trailer mast (${money(s.cTemp)}) so the
+          catchment is never without one. <em>${nf(M.nRebuild)} site${M.nRebuild === 1 ? '' : 's'}.</em></li>
+      </ul>
+      <p>A site nobody has assessed is <strong>audited first</strong> — a rigger's climb and a structural report, about ${money(s.cAudit)} — and
+        until then is costed at the card's mix: ${pct(mix.fit)} fit-out only, ${pct(mix.ret)} retrofit, ${pct(mix.reb)} rebuilt, allotted
+        catchment by catchment. ${M.nMarked
+          ? `<strong>${nf(M.nMarked)} site${M.nMarked === 1 ? ' is' : 's are'} marked</strong> below from what is known of ${M.nMarked === 1 ? 'it' : 'them'}, and costed at that.`
+          : 'When you know what a site needs, mark it in the table below: it is costed at that rather than the mix, it skips the audit, and the plan follows.'}</p>
+      <h4>Why the backbone goes first</h4>
       <ol class="a2p-points">
-        <li><strong>It needs no ALERT2 equipment.</strong> Acquisition is property and legal work; remediation is power, masts,
-          enclosures, earthing and access. Both can start on approval — or before it, from existing budgets.</li>
+        <li><strong>Most of it needs no ALERT2 equipment.</strong> Acquisition is property and legal work; audits, retrofits and
+          rebuilds are power, structures, enclosures, earthing and access. All of it can start on approval — or before it, from existing budgets.</li>
         <li><strong>The Bureau cannot upgrade, licence or maintain a site it does not control.</strong> ${slsReady
           ? `By the SLS and the register, ${M.own.bureau} backbone site${M.own.bureau === 1 ? ' is' : 's are'} the Bureau's, ${M.own.joint} shared,
              ${M.own.other} another owner's — mostly councils — and ${M.own.unknown} ha${M.own.unknown === 1 ? 's' : 've'} no owner on record.`
           : 'Ownership is still loading from the SLS.'}
           Acquisition has the longest lead time of anything in the plan — an owner's agreement is assumed to take ${s.acqLeadMonths} months — so it has to start first,
           and FWIN is already negotiating with most of the same councils for their gauges.</li>
-        <li><strong>An ALERT2 repeater concentrates legacy ALERT.</strong> Once a repeater is an ERT-A2, the legacy stations it hears
-          reach the base over ALERT2 — the backbone can move before a single field station does, and the field work can go at its own pace.</li>
+        <li><strong>Concentration moves a whole catchment at once.</strong> Once its repeaters are ERT-A2s, its legacy stations reach the base
+          over ALERT2 — the backbone can move before a single field station does, and the field work can go at its own pace.</li>
         <li><strong>It is where the network is weakest.</strong> The 2015 review of Queensland's flood warning gauge network found
           relay failure — masts, birds, water — to be the network's largest vulnerability, repeaters rarely visited, and little on
           record of where they are or how they were designed.<sup><a href="#a2p-ref-kbr">[9]</a></sup></li>
@@ -1345,22 +1698,163 @@ const Alert2Plan = (function () {
         <figcaption><ul class="a2p-legend">${legend}</ul></figcaption>
       </figure>
       <p>Under this scenario: <strong>${nf(M.nAcq)} site${M.nAcq === 1 ? '' : 's'} acquired</strong>
-        ${M.nAcq ? `from about ${nf(M.nOwners)} owner${M.nOwners === 1 ? '' : 's'} — one agreement an owner, ${s.acqParallel} negotiated at once, ${s.acqLeadMonths} months each — finishing ${endLabel(s, M.acqEnd)}` : ''}; <strong>${nf(M.nRemed)} remediated</strong>
-        (${pct(s.remediatePct)} of the backbone)${s.backboneFirst ? `, and every repeater on ALERT2 by ${endLabel(s, M.bbReady)}` : ''}.
+        ${M.nAcq ? `from about ${nf(M.nOwners)} owner${M.nOwners === 1 ? '' : 's'} — one agreement an owner, ${s.acqParallel} negotiated at once, ${s.acqLeadMonths} months each — finishing ${endLabel(s, M.acqEnd)}` : ''};
+        <strong>${nf(M.nAudit)} audited</strong>, <strong>${nf(M.nRetro)} retrofitted</strong> and <strong>${nf(M.nRebuild)} rebuilt</strong>${M.bf && M.cats.length
+          ? `, and every catchment on the ALERT2 backbone by ${endLabel(s, M.bbReady)}` : ''}.
         ${noLicence ? `${noLicence} backbone repeater${noLicence === 1 ? ' has' : 's have'} no ACMA licence on file in the register — each needs one confirmed, or applied for, before it transmits ALERT2.` : ''}</p>
       <div class="table-wrap"><table class="a2p-table">
         <caption>The backbone repeaters carrying the most stations${bb.length > top.length ? ` — ${top.length} of ${bb.length}` : ''}</caption>
         ${head}<tbody>${top.map(row).join('')}</tbody></table></div>
-      ${bb.length > top.length ? `<details class="a2p-more"><summary>All ${bb.length} backbone repeaters</summary>
-        <div class="table-wrap medium" role="region" tabindex="0" aria-label="All backbone repeaters"><table class="a2p-table">
-          <caption class="sr-only">Every backbone repeater</caption>${head}<tbody>${bb.map(row).join('')}</tbody></table></div></details>` : ''}`);
+      <details class="a2p-more" id="a2p-sites"><summary>What each repeater site needs — all ${nf(list.length)} in the plan, to mark from what you know</summary>
+        <p class="small">A site marked here is costed at what it is marked, and not audited. A backbone site left <em>Not assessed</em> is audited and costed at the card's mix;
+          a repeater that is not backbone is fitted out as it stands.
+          The marks are kept on this device with the scenario; presets and “The proposal” leave them as they are.</p>
+        <div class="table-wrap medium" role="region" tabindex="0" aria-label="What each repeater site needs"><table class="a2p-table">
+          <caption class="sr-only">Every repeater in the plan: its role, the catchments that need it, and what its site needs</caption>
+          <thead><tr><th scope="col">Repeater</th><th scope="col">Region</th><th scope="col">Role</th><th scope="col">Catchments that need it</th>
+            <th scope="col">Site works</th><th scope="col">Owner</th></tr></thead>
+          <tbody>${list.map(siteRow).join('')}</tbody></table></div></details>`);
+  }
+
+  // ── the cut-over, catchment by catchment ──
+  // How many of the plan's field stations ride an ALERT2 backbone, and how
+  // many are ALERT2 themselves, at each month boundary.
+  function stationsOverTime(M, N) {
+    const on = [], conv = [];
+    for (let m = 0; m <= N; m++) {
+      let a = 0, b = 0;
+      for (const r of M.cats) {
+        if (r.cutover != null && r.cutover <= m + 1e-9) a += r.carried;
+        if (!M.fieldOn) continue;
+        if (r.pilotHere && M.pilotEnd <= m + 1e-9) b += r.pilotHere;
+        const rest = r.field - (r.pilotHere || 0);
+        if (!rest) continue;
+        if (r.work > 0) {
+          let done = 0;
+          r.by.forEach((v, j) => { if (j < m && v) done += v; });
+          b += rest * Math.min(1, done / r.work);
+        } else if (r.end <= m + 1e-9) b += rest;
+      }
+      on.push(a); conv.push(b);
+    }
+    return { on, conv };
+  }
+  function cutoverSvg(M) {
+    const s = sc;
+    const rows = M.cats.filter(r => r.cutover != null);
+    if (!rows.length || !M.nField) return '';
+    const N = Math.max(12, Math.ceil(M.end));
+    const W = 980, H = 250, L = 48, RM = 170, T = 14, B = 28;
+    const x = m => L + (m / N) * (W - L - RM);
+    const y = v => T + (1 - v / M.nField) * (H - T - B);
+    const steps = rows.slice().sort((a, b) => a.cutover - b.cutover);
+    const carried = steps.reduce((a, r) => a + r.carried, 0);
+    if (!carried) return '';
+    let d = `M${x(0).toFixed(1)} ${y(0).toFixed(1)}`, n = 0, half = null;
+    const dots = [];
+    for (const r of steps) {
+      if (!r.carried) continue;
+      d += ` H${x(r.cutover).toFixed(1)}`;
+      n += r.carried;
+      d += ` V${y(n).toFixed(1)}`;
+      if (half == null && n >= carried / 2) half = r.cutover;
+      dots.push(`<circle class="a2p-cut" cx="${x(r.cutover).toFixed(1)}" cy="${y(n).toFixed(1)}" r="4"><title>${esc(r.name)}: on the ALERT2 backbone ${endLabel(s, r.cutover)}, ${nf(r.carried)} station${r.carried === 1 ? '' : 's'} (${nf(n)} in all)</title></circle>`);
+    }
+    d += ` H${x(N).toFixed(1)}`;
+    const T2 = stationsOverTime(M, N);
+    let conv = '';
+    if (M.fieldOn) conv = `<path class="a2p-l2" d="${T2.conv.map((v, m) => `${m ? 'L' : 'M'}${x(m).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')}"/>`;
+    let axis = '';
+    for (const f of [0, 0.25, 0.5, 0.75, 1]) {
+      const v = Math.round(M.nField * f);
+      axis += `<line class="a2p-grid" x1="${L}" y1="${y(v).toFixed(1)}" x2="${(W - RM).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text class="a2p-axis" x="${L - 6}" y="${y(v).toFixed(1)}" text-anchor="end">${nf(v)}</text>`;
+    }
+    for (let m = 0; m < N; m++) if (calOf(s, m).m === 0) axis += `<text class="a2p-axis" x="${x(m).toFixed(1)}" y="${H - 8}">${calOf(s, m).y}</text>`;
+    const lastConv = T2.conv[T2.conv.length - 1];
+    // Direct labels at the right, held apart when the two lines end close.
+    let ya = y(carried), yb = y(lastConv);
+    if (M.fieldOn && Math.abs(ya - yb) < 16) { if (ya <= yb) { yb = ya + 16; } else { ya = yb + 16; } }
+    const labA = `<text class="a2p-lab" x="${(W - RM + 8).toFixed(1)}" y="${ya.toFixed(1)}">On the backbone · ${nf(carried)}</text>`;
+    const labB = M.fieldOn ? `<text class="a2p-lab" x="${(W - RM + 8).toFixed(1)}" y="${yb.toFixed(1)}">ALERT2 themselves · ${nf(lastConv)}</text>` : '';
+    const title = `Field stations on the ALERT2 backbone: half of the ${nf(carried)} a repeater carries by ${endLabel(s, half == null ? M.bbReady : half)}, all by ${endLabel(s, M.bbReady)}${
+      M.fieldOn ? `; all ${nf(M.nField)} converted themselves by ${endLabel(s, M.fieldEnd)}` : ''}`;
+    return `<svg class="a2p-cutover" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="a2p-cut-t a2p-cut-d">
+      <title id="a2p-cut-t">${esc(title)}</title>
+      <desc id="a2p-cut-d">A step for each catchment as it is cut over to the ALERT2 backbone, rising to every field station in the plan${M.fieldOn ? '; a dashed line for the stations converted to ALERT2 themselves, which follows behind' : ''}. The table below lists each catchment's date.</desc>
+      ${axis}${conv}<path class="a2p-l1" d="${d}"/>${dots.join('')}${labA}${labB}</svg>`;
+  }
+  function cutoverHtml({ I, M }) {
+    const s = sc;
+    const rows = M.cats;
+    const noPath = rows.filter(r => r.noPath > 0);
+    const worksCell = r => {
+      const bits = [];
+      if (r.w.retrofit) bits.push(`${r.w.retrofit} retrofit`);
+      if (r.w.rebuild) bits.push(`${r.w.rebuild} rebuilt`);
+      if (r.w.fit) bits.push(`${r.w.fit} fit-out`);
+      const guessed = r.w.audit ? ` <span class="small txt-muted">· ${r.w.audit} to audit</span>` : '';
+      return (bits.length ? `${r.w.audit ? '≈ ' : ''}${bits.join(' · ')}` : '—') + guessed;
+    };
+    const tr = (r, i) => {
+      const prevSame = i > 0 && rows[i - 1].region === r.region;
+      const nextSame = i < rows.length - 1 && rows[i + 1].region === r.region;
+      return `<tr><td class="col-optional">${i + 1}</td>
+        <th scope="row"><span class="a2p-swatch" style="--c:${regionVar(r.region)}" aria-hidden="true"></span>${esc(r.name)} <span class="small txt-muted">${esc(r.region)}</span></th>
+        <td class="a2p-num">${nf(r.field)}</td>
+        <td class="a2p-num">${nf(r.needs.length)}${r.shared ? ` <span class="small txt-muted">(${nf(r.fresh)} new)</span>` : ''}</td>
+        <td>${worksCell(r)}</td>
+        <td class="a2p-num">${money(r.worksCost)}</td>
+        <td>${r.cutover != null ? endLabel(s, r.cutover) : '<span class="txt-muted">— no repeater on record</span>'}</td>
+        <td class="col-optional small">${esc(M.bf ? r.cutGate || '' : 'with its field work')}</td>
+        ${M.fieldOn ? `<td class="col-optional">${r.work > 0 || r.end > r.start ? `${monthLabel(s, r.start)} – ${endLabel(s, r.end)}` : '—'}</td>` : ''}
+        <td><span class="button-group a2p-move">
+          <button type="button" class="exp-btn-sm" data-k="cup:${escAttr(r.key)}" onclick="Alert2Plan.moveCat(${i}, -1)" ${prevSame ? '' : 'disabled'} aria-label="Cut ${escAttr(r.name)} over earlier">▲</button>
+          <button type="button" class="exp-btn-sm" data-k="cdown:${escAttr(r.key)}" onclick="Alert2Plan.moveCat(${i}, 1)" ${nextSame ? '' : 'disabled'} aria-label="Cut ${escAttr(r.name)} over later">▼</button>
+        </span></td></tr>`;
+    };
+    const worksTotal = rows.reduce((a, r) => a + r.worksCost, 0);
+    const unheard = rows.reduce((a, r) => a + r.field - r.carried, 0);
+    return sec('cut', '6. The cut-over, catchment by catchment', `
+      <p>A catchment comes onto ALERT2 on the backbone in one step: once the repeaters that hear its stations, and every repeater from them
+        to a base, are sound and fitted, and its base receives ALERT2. Until then nothing changes for it — its repeaters keep repeating ALERT1.
+        <strong>${nf(M.shared)} of the ${nf(M.nRep0)} repeaters</strong> are needed by more than one catchment, so the first catchments in a
+        region carry most of its backbone work and the later ones find much of theirs done: the table says how many of each catchment's are
+        new to it. Within a region the catchments go in the order below — the most High-priority SLS sites first, then the most stations;
+        ▲ ▼ change it.${M.bf ? '' : ' <strong>In this scenario the backbone is not first</strong>: each catchment\'s repeaters are fitted by the field crews with its stations, so its cut-over is the end of its field work.'}</p>
+      <figure class="a2p-fig a2p-wide">${cutoverSvg(M)}
+        <figcaption><ul class="a2p-legend"><li><span class="a2p-swatch a2p-s1" aria-hidden="true"></span>Field stations whose readings ride the ALERT2 backbone — a step, and a dot to hover, for each catchment</li>${
+          M.fieldOn ? '<li><span class="a2p-swatch a2p-s3" aria-hidden="true"></span>Field stations converted to ALERT2 themselves (dashed)</li>' : ''}</ul></figcaption></figure>
+      <div class="table-wrap medium" role="region" tabindex="0" aria-label="The cut-over, catchment by catchment"><table class="a2p-table a2p-cut-table">
+        <caption class="sr-only">Each catchment in the order it is cut over: its stations, the repeaters it needs, their site works and cost, and its dates</caption>
+        <thead><tr><th scope="col" class="col-optional">Order</th><th scope="col">Catchment</th><th scope="col" class="a2p-num">Stations</th>
+          <th scope="col" class="a2p-num">Repeaters</th><th scope="col">Site works new to it</th><th scope="col" class="a2p-num">Cost</th>
+          <th scope="col">On the ALERT2 backbone</th><th scope="col" class="col-optional">Waits for</th>
+          ${M.fieldOn ? '<th scope="col" class="col-optional">Field stations</th>' : ''}<th scope="col">Move</th></tr></thead>
+        <tbody>${rows.map(tr).join('')}
+          <tr class="a2p-total"><td class="col-optional"></td><th scope="row">All</th><td class="a2p-num">${nf(rows.reduce((a, r) => a + r.field, 0))}</td><td class="a2p-num">${nf(M.nRep0)}</td>
+            <td>${nf(M.nRetro)} retrofit · ${nf(M.nRebuild)} rebuilt · ${nf(M.nFitOnly)} fit-out</td><td class="a2p-num">${money(worksTotal)}</td>
+            <td>${M.cats.length ? endLabel(s, M.bbReady) : '—'}</td><td class="col-optional"></td>${M.fieldOn ? `<td class="col-optional">${endLabel(s, M.fieldEnd)}</td>` : ''}<td></td></tr>
+        </tbody></table></div>
+      <p class="small txt-muted"><em>Stations</em> are the catchment's field stations; <em>Repeaters</em> the ones it needs, and how many no catchment before it needed.
+        <em>Cost</em> is the audits, retrofits and rebuilds (with their temporary repeaters) of the sites new to it, before contingency — ≈ where some are unassessed and
+        allotted at the card's mix; acquisition is in section 5. A catchment's bases are counted as its share of the plan's stations: the bases are equipped in the order the catchments need them.</p>
+      <ul class="a2p-points small">
+        ${unheard ? `<li><strong>${nf(unheard)} field station${unheard === 1 ? '' : 's'} no repeater on record carries</strong> — by their pass ranges — are heard by a base directly,
+          or their path is not on record. The chart leaves them off the backbone line; ${M.fieldOn ? 'they are converted with their catchment\'s field stations once its bases receive ALERT2' : 'they stay ALERT1, received as they are now'}.</li>` : ''}
+        ${noPath.length ? `<li><strong>No path to a base on record</strong> from some of the concentrators of ${nf(noPath.length)} catchment${noPath.length === 1 ? '' : 's'} — the register marks
+          ${I.registerBases} base${I.registerBases === 1 ? '' : 's'} for ${I.radioNetworks} radio networks — so the relays between them and their base are not counted. Their networks' reviews must find the way.</li>` : ''}
+        <li><strong>Anyone else listening.</strong> A council, a dam operator or another agency that receives a catchment's ALERT1 off the air today stops hearing
+          it at the cut-over, unless it receives ALERT2 too or takes the readings from the Bureau. Each catchment's listeners need finding, and telling, before it goes.</li>
+        <li><strong>The first hop is still ALERT1</strong> until a station takes its own ERT-A2: its burst can still collide on the way to the concentrator, and its reading
+          is time-stamped at the repeater, not the gauge. The backbone hops — where a lost burst loses every station behind it — are where concentration helps first.</li>
+      </ul>`);
   }
 
   // ── reviews ──
   function reviewsHtml({ M }) {
     const s = sc;
     const rows = M.regionRows.filter(x => x.review);
-    return sec('rev', '6. Network reviews', `
+    return sec('rev', '7. Network reviews', `
       <p>Before a network is converted it is reviewed: is every station heard by two repeaters with margin to spare, are there
         repeaters doing nothing, hills that would do better, a base that needs a partner? ALERT2 changes the answers — every repeat
         takes a TDMA slot, so long repeater chains cost airtime they did not cost before — and the conversion visit is the cheapest
@@ -1381,22 +1875,24 @@ const Alert2Plan = (function () {
       <p>Each review ends in decisions: repeaters to add, move or retire; bases to add; the frequency and slot plan; the licences
         to apply for. ${s.reviews
           ? `This scenario expects the reviews to <strong>add about ${M.added}</strong> repeater${M.added === 1 ? '' : 's'} and <strong>retire about ${M.removed}</strong>,
-             takes ${nf(M.reviewDays)} engineer-days on ${s.reviewTeams} team${s.reviewTeams === 1 ? '' : 's'}, and runs each region's review ahead of its field work:`
+             takes ${nf(M.reviewDays)} engineer-days on ${s.reviewTeams} team${s.reviewTeams === 1 ? '' : 's'}, and runs each region's review ahead of its field work —
+             and ahead of any structure in it being rebuilt, so no tower is replaced on a hill the review would leave. Audits and retrofits go ahead of it: they keep today's network running whatever the review decides.`
           : '<strong>This scenario skips the reviews</strong>: the network is converted as it stands, which is quicker and cheaper and carries today\'s weaknesses into ALERT2.'}</p>
       ${rows.length ? `<div class="table-wrap"><table class="a2p-table">
         <caption class="sr-only">Network review schedule by region</caption>
         <thead><tr><th scope="col">Region</th><th scope="col">Review</th><th scope="col" class="a2p-num">Engineer-days</th>
-          <th scope="col" class="a2p-num">Repeaters added</th><th scope="col" class="a2p-num">Retired</th><th scope="col">Field work may start</th></tr></thead>
+          <th scope="col" class="a2p-num">Repeaters added</th><th scope="col" class="a2p-num">Retired</th><th scope="col">${M.fieldOn ? 'Field work starts' : 'On the ALERT2 backbone'}</th></tr></thead>
         <tbody>${rows.map(x => `<tr><th scope="row">${esc(x.name)}</th><td>${monthLabel(s, x.review.start)} – ${endLabel(s, x.review.end)}</td>
           <td class="a2p-num">${nf(x.review.by.reduce((a, v) => a + (v || 0), 0))}</td><td class="a2p-num">${x.added}</td><td class="a2p-num">${x.removed}</td>
-          <td>${monthLabel(s, x.start)}</td></tr>`).join('')}</tbody></table></div>` : ''}`);
+          <td>${x.start == null ? '<span class="txt-muted">no catchment ticked in it</span>' : M.fieldOn ? monthLabel(s, x.start) : endLabel(s, x.end)}</td></tr>`).join('')}</tbody></table></div>` : ''}`);
   }
 
   // ── timeline ──
   const ROWS = [
     ['procure', 'Procurement and supply'], ['review', 'Network reviews'], ['acquire', 'Backbone sites acquired'],
-    ['remediate', 'Backbone remediation'], ['fit', 'Repeaters to ALERT2'], ['pilot', 'Pilot network'],
-    ['bases', 'Bases receive ALERT2'], ['field', 'Field stations to ALERT2'], ['close', 'Legacy retired, close-out'],
+    ['audit', 'Condition audits'], ['remediate', 'Backbone retrofits'], ['rebuild', 'Structures rebuilt'],
+    ['pilot', 'Pilot network'], ['bases', 'Bases receive ALERT2'], ['fit', 'Backbone cut-over'],
+    ['field', 'Field stations to ALERT2'], ['close', 'Legacy retired, close-out'],
   ];
   function ganttSvg(M) {
     const s = sc;
@@ -1444,22 +1940,25 @@ const Alert2Plan = (function () {
   function timelineHtml({ M }) {
     const s = sc;
     const ms = M.ms.slice().sort((a, b) => a.at - b.at);
-    return sec('time', '7. Timeline', `
-      <p>About <strong>${mo(M.end)}</strong> from approval to close-out. ${s.backboneFirst
-        ? `The backbone stream starts on day one beside procurement and the reviews; the pilot proves the equipment and the method on one network${s.pilot ? '' : ' (not in this scenario)'}; then the field crews work region by region, each region starting once its review is done and its repeaters are on ALERT2.`
-        : `In this scenario the backbone waits for the equipment and is done region by region by the field crews, and no region starts before the acquisitions are complete — compare it with “The proposal” to see what starting the backbone first is worth.`}
+    const span = (a, b) => (a == null ? '—' : `${endLabel(s, a)}${endLabel(s, b) === endLabel(s, a) ? '' : ` – ${endLabel(s, b)}`}`);
+    return sec('time', '8. Timeline', `
+      <p>About <strong>${mo(M.end)}</strong> from approval to close-out. ${M.bf
+        ? `The backbone stream starts on day one beside procurement and the reviews: the condition audits, then the retrofits and — once each is designed, approved and its network reviewed — the rebuilds, catchment by catchment.
+           The pilot proves the equipment and concentration on the first catchment${s.pilot ? '' : ' (not in this scenario)'}; then the tower crews cut the catchments over one by one, each once its site works are done and its bases receive ALERT2.${
+           M.fieldOn ? ' The field crews follow catchment by catchment, each starting once its backbone is ALERT2 and its network has been reviewed.' : ' The field stations are not converted in this scenario.'}`
+        : `In this scenario the backbone waits for the equipment and is done catchment by catchment by the field crews, and none starts before the acquisitions are complete — compare it with “The proposal” to see what starting the backbone first is worth.`}
         ${s.wet ? `Field work slows to ${pct(s.wetFactor)} from December to March (shaded): crews are pulled to flood response and roads close.` : ''}</p>
       <figure class="a2p-fig a2p-wide">${ganttSvg(M)}
-        <figcaption class="small txt-muted">Thin lines mark each 1 July (the financial year). Hover a bar for its dates.</figcaption></figure>
+        <figcaption class="small txt-muted">Thin lines mark each 1 July (the financial year). The backbone and field rows are a bar a catchment, coloured by its region. Hover a bar for its dates.</figcaption></figure>
       <div class="a2p-two">
         <div><h4>Milestones</h4><ul class="a2p-ms-list">${ms.map(m => `<li><strong>${endLabel(s, m.at + 1e-6)}</strong> — ${esc(m.label)}</li>`).join('')}</ul></div>
         <div><h4>Each network's own timeline</h4>
           <div class="table-wrap"><table class="a2p-table">
             <caption class="sr-only">Timeline by region</caption>
-            <thead><tr><th scope="col">Region</th><th scope="col">Field stations</th><th scope="col" class="a2p-num">Months</th><th scope="col" class="col-optional">Waits for</th></tr></thead>
+            <thead><tr><th scope="col">Region</th><th scope="col">On the ALERT2 backbone</th>${M.fieldOn ? '<th scope="col">Field stations</th><th scope="col" class="a2p-num">Months</th>' : ''}</tr></thead>
             <tbody>${M.regionRows.map(x => `<tr><th scope="row"><span class="a2p-swatch" style="--c:${regionVar(x.name)}" aria-hidden="true"></span>${esc(x.name)}</th>
-              <td>${monthLabel(s, x.start)} – ${endLabel(s, x.end)}</td><td class="a2p-num">${nf1(x.end - x.start)}</td>
-              <td class="col-optional small">${esc(x.gate)}</td></tr>`).join('')}</tbody></table></div></div>
+              <td>${x.cutFirst == null ? '<span class="txt-muted">no catchment ticked in it</span>' : span(x.cutFirst, x.cutLast)}</td>
+              ${M.fieldOn ? `<td>${x.start == null ? '—' : `${monthLabel(s, x.start)} – ${endLabel(s, x.end)}`}</td><td class="a2p-num">${x.start == null ? '—' : nf1(x.end - x.start)}</td>` : ''}</tr>`).join('')}</tbody></table></div></div>
       </div>`);
   }
 
@@ -1495,11 +1994,12 @@ const Alert2Plan = (function () {
   function effortHtml({ M }) {
     const s = sc;
     const peakOf = k => M.fte.reduce((a, f) => Math.max(a, f[k]), 0);
-    return sec('fte', '8. Effort', `
-      <p><strong>${nf1(M.fteTotal)} FTE-years</strong> over the program, peaking at <strong>${nf1(M.peak)} FTE</strong>. Field crews are
-        ${s.fieldCrews} of ${s.staffPerCrew} for the stations and ${s.backboneCrews} of ${s.staffPerCrew} for the backbone; each works
-        ${s.crewDays} field days a month, the rest going to leave, training, bench preparation and travel days. A rainfall station takes
-        ${nf1(s.rainDays)} crew-days and a river station ${nf1(s.levelDays)}, travel included, ${nf1(s.remoteMult)}× that in the remote regions.
+    return sec('fte', '9. Effort', `
+      <p><strong>${nf1(M.fteTotal)} FTE-years</strong> over the program, peaking at <strong>${nf1(M.peak)} FTE</strong>. The Bureau's crews are
+        ${M.fieldOn ? `${s.fieldCrews} of ${s.staffPerCrew} for the stations and ` : ''}${s.backboneCrews} of ${s.staffPerCrew} fitting the backbone; each works
+        ${s.crewDays} field days a month, the rest going to leave, training, bench preparation and travel days.${M.fieldOn ? ` A rainfall station takes
+        ${nf1(s.rainDays)} crew-days and a river station ${nf1(s.levelDays)}, travel included, ${nf1(s.remoteMult)}× that in the remote regions.` : ''}
+        The audits, retrofits and rebuilds are contract works (section 5) — their cost is in the backbone sites, and a contract manager looks after them.
         Every unit is configured and bench-tested (${nf1(s.benchHours)} hours each) before it goes out.</p>
       <figure class="a2p-fig a2p-wide">${fteSvg(M)}
         <figcaption><ul class="a2p-legend">${ROLES.map(([, l, cls]) => `<li><span class="a2p-swatch ${cls}" aria-hidden="true"></span>${l}</li>`).join('')}</ul></figcaption></figure>
@@ -1510,7 +2010,7 @@ const Alert2Plan = (function () {
           <td class="a2p-num">${money(M.fteYears[k] * ({ field: s.rateField, eng: s.rateEng, pm: s.ratePm, support: s.rateSupport }[k]), true)}</td></tr>`).join('')}
           <tr class="a2p-total"><th scope="row">All</th><td class="a2p-num">${nf1(M.fteTotal)}</td><td class="a2p-num">${nf1(M.peak)}</td><td class="a2p-num">${money(M.breakdown[1].v, true)}</td></tr>
         </tbody></table></div>
-      <p class="small txt-muted">FTE-years at ${WORK_DAYS_YEAR} working days. Whether these are existing staff, new positions or contractors is a decision for management (section 11).</p>`);
+      <p class="small txt-muted">FTE-years at ${WORK_DAYS_YEAR} working days. Whether these are existing staff, new positions or contractors is a decision for management (section 12).</p>`);
   }
 
   // ── cost ──
@@ -1552,7 +2052,7 @@ const Alert2Plan = (function () {
       return r;
     }).join('');
     const cats = ['equip', 'labour', 'travel', 'backbone', 'network', 'contingency'];
-    return sec('cost', '9. Cost', `
+    return sec('cost', '10. Cost', `
       <p>About <strong>${money(M.total)}</strong> in all: ${money(M.base)} of estimated cost and ${money(M.contingency)} contingency
         (${pct(s.contingency)}). Equipment is bought on delivery for the repeaters and bases and as each region starts for the field
         stations, so the spend follows the work across the financial years.</p>
@@ -1573,7 +2073,7 @@ const Alert2Plan = (function () {
   function risksHtml({ I, M }) {
     const s = sc;
     const unknown = M.own.unknown;
-    return sec('risk', '10. Assumptions, risks and open questions', `
+    return sec('risk', '11. Assumptions, risks and open questions', `
       <h4>Risks</h4>
       <ul class="a2p-points">
         <li><strong>One supplier.</strong> The ERT-A2 and 115E-2 come from one Brisbane manufacturer, and the 2015 review noted a single
@@ -1581,7 +2081,15 @@ const Alert2Plan = (function () {
           before the field work is scheduled — the ${s.procureMonths}-month procurement window and the pilot are where that shows. A second
           source exists: Campbell Scientific Australia makes an ALERT2 canister wired to the same pinouts.<sup><a href="#a2p-ref-csa">[10]</a></sup></li>
         <li><strong>Repeater power.</strong> An ERT-A2 repeating draws about 50 mA idle against a field station's 200 µA, so the
-          remediation must size each repeater's solar and battery for it.<sup><a href="#a2p-ref-ert">[5]</a></sup></li>
+          retrofit must size each repeater's solar and battery for it.<sup><a href="#a2p-ref-ert">[5]</a></sup></li>
+        <li><strong>Structures worse than assumed.</strong> How many sites need their structure rebuilt is the largest swing in the cost — each is about
+          ${money(s.cRebuild + s.cTemp)} against ${money(s.cRemed)} for a retrofit — and nobody knows it until the sites are audited. ${M.nAudit
+            ? `${nf(M.nAudit)} backbone site${M.nAudit === 1 ? ' is' : 's are'} unassessed and costed at the card's mix; the audits come first so the figure firms up early.`
+            : 'Every site in the plan is marked on the card, so the figure is as good as the marks.'}
+          A rebuild needs a structural design, landholder consent and approvals (and on some hills cultural heritage and vegetation clearance) before it starts, and
+          takes the site off the air while it is done: a temporary repeater carries the catchment, and no structure comes down in the wet season.</li>
+        <li><strong>Anyone else listening.</strong> Councils, dam operators and other agencies that hear a catchment's ALERT1 off the air lose it at the cut-over
+          unless they receive ALERT2 or take the readings from the Bureau — they need finding before each catchment goes.</li>
         <li><strong>Acquisitions that do not settle.</strong> ${unknown ? `${unknown} backbone site${unknown === 1 ? ' has' : 's have'} no owner on record, and ` : ''}a council
           may not agree to transfer a site. The fallback for each is a lease, co-location, or a new site found by the review.</li>
         <li><strong>The wet season and floods.</strong> The same people who convert the network respond to floods; a big season stops the field work.
@@ -1603,14 +2111,21 @@ const Alert2Plan = (function () {
           <tr><th scope="row">Catchments in the plan</th><td>${esc(unticked(I))}</td></tr>
           <tr><th scope="row">Procurement and supply</th><td>${s.procureMonths} months</td></tr>
           <tr><th scope="row">Pilot</th><td>${s.pilot ? `${s.pilotMonths} months, ${s.pilotSites} stations` : 'none'}</td></tr>
-          <tr><th scope="row">Remediation, per backbone site</th><td>${s.remediateDays} crew-days</td></tr>
+          <tr><th scope="row">Repeater sites marked on the card</th><td>${esc(marksText(M))}</td></tr>
+          <tr><th scope="row">Works on a site another owner holds</th><td>go ahead under an access agreement while its acquisition is negotiated</td></tr>
+          <tr><th scope="row">Condition audit, per unassessed backbone site</th><td>${s.auditDays} contract crew-day${s.auditDays === 1 ? '' : 's'}, one team</td></tr>
+          <tr><th scope="row">Retrofit, per backbone site</th><td>${s.remediateDays} crew-days</td></tr>
+          <tr><th scope="row">Rebuilding a structure</th><td>${s.rebuildDays} crew-days</td></tr>
           <tr><th scope="row">Fitting an ERT-A2 at a repeater</th><td>${s.fitDays} crew-days</td></tr>
           <tr><th scope="row">Equipping a base, per receive chain</th><td>${s.baseDays} engineer-days</td></tr>
           <tr><th scope="row">Close-out</th><td>${s.closeMonths} months</td></tr>
         </tbody></table></div>
       <h4>Open questions</h4>
       <ul class="a2p-points">
-        <li>Which base stations receive which networks today, and which will receive ALERT2 — the register counts ${I.radioNetworks} radio networks and marks ${I.registerBases} bases${I.partial ? ' in the catchments ticked' : ''}.</li>
+        <li>Which base stations receive which networks today, and which will receive ALERT2 — the register counts ${I.radioNetworks} radio networks and marks ${I.registerBases} bases${I.partial ? ' in the catchments ticked' : ''},
+          so the way from many repeaters to a base is not on record.</li>
+        <li>Whether each concentrator hears legacy ALERT on the frequency it sends ALERT2 on, or needs a second receiver — the frequency and slot plan decides it, site by site.</li>
+        <li>What each repeater site needs: a condition record for every backbone site, so the mix on the card gives way to what is known.</li>
         <li>Who owns each backbone site with no owner on record, and on what terms the Bureau could take it.</li>
         <li>Whether the stations the Bureau does not own convert at the owner's cost, the Bureau's, or shared.</li>
         <li>Supplier pricing at volume, lead time, and the support and warranty terms.</li>
@@ -1620,13 +2135,14 @@ const Alert2Plan = (function () {
 
   function decisionsHtml({ M }) {
     const s = sc;
-    return sec('dec', '11. Decisions sought', `
+    return sec('dec', '12. Decisions sought', `
       <ol class="a2p-points">
-        <li><strong>Start the backbone now</strong> — approve the acquisition of about ${nf(M.nAcq)} backbone site${M.nAcq === 1 ? '' : 's'} and the remediation of about ${nf(M.nRemed)},
-          ahead of and independent of the rest of the program.</li>
-        <li><strong>Approve the network reviews</strong>, region by region, as the first step of each region's conversion.</li>
-        <li><strong>Endorse the approach</strong>: ${s.pilot ? 'a pilot network, then ' : ''}regions converted in the order in section 3, legacy ALERT kept running until each region is done.</li>
-        <li><strong>Agree the funding envelope</strong> of about ${money(M.total)} over ${mo(M.end)}, phased by financial year as in section 9.</li>
+        <li><strong>Start the backbone now</strong> — approve the condition audits of ${nf(M.nAudit)} backbone site${M.nAudit === 1 ? '' : 's'}, the acquisition of about ${nf(M.nAcq)},
+          the retrofit of about ${nf(M.nRetro)} and the structural design and rebuild of about ${nf(M.nRebuild)}, ahead of and independent of the rest of the program.</li>
+        <li><strong>Approve the network reviews</strong>, region by region, before each region's field work and before any structure in it is rebuilt.</li>
+        <li><strong>Endorse the approach</strong>: ${s.pilot ? 'a pilot on the first catchment, then ' : ''}each catchment cut over to an ALERT2 backbone in concentration mode, in the order in section 6,
+          ${M.fieldOn ? 'its field stations converted after it' : 'its field stations left on ALERT1 for FWIN visits and renewals to convert'}, and legacy ALERT kept running until each catchment is done.</li>
+        <li><strong>Agree the funding envelope</strong> of about ${money(M.total)} over ${mo(M.end)}, phased by financial year as in section 10.</li>
         <li><strong>Agree how the people are found</strong> — ${nf1(M.peak)} FTE at the peak — and the procurement route for the ERT-A2 and 115E-2.</li>
       </ol>`);
   }
@@ -1675,15 +2191,19 @@ const Alert2Plan = (function () {
     if (el) el.innerHTML = render();
     syncPartial();
   }
-  // Only what the scenario moves is rewritten: the five figures and the
+  // Only what the scenario moves is rewritten: the figures at the top and the
   // document. The card stays as it is, so the slider being dragged keeps
   // its focus and its place.
   function repaintLive(focusKey) {
     if (state.activeTab !== 'a2plan') return;
     const k = document.getElementById('a2p-kpis'), o = document.getElementById('a2p-out');
     if (!k || !o) { repaint(); return; }
+    // A folded table somebody has opened stays open: the site table's
+    // selects live in one, and a choice made there must not fold it away.
+    const open = new Set([...o.querySelectorAll('details[id][open]')].map(d => d.id));
     k.innerHTML = kpisHtml();
     o.innerHTML = outHtml();
+    for (const id of open) { const d = document.getElementById(id); if (d && o.contains(d)) d.open = true; }
     const note = document.querySelector('.a2p-controls > p.small');
     if (note) {
       const fresh = document.createElement('div');
@@ -1693,7 +2213,7 @@ const Alert2Plan = (function () {
     }
     if (focusKey) {
       const find = key => document.querySelector(`#a2p-out [data-k="${CSS.escape(key)}"]`);
-      const other = focusKey.replace(/^(up|down):/, (m, d) => (d === 'up' ? 'down:' : 'up:'));
+      const other = focusKey.replace(/^(c?)(up|down):/, (m, c, d) => `${c}${d === 'up' ? 'down' : 'up'}:`);
       const el = [find(focusKey), find(other)].find(e => e && !e.disabled);
       if (el) el.focus();
     }
@@ -1708,12 +2228,14 @@ const Alert2Plan = (function () {
     sc = sanitize(sc);
     saveScenario();
     if (k === 'scope') refreshCats();
-    const c = CONTROLS.flatMap(g => g.items).find(x => x.k === k);
-    if (c && c.kind === 'range') {
-      const out = document.getElementById(`a2p-c-${k}-o`);
-      const txt = ctlValue(c, sc[k]);
-      if (out) out.textContent = txt;
-      const inp = document.getElementById(`a2p-c-${k}`);
+    // Every slider's value is said again: one can depend on another (the
+    // retrofits on the rebuilds, the bases on the scope).
+    for (const c of CONTROLS.flatMap(g => g.items)) {
+      if (c.kind !== 'range') continue;
+      const out = document.getElementById(`a2p-c-${c.k}-o`);
+      const txt = ctlValue(c, sc[c.k]);
+      if (out && out.textContent !== txt) out.textContent = txt;
+      const inp = document.getElementById(`a2p-c-${c.k}`);
       if (inp) inp.setAttribute('aria-valuetext', txt);
     }
     repaintLive();
@@ -1742,12 +2264,24 @@ const Alert2Plan = (function () {
     return `${I.catchmentCount} of ${I.catchmentsInScope} — left out: ${out.length > 15 ? `${out.slice(0, 15).join(', ')} and ${out.length - 15} more` : out.join(', ')}`;
   }
 
+  // The repeater sites the card says something of, in words.
+  function marksText(M) {
+    const marks = Object.values(sc.sites || {});
+    if (!marks.length) return 'none — every backbone site is audited, and costed at the mix';
+    const n = k => marks.filter(v => v === k).length;
+    return `${marks.length}: ${WORKS.map(k => `${n(k)} ${WORKS_LABEL[k].toLowerCase()}`).join(', ')}${M.nMarked < marks.length ? ` (${M.nMarked} of them in this plan)` : ''}`;
+  }
+
   function csvRows(M) {
-    const head = ['Order', 'Region', 'Catchment', 'Rainfall stations', 'River stations', 'Repeaters', 'Backbone repeaters', 'Bases', 'Ticked'];
+    const head = ['Order', 'Region', 'Catchment', 'Rainfall stations', 'River stations', 'Repeaters', 'Backbone repeaters', 'Bases', 'Ticked', 'On the ALERT2 backbone'];
     const rows = [head];
+    const cut = new Map(M.cats.map(c => [c.key, c]));
     M.regionRows.forEach((x, i) => {
-      for (const c of x.r.cats.values()) rows.push([i + 1, x.name, c.name, c.rain, c.level, c.repeaters, c.backbone, c.bases,
-        c.outside ? 'no — its repeaters carry ticked stations' : 'yes']);
+      for (const [key, c] of x.r.cats) {
+        const k = cut.get(key);
+        rows.push([i + 1, x.name, c.name, c.rain, c.level, c.repeaters, c.backbone, c.bases,
+          c.outside ? 'no — its repeaters carry or relay ticked stations' : 'yes', k && k.cutover != null ? endLabel(sc, k.cutover) : '']);
+      }
     });
     return rows;
   }
@@ -1781,13 +2315,29 @@ const Alert2Plan = (function () {
         [t('Effort (FTE-years)', 'label'), Math.round(M.fteTotal * 10) / 10], [t('Peak FTE', 'label'), Math.round(M.peak * 10) / 10],
         [t('Field stations', 'label'), M.nField], [t('Repeaters (after reviews)', 'label'), M.nRep], [t('Base stations', 'label'), M.nBases],
         [t('ERT-A2 units', 'label'), M.units.ertA2], [t('115E-2 gateways', 'label'), M.units.e115],
-        [t('Backbone sites to acquire', 'label'), M.nAcq], [t('Backbone sites to remediate', 'label'), M.nRemed],
+        [t('Backbone sites to acquire', 'label'), M.nAcq], [t('Backbone sites to audit', 'label'), M.nAudit],
+        [t('Backbone sites to retrofit', 'label'), M.nRetro], [t('Repeater structures to rebuild', 'label'), M.nRebuild],
+        [t('First catchment on the ALERT2 backbone', 'label'), M.cats.length ? endLabel(s, M.firstCut) : ''],
+        [t('Every catchment on the ALERT2 backbone', 'label'), M.cats.length ? endLabel(s, M.bbReady) : ''],
+        [t('Field stations converted', 'label'), M.fieldOn ? 'yes' : 'no — they stay ALERT1, concentrated'],
       ] },
       { name: 'Equipment', cols: [52, 10, 12, 14, 40], freeze: 1, rows: [
         ['Item', 'Quantity', 'Each', 'Total', 'Basis'].map(h => t(h, 'head')),
         ...M.equipment.map(e => [e.item, e.qty, e.unit, e.total, e.note]),
       ] },
-      { name: 'Regions', cols: [8, 26, 30, 10, 10, 10, 10, 10], freeze: 1, rows: csvRows(M).map((r, i) => i ? r : r.map(h => t(h, 'head'))) },
+      { name: 'Regions', cols: [8, 26, 30, 10, 10, 10, 10, 10, 14, 14], freeze: 1, rows: csvRows(M).map((r, i) => i ? r : r.map(h => t(h, 'head'))) },
+      { name: 'Cut-over', cols: [8, 30, 24, 10, 10, 8, 10, 10, 10, 10, 14, 16, 16, 16], freeze: 1, rows: [
+        ['Order', 'Catchment', 'Region', 'Field stations', 'Repeaters it needs', 'New to it', 'Fit-out', 'Retrofit', 'Rebuilt', 'To audit',
+         'Site works cost', 'On the ALERT2 backbone', 'Field from', 'Field to'].map(h => t(h, 'head')),
+        ...M.cats.map((c, i) => [i + 1, c.name, c.region, c.field, c.needs.length, c.fresh, c.w.fit, c.w.retrofit, c.w.rebuild, c.w.audit,
+          Math.round(c.worksCost), c.cutover != null ? endLabel(s, c.cutover) : '',
+          M.fieldOn && c.start != null ? monthLabel(s, c.start) : '', M.fieldOn && c.end != null ? endLabel(s, c.end) : '']),
+      ] },
+      { name: 'Repeaters', cols: [34, 24, 24, 10, 26, 30, 30], freeze: 1, rows: [
+        ['Repeater', 'Region', 'Role', 'Backbone', 'Site works', 'Catchments that need it', 'Owner'].map(h => t(h, 'head')),
+        ...sitesOf(C.I).map(r => [r.s.name, r.p.region, roleText(r), r.backbone ? 'yes' : 'no', worksText(r),
+          [...r.cats].map(k => (C.I.catList.find(c => c.key === k) || {}).name).filter(Boolean).join(', '), r.owner.name || OWN[r.owner.cls]]),
+      ] },
       { name: 'Timeline', cols: [44, 14, 14], freeze: 1, rows: [
         ['Work', 'Start', 'Finish'].map(h => t(h, 'head')),
         ...M.acts.slice().sort((a, b) => a.start - b.start).map(a => [a.label, monthLabel(s, a.start), endLabel(s, a.end)]),
@@ -1800,6 +2350,7 @@ const Alert2Plan = (function () {
         ['Assumption', 'Value'].map(h => t(h, 'head')),
         ...Object.keys(DEFAULTS).map(k => [k, String(s[k])]),
         ['catchments', unticked(C.I)],
+        ['repeater sites marked', marksText(M)],
       ] },
     ];
     const data = XlsxWrite.build(sheets, { title: 'ALERT2 Transition Plan' });
@@ -1822,7 +2373,7 @@ const Alert2Plan = (function () {
     preset(id) {
       const p = PRESETS.find(x => x.id === id);
       if (!p) return;
-      sc = sanitize({ ...DEFAULTS, ...p.set, order: sc.order, excluded: sc.excluded });
+      sc = sanitize({ ...DEFAULTS, ...p.set, order: sc.order, catOrder: sc.catOrder, excluded: sc.excluded, sites: sc.sites });
       saveScenario();
       repaint();
       announce(`${p.label}: the plan is worked again.`);
@@ -1844,6 +2395,40 @@ const Alert2Plan = (function () {
       const name = order[i];
       repaintLive(`${dir < 0 ? 'up' : 'down'}:${name}`);
       announce(`${name} is now number ${j + 1} in the order.`);
+    },
+    // ▲ ▼ on the cut-over table: a catchment swaps with its neighbour in the
+    // same region, in the order of every catchment in the scope, so one the
+    // ticks have taken out keeps its place for when it is back.
+    moveCat(i, dir) {
+      const C = cur();
+      if (!C) return;
+      const rows = C.M.cats;
+      const j = i + dir;
+      if (j < 0 || j >= rows.length || rows[i].region !== rows[j].region) return;
+      const I0 = inventoryFor([]);
+      const full = catOrder(I0, sc, regionOrder(I0, sc)).map(c => c.key);
+      const a = full.indexOf(rows[i].key), b = full.indexOf(rows[j].key);
+      if (a < 0 || b < 0) return;
+      [full[a], full[b]] = [full[b], full[a]];
+      sc.catOrder = full.concat((sc.catOrder || []).filter(k => !full.includes(k)));
+      sc = sanitize(sc);
+      saveScenario();
+      repaintLive(`${dir < 0 ? 'cup' : 'cdown'}:${rows[i].key}`);
+      announce(`${rows[i].name} is now number ${j + 1} in the cut-over order.`);
+    },
+    // What a repeater site needs, as somebody who knows it says: '' for not
+    // assessed, or one of the works. Numbered off sitesOf().
+    site(i, v) {
+      const I = inventory();
+      const r = I && sitesOf(I)[i];
+      if (!r) return;
+      const sites = { ...(sc.sites || {}) };
+      if (WORKS.includes(v)) sites[r.s.id] = v; else delete sites[r.s.id];
+      sc.sites = sites;
+      sc = sanitize(sc);
+      saveScenario();
+      repaintLive(`site:${i}`);
+      announce(`${r.s.name}: ${WORKS.includes(v) ? WORKS_LABEL[v].toLowerCase() : 'not assessed — audited first'}. The plan is worked again.`);
     },
     // The folded tables go on paper too: opened for the print and folded
     // again after, so the screen is left as it was.
