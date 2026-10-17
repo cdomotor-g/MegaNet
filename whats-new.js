@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 36, date: '2026-10-17', items: [
+      '<strong>🏛️ Owners\' logos on the station card.</strong> The <em>Owner</em> row now shows each owner\'s logo '
+        + 'beside its name — the Bureau, WaterNSW, Seqwater, Sunwater, the councils and the rest, ninety-odd in all. '
+        + 'A station with two owners shows both. A state department carries its government\'s logo; hover it to see '
+        + 'whose it is.',
+    ] },
     { n: 35, date: '2026-10-17', items: [
       '<strong>⏱️ TDMA Planner.</strong> A new tab under <em>Admin</em> that works out an ALERT2 time-slot plan for one radio '
         + 'channel: a valid frame length, a slot for every field station and repeater — the repeaters\' slots after the ones '

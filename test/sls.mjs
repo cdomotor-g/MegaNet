@@ -182,6 +182,88 @@ try {
     owners.own && owners.own.k === 'Owner' && owners.own.v === owners.ownName, JSON.stringify(owners.own));
   check('…and "Not recorded" where nobody is on record — the row is still there',
     owners.none && owners.none.k === 'Owner' && owners.none.v === 'Not recorded', JSON.stringify(owners.none));
+
+  // ── Each owner's logo, beside its name (owner-logos.js) ──────────────────
+  // Every party the SLS or a station names has one, or is a name the module
+  // says has none — so an owner new to a re-ingested document is noticed here
+  // rather than quietly drawn without one. The last three are the pieces of
+  // a name written with commas, whose government is the party with the logo.
+  const NO_LOGO = ['Bureau Western Downs Regional Council', 'Gunnedah Shire Council', 'Inverell Shire Council',
+    'NGRMG', 'North Burnett Regional Council', 'North Byron Parklands', 'Northern RWMP',
+    'Department of Environment', 'Environment and Climate Action', 'Water and Natural Resources'];
+  const logos = await page.evaluate(() => {
+    const parties = new Set();
+    for (const l of SLS.all()) {
+      const o = l.owner && stationOwnerParse(l.owner, 'sls', 'the SLS');
+      if (o) o.parties.forEach(p => parties.add(p));
+    }
+    for (const s of state.data.stations) {
+      if (s.owner && String(s.owner).trim()) stationOwner(s).parties.forEach(p => parties.add(p));
+    }
+    return { parties: parties.size, none: [...parties].filter(p => !OwnerLogos.forParty(p)).sort(),
+             files: OwnerLogos.files(), bare: OwnerLogos.partyHtml('Northern RWMP'),
+             escaped: OwnerLogos.partyHtml('A <b>&</b> B') };
+  });
+  check('every owner the SLS or a station names has a logo, except the names owner-logos.js says have none',
+    JSON.stringify(logos.none) === JSON.stringify([...NO_LOGO].sort()),
+    `${logos.parties} parties; without a logo: ${JSON.stringify(logos.none)}`);
+  check('…and one with none is its name alone, escaped like any other',
+    logos.bare === 'Northern RWMP' && logos.escaped === 'A &lt;b&gt;&amp;&lt;/b&gt; B',
+    JSON.stringify([logos.bare, logos.escaped]));
+  const ownerDir = repo('assets/owners');
+  const onDisk = fs.readdirSync(ownerDir).sort();
+  const isWebp = (f) => {
+    const b = fs.readFileSync(`${ownerDir}/${f}`);
+    return b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP';
+  };
+  const missing = logos.files.filter((f) => !onDisk.includes(`${f}.webp`) || !isWebp(`${f}.webp`));
+  check('every logo the table names is a WebP in assets/owners/', missing.length === 0, JSON.stringify(missing));
+  const orphans = onDisk.filter((f) => !logos.files.includes(f.replace(/\.webp$/, '')));
+  check('…and nothing is in assets/owners/ that the table does not name', orphans.length === 0,
+    JSON.stringify(orphans));
+
+  const shown = await page.evaluate(async () => {
+    const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const look = async (id) => {
+      showStationCard(id);
+      await frame();
+      const row = document.querySelector('#stn-card .acma-sect .acma-row');
+      const imgs = [...row.querySelectorAll('img.owner-logo')];
+      await Promise.all(imgs.map(i => i.decode().catch(() => {})));
+      return {
+        text: row.lastElementChild.textContent.replace(/\s+/g, ' ').trim(),
+        logos: imgs.map(i => ({
+          src: i.getAttribute('src'), loaded: i.complete && i.naturalWidth > 0, alt: i.getAttribute('alt'),
+          title: i.title, h: Math.round(i.getBoundingClientRect().height),
+          name: i.closest('.owner-party').textContent.trim(),
+          // on the same line as its name's first word, whatever the width
+          held: !!i.nextSibling && i.parentElement.matches('.owner-lead')
+            && getComputedStyle(i.parentElement).whiteSpace === 'nowrap' })),
+      };
+    };
+    const own = state.data.stations.find(s => s.owner && String(s.owner).trim());
+    return { bom: await look('beaudesert_al'), murw: await look('north_murwillumbah_tweed_river'),
+             own: own ? await look(own.id) : null, none: await look(state.data.stations.find(
+               s => !s.owner && s.lat != null && !(SLS.forStation(s) || {}).owner).id) };
+  });
+  const one = (l, file, name) => l && l.src === `assets/owners/${file}.webp` && l.loaded && l.alt === ''
+    && l.name === name && l.held && l.h >= 18 && l.h <= 32;
+  check('the owner\'s logo is on the card, loaded, right before its name and about a line tall',
+    shown.bom.logos.length === 1 && one(shown.bom.logos[0], 'bom', 'Bureau of Meteorology'),
+    JSON.stringify(shown.bom));
+  check('…its alt text empty, the name beside it already saying whose it is', shown.bom.logos[0].alt === '',
+    JSON.stringify(shown.bom.logos[0]));
+  check('…the station\'s own owner\'s too', shown.own && shown.own.logos.length === 1
+    && one(shown.own.logos[0], 'toowoomba', 'Toowoomba Regional Council'), JSON.stringify(shown.own));
+  check('…two owners each with their own, in order, a department\'s tooltip naming its government',
+    shown.murw.logos.length === 2 && one(shown.murw.logos[0], 'tweed', 'Tweed Shire Council')
+      && one(shown.murw.logos[1], 'nsw-gov', 'NSW DCCEEW') && shown.murw.logos[0].title === ''
+      && shown.murw.logos[1].title === 'NSW Government logo',
+    JSON.stringify(shown.murw));
+  check('…the row\'s words unchanged by them', shown.murw.text === 'Tweed Shire Council / NSW DCCEEW per SLS',
+    shown.murw.text);
+  check('…and none where nobody is on record', shown.none.logos.length === 0 && shown.none.text === 'Not recorded',
+    JSON.stringify(shown.none));
   await page.evaluate(() => showStationCard('beaudesert_al'));
 
   // ── The heading is the way to the document ───────────────────────────────

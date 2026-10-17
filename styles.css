@@ -7395,6 +7395,26 @@ hr {
   font-size: .74rem;
 }
 
+/* Each owner's logo, before its name on the station card's Owner row
+   (owner-logos.js). One height whatever the mark's shape — a square crest and
+   a wide wordmark side by side read as a set — with the wide ones capped and
+   letterboxed rather than stretched. On a white chip in every theme: the
+   marks are drawn for a white page, and a dark card would swallow the black
+   ones (the coats of arms) whole. */
+.owner-logo {
+  height: 1.4rem;
+  width: auto;
+  max-width: 4.2rem;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: .4rem;
+  padding: 1px;
+  background: #fff;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.owner-lead { white-space: nowrap; }
+
 .mn-pop-pill {
   background: var(--pill, var(--muted));
   /* White by default — every role hue clears AA with it (5.03:1 at worst).

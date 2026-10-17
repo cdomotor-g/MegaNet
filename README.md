@@ -226,6 +226,8 @@ MegaNet/
 │                             wavefronts, shadows, echoes, repeaters relaying, ghosts
 ├── propagation.js          ← Propagation — the Radio Propagation tab itself, and its
 │                             2-D drawings (interference, path, bit lanes, delays)
+├── owner-logos.js          ← OwnerLogos — each station owner's logo beside its name
+│                             on the station card (the marks in assets/owners/)
 ├── health-glance.js        ← HealthGlance — a station's health where people already
 │                             look (#218): last heard, its battery and its findings on
 │                             its card, each a door into Station Health, and Colour

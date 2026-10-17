@@ -7628,12 +7628,15 @@ function stationOwner(s) {
 // or that none is recorded — said as "Not recorded", never "unknown", which
 // would read as a claim about the station rather than about the records.
 // Until the SLS file is on hand a station with no owner of its own cannot be
-// told apart from one with none anywhere; stnCardOwnerAsk fills it in.
+// told apart from one with none anywhere; stnCardOwnerAsk fills it in. Each
+// party carries its logo beside its name (owner-logos.js); one with none
+// there is its name alone.
 function stnCardOwnerHtml(s) {
   const o = stationOwner(s);
-  if (o && o.from === 'station') return esc(o.name);
+  const named = o && o.parties.map(p => OwnerLogos.partyHtml(p)).join(' / ');
+  if (o && o.from === 'station') return named;
   if (o) {
-    return `<span title="${esc(`From ${o.src}. No owner is recorded on the station itself.`)}">${esc(o.name)}
+    return `<span title="${esc(`From ${o.src}. No owner is recorded on the station itself.`)}">${named}
       <span class="mn-pop-note">per SLS</span></span>`;
   }
   if (typeof SLS !== 'undefined' && !SLS.loaded() && !stnCardOwnerFailed) {
