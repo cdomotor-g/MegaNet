@@ -309,6 +309,14 @@ const SiteMap = (function () {
       ],
       note: 'Administrators only.',
     },
+    tdma: {
+      what: 'An ALERT2 time-slot plan for one radio channel: frame length, a slot for every field station and repeater, bytes against capacity at the storm peak, and how long the slowest report takes to get home.',
+      use: [
+        'Sketch a network from a few counts and see a valid frame laid out slot by slot',
+        'Pick repeaters from the register and plan the channel they share',
+        'Take away the configuration sheet, device by device, as CSV or print',
+      ],
+    },
     levels: {
       what: 'A station\'s levels surveyed on a phone: the run booked rise and fall and reduced as you go, kept with no signal, filed under the station.',
       use: [
@@ -420,6 +428,7 @@ const SiteMap = (function () {
     { text: 'Check a level with a two-peg test',           tab: 'twopeg' },
     { text: 'Print a map for a field trip',                tab: 'mapgen' },
     { text: 'Review a radio network\'s design',            tab: 'review' },
+    { text: 'Plan a channel\'s TDMA slots',                tab: 'tdma' },
     { text: 'Learn how radio gets a reading home',         tab: 'propagation' },
     { text: 'Practise reading a levelling staff',          tab: 'kbstaff' },
     { text: 'Walk through a routine river station visit',  tab: 'kbriver' },

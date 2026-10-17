@@ -216,6 +216,9 @@ MegaNet/
 ├── alert2-plan.js          ← Alert2Plan — ALERT2 Transition Plan tab (administrators
 │                             only: the draft for management, worked from the register
 │                             under a scenario card of sliders and switches)
+├── tdma-planner.js         ← TdmaPlanner — the ⏱️ TDMA Planner tab: ALERT2 frame and
+│                             slot allocation, bytes against capacity, latency, the
+│                             configuration sheet
 ├── propagation-physics.js  ← PropPhysics — the 🎓 Radio Propagation tab's arithmetic
 │                             (wavelength, Fresnel, knife edge, foliage, phasors, the
 │                             ALERT Binary frame, a receiver with FM capture); pure
@@ -352,6 +355,7 @@ MegaNet/
 │   ├── basestations.mjs     (the Base Stations tab: the list, a station's panel, what each button sends)
 │   ├── review.mjs           (the Network Review tab: administrators only, the matrix's cells the card's figures, the field beside them)
 │   ├── a2plan.mjs           (the ALERT2 Transition Plan tab: administrators only, the inventory and the plan add up, the card moves it)
+│   ├── tdma.mjs             (the TDMA Planner: air-time formula, two worked frames, the card)
 │   ├── healthreport.mjs     (Station Health run unattended: the browser's analysis over the demo week, reported as the database takes it)
 │   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
@@ -5053,6 +5057,66 @@ and `floodnet-alert2-plan-quantities.csv`.
 
 Its words are in this public repository: anything that must stay private belongs
 in the database, not the tab. `npm run a2plan` holds it.
+
+---
+
+### 32. TDMA Planner (a Frame Laid Out Slot by Slot, With the Sheet to Configure It)
+
+⏱️ **TDMA Planner**, under *Admin* and open to everyone, takes one ALERT2 radio
+channel — a base, the repeaters that reach it and the field stations they carry —
+and works out the time-slot plan that gets every report home: a frame length the
+protocol allows, a slot for every transmitter, the repeaters' slots after the ones
+they forward and sized to what they carry at the storm peak, the bytes each slot
+holds against the bytes it must, and the worst-case time a report takes to reach
+the base. It is a planning tool for the transition, not a configuration tool:
+nothing it works out is written to a radio or to the register, and the plan is
+kept on the device that made it.
+
+The protocol it plans for is the ALERT2 AirLink's: 4800 bits a second, a preamble
+of carrier, AGC tone, bit sync and frame sync, then the payload blocked and
+forward-error-corrected — a first block of 22 data bytes that comes out as 82 on
+the air, **228.33 ms** of RF and **233.33 ms** with the 5 ms tail, and follow-on
+blocks of 32 after it. A ½ s slot with ±50 ms of clock buffer holds 54 bytes — a
+first block and one full follow-on, **396.67 ms** in a 400 ms window — and a
+frame must be a multiple of 500 ms between 5 s and an hour that divides 12 hours
+exactly, which leaves 79 lengths. Reports are counted in MANT PDUs as the ERT-A2
+sends them — the four-sensor quick start is 28 bytes, 29 with path service and 2
+more at every repeater — or, with a switch, one PDU per sensor as the only capture
+on file shows.
+
+The allocation is **deepest first**: a repeater's run comes after every slot it
+forwards, so a report crosses every hop within one frame, and each run grows in
+whole slot units to the peak load it must carry; sectors spread a repeater's runs
+through the frame to cut the wait. The worst-case latency is walked round the
+frame — a report ready just after its slot has started waits a frame, then every
+hop's wait to that repeater's next run — and the plan says who waits longest and
+why. Two worked frames hold the arithmetic: Telos's 30 gauges and a 5 s repeater
+slot in a 20 s frame, filled to 948 of 950 bytes, and a two-hop chain in 60 s.
+The tab also names the shortest valid frame in which everything fits — nothing
+unplaced, no run past the 1023 bytes one AirLink payload holds — with the spare
+slots asked for, or, when a repeater's load needs more than one run, says how
+many repeater slots per frame it would take.
+
+A network comes from one of two places: a **sketch** from five counts —
+repeaters, the depth of their chain, stations per repeater, stations heard
+straight by the base, legacy gauges per repeater — or **the register**, where the
+hubs picked bring every station their pass ranges carry, the backbone links set
+their depth, and the flags the Network Review raises (a station more than
+150 km from its hub, left out; a station in no pass range; a repeater with no
+path to a base) are counted. The
+page is the figures at the top, the frame as a timeline and as a circle, one
+report's journey hop by hop, the slot table and the **configuration sheet**: for
+every transmitter, the IND API's setting names with the plan's values beside the
+ERT-A2's menu names. The sheet is honest about the ERT-A2: its manuals show no
+item for the frame, the slot or either offset — only that TDMA needs the GPS
+option — so those rows say "not in the documented menus; confirm with ELPRO", and
+the questions only ELPRO can answer are printed at its foot. It saves as
+`floodnet-tdma-plan-<frame>s.csv` and `floodnet-tdma-config-sheet-<frame>s.csv`,
+and prints with the card left off.
+
+The tab is `tdma-planner.js`; `npm run tdma` holds its air-time formula to the
+sources' figures and the two worked frames to the slot. How it works it out, with
+the sources, is [`docs/tdma-planner.md`](docs/tdma-planner.md).
 
 ---
 

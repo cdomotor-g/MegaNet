@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-16** (revision 156 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-17** (revision 157 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -539,6 +539,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and fourteen `[Human]` issues.
 >
+> **Revision 157 opens and closes nothing** — the ⏱️ TDMA Planner tab ships: an ALERT2 time-slot plan for one channel worked from a sketch or the register — valid frame, a slot for every transmitter with the repeaters' after the ones they forward and sized to the storm peak, bytes against capacity, worst-case latency, and a configuration sheet in the IND API's and the ERT-A2's names. See revision 157 below.
+>
 > **Revision 156 opens and closes nothing** — at the owner's request, the ALERT2 Transition Plan's site conditions (as "marks" were renamed) and **saved scenarios** go into the database (`0065`, applied live): a scenario is private to its author until shared, then every administrator can load it. #239's Part 1 shrinks to `tools/storage_bucket.sql`. See revision 156 below.
 >
 > **Revision 155 opens and closes nothing** — at the owner's request, the ALERT2 Transition Plan moves the backbone first **catchment by catchment**: each catchment cut over in one step to an ALERT2 backbone in concentration mode (its ALERT1 stations untouched), the repeaters it needs audited, retrofitted or their structures rebuilt, and a site table to mark what each repeater is known to need. See revision 155 below.
@@ -792,6 +794,20 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 157 — 2026-10-17: ⏱️ TDMA Planner — frames, slots and the sheet
+
+At the owner's request, a tool for the ALERT2 transition's other half — not what to buy and when, but how the radio channel is laid out once the units are in. Nothing opened or closed.
+
+- **⏱️ TDMA Planner** (`tdma-planner.js`, new; a tab under *Admin*, open to everyone — the sketch needs no register and no account): one ALERT2 channel — a base, its repeaters and the field stations they carry — and the time-slot plan that gets every report home. A frame length the protocol allows (5 s to an hour, a multiple of 500 ms, dividing 12 hours exactly: 79 of them); a slot for every transmitter; the repeaters' runs **after every slot they forward** (deepest first, so a report crosses every hop within one frame) and **sized to the storm peak** in whole slot units; the bytes each run can carry against the bytes it must; and the worst-case latency walked round the frame, the planner's own model and said so. Sectors spread a repeater's runs through the frame to cut the wait; a spare target, reserved slots and an ALOHA share keep room; a seventh tile names the **shortest frame that fits** and a button takes it.
+- **The protocol, held to the sources**: the AirLink v1.1 blocking and FEC tables (a padded first block 82 bytes and 228.33 ms of RF, Telos's "228 msec"; 54 bytes — a first block and one full follow-on — 396.67 ms in a ½ s slot's 400 ms window; 1023 bytes 5.28 s), the preamble as two sliders with Telos's planning values (60 + 15 ms; the IND API's own defaults are 10 + 55), the ±50 ms clock buffer, the ERT-A2's reports counted in MANT bytes (the four-sensor quick start 28, 29 with path service, 2 more a hop; or one PDU per sensor, as the only capture on file shows, by a switch), legacy readings concentrated at 4 bytes a record. Telos's 30 gauges and a 5 s repeater slot in a 20 s frame come out as Telos drew them — the frame full, the repeater's run 948 of 950 bytes.
+- **A network from two places**: a sketch from five counts, or the register — hubs picked as the Network Review picks them, the stations their pass ranges carry (a station more than 150 km from its hub left out, and counted), the backbone links setting each repeater's depth, a picked base + repeater the root when no pure base is picked, every register fault flagged in words. Only the hub ids are kept on the device; the plan is rebuilt from the register each time.
+- **The page**: seven figures at the top; the frame as a timeline (field runs at 70 % height, repeater runs full height with an outline — colour never the only channel — reserved and ALOHA hatched, spare dashed) and as a circle, OneRain's two depictions; a slot detail strip (buffers, window, air time); one report's journey hop by hop; the slot table with its warnings in words; six presets; one playhead on `requestAnimationFrame`, off under reduced motion, torn down with the tab. Exports `floodnet-tdma-plan-<frame>s.csv` and `floodnet-tdma-config-sheet-<frame>s.csv`; print with the card left off.
+- **The configuration sheet and the ERT-A2**: every transmitter's settings in the IND API's names with the plan's values, beside the ERT-A2's menu names. The manuals (2021 and Sept 2025) show **no item for the frame, the slot, either offset, the hop limit or path service** — only that TDMA needs the GPS option — so those rows say "not in the documented menus; confirm with ELPRO", Repeater Delay reads 0 under TDMA with the manual's silence noted, and the seven questions only ELPRO can answer are printed at the sheet's foot.
+- **What it does not do yet**: per-station policies (every field station has the same report and cadence); writing a plan's slots back to the register (the exports carry it); the ERT-A2 questions themselves. Two follow-ups are **proposed, not opened — the owner decides**: `[Standalone] [Human] Ask ELPRO where the ERT-A2 takes frame, slot and offset` (and GPS Update's units, Repeater Delay under TDMA, hop limit and path, aggregation per slot, a shared Station Address, the Agency ID's format), and `[Standalone] [Sonnet5/Med] TDMA Planner: per-station slot policies and saving a plan to the register`.
+- **Around it**: `TABS` and `HELP` in `core.js`, the Site Map guide and task, the Export menu's two offers, What's new 35, `docs/tdma-planner.md` (how a frame works, what a report costs, how slots are allocated, the warnings, the page, the sheet, register mode, limits, the sources with their public URLs), README §32, and the smoke test's tab count 42 → 43.
+
+**Checks:** `npm run tdma` (new: the air-time table and capacities in Node, the two worked frames to the slot, the validity rules, overflow, ordering by name wrapping a frame, sectors, the ALOHA share and reserved slots, legacy concentration, the shortest frame, a run over capacity and the runs it needs, a repeater left without a slot; in Chromium the tab, a slider keeping its focus, the presets, a hub from the register and a base + repeater as the root, the two downloads), `help`, `exports`, `smoke`, `tabs`, `nav` and the cheap five.
 
 ### Revision 156 — 2026-10-16: 🧭 Site conditions and saved scenarios, in the database — private until shared with the administrators
 

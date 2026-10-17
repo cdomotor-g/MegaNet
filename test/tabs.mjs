@@ -686,6 +686,32 @@ const SEED_A2 = `async () => {
   for (const d of document.querySelectorAll('#main-content details')) d.open = true;
 }`;
 
+// The TDMA Planner, born converted: the sketched network it opens on — the
+// source set back to the sketch first, since the register seed below leaves
+// it on the register and every seed runs in the one context — with every
+// disclosure open: the circle, and the sheet's every unit, whose tables are
+// drawn on their toggle (hence the tick). Then the same page worked from the
+// register, the hub with the most stations in its pass ranges picked —
+// Constitution Hill, a base + repeater, so it is the root and its stations
+// fill the table.
+const SEED_TDMA = `async () => {
+  TdmaPlanner.source('sketch');
+  TdmaPlanner.preset('review');
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+  await new Promise(r => setTimeout(r, 0));
+}`;
+
+const SEED_TDMA_REG = `async () => {
+  TdmaPlanner.source('register');
+  const idx = passRelationIndex();
+  let pick = null, most = 0;
+  for (const [id, list] of idx.byRepeater) { if (list.length > most) { most = list.length; pick = id; } }
+  if (pick) TdmaPlanner.pickHub(pick);
+  await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+  await new Promise(r => setTimeout(r, 0));
+}`;
+
 // The Radio Propagation tab, born converted: the echo story, so the Town
 // base's table and its phasor are on the page too, and every disclosure open.
 const SEED_RP = `async () => {
@@ -854,6 +880,8 @@ const CONVERTED = [
   { id: 'review',     label: 'Network Review — a matrix of two repeaters and a proposed site', issue: 'born converted', seed: SEED_NR },
   { id: 'a2plan',     label: 'ALERT2 Transition Plan — signed out', issue: 'born converted', seed: SEED_A2_OUT },
   { id: 'a2plan',     label: 'ALERT2 Transition Plan — the plan, every table open', issue: 'born converted', seed: SEED_A2 },
+  { id: 'tdma',       label: 'TDMA Planner — sketch, every fold open', issue: 'born converted', seed: SEED_TDMA },
+  { id: 'tdma',       label: 'TDMA Planner — from the register', issue: 'born converted', seed: SEED_TDMA_REG },
   { id: 'propagation', label: 'Radio Propagation — the lesson, the echo story and every drawing', issue: 'born converted', seed: SEED_RP },
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },

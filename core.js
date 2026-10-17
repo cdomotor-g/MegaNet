@@ -246,6 +246,8 @@ const TABS = [
       find: 'network review design audit planning fade margin matrix radio mobile rm comparison calibration calibrate attenuator path margin measured field test redundancy two paths second path gateways repeater relocation move proposed site hops tdma alert2 frequency principles licence' },
     { id: 'a2plan',     label: 'ALERT2 Transition Plan', icon: '🧭',     who: 'admin',
       find: 'alert2 transition migration upgrade plan proposal business case management submission erta2 ert-a2 elpro 115e base station repeater backbone acquisition remediation equipment quantity cost estimate budget fte effort staff crews timeline gantt schedule duration catchment basin region scenario what if sliders network review' },
+    { id: 'tdma',       label: 'TDMA Planner',           icon: '⏱️',
+      find: 'tdma planner alert2 time slot slots frame length slot length offset schedule timing repeater field station aggregation latency capacity air time airlink buffer guard clock gps hop limit path service configuration sheet ert-a2 ind api legacy concentration aloha channel network planning transition' },
   ] },
 ];
 
@@ -2162,6 +2164,21 @@ const HELP = {
     links: [{ label: 'Network review and the design principles', href: 'docs/network-review.md' },
             { label: 'The ELPRO 115E-2 as a base-station gateway', href: 'docs/elpro115e_mqtt.md' }],
     related: ['review', 'alert2', 'basestations'],
+  },
+  tdma: {
+    summary: 'The <strong>TDMA Planner</strong> works out an ALERT2 time-slot plan for one radio channel: a valid frame length, '
+      + 'the slot each field station and repeater transmits in, how many bytes each slot carries at the storm peak against how '
+      + 'many it must, and how long the slowest report takes to reach the base. Sketch a network from a few counts, or pick '
+      + 'repeaters from the register and their stations come with them; the sheet at the foot says what to set on each unit.',
+    watch: [
+      '<strong>Deepest first.</strong> A repeater\'s slots come after every slot it forwards, so a report crosses every hop within one frame; order by name and the plan shows the extra frame of delay.',
+      '<strong>Peak, not average.</strong> Slots are sized to the storm peak you set — reports per frame, sensors per report, path bytes per hop. A run that cannot carry its peak needs more repeater slots per frame, and the plan says how many; only a single AirLink payload past 1023 bytes has its oldest PDUs dropped (AirLink §3.2).',
+      '<strong>The ERT-A2 manuals show no slot menu.</strong> The sheet prints the IND API names for frame, slot and offset; confirm with ELPRO where your units take them.',
+      '<strong>Keep slots spare.</strong> Network Review\'s principle: slots for stations not yet built, and a slot left empty where another network\'s receivers are within about 50 km.',
+    ],
+    links: [{ label: 'How the planner works it out', href: 'docs/tdma-planner.md' },
+            { label: 'Network Review', href: 'docs/network-review.md' }],
+    related: ['review', 'alert2', 'network'],
   },
 };
 

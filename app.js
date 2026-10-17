@@ -3532,7 +3532,7 @@ function renderMain() {
   // no list is still stamped and kept, and filed by the database by distance —
   // only the station suggestions wait for the list.
   // The Views tab is about the nav, not the stations, so it is here too.
-  const noDataTabs = ['sitemap', 'offline', 'views', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations'];
+  const noDataTabs = ['sitemap', 'offline', 'views', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations', 'tdma'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -3597,6 +3597,7 @@ function renderMain() {
     case 'basestations': el.innerHTML = BaseStations.render(); BaseStations.init(); break;
     case 'review':     el.innerHTML = NetworkReview.render(); NetworkReview.init(); break;
     case 'a2plan':     el.innerHTML = Alert2Plan.render();    Alert2Plan.init();    break;
+    case 'tdma':       el.innerHTML = TdmaPlanner.render();   TdmaPlanner.init();   break;
     case 'propagation': el.innerHTML = Propagation.render(); Propagation.init(); break;
     default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }

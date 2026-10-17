@@ -171,6 +171,14 @@ const ExportMenu = (function () {
           call: ['Alert2Plan.exportCsv'], ready: why },
       ];
     },
+    tdma: () => {
+      const why = () => (typeof TdmaPlanner === 'undefined' ? 'The TDMA Planner tab is not loaded.'
+        : TdmaPlanner.plan().summary ? '' : 'The settings do not make a valid frame.');
+      return [
+        { label: 'The slot plan — CSV', sub: 'One row per transmitter: slots, offsets, bytes, latency', call: ['TdmaPlanner.exportCsv'], ready: why },
+        { label: 'The configuration sheet — CSV', sub: 'IND API and ERT-A2 names, device by device', call: ['TdmaPlanner.exportSheetCsv'], ready: why },
+      ];
+    },
     review: () => [
       { label: 'The path margin matrix — CSV', sub: 'every field station\'s margin to each hub, its best path, the measured margin and the flags',
         call: ['NetworkReview.exportCsv'],

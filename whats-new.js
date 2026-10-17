@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 35, date: '2026-10-17', items: [
+      '<strong>⏱️ TDMA Planner.</strong> A new tab under <em>Admin</em> that works out an ALERT2 time-slot plan for one radio '
+        + 'channel: a valid frame length, a slot for every field station and repeater — the repeaters\' slots after the ones '
+        + 'they forward and sized to the storm peak — the bytes each slot carries against what it must, and the worst-case '
+        + 'time a report takes to reach the base. Sketch a network from a few counts or pick repeaters from the register, '
+        + 'watch the frame and one report\'s journey, and take away the configuration sheet in the IND API\'s and the ERT-A2\'s names.',
+    ] },
     { n: 34, date: '2026-10-16', items: [
       '<strong>🎚️ The fade-margin test, as a bench you can run.</strong> 🎓 Radio Propagation has a new section 6: a '
         + 'field station sending its test through a step attenuator (0–30 dB in 1 dB clicks) to a repeater on a hill. '

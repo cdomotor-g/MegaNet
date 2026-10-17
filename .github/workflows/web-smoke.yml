@@ -1181,6 +1181,12 @@ jobs:
         working-directory: test
         run: npm run a2plan
 
+      # Node, then Chromium. The TDMA Planner tab (tdma-planner.js): the AirLink
+      # air-time formula and the two worked frames against the sources' figures, then the tab, its card and its CSVs.
+      - name: TDMA Planner — the air-time formula, the two worked examples, the card
+        working-directory: test
+        run: npm run tdma
+
       # Node, then Chromium. The 🎓 Radio Propagation tab (propagation-*.js):
       # its physics against figures worked by hand, its ALERT frame against
       # packets.js's own decoder, each of the made-up catchment's stories
