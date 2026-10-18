@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 37, date: '2026-10-18', items: [
+      '<strong>🔭 Forecast and information locations in Look Around.</strong> A pin for one of the Bureau\'s forecast '
+        + 'locations is now ringed in purple and tagged <em>Forecast</em>, and one for an information location ringed in '
+        + 'pink and tagged <em>Info</em> — the same stations the Stations map outlines. Tap the pin and its sheet says '
+        + 'which in words; the other stations that way are tagged in its list too.',
+    ] },
     { n: 36, date: '2026-10-17', items: [
       '<strong>🏛️ Owners\' logos on the station card.</strong> The <em>Owner</em> row now shows each owner\'s logo '
         + 'beside its name — the Bureau, WaterNSW, Seqwater, Sunwater, the councils and the rest, ninety-odd in all. '

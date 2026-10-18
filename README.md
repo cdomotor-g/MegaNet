@@ -4689,7 +4689,15 @@ stations the way it faces are pinned over it, each pin a callout on a stem whose
 foot stands on the horizon at the station's bearing. A pin names the station and
 says how far away it is, and its type in one letter in the map's own colours —
 **F** field station (green), **R** repeater (blue), **B** base station (red).
-Turn round and the pins come and go with the view; a little circle at the top
+Where the Bureau's Service Level Specification names the station one of its
+**forecast locations** (a height is predicted for it) or **information
+locations** (heights reported and classified, not predicted), the pin is ringed
+in the Bureau's purple or pink — the outlines the Stations map draws, from the
+same answer (`MapSymbols.kind`) — and tagged **Forecast** or **Info** beside its
+distance; its sheet says which in words, and the rest of its direction is
+tagged in the sheet's list. A station the document doesn't name has no tag. The
+tab sends for the SLS file as it opens, and the pins pick up their marks when it
+lands. Turn round and the pins come and go with the view; a little circle at the top
 right is the same directions from above, the way you face at the top, so the
 next one is easy to find.
 

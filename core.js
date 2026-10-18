@@ -976,7 +976,9 @@ const HELP = {
   lookaround: {
     summary: 'Hold a phone up and turn round: the stations the way it faces are pinned over the camera\'s '
            + 'picture, each with its type in a letter of its colour — <strong>F</strong> field (green), '
-           + '<strong>R</strong> repeater (blue), <strong>B</strong> base (red). One pin a direction: the nearest '
+           + '<strong>R</strong> repeater (blue), <strong>B</strong> base (red) — and the Bureau\'s forecast and '
+           + 'information locations ringed in purple and pink and tagged <em>Forecast</em> or <em>Info</em>, as the '
+           + 'Stations map outlines them. One pin a direction: the nearest '
            + 'station that way, named, with a count of how many more stand behind it. The slider sets how far out '
            + 'it looks, and the letters at the foot switch a type off. Tap a pin for the station\'s number, its '
            + 'ALERT IDs, how far and which way, the rest of that direction, and <em>Show on the map</em>, which '
@@ -985,6 +987,10 @@ const HELP = {
       'North is <em>true</em> north: the compass is corrected by the World Magnetic Model\'s declination, '
       + 'about 11° in Brisbane. Phone compasses are often 5–15° out — aim at a station you can see, tap its pin '
       + 'and press <em>I\'m facing it</em> to bring every pin into line.',
+      'Forecast and information locations come from the Bureau\'s Service Level Specification: at a forecast '
+      + 'location it predicts a height, at an information location it reports and classifies heights without '
+      + 'predicting them. A station the document doesn\'t name has no tag — that is detail we don\'t have, not a '
+      + 'station that is neither.',
       'It shows the stations the Stations tab\'s filters leave, so a filter set there applies here — and a '
       + 'station that seems to be missing may simply be filtered out.',
       '<em>From the map\'s centre</em> does the same without GPS or the camera, standing where the Stations map '

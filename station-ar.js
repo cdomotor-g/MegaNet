@@ -6,16 +6,19 @@
 //               pin a direction, the nearest station in it named, its type in
 //               one letter (F field, R repeater, B base, in the map's own
 //               colours) and how many more stand behind it, out to a distance
-//               a slider sets. A tap on a pin opens the station: its number,
-//               its ALERT ids, how far and which way, the rest of that
-//               direction, and the way back to it on the map.
+//               a slider sets — and the Bureau's forecast and information
+//               locations ringed and tagged in the Bureau's own purple and
+//               pink. A tap on a pin opens the station: its number, its ALERT
+//               ids, how far and which way, the rest of that direction, and
+//               the way back to it on the map.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, announce, fmtKm, bearingDeg,
 // acmaHaversineKm, ROLE_LABEL, proposedTagHtml and registerTabTeardown; across
 // to app.js for filteredStations, primaryRole, stationAlertIdTypes,
-// focusStationOnMap and switchTab. All of it from inside its own functions, so
-// this file's position among the modules is free. Nothing executes at load
+// focusStationOnMap and switchTab, and to map-symbols.js and sls.js for
+// MapSymbols and SLS. All of it from inside its own functions, so this file's
+// position among the modules is free. Nothing executes at load
 // (`npm run toplevel`). renderMain() calls render() and init() for the tab.
 //
 // ── A tab of its own ─────────────────────────────────────────────────────────
@@ -41,6 +44,18 @@
 // stands for because another came into view beside it. How many degrees make
 // one direction follows the screen (about a finger's width of it), and widens
 // where even then the labels would not fit in a few rows over the horizon.
+//
+// ── Forecast and information locations ───────────────────────────────────────
+// Where the Bureau's Service Level Specification names a station as one of its
+// forecast locations (Schedule 2: a height is predicted for it) or information
+// locations (Schedule 3: reported and classified, not predicted), its pin is
+// ringed in the Bureau's purple or pink and says Forecast or Info beside its
+// distance, and its sheet says which in words. The answer is MapSymbols.kind's,
+// the one the Stations map's outlines and its Gauge filter are drawn from, so
+// the two never disagree; a station the document does not name has no mark,
+// which is "we don't have that detail", not "it is neither". The file is
+// nobody's at page load (sls.js): the tab sends for it as it comes into view,
+// and the directions are gathered again — marks and all — when it lands.
 //
 // ── Which way is north ───────────────────────────────────────────────────────
 // A phone's compass reads magnetic north, and every bearing here is true: in
@@ -94,6 +109,15 @@ const StationAR = (function () {
   const ROLES  = ['field', 'repeater', 'base'];
   const LETTER = { field: 'F', repeater: 'R', base: 'B' };
   const SHORT  = { field: 'Field', repeater: 'Repeater', base: 'Base' };
+
+  // The Bureau's part in a station, where its SLS names one (MapSymbols.kind's
+  // role): the tag on a pin, what it says to a screen reader, and the sheet's line.
+  const SLS_TAG  = { forecast: 'Forecast', information: 'Info' };
+  const SLS_NAME = { forecast: 'Bureau forecast location', information: 'Bureau information location' };
+  const SLS_LINE = {
+    forecast:    'One of the Bureau\'s forecast locations — it predicts a height here.',
+    information: 'One of the Bureau\'s information locations — its heights are reported and classified, not predicted.',
+  };
 
   const HERE_KM = 0.02;          // a station this close is where you stand, not a direction
   const CLUSTER_PX = 48;         // a direction is about a finger's width of the screen…
@@ -406,6 +430,7 @@ const StationAR = (function () {
   let proj = { f: 500, w: 0, h: 0 };
   let raf = 0, drag = null, wake = null;
   let shownHeading = null;
+  let slsWaiting = false;              // the SLS sent for, and not yet back
 
   // ── Small things ───────────────────────────────────────────────────────────
 
@@ -428,6 +453,19 @@ const StationAR = (function () {
   function roleOf(s) {
     return Array.isArray(s.roles) && typeof primaryRole === 'function' ? primaryRole(s) : 'field';
   }
+  // 'forecast', 'information' or null — null too until the SLS has landed.
+  function slsOf(s) {
+    const k = typeof MapSymbols !== 'undefined' ? MapSymbols.kind(s) : null;
+    return k && (k.role === 'forecast' || k.role === 'information') ? k.role : null;
+  }
+  // The tag, in the Bureau's colour. Hidden from a screen reader, which is
+  // told the whole name instead where `sr` asks for it (a pin's own label says
+  // it already).
+  function slsTagHtml(sls, sr = false) {
+    if (!sls) return '';
+    return `<span class="ar-sls sls-${sls}" aria-hidden="true">${SLS_TAG[sls]}</span>`
+      + (sr ? `<span class="sr-only">, ${SLS_NAME[sls]}</span>` : '');
+  }
   function isMobile() {
     return (typeof L !== 'undefined' && L.Browser && L.Browser.mobile)
       || window.matchMedia('(pointer: coarse)').matches;
@@ -446,6 +484,19 @@ const StationAR = (function () {
     if (!state.data) return [];
     const list = typeof filteredStations === 'function' ? filteredStations() : state.data.stations;
     return list.filter(hasPos);
+  }
+
+  // The SLS, for the forecast and information marks. Through MapSymbols, so
+  // its answers are worked out again when the file lands (and a failed fetch
+  // tried again), then the directions are gathered again here. Both wait on
+  // the one fetch, MapSymbols' first, so its answers are new by the time
+  // these are asked for.
+  function askSls() {
+    if (slsWaiting || typeof MapSymbols === 'undefined' || typeof SLS === 'undefined' || SLS.loaded()) return;
+    slsWaiting = true;
+    MapSymbols.askSls(MapSymbols.slsFailed());
+    const landed = () => { slsWaiting = false; syncPane(); replan(); };
+    SLS.ensureData().then(landed, landed);
   }
 
   // The distance and the types, remembered across visits.
@@ -495,7 +546,9 @@ const StationAR = (function () {
         <div class="ar-pane">
           <h2 class="ar-pane-title" id="ar-pane-h"><span aria-hidden="true">🔭</span> Look Around</h2>
           <p class="ar-pane-lead">Hold your phone up and turn round: the stations the way it faces are pinned over the
-            camera's picture, each with its type — <strong>F</strong> field, <strong>R</strong> repeater, <strong>B</strong> base.
+            camera's picture, each with its type — <strong>F</strong> field, <strong>R</strong> repeater, <strong>B</strong> base —
+            and the Bureau's forecast and information locations ringed and tagged in its own colours,
+            ${slsTagHtml('forecast')} ${slsTagHtml('information')}.
             One pin a direction: the nearest station that way, and how many more stand behind it. Tap a pin for its station
             number and ALERT IDs, and the way to it on the map.</p>
           <div class="button-group ar-pane-go">
@@ -519,6 +572,10 @@ const StationAR = (function () {
               too. Stations are gathered by direction, nearest first, so a pin is the nearest station that way and its number
               counts the rest; the pin's sheet lists them. The little circle is the same directions from above, the way you
               face at the top.</p>
+            <p class="small">Forecast and information locations are the Bureau's, from its Service Level Specification — the
+              ones the Stations map outlines in purple and pink. At a <strong>forecast</strong> location the Bureau predicts a
+              height; at an <strong>information</strong> location it reports and classifies the heights but does not predict
+              them. A station the document doesn't name has no tag.</p>
             <p class="small">The camera's picture is drawn on your screen and goes nowhere else — nothing is recorded or
               sent. On a computer, <em>From the map's centre</em> stands where the Stations map was last looking and turns
               by dragging or with ← and →.</p>
@@ -527,8 +584,9 @@ const StationAR = (function () {
       </div>`;
   }
 
-  // The tab coming into view: what the page says about what it will show.
-  function init() { syncPane(); }
+  // The tab coming into view: what the page says about what it will show, and
+  // the SLS sent for while the phone is still in a pocket.
+  function init() { askSls(); syncPane(); }
 
   // What the page says about what it will show, brought up to date whenever it
   // is drawn (init).
@@ -541,9 +599,12 @@ const StationAR = (function () {
       else {
         const all = state.data.stations.filter(hasPos).length;
         const shown = candidates().length;
-        note.textContent = shown < all
+        note.textContent = (shown < all
           ? `The Stations tab's filters are on: ${shown.toLocaleString()} of the ${all.toLocaleString()} stations with a position, and the finder shows those.`
-          : `${all.toLocaleString()} stations with a position. Filters set on the Stations tab apply here too.`;
+          : `${all.toLocaleString()} stations with a position. Filters set on the Stations tab apply here too.`)
+          + (!slsWaiting && typeof MapSymbols !== 'undefined' && MapSymbols.slsFailed()
+            ? ' The Bureau\'s Service Level Specification did not load, so its forecast and information locations are not marked.'
+            : '');
       }
     }
   }
@@ -633,6 +694,7 @@ const StationAR = (function () {
     source = src === 'map' ? 'map' : 'gps';
     opener = document.activeElement;
     startCompass();
+    askSls();                         // after the compass's ask, which must come first in the press
     view = document.createElement('div');
     view.className = 'ar-view';
     view.id = 'ar-view';
@@ -913,7 +975,7 @@ const StationAR = (function () {
         const d = acmaHaversineKm(here.lat, here.lon, s.lat, s.lon);
         if (d > maxKm) continue;
         if (d < HERE_KM) { at.push(s); continue; }
-        items.push({ s, role, d, b: bearingDeg(here.lat, here.lon, s.lat, s.lon) });
+        items.push({ s, role, d, b: bearingDeg(here.lat, here.lon, s.lat, s.lon), sls: slsOf(s) });
       }
       items.sort((a, b) => a.d - b.d);
       const ppd = pxPerDeg();
@@ -951,14 +1013,14 @@ const StationAR = (function () {
     const rep = c.members[0], n = c.members.length;
     const picked = pick && c.members.some(x => x.s.id === pick.id);
     const name = rep.s.name || 'Unnamed station';
-    const label = `${ROLE_LABEL[rep.role]} ${name}, ${fmtKm(rep.d)}, bearing ${bearingText(rep.b)}`
+    const label = `${ROLE_LABEL[rep.role]} ${name}${rep.sls ? `, ${SLS_NAME[rep.sls]}` : ''}, ${fmtKm(rep.d)}, bearing ${bearingText(rep.b)}`
       + (n > 1 ? `. ${n} stations this way` : '');
-    return `<div class="ar-pin role-${rep.role}${picked ? ' is-picked' : ''}" data-k="${k}" data-id="${escAttr(rep.s.id)}"
+    return `<div class="ar-pin role-${rep.role}${rep.sls ? ` sls-${rep.sls}` : ''}${picked ? ' is-picked' : ''}" data-k="${k}" data-id="${escAttr(rep.s.id)}"
                  style="--ar-row: ${c.row}; --ar-z: ${1000 - k}" hidden>
         <button type="button" class="ar-pin-box" onclick="StationAR.pickCluster(${k})" aria-label="${escAttr(label)}"
                 ${picked ? 'aria-current="true"' : ''}><span class="ar-letter" aria-hidden="true">${LETTER[rep.role]}</span><span
                 class="ar-pin-text" aria-hidden="true"><span class="ar-pin-name">${esc(name)}</span><span
-                class="ar-pin-dist">${esc(fmtKm(rep.d))}</span></span>${n > 1
+                class="ar-pin-dist">${esc(fmtKm(rep.d))}${slsTagHtml(rep.sls)}</span></span>${n > 1
                 ? `<span class="ar-pin-n" aria-hidden="true">${n}</span>` : ''}</button>
         <span class="ar-pin-stem" aria-hidden="true"></span>
       </div>`;
@@ -1069,6 +1131,7 @@ const StationAR = (function () {
       <p class="ar-detail-line">${esc(ROLE_LABEL[m.role])} · ${s.station_number
         ? `Stn # <strong>${esc(String(s.station_number))}</strong>` : 'no station number'}${s.enabled === false
         ? ' · <span class="ar-detail-kind">not enabled</span>' : ''} ${proposedTagHtml(s, { short: true })}</p>
+      ${m.sls ? `<p class="ar-detail-line ar-detail-sls">${slsTagHtml(m.sls)} ${esc(SLS_LINE[m.sls])}</p>` : ''}
       <p class="ar-detail-line">${esc(fmtKm(m.d))} away, bearing <strong>${esc(bearingText(m.b))}</strong></p>
       <p class="ar-detail-line">${idsHtml}</p>
       <div class="button-group ar-detail-actions">
@@ -1080,7 +1143,7 @@ const StationAR = (function () {
       ${others.length ? `<h4 class="ar-more-h">${others.length} more this way</h4>
       <ul class="ar-more">${others.slice(0, MORE_CAP).map(x => `<li><button type="button" class="ar-more-row role-${x.role}"
             data-id="${escAttr(x.s.id)}" onclick="StationAR.pickStation(this.dataset.id)"><span class="ar-letter"
-            aria-hidden="true">${LETTER[x.role]}</span><span class="ar-more-name">${esc(x.s.name || 'Unnamed station')}</span><span
+            aria-hidden="true">${LETTER[x.role]}</span><span class="ar-more-name">${esc(x.s.name || 'Unnamed station')}</span>${slsTagHtml(x.sls, true)}<span
             class="ar-more-d">${esc(fmtKm(x.d))}</span></button></li>`).join('')}</ul>
       ${others.length > MORE_CAP ? `<p class="ar-more-cap">…and ${others.length - MORE_CAP} more further out.</p>` : ''}` : ''}`;
   }
@@ -1401,8 +1464,9 @@ const StationAR = (function () {
         decl, align, rangeKm: RANGES_KM[rangeIdx], roles: { ...roles }, f: proj.f, w: proj.w, h: proj.h,
         width: plan ? plan.width : null, n: plan ? plan.n : null,
         clusters: plan ? plan.clusters.map(c => ({
-          b: c.b, d: c.d, row: c.row, n: c.members.length, role: c.members[0].role,
+          b: c.b, d: c.d, row: c.row, n: c.members.length, role: c.members[0].role, sls: c.members[0].sls,
           id: c.members[0].s.id, name: c.members[0].s.name, ids: c.members.map(x => x.s.id),
+          slsIds: c.members.filter(x => x.sls).map(x => [x.s.id, x.sls]),
         })) : null,
         visible: pinEls.filter(el => !el.hidden).map(el => el.dataset.id),
         pick: pick ? pick.id : null,

@@ -16506,6 +16506,35 @@ button.adm-danger:hover { border-color: var(--bad); }
 .ar-pin-dist {
   color: var(--muted);
   font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+/* The Bureau's forecast and information locations: a ring round the label in
+   the Bureau's own key — the purple and pink the Stations map outlines them in
+   (MapSymbols.FORECAST and INFORMATION), literals for the reason they are
+   there — and a tag that says it in a word, so the ring is not left to colour
+   alone. White on the purple and black on the pink are the pairs that read. */
+:is(.ar-sls, .ar-pin).sls-forecast    { --ar-sls: #8400a8; --ar-sls-ink: #fff; }
+:is(.ar-sls, .ar-pin).sls-information { --ar-sls: #ff00c5; --ar-sls-ink: #000; }
+
+.ar-sls {
+  display: inline-block;
+  padding: 0 .3rem;
+  border-radius: var(--r-pill);
+  background: var(--ar-sls);
+  color: var(--ar-sls-ink);
+  font-size: .66rem;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+  vertical-align: .05em;
+}
+
+.ar-pin-dist .ar-sls { margin-left: .35rem; }
+.ar-more-row .ar-sls { flex: 0 0 auto; }
+
+.ar-pin:is(.sls-forecast, .sls-information) .ar-pin-box {
+  box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 4px var(--ar-sls), var(--shadow-2);
 }
 
 /* How many stations stand this way, the nearest one named. */

@@ -31,7 +31,11 @@
 //   in exactly one direction; the heading true north by the declination where
 //   the phone stands; the pins on the screen exactly the directions in the
 //   view, each stem's foot on its bearing and no two labels in a row
-//   overlapping; F, R and B in their roles' colours; a pin tapped opening its
+//   overlapping; F, R and B in their roles' colours; every station gathered
+//   marked forecast or information location exactly as MapSymbols.kind (the
+//   map's purple and pink outlines) says, its pin ringed, tagged and labelled
+//   to match, its sheet saying so in words and the rest of its direction
+//   tagged in the sheet's list; a pin tapped opening its
 //   station's sheet with its number and ALERT IDs; "I'm facing it" moving north
 //   onto that station and Undo moving it back; the slider and the types
 //   changing what is gathered, the pane's controls following; an iPhone's
@@ -269,6 +273,9 @@ try {
   await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
   await page.evaluate(() => switchTab('stations'));
   await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
+  // The Bureau's SLS, which the Stations map sends for once it is drawn — here
+  // before the view opens, so its marks do not arrive in the middle of a check.
+  await page.waitForFunction(() => SLS.loaded(), null, { timeout: 30_000 });
 
   // Spies on what the view starts, so its going can be seen to stop it.
   await page.evaluate(() => {
@@ -368,6 +375,37 @@ try {
   check('each pin: its nearest station\'s name, F/R/B in its role\'s colour, and how many stand that way',
     pins.length > 0 && pinOk, JSON.stringify(pins.slice(0, 2)));
 
+  // The Bureau's forecast and information locations: every station gathered
+  // marked as MapSymbols.kind — the map's purple and pink outlines — says, and
+  // every pin ringed, tagged and labelled to match; the rest left plain.
+  const marks = await page.evaluate(() => {
+    const dbg = StationAR.debug();
+    const byId = new Map(state.data.stations.map(s => [s.id, s]));
+    const want = id => { const r = MapSymbols.kind(byId.get(id)).role; return r === 'forecast' || r === 'information' ? r : null; };
+    const members = dbg.clusters.flatMap(c => c.ids.map(id => ({ id, want: want(id),
+      got: (c.slsIds.find(x => x[0] === id) || [])[1] || null })));
+    const pins = [...document.querySelectorAll('.ar-pin')].map(el => {
+      const c = dbg.clusters[Number(el.dataset.k)];
+      const tag = el.querySelector('.ar-pin-dist .ar-sls');
+      const box = el.querySelector('.ar-pin-box');
+      return { id: el.dataset.id, want: c.sls, cls: el.className, tag: tag ? tag.textContent : null,
+               ring: getComputedStyle(box).boxShadow, label: box.getAttribute('aria-label') };
+    });
+    return { members, pins };
+  });
+  const SLS_RING = { forecast: 'rgb(132, 0, 168)', information: 'rgb(255, 0, 197)' };
+  const SLS_TAG = { forecast: 'Forecast', information: 'Info' };
+  const nMarked = r => marks.members.filter(m => m.want === r).length;
+  check(`every station gathered marked as the map outlines it (${nMarked('forecast')} forecast, ${nMarked('information')} information locations)`,
+    nMarked('forecast') > 0 && nMarked('information') > 0 && marks.members.every(m => m.got === m.want),
+    JSON.stringify(marks.members.filter(m => m.got !== m.want).slice(0, 5)));
+  const pinMarkOk = p => p.want
+    ? p.cls.includes(`sls-${p.want}`) && p.tag === SLS_TAG[p.want] && p.ring.includes(SLS_RING[p.want])
+      && p.label.includes(`Bureau ${p.want} location`)
+    : !/sls-/.test(p.cls) && p.tag === null && !p.label.includes('Bureau');
+  check('…each pin ringed in the Bureau\'s purple or pink, tagged Forecast or Info and labelled so; the others plain',
+    marks.pins.some(p => p.want) && marks.pins.every(pinMarkOk), JSON.stringify(marks.pins.filter(p => !pinMarkOk(p)).slice(0, 3)));
+
   // A pin tapped: the station's sheet.
   await page.tap(`.ar-pin[data-id="${nearest[0]}"] .ar-pin-box`);
   await page.waitForTimeout(150);
@@ -397,6 +435,34 @@ try {
   await frames(page);
   dbg = await page.evaluate(() => StationAR.debug());
   check('…and Undo puts it back', dbg.align === 0 && angNear(dbg.heading, nearest[1].b + 7, 0.02), JSON.stringify(dbg.heading));
+
+  // The sheet says it in words, and the rest of a direction is tagged too.
+  const fcLead = marks.pins.find(p => p.want === 'forecast');
+  const plainLead = marks.pins.find(p => !p.want);
+  const sheets = await page.evaluate(([fc, plain]) => {
+    const read = id => {
+      StationAR.pickStation(id);
+      const el = document.getElementById('ar-detail');
+      const line = el.querySelector('.ar-detail-sls');
+      return { name: document.getElementById('ar-detail-h')?.textContent, line: line ? line.textContent.replace(/\s+/g, ' ').trim() : null };
+    };
+    const dbg = StationAR.debug();
+    const deep = dbg.clusters.flatMap(c => c.slsIds.filter(([id]) => id !== c.id).map(([id, sls]) => ({ lead: c.id, id, sls })))[0];
+    let more = null;
+    if (deep) {
+      StationAR.pickStation(deep.lead);
+      const row = document.querySelector(`#ar-detail .ar-more-row[data-id="${CSS.escape(deep.id)}"]`);
+      more = { ...deep, tag: row?.querySelector('.ar-sls')?.textContent || null,
+               sr: row?.querySelector('.sr-only')?.textContent || null };
+    }
+    return { fc: read(fc), plain: read(plain), more };
+  }, [fcLead.id, plainLead.id]);
+  check('a forecast location\'s sheet says so in words; a station the SLS does not name says nothing of it',
+    /^Forecast One of the Bureau's forecast locations/.test(sheets.fc.line || '') && sheets.plain.line === null,
+    JSON.stringify(sheets));
+  check('…and a marked station behind a direction\'s nearest is tagged in its sheet\'s list, with its name for a screen reader',
+    !!sheets.more && (sheets.more.tag === SLS_TAG[sheets.more.sls] && sheets.more.sr === `, Bureau ${sheets.more.sls} location`),
+    JSON.stringify(sheets.more));
 
   // The distance and the types.
   await page.keyboard.press('Escape');
