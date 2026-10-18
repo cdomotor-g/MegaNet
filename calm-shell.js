@@ -63,6 +63,7 @@ const CalmShell = (() => {
     map:       '<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>',
     camera:    '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
     nearby:    '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>',
+    look:      '<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M12 16.5s-3.5-3-3.5-5.7a3.5 3.5 0 0 1 7 0c0 2.7-3.5 5.7-3.5 5.7z"/><circle cx="12" cy="10.8" r="1.1"/>',
     download:  '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
     palette:   '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-.9-.7-1.3-.7-2.2 0-.9.7-1.6 1.6-1.6H17a4 4 0 0 0 4-4c0-4.7-4-8.6-9-8.6z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="14.5" cy="7" r="1"/>',
     help:      '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/><circle cx="12" cy="17" r=".6"/>',
@@ -269,13 +270,21 @@ const CalmShell = (() => {
   }
 
   // ── A phone's foot ────────────────────────────────────────────────────────
-  // Five buttons, for the five things a site visit reaches for. Inside #tab-nav
+  // Six buttons, for the six things a site visit reaches for. Inside #tab-nav
   // rather than a nav of its own, because the page has one navigation landmark
   // (`npm run shell`), and a fixed child of the bar is drawn where styles.css
   // puts it whatever the bar's own width — 0 on a phone. ⋯ More is the drawer:
   // every group and every tab, the way back to all of it.
+  //
+  // 🔭 Look Around sits beside Nearby, asked for by the owner as the other
+  // thing a phone at a site reaches for most: Nearby says which station is
+  // closest, Look Around which one that mast on the skyline is. Six buttons is
+  // 60 px apiece on a 360 px phone, so its label under the drawing is "Look"
+  // and its full name is the button's own (`name`), which starts with the word
+  // that is drawn.
   const FIELD = [
     { key: 'nearby',  tab: 'nearby',      icon: 'nearby',    label: 'Nearby' },
+    { key: 'look',    tab: 'lookaround',  icon: 'look',      label: 'Look', name: 'Look Around' },
     { key: 'map',     tab: 'stations',    icon: 'map',       label: 'Map' },
     { key: 'visits',  tab: 'inspections', icon: 'clipboard', label: 'Visits' },
     { key: 'camera',  tab: 'camera',      icon: 'camera',    label: 'Camera' },
@@ -290,7 +299,8 @@ const CalmShell = (() => {
           const on = !open && state.activeTab === f.tab;
           return `
         <button type="button" class="field-btn${on ? ' active' : ''}" data-field="${f.key}"
-                onclick="CalmShell.fieldGo('${f.key}')" ${on ? 'aria-current="page"' : ''}>
+                onclick="CalmShell.fieldGo('${f.key}')" ${on ? 'aria-current="page"' : ''}${
+                f.name ? ` aria-label="${escAttr(f.name)}" title="${escAttr(f.name)}"` : ''}>
           ${icon(f.icon)}<span>${f.label}</span>
         </button>`;
         }).join('')}

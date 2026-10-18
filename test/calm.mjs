@@ -258,8 +258,26 @@ async function main() {
     await page.evaluate(() => switchTab('sitemap'));
     await page.waitForTimeout(SETTLE);
     S = await shell(page);
-    check('the bar along the foot: Nearby, Map, Visits, Camera and More — and no ☰ in the banner',
-      J(S.field) === J(['nearby', 'map', 'visits', 'camera', 'more']) && !S.btn['btn-nav'], J({ field: S.field, nav: S.btn['btn-nav'] }));
+    check('the bar along the foot: Nearby, Look Around, Map, Visits, Camera and More — and no ☰ in the banner',
+      J(S.field) === J(['nearby', 'look', 'map', 'visits', 'camera', 'more']) && !S.btn['btn-nav'], J({ field: S.field, nav: S.btn['btn-nav'] }));
+    // Six to a 360 px row: every label on one line inside its own button.
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.waitForTimeout(150);
+    const fit = await page.evaluate(() => [...document.querySelectorAll('.field-bar .field-btn')].map(b => {
+      const t = b.querySelector('span'), r = t.getBoundingClientRect(), br = b.getBoundingClientRect();
+      return { k: b.dataset.field, one: r.height < 20, inside: r.left >= br.left - 0.5 && r.right <= br.right + 0.5 };
+    }));
+    check('…six of them fit a 360 px phone, each label on one line inside its button', fit.every(f => f.one && f.inside), J(fit));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(150);
+    await page.click('.field-bar [data-field="look"]');
+    await page.waitForTimeout(SETTLE);
+    const look = await page.evaluate(() => {
+      const b = document.querySelector('.field-bar [data-field="look"]');
+      return { tab: state.activeTab, name: b.getAttribute('aria-label'), shown: b.textContent.trim(), on: b.getAttribute('aria-current') };
+    });
+    check('Look opens 🔭 Look Around, is marked in the bar, and is called Look Around by name',
+      look.tab === 'lookaround' && look.on === 'page' && look.name === 'Look Around' && look.shown === 'Look', J(look));
     const foot = await page.evaluate(() => {
       const r = document.querySelector('.field-bar').getBoundingClientRect();
       return { bottom: Math.round(r.bottom), h: Math.round(r.height), vh: innerHeight,

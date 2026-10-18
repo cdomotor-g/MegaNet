@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-18** (revision 160 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-18** (revision 161 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -539,6 +539,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and fourteen `[Human]` issues.
 >
+> **Revision 161 opens and closes nothing** — at the owner's request, **🔭 Look Around joins the Calm look's bar along a phone's foot**, beside Nearby: Nearby, Look, Map, Visits, Camera, More. See revision 161 below.
+>
 > **Revision 160 opens and closes nothing** — the three follow-ups revision 159 named, done at the owner's word (*"just tackle them now"*): under Calm a tab's long introduction is two lines deep with *More about this tab*; Station Health leads with its answer in a sentence above bigger numbers and a wider Needs attention; and `npm run camera`'s stale expectation (the proposed Gatton Auto station now stands where the phone does) put right. See revision 160 below.
 >
 > **Revision 159 opens and closes nothing** — at the owner's request, **🪷 a Calm look, the new default, with 🗂️ Classic one pick away**: the groups down the side and the open group's tabs across the top, a white banner with search, sign in and ⋯, and on a phone a bar along the foot (Nearby, Map, Visits, Camera, More), the inspection sheet a section at a time, and a new **📌 Nearby** tab (`looks.js`, `calm-shell.js`, `nearby.js`). Built so more looks can follow. See revision 159 below.
@@ -800,6 +802,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 161 — 2026-10-18: 🔭 Look Around on a phone's bottom bar
+
+The owner: *"put look around in the bottom buttons on the calm look — I think it's one that users will probably like to use often when they are on mobile"*. Nothing opened or closed.
+
+- **The bar along the foot** (`calm-shell.js`, `FIELD`) is six buttons now: Nearby, **Look**, Map, Visits, Camera, More — Look beside Nearby because the two answer the same question at a site, *which station is that?*, one as a list and one by pointing. Labelled *Look* under its drawing (a pin in a viewfinder) because six to a 360 px row is 60 px apiece; its name to a screen reader and its tooltip is *Look Around*, which starts with the word drawn.
+- What's new 41, `docs/design-system.md` §8, the version stamp `20261018d`.
+
+**Checks:** `npm run calm` (now 54: the six in order, each label on one line inside its button at 360 px, and Look opening Look Around, marked in the bar and named in full) and the cheap five.
 
 ### Revision 160 — 2026-10-18: 📖 Introductions folded, 🚦 Station Health's answer first, and the camera check put right
 
