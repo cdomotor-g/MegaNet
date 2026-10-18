@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-17** (revision 157 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-18** (revision 158 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -539,6 +539,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and fourteen `[Human]` issues.
 >
+> **Revision 158 opens and closes nothing** — at the owner's request, **🔔 notifications on an administrator's phone**, and the number waiting on the app's icon: an account waiting for approval or a base station asking for its token is pushed (Web Push — on an iPhone from the Home Screen app) by the Worker every minute (`0066`, applied live; `worker/push.js`; `push.js`). Nothing to set on the server: the VAPID key makes itself. See revision 158 below.
+>
 > **Revision 157 opens and closes nothing** — the ⏱️ TDMA Planner tab ships: an ALERT2 time-slot plan for one channel worked from a sketch or the register — valid frame, a slot for every transmitter with the repeaters' after the ones they forward and sized to the storm peak, bytes against capacity, worst-case latency, and a configuration sheet in the IND API's and the ERT-A2's names. See revision 157 below.
 >
 > **Revision 156 opens and closes nothing** — at the owner's request, the ALERT2 Transition Plan's site conditions (as "marks" were renamed) and **saved scenarios** go into the database (`0065`, applied live): a scenario is private to its author until shared, then every administrator can load it. #239's Part 1 shrinks to `tools/storage_bucket.sql`. See revision 156 below.
@@ -794,6 +796,20 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 158 — 2026-10-18: 🔔 Notifications and a count on the icon, for administrators
+
+At the owner's request (*"Is there a way to get a notification and counter on iPhone pwa icon for things like new users requests?"* — then *"build it now please"*). Nothing opened or closed (no ticket asked for).
+
+- **What is told**: the two queues that wait on an administrator and nobody else — a confirmed account the allowlist does not approve on its own (`0062`'s), and a base station asking for an ingest token (`0048`'s, which expire in 30 minutes) — once per arrival, to every current administrator's devices, with the total waiting as the icon's count. Counts and a base station's own label and code; **never a person's name or address** (a notification is read on a lock screen). A lone base station's notification opens its approve form (`#pair=`); anything else the Admin tab.
+- **The database** (`0066_push_notifications.sql`, **applied live**, schema 65 → 66; `tools/check_push.sql`, 60 checks, in CI's db-checks job): `meganet.push_subscription` — a device's endpoint (Apple's, Google's, Mozilla's or Microsoft's push service and nowhere else, a check), its keys, the VAPID key it subscribed with, `told_through`, a test asked for and the push service's last answer; RLS on, no policy, no grant. The page's doors `push_subscribe` / `push_test` (administrators), `push_unsubscribe` / `push_mine` (own devices); the sender's `push_due` / `push_done` / `push_waiting` / `push_trim`, `service_role` only. Arrivals are counted to ten seconds ago, for a request still committing; a failure is noted, not retried every minute; `404`/`410` deletes the row.
+- **The sender** (`worker/push.js`, new; `scheduled()` in `worker/index.js`; `[triggers] crons = ["* * * * *"]` in `wrangler.toml`): asks `push_due` with `SUPABASE_SECRET_KEY`, encrypts each message to its device (RFC 8291 aes128gcm, Web Crypto — no library), signs a VAPID token for the push service (RFC 8292, ES256, a URL subject, 12 h), sends with TTL, Urgency and Topic, and reports each answer to `push_done`. **Its VAPID key is made on the first run and kept in the PHOTOS bucket under `_meganet/`**, as `worker/photos.js` keeps its URL-signing key, so there is no secret to set (`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` override it).
+- **The page** (`push.js`, new): the Admin tab's **🔔 Notifications** panel — turn on (permission asked first, inside the tap, as Safari requires), send a test, turn off, the account's devices with what their push service last said, Remove; the server not set up, or its schedule stopped, said. **The count on the icon** (Badging API) only on a device that is told, put right from `push_mine` on sign-in, on coming back to the foreground and after a decision. An iPhone in Safari's tab is told the Home Screen app is where notifications come, with *How to add it*. `sw.js` shows each push, sets the count, and on a press brings an open app forward and tells it where to go (`floodnet-open`) rather than reloading it.
+- **Applying it live**: the Supabase connection timed out on any request that held an `insert … on conflict` and a `delete` together, or a `delete … or …`, though each went through alone — so `0066` went in as twelve parts (`0066a`–`0066l`), the ten-device trim moved into its own function (`push_trim`) and `push_unsubscribe`'s two cases written as two deletes; the file says it the same way, and the live functions' `md5(prosrc)`, grants and constraints were compared with a local apply and match.
+- **Around it**: `docs/accounts.md` step G (what to check, each device's four steps, what a notification says, what it does not do, six troubleshooting rows), `db/README.md`, `docs/floodwarning-net.md`, the privacy policy (what is kept for a device, the push services among the providers, deletion), README's *Signing in*, What's new 38, `core.js` `DB_SCHEMA_VERSION` 66, the version stamp `20261018a`.
+- **What is left for people**: each administrator turns it on on their own phone (step G). Nothing on the server.
+
+**Checks:** `npm run push` (new, Node: RFC 8291 Appendix A byte for byte, a message opened as a browser opens it, the VAPID token verified, the key made once in the bucket, a run's asks and reports for 201, 410, 403 and a dropped connection, one list of push services, the schedule, `sw.js`'s handlers), `npm run notify` (new, Chromium: the panel for an administrator and not a member, the server's states, on/test/remove/off, the icon's count, permission refused, an iPhone in Safari, a press with the app open), `check_push.sql` with `check_accounts`, `check_user_admin` and the token checks, `accounts`, `offline`, `offlinetab`, `gate`, `dbproxy`, `photostore`, `briefing`, `agentapi`, `agentdocs`, `wrangler deploy --dry-run`, and the cheap five.
 
 ### Revision 157 — 2026-10-17: ⏱️ TDMA Planner — frames, slots and the sheet
 

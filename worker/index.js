@@ -51,10 +51,16 @@
 // Access who this is the way /api/session does (accessIdentity, below), and
 // keeps its day's spend in a Durable Object, BriefingLedger, exported from here
 // because a Durable Object class has to be exported by the Worker's main module.
+//
+// And one that is not a door at all: scheduled() below, every minute
+// (wrangler.toml's [triggers]), sends the administrators' notifications —
+// worker/push.js, db/migrations/0066_push_notifications.sql. Nothing a
+// request carries reaches it.
 
 import { isApiPath, handleApi } from './api.js';
 import { isPhotoPath, handlePhotos } from './photos.js';
 import { isBriefingPath, handleBriefing } from './briefing.js';
+import { runPush } from './push.js';
 
 export { BriefingLedger } from './briefing.js';
 
@@ -496,5 +502,14 @@ export default {
       }
       return json({ error: `could not mint a session: ${err.message}` }, 502);
     }
+  },
+
+  // The notifications' sender (worker/push.js): ask the database what is due,
+  // send it, report what the push services said. Said in the Worker's log only
+  // when something was due or went wrong — a quiet minute says nothing.
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(runPush(env).then(out => {
+      if (out.error || out.due) console.log(`[push] ${JSON.stringify(out)}`);
+    }, err => console.log(`[push] ${(err && err.message) || err}`)));
   },
 };

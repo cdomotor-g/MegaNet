@@ -32,6 +32,10 @@
   // The copy kept for opening with no signal (#213), after everything above
   // has drawn: registering a worker is the last thing a first paint needs.
   Pwa.start();
+  // An administrator's notifications (push.js, 0066): where a notification
+  // pressed with the app open goes, and the icon's count when it comes back
+  // to the foreground.
+  Push.start();
   applyTheme({ repaint: false });
   // The views an account keeps (nav-views.js), from this device's copy of
   // them, before the bar is drawn — so a view picked here does not open on

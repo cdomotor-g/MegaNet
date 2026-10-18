@@ -10,7 +10,7 @@ is still decided by the database, in four steps:
 | **An account** | Sign up, and confirm the address from the email | Its own left-bar views, kept in the database and on every device it signs in on |
 | **A member** | Approved — automatically for an address on the allowlist (any `@bom.gov.au`), or by an administrator on the Admin tab | The field photos |
 | **An editor** | On the allowlist (by address or domain) — *Approve as editor* puts an address there | Editing stations, inspections, surveys, photos — exactly as before |
-| **An administrator** | An editor whose role is `admin` | Approving accounts, managing users |
+| **An administrator** | An editor whose role is `admin` | Approving accounts, managing users, and a notification on their phone when somebody is waiting (`0066`) |
 
 The enforcement is in Postgres — `meganet.is_member()`, `meganet.is_editor()` and
 `meganet.is_admin()` — and in the Worker's photo route (`worker/photos.js`), which asks
@@ -258,6 +258,64 @@ tidy, or finish it:
 
 ---
 
+### G. Notifications on a phone — nothing to set on the server; ~2 minutes a device
+
+Since `0066_push_notifications.sql`, an administrator's phone can be told when somebody
+is waiting for one — an account to approve, or a base station asking for an ingest token
+(they expire in 30 minutes) — with the number waiting on Flood-Net's icon, the way a
+native app shows one. It is Web Push, which an iPhone has given home-screen web apps
+since iOS 16.4, and every desktop and Android browser gives any site.
+
+**On the server — check only.** There is no secret to make or set:
+
+* The Worker sends them from `scheduled()` every minute (`worker/push.js`; the
+  `[triggers]` block in `wrangler.toml` deploys with it). Workers & Pages → **meganet** →
+  **Settings → Triggers** lists `* * * * *`.
+* Its VAPID key — what the push services know Flood-Net's sender by — is made on its first
+  run and kept in the photos' R2 bucket under `_meganet/`, as the photo route keeps its
+  URL-signing key. To use a key of your own instead, set the Worker secrets
+  `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` (the `web-push` library's base64url pair).
+  **A changed key means every device has to be turned on again**; the panel says so on
+  each one.
+* It reads the queues with `SUPABASE_SECRET_KEY`, which `/api/session` already uses.
+* The database needs `0066` (step 0's check reads `66`). Then, within a minute of a
+  deploy, both of these rows exist:
+
+  ```sql
+  select key, value, updated_at from meganet.app_meta
+   where key in ('push_public_key', 'push_last_run');
+  ```
+
+**On an iPhone or iPad — each administrator, each device:**
+
+1. Open <https://floodwarning.net> in **Safari** → **Share** → **Add to Home Screen** →
+   **Add**. (The 📲 Offline & Install tab has the steps for every browser.)
+2. Open Flood-Net **from the new icon**, and sign in there: the home-screen app keeps a
+   sign-in of its own, apart from Safari's.
+3. **Admin** tab → **🔔 Notifications** → **Turn on for this device** → **Allow** when iOS
+   asks.
+4. Within a minute or two, a notification says *Flood-Net notifications are on*. That is
+   the whole path proved — the key, the sender, Apple's push service, the phone.
+
+On Android, a Mac or a PC it is step 3 on its own, in Chrome, Edge, Firefox or Safari.
+
+**What a notification says.** What arrived — *An account is waiting for your approval*,
+*A base station is asking for a token* — and how many of each are waiting; a lone base
+station by its own label and code. **Never a person's name or address**: a notification
+is read on a lock screen. Tapping it opens the Admin tab, or a lone base station's approve
+form, in the app that is already open rather than reloading it. Each arrival is told once,
+to every administrator's devices; nothing is sent when nothing arrived.
+
+**The count on the icon** is what was waiting when the last notification came. iOS lets
+a web app's push only show a notification, never quietly change the number, so when
+somebody else decides, the count catches up the next time the app is opened. A device that
+is not turned on shows no count, since nothing would keep it true.
+
+**What it does not do.** It does not repeat. A phone that is off longer than 12 hours (30
+minutes, for a base station's request) misses that message — the Admin tab still shows
+everything. Anybody can make a base station's token request (`0048`, at most 20 waiting),
+so a stranger can cause a notification; at most one a minute reaches each device.
+
 ## Day to day
 
 * **Approving.** Admin tab → **Waiting for approval**: *Approve* (sees the photos), *Approve
@@ -267,6 +325,8 @@ tidy, or finish it:
 * **Too many strangers?** Admin tab → **Who may create an account** → *Only addresses on
   the allowlist*. Sign-up is then 0005's rule again; nothing else changes.
 * **Removing somebody.** The users table's **Delete**, as before (`access.md`).
+* **Notifications.** Admin tab → **🔔 Notifications**: *Send a test*, *Turn off on this
+  device*, or **Remove** a device from the list — a phone that was lost or replaced.
 * **Unconfirmed sign-ups** are folded away under the waiting list. They count for nothing —
   a typo or a robot — and need no action.
 
@@ -282,3 +342,9 @@ tidy, or finish it:
 | The panel says *New accounts are open only to listed addresses* | Sign-up is closed (Admin tab switch, or `app_meta` `signup = 'allowlist'`). |
 | Approved, but no photos | The person needs to sign out and in again only if their tab was open for over an hour; otherwise check the Worker is deployed (its photo route asks `rpc/is_member`). |
 | Administrators are not emailed | Step E: the Vault secret's name must be exactly `resend_api_key`. `select meganet.send_account_mail();` in the SQL editor returns how many it told. |
+| The Notifications panel says *Not set up on the server yet* | The Worker has not run on its schedule since it was deployed: Settings → Triggers should list `* * * * *` (step G), and `SUPABASE_SECRET_KEY` must be set (`access.md`). |
+| The panel says *its schedule may have stopped* | Workers & Pages → meganet → **Logs**: a `[push]` line says what each run with something to send hit. |
+| A device's row says *the last one did not go: HTTP 403* | The push service refused the signature — usually a key changed since the device was turned on. Turn it on again on that device. |
+| Turned on, but no test arrives | Focus or Do Not Disturb; or iOS Settings → **Notifications → Flood-Net** is off. The device's row says *last sent* once Apple has taken it. |
+| No *Turn on* button on an iPhone | This is Safari's tab, not the home-screen app: step G 1–2. |
+| The icon's number is out of date | It catches up when the app is opened (step G, the count). |

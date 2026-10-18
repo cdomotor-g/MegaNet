@@ -4,15 +4,17 @@
 //           it, who is signed in and what they may do, the accounts waiting
 //           for an administrator's approval and whether anybody may sign up
 //           (0062), the people who may sign in (users and the allowlist,
-//           0042), the roles and what each one grants, and the housekeeping
-//           tools that had no other home.
+//           0042), the roles and what each one grants, an administrator's
+//           notifications on this device (push.js, 0066), and the
+//           housekeeping tools that had no other home.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, announce, APP_VERSION and
 // DB_SCHEMA_VERSION; across to app.js for loadFromGitHub, dataSourceSummary,
 // docUrl and switchTab; to datastore.js for dbRpc, dbCheck, renderDbStatusHtml,
 // reloadFromDatastore and snapshotStationsJson; to export.js for
-// exportMayDownload; to auth.js for Auth; to mem-meter.js for MemMeter; and to
+// exportMayDownload; to auth.js for Auth; to mem-meter.js for MemMeter; to
+// push.js for Push, whose Notifications panel it draws under the tokens; and to
 // station-history.js for StationHistory, whose Deleted stations panel it draws
 // under Station data and loads from init().
 // Nothing here runs at load. auth.js calls Admin.authChanged() on every sign-in
@@ -517,6 +519,7 @@ const Admin = (function () {
           <div class="stack">
             <div id="adm-people" class="stack">${peopleHtml()}</div>
             <div id="adm-tokens">${typeof AdminTokens !== 'undefined' ? AdminTokens.render() : ''}</div>
+            <div id="adm-push">${typeof Push !== 'undefined' ? Push.render() : ''}</div>
             ${rolesHtml()}
             ${toolsHtml()}
           </div>
@@ -532,6 +535,8 @@ const Admin = (function () {
     if (typeof StationHistory !== 'undefined') StationHistory.adminLoad();
     if (typeof AdminDash !== 'undefined') AdminDash.start();
     if (typeof AdminTokens !== 'undefined' && isAdmin()) AdminTokens.load();
+    // This device's notifications (push.js, 0066), and the icon's count.
+    if (typeof Push !== 'undefined' && isAdmin()) Push.refresh();
   }
 
   // Only the parts that change are repainted: the Data source panel and the
@@ -597,6 +602,7 @@ const Admin = (function () {
     deciding.delete(id);
     await load();
     if (typeof Auth !== 'undefined' && Auth.recheck) Auth.recheck();
+    if (typeof Push !== 'undefined') Push.refresh();
   }
 
   async function setSignup(open) {

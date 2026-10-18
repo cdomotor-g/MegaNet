@@ -55,6 +55,10 @@
 //   Nothing else. The datastore's other reads, the Worker's /api routes,
 //   sign-in, map tiles: the network's, as if this worker were not here.
 //
+// And one thing that is not keeping at all: an administrator's notifications
+// (0066) arrive here, from the push service, whether or not a page is open —
+// see "Notifications" at the foot of this file.
+//
 //   Nothing waits on a copy being kept: the page reads the network's answer
 //   as it arrives — the first load's progress (#212) counts real bytes — and
 //   the copy is written beside it.
@@ -294,3 +298,70 @@ async function keepDated(url, res) {
   const cache = await caches.open(DATA);
   await cache.put(url, new Response(body, { status: 200, headers }));
 }
+
+// ── Notifications (0066) ─────────────────────────────────────────────────────
+//
+// The Worker's sender (worker/push.js) encrypted a message to this device and
+// the browser has opened it: {title, body, count, url, tag}, written by the
+// database (push_due). Every one is shown — iOS takes the subscription away
+// from a site whose push shows nothing — and its count goes on the app's icon
+// where the browser has the Badging API (an iPhone's home-screen app does).
+// One tag for them all, so the newest replaces the last rather than stacking.
+//
+// Pressed, it brings Flood-Net forward if it is open and posts it the address
+// to go to (push.js acts on it) rather than reloading it — a form being
+// filled in is never reloaded from under its author (pwa.js); with none open,
+// it opens one there. The address is held to this scope whatever it says.
+
+const NOTE_TAG = 'floodnet-admin';
+const NOTE_HOME = './?tab=admin';
+
+function noteUrl(raw) {
+  try {
+    const u = new URL(typeof raw === 'string' && raw ? raw : NOTE_HOME, SCOPE);
+    if (u.origin === SCOPE.origin && u.pathname.startsWith(SCOPE.pathname)) return u.href;
+  } catch (_) { /* below */ }
+  return new URL(NOTE_HOME, SCOPE).href;
+}
+
+function noteBadge(count) {
+  const nav = self.navigator;
+  try {
+    if (count > 0 && nav && nav.setAppBadge) return nav.setAppBadge(count).catch(() => {});
+    if (count === 0 && nav && nav.clearAppBadge) return nav.clearAppBadge().catch(() => {});
+  } catch (_) { /* no Badging API here */ }
+  return Promise.resolve();
+}
+
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (_) { data = {}; }
+  if (!data || typeof data !== 'object') data = {};
+  const text = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
+  const count = Number.isInteger(data.count) && data.count >= 0 ? Math.min(data.count, 9999) : null;
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(text(data.title, 120) || 'Flood-Net', {
+      body: text(data.body, 600),
+      tag: text(data.tag, 64) || NOTE_TAG,
+      renotify: true,
+      icon: new URL('assets/icon-192.png', SCOPE).href,
+      data: { url: noteUrl(data.url) },
+    }),
+    count === null ? Promise.resolve() : noteBadge(count),
+  ]));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = noteUrl(event.notification.data && event.notification.data.url);
+  event.waitUntil((async () => {
+    const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const here = open.find(c => { try { return new URL(c.url).origin === SCOPE.origin; } catch (_) { return false; } });
+    if (here) {
+      here.postMessage({ type: 'floodnet-open', url });
+      try { await here.focus(); } catch (_) { /* focus is the browser's to refuse */ }
+      return;
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(url);
+  })());
+});

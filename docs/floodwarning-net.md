@@ -171,6 +171,12 @@ Flood-Net's key](access.md#claude-on-flood-nets-key-229). Skip it and the tab
 asks for the person's own key, as it always did. Its daily ledger (a Durable
 Object) needs nothing: `wrangler.toml` declares it and the deploy creates it.
 
+And one that needs nothing at all: the administrators' notifications (`0066`,
+`worker/push.js`) run from the Worker's schedule — `[triggers]` in `wrangler.toml`,
+every minute — on the `SUPABASE_SECRET_KEY` above, with a VAPID key the Worker makes
+on its first run and keeps in the photos' R2 bucket. Each administrator turns them on
+for their own phone: [`accounts.md` → step G](accounts.md#g-notifications-on-a-phone--nothing-to-set-on-the-server-2-minutes-a-device).
+
 ### 6. Retire the second door
 
 Once `floodwarning.net` serves the app and the gate works, GitHub Pages is a

@@ -353,6 +353,8 @@ const AdminTokens = (function () {
       announce(note);
       approving = null; focusCode = null; reqErr = null;
       await load();
+      // One fewer waiting: the count on the app's icon (push.js, 0066).
+      if (typeof Push !== 'undefined') Push.refresh();
     } catch (err) {
       reqErr = 'Could not approve it: ' + err.message;
       repaintReqs();
@@ -373,6 +375,7 @@ const AdminTokens = (function () {
       if (focusCode === r.code) focusCode = null;
       await loadReqs(true);
       repaint();
+      if (typeof Push !== 'undefined') Push.refresh();
     } catch (err) {
       reqErr = 'Could not deny it: ' + err.message;
       repaintReqs();

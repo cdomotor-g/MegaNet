@@ -734,6 +734,18 @@ jobs:
         working-directory: test
         run: npm run accounts
 
+      # An administrator's notifications on the Admin tab (push.js, 0066)
+      # against a stand-in for the push functions, with the browser's push
+      # manager, permission prompt and Badging API stood in too (headless
+      # Chromium has no push service): who sees the panel, a server not set up
+      # or stopped, turning a device on with the server's key, the count on the
+      # icon of a device that is told, a test, a device removed and one turned
+      # off, permission refused, an iPhone in Safari told the Home Screen app is
+      # where they come, and a pressed notification moving the open app.
+      - name: Notifications — on, tested and off; the icon's count; an iPhone told where
+        working-directory: test
+        run: npm run notify
+
       # Proposed stations (0039) in the editor, on the card and on the map,
       # against a stand-in for save_station() that holds the database's rules
       # (tools/check_proposed_stations.sql holds the real one to them): a
@@ -1278,6 +1290,17 @@ jobs:
         working-directory: test
         run: npm run briefing
 
+      # The notifications' sender (worker/push.js, 0066) and sw.js's half: a
+      # phone never told turns nothing red anywhere, so the encryption is held
+      # to RFC 8291's own worked example byte for byte, the VAPID token to the
+      # key it names, a run to what it asks and reports (201, 410, a 403 and a
+      # dropped connection), the Worker's list of push services to the
+      # database's, and sw.js to what it shows, counts and opens. Offline: the
+      # push services and the database are stand-ins on fetch.
+      - name: Notifications' sender — RFC 8291 byte for byte, signed, sent and reported
+        working-directory: test
+        run: npm run push
+
       # The third server-side door: /api/v1 and /api/mcp (worker/api.js), public
       # and read-only, for AI agents and scripts. What it must never do fails in
       # silence — forward a caller's token, read a private relation, write
@@ -1576,6 +1599,14 @@ jobs:
       # an account must not have.
       - name: check_accounts.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_accounts.sql
+      # An administrator's notifications (0066): only an administrator turns a
+      # device on, only at one of the four push services and with the server's
+      # key; the sender alone hears what is due, once per arrival, with the
+      # badge's count and no address in it; a demoted, declined or delisted
+      # administrator's devices hear nothing; and what a push service says
+      # comes back, a gone subscription going with it.
+      - name: check_push.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_push.sql
       # The Admin tab's dashboard (0043): administrators only, and the visit
       # log's anonymous write held to one row a visitor a day, 5,000 a day.
       - name: check_admin_dashboard.sql

@@ -17,7 +17,9 @@
 // for Alert2Plan.authChanged (administrators only); to station-history.js for StationHistory.authChanged (0056, editors
 // only); to site-features.js for SiteFeatures.authChanged (0061, editors only);
 // to nav-views.js for NavViews.authChanged (0062: an account's own views); to
-// toast.js for the once-a-page notes; and to datastore.js for dbSetAccessToken.
+// push.js for Push.authChanged (0066: an administrator's notifications and the
+// icon's count); to toast.js for the once-a-page notes; and to datastore.js
+// for dbSetAccessToken.
 // datastore.js and station-editor.js call back into Auth, so this is a cycle —
 // which is fine in one shared global scope and would not be under ESM, one of
 // the four reasons #129 gives for classic scripts. Nothing here runs at load,
@@ -875,7 +877,9 @@ const Auth = (function () {
   // tests (level-store.js) theirs; the Level Survey tab shows an
   // administrator the filed surveys waiting for a decision (0060). The left
   // bar's views are the account's own (0062, nav-views.js), and the bar shows
-  // an administrator how many accounts are waiting for them.
+  // an administrator how many accounts are waiting for them; the app's icon
+  // shows them how many things are, and their notifications are theirs alone
+  // (0066, push.js).
   function tabsAuthChanged() {
     for (const mod of [typeof FieldPhotos !== 'undefined' ? FieldPhotos : null,
                        typeof FieldCamera !== 'undefined' ? FieldCamera : null,
@@ -891,7 +895,8 @@ const Auth = (function () {
                        typeof StationHistory !== 'undefined' ? StationHistory : null,
                        typeof SiteFeatures !== 'undefined' ? SiteFeatures : null,
                        typeof HealthAgent !== 'undefined' ? HealthAgent : null,
-                       typeof NavViews    !== 'undefined' ? NavViews    : null]) {
+                       typeof NavViews    !== 'undefined' ? NavViews    : null,
+                       typeof Push        !== 'undefined' ? Push        : null]) {
       if (!mod || !mod.authChanged) continue;
       try { mod.authChanged(); } catch (_) { /* its own problem, not the sign-in's */ }
     }

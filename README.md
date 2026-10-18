@@ -529,6 +529,12 @@ Two independent locks, and it is worth knowing which is which:
 Adding a domain, adding one person, and what to do when nobody can get in are all
 in [`docs/access.md`](docs/access.md).
 
+**An administrator's phone is told** when somebody is waiting for them — an account
+to approve, or a base station asking for its token — with the number waiting on the
+app's icon (Web Push, on an iPhone from the Home Screen app; `0066`, `push.js`,
+`worker/push.js`). Each administrator turns it on for each device on the Admin tab;
+[`docs/accounts.md`](docs/accounts.md), step G.
+
 ### With no signal
 
 A device that has opened Flood-Net before opens it again with no signal (#213).

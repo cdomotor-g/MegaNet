@@ -90,3 +90,12 @@ namespace_id = "1103"
   [ratelimits.simple]
   limit = 240
   period = 60
+
+# The administrators' notifications (worker/push.js, 0066): every minute the
+# Worker's scheduled() asks the database which devices have something to hear
+# and sends it through Apple's, Google's, Mozilla's or Microsoft's push
+# service. Its VAPID key is made on the first run and kept in the PHOTOS
+# bucket, so there is nothing to set; without SUPABASE_SECRET_KEY a run
+# returns before it asks anything. docs/accounts.md, "Notifications on a phone".
+[triggers]
+crons = ["* * * * *"]

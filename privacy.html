@@ -10,9 +10,9 @@
        given to Google's OAuth consent screen as the privacy policy link, so it
        has to stay where it is. -->
   <link rel="canonical" href="https://floodwarning.net/privacy">
-  <link rel="icon" type="image/svg+xml" href="assets/icon-small.svg?v=20261017a">
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=20261017a">
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=20261017a">
+  <link rel="icon" type="image/svg+xml" href="assets/icon-small.svg?v=20261018a">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=20261018a">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=20261018a">
   <meta name="theme-color" content="#0b5cab">
 
   <!-- Self-contained for the same reason as about.html: no stylesheet, font or
@@ -22,7 +22,8 @@
 
        Every claim here is a claim about the code: the visit log is 0043, the
        account tables 0005 and 0062, attribution meganet.actor() in 0004, the
-       briefing ledger worker/briefing.js, the API limiter worker/api.js. A
+       briefing ledger worker/briefing.js, the API limiter worker/api.js, an
+       administrator's notification devices 0066 and worker/push.js. A
        change to any of those that changes what is kept, who sees it or for how
        long has to change this page in the same push. -->
   <style>
@@ -72,7 +73,7 @@
 
   <p class="crumb"><a href="/">Flood-Net</a> &rsaquo; Privacy policy</p>
   <h1>Privacy policy</h1>
-  <p class="stamp">Last updated 16 October 2026</p>
+  <p class="stamp">Last updated 18 October 2026</p>
   <p class="lede">
     What Flood-Net at <a href="https://floodwarning.net/">floodwarning.net</a> keeps
     about the people who use it, why, who else handles it, how long it stays, and
@@ -158,6 +159,20 @@
       approved members — the people who maintain the sites, since the
       inspection records hold their access notes and lock codes — and surveys,
       site features and the station history to editors only.
+    </dd>
+
+    <dt>Notifications, if you are an administrator</dt>
+    <dd>
+      If you turn notifications on for a device, we keep that device's push
+      address (a link at Apple's, Google's, Mozilla's or Microsoft's push service,
+      whichever your browser uses), the two keys messages to it are encrypted
+      with, what the device is called (such as <em>iPhone · Home Screen</em>),
+      and whether the last message reached the push service. Each message is
+      encrypted so that the push service carries it without being able to read
+      it, and says only how many things are waiting and a base station's own
+      name and code — never a person's name or email address. Turning
+      notifications off, or removing the device from the list, deletes it;
+      deleting your account deletes them all.
     </dd>
 
     <dt>Emails we send</dt>
@@ -318,6 +333,10 @@
     <dd>Sign-in, if you choose <em>Continue with Google</em>.</dd>
     <dt>Resend</dt>
     <dd>Sends the account emails.</dd>
+    <dt>Apple, Google, Mozilla and Microsoft</dt>
+    <dd>Deliver an administrator's notifications, if they turn them on — whichever
+      runs the push service of the browser they use. The messages are encrypted
+      to the device, so the push service cannot read them.</dd>
     <dt>Anthropic</dt>
     <dd>Ask Claude, as described above.</dd>
     <dt>GitHub</dt>
@@ -350,7 +369,8 @@
     <li>get a copy of what we hold about you;</li>
     <li>correct it; or</li>
     <li>delete your account. Deleting it removes your account, your name, your
-      settings and what Supabase holds about your sign-ins, within 30 days.
+      settings, your notification devices and what Supabase holds about your
+      sign-ins, within 30 days.
       Records you changed stay, because other people rely on them; your email
       address stays in their history unless you ask us to remove it, which we
       will do wherever it does not leave a record unaccountable.</li>

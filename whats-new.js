@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 38, date: '2026-10-18', items: [
+      '<strong>🔔 Notifications on your phone, for administrators.</strong> When an account is waiting for approval or a '
+        + 'base station asks for a token, your phone can tell you — and the app\'s icon shows how many are waiting. Turn it '
+        + 'on for each device on the <em>Admin</em> tab, under <em>🔔 Notifications</em>. On an iPhone or iPad, add '
+        + 'Flood-Net to your Home Screen first, open it from the icon and sign in there; that is where notifications come.',
+    ] },
     { n: 37, date: '2026-10-18', items: [
       '<strong>🔭 Forecast and information locations in Look Around.</strong> A pin for one of the Bureau\'s forecast '
         + 'locations is now ringed in purple and tagged <em>Forecast</em>, and one for an information location ringed in '

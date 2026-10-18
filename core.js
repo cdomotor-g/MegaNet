@@ -2967,7 +2967,9 @@ const DB_SCHEMA = 'meganet';
 // contractors see the site codes in them; editors still write.
 // 65: the ALERT2 Transition Plan's site conditions and saved scenarios (0065),
 // administrators only; a scenario private to its author until shared.
-const DB_SCHEMA_VERSION = 65;
+// 66: an administrator's notifications (0066) — the devices turned on, and
+// what the Worker's sender asks and reports. Bumped with the file.
+const DB_SCHEMA_VERSION = 66;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
