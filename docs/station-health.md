@@ -14,6 +14,14 @@ twelve hours at a time, a few seconds) and works everything out in the browser
 in a few hundred milliseconds. **Demo week** shows what it does with a made-up
 week of real stations, one of every fault planted in it.
 
+In the Calm look (the default) the tab opens with its answer in a sentence —
+how many findings need attention and at how many stations, how bad, how many
+stations are silent now and what share of the checks due came in — above the
+numbers it comes from, and **See them** goes straight to Needs attention, which
+has most of the page's width. The paragraph explaining the tab is two lines
+deep until *More about this tab*. The Classic look shows the tab as it always
+was.
+
 ## Six ways in
 
 - **Needs attention** — the findings, worst first: what is wrong, the evidence,

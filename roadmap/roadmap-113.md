@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-18** (revision 159 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-18** (revision 160 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -539,6 +539,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and fourteen `[Human]` issues.
 >
+> **Revision 160 opens and closes nothing** — the three follow-ups revision 159 named, done at the owner's word (*"just tackle them now"*): under Calm a tab's long introduction is two lines deep with *More about this tab*; Station Health leads with its answer in a sentence above bigger numbers and a wider Needs attention; and `npm run camera`'s stale expectation (the proposed Gatton Auto station now stands where the phone does) put right. See revision 160 below.
+>
 > **Revision 159 opens and closes nothing** — at the owner's request, **🪷 a Calm look, the new default, with 🗂️ Classic one pick away**: the groups down the side and the open group's tabs across the top, a white banner with search, sign in and ⋯, and on a phone a bar along the foot (Nearby, Map, Visits, Camera, More), the inspection sheet a section at a time, and a new **📌 Nearby** tab (`looks.js`, `calm-shell.js`, `nearby.js`). Built so more looks can follow. See revision 159 below.
 >
 > **Revision 158 opens and closes nothing** — at the owner's request, **🔔 notifications on an administrator's phone**, and the number waiting on the app's icon: an account waiting for approval or a base station asking for its token is pushed (Web Push — on an iPhone from the Home Screen app) by the Worker every minute (`0066`, applied live; `worker/push.js`; `push.js`). Nothing to set on the server: the VAPID key makes itself. See revision 158 below.
@@ -798,6 +800,17 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 160 — 2026-10-18: 📖 Introductions folded, 🚦 Station Health's answer first, and the camera check put right
+
+The owner, on revision 159's three suggested follow-ups: *"No just tackle them now in whatever order you like"*. Nothing opened or closed.
+
+- **A tab's introduction, folded** (`CalmShell.foldLede`, Calm only): the first long paragraph after a tab's heading — in its panel, before any control, not a status line or a table's — two lines deep with *More about this tab*; opened, it stays open on that tab on this device (`mn-lede-open`). Found off the page, not listed per tab, and applied again when a tab writes its page afresh (a `MutationObserver` on `#main-content`'s children). Twelve tabs fold at a desktop's width, twenty-three on a phone; a note on a control (the Workbench's known-good list) and a short line are left alone.
+- **Station Health, answer first** (`verdictHtml` in `health.js`, Calm only): *"8 findings need attention at 5 stations — 1 critical, 7 warnings. 1 station is silent now. 95% of the checks due came in. See them"* above the numbers; the numbers drawn as numbers, seven to a row on a desktop and three on a phone; Needs attention given two-thirds of the width and its *Since* column a date's width, so *What, and what to do* reads in lines. Classic unchanged. `docs/station-health.md` says so.
+- **`npm run camera`** had been failing on `main`: it expected Gatton's own gauge (225 m) as the second station *where you stand* — never inside the 60 m that means — and the bundled list has had the proposed Gatton Auto at 59 m beside Gatton AL since 2026-10-11. The expectation is the list's now, and the rule's order is asserted with it; `field-camera.js` unchanged (a proposed site is a place a photo can be of).
+- What's new 40, `docs/design-system.md` §8, the version stamp `20261018c`.
+
+**Checks:** `npm run calm` (now 52), `health`, `healthcard`, `shell`, `smoke`, `help`, `tabs`, `camera`, and the cheap five.
 
 ### Revision 159 — 2026-10-18: 🪷 A Calm look, the default — 🗂️ Classic one pick away, 📌 Nearby, and a phone's bar along the foot
 

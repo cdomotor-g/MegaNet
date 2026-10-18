@@ -23,7 +23,11 @@
 //      with its tabs; 📌 Nearby nearest first from the map's centre; a station's
 //      Start inspection opens the sheet filled in with it, a section at a time,
 //      Next and Back moving through it with nothing typed lost.
-//   7. **Every tab, in Calm.** Opened one by one with a clean console, and every
+//   7. **Less to read first.** A tab's long introduction two lines deep with
+//      More about this tab, remembered once opened, a short one left alone;
+//      Station Health's answer in a sentence above its numbers, See them going
+//      down to the list; Classic showing neither.
+//   8. **Every tab, in Calm.** Opened one by one with a clean console, and every
 //      on*= handler on the page — the bar's, the row's, ⋯'s — resolving.
 //
 // Run:  npm run calm
@@ -341,8 +345,55 @@ async function main() {
     check('wider than a phone, the sheet is whole again', sh.shown.length === sh.total && !sh.step, J(sh));
     await context.close();
 
-    // ── 7. Every tab ───────────────────────────────────────────────────────
-    log('\n7. Every tab, in Calm\n');
+    // ── 7. Introductions folded, and Station Health's answer first ─────────
+    log('\n7. A tab\'s introduction folded, and Station Health\'s answer first\n');
+    ({ context, page } = await open(browser, server, { viewport: { width: 1440, height: 900 },
+      storage: { 'mn-tab': 'sitemap', 'mn-look-intro': 'seen' }, errors }));
+    await page.evaluate(() => { switchTab('health'); Health.demo(); });
+    await page.waitForSelector('.hl-verdict', { timeout: 15_000 });
+    const lede = () => page.evaluate(() => {
+      const p = document.querySelector('.hl-sub');
+      const line = parseFloat(getComputedStyle(p).lineHeight) || 20;
+      const b = document.querySelector('.lede-more');
+      return { folded: p.classList.contains('lede-fold'), lines: Math.round(p.getBoundingClientRect().height / line),
+               button: b && b.textContent, expanded: b && b.getAttribute('aria-expanded'), whole: p.textContent.length > 300 };
+    });
+    let L = await lede();
+    check('Station Health\'s introduction is two lines deep, with More about this tab — and all of it still in the page',
+      L.folded && L.lines <= 2 && L.button === 'More about this tab' && L.expanded === 'false' && L.whole, J(L));
+    await page.click('.lede-more');
+    L = await lede();
+    check('More opens it, and says so', L.lines > 2 && L.button === 'Less' && L.expanded === 'true', J(L));
+    await page.evaluate(() => { switchTab('sitemap'); switchTab('health'); Health.demo(); });
+    await page.waitForSelector('.hl-verdict', { timeout: 15_000 });
+    L = await lede();
+    check('…and it stays open on that tab when the tab is opened again', L.folded && L.lines > 2 && L.button === 'Less', J(L));
+    const short = await page.evaluate(() => { switchTab('maps'); return !document.querySelector('#main-content .lede-fold'); });
+    check('a tab that opens with a short line is left as it is (Radio Path Maps)', short);
+    await page.evaluate(() => { switchTab('health'); Health.demo(); });
+    await page.waitForSelector('.hl-verdict', { timeout: 15_000 });
+    const V = await page.evaluate(() => {
+      const t = document.querySelector('.hl-verdict').textContent.replace(/\s+/g, ' ');
+      const tiles = [...document.querySelectorAll('.hl-kpis .qs-chip')];
+      const attn = tiles.find(c => /Need attention/.test(c.textContent));
+      return { t, attn: attn && attn.querySelector('.qs-chip-v').textContent,
+               above: !!(document.querySelector('.hl-verdict').compareDocumentPosition(document.querySelector('.hl-kpis')) & Node.DOCUMENT_POSITION_FOLLOWING) };
+    });
+    check('the answer in a sentence above the numbers, its count the Need attention tile\'s',
+      V.above && new RegExp(`^${V.attn} findings? needs? attention`).test(V.t) && /critical/.test(V.t) && /% of the checks due came in/.test(V.t), J(V));
+    await page.click('.hl-verdict .link-btn');
+    check('See them goes down to Needs attention, its heading in focus',
+      await page.evaluate(() => document.activeElement && document.activeElement.id === 'hl-h-attn'));
+    await page.evaluate(() => Looks.set('classic'));
+    await page.evaluate(() => Health.demo());
+    await page.waitForSelector('.hl-kpis', { timeout: 15_000 });
+    const classic = await page.evaluate(() => ({ verdict: !!document.querySelector('.hl-verdict'),
+      fold: !!document.querySelector('.lede-fold'), more: !!document.querySelector('.lede-more') }));
+    check('Classic: the whole introduction and the numbers alone, as before', !classic.verdict && !classic.fold && !classic.more, J(classic));
+    await context.close();
+
+    // ── 8. Every tab ───────────────────────────────────────────────────────
+    log('\n8. Every tab, in Calm\n');
     ({ context, page } = await open(browser, server, { viewport: { width: 1440, height: 900 }, errors }));
     await page.evaluate(() => { Auth.isSignedIn = () => true; Auth.isAdmin = () => true; Auth.role = () => 'admin'; renderTabs(); });
     const ids = await page.evaluate(() => TAB_LIST.map(t => t.id));
@@ -369,7 +420,7 @@ async function main() {
   const failed = results.filter(r => !r.ok);
   log(failed.length
     ? `\nFAIL — ${failed.length} of ${results.length}:\n${failed.map(f => `  ✗ ${f.label}`).join('\n')}`
-    : `\nPASS — the Calm look: the default, its bar and row, ⋯, the way back, a phone's foot, Nearby and the stepped sheet (${results.length} checks).`);
+    : `\nPASS — the Calm look: the default, its bar and row, ⋯, the way back, a phone's foot, Nearby, the stepped sheet, folded introductions and Station Health's answer first (${results.length} checks).`);
   process.exit(failed.length ? 1 : 0);
 }
 

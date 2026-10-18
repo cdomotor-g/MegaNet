@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 40, date: '2026-10-18', items: [
+      '<strong>📖 Less to read before you start.</strong> In the Calm look a tab\'s long introduction now shows two lines, '
+        + 'with <em>More about this tab</em> to read the rest — open it once and it stays open on that tab.',
+      '<strong>🚦 Station Health says what it found first:</strong> how many findings need attention and at how many '
+        + 'stations, how many are silent and how many checks came in — then the numbers, bigger, and <em>See them</em> '
+        + 'takes you to the list, which now has more of the page.',
+    ] },
     { n: 39, date: '2026-10-18', items: [
       '<strong>🪷 A calmer look.</strong> The same tabs, with less in front of you: the bar on the left lists the groups, '
         + 'and the tabs of the group you are in run across the top of the page. Search is a box in the banner, and Export, '

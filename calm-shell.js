@@ -41,7 +41,7 @@
 // blank.
 //
 // Exposes: render, clearBar, openSection, stripKey, navKey, more, moreGo,
-//          fieldGo, ICONS (for the ⋯ menu and nearby.js).
+//          fieldGo, foldLede, ledeToggle, icon, ICONS.
 
 const CalmShell = (() => {
   const SECTIONS_KEY = 'mn-look-sections';
@@ -137,6 +137,7 @@ const CalmShell = (() => {
   // ── The bar ───────────────────────────────────────────────────────────────
 
   function render(nav) {
+    watchLedes();
     const list = sections();
     const here = current(list);
     remember(here);
@@ -355,6 +356,97 @@ const CalmShell = (() => {
     }
   }
 
-  return { render, clearBar, openSection, stripKey, navKey, more, moreGo, fieldGo, icon, ICONS };
+  // ── A tab's introduction, folded ──────────────────────────────────────────
+  // Most tabs open with a paragraph saying what the tab is for and how it
+  // works it out — four lines of it on Station Health, eight on the Serial
+  // Monitor at a phone's width — above the thing somebody came to the tab to
+  // read. Under Calm the first long paragraph after the tab's heading is shown
+  // two lines deep, with "More about this tab" to open it; opened on a tab, it
+  // stays open there on this device. Nothing is taken out: the whole paragraph
+  // is in the page, and a screen reader reads it all.
+  //
+  // Which paragraph is decided off the page rather than listed per tab, since
+  // the tabs were not written to one pattern: the first <p> after the first
+  // h2, inside the same panel, section or page, of real length, holding no
+  // control and not a status line or a table's. A tab that opens with a short
+  // line, or with nothing, is left as it is. Applied again whenever a tab
+  // writes its page afresh (several draw themselves, not through renderMain),
+  // by watching #main-content's own children.
+  const LEDE_KEY = 'mn-lede-open';
+  const LEDE_MIN_CHARS = 160;
+  let ledeWatch = null;
+
+  function ledesOpen() {
+    try { const v = JSON.parse(localStorage.getItem(LEDE_KEY) || '[]'); return Array.isArray(v) ? v : []; }
+    catch (_) { return []; }
+  }
+
+  function ledeOf(main) {
+    const h = main.querySelector('h2');
+    if (!h) return null;
+    const box = h.closest('.panel, .page, section') || main;
+    // The heading's own row — the tab's name and its buttons, an owner
+    // picker's drop-down — is not the page's text; nor is anything folded away.
+    const head = h.closest('.panel-header');
+    const after = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const aside = el => (head && head.contains(el)) || !!el.closest('details, table, .modal-card');
+    const p = [...box.querySelectorAll('p')].find(x => after(h, x) && !aside(x));
+    if (!p || p.classList.contains('sr-only')) return null;
+    if (p.closest('[role="status"], [aria-live], .map-panel')) return null;
+    if (p.querySelector('input, select, textarea, button')) return null;
+    if ((p.textContent || '').trim().length < LEDE_MIN_CHARS) return null;
+    // A control between the heading and the paragraph makes the paragraph a
+    // note on that control — the Workbench's known-good list says what
+    // marking a station does — rather than the tab's introduction.
+    const ctl = [...box.querySelectorAll('input, select, textarea, button')]
+      .some(c => after(h, c) && after(c, p) && !aside(c));
+    return ctl ? null : p;
+  }
+
+  function foldLede() {
+    if (state.look !== 'calm') return;
+    const main = document.getElementById('main-content');
+    const p = main && ledeOf(main);
+    if (!p || p.classList.contains('lede-fold') || !p.getClientRects().length) return;
+    const cs = getComputedStyle(p);
+    const line = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4 || 20;
+    if (p.getBoundingClientRect().height <= line * 2.6) return;     // two lines already
+    const tab = state.activeTab;
+    const open = ledesOpen().includes(tab);
+    if (!p.id) p.id = `lede-${tab}`;
+    p.classList.add('lede-fold');
+    p.classList.toggle('lede-open', open);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'link-btn lede-more';
+    b.setAttribute('aria-controls', p.id);
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    b.setAttribute('onclick', 'CalmShell.ledeToggle(this)');
+    b.textContent = open ? 'Less' : 'More about this tab';
+    p.after(b);
+  }
+
+  function ledeToggle(b) {
+    const p = b && document.getElementById(b.getAttribute('aria-controls'));
+    if (!p) return;
+    const open = !p.classList.contains('lede-open');
+    p.classList.toggle('lede-open', open);
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    b.textContent = open ? 'Less' : 'More about this tab';
+    const all = ledesOpen().filter(t => t !== state.activeTab);
+    if (open) all.push(state.activeTab);
+    try { localStorage.setItem(LEDE_KEY, JSON.stringify(all)); } catch (_) {}
+  }
+
+  function watchLedes() {
+    if (ledeWatch || typeof MutationObserver === 'undefined') return;
+    const main = document.getElementById('main-content');
+    if (!main) return;
+    ledeWatch = new MutationObserver(foldLede);
+    ledeWatch.observe(main, { childList: true });
+  }
+
+  return { render, clearBar, openSection, stripKey, navKey, more, moreGo, fieldGo, icon, ICONS,
+           foldLede, ledeToggle };
 })();
 if (typeof window !== 'undefined') window.CalmShell = CalmShell;

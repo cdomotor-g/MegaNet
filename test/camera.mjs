@@ -387,9 +387,18 @@ try {
   check('the readout says it in the stamp\'s words', new RegExp(`${Math.round(d.heading) % 360}° ${PhotoStamp.point8(d.heading)} true`).test(await text(page, '#cam-readout')),
     await text(page, '#cam-readout'));
   const why = Object.fromEntries(d.suggestions.map(s => [s.id, s.why]));
+  // Two stations in the bundled list stand where the phone does — inside
+  // AT_M, 60 m: Gatton AL at 41 m, and the proposed Gatton Auto beside it at
+  // 59 m (a proposed site is a place a photo can be of: it is how a site is
+  // chosen). Then Gatton TM, in view; then the rest by distance, Gatton's own
+  // gauge at 225 m among them. This named Gatton as the second "here" until
+  // the proposed station joined the list beside it, and Gatton at 225 m was
+  // never inside 60 m — the ids are the list's, the order is the rule's.
   check('suggested: the two you stand at first, nearest first, then the one in view, then the rest by distance',
-    J(d.suggestions.slice(0, 3).map(s => s.id)) === J(['gatton_al', 'gatton', 'gatton_tm'])
-      && why.gatton_al === 'here' && why.gatton === 'here' && why.gatton_tm === 'view' && why.gatton_2 === 'near',
+    J(d.suggestions.slice(0, 3).map(s => s.id)) === J(['gatton_al', 'proposed_gatton_auto', 'gatton_tm'])
+      && why.gatton_al === 'here' && why.proposed_gatton_auto === 'here' && why.gatton_tm === 'view'
+      && why.gatton === 'near' && why.gatton_2 === 'near'
+      && d.suggestions.filter(s => s.why === 'near').every((s, i, a) => !i || s.m >= a[i - 1].m),
     J(d.suggestions));
   check('the stamp carries the nearest within a kilometre — the database\'s own rule', d.chosen === 'gatton_al' && d.how === 'suggested'
     && /Gatton AL \(540156\)/.test(await text(page, '#cam-station .cam-chosen')), J({ chosen: d.chosen, how: d.how }));

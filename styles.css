@@ -20412,3 +20412,58 @@ select.kl-in { width: auto; font-family: inherit; }
 @media (max-width: 380px) {
   :root[data-look="calm"] .header-logo { display: inline-block; }
 }
+
+/* A tab's introduction, two lines deep under Calm until "More about this tab"
+   (CalmShell.foldLede). Clamped, not cut: the rest is in the page and is read
+   out in full. */
+:root[data-look="calm"] .lede-fold:not(.lede-open) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.lede-more {
+  display: inline-block;
+  margin: 0 0 var(--sp-2);
+  padding: 0;
+  font-size: var(--fs-sm);
+}
+
+/* ── Station Health under Calm: the answer first ─────────────────────────────
+   The sentence (Health's verdictHtml), then the numbers it comes from drawn as
+   numbers, then a Needs attention list given most of the width — the map beside
+   it is where, the list is what to do. */
+.hl-verdict {
+  margin: var(--sp-2) 0;
+  font-size: 1.08rem;
+  line-height: 1.45;
+}
+.hl-verdict .link-btn { font-size: var(--fs-md); }
+:root[data-look="calm"] .hl-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.25rem, 1fr));
+  gap: var(--sp-2);
+}
+:root[data-look="calm"] .hl-kpis .qs-chip {
+  padding: .55rem .75rem;
+  border-radius: 10px;
+}
+:root[data-look="calm"] .hl-kpis .qs-chip-v {
+  font-size: 1.45rem;
+  line-height: 1.25;
+}
+/* "Since" is a date: as narrow as it can be, so "What, and what to do" has
+   the width to be read in lines rather than in words. */
+:root[data-look="calm"] .hl-ftable col.col-optional { width: 8.5rem; }
+@media (min-width: 1100px) {
+  :root[data-look="calm"] .hl-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+}
+/* A phone: three numbers a row, each its name and its number — the sentence
+   above has already said what they add up to. */
+@media (max-width: 560px) {
+  :root[data-look="calm"] .hl-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; }
+  :root[data-look="calm"] .hl-kpis .qs-chip { padding: .4rem .5rem; }
+  :root[data-look="calm"] .hl-kpis .qs-chip-v { font-size: 1.2rem; }
+  :root[data-look="calm"] .hl-kpis .qs-chip-v + .qs-chip-k { display: none; }
+}

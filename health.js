@@ -442,7 +442,7 @@ const Health = (() => {
     const silent = F.filter(f => f.kind === 'silent').length;
     const power = F.filter(f => f.category === 'power' && f.severity !== 'info').length;
     const rxDown = A.findings.filter(f => f.kind === 'receiver-silent' && f.severity !== 'info').length;
-    return `<div class="qs-status hl-kpis">
+    return `${state.look === 'calm' ? verdictHtml(F, pct, silent) : ''}<div class="qs-status hl-kpis">
       ${chip('Stations heard', num(c.stationsHeard), `${num(c.scheduled)} on a learned schedule`)}
       ${chip('Checks received', pct == null ? '—' : pct + '%', `${num(c.checksReceived)} of ${num(c.checksDue)} due`, pct != null && pct < 80 ? 'warn' : '')}
       ${chip('Need attention', num(c.attention), 'critical and warnings', c.attention ? 'warn' : '')}
@@ -451,6 +451,40 @@ const Health = (() => {
       ${chip('Corrupted copies', num(c.corrupted + c.ghosts), own ? 'whole network' : `${num(c.ghosts)} under the wrong address`, '')}
       ${chip('Receivers', num(c.receivers), (rxDown ? `${rxDown} stopped` : 'delivering') + (own ? ' · whole network' : ''), rxDown ? 'bad' : '')}
     </div>`;
+  }
+
+  // The answer, in a sentence, before the numbers it comes from — under the
+  // Calm look (looks.js), whose pages lead with what they found rather than
+  // with how they find it: how many findings need attention and at how many
+  // stations, how bad, how many stations are silent now and how many checks
+  // came in, and the way down to the list. Classic shows the numbers alone,
+  // as it always has.
+  function verdictHtml(F, pct, silent) {
+    const bad = F.filter(f => f.severity !== 'info');
+    const crit = bad.filter(f => f.severity === 'critical').length;
+    const warn = bad.length - crit;
+    const at = new Set(bad.map(f => f.stationId).filter(Boolean)).size;
+    const plural = (n, one, many) => `${num(n)} ${n === 1 ? one : many}`;
+    const checks = pct == null ? '' : ` ${pct}% of the checks due came in.`;
+    if (!bad.length) {
+      return `<p class="hl-verdict"><strong>Nothing needs attention</strong> — every station heard is checking in
+        and nothing in its readings looks wrong.${checks}</p>`;
+    }
+    const how = [crit && `${num(crit)} critical`, warn && plural(warn, 'warning', 'warnings')].filter(Boolean).join(', ');
+    return `<p class="hl-verdict"><strong>${plural(bad.length, 'finding needs', 'findings need')} attention</strong>${
+        at ? ` at ${plural(at, 'station', 'stations')}` : ''} — ${how}.${
+        silent ? ` ${plural(silent, 'station is', 'stations are')} silent now.` : ''}${checks}
+      <button type="button" class="link-btn" onclick="Health.toAttention()">See them</button></p>`;
+  }
+
+  // "See them": down to Needs attention, focus on its heading so the list is
+  // the next thing read.
+  function toAttention() {
+    const h = document.getElementById('hl-h-attn');
+    if (!h) return;
+    h.setAttribute('tabindex', '-1');
+    h.scrollIntoView({ block: 'start' });
+    h.focus({ preventScroll: true });
   }
 
   // ── the owner filter ───────────────────────────────────────────────────────
@@ -1842,7 +1876,7 @@ const Health = (() => {
     setWin, setCat, setInfo, toggleMatrix, select, close, lensAt, lensClose, stripClick,
     ssKind, ssAttn, ssFind, ssMore,
     openLog, openAddr, openField, openReception, showStation, picked, wantStation, exportCsv, fetchReadings,
-    setOwner, clearOwners, findOwner, owner,
+    setOwner, clearOwners, findOwner, owner, toAttention,
     state: state_,
   };
 })();

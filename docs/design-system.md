@@ -1404,6 +1404,19 @@ way back.
 - **The scale is the scale.** Calm's media queries are `BREAKPOINTS`' steps,
   like everything else's.
 
+**Less to read first.** Two Calm habits a tab gets without asking for them:
+
+- **A long introduction is folded.** The first long paragraph after a tab's
+  heading — in its panel, before any control, not a status line — shows two
+  lines with *More about this tab*; opened, it stays open on that tab
+  (`mn-lede-open`). Found off the page by `CalmShell.foldLede()` rather than
+  listed per tab, and applied again when a tab writes its page afresh. A tab
+  whose first paragraph is short, or a note on a control, is left alone.
+- **Lead with the answer.** Station Health says what it found in a sentence
+  above its numbers (`verdictHtml` in health.js), draws the numbers as numbers,
+  and gives Needs attention most of the width. The next tab to follow it gets
+  the same treatment the same way: the sentence only under Calm.
+
 **Checks.** Every browser check but one opens the app in Classic — the
 checks were written against it and it is still a look people use;
 `test/lib/browser.mjs` pins it through `?look=classic`, which (unlike a stored
