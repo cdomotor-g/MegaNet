@@ -208,6 +208,7 @@ const ExportMenu = (function () {
     offline:     'This device\'s setup for working with no signal — nothing on it is a record to keep as a file.',
     views:       'What the bar on the left lists — a setting kept with your account, not a record to keep as a file.',
     lookaround:  'A view through the phone\'s camera, drawn on the screen and never recorded — there is nothing on it to keep as a file.',
+    nearby:      'A list measured from where you stand, kept only while the tab is open — the Stations tab saves the same stations, positions and all.',
     propagation: 'A lesson in how radio travels — made-up demonstrations, not records; nothing on it is data to keep as a file.',
     maps:        'The printed sheets are the files: each one opens as its own PDF.',
     passranges:  'Worked out from the station list, which Stations saves; the ranges travel with each station\'s record in that file.',

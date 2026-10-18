@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-18** (revision 158 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-18** (revision 159 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -539,6 +539,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and fourteen `[Human]` issues.
 >
+> **Revision 159 opens and closes nothing** — at the owner's request, **🪷 a Calm look, the new default, with 🗂️ Classic one pick away**: the groups down the side and the open group's tabs across the top, a white banner with search, sign in and ⋯, and on a phone a bar along the foot (Nearby, Map, Visits, Camera, More), the inspection sheet a section at a time, and a new **📌 Nearby** tab (`looks.js`, `calm-shell.js`, `nearby.js`). Built so more looks can follow. See revision 159 below.
+>
 > **Revision 158 opens and closes nothing** — at the owner's request, **🔔 notifications on an administrator's phone**, and the number waiting on the app's icon: an account waiting for approval or a base station asking for its token is pushed (Web Push — on an iPhone from the Home Screen app) by the Worker every minute (`0066`, applied live; `worker/push.js`; `push.js`). Nothing to set on the server: the VAPID key makes itself. See revision 158 below.
 >
 > **Revision 157 opens and closes nothing** — the ⏱️ TDMA Planner tab ships: an ALERT2 time-slot plan for one channel worked from a sketch or the register — valid frame, a slot for every transmitter with the repeaters' after the ones they forward and sized to the storm peak, bytes against capacity, worst-case latency, and a configuration sheet in the IND API's and the ERT-A2's names. See revision 157 below.
@@ -796,6 +798,20 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 159 — 2026-10-18: 🪷 A Calm look, the default — 🗂️ Classic one pick away, 📌 Nearby, and a phone's bar along the foot
+
+At the owner's request, after users said the app was too complex and visually busy: five alternative layouts were mocked up in chat, and the owner picked two — a calmer shell for the same app, and a field mode for phones — *"build it out but allow user to revert, we will also build other view/ui later"*. Nothing opened or closed (no ticket asked for).
+
+- **Looks** (`looks.js`, new): Calm or Classic as one choice, `state.look`, built in `core.js` (`lookStored()`, `LOOK_CHOICES`) from `?look=` in the address, then `mn-look`, then the default, Calm; on `<html data-look>`. Picked in the Theme dialog (Classic's 🌗, Calm's ⋯ → Theme & look) or Ctrl+K, redrawn at once and remembered; `?look=classic` is kept as the choice and taken out of the address — the link for somebody who cannot find the switch. A device that knew Classic and has not chosen is told once, with the way back. **A third look** is an entry in `LOOKS`, its CSS under its own `data-look`, and a branch in `renderTabs()` — `docs/design-system.md` §8.
+- **Calm** (`calm-shell.js`, new; the `data-look="calm"` block at the end of `styles.css`): the bar is one button a group of the view (a group reopens on its last-used tab), the open group's tabs a row across the top (`#section-bar`, in the shell's grid and counted in `--mn-chrome`); a white banner with search drawn as a box, sign in and ⋯ (Export, Theme & look, help, the Site Map, What's new, Report a Bug); line drawings for the groups instead of emoji; one accent (`--primary` the accent blue); the side panel's strip and the memory strip in grey until they have something to say; the Bureau's forecast/information outlines off on the map until ticked. Every tab, action and address is the same in both looks.
+- **A phone under Calm**: a bar along the foot — **Nearby, Map, Visits, Camera, More** (More is the drawer, every group with its tabs; ☰ goes) — a fixed child of `#tab-nav`, so the page keeps one navigation landmark; the logo alone in the banner. **The inspection sheet a section at a time** (`inspections.js`, `stepped()`): the section, where it is in the sheet, Back and Next; every section still in the page and the record. Classic and wider screens get the whole sheet as before.
+- **📌 Nearby** (`nearby.js`, new tab under Site visits; in the Field view too): the stations closest to you, nearest first, with distance and compass point — from one GPS reading (Refresh for another; asked without a press only where permission is already given) or from where the Stations map was last looking. A station's **Start inspection** opens the sheet filled in with it (or the sheet already open, never started over), **Photos** the Field Camera with it chosen, **Directions** your maps app. The position is never stored or sent.
+- **Around it**: Site Map card and task, help entry, the Export menu's reason, What's new 39, `docs/design-system.md` §8, the version stamp `20261018b`.
+- **The checks**: every browser check but one opens the app in **Classic** — they were written against it and it stays a look people use — pinned by `test/lib/browser.mjs` through `?look=classic` (not a stored key, so a first visit stays a first visit). `npm run calm` (new) opens the default and holds Calm to its promises, a phone and every tab included.
+- **What is next, when wanted**: Station Health's overview answer-first (the counts, then the stations that need a look — mocked up as A′); more tabs' long introductions folded to a line; further looks.
+
+**Checks:** `npm run calm` (new, 45 checks), `views` (the Field preset's new first tab), `nav`, `shell`, `themes`, `dialogs`, `firstvisit`, `help`, `exports`, `palette`, `smoke`, `tabs`, `dock`, `insp`, `ar`, `links`, `offlinetab`, `accounts`, `stncard`, `pins`, `camera`, and the cheap five.
 
 ### Revision 158 — 2026-10-18: 🔔 Notifications and a count on the icon, for administrators
 

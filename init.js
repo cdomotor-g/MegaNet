@@ -26,6 +26,11 @@
   // The tab the address names, or the last one used on this device, before
   // anything is drawn — and back and forward from here on (route.js, #211).
   Route.start();
+  // The look — Calm or Classic (looks.js) — on the page before anything is
+  // drawn in it, and an address that names one taken as the choice. After
+  // Route, which has to see the address as it arrived and which is the one
+  // that knows whether this device is new.
+  Looks.start();
   // ✨ What's new: shown if this device has something it has not seen, and a
   // device that has never been here has seen it all (whats-new.js, #222).
   WhatsNew.start();

@@ -238,6 +238,13 @@ const SiteMap = (function () {
         'Ask Claude to investigate and write the briefing',
       ],
     },
+    nearby: {
+      what: 'The stations closest to where you stand, nearest first, with how far and which way.',
+      use: [
+        'Work out which station you are at, and which is next',
+        'Start a station\'s inspection, its photos or the drive there from one screen',
+      ],
+    },
     inspections: {
       what: 'The six paper inspection sheets as one form, shaped by each station\'s configuration.',
       use: [
@@ -420,6 +427,7 @@ const SiteMap = (function () {
     { text: 'Fill in a site inspection',                   tab: 'inspections' },
     { text: 'Get a phone ready for a site with no signal', tab: 'offline' },
     { text: 'Take site photos stamped with where and which way', tab: 'camera' },
+    { text: 'Find the station nearest you, and start its inspection', tab: 'nearby' },
     { text: 'See which way a station is from where you stand', tab: 'lookaround' },
     { text: 'Make the bar on the left list only what you use', tab: 'views' },
     { text: 'File the photos from a field trip',           tab: 'photos' },
@@ -543,11 +551,17 @@ const SiteMap = (function () {
           <ol class="sm-anat-key">
             <li data-sm-point="nav" data-sm-part="nav">
               <span class="sm-num" aria-hidden="true">1</span>
-              <div><strong>The bar on the left</strong> — every tab, filed in groups. « at its top
+              <div>${state.look === 'calm' ? `<strong>The bar on the left</strong> — the groups the tabs
+                are filed in; the group you are in has its tabs across the top of the page. « at its
+                top shrinks it to icons; on a phone it is <strong>More</strong> in the bar along the
+                bottom. To find a tab by what it does — "decode", "battery", "print" — use
+                <button type="button" class="link-btn" data-sm-point="find" onclick="focusNavFind()">🔎 Search</button>
+                in the banner or press <kbd>Ctrl</kbd>+<kbd>K</kbd>.`
+              : `<strong>The bar on the left</strong> — every tab, filed in groups. « at its top
                 shrinks it to icons; on a phone it is tucked behind ☰. To find a tab by what it
                 does — "decode", "battery", "print" — use
                 <button type="button" class="link-btn" data-sm-point="find" onclick="focusNavFind()">🔎 Find a tab</button>
-                or press <kbd>Ctrl</kbd>+<kbd>K</kbd>.</div>
+                or press <kbd>Ctrl</kbd>+<kbd>K</kbd>.`}</div>
             </li>
             <li data-sm-part="main">
               <span class="sm-num" aria-hidden="true">2</span>
@@ -562,8 +576,11 @@ const SiteMap = (function () {
             </li>
             <li data-sm-point="banner" data-sm-part="header">
               <span class="sm-num" aria-hidden="true">4</span>
-              <div><strong>The banner</strong> — 🔑 Sign in (only needed to edit), 🐞 Report a Bug,
-                and 🌗 light or dark.</div>
+              <div>${state.look === 'calm'
+                ? `<strong>The banner</strong> — 🔎 Search, 🔑 Sign in (only needed to edit), and ⋯ for
+                  the rest: export, theme &amp; look — Calm, this one, or Classic — help and Report a Bug.`
+                : `<strong>The banner</strong> — 🔑 Sign in (only needed to edit), 🐞 Report a Bug,
+                and 🌗 light or dark — and the look, Classic or Calm.`}</div>
             </li>
           </ol>
         </div>
@@ -822,14 +839,23 @@ const SiteMap = (function () {
     let el = null;
     if (kind === 'tab') {
       el = document.querySelector(`#tab-nav .tab-btn[data-tab="${CSS.escape(val)}"]`);
+      // The Calm look (calm-shell.js) keeps a tab's button in the bar only in
+      // a phone's drawer; wider, its group's button stands for it, and the
+      // row across the top has it when its group is the one open.
+      if (el && !onScreen(el)) {
+        const sec = el.closest('.calm-sec');
+        el = onScreen(document.querySelector(`#section-bar .tab-btn[data-tab="${CSS.escape(val)}"]`))
+          || (sec && sec.querySelector('.nav-sec')) || el;
+      }
     } else if (kind === 'group') {
       const h = document.getElementById('nav-h-' + val);
-      el = h && h.closest('.nav-group');
+      el = h && h.closest('.nav-group, .calm-sec');
     } else if (kind === 'nav') {
       el = document.querySelector('#tab-nav .nav-inner');
     } else if (kind === 'find') {
       el = onScreen(document.getElementById('nav-search'))
-        || document.querySelector('#tab-nav .nav-find-btn');
+        || document.querySelector('#tab-nav .nav-find-btn')
+        || onScreen(document.getElementById('btn-palette'));
     } else if (kind === 'dock') {
       el = document.querySelector('#help-panel .help-toggle');
     } else if (kind === 'banner') {
@@ -840,8 +866,10 @@ const SiteMap = (function () {
     if (el && el !== lit) bringIntoNav(el);
     if (onScreen(el)) return el;
     // The nav put away behind ☰ (a phone): the line goes to where it is.
+    // Under Calm a phone's drawer opens from ⋯ More along the foot instead.
     if (kind === 'tab' || kind === 'group' || kind === 'nav' || kind === 'find') {
-      return onScreen(document.getElementById('btn-nav'));
+      return onScreen(document.getElementById('btn-nav'))
+        || onScreen(document.querySelector('.field-bar [data-field="more"]'));
     }
     return null;
   }

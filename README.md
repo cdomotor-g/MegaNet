@@ -103,6 +103,8 @@ MegaNet/
 ├── station-ar.js           ← StationAR — 🔭 Look Around, the AR station finder: a phone
 │                             held up, the stations the way it faces pinned over the
 │                             camera's picture, its compass turned to true north by WMM2025
+├── nearby.js               ← Nearby    — 📌 Nearby: the stations closest to you, nearest
+│                             first, and Start inspection, Photos and Directions for one
 ├── terrain.js              ← Terrain   — ground height from terrarium PNG tiles
 ├── lidar-profile.js        ← LidarProfile — 5 m LiDAR (Geoscience Australia) round a
 │                             path's ends and obstacles, spliced into the tiles' profile
@@ -237,6 +239,11 @@ MegaNet/
 ├── nav-views.js            ← NavViews  — what the left bar lists: All, Simple, Field,
 │                             or a view an account makes on the 🎛️ Views tab, kept in
 │                             the database (0062: user_pref, save_my_views)
+├── looks.js                ← Looks     — the look: Calm (the default) or Classic, the
+│                             choice, ?look=, and the switch in the Theme dialog
+├── calm-shell.js           ← CalmShell — Calm's shell: the groups down the side, the
+│                             open group's tabs across the top, ⋯ in the banner, and a
+│                             phone's bar along the foot (docs/design-system.md §8)
 ├── route.js                ← Route     — where you are, in the address bar: the tab,
 │                             the station whose card is up (or Station Health has
 │                             open) and the map's view, so a view can be linked to

@@ -8,7 +8,9 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, DB_URL and DB_SCHEMA (via
 // datastore.js only), registerTabTeardown; across to app.js for switchTab and
-// goToStation from inline handlers, so at click time; to auth.js for Auth; to
+// goToStation from inline handlers, so at click time, and for isPhoneNav —
+// which, with state.look, decides whether the sheet is shown a section at a
+// time (stepped(), below); to auth.js for Auth; to
 // datastore.js for dbSelect, dbRpc and dbCanWrite; to attachments.js for the
 // photo panel in the admin section; and to maintenance.js for
 // Maintenance.startFrom(), from the prompt at the foot of a visit that departed
@@ -1262,11 +1264,81 @@ const Inspections = (function () {
     // runs. Idempotent — it loads the type vocabulary once for the session and
     // this record's index rows once, then repaints its own nodes.
     Attachments.forRecord('inspection', doc.id);
-    return `
+    const at = stepAt(rows);
+    if (at < 0) {
+      return `
       ${formHeadHtml()}
       ${rows.map(row => sectionHtml(row)).join('')}
       ${notOnFormHtml(cfg)}
       ${formFootHtml()}`;
+    }
+    const last = at === rows.length - 1;
+    return `
+      ${formHeadHtml()}
+      ${stepHeadHtml(rows, at)}
+      ${rows.map((row, i) => sectionHtml(row, i !== at)).join('')}
+      ${last ? notOnFormHtml(cfg) : ''}
+      ${stepNavHtml(rows, at)}
+      ${formFootHtml()}`;
+  }
+
+  // ── One section a screen (the Calm look, on a phone) ───────────────────────
+  // The sheet is fourteen sections long at most, and on a phone that is a
+  // scroll of several metres with the save buttons at the far end of it. Under
+  // the Calm look (looks.js) at a phone's width it is shown a section at a time
+  // instead — the section, where it is in the sheet, and Back and Next — with
+  // nothing else about it changed: every section is still in the page and in
+  // the record, the ones not showing only hidden, so what was typed into one
+  // is saved with the rest whether or not it is the one on screen, and the
+  // draft, the save and the checks are the ones the whole sheet has. Classic,
+  // and anything wider than a phone, get the whole sheet as before.
+  //
+  // Which section is showing belongs to the sheet that is open: a new sheet, a
+  // resumed draft or a saved visit opened from history starts at the first.
+
+  function stepped() {
+    return state.look === 'calm' && typeof isPhoneNav === 'function' && isPhoneNav();
+  }
+
+  // The index of the section showing, or -1 for the whole sheet.
+  function stepAt(rows) {
+    if (!stepped() || rows.length < 2) return -1;
+    const s = S();
+    if (s.stepFor !== s.draftKey) { s.stepFor = s.draftKey; s.step = 0; }
+    s.step = Math.max(0, Math.min(rows.length - 1, s.step || 0));
+    return s.step;
+  }
+
+  function stepHeadHtml(rows, at) {
+    return `
+      <div class="panel insp-steps" id="insp-steps" tabindex="-1">
+        <span class="small insp-muted">Section ${at + 1} of ${rows.length}</span>
+        <strong class="insp-step-name">${esc(sectionLabel(rows[at]))}</strong>
+        <span class="insp-step-bar" aria-hidden="true">${rows.map((r, i) =>
+          `<i class="${i < at ? 'done' : i === at ? 'on' : ''}"></i>`).join('')}</span>
+      </div>`;
+  }
+
+  function stepNavHtml(rows, at) {
+    const next = rows[at + 1];
+    return `
+      <div class="insp-step-nav">
+        <button type="button" onclick="Inspections.step(-1)" ${at ? '' : 'disabled'}>‹ Back</button>
+        ${next
+          ? `<button type="button" class="primary" onclick="Inspections.step(1)">Next: ${esc(sectionLabel(next))} ›</button>`
+          : `<span class="small insp-muted">Last section — save below.</span>`}
+      </div>`;
+  }
+
+  function step(delta) {
+    const s = S();
+    if (!s.doc) return;
+    const rows = sectionsFor(s.doc.config_key);
+    s.step = Math.max(0, Math.min(rows.length - 1, (s.step || 0) + delta));
+    repaint();
+    const head = document.getElementById('insp-steps');
+    if (head) { head.scrollIntoView({ block: 'start' }); head.focus({ preventScroll: true }); }
+    announce(`Section ${s.step + 1} of ${rows.length}: ${sectionLabel(rows[s.step])}`);
   }
 
   function formHeadHtml() {
@@ -1310,7 +1382,7 @@ const Inspections = (function () {
     return `<span class="insp-sheet">Sheet <code>${esc(c.sheet)}</code> — ${esc(c.note)}</span>`;
   }
 
-  function sectionHtml(row) {
+  function sectionHtml(row, away = false) {
     const cfg = row.config_key;
     const key = row.section_key;
     const banner = `
@@ -1335,7 +1407,7 @@ const Inspections = (function () {
 
     const gaps = (UNCAPTURED[cfg] && UNCAPTURED[cfg][key]) || [];
     return `
-      <section class="panel insp-section" data-section="${escAttr(key)}">
+      <section class="panel insp-section" data-section="${escAttr(key)}"${away ? ' hidden' : ''}>
         ${banner}
         ${body}
         ${gaps.length ? uncapturedHtml(gaps) : ''}
@@ -2482,13 +2554,16 @@ const Inspections = (function () {
   return {
     render, init, set, setExtra, search, pick, setConfig, close, save,
     saveDraft: () => writeDraft(true),
-    open, resume, discard, retry, refresh, raiseMaintenance,
+    open, resume, discard, retry, refresh, raiseMaintenance, step,
     addSerial, removeSerial, addValue, removeValue, addFade, removeFade,
     // #118: the history view renders this file's sheets without owning them.
     // #147: the station editor's telemetry pick-list reads configs() — one
     // list, from meganet.inspection_config, no second copy.
     ensureRefs, recordModel, configLabel, configs,
     refsReady: () => !!S().refs,
+    // nearby.js: a sheet open on the tab is somebody's visit, and Start
+    // inspection takes them back to it rather than starting another over it.
+    isOpen: () => !!S().doc,
     refsError: () => S().refsError,
     // #213: the lists' paths, for pwa.js to have the worker keep them.
     refPaths,

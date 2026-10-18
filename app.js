@@ -128,7 +128,8 @@ function openThemeMenu() {
           <span class="theme-opt-text"><strong>${THEME_LABELS[c]}</strong>
             <span class="small txt-muted">${esc(THEME_HINTS[c])}</span></span>
         </label>`).join('')}
-      </fieldset>`,
+      </fieldset>
+      ${typeof Looks !== 'undefined' ? Looks.pickerHtml() : ''}`,
   });
   const on = document.querySelector('#theme-pick input:checked');
   if (on) on.focus();
@@ -1784,6 +1785,13 @@ function renderTabs() {
     nav.classList.add('nav-ready');
   }
 
+  // The Calm look (looks.js) draws its own bar — the groups, with the open
+  // group's tabs across the top of the page — and everything below is
+  // Classic's. Either way the collapse, the drawer and the chrome above are
+  // the same, so they are set before this hands over rather than twice.
+  if (state.look === 'calm') { CalmShell.render(nav); return; }
+  if (typeof CalmShell !== 'undefined') CalmShell.clearBar();
+
   // On a phone the nav is a drawer over the page, not a column beside it, so
   // the toggle at its top closes a menu rather than narrowing a rail — and has
   // to say so. Collapsed it is never seen there at all: the rail is gone and
@@ -1880,6 +1888,9 @@ function navFindKey(e) {
 // the nav first is the point on the rail and on a phone: there is no box to type
 // in until it is.
 function focusNavFind() {
+  // Calm's bar has no find box: its banner's search box (the palette) is the
+  // one place a tab is found by what it does.
+  if (state.look === 'calm') { Palette.open(); return; }
   if (state.navCollapsed) setNavCollapsed(false);
   const el = document.getElementById('nav-search');
   if (el) { el.focus(); el.select(); }
@@ -1986,7 +1997,11 @@ function toTopStart() {
 function refocusAfterTabSwitch(cameFromShell) {
   if (!cameFromShell) return;
   if (isPhoneNav()) { focusMain(); return; }
-  const btn = document.querySelector('#tab-nav .tab-btn.active');
+  // Under Calm the new tab's own button is in the row across the top
+  // (#section-bar) — its copy in the bar is put away at this width — so that
+  // is the one that becomes "where you already were".
+  const btn = (state.look === 'calm' && document.querySelector('#section-bar .tab-btn.active'))
+    || document.querySelector('#tab-nav .tab-btn.active');
   if (btn) btn.focus(); else focusMain();
 }
 
@@ -2002,7 +2017,7 @@ function switchTab(id) {
   // a tab is switched *from* as navigation. Not the rest of the side panel: the
   // Stations cards live there now, and a switchTab() from a button inside the
   // editor card is a deep link out of a tab, the same as one inside <main>.
-  const cameFromShell = !!(from && from.closest && (from.closest('#tab-nav')
+  const cameFromShell = !!(from && from.closest && (from.closest('#tab-nav') || from.closest('#section-bar')
     || from.closest('#help-panel .dock-strip') || from.closest('#dock-pane-help')));
   // …and whether a phone's drawer is open, asked of the tab being left: a map
   // panel's pane is not there on the tab being opened, and asked afterwards
@@ -2135,8 +2150,10 @@ function setNavCollapsed(collapsed) {
   // drops the user back at the top of the page. Closing the phone drawer sends
   // focus back to the hamburger that opened it — the drawer's own toggle has
   // just gone off-screen with the rail.
+  // Under Calm a phone's drawer is opened from ⋯ More in the bar along the
+  // foot rather than from ☰, so that is where focus goes back to.
   const btn = (isPhoneNav() && state.navCollapsed)
-    ? document.getElementById('btn-nav')
+    ? (state.look === 'calm' ? document.querySelector('.field-bar [data-field="more"]') : document.getElementById('btn-nav'))
     : document.querySelector('#tab-nav .nav-toggle');
   if (btn) btn.focus();
 }
@@ -3560,6 +3577,7 @@ function renderMain() {
     case 'offline':    el.innerHTML = OfflineTab.render();    OfflineTab.init();   break;
     case 'views':      el.innerHTML = NavViews.render();      NavViews.init();     break;
     case 'lookaround': el.innerHTML = StationAR.render();     StationAR.init();    break;
+    case 'nearby':     el.innerHTML = Nearby.render();        Nearby.init();       break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
     case 'passranges': el.innerHTML = renderPassRangesHtml();             break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;
@@ -3870,7 +3888,27 @@ function updateChromeHeight() {
   const hdr = document.querySelector('header');
   const bar = document.getElementById('mem-bar');
   const h = (hdr ? hdr.offsetHeight : 0) + (bar && !bar.hidden ? bar.offsetHeight : 0);
-  document.documentElement.style.setProperty('--mn-chrome', `${h}px`);
+  // Under Calm the open group's row of tabs sits over the page and the side
+  // panel (#section-bar), and on a phone the bar along the foot covers the
+  // bottom of the screen — both are screen that a "fill the rest of it" height
+  // cannot have, so both are counted as chrome.
+  // Each is also kept as its own measure: the bar down the side starts under
+  // the banner but beside the row, so it has the row's height back
+  // (styles.css), and what stands at a phone's foot — a toast, ↑ — stands on
+  // the bar rather than behind it.
+  let secH = 0, footH = 0;
+  if (state.look === 'calm') {
+    const sec = document.getElementById('section-bar');
+    if (sec && !sec.hidden) secH = sec.offsetHeight;
+    // Fixed, so it has no offsetParent to ask; a box with no height is one
+    // the stylesheet has put away.
+    const foot = document.querySelector('.field-bar');
+    if (foot) footH = Math.round(foot.getBoundingClientRect().height);
+  }
+  const root = document.documentElement.style;
+  root.setProperty('--mn-chrome', `${h + secH + footH}px`);
+  root.setProperty('--mn-secbar', `${secH}px`);
+  root.setProperty('--mn-footbar', `${footH}px`);
   // The Stations map beside its cards is the other thing whose height is "the
   // viewport, less whatever is above it", and it is measured here for the same
   // reason:

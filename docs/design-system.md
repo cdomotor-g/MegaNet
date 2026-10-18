@@ -1362,3 +1362,56 @@ next rather than to a tab still waiting:
   - The five Leaflet **options** (`L.polyline({color})`, `L.polygon({color})`)
     are the ones that cannot take `var()` at all and need `acmaMechColor()`
     (**#136**).
+
+---
+
+## 8. Looks — Calm and Classic
+
+Added October 2026, after people using the app said it was too much at once:
+forty-odd tabs down the side, six buttons in a blue banner, an emoji on every
+line and a map ringed in four colours. The answer is a second way of laying the
+same app out, not a cull — every tab, action and address is the same in both.
+
+| Look | Where it lives | What it is |
+|---|---|---|
+| **Calm** (default) | `looks.js`, `calm-shell.js`, the `:root[data-look="calm"]` block at the end of `styles.css` | The groups down the side, the open group's tabs across the top (`#section-bar`), search, sign in and ⋯ in a white banner, line drawings for the groups, one accent (`--primary` is the accent blue). On a phone, a bar along the foot — Nearby, Map, Visits, Camera, More — and the inspection sheet a section at a time. The Bureau's forecast and information outlines start off on the map. |
+| **Classic** | everything else in `app.js` and `styles.css` | The app as it was: every tab in the bar under its group's heading, every button in the banner, ☰ on a phone. |
+
+**The choice** is `state.look`, built in `core.js` (`lookStored()`) from
+`?look=` in the address, then `mn-look` in storage, then the default — the
+theme's pattern, for the theme's reason. `Looks.start()` (init.js) puts it on
+`<html data-look>`, keeps an address's `?look=` as the choice and takes it out of
+the address. The switch is in the Theme dialog (Classic's 🌗, Calm's ⋯ → Theme &
+look) and in Ctrl+K; `Looks.set()` redraws the shell at once. A device that knew
+Classic and has not chosen is told once, under the row across the top, with the
+way back.
+
+**The rules that keep two looks one app:**
+
+- **Scope, don't fork.** A look's CSS is under `:root[data-look="<id>"]`; its
+  code branches on `state.look` in the few places that draw the shell
+  (`renderTabs`, `refocusAfterTabSwitch`, `setNavCollapsed`'s focus,
+  `updateChromeHeight`). A tab does not branch on the look unless how it is laid
+  out *is* the point — the Inspections sheet's section-at-a-time is the one so far.
+- **Same buttons, same names.** A tab's button carries `data-tab` and
+  `aria-current="page"` in either look, so focus, the Site Map's gold line and
+  every check that finds a tab by its button find it in both.
+- **One navigation landmark.** Calm's bar along a phone's foot is a fixed child
+  of `#tab-nav`, not a second `<nav>` (`npm run shell` counts one).
+- **What is above the page is chrome.** `#section-bar` and the phone's foot bar
+  are counted in `--mn-chrome`, so every "fill the rest of the screen" height
+  still fills it; `--mn-secbar` and `--mn-footbar` are the two on their own.
+- **The scale is the scale.** Calm's media queries are `BREAKPOINTS`' steps,
+  like everything else's.
+
+**Checks.** Every browser check but one opens the app in Classic — the
+checks were written against it and it is still a look people use;
+`test/lib/browser.mjs` pins it through `?look=classic`, which (unlike a stored
+key) leaves a first visit a first visit. `npm run calm` opens the default and
+holds Calm to the above, a phone and every tab included.
+
+**Adding a third look:** an entry in `LOOKS` (looks.js) and `LOOK_CHOICES`
+(core.js), its CSS under its own `data-look`, and — if it draws the bar
+differently — a branch in `renderTabs()` handing the bar to its renderer, the
+way Calm's goes to `CalmShell.render()`. Its own browser check, like
+`npm run calm`, opening with `browser.newContext({ look: '<id>' })`.

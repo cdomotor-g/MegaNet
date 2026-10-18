@@ -59,9 +59,9 @@ const NavViews = (function () {
     },
     field: {
       name: 'Field', icon: '🥾',
-      about: 'What a site visit needs on a phone: the station and the way to it, the camera and the photos, the forms, the surveys, and whether the station is reporting.',
+      about: 'What a site visit needs on a phone: the nearest stations, the station and the way to it, the camera and the photos, the forms, the surveys, and whether the station is reporting.',
       groups: [
-        { name: 'Stations & networks', tabs: ['stations', 'lookaround'] },
+        { name: 'Stations & networks', tabs: ['nearby', 'stations', 'lookaround'] },
         { name: 'Site visits',         tabs: ['camera', 'photos', 'inspections', 'maintenance', 'history'] },
         { name: 'Surveying',           tabs: ['levels', 'twopeg', 'surveyguide'] },
         { name: 'Is it reporting?',    tabs: ['msglog', 'health'] },

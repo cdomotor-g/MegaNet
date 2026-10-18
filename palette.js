@@ -43,7 +43,7 @@
 //           goToStation, switchTab, setDockTab, navTerms, navHaystack,
 //           navScore, resetStationFilters, newSearchRow, renderMain,
 //           toggleTheme), modal.js, places.js, station-trail.js, route.js,
-//           bug-report.js.
+//           bug-report.js, looks.js.
 
 const Palette = (() => {
   const MAX_STATIONS = 8;
@@ -192,6 +192,13 @@ const Palette = (() => {
         find: 'theme dark light colour color night mode', run: () => toggleTheme() },
       { icon: '☀️', label: 'Choose a theme — System, Light, Dark or Sunlight', find: 'theme sunlight contrast outdoors system device',
         run: () => openThemeMenu() },
+      // The other look (looks.js) — the way back to Classic for somebody who
+      // knew where everything was, and the way to Calm from it.
+      state.look === 'calm'
+        ? { icon: '🗂️', label: 'Switch to the Classic look — every tab in the bar, every button in the banner',
+            find: 'look layout classic old interface design switch back previous', run: () => Looks.set('classic') }
+        : { icon: '🪷', label: 'Switch to the Calm look — the groups down the side, fewer buttons',
+            find: 'look layout calm new interface design switch quieter', run: () => Looks.set('calm') },
       { icon: '🐞', label: 'Report a bug or suggest an improvement', find: 'bug report problem issue feedback suggest broken',
         run: () => BugReport.open() },
     ];

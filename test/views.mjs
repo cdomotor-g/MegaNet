@@ -150,9 +150,9 @@ async function main() {
 
     await page.selectOption('#nav-view-select', 'field');
     b = await bar(page);
-    const FIELD = ['stations', 'lookaround', 'camera', 'photos', 'inspections', 'maintenance', 'history',
+    const FIELD = ['nearby', 'stations', 'lookaround', 'camera', 'photos', 'inspections', 'maintenance', 'history',
                    'levels', 'twopeg', 'surveyguide', 'msglog', 'health', 'offline', 'views'];
-    check('Field: the site-visit list — Stations and Look Around first, no desk tool',
+    check('Field: the site-visit list — Nearby, Stations and Look Around first, no desk tool',
       b.view === 'field' && J(ids(b)) === J(FIELD), J(b.groups));
     check('…in groups of its own: Site visits, Surveying, Is it reporting?, Before you go',
       J(b.groups.map(g => g.h)) === J(['Stations & networks', 'Site visits', 'Surveying', 'Is it reporting?', 'Before you go']),
@@ -237,13 +237,13 @@ async function main() {
     await p2.click('#vw-editor [data-k="t:stations:down"]');
     let mine = await p2.evaluate(() => NavViews.layout().views.find(v => v.name === 'Field (copy)'));
     check('a group renamed, and Stations moved down below Look Around',
-      mine.groups[0].name === 'On site' && J(mine.groups[0].tabs) === J(['lookaround', 'stations']), J(mine.groups[0]));
+      mine.groups[0].name === 'On site' && J(mine.groups[0].tabs) === J(['nearby', 'lookaround', 'stations']), J(mine.groups[0]));
     const focusAfter = await p2.evaluate(() => document.activeElement?.dataset.k);
     check('…focus stays on the moved tab\'s ↓', focusAfter === 't:stations:down', String(focusAfter));
     await p2.selectOption('#vw-editor [data-k="t:health:group"]', '0');
     mine = await p2.evaluate(() => NavViews.layout().views.find(v => v.name === 'Field (copy)'));
     check('Move to… puts Station Health at the foot of On site',
-      J(mine.groups[0].tabs) === J(['lookaround', 'stations', 'health']) && !mine.groups[3].tabs.includes('health'), J(mine.groups));
+      J(mine.groups[0].tabs) === J(['nearby', 'lookaround', 'stations', 'health']) && !mine.groups[3].tabs.includes('health'), J(mine.groups));
     await p2.click('#vw-editor [data-k="t:maintenance:remove"]');
     mine = await p2.evaluate(() => NavViews.layout().views.find(v => v.name === 'Field (copy)'));
     const missingNow = await p2.evaluate(() => [...document.querySelectorAll('#vw-editor .vw-missing [data-k^="add:"]')].map(s => s.dataset.k));
@@ -255,7 +255,7 @@ async function main() {
     await p2.click('#vw-editor [data-k="use"]');
     let b2 = await bar(p2);
     check('Use this view: the bar lists it, its renamed group and moved tabs included',
-      b2.view === mine.id && b2.groups[0].h === 'On site' && J(b2.groups[0].tabs) === J(['lookaround', 'stations', 'health', 'export'])
+      b2.view === mine.id && b2.groups[0].h === 'On site' && J(b2.groups[0].tabs) === J(['nearby', 'lookaround', 'stations', 'health', 'export'])
         && !ids(b2).includes('maintenance'), J(b2.groups.slice(0, 2)));
     await p2.waitForFunction(() => document.getElementById('vw-save')?.dataset.state === 'saved', null, { timeout: 10_000 });
     const last = db.saved[db.saved.length - 1];

@@ -15898,6 +15898,7 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   #tab-nav,
   #help-panel,
   #mem-bar,
+  #section-bar,
   #nav-backdrop,
   #help-backdrop,
   .modal-backdrop,
@@ -19876,4 +19877,538 @@ select.kl-in { width: auto; font-family: inherit; }
   .tdp-more > summary { display: none; }
   .tdp-page .table-wrap.tall,
   .tdp-page .table-wrap.medium { max-height: none !important; overflow: visible !important; }
+}
+
+/* ── The Calm look (looks.js, calm-shell.js) ─────────────────────────────────
+   The same app with less in front of you: the banner white and holding three
+   things, the bar down the side one button a group, the open group's tabs in a
+   row across the top (#section-bar), line drawings in the ink of their text
+   where there were emoji, and one accent — the primary button blue like
+   everything else that acts, rather than a second, green, colour for "go". On a
+   phone, a bar along the foot for a site visit (.field-bar).
+
+   Every rule here is scoped to :root[data-look="calm"], so Classic is exactly
+   the stylesheet above. The few that are not are the Classic defaults for the
+   elements Calm adds: put away unless the look draws them. */
+
+.hdr-find,
+.hdr-kbd,
+.hdr-more,
+.field-bar { display: none; }
+#section-bar[hidden] { display: none; }
+
+:root[data-look="calm"] {
+  --calm-soft: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  --primary: var(--accent);
+  --primary-text: #ffffff;
+}
+:root[data-look="calm"][data-theme="dark"] {
+  /* The dark theme's accent is a light blue for text on a dark panel; white
+     on it is not readable, so a button wears the deeper blue the active nav
+     tab always has there. */
+  --primary: #2a6fb0;
+}
+
+/* The line drawings (CalmShell.ICONS): 24-unit strokes in the ink around them. */
+.calm-ico {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+}
+
+/* ── The banner ── */
+:root[data-look="calm"] header {
+  background: var(--panel);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  padding: .5rem 1rem;
+  gap: .75rem;
+}
+:root[data-look="calm"] header h1 { font-size: 1.12rem; }
+:root[data-look="calm"] .header-tag { display: none; }
+:root[data-look="calm"] .header-sub { color: var(--muted); font-size: .8rem; }
+:root[data-look="calm"] .header-stats:not(:empty)::before { content: none; }
+
+/* What ⋯ holds instead, and ☰, whose drawer a phone opens from the bar
+   along its foot. */
+:root[data-look="calm"] #btn-export,
+:root[data-look="calm"] #btn-report,
+:root[data-look="calm"] #btn-theme,
+:root[data-look="calm"] #btn-nav { display: none; }
+:root[data-look="calm"] .hdr-more { display: inline-flex; }
+
+:root[data-look="calm"] .header-actions {
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: .3rem;
+  min-width: 0;
+}
+
+/* The buttons left in it lie flat on the white, as text does. */
+:root[data-look="calm"] .hdr-btn,
+:root[data-look="calm"] .hdr-side {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text);
+  font-size: .92rem;
+}
+:root[data-look="calm"] .hdr-btn:hover,
+:root[data-look="calm"] .hdr-side:hover { background: var(--subtle); }
+:root[data-look="calm"] .hdr-btn.is-in,
+:root[data-look="calm"] .hdr-btn.hdr-new,
+:root[data-look="calm"] .hdr-side.on {
+  background: var(--calm-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+:root[data-look="calm"] .hdr-ico { filter: grayscale(1); }
+:root[data-look="calm"] .hdr-more .hdr-ico { filter: none; font-size: 1.2rem; font-weight: 700; }
+
+/* A label that is read but not drawn: ⋯ says "More" to a screen reader, and
+   the search box below says "Search" while it shows the longer hint. */
+:root[data-look="calm"] .hdr-more .hdr-label,
+:root[data-look="calm"] #btn-palette .hdr-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Search, drawn as the box it is: the first thing after the name, as wide as
+   it can usefully be, with what it finds written in it. */
+:root[data-look="calm"] #btn-palette {
+  order: -1;
+  margin-right: auto;
+  flex: 0 1 30rem;
+  width: auto;
+  min-width: 0;
+  height: 2.35rem;
+  padding: 0 .7rem;
+  justify-content: flex-start;
+  gap: .5rem;
+  background: var(--subtle);
+  border: 1px solid var(--ctl-border);
+  border-radius: 10px;
+  color: var(--muted);
+}
+:root[data-look="calm"] #btn-palette:hover { background: var(--panel); }
+:root[data-look="calm"] #btn-palette .hdr-find {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+:root[data-look="calm"] #btn-palette .hdr-kbd {
+  display: inline-block;
+  flex: none;
+  padding: 0 .35rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel);
+  font: inherit;
+  font-size: .72rem;
+  line-height: 1.3rem;
+  color: var(--muted);
+}
+
+/* ── The shell's grid ──
+   The bar down the side the whole height; over the page and the side panel,
+   the open group's row of tabs. */
+:root[data-look="calm"] #app-shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr;
+}
+:root[data-look="calm"] #tab-nav      { grid-column: 1; grid-row: 1 / 3; }
+:root[data-look="calm"] #section-bar  { grid-column: 2 / 4; grid-row: 1; }
+:root[data-look="calm"] #main-content { grid-column: 2; grid-row: 2; }
+:root[data-look="calm"] #help-panel   { grid-column: 3; grid-row: 2; }
+
+/* The bar begins under the banner, beside the row, so the row's height is
+   screen it has (--mn-chrome counts the row for the page under it). */
+:root[data-look="calm"] .nav-inner {
+  max-height: calc(100dvh - var(--mn-chrome, 96px) + var(--mn-secbar, 0px));
+}
+
+/* ── The bar down the side ── */
+:root[data-look="calm"] .calm-nav { gap: .15rem; padding: .5rem .5rem 1rem; }
+:root[data-look="calm"] .calm-nav .nav-head { border-bottom: 0; margin-bottom: 0; }
+:root[data-look="calm"] #tab-nav .nav-toggle { margin-bottom: .1rem; }
+.calm-sections {
+  display: flex;
+  flex-direction: column;
+  gap: .12rem;
+}
+:root[data-look="calm"] #tab-nav .nav-sec {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  width: 100%;
+  padding: .5rem .5rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: .94rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+:root[data-look="calm"] #tab-nav .nav-sec:hover { background: var(--subtle); }
+:root[data-look="calm"] #tab-nav .nav-sec .calm-ico { color: var(--muted); }
+:root[data-look="calm"] #tab-nav .nav-sec.active {
+  background: var(--calm-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+:root[data-look="calm"] #tab-nav .nav-sec.active .calm-ico { color: var(--accent); }
+:root[data-look="calm"] #tab-nav .nav-sec .nav-count { margin-left: auto; }
+:root[data-look="calm"] #tab-nav.collapsed .nav-sec {
+  justify-content: center;
+  gap: 0;
+  padding-left: .2rem;
+  padding-right: .2rem;
+}
+:root[data-look="calm"] #tab-nav.collapsed .nav-sec .nav-count {
+  position: absolute;
+  top: .1rem;
+  right: .1rem;
+  min-width: 1rem;
+  padding: 0 .2rem;
+  font-size: .6rem;
+  line-height: 1rem;
+}
+/* A group's own tabs are in the row across the top above a phone's width;
+   in a phone's drawer they are listed under it. */
+:root[data-look="calm"] .calm-tabs { display: none; }
+
+.calm-foot {
+  margin-top: .75rem;
+  padding-top: .6rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+/* ── The row across the top ── */
+:root[data-look="calm"] #section-bar {
+  min-width: 0;
+  padding: .45rem 1.25rem 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.sec-bar-in {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0 1.5rem;
+  min-width: 0;
+}
+.sec-name {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding-bottom: .55rem;
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+.sec-name .calm-ico { color: var(--muted); }
+.sec-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.15rem;
+  min-width: 0;
+}
+#section-bar .tab-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .4rem .1rem .5rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: .92rem;
+  white-space: nowrap;
+}
+#section-bar .tab-btn:hover { color: var(--text); }
+#section-bar .tab-btn.active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+#section-bar .nav-needs { font-size: .8rem; filter: grayscale(1); }
+
+/* Once, for a device that knew Classic (Looks.introHtml). */
+.look-intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .25rem .75rem;
+  margin: .1rem 0 .55rem;
+  padding: .45rem .5rem .45rem .75rem;
+  border-radius: var(--r-md);
+  background: var(--calm-soft);
+  font-size: var(--fs-sm);
+}
+.look-intro > span { flex: 1 1 18rem; }
+.look-intro-x {
+  padding: 0 .45rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1.6rem;
+}
+
+/* ── The side panel's strip, in the same quiet ink ── */
+:root[data-look="calm"] .dock-strip .dock-ico { filter: grayscale(1); }
+
+/* The memory strip under the banner (#79) keeps its place and its click, but
+   says nothing in colour until it has something to say: grey while the page
+   is holding what it should, its own colours once it passes a threshold. */
+:root[data-look="calm"] .mem-bar:not(.mem-warn):not(.mem-bad) .mem-seg { filter: grayscale(1); opacity: .45; }
+
+/* ── ⋯ More ── */
+.more-menu { display: grid; gap: .2rem; }
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  width: 100%;
+  padding: .6rem .5rem;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  text-align: left;
+}
+.more-item:hover { background: var(--subtle); }
+.more-item .calm-ico { width: 1.3rem; height: 1.3rem; color: var(--muted); }
+.more-text { display: grid; gap: .1rem; }
+.more-menu .nav-legal { margin: .5rem .5rem 0; }
+.look-pick { margin-top: var(--sp-3, .75rem); }
+
+/* ── Tablets: the banner's hint gives way before its buttons do ── */
+@media (max-width: 900px) {
+  :root[data-look="calm"] #btn-palette .hdr-kbd { display: none; }
+  :root[data-look="calm"] .header-sub { display: none; }
+}
+
+/* ── A phone ── */
+@media (max-width: 560px) {
+  :root[data-look="calm"] header { padding: .4rem .6rem; }
+  /* The mark says Flood-Net on its own at this width; the row is the search
+     box's. ✨ What's new is in ⋯ here, and while there is news ⋯ wears its dot. */
+  :root[data-look="calm"] header h1 { font-size: 0; }
+  :root[data-look="calm"] .header-logo { margin-right: 0; height: 1.75rem; }
+  :root[data-look="calm"] #btn-whatsnew { display: none; }
+  :root[data-look="calm"] header:has(#btn-whatsnew:not([hidden])) .hdr-more { position: relative; }
+  :root[data-look="calm"] header:has(#btn-whatsnew:not([hidden])) .hdr-more::after {
+    content: '';
+    position: absolute;
+    top: .35rem;
+    right: .3rem;
+    width: .5rem;
+    height: .5rem;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  /* The help tab stands on the right edge of every page but Stations; the
+     distances keep clear of it. */
+  .page.nb-page { padding-right: 2.6rem; }
+  :root[data-look="calm"] #btn-palette { flex-basis: 9rem; height: 2.25rem; }
+
+  /* The drawer lists every group with its tabs under it. */
+  :root[data-look="calm"] .calm-tabs {
+    display: block;
+    margin: 0 0 .35rem 2rem;
+  }
+  :root[data-look="calm"] #tab-nav .calm-tabs .tab-btn {
+    padding: .5rem .5rem;
+    color: var(--muted);
+    font-size: .92rem;
+  }
+  :root[data-look="calm"] #tab-nav .calm-tabs .tab-btn.active {
+    background: var(--calm-soft);
+    border-color: transparent;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* The row across the top scrolls sideways rather than wrapping, and the
+     group's name is in the drawer. */
+  :root[data-look="calm"] #section-bar { padding: 0 .5rem; }
+  :root[data-look="calm"] .sec-name { display: none; }
+  :root[data-look="calm"] .sec-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 0 1rem;
+    padding: 0 .25rem;
+  }
+  :root[data-look="calm"] .sec-tabs::-webkit-scrollbar { display: none; }
+  :root[data-look="calm"] #section-bar .tab-btn { padding: .6rem .1rem .55rem; min-height: 2.75rem; }
+
+  /* The bar along the foot: five thumbs' worth, over the page and under a
+     drawer, clear of the home indicator. */
+  :root[data-look="calm"] .field-bar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1100;
+    padding: .25rem .25rem calc(.25rem + env(safe-area-inset-bottom));
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, .06);
+  }
+  .field-btn {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .15rem;
+    min-height: 3.1rem;
+    padding: .3rem 0;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 500;
+  }
+  .field-btn .calm-ico { width: 1.45rem; height: 1.45rem; }
+  .field-btn.active { color: var(--accent); }
+  :root[data-look="calm"] body { padding-bottom: var(--mn-footbar, 0px); }
+  :root[data-look="calm"] .toasts,
+  :root[data-look="calm"] .to-top {
+    bottom: calc(max(1rem, env(safe-area-inset-bottom)) + var(--pwa-lift, 0px) + var(--mn-footbar, 0px));
+  }
+}
+
+/* ── 📌 Nearby (nearby.js) ───────────────────────────────────────────────────
+   A list to tap with a glove on: each station a row the width of the page,
+   its name and number on the left and how far and which way on the right. */
+.nb-head .nb-lead { margin: .25rem 0 .6rem; }
+.nb-go { justify-content: flex-start; }
+.nb-from { margin: .5rem 0 0; color: var(--muted); }
+.nb-from:empty { display: none; }
+.nb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: .5rem;
+}
+.nb-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: .7rem .9rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  text-align: left;
+}
+.nb-row:hover { border-color: var(--ctl-border); }
+.nb-name {
+  display: grid;
+  gap: .15rem;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 1rem;
+}
+.nb-meta {
+  font-weight: 400;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nb-dist {
+  margin-left: auto;
+  display: grid;
+  justify-items: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.nb-dist strong { font-size: 1rem; }
+.nb-dist span { font-size: var(--fs-sm); color: var(--muted); }
+.nb-more { justify-content: center; }
+.nb-stn h2 { margin: .35rem 0 .2rem; font-size: 1.5rem; }
+.nb-stn-meta { margin: 0 0 1rem; }
+.nb-back { padding-left: 0; }
+.nb-acts { display: grid; gap: .6rem; margin-bottom: .75rem; }
+.nb-big { min-height: 3.25rem; font-size: 1.05rem; font-weight: 600; border-radius: 12px; }
+.nb-two { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.nb-two > * {
+  min-height: 2.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.nb-dir {
+  padding: 0 .8rem;
+  border: 1px solid var(--ctl-border);
+  background: var(--panel);
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* ── The inspection sheet a section at a time (inspections.js, stepped()) ── */
+.insp-section[hidden] { display: none; }
+.insp-steps {
+  display: grid;
+  gap: .2rem;
+}
+.insp-step-name { font-size: 1.25rem; }
+.insp-step-bar { display: flex; gap: 3px; margin-top: .45rem; }
+.insp-step-bar i { flex: 1 1 0; height: 5px; border-radius: 3px; background: var(--border); }
+.insp-step-bar i.done,
+.insp-step-bar i.on { background: var(--accent); }
+.insp-step-nav {
+  position: sticky;
+  bottom: var(--mn-footbar, 0px);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  margin: .5rem 0;
+  padding: .6rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, .06);
+}
+.insp-step-nav button { min-height: 2.9rem; }
+.insp-step-nav .primary { flex: 1 1 auto; font-weight: 600; }
+
+/* Classic gives the logo's room to the name below 380 px; Calm has already
+   given the name's to the search box, so the logo stays. */
+@media (max-width: 380px) {
+  :root[data-look="calm"] .header-logo { display: inline-block; }
 }

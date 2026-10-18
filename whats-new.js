@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 39, date: '2026-10-18', items: [
+      '<strong>🪷 A calmer look.</strong> The same tabs, with less in front of you: the bar on the left lists the groups, '
+        + 'and the tabs of the group you are in run across the top of the page. Search is a box in the banner, and Export, '
+        + 'Theme, Help and Report a Bug are behind <strong>⋯</strong>. Prefer the old look? <strong>⋯ → Theme &amp; look → '
+        + 'Classic</strong> puts it back, and it is remembered.',
+      '<strong>📱 A bar along the bottom on a phone</strong>, for a site visit: Nearby, Map, Visits, Camera and More. On a '
+        + 'phone the inspection sheet now shows one section at a time, with <em>Next</em> and <em>Back</em>.',
+      '<strong>📌 Nearby</strong> — a new tab under <em>Site visits</em>: the stations closest to where you stand, nearest '
+        + 'first, with how far and which way. Pick one for <em>Start inspection</em>, <em>Photos</em> and <em>Directions</em>.',
+    ] },
     { n: 38, date: '2026-10-18', items: [
       '<strong>🔔 Notifications on your phone, for administrators.</strong> When an account is waiting for approval or a '
         + 'base station asks for a token, your phone can tell you — and the app\'s icon shows how many are waiting. Turn it '

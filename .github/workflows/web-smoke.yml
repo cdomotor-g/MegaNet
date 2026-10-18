@@ -726,6 +726,17 @@ jobs:
         working-directory: test
         run: npm run views
 
+      # The Calm look (looks.js, calm-shell.js), the default — every other
+      # browser check opens the app in Classic (test/lib/browser.mjs): the bar
+      # one button a group and the open group's tabs across the top, ⋯ in the
+      # banner, Classic and back from the Theme dialog and from ?look=, the
+      # note for a device that knew Classic, a phone's bar along the foot,
+      # 📌 Nearby nearest first, Start inspection into the sheet a section at a
+      # time, and every tab opened in Calm with a clean console.
+      - name: Calm look — the default shell, a phone's foot, Nearby
+        working-directory: test
+        run: npm run calm
+
       # Accounts (auth.js, admin.js, 0062) against a stand-in for Supabase
       # Auth: the visitor note, a password sign-in, a new account confirmed by
       # its code and left waiting, a forgotten password and a reset link, an

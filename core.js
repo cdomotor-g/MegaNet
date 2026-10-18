@@ -191,6 +191,13 @@ const TABS = [
       find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage' },
   ] },
   { group: 'Site visits', tabs: [
+    // 📌 Nearby (nearby.js) heads the group because it is where a visit
+    // starts: which station is this, and which is next. Its find words are
+    // the questions somebody standing at a gate asks — never "nearby" alone,
+    // which Look Around and RF Environment already answer to, and a tie it
+    // wins on its label rather than on a word the other two were given.
+    { id: 'nearby',     label: 'Nearby',                 icon: '📌',
+      find: 'nearest closest close by around me how far distance which station am i at gps position location list sorted next site visit walk drive arrive start inspection directions' },
     { id: 'inspections', label: 'Inspections',           icon: '🩺',
       find: 'form paper sheet checklist calibration draft photo configuration' },
     { id: 'maintenance', label: 'Site Maintenance',      icon: '🧰',
@@ -1000,6 +1007,24 @@ const HELP = {
       + 'while it is open and lets it sleep again when it closes.',
     ],
     related: ['stations', 'camera', 'photos'],
+  },
+  nearby: {
+    summary: 'The stations closest to where you are standing, nearest first, each with how far it is and '
+           + 'which way. Press <strong>Use my location</strong> and allow it once; with no GPS, '
+           + '<em>From the map\'s centre</em> measures from where the Stations map was last looking instead. '
+           + 'Pick a station for what a visit needs in one place: <strong>Start inspection</strong> opens the '
+           + 'inspection sheet already filled in with it, <strong>Photos</strong> opens the Field Camera with it '
+           + 'chosen, <strong>Directions</strong> hands its position to your maps app, and <em>Show on the map</em> '
+           + 'opens the Stations tab on it.',
+    watch: [
+      'The list follows the Stations tab\'s filters, so a station that seems to be missing may simply be '
+      + 'filtered out there.',
+      'Your position stays on this device: it is used to sort the list and is never sent or kept. The list '
+      + 'is measured once when you press the button, not tracked — press <em>Refresh</em> after you have moved.',
+      'Distances are in a straight line, not by road. Directions is your maps app\'s route, from wherever it '
+      + 'thinks you are.',
+    ],
+    related: ['inspections', 'camera', 'lookaround'],
   },
   maps: {
     summary: 'Browses the bundled Radio-path PDF maps by region, and suggests the relevant map for '
@@ -3141,6 +3166,27 @@ function themeStored() {
   return THEME_CHOICES.includes(v) ? v : 'system';
 }
 
+// ── Look: how the app is laid out around the tabs ────────────────────────────
+// Calm (the default since October 2026) or Classic, and room for more — the
+// registry, the switch and the reasons are looks.js's. The choice lives here,
+// beside the theme's, for the theme's reason: `state` below is built from it,
+// before looks.js has loaded, and so are the map defaults a look changes.
+//
+// The address can name one — `?look=classic` — which is the way back that
+// needs no menu at all: a person who cannot find the switch can be sent a
+// link. Read here as well as stored by Looks.start(), because a state built
+// from the stored value alone would draw the first page in the old look and
+// change under the reader.
+const LOOK_CHOICES = ['calm', 'classic'];
+
+function lookStored() {
+  let v = null;
+  try { v = new URLSearchParams(location.search).get('look'); } catch (_) {}
+  if (LOOK_CHOICES.includes(v)) return v;
+  try { v = localStorage.getItem('mn-look'); } catch (_) {}
+  return LOOK_CHOICES.includes(v) ? v : 'calm';
+}
+
 // Where the Stations map was last looking, as noteStationsView() (app.js) kept
 // it when the tab was left: { lat, lng, zoom }, or null. 🔭 Look Around's
 // "From the map's centre" stands there from its own tab (station-ar.js),
@@ -3431,9 +3477,17 @@ const state = {
   // they were asked for, their one cost is the SLS file the station card reads
   // (fetched once, after the pins are drawn), and an operator who turns one
   // off means it.
+  //
+  // Except the outlines under the Calm look, which start off there: a purple
+  // or pink ring on a third of the south-east's pins is most of what made the
+  // map read as busy, and it answers a question — which of these does the
+  // Bureau forecast? — that most visits to the map are not asking. One tick
+  // in 🗺️ Map display brings them back, and is remembered like any other.
+  // Looks.set() moves the default with the look for a browser with no choice
+  // of its own stored.
   mapPinShapes:   (localStorage.getItem('mn-pin-shapes') || 'on') === 'on',
   mapPinManual:   (localStorage.getItem('mn-pin-manual') || 'on') === 'on',
-  mapPinSls:      (localStorage.getItem('mn-pin-sls') || 'on') === 'on',
+  mapPinSls:      (localStorage.getItem('mn-pin-sls') || (lookStored() === 'calm' ? 'off' : 'on')) === 'on',
   // Whose stations the map draws (map-symbols.js): '' for everyone's, else one
   // owner party (or FILTER_NONE, none on record), drawn alone ('only') or left
   // off ('except'). Session-only, for mapHideOthers' reason: it takes stations
@@ -3975,6 +4029,8 @@ const state = {
   // the right question everywhere it is asked (#224).
   themeChoice: themeStored(),
   theme: themeResolve(themeStored()),
+  // 'calm' or 'classic' (looks.js). Read by everything that draws the shell.
+  look: lookStored(),
   // The Stations map's last centre and zoom, kept as the tab is left
   // (noteStationsView, app.js) — see storedMapView() above.
   mapLastView: storedMapView(),

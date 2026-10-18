@@ -43,7 +43,7 @@ function findChromium() {
 export async function launchBrowser(opts = {}) {
   const args = { headless: true, ...opts };
   try {
-    return await chromium.launch(args);
+    return pinLook(await chromium.launch(args));
   } catch (err) {
     const exe = findChromium();
     if (!exe) {
@@ -53,6 +53,46 @@ export async function launchBrowser(opts = {}) {
         + `Or point CHROMIUM_PATH at a Chromium executable.\n\n`
         + `Original error: ${err.message}`);
     }
-    return await chromium.launch({ ...args, executablePath: exe });
+    return pinLook(await chromium.launch({ ...args, executablePath: exe }));
   }
+}
+
+// ── Which look a page opens in ───────────────────────────────────────────────
+// The app has two looks (looks.js): Calm, the default since October 2026, and
+// Classic, the one every check written before it was written against — its
+// banner buttons, its bar of every tab under its group's heading, ☰ on a phone.
+// Those checks are about Classic, and Classic is still one pick away for
+// anybody who wants it, so they go on checking it: every context opens the app
+// in Classic unless it asks for another, `browser.newContext({ look: 'calm' })`,
+// or for none at all, `{ look: null }` — the app's own default, which is what
+// `npm run calm` checks.
+//
+// Pinned through the address, `?look=classic`, rather than through storage:
+// the address is a door the app keeps for exactly this (somebody sent a link
+// back to Classic), it takes the parameter out again before anything reads the
+// address, and — the reason storage would not do — a key written before the
+// app runs would make every first visit a second one (Route.newDevice), which
+// is what `npm run firstvisit` is about.
+function pinLook(browser) {
+  const newContext = browser.newContext.bind(browser);
+  browser.newContext = async (opts = {}) => {
+    const { look = 'classic', ...rest } = opts || {};
+    const context = await newContext(rest);
+    if (look) {
+      await context.addInitScript(want => {
+        try {
+          if (window.top !== window || !/^https?:$/.test(location.protocol)) return;
+          const q = new URLSearchParams(location.search);
+          if (q.has('look')) return;
+          q.set('look', want);
+          history.replaceState(history.state, '', location.pathname + '?' + q.toString() + location.hash);
+        } catch (_) {}
+      }, look);
+    }
+    return context;
+  };
+  // browser.newPage() makes a context of its own, which the pin above would
+  // never see — so it is made through newContext() like any other.
+  browser.newPage = async (opts = {}) => (await browser.newContext(opts)).newPage();
+  return browser;
 }
