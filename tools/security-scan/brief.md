@@ -84,6 +84,11 @@ If an open `security-scan` issue already covers it, comment there only if you
 have something new. If a fix has landed for an open one, say so on it with the
 commit, and close it.
 
+If this session has no GitHub tool that can open issues, write each finding
+instead as `security/findings/<YYYY-MM-DD>-<slug>.md` in `flood-net-private`
+(same title and body), and say so in the log entry; they go up with the log's
+commit.
+
 Never open an issue, push a commit or comment anywhere in `cdomotor-g/meganet`.
 Fixing is a separate session's job (`tools/security-scan/README.md`).
 
