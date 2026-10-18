@@ -1,0 +1,32 @@
+# Dependabot, security updates only. open-pull-requests-limit: 0 switches off
+# routine version bumps, so the only pull requests it opens are fixes for a
+# dependency with a published vulnerability (that half needs "Dependabot
+# security updates" on in Settings → Code security). Alerts appear under
+# Security → Dependabot either way.
+#
+# The browser app itself loads its libraries from CDNs at pinned versions and
+# has no package.json; these are the Node pieces that do.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /bridge
+      - /sdr-pi
+      - /test
+      - /tools/field-photos
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: docker
+    directory: /bridge
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
