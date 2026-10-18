@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "1.2",
-    "description": "MegaNet station database. catchments[] is the Queensland drainage-basin vocabulary used by the Network Maps navigator, with each basin's drainage division; hubs[] is the Bureau's field maintenance hubs. Per-station catchment_ids and hub_id are point-in-polygon against the boundaries in data/qld-basins.geojson and data/bom-hubs.geojson (see tools/build_geo_layers.py), not against the affine-fitted basin SVG.",
+    "description": "Flood-Net station database. catchments[] is the Queensland drainage-basin vocabulary used by the Network Maps navigator, with each basin's drainage division; hubs[] is the Bureau's field maintenance hubs. Per-station catchment_ids and hub_id are point-in-polygon against the boundaries in data/qld-basins.geojson and data/bom-hubs.geojson (see tools/build_geo_layers.py), not against the affine-fitted basin SVG.",
     "updated": "2026-07-31",
     "rm_paths": {
       "map": "c:\\program files (x86)\\radio mobile 11.6.6\\networks\\meganet\\net1.map",
@@ -21308,8 +21308,8 @@
       "id": "clyde_rd_al",
       "name": "Clyde Rd AL",
       "station_number": "531074",
-      "lat": -17.3247,
-      "lon": 145.9522,
+      "lat": -17.323375,
+      "lon": 145.951521,
       "elevation_ahd": 7.5,
       "roles": [
         "field"
@@ -21319,7 +21319,9 @@
         "mulgrave_russell"
       ],
       "alert_ids": {
-        "rainfall": 5114
+        "rainfall": 5113,
+        "battery": 5115,
+        "water_level": 5114
       },
       "satcom": {
         "enabled": false,
@@ -78813,7 +78815,7 @@
     },
     {
       "id": "running_river_hidde",
-      "name": "Running River (Hidde",
+      "name": "Running River (Hidden Valley)",
       "station_number": "532155",
       "lat": -18.9803,
       "lon": 146.0248,
@@ -80097,8 +80099,8 @@
       "id": "saxby_river_ldr_tm",
       "name": "Saxby River Ldr Tm",
       "station_number": "529080",
-      "lat": -19.4823,
-      "lon": 141.2343,
+      "lat": -19.482256,
+      "lon": 141.234288,
       "elevation_ahd": 67.96,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
@@ -105452,8 +105454,8 @@
       "id": "gatton_lvrc_enviromon_basestation",
       "name": "GATTON LVRC ENVIROMON BASESTATION",
       "station_number": "260122",
-      "lat": -27.5588,
-      "lon": 152.2762,
+      "lat": -27.559429,
+      "lon": 152.276993,
       "elevation_ahd": 108.39,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
@@ -191527,12 +191529,12 @@
       "id": "mt_kanigan_al",
       "name": "Mt Kanigan AL",
       "station_number": "40892",
-      "lat": -25.959,
-      "lon": 152.575,
+      "lat": -25.956959,
+      "lon": 152.577143,
       "elevation_ahd": 347.73,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
-        "field"
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -191550,6 +191552,27 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 5608,
+            "high": 5650
+          },
+          {
+            "low": 6934,
+            "high": 6936
+          },
+          {
+            "low": 6954,
+            "high": 6958
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2129,
         "number": "40892",
@@ -204926,7 +204949,8 @@
       "elevation_ahd": 451.78,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -204944,6 +204968,19 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 2006,
+            "high": 2007
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2979,
         "number": "540459",
@@ -238991,7 +239028,7 @@
       "satcom": {},
       "rm_system_id": null,
       "enabled": true,
-      "notes": "The base station at 18 Bateson and the sensors wired to its logger — a tipping bucket, two SDI-12 level sensors and the supply voltage. Not a gauging station and not network data: it is where MegaNet's ingest path is exercised live. Local channels post as station_number 999998 with a channel (s:999998/rain and so on); alert_id 8101 is the logger's ALERT2 self-test, which builds a real frame and feeds it to its own decoder. See logger/README.md and docs/live-end-to-end-test.md. No lat/lon on purpose — the site itself is on the map as 18_bateson. Not in stations.json, so document_managed is false and a stations load leaves it alone (0022). Retire with update meganet.station set deleted_at = now() where id = 'bateson_test'.",
+      "notes": "The base station at 18 Bateson and the sensors wired to its logger — a tipping bucket, two SDI-12 level sensors and the supply voltage. Not a gauging station and not network data: it is where Flood-Net's ingest path is exercised live. Local channels post as station_number 999998 with a channel (s:999998/rain and so on); alert_id 8101 is the logger's ALERT2 self-test, which builds a real frame and feeds it to its own decoder. See logger/README.md and docs/live-end-to-end-test.md. No lat/lon on purpose — the site itself is on the map as 18_bateson. Not in stations.json, so document_managed is false and a stations load leaves it alone (0022). Retire with update meganet.station set deleted_at = now() where id = 'bateson_test'.",
       "sensors": [
         {
           "alert_id": null,
