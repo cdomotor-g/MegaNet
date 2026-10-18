@@ -19902,6 +19902,12 @@ select.kl-in { width: auto; font-family: inherit; }
   --primary: var(--accent);
   --primary-text: #ffffff;
 }
+:root[data-look="calm"] {
+  /* The one colour Calm draws every link in (mapLinkColourFromStorage, core.js):
+     a slate that reads over the light ground and the dark, under the pins'
+     own colours rather than against them. */
+  --map-line: #5b7c9d;
+}
 :root[data-look="calm"][data-theme="dark"] {
   /* The dark theme's accent is a light blue for text on a dark panel; white
      on it is not readable, so a button wears the deeper blue the active nav

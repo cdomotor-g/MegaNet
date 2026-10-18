@@ -921,6 +921,11 @@ const HELP = {
       + 'The mix and the order are remembered. Below that the panel holds more than fits its first screenful — '
       + 'LiDAR contours, wind regions, line-of-sight checks, survey marks, ACMA licensing — '
       + 'and the legend\'s last line names whichever of them are currently off.',
+      'In the Calm look the map starts quiet: the pale <strong>Light</strong> base map (<strong>Dark</strong> '
+      + 'in the dark theme), every link in one colour, and waterways, survey marks, wind regions, road '
+      + 'parcels, property boundaries, the backbone paths, the arrowheads, the forecast outlines and the '
+      + 'digital twin up close all off. The top of 🗺️ Map display names whichever are still off, with '
+      + '<em>Turn them all on</em>; tick any one to have it back, and it stays the way you leave it.',
     ],
     figure: {
       title: 'Draw & measure',
@@ -3187,6 +3192,32 @@ function lookStored() {
   return LOOK_CHOICES.includes(v) ? v : 'calm';
 }
 
+// The Stations map's context layers the Calm look starts without: each one
+// still a tick away in 🗺️ Map display, and each still remembered once ticked
+// — a stored 'on' or 'off' means what it always meant, in either look. Only a
+// browser that has never said starts from the look's answer: Classic's, every
+// one of them on; Calm's, every one of them off, so the map opens as the
+// network on a plain ground — the pins and the radio paths between them. A
+// state key and the storage key its switch writes.
+const CALM_MAP_OFF = [
+  ['mapPinSls',   'mn-pin-sls',             'the forecast and information outlines'],
+  ['mapRivers',   'mn-rivers',              'waterways'],
+  ['mapWind',     'mn-wind',                'wind regions'],
+  ['mapSurvey',   'mn-survey',              'survey marks'],
+  ['mapRoads',    'mn-roads',               'road parcels'],
+  ['mapLots',     'mn-property-boundaries', 'property boundaries'],
+  ['mapTwinAuto', 'mn-map-twin',            'the digital twin up close'],
+  ['mapArrows',   'mn-map-arrows',          'arrowheads on the links'],
+  ['mapShowBackbone', 'mn-map-backbone',    'the backbone paths'],
+];
+
+// One of those switches: what it says if it has been set, else the look's.
+function mapLayerStored(key) {
+  let v = null;
+  try { v = localStorage.getItem(key); } catch (_) {}
+  return v == null ? lookStored() !== 'calm' : v !== 'off';
+}
+
 // Where the Stations map was last looking, as noteStationsView() (app.js) kept
 // it when the tab was left: { lat, lng, zoom }, or null. 🔭 Look Around's
 // "From the map's centre" stands there from its own tab (station-ar.js),
@@ -3300,7 +3331,9 @@ const state = {
   // whose pass-range windows share an ALERT address, and between a repeater and
   // a base station within that same distance. Session-only like the rest of the
   // map display block — see map-backbone.js.
-  mapShowBackbone: true,
+  // Remembered since the Calm look started without them (CALM_MAP_OFF): a
+  // switch a look leaves off has to stay on once somebody turns it back on.
+  mapShowBackbone: mapLayerStored('mn-map-backbone'),
   mapHideOthers:  false,   // filter box: highlight matches (default) vs hide the rest
   mapKillSpaghetti: true,  // drop pass-range links longer than mapMaxLinkKm
   // km. 120 until #164, then 70, and 100 since — by request each time, and the
@@ -3325,7 +3358,7 @@ const state = {
   // Light up watercourses whose name matches the filter box (see MapRivers).
   // The one map display switch that is remembered between visits: it is the only
   // one that costs a network request, so an operator who turns it off means it.
-  mapRivers:      localStorage.getItem('mn-rivers') !== 'off',
+  mapRivers:      mapLayerStored('mn-rivers'),
   // Survey marks & CORS sites (see MapSurvey, #120). On by default now, and
   // remembered like mapRivers: a crew standing at a site wants the benchmarks
   // beside the station without going looking for a checkbox first, and an
@@ -3336,7 +3369,7 @@ const state = {
   // station in the network — an extent far wider than that — so the layer's
   // opening state is "zoom in to look them up" and no request is made until
   // somebody actually zooms to a site.
-  mapSurvey:      localStorage.getItem('mn-survey') !== 'off',
+  mapSurvey:      mapLayerStored('mn-survey'),
   // Ground height as colour, over whichever base map is picked (see
   // MapElevation, #186). It was a base map until then and is an overlay now,
   // because the ground and the place names are not alternatives — the opacity
@@ -3363,7 +3396,7 @@ const state = {
   // The Digital Twin taking the map over at close zoom (map-twin.js). On by
   // default and remembered, for mapRivers' reason: it is how an operator
   // reads the map, and a switch they turned off should stay off.
-  mapTwinAuto:        localStorage.getItem('mn-map-twin') !== 'off',
+  mapTwinAuto:        mapLayerStored('mn-map-twin'),
   mapElvisCov:        false,
   mapElvisCovOpacity: Math.max(0.1, Math.min(1,
                         Number(localStorage.getItem('mn-elvis-cov-op')) || 0.6)),
@@ -3383,7 +3416,7 @@ const state = {
   // having the layer off never avoided the 650 KB fetch — it only meant the
   // map stayed silent about which regions the network crosses until somebody
   // went looking for a checkbox. An operator who turns it off means it.
-  mapWind:        localStorage.getItem('mn-wind') !== 'off',
+  mapWind:        mapLayerStored('mn-wind'),
   // Road parcels from the Queensland cadastre (see MapRoads, #176). On by
   // default and remembered, on MapSurvey's terms — and for MapSurvey's exact
   // reason, which is that MIN_ZOOM does the work the default-off was doing.
@@ -3391,7 +3424,7 @@ const state = {
   // the whole network, and no request is made until somebody zooms to a site —
   // which is the moment "whose road reserve is this?" is worth answering, and
   // the moment a checkbox stands between the operator and the answer.
-  mapRoads:       localStorage.getItem('mn-roads') !== 'off',
+  mapRoads:       mapLayerStored('mn-roads'),
   // Property / lot boundaries from the same Queensland cadastre (see MapLots).
   // On by default and remembered, on MapRoads' terms and for MapRoads' reason:
   // the scale gate does the work the default-off was doing. The lines draw
@@ -3404,7 +3437,7 @@ const state = {
   // written while the layer was off by default, when unticking it only meant
   // "back to the default"; read under this default, it would keep the lines
   // hidden from exactly the people who had tried them once.
-  mapLots:        localStorage.getItem('mn-property-boundaries') !== 'off',
+  mapLots:        mapLayerStored('mn-property-boundaries'),
   // Who manages each road and bridge (see MapRoadOwners). Off by default and
   // remembered, on the catchments' terms rather than the road parcels': it
   // recolours every road on the map, which is a way of reading the map
@@ -3462,7 +3495,7 @@ const state = {
   // painted off lines that are on the map already — so the rule that keeps
   // MapContours and MapPeaks off until asked for does not apply. An operator
   // who turns them off means it.
-  mapArrows:      (localStorage.getItem('mn-map-arrows') || 'on') === 'on',
+  mapArrows:      mapLayerStored('mn-map-arrows'),
   // Colour pins by health (#218, health-glance.js): every station pin OK,
   // watch, fault or no data in place of its role's colour. Off by default,
   // because the role colours are how the map has always been read and the
@@ -3478,16 +3511,14 @@ const state = {
   // (fetched once, after the pins are drawn), and an operator who turns one
   // off means it.
   //
-  // Except the outlines under the Calm look, which start off there: a purple
-  // or pink ring on a third of the south-east's pins is most of what made the
-  // map read as busy, and it answers a question — which of these does the
-  // Bureau forecast? — that most visits to the map are not asking. One tick
-  // in 🗺️ Map display brings them back, and is remembered like any other.
-  // Looks.set() moves the default with the look for a browser with no choice
-  // of its own stored.
+  // Except the outlines under the Calm look, which start off there with the
+  // rest of CALM_MAP_OFF (above): a purple or pink ring on a third of the
+  // south-east's pins is most of what made the map read as busy, and it
+  // answers a question — which of these does the Bureau forecast? — that most
+  // visits to the map are not asking.
   mapPinShapes:   (localStorage.getItem('mn-pin-shapes') || 'on') === 'on',
   mapPinManual:   (localStorage.getItem('mn-pin-manual') || 'on') === 'on',
-  mapPinSls:      (localStorage.getItem('mn-pin-sls') || (lookStored() === 'calm' ? 'off' : 'on')) === 'on',
+  mapPinSls:      mapLayerStored('mn-pin-sls'),
   // Whose stations the map draws (map-symbols.js): '' for everyone's, else one
   // owner party (or FILTER_NONE, none on record), drawn alone ('only') or left
   // off ('except'). Session-only, for mapHideOthers' reason: it takes stations
@@ -4391,7 +4422,11 @@ function mapLinkColourFromStorage() {
     fade  = localStorage.getItem('mn-map-fade');
   } catch (_) { /* private mode, or storage disabled — take the default */ }
   if (saved === 'freq' || saved === 'fade' || saved === 'plain') return saved;
-  return fade === 'on' ? 'fade' : 'freq';
+  // Under the Calm look a map with no choice of its own draws every link in
+  // one colour (styles.css gives Calm a quiet one): seven channel hues across
+  // the south-east read as noise to anybody not asking which channel a hop is
+  // on. The radio group in 🗺️ Map display puts any other back, remembered.
+  return fade === 'on' ? 'fade' : lookStored() === 'calm' ? 'plain' : 'freq';
 }
 
 // The fallback is not decoration. A token misspelt here resolves to the empty

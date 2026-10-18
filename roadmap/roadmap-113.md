@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-18** (revision 161 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-18** (revision 162 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -539,6 +539,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and fourteen `[Human]` issues.
 >
+> **Revision 162 opens and closes nothing** — at the owner's request, **🗺️ a quieter Stations map under Calm**: a new **Light** base map (Esri's Light Gray Canvas; Dark in the dark theme), every link one slate colour, and nine context layers off until ticked — remembered once ticked, *Turn them all on* at the top of Map display. Classic unchanged. See revision 162 below.
+>
 > **Revision 161 opens and closes nothing** — at the owner's request, **🔭 Look Around joins the Calm look's bar along a phone's foot**, beside Nearby: Nearby, Look, Map, Visits, Camera, More. See revision 161 below.
 >
 > **Revision 160 opens and closes nothing** — the three follow-ups revision 159 named, done at the owner's word (*"just tackle them now"*): under Calm a tab's long introduction is two lines deep with *More about this tab*; Station Health leads with its answer in a sentence above bigger numbers and a wider Needs attention; and `npm run camera`'s stale expectation (the proposed Gatton Auto station now stands where the phone does) put right. See revision 160 below.
@@ -802,6 +804,17 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 162 — 2026-10-18: 🗺️ A quieter Stations map under Calm — a Light base, one link colour, the context layers a tick away
+
+The owner: *"Use a lighter base map on the Stations map in Calm. And strip out layers not needed in calm by default. Allow user to add them back."* Nothing opened or closed.
+
+- **A fifth base map, Light** (`map-controls.js`): Esri's World Light Gray Canvas with its own Light Gray Reference names, from the host Satellite and Dark already use (no key). It is **Calm's default ground** — Dark in the dark theme — and an ordinary, unticked row under Classic. The 3-D view drapes it too (`map-3d.js`). Esri's canvases stop at level 16 and answer every tile past it with *"Map data not yet available"* — **Dark had been showing that from level 17** — so both canvases and their names now ask for 16 and stretch past it.
+- **The layers Calm starts without** (`CALM_MAP_OFF`, `core.js`): the forecast/information outlines, waterways, wind regions, survey marks, road parcels, property boundaries, the digital twin up close, the arrowheads and the backbone paths. One list read three ways: `state`'s defaults (`mapLayerStored` — a stored *on* or *off* means what it always meant, in either look; only a browser that has never said starts from the look's answer), `Looks.set()`, and the line at the top of 🗺️ Map display that names whichever are still off with **Turn them all on** (`Looks.layersOn`, which stores each as *on*). The backbone switch is remembered now (`mn-map-backbone`, `setMapBackbone`), in both looks — a switch a look leaves off has to stay on once somebody turns it back on. The radio paths themselves stay: they are the network.
+- **One link colour**: with no colouring chosen, Calm draws every link *Plain* (`mapLinkColourFromStorage`), and Calm's `--map-line` is a slate (`#5b7c9d`) rather than the orange. The Map display radio group puts the frequency or fade-margin colouring back, remembered.
+- The once-a-device map tip says the map starts quiet under Calm, and where its layers are; the one-time *calmer look* note mentions the map. The Stations help, README's *Base maps, blended*, What's new 42, `docs/design-system.md` §8, the version stamp `20261018e`.
+
+**Checks:** `npm run calm` (now 62: the Light ground, plain links, every layer off with nothing stored; the note naming them; *Turn them all on* turning and remembering them, and the note going; a reload keeping each as left; Dark in the dark theme; Classic as before), `mapctl`, `mapfade`, `maplinks`, `pins`, `smoke`, `map3d`, `rivers`, `survey`, `roads`, `sites`, `dock`, `shell`, and the cheap five.
 
 ### Revision 161 — 2026-10-18: 🔭 Look Around on a phone's bottom bar
 

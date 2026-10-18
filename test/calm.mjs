@@ -27,7 +27,11 @@
 //      More about this tab, remembered once opened, a short one left alone;
 //      Station Health's answer in a sentence above its numbers, See them going
 //      down to the list; Classic showing neither.
-//   8. **Every tab, in Calm.** Opened one by one with a clean console, and every
+//   8. **A quiet map.** The Stations map on the Light canvas (Dark in the dark
+//      theme), every link one colour, the context layers off with nothing
+//      stored; Map display naming them with Turn them all on, which turns and
+//      remembers them; a reload keeping each as left; Classic as before.
+//   9. **Every tab, in Calm.** Opened one by one with a clean console, and every
 //      on*= handler on the page — the bar's, the row's, ⋯'s — resolving.
 //
 // Run:  npm run calm
@@ -410,8 +414,54 @@ async function main() {
     check('Classic: the whole introduction and the numbers alone, as before', !classic.verdict && !classic.fold && !classic.more, J(classic));
     await context.close();
 
-    // ── 8. Every tab ───────────────────────────────────────────────────────
-    log('\n8. Every tab, in Calm\n');
+    // ── 8. The Stations map, quiet ─────────────────────────────────────────
+    log('\n8. The Stations map under Calm: a light ground, the network, and the rest a tick away\n');
+    ({ context, page } = await open(browser, server, { viewport: { width: 1440, height: 900 },
+      storage: { 'mn-tab': 'sitemap', 'mn-look-intro': 'seen', 'mn-hint-display': '1' }, errors }));
+    await page.evaluate(() => switchTab('stations'));
+    await page.waitForFunction(() => !!(state.map && state.map.mnBases), null, { timeout: 15_000 });
+    const quiet = () => page.evaluate(() => ({
+      base: state.map.mnBaseName,
+      links: state.mapLinkColour, showLinks: state.mapShowLinks,
+      on: CALM_MAP_OFF.filter(([k]) => state[k]).map(([k]) => k),
+      stored: CALM_MAP_OFF.map(([, key]) => localStorage.getItem(key)).filter(v => v != null),
+      baseStored: localStorage.getItem('mn-base-maps'),
+    }));
+    let Q = await quiet();
+    check('the ground is the Light canvas, the links one colour, and the radio paths still drawn',
+      Q.base === 'Light' && Q.links === 'plain' && Q.showLinks, J(Q));
+    check(`every one of the context layers starts off (${await page.evaluate(() => CALM_MAP_OFF.length)}) — and nothing is stored for any of them`,
+      Q.on.length === 0 && Q.stored.length === 0 && Q.baseStored === null, J(Q));
+    await page.evaluate(() => setDockTab('map-display'));
+    await page.waitForSelector('#map-display-calm', { timeout: 10_000 });
+    const note = await page.evaluate(() => document.getElementById('map-display-calm').textContent.replace(/\s+/g, ' '));
+    check('🗺️ Map display says which are off, by name, with Turn them all on',
+      /waterways/.test(note) && /survey marks/.test(note) && /wind regions/.test(note) && /backbone/.test(note) && /Turn them all on/.test(note), note);
+    await page.click('#map-display-calm .link-btn');
+    await page.waitForFunction(() => !!(state.map && state.map.mnBases), null, { timeout: 15_000 });
+    Q = await quiet();
+    check('Turn them all on: every one on, and remembered as on', Q.on.length === await page.evaluate(() => CALM_MAP_OFF.length)
+      && Q.stored.length === Q.on.length && Q.stored.every(v => v === 'on'), J(Q));
+    await page.evaluate(() => setDockTab('map-display'));
+    await page.waitForTimeout(300);
+    check('…and the note goes', await page.evaluate(() => !document.getElementById('map-display-calm')));
+    await page.evaluate(() => { localStorage.setItem('mn-wind', 'off'); });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
+    Q = await page.evaluate(() => ({ wind: state.mapWind, survey: state.mapSurvey, backbone: state.mapShowBackbone }));
+    check('a reload keeps each as it was left — one ticked off again stays off, the rest on', !Q.wind && Q.survey && Q.backbone, J(Q));
+    await page.evaluate(() => { for (const [, key] of CALM_MAP_OFF) localStorage.removeItem(key); setTheme('dark'); switchTab('stations'); });
+    await page.waitForFunction(() => !!(state.map && state.map.mnBases), null, { timeout: 15_000 });
+    check('in the dark theme the ground is the Dark canvas instead', await page.evaluate(() => state.map.mnBaseName) === 'Dark');
+    await page.evaluate(() => { setTheme('light'); Looks.set('classic'); });
+    await page.waitForFunction(() => !!(state.map && state.map.mnBases), null, { timeout: 15_000 });
+    Q = await quiet();
+    check('Classic: OSM-Topo, links coloured by channel, and every layer on, as before',
+      Q.base === 'OSM-Topo' && Q.links === 'freq' && Q.on.length === await page.evaluate(() => CALM_MAP_OFF.length), J(Q));
+    await context.close();
+
+    // ── 9. Every tab ───────────────────────────────────────────────────────
+    log('\n9. Every tab, in Calm\n');
     ({ context, page } = await open(browser, server, { viewport: { width: 1440, height: 900 }, errors }));
     await page.evaluate(() => { Auth.isSignedIn = () => true; Auth.isAdmin = () => true; Auth.role = () => 'admin'; renderTabs(); });
     const ids = await page.evaluate(() => TAB_LIST.map(t => t.id));
@@ -438,7 +488,7 @@ async function main() {
   const failed = results.filter(r => !r.ok);
   log(failed.length
     ? `\nFAIL — ${failed.length} of ${results.length}:\n${failed.map(f => `  ✗ ${f.label}`).join('\n')}`
-    : `\nPASS — the Calm look: the default, its bar and row, ⋯, the way back, a phone's foot, Nearby, the stepped sheet, folded introductions and Station Health's answer first (${results.length} checks).`);
+    : `\nPASS — the Calm look: the default, its bar and row, ⋯, the way back, a phone's foot, Nearby, the stepped sheet, folded introductions and Station Health's answer first and a quiet map (${results.length} checks).`);
   process.exit(failed.length ? 1 : 0);
 }
 

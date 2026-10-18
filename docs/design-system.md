@@ -1374,7 +1374,7 @@ same app out, not a cull — every tab, action and address is the same in both.
 
 | Look | Where it lives | What it is |
 |---|---|---|
-| **Calm** (default) | `looks.js`, `calm-shell.js`, the `:root[data-look="calm"]` block at the end of `styles.css` | The groups down the side, the open group's tabs across the top (`#section-bar`), search, sign in and ⋯ in a white banner, line drawings for the groups, one accent (`--primary` is the accent blue). On a phone, a bar along the foot — Nearby, Look Around ("Look"), Map, Visits, Camera, More — and the inspection sheet a section at a time. The Bureau's forecast and information outlines start off on the map. |
+| **Calm** (default) | `looks.js`, `calm-shell.js`, the `:root[data-look="calm"]` block at the end of `styles.css` | The groups down the side, the open group's tabs across the top (`#section-bar`), search, sign in and ⋯ in a white banner, line drawings for the groups, one accent (`--primary` is the accent blue). On a phone, a bar along the foot — Nearby, Look Around ("Look"), Map, Visits, Camera, More — and the inspection sheet a section at a time. The Stations map starts quiet: the Light base map (Dark in the dark theme), every link one slate colour, and the context layers in `CALM_MAP_OFF` (core.js) off until ticked — remembered once ticked, and *Turn them all on* at the top of Map display. |
 | **Classic** | everything else in `app.js` and `styles.css` | The app as it was: every tab in the bar under its group's heading, every button in the banner, ☰ on a phone. |
 
 **The choice** is `state.look`, built in `core.js` (`lookStored()`) from

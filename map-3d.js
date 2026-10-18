@@ -256,7 +256,7 @@ const Map3D = (function () {
   let lfZoom   = null;   // the 2-D map's zoom as this file last left it
 
   // ── base maps ────────────────────────────────────────────────────────────
-  // The four the 2-D map already offers, as MapLibre raster sources. They are
+  // The five the 2-D map already offers, as MapLibre raster sources. They are
   // the same hosts and the same attributions makeBaseLayers() uses
   // (map-controls.js) because they are the same tiles: the 3-D view is meant to
   // read as *this map, in relief*, and a base map that changed when you tilted
@@ -286,9 +286,15 @@ const Map3D = (function () {
       maxzoom: 19,
       attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
     },
+    // The canvases stop at level 16 (map-controls.js, makeBaseLayers).
     'Dark': {
       tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'],
-      maxzoom: 19,
+      maxzoom: 16,
+      attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS User Community',
+    },
+    'Light': {
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}'],
+      maxzoom: 16,
       attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS User Community',
     },
   };

@@ -5,7 +5,8 @@
 //           a person can make and take back: 🪷 Calm, the default since
 //           October 2026, or 🗂️ Classic, the way it looked before.
 //
-// After core.js (state, LOOK_CHOICES, lookStored, announce, esc, escAttr),
+// After core.js (state, LOOK_CHOICES, lookStored, CALM_MAP_OFF, mapLayerStored,
+// announce, esc, escAttr),
 // before init.js. Reaches across to app.js for renderTabs, renderHelp,
 // renderMain, updateChromeHeight, invalidateMapSizes and refreshMapLayers,
 // and to route.js for Route.newDevice — all at call time, so this file's
@@ -39,7 +40,8 @@
 // withdrawn without a migration: a browser holding an id nobody knows is
 // handed the default, as lookStored() does for any other junk.
 //
-// Exposes: start, set, current, is, label, pickerHtml, introHtml, dismissIntro, LOOKS.
+// Exposes: start, set, current, is, label, pickerHtml, introHtml, dismissIntro,
+//          layersOff, layersNoteHtml, layersOn, LOOKS.
 
 const Looks = (() => {
   const KEY = 'mn-look';
@@ -110,11 +112,13 @@ const Looks = (() => {
     state.look = id;
     try { localStorage.setItem(KEY, id); localStorage.setItem(INTRO_KEY, 'seen'); } catch (_) {}
     apply();
-    // The forecast outlines follow the look for a browser that has not said
-    // what it wants of them (core.js, mapPinSls).
-    let sls = null;
-    try { sls = localStorage.getItem('mn-pin-sls'); } catch (_) {}
-    if (sls == null) state.mapPinSls = id !== 'calm';
+    // The Stations map's context layers follow the look for a browser that
+    // has not said what it wants of them (core.js, CALM_MAP_OFF) — and so do
+    // its links' colouring (mapLinkColourFromStorage) and its base map
+    // (addBaseLayers), all taken up by the map being built again below.
+    for (const [key, store] of CALM_MAP_OFF) state[key] = mapLayerStored(store);
+    state.mapLinkColour = mapLinkColourFromStorage();
+    state.mapFade = state.mapLinkColour === 'fade';
     // A phone's drawer belongs to the bar being replaced; the new one opens
     // shut.
     if (typeof isPhoneNav === 'function' && isPhoneNav()) state.navCollapsed = true;
@@ -126,6 +130,37 @@ const Looks = (() => {
     const picker = document.getElementById('look-pick');
     if (picker) picker.querySelectorAll('input').forEach(r => { r.checked = r.value === id; });
     announce(`Look: ${label(id)}`);
+  }
+
+  // ── The map's layers under Calm ─────────────────────────────────────────
+  // What the Calm look left off the Stations map and is still off, named, for
+  // the line at the top of 🗺️ Map display (mapDisplayControlsHtml, app.js) —
+  // empty under Classic, and once every one of them is on.
+  function layersOff() {
+    if (state.look !== 'calm') return [];
+    return CALM_MAP_OFF.filter(([key]) => !state[key]).map(([, , name]) => name);
+  }
+
+  function layersNoteHtml() {
+    const off = layersOff();
+    if (!off.length) return '';
+    return `
+      <div class="mapd-calm" id="map-display-calm">
+        <p class="filter-note">The Calm look starts the map quiet: ${esc(off.join(', '))} ${off.length === 1 ? 'is' : 'are'}
+          off until ticked below.</p>
+        <button type="button" class="link-btn" onclick="Looks.layersOn()">Turn ${off.length === 1 ? 'it' : 'them all'} on</button>
+      </div>`;
+  }
+
+  // Every one of them on, and remembered as on — the same as ticking each —
+  // and the map built again with them.
+  function layersOn() {
+    for (const [key, store] of CALM_MAP_OFF) {
+      state[key] = true;
+      try { localStorage.setItem(store, 'on'); } catch (_) {}
+    }
+    if (state.activeTab === 'stations') renderMain();
+    announce('The map\'s layers are all on, and will be next time.');
   }
 
   // The radios, for the Theme dialog (openThemeMenu, app.js): a pick applies
@@ -157,8 +192,8 @@ const Looks = (() => {
     if (!introDue()) return '';
     return `
       <div class="look-intro" role="note">
-        <span>Flood-Net has a calmer look: the same tabs, filed under their groups, and fewer buttons in the
-          banner. Prefer the old one?</span>
+        <span>Flood-Net has a calmer look: the same tabs, filed under their groups, fewer buttons in the
+          banner, and a quieter map — 🗺️ Map display turns its layers back on. Prefer the old look?</span>
         <button type="button" class="link-btn" onclick="Looks.set('classic')">Switch back to Classic</button>
         <button type="button" class="look-intro-x" onclick="Looks.dismissIntro()"
                 aria-label="Keep the calm look and hide this note" title="Keep this look">×</button>
@@ -175,6 +210,6 @@ const Looks = (() => {
     if (next) next.focus();
   }
 
-  return { start, set, current, is, label, pickerHtml, introHtml, dismissIntro, LOOKS };
+  return { start, set, current, is, label, pickerHtml, introHtml, dismissIntro, layersOff, layersNoteHtml, layersOn, LOOKS };
 })();
 if (typeof window !== 'undefined') window.Looks = Looks;

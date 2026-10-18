@@ -177,7 +177,21 @@ function makeBaseLayers() {
     // compositing needs — so this adds a base map without adding a host.
     'Dark': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
       attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS User Community',
-      className: 'mn-base-dark', maxZoom: 19,
+      // Esri's canvases stop at level 16 and answer every tile past it with
+      // "Map data not yet available" across the middle, so 16 is asked for
+      // and stretched past it, as Satellite's 18 is.
+      className: 'mn-base-dark', maxZoom: 19, maxNativeZoom: 16,
+    }),
+    // ── Light ───────────────────────────────────────────────────────────────
+    // Dark's daytime twin, and the Calm look's ground (looks.js): Esri's Light
+    // Gray Canvas — no terrain, no landuse, roads and water in pale greys —
+    // so that on a white page the network is the only thing on the map with
+    // colour in it. Its names ride along like Dark's (Light_Gray_Reference,
+    // addBaseLayers). Same host as Satellite and Dark, no key, the same
+    // `access-control-allow-origin: *`.
+    'Light': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS User Community',
+      maxZoom: 19, maxNativeZoom: 16,
     }),
     // Elevation was a fifth entry here until #186 and is an overlay now, on the
     // Stations map's Map display panel with an opacity slider — see the note at
@@ -211,7 +225,7 @@ function makeStateImagery(opts = {}) {
 // Satellite at 40 % over OSM-Topo is contour lines on real ground cover, which
 // no single base shows. The stack is the list: the first entry is drawn lowest
 // and each one after it paints over it (tile-layer zIndex). Nothing has to be
-// on; all four off is a blank sheet under the network, which is a legitimate
+// on; all five off is a blank sheet under the network, which is a legitimate
 // thing to look at.
 //
 // Where the controls are drawn is the caller's business. The Stations map
@@ -233,9 +247,9 @@ function addBaseLayers(map, opts = {}) {
   const STORE   = 'mn-base-maps';
 
   // ── Names over the bases that have none ────────────────────────────────────
-  // Two of the four bases arrive without place names on them and are near-
+  // Three of the five bases arrive without place names on them and are near-
   // useless for orienting around a station that way: Satellite is bare imagery,
-  // and the Dark canvas is deliberately stripped. Esri publishes a matching
+  // and the Dark and Light canvases are deliberately stripped. Esri publishes a matching
   // reference service for each, from the same host as the base itself, and
   // these ride along whenever their base is the chosen one — and only then.
   //
@@ -249,7 +263,8 @@ function addBaseLayers(map, opts = {}) {
   // on the Stations map by the Waterways overlay (map-rivers.js), which labels
   // every named river in view and draws above these tiles.
   //
-  // Dark takes the one built for it, Dark_Gray_Reference: pale names and
+  // Dark takes the one built for it, Dark_Gray_Reference, and Light its own,
+  // Light_Gray_Reference: Dark's are pale names and
   // hairline boundaries drawn for exactly this base. It is a separate layer
   // rather than the labelled variant of the base because the base is passed
   // through a darkening filter (makeBaseLayers) and the labels must not be —
@@ -263,10 +278,12 @@ function addBaseLayers(map, opts = {}) {
   if (!map.getPane('mnBaseLabels')) {
     map.createPane('mnBaseLabels').style.zIndex = 250;
   }
+  // The canvases' names stop where the canvases do (level 16 — makeBaseLayers)
+  // and are stretched past it with them; Satellite's go on natively.
   const refLayer = svc => L.tileLayer(
     `https://server.arcgisonline.com/ArcGIS/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`,
-    { pane: 'mnBaseLabels', maxZoom: 19 }   // attribution rides on the base layer
-  );
+    { pane: 'mnBaseLabels', maxZoom: 19, ...(svc.startsWith('Canvas/') ? { maxNativeZoom: 16 } : {}) }
+  );   // attribution rides on the base layer
   // Satellite also takes the State imagery (makeStateImagery), in the base's
   // own pane and added after it, so it paints over Esri and under the names.
   const companions = {
@@ -274,13 +291,18 @@ function addBaseLayers(map, opts = {}) {
                   ...['Reference/World_Boundaries_and_Places',
                       'Reference/World_Transportation'].map(refLayer)],
     'Dark':      ['Canvas/World_Dark_Gray_Reference'].map(refLayer),
+    'Light':     ['Canvas/World_Light_Gray_Reference'].map(refLayer),
   };
   // ── What is on, and how strongly ───────────────────────────────────────────
   // { name: { on, op } }, op 0–1. The default is the one the radios had: the
-  // first base on at full strength and the rest off. Every read is guarded —
-  // private browsing, a full quota or a hand-edited value must still give a map.
+  // first base on at full strength and the rest off — except under the Calm
+  // look (looks.js), whose default is Light, or Dark in the dark theme: a pale
+  // sheet glaring out of a dark page is the opposite of calm. Every read is
+  // guarded — private browsing, a full quota or a hand-edited value must still
+  // give a map.
   const pick = {};
-  for (const n of names) pick[n] = { on: n === names[0], op: 1 };
+  const first = state.look !== 'calm' ? names[0] : state.theme === 'dark' ? 'Dark' : 'Light';
+  for (const n of names) pick[n] = { on: n === first, op: 1 };
   // …and in what order, bottom first. Reorderable (drag the ⠿ grip, or arrow
   // keys on it), saved beside the mix as `_order`. A saved order is taken for
   // the names it knows and anything it does not mention keeps its default

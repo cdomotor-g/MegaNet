@@ -4749,6 +4749,14 @@ const MAX_LINK_KM_CAP = 600;
 // signal links" was below the fold, and a column of unlabelled checkboxes
 // gives nobody a reason to scroll it. Inert markup — the ids, the checkboxes
 // and the panel's pointer contract (test/mapctl.mjs) are untouched.
+// Backbone paths on or off, and remembered either way (core.js, CALM_MAP_OFF).
+function setMapBackbone(on) {
+  state.mapShowBackbone = !!on;
+  try { localStorage.setItem('mn-map-backbone', on ? 'on' : 'off'); } catch (_) {}
+  rerenderMapLegend();
+  refreshMapLayers();
+}
+
 function mapDisplayControlsHtml() {
   const on = state.mapKillSpaghetti;
   return `
@@ -4773,6 +4781,7 @@ function mapDisplayControlsHtml() {
              oninput="setMapDisplayFind(this.value)">
     </div>
     <p class="filter-note" id="map-display-find-none" hidden></p>
+    ${typeof Looks !== 'undefined' ? Looks.layersNoteHtml() : ''}
     ${state.map && state.map.mnBases ? state.map.mnBases.html() : ''}
     <!-- What a pin's shape, fill and outline say (map-symbols.js): a triangle
          for a river height gauge, grey for one read by hand, the Bureau's
@@ -4834,7 +4843,7 @@ function mapDisplayControlsHtml() {
     </label>
     <label class="filter-check">
       <input type="checkbox" ${state.mapShowBackbone ? 'checked' : ''}
-             onchange="state.mapShowBackbone=this.checked;rerenderMapLegend();refreshMapLayers()">
+             onchange="setMapBackbone(this.checked)">
       Backbone links/paths (repeater &amp; base)
     </label>
     <label class="filter-check"
@@ -5567,10 +5576,15 @@ function maybeShowMapLayersHint() {
   // The 🗺️ is in the side panel's strip at every width — the strip on the
   // window's edge, and on a phone the rail that ⋮ at the top right brings out,
   // where a sentence over the map costs more of it than a laptop's.
+  // Under Calm the map has started without most of its layers, so the tip
+  // says that, and where they are.
   mapNote(isPhoneNav()
     ? 'Tip: ⋮ at the top right opens the station list, the filters and the map’s tools.'
-    : 'Tip: 🗺️ in the side panel’s strip, on the right, mixes the base maps and has more '
-      + 'layers — survey marks, LiDAR contours, wind regions, ACMA licences, line of sight.', mapLayersHintUntil - now);
+    : state.look === 'calm'
+      ? 'Tip: the map starts quiet. 🗺️ in the side panel’s strip, on the right, turns layers on — '
+        + 'waterways, survey marks, wind regions, property boundaries, contours, ACMA licences — and mixes the base maps.'
+      : 'Tip: 🗺️ in the side panel’s strip, on the right, mixes the base maps and has more '
+        + 'layers — survey marks, LiDAR contours, wind regions, ACMA licences, line of sight.', mapLayersHintUntil - now);
 }
 
 // A filter change on the Stations tab drives both halves of the page: the map

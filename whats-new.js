@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 42, date: '2026-10-18', items: [
+      '<strong>🗺️ A quieter Stations map in the Calm look.</strong> It opens on a pale grey base map (dark grey in the '
+        + 'dark theme), with every radio link in one colour, and without the waterways, survey marks, wind regions, road '
+        + 'parcels, property boundaries, backbone paths and arrowheads. Want them? The top of <em>🗺️ Map display</em> '
+        + 'lists what is off, with <em>Turn them all on</em> — or tick just the ones you use. Either way it is remembered.',
+    ] },
     { n: 41, date: '2026-10-18', items: [
       '<strong>🔭 Look Around on a phone\'s bottom bar.</strong> In the Calm look the bar along the bottom of a phone now has '
         + '<em>Look</em>, beside Nearby — one tap to hold the phone up and see which station is which way.',
