@@ -485,8 +485,8 @@ const HealthGlance = (() => {
 
   // ── The pins ──────────────────────────────────────────────────────────────
 
-  function ensureNet(force) {
-    if (!state.mapHealth) return;
+  function ensureNet(force, anyway) {
+    if (!state.mapHealth && !anyway) return;
     if (net.status === 'loading') return;
     if (!force && net.at && now_() - net.at < NET_TTL) return;
     fetchNet();
@@ -515,9 +515,11 @@ const HealthGlance = (() => {
     afterAnswer(true);
   }
 
-  // An answer landed: the pins, the note and the key follow it, once.
+  // An answer landed: the pins, the note and the key follow it, once — and
+  // whatever else counts the network (onNet, below).
   function afterAnswer(fromNet) {
     paintNote();
+    if (fromNet) watchers.forEach(fn => { try { fn(); } catch (e) { console.warn('[health] a count:', e); } });
     if (!state.mapHealth) return;
     if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
@@ -538,6 +540,22 @@ const HealthGlance = (() => {
   // switch on is when the batch is asked for, or asked again once it is older
   // than NET_TTL.
   function reset() { ensureNet(); }
+
+  // ── The counts ────────────────────────────────────────────────────────────
+  // The same batch, counted, for 🏠 Home and the Instrument look's banner
+  // (home.js): asked for whether or not the pins' switch is on — the counts
+  // are the answer to "how is the network?", which a front page asks every
+  // time — and on the pins' terms otherwise, once per NET_TTL. A watcher is
+  // told each time an answer lands, good or bad.
+  const watchers = new Set();
+  function onNet(fn) { watchers.add(fn); }
+  function askNet() { ensureNet(false, true); }
+  // { status: 'idle' | 'loading' | 'ok' | 'error', okAt, denied, error,
+  //   ok, watch, fault, nodata, total } — the classes as tally() counts them,
+  // which are the ones the pins and Station Health's overview wear.
+  function counts() {
+    return { status: net.status, okAt: net.okAt, denied: net.denied, error: net.error, ...tally() };
+  }
 
   // What refreshMapLayers lays over a pin's own style while the switch is on:
   // { cls, fill, ring, grow, weight, dash }, or null — the switch off, or no
@@ -844,6 +862,8 @@ const HealthGlance = (() => {
     cardHtml, ask, retry, open,
     // the pins
     pinStyle, reset, setPins, askAgain, noteHtml, legendHtml, altText,
+    // the counts, for Home and the Instrument look's banner
+    onNet, askNet, counts,
     // the rules, for test/healthcard.mjs and for #215 to keep honest
     classify, bars, glanceFrom, quietFinding, findingsOf, fromServer,
     classOf: id => classOf(id),

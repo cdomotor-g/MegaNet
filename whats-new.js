@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 43, date: '2026-10-18', items: [
+      '<strong>🔲 🎚️ 🪧 Three new looks, in pictures.</strong> Pick one from <em>⋯ → Theme &amp; look</em>. '
+        + '<strong>Tiles</strong>: a coloured tile with a drawing on it for every tool. <strong>Instrument</strong>: a dark '
+        + 'frame round the network, with how many stations are OK, on watch or at fault across the top and the map '
+        + 'coloured by health. <strong>Signs</strong>: black on yellow and larger, for full sun and gloves — on a phone '
+        + 'the inspection sheet becomes a row of signs, one a section. Calm and Classic are still there, one pick away.',
+      '<strong>🏠 Home</strong>, a new tab under Start here: how the network is right now, the six things used most as '
+        + 'big tiles, and every other tool under them. Tiles and Signs open on it, with 🏠 in the banner to come back.',
+      '<strong>📌 Nearby</strong> now says whether the station you picked is reporting, under its buttons.',
+    ] },
     { n: 42, date: '2026-10-18', items: [
       '<strong>🗺️ A quieter Stations map in the Calm look.</strong> It opens on a pale grey base map (dark grey in the '
         + 'dark theme), with every radio link in one colour, and without the waterways, survey marks, wind regions, road '

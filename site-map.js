@@ -58,6 +58,13 @@ const SiteMap = (function () {
   // what: one sentence. use: the jobs somebody would come to it for. note: the
   // one thing about access worth knowing before you go. Plain text; escaped.
   const GUIDE = {
+    home: {
+      what: 'The front page: how the network is right now, the six things used most as big tiles, and every other tab as a small one.',
+      use: [
+        'See at a glance how many stations are OK, on watch or at fault',
+        'Get to the map, Nearby, Station Health, an inspection, the camera or Look Around in one press',
+      ],
+    },
     offline: {
       what: 'Flood-Net with no signal: what this device has saved, a button that saves the rest, and how to put it on your home screen.',
       use: [
@@ -551,7 +558,7 @@ const SiteMap = (function () {
           <ol class="sm-anat-key">
             <li data-sm-point="nav" data-sm-part="nav">
               <span class="sm-num" aria-hidden="true">1</span>
-              <div>${state.look === 'calm' ? `<strong>The bar on the left</strong> — the groups the tabs
+              <div>${lookUsesCalmShell() ? `<strong>The bar on the left</strong> — the groups the tabs
                 are filed in; the group you are in has its tabs across the top of the page. « at its
                 top shrinks it to icons; on a phone it is <strong>More</strong> in the bar along the
                 bottom. To find a tab by what it does — "decode", "battery", "print" — use
@@ -576,9 +583,10 @@ const SiteMap = (function () {
             </li>
             <li data-sm-point="banner" data-sm-part="header">
               <span class="sm-num" aria-hidden="true">4</span>
-              <div>${state.look === 'calm'
-                ? `<strong>The banner</strong> — 🔎 Search, 🔑 Sign in (only needed to edit), and ⋯ for
-                  the rest: export, theme &amp; look — Calm, this one, or Classic — help and Report a Bug.`
+              <div>${lookUsesCalmShell()
+                ? `<strong>The banner</strong> — ${lookHasSymbols() && state.look !== 'instrument' ? '🏠 Home, ' : ''}🔎 Search,
+                  🔑 Sign in (only needed to edit), and ⋯ for the rest: export, theme &amp; look — this is
+                  ${esc(Looks.label())}, one of five, Classic among them — help and Report a Bug.`
                 : `<strong>The banner</strong> — 🔑 Sign in (only needed to edit), 🐞 Report a Bug,
                 and 🌗 light or dark — and the look, Classic or Calm.`}</div>
             </li>

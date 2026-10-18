@@ -3,7 +3,8 @@
 //   Looks   how Flood-Net is laid out around its tabs — the banner, the bar
 //           down the side, what a phone shows along its foot — as one choice
 //           a person can make and take back: 🪷 Calm, the default since
-//           October 2026, or 🗂️ Classic, the way it looked before.
+//           October 2026; three drawn in pictures — 🔲 Tiles, 🎚️ Instrument
+//           and 🪧 Signs; or 🗂️ Classic, the way it looked before.
 //
 // After core.js (state, LOOK_CHOICES, lookStored, CALM_MAP_OFF, mapLayerStored,
 // announce, esc, escAttr),
@@ -31,14 +32,29 @@
 // `?look=classic`, which is the way back for somebody who cannot find the
 // switch and the way the browser checks pin it (test/lib/browser.mjs).
 //
-// ── Adding a third ───────────────────────────────────────────────────────────
-// A look is an entry in LOOKS below and in LOOK_CHOICES (core.js), and
-// everything it changes is scoped to `:root[data-look="<id>"]` in styles.css
-// and to `state.look === '<id>'` in the code that draws the shell —
-// renderTabs() hands the bar to a look's own renderer the way it hands it to
-// CalmShell now. Nothing about a look is stored but its id, so a look can be
-// withdrawn without a migration: a browser holding an id nobody knows is
-// handed the default, as lookStored() does for any other junk.
+// ── The three in pictures ────────────────────────────────────────────────────
+// Asked for after Calm, by the same people: an app read at a glance rather
+// than read. Each is Calm's shell with the line drawings swapped for
+// pictograms (glyphs.js) — a tab, a group and a station's state each a
+// picture — and 🏠 Home (home.js) as the front page they open on:
+//   🔲 Tiles       light, a coloured tile per tool, every tool on Home.
+//   🎚️ Instrument  a dark frame round the map: the groups a rail of pictures,
+//                  the network's OK / watch / fault counts across the banner
+//                  and the pins coloured by health on a dark ground.
+//   🪧 Signs       black on yellow and large, for full sun and a gloved
+//                  thumb: Home six signs, the inspection sheet a row of them.
+// They share everything Calm does (lookUsesCalmShell, core.js) and each other's
+// pictures (lookHasSymbols); what is a look's own is in styles.css under
+// `:root[data-look="<id>"]`, and the map's base and health pins it starts with
+// (addBaseLayers, mapHealthStored).
+//
+// ── Adding another ───────────────────────────────────────────────────────────
+// A look is an entry in LOOKS below and in LOOK_CHOICES (core.js). Everything
+// Calm's shell draws is scoped to `:root[data-shell="calm"]` in styles.css,
+// which every look but Classic wears; what one look changes is scoped to
+// `:root[data-look="<id>"]`. Nothing about a look is stored but its id, so a
+// look can be withdrawn without a migration: a browser holding an id nobody
+// knows is handed the default, as lookStored() does for any other junk.
 //
 // Exposes: start, set, current, is, label, pickerHtml, introHtml, dismissIntro,
 //          layersOff, layersNoteHtml, layersOn, LOOKS.
@@ -49,17 +65,47 @@ const Looks = (() => {
   // look: what changed and the way back. Seen is remembered; so is choosing.
   const INTRO_KEY = 'mn-look-intro';
 
-  // The order is the order the Theme dialog lists them in.
+  // The Theme dialog lists them in LOOK_CHOICES' order. `brief` and `find`
+  // are Ctrl+K's (palette.js): what the switch is said to do, and the words
+  // that find it.
   const LOOKS = {
     calm: {
-      label: 'Calm',
+      label: 'Calm', icon: '🪷',
       hint: 'Fewer buttons and quieter colours. The groups down the side and one group\'s tabs across the '
           + 'top; ⋯ in the banner for the rest. On a phone, a bar along the bottom for a site visit.',
+      brief: 'the groups down the side, fewer buttons',
+      find: 'calm new quieter',
+    },
+    tiles: {
+      label: 'Tiles', icon: '🔲',
+      hint: 'Calm, in pictures: a coloured tile with a drawing on it for every tool, and 🏠 Home to start '
+          + 'from — the things used most as big tiles, how the network is right now across the top, and '
+          + 'every other tool under them.',
+      brief: 'a coloured tile for every tool, and 🏠 Home',
+      find: 'tiles icons symbols pictures pictograms launcher colourful colorful',
+    },
+    instrument: {
+      label: 'Instrument', icon: '🎚️',
+      hint: 'A dark frame round the network: the groups as a rail of pictures, how many stations are OK, on '
+          + 'watch or at fault across the banner, and the Stations map on a dark ground with every pin '
+          + 'coloured by its health.',
+      brief: 'a dark frame, the network\'s state across the banner',
+      find: 'instrument cockpit control room dark panel symbols pictures status at a glance',
+    },
+    signs: {
+      label: 'Signs', icon: '🪧',
+      hint: 'Black on yellow, thick edges and large type — every button a sign, to read in full sun and '
+          + 'press with a glove. 🏠 Home is six big signs; on a phone the inspection sheet is a row of '
+          + 'them, a section at a time.',
+      brief: 'black on yellow and large, for full sun',
+      find: 'signs high contrast large big buttons glove yellow symbols pictures',
     },
     classic: {
-      label: 'Classic',
+      label: 'Classic', icon: '🗂️',
       hint: 'Every tab listed down the side and every button in the banner, as Flood-Net looked until '
           + 'October 2026.',
+      brief: 'every tab in the bar, every button in the banner',
+      find: 'classic old back previous',
     },
   };
 
@@ -67,8 +113,12 @@ const Looks = (() => {
   const is = id => state.look === id;
   const label = (id = state.look) => (LOOKS[id] ? LOOKS[id].label : id);
 
+  // `data-look` is the look; `data-shell` is whose bar it is drawn with — the
+  // stylesheet's Calm rules are written once, for every look that uses it.
   function apply() {
-    document.documentElement.setAttribute('data-look', state.look);
+    const root = document.documentElement;
+    root.setAttribute('data-look', state.look);
+    root.setAttribute('data-shell', lookUsesCalmShell() ? 'calm' : 'classic');
   }
 
   // Called once from init.js, after Route.start() (which has to see the
@@ -114,14 +164,18 @@ const Looks = (() => {
     apply();
     // The Stations map's context layers follow the look for a browser that
     // has not said what it wants of them (core.js, CALM_MAP_OFF) — and so do
-    // its links' colouring (mapLinkColourFromStorage) and its base map
-    // (addBaseLayers), all taken up by the map being built again below.
+    // its links' colouring (mapLinkColourFromStorage), its pins' health
+    // colours (mapHealthStored) and its base map (addBaseLayers), all taken
+    // up by the map being built again below.
     for (const [key, store] of CALM_MAP_OFF) state[key] = mapLayerStored(store);
     state.mapLinkColour = mapLinkColourFromStorage();
     state.mapFade = state.mapLinkColour === 'fade';
+    state.mapHealth = mapHealthStored();
     // A phone's drawer belongs to the bar being replaced; the new one opens
-    // shut.
+    // shut. Instrument's bar is a rail of pictures, and starts as one — »
+    // at its top still opens it, and that is remembered as it always was.
     if (typeof isPhoneNav === 'function' && isPhoneNav()) state.navCollapsed = true;
+    else if (id === 'instrument') state.navCollapsed = true;
     renderTabs();
     renderHelp({ instant: true, remeasure: false });
     renderMain();
@@ -133,11 +187,12 @@ const Looks = (() => {
   }
 
   // ── The map's layers under Calm ─────────────────────────────────────────
-  // What the Calm look left off the Stations map and is still off, named, for
-  // the line at the top of 🗺️ Map display (mapDisplayControlsHtml, app.js) —
-  // empty under Classic, and once every one of them is on.
+  // What the Calm look (or one of the three it shares its map with) left off
+  // the Stations map and is still off, named, for the line at the top of
+  // 🗺️ Map display (mapDisplayControlsHtml, app.js) — empty under Classic,
+  // and once every one of them is on.
   function layersOff() {
-    if (state.look !== 'calm') return [];
+    if (!lookUsesCalmShell()) return [];
     return CALM_MAP_OFF.filter(([key]) => !state[key]).map(([, , name]) => name);
   }
 
@@ -146,7 +201,7 @@ const Looks = (() => {
     if (!off.length) return '';
     return `
       <div class="mapd-calm" id="map-display-calm">
-        <p class="filter-note">The Calm look starts the map quiet: ${esc(off.join(', '))} ${off.length === 1 ? 'is' : 'are'}
+        <p class="filter-note">The ${esc(label())} look starts the map quiet: ${esc(off.join(', '))} ${off.length === 1 ? 'is' : 'are'}
           off until ticked below.</p>
         <button type="button" class="link-btn" onclick="Looks.layersOn()">Turn ${off.length === 1 ? 'it' : 'them all'} on</button>
       </div>`;

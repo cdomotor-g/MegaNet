@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-18** (revision 162 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-18** (revision 163 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -539,6 +539,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 > ## ⬛ Six AI rows, and fourteen `[Human]` issues.
 >
+> **Revision 163 opens and closes nothing** — at the owner's request, **three more looks, in pictures**: 🔲 **Tiles**, 🎚️ **Instrument** and 🪧 **Signs**, each Calm's shell drawn with a new set of pictograms (`glyphs.js`), and 🏠 **Home** (`home.js`), a new tab heading Start here — the network's counts, the six tools used most as big tiles, every other tool under them. Calm stays the default; Classic is untouched. See revision 163 below.
+>
 > **Revision 162 opens and closes nothing** — at the owner's request, **🗺️ a quieter Stations map under Calm**: a new **Light** base map (Esri's Light Gray Canvas; Dark in the dark theme), every link one slate colour, and nine context layers off until ticked — remembered once ticked, *Turn them all on* at the top of Map display. Classic unchanged. See revision 162 below.
 >
 > **Revision 161 opens and closes nothing** — at the owner's request, **🔭 Look Around joins the Calm look's bar along a phone's foot**, beside Nearby: Nearby, Look, Map, Visits, Camera, More. See revision 161 below.
@@ -804,6 +806,20 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 163 — 2026-10-18: 🔲 🎚️ 🪧 Three looks in pictures — Tiles, Instrument and Signs — and 🏠 Home
+
+The owner, shown mock-ups of a look built from symbols — a sheet of pictograms, *Tiles*, *Instrument* and *Signs*: *"I actually love all three of these. Please build them all."* Nothing opened or closed.
+
+- **The pictures** (`glyphs.js`, new): one hand — a 24-unit grid, a 2-unit round stroke in `currentColor` — for every one of the 45 tabs, every TABS group (with one of six families' colours, `--hue-*`, each white-on-safe), every state a station can be in and every inspection section (0009's `section_key`). A picture is never a control's only name.
+- **🏠 Home** (`home.js`, new; the 45th tab, first under Start here, in every look): *Network now* — OK, on watch and at fault from Station Health's batch (`HealthGlance.counts()`/`askNet()`/`onNet()`, new: the pins' batch, asked whether or not the pins' switch is on; a dash until it answers, never a nought), and the station, repeater and base counts from the list — then six big tiles (Map, Nearby, Health with how many need a look, Inspect, Camera, Look Around) and every other tab as a small tile under its group.
+- **One shell for four looks.** Calm's shell is now every look but Classic's: `lookUsesCalmShell()` and `lookHasSymbols()` (core.js) replace the `state.look === 'calm'` tests, and the stylesheet's Calm rules are scoped to `:root[data-shell="calm"]` (`Looks.apply` sets it). Calm itself is unchanged.
+- **🔲 Tiles**: the groups wear their pictures on their colours, the banner's buttons pictograms, 🏠 in the banner; Light map; a phone's foot Home, Nearby, Look, Map, Visits, More.
+- **🎚️ Instrument**: a dark frame (banner, rail, row of tabs, a phone's foot) round a page in either theme, by restating the theme's tokens on those four; the rail collapsed to its pictures to start; the counts across the banner (`#hdr-status`), each a way into Station Health; the Stations map on the Dark base with the pins coloured by health unless that switch was turned off (`mapHealthStored`).
+- **🪧 Signs**: a step larger type, black on yellow for the button that acts (yellow on black in the dark theme), 2-px edges in the ink's colour, every picture a yellow sign, the street map; on a phone the stepped inspection sheet's sections are a row of signs, each a way to its section (`Inspections.stepTo`), and *Next* carries the next section's picture.
+- **📌 Nearby** shows the station card's health lines under a station's buttons, in every look. Ctrl+K offers each other look by name; the Theme dialog lists five. Help (`HELP.home`, Nearby's), the Site Map's banner line, README's file map, `docs/design-system.md` §8, `test/README.md`, What's new 43, the version stamp `20261018f`.
+
+**Checks:** `npm run looks` (new, 39, and a CI step: the five looks, each on Calm's shell and remembered; a picture for every tab and group; Home's tiles, dashes and counts; Tiles, Instrument and Signs as above, Instrument's dark frame measured in the light theme, the stepped sheet's signs on a phone; Classic with none of it; the main pages in each with a clean console); `npm run calm` (62, the dialog's five), `smoke` (45 tabs), and the cheap five.
 
 ### Revision 162 — 2026-10-18: 🗺️ A quieter Stations map under Calm — a Light base, one link colour, the context layers a tick away
 

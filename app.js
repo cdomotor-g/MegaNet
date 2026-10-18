@@ -1785,11 +1785,16 @@ function renderTabs() {
     nav.classList.add('nav-ready');
   }
 
-  // The Calm look (looks.js) draws its own bar — the groups, with the open
-  // group's tabs across the top of the page — and everything below is
-  // Classic's. Either way the collapse, the drawer and the chrome above are
-  // the same, so they are set before this hands over rather than twice.
-  if (state.look === 'calm') { CalmShell.render(nav); return; }
+  // The banner's own pieces of a look — 🏠 Home, and Instrument's counts
+  // across it (home.js) — whichever bar is drawn below.
+  if (typeof Home !== 'undefined') Home.chrome();
+
+  // The Calm look (looks.js) — and the three in pictures, which share its
+  // shell — draws its own bar: the groups, with the open group's tabs across
+  // the top of the page. Everything below is Classic's. Either way the
+  // collapse, the drawer and the chrome above are the same, so they are set
+  // before this hands over rather than twice.
+  if (lookUsesCalmShell()) { CalmShell.render(nav); return; }
   if (typeof CalmShell !== 'undefined') CalmShell.clearBar();
 
   // On a phone the nav is a drawer over the page, not a column beside it, so
@@ -1890,7 +1895,7 @@ function navFindKey(e) {
 function focusNavFind() {
   // Calm's bar has no find box: its banner's search box (the palette) is the
   // one place a tab is found by what it does.
-  if (state.look === 'calm') { Palette.open(); return; }
+  if (lookUsesCalmShell()) { Palette.open(); return; }
   if (state.navCollapsed) setNavCollapsed(false);
   const el = document.getElementById('nav-search');
   if (el) { el.focus(); el.select(); }
@@ -2000,7 +2005,7 @@ function refocusAfterTabSwitch(cameFromShell) {
   // Under Calm the new tab's own button is in the row across the top
   // (#section-bar) — its copy in the bar is put away at this width — so that
   // is the one that becomes "where you already were".
-  const btn = (state.look === 'calm' && document.querySelector('#section-bar .tab-btn.active'))
+  const btn = (lookUsesCalmShell() && document.querySelector('#section-bar .tab-btn.active'))
     || document.querySelector('#tab-nav .tab-btn.active');
   if (btn) btn.focus(); else focusMain();
 }
@@ -2153,7 +2158,7 @@ function setNavCollapsed(collapsed) {
   // Under Calm a phone's drawer is opened from ⋯ More in the bar along the
   // foot rather than from ☰, so that is where focus goes back to.
   const btn = (isPhoneNav() && state.navCollapsed)
-    ? (state.look === 'calm' ? document.querySelector('.field-bar [data-field="more"]') : document.getElementById('btn-nav'))
+    ? (lookUsesCalmShell() ? document.querySelector('.field-bar [data-field="more"]') : document.getElementById('btn-nav'))
     : document.querySelector('#tab-nav .nav-toggle');
   if (btn) btn.focus();
 }
@@ -3578,6 +3583,7 @@ function renderMain() {
     case 'views':      el.innerHTML = NavViews.render();      NavViews.init();     break;
     case 'lookaround': el.innerHTML = StationAR.render();     StationAR.init();    break;
     case 'nearby':     el.innerHTML = Nearby.render();        Nearby.init();       break;
+    case 'home':       el.innerHTML = Home.render();          Home.init();         break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
     case 'passranges': el.innerHTML = renderPassRangesHtml();             break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;
@@ -3897,7 +3903,7 @@ function updateChromeHeight() {
   // (styles.css), and what stands at a phone's foot — a toast, ↑ — stands on
   // the bar rather than behind it.
   let secH = 0, footH = 0;
-  if (state.look === 'calm') {
+  if (lookUsesCalmShell()) {
     const sec = document.getElementById('section-bar');
     if (sec && !sec.hidden) secH = sec.offsetHeight;
     // Fixed, so it has no offsetParent to ask; a box with no height is one
@@ -5580,7 +5586,7 @@ function maybeShowMapLayersHint() {
   // says that, and where they are.
   mapNote(isPhoneNav()
     ? 'Tip: ⋮ at the top right opens the station list, the filters and the map’s tools.'
-    : state.look === 'calm'
+    : lookUsesCalmShell()
       ? 'Tip: the map starts quiet. 🗺️ in the side panel’s strip, on the right, turns layers on — '
         + 'waterways, survey marks, wind regions, property boundaries, contours, ACMA licences — and mixes the base maps.'
       : 'Tip: 🗺️ in the side panel’s strip, on the right, mixes the base maps and has more '

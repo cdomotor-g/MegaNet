@@ -1297,7 +1297,7 @@ const Inspections = (function () {
   // resumed draft or a saved visit opened from history starts at the first.
 
   function stepped() {
-    return state.look === 'calm' && typeof isPhoneNav === 'function' && isPhoneNav();
+    return lookUsesCalmShell() && typeof isPhoneNav === 'function' && isPhoneNav();
   }
 
   // The index of the section showing, or -1 for the whole sheet.
@@ -1309,25 +1309,51 @@ const Inspections = (function () {
     return s.step;
   }
 
+  // Under the three looks in pictures (looks.js) the bar is a row of signs,
+  // one a section, each its pictogram (Glyphs.section) — the ones behind
+  // filled, the one open picked out — and each a button to that section:
+  // a sheet is not always filled in its printed order.
+  const glyphed = () => typeof lookHasSymbols === 'function' && lookHasSymbols() && typeof Glyphs !== 'undefined';
+
   function stepHeadHtml(rows, at) {
+    const g = glyphed();
     return `
-      <div class="panel insp-steps" id="insp-steps" tabindex="-1">
-        <span class="small insp-muted">Section ${at + 1} of ${rows.length}</span>
-        <strong class="insp-step-name">${esc(sectionLabel(rows[at]))}</strong>
-        <span class="insp-step-bar" aria-hidden="true">${rows.map((r, i) =>
-          `<i class="${i < at ? 'done' : i === at ? 'on' : ''}"></i>`).join('')}</span>
+      <div class="panel insp-steps${g ? ' insp-steps-gl' : ''}" id="insp-steps" tabindex="-1">
+        ${g ? `<div class="insp-step-signs" role="group" aria-label="The sheet's sections">${rows.map((r, i) => `
+          <button type="button" class="insp-sign${i < at ? ' done' : i === at ? ' on' : ''}" onclick="Inspections.stepTo(${i})"
+                  title="${escAttr(sectionLabel(r))}" aria-label="${escAttr(`${i + 1}. ${sectionLabel(r)}`)}"
+                  ${i === at ? 'aria-current="step"' : ''}>${Glyphs.svg(Glyphs.section(r.section_key))}</button>`).join('')}
+        </div>` : ''}
+        <div class="insp-step-title">
+          ${g ? `<span class="gl-tile insp-step-gl">${Glyphs.svg(Glyphs.section(rows[at].section_key))}</span>` : ''}
+          <span class="insp-step-text">
+            <strong class="insp-step-name">${esc(sectionLabel(rows[at]))}</strong>
+            <span class="small insp-muted">Section ${at + 1} of ${rows.length}</span>
+          </span>
+        </div>
+        ${g ? '' : `<span class="insp-step-bar" aria-hidden="true">${rows.map((r, i) =>
+          `<i class="${i < at ? 'done' : i === at ? 'on' : ''}"></i>`).join('')}</span>`}
       </div>`;
   }
 
   function stepNavHtml(rows, at) {
     const next = rows[at + 1];
+    const g = glyphed();
     return `
       <div class="insp-step-nav">
         <button type="button" onclick="Inspections.step(-1)" ${at ? '' : 'disabled'}>‹ Back</button>
         ${next
-          ? `<button type="button" class="primary" onclick="Inspections.step(1)">Next: ${esc(sectionLabel(next))} ›</button>`
+          ? `<button type="button" class="primary" onclick="Inspections.step(1)">Next: ${esc(sectionLabel(next))}${
+              g ? ` ${Glyphs.svg(Glyphs.section(next.section_key))}` : ' ›'}</button>`
           : `<span class="small insp-muted">Last section — save below.</span>`}
       </div>`;
+  }
+
+  // A sign in the row, pressed: that section.
+  function stepTo(i) {
+    const s = S();
+    if (!s.doc) return;
+    step(i - (s.step || 0));
   }
 
   function step(delta) {
@@ -2554,7 +2580,7 @@ const Inspections = (function () {
   return {
     render, init, set, setExtra, search, pick, setConfig, close, save,
     saveDraft: () => writeDraft(true),
-    open, resume, discard, retry, refresh, raiseMaintenance, step,
+    open, resume, discard, retry, refresh, raiseMaintenance, step, stepTo,
     addSerial, removeSerial, addValue, removeValue, addFade, removeFade,
     // #118: the history view renders this file's sheets without owning them.
     // #147: the station editor's telemetry pick-list reads configs() — one

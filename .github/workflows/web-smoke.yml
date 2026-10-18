@@ -737,6 +737,16 @@ jobs:
         working-directory: test
         run: npm run calm
 
+      # The three looks drawn in pictures (looks.js, glyphs.js, home.js):
+      # five looks in the Theme dialog, a picture for every tab, group and
+      # inspection section, 🏠 Home's tiles and counts, Tiles' colours and
+      # banner, Instrument's dark frame, counts and health-coloured map, Signs'
+      # black and yellow and its row of section signs on a phone, and Classic
+      # untouched by any of it.
+      - name: Looks in pictures — Tiles, Instrument, Signs and Home
+        working-directory: test
+        run: npm run looks
+
       # Accounts (auth.js, admin.js, 0062) against a stand-in for Supabase
       # Auth: the visitor note, a password sign-in, a new account confirmed by
       # its code and left waiting, a forgotten password and a reset link, an

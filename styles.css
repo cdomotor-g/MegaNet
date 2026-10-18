@@ -9908,7 +9908,7 @@ code {
   .maps-cat-facts dt { display: inline; }
   .maps-cat-facts dt::after { content: ': '; }
   .maps-cat-facts dd { display: inline; }
-  .maps-cat-list[data-layout="tiles"] { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
+  .maps-cat-list[data-layout="tiles"] { grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); }
   .maps-cat-list[data-layout="tiles"] .maps-cat-thumb { width: 100%; height: 9rem; }
 }
 
@@ -18199,7 +18199,7 @@ details.rp-more[open] > summary { margin-bottom: var(--sp-2); }
 .rp-fm-log-pass { color: var(--ok); }
 .rp-fm-log-miss { color: var(--bad); }
 .rp-fm-ladder { display: block; width: 100%; height: 310px; }
-.rp-fm-db { list-style: none; margin: 0 0 var(--sp-3); padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: var(--sp-2); }
+.rp-fm-db { list-style: none; margin: 0 0 var(--sp-3); padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: var(--sp-2); }
 .rp-fm-db li { display: grid; gap: 2px; padding: var(--sp-1) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); }
 .rp-fm-db-big { font-weight: 700; font-variant-numeric: tabular-nums; }
 .rp-fm-db-why { color: var(--muted); font-size: var(--fs-sm); line-height: 1.3; }
@@ -19887,28 +19887,32 @@ select.kl-in { width: auto; font-family: inherit; }
    everything else that acts, rather than a second, green, colour for "go". On a
    phone, a bar along the foot for a site visit (.field-bar).
 
-   Every rule here is scoped to :root[data-look="calm"], so Classic is exactly
-   the stylesheet above. The few that are not are the Classic defaults for the
-   elements Calm adds: put away unless the look draws them. */
+   Every rule here is scoped to :root[data-shell="calm"] — which every look but
+   Classic wears (Looks.apply), the three in pictures below being Calm's shell
+   too — so Classic is exactly the stylesheet above. The few that are not are
+   the Classic defaults for the elements Calm adds: put away unless the look
+   draws them. */
 
 .hdr-find,
 .hdr-kbd,
 .hdr-more,
+.hdr-home,
 .field-bar { display: none; }
+.hdr-status[hidden] { display: none; }
 #section-bar[hidden] { display: none; }
 
-:root[data-look="calm"] {
+:root[data-shell="calm"] {
   --calm-soft: color-mix(in srgb, var(--accent) 12%, var(--panel));
   --primary: var(--accent);
   --primary-text: #ffffff;
 }
-:root[data-look="calm"] {
+:root[data-shell="calm"] {
   /* The one colour Calm draws every link in (mapLinkColourFromStorage, core.js):
      a slate that reads over the light ground and the dark, under the pins'
      own colours rather than against them. */
   --map-line: #5b7c9d;
 }
-:root[data-look="calm"][data-theme="dark"] {
+:root[data-shell="calm"][data-theme="dark"] {
   /* The dark theme's accent is a light blue for text on a dark panel; white
      on it is not readable, so a button wears the deeper blue the active nav
      tab always has there. */
@@ -19929,27 +19933,27 @@ select.kl-in { width: auto; font-family: inherit; }
 }
 
 /* ── The banner ── */
-:root[data-look="calm"] header {
+:root[data-shell="calm"] header {
   background: var(--panel);
   color: var(--text);
   border-bottom: 1px solid var(--border);
   padding: .5rem 1rem;
   gap: .75rem;
 }
-:root[data-look="calm"] header h1 { font-size: 1.12rem; }
-:root[data-look="calm"] .header-tag { display: none; }
-:root[data-look="calm"] .header-sub { color: var(--muted); font-size: .8rem; }
-:root[data-look="calm"] .header-stats:not(:empty)::before { content: none; }
+:root[data-shell="calm"] header h1 { font-size: 1.12rem; }
+:root[data-shell="calm"] .header-tag { display: none; }
+:root[data-shell="calm"] .header-sub { color: var(--muted); font-size: .8rem; }
+:root[data-shell="calm"] .header-stats:not(:empty)::before { content: none; }
 
 /* What ⋯ holds instead, and ☰, whose drawer a phone opens from the bar
    along its foot. */
-:root[data-look="calm"] #btn-export,
-:root[data-look="calm"] #btn-report,
-:root[data-look="calm"] #btn-theme,
-:root[data-look="calm"] #btn-nav { display: none; }
-:root[data-look="calm"] .hdr-more { display: inline-flex; }
+:root[data-shell="calm"] #btn-export,
+:root[data-shell="calm"] #btn-report,
+:root[data-shell="calm"] #btn-theme,
+:root[data-shell="calm"] #btn-nav { display: none; }
+:root[data-shell="calm"] .hdr-more { display: inline-flex; }
 
-:root[data-look="calm"] .header-actions {
+:root[data-shell="calm"] .header-actions {
   flex: 1 1 auto;
   flex-wrap: nowrap;
   justify-content: flex-end;
@@ -19958,29 +19962,29 @@ select.kl-in { width: auto; font-family: inherit; }
 }
 
 /* The buttons left in it lie flat on the white, as text does. */
-:root[data-look="calm"] .hdr-btn,
-:root[data-look="calm"] .hdr-side {
+:root[data-shell="calm"] .hdr-btn,
+:root[data-shell="calm"] .hdr-side {
   background: transparent;
   border-color: transparent;
   color: var(--text);
   font-size: .92rem;
 }
-:root[data-look="calm"] .hdr-btn:hover,
-:root[data-look="calm"] .hdr-side:hover { background: var(--subtle); }
-:root[data-look="calm"] .hdr-btn.is-in,
-:root[data-look="calm"] .hdr-btn.hdr-new,
-:root[data-look="calm"] .hdr-side.on {
+:root[data-shell="calm"] .hdr-btn:hover,
+:root[data-shell="calm"] .hdr-side:hover { background: var(--subtle); }
+:root[data-shell="calm"] .hdr-btn.is-in,
+:root[data-shell="calm"] .hdr-btn.hdr-new,
+:root[data-shell="calm"] .hdr-side.on {
   background: var(--calm-soft);
   border-color: transparent;
   color: var(--accent);
 }
-:root[data-look="calm"] .hdr-ico { filter: grayscale(1); }
-:root[data-look="calm"] .hdr-more .hdr-ico { filter: none; font-size: 1.2rem; font-weight: 700; }
+:root[data-shell="calm"] .hdr-ico { filter: grayscale(1); }
+:root[data-shell="calm"] .hdr-more .hdr-ico { filter: none; font-size: 1.2rem; font-weight: 700; }
 
 /* A label that is read but not drawn: ⋯ says "More" to a screen reader, and
    the search box below says "Search" while it shows the longer hint. */
-:root[data-look="calm"] .hdr-more .hdr-label,
-:root[data-look="calm"] #btn-palette .hdr-label {
+:root[data-shell="calm"] .hdr-more .hdr-label,
+:root[data-shell="calm"] #btn-palette .hdr-label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -19991,7 +19995,7 @@ select.kl-in { width: auto; font-family: inherit; }
 
 /* Search, drawn as the box it is: the first thing after the name, as wide as
    it can usefully be, with what it finds written in it. */
-:root[data-look="calm"] #btn-palette {
+:root[data-shell="calm"] #btn-palette {
   order: -1;
   margin-right: auto;
   flex: 0 1 30rem;
@@ -20006,8 +20010,8 @@ select.kl-in { width: auto; font-family: inherit; }
   border-radius: 10px;
   color: var(--muted);
 }
-:root[data-look="calm"] #btn-palette:hover { background: var(--panel); }
-:root[data-look="calm"] #btn-palette .hdr-find {
+:root[data-shell="calm"] #btn-palette:hover { background: var(--panel); }
+:root[data-shell="calm"] #btn-palette .hdr-find {
   display: block;
   flex: 1 1 auto;
   min-width: 0;
@@ -20016,7 +20020,7 @@ select.kl-in { width: auto; font-family: inherit; }
   white-space: nowrap;
   text-align: left;
 }
-:root[data-look="calm"] #btn-palette .hdr-kbd {
+:root[data-shell="calm"] #btn-palette .hdr-kbd {
   display: inline-block;
   flex: none;
   padding: 0 .35rem;
@@ -20032,32 +20036,32 @@ select.kl-in { width: auto; font-family: inherit; }
 /* ── The shell's grid ──
    The bar down the side the whole height; over the page and the side panel,
    the open group's row of tabs. */
-:root[data-look="calm"] #app-shell {
+:root[data-shell="calm"] #app-shell {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-rows: auto 1fr;
 }
-:root[data-look="calm"] #tab-nav      { grid-column: 1; grid-row: 1 / 3; }
-:root[data-look="calm"] #section-bar  { grid-column: 2 / 4; grid-row: 1; }
-:root[data-look="calm"] #main-content { grid-column: 2; grid-row: 2; }
-:root[data-look="calm"] #help-panel   { grid-column: 3; grid-row: 2; }
+:root[data-shell="calm"] #tab-nav      { grid-column: 1; grid-row: 1 / 3; }
+:root[data-shell="calm"] #section-bar  { grid-column: 2 / 4; grid-row: 1; }
+:root[data-shell="calm"] #main-content { grid-column: 2; grid-row: 2; }
+:root[data-shell="calm"] #help-panel   { grid-column: 3; grid-row: 2; }
 
 /* The bar begins under the banner, beside the row, so the row's height is
    screen it has (--mn-chrome counts the row for the page under it). */
-:root[data-look="calm"] .nav-inner {
+:root[data-shell="calm"] .nav-inner {
   max-height: calc(100dvh - var(--mn-chrome, 96px) + var(--mn-secbar, 0px));
 }
 
 /* ── The bar down the side ── */
-:root[data-look="calm"] .calm-nav { gap: .15rem; padding: .5rem .5rem 1rem; }
-:root[data-look="calm"] .calm-nav .nav-head { border-bottom: 0; margin-bottom: 0; }
-:root[data-look="calm"] #tab-nav .nav-toggle { margin-bottom: .1rem; }
+:root[data-shell="calm"] .calm-nav { gap: .15rem; padding: .5rem .5rem 1rem; }
+:root[data-shell="calm"] .calm-nav .nav-head { border-bottom: 0; margin-bottom: 0; }
+:root[data-shell="calm"] #tab-nav .nav-toggle { margin-bottom: .1rem; }
 .calm-sections {
   display: flex;
   flex-direction: column;
   gap: .12rem;
 }
-:root[data-look="calm"] #tab-nav .nav-sec {
+:root[data-shell="calm"] #tab-nav .nav-sec {
   position: relative;
   display: flex;
   align-items: center;
@@ -20073,22 +20077,22 @@ select.kl-in { width: auto; font-family: inherit; }
   white-space: nowrap;
   overflow: hidden;
 }
-:root[data-look="calm"] #tab-nav .nav-sec:hover { background: var(--subtle); }
-:root[data-look="calm"] #tab-nav .nav-sec .calm-ico { color: var(--muted); }
-:root[data-look="calm"] #tab-nav .nav-sec.active {
+:root[data-shell="calm"] #tab-nav .nav-sec:hover { background: var(--subtle); }
+:root[data-shell="calm"] #tab-nav .nav-sec .calm-ico { color: var(--muted); }
+:root[data-shell="calm"] #tab-nav .nav-sec.active {
   background: var(--calm-soft);
   color: var(--accent);
   font-weight: 600;
 }
-:root[data-look="calm"] #tab-nav .nav-sec.active .calm-ico { color: var(--accent); }
-:root[data-look="calm"] #tab-nav .nav-sec .nav-count { margin-left: auto; }
-:root[data-look="calm"] #tab-nav.collapsed .nav-sec {
+:root[data-shell="calm"] #tab-nav .nav-sec.active .calm-ico { color: var(--accent); }
+:root[data-shell="calm"] #tab-nav .nav-sec .nav-count { margin-left: auto; }
+:root[data-shell="calm"] #tab-nav.collapsed .nav-sec {
   justify-content: center;
   gap: 0;
   padding-left: .2rem;
   padding-right: .2rem;
 }
-:root[data-look="calm"] #tab-nav.collapsed .nav-sec .nav-count {
+:root[data-shell="calm"] #tab-nav.collapsed .nav-sec .nav-count {
   position: absolute;
   top: .1rem;
   right: .1rem;
@@ -20099,7 +20103,7 @@ select.kl-in { width: auto; font-family: inherit; }
 }
 /* A group's own tabs are in the row across the top above a phone's width;
    in a phone's drawer they are listed under it. */
-:root[data-look="calm"] .calm-tabs { display: none; }
+:root[data-shell="calm"] .calm-tabs { display: none; }
 
 .calm-foot {
   margin-top: .75rem;
@@ -20111,7 +20115,7 @@ select.kl-in { width: auto; font-family: inherit; }
 }
 
 /* ── The row across the top ── */
-:root[data-look="calm"] #section-bar {
+:root[data-shell="calm"] #section-bar {
   min-width: 0;
   padding: .45rem 1.25rem 0;
   background: var(--panel);
@@ -20184,12 +20188,12 @@ select.kl-in { width: auto; font-family: inherit; }
 }
 
 /* ── The side panel's strip, in the same quiet ink ── */
-:root[data-look="calm"] .dock-strip .dock-ico { filter: grayscale(1); }
+:root[data-shell="calm"] .dock-strip .dock-ico { filter: grayscale(1); }
 
 /* The memory strip under the banner (#79) keeps its place and its click, but
    says nothing in colour until it has something to say: grey while the page
    is holding what it should, its own colours once it passes a threshold. */
-:root[data-look="calm"] .mem-bar:not(.mem-warn):not(.mem-bad) .mem-seg { filter: grayscale(1); opacity: .45; }
+:root[data-shell="calm"] .mem-bar:not(.mem-warn):not(.mem-bad) .mem-seg { filter: grayscale(1); opacity: .45; }
 
 /* ── ⋯ More ── */
 .more-menu { display: grid; gap: .2rem; }
@@ -20212,20 +20216,20 @@ select.kl-in { width: auto; font-family: inherit; }
 
 /* ── Tablets: the banner's hint gives way before its buttons do ── */
 @media (max-width: 900px) {
-  :root[data-look="calm"] #btn-palette .hdr-kbd { display: none; }
-  :root[data-look="calm"] .header-sub { display: none; }
+  :root[data-shell="calm"] #btn-palette .hdr-kbd { display: none; }
+  :root[data-shell="calm"] .header-sub { display: none; }
 }
 
 /* ── A phone ── */
 @media (max-width: 560px) {
-  :root[data-look="calm"] header { padding: .4rem .6rem; }
+  :root[data-shell="calm"] header { padding: .4rem .6rem; }
   /* The mark says Flood-Net on its own at this width; the row is the search
      box's. ✨ What's new is in ⋯ here, and while there is news ⋯ wears its dot. */
-  :root[data-look="calm"] header h1 { font-size: 0; }
-  :root[data-look="calm"] .header-logo { margin-right: 0; height: 1.75rem; }
-  :root[data-look="calm"] #btn-whatsnew { display: none; }
-  :root[data-look="calm"] header:has(#btn-whatsnew:not([hidden])) .hdr-more { position: relative; }
-  :root[data-look="calm"] header:has(#btn-whatsnew:not([hidden])) .hdr-more::after {
+  :root[data-shell="calm"] header h1 { font-size: 0; }
+  :root[data-shell="calm"] .header-logo { margin-right: 0; height: 1.75rem; }
+  :root[data-shell="calm"] #btn-whatsnew { display: none; }
+  :root[data-shell="calm"] header:has(#btn-whatsnew:not([hidden])) .hdr-more { position: relative; }
+  :root[data-shell="calm"] header:has(#btn-whatsnew:not([hidden])) .hdr-more::after {
     content: '';
     position: absolute;
     top: .35rem;
@@ -20238,19 +20242,19 @@ select.kl-in { width: auto; font-family: inherit; }
   /* The help tab stands on the right edge of every page but Stations; the
      distances keep clear of it. */
   .page.nb-page { padding-right: 2.6rem; }
-  :root[data-look="calm"] #btn-palette { flex-basis: 9rem; height: 2.25rem; }
+  :root[data-shell="calm"] #btn-palette { flex-basis: 9rem; height: 2.25rem; }
 
   /* The drawer lists every group with its tabs under it. */
-  :root[data-look="calm"] .calm-tabs {
+  :root[data-shell="calm"] .calm-tabs {
     display: block;
     margin: 0 0 .35rem 2rem;
   }
-  :root[data-look="calm"] #tab-nav .calm-tabs .tab-btn {
+  :root[data-shell="calm"] #tab-nav .calm-tabs .tab-btn {
     padding: .5rem .5rem;
     color: var(--muted);
     font-size: .92rem;
   }
-  :root[data-look="calm"] #tab-nav .calm-tabs .tab-btn.active {
+  :root[data-shell="calm"] #tab-nav .calm-tabs .tab-btn.active {
     background: var(--calm-soft);
     border-color: transparent;
     color: var(--accent);
@@ -20259,21 +20263,21 @@ select.kl-in { width: auto; font-family: inherit; }
 
   /* The row across the top scrolls sideways rather than wrapping, and the
      group's name is in the drawer. */
-  :root[data-look="calm"] #section-bar { padding: 0 .5rem; }
-  :root[data-look="calm"] .sec-name { display: none; }
-  :root[data-look="calm"] .sec-tabs {
+  :root[data-shell="calm"] #section-bar { padding: 0 .5rem; }
+  :root[data-shell="calm"] .sec-name { display: none; }
+  :root[data-shell="calm"] .sec-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
     gap: 0 1rem;
     padding: 0 .25rem;
   }
-  :root[data-look="calm"] .sec-tabs::-webkit-scrollbar { display: none; }
-  :root[data-look="calm"] #section-bar .tab-btn { padding: .6rem .1rem .55rem; min-height: 2.75rem; }
+  :root[data-shell="calm"] .sec-tabs::-webkit-scrollbar { display: none; }
+  :root[data-shell="calm"] #section-bar .tab-btn { padding: .6rem .1rem .55rem; min-height: 2.75rem; }
 
   /* The bar along the foot: five thumbs' worth, over the page and under a
      drawer, clear of the home indicator. */
-  :root[data-look="calm"] .field-bar {
+  :root[data-shell="calm"] .field-bar {
     display: flex;
     position: fixed;
     left: 0;
@@ -20303,9 +20307,9 @@ select.kl-in { width: auto; font-family: inherit; }
   }
   .field-btn .calm-ico { width: 1.45rem; height: 1.45rem; }
   .field-btn.active { color: var(--accent); }
-  :root[data-look="calm"] body { padding-bottom: var(--mn-footbar, 0px); }
-  :root[data-look="calm"] .toasts,
-  :root[data-look="calm"] .to-top {
+  :root[data-shell="calm"] body { padding-bottom: var(--mn-footbar, 0px); }
+  :root[data-shell="calm"] .toasts,
+  :root[data-shell="calm"] .to-top {
     bottom: calc(max(1rem, env(safe-area-inset-bottom)) + var(--pwa-lift, 0px) + var(--mn-footbar, 0px));
   }
 }
@@ -20410,19 +20414,19 @@ select.kl-in { width: auto; font-family: inherit; }
   background: var(--panel);
   box-shadow: 0 -2px 10px rgba(0, 0, 0, .06);
 }
-.insp-step-nav button { min-height: 2.9rem; }
+.insp-step-nav button { min-height: 2.9rem; white-space: nowrap; }
 .insp-step-nav .primary { flex: 1 1 auto; font-weight: 600; }
 
 /* Classic gives the logo's room to the name below 380 px; Calm has already
    given the name's to the search box, so the logo stays. */
 @media (max-width: 380px) {
-  :root[data-look="calm"] .header-logo { display: inline-block; }
+  :root[data-shell="calm"] .header-logo { display: inline-block; }
 }
 
 /* A tab's introduction, two lines deep under Calm until "More about this tab"
    (CalmShell.foldLede). Clamped, not cut: the rest is in the page and is read
    out in full. */
-:root[data-look="calm"] .lede-fold:not(.lede-open) {
+:root[data-shell="calm"] .lede-fold:not(.lede-open) {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -20446,30 +20450,419 @@ select.kl-in { width: auto; font-family: inherit; }
   line-height: 1.45;
 }
 .hl-verdict .link-btn { font-size: var(--fs-md); }
-:root[data-look="calm"] .hl-kpis {
+:root[data-shell="calm"] .hl-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(8.25rem, 1fr));
   gap: var(--sp-2);
 }
-:root[data-look="calm"] .hl-kpis .qs-chip {
+:root[data-shell="calm"] .hl-kpis .qs-chip {
   padding: .55rem .75rem;
   border-radius: 10px;
 }
-:root[data-look="calm"] .hl-kpis .qs-chip-v {
+:root[data-shell="calm"] .hl-kpis .qs-chip-v {
   font-size: 1.45rem;
   line-height: 1.25;
 }
 /* "Since" is a date: as narrow as it can be, so "What, and what to do" has
    the width to be read in lines rather than in words. */
-:root[data-look="calm"] .hl-ftable col.col-optional { width: 8.5rem; }
+:root[data-shell="calm"] .hl-ftable col.col-optional { width: 8.5rem; }
 @media (min-width: 1100px) {
-  :root[data-look="calm"] .hl-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  :root[data-shell="calm"] .hl-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 }
 /* A phone: three numbers a row, each its name and its number — the sentence
    above has already said what they add up to. */
 @media (max-width: 560px) {
-  :root[data-look="calm"] .hl-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; }
-  :root[data-look="calm"] .hl-kpis .qs-chip { padding: .4rem .5rem; }
-  :root[data-look="calm"] .hl-kpis .qs-chip-v { font-size: 1.2rem; }
-  :root[data-look="calm"] .hl-kpis .qs-chip-v + .qs-chip-k { display: none; }
+  :root[data-shell="calm"] .hl-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; }
+  :root[data-shell="calm"] .hl-kpis .qs-chip { padding: .4rem .5rem; }
+  :root[data-shell="calm"] .hl-kpis .qs-chip-v { font-size: 1.2rem; }
+  :root[data-shell="calm"] .hl-kpis .qs-chip-v + .qs-chip-k { display: none; }
+}
+
+/* ── 🏠 Home (home.js) ───────────────────────────────────────────────────────
+   The front page of the three looks in pictures, and a tab like any other in
+   Calm and Classic: how the network is right now in a strip, the six things
+   used most as big tiles, and every other tab under them as a small one. The
+   pictures and their colours are glyphs.js's (.gl, .gl-tile, below). */
+:root {
+  /* The six families a tab belongs to (Glyphs.GROUP): each dark enough for
+     white on it at 4.5:1 or better, which is how a tile draws them. The same
+     in both themes — a tile is its own ground. */
+  --hue-net:   #0b5cab;
+  --hue-data:  #0f766e;
+  --hue-field: #c2410c;
+  --hue-radio: #6d28d9;
+  --hue-learn: #8a5300;
+  --hue-admin: #475569;
+}
+
+/* A pictogram (Glyphs.svg): a 24-unit drawing in a 2-unit stroke, in the ink
+   around it. */
+.gl {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+}
+/* …and on a tile of its family's colour (Glyphs.tile). */
+.gl-tile {
+  --hue: var(--hue-net);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9px;
+  background: var(--hue);
+  color: #ffffff;
+}
+.gl-tile .gl { width: 62%; height: 62%; }
+[data-hue="data"]  { --hue: var(--hue-data); }
+[data-hue="field"] { --hue: var(--hue-field); }
+[data-hue="radio"] { --hue: var(--hue-radio); }
+[data-hue="learn"] { --hue: var(--hue-learn); }
+[data-hue="admin"] { --hue: var(--hue-admin); }
+
+.hm-page { --page-max: 1120px; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.hm-page h3 {
+  margin: 1.4rem .25rem .6rem;
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hm-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem .6rem;
+  padding: .7rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.hm-now h3 {
+  margin: 0 .5rem 0 0;
+  font-size: .95rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+.hm-status,
+.hm-fleets { display: flex; flex-wrap: wrap; gap: .4rem; }
+.hm-fleets { margin-left: auto; }
+.hm-note { flex: 1 0 100%; margin: 0; }
+/* A count: its class's picture in the class's colour, the number and the word
+   in the ink of the page, on a tint of the colour. */
+.hm-chip,
+.hm-fleet {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  min-height: 2.25rem;
+  padding: .3rem .75rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--text);
+  font-size: .88rem;
+}
+.hm-chip strong,
+.hm-fleet strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.hm-chip.hm-ok    { background: color-mix(in srgb, var(--ok) 13%, var(--panel)); }
+.hm-chip.hm-watch { background: color-mix(in srgb, var(--warn) 15%, var(--panel)); }
+.hm-chip.hm-fault { background: color-mix(in srgb, var(--bad) 13%, var(--panel)); }
+.hm-ok .gl    { color: var(--ok); }
+.hm-watch .gl { color: var(--warn); }
+.hm-fault .gl { color: var(--bad); }
+.hm-chip:hover { filter: brightness(.97); }
+.hm-fleet { background: var(--subtle); }
+.hm-fleet .gl { color: var(--accent); }
+
+.hm-bigs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: .9rem;
+}
+.hm-big {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .25rem;
+  padding: 1.15rem .75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--text);
+  text-align: center;
+}
+.hm-big:hover { border-color: var(--ctl-border); box-shadow: 0 4px 14px rgba(0, 0, 0, .07); }
+.hm-big .gl-tile {
+  width: 4.25rem;
+  height: 4.25rem;
+  margin-bottom: .5rem;
+  border-radius: 18px;
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--hue) 35%, transparent);
+}
+.hm-big-name { font-size: 1.02rem; font-weight: 700; }
+.hm-big-sub { font-size: var(--fs-sm); color: var(--muted); }
+.hm-badge {
+  position: absolute;
+  top: .6rem;
+  right: .6rem;
+  min-width: 1.6rem;
+  padding: 0 .45rem;
+  border-radius: 999px;
+  background: #b42318;
+  color: #ffffff;
+  font-size: .8rem;
+  font-weight: 700;
+  line-height: 1.6rem;
+}
+.hm-group h4 { margin: .9rem .25rem .4rem; font-size: .9rem; font-weight: 600; }
+.hm-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.25rem, 1fr));
+  gap: .35rem;
+}
+.hm-small {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .4rem;
+  width: 100%;
+  height: 100%;
+  padding: .6rem .35rem;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font-size: .82rem;
+  line-height: 1.25;
+  text-align: center;
+}
+.hm-small:hover { background: var(--panel); }
+.hm-small .gl-tile { width: 2.75rem; height: 2.75rem; border-radius: 12px; }
+@media (max-width: 560px) {
+  /* Three counts abreast, each its picture and its number — the button's own
+     name says which — and the station list's three on one line under them. */
+  .hm-now { padding: .6rem .7rem; }
+  .hm-now h3 { flex: 1 0 100%; }
+  .hm-status { flex: 1 0 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hm-status .hm-chip { justify-content: center; padding: .3rem .4rem; }
+  .hm-status .hm-chip span { display: none; }
+  .hm-fleets { flex: 1 0 100%; flex-wrap: nowrap; gap: .3rem; }
+  .hm-fleet { flex: 1 1 0; min-width: 0; justify-content: center; gap: .25rem; padding: .2rem .35rem; font-size: .72rem; }
+  .hm-fleet strong { font-size: .9rem; }
+  .hm-fleet .gl { width: 1rem; height: 1rem; }
+  .hm-fleet span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hm-bigs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+  .hm-big { padding: .9rem .5rem .8rem; }
+  .hm-big .gl-tile { width: 3.5rem; height: 3.5rem; border-radius: 15px; }
+  .hm-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .hm-small { font-size: .74rem; padding: .5rem .15rem; }
+  .hm-fleets { margin-left: 0; }
+}
+
+/* ── The three looks in pictures: what they share ────────────────────────────
+   Tiles, Instrument and Signs are Calm's shell (above) drawn with Glyphs: a
+   group's button wears its pictogram on its family's tile, the bar along a
+   phone's foot and the banner's buttons wear pictograms, and on a phone the
+   inspection sheet's sections are a row of signs. */
+#tab-nav .nav-sec .nav-icon:has(.gl-tile) { flex: 0 0 1.9rem; width: 1.9rem; line-height: 0; }
+#tab-nav .nav-sec .gl-tile { width: 1.9rem; height: 1.9rem; border-radius: 9px; }
+.sec-name .gl-tile { width: 1.55rem; height: 1.55rem; border-radius: 7px; }
+.hdr-ico .gl { width: 1.2rem; height: 1.2rem; }
+.field-btn .gl { width: 1.5rem; height: 1.5rem; }
+:root[data-shell="calm"] .hdr-home .hdr-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+:root[data-look="tiles"] .hdr-home,
+:root[data-look="signs"] .hdr-home { display: inline-flex; order: 0; }
+:root[data-shell="calm"] .hdr-home[aria-current="page"] { background: var(--calm-soft); color: var(--accent); }
+
+/* The sheet's sections as a row of signs (Inspections.stepHeadHtml). */
+.insp-step-signs { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .55rem; }
+.insp-sign {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+  border: 1px solid var(--ctl-border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+}
+.insp-sign .gl { width: 1.35rem; height: 1.35rem; }
+.insp-sign.done { background: var(--hue-field); border-color: var(--hue-field); color: #ffffff; }
+.insp-sign.on { outline: 3px solid var(--accent); outline-offset: 1px; }
+.insp-step-title { display: flex; align-items: center; gap: .65rem; }
+.insp-step-text { display: grid; gap: .1rem; }
+.insp-step-gl { width: 2.6rem; height: 2.6rem; border-radius: 11px; background: var(--hue-field); }
+.insp-step-nav .primary .gl { width: 1.15rem; height: 1.15rem; margin-left: .2rem; }
+
+/* ── 🔲 Tiles ─────────────────────────────────────────────────────────────────
+   Calm, in colour: a tool is a tile, its colour its family's. The ground a
+   shade cooler than the cards on it, so a tile reads as a thing to press. */
+:root[data-look="tiles"]:not([data-theme="dark"]) { --bg: #eef2f7; }
+:root[data-look="tiles"] .panel { border-radius: 14px; }
+:root[data-look="tiles"] #tab-nav .nav-sec { padding: .4rem .45rem; }
+:root[data-look="tiles"] #tab-nav .nav-sec.active { background: var(--calm-soft); }
+:root[data-look="tiles"] .field-btn.active .gl { color: var(--accent); }
+
+/* ── 🎚️ Instrument ───────────────────────────────────────────────────────────
+   A dark frame round the page — the banner, the rail, the row of tabs and a
+   phone's bar — whichever theme the page itself is in. Done by restating the
+   theme's tokens on those four, so every rule above them that reads a token
+   draws them dark without a rule of its own. */
+:root[data-look="instrument"] header,
+:root[data-look="instrument"] #tab-nav,
+:root[data-look="instrument"] #section-bar {
+  --panel: #0f172a;
+  --panel-sub: #111c33;
+  --subtle: #1e293b;
+  --text: #e2e8f0;
+  --muted: #a3b1c6;
+  --border: #23314d;
+  --ctl-border: #3b4a63;
+  --accent: #7dd3fc;
+  --calm-soft: rgba(56, 189, 248, .16);
+  color-scheme: dark;
+}
+:root[data-look="instrument"] #tab-nav,
+:root[data-look="instrument"] #section-bar { background: var(--panel); color: var(--text); }
+:root[data-look="instrument"] #tab-nav .nav-sec .gl-tile { background: transparent; color: var(--text); }
+:root[data-look="instrument"] #tab-nav .nav-sec.active .gl-tile { background: #0b5cab; color: #ffffff; }
+:root[data-look="instrument"] #tab-nav .nav-sec.active { color: var(--accent); }
+:root[data-look="instrument"] .sec-name .gl-tile { background: #0b5cab; }
+:root[data-look="instrument"] #btn-palette { background: var(--subtle); border-color: var(--ctl-border); }
+:root[data-look="instrument"] .nav-legal a { color: var(--muted); }
+
+/* The network's counts across the banner (Home.chrome): a chip a class, each
+   a way into Station Health. Its picture in the class's colour, lit for a
+   dark ground. */
+:root[data-look="instrument"] .hdr-status { display: flex; gap: .3rem; flex: none; }
+.hdr-status .hm-chip {
+  min-height: 2.1rem;
+  padding: .2rem .6rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--subtle);
+  font-size: .85rem;
+}
+.hdr-status .hm-chip strong { font-size: .95rem; }
+.hdr-status .hm-ok .gl    { color: #4ade80; }
+.hdr-status .hm-watch .gl { color: #fbbf24; }
+.hdr-status .hm-fault .gl { color: #f87171; }
+@media (max-width: 900px) {
+  :root[data-look="instrument"] .hdr-status .hm-chip { padding: .2rem .45rem; }
+}
+@media (max-width: 560px) {
+  /* A phone's banner is the search box's; the counts are on 🏠 Home. */
+  :root[data-look="instrument"] .hdr-status { display: none; }
+  :root[data-look="instrument"] .field-bar {
+    --panel: #0f172a;
+    --border: #23314d;
+    --muted: #a3b1c6;
+    --accent: #7dd3fc;
+    background: var(--panel);
+  }
+}
+
+/* ── 🪧 Signs ─────────────────────────────────────────────────────────────────
+   Black on yellow, thick edges and large type: a button is a sign, read in
+   full sun and pressed with a glove. Everything is a step bigger (the root's
+   size), the controls' edges are the ink's colour and twice the weight, and
+   the one colour that acts is the sign's: black on yellow, or yellow on black
+   on a dark page. */
+:root[data-look="signs"] {
+  font-size: 106.25%;
+  --sign: #facc15;
+  --sign-ink: #111111;
+  --primary: #111111;
+  --primary-text: #facc15;
+  --ctl-border: var(--text);
+  --calm-soft: #fef3c7;
+}
+:root[data-look="signs"][data-theme="dark"] {
+  --primary: #facc15;
+  --primary-text: #111111;
+  --calm-soft: rgba(250, 204, 21, .18);
+}
+:root[data-look="signs"] button { border-width: 2px; font-weight: 600; }
+:root[data-look="signs"] header { border-bottom: 3px solid var(--text); }
+:root[data-look="signs"] .hdr-btn,
+:root[data-look="signs"] .hdr-side { border: 2px solid var(--text); border-radius: 10px; }
+:root[data-look="signs"] #btn-palette { border: 2px solid var(--text); background: var(--panel); color: var(--text); }
+:root[data-look="signs"] #btn-palette .hdr-ico { color: var(--sign-ink); background: var(--sign); border-radius: 6px; padding: .1rem; }
+:root[data-look="signs"] .hdr-ico .gl { stroke-width: 2.4; }
+
+:root[data-look="signs"] .gl-tile { background: var(--sign); color: var(--sign-ink); box-shadow: inset 0 0 0 2px var(--sign-ink); }
+:root[data-look="signs"] .gl-tile .gl { stroke-width: 2.4; }
+:root[data-look="signs"] #tab-nav .nav-sec { border: 2px solid transparent; font-weight: 600; }
+:root[data-look="signs"] #tab-nav .nav-sec.active,
+:root[data-look="signs"] #section-bar .tab-btn.active,
+:root[data-look="signs"] #tab-nav .calm-tabs .tab-btn.active {
+  background: #111111;
+  border-color: #111111;
+  color: var(--sign);
+}
+:root[data-look="signs"][data-theme="dark"] #tab-nav .nav-sec.active,
+:root[data-look="signs"][data-theme="dark"] #section-bar .tab-btn.active,
+:root[data-look="signs"][data-theme="dark"] #tab-nav .calm-tabs .tab-btn.active { border-color: var(--sign); }
+:root[data-look="signs"] #section-bar { border-bottom: 2px solid var(--text); }
+:root[data-look="signs"] #section-bar .tab-btn {
+  margin: .25rem 0 .35rem;
+  padding: .35rem .7rem;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Home: three counts as solid signs, the six tiles as big ones. */
+:root[data-look="signs"] .hm-now { border: 3px solid var(--text); }
+:root[data-look="signs"] .hm-chip { border: 2px solid var(--sign-ink); font-weight: 700; color: #ffffff; }
+:root[data-look="signs"] .hm-chip .gl { color: inherit; stroke-width: 2.4; }
+:root[data-look="signs"] .hm-chip.hm-ok    { background: #15803d; }
+:root[data-look="signs"] .hm-chip.hm-watch { background: #f59e0b; color: #111111; }
+:root[data-look="signs"] .hm-chip.hm-fault { background: #b91c1c; }
+:root[data-look="signs"] .hm-big { border: 3px solid var(--text); border-radius: 18px; }
+:root[data-look="signs"] .hm-big .gl-tile { box-shadow: inset 0 0 0 3px var(--sign-ink); }
+:root[data-look="signs"] .hm-big-name { font-size: 1.2rem; font-weight: 800; }
+:root[data-look="signs"] .hm-small { border: 2px solid var(--border); background: var(--panel); font-weight: 600; }
+
+/* Nearby's rows and the inspection sheet's signs, thick-edged. */
+:root[data-look="signs"] .nb-row { border: 2px solid var(--text); border-radius: 14px; }
+:root[data-look="signs"] .nb-name { font-size: 1.1rem; }
+:root[data-look="signs"] .insp-sign { border: 2px solid var(--text); }
+:root[data-look="signs"] .insp-sign.done { background: #15803d; border-color: #15803d; color: #ffffff; }
+:root[data-look="signs"] .insp-sign.on { background: var(--sign); color: var(--sign-ink); border-color: var(--sign-ink); outline-color: var(--sign); }
+:root[data-look="signs"] .insp-step-gl { background: var(--sign); color: var(--sign-ink); }
+:root[data-look="signs"] .insp-step-nav { border: 2px solid var(--text); }
+:root[data-look="signs"] .insp-step-nav .primary { min-height: 3.25rem; font-size: 1.05rem; }
+
+@media (max-width: 560px) {
+  :root[data-look="signs"] .field-bar { border-top: 3px solid var(--text); }
+  :root[data-look="signs"] .field-btn { color: var(--text); font-weight: 700; }
+  :root[data-look="signs"] .field-btn.active { background: #111111; color: var(--sign); }
+  :root[data-look="signs"][data-theme="dark"] .field-btn.active { box-shadow: inset 0 0 0 2px var(--sign); }
+  :root[data-look="signs"] .field-btn .gl { stroke-width: 2.4; }
+  :root[data-look="signs"] .hm-big .gl-tile { width: 4rem; height: 4rem; }
 }

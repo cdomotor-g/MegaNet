@@ -204,6 +204,7 @@ const ExportMenu = (function () {
   // not a shrug: a tab that ought to have an export and does not is a gap to
   // file, not a line here.
   const EXEMPT = {
+    home:        'The front page: a way into the other tabs and a count of how the stations are — Station Health saves the findings behind the count.',
     sitemap:     'The guide to every other tab — it holds nothing of its own to save.',
     offline:     'This device\'s setup for working with no signal — nothing on it is a record to keep as a file.',
     views:       'What the bar on the left lists — a setting kept with your account, not a record to keep as a file.',

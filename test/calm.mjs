@@ -202,7 +202,7 @@ async function main() {
       themes: document.querySelectorAll('#theme-pick input').length,
       looks: [...document.querySelectorAll('#look-pick input')].map(r => r.value + (r.checked ? '*' : '')) }));
     check('Theme & look is the Theme dialog, with the looks under the themes, Calm picked',
-      dlg.title === 'Theme' && dlg.themes === 4 && J(dlg.looks) === J(['calm*', 'classic']), J(dlg));
+      dlg.title === 'Theme' && dlg.themes === 4 && J(dlg.looks) === J(['calm*', 'tiles', 'instrument', 'signs', 'classic']), J(dlg));
 
     // ── 4. The way back ────────────────────────────────────────────────────
     log('\n4. Classic, and back\n');

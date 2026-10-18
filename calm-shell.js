@@ -4,7 +4,9 @@
 //               as one button a group, that group's tabs as a row across the
 //               top of the page (#section-bar), ⋯ in the banner for what the
 //               banner no longer shows, and on a phone a bar along the foot
-//               for the five things a site visit reaches for.
+//               for the five things a site visit reaches for. The shell of
+//               every look but Classic: Tiles, Instrument and Signs draw it
+//               with pictograms (glyphs.js) and a stylesheet of their own.
 //
 // After core.js (state, TABS, TAB_LIST, esc, escAttr, slug, tabShown,
 // tabCannot, announce), before init.js. Reaches across to app.js for
@@ -13,8 +15,9 @@
 // NavViews.navHeadHtml; to looks.js for Looks.introHtml; and to the dialogs
 // ⋯ opens (ExportMenu, BugReport, WhatsNew, Modal). All of it at call time,
 // so this file's position among the modules is free. Nothing runs at load
-// (`npm run toplevel`): renderTabs() (app.js) hands the bar to render() when
-// the look is Calm, and that is the only way in.
+// (`npm run toplevel`): renderTabs() (app.js) hands the bar to render() under
+// any look but Classic (lookUsesCalmShell, core.js), and that is the only way
+// in.
 //
 // ── Two levels, not forty-two buttons ────────────────────────────────────────
 // Classic lists every tab in the bar, under its group's heading. Calm lists the
@@ -95,7 +98,13 @@ const CalmShell = (() => {
     return g ? g.group : '';
   }
 
+  // Under the three looks in pictures a group wears its pictogram on a tile
+  // of its family's colour (glyphs.js) instead.
   function groupIcon(g) {
+    if (lookHasSymbols() && typeof Glyphs !== 'undefined') {
+      const [name, hue] = g.outside ? ['more', 'admin'] : Glyphs.group(g.group, g.tabs[0] && g.tabs[0].id);
+      return Glyphs.tile(name, hue);
+    }
     if (g.outside) return icon('dots');
     const own = GROUP_ICON[g.group];
     if (own) return icon(own);
@@ -282,39 +291,56 @@ const CalmShell = (() => {
   // 60 px apiece on a 360 px phone, so its label under the drawing is "Look"
   // and its full name is the button's own (`name`), which starts with the word
   // that is drawn.
-  const FIELD = [
-    { key: 'nearby',  tab: 'nearby',      icon: 'nearby',    label: 'Nearby' },
-    { key: 'look',    tab: 'lookaround',  icon: 'look',      label: 'Look', name: 'Look Around' },
-    { key: 'map',     tab: 'stations',    icon: 'map',       label: 'Map' },
-    { key: 'visits',  tab: 'inspections', icon: 'clipboard', label: 'Visits' },
-    { key: 'camera',  tab: 'camera',      icon: 'camera',    label: 'Camera' },
+  //
+  // Tiles and Signs open on 🏠 Home (home.js), which has the camera on it as a
+  // big tile, so their bar trades Camera for Home: the way back to the page
+  // everything else is a press from.
+  const FIELD_ALL = [
+    { key: 'home',    tab: 'home',        icon: 'start',     glyph: 'home',    label: 'Home' },
+    { key: 'nearby',  tab: 'nearby',      icon: 'nearby',    glyph: 'nearby',  label: 'Nearby' },
+    { key: 'look',    tab: 'lookaround',  icon: 'look',      glyph: 'look',    label: 'Look', name: 'Look Around' },
+    { key: 'map',     tab: 'stations',    icon: 'map',       glyph: 'map',     label: 'Map' },
+    { key: 'visits',  tab: 'inspections', icon: 'clipboard', glyph: 'inspect', label: 'Visits' },
+    { key: 'camera',  tab: 'camera',      icon: 'camera',    glyph: 'camera',  label: 'Camera' },
   ];
+  const FIELD_HOME = ['home', 'nearby', 'look', 'map', 'visits'];
+  const FIELD_CALM = ['nearby', 'look', 'map', 'visits', 'camera'];
+
+  function field() {
+    const keys = state.look === 'tiles' || state.look === 'signs' ? FIELD_HOME : FIELD_CALM;
+    return keys.map(k => FIELD_ALL.find(f => f.key === k));
+  }
+
+  // A button's drawing: the look's pictogram, or Calm's line drawing.
+  function fieldIcon(f) {
+    return lookHasSymbols() && typeof Glyphs !== 'undefined' ? Glyphs.svg(f.glyph, 'gl calm-ico') : icon(f.icon);
+  }
 
   function fieldBarHtml(phone) {
     if (!phone) return '';
     const open = !state.navCollapsed;
     return `
       <div class="field-bar" role="group" aria-label="Site visit">
-        ${FIELD.map(f => {
+        ${field().map(f => {
           const on = !open && state.activeTab === f.tab;
           return `
         <button type="button" class="field-btn${on ? ' active' : ''}" data-field="${f.key}"
                 onclick="CalmShell.fieldGo('${f.key}')" ${on ? 'aria-current="page"' : ''}${
                 f.name ? ` aria-label="${escAttr(f.name)}" title="${escAttr(f.name)}"` : ''}>
-          ${icon(f.icon)}<span>${f.label}</span>
+          ${fieldIcon(f)}<span>${f.label}</span>
         </button>`;
         }).join('')}
         <button type="button" class="field-btn${open ? ' active' : ''}" data-field="more"
                 onclick="CalmShell.fieldGo('more')" aria-controls="tab-nav"
                 aria-expanded="${open ? 'true' : 'false'}" title="Every group and every tab">
-          ${icon('dots')}<span>More</span>
+          ${fieldIcon({ icon: 'dots', glyph: 'more' })}<span>More</span>
         </button>
       </div>`;
   }
 
   function fieldGo(key) {
     if (key === 'more') { setNavCollapsed(!state.navCollapsed); return; }
-    const f = FIELD.find(x => x.key === key);
+    const f = FIELD_ALL.find(x => x.key === key);
     if (!f) return;
     if (!state.navCollapsed) { state.navCollapsed = true; try { localStorage.setItem('mn-nav', 'collapsed'); } catch (_) {} }
     if (state.activeTab === f.tab) { renderTabs(); window.scrollTo(0, 0); return; }
@@ -333,7 +359,7 @@ const CalmShell = (() => {
     const fresh = !!pill && !pill.hidden;
     const items = [
       { go: 'export', ico: 'download', label: 'Export what this tab shows', sub: 'As a file — CSV, GeoJSON, KML, PNG and the rest' },
-      { go: 'theme',  ico: 'palette',  label: 'Theme & look', sub: 'Light, dark or sunlight; Calm or Classic' },
+      { go: 'theme',  ico: 'palette',  label: 'Theme & look', sub: 'Light, dark or sunlight; Calm, Tiles, Instrument, Signs or Classic' },
       { go: 'help',   ico: 'help',     label: 'Help for this tab', sub: 'In the side panel' },
       { go: 'guide',  ico: 'start',    label: 'Site Map', sub: 'What every tab is for, and where it is' },
       { go: 'news',   ico: 'sparkle',  label: 'What\'s new', sub: fresh ? 'Changes you have not seen yet' : 'The latest changes' },
@@ -414,7 +440,7 @@ const CalmShell = (() => {
   }
 
   function foldLede() {
-    if (state.look !== 'calm') return;
+    if (!lookUsesCalmShell()) return;
     const main = document.getElementById('main-content');
     const p = main && ledeOf(main);
     if (!p || p.classList.contains('lede-fold') || !p.getClientRects().length) return;

@@ -442,7 +442,7 @@ const Health = (() => {
     const silent = F.filter(f => f.kind === 'silent').length;
     const power = F.filter(f => f.category === 'power' && f.severity !== 'info').length;
     const rxDown = A.findings.filter(f => f.kind === 'receiver-silent' && f.severity !== 'info').length;
-    return `${state.look === 'calm' ? verdictHtml(F, pct, silent) : ''}<div class="qs-status hl-kpis">
+    return `${lookUsesCalmShell() ? verdictHtml(F, pct, silent) : ''}<div class="qs-status hl-kpis">
       ${chip('Stations heard', num(c.stationsHeard), `${num(c.scheduled)} on a learned schedule`)}
       ${chip('Checks received', pct == null ? '—' : pct + '%', `${num(c.checksReceived)} of ${num(c.checksDue)} due`, pct != null && pct < 80 ? 'warn' : '')}
       ${chip('Need attention', num(c.attention), 'critical and warnings', c.attention ? 'warn' : '')}

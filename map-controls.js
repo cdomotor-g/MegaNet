@@ -296,12 +296,16 @@ function addBaseLayers(map, opts = {}) {
   // ── What is on, and how strongly ───────────────────────────────────────────
   // { name: { on, op } }, op 0–1. The default is the one the radios had: the
   // first base on at full strength and the rest off — except under the Calm
-  // look (looks.js), whose default is Light, or Dark in the dark theme: a pale
-  // sheet glaring out of a dark page is the opposite of calm. Every read is
-  // guarded — private browsing, a full quota or a hand-edited value must still
-  // give a map.
+  // look (looks.js) and Tiles, whose default is Light, or Dark in the dark
+  // theme: a pale sheet glaring out of a dark page is the opposite of calm.
+  // Instrument's is Dark in any theme, the ground its health-coloured pins
+  // were drawn on; Signs' is the street map, the most contrast a base has,
+  // or Dark in the dark theme. Every read is guarded — private browsing, a
+  // full quota or a hand-edited value must still give a map.
   const pick = {};
-  const first = state.look !== 'calm' ? names[0] : state.theme === 'dark' ? 'Dark' : 'Light';
+  const dark = state.theme === 'dark';
+  const first = { classic: names[0], instrument: 'Dark', signs: dark ? 'Dark' : 'OpenStreetMap' }[state.look]
+             || (dark ? 'Dark' : 'Light');
   for (const n of names) pick[n] = { on: n === first, op: 1 };
   // …and in what order, bottom first. Reorderable (drag the ⠿ grip, or arrow
   // keys on it), saved beside the mix as `_order`. A saved order is taken for

@@ -1365,33 +1365,57 @@ next rather than to a tab still waiting:
 
 ---
 
-## 8. Looks — Calm and Classic
+## 8. Looks — Calm, the three in pictures, and Classic
 
 Added October 2026, after people using the app said it was too much at once:
 forty-odd tabs down the side, six buttons in a blue banner, an emoji on every
-line and a map ringed in four colours. The answer is a second way of laying the
-same app out, not a cull — every tab, action and address is the same in both.
+line and a map ringed in four colours. The answer is another way of laying the
+same app out, not a cull — every tab, action and address is the same in each.
+Three more followed the same month, asked for by the same people: an app read
+at a glance rather than read, in pictures.
 
 | Look | Where it lives | What it is |
 |---|---|---|
-| **Calm** (default) | `looks.js`, `calm-shell.js`, the `:root[data-look="calm"]` block at the end of `styles.css` | The groups down the side, the open group's tabs across the top (`#section-bar`), search, sign in and ⋯ in a white banner, line drawings for the groups, one accent (`--primary` is the accent blue). On a phone, a bar along the foot — Nearby, Look Around ("Look"), Map, Visits, Camera, More — and the inspection sheet a section at a time. The Stations map starts quiet: the Light base map (Dark in the dark theme), every link one slate colour, and the context layers in `CALM_MAP_OFF` (core.js) off until ticked — remembered once ticked, and *Turn them all on* at the top of Map display. |
+| **Calm** (default) | `looks.js`, `calm-shell.js`, the `:root[data-shell="calm"]` block near the end of `styles.css` | The groups down the side, the open group's tabs across the top (`#section-bar`), search, sign in and ⋯ in a white banner, line drawings for the groups, one accent (`--primary` is the accent blue). On a phone, a bar along the foot — Nearby, Look Around ("Look"), Map, Visits, Camera, More — and the inspection sheet a section at a time. The Stations map starts quiet: the Light base map (Dark in the dark theme), every link one slate colour, and the context layers in `CALM_MAP_OFF` (core.js) off until ticked — remembered once ticked, and *Turn them all on* at the top of Map display. |
+| **🔲 Tiles** | Calm's, plus `glyphs.js`, `home.js` and `:root[data-look="tiles"]` | Calm with a coloured tile for every group and tool — each a pictogram on its family's colour — pictograms for the banner's buttons, and 🏠 **Home** in the banner: the network's counts, the six tools used most as big tiles, every other tab as a small one. A phone's foot trades Camera for Home. |
+| **🎚️ Instrument** | Calm's, plus `:root[data-look="instrument"]` | A dark frame — banner, rail, row of tabs, a phone's foot — round the page in whichever theme it is in, done by restating the theme's tokens on those four. The groups a rail of pictures (collapsed to start), the OK / on watch / at fault counts across the banner (`#hdr-status`), and the Stations map on the Dark base with its pins coloured by health (`mapHealthStored`, core.js). |
+| **🪧 Signs** | Calm's, plus `:root[data-look="signs"]` | Black on yellow, thick edges and a step larger type, for full sun and a gloved thumb: every pictogram on a yellow sign, the button that acts black with yellow text (yellow on black in the dark theme), the street map, and 🏠 Home as six big signs. On a phone the inspection sheet's sections are a row of signs, each a way to its section. |
 | **Classic** | everything else in `app.js` and `styles.css` | The app as it was: every tab in the bar under its group's heading, every button in the banner, ☰ on a phone. |
+
+**The pictures** are `glyphs.js`: a 24-unit grid, a 2-unit stroke with round
+ends, in `currentColor` — so one drawing sits white on a tile, black on a sign
+or in the ink of a plain button. Every tab has one (`Glyphs.TAB`), every TABS
+group has one and a family (`Glyphs.GROUP`: net, data, field, radio, learn,
+admin — `--hue-*`, each dark enough for white on it), and so does every
+inspection section (`Glyphs.SECTION`). A picture is never a control's only
+name: it sits beside the label or the button carries the name. A new tab
+without a line in `Glyphs.TAB` draws its group's picture, and `npm run looks`
+fails until it has its own.
+
+**🏠 Home** (`home.js`) is a tab like any other — first under Start here, in
+every look — and the front page of Tiles and Signs. Its counts are Station
+Health's classes from the batch the map's health pins use
+(`HealthGlance.counts()`, asked through `askNet()` whether or not the pins'
+switch is on); a count not yet known is a dash, never a nought.
 
 **The choice** is `state.look`, built in `core.js` (`lookStored()`) from
 `?look=` in the address, then `mn-look` in storage, then the default — the
 theme's pattern, for the theme's reason. `Looks.start()` (init.js) puts it on
-`<html data-look>`, keeps an address's `?look=` as the choice and takes it out of
-the address. The switch is in the Theme dialog (Classic's 🌗, Calm's ⋯ → Theme &
+`<html data-look>` — and `data-shell="calm"` for every look but Classic, which
+wears `data-shell="classic"` — keeps an address's `?look=` as the choice and
+takes it out of the address. The switch is in the Theme dialog (Classic's 🌗, Calm's ⋯ → Theme &
 look) and in Ctrl+K; `Looks.set()` redraws the shell at once. A device that knew
 Classic and has not chosen is told once, under the row across the top, with the
 way back.
 
-**The rules that keep two looks one app:**
+**The rules that keep five looks one app:**
 
-- **Scope, don't fork.** A look's CSS is under `:root[data-look="<id>"]`; its
-  code branches on `state.look` in the few places that draw the shell
-  (`renderTabs`, `refocusAfterTabSwitch`, `setNavCollapsed`'s focus,
-  `updateChromeHeight`). A tab does not branch on the look unless how it is laid
+- **Scope, don't fork.** Calm's shell CSS is under `:root[data-shell="calm"]`,
+  a look's own under `:root[data-look="<id>"]`; the code asks
+  `lookUsesCalmShell()` or `lookHasSymbols()` (core.js) in the few places that
+  draw the shell (`renderTabs`, `refocusAfterTabSwitch`, `setNavCollapsed`'s
+  focus, `updateChromeHeight`), and `state.look` only where one look differs
+  from the rest (the map's base, Instrument's counts and rail). A tab does not branch on the look unless how it is laid
   out *is* the point — the Inspections sheet's section-at-a-time is the one so far.
 - **Same buttons, same names.** A tab's button carries `data-tab` and
   `aria-current="page"` in either look, so focus, the Site Map's gold line and
@@ -1417,14 +1441,16 @@ way back.
   and gives Needs attention most of the width. The next tab to follow it gets
   the same treatment the same way: the sentence only under Calm.
 
-**Checks.** Every browser check but one opens the app in Classic — the
+**Checks.** Every browser check but two opens the app in Classic — the
 checks were written against it and it is still a look people use;
 `test/lib/browser.mjs` pins it through `?look=classic`, which (unlike a stored
 key) leaves a first visit a first visit. `npm run calm` opens the default and
-holds Calm to the above, a phone and every tab included.
+holds Calm to the above, a phone and every tab included; `npm run looks` holds
+the three in pictures, Home and the pictures themselves.
 
-**Adding a third look:** an entry in `LOOKS` (looks.js) and `LOOK_CHOICES`
+**Adding another look:** an entry in `LOOKS` (looks.js) and `LOOK_CHOICES`
 (core.js), its CSS under its own `data-look`, and — if it draws the bar
-differently — a branch in `renderTabs()` handing the bar to its renderer, the
-way Calm's goes to `CalmShell.render()`. Its own browser check, like
-`npm run calm`, opening with `browser.newContext({ look: '<id>' })`.
+differently from Calm — a branch in `renderTabs()` handing the bar to its
+renderer, the way every look but Classic goes to `CalmShell.render()`. Its
+checks in `npm run looks`, or a check of its own like `npm run calm`, opening
+with `browser.newContext({ look: null })` and `mn-look` stored.

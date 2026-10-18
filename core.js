@@ -133,6 +133,14 @@
 // is asking for must not be the answer.
 const TABS = [
   { group: 'Start here', tabs: [
+    // 🏠 Home (home.js) heads the first group because it is the front page of
+    // the three looks drawn in pictures (looks.js): the tools used most as big
+    // tiles, how the network is right now, and every other tab under them. A
+    // tab like any other in Calm and Classic. Its find words are what somebody
+    // looking for a front page types — never "screen", so that "home screen"
+    // still finds Offline & Install (nav.mjs).
+    { id: 'home',       label: 'Home',                   icon: '🏠',
+      find: 'front page start launcher dashboard tiles shortcuts most used everything all tools at a glance network now overview' },
     { id: 'sitemap',    label: 'Site Map',               icon: '🗂️',
       find: 'guide overview tour index directory contents orientation beginner introduction getting started help what does each every tab do explained' },
     { id: 'offline',    label: 'Offline & Install',      icon: '📲',
@@ -362,6 +370,21 @@ function tabShown(t) {
 //    loud: that the box highlights rather than hides, and that a "not recorded
 //    yet" bucket is ticked by default.
 const HELP = {
+  home: {
+    summary: 'The front page: how the network is right now — how many stations are reporting as they should, '
+           + 'how many are on watch and how many are at fault — then the six things used most as big tiles '
+           + '(the map, the stations nearest you, Station Health, an inspection, the camera and Look Around), '
+           + 'and every other tab under them, each a picture in its group\'s colour. Press a tile to go there.',
+    watch: [
+      'The counts are Station Health\'s, asked for once when the page opens and again after fifteen minutes: '
+      + 'press one to open Station Health. A count is a dash while the answer is on its way, or if it cannot '
+      + 'be had — Station Health says why.',
+      'The number on Station Health\'s tile is how many stations are on watch or at fault together.',
+      'It is the front page of the Tiles and Signs looks, and 🏠 in their banner comes back to it. '
+      + 'Theme &amp; look, under ⋯, changes the look.',
+    ],
+    related: ['health', 'nearby', 'sitemap'],
+  },
   sitemap: {
     summary: 'A guide to the whole app for somebody new to it: how the screen is laid out, the '
            + 'groups the tabs are filed under and the order the work moves through them, a list of '
@@ -1020,7 +1043,8 @@ const HELP = {
            + 'Pick a station for what a visit needs in one place: <strong>Start inspection</strong> opens the '
            + 'inspection sheet already filled in with it, <strong>Photos</strong> opens the Field Camera with it '
            + 'chosen, <strong>Directions</strong> hands its position to your maps app, and <em>Show on the map</em> '
-           + 'opens the Stations tab on it.',
+           + 'opens the Stations tab on it. Under them, whether it is reporting — the station card\'s '
+           + '<em>Health</em> lines, each a way into Station Health.',
     watch: [
       'The list follows the Stations tab\'s filters, so a station that seems to be missing may simply be '
       + 'filtered out there.',
@@ -3172,8 +3196,9 @@ function themeStored() {
 }
 
 // ── Look: how the app is laid out around the tabs ────────────────────────────
-// Calm (the default since October 2026) or Classic, and room for more — the
-// registry, the switch and the reasons are looks.js's. The choice lives here,
+// Calm (the default since October 2026), the three drawn in pictures — Tiles,
+// Instrument and Signs — or Classic: the registry, the switch and the reasons
+// are looks.js's. The choice lives here,
 // beside the theme's, for the theme's reason: `state` below is built from it,
 // before looks.js has loaded, and so are the map defaults a look changes.
 //
@@ -3182,7 +3207,7 @@ function themeStored() {
 // link. Read here as well as stored by Looks.start(), because a state built
 // from the stored value alone would draw the first page in the old look and
 // change under the reader.
-const LOOK_CHOICES = ['calm', 'classic'];
+const LOOK_CHOICES = ['calm', 'tiles', 'instrument', 'signs', 'classic'];
 
 function lookStored() {
   let v = null;
@@ -3192,13 +3217,26 @@ function lookStored() {
   return LOOK_CHOICES.includes(v) ? v : 'calm';
 }
 
+// Every look but Classic is drawn by CalmShell (calm-shell.js) — the groups
+// down the side, the open group's tabs across the top, ⋯ in the banner and a
+// phone's bar along its foot — and starts the Stations map quiet. The three
+// in pictures are Calm with its line drawings swapped for pictograms
+// (glyphs.js) and a stylesheet of their own, so a rule written for Calm's
+// shell is written once, here, for all four.
+function lookUsesCalmShell(look = state.look) { return look !== 'classic'; }
+
+// Tiles, Instrument and Signs: the looks that draw a tab, a group and a
+// station's state as a pictogram (Glyphs), with 🏠 Home as their front page.
+function lookHasSymbols(look = state.look) { return look === 'tiles' || look === 'instrument' || look === 'signs'; }
+
 // The Stations map's context layers the Calm look starts without: each one
 // still a tick away in 🗺️ Map display, and each still remembered once ticked
 // — a stored 'on' or 'off' means what it always meant, in either look. Only a
 // browser that has never said starts from the look's answer: Classic's, every
 // one of them on; Calm's, every one of them off, so the map opens as the
-// network on a plain ground — the pins and the radio paths between them. A
-// state key and the storage key its switch writes.
+// network on a plain ground — the pins and the radio paths between them. The
+// three looks in pictures start from Calm's answer. A state key and the
+// storage key its switch writes.
 const CALM_MAP_OFF = [
   ['mapPinSls',   'mn-pin-sls',             'the forecast and information outlines'],
   ['mapRivers',   'mn-rivers',              'waterways'],
@@ -3215,7 +3253,16 @@ const CALM_MAP_OFF = [
 function mapLayerStored(key) {
   let v = null;
   try { v = localStorage.getItem(key); } catch (_) {}
-  return v == null ? lookStored() !== 'calm' : v !== 'off';
+  return v == null ? lookStored() === 'classic' : v !== 'off';
+}
+
+// Pins coloured by health (#218): what the switch says if it has been set,
+// else on under 🎛️ Instrument, whose map is the network's state at a glance,
+// and off under every other look, for the reasons given at mapHealth below.
+function mapHealthStored() {
+  let v = null;
+  try { v = localStorage.getItem('mn-map-health'); } catch (_) {}
+  return v == null ? lookStored() === 'instrument' : v === 'on';
 }
 
 // Where the Stations map was last looking, as noteStationsView() (app.js) kept
@@ -3501,8 +3548,9 @@ const state = {
   // because the role colours are how the map has always been read and the
   // switch costs a request — one, for the whole network, per load — and
   // remembered, on MapCatchments' terms: an operator who turns it on wants
-  // the map that way next time.
-  mapHealth:      localStorage.getItem('mn-map-health') === 'on',
+  // the map that way next time. On by default under the Instrument look
+  // (mapHealthStored, above), which was drawn round it.
+  mapHealth:      mapHealthStored(),
   // What a pin's shape, fill and outline say about the station (map-symbols.js):
   // a triangle for a river height (water level) gauge, grey for a gauge read
   // by hand, the Bureau's purple and pink outlines for its forecast and
@@ -3613,8 +3661,10 @@ const state = {
   // Left nav: an icon rail, or icons plus labels. Kept under 'mn-nav' the same
   // way the theme and the filter card are. With nothing stored the window's
   // width decides, so a first visit on a laptop isn't handed two sidebars.
+  // The Instrument look's bar is a rail of pictures unless asked otherwise.
   navCollapsed:   (localStorage.getItem('mn-nav')
-                   || (window.innerWidth < NAV_AUTO_COLLAPSE_PX ? 'collapsed' : 'expanded')) === 'collapsed',
+                   || (window.innerWidth < NAV_AUTO_COLLAPSE_PX || lookStored() === 'instrument'
+                       ? 'collapsed' : 'expanded')) === 'collapsed',
   // What is typed in the nav's "find a tab" box (#108). Deliberately *not*
   // persisted: a filter is a thing you are doing now, and a nav that opens
   // already showing four of its twenty tabs — with no memory of why — reads as
@@ -4060,7 +4110,8 @@ const state = {
   // the right question everywhere it is asked (#224).
   themeChoice: themeStored(),
   theme: themeResolve(themeStored()),
-  // 'calm' or 'classic' (looks.js). Read by everything that draws the shell.
+  // One of LOOK_CHOICES (looks.js). Read by everything that draws the shell,
+  // mostly through lookUsesCalmShell() and lookHasSymbols().
   look: lookStored(),
   // The Stations map's last centre and zoom, kept as the tab is left
   // (noteStationsView, app.js) — see storedMapView() above.
@@ -4422,11 +4473,11 @@ function mapLinkColourFromStorage() {
     fade  = localStorage.getItem('mn-map-fade');
   } catch (_) { /* private mode, or storage disabled — take the default */ }
   if (saved === 'freq' || saved === 'fade' || saved === 'plain') return saved;
-  // Under the Calm look a map with no choice of its own draws every link in
-  // one colour (styles.css gives Calm a quiet one): seven channel hues across
+  // Under the Calm look (and the three in pictures, which start from it) a
+  // map with no choice of its own draws every link in one colour (styles.css gives Calm a quiet one): seven channel hues across
   // the south-east read as noise to anybody not asking which channel a hop is
   // on. The radio group in 🗺️ Map display puts any other back, remembered.
-  return fade === 'on' ? 'fade' : lookStored() === 'calm' ? 'plain' : 'freq';
+  return fade === 'on' ? 'fade' : lookStored() !== 'classic' ? 'plain' : 'freq';
 }
 
 // The fallback is not decoration. A token misspelt here resolves to the empty

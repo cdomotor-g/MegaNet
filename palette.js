@@ -192,13 +192,11 @@ const Palette = (() => {
         find: 'theme dark light colour color night mode', run: () => toggleTheme() },
       { icon: '☀️', label: 'Choose a theme — System, Light, Dark or Sunlight', find: 'theme sunlight contrast outdoors system device',
         run: () => openThemeMenu() },
-      // The other look (looks.js) — the way back to Classic for somebody who
-      // knew where everything was, and the way to Calm from it.
-      state.look === 'calm'
-        ? { icon: '🗂️', label: 'Switch to the Classic look — every tab in the bar, every button in the banner',
-            find: 'look layout classic old interface design switch back previous', run: () => Looks.set('classic') }
-        : { icon: '🪷', label: 'Switch to the Calm look — the groups down the side, fewer buttons',
-            find: 'look layout calm new interface design switch quieter', run: () => Looks.set('calm') },
+      // The other looks (looks.js) — the way back to Classic for somebody who
+      // knew where everything was, and the way to each of the rest from it.
+      ...LOOK_CHOICES.filter(id => id !== state.look).map(id => ({
+        icon: Looks.LOOKS[id].icon, label: `Switch to the ${Looks.label(id)} look — ${Looks.LOOKS[id].brief}`,
+        find: `look layout interface design switch ${Looks.LOOKS[id].find}`, run: () => Looks.set(id) })),
       { icon: '🐞', label: 'Report a bug or suggest an improvement', find: 'bug report problem issue feedback suggest broken',
         run: () => BugReport.open() },
     ];

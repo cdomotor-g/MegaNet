@@ -154,7 +154,15 @@ const Nearby = (() => {
           <button type="button" class="link-btn" onclick="Nearby.show('${escAttr(s.id)}')">Show on the map</button>
         </div>
         ${ids.length ? `<p class="small txt-muted">ALERT ${ids.length > 1 ? 'IDs' : 'ID'} ${esc(ids.join(', '))}</p>` : ''}
+        ${typeof HealthGlance !== 'undefined' ? HealthGlance.cardHtml(s) : ''}
       </div>`;
+  }
+
+  // Whether it is reporting — the station card's answer (health-glance.js),
+  // asked once the station is on screen and painted into it when it lands.
+  function askHealth() {
+    const s = pick ? stationById(pick) : null;
+    if (s && typeof HealthGlance !== 'undefined') HealthGlance.ask(s);
   }
 
   function repaint() {
@@ -173,6 +181,7 @@ const Nearby = (() => {
   let registered = false;
   function init() {
     if (!registered) { registerTabTeardown('Nearby', () => { pick = null; }); registered = true; }
+    askHealth();
     if (pick || asking || !navigator.permissions || !navigator.permissions.query) return;
     if (here && here.from === 'gps' && Date.now() - here.at < 60000) return;
     if (Date.now() - lastAuto < 60000) return;
@@ -225,6 +234,7 @@ const Nearby = (() => {
   function open(id) {
     pick = id;
     repaint();
+    askHealth();
     window.scrollTo(0, 0);
     const h = $('nb-stn-h');
     if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
