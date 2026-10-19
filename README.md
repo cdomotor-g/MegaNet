@@ -3489,7 +3489,7 @@ are the terminal term below, so a canopy is never counted twice.
 arbitrary point on the map — and itemises the path:
 
 ```
-EIRP           = tx_power_dbm + tx_gain_dbi − tx_losses_db
+EIRP           = tx_power_dbm + tx_gain_dbd + 2.15 − tx_losses_db   (dBd + the dipole = dBi)
 Free space     = 32.45 + 20·log10(f_MHz) + 20·log10(d_km)
 Terrain        = A_ref, the Longley–Rice reference attenuation over the profile
 Statistics     = the climate's median shift + the variability for the reliability asked
@@ -3498,9 +3498,21 @@ Ground cover   = ITU-R P.2108 §3.1 terminal loss at an end whose antenna is und
                                                                  (the land-cover model instead)
 Obstruction floor = knife-edge over the worst obstruction, where the model's regime prices it lower
 = Path loss    = the sum of those
-RX predicted   = EIRP − path loss + rx_gain_dbi − rx_losses_db
+RX predicted   = EIRP − path loss + rx_gain_dbd + 2.15 − rx_losses_db
 Fade margin    = RX predicted − rx_sensitivity_dbm     (Radio Mobile's "Rx relative")
 ```
+
+**Antenna gain is shown and typed in dBd**, the way the antennas are bought and
+known — the field stations' CLV3 collinear is "a 3 dB antenna", 3 dBd — and kept
+in dBi underneath (`rm_systems.antenna_gain_dbi`, 5.15 for the CLV3), because a
+path loss is reckoned between isotropic antennas and Radio Mobile's own field is
+dBi. The table lists each gain in dBd with a *Dipole over isotropic* row of
++2.15 dB under it, so the column still adds up; the box beside each end shows
+the dBi it stands for, and a figure typed in dBd is stored as dBi
+(`lbDbd`, `LB_DIPOLE_DBI`, link-budget.js). The radio-system lists in 🗼 Repeater
+site finder and 📡 Polar radio coverage, the ACMA licence card (beside the register's own
+dBi) and the 🎓 fade-margin bench say dBd too; the Radio Mobile export and the
+agent API stay in dBi, which is what their readers expect.
 
 Every term is its own row, signed, and visibly adds up to the received level —
 never a single number.

@@ -9572,7 +9572,10 @@ function renderAcmaCard() {
     <div class="acma-sect"><h4>Antenna</h4>
       ${acmaCardRow('Type / model', esc([ant.type, ant.manufacturer, ant.model].filter(Boolean).join(' · ')))}
       ${acmaCardRow('Height', dev.height_m != null ? dev.height_m + ' m' : null)}
-      ${acmaCardRow('Gain', ant.gain_dbi != null ? ant.gain_dbi + ' dBi' : null)}
+      ${acmaCardRow('Gain', ant.gain_dbi != null && isFinite(ant.gain_dbi)
+        // In dBd, like every gain in the app (lbFmtDbd), and the dBi the
+        // register holds it in beside it.
+        ? `${lbFmtDbd(Number(ant.gain_dbi))} · ${ant.gain_dbi} dBi as licensed` : null)}
       ${acmaCardRow('Azimuth / tilt', dev.az != null ? `${dev.az}° / ${dev.tilt != null ? dev.tilt + '°' : '—'}` : null)}
       ${acmaCardRow('H-beamwidth', ant.h_bw ? ant.h_bw + '°' : null)}
       ${acmaCardRow('Polarisation', esc(dev.pol))}

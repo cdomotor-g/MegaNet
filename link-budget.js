@@ -79,6 +79,25 @@ function lbMarginClass(db) { return LB_MARGIN.find(m => db >= m.min); }
 // rm_systems row carries a figure of its own uses that instead of this.
 const LB_DEFAULT_LOSS_DB = 0.5;
 
+// Antenna gain, as a person reads it. Stored, priced and exported in dBi —
+// rm_systems.antenna_gain_dbi is Radio Mobile's own field, and a path loss is
+// reckoned between isotropic antennas, so the arithmetic wants dBi — but shown
+// and typed in dBd, because that is how the antennas are bought and known: the
+// field stations' CLV3 collinear is "a 3 dB antenna", which is 3 dBd, 5.15 dBi.
+// A dBd is a decibel over a half-wave dipole, and the dipole is 2.15 dBi.
+const LB_DIPOLE_DBI = 2.15;
+
+// dBi → dBd, to the hundredth (5.15 − 2.15 is 3.0000000000000004 otherwise).
+function lbDbd(dbi) {
+  return dbi == null || !isFinite(dbi) ? null : Math.round((dbi - LB_DIPOLE_DBI) * 100) / 100;
+}
+
+// "3 dBd", for a label or a list: as few figures as the gain has.
+function lbFmtDbd(dbi) {
+  const d = lbDbd(dbi);
+  return d == null ? '—' : `${d} dBd`;
+}
+
 const LinkBudget = (function () {
   let map = null, layer = null, clickHandler = null, keyHandler = null;
 
@@ -603,14 +622,18 @@ const LinkBudget = (function () {
     const f = (k, label, step, unit) => {
       const over = isOver(e, k);
       const v = val(e, k);
+      // The gain is kept in dBi and typed in dBd (lbDbd): the box shows dBd,
+      // and its flag the dBi it stands for, which is the figure the budget adds.
+      const dbd = k === 'gain_dbi';
+      const shown = dbd ? lbDbd(v) : v;
       return `
         <label class="lb-field${over ? ' is-over' : ''}">
           <span>${esc(label)}${unit ? ` <em>${esc(unit)}</em>` : ''}</span>
           <input type="number" step="${step}" id="lb-f-${which}-${k}"
-                 value="${v == null ? '' : v}"
+                 value="${shown == null ? '' : shown}"
                  placeholder="not set"
-                 onchange="LinkBudget.setField('${which}','${k}',this.value)">
-          <b class="lb-flag">${over ? 'edited'
+                 onchange="LinkBudget.${dbd ? 'setGainDbd' : 'setField'}('${which}','${k}',this.value)">
+          <b class="lb-flag">${dbd && v != null ? `${+v.toFixed(2)} dBi · ` : ''}${over ? 'edited'
             : e.def[k] == null ? ''
             : k === 'agl_m' && e.mast != null ? `mast · system says ${e.mast} m`
             : e.kind === 'station' ? 'default'
@@ -637,7 +660,7 @@ const LinkBudget = (function () {
               : '<span class="txt-muted">sampling…</span>')}</p>
         <div class="lb-fields">
           ${f('tx_w',     'TX power',        '0.1',  'W')}
-          ${f('gain_dbi', 'Antenna gain',    '0.05', 'dBi')}
+          ${f('gain_dbi', 'Antenna gain',    '0.05', 'dBd')}
           ${f('loss_db',  'Line loss',       '0.1',  'dB')}
           ${f('agl_m',    'Antenna height',  '0.5',  'm AGL')}
           ${f('rx_dbm',   'RX threshold',    '0.1',  'dBm')}
@@ -671,6 +694,15 @@ const LinkBudget = (function () {
       </tr>`;
   }
 
+  // The step from dBd to dBi, as a row of its own under each antenna's gain, so
+  // the column still adds up in plain sight: the gain is shown in dBd, the way
+  // the antenna is known, and the path loss is reckoned between isotropic
+  // antennas, so the dipole's own 2.15 dBi goes in between.
+  function dipoleRow() {
+    return budgetRow('Dipole over isotropic', LB_DIPOLE_DBI, 'dB',
+      'dBd to dBi: a dBd is over a half-wave dipole, which is 2.15 dBi');
+  }
+
   function budgetHtml(r) {
     const a = S().a, b = S().b;
     const m = r.margin == null ? null : lbMarginClass(r.margin);
@@ -698,8 +730,9 @@ const LinkBudget = (function () {
         <caption class="sr-only">The link budget, term by term — each gain and loss between the transmitter and the receiver, and the margin they add up to</caption>
         <tbody>
           ${budgetRow('TX power', r.txDbm, 'dBm', r.txW != null ? `${r.txW} W at ${esc(a.name)}` : 'no TX power set')}
-          ${budgetRow('TX antenna gain', val(a, 'gain_dbi'), 'dBi',
+          ${budgetRow('TX antenna gain', lbDbd(val(a, 'gain_dbi')), 'dBd',
             val(a, 'gain_dbi') == null ? '<span class="txt-bad">not set — no EIRP without it</span>' : '')}
+          ${val(a, 'gain_dbi') == null ? '' : dipoleRow()}
           ${budgetRow('TX line loss', val(a, 'loss_db') == null ? null : -val(a, 'loss_db'), 'dB',
             val(a, 'loss_db') == null ? '<span class="txt-bad">not set — no EIRP without it</span>' : '')}
           ${budgetRow('= EIRP', r.eirp, 'dBm', '', 'lb-sub')}
@@ -744,8 +777,9 @@ const LinkBudget = (function () {
           ${budgetRow('= Path loss', -r.pathLoss, 'dB', an && itm
             ? `${(r.pathLoss - r.fspl).toFixed(1)} dB over free space${itm.warnings.length ? ` · <span class="txt-warn">${itm.warnings.length} model warning${itm.warnings.length === 1 ? '' : 's'} below</span>` : ''}`
             : '', 'lb-sub')}
-          ${budgetRow('RX antenna gain', val(b, 'gain_dbi'), 'dBi',
+          ${budgetRow('RX antenna gain', lbDbd(val(b, 'gain_dbi')), 'dBd',
             val(b, 'gain_dbi') == null ? '<span class="txt-bad">not set — no received level without it</span>' : '')}
+          ${val(b, 'gain_dbi') == null ? '' : dipoleRow()}
           ${budgetRow('RX line loss', val(b, 'loss_db') == null ? null : -val(b, 'loss_db'), 'dB',
             val(b, 'loss_db') == null ? '<span class="txt-bad">not set — no received level without it</span>' : '')}
           ${budgetRow('= Received signal', r.rxDbm, 'dBm', `at ${esc(b.name)}${r.uV != null ? ` · ${fmtUv(r.uV)}` : ''}`, 'lb-sub')}
@@ -1417,6 +1451,12 @@ const LinkBudget = (function () {
       propChanged();
     },
     setPropOpen(v) { S().propOpen = !!v; },
+    // The gain box, typed in dBd and kept in dBi (lbDbd). Blank, as for every
+    // box, puts the default back.
+    setGainDbd(which, k, v) {
+      const n = v.trim() === '' ? null : Number(v);
+      LinkBudget.setField(which, k, n != null && isFinite(n) ? String(n + LB_DIPOLE_DBI) : '');
+    },
     setField(which, k, v) {
       const e = S()[which];
       if (!e) return;

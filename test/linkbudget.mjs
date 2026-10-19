@@ -361,6 +361,46 @@ ok('…and the note names the term that is missing',
    holed.missing.includes('TX antenna gain') && /TX antenna gain/.test(holed.text),
    holed.text.slice(0, 140));
 
+// ── 9b. The antenna gain, in dBd ─────────────────────────────────────────────
+// Kept in dBi, shown and typed in dBd: the field stations' CLV3 collinear is
+// "a 3 dB antenna" — 3 dBd, the 5.15 dBi their system holds — and the table
+// puts the dipole's 2.15 back as a row of its own, so the column still adds up.
+const dbd = await page.evaluate(() => {
+  state.link.a.def.gain_dbi = 5.15;
+  LinkBudget.rerender();
+  const read = () => {
+    const box = document.getElementById('lb-f-a-gain_dbi');
+    const field = box.closest('.lb-field');
+    const rows = [...document.querySelectorAll('.lb-table tbody tr')].map(tr => ({
+      label: tr.querySelector('th').textContent.trim(),
+      v: tr.querySelector('.lb-num').textContent.trim(), u: tr.querySelector('.lb-unit').textContent.trim() }));
+    return { box: box.value, unit: field.querySelector('em').textContent,
+             flag: field.querySelector('.lb-flag').textContent.trim(), rows, r: LinkBudget.current() };
+  };
+  const before = read();
+  LinkBudget.setGainDbd('a', 'gain_dbi', '6');
+  const typed = { ...read(), stored: state.link.a.over.gain_dbi };
+  LinkBudget.setGainDbd('a', 'gain_dbi', '');
+  return { before, typed, cleared: state.link.a.over.gain_dbi };
+});
+const row = (rows, label) => rows.filter(x => x.label === label);
+ok('the gain box shows a 5.15 dBi system as 3 dBd, and says the dBi beside it',
+   dbd.before.box === '3' && dbd.before.unit === 'dBd' && /^5\.15 dBi · /.test(dbd.before.flag),
+   `${dbd.before.box} ${dbd.before.unit} · ${dbd.before.flag}`);
+ok('the budget lists each antenna gain in dBd, with the dipole as a row of its own',
+   row(dbd.before.rows, 'TX antenna gain').map(x => x.v + x.u).join() === '+3.00dBd'
+     && row(dbd.before.rows, 'RX antenna gain').map(x => x.v + x.u).join() === '+3.00dBd'
+     && row(dbd.before.rows, 'Dipole over isotropic').map(x => x.v + x.u).join() === '+2.15dB,+2.15dB',
+   JSON.stringify(dbd.before.rows.filter(x => /gain|Dipole/.test(x.label))));
+ok('…and the column still adds up to the EIRP: power + dBd + dipole − line loss',
+   Math.abs(dbd.before.r.txDbm + 3 + 2.15 - 1 - dbd.before.r.eirp) < 1e-9,
+   `${dbd.before.r.txDbm} + 3 + 2.15 − 1 against ${dbd.before.r.eirp}`);
+ok('6 dBd typed is kept as 8.15 dBi, shown as 6, and is worth 3 dB of margin over 3 dBd',
+   Math.abs(dbd.typed.stored - 8.15) < 1e-9 && dbd.typed.box === '6'
+     && Math.abs(dbd.typed.r.margin - dbd.before.r.margin - 3) < 1e-9,
+   `${dbd.typed.stored} dBi, box ${dbd.typed.box}, margin ${dbd.before.r.margin} → ${dbd.typed.r.margin}`);
+ok('…and blanking it puts the system\'s figure back', dbd.cleared === undefined, String(dbd.cleared));
+
 // ── 10. A repaint must not eat what is being typed ───────────────────────────
 // Every field commits on `change`, so everything typed since the last blur is
 // uncommitted — and a terrain tile landing repaints the card up to twelve

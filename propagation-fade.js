@@ -510,7 +510,7 @@ const PropFade = (function () {
       ['📻', 'Transmitter', `${o.w} W`, `${num(B.ptx)} dBm`],
       ['🎚️', 'Attenuator', `${B.atten} dB`, `lets ${pct(100 * Math.pow(10, -B.atten / 10))} of the power through`],
       ['🔌', 'Into the antenna', fmtW(dbmToWatts(B.intoAnt)), `${num(B.intoAnt)} dBm, after the feeder`],
-      ['📡', 'Radiated', `${num(B.eirp)} dBm`, `${fmtW(dbmToWatts(B.eirp))} EIRP, with the antenna's ${B.gtx.toFixed(2)} dBi`],
+      ['📡', 'Radiated', `${num(B.eirp)} dBm`, `${fmtW(dbmToWatts(B.eirp))} EIRP, with the antenna's ${+(B.gtx - DIPOLE_DBI).toFixed(2)} dBd (${B.gtx.toFixed(2)} dBi)`],
       ['🏞️', 'Lost on the way', `${B.pl.toFixed(1)} dB`, `${o.km} km, ${e_(COUNTRY[o.country].label.toLowerCase())}`],
       ['📶', 'At the receiver', `${num(B.rx)} dBm`, `${fmtW(dbmToWatts(B.rx))} — it needs ${num(RX_DBM, 0)} dBm`],
       ['🛟', 'Margin left', `${sign(B.margin)} dB`, B.atten ? `with ${B.atten} dB in: ${bn.label}` : bn.label, bn.cls],
@@ -569,8 +569,9 @@ const PropFade = (function () {
     const o = cur(), B = budget(o);
     const loss = B.pl;
     return `${o.w} W is ${num(B.ptx)} dBm. ${B.atten ? `${MINUS}${B.atten} dB at the attenuator, ` : 'Nothing off at the attenuator, '}
-      ${MINUS}${FEED_DB} dB of feeder and +${B.gtx.toFixed(2)} dBi of antenna: <strong>${num(B.eirp)} dBm</strong> radiated.
-      The path takes ${loss.toFixed(1)} dB, the repeater's antenna gives back ${RX_GAIN_DBI} and its feeder takes ${FEED_DB}:
+      ${MINUS}${FEED_DB} dB of feeder and +${+(B.gtx - DIPOLE_DBI).toFixed(2)} dBd of antenna (${B.gtx.toFixed(2)} dBi, the dBd and
+      the dipole's own 2.15): <strong>${num(B.eirp)} dBm</strong> radiated.
+      The path takes ${loss.toFixed(1)} dB, the repeater's 3 dBd antenna gives back ${RX_GAIN_DBI} dBi and its feeder takes ${FEED_DB}:
       <strong>${num(B.rx)} dBm</strong> arrives, ${B.margin >= 0 ? `${B.margin.toFixed(1)} dB above` : `${(-B.margin).toFixed(1)} dB short of`}
       the ${num(RX_DBM, 0)} dBm the receiver needs. In watts that is ${fmtW(o.w)} in and ${zerosW(dbmToWatts(B.rx))} out:
       the path alone divides the power by ${sci(Math.pow(10, loss / 10))}.`;

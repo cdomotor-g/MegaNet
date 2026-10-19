@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 47, date: '2026-10-19', items: [
+      '<strong>📡 Antenna gain in dBd.</strong> The link budget, the Repeater site finder, Polar radio coverage and the ACMA licence card now give '
+        + 'antenna gain in dBd — the field stations\' CLV3 collinear reads as the 3 dB antenna it is sold as. Type gains in '
+        + 'dBd too. The budget adds a <em>Dipole over isotropic</em> row (+2.15 dB) under each gain, so its sum still adds '
+        + 'up; the figures themselves have not changed.',
+    ] },
     { n: 46, date: '2026-10-19', items: [
       '<strong>📍 Two pins in the side panel, told apart again.</strong> In Calm and the looks in pictures the strip '
         + 'had greyed them both: now the <strong>red</strong> one is the Stations cards and the <strong>blue</strong> one '

@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-19** (revision 165 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-19** (revision 166 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -806,6 +806,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 166 — 2026-10-19: 📡 Antenna gain shown in dBd
+
+The owner: *"can you please show the antenna gain as dBd (we know the "CLV3" antennas as 3dB gain so it must be dBd)."* The data was already right — both field-station systems hold 5.15 dBi, which is 3 dBd — so this is how the figure is shown and typed, not what it is; no margin moves. Nothing opened or closed.
+
+- **link-budget.js**: `LB_DIPOLE_DBI`, `lbDbd` and `lbFmtDbd`. Each end's gain box is typed and shown in dBd, its flag giving the dBi it stands for; `LinkBudget.setGainDbd` stores dBi. The table lists each gain in dBd with a *Dipole over isotropic* +2.15 dB row under it, so the column still visibly adds up.
+- **Elsewhere in dBd**: the radio-system lists in the Repeater site finder and Polar radio coverage, the ACMA licence card (beside the register's own dBi), and the 🎓 fade-margin bench's two sentences. Still dBi: `rm_systems.antenna_gain_dbi`, the Radio Mobile export and the agent API — what their readers expect.
+- README §17 and its budget formula, What's new 47, `test/README.md`, the version stamp `20261019d`.
+
+**Checks:** `npm run linkbudget` (5 new: 5.15 dBi shown as 3 dBd with its dBi beside it; both gain rows in dBd with the dipole row under each; the column adding to the EIRP; 6 dBd typed kept as 8.15 dBi and worth exactly 3 dB; blank restoring the system's figure), `propagation`, `sites`, `terrain`, `sls`, and the cheap five.
 
 ### Revision 165 — 2026-10-19: 📡 The profile's signal one way, and its dB on the cursor
 

@@ -13,7 +13,7 @@
 // copyLatLonPillHtml and mapViewPills; across to terrain.js for Terrain.grid
 // and Terrain.profile, land-cover.js for LandCover.sample, path-profile.js for
 // pathAnalyse, pathPropOf, rmSystemOf, wattsToDbm and the PATH_DEFAULT_*
-// constants, map-roads.js for MapRoads.near, map-draw.js for MapDraw,
+// constants, link-budget.js for lbFmtDbd, map-roads.js for MapRoads.near, map-draw.js for MapDraw,
 // places.js for Places.parse, map-controls.js for MapChrome.panel, and app.js
 // for parseSearchTerms, parseIdRange, prepareSearch, stationMatchesSearch,
 // stationAlertIds, rerenderMapLegend and mapNote. Its two Google Earth
@@ -1288,7 +1288,7 @@ const MapSites = (function () {
               <span>Radio system</span>
               <select onchange="MapSites.set('sysId', this.value)">
                 ${sys.map(x => `<option value="${x.id}" ${rep && rep.id === x.id ? 'selected' : ''}>${
-                  esc(x.name)} — ${x.tx_power_w} W, ${x.antenna_gain_dbi} dBi, ${x.rx_threshold_dbm} dBm</option>`).join('')}
+                  esc(x.name)} — ${x.tx_power_w} W, ${lbFmtDbd(x.antenna_gain_dbi)}, ${x.rx_threshold_dbm} dBm</option>`).join('')}
               </select>
             </label>
             ${num('agl', 'Mast height', cfg.agl, 0.5, 'm AGL', 0, 200, rep && rep.antenna_height_m != null ? String(rep.antenna_height_m) : String(PATH_DEFAULT_AGL))}

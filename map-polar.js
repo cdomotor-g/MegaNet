@@ -8,8 +8,8 @@
 // Reaches back to core.js for state, esc, escAttr, fmtKm, destPoint,
 // acmaHaversineKm, cssVar, slug and dlText; across to terrain.js for
 // Terrain.grid, itm.js for ITM.pointToPoint, path-profile.js for rmSystemOf, stationAntenna, pathPropOf,
-// pathPropOf, wattsToDbm and the PATH_DEFAULT_* constants, map-controls.js
-// for MapChrome.panel, and app.js for rerenderMapLegend and mapNote. All of it
+// pathPropOf, wattsToDbm and the PATH_DEFAULT_* constants, link-budget.js for
+// lbFmtDbd, map-controls.js for MapChrome.panel, and app.js for rerenderMapLegend and mapNote. All of it
 // from inside its own functions, so this file's position among the modules is
 // free.
 //
@@ -704,7 +704,7 @@ const MapPolar = (function () {
               <span>Radio system</span>
               <select onchange="MapPolar.set('mobileSysId', this.value)">
                 ${sys.map(x => `<option value="${x.id}" ${m && m.id === x.id ? 'selected' : ''}>${
-                  esc(x.name)} — ${x.tx_power_w} W, ${x.antenna_gain_dbi} dBi, ${x.rx_threshold_dbm} dBm</option>`).join('')}
+                  esc(x.name)} — ${x.tx_power_w} W, ${lbFmtDbd(x.antenna_gain_dbi)}, ${x.rx_threshold_dbm} dBm</option>`).join('')}
               </select>
             </label>
             ${num('mobileAgl', 'Antenna height', cfg.mobileAgl, 0.5, 'm AGL', 0)}`
