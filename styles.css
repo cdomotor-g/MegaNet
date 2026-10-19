@@ -20204,6 +20204,10 @@ select.kl-in { width: auto; font-family: inherit; }
 
 /* ── The side panel's strip, in the same quiet ink ── */
 :root[data-shell="calm"] .dock-strip .dock-ico { filter: grayscale(1); }
+/* …but the two pins keep theirs, because colour is all that tells them apart:
+   the red one the Stations cards, the blue one Find a place (.mn-pin-blue,
+   the same blue as the pin it drops). Greyed, they were one pin twice. */
+:root[data-shell="calm"] .dock-strip :is([data-dock="stations"], [data-dock="places"]) .dock-ico { filter: none; }
 
 /* The memory strip under the banner (#79) keeps its place and its click, but
    says nothing in colour until it has something to say: grey while the page

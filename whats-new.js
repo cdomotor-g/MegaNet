@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 46, date: '2026-10-19', items: [
+      '<strong>📍 Two pins in the side panel, told apart again.</strong> In Calm and the looks in pictures the strip '
+        + 'had greyed them both: now the <strong>red</strong> one is the Stations cards and the <strong>blue</strong> one '
+        + '<em>Find a place</em>, as in Classic.',
+    ] },
     { n: 45, date: '2026-10-19', items: [
       '<strong>📡 The signal on the profile runs one way now</strong>, A to B, over and over — <em>⇄ Flip direction</em> '
         + 'shows the other way round. And <strong>pointing at the chart</strong>, or along the line on the map, now shows the '
