@@ -952,7 +952,7 @@ const PathProfile = (function () {
       sigGeom = {
         key: sig.key, L, T, iw, ih, lo, hi, D,
         txZ: an.txZ, rxZ: an.rxZ, fMhz: an.fMhz,
-        ab: sig.ab, ba: sig.ba, loss: an.pathLoss_db,
+        end: sig.end, loss: an.pathLoss_db,
         beam: `M${upper.join(' L')} L${lower.join(' L')} Z`,
         m: null,
       };
@@ -1160,8 +1160,8 @@ const PathProfile = (function () {
                      ? `, worst clearance ${Math.round(w.clearance)} m under the line at ${fmtKm(w.d1 / 1000)}`
                      : `, ${w.cover != null ? 'cover' : 'terrain'} ${Math.round(-w.clearance)} m above the line at ${fmtKm(w.d1 / 1000)}`)
                  : ''}${an.coverUsed ? `, with ${present.length} land-cover class${present.length === 1 ? '' : 'es'} drawn on the ground` : ''}${
-               sigOn ? `, and the signal run along the line each way, coloured by what is left over the receiver's threshold: ${
-                 sigDb(sig.ab)} arriving at B, ${sigDb(sig.ba)} arriving at A` : ''}. The same figures are listed under the chart.">
+               sigOn ? `, and the signal run along the line from A to B, coloured by what is left over B's receiver threshold: ${
+                 sigDb(sig.end)} arriving at B` : ''}. The same figures are listed under the chart.">
           ${sky}
           ${grid.join('')}
           ${radio}
@@ -1194,11 +1194,12 @@ const PathProfile = (function () {
           ${coverKey}
           ${flat || !sig ? '' : `<span id="path-sig-key">${sigKeyHtml(!sigOn ? 'none' : sigRows ? 'ready' : 'pending')}</span>`}
         </div>
-        ${sigOn ? `<p class="filter-hint path-sig-note">The signal runs A → B, then the reply B → A, priced the way the
-          fade margin is: the same model over the ground from the transmitter to each point on the line, for a
+        ${sigOn ? `<p class="filter-hint path-sig-note">The signal runs A → B (⇄ Flip direction for B → A), priced
+          the way the fade margin is: the same model over the ground from the transmitter to each point on the line, for a
           receiver like the far end's standing on the beam there. It fades with distance, drops where ${
           an.model === 'cover' && an.coverUsed ? 'ground or cover' : 'the ground'} reaches into the Fresnel zone, stays down in the
-          shadow behind it, and reaches the far end in the colour of that way round's fade margin.${
+          shadow behind it, and reaches B in the colour of the A→B fade margin. Point at the chart, or along the
+          line on the map, for the figure at that point.${
           an.model === 'cover' || !an.coverUsed ? ''
             : ' Under the field model the cover is drawn but not priced along the way — its average cost is in the allowance; the land-cover model, in the link budget\'s propagation settings, prices it where it stands.'}</p>` : ''}
         <p class="filter-hint">${esc(prof.attribution)} · ${prof.lidar ? `~${prof.resolution_m} m tiles read every ${
@@ -1247,6 +1248,10 @@ const PathProfile = (function () {
       const cls = p.cls != null && LandCover.CLASSES[p.cls] ? LandCover.CLASSES[p.cls].label : 'cover';
       bits.push(`${Math.round(p.cover)} m ${cls.toLowerCase()} on it`);
     }
+    // The signal on the beam over this point, as the chart's tag has it — with
+    // room here to say what the figure is over.
+    const m = sigAt(p.d1);
+    if (m != null) bits.push(m >= 0 ? `signal ${sigDb(m)} over B’s threshold` : `signal ${Math.abs(m).toFixed(1)} dB under B’s threshold`);
     bits.push(`${fmtKm(p.d1 / 1000)} along`);
     return bits.join(' · ');
   }
@@ -1290,7 +1295,16 @@ const PathProfile = (function () {
     dot.setAttribute('cx', p.x.toFixed(1));
     dot.setAttribute('cy', p.y.toFixed(1));
 
+    // The height, and once the line is priced the signal there, in its colour.
     txt.textContent = heightLabel(p);
+    const m = sigAt(p.d1);
+    if (m != null) {
+      const db = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+      db.textContent = ` · ${sigDb(m)}`;
+      db.style.fill = sigColour(m);
+      db.setAttribute('font-weight', '600');
+      txt.appendChild(db);
+    }
     const w = Math.max(28, (txt.getComputedTextLength ? txt.getComputedTextLength() : 30) + 12);
     // Above the dot, unless that would put it through the top of the plot, in
     // which case it goes below — a summit is exactly where the tag is most
@@ -1406,9 +1420,11 @@ const PathProfile = (function () {
   // The fade margin is one number at the far end. The chart above it shows the
   // ground that number was paid to, and until now nothing joined the two: where
   // along the way the signal went, and what took it. So the chart carries the
-  // transmission itself — a wavefront leaving A, running down the line of sight
-  // to B, then the reply from B to A — and paints the beam behind it in the
-  // colour of the margin left at each point.
+  // transmission itself — a wavefront leaving A and running down the line of
+  // sight to B, over and over — and paints the beam behind it in the colour of
+  // the margin left at each point. One way, A → B: the chart is drawn A → B,
+  // the budget's transmitter is A, and ⇄ Flip direction is the other way round.
+  // The same figure rides the hover cursor, on the chart and on the map.
   //
   // What it is priced with is the readout's own pathAnalyse, run again from the
   // transmitter to each point on the line: the ground between, the cover where
@@ -1422,31 +1438,30 @@ const PathProfile = (function () {
   // colours do what the physics does: fade slowly with distance in clear air,
   // drop where ground or cover reaches into the Fresnel zone, stay dark in the
   // shadow behind a ridge and fill back in as the shadow widens — and arrive at
-  // the far end in exactly the colour of that way round's fade margin, because
-  // the last point is the readout's own path loss and not a re-run of it.
+  // B in exactly the colour of the A→B fade margin, because the last point is
+  // the readout's own path loss and not a re-run of it.
   //
   // A margin is linear in the loss, so the radios are read once: the margin at
   // a point is the end's margin plus the loss the end paid that this point did
   // not. Only the losses are priced, and they are priced in slices off the main
-  // thread's back (two to three hundred model runs is a visible hitch in one
-  // go), then poured into the chart already on screen — not a re-render, which
-  // would throw the hover cursor away mid-reading.
+  // thread's back (a hundred and more model runs is a visible hitch in one go),
+  // then poured into the chart already on screen — not a re-render, which would
+  // throw the hover cursor away mid-reading.
   //
   // Stations only, as for the margin itself: a line on bare ground has no radio
   // at either end, and a signal along it would be this card inventing one.
-  const SIG_STATIONS = 128;   // points per direction the loss is priced at
+  const SIG_STATIONS = 128;   // points along the line the loss is priced at
   const SIG_SLICE_MS = 8;     // work per slice before yielding to the page
   const SIG_RUN  = 2400;      // ms the wavefront takes end to end
   const SIG_HOLD = 1100;      // …then the arrival, held
   const SIG_FADE = 500;       // …faded
-  const SIG_GAP  = 350;       // …and a breath before the reply
-  const SIG_LEG  = SIG_RUN + SIG_HOLD + SIG_FADE + SIG_GAP;
-  const SIG_CYCLE = 2 * SIG_LEG;
+  const SIG_GAP  = 350;       // …and a breath before the next
+  const SIG_CYCLE = SIG_RUN + SIG_HOLD + SIG_FADE + SIG_GAP;
 
   let sigCache = { key: null, rows: null };   // the losses for one chart's settings
   let sigJob = null;                          // the pricing in progress
-  // What the animation reads — the scales the chart was drawn to, the margins at
-  // each end, the beam's outline — rebuilt by every chartSvg() and null without
+  // What the animation and the cursor read — the scales the chart was drawn
+  // to, the margin at B, the beam's outline — rebuilt by every chartSvg() and null without
   // a chart, which is what stops a frame painting onto a chart that went.
   let sigGeom = null;
   let sigRaf = 0, sigT0 = 0, sigPhaseKey = null, sigObs = null, sigInView = true, sigTagWas = '';
@@ -1459,22 +1474,18 @@ const PathProfile = (function () {
             an.model, an.coverUsed, cur.coverStatus, JSON.stringify(an.prop)].join('|');
   }
 
-  // The loss from one end to the point on the line of sight over sample i.
-  function lossOnLine(prof, opt, an, i, fromB) {
+  // The loss from A to the point on the line of sight over sample i.
+  function lossOnLine(prof, opt, an, i) {
     const p = an.pts[i];
     if (!p || p.bulged == null) return null;
-    const n = prof.distance_m.length;
     // The ray's height over the bare ground there, which is the receiver's. A
     // line already under the ground is a point on the face of whatever cut it,
     // and the model's own floor of half a metre stands it on that face.
     const h = Math.min(3000, Math.max(0.5, p.los - p.bulged));
-    const take = arr => (Array.isArray(arr) && arr.length === n
-      ? (fromB ? arr.slice(i).reverse() : arr.slice(0, i + 1)) : null);
-    const dist = fromB ? prof.distance_m.slice(i).reverse().map(d => an.D - d) : prof.distance_m.slice(0, i + 1);
+    const take = arr => (Array.isArray(arr) && arr.length === prof.distance_m.length ? arr.slice(0, i + 1) : null);
+    const dist = prof.distance_m.slice(0, i + 1);
     const sub = pathAnalyse({ distance_m: dist, terrain_m: take(prof.terrain_m), partial: prof.partial }, {
-      ...opt,
-      elevA: fromB ? opt.elevB : opt.elevA, elevB: null,
-      aglA: fromB ? an.aglB : an.aglA, aglB: h,
+      ...opt, elevB: null, aglA: an.aglA, aglB: h,
       cover: take(opt.cover), canopy: take(opt.canopy),
     });
     if (sub.ok && sub.pathLoss_db != null) return sub.pathLoss_db;
@@ -1491,26 +1502,20 @@ const PathProfile = (function () {
     if (sigJob && sigJob.key === key) return null;
     const n = prof.distance_m.length, last = n - 1;
     const idx = pickIdx(n, SIG_STATIONS).filter(i => i > 0 && i < last);
-    const total = 2 * idx.length;
-    const job = sigJob = { key, k: 0, ab: [], ba: [] };
+    const job = sigJob = { key, k: 0, rows: [] };
     const step = () => {
       if (sigJob !== job) return;                   // a newer chart took over
       const until = performance.now() + SIG_SLICE_MS;
-      while (job.k < total && performance.now() < until) {
-        const fromB = job.k >= idx.length;
-        const i = idx[fromB ? job.k - idx.length : job.k];
-        const loss = lossOnLine(prof, opt, an, i, fromB);
-        if (loss != null) (fromB ? job.ba : job.ab).push({ d1: prof.distance_m[i], loss });
-        job.k++;
+      while (job.k < idx.length && performance.now() < until) {
+        const i = idx[job.k++];
+        const loss = lossOnLine(prof, opt, an, i);
+        if (loss != null) job.rows.push({ d1: prof.distance_m[i], loss });
       }
-      if (job.k < total) { setTimeout(step, 0); return; }
+      if (job.k < idx.length) { setTimeout(step, 0); return; }
       sigJob = null;
-      // The far end of each run is the readout's own path loss — the figure the
-      // fade margin row is taken off — so the two cannot differ by a re-run.
-      sigCache = { key, rows: {
-        ab: [...job.ab, { d1: an.D, loss: an.pathLoss_db }],
-        ba: [{ d1: 0, loss: an.pathLoss_db }, ...job.ba],
-      } };
+      // B is the readout's own path loss — the figure the fade margin row is
+      // taken off — so the two cannot differ by a re-run.
+      sigCache = { key, rows: [...job.rows, { d1: an.D, loss: an.pathLoss_db }] };
       sigFill();
     };
     setTimeout(step, 0);
@@ -1561,35 +1566,42 @@ const PathProfile = (function () {
     return a.m + (b.m - a.m) * (d - a.d1) / (b.d1 - a.d1 || 1);
   }
 
+  // The margin at a distance along the path, for the cursor: on the chart's tag
+  // and on the map's marker both, since both are painted from one place
+  // (paintCursor). Null until the line is priced, and then the tag simply has
+  // no figure yet rather than a guess at one.
+  function sigAt(d) {
+    const g = sigGeom;
+    return g && g.m ? sigMarginAt(g.m, d) : null;
+  }
+
   const sigX = (g, d) => g.L + (g.D > 0 ? d / g.D : 0) * g.iw;
   const sigY = (g, m) => g.T + (1 - (m - g.lo) / (g.hi - g.lo)) * g.ih;
   const sigLos = (g, d) => g.txZ + (g.rxZ - g.txZ) * (g.D > 0 ? d / g.D : 0);
   const sigDb = m => `${m > 0 ? '+' : ''}${m.toFixed(1)} dB`;
 
-  // Under the ground: the two runs' washes — a tint over the whole column of
-  // sky, the beam (the 60% Fresnel envelope) stronger, the line itself solid —
-  // each painted with its run's gradient and revealed by a clip the wavefront
-  // drags along; and the wavefront. Under the ground on purpose: where the line
+  // Under the ground: the wash — a tint over the whole column of sky, the beam
+  // (the 60% Fresnel envelope) stronger, the line itself solid — painted with
+  // the margins' gradient and revealed by a clip the wavefront drags along; and
+  // the wavefront. Under the ground on purpose: where the line
   // goes into a hill, so does the signal.
   function sigUnderHtml(g) {
-    const grad = (dir, rows) => `
-      <linearGradient id="path-sig-${dir}" gradientUnits="userSpaceOnUse"
-                      x1="${g.L}" y1="0" x2="${g.L + g.iw}" y2="0">${rows.map(r => `
-        <stop offset="${(g.D > 0 ? r.d1 / g.D : 0).toFixed(4)}" style="stop-color:${sigColour(r.m)}"/>`).join('')}
-      </linearGradient>
-      <clipPath id="path-sig-clip-${dir}">
-        <rect id="path-sig-reveal-${dir}" x="${g.L}" y="${g.T}" width="0" height="${g.ih}"/>
-      </clipPath>`;
-    const run = dir => `
-      <g id="path-sig-run-${dir}" clip-path="url(#path-sig-clip-${dir})" style="display:none">
-        <rect x="${g.L}" y="${g.T}" width="${g.iw}" height="${g.ih}" fill="url(#path-sig-${dir})" opacity=".13"/>
-        <path d="${g.beam}" fill="url(#path-sig-${dir})" opacity=".42"/>
-        <line x1="${g.L}" y1="${sigY(g, g.txZ).toFixed(1)}" x2="${g.L + g.iw}" y2="${sigY(g, g.rxZ).toFixed(1)}"
-              stroke="url(#path-sig-${dir})" stroke-width="3" stroke-linecap="round"/>
-      </g>`;
     return `
-      <defs>${grad('ab', g.m.ab)}${grad('ba', g.m.ba)}</defs>
-      ${run('ab')}${run('ba')}
+      <defs>
+        <linearGradient id="path-sig-grad" gradientUnits="userSpaceOnUse"
+                        x1="${g.L}" y1="0" x2="${g.L + g.iw}" y2="0">${g.m.map(r => `
+          <stop offset="${(g.D > 0 ? r.d1 / g.D : 0).toFixed(4)}" style="stop-color:${sigColour(r.m)}"/>`).join('')}
+        </linearGradient>
+        <clipPath id="path-sig-clip">
+          <rect id="path-sig-reveal" x="${g.L}" y="${g.T}" width="0" height="${g.ih}"/>
+        </clipPath>
+      </defs>
+      <g id="path-sig-run" clip-path="url(#path-sig-clip)" style="display:none">
+        <rect x="${g.L}" y="${g.T}" width="${g.iw}" height="${g.ih}" fill="url(#path-sig-grad)" opacity=".13"/>
+        <path d="${g.beam}" fill="url(#path-sig-grad)" opacity=".42"/>
+        <line x1="${g.L}" y1="${sigY(g, g.txZ).toFixed(1)}" x2="${g.L + g.iw}" y2="${sigY(g, g.rxZ).toFixed(1)}"
+              stroke="url(#path-sig-grad)" stroke-width="3" stroke-linecap="round"/>
+      </g>
       <g id="path-sig-front" style="display:none">
         ${[0, 1, 2].map(k => `<path id="path-sig-ripple-${k}" fill="none" stroke-width="${2.4 - k * 0.5}" stroke-linecap="round"/>`).join('')}
         <circle id="path-sig-glow" r="9" opacity=".3"/>
@@ -1644,8 +1656,7 @@ const PathProfile = (function () {
     const under = document.getElementById('path-sig-under');
     const over  = document.getElementById('path-sig-over');
     if (!under || !over) return;
-    const mOf = (end, rows) => rows.map(r => ({ d1: r.d1, m: end + g.loss - r.loss }));
-    g.m = { ab: mOf(g.ab, sigCache.rows.ab), ba: mOf(g.ba, sigCache.rows.ba) };
+    g.m = sigCache.rows.map(r => ({ d1: r.d1, m: g.end + g.loss - r.loss }));
     under.innerHTML = sigUnderHtml(g);
     over.innerHTML = sigOverHtml();
     const key = document.getElementById('path-sig-key');
@@ -1690,43 +1701,34 @@ const PathProfile = (function () {
     if (!g || !g.m || !sigInView || !document.getElementById('path-sig-front')) return;
     // A frame's timestamp is when the frame began, which can be a moment
     // before the clock was started from performance.now().
-    const t = Math.max(0, now - sigT0) % SIG_CYCLE;
-    const dir = t < SIG_LEG ? 'ab' : 'ba';
-    const u = t % SIG_LEG;
+    const u = Math.max(0, now - sigT0) % SIG_CYCLE;
     const alpha = u < SIG_RUN + SIG_HOLD ? 1
       : u < SIG_RUN + SIG_HOLD + SIG_FADE ? 1 - (u - SIG_RUN - SIG_HOLD) / SIG_FADE : 0;
-    sigShow(g, dir, Math.min(1, u / SIG_RUN), alpha, u < SIG_RUN ? null : Math.min(1, (u - SIG_RUN) / SIG_HOLD), false);
+    sigShow(g, Math.min(1, u / SIG_RUN), alpha, u < SIG_RUN ? null : Math.min(1, (u - SIG_RUN) / SIG_HOLD));
     sigRaf = requestAnimationFrame(sigFrame);
   }
 
-  // Held: the worse way round — the run the fade margin row quotes — whole.
+  // Held: the run whole, arrived.
   function sigStill() {
     const g = sigGeom;
     if (!g || !g.m) return;
-    sigShow(g, g.ba < g.ab ? 'ba' : 'ab', 1, 1, 0.35, true);
+    sigShow(g, 1, 1, 0.35);
   }
 
   // One frame. `f` is how far the wavefront has run (0–1), `alpha` the run's
   // opacity as it fades, `arrive` null while it travels and 0–1 through the
   // arrival.
-  function sigShow(g, dir, f, alpha, arrive, still) {
+  function sigShow(g, f, alpha, arrive) {
     const $ = id => document.getElementById(id);
-    const run = $(`path-sig-run-${dir}`), off = $(`path-sig-run-${dir === 'ab' ? 'ba' : 'ab'}`);
+    const run = $('path-sig-run'), reveal = $('path-sig-reveal');
     const front = $('path-sig-front'), arr = $('path-sig-arrive');
-    if (!run || !off || !front || !arr) return;
-    off.style.display = 'none';
+    if (!run || !reveal || !front || !arr) return;
     run.style.display = alpha > 0 ? '' : 'none';
     run.setAttribute('opacity', alpha.toFixed(3));
-    const w = f * g.iw;
-    const reveal = $(`path-sig-reveal-${dir}`), hidden = $(`path-sig-reveal-${dir === 'ab' ? 'ba' : 'ab'}`);
-    if (hidden) hidden.setAttribute('width', '0');
-    reveal.setAttribute('x', (dir === 'ab' ? g.L : g.L + g.iw - w).toFixed(1));
-    reveal.setAttribute('width', w.toFixed(1));
+    reveal.setAttribute('width', (f * g.iw).toFixed(1));
 
-    const rows = g.m[dir];
-    const s = dir === 'ab' ? 1 : -1;
-    const d = dir === 'ab' ? f * g.D : (1 - f) * g.D;
-    const m = sigMarginAt(rows, d);
+    const d = f * g.D;
+    const m = sigMarginAt(g.m, d);
 
     if (arrive == null) {
       front.style.display = '';
@@ -1736,15 +1738,15 @@ const PathProfile = (function () {
       const gapD = 22 / g.iw * g.D;
       for (let k = 0; k < 3; k++) {
         const el = $(`path-sig-ripple-${k}`);
-        const dk = d - s * k * gapD;
+        const dk = d - k * gapD;
         if (!el) continue;
         if (dk < 0 || dk > g.D) { el.setAttribute('d', ''); continue; }
         const X = sigX(g, dk), los = sigLos(g, dk);
         const r = 0.6 * fresnelR1(dk, g.D - dk, g.fMhz);
         const yMid = sigY(g, los);
         const half = Math.max(7, Math.abs(sigY(g, los + r) - yMid));
-        const mk = sigMarginAt(rows, dk);
-        el.setAttribute('d', `M${X.toFixed(1)},${(yMid - half).toFixed(1)} Q${(X + s * (12 + half * 0.25)).toFixed(1)},${
+        const mk = sigMarginAt(g.m, dk);
+        el.setAttribute('d', `M${X.toFixed(1)},${(yMid - half).toFixed(1)} Q${(X + 12 + half * 0.25).toFixed(1)},${
           yMid.toFixed(1)} ${X.toFixed(1)},${(yMid + half).toFixed(1)}`);
         el.style.stroke = sigColour(mk);
         el.setAttribute('opacity', ((1 - k * 0.32) * (mk < 0 ? 0.55 : 1)).toFixed(2));
@@ -1764,8 +1766,8 @@ const PathProfile = (function () {
       arr.style.display = 'none';
     } else {
       front.style.display = 'none';
-      const end = dir === 'ab' ? g.ab : g.ba;
-      const ex = dir === 'ab' ? sigX(g, g.D) : g.L, ey = sigY(g, dir === 'ab' ? g.rxZ : g.txZ);
+      const end = g.end;
+      const ex = sigX(g, g.D), ey = sigY(g, g.rxZ);
       const ring = $('path-sig-ring'), cross = $('path-sig-cross');
       arr.style.display = alpha > 0 ? '' : 'none';
       arr.setAttribute('opacity', alpha.toFixed(3));
@@ -1782,17 +1784,15 @@ const PathProfile = (function () {
       }
     }
 
-    // The tag, top left of the plot: the run, how far it has got and what is
-    // left over the threshold there — and on arrival the far end's margin and
-    // its band, which is the fade margin row's figure for that way round.
-    const from = dir === 'ab' ? 'A → B' : 'B → A';
-    const to = dir === 'ab' ? 'B' : 'A';
-    const end = dir === 'ab' ? g.ab : g.ba;
+    // The tag, top left of the plot: how far the wavefront has got and what is
+    // left over the threshold there — and on arrival B's margin and its band,
+    // which is the fade margin row's A→B figure.
+    const end = g.end;
     const text = arrive == null
-      ? `${from} · ${fmtKm((dir === 'ab' ? d : g.D - d) / 1000)} · ${sigDb(m)}`
+      ? `A → B · ${fmtKm(d / 1000)} · ${sigDb(m)}`
       : end >= 0
-        ? `${from} arrives ${sigDb(end)} over ${to}’s threshold · ${lbMarginClass(end).label}${still && g.ab !== g.ba ? ' · the worse way round' : ''}`
-        : `${from} arrives ${Math.abs(end).toFixed(1)} dB under ${to}’s threshold · not heard${still && g.ab !== g.ba ? ' · the worse way round' : ''}`;
+        ? `A → B arrives ${sigDb(end)} over B’s threshold · ${lbMarginClass(end).label}`
+        : `A → B arrives ${Math.abs(end).toFixed(1)} dB under B’s threshold · not heard`;
     const tag = $('path-sig-tag'), box = $('path-sig-tag-box'), txt = $('path-sig-tag-text'), tdot = $('path-sig-tag-dot');
     if (!tag || !box || !txt || !tdot) return;
     tag.style.display = '';
@@ -1968,13 +1968,13 @@ const PathProfile = (function () {
       ${P().cover ? coverTableHtml() : ''}`;
   }
 
-  // What the chart needs for the signal along the line: both one-way margins,
-  // the settings the readout ran on and the key they are cached under — or,
+  // What the chart needs for the signal along the line: the A→B margin, the
+  // settings the readout ran on and the key they are cached under — or,
   // with no margin to colour by, why not.
   function signalIn(an, a, b) {
     const r = profileMargin(an, a, b);
     if (r.m == null) return { why: r.why };
-    return { ab: r.ab, ba: r.ba, opt: mainOpts(a, b), key: signalKey(an) };
+    return { end: r.ab, opt: mainOpts(a, b), key: signalKey(an) };
   }
 
   function bodyHtml() {
@@ -2163,10 +2163,10 @@ const PathProfile = (function () {
       sigStart();
     },
     // What the signal was priced at, for anything that wants to check it: the
-    // margins along each run, A → B and B → A, or null before they are priced.
+    // margins along the line A → B, or null before they are priced.
     signalState() {
       const g = sigGeom;
-      return g && g.m ? { ab: g.m.ab.slice(), ba: g.m.ba.slice(), endAB: g.ab, endBA: g.ba,
+      return g && g.m ? { m: g.m.slice(), end: g.end, at: sigAt,
                           playing: sigPlaying(), running: !!sigRaf, inView: sigInView,
                           colour: sigColour } : null;
     },

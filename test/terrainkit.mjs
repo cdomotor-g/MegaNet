@@ -36,8 +36,8 @@
 //   Fade margin          the profile card's new row: a figure where both ends
 //                        are stations with radios, and a stated reason where
 //                        they are not — and the signal run along the line
-//                        under it, which has to arrive at each end in that
-//                        way round's figure and be painted in its bands.
+//                        under it, which has to arrive at B in the A→B
+//                        figure, be painted in its bands, and ride the cursor.
 //
 //   node --run terrain        (or: npm run terrain)
 //       npm run terrain -- -v    also print what passed
@@ -697,11 +697,11 @@ const sig = await page.evaluate(async () => {
   }));
   const exact = { under: rgb(s.colour(-3)).join(), bad: tokens.bad.join(), strong: rgb(s.colour(40)).join(), ok: tokens.ok.join() };
   probe.remove();
-  const stops = id => [...document.querySelectorAll(`#path-sig-${id} stop`)].length;
-  const svgOk = !!document.querySelector('#path-sig-under #path-sig-run-ab path')
-             && !!document.querySelector('#path-sig-over #path-sig-tag');
-  const width = () => Number(document.getElementById('path-sig-reveal-ab').getAttribute('width'))
-                    + Number(document.getElementById('path-sig-reveal-ba').getAttribute('width'));
+  const stops = [...document.querySelectorAll('#path-sig-grad stop')].length;
+  const svgOk = !!document.querySelector('#path-sig-under #path-sig-run path')
+             && !!document.querySelector('#path-sig-over #path-sig-tag')
+             && !document.getElementById('path-sig-run-ba');
+  const width = () => Number(document.getElementById('path-sig-reveal').getAttribute('width'));
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   // Playing, on screen — the side panel's 〽️ pane brought up and the chart
   // scrolled to, as pathcursor.mjs does, because off screen it idles: the
@@ -725,7 +725,7 @@ const sig = await page.evaluate(async () => {
   await sleep(250);
   const back = new Set();
   for (let k = 0; k < 24; k++) { back.add(width()); await sleep(100); }
-  // Held: the worse way round, whole, and nothing moving.
+  // Held: the run whole, and nothing moving.
   PathProfile.signalToggle();
   const stored = localStorage.getItem('mn-path-signal');
   const heldW = width();
@@ -734,36 +734,51 @@ const sig = await page.evaluate(async () => {
   const tag = document.getElementById('path-sig-tag-text').textContent;
   const btn = document.getElementById('path-sig-toggle').textContent;
   PathProfile.signalToggle();
+  // The cursor: the figure at the point under it, on the chart's tag and on the
+  // map's marker. At B it is the A→B fade margin itself.
+  const D = s.m[s.m.length - 1].d1;
+  const mapLabel = () => { let t = null; state.map.eachLayer(l => {
+    if (l instanceof L.CircleMarker && l.getTooltip && l.getTooltip()) t = String(l.getTooltip().getContent()); }); return t; };
+  PathProfile.hoverAt(D);
+  const hoverEnd = { tag: document.getElementById('path-cursor-text').textContent, map: mapLabel() };
+  PathProfile.hoverAt(D / 2);
+  const hoverMid = { tag: document.getElementById('path-cursor-text').textContent, map: mapLabel() };
+  PathProfile.hoverOff();
   return {
-    rowAB: m ? Number(m[1]) : null, rowBA: m ? Number(m[2]) : null,
-    endAB: s.ab[s.ab.length - 1].m, endBA: s.ba[0].m,
-    nearAB: s.ab[0].m, nearBA: s.ba[s.ba.length - 1].m,
-    n: s.ab.length + s.ba.length, stopsAB: stops('ab'), stopsBA: stops('ba'),
+    rowAB: m ? Number(m[1]) : null,
+    end: s.m[s.m.length - 1].m, near: s.m[0].m,
+    n: s.m.length, stops, hoverEnd, hoverMid,
     bands, exact, svgOk, moved: seen.size >= 3, seen: seen.size, loop: JSON.stringify({
       playing: PathProfile.signalState().playing, running: PathProfile.signalState().running,
       inView: PathProfile.signalState().inView }),
-    stored, heldW, heldW2, tag, btn, idleOff, resumed: back.size >= 3, iw: Number(document.querySelector('#path-sig-run-ab rect').getAttribute('width')),
+    stored, heldW, heldW2, tag, btn, idleOff, resumed: back.size >= 3, iw: Number(document.querySelector('#path-sig-run rect').getAttribute('width')),
   };
 });
-ok('the signal is priced along the line, both ways', !!sig && sig.n > 40, sig ? `${sig.n} points` : 'never priced');
+ok('the signal is priced along the line, A → B', !!sig && sig.n > 40, sig ? `${sig.n} points` : 'never priced');
 if (sig) {
-  ok('…and arrives at B in the A→B fade margin, and at A in the B→A one',
-     Math.abs(sig.endAB - sig.rowAB) < 0.06 && Math.abs(sig.endBA - sig.rowBA) < 0.06,
-     `${sig.endAB.toFixed(2)} / ${sig.endBA.toFixed(2)} against the row's ${sig.rowAB} / ${sig.rowBA}`);
-  ok('…stronger near the transmitter than at the receiver, each way',
-     sig.nearAB > sig.endAB && sig.nearBA > sig.endBA,
-     `A→B ${sig.nearAB.toFixed(1)} → ${sig.endAB.toFixed(1)}, B→A ${sig.nearBA.toFixed(1)} → ${sig.endBA.toFixed(1)}`);
+  ok('…and arrives at B in the A→B fade margin',
+     Math.abs(sig.end - sig.rowAB) < 0.06, `${sig.end.toFixed(2)} against the row's ${sig.rowAB}`);
+  ok('…stronger near the transmitter than at the receiver',
+     sig.near > sig.end, `${sig.near.toFixed(1)} → ${sig.end.toFixed(1)}`);
   const off = sig.bands.filter(b => b.band !== b.painted);
   ok('every colour on the line is nearest its fade-margin band\'s own token', !off.length,
      off.map(b => `${b.m} dB is ${b.band}, painted nearest ${b.painted}`).join('; '));
   ok('…red outright under the RX threshold, green outright when strong',
      sig.exact.under === sig.exact.bad && sig.exact.strong === sig.exact.ok, JSON.stringify(sig.exact));
-  ok('the chart carries the runs, a gradient stop per priced point, and the tag',
-     sig.svgOk && sig.stopsAB === sig.n / 2 && sig.stopsBA === sig.n / 2, `${sig.stopsAB} + ${sig.stopsBA} stops`);
+  ok('the chart carries one run, a gradient stop per priced point, and the tag',
+     sig.svgOk && sig.stops === sig.n, `${sig.stops} stops for ${sig.n} points`);
   ok('playing, the wavefront moves', sig.moved, `${sig.seen} distinct positions in 2.4 s; ${sig.loop}`);
   ok('…not while the card is closed, and again when it is opened', sig.idleOff && sig.resumed,
      `idle ${sig.idleOff}, resumed ${sig.resumed}`);
-  ok('⏸ holds the worse way round whole, still, says so, and is remembered',
+  const fig = `${sig.rowAB > 0 ? '+' : ''}${sig.rowAB.toFixed(1)} dB`;
+  ok('the cursor at B carries the fade margin, on the chart and on the map',
+     sig.hoverEnd.tag.endsWith(` · ${fig}`)
+       && sig.hoverEnd.map.includes(sig.rowAB >= 0 ? `signal ${fig} over B’s threshold` : `signal ${Math.abs(sig.rowAB).toFixed(1)} dB under B’s threshold`),
+     JSON.stringify(sig.hoverEnd));
+  ok('…and the figure where it is anywhere along the line, with the distance still last on the map',
+     /^\d+ m · [-+]?\d+\.\d dB$/.test(sig.hoverMid.tag) && /· signal .* threshold · [\d.]+ km along$/.test(sig.hoverMid.map || ''),
+     JSON.stringify(sig.hoverMid));
+  ok('⏸ holds the run whole, still, says so, and is remembered',
      sig.stored === 'still' && Math.abs(sig.heldW - sig.iw) < 0.5 && sig.heldW === sig.heldW2
        && /arrives/.test(sig.tag) && /Play/.test(sig.btn),
      `${sig.stored}; ${sig.heldW} of ${sig.iw}; "${sig.tag}"; ${sig.btn}`);

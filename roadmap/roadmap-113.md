@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-19** (revision 164 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-19** (revision 165 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -806,6 +806,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 165 — 2026-10-19: 📡 The profile's signal one way, and its dB on the cursor
+
+The owner, of revision 164: *"we don't need dual directional animations, one is fine to loop through, we have the flip direction button if required. can you just add the dB to the mouseover details along the link in the profile window and the map."* Nothing opened or closed.
+
+- **One run** (`path-profile.js`): the wavefront loops A → B only; the reply B → A, its gradient and its pricing are gone (half the model runs). ⏸ holds the run whole rather than the worse way round. The fade margin row still quotes both directions.
+- **The cursor carries the figure**: the chart's tag reads `ground · ±dB`, the dB in the signal's colour, and the map marker's label adds `signal ±x dB over/under B’s threshold` before the distance — from the chart or from the line on the map, both painted by `paintCursor`. Nothing until the line is priced.
+- README §17, What's new 45 (44 reworded), `test/README.md`, the version stamp `20261019b`.
+
+**Checks:** `npm run terrain` (the signal's assertions reworked for one run, two new for the cursor: at B the tag and the map label quote the A→B fade margin, and anywhere along the line they carry a figure with the distance still last on the map), `pathcursor`, `pathcover`, and the cheap five.
 
 ### Revision 164 — 2026-10-19: 📡 The signal, run along the elevation profile
 

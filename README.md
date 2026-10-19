@@ -3425,8 +3425,10 @@ glance. Finally the *Path* row under the chart is one end per line rather than
 it was for the last path.
 
 **The signal, run along the line.** Between two stations with radios on file the
-chart animates the transmission: a wavefront leaves A, runs down the line of
-sight to B, then the reply runs from B to A, and the beam behind it — the line,
+chart animates the transmission: a wavefront leaves A and runs down the line of
+sight to B, over and over — one way, since the chart, the budget's transmitter
+and the readout's A→B figure all run A → B, and ⇄ *Flip direction* is the other
+way round — and the beam behind it — the line,
 the 60% Fresnel envelope and, faintly, the column of sky — is painted in the
 colour of the margin left over the receiver's threshold at each point. The
 colours are the fade margin's own tokens (`--ok`, `--warn`, `--bad`) walked in
@@ -3434,17 +3436,20 @@ OKLCH, so strong is green, and it fades through yellow, amber and orange to red,
 which it is outright at the RX threshold and under it; each band keeps to its
 own stretch of that walk and steps where the number changes band, so the line
 and the *Fade margin* row cannot be read as disagreeing. It is priced with the
-readout's own `pathAnalyse`, run again from the transmitter to 127 points on the
-line each way, for a receiver like the far end's standing on the beam at the
+readout's own `pathAnalyse`, run again from A to 127 points on the line, for a
+receiver like the far end's standing on the beam at the
 line's height there (the curvature terms cancel, so every point sees the
 clearances the chart draws): the signal fades with distance, drops where the
 ground — or, under the land-cover model, the cover — reaches into the Fresnel
 zone, stays down in the shadow behind a ridge and fills back in as the shadow
-widens, and arrives at the far end in exactly that way round's fade margin,
-with a ring in its colour or a ✕ under the threshold. The pricing runs in
-slices after the chart is drawn and is poured into it, so the hover cursor is
-never thrown away; the animation runs only while the chart is on screen, and
-⏸ holds the worse way round whole (remembered, `mn-path-signal`; with reduced
+widens, and arrives at B in exactly the A→B fade margin, with a ring in its
+colour or a ✕ under the threshold. **The hover cursor carries the figure**: the
+chart's tag reads the ground height and the signal there (`412 m · +8.2 dB`, the
+dB in its colour), and the marker on the map — pointing along the line works
+from either side — says it in full (`signal +8.2 dB over B’s threshold`). The
+pricing runs in slices after the chart is drawn and is poured into it, so the
+hover cursor is never thrown away; the animation runs only while the chart is
+on screen, and ⏸ holds the run whole (remembered, `mn-path-signal`; with reduced
 motion asked for it starts held). A line on bare ground has no radio at either
 end, and gets no signal and a line in the key saying why.
 

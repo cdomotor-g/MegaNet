@@ -25,13 +25,18 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 45, date: '2026-10-19', items: [
+      '<strong>📡 The signal on the profile runs one way now</strong>, A to B, over and over — <em>⇄ Flip direction</em> '
+        + 'shows the other way round. And <strong>pointing at the chart</strong>, or along the line on the map, now shows the '
+        + 'signal at that spot in dB beside the ground height, in its colour.',
+    ] },
     { n: 44, date: '2026-10-19', items: [
       '<strong>📡 The signal, along the elevation profile.</strong> Between two stations, the chart now runs the '
-        + 'transmission: a wave leaves one end, travels down the line of sight to the other, then the reply comes back, '
+        + 'transmission: a wave leaves one end, travels down the line of sight to the other, '
         + 'and the beam is painted by how much signal is left at each point — green when strong, then yellow, amber and '
         + 'orange as it fades, and red under the receiver\'s threshold, in the same colours as the fade margin. Ridges '
         + 'and (with the land-cover model) trees take their share where they stand, and the shadow behind a hill shows. '
-        + '<em>⏸ Pause</em> in the chart\'s key holds the worse way round.',
+        + '<em>⏸ Pause</em> in the chart\'s key holds it still.',
     ] },
     { n: 43, date: '2026-10-18', items: [
       '<strong>🔲 🎚️ 🪧 Three new looks, in pictures.</strong> Pick one from <em>⋯ → Theme &amp; look</em>. '
