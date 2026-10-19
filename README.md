@@ -446,6 +446,10 @@ because the header then says so.
 different shape. Everything downstream of `loadJson()` in `app.js` is unchanged
 and cannot tell the difference, which is the entire design: the database is
 normalised properly, and a view reassembles the document the app already parses.
+Since `0069` the database keeps that document, built again as each change to the
+stations commits, so a page load reads one row rather than reassembling 4,874
+stations — which had grown to take longer than the 3 s a signed-out visitor is
+given (`db/README.md`, **The document is kept**).
 
 That claim is checked rather than asserted:
 

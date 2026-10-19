@@ -1659,6 +1659,14 @@ jobs:
       # and a gauge of its own winning — after the peaks are loaded, above.
       - name: check_flood_peaks_from.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_flood_peaks_from.sql
+      # The station document kept rather than built on every load (0069): the
+      # copy is the document to the byte after every committed load above
+      # (stations.json, the flood peaks), each of the seventeen tables it reads
+      # notes a change, a change is built in at commit and not before, two
+      # changes in a row and a rolled-back one, and the watch putting back a
+      # dropped trigger. Last of the loads, so the copy has been through them all.
+      - name: check_stations_doc_cache.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_stations_doc_cache.sql
       # The SLS's merge rule is written twice — in tools/ingest/sls.py for the
       # file the app reads off disk, and in meganet.sls_location for anything
       # that asks the database — and this is what holds the two to one rule:

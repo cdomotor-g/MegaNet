@@ -3075,7 +3075,9 @@ const DB_SCHEMA = 'meganet';
 // to the sites, loaded as the last of the way into each. Bumped with the file.
 // 68: a base station's spectrum rows (0068), the Base Stations tab's waterfall;
 // administrators only. Bumped with the file.
-const DB_SCHEMA_VERSION = 68;
+// 69: the station document kept (0069) — built as a change commits, not on
+// every load, which was running into anon's 3 s timeout. Bumped with the file.
+const DB_SCHEMA_VERSION = 69;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

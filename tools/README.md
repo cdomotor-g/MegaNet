@@ -825,6 +825,26 @@ nothing else.
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_flood_peaks_from.sql
 ```
 
+## `check_stations_doc_cache.sql` — prove the station document is kept, and kept current
+
+34 checks over `0069`, in a transaction that rolls back: the kept copy is the
+document to the byte and `stations_doc()` serves it rather than building one;
+every table the document reads (seventeen, found in `pg_depend`) is watched,
+and a statement on each — or a truncate — notes the transaction, while a read
+notes nothing; a station renamed shows in `stations_doc()` inside its own
+transaction while the copy waits, and is built in at commit (run here with `SET
+CONSTRAINTS ALL IMMEDIATE`, which fires the same trigger); changes built one
+after another, a change rolled back to a savepoint leaving nothing behind;
+`anon` reads the copy and writes neither table; and `stations_doc_watch()`
+putting back a dropped trigger and taking one off a table the document does not
+read. CI runs it after the stations and the flood peaks are loaded, which are
+committed changes, so the first checks are also the proof that a commit builds
+the copy.
+
+```bash
+psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_stations_doc_cache.sql
+```
+
 ## `storage_bucket.sql` — create the `inspections` bucket and its policies
 
 The one script here that writes, and the one that does not roll back. Idempotent

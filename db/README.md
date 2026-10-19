@@ -166,7 +166,9 @@ its cache at all (`PGRST002`).
 | `meganet.station.hub_id`, `meganet.station.catchment_ids` | Which hub maintains a station and which basin it is in — both point-in-polygon against real WGS84 boundaries by `tools/build_geo_layers.py`, not typed and not derived from the affine-fitted basin SVG. See **Where a station is**, below. |
 | `meganet.station_json` | View: one row per *live* station — its id, its `ord`, its `updated_at`, and its `stations.json` fragment. Deleted stations are filtered out here, which is what makes the soft delete work everywhere at once. |
 | `meganet.stations_json` | View: the whole `stations.json` document, rebuilt — the reference lists plus an aggregate of the view above. `security_invoker`, so RLS on the base tables applies. |
-| `meganet.stations_doc()` | The same document as a `stable` function, so `GET /rest/v1/rpc/stations_doc` returns it as the response body rather than wrapped in `{"doc": …}`. This is what the app calls. |
+| `meganet.stations_doc()` | The same document as a `stable` function, so `GET /rest/v1/rpc/stations_doc` returns it as the response body rather than wrapped in `{"doc": …}`. This is what the app calls. Since `0069` it returns the kept copy below rather than building the document, except inside a transaction that has changed the stations and not committed. |
+| `meganet.stations_doc_cache`, `meganet.stations_doc_change` | **The document, kept** (`0069`): one row holding `stations_json` as of the last committed change, and a row for each transaction that has changed what it reads and not yet committed. Read-all (`stations_doc()` reads them as the caller); written only by the functions below. See **The document is kept**, below. |
+| `meganet.stations_doc_refresh()`, `meganet.stations_doc_watch()`, `meganet.stations_doc_reads()` | Build the kept copy now; put its trigger on every table the document reads (found in `pg_depend`, not listed) and build it; and those tables. Not `anon`'s or `authenticated`'s; `service_role` may refresh. |
 | `meganet.load_stations_doc(jsonb)` | The reverse: makes the tables match a document. Idempotent. `EXECUTE` revoked from `public`. |
 | `meganet.load_stations_from_url(text)` | Fetches `stations.json` over HTTP and hands it to the above. Defaults to the copy on `main`. Needs the `http` extension; says so plainly if it is missing. |
 | `meganet.save_station(jsonb, timestamptz)` | The write path. One station and everything hanging off it, in one transaction. Refuses a stale write. Returns the saved fragment and its new `updated_at`. |
@@ -401,6 +403,42 @@ python3 tools/check_stations_doc.py /tmp/doc.json
 That check is the one that matters. The whole read path rests on the database's
 document being indistinguishable from the file, because ~17,700 lines of `app.js`
 assume that shape.
+
+### The document is kept
+
+Every page load asks for the whole document, and until `0069` every one of them
+built it again from seventeen tables — 4,874 stations, about 7.5 MB, 1.9–2.3 s
+on the live project by October 2026. Supabase gives `anon` 3 s a statement, so a
+busy moment turned it into *Could not load from the datastore: canceling
+statement due to statement timeout* and the app fell back to the site's copy of
+`stations.json`.
+
+So it is built when it changes, not when it is read. A statement-level trigger
+(`stations_doc_touch`) on every table the document reads notes the transaction
+in `stations_doc_change`; a deferred trigger on that row builds the document
+again as the transaction commits, and the copy commits with the change. A
+committed change is never missing from it, the cost is one build per committing
+edit rather than one per visitor, and a read is one row (~40 ms locally, where
+building was ~0.6 s). Builds take turns on the kept row and each takes its
+snapshot after the one before has committed, so two editors saving at once both
+end up in it — `tools/check_stations_doc_cache.sql` holds that and the rest.
+Inside the transaction that made a change, `stations_doc()` builds the document
+as it stands, so a check that edits a station and reads the document back sees
+its edit.
+
+**A migration that changes `station_json` or `stations_json` ends with**
+
+```sql
+select meganet.stations_doc_watch();
+```
+
+which puts the trigger on any table the views now read, takes it off any they
+no longer do, and builds the copy. Without it a new list's table would change
+without the copy knowing, and a view rewritten over unchanged rows would leave
+the copy as the old view built it. `check_stations_doc_cache.sql` fails on the
+first. Anything that changes the stations with triggers off (a restore, or
+`session_replication_role = replica`) ends with
+`select meganet.stations_doc_refresh();`.
 
 ## Writing
 

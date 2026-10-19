@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 53, date: '2026-10-20', items: [
+      '<strong>⚡ The station list loads faster.</strong> The database now keeps the list ready, built again whenever '
+        + 'somebody saves a station, instead of putting all of it together on every visit. It had grown slow enough that the '
+        + 'app sometimes said <em>Could not load from the datastore: canceling statement due to statement timeout</em> and '
+        + 'fell back to an older copy; that should not happen now.',
+    ] },
     { n: 52, date: '2026-10-19', items: [
       '<strong>📡 What a base station hears, from here.</strong> Open a base station on the <em>Base Stations</em> tab '
         + '(administrators) and, under its panel, a waterfall of what its SDR sticks hear — every stick on one picture in its '
