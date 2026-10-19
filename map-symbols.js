@@ -4,9 +4,9 @@
 //                Its shape is what it measures: a triangle for a water level
 //                (a river height gauge), a circle for a rain gauge and the
 //                rest. Grey is a gauge read by hand, black a TM station (a data
-//                logger and modem, not an ALERT radio). A purple or a pink outline
-//                is the Bureau's forecast or information location, in the
-//                Bureau's own colours. And whose stations the map draws at all.
+//                logger and modem, not an ALERT radio). A solid pink outline is
+//                the Bureau's forecast location and a dashed one its information
+//                location. And whose stations the map draws at all.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js (state, esc, escAttr, announce, FILTER_NONE,
@@ -25,10 +25,12 @@
 // of these are river gauges and which are rain gauges, which ones does the
 // Bureau forecast, and which ones does nobody hear over the radio because a
 // person reads them. The Bureau's own flood maps answer the first two with
-// shape and outline — river heights are triangles, its forecast locations are
-// outlined in purple and its information locations in pink — and this follows
-// that key rather than inventing another, so a map read here reads the same as
-// one read there.
+// shape and outline — river heights are triangles, its forecast and
+// information locations are outlined — and this follows that key rather than
+// inventing another, so a map read here reads the same as one read there. The
+// Bureau's key outlines them in purple and pink; at the owner's request both
+// are its pink here, a forecast location's solid and an information
+// location's dashed, so the dash says which and not a second colour.
 //
 //   shape    A triangle for a station that measures a water level — a river
 //            height gauge, and a storage or tide gauge with it, since a height
@@ -45,11 +47,12 @@
 //            receivers never hear it either and its silence on them means
 //            nothing — the field green is left saying ALERT.
 //   outline  The Bureau's forecast location (Schedule 2 of its Service Level
-//            Specification — somebody predicts a height for it) in purple, its
-//            information location (Schedule 3 — reported and classified, not
-//            predicted) in pink. Drawn round the outside of the pin's own white
-//            ring, not instead of it, so a match's amber, a selection's violet
-//            and a health ring still have the ring to say themselves with.
+//            Specification — somebody predicts a height for it) in a solid
+//            pink, its information location (Schedule 3 — reported and
+//            classified, not predicted) in a dashed one. Drawn round the
+//            outside of the pin's own white ring, not instead of it, so a
+//            match's amber, a selection's violet and a health ring still have
+//            the ring to say themselves with.
 //
 // The shape, the grey, the black and the outline are each a switch in 🗺️ Map
 // display (Station pins), on by default and remembered, on MapArrows' terms: none of them costs anything the
@@ -117,15 +120,18 @@
 // Exposes: kind, pin, radius, marker, reset, ownersReady, askSls, slsFailed,
 //          ownerDrawn, ownerHiding, ownerNoteShort, ownerPhrase, ownerParties,
 //          sectionHtml, ownerHtml, noteHtml, legendHtml, legendOff, setShapes,
-//          setManual, setTm, setOutlines, setOwner, setOwnerMode, and the
-//          colours FORECAST, INFORMATION, MANUAL and TM and the triangle's
-//          TRI_SCALE.
+//          setManual, setTm, setOutlines, setOwner, setOwnerMode, the colours
+//          FORECAST, INFORMATION, MANUAL and TM, the information outline's
+//          INFORMATION_DASH and the triangle's TRI_SCALE.
 const MapSymbols = (function () {
-  // Sampled off the Bureau's own key for its flood warning map, and literals
-  // for the reason the ACMA squares' are: they are that key's colours and mean
-  // what they mean there, so a theme does not restyle them.
-  const FORECAST    = '#8400a8';
+  // The pink sampled off the Bureau's own key for its flood warning map, and a
+  // literal for the reason the ACMA squares' are: it is that key's colour and
+  // means what it means there, so a theme does not restyle it. Both outlines
+  // wear it; an information location's is dashed, which is what tells the two
+  // apart — on the pins, the legend, the 3-D view and the AR finder alike.
+  const FORECAST    = '#ff00c5';
   const INFORMATION = '#ff00c5';
+  const INFORMATION_DASH = [4, 3];
   // A gauge read by hand. A mid grey that is none of the role fills, not the
   // hollow white of a proposed or unheard pin, and still a fill under the white
   // ring every pin wears, so it reads on a satellite base as well as a topo.
@@ -186,7 +192,7 @@ const MapSymbols = (function () {
     const sections = (Array.isArray(s.bureau_listings) ? s.bureau_listings : [])
       .map(b => String(b && b.section));
     // Every document's entry: a station on the border is in both, and the
-    // purple outline belongs to it if either forecasts for it.
+    // forecast location's solid outline belongs to it if either forecasts for it.
     const sls = slsLoaded() && SLS.entriesFor ? SLS.entriesFor(s) : [];
     const first = sls[0] || null;
     const slsData = sls.map(e => String(e.data_type || '')).join(' ');
@@ -229,16 +235,17 @@ const MapSymbols = (function () {
   }
 
   // What the pin wears, with the switches applied. `outline` is a colour or
-  // null; the fill is the caller's, which knows about health and proposals.
+  // null, `outlineDash` its dash or null for a solid line; the fill is the
+  // caller's, which knows about health and proposals.
   function pin(s) {
     const k = kind(s);
+    const role = state.mapPinSls && k ? k.role : null;
     return {
       triangle: !!(state.mapPinShapes && k && k.river),
       manual:   !!(state.mapPinManual && k && k.manual),
       tm:       !!(state.mapPinTm && k && k.tm),
-      outline:  state.mapPinSls && k
-        ? (k.role === 'forecast' ? FORECAST : k.role === 'information' ? INFORMATION : null)
-        : null,
+      outline:  role === 'forecast' ? FORECAST : role === 'information' ? INFORMATION : null,
+      outlineDash: role === 'information' ? INFORMATION_DASH : null,
     };
   }
 
@@ -248,9 +255,9 @@ const MapSymbols = (function () {
   }
 
   // ── The pin ────────────────────────────────────────────────────────────────
-  // A CircleMarker that may be a triangle and may carry an outline: two options
-  // (`mnShape`, `mnOutline`) and one drawing routine on the canvas renderer the
-  // Stations map draws with (preferCanvas, app.js initMap). Everything else is
+  // A CircleMarker that may be a triangle and may carry an outline: three
+  // options (`mnShape`, `mnOutline` and its `mnOutlineDash`) and one drawing
+  // routine on the canvas renderer the Stations map draws with (preferCanvas, app.js initMap). Everything else is
   // CircleMarker's own, which is the point — setStyle, setRadius, the click
   // test, setLatLng for the fan-out, the 3-D mirror reading `options` — every
   // caller that restyles a pin goes on doing exactly what it did.
@@ -291,11 +298,14 @@ const MapSymbols = (function () {
           ctx.beginPath();
           if (tri) triPath(ctx, p.x, p.y, outlineR(r, o.weight, true));
           else ctx.arc(p.x, p.y, outlineR(r, o.weight, false), 0, Math.PI * 2, false);
-          if (ctx.setLineDash) ctx.setLineDash([]);
+          // Butt ends: a round cap reaches half the line's width into each
+          // gap, and at this weight would close the dashes up.
+          if (ctx.setLineDash) ctx.setLineDash(o.mnOutlineDash || []);
           ctx.globalAlpha = o.opacity;
           ctx.lineWidth = OUTLINE_W;
           ctx.strokeStyle = o.mnOutline;
           ctx.lineJoin = 'round';
+          ctx.lineCap = 'butt';
           ctx.stroke();
         }
         ctx.beginPath();
@@ -516,7 +526,7 @@ const MapSymbols = (function () {
       Black for TM stations
     </label>
     <label class="filter-check"
-           title="The Bureau's own key: its forecast locations (Schedule 2 of the Service Level Specification — a height is predicted) outlined in purple, its information locations (Schedule 3 — reported and classified, not predicted) in pink.">
+           title="The Bureau's forecast locations (Schedule 2 of the Service Level Specification — a height is predicted) outlined in solid pink, its information locations (Schedule 3 — reported and classified, not predicted) in dashed pink.">
       <input type="checkbox" ${state.mapPinSls ? 'checked' : ''}
              onchange="MapSymbols.setOutlines(this.checked)">
       Outline the Bureau's forecast &amp; information locations
@@ -572,8 +582,9 @@ const MapSymbols = (function () {
   // ── The legend ─────────────────────────────────────────────────────────────
   // The swatches are small SVGs, drawn as the map draws the marks: a triangle
   // and the TM black with the white ring, and the two outlines alone as the Bureau's key shows
-  // them — hollow, with a white casing under the colour so the purple still
-  // reads on the dark theme's panel.
+  // them — hollow, with a white casing under the colour so the pink still
+  // reads on the dark theme's panel, the information location's dashed as the
+  // pin's is, casing and all, so its gaps are the panel's.
   function triSvg(fill, stroke, w) {
     return `<svg class="legend-tri" viewBox="0 0 16 15" width="16" height="15" aria-hidden="true" focusable="false">
       <polygon points="8,2 14.2,12.75 1.8,12.75" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round"/></svg>`;
@@ -586,10 +597,11 @@ const MapSymbols = (function () {
       <circle cx="6" cy="6" r="4.75" fill="${fill}" stroke="${stroke}" stroke-width="${w}"/></svg>`;
   }
 
-  function outlineSvg(colour) {
+  function outlineSvg(colour, dash) {
+    const d = dash ? ` stroke-dasharray="${dash.join(' ')}"` : '';
     return `<svg class="legend-tri" viewBox="0 0 16 15" width="16" height="15" aria-hidden="true" focusable="false">
-      <polygon points="8,2 14.2,12.75 1.8,12.75" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linejoin="round"/>
-      <polygon points="8,2 14.2,12.75 1.8,12.75" fill="none" stroke="${colour}" stroke-width="2.5" stroke-linejoin="round"/></svg>`;
+      <polygon points="8,2 14.2,12.75 1.8,12.75" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linejoin="round"${d}/>
+      <polygon points="8,2 14.2,12.75 1.8,12.75" fill="none" stroke="${colour}" stroke-width="2.5" stroke-linejoin="round"${d}/></svg>`;
   }
 
   function legendHtml({ health = false } = {}) {
@@ -620,11 +632,11 @@ const MapSymbols = (function () {
       rows.push(`
     <span class="legend-item">
       ${outlineSvg(FORECAST)}
-      <span class="small">Forecast location (Bureau SLS)</span>
+      <span class="small">Forecast location (Bureau SLS) — solid outline</span>
     </span>
     <span class="legend-item">
-      ${outlineSvg(INFORMATION)}
-      <span class="small">Information location (Bureau SLS)</span>
+      ${outlineSvg(INFORMATION, INFORMATION_DASH)}
+      <span class="small">Information location (Bureau SLS) — dashed outline</span>
     </span>`);
     }
     return rows.join('');
@@ -681,7 +693,7 @@ const MapSymbols = (function () {
     store('mn-pin-sls', on);
     if (on) askSls();
     repaint();
-    announce(on ? 'Forecast locations are outlined in purple and information locations in pink.'
+    announce(on ? 'Forecast locations are outlined in solid pink and information locations in dashed pink.'
                 : 'Forecast and information locations are no longer outlined.');
   }
 
@@ -711,7 +723,7 @@ const MapSymbols = (function () {
   }
 
   return {
-    FORECAST, INFORMATION, MANUAL, TM, TRI_SCALE,
+    FORECAST, INFORMATION, INFORMATION_DASH, MANUAL, TM, TRI_SCALE,
     kind, pin, radius, marker, reset,
     ownersReady, askSls, ownerDrawn, ownerHiding, ownerNoteShort, ownerPhrase, ownerParties,
     sectionHtml, ownerHtml, legendHtml, legendOff, noteHtml,

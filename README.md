@@ -1219,8 +1219,8 @@ here.
   level) gauge and a **circle** for a rain gauge or anything else — a station that
   measures both is a triangle; **grey** for a gauge read by hand; **black** for
   a TM station (a data logger and modem, not an ALERT radio); and the
-  Bureau's own key for its flood warning service — a **purple outline** round a
-  forecast location and a **pink** one round an information location, from its
+  Bureau's flood warning locations — a **solid pink outline** round a forecast
+  location and a **dashed pink** one round an information location, from its
   Service Level Specifications. See *Reading the map* below
 - Draw signal path lines between field stations and the repeaters/base stations their AlertID passes through
 - Click a station to see its full detail panel
@@ -1264,11 +1264,12 @@ river height and rainfall indexes and its SLS. **Grey** is a gauge read by hand
 daily and nothing says a radio does — so silence from it is not a fault.
 **Black** is a TM station — its Telemetry field says a Campbell or older data
 logger, its name ends TM, or a satellite terminal reads it and nothing says
-ALERT — so the field green is left for ALERT stations. A **purple outline**
+ALERT — so the field green is left for ALERT stations. A **solid pink outline**
 round a pin is one of the Bureau's forecast locations (SLS
-Schedule 2: a height is predicted) and a **pink** one an information location
-(Schedule 3: reported and classified, not predicted), as the Bureau's own flood
-maps key them; the outline is drawn outside the white ring, so a match's amber
+Schedule 2: a height is predicted) and a **dashed pink** one an information location
+(Schedule 3: reported and classified, not predicted) — the Bureau's own flood
+maps outline them in purple and pink, and here the dash tells them apart
+instead; the outline is drawn outside the white ring, so a match's amber
 and a selection's violet still show inside it. The grey and the outlines come
 from the SLS file, which the map asks for once its pins are drawn and paints in
 when it lands. Each of the four is a switch under *Station pins* in 🗺️ Map
@@ -4760,7 +4761,7 @@ says how far away it is, and its type in one letter in the map's own colours —
 Where the Bureau's Service Level Specification names the station one of its
 **forecast locations** (a height is predicted for it) or **information
 locations** (heights reported and classified, not predicted), the pin is ringed
-in the Bureau's purple or pink — the outlines the Stations map draws, from the
+in the Bureau's pink, solid or dashed — the outlines the Stations map draws, from the
 same answer (`MapSymbols.kind`) — and tagged **Forecast** or **Info** beside its
 distance; its sheet says which in words, and the rest of its direction is
 tagged in the sheet's list. A station the document doesn't name has no tag. The

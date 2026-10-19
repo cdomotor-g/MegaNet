@@ -33,7 +33,7 @@
 //   view, each stem's foot on its bearing and no two labels in a row
 //   overlapping; F, R and B in their roles' colours; every station gathered
 //   marked forecast or information location exactly as MapSymbols.kind (the
-//   map's purple and pink outlines) says, its pin ringed, tagged and labelled
+//   map's solid and dashed pink outlines) says, its pin ringed, tagged and labelled
 //   to match, its sheet saying so in words and the rest of its direction
 //   tagged in the sheet's list; a pin tapped opening its
 //   station's sheet with its number and ALERT IDs; "I'm facing it" moving north
@@ -376,7 +376,7 @@ try {
     pins.length > 0 && pinOk, JSON.stringify(pins.slice(0, 2)));
 
   // The Bureau's forecast and information locations: every station gathered
-  // marked as MapSymbols.kind — the map's purple and pink outlines — says, and
+  // marked as MapSymbols.kind — the map's solid and dashed pink outlines — says, and
   // every pin ringed, tagged and labelled to match; the rest left plain.
   const marks = await page.evaluate(() => {
     const dbg = StationAR.debug();
@@ -388,22 +388,28 @@ try {
       const c = dbg.clusters[Number(el.dataset.k)];
       const tag = el.querySelector('.ar-pin-dist .ar-sls');
       const box = el.querySelector('.ar-pin-box');
+      const dash = getComputedStyle(box, '::before');
       return { id: el.dataset.id, want: c.sls, cls: el.className, tag: tag ? tag.textContent : null,
-               ring: getComputedStyle(box).boxShadow, label: box.getAttribute('aria-label') };
+               ring: getComputedStyle(box).boxShadow, dash: `${dash.borderTopStyle} ${dash.borderTopColor}`,
+               label: box.getAttribute('aria-label') };
     });
     return { members, pins };
   });
-  const SLS_RING = { forecast: 'rgb(132, 0, 168)', information: 'rgb(255, 0, 197)' };
+  // A forecast location's ring is a solid pink shadow; an information
+  // location's a dashed pink border on the box's ::before, over a casing.
+  const PINK = 'rgb(255, 0, 197)';
+  const ringOk = p => p.want === 'forecast' ? p.ring.includes(PINK) && !p.dash.startsWith('dashed')
+    : !p.ring.includes(PINK) && p.dash === `dashed ${PINK}`;
   const SLS_TAG = { forecast: 'Forecast', information: 'Info' };
   const nMarked = r => marks.members.filter(m => m.want === r).length;
   check(`every station gathered marked as the map outlines it (${nMarked('forecast')} forecast, ${nMarked('information')} information locations)`,
     nMarked('forecast') > 0 && nMarked('information') > 0 && marks.members.every(m => m.got === m.want),
     JSON.stringify(marks.members.filter(m => m.got !== m.want).slice(0, 5)));
   const pinMarkOk = p => p.want
-    ? p.cls.includes(`sls-${p.want}`) && p.tag === SLS_TAG[p.want] && p.ring.includes(SLS_RING[p.want])
+    ? p.cls.includes(`sls-${p.want}`) && p.tag === SLS_TAG[p.want] && ringOk(p)
       && p.label.includes(`Bureau ${p.want} location`)
     : !/sls-/.test(p.cls) && p.tag === null && !p.label.includes('Bureau');
-  check('…each pin ringed in the Bureau\'s purple or pink, tagged Forecast or Info and labelled so; the others plain',
+  check('…each pin ringed in the Bureau\'s pink, solid or dashed, tagged Forecast or Info and labelled so; the others plain',
     marks.pins.some(p => p.want) && marks.pins.every(pinMarkOk), JSON.stringify(marks.pins.filter(p => !pinMarkOk(p)).slice(0, 3)));
 
   // A pin tapped: the station's sheet.

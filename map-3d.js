@@ -494,7 +494,8 @@ const Map3D = (function () {
   // The pins, likewise: `fillColor` is the role colour (grey for a gauge read
   // by hand, black for a TM station), `color` the ring the filter put on it (white, amber for a match,
   // cyan for a station a pass range pulled in), `mnOutline` the Bureau's
-  // purple or pink for its forecast and information locations, and the
+  // pink for its forecast and information locations (`mnOutlineDash` the
+  // information location's dashes), and the
   // opacities are the focus dim. Circles rather than MapLibre Markers on
   // purpose — a Marker is a DOM node each, and this map draws ~3,174 of them —
   // and so a river height gauge's 2-D triangle is a circle here, of the size
@@ -525,6 +526,40 @@ const Map3D = (function () {
       ? r / MapSymbols.TRI_SCALE : r;
   }
 
+  // An information location's dashed outline. MapLibre strokes a circle solid
+  // and no other way, so the dashes are an image on a symbol layer: 2-D's ring
+  // (map-symbols.js) at 2-D's weight and dash, centred OUTLINE_W / 2 outside
+  // the pin's own stroke, drawn the first time a pin of that size asks for it
+  // (styleimagemissing), at twice the pixels so it is not soft on a phone. The
+  // id carries the pin's outer edge, to the half pixel.
+  const SLS_DASH = 'mn-sls-dash-';
+  const SLS_OUTLINE_W = 2.5;
+
+  function slsDashId(edge) {
+    return SLS_DASH + (Math.round(edge * 2) / 2);
+  }
+
+  function addSlsDashImage(id) {
+    if (!map || map.hasImage(id) || typeof MapSymbols === 'undefined') return;
+    const edge = Number(id.slice(SLS_DASH.length));
+    if (!(edge > 0)) return;
+    const PX = 2;
+    const rr = edge + SLS_OUTLINE_W / 2;
+    const box = Math.ceil(2 * (rr + SLS_OUTLINE_W));
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = box * PX;
+    const cx = cv.getContext('2d');
+    cx.setTransform(PX, 0, 0, PX, 0, 0);
+    cx.setLineDash(MapSymbols.INFORMATION_DASH);
+    cx.lineWidth = SLS_OUTLINE_W;
+    cx.lineCap = 'butt';
+    cx.strokeStyle = MapSymbols.INFORMATION;
+    cx.beginPath();
+    cx.arc(box / 2, box / 2, rr, 0, Math.PI * 2, false);
+    cx.stroke();
+    map.addImage(id, cx.getImageData(0, 0, cv.width, cv.height), { pixelRatio: PX });
+  }
+
   function stationFeatures() {
     const out = [];
     for (const m of (state.mapMarkers || [])) {
@@ -539,8 +574,11 @@ const Map3D = (function () {
           r:    pinR(m),
           w:    m.options.weight || 2,
           op:   m.options.fillOpacity == null ? 1 : m.options.fillOpacity,
-          // The Bureau's purple or pink outline (map-symbols.js), or ''.
+          // The Bureau's pink outline (map-symbols.js), or ''; and for an
+          // information location's dashed one, the image that draws it.
           outline: m.options.mnOutline || '',
+          dash: m.options.mnOutline && m.options.mnOutlineDash
+            ? slsDashId(pinR(m) + (m.options.weight || 2)) : '',
         },
         geometry: { type: 'Point', coordinates: [ll.lng, ll.lat] },
       });
@@ -1116,6 +1154,7 @@ const Map3D = (function () {
     set('mn-stations', 'circle-opacity', op);
     set('mn-stations', 'circle-stroke-opacity', op);
     set('mn-stations-outline', 'circle-stroke-opacity', op);
+    set('mn-stations-outline-dash', 'icon-opacity', op);
     set('mn-here-ring', 'circle-stroke-opacity', dimK);
     set('mn-here-dot', 'circle-opacity', dimK);
     set('mn-here-dot', 'circle-stroke-opacity', dimK);
@@ -1578,12 +1617,14 @@ const Map3D = (function () {
                    'circle-opacity-transition':        { duration: 0, delay: 0 },
                    'circle-stroke-opacity-transition': { duration: 0, delay: 0 } } },
         // The Bureau's forecast and information locations' outlines
-        // (map-symbols.js): 2-D's purple or pink, as a ring round the pin's
-        // own. MapLibre strokes outside the radius, so the pin reaches r + w
-        // and the outline starts there. Under the pins and never a target —
-        // a click is the pin's.
+        // (map-symbols.js): 2-D's pink, as a ring round the pin's own —
+        // solid for a forecast location, dashed for an information one.
+        // MapLibre strokes outside the radius, so the pin reaches r + w and
+        // the outline starts there. Under the pins and never a target — a
+        // click is the pin's. The dashed ring is an image (addSlsDashImage),
+        // centred on the pin, billboarded as the circles are.
         { id: 'mn-stations-outline', type: 'circle', source: 'mn-stations',
-          filter: ['!=', ['get', 'outline'], ''],
+          filter: ['all', ['!=', ['get', 'outline'], ''], ['==', ['get', 'dash'], '']],
           paint: {
             'circle-radius':       ['+', ['get', 'r'], ['get', 'w']],
             'circle-color':        'rgba(0,0,0,0)',
@@ -1592,6 +1633,12 @@ const Map3D = (function () {
             'circle-stroke-opacity': ['get', 'op'],
             'circle-stroke-opacity-transition': { duration: 0, delay: 0 },
           } },
+        { id: 'mn-stations-outline-dash', type: 'symbol', source: 'mn-stations',
+          filter: ['!=', ['get', 'dash'], ''],
+          layout: { 'icon-image': ['get', 'dash'],
+                    'icon-allow-overlap': true, 'icon-ignore-placement': true },
+          paint: { 'icon-opacity': ['get', 'op'],
+                   'icon-opacity-transition': { duration: 0, delay: 0 } } },
         { id: 'mn-stations', type: 'circle', source: 'mn-stations',
           paint: {
             'circle-color':        ['get', 'fill'],
@@ -1986,6 +2033,13 @@ const Map3D = (function () {
     // lifting it. Not `move`: that is the camera only, and fires before the
     // frame it changes, where `render` is that frame.
     map.on('render', syncLeader);
+
+    // An information location's dashed outline, drawn the first time a pin of
+    // its size asks for it — a new size comes with a selection's grow or a
+    // health ring's weight, and is drawn then rather than guessed at here.
+    map.on('styleimagemissing', e => {
+      if (e && typeof e.id === 'string' && e.id.startsWith(SLS_DASH)) addSlsDashImage(e.id);
+    });
 
     map.on('style.load', () => {
       ready = true;

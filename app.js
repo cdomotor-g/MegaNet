@@ -1212,7 +1212,7 @@ function stationOwnerKeys(s) {
 // The Gauge block's three questions, against the same answers the pins are
 // drawn from (MapSymbols.kind), so "River height" is exactly the triangles,
 // "Read by a person" exactly the grey pins and "Forecast location" exactly the
-// purple outlines.
+// solid pink outlines.
 function gaugeMatches(f, s) {
   const k = MapSymbols.kind(s);
   if (f.measures) {
@@ -4791,8 +4791,8 @@ function mapDisplayControlsHtml() {
     ${state.map && state.map.mnBases ? state.map.mnBases.html() : ''}
     <!-- What a pin's shape, fill and outline say (map-symbols.js): a triangle
          for a river height gauge, grey for one read by hand, black for a TM
-         station, the Bureau's purple and pink outlines for its forecast and
-         information locations. -->
+         station, a solid pink outline for the Bureau's forecast locations and
+         a dashed one for its information locations. -->
     ${MapSymbols.sectionHtml()}
     <div class="map-display-h">Stations &amp; links</div>
     <label class="filter-check"
@@ -6193,8 +6193,8 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     const role   = primaryRole(s);
     // What the pin says beyond its role (map-symbols.js): a triangle for a
     // river height gauge, grey for one read by hand, black for a TM station,
-    // the Bureau's purple or pink outline for its forecast and information
-    // locations. Grey or black takes the role's place as the colour, so
+    // a solid pink outline for the Bureau's forecast locations and a dashed
+    // one for its information locations. Grey or black takes the role's place as the colour, so
     // everything below that paints "the station's colour" — the fill, a
     // proposal's dashed ring — paints it.
     const sym    = MapSymbols.pin(s);
@@ -6252,6 +6252,7 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
       bubblingMouseEvents: false,          // a pin click is not an empty-map click
       mnShape:     sym.triangle ? 'triangle' : 'circle',
       mnOutline:   sym.outline,
+      mnOutlineDash: sym.outlineDash,
     }).addTo(map);
     marker.mnStationId = s.id;             // lets the table below find its pin
     marker.mnStation   = s;                // and lets labels be re-picked on pan
@@ -8638,8 +8639,8 @@ const GAUGE_CHOICES = {
   ]],
   slsRole: ['Flood warning role', [
     ['',            'Any'],
-    ['forecast',    'Forecast location — outlined purple'],
-    ['information', 'Information location — outlined pink'],
+    ['forecast',    'Forecast location — solid pink outline'],
+    ['information', 'Information location — dashed pink outline'],
     ['either',      'Forecast or information location'],
     ['river_data',  'River data location'],
     ['listed',      'In the Bureau’s SLS, any role'],

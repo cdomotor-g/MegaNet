@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 50, date: '2026-10-19', items: [
+      '<strong>🩷 Forecast and information locations: solid and dashed.</strong> On the Stations map a forecast '
+        + 'location is now outlined in <strong>solid pink</strong> and an information location in <strong>dashed '
+        + 'pink</strong>, in place of purple and pink — the dash tells them apart. The legend, the Filters\' '
+        + '<em>Gauge</em> block, the 3-D view and 🔭 Look Around\'s rings and tags all match.',
+    ] },
     { n: 49, date: '2026-10-19', items: [
       '<strong>⚫ TM stations are black on the map.</strong> A station read by a data logger and modem — its name ends '
         + '<em>TM</em> — is now a black pin, so it stands apart from the green of an ALERT station and the grey of a '

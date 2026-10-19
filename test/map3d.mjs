@@ -414,6 +414,15 @@ const mirror = await page.evaluate(() => {
                 JSON.stringify(state.mapMarkers.map(k => k.options.fillColor)),
     ringsMatch: JSON.stringify(m.stations.features.map(f => f.properties.ring)) ===
                 JSON.stringify(state.mapMarkers.map(k => k.options.color)),
+    // The Bureau's outlines: solid pink round a forecast location, and for an
+    // information location the dashed ring's image instead (MapLibre strokes
+    // a circle solid and no other way).
+    solid: m.stations.features.filter(f => f.properties.outline && !f.properties.dash).length,
+    dashed: m.stations.features.filter(f => f.properties.dash).length,
+    outlinesMatch: JSON.stringify(m.stations.features.map(f => [f.properties.outline, !!f.properties.dash])) ===
+                   JSON.stringify(state.mapMarkers.map(k => [k.options.mnOutline || '', !!(k.options.mnOutline && k.options.mnOutlineDash)])),
+    dashLayer: !!Map3D._map().getLayer('mn-stations-outline-dash'),
+    dashImages: Map3D._map().listImages().filter(id => id.startsWith('mn-sls-dash-')).length,
   };
 });
 ok('every pin on the 2-D map is in the 3-D view',
@@ -421,6 +430,11 @@ ok('every pin on the 2-D map is in the 3-D view',
 ok('…carrying the same station ids, in the same order', mirror.idsMatch);
 ok('…the same role colours',                            mirror.fillsMatch);
 ok('…and the same filter rings',                        mirror.ringsMatch);
+ok('…and the same outlines: solid round a forecast location, dashed round an information one',
+   mirror.outlinesMatch && mirror.solid + mirror.dashed > 0, `${mirror.solid} solid, ${mirror.dashed} dashed`);
+ok('…the dashed ones drawn as the ring\'s image, made for the pins in view',
+   !mirror.dashed || (mirror.dashLayer && mirror.dashImages > 0),
+   `layer ${mirror.dashLayer}, ${mirror.dashImages} image(s)`);
 ok('every core and backbone line is mirrored, and the casings are not',
    mirror.links === mirror.cores + mirror.dashes,
    `${mirror.links} features for ${mirror.cores} cores + ${mirror.dashes} dashes, `

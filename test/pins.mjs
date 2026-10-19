@@ -1,6 +1,6 @@
 // What a station's pin says beyond its role, and whose stations the map draws
 // (map-symbols.js): a triangle for a river height gauge, grey for one read by
-// hand, black for a TM station, the Bureau's purple and pink outlines for its
+// hand, black for a TM station, the Bureau's solid and dashed pink outlines for its
 // forecast and information locations — and the Filters' Owner and Gauge blocks that pick out exactly
 // those pins, and Map display's owner choice that takes the others away.
 //
@@ -11,18 +11,19 @@
 //     but against what stations.json and data/sls-locations.json say, read in
 //     Node: every station with a water level on record is a triangle and every
 //     one with none is a circle; every station either SLS calls a forecast
-//     location is outlined purple, every information location pink; every
-//     gauge the SLS calls Manual is grey; every TM station — a logger on its
-//     Telemetry field, or TM on the end of its name — is black, and nothing
-//     else is.
+//     location is outlined in solid pink, every information location in
+//     dashed pink; every gauge the SLS calls Manual is grey; every TM station
+//     — a logger on its Telemetry field, or TM on the end of its name — is
+//     black, and nothing else is.
 //   * The canvas actually draws them. A pin that carries `mnShape: 'triangle'`
 //     and is painted as a circle passes every assertion about options, so the
 //     canvas is read back: inside a triangle pin's circumcircle but outside the
 //     triangle is the ground, where a circle pin of the same size has its ring;
-//     and the outline is there in the Bureau's colour.
+//     and the outline is there in the Bureau's pink, unbroken round a forecast
+//     location and broken into dashes round an information location.
 //   * The filters say what the pins say. "Read by a person" is exactly the grey
 //     pins, "River height" exactly the triangles, "Forecast location" exactly
-//     the purple outlines — the claim the Gauge block's hint makes. The Owner
+//     the solid outlines — the claim the Gauge block's hint makes. The Owner
 //     block's rows are the owners the files name, with their counts; "only"
 //     gives that owner's stations and nobody else's, and its find box hides
 //     rows without unticking any.
@@ -143,8 +144,8 @@ const pins = (page) => page.evaluate(() => {
     triangle: by((m) => m.options.mnShape === 'triangle'),
     grey: by((m) => m.options.fillColor === MapSymbols.MANUAL),
     black: by((m) => m.options.fillColor === MapSymbols.TM),
-    forecast: by((m) => m.options.mnOutline === MapSymbols.FORECAST),
-    information: by((m) => m.options.mnOutline === MapSymbols.INFORMATION),
+    forecast: by((m) => m.options.mnOutline === MapSymbols.FORECAST && !m.options.mnOutlineDash),
+    information: by((m) => m.options.mnOutline === MapSymbols.INFORMATION && !!m.options.mnOutlineDash),
   };
 });
 
@@ -201,14 +202,14 @@ try {
   await page.waitForTimeout(300);
   const got = await pins(page);
   const tri = new Set(got.triangle), grey = new Set(got.grey), black = new Set(got.black);
-  const purple = new Set(got.forecast), pink = new Set(got.information);
+  const solid = new Set(got.forecast), dashed = new Set(got.information);
   check('every station with a water level on record is a triangle, and every other a circle',
     same(expect.triangle, tri),
     `file ${expect.triangle.size}, map ${tri.size}; not drawn as one: ${missing(expect.triangle, tri)}; drawn but not: ${missing(tri, expect.triangle)}`);
-  check('every forecast location the SLS names is outlined purple, and nothing else is',
-    same(expect.forecast, purple), `file ${expect.forecast.size}, map ${purple.size}`);
-  check('every information location (not also forecast) is outlined pink, and nothing else is',
-    same(expect.information, pink), `file ${expect.information.size}, map ${pink.size}`);
+  check('every forecast location the SLS names is outlined in solid pink, and nothing else is',
+    same(expect.forecast, solid), `file ${expect.forecast.size}, map ${solid.size}`);
+  check('every information location (not also forecast) is outlined in dashed pink, and nothing else is',
+    same(expect.information, dashed), `file ${expect.information.size}, map ${dashed.size}`);
   check('every gauge the SLS calls Manual is grey',
     [...expect.slsManual].every((id) => grey.has(id)), `${expect.slsManual.size} manual; not grey: ${missing(expect.slsManual, grey)}`);
   check('…and no grey pin is a repeater or a base, which a radio reads by definition',
@@ -233,7 +234,9 @@ try {
   // Read back off the renderer's own canvas, at a zoom where the pin is alone:
   // its middle is its fill; a point inside its circumcircle but outside the
   // triangle is whatever the ground is three radii away; the outline's bottom
-  // edge is the Bureau's colour. Links off, so nothing crosses the samples.
+  // edge is the Bureau's pink — all of it round a forecast location, and in
+  // dashes with the ground between round an information location. Links off,
+  // so nothing crosses the samples.
   await page.evaluate(() => { state.mapShowLinks = false; state.mapShowBackbone = false; refreshMapLayers({ skipFit: true }); });
   const drawn = await page.evaluate(async () => {
     const lone = (pred) => {
@@ -271,25 +274,39 @@ try {
       const ground = g.px(-3 * g.r, 0);
       out.circle = { name: g.name, corner: !(near(g.px(-0.75 * g.r, -0.5 * g.r), ground, 30) && g.px(-0.75 * g.r, -0.5 * g.r)[3] === ground[3]) };
     }
-    const f = lone((m) => m.options.mnOutline === MapSymbols.FORECAST && m.options.mnShape === 'triangle');
-    if (f) {
-      const g = await read(f);
-      const ro = g.r + 2 * (g.w / 2 + 2.5 / 2);
-      let best = Infinity;
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        const p = g.px(dx, ro / 2 + dy);
-        best = Math.min(best, Math.hypot(p[0] - 0x84, p[1] - 0x00, p[2] - 0xa8));
+    // Along the outline's bottom edge, a pixel at a time: pink or not, each
+    // the best of the pixel and the two above and below it, so a half-pixel
+    // of rounding across the line is not a gap — but never one beside it,
+    // which would bridge a dash's gap. Opaque pink only: the canvas is
+    // transparent off the pins, and a faint edge reads pink at any alpha.
+    const edge = async (m) => {
+      const g = await read(m);
+      const ro = g.r + 2 * (g.w / 2 + 2.5 / 2), half = 0.8 * ro * Math.sqrt(3) / 2;
+      const pink = hex(MapSymbols.FORECAST), runs = [];
+      for (let x = -half; x <= half; x++) {
+        let best = Infinity;
+        for (let dy = -1; dy <= 1; dy++) {
+          const p = g.px(x, ro / 2 + dy);
+          if (p[3] >= 128) best = Math.min(best, Math.hypot(p[0] - pink[0], p[1] - pink[1], p[2] - pink[2]));
+        }
+        runs.push(best <= 60);
       }
-      out.forecast = { name: g.name, outline: best <= 60, best: Math.round(best) };
-    }
+      return { name: g.name, pink: runs.filter(Boolean).length, gaps: runs.filter((v) => !v).length };
+    };
+    const f = lone((m) => m.options.mnOutline === MapSymbols.FORECAST && !m.options.mnOutlineDash && m.options.mnShape === 'triangle');
+    if (f) out.forecast = await edge(f);
+    const i = lone((m) => m.options.mnOutline === MapSymbols.INFORMATION && !!m.options.mnOutlineDash && m.options.mnShape === 'triangle');
+    if (i) out.information = await edge(i);
     return out;
   });
   check('a triangle pin is filled in its middle', !!drawn.triangle && drawn.triangle.middle, JSON.stringify(drawn.triangle));
   check('…and its circumcircle\'s corner is bare ground, where a circle would be ring',
     !!drawn.triangle && drawn.triangle.corner, JSON.stringify(drawn.triangle));
   check('…which the same point on a circle pin is not', !!drawn.circle && drawn.circle.corner, JSON.stringify(drawn.circle));
-  check('a forecast location\'s outline is drawn in the Bureau\'s purple', !!drawn.forecast && drawn.forecast.outline,
-    JSON.stringify(drawn.forecast));
+  check('a forecast location\'s outline is drawn in the Bureau\'s pink, unbroken',
+    !!drawn.forecast && drawn.forecast.pink > 4 && drawn.forecast.gaps === 0, JSON.stringify(drawn.forecast));
+  check('…and an information location\'s in the same pink, in dashes',
+    !!drawn.information && drawn.information.pink > 2 && drawn.information.gaps > 0, JSON.stringify(drawn.information));
   await page.evaluate(() => { state.mapShowLinks = true; state.mapShowBackbone = true; refreshMapLayers({ skipFit: true }); });
 
   // ── 5. The filters say what the pins say ───────────────────────────────────
@@ -308,8 +325,8 @@ try {
   };
   check('Gauge: "Read by a person" is exactly the grey pins', same(new Set(await gauge(1, 'manual')), grey));
   check('Gauge: "River height" is exactly the triangles', same(new Set(await gauge(0, 'river')), tri));
-  check('Gauge: "Forecast location" is exactly the purple outlines', same(new Set(await gauge(2, 'forecast')), purple));
-  check('Gauge: "Information location" is exactly the pink outlines', same(new Set(await gauge(2, 'information')), pink));
+  check('Gauge: "Forecast location" is exactly the solid outlines', same(new Set(await gauge(2, 'forecast')), solid));
+  check('Gauge: "Information location" is exactly the dashed outlines', same(new Set(await gauge(2, 'information')), dashed));
   const gaugeState = await page.evaluate(() => document.getElementById('filter-state-gauge').textContent.trim());
   check('…and the block says it is set while it is', gaugeState === '1 set', gaugeState);
   await page.evaluate(() => clearStationFilters(false));
@@ -407,7 +424,8 @@ try {
     /River height \(water level\) gauge/.test(legendOn) && /Read by hand/.test(legendOn)
       && /TM station/.test(legendOn)
       && /Forecast location/.test(legendOn) && /Information location/.test(legendOn)
-      && legendOn.includes('#8400a8') && legendOn.includes('#ff00c5'));
+      && legendOn.includes('#ff00c5') && !legendOn.includes('#8400a8')
+      && /stroke="#ff00c5"[^>]*stroke-dasharray="4 3"/.test(legendOn));
   await page.uncheck('#map-display-block input[onchange^="MapSymbols.setShapes"]');
   await page.uncheck('#map-display-block input[onchange^="MapSymbols.setManual"]');
   await page.uncheck('#map-display-block input[onchange^="MapSymbols.setTm"]');

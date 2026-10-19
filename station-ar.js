@@ -7,8 +7,8 @@
 //               one letter (F field, R repeater, B base, in the map's own
 //               colours) and how many more stand behind it, out to a distance
 //               a slider sets — and the Bureau's forecast and information
-//               locations ringed and tagged in the Bureau's own purple and
-//               pink. A tap on a pin opens the station: its number, its ALERT
+//               locations ringed and tagged in the Bureau's pink, solid and
+//               dashed. A tap on a pin opens the station: its number, its ALERT
 //               ids, how far and which way, the rest of that direction, and
 //               the way back to it on the map.
 //
@@ -49,8 +49,9 @@
 // Where the Bureau's Service Level Specification names a station as one of its
 // forecast locations (Schedule 2: a height is predicted for it) or information
 // locations (Schedule 3: reported and classified, not predicted), its pin is
-// ringed in the Bureau's purple or pink and says Forecast or Info beside its
-// distance, and its sheet says which in words. The answer is MapSymbols.kind's,
+// ringed in the Bureau's pink — solid for a forecast location, dashed for an
+// information one — and says Forecast or Info beside its distance, and its
+// sheet says which in words. The answer is MapSymbols.kind's,
 // the one the Stations map's outlines and its Gauge filter are drawn from, so
 // the two never disagree; a station the document does not name has no mark,
 // which is "we don't have that detail", not "it is neither". The file is
@@ -458,9 +459,9 @@ const StationAR = (function () {
     const k = typeof MapSymbols !== 'undefined' ? MapSymbols.kind(s) : null;
     return k && (k.role === 'forecast' || k.role === 'information') ? k.role : null;
   }
-  // The tag, in the Bureau's colour. Hidden from a screen reader, which is
-  // told the whole name instead where `sr` asks for it (a pin's own label says
-  // it already).
+  // The tag, in the Bureau's pink — filled, or inside a dashed edge. Hidden
+  // from a screen reader, which is told the whole name instead where `sr` asks
+  // for it (a pin's own label says it already).
   function slsTagHtml(sls, sr = false) {
     if (!sls) return '';
     return `<span class="ar-sls sls-${sls}" aria-hidden="true">${SLS_TAG[sls]}</span>`
@@ -547,7 +548,7 @@ const StationAR = (function () {
           <h2 class="ar-pane-title" id="ar-pane-h"><span aria-hidden="true">🔭</span> Look Around</h2>
           <p class="ar-pane-lead">Hold your phone up and turn round: the stations the way it faces are pinned over the
             camera's picture, each with its type — <strong>F</strong> field, <strong>R</strong> repeater, <strong>B</strong> base —
-            and the Bureau's forecast and information locations ringed and tagged in its own colours,
+            and the Bureau's forecast and information locations ringed and tagged in its pink, solid and dashed,
             ${slsTagHtml('forecast')} ${slsTagHtml('information')}.
             One pin a direction: the nearest station that way, and how many more stand behind it. Tap a pin for its station
             number and ALERT IDs, and the way to it on the map.</p>
@@ -573,7 +574,7 @@ const StationAR = (function () {
               counts the rest; the pin's sheet lists them. The little circle is the same directions from above, the way you
               face at the top.</p>
             <p class="small">Forecast and information locations are the Bureau's, from its Service Level Specification — the
-              ones the Stations map outlines in purple and pink. At a <strong>forecast</strong> location the Bureau predicts a
+              ones the Stations map outlines in solid and dashed pink. At a <strong>forecast</strong> location the Bureau predicts a
               height; at an <strong>information</strong> location it reports and classifies the heights but does not predict
               them. A station the document doesn't name has no tag.</p>
             <p class="small">The camera's picture is drawn on your screen and goes nowhere else — nothing is recorded or

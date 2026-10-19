@@ -16525,19 +16525,26 @@ button.adm-danger:hover { border-color: var(--bad); }
   white-space: nowrap;
 }
 
-/* The Bureau's forecast and information locations: a ring round the label in
-   the Bureau's own key — the purple and pink the Stations map outlines them in
-   (MapSymbols.FORECAST and INFORMATION), literals for the reason they are
-   there — and a tag that says it in a word, so the ring is not left to colour
-   alone. White on the purple and black on the pink are the pairs that read. */
-:is(.ar-sls, .ar-pin).sls-forecast    { --ar-sls: #8400a8; --ar-sls-ink: #fff; }
-:is(.ar-sls, .ar-pin).sls-information { --ar-sls: #ff00c5; --ar-sls-ink: #000; }
+/* The Bureau's forecast and information locations: a ring round the label as
+   the Stations map outlines them — the Bureau's pink (MapSymbols.FORECAST and
+   INFORMATION, a literal for the reason it is there), solid for a forecast
+   location and dashed for an information one — and a tag that says it in a
+   word, so the ring is not left to a dash alone. The forecast tag is filled,
+   black on the pink being the pair that reads; the information tag is the
+   panel inside a dashed pink edge, as its ring is. */
+:is(.ar-sls, .ar-pin).sls-forecast {
+  --ar-sls: #ff00c5; --ar-sls-bg: #ff00c5; --ar-sls-ink: #000; --ar-sls-line: solid;
+}
+:is(.ar-sls, .ar-pin).sls-information {
+  --ar-sls: #ff00c5; --ar-sls-bg: var(--panel); --ar-sls-ink: var(--text); --ar-sls-line: dashed;
+}
 
 .ar-sls {
   display: inline-block;
   padding: 0 .3rem;
+  border: 1.5px var(--ar-sls-line) var(--ar-sls);
   border-radius: var(--r-pill);
-  background: var(--ar-sls);
+  background: var(--ar-sls-bg);
   color: var(--ar-sls-ink);
   font-size: .66rem;
   font-weight: 700;
@@ -16549,9 +16556,28 @@ button.adm-danger:hover { border-color: var(--bad); }
 .ar-pin-dist .ar-sls { margin-left: .35rem; }
 .ar-more-row .ar-sls { flex: 0 0 auto; }
 
-.ar-pin:is(.sls-forecast, .sls-information) .ar-pin-box {
+.ar-pin.sls-forecast .ar-pin-box {
   box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 4px var(--ar-sls), var(--shadow-2);
 }
+
+/* The dashed ring: a box-shadow has no dashes, and the outline is the focus
+   ring's, so it is a border on a layer of its own, over a panel casing that
+   fills the gaps — where the forecast ring runs, 1.5 to 4 px out from the
+   label's border (2px, 3px when picked). */
+.ar-pin.sls-information .ar-pin-box {
+  box-shadow: 0 0 0 4px var(--panel), var(--shadow-2);
+}
+
+.ar-pin.sls-information .ar-pin-box::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 2.5px dashed var(--ar-sls);
+  border-radius: calc(var(--r-lg) + 4px);
+  pointer-events: none;
+}
+
+.ar-pin.is-picked.sls-information .ar-pin-box::before { inset: -7px; }
 
 /* How many stations stand this way, the nearest one named. */
 .ar-pin-n {

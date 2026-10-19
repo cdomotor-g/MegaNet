@@ -757,8 +757,8 @@ const HELP = {
       + 'for a station that measures both. <strong>Grey</strong> is a gauge read by hand: nothing '
       + 'reports it over the radio, so silence from it is not a fault. <strong>Black</strong> is a '
       + 'TM station — a data logger and modem rather than an ALERT radio, which keeps the green. '
-      + 'A <strong>purple</strong> outline is one of the Bureau\'s forecast locations and a '
-      + '<strong>pink</strong> one an information location, as the Bureau\'s own flood maps draw them, from its Service Level '
+      + 'A <strong>solid pink</strong> outline is one of the Bureau\'s forecast locations and a '
+      + '<strong>dashed pink</strong> one an information location, from its Service Level '
       + 'Specifications. Each is a switch under <em>Station pins</em> in 🗺️ <strong>Map '
       + 'display</strong>, and the Filters\' <em>Gauge</em> block picks out exactly the same pins — '
       + 'what a station measures, who reads it and what the Bureau does with it.',
@@ -1013,7 +1013,7 @@ const HELP = {
     summary: 'Hold a phone up and turn round: the stations the way it faces are pinned over the camera\'s '
            + 'picture, each with its type in a letter of its colour — <strong>F</strong> field (green), '
            + '<strong>R</strong> repeater (blue), <strong>B</strong> base (red) — and the Bureau\'s forecast and '
-           + 'information locations ringed in purple and pink and tagged <em>Forecast</em> or <em>Info</em>, as the '
+           + 'information locations ringed in pink — solid and dashed — and tagged <em>Forecast</em> or <em>Info</em>, as the '
            + 'Stations map outlines them. One pin a direction: the nearest '
            + 'station that way, named, with a count of how many more stand behind it. The slider sets how far out '
            + 'it looks, and the letters at the foot switch a type off. Tap a pin for the station\'s number, its '
@@ -3329,7 +3329,7 @@ const state = {
     enabledOnly:  false,
     // The Gauge block (MapSymbols.kind, map-symbols.js), the same answers the
     // pins are drawn from, so a filter can pick out exactly the triangles, the
-    // grey pins or the purple outlines:
+    // grey pins or the forecast locations' solid outlines:
     //   measures  '' | 'river' (a water level — a triangle) | 'rain' (any
     //             rainfall) | 'rainOnly' (rainfall and no water level — a
     //             circle) | FILTER_NONE (neither recorded)
@@ -3556,14 +3556,14 @@ const state = {
   mapHealth:      mapHealthStored(),
   // What a pin's shape, fill and outline say about the station (map-symbols.js):
   // a triangle for a river height (water level) gauge, grey for a gauge read
-  // by hand, black for a TM station, the Bureau's purple and pink outlines for
+  // by hand, black for a TM station, the Bureau's solid and dashed pink outlines for
   // its forecast and information locations. On by default and remembered, on mapArrows' terms —
   // they were asked for, their one cost is the SLS file the station card reads
   // (fetched once, after the pins are drawn), and an operator who turns one
   // off means it.
   //
   // Except the outlines under the Calm look, which start off there with the
-  // rest of CALM_MAP_OFF (above): a purple or pink ring on a third of the
+  // rest of CALM_MAP_OFF (above): a pink ring on a third of the
   // south-east's pins is most of what made the map read as busy, and it
   // answers a question — which of these does the Bureau forecast? — that most
   // visits to the map are not asking.
