@@ -6519,18 +6519,9 @@ function stationActionGroups(s) {
       // orifice run (site-features.js, 0061) — signed-in editors only.
       SiteFeatures.pillHtml(s),
     ] },
-    // Two pairs, which is what the row wraps into at the card's width: the two
-    // ways to stand on the ground (Street View, Apple Maps — Look Around is one
-    // tap further), then the two Google Earth errands. Google Earth and Apple
-    // Maps traded places to make that so, at the same time as the KML download
-    // came to sit against the Earth link it belongs with (#176, export.js) —
-    // that one takes you to the ground, this one takes the network with you.
-    // No coordinates, no group: neither the views nor the KML exist for a
-    // station with no position.
-    { label: 'Imagery and terrain', pills: (() => {
-      const v = mapViewPillParts(s);
-      return v ? [v.street, v.apple, stationKmlPillHtml(s), v.earth] : [];
-    })() },
+    // Two pairs, the same as the editor card's (stationImageryPills). No
+    // coordinates, no group.
+    { label: 'Imagery and terrain', pills: stationImageryPills(s) },
     { label: 'Records', pills: [
       arroUrl ? `<a class="pill" href="${esc(arroUrl)}" target="_blank" rel="noopener"
            title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
@@ -7886,10 +7877,10 @@ function stnCardHtml(s) {
          role=group with a name on each, and the name is also the group's
          visible heading — styles.css draws it from the aria-label, so the two
          cannot disagree. Each group lays its pills out as a two-column list
-         (.stn-card-group), which is why the pills' labels are pillText spans. -->
+         (.pill-list), which is why the pills' labels are pillText spans. -->
     <div class="acma-sect stn-card-actions">
       ${stationActionGroups(s).map(g =>
-        `<div class="pill-row stn-card-group" role="group" aria-label="${escAttr(g.label)}">
+        `<div class="pill-row pill-list stn-card-group" role="group" aria-label="${escAttr(g.label)}">
         ${g.pills.join('\n        ')}
       </div>`).join('\n      ')}
     </div>

@@ -22,8 +22,8 @@
 // cleanly into a work order is the exact defect this exists to hold shut.
 //
 // It is separate from `movepin` on purpose: that check is #170's, its "five
-// links" assertion is a *cap* on the row mapLinksHtml() builds, and this pill
-// is deliberately not part of that row — every pill in it leaves the site, and
+// links" assertion is a *cap* on the links out of a station, and this pill
+// is deliberately not one of them — every one of those leaves the site, and
 // this one does not go anywhere at all.
 //
 // The clipboard is read back for real. The context is granted clipboard-read
@@ -174,6 +174,10 @@ async function main() {
         found:     !!btn,
         onCoordRow: !!row && row.classList.contains('pill-row'),
         besideMove: !!row && !!row.querySelector('#ef-movepin'),
+        // Under the boxes, the groups the station card on the map draws, under
+        // the same names, each laid out as a list (.pill-list).
+        groups:    [...document.querySelectorAll('#stations-editor-card .ef-actions > [role="group"]')]
+                     .map(g => `${g.getAttribute('aria-label')}${g.classList.contains('pill-list') ? '' : ' (not a list)'}`),
         // No baked-in coordinate: one would go stale the moment a pin is
         // dragged into the boxes, which map-move-pin does without re-rendering
         // the card.
@@ -184,6 +188,8 @@ async function main() {
     check('the editor card carries the same pill', ed.found);
     check('on the coordinate row, beside Move pin on map',
       ed.onCoordRow && ed.besideMove);
+    check('in the Position group, then imagery and records — the map card’s groups, as lists',
+      ed.groups.join(' | ') === 'Position | Imagery and terrain | Records', ed.groups.join(' | '));
     check('reading the boxes rather than a figure baked in when the card was drawn',
       ed.noStale && ed.handler === 'editorCopyLatLon(this)', ed.handler);
 

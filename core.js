@@ -534,14 +534,16 @@ const HELP = {
            + '35 recorded parameters on request — and the pill beside the heading opens the full '
            + 'records on the Inspection History tab with this station already in its filter box. '
            + 'That chart needs no sign-in; the records behind the pill do. Under the coordinate '
-           + 'boxes, and on every station\'s map callout, is a row of pills: Street View, Google '
-           + 'Earth and Apple Maps at that position, and searches of the <strong>FWIN</strong> and '
-           + '<strong>OOHB</strong> document libraries for that station. Beside them, '
-           + '<strong>Move pin on map</strong> and <strong>Copy lat, lon</strong> — the position as '
+           + 'boxes are the same short lists the station\'s card on the map carries. '
+           + '<strong>Position</strong> has <strong>Move pin on map</strong> and '
+           + '<strong>Copy lat, lon</strong> — the position as '
            + 'decimal degrees on the clipboard, ready to paste into a work order, a planning tool '
            + 'or a message to whoever is standing at the site. In the editor it copies what the two '
            + 'boxes say rather than what was last saved, so a pin you have just dragged or a figure '
-           + 'you have just typed is what you get. In the editor\'s <strong>ALERT IDs / Sensors</strong> '
+           + 'you have just typed is what you get. <strong>Imagery and terrain</strong> opens Street '
+           + 'View, Apple Maps and Google Earth at that position, or downloads the station as KML, and '
+           + '<strong>Records</strong> searches the <strong>FWIN</strong> and <strong>OOHB</strong> '
+           + 'document libraries for it. In the editor\'s <strong>ALERT IDs / Sensors</strong> '
            + 'list, each row carries a <strong>Flip</strong> link that opens the Bit Flipper on that '
            + 'row\'s address — what else it could have been, one or more bit-flips away. It reads '
            + 'the address out of the box rather than off the saved record, so a row you have '
@@ -2754,13 +2756,13 @@ function appleDevice(ua = (typeof navigator !== 'undefined' && navigator.userAge
 // (↗ leaves the site, → or ↓ goes somewhere in it, ⬇ downloads). On a pill
 // row the three still read as the one line they always were — a flex box does
 // not draw the spaces between the spans, the pill's own gap stands in for them
-// — and textContent is still "🚗 Directions ↗". The station card lays the same
-// spans out as a two-column list (styles.css, .stn-card-group): the icons in
+// — and textContent is still "🚗 Directions ↗". Both station cards lay the
+// same spans out as two-column lists (styles.css, .pill-list): the icons in
 // one column down the left, the marks in another down the right.
 //
-// `name` is HTML, so a caller can wrap the words the card's narrow columns
-// drop in pillLong(): "Search FWIN docs" everywhere else, "FWIN docs" under
-// the card's Records heading, which already says what kind of thing it is.
+// `name` is HTML, so a caller can wrap the words a list's narrow columns drop
+// in pillLong(): "Search FWIN docs" on a row, "FWIN docs" under a list's
+// Records heading, which already says what kind of thing it is.
 function pillText(icon, name, mark = '') {
   return `<span class="pill-ic">${icon}</span> <span class="pill-lbl">${name}</span>${
     mark ? ` <span class="pill-end">${mark}</span>` : ''}`;
@@ -2785,46 +2787,33 @@ function directionsPillHtml(s) {
        title="Driving directions to this location from wherever you are, in ${apple ? 'Apple' : 'Google'} Maps">${pillText('🚗', 'Directions', '↗')}</a>`;
 }
 
-// The links above, rendered as the row of pills used in both the map popup and
-// the station editor card — one place a URL shape is written, not two, and one
-// place they are dressed.
+// The links above, as pills — one place a URL shape is written, not two, and
+// one place they are dressed.
 //
 // Pills rather than a stack of underlined text (#170): every one of these
 // leaves the app for somewhere else, they are the same *kind* of thing as each
-// other, and a column of five links reads as a menu nobody asked for. `.pill`
-// is `.btn-link`'s shape at a link's weight — see styles.css.
+// other, and a bare column of links read as a menu nobody asked for. `.pill`
+// is `.btn-link`'s shape at a link's weight — see styles.css, where `.pill-list`
+// sets them in two columns under a heading on both station cards.
 //
 // A station with no coordinates still gets the document searches: the two
 // libraries are searched by name, and a site nobody has surveyed yet is exactly
 // the one whose paperwork is worth finding.
 //
-// Split in two since #175: the array, and the row string joined from it. One
-// place the URL shapes are written, two places they are drawn — the editor
-// card's row, and the station card, which takes the halves below to put the
-// pills in its groups. (The desktop callout's expanded row was a third, and
-// counted them for its "Actions (N)" label, until the callout gave way to the
-// leader.)
-function mapLinksHtml(s) {
-  return mapLinksPills(s).join('\n    ');
-}
-
 // Two kinds of leaving, kept apart since the station card grew groups (#175):
-// three pills that put the *site* on somebody else’s imagery, and two that go
-// looking for its *paperwork*. The concatenation is still what the editor card
-// draws — one flat row, in the order #170 fixed — so nothing that reads
-// mapLinksPills/mapLinksHtml changes shape; the station card asks for the
-// halves instead and draws a rule between them.
-function mapLinksPills(s) {
-  return [...mapViewPills(s), ...docSearchPills(s)];
-}
+// pills that put the *site* on somebody else’s imagery (stationImageryPills),
+// and two that go looking for its *paperwork* (docSearchPills). Both station
+// cards — the one on the map and the editor — draw the two as their own
+// groups; the other callouts on the map, which have no paperwork to find, draw
+// mapViewPills.
 
 // Somebody else’s picture of this ground, by name. Null for a station with no
 // coordinates — there is nowhere to point a camera.
 //
 // Named rather than positional because one caller has to reach *into* the
-// order: the station card puts the KML download beside the Google Earth link
-// (#176), and `pills[1]` would be a silent breakage the day a fourth imagery
-// service is added. The flat array below is what everything else draws.
+// order: stationImageryPills puts the KML download beside the Google Earth
+// link (#176), and `pills[1]` would be a silent breakage the day a fourth
+// imagery service is added. The flat array below is what the callouts draw.
 function mapViewPillParts(s) {
   const urls = stationMapLinkUrls(s);
   if (!urls) return null;
@@ -2841,6 +2830,18 @@ function mapViewPillParts(s) {
 function mapViewPills(s) {
   const p = mapViewPillParts(s);
   return p ? [p.street, p.earth, p.apple] : [];
+}
+
+// The imagery group on both station cards: two pairs, which is what the list
+// sets side by side in its two columns. The two ways to stand on the ground
+// (Street View, Apple Maps — Look Around is one tap further), then the two
+// Google Earth errands, the KML download against the Earth link it belongs
+// with (#176, export.js): that one takes you to the ground, this one takes the
+// network with you. Empty for a station with no position — neither the views
+// nor the KML exist without one.
+function stationImageryPills(s) {
+  const v = mapViewPillParts(s);
+  return v ? [v.street, v.apple, stationKmlPillHtml(s), v.earth] : [];
 }
 
 // The two document libraries, searched by name — so a station with no position
@@ -2864,9 +2865,9 @@ function docSearchPills(s) {
 // is reading twelve digits off the screen and typing them somewhere else, which
 // is the exact operation nobody can check.
 //
-// Not part of mapLinksHtml(): every pill in that row leaves the site, and this
-// one does not go anywhere at all. Same row, same shape, different kind of
-// thing — so it is built here and placed by each caller.
+// Not one of them: every pill above leaves the site, and this one does not go
+// anywhere at all. Same shape, different kind of thing — so it is built here
+// and placed by each caller, in the Position group on both station cards.
 
 // Six decimal places, the same as MapMovePin writes when it saves a dragged
 // pin — about 0.1 m, past what a handheld GPS claims. Number() strips the
@@ -2916,7 +2917,7 @@ function _copyFallback(text) {
 }
 
 // The pill itself, for the map callout and the station editor card — one place
-// it is written, two places it is drawn, the same argument as mapLinksHtml().
+// it is written, two places it is drawn, the same argument as the links above.
 // Nothing at all when the station has no position: a button that copies an
 // empty string is worse than no button.
 //
@@ -2948,7 +2949,7 @@ function copyLatLonPillHtml(s, { live = false } = {}) {
 // because the likeliest place to press this is a Leaflet popup, and a popup
 // closed inside the 1.6 s is a button that no longer exists. The markup is
 // what is put back, not the text: the pill's label is spans (pillText), and
-// the station card lines them up in columns.
+// both station cards line them up in columns.
 function copyStationLatLon(btn, text) {
   if (!btn) return;
   const value = (text != null ? text : btn.getAttribute('data-mn-latlon')) || '';

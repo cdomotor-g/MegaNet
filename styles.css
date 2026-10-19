@@ -1311,6 +1311,93 @@ button.pill {
   gap: .3rem;
 }
 
+/* …and the same pills as a list: two columns under a small heading, the way
+   both station cards draw their actions (the card on the map, #175, and the
+   editor card). A wrapping row of outlined pills broke wherever each label's
+   text ran out, so no two lines were the same length, and seventeen outlines
+   read as clutter. In columns the icons line up down the left and the ↗ → ⬇
+   marks down the right (pillText() in core.js gives each its own span), and
+   nothing but a hover says where one pill ends. It goes on a .pill-row, so it
+   is a later rule winning over that one's flex.
+
+   The heading is the group's aria-label, drawn, so the name a screen reader
+   is given and the one a sighted person reads cannot drift apart; the second
+   `content` hides the drawn copy from a screen reader, which already has the
+   name from the group, and a browser too old to read it keeps the first. */
+.pill-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 .5rem;
+  align-items: stretch;
+}
+
+.pill-list::before {
+  content: attr(aria-label);
+  content: attr(aria-label) / "";
+  grid-column: 1 / -1;
+  margin: 0 0 .15rem .3rem;
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* min-width: 0 and normal wrapping so a name too long for its column takes a
+   second line rather than pushing the column wider. Left-justified over
+   .mn-copy-latlon's centring, which keeps that pill one width while it
+   flashes "✓ Copied" on a row. */
+.pill-list .pill {
+  justify-content: flex-start;
+  gap: .35rem;
+  min-width: 0;
+  padding: .22rem .3rem;
+  border-color: transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  white-space: normal;
+}
+
+.pill-list .pill:hover {
+  border-color: transparent;
+  background: var(--subtle);
+}
+
+/* Armed — the blast styling on, the pin being moved — is still filled, and
+   takes the whole row: while it is on it is the one thing in the list that
+   matters, and "Mapping site features…" fits a row and not a column. */
+.pill-list .pill.is-on {
+  grid-column: 1 / -1;
+  background: var(--accent);
+  color: var(--panel);
+}
+
+.pill-list .pill-ic {
+  flex: none;
+  width: 1.25em;
+  text-align: center;
+}
+
+.pill-list .pill-lbl {
+  min-width: 0;
+}
+
+.pill-list .pill-end {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.pill-list .pill.is-on .pill-end {
+  color: inherit;
+}
+
+/* The words a column has no room for, which the heading over them makes
+   redundant: "Search FWIN docs" is "FWIN docs" under Records. */
+.pill-list .pill-long {
+  display: none;
+}
+
 /* …and its opposite, which the app needed just as often and had never named
    (#138). `.btn-link` is an <a> that reads as a button, for leaving the site.
    `.link-btn` is a <button> that reads as a link, for the thing the app writes
@@ -2554,15 +2641,22 @@ h2.h-bad {
    rather than reading as a paragraph of its own. */
 .ef-hint { margin-top: -.35rem; }
 
-/* The links out of the station in the editor card: the same row of pills the
-   map callout carries, from the same mapLinksHtml(). Wraps — five pills do not
-   fit across the form's left column on a phone. */
-.ef-links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: .3rem;
-  margin-top: -.35rem;
+/* Everything under the coordinate boxes in the editor card — Position, then
+   Imagery and terrain, then Records, each a .pill-list — pulled up into the
+   grid gap the way .ef-hint is, so the Position group reads as belonging to
+   the two boxes above it.
+
+   Out to each side by a pill's own padding, and the lists' column gap closed
+   to what is left of the form's .7rem, so every icon starts where a field's
+   label does in both of the form's columns. */
+.ef-actions {
+  display: grid;
+  gap: .55rem;
+  margin: -.35rem -.3rem 0;
+}
+
+.ef-actions .pill-list {
+  column-gap: .1rem;
 }
 
 .ef-section-head {
@@ -4958,11 +5052,6 @@ hr {
   font-variant-numeric: tabular-nums;
 }
 
-/* The card's own arming button, and Copy lat, lon beside it, on one line under
-   the coordinate boxes. `.pill-row` supplies the layout — this is only the pull
-   up into the grid gap, the same as `.ef-hint` and `.ef-links` take. */
-.ef-movepin { margin-top: -.35rem; }
-
 /* Copy lat, lon flashes "✓ Copied" or "✗ Copy failed" in place of its label for
    1.6 s. Both are shorter than the label — 79 px and 105 px against 118 px as
    measured here — and a pill that shrinks and grows again shoves every pill
@@ -6838,97 +6927,17 @@ hr {
 }
 
 /* One group of actions, with a hairline over every group but the first. See
-   stationActionGroups() in app.js for what goes in each.
-
-   A two-column list under a small heading rather than a wrapping row of
-   outlined pills: a row wrapped wherever each label's text ran out, so no two
-   lines were the same length and seventeen outlines read as clutter. In
-   columns the icons line up down the left and the ↗ → ⬇ marks down the right
-   (pillText() in core.js gives each its own span), and nothing but a hover
-   says where one ends. The pills stay pills everywhere else — this dresses
-   them only here.
-
-   The heading is the group's aria-label, drawn, so the name a screen reader
-   is given and the one a sighted person reads cannot drift apart; the second
-   `content` hides the drawn copy from a screen reader, which already has the
-   name from the group, and a browser too old to read it keeps the first. */
-.stn-card-group.pill-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 .5rem;
-  align-items: stretch;
+   stationActionGroups() in app.js for what goes in each; `.pill-list` (with
+   the pill rules near the top of this file) lays each one out as a headed
+   two-column list. This is only the card's own spacing and the rules between
+   its bands, which run the full width of the card like the section borders
+   above them. */
+.stn-card-group {
   padding: .45rem .6rem;
 }
 
 .stn-card-group + .stn-card-group {
   border-top: 1px solid var(--border);
-}
-
-.stn-card-group::before {
-  content: attr(aria-label);
-  content: attr(aria-label) / "";
-  grid-column: 1 / -1;
-  margin: 0 0 .15rem .3rem;
-  font-size: .68rem;
-  font-weight: 600;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-/* min-width: 0 and normal wrapping so a name too long for its column (the
-   armed states — "Mapping site features…") takes a second line rather than
-   pushing the column wider. Left-justified over .mn-copy-latlon's centring,
-   which keeps the pill one width while it flashes "✓ Copied" on a row. */
-.stn-card-group .pill {
-  justify-content: flex-start;
-  gap: .35rem;
-  min-width: 0;
-  padding: .22rem .3rem;
-  border-color: transparent;
-  border-radius: var(--r-md);
-  background: transparent;
-  white-space: normal;
-}
-
-.stn-card-group .pill:hover {
-  border-color: transparent;
-  background: var(--subtle);
-}
-
-/* Armed — the blast styling on, the pin being moved — is still filled, and
-   takes the whole row: while it is on it is the one thing on the card that
-   matters, and "Mapping site features…" fits a row and not a column. */
-.stn-card-group .pill.is-on {
-  grid-column: 1 / -1;
-  background: var(--accent);
-  color: var(--panel);
-}
-
-.stn-card-group .pill-ic {
-  flex: none;
-  width: 1.25em;
-  text-align: center;
-}
-
-.stn-card-group .pill-lbl {
-  min-width: 0;
-}
-
-.stn-card-group .pill-end {
-  margin-left: auto;
-  color: var(--muted);
-  font-weight: 400;
-}
-
-.stn-card-group .pill.is-on .pill-end {
-  color: inherit;
-}
-
-/* The words a column has no room for, which the heading over them makes
-   redundant: "Search FWIN docs" is "FWIN docs" under Records. */
-.stn-card-group .pill-long {
-  display: none;
 }
 
 /* The ALERT id list sits under the label/value rows. */

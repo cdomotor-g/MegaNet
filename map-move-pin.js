@@ -212,7 +212,7 @@ const MapMovePin = (function () {
         onclick="MapMovePin.${on ? 'cancel' : 'start'}('${escAttr(s.id)}')"
         title="${on ? 'Stop moving the pin and leave the coordinates as they were'
                     : 'Drag this station’s pin on the map above to where it should be'}"
-        >📍 ${label(s.id)}</button>`;
+        >${pillText('📍', label(s.id))}</button>`;
   }
 
   // The station card's pill (it was the desktop callout's too, until the

@@ -8,10 +8,10 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, slug, pInt, pFloat,
-// parseRangeLines, mapLinksHtml, stationMapLinkUrls, stationSensors,
-// arroSiteId, arroSiteUrl, arroSensorUrl, buildArroUrl, bucketSizeGapNote,
-// ROLE_LABEL and STATION_TYPE_LABEL (a proposed station's type, 0039); across
-// to app.js for the Stations tab's rerender hooks —
+// parseRangeLines, stationImageryPills, docSearchPills, stationMapLinkUrls,
+// stationSensors, arroSiteId, arroSiteUrl, arroSensorUrl, buildArroUrl,
+// bucketSizeGapNote, ROLE_LABEL and STATION_TYPE_LABEL (a proposed station's
+// type, 0039); across to app.js for the Stations tab's rerender hooks —
 // rerenderStations, rerenderStationEditorCard, refreshFilterOptions,
 // refreshMapLayers, updateHeaderStats, findStationMatches, stationAlertIds,
 // passRangeCoversId, repeaterPassingCount and repeaterPassRangeSpan — and for
@@ -286,14 +286,6 @@ function editorForm(s) {
   const hasBase = s.roles.includes('base');
   const sensors = stationSensors(s).slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0));
   const dbId    = arroSiteId(s);
-  // The row of pills under the coordinate boxes. Read once rather than twice —
-  // a station with no position still has the two document searches, so what
-  // decides whether the row is drawn is whether it came back with anything.
-  // The KML download joins it here rather than inside mapLinksHtml() because it
-  // is the one pill in the row that does not leave the site for somewhere else:
-  // it builds a file out of this station and the links the map draws around it
-  // (#176, export.js), and it is the same pill the map's own card carries.
-  const links   = [mapLinksHtml(s), stationKmlPillHtml(s)].filter(Boolean).join('\n    ');
   const movePin = MapMovePin.editorButtonHtml(s);
   // Where the station's outlet, pits, benchmarks, boards and orifice run are
   // (site-features.js, 0061): the same mode the card's 📌 pill arms, beside
@@ -307,6 +299,17 @@ function editorForm(s) {
   // figure typed over one has to be what the clipboard gets, and reading the
   // boxes at the click is the only version of that which cannot go stale.
   const copyLL  = copyLatLonPillHtml(s, { live: true });
+  // Everything under the coordinate boxes, in the groups the station card on
+  // the map draws and under the same names — the position's own three, then
+  // somebody else's picture of the ground (the KML download among them, #176),
+  // then the paperwork. A two-column list under each name (.pill-list), as on
+  // the card. A group with nothing in it is not drawn: a "+ New" draft has no
+  // pin to move, and a station with no position has only its two searches.
+  const actions = [
+    { label: 'Position', cls: ' ef-movepin', pills: [movePin, copyLL, siteFeat] },
+    { label: 'Imagery and terrain', cls: '', pills: stationImageryPills(s) },
+    { label: 'Records', cls: '', pills: docSearchPills(s) },
+  ].map(g => ({ ...g, pills: g.pills.filter(Boolean) })).filter(g => g.pills.length);
   // The wind region the station's coordinate falls in — the same answer the
   // station card on the map gives, so the two cards never disagree. Read now, and
   // filled in when the polygons land if this page has not needed them yet.
@@ -368,10 +371,13 @@ function editorForm(s) {
            the station is, and writes these two boxes on the way back. Copy is
            the other direction — the position out of here and into whatever is
            being written somewhere else. Both belong to the two boxes above, so
-           they sit on one row directly under them rather than in the links row
-           below, which is five things that all leave the site. -->
-      ${movePin || copyLL || siteFeat ? `<div class="full ef-movepin pill-row">${movePin}${copyLL}${siteFeat}</div>` : ''}
-      ${links ? `<div class="full small ef-links">${links}</div>` : ''}
+           the Position group comes first, directly under them, and the groups
+           that leave the site follow it. -->
+      ${actions.length ? `<div class="full ef-actions">
+        ${actions.map(g => `<div class="pill-row pill-list${g.cls}" role="group" aria-label="${escAttr(g.label)}">
+          ${g.pills.join('\n          ')}
+        </div>`).join('\n        ')}
+      </div>` : ''}
       <label>Elevation AHD (m)<input type="number" step="any" id="ef-elev" value="${s.elevation_ahd ?? ''}"></label>
       <!-- Read-only because it is not a property of the station: it is where the
            station's coordinate falls on AS/NZS 1170.2's map, so moving the pin

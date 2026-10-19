@@ -1,6 +1,7 @@
 // The three things #170 added to the Stations tab, driven in a real browser.
 //
-//   1. The row of pills a station's card on the map and its editor card both carry —
+//   1. The links out of a station both its cards carry — the imagery and
+//      the two document searches, in their own groups on each card —
 //      that every one of them is there, that the two document searches carry
 //      the *reduced* name rather than the raw one and ask for both spellings of
 //      the words that have two, and that a station with no coordinates still
@@ -118,12 +119,16 @@ async function main() {
 
     const pills = await page.evaluate(() => {
       const s = state.data.stations.find(x => x.lat != null && x.lon != null);
+      // The links out of a station, as both cards build them: the imagery
+      // (mapViewPills — the station cards add the KML download to it) and
+      // the two searches.
+      const links = x => [...mapViewPills(x), ...docSearchPills(x)].join('');
       const div = document.createElement('div');
-      div.innerHTML = mapLinksHtml(s);
+      div.innerHTML = links(s);
       const els = [...div.children];
       const hrefs = els.map(e => e.getAttribute('href') || '');
       const noCoords = document.createElement('div');
-      noCoords.innerHTML = mapLinksHtml({ id: 'x', name: 'Upper Sandy Creek AL' });
+      noCoords.innerHTML = links({ id: 'x', name: 'Upper Sandy Creek AL' });
       return {
         name: s.name,
         count: els.length,
