@@ -2449,7 +2449,23 @@ const ArroData = (function () {
       : 'Nothing in the datastore matches.');
   }
 
-  function fieldSetProbeTerm(v) { const p = fq().probe; p.term = String(v || ''); renderSide(); }
+  // Kept, not drawn. Nothing on the rail answers to the term until it is
+  // asked, and rebuilding the rail per keystroke replaced the field under the
+  // cursor, so every character after the first landed nowhere. The ask
+  // button's tooltip is the one thing that reads it, so that alone follows.
+  function fieldSetProbeTerm(v) {
+    const p = fq().probe;
+    p.term = String(v || '');
+    const ask = document.getElementById('ad-probe-ask');
+    if (ask) ask.title = fieldProbeAskTitle(p.term, fieldStation());
+  }
+
+  function fieldProbeAskTitle(term, st) {
+    const t = String(term || '').trim();
+    return t ? `Search the datastore for “${t}”`
+         : st ? `Read the datastore for ${st.name}`
+              : 'Type something to search for first';
+  }
 
   function fieldProbeClear() { fq().probe = newFieldProbe(); renderSide(); }
 
@@ -2801,7 +2817,8 @@ const ArroData = (function () {
 
         <label class="ad-cfg-row ad-cfg-row--block">
           <span>Station</span>
-          <input type="search" class="ad-field-input" placeholder="Name, station number or id…"
+          <input type="search" class="ad-field-input" id="ad-field-find" data-keep
+                 placeholder="Name, station number or id…"
                  value="${escAttr(q.find)}"
                  oninput="ArroData.fieldSetStation('', this.value)">
         </label>
@@ -2915,18 +2932,16 @@ const ArroData = (function () {
         <div class="panel-header ad-subhead">
           <h3 class="ad-subhead-h" id="ad-probe-h"
               title="What meganet.reading has actually heard, rather than what stations.json says this station should report. The two disagree often — 244 of the 706 addresses in the datastore resolve to no station at all.">In the datastore</h3>
-          <button class="btn-link" ${p.loading ? 'disabled' : ''}
-                  title="${escAttr(p.term.trim()
-                    ? `Search the datastore for “${p.term.trim()}”`
-                    : st ? `Read the datastore for ${st.name}`
-                         : 'Type something to search for first')}"
+          <button class="btn-link" id="ad-probe-ask" ${p.loading ? 'disabled' : ''}
+                  title="${escAttr(fieldProbeAskTitle(p.term, st))}"
                   onclick="ArroData.fieldProbe()">${p.loading ? 'asking…' : 'ask'}</button>
         </div>
 
         <label class="ad-cfg-row ad-cfg-row--block"
                title="Station id, channel, station number or ALERT address — the four things a reading carries its identity as. Leave it empty to ask about the station picked above.">
           <span>Search</span>
-          <input type="search" class="ad-field-input" placeholder="${escAttr(st ? st.id : 'bateson, rain, 999998, 8101…')}"
+          <input type="search" class="ad-field-input" id="ad-probe-term" data-keep
+                 placeholder="${escAttr(st ? st.id : 'bateson, rain, 999998, 8101…')}"
                  value="${escAttr(p.term)}"
                  oninput="ArroData.fieldSetProbeTerm(this.value)"
                  onchange="ArroData.fieldProbe(this.value)">
@@ -7297,9 +7312,25 @@ const ArroData = (function () {
     main.innerHTML = mainHtml();
     init();
   }
+  // The rail is rebuilt whole, which replaces a field being typed in under the
+  // cursor: the station search redraws its matches on every keystroke, and an
+  // answer coming back can land mid-word in the datastore search. A field
+  // marked data-keep is put back as the same element, so its caret, its focus
+  // and the edit an Enter is about to report as a change all survive it.
   function renderSide() {
     const side = document.getElementById('ad-side');
-    if (side) side.innerHTML = sideHtml();
+    if (side) {
+      const a = document.activeElement;
+      const keep = a && a.id && a.hasAttribute('data-keep') && side.contains(a) ? a : null;
+      const caret = keep && [keep.selectionStart, keep.selectionEnd];
+      side.innerHTML = sideHtml();
+      const fresh = keep && document.getElementById(keep.id);
+      if (fresh) {
+        fresh.replaceWith(keep);
+        keep.focus();
+        try { keep.setSelectionRange(caret[0], caret[1]); } catch (_) { /* not a text field */ }
+      }
+    }
     bind();
   }
   function renderReadout() {

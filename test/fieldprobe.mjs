@@ -179,6 +179,52 @@ try {
     return log;
   }, RIG);
 
+  // ── typing, with the real keyboard ──────────────────────────────────────
+  // Every keystroke in the datastore search used to rebuild the rail, field
+  // and all, so the field lost the focus after one character and the operator
+  // clicked back into it for each of the next. Driven by key presses, because
+  // the setters the evaluate block above calls were never what was broken.
+  const focusOf = sel => page.evaluate(sel => {
+    const el = document.querySelector(sel);
+    return { focused: !!el && document.activeElement === el, value: el ? el.value : null,
+             caret: el ? el.selectionStart : null };
+  }, sel);
+
+  await page.click('#ad-probe-term');
+  await page.keyboard.type('battery', { delay: 15 });
+  const probeTyped = await focusOf('#ad-probe-term');
+  const probeTerm = await page.evaluate(() => ArroData.ad.fq.probe.term);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => ArroData.ad.fq.probe.asked && !ArroData.ad.fq.probe.loading,
+    null, { timeout: 5000 });
+  const probeAnswered = await focusOf('#ad-probe-term');
+  const probeRows = await page.evaluate(() => ArroData.ad.fq.probe.rows.map(r => r.addr));
+  const askTitle = await page.evaluate(() => document.getElementById('ad-probe-ask')?.title || '');
+
+  // The station search redraws its matches as it goes, so it is rebuilt on
+  // every keystroke by design — the field has to survive that.
+  await page.click('#ad-field-find');
+  await page.keyboard.type('Bateson', { delay: 15 });
+  const findTyped = await focusOf('#ad-field-find');
+  const findHits = await page.evaluate(() => document.querySelectorAll('#ad-side .ad-field-hit').length);
+  await page.keyboard.press('Home');
+  await page.keyboard.type('18 ', { delay: 15 });
+  const findMid = await focusOf('#ad-field-find');
+
+  console.log('\n  typing into the search fields');
+  ok('the datastore search keeps the focus while it is typed into',
+     probeTyped.focused && probeTyped.value === 'battery', JSON.stringify(probeTyped));
+  ok('and holds the whole term, not its first letter', probeTerm === 'battery', probeTerm);
+  ok('Enter asks it', probeRows.join(',') === 's:999998/battery', probeRows.join(','));
+  ok('and the field still has the focus once the answer is drawn',
+     probeAnswered.focused && probeAnswered.value === 'battery', JSON.stringify(probeAnswered));
+  ok('the ask button says what it will search for', /battery/.test(askTitle), askTitle);
+  ok('the station search keeps the focus while its matches redraw',
+     findTyped.focused && findTyped.value === 'Bateson' && findHits > 0,
+     `${JSON.stringify(findTyped)}, ${findHits} matches`);
+  ok('and keeps the caret where it was, not thrown to the end',
+     findMid.focused && findMid.value === '18 Bateson' && findMid.caret === 3, JSON.stringify(findMid));
+
   console.log('\n  the block is there before anything is asked');
   ok('the datastore block is drawn on the picker', out.blockBeforeAnything);
 
