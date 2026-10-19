@@ -2,7 +2,7 @@
 // of the base stations that check in, and what the tab sends when they ask
 // one of them for something.
 //
-// The database is stood in for by routes answering the eight functions as the
+// The database is stood in for by routes answering the nine functions as the
 // real ones answer (tools/check_base_stations.sql holds the real functions to
 // the same contract against Postgres): a list of four — one checking in and
 // managed, one that only reports, one gone quiet, one that posts but never
@@ -28,6 +28,10 @@
 //   * the latest RPi ALERT release (GitHub, stood in for too) beside the
 //     station's version, in the list and the panel, asked for once
 //   * a last update run that found nothing says when, not the release it saw
+//   * what an open station's radios hear (0068): one waterfall for its sticks,
+//     a stick's span and channels in its colour, the bursts it heard in words,
+//     a tip under the pointer, the window's buttons, and a poll asking for the
+//     last few minutes rather than the hour
 //
 // Run:  npm run basestations
 //       npm run basestations -- -v    also print what passed
@@ -173,6 +177,24 @@ const db = {
   ],
 };
 
+// What station 11's first stick sent (0068): a row a minute for the last
+// hour, 64 bins over 151.22–152.18 MHz, its floor and a carrier on 151.5000;
+// and the bursts it heard — two a minute on 151.5000, both decoded, and one
+// every five minutes on 151.6250 that did not decode.
+const WF_BUCKET = 10, WF_LO = 151.22e6, WF_RATE = 960000;
+const wfRows = [], wfBursts = [];
+{
+  const top = Math.floor(dbNow() / 1000 / WF_BUCKET) * WF_BUCKET;
+  for (let m = 0; m < 60; m++) {
+    const t = top - m * 60, bins = new Uint8Array(64);
+    for (let i = 0; i < 64; i++) bins[i] = (i * 7 + m * 3) % 7;
+    bins[Math.floor((151.5e6 - WF_LO) / WF_RATE * 64)] = 60;
+    wfRows.push({ t, key: STICK_1, center_hz: WF_LO + WF_RATE / 2, rate: WF_RATE, floor_db: -45.5, span_s: 60, n: 1, bins: Buffer.from(bins).toString('base64') });
+    wfBursts.push([t, 151.5, 2, 2, 0, 24.5]);
+    if (m % 5 === 0) wfBursts.push([t, 151.625, 1, 0, 0, 8.1]);
+  }
+}
+
 const calls = [];        // every call: { fn, args }
 const sent = fn => calls.filter(c => c.fn === fn).map(c => c.args);
 let missing = false;     // answer as a database without 0049
@@ -201,6 +223,15 @@ const FNS = {
     return { id: c.id, status: 'cancelled' };
   },
   admin_base_station_keys: () => ({ hash: db.keysHash, keys: db.keys }),
+  admin_base_station_spectrum: a => {
+    const bucket = a.p_hours * 10, nowS = dbNow() / 1000;
+    let from = nowS - a.p_hours * 3600;
+    if (a.p_since && Date.parse(a.p_since) / 1000 > from) from = Math.floor(Date.parse(a.p_since) / 1000 / bucket) * bucket;
+    const mine = a.p_id === 11;
+    return { now: new Date(dbNow()).toISOString(), hours: a.p_hours, bucket_s: bucket, from: new Date(from * 1000).toISOString(),
+      rows: mine ? wfRows.filter(r => r.t >= from).map(r => Object.assign({}, r, { t: Math.floor(r.t / bucket) * bucket })) : [],
+      bursts: mine ? wfBursts.filter(b => b[0] >= from).map(b => [Math.floor(b[0] / bucket) * bucket].concat(b.slice(1))) : [] };
+  },
   admin_base_station_key_add: a => {
     db.keys.unshift({ id: 6, key_type: 'ssh-ed25519', fingerprint: 'SHA256:newkeynewkeynewkeynewkeynewkeynewkeynewkeyA', owner: a.p_owner,
       comment: 'sam@desk', added_at: ago(0), added_by: 'admin@example.test', removed_at: null, removed_by: null });
@@ -370,6 +401,48 @@ try {
   ok('…and asks it for its whole status, starting the fast check-ins',
     sent('admin_base_station_watch').some(a => a.p_id === 11 && a.p_status === true), JSON.stringify(sent('admin_base_station_watch')));
   await until(() => page.evaluate(() => !!document.querySelector('#bs-settings #bs-f-name')), 'its settings arrive with its whole status');
+
+  // ── What its radios hear (0068) ──────────────────────────────────────────────
+  const spectra = () => sent('admin_base_station_spectrum');
+  ok('opening it asks for the last hour of what its radios hear', spectra().some(a => a.p_id === 11 && a.p_hours === 1 && a.p_since === null),
+    JSON.stringify(spectra()));
+  await until(() => page.evaluate(() => /Heard in the last 1 h/.test((document.getElementById('bs-wf-sum') || {}).textContent || '')),
+    'the waterfall arrives, with what was heard in words');
+  ok('…under its own heading', /What Mt Stuart base hears/.test(await text('#bs-wf h2')), await text('#bs-wf h2'));
+  const legend = (await text('#bs-wf-legend')).replace(/\s+/g, ' ');
+  ok('…each stick named with the span its rows cover, one that sent none saying so', /RTL-SDR 1 151\.22–152\.18 MHz/.test(legend) && /Second stick no row yet/.test(legend), legend);
+  const sum = (await text('#bs-wf-sum')).replace(/\s+/g, ' ');
+  ok('…the busiest channel first: every burst on it, how many decoded, the best signal', /^Heard in the last 1 h: 151\.50 MHz 120 bursts, 120 decoded, best 24\.5 dB · 151\.625 MHz 12 bursts, 0 decoded, best 8\.1 dB$/.test(sum), sum);
+  const pic = await page.evaluate(() => {
+    const cv = document.getElementById('bs-wf-c'), x = cv.getContext('2d'), w = cv.width, h = cv.height;
+    const d = x.getImageData(0, 0, w, h).data, seen = new Set();
+    for (let i = 0; i < d.length; i += 4 * 37) seen.add(d[i] + ',' + d[i + 1] + ',' + d[i + 2]);
+    return { colours: seen.size, label: cv.getAttribute('aria-label') };
+  });
+  ok('…drawn: a picture of many colours, and said in words for a screen reader',
+    pic.colours > 12 && /^Waterfall of the last 1 h, 151\.22–152\.18 MHz from 1 stick, newest at the top: 132 bursts heard, 120 decoded\.$/.test(pic.label), JSON.stringify(pic));
+  await page.locator('#bs-wf-c').scrollIntoViewIfNeeded();
+  const box = await page.evaluate(() => { const b = document.getElementById('bs-wf-c').getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width }; });
+  await page.mouse.move(box.x + 52 + (151.5e6 - WF_LO) / WF_RATE * (box.w - 60) + 2, box.y + 34 + 20);
+  await until(() => page.evaluate(() => !document.getElementById('bs-wf-tip').hidden), 'pointing at it shows a tip');
+  const tip = (await text('#bs-wf-tip')).replace(/\s+/g, ' ');
+  ok('…the frequency, the few seconds under it, the stick\'s level over its floor, and what was heard on the channel then',
+    /^151\.5\d* MHz/.test(tip) && /RTL-SDR 1: \+\d+\.\d dB over its floor \(-\d+\.\d dB\)/.test(tip)
+      && /^151\.5\d* MHz \d\d:\d\d:\d\d–\d\d:\d\d:\d\d /.test(tip)
+      && /Channel 151\.50 MHz \(ALERT Binary\): (\d+) bursts, \1 decoded, best 24\.5 dB/.test(tip), tip);
+  await page.mouse.move(box.x + 5, box.y + 5);
+  await until(() => page.evaluate(() => document.getElementById('bs-wf-tip').hidden), '…and hides it off the picture');
+  const asked = spectra().length;
+  await page.evaluate(() => BaseStations._wfLoad(false));
+  const poll = spectra()[asked] || {};
+  ok('a poll asks only for the last few minutes, not the hour again',
+    poll.p_id === 11 && poll.p_hours === 1 && !!poll.p_since && Date.now() + SKEW - Date.parse(poll.p_since) < 7 * 60_000 && Date.now() + SKEW - Date.parse(poll.p_since) > 4 * 60_000,
+    JSON.stringify(poll));
+  ok('…and what it held stays drawn', /120 bursts/.test(await text('#bs-wf-sum')), await text('#bs-wf-sum'));
+  await page.click('#bs-wf button:has-text("6 h")');
+  await until(() => spectra().some(a => a.p_hours === 6 && a.p_since === null), 'the 6 h button asks for six hours');
+  ok('…and says it is the one on', await page.evaluate(() => document.querySelector('#bs-wf button[aria-pressed="true"]').textContent.trim() === '6 h'));
+  await until(() => page.evaluate(() => /Heard in the last 6 h/.test(document.getElementById('bs-wf-sum').textContent)), '…and draws it');
   const detail = (await text('#bs-detail')).replace(/\s+/g, ' ');
   ok('its health', /mt-stuart/.test(detail) && /192\.168\.1\.40/.test(detail) && /58\.4 °C/.test(detail) && /under-voltage since boot/.test(detail), detail.slice(0, 400));
   ok('a stick hearing two channels says each, with what each decoded', /151\.5000 MHz ALERT Binary \(410 decoded\), 151\.6250 MHz Enhanced iFLOWS \(2 decoded\)/.test(detail)
@@ -472,6 +545,8 @@ try {
   await until(() => page.evaluate(() => /Serial laptop/.test((document.getElementById('bs-detail-h') || {}).textContent || '')), 'a station that only posts opens too');
   ok('…saying it cannot be asked anything, and naming its receivers', /does not check in/.test(await text('#bs-detail')) && /Quansheng radio/.test(await text('#bs-detail')));
   ok('…and nothing is watched that never checks in', !sent('admin_base_station_watch').some(a => a.p_id === 13));
+  ok('…nor a waterfall drawn for either, with no SDR stick between them', await page.evaluate(() => !document.querySelector('#bs-wf canvas'))
+    && !spectra().some(a => a.p_id === 13));
 
   // A refusal from the database is shown, not swallowed.
   await page.click('#bs-list button[aria-label="Open Mt Stuart base"]');

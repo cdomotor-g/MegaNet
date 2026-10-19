@@ -3073,7 +3073,9 @@ const DB_SCHEMA = 'meganet';
 // what the Worker's sender asks and reports. Bumped with the file.
 // 67: the access track, a kind of site feature (0067) — the GPS tracks driven
 // to the sites, loaded as the last of the way into each. Bumped with the file.
-const DB_SCHEMA_VERSION = 67;
+// 68: a base station's spectrum rows (0068), the Base Stations tab's waterfall;
+// administrators only. Bumped with the file.
+const DB_SCHEMA_VERSION = 68;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

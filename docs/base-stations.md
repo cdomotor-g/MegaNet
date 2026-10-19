@@ -16,7 +16,8 @@ owner allows it installs for its maintenance login.
 This page is for an administrator using the tab, and for whoever writes a base
 station's software. The database side is
 [`db/migrations/0049_base_stations.sql`](../db/migrations/0049_base_stations.sql)
-and [`db/README.md`](../db/README.md); `tools/check_base_stations.sql` holds the
+(and [`0068_base_station_spectrum.sql`](../db/migrations/0068_base_station_spectrum.sql),
+the waterfall) and [`db/README.md`](../db/README.md); `tools/check_base_stations.sql` holds the
 functions to the contract described here.
 
 ## Flood-Net never connects to a base station
@@ -111,6 +112,26 @@ red), throttling, a clock not set yet (readings are held until it is), under
 receiving, and a receiver that has **decoded nothing for hours** — which the
 receiver's own row says too, beside its count.
 
+## What its radios hear
+
+Under an open base station's panel is a **waterfall** of what its SDR sticks
+hear (`0068`): every stick on one picture, frequency across and time down,
+newest at the top, each stick's span and channel labels in its own colour. The
+last hour comes in ten-second slices, six hours in minutes, a day in four-minute
+slices; bright is strong, against each stick's own noise floor (0–40 dB). The
+bursts the station heard are marked on their channels — decoded, and heard but
+not decoded — since the spectrum is a few short looks a second and can miss one,
+and under the picture the busiest channels are listed in words. Point at it for
+the frequency, the level over the floor, and what was heard on the channel there.
+
+It costs the station nothing new. Its decoders work the spectrum out anyway;
+each stick keeps the strongest every slice of its band has been since the last
+check-in and sends that row with it, 256 bytes. So the picture is a check-in
+behind — a minute normally, five seconds while the station is open, which is
+also how often its rows come — and a gap in it is a time the station was not
+checking in. Two days of rows are kept. It needs RPi ALERT 0.13.5 or later on
+the station; an older one, or a station with no SDR stick, has no waterfall.
+
 ## Noticed with the tab closed
 
 Every five minutes the database works out, by itself (`pg_cron`,
@@ -187,7 +208,9 @@ Content-Type: application/json
   "beat":   {…},                           // every check-in, ≤ 2 KB
   "status": {…},                           // when it changed, ≤ 16 KB
   "results": [{"id": 17, "ok": true, "result": …}, {"id": 18, "ok": false, "error": "…"}],
-  "keys_hash": "…"                         // the team-key list it holds, if it takes it
+  "keys_hash": "…",                        // the team-key list it holds, if it takes it
+  "spectra": [{"key": "sdr-serial:00000001", "center_hz": 151935000, "rate": 1200000,
+               "span_s": 60, "floor_db": -45.5, "bins": "AAIE…"}]   // since 0068, optional
 }}
 ```
 
@@ -209,6 +232,13 @@ and is answered
   of which the first 1,000 characters are kept. A station can only answer its own
   requests, and only ones handed over or still waiting.
 - **`want_status`** asks for the whole status with the next check-in.
+- **`spectra`** (since `0068`) is a row per SDR stick for the waterfall: the
+  strongest each bin of the stick's spectrum was since the last check-in, a
+  byte a bin (16–1,024 of them, lowest frequency first) in half-dB steps over
+  `floor_db`, base64; `key` is the stick's key in the status's `receivers`,
+  `center_hz` and `rate` what it was tuned to, `span_s` how long the row covers.
+  At most eight a check-in and one a stick in four seconds; a row that does not
+  fit is left out without failing the check-in.
 - **`beat`** and **`status`** are what the tab draws. The beat keeps the last
   status, so a check-in carrying only a beat costs a few hundred bytes. The
   fields the tab reads are those of the reference agent: in the beat, `up`,

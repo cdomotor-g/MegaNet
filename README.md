@@ -390,7 +390,7 @@ MegaNet/
 │   ├── check_tower_height.sql (psql: prove a tower's platform height, 3.0 or 4.5 m, and who may record it (0040) — 18 checks, rolls back)
 │   ├── check_flood_peaks_from.sql (psql: prove a station taking its flood history from another (0041) — 23 checks, rolls back)
 │   ├── check_station_history.sql (psql: prove the station history, who it names and the way back (0056) — 50 checks, rolls back)
-│   ├── check_base_stations.sql (psql: prove base stations checking in, being asked, and the team keys (0049) — 48 checks, rolls back)
+│   ├── check_base_stations.sql (psql: prove base stations checking in, being asked, the team keys (0049) and the waterfall (0068) — 60 checks, rolls back)
 │   ├── check_health_findings.sql (psql: prove the health findings kept between visits — base stations, receivers, station reports (0059) — 39 checks, rolls back)
 │   ├── health/report.mjs    (Station Health's own health-analysis.js, run every fifteen minutes by station-health.yml, its findings reported to the database)
 │   ├── field-photos/        (the Dropbox and Google Drive → Flood-Net photo sync, run by field-photos-dropbox.yml and field-photos-gdrive.yml)

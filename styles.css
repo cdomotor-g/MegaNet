@@ -16464,6 +16464,35 @@ button.adm-danger:hover { border-color: var(--bad); }
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* What a base station hears (0068): one waterfall for all its sticks, each
+   stick's span and channel labels in its own colour (the swatches), a tip
+   that follows the pointer — placed through two tokens, the one inline style
+   the system allows — and the heat palette's range as a swatch of its own. */
+.bs-wf .panel-header { flex-wrap: wrap; gap: var(--sp-2); }
+.bs-wf-legend { margin: 0 0 var(--sp-2); }
+.bs-wf-wrap { position: relative; }
+.bs-wf-c { cursor: crosshair; }
+.bs-wf-tip {
+  position: absolute;
+  left: var(--tip-x, 0);
+  top: var(--tip-y, 0);
+  z-index: 4;
+  max-width: 20rem;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .22);
+  font-size: var(--fs-xs);
+  pointer-events: none;
+}
+.bs-wf-tip-h { font-weight: 600; }
+.qs-sw.bs-sw-1 { background: var(--accent); }
+.qs-sw.bs-sw-2 { background: var(--c-ident); }
+.qs-sw.bs-sw-3 { background: var(--c-crc); }
+.qs-sw.bs-sw-4 { background: var(--c-data); }
+.qs-sw.bs-sw-bad { background: var(--bad); }
+.qs-sw.bs-sw-heat { width: 42px; background: linear-gradient(90deg, #060a20, #122e82, #0e80aa, #46be78, #f0d23c, #fa7828, #fffaeb); }
 
 /* ── A header's "?" (Repeaters listening) ────────────────────────────────────
    How-to text that every visit would otherwise pay for in card height, moved

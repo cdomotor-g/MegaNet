@@ -81,7 +81,8 @@ step); denied, withdrawn and expired requests cannot be approved and their token
 cannot ask again; a request a day past expiry is swept; and the twenty-first waiting
 device is told to try later (`PT429`). Confirmed red on four deliberate breaks.
 
-`check_base_stations.sql` holds `0049`, base stations checking in: 48 checks, the
+`check_base_stations.sql` holds `0049`, base stations checking in, and `0068`'s
+waterfall: 60 checks, the
 stations played by anon holding a token in `X-Ingest-Token` and the people made
 through 0005's triggers. The three tables are closed to every role a browser holds,
 and anon may check in and fetch the team keys but not list, ask or add. A check-in
@@ -103,6 +104,15 @@ editor cannot add one; Ed25519 and ECDSA are fingerprinted exactly as `ssh-keyge
 -l` prints them; a weak RSA key, a non-key, a duplicate or no owner is refused; a
 station fetches them with its token and nobody else can; a key taken off is no
 longer served, changes the hash, stays on the record, and can be added again.
+The waterfall: the spectrum table closed like the rest; a check-in's rows kept a
+stick each with their bytes as sent, a stick's second within four seconds left
+out; rows that do not fit — not base64, too short or long, a number that is not
+one, no key, the ninth — left out without failing the check-in; two-day-old rows
+swept; an editor refused and an unknown station `22023`; an hour in ten-second
+slices, a slice's rows folded to each bin's strongest with their floors' mean
+and spans' sum, and the receptions by frequency — bursts, decoded, ALERT2, best
+signal — not another station's nor a radio with no frequency; a day in
+four-minute slices, and `since` returning only what follows.
 
 ## `build_map_thumbs.py` — thumbnails and page facts for Radio Path Maps
 

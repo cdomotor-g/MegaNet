@@ -53,7 +53,7 @@ const BaseStations = (function () {
   let formNote = null;
   // The log a station sent back, shown until the panel closes: { id, lines }.
   let logShown = null;
-  const timers = { list: null, detail: null, watch: null };
+  const timers = { list: null, detail: null, watch: null, wf: null };
   let lastAsk = 0;
   // The newest RPi ALERT release, as GitHub says: what a station's "Install the
   // latest release" and its nightly timer fetch (rpi-alert-update asks the same
@@ -628,6 +628,332 @@ const BaseStations = (function () {
     </section>`;
   }
 
+  // ── what its radios hear (0068) ──────────────────────────────────────────
+  // Each SDR stick sends a spectrum row with every check-in: the strongest
+  // each slice of its band was since the one before, in half-dB steps over
+  // the row's own floor (RPi ALERT 0.13.5). admin_base_station_spectrum()
+  // folds the rows into at most 360 slices of the window asked for, and adds
+  // the bursts the station heard in each slice. Stacked, newest at the top,
+  // they are a waterfall — behind by a check-in, and coarse, but asking
+  // nothing of the station it does not send anyway. Drawn in a container of
+  // its own (#bs-wf), outside the panel a poll repaints, and polled while the
+  // station is open: the last few minutes again each time, since receptions
+  // can arrive a little after the row they belong beside.
+
+  const WF_HOURS = [1, 6, 24];
+  const WF_MS = 15000;
+  const WF_CSS_H = 380, WF_LEFT = 52, WF_TOP = 34;  // CSS px: times to the left, channel labels above
+  const WF_RANGE_DB = 40;                           // the palette's top, over each row's floor
+  // A stick each: SerialViz.colors()'s key, and the token its swatch uses.
+  const WF_TONES = [['accent', 'bs-sw-1'], ['ident', 'bs-sw-2'], ['crc', 'bs-sw-3'], ['data', 'bs-sw-4']];
+  // { id, hours, bucket, rows: [{ t, key, center_hz, rate, floor_db, span_s, n, v: Uint8Array }],
+  //   bursts: [[t, freq_mhz, bursts, decoded, alert2, snr]], err, v }
+  let wf = null, wfHours = 1, wfBusy = false, wfImg = null, wfResize = false;
+  let wfHoverAt = null;   // { x, y } under the pointer, for the line down the picture
+
+  const mhz = hz => (hz / 1e6).toFixed(4).replace(/0{1,2}$/, '');
+  const hhmm = (sec, secs) => SerialViz.hhmm(sec * 1000, secs);
+
+  // The open station's sticks: each with its colour, its last row's span and
+  // its channels — the status's SDR receivers, and any stick a row names that
+  // the status does not.
+  function wfSticks(s) {
+    const rx = receiversOf(s).filter(r => r.kind === 'sdr');
+    const latest = new Map();
+    for (const r of (wf && wf.id === s.id && wf.rows) || []) { const l = latest.get(r.key); if (!l || r.t >= l.t) latest.set(r.key, r); }
+    const keys = [...new Set(rx.map(r => String(r.key).slice(-80)).concat([...latest.keys()]))];
+    const col = SerialViz.colors();
+    return keys.map((key, i) => {
+      const r = rx.find(x => String(x.key).slice(-80) === key) || null, row = latest.get(key) || null;
+      const chans = !r ? [] : Array.isArray(r.channels) && r.channels.length ? r.channels.map(c => ({ hz: c.freq_hz, format: c.format }))
+        : r.freq_hz ? [{ hz: r.freq_hz, format: r.format }] : [];
+      const tone = WF_TONES[i % WF_TONES.length];
+      return { key, name: r ? r.name : key, color: col[tone[0]], sw: tone[1], chans,
+        lo: row ? row.center_hz - row.rate / 2 : null, hi: row ? row.center_hz + row.rate / 2 : null };
+    });
+  }
+
+  // The frequencies and times the picture spans, in CSS pixels.
+  function wfGeom(cv, sticks) {
+    const spans = sticks.filter(k => k.lo != null);
+    if (!spans.length || !wf) return null;
+    const lo = Math.min(...spans.map(k => k.lo)), hi = Math.max(...spans.map(k => k.hi));
+    const w = cv.clientWidth || 600, bottom = 18 + 4 * spans.length;
+    const n = Math.round(wf.hours * 3600 / wf.bucket);
+    return { lo, hi, gx: WF_LEFT, gy: WF_TOP, pw: w - WF_LEFT - 8, ph: WF_CSS_H - WF_TOP - bottom, n, bucket: wf.bucket,
+      top: Math.floor(now() / 1000 / wf.bucket) * wf.bucket, spans };
+  }
+
+  // The rows as a picture, a pixel row a slice: each column the strongest any
+  // stick's bins in it were. A row covers the time back to the one before it
+  // (a minute, normally), so it fills the slices below it that no row of its
+  // own stick fills. Kept until the rows or the width change.
+  function wfPicture(g, cols) {
+    const sig = wf.v + ':' + cols + ':' + g.top + ':' + g.lo + ':' + g.hi;
+    if (wfImg && wfImg.sig === sig) return wfImg;
+    const W = cols, H = g.n, cell = new Int16Array(W * H).fill(-1), owner = new Map();
+    const rows = wf.rows.slice().sort((a, b) => b.t - a.t);
+    const paint = (r, k) => {
+      const len = r.v.length, f0 = r.center_hz - r.rate / 2, step = r.rate / len, sc = W / (g.hi - g.lo);
+      for (let i = 0; i < len; i++) {
+        const x0 = Math.max(0, Math.floor((f0 + i * step - g.lo) * sc)), x1 = Math.min(W, Math.max(x0 + 1, Math.floor((f0 + (i + 1) * step - g.lo) * sc)));
+        for (let x = x0; x < x1; x++) if (r.v[i] > cell[k * W + x]) cell[k * W + x] = r.v[i];
+      }
+      owner.set(r.key + ':' + k, r);
+    };
+    for (const r of rows) { const k = (g.top - r.t) / g.bucket; if (k >= 0 && k < H) paint(r, k); }
+    for (const r of rows) {
+      const k = (g.top - r.t) / g.bucket, back = Math.min(H, Math.ceil(r.span_s / Math.max(1, r.n) / g.bucket) + k);
+      for (let kk = Math.max(0, k + 1); kk < back; kk++) if (!owner.has(r.key + ':' + kk)) paint(r, kk);
+    }
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d'), img = x.createImageData(W, H), px = new Uint32Array(img.data.buffer), lut = SerialViz.heat();
+    for (let i = 0; i < cell.length; i++) if (cell[i] >= 0) px[i] = lut[Math.min(255, Math.round(cell[i] / 2 / WF_RANGE_DB * 255))];
+    x.putImageData(img, 0, 0);
+    wfImg = { sig, canvas: c, owner };
+    return wfImg;
+  }
+
+  // Channel labels staggered over two lines where they would touch.
+  function wfLabels(ctx, g, sticks, X) {
+    const ends = [-1e9, -1e9];
+    const chans = [].concat(...sticks.map(k => k.chans.filter(c => c.hz >= g.lo && c.hz <= g.hi).map(c => ({ c, k })))).sort((a, b) => a.c.hz - b.c.hz);
+    ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    for (const { c, k } of chans) {
+      const x = X(c.hz), t = mhz(c.hz), tw = ctx.measureText(t).width;
+      const lvl = x - tw / 2 > ends[0] + 4 ? 0 : x - tw / 2 > ends[1] + 4 ? 1 : 0;
+      ends[lvl] = x + tw / 2;
+      ctx.fillStyle = k.color;
+      ctx.fillText(t, x, 12 + lvl * 11);
+      ctx.fillRect(Math.round(x) - 0.5, g.gy - 7, 1, 7);
+    }
+  }
+
+  function drawWf() {
+    const cv = document.getElementById('bs-wf-c');
+    const s = stationOf();
+    if (!cv || !s || !wf || wf.id !== s.id) return;
+    const f = SerialViz.fit(cv, WF_CSS_H);
+    if (!f) return;
+    const { ctx, w, h, dpr } = f, col = SerialViz.colors();
+    ctx.clearRect(0, 0, w, h);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const sticks = wfSticks(s), g = wfGeom(cv, sticks);
+    if (!g) {
+      ctx.fillStyle = col.muted; ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(wf.err ? 'Nothing to draw.' : 'No spectrum rows from this station in the window yet.', w / dpr / 2, WF_CSS_H / 2);
+      cv.setAttribute('aria-label', 'Waterfall: no spectrum rows from this station in the window yet.');
+      return;
+    }
+    const X = hz => g.gx + (hz - g.lo) / (g.hi - g.lo) * g.pw, rowH = g.ph / g.n;
+    // Where no stick reaches, and slices nothing covers: the panel's own ground.
+    ctx.fillStyle = col.subtle; ctx.fillRect(g.gx, g.gy, g.pw, g.ph);
+    const pic = wfPicture(g, Math.max(64, Math.min(1024, Math.round(g.pw * dpr))));
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(pic.canvas, g.gx, g.gy, g.pw, g.ph);
+    // Times down the left: every quarter hour, hour or four hours.
+    const every = wf.hours <= 1 ? 900 : wf.hours <= 6 ? 3600 : 14400;
+    ctx.font = '10px ui-monospace, Menlo, Consolas, monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = col.muted; ctx.fillText('now', g.gx - 6, g.gy + 5);
+    for (let t = Math.floor((g.top + g.bucket) / every) * every; t > g.top + g.bucket - wf.hours * 3600; t -= every) {
+      const y = g.gy + (g.top + g.bucket - t) / g.bucket * rowH;
+      if (y < g.gy + 14 || y > g.gy + g.ph - 4) continue;
+      ctx.fillStyle = SerialViz.alpha(col.border, 0.3); ctx.fillRect(g.gx, Math.round(y), g.pw, 1);
+      ctx.fillStyle = col.muted; ctx.fillText(hhmm(t), g.gx - 6, y);
+    }
+    // The bursts it heard, on their channels: decoded, and not.
+    for (const b of wf.bursts) {
+      const hz = b[1] * 1e6;
+      if (hz < g.lo || hz > g.hi) continue;
+      const k = (g.top - b[0]) / g.bucket;
+      if (k < 0 || k >= g.n) continue;
+      ctx.fillStyle = b[3] > 0 ? col.ok : col.bad;
+      ctx.fillRect(X(hz) - 4, g.gy + k * rowH, 8, Math.max(2, rowH));
+    }
+    wfLabels(ctx, g, sticks, X);
+    // Frequencies along the bottom, and each stick's span under them in its colour.
+    const width = g.hi - g.lo, step = width <= 1.6e6 ? 1e5 : width <= 4e6 ? 2.5e5 : 5e5;
+    ctx.fillStyle = col.muted; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let hz = Math.ceil(g.lo / step) * step; hz <= g.hi; hz += step) {
+      const x = X(hz);
+      if (x < g.gx + 20 || x > g.gx + g.pw - 20) continue;
+      ctx.fillRect(Math.round(x) - 0.5, g.gy + g.ph, 1, 3);
+      ctx.fillText((hz / 1e6).toFixed(step < 1e5 ? 3 : 2), x, g.gy + g.ph + 4);
+    }
+    g.spans.forEach((k, i) => { ctx.fillStyle = k.color; ctx.fillRect(X(k.lo), g.gy + g.ph + 17 + i * 4, X(k.hi) - X(k.lo), 3); });
+    if (wfHoverAt) wfCross(ctx, g, col);
+    const n = wf.bursts.reduce((a, b) => a + b[2], 0), d = wf.bursts.reduce((a, b) => a + b[3], 0);
+    cv.setAttribute('aria-label', `Waterfall of the last ${wf.hours} h, ${mhz(g.lo)}–${mhz(g.hi)} MHz from ${g.spans.length} stick${g.spans.length === 1 ? '' : 's'}, newest at the top: ${n} burst${n === 1 ? '' : 's'} heard, ${d} decoded.`);
+  }
+
+  // Where the pointer is: a line down the picture.
+  function wfCross(ctx, g, col) {
+    const x = wfHoverAt.x;
+    if (x < g.gx || x > g.gx + g.pw) return;
+    ctx.fillStyle = SerialViz.alpha(col.text, 0.5);
+    ctx.fillRect(Math.round(x) - 0.5, g.gy, 1, g.ph);
+  }
+
+  // What is under the pointer → the tip's lines, or null.
+  function wfAt(cv, x, y) {
+    const s = stationOf();
+    if (!s || !wf) return null;
+    const sticks = wfSticks(s), g = wfGeom(cv, sticks);
+    if (!g || x < g.gx || x > g.gx + g.pw || y < g.gy || y > g.gy + g.ph) return null;
+    const rowH = g.ph / g.n, hz = g.lo + (x - g.gx) / g.pw * (g.hi - g.lo), k = Math.min(g.n - 1, Math.floor((y - g.gy) / rowH));
+    // What was heard is counted over the slices within three pixels: a slice
+    // can be under a pixel high.
+    const near = Math.max(0, Math.round(3 / rowH)), k0 = Math.max(0, k - near), k1 = Math.min(g.n - 1, k + near);
+    const t0 = g.top - k1 * g.bucket, t1 = g.top - k0 * g.bucket + g.bucket, secs = g.bucket < 60;
+    const lines = [mhz(hz) + ' MHz', hhmm(t0, secs) + '–' + hhmm(t1, secs)];
+    const owner = wfImg ? wfImg.owner : new Map();
+    for (const k2 of g.spans) {
+      if (hz < k2.lo || hz > k2.hi) continue;
+      const r = owner.get(k2.key + ':' + k);
+      if (!r) { lines.push(k2.name + ': no row'); continue; }
+      const i = Math.min(r.v.length - 1, Math.floor((hz - (r.center_hz - r.rate / 2)) / r.rate * r.v.length));
+      lines.push(k2.name + ': +' + (r.v[i] / 2).toFixed(1) + ' dB over its floor' + (r.floor_db != null ? ' (' + (r.floor_db + r.v[i] / 2).toFixed(1) + ' dB)' : ''));
+    }
+    // The nearest channel within 15 kHz, and what was heard on it in the slice.
+    const chans = [].concat(...sticks.map(k2 => k2.chans)).filter(c => Math.abs(c.hz - hz) <= 15000).sort((a, b) => Math.abs(a.hz - hz) - Math.abs(b.hz - hz));
+    if (chans.length) {
+      const c = chans[0], here = wf.bursts.filter(b => b[0] >= t0 && b[0] < t1 && Math.abs(b[1] * 1e6 - c.hz) < 12500);
+      const n = here.reduce((a, b) => a + b[2], 0), d = here.reduce((a, b) => a + b[3], 0), a2 = here.reduce((a, b) => a + b[4], 0);
+      const snr = here.reduce((a, b) => (b[5] != null && b[5] > a ? b[5] : a), -Infinity);
+      lines.push('Channel ' + mhz(c.hz) + ' MHz' + (FORMATS[c.format] ? ' (' + FORMATS[c.format] + ')' : '') + ': '
+        + (n ? n + ' burst' + (n === 1 ? '' : 's') + ', ' + d + ' decoded' + (a2 ? ' (' + a2 + ' ALERT2)' : '') + (isFinite(snr) ? ', best ' + snr.toFixed(1) + ' dB' : '') : 'nothing heard'));
+    }
+    return { x, y, lines };
+  }
+
+  function wireWf() {
+    const cv = document.getElementById('bs-wf-c'), tip = document.getElementById('bs-wf-tip');
+    if (!cv || !tip) return;
+    cv.addEventListener('mousemove', e => {
+      const b = cv.getBoundingClientRect(), at = wfAt(cv, e.clientX - b.left, e.clientY - b.top);
+      wfHoverAt = at;
+      drawWf();
+      if (!at) { tip.hidden = true; return; }
+      tip.textContent = '';
+      at.lines.forEach((l, i) => { const d = document.createElement('div'); d.textContent = l; if (i === 0) d.className = 'bs-wf-tip-h'; tip.appendChild(d); });
+      tip.hidden = false;
+      const left = at.x + 14 + tip.offsetWidth > cv.clientWidth ? at.x - 14 - tip.offsetWidth : at.x + 14;
+      tip.style.setProperty('--tip-x', Math.max(0, left) + 'px');
+      tip.style.setProperty('--tip-y', Math.max(0, Math.min(at.y + 12, WF_CSS_H - tip.offsetHeight)) + 'px');
+    });
+    cv.addEventListener('mouseleave', () => { wfHoverAt = null; tip.hidden = true; drawWf(); });
+    if (!wfResize) {
+      wfResize = true;
+      window.addEventListener('resize', () => { if (state.activeTab === 'basestations') drawWf(); });
+    }
+  }
+
+  // The busiest channels over the window, in words: the picture's text alternative.
+  function wfSummaryHtml() {
+    if (!wf) return 'Loading…';
+    if (wf.err) return `<span class="txt-bad">${esc(wf.err)}</span>`;
+    if (!wf.rows.length) return 'No spectrum rows from this station in the window yet: a stick sends its first with the station\'s next check-in, from RPi ALERT 0.13.5 on.';
+    const by = new Map();
+    for (const b of wf.bursts) {
+      const e = by.get(b[1]) || { f: b[1], n: 0, d: 0, a2: 0, snr: null };
+      e.n += b[2]; e.d += b[3]; e.a2 += b[4];
+      if (b[5] != null && (e.snr == null || b[5] > e.snr)) e.snr = b[5];
+      by.set(b[1], e);
+    }
+    const top = [...by.values()].sort((a, b) => b.n - a.n).slice(0, 8);
+    if (!top.length) return `Nothing heard on its channels in the last ${wf.hours} h.`;
+    return `Heard in the last ${wf.hours} h: ` + top.map(e => `<strong>${esc(mhz(e.f * 1e6))} MHz</strong> ${e.n} burst${e.n === 1 ? '' : 's'}, ${e.d} decoded`
+      + (e.a2 ? ` (${e.a2} ALERT2)` : '') + (e.snr != null ? `, best ${esc(Number(e.snr).toFixed(1))} dB` : '')).join(' · ');
+  }
+
+  function wfLegendHtml(s) {
+    const sticks = wfSticks(s);
+    return sticks.map(k => `<span><i class="qs-sw ${k.sw}" aria-hidden="true"></i>${esc(k.name)} <span class="qs-dim">${k.lo != null ? esc(mhz(k.lo) + '–' + mhz(k.hi) + ' MHz') : 'no row yet'}</span></span>`).join('')
+      + '<span><i class="qs-sw sw-ok" aria-hidden="true"></i>a burst decoded</span><span><i class="qs-sw bs-sw-bad" aria-hidden="true"></i>heard, not decoded</span>'
+      + `<span><i class="qs-sw bs-sw-heat" aria-hidden="true"></i>0–${WF_RANGE_DB} dB over the floor</span>`;
+  }
+
+  function wfShellHtml(s) {
+    const slice = wfHours * 10;
+    return `<section class="panel bs-wf" aria-labelledby="bs-wf-h">
+      <div class="panel-header"><h2 id="bs-wf-h">What ${esc(s.label)} hears</h2>
+        <div class="pill-row" role="group" aria-label="How far back">${WF_HOURS.map(hh => `<button type="button" class="pill${hh === wfHours ? ' is-on' : ''}" aria-pressed="${hh === wfHours}" onclick="BaseStations.wfWindow(${hh})">${hh} h</button>`).join('')}</div></div>
+      <div class="qs-legend bs-wf-legend" id="bs-wf-legend"></div>
+      <div class="bs-wf-wrap"><canvas id="bs-wf-c" class="qs-canvas bs-wf-c" role="img" aria-label="Waterfall"></canvas><div class="bs-wf-tip" id="bs-wf-tip" hidden></div></div>
+      <p class="small" id="bs-wf-sum" aria-live="polite"></p>
+      <p class="small qs-dim">Each SDR stick sends a row with every check-in — a minute apart, five seconds while this station is open: the strongest every frequency was since the row before, over the stick's own noise floor. Here they are folded into ${slice < 60 ? slice + '-second' : slice / 60 + '-minute'} slices, newest at the top; a gap is a time the station was not checking in. The bursts it heard are marked on their channels, since a spectrum of a few short looks a second can miss one. Point at it for the frequency, the level and what was heard.</p>
+    </section>`;
+  }
+
+  // Into #bs-wf: the panel for the open station, built once per station and
+  // window, its text and picture refreshed each time.
+  function paintWf() {
+    if (state.activeTab !== 'basestations') return;
+    const el = document.getElementById('bs-wf');
+    if (!el) return;
+    const s = stationOf();
+    if (!isAdmin() || !s || !s.managed || !wfSticks(s).length) { if (el.innerHTML) { el.innerHTML = ''; el.dataset.sig = ''; } return; }
+    const sig = s.id + ':' + wfHours;
+    if (el.dataset.sig !== sig || !el.firstElementChild) { el.innerHTML = wfShellHtml(s); el.dataset.sig = sig; wireWf(); }
+    const set = (id, html) => { const e = document.getElementById(id); if (e && e.innerHTML !== html) e.innerHTML = html; };
+    set('bs-wf-legend', wfLegendHtml(s));
+    set('bs-wf-sum', wfSummaryHtml());
+    drawWf();
+  }
+
+  function wfRow(r) {
+    const b = atob(r.bins || ''), v = new Uint8Array(b.length);
+    for (let i = 0; i < b.length; i++) v[i] = b.charCodeAt(i);
+    return { t: Number(r.t), key: r.key, center_hz: Number(r.center_hz), rate: Number(r.rate), floor_db: r.floor_db == null ? null : Number(r.floor_db),
+      span_s: Number(r.span_s) || 0, n: Number(r.n) || 1, v };
+  }
+
+  // The window's slices, or — polling a window already held — the last few
+  // minutes of them again, laid over what is held.
+  async function loadWf(full) {
+    if (!isAdmin() || openId == null || wfBusy) return;
+    const id = openId, hours = wfHours;
+    const keep = !full && wf && wf.id === id && wf.hours === hours && !wf.err;
+    const last = keep ? Math.max(0, ...wf.rows.map(r => r.t), ...wf.bursts.map(b => b[0])) : 0;
+    const since = keep && last ? new Date((last - Math.max(300, wf.bucket)) * 1000).toISOString() : null;
+    wfBusy = true;
+    try {
+      const r = await dbRpc('admin_base_station_spectrum', { p_id: id, p_hours: hours, p_since: since });
+      if (openId !== id || wfHours !== hours) return;
+      setNow(r.now);
+      const from = Date.parse(r.from) / 1000, cut = Date.parse(r.now) / 1000 - hours * 3600 - r.bucket_s;
+      const rows = (keep ? wf.rows.filter(x => x.t < from) : []).concat((r.rows || []).map(wfRow)).filter(x => x.t >= cut);
+      const bursts = (keep ? wf.bursts.filter(x => x[0] < from) : []).concat(r.bursts || []).filter(x => x[0] >= cut);
+      wf = { id, hours, bucket: r.bucket_s, rows, bursts, err: null, v: ((wf && wf.v) || 0) + 1 };
+    } catch (err) {
+      if (openId !== id || wfHours !== hours) return;
+      const why = err.status === 404 ? 'The database does not have this yet — apply db/migrations/0068_base_station_spectrum.sql.'
+        : 'Could not load what it hears: ' + err.message;
+      wf = Object.assign(keep ? wf : { id, hours, bucket: hours * 10, rows: [], bursts: [] }, { err: why, v: ((wf && wf.v) || 0) + 1 });
+    } finally {
+      wfBusy = false;
+    }
+    paintWf();
+  }
+
+  function wfStart() {
+    clearInterval(timers.wf);
+    timers.wf = null;
+    const s = stationOf();
+    if (!s || !s.managed) return;
+    loadWf(true);
+    timers.wf = setInterval(() => { if (!document.hidden && state.activeTab === 'basestations') loadWf(false); }, WF_MS);
+  }
+
+  function wfWindow(hours) {
+    if (!WF_HOURS.includes(hours) || hours === wfHours) return;
+    wfHours = hours; wf = null; wfImg = null;
+    paintWf();
+    loadWf(true);
+  }
+
   // ── team keys ────────────────────────────────────────────────────────────
 
   function keysHtml() {
@@ -683,6 +1009,7 @@ const BaseStations = (function () {
         <div id="bs-list">${list ? listHtml() : ''}</div>
       </div>
       <div id="bs-detail">${detailHtml()}</div>
+      <div id="bs-wf"></div>
       <div id="bs-keys">${keysHtml()}</div>
       <div class="panel">
         <div class="panel-header"><h2>How a base station is reached</h2></div>
@@ -701,6 +1028,7 @@ const BaseStations = (function () {
     if (!el) return;
     // Typing in either form survives: it is mirrored, and focus is put back.
     keepFocus(el, () => { el.innerHTML = render(); });
+    paintWf();
   }
 
   // A repaint must not take the keyboard's place away. Whatever had focus is
@@ -729,6 +1057,7 @@ const BaseStations = (function () {
     set('bs-kpis', list ? kpisHtml() : '');
     set('bs-msg', msgHtml());
     set('bs-list', list ? listHtml() : '');
+    paintWf();
     const d = document.getElementById('bs-detail');
     if (!d) return;
     const s = stationOf();
@@ -833,8 +1162,8 @@ const BaseStations = (function () {
   }
 
   function stop() {
-    clearInterval(timers.list); clearTimeout(timers.detail); clearInterval(timers.watch);
-    timers.list = timers.detail = timers.watch = null;
+    clearInterval(timers.list); clearTimeout(timers.detail); clearInterval(timers.watch); clearInterval(timers.wf);
+    timers.list = timers.detail = timers.watch = timers.wf = null;
   }
 
   function init() {
@@ -844,7 +1173,7 @@ const BaseStations = (function () {
     loadKeys();
     loadLatest();
     timers.list = setInterval(() => { if (!document.hidden && state.activeTab === 'basestations') { load(); loadLatest(); } }, LIST_MS);
-    if (openId != null) { loadDetail(); timers.watch = setInterval(() => { if (!document.hidden) watch(false); }, WATCH_MS); }
+    if (openId != null) { loadDetail(); wfStart(); timers.watch = setInterval(() => { if (!document.hidden) watch(false); }, WATCH_MS); }
     if (typeof registerTabTeardown === 'function') registerTabTeardown('base-stations', stop);
   }
 
@@ -862,12 +1191,15 @@ const BaseStations = (function () {
       timers.watch = setInterval(() => { if (!document.hidden && state.activeTab === 'basestations') watch(false); }, WATCH_MS);
     }
     loadDetail();
+    wf = null; wfImg = null; wfHoverAt = null;
+    wfStart();
     announce('Opened ' + (s ? s.label : 'the base station') + '.');
   }
 
   function close() {
     openId = null; detail = null; askErr = null; form = null; formNote = null; logShown = null;
-    clearInterval(timers.watch); clearTimeout(timers.detail);
+    wf = null; wfImg = null; wfHoverAt = null;
+    clearInterval(timers.watch); clearTimeout(timers.detail); clearInterval(timers.wf);
     repaint();
   }
 
@@ -980,14 +1312,15 @@ const BaseStations = (function () {
   // A sign-in or sign-out: everything held was the last session's.
   function authChanged() {
     list = null; error = null; detail = null; openId = null; askErr = null; keys = null; keysErr = null; keyMsg = null; form = null; formNote = null; logShown = null; note = '';
+    wf = null; wfImg = null; wfHoverAt = null;
     stop();
     if (state.activeTab === 'basestations') { repaint(); init(); }
   }
 
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
-           keyField, addKey, removeKey, authChanged,
+           keyField, addKey, removeKey, authChanged, wfWindow,
            // Pure, for test/basestations.mjs.
-           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _cmpVersion: cmpVersion, _lastInstall: lastInstall };
+           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf };
 })();
 
 if (typeof window !== 'undefined') window.BaseStations = BaseStations;

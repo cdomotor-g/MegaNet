@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 52, date: '2026-10-19', items: [
+      '<strong>📡 What a base station hears, from here.</strong> Open a base station on the <em>Base Stations</em> tab '
+        + '(administrators) and, under its panel, a waterfall of what its SDR sticks hear — every stick on one picture in its '
+        + 'own colour, the last hour, six or a day, with the bursts it heard marked on their channels and listed by how busy '
+        + 'each channel was. Point at it for the frequency, the level and what was heard. It needs RPi ALERT 0.13.5 on the station.',
+    ] },
     { n: 51, date: '2026-10-19', items: [
       '<strong>🧹 Station cards, tidied.</strong> The actions on a station\'s card on the map are short lists under '
         + 'four headings — <em>In Flood-Net</em>, <em>Position</em>, <em>Imagery and terrain</em> and <em>Records</em> — '

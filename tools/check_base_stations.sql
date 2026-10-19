@@ -1,5 +1,6 @@
 -- check_base_stations.sql — Prove 0049: a base station checks in with its
--- health, an administrator asks it to do something, and the team SSH keys.
+-- health, an administrator asks it to do something, and the team SSH keys —
+-- and 0068: the spectrum rows its check-ins carry, as the tab's waterfall.
 --
 --   psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_base_stations.sql
 --
@@ -388,6 +389,105 @@ begin
   perform pg_temp.checkin(pg_temp.ctx('tok_one'), '{"v": 1, "mode": "manage"}');
   perform pg_temp.check_that('a station''s requests a quarter of a year old are swept away at its next check-in',
     not exists (select 1 from meganet.base_station_command where ingest_token_id = pg_temp.ctx('id_one')::bigint and created_by = 'old'));
+end
+$$;
+
+-- ── The waterfall (0068) ─────────────────────────────────────────────────────
+
+do $$
+declare
+  -- A row of 16 bins: 0, 2, 4 … 30, and one of 16 the other way round.
+  up   text := encode(decode((select string_agg(lpad(to_hex(g * 2), 2, '0'), '' order by g) from generate_series(0, 15) g), 'hex'), 'base64');
+  down text := encode(decode((select string_agg(lpad(to_hex((15 - g) * 2), 2, '0'), '' order by g) from generate_series(0, 15) g), 'hex'), 'base64');
+  -- Two moments in one ten-second slice half a minute ago.
+  t0 timestamptz := to_timestamp(floor(extract(epoch from now()) / 10) * 10 - 30);
+  row1 jsonb;
+  a jsonb;
+  w jsonb;
+  n integer;
+  spec text := 'select meganet.admin_base_station_spectrum(%s, %s, %L)::text';
+begin
+  row1 := jsonb_build_object('key', 'sdr-serial:00000001', 'center_hz', 151935000, 'rate', 1200000, 'span_s', 60, 'floor_db', -45.5, 'bins', up);
+
+  perform pg_temp.check_that('the spectrum table has RLS on, no policy and no grant; anon cannot read the waterfall',
+    (select relrowsecurity from pg_class where oid = 'meganet.base_station_spectrum'::regclass)
+      and not exists (select 1 from pg_policies where schemaname = 'meganet' and tablename = 'base_station_spectrum')
+      and not has_table_privilege('anon', 'meganet.base_station_spectrum', 'select')
+      and not has_table_privilege('authenticated', 'meganet.base_station_spectrum', 'select')
+      and not has_function_privilege('anon', 'meganet.admin_base_station_spectrum(bigint, integer, timestamptz)', 'execute'));
+
+  delete from meganet.base_station_spectrum where ingest_token_id = pg_temp.ctx('id_one')::bigint;
+  a := pg_temp.checkin(pg_temp.ctx('tok_one'), jsonb_build_object('v', 1, 'mode', 'manage', 'spectra', jsonb_build_array(row1,
+         row1 || jsonb_build_object('key', 'sdr-serial:00000002', 'center_hz', 151500000, 'bins', down))));
+  perform pg_temp.check_that('a check-in''s spectra are kept, a row a stick, their bytes as sent',
+    (select count(*) from meganet.base_station_spectrum where ingest_token_id = pg_temp.ctx('id_one')::bigint) = 2
+      and (select encode(bins, 'base64') = up and span_s = 60 and center_hz = 151935000 and rate = 1200000 and floor_db = -45.5::real
+             from meganet.base_station_spectrum where ingest_token_id = pg_temp.ctx('id_one')::bigint and rx_key = 'sdr-serial:00000001'), a::text);
+
+  a := pg_temp.checkin(pg_temp.ctx('tok_one'), jsonb_build_object('v', 1, 'mode', 'manage', 'spectra', jsonb_build_array(row1)));
+  perform pg_temp.check_that('…a stick''s second row within four seconds is left out, and the check-in answered all the same',
+    (select count(*) from meganet.base_station_spectrum where ingest_token_id = pg_temp.ctx('id_one')::bigint) = 2 and a ? 'next_s', a::text);
+
+  update meganet.base_station_spectrum set at = at - interval '30 seconds' where ingest_token_id = pg_temp.ctx('id_one')::bigint;
+  a := pg_temp.checkin(pg_temp.ctx('tok_one'), jsonb_build_object('v', 1, 'mode', 'manage', 'spectra', jsonb_build_array(
+         row1 || '{"key": "bad-1", "bins": "not base64!"}',
+         row1 || '{"key": "bad-2", "bins": "AAAA"}',
+         row1 || '{"key": "bad-3", "center_hz": "lots"}',
+         row1 || '{"key": "bad-4", "rate": 99}',
+         row1 || jsonb_build_object('key', 'bad-5', 'bins', encode(decode(repeat('00', 1025), 'hex'), 'base64')),
+         row1 || '{"key": ""}',
+         '"a string"'::jsonb,
+         row1 || '{"key": "bad-6", "bins": 12}',
+         row1 || '{"key": "ninth"}')));
+  perform pg_temp.check_that('rows that do not fit — not base64, too short or long, a number that is not one, out of range, no key, the ninth — are left out without failing the check-in',
+    a ? 'next_s' and not exists (select 1 from meganet.base_station_spectrum where ingest_token_id = pg_temp.ctx('id_one')::bigint and rx_key <> 'sdr-serial:00000001' and rx_key <> 'sdr-serial:00000002'),
+    a::text);
+  perform pg_temp.check_that('…and a station that sends spectra as something else still checks in',
+    (pg_temp.checkin(pg_temp.ctx('tok_one'), '{"v": 1, "mode": "manage", "spectra": "yes"}') ? 'next_s'));
+
+  -- Two more rows of stick 1 in the slice of the first, the other way up: the
+  -- slice keeps each bin's strongest.
+  insert into meganet.base_station_spectrum (ingest_token_id, rx_key, at, span_s, center_hz, rate, floor_db, bins)
+  select pg_temp.ctx('id_one')::bigint, 'sdr-serial:00000001', s.at, 5, 151935000, 1200000, -44.5, decode(down, 'base64')
+    from meganet.base_station_spectrum s where s.ingest_token_id = pg_temp.ctx('id_one')::bigint and s.rx_key = 'sdr-serial:00000001';
+  -- And one three days old, swept at the next check-in that sends spectra.
+  insert into meganet.base_station_spectrum (ingest_token_id, rx_key, at, span_s, center_hz, rate, floor_db, bins)
+  values (pg_temp.ctx('id_one')::bigint, 'old', now() - interval '3 days', 60, 151935000, 1200000, -40, decode(up, 'base64'));
+  perform pg_temp.checkin(pg_temp.ctx('tok_one'), jsonb_build_object('v', 1, 'mode', 'manage', 'spectra', jsonb_build_array(row1 || '{"key": "sdr-serial:00000003"}')));
+  perform pg_temp.check_that('rows two days old are swept away at the station''s next check-in with spectra',
+    not exists (select 1 from meganet.base_station_spectrum where ingest_token_id = pg_temp.ctx('id_one')::bigint and rx_key = 'old'));
+
+  -- What it heard: two bursts on 151.5375, one an ALERT2 frame of two readings, and one that did not decode.
+  insert into meganet.reception (ingest_token_id, point_id, receiver, heard_at, protocol, alert_id, value_raw, ok, fault, level_dbfs, detail) values
+    (pg_temp.ctx('id_one')::bigint, 'check-sdr1-151.5375', 'rtl-sdr', t0 + interval '3 seconds', 'alert2', 1909, 38, true, null, -44, '{"freq_mhz": 151.5375, "snr_db": 21.8}'),
+    (pg_temp.ctx('id_one')::bigint, 'check-sdr1-151.5375', 'rtl-sdr', t0 + interval '3 seconds', 'alert2', 1910, 39, true, null, -44, '{"freq_mhz": 151.5375, "snr_db": 21.8}'),
+    (pg_temp.ctx('id_one')::bigint, 'check-sdr1-151.5375', 'rtl-sdr', t0 + interval '2 seconds', 'alert', null, null, false, 'undecoded', -52, '{"freq_mhz": 151.5375, "nf_dbfs": -66}'),
+    (pg_temp.ctx('id_one')::bigint, 'check-quansheng', 'quansheng', t0 + interval '3 seconds', 'alert', 2088, 143, true, null, null, '{}'),
+    (pg_temp.ctx('id_two')::bigint, 'check-other-151.5375', 'rtl-sdr', t0 + interval '3 seconds', 'alert', 2088, 143, true, null, -40, '{"freq_mhz": 151.5375, "snr_db": 30}');
+
+  perform pg_temp.check_that('an editor who is not an administrator cannot see the waterfall (42501); an unknown station is 22023',
+    pg_temp.as_role('authenticated', (select claims from _who where k = 'editor'), format(spec, pg_temp.ctx('id_one'), 1, null)) = 'ERROR 42501'
+      and pg_temp.as_role('authenticated', (select claims from _who where k = 'admin'), format(spec, 0, 1, null)) = 'ERROR 22023');
+
+  w := pg_temp.as_admin_keep(format(spec, pg_temp.ctx('id_one'), 1, null))::jsonb;
+  select count(*) into n from jsonb_array_elements(w -> 'rows') r where r ->> 'key' = 'sdr-serial:00000001';
+  perform pg_temp.check_that('an administrator gets an hour in ten-second slices: each stick''s rows',
+    (w ->> 'bucket_s')::int = 10 and (w ->> 'hours')::int = 1
+      and (select count(distinct r ->> 'key') from jsonb_array_elements(w -> 'rows') r) = 3, w::text);
+  perform pg_temp.check_that('…a slice''s rows folded into one, each bin the strongest it was, its floor their mean and its span their sum',
+    exists (select 1 from jsonb_array_elements(w -> 'rows') r
+             where r ->> 'key' = 'sdr-serial:00000001' and (r ->> 'n')::int = 2 and (r ->> 'span_s')::int = 65 and (r ->> 'floor_db')::numeric = -45.0
+               and r ->> 'bins' = encode(decode((select string_agg(lpad(to_hex(greatest(g, 15 - g) * 2), 2, '0'), '' order by g) from generate_series(0, 15) g), 'hex'), 'base64')),
+    w -> 'rows' ->> 0);
+  perform pg_temp.check_that('…and what it heard by frequency: two bursts, one decoded and ALERT2, the best signal — not another station''s, nor a radio with no frequency',
+    w -> 'bursts' = jsonb_build_array(jsonb_build_array(extract(epoch from t0)::bigint, 151.5375, 2, 1, 1, 21.8)), w -> 'bursts' ->> 0);
+
+  w := pg_temp.as_admin_keep(format(spec, pg_temp.ctx('id_one'), 24, null))::jsonb;
+  perform pg_temp.check_that('a day is four-minute slices',
+    (w ->> 'bucket_s')::int = 240 and jsonb_array_length(w -> 'bursts') = 1, w::text);
+  w := pg_temp.as_admin_keep(format(spec, pg_temp.ctx('id_one'), 1, now() + interval '1 minute'))::jsonb;
+  perform pg_temp.check_that('since a moment: only the slices from then on',
+    w -> 'rows' = '[]'::jsonb and w -> 'bursts' = '[]'::jsonb, w::text);
 end
 $$;
 
