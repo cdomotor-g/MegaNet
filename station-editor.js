@@ -167,15 +167,21 @@ function editorProposedBoxHtml(s) {
   const why = !locked ? ''
     : on ? 'Only an administrator establishes a proposed station.'
          : 'Only an administrator takes an established station back to proposed.';
-  const outright = !saved && typeof Auth !== 'undefined' && Auth.isSignedIn() && !editorIsAdmin();
   return `
-      <label class="check-label ef-proposed"${locked ? ` title="${escAttr(why)}"` : ''}>
-        <input type="checkbox" id="ef-proposed" ${on ? 'checked' : ''} ${locked ? 'disabled' : ''}
-               onchange="editorProposedChanged(this.checked)"> Proposed — not yet established
-      </label>
-      ${outright ? `<div class="full small ef-hint ef-proposed-hint" id="ef-proposed-hint" ${on ? 'hidden' : ''}>
+        <label class="check-label ef-proposed"${locked ? ` title="${escAttr(why)}"` : ''}>
+          <input type="checkbox" id="ef-proposed" ${on ? 'checked' : ''} ${locked ? 'disabled' : ''}
+                 onchange="editorProposedChanged(this.checked)"> Proposed — not yet established
+        </label>`;
+}
+
+// What a signed-in editor who is not an administrator is told under the box on
+// a new station — a row of its own under the status row, since the box shares
+// that row with Enabled.
+function editorProposedHintHtml(s) {
+  const outright = !state.editorId && typeof Auth !== 'undefined' && Auth.isSignedIn() && !editorIsAdmin();
+  return outright ? `<div class="full small ef-hint ef-proposed-hint" id="ef-proposed-hint" ${s.proposed ? 'hidden' : ''}>
         Only an administrator adds a station outright. Tick <em>Proposed</em> and it goes in as a proposal,
-        for an administrator to establish.</div>` : ''}`;
+        for an administrator to establish.</div>` : '';
 }
 
 // The box ticked or unticked: the band and its year shown or put away, and the
@@ -336,7 +342,7 @@ function editorForm(s) {
     <div id="ef-status" class="small ef-status">${editorStatusHtml()}</div>
     <!-- A proposal says so first (0039): the band, and the year it is for. -->
     ${editorProposalHtml(s)}
-    <div class="form-grid">
+    <div class="form-grid ef-grid">
       <label>Name<input type="text" id="ef-name" value="${esc(s.name)}"></label>
       <label>Station Number<input type="text" id="ef-stnno" value="${esc(s.station_number || '')}"
              ${s.proposed ? 'placeholder="none yet — it is proposed"' : ''}></label>
@@ -352,6 +358,17 @@ function editorForm(s) {
       <label>Tower platform height
         <select id="ef-tower">${towerHeightOptions(s.tower_height)}</select>
       </label>
+      <!-- The station's two states, on one row of their own: whether it is only
+           proposed (0039) — beside its type and number, which both answer to
+           that — and whether it is enabled. Both are a box and its words, and a
+           row each in the two-column grid would split the pairs below them. -->
+      <div class="full ef-flags">
+        ${editorProposedBoxHtml(s)}
+        <label class="check-label ef-enabled">
+          <input type="checkbox" id="ef-enabled" ${s.enabled ? 'checked' : ''}> Enabled
+        </label>
+      </div>
+      ${editorProposedHintHtml(s)}
       <!-- The way the station faces (0044): the bearing its front — enclosure
            door, or a tower's ladder — looks out. Blank is not recorded, which
            the Digital Twin draws facing south. Its 🧭 Orientation tool sets it
@@ -363,7 +380,6 @@ function editorForm(s) {
            station with no gauge of its own, such as a proposal beside one. -->
       <label>Flood history from<input type="text" id="ef-fpfrom" value="${esc(s.flood_peaks_from || '')}"
              placeholder="a station's id, e.g. gatton" title="The Bureau's floods at that station's gauge are shown for this one while it has no gauge of its own"></label>
-      ${editorProposedBoxHtml(s)}
       <label>Latitude<input type="number" step="any" id="ef-lat" value="${s.lat ?? ''}"></label>
       <label>Longitude<input type="number" step="any" id="ef-lon" value="${s.lon ?? ''}"></label>
       <!-- Typing a coordinate is the exact form of this that nobody can check.
@@ -373,7 +389,7 @@ function editorForm(s) {
            being written somewhere else. Both belong to the two boxes above, so
            the Position group comes first, directly under them, and the groups
            that leave the site follow it. -->
-      ${actions.length ? `<div class="full ef-actions">
+      ${actions.length ? `<div class="full ef-pills">
         ${actions.map(g => `<div class="pill-row pill-list${g.cls}" role="group" aria-label="${escAttr(g.label)}">
           ${g.pills.join('\n          ')}
         </div>`).join('\n        ')}
@@ -451,9 +467,6 @@ function editorForm(s) {
           ${['Rainfall', 'Rainfall Increment', 'Water Level', 'Water Level - AHD', 'Battery', 'Air Temperature', 'Relative Humidity', 'Wind Speed', 'Wind Gust', 'Wind Direction', 'pH', 'Conductivity', 'Dissolved Oxygen', 'Water Temperature', 'Turbidity'].map(t => `<option value="${esc(t)}">`).join('')}
         </datalist>
       </div>
-      <label class="check-label ef-enabled">
-        <input type="checkbox" id="ef-enabled" ${s.enabled ? 'checked' : ''}> Enabled
-      </label>
       <!-- Who owns the station, recorded on it (0030). Blank means not recorded,
            and the card then shows only what the SLS says, if anything. -->
       <label class="full">Owner<input type="text" id="ef-owner" value="${escAttr(s.owner || '')}"
@@ -463,7 +476,7 @@ function editorForm(s) {
     ${hasRep ? `
       <hr>
       <h4 class="ef-h">Repeater Configuration</h3>
-      <div class="form-grid">
+      <div class="form-grid ef-grid">
         <label>ACMA Licence<input type="text" id="ef-acma" value="${esc(s.repeater?.acma_licence || '')}"></label>
         <label>Repeater delay (ms)
           <input type="number" min="0" max="999" step="1" id="ef-delay"
@@ -483,10 +496,10 @@ function editorForm(s) {
         ${Frequencies.editorHtml(s, { primary: true })}
         ${repeaterPassingSummaryHtml(s)}
         ${repeaterCarriedStationsHtml(s)}
-        <label class="full">Pass Ranges (one per line: <em>low-high</em>)
+        <label class="full"><span>Pass Ranges (one per line: <em>low-high</em>)</span>
           <textarea id="ef-pass" rows="5">${(s.repeater?.pass_ranges || []).map(r => `${r.low}-${r.high}`).join('\n')}</textarea>
         </label>
-        <label class="full">Exclusions (one per line: <em>low-high</em>)
+        <label class="full"><span>Exclusions (one per line: <em>low-high</em>)</span>
           <textarea id="ef-excl" rows="3">${(s.repeater?.exclusions || []).map(r => `${r.low}-${r.high}`).join('\n')}</textarea>
         </label>
       </div>` : ''}
@@ -495,7 +508,7 @@ function editorForm(s) {
       <h4 class="ef-h">Base Station Radio</h4>
       <!-- A base station has no repeater row, so every pair it uses is a row
            here (0033). A base that is also a repeater keeps them above. -->
-      <div class="form-grid">
+      <div class="form-grid ef-grid">
         ${Frequencies.editorHtml(s)}
       </div>` : ''}
     ${RiverDetails.editorHtml(s)}
@@ -556,11 +569,11 @@ function editorArroSection(s, sensors) {
   return `
     <hr>
     <h4 class="ef-h">ARRO</h4>
-    <div class="form-grid">
-      <label>ARRO site id <span class="small ef-plain">— ARRO's key, not BoM's</span>
+    <div class="form-grid ef-grid">
+      <label><span>ARRO site id <span class="small ef-plain">— ARRO's key, not BoM's</span></span>
         <input type="text" readonly value="${esc(dbId)}" title="site.db_id — the id every ARRO URL takes">
       </label>
-      <label>Station number <span class="small ef-plain">— BoM's</span>
+      <label><span>Station number <span class="small ef-plain">— BoM's</span></span>
         <input type="text" readonly value="${esc(site.number || s.station_number || '—')}">
       </label>
       <label class="full">Site name in ARRO
@@ -610,16 +623,18 @@ function sensorRowHtml(se, dbId) {
       <input type="text" class="sensor-type" list="ef-sensor-types" value="${esc(se.type || '')}"
              aria-label="Sensor type"
              placeholder="Sensor type (e.g. Rainfall)">
-      <button type="button" class="link-btn sensor-flip" onclick="editorOpenSensorFlip(this)"
-              ${isBfAddress(pInt(se.alert_id)) ? '' : 'disabled'}
-              aria-label="Open this row's ALERT address in the Bit Flipper"
-              title="Open this row's ALERT address in the Bit Flipper — what else it could be, one or more bit-flips away">Flip</button>
-      <span class="sensor-arro small">${url
-        ? `<a href="${esc(url)}" target="_blank" rel="noopener"
-             title="ARRO admin for device ${esc(se.device_id)} on site ${esc(dbId)}">ARRO ↗</a>`
-        : ''}</span>
-      <button type="button" class="sensor-del btn-danger" title="Remove this sensor"
-              onclick="this.closest('.sensor-row').remove()"><span aria-hidden="true">×</span></button>
+      <span class="sensor-acts">
+        <button type="button" class="link-btn sensor-flip" onclick="editorOpenSensorFlip(this)"
+                ${isBfAddress(pInt(se.alert_id)) ? '' : 'disabled'}
+                aria-label="Open this row's ALERT address in the Bit Flipper"
+                title="Open this row's ALERT address in the Bit Flipper — what else it could be, one or more bit-flips away">Flip</button>
+        <span class="sensor-arro small">${url
+          ? `<a href="${esc(url)}" target="_blank" rel="noopener"
+               title="ARRO admin for device ${esc(se.device_id)} on site ${esc(dbId)}">ARRO ↗</a>`
+          : ''}</span>
+        <button type="button" class="sensor-del btn-danger" title="Remove this sensor"
+                onclick="this.closest('.sensor-row').remove()"><span aria-hidden="true">×</span></button>
+      </span>
     </div>`;
 }
 

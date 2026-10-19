@@ -176,8 +176,24 @@ async function main() {
         besideMove: !!row && !!row.querySelector('#ef-movepin'),
         // Under the boxes, the groups the station card on the map draws, under
         // the same names, each laid out as a list (.pill-list).
-        groups:    [...document.querySelectorAll('#stations-editor-card .ef-actions > [role="group"]')]
+        groups:    [...document.querySelectorAll('#stations-editor-card .ef-pills > [role="group"]')]
                      .map(g => `${g.getAttribute('aria-label')}${g.classList.contains('pill-list') ? '' : ' (not a list)'}`),
+        // The form's own tidiness: the two halves of a coordinate on one line,
+        // a box level with its neighbour when the neighbour's caption wraps
+        // ("Wind region (AS/NZS 1170.2)"), and a checkbox beside its word
+        // rather than on a line above it.
+        layout:    (() => {
+          const box = id => document.getElementById(id).getBoundingClientRect();
+          const lat = box('ef-lat'), lon = box('ef-lon');
+          const mid = r => (r.top + r.bottom) / 2;
+          return {
+            latLon: Math.abs(lat.top - lon.top) < 1 && lon.left > lat.right,
+            level:  Math.abs(box('ef-elev').top - box('ef-wind').top) < 1,
+            checks: [...document.querySelectorAll('#stations-editor-card .check-label')]
+                      .filter(l => l.offsetParent)
+                      .map(l => Math.abs(mid(l.querySelector('input').getBoundingClientRect()) - mid(l.getBoundingClientRect())) < 4),
+          };
+        })(),
         // No baked-in coordinate: one would go stale the moment a pin is
         // dragged into the boxes, which map-move-pin does without re-rendering
         // the card.
@@ -190,6 +206,10 @@ async function main() {
       ed.onCoordRow && ed.besideMove);
     check('in the Position group, then imagery and records — the map card’s groups, as lists',
       ed.groups.join(' | ') === 'Position | Imagery and terrain | Records', ed.groups.join(' | '));
+    check('latitude and longitude on one line, and boxes level when a caption wraps',
+      ed.layout.latLon && ed.layout.level, JSON.stringify(ed.layout));
+    check('every checkbox beside its word, not on a line above it',
+      ed.layout.checks.length >= 5 && ed.layout.checks.every(Boolean), JSON.stringify(ed.layout.checks));
     check('reading the boxes rather than a figure baked in when the card was drawn',
       ed.noStale && ed.handler === 'editorCopyLatLon(this)', ed.handler);
 

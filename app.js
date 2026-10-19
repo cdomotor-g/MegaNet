@@ -6444,6 +6444,10 @@ function clearMapSelection() {
 // No width test in here: a window that has widened past the phone width since
 // the markers were bound can still be showing one, and it is the same callout
 // either way.
+//
+// The two are the station card's list (.pill-list) without a heading — the
+// rule above them says where the actions start — so a pin read on a phone and
+// the card it opens look like the same thing.
 function stationPopupHtml(s) {
   const stnElev = [
     s.station_number ? `Stn #${esc(s.station_number)}` : '',
@@ -6454,9 +6458,9 @@ function stationPopupHtml(s) {
       <strong>${esc(s.name)}</strong><br>
       ${s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${esc(r)}</span>`).join('')}${proposedTagHtml(s)}
       ${stnElev ? `<br><span class="mn-pop-line">${stnElev}</span>` : ''}
-      <div class="mn-popup-actions pill-row">
+      <div class="mn-popup-actions pill-row pill-list">
         <button type="button" class="pill mn-popup-details" onclick="stnCardFromPopup('${escAttr(s.id)}', event)"
-           title="Open the station card — the full details and every action">ℹ️ Details &amp; actions</button>
+           title="Open the station card — the full details and every action">${pillText('ℹ️', 'Details &amp; actions')}</button>
         ${copyLatLonPillHtml(s)}
       </div>`;
 }

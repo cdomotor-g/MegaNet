@@ -1331,7 +1331,7 @@ button.pill {
   align-items: stretch;
 }
 
-.pill-list::before {
+.pill-list[aria-label]::before {
   content: attr(aria-label);
   content: attr(aria-label) / "";
   grid-column: 1 / -1;
@@ -1396,6 +1396,12 @@ button.pill {
    redundant: "Search FWIN docs" is "FWIN docs" under Records. */
 .pill-list .pill-long {
   display: none;
+}
+
+/* EPIC #107's 44 px floor. Without an outline the whole cell is the target,
+   so the floor is the cell's height rather than anything drawn. */
+@media (pointer: coarse) {
+  .pill-list .pill { min-height: 2.75rem; }
 }
 
 /* …and its opposite, which the app needed just as often and had never named
@@ -2649,14 +2655,47 @@ h2.h-bad {
    Out to each side by a pill's own padding, and the lists' column gap closed
    to what is left of the form's .7rem, so every icon starts where a field's
    label does in both of the form's columns. */
-.ef-actions {
+.ef-pills {
   display: grid;
   gap: .55rem;
   margin: -.35rem -.3rem 0;
 }
 
-.ef-actions .pill-list {
+.ef-pills .pill-list {
   column-gap: .1rem;
+}
+
+/* A field whose caption wraps to two lines ("Wind region (AS/NZS 1170.2)",
+   "TBRG bucket size (mm/tip)") made its box sit lower than its neighbour's.
+   The grid stretches both labels to the row's height; spacing their caption
+   and box apart puts every box in a row on one line, the captions level at
+   the top. */
+.ef-grid > label {
+  align-content: space-between;
+}
+
+/* The `.form-grid label` rule stacks a caption over its field, and it reached
+   the editor's checkboxes too — Roles, Enabled, Proposed — putting each box
+   on a line above its word. A box and its word are one line. */
+.form-grid .check-label {
+  display: inline-flex;
+  gap: var(--sp-1);
+  align-items: center;
+}
+
+/* The station's two states, Proposed and Enabled, side by side on a row of
+   their own. */
+.ef-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-4);
+}
+
+/* A field inside a section (the ALERT2 address under the sensor rows) is
+   off the note above it, as a field in the grid is off the one above. */
+.ef-section > label {
+  margin-top: var(--sp-2);
 }
 
 .ef-section-head {
@@ -2677,7 +2716,6 @@ h2.h-bad {
 /* The role checkboxes sit inside a <label> that is already bold; these are the
    values under it, not headings of their own. */
 .ef-role    { font-weight: normal; color: inherit; }
-.ef-enabled { grid-column: 1; }
 
 /* The carried-stations list caps its height, so it scrolls — which is why it
    is a named region in the markup (pattern 7a, for something that is not a
@@ -2710,20 +2748,29 @@ h2.h-bad {
   margin-bottom: var(--sp-2);
 }
 
-/* Wrapping, because the fixed-width half of this row is wider than a phone once
-   the Bit Flipper link is in it. The two address boxes, the two links and the
-   remove button come to ~350 px between them before the type box has any width
-   at all, so unwrapped the row pushed the whole document sideways by ten of them
-   at 375 px — `npm run tabs` measures exactly that. Wrapped, the type box takes
-   the second line with the links beside it and nothing overflows; on any screen
-   wide enough the row is still one line, exactly as it was. */
-.sensor-row .sensor-aid  { flex: 0 0 7.5rem; width: 7.5rem; }
+/* Wrapping, because the whole row is wider than a phone: the two address
+   boxes, the type's least width and the actions come to ~440 px, so unwrapped
+   it pushed the whole document sideways at 375 px — `npm run tabs` measures
+   exactly that. Wrapped, the actions take the second line and nothing
+   overflows; on any pane wide enough the row is one line. */
+.sensor-row .sensor-aid  { flex: 0 0 5.5rem; width: 5.5rem; }
 /* Narrower than the ALERT box on purpose: a slot is 0-254 and three digits is
    the whole of it, so the row still reads as one wide field (the type) between
    two short ones rather than as three equal columns competing for the eye. */
-.sensor-row .sensor-a2id { flex: 0 0 5.5rem; width: 5.5rem; }
-.sensor-row .sensor-type { flex: 1 1 auto; width: auto; min-width: 0; }
-.sensor-row .sensor-arro { flex: 0 0 4.2rem; text-align: right; }
+.sensor-row .sensor-a2id { flex: 0 0 5rem; width: 5rem; }
+/* The type keeps a usable width before anything wraps, so what wraps is the
+   actions — never the type away from its address, which left an address and
+   a slot alone on one line and the type under them, a sensor read as two. */
+.sensor-row .sensor-type { flex: 1 1 8rem; width: auto; min-width: 8rem; }
+/* Flip, ARRO and remove as one unit: at the end of the line when it fits,
+   otherwise under it at the right, the same place on every row. */
+.sensor-row .sensor-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+.sensor-row .sensor-arro { flex: 0 0 3.6rem; text-align: right; }
 .sensor-row .sensor-del  { flex: 0 0 auto; padding: .2rem .55rem; line-height: 1; }
 
 /* The row's own deep link: this address, in the Bit Flipper. A .link-btn and
@@ -7320,14 +7367,6 @@ hr {
 .ef-proposal[hidden] { display: none; }
 .ef-proposal-lead { margin: 0; font-size: var(--fs-sm); }
 
-/* The Proposed box beside the Station type it goes with: a box and its words
-   on one line (the grid's labels are a caption over a field), level with the
-   select rather than its caption. */
-.form-grid .ef-proposed {
-  display: flex;
-  align-self: end;
-  min-height: 2.4rem;
-}
 .ef-proposal-year { display: grid; gap: .25rem; max-width: 14rem; font-size: var(--fs-sm); }
 .ef-proposal-hint { margin: 0; }
 
@@ -7661,13 +7700,20 @@ hr {
 /* Still for a device that asks for less motion: in the one reduced-motion
    block, further down, with everything else that moves. */
 
-/* A wrapping row of pills since #170, not a column of links — the layout comes
-   from .pill-row, which this carries alongside; what is left here is the rule
+/* Pills since #170, and the station card's list since: the layout comes from
+   .pill-list, which this carries alongside; what is left here is the rule
    that separates the actions from the station's own details above them. */
 .mn-popup-actions {
   margin-top: .45rem;
   padding-top: .4rem;
   border-top: 1px solid var(--border);
+}
+
+/* One column rather than the card's two: a callout is as narrow as a phone
+   lets it be, and "Details & actions" in half of it broke over two lines. Two
+   rows of a full width read as the short menu they are. */
+.mn-popup-actions.pill-list {
+  grid-template-columns: 1fr;
 }
 
 .leaflet-control-attribution,
