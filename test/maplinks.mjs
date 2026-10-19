@@ -400,10 +400,19 @@ try {
     const rows = [...root.children]
       .filter((el) => vis(el) && el.id !== 'map-display-find-row');
     const acma = root.parentNode.querySelector('.filter-block');
+    // What is on screen under each heading, for a check about one section
+    // rather than about whatever the rest of the panel happens to say.
+    const sections = {};
+    let at = null;
+    for (const r of rows) {
+      if (r.classList.contains('map-display-h')) sections[at = r.textContent.trim()] = '';
+      else if (at) sections[at] += ' | ' + r.textContent.replace(/\s+/g, ' ').trim();
+    }
     return {
       rows: rows.length,
       heads: rows.filter((r) => r.classList.contains('map-display-h')).map((r) => r.textContent.trim()),
       text: rows.map((r) => r.textContent.replace(/\s+/g, ' ').trim()).join(' | '),
+      sections,
       acma: vis(acma),
       none: vis(document.getElementById('map-display-find-none')),
     };
@@ -437,13 +446,22 @@ try {
 
   // The base-map rows are rows like any other: one base's switch and slider
   // are one row, found by its name and nothing else of the section with it.
+  // Held to the Base maps section, because "satellite" is said elsewhere in
+  // the panel on purpose: the Black for TM stations switch's tooltip (Station
+  // pins) says a satellite terminal reads some TM stations, and the box
+  // searches tooltips by design (mapDisplayRowText, app.js). Which other
+  // sections a word turns up is their own copy's business; the narrowing
+  // checks above hold the rest of the panel to the filter. (Light comes along:
+  // the section's closing note names Satellite, and a note goes with the row
+  // above it.)
   await page.fill('#map-display-find', 'satellite');
   await page.waitForTimeout(300);
   const base = await panel();
+  const bases = base.sections['Base maps'] || '';
   check('a base map is found by name, its switch and slider together',
-    base.heads.join('|') === 'Base maps' && /Satellite/.test(base.text)
-      && !/OSM-Topo/.test(base.text) && !/OpenStreetMap/.test(base.text),
-    `${base.heads.join(' | ')}: ${base.text.slice(0, 160)}`);
+    base.heads[0] === 'Base maps' && /Satellite/.test(bases)
+      && !/OSM-Topo/.test(bases) && !/OpenStreetMap/.test(bases),
+    `${base.heads.join(' | ')}: ${bases.slice(0, 160)}`);
 
   await page.fill('#map-display-find', 'licence');
   await page.waitForTimeout(300);
