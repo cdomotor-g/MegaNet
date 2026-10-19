@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 44, date: '2026-10-19', items: [
+      '<strong>📡 The signal, along the elevation profile.</strong> Between two stations, the chart now runs the '
+        + 'transmission: a wave leaves one end, travels down the line of sight to the other, then the reply comes back, '
+        + 'and the beam is painted by how much signal is left at each point — green when strong, then yellow, amber and '
+        + 'orange as it fades, and red under the receiver\'s threshold, in the same colours as the fade margin. Ridges '
+        + 'and (with the land-cover model) trees take their share where they stand, and the shadow behind a hill shows. '
+        + '<em>⏸ Pause</em> in the chart\'s key holds the worse way round.',
+    ] },
     { n: 43, date: '2026-10-18', items: [
       '<strong>🔲 🎚️ 🪧 Three new looks, in pictures.</strong> Pick one from <em>⋯ → Theme &amp; look</em>. '
         + '<strong>Tiles</strong>: a coloured tile with a drawing on it for every tool. <strong>Instrument</strong>: a dark '

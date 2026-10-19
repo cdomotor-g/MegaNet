@@ -3424,6 +3424,30 @@ glance. Finally the *Path* row under the chart is one end per line rather than
 `A → B` wrapped wherever the names ran out, so every figure below it stays where
 it was for the last path.
 
+**The signal, run along the line.** Between two stations with radios on file the
+chart animates the transmission: a wavefront leaves A, runs down the line of
+sight to B, then the reply runs from B to A, and the beam behind it — the line,
+the 60% Fresnel envelope and, faintly, the column of sky — is painted in the
+colour of the margin left over the receiver's threshold at each point. The
+colours are the fade margin's own tokens (`--ok`, `--warn`, `--bad`) walked in
+OKLCH, so strong is green, and it fades through yellow, amber and orange to red,
+which it is outright at the RX threshold and under it; each band keeps to its
+own stretch of that walk and steps where the number changes band, so the line
+and the *Fade margin* row cannot be read as disagreeing. It is priced with the
+readout's own `pathAnalyse`, run again from the transmitter to 127 points on the
+line each way, for a receiver like the far end's standing on the beam at the
+line's height there (the curvature terms cancel, so every point sees the
+clearances the chart draws): the signal fades with distance, drops where the
+ground — or, under the land-cover model, the cover — reaches into the Fresnel
+zone, stays down in the shadow behind a ridge and fills back in as the shadow
+widens, and arrives at the far end in exactly that way round's fade margin,
+with a ring in its colour or a ✕ under the threshold. The pricing runs in
+slices after the chart is drawn and is poured into it, so the hover cursor is
+never thrown away; the animation runs only while the chart is on screen, and
+⏸ holds the worse way round whole (remembered, `mn-path-signal`; with reduced
+motion asked for it starts held). A line on bare ground has no radio at either
+end, and gets no signal and a line in the key saying why.
+
 > **On the Fresnel coefficient.** The first-zone radius here is
 > `r1 = 17.32·√(d1·d2 / (f·D))` (km, GHz, metres), not the `8.657` the original
 > ticket quoted. `8.657` is the same formula already specialised to the path

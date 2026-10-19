@@ -3758,6 +3758,10 @@ const state = {
     // profile, and a profile without it is the one that reads clear through a
     // forest. Remembered, because turning it off is a standing choice.
     cover:   (localStorage.getItem('mn-path-cover') || 'on') === 'on',
+    // The signal run along the profile's line (PathProfile, "the signal"):
+    // 'play', 'still', or '' for not chosen — plays unless the system asks for
+    // reduced motion. Remembered, like the cover switch.
+    signal:  localStorage.getItem('mn-path-signal') || '',
   },
   // Link budget card. The endpoints have to outlive a tab switch — half an hour
   // of what-ifs should not be thrown away by looking at the Pass Ranges tab.

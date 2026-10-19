@@ -35,7 +35,9 @@
 //                        blocked gazetteer says so and leaves them standing.
 //   Fade margin          the profile card's new row: a figure where both ends
 //                        are stations with radios, and a stated reason where
-//                        they are not.
+//                        they are not — and the signal run along the line
+//                        under it, which has to arrive at each end in that
+//                        way round's figure and be painted in its bands.
 //
 //   node --run terrain        (or: npm run terrain)
 //       npm run terrain -- -v    also print what passed
@@ -654,6 +656,119 @@ ok('…banded with the link budget\'s own bands',
    /txt-(ok|warn|bad)/.test(marginRow.cls), marginRow.cls);
 ok('…and quoting both directions', /A→B \/ B→A/.test(marginRow.text || ''), marginRow.text || '');
 
+// The signal along the line. Priced after the chart is up, in slices, so it is
+// waited for; then held to the row above it, to the bands, and to moving.
+const sig = await page.evaluate(async () => {
+  const until = Date.now() + 40000;
+  while (Date.now() < until && !PathProfile.signalState()) await new Promise(r => setTimeout(r, 200));
+  const s = PathProfile.signalState();
+  if (!s) return null;
+  const dd = [...document.querySelectorAll('#path-profile-panel .path-stats dt')]
+    .find(x => x.textContent.trim() === 'Fade margin').nextElementSibling.textContent;
+  const m = dd.match(/([-+]?\d+\.\d) \/ ([-+]?\d+\.\d) dB A→B \/ B→A/);
+  // A colour as the page paints it: resolved by the cascade (the tokens, the
+  // mix), then painted on a canvas and read back, because a computed mix comes
+  // back as oklch() or color() rather than as three sRGB numbers.
+  const probe = document.createElement('i');
+  document.body.appendChild(probe);
+  const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  const rgb = c => {
+    probe.style.color = ''; probe.style.color = c;
+    ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = getComputedStyle(probe).color;
+    ctx.fillRect(0, 0, 1, 1);
+    return [...ctx.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+  };
+  const tokens = { ok: rgb('var(--ok)'), warn: rgb('var(--warn)'), bad: rgb('var(--bad)') };
+  // Nearest as seen, so in OKLab rather than in raw sRGB: a dark amber and a
+  // dark green are close in sRGB numbers and nothing alike to look at.
+  const lab = c => {
+    const [r, g, b] = c.map(v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+            1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+            0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+  };
+  const nearest = c => Object.entries(tokens)
+    .map(([k, t]) => [k, Math.hypot(...lab(t).map((v, i) => v - lab(c)[i]))]).sort((a, b) => a[1] - b[1])[0][0];
+  const bands = [-8, -0.5, 0, 1, 2.9, 3.1, 5, 6.5, 9.9, 10.1, 12, 20, 60].map(v => ({
+    m: v, band: lbMarginClass(v).cls, painted: nearest(rgb(s.colour(v))),
+  }));
+  const exact = { under: rgb(s.colour(-3)).join(), bad: tokens.bad.join(), strong: rgb(s.colour(40)).join(), ok: tokens.ok.join() };
+  probe.remove();
+  const stops = id => [...document.querySelectorAll(`#path-sig-${id} stop`)].length;
+  const svgOk = !!document.querySelector('#path-sig-under #path-sig-run-ab path')
+             && !!document.querySelector('#path-sig-over #path-sig-tag');
+  const width = () => Number(document.getElementById('path-sig-reveal-ab').getAttribute('width'))
+                    + Number(document.getElementById('path-sig-reveal-ba').getAttribute('width'));
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  // Playing, on screen — the side panel's 〽️ pane brought up and the chart
+  // scrolled to, as pathcursor.mjs does, because off screen it idles: the
+  // wavefront moves. Looked at for longer than an arrival, its hold and the
+  // breath after it last together, so some of what is seen is travel.
+  const chart = document.querySelector('svg.path-chart');
+  dockReveal(chart);
+  chart.scrollIntoView({ block: 'center', behavior: 'instant' });
+  await sleep(150);
+  if (!s.playing) PathProfile.signalToggle();
+  const seen = new Set();
+  for (let k = 0; k < 24; k++) { seen.add(width()); await sleep(100); }
+  // The card closed: no frames, nothing moving; opened again, it carries on.
+  const card = chart.closest('details');
+  card.open = false;
+  await sleep(250);
+  const idleW = width(), idleRun = PathProfile.signalState().running;
+  await sleep(400);
+  const idleOff = !idleRun && width() === idleW;
+  card.open = true;
+  await sleep(250);
+  const back = new Set();
+  for (let k = 0; k < 24; k++) { back.add(width()); await sleep(100); }
+  // Held: the worse way round, whole, and nothing moving.
+  PathProfile.signalToggle();
+  const stored = localStorage.getItem('mn-path-signal');
+  const heldW = width();
+  await sleep(350);
+  const heldW2 = width();
+  const tag = document.getElementById('path-sig-tag-text').textContent;
+  const btn = document.getElementById('path-sig-toggle').textContent;
+  PathProfile.signalToggle();
+  return {
+    rowAB: m ? Number(m[1]) : null, rowBA: m ? Number(m[2]) : null,
+    endAB: s.ab[s.ab.length - 1].m, endBA: s.ba[0].m,
+    nearAB: s.ab[0].m, nearBA: s.ba[s.ba.length - 1].m,
+    n: s.ab.length + s.ba.length, stopsAB: stops('ab'), stopsBA: stops('ba'),
+    bands, exact, svgOk, moved: seen.size >= 3, seen: seen.size, loop: JSON.stringify({
+      playing: PathProfile.signalState().playing, running: PathProfile.signalState().running,
+      inView: PathProfile.signalState().inView }),
+    stored, heldW, heldW2, tag, btn, idleOff, resumed: back.size >= 3, iw: Number(document.querySelector('#path-sig-run-ab rect').getAttribute('width')),
+  };
+});
+ok('the signal is priced along the line, both ways', !!sig && sig.n > 40, sig ? `${sig.n} points` : 'never priced');
+if (sig) {
+  ok('…and arrives at B in the A→B fade margin, and at A in the B→A one',
+     Math.abs(sig.endAB - sig.rowAB) < 0.06 && Math.abs(sig.endBA - sig.rowBA) < 0.06,
+     `${sig.endAB.toFixed(2)} / ${sig.endBA.toFixed(2)} against the row's ${sig.rowAB} / ${sig.rowBA}`);
+  ok('…stronger near the transmitter than at the receiver, each way',
+     sig.nearAB > sig.endAB && sig.nearBA > sig.endBA,
+     `A→B ${sig.nearAB.toFixed(1)} → ${sig.endAB.toFixed(1)}, B→A ${sig.nearBA.toFixed(1)} → ${sig.endBA.toFixed(1)}`);
+  const off = sig.bands.filter(b => b.band !== b.painted);
+  ok('every colour on the line is nearest its fade-margin band\'s own token', !off.length,
+     off.map(b => `${b.m} dB is ${b.band}, painted nearest ${b.painted}`).join('; '));
+  ok('…red outright under the RX threshold, green outright when strong',
+     sig.exact.under === sig.exact.bad && sig.exact.strong === sig.exact.ok, JSON.stringify(sig.exact));
+  ok('the chart carries the runs, a gradient stop per priced point, and the tag',
+     sig.svgOk && sig.stopsAB === sig.n / 2 && sig.stopsBA === sig.n / 2, `${sig.stopsAB} + ${sig.stopsBA} stops`);
+  ok('playing, the wavefront moves', sig.moved, `${sig.seen} distinct positions in 2.4 s; ${sig.loop}`);
+  ok('…not while the card is closed, and again when it is opened', sig.idleOff && sig.resumed,
+     `idle ${sig.idleOff}, resumed ${sig.resumed}`);
+  ok('⏸ holds the worse way round whole, still, says so, and is remembered',
+     sig.stored === 'still' && Math.abs(sig.heldW - sig.iw) < 0.5 && sig.heldW === sig.heldW2
+       && /arrives/.test(sig.tag) && /Play/.test(sig.btn),
+     `${sig.stored}; ${sig.heldW} of ${sig.iw}; "${sig.tag}"; ${sig.btn}`);
+}
+
 const noRadio = await page.evaluate(async () => {
   MapDraw.clearAll();
   MapDraw.addLine([[-27.50, 152.40], [-27.50, 152.50]], [null, null]);
@@ -662,13 +777,17 @@ const noRadio = await page.evaluate(async () => {
   while (Date.now() < until) {
     const dt = [...document.querySelectorAll('#path-profile-panel .path-stats dt')]
       .find(x => x.textContent.trim() === 'Fade margin');
-    if (dt) return dt.nextElementSibling.textContent.replace(/\s+/g, ' ').trim();
+    if (dt) return { row: dt.nextElementSibling.textContent.replace(/\s+/g, ' ').trim(),
+                     sig: (document.getElementById('path-sig-key') || {}).textContent || '',
+                     layer: !!document.getElementById('path-sig-under') };
     await new Promise(r => setTimeout(r, 300));
   }
   return null;
 });
 ok('two points on the ground get a stated reason, not a number',
-   /both ends have to be stations/.test(noRadio || ''), String(noRadio));
+   /both ends have to be stations/.test((noRadio || {}).row || ''), JSON.stringify(noRadio));
+ok('…and no signal along the line, with the key saying why',
+   !!noRadio && !noRadio.layer && /No signal drawn/.test(noRadio.sig), JSON.stringify(noRadio));
 await page.evaluate(() => { MapDraw.clearAll(); PathProfile.setOpen(false); });
 
 // ── 5. polar radio coverage ─────────────────────────────────────────────────

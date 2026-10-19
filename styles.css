@@ -5813,6 +5813,21 @@ hr {
   border: 1px solid color-mix(in srgb, var(--dot, var(--muted)) 60%, var(--text));
 }
 .path-key-mast { border-top: 2px solid var(--map-repeater); }
+
+/* The signal along the profile's line: a ramp in the fade margin's own three
+   tokens, walked in OKLCH so it passes through yellow and orange on the way
+   from green to red — the same walk the chart's beam takes. The plain ramp
+   first, for a browser that does not know the interpolation hint. */
+.path-key-sig {
+  height: 8px !important;
+  width: 28px !important;
+  background: linear-gradient(90deg, var(--ok), var(--warn), var(--bad));
+  background: linear-gradient(90deg in oklch, var(--ok), var(--warn), var(--bad));
+  border-radius: 2px;
+}
+.path-key-sig.is-off { background: var(--border); }
+.path-sig-toggle { margin-left: .35rem; }
+.path-sig-note { margin-top: .15rem; }
 .path-key-lidar { border-top: 3px solid var(--profile-lidar); }
 
 /* The curvature arc's chip, built like the ground one so the two read as a

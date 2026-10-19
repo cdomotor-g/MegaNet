@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-18** (revision 163 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-19** (revision 164 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -806,6 +806,18 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 164 — 2026-10-19: 📡 The signal, run along the elevation profile
+
+The owner, of the profile chart: *"can you please animate the link/elevation profile with radio transmissions. try to model how the transmissions/signal is/are affected by the terrain and terrain coverage … colourise across the image in sync with signal power … just use same colourisation as we are using for the fade margin number."* Nothing opened or closed.
+
+- **The run** (`path-profile.js`, PathProfile's "the signal, along the line"): between two stations with a fade margin, a wavefront leaves A down the line of sight, arrives at B with a ring in its margin's colour (a ✕ under the threshold), and the reply runs B → A; the line, the 60% Fresnel envelope and the column of sky behind the front are painted by the margin left at each point. A tag in the plot's corner says the run, the distance and the figure.
+- **The pricing**: the readout's own `pathAnalyse`, run from the transmitter to 127 points on the line each way, for a receiver like the far end's standing on the beam at the line's height (the curvature terms cancel exactly, so the clearances are the chart's); the far end is the readout's own path loss, so each run arrives in exactly that way round's fade margin. The radios enter once — a margin is linear in the loss. Priced in 8 ms slices after the chart is drawn and poured into it, not re-rendered, so the hover cursor survives.
+- **The colours**: `--ok`, `--warn` and `--bad` walked in OKLCH — green, yellow, amber, orange, red — each band on its own stretch of the walk and stepping at its edge (10 and 3 dB, read from `LB_MARGIN`), red outright at the threshold.
+- **The motion**: runs only while the chart is on screen (an IntersectionObserver; a closed card costs no frames), keeps its place across re-renders, and ⏸ in the key holds the worse way round whole — remembered (`mn-path-signal`, `state.path.signal`), and held from the start when the system asks for reduced motion. A line on bare ground gets no signal and a line in the key saying why.
+- README §17, What's new 44, `test/README.md`, the version stamp `20261019a`.
+
+**Checks:** `npm run terrain` (15 new assertions, all passing: priced both ways, arriving at each end in the row's figure, fading from the transmitter, every colour nearest its band's token in OKLab with red under the threshold, the wavefront moving on screen and idle with the card closed, ⏸ held and remembered, no signal for points on the ground), and the cheap five.
 
 ### Revision 163 — 2026-10-18: 🔲 🎚️ 🪧 Three looks in pictures — Tiles, Instrument and Signs — and 🏠 Home
 
