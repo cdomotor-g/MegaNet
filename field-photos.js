@@ -7,7 +7,7 @@
 //
 // After core.js, photo-meta.js, photo-zip.js, photo-equipment.js and
 // datastore.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, escAttr, announce,
+// Reaches back to core.js for state, esc, escAttr, pillText, announce,
 // registerTabTeardown, registerLiveMap, removeMap, KM_PER_DEG_LAT, kmPerDegLon,
 // bearingDeg and fmtKm; to photo-meta.js for PhotoMeta; to photo-zip.js for
 // PhotoZip; to datastore.js for dbSelect, dbRpc, dbCanWrite, dbUploadObject,
@@ -2785,7 +2785,7 @@ const FieldPhotos = (function () {
   function pillHtml(s) {
     if (!signedIn() || !s) return '';
     return `<button type="button" class="pill mn-photos" onclick="FieldPhotos.openStation('${escAttr(s.id)}')"
-             title="The field photos filed under this station, on the Field Photos tab">📷 Field photos →</button>`;
+             title="The field photos filed under this station, on the Field Photos tab">${pillText('📷', 'Field photos', '→')}</button>`;
   }
 
   function setShow(show) {

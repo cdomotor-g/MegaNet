@@ -6837,17 +6837,98 @@ hr {
   padding: 0;
 }
 
-/* One group of actions — a wrapping pill row (.pill-row supplies the layout),
-   with a hairline over every group but the first. The line is the whole
-   grouping: four named groups, no headings drawn, because at 340 px wide the
-   headings would cost more height than the pills they label. See
-   stationActionGroups() in app.js for what goes in each. */
-.stn-card-group {
+/* One group of actions, with a hairline over every group but the first. See
+   stationActionGroups() in app.js for what goes in each.
+
+   A two-column list under a small heading rather than a wrapping row of
+   outlined pills: a row wrapped wherever each label's text ran out, so no two
+   lines were the same length and seventeen outlines read as clutter. In
+   columns the icons line up down the left and the ↗ → ⬇ marks down the right
+   (pillText() in core.js gives each its own span), and nothing but a hover
+   says where one ends. The pills stay pills everywhere else — this dresses
+   them only here.
+
+   The heading is the group's aria-label, drawn, so the name a screen reader
+   is given and the one a sighted person reads cannot drift apart; the second
+   `content` hides the drawn copy from a screen reader, which already has the
+   name from the group, and a browser too old to read it keeps the first. */
+.stn-card-group.pill-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 .5rem;
+  align-items: stretch;
   padding: .45rem .6rem;
 }
 
 .stn-card-group + .stn-card-group {
   border-top: 1px solid var(--border);
+}
+
+.stn-card-group::before {
+  content: attr(aria-label);
+  content: attr(aria-label) / "";
+  grid-column: 1 / -1;
+  margin: 0 0 .15rem .3rem;
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* min-width: 0 and normal wrapping so a name too long for its column (the
+   armed states — "Mapping site features…") takes a second line rather than
+   pushing the column wider. Left-justified over .mn-copy-latlon's centring,
+   which keeps the pill one width while it flashes "✓ Copied" on a row. */
+.stn-card-group .pill {
+  justify-content: flex-start;
+  gap: .35rem;
+  min-width: 0;
+  padding: .22rem .3rem;
+  border-color: transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  white-space: normal;
+}
+
+.stn-card-group .pill:hover {
+  border-color: transparent;
+  background: var(--subtle);
+}
+
+/* Armed — the blast styling on, the pin being moved — is still filled, and
+   takes the whole row: while it is on it is the one thing on the card that
+   matters, and "Mapping site features…" fits a row and not a column. */
+.stn-card-group .pill.is-on {
+  grid-column: 1 / -1;
+  background: var(--accent);
+  color: var(--panel);
+}
+
+.stn-card-group .pill-ic {
+  flex: none;
+  width: 1.25em;
+  text-align: center;
+}
+
+.stn-card-group .pill-lbl {
+  min-width: 0;
+}
+
+.stn-card-group .pill-end {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.stn-card-group .pill.is-on .pill-end {
+  color: inherit;
+}
+
+/* The words a column has no room for, which the heading over them makes
+   redundant: "Search FWIN docs" is "FWIN docs" under Records. */
+.stn-card-group .pill-long {
+  display: none;
 }
 
 /* The ALERT id list sits under the label/value rows. */

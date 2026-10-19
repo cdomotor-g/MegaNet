@@ -19,7 +19,7 @@
 //                      sites themselves. zipStore is the KMZ's container.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, escAttr, announce, netName, csvEscape,
+// Reaches back to core.js for state, esc, escAttr, pillText, pillLong, announce, netName, csvEscape,
 // dlText, acmaHaversineKm, stationLatLonText and RM_NET_DEFAULTS; across to
 // app.js for findStationMatches, findRepeaterMatches, stationAlertIds and
 // repeaterPassingCount; to map-backbone.js for backboneLinks; to map-wind.js
@@ -695,7 +695,7 @@ function stationKmlPillHtml(s) {
   const n = stationKmlLinks(s).length;
   return `<button type="button" class="pill" onclick="downloadStationKml('${escAttr(s.id)}')"
        title="Download this station and its ${n} link line${n === 1 ? '' : 's'} as a KML file — open it in Google Earth to see the pin and the paths to its repeaters over the terrain"
-       >🌏 Google Earth KML ⬇</button>`;
+       >${pillText('🌏', `${pillLong('Google ')}Earth KML`, '⬇')}</button>`;
 }
 
 // ── Google Earth: the drawing, and what it holds (#183) ──────────────────────

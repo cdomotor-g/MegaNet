@@ -2750,6 +2750,26 @@ function appleDevice(ua = (typeof navigator !== 'undefined' && navigator.userAge
   return /iPhone|iPad|iPod|Macintosh/.test(ua);
 }
 
+// What a pill says, in three parts: its icon, its name, and the mark after it
+// (↗ leaves the site, → or ↓ goes somewhere in it, ⬇ downloads). On a pill
+// row the three still read as the one line they always were — a flex box does
+// not draw the spaces between the spans, the pill's own gap stands in for them
+// — and textContent is still "🚗 Directions ↗". The station card lays the same
+// spans out as a two-column list (styles.css, .stn-card-group): the icons in
+// one column down the left, the marks in another down the right.
+//
+// `name` is HTML, so a caller can wrap the words the card's narrow columns
+// drop in pillLong(): "Search FWIN docs" everywhere else, "FWIN docs" under
+// the card's Records heading, which already says what kind of thing it is.
+function pillText(icon, name, mark = '') {
+  return `<span class="pill-ic">${icon}</span> <span class="pill-lbl">${name}</span>${
+    mark ? ` <span class="pill-end">${mark}</span>` : ''}`;
+}
+
+function pillLong(words) {
+  return `<span class="pill-long">${words}</span>`;
+}
+
 // The pill for it, or '' for a station with no position. It sits in the station
 // card's Position group, beside Copy lat, lon and Move pin, rather than among
 // the imagery: those pills show somebody else's picture of the ground, and this
@@ -2762,7 +2782,7 @@ function directionsPillHtml(s) {
   const url = stationDirectionsUrl(s, apple);
   if (!url) return '';
   return `<a class="pill mn-directions" href="${esc(url)}" target="_blank" rel="noopener"
-       title="Driving directions to this location from wherever you are, in ${apple ? 'Apple' : 'Google'} Maps">🚗 Directions ↗</a>`;
+       title="Driving directions to this location from wherever you are, in ${apple ? 'Apple' : 'Google'} Maps">${pillText('🚗', 'Directions', '↗')}</a>`;
 }
 
 // The links above, rendered as the row of pills used in both the map popup and
@@ -2810,11 +2830,11 @@ function mapViewPillParts(s) {
   if (!urls) return null;
   return {
     street: `<a class="pill" href="${esc(urls.google)}" target="_blank" rel="noopener"
-       title="Opens the nearest Google Street View panorama; sites with no coverage open the map at this location instead">🚶 Google Street View ↗</a>`,
+       title="Opens the nearest Google Street View panorama; sites with no coverage open the map at this location instead">${pillText('🚶', `${pillLong('Google ')}Street View`, '↗')}</a>`,
     earth: `<a class="pill" href="${esc(urls.earth)}" target="_blank" rel="noopener"
-       title="Opens Google Earth looking straight down on this location from about 2 km up">🛰️ Google Earth ↗</a>`,
+       title="Opens Google Earth looking straight down on this location from about 2 km up">${pillText('🛰️', 'Google Earth', '↗')}</a>`,
     apple: `<a class="pill" href="${esc(urls.apple)}" target="_blank" rel="noopener"
-       title="Opens Apple Maps at this location; Look Around is one tap away where Apple has coverage">🗺️ Apple Maps ↗</a>`,
+       title="Opens Apple Maps at this location; Look Around is one tap away where Apple has coverage">${pillText('🗺️', 'Apple Maps', '↗')}</a>`,
   };
 }
 
@@ -2830,9 +2850,9 @@ function docSearchPills(s) {
   if (!docs) return [];
   return [
     `<a class="pill" href="${esc(docs.fwin)}" target="_blank" rel="noopener"
-       title="Searches the Flood Warning Infrastructure Network Program library for &quot;${escAttr(docs.q)}&quot;">📚 Search FWIN docs ↗</a>`,
+       title="Searches the Flood Warning Infrastructure Network Program library for &quot;${escAttr(docs.q)}&quot;">${pillText('📚', `${pillLong('Search ')}FWIN docs`, '↗')}</a>`,
     `<a class="pill" href="${esc(docs.oohb)}" target="_blank" rel="noopener"
-       title="Searches the OOHB FWN Library for &quot;${escAttr(docs.q)}&quot;">📚 Search OOHB docs ↗</a>`,
+       title="Searches the OOHB FWN Library for &quot;${escAttr(docs.q)}&quot;">${pillText('📚', `${pillLong('Search ')}OOHB docs`, '↗')}</a>`,
   ];
 }
 
@@ -2915,7 +2935,7 @@ function copyLatLonPillHtml(s, { live = false } = {}) {
        title="${live
          ? 'Copy the latitude and longitude in the boxes above to the clipboard, as decimal degrees'
          : `Copy ${escAttr(text)} to the clipboard — decimal degrees, ready to paste into a map, a work order or a message`}"
-       >📋 Copy lat, lon</button>`;
+       >${pillText('📋', 'Copy lat, lon')}</button>`;
 }
 
 // The click. The coordinate rides on the button, so the callout's pill needs no
@@ -2926,22 +2946,24 @@ function copyLatLonPillHtml(s, { live = false } = {}) {
 //
 // The label says what happened and puts itself back. Guarded on isConnected
 // because the likeliest place to press this is a Leaflet popup, and a popup
-// closed inside the 1.6 s is a button that no longer exists.
+// closed inside the 1.6 s is a button that no longer exists. The markup is
+// what is put back, not the text: the pill's label is spans (pillText), and
+// the station card lines them up in columns.
 function copyStationLatLon(btn, text) {
   if (!btn) return;
   const value = (text != null ? text : btn.getAttribute('data-mn-latlon')) || '';
-  const prev  = btn.textContent;
-  const flash = (label, said) => {
-    btn.textContent = label;
+  const prev  = btn.innerHTML;
+  const flash = (icon, label, said) => {
+    btn.innerHTML = pillText(icon, label);
     announce(said);
-    setTimeout(() => { if (btn.isConnected) btn.textContent = prev; }, 1600);
+    setTimeout(() => { if (btn.isConnected) btn.innerHTML = prev; }, 1600);
   };
   // Only reachable from the editor card, whose boxes can be emptied after the
   // pill was drawn. Saying so beats a button that silently does nothing.
-  if (!value) { flash('✗ No position', 'There is no latitude and longitude to copy'); return; }
+  if (!value) { flash('✗', 'No position', 'There is no latitude and longitude to copy'); return; }
   copyToClipboard(value).then(ok => ok
-    ? flash('✓ Copied', `Copied ${value}`)
-    : flash('✗ Copy failed', 'Could not copy the coordinate to the clipboard'));
+    ? flash('✓', 'Copied', `Copied ${value}`)
+    : flash('✗', 'Copy failed', 'Could not copy the coordinate to the clipboard'));
 }
 
 // ── Datastore ─────────────────────────────────────────────────────────────────

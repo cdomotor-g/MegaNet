@@ -6,7 +6,7 @@
 //                ⛰️ 3-D view, and in the Digital Twin, in the map or on its tab.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, escAttr, cssVar, announce,
+// Reaches back to core.js for state, esc, escAttr, pillText, pillLong, cssVar, announce,
 // acmaHaversineKm and fmtKm; across to app.js for the Stations map itself,
 // mapNote and selectStation; to auth.js for Auth.open() from the station
 // card's pill; to station-editor.js for editorSave, stationSavePosition and the
@@ -226,11 +226,11 @@ const MapMovePin = (function () {
     if (!dbCanWrite() && !on) {
       return `<button type="button" class="pill" onclick="Auth.open()"
           title="Moving a pin writes the station’s coordinates, which needs a signed-in session"
-          >📍 Sign in to move this pin</button>`;
+          >${pillText('📍', `Sign in to move ${pillLong('this ')}pin`)}</button>`;
     }
     return `<button type="button" class="pill${on ? ' is-on' : ''}"
         onclick="MapMovePin.${on ? 'cancel' : 'start'}('${escAttr(s.id)}')"
-        >📍 ${label(s.id)}</button>`;
+        >${pillText('📍', label(s.id))}</button>`;
   }
 
   // Both affordances, wherever they currently are. The editor button is

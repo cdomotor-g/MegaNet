@@ -6497,14 +6497,14 @@ function stationActionGroups(s) {
   return [
     { label: 'In Flood-Net', pills: [
       `<button type="button" class="pill mn-edit-station" onclick="editStationFromCard('${escAttr(s.id)}')"
-           title="Select this station and jump to its details card ${stationsCardsWhere()}">✏️ Station details ${stationsCardsArrow()}</button>`,
+           title="Select this station and jump to its details card ${stationsCardsWhere()}">${pillText('✏️', 'Station details', stationsCardsArrow())}</button>`,
       `<button type="button" class="pill" onclick="focusStation('${escAttr(s.id)}')"
-           title="Select this station in the Stations list ${stationsCardsWhere()}">🗒️ Show in the list ${stationsCardsArrow()}</button>`,
+           title="Select this station in the Stations list ${stationsCardsWhere()}">${pillText('🗒️', `Show in ${pillLong('the ')}list`, stationsCardsArrow())}</button>`,
       `<button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
-           title="Zoom the map all the way in on this station — where the map offers its digital twin">🔍 Zoom to station</button>`,
+           title="Zoom the map all the way in on this station — where the map offers its digital twin">${pillText('🔍', 'Zoom to station')}</button>`,
       // A link that opens this card on this view for somebody else (#211).
       `<button type="button" class="pill mn-copy-link" onclick="Route.copyLink(this, '${escAttr(s.id)}')"
-           title="Copy a link to this station — it opens the Stations map here, with this card up">🔗 Copy link</button>`,
+           title="Copy a link to this station — it opens the Stations map here, with this card up">${pillText('🔗', 'Copy link')}</button>`,
       fieldDataPillHtml(s),
       twinPillHtml(s),
       fieldPhotosPillHtml(s),
@@ -6534,7 +6534,7 @@ function stationActionGroups(s) {
     { label: 'Records', pills: [
       arroUrl ? `<a class="pill" href="${esc(arroUrl)}" target="_blank" rel="noopener"
            title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
-           >📊 Open in ARRO admin ↗</a>` : '',
+           >${pillText('📊', `${pillLong('Open in ')}ARRO admin`, '↗')}</a>` : '',
       ...docSearchPills(s),
     ] },
   ].map(g => ({ label: g.label, pills: g.pills.filter(Boolean) }))
@@ -6550,7 +6550,7 @@ function twinPillHtml(s) {
   if (s.lat == null || s.lon == null || !isFinite(s.lat) || !isFinite(s.lon)) return '';
   return `<button type="button" class="pill mn-twin" onclick="DigitalTwin.openStation('${escAttr(s.id)}')"
            title="Open this station's digital twin on the map: its ground in 3-D, the station as built where it stands"
-           >🧊 Digital twin →</button>`;
+           >${pillText('🧊', 'Digital twin', '→')}</button>`;
 }
 
 // "Field photos →": the photos filed under this station, on the Field Photos
@@ -6586,7 +6586,7 @@ function fieldDataPillHtml(s) {
            title="Open the Field Data tab on this station${n
              ? ` with its ${n} sensor${n === 1 ? '' : 's'} ticked, and read the datastore`
              : ' and ask the datastore what it has heard from it'}"
-           >🌡️ Field data →</button>`;
+           >${pillText('🌡️', 'Field data', '→')}</button>`;
 }
 
 // Out of full screen first, for the reason editStationFromCard gives: the
@@ -7876,17 +7876,17 @@ function stnCardHtml(s) {
          filled after the fetch by StationHistory.cardAsk. -->
     ${typeof StationHistory !== 'undefined' ? StationHistory.cardHtml(s) : ''}
     <!-- Every action the station offers, Station details first, in their
-         groups — each its own wrapping row with a rule between
+         groups — each its own headed list with a rule between
          (stationActionGroups). The rules are full-bleed, like the section
          borders above them, so the card reads as one stack of bands rather
          than a panel with boxes in it. MapBlast's and MapMovePin's pills close
          any callout open when pressed — a phone's — and there may be none,
          which is fine.
 
-         role=group with a name on each: the rules are the sighted version of
-         a boundary, and a screen reader gets the boundary told to it instead.
-         Nothing is drawn for the names — the card is 340 px and four headings
-         would cost more height than they explain. -->
+         role=group with a name on each, and the name is also the group's
+         visible heading — styles.css draws it from the aria-label, so the two
+         cannot disagree. Each group lays its pills out as a two-column list
+         (.stn-card-group), which is why the pills' labels are pillText spans. -->
     <div class="acma-sect stn-card-actions">
       ${stationActionGroups(s).map(g =>
         `<div class="pill-row stn-card-group" role="group" aria-label="${escAttr(g.label)}">

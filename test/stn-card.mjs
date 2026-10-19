@@ -310,6 +310,23 @@ async function main() {
         grouped:    groups.length > 1 && groups.every(g =>
                     g.getAttribute('role') === 'group' && !!g.getAttribute('aria-label')),
         iconed:     kids.every(e => /^\p{Extended_Pictographic}/u.test(e.textContent.trim())),
+        // Laid out as a two-column list under a heading, not a wrapping row:
+        // every icon starts on one of two lines down the card, every ↗ → ⬇
+        // ends on one of two, and the words the columns have no room for
+        // ("Search", "Google") are not drawn.
+        list:       (() => {
+          const cols = groups.map(g => getComputedStyle(g).gridTemplateColumns.split(' ').length);
+          const heads = groups.map(g => getComputedStyle(g, '::before').content);
+          const lines = sel => new Set([...acts.querySelectorAll(sel)]
+            .map(e => Math.round(sel === '.pill-end' ? e.getBoundingClientRect().right
+                                                     : e.getBoundingClientRect().left))).size;
+          const long = [...acts.querySelectorAll('.pill-long')];
+          return { twoCols: cols.every(n => n === 2),
+                   headed: heads.every((c, i) => c.includes(groups[i].getAttribute('aria-label'))),
+                   icons: lines('.pill-ic'), marks: lines('.pill-end'),
+                   shortened: long.length > 0 && long.every(e => getComputedStyle(e).display === 'none'),
+                   heads };
+        })(),
         // Two pairs, in this order: the two ways to stand on the ground, then
         // the two Google Earth errands.
         imagery:    (() => {
@@ -365,6 +382,12 @@ async function main() {
     check('in named groups, each its own row — the rules a sighted reader sees',
       rows.grouped);
     check('and every one of them opens with an icon', rows.iconed);
+    check('each group a two-column list under its own name, drawn as a heading',
+      rows.list.twoCols && rows.list.headed, JSON.stringify(rows.list.heads));
+    check('the icons line up down two columns, and so do the ↗ → ⬇ marks',
+      rows.list.icons === 2 && rows.list.marks === 2,
+      `icon columns ${rows.list.icons}, mark columns ${rows.list.marks}`);
+    check('and the words the columns have no room for are not drawn', rows.list.shortened);
     check('the imagery group is the two street views, then the two Google Earths',
       rows.imagery.join(' | ') === 'Google Street View ↗ | Apple Maps ↗ | Google Earth KML ⬇ | Google Earth ↗',
       rows.imagery.join(' | '));

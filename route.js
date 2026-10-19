@@ -60,7 +60,7 @@
 //
 // Exposes: start, sync, tabChanged, stationShown, attach, afterLoad, read,
 //          href, copyLink, newDevice, firstVisit.
-// Requires: core.js (state, TAB_LIST, announce, copyToClipboard), app.js
+// Requires: core.js (state, TAB_LIST, announce, copyToClipboard, pillText), app.js
 //           (switchTab, showStationCard, closeStnCard), map-leader.js, and
 //           health.js (Health.picked, Health.wantStation) — all at call time.
 
@@ -332,18 +332,18 @@ const Route = (() => {
   }
 
   // The station card's 🔗 Copy link. The label says what happened and puts
-  // itself back, as Copy lat, lon's does.
+  // itself back, as Copy lat, lon's does — markup and all (pillText).
   function copyLink(btn, stationId) {
     if (!btn) return;
-    const prev = btn.textContent;
-    const flash = (label, said) => {
-      btn.textContent = label;
+    const prev = btn.innerHTML;
+    const flash = (icon, label, said) => {
+      btn.innerHTML = pillText(icon, label);
       announce(said);
-      setTimeout(() => { if (btn.isConnected) btn.textContent = prev; }, 1600);
+      setTimeout(() => { if (btn.isConnected) btn.innerHTML = prev; }, 1600);
     };
     copyToClipboard(href(stationId)).then(ok => ok
-      ? flash('✓ Copied', 'Copied a link to this station')
-      : flash('✗ Copy failed', 'Could not copy the link to the clipboard'));
+      ? flash('✓', 'Copied', 'Copied a link to this station')
+      : flash('✗', 'Copy failed', 'Could not copy the link to the clipboard'));
   }
 
   return { start, sync, tabChanged, stationShown, attach, afterLoad, read, href, copyLink,

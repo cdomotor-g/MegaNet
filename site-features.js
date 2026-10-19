@@ -10,7 +10,7 @@
 //   SITE_FEATURE_KINDS  the kinds as 0061 and 0067 seed them, and how each is drawn.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, escAttr, announce, fmtKm, kmPerDegLon,
+// Reaches back to core.js for state, esc, escAttr, pillText, announce, fmtKm, kmPerDegLon,
 // KM_PER_DEG_LAT, slug, dlText and BREAKPOINTS; across to app.js for mapNote,
 // repaintStnCard, closeStnCard and rerenderMapLegend; to datastore.js for
 // dbSelect, dbRpc and dbCanWrite; to auth.js for Auth.open; to modal.js for
@@ -641,7 +641,7 @@ const SiteFeatures = (function () {
     return `<button type="button" class="pill mn-sitefeat-pill${on ? ' is-on' : ''}" aria-pressed="${on}"
         onclick="SiteFeatures.${on ? 'stop()' : `start('${escAttr(s.id)}')`}"
         title="${on ? 'Close site features' : 'Map this station’s orifice outlet, pits, benchmarks and gauge boards, and draw its orifice run'}"
-        >📌 ${on ? 'Mapping site features…' : 'Site features'}</button>`;
+        >${pillText('📌', on ? 'Mapping site features…' : 'Site features')}</button>`;
   }
 
   function editorButtonHtml(s) {
