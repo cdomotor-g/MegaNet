@@ -2,8 +2,9 @@
 
 Where a station's ancillary features are — its **orifice outlet**, **inspection
 pits**, **benchmarks**, **gauge boards** and **crest gauge** as points, and its
-**orifice run** (or a cable run) as a line through them — mapped on the Stations
-map and kept in the datastore (`0061`).
+**orifice run** (or a cable run) as a line through them, and the **access track**
+driven to the site — mapped on the Stations map and kept in the datastore
+(`0061`, `0067`).
 
 | Where | What it does |
 |---|---|
@@ -29,11 +30,26 @@ internet, the same call `0060` made for the levels.
 | Other point | point | a dot — **needs a name** |
 | Orifice run | line | blue, in a dark casing |
 | Cable run | line | orange, dashed |
+| Access track | line | green — the way in, ending at the station (`0067`) |
 | Other line | line | white, dotted — **needs a name** |
 
 The list is `meganet.station_feature_kind`: a new kind is an insert there, and
 the app offers it without a release, drawn as a plain dot or line until it is
 given a shape of its own in `site-features.js` (`SITE_FEATURE_KINDS`).
+
+## Access tracks from GPS tracks
+
+Most stations' access tracks came in from a 2021 collection of GPS tracks driven
+to the sites, through `tools/ingest/access_tracks.py`: for each, the last of the
+way in (at most 10 km, the limit for any site feature), ending where the track
+first arrived, named *Access track* and the day it was driven. What a GPS left
+running records besides the way in — jumps across country where it was switched
+off and on, stray fixes, a run up the wrong road and back, the walk round the
+gauge, the second trip over the same road — was taken out, and each row's note
+says which recorded track it came from, what was cut, and whether it stops short
+of the pin. They are ordinary features from there: an editor can move a point,
+trim one, or delete it. One import's rows are found (or removed) by the tag at
+the end of their notes, `[access-tracks:2021-gpx]`.
 
 ## Mapping a station's features
 

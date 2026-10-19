@@ -190,6 +190,9 @@ begin
     exists (select 1 from meganet.station_feature_kind where key = 'orifice_run' and geometry = 'LineString'));
   perform pg_temp.check_that('only the two "other" kinds have to be named',
     (select array_agg(key order by key) = '{other_line,other_point}' from meganet.station_feature_kind where needs_name));
+  perform pg_temp.check_that('…and the access track (0067) is a line, after the cable run and before any other line',
+    exists (select 1 from meganet.station_feature_kind
+             where key = 'access_track' and geometry = 'LineString' and ord > 120 and ord < 190));
 end
 $$;
 

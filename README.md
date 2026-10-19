@@ -95,8 +95,9 @@ MegaNet/
 ├── map-move-pin.js         ← MapMovePin — drag one station's pin to where the
 │                             station is, and save the coordinates
 ├── site-features.js        ← SiteFeatures — a station's orifice outlet, pits,
-│                             benchmarks, gauge boards and orifice run: drawn on the
-│                             map, listed on its card, placed and drawn (0061)
+│                             benchmarks, gauge boards, orifice run and access
+│                             tracks: drawn on the map, listed on its card, placed
+│                             and drawn (0061, 0067)
 ├── station-trail.js        ← StationTrail — the stations looked at this session:
 │                             a pill in the map's top row that brings a closed
 │                             card back and goes back to any of them
@@ -3059,7 +3060,7 @@ Side panel or modal showing full station record:
 - **Equipment**, for signed-in editors: what the station's register says is
   fitted there, once an administrator has approved it (`photo-review.js`)
 - **Site features**, for signed-in editors: where its orifice outlet, pits,
-  benchmarks, gauge boards and orifice run are, a row each that shows its
+  benchmarks, gauge boards, orifice run and access tracks are, a row each that shows its
   feature on the map, and the **📌 Site features** pill that maps them
   (`site-features.js`, `0061`; see §30)
 
@@ -5026,8 +5027,9 @@ way the levels behind them are (`0060`): where a benchmark is, is not for the
 open internet.
 
 **Points and lines.** The orifice outlet, inspection pits, benchmarks, gauge
-boards and crest gauges are points; the orifice run (and a cable run) is a line;
-an *Other point* or *Other line* is anything else worth finding again, named.
+boards and crest gauges are points; the orifice run (and a cable run) is a line,
+and so is the **access track** (`0067`), the way in, ending at the station; an
+*Other point* or *Other line* is anything else worth finding again, named.
 The kinds are a vocabulary in the database (`meganet.station_feature_kind`), so
 a new one is an insert. Each is drawn as the shape a plan uses for it — a ringed
 dot the outlet, a crossed square a pit, a bullseye a benchmark, a staff a board
@@ -5056,6 +5058,14 @@ one shape (GeoJSON, longitude first, seven places), a kind to its shape, and a
 feature to within 10 km of its station's pin. Delete is soft. *⬇ GeoJSON* takes
 a station's features, with the station, to QGIS or Google Earth, named
 `floodnet-site-features-…` and carrying nobody's address.
+
+**Access tracks from the GPS.** The first access tracks came from twenty years
+of GPS tracks driven to the sites (a 2021 collection, as a Google Earth KML),
+through `tools/ingest/access_tracks.py`: the last of the way into each station,
+with the jumps where the GPS was off, the runs up the wrong road, the walk round
+the gauge and the repeat trips taken out. Each one's note says which recorded
+track it came from and what was cut; they are editors-only like the rest, and
+neither the KML nor anything made from it is in this repository.
 
 From zoom 16 the map draws the features of the stations in view (🗺️ Map
 display, *Site features*); the card lists a station's, each row showing its

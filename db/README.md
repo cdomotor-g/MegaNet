@@ -280,7 +280,7 @@ its cache at all (`PGRST002`).
 | `meganet.station_level_point`, `meganet.station_level_offset` | What a station holds once an administrator adopts it from a survey (`0060`): its benchmarks (one primary), sensor reference (CTR), cease to flow, gauge boards and other surveyed points — each with its level in the survey's datum, on the gauge (`rl_lgh`) and in AHD where known, current until a later adoption supersedes it (the old row stays) — and each change made to the logger's offset. Written only by `meganet.level_survey_apply()`. **Editors only**. |
 | `meganet.level_survey_apply(uuid, jsonb, text)`, `meganet.level_survey_return(uuid, text)`, `meganet.level_survey_decision` | The administrator's decision (`0060`). `apply` takes the changes ticked — a gauge zero (a new `station_gauge_survey` row from the survey's date, the open one closed the day before, never behind a later one; the station's stamp moves so an open editor reloads), points, offset corrections — in one transaction; `return` sends a survey back with why. **Administrators only** (`42501`, detail `administrator`). Every decision, with each change's before and after, is a row of `level_survey_decision`: station history (`0056`) logs the station's own columns, and gauge zero is not one. |
 | `meganet.level_num(jsonb)` | A reading as a phone sent it — a JSON number, or a string holding one — as numeric, else null (`0060`). Internal. |
-| `meganet.station_feature_kind` | What a station's site feature can be (`0061`): the orifice outlet, inspection pit, benchmark, gauge board, crest gauge and *other point* as `Point`, the orifice run, cable run and *other line* as `LineString`, whether it has to be named (the two *other*s), its order and a sentence. A new kind is an insert. Public, like every vocabulary. |
+| `meganet.station_feature_kind` | What a station's site feature can be (`0061`): the orifice outlet, inspection pit, benchmark, gauge board, crest gauge and *other point* as `Point`, the orifice run, cable run, access track (`0067`) and *other line* as `LineString`, whether it has to be named (the two *other*s), its order and a sentence. A new kind is an insert. Public, like every vocabulary. |
 | `meganet.station_feature` | Where a station's ancillary features are (`0061`): station, kind, name, note, `geom` — GeoJSON, longitude first, WGS84, seven places, nothing but `type` and `coordinates` (a check over `station_feature_geom_problem()`) — `placed` (`map`, `gps`, `typed`, `mixed`) and the GPS's `accuracy_m`, who added and last changed it, and a soft delete. The kind and the shape are tied by a foreign key over a generated `geom_type`, so a benchmark cannot be a line however it is written; two live features of one kind at a station do not share a name. **Editors only** (RLS hides tombstones); nothing for `anon`. See **Site features**, below. |
 | `meganet.a2plan_site` | What a repeater site needs before it carries ALERT2, for the ALERT2 Transition Plan (`0065`): `fit` (a fit-out only), `retrofit` (power, antenna, enclosure, earthing, access) or `rebuild` (the structure), one row a station, who set it and when; no row is "not assessed". **Administrators only**, every one seeing the same answer; nothing for `anon` or members. |
 | `meganet.a2plan_scenario` | A saved ALERT2 Transition Plan scenario (`0065`): the card's settings (a JSON object of at most 64 KB the app checks again on load), a name, notes, `shared`. **Private to its author until shared, then every administrator's to see** (the select policy and `a2plan_read()` say the same); only its author changes or removes it. Groups, when they come, are a group id here and a membership test in that one policy. |
@@ -1979,8 +1979,11 @@ editor, a second editor, an administrator, a stranger and nobody signed in.
 
 `0061` keeps where a station's ancillary features are — the orifice outlet, the
 inspection pits, the benchmarks, the gauge boards, the crest gauge, and the
-orifice run as a line through them — mapped on the Stations map
-(`site-features.js`). Any editor maps them; `0060`'s levels are where the
+orifice run as a line through them, and (`0067`) the access track driven to
+the site — mapped on the Stations map (`site-features.js`). Any editor maps
+them; the first access tracks came in from twenty years of GPS tracks, through
+`tools/ingest/access_tracks.py`, each row's note saying which track and what was
+cut from it. `0060`'s levels are where the
 *levels* of the same benchmarks and boards go, by an administrator, and the two
 meet on the name.
 

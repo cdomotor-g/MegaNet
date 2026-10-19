@@ -5015,7 +5015,7 @@ function mapDisplayControlsHtml() {
          photos because they are the same ground at the same scale, and
          editors-only for the same reason. -->
     <label class="filter-check"
-           title="Each station's orifice outlet, inspection pits, benchmarks, gauge boards and orifice run, where an editor has mapped them. Signed-in editors only, from zoom 16 in. 📌 Site features on a station's card maps them.">
+           title="Each station's orifice outlet, inspection pits, benchmarks, gauge boards, orifice run and access tracks, where they have been mapped. Signed-in editors only, from zoom 16 in. 📌 Site features on a station's card maps them.">
       <input type="checkbox" ${state.mapSiteFeatures ? 'checked' : ''}
              onchange="SiteFeatures.setEnabled(this.checked)">
       Site features (📌)

@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-19** (revision 166 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-19** (revision 167 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -806,6 +806,17 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 167 — 2026-10-19: 🛣️ Access tracks from twenty years of GPS tracks
+
+The owner, with a Google Earth KML of the 2021 GPX collection (1,058 tracks, organised into *renamed*, *split* and *unmatched* folders, plus the organiser's station pins): *"These access tracks should be ingested into FloodNet … make sure we don't get weird artifacts of poorly started and stopped GPS tracking … big long lines that stretch line of sight across the map … only bring in tracks that make sense"*, and a report of what was left out and why. Nothing opened or closed.
+
+- **`0067`**: the access track as a kind of site feature (`access_track`, a line, ord 130) — an insert into 0061's vocabulary, schema version 67. Applied live; `core.js` `DB_SCHEMA_VERSION` 67. Editors-only like every site feature: a route across somebody's land to a locked gate.
+- **`tools/ingest/access_tracks.py`**: the cleaner. Per track and station, the last of the way in (at most 10 km, 0061's limit), ending at first arrival. Straight segments over 800 m near a station are put to Queensland Roads and Tracks: one running along a mapped road (near it *and* the same way — in a town every line is near a street) stays; one that does not is a jump and the track is cut there. Spurs, laps and earlier visits erased; the drive somewhere else before the final approach trimmed; repeats of the same road kept once (longest first). Unnumbered tracks tied to a station only by name *and* by going there. Nothing it reads or writes is in the repository — `--out` must be outside the checkout.
+- **Loaded**: 813 lines at 743 stations (693 from numbered tracks, 120 from unnumbered ones), tagged `[access-tracks:2021-gpx]` in each note, through the chunked route `load.py` uses (a secret-gated stage function, posted by `apply_chunks.py`, one sync call). Left out: 177 repeats, 44 unnumbered tracks that go to no station of their name, 10 that never reach their station's pin (Palen Creek AL's pin is at longitude 142.7°, ~980 km west of its track — likely 152.7°), 8 too short, 3 that reach the site only by a jump, 2 Garmin demo tracks abroad, 1 for a station not in Flood-Net (Redcliffe, 40958).
+- `site-features.js` draws it green; `apply_chunks.py` reads `DB_ORIGIN` now that `DB_URL` is worked out in the browser. README §30 and the file tree, `docs/site-features.md`, `db/README.md`, `tools/README.md`, What's new 48, the version stamp `20261019e`.
+
+**Checks:** `npm run sitefeatures` (the kinds read out of 0061 *and* 0067, in the vocabulary's order), `tools/check_station_features.sql` (+1: the access track is a line between the cable run and *Other line*), and the cheap five. On the live database: 813 rows, all `gps`, 2–344 points, none past 10 km, no name repeated at a station.
 
 ### Revision 166 — 2026-10-19: 📡 Antenna gain shown in dBd
 

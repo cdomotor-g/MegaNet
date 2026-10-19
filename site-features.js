@@ -7,7 +7,7 @@
 //                       for a signed-in editor from zoom 16, listed on the
 //                       station card, and placed, drawn, moved and deleted one
 //                       station at a time in the 📌 Site features mode.
-//   SITE_FEATURE_KINDS  the kinds as 0061 seeds them, and how each is drawn.
+//   SITE_FEATURE_KINDS  the kinds as 0061 and 0067 seed them, and how each is drawn.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, announce, fmtKm, kmPerDegLon,
@@ -73,11 +73,12 @@
 // station and the draft, and attach() puts them back. A line clicked out over
 // ten minutes is not lost to a filter that re-rendered the tab.
 
-// The kinds 0061 seeds, in its order, with the shape and colour each is drawn
-// in. The first six columns are the vocabulary's own, word for word — `npm run
-// sitefeatures` holds them to the migration — and the database's copy is read
-// over this one when it answers, so a kind added there by an insert is offered
-// here, drawn plainly, without a release.
+// The kinds 0061 seeds and the access track 0067 adds, in the vocabulary's
+// order, with the shape and colour each is drawn in. The first six columns are
+// the vocabulary's own, word for word — `npm run sitefeatures` holds them to
+// the migrations — and the database's copy is read over this one when it
+// answers, so a kind added there by an insert is offered here, drawn plainly,
+// without a release.
 const SITE_FEATURE_KINDS = [
   { key: 'orifice_outlet', label: 'Orifice outlet', geometry: 'Point', needs_name: false, ord: 10,
     note: 'Where the orifice line ends in the stream — the point a bubbler reads the water at.',
@@ -103,6 +104,10 @@ const SITE_FEATURE_KINDS = [
   { key: 'cable_run', label: 'Cable run', geometry: 'LineString', needs_name: false, ord: 120,
     note: 'A sensor\'s cable or a conduit, from the shelter to the sensor, through its pits.',
     colour: '#ff9100', dash: '9,6' },
+  // 0067's: the way in, from the GPS tracks driven to the sites.
+  { key: 'access_track', label: 'Access track', geometry: 'LineString', needs_name: false, ord: 130,
+    note: 'The way in to the site — the road or track driven to it, ending at the station.',
+    colour: '#76ff03', dash: null },
   { key: 'other_line', label: 'Other line', geometry: 'LineString', needs_name: true, ord: 190,
     note: 'Any other run worth finding again — an access track, a fence, a drain — named.',
     colour: '#f5f5f5', dash: '2,7' },
@@ -521,7 +526,7 @@ const SiteFeatures = (function () {
   function noteHtml() {
     switch (note.kind) {
       case 'off':
-        return 'A station’s orifice outlet, pits, benchmarks, gauge boards and orifice run, where an editor has mapped them. 📌 Site features on a station’s card maps them.';
+        return 'A station’s orifice outlet, pits, benchmarks, gauge boards, orifice run and access tracks, where they have been mapped. 📌 Site features on a station’s card maps them.';
       case 'signed-out':
         return 'Site features are for signed-in editors — sign in to see where they are.';
       case 'zoom':

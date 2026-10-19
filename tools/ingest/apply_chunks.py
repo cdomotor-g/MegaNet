@@ -19,7 +19,7 @@ sync function's count assertion and the sync would refuse — that assertion
 is the backstop; this file's ledger is the convenience.
 
 The URL and anon key default to the app's own, read out of core.js — the
-same public values every browser uses; the write authority comes from the
+same public values every browser uses (DB_ORIGIN's /rest/v1); the write authority comes from the
 per-emission secret in the manifest, not from the key. Standard library only.
 """
 
@@ -40,15 +40,17 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 
 
 def app_defaults():
-    """DB_URL and DB_ANON_KEY as core.js states them."""
+    """The project's REST base and DB_ANON_KEY as core.js states them. DB_URL
+    there is worked out in the browser (the Worker's proxy or the project), so
+    this reads DB_ORIGIN, the project, and adds /rest/v1 as core.js does."""
     with open(os.path.join(REPO, 'core.js'), encoding='utf-8') as f:
         src = f.read()
-    url = re.search(r"const DB_URL\s*=\s*'([^']+)'", src)
+    origin = re.search(r"const DB_ORIGIN\s*=\s*'([^']+)'", src)
     key = re.search(r"const DB_ANON_KEY\s*=\s*'([^']+)'", src)
-    if not url or not key:
-        raise SystemExit('could not read DB_URL / DB_ANON_KEY out of core.js '
+    if not origin or not key:
+        raise SystemExit('could not read DB_ORIGIN / DB_ANON_KEY out of core.js '
                          '— pass --url and --key')
-    return url.group(1), key.group(1)
+    return origin.group(1) + '/rest/v1', key.group(1)
 
 
 def post(url, key, profile, payload, cafile, timeout):

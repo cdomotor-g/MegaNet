@@ -3023,7 +3023,9 @@ const DB_SCHEMA = 'meganet';
 // administrators only; a scenario private to its author until shared.
 // 66: an administrator's notifications (0066) — the devices turned on, and
 // what the Worker's sender asks and reports. Bumped with the file.
-const DB_SCHEMA_VERSION = 66;
+// 67: the access track, a kind of site feature (0067) — the GPS tracks driven
+// to the sites, loaded as the last of the way into each. Bumped with the file.
+const DB_SCHEMA_VERSION = 67;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

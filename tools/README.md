@@ -155,6 +155,36 @@ silent: the hub file is 5,931 rings for eight hubs and all but ~660 of them are
 islets under a square kilometre, which the drawn copy leaves out and the
 assignment still uses.
 
+## Access tracks from GPS tracks (0067)
+
+`ingest/access_tracks.py` reads a Google Earth KML of GPS tracks driven to
+stations — the 2021 collection, organised into folders of tracks named for a
+station's number, pieces cut out of longer drives, and tracks nobody had tied
+to a station — and keeps, for each, the one line that is a way in: ending at
+the station, starting no more than 10 km out (0061's limit), and with the GPS's
+day taken out of it. Points outside Australia go; so do stray fixes, straight
+lines drawn across country where the receiver was off (any straight segment
+over 800 m near a station is put to Queensland Roads and Tracks, and one that
+follows no mapped road or track is a gap), runs up a side road and back, the
+drive somewhere else before the last approach, the walk round the gauge, and
+the second and third trip over the same road. An unmatched track is tied to a
+station only when its name is the station's and it goes there.
+
+```bash
+python3 tools/ingest/access_tracks.py ~/Downloads/tracks.kml --out ~/access-tracks
+# then, after 0067: psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f ~/access-tracks/load.sql
+```
+
+`--out` has to be outside the checkout: the lines are editors-only in the
+database (an access track is a route across somebody's land to a locked gate),
+so neither the KML nor anything made from it belongs in this public repository.
+It gets `load.sql` (one insert, refusing to run twice), `features.json`,
+`report.md` (every track and what became of it, and why) and `roads.json` (QRT's
+answers, so a rerun asks only about what is new). Every row's note ends in the
+import's tag, `[access-tracks:2021-gpx]` by default, which is how to find or
+remove one import's rows. The thresholds are constants at the top of the file,
+each with the reason for its value.
+
 ## The Service Level Specification (#180)
 
 `ingest/sls.py` reads the six station schedules out of each of the Bureau's

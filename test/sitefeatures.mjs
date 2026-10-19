@@ -1,6 +1,6 @@
 // A station's site features (0061, site-features.js), driven in a real browser.
 //
-//   1. The kinds the panel offers are the kinds 0061 seeds — read out of the
+//   1. The kinds the panel offers are the kinds 0061 and 0067 seed — read out of the
 //      migration (lib/migration.mjs), not copied, so a kind added there and
 //      not here fails here.
 //   2. Signed out there is nothing: no pill, no card section, not a request.
@@ -59,8 +59,11 @@ const J = v => JSON.stringify(v);
 
 const STN = 'abercorn_al';          // a field station on its own, with a pin
 const OTHER = 'abbieglassie_al';    // another, far away
+// 0061's kinds and the access track 0067 adds, in the vocabulary's order.
 const SQL = fs.readFileSync(repo('db', 'migrations', '0061_station_features.sql'), 'utf8');
-const KINDS = seedRows(SQL, 'station_feature_kind');
+const KINDS = [...seedRows(SQL, 'station_feature_kind'),
+               ...seedRows(fs.readFileSync(repo('db', 'migrations', '0067_access_tracks.sql'), 'utf8'), 'station_feature_kind')]
+  .sort((a, b) => a.ord - b.ord);
 
 const decimals = n => (String(n).split('.')[1] || '').length;
 
@@ -183,7 +186,7 @@ async function main() {
 
   try {
     // ── 1. The vocabulary ──────────────────────────────────────────────────
-    log('\nThe kinds offered are the kinds 0061 seeds\n');
+    log('\nThe kinds offered are the kinds 0061 and 0067 seed\n');
     const db = fakeDatabase();
     const outlet = db.seed({ station_id: STN, kind: 'orifice_outlet', name: 'Outlet',
                              geom: { type: 'Point', coordinates: [151.13105, -25.12975] } });

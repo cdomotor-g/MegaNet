@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 48, date: '2026-10-19', items: [
+      '<strong>🛣️ Access tracks.</strong> 813 GPS tracks driven to the sites over twenty years are now the '
+        + '<em>Access track</em> of 743 stations: the last of the way in, up to 10 km out, ending at the station, with '
+        + 'the GPS\'s jumps across country, wrong turns, walks round the gauge and repeat trips taken out. Signed-in '
+        + 'editors see them with a station\'s other site features — listed on its card (a row shows the whole track on '
+        + 'the map), and drawn in green on the map from zoom 16. Each one\'s note says which recorded track it came from.',
+    ] },
     { n: 47, date: '2026-10-19', items: [
       '<strong>📡 Antenna gain in dBd.</strong> The link budget, the Repeater site finder, Polar radio coverage and the ACMA licence card now give '
         + 'antenna gain in dBd — the field stations\' CLV3 collinear reads as the 3 dB antenna it is sold as. Type gains in '
