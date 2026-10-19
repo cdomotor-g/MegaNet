@@ -136,9 +136,14 @@ begin
     (select value::integer from meganet.app_meta where key = 'schema_version') >= 41);
   perform pg_temp.check_that('Gatton (40444) has its floods — the extract is loaded',
     jsonb_array_length(pg_temp.floods('gatton')) = 5, pg_temp.floods('gatton')::text);
-  perform pg_temp.check_that('no station in the register borrows yet — no document gains a key',
-    not exists (select 1 from meganet.station_json
-                 where (doc ? 'flood_peaks_from' or doc ? 'flood_peaks_gauge') and id not like '\_check\_%'));
+  -- The register is the live one, where a proposal has borrowed Gatton's
+  -- floods since its 8 October 2026 snapshot: a document names a lender only where its
+  -- station borrows, and a gauge only beside the lender.
+  perform pg_temp.check_that('a document in the register gains the keys only where its station borrows',
+    not exists (select 1 from meganet.station_json j join meganet.station s on s.id = j.id
+                 where j.id not like '\_check\_%'
+                   and ((j.doc ? 'flood_peaks_from') <> (s.flood_peaks_from is not null)
+                        or (j.doc ? 'flood_peaks_gauge' and s.flood_peaks_from is null))));
   perform pg_temp.check_that('a station with no gauge has no floods',
     jsonb_array_length(pg_temp.floods('_check_fpf')) = 0);
 end

@@ -139,8 +139,13 @@ begin
   perform pg_temp.check_that('meganet.station.tower_height exists',
     exists (select 1 from information_schema.columns
              where table_schema = 'meganet' and table_name = 'station' and column_name = 'tower_height'));
-  perform pg_temp.check_that('no station in the loaded register carries a height yet — the document gains nothing',
-    not exists (select 1 from meganet.station_json where doc ? 'tower_height' and id not like '\_check\_%'));
+  -- The loaded register is the live one, which has carried a recorded height
+  -- since its 8 October 2026 snapshot: the document carries one exactly where one is.
+  perform pg_temp.check_that('in the loaded register the document carries a height only where one is recorded',
+    not exists (select 1 from meganet.station_json j join meganet.station s on s.id = j.id
+                 where j.id not like '\_check\_%'
+                   and ((j.doc ? 'tower_height') <> (s.tower_height is not null)
+                        or (j.doc -> 'tower_height') <> to_jsonb(s.tower_height))));
   perform pg_temp.check_that('a station with none recorded has no tower_height key',
     not (pg_temp.doc_of('_check_tower_a') ? 'tower_height'));
 end

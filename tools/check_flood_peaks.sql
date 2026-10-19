@@ -189,13 +189,18 @@ begin
       where station_id = 'little_nerang_dam_al' and peak_date = '2017-03-30'
         and time_utc = '23:47'));
 
-  perform pg_temp.check_that('no station outside the extract, and no deleted one, carries flood_peaks',
+  -- …save one taking a live station's floods (0041), whose gauge is the
+  -- one in the extract — as the live register's Proposed Gatton Auto takes
+  -- Gatton's (40444).
+  perform pg_temp.check_that('no station outside the extract, and no deleted one, carries flood_peaks — unless it takes them from one inside',
     not exists (select 1 from meganet.station_json j
                   join meganet.station s on s.id = j.id
+                  left join meganet.station d on d.id = s.flood_peaks_from and d.deleted_at is null
                  where j.doc ? 'flood_peaks'
                    and not exists (select 1 from meganet.flood_peak_gauge g
                                     where meganet.bureau_key(g.bureau_number)
-                                        = meganet.bureau_key(s.station_number))));
+                                          in (meganet.bureau_key(s.station_number),
+                                              meganet.bureau_key(d.station_number)))));
 end
 $$;
 

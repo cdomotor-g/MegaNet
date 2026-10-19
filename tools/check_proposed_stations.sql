@@ -149,12 +149,19 @@ begin
     (select relrowsecurity from pg_catalog.pg_class where oid = 'meganet.station_type'::regclass),
     'db/README.md: no table without RLS, in the same file');
 
-  perform pg_temp.check_that('every station already here is established: none is proposed',
-    not exists (select 1 from meganet.station where proposed and id not like '\_check\_%'));
+  -- The register stations.json loads is the live one, which has had a real
+  -- proposal and a typed station in it since its 8 October 2026 snapshot — so these are
+  -- the rules every station here keeps, not a claim that none uses them.
+  perform pg_temp.check_that('every proposal already here is a whole one: a type, a year and a place',
+    not exists (select 1 from meganet.station
+                 where proposed and id not like '\_check\_%'
+                   and (station_type is null or proposed_year is null or lat is null or lon is null)));
 
-  perform pg_temp.check_that('and the station document gained nothing: no station carries the three keys',
-    not exists (select 1 from meganet.station_json
-                 where doc ?| array['proposed', 'station_type', 'proposed_year']));
+  perform pg_temp.check_that('and the station document carries the three keys only where the station has them',
+    not exists (select 1 from meganet.station_json j join meganet.station s on s.id = j.id
+                 where (j.doc ? 'proposed') <> s.proposed
+                    or (j.doc ? 'station_type') <> (s.station_type is not null)
+                    or (j.doc ? 'proposed_year') <> (s.proposed_year is not null)));
 
   if exists (select 1 from pg_catalog.pg_roles where rolname = 'authenticator') then
     perform pg_temp.check_that('the vocabulary is anybody''s to read, and nobody''s in a browser to write',

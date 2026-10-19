@@ -304,7 +304,7 @@ async function browserHalf() {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
     await applyNetworkPolicy(page, server.origin);
-    await installPhotoProject(page, db, store);
+    await installPhotoProject(page, db, store, { placed: true });
     await installStorage(page, store);
     page.on('pageerror', e => errors.push(e.stack || e.message));
     page.on('console', m => {

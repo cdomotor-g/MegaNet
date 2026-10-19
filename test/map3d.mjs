@@ -801,7 +801,13 @@ ok('minutes after 3-D opened, the hint has folded by itself to its "?", which sa
    H.inHost && H.folded && !H.shown && H.q && H.q.shown && H.q.expanded === 'false' && H.q.name === 'How to move the view',
    JSON.stringify({ inHost: H.inHost, folded: H.folded, shown: H.shown, q: H.q }));
 await page.click('#map3d-hud-q');
-await page.waitForTimeout(450);   // the fade in (.3 s)
+// The fade in is .3 s, but SwiftShader drawing the terrain can hold the page's
+// frames back past a fixed wait (twice in CI, October 2026): wait for the hint
+// itself, well inside the 12 s it stays up.
+await page.waitForFunction(() => {
+  const hud = document.getElementById('map3d-hud');
+  return !!hud && getComputedStyle(hud).visibility !== 'hidden' && Number(getComputedStyle(hud).opacity) > 0.5;
+}, null, { timeout: 3000 }).catch(() => {});
 H = await hudNow();
 ok('…and the "?" brings it back', H.shown && !H.folded && H.q.expanded === 'true', JSON.stringify({ shown: H.shown, q: H.q }));
 ok('…saying how the view is moved in the twin\'s own words, and where the compass and tilt buttons are',

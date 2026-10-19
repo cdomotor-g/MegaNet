@@ -1098,7 +1098,11 @@ async function browserHalf(FS) {
     section('Inside the Stations map');
     await page.evaluate(() => { DigitalTwin.floodAt('major_m'); switchTab('stations'); });
     await page.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
-    await page.evaluate(() => { state.selectedId = 'gatton'; state.map.setView([-27.555, 152.275], 18, { animate: false }); });
+    // Over Gatton where the register has it, not where it once stood: moved
+    // 233 m by the 8 October 2026 snapshot it was out of the offer's reach, and
+    // the offer went to the station nearest that old spot — Proposed Gatton
+    // Auto, whose borrowed floods made twelve marks of seven.
+    await page.evaluate(() => { const g = state.data.stations.find(x => x.id === 'gatton'); state.selectedId = 'gatton'; state.map.setView([g.lat, g.lon], 18, { animate: false }); });
     // Zoom 18 offers the twin; pressing the offer hands the map over.
     await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
     await page.click('#map-twin-offer .map-twin-offer-open');
@@ -1198,7 +1202,7 @@ async function browserHalf(FS) {
       switchTab('stations');
     });
     await hp.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
-    await hp.evaluate(() => { state.selectedId = 'gatton'; state.map.setView([-27.555, 152.275], 18, { animate: false }); });
+    await hp.evaluate(() => { const g = state.data.stations.find(x => x.id === 'gatton'); state.selectedId = 'gatton'; state.map.setView([g.lat, g.lon], 18, { animate: false }); });
     await hp.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
     await hp.tap('#map-twin-offer .map-twin-offer-open');
     await hp.waitForFunction(() => {

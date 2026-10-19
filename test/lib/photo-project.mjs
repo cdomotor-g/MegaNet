@@ -19,12 +19,40 @@ import { repo } from './paths.mjs';
 
 const J = v => JSON.stringify(v);
 
-export const STATIONS = JSON.parse(fs.readFileSync(repo('stations.json'), 'utf8')).stations
-  .filter(s => s.lat != null && s.lon != null);
 const metres = (a, b) => Math.hypot((b.lat - a.lat) * 110574, (b.lon - a.lon) * 111320 * Math.cos(a.lat * Math.PI / 180));
-export function nearestStation(p, within = 1000) {
+
+// The stations round Gatton as they stood when the fixture photos were placed
+// there. Which station a photo is filed under, and how far away, is a fact
+// about these — and stations.json follows the live register. A person corrects
+// a position in the editor (Gatton moved 67 m and Gatton AL 221 m on 27–28
+// September 2026, which filed the SW photo under Gatton AL, and Gatton again
+// by the 8 October snapshot), and a station added since takes the photos by
+// being nearer (Proposed Gatton Auto, proposed on 29 September 68 m from
+// Gatton, filed them under itself). So the checks written round those photos
+// pin the three, and leave out any station within two kilometres of Gatton
+// that was not there — in what they match against here and in the
+// stations.json the page is served (installPhotoProject's `placed`, and
+// photos.mjs's own) — rather than chasing the survey. A check written against
+// the register as it is now (camera.mjs) takes it as it is.
+export const PINNED = {
+  gatton:    { lat: -27.555,    lon: 152.275 },
+  gatton_al: { lat: -27.556389, lon: 152.273056 },
+  gatton_tm: { lat: -27.55,     lon: 152.26861 },
+};
+const AROUND_GATTON = new Set([...Object.keys(PINNED), 'gatton_2', 'gatton_lvrc_enviromon_basestation']);
+export function asPlaced(stations) {
+  return stations
+    .filter(s => AROUND_GATTON.has(s.id) || s.lat == null || s.lon == null || metres(PINNED.gatton, s) > 2000)
+    .map(s => PINNED[s.id] ? { ...s, ...PINNED[s.id] } : s);
+}
+const DOC = JSON.parse(fs.readFileSync(repo('stations.json'), 'utf8'));
+const PLACED_DOC = { ...DOC, stations: asPlaced(DOC.stations) };
+const located = list => list.filter(s => s.lat != null && s.lon != null);
+export const STATIONS = located(DOC.stations);
+const PLACED = located(PLACED_DOC.stations);
+export function nearestStation(p, within = 1000, stations = STATIONS) {
   let best = null, bd = Infinity;
-  for (const s of STATIONS) {
+  for (const s of stations) {
     if (Math.abs(s.lat - p.lat) > 0.05 || Math.abs(s.lon - p.lon) > 0.06) continue;
     const d = metres(p, s);
     if (d <= within && d < bd) { best = s; bd = d; }
@@ -119,7 +147,14 @@ export function photoProject(seed = {}) {
 const nextId = (db, block) => `00000000-0000-4000-${block}-${String(++db.seq).padStart(12, '0')}`;
 const now = () => new Date().toISOString();
 
-export function installPhotoProject(page, db, store) {
+// `placed`: the page and the fake both see the Gatton stations as the fixture
+// photos were placed round them (asPlaced, above), not the register as it is.
+export async function installPhotoProject(page, db, store, { placed = false } = {}) {
+  const stations = placed ? PLACED : STATIONS;
+  if (placed) {
+    await page.route('**/stations.json', route =>
+      route.fulfill({ status: 200, contentType: 'application/json; charset=utf-8', body: J(PLACED_DOC) }));
+  }
   return page.route('**://*.supabase.co/rest/v1/**', async route => {
     const req = route.request();
     const url = new URL(req.url());
@@ -139,7 +174,7 @@ export function installPhotoProject(page, db, store) {
         if (dup) return json(409, { code: '23505', message: 'this photo is already in MegaNet', details: dup.id, hint: null });
         let station_id = null, station_auto = false;
         if ('station_id' in p) station_id = p.station_id;
-        else if (p.lat != null) { const s = nearestStation(p); if (s) { station_id = s.id; station_auto = true; } }
+        else if (p.lat != null) { const s = nearestStation(p, 1000, stations); if (s) { station_id = s.id; station_auto = true; } }
         const at = now();
         const row = Object.assign({
           id: nextId(db, '8000'), storage_bucket: 'field-photos', title: '', caption: '', thumb_path: null,

@@ -218,6 +218,11 @@ async function main() {
     log('\n2. Signing in with a password\n');
     await page.click('#btn-auth');
     await page.waitForSelector('#au-password');
+    // The panel opens before the providers are asked (/settings, then each
+    // one's /authorize) and draws their buttons when they answer. Wait for
+    // that, or the read below races it and finds none on a slow runner; a
+    // panel that never offers one still fails the check, with what it showed.
+    await page.waitForSelector('.au-provider', { timeout: 8000 }).catch(() => {});
     const form = await page.evaluate(() => ({
       email: document.getElementById('au-email')?.getAttribute('autocomplete'),
       pw: document.getElementById('au-password')?.getAttribute('autocomplete'),

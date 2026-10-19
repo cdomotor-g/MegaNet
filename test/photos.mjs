@@ -71,7 +71,7 @@ import { applyNetworkPolicy } from './lib/network.mjs';
 import { auditHandlers } from './lib/controls.mjs';
 import { answer } from './lib/ask.mjs';
 import { storageStore, installStorage, fileOf } from './lib/storage.mjs';
-import { serveObjects } from './lib/photo-project.mjs';
+import { serveObjects, asPlaced, PINNED } from './lib/photo-project.mjs';
 import { seedRows, attachmentsSql } from './lib/migration.mjs';
 import { hillyTerrariumPng } from './lib/terrarium.mjs';
 import { repo } from './lib/paths.mjs';
@@ -468,20 +468,11 @@ const HEIC_AT = { lat: -27.5551, lon: 152.2756 };
 const HEIC_QUADS = [['top left', 40, 30, [220, 40, 40]], ['top right', 120, 30, [40, 180, 60]],
                     ['bottom left', 40, 90, [40, 80, 220]], ['bottom right', 120, 90, [240, 210, 40]]];
 
-// Where the three Gatton stations stood when these photos were placed round
-// them. Which station a photo is filed under, and how far away, is a fact about
-// these positions — and stations.json follows the database, where a person
-// corrects a station's position in the editor (Gatton moved 67 m and Gatton AL
-// 221 m on 27–28 September 2026, which filed the SW photo under Gatton AL). So the
-// check pins them, in what it reads here and in the file the page is served,
-// rather than chasing the survey.
-const PINNED = {
-  gatton:    { lat: -27.555,    lon: 152.275 },
-  gatton_al: { lat: -27.556389, lon: 152.273056 },
-  gatton_tm: { lat: -27.55,     lon: 152.26861 },
-};
+// The Gatton stations where these photos were placed round them, and only
+// those (asPlaced and PINNED, photo-project.mjs), in what this reads and in the
+// file the page is served.
 const DOC = JSON.parse(fs.readFileSync(repo('stations.json'), 'utf8'));
-for (const s of DOC.stations) if (PINNED[s.id]) Object.assign(s, PINNED[s.id]);
+DOC.stations = asPlaced(DOC.stations);
 const STATIONS = DOC.stations.filter(s => s.lat != null && s.lon != null);
 const GATTON = STATIONS.find(s => s.id === 'gatton');
 const metres = (a, b) => Math.hypot((b.lat - a.lat) * 110574, (b.lon - a.lon) * 111320 * Math.cos(a.lat * Math.PI / 180));
