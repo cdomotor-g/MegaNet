@@ -1,7 +1,7 @@
 // What a station's pin says beyond its role, and whose stations the map draws
 // (map-symbols.js): a triangle for a river height gauge, grey for one read by
-// hand, the Bureau's purple and pink outlines for its forecast and information
-// locations — and the Filters' Owner and Gauge blocks that pick out exactly
+// hand, black for a TM station, the Bureau's purple and pink outlines for its
+// forecast and information locations — and the Filters' Owner and Gauge blocks that pick out exactly
 // those pins, and Map display's owner choice that takes the others away.
 //
 // What is worth asserting, in order of what would actually go wrong:
@@ -12,7 +12,9 @@
 //     Node: every station with a water level on record is a triangle and every
 //     one with none is a circle; every station either SLS calls a forecast
 //     location is outlined purple, every information location pink; every
-//     gauge the SLS calls Manual is grey.
+//     gauge the SLS calls Manual is grey; every TM station — a logger on its
+//     Telemetry field, or TM on the end of its name — is black, and nothing
+//     else is.
 //   * The canvas actually draws them. A pin that carries `mnShape: 'triangle'`
 //     and is painted as a circle passes every assertion about options, so the
 //     canvas is read back: inside a triangle pin's circumcircle but outside the
@@ -28,7 +30,7 @@
 //     but theirs, says how many it is not drawing, leaves the list alone, and
 //     is gone after a reload — it takes stations off the map, and a map that
 //     opens missing most of the network reads as data that has gone.
-//   * The three switches are remembered, take their rows out of the legend and
+//   * The four switches are remembered, take their rows out of the legend and
 //     name themselves on its "Also available" line.
 //   * The SLS file is not waited for. The pins are on the map before it lands
 //     and painted again when it does; a file that does not load leaves the
@@ -83,6 +85,17 @@ const expect = {
                                           && entries(s).some((e) => e.information_location)).map((s) => s.id)),
   slsManual: new Set(located.filter((s) => !/^auto_/.test(s.station_type || '')
                                         && entries(s).some((e) => /^manual$/i.test(e.gauge_type || ''))).map((s) => s.id)),
+  // The Telemetry field's logger, else TM on the name where the field does not
+  // say ALERT; not a repeater or a base, and not a gauge read by hand.
+  tm: new Set(located.filter((s) => {
+    const cfg = s.inspection_config_key || '';
+    const said = cfg === 'campbell_datalogger' || cfg === 'datalogger_old'
+      || (cfg !== 'alert' && /\sTM$/i.test(String(s.name || '').trim()));
+    const roles = s.roles || [];
+    const byHand = /^manual_/.test(s.station_type || '')
+      || (!/^auto_/.test(s.station_type || '') && (entries(s)[0] || {}).gauge_type === 'Manual');
+    return said && !byHand && !roles.includes('repeater') && !roles.includes('base');
+  }).map((s) => s.id)),
 };
 // Whose: the station's own owner, else the owner of the SLS entry the card
 // quotes first — the more specific statement of service, then Queensland's.
@@ -129,6 +142,7 @@ const pins = (page) => page.evaluate(() => {
     n: state.mapMarkers.length,
     triangle: by((m) => m.options.mnShape === 'triangle'),
     grey: by((m) => m.options.fillColor === MapSymbols.MANUAL),
+    black: by((m) => m.options.fillColor === MapSymbols.TM),
     forecast: by((m) => m.options.mnOutline === MapSymbols.FORECAST),
     information: by((m) => m.options.mnOutline === MapSymbols.INFORMATION),
   };
@@ -186,7 +200,7 @@ try {
   await page.waitForFunction(() => SLS.loaded(), null, { timeout: 30_000 });
   await page.waitForTimeout(300);
   const got = await pins(page);
-  const tri = new Set(got.triangle), grey = new Set(got.grey);
+  const tri = new Set(got.triangle), grey = new Set(got.grey), black = new Set(got.black);
   const purple = new Set(got.forecast), pink = new Set(got.information);
   check('every station with a water level on record is a triangle, and every other a circle',
     same(expect.triangle, tri),
@@ -200,6 +214,13 @@ try {
   check('…and no grey pin is a repeater or a base, which a radio reads by definition',
     await page.evaluate(() => state.mapMarkers.filter((m) => m.options.fillColor === MapSymbols.MANUAL)
       .every((m) => !m.mnStation.roles.includes('repeater') && !m.mnStation.roles.includes('base'))));
+  check('every TM station is black, and nothing else is',
+    expect.tm.size > 900 && same(expect.tm, black),
+    `file ${expect.tm.size}, map ${black.size}; not black: ${missing(expect.tm, black)}; black but not: ${missing(black, expect.tm)}`);
+  check('…and no black pin is grey, and no ALERT-named station is black',
+    [...black].every((id) => !grey.has(id))
+      && await page.evaluate(() => state.mapMarkers.filter((m) => m.options.fillColor === MapSymbols.TM)
+        .every((m) => !/\s(AL|ALERT)$/i.test(String(m.mnStation.name || '').trim()))));
   const greenmount = await page.evaluate(() => {
     const m = state.mapMarkers.find((x) => x.mnStation.name === 'Greenmount');
     return m && { shape: m.options.mnShape, fill: m.options.fillColor, outline: m.options.mnOutline };
@@ -382,31 +403,36 @@ try {
   await page.selectOption('#map-owner', 'Seqwater');
   await page.waitForTimeout(200);
   const legendOn = await page.evaluate(() => mapLegendHtml());
-  check('the legend keys the triangle, the grey and both outlines while they are on',
+  check('the legend keys the triangle, the grey, the black and both outlines while they are on',
     /River height \(water level\) gauge/.test(legendOn) && /Read by hand/.test(legendOn)
+      && /TM station/.test(legendOn)
       && /Forecast location/.test(legendOn) && /Information location/.test(legendOn)
       && legendOn.includes('#8400a8') && legendOn.includes('#ff00c5'));
   await page.uncheck('#map-display-block input[onchange^="MapSymbols.setShapes"]');
   await page.uncheck('#map-display-block input[onchange^="MapSymbols.setManual"]');
+  await page.uncheck('#map-display-block input[onchange^="MapSymbols.setTm"]');
   await page.uncheck('#map-display-block input[onchange^="MapSymbols.setOutlines"]');
   await page.waitForTimeout(300);
   const off = await page.evaluate(() => ({
     shaped: state.mapMarkers.filter((m) => m.options.mnShape === 'triangle' || m.options.mnOutline
-                                        || m.options.fillColor === MapSymbols.MANUAL).length,
+                                        || m.options.fillColor === MapSymbols.MANUAL
+                                        || m.options.fillColor === MapSymbols.TM).length,
     legend: mapLegendHtml(),
-    stored: ['mn-pin-shapes', 'mn-pin-manual', 'mn-pin-sls'].map((k) => localStorage.getItem(k)),
+    stored: ['mn-pin-shapes', 'mn-pin-manual', 'mn-pin-tm', 'mn-pin-sls'].map((k) => localStorage.getItem(k)),
   }));
-  check('with the three switches off every pin is a circle in its role\'s colour, unoutlined', off.shaped === 0, String(off.shaped));
+  check('with the four switches off every pin is a circle in its role\'s colour, unoutlined', off.shaped === 0, String(off.shaped));
   check('…their rows leave the legend and its "Also available" line names them',
-    !/Read by hand/.test(off.legend) && /Also available[^<]*Triangles for river height gauges/.test(off.legend)
-      && /Grey for manual gauges/.test(off.legend) && /Forecast and information outlines/.test(off.legend));
+    !/Read by hand/.test(off.legend) && !/TM station —/.test(off.legend)
+      && /Also available[^<]*Triangles for river height gauges/.test(off.legend)
+      && /Grey for manual gauges/.test(off.legend) && /Black for TM stations/.test(off.legend)
+      && /Forecast and information outlines/.test(off.legend));
   check('…and they are remembered', off.stored.every((v) => v === 'off'), off.stored.join(','));
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
   await page.evaluate(() => switchTab('stations'));
   await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
   const back = await page.evaluate(() => ({
-    switches: [state.mapPinShapes, state.mapPinManual, state.mapPinSls],
+    switches: [state.mapPinShapes, state.mapPinManual, state.mapPinTm, state.mapPinSls],
     owner: state.mapOwner, n: state.mapMarkers.length,
     tri: state.mapMarkers.filter((m) => m.options.mnShape === 'triangle').length,
   }));
@@ -414,7 +440,7 @@ try {
     JSON.stringify(back.switches));
   check('…and the owner choice is gone: every owner\'s stations are drawn', back.owner === '' && back.n === got.n,
     JSON.stringify({ owner: back.owner, n: back.n }));
-  await page.evaluate(() => { MapSymbols.setShapes(true); MapSymbols.setManual(true); MapSymbols.setOutlines(true); });
+  await page.evaluate(() => { MapSymbols.setShapes(true); MapSymbols.setManual(true); MapSymbols.setTm(true); MapSymbols.setOutlines(true); });
   allErrors.push(...errors);
   await context.close();
 

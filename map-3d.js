@@ -492,7 +492,7 @@ const Map3D = (function () {
   }
 
   // The pins, likewise: `fillColor` is the role colour (grey for a gauge read
-  // by hand), `color` the ring the filter put on it (white, amber for a match,
+  // by hand, black for a TM station), `color` the ring the filter put on it (white, amber for a match,
   // cyan for a station a pass range pulled in), `mnOutline` the Bureau's
   // purple or pink for its forecast and information locations, and the
   // opacities are the focus dim. Circles rather than MapLibre Markers on

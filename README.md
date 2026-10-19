@@ -1217,7 +1217,8 @@ here.
 - **Station pins say what the station is** (🗺️ Map display, *Station pins*, each
   switch on by default and remembered): a **triangle** for a river height (water
   level) gauge and a **circle** for a rain gauge or anything else — a station that
-  measures both is a triangle; **grey** for a gauge read by hand; and the
+  measures both is a triangle; **grey** for a gauge read by hand; **black** for
+  a TM station (a data logger and modem, not an ALERT radio); and the
   Bureau's own key for its flood warning service — a **purple outline** round a
   forecast location and a **pink** one round an information location, from its
   Service Level Specifications. See *Reading the map* below
@@ -1260,14 +1261,17 @@ both is a triangle. The answer is read from everything that says any of it: the
 sensors and ALERT addresses, the location types, the station type, the Bureau's
 river height and rainfall indexes and its SLS. **Grey** is a gauge read by hand
 — the station type says manual, the SLS calls it Manual, or the Bureau reads it
-daily and nothing says a radio does — so silence from it is not a fault. A
-**purple outline** round a pin is one of the Bureau's forecast locations (SLS
+daily and nothing says a radio does — so silence from it is not a fault.
+**Black** is a TM station — its Telemetry field says a Campbell or older data
+logger, its name ends TM, or a satellite terminal reads it and nothing says
+ALERT — so the field green is left for ALERT stations. A **purple outline**
+round a pin is one of the Bureau's forecast locations (SLS
 Schedule 2: a height is predicted) and a **pink** one an information location
 (Schedule 3: reported and classified, not predicted), as the Bureau's own flood
 maps key them; the outline is drawn outside the white ring, so a match's amber
 and a selection's violet still show inside it. The grey and the outlines come
 from the SLS file, which the map asks for once its pins are drawn and paints in
-when it lands. Each of the three is a switch under *Station pins* in 🗺️ Map
+when it lands. Each of the four is a switch under *Station pins* in 🗺️ Map
 display, on by default and remembered; with *Colour pins by health* on, the fill
 is health's and the shape and outline stay. In the 3-D view a river gauge is a
 circle of its circle's size, with its grey and its outline.

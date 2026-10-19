@@ -3,7 +3,8 @@
 //   MapSymbols   What a station's pin says about the station beyond its role.
 //                Its shape is what it measures: a triangle for a water level
 //                (a river height gauge), a circle for a rain gauge and the
-//                rest. Grey is a gauge read by hand. A purple or a pink outline
+//                rest. Grey is a gauge read by hand, black a TM station (a data
+//                logger and modem, not an ALERT radio). A purple or a pink outline
 //                is the Bureau's forecast or information location, in the
 //                Bureau's own colours. And whose stations the map draws at all.
 //
@@ -39,7 +40,10 @@
 //   fill     Grey for a gauge read by hand. Silence from it is not a fault —
 //            nothing reports it over the radio — and grey is what says so from
 //            across the map, before anybody opens a card to find out why
-//            Flood-Net has never heard it.
+//            Flood-Net has never heard it. Black for a TM station: a data
+//            logger read over a modem rather than an ALERT radio, so the
+//            receivers never hear it either and its silence on them means
+//            nothing — the field green is left saying ALERT.
 //   outline  The Bureau's forecast location (Schedule 2 of its Service Level
 //            Specification — somebody predicts a height for it) in purple, its
 //            information location (Schedule 3 — reported and classified, not
@@ -47,8 +51,8 @@
 //            ring, not instead of it, so a match's amber, a selection's violet
 //            and a health ring still have the ring to say themselves with.
 //
-// Each of the three is a switch in 🗺️ Map display (Station pins), on by
-// default and remembered, on MapArrows' terms: none of them costs anything the
+// The shape, the grey, the black and the outline are each a switch in 🗺️ Map
+// display (Station pins), on by default and remembered, on MapArrows' terms: none of them costs anything the
 // map is not already paying for, and an operator who turns one off means it.
 // Colour pins by health takes the fill when it is on — the fill is health then
 // — and leaves the shape and the outline alone, because neither says anything
@@ -78,6 +82,12 @@
 //                an AL, ALERT or TM on the end of the name, a satellite
 //                terminal, a telemetry form, a repeater's or a base's role — or
 //                the SLS calls the gauge Automatic.
+//   TM           the digital twin's telemetry rule (stationKind): the Telemetry
+//                field saying a Campbell or older data logger; else, where it
+//                does not say ALERT, a TM on the end of the name; else, with no
+//                AL or ALERT on the name and no ALERT address, a satellite
+//                terminal. Never a gauge read by hand, and never a repeater or
+//                a base, whose own colour is the more important thing to say.
 //   SLS role     forecast beats information beats river data, as the card says
 //                it (sls.js, roleText), across both documents for a station on
 //                the border.
@@ -107,8 +117,9 @@
 // Exposes: kind, pin, radius, marker, reset, ownersReady, askSls, slsFailed,
 //          ownerDrawn, ownerHiding, ownerNoteShort, ownerPhrase, ownerParties,
 //          sectionHtml, ownerHtml, noteHtml, legendHtml, legendOff, setShapes,
-//          setManual, setOutlines, setOwner, setOwnerMode, and the colours
-//          FORECAST, INFORMATION and MANUAL and the triangle's TRI_SCALE.
+//          setManual, setTm, setOutlines, setOwner, setOwnerMode, and the
+//          colours FORECAST, INFORMATION, MANUAL and TM and the triangle's
+//          TRI_SCALE.
 const MapSymbols = (function () {
   // Sampled off the Bureau's own key for its flood warning map, and literals
   // for the reason the ACMA squares' are: they are that key's colours and mean
@@ -119,6 +130,9 @@ const MapSymbols = (function () {
   // hollow white of a proposed or unheard pin, and still a fill under the white
   // ring every pin wears, so it reads on a satellite base as well as a topo.
   const MANUAL      = '#7b8189';
+  // A TM station. Black, under the same white ring, so it is told from the
+  // field green of an ALERT station and the grey of a manual gauge at a glance.
+  const TM          = '#000000';
   // The outline's own weight. Heavier than a pin's ring (2) so it reads as a
   // second shape round the first rather than as a thicker ring, and lighter
   // than a selection's (4), which outranks it.
@@ -194,16 +208,24 @@ const MapSymbols = (function () {
     const slsGauge = String((first && first.gauge_type) || '');
     const typeManual = /^manual_/.test(stype), typeAuto = /^auto_/.test(stype);
     const roles = Array.isArray(s.roles) ? s.roles : [];
-    const radio = sensors.some(x => x && x.alert_id != null) || Object.keys(aids).length > 0
-      || /\s(AL|ALERT|TM)$/i.test(String(s.name || '').trim())
-      || !!(s.satcom && s.satcom.enabled)
+    const suffix = (/\s(AL|ALERT|TM)$/i.exec(String(s.name || '').trim()) || [])[1];
+    const alertAddr = sensors.some(x => x && x.alert_id != null) || Object.keys(aids).length > 0;
+    const satcom = !!(s.satcom && s.satcom.enabled);
+    const radio = alertAddr || !!suffix || satcom
       || ['alert', 'campbell_datalogger', 'datalogger_old', 'mace', 'gas_only', 'base_station'].includes(cfg)
       || roles.includes('repeater') || roles.includes('base');
     const manual = typeManual
       || (!typeAuto && (/^manual$/i.test(slsGauge)
         || (!/^automatic$/i.test(slsGauge) && !radio && sections.includes('2'))));
     const auto = !manual && (typeAuto || radio || /^automatic$/i.test(slsGauge));
-    return { river, rain, manual, auto, role, sls: sls.length > 0 };
+    // TM as the twin decides it (digital-twin.js, stationKind): the Telemetry
+    // field first, then the name, then the satellite terminal.
+    const tmSaid = cfg === 'campbell_datalogger' || cfg === 'datalogger_old' ? true
+      : cfg === 'alert' ? false
+      : suffix ? /^TM$/i.test(suffix)
+      : !alertAddr && satcom;
+    const tm = tmSaid && !manual && !roles.includes('repeater') && !roles.includes('base');
+    return { river, rain, manual, auto, tm, role, sls: sls.length > 0 };
   }
 
   // What the pin wears, with the switches applied. `outline` is a colour or
@@ -213,6 +235,7 @@ const MapSymbols = (function () {
     return {
       triangle: !!(state.mapPinShapes && k && k.river),
       manual:   !!(state.mapPinManual && k && k.manual),
+      tm:       !!(state.mapPinTm && k && k.tm),
       outline:  state.mapPinSls && k
         ? (k.role === 'forecast' ? FORECAST : k.role === 'information' ? INFORMATION : null)
         : null,
@@ -487,6 +510,12 @@ const MapSymbols = (function () {
       Grey for gauges read by hand (manual)
     </label>
     <label class="filter-check"
+           title="A TM station: its Telemetry field says a Campbell or older data logger, its name ends TM, or a satellite terminal reads it and nothing says ALERT. A logger and modem rather than an ALERT radio, so the receivers do not hear it — the green is left for ALERT stations.">
+      <input type="checkbox" ${state.mapPinTm ? 'checked' : ''}
+             onchange="MapSymbols.setTm(this.checked)">
+      Black for TM stations
+    </label>
+    <label class="filter-check"
            title="The Bureau's own key: its forecast locations (Schedule 2 of the Service Level Specification — a height is predicted) outlined in purple, its information locations (Schedule 3 — reported and classified, not predicted) in pink.">
       <input type="checkbox" ${state.mapPinSls ? 'checked' : ''}
              onchange="MapSymbols.setOutlines(this.checked)">
@@ -503,13 +532,14 @@ const MapSymbols = (function () {
   }
 
   function counts() {
-    const out = { tri: 0, manual: 0, forecast: 0, information: 0 };
+    const out = { tri: 0, manual: 0, tm: 0, forecast: 0, information: 0 };
     if (!state.data) return out;
     for (const s of state.data.stations) {
       const k = kind(s);
       if (!k) continue;
       if (k.river) out.tri++;
       if (k.manual) out.manual++;
+      if (k.tm) out.tm++;
       if (k.role === 'forecast') out.forecast++;
       else if (k.role === 'information') out.information++;
     }
@@ -519,7 +549,8 @@ const MapSymbols = (function () {
   function noteHtml() {
     const c = counts();
     const n = v => `<strong>${v.toLocaleString()}</strong>`;
-    const bits = [`${n(c.tri)} river height gauge${c.tri === 1 ? '' : 's'}`];
+    const bits = [`${n(c.tri)} river height gauge${c.tri === 1 ? '' : 's'}`,
+                  `${n(c.tm)} TM station${c.tm === 1 ? '' : 's'}`];
     if (slsLoaded()) {
       bits.push(`${n(c.manual)} read by hand`);
       bits.push(`${n(c.forecast)} forecast and ${n(c.information)} information location${c.information === 1 ? '' : 's'}`);
@@ -540,12 +571,19 @@ const MapSymbols = (function () {
 
   // ── The legend ─────────────────────────────────────────────────────────────
   // The swatches are small SVGs, drawn as the map draws the marks: a triangle
-  // with the white ring, and the two outlines alone as the Bureau's key shows
+  // and the TM black with the white ring, and the two outlines alone as the Bureau's key shows
   // them — hollow, with a white casing under the colour so the purple still
   // reads on the dark theme's panel.
   function triSvg(fill, stroke, w) {
     return `<svg class="legend-tri" viewBox="0 0 16 15" width="16" height="15" aria-hidden="true" focusable="false">
       <polygon points="8,2 14.2,12.75 1.8,12.75" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round"/></svg>`;
+  }
+
+  // A circle pin with its white ring, for the black: a plain dot of it would
+  // vanish into the dark theme's panel, as the pin itself does not on the map.
+  function dotSvg(fill, stroke, w) {
+    return `<svg class="legend-tri" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
+      <circle cx="6" cy="6" r="4.75" fill="${fill}" stroke="${stroke}" stroke-width="${w}"/></svg>`;
   }
 
   function outlineSvg(colour) {
@@ -571,6 +609,13 @@ const MapSymbols = (function () {
       <span class="small">Read by hand — a manual gauge, silent on the radio</span>
     </span>`);
     }
+    if (state.mapPinTm && !health) {
+      rows.push(`
+    <span class="legend-item">
+      ${dotSvg(TM, '#ffffff', 1.5)}
+      <span class="small">TM station — a data logger and modem, not an ALERT radio</span>
+    </span>`);
+    }
     if (state.mapPinSls) {
       rows.push(`
     <span class="legend-item">
@@ -590,6 +635,7 @@ const MapSymbols = (function () {
     return [
       !state.mapPinShapes && 'Triangles for river height gauges',
       !state.mapPinManual && 'Grey for manual gauges',
+      !state.mapPinTm     && 'Black for TM stations',
       !state.mapPinSls    && 'Forecast and information outlines',
     ].filter(Boolean);
   }
@@ -621,6 +667,13 @@ const MapSymbols = (function () {
     if (on) askSls();
     repaint();
     announce(on ? 'Gauges read by hand are grey on the map.' : 'Gauges read by hand are back in their role’s colour.');
+  }
+
+  function setTm(on) {
+    state.mapPinTm = !!on;
+    store('mn-pin-tm', on);
+    repaint();
+    announce(on ? 'TM stations are black on the map.' : 'TM stations are back in their role’s colour.');
   }
 
   function setOutlines(on) {
@@ -658,11 +711,11 @@ const MapSymbols = (function () {
   }
 
   return {
-    FORECAST, INFORMATION, MANUAL, TRI_SCALE,
+    FORECAST, INFORMATION, MANUAL, TM, TRI_SCALE,
     kind, pin, radius, marker, reset,
     ownersReady, askSls, ownerDrawn, ownerHiding, ownerNoteShort, ownerPhrase, ownerParties,
     sectionHtml, ownerHtml, legendHtml, legendOff, noteHtml,
-    setShapes, setManual, setOutlines, setOwner, setOwnerMode,
+    setShapes, setManual, setTm, setOutlines, setOwner, setOwnerMode,
     slsFailed: () => slsFailed,
   };
 })();

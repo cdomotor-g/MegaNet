@@ -4790,8 +4790,9 @@ function mapDisplayControlsHtml() {
     ${typeof Looks !== 'undefined' ? Looks.layersNoteHtml() : ''}
     ${state.map && state.map.mnBases ? state.map.mnBases.html() : ''}
     <!-- What a pin's shape, fill and outline say (map-symbols.js): a triangle
-         for a river height gauge, grey for one read by hand, the Bureau's
-         purple and pink outlines for its forecast and information locations. -->
+         for a river height gauge, grey for one read by hand, black for a TM
+         station, the Bureau's purple and pink outlines for its forecast and
+         information locations. -->
     ${MapSymbols.sectionHtml()}
     <div class="map-display-h">Stations &amp; links</div>
     <label class="filter-check"
@@ -6191,12 +6192,14 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   for (const s of stations) {
     const role   = primaryRole(s);
     // What the pin says beyond its role (map-symbols.js): a triangle for a
-    // river height gauge, grey for one read by hand, the Bureau's purple or
-    // pink outline for its forecast and information locations. Grey takes the
-    // role's place as the colour, so everything below that paints "the
-    // station's colour" — the fill, a proposal's dashed ring — paints grey.
+    // river height gauge, grey for one read by hand, black for a TM station,
+    // the Bureau's purple or pink outline for its forecast and information
+    // locations. Grey or black takes the role's place as the colour, so
+    // everything below that paints "the station's colour" — the fill, a
+    // proposal's dashed ring — paints it.
     const sym    = MapSymbols.pin(s);
-    const color  = sym.manual ? MapSymbols.MANUAL : (ROLE_COLOR[role] || ROLE_COLOR.field);
+    const color  = sym.manual ? MapSymbols.MANUAL : sym.tm ? MapSymbols.TM
+      : (ROLE_COLOR[role] || ROLE_COLOR.field);
     const isRpt  = s.roles.includes('repeater');
     const hit    = active && matchIds.has(s.id);
     const rel    = active && !hit && relIds.has(s.id);

@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 49, date: '2026-10-19', items: [
+      '<strong>⚫ TM stations are black on the map.</strong> A station read by a data logger and modem — its name ends '
+        + '<em>TM</em> — is now a black pin, so it stands apart from the green of an ALERT station and the grey of a '
+        + 'gauge read by hand. The legend keys it, and <em>Black for TM stations</em> under <em>Station pins</em> in '
+        + '🗺️ Map display turns it off.',
+    ] },
     { n: 48, date: '2026-10-19', items: [
       '<strong>🛣️ Access tracks.</strong> 813 GPS tracks driven to the sites over twenty years are now the '
         + '<em>Access track</em> of 743 stations: the last of the way in, up to 10 km out, ending at the station, with '

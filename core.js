@@ -755,9 +755,10 @@ const HELP = {
       'A pin\'s <strong>shape is what the station measures</strong>: a triangle for a river '
       + 'height (water level) gauge, a circle for a rain gauge or anything else — and a triangle '
       + 'for a station that measures both. <strong>Grey</strong> is a gauge read by hand: nothing '
-      + 'reports it over the radio, so silence from it is not a fault. A <strong>purple</strong> '
-      + 'outline is one of the Bureau\'s forecast locations and a <strong>pink</strong> one an '
-      + 'information location, as the Bureau\'s own flood maps draw them, from its Service Level '
+      + 'reports it over the radio, so silence from it is not a fault. <strong>Black</strong> is a '
+      + 'TM station — a data logger and modem rather than an ALERT radio, which keeps the green. '
+      + 'A <strong>purple</strong> outline is one of the Bureau\'s forecast locations and a '
+      + '<strong>pink</strong> one an information location, as the Bureau\'s own flood maps draw them, from its Service Level '
       + 'Specifications. Each is a switch under <em>Station pins</em> in 🗺️ <strong>Map '
       + 'display</strong>, and the Filters\' <em>Gauge</em> block picks out exactly the same pins — '
       + 'what a station measures, who reads it and what the Bureau does with it.',
@@ -3555,8 +3556,8 @@ const state = {
   mapHealth:      mapHealthStored(),
   // What a pin's shape, fill and outline say about the station (map-symbols.js):
   // a triangle for a river height (water level) gauge, grey for a gauge read
-  // by hand, the Bureau's purple and pink outlines for its forecast and
-  // information locations. On by default and remembered, on mapArrows' terms —
+  // by hand, black for a TM station, the Bureau's purple and pink outlines for
+  // its forecast and information locations. On by default and remembered, on mapArrows' terms —
   // they were asked for, their one cost is the SLS file the station card reads
   // (fetched once, after the pins are drawn), and an operator who turns one
   // off means it.
@@ -3568,6 +3569,7 @@ const state = {
   // visits to the map are not asking.
   mapPinShapes:   (localStorage.getItem('mn-pin-shapes') || 'on') === 'on',
   mapPinManual:   (localStorage.getItem('mn-pin-manual') || 'on') === 'on',
+  mapPinTm:       (localStorage.getItem('mn-pin-tm') || 'on') === 'on',
   mapPinSls:      mapLayerStored('mn-pin-sls'),
   // Whose stations the map draws (map-symbols.js): '' for everyone's, else one
   // owner party (or FILTER_NONE, none on record), drawn alone ('only') or left
