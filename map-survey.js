@@ -6,7 +6,7 @@
 //               height/levelling check near a site (#120, part of #119).
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for `state`, `esc` and `stationMapLinkUrls` (the
+// Reaches back to core.js for `state`, `esc`, `pillText`, `pillLong` and `stationMapLinkUrls` (the
 // Street View link on the callout is the station popup's own, so the URL shape
 // is written once); across to app.js for rerenderMapLegend. All of them are
 // only called from inside MapSurvey's own functions, so this file's position
@@ -629,8 +629,9 @@ const MapSurvey = (function () {
     if (status === 'loading') out.push(line('Looking up mark details…', 'txt-muted'));
     if (status === 'fail')    out.push(line('Mark details unavailable.', 'txt-muted'));
 
-    // The links, as the row of pills every other callout in the app ends with
-    // (#170). The report first: it is the reason this callout exists.
+    // The links, as the list every other callout in the app ends with (#170,
+    // .pill-list — one column here, as on a station's phone callout). The
+    // report first: it is the reason this callout exists.
     const pills = [];
     if (url) {
       const sketch = d.sketch === 'Y';
@@ -638,14 +639,14 @@ const MapSurvey = (function () {
         + ' GDA2020 and AHD blocks, survey connections'
         + (sketch ? ', and the Form 6 sketch dimensioning the mark to what is around it' : '');
       pills.push(`<a class="pill" href="${esc(url)}" target="_blank" rel="noopener"
-         title="${esc(what)}">Mark report (PDF${sketch ? ', with sketch' : ''}) ↗</a>`);
+         title="${esc(what)}">${pillText('📄', `Mark report (PDF${sketch ? ', with sketch' : ''})`, '↗')}</a>`);
     }
     if (links) {
       pills.push(`<a class="pill" href="${esc(links.google)}" target="_blank" rel="noopener"
          title="Opens the nearest Google Street View panorama; sites with no coverage open the map at this location instead"
-         >Google Street View ↗</a>`);
+         >${pillText('🚶', `${pillLong('Google ')}Street View`, '↗')}</a>`);
     }
-    if (pills.length) out.push(`<div class="mn-popup-actions pill-row">${pills.join('\n')}</div>`);
+    if (pills.length) out.push(`<div class="mn-popup-actions pill-row pill-list">${pills.join('\n')}</div>`);
     return out.join('\n');
   }
 

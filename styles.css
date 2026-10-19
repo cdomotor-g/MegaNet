@@ -1343,20 +1343,33 @@ button.pill {
   color: var(--muted);
 }
 
-/* min-width: 0 and normal wrapping so a name too long for its column takes a
-   second line rather than pushing the column wider. Left-justified over
-   .mn-copy-latlon's centring, which keeps that pill one width while it
-   flashes "✓ Copied" on a row. */
+/* Left-justified over .mn-copy-latlon's centring, which keeps that pill one
+   width while it flashes "✓ Copied" on a row. */
 .pill-list .pill {
   justify-content: flex-start;
   gap: .35rem;
-  min-width: 0;
   padding: .22rem .3rem;
   border-color: transparent;
   border-radius: var(--r-md);
   background: transparent;
+}
+
+/* Where the list's width is the container's — the station card, the editor —
+   a name too long for its column takes a second line rather than pushing the
+   column wider. Not in a map callout: Leaflet sizes a callout to its content's
+   least width, and a pill that may wrap, or may shrink below its name, has a
+   least width of next to nothing — the callout came out too narrow for any of
+   its names. Unwrapped, a callout's columns are as wide as their names. */
+.stn-card-group .pill,
+.ef-pills .pill {
+  min-width: 0;
   white-space: normal;
 }
+
+/* Copy lat, lon's 18ch keeps a row from shifting while it says "✓ Copied";
+   a list's columns are set already, and in a callout the 18ch only made
+   Copy's column wider than the one beside it. */
+.pill-list .mn-copy-latlon { min-width: auto; }
 
 .pill-list .pill:hover {
   border-color: transparent;
@@ -2670,9 +2683,59 @@ h2.h-bad {
    The grid stretches both labels to the row's height; spacing their caption
    and box apart puts every box in a row on one line, the captions level at
    the top. */
-.ef-grid > label {
+.ef-grid > label,
+.ef-grid > .ef-field {
   align-content: space-between;
 }
+
+/* A field whose explanation is folded behind an ⓘ (efField(), station-editor.js):
+   a label's own caption-over-box grid, with the caption and its ⓘ on one line.
+   The caption is a <label for> of its own, so the ⓘ is not part of the field's
+   name. */
+.form-grid .ef-field {
+  display: grid;
+  gap: .3rem;
+  font-size: .9rem;
+  color: var(--muted);
+}
+
+/* Inline, so the ⓘ follows the caption's last word when the caption wraps
+   ("TBRG bucket size (mm/tip) ⓘ") rather than standing off at the edge. */
+.ef-cap > label { display: inline; }
+.ef-cap .hint-toggle { margin-left: .1rem; }
+
+/* The ⓘ itself (hintToggleHtml, core.js): quiet until pointed at, so a column
+   of them reads as a margin note and not as a row of buttons; the accent once
+   its paragraph is open. */
+.hint-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 .2rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: .95rem;
+  font-weight: 400;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.hint-toggle:hover,
+.hint-toggle[aria-expanded="true"] { color: var(--accent); }
+.hint-fold[hidden] { display: none; }
+
+/* EPIC #107's 44 px floor on a touch screen, as a reach round the ⓘ rather
+   than a bigger ⓘ, which would push its caption or heading apart. */
+@media (pointer: coarse) {
+  .hint-toggle { position: relative; }
+  .hint-toggle::after { content: ""; position: absolute; inset: -.85rem -.6rem; }
+}
+
+/* The first of the editor's sections, straight under the card's head and its
+   status line, has no rule above it to clear. */
+.ef-h-top { margin-top: var(--sp-1); }
 
 /* The `.form-grid label` rule stacks a caption over its field, and it reached
    the editor's checkboxes too — Roles, Enabled, Proposed — putting each box
@@ -2694,7 +2757,8 @@ h2.h-bad {
 
 /* A field inside a section (the ALERT2 address under the sensor rows) is
    off the note above it, as a field in the grid is off the one above. */
-.ef-section > label {
+.ef-section > label,
+.ef-section > .ef-field {
   margin-top: var(--sp-2);
 }
 
@@ -3081,7 +3145,7 @@ h2.h-bad {
   .sensor-row .sensor-flip,
   .rhs-fields .rhs-del,
   .ef-carried-row,
-  .ef-section-head button {
+  .ef-section-head > button {
     min-height: 2.75rem;
     display: inline-flex;
     align-items: center;

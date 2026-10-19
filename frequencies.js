@@ -6,7 +6,7 @@
 //                 and as a line each on the station card.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for esc and escAttr. station-editor.js places
+// Reaches back to core.js for esc, escAttr and hintToggleHtml. station-editor.js places
 // editorHtml() and reads readForm()/formProblem() on save; app.js's
 // stnCardHtml() places cardHtml(). The IIFE body only declares, so this file's
 // position among the modules is free (`npm run toplevel`).
@@ -113,7 +113,7 @@ const Frequencies = (function () {
     return n ? ` <span class="small ef-plain">— ${n}</span>` : '';
   }
 
-  // The block, inside the Repeater Configuration grid for a repeater
+  // The block, inside the Repeater configuration grid for a repeater
   // (`primary` true) and in a section of its own for a base station.
   function editorHtml(s, { primary = false } = {}) {
     const rows = (s && s.frequencies) || [];
@@ -121,18 +121,21 @@ const Frequencies = (function () {
     return `
       <div class="full ef-section freq-list" id="ef-freqs">
         <div class="ef-section-head">
-          <div class="ef-sub">Frequencies — RX / TX<span class="freq-count">${countText(n)}</span></div>
+          <div class="ef-sub">Frequencies — RX / TX<span class="freq-count">${countText(n)}</span>
+            ${hintToggleHtml('ef-h-freqs', 'the frequencies')}</div>
           <button type="button" onclick="Frequencies.addRow()" aria-label="Add a frequency">+ Add frequency</button>
         </div>
-        ${primary ? primaryHtml(s) : ''}
-        <div class="freq-rows">${rows.map(r => rowHtml(r)).join('')}</div>
-        <div class="small ef-note">
+        <!-- Folded behind the heading's ⓘ (hintToggleHtml, core.js), and opening
+             under it rather than under however many rows there are. -->
+        <div class="small ef-note hint-fold" id="ef-h-freqs" hidden>
           ${primary
             ? 'The primary pair is what the path profile, fade map, backbone, frequency layer and ACMA tools use. '
               + 'Add a row for every other channel this site listens or transmits on.'
             : 'One row per channel this station listens or transmits on.'}
           Blank means not recorded.
         </div>
+        ${primary ? primaryHtml(s) : ''}
+        <div class="freq-rows">${rows.map(r => rowHtml(r)).join('')}</div>
       </div>`;
   }
 
@@ -156,14 +159,15 @@ const Frequencies = (function () {
     if (last) last.focus();
   }
 
-  // Focus to + Add, not to <body>: the pressed button has just gone.
+  // Focus to + Add, not to <body>: the pressed button has just gone. The head's
+  // own button — the ⓘ beside its title is a button too.
   function removeRow(btn) {
     const row = btn && btn.closest('.freq-row');
     const box = document.getElementById('ef-freqs');
     if (!row || !box) return;
     row.remove();
     recount();
-    const add = box.querySelector('.ef-section-head button');
+    const add = box.querySelector('.ef-section-head > button');
     if (add) add.focus();
   }
 

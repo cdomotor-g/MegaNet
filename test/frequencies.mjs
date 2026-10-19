@@ -102,7 +102,7 @@ async function main() {
       shape.untouched && shape.repeater.rx_mhz === repeater.repeater.rx_mhz
         && shape.repeater.tx_mhz === repeater.repeater.tx_mhz, JSON.stringify(shape.repeater));
 
-    await page.click('#ef-freqs .ef-section-head button');
+    await page.click('#ef-freqs .ef-section-head > button');
     check('+ Add frequency puts a row at the foot, with the cursor in its RX box',
       await page.evaluate(() => {
         const rows = document.querySelectorAll('#ef-freqs .freq-rows .freq-row');
@@ -129,7 +129,7 @@ async function main() {
       sent.rhs.length === 0 && sent.rx === repeater.repeater.rx_mhz, JSON.stringify(sent));
 
     // A use with no frequency.
-    await page.click('#ef-freqs .ef-section-head button');
+    await page.click('#ef-freqs .ef-section-head > button');
     await page.fill('#ef-freqs .freq-rows .freq-row:last-child [data-f="label"]', 'Link');
     const p1 = await page.evaluate(() => Frequencies.formProblem());
     check('a row with a use and no frequency stops the save by name',
@@ -149,7 +149,7 @@ async function main() {
     await openEditor(page, base.id);
     await page.waitForSelector('#ef-freqs');
     const b = await page.evaluate(() => ({
-      head: [...document.querySelectorAll('#stations-editor-card h4')].some(h => h.textContent.trim() === 'Base Station Radio'),
+      head: [...document.querySelectorAll('#stations-editor-card h4')].some(h => h.textContent.trim() === 'Base station radio'),
       primary: !!document.querySelector('#ef-freqs .freq-primary'),
       rx: !!document.getElementById('ef-rx'),
     }));

@@ -160,7 +160,7 @@ const MapPeaks = (function () {
         <p class="small">${esc(stationLatLonText(s))}<br>
           <span class="txt-muted">Ground height only — nothing is standing on it. Height is
           the highest sample on the ~${note.res || '?'} m search grid, above the EGM96 geoid.</span></p>
-        <div class="pill-row">
+        <div class="pill-row pill-list">
           ${copyLatLonPillHtml(s)}
           ${mapViewPills(s).join('\n          ')}
         </div>

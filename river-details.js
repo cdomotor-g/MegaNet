@@ -12,7 +12,7 @@
 //                  editor.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for esc, escAttr and acmaHaversineKm, across to
+// Reaches back to core.js for esc, escAttr, hintToggleHtml and acmaHaversineKm, across to
 // flood-velocity.js for FloodVelocity, and to digital-twin.js for
 // DigitalTwin.openVelocity (from an inline handler on the velocity's
 // workings, so only when pressed). Two files reach into this one: app.js,
@@ -791,21 +791,25 @@ const RiverDetails = (function () {
     return n ? ` <span class="small ef-plain">— ${n}</span>` : '';
   }
 
-  // The block at the foot of the editor form, above ARRO: the three fields,
-  // then one section per list, each with its rows and an add button, the way
-  // the sensors are done.
-  function editorHtml(s) {
+  // The block at the foot of the editor form, above ARRO: the three fields
+  // (and `more`, the editor's own Bureau field — Flood history from — beside
+  // Stream), then one section per list, each with its rows and an add button,
+  // the way the sensors are done. Every paragraph of explanation is folded
+  // behind an ⓘ on the heading it explains (hintToggleHtml, core.js), and
+  // opens under that heading.
+  function editorHtml(s, { more = '' } = {}) {
     return `
       <hr>
-      <h4 class="ef-h">Bureau flood warning details</h4>
-      <p class="small ef-block">
+      <h4 class="ef-h">Bureau flood warning details ${hintToggleHtml('ef-h-rhs', 'the Bureau flood warning details')}</h4>
+      <p class="small ef-block hint-fold" id="ef-h-rhs" hidden>
         What the Bureau’s Queensland flood warning station lists say about this station, the
         modelled AEP flood levels at it, and anything added since. Blank means not recorded.
         Saved with the station.
       </p>
-      <div class="form-grid rhs-station-fields">
+      <div class="form-grid ef-grid rhs-station-fields">
         ${[...FIELDS].sort((a, b) => (a.key === 'stream') - (b.key === 'stream')).map(f =>
-          `<label${f.key === 'stream' ? ' class="full"' : ''}${f.hint ? ` title="${escAttr(f.hint)}"` : ''}>${esc(f.label)}<input type="text" id="${f.id}" value="${escAttr((s && s[f.key]) || '')}"></label>`).join('')}
+          `<label${f.key === 'stream' && !more ? ' class="full"' : ''}${f.hint ? ` title="${escAttr(f.hint)}"` : ''}>${esc(f.label)}<input type="text" id="${f.id}" value="${escAttr((s && s[f.key]) || '')}"></label>`).join('')}
+        ${more}
       </div>
       ${LIST_KEYS.map(list => {
         const spec = LISTS[list];
@@ -813,12 +817,13 @@ const RiverDetails = (function () {
         return `
       <div class="ef-section rhs-list" id="ef-rhs-${list}">
         <div class="ef-section-head">
-          <div class="ef-sub">${esc(spec.title)}<span class="rhs-count">${countText(rows.length)}</span></div>
+          <div class="ef-sub">${esc(spec.title)}<span class="rhs-count">${countText(rows.length)}</span>
+            ${hintToggleHtml(`ef-h-rhs-${list}`, spec.title)}</div>
           <button type="button" onclick="RiverDetails.addRow('${list}')"
                   aria-label="Add a ${escAttr(spec.one)}">+ Add</button>
         </div>
+        <div class="small ef-note hint-fold" id="ef-h-rhs-${list}" hidden>${spec.hint}</div>
         <div class="rhs-rows">${rows.map(r => rowHtml(list, r)).join('')}</div>
-        <div class="small ef-note">${spec.hint}</div>
       </div>`;
       }).join('')}`;
   }
@@ -842,14 +847,15 @@ const RiverDetails = (function () {
   }
 
   // Focus goes to the list's add button, not to <body>: the button that was
-  // pressed has just been removed from the page.
+  // pressed has just been removed from the page. The head's own button — the
+  // ⓘ beside its title is a button too.
   function removeRow(btn) {
     const row = btn && btn.closest('.rhs-row');
     const box = row && row.closest('.rhs-list');
     if (!row || !box) return;
     row.remove();
     recount(box);
-    const add = box.querySelector('.ef-section-head button');
+    const add = box.querySelector('.ef-section-head > button');
     if (add) add.focus();
   }
 

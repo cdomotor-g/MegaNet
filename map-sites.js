@@ -1034,7 +1034,7 @@ const MapSites = (function () {
         <h4>#${r.rank} repeater site · ${Math.round(c.ground)} m · score ${Math.round(r.s.score)}</h4>
         <p class="small">${esc(stationLatLonText(c))} — ${esc(whereText(c))}<br>
           ${summaryHtml(r)}<br>${roadHtml(c)}</p>
-        <div class="pill-row">
+        <div class="pill-row pill-list">
           ${copyLatLonPillHtml(pt)}
           ${mapViewPills(pt).join('\n          ')}
         </div>

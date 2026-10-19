@@ -2772,6 +2772,30 @@ function pillLong(words) {
   return `<span class="pill-long">${words}</span>`;
 }
 
+// ── A paragraph of explanation, folded behind an ⓘ ──────────────────────────
+// The station editor's fields and sections each carry a paragraph on what they
+// are and how to fill them in: needed the first time, in the way every time
+// after, and together they made the card a wall of grey text. Each is folded
+// behind an ⓘ beside the caption or heading it explains — one press shows it
+// under the field, another puts it away. Only explanation is folded: a count,
+// a suggestion or an error is news, and stays on screen.
+//
+// The paragraph carries the id, `hidden` and class `hint-fold`; this is the
+// button that opens it. Not inside a <label> — its name would become part of
+// the field's (station-editor.js's efField() keeps it beside the caption).
+function hintToggleHtml(id, about) {
+  return `<button type="button" class="hint-toggle" aria-expanded="false" aria-controls="${escAttr(id)}"
+     onclick="toggleHint(this)" title="About ${escAttr(about)}" aria-label="About ${escAttr(about)}"
+     ><span aria-hidden="true">ⓘ</span></button>`;
+}
+
+function toggleHint(btn) {
+  const el = btn && document.getElementById(btn.getAttribute('aria-controls'));
+  if (!el) return;
+  el.hidden = !el.hidden;
+  btn.setAttribute('aria-expanded', String(!el.hidden));
+}
+
 // The pill for it, or '' for a station with no position. It sits in the station
 // card's Position group, beside Copy lat, lon and Move pin, rather than among
 // the imagery: those pills show somebody else's picture of the ground, and this

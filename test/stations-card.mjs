@@ -178,6 +178,22 @@ async function main() {
         // the same names, each laid out as a list (.pill-list).
         groups:    [...document.querySelectorAll('#stations-editor-card .ef-pills > [role="group"]')]
                      .map(g => `${g.getAttribute('aria-label')}${g.classList.contains('pill-list') ? '' : ' (not a list)'}`),
+        // The form in sections, and its explanations folded behind an ⓘ that
+        // opens and shuts its paragraph — never inside a <label>, where its
+        // name would join the field's.
+        sections:  [...document.querySelectorAll('#stations-editor-card h4.ef-h')]
+                     .map(h => h.firstChild.textContent.trim()),
+        hints:     (() => {
+          const btns = [...document.querySelectorAll('#stations-editor-card .hint-toggle')];
+          const para = x => document.getElementById(x.getAttribute('aria-controls'));
+          const shut = btns.every(x => para(x) && para(x).hidden && x.getAttribute('aria-expanded') === 'false');
+          const b = btns[0];
+          b.click();
+          const opened = !para(b).hidden && b.getAttribute('aria-expanded') === 'true';
+          b.click();
+          return { n: btns.length, shut, opened, shutAgain: para(b).hidden,
+                   outside: btns.every(x => !x.closest('label')) };
+        })(),
         // The form's own tidiness: the two halves of a coordinate on one line,
         // a box level with its neighbour when the neighbour's caption wraps
         // ("Wind region (AS/NZS 1170.2)"), and a checkbox beside its word
@@ -208,6 +224,11 @@ async function main() {
       ed.groups.join(' | ') === 'Position | Imagery and terrain | Records', ed.groups.join(' | '));
     check('latitude and longitude on one line, and boxes level when a caption wraps',
       ed.layout.latLon && ed.layout.level, JSON.stringify(ed.layout));
+    check('the form is in sections — Station, Location, Telemetry first',
+      ed.sections.slice(0, 3).join(' | ') === 'Station | Location | Telemetry', ed.sections.join(' | '));
+    check('every explanation folded behind an ⓘ, which opens and shuts it, and none inside a label',
+      ed.hints.n >= 5 && ed.hints.shut && ed.hints.opened && ed.hints.shutAgain && ed.hints.outside,
+      JSON.stringify(ed.hints));
     check('every checkbox beside its word, not on a line above it',
       ed.layout.checks.length >= 5 && ed.layout.checks.every(Boolean), JSON.stringify(ed.layout.checks));
     check('reading the boxes rather than a figure baked in when the card was drawn',

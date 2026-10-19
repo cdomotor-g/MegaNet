@@ -8,7 +8,8 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, slug, pInt, pFloat,
-// parseRangeLines, stationImageryPills, docSearchPills, stationMapLinkUrls,
+// parseRangeLines, stationImageryPills, docSearchPills, pillText, pillLong,
+// hintToggleHtml, stationMapLinkUrls,
 // stationSensors, arroSiteId, arroSiteUrl, arroSensorUrl, buildArroUrl,
 // bucketSizeGapNote, ROLE_LABEL and STATION_TYPE_LABEL (a proposed station's
 // type, 0039); across to app.js for the Stations tab's rerender hooks —
@@ -172,6 +173,17 @@ function editorProposedBoxHtml(s) {
           <input type="checkbox" id="ef-proposed" ${on ? 'checked' : ''} ${locked ? 'disabled' : ''}
                  onchange="editorProposedChanged(this.checked)"> Proposed — not yet established
         </label>`;
+}
+
+// A field whose explanation is folded behind an ⓘ (hintToggleHtml, core.js).
+// Its caption is a <label for> of its own, so the button beside it is not part
+// of the field's name, as it would be inside the label; the paragraph is a
+// row of its own under the field, with the id `hint` names.
+function efFieldHtml({ id, caption, hint, control, full = false }) {
+  return `<div class="ef-field${full ? ' full' : ''}">
+        <span class="ef-cap"><label for="${id}">${caption}</label>${hintToggleHtml(hint, caption)}</span>
+        ${control}
+      </div>`;
 }
 
 // What a signed-in editor who is not an administrator is told under the box on
@@ -342,6 +354,12 @@ function editorForm(s) {
     <div id="ef-status" class="small ef-status">${editorStatusHtml()}</div>
     <!-- A proposal says so first (0039): the band, and the year it is for. -->
     ${editorProposalHtml(s)}
+    <!-- The form in the sections a station is thought about in, each under a
+         heading of its own: what it is, where it is, what it sends — then the
+         repeater's radio, the Bureau's lists, ARRO and the inspections, which
+         were sections already. It had been one grid in the order the fields
+         were added, so each box was paired with whatever came after it. -->
+    <h4 class="ef-h ef-h-top">Station</h4>
     <div class="form-grid ef-grid">
       <label>Name<input type="text" id="ef-name" value="${esc(s.name)}"></label>
       <label>Station Number<input type="text" id="ef-stnno" value="${esc(s.station_number || '')}"
@@ -358,10 +376,29 @@ function editorForm(s) {
       <label>Tower platform height
         <select id="ef-tower">${towerHeightOptions(s.tower_height)}</select>
       </label>
+      <!-- The way the station faces (0044): the bearing its front — enclosure
+           door, or a tower's ladder — looks out. Blank is not recorded, which
+           the Digital Twin draws facing south. Its 🧭 Orientation tool sets it
+           by eye. Under the tower's height: both are how it is built. -->
+      <label>Faces (° from north)<input type="number" id="ef-facing" min="0" max="359.9" step="0.1" inputmode="decimal"
+             value="${s.facing_deg == null ? '' : esc(String(s.facing_deg))}" placeholder="not recorded (south)"
+             title="The bearing the station's front — its enclosure door, or a tower's ladder — faces, clockwise from true north"></label>
+      <!-- Who owns the station, recorded on it (0030). Blank means not recorded,
+           and the card then shows only what the SLS says, if anything. -->
+      <label>Owner<input type="text" id="ef-owner" value="${escAttr(s.owner || '')}"
+             placeholder="e.g. Toowoomba Regional Council"></label>
+      <label class="full">Roles
+        <div class="ef-roles">
+          ${Object.keys(ROLE_LABEL).map(r => `
+            <label class="check-label ef-role">
+              <input type="checkbox" name="ef-roles" value="${r}" ${s.roles.includes(r) ? 'checked' : ''}> ${r}
+            </label>`).join('')}
+        </div>
+      </label>
       <!-- The station's two states, on one row of their own: whether it is only
-           proposed (0039) — beside its type and number, which both answer to
-           that — and whether it is enabled. Both are a box and its words, and a
-           row each in the two-column grid would split the pairs below them. -->
+           proposed (0039) and whether it is enabled. Both are a box and its
+           words, and a row each in the two-column grid would split the pairs
+           around them. -->
       <div class="full ef-flags">
         ${editorProposedBoxHtml(s)}
         <label class="check-label ef-enabled">
@@ -369,17 +406,11 @@ function editorForm(s) {
         </label>
       </div>
       ${editorProposedHintHtml(s)}
-      <!-- The way the station faces (0044): the bearing its front — enclosure
-           door, or a tower's ladder — looks out. Blank is not recorded, which
-           the Digital Twin draws facing south. Its 🧭 Orientation tool sets it
-           by eye. -->
-      <label>Faces (° from north)<input type="number" id="ef-facing" min="0" max="359.9" step="0.1" inputmode="decimal"
-             value="${s.facing_deg == null ? '' : esc(String(s.facing_deg))}" placeholder="not recorded (south)"
-             title="The bearing the station's front — its enclosure door, or a tower's ladder — faces, clockwise from true north"></label>
-      <!-- The station it takes its flood history from (0041), by id: for a
-           station with no gauge of its own, such as a proposal beside one. -->
-      <label>Flood history from<input type="text" id="ef-fpfrom" value="${esc(s.flood_peaks_from || '')}"
-             placeholder="a station's id, e.g. gatton" title="The Bureau's floods at that station's gauge are shown for this one while it has no gauge of its own"></label>
+      <label class="full">Notes<textarea id="ef-notes">${esc(s.notes || '')}</textarea></label>
+    </div>
+    <hr>
+    <h4 class="ef-h">Location</h4>
+    <div class="form-grid ef-grid">
       <label>Latitude<input type="number" step="any" id="ef-lat" value="${s.lat ?? ''}"></label>
       <label>Longitude<input type="number" step="any" id="ef-lon" value="${s.lon ?? ''}"></label>
       <!-- Typing a coordinate is the exact form of this that nobody can check.
@@ -413,50 +444,46 @@ function editorForm(s) {
         <input type="text" id="ef-flood-vel" readonly value="${escAttr(RiverDetails.velocitySummary(s))}"
                title="Estimated peak flood velocity from the AEP flood levels, by Manning’s equation. The workings are on the station card; the setting, slope and Manning n are on the AEP row below.">
       </label>
-      <label>RM System ID<input type="number" id="ef-rmsys" value="${s.rm_system_id || 1}"></label>
-      <label>TBRG bucket size (mm/tip)
-        <input type="number" step="0.1" min="0" id="ef-bucket" value="${s.TBRGbucketSize ?? ''}" placeholder="not recorded">
-      </label>
-      <div class="full small ef-hint">
-        Blank means not recorded, not zero — the app falls back to an assumed 0.2 mm/tip wherever it
-        converts a rain gauge count and says so. ${bucketSizeGapNote()}
-      </div>
-      <label class="full">Roles
-        <div class="ef-roles">
-          ${Object.keys(ROLE_LABEL).map(r => `
-            <label class="check-label ef-role">
-              <input type="checkbox" name="ef-roles" value="${r}" ${s.roles.includes(r) ? 'checked' : ''}> ${r}
-            </label>`).join('')}
-        </div>
-      </label>
-      <label class="full">Telemetry / inspection form
-        <select id="ef-insp-config">${editorInspConfigOptions(s.inspection_config_key)}</select>
-      </label>
-      <div class="full small ef-hint">
+    </div>
+    <hr>
+    <h4 class="ef-h">Telemetry</h4>
+    <div class="form-grid ef-grid">
+      ${efFieldHtml({ id: 'ef-insp-config', caption: 'Telemetry / inspection form', hint: 'ef-h-insp', full: true,
+        control: `<select id="ef-insp-config">${editorInspConfigOptions(s.inspection_config_key)}</select>` })}
+      <div class="full small ef-hint hint-fold" id="ef-h-insp" hidden>
         Which of the six inspection sheets a crew prints at this site — the Inspections tab
         pre-selects its form from this. “Not recorded” means nobody has said yet, and the form
         asks rather than guesses; leave it that way unless you know the site's telemetry.
       </div>
+      <label>RM System ID<input type="number" id="ef-rmsys" value="${s.rm_system_id || 1}"></label>
+      ${efFieldHtml({ id: 'ef-bucket', caption: 'TBRG bucket size (mm/tip)', hint: 'ef-h-bucket',
+        control: `<input type="number" step="0.1" min="0" id="ef-bucket" value="${s.TBRGbucketSize ?? ''}" placeholder="not recorded">` })}
+      <div class="full small ef-hint hint-fold" id="ef-h-bucket" hidden>
+        Blank means not recorded, not zero — the app falls back to an assumed 0.2 mm/tip wherever it
+        converts a rain gauge count and says so. ${bucketSizeGapNote()}
+      </div>
       <div class="full ef-section">
         <div class="ef-section-head">
-          <div class="ef-sub">ALERT IDs / Sensors${sensors.length ? ` <span class="small ef-plain">— ${sensors.length}</span>` : ''}</div>
+          <div class="ef-sub">ALERT IDs / Sensors${sensors.length ? ` <span class="small ef-plain">— ${sensors.length}</span>` : ''}
+            ${hintToggleHtml('ef-h-sensors', 'the ALERT IDs and sensors')}</div>
           <button type="button" onclick="editorAddSensorRow()">+ Add sensor</button>
         </div>
-        <div id="ef-sensors">
-          ${sensors.map(se => sensorRowHtml(se, dbId)).join('')}
-        </div>
-        <div class="small ef-note">
+        <!-- Under the heading its ⓘ is beside, rather than under the rows, so
+             it opens where it was asked for however many rows there are. -->
+        <div class="small ef-note hint-fold" id="ef-h-sensors" hidden>
           One row per ALERT address and what it measures — rainfall, water level, battery, etc.
           <b>Flip</b> takes the row's address to the Bit Flipper, which says what else it could
           have been.${
             dbId != null ? ' Rows whose sensor carries an ARRO device id link straight to its admin page.' : ''}
         </div>
-        <label class="full">ALERT2 station address
-          <input type="number" id="ef-a2stn" min="1" max="65535" value="${s.alert2_station_id ?? ''}"
+        <div id="ef-sensors">
+          ${sensors.map(se => sensorRowHtml(se, dbId)).join('')}
+        </div>
+        ${efFieldHtml({ id: 'ef-a2stn', caption: 'ALERT2 station address', hint: 'ef-h-a2stn',
+          control: `<input type="number" id="ef-a2stn" min="1" max="65535" value="${s.alert2_station_id ?? ''}"
                  placeholder="none — this station is not relayed over ALERT2"
-                 onchange="editorRefreshA2Seen()">
-        </label>
-        <div class="small ef-note">
+                 onchange="editorRefreshA2Seen()">` })}
+        <div class="small ef-note hint-fold" id="ef-h-a2stn" hidden>
           Set this only when the station's readings reach Flood-Net relayed over ALERT2 — an
           ELPRO 115E-2 publishes them under this address, and it is what attributes them here.
           The <b>A2 slot</b> on each row above then says which of that station's sensors the row is.
@@ -467,51 +494,56 @@ function editorForm(s) {
           ${['Rainfall', 'Rainfall Increment', 'Water Level', 'Water Level - AHD', 'Battery', 'Air Temperature', 'Relative Humidity', 'Wind Speed', 'Wind Gust', 'Wind Direction', 'pH', 'Conductivity', 'Dissolved Oxygen', 'Water Temperature', 'Turbidity'].map(t => `<option value="${esc(t)}">`).join('')}
         </datalist>
       </div>
-      <!-- Who owns the station, recorded on it (0030). Blank means not recorded,
-           and the card then shows only what the SLS says, if anything. -->
-      <label class="full">Owner<input type="text" id="ef-owner" value="${escAttr(s.owner || '')}"
-             placeholder="e.g. Toowoomba Regional Council"></label>
-      <label class="full">Notes<textarea id="ef-notes">${esc(s.notes || '')}</textarea></label>
     </div>
     ${hasRep ? `
       <hr>
-      <h4 class="ef-h">Repeater Configuration</h3>
+      <h4 class="ef-h">Repeater configuration</h4>
+      <!-- Its licence and delay, its radio, then what it passes: the two lists
+           of ranges side by side, and under them what they come to — the count
+           and the stations — which read the ranges above them. -->
       <div class="form-grid ef-grid">
         <label>ACMA Licence<input type="text" id="ef-acma" value="${esc(s.repeater?.acma_licence || '')}"></label>
-        <label>Repeater delay (ms)
-          <input type="number" min="0" max="999" step="1" id="ef-delay"
-                 value="${s.repeater?.delay_ms ?? ''}" placeholder="not set">
-        </label>
-        <div class="full small ef-hint">
+        ${efFieldHtml({ id: 'ef-delay', caption: 'Repeater delay (ms)', hint: 'ef-h-delay',
+          control: `<input type="number" min="0" max="999" step="1" id="ef-delay"
+                 value="${s.repeater?.delay_ms ?? ''}" placeholder="not set">` })}
+        <div class="full small ef-hint hint-fold" id="ef-h-delay" hidden>
           How long this repeater waits before re-transmitting a message its pass ranges accept.
-          Blank means not set, not zero. ${(() => {
-            const sug = suggestedRepeaterDelayMs(s);
-            return sug == null ? '' :
-              `Suggested: <strong>${sug} ms</strong> — staggered so repeaters within the backbone
-               distance whose windows share an address never hold the same delay.`;
-          })()}
+          Blank means not set, not zero.
         </div>
+        ${(() => {
+          // The suggestion is not explanation: it is this repeater's own figure,
+          // so it stays on screen when the paragraph above it is folded.
+          const sug = suggestedRepeaterDelayMs(s);
+          return sug == null ? '' : `<div class="full small ef-hint">
+          Suggested: <strong>${sug} ms</strong> — staggered so repeaters within the backbone
+          distance whose windows share an address never hold the same delay.
+        </div>`;
+        })()}
         <!-- The repeater's own RX/TX pair first (ef-rx, ef-tx — what every path
              tool reads), then a row per other channel, with + Add (0033). -->
         ${Frequencies.editorHtml(s, { primary: true })}
-        ${repeaterPassingSummaryHtml(s)}
-        ${repeaterCarriedStationsHtml(s)}
-        <label class="full"><span>Pass Ranges (one per line: <em>low-high</em>)</span>
+        <label><span>Pass ranges (one per line: <em>low-high</em>)</span>
           <textarea id="ef-pass" rows="5">${(s.repeater?.pass_ranges || []).map(r => `${r.low}-${r.high}`).join('\n')}</textarea>
         </label>
-        <label class="full"><span>Exclusions (one per line: <em>low-high</em>)</span>
-          <textarea id="ef-excl" rows="3">${(s.repeater?.exclusions || []).map(r => `${r.low}-${r.high}`).join('\n')}</textarea>
+        <label><span>Exclusions (one per line: <em>low-high</em>)</span>
+          <textarea id="ef-excl" rows="5">${(s.repeater?.exclusions || []).map(r => `${r.low}-${r.high}`).join('\n')}</textarea>
         </label>
+        ${repeaterPassingSummaryHtml(s)}
+        ${repeaterCarriedStationsHtml(s)}
       </div>` : ''}
     ${hasBase && !hasRep ? `
       <hr>
-      <h4 class="ef-h">Base Station Radio</h4>
+      <h4 class="ef-h">Base station radio</h4>
       <!-- A base station has no repeater row, so every pair it uses is a row
            here (0033). A base that is also a repeater keeps them above. -->
       <div class="form-grid ef-grid">
         ${Frequencies.editorHtml(s)}
       </div>` : ''}
-    ${RiverDetails.editorHtml(s)}
+    <!-- The station it takes its flood history from (0041), by id: for a
+         station with no gauge of its own, such as a proposal beside one. A
+         Bureau question, so it is among the Bureau's fields. -->
+    ${RiverDetails.editorHtml(s, { more: `<label>Flood history from<input type="text" id="ef-fpfrom" value="${esc(s.flood_peaks_from || '')}"
+             placeholder="a station's id, e.g. gatton" title="The Bureau's floods at that station's gauge are shown for this one while it has no gauge of its own"></label>` })}
     ${editorArroSection(s, sensors)}
     ${StationInspections.sectionHtml(s)}`;
 }
@@ -580,11 +612,13 @@ function editorArroSection(s, sensors) {
         <input type="text" readonly value="${esc(site.name || '—')}">
       </label>
     </div>
-    <div class="button-group ef-actions">
-      <a class="btn-link" href="${esc(admin)}" target="_blank" rel="noopener"
-         title="Site administration page in ARRO">Open site in ARRO admin ↗</a>
-      ${graph ? `<a class="btn-link" href="${esc(graph.url)}" target="_blank" rel="noopener"
-         title="Last 7 days for ${graph.count} sensor${graph.count !== 1 ? 's' : ''}">Graph last 7 days ↗</a>` : ''}
+    <!-- The two ways into ARRO, as the list the Location section's links are
+         (.pill-list), without a heading: the section's own says where they go. -->
+    <div class="pill-row pill-list ef-actions">
+      <a class="pill" href="${esc(admin)}" target="_blank" rel="noopener"
+         title="Site administration page in ARRO">${pillText('📊', `${pillLong('Open site in ')}ARRO admin`, '↗')}</a>
+      ${graph ? `<a class="pill" href="${esc(graph.url)}" target="_blank" rel="noopener"
+         title="Last 7 days for ${graph.count} sensor${graph.count !== 1 ? 's' : ''}">${pillText('📈', 'Graph last 7 days', '↗')}</a>` : ''}
     </div>
     <p class="small st-note">
       ${withDev

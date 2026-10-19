@@ -625,7 +625,7 @@ const Places = (function () {
         <p class="small">${p.kind ? `${esc(p.kind)}${p.where ? ` · ${esc(p.where)}` : ''}<br>` : ''}
           ${esc(stationLatLonText(s))}<br>
           <span class="txt-muted">${esc(p.credit || (p.name ? ATTRIB : 'Typed into Find a place — not a station.'))}</span></p>
-        <div class="pill-row">
+        <div class="pill-row pill-list">
           ${copyLatLonPillHtml(s)}
           ${mapViewPills(s).join('\n          ')}
         </div>

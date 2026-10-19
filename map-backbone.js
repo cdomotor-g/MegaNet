@@ -21,7 +21,7 @@
 //                              cross-tab "open this path on the Stations map".
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, escAttr, fmtKm, acmaHaversineKm;
+// Reaches back to core.js for state, esc, escAttr, pillText, fmtKm, acmaHaversineKm;
 // across to app.js for repeaterList, passRelationIndex, passRangeCoversId,
 // stationAlertIdTypes, focusStation, zoomToStation, switchTab and
 // dockReveal; and
@@ -542,15 +542,15 @@ const MapBackbone = (function () {
           : 'no pass-range window at the base end — matched on distance alone'}</span><br>` : ''}
         <span class="mn-pop-line">${ch ? esc(ch.label) + (ch.far ? ` (far end ${esc(ch.far)})` : '') + ' · ' : ''}${fmtKm(km)} · ${r.margin == null ? 'no margin figure'
           : `${(r.margin > 0 ? '+' : '') + r.margin.toFixed(1)} dB ${m.label.toLowerCase()} (free-space)`}</span>
-        <!-- The same row of pills a station callout carries (#170), and the
+        <!-- The same list a station callout carries (#170, .pill-list), and the
              same reason its two in-page actions became buttons: this one is
              in-page too — it switches tab and opens a card — so the anchor it
              used to be was announcing a link to nowhere. -->
-        <div class="mn-popup-actions pill-row">
+        <div class="mn-popup-actions pill-row pill-list">
           <button type="button" class="pill"
              onclick="MapBackbone.openOnStations('${backbone ? 'backbone' : 'field'}','${escAttr(aId)}','${escAttr(bId)}')"
              title="Open this path on the Stations map with the elevation profile and fade margin cards"
-             >Open on the Stations map ↗</button>
+             >${pillText('🗺️', 'Open on the Stations map', '↗')}</button>
         </div>`;
     },
 

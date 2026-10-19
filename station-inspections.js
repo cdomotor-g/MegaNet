@@ -6,7 +6,7 @@
 //                        numbers its past visits recorded.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, escAttr and cssVar; across to app.js
+// Reaches back to core.js for state, esc, escAttr, cssVar and hintToggleHtml; across to app.js
 // for switchTab from an inline handler, so at click time; to datastore.js for
 // dbSelect and dbCanWrite — the second only to say, in the lead paragraph, that
 // the chart needs no session and the records behind the pill do; and to
@@ -446,13 +446,13 @@ const StationInspections = (function () {
     return `
     <hr>
     <div class="ef-section-head si-head">
-      <h4 class="ef-h si-h">Inspections</h4>
+      <h4 class="ef-h si-h">Inspections ${hintToggleHtml('ef-h-si', 'the inspections')}</h4>
       <button type="button" class="si-pill" onclick="StationInspections.openHistory('${escAttr(station.id)}')"
               title="Open the Inspection History tab scoped to ${esc(station.name || 'this station')}">
         <span aria-hidden="true">🗓</span> Inspection history for this station →
       </button>
     </div>
-    <p class="small ef-flush si-lead">
+    <p class="small ef-flush si-lead hint-fold" id="ef-h-si" hidden>
       Every visit this station has had, typed here or imported from the archive workbook, charted by
       the numbers each one recorded. The pill above opens the full records — the sheets as they were
       written, printable and exportable — with this station already in the history's filter box.${

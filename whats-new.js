@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 51, date: '2026-10-19', items: [
+      '<strong>🧹 Station cards, tidied.</strong> The actions on a station\'s card on the map are short lists under '
+        + 'four headings — <em>In Flood-Net</em>, <em>Position</em>, <em>Imagery and terrain</em> and <em>Records</em> — '
+        + 'their icons in one column and their ↗ → ⬇ in another. The station editor\'s links are the same lists, and so '
+        + 'are the callouts a pin opens on a phone and the map\'s other callouts.',
+      '<strong>✏️ The station editor, in sections.</strong> <em>Station</em>, <em>Location</em> and <em>Telemetry</em> '
+        + 'each have a heading; Latitude and Longitude share a line, every checkbox sits beside its word, and each sensor\'s '
+        + 'address, slot and type are on one line. The longer explanations are folded behind an <strong>ⓘ</strong> '
+        + 'beside the field or heading they explain.',
+    ] },
     { n: 50, date: '2026-10-19', items: [
       '<strong>🩷 Forecast and information locations: solid and dashed.</strong> On the Stations map a forecast '
         + 'location is now outlined in <strong>solid pink</strong> and an information location in <strong>dashed '

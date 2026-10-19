@@ -300,7 +300,7 @@ async function main() {
     await page.fill('#ef-awrc', full.awrc_number);
 
     // A flood effect, added.
-    await page.click('#ef-rhs-flood_effects .ef-section-head button');
+    await page.click('#ef-rhs-flood_effects .ef-section-head > button');
     await page.fill('#ef-rhs-flood_effects .rhs-row [data-f="height_m"]', '12.50');
     await page.fill('#ef-rhs-flood_effects .rhs-row [data-f="effect"]', 'Bridge');
     await page.fill('#ef-rhs-flood_effects .rhs-row [data-f="detail"]', 'Test Road Bridge');
@@ -317,7 +317,7 @@ async function main() {
     await page.click('#ef-rhs-flood_effects .rhs-row .rhs-del');
 
     // A listing: the index is a pick-list of the Bureau's three.
-    await page.click('#ef-rhs-bureau_listings .ef-section-head button');
+    await page.click('#ef-rhs-bureau_listings .ef-section-head > button');
     const pick = await page.evaluate(() => [...document.querySelectorAll(
       '#ef-rhs-bureau_listings .rhs-row:first-child [data-f="section"] option')].map(o => o.value));
     check('a new listing picks its index from the Bureau\'s three',
@@ -325,7 +325,7 @@ async function main() {
     await page.click('#ef-rhs-bureau_listings .rhs-row .rhs-del');
 
     // Add a flood classification.
-    await page.click('#ef-rhs-flood_classes .ef-section-head button');
+    await page.click('#ef-rhs-flood_classes .ef-section-head > button');
     check('+ Add puts an open row on top, with the cursor in it',
       await page.evaluate(() => {
         const first = document.querySelector('#ef-rhs-flood_classes .rhs-row');
