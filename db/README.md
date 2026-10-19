@@ -407,7 +407,7 @@ assume that shape.
 ### The document is kept
 
 Every page load asks for the whole document, and until `0069` every one of them
-built it again from seventeen tables — 4,874 stations, about 7.5 MB, 1.9–2.3 s
+built it again from seventeen tables — 4,874 stations, 5.2 MB as sent, 1.6–2.3 s
 on the live project by October 2026. Supabase gives `anon` 3 s a statement, so a
 busy moment turned it into *Could not load from the datastore: canceling
 statement due to statement timeout* and the app fell back to the site's copy of

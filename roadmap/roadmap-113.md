@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-19** (revision 167 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-20** (revision 169 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -806,6 +806,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 169 — 2026-10-20: ⚡ The station document kept, not built on every load
+
+The owner, with a screenshot of the app's toast — *Could not load from the datastore: canceling statement due to statement timeout*: *"getting a bit of this. can you please figure out why and try to fix it"*. Nothing opened or closed.
+
+- **Why**: `stations_doc()`, the app's first request, built the whole document from seventeen tables on every page load — 4,874 stations, 5.2 MB as sent. On the live project that took 1.6–2.3 s on a quiet minute (0037 measured ~1.6 s; it had only grown), and Supabase gives `anon` 3 s a statement, so a busy minute ran it over: Postgres logged 24 statement timeouts in the day before the fix, the edge log 500s (`57014`) at 3.7–11.6 s, and pg_stat_statements 879 calls averaging 1.3 s — the most expensive read in the project. Each time the app fell back to the site's `stations.json`.
+- **`0069`**: the document kept in `meganet.stations_doc_cache`, built as each change commits. A statement-level trigger on every table the document reads — found through `pg_depend` by `stations_doc_reads()`, not listed — notes the transaction in `stations_doc_change`; a deferred trigger builds the copy at commit, so no committed change is ever missing from it and the cost is one build per edit, not one per visitor. Builds take turns on the kept row, each taking its snapshot after the one before has committed, so two editors saving at once both land in it — a one-statement build loses one of them, shown with two live sessions on a local copy. `stations_doc()` keeps its signature, jsonb, security invoker and grants, so nothing that calls it changed; inside a transaction that has changed the stations it builds the document as it stands. **A migration that changes `station_json` or `stations_json` ends with `select meganet.stations_doc_watch();`** (`db/README.md`, *The document is kept*). Schema version 69; `core.js` `DB_SCHEMA_VERSION` 69; What's new 53; the version stamp `20261020a`.
+- **Applied live** from this session: the database fetched `0069` from `raw.githubusercontent.com` at `9ff5b43` and ran it only on a SHA-256 match (`86edfe9e…`; the connection drops a request holding an upsert and a delete). First a trial that rolled itself back: the document identical to the byte, 17 tables watched, a read 134–293 ms against 1,131 ms to build. Then for real, and a rolled-back edit on the live data: noted, seen inside its own transaction, the copy waiting, built in at commit, the copy the document after. The edge log's upstream time for `GET /rpc/stations_doc` went from 1.6–4.9 s (and the 500s) to 157–436 ms. No new advisor finding.
+
+**Checks:** `tools/check_stations_doc_cache.sql` (new, 34 checks, a `db-checks` step after the stations and flood peaks are loaded), red by name on five deliberate breaks — no build at commit (13 fail), a table unwatched (2), `stations_doc()` building every time (1), the touch before the statement rather than after (3), the build leaving its transaction noted (5); every `db-checks` step from zero on Postgres 16 with `0069` (38 steps, 1 m 55 s, the same as without it); `0069` applied twice; `npm run firstvisit` and the cheap five.
 
 ### Revision 168 — 2026-10-19: 📡 What a base station hears, as a waterfall on the Base Stations tab
 
