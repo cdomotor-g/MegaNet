@@ -6475,8 +6475,8 @@ function stationPopupHtml(s) {
 }
 
 // The 7–12 actions a station offers, in four groups. One builder for the two
-// surfaces that draw them — the station card (#175), and the editor card its
-// own subset — and test/movepin.mjs pins the shapes once, not per surface.
+// surfaces that draw them — the station card (#175) and the editor card — and
+// test/movepin.mjs pins the shapes once, not per surface.
 // (The desktop callout's row was a third, flattened, until the callout went.)
 // Every one of these is a pill (#170), and the in-page ones are <button>s,
 // which is what #138 says they always should have been: the action happens
@@ -6496,22 +6496,40 @@ function stationPopupHtml(s) {
 // is what separates *Zoom to station* from *Show in the list* before either
 // label has been read. The trailing marks stay and mean what they always did —
 // ↓ goes down this page (→ into the side panel, when the Stations cards are
-// there: stationsCardsArrow), ↗ leaves the site, ⬇ downloads.
+// there: stationsCardsArrow; ↑ up it, from the editor to the list above it),
+// ↗ leaves the site, ⬇ downloads.
 //
 // A group whose pills a station doesn't get (no position, not a repeater, no
 // ARRO id) drops out entirely rather than drawing an empty rule.
 //
-// "Station details" leads. It was the card's alone while the desktop callout
-// drew the same builder without it — a scroll to the editor from a balloon
-// over the map is a scroll to somewhere the balloon isn't — and the card is
-// the only caller now.
-function stationActionGroups(s) {
+// "Station details" leads on the station card. It was the card's alone while
+// the desktop callout drew the same builder without it — a scroll to the
+// editor from a balloon over the map is a scroll to somewhere the balloon
+// isn't.
+//
+// `editor` is the editor card's set: every pill the station card has, under
+// the same names and in the same order, so the two never offer different
+// things — less Station details, which is the card it would be pressed on.
+// Where the editor's own coordinate boxes are what a pill should act on, or a
+// pill has to be repainted in place without re-rendering the form, it is that
+// pill's editor version: Copy lat, lon and Directions read the boxes at the
+// press, Move pin, Site features and the blast pill carry the ids their
+// modules repaint them by, and Show in the list scrolls up to the row rather
+// than re-selecting the station, which would redraw the form over whatever is
+// half-typed in it. A "+ New" draft has no id for the first group to act on,
+// so it has no first group.
+function stationActionGroups(s, { editor = false } = {}) {
   const arroUrl = arroSiteUrl(arroSiteId(s));
+  const sf = typeof SiteFeatures !== 'undefined' ? SiteFeatures : null;
   return [
-    { label: 'In Flood-Net', pills: [
-      `<button type="button" class="pill mn-edit-station" onclick="editStationFromCard('${escAttr(s.id)}')"
+    { label: 'In Flood-Net', pills: editor && !s.id ? [] : [
+      editor ? '' : `<button type="button" class="pill mn-edit-station" onclick="editStationFromCard('${escAttr(s.id)}')"
            title="Select this station and jump to its details card ${stationsCardsWhere()}">${pillText('✏️', 'Station details', stationsCardsArrow())}</button>`,
-      `<button type="button" class="pill" onclick="focusStation('${escAttr(s.id)}')"
+      // The list is above the editor, wherever the two are.
+      editor
+        ? `<button type="button" class="pill mn-show-in-list" onclick="showStationInList('${escAttr(s.id)}', { editor: true })"
+           title="Scroll up to this station's row in the Stations list">${pillText('🗒️', `Show in ${pillLong('the ')}list`, '↑')}</button>`
+        : `<button type="button" class="pill mn-show-in-list" onclick="showStationInList('${escAttr(s.id)}')"
            title="Select this station in the Stations list ${stationsCardsWhere()}">${pillText('🗒️', `Show in ${pillLong('the ')}list`, stationsCardsArrow())}</button>`,
       `<button type="button" class="pill" onclick="zoomToStation('${escAttr(s.id)}')"
            title="Zoom the map all the way in on this station — where the map offers its digital twin">${pillText('🔍', 'Zoom to station')}</button>`,
@@ -6521,19 +6539,18 @@ function stationActionGroups(s) {
       fieldDataPillHtml(s),
       twinPillHtml(s),
       fieldPhotosPillHtml(s),
-      MapBlast.popupLinkHtml(s),
+      MapBlast.popupLinkHtml(s, { editor }),
     ] },
     // The position handed over, driven to (#225), and moved.
     { label: 'Position', pills: [
-      copyLatLonPillHtml(s),
-      directionsPillHtml(s),
-      MapMovePin.popupLinkHtml(s),
+      copyLatLonPillHtml(s, { live: editor }),
+      directionsPillHtml(s, { live: editor }),
+      editor ? MapMovePin.editorButtonHtml(s) : MapMovePin.popupLinkHtml(s),
       // Where the station's outlet, pits, benchmarks and boards are, and its
       // orifice run (site-features.js, 0061) — signed-in editors only.
-      SiteFeatures.pillHtml(s),
+      sf ? (editor ? sf.editorButtonHtml(s) : sf.pillHtml(s)) : '',
     ] },
-    // Two pairs, the same as the editor card's (stationImageryPills). No
-    // coordinates, no group.
+    // Two pairs (stationImageryPills). No coordinates, no group.
     { label: 'Imagery and terrain', pills: stationImageryPills(s) },
     { label: 'Records', pills: [
       arroUrl ? `<a class="pill" href="${esc(arroUrl)}" target="_blank" rel="noopener"
@@ -6696,6 +6713,9 @@ function setMapFocusRepeater(id) {
   if (id == null) state.mapBlast = false;
   applyMapFocusStyles();
   applyMapLabels();          // the names recede with their pins (mnFocusDimmed)
+  // The editor card's blast pill says Show or Hide for the repeater it is on,
+  // and both a cleared focus and a moved one change which.
+  MapBlast.repaintEditorPill();
   // The "Repeaters listening" card marks whichever of its rows is the focused
   // repeater, so it follows the focus however it was set — a pin click, the
   // empty map, or one of its own rows.
@@ -7292,6 +7312,20 @@ function focusStation(id) {
     rerenderStationEditorCard();
   }
   scrollStationRowIntoView(id);
+}
+
+// The two cards' "Show in the list". The list opens first if it is shut, as a
+// pick from it leaves it: a row in a shut list cannot be shown. From the
+// station card the station is selected as well (focusStation). In the editor
+// card it already is, and selecting it again would redraw the form over
+// whatever is half-typed in it, so the row is only scrolled to — unless the
+// filters have moved since and it has no row, when selecting is the only way
+// to give it one.
+function showStationInList(id, { editor = false } = {}) {
+  if (!state.stationsListOpen) setStationsListOpen(true);
+  const row = document.querySelector(`#stations-table-wrap tr[data-sid="${CSS.escape(id)}"]`);
+  if (editor && row) scrollStationRowIntoView(id);
+  else focusStation(id);
 }
 
 // Open the Stations tab focused on one station. Used by the Pass Ranges tables,

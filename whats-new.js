@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 57, date: '2026-10-20', items: [
+      '<strong>✏️ The station editor has every action the map\'s card has.</strong> A station\'s details card now '
+        + 'opens with <em>In Flood-Net</em> — Show in list, Zoom to station, Copy link, Field data, Digital twin, Field '
+        + 'photos and a repeater\'s blast radius — and under its coordinates <em>Position</em> gains Directions and '
+        + '<em>Records</em> gains ARRO admin, in the same order as on the map. Directions, like Copy lat, lon, goes to '
+        + 'the figures in the boxes, so a pin you have just dragged is where it sends you.',
+    ] },
     { n: 56, date: '2026-10-20', items: [
       '<strong>〽️ The elevation profile, full screen.</strong> Click the chart on the elevation profile — or ⛶ '
         + '<em>Full screen</em> in its key — and it opens the size of the window, the signal still running along it, with '

@@ -533,16 +533,19 @@ const HELP = {
            + 'visits measured — fade margin and battery under load to begin with, any of the other '
            + '35 recorded parameters on request — and the pill beside the heading opens the full '
            + 'records on the Inspection History tab with this station already in its filter box. '
-           + 'That chart needs no sign-in; the records behind the pill do. Under the coordinate '
-           + 'boxes are the same short lists the station\'s card on the map carries. '
-           + '<strong>Position</strong> has <strong>Move pin on map</strong> and '
-           + '<strong>Copy lat, lon</strong> — the position as '
+           + 'That chart needs no sign-in; the records behind the pill do. The editor carries every '
+           + 'action the station\'s card on the map does, in the same short lists: <strong>In '
+           + 'Flood-Net</strong> at the top of it — Show in list, Zoom to station, Copy link, Field '
+           + 'data, Digital twin and the rest — and the other three under the coordinate boxes. '
+           + '<strong>Position</strong> has <strong>Copy lat, lon</strong> — the position as '
            + 'decimal degrees on the clipboard, ready to paste into a work order, a planning tool '
-           + 'or a message to whoever is standing at the site. In the editor it copies what the two '
+           + 'or a message to whoever is standing at the site — <strong>Directions</strong> and '
+           + '<strong>Move pin on map</strong>. In the editor Copy and Directions use what the two '
            + 'boxes say rather than what was last saved, so a pin you have just dragged or a figure '
            + 'you have just typed is what you get. <strong>Imagery and terrain</strong> opens Street '
            + 'View, Apple Maps and Google Earth at that position, or downloads the station as KML, and '
-           + '<strong>Records</strong> searches the <strong>FWIN</strong> and <strong>OOHB</strong> '
+           + '<strong>Records</strong> opens its <strong>ARRO admin</strong> page and searches the '
+           + '<strong>FWIN</strong> and <strong>OOHB</strong> '
            + 'document libraries for it. In the editor\'s <strong>ALERT IDs / Sensors</strong> '
            + 'list, each row carries a <strong>Flip</strong> link that opens the Bit Flipper on that '
            + 'row\'s address — what else it could have been, one or more bit-flips away. It reads '
@@ -2804,15 +2807,21 @@ function toggleHint(btn) {
 // card's Position group, beside Copy lat, lon and Move pin, rather than among
 // the imagery: those pills show somebody else's picture of the ground, and this
 // one — like the two beside it — is something done with the position itself.
-// Not on the editor card: that card's coordinate is the boxes, which Copy reads
-// at the click, and a link drawn from the saved record beside it would send a
-// crew to the pin as it was before somebody dragged it.
-function directionsPillHtml(s) {
+//
+// `live` is the editor card's, for Copy lat, lon's reason: that card's
+// coordinate is the boxes, and a link drawn from the saved record beside them
+// would send a crew to the pin as it was before somebody dragged it. So the
+// href is the record's only until it is pressed — editorDirections() puts the
+// boxes' figure in it first, on the press (pointerdown, which is before any
+// button's way of opening it, a middle click's and a menu's included) and on
+// the click, which is also Enter's.
+function directionsPillHtml(s, { live = false } = {}) {
   const apple = appleDevice();
   const url = stationDirectionsUrl(s, apple);
   if (!url) return '';
-  return `<a class="pill mn-directions" href="${esc(url)}" target="_blank" rel="noopener"
-       title="Driving directions to this location from wherever you are, in ${apple ? 'Apple' : 'Google'} Maps">${pillText('🚗', 'Directions', '↗')}</a>`;
+  return `<a class="pill mn-directions" href="${esc(url)}" target="_blank" rel="noopener"${live
+       ? ' onpointerdown="editorDirections(this, false)" onclick="return editorDirections(this)"' : ''}
+       title="Driving directions to ${live ? 'the latitude and longitude in the boxes above' : 'this location'} from wherever you are, in ${apple ? 'Apple' : 'Google'} Maps">${pillText('🚗', 'Directions', '↗')}</a>`;
 }
 
 // The links above, as pills — one place a URL shape is written, not two, and
@@ -2981,18 +2990,27 @@ function copyLatLonPillHtml(s, { live = false } = {}) {
 function copyStationLatLon(btn, text) {
   if (!btn) return;
   const value = (text != null ? text : btn.getAttribute('data-mn-latlon')) || '';
-  const prev  = btn.innerHTML;
-  const flash = (icon, label, said) => {
-    btn.innerHTML = pillText(icon, label);
-    announce(said);
-    setTimeout(() => { if (btn.isConnected) btn.innerHTML = prev; }, 1600);
-  };
   // Only reachable from the editor card, whose boxes can be emptied after the
   // pill was drawn. Saying so beats a button that silently does nothing.
-  if (!value) { flash('✗', 'No position', 'There is no latitude and longitude to copy'); return; }
+  if (!value) { flashPill(btn, '✗', 'No position', 'There is no latitude and longitude to copy'); return; }
   copyToClipboard(value).then(ok => ok
-    ? flash('✓', 'Copied', `Copied ${value}`)
-    : flash('✗', 'Copy failed', 'Could not copy the coordinate to the clipboard'));
+    ? flashPill(btn, '✓', 'Copied', `Copied ${value}`)
+    : flashPill(btn, '✗', 'Copy failed', 'Could not copy the coordinate to the clipboard'));
+}
+
+// A pill saying what its press did, for 1.6 s, and then its own label again —
+// Copy lat, lon's, and the editor card's Directions when its boxes are empty.
+// The label it goes back to is the one from before the first flash, so a
+// second press inside the 1.6 s cannot leave it reading "✓ Copied" for good.
+function flashPill(btn, icon, label, said) {
+  const f = btn._mnFlash || (btn._mnFlash = { prev: btn.innerHTML });
+  clearTimeout(f.timer);
+  btn.innerHTML = pillText(icon, label);
+  announce(said);
+  f.timer = setTimeout(() => {
+    btn._mnFlash = null;
+    if (btn.isConnected) btn.innerHTML = f.prev;
+  }, 1600);
 }
 
 // ── Datastore ─────────────────────────────────────────────────────────────────

@@ -233,18 +233,33 @@ const MapBlast = (function () {
     applyStyles,
 
     // The station card's affordance (the desktop callout's too, until the
-    // leader replaced it): arming is a mode on the repeater the operator
-    // already picked, so the link lives where a repeater is already in hand.
-    popupLinkHtml(s) {
+    // leader replaced it), and the editor card's: arming is a mode on the
+    // repeater the operator already picked, so the link lives where a repeater
+    // is already in hand. The editor's carries an id, so repaintEditorPill()
+    // can put its label right without redrawing the form round it.
+    popupLinkHtml(s, { editor = false } = {}) {
       if (!s.roles.includes('repeater') || !s.repeater) return '';
       const on = armedId() === s.id;
       // A pill since #170, and a <button> with it: the action is in-page, so
       // this is the element #138 named — not an `<a href="#">` that navigates
       // to the top of the document if the handler ever throws.
-      return `<button type="button" class="pill" onclick="MapBlast.toggle('${escAttr(s.id)}')"
+      return `<button type="button" class="pill"${editor ? ' id="ef-blast"' : ''} onclick="MapBlast.toggle('${escAttr(s.id)}')"
         title="${on ? 'Take the blast styling off the map'
                     : 'Red links and rings: what stops getting in if this repeater dies'}"
         >${pillText('💥', on ? 'Hide blast radius' : 'Show blast radius')}</button>`;
+    },
+
+    // The editor card's pill, in place, with the keyboard still on it if it
+    // was. Called wherever the mode or the repeater it is armed on changes —
+    // here, and from setMapFocusRepeater, which a click on the empty map or on
+    // another repeater goes through.
+    repaintEditorPill() {
+      const el = document.getElementById('ef-blast');
+      const s = el && state.data && state.data.stations.find(x => x.id === state.editorId);
+      if (!s) return;
+      const had = document.activeElement === el;
+      el.outerHTML = this.popupLinkHtml(s, { editor: true });
+      if (had) document.getElementById('ef-blast')?.focus({ preventScroll: true });
     },
 
     toggle(id) {
@@ -261,8 +276,10 @@ const MapBlast = (function () {
       applyMapLabels();
       // The station card draws this pill (#175), and is not rebuilt on its
       // next open the way a callout is — so its label is put right here, or
-      // it would go on saying "Show" over a map already showing.
+      // it would go on saying "Show" over a map already showing. The editor
+      // card's likewise.
       if (typeof repaintStnCard === 'function') repaintStnCard();
+      this.repaintEditorPill();
     },
 
     disarm() {
@@ -271,6 +288,7 @@ const MapBlast = (function () {
       applyMapFocusStyles();
       applyMapLabels();
       if (typeof repaintStnCard === 'function') repaintStnCard();   // as in toggle()
+      this.repaintEditorPill();
     },
 
     exportCsv() {

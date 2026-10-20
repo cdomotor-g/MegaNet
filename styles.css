@@ -2678,6 +2678,13 @@ h2.h-bad {
   column-gap: .1rem;
 }
 
+/* …and In Flood-Net, which leads the card from under its status line, as it
+   leads the station card's list. No grid gap above it to ride up into, so
+   not pulled up; the room under it is a section's, before Station. */
+.ef-pills-top {
+  margin: 0 -.3rem var(--sp-3);
+}
+
 /* A field whose caption wraps to two lines ("Wind region (AS/NZS 1170.2)",
    "TBRG bucket size (mm/tip)") made its box sit lower than its neighbour's.
    The grid stretches both labels to the row's height; spacing their caption

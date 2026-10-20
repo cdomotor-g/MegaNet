@@ -174,10 +174,27 @@ async function main() {
         found:     !!btn,
         onCoordRow: !!row && row.classList.contains('pill-row'),
         besideMove: !!row && !!row.querySelector('#ef-movepin'),
-        // Under the boxes, the groups the station card on the map draws, under
-        // the same names, each laid out as a list (.pill-list).
+        // The groups the station card on the map draws, under the same names,
+        // each laid out as a list (.pill-list): In Flood-Net under the card's
+        // head, the other three under the boxes.
         groups:    [...document.querySelectorAll('#stations-editor-card .ef-pills > [role="group"]')]
                      .map(g => `${g.getAttribute('aria-label')}${g.classList.contains('pill-list') ? '' : ' (not a list)'}`),
+        // And in them, the station card's pills, one for one — every one but
+        // Station details, which is this card — read by their icons, since an
+        // editor's own version of a pill (Show in the list ↑, Move pin with no
+        // sign-in to ask for) may word it differently.
+        same:      (() => {
+          const icons = groups => groups.map(g => `${g.label}: ${g.pills.map(h => {
+            const d = document.createElement('div');
+            d.innerHTML = h;
+            return d.querySelector('.pill-ic')?.textContent;
+          }).filter(i => i !== '✏️').join(' ')}`);
+          const card = icons(stationActionGroups(s));
+          const ed   = [...document.querySelectorAll('#stations-editor-card .ef-pills > [role="group"]')]
+            .map(g => `${g.getAttribute('aria-label')}: ${[...g.querySelectorAll('.pill-ic')].map(i => i.textContent).join(' ')}`);
+          return { card: card.join(' | '), ed: ed.join(' | ') };
+        })(),
+        top:       !!document.querySelector('#stations-editor-card .ef-pills-top [aria-label="In Flood-Net"]'),
         // The form in sections, and its explanations folded behind an ⓘ that
         // opens and shuts its paragraph — never inside a <label>, where its
         // name would join the field's.
@@ -220,8 +237,11 @@ async function main() {
     check('the editor card carries the same pill', ed.found);
     check('on the coordinate row, beside Move pin on map',
       ed.onCoordRow && ed.besideMove);
-    check('in the Position group, then imagery and records — the map card’s groups, as lists',
-      ed.groups.join(' | ') === 'Position | Imagery and terrain | Records', ed.groups.join(' | '));
+    check('in the map card’s four groups, as lists, in its order — In Flood-Net at the top',
+      ed.groups.join(' | ') === 'In Flood-Net | Position | Imagery and terrain | Records' && ed.top,
+      ed.groups.join(' | '));
+    check('carrying every pill the map card does but Station details',
+      ed.same.ed === ed.same.card, `editor ${ed.same.ed}\n      card   ${ed.same.card}`);
     check('latitude and longitude on one line, and boxes level when a caption wraps',
       ed.layout.latLon && ed.layout.level, JSON.stringify(ed.layout));
     check('the form is in sections — Station, Location, Telemetry first',
@@ -250,6 +270,17 @@ async function main() {
       edited.clip === '-12.345678, 145.5', edited.clip);
     check('and the label confirms it', edited.label === '✓ Copied', edited.label);
 
+    // Directions, beside it, on the same terms: the boxes, put into the link
+    // as it is pressed — before any way of opening it, a middle click's too.
+    const drive = await page.evaluate(() => {
+      const a = document.querySelector('#stations-editor-card .mn-directions');
+      if (!a) return null;
+      a.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      return { href: a.getAttribute('href'), want: stationDirectionsUrl({ lat: -12.345678, lon: 145.5 }) };
+    });
+    check('Directions on the editor card drives to the boxes, not the saved position',
+      !!drive && drive.href === drive.want, drive && `${drive.href} vs ${drive.want}`);
+
     await page.waitForTimeout(1800);
     await page.evaluate(() => {
       document.getElementById('ef-lat').value = '';
@@ -262,6 +293,14 @@ async function main() {
     }));
     check('emptied boxes say so rather than doing nothing visible',
       emptied.label === '✗ No position', emptied.label);
+    const nowhere = await page.evaluate(() => {
+      const a = document.querySelector('#stations-editor-card .mn-directions');
+      const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+      a.dispatchEvent(ev);
+      return { stopped: ev.defaultPrevented, label: a.textContent.trim() };
+    });
+    check('and so does Directions, which opens nothing',
+      nowhere.stopped && nowhere.label === '✗ No position', JSON.stringify(nowhere));
     check('and nothing is written over what was already on the clipboard',
       emptied.clip === '-12.345678, 145.5', emptied.clip);
 

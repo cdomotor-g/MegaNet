@@ -8,23 +8,20 @@
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, slug, pInt, pFloat,
-// parseRangeLines, stationImageryPills, docSearchPills, pillText, pillLong,
+// parseRangeLines, pillText, pillLong, flashPill, stationDirectionsUrl,
 // hintToggleHtml, stationMapLinkUrls,
 // stationSensors, arroSiteId, arroSiteUrl, arroSensorUrl, buildArroUrl,
 // bucketSizeGapNote, ROLE_LABEL and STATION_TYPE_LABEL (a proposed station's
-// type, 0039); across to app.js for the Stations tab's rerender hooks —
-// rerenderStations, rerenderStationEditorCard, refreshFilterOptions,
+// type, 0039); across to app.js for stationActionGroups — the station card's
+// pill groups, which this card draws too — and the Stations tab's rerender
+// hooks — rerenderStations, rerenderStationEditorCard, refreshFilterOptions,
 // refreshMapLayers, updateHeaderStats, findStationMatches, stationAlertIds,
 // passRangeCoversId, repeaterPassingCount and repeaterPassRangeSpan — and for
 // the places a new proposal is shown (focusStationOnMap, dockReveal,
 // toggleMapFullscreen) — and back
 // the other way, rerenderStationEditorCard() calls editorRefreshA2Seen() here
 // once the card is on screen, because the heard-slots list reads the readings
-// rather than state.data; to
-// map-move-pin.js for the button that moves this station's pin on the map above
-// the card, which writes back into the two coordinate boxes; to site-features.js
-// for the one beside it that maps the station's site features (0061); to auth.js for
-// Auth; and to
+// rather than state.data; to auth.js for Auth; and to
 // datastore.js for dbCanWrite, dbSaveStation, dbDeleteStation, dbSelect,
 // setEditorStatus, editorStatusHtml and editorWritesGoToDatabase; to inspections.js for
 // Inspections.configs and Inspections.ensureRefs — the telemetry pick-list
@@ -304,30 +301,28 @@ function editorForm(s) {
   const hasBase = s.roles.includes('base');
   const sensors = stationSensors(s).slice().sort((a, b) => (a.alert_id ?? 0) - (b.alert_id ?? 0));
   const dbId    = arroSiteId(s);
-  const movePin = MapMovePin.editorButtonHtml(s);
-  // Where the station's outlet, pits, benchmarks, boards and orifice run are
-  // (site-features.js, 0061): the same mode the card's 📌 pill arms, beside
-  // Move pin because both are the station's place on the ground. Signed-in
-  // editors only, and nothing for a "+ New" draft, which has no id yet.
-  const siteFeat = typeof SiteFeatures !== 'undefined' ? SiteFeatures.editorButtonHtml(s) : '';
-  // Same pill the station card on the map carries (and a phone's callout),
-  // from the same builder — but pointed at
-  // editorCopyLatLon(), which reads the two boxes rather than the record. The
-  // card is where a coordinate is *edited*: a pin dragged in from the map or a
-  // figure typed over one has to be what the clipboard gets, and reading the
-  // boxes at the click is the only version of that which cannot go stale.
-  const copyLL  = copyLatLonPillHtml(s, { live: true });
-  // Everything under the coordinate boxes, in the groups the station card on
-  // the map draws and under the same names — the position's own three, then
-  // somebody else's picture of the ground (the KML download among them, #176),
-  // then the paperwork. A two-column list under each name (.pill-list), as on
-  // the card. A group with nothing in it is not drawn: a "+ New" draft has no
-  // pin to move, and a station with no position has only its two searches.
-  const actions = [
-    { label: 'Position', cls: ' ef-movepin', pills: [movePin, copyLL, siteFeat] },
-    { label: 'Imagery and terrain', cls: '', pills: stationImageryPills(s) },
-    { label: 'Records', cls: '', pills: docSearchPills(s) },
-  ].map(g => ({ ...g, pills: g.pills.filter(Boolean) })).filter(g => g.pills.length);
+  // Every action the station card on the map offers, from the same builder,
+  // under the same names and in the same order (stationActionGroups, app.js) —
+  // the editor's versions of the ones that read the coordinate boxes or are
+  // repainted in place, and no Station details, which is this card. The card is
+  // where a coordinate is *edited*: a pin dragged in from the map or a figure
+  // typed over one has to be what Copy and Directions hand over, and reading
+  // the boxes at the press is the only version of that which cannot go stale.
+  //
+  // What the app does with the station leads the card, under its header, as it
+  // leads the station card's list. The other three go under the coordinate
+  // boxes: the position's own, then somebody else's picture of the ground (the
+  // KML download among them, #176), then the paperwork. A two-column list under
+  // each name (.pill-list), as on the card. A group with nothing in it is not
+  // drawn: a "+ New" draft has nothing for the app to do with it yet and no pin
+  // to move, and a station with no position has only its two searches.
+  const groups  = stationActionGroups(s, { editor: true });
+  const inApp   = groups.filter(g => g.label === 'In Flood-Net');
+  const actions = groups.filter(g => g.label !== 'In Flood-Net')
+    .map(g => ({ ...g, cls: g.label === 'Position' ? ' ef-movepin' : '' }));
+  const groupHtml = g => `<div class="pill-row pill-list${g.cls || ''}" role="group" aria-label="${escAttr(g.label)}">
+          ${g.pills.join('\n          ')}
+        </div>`;
   // The wind region the station's coordinate falls in — the same answer the
   // station card on the map gives, so the two cards never disagree. Read now, and
   // filled in when the polygons land if this page has not needed them yet.
@@ -354,6 +349,11 @@ function editorForm(s) {
     <div id="ef-status" class="small ef-status">${editorStatusHtml()}</div>
     <!-- A proposal says so first (0039): the band, and the year it is for. -->
     ${editorProposalHtml(s)}
+    <!-- What the app can do with the station, first, as on the station card:
+         the list, the map, a link to it, its readings, its twin, its photos. -->
+    ${inApp.length ? `<div class="ef-pills ef-pills-top">
+        ${inApp.map(groupHtml).join('\n        ')}
+      </div>` : ''}
     <!-- The form in the sections a station is thought about in, each under a
          heading of its own: what it is, where it is, what it sends — then the
          repeater's radio, the Bureau's lists, ARRO and the inspections, which
@@ -415,15 +415,14 @@ function editorForm(s) {
       <label>Longitude<input type="number" step="any" id="ef-lon" value="${s.lon ?? ''}"></label>
       <!-- Typing a coordinate is the exact form of this that nobody can check.
            Move pin arms map-move-pin.js: the pin comes off the map, goes where
-           the station is, and writes these two boxes on the way back. Copy is
-           the other direction — the position out of here and into whatever is
-           being written somewhere else. Both belong to the two boxes above, so
-           the Position group comes first, directly under them, and the groups
-           that leave the site follow it. -->
+           the station is, and writes these two boxes on the way back. Copy and
+           Directions are the other direction — the position out of here and
+           into whatever is being written somewhere else, or driven to. All of
+           them belong to the two boxes above, so the Position group comes
+           first, directly under them, and the groups that leave the site
+           follow it. -->
       ${actions.length ? `<div class="full ef-pills">
-        ${actions.map(g => `<div class="pill-row pill-list${g.cls}" role="group" aria-label="${escAttr(g.label)}">
-          ${g.pills.join('\n          ')}
-        </div>`).join('\n        ')}
+        ${actions.map(groupHtml).join('\n        ')}
       </div>` : ''}
       <label>Elevation AHD (m)<input type="number" step="any" id="ef-elev" value="${s.elevation_ahd ?? ''}"></label>
       <!-- Read-only because it is not a property of the station: it is where the
@@ -805,9 +804,23 @@ function deriveLegacyAlertIds(sensors) {
 // stationLatLonText() the map's own Copy pill uses, so the two never disagree about how
 // many digits a position has.
 function editorCopyLatLon(btn) {
-  const lat = pFloat(document.getElementById('ef-lat')?.value);
-  const lon = pFloat(document.getElementById('ef-lon')?.value);
-  copyStationLatLon(btn, stationLatLonText({ lat, lon }));
+  copyStationLatLon(btn, stationLatLonText(editorBoxesLatLon()));
+}
+
+// Directions from the editor card, to the boxes for the same reason
+// (directionsPillHtml's `live`): the link's href is put right just before the
+// browser follows it. `press` is the click — the one call that can say there is
+// nowhere to drive to, and stop the link opening a map of the old position.
+function editorDirections(a, press = true) {
+  const url = stationDirectionsUrl(editorBoxesLatLon());
+  if (url) { a.href = url; return true; }
+  if (press) flashPill(a, '✗', 'No position', 'There is no latitude and longitude to give directions to');
+  return false;
+}
+
+function editorBoxesLatLon() {
+  return { lat: pFloat(document.getElementById('ef-lat')?.value),
+           lon: pFloat(document.getElementById('ef-lon')?.value) };
 }
 
 // Read the form into a station record. Split out of editorSave() because the
