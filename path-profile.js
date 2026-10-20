@@ -875,21 +875,39 @@ const PathProfile = (function () {
     return { cover: c ? c.cls : null, canopy: c && c.canopyOk ? c.canopy : null, coverOff: false };
   }
 
+  // The stretch as the key and the note say it: whole numbers once it is
+  // large, a decimal while it is near true scale.
+  function stretchLabel(s) {
+    return s >= 10 ? String(Math.round(s)) : s.toFixed(1);
+  }
+
   // Why the zone is an ellipse when a signal spreads out — the question the
   // picture raises, answered under it with this path's own figures. The two
   // are not at odds: the wave does spread (that is the free-space loss), and
   // the ellipse is the part of it the far antenna hears in step. Shut by
   // default, like the card's other disclosures.
-  function zoneWhyHtml(an, sigOn) {
+  //
+  // `scale` is the chart's own stretch (see chartSvg): the reason the circle a
+  // wave spreads in is drawn as an upright line, said with this chart's figures.
+  function zoneWhyHtml(an, sigOn, scale) {
     const r1 = fresnelR1(an.D / 2, an.D / 2, an.fMhz);
+    const S = stretchLabel(scale.stretch);
+    const shape = scale.stretch >= 5
+      ? ` This chart draws heights ×${S} against distances — at true scale the ground would be a hair-thin line
+          along the bottom — and that stretches each circle into an ellipse ${S} times taller than it is wide. So
+          the wave does not leap into the sky: it is a small burst at A that reaches the top and bottom of the chart
+          once it is ${fmtKm(scale.reachZ / 1000)} out${scale.flatAt < an.D
+            ? `, and from ${fmtKm(scale.flatAt / 1000)} out a circle that big bends by less than a pixel across the
+              chart's whole height`
+            : ''}.${sigOn ? ' That is the wavefront the signal draws.' : ''}`
+      : sigOn ? ' That is the wavefront the signal draws.' : '';
     return `
       <details class="path-why" ${state.link.zoneOpen ? 'open' : ''}
                ontoggle="state.link.zoneOpen = this.open">
         <summary class="small">Why an ellipse, if the signal spreads out?</summary>
-        <p class="filter-hint">It does spread out. The wave leaves A as an ever-widening front — narrowed only by the
-          antenna's pattern — and within a few kilometres it is taller than this whole chart${
-          sigOn ? ', which is why the wavefront sweeps the full height of it' : ''}. That spreading is most of the loss: free space takes a quarter of the power,
-          6 dB, for every doubling of the distance.</p>
+        <p class="filter-hint">It does spread out, in circles round A — spheres, really, narrowed only by the antenna's
+          pattern.${shape} The spreading is also most of the loss: free space takes a quarter of the power, 6 dB, for every
+          doubling of the distance.</p>
         <p class="filter-hint">The ellipse is not the beam. It is the first Fresnel zone: every point where the bent path
           A → that point → B is no more than half a wavelength (${(299.792458 / an.fMhz / 2).toFixed(2)} m at ${
           Number(an.fMhz.toFixed(3))} MHz) longer than the straight one. The wave passing through it reaches B in step
@@ -931,6 +949,16 @@ const PathProfile = (function () {
     if (!isFinite(lo) || !isFinite(hi)) return '';
     const pad = Math.max(20, (hi - lo) * 0.1);
     lo -= pad; hi += pad;
+
+    // How much more the chart stretches heights than distances. Said in the
+    // key, because a profile drawn at true scale would put a 1 km range on a
+    // 96 km path nine pixels high, and the stretch is what turns the circle a
+    // wave spreads in into the near-upright line the signal draws. `flatAt`
+    // is how far out from A that circle bends by under a pixel from the top of
+    // the chart to the bottom — the sagitta dz²/2d, in pixels along.
+    const stretch = D > 0 && hi > lo ? (ih / (hi - lo)) / (iw / D) : 1;
+    const reachZ  = flat ? 0 : Math.max(hi - an.txZ, an.txZ - lo);
+    const scale = { stretch, reachZ, flatAt: D > 0 ? reachZ * reachZ * (iw / D) / 2 : Infinity };
 
     const x = d => L + (D > 0 ? d / D : 0) * iw;
     const y = m => T + (1 - (m - lo) / (hi - lo)) * ih;
@@ -1231,6 +1259,7 @@ const PathProfile = (function () {
             <span><i class="path-key-los"></i> Line of sight</span>
             <span><i class="path-key-fres"></i> 60% Fresnel zone — the clearance the link needs</span>`}
           <span><i class="path-key-gnd"></i> Ground (curvature k=${an.k.toFixed(2)} included)</span>
+          <span>Heights drawn ×${stretchLabel(stretch)} against distances</span>
           ${lidarLine ? '<span><i class="path-key-lidar"></i> 5 m LiDAR</span>' : ''}
           ${earth ? `<span><i class="path-key-earth"></i> Earth curvature${sag > 0.5 ? ` · ${Math.round(sag)} m at mid-path` : ''}</span>` : ''}
           ${flat ? '' : '<span><i class="path-key-obs"></i> Inside the Fresnel zone</span>'}
@@ -1248,7 +1277,7 @@ const PathProfile = (function () {
           line on the map, for the figure at that point.${
           an.model === 'cover' || !an.coverUsed ? ''
             : ' Under the field model the cover is drawn but not priced along the way — its average cost is in the allowance; the land-cover model, in the link budget\'s propagation settings, prices it where it stands.'}</p>` : ''}
-        ${flat ? '' : zoneWhyHtml(an, sigOn)}
+        ${flat ? '' : zoneWhyHtml(an, sigOn, scale)}
         <p class="filter-hint">${esc(prof.attribution)} · ${prof.lidar ? `~${prof.resolution_m} m tiles read every ${
           Math.round(prof.distance_m[1] - prof.distance_m[0])} m` : `sampled every ~${prof.resolution_m} m`} at zoom ${prof.zoom} over ${prof.tiles} tile${prof.tiles === 1 ? '' : 's'}${
           prof.capped ? ', zoom reduced to stay inside the tile budget for a path this long' : ''}.${lidarNote()}${
@@ -1639,7 +1668,7 @@ const PathProfile = (function () {
   //
   // The clip is the wavefront itself: a sphere round A's antenna, which the
   // chart's scales — metres up, kilometres along — draw as an ellipse many
-  // times taller than it is wide. So it is a burst at A that fills the sky
+  // times taller than it is wide (the key says how many: chartSvg's stretch). So it is a burst at A that fills the sky
   // within a few pixels and sweeps on to B as a wall, which is the honest
   // picture at this exaggeration rather than a stylised one.
   function sigUnderHtml(g) {

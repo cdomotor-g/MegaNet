@@ -3465,7 +3465,9 @@ envelope a little stronger over it, and the line — is painted in the
 colour of the margin left over the receiver's threshold at each point. The
 wavefront is the wave itself: a sphere round A's antenna, which the chart's
 two scales (metres up, kilometres along) draw as an ellipse far taller than it
-is wide — a burst at A that fills the sky within a few pixels and sweeps on to B
+is wide — the key says by how much, *Heights drawn ×N against distances*, since
+nothing else on the chart did and an upright line read as a wave leaping into
+the sky — a burst at A that fills the sky within a few pixels and sweeps on to B
 as a wall — with the stretch of it inside the Fresnel zone drawn brighter, as
 the part of the wave B hears in step. It used to be only as tall as the zone,
 which drew the signal as a lens swelling out of A and narrowing into B, the
