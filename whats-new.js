@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 55, date: '2026-10-20', items: [
+      '<strong>🗺️ The carriers\' coverage maps on the map.</strong> In 🗺️ Map display, <em>Mobile coverage — the '
+        + 'carriers\' 4G maps</em> draws Telstra\'s, Optus\'s or TPG\'s own 4G coverage map — or the best of the three — '
+        + 'green where a phone works outdoors and amber where only with an external antenna, as each carrier gave it to '
+        + 'the ACCC.',
+      '<strong>📶 Each carrier\'s own word, on the cards.</strong> Under each carrier in a station card\'s or the '
+        + '<strong>ℹ️ What is here</strong> card\'s <em>Mobile coverage</em> section is now what that carrier\'s own map '
+        + 'says there — covered outdoors, external antenna only, or not covered — and the section says so when it and '
+        + 'the estimate disagree.',
+    ] },
     { n: 54, date: '2026-10-20', items: [
       '<strong>📶 Mobile coverage, estimated.</strong> Every station card, and the <strong>ℹ️ What is here</strong> card '
         + 'for any point on the map, now has a <em>Mobile coverage — estimated</em> section: for Telstra, Optus and TPG '

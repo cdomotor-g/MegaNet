@@ -1,0 +1,67 @@
+# The carriers' own 4G coverage maps, as the ACCC publishes them once a year
+# (each as at 31 January), turned into data/coverage/ — the tiles the Stations
+# map's Mobile coverage layer draws and the station and What is here cards read
+# a point off — and, from the same release, the year's list of Optus sites
+# shared with TPG that tools/mobile_sectors.py counts for TPG.
+#
+# By hand, once the ACCC has published the year's maps on data.gov.au
+# (docs/mobile-coverage.md): Actions → Refresh mobile coverage tiles → Run
+# workflow, with the year. It downloads ~2 GB, takes ~20 minutes, and opens a
+# pull request rather than pushing, like the ACMA refresh, so the new tiles are
+# looked at before they are served.
+
+name: Refresh mobile coverage tiles
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: 'The ACCC release year (maps as at 31 January of it)'
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  tiles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      YEAR: ${{ inputs.year }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Pillow and numpy
+        run: pip install numpy pillow
+
+      - name: Download the maps and build the tiles
+        run: python3 tools/coverage_tiles.py --fetch "$YEAR" --out data/coverage
+             --mocn-sites data/mobile/accc-mocn-sites.csv
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: coverage-tiles-refresh
+          commit-message: "Mobile coverage tiles: the ACCC's ${{ inputs.year }} maps"
+          title: "Mobile coverage tiles: the ACCC's ${{ inputs.year }} maps"
+          body: |
+            The carriers' own 4G coverage maps as at 31 January
+            ${{ inputs.year }}, from the ACCC Mobile Infrastructure Report
+            data release, rebuilt into `data/coverage/` by
+            `tools/coverage_tiles.py`; and the year's list of Optus sites
+            shared with TPG in `data/mobile/accc-mocn-sites.csv`, which the
+            next monthly ACMA refresh folds into `data/mobile/`.
+
+            Turn on **Mobile coverage — the carriers' 4G maps** in 🗺️ Map
+            display and look at a few places you know before merging.
+
+            Contains ACCC data, licensed under CC BY 2.5 AU.
+          add-paths: |
+            data/coverage/**
+            data/mobile/accc-mocn-sites.csv
+          delete-branch: true

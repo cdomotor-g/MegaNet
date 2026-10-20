@@ -3501,6 +3501,13 @@ const state = {
   mapElvisCov:        false,
   mapElvisCovOpacity: Math.max(0.1, Math.min(1,
                         Number(localStorage.getItem('mn-elvis-cov-op')) || 0.6)),
+  // The carriers' own 4G coverage maps (see MapMobileCoverage), on the same
+  // terms: off by default and not persisted, since it costs tile requests;
+  // which carrier and how strongly it is painted are preferences, remembered.
+  mapMobileCov:        false,
+  mapMobileCovCarrier: localStorage.getItem('mn-mobile-cov-carrier') || 'telstra',
+  mapMobileCovOpacity: Math.max(0.1, Math.min(1,
+                         Number(localStorage.getItem('mn-mobile-cov-op')) || 0.5)),
   // The highest ground in view (see MapPeaks). Off by default and not
   // persisted, on MapContours' terms rather than MapSurvey's: a pass costs up
   // to a hundred terrain tiles for a view nobody asked a question about, so

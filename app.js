@@ -4987,6 +4987,12 @@ function mapDisplayControlsHtml() {
     </label>
     ${ElvisCoverage.rampHtml()}` : ''}
     <p class="filter-note" id="map-elvis-cov-note">${ElvisCoverage.noteHtml()}</p>
+    <!-- The carriers' own 4G coverage maps (map-mobile-coverage.js): where a
+         phone works outdoors, and where only with an external antenna, as
+         Telstra, Optus and TPG gave them to the ACCC. Beside the elevation
+         coverage because it is the same kind of thing — a map of what exists
+         where, drawn under the pins; the cards price the signal itself. -->
+    ${MapMobileCoverage.controlsHtml()}
     <!-- The Digital Twin at close zoom (map-twin.js): from zoom 17 with a
          station under the view the map offers the site twin — a card saying
          what imagery covers the station, and a button — and hands its
@@ -5479,6 +5485,7 @@ function mapLegendHtml() {
         under each place, keyed in full in 🗺️ Map display. Profiles still read ~30 m terrain
         everywhere (Elvis — Geoscience Australia / ICSM)</span>
     </span>` : ''}
+    ${MapMobileCoverage.active() ? MapMobileCoverage.legendHtml() : ''}
     ${MapPolar.active() ? mapPolarLegendHtml() : ''}
     ${MapSites.active() ? MapSites.legendHtml() : ''}
     ${MapPeaks.active() ? `
@@ -5686,6 +5693,7 @@ function stopStationsMap() {
   MapSurvey.detach();
   MapContours.detach();
   ElvisCoverage.detach();
+  MapMobileCoverage.detach();
   MapPeaks.detach();
   MapPolar.detach();
   MapSites.detach();
@@ -5844,6 +5852,7 @@ function initMap() {
   MapSurvey.attach(state.map);
   MapContours.attach(state.map);
   ElvisCoverage.attach(state.map);
+  MapMobileCoverage.attach(state.map);
   MapPeaks.attach(state.map);
   // Its own on-map panel rather than a switch in the 🗺️ flyout: this one is a
   // dialog, not a layer — nine fields and a Draw button — and it is the same

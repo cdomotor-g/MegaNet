@@ -18,12 +18,18 @@
 //   · a point with no mast within 60 km says so for every carrier, and plans on
 //     no signal; a point whose terrain will not come says it could not be
 //     estimated — never "no coverage" — and Try again recovers it;
+//   · each carrier's own map is read off a coverage tile made here (Telstra
+//     outdoors, Optus external antenna only, TPG none) and set under its row,
+//     and a disagreement with the estimate is said;
+//   · the coverage layer, off until asked, paints that tile per carrier in the
+//     key's colours and asks for no tile its index does not list;
 //   · a real station's card carries the section under its road section, off the
 //     real register extract.
 //
 //   npm run mobilecard          (-- -v to list what passed)
 
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { createRequire } from 'node:module';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
@@ -53,6 +59,34 @@ function dest(lat, lon, brg, km) {
   return [+(p2 * 180 / Math.PI).toFixed(5), +(l2 * 180 / Math.PI).toFixed(5)];
 }
 
+// A 256×256 8-bit greyscale PNG, every pixel `grey` — a coverage tile.
+function greyPng(grey) {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = buf => { let c = 0xffffffff; for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const c = Buffer.alloc(4); c.writeUInt32BE(crc(td));
+    return Buffer.concat([len, td, c]);
+  };
+  const raw = Buffer.alloc((256 + 1) * 256);
+  for (let y = 0; y < 256; y++) raw.fill(grey, y * 257 + 1, (y + 1) * 257);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(256, 0); ihdr.writeUInt32BE(256, 4); ihdr[8] = 8; ihdr[9] = 0;
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+// The z9 tile over a point.
+function tileOf(lat, lon, z) {
+  const n = 2 ** z, s = Math.sin(lat * Math.PI / 180);
+  return [Math.floor((lon + 180) / 360 * n), Math.floor((0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n)];
+}
+
 // ── The invented register ────────────────────────────────────────────────────
 const P = [-27.5, 152.45];
 const T = dest(...P, 0, 5);        // Telstra, north, facing the point
@@ -68,6 +102,18 @@ const CELL = {
   ],
 };
 const INDEX = { meta: { source_date: '2026-10-20', attribution: 'test' }, cells: { '-28_152': 4 } };
+
+// ── The invented coverage maps ───────────────────────────────────────────────
+// One z9 tile over the point, every pixel v = 2 + 3·1 + 9·0: Telstra covered
+// outdoors, Optus with an external antenna only, TPG not at all — written 9·v,
+// as tools/coverage_tiles.py writes it.
+const [CX, CY] = tileOf(...P, 9);
+const COVER_INDEX = {
+  meta: { as_at: '2026-01-31', year: 2026, z_native: 9, z_min: 3, step: 9,
+          box: { w: 112, e: 154.5, n: -9, s: -44.5 }, attribution: 'Mobile coverage: test' },
+  tiles: { 9: [`${CX}_${CY}`] },
+};
+const COVER_TILE = greyPng(9 * (2 + 3 * 1 + 9 * 0));
 
 const server = await startServer();
 const browser = await launchBrowser();
@@ -86,6 +132,17 @@ const stubRegister = async route => {
   return route.fulfill({ status: 404, body: '' });
 };
 await page.route(/\/data\/mobile\//, stubRegister);
+const coverAsked = [];
+const stubCoverage = async route => {
+  const u = new URL(route.request().url());
+  coverAsked.push(u.pathname);
+  if (u.pathname.endsWith('/data/coverage/index.json')) return route.fulfill({ json: COVER_INDEX });
+  if (u.pathname.endsWith(`/data/coverage/9/${CX}/${CY}.png`)) {
+    return route.fulfill({ status: 200, contentType: 'image/png', body: COVER_TILE });
+  }
+  return route.fulfill({ status: 404, body: '' });
+};
+await page.route(/\/data\/coverage\//, stubCoverage);
 page.on('pageerror', e => errors.push(String(e)));
 
 await page.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
@@ -161,8 +218,67 @@ try {
   check('the summary names who reaches, and links all three carriers’ own maps',
     a.items.some(t => /^A phone here should get /.test(t)) && a.items.some(t => /Telstra’s coverage map/.test(t)
       && /Optus’s coverage map/.test(t) && /Vodafone’s \(TPG’s\) coverage checker/.test(t)), JSON.stringify(a.items));
+  check('each carrier’s own map is read off the coverage tile at the point',
+    /its own map \(2026\): covered outdoors/.test(a.rows.Telstra)
+      && /its own map \(2026\): external antenna only/.test(a.rows.Optus)
+      && /its own map \(2026\): not covered/.test(a.rows['TPG (Vodafone)']),
+    JSON.stringify([a.rows.Telstra, a.rows.Optus, a.rows['TPG (Vodafone)']]));
+  const tpgReaches = !/^No coverage/.test(a.rows['TPG (Vodafone)']);
+  check('where the estimate and a carrier’s map disagree, the summary says so and names it',
+    !tpgReaches || a.items.some(t => /TPG \(Vodafone\)’s own map disagree/.test(t)), JSON.stringify(a.items));
   check('the sources name the register, the ACCC’s shared-site list and the standard',
     a.workings.some(w => /Register of Radiocommunications Licences/.test(w) && /MOCN/.test(w) && /F2026L00381|Industry Standard 2026/.test(w)));
+
+  // ── The coverage layer ────────────────────────────────────────────────────
+  if (VERBOSE) console.log('The coverage layer');
+  const before = coverAsked.length;
+  check('the layer is off on a cold load, and claims no legend key',
+    await page.evaluate(() => state.mapMobileCov === false && !MapMobileCoverage.active()));
+  check('…and its note says so', await page.evaluate(() => /^Off\./.test(MapMobileCoverage.noteHtml())));
+  await page.evaluate(([lat, lon]) => { MapHere.close(); state.map.setView([lat, lon], 9, { animate: false });
+    MapMobileCoverage.setCarrier('telstra'); MapMobileCoverage.setEnabled(true); }, P);
+  const painted = async () => page.waitForFunction(() => {
+    const pane = state.map.getPane('mnMobileCov');
+    const cvs = pane ? [...pane.querySelectorAll('canvas')] : [];
+    return cvs.length > 0;
+  }, null, { timeout: 15_000 }).then(() => page.waitForTimeout(400)).then(() => page.evaluate(() => {
+    const seen = new Set();
+    for (const cv of state.map.getPane('mnMobileCov').querySelectorAll('canvas')) {
+      const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      for (let i = 3; i < d.length; i += 4 * 97) if (d[i]) seen.add(`${d[i - 3]},${d[i - 2]},${d[i - 1]}`);
+    }
+    return [...seen];
+  }));
+  const tel = await painted();
+  check('on, it puts a layer in its own pane, above the elevation coverage and under the contours',
+    await page.evaluate(() => MapMobileCoverage.active()
+      && Number(getComputedStyle(state.map.getPane('mnMobileCov')).zIndex) === 248));
+  check('Telstra’s tile paints the outdoor green, and nothing else', tel.length === 1 && tel[0] === '31,157,85', tel.join(' | '));
+  await page.evaluate(() => MapMobileCoverage.setCarrier('optus'));
+  const opt = await painted();
+  check('Optus’s, off the same tile, paints the external-antenna amber', opt.length === 1 && opt[0] === '224,161,0', opt.join(' | '));
+  await page.evaluate(() => MapMobileCoverage.setCarrier('tpg'));
+  const tpg = await painted();
+  check('TPG’s paints nothing — the tile says none', tpg.length === 0, tpg.join(' | '));
+  await page.evaluate(() => MapMobileCoverage.setCarrier('any'));
+  const any = await painted();
+  check('the best of the three is Telstra’s outdoor', any.length === 1 && any[0] === '31,157,85', any.join(' | '));
+  const ui = await page.evaluate(() => ({
+    legend: MapMobileCoverage.legendHtml(),
+    controls: MapMobileCoverage.controlsHtml(), carrier: localStorage.getItem('mn-mobile-cov-carrier'),
+  }));
+  check('the panel offers the carrier and the opacity, with the key', /<select/.test(ui.controls)
+    && /Coverage opacity/.test(ui.controls) && /Outdoor — a phone in the hand/.test(ui.controls)
+    && /External antenna only/.test(ui.controls));
+  check('the carrier picked is remembered', ui.carrier === 'any', String(ui.carrier));
+  check('the legend keys both levels and dates the map', /4G — outdoor/.test(ui.legend)
+    && /external antenna only/.test(ui.legend) && /31 January 2026/.test(ui.legend), ui.legend);
+  check('only tiles the index lists are asked for',
+    coverAsked.slice(before).every(p => /index\.json$/.test(p) || p.endsWith(`/9/${CX}/${CY}.png`)),
+    coverAsked.slice(before).filter(p => !/index\.json$/.test(p)).slice(0, 4).join(' '));
+  await page.evaluate(() => MapMobileCoverage.setEnabled(false));
+  check('off again takes the layer away', await page.evaluate(() => !MapMobileCoverage.active()
+    && !state.map.getPane('mnMobileCov').querySelector('canvas')));
 
   // ── Nowhere near a mast ───────────────────────────────────────────────────
   if (VERBOSE) console.log('Far from every mast');

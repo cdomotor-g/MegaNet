@@ -60,11 +60,11 @@ jobs:
       # Every Telstra, Optus and TPG mobile sector, off the same extract, for
       # the mobile coverage section on the station and What is here cards
       # (site-mobile.js). The ACCC's list of Optus sites shared with TPG is the
-      # yearly file committed beside it; replace it when the ACCC publishes
-      # the next year's (docs/mobile-coverage.md).
+      # yearly file committed beside it, refreshed with the coverage maps by
+      # coverage-tiles.yml (docs/mobile-coverage.md).
       - name: Mobile base station sectors
         run: python3 tools/mobile_sectors.py --zip /tmp/spectra_rrl.zip
-             --mocn data/mobile/accc-mocn-sites-2026.csv --out data/mobile
+             --mocn data/mobile/accc-mocn-sites.csv --out data/mobile
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@v6

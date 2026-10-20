@@ -1,10 +1,10 @@
 {
  "meta": {
-  "generated": "2026-10-20T05:31:40Z",
+  "generated": "2026-10-20T06:16:20Z",
   "source_date": "2026-10-20",
   "source": "ACMA Spectra RRL daily extract (bulk download)",
   "attribution": "Contains data from the Australian Communications and Media Authority, Register of Radiocommunications Licences (CC BY 4.0).",
-  "mocn_source": "ACCC Mobile Infrastructure Report data release \u2014 Mobile sites, Optus-TPG MOCN (CC BY 2.5 AU)",
+  "mocn_source": "ACCC Mobile Infrastructure Report data release \u2014 Mobile sites, Optus-TPG MOCN, 2026 (CC BY 2.5 AU)",
   "carriers": [
    "Telstra",
    "Optus",

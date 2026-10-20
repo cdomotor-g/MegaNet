@@ -409,6 +409,12 @@
        DEM resolution exists where, which is the question the contours' own
        source raises and this app could not previously answer. -->
   <script src="map-elvis-coverage.js?v=20261020a"></script>
+  <!-- The carriers' own 4G coverage maps, from the ACCC's release, as one
+       tile set of all three carriers in data/coverage/ (tools/
+       coverage_tiles.py). Beside the elevation coverage because it is the same
+       kind of thing — a map of what exists where — and it only declares;
+       site-mobile.js above reads a point off it at runtime. -->
+  <script src="map-mobile-coverage.js?v=20261020a"></script>
   <!-- Road parcels from the Queensland cadastre. Beside the survey marks and
        the contours because it is the same kind of thing — a Qld spatial
        service drawn under the pins — not because it has to be: like every

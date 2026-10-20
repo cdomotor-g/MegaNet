@@ -74,7 +74,7 @@ OUTPUT
 
 USAGE
     python3 tools/mobile_sectors.py --zip spectra_rrl.zip \\
-        --mocn data/mobile/accc-mocn-sites-2026.csv --out data/mobile
+        --mocn data/mobile/accc-mocn-sites.csv --out data/mobile
 """
 
 import argparse
@@ -211,14 +211,17 @@ def carrier_of(name):
 
 
 def load_mocn(path):
-    """(lat, lon) of every site the ACCC lists as Optus–TPG shared."""
-    out = []
+    """(lat, lon) of every site the ACCC lists as Optus–TPG shared, and the
+    year the list is as at (its Year column)."""
+    out, years = [], set()
     with open(path, encoding="utf-8-sig", newline="") as fh:
         for r in csv.DictReader(fh):
             lat, lon = num(r.get("Latitude")), num(r.get("Longitude"))
             if lat is not None and lon is not None:
                 out.append((lat, lon))
-    return out
+            if r.get("Year"):
+                years.add(r["Year"].strip())
+    return out, (max(years) if years else None)
 
 
 def main():
@@ -300,7 +303,7 @@ def main():
 
     # The shared sites: Optus sites near a listed position. A coarse grid
     # keeps the match linear rather than every Optus site against every row.
-    mocn_rows = load_mocn(a.mocn) if a.mocn else []
+    mocn_rows, mocn_year = load_mocn(a.mocn) if a.mocn else ([], None)
     grid = {}
     for lat, lon in mocn_rows:
         grid.setdefault((round(lat, 2), round(lon, 2)), []).append((lat, lon))
@@ -349,8 +352,8 @@ def main():
             "source": "ACMA Spectra RRL daily extract (bulk download)",
             "attribution": "Contains data from the Australian Communications and Media Authority, "
                            "Register of Radiocommunications Licences (CC BY 4.0).",
-            "mocn_source": ("ACCC Mobile Infrastructure Report data release — Mobile sites, "
-                            "Optus-TPG MOCN (CC BY 2.5 AU)") if a.mocn else None,
+            "mocn_source": (f"ACCC Mobile Infrastructure Report data release — Mobile sites, "
+                            f"Optus-TPG MOCN, {mocn_year} (CC BY 2.5 AU)") if a.mocn else None,
             "carriers": [name for _, name, _ in CARRIERS],
             "cell_deg": CELL_DEG,
             "row": ["carrier", "band", "f_mhz", "az", "h_m", "hbw_deg", "f2b_db", "rs_dbm"],

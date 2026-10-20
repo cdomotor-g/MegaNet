@@ -12,8 +12,9 @@
 // because a flat stretch reads as a clear path.
 //
 // Then the data: data/mobile/index.json names exactly the cell files there
-// are, and every row in them is the shape and range the card assumes. Node
-// only, no browser, well under a second.
+// are, and every row in them is the shape and range the card assumes; and
+// data/coverage/index.json names exactly the tiles there are, each an 8-bit
+// greyscale PNG of 9·v. Node only, no browser, about a second.
 //
 //   npm run mobile          (-- -v to list what passed)
 
@@ -203,6 +204,61 @@ console.log('data/mobile/');
   check('the counts add up', total === index.meta.counts.sectors && sites === index.meta.counts.sites
     && per.join() === index.meta.counts.per_carrier.join(), `${total} / ${sites} / ${per}`);
   check('all three carriers are there in numbers', per.every(n => n > 10000), per.join());
+}
+
+// ── The carriers' coverage tiles ─────────────────────────────────────────────
+console.log('data/coverage/');
+{
+  const dir = path.join(REPO_ROOT, 'data', 'coverage');
+  const index = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8'));
+  const m = index.meta;
+  check('the index dates the maps and carries the ACCC’s attribution',
+    /^\d{4}-01-31$/.test(m.as_at) && /Australian Competition and Consumer Commission/.test(m.attribution)
+      && /CC BY 2\.5 AU/.test(m.attribution), JSON.stringify([m.as_at, m.attribution]));
+  check('it says how a pixel is read: 9·v, three carriers to a pixel', m.step === 9 && /9\*v/.test(m.encoding)
+    && m.z_native >= m.z_min && m.box && m.box.w < m.box.e && m.box.s < m.box.n);
+  const onDisk = [];
+  for (const z of fs.readdirSync(dir).filter(d => /^\d+$/.test(d))) {
+    for (const x of fs.readdirSync(path.join(dir, z))) {
+      for (const f of fs.readdirSync(path.join(dir, z, x))) onDisk.push(`${z}/${x}_${f.replace(/\.png$/, '')}`);
+    }
+  }
+  const listed = Object.entries(index.tiles).flatMap(([z, l]) => l.map(k => `${z}/${k}`));
+  check('the index lists exactly the tiles there are', onDisk.sort().join() === listed.sort().join(),
+    `${onDisk.length} on disk, ${listed.length} listed`);
+  check('every zoom from the overviews to native has tiles',
+    Array.from({ length: m.z_native - m.z_min + 1 }, (_, i) => String(m.z_min + i)).every(z => (index.tiles[z] || []).length > 0));
+  check('the counts add up', m.tiles === listed.length, `${m.tiles} vs ${listed.length}`);
+  // A native tile's pixels, decoded by hand: an 8-bit greyscale PNG, every
+  // value a multiple of 9 no greater than 9 × 26.
+  const z9 = index.tiles[String(m.z_native)];
+  const [x, y] = z9[Math.floor(z9.length / 2)].split('_');
+  const png = fs.readFileSync(path.join(dir, String(m.z_native), x, `${y}.png`));
+  const ihdr = png.subarray(16, 29);
+  check('a tile is 256 × 256, 8-bit greyscale', png.readUInt32BE(16) === 256 && png.readUInt32BE(20) === 256
+    && ihdr[8] === 8 && ihdr[9] === 0, `${png.readUInt32BE(16)}×${png.readUInt32BE(20)} depth ${ihdr[8]} type ${ihdr[9]}`);
+  const zlib = await import('node:zlib');
+  let off = 8, idat = [];
+  while (off < png.length) {
+    const len = png.readUInt32BE(off), type = png.toString('ascii', off + 4, off + 8);
+    if (type === 'IDAT') idat.push(png.subarray(off + 8, off + 8 + len));
+    off += 12 + len;
+  }
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  // Undo the scanline filters (PNG §9) to read the greys themselves.
+  const W = 256, px = Buffer.alloc(W * 256);
+  for (let r = 0; r < 256; r++) {
+    const f = raw[r * (W + 1)], src = raw.subarray(r * (W + 1) + 1, (r + 1) * (W + 1));
+    for (let i = 0; i < W; i++) {
+      const a = i ? px[r * W + i - 1] : 0, b = r ? px[(r - 1) * W + i] : 0, c = i && r ? px[(r - 1) * W + i - 1] : 0;
+      const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+      const pred = f === 0 ? 0 : f === 1 ? a : f === 2 ? b : f === 3 ? (a + b) >> 1 : (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
+      px[r * W + i] = (src[i] + pred) & 0xff;
+    }
+  }
+  const bad = [...px].filter(g => g % 9 || g > 9 * 26);
+  check('every pixel is 9·v with v a three-carrier code', bad.length === 0, `${bad.length} odd greys, e.g. ${bad.slice(0, 3)}`);
+  check('…and the tile has coverage on it', [...px].some(g => g > 0));
 }
 
 console.log(`\n${failures ? 'FAIL' : 'PASS'} — ${passes} passed, ${failures} failed.`);

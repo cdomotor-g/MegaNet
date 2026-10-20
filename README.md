@@ -180,6 +180,9 @@ MegaNet/
 ├── site-mobile.js          ← SiteMobile — mobile coverage at a station or a picked
 │                             point, per carrier: the register's masts priced over
 │                             the terrain with Longley–Rice, graded good to none
+├── map-mobile-coverage.js  ← MapMobileCoverage — the Stations map's Mobile coverage:
+│                             each carrier's own 4G map (ACCC), outdoor or external
+│                             antenna only, off one tile set in data/coverage/
 ├── map-road-owners.js      ← MapRoadOwners — the Stations map's Road & bridge owners:
 │                             every Qld road coloured by its manager, bridge pins
 │                             that say whose they are and who to call
@@ -405,7 +408,8 @@ MegaNet/
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
 │   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
 │   ├── acma_diff.py         (archive monthly snapshots + diff them → data/acma-changes.json)
-│   └── mobile_sectors.py    (every mobile base station sector in the ACMA extract → data/mobile/)
+│   ├── mobile_sectors.py    (every mobile base station sector in the ACMA extract → data/mobile/)
+│   └── coverage_tiles.py    (the carriers' 4G coverage maps, ACCC, yearly → data/coverage/ tiles)
 │
 └── archive/                ← redundant / superseded / unreferenced (see archive/README.md)
     ├── prototype_index.html, BitFlipper*.html, image_bitflipper.svg, app_updated*.js
@@ -1246,6 +1250,7 @@ here.
 - Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
 - **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, the estimated mobile signal for each carrier, and the nearest station, repeater and survey mark
 - **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, a polar coverage plot lying on the relief, your Draw & measure sketches on the ground (and its tools drawing there), pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
+- **Mobile coverage** — each carrier's own 4G coverage map, as Telstra, Optus and TPG give it to the ACCC: where a phone works outdoors and where only with an external antenna, one carrier at a time or the best of the three
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
 - Light up the watercourses whose names match the filter box, drawn beneath the pins from OpenStreetMap (*Highlight matching rivers*)
@@ -3079,9 +3084,9 @@ Side panel or modal showing full station record:
   *Good*, *Moderate*, *Basic* or *No coverage*, with the level in dBm, the band
   and which way the mast is — and the same for a modem with an external
   antenna on a mast. Worked out from the masts the ACMA register lists over the
-  map's terrain with Longley–Rice, the sum shown term by term, and each
-  carrier's own map linked beside it; it agrees with the carriers' own outdoor
-  maps at 88% of a random 150 stations (`site-mobile.js`;
+  map's terrain with Longley–Rice, the sum shown term by term, and under each
+  carrier what its own 4G map says there; it agrees with the carriers' own
+  outdoor maps at 88% of a random 150 stations (`site-mobile.js`;
   `docs/mobile-coverage.md`)
 - **Equipment**, for signed-in editors: what the station's register says is
   fitted there, once an administrator has approved it (`photo-review.js`)

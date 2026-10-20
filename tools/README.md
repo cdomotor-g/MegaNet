@@ -452,12 +452,32 @@ and the keying errors it repairs.
 
 ```bash
 python3 tools/mobile_sectors.py --zip spectra_rrl.zip \
-    --mocn data/mobile/accc-mocn-sites-2026.csv --out data/mobile
+    --mocn data/mobile/accc-mocn-sites.csv --out data/mobile
 ```
 
 `--mocn` is the ACCC's list of Optus regional sites shared with TPG. Without it,
 TPG has no regional coverage at all, because those transmitters are on Optus's
 licences. Standard library only. It takes about 20 seconds over the zip.
+
+## `coverage_tiles.py` — the carriers' own 4G coverage maps, as map tiles
+
+The ACCC publishes each carrier's predicted 4G coverage once a year, as at 31
+January: outdoor, and with an external antenna. That is 0.1–1.4 GB of KML a map.
+This rasterises all eight maps (Telstra, Optus, TPG, and the Optus–TPG shared
+network) into one tile set under `data/coverage/`: zoom 9 plus overviews, with
+every pixel holding all three carriers' levels. The Stations map's **Mobile
+coverage** layer (`map-mobile-coverage.js`) draws it, and the station and What
+is here cards read a point off it. Needs Pillow and numpy. Takes ~15 minutes.
+
+```bash
+# from data.gov.au — what .github/workflows/coverage-tiles.yml runs, by hand, yearly
+python3 tools/coverage_tiles.py --fetch 2026 --out data/coverage \
+    --mocn-sites data/mobile/accc-mocn-sites.csv
+```
+
+Or give the eight files with `--year`, `--telstra`, `--optus`, `--tpg` and
+`--mocn` (each OUTDOOR EXT_ANT, `.kml` or the ACCC's `.zip`).
+`docs/mobile-coverage.md` has the encoding.
 
 ## `import_arro_sensors.py` — fold ARRO sensor exports into `stations.json`
 

@@ -1,28 +1,39 @@
-# Mobile coverage — estimated
+# Mobile coverage
 
-Whether a phone works at a station or a point, for each of **Telstra**,
-**Optus** and **TPG (Vodafone)**, in two places:
+Whether a phone works at a place, for each of **Telstra**, **Optus** and **TPG
+(Vodafone)**, in three places:
 
 - **Mobile coverage — estimated**, a section on every station card, under the
   road and bridge section. It also gives the same figure for a modem with an
   external antenna on a mast, which is the question for a station's telemetry.
 - The same section on the **ℹ️ What is here** card, for any point picked on the
   map.
+- **Mobile coverage — the carriers' 4G maps**, a layer in 🗺️ **Map display** on
+  the Stations map. It shows each carrier's own coverage map, as the carrier
+  gave it to the ACCC: green where a phone works outdoors, amber where only
+  with an external antenna. You can pick one carrier, or the best of the three.
 
-Each carrier gets the ACMA coverage map standard's grade — **Good**,
-**Moderate**, **Basic** or **No coverage** — with the level in dBm, the band,
-and how far and which way the mast is. Under that is a sentence on what it adds
-up to, links to each carrier's own map, **How each figure is reached** (every
-term of the best sector's sum), and **Sources and limits**.
+On the cards, each carrier gets the ACMA coverage map standard's grade —
+**Good**, **Moderate**, **Basic** or **No coverage** — with the level in dBm, the
+band, and how far and which way the mast is. Under that come the external
+antenna's grade and **what the carrier's own map says at the point**. Below the
+rows are a sentence on what it adds up to, which also says when the estimate
+and a carrier's map disagree, plus links to each carrier's own map, **How each
+figure is reached** (every term of the best sector's sum) and **Sources and
+limits**.
 
-It is `site-mobile.js` (the section), `mobile-signal.js` (the arithmetic) and
-`tools/mobile_sectors.py` (the data, `data/mobile/`).
+The code:
+
+- `site-mobile.js` — the card section.
+- `mobile-signal.js` — the arithmetic.
+- `map-mobile-coverage.js` — the layer, and the point lookup the cards use.
+- `tools/mobile_sectors.py` — the transmitter data, `data/mobile/`.
+- `tools/coverage_tiles.py` — the map tiles, `data/coverage/`.
 
 It was asked for in these words: *"is it possible to bring in cell phone
 coverage into flood-net somehow? … coverage overlay on the map and estimated
 signal strength at locations like stations and with the information at map
-point tool"*. This is the signal strength half. The overlay is below, under
-[What is not here yet](#what-is-not-here-yet).
+point tool"*.
 
 ---
 
@@ -149,6 +160,10 @@ reading as "marginal".
 - **~30 m terrain, no buildings.** A gully narrower than a tile, a building, a
   vehicle or a cutting all cost signal that is not here. The cover is only what
   is at the point itself.
+- **The carriers' maps are the carriers'.** They show predicted coverage as at
+  31 January, from the carrier's own model, before the standard's grades. The
+  line under each row reads them at ~270 m, so right at an edge it can fall
+  either side.
 - **Median propagation.** Longley–Rice at 50% of time, locations and
   situations, then the standard's 85% shift. It is not a guarantee at any one
   spot.
@@ -174,7 +189,7 @@ interference layer uses:
 - `cells/<lat>_<lon>.json` holds one cell, 1° × 1°, named for its south-west
   corner. A city cell is up to ~2 MB, a rural one tens of kilobytes. A card
   fetches only the one to four cells round its point.
-- `accc-mocn-sites-2026.csv` is the ACCC's list of Optus sites shared with TPG,
+- `accc-mocn-sites.csv` is the ACCC's list of Optus sites shared with TPG,
   as published (CC BY 2.5 AU). It is yearly: when the ACCC publishes the next
   year's, add it here and point the workflow's `--mocn` at it.
 
@@ -197,30 +212,72 @@ Run it by hand with:
 
 ```sh
 python3 tools/mobile_sectors.py --zip spectra_rrl.zip \
-    --mocn data/mobile/accc-mocn-sites-2026.csv --out data/mobile
+    --mocn data/mobile/accc-mocn-sites.csv --out data/mobile
 ```
 
 `npm run mobile` (in `test/`) holds the arithmetic to hand calculations and the
 files to the shape the card reads.
 
-## What is not here yet
+## The carriers' maps: the layer and the line under each row
 
-- **The coverage overlay.** The ACCC's polygons are the carriers' own maps, and
-  they would make the overlay: one layer per carrier and technology, outdoor and
-  external antenna. They are big, though. Telstra's 4G outdoor map alone is 294
-  MB of KML, and Optus's is 1.4 GB. They need turning into map tiles once a
-  year and hosting somewhere the map can fetch them. That is the next piece.
-- **A carrier's map at a point.** The same polygons would give a second row
-  beside each estimate: *inside Telstra's outdoor map*. That comes with the
-  overlay.
+The ACCC publishes each carrier's predicted coverage once a year, as at 31
+January ([Mobile Infrastructure Report data
+release](https://data.gov.au/data/dataset/accc-mobile-infrastructure-report-data-release),
+CC BY 2.5 AU). For 4G it publishes two levels:
+
+- **Outdoor** — a phone in the hand, outdoors at head height.
+- **Ext Ant** — with an external antenna.
+
+They are each carrier's own model, from before the ACMA standard's grades took
+effect. They say covered or not covered, and nothing about how strong.
+
+`tools/coverage_tiles.py` turns the year's eight maps into one tile set:
+
+- Telstra, Optus and TPG, each outdoor and external antenna.
+- The Optus–TPG shared regional network. TPG here is the better of its own map
+  and that one.
+
+The maps are 0.1–1.4 GB of KML each. The tiles are 8-bit greyscale PNGs, every
+pixel `9 × v` with `v = telstra + 3·optus + 9·tpg`, where each carrier's term is
+0 none, 1 external antenna only, 2 outdoor. That way one tile answers for all
+three carriers:
+
+- **The layer** (`map-mobile-coverage.js`) reads the value back through a
+  canvas and paints the carrier asked for.
+- **The cards** read one pixel at the point for the line *its own map: covered
+  outdoors / external antenna only / not covered*.
+
+How the tiles are laid out:
+
+- Zoom 9 is native, about 270 m a pixel at 27° S. That is near the maps' own
+  ~100 m grid for a map layer, and is how fine the cards' line is.
+- Zooms 3–8 are overviews, taking each carrier's best level under them, so a
+  small town still shows when zoomed out.
+- A tile with nothing on it is not written. `index.json` lists the tiles that
+  are, so the map never asks for one that is not there.
+
+The 2026 maps came to 2,119 tiles, 13 MB: 1,458 at zoom 9 and the rest overviews.
+Building them read ~4.9 million polygons and took 17 minutes.
+
+**Refreshing them.** When the ACCC publishes a new year's maps (usually in the
+second half of the year):
+
+1. In GitHub, go to **Actions → Refresh mobile coverage tiles → Run workflow**
+   and give the year.
+2. The workflow downloads the maps, builds the tiles, also takes that year's
+   list of shared Optus/TPG sites, and opens a pull request.
+3. Turn the layer on and look at places you know before merging.
+4. The next monthly ACMA refresh folds the new site list into `data/mobile/`.
 
 ## Sources
 
 - Register of Radiocommunications Licences — © Australian Communications and
   Media Authority, CC BY 4.0.
-- ACCC Mobile Infrastructure Report data release (the MOCN site list, and the
-  coverage maps used to check the estimate) — © Australian Competition and
-  Consumer Commission, CC BY 2.5 AU.
+- ACCC Mobile Infrastructure Report data release (the carriers' 4G coverage
+  maps behind the layer and the line under each row, which were also used to
+  check the estimate, and the MOCN site list) — © Australian Competition and
+  Consumer Commission, from maps supplied by Telstra, Optus and TPG, CC BY 2.5
+  AU.
 - Telecommunications (Mobile Network Coverage Maps) Industry Standard 2026
   (F2026L00381) — Federal Register of Legislation.
 - Terrain: AWS Terrain Tiles (SRTM/GMTED). Land cover: as `land-cover.js` names

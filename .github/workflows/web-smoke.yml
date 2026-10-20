@@ -75,8 +75,12 @@ on:
       - 'tools/build_geoid_grid.py'
       # The mobile transmitter extract the coverage section reads, and the
       # script that makes it monthly: `npm run mobile` holds the files' shape.
+      # …and the carriers' coverage tiles and the script that makes them
+      # yearly: `npm run mobile` holds the index to the files.
       - 'data/mobile/**'
       - 'tools/mobile_sectors.py'
+      - 'data/coverage/**'
+      - 'tools/coverage_tiles.py'
       # The Service Level Specifications and what tools/ingest/sls.py reads out
       # of them (0028, 0034, 0038), and the check holding the database's merge
       # of them to the app's. Neither the PDFs nor the files were listed, so a
@@ -156,8 +160,12 @@ on:
       - 'tools/build_geoid_grid.py'
       # The mobile transmitter extract the coverage section reads, and the
       # script that makes it monthly: `npm run mobile` holds the files' shape.
+      # …and the carriers' coverage tiles and the script that makes them
+      # yearly: `npm run mobile` holds the index to the files.
       - 'data/mobile/**'
       - 'tools/mobile_sectors.py'
+      - 'data/coverage/**'
+      - 'tools/coverage_tiles.py'
       # The Service Level Specifications and what tools/ingest/sls.py reads out
       # of them (0028, 0034, 0038), and the check holding the database's merge
       # of them to the app's. Neither the PDFs nor the files were listed, so a

@@ -12,10 +12,11 @@
 // Reaches back to core.js for esc, escAttr, announce and fmtKm; across to
 // mobile-signal.js for every piece of arithmetic, terrain.js for
 // Terrain.profile, itm.js for ITM.pointToPoint, land-cover.js for the cover at
-// the point, path-profile.js for pathPropOf and terminalClutterDb, and app.js
-// for docUrl. All from inside its own functions, so this file's position among
-// the modules is free. app.js's stnCardHtml() places the section and calls
-// ask(); map-here.js does the same for a picked point.
+// the point, path-profile.js for pathPropOf and terminalClutterDb,
+// map-mobile-coverage.js for what each carrier's own map says at the point,
+// and app.js for docUrl. All from inside its own functions, so this file's
+// position among the modules is free. app.js's stnCardHtml() places the
+// section and calls ask(); map-here.js does the same for a picked point.
 //
 // ── Why an estimate, and not the carriers' map ──────────────────────────────
 // There is no open feed of anybody's coverage map. The carriers publish theirs
@@ -88,6 +89,12 @@ const SiteMobile = (function () {
       by: 'Australian Competition and Consumer Commission', licence: 'CC BY 2.5 AU',
       page: 'https://data.gov.au/data/dataset/accc-mobile-infrastructure-report-data-release',
     },
+    maps: {
+      title: 'ACCC Mobile Infrastructure Report data release — each carrier’s own 4G coverage map, as at 31 January',
+      by: 'Australian Competition and Consumer Commission, from maps supplied by Telstra, Optus and TPG',
+      licence: 'CC BY 2.5 AU',
+      page: 'https://data.gov.au/data/dataset/accc-mobile-infrastructure-report-data-release',
+    },
     standard: {
       title: 'Telecommunications (Mobile Network Coverage Maps) Industry Standard 2026, Schedule 1 — the grades and the phone',
       by: 'Australian Communications and Media Authority', licence: 'Federal Register of Legislation',
@@ -100,7 +107,8 @@ const SiteMobile = (function () {
         + 'lists over this app’s terrain and propagation model, and graded on the ACMA coverage map standard’s scale. '
         + 'Not the carriers’ own maps, which are linked below.',
     row: 'The strongest sector of this carrier’s within 60 km, at the level the standard grades on — reached at 85% of '
-       + 'locations, 8.3 dB under the median. The second line is the same with an external antenna.',
+       + 'locations, 8.3 dB under the median. The second line is the same with an external antenna; the third, what '
+       + 'the carrier’s own 4G map says here.',
   };
 
   // ── Data ──────────────────────────────────────────────────────────────────
@@ -180,6 +188,10 @@ const SiteMobile = (function () {
     }
     const cand = MobileSignal.candidates(sites, lat, lon, { perCarrier: PER_CARRIER });
     const coverP = coverAt(lat, lon);
+    // What each carrier's own map says here, read off the coverage layer's
+    // tiles whether or not the layer is drawn. Null if it cannot be read.
+    const mapsP = typeof MapMobileCoverage !== 'undefined'
+      ? MapMobileCoverage.at(lat, lon).catch(() => null) : Promise.resolve(null);
 
     // One profile per site, whichever carriers it serves.
     const bySite = new Map();
@@ -195,6 +207,7 @@ const SiteMobile = (function () {
     if (bySite.size && unpriced === bySite.size) {
       return { ok: false, why: 'the terrain between here and the masts could not be read' };
     }
+    const maps = await mapsP;
 
     const cover = await coverP;
     const P = propOf();
@@ -224,7 +237,7 @@ const SiteMobile = (function () {
       handheld: MobileSignal.bestPerCarrier(levels, 'handheld'),
       external: MobileSignal.bestPerCarrier(levels, 'external'),
       considered: cand.map(l => l.length),
-      sites: bySite.size, unpriced, cover,
+      sites: bySite.size, unpriced, cover, maps,
       meta: index.meta || {},
     };
   }
@@ -335,16 +348,37 @@ const SiteMobile = (function () {
   // be read — not one with no coverage, and never said to be.
   const unpricedAt = (r, i) => !r.handheld[i] && !r.external[i] && r.considered[i] > 0;
 
+  // The carrier's own map at the point (MapMobileCoverage.at): 2 outdoors,
+  // 1 external antenna only, 0 not covered; undefined if it could not be read.
+  const MAP_WORDS = ['not covered', 'external antenna only', 'covered outdoors'];
+  const mapLevel = (r, i) => (r.maps ? r.maps[MobileSignal.CARRIERS[i].key] : undefined);
+
+  function mapLine(r, i) {
+    const lv = mapLevel(r, i);
+    if (lv == null) return '';
+    const when = r.maps.year ? ` (${r.maps.year})` : '';
+    return `<br>${note(esc(`its own map${when}: ${MAP_WORDS[lv]}`))}`;
+  }
+
+  // The estimate and the carrier's map at odds: a phone graded no coverage
+  // where the carrier draws outdoor coverage, or graded as reaching where the
+  // carrier draws none at all.
+  function atOdds(r, i) {
+    const lv = mapLevel(r, i), h = r.handheld[i];
+    if (lv == null || !h) return false;
+    return (lv === 2 && h.grade.key === 'none') || (lv === 0 && h.grade.key !== 'none');
+  }
+
   function carrierRow(i, r) {
     const name = MobileSignal.CARRIERS[i].name;
     const h = r.handheld[i], x = r.external[i];
     if (unpricedAt(r, i)) {
       return row(name, `<span class="txt-warn">could not be estimated</span> ${note(
-        '— the terrain to its masts could not be read')}`, TITLE.row);
+        '— the terrain to its masts could not be read')}${mapLine(r, i)}`, TITLE.row);
     }
     if (!h && !x) {
       return row(name, `${grade({ grade: MobileSignal.gradeOf(-Infinity) })} ${note(
-        esc(`no transmitter registered within ${MobileSignal.MAX_RANGE_KM} km`))}`, TITLE.row);
+        esc(`no transmitter registered within ${MobileSignal.MAX_RANGE_KM} km`))}${mapLine(r, i)}`, TITLE.row);
     }
     const first = h
       ? `<span title="${esc(levelTitle(h))}">${grade(h)} ${esc(dbm(h.graded))}</span> ${note(esc(whence(h)))}`
@@ -352,7 +386,7 @@ const SiteMobile = (function () {
     const second = x
       ? `<br>${note(`external antenna: <span title="${esc(levelTitle(x))}">${esc(x.grade.label)} · ${esc(dbm(x.graded))}</span>`)}`
       : '';
-    return row(name, first + second, TITLE.row);
+    return row(name, first + second + mapLine(r, i), TITLE.row);
   }
 
   // What it adds up to, for somebody about to go there.
@@ -376,6 +410,11 @@ const SiteMobile = (function () {
         : unpriced
           ? 'No carrier that could be estimated reaches here, even with an external antenna.'
           : 'No carrier is estimated to reach here, even with an external antenna: plan on no mobile signal.');
+    }
+    const odds = [0, 1, 2].filter(i => atOdds(r, i)).map(i => MobileSignal.CARRIERS[i].name);
+    if (odds.length) {
+      lines.push(`The estimate and ${odds.join(' and ')}’s own map disagree here. Near the edge of coverage the `
+        + 'estimate is usually the more cautious of the two; neither is a measurement.');
     }
     lines.push('An estimate from registered transmitter power over ~30 m terrain — check the carrier’s own map before '
       + 'relying on it, and expect less in a gully, a building or a vehicle.');
