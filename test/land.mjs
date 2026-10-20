@@ -274,13 +274,15 @@ try {
   check('the What is here card carries the land section, keyed by the position to five places',
     !!here && here.key === `${Number(Y.lat).toFixed(5)},${Number(Y.lon).toFixed(5)}`, JSON.stringify(here && here.key));
   // The road and bridge section (site-roads.js) sits directly under it: it
-  // finishes the land's answer for a road reserve, "council or TMR".
-  check('…between the ground’s facts and the nearest stations, the road and bridge section under it',
+  // finishes the land's answer for a road reserve, "council or TMR". The
+  // mobile coverage section (site-mobile.js) follows, before the nearest
+  // stations.
+  check('…between the ground’s facts and the nearest stations, the road and bridge section under it, then mobile coverage',
     await page.evaluate(() => {
       const kids = [...document.getElementById('here-card').children];
       const i = kids.findIndex(e => e.id === 'mn-land-here');
       return i > 0 && /Ground height/.test(kids[i - 1].textContent) && kids[i + 1].id === 'mn-roads-here'
-        && /Nearest station/.test(kids[i + 2].textContent);
+        && kids[i + 2].id === 'mn-mobile-here' && /Nearest station/.test(kids[i + 3].textContent);
     }));
   check('the lot on its plan, with the State’s free SmartMap of it',
     /^Lot 192 on ML2222 SmartMap/.test(here.rows['Lot on plan'] || '')

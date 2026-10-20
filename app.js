@@ -7471,6 +7471,8 @@ function repaintStnCard() {
   SiteLand.ask(`mn-land-card-${s.id}`, s);
   // …and the road and bridge beside it, on the same terms (site-roads.js).
   SiteRoads.ask(`mn-roads-card-${s.id}`, s);
+  // …and the mobile signal there, on the same terms (site-mobile.js).
+  SiteMobile.ask(`mn-mobile-card-${s.id}`, s);
   // The equipment register, for a signed-in editor, on the same terms.
   if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
   // …and its site features (site-features.js), kept per station for two
@@ -7730,6 +7732,7 @@ function stnCardHtml(s) {
   const expId    = `mn-exposure-card-${s.id}`;
   const landId   = `mn-land-card-${s.id}`;
   const roadsId  = `mn-roads-card-${s.id}`;
+  const mobileId = `mn-mobile-card-${s.id}`;
   const ownerId  = `mn-owner-card-${s.id}`;
   const nets     = (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean).join(', ');
   const isRpt    = s.roles.includes('repeater');
@@ -7825,6 +7828,13 @@ function stnCardHtml(s) {
          Queensland is told so. -->
     ${located ? `<div class="acma-sect" id="${escAttr(roadsId)}"
          data-mn-roads="${escAttr(SiteRoads.key(s))}">${SiteRoads.html(s)}</div>` : ''}
+    <!-- The mobile signal at the station, for each carrier, estimated from the
+         ACMA register's transmitters over the app's terrain and graded on the
+         ACMA coverage map standard's scale (site-mobile.js): whether a phone
+         works here, and whether a modem on the mast would. Filled by
+         SiteMobile.ask, the way the road section is. -->
+    ${located ? `<div class="acma-sect" id="${escAttr(mobileId)}"
+         data-mn-mobile="${escAttr(SiteMobile.key(s))}">${SiteMobile.html(s)}</div>` : ''}
     <!-- The flood classes, crossing and gauge survey recorded on the station
          (0031), from the Bureau's river height station lists and whatever an
          editor has added since. Its own section, like the SLS below it, and

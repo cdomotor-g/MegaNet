@@ -82,6 +82,16 @@ const ACCEPTED = {
          + 'nothing below it.',
     },
   ],
+  'mobile-signal.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = MobileSignal;",
+      why: 'The mobile signal estimate\'s arithmetic — the antenna, the phone and '
+         + 'the ACMA coverage standard\'s grades — required by test/mobile.mjs so '
+         + 'the grading the browser runs is the one the check holds to hand '
+         + 'calculations. Guarded so the browser, where `module` is undefined, '
+         + 'never runs it. Constrains nothing below it.',
+    },
+  ],
   'plot-lines.js': [
     {
       match: "if (typeof module !== 'undefined' && module.exports) module.exports = PlotLines;",

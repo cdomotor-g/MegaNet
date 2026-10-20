@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 54, date: '2026-10-20', items: [
+      '<strong>📶 Mobile coverage, estimated.</strong> Every station card, and the <strong>ℹ️ What is here</strong> card '
+        + 'for any point on the map, now has a <em>Mobile coverage — estimated</em> section: for Telstra, Optus and TPG '
+        + '(Vodafone), whether a phone should work there — <em>Good</em>, <em>Moderate</em>, <em>Basic</em> or <em>No '
+        + 'coverage</em>, the same grades the carriers\' own maps use — with the signal in dBm, the band and which way the '
+        + 'mast is, and the same again for a modem with an external antenna on a mast. It is worked out from the masts the '
+        + 'ACMA register lists, over the map\'s terrain; <em>How each figure is reached</em> shows the sum, and each carrier\'s '
+        + 'own map is linked beside it.',
+    ] },
     { n: 53, date: '2026-10-20', items: [
       '<strong>⚡ The station list loads faster.</strong> The database now keeps the list ready, built again whenever '
         + 'somebody saves a station, instead of putting all of it together on every visit. It had grown slow enough that the '

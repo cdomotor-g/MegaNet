@@ -391,6 +391,14 @@
        section's answer; it asks map-road-owners.js (further down) for every
        answer, at runtime, so it only declares. -->
   <script src="site-roads.js?v=20261020a"></script>
+  <!-- The mobile signal at a station or a picked point, per carrier: the
+       arithmetic (mobile-signal.js — the antenna, the phone and the ACMA
+       standard's grades, reaching into nothing so a Node test can hold it),
+       then the section on the station card and the What is here card that
+       fetches the register's transmitters and prices them over terrain.js
+       with itm.js, both read at runtime. Both only declare. -->
+  <script src="mobile-signal.js?v=20261020a"></script>
+  <script src="site-mobile.js?v=20261020a"></script>
   <!-- A station's RX/TX frequency pairs beyond a repeater's own (0033): rows in
        the station editor and a line each on the card. Only declares. -->
   <script src="frequencies.js?v=20261020a"></script>

@@ -57,6 +57,15 @@ jobs:
       - name: Archive snapshot and compute register diffs
         run: python3 tools/acma_diff.py --archive
 
+      # Every Telstra, Optus and TPG mobile sector, off the same extract, for
+      # the mobile coverage section on the station and What is here cards
+      # (site-mobile.js). The ACCC's list of Optus sites shared with TPG is the
+      # yearly file committed beside it; replace it when the ACCC publishes
+      # the next year's (docs/mobile-coverage.md).
+      - name: Mobile base station sectors
+        run: python3 tools/mobile_sectors.py --zip /tmp/spectra_rrl.zip
+             --mocn data/mobile/accc-mocn-sites-2026.csv --out data/mobile
+
       - name: Open pull request
         uses: peter-evans/create-pull-request@v6
         with:
@@ -71,6 +80,11 @@ jobs:
             which the RF Changes tab renders as added/removed/changed
             transmitters and new same-site intermod products.
 
+            It also rebuilds `data/mobile/` — every mobile base station
+            sector, which the station card's mobile coverage section prices.
+            Its cells change whenever a carrier registers or moves a sector;
+            `npm run mobile` (in CI) holds their shape.
+
             This PR also archives the month's subset under
             `data/acma-raw/<YYYY-MM>/`. Never delete archived months: ACMA
             publishes no back-catalogue, so they are the only record of what
@@ -82,4 +96,5 @@ jobs:
             data/acma-raw/**
             data/acma-*.json
             data/acma-licence-suggestions.csv
+            data/mobile/**
           delete-branch: true

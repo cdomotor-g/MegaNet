@@ -73,6 +73,10 @@ on:
       # flood` holds the file to its numbers, `npm run twin` the ground to it.
       - 'data/geoid-ahd-egm96.json'
       - 'tools/build_geoid_grid.py'
+      # The mobile transmitter extract the coverage section reads, and the
+      # script that makes it monthly: `npm run mobile` holds the files' shape.
+      - 'data/mobile/**'
+      - 'tools/mobile_sectors.py'
       # The Service Level Specifications and what tools/ingest/sls.py reads out
       # of them (0028, 0034, 0038), and the check holding the database's merge
       # of them to the app's. Neither the PDFs nor the files were listed, so a
@@ -150,6 +154,10 @@ on:
       # flood` holds the file to its numbers, `npm run twin` the ground to it.
       - 'data/geoid-ahd-egm96.json'
       - 'tools/build_geoid_grid.py'
+      # The mobile transmitter extract the coverage section reads, and the
+      # script that makes it monthly: `npm run mobile` holds the files' shape.
+      - 'data/mobile/**'
+      - 'tools/mobile_sectors.py'
       # The Service Level Specifications and what tools/ingest/sls.py reads out
       # of them (0028, 0034, 0038), and the check holding the database's merge
       # of them to the app's. Neither the PDFs nor the files were listed, so a
@@ -281,6 +289,14 @@ jobs:
       - name: Longley–Rice port — the NTIA reference vectors
         working-directory: test
         run: npm run itm
+
+      # Node-only and fast. The mobile signal estimate's arithmetic held to hand
+      # calculations — the ACMA coverage standard's edges to the decibel, the
+      # 85% shift against ITM's inverse normal, the antenna pattern, which masts
+      # are priced and for whom — and data/mobile/ to the shape the card reads.
+      - name: Mobile signal — the standard's grades, the pattern, the register extract
+        working-directory: test
+        run: npm run mobile
 
       # Node-only and fast. lidar-profile.js with its tiles answered by its test
       # seam: the GeoTIFF it reads, where it puts LiDAR on a path (the ends and
@@ -507,6 +523,17 @@ jobs:
       - name: Road and bridge owners — keyed by manager, with who to call
         working-directory: test
         run: npm run roadowners
+
+      # The mobile coverage section on the What is here card and a station's
+      # card (site-mobile.js), over flat ground and invented masts so every
+      # figure has an answer on paper: the level summed as stated, the trees
+      # at the point charged, TPG on Optus's shared mast saying so, no mast in
+      # 60 km said for every carrier, no terrain "could not be estimated" and
+      # never "no coverage", Try again recovering it, and a real station
+      # priced off the real register under its road section.
+      - name: Mobile coverage section — the sum, the shared mast, the honest failures
+        working-directory: test
+        run: npm run mobilecard
 
       # The QLD SurveyControl service answers any query carrying
       # resultRecordCount with an empty feature set — HTTP 200, no error field

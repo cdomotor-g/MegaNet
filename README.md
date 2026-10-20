@@ -174,6 +174,12 @@ MegaNet/
 │                             point: who manages each (TMR, the council, a park,
 │                             private) and who to call, from the State's road data
 │                             and QLDTraffic's road lookup
+├── mobile-signal.js        ← MobileSignal — the arithmetic of a mobile signal estimate:
+│                             a sector's power per resource element, its antenna,
+│                             the ACMA coverage standard's phone and grades
+├── site-mobile.js          ← SiteMobile — mobile coverage at a station or a picked
+│                             point, per carrier: the register's masts priced over
+│                             the terrain with Longley–Rice, graded good to none
 ├── map-road-owners.js      ← MapRoadOwners — the Stations map's Road & bridge owners:
 │                             every Qld road coloured by its manager, bridge pins
 │                             that say whose they are and who to call
@@ -301,6 +307,7 @@ MegaNet/
 │   ├── site-exposure.md                    (tides and soils on the station card — rows, sources, limits)
 │   ├── site-land.md                        (the land — tenure, council, address — on the station and What is here cards)
 │   ├── road-owners.md                      (who manages each road and bridge — the map layer, the card section, sources, limits, what else QLDTraffic has)
+│   ├── mobile-coverage.md                  (the mobile signal estimate on the station and What is here cards — how, the grades, how it agrees with the carriers' maps, limits)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
 │   ├── 357 Filter doco.doc                  (the 1998 first edition of the same spec)
@@ -397,7 +404,8 @@ MegaNet/
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
 │   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
-│   └── acma_diff.py         (archive monthly snapshots + diff them → data/acma-changes.json)
+│   ├── acma_diff.py         (archive monthly snapshots + diff them → data/acma-changes.json)
+│   └── mobile_sectors.py    (every mobile base station sector in the ACMA extract → data/mobile/)
 │
 └── archive/                ← redundant / superseded / unreferenced (see archive/README.md)
     ├── prototype_index.html, BitFlipper*.html, image_bitflipper.svg, app_updated*.js
@@ -1236,7 +1244,7 @@ here.
 - **Colour pins by health** — every station OK, watch, fault or no data by when Flood-Net last heard it (and, once its card has been opened, by what its readings say), with its key in the legend; bigger is worse and the ring says it again, so colour is never the only channel; off by default, one request for the whole network a load
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
 - Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
-- **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, and the nearest station, repeater and survey mark
+- **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, the estimated mobile signal for each carrier, and the nearest station, repeater and survey mark
 - **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, a polar coverage plot lying on the relief, your Draw & measure sketches on the ground (and its tools drawing there), pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
@@ -3066,6 +3074,15 @@ Side panel or modal showing full station record:
   bridge and whether it is on TMR's register (with its structure number), and
   who to call: the TMR district, the council or the road's own operator, from
   QLDTraffic's road lookup (`site-roads.js`; `docs/road-owners.md`)
+- **Mobile coverage — estimated**, under the road: for Telstra, Optus and TPG
+  (Vodafone), whether a phone works there — the ACMA coverage map standard's
+  *Good*, *Moderate*, *Basic* or *No coverage*, with the level in dBm, the band
+  and which way the mast is — and the same for a modem with an external
+  antenna on a mast. Worked out from the masts the ACMA register lists over the
+  map's terrain with Longley–Rice, the sum shown term by term, and each
+  carrier's own map linked beside it; it agrees with the carriers' own outdoor
+  maps at 88% of a random 150 stations (`site-mobile.js`;
+  `docs/mobile-coverage.md`)
 - **Equipment**, for signed-in editors: what the station's register says is
   fitted there, once an administrator has approved it (`photo-review.js`)
 - **Site features**, for signed-in editors: where its orifice outlet, pits,

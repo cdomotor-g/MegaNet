@@ -441,6 +441,24 @@ document every flag under `--help`. `acma_fetch.py --dry-run` prints the
 per-mechanism candidate counts without writing anything — it doubles as the
 sanity check that frequency units parsed correctly.
 
+## `mobile_sectors.py` — every mobile base station sector, for the coverage estimate
+
+Off the same ACMA extract, a different cut: every Telstra, Optus and TPG
+(Vodafone) transmitter in the 4G and 5G bands below 6 GHz, one row per sector,
+tiled into 1° cells under `data/mobile/` for the **Mobile coverage — estimated**
+section on the station and What is here cards (`site-mobile.js`). The monthly
+ACMA refresh runs it; `docs/mobile-coverage.md` has what it keeps, what it drops
+and the keying errors it repairs.
+
+```bash
+python3 tools/mobile_sectors.py --zip spectra_rrl.zip \
+    --mocn data/mobile/accc-mocn-sites-2026.csv --out data/mobile
+```
+
+`--mocn` is the ACCC's list of Optus regional sites shared with TPG. Without it,
+TPG has no regional coverage at all, because those transmitters are on Optus's
+licences. Standard library only. It takes about 20 seconds over the zip.
+
 ## `import_arro_sensors.py` — fold ARRO sensor exports into `stations.json`
 
 ARRO's **Sensors — List by System** report exports one workbook per state with

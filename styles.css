@@ -3415,6 +3415,16 @@ hr {
 .stn-card-exp-foot { margin: .3rem 0 0; overflow-wrap: anywhere; }
 .stn-card-exp-retry { margin-top: var(--sp-1); }
 
+/* The mobile coverage section (site-mobile.js): the exposure section's rows
+   and lists, plus the grade — the ACMA coverage map standard's word, in the
+   status tokens the link budget's margin uses (good ok, basic warn, none bad;
+   moderate in the text colour). The word carries the meaning; the colour only
+   repeats it. */
+.mn-mob-grade { font-weight: 600; }
+.mn-mob-good  { color: var(--ok); }
+.mn-mob-basic { color: var(--warn); }
+.mn-mob-none  { color: var(--bad); }
+
 /* The station's health on its card (#218, health-glance.js): the label/value
    rows of the sections under it, under a heading that carries the station's
    class — the class its pin wears, by construction — as a glyph and a word as
