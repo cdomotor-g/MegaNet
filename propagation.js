@@ -320,6 +320,8 @@ const Propagation = (function () {
       <h3 id="rp-path-h" tabindex="-1">3 · Over hills, through trees</h3>
       <p>Line of sight is not a laser beam. The wave that matters fills a long, fat <strong>Fresnel zone</strong> round
         the straight line — at 151.5 MHz over 20 km it is about <strong>${f1(PH().fresnelM(10, 10), 0)} m</strong> in radius at the middle.
+        The wave itself spreads far wider than that; the zone is the part of it that reaches the far antenna in step,
+        which is why it pinches in at both ends rather than widening with distance.
         A ridge that pokes into it costs signal even though you can still see the far antenna; a ridge that blocks the
         line entirely does not stop the signal dead either: the wave <strong>bends over the edge</strong> (diffraction),
         weaker for every metre the edge stands above the line. Low frequencies bend further, which is one reason VHF

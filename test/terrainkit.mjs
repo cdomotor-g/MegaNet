@@ -701,7 +701,9 @@ const sig = await page.evaluate(async () => {
   const svgOk = !!document.querySelector('#path-sig-under #path-sig-run path')
              && !!document.querySelector('#path-sig-over #path-sig-tag')
              && !document.getElementById('path-sig-run-ba');
-  const width = () => Number(document.getElementById('path-sig-reveal').getAttribute('width'));
+  // The reveal is the wavefront's sphere round A, so how far it has run is its
+  // horizontal radius.
+  const width = () => Number(document.getElementById('path-sig-reveal').getAttribute('rx'));
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   // Playing, on screen — the side panel's 〽️ pane brought up and the chart
   // scrolled to, as pathcursor.mjs does, because off screen it idles: the
@@ -713,7 +715,22 @@ const sig = await page.evaluate(async () => {
   await sleep(150);
   if (!s.playing) PathProfile.signalToggle();
   const seen = new Set();
-  for (let k = 0; k < 24; k++) { seen.add(width()); await sleep(100); }
+  // …and the wavefront is the wave, not the Fresnel zone: mid-run it stands
+  // the height of the sky, with the zone's stretch of it a part of that. It
+  // was once only as tall as the zone, which drew the signal as a lens that
+  // swelled out of A and narrowed into B.
+  const fronts = [];
+  const tall = id => { const el = document.getElementById(id);
+    return el && el.getAttribute('d') ? el.getBBox().height : null; };
+  for (let k = 0; k < 24; k++) {
+    seen.add(width());
+    // Travelling only — arrived, the front is hidden and the reveal run on.
+    const going = document.getElementById('path-sig-front').style.display !== 'none';
+    const w = tall('path-sig-wave-0'), z = tall('path-sig-ripple-0');
+    if (going && w != null && z != null
+        && width() > 0.2 * Number(document.querySelector('#path-sig-run rect').getAttribute('width'))) fronts.push([w, z]);
+    await sleep(100);
+  }
   // The card closed: no frames, nothing moving; opened again, it carries on.
   const card = chart.closest('details');
   card.open = false;
@@ -751,6 +768,7 @@ const sig = await page.evaluate(async () => {
     bands, exact, svgOk, moved: seen.size >= 3, seen: seen.size, loop: JSON.stringify({
       playing: PathProfile.signalState().playing, running: PathProfile.signalState().running,
       inView: PathProfile.signalState().inView }),
+    fronts, ih: Number(document.querySelector('#path-sig-run rect').getAttribute('height')),
     stored, heldW, heldW2, tag, btn, idleOff, resumed: back.size >= 3, iw: Number(document.querySelector('#path-sig-run rect').getAttribute('width')),
   };
 });
@@ -768,6 +786,9 @@ if (sig) {
   ok('the chart carries one run, a gradient stop per priced point, and the tag',
      sig.svgOk && sig.stops === sig.n, `${sig.stops} stops for ${sig.n} points`);
   ok('playing, the wavefront moves', sig.moved, `${sig.seen} distinct positions in 2.4 s; ${sig.loop}`);
+  ok('…as the whole wave, the height of the sky, with the Fresnel zone a stretch of it',
+     sig.fronts.length > 0 && sig.fronts.every(([w, z]) => w > 0.95 * sig.ih && z < w),
+     JSON.stringify({ ih: sig.ih, fronts: sig.fronts.slice(0, 4) }));
   ok('…not while the card is closed, and again when it is opened', sig.idleOff && sig.resumed,
      `idle ${sig.idleOff}, resumed ${sig.resumed}`);
   const fig = `${sig.rowAB > 0 ? '+' : ''}${sig.rowAB.toFixed(1)} dB`;
@@ -779,7 +800,7 @@ if (sig) {
      /^\d+ m · [-+]?\d+\.\d dB$/.test(sig.hoverMid.tag) && /· signal .* threshold · [\d.]+ km along$/.test(sig.hoverMid.map || ''),
      JSON.stringify(sig.hoverMid));
   ok('⏸ holds the run whole, still, says so, and is remembered',
-     sig.stored === 'still' && Math.abs(sig.heldW - sig.iw) < 0.5 && sig.heldW === sig.heldW2
+     sig.stored === 'still' && sig.heldW >= sig.iw - 0.5 && sig.heldW === sig.heldW2
        && /arrives/.test(sig.tag) && /Play/.test(sig.btn),
      `${sig.stored}; ${sig.heldW} of ${sig.iw}; "${sig.tag}"; ${sig.btn}`);
 }

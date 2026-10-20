@@ -3877,11 +3877,13 @@ const state = {
       allowance:  FN_MODEL_DEFAULTS.allowance,    // dB, the field model only
       mastAgl:    FN_MODEL_DEFAULTS.mastAgl,      // m, repeaters and bases
     },
-    // Which of the card's disclosures are open: the propagation settings and
-    // the cover-height table. Shut by default — they are the premises, and the
-    // figure is what the card is opened for.
+    // Which of the card's disclosures are open: the propagation settings, the
+    // cover-height table and why the Fresnel zone is an ellipse. Shut by
+    // default — they are the premises, and the figure is what the card is
+    // opened for.
     propOpen:  false,
     coverOpen: false,
+    zoneOpen:  false,
     // Which end the next station pick fills: a click on the map, or a row in
     // the Stations list under it. null is the original behaviour — A, then B,
     // then A again. Putting the caret in an end's search box arms that end,

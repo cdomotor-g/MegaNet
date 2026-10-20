@@ -6108,8 +6108,8 @@ hr {
 }
 .lb-prop select, .lb-prop input { width: 100%; box-sizing: border-box; }
 .lb-prop .is-unused { opacity: .55; }
-.lb-propset, .path-cover-table { margin: .4rem 0; }
-.lb-propset > summary, .path-cover-table > summary { cursor: pointer; }
+.lb-propset, .path-cover-table, .path-why { margin: .4rem 0; }
+.lb-propset > summary, .path-cover-table > summary, .path-why > summary { cursor: pointer; }
 .lb-prop .lb-flag { display: block; }
 
 /* The model's readouts under the table — Radio Mobile's Radio Link window,

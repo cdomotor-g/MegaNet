@@ -875,6 +875,33 @@ const PathProfile = (function () {
     return { cover: c ? c.cls : null, canopy: c && c.canopyOk ? c.canopy : null, coverOff: false };
   }
 
+  // Why the zone is an ellipse when a signal spreads out — the question the
+  // picture raises, answered under it with this path's own figures. The two
+  // are not at odds: the wave does spread (that is the free-space loss), and
+  // the ellipse is the part of it the far antenna hears in step. Shut by
+  // default, like the card's other disclosures.
+  function zoneWhyHtml(an, sigOn) {
+    const r1 = fresnelR1(an.D / 2, an.D / 2, an.fMhz);
+    return `
+      <details class="path-why" ${state.link.zoneOpen ? 'open' : ''}
+               ontoggle="state.link.zoneOpen = this.open">
+        <summary class="small">Why an ellipse, if the signal spreads out?</summary>
+        <p class="filter-hint">It does spread out. The wave leaves A as an ever-widening front — narrowed only by the
+          antenna's pattern — and within a few kilometres it is taller than this whole chart${
+          sigOn ? ', which is why the wavefront sweeps the full height of it' : ''}. That spreading is most of the loss: free space takes a quarter of the power,
+          6 dB, for every doubling of the distance.</p>
+        <p class="filter-hint">The ellipse is not the beam. It is the first Fresnel zone: every point where the bent path
+          A → that point → B is no more than half a wavelength (${(299.792458 / an.fMhz / 2).toFixed(2)} m at ${
+          Number(an.fMhz.toFixed(3))} MHz) longer than the straight one. The wave passing through it reaches B in step
+          and adds up; the wave passing outside it arrives out of step and largely cancels itself, so B in effect hears
+          only the zone. That is why ground or trees inside it cost signal and ground outside it costs nothing. It pinches
+          in at both ends because close to an antenna even a small step sideways makes the detour more than half a
+          wavelength longer, and it belongs to the pair of antennas rather than to the transmitter — the same zone
+          whichever way the link is used. On this path it is ${Math.round(r1)} m in radius at mid-path; the dashed
+          envelope is 60% of that, ${Math.round(0.6 * r1)} m, the clearance that loses next to nothing to the ground.</p>
+      </details>`;
+  }
+
   // ── the chart ──
 
   // `flat` draws the ground and nothing else — the multi-leg case, where there
@@ -953,8 +980,9 @@ const PathProfile = (function () {
     };
 
     // The signal's geometry, for the layer filled in once its losses are priced
-    // (see "the signal, along the line"). The beam is the 60% Fresnel envelope
-    // the chart draws dashed, as one closed outline.
+    // (see "the signal, along the line"). The zone is the 60% Fresnel envelope
+    // the chart draws dashed, as one closed outline — the part of the wave B
+    // hears, and not the shape of the wave itself.
     const sigOn = !flat && sig && !sig.why;
     if (sigOn) {
       const upper = pts.map(p => `${x(p.d1).toFixed(1)},${y(p.los + 0.6 * p.r1).toFixed(1)}`);
@@ -963,7 +991,7 @@ const PathProfile = (function () {
         key: sig.key, L, T, iw, ih, lo, hi, D,
         txZ: an.txZ, rxZ: an.rxZ, fMhz: an.fMhz,
         end: sig.end, loss: an.pathLoss_db,
-        beam: `M${upper.join(' L')} L${lower.join(' L')} Z`,
+        zone: `M${upper.join(' L')} L${lower.join(' L')} Z`,
         m: null,
       };
     }
@@ -1201,7 +1229,7 @@ const PathProfile = (function () {
         <div class="path-key small">
           ${flat ? '' : `
             <span><i class="path-key-los"></i> Line of sight</span>
-            <span><i class="path-key-fres"></i> 60% Fresnel zone</span>`}
+            <span><i class="path-key-fres"></i> 60% Fresnel zone — the clearance the link needs</span>`}
           <span><i class="path-key-gnd"></i> Ground (curvature k=${an.k.toFixed(2)} included)</span>
           ${lidarLine ? '<span><i class="path-key-lidar"></i> 5 m LiDAR</span>' : ''}
           ${earth ? `<span><i class="path-key-earth"></i> Earth curvature${sag > 0.5 ? ` · ${Math.round(sag)} m at mid-path` : ''}</span>` : ''}
@@ -1214,12 +1242,13 @@ const PathProfile = (function () {
         </div>
         ${sigOn ? `<p class="filter-hint path-sig-note">The signal runs A → B (⇄ Flip direction for B → A), priced
           the way the fade margin is: the same model over the ground from the transmitter to each point on the line, for a
-          receiver like the far end's standing on the beam there. It fades with distance, drops where ${
+          receiver like the far end's standing on the line there. It fades with distance, drops where ${
           an.model === 'cover' && an.coverUsed ? 'ground or cover' : 'the ground'} reaches into the Fresnel zone, stays down in the
           shadow behind it, and reaches B in the colour of the A→B fade margin. Point at the chart, or along the
           line on the map, for the figure at that point.${
           an.model === 'cover' || !an.coverUsed ? ''
             : ' Under the field model the cover is drawn but not priced along the way — its average cost is in the allowance; the land-cover model, in the link budget\'s propagation settings, prices it where it stands.'}</p>` : ''}
+        ${flat ? '' : zoneWhyHtml(an, sigOn)}
         <p class="filter-hint">${esc(prof.attribution)} · ${prof.lidar ? `~${prof.resolution_m} m tiles read every ${
           Math.round(prof.distance_m[1] - prof.distance_m[0])} m` : `sampled every ~${prof.resolution_m} m`} at zoom ${prof.zoom} over ${prof.tiles} tile${prof.tiles === 1 ? '' : 's'}${
           prof.capped ? ', zoom reduced to stay inside the tile budget for a path this long' : ''}.${lidarNote()}${
@@ -1266,7 +1295,7 @@ const PathProfile = (function () {
       const cls = p.cls != null && LandCover.CLASSES[p.cls] ? LandCover.CLASSES[p.cls].label : 'cover';
       bits.push(`${Math.round(p.cover)} m ${cls.toLowerCase()} on it`);
     }
-    // The signal on the beam over this point, as the chart's tag has it — with
+    // The signal on the line over this point, as the chart's tag has it — with
     // room here to say what the figure is over.
     const m = sigAt(p.d1);
     if (m != null) bits.push(m >= 0 ? `signal ${sigDb(m)} over B’s threshold` : `signal ${Math.abs(m).toFixed(1)} dB under B’s threshold`);
@@ -1439,7 +1468,7 @@ const PathProfile = (function () {
   // ground that number was paid to, and until now nothing joined the two: where
   // along the way the signal went, and what took it. So the chart carries the
   // transmission itself — a wavefront leaving A and running down the line of
-  // sight to B, over and over — and paints the beam behind it in the colour of
+  // sight to B, over and over — and paints the sky behind it in the colour of
   // the margin left at each point. One way, A → B: the chart is drawn A → B,
   // the budget's transmitter is A, and ⇄ Flip direction is the other way round.
   // The same figure rides the hover cursor, on the chart and on the map.
@@ -1448,7 +1477,7 @@ const PathProfile = (function () {
   // transmitter to each point on the line: the ground between, the cover where
   // the model prices cover, the knife-edge floor, the field allowance — and a
   // receiver like the far end's (its gain, its line loss, its threshold)
-  // standing on the beam there, at the line's height above the ground. The line
+  // standing on the line there, at the line's height above the ground. The line
   // from A to a point on the line A–B is the same line, and the curvature drops
   // out of that (the d1·d2 bulge terms cancel, to within the k the shorter
   // path's own mean height gives it), so every intermediate point sees the
@@ -1479,7 +1508,7 @@ const PathProfile = (function () {
   let sigCache = { key: null, rows: null };   // the losses for one chart's settings
   let sigJob = null;                          // the pricing in progress
   // What the animation and the cursor read — the scales the chart was drawn
-  // to, the margin at B, the beam's outline — rebuilt by every chartSvg() and null without
+  // to, the margin at B, the Fresnel zone's outline — rebuilt by every chartSvg() and null without
   // a chart, which is what stops a frame painting onto a chart that went.
   let sigGeom = null;
   let sigRaf = 0, sigT0 = 0, sigPhaseKey = null, sigObs = null, sigInView = true, sigTagWas = '';
@@ -1598,11 +1627,21 @@ const PathProfile = (function () {
   const sigLos = (g, d) => g.txZ + (g.rxZ - g.txZ) * (g.D > 0 ? d / g.D : 0);
   const sigDb = m => `${m > 0 ? '+' : ''}${m.toFixed(1)} dB`;
 
-  // Under the ground: the wash — a tint over the whole column of sky, the beam
-  // (the 60% Fresnel envelope) stronger, the line itself solid — painted with
-  // the margins' gradient and revealed by a clip the wavefront drags along; and
-  // the wavefront. Under the ground on purpose: where the line
-  // goes into a hill, so does the signal.
+  // Under the ground: the wash — the wave, which a few kilometres out is taller
+  // than the whole column of sky the chart has room for — with the Fresnel zone
+  // a little stronger over it, as the part of the wave B hears, and the line
+  // itself solid; painted with the margins' gradient and revealed by a clip
+  // the wavefront drags along; and the wavefront. The zone was once the
+  // strong fill and the wavefront only as tall as it, which drew the signal
+  // as a lens that swelled out of A and narrowed into B — the opposite of what
+  // a wave leaving an antenna does. Under the ground on purpose: where the
+  // line goes into a hill, so does the signal.
+  //
+  // The clip is the wavefront itself: a sphere round A's antenna, which the
+  // chart's scales — metres up, kilometres along — draw as an ellipse many
+  // times taller than it is wide. So it is a burst at A that fills the sky
+  // within a few pixels and sweeps on to B as a wall, which is the honest
+  // picture at this exaggeration rather than a stylised one.
   function sigUnderHtml(g) {
     return `
       <defs>
@@ -1611,20 +1650,40 @@ const PathProfile = (function () {
           <stop offset="${(g.D > 0 ? r.d1 / g.D : 0).toFixed(4)}" style="stop-color:${sigColour(r.m)}"/>`).join('')}
         </linearGradient>
         <clipPath id="path-sig-clip">
-          <rect id="path-sig-reveal" x="${g.L}" y="${g.T}" width="0" height="${g.ih}"/>
+          <ellipse id="path-sig-reveal" cx="${g.L}" cy="${sigY(g, g.txZ).toFixed(1)}" rx="0" ry="0"/>
         </clipPath>
       </defs>
       <g id="path-sig-run" clip-path="url(#path-sig-clip)" style="display:none">
-        <rect x="${g.L}" y="${g.T}" width="${g.iw}" height="${g.ih}" fill="url(#path-sig-grad)" opacity=".13"/>
-        <path d="${g.beam}" fill="url(#path-sig-grad)" opacity=".42"/>
+        <rect x="${g.L}" y="${g.T}" width="${g.iw}" height="${g.ih}" fill="url(#path-sig-grad)" opacity=".2"/>
+        <path d="${g.zone}" fill="url(#path-sig-grad)" opacity=".24"/>
         <line x1="${g.L}" y1="${sigY(g, g.txZ).toFixed(1)}" x2="${g.L + g.iw}" y2="${sigY(g, g.rxZ).toFixed(1)}"
               stroke="url(#path-sig-grad)" stroke-width="3" stroke-linecap="round"/>
       </g>
       <g id="path-sig-front" style="display:none">
-        ${[0, 1, 2].map(k => `<path id="path-sig-ripple-${k}" fill="none" stroke-width="${2.4 - k * 0.5}" stroke-linecap="round"/>`).join('')}
+        ${[0, 1, 2].map(k => `<path id="path-sig-wave-${k}" fill="none" stroke-width="${(1.4 - k * 0.3).toFixed(1)}"/>
+        <path id="path-sig-ripple-${k}" fill="none" stroke-width="${2.6 - k * 0.5}" stroke-linecap="round"/>`).join('')}
         <circle id="path-sig-glow" r="9" opacity=".3"/>
         <circle id="path-sig-dot" r="4.5" stroke="var(--panel)" stroke-width="1"/>
       </g>`;
+  }
+
+  // A stretch of the wavefront `dk` metres out from A, between two heights on
+  // the chart (pixels, top first): the sphere round A's antenna, at the chart's
+  // own two scales. Sampled in angle, so the burst at A is round and the wall
+  // it becomes is straight; clamped to the plot, so it never runs over the axes.
+  function sigFrontPath(g, dk, yTop, yBot) {
+    const rx = dk * (g.D > 0 ? g.iw / g.D : 0), ry = dk * g.ih / (g.hi - g.lo);
+    if (!(rx > 0) || !(ry > 0)) return '';
+    const cy = sigY(g, g.txZ);
+    const a0 = Math.asin(Math.max(-1, Math.min(1, (Math.max(yTop, g.T) - cy) / ry)));
+    const a1 = Math.asin(Math.max(-1, Math.min(1, (Math.min(yBot, g.T + g.ih) - cy) / ry)));
+    if (!(a1 > a0)) return '';
+    const out = [];
+    for (let i = 0; i <= 16; i++) {
+      const a = a0 + (a1 - a0) * i / 16;
+      out.push(`${(g.L + rx * Math.cos(a)).toFixed(1)},${(cy + ry * Math.sin(a)).toFixed(1)}`);
+    }
+    return `M${out.join(' L')}`;
   }
 
   // Over everything but the cursor: the arrival at the receiving antenna — a
@@ -1743,31 +1802,43 @@ const PathProfile = (function () {
     if (!run || !reveal || !front || !arr) return;
     run.style.display = alpha > 0 ? '' : 'none';
     run.setAttribute('opacity', alpha.toFixed(3));
-    reveal.setAttribute('width', (f * g.iw).toFixed(1));
+    // The wave's reach from A. Arrived, it has gone on past B, so the sphere is
+    // let run three path lengths out: far enough that even a short steep hop,
+    // a chart taller than it is long, has no corner of sky left uncovered.
+    const reach = (arrive == null ? f : 3) * g.D;
+    reveal.setAttribute('rx', (reach * (g.D > 0 ? g.iw / g.D : 0)).toFixed(1));
+    reveal.setAttribute('ry', (reach * g.ih / (g.hi - g.lo)).toFixed(1));
 
     const d = f * g.D;
     const m = sigMarginAt(g.m, d);
 
     if (arrive == null) {
       front.style.display = '';
-      // Three ripples, the front one brightest, each spanning the beam where it
-      // is — so the wavefront swells to the Fresnel zone's width mid-path and
-      // narrows into the far antenna — and each in the colour of where it is.
+      // Three ripples, the front one brightest. Each is the wavefront itself,
+      // the reveal's sphere at its own distance — spreading as a wave does,
+      // taller than the chart a few pixels out of A — and over it, brighter,
+      // the stretch of it inside the 60% Fresnel zone: the part of the wave
+      // that reaches B in step. So the zone is traced out on the wave, swelling
+      // mid-path and pinching in to the far antenna, rather than being the
+      // wave. Each in the colour of where it is.
       const gapD = 22 / g.iw * g.D;
       for (let k = 0; k < 3; k++) {
-        const el = $(`path-sig-ripple-${k}`);
+        const wave = $(`path-sig-wave-${k}`), el = $(`path-sig-ripple-${k}`);
         const dk = d - k * gapD;
-        if (!el) continue;
-        if (dk < 0 || dk > g.D) { el.setAttribute('d', ''); continue; }
-        const X = sigX(g, dk), los = sigLos(g, dk);
+        if (!el || !wave) continue;
+        if (dk <= 0 || dk > g.D) { el.setAttribute('d', ''); wave.setAttribute('d', ''); continue; }
+        const los = sigLos(g, dk);
         const r = 0.6 * fresnelR1(dk, g.D - dk, g.fMhz);
         const yMid = sigY(g, los);
-        const half = Math.max(7, Math.abs(sigY(g, los + r) - yMid));
+        const half = Math.max(3, Math.abs(sigY(g, los + r) - yMid));
         const mk = sigMarginAt(g.m, dk);
-        el.setAttribute('d', `M${X.toFixed(1)},${(yMid - half).toFixed(1)} Q${(X + 12 + half * 0.25).toFixed(1)},${
-          yMid.toFixed(1)} ${X.toFixed(1)},${(yMid + half).toFixed(1)}`);
+        const fade = mk < 0 ? 0.55 : 1;
+        wave.setAttribute('d', sigFrontPath(g, dk, -Infinity, Infinity));
+        wave.style.stroke = sigColour(mk);
+        wave.setAttribute('opacity', ((0.5 - k * 0.14) * fade).toFixed(2));
+        el.setAttribute('d', sigFrontPath(g, dk, yMid - half, yMid + half));
         el.style.stroke = sigColour(mk);
-        el.setAttribute('opacity', ((1 - k * 0.32) * (mk < 0 ? 0.55 : 1)).toFixed(2));
+        el.setAttribute('opacity', ((1 - k * 0.32) * fade).toFixed(2));
       }
       // The pulse on the line: as big as the signal is strong, and faint once
       // it is under the threshold.
@@ -2085,7 +2156,7 @@ const PathProfile = (function () {
   // the card says about this path but the form that changes it.
   //
   // One chart at a time. Its parts are found by id — the cursor, the signal's
-  // layers, the gradient its beam is filled with — so while it is full screen
+  // layers, the gradient its signal is painted with — so while it is full screen
   // the card says where it went rather than drawing a second. Every repaint of
   // the card repaints this too (rerender), so the ground or the cover landing,
   // a flip or another line selected shows up in either place.

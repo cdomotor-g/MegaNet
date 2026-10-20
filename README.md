@@ -3460,16 +3460,25 @@ it was for the last path.
 chart animates the transmission: a wavefront leaves A and runs down the line of
 sight to B, over and over — one way, since the chart, the budget's transmitter
 and the readout's A→B figure all run A → B, and ⇄ *Flip direction* is the other
-way round — and the beam behind it — the line,
-the 60% Fresnel envelope and, faintly, the column of sky — is painted in the
+way round — and the sky behind it — the column of sky, the 60% Fresnel
+envelope a little stronger over it, and the line — is painted in the
 colour of the margin left over the receiver's threshold at each point. The
+wavefront is the wave itself: a sphere round A's antenna, which the chart's
+two scales (metres up, kilometres along) draw as an ellipse far taller than it
+is wide — a burst at A that fills the sky within a few pixels and sweeps on to B
+as a wall — with the stretch of it inside the Fresnel zone drawn brighter, as
+the part of the wave B hears in step. It used to be only as tall as the zone,
+which drew the signal as a lens swelling out of A and narrowing into B, the
+opposite of what a wave leaving an antenna does; *Why an ellipse, if the signal
+spreads out?* under the chart says the difference in words, with the path's own
+half wavelength and mid-path radius. The
 colours are the fade margin's own tokens (`--ok`, `--warn`, `--bad`) walked in
 OKLCH, so strong is green, and it fades through yellow, amber and orange to red,
 which it is outright at the RX threshold and under it; each band keeps to its
 own stretch of that walk and steps where the number changes band, so the line
 and the *Fade margin* row cannot be read as disagreeing. It is priced with the
 readout's own `pathAnalyse`, run again from A to 127 points on the line, for a
-receiver like the far end's standing on the beam at the
+receiver like the far end's standing on the line at the
 line's height there (the curvature terms cancel, so every point sees the
 clearances the chart draws): the signal fades with distance, drops where the
 ground — or, under the land-cover model, the cover — reaches into the Fresnel

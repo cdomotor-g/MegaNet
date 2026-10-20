@@ -88,7 +88,7 @@
     {
       "id": "los_fresnel",
       "title": "Line of sight & Fresnel clearance",
-      "what": "VHF links need more than a sightline: they need the first Fresnel zone — an ellipsoid around the direct path, tens of metres thick at these distances — mostly clear. Terrain or growing vegetation intruding into it attenuates the signal even though the antennas can 'see' each other.",
+      "what": "VHF links need more than a sightline: they need the first Fresnel zone — an ellipsoid around the direct path, tens of metres thick at these distances — mostly clear. It is not the shape of the beam: the wave spreads far wider than this, and the ellipsoid is the part of it that arrives at the receiver in step, which is why it narrows at both ends. Terrain or growing vegetation intruding into it attenuates the signal even though the antennas can 'see' each other.",
       "in_your_data": "A slow degradation of one path over months (vegetation growth) or a seasonal pattern (foliage, moisture). Also why the ACMA threat scores carry an unknown-LOS discount: a licensed transmitter behind a mountain may be no threat at all, and the register cannot tell.",
       "next": "For a single degrading path, check the Radio Mobile profile before blaming interference. For threat triage, remember distance-based scores ignore terrain both ways.",
       "see_also": ["noise_floor", "acma_register"]
