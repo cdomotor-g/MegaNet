@@ -549,7 +549,12 @@ const PathProfile = (function () {
   // null whenever there is no chart — which is also what stops a stale pointer
   // from painting onto the chart that replaced it.
   let hoverGeom = null;
-  let refocusFlip = false;   // see rerender()
+  let refocusFlip = null;    // the id of the ⇄ that was pressed — see rerender()
+  // What the chart on the card was last drawn from — the analysis, the ground
+  // and the two ends — or null when bodyHtml drew no chart. The full-screen
+  // view draws from it, and the radio-path card quotes its margin.
+  let shown = null;
+  let full = null;           // { t, onResize } while the chart is full screen
 
   const P = () => state.path;
 
@@ -609,7 +614,8 @@ const PathProfile = (function () {
   }
 
   // Everything that quotes this profile follows it: the budget's terrain and
-  // cover terms, and the radio-path card that quotes the budget.
+  // cover terms, and the radio-path card that quotes its fade margin
+  // (shownMargin) — called after a rerender, so that figure is the new one.
   function announce() {
     LinkBudget.profileChanged();
     MapBackbone.profileChanged();
@@ -873,9 +879,13 @@ const PathProfile = (function () {
 
   // `flat` draws the ground and nothing else — the multi-leg case, where there
   // is a distance profile but no single radio path to put a line of sight on.
-  // `sig` is the signal's inputs (signalIn), or null for none.
-  function chartSvg(an, prof, flat, sig) {
-    const W = 920, H = 300;
+  // `sig` is the signal's inputs (signalIn), or null for none. `size` is the
+  // full-screen view's { W, H }: the chart drawn at the pixels it is shown at,
+  // so its labels stay the size they were set at and a LiDAR ground keeps as
+  // many of its samples as that width has room for (THIN_AT's buckets).
+  function chartSvg(an, prof, flat, sig, size) {
+    const W = size ? size.W : 920, H = size ? size.H : 300;
+    const fs = size ? 12 : 10;   // axis labels
     const L = 52, R = 14, T = 14, B = 30;
     const iw = W - L - R, ih = H - T - B;
     const D  = an.D;
@@ -1096,12 +1106,14 @@ const PathProfile = (function () {
     for (let m = Math.ceil(lo / stepM) * stepM; m <= hi; m += stepM) {
       grid.push(`<line x1="${L}" y1="${y(m).toFixed(1)}" x2="${W - R}" y2="${y(m).toFixed(1)}"
                        stroke="var(--border)" stroke-width="1"/>
-                 <text x="${L - 6}" y="${(y(m) + 3.5).toFixed(1)}" font-size="10" text-anchor="end"
+                 <text x="${L - 6}" y="${(y(m) + 3.5).toFixed(1)}" font-size="${fs}" text-anchor="end"
                        style="fill:var(--muted)">${m}</text>`);
     }
     // The end labels are anchored inwards so neither runs off the viewBox.
-    const xticks = [0, .25, .5, .75, 1].map(f => `
-      <text x="${x(D * f).toFixed(1)}" y="${H - 10}" font-size="10"
+    // Full screen has the width for eight intervals rather than four.
+    const ticks = size && iw >= 1100 ? [0, .125, .25, .375, .5, .625, .75, .875, 1] : [0, .25, .5, .75, 1];
+    const xticks = ticks.map(f => `
+      <text x="${x(D * f).toFixed(1)}" y="${H - 10}" font-size="${fs}"
             text-anchor="${f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}"
             style="fill:var(--muted)">${fmtKm(D * f / 1000)}</text>`).join('');
 
@@ -1145,11 +1157,14 @@ const PathProfile = (function () {
               style="fill:var(--text)"></text>
       </g>`;
     // Last in the SVG so it is over everything, and transparent rather than
-    // absent because a fill of `none` takes no pointer events at all.
+    // absent because a fill of `none` takes no pointer events at all. On the
+    // card a click opens the chart full screen; ⛶ in the key is the same for
+    // a keyboard, since an image is not something Tab stops on.
     const catcher = `
       <rect x="${L}" y="${T}" width="${iw}" height="${ih}" fill="transparent"
             onmousemove="PathProfile.hoverEvent(event)"
-            onmouseleave="PathProfile.hoverOff()"/>`;
+            onmouseleave="PathProfile.hoverOff()"${size ? '' : `
+            onclick="PathProfile.openFull()"`}/>`;
 
     return `
       <div class="path-chart-wrap">
@@ -1193,6 +1208,9 @@ const PathProfile = (function () {
           ${flat ? '' : '<span><i class="path-key-obs"></i> Inside the Fresnel zone</span>'}
           ${coverKey}
           ${flat || !sig ? '' : `<span id="path-sig-key">${sigKeyHtml(!sigOn ? 'none' : sigRows ? 'ready' : 'pending')}</span>`}
+          ${size ? '' : `<button type="button" class="lb-link path-full-open" id="path-full-open"
+                    onclick="PathProfile.openFull()"
+                    title="Open the chart full screen, with the figures beside it">⛶ Full screen</button>`}
         </div>
         ${sigOn ? `<p class="filter-hint path-sig-note">The signal runs A → B (⇄ Flip direction for B → A), priced
           the way the fade margin is: the same model over the ground from the transmitter to each point on the line, for a
@@ -2007,12 +2025,14 @@ const PathProfile = (function () {
     // the one drawn.
     if (multi) {
       const an = pathAnalyse(prof, { elevA: a.elev, elevB: b.elev, aglA: 0, aglB: 0, ...coverFor() });
-      return `
+      const legs = `
         <p class="path-warn small">This line has ${sh.pts.length - 1} legs, so it is a
           <strong>distance profile only</strong> — no line of sight and no Fresnel zone.
           A dog-leg is not a radio path. Draw a two-point line to analyse a hop.</p>
-        ${warn}
-        ${an.ok ? chartSvg(an, prof, true) : `<p class="filter-note">${esc(an.error)}</p>`}`;
+        ${warn}`;
+      if (an.ok) shown = { an, prof, a, b, flat: true, sig: null, warn: legs, datum: '' };
+      return `${legs}
+        ${an.ok ? chartHere() : `<p class="filter-note">${esc(an.error)}</p>`}`;
     }
 
     const an = pathAnalyse(prof, mainOpts(a, b));
@@ -2030,10 +2050,11 @@ const PathProfile = (function () {
       <p class="filter-hint">All heights are sampled from tiles (EGM96 geoid, not AHD) — neither
         end is snapped to a station with a surveyed elevation.</p>`;
 
+    shown = { an, prof, a, b, flat: false, sig: signalIn(an, a, b), warn, datum };
     return `
       ${readoutHtml(an, a, b)}
       ${warn}
-      ${chartSvg(an, prof, false, signalIn(an, a, b))}
+      ${chartHere()}
       ${endsFormHtml(a, b, an)}
       ${datum}
       ${elvisHtml(an)}
@@ -2052,6 +2073,109 @@ const PathProfile = (function () {
           : cur.elvisStatus === 'ready' ? 'Check again with Elvis'
           : 'Check this path against 1 m data'}</button>
       </div>`;
+  }
+
+  // ── full screen ──
+  // The chart on the card is drawn 920 wide and shown at whatever width the
+  // column gives it — in the side panel about two thirds of that, which puts
+  // its labels at seven pixels and the ridges of a 13 km path a few pixels
+  // apart. A click on it, or ⛶ in its key, draws it again at the window's own
+  // size, in Modal's shell (Escape, the Tab walls and focus handed back are
+  // Modal's): the readout over it, the key and the notes under it — everything
+  // the card says about this path but the form that changes it.
+  //
+  // One chart at a time. Its parts are found by id — the cursor, the signal's
+  // layers, the gradient its beam is filled with — so while it is full screen
+  // the card says where it went rather than drawing a second. Every repaint of
+  // the card repaints this too (rerender), so the ground or the cover landing,
+  // a flip or another line selected shows up in either place.
+
+  function chartHere() {
+    if (full) {
+      return `<p class="filter-note path-full-away">The chart is open full screen.
+        <button type="button" class="lb-link" onclick="Modal.close()">Bring it back here</button></p>`;
+    }
+    return chartSvg(shown.an, shown.prof, shown.flat, shown.sig);
+  }
+
+  // The plot's size: the width of its box, and the height the window has left
+  // under the readout for it and a line or two of key — never taller than 0.6
+  // of its width, or a phone held upright would get a tall thin strip of sky.
+  function fullSize(slot) {
+    const W = Math.max(620, Math.floor(slot.clientWidth || 920));
+    // Where the box starts with nothing scrolled: the body scrolls on a wide
+    // screen, the overlay on a phone.
+    const body = slot.closest('.modal-body'), over = slot.closest('.modal-overlay');
+    const top = slot.getBoundingClientRect().top + (body ? body.scrollTop : 0) + (over ? over.scrollTop : 0);
+    const room = window.innerHeight - top - 96;
+    return { W, H: Math.round(Math.max(300, Math.min(room, W * 0.6))) };
+  }
+
+  function fullPaint() {
+    const host = document.getElementById('path-full');
+    if (!host) return;
+    const sh = target();
+    if (!sh) { Modal.close(); return; }      // the line went, and its picture with it
+    const s = shown;
+    const title = document.getElementById('app-modal-title');
+    if (title) title.textContent = s ? `Elevation profile — ${s.a.name} → ${s.b.name}` : 'Elevation profile';
+    // Focus goes back to the control it was on, as it does on the card.
+    const f = document.activeElement;
+    const back = f && host.contains(f) && f.id ? f.id : '';
+    if (!s) {
+      host.innerHTML = `<p class="filter-note">${cur.status === 'loading'
+        ? `Sampling terrain along ${fmtKm(MapDraw.lineKm(sh.pts))} of path…`
+        : cur.status === 'failed' ? `Terrain data unavailable — ${esc(cur.error)}`
+        : 'No profile to draw for this line.'}</p>`;
+    } else {
+      host.innerHTML = `
+        <p class="small path-full-sub">${esc(MapDraw.measure(sh))}</p>
+        ${s.flat ? s.warn : readoutHtml(s.an, s.a, s.b) + s.warn}
+        <div class="path-full-chart" id="path-full-chart"></div>
+        ${s.flat ? '' : `<p class="small path-cover-note">${coverStatusHtml(s.an)}</p>${s.datum}${elvisHtml(s.an)}`}
+        <div class="path-actions">
+          ${s.flat ? '' : `<button type="button" id="path-full-flip" onclick="PathProfile.flip()"
+                  aria-label="Flip direction: make ${escAttr(s.b.name)} end A and ${escAttr(s.a.name)} end B"
+                  title="Turn the line round — ${escAttr(s.b.name)} becomes A, ${escAttr(s.a.name)} becomes B">⇄ Flip direction</button>`}
+          <button type="button" onclick="Modal.close()">Close</button>
+        </div>`;
+      const slot = document.getElementById('path-full-chart');
+      slot.innerHTML = chartSvg(s.an, s.prof, s.flat, s.sig, fullSize(slot));
+    }
+    if (back) {
+      const to = document.getElementById(back) || host.closest('.modal-card');
+      if (to) to.focus({ preventScroll: true });
+    }
+  }
+
+  function openFull() {
+    if (full || !shown) return;
+    full = { t: 0, onResize: null };
+    // Redrawn to the new size once the window has stopped moving.
+    full.onResize = () => {
+      if (!full) return;
+      clearTimeout(full.t);
+      full.t = setTimeout(() => { if (full) rerender(); }, 150);
+    };
+    window.addEventListener('resize', full.onResize);
+    Modal.open({ title: 'Elevation profile', wide: true, onClose: closedFull,
+                 html: '<div id="path-full" class="path-full"></div>' });
+    rerender();
+  }
+
+  // However it closed — Escape, ×, Close, the backdrop, another dialog in its
+  // place — the chart goes back on the card. Modal hands focus back to what
+  // opened it, but that ⛶ went with the card's repaint when this opened, so a
+  // focus left on nothing goes to the new one.
+  function closedFull() {
+    if (!full) return;
+    clearTimeout(full.t);
+    window.removeEventListener('resize', full.onResize);
+    full = null;
+    rerender();
+    const f = document.activeElement;
+    const btn = document.getElementById('path-full-open');
+    if (btn && (!f || f === document.body)) btn.focus({ preventScroll: true });
   }
 
   function panelHtml() {
@@ -2107,19 +2231,23 @@ const PathProfile = (function () {
     // It goes back to the same control, or failing that to the card's header.
     const f = document.activeElement;
     const back = f && f !== el && el.contains(f) ? (f.id || 'summary') : '';
+    shown = null;
     el.innerHTML = sh ? panelHtml() : emptyHtml();
     if (back) {
       const to = (back !== 'summary' && document.getElementById(back)) || el.querySelector('summary');
       if (to) to.focus({ preventScroll: true });
     }
+    // The full-screen view, from what the card was just drawn from.
+    if (full) fullPaint();
     // A flip re-walks the terrain, so the button that was pressed is replaced
     // twice — by the "Sampling…" line and then by the new chart's own button.
     // Focus goes back to it once it exists again, so a keyboard user can flip
-    // and flip back without hunting for it.
+    // and flip back without hunting for it — on the card or full screen,
+    // whichever it was pressed in.
     if (refocusFlip) {
-      const btn = document.getElementById('path-flip');
-      if (btn) { btn.focus(); refocusFlip = false; }
-      else if (cur.status !== 'loading') refocusFlip = false;
+      const btn = document.getElementById(refocusFlip);
+      if (btn) { btn.focus(); refocusFlip = null; }
+      else if (cur.status !== 'loading') refocusFlip = null;
     }
     // The signal's losses, if this chart's are priced already; otherwise the
     // pricing chartSvg started pours them in when it finishes.
@@ -2151,6 +2279,25 @@ const PathProfile = (function () {
 
     hoverOff() { hideCursor(); },
 
+    // The chart, full screen (see "full screen"); Modal.close() puts it back.
+    openFull,
+    isFull() { return !!full; },
+
+    // The fade margin the readout is quoting, for the radio-path card that
+    // heads this one: the worse of the two directions, off the path loss the
+    // chart was priced with, the obstruction already in it. Null when the card
+    // has none to quote — no single-hop profile drawn, an end that is not a
+    // station, a term not on file.
+    shownMargin() {
+      const s = shown;
+      if (!s || s.flat) return null;
+      const r = profileMargin(s.an, s.a, s.b);
+      return r.m == null ? null : {
+        margin: r.m, ab: r.ab, ba: r.ba, verdict: s.an.verdict,
+        ends: [s.a.station.id, s.b.station.id],
+      };
+    },
+
     setOpen(v) { P().open = !!v; },
     // The signal's ⏸ / ▶. Remembered: an animation somebody stopped stays
     // stopped. With nothing chosen it plays, unless the system asks for less
@@ -2174,7 +2321,7 @@ const PathProfile = (function () {
     flip() {
       const sh = target();
       if (!sh) return;
-      refocusFlip = true;
+      refocusFlip = full ? 'path-full-flip' : 'path-flip';
       MapDraw.flipLine(sh.id);
     },
     setAgl(which, v) {

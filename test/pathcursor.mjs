@@ -300,6 +300,43 @@ try {
   check('and stepping off the line puts both halves away again',
     offIt.c.shown === false && offIt.m === null, JSON.stringify(offIt));
 
+  // ── Full screen: a click on the chart, and the cursor still reads ───────
+  // The chart is drawn again at the size the window gives it, so the viewBox
+  // is no longer 920 wide — the fractions above are what still have to hold.
+  await showChart();
+  const mid = await page.evaluate(() => {
+    const r = document.querySelector('svg.path-chart').getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  });
+  await page.mouse.click(mid.x, mid.y);
+  await page.waitForFunction(() => !!document.querySelector('#path-full svg.path-chart'), null, { timeout: 10_000 });
+  const big = await page.evaluate(() => {
+    const svg = document.querySelector('#path-full svg.path-chart');
+    const r = svg.getBoundingClientRect();
+    return { left: r.left, top: r.top, width: r.width, height: r.height, vbw: svg.viewBox.baseVal.width,
+             n: document.querySelectorAll('svg.path-chart').length };
+  });
+  check('a click on the chart opens it full screen, wider than the card draws it, and only there',
+    big.n === 1 && big.vbw > 920 && Math.abs(big.width - big.vbw) < 3, JSON.stringify(big));
+  await page.mouse.move(big.left + (L_ + 0.5 * (big.vbw - L_ - R_)) * (big.width / big.vbw), big.top + big.height * 0.5);
+  await page.waitForTimeout(120);
+  const bigHalf = await page.evaluate(() => ({ c: window.__cursor(), m: window.__mapDot() }));
+  check('full screen, halfway across still reads 500 m, with the dot halfway across the wider plot',
+    /^(4[89]\d|5[01]\d) m$/.test(bigHalf.c.text || '')
+      && Math.abs(bigHalf.c.x - (L_ + 0.5 * (big.vbw - L_ - R_))) < 12
+      && !!bigHalf.m && Math.abs(bigHalf.m.lon - (HOP.lonA + SPAN * 0.5)) < SPAN * 0.03,
+    JSON.stringify(bigHalf));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  const shut = await page.evaluate(() => ({
+    full: PathProfile.isFull(),
+    back: !!document.querySelector('#path-profile-panel svg.path-chart'),
+    n: document.querySelectorAll('svg.path-chart').length,
+    m: window.__mapDot(),
+  }));
+  check('Escape puts the chart back on the card, and the marker on the map goes with the view it came from',
+    !shut.full && shut.back && shut.n === 1 && shut.m === null, JSON.stringify(shut));
+
   // ── The marker must not outlive the chart it was reading ────────────────
   await hoverMap(0.5);
   await page.evaluate(() => { MapDraw.clearAll(); });

@@ -716,7 +716,11 @@ const HELP = {
       + 'pairs qualify, not just which are drawn. Clicking any radio path — field link or '
       + 'backbone — opens a card about that hop at the top of the path tools (〽️ in the side '
       + 'panel, or under the map), above the elevation profile and link budget it points at the '
-      + 'same hop; × or Escape closes it. The dashes are what says <em>backbone</em>; the colour between them says '
+      + 'same hop; × or Escape closes it. Its fade margin is the elevation profile\'s own figure — the worse '
+      + 'of the two directions — in the profile\'s colour for it; a line of sight the ground cuts is named '
+      + 'beside the figure, since the model has already priced it. Click the profile\'s chart, or ⛶ '
+      + '<strong>Full screen</strong> in its key, to draw it again the size of the window with its figures '
+      + 'over it; Escape puts it back. The dashes are what says <em>backbone</em>; the colour between them says '
       + 'whatever the link colouring says.',
       'The 🗺️ <strong>Map display</strong> panel has a <strong>Find a control</strong> box at the '
       + 'top of it. Type into it and the panel filters down to the rows that match — against the '

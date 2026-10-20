@@ -784,6 +784,101 @@ if (sig) {
      `${sig.stored}; ${sig.heldW} of ${sig.iw}; "${sig.tag}"; ${sig.btn}`);
 }
 
+// The radio-path card that heads the profile quotes the profile's own fade
+// margin, in the profile's colour. And an obstruction the model has priced is
+// said beside the figure rather than painted over it: the card read red on a
+// path the profile called +39.6 dB good, because something stood above the
+// line of sight — a yes or no on the geometry, where the margin is the model's
+// answer with the obstruction already in it.
+const pathCard = await page.evaluate(async ids => {
+  const read = () => {
+    const row = [...document.querySelectorAll('#path-card .acma-row')]
+      .find(r => r.firstElementChild.textContent.trim() === 'Fade margin');
+    const s = row ? row.querySelector('strong') : null;
+    return s ? { text: row.lastElementChild.textContent.replace(/\s+/g, ' ').trim(), cls: s.className } : null;
+  };
+  MapBackbone.open('field', ids[0], ids[1]);
+  const until = Date.now() + 40000;
+  while (Date.now() < until && !(PathProfile.shownMargin() && read())) await new Promise(r => setTimeout(r, 200));
+  const p = PathProfile.shownMargin();
+  if (!p) return null;
+  const plain = read();
+  const real = PathProfile.shownMargin;
+  PathProfile.shownMargin = () => ({ ...real(), margin: 39.6, verdict: 'obstructed' });
+  MapBackbone.repaint();
+  const blocked = read();
+  PathProfile.shownMargin = real;
+  MapBackbone.repaint();
+  return { fig: `${p.margin > 0 ? '+' : ''}${p.margin.toFixed(1)} dB`, want: `txt-${lbMarginClass(p.margin).cls}`, plain, blocked };
+}, PAIR);
+ok('the radio-path card quotes the profile\'s fade margin', !!pathCard && !!pathCard.plain
+   && pathCard.plain.text.startsWith(pathCard.fig), JSON.stringify(pathCard));
+if (pathCard && pathCard.plain) {
+  ok('…in the profile\'s colour for it', pathCard.plain.cls === pathCard.want && pathCard.want === marginRow.cls,
+     `${pathCard.plain.cls}, the band ${pathCard.want}, the profile ${marginRow.cls}`);
+  ok('…and an obstruction the model priced is named beside a good figure, not painted red over it',
+     !!pathCard.blocked && pathCard.blocked.cls === 'txt-ok'
+       && /^\+39\.6 dB — good · line of sight obstructed, priced in$/.test(pathCard.blocked.text),
+     JSON.stringify(pathCard.blocked));
+}
+
+// Full screen: the same chart, drawn again at the size the window gives it,
+// with the readout over it — and only one chart in the page at a time, since
+// its parts are found by id.
+const fullView = await page.evaluate(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const rowOf = root => {
+    const dt = [...root.querySelectorAll('.path-stats dt')].find(x => x.textContent.trim() === 'Fade margin');
+    return dt ? dt.nextElementSibling.textContent.replace(/\s+/g, ' ').trim() : null;
+  };
+  const before = rowOf(document.getElementById('path-profile-panel'));
+  // Focused as a real click focuses it: the ⛶ pressed is the one focus has to
+  // come back to, though the card's repaint replaces it as the view opens.
+  const btn = document.getElementById('path-full-open');
+  btn.focus();
+  btn.click();
+  await sleep(300);
+  const host = document.getElementById('path-full');
+  const svg = host && host.querySelector('svg.path-chart');
+  const open = {
+    full: PathProfile.isFull(),
+    charts: document.querySelectorAll('svg.path-chart').length,
+    inModal: !!svg,
+    away: !!document.querySelector('#path-profile-panel .path-full-away'),
+    vbw: svg ? svg.viewBox.baseVal.width : 0,
+    shownW: svg ? svg.getBoundingClientRect().width : 0,
+    title: (document.getElementById('app-modal-title') || {}).textContent || '',
+    row: host ? rowOf(host) : null,
+    sig: !!PathProfile.signalState() && !!host.querySelector('#path-sig-run'),
+    flip: !!document.getElementById('path-full-flip'),
+  };
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  await sleep(300);
+  const shut = {
+    full: PathProfile.isFull(),
+    modal: !document.getElementById('path-full'),
+    back: !!document.querySelector('#path-profile-panel svg.path-chart'),
+    charts: document.querySelectorAll('svg.path-chart').length,
+    focus: document.activeElement && document.activeElement.id,
+  };
+  return { before, open, shut };
+});
+ok('⛶ opens the chart full screen, the only chart in the page, the card saying where it went',
+   fullView.open.full && fullView.open.inModal && fullView.open.charts === 1 && fullView.open.away,
+   JSON.stringify(fullView.open));
+ok('…drawn at the width it is shown at, wider than the card\'s 920',
+   fullView.open.vbw > 920 && Math.abs(fullView.open.vbw - fullView.open.shownW) < 3,
+   `${fullView.open.vbw} drawn, ${fullView.open.shownW.toFixed(0)} shown`);
+ok('…with the readout\'s figures, the signal along the line and ⇄, named for its two ends',
+   fullView.open.row === fullView.before && fullView.open.sig && fullView.open.flip
+     && /Beenleigh/i.test(fullView.open.title) && /Carbrook/i.test(fullView.open.title),
+   JSON.stringify({ title: fullView.open.title, row: fullView.open.row, before: fullView.before }));
+ok('Escape puts it back on the card, focus on ⛶',
+   !fullView.shut.full && fullView.shut.modal && fullView.shut.back && fullView.shut.charts === 1
+     && fullView.shut.focus === 'path-full-open',
+   JSON.stringify(fullView.shut));
+await page.evaluate(() => MapBackbone.closeCard(false));
+
 const noRadio = await page.evaluate(async () => {
   MapDraw.clearAll();
   MapDraw.addLine([[-27.50, 152.40], [-27.50, 152.50]], [null, null]);

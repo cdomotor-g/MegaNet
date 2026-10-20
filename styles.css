@@ -5988,6 +5988,30 @@ hr {
    is what catches the pointer, and a crosshair cursor over it says the chart
    can be read at a point rather than only looked at. */
 .path-chart rect[onmousemove] { cursor: crosshair; }
+/* …and on the card a click on it opens it full screen (PathProfile.openFull),
+   which the pointer says instead. Full screen there is no click, and it is the
+   crosshair again. */
+.path-chart rect[onclick] { cursor: zoom-in; }
+.path-full-open { margin-left: auto; }
+
+/* The elevation profile, full screen: Modal's wide card made the window less a
+   margin, because the chart is drawn to the size of its box (fullSize). :has()
+   for the readings table's reason (.modal-card--wide:has(#ad-table-modal)). On
+   a phone the card is the page already, and the page scrolls. */
+@media (min-width: 561px) {
+  .modal-overlay:has(#path-full) { padding: 1.5vh 1.5vw; }
+  .modal-card--wide:has(#path-full) {
+    max-width: none;
+    height: 97vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-card--wide:has(#path-full) .modal-body { flex: 1 1 auto; min-height: 0; max-height: none; }
+}
+.path-full-sub { margin: 0 0 .5rem; color: var(--muted); }
+/* A row of the readout is a screen wide here: wider cells, so the margin's
+   two directions and the obstructions list are a line or two each. */
+.path-full .path-stats { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 
 .path-key {
   display: flex;

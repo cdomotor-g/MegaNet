@@ -261,10 +261,22 @@ const MapBackbone = (function () {
 
   function cardEl() { return document.getElementById('path-card'); }
 
+  // The margin the elevation profile under this card is quoting — the worse of
+  // the two directions, priced over the terrain with the obstruction in it —
+  // when the profile is on this exact pair, which it is whenever the card is
+  // open and the ground has landed (onProfile). That is the figure the card
+  // quotes, so the two say one number in one colour. Before the ground lands,
+  // or where the profile has no figure, the budget's (budgetFor) and then a
+  // plain free-space margin computed from the same primitives.
+  function profileFor(a, b) {
+    const p = typeof PathProfile !== 'undefined' ? PathProfile.shownMargin() : null;
+    if (!p) return null;
+    const same = (p.ends[0] === a.id && p.ends[1] === b.id) || (p.ends[0] === b.id && p.ends[1] === a.id);
+    return same ? { margin: p.margin, verdict: p.verdict, priced: true } : null;
+  }
+
   // The budget the link-budget card is showing, when it is showing this exact
-  // pair — so the card and the panel below it quote the same figure, terrain
-  // term included once the profile lands. Anything else falls back to a plain
-  // free-space margin computed from the same primitives.
+  // pair, terrain term included once the profile lands.
   function budgetFor(a, b) {
     const L = state.link;
     const match = L.a && L.b &&
@@ -299,14 +311,22 @@ const MapBackbone = (function () {
     if (!r || r.margin == null) {
       return '<span class="small">no figure — TX power or RX threshold not set</span>';
     }
-    // An obstructed path never gets to read "good", however fat the number —
-    // the budget card's own rule, reproduced rather than re-banded.
-    const blocked = !!(r.an && r.an.verdict === 'obstructed');
+    // Coloured by the number, in the bands the profile and the budget colour it
+    // in. "Obstructed" is a yes or no on the geometry — something stands above
+    // the line of sight — and the margin is what the model says is left after
+    // paying for it, so it is said beside the figure rather than painted over
+    // it. It was painted over it, and a path the profile called +39.6 dB good
+    // read red here. The one override is the budget card's own: an obstructed
+    // path with no model run over it is priced by a single knife edge, the most
+    // optimistic estimate there is, and never reads "good".
+    const verdict = r.priced ? r.verdict : r.an ? r.an.verdict : null;
+    const guessed = verdict === 'obstructed' && !r.priced && !r.itm;
     const m = lbMarginClass(r.margin);
-    const cls = blocked ? 'bad' : m.cls;
+    const cls = guessed ? 'bad' : m.cls;
+    const note = r.fsplOnly ? ' · free-space only'
+      : verdict === 'obstructed' && !guessed ? ' · line of sight obstructed, priced in' : '';
     return `<strong class="txt-${cls}">${(r.margin > 0 ? '+' : '') + r.margin.toFixed(1)} dB</strong>
-      <span class="small"> — ${blocked ? 'obstructed' : m.label.toLowerCase()}${
-        r.fsplOnly ? ' · free-space only' : ''}</span>`;
+      <span class="small"> — ${guessed ? 'obstructed' : m.label.toLowerCase()}${note}</span>`;
   }
 
   // The channel the path is on — MapFreq's pick, the one the link colouring
@@ -385,7 +405,7 @@ const MapBackbone = (function () {
   // same kind of figure they do.
   function cardHtml(kind, a, b) {
     const backbone = kind === 'backbone';
-    const r = budgetFor(a, b) || freeSpaceMargin(a, b);
+    const r = profileFor(a, b) || budgetFor(a, b) || freeSpaceMargin(a, b);
     const km = acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
     return `
       <div class="path-card-head">
@@ -400,9 +420,9 @@ const MapBackbone = (function () {
         ${row('Distance', fmtKm(km))}
         ${row('Fade margin', marginHtml(r))}
       </div>
-      <p class="small path-card-note">Indicative only — the margin is the link budget card's figure
-        (free-space until the terrain profile lands). The elevation profile and link budget below
-        are open on this exact path:
+      <p class="small path-card-note">Indicative only — the margin is the elevation profile's figure,
+        the worse of the two directions (free-space until the terrain profile lands). The elevation
+        profile and link budget below are open on this exact path:
         <a href="#" onclick="MapBackbone.scrollTo('path-profile-panel');return false">elevation profile ↓</a> ·
         <a href="#" onclick="MapBackbone.scrollTo('link-budget-panel');return false">fade margin ↓</a></p>`;
   }

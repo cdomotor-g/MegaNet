@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 56, date: '2026-10-20', items: [
+      '<strong>〽️ The elevation profile, full screen.</strong> Click the chart on the elevation profile — or ⛶ '
+        + '<em>Full screen</em> in its key — and it opens the size of the window, the signal still running along it, with '
+        + 'the path\'s figures over it and the notes under it. Point at it for the height and the signal anywhere along the '
+        + 'line; Escape puts it back.',
+      '<strong>🎨 One fade margin, one colour.</strong> The <em>Radio path</em> card now quotes the elevation profile\'s '
+        + 'own fade margin, in the same colour. It turned the figure red whenever something stood above the line of sight, '
+        + 'even where the profile had priced that in and called the path good; now it says <em>line of sight obstructed, '
+        + 'priced in</em> beside the figure instead.',
+    ] },
     { n: 55, date: '2026-10-20', items: [
       '<strong>🗺️ The carriers\' coverage maps on the map.</strong> In 🗺️ Map display, <em>Mobile coverage — the '
         + 'carriers\' 4G maps</em> draws Telstra\'s, Optus\'s or TPG\'s own 4G coverage map — or the best of the three — '
