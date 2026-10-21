@@ -3144,7 +3144,11 @@ const DB_SCHEMA = 'meganet';
 // Applied by hand before this bump, which is why it is its own commit.
 // 72: a reception's detail as typed columns (0072, #242) — readers see the
 // same object through reception_detail(); applied by hand, bumped after.
-const DB_SCHEMA_VERSION = 72;
+// 73: the data archive's manifest and retain() that deletes only what it
+// holds (0073, #243). 74: receptions and submissions found by time with a
+// btree, and the archive counting from the rollups (0074). Both applied by
+// hand, bumped after; neither changes a shape the app reads.
+const DB_SCHEMA_VERSION = 74;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

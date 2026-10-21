@@ -29,6 +29,7 @@
 
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
+import { restore } from './restore-day.mjs';
 
 const DEFAULT_SUPABASE_URL = 'https://jjprlritvhdqpvphfrnu.supabase.co';
 const DEFAULT_ARCHIVE_URL = 'https://floodwarning.net/api/archive';
@@ -162,6 +163,26 @@ export async function archive({ env = {}, fetch = globalThis.fetch, log = () => 
   return out;
 }
 
+// Each run also gets one archived day back — released ones first, the days the
+// database no longer holds — exactly as restore-day.mjs would, so a broken
+// round trip shows as a red run, not on the day somebody needs it.
+export async function selfTest({ env = {}, fetch = globalThis.fetch, pick = Math.random } = {}) {
+  const url = (env.SUPABASE_URL || '').trim() || DEFAULT_SUPABASE_URL;
+  const key = env.SUPABASE_SECRET_KEY;
+  const q = async (filter) => {
+    const res = await fetch(`${url}/rest/v1/archive_day?select=table_name,day,version${filter}&order=day.desc&limit=200`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}`, 'Accept-Profile': 'meganet' } });
+    if (!res.ok) throw new Error(`the manifest: ${res.status}`);
+    return res.json();
+  };
+  let days = await q('&released_at=not.is.null');
+  if (!days.length) days = await q('');
+  if (!days.length) return null;
+  const d = days[Math.floor(pick() * days.length)];
+  const { manifest } = await restore({ table: d.table_name, day: d.day, version: d.version, env, fetch });
+  return manifest;
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const mb = b => `${(b / 1048576).toFixed(1)} MB`;
   try {
@@ -170,6 +191,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     if (process.env.DRY_RUN) console.log(`Dry run: ${r.left} day(s) would be archived.`);
     else console.log(`Archived ${r.archived} day(s), ${r.rows} rows, ${mb(r.bytes)}; ${r.again} to try again; ${r.failed} failed; ${r.left} left for the next run.`);
     if (r.failed) process.exitCode = 1;
+    if (!process.env.DRY_RUN) {
+      const m = await selfTest({ env: process.env });
+      if (m) console.log(`Self-test: ${m.object_key} restored — ${m.rows} rows, its hash the manifest's${m.released_at ? ' (a day the database no longer holds)' : ''}.`);
+    }
   } catch (err) {
     if (err.code === 'nokey') { console.log(`::notice::${err.message} — nothing archived.`); }
     else if (err.unbound) { console.log('::warning::The Worker has no ARCHIVE binding yet — nothing archived.'); }

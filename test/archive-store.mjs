@@ -14,7 +14,7 @@
 import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { handleArchive, archiveKey, isArchivePath } from '../worker/archive.js';
-import { archive, objectKey, encodeDay } from '../tools/archive/archive-to-r2.mjs';
+import { archive, objectKey, encodeDay, selfTest } from '../tools/archive/archive-to-r2.mjs';
 import { restore } from '../tools/archive/restore-day.mjs';
 
 const results = [];
@@ -65,8 +65,13 @@ function project(env, db) {
     }
     if (db && u.includes('/rest/v1/archive_day?')) {
       const q = new URL(u).searchParams;
+      if (!q.get('table_name')) {
+        const rel = q.get('released_at');
+        return new Response(JSON.stringify(db.manifest.filter(m => (rel ? !!m.released_at : true))), { status: 200 });
+      }
       const t = q.get('table_name').slice(3), d = q.get('day').slice(3);
-      const rows = db.manifest.filter(r => r.table_name === t && r.day === d).sort((a, b) => b.version - a.version);
+      const v = q.get('version') ? Number(q.get('version').slice(3)) : null;
+      const rows = db.manifest.filter(r => r.table_name === t && r.day === d && (v === null || r.version === v)).sort((a, b) => b.version - a.version);
       return new Response(JSON.stringify(rows.slice(0, 1)), { status: 200 });
     }
     return new Response('not here', { status: 404 });
@@ -195,6 +200,15 @@ function fakeDb() {
   check('… and the next run steps over the half-done version rather than overwrite it',
     r5.archived === 1 && v.join() === '1,3' && env.ARCHIVE.m.has('reception/2026/10/05.v2.ndjson.gz') && env.ARCHIVE.m.has('reception/2026/10/05.v3.ndjson.gz'),
     JSON.stringify({ r5, v }));
+
+  const st = await selfTest({ env: ENV, fetch, pick: () => 0 });
+  check('the self-test gets an archived day back and checks it against the manifest', st && st.rows >= 1 && st.object_key, JSON.stringify(st));
+  const k0 = [...env.ARCHIVE.m.keys()][0];
+  const v0 = env.ARCHIVE.m.get(k0);
+  env.ARCHIVE.m.set(k0, { ...v0, bytes: new Uint8Array([...v0.bytes].map((b, i) => (i === v0.bytes.length - 1 ? b ^ 1 : b))) });
+  const bad = await (async () => { for (let i = 0; i < 20; i += 1) { try { await selfTest({ env: ENV, fetch, pick: () => i / 20 }); } catch (e) { return e; } } return null; })();
+  check('… and fails when an object is not what was recorded', bad && /SHA-256/.test(bad.message), String(bad && bad.message));
+  env.ARCHIVE.m.set(k0, v0);
 
   const noKey = await archive({ env: { ...ENV, SUPABASE_SECRET_KEY: '' }, fetch }).catch(e => e);
   check('without the secret key it does nothing and says so', noKey.code === 'nokey');
