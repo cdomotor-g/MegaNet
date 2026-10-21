@@ -544,7 +544,7 @@ curl -s 'https://floodwarning.net/api/v1/readings/latest?type=river&bbox=145.5,-
     ]
   }],
   "unattributed_addresses": 2,
-  "notes": ["Telemetry ingested into Flood-Net only. …", "Each channel is its address's newest reading that meganet.reading still holds (90 days) …",
+  "notes": ["Telemetry ingested into Flood-Net only. …", "Each channel is its address's newest reading that meganet.reading still holds (about two years) …",
             "2 address(es) heard belong to no single live station — …"],
   "source": "meganet.reading_latest (each address's newest reading in meganet.reading); meganet.station"
 }
@@ -553,7 +553,7 @@ curl -s 'https://floodwarning.net/api/v1/readings/latest?type=river&bbox=145.5,-
 - **Newest by the station's own clock.** `t` is when the device says it read,
   as everywhere in this API; `minutes_since` counts from it to now, so a
   negative one is a station whose clock runs ahead. `received_at` is when
-  Flood-Net got it. Readings are kept 90 days: a channel silent for longer has
+  Flood-Net got it. Readings are kept about two years: a channel silent for longer has
   no reading here.
 - **`unattributed_addresses`** counts the addresses heard that no single live
   station carries — an ALERT address more than one station uses, or a station

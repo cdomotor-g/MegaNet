@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-20** (revision 169 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-21** (revision 170 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -227,6 +227,14 @@ Six per-tab issues are about to restyle nineteen tabs in parallel. The decisions
 ---
 
 ## Epics & their sub-issues
+
+### 🗄️ EPIC #240 — the data storage regime: keep everything, tiered by age — **OPEN, opened revision 170**
+`[Epic]` `[Opus5/High]` — the rating is for the children; each changes how the database stores or deletes data. The owner, 2026-10-21: *"I don't want to run out of space … more data is usually better than less … that metadata is probably going to be useful for things like forensics in terms of network health."* The database was 468 MB and growing ~80 MB a day (receptions ~65, readings ~10, submissions ~6), and `roll_up()` / `retain()` had never run. **The regime: nothing leaves the database unless it is rolled up and archived to R2.** Readings 730 days in full (set by `0070`), receptions 90 days in full, submissions 30; the rollups of both forever in the database, every raw row forever in R2.
+- **#241** `[Sub-issue of #240]` `[Opus5/High]` — **OPEN** — reception hourly and daily rollups, kept forever: per ingest point × transmitting station × repeater path × hour, counts and sums (not means) of SNR, noise floor, signal and carrier offset. ~6.5k rows a day against ~96k receptions. The long-term record of network health.
+- **#242** `[Sub-issue of #240]` `[Opus5/High]` — **OPEN** — slimmer receptions: `detail`'s known fields as typed columns, the repeated constant labels not stored, anything unrecognised still kept. 392 of a row's 557 bytes are `detail` today; ~60% less a row, nothing lost. Checks two indexes with no scans (`reception_alert_idx`, `reading_ingest_token_idx`).
+- **#243** `[Sub-issue of #240]` `[Opus5/High]` — **OPEN** — archive to R2 before anything is deleted (daily gzip NDJSON, a manifest `retain()` checks), receptions taught to `retain()` at 90 days, **then** `retain()` on pg_cron. The first scheduled deletion in the project.
+
+> **Sequencing.** #241 → #242 → #243. The rollup comes first so no reception is ever deleted without one; #242 before #243 so the archive is written in the final shape; `retain()` is scheduled only inside #243. **Already done at revision 170 (`0070`)**: `roll_up()` hourly on pg_cron and `retain_reading_days` 730 — nothing is deleted until #243.
 
 ### 📣 EPIC #214 — network health that reaches people: findings on the server, alerts to staff, transmitter drift — **OPEN, opened revision 117**
 `[Epic]` `[Opus5/High]` — the rating is for the children. Out of the UX review of 2026-10-07 (Flood-Net item 5, and the review's three cross-repo items). The network's health is something a person has to go and look at today: Station Health works its findings out in the browser when its tab is open, Base Stations shows online / quiet / offline when that tab is open, and nothing tells anyone. **The scope is the network's equipment, for the people who keep it running** — Flood-Net is not a flood warning service (`docs/agent-api.md`), and nothing under this epic alerts anyone about river levels. #156's "watch-and-notify during field tests" is a different thing and stays there.
@@ -678,7 +686,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Opus5
 | Effort | Issues |
 |---|---|
-| High | **#186** (epic — rating is for its children; #187 is its last open child) · **#204** (assessment report drafts from the dossier — *blocked on the example reports*) · **#214** (epic — rating is for its children) · **#216** (alerts to staff — *a person sets two secrets*) · **#232** (a burst heard twice, stored twice — *measure first*) |
+| High | **#186** (epic — rating is for its children; #187 is its last open child) · **#204** (assessment report drafts from the dossier — *blocked on the example reports*) · **#214** (epic — rating is for its children) · **#216** (alerts to staff — *a person sets two secrets*) · **#232** (a burst heard twice, stored twice — *measure first*) · **#240** (epic — rating is for its children) · **#241** (reception rollups, forever) · **#242** (slimmer receptions — *after #241*) · **#243** (archive to R2, then `retain()` scheduled — *last*) |
 | Med | **#206** (an agent proposing equipment from new photos — *blocked on the credential decision*) |
 
 ### AI agent — Sonnet5
@@ -791,6 +799,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 31. **#238 (QLDTraffic on the map) has no blockers and gates nothing.** It reads a different service from everything else on the map, and its station-card half goes beside `site-roads.js`'s section — so with #177 and #205 it is one of three that edit `app.js`'s Map display and station card: one at a time (constraint 2). Two of its calls are the owner's and are on the issue: roadworks on or off by default, and Transport for NSW's events.
 32. **#239 (privacy clean-up) Part 1 after #237's Part 1; Part 2 whenever there is an hour, and it gates nothing.** Part 1 is `0063` then `0064` — the order matters, `0064` writes schema 64 over `0063`'s 63. Part 2 rewrites every commit ID, so it wants every other session paused while it runs and fresh clones after; work in between is unaffected (the script clones whatever `main` is then and refuses to push if `main`'s files would change). Until then: the inspection archive stays out of this repository (`.gitignore`, `extract.py`'s contact guard), and commit IDs cited from now on will be translated by the follow-up.
+33. **EPIC #240 (storage regime, revision 170): #241 → #242 → #243, in that order, and nothing deleted before #243.** Not blocked by anything else on the board. #242 changes the ingest path for receptions, so it should not run at the same time as #232 if #232 changes `meganet.ingest()` (constraint 2); #241 and #243 touch neither. Two dates matter: readings start crossing 730 days in August 2028, and the database passes Pro's included 8 GB around late January 2027 at October's rate — #243 should land well before that.
 
 ## Priority (as stated on each epic/issue, where given)
 - **P2:** ~~#100 (epic) → #102/#103~~ — **the whole epic is closed**; ~~#152 (epic) → #153/#154/#155~~ — **that epic is closed too, at revision 55**; ~~#78 (epic) → #115/#116/#117/#149/#146/#148/#118~~ — **EPIC #78 is closed out; every child of it is shut**; ~~#122 (epic) → #123/#124/#125/#126/#159/#128/#127~~ — **the whole epic is closed**; ~~#129 (epic) → #130/#132/#133/#134/#135~~ — **all closed**
@@ -806,6 +815,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 170 — 2026-10-21: 🗄️ Storage — the rollups built hourly, readings kept two years, and EPIC #240 for the rest
+
+The owner: *"make an assessment on our data storage regime and I don't want to run out of space … maybe we need to think about aggregation or summary or how long certain things live in the database"*, and then, on receptions: *"I would like to hold on to that information forever, really."* **Opens EPIC #240 and its children #241, #242, #243; closes nothing.**
+
+- **What was found**: 468 MB, growing ~80 MB a day since the second receiver came up on 2026-10-19 — `reception` 204 MB (+~65 MB/day, 96k rows/day, 70% of ALERT2 rows repeat copies over other repeater paths), `reading_raw` 84 MB (+~6), `reading` 71 MB (+~10). `roll_up()` and `retain()` had never run (`0006` left them to be run by hand): `reading_hourly` and `reading_daily` were empty, and 15.5k submissions were past their 30 days. 392 of a reception row's 557 bytes are its `detail` jsonb.
+- **`0070`**: `retain_reading_days` 730 (was the default 90), and `roll_up()` on pg_cron hourly at minute 7 (`meganet-roll-up`). `retain()` is **not** scheduled: the owner's rule is that nothing is deleted before it is rolled up and archived, and the archive is #243. Schema version 70; `core.js` `DB_SCHEMA_VERSION` 70; the version stamp `20261021b`. The help text, `README.md`, `docs/message-log.md`, `docs/agent-api.md` and the agent API's notes now say readings are kept about two years.
+- **Applied live** with the Supabase connector's `apply_migration`. The first `roll_up()` ran by hand straight after: 104,806 hourly and 21,866 daily rows, ~25 MB, and the hourly and daily `n` both sum to the 189,326 readings exactly.
+
+**Checks:** the cheap five, `npm run agentapi`, `npm run agentdocs`, `npm run health`.
 
 ### Revision 169 — 2026-10-20: ⚡ The station document kept, not built on every load
 

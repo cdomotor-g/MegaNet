@@ -215,8 +215,8 @@ to the other:
 
 ## Edges worth knowing
 
-* **Raw readings age out at ~90 days.** A window into last winter comes back
-  empty here; the hourly and daily rollups that survive are on the Field Data
+* **Raw readings are kept about two years.** A window further back than that
+  comes back empty here; the hourly and daily rollups that survive are on the Field Data
   tab, which knows how to widen. The row cap (5,000 per fetch) is stated on
   screen when it bites, with *load more* for the next page.
 * **Reading needs no sign-in.** The log, like the station list, is public by

@@ -32,7 +32,7 @@
 // their age — so "last heard" is answered even for a station gone quiet a
 // month ago, by the same request that carries the week its battery and its
 // findings are worked out from. A second, of one row, only for a station with
-// no readings left at all (they age out at about 90 days): when the ingest
+// no readings left at all (they age out after about two years): when the ingest
 // last heard it, from station_health, so that "never" is only ever true. Kept
 // per station for CARD_TTL: a repaint (a save, a filter keystroke, the trail)
 // asks nothing new, and neither does coming back to the same pin inside five
@@ -355,7 +355,7 @@ const HealthGlance = (() => {
                                     : `station_id=eq.${encodeURIComponent(s.id)}`;
     const rows = await dbSelect(`reading?select=${CARD_SELECT}&${filter}&order=reading_ts.desc&limit=${CARD_ROWS}`);
     const g = glanceFrom(s, rows, now_());
-    // No readings left: readings age out at about 90 days, and the ingest's
+    // No readings left: readings age out after about two years, and the ingest's
     // own record of when it last heard the station does not. So a station
     // with nothing in meganet.reading costs a second, one-row request — unless
     // the pins' batch already holds the answer — and "never" is said only

@@ -1939,7 +1939,7 @@ async function readingsEndpoint(rc, rawId, params) {
         raw_mean: num(r.raw_mean), raw_last: num(r.raw_last), val_min: num(r.val_min), val_max: num(r.val_max),
         val_mean: num(r.val_mean), val_last: num(r.val_last), unit: r.unit, first_ts: r.first_ts, last_ts: r.last_ts })));
   if (!shaped.length) {
-    notes.push('No readings in this window. Flood-Net holds only telemetry ingested into it (docs/ingest-http.md, docs/ingest-mqtt.md); most stations report through the Bureau\'s own systems. Raw readings are kept 90 days; hourly and daily rollups are kept indefinitely.');
+    notes.push('No readings in this window. Flood-Net holds only telemetry ingested into it (docs/ingest-http.md, docs/ingest-mqtt.md); most stations report through the Bureau\'s own systems. Raw readings are kept about two years; hourly and daily rollups are kept indefinitely.');
   }
   if (resolution === 'daily') notes.push('Daily buckets are UTC dates.');
   const nextOffset = offset + shaped.length;
@@ -2126,7 +2126,7 @@ async function latestReadingsEndpoint(rc, params) {
     .map(st => latestRow(st, byStation.get(st.id), rc.now));
 
   notes.push('Telemetry ingested into Flood-Net only. Most stations report through the Bureau\'s own systems and so are not here — which says nothing about whether they work.');
-  notes.push('Each channel is its address\'s newest reading that meganet.reading still holds (90 days), by the station\'s own clock; minutes_since runs from that time to now, and a negative one is a clock running ahead. Stations are in id order.');
+  notes.push('Each channel is its address\'s newest reading that meganet.reading still holds (about two years), by the station\'s own clock; minutes_since runs from that time to now, and a negative one is a clock running ahead. Stations are in id order.');
   if (unattributed) {
     notes.push(`${unattributed} address(es) heard belong to no single live station — an ALERT address more than one station carries, or a station not in the register — so are in no row here. That count is the whole network's, whatever the filters.`);
   }

@@ -729,14 +729,16 @@ select meganet.retain();   -- rolls up, then deletes. In that order, always.
 
 | | Kept for | Set by |
 | --- | --- | --- |
-| `meganet.reading` | 90 days | `app_meta.retain_reading_days` |
+| `meganet.reading` | 730 days (two years, since `0070`) | `app_meta.retain_reading_days` |
 | `meganet.reading_raw` (submissions as received) | 30 days | `app_meta.retain_reading_raw_days` |
 | `meganet.reading_hourly`, `meganet.reading_daily` | forever | — |
 
-Both knobs are rows, so changing them needs no migration. Run `retain()` daily —
-by hand for the pilot, from `pg_cron` or a scheduled workflow once there is enough
-data to matter. The order is not optional: a reading deleted before it is rolled
-up is gone from both places.
+Both knobs are rows, so changing them needs no migration. Since `0070`, `roll_up()`
+runs hourly from `pg_cron` (`meganet-roll-up`, minute 7), so the rollups are never
+more than an hour behind. `retain()` is **not** scheduled yet, on purpose: the rule
+is that nothing is deleted that has not been both rolled up and archived to R2, and
+the archive comes first (see the roadmap). The order inside `retain()` is not
+optional either: a reading deleted before it is rolled up is gone from both places.
 
 ### Proving it
 
@@ -1625,7 +1627,7 @@ holds nothing from is said to be so, with a longer window one press away. It cos
 **one request a card** — the station's newest readings, whatever their age, worked
 out by the Station Health tab's own rules (`HealthAnalysis`), so the two cannot
 disagree about a battery — kept for five minutes, so a repaint asks nothing; a
-station with no readings left at all (they age out at about 90 days) costs a
+station with no readings left at all (they age out after about two years) costs a
 second, one-row look at when the ingest last heard it, so *never* is only said
 when it is true. What one station's readings cannot say is whether the receivers
 that hear it were listening while it was quiet: the card says so, and that is

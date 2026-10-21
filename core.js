@@ -1636,10 +1636,10 @@ const HELP = {
       + 'faster way round when the traffic is what you are looking at. It claims the '
       + '<em>address</em>, not the row — and for a relayed ALERT2 message that means the whole '
       + 'station, whose individual sensor slots are then named on the station card.',
-      '<strong>Raw readings age out at about 90 days</strong>, so a window into last winter '
-      + 'comes back empty here — the hourly and daily rollups that survive live on the Field '
+      '<strong>Raw readings are kept about two years</strong>, so a window further back than that '
+      + 'comes back empty here — the hourly and daily rollups, kept for good, live on the Field '
       + 'Data tab. The submission a reading arrived on ages out faster (~30 days) and needs a '
-      + 'signed-in session to fetch; the reading itself is public and stays the full 90.',
+      + 'signed-in session to fetch; the reading itself is public and stays the full two years.',
       'The <strong>tray map follows the Stations tab\'s rules</strong>: every pin stays on the '
       + 'map, ghosted; the stations behind your selected rows come up at full opacity with '
       + 'their names; and the repeaters whose pass ranges carry them are pulled in dashed cyan '
@@ -1708,7 +1708,7 @@ const HELP = {
       + 'checks, its battery or its findings — with the address naming it, so that view is a link too. '
       + 'A station the window holds nothing from is said to be so, with a longer window one press away.',
       '<strong>Readings are public, so this tab needs no sign-in</strong> — and it reads only what the '
-      + 'datastore holds: raw readings age out at about 90 days, and a station only one receiver can '
+      + 'datastore holds: raw readings are kept about two years, and a station only one receiver can '
       + 'hear cannot be judged while that receiver is down.',
     ],
     links: [
@@ -3099,7 +3099,9 @@ const DB_SCHEMA = 'meganet';
 // administrators only. Bumped with the file.
 // 69: the station document kept (0069) — built as a change commits, not on
 // every load, which was running into anon's 3 s timeout. Bumped with the file.
-const DB_SCHEMA_VERSION = 69;
+// 70: the rollups built hourly by pg_cron and raw readings kept two years
+// (0070). No new shape; bumped with the file, as every migration is.
+const DB_SCHEMA_VERSION = 70;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
