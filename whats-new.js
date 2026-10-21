@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 58, date: '2026-10-21', items: [
+      '<strong>🗺️ Station Health\'s map, bigger and first.</strong> The <em>Where</em> map now has a row of its own '
+        + 'across the page, under the headline and its numbers, so landing on the tab shows where the trouble is before '
+        + 'the list of it. <em>Needs attention</em> follows below, the page\'s full width.',
+    ] },
     { n: 57, date: '2026-10-20', items: [
       '<strong>✏️ The station editor has every action the map\'s card has.</strong> A station\'s details card now '
         + 'opens with <em>In Flood-Net</em> — Show in list, Zoom to station, Copy link, Field data, Digital twin, Field '

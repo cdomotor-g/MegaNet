@@ -17310,7 +17310,7 @@ button.adm-danger:hover { border-color: var(--bad); }
    is never narrower than its content unless told so — without this the
    check-signal matrix's min-content width set the page's, and a phone
    scrolled sideways. The tables inside have their own scrollers. */
-.hl-page > *, #hl-body > *, .hl-grid > * { min-width: 0; }
+.hl-page > *, #hl-body > * { min-width: 0; }
 #hl-body { display: grid; gap: var(--sp-3); }
 .hl-sub { margin: .35rem 0 var(--sp-2); }
 .hl-status { margin: 0 0 var(--sp-2); }
@@ -17364,13 +17364,6 @@ button.adm-danger:hover { border-color: var(--bad); }
 /* A station's owner, a quiet line under its name wherever the tab names it. */
 .hl-owner { display: block; font-size: var(--fs-xs); font-weight: 400; color: var(--muted); white-space: normal; }
 
-.hl-grid {
-  display: grid; gap: var(--sp-3);
-  grid-template-columns: minmax(0, 1fr);
-}
-@media (min-width: 1100px) {
-  .hl-grid { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
-}
 .hl-filters { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin: var(--sp-2) 0 0; }
 .hl-check { display: inline-flex; gap: .3rem; align-items: center; font-size: var(--fs-sm); cursor: pointer; }
 .hl-empty { color: var(--muted); padding: var(--sp-2) 0; }
@@ -17386,10 +17379,14 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-frow--critical > td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
 .hl-frow--warn > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
 
-/* isolation keeps Leaflet's panes and controls (z-index 400 to 1000) inside
-   the map, so the header's owner list opens over it rather than under it. */
-.hl-map { height: 440px; border-radius: var(--r-md); border: 1px solid var(--border); isolation: isolate; }
-@media (max-width: 700px) { .hl-map { height: 320px; } }
+/* The map has a row of its own under the header, the page's full width, and
+   most of the window's height — tall enough to tell one cluster of pins from
+   the next without zooming, short enough that Needs attention starts just
+   below. isolation keeps Leaflet's panes and controls (z-index 400 to 1000)
+   inside the map, so the header's owner list opens over it rather than under
+   it. */
+.hl-map { height: clamp(400px, 60vh, 680px); border-radius: var(--r-md); border: 1px solid var(--border); isolation: isolate; }
+@media (max-width: 700px) { .hl-map { height: clamp(320px, 55vh, 420px); } }
 .hl-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--border); }
 .hl-dot--critical { background: var(--bad); width: 16px; height: 16px; }
 .hl-dot--warn { background: var(--warn); width: 14px; height: 14px; }
@@ -20757,8 +20754,8 @@ select.kl-in { width: auto; font-family: inherit; }
 
 /* ── Station Health under Calm: the answer first ─────────────────────────────
    The sentence (Health's verdictHtml), then the numbers it comes from drawn as
-   numbers, then a Needs attention list given most of the width — the map beside
-   it is where, the list is what to do. */
+   numbers, then the map across the page — where — and Needs attention under
+   it, what to do. */
 .hl-verdict {
   margin: var(--sp-2) 0;
   font-size: 1.08rem;
@@ -20781,9 +20778,6 @@ select.kl-in { width: auto; font-family: inherit; }
 /* "Since" is a date: as narrow as it can be, so "What, and what to do" has
    the width to be read in lines rather than in words. */
 :root[data-shell="calm"] .hl-ftable col.col-optional { width: 8.5rem; }
-@media (min-width: 1100px) {
-  :root[data-shell="calm"] .hl-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
-}
 /* A phone: three numbers a row, each its name and its number — the sentence
    above has already said what they add up to. */
 @media (max-width: 560px) {

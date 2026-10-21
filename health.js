@@ -354,21 +354,21 @@ const Health = (() => {
 
   function bodyHtml() {
     if (!H.A) return '';
+    // The map first and the page's full width, under the headline and its
+    // numbers: where the trouble is, seen on landing, before the list of it.
     return `
-      <div class="hl-grid">
-        <section class="panel hl-attn" aria-labelledby="hl-h-attn">
-          <div class="panel-header"><h3 id="hl-h-attn">Needs attention</h3>
-            <span class="small">${esc(attnCountText())}</span></div>
-          ${filtersHtml()}
-          <div id="hl-findings">${findingsHtml()}</div>
-        </section>
-        <section class="panel hl-mapcard" aria-labelledby="hl-h-map">
-          <div class="panel-header"><h3 id="hl-h-map">Where</h3>
-            <span class="small">every station heard, by its worst finding</span></div>
-          <div id="hl-map" class="hl-map" role="region" aria-label="Map of the stations heard, coloured by their worst finding"></div>
-          ${mapLegendHtml()}
-        </section>
-      </div>
+      <section class="panel hl-mapcard" aria-labelledby="hl-h-map">
+        <div class="panel-header"><h3 id="hl-h-map">Where</h3>
+          <span class="small">every station heard, by its worst finding</span></div>
+        <div id="hl-map" class="hl-map" role="region" aria-label="Map of the stations heard, coloured by their worst finding"></div>
+        ${mapLegendHtml()}
+      </section>
+      <section class="panel hl-attn" aria-labelledby="hl-h-attn">
+        <div class="panel-header"><h3 id="hl-h-attn">Needs attention</h3>
+          <span class="small">${esc(attnCountText())}</span></div>
+        ${filtersHtml()}
+        <div id="hl-findings">${findingsHtml()}</div>
+      </section>
       <section class="panel" id="hl-station" aria-labelledby="hl-h-stn">${stationHtml()}</section>
       <section class="panel" aria-labelledby="hl-h-checks">${matrixHtml()}</section>
       <section class="panel" id="hl-ss" aria-labelledby="hl-h-ss">${sparkCardHtml()}</section>

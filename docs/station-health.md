@@ -17,10 +17,10 @@ week of real stations, one of every fault planted in it.
 In the Calm look (the default) the tab opens with its answer in a sentence —
 how many findings need attention and at how many stations, how bad, how many
 stations are silent now and what share of the checks due came in — above the
-numbers it comes from, and **See them** goes straight to Needs attention, which
-has most of the page's width. The paragraph explaining the tab is two lines
-deep until *More about this tab*. The Classic look shows the tab as it always
-was.
+numbers it comes from, then the map across the page's full width, and **See
+them** goes straight to Needs attention, under the map. The paragraph explaining
+the tab is two lines deep until *More about this tab*. The Classic look shows
+the numbers without the sentence.
 
 ## Six ways in
 
@@ -29,7 +29,8 @@ was.
   quality, register); *include notes* shows the informational ones too. *Export
   findings* downloads them all, with their evidence, as CSV.
 - **The map** — each station heard, coloured by its worst finding; bigger is
-  worse. A pin opens the station.
+  worse. A pin opens the station. It has a row of its own, under the numbers
+  and above Needs attention, so where the trouble is is the first thing seen.
 - **Check signals** — every scheduled station's checks over the window, slot by
   slot: received, received with frames missing, missed, missed network-wide, or
   nobody listening. Worst first; a row opens the station.
