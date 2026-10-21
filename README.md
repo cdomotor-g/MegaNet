@@ -736,6 +736,8 @@ select meganet.retain();   -- rolls up, then deletes. In that order, always.
 | `meganet.reading` | 730 days (two years, since `0070`) | `app_meta.retain_reading_days` |
 | `meganet.reading_raw` (submissions as received) | 30 days | `app_meta.retain_reading_raw_days` |
 | `meganet.reading_hourly`, `meganet.reading_daily` | forever | — |
+| `meganet.reception` (every copy heard) | 90 days once #243 lands; nothing is deleted until then | `app_meta.retain_reception_days` |
+| `meganet.reception_hourly`, `meganet.reception_daily` (`0071`) | forever | — |
 
 Both knobs are rows, so changing them needs no migration. Since `0070`, `roll_up()`
 runs hourly from `pg_cron` (`meganet-roll-up`, minute 7), so the rollups are never

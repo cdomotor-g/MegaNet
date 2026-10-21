@@ -3119,7 +3119,9 @@ const DB_SCHEMA = 'meganet';
 // every load, which was running into anon's 3 s timeout. Bumped with the file.
 // 70: the rollups built hourly by pg_cron and raw readings kept two years
 // (0070). No new shape; bumped with the file, as every migration is.
-const DB_SCHEMA_VERSION = 70;
+// 71: receptions rolled up by the hour and the day, kept forever (0071, #241).
+// Applied by hand before this bump, which is why it is its own commit.
+const DB_SCHEMA_VERSION = 71;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
