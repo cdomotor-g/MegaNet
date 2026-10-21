@@ -450,6 +450,81 @@ address until the register has its station's `alert2_station_id`.
 both kinds, three repeaters and the cases above, with a receiver whose crystal
 wanders 180 Hz.
 
+## Bit flips, by who sent them
+
+The network's bit flips — a reading turning up a moment after the real one
+with one or two bits wrong, in its value or its address — are found already:
+*corrupt copies*, *ghosts* and *repeater bit flips* in the findings above, and
+the Reception Map's blame. But a legacy burst does not say who sent it, so
+those can only split the blame between every repeater whose pass range could
+have carried the reading. **The carrier fingerprint says who sent it**: every
+burst arrives on the carrier of the transmitter that put it on the air
+([Transmitter frequency](#transmitter-frequency), above), so the server
+(`0078`) charges each corrupted copy to the transmitter whose carrier it came
+on.
+
+**Finding a corrupted copy.** Two bursts heard by one base station within five
+seconds, one or two bits apart. On the live receptions these are corruption,
+not chance: one bit apart is as common as four though there are 443 times
+fewer ways to be one bit apart — about 140 a day, a median 1.7 s apart, 60% of
+them in the address. Which of the two is wrong is the first of these that can
+say:
+
+- **not a flip** — one station's two sensors in one burst (two values), or two
+  values both in line with one address's last reading (a gauge tipping twice);
+- **ghost** — one address is on no station;
+- **silent address** — both on stations, one not otherwise heard for a week;
+- **fit** — one value within 8 counts of its address's last reading, the other
+  more than 32 from its own;
+- **copies** — the version heard more often is the true one;
+- otherwise **undecided**, and not counted. A burst judged corrupted in one
+  pair and true in another sets every pair it is in aside.
+
+On three days of live data that decided about seven in ten. A flip in the
+lowest bits of a slow series looks like two real reports, and is missed.
+
+**Who sent it.** The corrupted copy's carrier is matched to whichever of the
+true reading's possible senders — its station, the repeaters that pass it —
+this base station heard that day nearest it, within 40 Hz. None near is
+*unmatched* (a transmitter the register does not have, or one well off its
+usual carrier); two about equally near is *ambiguous*; a burst from a base
+station before RPi ALERT 0.14 has *no carrier*. A corrupted copy is also left
+out of the carrier measurements, where it would have counted under the wrong
+address.
+
+**What the panel shows**, each transmitter that sent any, worst first:
+
+- **Corrupted copies** it sent in the last week, and how many were **clear** —
+  as strong as the clean copy, within 6 dB, so it sent the wrong bits. One much
+  weaker is more likely this base station mishearing it. (Most bursts here
+  arrive at 5–15 dB, so a fixed "loud" level would not work.)
+- **Bursts it sent** and the **clear rate**.
+- **Clean upstream too** — how often the clean version reached us as well, from
+  the station or another repeater: the corruption entered at this
+  transmitter, its own receiver (interference at its site, a weak input), its
+  modem or its transmitter. This is what points at a repeater.
+- **In the address** — how many turned a reading into another station's.
+- **Commonest** — the true → corrupted addresses, each a door to the Bit
+  Flipper.
+
+A transmitter is a finding (`transmitter-corrupting`) when five or more clear
+corrupted copies in a week are 2% or more of what it sent and three times the
+typical transmitter's rate; critical at 10% (`app_meta` `tx_flip_min`,
+`tx_flip_warn_rate`, `tx_flip_crit_rate`). *Show the recent corrupted copies*
+lists the week's events: the true reading, what it became, who sent the
+corrupted copy and who the clean one, and which rule told them apart.
+
+**In the Bit Flipper**, *Seen on the air* lists the last 30 days' corrupted
+copies an entered address was in — its readings that came through corrupted,
+and other stations' readings that turned up under it — and who sent each.
+
+**It narrows; it does not convict.** A repeater whose own receiver hears
+interference passes on what it heard: the corruption entered at its site,
+which is where to look, though its radio may be fine. Confirm with a receiver
+parked beside it. `tools/check_flip_fingerprints.sql` holds the server to a
+made-up week — two repeaters passing the same stations, one corrupting — and
+`npm run health` holds the panel and the Bit Flipper's section.
+
 ## On a station's card, and its pin
 
 The same rules reach the Stations tab (#218, `health-glance.js`), so somebody

@@ -3397,6 +3397,15 @@ back to the browser's `#0000EE` and, once followed, `#551A8B` — two shades of
 near-black on a dark panel. Links are now `var(--accent)`, visited included.
 
 
+**Seen on the air** (`0078`). Under an entered address the Bit Flipper also
+lists the corrupted copies it was really in over the last 30 days — its own
+readings that came through corrupted, and other stations' that turned up under
+it — and **who sent each**, by the carrier the corrupted copy came on: the
+station, or the repeater that relayed it. The arithmetic says what an address
+*could* become; this says what it *did*, and where. Station Health's *Bit flips,
+by who sent them* panel is the same evidence by transmitter
+([docs/station-health.md](docs/station-health.md#bit-flips-by-who-sent-them)).
+
 ### 16. Ghosting Graph (ALERT Address Ghosting, as a Graph)
 The Bit Flipper answers "what else could this address be?" one address at a
 time. The Ghosting Graph asks it of the whole file at once and draws the answer:

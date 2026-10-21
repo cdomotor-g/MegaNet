@@ -133,6 +133,8 @@ function renderBitFlipperHtml() {
         </div>
       </div>
 
+      <div id="bf-seen">${typeof HealthFlips !== 'undefined' ? HealthFlips.seenHtml(bfBaseId()) : ''}</div>
+
       <div id="bf-results">${renderBitFlipperResults()}</div>
 
       <div class="panel">
@@ -292,6 +294,8 @@ function onBfAddrInput(val) {
   state.bfSensorFilter = '';
   refreshBfResults();
   scheduleBfMapRefresh();
+  // The corrupted copies this address was in, from the server (health-flips.js, 0078).
+  if (typeof HealthFlips !== 'undefined') HealthFlips.seenChanged();
 }
 
 function onBfBitsInput(val) {

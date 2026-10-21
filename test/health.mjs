@@ -116,7 +116,30 @@ async function standIn(page) {
       row('st:amiens_knob_al', 'alert', 'amiens_knob_al', 'repeater', 0.4, 61),
       row('st:abergowrie_br_al', 'alert', 'abergowrie_br_al', 'own', -3.0, -455)]) });
   });
-  await page.route('**/rest/v1/health_finding?*', route => /source=eq\.transmitters/.test(route.request().url())
+  // Bit flips, by who sent them (0078): a repeater sending corrupted copies,
+  // a station that was only misheard, and the events behind them.
+  await page.route('**/rest/v1/flip_summary?*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
+    { tx: 'st:amiens_knob_al', station_id: 'amiens_knob_al', bursts: 600, flips: 21, rate: 0.035, clear: 20, clear_rate: 0.033,
+      clean_upstream: 19, addr_flips: 8, addresses: 6, top: [{ true_addr: 6038, bad_addr: 6046, n: 5 }, { true_addr: 6039, bad_addr: 6039, n: 3 }],
+      fleet_rate: 0.002, judged_at: new Date().toISOString() },
+    { tx: 'st:abergowrie_br_al', station_id: 'abergowrie_br_al', bursts: 56, flips: 2, rate: 0.036, clear: 0, clear_rate: 0,
+      clean_upstream: 0, addr_flips: 0, addresses: 1, top: [], fleet_rate: 0.002, judged_at: new Date().toISOString() }]) }));
+  await page.route('**/rest/v1/rpc/flip_overview', route => route.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ days: 7, corrupted: 30, by_how: { carrier: 23, unmatched: 3, 'no-carrier': 4 }, by_rule: { fit: 20, ghost: 10 }, undecided: 9, weak: 2 }) }));
+  await page.route('**/rest/v1/rpc/recent_flips', route => {
+    const args = JSON.parse(route.request().postData() || '{}');
+    const ev = [{ heard_at: new Date(Date.now() - 3600e3).toISOString(), true_addr: 6038, true_value: 1262, bad_addr: 6046, bad_value: 1262, bits: 1,
+      addr_flip: true, gap_s: 1.4, rule: 'ghost', bad_snr: 14, good_snr: 15, bad_tx: 'st:amiens_knob_al', bad_how: 'carrier', good_tx: 'st:abergowrie_br_al' }];
+    const rows = args.p_addr == null ? ev : ev.filter(e => e.true_addr === args.p_addr || e.bad_addr === args.p_addr);
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
+  });
+  await page.route('**/rest/v1/health_finding?*', route => /kind=eq\.transmitter-corrupting/.test(route.request().url())
+    ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
+        { kind: 'transmitter-corrupting', subject: 'st:amiens_knob_al', station_id: 'amiens_knob_al', severity: 'warn',
+          title: 'Amiens Knob AL: 21 corrupted copies in a week (3.5% of what it sent)', detail: '' }]) })
+    : route.fallback());
+  await page.route('**/rest/v1/health_finding?*', route => /kind=eq\.transmitter-corrupting/.test(route.request().url()) ? route.fallback()
+    : /source=eq\.transmitters/.test(route.request().url())
     ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
         { kind: 'transmitter-off-channel', subject: 'st:abergowrie_br_al', station_id: 'abergowrie_br_al', severity: 'warn',
           title: 'Abergowrie Bridge AL: transmitting -3.0 ppm off the others (-455 Hz)', detail: '', evidence: { offset_ppm: -3.0 },
@@ -421,6 +444,28 @@ try {
   ok('…a kind at a time, one found by its address, and a line each', reps.length === 1 && /^Amiens Knob/.test(reps[0])
     && found.length === 1 && /4101/.test(found[0]) && spark === 1, JSON.stringify({ reps, found, spark }));
   await page.evaluate(() => { HealthDrift.set('q', ''); HealthDrift.set('show', 'look'); });
+
+  // ── Bit flips, by who sent them (0078) ─────────────────────────────────────
+  await until(page, () => typeof HealthFlips !== 'undefined' && HealthFlips.state().rows
+    && document.querySelectorAll('#hl-flips tbody tr').length > 0, null, 20_000).catch(() => {});
+  const flips = await page.evaluate(() => {
+    const el = document.getElementById('hl-flips');
+    return { rows: el ? [...el.querySelectorAll('tbody tr')].map(tr => tr.textContent.replace(/\s+/g, ' ').trim()) : [],
+             text: el ? el.textContent.replace(/\s+/g, ' ') : '',
+             door: !!(el && el.querySelector('button.link-btn[onclick*="openBitFlipper(6038"]')) };
+  });
+  ok('Bit flips: each transmitter that sent corrupted copies, the one flagged first, by name, with its clear rate and its commonest flip, a door to the Bit Flipper',
+    flips.rows.length === 2 && /^Amiens Knob AL repeater 21\s?20 clear 600 3\.3%/.test(flips.rows[0]) && /Corrupting/.test(flips.rows[0])
+      && /6038/.test(flips.rows[0]) && /→ 6046 ×5/.test(flips.rows[0]) && /Within the usual/.test(flips.rows[1]) && flips.door, JSON.stringify(flips.rows));
+  ok('…led with the finding, and how many were put down by carrier, unmatched, without one, undecided',
+    /1 transmitter to look at first: Amiens Knob AL: 21 corrupted copies/.test(flips.text) && /30 corrupted copies in the last 7 days: 23 put down/.test(flips.text)
+      && /3 on a carrier none/.test(flips.text) && /4 with no carrier measured/.test(flips.text) && /9 pairs stayed undecided/.test(flips.text), flips.text.slice(0, 600));
+  await page.evaluate(() => HealthFlips.events());
+  await until(page, () => document.querySelectorAll('#hl-flips table.hl-flip-events tbody tr').length > 0, null, 10_000).catch(() => {});
+  const ev = await page.evaluate(() => [...document.querySelectorAll('#hl-flips table.hl-flip-events tbody tr')].map(tr => tr.textContent.replace(/\s+/g, ' ').trim()));
+  ok('…and the recent corrupted copies on asking: the true reading, what it became, who sent the corrupted and the clean copy',
+    ev.length === 1 && /6038 Abergowrie Bridge AL = 1262/.test(ev[0]) && /6046 = 1262 1 bit/.test(ev[0]) && /Amiens Knob AL repeater/.test(ev[0])
+      && /Abergowrie Bridge AL ghost$/.test(ev[0]), JSON.stringify(ev));
 
   await page.evaluate(() => Health.setCat('power'));
   const power = await page.evaluate(() => [...document.querySelectorAll('.hl-ftable tbody tr .hl-fwhat b')].map(b => b.textContent));
@@ -911,6 +956,18 @@ try {
     return { scroll: d.scrollWidth, client: d.clientWidth };
   }, WORLD.roles.falling);
   ok('no sideways scroll at 375 px, a station open', narrow.scroll <= narrow.client + 1, JSON.stringify(narrow));
+
+  // ── The Bit Flipper's "Seen on the air" (0078) ─────────────────────────────
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate(() => openBitFlipper(6038, { bits: 2 }));
+  await until(page, () => /came through corrupted/.test((document.getElementById('bf-seen') || {}).textContent || ''), null, 10_000).catch(() => {});
+  const seen = await page.evaluate(() => (document.getElementById('bf-seen') || {}).textContent.replace(/\s+/g, ' ').trim());
+  ok('Bit Flipper: an address\'s corrupted copies seen on the air, and who sent them',
+    /Seen on the air/.test(seen) && /1 of its readings came through corrupted — sent by Amiens Knob AL repeater ×1/.test(seen) && /6046 = 1262/.test(seen), seen);
+  await page.evaluate(() => { document.getElementById('bf-addr').value = '6046'; onBfAddrInput('6046'); });
+  await until(page, () => /turned up under 6046/.test((document.getElementById('bf-seen') || {}).textContent || ''), null, 10_000).catch(() => {});
+  const seen2 = await page.evaluate(() => (document.getElementById('bf-seen') || {}).textContent.replace(/\s+/g, ' ').trim());
+  ok('…and for the address a reading was corrupted onto, the other way round', /1 times another station's reading turned up under 6046/.test(seen2), seen2);
 
   ok('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 } finally {

@@ -1633,6 +1633,12 @@ jobs:
       # opened and cleared.
       - name: check_transmitter_drift.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_transmitter_drift.sql
+      # Who corrupts (0078): flipped copies found and decided — a ghost
+      # address, a value off its series — real pairs left alone, and each
+      # corrupted copy put down to the transmitter whose carrier it came on,
+      # not split between the repeaters that could have carried it.
+      - name: check_flip_fingerprints.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_flip_fingerprints.sql
       # A reading's frequency and signal (0050): stored from the reading or
       # its envelope, readable by anon like the rest of it, the first copy's
       # kept on a duplicate — and a bad one stored as null, never a refusal.

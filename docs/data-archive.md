@@ -7,7 +7,7 @@ at a time, before the database is allowed to let it go** (#243, `db/migrations/0
 | What | Full detail in the database | Kept for good |
 | --- | --- | --- |
 | Readings (`meganet.reading`) | 730 days | `reading_hourly` / `reading_daily`, and every row in R2 |
-| Receptions (`meganet.reception`) | 90 days | `reception_hourly` / `reception_daily`, each transmitter's carrier offsets by the day (`carrier_daily`, 0077), and every row in R2 |
+| Receptions (`meganet.reception`) | 90 days | `reception_hourly` / `reception_daily`, each transmitter's carrier offsets by the day (`carrier_daily`, 0077), every corrupted copy found (`flip_event`, 0078), and every row in R2 |
 | Submissions (`meganet.reading_raw`) | 30 days | every row in R2 |
 
 ## How a day is archived

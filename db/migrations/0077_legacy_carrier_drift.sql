@@ -420,7 +420,7 @@ as $$
     -- receiver key is (token, point, protocol). 20 bursts a day for ALERT2, as
     -- 0075; 3 for legacy, a station reporting every few hours.
     select c.day as d, c.ingest_token_id as tok, c.point_id || '|' || c.protocol as rx, c.tx as a,
-           c.protocol, c.station_id, c.via, c.n::bigint as n, c.cfo_sum / c.n as cfo, c.freq_mhz as f
+           c.protocol, c.station_id, c.via, c.n::bigint as n, c.cfo_sum / nullif(c.n, 0) as cfo, c.freq_mhz as f
       from meganet.carrier_daily c
      where not c.mixed and c.n >= case when c.protocol = 'alert2' then 20 else 3 end
        and c.day >= (pg_catalog.now() at time zone 'UTC')::date - least(greatest(coalesce(p_days, 37), 1), 400)
