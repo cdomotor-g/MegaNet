@@ -158,7 +158,8 @@ const HealthDrift = (() => {
       ? `<p><b>${num(off.length)} transmitter${off.length === 1 ? '' : 's'} to check:</b> ${off.slice(0, 4).map(r => esc(r.finding.title)).join('; ')}${off.length > 4 ? '; …' : ''}.</p>`
       : `<p>All ${num(rows.length)} transmitters measured are within ${esc(String(S.warn))} ppm of the rest, and none has moved by 1 ppm in a week.</p>`;
     return head + lead + `
-      <p class="small hl-drift-sub">Base stations measure every ALERT2 burst's carrier offset. A relayed copy is on the last repeater's carrier,
+      <p class="small hl-drift-sub">ALERT2 only: legacy ALERT bursts arrive with no carrier measurement, so most of the network is not here.
+        Base stations measure every ALERT2 burst's carrier offset. A relayed copy is on the last repeater's carrier,
         so repeaters are here too. Each receiver's own crystal error is worked out day by day and taken out, and each transmitter is shown
         against the median of the fleet that receiver hears — so 0 ppm is <em>like the rest</em>, not exactly on frequency, and the shaded band
         is ±${esc(String(S.warn))} ppm. The server checks hourly: further than that from the rest is a warning, and a move of 1 ppm in a week

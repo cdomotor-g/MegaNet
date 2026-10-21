@@ -395,11 +395,15 @@ and the like. The panel lists every transmitter measured, furthest from the
 rest first, with the last week's offset, its change, a line of its days with the
 ±2.5 ppm band shaded, and the finding.
 
-**Limits.** Offsets have been kept since 2026-10-19, so *drift* needs until
+**Limits.** ALERT2 only: legacy (binary) ALERT bursts reach Flood-Net with no
+carrier offset, so the panel covers the network's ALERT2 transmitters — 35 of
+them, heard by 3 base stations, when this was built — and the legacy majority
+not at all. Offsets have been kept since 2026-10-19, so *drift* needs until
 late November to have its thirty days to compare with; until then only
-*off-channel* can fire. A transmitter is named by its ALERT2 address; it gets
-its station's name, and the finding its station, once the register has that
-station's ALERT2 address (`alert2_station_id`). `npm run health` holds the
+*off-channel* can fire. A transmitter is named by its ALERT2 address; it would get
+its station's name, and the finding its station, from the register's
+`alert2_station_id` — which no station has yet, and most will not until the
+move to ALERT2, so the address is the name for now. `npm run health` holds the
 panel to two transmitters built for it; `tools/check_transmitter_drift.sql`
 holds the server to six, with a receiver whose crystal wanders 180 Hz.
 

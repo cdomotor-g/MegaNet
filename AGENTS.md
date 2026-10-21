@@ -49,13 +49,18 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     channel, with its age, in one call (100 stations a page, up to 1,000).
     Use it rather than `get_readings` station by station. A 503 "not
     available yet" means database migration 0057 has not been applied yet.
+  - `get_silent_stations` — `GET /api/v1/health/silent?network=&basin=&type=&bbox=&severity=`:
+    what has gone quiet — the stations silent now, worst first, with when each
+    was last heard, and the groups that went quiet together (around a place,
+    or behind a repeater). From the server's health run every 15 minutes;
+    `checked_at` says when it last looked.
   - `get_flood_levels` — `GET /api/v1/stations/{id}/flood-levels`
   - `get_service_level` — `GET /api/v1/stations/{id}/service-level`
   - `list_catchments`, `get_catchment` — `GET /api/v1/catchments[/{id}]`
   - `list_networks` — `GET /api/v1/networks`
 - **For a map:** `format=geojson` on `/api/v1/stations` (search and `near`) and
   on `/api/v1/readings/latest` — `format: "geojson"` on `search_stations`,
-  `stations_near` and `get_latest_readings` — answers a GeoJSON
+  `stations_near`, `get_latest_readings` and `get_silent_stations` — answers a GeoJSON
   FeatureCollection (`application/geo+json`): Point features at `[lon, lat]`,
   longitude first, each feature's properties the JSON row; a station with no
   position is left out and named in `omitted_without_position`.

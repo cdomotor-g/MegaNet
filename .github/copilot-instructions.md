@@ -25,6 +25,8 @@ See [`docs/agent-api.md`](../docs/agent-api.md).
 - `get_latest_readings` (`/api/v1/readings/latest`) is what every gauge
   reporting into Flood-Net is saying now, in one call; `format=geojson` on it
   and on station search answers GeoJSON for a map (`[lon, lat]`).
+- `get_silent_stations` (`/api/v1/health/silent`) lists what has gone quiet —
+  stations silent now and groups that went quiet together.
 - Flood classes are metres on the gauge, AEP levels modelled m AHD (indicative);
   quote each figure's source and datum.
 

@@ -81,6 +81,8 @@ const COLUMNS = Object.fromEntries(Object.entries({
   inspection_chart_fade_margin: 'inspection_id phase load_db',
   link_fade_margin: 'station_a_id station_b_id kind margin_db margin_ab_db margin_ba_db distance_km freq_mhz verdict signature model good_db ok_db band computed_at computed_by',
   app_meta: 'key value updated_at',
+  health_finding: 'id source kind subject station_id ingest_token_id rx_key severity title detail evidence first_seen last_seen cleared_at',
+  health_refresh: 'source at took_ms detail',
 }).map(([k, v]) => [k, new Set(v.split(' '))]));
 
 const T = Object.fromEntries(Object.keys(COLUMNS).map(k => [k, []]));
@@ -1049,10 +1051,96 @@ const ageless = row => JSON.parse(JSON.stringify(row, (k, v) => (/^minutes_since
     && vanished.json.error === 'database refused the query', `${vanished.status}`);
 }
 
+const GEO = /^application\/geo\+json/;
+
+// ── Silent stations (#230, over #215's findings) ─────────────────────────────
+section('Silent stations');
+{
+  const liveSt = T.station.filter(st => !st.deleted_at && st.lat != null && st.lon != null);
+  const [A, B, C, D] = liveSt;
+  const dead = T.station.find(st => st.deleted_at);
+  const ago = m => iso(NOW - m * 60000);
+  const fnd = (o) => ({ id: T.health_finding.length + 1, source: 'stations', ingest_token_id: null, rx_key: null,
+    detail: '', evidence: {}, first_seen: ago(60), last_seen: ago(5), cleared_at: null, ...o });
+  T.health_finding.push(
+    fnd({ kind: 'silent', subject: `silent:${A.id}`, station_id: A.id, severity: 'warn', title: 'Silent — missed its last 2 checks',
+      evidence: { since: ago(400), periodMin: 180, trailingMisses: 2, action: 'Check power and radio.' } }),
+    fnd({ kind: 'silent', subject: `silent:${B.id}`, station_id: B.id, severity: 'critical', title: 'Silent — missed its last 9 checks',
+      evidence: { since: ago(1700), periodMin: 180, trailingMisses: 9 } }),
+    fnd({ kind: 'silent', subject: `silent:${C.id}`, station_id: C.id, severity: 'warn', title: 'Silent — missed its last 3 checks',
+      evidence: { since: ago(900), periodMin: 180, trailingMisses: 3 } }),
+    fnd({ kind: 'silent', subject: `silent:${D.id}`, station_id: D.id, severity: 'warn', title: 'cleared', cleared_at: ago(30),
+      evidence: { since: ago(100) } }),
+    fnd({ kind: 'battery-low', subject: `battery-low:${D.id}`, station_id: D.id, severity: 'warn', title: 'Battery low' }),
+    fnd({ source: 'base-stations', kind: 'receiver-deaf', subject: 'rx:x', station_id: null, severity: 'critical', title: 'not for anon' }),
+    fnd({ kind: 'area-silence', subject: `area-silence:area:${A.id}`, station_id: null, severity: 'warn',
+      title: `2 stations around ${A.name} went quiet together`, evidence: { since: ago(500), stations: [A.id, C.id] } }),
+    ...(dead ? [fnd({ kind: 'silent', subject: `silent:${dead.id}`, station_id: dead.id, severity: 'critical', title: 'gone' })] : []),
+  );
+  T.health_refresh.push({ source: 'stations', at: ago(6), took_ms: 4000, detail: {} },
+    { source: 'stations', at: ago(21), took_ms: 4000, detail: {} });
+  api.resetApiState();
+
+  const r = await get('/api/v1/health/silent');
+  const j = r.json || {};
+  const ids = (j.stations || []).map(x => x.id);
+  check('GET /api/v1/health/silent: the open silent stations, worst first then longest quiet — not the cleared, not another kind, not a deleted station',
+    r.status === 200 && JSON.stringify(ids) === JSON.stringify([B.id, C.id, A.id]) && j.total === 3, JSON.stringify(ids));
+  const b = (j.stations || [])[0] || {};
+  check('…each with its station, when it was last heard and how long ago, its checks and the finding',
+    b.name === B.name && b.lat === Number(B.lat) && b.severity === 'critical' && b.last_heard_at === ago(1700)
+      && b.minutes_since_heard >= 1699 && b.minutes_since_heard <= 1701 && b.checks_every_minutes === 180 && b.checks_missed === 9
+      && /9 checks/.test(b.title), JSON.stringify(b));
+  check('…the group that went quiet together, with its stations',
+    Array.isArray(j.groups) && j.groups.length === 1 && j.groups[0].kind === 'area-silence'
+      && JSON.stringify(j.groups[0].station_ids) === JSON.stringify([A.id, C.id]), JSON.stringify(j.groups));
+  check('…and when the server last looked, the newest run', j.checked_at === ago(6) && j.minutes_since_checked === 6
+    && !j.notes.some(n => /may have stopped/.test(n)), `${j.checked_at} ${j.minutes_since_checked}`);
+  const crit = await get('/api/v1/health/silent?severity=critical');
+  check('severity=critical: only those', crit.status === 200 && crit.json.stations.length === 1 && crit.json.stations[0].id === B.id
+    && crit.json.groups.length === 0);
+  const box = [Number(A.lon) - 0.0001, Number(A.lat) - 0.0001, Number(A.lon) + 0.0001, Number(A.lat) + 0.0001];
+  const inBox = await get(`/api/v1/health/silent?bbox=${box.join(',')}`);
+  const boxIds = inBox.json.stations.map(x => x.id);
+  const cInBox = Number(C.lon) >= box[0] && Number(C.lon) <= box[2] && Number(C.lat) >= box[1] && Number(C.lat) <= box[3];
+  check('bbox: only the stations inside it, and a group only with its stations inside', inBox.status === 200 && boxIds.includes(A.id)
+    && !boxIds.includes(B.id) && inBox.json.groups.length === 1 && inBox.json.groups[0].station_ids.includes(A.id)
+    && inBox.json.groups[0].station_ids.includes(C.id) === cInBox, JSON.stringify({ boxIds, groups: inBox.json.groups }));
+  const p1 = await get('/api/v1/health/silent?limit=2');
+  const p2 = p1.json.next ? await get(new URL(p1.json.next).pathname + new URL(p1.json.next).search) : null;
+  check('paging: limit and next, through to the end', p1.json.stations.length === 2 && !!p2 && p2.json.stations.length === 1
+    && p2.json.stations[0].id === A.id && p2.json.next === null, p1.json.next);
+  const geo = await get('/api/v1/health/silent?format=geojson');
+  check('format=geojson: a Point per silent station at [lon, lat], the groups alongside', geo.status === 200 && GEO.test(geo.headers.get('content-type'))
+    && geo.json.type === 'FeatureCollection' && geo.json.features.length === 3
+    && geo.json.features.every(f => f.geometry.coordinates[0] === f.properties.lon && f.geometry.coordinates[1] === f.properties.lat)
+    && Array.isArray(geo.json.groups));
+  const bad = await get('/api/v1/health/silent?severity=info');
+  const unknown = await get('/api/v1/health/silent?station=x');
+  check('a severity it does not take, and a parameter it does not know, are 400s', bad.status === 400 && unknown.status === 400, `${bad.status} ${unknown.status}`);
+  const tool = await rpc('tools/call', { name: 'get_silent_stations', arguments: { severity: 'critical' } });
+  const text = (tool.json.result && tool.json.result.content[0].text) || '';
+  check('the tool get_silent_stations answers the same', tool.json.result && !tool.json.result.isError && text.includes(B.id) && !text.includes(`"${A.id}"`),
+    text.slice(0, 200));
+
+  // A run that has stopped is said to have.
+  T.health_refresh.length = 0;
+  T.health_refresh.push({ source: 'stations', at: ago(180), took_ms: 4000, detail: {} });
+  api.resetApiState();
+  const stale = await get('/api/v1/health/silent');
+  check('…and a server that last looked three hours ago is said to have maybe stopped', stale.json.notes.some(n => /180 minutes ago .*may have stopped/.test(n)),
+    JSON.stringify(stale.json.notes));
+  T.health_finding.length = 0;
+  T.health_refresh.length = 0;
+  api.resetApiState();
+  const none = await get('/api/v1/health/silent');
+  check('…and with no run at all, nothing is passed off as current', none.status === 200 && none.json.total === 0 && none.json.checked_at === null
+    && none.json.notes.some(n => /not recorded a health run/.test(n)));
+}
+
 // ── GeoJSON (#230) ───────────────────────────────────────────────────────────
 section('GeoJSON');
 
-const GEO = /^application\/geo\+json/;
 {
   const plain = await get('/api/v1/stations?q=tide&limit=100');
   const geo = await get('/api/v1/stations?q=tide&limit=100&format=geojson');
@@ -1187,6 +1275,7 @@ function toolArgs(name) {
     case 'stations_near': return { lat: RICH.lat, lon: RICH.lon, radius_km: 15, limit: 3 };
     case 'get_readings': return { id: RICH.id, resolution: 'daily', from: day(NOW - 10 * 24 * hour) };
     case 'get_latest_readings': return { type: 'river', limit: 3 };
+    case 'get_silent_stations': return { limit: 3 };
     case 'list_catchments': case 'list_networks': return {};
     case 'get_catchment': return { id: RICH.catchment_ids[0], limit: 3 };
     default: return { id: RICH.id };
@@ -1344,7 +1433,7 @@ section('MCP');
 
   const list = await rpc('tools/list', {}, { headers: { 'MCP-Protocol-Version': '2025-06-18' } });
   const tools = list.json.result.tools;
-  const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'get_latest_readings',
+  const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'get_latest_readings', 'get_silent_stations',
     'list_catchments', 'get_catchment', 'get_flood_levels', 'get_service_level', 'list_networks'];
   check('tools/list has every tool', expected.every(n => tools.some(t => t.name === n)) && tools.length === expected.length, tools.map(t => t.name).join(', '));
   check('every tool is annotated read-only and has an object input schema', tools.every(t => t.annotations.readOnlyHint === true

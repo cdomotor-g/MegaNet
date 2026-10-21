@@ -145,6 +145,7 @@ export const READABLE_RELATIONS = Object.freeze(new Set([
   'inspection_chart_gas', 'inspection_chart_water_level', 'inspection_chart_data',
   'inspection_chart_fade_margin',
   'link_fade_margin', 'app_meta',
+  'health_finding', 'health_refresh',
 ]));
 
 // Relations on that list that a migration still to be applied to the live
@@ -2154,6 +2155,151 @@ async function latestReadingsEndpoint(rc, params) {
   }, 'stations');
 }
 
+// ── GET /api/v1/health/silent ────────────────────────────────────────────────
+// "What's gone quiet?" — the stations Station Health finds silent now, and the
+// groups that went quiet together (an area, or a repeater), as the server's
+// own run left them (0059, #215: tools/health/report.mjs every fifteen
+// minutes, Station Health's health-analysis.js run with nobody's browser open).
+//
+// Two reads, then the stations by id:
+//   1. the open findings of source `stations` and a silence kind — public, as
+//      db/README.md lists them; base-station findings are administrators' and
+//      are not asked for (RLS would refuse them to this key anyway);
+//   2. when the server last looked (health_refresh), so an answer from a run
+//      that has stopped says so rather than passing for now;
+//   3. the stations those name, live and matching the filters.
+// Worst first: critical before warn, then the longest silent, then id.
+
+export const SILENT_PARAMS = ['network', 'basin', 'type', 'bbox', 'severity', 'format', 'limit', 'offset'];
+export const SILENT_KINDS = Object.freeze(['silent', 'area-silence', 'repeater-down']);
+const SILENT_SELECT = 'kind,subject,station_id,severity,title,detail,evidence,first_seen,last_seen';
+const SILENT_STALE_MINUTES = 45;               // three runs missed: the schedule may have stopped
+const SEVERITY_RANK = { critical: 0, warn: 1, info: 2 };
+
+async function silentStationsEndpoint(rc, params) {
+  const notes = [];
+  const f = {
+    network: parseSlug(params.network, 'network'),
+    basin: cleanText(params.basin, 'basin'),
+    type: parseEnum(params.type, 'type', ['rain', 'river', 'repeater', 'base']),
+    bbox: parseBbox(params.bbox),
+    severity: parseEnum(params.severity, 'severity', ['critical', 'warn']),
+    format: parseEnum(params.format, 'format', FORMATS),
+    limit: parseIntParam(params.limit, 'limit', { min: 1, max: LIMITS.latestMax, dflt: LIMITS.latestDefault, clampMax: true }, notes),
+    offset: parseIntParam(params.offset, 'offset', { min: 0, max: LIMITS.offsetMax, dflt: 0 }),
+  };
+  const echo = stripNulls({ network: f.network, basin: f.basin, type: f.type,
+    bbox: f.bbox ? [f.bbox.west, f.bbox.south, f.bbox.east, f.bbox.north].join(',') : undefined,
+    severity: f.severity, format: f.format, limit: f.limit, offset: f.offset });
+  const filtered = !!(f.network || f.basin || f.type || f.bbox);
+
+  const filters = stationFilterPairs({ basin: f.basin, network: f.network, type: f.type });
+  if (f.type === 'rain' || f.type === 'river') filters.push(logicPair([TYPE_TERMS[f.type]]));
+  if (f.bbox) {
+    filters.push(['lat', `gte.${f.bbox.south}`], ['lat', `lte.${f.bbox.north}`],
+      ['lon', `gte.${f.bbox.west}`], ['lon', `lte.${f.bbox.east}`]);
+  }
+
+  // 1 and 2, side by side.
+  const [found, refresh] = await Promise.all([
+    rc.up.selectAll('health_finding', [['select', SILENT_SELECT], ['source', 'eq.stations'],
+      ['kind', `in.${pgList(SILENT_KINDS)}`], ['cleared_at', 'is.null'], ['order', 'first_seen.asc,subject.asc']],
+      LIMITS.candidateMax),
+    rc.up.select('health_refresh', [['select', 'at'], ['source', 'eq.stations'], ['order', 'at.desc'], ['limit', '1']]),
+  ]);
+  const silent = found.rows.filter(r => r.kind === 'silent' && r.station_id
+    && (!f.severity || r.severity === f.severity));
+  const groupRows = found.rows.filter(r => r.kind !== 'silent' && (!f.severity || r.severity === f.severity));
+  const groupIds = r => (r.evidence && Array.isArray(r.evidence.stations) ? r.evidence.stations.map(String) : []);
+
+  // 3. The stations they name, live and matching.
+  const ids = [...new Set([...silent.map(r => r.station_id), ...groupRows.flatMap(groupIds)])].sort();
+  const rowsById = ids.length ? byKey(await stationRowsByIds(rc, ids, LATEST_STATION_SELECT, filters)) : new Map();
+
+  const sinceOf = r => (r.evidence && typeof r.evidence.since === 'string' ? r.evidence.since : null);
+  const all = silent.filter(r => rowsById.has(r.station_id)).map(r => {
+    const st = rowsById.get(r.station_id);
+    const since = sinceOf(r);
+    const ev = r.evidence || {};
+    return stripNulls({
+      id: st.id,
+      name: st.name,
+      station_number: st.station_number || null,
+      lat: num(st.lat),
+      lon: num(st.lon),
+      kinds: stationKinds(st),
+      basin: st.basin || null,
+      stream: st.stream || null,
+      radio_network_ids: st.radio_network_ids || [],
+      severity: r.severity,
+      title: r.title,
+      detail: r.detail || null,
+      action: typeof ev.action === 'string' ? ev.action : null,
+      last_heard_at: since,
+      minutes_since_heard: since ? minutesSince(since, rc.now) : null,
+      checks_every_minutes: Number.isFinite(ev.periodMin) ? ev.periodMin : null,
+      checks_missed: Number.isFinite(ev.trailingMisses) ? ev.trailingMisses : null,
+      noticed_at: r.first_seen,
+    });
+  }).sort((a, b) => (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9)
+    || (a.last_heard_at && b.last_heard_at ? Date.parse(a.last_heard_at) - Date.parse(b.last_heard_at) : 0)
+    || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+  // A group is shown when any station it names passes the filters (all of
+  // them, unfiltered), with only those stations.
+  const groups = groupRows.map(r => {
+    const named = groupIds(r);
+    const inView = named.filter(id => rowsById.has(id));
+    if (filtered ? !inView.length : false) return null;
+    const since = sinceOf(r);
+    return stripNulls({
+      kind: r.kind,
+      severity: r.severity,
+      title: r.title,
+      detail: r.detail || null,
+      action: r.evidence && typeof r.evidence.action === 'string' ? r.evidence.action : null,
+      since,
+      station_ids: filtered ? inView : named,
+      noticed_at: r.first_seen,
+    });
+  }).filter(Boolean);
+
+  const page = all.slice(f.offset, f.offset + f.limit);
+  const checkedAt = refresh.rows[0] ? refresh.rows[0].at : null;
+  const checkedAgo = checkedAt ? minutesSince(checkedAt, rc.now) : null;
+
+  notes.push('A station is silent when it has missed its expected checks while the receivers that hear it kept delivering other traffic — Station Health\'s own rule, run by the server every fifteen minutes. Only stations whose telemetry is ingested into Flood-Net can be judged; one absent here may simply not send to Flood-Net.');
+  notes.push('groups are stations that went quiet together — around one place (area-silence) or behind one repeater (repeater-down): usually one cause, worth one visit.');
+  if (!checkedAt) {
+    notes.push('The server has not recorded a health run yet, so nothing here is current.');
+  } else if (checkedAgo > SILENT_STALE_MINUTES) {
+    notes.push(`The server last looked ${checkedAgo} minutes ago — its every-fifteen-minutes run may have stopped, so this is older than it looks.`);
+  }
+  if (found.truncated) notes.push(`More than ${LIMITS.candidateMax} open findings; this answer covers the first ${LIMITS.candidateMax}.`);
+  const dropped = silent.length - all.length;
+  if (dropped && !filtered) notes.push(`${dropped} silent finding(s) name a station no longer live in the register, so are not listed.`);
+
+  const nextOffset = f.offset + page.length;
+  const nextParams = {};
+  for (const k of SILENT_PARAMS) if (params[k] !== undefined) nextParams[k] = params[k];
+  nextParams.limit = String(f.limit);
+  return inFormat(f.format, {
+    count: page.length,
+    total: all.length,
+    limit: f.limit,
+    offset: f.offset,
+    next: page.length && nextOffset < all.length ? pageLink(rc, '/health/silent', nextParams, nextOffset) : null,
+    query: echo,
+    checked_at: checkedAt,
+    minutes_since_checked: checkedAgo,
+    stations: page,
+    groups,
+    notes,
+    source: 'meganet.health_finding (source stations; kinds silent, area-silence, repeater-down; open); meganet.health_refresh; meganet.station',
+    generated_at: new Date().toISOString(),
+  }, 'stations');
+}
+
 // ── Catchments and networks ──────────────────────────────────────────────────
 
 async function catchmentsEndpoint(rc) {
@@ -2213,6 +2359,7 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/stations/{id}/flood-levels', op: 'getStationFloodLevels', summary: 'Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels and one AHD ladder.' },
   { path: '/api/v1/stations/{id}/service-level', op: 'getStationServiceLevel', summary: 'The station\'s entries in the Service Level Specifications (Queensland; New South Wales and the ACT).' },
   { path: '/api/v1/readings/latest', op: 'getLatestReadings', summary: 'Every station\'s newest reading on each channel, in one call: by network, basin, kind or bounding box.' },
+  { path: '/api/v1/health/silent', op: 'getSilentStations', summary: 'The stations gone quiet now, and the groups that went quiet together, from the server\'s own health run.' },
   { path: '/api/v1/catchments', op: 'listCatchments', summary: 'The 77 Queensland drainage basins.' },
   { path: '/api/v1/catchments/{id}', op: 'getCatchment', summary: 'One basin and its stations.' },
   { path: '/api/v1/networks', op: 'listNetworks', summary: 'Radio networks, maintenance hubs and Radio Mobile systems.' },
@@ -2345,6 +2492,17 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
           formatParam,
           limitParam(LIMITS.latestMax, LIMITS.latestDefault), offsetParam,
         ], okOrGeo('A page of stations, each with its channels\' newest readings; or a GeoJSON FeatureCollection of them.')),
+      '/api/v1/health/silent': op('getSilentStations', 'Get the silent stations',
+        'Stations silent now — missed checks while their receivers kept hearing others — worst first, with when each was last heard, and the groups that went quiet together. From the server\'s run every 15 minutes; checked_at says when it last looked.',
+        [
+          q('network', 'A radio network id. See /api/v1/networks.', { type: 'string' }),
+          q('basin', 'Words in the Bureau\'s basin name for the station, e.g. "Burdekin".', { type: 'string' }),
+          q('type', 'A kind: rain, river, repeater or base — the same rule as /api/v1/stations.', { type: 'string', enum: ['rain', 'river', 'repeater', 'base'] }),
+          q('bbox', 'A bounding box, "west,south,east,north" in decimal degrees — longitude first — e.g. 152.5,-28.2,153.6,-27.0.', { type: 'string', pattern: '^-?\\d+(\\.\\d+)?(,-?\\d+(\\.\\d+)?){3}$' }),
+          q('severity', 'Only critical, or only warn.', { type: 'string', enum: ['critical', 'warn'] }),
+          formatParam,
+          limitParam(LIMITS.latestMax, LIMITS.latestDefault), offsetParam,
+        ], okOrGeo('A page of silent stations, worst first, and the groups; or a GeoJSON FeatureCollection of the stations.')),
       '/api/v1/catchments': op('listCatchments', 'List catchments', 'The 77 Queensland drainage basins with basin number, area and drainage division.', [], ok('Catchments.')),
       '/api/v1/catchments/{id}': op('getCatchment', 'Get a catchment and its stations', 'One basin (by id or name) and a page of its stations.',
         [{ name: 'id', in: 'path', required: true, description: 'Catchment id, e.g. "herbert".', schema: { type: 'string' } },
@@ -2425,6 +2583,9 @@ async function routeRest(rc, sub, params) {
   }
   if (parts[0] === 'readings' && parts.length === 2 && parts[1] === 'latest') {
     return latestReadingsEndpoint(rc, allowParams(params, LATEST_PARAMS));
+  }
+  if (parts[0] === 'health' && parts.length === 2 && parts[1] === 'silent') {
+    return silentStationsEndpoint(rc, allowParams(params, SILENT_PARAMS));
   }
   if (parts[0] === 'catchments') {
     if (parts.length === 1) { none(); return catchmentsEndpoint(rc); }
@@ -2722,7 +2883,7 @@ const SERVER_INFO = Object.freeze({
 export const MCP_INSTRUCTIONS = [
   'Flood-Net (floodwarning.net) is the engineering register of the Bureau of Meteorology\'s Queensland (and neighbouring) flood-warning telemetry network: rainfall and river-height field stations, the repeaters that relay them, base stations, and the radio paths between. This server is READ-ONLY and serves only public data.',
   'Station ids are lowercase slugs such as "abergowrie_br_al" (a Bureau number also works). Find stations with search_stations or stations_near, then call get_station_dossier for everything about one station in a single call — identity, location, radio, telemetry and health, the Service Level Specification entry, the Bureau\'s flood classes, crossings and gauge zero, AEP levels, inspection numbers and nearby stations, each labelled with its source. Use get_flood_levels or get_service_level when only that is needed.',
-  'For what every gauge is saying now, call get_latest_readings once — by radio network, basin, kind or bounding box if you like — rather than get_readings station by station; it covers only telemetry ingested into Flood-Net, which most stations do not send. For a map, search_stations, stations_near and get_latest_readings answer GeoJSON with format "geojson".',
+  'For what every gauge is saying now, call get_latest_readings once — by radio network, basin, kind or bounding box if you like — rather than get_readings station by station; it covers only telemetry ingested into Flood-Net, which most stations do not send. For what has gone quiet, call get_silent_stations. For a map, search_stations, stations_near, get_latest_readings and get_silent_stations answer GeoJSON with format "geojson".',
   'Heights: flood classes, crossings and flood effects are metres on the gauge, not AHD; AEP levels are modelled metres AHD and indicative only. Say which source a figure came from. Sections report status "ok", "not recorded" or "unavailable" — never read "not recorded" as zero.',
   `Be gentle: ${rateLimitWords().join('; ')}. Cache what you fetch and do not walk the whole network station by station.`,
   'Flood-Net is not a flood warning service. For current warnings and observations, send people to the Bureau of Meteorology (bom.gov.au).',
@@ -2809,6 +2970,18 @@ export const MCP_TOOLS = Object.freeze([
       format: formatArg, limit: limitArg(LIMITS.latestMax, LIMITS.latestDefault), offset: offsetArg,
     }, additionalProperties: false },
     route: a => ['/readings/latest', pick(a, ['network', 'basin', 'type', 'bbox', 'format', 'limit', 'offset'])],
+  },
+  {
+    name: 'get_silent_stations',
+    title: 'Get the silent stations',
+    description: `What has gone quiet: the stations Station Health finds silent now — missed their expected checks while the receivers that hear them kept delivering other traffic — worst first, each with when it was last heard, how many checks it missed and what to check; and the groups that went quiet together (around one place, or behind one repeater), which usually share one cause. Filter by radio network, basin, kind, bounding box or severity; format "geojson" for a map. From the server's own run every fifteen minutes — checked_at says when it last looked. Only stations whose telemetry reaches Flood-Net can be judged.`,
+    inputSchema: { type: 'object', properties: {
+      network: listFilters.network, basin: listFilters.basin, type: listFilters.type,
+      bbox: { type: 'string', maxLength: 100, description: 'A bounding box, "west,south,east,north" in decimal degrees — longitude first — e.g. "152.5,-28.2,153.6,-27.0".' },
+      severity: { type: 'string', enum: ['critical', 'warn'], description: 'Only critical, or only warn.' },
+      format: formatArg, limit: limitArg(LIMITS.latestMax, LIMITS.latestDefault), offset: offsetArg,
+    }, additionalProperties: false },
+    route: a => ['/health/silent', pick(a, ['network', 'basin', 'type', 'bbox', 'severity', 'format', 'limit', 'offset'])],
   },
   {
     name: 'list_catchments',

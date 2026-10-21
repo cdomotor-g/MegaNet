@@ -40,6 +40,9 @@ Documentation: [`docs/agent-api.md`](docs/agent-api.md).
   channel, in one call, by network, basin, kind or `bbox=west,south,east,north`.
   It covers only telemetry ingested into Flood-Net; a 503 "not available yet"
   means database migration 0057 has not been applied yet.
+- What has gone quiet: `get_silent_stations` (`/api/v1/health/silent`) — the
+  stations silent now and the groups that went quiet together, from the
+  server's health run every 15 minutes (`checked_at` says when it last looked).
 - For a map, `format=geojson` (tool argument `format: "geojson"`) on station
   search, `stations_near` and the latest readings answers a GeoJSON
   FeatureCollection: points at `[lon, lat]`, properties the JSON row, stations

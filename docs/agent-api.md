@@ -220,6 +220,7 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 | `get_station_dossier` | Everything a report needs about one station, in one call | `GET /api/v1/stations/{id}/dossier` |
 | `get_readings` | Telemetry ingested into Flood-Net: raw, hourly or daily | `GET /api/v1/stations/{id}/readings` |
 | `get_latest_readings` | What every gauge is saying now: each station's newest reading on every channel, in one call, by network, basin, kind or bounding box; `format: "geojson"` for a map | `GET /api/v1/readings/latest` |
+| `get_silent_stations` | What has gone quiet: the stations silent now, worst first, with when each was last heard, and the groups that went quiet together; by network, basin, kind, bounding box or severity; `format: "geojson"` for a map | `GET /api/v1/health/silent` |
 | `get_flood_levels` | Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels, one AHD ladder | `GET /api/v1/stations/{id}/flood-levels` |
 | `get_service_level` | The station's Service Level Specification entry | `GET /api/v1/stations/{id}/service-level` |
 | `list_catchments` | The 77 Queensland drainage basins | `GET /api/v1/catchments` |
@@ -643,6 +644,59 @@ class has not been defined yet (`flood_classes_not_yet_defined`, printed
 `n/a`: "not yet defined by the NSW SES"), that a location is a small catchment
 with a faster response (`fast_response`, its `^`), or that a service is
 interim with no determined lead time (`prediction.interim_service`, its `*`).
+
+### `GET /api/v1/health/silent`
+
+What has gone quiet. The stations Station Health finds **silent now** — they
+have missed their expected checks while the receivers that hear them kept
+delivering other traffic — worst first (critical, then the longest silent),
+and the **groups** that went quiet together, around one place
+(`area-silence`) or behind one repeater (`repeater-down`), which usually share
+one cause. It is the server's own run of Station Health's rules, every fifteen
+minutes with nobody's browser open; `checked_at` and `minutes_since_checked`
+say when it last looked, and a note says so if that is more than 45 minutes
+ago. Like the latest readings, it can only judge stations whose telemetry is
+ingested into Flood-Net — a station absent here is not thereby well.
+
+| Parameter | Meaning |
+|---|---|
+| `network` | a radio network id — see `/api/v1/networks` |
+| `basin` | words in the Bureau's basin name for the station (`Burdekin`) |
+| `type` | `rain`, `river`, `repeater` or `base` — the same rule as [`/api/v1/stations`](#get-apiv1stations) |
+| `bbox` | a box, `west,south,east,north` in decimal degrees — longitude first |
+| `severity` | `critical` or `warn` only |
+| `format` | `json` (the default) or `geojson` — the silent stations as Points, `groups` alongside |
+| `limit`, `offset` | 100 stations a page by default and at most 1,000; follow `next` |
+
+A row is a station — id, name, Bureau number, position, `kinds`, basin, stream
+and radio networks — with the finding: `severity`, `title`, `detail`, the
+`action` to take, `last_heard_at` and `minutes_since_heard`,
+`checks_every_minutes` and `checks_missed`, and `noticed_at` (when the server
+first saw it). A group carries its `kind`, `severity`, `title`, `since` and its
+`station_ids` — with a filter, only those of its stations that pass it.
+
+```sh
+curl -s 'https://floodwarning.net/api/v1/health/silent?severity=critical'
+```
+
+```json
+{
+  "count": 1, "total": 1, "limit": 100, "offset": 0, "next": null,
+  "query": { "severity": "critical", "limit": 100, "offset": 0 },
+  "checked_at": "2026-10-21T07:31:46.096+00:00", "minutes_since_checked": 4,
+  "stations": [{
+    "id": "mt_tamborine_al", "name": "Mt Tamborine AL", "lat": -27.94, "lon": 153.19, "kinds": ["rain"],
+    "radio_network_ids": [], "severity": "critical", "title": "Silent — missed its last 4 checks",
+    "detail": "Checks every 3 h; nothing heard since 08:17 today (9.2 h), while the receivers that hear it kept delivering other traffic.",
+    "action": "Check power and radio at the station; if its repeater went quiet too, start there.",
+    "last_heard_at": "2026-10-20T22:17:47.000Z", "minutes_since_heard": 558,
+    "checks_every_minutes": 180, "checks_missed": 4, "noticed_at": "2026-10-21T06:38:02.347+00:00"
+  }],
+  "groups": [],
+  "notes": ["A station is silent when it has missed its expected checks …"],
+  "source": "meganet.health_finding (source stations; kinds silent, area-silence, repeater-down; open); meganet.health_refresh; meganet.station"
+}
+```
 
 ### `GET /api/v1/catchments`
 
