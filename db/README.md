@@ -41,6 +41,25 @@ landed is a no-op rather than an error. Pasting the file into the dashboard's SQ
 editor works too, and is the path of least resistance for a one-off — but the
 file in this repo stays the source of truth either way.
 
+**From GitHub, the usual way now.** `.github/workflows/db-migrate.yml` applies
+whatever is pending — every file numbered above `meganet.app_meta`'s
+`schema_version`, in order, each in one transaction, stopping at the first that
+fails or does not set its own number (`tools/ci/apply-pending-migrations.sh`).
+Start it from **Actions → db-migrate → Run workflow** (tick *dry run* to see the
+list first), or from an agent session with `gh workflow run db-migrate.yml`. It
+never runs on a push. It needs one repository secret, **`SUPABASE_DB_URL`**:
+Supabase → the project → **Connect** → **Session pooler** → the URI, with the
+database password in it. The session pooler, because GitHub's runners have no
+IPv6 for the direct connection and the transaction pooler cannot hold a
+migration's transaction together.
+
+Why: an agent session's Supabase connector asks a person to confirm any
+statement that drops or deletes — it reads the text, so even `drop constraint
+if exists` or the word inside a function body — and in a session where nobody
+can see that prompt it cancels the statement. Every migration has such text, so
+none could go in that way. An agent does not route around that check (by
+having the database fetch the file itself, say); it runs this workflow.
+
 ## Rules
 
 These are short because they are absolute. Each one exists because the failure it

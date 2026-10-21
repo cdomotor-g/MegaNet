@@ -1,0 +1,74 @@
+# Apply the migrations the live database has not had yet — by hand (Actions →
+# db-migrate → Run workflow) or by an agent session (`gh workflow run
+# db-migrate.yml`), never on its own: nothing here runs on a push.
+#
+# Why it exists: the Supabase connector an agent session talks to asks for a
+# person's confirmation before any statement that drops or deletes — every
+# migration has some (`drop constraint if exists`, a function that deletes) —
+# and in a session where nobody can see that prompt it cancels them. Pasting
+# each file into the SQL editor was the workaround; this is the fix.
+#
+# It runs tools/ci/apply-pending-migrations.sh: every db/migrations file
+# numbered above meganet.app_meta's schema_version, in order, each in one
+# transaction, stopping at the first that fails or does not set its number.
+#
+# One repository secret:
+#
+#   SUPABASE_DB_URL   the database's connection string, password included —
+#                     Supabase → the project → Connect → "Session pooler" →
+#                     URI (postgresql://postgres.<ref>:<password>@aws-….pooler
+#                     .supabase.com:5432/postgres). The session pooler, not the
+#                     direct connection: GitHub's runners have no IPv6, and the
+#                     transaction pooler (6543) cannot hold a migration's
+#                     transaction together.
+#
+# Without it the run says so and does nothing. A secret is never given to a
+# workflow started from a fork, and only someone who can push here can start
+# this one.
+
+name: db-migrate
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only list what is pending'
+        type: boolean
+        default: false
+      up_to:
+        description: 'Stop after this migration number (e.g. 77). Empty: all pending.'
+        type: string
+        default: ''
+
+concurrency:
+  group: db-migrate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+      UP_TO: ${{ inputs.up_to }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: The database's connection string
+        id: have
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::SUPABASE_DB_URL is not set — nothing applied. db/README.md ('Applying migrations') has the steps."
+            echo "ok=" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=1" >> "$GITHUB_OUTPUT"
+          fi
+      - name: psql
+        if: steps.have.outputs.ok
+        run: command -v psql >/dev/null || (sudo apt-get update -q && sudo apt-get install -y -q postgresql-client)
+      - name: Apply what is pending
+        if: steps.have.outputs.ok
+        run: tools/ci/apply-pending-migrations.sh

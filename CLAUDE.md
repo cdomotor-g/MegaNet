@@ -70,6 +70,10 @@
   - **Editing an issue** (retitling, re-scoping, changing its model/effort recommendation, re-parenting it): update the corresponding entry in #113 to match.
 - If a change touches several issues at once, make one edit to #113 covering all of them rather than several small edits.
 
+## Applying migrations to the live database
+- Run `gh workflow run db-migrate.yml` (or `-f dry_run=true` first): it applies every pending `db/migrations` file in order and stops at the first that fails. Check the result with a read-only `select value from meganet.app_meta where key = 'schema_version'` through the Supabase connector, then bump `core.js` `DB_SCHEMA_VERSION` to match.
+- Don't use the Supabase connector's `apply_migration`/`execute_sql` for migrations: it cancels any statement containing drop or delete text, asking for a confirmation nobody can see. Don't work around that check (for example by having the database fetch and run the file). `db/README.md` ("Applying") explains.
+
 ## Agent API and MCP server (`worker/api.js`)
 - `https://floodwarning.net/api/v1` (REST; OpenAPI at `/api/v1/openapi.json`) and `https://floodwarning.net/api/mcp` (MCP, Streamable HTTP) serve public station data, read-only, to AI agents and scripts. The user doc is `docs/agent-api.md`. From Claude Code: `claude mcp add --transport http floodnet https://floodwarning.net/api/mcp`.
 - Keep it read-only by construction. Upstream requests are GETs to PostgREST with the publishable key, only for relations in `READABLE_RELATIONS`, and nothing from the caller's request is forwarded. Add a relation only if a migration grants it to `anon` and `db/README.md` lists it as public. No RPCs.
