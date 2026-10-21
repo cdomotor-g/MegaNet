@@ -1560,6 +1560,11 @@ jobs:
       # means, idempotent, late copies rebuilt, never past the horizon.
       - name: check_reception_rollups.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_reception_rollups.sql
+      # A reception's detail as typed columns (0072, #242): every key posted
+      # comes back exactly, what a column cannot take stays in detail, the
+      # readers see the whole object, and the backfill splits an old row.
+      - name: check_reception_detail.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_reception_detail.sql
       # A reading's frequency and signal (0050): stored from the reading or
       # its envelope, readable by anon like the rest of it, the first copy's
       # kept on a duplicate — and a bad one stored as null, never a refusal.
