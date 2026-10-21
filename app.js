@@ -6992,9 +6992,19 @@ function stationsTable(allStations) {
   // position is what the map is drawing, and the other five are on the
   // station's card, one row click away in this same column. Stacked, the table
   // has the width of the page and keeps all ten.
+  //
+  // Both shapes carry Last heard, last: how long since Flood-Net heard the
+  // station, which neither the map nor the rest of the row says (see
+  // askStationsHeard). Beside the map it is the sixth column, and the side
+  // panel's default width went from 420 to 470 px to make room for it
+  // (DOCK_DEFAULT_W): measured, every split of 420 px six ways cost the name or
+  // the catchment, and at 470 the five keep exactly the widths they had —
+  // name 103 px, number 61, roles 70, addresses 59, catchment 74 — beside a
+  // Last heard of 55, the width of its own heading.
   const narrow = stationsSplitActive();
   stationsColsNarrow = narrow;
   if (narrow) askStationsSls();
+  askStationsHeard();
   return `
     ${selBar}
     ${capped ? `
@@ -7004,18 +7014,19 @@ function stationsTable(allStations) {
     ` : ''}
     <table${narrow ? ' class="stn-table--narrow"' : ''}>
       <colgroup>${narrow ? `
-        <col style="width:28%"><col style="width:17%"><col style="width:19%">
-        <col style="width:16%"><col style="width:20%">` : `
-        <col style="width:20%"><col style="width:8%"><col style="width:12%"><col style="width:12%">
-        <col style="width:11%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:6%">
-        <col style="width:7%">`}
+        <col style="width:24.5%"><col style="width:14.5%"><col style="width:16.5%">
+        <col style="width:14%"><col style="width:17.5%"><col style="width:13%">` : `
+        <col style="width:17%"><col style="width:8%"><col style="width:11%"><col style="width:11%">
+        <col style="width:10%"><col style="width:7.5%"><col style="width:7.5%"><col style="width:8%"><col style="width:5%">
+        <col style="width:6.5%"><col style="width:8.5%">`}
       </colgroup>
       <caption class="sr-only">${narrow
-        ? 'Every station the filter matched — name, number, roles, ALERT addresses and SLS catchment. '
-          + 'The map beside this table carries the position of each, and selecting a row opens a card '
-          + 'with its radio network, elevation and ARRO link.'
+        ? 'Every station the filter matched — name, number, roles, ALERT addresses, SLS catchment, and '
+          + 'how long since Flood-Net last heard it. The map beside this table carries the position of '
+          + 'each, and selecting a row opens a card with its radio network, elevation and ARRO link.'
         : 'Every station the filter matched — name, number, roles, radio network, ALERT addresses, '
-          + 'position, whether it is enabled, and a link to its ARRO admin page'}</caption>
+          + 'position, whether it is enabled, a link to its ARRO admin page, and how long since '
+          + 'Flood-Net last heard it'}</caption>
       <thead>
         <tr>
           <th scope="col">Name</th><th scope="col">Stn #</th><th scope="col">Roles</th>
@@ -7024,6 +7035,7 @@ function stationsTable(allStations) {
           <th scope="col">SLS catchment</th>` : `
           <th scope="col">Lat</th><th scope="col">Lon</th>
           <th scope="col">Elev (AHD)</th><th scope="col">On</th><th scope="col">ARRO</th>`}
+          <th scope="col" class="stn-heard" title="How long since Flood-Net’s receivers last heard the station — coloured against its checks: green inside two, amber from two, red from four or a day">Last heard</th>
         </tr>
       </thead>
       <tbody>
@@ -7048,6 +7060,7 @@ function stationsTable(allStations) {
               ${narrow ? '' : `<td class="small">${s.radio_network_ids.map(id => esc(netName(id))).join(', ')}</td>`}
               <td class="small">${aids.map(id => markAlertId(id, marks.nums, marks.ranges)).join(', ')}</td>
               ${narrow ? `<td class="small">${slsCatchmentCell(s)}</td>` : stationWideCellsHtml(s)}
+              <td class="small stn-heard">${HealthGlance.heardCellHtml(s)}</td>
             </tr>`;
         }).join('')}
       </tbody>
@@ -7144,6 +7157,36 @@ function askStationsSls() {
   // empty cells with something that says why it is empty.
   SLS.ensureData().then(() => rerenderStations(),
                         () => { stationsSlsFailed = true; rerenderStations(); });
+}
+
+// The Last heard column's half of HealthGlance's network batch — the one
+// request for every station's last-heard time that the health pins and 🏠 Home
+// already share, asked at most once per its fifteen minutes however often the
+// table repaints. When it lands, or a station's card learns more about that
+// one station, the cells are repainted in place rather than the table
+// rebuilt: an answer arriving is no reason to throw away 500 rows, the
+// scroll and the keyboard's place in them.
+let stationsHeardWatching = false;
+function askStationsHeard() {
+  if (typeof HealthGlance === 'undefined' || !HealthGlance.askNet) return;
+  if (!stationsHeardWatching) { HealthGlance.onHeard(paintStationsHeard); stationsHeardWatching = true; }
+  HealthGlance.askNet();
+}
+
+function paintStationsHeard(id) {
+  const wrap = document.getElementById('stations-table-wrap');
+  if (!wrap || !state.data) return;
+  const rows = id == null ? wrap.querySelectorAll('tr[data-sid]')
+                          : wrap.querySelectorAll(`tr[data-sid="${CSS.escape(id)}"]`);
+  if (!rows.length) return;
+  // One station's card: one lookup. The batch: an index, not 500 scans.
+  const byId = id == null ? new Map(state.data.stations.map(s => [s.id, s]))
+    : new Map([[id, state.data.stations.find(s => s.id === id)]]);
+  rows.forEach(tr => {
+    const td = tr.querySelector('td.stn-heard');
+    const s = byId.get(tr.dataset.sid);
+    if (td && s) td.innerHTML = HealthGlance.heardCellHtml(s);
+  });
 }
 
 function rerenderStations() {

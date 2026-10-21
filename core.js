@@ -568,7 +568,10 @@ const HELP = {
       + 'nothing yet. <strong>Colour pins by health</strong>, in 🗺️ Map display, colours every pin the same '
       + 'way — by when Flood-Net last heard it, and by what its readings say once its card has been '
       + 'opened — for one request for the whole network. Bigger is worse, and the ring says it again: '
-      + 'dashed to watch, heavy at fault, hollow for no data.',
+      + 'dashed to watch, heavy at fault, hollow for no data. The same request fills the station list\'s '
+      + '<strong>Last heard</strong> column: how long since Flood-Net heard each station — green inside two '
+      + 'of its checks, ⚠ amber from two, ⛔ red from four or a day, grey for one heard too seldom to judge, '
+      + 'and <em>never</em> for one its receivers have not heard. Hover a cell for the time.',
       '<strong>From zoom 17 the map offers the station\'s digital twin</strong> — the ground to '
       + '1 m where the State holds LiDAR, the aerial imagery, the station as built and the radio paths '
       + 'as this map colours them — whenever a station is under the view: the one on the card, the '
@@ -757,11 +760,11 @@ const HELP = {
       + 'side panel again — 📍 and 〽️ in the rail that ⋮ brings out, each a drawer over the map — '
       + 'so that the map can have the whole screen. The side panel\'s width is '
       + 'yours: drag its left edge, or focus it and use the arrow keys, and it is remembered. The '
-      + 'station list in the side panel carries five columns rather than ten — name, station '
-      + 'number, roles, AlertID and <strong>SLS catchment</strong> — because ten of them in a '
-      + '420 px pane is ten columns nothing fits in. The network, position, elevation, the enabled '
-      + 'tick and the ARRO link are all on the station\'s card, which a click on any row opens; '
-      + 'under the map the table has them back.',
+      + 'station list in the side panel carries six columns rather than eleven — name, station '
+      + 'number, roles, AlertID, <strong>SLS catchment</strong> and <strong>Last heard</strong> — '
+      + 'because eleven of them in a side panel is eleven columns nothing fits in. The network, '
+      + 'position, elevation, the enabled tick and the ARRO link are all on the station\'s card, which '
+      + 'a click on any row opens; under the map the table has them back.',
       '<strong>Clear</strong> also clears the repeater focus — the dim that a click on a '
       + 'repeater pin puts over everything not on its own paths. Both are ways of saying "back to '
       + 'the whole network", so both buttons do both, and both are enabled by a focus even with no '
@@ -2483,12 +2486,15 @@ const TWIN_HELP = {
 // rather than part-way through it. Kept in step with styles.css.
 const HELP_TRANSITION_MS = 160;
 
-// The side panel's pane, in px (the strip beside it is --mn-help-rail). 420 is
-// wide enough for the station table's five columns and the link budget's
+// The side panel's pane, in px (the strip beside it is --mn-help-rail). 470 is
+// wide enough for the station table's six columns and the link budget's
 // two-column rows without either wrapping, and leaves a 1440 px laptop with the
-// nav open a map of about 700 px — wider than the side-by-side split it
-// replaced ever gave it.
-const DOCK_DEFAULT_W = 420;
+// nav open a map of about 650 px — wider than the side-by-side split it
+// replaced ever gave it. It was 420 until the table took Last heard as its
+// sixth column: at 420 the sixth could only be had by clipping the station's
+// name or its catchment (see stationsTable). A width the operator has dragged
+// is kept (mn-dock-w); this is only where an undragged panel starts.
+const DOCK_DEFAULT_W = 470;
 // The narrowest a pane may be dragged to while there is room for more. Below
 // this the Stations card's head and filter rows — the toggles, + Propose and
 // + New, the search box and two Clear buttons — wrap onto four lines, and a

@@ -2607,12 +2607,21 @@ h2.h-bad {
    label (it is what says the link leaves the app), not punctuation after it. */
 .stn-arro { white-space: nowrap; }
 
+/* The station table's Last heard column (heardCellHtml, health-glance.js):
+   the narrow table's side padding in either shape. What it holds is a token —
+   "45 min", "3 h", "never" — rather than prose, and the 3 px a side this
+   saves is what lets "45 min" (42.5 px in this type) stand on one line in an
+   eighth of a stacked table 643 px wide, the narrowest the stacked shape is
+   drawn at before its columns go automatic. */
+.stn-heard { padding-left: .35rem; padding-right: .35rem; }
+
 /* The station table when it is the column beside the map rather than the page
    (#186 — the column set itself is decided in stationsTable, app.js).
 
-   Five columns in about 420 px, and the 8.8 px of side padding every cell
-   carries is 88 px of that — a fifth of the table spent on gutters, at the
-   width where a name has the least room to spare. Tightened rather than
+   Six columns in about 420 px (five until Last heard joined them), and the
+   8.8 px of side padding every cell carries was 88 px of five — a fifth of the
+   table spent on gutters, at the width where a name has the least room to
+   spare. Tightened rather than
    removed: the columns still have to read as columns, and .4rem still separates
    them by more than the space between two words. It buys back roughly 30 px,
    which is a quarter of the name column.
@@ -8691,7 +8700,7 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
 }
 
 #help-panel:not(.collapsed) {
-  width: calc(var(--mn-help-rail, 56px) + var(--mn-dock-w, 420px));
+  width: calc(var(--mn-help-rail, 56px) + var(--mn-dock-w, 470px));
 }
 
 #help-panel.help-ready {

@@ -15,8 +15,9 @@
 //      only by the ingest (its readings aged out), one heard once — a stray
 //      frame, no data rather than a fault — and one never heard. One request
 //      a card, of the station's own rows and addresses (and a one-row look at
-//      station_health for the three with no readings), none for a repaint or
-//      a second look.
+//      station_health for one with no readings that the network's batch,
+//      already asked for by the station list, holds no row for), none for a
+//      repaint or a second look.
 //   3. **The doors** — each line opens the Station Health tab on that station,
 //      at the part it was about, with focus there and the address saying so
 //      (?tab=health&station=…); a reload of that address lands on it again; a
@@ -30,12 +31,20 @@
 //      card; and switched off, the roles' colours back.
 //   5. **No data, honestly** — a datastore that refuses this browser, and one
 //      that cannot be reached: the card says which and offers Try again, every
-//      pin is hollow, nothing says OK.
+//      pin is hollow, nothing says OK, and the station list's Last heard says
+//      "?" rather than "never".
 //   6. **The server's findings** (#215, 0059) — while the server's last run is
 //      fresh, the card and the pins take what it keeps: its silence in place
 //      of the card's own, the kinds it keeps from it, the rest worked out
 //      here; stale, the card's own rules again.
 //   7. **A phone** — the card's health lines inside a 375 px screen.
+//   8. **The station list's Last heard column** — from the same one request,
+//      the pins' switch on or off: how long since each row's station was
+//      heard, green, amber or red against its checks with the card's glyph
+//      beside a watch or a fault, grey for a station heard too seldom to
+//      judge, "never" only once the datastore has said so, an em dash for a
+//      proposed one; repainted in place, never by rebuilding the table, when
+//      the batch is asked again or a station's card answers.
 //
 // Why a check of its own: every failure here is a page that looks right. A pin
 // coloured green for want of an answer, a card that asks the datastore on every
@@ -278,6 +287,9 @@ try {
   // ── 2. Off by default ─────────────────────────────────────────────────
   log('\n2. Colour pins by health is off until it is asked for\n');
   await toStations(page);
+  // The station list's Last heard column reads the batch the pins would, so
+  // the Stations tab asks for it once whether or not the switch is on.
+  await waitTrue(page, () => HealthGlance._state().net.status === 'ok');
   await page.waitForTimeout(400);
   const off0 = await page.evaluate(() => ({
     flag: state.mapHealth, stored: localStorage.getItem('mn-map-health'),
@@ -286,14 +298,53 @@ try {
     offLine: /Also available[^<]*Pins coloured by health/.test(document.getElementById('map-legend').innerHTML),
     note: (document.getElementById('map-health-note') || {}).textContent || null,
   }));
-  check('off on a first visit, and the map asks the datastore nothing for it',
-    off0.flag === false && off0.tagged === 0 && count('network') === 0, J({ off0, network: count('network') }));
+  check('off on a first visit: no pin wears a class, and the one request for the network is the station list’s',
+    off0.flag === false && off0.tagged === 0 && count('network') === 1, J({ off0, network: count('network') }));
   check('the legend keeps the role key and names the switch among what else is available', off0.roles && off0.offLine, J(off0));
   check('its note in Map display says what the pins wear while it is off', /role/.test(off0.note || ''), off0.note);
 
+  // ── 2b. The station list's Last heard column ──────────────────────────
+  log('\n2b. The station list’s Last heard column, from the same one request\n');
+  const col = await page.evaluate(([R, aged, never, once]) => {
+    const T = '#stations-table-wrap table';
+    const heads = [...document.querySelectorAll(`${T} thead th`)].map(th => th.textContent.trim());
+    const at = heads.indexOf('Last heard');
+    const rows = [...document.querySelectorAll(`${T} tbody tr[data-sid]`)];
+    const byId = new Map(state.data.stations.map(s => [s.id, s]));
+    const read = html => { const d = document.createElement('div'); d.innerHTML = html; return d; };
+    const flat = t => t.replace(/\s+/g, ' ').trim();
+    // Every row on the page holds what the column says now — filled in once
+    // the batch answered, none left empty.
+    const painted = rows.length > 0 && rows.every(tr => {
+      const td = tr.cells[at];
+      return td && td.classList.contains('stn-heard') && flat(td.textContent) !== ''
+        && flat(td.textContent) === flat(read(HealthGlance.heardCellHtml(byId.get(tr.dataset.sid))).textContent);
+    });
+    const cell = id => {
+      const d = read(HealthGlance.heardCellHtml(byId.get(id)));
+      const sp = d.firstElementChild;
+      return { text: flat(d.textContent), cls: sp ? sp.className : '', title: sp ? sp.title : '' };
+    };
+    const prop = state.data.stations.find(s => s.proposed);
+    return { heads, at, n: rows.length, painted, steady: cell(R.steady), silent: cell(R.silent), aged: cell(aged),
+             never: cell(never), once: cell(once), proposed: prop ? cell(prop.id) : null };
+  }, [R, W.aged, W.never, W.once]);
+  check('beside the map the list carries six columns, Last heard the last of them',
+    col.heads.length === 6 && col.at === 5, J(col.heads));
+  check('every row filled in from the batch once it answered — none left empty', col.painted, `${col.n} row(s)`);
+  check('heard lately: how long ago, in green', col.steady.cls === 'txt-ok' && /^(now|\d+ (min|h) ago)$/.test(col.steady.text), J(col.steady));
+  check('silent a day and more: red, with the fault’s glyph and, for a screen reader, its word',
+    col.silent.cls === 'txt-bad' && /⛔/.test(col.silent.text) && /Fault:/.test(col.silent.text) && /ago$/.test(col.silent.text), J(col.silent));
+  check('heard for a month and not for 100 days: red, in weeks', col.aged.cls === 'txt-bad' && /\b14 wk ago$/.test(col.aged.text), J(col.aged));
+  check('never heard: "never", in grey', col.never.text === 'never' && col.never.cls === 'txt-muted', J(col.never));
+  check('heard once, two days ago: its age in grey, not red — too seldom to judge, as its pin is',
+    col.once.cls === 'txt-muted' && /^2 d ago$/.test(col.once.text) && /heard once/.test(col.once.title), J(col.once));
+  check('a proposed station: an em dash — not built, nothing to have heard', !col.proposed || col.proposed.text === '—', J(col.proposed));
+
   // ── 3. The card ───────────────────────────────────────────────────────
   log('\n3. The card: last heard, the battery, the findings — one request\n');
-  asked = [];
+  // The network's requests are kept: section 4 counts the visit's.
+  asked = asked.filter(a => a.kind === 'network');
   const falling = await card(page, R.falling);
   const req = asked.filter(a => a.kind === 'card');
   const ids = await page.evaluate(id => stationAlertIds(state.data.stations.find(s => s.id === id)), R.falling);
@@ -344,10 +395,13 @@ try {
     return s ? HealthGlance.cardHtml(s) : null;
   });
   check('a proposed station has no health section — nothing to have heard', proposed === '' || proposed === null, String(proposed).slice(0, 80));
-  check('one request a card, seven cards — and a second, of one row, only for the three with no readings at all',
-    asked.filter(a => a.kind === 'card').length === 7 && count('ingest') === 3
-      && asked.filter(a => a.kind === 'ingest').every(a => [W.aged, W.never, W.once].some(id => a.url.includes(`station_id=eq.${id}`))),
-    J({ card: asked.filter(a => a.kind === 'card').length, ingest: count('ingest') }));
+  // Of the three with no readings at all, the batch the station list asked
+  // for already holds two — the aged one and the one heard once — so only the
+  // one never heard costs the second, one-row look.
+  check('one request a card, seven cards — and a second, of one row, only for a station with no readings the batch has no row for',
+    asked.filter(a => a.kind === 'card').length === 7 && count('ingest') === 1
+      && asked.filter(a => a.kind === 'ingest').every(a => a.url.includes(`station_id=eq.${W.never}`)),
+    J({ card: asked.filter(a => a.kind === 'card').length, ingest: asked.filter(a => a.kind === 'ingest').map(a => a.url.slice(-60)) }));
 
   // ── 4. The pins ───────────────────────────────────────────────────────
   log('\n4. Colour pins by health — one request for the whole network\n');
@@ -385,7 +439,8 @@ try {
     };
   }, [R, W.aged, W.never, W.once]);
   check('a real click on the switch turns it on, and it is remembered', pins.flag === true && pins.stored === 'on', J({ flag: pins.flag, stored: pins.stored }));
-  check('one request for the whole network', count('network') === 1, `${count('network')} station_health request(s)`);
+  check('one request for the whole network — the one the station list already made', count('network') === 1,
+    `${count('network')} station_health request(s)`);
   check('every pin wears a class', Object.keys(pins.tally).every(k => ['ok', 'watch', 'fault', 'nodata'].includes(k)), J(pins.tally));
   check('heard lately and nothing found: OK; silent a day and more: a fault; heard for a month and not for 100 days: a fault; never: no data',
     pins.steady.cls === 'ok' && pins.silent.cls === 'fault' && pins.aged.cls === 'fault' && pins.never.cls === 'nodata',
@@ -430,6 +485,25 @@ try {
   const classed = await waitTrue(page, () => !!state.map && state.mapMarkers.length > 1000 && state.mapMarkers.every(m => m.mnHealth), null, LOAD_TIMEOUT);
   check('rebuilt four times and the tab re-entered: still one request, every pin still classed',
     classed && count('network') === 1, `${count('network')} station_health request(s), classed: ${classed}`);
+  // The Last heard column follows what is learned without the table being
+  // rebuilt: the batch asked again, and one station's card answering.
+  const stale = async ask => page.evaluate(async ask => {
+    const wrap = document.getElementById('stations-table-wrap');
+    const table = wrap.querySelector('table');
+    const tr = wrap.querySelector('tr[data-sid]');
+    const td = tr.querySelector('td.stn-heard');
+    td.textContent = 'stale';
+    if (ask === 'net') HealthGlance.askAgain(); else HealthGlance.retry(tr.dataset.sid);
+    const t0 = Date.now();
+    while (td.textContent === 'stale' && Date.now() - t0 < 10_000) await new Promise(r => setTimeout(r, 50));
+    return { same: wrap.querySelector('table') === table && tr.isConnected, repainted: td.textContent !== 'stale' };
+  }, ask);
+  const again = await stale('net');
+  check('the batch asked again repaints Last heard in place — the same table, the same rows',
+    again.same && again.repainted && count('network') === 2, J({ ...again, network: count('network') }));
+  const byCard = await stale('card');
+  check('…and so does a station’s card answering, for its own row', byCard.same && byCard.repainted, J(byCard));
+
   const theme = await page.evaluate(id => ({ dark: state.mapMarkers.find(x => x.mnStationId === id).options.fillColor }), R.silent);
   check('the pins keep their colours across a theme change — the base maps do not go dark', theme.dark === '#c7401a', J(theme));
 
@@ -523,6 +597,10 @@ try {
     check('remembered on: one request at load, before anything is clicked', count('network') === 1, `${count('network')}`);
     check('refused: every pin no data — hollow, not OK — and the note says the datastore would not let it read',
       Object.keys(denied.tally).join() === 'nodata' && /would not let this browser read/.test(denied.note), J(denied));
+    const heardDenied = await p.evaluate(() => [...document.querySelectorAll('#stations-table-wrap td.stn-heard')].slice(0, 50)
+      .map(td => ({ text: td.textContent.trim(), title: (td.firstElementChild || {}).title || '' })));
+    check('…and the station list’s Last heard says "?" and why, never "never"',
+      heardDenied.length > 0 && heardDenied.every(c => c.text === '?' && /would not let this browser read/.test(c.title)), J(heardDenied.slice(0, 3)));
     const c = await card(p, R.steady);
     check('…and the card: no data, the refusal in words, and Try again',
       /No data/.test(c.badge || '') && /would not let this browser read its readings/.test(c.text) && c.retry && c.cls === 'nodata', J({ badge: c.badge, text: c.text }));
@@ -654,4 +732,5 @@ if (failed.length) {
   process.exit(1);
 }
 log('\nPASS — a station’s card says when it was last heard and what is wrong with it, each line opens\n'
-  + '       Station Health on it, and the map colours every station by health for one request a load.');
+  + '       Station Health on it, the map colours every station by health and the station list says how\n'
+  + '       long since each was heard, for one request a load.');

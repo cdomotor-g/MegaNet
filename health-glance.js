@@ -4,8 +4,10 @@
 //                  lines on its card on the Stations map — when it was last
 //                  heard, where its battery is going, and what is wrong with
 //                  it — each a door into the Station Health tab with the
-//                  station picked; and *Colour pins by health* in 🗺️ Map
-//                  display, every pin OK, watch, fault or no data.
+//                  station picked; *Colour pins by health* in 🗺️ Map
+//                  display, every pin OK, watch, fault or no data; and the
+//                  station list's **Last heard** column, how long since
+//                  Flood-Net heard each row's station.
 //
 // After core.js (state, esc, escAttr, announce, stationSensors), app.js
 // (stationAlertIds, refreshMapLayers, rerenderMapLegend, toggleMapFullscreen,
@@ -16,7 +18,8 @@
 // app.js's stnCardHtml() places the section and repaintStnCard() calls ask();
 // refreshMapLayers() calls reset() once per rebuild and pinStyle() per pin;
 // mapDisplayControlsHtml() and mapLegendHtml() draw the switch's note and its
-// key.
+// key; stationsTable() asks for the batch (askNet), heardCellHtml() is each of
+// its Last heard cells, and onHeard() is what repaints them in place.
 //
 // ── Why this exists ─────────────────────────────────────────────────────────
 // The Station Health tab ranks silent stations, sliding batteries and the rest
@@ -43,7 +46,10 @@
 // network outgrow one page, kept for NET_TTL and asked again only by a map
 // rebuilt after that, or by ↻ in the switch's note. Never one per station:
 // the Station Health tab's own way in is seventeen pages of readings, which
-// is what a visit to the Stations map must not cost.
+// is what a visit to the Stations map must not cost. The station list's Last
+// heard column reads the same batch, so the Stations tab asks for it whether
+// or not the pins' switch is on — still one request, once per NET_TTL, and the
+// pins, 🏠 Home and the column share whichever of them asked first.
 //
 // **Worked out once per answer, not once per pin.** Each station's class is
 // computed when an answer lands (rebuild()), into a Map; a marker rebuild —
@@ -520,6 +526,7 @@ const HealthGlance = (() => {
   function afterAnswer(fromNet) {
     paintNote();
     if (fromNet) watchers.forEach(fn => { try { fn(); } catch (e) { console.warn('[health] a count:', e); } });
+    if (fromNet) tellHeard(null);
     if (!state.mapHealth) return;
     if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
@@ -555,6 +562,102 @@ const HealthGlance = (() => {
   // which are the ones the pins and Station Health's overview wear.
   function counts() {
     return { status: net.status, okAt: net.okAt, denied: net.denied, error: net.error, ...tally() };
+  }
+
+  // ── The station list's Last heard column ──────────────────────────────────
+  // The same batch again, read for one thing: how long since Flood-Net heard
+  // each row's station, and how that sits against its checks. The colour is
+  // the silence alone, on the bars the pins use for it — green inside two of
+  // its checks, amber from two, red from four or a day — and not the pin's
+  // whole class: a sliding battery is the card's to say, and the column is
+  // only ever about hearing. A station heard too seldom to judge stays grey
+  // whatever its age, as its pin does. Colour is never the only channel: a
+  // watch and a fault carry the card's glyph and, for a screen reader, its
+  // word.
+  //
+  // A cell knows where its answer is: empty while the batch is on its way (as
+  // the SLS column is before its file lands — "never" before anyone has asked
+  // would be a claim), "?" when it could not be asked, "never" only once the
+  // datastore has said so, and an em dash for a proposed station, which is
+  // not built and has nothing to have heard.
+
+  // Short, because the column is an eighth of the table beside the map: "3 h",
+  // "45 min", "7 mo" under a heading that already says *last heard*, with the
+  // "ago" kept for a screen reader, which hears the cell without the heading.
+  // The number and its unit are one word (a no-break space), so a narrow cell
+  // wraps a glyph off the front of "7 mo" rather than "mo" off the end of it.
+  // Measured in the table's own type: "45 min", the widest that ordinarily
+  // turns up, is 42.5 px, and the column's content box beside the map is 43.
+  function agoShort(ms) {
+    if (ms < 90 * 1000) return 'now';
+    const m = Math.round(ms / MIN);
+    if (m < 90) return `${m}\u00a0min`;
+    const h = Math.round(ms / HOUR);
+    if (h < 48) return `${h}\u00a0h`;
+    const d = Math.round(ms / DAY);
+    if (d < 14) return `${d}\u00a0d`;
+    if (d < 120) return `${Math.round(d / 7)}\u00a0wk`;
+    if (d < 730) return `${Math.round(d / 30.44)}\u00a0mo`;
+    return `${Math.round(d / 365.25)}\u00a0yr`;
+  }
+  const agoHtml = ms => esc(agoShort(ms)) + (ms < 90 * 1000 ? '' : '<span class="sr-only"> ago</span>');
+
+  // { cls: 'ok' | 'watch' | 'fault' | 'brief' | 'never' | 'asking' | 'unknown'
+  //   | 'proposed', lastHeard, firstHeard, P } — 'brief' heard too seldom to
+  // judge, 'unknown' the batch could not be asked and nothing else knows.
+  function heard(s, now) {
+    if (!s) return { cls: 'unknown', lastHeard: null };
+    if (s.proposed) return { cls: 'proposed', lastHeard: null };
+    const k = knowledgeOf(s.id);
+    const c = cards.get(s.id);
+    if (k.lastHeard == null) {
+      const known = net.okAt > 0 || !!(c && c.glance);
+      return { cls: known ? 'never' : net.status === 'error' ? 'unknown' : 'asking', lastHeard: null };
+    }
+    const ms = now - k.lastHeard;
+    const cls = ms >= bars(k.P).watch && briefly(k) ? 'brief' : quietClass(ms, k.P);
+    return { cls, lastHeard: k.lastHeard, firstHeard: k.firstHeard, P: k.P };
+  }
+
+  function heardCellHtml(s) {
+    const now = now_();
+    const h = heard(s, now);
+    if (h.cls === 'asking') return '';
+    if (h.cls === 'proposed') {
+      return '<span class="txt-muted" title="Proposed — not built yet, so there is nothing to have heard">—</span>';
+    }
+    if (h.cls === 'unknown') {
+      return `<span class="txt-muted" title="${net.denied
+        ? 'The datastore would not let this browser read when stations were last heard'
+        : 'The datastore could not be reached, so when this station was last heard is not known'}">?</span>`;
+    }
+    if (h.cls === 'never') {
+      return '<span class="txt-muted" title="Flood-Net’s receivers have not heard this station">never</span>';
+    }
+    const when = `Last heard ${HealthAnalysis.fmtWhen(h.lastHeard, now)}`;
+    if (h.cls === 'brief') {
+      const once = h.lastHeard - h.firstHeard < MIN;
+      return `<span class="txt-muted" title="${esc(`${when} — ${once ? 'heard once' : 'heard only briefly'}, `
+        + 'too seldom to say when it is overdue.')}">${agoHtml(now - h.lastHeard)}</span>`;
+    }
+    // The bars themselves, in hours: "four of its checks or a day" is not what
+    // an assumed check does — its fault waits the whole day.
+    const b = bars(h.P), span = HealthAnalysis.fmtSpan;
+    const C = CLS[h.cls];
+    const mark = h.cls === 'ok' ? ''
+      : `<span aria-hidden="true">${C.icon}</span><span class="sr-only">${esc(C.word)}:</span> `;
+    return `<span class="${C.txt}" title="${esc(`${when}. `
+      + (h.P ? `It checks every ${HealthAnalysis.fmtPeriod(h.P)}:` : 'Until its card has been opened and its own checks learned,')
+      + ` amber once quiet ${span(b.watch)}, red from ${span(b.fault)}. `
+      + 'Whether its receivers were listening is Station Health’s to weigh.')}">${mark}${agoHtml(now - h.lastHeard)}</span>`;
+  }
+
+  // Told each time something new is known about when a station was heard: the
+  // batch (id null — every row) or one station's card (its id).
+  const heardWatchers = new Set();
+  function onHeard(fn) { heardWatchers.add(fn); }
+  function tellHeard(id) {
+    heardWatchers.forEach(fn => { try { fn(id); } catch (e) { console.warn('[health] the Last heard column:', e); } });
   }
 
   // What refreshMapLayers lays over a pin's own style while the switch is on:
@@ -833,6 +936,10 @@ const HealthGlance = (() => {
     dirty = true;
     const after = classOf(id);
     paintCard(id);
+    // Its row in the station list follows its card too: the card's readings
+    // can be newer than the ingest's record, and its learned period moves the
+    // bars.
+    tellHeard(id);
     // The pin follows its card: the two say the same thing about the station
     // somebody is looking at.
     if (state.mapHealth && net.at && after !== before) afterAnswer(false);
@@ -864,6 +971,8 @@ const HealthGlance = (() => {
     pinStyle, reset, setPins, askAgain, noteHtml, legendHtml, altText,
     // the counts, for Home and the Instrument look's banner
     onNet, askNet, counts,
+    // the station list's Last heard column
+    heardCellHtml, onHeard,
     // the rules, for test/healthcard.mjs and for #215 to keep honest
     classify, bars, glanceFrom, quietFinding, findingsOf, fromServer,
     classOf: id => classOf(id),

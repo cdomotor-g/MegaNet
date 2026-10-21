@@ -1254,8 +1254,9 @@ here.
 - Toggle the link lines on/off (the backbone paths have a switch of their own), fade them with a slider, and cap how long a link may be before it is dropped (*Limit link/path length*)
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
 - **Colour pins by health** — every station OK, watch, fault or no data by when Flood-Net last heard it (and, once its card has been opened, by what its readings say), with its key in the legend; bigger is worse and the ring says it again, so colour is never the only channel; off by default, one request for the whole network a load
+- **Last heard** in the station list — how long since Flood-Net heard each station (*45 min*, *3 h*, *never*), green, ⚠ amber or ⛔ red against its checks, from that same one request
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
-- Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a five-column list there (name, station number, roles, AlertID, SLS catchment) instead of the ten the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
+- Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a six-column list there (name, station number, roles, AlertID, SLS catchment, last heard) instead of the eleven the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
 - **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, the estimated mobile signal for each carrier, and the nearest station, repeater and survey mark
 - **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, a polar coverage plot lying on the relief, your Draw & measure sketches on the ground (and its tools drawing there), pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
 - **Mobile coverage** — each carrier's own 4G coverage map, as Telstra, Optus and TPG give it to the ACCC: where a phone works outdoors and where only with an external antenna, one carrier at a time or the best of the three
@@ -1502,7 +1503,7 @@ match*, drops) the same set. Picking a row pans the map to that station and
 opens its pin, so the list and the map never disagree about which site is being
 looked at.
 
-**The ARRO column.** The last column of the stacked table — the split drops it,
+**The ARRO column.** The next to last column of the stacked table — the split drops it,
 along with the network and the position — is a link straight out to that
 station's ARRO (Contrail) site admin page — the place its telemetry actually
 lives. It exists because the key ARRO takes is `site.db_id`, an arbitrary
@@ -1643,8 +1644,9 @@ the tab's to weigh. A datastore that cannot be reached, or will not answer, is
 **Colour pins by health**, under *Stations & links* in 🗺️ Map display and off
 by default, colours every pin by the same rules: by when Flood-Net last heard it
 (`meganet.station_health`, **one request for the whole network a load**, kept
-fifteen minutes, however often the map is rebuilt) and, for a station whose card
-has been opened, by what its readings say. A quiet station is a watch from two of
+fifteen minutes, however often the map is rebuilt — and shared with the station
+list's **Last heard** column, which asks for it while the switch is off) and,
+for a station whose card has been opened, by what its readings say. A quiet station is a watch from two of
 its checks and a fault from four or a day — a check taken as three hours, and a
 fault waiting a whole day, until its own schedule is known — and a station heard
 across less than two of its checks is *no data*, not a fault: it has shown no
@@ -1844,11 +1846,12 @@ Leaflet map keeps its view, its layers and its in-flight requests.
 420 px column is ten columns nothing fits in — measured at 1440 px, every
 latitude and longitude in the table was clipped, 496 of the 500 station numbers
 with them, and a third of the ALERT address lists. So the side-by-side shape
-lists five: **Name**, **Stn #**, **Roles**, **AlertID** and **SLS catchment**.
-Nothing is lost that is not already on the same screen — the position is what
-the map beside it is drawing, and the network, the elevation, the enabled tick
-and the ARRO link are all on the station's own card, one row click away in that
-same column. Stacked, the table has the width of the page and keeps all ten.
+lists six: **Name**, **Stn #**, **Roles**, **AlertID**, **SLS catchment** and
+**Last heard**. Nothing is lost that is not already on the same screen — the
+position is what the map beside it is drawing, and the network, the elevation,
+the enabled tick and the ARRO link are all on the station's own card, one row
+click away in that same column. Stacked, the table has the width of the page and
+keeps all ten, with Last heard after them.
 Crossing 1100 px swaps the sets on its own, in either direction, because the
 columns follow the *layout* and not the setting.
 
@@ -1862,6 +1865,27 @@ card puts first — and the 1.2 MB of schedule behind it is fetched once, after
 the first paint, the first time the narrow table asks for it. The 1,620
 stations neither document carries show an em dash, as the ARRO column already
 does for a station with no site id.
+
+**Last heard** is the last column in both shapes: how long since Flood-Net's
+receivers last heard the station — *now*, *45 min*, *3 h*, *2 d*, *7 mo* — or
+*never*. It is the same answer the station card's **Last heard** row and the
+health pins give, from the same one request for the whole network
+(`meganet.station_health`, kept fifteen minutes; see *A station's health, on its
+card and its pin* above), asked for when the table is first drawn whether or not
+the pins' switch is on, and filled into the cells in place when it lands rather
+than by rebuilding the table. The colour is how the silence sits against the
+station's checks, on the pins' bars: green inside two, amber with ⚠ from two,
+red with ⛔ from four or a day — a check taken as three hours until the
+station's card has been opened and its own schedule learned. A station heard
+too seldom to judge (once, or across less than two of its checks) stays grey
+whatever its age, as its pin does. The colour is the silence alone, not the
+pin's whole class: a sliding battery is the card's to say. Hovering a cell
+gives the time it was heard. A cell is empty while the answer is on its way,
+*?* if the datastore could not be asked, and an em dash for a proposed
+station, which has nothing to have heard. Six columns needed the side panel's
+default width to go from 420 to 470 px: at 420, every way of making room
+clipped the station's name or its catchment, and at 470 the other five keep
+exactly the widths they had. A width you have dragged is kept.
 
 **Signal links and *Limit link/path length*.** Links are drawn from each field station
 to every repeater whose pass ranges cover one of its ALERT addresses, which

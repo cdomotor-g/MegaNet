@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 62, date: '2026-10-21', items: [
+      '<strong>📡 Last heard, in the station list.</strong> The list of stations on the Stations tab has a new last '
+        + 'column, <em>Last heard</em>: how long since Flood-Net\'s receivers last heard each station — <em>45 min</em>, '
+        + '<em>3 h</em>, <em>2 d</em> — or <em>never</em>. Green is within two of its checks, ⚠ amber two or more, ⛔ red '
+        + 'four or a day; grey is a station heard too seldom to judge. Point at a time for when it was heard. The side '
+        + 'panel now opens 50 px wider to make room for the column — drag its edge if you would rather the map had it.',
+    ] },
     { n: 61, date: '2026-10-21', items: [
       '<strong>🏛️ The station editor shows the station\'s owner, logo and all.</strong> Its <em>Owner</em> field '
         + 'now says what the station card on the map says: where the Bureau\'s Service Level Specification names the '
