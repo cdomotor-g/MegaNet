@@ -3583,6 +3583,7 @@ function renderMain() {
     case 'stations':   noteMapCornerFocus();
                        el.innerHTML = renderStationsHtml();
                        syncStationsCardsHome({ instant: true, remeasure: false });
+                       stationEditorCardDrawn();
                        initStationFilters(); initMap(); break;
     case 'sitemap':    el.innerHTML = SiteMap.render();       SiteMap.init();      break;
     case 'offline':    el.innerHTML = OfflineTab.render();    OfflineTab.init();   break;
@@ -8067,18 +8068,29 @@ function renderStationEditorCard() {
   return editorForm(s);
 }
 
-function rerenderStationEditorCard() {
-  const el = document.getElementById('stations-editor-card');
-  if (el) el.innerHTML = renderStationEditorCard();
+// What a freshly drawn editor card is filled with once it is on the page.
+// Called by both ways the card is drawn — rerenderStationEditorCard() below, and
+// the whole Stations tab's render, which draws it inline (renderStationsHtml) —
+// so a station selected by a path that redraws the tab (back to the tab with a
+// station selected, focusStation moving the filters to a station they had left
+// out, goToStation) is filled like a row click, not left with empty sparklines.
+function stationEditorCardDrawn() {
+  if (!document.getElementById('stations-editor-card')) return;
   // A fresh card is the saved station: no gilt, and teal again.
-  if (el) editorUnsavedRefresh();
+  editorUnsavedRefresh();
   // The slots this station's relayed ALERT2 address has actually been heard on
   // (#172). A background fill, like the editor stamp: it reads the readings
   // rather than the registry, so it cannot come out of state.data.
-  if (el) editorRefreshA2Seen();
+  editorRefreshA2Seen();
   // …and each sensor row's last seven days (sensor-sparks.js), for the same
   // reason: they are readings, read in the background.
-  if (el && typeof SensorSparks !== 'undefined') SensorSparks.fill();
+  if (typeof SensorSparks !== 'undefined') SensorSparks.fill();
+}
+
+function rerenderStationEditorCard() {
+  const el = document.getElementById('stations-editor-card');
+  if (el) el.innerHTML = renderStationEditorCard();
+  if (el) stationEditorCardDrawn();
   // The card below the table follows the same selection, so every caller that
   // reloads the editor reloads it too — there is no path that changes the
   // selected station without going through here.

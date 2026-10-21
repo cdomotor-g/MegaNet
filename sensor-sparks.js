@@ -15,7 +15,8 @@
 // ArroData.fieldOpenAddr, the door the dialog opens onto Field Data. All at
 // call time; nothing here runs at load (`npm run toplevel`).
 // station-editor.js draws the slot on each row (slotHtml) and app.js's
-// rerenderStationEditorCard() asks for the slots to be filled (fill).
+// stationEditorCardDrawn() asks for the slots to be filled (fill), whichever
+// way the card was drawn — on its own or with the whole Stations tab.
 //
 // ── What a row's line is ─────────────────────────────────────────────────────
 //

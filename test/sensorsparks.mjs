@@ -199,6 +199,23 @@ try {
   });
   ok('a redraw of the card asks the datastore nothing again', again.queries === 0 && again.drawn === 3, JSON.stringify(again));
 
+  // The whole tab drawn with the station selected — back to the tab, or a
+  // station the filters had to move for (focusStation) — draws the card inline
+  // rather than through rerenderStationEditorCard(), and fills it all the same.
+  const whole = await page.evaluate(async id => {
+    renderMain();
+    await new Promise(r => setTimeout(r, 200));
+    const drawn = document.querySelectorAll('#ef-sensors .sensor-spark path.sspk-line').length;
+    resetStationFilters();
+    state.filters.searches = [newSearchRow('no station is called this')];
+    state.selectedId = null;
+    focusStation(id);
+    await new Promise(r => setTimeout(r, 200));
+    return { drawn, focused: document.querySelectorAll('#ef-sensors .sensor-spark path.sspk-line').length };
+  }, STATION);
+  ok('…and so does the whole tab drawn with the station selected, or a station the filters were moved for',
+    whole.drawn === 3 && whole.focused === 3, JSON.stringify(whole));
+
   const retyped = await page.evaluate(async () => {
     window.__sspk.queries.length = 0;
     const row = [...document.querySelectorAll('#ef-sensors .sensor-row')].find(r => r.querySelector('.sensor-type').value === 'Battery');

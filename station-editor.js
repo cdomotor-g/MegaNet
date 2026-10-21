@@ -23,7 +23,7 @@
 // toggleMapFullscreen) and for the station card's owner (stationOwner,
 // stationOwnerParse), which the Owner field shows, with sls.js's SLS behind
 // it and owner-logos.js's OwnerLogos for the logos — and back
-// the other way, rerenderStationEditorCard() calls editorRefreshA2Seen() here
+// the other way, stationEditorCardDrawn() calls editorRefreshA2Seen() here
 // once the card is on screen, because the heard-slots list reads the readings
 // rather than state.data; to auth.js for Auth; and to
 // datastore.js for dbCanWrite, dbSaveStation, dbDeleteStation, dbSelect,
