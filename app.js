@@ -9445,7 +9445,8 @@ function refreshAcmaLayer() {
     const m = L.marker([site.lat, site.lon], { icon }).addTo(A.layer);
     m.bindPopup(acmaPopupHtml(d, site), { maxWidth: 300 });
     m.on('click', () => acmaHighlightDevice(t.device_id));
-    m.bindTooltip(`${esc(t.client || 'Unknown licensee')} · ${mech.label} · ${t.score}`);
+    m.bindTooltip(`${esc(t.client || 'Unknown licensee')} · ${mech.label} · ${t.score}`,
+      { direction: 'top', offset: [0, -ACMA_PIN_HIT_PX / 2] });
     // A divIcon marker is a keyboard stop Leaflet's `alt` option cannot name —
     // `alt` reaches IMG icons only, and this one is a <div>. Up to 500 of these
     // are on the map at once, so unnamed they are 500 unnamed tab stops between

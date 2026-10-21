@@ -458,7 +458,8 @@ const SiteFeatures = (function () {
       const line = L.polyline(pts, { color: safeColour(k.colour), weight: sel ? 5 : 3.5, opacity: 1,
                                      dashArray: k.dash || null, lineCap: k.dash ? 'butt' : 'round', lineJoin: 'round',
                                      bubblingMouseEvents: false });
-      line.bindTooltip(`${esc(title)} · ${esc(measureText(f, s))}`, { sticky: true, className: 'mn-sf-tip' });
+      line.bindTooltip(`${esc(title)} · ${esc(measureText(f, s))}`,
+                       { sticky: true, direction: 'top', offset: [0, -10], className: 'mn-sf-tip' });
       line.on('click', e => { L.DomEvent.stop(e); onFeatureClick(f, e.latlng); });
       line.addTo(layer);
     } else {

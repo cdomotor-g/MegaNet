@@ -375,14 +375,15 @@ try {
   const tipAt = async (pt) => {
     await page.mouse.move(pt.x, pt.y);
     await page.waitForTimeout(200);
-    return page.evaluate(() => {
+    return page.evaluate((pt) => {
       const el = document.getElementById('ad-tip');
       if (!el || el.hidden) return null;
       const d = el.querySelector('.ad-tip-d');
       return { text: el.innerText.replace(/\s+/g, ' ').trim(),
                delta: d ? d.textContent.replace(/\s+/g, ' ').trim() : null,
-               warned: !!(d && d.querySelector('b.txt-warn')) };
-    });
+               warned: !!(d && d.querySelector('b.txt-warn')),
+               above: el.getBoundingClientRect().bottom <= pt.y - 8 };
+    }, pt);
   };
 
   // Re-measure: repaint() above moved the window, and the coordinates were
@@ -395,6 +396,7 @@ try {
   await page.waitForTimeout(200);
   const tipStep = await tipAt(balloon.at.step);
   ok('the hover balloon appears', !!tipStep, 'no balloon');
+  ok('…above the pointer, where the pointer does not cover it', !!(tipStep && tipStep.above), JSON.stringify(tipStep));
   ok('it carries a Δ prev and a Δ next', !!(tipStep && /Δ prev/.test(tipStep.delta || '')
                                             && /Δ next/.test(tipStep.delta || '')),
      tipStep && tipStep.text);

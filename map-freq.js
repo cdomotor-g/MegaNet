@@ -164,7 +164,7 @@ const MapFreq = (function () {
       if (typeof line.bindTooltip === 'function') {
         const other = endMhz(a) != null && endMhz(b) != null && endMhz(a) !== endMhz(b)
           ? ` (far end ${fmt(endMhz(b))})` : '';
-        line.bindTooltip(`${fmt(f)}${other}`, { sticky: true });
+        line.bindTooltip(`${fmt(f)}${other}`, { sticky: true, direction: 'top', offset: [0, -10] });
       }
     },
 

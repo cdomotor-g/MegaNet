@@ -979,6 +979,13 @@ jobs:
         working-directory: test
         run: npm run sensorsparks
 
+      # Every title's words above the pointer (tooltips.js), not in the
+      # browser's box under it where the pointer covers them. It stands down
+      # under automation, so no other check meets it; this one asks for it.
+      - name: Tooltips — above the pointer, timed as the browser's, everything put back
+        working-directory: test
+        run: npm run tooltips
+
       # The same drift the claim step's note describes, found again while
       # adding the one above: `mapfade` has been in `npm run all` with no step
       # here, so it has run for whoever typed it and on no push at all. A check

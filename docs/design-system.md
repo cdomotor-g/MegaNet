@@ -1033,6 +1033,12 @@ site's address as their only heading. In their place:
   without being stopped by it. It speaks through `announce()` — one live region,
   not two. A "done" goes after a few seconds (not while pointed at); a
   "failed" stays until it is dismissed.
+- **A tooltip is a `title`** (or an SVG shape's `<title>`), written as it always
+  was; `tooltips.js` draws its words above the pointer, in place of the
+  browser's box under it, which the pointer covers. A readout of a component's
+  own that comes up on hover — a chart's balloon, a Leaflet tooltip — goes
+  above the pointer too (`direction: 'top'` for Leaflet), and under it only
+  where there is no room above.
 
 Questions are asked one layer up, in `#app-ask` (z-index 2100, over `Modal`'s
 2000 and the photo viewer's 2050), because a question is usually asked from

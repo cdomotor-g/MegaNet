@@ -6535,8 +6535,11 @@ const ArroData = (function () {
     const r = stage.getBoundingClientRect();
     const lx = ev.clientX - r.left, ly = ev.clientY - r.top;
     tip.hidden = false;
-    tip.style.left = Math.min(r.width - tip.offsetWidth - 8, lx + 14) + 'px';
-    tip.style.top  = Math.min(r.height - tip.offsetHeight - 8, ly + 14) + 'px';
+    // Above the pointer, where the pointer does not cover its first lines;
+    // under it, clear of the pointer, only when the stage has no room above.
+    const above = ly - 12 - tip.offsetHeight;
+    tip.style.left = Math.max(4, Math.min(r.width - tip.offsetWidth - 8, lx + 14)) + 'px';
+    tip.style.top  = (above >= 4 ? above : Math.min(r.height - tip.offsetHeight - 8, ly + 28)) + 'px';
   }
 
   // A zoom gesture that lands a vertical range speaks through the same manual

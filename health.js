@@ -742,7 +742,8 @@ const Health = (() => {
         radius: sel ? r + 3 : r, color: sel ? cssVar('--text', '#16202a') : cssVar('--panel', '#fff'), weight: sel ? 3 : 2,
         fillColor: statusColour(S.status), fillOpacity: 0.95,
       })
-        .bindTooltip(`${esc(S.st.name)}${own ? ` · ${esc(own.name)}` : ''} — ${esc((S.findings[0] && S.findings[0].title) || (S.status === 'irregular' ? 'no schedule learned' : 'nothing found'))}`)
+        .bindTooltip(`${esc(S.st.name)}${own ? ` · ${esc(own.name)}` : ''} — ${esc((S.findings[0] && S.findings[0].title) || (S.status === 'irregular' ? 'no schedule learned' : 'nothing found'))}`,
+          { direction: 'top', offset: [0, -(sel ? r + 3 : r)] })
         .on('click', () => select(S.st.id))
         .addTo(layer);
       pts.push([S.st.lat, S.st.lon]);
@@ -753,7 +754,8 @@ const Health = (() => {
       centres.forEach((c, host) => {
         if (!c) return;
         L.circleMarker([c.lat, c.lon], { radius: 14, color: cssVar('--accent', '#0b5cab'), weight: 2, fill: false, dashArray: '5 4' })
-          .bindTooltip(`${esc(host)} hears around here (the middle of ${c.n} addresses only one station carries)`)
+          .bindTooltip(`${esc(host)} hears around here (the middle of ${c.n} addresses only one station carries)`,
+            { direction: 'top', offset: [0, -14] })
           .addTo(layer);
       });
     }

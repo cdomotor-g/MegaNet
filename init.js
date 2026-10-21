@@ -41,6 +41,9 @@
   // pressed with the app open goes, and the icon's count when it comes back
   // to the foreground.
   Push.start();
+  // A title's words above the pointer, where the pointer does not cover them,
+  // in place of the browser's box under it (tooltips.js).
+  Tooltips.start();
   applyTheme({ repaint: false });
   // The views an account keeps (nav-views.js), from this device's copy of
   // them, before the bar is drawn — so a view picked here does not open on

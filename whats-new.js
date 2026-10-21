@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 66, date: '2026-10-21', items: [
+      '<strong>💬 Tooltips above the pointer.</strong> Rest the mouse on a button, a pin or a chart and its tooltip now '
+        + 'comes up <em>above</em> the pointer, rather than in the browser\'s box just under it, where the pointer '
+        + 'covered the first words. It follows the pointer as it moves, and goes under it only at the very top of the '
+        + 'window. The reading on the Field Data chart and the map labels that come up on hover — a fade margin, a '
+        + 'frequency, a site\'s feature, a pin on Station Health, an ACMA licence — are above the pointer now too.',
+    ] },
     { n: 65, date: '2026-10-21', items: [
       '<strong>📡 Last heard, in the station editor\'s header.</strong> Beside the station\'s name at the top of its '
         + 'details card: when Flood-Net\'s receivers last heard it, and how long ago — <em>Last heard 14:32 today · '

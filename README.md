@@ -198,6 +198,8 @@ MegaNet/
 │                             browser's confirm() and prompt() (#223)
 ├── toast.js                ← Toast     — how something just went, at the foot of the
 │                             window, in place of alert() (#223)
+├── tooltips.js             ← Tooltips  — a title's words above the pointer, in place
+│                             of the browser's tooltip under it, which it covers
 ├── packets.js              ← Packets   — ALERT / ERTS codec, and its tab
 ├── log-follow.js           ← LogFollow — follows a log file as it grows (PuTTY's,
 │                             for a computer that blocks Web Serial)

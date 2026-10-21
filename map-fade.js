@@ -248,7 +248,8 @@ const MapFade = (function () {
     // The figure itself, on hover. A colour says which of three buckets; the
     // number is what anybody who cares about the colour asks next.
     if (typeof line.bindTooltip === 'function' && margin != null) {
-      line.bindTooltip(`Fade margin ${margin > 0 ? '+' : ''}${margin.toFixed(1)} dB`, { sticky: true });
+      line.bindTooltip(`Fade margin ${margin > 0 ? '+' : ''}${margin.toFixed(1)} dB`,
+        { sticky: true, direction: 'top', offset: [0, -10] });
     }
   }
 

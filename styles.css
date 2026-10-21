@@ -11223,6 +11223,36 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 /* Reduced motion is the one policy at the foot of this file, which stills this too. */
 @keyframes toast-in { from { opacity: 0; transform: translateY(.5rem); } to { opacity: 1; transform: none; } }
 
+/* A title's words, above the pointer (tooltips.js) rather than in the
+   browser's box under it. A popover where the browser has them, so in the top
+   layer over everything, a full-screen camera included; the z-index is for
+   one without. Its place is set from the pointer, so the popover's own
+   centring is undone. pre-line keeps a title's line breaks, as the browser's
+   box did. */
+.mn-tip {
+  position: fixed;
+  inset: auto;
+  left: 0;
+  top: 0;
+  margin: 0;
+  z-index: 2300;
+  max-width: min(22rem, calc(100vw - 12px));
+  padding: .3rem .5rem;
+  overflow: visible;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
 /* A tab this browser cannot run (#223): marked in the nav, said in its tooltip
    and to a screen reader — not only by the mark. */
 .nav-needs { margin-left: auto; padding-left: .4rem; font-size: .85em; }
