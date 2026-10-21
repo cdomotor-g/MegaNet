@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-21** (revision 175 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-21** (revision 176 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -815,6 +815,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 176 — 2026-10-21: 🐞 A bug report sent with one press — no GitHub account, no second page
+
+The owner, with a screenshot of the 🐞 dialog: *"reduce the friction involved with this bug report and suggestion submission, just so that it's all automatic and goes straight to us? Either in GitHub or … an email."* **Opens nothing, closes nothing.**
+
+- **`/api/report`** (`worker/report.js`, new): files the dialog's report as an issue on this repository with a fine-grained token (`GITHUB_ISSUES_TOKEN`, Issues read and write on this repository alone), emails it through Resend (`RESEND_API_KEY` and `REPORT_EMAIL_TO`, once #237's Part 2 has verified `floodwarning.net`), or both. Open to anybody, since the dialog is for people with no account, so the brakes are on volume and reach: Flood-Net's own pages only (this origin and github.io, JSON only), **3 a minute from one address** (`REPORT_RATE_LIMIT`, a new `[[ratelimits]]`), **25 a UTC day in all** counted in the photo bucket under `_meganet/reports/` before anything is sent, GitHub's sizes, and `@mentions` and other repositories' `owner/repo#n` broken with a word joiner outside code.
+- **The dialog** (`bug-report.js`) asks the route on opening. Ready: the line says it goes straight to the team and is public, so leave out codes and contact details; the button is **Send report**; one press sends it and the dialog thanks them with the issue's link. Not ready, or a send that fails: it says why and becomes GitHub's prefilled page as before, with what was typed still there (a busy minute is only a wait). The diagnostics' page address loses any parameter that could be a credential.
+- **Left to the owner**: the token, about five minutes — `docs/bug-reports.md` (new). Until it is set the dialog behaves exactly as it did. Issues filed with the owner's token show as opened by the owner, who GitHub does not notify; the email route covers that once Resend is set up. Stamp `20261021o`.
+
+**Checks:** `test/report.mjs` (new, 48, offline, a CI step: where it goes, who may, what it may be, reach, the brakes, email); `test/dialogs.mjs` +6 in Chromium (Send, the thanks, a failure, a busy minute, not ready); `agent-docs.mjs` holds `REPORT_RATE_LIMIT` to `REPORT_RATE`; the wrangler dry run lists it; `agentapi`, `gate`, `dbproxy` and the cheap five.
 
 ### Revision 175 — 2026-10-21: 🔕 The agent API says what has gone quiet — #230 closed
 

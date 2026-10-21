@@ -1,12 +1,14 @@
 // MegaNet — bug-report.js
 //
-//   BugReport   gathers context and opens GitHub's own prefilled "New issue"
-//               page, with a copy-the-report fallback for anyone without an
-//               account.
+//   BugReport   gathers context and sends it to the Worker's /api/report,
+//               which files it for the reporter; where that is not set up or
+//               fails, GitHub's own prefilled "New issue" page, with a
+//               copy-the-report fallback for anyone without an account.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js and nowhere else: state, esc, TAB_LIST, APP_VERSION,
-// GITHUB_REPO, and the _errorLog ring buffer the global error handlers fill.
+// GITHUB_REPO, dbProxyAvailable, and the _errorLog ring buffer the global error
+// handlers fill.
 // That is deliberate rather than incidental. This is the thing people reach for
 // when the app is already misbehaving, so it does not get to depend on anything
 // newer than itself — which is also why it keeps its own copy of the modal
@@ -19,14 +21,20 @@
 // Moved out of app.js byte-for-byte by M2 (#133) of #129.
 
 // ── Bug / issue reporting ────────────────────────────────────────────────────
-// MegaNet is a static GitHub Pages app: there's no server to POST an issue to
-// and nowhere safe to keep an API token. So the report button gathers context
-// and opens GitHub's own prefilled "New issue" page — the user reviews it and
-// clicks Submit, and the issue lands on the project repo (GITHUB_REPO). A "Copy
-// report" fallback covers anyone without a GitHub account: paste it into an
-// email to the maintainer instead. Auto-collected diagnostics (which screen,
-// data state, browser, and any captured errors) turn a vague "it broke" into
-// something reproducible.
+// The report button gathers context and, where the Worker is set up to take it
+// (worker/report.js, docs/bug-reports.md), sends it there: one press of Send,
+// and it is filed as an issue on the project repo (GITHUB_REPO) or emailed to
+// the team, with no GitHub account and no second page. The dialog asks the
+// Worker on opening whether it is ready, and words itself to match.
+//
+// Where it is not — no token set yet, the day's ceiling reached, a page served
+// from somewhere the Worker does not answer for — it opens GitHub's own
+// prefilled "New issue" page as it always did: the user reviews it and clicks
+// Submit. A send that fails says why and turns the dialog into that, with the
+// report still in it. "Copy report" covers anyone without a GitHub account:
+// paste it into an email to the maintainer instead. Auto-collected diagnostics
+// (which screen, data state, browser, and any captured errors) turn a vague "it
+// broke" into something reproducible.
 const BugReport = (function () {
 
   // ghLabel values are GitHub's built-in default labels, so the prefilled
@@ -36,6 +44,36 @@ const BugReport = (function () {
     { id: 'enhancement', label: 'Idea / improvement',  prefix: 'Idea',     ghLabel: 'enhancement' },
     { id: 'question',    label: 'Question',            prefix: 'Question', ghLabel: 'question' },
   ];
+
+  // Where a report is sent: this origin when the Worker is in front of it, as
+  // for the database; the one that has it otherwise, which answers the
+  // github.io copy and refuses anywhere else — and a refusal reads as "not
+  // ready", which is GitHub's page.
+  const REPORT_URL = `${dbProxyAvailable() ? '' : 'https://floodwarning.net'}/api/report`;
+  const SEND_TIMEOUT_MS = 20000;
+
+  // How Send goes this session: 'direct' (the Worker files it) or 'github'
+  // (GitHub's prefilled page). Null until the Worker has been asked; `to` is
+  // where it said a report goes.
+  let route = null, to = [], sending = false;
+  // Bumped by each probe and each send: only the latest one's answer is acted
+  // on, so a probe answering late cannot undo what a send decided, and a send
+  // answering into a dialog closed and opened again since leaves it be.
+  let asked = 0;
+
+  // The address, less anything in it that could be a credential: auth.js takes
+  // a sign-in link's token out of the address once it has read it, and this
+  // does not rely on that having happened.
+  function pageForReport() {
+    try {
+      const u = new URL(location.href);
+      for (const k of [...u.searchParams.keys()]) {
+        if (/token|code|key|secret|pass/i.test(k)) u.searchParams.set(k, '(removed)');
+      }
+      if (/token|code|key|secret|pass/i.test(u.hash)) u.hash = '(removed)';
+      return u.href;
+    } catch (_) { return '(unknown)'; }
+  }
 
   // Snapshot of the user's current context. Ordered for readability in the issue.
   function collect() {
@@ -49,7 +87,7 @@ const BugReport = (function () {
                             : 'no',
       'App build':        APP_VERSION,
       'Theme':            state.theme,
-      'Page':             location.href,
+      'Page':             pageForReport(),
       'Browser':          navigator.userAgent,
       'Platform':         navigator.platform || '(unknown)',
       'Language':         navigator.language || '(unknown)',
@@ -76,6 +114,49 @@ const BugReport = (function () {
     return out;
   }
 
+  // The line under the title, for the way Send will go.
+  function introHtml() {
+    if (route === 'direct') {
+      const pub = to.includes('github')
+        ? ` It is posted on the project's public GitHub page, so leave out passwords, gate or padlock codes,
+            and anyone's phone number or email address.`
+        : '';
+      return `Tell us what happened and press <em>Send report</em> — it goes straight to the Flood-Net team.
+              No GitHub account needed.${pub}`;
+    }
+    return `Tell us what happened. When you submit, Flood-Net opens a pre-filled issue on the
+            project's GitHub — just review it and click <em>Submit new issue</em>. No GitHub account?
+            Use <em>Copy report</em> and email it to the maintainer instead.`;
+  }
+
+  // Bring the line, the button and Copy report into step with `route`. In
+  // place, so nothing typed in the boxes is touched.
+  function applyRoute() {
+    const intro = document.getElementById('br-intro');
+    const go = document.getElementById('br-go');
+    const copyBtn = document.getElementById('br-copy');
+    if (intro) intro.innerHTML = introHtml();
+    if (go && !sending) go.textContent = route === 'direct' ? 'Send report' : 'Open GitHub issue ↗';
+    // Sending direct, a copy is not the next step for anybody; on GitHub's
+    // route it is the way round for anyone without an account.
+    if (copyBtn) copyBtn.hidden = route === 'direct';
+  }
+
+  // Ask the Worker whether Send can go through it. Any answer but a ready one
+  // — including none, from an origin it does not answer — is GitHub's page.
+  function probe() {
+    const mine = ++asked;
+    fetch(REPORT_URL, { headers: { Accept: 'application/json' }, cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(out => out, () => null)
+      .then(out => {
+        if (mine !== asked) return;
+        route = out && out.ready ? 'direct' : 'github';
+        to = (out && Array.isArray(out.to)) ? out.to : [];
+        applyRoute();
+      });
+  }
+
   function template() {
     const typeOpts = TYPES.map(t => `<option value="${t.id}">${esc(t.label)}</option>`).join('');
     return `
@@ -85,9 +166,7 @@ const BugReport = (function () {
           <h2 id="br-title">Report a bug or idea</h2>
           <button class="modal-x" title="Close (Esc)" onclick="BugReport.close()">×</button>
         </div>
-        <p class="sub">Tell us what happened. When you submit, Flood-Net opens a pre-filled issue on the
-           project's GitHub — just review it and click <em>Submit new issue</em>. No GitHub account?
-           Use <em>Copy report</em> and email it to the maintainer instead.</p>
+        <p class="sub" id="br-intro">${introHtml()}</p>
 
         <div class="modal-form">
           <label>What kind of report is this?
@@ -115,8 +194,8 @@ const BugReport = (function () {
 
         <div class="modal-foot">
           <button onclick="BugReport.close()">Cancel</button>
-          <button onclick="BugReport.copy(this)">Copy report</button>
-          <button class="primary" onclick="BugReport.submit()">Open GitHub issue ↗</button>
+          <button id="br-copy" onclick="BugReport.copy(this)">Copy report</button>
+          <button id="br-go" class="primary" onclick="BugReport.submit()">Open GitHub issue ↗</button>
         </div>
       </div>`;
   }
@@ -130,11 +209,17 @@ const BugReport = (function () {
       root.onclick = close;   // click on the backdrop (outside the card) closes
       document.body.appendChild(root);
     }
+    // Until the Worker has answered, a guess from where the page is: this
+    // origin has the Worker in front of it; anywhere else may not.
+    if (!route) { route = dbProxyAvailable() ? 'direct' : 'github'; to = ['github']; }
+    sending = false;
     root.innerHTML = template();
+    applyRoute();
     root.style.display = 'flex';
     document.addEventListener('keydown', onKey);
     const ta = document.getElementById('br-desc');
     if (ta) ta.focus();
+    probe();
   }
 
   // preventDefault marks the key claimed: the fullscreen map's own Escape
@@ -146,6 +231,7 @@ const BugReport = (function () {
     const root = document.getElementById('bugreport-modal');
     if (root) { root.style.display = 'none'; root.innerHTML = ''; }
     document.removeEventListener('keydown', onKey);
+    sending = false;
   }
 
   function buildReport() {
@@ -191,6 +277,7 @@ const BugReport = (function () {
   }
 
   function submit() {
+    if (sending) return;
     const { url, report } = issueUrl(false);
     const ta = document.getElementById('br-desc');
     if (!report.desc) {
@@ -199,6 +286,7 @@ const BugReport = (function () {
       return;
     }
     if (ta) ta.removeAttribute('aria-invalid');
+    if (route === 'direct') { send(report); return; }
     // GitHub caps the length of a prefilled issue URL. If we're over a safe
     // budget, copy the report and open a blank issue so nothing typed is lost.
     // The copy is started first, while the page still has the focus a new tab
@@ -219,6 +307,73 @@ const BugReport = (function () {
     }
     window.open(url, '_blank', 'noopener');
     close();
+  }
+
+  // Send it through the Worker. On success the dialog becomes a thank-you with
+  // the issue's link; on failure it says why and becomes GitHub's route, with
+  // everything typed still in it — except a busy minute, which is only a wait.
+  function send(report) {
+    const go = document.getElementById('br-go');
+    const mine = ++asked;
+    sending = true;
+    say('');
+    if (go) { go.disabled = true; go.textContent = 'Sending…'; }
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), SEND_TIMEOUT_MS) : null;
+    const type = (document.getElementById('br-type') || {}).value || 'bug';
+    fetch(REPORT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ type, title: report.title, body: report.body }),
+      signal: ctl ? ctl.signal : undefined,
+    }).then(
+      res => res.json().catch(() => null).then(out => ({ status: res.status, out: out || {} })),
+      () => ({ status: 0, out: {} }),
+    ).then(({ status, out }) => {
+      if (timer) clearTimeout(timer);
+      if (mine !== asked || !document.getElementById('br-go')) return;   // closed meanwhile
+      sending = false;
+      if (status === 201) { sent(out); return; }
+      const busy = status === 429 && !out.ceiling;
+      if (!busy) route = 'github';
+      applyRoute();
+      const btn = document.getElementById('br-go');
+      if (btn) btn.disabled = false;
+      const why = status === 0 ? 'Flood-Net could not be reached (are you offline?)'
+        : busy ? 'A few reports have just been sent from this connection'
+        : out.ceiling ? 'Flood-Net has taken as many reports as it can for today'
+        : out.unconfigured ? 'Flood-Net is not set up to take reports directly yet'
+        : `Flood-Net could not file it (${out.error || `HTTP ${status}`})`;
+      const el = say(busy
+        ? `${why}. Wait a minute and press Send report again — what you typed is still here.`
+        : `${why}. What you typed is still here: press Open GitHub issue to file it there, filled in for you, `
+          + 'or Copy report to email it.', true);
+      if (el) el.focus();
+    });
+  }
+
+  // The dialog's thanks, in place of the form, with where the report went.
+  function sent(out) {
+    const card = document.querySelector('#bugreport-modal .modal-card');
+    if (!card) return;
+    for (const sel of ['#br-intro', '.modal-form']) {
+      const el = card.querySelector(sel);
+      if (el) el.hidden = true;
+    }
+    const foot = card.querySelector('.modal-foot');
+    if (foot) foot.innerHTML = '<button class="primary" onclick="BugReport.close()">Done</button>';
+    const el = say('Thank you — your report has reached the Flood-Net team.');
+    if (!el) return;
+    if (/^https:\/\/github\.com\//.test(out.url || '')) {
+      el.append(' It is ');
+      const a = document.createElement('a');
+      a.href = out.url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = `issue #${out.number} on GitHub ↗`;
+      el.append(a, ', if you would like to follow it.');
+    }
+    el.focus();
   }
 
   function copy(btn) {

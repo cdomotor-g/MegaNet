@@ -224,7 +224,7 @@ MegaNet/
 ├── message-log.js          ← MessageLog — Message Log tab (the arrival log:
 │                             every message the datastore accepted, filterable,
 │                             with a plot-and-map tray and a decode drawer)
-├── bug-report.js           ← BugReport — prefilled GitHub issue reporter
+├── bug-report.js           ← BugReport — sends a report via /api/report, or a prefilled GitHub issue
 ├── base-stations.js        ← BaseStations — Base Stations tab (every ingest point's
 │                             health; asking a base station that checks in, 0049)
 ├── network-review.js       ← NetworkReview — Network Review tab (administrators: the
@@ -3180,12 +3180,19 @@ Side panel or modal showing full station record:
 
 ### 13. In-App Bug / Idea Reporter
 The **🐞 Report a Bug** button in the header lets any user flag a problem or
-suggestion without leaving the app. Because Flood-Net is a static GitHub Pages
-site with no backend (and nowhere safe for an API token), the reporter gathers
-context and opens GitHub's own pre-filled **New Issue** page — the user reviews
-it and clicks *Submit new issue*, so the report lands straight on the project
-repo. Anyone without a GitHub account can use **Copy report** and paste it into
-an email instead.
+suggestion without leaving the app. They type what happened and press **Send
+report**: the Worker's `/api/report` (`worker/report.js`) files it as an issue on
+the project repo, emails it to the team, or both — no GitHub account and no
+second page — and the dialog thanks them with the issue's link. Which of the two
+it does is the Worker's secrets; [docs/bug-reports.md](docs/bug-reports.md) has
+the setup and the brakes (Flood-Net's own pages only, 3 a minute from one
+address, 25 a day in all).
+
+Until those secrets are set, and whenever a send fails or the day's reports are
+taken, the dialog does what it always did: it opens GitHub's own pre-filled
+**New Issue** page — the user reviews it and clicks *Submit new issue* — and
+anyone without a GitHub account can use **Copy report** and paste it into an
+email instead.
 
 Each report auto-collects the context that turns a vague "it broke" into
 something reproducible, all shown in a **"Preview exactly what will be shared"**
@@ -3200,9 +3207,10 @@ panel before anything leaves the browser:
   its stack travel with the report even when the user only saw a blank panel
 
 Report type (Bug / Idea / Question) maps to the matching GitHub default label
-(`bug` / `enhancement` / `question`). Long reports that would exceed GitHub's
-pre-filled-URL limit are copied to the clipboard automatically so nothing the
-user typed is lost.
+(`bug` / `enhancement` / `question`). On GitHub's route, long reports that would
+exceed its pre-filled-URL limit are copied to the clipboard automatically so
+nothing the user typed is lost. The page address in the diagnostics has any
+parameter that could be a credential replaced with `(removed)`.
 
 ### 14. Collapsible Side Navigation
 The tabs are a left-hand rail, grouped under headings, because a flat row of

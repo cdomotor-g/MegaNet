@@ -11373,6 +11373,9 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 /* The bug reporter's own message line (bug-report.js keeps its own markup). */
 .br-msg { margin: .8rem 0 0; font-size: .9rem; }
 .br-msg.is-bad { color: var(--bad); }
+/* Copy report while sending direct, the form once it has gone: the dialog's
+   own rules (.modal-form's grid, a button's display) would otherwise win. */
+#bugreport-modal [hidden] { display: none; }
 
 /* ── "How the 357 filter works" ──────────────────────────────────────────────
    Prose narrower than the figures: a paragraph is unreadable at the width a

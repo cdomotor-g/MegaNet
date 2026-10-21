@@ -56,6 +56,10 @@
 // readings, submissions and receptions, written with the project's secret key
 // before the database lets it go; worker/archive.js, db/migrations/0073.
 //
+// A seventh: /api/report, the 🐞 dialog's Send — a report filed as a GitHub
+// issue, emailed, or both, for somebody with no account anywhere; brakes on
+// volume rather than a sign-in. worker/report.js, docs/bug-reports.md.
+//
 // And one that is not a door at all: scheduled() below, every minute
 // (wrangler.toml's [triggers]), sends the administrators' notifications —
 // worker/push.js, db/migrations/0066_push_notifications.sql. Nothing a
@@ -65,6 +69,7 @@ import { isApiPath, handleApi } from './api.js';
 import { isPhotoPath, handlePhotos } from './photos.js';
 import { isArchivePath, handleArchive } from './archive.js';
 import { isBriefingPath, handleBriefing } from './briefing.js';
+import { isReportPath, handleReport } from './report.js';
 import { runPush } from './push.js';
 
 export { BriefingLedger } from './briefing.js';
@@ -475,6 +480,10 @@ export default {
     // briefing's one request shape, a ceiling on the day. Not part of the agent
     // API above, which it shares nothing with but two public constants.
     if (isBriefingPath(url.pathname)) return handleBriefing(request, env, ctx, accessIdentity);
+
+    // The bug reporter's Send (worker/report.js): anybody, from this origin or
+    // the github.io copy, a few a minute and DAY_MAX a day.
+    if (isReportPath(url.pathname)) return handleReport(request, env);
 
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.

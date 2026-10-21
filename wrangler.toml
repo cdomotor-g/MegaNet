@@ -100,6 +100,19 @@ namespace_id = "1103"
   limit = 240
   period = 60
 
+# The bug reporter's Send (worker/report.js, /api/report): a few reports a
+# minute from one address, keyed on a hash of it. Not part of the agent API —
+# REPORT_RATE in worker/report.js holds the same numbers, and
+# test/agent-docs.mjs checks the two agree.
+
+[[ratelimits]]
+name = "REPORT_RATE_LIMIT"
+namespace_id = "1104"
+
+  [ratelimits.simple]
+  limit = 3
+  period = 60
+
 # The administrators' notifications (worker/push.js, 0066): every minute the
 # Worker's scheduled() asks the database which devices have something to hear
 # and sends it through Apple's, Google's, Mozilla's or Microsoft's push

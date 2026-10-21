@@ -1414,6 +1414,16 @@ jobs:
         working-directory: test
         run: npm run push
 
+      # And /api/report (worker/report.js): the bug reporter's Send, open to
+      # anybody with no sign-in, filing under the project's own token. What it
+      # must not do fails in silence — file from another site's page, past a
+      # few a minute or the day's ceiling, or mention somebody on GitHub under
+      # the token's name — because a report still arrives. Offline: GitHub,
+      # Resend and the bucket are stand-ins.
+      - name: The bug reporter's Send — Flood-Net's pages only, a few a minute, a ceiling on the day
+        working-directory: test
+        run: npm run report
+
       # The third server-side door: /api/v1 and /api/mcp (worker/api.js), public
       # and read-only, for AI agents and scripts. What it must never do fails in
       # silence — forward a caller's token, read a private relation, write

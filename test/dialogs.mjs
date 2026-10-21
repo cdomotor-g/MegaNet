@@ -20,7 +20,8 @@
 //      dismissed; three at most.
 //   5. **Where they are used** — the map's drawings (Remove all; a text note
 //      from a click on the map), the map's reset, a station list that will not
-//      load, the bug reporter's own line, and the Workbench's case name.
+//      load, the bug reporter's own line — and its Send through the Worker,
+//      thanks or a failure said in that line — and the Workbench's case name.
 //   6. **A browser that cannot run a tab** — with no Web Serial the nav marks
 //      the Serial Monitor, in its tooltip and its accessible name as well as
 //      the mark, and the tab says why on arrival; with it, nothing is marked.
@@ -362,6 +363,80 @@ async function main() {
     check('the bug reporter says what it needs in its own line, describing the box, with the cursor put there',
       B.shown && /Describe what went wrong/.test(B.text) && B.invalid === 'true' && B.described === 'br-msg' && B.focus, J(B));
     await page.evaluate(() => BugReport.close());
+
+    // Send, through the Worker (worker/report.js). From this loopback origin the
+    // dialog asks floodwarning.net, which the network policy aborts — so the
+    // check above ran on GitHub's route — and which is answered here instead.
+    const REPORT = 'https://floodwarning.net/api/report';
+    const posted = [];
+    let ready = { ready: true, to: ['github'] };
+    let reply = { status: 201, body: { to: ['github'], number: 321, url: 'https://github.com/cdomotor-g/MegaNet/issues/321' } };
+    await page.route(REPORT, route => {
+      const req = route.request();
+      if (req.method() === 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: J(ready) });
+      posted.push(JSON.parse(req.postData() || 'null'));
+      return route.fulfill({ status: reply.status, contentType: 'application/json', body: J(reply.body) });
+    });
+    const popups = [];
+    page.on('popup', p => popups.push(p.url()));
+    const dialogState = () => page.evaluate(() => {
+      const go = document.getElementById('br-go'), copy = document.getElementById('br-copy');
+      const m = document.getElementById('br-msg'), a = m && m.querySelector('a');
+      const vis = el => !!el && getComputedStyle(el).display !== 'none' && !el.closest('[hidden]');
+      return { go: go && go.textContent, copy: vis(copy), intro: (document.getElementById('br-intro') || {}).textContent || '',
+               form: vis(document.querySelector('#bugreport-modal .modal-form')), msg: m && !m.hidden ? m.textContent : '',
+               bad: !!m && m.classList.contains('is-bad'), href: a && a.getAttribute('href'),
+               desc: (document.getElementById('br-desc') || {}).value, focus: document.activeElement === m };
+    });
+
+    await page.evaluate(() => BugReport.open());
+    await page.waitForFunction(() => (document.getElementById('br-go') || {}).textContent === 'Send report', null, { timeout: 5_000 }).catch(() => {});
+    let D = await dialogState();
+    check('where the Worker says it is ready, the button is Send report, Copy report is gone, and the line says it is public',
+      D.go === 'Send report' && !D.copy && /straight to the Flood-Net team/.test(D.intro) && /public GitHub page/.test(D.intro) && /padlock codes/.test(D.intro), J(D));
+    await page.selectOption('#br-type', 'enhancement');
+    await page.fill('#br-desc', 'Show the battery voltage on the card');
+    await page.click('#br-go');
+    await page.waitForFunction(() => /reached the Flood-Net team/.test((document.getElementById('br-msg') || {}).textContent || ''), null, { timeout: 5_000 }).catch(() => {});
+    D = await dialogState();
+    const SENT = posted[0] || {};
+    check('one press sends it: kind, title and the report with its diagnostics, and no page of GitHub\'s opens',
+      posted.length === 1 && SENT.type === 'enhancement' && SENT.title === '[Idea] Show the battery voltage on the card'
+        && /Show the battery voltage/.test(SENT.body) && /### Diagnostics/.test(SENT.body) && popups.length === 0, J({ SENT, popups }));
+    check('… and the dialog thanks them, with the issue\'s link, the form put away and the thanks focused',
+      /reached the Flood-Net team/.test(D.msg) && !D.bad && D.href === reply.body.url && /#321/.test(D.msg) && !D.form && D.go === null && D.focus, J(D));
+    await page.evaluate(() => BugReport.close());
+
+    reply = { status: 503, body: { error: 'nowhere to send a report yet', unconfigured: true } };
+    await page.evaluate(() => BugReport.open());
+    await page.waitForFunction(() => (document.getElementById('br-go') || {}).textContent === 'Send report', null, { timeout: 5_000 }).catch(() => {});
+    await page.fill('#br-desc', 'The map is blank');
+    await page.click('#br-go');
+    await page.waitForFunction(() => /still here/.test((document.getElementById('br-msg') || {}).textContent || ''), null, { timeout: 5_000 }).catch(() => {});
+    D = await dialogState();
+    check('a send that fails says why, keeps what was typed, and turns into GitHub\'s route with Copy report back',
+      /not set up to take reports directly/.test(D.msg) && D.bad && D.focus && D.desc === 'The map is blank'
+        && D.go === 'Open GitHub issue ↗' && D.copy && /Submit new issue/.test(D.intro) && popups.length === 0, J(D));
+    await page.evaluate(() => BugReport.close());
+
+    reply = { status: 429, body: { error: 'busy', retry_after: 60 } };
+    await page.evaluate(() => BugReport.open());
+    await page.waitForFunction(() => (document.getElementById('br-go') || {}).textContent === 'Send report', null, { timeout: 5_000 }).catch(() => {});
+    await page.fill('#br-desc', 'Twice');
+    await page.click('#br-go');
+    await page.waitForFunction(() => /Wait a minute/.test((document.getElementById('br-msg') || {}).textContent || ''), null, { timeout: 5_000 }).catch(() => {});
+    D = await dialogState();
+    check('a busy minute is only a wait: Send report stays, to press again', /Wait a minute/.test(D.msg) && D.go === 'Send report' && !D.copy, J(D));
+    await page.evaluate(() => BugReport.close());
+
+    ready = { ready: false, to: ['github'], reason: 'ceiling' };
+    await page.evaluate(() => BugReport.open());
+    await page.waitForFunction(() => (document.getElementById('br-go') || {}).textContent === 'Open GitHub issue ↗', null, { timeout: 5_000 }).catch(() => {});
+    D = await dialogState();
+    check('where the Worker says it is not ready, the dialog is GitHub\'s route from the start',
+      D.go === 'Open GitHub issue ↗' && D.copy && /Submit new issue/.test(D.intro), J(D));
+    await page.evaluate(() => BugReport.close());
+    await page.unroute(REPORT);
 
     await page.evaluate(() => switchTab('workbench'));
     await page.fill('#wb-case-name', '');

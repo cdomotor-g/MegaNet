@@ -26,6 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { repo } from './lib/paths.mjs';
 import * as api from '../worker/api.js';
+import { REPORT_RATE } from '../worker/report.js';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const results = [];
@@ -122,8 +123,14 @@ for (const rule of api.RATE_LIMITS) {
   check(`wrangler.toml declares ${rule.binding} as ${rule.limit} / ${rule.period} s`,
     b && b.limit === rule.limit && b.period === rule.period, b ? `${b.limit} / ${b.period}` : 'not declared');
 }
+// The bug reporter's limit shares the file, not the agent API's documents.
+const report = blocks.find(x => x.name === REPORT_RATE.binding);
+check(`wrangler.toml declares ${REPORT_RATE.binding} as ${REPORT_RATE.limit} / ${REPORT_RATE.period} s`,
+  report && report.limit === REPORT_RATE.limit && report.period === REPORT_RATE.period,
+  report ? `${report.limit} / ${report.period}` : 'not declared');
 check('wrangler.toml declares no rate limit the code does not read',
-  blocks.every(b => api.RATE_LIMITS.some(r => r.binding === b.name)), blocks.map(b => b.name).join(', '));
+  blocks.every(b => b.name === REPORT_RATE.binding || api.RATE_LIMITS.some(r => r.binding === b.name)),
+  blocks.map(b => b.name).join(', '));
 check('each rate limit period is one Cloudflare accepts (10 or 60)', blocks.every(b => b.period === 10 || b.period === 60));
 check('each namespace_id is a distinct positive integer',
   blocks.every(b => /^[1-9]\d*$/.test(b.namespace || '')) && new Set(blocks.map(b => b.namespace)).size === blocks.length);
