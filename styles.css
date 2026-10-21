@@ -2683,7 +2683,22 @@ h2.h-bad {
    Thirty-four inline styles, all of them one of five things: a hint under a
    field, a sub-heading inside a section, a flex row, a destructive button, or
    the sensor row's column widths. Stated once here. */
-.ef-head    { margin-bottom: var(--sp-1); }
+.ef-head    { margin-bottom: var(--sp-1); container: ef-head / inline-size; }
+/* The name and its buttons, and when the station was last heard (#ef-heard)
+   on the line under them — beside the name instead once the card is wide
+   enough for all three on one line: the card under the map, or a side panel
+   dragged wide. The stamp and the "how long ago" each stay whole. */
+.ef-head-in { flex: 1 1 auto; min-width: 0; display: grid; align-items: center;
+              grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name actions" "heard heard";
+              column-gap: var(--sp-3); }
+.ef-head-in > h3            { grid-area: name; }
+.ef-head-in > .button-group { grid-area: actions; }
+.ef-heard   { grid-area: heard; }
+.ef-heard time, .ef-heard time + span { white-space: nowrap; }
+@container ef-head (min-width: 40rem) {
+  .ef-head-in { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "name heard actions";
+                align-items: baseline; }
+}
 .ef-status  { margin-bottom: var(--sp-2); }
 .ef-lead    { margin: var(--sp-1) 0 var(--sp-2); }
 .ef-block   { margin: 0 0 var(--sp-2); }

@@ -579,7 +579,8 @@ const HELP = {
       + 'dashed to watch, heavy at fault, hollow for no data. The same request fills the station list\'s '
       + '<strong>Last heard</strong> column: how long since Flood-Net heard each station — green inside two '
       + 'of its checks, ⚠ amber from two, ⛔ red from four or a day, grey for one heard too seldom to judge, '
-      + 'and <em>never</em> for one its receivers have not heard. Hover a cell for the time.',
+      + 'and <em>never</em> for one its receivers have not heard. Hover a cell for the time. The station '
+      + 'editor says the same beside the station\'s name, with the time: <em>Last heard 14:32 today · 9 min ago</em>.',
       '<strong>From zoom 17 the map offers the station\'s digital twin</strong> — the ground to '
       + '1 m where the State holds LiDAR, the aerial imagery, the station as built and the radio paths '
       + 'as this map colours them — whenever a station is under the view: the one on the card, the '

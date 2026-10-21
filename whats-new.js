@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 65, date: '2026-10-21', items: [
+      '<strong>📡 Last heard, in the station editor\'s header.</strong> Beside the station\'s name at the top of its '
+        + 'details card: when Flood-Net\'s receivers last heard it, and how long ago — <em>Last heard 14:32 today · '
+        + '9 min ago</em> — coloured as its row in the list is. Its card on the map already says the same, at the top '
+        + 'of its health lines.',
+    ] },
     { n: 64, date: '2026-10-21', items: [
       '<strong>📈 A sparkline on every sensor row.</strong> In the station editor\'s <em>ALERT IDs / Sensors</em>, '
         + 'each row now shows the last seven days of what that sensor has sent to Flood-Net, with its latest reading '

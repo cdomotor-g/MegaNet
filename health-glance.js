@@ -7,7 +7,8 @@
 //                  station picked; *Colour pins by health* in 🗺️ Map
 //                  display, every pin OK, watch, fault or no data; and the
 //                  station list's **Last heard** column, how long since
-//                  Flood-Net heard each row's station.
+//                  Flood-Net heard each row's station — and the same again,
+//                  stamped, in the station editor's header.
 //
 // After core.js (state, esc, escAttr, announce, stationSensors), app.js
 // (stationAlertIds, refreshMapLayers, rerenderMapLegend, toggleMapFullscreen,
@@ -19,7 +20,8 @@
 // refreshMapLayers() calls reset() once per rebuild and pinStyle() per pin;
 // mapDisplayControlsHtml() and mapLegendHtml() draw the switch's note and its
 // key; stationsTable() asks for the batch (askNet), heardCellHtml() is each of
-// its Last heard cells, and onHeard() is what repaints them in place.
+// its Last heard cells, and onHeard() is what repaints them in place;
+// editorForm() (station-editor.js) places heardHeadHtml() in its header.
 //
 // ── Why this exists ─────────────────────────────────────────────────────────
 // The Station Health tab ranks silent stations, sliding batteries and the rest
@@ -634,22 +636,69 @@ const HealthGlance = (() => {
     if (h.cls === 'never') {
       return '<span class="txt-muted" title="Flood-Net’s receivers have not heard this station">never</span>';
     }
+    if (h.cls === 'brief') {
+      return `<span class="txt-muted" title="${esc(heardTitle(h, now))}">${agoHtml(now - h.lastHeard)}</span>`;
+    }
+    const C = CLS[h.cls];
+    return `<span class="${C.txt}" title="${esc(heardTitle(h, now))}">${heardMark(h.cls)}${agoHtml(now - h.lastHeard)}</span>`;
+  }
+
+  // What a cell with a time says when pointed at: when, and how that sits
+  // against its checks — or, heard too seldom, that it cannot be judged.
+  function heardTitle(h, now) {
     const when = `Last heard ${HealthAnalysis.fmtWhen(h.lastHeard, now)}`;
     if (h.cls === 'brief') {
       const once = h.lastHeard - h.firstHeard < MIN;
-      return `<span class="txt-muted" title="${esc(`${when} — ${once ? 'heard once' : 'heard only briefly'}, `
-        + 'too seldom to say when it is overdue.')}">${agoHtml(now - h.lastHeard)}</span>`;
+      return `${when} — ${once ? 'heard once' : 'heard only briefly'}, too seldom to say when it is overdue.`;
     }
     // The bars themselves, in hours: "four of its checks or a day" is not what
     // an assumed check does — its fault waits the whole day.
     const b = bars(h.P), span = HealthAnalysis.fmtSpan;
-    const C = CLS[h.cls];
-    const mark = h.cls === 'ok' ? ''
-      : `<span aria-hidden="true">${C.icon}</span><span class="sr-only">${esc(C.word)}:</span> `;
-    return `<span class="${C.txt}" title="${esc(`${when}. `
+    return `${when}. `
       + (h.P ? `It checks every ${HealthAnalysis.fmtPeriod(h.P)}:` : 'Until its card has been opened and its own checks learned,')
       + ` amber once quiet ${span(b.watch)}, red from ${span(b.fault)}. `
-      + 'Whether its receivers were listening is Station Health’s to weigh.')}">${mark}${agoHtml(now - h.lastHeard)}</span>`;
+      + 'Whether its receivers were listening is Station Health’s to weigh.';
+  }
+
+  // A watch's or a fault's glyph, and its word for a screen reader.
+  function heardMark(cls) {
+    if (cls === 'ok' || !CLS[cls]) return '';
+    const C = CLS[cls];
+    return `<span aria-hidden="true">${C.icon}</span><span class="sr-only">${esc(C.word)}:</span> `;
+  }
+
+  // ── The station editor's header ───────────────────────────────────────────
+  // The row's cell again, said in full where there is room for it: when the
+  // station was last heard, as a stamp, then how long ago, coloured and marked
+  // as the cell is. The same heard(), so the header and the row it was picked
+  // from never disagree. Nothing for a draft not yet saved or a proposal —
+  // neither has anything to have heard — and "asking…" while the batch is on
+  // its way: this is one line somebody is reading, not a column of blanks.
+  //
+  // The stamp is fmtWhen's — "14:32 today", "06:10 Mon 19 Oct" — with the year
+  // once it is not this one, because "2 yr ago" beside a date with no year is
+  // a puzzle.
+  function heardHeadHtml(s) {
+    if (!s || !s.id || s.proposed) return '';
+    const now = now_();
+    const h = heard(s, now);
+    const label = '<span class="txt-muted">Last heard</span> ';
+    if (h.cls === 'asking') return `${label}<span class="txt-muted">asking…</span>`;
+    if (h.cls === 'unknown') {
+      return `${label}<span class="txt-muted" title="${net.denied
+        ? 'The datastore would not let this browser read when stations were last heard'
+        : 'The datastore could not be reached, so when this station was last heard is not known'}">not known</span>`;
+    }
+    if (h.cls === 'never') {
+      return `${label}<span class="txt-muted" title="Flood-Net’s receivers have not heard this station">never</span>`;
+    }
+    const ms = now - h.lastHeard;
+    const y = new Date(h.lastHeard).getFullYear();
+    const stamp = HealthAnalysis.fmtWhen(h.lastHeard, now) + (y !== new Date(now).getFullYear() ? ` ${y}` : '');
+    const C = CLS[h.cls];
+    return `<span title="${esc(heardTitle(h, now))}">${label}`
+      + `<time datetime="${esc(new Date(h.lastHeard).toISOString())}">${esc(stamp)}</time> · `
+      + `<span class="${C ? C.txt : 'txt-muted'}">${heardMark(h.cls)}${ms < 90 * 1000 ? 'just now' : `${esc(agoShort(ms))} ago`}</span></span>`;
   }
 
   // Told each time something new is known about when a station was heard: the
@@ -971,8 +1020,8 @@ const HealthGlance = (() => {
     pinStyle, reset, setPins, askAgain, noteHtml, legendHtml, altText,
     // the counts, for Home and the Instrument look's banner
     onNet, askNet, counts,
-    // the station list's Last heard column
-    heardCellHtml, onHeard,
+    // the station list's Last heard column, and the editor's header
+    heardCellHtml, heardHeadHtml, onHeard,
     // the rules, for test/healthcard.mjs and for #215 to keep honest
     classify, bars, glanceFrom, quietFinding, findingsOf, fromServer,
     classOf: id => classOf(id),

@@ -40,7 +40,8 @@
 // editorReadForm() reads back and editorSave() asks formProblem() about first;
 // and to frequencies.js for Frequencies — the RX/TX rows in the Repeater
 // Configuration and a base station's own section (0033), read back and asked
-// about the same way.
+// about the same way; and to health-glance.js for HealthGlance — when the
+// station was last heard, in the header (heardHeadHtml, askNet, onHeard).
 //
 // This file is the form, not its host. The card is rendered by the Stations
 // tab, which is frozen in app.js for the whole of #129 — so a change to where
@@ -408,6 +409,27 @@ function repeaterCarriedStationsHtml(s) {
         </div>`;
 }
 
+// When Flood-Net last heard the station, beside its name: the time and how
+// long ago, from the one batch the station list's Last heard column reads
+// (HealthGlance.heardHeadHtml), so the header says what the row it was
+// picked from says. Painted in place when the batch lands or the station's
+// map card learns more — a redraw would throw away whatever is being typed.
+let editorHeardWatching = false;
+function editorHeardHtml(s) {
+  if (typeof HealthGlance === 'undefined' || !HealthGlance.heardHeadHtml || !s.id || s.proposed) return '';
+  if (!editorHeardWatching) { HealthGlance.onHeard(editorHeardPaint); editorHeardWatching = true; }
+  HealthGlance.askNet();
+  return `<span id="ef-heard" class="small ef-heard">${HealthGlance.heardHeadHtml(s)}</span>`;
+}
+
+function editorHeardPaint(id) {
+  const el = document.getElementById('ef-heard');
+  if (!el || !state.editorId || !state.data) return;
+  if (id != null && String(id) !== String(state.editorId)) return;
+  const s = state.data.stations.find(x => x.id === state.editorId);
+  if (s) el.innerHTML = HealthGlance.heardHeadHtml(s);
+}
+
 function editorForm(s) {
   const hasRep  = s.roles.includes('repeater');
   const hasBase = s.roles.includes('base');
@@ -442,8 +464,9 @@ function editorForm(s) {
   MapWind.askRegion('ef-wind', s.lat, s.lon);
   editorOwnerAsk(s);
   return `
-    <div class="panel-header ef-head">
+    <div class="panel-header ef-head"><div class="ef-head-in">
       <h3>${esc(s.name) || (s.proposed ? 'New Proposed Station' : 'New Station')}</h3>
+      ${editorHeardHtml(s)}
       <div class="button-group">
         <!-- Signed out, the button is not disabled and does not fail at the
              network: it says what is missing and opens the panel that supplies
@@ -455,7 +478,7 @@ function editorForm(s) {
         ${s.id ? `<button id="ef-delete" class="btn-danger" onclick="editorDelete()" ${state.editorBusy ? 'disabled' : ''}
                           >Delete</button>` : ''}
       </div>
-    </div>
+    </div></div>
     <!-- Save writes to the database and waits for it, so this line is where the
          answer arrives: saved and when, refused and why. A failed save leaves
          everything below untouched — the typing is the thing being protected. -->

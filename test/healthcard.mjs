@@ -45,6 +45,10 @@
 //      judge, "never" only once the datastore has said so, an em dash for a
 //      proposed one; repainted in place, never by rebuilding the table, when
 //      the batch is asked again or a station's card answers.
+//   9. **The station editor's header** — the same answer beside the station's
+//      name, with the time it was heard: "Last heard 14:32 today · 9 min
+//      ago"; nothing for a proposed station; repainted in place, so whatever
+//      is being typed in the form stays.
 //
 // Why a check of its own: every failure here is a page that looks right. A pin
 // coloured green for want of an answer, a card that asks the datastore on every
@@ -523,6 +527,49 @@ try {
   }, R.silent);
   check('switched off by a real click: the roles’ colours and the role key back, remembered off',
     offAgain.cls === null && offAgain.fill === offAgain.role && offAgain.roles && offAgain.stored === 'off', J(offAgain));
+
+  // ── 4b. The station editor's header ───────────────────────────────────
+  log('\n4b. The station editor’s header: when it was last heard, and how long ago\n');
+  const head = id => page.evaluate(id => {
+    if (state.selectedId !== id) selectStation(id);
+    const flat = t => (t || '').replace(/\s+/g, ' ').trim();
+    const read = html => { const d = document.createElement('div'); d.innerHTML = html; return flat(d.textContent); };
+    const el = document.getElementById('ef-heard');
+    const t = el && el.querySelector('time');
+    return { text: el ? flat(el.textContent) : null, inHead: !!(el && el.closest('.ef-head')),
+             at: t ? Date.parse(t.getAttribute('datetime')) : null,
+             cell: read(HealthGlance.heardCellHtml(state.data.stations.find(s => s.id === id))) };
+  }, id);
+  const hSilent = await head(R.silent), hSteady = await head(R.steady);
+  check('in the header beside the name: the time it was heard, then the row’s own "how long ago"',
+    hSilent.inHead && /^Last heard \d\d:\d\d \S/.test(hSilent.text) && hSilent.text.endsWith(` · ${hSilent.cell}`)
+      && /⛔/.test(hSilent.text) && Number.isFinite(hSilent.at), J(hSilent));
+  check('…heard lately, the same, as the row says it',
+    hSteady.inHead && /^Last heard \d\d:\d\d today · (just now|\d+ (min|h) ago)$/.test(hSteady.text)
+      && hSteady.text.endsWith(hSteady.cell === 'now' ? 'just now' : hSteady.cell), J(hSteady));
+  const prop = await page.evaluate(() => (state.data.stations.find(s => s.proposed) || {}).id || null);
+  if (prop) {
+    const hProp = await head(prop);
+    check('a proposed station’s header says nothing about hearing it', hProp.text === null, J(hProp));
+  }
+  // The batch answering again, or the station's card, repaints the line in
+  // place: the form is not redrawn, so what is being typed stays.
+  await head(R.silent);
+  const typed = await page.evaluate(async id => {
+    const name = document.getElementById('ef-name'), el = document.getElementById('ef-heard');
+    const was = name.value;
+    name.value = `${was} (typing)`;
+    el.textContent = 'stale';
+    HealthGlance.retry(id);
+    const t0 = Date.now();
+    while (el.textContent === 'stale' && Date.now() - t0 < 10_000) await new Promise(r => setTimeout(r, 50));
+    const out = { kept: document.getElementById('ef-name') === name && name.value === `${was} (typing)`,
+                  same: document.getElementById('ef-heard') === el, repainted: /^Last heard /.test(el.textContent) };
+    name.value = was;
+    selectStation(id);   // and closed again
+    return out;
+  }, R.silent);
+  check('its card answering repaints the line in place — nothing being typed is lost', typed.kept && typed.same && typed.repainted, J(typed));
 
   // ── 5. The doors ──────────────────────────────────────────────────────
   log('\n5. Each line opens Station Health on that station\n');
