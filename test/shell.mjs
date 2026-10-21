@@ -109,6 +109,13 @@ const TEXT_PAIRS = [
   ['--warn', '--bg'], ['--warn', '--panel'],
   ['--role-field', '--panel'], ['--role-repeater', '--panel'],
   ['--role-base', '--panel'], ['--role-satcom', '--panel'],
+  // The Stations cards' three grounds (.card-kind): each card restates --panel
+  // as its own, so everything above that is written on --panel is written on
+  // these there — the list's role-coloured names, the editor's warnings, the
+  // orphan note in red.
+  ...['--panel-register', '--panel-links', '--panel-station'].flatMap(bg =>
+    ['--text', '--muted', '--accent', '--ok', '--bad', '--warn',
+     '--role-field', '--role-repeater', '--role-base', '--role-satcom'].map(fg => [fg, bg])),
   // The F, R and B the AR station finder writes on each role's own colour —
   // its pins, its sheet and its toggles (station-ar.js).
   ['--role-field-ink', '--role-field'], ['--role-repeater-ink', '--role-repeater'],

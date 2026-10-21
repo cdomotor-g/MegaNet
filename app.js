@@ -3793,7 +3793,7 @@ function renderStationsHtml() {
              for #181's reason, and each is remembered. The filters keep the
              id #stations-filter-card: it is the block every search box and
              clear button is found inside. -->
-        <div class="panel stn-list-card" id="stations-list-card">
+        <div class="panel stn-list-card card-kind card-kind-register" id="stations-list-card">
           <div class="stn-list-head">
             <h3 class="stn-list-title" id="stations-table-h">
               <button type="button" class="stn-list-toggle" id="stations-list-toggle"
@@ -3846,15 +3846,15 @@ function renderStationsHtml() {
              two cards it quotes rather than sitting over the map it was
              clicked on. -->
         <div class="stn-cards" id="stations-path-cards">
-          <div class="panel path-card" id="path-card" hidden></div>
-          <div class="panel" id="path-profile-panel"></div>
-          <div class="panel" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
+          <div class="panel path-card card-kind card-kind-links" id="path-card" hidden></div>
+          <div class="panel card-kind card-kind-links" id="path-profile-panel"></div>
+          <div class="panel card-kind card-kind-links" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
         </div>
-        <div class="panel" id="stations-carriers-card" ${carriers ? '' : 'hidden'}>
+        <div class="panel card-kind card-kind-links" id="stations-carriers-card" ${carriers ? '' : 'hidden'}>
           ${carriers}
         </div>
-        <div class="panel" id="blast-card" hidden></div>
-        <div class="panel" id="stations-editor-card">
+        <div class="panel card-kind card-kind-links" id="blast-card" hidden></div>
+        <div class="panel card-kind card-kind-station" id="stations-editor-card">
           ${renderStationEditorCard()}
         </div>
        </div>

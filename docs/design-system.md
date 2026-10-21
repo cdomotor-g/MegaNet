@@ -382,6 +382,20 @@ there with nothing to do.
 `.panel-header` is a flex row, spaced apart, wrapping, with `h2`/`h3` margins
 zeroed. A panel's heading and its count/actions go in it.
 
+`.card-kind` says what a card is *about*, where a column of look-alike cards
+would otherwise read as one long form. The Stations tab is the one user: its
+list is `card-kind-register` (blue — every station), Repeaters listening, the
+blast radius, the radio path, the profile and the link budget are
+`card-kind-links` (violet — the links between stations), and the editor is
+`card-kind-station` (gold — the one station picked, the leader's gold that the
+same station's card wears on the map). Each kind is a ground a breath off
+`--panel` (`--panel-register`, `--panel-links`, `--panel-station`) and a band in
+its colour along the top edge (`--edge-*`). The card restates `--panel` as its
+ground rather than painting over it, so its buttons and inputs sit on the same
+colour; the grounds are in the contrast contract for every ink a card writes,
+and the bands, like the role fills, are categorical and are not. The heading
+still names the card — the colour is a second channel, never the only one.
+
 ### Buttons
 
 The base `button` is `--panel` on `--ctl-border` at `--r-md`. `button.primary`

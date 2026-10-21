@@ -55,6 +55,18 @@
   --header: #0b5cab;
   --thead: #f8fafc;
   --shadow: 0 1px 2px rgba(0,0,0,.04);
+  /* What a Stations card is about (.card-kind, below): a ground a breath off
+     --panel and a band along its top edge, one pair per kind — the whole
+     register in blue, the radio links between stations in violet, and the
+     one station picked in the leader's gold. The grounds carry text, so they
+     are in the contrast contract; the bands are categorical, like the role
+     fills, and are not. */
+  --panel-register: #f2f7fe;
+  --panel-links:    #f8f4fd;
+  --panel-station:  #fdf7e8;
+  --edge-register:  #0b5cab;
+  --edge-links:     #6d28d9;
+  --edge-station:   #f0bf3c;
   --rx-bg: #eef4fb;
   --tx-bg: #eef8f1;
   --map-line: #ff6f00;
@@ -562,6 +574,12 @@
   --header: #133f6d;
   --thead: #1d2a36;
   --shadow: 0 1px 2px rgba(0,0,0,.18);
+  --panel-register: #1f2e3e;
+  --panel-links:    #252b3f;
+  --panel-station:  #2c2b25;
+  --edge-register:  #6bb6ff;
+  --edge-links:     #a78bfa;
+  --edge-station:   #f0bf3c;
   --rx-bg: #1d3242;
   --tx-bg: #19362a;
   --map-line: #ff9f43;
@@ -9463,6 +9481,32 @@ body:has(.map-panel.is-full) .dock-inner {
   align-content: start;
   min-width: 0;
 }
+
+/* What each card is about. Stacked in one column, the cards looked like one
+   long form about the picked station, when only the last of them is: the list
+   is the whole register, and Repeaters listening, the blast radius and the
+   path tools are about the links *between* stations. So each kind gets a
+   ground of its own and a band in its colour along the top edge —
+
+     register  blue    the list and its filters: every station
+     links     violet  who hears whom: Repeaters listening, the blast
+                       radius, the radio path, its profile and link budget
+     station   gold    the editor: the one station picked — the leader's gold,
+                       the crown the same station's card wears on the map
+
+   The card restates --panel rather than painting a background over it, so
+   everything inside that is drawn on --panel — the buttons, the inputs, a
+   sticky cell — sits on the card's own ground instead of punching a hole
+   through it. Paint only: the band is a top border and an inset shadow, so
+   no card moves by a pixel when it takes a kind. */
+.card-kind {
+  --panel: var(--kind-panel);
+  border-top-color: var(--kind-edge);
+  box-shadow: inset 0 3px 0 var(--kind-edge), var(--shadow);
+}
+.card-kind-register { --kind-panel: var(--panel-register); --kind-edge: var(--edge-register); }
+.card-kind-links    { --kind-panel: var(--panel-links);    --kind-edge: var(--edge-links); }
+.card-kind-station  { --kind-panel: var(--panel-station);  --kind-edge: var(--edge-station); }
 
 /* The map alone, filling what is left of the window below the banner — so the
    page itself does not scroll behind a side panel that does. --mn-split-h is

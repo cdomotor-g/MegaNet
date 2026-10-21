@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 60, date: '2026-10-21', items: [
+      '<strong>🎨 The Stations cards say what they are about.</strong> Each card beside (or under) the map now has a '
+        + 'faint colour of its own and a band along its top: <em>blue</em> for the list — every station; '
+        + '<em>violet</em> for the links between stations — Repeaters listening, the blast radius, the radio path, '
+        + 'its profile and link budget; and <em>gold</em> for the details card — the one station you picked, in the '
+        + 'same gold as its card on the map.',
+    ] },
     { n: 59, date: '2026-10-21', items: [
       '<strong>🚚 Station relocation finder.</strong> On the Stations map, beside 🗼 Repeater site finder in the side '
         + 'panel\'s strip: pick a station that has to move, say how far it may go, and the ground round it is coloured by '
