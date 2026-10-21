@@ -83,10 +83,13 @@ const MAP_SETTLE = 700;
 // "not a step" is no pushState at all. history.length cannot say it — a push
 // from the middle of the history drops the steps ahead of it, so the length
 // can stand still across a real step.
+// The title each push left behind is kept too: a browser files a title
+// against the step that is current when it is set, so the step being left
+// must still carry its own when the push is made.
 const COUNT_STEPS = () => {
-  window.__steps = { push: 0, replace: 0 };
+  window.__steps = { push: 0, replace: 0, left: [] };
   const push = history.pushState.bind(history), replace = history.replaceState.bind(history);
-  history.pushState = (...a) => { window.__steps.push++; return push(...a); };
+  history.pushState = (...a) => { window.__steps.push++; window.__steps.left.push(document.title); return push(...a); };
   history.replaceState = (...a) => { window.__steps.replace++; return replace(...a); };
 };
 
@@ -94,7 +97,8 @@ const where = page => page.evaluate(() => {
   const q = new URLSearchParams(location.search);
   return { search: location.search, hash: location.hash, tab: q.get('tab'), station: q.get('station'),
            map: q.get('map'), push: window.__steps.push, active: state.activeTab,
-           card: state.stnCard && state.stnCard.id };
+           card: state.stnCard && state.stnCard.id, title: document.title,
+           left: window.__steps.left[window.__steps.left.length - 1] };
 });
 
 // A view is "the same" to within a few pixels: the maps are re-measured after
@@ -232,12 +236,15 @@ async function main() {
     let w = await where(page);
     check('a tab picked from the nav is a step, and the address names it alone',
       w.search === '?tab=passranges' && w.push === w0.push + 1, J({ w, before: w0.push }));
+    check('…and the title names it, so the back button\'s list tells the steps apart — set after the push, not before',
+      w0.title === 'Stations — Flood-Net' && w.title === 'Pass Ranges — Flood-Net' && w.left === w0.title, J({ w0: w0.title, w }));
     await page.evaluate(() => history.back());
     await page.waitForFunction(() => state.activeTab === 'stations' && !!state.map, null, { timeout: 10_000 });
     await mapUp(page);
     w = await where(page);
     check('back returns to the Stations tab, at the view it was on — and is not itself a step',
-      w.tab === 'stations' && w.push === w0.push + 1 && await centreNear(page, A.lat, A.lon, 13), J(w));
+      w.tab === 'stations' && w.push === w0.push + 1 && await centreNear(page, A.lat, A.lon, 13)
+      && w.title === 'Stations — Flood-Net', J(w));
     await page.evaluate(() => history.forward());
     await page.waitForFunction(() => state.activeTab === 'passranges', null, { timeout: 10_000 });
     check('forward goes to Pass Ranges again', (await where(page)).tab === 'passranges');
@@ -251,8 +258,9 @@ async function main() {
     await page.waitForFunction(id => state.stnCard.id === id, A.id, { timeout: 10_000 });
     await page.waitForTimeout(MAP_SETTLE);
     const wA = await where(page);
-    check('a pin opening a card is a step, and the address names the station',
-      wA.station === A.id && wA.push === w0.push + 1, J({ wA, before: w0.push }));
+    check('a pin opening a card is a step, and the address and the title name the station',
+      wA.station === A.id && wA.push === w0.push + 1 && wA.title === `${A.name} · Stations — Flood-Net`
+      && wA.left === 'Stations — Flood-Net', J({ wA, before: w0.push }));
     await page.evaluate(() => state.map.setView([-25.6, 134.3], 6, { animate: false }));
     await page.waitForTimeout(MAP_SETTLE);
     const wPan = await where(page);
@@ -271,7 +279,9 @@ async function main() {
       backA.tab === 'stations' && backA.push === wB.push && await centreNear(page, -25.6, 134.3, 6), J(backA));
     await page.evaluate(() => history.back());
     await page.waitForFunction(() => state.stnCard.id === null, null, { timeout: 10_000 });
-    check('back again closes the card: the step before had none', (await where(page)).station === null);
+    const noCard = await where(page);
+    check('back again closes the card: the step before had none, and the title says so',
+      noCard.station === null && noCard.title === 'Stations — Flood-Net', J(noCard));
     await page.evaluate(() => history.forward());
     await page.waitForFunction(id => state.stnCard.id === id, A.id, { timeout: 10_000 });
     check('forward brings it back', (await where(page)).station === A.id);

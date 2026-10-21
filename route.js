@@ -37,6 +37,16 @@
 // closing and the map moving are not: they replace the step you are on, so
 // back goes to where you were before rather than through every pan.
 //
+// ── The title ───────────────────────────────────────────────────────────────
+// Each step names where it is in the page's title — "Pass Ranges — Flood-Net",
+// "Gatton AL · Stations — Flood-Net" — because the list behind the back
+// button (a long press or a right-click on it) and the browser's history
+// show a step by its title, and every step used to read the page's one title
+// over and over. A browser files a title against the step that is current
+// when it is set, so it is written after the push, never before: before would
+// rename the step being left. The station is named once the list has it; a
+// station still on its way leaves the tab alone in the title until it lands.
+//
 // ── With nothing in the address ─────────────────────────────────────────────
 // The last tab used on this device opens, rather than always Stations. A link
 // that names a station or a map view and no tab means the Stations tab. And a
@@ -160,6 +170,28 @@ const Route = (() => {
     return location.pathname + (query ? '?' + query : '') + hash;
   }
 
+  // The station a step names, by its name: the card's on Stations, the one
+  // picked on Station Health. One the list does not carry (yet) names nothing.
+  function stationName(tab) {
+    const id = tab === 'stations' ? state.stnCard.id : tab === 'health' ? healthStation() : null;
+    if (!id || !state.data || !state.data.stations) return '';
+    const s = state.data.stations.find(x => x.id === id);
+    return (s && s.name) || '';
+  }
+
+  // "Pass Ranges — Flood-Net"; "Gatton AL · Stations — Flood-Net".
+  function titleFor() {
+    const t = TAB_LIST.find(x => x.id === state.activeTab);
+    if (!t) return null;
+    const stn = stationName(t.id);
+    return (stn ? stn + ' · ' : '') + t.label + ' — Flood-Net';
+  }
+
+  function retitle() {
+    const t = titleFor();
+    if (t && document.title !== t) document.title = t;
+  }
+
   // One gesture, one step. "Go to station" from another tab (goToStation:
   // Pass Ranges, Station Health) switches the tab and then brings the card
   // up, in one go — two pushes, and back would stop at a Stations tab nobody
@@ -169,16 +201,19 @@ const Route = (() => {
   function write(how) {
     if (!started || applying) return;
     const url = urlFor();
-    if (url === location.pathname + location.search + location.hash) return;
-    try {
-      if (how === 'push' && !pushedThisTask) {
-        history.pushState(null, '', url);
-        pushedThisTask = true;
-        Promise.resolve().then(() => { pushedThisTask = false; });
-      } else {
-        history.replaceState(null, '', url);
-      }
-    } catch (_) { /* refused — the app works on, the address stays put */ }
+    if (url !== location.pathname + location.search + location.hash) {
+      try {
+        if (how === 'push' && !pushedThisTask) {
+          history.pushState(null, '', url);
+          pushedThisTask = true;
+          Promise.resolve().then(() => { pushedThisTask = false; });
+        } else {
+          history.replaceState(null, '', url);
+        }
+      } catch (_) { /* refused — the app works on, the address stays put */ }
+    }
+    // After the push, so it is the new step that is named.
+    retitle();
   }
 
   function rememberTab() {

@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 67, date: '2026-10-21', items: [
+      '<strong>🔙 The back button\'s list names where each step was.</strong> Hold the browser\'s back button down '
+        + '(or right-click it) and every entry used to read the same — <em>Flood-Net — radio and satcom telemetry '
+        + 'network tool</em>. Each one now names its tab, and the station when one was open: <em>Field Data — '
+        + 'Flood-Net</em>, <em>Gatton AL · Stations — Flood-Net</em>. The browser\'s tab and its history say the same.',
+    ] },
     { n: 66, date: '2026-10-21', items: [
       '<strong>💬 Tooltips above the pointer.</strong> Rest the mouse on a button, a pin or a chart and its tooltip now '
         + 'comes up <em>above</em> the pointer, rather than in the browser\'s box just under it, where the pointer '

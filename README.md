@@ -272,7 +272,8 @@ MegaNet/
 ├── route.js                ← Route     — where you are, in the address bar: the tab,
 │                             the station whose card is up (or Station Health has
 │                             open) and the map's view, so a view can be linked to
-│                             and back and forward work (#211)
+│                             and back and forward work (#211) — and in the title,
+│                             so the back button's list names each step
 ├── pwa.js                  ← Pwa       — registers sw.js for the page's version, and
 │                             offers a newer one to a page from the kept copy (#213)
 ├── offline-tab.js          ← OfflineTab — 📲 Offline & Install: what this device has
