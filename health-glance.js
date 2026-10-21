@@ -729,6 +729,8 @@ const HealthGlance = (() => {
   function setPins(on) {
     state.mapHealth = !!on;
     try { localStorage.setItem('mn-map-health', on ? 'on' : 'off'); } catch (_) {}
+    // One colouring of the pins at a time: ⏱️ Latency gives way (map-latency.js).
+    if (on && typeof MapLatency !== 'undefined') MapLatency.yieldTo();
     if (on) {
       // An answer in hand and young is the answer; one that failed is asked
       // for again — turning the switch on is asking.
@@ -771,7 +773,10 @@ const HealthGlance = (() => {
 
   // The note under the switch, in 🗺️ Map display.
   function noteHtml() {
-    if (!state.mapHealth) return 'Off — every pin wears its role’s colour.';
+    if (!state.mapHealth) {
+      const lat = typeof MapLatency !== 'undefined' ? MapLatency.noteText() : '';
+      return lat ? esc(lat) : 'Off — every pin wears its role’s colour.';
+    }
     if (!net.okAt && net.status !== 'error') return 'Asking the datastore when each station was last heard…';
     const again = '<button type="button" class="link-btn" onclick="HealthGlance.askAgain()" '
       + 'title="Ask the datastore again when each station was last heard">↻ Ask again</button>';
@@ -1022,6 +1027,9 @@ const HealthGlance = (() => {
     onNet, askNet, counts,
     // the station list's Last heard column, and the editor's header
     heardCellHtml, heardHeadHtml, onHeard,
+    // when one station was last heard, as everything known says — for
+    // ⏱️ Latency (map-latency.js): { lastHeard, firstHeard }
+    known: id => { const k = knowledgeOf(id); return { lastHeard: k.lastHeard, firstHeard: k.firstHeard }; },
     // the rules, for test/healthcard.mjs and for #215 to keep honest
     classify, bars, glanceFrom, quietFinding, findingsOf, fromServer,
     classOf: id => classOf(id),

@@ -150,7 +150,7 @@ const TABS = [
   ] },
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
-      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site rain gauge exposure canopy trees buildings shed' },
+      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site rain gauge exposure canopy trees buildings shed latency data age stale freshness' },
     { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
       find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
     { id: 'passranges', label: 'Pass Ranges',            icon: '🔗',
@@ -581,6 +581,12 @@ const HELP = {
       + 'of its checks, ⚠ amber from two, ⛔ red from four or a day, grey for one heard too seldom to judge, '
       + 'and <em>never</em> for one its receivers have not heard. Hover a cell for the time. The station '
       + 'editor says the same beside the station\'s name, with the time: <em>Last heard 14:32 today · 9 min ago</em>.',
+      '<strong>⏱️ Latency</strong>, in the side panel after 🔑, colours every pin by how fresh its data is '
+      + 'instead of by its role — by <em>Age</em> (how long since Flood-Net heard it), <em>Delay</em> (how long its '
+      + 'readings take to reach the database) or <em>Checks</em> (how many of its timed checks went missing) — and '
+      + 'keeps its shape and the Bureau\'s outlines. Opening it turns the colouring on; it and <strong>Colour pins '
+      + 'by health</strong> take turns. Its pane counts the stations in view as the map moves; pick a station and it '
+      + 'shows that station\'s checks slot by slot, its delay reading by reading and the receivers that carried it.',
       '<strong>From zoom 17 the map offers the station\'s digital twin</strong> — the ground to '
       + '1 m where the State holds LiDAR, the aerial imagery, the station as built and the radio paths '
       + 'as this map colours them — whenever a station is under the view: the one on the card, the '

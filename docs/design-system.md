@@ -281,6 +281,22 @@ a gap no wider than the weight closes — `3,2` at weight 2 drew a solid ring;
 `2,4` draws dashes. A filter's or the selection's ring still wins the ring, being
 what somebody is doing now; the size and the hollow carry the class through it.
 
+**A latency pin is a band on a ramp, with the size for its second channel**
+(`map-latency.js`). ⏱️ Latency fills each Stations-map pin by how fresh its
+data is — its age, its readings' delay to the database, or its share of missed
+checks — on one seven-step ramp, green through gold to maroon, as literals for
+the health pin's reason. It is a sequential ramp rather than the status tokens
+because the question has more than three answers (*a quarter hour* and *an
+hour* are both fine, and differently fine), and it stays clear of the amber of a
+filter match, the selection's violet and the outlines' pink. The worse bands
+are a step or two bigger; a station never heard is hollow in a dotted ring, one
+silent through the window hollow in a maroon one; a gauge read by hand keeps its
+grey, its silence not being latency. The shape and the Bureau's outlines are
+never touched. It and *Colour pins by health* both want the fill, so turning one
+on turns the other off. The pane's bars and the legend take the same literals
+through `--dot`; what carries each band without the colour is its words, beside
+every swatch and on every listed station.
+
 **A site feature is a plan symbol in a categorical colour** (`site-features.js`,
 `0061`): the orifice outlet a ringed dot, a pit a crossed square, a benchmark a
 triangle, a gauge board a staff, a crest gauge a diamond, and the orifice and

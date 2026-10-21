@@ -97,7 +97,7 @@ try {
   await page.evaluate(() => switchTab('stations'));
   await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
   check('with its side panel declining them, the Stations map\'s controls stand in its corner',
-    await page.evaluate(() => document.querySelectorAll('#leaflet-map .leaflet-top.leaflet-right .mn-mapctl').length === 7
+    await page.evaluate(() => document.querySelectorAll('#leaflet-map .leaflet-top.leaflet-right .mn-mapctl').length === 8
       && !document.querySelector('#help-panel .mn-mapctl')));
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -472,7 +472,7 @@ try {
   });
   const alone = k => JSON.stringify(k.items) === '["mn-map-reset"]' && k.hairlines === 0 && !!k.at
     && k.at.dx >= 0 && k.at.dx <= 12 && k.at.dy >= 0 && k.at.dy <= 12
-    && k.panels === 7 && k.panelsInSide && k.buttonsInSide;
+    && k.panels === 8 && k.panelsInSide && k.buttonsInSide;
   const narrow = await cornerNow();
   check('at a phone\'s width the Stations map\'s corner holds ↺ alone, at its top right, every other control in the side panel\'s rail',
     alone(narrow), JSON.stringify(narrow));

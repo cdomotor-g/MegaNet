@@ -2812,6 +2812,9 @@ function renderDock(opts = {}) {
   // one of the moments it is brought up to date (a stations file loaded since,
   // a twin opened or put away while it was shut).
   if (showing === 'twin' && dockLastShowing !== 'twin') DigitalTwin.syncPane();
+  // ⏱️ Latency's pane, likewise: coming into view is when it asks for what is
+  // stale — and, the first time in a session, turns its view on (map-latency.js).
+  if (showing === 'map-latency' && dockLastShowing !== 'map-latency') MapLatency.shown();
   syncHelpChrome();
 
   // Same reason renderTabs() does this — a map built on the opening render must
@@ -3045,6 +3048,9 @@ function toggleDockTab(id) {
   const btn = document.activeElement;
   if (dockShowing() === id) shutDock();
   else setDockTab(id);
+  // ⏱️ Latency pressed open: the first time in a session, that turns its view
+  // on (map-latency.js) — a pane put back as the page loads does not.
+  if (id === 'map-latency' && dockShowing() === id) MapLatency.opened();
   if (btn && btn !== document.body && btn.closest && btn.closest('#help-panel .dock-strip')
       && !btn.getClientRects().length) dockFocusBack(null);
 }
@@ -4521,6 +4527,9 @@ function stationsMapPanels(map) {
     group: 'show', order: 30,
     html: () => `<div class="map-legend" id="map-legend">${mapLegendHtml()}</div>`,
   });
+  // ⏱️ Latency is show/40, from MapLatency.attach(), which runs later: the
+  // pins coloured by how fresh each station's data is, and a pane that sums
+  // that up for the stations in view (map-latency.js).
 
   // ── The tools you point at the map ─────────────────────────────────────────
   // What these three have in common, and what separates them from the group
@@ -5401,8 +5410,12 @@ function mapLegendHtml() {
   // dashed ring of its role's colour, is a no-data pin like any other unheard
   // one, so its row goes too.
   const health = state.mapHealth;
+  // ⏱️ Latency's key the same way, while it colours the pins (map-latency.js):
+  // its bands in place of the roles. A gauge read by hand or a TM station keeps
+  // its grey or black under it, so those rows stay.
+  const latency = MapLatency.on();
   return `
-    ${health ? HealthGlance.legendHtml() : Object.entries(ROLE_LABEL).map(([k, v]) => `
+    ${latency ? MapLatency.legendHtml() : health ? HealthGlance.legendHtml() : Object.entries(ROLE_LABEL).map(([k, v]) => `
       <span class="legend-item">
         <span class="legend-dot" style="--dot:${roleVar(k)}"></span>
         <span class="small">${v}</span>
@@ -5705,6 +5718,7 @@ function stopStationsMap() {
   MapPolar.detach();
   MapSites.detach();
   MapRelocate.detach();
+  MapLatency.detach();
   Places.detach();
   MapRoads.detach();
   MapRoadOwners.detach();
@@ -5876,6 +5890,11 @@ function initMap() {
   // that has to move: its repeaters go in, and the ground round it comes out
   // coloured by how well they would hear it there.
   MapRelocate.attach(state.map);
+  // ⏱️ Latency: a pane rather than a switch in 🗺️ Map display, because what it
+  // shows beside the pins — the stations in view summed up, and a picked
+  // station's checks slot by slot — is the point of it, and it follows the map
+  // as it moves (map-latency.js).
+  MapLatency.attach(state.map);
   // 📍 Find a place, the side panel's tool: no layer of its own until a place
   // is pressed in it — attached for MapSpider's reason, to know which map it
   // would be dropping a pin on before anybody asks it to, and to draw the one
@@ -6043,6 +6062,9 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // With Colour pins by health on (#218), the moment the one batch a load
   // costs is asked for — or asked again, once it is stale (health-glance.js).
   HealthGlance.reset();
+  // …and ⏱️ Latency's classes, worked out again against the clock, with
+  // whatever its pins need asked for (map-latency.js).
+  MapLatency.reset();
 
   // The owner choice in Map display (MapSymbols.ownerDrawn) comes first and
   // takes a station off the map entirely — its pin, its links, its place in
@@ -6249,7 +6271,12 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     // hollow carry the health through it. Null with the switch off, and
     // until the one batch a load costs has answered. A lookup, not a
     // judgement: HealthGlance works every class out when an answer lands.
-    const hg = HealthGlance.pinStyle(s);
+    //
+    // ⏱️ Latency (map-latency.js) takes the fill the same way, by how fresh the
+    // station's data is, and the two are never on together — so whichever is
+    // on is the one asked, and the rest of this reads either.
+    const lat = MapLatency.pinStyle(s);
+    const hg = lat || (MapLatency.on() ? null : HealthGlance.pinStyle(s));
     // A triangle is drawn round the circle it replaces, a little larger
     // (MapSymbols.radius), and its radius is that triangle's — so the click
     // target, the leader's ring and a selection's grow all fit the mark drawn.
@@ -6284,7 +6311,9 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     marker.mnSymbol    = sym;
     // Its health class while the pins wear it (#218), or null: what the map's
     // name and test/healthcard.mjs read, the canvas having no DOM to ask.
-    marker.mnHealth    = hg ? hg.cls : null;
+    marker.mnHealth    = hg && !lat ? hg.cls : null;
+    // …and its latency band while ⏱️ Latency colours the pins, for the same readers.
+    marker.mnLatency   = lat ? lat.cls : null;
     // The classification, not just its numbers — the canvas renderer draws no
     // DOM node for a className to land on, but the name label is real DOM in
     // the tooltip pane, and applyMapLabels dims it off this flag.
@@ -6372,6 +6401,9 @@ function updateMapAltName(pins, links, backbone, matched, related) {
   // With Colour pins by health on, the headline is the health (#218).
   const health = HealthGlance.altText();
   if (health) bits.push(health);
+  // …or the latency, while ⏱️ Latency colours them.
+  const latency = MapLatency.altText();
+  if (latency) bits.push(latency);
   // And whose stations they are, when Map display is drawing only some.
   if (MapSymbols.ownerHiding()) bits.push(MapSymbols.ownerPhrase());
   el.setAttribute('aria-label', 'Station map — ' + bits.join(', ')
@@ -7537,6 +7569,7 @@ function repaintStnCard() {
     state.stnCard.id = null; el.hidden = true; el.innerHTML = '';
     MapLeader.sync();
     StationTrail.sync();
+    MapLatency.follow(null);
     if (typeof Route !== 'undefined') Route.sync();
     return;
   }
@@ -7585,6 +7618,8 @@ function repaintStnCard() {
   // The trail's pill says whether its station's card is up, and its name,
   // which a save may just have changed.
   StationTrail.sync();
+  // ⏱️ Latency's pane is about the station on the card (map-latency.js).
+  MapLatency.follow(s.id);
 }
 
 // Escape closes the card from anywhere inside it. On the card rather than on
@@ -7619,6 +7654,7 @@ function closeStnCard(refocus = true) {
   el.innerHTML = '';
   MapLeader.sync();                         // and the leader goes with it
   StationTrail.sync();                      // whose pill now brings it back
+  MapLatency.follow(null);                  // ⏱️ Latency's pane goes back to the stations in view
   // The address drops the station, in place: closing is not a step to go
   // back through (route.js).
   if (typeof Route !== 'undefined') Route.sync();

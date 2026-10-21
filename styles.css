@@ -3630,6 +3630,118 @@ hr {
 .hg-key--fault  { width: 18px; height: 18px; background: var(--bad); border: 3px solid var(--map-backbone); }
 .hg-key--nodata { width: 9px; height: 9px; background: var(--panel); border: 2px dotted var(--muted); }
 
+/* ⏱️ Latency (map-latency.js): the pane in the Stations map's side panel, and
+   the swatches its key and its lists share with the 🔑 legend. A swatch takes
+   its band's colour through --dot, the seam .legend-dot uses; the ramp is
+   literals for the pins' reason (design-system §1) and is out of the contrast
+   contract like every categorical set — the band's words beside it are what
+   it says. The hollow keys repeat the pins' second channel: never heard in a
+   dotted ring, quiet through the window in a maroon one. The pane is in the
+   side panel's Leaflet-sized type (.dock-pane > .mn-mapctl), so its sizes are
+   written against .75rem. */
+.lat-key {
+  box-sizing: border-box; display: inline-block; flex: none; vertical-align: -1px;
+  width: 11px; height: 11px; border-radius: 999px;
+  background: var(--dot, var(--muted)); border: 1.5px solid var(--panel);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 25%, transparent);
+}
+.lat-key--never   { background: var(--panel); border: 2px dotted var(--muted); box-shadow: none; width: 9px; height: 9px; }
+.lat-key--quiet   { background: var(--panel); border: 2.5px solid #6b1717; box-shadow: none; }
+.lat-key--unknown { background: var(--panel); border: 2px solid var(--muted); box-shadow: none; }
+.lat-key--offair  { background: #7b8189; }
+.lat-key--asking  { background: var(--panel); border: 1px dashed var(--muted); box-shadow: none; }
+
+.lat-pane { display: flex; flex-direction: column; gap: var(--sp-2); }
+.lat-controls {
+  display: flex; flex-direction: column; gap: var(--sp-1);
+  padding-bottom: var(--sp-2); border-bottom: 1px solid var(--border);
+}
+.lat-switch { font-weight: 600; }
+.lat-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
+.lat-row-h { min-width: 4.6rem; color: var(--muted); }
+.lat-seg { display: inline-flex; flex-wrap: wrap; gap: 3px; }
+.lat-chip {
+  border: 1px solid var(--ctl-border); border-radius: 999px;
+  background: var(--panel); color: var(--text);
+  padding: .15rem .6rem; font: inherit; line-height: 1.4; cursor: pointer;
+}
+.lat-chip:hover { background: var(--subtle); }
+.lat-chip.is-on, .lat-chip.is-on:hover { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+.lat-again { font-size: 1rem; line-height: 1; padding: 0 .25rem; }
+.lat-status { margin: 0; color: var(--muted); min-height: 1.5em; }
+
+.lat-body { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.lat-sum-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
+.lat-h { margin: var(--sp-1) 0 0; font-size: .9rem; line-height: 1.3; }
+.lat-h5 { margin: var(--sp-1) 0 0; font-size: .8rem; color: var(--muted); font-weight: 600; }
+.lat-h:focus, .lat-h:focus-visible { outline-offset: 2px; }
+.lat-empty { margin: 0; }
+
+/* Two tiles a row in a pane this narrow, whatever the Admin grid would make of it. */
+.lat-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-1); }
+.lat-kpi { padding: .4rem .5rem; }
+.lat-kpi .adm-kpi-label { font-size: .66rem; }
+.lat-kpi .adm-kpi-value { font-size: 1.15rem; }
+.lat-kpi .adm-kpi-sub { font-size: .7rem; }
+
+/* The scope by band: a row a band, each a button that lists its stations. */
+.lat-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.lat-bar {
+  display: grid; grid-template-columns: auto minmax(6.5rem, 9.5rem) minmax(0, 1fr) 3.2rem;
+  align-items: center; gap: var(--sp-2); width: 100%;
+  padding: .2rem .35rem; border: 1px solid transparent; border-radius: var(--r-sm);
+  background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.lat-bar:hover:not(:disabled) { background: var(--subtle); }
+.lat-bar.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+.lat-bar:disabled { cursor: default; color: var(--muted); }
+.lat-bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lat-bar-track { height: 8px; border-radius: 2px; background: color-mix(in srgb, var(--muted) 14%, transparent); overflow: hidden; }
+.lat-bar-fill { display: block; height: 100%; background: var(--dot, var(--muted)); border-radius: 2px; }
+.lat-bar-n { text-align: right; font-variant-numeric: tabular-nums; }
+/* What is not on the scale — never heard, read by hand — counted, without a bar
+   to be read against the bands'. */
+.lat-bars--other { margin-top: 2px; padding-top: 3px; border-top: 1px dashed var(--border); }
+.lat-bars--other .lat-bar { grid-template-columns: auto minmax(0, 1fr) 3.2rem; }
+.lat-bars--other .lat-bar-label { white-space: normal; }
+
+.lat-list { margin: 0; padding-left: 1.4rem; display: flex; flex-direction: column; gap: 1px; }
+.lat-list li { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); }
+.lat-list .link-btn { text-align: left; overflow-wrap: anywhere; }
+.lat-list-v { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.lat-table-wrap { overflow-x: auto; max-width: 100%; }
+.lat-table { width: 100%; table-layout: auto; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.lat-table th, .lat-table td { padding: .15rem .35rem; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; overflow: visible; }
+/* The receiver's name wraps rather than being cut: "rpi-83071968-sdr1-151.5375"
+   is a host, a stick and a channel, and the end of it is the part that differs. */
+.lat-table td:first-child { white-space: normal; overflow-wrap: anywhere; }
+.lat-table th { color: var(--muted); font-weight: 600; }
+.lat-table .num { text-align: right; }
+.lat-table .mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: .7rem; }
+.lat-net { margin: 0; }
+.lat-foot, .lat-cap { margin: 0; }
+
+/* One station. */
+.lat-back { align-self: flex-start; }
+.lat-stn-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
+.lat-stn-what { margin: 0; }
+.lat-stn-band { margin: 0; }
+.lat-pill { border-radius: 999px; padding: 0 .5rem; font-size: .7rem; border: 1.5px solid #ff00c5; }
+.lat-pill--info { border-style: dashed; }
+.lat-strip-wrap { margin-top: 2px; }
+.lat-strip { display: block; max-width: none; }
+.lat-missed { margin: 0; }
+.lat-stn-links { margin-top: var(--sp-1); }
+
+/* Its delay, a dot a transmission on a log scale. */
+.lat-delay { display: block; max-width: 100%; }
+.lat-grid { stroke: var(--border); stroke-width: 1; }
+.lat-med { stroke: var(--text); stroke-width: 1; stroke-dasharray: 4 3; opacity: .7; }
+.lat-dots { fill: none; stroke: var(--accent); stroke-width: 3.2; stroke-linecap: round; opacity: .75; }
+
+.legend-lat-h { margin-bottom: 2px; }
+
 /* Manual, as a pill. The one fact in that block that changes what a person
    does: a gauge read by hand reports nothing over the radio, so silence from it
    is not a telemetry fault to go chasing. Amber rather than red — it is a

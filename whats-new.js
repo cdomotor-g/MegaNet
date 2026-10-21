@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 68, date: '2026-10-21', items: [
+      '<strong>⏱️ Latency, on the Stations map.</strong> A new tool in the side panel, after 🔑 Legend: open it and '
+        + 'every station pin is coloured by how fresh its data is — green heard in the last quarter hour, through gold, to '
+        + 'maroon for a week or more; hollow if it has never been heard. A river gauge is still a triangle and the Bureau\'s '
+        + 'pink outlines stay. <em>Colour by</em> switches between <em>Age</em> (how long since it was heard), '
+        + '<em>Delay</em> (how long its readings take to reach the database) and <em>Checks</em> (how many of its timed '
+        + 'checks went missing), over the last 24 h, 3 days or 7 days. The pane sums up the stations in view as you move '
+        + 'the map, lists the worst of them and how each receiver is delivering; pick a station and it shows its checks '
+        + 'slot by slot — the missed ones marked — and its readings\' delay one by one.',
+    ] },
     { n: 67, date: '2026-10-21', items: [
       '<strong>🔙 The back button\'s list names where each step was.</strong> Hold the browser\'s back button down '
         + '(or right-click it) and every entry used to read the same — <em>Flood-Net — radio and satcom telemetry '

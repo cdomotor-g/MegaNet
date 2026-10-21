@@ -251,6 +251,10 @@ MegaNet/
 │                             look (#218): last heard, its battery and its findings on
 │                             its card, each a door into Station Health, and Colour
 │                             pins by health on the Stations map
+├── map-latency.js          ← MapLatency — ⏱️ Latency on the Stations map: every pin
+│                             coloured by its data's age, its readings' delay to the
+│                             database or its missed checks, and a pane that sums up
+│                             the stations in view and shows one's checks slot by slot
 ├── site-map.js             ← SiteMap   — Site Map tab (a guide to every other tab,
 │                             and the gold line from each to its button in the nav)
 ├── nav-views.js            ← NavViews  — what the left bar lists: All, Simple, Field,
@@ -1669,6 +1673,36 @@ is on, and the note under the switch, the legend and the map's accessible name
 carry how many of each. When the server works findings out itself (#215), the
 card and the pins read them there instead: the seam is `SOURCE` in
 `health-glance.js`, whose header says how.
+
+**⏱️ Latency (`map-latency.js`).** A tool in the side panel's strip, after 🔑,
+for the question health's classes answer only obliquely — *how fresh is the data
+on this part of the map?* — asked three ways. **Age** is how long since Flood-Net
+last heard each station, on the plain clock rather than against its checks: under
+15 minutes, to an hour, three, six, a day, a week, and over. **Delay** is how long
+a reading takes from being heard to reaching the database — each transmission's
+first copy to land, the median over the window — which is where a base station
+whose uploads queue shows up (a serial-monitor base posts in batches about a
+minute apart, the MQTT feed in a second or two). **Checks** is the share of a
+station's timed checks that never arrived while a receiver that hears it was
+listening, from the Station Health tab's own slots. Opening the tool turns the
+colouring on (once a session; after that the switch in its pane decides) and
+turns Colour pins by health off — one colouring of the pins at a time. Only the
+fill and the size change: a river gauge stays a triangle, the Bureau's outlines
+stay, a station never heard is hollow in a dotted ring and a gauge read by hand
+keeps its grey. Age costs nothing new — it is HealthGlance's one batch of
+last-heard times; Delay and Checks need the readings, 24 h by default (about
+27,000 when this was written), 3 or 7 days on request, fetched as Station Health
+fetches its week and worked out by the same `HealthAnalysis.run()` — or taken
+from that tab's own analysis of the same window if it is under ten minutes old.
+The pane sums up the stations **in view**, following the map as it moves (or the
+whole map): heard in the last hour, quiet over a day, the median delay and the
+share of checks received; the stations by band, each band a button that lists
+them, the worst first; the receivers and how long each takes to deliver; and the
+moments most of the network missed its checks at once. Pick a station — on the
+map or in the pane — and the pane is about it: its last-heard time and next
+check, its delay and checks received, its checks slot by slot a row a day with
+the missed ones listed, its delay dot by dot on a log scale, and the receivers
+that carried it, with a door into Station Health.
 
 **The trail of stations looked at (`station-trail.js`).** Closing the card is a
 decision that holds, and nothing brought it back short of finding the pin again

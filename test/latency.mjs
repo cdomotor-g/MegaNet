@@ -1,0 +1,398 @@
+// ⏱️ Latency (map-latency.js): the Stations map's pins coloured by how fresh
+// each station's data is, and the pane beside the map that sums it up and,
+// for a picked station, shows its checks slot by slot. Driven in Chromium with
+// the datastore stood in for by test/lib/postgrest-stub.mjs — the strict
+// PostgREST the agent API is held to — serving HealthAnalysis's demo week
+// (real stations, one of every fault planted) and the station_health rows the
+// ingest would have written for it.
+//
+//   1. **The rules** — the bands' edges for age, delay and checks; a negative
+//      delay (a receiver's clock running ahead) is not late; the median and
+//      the 95th percentile; a delay said short.
+//   2. **Off until asked for** — no pin wears a band and no reading is fetched
+//      for it on a first visit to the Stations tab.
+//   3. **Opening the tool** — ⏱️ in the side panel's strip, after 🔑: the first
+//      press that opens it turns the view on (a pane the side panel puts back
+//      as the page loads does not, 6b); every pin a band or said otherwise (never
+//      heard hollow in a dotted ring, a gauge read by hand left grey); the
+//      shape and the Bureau's outline untouched; the readings fetched once;
+//      the pane's summary counting what the pins say.
+//   4. **Delay and checks** — a station whose uploads queue four minutes is
+//      in the 2 – 5 min band and the rest under 10 s; one silent through the
+//      window hollow in its ring; over the whole week, the planted fading
+//      station misses more of its checks than a steady one; a rebuild of the
+//      map fetches nothing again.
+//   5. **One station** — picked in the pane: on the map with its card, and in
+//      the pane its tiles, its checks slot by slot with the misses listed, its
+//      delay dot by dot and the receiver that carried it; the pane follows the
+//      card to another station and back to the summary when the card shuts.
+//   6. **One colouring at a time** — Colour pins by health turns latency off,
+//      and latency turns health off; the 🔑 legend carries whichever is on.
+//   7. **No data, honestly** — a datastore that cannot be reached: the pane
+//      says so and offers to try again, and nothing throws.
+//
+// Run:  npm run latency
+//       npm run latency -- -v
+
+import { startServer } from './lib/server.mjs';
+import { launchBrowser } from './lib/browser.mjs';
+import { applyNetworkPolicy } from './lib/network.mjs';
+import { PostgrestStub } from './lib/postgrest-stub.mjs';
+
+const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
+const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
+
+const log  = (...a) => console.log(...a);
+const vlog = (...a) => { if (VERBOSE) console.log(...a); };
+const results = [];
+function check(label, ok, detail = '') {
+  results.push({ label, ok: !!ok, detail });
+  log(`  ${ok ? '✓' : '✗'} ${label}${ok || !detail ? '' : `\n      ${detail}`}`);
+  if (ok && detail) vlog(`      ${detail}`);
+}
+const J = v => JSON.stringify(v);
+
+const DB = 'https://jjprlritvhdqpvphfrnu.supabase.co/rest/v1';
+const READING_COLS = ['addr', 'alert_id', 'a2_station', 'a2_sensor', 'station_number', 'channel', 'station_id',
+  'reading_ts', 'received_at', 'value_raw', 'value', 'unit', 'conversion', 'quality', 'protocol', 'source', 'path',
+  'dup_count', 'dup_paths', 'last_dup_at', 'raw_id', 'ingest_token_id', 'freq_mhz', 'rssi_dbm', 'level_dbfs', 'snr_db'];
+const HEALTH_COLS = ['station_key', 'station_id', 'station_name', 'online', 'since', 'last_seen_at', 'last_reading_at',
+  'minutes_since_seen', 'minutes_since_reading', 'last_status', 'reported_by', 'updated_at'];
+
+const server  = await startServer();
+const browser = await launchBrowser();
+const errors  = [];
+
+let asked = [];
+const count = kind => asked.filter(a => a.kind === kind).length;
+let MODE = 'ok';
+let stub = null;
+
+async function standIn(page) {
+  await page.route('**://*.supabase.co/rest/v1/**', async route => {
+    const req = route.request();
+    const url = req.url();
+    const rel = new URL(url).pathname.replace(/^.*\/rest\/v1\//, '');
+    if (rel !== 'reading' && rel !== 'station_health') return route.fallback();
+    // The last-heard batch; a card's readings; the window's pages.
+    const kind = rel === 'station_health' ? 'network'
+      : /[?&]or=/.test(url) || /[?&]station_id=eq\./.test(url) ? 'card' : 'window';
+    asked.push({ kind, url: decodeURIComponent(url) });
+    if (MODE === 'down') return route.abort('connectionrefused');
+    const res = await stub.fetch(url, { method: req.method(), headers: req.headers() });
+    return route.fulfill({ status: res.status, contentType: 'application/json', body: await res.text() });
+  });
+}
+
+async function open(context) {
+  const page = await context.newPage();
+  await applyNetworkPolicy(page, server.origin);
+  await standIn(page);
+  page.on('pageerror', e => errors.push(String(e)));
+  return page;
+}
+async function loaded(page) {
+  await page.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded', timeout: LOAD_TIMEOUT });
+  await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations),
+    null, { timeout: LOAD_TIMEOUT });
+}
+async function toStations(page) {
+  await page.evaluate(() => { if (state.activeTab !== 'stations') switchTab('stations'); });
+  await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: LOAD_TIMEOUT });
+}
+const waitTrue = (page, fn, arg, timeout = 20_000) =>
+  page.waitForFunction(fn, arg, { timeout }).then(() => true, () => false);
+const settled = page => waitTrue(page, () => MapLatency._state().window.status === 'ok' || MapLatency._state().window.status === 'error', null, 60_000);
+
+// What a pin is wearing, the canvas having no DOM to ask. `grow` is how many
+// pixels the view added to the radius the pin would have had without it — a
+// triangle is drawn round a circle 1.4 times its size (MapSymbols.radius), so
+// two radii are only comparable through it.
+const pin = (page, id) => page.evaluate(id => {
+  const m = state.mapMarkers.find(x => x.mnStationId === id);
+  if (!m) return null;
+  const base = m.mnStation.roles.includes('repeater') ? MAP_PIN_R_RPT : MAP_PIN_R_FIELD;
+  let grow = null;
+  for (let g = -2; g <= 6; g++) if (MapSymbols.radius(Math.max(3, base + g), m.mnSymbol) === m.options.radius) { grow = g; break; }
+  return { band: m.mnLatency, health: m.mnHealth, fill: m.options.fillColor, ring: m.options.color,
+           dash: m.options.dashArray, shape: m.options.mnShape, outline: m.options.mnOutline || null,
+           r: m.options.radius, grow };
+}, id);
+
+try {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'Australia/Brisbane' });
+  const page = await open(context);
+  await loaded(page);
+
+  // The demo week, ending now, with one station's uploads made to queue four
+  // minutes; and stations the week does not touch, for the hollow and the grey.
+  const W = await page.evaluate(() => {
+    const w = HealthAnalysis.demoWorld(undefined, { now: Date.now() });
+    const idx = SensorValues.index();
+    const whose = aid => { const c = idx.get(aid) || []; return c.length === 1 ? c[0].station.id : null; };
+    w.rows.forEach(r => {
+      if (whose(r.alert_id) === w.roles.steady3) r.received_at = new Date(Date.parse(r.reading_ts) + 240e3).toISOString();
+    });
+    const last = {}, first = {};
+    w.rows.forEach(r => {
+      const id = whose(r.alert_id);
+      if (!id) return;
+      if (!last[id] || last[id] < r.reading_ts) last[id] = r.reading_ts;
+      if (!first[id] || first[id] > r.reading_ts) first[id] = r.reading_ts;
+    });
+    const roles = new Set(Object.values(w.roles).filter(v => typeof v === 'string'));
+    const placedField = s => s.lat != null && s.lon != null && !s.proposed && (s.roles || []).includes('field')
+      && MapSymbols.ownerDrawn(s);
+    const never = state.data.stations.find(s => placedField(s) && !roles.has(s.id) && stationAlertIds(s).length
+      && !MapSymbols.kind(s).manual && !MapSymbols.kind(s).tm);
+    const manual = state.data.stations.find(s => placedField(s) && !roles.has(s.id) && MapSymbols.kind(s).manual);
+    return { rows: w.rows, roles: w.roles, last, first, never: never && never.id, manual: manual ? manual.id : null };
+  });
+  const R = W.roles;
+  const healthRows = Object.entries(W.last).map(([id, t]) => ({
+    station_key: id, station_id: id, station_name: null, online: null, since: W.first[id],
+    last_seen_at: t, last_reading_at: t, minutes_since_seen: 0, minutes_since_reading: 0,
+    last_status: {}, reported_by: null, updated_at: t,
+  }));
+  stub = new PostgrestStub({
+    base: DB,
+    columns: { reading: new Set(READING_COLS), station_health: new Set(HEALTH_COLS) },
+    tables: { reading: W.rows, station_health: healthRows },
+  });
+  vlog(`  the week: ${W.rows.length} readings; ${healthRows.length} station_health rows; roles ${J(R)}`);
+
+  // ── 1. The rules ──────────────────────────────────────────────────────
+  log('\n1. The bands\n');
+  const rules = await page.evaluate(() => {
+    const M = 60e3, H = 3600e3, D = 86400e3, k = (m, v) => MapLatency.classifyValue(m, v).k;
+    return {
+      age: [k('age', 15 * M), k('age', 15 * M + 1), k('age', H), k('age', 3 * H + 1), k('age', D), k('age', 7 * D + 1)],
+      delay: [k('delay', -3), k('delay', 10), k('delay', 52), k('delay', 61), k('delay', 240), k('delay', 4000)],
+      checks: [k('checks', 0), k('checks', 0.05), k('checks', 0.2), k('checks', 0.3), k('checks', 0.9)],
+      q: [MapLatency.quantile([4, 1, 3, 2], 0.5), MapLatency.quantile([1, 2, 3, 4, 100], 0.95), MapLatency.quantile([], 0.5)],
+      f: [MapLatency.fmtDelay(1.64), MapLatency.fmtDelay(52.2), MapLatency.fmtDelay(270), MapLatency.fmtDelay(7600)],
+    };
+  });
+  check('age: 15 min and under is the freshest band, a minute more the next; an hour, three, a day and a week are edges',
+    J(rules.age) === J(['a0', 'a1', 'a1', 'a3', 'a4', 'a6']), J(rules.age));
+  check('delay: a clock running ahead is not late; 10 s, a minute, five and thirty are edges',
+    J(rules.delay) === J(['d0', 'd0', 'd1', 'd2', 'd3', 'd5']), J(rules.delay));
+  check('checks: none missed, under 10%, to a quarter, to half, more than half',
+    J(rules.checks) === J(['c0', 'c1', 'c2', 'c3', 'c4']), J(rules.checks));
+  check('the median interpolates, the 95th percentile is not the maximum, nothing is null',
+    rules.q[0] === 2.5 && rules.q[1] > 4 && rules.q[1] < 100 && rules.q[2] === null, J(rules.q));
+  check('a delay said short: 1.6 s, 52 s, 4.5 min, 2.1 h', J(rules.f) === J(['1.6 s', '52 s', '4.5 min', '2.1 h']), J(rules.f));
+
+  // ── 2. Off until asked for ────────────────────────────────────────────
+  log('\n2. Off until it is asked for\n');
+  await toStations(page);
+  await waitTrue(page, () => HealthGlance._state().net.status === 'ok');
+  await page.waitForTimeout(300);
+  const off0 = await page.evaluate(() => ({
+    on: MapLatency.on(), tagged: state.mapMarkers.filter(m => m.mnLatency).length,
+    strip: [...document.querySelectorAll('#help-panel .dock-strip .dock-tab')].map(b => b.dataset.dock),
+  }));
+  check('off on a first visit: no pin wears a band, and no reading is fetched for it',
+    off0.on === false && off0.tagged === 0 && count('window') === 0, J({ off0, window: count('window') }));
+  check('⏱️ stands in the strip after 🔑, among what the map shows',
+    off0.strip.indexOf('map-latency') === off0.strip.indexOf('map-legend') + 1, J(off0.strip));
+
+  // ── 3. Opening the tool ───────────────────────────────────────────────
+  log('\n3. Opening ⏱️ Latency\n');
+  await page.click('#help-panel .dock-tab[data-dock="map-latency"]');
+  check('the first opening turns the view on', await waitTrue(page, () => MapLatency.on()));
+  await settled(page);
+  await waitTrue(page, () => state.mapMarkers.some(m => m.mnLatency));
+  const steady = await pin(page, R.steady);
+  const silent = await pin(page, R.silent);
+  const never = W.never ? await pin(page, W.never) : null;
+  check('a station heard minutes ago is in a fresh band, in that band\'s green',
+    steady && ['a0', 'a1'].includes(steady.band) && /^#(1a7f37|57a83a)$/i.test(steady.fill), J(steady));
+  check('the silent station, last heard a day and a half ago, is in 1 – 7 days and a step bigger',
+    silent && silent.band === 'a5' && silent.grow > steady.grow, J({ silent, steady }));
+  check('a radio station nobody has heard is hollow in a dotted ring, a step smaller',
+    never && never.band === 'never' && never.fill === '#ffffff' && /1,3/.test(String(never.dash)), J(never));
+  if (W.manual) {
+    const man = await pin(page, W.manual);
+    check('a gauge read by hand keeps its grey: its silence is not latency',
+      man && !man.band && man.fill === (await page.evaluate(() => MapSymbols.MANUAL)), J(man));
+  }
+  const shapes = await page.evaluate(() => state.mapMarkers.filter(m => m.mnLatency)
+    .every(m => m.options.mnShape === (m.mnSymbol.triangle ? 'triangle' : 'circle') && (m.options.mnOutline || null) === (m.mnSymbol.outline || null)));
+  check('every pin keeps its shape and the Bureau\'s outline under the colour', shapes);
+  const sum = await page.evaluate(() => {
+    MapLatency.setScope('all');
+    const el = document.getElementById('map-latency-panel');
+    const bars = [...el.querySelectorAll('.lat-bar')].map(b => ({ label: b.querySelector('.lat-bar-label').textContent, n: Number(b.querySelector('.lat-bar-n').textContent.replace(/,/g, '')) }));
+    const drawn = state.data.stations.filter(s => s.lat != null && s.lon != null && !s.proposed && MapSymbols.ownerDrawn(s)).length;
+    const pinsBand = state.mapMarkers.filter(m => m.mnLatency && /^a\d$/.test(m.mnLatency)).length;
+    return { head: el.querySelector('#lat-h-sum').textContent, bars, drawn, pinsBand,
+             tiles: [...el.querySelectorAll('.adm-kpi-label')].map(x => x.textContent.trim()),
+             shown: !!el.getClientRects().length, checked: el.querySelector('input[type=checkbox]').checked };
+  });
+  const banded = sum.bars.filter(b => !/never|hand/.test(b.label)).reduce((a, b) => a + b.n, 0);
+  check('the pane is on screen, its switch on, with the four tiles',
+    sum.shown && sum.checked && J(sum.tiles) === J(['Heard in the last hour', 'Quiet over a day', 'Delay to the database', 'Checks received']), J(sum));
+  check('the whole map\'s rows add up to every station drawn, and its bands to the pins that wear one',
+    sum.bars.reduce((a, b) => a + b.n, 0) === sum.drawn && banded === sum.pinsBand, J({ sum, banded }));
+  const fetched = count('window');
+  check('the readings were fetched for it — the window, paged, with the columns the analysis reads',
+    fetched > 0 && asked.filter(a => a.kind === 'window').every(a => /select=addr,alert_id,.*received_at/.test(a.url) && !/rssi_dbm/.test(a.url)),
+    J({ fetched }));
+
+  // ── 4. Delay and checks ───────────────────────────────────────────────
+  log('\n4. Delay and checks\n');
+  await page.evaluate(() => MapLatency.setMode('delay'));
+  await waitTrue(page, id => { const m = state.mapMarkers.find(x => x.mnStationId === id); return m && /^d/.test(m.mnLatency || ''); }, R.steady);
+  const d = { steady: await pin(page, R.steady), queued: await pin(page, R.steady3), silent: await pin(page, R.silent) };
+  check('delay: readings landing in 5.3 s are under 10 s; the station whose uploads queue four minutes is 2 – 5 min',
+    d.steady.band === 'd0' && d.queued.band === 'd3' && d.queued.grow > d.steady.grow, J(d));
+  check('…and the station silent through the last 24 h is hollow in a maroon ring, not given a delay',
+    d.silent.band === 'quiet' && d.silent.fill === '#ffffff' && /^#6b1717$/i.test(d.silent.ring), J(d.silent));
+  check('changing what the pins say fetched nothing again', count('window') === fetched, J({ before: fetched, after: count('window') }));
+  await page.evaluate(() => { MapLatency.setWin('7d'); MapLatency.setMode('checks'); });
+  await settled(page);
+  await waitTrue(page, () => MapLatency._state().window.key === '7d' && MapLatency._state().window.status === 'ok');
+  await waitTrue(page, id => { const m = state.mapMarkers.find(x => x.mnStationId === id); return m && /^c/.test(m.mnLatency || ''); }, R.steady);
+  const c = await page.evaluate(R => {
+    const of = id => { const x = MapLatency.classOf(id); return x && { k: x.key, rate: x.value, ch: x.st && x.st.checks }; };
+    return { steady: of(R.steady), fading: of(R.fading), silent: of(R.silent) };
+  }, R);
+  check('checks over the week: the fading station misses more than the steady one, and is in a worse band',
+    c.fading && c.steady && c.fading.rate > c.steady.rate && c.fading.k > c.steady.k && c.steady.k <= 'c1', J(c));
+  const w7 = count('window');
+  check('a week is fetched as a week — more pages than the day', w7 > fetched, J({ day: fetched, week: w7 - fetched }));
+  await page.evaluate(() => refreshMapLayers({ skipFit: true }));
+  await page.waitForTimeout(300);
+  check('a rebuild of the map inside the window\'s lifetime fetches nothing', count('window') === w7, J({ w7, now: count('window') }));
+
+  // ── 5. One station ────────────────────────────────────────────────────
+  log('\n5. One station, picked\n');
+  await page.evaluate(id => MapLatency.focus(id), R.fading);
+  await page.waitForTimeout(300);
+  const one = await page.evaluate(id => {
+    const el = document.getElementById('map-latency-panel');
+    const strip = el.querySelector('svg.lat-strip');
+    const s = state.data.stations.find(x => x.id === id);
+    return {
+      card: state.stnCard.id, head: (el.querySelector('#lat-h-stn') || {}).textContent, name: s.name,
+      focus: document.activeElement && document.activeElement.id,
+      tiles: [...el.querySelectorAll('.adm-kpi-label')].map(x => x.textContent.trim()),
+      slots: strip ? strip.querySelectorAll('rect.hl-slot').length : 0,
+      misses: strip ? strip.querySelectorAll('rect.hl-slot--miss').length : 0,
+      stripName: strip ? strip.getAttribute('aria-label') : '',
+      missed: (el.querySelector('.lat-missed') || {}).textContent || '',
+      dots: !!el.querySelector('svg.lat-delay path.lat-dots'),
+      rx: [...el.querySelectorAll('.lat-table tbody tr td:first-child')].map(td => td.textContent.trim()),
+    };
+  }, R.fading);
+  check('a station pressed in the pane is on the map with its card, and the pane is about it, focus on its name',
+    one.card === R.fading && one.head === one.name && one.focus === 'lat-h-stn', J(one));
+  check('…its tiles: last heard, delay, checks received and the next check',
+    J(one.tiles) === J(['Last heard', 'Delay', 'Checks received', 'Next check']), J(one.tiles));
+  check('…its checks slot by slot, the misses drawn and named, the picture saying the counts',
+    one.slots > 40 && one.misses > 0 && /missed/.test(one.stripName) && /Missed while a receiver/.test(one.missed), J(one));
+  check('…its delay dot by dot, and the receiver that carried it', one.dots && one.rx.some(r => /demo-pi-sdr1/.test(r)), J(one.rx));
+  await page.evaluate(id => showStationCard(id), R.steady);
+  await page.waitForTimeout(150);
+  const followed = await page.evaluate(() => (document.querySelector('#map-latency-panel #lat-h-stn') || {}).textContent);
+  const steadyName = await page.evaluate(id => state.data.stations.find(s => s.id === id).name, R.steady);
+  check('the pane follows the card to another station', followed === steadyName, J({ followed, steadyName }));
+  await page.evaluate(() => closeStnCard());
+  await page.waitForTimeout(150);
+  check('…and goes back to the summary when the card shuts',
+    await page.evaluate(() => !!document.querySelector('#map-latency-panel #lat-h-sum') && MapLatency._state().sel === null));
+
+  // ── 6. One colouring at a time ────────────────────────────────────────
+  log('\n6. One colouring of the pins at a time\n');
+  const legOn = await page.evaluate(() => document.getElementById('map-legend').textContent);
+  check('the 🔑 legend carries the latency key in place of the roles while it is on',
+    /Latency — how many of its timed checks went missing/.test(legOn) && !/Field Station/.test(legOn), legOn.slice(0, 160));
+  await page.evaluate(() => HealthGlance.setPins(true));
+  await page.waitForTimeout(400);
+  const h = await page.evaluate(() => ({ lat: MapLatency.on(), health: state.mapHealth,
+    latPins: state.mapMarkers.filter(m => m.mnLatency).length, stored: localStorage.getItem('mn-map-latency'),
+    note: (document.getElementById('map-health-note') || {}).textContent || '' }));
+  check('Colour pins by health turns latency off — no pin wears a band, and it is remembered off',
+    !h.lat && h.health && h.latPins === 0 && h.stored === 'off', J(h));
+  await page.evaluate(() => MapLatency.setOn(true));
+  await page.waitForTimeout(400);
+  const l = await page.evaluate(() => ({ lat: MapLatency.on(), health: state.mapHealth,
+    healthPins: state.mapMarkers.filter(m => m.mnHealth).length, latPins: state.mapMarkers.filter(m => m.mnLatency).length,
+    note: (document.getElementById('map-health-note') || {}).textContent || '',
+    box: (document.querySelector('#map-display-block input[onchange^="HealthGlance.setPins"]') || {}).checked }));
+  check('…and latency turns health off, its box unticked and its note saying where the colour went',
+    l.lat && !l.health && l.healthPins === 0 && l.latPins > 0 && l.box === false && /latency/.test(l.note), J(l));
+  await page.evaluate(() => MapLatency.setOn(false));
+  await page.waitForTimeout(300);
+  const back = await page.evaluate(() => ({ tagged: state.mapMarkers.filter(m => m.mnLatency).length,
+    roles: /Field Station/.test(document.getElementById('map-legend').textContent) }));
+  check('switched off, the pins and the legend are back in their roles', back.tagged === 0 && back.roles, J(back));
+  await page.evaluate(() => { setDockTab('stations', { instant: true }); });
+  await page.click('#help-panel .dock-tab[data-dock="map-latency"]');
+  await page.waitForTimeout(300);
+  check('opening the pane again in the same session leaves a view turned off, off', await page.evaluate(() => !MapLatency.on()));
+
+  // ── 6b. A pane put back as the page loads ────────────────────────────
+  log('\n6b. The pane put back by a reload\n');
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await ctx.addInitScript(() => {
+      try {
+        if (sessionStorage.getItem('lat-seeded')) return;
+        sessionStorage.setItem('lat-seeded', '1');
+        localStorage.setItem('mn-help', 'expanded');
+        localStorage.setItem('mn-dock-tab', 'map-latency');
+        localStorage.setItem('mn-map-latency', 'off');
+      } catch (_) {}
+    });
+    const p = await open(ctx);
+    await loaded(p);
+    await toStations(p);
+    await p.waitForTimeout(600);
+    const re = await p.evaluate(() => ({ showing: dockShowing(), on: MapLatency.on(),
+      pane: !!document.querySelector('#map-latency-panel #lat-h-sum') }));
+    check('the side panel putting the pane back leaves a view stored off, off — only a press of ⏱️ turns it on',
+      re.showing === 'map-latency' && re.pane && re.on === false, J(re));
+    await ctx.close();
+  }
+
+  // ── 7. No data, honestly ──────────────────────────────────────────────
+  log('\n7. A datastore that cannot be reached\n');
+  {
+    MODE = 'down';
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const p = await open(ctx);
+    await loaded(p);
+    await toStations(p);
+    await p.click('#help-panel .dock-tab[data-dock="map-latency"]');
+    await settled(p);
+    await p.waitForTimeout(300);
+    const down = await p.evaluate(() => ({
+      status: MapLatency._state().window.status,
+      text: document.getElementById('lat-status').textContent.replace(/\s+/g, ' '),
+      retry: !!document.querySelector('#lat-status button[onclick="MapLatency.refresh()"]'),
+      banded: state.mapMarkers.filter(m => m.mnLatency && /^a\d$/.test(m.mnLatency)).length,
+    }));
+    check('the pane says the readings could not be fetched and offers to try again; no pin claims an age',
+      down.status === 'error' && /could not be fetched/.test(down.text) && down.retry && down.banded === 0, J(down));
+    await ctx.close();
+    MODE = 'ok';
+  }
+
+  check('nothing threw for the whole run', errors.length === 0, errors.slice(0, 3).join(' | '));
+} finally {
+  await browser.close();
+  await server.close();
+}
+
+const failed = results.filter(r => !r.ok);
+log(`\n  ${results.length} assertion(s).`);
+if (failed.length) {
+  log(`\nFAIL — ${failed.length} of them:\n`);
+  for (const f of failed) log(`  ✗ ${f.label}${f.detail ? `\n      ${f.detail}` : ''}`);
+  process.exit(1);
+}
+log('\nPASS — ⏱️ Latency colours every pin by age, delay or missed checks and keeps its shape and outline,\n'
+  + '       fetches the window once, sums up the stations in view, and shows a picked station\'s checks\n'
+  + '       slot by slot; one colouring of the pins at a time.');

@@ -449,6 +449,16 @@ jobs:
         working-directory: test
         run: npm run healthcard
 
+      # ⏱️ Latency (map-latency.js), against the demo week through the strict
+      # PostgREST stub: the bands' edges; off until asked for; the first
+      # opening of the pane turns it on; every pin a band or said otherwise,
+      # its shape and outline kept; the window fetched once; a queued station
+      # in its delay band, a fading one missing more checks; a picked
+      # station's checks slot by slot; one colouring of the pins at a time.
+      - name: Latency — pins by age, delay and missed checks
+        working-directory: test
+        run: npm run latency
+
       - name: Smoke — every tab, clean console
         working-directory: test
         run: npm run smoke
