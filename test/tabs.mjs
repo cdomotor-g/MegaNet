@@ -663,9 +663,10 @@ const SEED_NR = `async () => {
   for (const d of document.querySelectorAll('#main-content details')) d.open = true;
 }`;
 
-// The ALERT2 Transition Plan, born converted: as an administrator would see
-// it — the SLS loaded so the owners are filled in, and every disclosure open,
-// the unit costs and the catchment and backbone tables with them.
+// The ALERT2 Transition Plan, born converted: as somebody on its list (0076)
+// would see it — the SLS loaded so the owners are filled in, and every
+// disclosure open, the unit costs and the catchment and backbone tables with
+// them.
 const SEED_A2_OUT = `() => {
   if (window.__a2Auth) { Object.assign(Auth, window.__a2Auth); delete window.__a2Auth; }
   Alert2Plan.authChanged();
@@ -673,12 +674,12 @@ const SEED_A2_OUT = `() => {
 
 const SEED_A2 = `async () => {
   if (!window.__a2Auth) {
-    const real = { isSignedIn: Auth.isSignedIn, isAdmin: Auth.isAdmin, role: Auth.role };
+    const real = { isSignedIn: Auth.isSignedIn, a2plan: Auth.a2plan, a2planNominates: Auth.a2planNominates };
     window.__a2Auth = real;
     const here = () => state.activeTab === 'a2plan';
     Auth.isSignedIn = () => here() || real.isSignedIn();
-    Auth.isAdmin = () => here() || (real.isAdmin ? real.isAdmin() : false);
-    Auth.role = () => here() ? 'admin' : real.role();
+    Auth.a2plan = () => here() || (real.a2plan ? real.a2plan() : false);
+    Auth.a2planNominates = () => here() || (real.a2planNominates ? real.a2planNominates() : false);
   }
   try { await SLS.ensureData(); } catch (_) { /* the plan draws without owners */ }
   Alert2Plan.authChanged();

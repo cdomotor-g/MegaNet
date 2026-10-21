@@ -20503,6 +20503,11 @@ select.kl-in { width: auto; font-family: inherit; }
 .a2p-scen-notes { display: block; font-weight: 400; overflow-wrap: anywhere; }
 .a2p-scen-on th[scope="row"] { box-shadow: inset 3px 0 0 var(--accent); }
 .a2p-scen-acts { flex-wrap: wrap; gap: .25rem; }
+/* Who sees the plan (0076), folded under the heading: the list, and for a
+   nominator the address to add somebody by. */
+.a2p-people { margin: var(--sp-1) 0; }
+.a2p-people > summary { cursor: pointer; font-size: var(--fs-sm); color: var(--muted); }
+.a2p-people-mail { display: block; font-weight: 400; overflow-wrap: anywhere; }
 .a2p-shared  { background: var(--accent); color: var(--panel); }
 .a2p-private { background: var(--subtle); color: var(--text); }
 .a2p-site-by { display: block; margin-top: .15rem; }
@@ -20515,6 +20520,7 @@ select.kl-in { width: auto; font-family: inherit; }
    carries what the card was set to, so nothing is lost by leaving it off. */
 @media print {
   .a2p-controls,
+  .a2p-people,
   .a2p-head .button-group,
   .a2p-move { display: none !important; }
   .a2p-fig { break-inside: avoid; }

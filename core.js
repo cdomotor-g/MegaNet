@@ -259,7 +259,7 @@ const TABS = [
       find: 'ingest points receivers fleet devices heartbeat check-in checking in uptime temperature under-voltage uplink queue remote manage restart reboot update upgrade release log ssh keys login maintenance team public key' },
     { id: 'review',     label: 'Network Review',         icon: '📐',
       find: 'network review design audit planning fade margin matrix radio mobile rm comparison calibration calibrate attenuator path margin measured field test redundancy two paths second path gateways repeater relocation move proposed site hops tdma alert2 frequency principles licence' },
-    { id: 'a2plan',     label: 'ALERT2 Transition Plan', icon: '🧭',     who: 'admin',
+    { id: 'a2plan',     label: 'ALERT2 Transition Plan', icon: '🧭',     who: 'a2plan',
       find: 'alert2 transition migration upgrade plan proposal business case management submission erta2 ert-a2 elpro 115e base station repeater backbone acquisition remediation equipment quantity cost estimate budget fte effort staff crews timeline gantt schedule duration catchment basin region scenario what if sliders network review' },
     { id: 'tdma',       label: 'TDMA Planner',           icon: '⏱️',
       find: 'tdma planner alert2 time slot slots frame length slot length offset schedule timing repeater field station aggregation latency capacity air time airlink buffer guard clock gps hop limit path service configuration sheet ert-a2 ind api legacy concentration aloha channel network planning transition' },
@@ -293,15 +293,19 @@ function tabCannot(t) {
 // Whether the nav lists a tab for this session. A tab with `who: 'admin'` is
 // listed to an administrator and to nobody else — not in the bar, the find
 // box, Ctrl+K, a view or the Site Map — where Base Stations and Network Review
-// are listed to everyone and say who they are for once opened. It is still a
-// tab (TAB_LIST holds it, and ?tab= opens it), so the module's own render is
-// what refuses anybody else; this decides only whether it is offered. The
-// database is not asked anything new: Auth.isAdmin() is whoami()'s answer, and
-// auth.js re-renders the nav whenever that answer changes.
+// are listed to everyone and say who they are for once opened. `who: 'a2plan'`
+// is the same for the people on the ALERT2 Transition Plan's list (0076),
+// whom the owner nominates — administrators are not on it by being one. Either
+// is still a tab (TAB_LIST holds it, and ?tab= opens it), so the module's own
+// render is what refuses anybody else; this decides only whether it is
+// offered. The database is not asked anything new: Auth.isAdmin() and
+// Auth.a2plan() are whoami()'s answers, and auth.js re-renders the nav
+// whenever they change.
 function tabShown(t) {
-  if (!t || t.who !== 'admin') return true;
-  return typeof Auth !== 'undefined' && Auth.isSignedIn()
-    && !!((Auth.isAdmin && Auth.isAdmin()) || Auth.role() === 'admin');
+  if (!t || !t.who) return true;
+  if (typeof Auth === 'undefined' || !Auth.isSignedIn()) return false;
+  if (t.who === 'a2plan') return !!(Auth.a2plan && Auth.a2plan());
+  return !!((Auth.isAdmin && Auth.isAdmin()) || Auth.role() === 'admin');
 }
 
 // What the help panel says, keyed by the same tab ids TABS uses. Kept beside
@@ -2239,14 +2243,15 @@ const HELP = {
            + '<strong>effort in FTE</strong> and the <strong>cost</strong> by financial year. Every figure is worked from the '
            + 'station register as loaded, under <strong>🎛️ Try it another way</strong> — sliders and switches that work the '
            + 'whole plan again as they move, and <strong>Catchments in the plan</strong>, a box for every catchment and region '
-           + 'to choose which are remediated. Listed to administrators only.',
+           + 'to choose which are remediated. Listed only to the people nominated to see it — administrators too are '
+           + 'left out unless they are on the list, which is folded under the heading.',
     watch: [
       '<strong>It is an estimate, and says so.</strong> The quantities are counted from the register; the rates, '
       + 'durations and unit prices are the draft\'s proposals, and a supplier\'s quote replaces them under '
       + '<em>Unit costs and rates</em>.',
       '<strong>The card is kept on this device; a scenario in the database.</strong> Under <em>📁 Scenarios</em>, '
       + '<em>Save as a new scenario…</em> keeps the card under a name — private, seen by nobody but you, until you press '
-      + '<em>Share</em>, when every administrator can load it. Only its author saves changes to it, shares it again or '
+      + '<em>Share</em>, when everybody who sees the plan can load it. Only its author saves changes to it, shares it again or '
       + 'removes it; anybody else loading it saves their own copy. “The proposal” puts the sliders back and leaves the '
       + 'catchments ticked and their order as they are; the figures at the top say how far any scenario is from the '
       + 'proposal over every catchment.',
@@ -2255,7 +2260,7 @@ const HELP = {
       + 'record; a repeater shared with an earlier catchment is done once. Where the register has no way to a base, the relays are '
       + 'not counted and the plan says so.',
       '<strong>A site condition</strong> — fit-out only, a retrofit, or the structure rebuilt — is set in section 5\'s '
-      + '<em>Site conditions</em> table and kept in the database: one answer per site, the same for every administrator, '
+      + '<em>Site conditions</em> table and kept in the database: one answer per site, the same for everybody who sees the plan, '
       + 'whatever scenario is loaded, with who set it and when. A site with its condition set is costed at that and not '
       + 'audited; one left <em>Not assessed</em> is audited first and costed at the card\'s mix. It is what is known, not a '
       + 'lever: the proposal is worked with it too.',
@@ -2264,7 +2269,10 @@ const HELP = {
       '<strong>The backbone is map-backbone.js\'s rule</strong> — repeaters sharing an open pass-range window with another, '
       + 'or with a base, within the hop distance on the card. Owners come from the station record or the SLS, and a site '
       + 'with neither is counted as “no owner on record”, not guessed.',
-      '<strong>Hidden is not secret.</strong> The tab is left out of the nav for anybody but an administrator, but its '
+      '<strong>Who sees it is a list.</strong> <em>Seen by …</em>, under the heading, says who is on it. Somebody who may '
+      + 'nominate adds a person by the address they sign in with (an approved account), lets them nominate too, or takes '
+      + 'them off; the plan always keeps one person who may nominate.',
+      '<strong>Hidden is not secret.</strong> The tab is left out of the nav for anybody not on the list, but its '
       + 'words are in a public repository. Nothing that must stay private belongs in it.',
     ],
     links: [{ label: 'Network review and the design principles', href: 'docs/network-review.md' },

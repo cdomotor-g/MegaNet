@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-21** (revision 176 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-21** (revision 177 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -815,6 +815,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 177 — 2026-10-21: 🧭 The ALERT2 Transition Plan for the people the owner nominates
+
+The owner: *"Can you please make the alert to transition plan only visible to certain users? Whom I nominate. Initially, it will be just me."* **Opens and closes nothing. Left: the owner applies `0076` and puts themselves on the list (below).**
+
+- **`0076`**: `meganet.a2plan_member` — the plan's list, one row a person, `nominates` for who may change it. `is_a2plan_member()` / `is_a2plan_nominator()` (the shape of `is_admin()`, and an approved account as well, so a decline takes the plan at once) replace `is_admin()` in all four of `0065`'s doors and both select policies; **an administrator not on the list sees nothing**. `a2plan_read()` answers the list too (`people`); `a2plan_member_save(email, nominates)` and `a2plan_member_remove(id)` for nominators, never taking the last nominator off. `whoami()` says `a2plan` and `a2plan_nominates`.
+- **The app**: the tab is `who: 'a2plan'` — the nav, find box, Ctrl+K, views and Site Map offer it by `Auth.a2plan()`. A database before `0076` does not say, and there it stays every administrator's, as its doors still are. Under the plan's heading, folded, **Seen by …** lists who is on it; a nominator adds by address (letting them nominate or not), ticks *May nominate*, and *Take off…*s. "Every administrator" in its words became "everybody who sees the plan". Stamp `20261021p`; `core.js` stays at 74 until `0075`/`0076` are applied.
+- **The owner's two steps**, in the SQL editor: run `db/migrations/0076_alert2_plan_list.sql`, then `select meganet.a2plan_member_save('<the address you sign in with>', true);`. Between the two, nobody sees the plan.
+
+**Checks:** `tools/check_alert2_plan.sql` rewritten (67: the list's guards, an administrator off it refused, a member on it reading, a decline closing it, leaving it) with `check_accounts` and `check_user_admin` against all 76 migrations from zero, `0076` applied twice; `npm run a2plan` (101, ten new under *Who sees it*), `nav` (an administrator off the list, somebody on it who is not one), `views`, `calm`, `tabs`, `help` and the cheap five.
 
 ### Revision 176 — 2026-10-21: 🐞 A bug report sent with one press — no GitHub account, no second page
 

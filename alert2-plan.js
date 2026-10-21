@@ -1,10 +1,10 @@
 // MegaNet — alert2-plan.js
 //
-//   Alert2Plan   the ALERT2 Transition Plan tab, listed to administrators and
-//                nobody else: a draft for management of what moving the
-//                network from ALERT to ALERT2 takes — the equipment and how
-//                much of it, where the work is by region and catchment, the
-//                network reviews, the backbone repeaters to acquire, audit,
+//   Alert2Plan   the ALERT2 Transition Plan tab, listed to the people the owner
+//                nominates and nobody else: a draft for management of what
+//                moving the network from ALERT to ALERT2 takes — the equipment
+//                and how much of it, where the work is by region and catchment,
+//                the network reviews, the backbone repeaters to acquire, audit,
 //                retrofit or rebuild first, the cut-over of each catchment
 //                onto an ALERT2 backbone in concentration mode, the timeline,
 //                the effort in FTE and the cost — every figure worked from the
@@ -22,15 +22,18 @@
 // (XlsxWrite) and export.js (zipStore, through it) for the workbook.
 //
 // ── Who it is for ────────────────────────────────────────────────────────────
-// The owner asked for this tab to be seen by the highest administrators only,
-// so TABS marks it `who: 'admin'` and the nav, the find box, Ctrl+K, the views
-// and the Site Map all leave it out for anybody else (tabShown, core.js).
+// The owner asked for this tab to be seen only by the people they nominate —
+// themselves alone, to begin with — so the database keeps a list (0076), and
+// TABS marks the tab `who: 'a2plan'`: the nav, the find box, Ctrl+K, the views
+// and the Site Map all leave it out for anybody not on it, administrators
+// included (tabShown, core.js; Auth.a2plan(), whoami()'s answer). A database
+// before 0076 has no list, and there it is still every administrator's.
 // Opened by its address it says who it is for and shows nothing more. Like
 // Network Review, everything it reads is readable without signing in — the
 // register, the SLS, the basins — so this is about who the page is for, not
 // the security of any datum. The plan's own words are in this file, and this
 // repository is public: anything that must stay private (a negotiated price,
-// a name) belongs in the database behind meganet.is_admin(), not here.
+// a name) belongs in the database behind meganet.is_a2plan_member(), not here.
 //
 // ── How the plan is worked out ───────────────────────────────────────────────
 // Three layers, kept apart so each can be read and checked alone:
@@ -78,10 +81,13 @@
 // change at a time:
 //
 //   site conditions  what each repeater site needs, as somebody knows it — one
-//                    answer per site, the same for every administrator.
+//                    answer per site, the same for everybody who sees the plan.
 //   scenarios        the card saved under a name: private to whoever saved it
-//                    until they share it, then every administrator may load it;
-//                    only its author changes, shares or removes it.
+//                    until they share it, then everybody who sees the plan may
+//                    load it; only its author changes, shares or removes it.
+//   people           who sees the plan (0076): everybody on the list sees who
+//                    else is, and a nominator adds people, lets them nominate
+//                    and takes them off.
 
 const Alert2Plan = (function () {
   const LS_KEY = 'meganet.a2plan.scenario';
@@ -234,13 +240,15 @@ const Alert2Plan = (function () {
 
   // ── the shared store (0065) ──
   // What a2plan_read() answered, and where the card came from. `store` says
-  // whether it has: 'idle' until the tab is opened by an administrator,
+  // whether it has: 'idle' until the tab is opened by somebody on the list,
   // 'loading', 'ready', or 'failed' with the reason in storeError.
   const LS_LOADED = 'meganet.a2plan.loaded';
   let conditions = {};               // station id → 'fit' | 'retrofit' | 'rebuild'
   const condBy = new Map();          // station id → { by, at }: who set it, and when
   let condStamp = 0;                 // moves whenever a condition does, so the plan is worked again
-  let scenarios = [];                // every saved scenario this administrator may see
+  let scenarios = [];                // every saved scenario this person may see
+  let people = null;                 // who sees the plan (0076); null from a database before it
+  let peopleOpen = false;            // the list, folded or not
   let store = 'idle', storeError = '';
   let scenFormOpen = false;          // "Save as a new scenario" unfolded
   let busy = false;                  // a write on its way: the buttons wait for it
@@ -260,9 +268,13 @@ const Alert2Plan = (function () {
     } catch (_) { /* unremembered, as the card is in a private window */ }
   }
 
-  function isAdmin() {
-    return typeof Auth !== 'undefined' && Auth.isSignedIn()
-      && ((Auth.isAdmin && Auth.isAdmin()) || Auth.role() === 'admin');
+  // On the plan's list, as whoami() says (0076) — and whether this person may
+  // change it. The doors ask the database again whatever these say.
+  function mayPlan() {
+    return typeof Auth !== 'undefined' && Auth.isSignedIn() && !!(Auth.a2plan && Auth.a2plan());
+  }
+  function mayNominate() {
+    return mayPlan() && !!(Auth.a2planNominates && Auth.a2planNominates());
   }
 
   // ── the scenario, kept on this device ──
@@ -337,7 +349,7 @@ const Alert2Plan = (function () {
     }
   }
   async function loadStore() {
-    if (!isAdmin() || typeof dbRpc !== 'function' || store === 'loading') return;
+    if (!mayPlan() || typeof dbRpc !== 'function' || store === 'loading') return;
     store = 'loading'; storeError = '';
     refreshStore();
     try {
@@ -345,6 +357,7 @@ const Alert2Plan = (function () {
       conditions = {}; condBy.clear();
       for (const r of (got && Array.isArray(got.sites) ? got.sites : [])) setCondition(r);
       scenarios = (got && Array.isArray(got.scenarios) ? got.scenarios : []).filter(x => x && typeof x.id === 'string');
+      people = got && Array.isArray(got.people) ? got.people.filter(x => x && typeof x.id === 'string') : null;
       if (loaded && !scenarios.some(x => x.id === loaded.id)) { loaded = null; saveLoaded(); }
       await carryLegacySites();
       store = 'ready';
@@ -357,7 +370,7 @@ const Alert2Plan = (function () {
     repaint();
   }
   // Conditions set when they were kept inside the card, on this device:
-  // saved for every administrator, except where somebody has already said.
+  // saved for everybody who sees the plan, except where somebody has already said.
   async function carryLegacySites() {
     const old = legacySites;
     legacySites = null;
@@ -369,7 +382,7 @@ const Alert2Plan = (function () {
     }
     // The card is written again without them, so they are carried once.
     saveScenario();
-    if (n) announce(`${n} site condition${n === 1 ? '' : 's'} kept on this device ${n === 1 ? 'is' : 'are'} now saved for every administrator.`);
+    if (n) announce(`${n} site condition${n === 1 ? '' : 's'} kept on this device ${n === 1 ? 'is' : 'are'} now saved for everybody who sees the plan.`);
   }
 
   // The card as a scenario keeps it: every setting, the regions' and
@@ -390,11 +403,12 @@ const Alert2Plan = (function () {
     scenarios.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
   }
   // A write to the store: the buttons wait, the panel says what happened, and
-  // a refusal is said in the database's own words.
-  async function write(what, fn, focusKey) {
+  // a refusal is said in the database's own words. `refresh` draws the panel
+  // the write was made from: the scenarios', or the list's.
+  async function write(what, fn, focusKey, refresh = refreshStore) {
     if (busy) return null;
     busy = true;
-    refreshStore(focusKey);
+    refresh(focusKey);
     try {
       const out = await fn();
       return out;
@@ -403,7 +417,7 @@ const Alert2Plan = (function () {
       return null;
     } finally {
       busy = false;
-      refreshStore(focusKey);
+      refresh(focusKey);
     }
   }
 
@@ -1236,14 +1250,14 @@ const Alert2Plan = (function () {
       <div class="panel-header"><h2>ALERT2 Transition Plan</h2></div>
       <p class="small">A draft plan for management, worked from the station register: the equipment, where the work is,
         the network reviews, the backbone repeaters, the timeline, the effort and the cost of moving the network to ALERT2.</p>
-      ${typeof Auth !== 'undefined' && Auth.isSignedIn() ? '<p class="small">This is for administrators only.</p>'
+      ${typeof Auth !== 'undefined' && Auth.isSignedIn() ? '<p class="small">This is only for the people nominated to see it.</p>'
         : '<div class="button-group"><button class="primary" onclick="Auth.open()">🔑 Sign in</button></div>'}
     </div>`;
   }
 
   function render() {
     let body;
-    if (!isAdmin()) body = outsideHtml();
+    if (!mayPlan()) body = outsideHtml();
     else if (!state.data) body = '<div class="panel"><p class="small">The station register is still loading — the plan is worked from it.</p></div>';
     else body = headHtml() + `<div id="a2p-kpis">${kpisHtml()}</div>` + controlsHtml() + `<div id="a2p-out" class="stack">${outHtml()}</div>`;
     return `<div class="page a2p-page" style="--page-max:1200px"><h2 class="sr-only">ALERT2 Transition Plan</h2><div class="stack" id="a2p-page">${body}</div></div>`;
@@ -1283,7 +1297,8 @@ const Alert2Plan = (function () {
         cost. <strong>Every figure is an estimate</strong>, worked from the station register${asAt} and the scenario
         below; move a slider and the whole plan is worked again.</p>
       <div id="a2p-scen-line">${scenLineHtml()}</div>
-      <p class="small txt-muted">Listed to administrators only. ${slsReady ? '' : 'Owners and SLS priorities are still loading — the backbone ownership figures fill in when they arrive.'}</p>
+      <div id="a2p-people-box">${peopleHtml()}</div>
+      ${slsReady ? '' : '<p class="small txt-muted">Owners and SLS priorities are still loading — the backbone ownership figures fill in when they arrive.</p>'}
     </div>`;
   }
 
@@ -1291,7 +1306,7 @@ const Alert2Plan = (function () {
   function scenLineHtml() {
     const L = loadedScenario();
     if (!L) return '';
-    return `<p class="small a2p-scen-line">Scenario: <strong>${esc(L.name)}</strong>${L.mine ? '' : ` by ${esc(L.by || 'another administrator')}`}${
+    return `<p class="small a2p-scen-line">Scenario: <strong>${esc(L.name)}</strong>${L.mine ? '' : ` by ${esc(L.by || 'somebody else')}`}${
       changedSinceLoad() ? ' — changed since it was saved' : ''}${L.notes ? ` · ${esc(L.notes)}` : ''}</p>`;
   }
 
@@ -1392,7 +1407,7 @@ const Alert2Plan = (function () {
 
   // ── saved scenarios ──
   // Where the card came from, the buttons to save it, and every scenario this
-  // administrator may load: their own, private or shared, and the ones the
+  // person may load: their own, private or shared, and the ones the
   // others have shared. Rows are numbered off `scenarios`, so no name has to
   // survive a trip through an onclick attribute.
   let scenListOpen = true;
@@ -1406,7 +1421,7 @@ const Alert2Plan = (function () {
     const changed = changedSinceLoad();
     const dis = busy ? ' disabled' : '';
     const now = L
-      ? `Working from <strong>${esc(L.name)}</strong> — ${L.mine ? 'yours' : `by ${esc(L.by || 'another administrator')}`}, ${L.shared ? 'shared with every administrator' : 'private to you'}${
+      ? `Working from <strong>${esc(L.name)}</strong> — ${L.mine ? 'yours' : `by ${esc(L.by || 'somebody else')}`}, ${L.shared ? 'shared with everybody who sees the plan' : 'private to you'}${
         changed ? '; <strong>changed since it was loaded</strong>' : ''}.${L.mine ? '' : ' Only its author can change it: save your own copy to keep your changes.'}`
       : 'The card is not saved as a scenario.';
     const mineN = scenarios.filter(x => x.mine).length, theirsN = scenarios.length - mineN;
@@ -1418,7 +1433,7 @@ const Alert2Plan = (function () {
         <td><span class="button-group a2p-scen-acts">
           <button type="button" class="exp-btn-sm" data-k="sload:${esc(x.id)}" onclick="Alert2Plan.scen('load', ${i})"${dis} aria-label="Load ${escAttr(x.name)}">Load</button>
           ${x.mine ? `<button type="button" class="exp-btn-sm" data-k="sshare:${esc(x.id)}" onclick="Alert2Plan.scen('share', ${i})"${dis}
-              aria-label="${x.shared ? 'Make' : 'Share'} ${escAttr(x.name)}${x.shared ? ' private' : ' with every administrator'}">${x.shared ? 'Make private' : 'Share'}</button>
+              aria-label="${x.shared ? 'Make' : 'Share'} ${escAttr(x.name)}${x.shared ? ' private' : ' with everybody who sees the plan'}">${x.shared ? 'Make private' : 'Share'}</button>
             <button type="button" class="exp-btn-sm" data-k="sdel:${esc(x.id)}" onclick="Alert2Plan.scen('delete', ${i})"${dis} aria-label="Remove ${escAttr(x.name)}">Remove…</button>` : ''}
         </span></td></tr>`;
     const form = scenFormOpen ? `<form class="a2p-scen-form" id="a2p-scen-form" onsubmit="event.preventDefault(); Alert2Plan.scen('save')">
@@ -1426,7 +1441,7 @@ const Alert2Plan = (function () {
           <input type="text" id="a2p-scen-name" maxlength="80" autocomplete="off" value="${escAttr(L && !changed ? '' : (L ? `${L.name} (changed)` : ''))}"></label>
         <label class="a2p-ctl" for="a2p-scen-notes"><span>Notes <span class="txt-muted">(optional)</span></span>
           <textarea id="a2p-scen-notes" maxlength="2000" rows="2"></textarea></label>
-        <label class="check-label a2p-switch"><input type="checkbox" id="a2p-scen-share"><span>Share it with every administrator now — otherwise only you see it until you share it</span></label>
+        <label class="check-label a2p-switch"><input type="checkbox" id="a2p-scen-share"><span>Share it with everybody who sees the plan now — otherwise only you see it until you share it</span></label>
         <div class="button-group">
           <button type="submit" class="primary exp-btn-sm" data-k="scen:save"${dis}>Save the scenario</button>
           <button type="button" class="exp-btn-sm" data-k="scen:cancel" onclick="Alert2Plan.scen('cancel')">Cancel</button>
@@ -1438,12 +1453,12 @@ const Alert2Plan = (function () {
       </div>
       ${form}
       ${scenarios.length ? `<details class="a2p-scen-list" id="a2p-scen-list"${scenListOpen ? ' open' : ''} ontoggle="Alert2Plan.scenListToggled(this.open)">
-        <summary>Saved scenarios — ${mineN} yours, ${theirsN} shared by other administrators</summary>
+        <summary>Saved scenarios — ${mineN} yours, ${theirsN} shared by others</summary>
         <div class="table-wrap"><table class="a2p-table a2p-scen-table">
-          <caption class="sr-only">Saved scenarios you may load: your own, and the ones other administrators have shared</caption>
+          <caption class="sr-only">Saved scenarios you may load: your own, and the ones others who see the plan have shared</caption>
           <thead><tr><th scope="col">Scenario</th><th scope="col">By</th><th scope="col">Who sees it</th><th scope="col" class="col-optional">Saved</th><th scope="col">Actions</th></tr></thead>
           <tbody>${scenarios.map(row).join('')}</tbody></table></div></details>`
-        : '<p class="small txt-muted">No scenario is saved yet. A private one is seen by nobody but you; a shared one by every administrator.</p>'}`;
+        : '<p class="small txt-muted">No scenario is saved yet. A private one is seen by nobody but you; a shared one by everybody who sees the plan.</p>'}`;
   }
   // The panel drawn again in place — after a load, a save or a change of
   // what is on its way — with what was typed in its form kept, and the
@@ -1468,6 +1483,68 @@ const Alert2Plan = (function () {
     if (focusKey) {
       const f = (focusKey[0] === '#' ? document.getElementById(focusKey.slice(1)) : el.querySelector(`[data-k="${CSS.escape(focusKey)}"]`))
         || el.querySelector('[data-k="scen:new"]');
+      if (f && !f.disabled) f.focus();
+    }
+  }
+
+  // ── who sees the plan (0076) ──
+  // Under the heading: who the plan is shown to, folded. Everybody on the list
+  // sees who else is — they are who a shared scenario is shared with — and a
+  // nominator adds people by the address they sign in with, lets them
+  // nominate too, and takes them off. Rows are numbered off `people`.
+  function peopleHtml() {
+    if (people === null) {
+      return store === 'ready' ? '<p class="small txt-muted">Listed to administrators only.</p>'
+        : '<p class="small txt-muted">Seen only by the people nominated to it.</p>';
+    }
+    const nom = mayNominate();
+    const dis = busy ? ' disabled' : '';
+    const n = people.length;
+    const names = people.map(x => (x.you ? 'you' : x.who || x.email || '—'));
+    const said = n === 1 && people[0].you ? 'you alone' : `${n} ${n === 1 ? 'person' : 'people'} — ${names.slice(0, 4).join(', ')}${n > 4 ? ` and ${n - 4} more` : ''}`;
+    const row = (x, i) => `<tr>
+        <th scope="row">${esc(x.who || x.email || '—')}${x.you ? ' <span class="badge">you</span>' : ''}${
+          x.email && x.email !== x.who ? `<span class="small txt-muted a2p-people-mail">${esc(x.email)}</span>` : ''}</th>
+        <td>${nom ? `<label class="check-label"><input type="checkbox" data-k="pnom:${esc(x.id)}"${x.nominates ? ' checked' : ''}${dis}
+              onchange="Alert2Plan.person('nominates', ${i}, this.checked)"><span class="sr-only">${escAttr(x.who || x.email || '')} may nominate</span></label>`
+          : x.nominates ? 'Yes' : 'No'}</td>
+        <td class="small col-optional">${esc(whenText(x.added_at))}${x.added_by ? ` by ${esc(x.added_by)}` : ''}</td>
+        ${nom ? `<td><button type="button" class="exp-btn-sm" data-k="pdel:${esc(x.id)}" onclick="Alert2Plan.person('remove', ${i})"${dis}
+              aria-label="Take ${escAttr(x.who || x.email || '')} off the list">Take off…</button></td>` : ''}
+      </tr>`;
+    const form = nom ? `<form class="a2p-scen-form a2p-people-form" onsubmit="event.preventDefault(); Alert2Plan.person('add')">
+        <label class="a2p-ctl" for="a2p-people-email"><span>Add somebody, by the address they sign in with</span>
+          <input type="email" id="a2p-people-email" maxlength="254" autocomplete="off" spellcheck="false"></label>
+        <label class="check-label a2p-switch"><input type="checkbox" id="a2p-people-nom"><span>They may nominate others too</span></label>
+        <div class="button-group"><button type="submit" class="primary exp-btn-sm" data-k="ppl:add"${dis}>Add to the list</button></div>
+        <p class="small txt-muted">They need an approved account first. An administrator sees the plan only from this list, like anybody else.</p>
+      </form>` : '<p class="small txt-muted">Only somebody who may nominate changes who sees it.</p>';
+    return `<details class="a2p-people" id="a2p-people"${peopleOpen ? ' open' : ''} ontoggle="Alert2Plan.peopleToggled(this.open)">
+        <summary>Seen by ${esc(said)}</summary>
+        <div class="table-wrap"><table class="a2p-table a2p-people-table">
+          <caption class="sr-only">Who sees the ALERT2 Transition Plan, and who may change that</caption>
+          <thead><tr><th scope="col">Person</th><th scope="col">May nominate</th><th scope="col" class="col-optional">Added</th>${
+            nom ? '<th scope="col"><span class="sr-only">Actions</span></th>' : ''}</tr></thead>
+          <tbody>${people.map(row).join('')}</tbody></table></div>
+        ${form}
+      </details>`;
+  }
+  // The list drawn again in place, keeping what was typed and the control
+  // pressed (or the add button, standing in for one that has gone).
+  function refreshPeople(focusKey) {
+    if (typeof document === 'undefined' || state.activeTab !== 'a2plan') return;
+    const el = document.getElementById('a2p-people-box');
+    if (!el) return;
+    const mail = document.getElementById('a2p-people-email'), nomBox = document.getElementById('a2p-people-nom');
+    const typed = mail ? mail.value : null, ticked = nomBox ? nomBox.checked : null;
+    const on = document.activeElement;
+    if (!focusKey && on && el.contains(on)) focusKey = on.dataset && on.dataset.k ? on.dataset.k : (on.id ? `#${on.id}` : '');
+    el.innerHTML = peopleHtml();
+    if (typed != null) { const f = document.getElementById('a2p-people-email'); if (f) f.value = typed; }
+    if (ticked != null) { const b = document.getElementById('a2p-people-nom'); if (b) b.checked = ticked; }
+    if (focusKey) {
+      const f = (focusKey[0] === '#' ? document.getElementById(focusKey.slice(1)) : el.querySelector(`[data-k="${CSS.escape(focusKey)}"]`))
+        || el.querySelector('[data-k="ppl:add"]');
       if (f && !f.disabled) f.focus();
     }
   }
@@ -1828,7 +1905,7 @@ const Alert2Plan = (function () {
     if (!b) return '';
     if (b.pending) return 'saving…';
     const when = whenText(b.at);
-    return `set by ${b.by || 'an administrator'}${when ? `, ${when}` : ''}`;
+    return `set by ${b.by || 'somebody who sees the plan'}${when ? `, ${when}` : ''}`;
   }
   function roleText(r) {
     return r.conc && r.relay ? 'Concentrator and relay' : r.conc ? 'Concentrator' : r.relay ? 'Relay to a base' : 'On a ticked catchment\'s ground';
@@ -1944,7 +2021,7 @@ const Alert2Plan = (function () {
       <details class="a2p-more" id="a2p-sites"><summary>Site conditions — what each of the ${nf(list.length)} repeaters in the plan needs, as known</summary>
         <p class="small">A site with its condition set is costed at that, and not audited. A backbone site left <em>Not assessed</em> is audited and costed at the card's mix;
           a repeater that is not backbone is fitted out as it stands.
-          ${ready ? 'Site conditions are kept in the database — one answer per site, the same for every administrator — whatever scenario is loaded.'
+          ${ready ? 'Site conditions are kept in the database — one answer per site, the same for everybody who sees the plan — whatever scenario is loaded.'
             : store === 'failed' ? `<span class="txt-warn">The site conditions could not be loaded (${esc(storeError)}), so none can be set.</span>`
             : 'The site conditions are loading.'}</p>
         <div class="table-wrap medium" role="region" tabindex="0" aria-label="What each repeater site needs"><table class="a2p-table">
@@ -2483,7 +2560,7 @@ const Alert2Plan = (function () {
   }
 
   function init() {
-    if (!isAdmin()) return;
+    if (!mayPlan()) return;
     syncPartial();
     // The site conditions and the saved scenarios, once a visit (0065).
     if (store === 'idle') loadStore();
@@ -2511,7 +2588,7 @@ const Alert2Plan = (function () {
   function scenarioText() {
     const L = loadedScenario();
     if (!L) return 'not saved as a scenario';
-    return `${L.name}${L.mine ? '' : ` (by ${L.by || 'another administrator'})`}, ${L.shared ? 'shared with every administrator' : 'private'}${changedSinceLoad() ? ' — changed since it was saved' : ''}`;
+    return `${L.name}${L.mine ? '' : ` (by ${L.by || 'somebody else'})`}, ${L.shared ? 'shared with everybody who sees the plan' : 'private'}${changedSinceLoad() ? ' — changed since it was saved' : ''}`;
   }
 
   // The site conditions set, in words.
@@ -2537,7 +2614,7 @@ const Alert2Plan = (function () {
   }
   function exportWhy() {
     const C = cur();
-    if (!C) return 'An administrator, with the station register loaded, first.';
+    if (!C) return 'Somebody who sees the plan, with the station register loaded, first.';
     if (emptyPlan(C.I)) return 'No catchment is ticked under Catchments in the plan.';
     return '';
   }
@@ -2622,15 +2699,72 @@ const Alert2Plan = (function () {
     authChanged() {
       cat = null; cuts.clear(); memo = null;
       // Another person, or nobody: what the last one could see goes with them.
-      store = 'idle'; storeError = ''; conditions = {}; condBy.clear(); scenarios = []; condStamp++; scenFormOpen = false;
-      if (isAdmin()) init();
+      store = 'idle'; storeError = ''; conditions = {}; condBy.clear(); scenarios = []; people = null; condStamp++; scenFormOpen = false;
+      if (mayPlan()) init();
       repaint();
     },
     retryStore() { if (store === 'failed') { store = 'idle'; return loadStore(); } return null; },
     // For the tests: read the shared store again, and say where it stands.
     reloadStore() { store = 'idle'; return loadStore(); },
-    storeState: () => ({ store, error: storeError, conditions: { ...conditions }, scenarios: scenarios.map(x => ({ ...x })), loaded: loaded ? { ...loaded } : null }),
+    storeState: () => ({ store, error: storeError, conditions: { ...conditions }, scenarios: scenarios.map(x => ({ ...x })),
+                         people: people ? people.map(x => ({ ...x })) : null, loaded: loaded ? { ...loaded } : null }),
     scenListToggled(open) { scenListOpen = !!open; },
+    peopleToggled(open) { peopleOpen = !!open; },
+    // The list's controls (0076), a nominator's: add by address, let nominate
+    // or not, take off. `i` numbers a row of `people`; the database answers
+    // the whole list each time, and that is what is drawn.
+    async person(action, i, on) {
+      if (store !== 'ready' || !people || !mayNominate()) return;
+      const x = typeof i === 'number' ? people[i] : null;
+      const named = p => p.who || p.email || 'them';
+      if (action === 'add') {
+        const f = document.getElementById('a2p-people-email');
+        const email = f ? f.value.trim() : '';
+        if (!email) { announce('Whose address?'); if (f) f.focus(); return; }
+        const nom = !!(document.getElementById('a2p-people-nom') || {}).checked;
+        const got = await write(`Adding ${email}`, () => dbRpc('a2plan_member_save', { p_email: email, p_nominates: nom }), 'ppl:add', refreshPeople);
+        if (!Array.isArray(got)) return;
+        people = got;
+        const g = document.getElementById('a2p-people-email'); if (g) g.value = '';
+        const b = document.getElementById('a2p-people-nom'); if (b) b.checked = false;
+        refreshPeople('ppl:add');
+        announce(`${email} sees the plan now${nom ? ', and may nominate' : ''}.`);
+        return;
+      }
+      if (!x) return;
+      if (action === 'nominates') {
+        const got = await write(`Changing what ${named(x)} may do`,
+          () => dbRpc('a2plan_member_save', { p_email: x.email, p_nominates: !!on }), `pnom:${x.id}`, refreshPeople);
+        if (!Array.isArray(got)) return;
+        people = got;
+        // Their own: whoami() is asked again, so the controls follow.
+        if (x.you && typeof Auth !== 'undefined' && Auth.recheck) await Auth.recheck();
+        refreshPeople(`pnom:${x.id}`);
+        announce(`${x.you ? 'You' : named(x)} ${on ? 'may' : 'may not'} nominate now.`);
+        return;
+      }
+      if (action === 'remove') {
+        const ok = await confirmDialog({
+          title: x.you ? 'Take yourself off the list?' : `Take ${named(x)} off the list?`,
+          message: (x.you ? 'The plan closes for you at once, and only somebody still on the list can put you back.'
+                          : `The plan closes for ${named(x)} at once.`)
+            + (x.you ? ' Scenarios you shared stay; your private ones wait, unseen, until you are back.'
+                     : ' Scenarios they shared stay; their private ones wait, unseen, until they are back.'),
+          confirm: 'Take off the list', danger: true,
+        });
+        if (!ok) { refreshPeople(`pdel:${x.id}`); return; }
+        const got = await write(`Taking ${named(x)} off`, () => dbRpc('a2plan_member_remove', { p_user_id: x.id }), 'ppl:add', refreshPeople);
+        if (!Array.isArray(got)) return;
+        people = got;
+        announce(`${named(x)} no longer sees the plan.`);
+        if (x.you && typeof Auth !== 'undefined' && Auth.recheck) {
+          // Gone from the list: whoami() says so, the nav drops the tab, and
+          // the page says who it is for.
+          await Auth.recheck();
+          this.authChanged();
+        } else refreshPeople('ppl:add');
+      }
+    },
     set,
     preset(id) {
       const p = PRESETS.find(x => x.id === id);
@@ -2681,7 +2815,7 @@ const Alert2Plan = (function () {
     // What a repeater site needs, as somebody who knows it says: '' for not
     // assessed, or one of the works. Numbered off sitesOf().
     // A site's condition, set from its select: the plan follows at once, and
-    // the database is told — every administrator's plan follows it. Refused,
+    // the database is told — everybody's plan follows it. Refused,
     // it goes back to what it was and says why.
     site(i, v) {
       const I = inventory();
@@ -2698,7 +2832,7 @@ const Alert2Plan = (function () {
         setCondition(row);
         const by = document.getElementById(`a2p-site-${i}-by`);
         if (by) by.textContent = setByText(id);
-        announce(`${said}. Saved for every administrator.`);
+        announce(`${said}. Saved for everybody who sees the plan.`);
       }, e => {
         if (was) { conditions[id] = was; if (wasBy) condBy.set(id, wasBy); } else { delete conditions[id]; condBy.delete(id); }
         condStamp++;
@@ -2729,7 +2863,7 @@ const Alert2Plan = (function () {
           loaded = { id: row.id, snap: snapOf(sc) };
           saveLoaded();
           scenFormOpen = false;
-          announce(`Saved “${row.name}”, ${row.shared ? 'shared with every administrator' : 'private to you'}.`);
+          announce(`Saved “${row.name}”, ${row.shared ? 'shared with everybody who sees the plan' : 'private to you'}.`);
         }, 'scen:new');
         repaintLive();
         return;
@@ -2752,7 +2886,7 @@ const Alert2Plan = (function () {
         await write(`Sharing “${x.name}”`, async () => {
           const row = await dbRpc('a2plan_scenario_save', { p_id: x.id, p_name: null, p_notes: null, p_shared: !x.shared, p_settings: null });
           putScenario(row);
-          announce(row.shared ? `“${row.name}” is shared: every administrator can load it.` : `“${row.name}” is private: only you can see it.`);
+          announce(row.shared ? `“${row.name}” is shared: everybody who sees the plan can load it.` : `“${row.name}” is private: only you can see it.`);
         }, `sshare:${x.id}`);
         repaintLive();
         return;
@@ -2760,7 +2894,7 @@ const Alert2Plan = (function () {
       if (action === 'delete') {
         const ok = await confirmDialog({
           title: `Remove “${x.name}”?`,
-          message: x.shared ? 'It is shared, so every administrator loses it too. This cannot be undone.' : 'Only you can see it. This cannot be undone.',
+          message: x.shared ? 'It is shared, so everybody who sees the plan loses it too. This cannot be undone.' : 'Only you can see it. This cannot be undone.',
           confirm: 'Remove scenario', danger: true,
         });
         if (!ok) { refreshStore(`sdel:${x.id}`); return; }
@@ -2789,7 +2923,7 @@ const Alert2Plan = (function () {
         saveLoaded();
         repaint();
         refreshStore(`sload:${x.id}`);
-        announce(`Loaded “${x.name}”${x.mine ? '' : ` by ${x.by || 'another administrator'}`}: the plan is worked again.`);
+        announce(`Loaded “${x.name}”${x.mine ? '' : ` by ${x.by || 'somebody else'}`}: the plan is worked again.`);
       }
     },
     // The folded tables go on paper too: opened for the print and folded

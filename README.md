@@ -232,9 +232,10 @@ MegaNet/
 │                             Flood-Net against Radio Mobile, the design principles)
 ├── network-history.js      ← NetworkHistory — the Network Review's check of the model
 │                             against every attenuator test on file, by hub and basin
-├── alert2-plan.js          ← Alert2Plan — ALERT2 Transition Plan tab (administrators
-│                             only: the draft for management, worked from the register
-│                             under a scenario card of sliders and switches)
+├── alert2-plan.js          ← Alert2Plan — ALERT2 Transition Plan tab (the people the
+│                             owner nominates only: the draft for management, worked
+│                             from the register under a scenario card of sliders and
+│                             switches)
 ├── tdma-planner.js         ← TdmaPlanner — the ⏱️ TDMA Planner tab: ALERT2 frame and
 │                             slot allocation, bytes against capacity, latency, the
 │                             configuration sheet
@@ -394,7 +395,7 @@ MegaNet/
 │   ├── stationhistory.mjs   (the station card's History and the Admin tab's Deleted stations: who changed what, Restore)
 │   ├── basestations.mjs     (the Base Stations tab: the list, a station's panel, what each button sends)
 │   ├── review.mjs           (the Network Review tab: administrators only, the matrix's cells the card's figures, the field beside them)
-│   ├── a2plan.mjs           (the ALERT2 Transition Plan tab: administrators only, the inventory and the plan add up, the card moves it)
+│   ├── a2plan.mjs           (the ALERT2 Transition Plan tab: its list only, who sees it, the inventory and the plan add up, the card moves it)
 │   ├── tdma.mjs             (the TDMA Planner: air-time formula, two worked frames, the card)
 │   ├── healthreport.mjs     (Station Health run unattended: the browser's analysis over the demo week, reported as the database takes it)
 │   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
@@ -5287,9 +5288,15 @@ database with `0053`–`0060`; until it is, the card and the panel say so.
 
 ### 31. ALERT2 Transition Plan (a Draft for Management, With the Sliders to Argue With)
 
-🧭 **ALERT2 Transition Plan**, under *Admin*, is listed to administrators and to
-nobody else — it is left out of the bar, the find box, Ctrl+K, every view and the
-Site Map for any other session, and says who it is for if opened by its address.
+🧭 **ALERT2 Transition Plan**, under *Admin*, is listed only to the people the
+owner nominates (`0076`) — an administrator who is not on its list does not see it
+either. It is left out of the bar, the find box, Ctrl+K, every view and the Site
+Map for any other session, and says who it is for if opened by its address.
+**Seen by …**, folded under its heading, is the list: everybody on it sees who else
+is, and somebody who may nominate adds a person by the address they sign in with
+(an approved account), lets them nominate too, or takes them off — the list always
+keeps one person who may nominate. The owner put themselves on it first, from the
+SQL editor: `select meganet.a2plan_member_save('their address', true);`.
 It is a draft plan for management of moving the ALERT networks to ALERT2, worked
 from the station register as loaded:
 
@@ -5307,7 +5314,7 @@ from the station register as loaded:
   and not before its network's review). A site nobody has assessed is audited
   first and costed at the card's mix. The **site conditions** table in section 5
   sets what each repeater is known to need; it is kept in the database (`0065`),
-  one answer per site for every administrator, with who set it and when.
+  one answer per site for everybody on the list, with who set it and when.
 * **The cut-over, catchment by catchment** — a catchment comes onto ALERT2 in one
   step on the backbone, its ALERT1 stations untouched: every repeater that hears
   one of them is fitted as a **concentrator** (ALERT1 in, ALERT2 on), every
@@ -5343,7 +5350,7 @@ with each catchment", "Like for like", "Work through the wet season"). Each move
 works the whole plan again at once, and the figures at the top — the backbone's
 date among them — say how far it is from the proposal. The card is kept on the
 device. **📁 Scenarios** keeps it in the database under a name (`0065`): private
-to whoever saved it until they press *Share*, then every administrator can load
+to whoever saved it until they press *Share*, then everybody on the list can load
 it; only its author saves changes, shares or makes it private, or removes it, and
 anybody else saves their own copy. The document says which scenario it is. It prints as a document (the card left off, the assumptions table
 saying what it was set to), and saves as `floodnet-alert2-transition-plan.xlsx`

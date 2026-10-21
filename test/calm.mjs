@@ -463,7 +463,8 @@ async function main() {
     // ── 9. Every tab ───────────────────────────────────────────────────────
     log('\n9. Every tab, in Calm\n');
     ({ context, page } = await open(browser, server, { viewport: { width: 1440, height: 900 }, errors }));
-    await page.evaluate(() => { Auth.isSignedIn = () => true; Auth.isAdmin = () => true; Auth.role = () => 'admin'; renderTabs(); });
+    // An administrator on the ALERT2 Transition Plan's list (0076): every tab is theirs.
+    await page.evaluate(() => { Auth.isSignedIn = () => true; Auth.isAdmin = () => true; Auth.role = () => 'admin'; Auth.a2plan = () => true; renderTabs(); });
     const ids = await page.evaluate(() => TAB_LIST.map(t => t.id));
     const bad = [];
     let unresolved = [];

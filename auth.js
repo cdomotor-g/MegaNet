@@ -13,10 +13,11 @@
 // photo it holds was fetched for one session (0035, 0062: members only); to
 // field-camera.js for FieldCamera.authChanged, which sends the photos waiting
 // on the device; to admin.js for Admin.authChanged (0042, administrators
-// only); to network-review.js for NetworkReview.authChanged and alert2-plan.js
-// for Alert2Plan.authChanged (administrators only); to station-history.js for StationHistory.authChanged (0056, editors
-// only); to site-features.js for SiteFeatures.authChanged (0061, editors only);
-// to nav-views.js for NavViews.authChanged (0062: an account's own views); to
+// only); to network-review.js for NetworkReview.authChanged (administrators
+// only) and alert2-plan.js for Alert2Plan.authChanged (the plan's list, 0076);
+// to station-history.js for StationHistory.authChanged (0056, editors only);
+// to site-features.js for SiteFeatures.authChanged (0061, editors only); to
+// nav-views.js for NavViews.authChanged (0062: an account's own views); to
 // push.js for Push.authChanged (0066: an administrator's notifications and the
 // icon's count); to toast.js for the once-a-page notes; and to datastore.js
 // for dbSetAccessToken.
@@ -1503,6 +1504,12 @@ const Auth = (function () {
     // What the Admin tab asks before it offers the user list; the functions
     // behind it refuse anybody else regardless.
     isAdmin:    () => !!session && !!(who && who.is_admin),
+    // whoami()'s a2plan (0076): on the ALERT2 Transition Plan's list, which
+    // the owner nominates. A database before 0076 does not say, and there the
+    // plan is every administrator's (0065), so this says what its doors would.
+    a2plan:     () => !!session && !!who && (who.a2plan !== undefined ? !!who.a2plan : !!who.is_admin),
+    // …and may change who is on it (0076).
+    a2planNominates: () => !!session && !!(who && who.a2plan_nominates),
     // whoami()'s is_member (0062): may see the field photos. False until the
     // database has answered — an answer is what decides, not a guess.
     isMember:   () => !!session && !!(who && who.is_member),

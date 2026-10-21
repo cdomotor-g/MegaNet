@@ -4,8 +4,17 @@
 // about the plan's *arithmetic and behaviour* — that its parts add up and move
 // the way the card says they will — not about any one figure for Queensland.
 //
-//   Who it is for   signed out, or signed in without being an administrator,
-//                   it says who it is for and draws no control.
+//   Who it is for   signed out, or signed in without being on the plan's list
+//                   (0076) — an administrator included — it says who it is
+//                   for, draws no control, and the nav does not offer it; on
+//                   the list, the nav does.
+//   Who sees it     the list folded under the heading, a row a person: the
+//                   only nominator cannot give it up; a nominator adds
+//                   somebody by address (focus kept, the box emptied), an
+//                   account not approved is refused in words with the address
+//                   kept, "May nominate" ticks, "Take off…" asks first; who
+//                   may not nominate sees the list and no control; taking
+//                   yourself off closes the plan.
 //   The inventory   every field station, repeater and base it counts is in the
 //                   scope it says, the regions add up to the totals, and the
 //                   backbone is a subset of the repeaters.
@@ -65,15 +74,29 @@ const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
 await applyNetworkPolicy(page, server.origin);
 
-// The shared store (0065) stood in for: the four functions, with the rules
-// tools/check_alert2_plan.sql holds the real ones to — a scenario private to
-// its author until shared, changed and removed by its author only — and a
-// switch to refuse one, or to fail the read. Registered after the network
-// policy, so it answers first.
+// The shared store (0065) and its list (0076) stood in for: the six
+// functions, with the rules tools/check_alert2_plan.sql holds the real ones
+// to — a scenario private to its author until shared, changed and removed by
+// its author only; an approved account added by address; the last nominator
+// kept — and a switch to refuse one, or to fail the read. Registered after
+// the network policy, so it answers first.
 const fake = {
   me: '00000000-0000-4000-8000-00000000a201', other: '00000000-0000-4000-8000-00000000a202',
   sites: new Map(), scenarios: [], calls: [], refuse: null, failRead: false, n: 0,
+  // Accounts by address: approved ones may be added; `waiting` may not.
+  accounts: {
+    'test@example.test':  { id: '00000000-0000-4000-8000-00000000a201', who: 'Test Admin' },
+    'other@example.test': { id: '00000000-0000-4000-8000-00000000a202', who: 'Other Admin' },
+    'new@example.test':   { id: '00000000-0000-4000-8000-00000000a203', who: 'New Person' },
+    'waiting@example.test': { id: '00000000-0000-4000-8000-00000000a204', who: 'Not Yet', waiting: true },
+  },
+  people: [],
 };
+fake.people.push({ email: 'test@example.test', nominates: true, added_at: '2026-10-01T00:00:00Z', added_by: null });
+fake.people.push({ email: 'other@example.test', nominates: false, added_at: '2026-10-02T00:00:00Z', added_by: 'Test Admin' });
+const peopleOut = () => fake.people.map(p => ({ id: fake.accounts[p.email].id, who: fake.accounts[p.email].who, email: p.email,
+    nominates: p.nominates, you: fake.accounts[p.email].id === fake.me, added_at: p.added_at, added_by: p.added_by }))
+  .sort((x, y) => (y.nominates - x.nominates) || x.who.localeCompare(y.who));
 fake.scenarios.push({ id: 'aaaaaaaa-0000-4000-8000-000000000001', owner: fake.other, name: 'Eight crews, wet season worked', notes: 'From the Townsville meeting',
   shared: true, settings: { v: 1, fieldCrews: 8, wet: false }, created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-02T00:00:00Z' });
 fake.scenarios.push({ id: 'aaaaaaaa-0000-4000-8000-000000000002', owner: fake.other, name: 'Somebody else\'s private one', notes: null,
@@ -87,12 +110,13 @@ await page.route('**/rpc/a2plan_*', async route => {
   fake.calls.push({ fn, a });
   const json = (status, body) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
   const no = (status, code, message) => json(status, { code, message });
-  if (fake.refuse === fn) return no(403, '42501', 'only an administrator may say what a site needs');
+  if (fake.refuse === fn) return no(403, '42501', 'only somebody on the plan\'s list may say what a site needs');
   const now = new Date(Date.UTC(2026, 9, 16, 12, 0, fake.n++)).toISOString();
   if (fn === 'a2plan_read') {
     if (fake.failRead) return no(500, 'XX000', 'the database is having a moment');
     return json(200, { sites: [...fake.sites.values()],
-      scenarios: fake.scenarios.filter(x => x.owner === fake.me || x.shared).sort((x, y) => y.updated_at.localeCompare(x.updated_at)).map(scenOut) });
+      scenarios: fake.scenarios.filter(x => x.owner === fake.me || x.shared).sort((x, y) => y.updated_at.localeCompare(x.updated_at)).map(scenOut),
+      people: peopleOut() });
   }
   if (fn === 'a2plan_site_set') {
     if (!a.p_condition) { fake.sites.delete(a.p_station_id); return json(200, { station_id: a.p_station_id, condition: null }); }
@@ -110,7 +134,7 @@ await page.route('**/rpc/a2plan_*', async route => {
     }
     const x = fake.scenarios.find(y => y.id === a.p_id);
     if (!x || (x.owner !== fake.me && !x.shared)) return no(404, 'P0002', 'no such scenario');
-    if (x.owner !== fake.me) return no(403, '42501', 'only the administrator who saved a scenario may change it — save your own copy');
+    if (x.owner !== fake.me) return no(403, '42501', 'only the person who saved a scenario may change it — save your own copy');
     if (a.p_name != null) x.name = a.p_name.trim();
     if (a.p_notes != null) x.notes = a.p_notes.trim() || null;
     if (a.p_shared != null) x.shared = a.p_shared;
@@ -121,9 +145,28 @@ await page.route('**/rpc/a2plan_*', async route => {
   if (fn === 'a2plan_scenario_delete') {
     const x = fake.scenarios.find(y => y.id === a.p_id);
     if (!x) return json(200, false);
-    if (x.owner !== fake.me) return no(403, '42501', 'only the administrator who saved a scenario may remove it');
+    if (x.owner !== fake.me) return no(403, '42501', 'only the person who saved a scenario may remove it');
     fake.scenarios = fake.scenarios.filter(y => y !== x);
     return json(200, true);
+  }
+  const lastNominator = email => fake.people.filter(p => p.nominates && p.email !== email).length === 0;
+  if (fn === 'a2plan_member_save') {
+    const email = String(a.p_email || '').trim().toLowerCase();
+    const acct = fake.accounts[email];
+    if (!acct) return no(404, 'P0002', `nobody has an account as ${email} — they sign up once, then you add them`);
+    if (acct.waiting) return no(400, '22023', `${email}'s account is not approved (pending), so the plan would not open for them — an administrator approves it on the Admin tab first`);
+    const p = fake.people.find(y => y.email === email);
+    if (p) {
+      if (a.p_nominates === false && p.nominates && lastNominator(email)) return no(403, '42501', 'that is the only person who may nominate — let somebody else first');
+      if (a.p_nominates != null) p.nominates = a.p_nominates;
+    } else fake.people.push({ email, nominates: !!a.p_nominates, added_at: now, added_by: 'Test Admin' });
+    return json(200, peopleOut());
+  }
+  if (fn === 'a2plan_member_remove') {
+    const p = fake.people.find(y => fake.accounts[y.email].id === a.p_user_id);
+    if (p && p.nominates && lastNominator(p.email)) return no(403, '42501', 'that is the only person who may nominate — let somebody else first');
+    fake.people = fake.people.filter(y => y !== p);
+    return json(200, peopleOut());
   }
   return no(404, 'PGRST202', 'no such function');
 });
@@ -144,6 +187,7 @@ try {
   console.log('\nWho it is for\n');
   await page.evaluate(() => {
     Auth.isSignedIn = () => false; Auth.isAdmin = () => false; Auth.role = () => null;
+    Auth.a2plan = () => false; Auth.a2planNominates = () => false;
     switchTab('a2plan');
   });
   let out = await page.evaluate(() => ({ text: document.getElementById('main-content').textContent,
@@ -153,23 +197,34 @@ try {
   await page.evaluate(() => { Auth.isSignedIn = () => true; Auth.role = () => 'editor'; Alert2Plan.authChanged(); });
   out = await page.evaluate(() => ({ text: document.getElementById('main-content').textContent,
     controls: document.querySelectorAll('#main-content input, #main-content select').length }));
-  ok('signed in without being an administrator it says it is for administrators, and no control',
-    /administrators only/i.test(out.text) && out.controls === 0, out.text.slice(0, 120));
-
-  await page.evaluate(async () => {
+  ok('signed in without being on the list it says who it is for, and no control',
+    /only for the people nominated/i.test(out.text) && out.controls === 0, out.text.slice(0, 120));
+  out = await page.evaluate(() => {
     Auth.isAdmin = () => true; Auth.role = () => 'admin';
+    Alert2Plan.authChanged();
+    return { text: document.getElementById('main-content').textContent,
+      controls: document.querySelectorAll('#main-content input, #main-content select').length,
+      listed: tabShown(TAB_LIST.find(t => t.id === 'a2plan')) };
+  });
+  ok('an administrator who is not on the list sees no more, and the nav does not offer the tab',
+    /only for the people nominated/i.test(out.text) && out.controls === 0 && out.listed === false, JSON.stringify({ ...out, text: out.text.slice(0, 80) }));
+
+  const onList = await page.evaluate(async () => {
+    Auth.a2plan = () => true; Auth.a2planNominates = () => true;
     try { await SLS.ensureData(); } catch (_) {}
     Alert2Plan.authChanged();
+    return tabShown(TAB_LIST.find(t => t.id === 'a2plan'));
   });
+  ok('on the list, the nav offers it', onList === true);
   await page.waitForFunction(() => !!document.getElementById('a2p-out') && Alert2Plan.storeState().store === 'ready', null, { timeout: 20_000 });
 
   // ── the shared store ──
   console.log('\nThe shared store\n');
   const carried = await page.evaluate(() => ({ state: Alert2Plan.storeState(),
     kept: JSON.parse(localStorage.getItem('meganet.a2plan.scenario') || '{}') }));
-  ok('opened by an administrator, the tab reads the shared store once',
+  ok('opened by somebody on the list, the tab reads the shared store once',
     fake.calls.filter(c => c.fn === 'a2plan_read').length === 1 && carried.state.store === 'ready', JSON.stringify(fake.calls.map(c => c.fn)));
-  ok('a site condition kept on the device the old way is saved for every administrator, then forgotten on the device',
+  ok('a site condition kept on the device the old way is saved for everybody who sees the plan, then forgotten on the device',
     fake.sites.get('amiens_knob_al')?.condition === 'rebuild' && carried.state.conditions.amiens_knob_al === 'rebuild' && !('sites' in carried.kept),
     JSON.stringify({ fake: [...fake.sites.keys()], kept: Object.keys(carried.kept) }));
   ok('…the others\' shared scenarios are listed, and nobody else\'s private one',
@@ -399,7 +454,7 @@ try {
   ok('a site condition set to "Rebuild the structure" by its select is costed at that and not audited, and the select keeps its focus with its table open',
     mark.audit[1] === mark.audit[0] - 1 && mark.known === 1 && mark.total[1] !== mark.total[0] && mark.focused && mark.value === 'rebuild' && mark.open,
     JSON.stringify({ audit: mark.audit, known: mark.known, focused: mark.focused, open: mark.open }));
-  ok('…it is saved in the database for every administrator, says who set it and when, and nothing is kept on the device',
+  ok('…it is saved in the database for everybody who sees the plan, says who set it and when, and nothing is kept on the device',
     sent && sent.a.p_condition === 'rebuild' && fake.sites.size === 1 && /^set by Test Admin, 16 Oct 2026$/.test(mark.by) && mark.device === undefined,
     JSON.stringify({ sent: sent && sent.a, by: mark.by, pending: mark.pending }));
   ok('…and it is what is known rather than a lever: still the proposal', mark.proposal && !/than the proposal/.test(mark.kpi));
@@ -520,9 +575,9 @@ try {
              now: document.getElementById('a2p-scen-now').textContent };
   });
   const sharedCall = fake.calls.filter(c => c.fn === 'a2plan_scenario_save').pop();
-  ok('"Share" shares it with every administrator, and nothing else about it is sent again; focus stays on the button',
+  ok('"Share" shares it with everybody who sees the plan, and nothing else about it is sent again; focus stays on the button',
     sharedCall.a.p_shared === true && sharedCall.a.p_settings === null && sharedCall.a.p_name === null && /Shared/.test(sh.row) && /Make private/.test(sh.row)
-    && /shared with every administrator/.test(sh.now) && sh.focus, JSON.stringify(sh));
+    && /shared with everybody who sees the plan/.test(sh.now) && sh.focus, JSON.stringify(sh));
 
   const ld = await page.evaluate(async () => {
     const st = Alert2Plan.storeState();
@@ -566,11 +621,124 @@ try {
              now: document.getElementById('a2p-scen-now').textContent };
   });
   ok('"Remove…" asks, as something that cannot be undone, warning that a shared one goes for everybody; then it is gone and the card is unsaved',
-    rm.danger && /every administrator loses it/.test(rm.text) && !rm.left.includes('Six crews') && rm.loaded === null && /not saved as a scenario/.test(rm.now)
+    rm.danger && /everybody who sees the plan loses it/.test(rm.text) && !rm.left.includes('Six crews') && rm.loaded === null && /not saved as a scenario/.test(rm.now)
     && fake.calls.some(c => c.fn === 'a2plan_scenario_delete'), JSON.stringify(rm));
 
   const own = await page.evaluate(() => Alert2Plan.storeState().scenarios.map(x => x.name));
   ok('nobody else\'s private scenario was ever listed', !own.includes('Somebody else\'s private one'), own.join(', '));
+
+  // ── who sees it (0076) ──
+  console.log('\nWho sees it\n');
+  const ppl = await page.evaluate(() => {
+    const d = document.getElementById('a2p-people');
+    return { summary: d ? d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim() : '', rows: d ? d.querySelectorAll('tbody tr').length : 0,
+             form: !!document.getElementById('a2p-people-email'), shut: d ? !d.open : null };
+  });
+  ok('under the heading, folded, it says who sees the plan — a row each, and for a nominator the address to add somebody by',
+    ppl.summary === 'Seen by 2 people — you, Other Admin' && ppl.rows === 2 && ppl.form && ppl.shut, JSON.stringify(ppl));
+
+  const last = await page.evaluate(async () => {
+    document.getElementById('a2p-people').open = true;
+    const me = Alert2Plan.storeState().people.find(x => x.you);
+    const box = document.querySelector(`#a2p-people [data-k="pnom:${me.id}"]`);
+    box.focus(); box.checked = false; box.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 300));
+    const again = document.querySelector(`#a2p-people [data-k="pnom:${me.id}"]`);
+    return { still: Alert2Plan.storeState().people.find(x => x.you).nominates, box: again.checked, focus: document.activeElement === again,
+             said: document.getElementById('app-status').textContent };
+  });
+  ok('the only nominator cannot give it up: refused in words, and the box goes back with focus on it',
+    last.still === true && last.box === true && last.focus && /only person who may nominate/.test(last.said), JSON.stringify(last));
+
+  const add = await page.evaluate(async () => {
+    document.getElementById('a2p-people-email').value = 'New@Example.test';
+    document.getElementById('a2p-people-nom').checked = true;
+    document.querySelector('#a2p-people [data-k="ppl:add"]').click();
+    await new Promise(r => setTimeout(r, 300));
+    const d = document.getElementById('a2p-people');
+    return { summary: d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim(), open: d.open,
+             typed: document.getElementById('a2p-people-email').value, ticked: document.getElementById('a2p-people-nom').checked,
+             focus: document.activeElement && document.activeElement.dataset.k, said: document.getElementById('app-status').textContent,
+             people: Alert2Plan.storeState().people.map(x => `${x.who}:${x.nominates}`) };
+  });
+  const added = fake.calls.filter(c => c.fn === 'a2plan_member_save').pop();
+  ok('a nominator adds somebody by address, letting them nominate: the list drawn again and still open, the form emptied, focus on Add',
+    added && added.a.p_email === 'New@Example.test' && added.a.p_nominates === true && add.people.includes('New Person:true')
+    && /^Seen by 3 people/.test(add.summary) && add.open && add.typed === '' && !add.ticked && add.focus === 'ppl:add' && /sees the plan now, and may nominate/.test(add.said),
+    JSON.stringify(add));
+
+  const waiting = await page.evaluate(async () => {
+    document.getElementById('a2p-people-email').value = 'waiting@example.test';
+    document.querySelector('#a2p-people [data-k="ppl:add"]').click();
+    await new Promise(r => setTimeout(r, 300));
+    return { typed: document.getElementById('a2p-people-email').value, n: Alert2Plan.storeState().people.length,
+             said: document.getElementById('app-status').textContent };
+  });
+  ok('an account not approved yet is refused in the database\'s words, and the address typed is kept',
+    waiting.typed === 'waiting@example.test' && waiting.n === 3 && /not approved/.test(waiting.said), JSON.stringify(waiting));
+  await page.evaluate(() => { document.getElementById('a2p-people-email').value = ''; });
+
+  const tog = await page.evaluate(async () => {
+    const other = Alert2Plan.storeState().people.find(x => x.who === 'Other Admin');
+    const box = document.querySelector(`#a2p-people [data-k="pnom:${other.id}"]`);
+    box.focus(); box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 300));
+    return { now: Alert2Plan.storeState().people.find(x => x.who === 'Other Admin').nominates,
+             focus: !!document.activeElement && document.activeElement.dataset.k === `pnom:${other.id}` };
+  });
+  ok('ticking "May nominate" lets them, and the box keeps focus', tog.now === true && tog.focus, JSON.stringify(tog));
+
+  const off = await page.evaluate(async () => {
+    const x = Alert2Plan.storeState().people.find(p => p.who === 'New Person');
+    document.querySelector(`#a2p-people [data-k="pdel:${x.id}"]`).click();
+    await new Promise(r => setTimeout(r, 100));
+    const yes = document.querySelector('[data-ask="yes"]');
+    const text = yes ? yes.closest('[role="alertdialog"], [role="dialog"], .modal-card, .modal').textContent.replace(/\s+/g, ' ') : '';
+    const danger = !!yes && yes.classList.contains('btn-danger');
+    if (yes) yes.click();
+    await new Promise(r => setTimeout(r, 300));
+    return { text: text.slice(0, 220), danger, left: Alert2Plan.storeState().people.map(p => p.who) };
+  });
+  ok('"Take off…" asks first, saying the plan closes for them; then they are off the list',
+    off.danger && /closes for New Person/.test(off.text) && !off.left.includes('New Person')
+    && fake.calls.some(c => c.fn === 'a2plan_member_remove'), JSON.stringify(off));
+
+  const plain = await page.evaluate(() => {
+    Auth.a2planNominates = () => false;
+    switchTab('stations'); switchTab('a2plan');
+    const d = document.getElementById('a2p-people');
+    return { rows: d ? d.querySelectorAll('tbody tr').length : 0, controls: d ? d.querySelectorAll('input, button').length : -1,
+             text: d ? d.textContent.replace(/\s+/g, ' ') : '' };
+  });
+  ok('somebody who may not nominate sees the list, and no control to change it',
+    plain.rows === 2 && plain.controls === 0 && /Only somebody who may nominate/.test(plain.text), JSON.stringify(plain));
+
+  const gone = await page.evaluate(async () => {
+    Auth.a2planNominates = () => true;
+    // whoami() asked again after leaving: off the list now.
+    const realRecheck = Auth.recheck;
+    Auth.recheck = async () => { Auth.a2plan = () => false; Auth.a2planNominates = () => false; };
+    switchTab('stations'); switchTab('a2plan');
+    const me = Alert2Plan.storeState().people.find(x => x.you);
+    document.querySelector(`#a2p-people [data-k="pdel:${me.id}"]`).click();
+    await new Promise(r => setTimeout(r, 100));
+    const yes = document.querySelector('[data-ask="yes"]');
+    const text = yes ? yes.closest('[role="alertdialog"], [role="dialog"], .modal-card, .modal').textContent.replace(/\s+/g, ' ') : '';
+    if (yes) yes.click();
+    await new Promise(r => setTimeout(r, 300));
+    Auth.recheck = realRecheck;
+    return { text: text.slice(0, 220), page: document.getElementById('main-content').textContent.replace(/\s+/g, ' ').slice(0, 300),
+             controls: document.querySelectorAll('#main-content input, #main-content select').length };
+  });
+  ok('taking yourself off asks in those words, then the plan closes for you',
+    /Take yourself off the list/.test(gone.text) && /only for the people nominated/.test(gone.page) && gone.controls === 0, JSON.stringify(gone));
+  // Back on, as it was, for what follows.
+  fake.people.push({ email: 'test@example.test', nominates: true, added_at: '2026-10-01T00:00:00Z', added_by: null });
+  await page.evaluate(async () => {
+    Auth.a2plan = () => true; Auth.a2planNominates = () => true;
+    Alert2Plan.authChanged();
+  });
+  await page.waitForFunction(() => Alert2Plan.storeState().store === 'ready' && !!document.getElementById('a2p-out'), null, { timeout: 20_000 });
 
   fake.failRead = true;
   const failed = await page.evaluate(async () => {
@@ -835,4 +1003,4 @@ if (failures) {
   console.log(`FAIL — ${failures} of ${passes + failures}.`);
   process.exit(1);
 }
-console.log(`PASS — the ALERT2 Transition Plan adds up, moves the way its card says, and is for administrators only (${passes} checks).`);
+console.log(`PASS — the ALERT2 Transition Plan adds up, moves the way its card says, and is for the people on its list only (${passes} checks).`);

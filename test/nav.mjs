@@ -31,11 +31,14 @@
 //                  rail. A filter left running behind a nav that cannot show its
 //                  own box is a nav that has silently lost fifteen tabs.
 //
-//   Who sees what. A tab marked `who: 'admin'` (tabShown, core.js) is listed to
-//                  an administrator and to nobody else — not in the bar, the find
-//                  box, Ctrl+K or the Site Map. So the coverage above runs as an
-//                  administrator, where every tab is listed, and the end of the
-//                  file signs out and checks the other half.
+//   Who sees what. A tab marked `who` (tabShown, core.js) is listed to the
+//                  people it is for and to nobody else — not in the bar, the
+//                  find box, Ctrl+K or the Site Map: `who: 'admin'` to an
+//                  administrator, `who: 'a2plan'` to the ALERT2 Transition
+//                  Plan's list (0076), administrators or not. So the coverage
+//                  above runs as an administrator on that list, where every tab
+//                  is listed, and the end of the file checks the other half —
+//                  an administrator off the list among them.
 //
 // Run:  npm run nav
 //       npm run nav -- -v    also print what passed
@@ -98,12 +101,12 @@ try {
   // assertion below about the find box depends on it.
   await page.evaluate(() => setNavCollapsed(false));
 
-  // An administrator, as whoami() would say: every tab is listed to one, so
-  // "every tab is in the nav" is a claim about this session. The other kind of
-  // session is checked at the end.
+  // An administrator on the plan's list, as whoami() would say: every tab is
+  // listed to one, so "every tab is in the nav" is a claim about this session.
+  // The other kinds of session are checked at the end.
   await page.evaluate(() => {
-    window.__auth = { isSignedIn: Auth.isSignedIn, isAdmin: Auth.isAdmin, role: Auth.role };
-    Auth.isSignedIn = () => true; Auth.isAdmin = () => true; Auth.role = () => 'admin';
+    window.__auth = { isSignedIn: Auth.isSignedIn, isAdmin: Auth.isAdmin, role: Auth.role, a2plan: Auth.a2plan };
+    Auth.isSignedIn = () => true; Auth.isAdmin = () => true; Auth.role = () => 'admin'; Auth.a2plan = () => true;
     renderTabs();
   });
 
@@ -458,10 +461,18 @@ try {
     !L.on, `on ${L.on}, lit ${L.lit.join(', ')}`);
 
   // ── Who sees what ─────────────────────────────────────────────────────────
-  console.log('\nWho sees what — a tab for administrators is listed to nobody else\n');
+  console.log('\nWho sees what — a tab for some people is listed to nobody else\n');
   await page.setViewportSize({ width: 1440, height: 900 });
-  const adminOnly = await page.evaluate(() => TAB_LIST.filter(t => t.who === 'admin').map(t => ({ id: t.id, label: t.label })));
-  check('at least one tab is listed to administrators only', adminOnly.length > 0, adminOnly.map(t => t.id).join(', '));
+  // Who this session is: signed in or not, an administrator or not, on the
+  // ALERT2 Transition Plan's list or not.
+  const as = (signedIn, admin, onList) => page.evaluate(([signedIn, admin, onList]) => {
+    navFind('');
+    Auth.isSignedIn = () => signedIn; Auth.isAdmin = () => admin;
+    Auth.role = () => (admin ? 'admin' : signedIn ? 'editor' : null); Auth.a2plan = () => onList;
+    renderTabs();
+  }, [signedIn, admin, onList]);
+  const restricted = await page.evaluate(() => TAB_LIST.filter(t => t.who).map(t => ({ id: t.id, label: t.label, who: t.who })));
+  check('at least one tab is listed only to some people', restricted.length > 0, restricted.map(t => `${t.id} (${t.who})`).join(', '));
   const seen = () => page.evaluate((ids) => {
     setNavCollapsed(false);
     navFind('');
@@ -471,29 +482,40 @@ try {
     const cards = [...document.querySelectorAll('#main-content .sm-card')].map(c => c.dataset.tab);
     return { bar: ids.map(t => bar.filter(x => x === t.id).length), found, cards: ids.map(t => cards.includes(t.id)),
              count: (navFind('a'), document.getElementById('nav-found').textContent) };
-  }, adminOnly);
+  }, restricted);
   let w = await seen();
-  check('an administrator has each of them in the bar once, finds it by name, and has its Site Map card',
+  check('somebody each is for has it in the bar once, finds it by name, and has its Site Map card',
     w.bar.every(n => n === 1) && w.found.every(Boolean) && w.cards.every(Boolean), JSON.stringify(w));
-  await page.evaluate(() => { navFind(''); Auth.isSignedIn = () => false; Auth.isAdmin = () => false; Auth.role = () => null; renderTabs(); });
+  await as(false, false, false);
   w = await seen();
   check('signed out, none of them is in the bar, the find box or the Site Map',
     w.bar.every(n => n === 0) && !w.found.some(Boolean) && !w.cards.some(Boolean), JSON.stringify(w));
   const total = await page.evaluate(() => TAB_LIST.length);
-  check('and the find box counts only the tabs it could list', new RegExp(`of ${total - adminOnly.length} tabs`).test(w.count), w.count);
-  await page.evaluate(() => { navFind(''); Auth.isSignedIn = () => true; Auth.isAdmin = () => false; Auth.role = () => 'editor'; renderTabs(); });
+  check('and the find box counts only the tabs it could list', new RegExp(`of ${total - restricted.length} tabs`).test(w.count), w.count);
+  await as(true, false, false);
   w = await seen();
-  check('signed in without being an administrator, the same', w.bar.every(n => n === 0) && !w.found.some(Boolean) && !w.cards.some(Boolean), JSON.stringify(w));
-  const inPalette = (admin) => page.evaluate(([ids, admin]) => {
-    Auth.isSignedIn = () => admin; Auth.isAdmin = () => admin; Auth.role = () => (admin ? 'admin' : null);
+  check('signed in without being anybody they are for, the same', w.bar.every(n => n === 0) && !w.found.some(Boolean) && !w.cards.some(Boolean), JSON.stringify(w));
+  await as(true, true, false);
+  w = await seen();
+  const plan = restricted.findIndex(t => t.who === 'a2plan');
+  check('an administrator who is not on the plan\'s list does not have the plan, and has every tab for administrators',
+    plan >= 0 && w.bar[plan] === 0 && !w.found[plan] && !w.cards[plan]
+    && restricted.every((t, i) => t.who !== 'admin' || (w.bar[i] === 1 && w.found[i] && w.cards[i])), JSON.stringify(w));
+  await as(true, false, true);
+  w = await seen();
+  check('…and somebody on the list who is not an administrator has the plan',
+    w.bar[plan] === 1 && w.found[plan] && w.cards[plan], JSON.stringify(w));
+  const inPalette = (on) => page.evaluate(([ids, on]) => {
+    Auth.isSignedIn = () => on; Auth.isAdmin = () => on; Auth.role = () => (on ? 'admin' : null); Auth.a2plan = () => on;
     return ids.map(t => Palette.results(t.label).some(x => x.kind === 'tab' && x.label === t.label));
-  }, [adminOnly, admin]);
+  }, [restricted, on]);
   const palOut = await inPalette(false), palIn = await inPalette(true);
-  check('Ctrl+K offers it to an administrator and to nobody else', palIn.every(Boolean) && !palOut.some(Boolean),
-    `admin ${palIn.join(',')}, signed out ${palOut.join(',')}`);
-  await page.evaluate(() => { Auth.isSignedIn = () => true; Auth.isAdmin = () => false; Auth.role = () => 'editor'; renderTabs(); });
-  const opened = await page.evaluate(() => { navFind(''); switchTab(TAB_LIST.find(t => t.who === 'admin').id); return document.getElementById('main-content').textContent; });
-  check('opened by its address, it says who it is for and shows nothing more', /administrators only/i.test(opened) && opened.length < 600, opened.slice(0, 160));
+  check('Ctrl+K offers each to somebody it is for and to nobody else', palIn.every(Boolean) && !palOut.some(Boolean),
+    `for ${palIn.join(',')}, signed out ${palOut.join(',')}`);
+  await as(true, false, false);
+  const opened = await page.evaluate((ids) => { navFind(''); return ids.map(t => { switchTab(t.id); return document.getElementById('main-content').textContent; }); }, restricted);
+  check('opened by its address, each says who it is for and shows nothing more',
+    opened.every(t => /administrators only|only for the people nominated/i.test(t) && t.length < 600), opened.map(t => t.slice(0, 100)).join(' | '));
   await page.evaluate(() => { navFind(''); switchTab('stations'); });
 
   if (errors.length) check('no uncaught page errors', false, errors.join(' | '));
