@@ -104,7 +104,22 @@ async function standIn(page) {
   // unattended, and what it found that is still open.
   await page.route('**/rest/v1/health_refresh?*', route => route.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify([{ at: new Date(Date.now() - SERVER_AGO).toISOString() }]) }));
-  await page.route('**/rest/v1/health_finding?*', route => route.fulfill({ status: 200, contentType: 'application/json',
+  // Transmitter frequency (#217, 0075): two ALERT2 transmitters a base station
+  // hears, one like the rest and one 3 ppm off them, and the server's finding.
+  await page.route('**/rest/v1/rpc/transmitter_offsets', route => {
+    const day = g => new Date(Date.now() - g * 86400e3).toISOString().slice(0, 10);
+    const rows = [];
+    for (let g = 0; g < 20; g += 1) {
+      rows.push({ addr: 4101, day: day(g), offset_hz: 10, offset_ppm: 0.07, bursts: 90, receivers: 1, freq_mhz: 150.5 });
+      rows.push({ addr: 4102, day: day(g), offset_hz: -450, offset_ppm: -3.0, bursts: 60, receivers: 1, freq_mhz: 150.5 });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
+  });
+  await page.route('**/rest/v1/health_finding?*', route => /source=eq\.transmitters/.test(route.request().url())
+    ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
+        { kind: 'transmitter-off-channel', subject: 'a2:4102', severity: 'warn', title: 'ALERT2 4102 is 3.0 ppm below the rest',
+          detail: '', evidence: { offset_ppm: -3.0 }, first_seen: new Date(Date.now() - 3600e3).toISOString() }]) })
+    : route.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify(WORLD ? [
       { kind: 'silent', subject: 'silent:' + WORLD.roles.silent, station_id: WORLD.roles.silent, severity: 'critical',
         title: 'Silent — missed its last 4 checks', first_seen: new Date(Date.now() - 3600e3).toISOString() },
@@ -377,6 +392,24 @@ try {
   ok('…counts the planted pair landing together whenever the frame they meet on arrived', air.planted >= 25 && air.planted <= 50, 'times: ' + air.planted);
   ok('…and draws it: the folded hour, a tick for each station in a clash, a suggestion for each move', air.svg && air.ticks === air.inClash && air.rows === air.moves.length,
     JSON.stringify(air));
+
+  // ── Transmitter frequency (#217) ───────────────────────────────────────────
+  // The server's offsets drawn a row a transmitter, furthest from the rest
+  // first, with its finding; the one like the rest said to be.
+  await until(page, () => typeof HealthDrift !== 'undefined' && HealthDrift.state().rows
+    && document.querySelectorAll('#hl-drift tbody tr').length > 0, null, 20_000).catch(() => {});
+  const drift = await page.evaluate(() => {
+    const el = document.getElementById('hl-drift');
+    const rows = el ? [...el.querySelectorAll('tbody tr')].map(tr => tr.textContent.replace(/\s+/g, ' ').trim()) : [];
+    return { rows, head: el ? el.querySelector('h3') && el.querySelector('h3').id : null,
+             spark: el ? el.querySelectorAll('svg.hl-drift-spark path').length : 0,
+             lead: el ? (el.querySelector('p') || {}).textContent : '' };
+  });
+  ok('Transmitter frequency: a row each, the one furthest from the rest first, with its offset and its finding',
+    drift.rows.length === 2 && /^4102\b/.test(drift.rows[0]) && /−3\.00 ppm/.test(drift.rows[0]) && /−450 Hz/.test(drift.rows[0])
+      && /Off the rest/.test(drift.rows[0]) && /Like the rest/.test(drift.rows[1]), JSON.stringify(drift.rows));
+  ok('…labelled by its heading, a line a transmitter, and the finding led with',
+    drift.head === 'hl-h-drift' && drift.spark === 2 && /1 transmitter to check: ALERT2 4102/.test(drift.lead || ''), JSON.stringify(drift));
 
   await page.evaluate(() => Health.setCat('power'));
   const power = await page.evaluate(() => [...document.querySelectorAll('.hl-ftable tbody tr .hl-fwhat b')].map(b => b.textContent));

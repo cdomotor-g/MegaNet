@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-21** (revision 173 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-21** (revision 174 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -240,7 +240,7 @@ Six per-tab issues are about to restyle nineteen tabs in parallel. The decisions
 `[Epic]` `[Opus5/High]` — the rating is for the children. Out of the UX review of 2026-10-07 (Flood-Net item 5, and the review's three cross-repo items). The network's health is something a person has to go and look at today: Station Health works its findings out in the browser when its tab is open, Base Stations shows online / quiet / offline when that tab is open, and nothing tells anyone. **The scope is the network's equipment, for the people who keep it running** — Flood-Net is not a flood warning service (`docs/agent-api.md`), and nothing under this epic alerts anyone about river levels. #156's "watch-and-notify during field tests" is a different thing and stays there.
 - ~~**#215**~~ `[Sub-issue of #214]` `[Opus5/High]` — **CLOSED at revision 134** (`0059`, **not live yet** — #210 steps 3 and 4) — health findings on the server: a station silent past its interval, a base station whose heartbeat is stale, and **a receiver that is running but has decoded nothing for hours** — the case nothing catches today, because `base-stations.js`' `flags()` only counts receivers whose state isn't `running`, although the RPi ALERT heartbeat already carries each receiver's decode count and the seconds since it last sent anything (`beat()`). Findings start and clear (`first_seen`, `last_seen`, `cleared_at`) so something can act on a change, and the rules keep one source of truth rather than a browser copy and a server copy.
 - **#216** `[Sub-issue of #214]` `[Opus5/High]` — **OPEN** — alerts for staff: per-person subscriptions, a daily digest email, and a debounced web push for a new critical finding, each line linking to the station (#211). Two person-steps are expected and named in the issue: an email provider's key and a VAPID key pair, as Worker secrets.
-- **#217** `[Sub-issue of #214]` `[Sonnet5/High]` — **OPEN** — transmitter drift as a finding. `alert-dsp.js`' `carrierSearch` already estimates each burst's carrier offset and throws the number away; the Pi and the Serial Monitor's SDR card send it with each reading, the way `freq_mhz` and `snr_db` travel since `0050`, and the finding measures a station **against the other stations the same receiver hears**, so a receiver's own ppm error cancels out. The RPi ALERT half is in that repository's `docs/roadmap.md`.
+- **#217** `[Sub-issue of #214]` `[Sonnet5/High]` — **OPEN, built — revision 174; waits on `0075` in the SQL editor** — transmitter drift as a finding. The Pi's half was already done: since `0072` every ALERT2 reception carries `cfo_hz`, summed per day in `reception_daily` (kept forever), so no reading column was needed. `0075`: `transmitter_offsets()` (public) measures each transmitter — the **last** on a copy's path, so repeaters too — against the fleet the receiver hears, with the receiver's own daily crystal error taken out; `refresh_transmitter_findings()` hourly writes *transmitter-off-channel* and *transmitter-drift* into `health_finding` (source `transmitters`). Station Health gains a **Transmitter frequency** panel (`health-drift.js`). **Left**: the owner applies `0075`; `core.js` to 75; a live run checked; close. Drift itself needs thirty days of offsets (kept since 2026-10-19), and findings reach a station's card only once `alert2_station_id` is filled in the register.
 
 > **Sequencing.** ~~#215 first~~ — **done at revision 134**: #216 fires on the changes each run answers (`opened`, `worse`, `cleared` — from `refresh_base_station_findings()` and `report_station_findings()`), and #217 writes into `meganet.health_finding` — as a station finding it would be a `CURRENT_KINDS` kind reported by `tools/health/report.mjs`, or a base-station one with a rule beside the receiver's. #216 and #217 are independent of each other after that. ~~#218~~ (health on the card and the map — **closed at revision 126**, with `HealthGlance`'s `SOURCE` the seam for #215's findings) and #230's silent-stations route sit outside the epic and read #215's findings — the seam swapped at revision 134, the route still to build.
 
@@ -692,7 +692,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Sonnet5
 | Effort | Issues |
 |---|---|
-| High | **#217** (transmitter drift as a finding — *after the Pi's half*) · **#238** (QLDTraffic on the map — flooded and closed roads, damaged bridges, flood cameras) |
+| High | **#217** (transmitter drift as a finding — *built, waits on `0075`*) · **#238** (QLDTraffic on the map — flooded and closed roads, damaged bridges, flood cameras) |
 | Med | **#177** (NSW road parcels) · **#187** (ACMA transmitters in 3-D — its drawings half shipped at revision 147) · **#201** (place a field photo on the map) · **#205** (tides and soils on the card beyond Queensland) · **#220** (maintenance due list) · **#228** (accessibility follow-ups) · **#230** (agent API: silent stations — *#215's findings exist; answers once `0059` is live*; its other two parts shipped) |
 | Low | — |
 
@@ -815,6 +815,17 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 174 — 2026-10-21: 📡 Transmitter frequency — drift and off-channel as findings (#217)
+
+The owner: *"Let's skip the staff email alerts … What is the next ticket/s we could take?"*, then *"#217 Transmitter drift"*. **#216 left open, deferred by the owner (too few subscribers yet). Opens nothing; #217 stays open until `0075` is live.**
+
+- **No new reading column.** The issue planned the Pi sending the carrier offset with each reading; since `0072` every ALERT2 reception already carries `cfo_hz`, and `reception_daily` (forever) sums it, so the measurement is built on what is kept.
+- **The model**, fitted on the live receptions first: a copy's carrier is its **last** transmitter's (the repeater's, when relayed). offset = cfo − the receiver's crystal error that day (the median, over what it heard, of each transmitter's difference from its own mean) − the fleet median. Comparing each against "the others that day" swung ±200 Hz; this holds to ~15 Hz. Live: receiver error −16 to +20 Hz a day; 10020 sits at −2.1 ppm, just inside the line.
+- **`0075`**: `transmitter_offsets(days)` (public), `refresh_transmitter_findings()` (service key; pg_cron hourly, `meganet-transmitter-health`), `health_finding` source `transmitters` with kinds `transmitter-off-channel` (≥ 2.5 ppm from the rest over a week; 5 critical) and `transmitter-drift` (≥ 1 ppm moved against the 30 days before; 2 critical) — thresholds in `app_meta`.
+- **Station Health → Transmitter frequency** (`health-drift.js`): a row per transmitter, furthest from the rest first — last week's offset in ppm and Hz, its change, a line of its days with the ±2.5 ppm band, and the finding. `docs/station-health.md` and `db/README.md`.
+
+**Checks:** `tools/check_transmitter_drift.sql` (16: a receiver whose crystal wanders 180 Hz, six transmitters, one drifting, one off, one copy relayed — new `db-checks` step), `check_health_findings`, `check_base_stations`, `check_reception_rollups` with `0075` applied; `npm run health` (two new assertions) and the cheap five.
 
 ### Revision 173 — 2026-10-21: 🗄️ The data archive is live — everything kept, in R2, before anything is deleted (#243)
 

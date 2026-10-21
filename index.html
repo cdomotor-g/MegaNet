@@ -780,6 +780,11 @@
   <!-- …and the panel, drawn in Station Health's page by health.js; reads
        map-backbone.js's suggested delays at call time. -->
   <script src="health-airtime.js?v=20261021n"></script>
+  <!-- Transmitter frequency (#217), in Station Health's page beside it: each
+       ALERT2 transmitter's carrier against the rest, from
+       meganet.transmitter_offsets() (0075). After datastore.js and health.js,
+       read at call time; nothing runs at load. -->
+  <script src="health-drift.js?v=20261021n"></script>
   <script src="health-agent.js?v=20261021n"></script>
   <!-- A station's health where people already look (#218): last heard, its
        battery and its findings on its card, each a door into Station Health,

@@ -17844,6 +17844,11 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-empty { color: var(--muted); padding: var(--sp-2) 0; }
 
 .hl-table td, .hl-table th { vertical-align: top; }
+/* Transmitter frequency (#217): numbers right-aligned, the sparkline in the
+   text colour so it follows the theme. */
+.hl-drift-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hl-drift-spark { display: block; color: var(--text, currentColor); }
+.hl-drift-sub { max-width: 72ch; }
 .hl-ftable td, .hl-ftable th, .hl-airtable td, .hl-airtable th { white-space: normal; }
 .hl-ftable .hl-fwhere, .hl-airtable .hl-fwhere { min-width: 8rem; font-weight: 600; }
 .hl-fwhat b { display: block; }

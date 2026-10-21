@@ -373,6 +373,7 @@ const Health = (() => {
       <section class="panel" aria-labelledby="hl-h-checks">${matrixHtml()}</section>
       <section class="panel" id="hl-ss" aria-labelledby="hl-h-ss">${sparkCardHtml()}</section>
       <section class="panel" id="hl-airtime" aria-labelledby="hl-h-air">${typeof HealthAirtime !== 'undefined' ? HealthAirtime.render() : ''}</section>
+      <section class="panel" id="hl-drift" aria-labelledby="hl-h-drift">${typeof HealthDrift !== 'undefined' ? HealthDrift.render() : ''}</section>
       <section class="panel" aria-labelledby="hl-h-net">${networkHtml()}</section>
       <section class="panel" aria-labelledby="hl-h-reg">${registerHtml()}</section>
       <section class="panel" id="hl-agent" aria-labelledby="hl-h-agent">${typeof HealthAgent !== 'undefined' ? HealthAgent.render() : ''}</section>`;

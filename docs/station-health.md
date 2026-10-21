@@ -369,6 +369,40 @@ station's check time, its clock, who it falls together with and the move
 suggested. `npm run airtime` holds the rules to networks built for each, in
 Node; `npm run health` holds the panel to the demo week's one planted clash.
 
+## Transmitter frequency
+
+Every ALERT2 burst a base station hears comes with its **carrier offset** — how
+far, in hertz, the transmitter's carrier sat from where the receiver expected
+it. A crystal that is ageing, or a site running very hot or cold, shows here
+weeks before the station goes quiet.
+
+**Whose carrier.** A copy that came over a repeater is on the repeater's
+carrier, not the gauge's, so each copy counts for the **last** transmitter on
+its path — repeaters are measured too.
+
+**Against the rest, not against the book.** The receiver's own crystal is off
+as well, and moves with the weather: every transmitter it hears moves with it.
+So each day the receiver's own error is worked out (the median, over what it
+heard, of each transmitter's difference from its own usual) and taken out, and
+each transmitter is shown against the median of the fleet. 0 ppm is *like the
+rest*, not exactly on frequency.
+
+**What is a finding.** The server checks every hour (`0075`, with the tab
+closed): a transmitter more than 2.5 ppm from the rest over the last week is a
+warning (5 ppm critical); one that moved 1 ppm against the thirty days before
+is drifting (2 ppm critical). Both are `app_meta` rows, `tx_offset_warn_ppm`
+and the like. The panel lists every transmitter measured, furthest from the
+rest first, with the last week's offset, its change, a line of its days with the
+±2.5 ppm band shaded, and the finding.
+
+**Limits.** Offsets have been kept since 2026-10-19, so *drift* needs until
+late November to have its thirty days to compare with; until then only
+*off-channel* can fire. A transmitter is named by its ALERT2 address; it gets
+its station's name, and the finding its station, once the register has that
+station's ALERT2 address (`alert2_station_id`). `npm run health` holds the
+panel to two transmitters built for it; `tools/check_transmitter_drift.sql`
+holds the server to six, with a receiver whose crystal wanders 180 Hz.
+
 ## On a station's card, and its pin
 
 The same rules reach the Stations tab (#218, `health-glance.js`), so somebody
