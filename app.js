@@ -3854,7 +3854,11 @@ function renderStationsHtml() {
           ${carriers}
         </div>
         <div class="panel card-kind card-kind-links" id="blast-card" hidden></div>
-        <div class="panel card-kind card-kind-station" id="stations-editor-card">
+        <!-- Every edit is looked at as it is made: the card goes gold and the
+             field gilded while it differs from what was saved
+             (editorUnsavedRefresh, station-editor.js). -->
+        <div class="panel card-kind card-kind-station" id="stations-editor-card"
+             oninput="editorUnsavedRefresh()" onchange="editorUnsavedRefresh()">
           ${renderStationEditorCard()}
         </div>
        </div>
@@ -8030,6 +8034,8 @@ function renderStationEditorCard() {
 function rerenderStationEditorCard() {
   const el = document.getElementById('stations-editor-card');
   if (el) el.innerHTML = renderStationEditorCard();
+  // A fresh card is the saved station: no gilt, and teal again.
+  if (el) editorUnsavedRefresh();
   // The slots this station's relayed ALERT2 address has actually been heard on
   // (#172). A background fill, like the editor stamp: it reads the readings
   // rather than the registry, so it cannot come out of state.data.

@@ -6,7 +6,8 @@
 //                 and as a line each on the station card.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for esc, escAttr and hintToggleHtml. station-editor.js places
+// Reaches back to core.js for esc, escAttr and hintToggleHtml, and to station-editor.js
+// for editorUnsavedRemoved/editorUnsavedRefresh when a row comes and goes. station-editor.js places
 // editorHtml() and reads readForm()/formProblem() on save; app.js's
 // stnCardHtml() places cardHtml(). The IIFE body only declares, so this file's
 // position among the modules is free (`npm run toplevel`).
@@ -154,6 +155,8 @@ const Frequencies = (function () {
     if (!box) return;
     const rows = box.querySelector('.freq-rows');
     rows.insertAdjacentHTML('beforeend', rowHtml({}));
+    // New since the card was drawn: anything in it is an unsaved change.
+    rows.querySelector('.freq-row:last-child')?.setAttribute('data-ef-added', '');
     recount();
     const last = rows.querySelector('.freq-row:last-child input');
     if (last) last.focus();
@@ -165,8 +168,10 @@ const Frequencies = (function () {
     const row = btn && btn.closest('.freq-row');
     const box = document.getElementById('ef-freqs');
     if (!row || !box) return;
+    editorUnsavedRemoved(row, 'A frequency pair');
     row.remove();
     recount();
+    editorUnsavedRefresh();
     const add = box.querySelector('.ef-section-head > button');
     if (add) add.focus();
   }

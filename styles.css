@@ -58,15 +58,23 @@
   /* What a Stations card is about (.card-kind, below): a ground a breath off
      --panel and a band along its top edge, one pair per kind — the whole
      register in blue, the radio links between stations in violet, and the
-     one station picked in the leader's gold. The grounds carry text, so they
-     are in the contrast contract; the bands are categorical, like the role
-     fills, and are not. */
+     one station picked in teal. The editor goes gold-orange while it holds
+     an edit not saved yet (.is-unsaved), and each field that changed is
+     gilded: --field-unsaved its ground, --ctl-unsaved its edge — the bar at
+     the card's foot takes the same ground. The grounds carry text, so they
+     are in the contrast contract, and the gilded edge is a control's edge,
+     so it is too (3:1); the bands are categorical, like the role fills, and
+     are not. */
   --panel-register: #f2f7fe;
   --panel-links:    #f8f4fd;
-  --panel-station:  #fdf7e8;
+  --panel-station:  #eef8f6;
+  --panel-unsaved:  #fff6e3;
+  --field-unsaved:  #ffecc2;
   --edge-register:  #0b5cab;
   --edge-links:     #6d28d9;
-  --edge-station:   #f0bf3c;
+  --edge-station:   #0f766e;
+  --edge-unsaved:   #f59f0a;
+  --ctl-unsaved:    #a85d00;
   --rx-bg: #eef4fb;
   --tx-bg: #eef8f1;
   --map-line: #ff6f00;
@@ -576,10 +584,14 @@
   --shadow: 0 1px 2px rgba(0,0,0,.18);
   --panel-register: #1f2e3e;
   --panel-links:    #252b3f;
-  --panel-station:  #2c2b25;
+  --panel-station:  #1a3032;
+  --panel-unsaved:  #2f2919;
+  --field-unsaved:  #3f3315;
   --edge-register:  #6bb6ff;
   --edge-links:     #a78bfa;
-  --edge-station:   #f0bf3c;
+  --edge-station:   #2dd4bf;
+  --edge-unsaved:   #f5a524;
+  --ctl-unsaved:    #f5b041;
   --rx-bg: #1d3242;
   --tx-bg: #19362a;
   --map-line: #ff9f43;
@@ -9544,8 +9556,9 @@ body:has(.map-panel.is-full) .dock-inner {
      register  blue    the list and its filters: every station
      links     violet  who hears whom: Repeaters listening, the blast
                        radius, the radio path, its profile and link budget
-     station   gold    the editor: the one station picked — the leader's gold,
-                       the crown the same station's card wears on the map
+     station   teal    the editor: the one station picked, as the database
+                       has it — and gold-orange while it holds an edit that
+                       has not been saved (.is-unsaved, below)
 
    The card restates --panel rather than painting a background over it, so
    everything inside that is drawn on --panel — the buttons, the inputs, a
@@ -9556,10 +9569,79 @@ body:has(.map-panel.is-full) .dock-inner {
   --panel: var(--kind-panel);
   border-top-color: var(--kind-edge);
   box-shadow: inset 0 3px 0 var(--kind-edge), var(--shadow);
+  transition: background-color .25s ease, border-top-color .25s ease, box-shadow .25s ease;
 }
 .card-kind-register { --kind-panel: var(--panel-register); --kind-edge: var(--edge-register); }
 .card-kind-links    { --kind-panel: var(--panel-links);    --kind-edge: var(--edge-links); }
 .card-kind-station  { --kind-panel: var(--panel-station);  --kind-edge: var(--edge-station); }
+
+/* ── Unsaved edits in the station editor ─────────────────────────────────────
+   The editor is teal while what it shows is what the database holds. The
+   first edit turns the card gold-orange and gilds the field it was made in;
+   putting the field back the way it was takes the gilt off again, and a save
+   — which redraws the card from what the database sent back — takes the card
+   back to teal. editorUnsavedRefresh() (station-editor.js) sets the classes;
+   nothing here decides what counts as a change.
+
+   A gilded control changes its edge and its ground and nothing else: its box
+   is where the focus ring's halo is drawn (a box-shadow), and an outline or a
+   shadow here would take the ring off the field being typed in. A checkbox
+   cannot be painted, so the label round it takes the gilt — a label is never
+   focused, so its shadow is free. A list row folded shut says so on its
+   summary line, where the change would otherwise be out of sight. */
+.card-kind-station.is-unsaved { --kind-panel: var(--panel-unsaved); --kind-edge: var(--edge-unsaved); }
+
+#stations-editor-card :is(input, select, textarea).ef-changed {
+  border-color: var(--ctl-unsaved);
+  background: var(--field-unsaved);
+}
+#stations-editor-card label.ef-changed {
+  background: var(--field-unsaved);
+  border-radius: var(--r-sm);
+  box-shadow: 0 0 0 3px var(--field-unsaved), 0 0 0 4px var(--ctl-unsaved);
+}
+#stations-editor-card .rhs-row:not([open]):has(.ef-changed) > summary {
+  background: var(--field-unsaved);
+  border-radius: var(--r-sm);
+}
+
+/* The bar that says so, at the foot of the editor and stuck to the bottom of
+   whatever is scrolling it — the side panel's pane beside the map, the page
+   under it — for as long as any of the card is in view, so the Save it carries
+   is never a scroll away. Only there while something is unsaved: an editor
+   with nothing to say has no bar. A rounded strip inside the card's padding
+   rather than the card's full width, so it does not have to know what that
+   padding is at each width. */
+.ef-unsaved {
+  position: sticky;
+  bottom: .5rem;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem .75rem;
+  margin-top: 1rem;
+  padding: .5rem .5rem .5rem .75rem;
+  border: 1px solid var(--ctl-unsaved);
+  border-left-width: 4px;
+  border-radius: var(--r-md);
+  background: var(--field-unsaved);
+  color: var(--text);
+  box-shadow: var(--shadow-2);
+}
+.ef-unsaved[hidden] { display: none; }
+/* Under the map the page is what scrolls, and its foot is shared: Calm's
+   footbar, an installed app's lift, and ↑ Back to top in the corner while it
+   shows — whose 44 px circle would otherwise sit on the bar's Save. */
+#main-content .ef-unsaved {
+  bottom: calc(.5rem + var(--mn-footbar, 0px) + var(--pwa-lift, 0px));
+}
+:root:has(#to-top:not([hidden])) #main-content .ef-unsaved {
+  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + var(--pwa-lift, 0px) + var(--mn-footbar, 0px) + 3.25rem);
+}
+.ef-unsaved-text { flex: 1 1 10rem; min-width: 0; font-size: var(--fs-sm); }
+.ef-unsaved-text .link-btn { font-size: inherit; }
+.ef-unsaved > button { flex: none; }
 
 /* The map alone, filling what is left of the window below the banner — so the
    page itself does not scroll behind a side panel that does. --mn-split-h is

@@ -9,7 +9,8 @@
 // Reaches back to core.js for state, esc, escAttr, pillText, pillLong, cssVar, announce,
 // acmaHaversineKm and fmtKm; across to app.js for the Stations map itself,
 // mapNote and selectStation; to auth.js for Auth.open() from the station
-// card's pill; to station-editor.js for editorSave, stationSavePosition and the
+// card's pill; to station-editor.js for editorSave, stationSavePosition,
+// editorUnsavedRefresh and the
 // #ef-lat / #ef-lon boxes it writes into; to map-draw.js, link-budget.js and
 // map-here.js, to take the map's other interactive modes off before it takes
 // the clicks, and to site-features.js for the one it will not take the map
@@ -521,6 +522,9 @@ const MapMovePin = (function () {
     if (state.editorId === id) state.editorDraft = { ...state.editorDraft, lat, lon };
     if (latEl) latEl.value = lat;
     if (lonEl) lonEl.value = lon;
+    // Typed by nobody, so no input event says so: the boxes are gilded and the
+    // card goes gold until the save below lands — and stays so if it cannot.
+    editorUnsavedRefresh();
 
     // No boxes means no form on screen, and editorReadForm() reads lat/lon from
     // the DOM unconditionally: saving now would write null over both. Say so

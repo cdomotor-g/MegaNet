@@ -387,10 +387,23 @@ would otherwise read as one long form. The Stations tab is the one user: its
 list is `card-kind-register` (blue — every station), Repeaters listening, the
 blast radius, the radio path, the profile and the link budget are
 `card-kind-links` (violet — the links between stations), and the editor is
-`card-kind-station` (gold — the one station picked, the leader's gold that the
-same station's card wears on the map). Each kind is a ground a breath off
-`--panel` (`--panel-register`, `--panel-links`, `--panel-station`) and a band in
-its colour along the top edge (`--edge-*`). The card restates `--panel` as its
+`card-kind-station` (teal — the one station picked, as the database has it).
+Each kind is a ground a breath off `--panel` (`--panel-register`,
+`--panel-links`, `--panel-station`) and a band in its colour along the top edge
+(`--edge-*`).
+
+**Unsaved edits** are the editor's own state on top of its kind. From the first
+edit until a save lands, the card is `is-unsaved` — gold-orange,
+`--panel-unsaved` and `--edge-unsaved` — each field that differs from the saved
+value is `ef-changed` (gilded: `--field-unsaved` ground, `--ctl-unsaved` edge;
+a checkbox's label takes the gilt, since the box cannot be painted), and
+`.ef-unsaved`, a bar stuck to the foot of the card, counts and names the
+changes beside a Save. What counts is read off each control's
+`defaultValue`/`defaultChecked`/`defaultSelected` — the form is markup written
+from the record, so the defaults are the saved values — plus rows added since
+(`data-ef-added`) and rows from the record removed (`editorUnsavedRemoved`).
+A gilded control changes only its edge and ground: its box-shadow is where the
+focus ring's halo goes. The card restates `--panel` as its
 ground rather than painting over it, so its buttons and inputs sit on the same
 colour; the grounds are in the contrast contract for every ink a card writes,
 and the bands, like the role fills, are categorical and are not. The heading

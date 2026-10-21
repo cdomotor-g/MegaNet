@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 63, date: '2026-10-21', items: [
+      '<strong>✏️ The station editor shows what you have changed and not saved.</strong> The details card is now '
+        + '<em>teal</em> while it shows the station as the database has it. Change anything and the card turns '
+        + '<em>gold-orange</em>, the field you changed is gilded, and a bar at the foot of the card — kept in view as '
+        + 'you scroll — says how many changes are waiting, names them (press one to go to it) and has its own '
+        + '<em>Save</em>. Put a field back the way it was and its gilt goes; once a save lands the card is teal again. '
+        + 'A save that is refused leaves everything gold and says so in the bar.',
+    ] },
     { n: 62, date: '2026-10-21', items: [
       '<strong>📡 Last heard, in the station list.</strong> The list of stations on the Stations tab has a new last '
         + 'column, <em>Last heard</em>: how long since Flood-Net\'s receivers last heard each station — <em>45 min</em>, '

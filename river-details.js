@@ -15,7 +15,8 @@
 // Reaches back to core.js for esc, escAttr, hintToggleHtml and acmaHaversineKm, across to
 // flood-velocity.js for FloodVelocity, and to digital-twin.js for
 // DigitalTwin.openVelocity (from an inline handler on the velocity's
-// workings, so only when pressed). Two files reach into this one: app.js,
+// workings, so only when pressed), and to station-editor.js for
+// editorUnsavedRemoved/editorUnsavedRefresh when a list row comes and goes. Two files reach into this one: app.js,
 // whose stnCardHtml() places cardHtml(), aepCardHtml() and velocityRowHtml(),
 // and station-editor.js, whose
 // editorForm() places editorHtml() and whose editorReadForm()/editorSave() call
@@ -841,7 +842,11 @@ const RiverDetails = (function () {
     if (!box || !LISTS[list]) return;
     const rows = box.querySelector('.rhs-rows');
     rows.insertAdjacentHTML('afterbegin', rowHtml(list, {}, true));
+    // New since the card was drawn: anything in it, a prefilled figure
+    // included, is an unsaved change.
+    rows.firstElementChild?.setAttribute('data-ef-added', '');
     recount(box);
+    editorUnsavedRefresh();
     const first = rows.querySelector('.rhs-row .rhs-fields input, .rhs-row .rhs-fields select');
     if (first) first.focus();
   }
@@ -853,8 +858,10 @@ const RiverDetails = (function () {
     const row = btn && btn.closest('.rhs-row');
     const box = row && row.closest('.rhs-list');
     if (!row || !box) return;
+    editorUnsavedRemoved(row, `A row of ${LISTS[row.dataset.list]?.title || 'a list'}`);
     row.remove();
     recount(box);
+    editorUnsavedRefresh();
     const add = box.querySelector('.ef-section-head > button');
     if (add) add.focus();
   }

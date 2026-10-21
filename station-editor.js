@@ -5,6 +5,8 @@
 //   editorDelete   into it, and the save and delete path behind it.
 //   and the form
 //   helpers
+//   editorUnsaved… the gold card, the gilded fields and the bar while an edit
+//                  has not been saved (styles.css: "Unsaved edits")
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, slug, pInt, pFloat,
@@ -653,7 +655,11 @@ function editorForm(s) {
     ${RiverDetails.editorHtml(s, { more: `<label>Flood history from<input type="text" id="ef-fpfrom" value="${esc(s.flood_peaks_from || '')}"
              placeholder="a station's id, e.g. gatton" title="The Bureau's floods at that station's gauge are shown for this one while it has no gauge of its own"></label>` })}
     ${editorArroSection(s, sensors)}
-    ${StationInspections.sectionHtml(s)}`;
+    ${StationInspections.sectionHtml(s)}
+    <!-- Edits not saved yet: how many, which, and a Save — stuck to the foot of
+         the card while any of it is in view, and only there while there is
+         something unsaved to say (editorUnsavedRefresh). -->
+    <div class="ef-unsaved" id="ef-unsaved" role="status" hidden></div>`;
 }
 
 // The telemetry-type pick-list (#147). The six configurations come from
@@ -678,8 +684,13 @@ function editorInspConfigOptions(currentKey) {
 function editorFillInspConfigSelect() {
   const sel = document.getElementById('ef-insp-config');
   if (!sel || !Inspections.configs().length) return;
+  // Marked selected is the record's, and chosen is whatever the box was set
+  // to — which differ when somebody picked one before the list arrived, and
+  // that pick is an unsaved change still (editorUnsavedChanged).
+  const was = [...sel.options].find(o => o.defaultSelected)?.value || '';
   const cur = sel.value;
-  sel.innerHTML = editorInspConfigOptions(cur);
+  sel.innerHTML = editorInspConfigOptions(was);
+  sel.value = cur;
 }
 
 // The ARRO block at the foot of the editor. Read-only throughout: these ids come
@@ -775,7 +786,7 @@ function sensorRowHtml(se, dbId) {
                title="ARRO admin for device ${esc(se.device_id)} on site ${esc(dbId)}">ARRO ↗</a>`
           : ''}</span>
         <button type="button" class="sensor-del btn-danger" title="Remove this sensor"
-                onclick="this.closest('.sensor-row').remove()"><span aria-hidden="true">×</span></button>
+                onclick="editorRemoveSensorRow(this)"><span aria-hidden="true">×</span></button>
       </span>
     </div>`;
 }
@@ -817,6 +828,10 @@ function editorAddSensorRow(a2Slot) {
   const slot = a2Slot == null ? null : pInt(a2Slot);
   box.insertAdjacentHTML('beforeend', sensorRowHtml(slot == null ? {} : { alert2_sensor_id: slot }));
   const row = box.querySelector('.sensor-row:last-child');
+  // New since the card was drawn, so whatever it holds is a change — the slot
+  // a row from the heard list arrives with included (editorUnsavedChanged).
+  row?.setAttribute('data-ef-added', '');
+  editorUnsavedRefresh();
   // A row added from the heard-slots list below already knows its address; what
   // it is waiting for is what the thing measures, so that is where the cursor
   // goes. An empty row still starts at the ALERT box.
@@ -1247,6 +1262,186 @@ function rerenderEditorButtons() {
   const del  = document.getElementById('ef-delete');
   if (save) save.disabled = state.editorBusy;
   if (del)  del.disabled  = state.editorBusy;
+  editorUnsavedRefresh();
+}
+
+// ── Unsaved edits: the gold card, the gilded fields and the bar ─────────────
+// The card is teal while it shows what the database holds, and gold-orange
+// from the first edit until a save lands — each field that differs gilded,
+// and a bar stuck to the foot of the card saying how many and carrying a Save
+// (styles.css, "Unsaved edits in the station editor").
+//
+// What counts as changed is read off the controls themselves rather than off
+// a copy taken when the card was drawn: the form is markup written from the
+// record, so every control's defaultValue / defaultChecked / defaultSelected
+// already *is* the saved value, and a field typed back to what it was is
+// unchanged again without anything having to remember it. Two things the
+// markup cannot say are told here by the code that does them — a row added
+// since (data-ef-added: every figure in it is new, a prefilled one included)
+// and a row from the record taken away (editorUnsavedRemoved).
+//
+// Called on every input and change inside the card (its oninput/onchange, in
+// app.js), after a redraw, by setEditorStatus, and by anything that writes a
+// box itself — Move pin's coordinates. A paint, never a redraw: nothing typed
+// is touched.
+
+// The rows from the record taken away since the card was drawn, by name. The
+// heading element they were counted under says which drawing that was — a
+// redraw is a fresh card and starts the list again.
+const editorUnsavedGone = { head: null, names: [] };
+
+function editorUnsavedFresh(card) {
+  const head = card.querySelector('.ef-head');
+  if (head === editorUnsavedGone.head) return;
+  editorUnsavedGone.head  = head;
+  editorUnsavedGone.names = [];
+}
+
+// The station's own fields — not the Inspections chart's picker (data-ef-ignore),
+// and not the figures worked out from the others (read-only), nor a box this
+// account may not change (disabled).
+function editorUnsavedControls(card) {
+  return [...card.querySelectorAll('input, select, textarea')].filter(el =>
+    !el.readOnly && !el.disabled && !['hidden', 'button', 'submit', 'reset', 'file'].includes(el.type)
+    && !el.closest('[data-ef-ignore]'));
+}
+
+function editorUnsavedChanged(el) {
+  const added = !!el.closest('[data-ef-added]');
+  if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== (added ? false : el.defaultChecked);
+  if (el.tagName === 'SELECT') {
+    const opts = [...el.options];
+    if (!opts.length) return false;
+    if (added) return el.value !== '';
+    if (el.multiple) return opts.some(o => o.selected !== o.defaultSelected);
+    const def = opts.filter(o => o.defaultSelected).pop() || opts[0];
+    return el.value !== def.value;
+  }
+  return added ? el.value.trim() !== '' : el.value !== el.defaultValue;
+}
+
+// What a changed control is called in the bar: its caption, as the form
+// shows it.
+function editorUnsavedName(el) {
+  if (el.name === 'ef-roles') return 'Roles';
+  const sensor = el.closest('.sensor-row');
+  if (sensor) {
+    const was = sensor.querySelector('.sensor-aid')?.defaultValue || sensor.querySelector('.sensor-a2id')?.defaultValue;
+    return sensor.hasAttribute('data-ef-added') || !was ? 'New sensor' : `Sensor ${was}`;
+  }
+  const section = el.closest('.freq-list, .rhs-list');
+  if (section) return editorUnsavedText(section.querySelector('.ef-sub'), '.rhs-count, .freq-count') || 'Frequencies';
+  const label = (el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`)) || el.closest('label');
+  return editorUnsavedText(label) || el.getAttribute('aria-label') || el.title || el.id || 'A field';
+}
+
+// An element's own words: the text left once the controls, the ⓘ buttons
+// and anything named in `drop` are taken out of a copy of it.
+function editorUnsavedText(el, drop = '') {
+  if (!el) return '';
+  const copy = el.cloneNode(true);
+  copy.querySelectorAll(`input, select, textarea, button, datalist, .small, details${drop ? ', ' + drop : ''}`)
+    .forEach(x => x.remove());
+  return copy.textContent.replace(/\s+/g, ' ').trim();
+}
+
+// Where a change is painted: the control, or the label round a checkbox,
+// whose box takes no paint.
+function editorUnsavedMarkEl(el) {
+  return (el.type === 'checkbox' || el.type === 'radio') ? (el.closest('label') || el) : el;
+}
+
+// A row about to be taken out of the form. Only one from the record is a
+// change — a row added since and removed again never was.
+function editorUnsavedRemoved(row, name) {
+  const card = document.getElementById('stations-editor-card');
+  if (!card || !row || row.hasAttribute('data-ef-added')) return;
+  editorUnsavedFresh(card);
+  const fromRecord = [...row.querySelectorAll('input, select, textarea')].some(el =>
+    el.type === 'checkbox' ? el.defaultChecked
+      : el.tagName === 'SELECT' ? [...el.options].some(o => o.defaultSelected && o.value)
+      : el.defaultValue.trim() !== '');
+  if (fromRecord) editorUnsavedGone.names.push(`${name} removed`);
+}
+
+function editorRemoveSensorRow(btn) {
+  const row = btn.closest('.sensor-row');
+  if (!row) return;
+  const was = row.querySelector('.sensor-aid')?.defaultValue || row.querySelector('.sensor-a2id')?.defaultValue;
+  editorUnsavedRemoved(row, was ? `Sensor ${was}` : 'A sensor');
+  row.remove();
+  editorUnsavedRefresh();
+}
+
+// The changed controls behind the names in the bar, so a name can be pressed
+// to go to its field.
+let editorUnsavedTargets = [];
+
+function editorUnsavedRefresh() {
+  const card = document.getElementById('stations-editor-card');
+  if (!card) return;
+  const bar = document.getElementById('ef-unsaved');
+  card.querySelectorAll('.ef-changed').forEach(el => el.classList.remove('ef-changed'));
+  if (!bar) { card.classList.remove('is-unsaved'); return; }
+  editorUnsavedFresh(card);
+
+  const changed = editorUnsavedControls(card).filter(editorUnsavedChanged);
+  changed.forEach(el => editorUnsavedMarkEl(el).classList.add('ef-changed'));
+
+  // One name per field — the four role boxes are one change, Roles.
+  const byName = new Map();
+  for (const el of changed) {
+    const name = editorUnsavedName(el);
+    if (!byName.has(name)) byName.set(name, el);
+  }
+  for (const name of editorUnsavedGone.names) if (!byName.has(name)) byName.set(name, null);
+  const n = byName.size;
+  card.classList.toggle('is-unsaved', n > 0);
+  bar.hidden = n === 0;
+  if (!n) { bar.innerHTML = ''; editorUnsavedTargets = []; return; }
+
+  editorUnsavedTargets = [...byName.values()];
+  const SHOWN = 3;
+  const names = [...byName.keys()];
+  const list = names.slice(0, SHOWN).map((name, i) => editorUnsavedTargets[i]
+    ? `<button type="button" class="link-btn" onclick="editorUnsavedGo(${i})"
+              title="Go to ${escAttr(name)}">${esc(name)}</button>`
+    : esc(name)).join(', ')
+    + (n > SHOWN ? ` and ${n - SHOWN} more` : '');
+  const m = state.editorMsg;
+  const where = state.editorBusy ? 'saving…'
+    : m && m.kind === 'error' ? `<strong>⚠ not saved</strong> (<button type="button" class="link-btn"
+        onclick="editorUnsavedWhy()">why ↑</button>)`
+    : 'not in the database yet';
+  const html = `
+    <span class="ef-unsaved-text"><strong>${n} unsaved change${n === 1 ? '' : 's'}</strong>, ${where} — ${list}.</span>
+    ${dbCanWrite()
+      ? `<button type="button" class="primary" id="ef-save-bar" onclick="editorSave()"
+                 ${state.editorBusy ? 'disabled' : ''}>Save</button>`
+      : `<button type="button" class="primary" id="ef-save-bar" onclick="Auth.open()"
+                 title="Saving needs a signed-in session">Sign in to save</button>`}`;
+  // Only when it says something new: the bar is a status region, and a
+  // keystroke that changes nothing it says should not be read out again.
+  if (bar.dataset.said !== html) {
+    bar.dataset.said = html;
+    bar.innerHTML = html;
+  }
+}
+
+function editorUnsavedGo(i) {
+  const el = editorUnsavedTargets[i];
+  if (!el || !el.isConnected) return;
+  const fold = el.closest('details:not([open])');
+  if (fold) fold.open = true;
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.focus({ preventScroll: true });
+}
+
+// The answer to a refused save is the status line under the card's heading,
+// which a Save pressed in the bar may be a long way below.
+function editorUnsavedWhy() {
+  const el = document.getElementById('ef-status');
+  if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 // Delete, which is a soft delete at the other end: the row, its sensors, its

@@ -15,7 +15,9 @@
 // DB_SCHEMA_VERSION, _dbClock, dbHostLabel, dbRouteLabel, state, esc and dlText; across to
 // app.js for SOURCE_LABELS, loadFromApi and renderMain; to export.js for
 // exportMayDownload, the sign-in gate on taking the network away as a file
-// (#191); and to auth.js for Auth, which reaches back here for dbSetAccessToken.
+// (#191); to station-editor.js for editorUnsavedRefresh, which setEditorStatus
+// calls so the editor's unsaved bar says what the status line says; and to
+// auth.js for Auth, which reaches back here for dbSetAccessToken.
 //
 // This was three banner sections of app.js with the Export tab sitting in the
 // middle of them; they are joined here because they are one concern. The seam
@@ -663,6 +665,9 @@ function setEditorStatus(msg) {
   state.editorMsg = msg;
   const el = document.getElementById('ef-status');
   if (el) el.innerHTML = editorStatusHtml();
+  // The bar at the card's foot says "Saving…" and "Not saved" too, for a
+  // Save pressed down there, a long way under this line.
+  editorUnsavedRefresh();
 }
 
 function editorStatusHtml() {

@@ -109,13 +109,17 @@ const TEXT_PAIRS = [
   ['--warn', '--bg'], ['--warn', '--panel'],
   ['--role-field', '--panel'], ['--role-repeater', '--panel'],
   ['--role-base', '--panel'], ['--role-satcom', '--panel'],
-  // The Stations cards' three grounds (.card-kind): each card restates --panel
-  // as its own, so everything above that is written on --panel is written on
+  // The Stations cards' grounds (.card-kind): each card restates --panel as
+  // its own, so everything above that is written on --panel is written on
   // these there — the list's role-coloured names, the editor's warnings, the
-  // orphan note in red.
-  ...['--panel-register', '--panel-links', '--panel-station'].flatMap(bg =>
+  // orphan note in red — and the editor's gold one while it holds an unsaved
+  // edit (.is-unsaved) is the same card.
+  ...['--panel-register', '--panel-links', '--panel-station', '--panel-unsaved'].flatMap(bg =>
     ['--text', '--muted', '--accent', '--ok', '--bad', '--warn',
      '--role-field', '--role-repeater', '--role-base', '--role-satcom'].map(fg => [fg, bg])),
+  // …and a gilded field's ground, which is also the unsaved bar's: what is
+  // typed in the one, and the count and the field names (links) in the other.
+  ['--text', '--field-unsaved'], ['--muted', '--field-unsaved'], ['--accent', '--field-unsaved'],
   // The F, R and B the AR station finder writes on each role's own colour —
   // its pins, its sheet and its toggles (station-ar.js).
   ['--role-field-ink', '--role-field'], ['--role-repeater-ink', '--role-repeater'],
@@ -180,6 +184,12 @@ const NONTEXT_PAIRS = [
   // their second channels (weight, dash, growth, the focus dim) carry them.
   ['--map-blast', '--panel'], ['--map-blast-ring', '--panel'],
   ['--map-line-blocked', '--panel'],
+  // A control's edge and the focus ring on the Stations cards' grounds, and a
+  // gilded field's own edge — the boundary of a changed box — on the gold card
+  // it sits in.
+  ...['--panel-register', '--panel-links', '--panel-station', '--panel-unsaved'].flatMap(bg =>
+    [['--ctl-border', bg], ['--focus', bg]]),
+  ['--ctl-unsaved', '--panel-unsaved'],
   // The ERT-A2 decoder's RSSI scale (#140). Unlike the bit cells above, these
   // are drawn *on the page* — a 3 px bar beside a number, a legend dot, a map
   // pin — so each step has to hold 3:1 against the ground of whichever theme is

@@ -651,6 +651,17 @@ jobs:
         working-directory: test
         run: npm run stationscard
 
+      # Unsaved edits in the station editor (editorUnsavedRefresh). A gilt that
+      # lands on a freshly drawn card cries wolf on every station, and one that
+      # stays after a save says the database is behind when it is not — either
+      # way the colour stops meaning anything. This opens dozens of stations of
+      # every kind and expects nothing gilded, then edits, types back, ticks,
+      # removes and adds rows, and saves through a stand-in that refuses once
+      # and then accepts.
+      - name: Station editor — gold and gilded until saved, the bar that says so
+        working-directory: test
+        run: npm run unsaved
+
       # The station card on the map is state, not popup DOM — a filter
       # keystroke rebuilds every marker and destroys the callout, and the card
       # has to still be there afterwards. A card that dies with the markers, a

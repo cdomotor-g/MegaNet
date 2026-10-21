@@ -524,7 +524,7 @@ const StationInspections = (function () {
     }
     const n = s.params.length;
     return `
-      <details class="si-picker" ${s.pickerOpen ? 'open' : ''}
+      <details class="si-picker" data-ef-ignore ${s.pickerOpen ? 'open' : ''}
                ontoggle="StationInspections.pickerToggle(this)">
         <summary>Parameters
           <span class="small si-muted">— ${n} chosen${
