@@ -557,7 +557,11 @@ const HELP = {
            + 'list, each row carries a <strong>Flip</strong> link that opens the Bit Flipper on that '
            + 'row\'s address — what else it could have been, one or more bit-flips away. It reads '
            + 'the address out of the box rather than off the saved record, so a row you have '
-           + 'retyped sends you to the number on screen.',
+           + 'retyped sends you to the number on screen. Each row also draws the <strong>last seven '
+           + 'days</strong> of what its address has sent to Flood-Net, with its latest reading — volts '
+           + 'for a battery, the rain that fell for a rain gauge, the raw count for a level. Press the '
+           + 'line for a larger chart over 24 hours to 12 months, and <strong>Open in Field Data</strong> '
+           + 'from there to filter, inspect and export the same readings.',
     watch: [
       '<strong>The address bar says where you are</strong> — this tab, the station whose card is up '
       + 'and the map\'s view — so a bookmark, a reload or a link sent to somebody opens exactly this. '

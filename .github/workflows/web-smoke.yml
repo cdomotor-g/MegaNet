@@ -969,6 +969,16 @@ jobs:
         working-directory: test
         run: npm run fieldprobe
 
+      # The station editor's sparklines (sensor-sparks.js): a week on every
+      # sensor row from one load for the station, the rain gauge's wrap undone
+      # and a flipped frame not counted as rain, a 163 V battery frame left
+      # out, the dialog's windows each asking the right table, and its door
+      # landing on Field Data with the address and the window. Smoke opens the
+      # editor with the datastore aborted, so every line is a dash there.
+      - name: Sensor sparklines — a week on every row, the chart, and the door to Field Data
+        working-directory: test
+        run: npm run sensorsparks
+
       # The same drift the claim step's note describes, found again while
       # adding the one above: `mapfade` has been in `npm run all` with no step
       # here, so it has run for whoever typed it and on no push at all. A check

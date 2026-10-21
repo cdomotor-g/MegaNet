@@ -32,7 +32,9 @@
 // (#147) reads the same meganet.inspection_config list the Inspections tab
 // renders its form from, rather than keeping a second copy; to
 // station-inspections.js for StationInspections.sectionHtml, the Inspections
-// section under the ARRO block at the foot of the form; and to
+// section under the ARRO block at the foot of the form; to sensor-sparks.js for
+// SensorSparks — the slot on each sensor row for its last seven days, and
+// fill() when a row is added from the heard-slots list; and to
 // river-details.js for RiverDetails — the Bureau's flood warning lists above
 // the ARRO block (0031, 0032) and the AEP flood levels with them (0033), which
 // editorReadForm() reads back and editorSave() asks formProblem() about first;
@@ -582,6 +584,10 @@ function editorForm(s) {
              it opens where it was asked for however many rows there are. -->
         <div class="small ef-note hint-fold" id="ef-h-sensors" hidden>
           One row per ALERT address and what it measures — rainfall, water level, battery, etc.
+          The line on each row is the last seven days of what that address has sent, out of the
+          Flood-Net datastore: volts for a battery, the rain fallen for a rain gauge (the rain in
+          each six hours for an increment), the raw count for a level. Press it for the chart, and
+          from there <b>Open in Field Data</b> for the whole tool.
           <b>Flip</b> takes the row's address to the Bit Flipper, which says what else it could
           have been.${
             dbId != null ? ' Rows whose sensor carries an ARRO device id link straight to its admin page.' : ''}
@@ -750,7 +756,10 @@ function editorArroSection(s, sensors) {
 
 // One editable sensor row: ALERT id, ALERT2 slot and type, with the
 // national-export metadata (sensor_id, device_id) preserved on data-attributes
-// so a round-trip keeps it.
+// so a round-trip keeps it — and, after the type, the slot sensor-sparks.js
+// fills with the last seven days of what the row's address has sent, which
+// opens a chart of it. Drawn empty here; SensorSparks.fill() reads the boxes
+// once the card is on screen, as editorRefreshA2Seen() does.
 //
 // Two address boxes rather than one, because they are two different things. An
 // ALERT address is global and identifies the sensor on its own; an ALERT2 slot
@@ -776,6 +785,7 @@ function sensorRowHtml(se, dbId) {
       <input type="text" class="sensor-type" list="ef-sensor-types" value="${esc(se.type || '')}"
              aria-label="Sensor type"
              placeholder="Sensor type (e.g. Rainfall)">
+      ${typeof SensorSparks !== 'undefined' ? SensorSparks.slotHtml() : ''}
       <span class="sensor-acts">
         <button type="button" class="link-btn sensor-flip" onclick="editorOpenSensorFlip(this)"
                 ${isBfAddress(pInt(se.alert_id)) ? '' : 'disabled'}
@@ -836,7 +846,10 @@ function editorAddSensorRow(a2Slot) {
   // it is waiting for is what the thing measures, so that is where the cursor
   // goes. An empty row still starts at the ALERT box.
   row?.querySelector(slot == null ? '.sensor-aid' : '.sensor-type')?.focus();
-  if (slot != null) editorRefreshA2Seen();
+  if (slot != null) {
+    editorRefreshA2Seen();
+    if (typeof SensorSparks !== 'undefined') SensorSparks.fill();
+  }
 }
 
 // What the relayed ALERT2 station has actually sent, whether or not anybody has

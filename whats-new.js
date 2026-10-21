@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 64, date: '2026-10-21', items: [
+      '<strong>📈 A sparkline on every sensor row.</strong> In the station editor\'s <em>ALERT IDs / Sensors</em>, '
+        + 'each row now shows the last seven days of what that sensor has sent to Flood-Net, with its latest reading '
+        + 'beside it — volts for a battery, the rain that fell for a rain gauge (bars, for a Rainfall Increment row), '
+        + 'the raw count for a water level. Press the line for a bigger chart over 24 hours, 7, 30 or 90 days or 12 '
+        + 'months, with the reading under your pointer and the readings as a table; <em>Open in Field Data</em> takes '
+        + 'the same sensor and window to the Field Data tab for filtering and export.',
+    ] },
     { n: 63, date: '2026-10-21', items: [
       '<strong>✏️ The station editor shows what you have changed and not saved.</strong> The details card is now '
         + '<em>teal</em> while it shows the station as the database has it. Change anything and the card turns '

@@ -8040,6 +8040,9 @@ function rerenderStationEditorCard() {
   // (#172). A background fill, like the editor stamp: it reads the readings
   // rather than the registry, so it cannot come out of state.data.
   if (el) editorRefreshA2Seen();
+  // …and each sensor row's last seven days (sensor-sparks.js), for the same
+  // reason: they are readings, read in the background.
+  if (el && typeof SensorSparks !== 'undefined') SensorSparks.fill();
   // The card below the table follows the same selection, so every caller that
   // reloads the editor reloads it too — there is no path that changes the
   // selected station without going through here.

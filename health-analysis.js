@@ -2013,6 +2013,11 @@ const HealthAnalysis = (() => {
     // The arithmetic, for test/health.mjs.
     _detectSchedule: detectSchedule, _theilSen: theilSen, _batteryOf: batteryOf, _rainOf: rainOf,
     _transmissions: transmissions, _normalise: normalise, _pop: pop,
+    // A rain gauge's tips with the counter's wraps, resets and corrupted
+    // frames taken out, and the one-reading spikes a battery or a level
+    // leaves out — for the station editor's sparklines too
+    // (sensor-sparks.js), so a row's line is Station Health's.
+    rainOf, spikesOf,
     fmtWhen, fmtSpan, fmtPeriod, ACTION, CATEGORY, CURRENT_KINDS,
     PERIODS, COPY_WINDOW, BURST_WINDOW,
   };

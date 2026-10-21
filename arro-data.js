@@ -3099,6 +3099,30 @@ const ArroData = (function () {
     fieldRun();
   }
 
+  // The station editor's door in (sensor-sparks.js): one address over one of
+  // the picker's own windows — the dialog a row's sparkline opens hands over
+  // what it was showing, and the tab picks the resolution as it always does.
+  // An address the station's rows do not offer (an ALERT2 slot, one retyped
+  // and not saved) goes in the "Or an address" box, as fieldShow() does.
+  // Callers switchTab('field') first, for fieldShow()'s reason.
+  function fieldOpenAddr(addr, { stationId = '', win = '7d' } = {}) {
+    const a = String(addr || '').trim();
+    if (!a) return;
+    const q = fq();
+    const st = (state.data?.stations || []).find(s => s.id === stationId) || null;
+    const known = st ? fieldAddrs(st).some(x => x.addr === a) : false;
+    q.stationId = st ? st.id : '';
+    q.find    = '';
+    q.probe   = newFieldProbe();
+    q.sensors = known ? [a] : [];
+    q.extra   = known ? '' : a;
+    q.win     = AD_FIELD_WINDOWS.some(w => w[0] === win) ? win : '7d';
+    q.from    = ''; q.to = '';
+    q.res     = 'auto';
+    q.error   = ''; q.empty = '';
+    fieldRun();
+  }
+
   // What the chart says about itself. Only on the Field tab: the ARRO tab's
   // answer is its own name, and adding a banner there would change a tab this
   // work promised not to touch.
@@ -7920,6 +7944,8 @@ const ArroData = (function () {
     fieldShow,
     // and the station card's — one station, everything it reports, drawn
     fieldOpenStation,
+    // and the station editor's sparklines' — one address, one window
+    fieldOpenAddr,
     // exposed for reasoning about the filter outside the UI
     parseCsv, parseName, linkStation, guessKind, runFilter, walk357,
     // and about which addresses a station is reachable on, which is two shapes

@@ -84,6 +84,7 @@ MegaNet/
 ├── datastore.js            ← the browser's PostgREST client: ping, reads, writes, snapshot
 ├── export.js               ← Export tab
 ├── station-editor.js       ← the station editor card on the Stations tab
+├── sensor-sparks.js        ← SensorSparks — each sensor row's last seven days, and the chart it opens
 ├── inspections.js          ← Inspections — the six paper inspection sheets, digitised
 ├── maintenance.js          ← Maintenance — Site Maintenance tab, the Council sheet
 ├── history.js              ← History   — Inspection History tab: past records,
@@ -843,7 +844,9 @@ select station_key, station_name, online, round(minutes_since_seen) as quiet_for
 ### Reading it back — three tabs, one table
 
 What lands through `ingest()` is read back three ways. **Field Data** charts one
-station's sensors over a window — the 357 filter, the rollups, the gaps.
+station's sensors over a window — the 357 filter, the rollups, the gaps — and
+the station editor's sensor rows each carry a week of it as a sparkline, which
+opens a chart with a door onto Field Data.
 **Message Log** is the same rows read as an arrival log: every message the
 datastore accepted, newest first, with the ingress pathway (protocol,
 transport, which base heard it, how many further copies by which other paths)
@@ -3095,6 +3098,12 @@ Side panel or modal showing full station record:
 - A link to ARRO's graphs — *Graph last 7 days* in the editor's ARRO block draws
   every sensor of the station at once, and each sensor row with an ARRO device id
   links to that sensor's admin page
+- **A sparkline on every sensor row** — the last seven days of what that address
+  has sent, out of Flood-Net's own datastore (volts for a battery, the rain
+  fallen for a rain gauge and the rain in each six hours for an increment, the
+  raw count for a level), with the latest beside it; press it for the chart
+  over 24 hours to 12 months, and *Open in Field Data* from there for the whole
+  tool (`sensor-sparks.js`)
 - **Site exposure — tides and soils** (Queensland): whether it stands in or
   near tidal water, the nearest Water Act tidal limit, the coastal management
   district and storm tide areas, and the acid sulfate soil mapping under it,
