@@ -371,41 +371,72 @@ Node; `npm run health` holds the panel to the demo week's one planted clash.
 
 ## Transmitter frequency
 
-Every ALERT2 burst a base station hears comes with its **carrier offset** — how
-far, in hertz, the transmitter's carrier sat from where the receiver expected
-it. A crystal that is ageing, or a site running very hot or cold, shows here
-weeks before the station goes quiet.
+Every burst a base station's SDR hears comes with its **carrier offset** — how
+far, in hertz, the transmitter's carrier sat from the channel. A crystal that
+is ageing, or a site running very hot or cold, shows here weeks before the
+station goes quiet. ALERT2 since 2026-10-19; **legacy ALERT** from the day a
+base station runs RPi ALERT 0.14 or later.
 
-**Whose carrier.** A copy that came over a repeater is on the repeater's
-carrier, not the gauge's, so each copy counts for the **last** transmitter on
-its path — repeaters are measured too.
+**Whose carrier.** A burst relayed by a repeater is on the repeater's carrier,
+not the station's. An ALERT2 copy says so: its path's last address sent it. A
+legacy burst says nothing, and repeaters here transmit on the channel they
+listen on, so the server works it out (`0077`) for each receiver's day:
+
+- **A repeater's carrier is shared.** Everything it relays goes out on its one
+  carrier. For each repeater in the register, the server looks at the bursts
+  from the addresses its pass range covers, and from its own sensors, and finds
+  the ±30 Hz window holding the most addresses. That is the repeater when its
+  own sensors were heard there, or when at least four of the addresses it
+  passes were — and at least half of those the receiver heard from its range
+  that day. (Stations' own carriers are spread over hundreds of hertz, so a
+  window that narrow holds about a tenth of them by chance.)
+- **Each burst** then goes to that repeater when it sits on its carrier and its
+  address is the repeater's to pass; otherwise to its own station. A copy of a
+  reading (RPi ALERT keeps a repeater's copy, a second after the original,
+  where it used to drop it as a repeat) that no repeater explains is set
+  aside, as is a burst two repeaters could have sent.
+- **One name, one carrier.** A station whose day's bursts spread wider than
+  40 Hz is two transmitters under one name — a repeater the register does not
+  have, or a pass range that is wrong — and that day is not measured.
+- A burst that was **two carriers at once** (a repeater keying up as its
+  station lets go) is never measured: RPi ALERT checks the burst's two halves
+  agree and sends no offset when they do not.
+
+So repeaters are measured too, and a station heard only through its repeater is
+not measured at all, rather than measured as its repeater.
 
 **Against the rest, not against the book.** The receiver's own crystal is off
 as well, and moves with the weather: every transmitter it hears moves with it.
 So each day the receiver's own error is worked out (the median, over what it
 heard, of each transmitter's difference from its own usual) and taken out, and
-each transmitter is shown against the median of the fleet. 0 ppm is *like the
-rest*, not exactly on frequency.
+each transmitter is shown against the median of the fleet — legacy and ALERT2
+together. 0 ppm is *like the rest*, not exactly on frequency.
 
-**What is a finding.** The server checks every hour (`0075`, with the tab
-closed): a transmitter more than 2.5 ppm from the rest over the last week is a
-warning (5 ppm critical); one that moved 1 ppm against the thirty days before
-is drifting (2 ppm critical). Both are `app_meta` rows, `tx_offset_warn_ppm`
-and the like. The panel lists every transmitter measured, furthest from the
-rest first, with the last week's offset, its change, a line of its days with the
-±2.5 ppm band shaded, and the finding.
+**What is a finding.** The server checks every hour, with the tab closed: a
+transmitter more than 2.5 ppm from the rest over the last week is a warning
+(5 ppm critical); one that moved 1 ppm against the thirty days before is
+drifting (2 ppm critical). Both are `app_meta` rows, `tx_offset_warn_ppm` and
+the like. A legacy station's finding is on its station, so it shows on the
+station's card too.
 
-**Limits.** ALERT2 only: legacy (binary) ALERT bursts reach Flood-Net with no
-carrier offset, so the panel covers the network's ALERT2 transmitters — 35 of
-them, heard by 3 base stations, when this was built — and the legacy majority
-not at all. Offsets have been kept since 2026-10-19, so *drift* needs until
-late November to have its thirty days to compare with; until then only
-*off-channel* can fire. A transmitter is named by its ALERT2 address; it would get
-its station's name, and the finding its station, from the register's
-`alert2_station_id` — which no station has yet, and most will not until the
-move to ALERT2, so the address is the name for now. `npm run health` holds the
-panel to two transmitters built for it; `tools/check_transmitter_drift.sql`
-holds the server to six, with a receiver whose crystal wanders 180 Hz.
+**The panel** lists what needs a look first — findings, anything near the line
+or moving — and every transmitter on asking: by kind (legacy stations,
+repeaters, ALERT2), or found by name, number or address. Each row has its
+station's name (a door to it), the last week's offset in ppm and Hz, its
+change, a line of its 37 days with the ±2.5 ppm band shaded, its days and
+bursts, and the finding.
+
+**Limits.** Only what a base station's SDR hears is measured — a Quansheng or
+ERT-A2 receiver reports no carrier. *Drift* needs thirty days of history to
+compare with, so it fires only once a transmitter has been measured that long.
+A legacy station heard only through a repeater is not measured (its
+repeater is). An ALERT address two stations share stays an address
+(`a:<address>`) rather than a guess. An ALERT2 transmitter is named by its
+address until the register has its station's `alert2_station_id`.
+`npm run health` holds the panel to three transmitters built for it;
+`tools/check_transmitter_drift.sql` holds the server to a made-up network of
+both kinds, three repeaters and the cases above, with a receiver whose crystal
+wanders 180 Hz.
 
 ## On a station's card, and its pin
 

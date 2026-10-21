@@ -1074,20 +1074,31 @@ const AlertDsp = (function alertDspModule() {
       const wr = new Float32Array(len), wi = new Float32Array(len);
       for (let k = 0; k < len; k++) { const p = (from + k) % CAP; wr[k] = this.ringR[p]; wi[k] = this.ringI[p]; }
       const r = decodeWindow(wr, wi, { format: c.format, minVotes: c.minVotes, minVotesCrc: c.minVotesCrc });
-      // the same reading from overlapping windows is one reading
+      // The same reading from overlapping windows is one reading. The same
+      // reading from another burst within ten seconds is another transmission
+      // of it — a repeater's copy, on the repeater's own carrier — so it is not
+      // a reading again, but it is reported, in `copies`, with how many copies
+      // of it came before (1 for the first repeat), for whoever wants to know
+      // who sent it: the carrier, the level, the path.
       const now = Date.now();
-      for (const [k, t] of this.recent) if (now - t > 10000) this.recent.delete(k);
-      const fresh = r.readings.filter(x => {
+      const bt = burst ? burst.t : null;
+      for (const [k, v] of this.recent) if (now - v.at > 10000) this.recent.delete(k);
+      const fresh = [], copies = [];
+      for (const x of r.readings) {
         const k = x.sensorId * 4096 + x.value;
-        const dup = this.recent.has(k);
-        this.recent.set(k, now);
-        return !dup;
-      });
+        const was = this.recent.get(k);
+        if (!was) { fresh.push(x); this.recent.set(k, { at: now, bt, n: 0 }); continue; }
+        if (bt != null && was.bt != null && bt !== was.bt) {
+          was.n += 1; was.bt = bt;
+          copies.push(Object.assign({}, x, { copy: was.n }));
+        }
+        was.at = now;
+      }
       this.decodes += fresh.length;
       const trace = r.trace;
       const transfer = trace ? [trace.symbols.buffer] : [];
       this.post({
-        type: 'decode', readings: fresh, all: r.readings.length, shadows: r.shadows || [], candidates: r.candidates,
+        type: 'decode', readings: fresh, copies, all: r.readings.length, shadows: r.shadows || [], candidates: r.candidates,
         ms: Math.round(r.ms), combos: r.combos, seconds: len / FS_IN, format: c.format,
         burst: burst ? { ms: burst.ms, peakDb: burst.peak, nfDb: burst.nf, t: burst.t } : null, trace,
       }, transfer);

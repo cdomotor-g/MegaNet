@@ -104,21 +104,23 @@ async function standIn(page) {
   // unattended, and what it found that is still open.
   await page.route('**/rest/v1/health_refresh?*', route => route.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify([{ at: new Date(Date.now() - SERVER_AGO).toISOString() }]) }));
-  // Transmitter frequency (#217, 0075): two ALERT2 transmitters a base station
-  // hears, one like the rest and one 3 ppm off them, and the server's finding.
-  await page.route('**/rest/v1/rpc/transmitter_offsets', route => {
-    const day = g => new Date(Date.now() - g * 86400e3).toISOString().slice(0, 10);
-    const rows = [];
-    for (let g = 0; g < 20; g += 1) {
-      rows.push({ addr: 4101, day: day(g), offset_hz: 10, offset_ppm: 0.07, bursts: 90, receivers: 1, freq_mhz: 150.5 });
-      rows.push({ addr: 4102, day: day(g), offset_hz: -450, offset_ppm: -3.0, bursts: 60, receivers: 1, freq_mhz: 150.5 });
-    }
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
+  // Transmitter frequency (#217, 0075, 0077): a legacy station 3 ppm off the
+  // rest, a repeater like the rest, an ALERT2 transmitter like the rest — as
+  // the server's transmitter_summary has them — and the station's finding.
+  await page.route('**/rest/v1/transmitter_summary?*', route => {
+    const days = [...Array(20)].map((_, g) => new Date(Date.now() - (19 - g) * 86400e3).toISOString().slice(0, 10));
+    const row = (tx, protocol, station_id, via, ppm, hz) => ({ tx, protocol, station_id, via, freq_mhz: 151.5, w_days: 7, w_ppm: ppm, w_hz: hz,
+      b_days: 13, b_ppm: ppm, change_ppm: 0.02, bursts: 56, receivers: 1, days, ppm: days.map(() => ppm), judged_at: new Date().toISOString() });
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
+      row('a2:4101', 'alert2', null, 'path', 0.07, 10),
+      row('st:amiens_knob_al', 'alert', 'amiens_knob_al', 'repeater', 0.4, 61),
+      row('st:abergowrie_br_al', 'alert', 'abergowrie_br_al', 'own', -3.0, -455)]) });
   });
   await page.route('**/rest/v1/health_finding?*', route => /source=eq\.transmitters/.test(route.request().url())
     ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
-        { kind: 'transmitter-off-channel', subject: 'a2:4102', severity: 'warn', title: 'ALERT2 4102 is 3.0 ppm below the rest',
-          detail: '', evidence: { offset_ppm: -3.0 }, first_seen: new Date(Date.now() - 3600e3).toISOString() }]) })
+        { kind: 'transmitter-off-channel', subject: 'st:abergowrie_br_al', station_id: 'abergowrie_br_al', severity: 'warn',
+          title: 'Abergowrie Bridge AL: transmitting -3.0 ppm off the others (-455 Hz)', detail: '', evidence: { offset_ppm: -3.0 },
+          first_seen: new Date(Date.now() - 3600e3).toISOString() }]) })
     : route.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify(WORLD ? [
       { kind: 'silent', subject: 'silent:' + WORLD.roles.silent, station_id: WORLD.roles.silent, severity: 'critical',
@@ -394,22 +396,31 @@ try {
     JSON.stringify(air));
 
   // ── Transmitter frequency (#217) ───────────────────────────────────────────
-  // The server's offsets drawn a row a transmitter, furthest from the rest
-  // first, with its finding; the one like the rest said to be.
+  // What needs a look first — the station off the rest, by name, as a door to
+  // it — then every transmitter, a kind at a time, and one found by name.
   await until(page, () => typeof HealthDrift !== 'undefined' && HealthDrift.state().rows
     && document.querySelectorAll('#hl-drift tbody tr').length > 0, null, 20_000).catch(() => {});
-  const drift = await page.evaluate(() => {
-    const el = document.getElementById('hl-drift');
-    const rows = el ? [...el.querySelectorAll('tbody tr')].map(tr => tr.textContent.replace(/\s+/g, ' ').trim()) : [];
-    return { rows, head: el ? el.querySelector('h3') && el.querySelector('h3').id : null,
-             spark: el ? el.querySelectorAll('svg.hl-drift-spark path').length : 0,
-             lead: el ? (el.querySelector('p') || {}).textContent : '' };
-  });
-  ok('Transmitter frequency: a row each, the one furthest from the rest first, with its offset and its finding',
-    drift.rows.length === 2 && /^4102\b/.test(drift.rows[0]) && /−3\.00 ppm/.test(drift.rows[0]) && /−450 Hz/.test(drift.rows[0])
-      && /Off the rest/.test(drift.rows[0]) && /Like the rest/.test(drift.rows[1]), JSON.stringify(drift.rows));
-  ok('…labelled by its heading, a line a transmitter, and the finding led with',
-    drift.head === 'hl-h-drift' && drift.spark === 2 && /1 transmitter to check: ALERT2 4102/.test(drift.lead || ''), JSON.stringify(drift));
+  const driftRows = () => page.evaluate(() => [...document.querySelectorAll('#hl-drift tbody tr')].map(tr => tr.textContent.replace(/\s+/g, ' ').trim()));
+  const look = await driftRows();
+  const lead = await page.evaluate(() => { const el = document.getElementById('hl-drift'); return el ? (el.querySelector('p') || {}).textContent : ''; });
+  const door = await page.evaluate(() => !!document.querySelector('#hl-drift tbody th button.link-btn[onclick*="abergowrie_br_al"]'));
+  ok('Transmitter frequency: what needs a look, by its station\'s name and number, with its offset and its finding — and nothing else',
+    look.length === 1 && /^Abergowrie Bridge AL 532028\s?ALERT/.test(look[0]) && /−3\.00 ppm/.test(look[0]) && /−455 Hz/.test(look[0])
+      && /Off the rest/.test(look[0]) && door, JSON.stringify(look));
+  ok('…led with what to check', /1 of 3 transmitters to check/.test(lead || '') && /Abergowrie Bridge AL: transmitting/.test(lead || ''), lead);
+  await page.evaluate(() => HealthDrift.set('show', 'all'));
+  const every = await driftRows();
+  ok('…every transmitter on asking, the one to check first, a repeater named as one, ALERT2 by its address',
+    every.length === 3 && /^Abergowrie/.test(every[0]) && every.some(r => /^Amiens Knob AL .*Repeater/.test(r) && /Like the rest/.test(r))
+      && every.some(r => /^ALERT2 4101\s?ALERT2/.test(r)), JSON.stringify(every));
+  await page.evaluate(() => HealthDrift.set('kind', 'repeater'));
+  const reps = await driftRows();
+  await page.evaluate(() => { HealthDrift.set('kind', 'all'); HealthDrift.set('q', '4101'); });
+  const found = await driftRows();
+  const spark = await page.evaluate(() => document.querySelectorAll('#hl-drift svg.hl-drift-spark path').length);
+  ok('…a kind at a time, one found by its address, and a line each', reps.length === 1 && /^Amiens Knob/.test(reps[0])
+    && found.length === 1 && /4101/.test(found[0]) && spark === 1, JSON.stringify({ reps, found, spark }));
+  await page.evaluate(() => { HealthDrift.set('q', ''); HealthDrift.set('show', 'look'); });
 
   await page.evaluate(() => Health.setCat('power'));
   const power = await page.evaluate(() => [...document.querySelectorAll('.hl-ftable tbody tr .hl-fwhat b')].map(b => b.textContent));

@@ -378,7 +378,8 @@ const HealthGlance = (() => {
     try {
       await serverRan();
       if (serverFresh()) {
-        g.server = (await dbSelect(`health_finding?select=${SERVER_SELECT}&source=eq.stations&cleared_at=is.null`
+        // Its station findings, and (#217) its transmitter's: off channel or drifting.
+        g.server = (await dbSelect(`health_finding?select=${SERVER_SELECT}&source=in.(stations,transmitters)&cleared_at=is.null`
           + `&station_id=eq.${encodeURIComponent(s.id)}`)).map(fromServer);
         g.serverAt = server.at;
       }

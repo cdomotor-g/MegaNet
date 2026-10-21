@@ -1626,9 +1626,11 @@ jobs:
       # archived and rolled up at their count — never one that is not, however old.
       - name: check_archive.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_archive.sql
-      # Transmitter drift (0075, #217): a receiver's own crystal taken out, each
+      # Transmitter drift (0075, 0077, #217): a receiver's own crystal taken out, each
       # transmitter against the fleet, a relayed copy on its repeater's
-      # carrier, drift and off-channel findings opened and cleared.
+      # carrier — legacy bursts put down to their station or the repeater
+      # whose shared carrier they sit on — drift and off-channel findings
+      # opened and cleared.
       - name: check_transmitter_drift.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_transmitter_drift.sql
       # A reading's frequency and signal (0050): stored from the reading or

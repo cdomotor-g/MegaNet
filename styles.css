@@ -17852,6 +17852,8 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-drift-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hl-drift-spark { display: block; color: var(--text, currentColor); }
 .hl-drift-sub { max-width: 72ch; }
+.hl-drift-controls { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin: .5rem 0; }
+.hl-drift-controls input[type="search"] { min-width: 12rem; max-width: 100%; }
 .hl-ftable td, .hl-ftable th, .hl-airtable td, .hl-airtable th { white-space: normal; }
 .hl-ftable .hl-fwhere, .hl-airtable .hl-fwhere { min-width: 8rem; font-weight: 600; }
 .hl-fwhat b { display: block; }

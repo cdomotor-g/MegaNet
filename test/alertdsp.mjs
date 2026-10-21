@@ -182,6 +182,24 @@ for (const c of [
   const all = d2.flatMap(m => m.readings.map(x => `${x.sensorId}=${x.value}`));
   check('ungated at 240 ksps: overlapping windows report each reading once',
     all.sort().join(' ') === '2088=143 2443=142', all.join(' '));
+  check('…and none of them as a copy', d2.every(m => !(m.copies || []).length), JSON.stringify(d2.map(m => m.copies)));
+
+  // A repeater's copy: the same reading again, 1.2 s later, as its own burst on
+  // its own carrier. Not a reading again — but reported, as copy 1, so the
+  // repeater's carrier can be measured (#217).
+  const msgs3 = [];
+  const r3 = new D.Pipeline(m => msgs3.push(m));
+  r3.configure({ deviceRate: 240000, channelOffsetHz: 0, format: D.BINARY, gate: true, squelchDb: 8 });
+  const one = [D.encodeFrame(D.BINARY, 2088, 143)];
+  const s3 = D.synthIq({ fs: 240000, seconds: 5, snrDb: 25, seed: 6, bursts: [
+    { startSec: 1.0, frames: one, cfoHz: 300, amp: 30 }, { startSec: 2.2, frames: one, cfoHz: -700, amp: 30 }] });
+  for (let o = 0; o < s3.length; o += 32768) r3.feed(s3.subarray(o, Math.min(s3.length, o + 32768)));
+  const d3 = msgs3.filter(m => m.type === 'decode' && (m.readings.length || (m.copies || []).length));
+  check('a repeater\'s copy 1.2 s later: one reading, then the same reading reported as copy 1 of another burst',
+    d3.length === 2 && d3[0].readings.length === 1 && d3[0].readings[0].sensorId === 2088 && !d3[0].copies.length
+      && !d3[1].readings.length && d3[1].copies.length === 1 && d3[1].copies[0].sensorId === 2088 && d3[1].copies[0].copy === 1
+      && d3[0].burst.t !== d3[1].burst.t,
+    JSON.stringify(d3.map(m => ({ r: show(m.readings), c: (m.copies || []).map(x => `${x.sensorId}#${x.copy}`), t: m.burst && m.burst.t }))));
 }
 
 // ── The Worker's source ──────────────────────────────────────────────────────
