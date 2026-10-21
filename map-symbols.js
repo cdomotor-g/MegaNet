@@ -465,7 +465,7 @@ const MapSymbols = (function () {
         </select>`;
     return `
       <label class="filter-field"
-             title="Draw one owner's stations and leave everyone else's off the map — or the other way round. The owner recorded on the station, else the one the Bureau's Service Level Specification names; a joint owner counts under each party. The station list and the filters are not changed: the Filters' Owner block is the way to filter by owner, and to pick two or more.">
+             title="Draw one owner's stations and leave everyone else's off the map — or the other way round. The owner the Bureau's Service Level Specification names, else the one recorded on the station; a joint owner counts under each party. The station list and the filters are not changed: the Filters' Owner block is the way to filter by owner, and to pick two or more.">
         <span>Owner</span>
         ${sel}
       </label>

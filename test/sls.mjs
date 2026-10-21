@@ -158,8 +158,9 @@ try {
   check('an automatic gauge gets no manual pill', card.manualPills === 0);
 
   // ── The owner, first on the card and always there ────────────────────────
-  // The station's own owner where it has one; else the SLS's, marked so;
-  // else "Not recorded" — never "unknown".
+  // The SLS's, marked so — the SLS is the word on it, even where the station
+  // records one too; else the station's own; else "Not recorded" — never
+  // "unknown".
   const owners = await page.evaluate(async () => {
     const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     const first = async (id) => {
@@ -170,15 +171,20 @@ try {
       return { id, k, v };
     };
     const st = state.data.stations;
-    const own = st.find(s => s.owner && String(s.owner).trim());
+    const recorded = s => s.owner && String(s.owner).trim();
+    const own = st.find(s => recorded(s) && !(SLS.forStation(s) || {}).owner);
+    const both = st.find(s => recorded(s) && (SLS.forStation(s) || {}).owner);
     const none = st.find(s => !s.owner && s.lat != null && !(SLS.forStation(s) || {}).owner);
     return { sls: await first('beaudesert_al'), own: own ? await first(own.id) : null, ownName: own && own.owner,
+             both: both ? await first(both.id) : null, bothSls: both && SLS.forStation(both).owner,
              none: none ? await first(none.id) : null };
   });
-  check('the card\'s first row is its owner, from the SLS and marked so where the station records none',
+  check('the card\'s first row is its owner, from the SLS and marked so',
     owners.sls.k === 'Owner' && owners.sls.v.includes(BEAUDESERT.owner.replace(/^Bureau$/, 'Bureau of Meteorology'))
       && /per SLS/.test(owners.sls.v), JSON.stringify(owners.sls));
-  check('…the station\'s own owner where it records one, not marked',
+  check('…the SLS\'s even where the station records an owner of its own',
+    owners.both && owners.both.v === `${owners.bothSls} per SLS`, JSON.stringify(owners.both));
+  check('…the station\'s own owner where the SLS names none, not marked',
     owners.own && owners.own.k === 'Owner' && owners.own.v === owners.ownName, JSON.stringify(owners.own));
   check('…and "Not recorded" where nobody is on record — the row is still there',
     owners.none && owners.none.k === 'Owner' && owners.none.v === 'Not recorded', JSON.stringify(owners.none));
@@ -241,7 +247,7 @@ try {
             && getComputedStyle(i.parentElement).whiteSpace === 'nowrap' })),
       };
     };
-    const own = state.data.stations.find(s => s.owner && String(s.owner).trim());
+    const own = state.data.stations.find(s => s.owner && String(s.owner).trim() && !(SLS.forStation(s) || {}).owner);
     return { bom: await look('beaudesert_al'), murw: await look('north_murwillumbah_tweed_river'),
              own: own ? await look(own.id) : null, none: await look(state.data.stations.find(
                s => !s.owner && s.lat != null && !(SLS.forStation(s) || {}).owner).id) };
@@ -264,6 +270,58 @@ try {
     shown.murw.text);
   check('…and none where nobody is on record', shown.none.logos.length === 0 && shown.none.text === 'Not recorded',
     JSON.stringify(shown.none));
+
+  // ── The editor's Owner field says what the card's row says ───────────────
+  // Where the SLS names the owner: that owner, read-only, logo and all, with
+  // "per SLS" by the caption and no box to type another into — and a save
+  // leaving the recorded owner as it was. Where it names none: the box, with
+  // the recorded owner and its logo. A Station Number changed to one the SLS
+  // lists turns the box into the SLS's owner, and back.
+  const ed = await page.evaluate(() => {
+    closeStnCard(false);
+    const look = (id) => {
+      if (id && state.selectedId !== id) selectStation(id);
+      const val = document.getElementById('ef-owner-val');
+      const ro = document.getElementById('ef-owner-sls');
+      const box = document.getElementById('ef-owner');
+      const cap = document.getElementById('ef-owner-cap');
+      return { ro: !!ro && ro.tagName === 'OUTPUT', box: !!box, value: box && box.value,
+               text: val.textContent.replace(/\s+/g, ' ').trim(),
+               from: document.getElementById('ef-owner-from').textContent.trim(),
+               logos: [...val.querySelectorAll('img.owner-logo')].map(i => i.getAttribute('src')),
+               labelled: !!cap && document.getElementById(cap.htmlFor) === (box || ro),
+               saved: editorReadForm().owner ?? null };
+    };
+    const st = state.data.stations;
+    const recorded = s => s.owner && String(s.owner).trim();
+    const own = st.find(s => recorded(s) && !(SLS.forStation(s) || {}).owner);
+    const both = st.find(s => recorded(s) && (SLS.forStation(s) || {}).owner);
+    const none = st.find(s => !s.owner && s.station_number && !(SLS.forStation(s) || {}).owner);
+    const out = { bom: look('beaudesert_al'), own: look(own.id), ownName: own.owner,
+                  both: look(both.id), bothName: both.owner, none: look(none.id) };
+    const num = document.getElementById('ef-stnno');
+    num.value = st.find(s => s.id === 'beaudesert_al').station_number;
+    num.dispatchEvent(new Event('change'));
+    out.renumbered = look(null);
+    num.value = none.station_number;
+    num.dispatchEvent(new Event('change'));
+    out.back = look(null);
+    return out;
+  });
+  const bomSrc = 'assets/owners/bom.webp';
+  check('the editor\'s Owner field is the SLS\'s owner, read-only, its logo before it and "per SLS" by the caption',
+    ed.bom.ro && !ed.bom.box && ed.bom.text === 'Bureau of Meteorology' && ed.bom.from === 'per SLS'
+      && JSON.stringify(ed.bom.logos) === JSON.stringify([bomSrc]) && ed.bom.labelled, JSON.stringify(ed.bom));
+  check('…and the SLS\'s where the station records one too, the recorded one saved as it was',
+    ed.both.ro && !ed.both.box && ed.both.from === 'per SLS' && ed.both.saved === ed.bothName, JSON.stringify(ed.both));
+  check('…a box only where the SLS names nobody, holding the recorded owner, its logo beside it',
+    ed.own.box && !ed.own.ro && ed.own.value === ed.ownName && ed.own.from === '' && ed.own.labelled
+      && JSON.stringify(ed.own.logos) === JSON.stringify(['assets/owners/toowoomba.webp']), JSON.stringify(ed.own));
+  check('…empty, with no logo, where nobody is on record',
+    ed.none.box && ed.none.value === '' && ed.none.logos.length === 0 && ed.none.saved === null, JSON.stringify(ed.none));
+  check('…the SLS\'s owner once the Station Number is one the SLS lists, and the box again once it is not',
+    ed.renumbered.ro && ed.renumbered.text === 'Bureau of Meteorology' && ed.back.box && ed.back.value === '',
+    JSON.stringify([ed.renumbered, ed.back]));
   await page.evaluate(() => showStationCard('beaudesert_al'));
 
   // ── The heading is the way to the document ───────────────────────────────

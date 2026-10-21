@@ -1,10 +1,12 @@
 // MegaNet — owner-logos.js
 //
 //   OwnerLogos   each station owner's logo, beside its name in the Owner row of
-//                the station card on the Stations map.
+//                the station card on the Stations map, and in the station
+//                editor's Owner field.
 //
 // After core.js (esc, escAttr); app.js's stnCardOwnerHtml() calls partyHtml()
-// once per party of the owner that stationOwner() worked out. Nothing runs at
+// once per party of the owner that stationOwner() worked out, and the station
+// editor calls logoHtml() beside an owner typed into its box. Nothing runs at
 // load: the name-to-logo lookup is built the first time it is asked for
 // (`npm run toplevel`).
 //
@@ -18,9 +20,9 @@
 // else's site.
 //
 // ── Whose logo a name gets ──────────────────────────────────────────────────
-// Owners are looked up by the names stationOwner() hands out: the station's
-// own `owner` (0030), else the Bureau's Service Level Specification's
-// "Station owner", split into its parties and tidied (app.js). A state
+// Owners are looked up by the names stationOwner() hands out: the Bureau's
+// Service Level Specification's "Station owner", else the station's own
+// `owner` (0030), split into its parties and tidied (app.js). A state
 // department carries its government's mark — DLGWV, DETSI, Transport and Main
 // Roads and Maritime Safety Queensland the Queensland Government's, NSW
 // DCCEEW and the NSW Office of Water the NSW Government's — because that is
@@ -179,19 +181,27 @@ const OwnerLogos = (() => {
     return party == null ? null : lookup().get(key(party)) || null;
   }
 
-  // One party as the card shows it: its logo, then its name, the logo held to
-  // the name's first word so a narrow card never leaves it alone at the end
-  // of a line. The logo says nothing the name beside it does not, so it has
-  // no alt text of its own; where it is a parent's (a department carrying its
-  // government's crest) the tooltip says whose.
-  function partyHtml(party) {
+  // One party's logo alone, or '' when it has none. It says nothing the name
+  // beside it does not, so it has no alt text of its own; where it is a
+  // parent's (a department carrying its government's crest) the tooltip says
+  // whose.
+  function logoHtml(party) {
     const l = forParty(party);
-    if (!l) return esc(party);
+    if (!l) return '';
     const tip = key(l.name) === key(party) ? '' : ` title="${escAttr(`${l.name} logo`)}"`;
-    const [, first, rest] = String(party).match(/^(\S*)([\s\S]*)$/);
-    return `<span class="owner-party"><span class="owner-lead"><img class="owner-logo" src="${escAttr(l.src)}"
-      alt=""${tip} decoding="async">${esc(first)}</span>${esc(rest)}</span>`;
+    return `<img class="owner-logo" src="${escAttr(l.src)}"
+      alt=""${tip} decoding="async">`;
   }
 
-  return { forParty, partyHtml, files: () => Object.keys(LOGOS) };
+  // One party as the card shows it: its logo, then its name, the logo held to
+  // the name's first word so a narrow card never leaves it alone at the end
+  // of a line.
+  function partyHtml(party) {
+    const logo = logoHtml(party);
+    if (!logo) return esc(party);
+    const [, first, rest] = String(party).match(/^(\S*)([\s\S]*)$/);
+    return `<span class="owner-party"><span class="owner-lead">${logo}${esc(first)}</span>${esc(rest)}</span>`;
+  }
+
+  return { forParty, logoHtml, partyHtml, files: () => Object.keys(LOGOS) };
 })();

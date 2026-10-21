@@ -98,8 +98,8 @@ const expect = {
     return said && !byHand && !roles.includes('repeater') && !roles.includes('base');
   }).map((s) => s.id)),
 };
-// Whose: the station's own owner, else the owner of the SLS entry the card
-// quotes first — the more specific statement of service, then Queensland's.
+// Whose: the owner of the SLS entry the card quotes first — the more specific
+// statement of service, then Queensland's — else the station's own owner.
 const ROLE_ORDER = ['forecast_location', 'information_location', 'river_data_location',
                     'bureau_owned', 'bureau_assists', 'bureau_colocated'];
 const rank = (l) => {
@@ -107,7 +107,7 @@ const rank = (l) => {
   const d = ['QLD', 'NSW'].indexOf(l.jurisdiction);
   return (r < 0 ? ROLE_ORDER.length : r) * 10 + (d < 0 ? 2 : d);
 };
-const ownerRaw = (s) => (s.owner && String(s.owner).trim()) || ([...entries(s)].sort((a, b) => rank(a) - rank(b))[0] || {}).owner || '';
+const ownerRaw = (s) => ([...entries(s)].sort((a, b) => rank(a) - rank(b))[0] || {}).owner || (s.owner && String(s.owner).trim()) || '';
 const expectSeqwater = stations.filter((s) => ownerRaw(s).split(/\s*[/,]\s*/).map((p) => p.trim()).includes('Seqwater')).length;
 const expectNoOwner = stations.filter((s) => !ownerRaw(s).trim()).length;
 const seqwaterLocated = located.filter((s) => ownerRaw(s).split(/\s*[/,]\s*/).map((p) => p.trim()).includes('Seqwater')).length;

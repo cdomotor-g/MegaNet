@@ -2771,6 +2771,50 @@ h2.h-bad {
   align-items: center;
 }
 
+/* The Owner field (editorOwnerFieldHtml, station-editor.js): the station
+   card's Owner row — each party's logo before its name — in a read-only box
+   where the SLS names the owner, "per SLS" beside the caption. A text box's
+   look and size (input[readonly]'s background; a control's border, radius,
+   padding and text size), so it is one box among the others; its name in the
+   text colour all the same, because it is the answer and not a placeholder.
+   The logo a little smaller than the card's and let into the padding, so it
+   does not make the box taller than the one beside it. A name too long for
+   the column wraps rather than being cut off — and its neighbour's box then
+   keeps to the top of the row, level with this one's, rather than dropping
+   to the foot of it (the grid's rule for a wrapped caption, above). */
+.ef-owner-ro {
+  display: block;
+  padding: .55rem .5rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md);
+  background: var(--subtle);
+  color: var(--text);
+  font-size: .8333rem;
+}
+.ef-owner-ro .owner-logo {
+  height: 1.25rem;
+  margin: -.3rem .3rem -.3rem 0;
+}
+.ef-grid > .ef-owner-field,
+.ef-grid > label:has(+ .ef-owner-field) {
+  align-content: start;
+}
+
+/* …and where it does not, the box to type in, the typed owner's logo before
+   it once it is one that has one. */
+.ef-owner-in {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+.ef-owner-logos {
+  display: flex;
+  flex: none;
+  gap: .3rem;
+}
+.ef-owner-logos:empty { display: none; }
+.ef-owner-logos .owner-logo { height: 1.25rem; margin: 0; }
+
 /* The station's two states, Proposed and Enabled, side by side on a row of
    their own. */
 .ef-flags {

@@ -18,7 +18,9 @@
 // refreshMapLayers, updateHeaderStats, findStationMatches, stationAlertIds,
 // passRangeCoversId, repeaterPassingCount and repeaterPassRangeSpan — and for
 // the places a new proposal is shown (focusStationOnMap, dockReveal,
-// toggleMapFullscreen) — and back
+// toggleMapFullscreen) and for the station card's owner (stationOwner,
+// stationOwnerParse), which the Owner field shows, with sls.js's SLS behind
+// it and owner-logos.js's OwnerLogos for the logos — and back
 // the other way, rerenderStationEditorCard() calls editorRefreshA2Seen() here
 // once the card is on screen, because the heard-slots list reads the readings
 // rather than state.data; to auth.js for Auth; and to
@@ -127,6 +129,112 @@ function stationTypeOptions(cur, proposed) {
     ...Object.entries(STATION_TYPE_LABEL).map(([k, v]) =>
       `<option value="${escAttr(k)}"${k === cur ? ' selected' : ''}>${esc(v)}</option>`),
   ].join('');
+}
+
+// ── Who owns it ─────────────────────────────────────────────────────────────
+// The Owner field says what the station card's Owner row says (stationOwner,
+// app.js), each party's logo before its name (OwnerLogos). Where that is the
+// Bureau's Service Level Specification the SLS is the word on it, so the field
+// is a read-only box, as the wind region's is, with "per SLS" beside its
+// caption — not in the box, which in the side panel's half column has room
+// for a logo and a name and little more. Only a station the SLS names nobody
+// for — one it does not list, a proposal, a "+ New" — gets a box to type in,
+// for the owner recorded on the station (0030), with the logo before it once
+// the owner typed is one that has one.
+//
+// The SLS is fetched on first need, so until it lands a numbered station's
+// field says it is checking and offers no box; it is filled in when the file
+// arrives, and again when the Station Number box changes, since that is what
+// the SLS is looked up by. With no box on screen a save leaves the recorded
+// owner as it was (editorReadForm), which is what answers if the SLS ever
+// stops naming one.
+let editorOwnerSlsFailed = false;
+
+// 'sls' (the SLS names it), 'wait' (it may, once the file is here) or 'box'.
+function editorOwnerMode(s) {
+  const o = stationOwner(s);
+  if (o && o.from === 'sls') return 'sls';
+  const waiting = s.station_number && typeof SLS !== 'undefined' && !SLS.loaded() && !editorOwnerSlsFailed;
+  return waiting ? 'wait' : 'box';
+}
+
+// The logos of an owner typed into the box, for before it.
+function editorOwnerLogosHtml(text) {
+  const o = String(text || '').trim() ? stationOwnerParse(text, 'station', 'typed in the editor') : null;
+  return o ? o.parties.map(p => OwnerLogos.logoHtml(p)).join('') : '';
+}
+
+// The caption's "per SLS", and the field's value: the read-only box, or the
+// box to type in.
+function editorOwnerFromHtml(s, mode) {
+  if (mode !== 'sls') return '';
+  const o = stationOwner(s);
+  return `<span class="mn-pop-note" title="${escAttr(`From ${o.src}. Where the SLS names an owner, that is the owner.`)}">per SLS</span>`;
+}
+function editorOwnerValueHtml(s, mode) {
+  if (mode === 'sls') {
+    const o = stationOwner(s);
+    return `<output id="ef-owner-sls" class="ef-owner-ro" title="${escAttr(`${o.name} — from ${o.src}`)}">${
+      o.parties.map(p => OwnerLogos.partyHtml(p)).join(' / ')}</output>`;
+  }
+  if (mode === 'wait') {
+    return '<output id="ef-owner-sls" class="ef-owner-ro"><span class="txt-muted">checking the SLS…</span></output>';
+  }
+  const tip = s.station_number && typeof SLS !== 'undefined' && SLS.loaded()
+    ? 'not in the SLS — who owns it?' : 'e.g. Toowoomba Regional Council';
+  return `<span class="ef-owner-in"><span class="ef-owner-logos" id="ef-owner-logos">${editorOwnerLogosHtml(s.owner)}</span><input
+        type="text" id="ef-owner" value="${escAttr(s.owner || '')}" placeholder="${escAttr(tip)}"
+        onchange="editorOwnerTyped(this)"></span>`;
+}
+
+function editorOwnerFieldHtml(s) {
+  const mode = editorOwnerMode(s);
+  return `<div class="ef-field ef-owner-field">
+        <span class="ef-cap"><label for="${mode === 'box' ? 'ef-owner' : 'ef-owner-sls'}" id="ef-owner-cap">Owner</label>
+          <span id="ef-owner-from">${editorOwnerFromHtml(s, mode)}</span>${hintToggleHtml('ef-h-owner', 'the owner')}</span>
+        <div id="ef-owner-val" data-mn-owner="${escAttr(String(s.id || ''))}">${editorOwnerValueHtml(s, mode)}</div>
+      </div>
+      <div class="full small ef-hint hint-fold" id="ef-h-owner" hidden>
+        Where the Bureau's Service Level Specification names the owner, that is the owner — shown
+        here as on the station card, and not typed. A box is offered only for a station the SLS
+        names nobody for (one it does not list, or a proposal), and what is typed there is the
+        owner recorded on the station.
+      </div>`;
+}
+
+// The field again for what the form now says — the number box as typed, the
+// owner box's text kept — in place, so nothing else typed is thrown away.
+function editorOwnerRefresh() {
+  const val = document.getElementById('ef-owner-val');
+  if (!val || !state.editorDraft) return;
+  const num = document.getElementById('ef-stnno');
+  const box = document.getElementById('ef-owner');
+  const s = { ...state.editorDraft,
+              station_number: num ? num.value.trim() : state.editorDraft.station_number,
+              owner: box ? box.value : state.editorDraft.owner };
+  const mode = editorOwnerMode(s);
+  val.innerHTML = editorOwnerValueHtml(s, mode);
+  const from = document.getElementById('ef-owner-from');
+  if (from) from.innerHTML = editorOwnerFromHtml(s, mode);
+  const cap = document.getElementById('ef-owner-cap');
+  if (cap) cap.htmlFor = mode === 'box' ? 'ef-owner' : 'ef-owner-sls';
+}
+
+// Filled in once the SLS lands, if the card still shows the station it was
+// asked for.
+function editorOwnerAsk(s) {
+  if (typeof SLS === 'undefined' || SLS.loaded() || !s.station_number) return;
+  const want = String(s.id || '');
+  const fill = () => {
+    const val = document.getElementById('ef-owner-val');
+    if (val && val.dataset.mnOwner === want) editorOwnerRefresh();
+  };
+  SLS.ensureData().then(fill, () => { editorOwnerSlsFailed = true; fill(); });
+}
+
+function editorOwnerTyped(box) {
+  const logos = document.getElementById('ef-owner-logos');
+  if (logos) logos.innerHTML = editorOwnerLogosHtml(box.value);
 }
 
 // The band across the top of the form while the station is a proposal: what a
@@ -328,6 +436,7 @@ function editorForm(s) {
   // filled in when the polygons land if this page has not needed them yet.
   const wind    = MapWind.regionState(s.lat, s.lon);
   MapWind.askRegion('ef-wind', s.lat, s.lon);
+  editorOwnerAsk(s);
   return `
     <div class="panel-header ef-head">
       <h3>${esc(s.name) || (s.proposed ? 'New Proposed Station' : 'New Station')}</h3>
@@ -363,13 +472,17 @@ function editorForm(s) {
     <div class="form-grid ef-grid">
       <label>Name<input type="text" id="ef-name" value="${esc(s.name)}"></label>
       <label>Station Number<input type="text" id="ef-stnno" value="${esc(s.station_number || '')}"
-             ${s.proposed ? 'placeholder="none yet — it is proposed"' : ''}></label>
+             ${s.proposed ? 'placeholder="none yet — it is proposed"' : ''} onchange="editorOwnerRefresh()"></label>
       <!-- What kind of station it is, or is to be, and whether it is only
            proposed (0039). The type is asked of every proposal and allowed on
            any station; the box is an administrator's once the station is saved. -->
       <label>Station type
         <select id="ef-stype">${stationTypeOptions(s.station_type, s.proposed)}</select>
       </label>
+      <!-- Who owns it, beside what it is: the station card's Owner row, logo
+           and all — the SLS's word where it names one, and a box only where
+           it does not (editorOwnerFieldHtml). -->
+      ${editorOwnerFieldHtml(s)}
       <!-- A river-gauge tower's platform height (0040): the standard drawing's
            two, each on a 2100 × 2100 footing. Blank is not recorded, which the
            Digital Twin draws as the 3.0 m default. -->
@@ -379,14 +492,10 @@ function editorForm(s) {
       <!-- The way the station faces (0044): the bearing its front — enclosure
            door, or a tower's ladder — looks out. Blank is not recorded, which
            the Digital Twin draws facing south. Its 🧭 Orientation tool sets it
-           by eye. Under the tower's height: both are how it is built. -->
+           by eye. Beside the tower's height: both are how it is built. -->
       <label>Faces (° from north)<input type="number" id="ef-facing" min="0" max="359.9" step="0.1" inputmode="decimal"
              value="${s.facing_deg == null ? '' : esc(String(s.facing_deg))}" placeholder="not recorded (south)"
              title="The bearing the station's front — its enclosure door, or a tower's ladder — faces, clockwise from true north"></label>
-      <!-- Who owns the station, recorded on it (0030). Blank means not recorded,
-           and the card then shows only what the SLS says, if anything. -->
-      <label>Owner<input type="text" id="ef-owner" value="${escAttr(s.owner || '')}"
-             placeholder="e.g. Toowoomba Regional Council"></label>
       <label class="full">Roles
         <div class="ef-roles">
           ${Object.keys(ROLE_LABEL).map(r => `
@@ -845,8 +954,11 @@ function editorReadForm() {
   d.enabled        = document.getElementById('ef-enabled')?.checked ?? true;
   d.notes          = document.getElementById('ef-notes')?.value || '';
   // Absent rather than empty when the box is blank — the shape station_json
-  // emits, so a save that set nothing round-trips without gaining a key.
-  const owner = document.getElementById('ef-owner')?.value.trim() || '';
+  // emits, so a save that set nothing round-trips without gaining a key. No
+  // box on screen — the SLS names the owner, or is still being fetched — is
+  // the recorded owner left as it was (editorOwnerFieldHtml).
+  const ownerBox = document.getElementById('ef-owner');
+  const owner = (ownerBox ? ownerBox.value : String(d.owner || '')).trim();
   if (owner) d.owner = owner; else delete d.owner;
   // The proposal (0039), the same way: `proposed` only where it is, and the
   // type and the year absent where blank — so a station that never was one

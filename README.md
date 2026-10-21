@@ -243,7 +243,7 @@ MegaNet/
 ├── propagation.js          ← Propagation — the Radio Propagation tab itself, and its
 │                             2-D drawings (interference, path, bit lanes, delays)
 ├── owner-logos.js          ← OwnerLogos — each station owner's logo beside its name
-│                             on the station card (the marks in assets/owners/)
+│                             on the station card and in the editor (the marks in assets/owners/)
 ├── health-glance.js        ← HealthGlance — a station's health where people already
 │                             look (#218): last heard, its battery and its findings on
 │                             its card, each a door into Station Health, and Colour
@@ -2614,7 +2614,7 @@ number of stations behind it and nothing is offered that no station uses:
 | Station type | `roles[]` — field / repeater / base / satcom | tick boxes |
 | Sensor type | every sensor type present in the file — rainfall, water level, battery, water quality, … | tick boxes, plus *must have all ticked types* for "rain **and** level" |
 | Radio network | `radio_network_ids[]` | tick boxes |
-| Owner | who owns the station — the owner recorded on it, else the one the Bureau's Service Level Specification names, a joint owner under each of its parties — most stations first, with *No owner on record* last | tick boxes, with a box to find an owner in |
+| Owner | who owns the station — the one the Bureau's Service Level Specification names, else the owner recorded on it, a joint owner under each of its parties — most stations first, with *No owner on record* last | tick boxes, with a box to find an owner in |
 | Region | the region of the station's catchment | tick boxes |
 | Gauge | what it measures (river height, rainfall, rainfall only, neither), who reads it (a radio or a person) and the Bureau's flood warning role (forecast, information or river data location, in the SLS at all, or not) — the same answers the pins' shape, grey and outline are drawn from | dropdowns |
 | Basin & council | `basin` and `lga` | dropdowns |

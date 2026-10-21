@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 61, date: '2026-10-21', items: [
+      '<strong>🏛️ The station editor shows the station\'s owner, logo and all.</strong> Its <em>Owner</em> field '
+        + 'now says what the station card on the map says: where the Bureau\'s Service Level Specification names the '
+        + 'owner it shows that owner, with their logo, marked <em>per SLS</em> — the SLS is the word on it, so it is not '
+        + 'typed. A box to type an owner in is there only for a station the SLS does not list. Owner now sits beside '
+        + '<em>Station type</em>, and the tower\'s height beside the way the station faces.',
+    ] },
     { n: 60, date: '2026-10-21', items: [
       '<strong>🎨 The Stations cards say what they are about.</strong> Each card beside (or under) the map now has a '
         + 'faint colour of its own and a band along its top: <em>blue</em> for the list — every station; '

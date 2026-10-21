@@ -151,8 +151,8 @@ const Health = (() => {
   const stationById = id => ((state.data && state.data.stations) || []).find(s => s.id === id) || null;
 
   // ── who owns a station ─────────────────────────────────────────────────────
-  // app.js's stationOwner: the owner recorded on the station, else the
-  // Bureau's SLS "Station owner" — the same answer the station card's top row
+  // app.js's stationOwner: the Bureau's SLS "Station owner", else the owner
+  // recorded on the station — the same answer the station card's top row
   // gives — split into its parties for the filter ("Bureau/Seqwater" is
   // Seqwater's station too). { name, parties, src } or null: nobody on
   // record, or the SLS file not on hand yet.

@@ -7695,13 +7695,18 @@ function stnCardProposalHtml(s) {
     </div>`;
 }
 
-// Who owns a station, as one answer — the station card's top row and the
-// Station Health tab both read it. The owner recorded on the station (0030)
-// where there is one; where not, the Bureau's Service Level Specification's
-// "Station owner" (sls.js), which is the only source for nearly all of them:
-// four stations carry their own, the SLS names one for 3,253 of the 4,873.
-// The card's SLS section still quotes the document word for word; this is the
-// one line to read at a glance.
+// Who owns a station, as one answer — the station card's top row, the station
+// editor and the Station Health tab all read it. The Bureau's Service Level
+// Specification's "Station owner" (sls.js) is the word on it wherever it
+// names one — it does for 3,253 of the 4,873 — and the owner recorded on the
+// station (0030) answers only where it does not: a station the SLS does not
+// list, such as one commissioned since, or a proposal. Four stations carry
+// their own, two of them stations the SLS names the same owner for. The
+// card's SLS section still quotes the document word for word; this is the one
+// line to read at a glance.
+//
+// Until the SLS file is on hand, a station's own owner is the answer for now
+// (stnCardOwnerAsk asks again once it lands); one with none waits for it.
 //
 // A joint owner is split into its parties — "Bureau/Seqwater" is Seqwater's
 // station as much as the Bureau's, and Station Health's owner filter finds it
@@ -7726,12 +7731,11 @@ function stationOwnerParse(raw, from, src) {
 }
 function stationOwner(s) {
   if (!s) return null;
-  if (s.owner && String(s.owner).trim()) return stationOwnerParse(s.owner, 'station', 'recorded on the station');
-  if (typeof SLS === 'undefined' || !SLS.loaded()) return null;
-  const loc = SLS.forStation(s);
-  return loc && loc.owner
-    ? stationOwnerParse(loc.owner, 'sls', `the Bureau's ${loc.jurisdiction ? loc.jurisdiction + ' ' : ''}Service Level Specification`)
-    : null;
+  const loc = typeof SLS !== 'undefined' && SLS.loaded() ? SLS.forStation(s) : null;
+  if (loc && loc.owner) {
+    return stationOwnerParse(loc.owner, 'sls', `the Bureau's ${loc.jurisdiction ? loc.jurisdiction + ' ' : ''}Service Level Specification`);
+  }
+  return s.owner && String(s.owner).trim() ? stationOwnerParse(s.owner, 'station', 'recorded on the station') : null;
 }
 
 // The card's Owner row, which is always there: an owner, where it came from,
@@ -7746,7 +7750,7 @@ function stnCardOwnerHtml(s) {
   const named = o && o.parties.map(p => OwnerLogos.partyHtml(p)).join(' / ');
   if (o && o.from === 'station') return named;
   if (o) {
-    return `<span title="${esc(`From ${o.src}. No owner is recorded on the station itself.`)}">${named}
+    return `<span title="${esc(`From ${o.src}. Where the SLS names an owner, that is the owner.`)}">${named}
       <span class="mn-pop-note">per SLS</span></span>`;
   }
   if (typeof SLS !== 'undefined' && !SLS.loaded() && !stnCardOwnerFailed) {
@@ -7759,9 +7763,10 @@ function stnCardOwnerHtml(s) {
 }
 let stnCardOwnerFailed = false;
 // The row's half of SLS.ask, on its terms: data-mn-owner carries the station
-// the placeholder was painted for, checked before writing.
+// the placeholder was painted for, checked before writing. A station with an
+// owner of its own asks too, since the SLS's word, once it lands, is first.
 function stnCardOwnerAsk(elId, s) {
-  if (typeof SLS === 'undefined' || SLS.loaded() || (s.owner && String(s.owner).trim())) return;
+  if (typeof SLS === 'undefined' || SLS.loaded()) return;
   const fill = () => {
     const el = document.getElementById(elId);
     if (el && el.dataset.mnOwner === String(s.id)) el.innerHTML = stnCardOwnerHtml(s);
@@ -8198,8 +8203,8 @@ const FILTER_GROUPS = {
   // rather than listing everyone it has not heard about yet as owner-less.
   owners: {
     title: 'Owner',
-    hint: 'The owner recorded on the station, else the one the Bureau\'s Service Level ' +
-          'Specification names. A joint owner is listed under each of its parties.',
+    hint: 'The owner the Bureau\'s Service Level Specification names, else the one recorded ' +
+          'on the station. A joint owner is listed under each of its parties.',
     noneLabel: 'No owner on record',
     find: 'Find an owner',
     // Health's wording for the same failure: without the SLS the owners are
