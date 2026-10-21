@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 59, date: '2026-10-21', items: [
+      '<strong>🚚 Station relocation finder.</strong> On the Stations map, beside 🗼 Repeater site finder in the side '
+        + 'panel\'s strip: pick a station that has to move, say how far it may go, and the ground round it is coloured by '
+        + 'how good a new home each spot would be — fade margin to the repeaters that hear it now first, then open sky for '
+        + 'the rain gauge (its WMO siting class from the trees and roofs round it), clear ground and how close it is. The '
+        + 'three to five best are pinned, kept off every shed, house and building the State and OpenStreetMap have mapped, '
+        + 'and out of the water. Point at the coloured ground to read any square.',
+    ] },
     { n: 58, date: '2026-10-21', items: [
       '<strong>🗺️ Station Health\'s map, bigger and first.</strong> The <em>Where</em> map now has a row of its own '
         + 'across the page, under the headline and its numbers, so landing on the tab shows where the trouble is before '

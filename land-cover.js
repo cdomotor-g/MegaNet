@@ -371,6 +371,23 @@ const LandCover = (function () {
       return res;
     },
 
+    // The canopy height alone, at each of any set of points — a lattice over a
+    // patch of ground rather than the samples of a path — read off the canopy
+    // tiles at their finest level and never off the class service, so ten
+    // thousand points cost the handful of tiles under them and no request
+    // each. The station relocation finder (map-relocate.js) reads the trees
+    // round a candidate this way. Resolves — never rejects — to an array of
+    // metres (null where the map has no pixel), or null when the canopy
+    // cannot be had at all; a seeded sampler answers with its `canopy`.
+    async canopyAt(lat, lon) {
+      if (!lat || !lon || !lat.length || lat.length !== lon.length) return null;
+      if (seeded) {
+        const got = seeded(lat, lon);
+        return got && !Array.isArray(got) && Array.isArray(got.canopy) ? got.canopy : null;
+      }
+      return canopy(lat, lon, 0).catch(() => null);
+    },
+
     // Tests cannot reach the service; they hand in a sampler that answers
     // from a fixture, the way MapRivers.seed() hands in ways.
     seed(fn) { seeded = typeof fn === 'function' ? fn : null; cache.clear(); },

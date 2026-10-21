@@ -188,6 +188,10 @@ MegaNet/
 │                             that say whose they are and who to call
 ├── map-photos.js           ← MapPhotos — the Stations map's 📷 pins, a cone each
 │                             way the camera faced
+├── map-relocate.js         ← MapRelocate — 🚚 the station relocation finder: the
+│                             ground round a station that has to move, coloured by
+│                             fade margin to its repeaters, open sky and cover, kept
+│                             off the buildings
 ├── modal.js                ← Modal     — the shared dialog shell, and confirmDialog /
 │                             promptDialog: the app's own questions, in place of the
 │                             browser's confirm() and prompt() (#223)
@@ -1261,10 +1265,11 @@ here.
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
 - **Repeater site finder** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve; fade everything else on the map to see them, see them on the terrain in 3-D, and take them to Google Earth as a KMZ with each candidate's paths in a folder of its own — see *Repeater site finder* under §17
+- **Station relocation finder** — pick a station that has to move and how far it may go, and the ground round it is coloured by how good a new home each spot would be: fade margin to the repeaters that hear it now first, then open sky for the rain gauge (its WMO siting class from the trees and roofs round it), clear ground and closeness; the three to five best are pinned, kept off every building the State and OpenStreetMap have mapped and out of the water — see *Station relocation finder* under §17
 - Leaflet.js, with the map's own controls in the side panel's strip beside it (§20), grouped by what they
   are for and separated by a hairline: what the map **shows** (base map — OSM-Topo by default,
   OpenStreetMap, Satellite or Dark — **Map display**, the **legend**), the tools you point at it
-  (**Draw & measure**, **Polar radio coverage**, **Repeater site finder**, **What is here**), the **3-D view**, its
+  (**Draw & measure**, **Polar radio coverage**, **Repeater site finder**, **Station relocation finder**, **What is here**), the **3-D view**, its
   settings (🎚️) and its camera, and how much screen the map gets (⛶ full screen). A panel opens as a pane of
   the side panel from its button in the strip; a button does its one thing.
   The one control left on the map is ↺ reset, alone in its top-right corner at every width. On a phone the map
@@ -1673,7 +1678,7 @@ forgets it, and it holds the latest hundred.
 map back the way it was found: the filters and the search behind them, the
 selection and the box-select, the focused repeater and its blast ring, every
 drawing, both link-budget ends, the polar plot, the repeater site finder's sites
-and answer, the spiderfied cluster, whatever mode was armed, and all four of the
+and answer, the station relocation finder's station and answer, the spiderfied cluster, whatever mode was armed, and all four of the
 corner cards. Eleven modules can put
 something on this map and every one of them has its own way of taking it off
 again — right for each of them in isolation, and adding up to a map nobody can
@@ -3831,6 +3836,84 @@ circle** works there too: Draw & measure takes its clicks off the terrain in 3-D
 
 `npm run sites` holds it to all of this on a synthetic hilly world.
 
+#### Station relocation finder
+
+The site finder places a new mast for a set of stations. The everyday question
+is closer in: *this* station has to move — the bank washed out, the landholder
+wants the paddock back, the trees have grown over it — and the repeaters that
+hear it today must go on hearing it. **🚚 Station relocation finder**, in the
+strip straight after 🗼, answers it.
+
+**The station**: *Use the station on the card* takes the one whose card is open
+on the map, or find it by name or number. The repeaters that carry it now (its
+pass ranges) come ticked; the nearest six other repeaters and bases within 60 km
+are offered unticked, for a station that might be better heard by a hub that
+does not carry it yet. A hub with no complete radio on file cannot be ticked.
+
+**Find new sites** works the site finder's two passes over a circle round the
+station (**Within**, 500 m by default, 50 m–2 km):
+
+- a **lattice** of places about 32 across the circle, never closer than 15 m,
+  where the station stands now among them;
+- a **screen** from every place to every repeater ticked, sampled every 30 m so
+  the terrain tiles come at their finest (~30 m) and two places a step apart
+  stand on different ground, through `pathAnalyse` — this colours the map;
+- the ground round it, read once: the **trees** (Esri's Global Canopy Height
+  2020, ETH Zürich, 10 m, ±5 m, on a 10 m lattice — the tiles the profile card
+  already reads), the **buildings** (in Queensland the State's outlines
+  generated from its LiDAR's building class, with roof heights, by project area;
+  its topographic building outlines and building points — every shed, house and
+  homestead digitised off the imagery; and everywhere OpenStreetMap's buildings
+  through Overpass), and the **land cover** class under each place (Sentinel-2);
+- a **refine** of where it is now and the best few, spaced a quarter of the
+  radius apart, the link budget card's way (`pathGround` at 256 samples, the
+  card's ground and model), so the margin quoted for a result is the card's.
+  Where it is now goes in on its surveyed height: its figure is the card's for
+  the link the station has today.
+
+**The score** is four figures, 0–100 each, weighted by four sliders and all
+printed beside every result: **fade margin** to the worst-served repeater ticked
+(the worse direction; 0 at 6 dB under the map's *ok*, 100 at 10 dB over its
+*good*; weight 5 by default — the primary one), **open sky** for the rain gauge
+(the WMO siting classification for precipitation, CIMO Guide WMO-No. 8: the
+steepest tree or roof within 60 m seen from the gauge rim, class 1 at 14° or
+under — obstacles four times their height away — 2 at 26.6°, 3 at 45°, 4 at
+63.4°, 5 nearer or under the canopy), **clear ground** (the share of the ground
+within 20 m with no tree or roof — under the field model the trees round the
+antenna are in the allowance, the same for every place, so this is what tells a
+clearing from a forest) and **close by**. **A place every repeater ticked hears
+at the map's *ok* or better always ranks above one that some repeater does not**,
+whatever the weights. Two things are not scored but ruled out: **on or within
+*Keep clear of buildings by* (10 m) of a mapped building**, and **in water**;
+both are hatched grey on the map, so "nothing here" is never mistaken for "not
+looked at". A weight is a re-rank, not a re-run; the clearance and the gauge rim
+re-read the ground already in hand; the station, its repeaters, the circle and
+the antenna at the new site take the answer away.
+
+**On the map** the ground is coloured by *suitability* (one blue, light to dark,
+over this run's own range), by *fade margin* (the fade map's own green, amber and
+red) or by the *change in fade margin from where it is now* (blue better, red
+worse, grey within a decibel), with an opacity slider and a key; the buildings
+found are outlined in white, and **pointing at a square says what it scored** —
+its worst margin and to which repeater, its WMO class, the cover round it and the
+nearest building. The best three to five are numbered pins; pick one (on the map
+or in the panel) for its paths to every repeater, coloured by fade margin, and a
+table of every repeater against it and against now; **Profile the worst path**
+opens it in the elevation profile. If every place offered is heard worse than
+where the station stands now, the panel says so and by how much. **Save CSV**
+writes every place screened — offsets, distance, every repeater's margin, the
+WMO class and the obstacle, the cover, the land-cover class and the nearest
+building.
+
+**What it is not**: ~30 m terrain, omnidirectional antennas, a canopy map of
+2020, and only the buildings somebody has mapped — a shed nobody mapped is one it
+cannot see, so look at the imagery (every pin's callout has the map-view links)
+and open the path in the elevation profile card before anything is moved. It is
+not drawn in the ⛰️ 3-D view.
+
+`npm run relocate` holds it to this on the hilly world, with trees, water and
+buildings laid out round the station by the check.
+
 ---
 
 ### 18. Plots (CSV Import, 357 Filter & Plotting) — once "ARRO Data"
@@ -4485,7 +4568,7 @@ top-right corner lives in the strip instead, at every width — a phone's rail
 included, where a pane is a drawer — except ↺ reset, which is built to stay
 (`corner: true` on `MapChrome.button`, so the side panel is never offered it)
 and is the one thing in that corner. Each panel — 🗺️ Map display, 🔑 Legend, ✏️ Draw & measure,
-📡 Polar radio coverage, 🗼 Repeater site finder, 🎚️ the 3-D settings — moves
+📡 Polar radio coverage, 🗼 Repeater site finder, 🚚 Station relocation finder, 🎚️ the 3-D settings — moves
 its whole `.mn-mapctl` wrapper (icon, heading, pin and body) into a pane of its
 own the moment it is built, with a button in the strip; its corner icon and its
 📌 are hidden there, because a pane already stays open. Each other plain button

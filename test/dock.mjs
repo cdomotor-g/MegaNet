@@ -101,7 +101,8 @@ const CARD_IDS = ['stations-cards', 'stations-filter-card', 'stations-list-card'
                   'blast-card', 'stations-editor-card'];
 
 // …and every id the map's panels are found by, for the same rule.
-const PANEL_IDS = ['map-display-block', 'map-legend', 'map-draw-panel', 'map-3d-panel-body', 'sites-run', 'polar-status'];
+const PANEL_IDS = ['map-display-block', 'map-legend', 'map-draw-panel', 'map-3d-panel-body', 'sites-run', 'polar-status',
+                   'reloc-run'];
 
 // The strip, top to bottom, as the corner orders it: the side panel's own
 // five (❔, 📍 the cards, the blue 📍 Find a place, 〽️ the path tools, 🧊 the
@@ -113,7 +114,7 @@ const PANEL_IDS = ['map-display-block', 'map-legend', 'map-draw-panel', 'map-3d-
 // it is built to stay in the map's corner (`corner`), and is asserted there.
 const STRIP = ['help', 'stations', 'places', 'paths', 'twin',
                'map-display', 'map-legend',
-               'map-draw', 'map-polar', 'map-sites', 'mn-map-here',
+               'map-draw', 'map-polar', 'map-sites', 'map-relocate', 'mn-map-here',
                'mn-map-3d', 'map-3d', 'mn-map-north', 'mn-map-tilt',
                'mn-map-full'];
 const BUTTONS = STRIP.filter(k => k.startsWith('mn-map-'));
@@ -276,7 +277,7 @@ try {
   check('the strip holds every one of the map\'s controls but ↺, in the corner\'s order, from the first render',
     JSON.stringify(s.strip) === JSON.stringify(STRIP), JSON.stringify(s.strip));
   const panels = {};
-  for (const id of ['display', 'legend', 'draw', 'polar', 'sites', '3d']) panels[id] = await wrapAt(id);
+  for (const id of ['display', 'legend', 'draw', 'polar', 'sites', 'relocate', '3d']) panels[id] = await wrapAt(id);
   check('every panel is a pane of the side panel, whole, one of each',
     Object.values(panels).every(p => p.n === 1 && p.where === 'dock' && p.whole),
     JSON.stringify(panels));
@@ -1098,7 +1099,7 @@ try {
   // 24 px WCAG 2.2 sets as a target's least.
   check('…holding ❔, the two 📍, 〽️ and every one of the map\'s controls, in the corner\'s order, each 36 px square',
     JSON.stringify(phone.strip) === JSON.stringify(PHONE_STRIP) && phone.square.every(([w, h]) => w === 36 && h === 36)
-      && phone.panels.length === 6 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
+      && phone.panels.length === 7 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
     JSON.stringify(phone));
   const phoneCorner = await cornerNow();
   check('…the map ending where the rail begins, measured to it, and only ↺ standing on it, at its top right',

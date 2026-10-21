@@ -1029,6 +1029,17 @@ jobs:
         working-directory: test
         run: npm run sites
 
+      # The station relocation finder (map-relocate.js), on the same hilly
+      # world, with trees, water and buildings laid out round the station by
+      # the check: every place within the clearance of a building and in water
+      # ruled out and no other, the WMO class of the trees' own angle, the
+      # screened and the quoted margins pathAnalyse's and the card's to the
+      # last bit, a weight a re-rank with the screen kept, a pin a real click
+      # picks, Overpass down said in words, and reset taking all of it away.
+      - name: Station relocation finder — one station, the ground round it
+        working-directory: test
+        run: npm run relocate
+
       # The 3-D view (map-3d.js). Invisible to every check above it: `smoke`
       # opens the Stations tab and a ⛰️ button that does nothing at all passes,
       # `registry` looks for Leaflet maps and a WebGL context outliving its div

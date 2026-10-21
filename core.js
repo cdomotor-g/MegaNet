@@ -150,7 +150,7 @@ const TABS = [
   ] },
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
-      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson' },
+      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site rain gauge exposure canopy trees buildings shed' },
     { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
       find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
     { id: 'passranges', label: 'Pass Ranges',            icon: '🔗',
@@ -491,7 +491,7 @@ const HELP = {
            + 'hairline between them: what the map <em>shows</em> (🗺️ <strong>Map display</strong>, '
            + 'base maps first, and 🔑 the legend), the tools you point at it (✏️ <strong>Draw &amp; '
            + 'measure</strong>, 📡 <strong>Polar radio coverage</strong>, <strong>🗼 Repeater site '
-           + 'finder</strong>, <strong>ℹ️ What is here</strong>), the <strong>3-D view</strong> (⛰️, 🎚️ '
+           + 'finder</strong>, <strong>🚚 Station relocation finder</strong>, <strong>ℹ️ What is here</strong>), the <strong>3-D view</strong> (⛰️, 🎚️ '
            + 'its settings, and its camera), and how much screen the map gets (⛶ full screen). A panel '
            + 'among them opens as a pane of the side panel, the way 📍 does; a button does its one '
            + 'thing. The one control left on the map is <strong>↺ Reset</strong>, alone in its '
@@ -659,6 +659,21 @@ const HELP = {
       + 'the search area, the rings, the chosen candidate\'s paths and the numbered pins stand on '
       + 'the terrain, and a pin click picks that candidate there too — and <em>Draw a circle</em> '
       + 'draws its circle on the terrain.',
+      '<strong>🚚 Station relocation finder</strong> is for one station that has to move. Pick it — '
+      + '<em>Use the station on the card</em>, or find it by name or number — and the repeaters that '
+      + 'carry it today come ticked, with the nearest few others offered beside them. Say how far it '
+      + 'may go (500 m by default) and <em>Find new sites</em> colours every square of ground inside '
+      + 'that circle: it screens a lattice of places against every repeater ticked over ~30 m terrain, '
+      + 'reads the tree heights (the 2020 canopy map, 10 m), the land cover and every building the '
+      + 'State and OpenStreetMap have mapped round it, then checks where it is now and the best few '
+      + 'the link budget card\'s way. Four sliders say what matters: <strong>fade margin</strong> to '
+      + 'the worst-served repeater (the primary one), <strong>open sky</strong> for the rain gauge — '
+      + 'its WMO siting class from the steepest tree or roof within 60 m — <strong>clear '
+      + 'ground</strong> with no trees or roofs within 20 m, and <strong>close by</strong>. A place every '
+      + 'repeater hears at the map\'s <em>ok</em> or better always ranks first, and a place on or beside '
+      + 'a mapped building, or in water, is ruled out and hatched. Colour the ground by suitability, by '
+      + 'fade margin, or by the change from where it is now, and point at a square for its figures. It '
+      + 'only sees buildings somebody has mapped: look at the imagery before you go.',
       '<strong>Find a place</strong> (the blue 📍 in the strip) is where a place is looked for, '
       + 'not the filter box — which filters the stations, and would have cut the network down to '
       + 'the stations named after a town while you were only looking for the town. Paste a '

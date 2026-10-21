@@ -4992,6 +4992,80 @@ hr {
   font-size: .75rem;
 }
 
+/* ── Station relocation finder (map-relocate.js) ─────────────────────────── */
+/* The site finder's dialog, borrowed whole (.sites-fs, .sites-results, the
+   pins), and only what is its own here: the repeaters to reach, the key to the
+   coloured ground, the reference row for where it is now, and the hover. */
+
+.reloc-hubs {
+  max-height: 10rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: .8rem;
+}
+
+.reloc-hubs li { padding: 1px 0; }
+
+.reloc-hubs-head {
+  margin-top: var(--sp-1);
+  font-weight: 600;
+}
+
+.reloc-hubs .filter-check { align-items: baseline; }
+
+/* The key: the wash's bands, best first, as .polar-key draws its ramp. Colour
+   arrives as --dot (#138); ruled out also carries the wash's own hatch, so it
+   reads without the grey. */
+.reloc-key {
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: .74rem;
+  line-height: 1.3;
+}
+
+.reloc-key li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.reloc-key i {
+  flex: none;
+  width: 20px;
+  height: 11px;
+  border: 1px solid var(--border);
+  background: var(--dot, var(--muted));
+}
+
+.reloc-key i.reloc-hatch {
+  background:
+    repeating-linear-gradient(-45deg, #c3c2b7 0 1.5px, transparent 1.5px 4px),
+    var(--dot, var(--muted));
+}
+
+.reloc-key span { color: var(--muted); }
+
+.reloc-now { margin-top: var(--sp-2); }
+
+/* Where it is now is a reference, not a rank: its badge is a ring on the
+   panel's ground rather than the pins' blue disc — its own blue in each
+   theme, so the ring holds 3:1 against the panel either way. */
+.sites-rank.reloc-now-mark {
+  border: 2px solid var(--accent);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.reloc-tip {
+  max-width: 18rem;
+  font-size: .75rem;
+  line-height: 1.35;
+  white-space: normal;
+}
+
 /* ── My location + heading (mobile only) ─────────────────────────────────── */
 
 .mn-locate a {

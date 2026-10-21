@@ -4529,7 +4529,8 @@ function stationsMapPanels(map) {
     html: () => `<div id="map-draw-panel">${MapDraw.panelHtml()}</div>`,
   });
   // 📡 Polar radio coverage is tools/20 — MapPolar.attach(), which runs later —
-  // and 🗼 Repeater site finder tools/25, from MapSites.attach() after it.
+  // 🗼 Repeater site finder tools/25, from MapSites.attach() after it, and
+  // 🚚 Station relocation finder tools/26, from MapRelocate.attach() after that.
   //
   // What is here (#186) — arm it, click the map, and the card in the opposite
   // corner says what the app knows about that point. A plain corner button
@@ -4716,6 +4717,7 @@ async function resetStationsMap() {
   try_(() => LinkBudget.reset());
   try_(() => { if (MapPolar.active()) MapPolar.clear(); });
   try_(() => MapSites.clear());
+  try_(() => MapRelocate.clear());
   try_(() => MapSpider.reset());
   try_(() => Places.clearMark());
 
@@ -5488,6 +5490,7 @@ function mapLegendHtml() {
     ${MapMobileCoverage.active() ? MapMobileCoverage.legendHtml() : ''}
     ${MapPolar.active() ? mapPolarLegendHtml() : ''}
     ${MapSites.active() ? MapSites.legendHtml() : ''}
+    ${MapRelocate.active() ? MapRelocate.legendHtml() : ''}
     ${MapPeaks.active() ? `
     <span class="legend-item">
       <span class="legend-peak" aria-hidden="true">▲</span>
@@ -5697,6 +5700,7 @@ function stopStationsMap() {
   MapPeaks.detach();
   MapPolar.detach();
   MapSites.detach();
+  MapRelocate.detach();
   Places.detach();
   MapRoads.detach();
   MapRoadOwners.detach();
@@ -5864,6 +5868,10 @@ function initMap() {
   // out. After MapDraw, whose circle it selects with — though like every other
   // attach here it only needs the map it is handed.
   MapSites.attach(state.map);
+  // The station relocation finder, the same kind of dialog for one station
+  // that has to move: its repeaters go in, and the ground round it comes out
+  // coloured by how well they would hear it there.
+  MapRelocate.attach(state.map);
   // 📍 Find a place, the side panel's tool: no layer of its own until a place
   // is pressed in it — attached for MapSpider's reason, to know which map it
   // would be dropping a pin on before anybody asks it to, and to draw the one
