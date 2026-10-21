@@ -293,6 +293,21 @@ const SEED_MSGLOG = `() => {
 // types one through the tab's own handler — an alert id read out of the loaded
 // data, so the variants genuinely match stations — and waits out the 250 ms
 // map-refresh debounce so the overflow pass measures a populated tab.
+const SEED_FLIPSOURCES = `async () => {
+  const placed = state.data.stations.filter(s => s.lat != null && s.lon != null);
+  const reps = placed.slice(0, 3);
+  const addrs = placed.slice(3, 40).flatMap(s => (s.sensors || []).map(x => Number(x.alert_id))).filter(a => a > 0 && a < 8192).slice(0, 6);
+  const cand = (r, o) => ({ rid: r.id, name: r.name, lat: r.lat, lon: r.lon, only_it: 1, stations: 3, clear: 0, by_carrier: 0, blame: 10, carried: 900, rate: 0.011, ...o });
+  const data = { days: 7, built_at: new Date().toISOString(), corrupted: 60, heard: 6000, network_rate: 0.01, by_how: { carrier: 8, 'no-carrier': 52 },
+    candidates: [cand(reps[0], { by_carrier: 8, clear: 8 }), cand(reps[1], { rate: 0.03, blame: 20 }), cand(reps[2])],
+    stations: addrs.map((a, i) => ({ addr: a, station_id: null, n: 10 - i, addr_flips: 1, no_carrier: 5, first_at: '2026-10-15T01:00:00Z', last_at: '2026-10-20T01:00:00Z',
+      targets: [{ addr: a ^ 2, n: 3 }], senders: i ? {} : { ['st:' + reps[0].id]: 8 }, candidates: reps.map(r => r.id) })),
+    hours: Array.from({ length: 24 }, (_, h) => h % 5), per_day: [{ day: '2026-10-15', n: 30 }, { day: '2026-10-16', n: 30 }] };
+  FlipSources.adopt([{ period_days: 7, data, built_at: data.built_at }]);
+  FlipSources.select(reps[0].id);
+  await new Promise(r => setTimeout(r, 300));
+}`;
+
 const SEED_BITFLIPPER = `async () => {
   const addr = String(state.data.stations
     .flatMap(s => (s.sensors || []).map(x => x.alert_id))
@@ -850,6 +865,7 @@ const CONVERTED = [
   { id: 'msglog',     label: 'Message Log',     issue: 'new with the tab', seed: SEED_MSGLOG },
   { id: 'mapgen',     label: 'Map Generator',   issue: 'new with the tab' },
   { id: 'bitflipper', label: 'Bit Flipper',     issue: '#139', seed: SEED_BITFLIPPER },
+  { id: 'flipsources', label: 'Bit-Flip Sources', issue: '#244', seed: SEED_FLIPSOURCES },
   { id: 'workbench',  label: 'Interference Workbench — intro',       issue: '#139' },
   { id: 'workbench',  label: 'Interference Workbench — worked case', issue: '#139', seed: SEED_WORKBENCH },
   { id: 'packets',    label: 'ALERT Packets',   issue: '#140', seed: SEED_PACKETS },

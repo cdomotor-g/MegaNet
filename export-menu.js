@@ -137,6 +137,12 @@ const ExportMenu = (function () {
         call: ['HealthAgent.downloadPack'],
         empty: 'There are no findings yet — the week is still being read.' },
     ],
+    flipsources: () => [
+      { label: 'The suspects — CSV', sub: 'every repeater that could have corrupted a reading, with its carrier evidence, pass-range share and rate',
+        call: ['FlipSources.exportCsv'], empty: 'There is no bit-flip evidence for this period yet.' },
+      { label: 'The corrupted readings — CSV', sub: 'each address being corrupted, what it became, who sent it and who could have',
+        call: ['FlipSources.exportStationsCsv'], empty: 'There are no corrupted copies in this period.' },
+    ],
     history: () => [
       { label: 'The records listed — CSV', sub: 'the inspection and maintenance records, as filtered', call: ['History.exportList'],
         empty: 'There are no records listed.' },

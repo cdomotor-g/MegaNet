@@ -525,6 +525,37 @@ parked beside it. `tools/check_flip_fingerprints.sql` holds the server to a
 made-up week — two repeaters passing the same stations, one corrupting — and
 `npm run health` holds the panel and the Bit Flipper's section.
 
+### The Bit-Flip Sources tab
+
+The same evidence for the whole network, in a tab of its own (🔎 **Bit-Flip
+Sources**, under Interference). The server builds it every hour, at :14, into
+`meganet.flip_sources` (`0079`) — one public row for the last 7 days and one
+for the last 30 — so the page asks once and draws at once.
+
+- **Suspects** — every repeater that passes a corrupted address. *By carrier*
+  is definite: copies that arrived on its carrier (and how many of them were
+  *clear*, as strong as the clean copy). *Share by pass range* splits each
+  corrupted copy equally between every repeater that passes its address, and
+  *Carried* splits everything heard from those addresses the same way, so the
+  **rate** — share over carried — can be set against the network's. *Only it
+  could have* counts copies no other repeater passes. The verdict, most
+  suspect first: *caught by its carrier* (5 or more clear), *seen by its
+  carrier*, *N× the network's rate* (twice or more, on 10 or more), *above the
+  network*, *within the usual*.
+- **Map** — suspects coloured by verdict and sized by share; corrupted stations
+  as small dots. Pick a repeater (in the table or on the map) to join it to the
+  stations it could have corrupted: a solid line where its carrier caught it,
+  dashed where only its pass range puts it there.
+- **Corrupted readings** — by address: how many, how many into another
+  address, what they became, who the carrier says sent them, and who could
+  have. The address opens it in the Bit Flipper.
+- **When** — by hour (Brisbane time) and by day. Interference keeps hours; a
+  failing radio does not.
+
+Copies heard before the receivers measured carriers (RPi ALERT 0.14) have no
+sender and are weighed by pass range only, so the carrier columns fill as the
+weeks go by. Both tables download as CSV from 📤 Export.
+
 ## On a station's card, and its pin
 
 The same rules reach the Stations tab (#218, `health-glance.js`), so somebody

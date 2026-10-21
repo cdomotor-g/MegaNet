@@ -172,6 +172,13 @@ const SiteMap = (function () {
         'Open it straight from a sensor row\'s Flip link in the station editor',
       ],
     },
+    flipsources: {
+      what: 'Who is corrupting the network\'s ALERT readings: every corrupted copy put down to the repeater that sent it, by its carrier or its pass range.',
+      use: [
+        'Find the repeater or two behind the bit flips',
+        'See which stations are being corrupted, into what, and at what hours',
+      ],
+    },
     network: {
       what: 'The Bit Flipper\'s question for the whole network at once: addresses as nodes, ghosting between them as lines.',
       use: [
@@ -429,6 +436,7 @@ const SiteMap = (function () {
     { text: 'Chart a station\'s rainfall or river level',  tab: 'field' },
     { text: 'Decode an ALERT message',                     tab: 'packets' },
     { text: 'Explain a reading on an address nobody owns', tab: 'bitflipper' },
+    { text: 'Find the repeater that is corrupting readings', tab: 'flipsources' },
     { text: 'Work out what is interfering with a repeater', tab: 'workbench' },
     { text: 'Listen to ALERT off the air',                 tab: 'serial' },
     { text: 'Fill in a site inspection',                   tab: 'inspections' },

@@ -171,6 +171,8 @@ const TABS = [
       find: 'case hypotheses scoring evidence checklist acma complaint site visit share' },
     { id: 'reception',  label: 'Reception Map',          icon: '📡',
       find: 'drive survey site survey candidate repeater base station site signal strength rssi coverage gps vehicle bad packets bit flip repeater triangulate where heard receptions' },
+    { id: 'flipsources', label: 'Bit-Flip Sources',       icon: '🔎',
+      find: 'bit flip source sources corrupted corruption repeater suspect carrier fingerprint drift who culprit blame interference rate' },
   ] },
   { group: 'ALERT', tabs: [
     { id: 'bitflipper', label: 'Bit Flipper',            icon: '🔀',
@@ -1312,6 +1314,27 @@ const HELP = {
       + 'that will not parse falls back to the default rather than producing a broken link.',
     ],
     related: ['network', 'packets', 'passranges'],
+  },
+
+  flipsources: {
+    summary: 'Who is corrupting the network\'s ALERT readings. Every corrupted copy a base station has '
+           + 'heard — a reading one or two bits from a real one, a moment after it — is put down to a '
+           + 'transmitter two ways: <strong>by carrier</strong>, the transmitter whose carrier frequency it '
+           + 'came on (definite, since RPi ALERT 0.14 measures carriers), and <strong>by pass range</strong>, '
+           + 'shared between every repeater that passes its address (circumstantial, but for every copy). '
+           + 'Then the repeaters are ranked against the network\'s rate and put on a map, with the stations '
+           + 'being corrupted, what they became, and the hours it happens.',
+    watch: [
+      'A repeater with a broad pass range collects a big <strong>share</strong> just by passing many '
+      + 'stations. Compare the <strong>rate</strong> — its share over what it carried — against the '
+      + 'network\'s, and look at <strong>only it could have</strong>.',
+      'It narrows; it does not convict. A repeater whose receiver hears interference passes on what it '
+      + 'heard, so the corruption entered at its site, but its radio may be fine. Confirm with a receiver '
+      + 'parked beside it.',
+      'Built by the server every hour from the last 7 or 30 days. Copies heard before the receivers '
+      + 'measured carriers have no sender, and are weighed by pass range only.',
+    ],
+    related: ['bitflipper', 'health', 'reception', 'workbench'],
   },
 
   network: {

@@ -3598,6 +3598,7 @@ function renderMain() {
     case 'workbench':  el.innerHTML = Workbench.render();    Workbench.init();    break;
     case 'reception':  el.innerHTML = Reception.render();    Reception.init();    break;
     case 'bitflipper': el.innerHTML = renderBitFlipperHtml(); initBitFlipperMap(); break;
+    case 'flipsources': el.innerHTML = FlipSources.render(); FlipSources.init(); break;
     case 'network':    el.innerHTML = NetworkView.render();  NetworkView.init();  break;
     case 'packets':    el.innerHTML = Packets.render();       Packets.init();      break;
     case 'alert2':     el.innerHTML = Alert2.render();        Alert2.init();       break;

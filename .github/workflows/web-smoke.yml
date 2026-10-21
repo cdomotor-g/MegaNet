@@ -449,6 +449,14 @@ jobs:
         working-directory: test
         run: npm run healthcard
 
+      # 🎯 Bit-Flip Sources (flip-sources.js, 0079): one request for both
+      # periods, the carrier-caught repeater ranked before a broad one at the
+      # network's rate, a pick joined to its stations, the CSVs, and a database
+      # without 0079 said so.
+      - name: Bit-Flip Sources
+        working-directory: test
+        run: npm run flipsources
+
       # ⏱️ Latency (map-latency.js), against the demo week through the strict
       # PostgREST stub: the bands' edges; off until asked for; the first
       # opening of the pane turns it on; every pin a band or said otherwise,

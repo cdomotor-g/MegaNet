@@ -1,6 +1,6 @@
 -- check_flip_fingerprints.sql — Prove 0078: corrupted copies found, and each
 -- put down to the transmitter whose carrier it came on (#217's fingerprints,
--- for the bit flips).
+-- for the bit flips) — and 0079, the Bit-Flip Sources tab's evidence.
 --
 --   psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_flip_fingerprints.sql
 --
@@ -69,8 +69,8 @@ insert into meganet.pass_range (repeater_id, kind, lo, hi, ord) values
 
 create or replace function pg_temp.rx(p_t timestamptz, p_a integer, p_v integer, p_cfo double precision, p_dup boolean, p_snr double precision default 14)
 returns void language sql as $$
-  insert into meganet.reception (ingest_token_id, point_id, receiver, heard_at, protocol, alert_id, value_raw, ok, detail)
-  values ((select id from _tok), 'check-flip-sdr', 'rtl-sdr', p_t, 'alert', p_a, p_v, true,
+  insert into meganet.reception (ingest_token_id, point_id, receiver, heard_at, received_at, protocol, alert_id, value_raw, ok, detail)
+  values ((select id from _tok), 'check-flip-sdr', 'rtl-sdr', p_t, least(p_t, now() - interval '5 minutes'), 'alert', p_a, p_v, true,
           jsonb_build_object('freq_mhz', 151.5, 'snr_db', p_snr)
             || case when p_cfo is null then '{}'::jsonb else jsonb_build_object('cfo_hz', round(p_cfo)::integer) end
             || case when p_dup then '{"duplicate": true, "copy": 1}'::jsonb else '{}'::jsonb end);
@@ -205,6 +205,34 @@ begin
 end
 $$;
 
+-- ── The Bit-Flip Sources tab's evidence (0079) ──────────────────────────────
+select meganet.roll_up_receptions(1000) is not null as rolled_receptions \gset
+create temporary table _src on commit drop as select meganet.flip_sources_build(8) as d;
+
+do $$
+declare d jsonb := (select x.d from _src x); r1 jsonb; r2 jsonb; st jsonb;
+begin
+  select c into r1 from jsonb_array_elements(d -> 'candidates') c where c ->> 'rid' = 'chk_fr1';
+  select c into r2 from jsonb_array_elements(d -> 'candidates') c where c ->> 'rid' = 'chk_fr2';
+  perform pg_temp.check_that('Bit-Flip Sources: two repeaters passing the same stations share the pass-range blame evenly — the ranges cannot tell them apart',
+    r1 is not null and r2 is not null and (r1 ->> 'blame')::numeric = (r2 ->> 'blame')::numeric
+      and (r1 ->> 'only_it')::int = 0 and (r1 ->> 'carried')::numeric > 0 and (r1 ->> 'rate') is not null,
+    coalesce(r1::text, '<none>') || ' ' || coalesce(r2::text, '<none>'));
+  perform pg_temp.check_that('…the carrier fingerprint does: R2 first, with its corrupted copies, R1 with none',
+    (d -> 'candidates' -> 0 ->> 'rid') = 'chk_fr2' and (r2 ->> 'by_carrier')::int = 21 and (r2 ->> 'clear')::int = 21
+      and (r1 ->> 'by_carrier')::int = 0, left((d -> 'candidates')::text, 300));
+  select x into st from jsonb_array_elements(d -> 'stations') x where (x ->> 'addr')::int = 8003;
+  perform pg_temp.check_that('…each corrupted station: how many, what it became, who sent them, who could have',
+    (st ->> 'n')::int = 7 and (st ->> 'addr_flips')::int = 7 and st -> 'targets' @> '[{"addr": 8035, "n": 7}]'::jsonb
+      and (st -> 'senders' ->> 'st:chk_fr2')::int = 7 and st -> 'candidates' @> '["chk_fr1", "chk_fr2"]'::jsonb,
+    coalesce(st::text, '<none>'));
+  perform pg_temp.check_that('…and by hour of day (24, Brisbane) and by day, with a network rate',
+    jsonb_array_length(d -> 'hours') = 24 and (select sum(h::int) from jsonb_array_elements_text(d -> 'hours') h) = (d ->> 'corrupted')::int
+      and jsonb_array_length(d -> 'per_day') >= 7 and (d ->> 'network_rate')::numeric > 0, left(d::text, 200));
+end
+$$;
+select meganet.refresh_flip_sources() is not null as refreshed \gset
+
 -- Who may.
 do $$
 declare v text;
@@ -215,6 +243,8 @@ begin
   perform pg_temp.check_that('…and recent_flips()', v = '6', v);
   v := pg_temp.as_role('anon', '{"role":"anon"}', $q$select count(*)::text from meganet.flip_event$q$);
   perform pg_temp.check_that('…but not flip_event, which names receivers', v like 'ERROR %' or v = '0', v);
+  v := pg_temp.as_role('anon', '{"role":"anon"}', $q$select count(*)::text from meganet.flip_sources$q$);
+  perform pg_temp.check_that('…and the Bit-Flip Sources evidence, built for 7 and 30 days', v = '2', v);
   perform pg_temp.check_that('nobody but the owner and the service key attributes a burst by its carrier',
     not has_function_privilege('anon', 'meganet.carrier_tx(date, bigint, text, integer, double precision, double precision)', 'execute'));
 end

@@ -3406,6 +3406,15 @@ station, or the repeater that relayed it. The arithmetic says what an address
 by who sent them* panel is the same evidence by transmitter
 ([docs/station-health.md](docs/station-health.md#bit-flips-by-who-sent-them)).
 
+**Bit-Flip Sources** (🔎, under Interference; `0079`) is the whole network's
+version: every corrupted copy of the last 7 or 30 days, put down to the
+repeater that sent it **by its carrier** where the receiver measured one, and
+otherwise **shared by pass range** between the repeaters that pass the address.
+Repeaters are ranked against the network's rate (a broad pass range collects a
+big share just by passing many stations), drawn on a map joined to the stations
+they could have corrupted, with what those stations became and the hours it
+happens ([docs/station-health.md](docs/station-health.md#the-bit-flip-sources-tab)).
+
 ### 16. Ghosting Graph (ALERT Address Ghosting, as a Graph)
 The Bit Flipper answers "what else could this address be?" one address at a
 time. The Ghosting Graph asks it of the whole file at once and draws the answer:
