@@ -61,7 +61,7 @@ jobs:
         id: have
         run: |
           if [ -z "$DATABASE_URL" ]; then
-            echo "::notice::SUPABASE_DB_URL is not set — nothing applied. db/README.md ('Applying migrations') has the steps."
+            echo "::notice::SUPABASE_DB_URL is not set — nothing applied. db/README.md ('Applying') has the steps."
             echo "ok=" >> "$GITHUB_OUTPUT"
           else
             echo "ok=1" >> "$GITHUB_OUTPUT"
