@@ -736,15 +736,19 @@ select meganet.retain();   -- rolls up, then deletes. In that order, always.
 | `meganet.reading` | 730 days (two years, since `0070`) | `app_meta.retain_reading_days` |
 | `meganet.reading_raw` (submissions as received) | 30 days | `app_meta.retain_reading_raw_days` |
 | `meganet.reading_hourly`, `meganet.reading_daily` | forever | — |
-| `meganet.reception` (every copy heard) | 90 days once #243 lands; nothing is deleted until then | `app_meta.retain_reception_days` |
+| `meganet.reception` (every copy heard) | 90 days (`0073`) | `app_meta.retain_reception_days` |
+| Every raw row of the three above, a gzipped day at a time (`0073`) | **forever, in R2** (`meganet-archive`) | — |
 | `meganet.reception_hourly`, `meganet.reception_daily` (`0071`) | forever | — |
 
-Both knobs are rows, so changing them needs no migration. Since `0070`, `roll_up()`
-runs hourly from `pg_cron` (`meganet-roll-up`, minute 7), so the rollups are never
-more than an hour behind. `retain()` is **not** scheduled yet, on purpose: the rule
-is that nothing is deleted that has not been both rolled up and archived to R2, and
-the archive comes first (see the roadmap). The order inside `retain()` is not
-optional either: a reading deleted before it is rolled up is gone from both places.
+The knobs are rows, so changing them needs no migration. `roll_up()` runs hourly
+from `pg_cron` (`meganet-roll-up`, minute 7, since `0070`), `roll_up_receptions()`
+at minute 9 (`0071`). Since `0073` **nothing is deleted that has not been both
+rolled up and archived**: `.github/workflows/archive-r2.yml` writes each finished
+UTC day to R2 nightly at 14:37 UTC and records it in `meganet.archive_day`, and
+`retain()` (`pg_cron`, `meganet-retain`, 15:17 UTC) deletes only a day past its
+horizon whose archive and rollup hold exactly the rows it has now — a late row
+makes the day archive again first. `docs/data-archive.md` has how to get a day
+back.
 
 ### Proving it
 

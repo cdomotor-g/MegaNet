@@ -1355,6 +1355,14 @@ jobs:
         working-directory: test
         run: npm run photostore
 
+      # And /api/archive/* (worker/archive.js) with the archiver and the restore
+      # tool (tools/archive/, #243): only the secret key writes, nothing is
+      # overwritten, and a day is recorded only once it reads back the same —
+      # the thing the nightly retain() trusts before it deletes. Offline.
+      - name: The data archive writes once, reads back the same, and records only then
+        working-directory: test
+        run: npm run archivestore
+
       # And /api/briefing (worker/briefing.js): Station Health's Ask Claude on
       # Flood-Net's own Anthropic key, the one server-side door that spends
       # money. Who may (Access and the database's word that this is an editor
@@ -1576,6 +1584,11 @@ jobs:
       # readers see the whole object, and the backfill splits an old row.
       - name: check_reception_detail.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_reception_detail.sql
+      # The data archive and retain() (0073, #243): a day is due until it is
+      # archived at its count; retain() deletes only days past their horizon,
+      # archived and rolled up at their count — never one that is not, however old.
+      - name: check_archive.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_archive.sql
       # A reading's frequency and signal (0050): stored from the reading or
       # its envelope, readable by anon like the rest of it, the first copy's
       # kept on a duplicate — and a bad one stored as null, never a refusal.

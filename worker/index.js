@@ -52,6 +52,10 @@
 // keeps its day's spend in a Durable Object, BriefingLedger, exported from here
 // because a Durable Object class has to be exported by the Worker's main module.
 //
+// A sixth: /api/archive/*, the data archive in R2 (#243) — every UTC day of
+// readings, submissions and receptions, written with the project's secret key
+// before the database lets it go; worker/archive.js, db/migrations/0073.
+//
 // And one that is not a door at all: scheduled() below, every minute
 // (wrangler.toml's [triggers]), sends the administrators' notifications —
 // worker/push.js, db/migrations/0066_push_notifications.sql. Nothing a
@@ -59,6 +63,7 @@
 
 import { isApiPath, handleApi } from './api.js';
 import { isPhotoPath, handlePhotos } from './photos.js';
+import { isArchivePath, handleArchive } from './archive.js';
 import { isBriefingPath, handleBriefing } from './briefing.js';
 import { runPush } from './push.js';
 
@@ -460,6 +465,10 @@ export default {
     // The field photos' bytes, in R2 (worker/photos.js). Its own checks: an
     // editor's Supabase token, the project's secret key, or a signed URL.
     if (isPhotoPath(url.pathname)) return handlePhotos(request, env);
+
+    // The data archive, in R2 (worker/archive.js): written with the secret key
+    // only, create-only; read by it or an editor.
+    if (isArchivePath(url.pathname)) return handleArchive(request, env);
 
     // Ask Claude's model calls on Flood-Net's key (worker/briefing.js): an
     // Access identity and an editor's or administrator's session in, the

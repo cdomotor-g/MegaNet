@@ -37,6 +37,15 @@ directory = "."
 binding = "PHOTOS"
 bucket_name = "meganet-photos"
 
+# The data archive (worker/archive.js, /api/archive/*, #243): every UTC day of
+# readings, submissions and receptions, gzipped NDJSON, before the database
+# ages them out. Created 2026-10-21 through the Cloudflare connector, before
+# this binding, because a binding to a bucket that does not exist fails the
+# deploy.
+[[r2_buckets]]
+binding = "ARCHIVE"
+bucket_name = "meganet-archive"
+
 # Ask Claude on Flood-Net's key (worker/briefing.js, /api/briefing): the day's
 # spend, the calls in flight and each person's last minute, kept by one Durable
 # Object so the daily ceiling holds across every isolate and location. Declared

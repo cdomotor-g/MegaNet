@@ -1,0 +1,64 @@
+# The data archive (#243): every finished UTC day of readings, submissions and
+# receptions, written to R2 (bucket meganet-archive, through the Worker's
+# /api/archive route) before the database is allowed to let any of it go.
+# tools/archive/archive-to-r2.mjs is the run; db/migrations/0073 is the rule.
+#
+# Nightly at 14:37 UTC (00:37 Brisbane), forty minutes before meganet.retain()
+# runs on pg_cron at 15:17 UTC — which deletes only days this has recorded, at
+# their row count now, and rolled up. A night this does not run, retain()
+# deletes nothing new; nothing is lost by a missed run, only postponed.
+#
+# Run it by hand (Actions → Data archive into R2 → Run workflow) after a
+# deploy, or with a dry run to see what is due. Needs the SUPABASE_SECRET_KEY
+# repository secret the photo syncs already use.
+
+name: Data archive into R2
+
+on:
+  schedule:
+    - cron: '37 14 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only list the days that are due'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: archive-r2
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+    steps:
+      - name: Is the secret key there?
+        id: ready
+        run: |
+          if [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "::notice::SUPABASE_SECRET_KEY is not set — nothing archived, so retain() deletes nothing."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          node-version: '22'
+
+      # No npm install: the archiver uses nothing but fetch, zlib and crypto.
+      - name: Archive
+        if: steps.ready.outputs.ready == 'true'
+        working-directory: tools/archive
+        run: node archive-to-r2.mjs

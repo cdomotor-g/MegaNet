@@ -425,15 +425,27 @@ begin
   select count(*) into n_hourly from meganet.reading_hourly;
   select count(*) into n_daily  from meganet.reading_daily;
 
-  -- Turn the window down to a day. Everything above is 26 hours old.
-  insert into meganet.app_meta (key, value) values ('retain_reading_days', '1')
+  -- Turn the window down to nothing: every whole UTC day before today is past
+  -- it. Everything above is 26 hours old. Since 0073 a day goes only once it is
+  -- archived (and rolled up) at its count, so first: with no archive, nothing.
+  insert into meganet.app_meta (key, value) values ('retain_reading_days', '0')
   on conflict (key) do update set value = excluded.value;
+
+  a := meganet.retain();
+  perform pg_temp.check_that('retain() deletes nothing that is not archived (0073)',
+    (select count(*) > 0 from meganet.reading
+      where reading_ts < (((now() at time zone 'UTC')::date)::timestamp at time zone 'UTC')), a::text);
+
+  -- Then archived, as tools/archive/archive-to-r2.mjs records a day.
+  perform meganet.archive_record('reading', c.day, 1, c.rows, 10, repeat('ab', 32),
+            format('reading/%s.v1.ndjson.gz', to_char(c.day, 'YYYY/MM/DD')))
+     from meganet.archive_day_counts('reading', (now() at time zone 'UTC')::date) c;
 
   a := meganet.retain();
 
   perform pg_temp.check_that('retain() ages out the old readings',
     (select count(*) = 0 from meganet.reading
-      where reading_ts < now() - interval '1 day'), a::text);
+      where reading_ts < (((now() at time zone 'UTC')::date)::timestamp at time zone 'UTC')), a::text);
 
   perform pg_temp.check_that('retain() rolled up before it deleted',
     (a -> 'rolled' -> 'hours') is not null,

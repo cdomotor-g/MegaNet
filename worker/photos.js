@@ -84,6 +84,8 @@ export function isPhotoPath(pathname) {
 
 // `/api/photos/<bucket>/<path>` → {bucket, path}, or null. Exported so
 // test/photo-store.mjs can assert the refusals.
+export { whoIs };
+
 export function photoTarget(pathname) {
   if (typeof pathname !== 'string' || !pathname.startsWith(PREFIX)) return null;
   let rest;
