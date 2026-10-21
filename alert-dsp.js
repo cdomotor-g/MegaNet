@@ -504,12 +504,17 @@ const AlertDsp = (function alertDspModule() {
     // Trim to the hot extent, with the desktop's margins (0.25 s before, 0.35
     // s after). The Kotlin decoded the whole window; noise either side only
     // offers the framer more chances to find a frame that is not there.
-    let wr = ir, wi = ii;
+    let wr = ir, wi = ii, a0 = 0;
     if (opts.trim !== false && search.hot) {
       const a = Math.max(0, search.hot[0] - Math.round(0.25 * FS_IN));
       const z = Math.min(ir.length, search.hot[1] + Math.round(0.35 * FS_IN));
-      wr = ir.subarray(a, z); wi = ii.subarray(a, z);
+      wr = ir.subarray(a, z); wi = ii.subarray(a, z); a0 = a;
     }
+    // Where in the window a frame starts, in seconds: its first symbol. Good
+    // to a symbol or two — enough to tell which burst of several in a window
+    // carried it (#217).
+    const secOf = pos => Math.round((a0 + pos * SPB * DECIM) / FS_IN * 50) / 50;
+    const at = new Map();
 
     const votes = new Map();
     const best = new Map();
@@ -552,6 +557,8 @@ const AlertDsp = (function alertDspModule() {
             if (!seen.has(key)) { seen.add(key); votes.set(key, (votes.get(key) || 0) + 1); }
             const prev = best.get(key);
             if (!prev || f.fixed > prev.fixed) best.set(key, { fixed: f.fixed, crc: f.crcOk === true, bytes: f.bytes, inv: f.inv, carrier: hyp + dc });
+            if (!at.has(key)) at.set(key, new Set());
+            at.get(key).add(secOf(f.pos));
           }
         }
       }
@@ -568,6 +575,7 @@ const AlertDsp = (function alertDspModule() {
         fixed: meta.fixed, crcOk: format === ENHANCED_IFLOWS ? meta.crc : null, format,
         bytes: meta.bytes.slice(), hex: meta.bytes.map(hex2).join(' '),
         polarity: meta.inv ? 'NEG' : 'STD', carrierHz: Math.round(meta.carrier),
+        at: [...(at.get(key) || [])].sort((x, y) => x - y),
       });
     }
     result.readings.sort((a, b) => b.votes - a.votes);
@@ -1051,6 +1059,7 @@ const AlertDsp = (function alertDspModule() {
         const b = this.burst;
         b.to = this.total - (long ? 0 : this.closeRun * (FS_IN / 100));
         b.ms = Math.round((b.to - b.from) / FS_IN * 1000);
+        b.s0 = b.from; b.s1 = b.to;   // the burst itself, before the decode window's margins
         this.burst = null;
         if (b.ms < 60) return;
         this.bursts++;
@@ -1074,21 +1083,31 @@ const AlertDsp = (function alertDspModule() {
       const wr = new Float32Array(len), wi = new Float32Array(len);
       for (let k = 0; k < len; k++) { const p = (from + k) % CAP; wr[k] = this.ringR[p]; wi[k] = this.ringI[p]; }
       const r = decodeWindow(wr, wi, { format: c.format, minVotes: c.minVotes, minVotesCrc: c.minVotesCrc });
-      // The same reading from overlapping windows is one reading. The same
-      // reading from another burst within ten seconds is another transmission
-      // of it — a repeater's copy, on the repeater's own carrier — so it is not
-      // a reading again, but it is reported, in `copies`, with how many copies
-      // of it came before (1 for the first repeat), for whoever wants to know
-      // who sent it: the carrier, the level, the path.
-      const now = Date.now();
+      // Which readings this burst carried. A window reaches 0.4 s or more
+      // either side of its burst, so a neighbouring burst — a repeater's copy a
+      // moment later, another station keying up — can be read in it too. A
+      // reading is this burst's (`own`) when a frame of it starts within the
+      // burst's own extent; null when there is no burst to say (#217).
       const bt = burst ? burst.t : null;
+      const span = burst && burst.s0 != null ? [(burst.s0 - from) / FS_IN - 0.06, (burst.s1 - from) / FS_IN + 0.06] : null;
+      for (const x of r.readings) x.own = span ? (x.at || []).some(t => t >= span[0] && t <= span[1]) : null;
+      // The same reading from overlapping windows is one reading. The same
+      // reading carried by another burst within ten seconds is another
+      // transmission of it — a repeater's copy, on the repeater's own carrier —
+      // so it is not a reading again, but it is reported, in `copies`, with how
+      // many copies of it came before (1 for the first repeat), for whoever
+      // wants to know who sent it: the carrier, the level, the path. Only a
+      // reading this burst carried can be its copy; one read here from a
+      // neighbour is that neighbour's, already counted where it was its own.
+      const now = Date.now();
       for (const [k, v] of this.recent) if (now - v.at > 10000) this.recent.delete(k);
       const fresh = [], copies = [];
       for (const x of r.readings) {
         const k = x.sensorId * 4096 + x.value;
         const was = this.recent.get(k);
-        if (!was) { fresh.push(x); this.recent.set(k, { at: now, bt, n: 0 }); continue; }
-        if (bt != null && was.bt != null && bt !== was.bt) {
+        if (!was) { fresh.push(x); this.recent.set(k, { at: now, bt: x.own === false ? null : bt, n: 0 }); continue; }
+        if (x.own === true && bt != null && was.bt == null) was.bt = bt;   // first read from a neighbour: now its own burst
+        else if (x.own === true && bt != null && bt !== was.bt) {
           was.n += 1; was.bt = bt;
           copies.push(Object.assign({}, x, { copy: was.n }));
         }

@@ -33,34 +33,49 @@
 -- bursts from the addresses it passes (meganet.pass_range, less exclusions)
 -- and from its own sensors (meganet.sensor.alert_id), and find the ±30 Hz window
 -- holding the most distinct addresses. It is the repeater's carrier when
---   * its own sensors were heard there (it is the repeater transmitting), or
+--   * its own sensors were heard there — and no other repeater passes them, or
+--     they would as well be that other repeater relaying its sensors (91 of the
+--     104 repeaters with sensors have one inside another's pass range); such
+--     sensors count only as addresses it passes; or
 --   * at least 4 of the addresses it passes were, and at least half of those
 --     the receiver heard from its pass range that day.
 -- Stations' own carriers are spread over hundreds of hertz, so a 60 Hz window
--- holds about a tenth of them by chance: half is far past chance. Two accepted
--- repeaters within 60 Hz of each other with nothing to tell them apart (only
--- one heard on its own sensors is kept) are both dropped for the day.
+-- holds about a tenth of them by chance: half is far past chance.
 --
--- **2. Each burst then goes to:**
---   * the repeater, when it sits within 30 Hz of an accepted repeater's
---     carrier and its address is that repeater's to pass (or its own); two
---     such repeaters is `ambiguous`, and the burst is set aside;
+-- **2. Two repeaters on one carrier** (centres within 60 Hz) are one
+-- transmitter. When one passes the other's sensors, the carrier is the one
+-- that relays — the other was heard through it — and only it is kept; when
+-- neither does, only one heard on its own sensors is kept; otherwise neither,
+-- for the day. So no burst sits on two kept repeaters' carriers (`ambiguous`
+-- is kept below as a guard, and should stay zero).
+--
+-- **3. Each burst then goes to:**
+--   * the repeater, when it sits within 30 Hz of a kept repeater's carrier and
+--     its address is that repeater's to pass (or its own);
 --   * nobody, when it is a copy (`duplicate`) and no repeater claims it — a
 --     relay the register does not explain; counted, set aside;
 --   * otherwise its own station (resolve_station(); an address shared by two
---     stations stays `a:<address>`).
+--     stations stays `a:<address>`). A station whose own carrier happens to sit
+--     within 30 Hz of its repeater's is put down to the repeater — about one in
+--     ten by the arithmetic above — and so is not measured; never the reverse.
 --
--- **3. A transmitter's day must be one carrier.** Its bursts on one receiver
--- that day are more than 40 Hz apart in spread (bursts agree to ~±20 Hz) is two
--- transmitters under one name — a repeater the register does not have, or a
--- pass range that is wrong. The day is kept, marked `mixed`, and not measured.
+-- **4. A transmitter's day must be one carrier.** A day's bursts more than
+-- 60 Hz from their median (bursts agree to ~±20 Hz) are another transmitter
+-- under the same name — a repeater the register does not have, a pass range
+-- that is wrong. Two or more of them, and a tenth of the day or more: the day
+-- is kept, marked `mixed`, and not measured; so is a day whose bursts spread
+-- wider than 35 Hz (two carriers too close for the median to part, ~70 Hz
+-- apart half and half). Fewer strays (a click, one stray) are left out of its
+-- sums, and counted (`n_out`). ALERT2 the same way.
 --
 -- What is kept. meganet.carrier_daily: a row per receiver, day and
 -- transmitter — bursts, the sum and sum of squares of their offsets, how many
 -- addresses, whether own or by repeater, mixed or not — forever (a few thousand
 -- rows a day), long after the receptions behind it have aged out at 90 days.
 -- ALERT2 goes into it too (the path's last address, as 0075), so both kinds
--- are measured one way, against one fleet. meganet.carrier_receiver_day says
+-- are measured one way — each against its own kind's fleet on that receiver,
+-- since the two are measured by different decoders (carrier.js, alert2-air.js)
+-- and a bias between them must not move either. meganet.carrier_receiver_day says
 -- for each receiver's day what was found: repeaters and where, how many bursts
 -- went where, how many were split, ambiguous or unexplained. Both are the
 -- service key's: they name receivers.
@@ -75,9 +90,11 @@
 -- writes the same findings as 0075. transmitter_offsets() stays, the ALERT2
 -- part of carrier_offsets(), for what reads it.
 --
--- pg_cron: meganet-roll-up-carriers hourly at minute 11 (today and yesterday,
--- UTC), after the reception rollups (minute 9); the transmitter findings at
--- minute 13, as 0075.
+-- pg_cron: meganet-roll-up-carriers hourly at minute 11 (the last three UTC
+-- days, for a base station's spool arriving late), after the reception
+-- rollups (minute 9); the transmitter findings at minute 13, as 0075. A day is
+-- never rebuilt once its receptions are gone (released by retain(), or none
+-- left): what carrier_daily holds for it is all there will ever be.
 
 -- ── The tables ───────────────────────────────────────────────────────────────
 
@@ -89,17 +106,22 @@ create table if not exists meganet.carrier_daily (
   protocol         text             not null check (protocol in ('alert', 'alert2')),
   station_id       text,
   via              text             not null check (via in ('own', 'repeater', 'path')),
-  n                integer          not null check (n > 0),
+  n                integer          not null,
   cfo_sum          double precision not null,
   cfo_sumsq        double precision not null,
   ids              integer          not null default 1,
   mixed            boolean          not null default false,
+  n_out            integer          not null default 0,
   freq_mhz         double precision,
   rolled_at        timestamptz      not null default pg_catalog.now(),
   primary key (day, ingest_token_id, point_id, tx)
 );
 comment on table meganet.carrier_daily is
-  'Each receiver''s day of each transmitter''s carrier offsets (0077, #217): bursts, sum and sum of squares of cfo_hz — legacy ALERT put down to its station or the repeater that relayed it, ALERT2 to its path''s last address. Kept forever. mixed: the day''s bursts were more than one carrier, not measured. The service key''s.';
+  'Each receiver''s day of each transmitter''s carrier offsets (0077, #217): bursts, sum and sum of squares of cfo_hz — legacy ALERT put down to its station or the repeater that relayed it, ALERT2 to its path''s last address. Kept forever. mixed: the day''s bursts were more than one carrier, not measured; n_out: strays more than 60 Hz from the day''s median, left out of the sums. The service key''s.';
+alter table meganet.carrier_daily add column if not exists n_out integer not null default 0;
+alter table meganet.carrier_daily drop constraint if exists carrier_daily_n_check;
+alter table meganet.carrier_daily drop constraint if exists carrier_daily_n;
+alter table meganet.carrier_daily add constraint carrier_daily_n check (n >= 0 and n_out >= 0 and n + n_out > 0);
 create index if not exists carrier_daily_tx_idx on meganet.carrier_daily (tx, day);
 
 create table if not exists meganet.carrier_receiver_day (
@@ -152,10 +174,16 @@ declare
   c_tol   constant double precision := 30;    -- Hz either side of a carrier
   c_bin   constant integer := 5;              -- Hz a histogram bin
   c_win   constant integer := 6;              -- bins either side: ±30 Hz
-  c_spread constant double precision := 40;   -- Hz: a day's bursts wider than this are two carriers
+  c_out   constant double precision := 60;    -- Hz from the day's median: another carrier
+  c_spread constant double precision := 35;   -- Hz: a day's spread wider than this is two carriers close together
   v_t0    timestamptz := (p_day::text || ' 00:00:00+00')::timestamptz;   -- the UTC day, whatever the session's zone
   v_out   jsonb;
 begin
+  -- A day whose receptions are gone is never rebuilt: what is kept is all there is.
+  if exists (select 1 from meganet.archive_day ad where ad.table_name = 'reception' and ad.day = p_day and ad.released_at is not null)
+     or not exists (select 1 from meganet.reception r where r.heard_at >= v_t0 and r.heard_at < v_t0 + interval '1 day') then
+    return pg_catalog.jsonb_build_object('day', p_day, 'skipped', 'no receptions left for this day');
+  end if;
 
   -- The day's legacy bursts with an offset.
   drop table if exists pg_temp._cb;
@@ -176,11 +204,26 @@ begin
     from meganet.repeater rep
     join meganet.station s on s.id = rep.station_id and s.deleted_at is null;
 
+  -- Which repeaters pass another's own sensors: B relays A when one of A's
+  -- addresses is in B's pass range (and not excluded).
+  drop table if exists pg_temp._relays;
+  create temporary table _relays on commit drop as
+  select distinct a.rid as relayed, p.repeater_id as by
+    from _rp a
+    cross join lateral pg_catalog.unnest(a.own) o(addr)
+    join meganet.pass_range p on p.kind = 'pass' and o.addr between p.lo and p.hi and p.repeater_id <> a.rid
+    join _rp b on b.rid = p.repeater_id
+   where not exists (select 1 from meganet.pass_range e
+                      where e.repeater_id = p.repeater_id and e.kind = 'exclusion' and o.addr between e.lo and e.hi);
+
   -- Every burst a repeater might have sent: an address it passes (and does not
-  -- exclude), or one of its own.
+  -- exclude), or one of its own — its own an anchor only when nobody else
+  -- passes it.
   drop table if exists pg_temp._cand;
   create temporary table _cand on commit drop as
-  select distinct b.id, b.tok, b.rx, x.rid, b.a, b.cfo, x.is_own, pg_catalog.floor(b.cfo / c_bin)::integer as bin
+  select distinct b.id, b.tok, b.rx, x.rid, b.a, b.cfo,
+         x.is_own and not exists (select 1 from _relays rl where rl.relayed = x.rid) as anchor,
+         pg_catalog.floor(b.cfo / c_bin)::integer as bin
     from _cb b
     join lateral (
       select rp.rid, true as is_own from _rp rp where b.a = any (rp.own)
@@ -198,16 +241,16 @@ begin
   drop table if exists pg_temp._rep;
   create temporary table _rep on commit drop as
   with idbin as (
-    select distinct c.tok, c.rx, c.rid, c.a, c.is_own, c.bin from _cand c
+    select distinct c.tok, c.rx, c.rid, c.a, c.anchor, c.bin from _cand c
   ), heard as (
-    select i.tok, i.rx, i.rid, pg_catalog.count(distinct i.a) filter (where not i.is_own) as nids
+    select i.tok, i.rx, i.rid, pg_catalog.count(distinct i.a) filter (where not i.anchor) as nids
       from idbin i group by 1, 2, 3
   ), bins as (
     select distinct i.tok, i.rx, i.rid, i.bin from idbin i
   ), win as (
     select k.tok, k.rx, k.rid, k.bin,
-           pg_catalog.count(distinct i.a) filter (where not i.is_own) as ids,
-           pg_catalog.count(distinct i.a) filter (where i.is_own) as own_ids
+           pg_catalog.count(distinct i.a) filter (where not i.anchor) as ids,
+           pg_catalog.count(distinct i.a) filter (where i.anchor) as own_ids
       from bins k
       join idbin i on i.tok = k.tok and i.rx = k.rx and i.rid = k.rid
                   and i.bin between k.bin - c_win and k.bin + c_win
@@ -225,12 +268,15 @@ begin
     from best b join heard h on h.tok = b.tok and h.rx = b.rx and h.rid = b.rid
    where b.own_ids > 0 or (b.ids >= 4 and b.ids >= 0.5 * h.nids);
 
-  -- Two repeaters on one carrier: only one heard on its own sensors is kept.
+  -- Two repeaters on one carrier are one transmitter: the one that relays the
+  -- other's sensors; else the one heard on its own; else neither.
   update _rep r set keep = false
    where exists (select 1 from _rep o
                   where o.tok = r.tok and o.rx = r.rx and o.rid <> r.rid
                     and pg_catalog.abs(o.centre - r.centre) <= 2 * c_tol
-                    and not (r.own_ids > 0 and o.own_ids = 0));
+                    and (exists (select 1 from _relays x where x.relayed = r.rid and x.by = o.rid)
+                         or not ((r.own_ids > 0 and o.own_ids = 0)
+                                 or exists (select 1 from _relays x where x.relayed = o.rid and x.by = r.rid))));
   delete from _rep where not keep;
 
   -- Each burst to its transmitter.
@@ -257,29 +303,47 @@ begin
   delete from meganet.carrier_daily where day = p_day;
   delete from meganet.carrier_receiver_day where day = p_day;
 
-  insert into meganet.carrier_daily (day, ingest_token_id, point_id, tx, protocol, station_id, via, n, cfo_sum, cfo_sumsq, ids, mixed, freq_mhz)
-  select p_day, s.tok, s.rx, s.tx, 'alert', case when s.tx like 'st:%' then pg_catalog.substr(s.tx, 4) end,
-         pg_catalog.max(s.how), pg_catalog.count(*)::integer, pg_catalog.sum(s.cfo), pg_catalog.sum(s.cfo * s.cfo),
-         pg_catalog.count(distinct s.a)::integer,
-         pg_catalog.count(*) >= 3 and pg_catalog.stddev_pop(s.cfo) > c_spread,
-         pg_catalog.max(s.f)
+  -- Both kinds, a burst a row: legacy as put down above, ALERT2 to its path's
+  -- last address or its source (0075).
+  drop table if exists pg_temp._all;
+  create temporary table _all on commit drop as
+  select s.tok, s.rx, s.tx, 'alert'::text as protocol, s.how, s.a, s.cfo, s.f
     from _as s where s.tx is not null
-   group by s.tok, s.rx, s.tx;
-
-  -- ALERT2: the path's last address, or the source (0075).
-  insert into meganet.carrier_daily (day, ingest_token_id, point_id, tx, protocol, station_id, via, n, cfo_sum, cfo_sumsq, ids, mixed, freq_mhz)
-  select p_day, q.tok, q.rx, 'a2:' || q.a, 'alert2', meganet.resolve_a2_station(q.a), 'path',
-         pg_catalog.count(*)::integer, pg_catalog.sum(q.cfo), pg_catalog.sum(q.cfo * q.cfo), 1,
-         pg_catalog.count(*) >= 3 and pg_catalog.stddev_pop(q.cfo) > c_spread,
-         pg_catalog.max(q.f)
+  union all
+  select q.tok, q.rx, 'a2:' || q.a, 'alert2', 'path', q.a, q.cfo, q.f
     from (select r.ingest_token_id as tok, r.point_id as rx,
                  coalesce(r.a2_path[pg_catalog.array_length(r.a2_path, 1)], r.a2_source) as a,
                  r.cfo_hz::double precision as cfo, r.freq_mhz as f
             from meganet.reception r
            where r.heard_at >= v_t0 and r.heard_at < v_t0 + interval '1 day'
              and r.protocol = 'alert2' and r.cfo_hz is not null and r.ingest_token_id is not null) q
-   where q.a is not null
-   group by q.tok, q.rx, q.a;
+   where q.a is not null;
+
+  -- A day a transmitter: strays from its median left out, and a day with too
+  -- many of them — another carrier under its name — marked mixed.
+  insert into meganet.carrier_daily (day, ingest_token_id, point_id, tx, protocol, station_id, via, n, cfo_sum, cfo_sumsq, ids, mixed, n_out, freq_mhz)
+  with g as (
+    select x.tok, x.rx, x.tx, pg_catalog.percentile_cont(0.5) within group (order by x.cfo) as med
+      from _all x group by 1, 2, 3
+  ), y as (
+    select x.*, pg_catalog.abs(x.cfo - g.med) > c_out as stray
+      from _all x join g on g.tok = x.tok and g.rx = x.rx and g.tx = x.tx
+  )
+  select p_day, y.tok, y.rx, y.tx, pg_catalog.min(y.protocol),
+         case when y.tx like 'st:%' then pg_catalog.substr(y.tx, 4)
+              when y.tx like 'a2:%' then meganet.resolve_a2_station(pg_catalog.substr(y.tx, 4)::integer) end,
+         pg_catalog.max(y.how),
+         pg_catalog.count(*) filter (where not y.stray)::integer,
+         coalesce(pg_catalog.sum(y.cfo) filter (where not y.stray), 0),
+         coalesce(pg_catalog.sum(y.cfo * y.cfo) filter (where not y.stray), 0),
+         pg_catalog.count(distinct y.a)::integer,
+         pg_catalog.count(*) filter (where y.stray) >= greatest(2, 0.1 * pg_catalog.count(*))
+           or (pg_catalog.count(*) filter (where not y.stray) >= 4
+               and pg_catalog.stddev_pop(y.cfo) filter (where not y.stray) > c_spread),
+         pg_catalog.count(*) filter (where y.stray)::integer,
+         pg_catalog.max(y.f)
+    from y
+   group by y.tok, y.rx, y.tx;
 
   -- What was found, per receiver.
   insert into meganet.carrier_receiver_day (day, ingest_token_id, point_id, detail)
@@ -319,7 +383,7 @@ set search_path = ''
 as $$
 declare
   v_to   date := coalesce(p_to, (pg_catalog.now() at time zone 'UTC')::date);
-  v_from date := coalesce(p_from, v_to - 1);
+  v_from date := coalesce(p_from, v_to - 2);
   d      date;
   v_out  jsonb := '[]'::jsonb;
 begin
@@ -336,7 +400,7 @@ end;
 $$;
 
 comment on function meganet.roll_up_carriers(date, date) is
-  'roll_up_carriers_day() for each day from p_from to p_to (default yesterday and today, UTC). pg_cron hourly (meganet-roll-up-carriers). The service key''s.';
+  'roll_up_carriers_day() for each day from p_from to p_to (default the last three UTC days); a day whose receptions are gone is skipped, never emptied. pg_cron hourly (meganet-roll-up-carriers). The service key''s.';
 
 -- ── The daily series, both kinds ─────────────────────────────────────────────
 
@@ -352,11 +416,14 @@ as $$
   -- 0075's model, over carrier_daily: cfo = the transmitter's own offset +
   -- the receiver's error that day + noise.
   with t as (
-    select c.day as d, c.ingest_token_id as tok, c.point_id as rx, c.tx as a,
+    -- A receiver's day of a transmitter, its own kind's fleet its company: the
+    -- receiver key is (token, point, protocol). 20 bursts a day for ALERT2, as
+    -- 0075; 3 for legacy, a station reporting every few hours.
+    select c.day as d, c.ingest_token_id as tok, c.point_id || '|' || c.protocol as rx, c.tx as a,
            c.protocol, c.station_id, c.via, c.n::bigint as n, c.cfo_sum / c.n as cfo, c.freq_mhz as f
       from meganet.carrier_daily c
-     where not c.mixed and c.n >= 3
-       and c.day >= (pg_catalog.now() at time zone 'UTC')::date - greatest(coalesce(p_days, 37), 1)
+     where not c.mixed and c.n >= case when c.protocol = 'alert2' then 20 else 3 end
+       and c.day >= (pg_catalog.now() at time zone 'UTC')::date - least(greatest(coalesce(p_days, 37), 1), 400)
   ), m0 as (
     select t.tok, t.rx, t.a, pg_catalog.sum(t.cfo * t.n) / pg_catalog.sum(t.n) as m from t group by 1, 2, 3
   ), e as (
@@ -377,7 +444,7 @@ as $$
       join fl on fl.tok = t.tok and fl.rx = t.rx
      where e.k >= 2 and fl.ntx >= 3
   )
-  select r.a, pg_catalog.min(r.protocol), pg_catalog.min(r.station_id), pg_catalog.min(r.via), r.d,
+  select r.a, pg_catalog.min(r.protocol), pg_catalog.min(r.station_id), pg_catalog.max(r.via), r.d,
          pg_catalog.sum(r.off * r.n) / pg_catalog.sum(r.n),
          pg_catalog.sum(r.off * r.n) / pg_catalog.sum(r.n) / nullif(pg_catalog.max(r.f), 0),
          pg_catalog.sum(r.n)::bigint, pg_catalog.count(*)::integer, pg_catalog.max(r.f)
@@ -387,7 +454,7 @@ as $$
 $$;
 
 comment on function meganet.carrier_offsets(integer) is
-  'Each transmitter''s carrier offset by UTC day over the last p_days (0077, #217) — legacy ALERT stations and repeaters (st:<station>, a:<address>) and ALERT2 (a2:<address>) — with each receiver''s daily error taken out, against the median of the fleet that receiver hears, in Hz and ppm, combined across receivers by bursts. From carrier_daily, mixed days left out. Public: no receiver is named.';
+  'Each transmitter''s carrier offset by UTC day over the last p_days (0077, #217) — legacy ALERT stations and repeaters (st:<station>, a:<address>) and ALERT2 (a2:<address>) — with each receiver''s daily error taken out, against the median of the fleet of its own kind that receiver hears, in Hz and ppm, combined across receivers by bursts. From carrier_daily, mixed days left out; at most 400 days. Public: no receiver is named.';
 
 -- 0075's function, now the ALERT2 part of the one above.
 create or replace function meganet.transmitter_offsets(p_days integer default 37)
@@ -437,7 +504,7 @@ begin
   drop table if exists pg_temp._ts;
   create temporary table _ts on commit drop as
   with s as (select * from meganet.carrier_offsets(38))
-  select s.tx, pg_catalog.min(s.protocol) as protocol, pg_catalog.min(s.station_id) as station_id, pg_catalog.min(s.via) as via,
+  select s.tx, pg_catalog.min(s.protocol) as protocol, pg_catalog.min(s.station_id) as station_id, pg_catalog.max(s.via) as via,
          pg_catalog.count(*) filter (where s.day > v_today - 7)::integer                                as w_days,
          pg_catalog.sum(s.offset_ppm * s.bursts) filter (where s.day > v_today - 7)
            / nullif(pg_catalog.sum(s.bursts) filter (where s.day > v_today - 7), 0)                     as w_ppm,

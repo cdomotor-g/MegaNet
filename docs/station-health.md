@@ -386,18 +386,27 @@ listen on, so the server works it out (`0077`) for each receiver's day:
   carrier. For each repeater in the register, the server looks at the bursts
   from the addresses its pass range covers, and from its own sensors, and finds
   the ±30 Hz window holding the most addresses. That is the repeater when its
-  own sensors were heard there, or when at least four of the addresses it
-  passes were — and at least half of those the receiver heard from its range
-  that day. (Stations' own carriers are spread over hundreds of hertz, so a
-  window that narrow holds about a tenth of them by chance.)
+  own sensors were heard there (unless another repeater passes them — most
+  repeaters' sensors are relayed by another, and then it may be that one), or
+  when at least four of the addresses it passes were — and at least half of
+  those the receiver heard from its range that day. (Stations' own carriers are
+  spread over hundreds of hertz, so a window that narrow holds about a tenth of
+  them by chance.) Two repeaters found on one carrier are one transmitter: the
+  one that relays the other's sensors.
 - **Each burst** then goes to that repeater when it sits on its carrier and its
   address is the repeater's to pass; otherwise to its own station. A copy of a
   reading (RPi ALERT keeps a repeater's copy, a second after the original,
   where it used to drop it as a repeat) that no repeater explains is set
   aside, as is a burst two repeaters could have sent.
-- **One name, one carrier.** A station whose day's bursts spread wider than
-  40 Hz is two transmitters under one name — a repeater the register does not
-  have, or a pass range that is wrong — and that day is not measured.
+- **One name, one carrier.** A station's day with bursts more than 60 Hz from
+  its median — two or more, and a tenth of the day — or whose bursts spread
+  wider than 35 Hz is two transmitters under one name (a repeater the register
+  does not have, or a pass range that is wrong), and that day is not measured.
+  A single stray burst is just left out.
+- **Beside another burst.** A burst's decode window reaches past it, so a
+  station keying up a moment later can be read in it too; RPi ALERT gives a
+  burst's carrier only to the readings whose frames start inside the burst
+  itself, and counts a repeat as a repeater's copy only then.
 - A burst that was **two carriers at once** (a repeater keying up as its
   station lets go) is never measured: RPi ALERT checks the burst's two halves
   agree and sends no offset when they do not.
@@ -426,7 +435,10 @@ station's name (a door to it), the last week's offset in ppm and Hz, its
 change, a line of its 37 days with the ±2.5 ppm band shaded, its days and
 bursts, and the finding.
 
-**Limits.** Only what a base station's SDR hears is measured — a Quansheng or
+**Limits.** A station whose own carrier sits within 30 Hz of its repeater's is put down
+to the repeater, and so not measured, about one time in ten. A day is rolled
+up again for three days (a base station's spool arriving late) and never once
+its receptions are gone. Only what a base station's SDR hears is measured — a Quansheng or
 ERT-A2 receiver reports no carrier. *Drift* needs thirty days of history to
 compare with, so it fires only once a transmitter has been measured that long.
 A legacy station heard only through a repeater is not measured (its

@@ -200,6 +200,27 @@ for (const c of [
       && !d3[1].readings.length && d3[1].copies.length === 1 && d3[1].copies[0].sensorId === 2088 && d3[1].copies[0].copy === 1
       && d3[0].burst.t !== d3[1].burst.t,
     JSON.stringify(d3.map(m => ({ r: show(m.readings), c: (m.copies || []).map(x => `${x.sensorId}#${x.copy}`), t: m.burst && m.burst.t }))));
+  check('…each reading this burst\'s own, by where its frame starts',
+    d3.length === 2 && d3[0].readings[0].own === true && d3[1].copies[0].own === true && d3[0].readings[0].at.length >= 1,
+    JSON.stringify(d3.map(m => [...m.readings, ...(m.copies || [])].map(x => ({ id: x.sensorId, own: x.own, at: x.at })))));
+
+  // Two stations keying up 170 ms apart: each window reads both, but neither
+  // is a copy, and each reading is its own burst's only in that burst's window.
+  const msgs4 = [];
+  const r4 = new D.Pipeline(m => msgs4.push(m));
+  r4.configure({ deviceRate: 240000, channelOffsetHz: 0, format: D.BINARY, gate: true, squelchDb: 8 });
+  const len = (Math.round(0.12 * D.BAUD) + 40 + Math.round(0.05 * D.BAUD)) / D.BAUD;
+  const s4 = D.synthIq({ fs: 240000, seconds: 4, snrDb: 25, seed: 8, bursts: [
+    { startSec: 1.0, frames: [D.encodeFrame(D.BINARY, 2088, 143)], cfoHz: 300, amp: 30 },
+    { startSec: 1.0 + len + 0.17, frames: [D.encodeFrame(D.BINARY, 2443, 142)], cfoHz: -700, amp: 30 }] });
+  for (let o = 0; o < s4.length; o += 32768) r4.feed(s4.subarray(o, Math.min(s4.length, o + 32768)));
+  const d4 = msgs4.filter(m => m.type === 'decode' && m.burst);
+  const ownOf = (m, id) => { const x = m.readings.find(r => r.sensorId === id); return x ? x.own : undefined; };
+  check('two stations 170 ms apart: no copies, and a reading read in its neighbour\'s window is not that burst\'s own',
+    d4.length === 2 && d4.every(m => !(m.copies || []).length)
+      && ownOf(d4[0], 2088) === true && (ownOf(d4[0], 2443) === false || ownOf(d4[0], 2443) === undefined)
+      && d4.flatMap(m => m.readings).filter(r => r.sensorId === 2443).length === 1,
+    JSON.stringify(d4.map(m => ({ r: m.readings.map(x => `${x.sensorId}:${x.own}:${x.at}`), c: (m.copies || []).map(x => x.sensorId) }))));
 }
 
 // ── The Worker's source ──────────────────────────────────────────────────────
