@@ -77,7 +77,7 @@ const Health = (() => {
   const OUTCOME = {
     hit:     { label: 'received',              cls: 'hl-slot--hit' },
     partial: { label: 'received, frames lost', cls: 'hl-slot--partial' },
-    miss:    { label: 'missed',                cls: 'hl-slot--miss' },
+    miss:    { label: 'missed',                cls: 'hl-slot--miss', x: true },
     net:     { label: 'missed network-wide',   cls: 'hl-slot--net' },
     unknown: { label: 'no receiver listening', cls: 'hl-slot--unknown' },
   };
@@ -833,12 +833,20 @@ const Health = (() => {
     return out.join(', ') + (DAY / sch.P > 4 ? ' …' : '');
   }
 
-  // Its checks, slot by slot, a row a day: the shape of a station's week at a
-  // glance — a column of misses at the same hour every night is a battery, a
-  // run of misses is an outage, scattered ones are a path.
-  function stripHtml(S) {
-    const slots = S.slots || [];
-    if (!slots.length) return '';
+  // The strip itself: a row a day, a square a slot in its outcome's colour, a
+  // miss crossed. This tab's, and — fitted to a width, from the card's own
+  // readings — the one on the station card and in the station editor
+  // (health-glance.js), so the three cannot be drawn differently.
+  //   o.outcomes  each outcome's word and class, and x to cross it (OUTCOME)
+  //   o.fit       a width to draw it in: the squares narrow to bars to fit,
+  //               3 px apart at the least, and the box scrolls past that;
+  //               without it, this tab's own sizes
+  //   o.sel       whether a slot is the one picked, to ring it
+  // → { svg, W, H }: what goes inside an <svg> whose label and press are the
+  // caller's. Each square carries its time (data-t) and says it in a tooltip.
+  function slotStrip(slots, P, o) {
+    o = o || {};
+    const outcomes = o.outcomes || OUTCOME;
     const days = new Map();
     slots.forEach(sl => {
       const d = new Date(sl.t); d.setHours(0, 0, 0, 0);
@@ -846,24 +854,48 @@ const Health = (() => {
       if (!days.has(k)) days.set(k, []);
       days.get(k).push(sl);
     });
-    const P = S.schedule.P;
     const perDay = Math.max(1, Math.round(DAY / P));
-    const cell = perDay > 48 ? 6 : perDay > 24 ? 9 : 16, gap = 2, labW = 92, rowH = cell + 6;
-    const W = labW + perDay * (cell + gap), Hh = days.size * rowH + 4;
+    let labW, pitch, cell, cellH, rowH;
+    if (o.fit) {
+      labW = 76;
+      pitch = Math.max(3, Math.min(18, Math.floor((o.fit - labW) / perDay)));
+      cell = pitch - (pitch >= 6 ? 2 : 1);
+      cellH = Math.max(cell, 10);
+      rowH = cellH + 6;
+    } else {
+      labW = 92;
+      cell = cellH = perDay > 48 ? 6 : perDay > 24 ? 9 : 16;
+      pitch = cell + 2;
+      rowH = cell + 6;
+    }
+    const W = labW + perDay * pitch, Hh = days.size * rowH + 4;
     const rows = [...days.entries()].sort((a, b) => a[0] - b[0]);
+    const i0 = Math.min(3, cell / 2);
     let svg = '';
     rows.forEach(([d0, list], r) => {
       const y = 2 + r * rowH;
-      svg += `<text class="hl-axis" x="0" y="${y + cell - 2}">${esc(fmtDay(d0))}</text>`;
+      svg += `<text class="hl-axis" x="0" y="${y + cellH - 2}">${esc(fmtDay(d0))}</text>`;
       list.forEach(sl => {
         const i = Math.min(perDay - 1, Math.floor((sl.t - d0) / P));
-        const x = labW + i * (cell + gap);
-        const o = OUTCOME[sl.outcome] || OUTCOME.unknown;
-        const sel = H.lens && H.lens.kind === 'slot' && Math.abs(H.lens.t - sl.t) < 1000;
-        svg += `<rect class="hl-slot ${o.cls}${sel ? ' hl-slot--sel' : ''}" x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2"
-                  data-t="${sl.t}"><title>${esc(fmtWhen(sl.t))} — ${esc(o.label)}${sl.missing && sl.missing.length ? ' (no ' + esc(sl.missing.join(', ')) + ')' : ''}</title></rect>`;
-        if (sl.outcome === 'miss') svg += `<path class="hl-slot-x" d="M${x + 3} ${y + 3}L${x + cell - 3} ${y + cell - 3}M${x + cell - 3} ${y + 3}L${x + 3} ${y + cell - 3}"/>`;
+        const x = labW + i * pitch;
+        const oc = outcomes[sl.outcome] || OUTCOME.unknown;
+        const sel = o.sel ? o.sel(sl) : false;
+        svg += `<rect class="hl-slot ${oc.cls}${sel ? ' hl-slot--sel' : ''}" x="${x}" y="${y}" width="${cell}" height="${cellH}" rx="2"
+                  data-t="${sl.t}"><title>${esc(fmtWhen(sl.t))} — ${esc(oc.label)}${sl.missing && sl.missing.length ? ' (no ' + esc(sl.missing.join(', ')) + ')' : ''}</title></rect>`;
+        if (oc.x) svg += `<path class="hl-slot-x" d="M${x + i0} ${y + i0}L${x + cell - i0} ${y + cellH - i0}M${x + cell - i0} ${y + i0}L${x + i0} ${y + cellH - i0}"/>`;
       });
+    });
+    return { svg, W, H: Hh };
+  }
+
+  // Its checks, slot by slot, a row a day: the shape of a station's week at a
+  // glance — a column of misses at the same hour every night is a battery, a
+  // run of misses is an outage, scattered ones are a path.
+  function stripHtml(S) {
+    const slots = S.slots || [];
+    if (!slots.length) return '';
+    const { svg, W, H: Hh } = slotStrip(slots, S.schedule.P, {
+      sel: sl => !!(H.lens && H.lens.kind === 'slot' && Math.abs(H.lens.t - sl.t) < 1000),
     });
     const missed = slots.filter(sl => sl.outcome === 'miss' || sl.outcome === 'partial' || sl.outcome === 'net').slice(-24);
     return `
@@ -1775,9 +1807,13 @@ const Health = (() => {
   // out (adopt). Either way the view goes to it and focus with it — and a
   // station the window holds nothing from says so, rather than leaving the
   // tab looking as though the press did nothing.
-  function showStation(id, part) {
+  //
+  // Part 'lens' with `t`, a check's time: the context lens open on it, as a
+  // press on this tab's own strip opens it — the strip on the station card
+  // and in the station editor (health-glance.js) hands one over.
+  function showStation(id, part, t) {
     if (!id) return;
-    H.want = { id, part: part || null };
+    H.want = { id, part: part || null, t: t == null || !Number.isFinite(Number(t)) ? null : Number(t) };
     const landing = takeWant();
     switchTab('health');
     if (landing) focusPart(landing.part);
@@ -1809,15 +1845,18 @@ const Health = (() => {
     if (!w || !H.A) return null;
     H.want = null;
     H.lens = null;
-    if (H.A.stations.has(w.id)) { H.sel = w.id; H.missing = null; }
-    else { H.sel = null; H.missing = w.id; }
+    if (H.A.stations.has(w.id)) {
+      H.sel = w.id; H.missing = null;
+      // Inside this window only: a check from before it has no network here.
+      if (w.t != null && w.t >= H.A.t0 && w.t <= H.A.t1) H.lens = { id: w.id, t: w.t, kind: 'slot', addr: null };
+    } else { H.sel = null; H.missing = w.id; }
     return w;
   }
 
   // The rain, level and sensors parts are where a row of All stations,
   // sparklines opens its station (select).
   const PART_HEAD = { checks: 'hl-h-strip', battery: 'hl-h-batt', findings: 'hl-h-stnf',
-                      rain: 'hl-h-rain', level: 'hl-h-level', sensors: 'hl-h-sens' };
+                      rain: 'hl-h-rain', level: 'hl-h-level', sensors: 'hl-h-sens', lens: 'hl-h-lens' };
   // The heading of the part asked for, or of the station when it has no such
   // part (no schedule learned, no battery heard, nothing found): scrolled to
   // and focused, the way select() does it.
@@ -1880,6 +1919,7 @@ const Health = (() => {
     setWin, setCat, setInfo, toggleMatrix, select, close, lensAt, lensClose, stripClick,
     ssKind, ssAttn, ssFind, ssMore,
     openLog, openAddr, openField, openReception, showStation, picked, wantStation, exportCsv, fetchReadings,
+    slotStrip,
     setOwner, clearOwners, findOwner, owner, toAttention,
     state: state_,
   };

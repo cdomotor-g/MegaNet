@@ -571,6 +571,54 @@ try {
   }, R.silent);
   check('its card answering repaints the line in place — nothing being typed is lost', typed.kept && typed.same && typed.repainted, J(typed));
 
+  // ── 4c. Its checks, slot by slot ──────────────────────────────────────
+  // The Station Health tab's strip, drawn from the card's own readings on the
+  // card and in the editor: received, frames lost or not heard — never
+  // "missed" or "no receiver listening", which take the whole network's.
+  log('\n4c. Its checks, slot by slot, on the card and in the editor\n');
+  await card(page, R.fading);
+  const stripOf = sel => page.evaluate(sel => {
+    const el = document.querySelector(sel);
+    const svg = el && el.querySelector('svg.hl-strip');
+    if (!svg) return null;
+    const cls = k => svg.querySelectorAll(`rect.hl-slot--${k}`).length;
+    const wrap = svg.parentElement;
+    return { slots: svg.querySelectorAll('rect.hl-slot').length, hit: cls('hit'), unheard: cls('miss'), x: svg.querySelectorAll('path.hl-slot-x').length,
+             unknown: cls('unknown'), net: cls('net'), label: svg.getAttribute('aria-label'),
+             legend: [...el.querySelectorAll('.qs-legend span')].map(x => x.textContent.trim()),
+             head: (el.querySelector('.hg-strip-head button.hg-go') || {}).getAttribute?.('onclick') || null,
+             fits: wrap.scrollWidth <= wrap.clientWidth + 1 };
+  }, sel);
+  const cStrip = await stripOf(`#mn-health-card-${R.fading}`);
+  check('the card draws its checks a row a day: received and not heard, each not-heard square crossed, its heading a door to the tab’s strip',
+    cStrip && cStrip.slots >= 40 && cStrip.hit > 0 && cStrip.unheard > 0 && cStrip.x === cStrip.unheard
+      && /HealthGlance\.open\('[^']+', 'checks'\)/.test(cStrip.head || '') && cStrip.fits, J(cStrip));
+  check('…saying "not heard", never "missed" or "no receiver listening" — whether a receiver was listening is the tab’s to weigh',
+    cStrip && cStrip.unknown === 0 && cStrip.net === 0 && cStrip.legend.join('|') === 'received|received, frames lost|not heard'
+      && /\d+ received, \d+ with frames lost, \d+ not heard$/.test(cStrip.label), J(cStrip));
+  const askedBefore = count('card');
+  await page.evaluate(id => selectStation(id), R.fading);
+  await waitTrue(page, () => !!document.querySelector('#ef-checks svg.hl-strip'));
+  const eStrip = await stripOf('#ef-checks');
+  check('the station editor draws the same strip at the head of Telemetry, from the card’s answer — no second request',
+    eStrip && cStrip && eStrip.slots === cStrip.slots && eStrip.unheard === cStrip.unheard && count('card') === askedBefore
+      && await page.evaluate(() => { const el = document.getElementById('ef-checks'); const h = el && el.previousElementSibling; return !!h && h.textContent === 'Telemetry'; }),
+    J({ eStrip, cards: count('card') - askedBefore }));
+  const kept = await page.evaluate(async id => {
+    const name = document.getElementById('ef-name'), el = document.getElementById('ef-checks');
+    const was = name.value;
+    name.value = `${was} (typing)`;
+    el.textContent = 'stale';
+    HealthGlance.retry(id);
+    const t0 = Date.now();
+    while (!el.querySelector('svg.hl-strip') && Date.now() - t0 < 10_000) await new Promise(r => setTimeout(r, 50));
+    const out = { kept: document.getElementById('ef-name') === name && name.value === `${was} (typing)`,
+                  same: document.getElementById('ef-checks') === el, repainted: !!el.querySelector('svg.hl-strip') };
+    name.value = was;
+    return out;
+  }, R.fading);
+  check('…repainted in place when its card answers — nothing being typed is lost', kept.kept && kept.same && kept.repainted, J(kept));
+
   // ── 5. The doors ──────────────────────────────────────────────────────
   log('\n5. Each line opens Station Health on that station\n');
   await card(page, R.falling);
@@ -625,6 +673,25 @@ try {
   await frames(page);
   check('Close puts the tab back, and the station leaves the address', await page.evaluate(() => location.search) === '?tab=health',
     await page.evaluate(() => location.search));
+
+  // A not-heard square pressed in the editor: the tab on that check, with
+  // what the rest of the network was doing then.
+  await toStations(page);
+  await card(page, R.fading);
+  if (await page.evaluate(id => state.editorId !== id, R.fading)) await page.evaluate(id => selectStation(id), R.fading);
+  await waitTrue(page, () => !!document.querySelector('#ef-checks rect.hl-slot--miss'));
+  const slotT = await page.evaluate(() => Number([...document.querySelectorAll('#ef-checks rect.hl-slot--miss')].pop().getAttribute('data-t')));
+  // The press itself, on the square: the editor may be out of view after the
+  // reload above, and it is the square's handler being held to here.
+  await page.evaluate(t => document.querySelector(`#ef-checks rect[data-t="${t}"]`)
+    .dispatchEvent(new MouseEvent('click', { bubbles: true })), slotT);
+  const onSlot = await waitTrue(page, id => state.activeTab === 'health' && Health.state().sel === id
+    && document.activeElement && document.activeElement.id === 'hl-h-lens', R.fading, 30_000);
+  const lens = await page.evaluate(() => ({ head: (document.getElementById('hl-h-lens') || {}).textContent,
+    ringed: [...document.querySelectorAll('#hl-station rect.hl-slot--sel')].map(r => Number(r.getAttribute('data-t'))) }));
+  check('a not-heard square pressed in the editor opens Station Health on that check, the network then in view and focused',
+    onSlot && /^The network at /.test(lens.head || '') && lens.ringed.length === 1 && Math.abs(lens.ringed[0] - slotT) < 60_000, J({ slotT, lens }));
+  await page.evaluate(() => Health.close());
 
   // ── 6. No data, honestly ──────────────────────────────────────────────
   log('\n6. A datastore that refuses, and one that is not there\n');

@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 71, date: '2026-10-22', items: [
+      '<strong>Its checks, slot by slot, on the station card and in the station editor</strong> — the strip from '
+        + '<em>Station Health</em>, a row a day and a square a check: received, received with frames lost, or not heard. '
+        + 'On the card it sits under the Health lines; in the editor, at the top of <em>Telemetry</em>. Press a square to '
+        + 'open Station Health on that check and see what the rest of the network was doing then — whether a check not '
+        + 'heard was the station or its receivers is worked out there.',
+    ] },
     { n: 70, date: '2026-10-22', items: [
       '<strong>◀ ▶ ▲ ▼ Step buttons on the chart\'s navigators</strong>, in <em>Plots</em> and <em>Field Data</em>. '
         + '◀ and ▶ at the two ends of the whole-record strip under the chart move the window earlier or later; ▲ and ▼ '

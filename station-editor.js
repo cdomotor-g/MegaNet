@@ -41,7 +41,8 @@
 // and to frequencies.js for Frequencies — the RX/TX rows in the Repeater
 // Configuration and a base station's own section (0033), read back and asked
 // about the same way; and to health-glance.js for HealthGlance — when the
-// station was last heard, in the header (heardHeadHtml, askNet, onHeard).
+// station was last heard, in the header (heardHeadHtml, askNet, onHeard), and
+// its checks slot by slot at the head of Telemetry (checksHtml).
 //
 // This file is the form, not its host. The card is rendered by the Stations
 // tab, which is frozen in app.js for the whole of #129 — so a change to where
@@ -430,6 +431,25 @@ function editorHeardPaint(id) {
   if (s) el.innerHTML = HealthGlance.heardHeadHtml(s);
 }
 
+// Its checks, slot by slot, at the head of Telemetry — what its checks carry:
+// the Station Health tab's strip, from the station card's own request, which
+// HealthGlance.checksHtml asks for if the card has not and shares with it.
+// Painted in place when the answer lands, as the header's stamp is.
+let editorChecksWatching = false;
+function editorChecksHtml(s) {
+  if (typeof HealthGlance === 'undefined' || !HealthGlance.checksHtml || !s.id || s.proposed) return '';
+  if (!editorChecksWatching) { HealthGlance.onHeard(editorChecksPaint); editorChecksWatching = true; }
+  return `<div id="ef-checks" class="ef-checks">${HealthGlance.checksHtml(s)}</div>`;
+}
+
+function editorChecksPaint(id) {
+  const el = document.getElementById('ef-checks');
+  if (!el || !state.editorId || !state.data) return;
+  if (id == null || String(id) !== String(state.editorId)) return;
+  const s = state.data.stations.find(x => x.id === state.editorId);
+  if (s) el.innerHTML = HealthGlance.checksHtml(s);
+}
+
 function editorForm(s) {
   const hasRep  = s.roles.includes('repeater');
   const hasBase = s.roles.includes('base');
@@ -582,6 +602,7 @@ function editorForm(s) {
     </div>
     <hr>
     <h4 class="ef-h">Telemetry</h4>
+    ${editorChecksHtml(s)}
     <div class="form-grid ef-grid">
       ${efFieldHtml({ id: 'ef-insp-config', caption: 'Telemetry / inspection form', hint: 'ef-h-insp', full: true,
         control: `<select id="ef-insp-config">${editorInspConfigOptions(s.inspection_config_key)}</select>` })}

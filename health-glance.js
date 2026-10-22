@@ -8,7 +8,9 @@
 //                  display, every pin OK, watch, fault or no data; and the
 //                  station list's **Last heard** column, how long since
 //                  Flood-Net heard each row's station — and the same again,
-//                  stamped, in the station editor's header.
+//                  stamped, in the station editor's header. And its checks
+//                  slot by slot, the Station Health tab's strip drawn from its
+//                  card's own readings, on the card and in the editor.
 //
 // After core.js (state, esc, escAttr, announce, stationSensors), app.js
 // (stationAlertIds, refreshMapLayers, rerenderMapLegend, toggleMapFullscreen,
@@ -21,7 +23,8 @@
 // mapDisplayControlsHtml() and mapLegendHtml() draw the switch's note and its
 // key; stationsTable() asks for the batch (askNet), heardCellHtml() is each of
 // its Last heard cells, and onHeard() is what repaints them in place;
-// editorForm() (station-editor.js) places heardHeadHtml() in its header.
+// editorForm() (station-editor.js) places heardHeadHtml() in its header and
+// checksHtml() under Telemetry. The strip is drawn by Health.slotStrip.
 //
 // ── Why this exists ─────────────────────────────────────────────────────────
 // The Station Health tab ranks silent stations, sliding batteries and the rest
@@ -273,14 +276,14 @@ const HealthGlance = (() => {
   // One station's readings — any shape meganet.reading returns, newest first
   // or not — into what its card says. Pure: no fetch, no DOM.
   //   { lastHeard, firstHeard, P, battery, hasBattery, findings, sev, rows,
-  //     t0, newest, capped, shared }
+  //     t0, newest, capped, shared, checks }
   function glanceFrom(s, rows, now) {
     const at = r => Date.parse(r && r.reading_ts);
     const list = (rows || []).filter(r => Number.isFinite(at(r)));
     const hasBattery = (typeof stationSensors === 'function' ? stationSensors(s) : [])
       .some(se => se && /batt/i.test(String(se.type || '')));
     const empty = { lastHeard: null, firstHeard: null, P: null, battery: null, hasBattery, findings: [], sev: null,
-                    rows: 0, t0: null, newest: null, capped: false, shared: false };
+                    rows: 0, t0: null, newest: null, capped: false, shared: false, checks: null };
     if (!list.length) return empty;
     let newest = -Infinity, oldest = Infinity;
     list.forEach(r => { const t = at(r); if (t > newest) newest = t; if (t < oldest) oldest = t; });
@@ -308,6 +311,23 @@ const HealthGlance = (() => {
                      daysTo: B.daysTo, nights: (B.nights || []).length, aid: B.aid } : null,
       hasBattery: hasBattery || !!S.battery,
       findings, sev: worstSev(findings), rows: win.length, t0, newest, capped, shared: false,
+      checks: checksOf(S),
+    };
+  }
+
+  // Its checks, slot by slot, for the strip on the card and in the editor:
+  // { P, slots: [{ t, outcome, missing }] }, or null with no schedule learned.
+  // A check is received, received with frames lost, or not heard. Whether a
+  // receiver that hears it was listening when one was not heard — the tab's
+  // "missed" against "no receiver listening" — takes every station's
+  // readings, so it is not said here: Station Health's to weigh, as the
+  // card's foot says.
+  function checksOf(S) {
+    if (!S.schedule || !(S.slots || []).length) return null;
+    return {
+      P: S.schedule.P,
+      slots: S.slots.map(sl => ({ t: sl.t, outcome: sl.outcome === 'hit' || sl.outcome === 'partial' ? sl.outcome : 'unheard',
+                                  missing: sl.missing || [] })),
     };
   }
 
@@ -864,6 +884,75 @@ const HealthGlance = (() => {
     return [level, trend].filter(Boolean).join(', ');
   }
 
+  // ── Its checks, slot by slot ──────────────────────────────────────────────
+  // The Station Health tab's strip, drawn by its own Health.slotStrip from the
+  // card's readings: on the card under its health lines, and in the station
+  // editor's Telemetry section (checksHtml). A square pressed opens the tab
+  // on that check, with what the rest of the network was doing then; the
+  // heading over it opens the tab's own strip, and is the keyboard's way in.
+
+  const SLOT = {
+    hit:     { label: 'received',              cls: 'hl-slot--hit' },
+    partial: { label: 'received, frames lost', cls: 'hl-slot--partial' },
+    unheard: { label: 'not heard',             cls: 'hl-slot--miss', x: true },
+  };
+  // Drawn this wide, the card's 340 px less its padding and scroll bar: a
+  // three-hourly station at the tab's own size, a busier one in bars, and the
+  // box scrolls sideways for the busiest rather than the page.
+  const STRIP_W = 300;
+
+  function stripHtml(s, c) {
+    if (!c || typeof Health === 'undefined' || !Health.slotStrip) return '';
+    const { svg, W, H: Hh } = Health.slotStrip(c.slots, c.P, { outcomes: SLOT, fit: STRIP_W });
+    const n = k => c.slots.filter(sl => sl.outcome === k).length;
+    const days = new Set(c.slots.map(sl => new Date(sl.t).toDateString())).size;
+    return `<div class="hl-strip-wrap hg-strip-wrap">
+        <svg class="hl-strip" viewBox="0 0 ${W} ${Hh}" width="${W}" height="${Hh}" role="img"
+             aria-label="${esc(`${s.name || s.id}: ${c.slots.length} checks, every ${HealthAnalysis.fmtPeriod(c.P)}, a row a day over ${days} day${days === 1 ? '' : 's'} — ${n('hit')} received, ${n('partial')} with frames lost, ${n('unheard')} not heard`)}"
+             onclick="HealthGlance.stripClick(event, '${escAttr(s.id)}')">${svg}</svg>
+      </div>
+      <div class="qs-legend">${Object.values(SLOT).map(o => `<span><i class="hl-key ${o.cls}" aria-hidden="true"></i>${esc(o.label)}</span>`).join('')}</div>`;
+  }
+  const stripHead = (s, cls) => `<div class="${cls} hg-strip-head">${go(s.id, 'checks', 'Its checks, slot by slot',
+      `Open the Station Health tab on ${s.name || s.id} — its checks, slot by slot, and whether its receivers were listening`)}</div>`;
+
+  // The station editor's: the card's answer, asked for if the card has not
+  // (one request, shared with the card and kept as long), and painted in
+  // place by the editor when it lands (onHeard). Where there is no strip to
+  // draw, it says why.
+  function checksHtml(s) {
+    if (!s || !s.id || s.proposed) return '';
+    ask(s);
+    const c = cards.get(s.id);
+    const g = c && c.glance;
+    const note = html => `<p class="small txt-muted ef-flush">${html}</p>`;
+    let body;
+    if (g && g.checks) {
+      body = stripHtml(s, g.checks) + note(`From its own readings since ${esc(fmtDay(g.t0))}${g.capped ? ' (the newest 1,000)' : ''}.
+        A check not heard may be its receivers rather than it — whether they were listening is Station Health’s to weigh:
+        press a square for the network at that moment.`);
+    } else if (!g && c && c.status === 'error') {
+      body = note(`${c.denied ? 'The datastore would not let this browser read its readings.' : `The datastore could not be reached (${esc(c.error)}).`}
+        <button type="button" class="link-btn" onclick="HealthGlance.retry('${escAttr(s.id)}')">Try again</button>`);
+    } else if (!g) {
+      body = note('Asking the datastore…');
+    } else if (g.shared) {
+      body = note('Its readings came on addresses it shares with other stations, and nothing heard with them says which were its.');
+    } else if (!g.rows) {
+      body = note('None of its readings is in the datastore, so there are no checks to draw.');
+    } else {
+      body = note(`No check schedule learned from its ${num(g.rows)} reading${g.rows === 1 ? '' : 's'} since ${esc(fmtDay(g.t0))} — it may report on events only.`);
+    }
+    return stripHead(s, 'ef-sub') + body;
+  }
+
+  // A press on a strip: the Station Health tab on the square's check, or on
+  // the strip itself for anywhere else on it.
+  function stripClick(e, id) {
+    const r = e && e.target && e.target.closest && e.target.closest('rect[data-t]');
+    open(id, r ? 'lens' : 'checks', r ? Number(r.getAttribute('data-t')) : null);
+  }
+
   function sectionHtml(s) {
     const id = s.id;
     const c = cards.get(id);
@@ -937,6 +1026,9 @@ const HealthGlance = (() => {
             ${f.action ? `<span class="small hg-action"><span aria-hidden="true">→</span> ${esc(f.action)}</span>` : ''}</li>`).join('')}
         </ul>
       </details>` : '';
+    // Its checks under the lines: the shape of its week, which the lines
+    // above can only sum up.
+    const strip = g.checks ? `<div class="hg-strip">${stripHead(s, 'small')}${stripHtml(s, g.checks)}</div>` : '';
     // Where the lines came from, and what they cannot see — one sentence, the
     // card being 340 px wide and this its most-read section. A station heard
     // too briefly to judge says so first: that is why it is no data.
@@ -951,7 +1043,7 @@ const HealthGlance = (() => {
         + (k.judged
           ? `; whether it is silent, and the rest the server keeps, as the server last worked it out over every receiver’s week — ${esc(ago(g.serverAt || net.serverAt, now))}.`
           : '; whether its receivers were listening is Station Health’s to weigh.'));
-    return wrap(head(cls) + lines.join('') + list + `<p class="small txt-muted stn-card-exp-foot">${foot}</p>`);
+    return wrap(head(cls) + lines.join('') + list + strip + `<p class="small txt-muted stn-card-exp-foot">${foot}</p>`);
   }
 
   // Paint the section in place, if the card is still on this station.
@@ -1013,15 +1105,18 @@ const HealthGlance = (() => {
   // the part of it the line was about. Out of full screen first, for the
   // reason fieldDataFromCard gives — the tab would be switched invisibly
   // behind a fixed panel.
-  function open(id, part) {
+  // `t`, from a press on the strip: the check the tab opens its lens on.
+  function open(id, part, t) {
     if (typeof Health === 'undefined' || !Health.showStation) return;
     if (state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
-    Health.showStation(id, part);
+    Health.showStation(id, part, t);
   }
 
   return {
     // the card
     cardHtml, ask, retry, open,
+    // its checks, slot by slot: the strip's press, and the editor's copy
+    stripClick, checksHtml,
     // the pins
     pinStyle, reset, setPins, askAgain, noteHtml, legendHtml, altText,
     // the counts, for Home and the Instrument look's banner

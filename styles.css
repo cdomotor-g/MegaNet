@@ -3627,6 +3627,15 @@ hr {
 .stn-card-health-list li + li { margin-top: .3rem; }
 .stn-card-health-list .small { display: block; }
 .hg-action { color: var(--muted); }
+/* Its checks, slot by slot, under the card's health lines and at the head of
+   the editor's Telemetry: the Station Health tab's own strip (.hl-strip, its
+   keys and its legend), its heading a door into that tab, read left to right
+   as a heading rather than a row's value. */
+.hg-strip { margin-top: .4rem; }
+.hg-strip-head { margin-bottom: .2rem; }
+.stn-card-health .hg-strip-head .hg-go { text-align: left; }
+.ef-checks { margin-bottom: var(--sp-3); }
+.ef-checks .qs-legend { margin-bottom: var(--sp-1); }
 
 /* The key to Colour pins by health, in the 🔑 legend: each swatch the pin's
    second channel as well as its hue — bigger is worse, the ring dashed to
