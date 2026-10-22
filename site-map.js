@@ -82,6 +82,14 @@ const SiteMap = (function () {
       ],
       note: 'Picking a view needs no account; making one is saved to yours.',
     },
+    biterrors: {
+      what: 'A lesson in why readings arrive wrong — every fault the Bit Bench shows, in depth: what it is, what it does to the bits, its fingerprint, how to confirm it and what fixes it.',
+      use: [
+        'Learn to tell a radio fault from a wiring fault by the readings alone',
+        'Read up on intermodulation, crystal drift or a PLL slow to lock before a site visit',
+        'Work out the intermodulation products of two transmitters near a site',
+      ],
+    },
     propagation: {
       what: 'A lesson in how radio carries a reading from a gauge to a base — waves, shadows, trees, echoes, collisions and repeater delays — in pictures that move.',
       use: [
@@ -177,6 +185,15 @@ const SiteMap = (function () {
       use: [
         'Find the repeater or two behind the bit flips',
         'See which stations are being corrupted, into what, and at what hours',
+      ],
+    },
+    bitbench: {
+      what: 'A bench for the bits a station sends: numbers as binary, a real ALERT frame, and fourteen faults — from noise and echoes to a drifting crystal or a wire on the wrong pin — each shown happening to the frame.',
+      use: [
+        'Work out what kind of fault could have corrupted a station\'s readings',
+        'See a fault\'s fingerprint — where in the frame, which way, what got through',
+        'Paste in readings that look wrong and let it name the pattern',
+        'Play whodunnit: name a fault from its fingerprint alone',
       ],
     },
     network: {
@@ -409,7 +426,7 @@ const SiteMap = (function () {
     'Stations & networks': { step: 'What is out there',
       blurb: 'The stations themselves, the radio paths between them, and the maps and files made from them. Most days start here.' },
     'Interference': { step: 'What is stepping on it',
-      blurb: 'For readings that go bad with nothing wrong on site: the licensed transmitters nearby, what changed on the air, and a case worked through to the next check.' },
+      blurb: 'For readings that go bad with nothing wrong on site: the licensed transmitters nearby, what changed on the air, a case worked through to the next check, who is corrupting the readings, and a bench to try what each cause does to the bits.' },
     'ALERT': { step: 'What it actually sent',
       blurb: 'The messages themselves — decoded bit by bit, explained when they land on the wrong address, and heard live off the air.' },
     'Data': { step: 'What the sensors said',
@@ -418,8 +435,10 @@ const SiteMap = (function () {
       blurb: 'The paperwork of a visit, digitised — inspections, council maintenance, the record of both, and the photos.' },
     'Surveying': { step: 'How high it all is',
       blurb: 'A station\'s levels on a phone: the survey sheet that reduces the run as it is read, the level\'s own two-peg check, and a refresher on doing both.' },
+    'Field training': { step: 'Practising the fieldwork',
+      blurb: 'Practice rather than tools: re-tellings of Mallee HydroTech\'s open training tools — reading a staff, keeping a level book, the life of a site, and a day on the level and on the river.' },
     'Knowledge base': { step: 'Learning how',
-      blurb: 'Lessons and practice rather than tools: how radio carries a reading home, and re-tellings of Mallee HydroTech\'s open training tools — reading a staff, keeping a level book, the life of a site, and a day on the level and on the river.' },
+      blurb: 'Flood-Net\'s own lessons: how radio carries a reading home, and why readings arrive wrong — each fault in depth, and how to tell them apart.' },
     'Admin': { step: 'Keeping it running',
       blurb: 'Where the station data comes from, who may sign in, the base stations that receive it all, and the review of a network\'s design.' },
   };
@@ -437,6 +456,7 @@ const SiteMap = (function () {
     { text: 'Decode an ALERT message',                     tab: 'packets' },
     { text: 'Explain a reading on an address nobody owns', tab: 'bitflipper' },
     { text: 'Find the repeater that is corrupting readings', tab: 'flipsources' },
+    { text: 'Work out what could have corrupted a station\'s readings', tab: 'bitbench' },
     { text: 'Work out what is interfering with a repeater', tab: 'workbench' },
     { text: 'Listen to ALERT off the air',                 tab: 'serial' },
     { text: 'Fill in a site inspection',                   tab: 'inspections' },
@@ -453,6 +473,7 @@ const SiteMap = (function () {
     { text: 'Review a radio network\'s design',            tab: 'review' },
     { text: 'Plan a channel\'s TDMA slots',                tab: 'tdma' },
     { text: 'Learn how radio gets a reading home',         tab: 'propagation' },
+    { text: 'Learn why bits go wrong, and how to tell the causes apart', tab: 'biterrors' },
     { text: 'Practise reading a levelling staff',          tab: 'kbstaff' },
     { text: 'Walk through a routine river station visit',  tab: 'kbriver' },
   ];

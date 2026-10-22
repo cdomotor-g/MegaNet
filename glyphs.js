@@ -79,6 +79,8 @@ const Glyphs = (() => {
     tools:     '<path d="M14.5 6.5a4 4 0 0 0 5 5L12 19a2.1 2.1 0 0 1-3-3z"/><path d="m14.5 6.5 2.5-2.5"/>',
     history:   '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8.5"/><path d="M3.5 3.5v5h5"/><path d="M12 7.5V12l3 2"/>',
     learn:     '<path d="m12 4 10 5-10 5L2 9z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/><path d="M22 9v6"/>',
+    bits:      '<rect x="3.5" y="5" width="7" height="14" rx="3.5"/><path d="M15.5 7.5 18 5v14"/><path d="M15.5 19h5"/>',
+    bolt:      '<path d="M13.5 2.5 5 13.5h6.5l-1 8 8.5-11h-6.5z"/>',
     waves:     '<circle cx="5" cy="12" r="1.6"/><path d="M9 8a5.5 5.5 0 0 1 0 8M13 5a10 10 0 0 1 0 14M17 2.5a14 14 0 0 1 0 19"/>',
     book:      '<path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19a2 2 0 0 0 2 2h13"/><path d="M8 7.5h7"/>',
     logbook:   '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v18M12 8h4M12 12h4"/>',
@@ -116,6 +118,7 @@ const Glyphs = (() => {
     'Data':                ['data',      'data'],
     'Site visits':         ['inspect',   'field'],
     'Surveying':           ['survey',    'field'],
+    'Field training':      ['staff',     'learn'],
     'Knowledge base':      ['learn',     'learn'],
     'Admin':               ['admin',     'admin'],
   };
@@ -126,12 +129,12 @@ const Glyphs = (() => {
   const TAB = {
     home: 'home', sitemap: 'signpost', offline: 'offline', views: 'sliders',
     stations: 'map', maps: 'route', passranges: 'chain', export: 'download', mapgen: 'print', lookaround: 'look',
-    rf: 'spectrum', rfchanges: 'trend', workbench: 'interfere', reception: 'drive',
+    rf: 'spectrum', rfchanges: 'trend', workbench: 'interfere', reception: 'drive', flipsources: 'search', bitbench: 'bits',
     bitflipper: 'flip', network: 'graph', packets: 'decode', alert2: 'packet', hfem: 'message', serial: 'plug',
     arro: 'launch', arrodata: 'data', field: 'level', msglog: 'inbox', health: 'health',
     nearby: 'nearby', inspections: 'inspect', maintenance: 'tools', history: 'history', camera: 'camera', photos: 'photos',
     levels: 'survey', twopeg: 'pegs', surveyguide: 'book',
-    propagation: 'waves', kbstaff: 'staff', kblogbook: 'logbook', kblifecycle: 'cycle', kblevel: 'solar', kbriver: 'gauge',
+    propagation: 'waves', biterrors: 'bolt', kbstaff: 'staff', kblogbook: 'logbook', kblifecycle: 'cycle', kblevel: 'solar', kbriver: 'gauge',
     admin: 'admin', basestations: 'base', review: 'review', a2plan: 'plan', tdma: 'slots',
   };
 

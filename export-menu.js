@@ -143,6 +143,14 @@ const ExportMenu = (function () {
       { label: 'The corrupted readings — CSV', sub: 'each address being corrupted, what it became, who sent it and who could have',
         call: ['FlipSources.exportStationsCsv'], empty: 'There are no corrupted copies in this period.' },
     ],
+    bitbench: () => [
+      { label: 'The batch, frame by frame — CSV', sub: 'every frame of the last batch: what was sent, what it arrived as and which bits flipped — a model, not a recording',
+        call: ['BitBench.exportCsv', 'batch'],
+        ready: () => (typeof BitBench !== 'undefined' && BitBench.state().batch) ? '' : 'No batch yet — pick a fault and press Send a batch.' },
+      { label: 'Your readings, pair by pair — CSV', sub: 'each pair pasted into Your readings, the bits that differ and the pattern found',
+        call: ['BitBench.exportCsv', 'pairs'],
+        ready: () => (typeof BitBench !== 'undefined' && BitBench.state().pairs) ? '' : 'No readings yet — paste pairs into Your readings.' },
+    ],
     history: () => [
       { label: 'The records listed — CSV', sub: 'the inspection and maintenance records, as filtered', call: ['History.exportList'],
         empty: 'There are no records listed.' },
@@ -217,6 +225,7 @@ const ExportMenu = (function () {
     lookaround:  'A view through the phone\'s camera, drawn on the screen and never recorded — there is nothing on it to keep as a file.',
     nearby:      'A list measured from where you stand, kept only while the tab is open — the Stations tab saves the same stations, positions and all.',
     propagation: 'A lesson in how radio travels — made-up demonstrations, not records; nothing on it is data to keep as a file.',
+    biterrors:   'A lesson in why readings arrive wrong — still drawings of the physics, not records; the Bit Bench saves its batches.',
     maps:        'The printed sheets are the files: each one opens as its own PDF.',
     passranges:  'Worked out from the station list, which Stations saves; the ranges travel with each station\'s record in that file.',
     bitflipper:  'A calculator: the variants of one address, on screen to read or copy.',

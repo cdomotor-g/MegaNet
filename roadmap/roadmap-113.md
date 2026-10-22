@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-21** (revision 181 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-22** (revision 182 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -817,6 +817,17 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 182 — 2026-10-22: 🧪 The Bit Bench and ⚡ Bit Errors
+
+The owner: *"a 'bit bench' … where they can play around with decimal and binary, and experiment with different known effects that will mess with our data (such as intermodulation, or rf reflections, etc) … a touch of education on the workbench thing and then link them over to the knowledge base section for deeper dives."* **Opens and closes nothing.**
+
+- **`bit-model.js`** (`BitModel`, pure, Node-tested): numbers as bits; ALERT Binary on the air from `PropPhysics`'s map; fourteen faults in three families — between the radios (noise, impulses, reflections, a collision, intermodulation), in the radio and the logger (crystal drift, the PLL at key-up, the UART clock, tone twist) and in the wiring and decoder (stuck, shifted, inverted, reversed, Gray) — each changing the bits the way its physics does; a batch's fingerprint read from the bits alone (even, runs, patchy, first word, word ends, one way, one bit, the hour, a fixed rule), and the same reasoning on pasted pairs; `passShare` (C(24,k)/C(40,k)) and an exhaustive CRC-6 catch (every 1–3-bit pattern, 96.6% of 4). **One model was thrown out on the way:** intermodulation first biased one tone detector (a beat on the space tone turning 1s to 0s) — FM's own phase modulation smears such a beat, so it was not sound; one-way flips come from **tone twist** instead (pre-emphasis left in: 4.2 dB between ALERT's tones), which is.
+- **Findings the model surfaced, worth keeping:** ALERT Binary's check bits sit at the ends of words, exactly where a UART timing error strikes first — so a sender with a bad clock is thrown out (drops out), almost never misread; a PLL slow to settle ghosts only inside the true address's block of 64; at 300 baud reflections fade, they never shift bits.
+- **`bit-bench.js`** — 🧪 the tab, under Interference (its sixth): the number bench, the frame and its tones, the faults drawn live on a frame (bits sent and heard, the verdict), batches, *Whodunnit?*, *Your readings*, two CSVs (in ⤓ Export too). **`bit-errors.js`** — ⚡ the lesson: the chain, a field guide, why flips get through, a section per fault (physics, bits, fingerprint, confirm, fix), an intermodulation calculator; each section opens the bench on its fault and back.
+- **The Knowledge base split.** Seven lessons, past `nav.mjs`'s six; `HELP.related` cut it as #108 cut the work groups — Radio Propagation and Bit Errors name radio tabs, the five Mallee HydroTech re-tellings name the survey and inspection tabs, nothing crosses. **Field training** (the five, after Surveying) and **Knowledge base** (the two). Their help lines, the third-party notice, a glyph and a Calm icon follow; `knowledge-base.js` keeps its name.
+- **Four checks red on main, put right in passing:** `views` (Bit-Flip Sources under Interference but left in Simple, which drops the whole group), `smoke` (`EXPECTED_TABS` 45 with 46 tabs), `looks` (no picture for Bit-Flip Sources) and `calm` (its Interference row written out without Bit-Flip Sources).
+- **Checks:** `npm run bitbench` (new, in CI: 90 — the frame read back by the ALERT Packets tab, the Radio Propagation lesson and the off-air decoder; the arithmetic; the UART's ±5%; every fault's fingerprint; pasted readings; both tabs in Chromium, reduced motion and a phone); `nav`, `views`, `help`, `looks`, `exports`, `shell`, `calm`, `firstvisit`, `registry`, `tabs`, `smoke` and the cheap five. Stamp `20261022a`.
 
 ### Revision 181 — 2026-10-21: 🔎 The Bit-Flip Sources tab (#244)
 

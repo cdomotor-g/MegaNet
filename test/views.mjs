@@ -142,7 +142,7 @@ async function main() {
 
     await page.selectOption('#nav-view-select', 'simple');
     b = await bar(page);
-    const gone = ['export', 'mapgen', 'rf', 'rfchanges', 'workbench', 'reception'];
+    const gone = ['export', 'mapgen', 'rf', 'rfchanges', 'workbench', 'reception', 'flipsources', 'bitbench'];
     check('Simple: All less Export, the Map Generator and the Interference group',
       b.view === 'simple' && gone.every(t => !ids(b).includes(t)) && !b.groups.some(g => g.h === 'Interference')
         && J(ids(b)) === J(all.filter(t => !gone.includes(t))), J(ids(b)));

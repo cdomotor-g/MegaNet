@@ -1,6 +1,6 @@
 // MegaNet — kb-logbook.js
 //
-//   KbLogbook   📒 the Survey Logbook tab, in the Knowledge base group: the
+//   KbLogbook   📒 the Survey Logbook tab, in the Field training group: the
 //               field book of a level run, worked six ways on one fictional
 //               gauging station — booking the readings as they are taken
 //               (back, inter, fore, and the change-point routine), reducing

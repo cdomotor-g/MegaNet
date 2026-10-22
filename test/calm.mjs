@@ -148,7 +148,7 @@ async function main() {
     await page.waitForTimeout(SETTLE);
     S = await shell(page);
     check('a group\'s button opens its first tab the first time, and the row becomes that group\'s',
-      S.tab === 'rf' && S.current === 'Interference' && J(S.row) === J(['rf', 'rfchanges', 'workbench', 'reception']), J(S));
+      S.tab === 'rf' && S.current === 'Interference' && J(S.row) === J(['rf', 'rfchanges', 'workbench', 'reception', 'flipsources', 'bitbench']), J(S));
     await page.click('#section-bar .tab-btn[data-tab="workbench"]');
     await page.waitForTimeout(SETTLE);
     const focus = await page.evaluate(() => ({ tab: document.activeElement?.dataset?.tab, inRow: !!document.activeElement?.closest('#section-bar') }));

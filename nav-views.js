@@ -34,7 +34,9 @@
 // ── The built-in two ─────────────────────────────────────────────────────────
 // Simple is All less what the owner named (October 2026): Export, the Map
 // Generator, and the whole Interference group — a subtraction, so a tab added
-// to the app later is in Simple without anybody editing this. Field is an
+// to the app later is in Simple without anybody editing this, unless it joins
+// the Interference group: then it joins this list too, as Bit-Flip Sources and
+// the 🧪 Bit Bench did (views.mjs holds the group out of Simple). Field is an
 // addition — what a site visit on a phone needs: the station and the way to
 // it, the camera and the photos, the forms, the surveys, and whether the
 // station is reporting — so a desk tool added later stays out of it. Either
@@ -55,7 +57,7 @@ const NavViews = (function () {
     simple: {
       name: 'Simple', icon: '🪶',
       about: 'Everything but the desk-bound radio work: no Export, no Map Generator, and none of the Interference group.',
-      drop: ['export', 'mapgen', 'rf', 'rfchanges', 'workbench', 'reception'],
+      drop: ['export', 'mapgen', 'rf', 'rfchanges', 'workbench', 'reception', 'flipsources', 'bitbench'],
     },
     field: {
       name: 'Field', icon: '🥾',

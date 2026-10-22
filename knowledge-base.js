@@ -1,9 +1,11 @@
 // MegaNet — knowledge-base.js
 //
-//   KnowledgeBase   the Knowledge base group's shared parts: where each lesson
-//                   came from, and the credit panel every adapted lesson shows.
+//   KnowledgeBase   the adapted lessons' shared parts: where each came from,
+//                   and the credit panel every one of them shows.
 //
-// Five of the group's tabs are Flood-Net re-tellings of Mallee HydroTech's
+// The five tabs of the Field training group — the Knowledge base's until the
+// lessons were split in two (core.js says why; the name here is older than
+// the split) — are Flood-Net re-tellings of Mallee HydroTech's
 // open training tools (github.com/MalleeHydroTech), used with the owner's
 // permission and under the terms they publish: the code is MIT, the artwork and
 // training material CC BY 4.0. CC BY asks for three things — credit Mallee

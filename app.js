@@ -3560,7 +3560,9 @@ function renderMain() {
   // no list is still stamped and kept, and filed by the database by distance —
   // only the station suggestions wait for the list.
   // The Views tab is about the nav, not the stations, so it is here too.
-  const noDataTabs = ['sitemap', 'offline', 'views', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations', 'tdma'];
+  // The 🧪 Bit Bench and ⚡ Bit Errors are about bits, and work on made-up
+  // frames; with a list they only name the station an address belongs to.
+  const noDataTabs = ['sitemap', 'offline', 'views', 'bitbench', 'biterrors', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations', 'tdma'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -3599,6 +3601,7 @@ function renderMain() {
     case 'reception':  el.innerHTML = Reception.render();    Reception.init();    break;
     case 'bitflipper': el.innerHTML = renderBitFlipperHtml(); initBitFlipperMap(); break;
     case 'flipsources': el.innerHTML = FlipSources.render(); FlipSources.init(); break;
+    case 'bitbench':   el.innerHTML = BitBench.render();    BitBench.init();    break;
     case 'network':    el.innerHTML = NetworkView.render();  NetworkView.init();  break;
     case 'packets':    el.innerHTML = Packets.render();       Packets.init();      break;
     case 'alert2':     el.innerHTML = Alert2.render();        Alert2.init();       break;
@@ -3631,6 +3634,7 @@ function renderMain() {
     case 'a2plan':     el.innerHTML = Alert2Plan.render();    Alert2Plan.init();    break;
     case 'tdma':       el.innerHTML = TdmaPlanner.render();   TdmaPlanner.init();   break;
     case 'propagation': el.innerHTML = Propagation.render(); Propagation.init(); break;
+    case 'biterrors':  el.innerHTML = BitErrors.render();   BitErrors.init();   break;
     default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }
   updateChromeHeight();     // three tabs size their own scrollers off it

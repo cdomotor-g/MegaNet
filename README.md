@@ -153,7 +153,7 @@ MegaNet/
 │                             administrator's panel that applies a survey
 ├── two-peg.js              ← TwoPeg    — Two-Peg Test tab (the level's collimation)
 ├── survey-guide.js         ← SurveyGuide — How to Survey tab: the refresher
-├── knowledge-base.js       ← KnowledgeBase — the Knowledge base group's sources and
+├── knowledge-base.js       ← KnowledgeBase — the Field training group's sources and
 │                             the credit panel on each adapted lesson
 ├── kb-staff.js             ← KbStaff — Staff Simulator tab (after Mallee HydroTech)
 ├── kb-logbook.js           ← KbLogbook — Survey Logbook tab (after Mallee HydroTech)
@@ -246,6 +246,11 @@ MegaNet/
 │                             wavefronts, shadows, echoes, repeaters relaying, ghosts
 ├── propagation.js          ← Propagation — the Radio Propagation tab itself, and its
 │                             2-D drawings (interference, path, bit lanes, delays)
+├── bit-model.js            ← BitModel — the 🧪 Bit Bench's arithmetic: numbers as
+│                             bits, the ALERT Binary frame on the air, fourteen
+│                             faults, a batch's fingerprint, pasted readings; pure
+├── bit-bench.js            ← BitBench — the 🧪 Bit Bench tab and its drawings
+├── bit-errors.js           ← BitErrors — the ⚡ Bit Errors lesson: each fault in depth
 ├── owner-logos.js          ← OwnerLogos — each station owner's logo beside its name
 │                             on the station card and in the editor (the marks in assets/owners/)
 ├── health-glance.js        ← HealthGlance — a station's health where people already
@@ -5223,12 +5228,14 @@ rest; `npm run levels` holds the arithmetic to a worked example and drives the
 tabs on a phone-sized page, a real OCR read included, and
 `tools/check_level_surveys.sql` holds the database's rules.
 
-### 29. Knowledge base (Lessons, and Mallee HydroTech's Training Tools)
+### 29. Knowledge base and Field training (Lessons, and Mallee HydroTech's Training Tools)
 
-**📚 Knowledge base** is the group for lessons rather than tools: 🎓 Radio
-Propagation, Flood-Net's own, and five lessons adapted
+Two groups hold lessons rather than tools. **📚 Knowledge base** is Flood-Net's
+own: 🎓 Radio Propagation and ⚡ Bit Errors (§34). **Field training**, straight
+after Surveying, holds five lessons adapted
 with permission from [Mallee HydroTech](https://malleehydrotech.com.au/)'s open
-training tools:
+training tools (one group until Bit Errors made it seven, past the nav's six;
+`core.js` says how it was cut):
 
 | Tab | Adapted from |
 |---|---|
@@ -5438,6 +5445,60 @@ sources' figures and the two worked frames to the slot. How it works it out, wit
 the sources, is [`docs/tdma-planner.md`](docs/tdma-planner.md).
 
 ---
+
+### 33. Bit Bench (the Bits a Station Sends, and the Faults That Change Them)
+
+🧪 **Bit Bench**, under **Interference**, is a bench for working out what could
+have corrupted a station's readings. Nothing on it needs a signal or the
+station list (with the list loaded, an address is named).
+
+1. **Numbers as bits.** A number typed in decimal, `0b…` binary or `0x…` hex,
+   at 8, 11 (a value), 13 (an address) or 16 bits: every bit a button to flip,
+   each set bit's share of the number as a bar, and the operations a fault
+   performs — shift, rotate, invert, reverse, Gray code, swap bytes, +1 — one
+   press away, animated.
+2. **The frame on the air.** An address and a value as ALERT Binary's 40 bits,
+   a word to a row, and the tones they go out as (1300.8 Hz for a 1, 2109.4 Hz
+   for a 0), ten bits at a time.
+3. **Faults.** Fourteen, in three families — *between the radios* (weak signal,
+   impulse noise, reflections, a collision, intermodulation), *in the radio and
+   the logger* (crystal drift, the PLL at key-up, clock drift, tone twist) and
+   *in the wiring and the decoder* (a stuck bit, shifted, inverted or reversed
+   lines, Gray code) — each with its settings, what it is, what it does to the
+   bits, a drawing of it at work on the frame (bits sent and heard, the
+   verdict), and buttons to the Bit Errors lesson and to where it shows in the
+   network's own data. **Send a batch** (100, 500 or 2,000 frames) and the bench
+   reads the fingerprint: what was clean, thrown out, lost, a ghost or a wrong
+   value; where in the frame the flips landed and which way; whether they come
+   in runs; whether they follow the time of day; whether one fixed rule
+   explains every wrong reading — with the faults most consistent with it.
+4. **Whodunnit?** A batch from a fault the bench will not name, to be named
+   from its fingerprint.
+5. **Your readings.** Pairs pasted in — what should have arrived, and what did
+   — read the same way: the bits that differ, which way, where on the air they
+   are sent, and the rule or the cause they point to.
+
+The frame is exact and so is the arithmetic; how a receiver turns a signal into
+bits is a model (non-coherent FSK's error curve, PropPhysics's capture rule, a
+filter-edge penalty for an off-frequency carrier), so the bench shows the
+*shape* of each fault's damage rather than any one radio's figures. The batch
+and the pasted readings export as CSV. `npm run bitbench` holds the model to
+the ALERT Packets tab's decoder and each fault to the fingerprint its physics
+predicts, and drives the tab in Chromium.
+
+### 34. Bit Errors (Why Readings Arrive Wrong, in Depth)
+
+⚡ **Bit Errors**, in the **Knowledge base**, is the lesson behind the Bit Bench:
+where in the chain from sensor to database each fault lives; three questions
+that split most cases and a field guide from symptom to cause; why ALERT Binary
+lets some flipped bits through (60% of one-flip frames, 35% of two) and what a
+six-bit CRC would catch (every pattern of up to three flipped bits — worked out
+exhaustively); then a section for each fault — the physics, what it does to the
+bits and why, its fingerprint, how to confirm it in the field (the attenuator
+test for intermodulation among them) and what fixes it — with a calculator for
+the intermodulation products of any two transmitters, readings that look
+corrupted and are not, and where each fault shows up in Flood-Net. Every figure
+is the Bit Bench's model, and each section opens the bench on its fault.
 
 ## Deployment Plan
 

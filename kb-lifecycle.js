@@ -1,6 +1,6 @@
 // MegaNet — kb-lifecycle.js
 //
-//   KbLifecycle   🔁 the Site Lifecycle tab, in the Knowledge base group: how a
+//   KbLifecycle   🔁 the Site Lifecycle tab, in the Field training group: how a
 //                 hydrometric monitoring site is run from start to finish. The
 //                 ten phases (selection and establishment, office prep, arrival
 //                 and safety, initial checks, gauging, flood operations,

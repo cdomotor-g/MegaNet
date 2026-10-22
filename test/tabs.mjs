@@ -735,6 +735,30 @@ const SEED_RP = `async () => {
   for (const d of document.querySelectorAll('#main-content details')) d.open = true;
 }`;
 
+// 🧪 The Bit Bench, born converted: a fault with every part showing — a batch
+// sent (its counts, the heat map, the findings, the river for a wiring fault),
+// a mystery guessed, readings pasted and analysed — and every disclosure open,
+// since a closed one is display: none and what is inside would go unmeasured.
+// Paused, so the frame on the bench holds still while it is measured.
+const SEED_BB = `async () => {
+  if (BitBench.state().live) { const b = document.getElementById('bb-play'); if (b && b.getAttribute('aria-pressed') === 'true') BitBench.play(); }
+  BitBench.pick('gray');
+  BitBench.batch(true);
+  BitBench.mystery();
+  BitBench.guess('noise');
+  BitBench.pairsExample('stuck');
+  await new Promise(r => setTimeout(r, 350));
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+}`;
+
+// ⚡ Bit Errors, born converted: the lesson with a pair of transmitters typed
+// into its intermodulation calculator, the products moving with them.
+const SEED_BE = `async () => {
+  BitErrors.im('f2', 152.5013);
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+}`;
+
 const SEED_BS_OUT = `() => {
   if (window.__bsAuth) { Object.assign(Auth, window.__bsAuth); delete window.__bsAuth; }
   BaseStations.authChanged();
@@ -900,6 +924,9 @@ const CONVERTED = [
   { id: 'tdma',       label: 'TDMA Planner — sketch, every fold open', issue: 'born converted', seed: SEED_TDMA },
   { id: 'tdma',       label: 'TDMA Planner — from the register', issue: 'born converted', seed: SEED_TDMA_REG },
   { id: 'propagation', label: 'Radio Propagation — the lesson, the echo story and every drawing', issue: 'born converted', seed: SEED_RP },
+  { id: 'bitbench',   label: 'Bit Bench — as it opens', issue: 'born converted' },
+  { id: 'bitbench',   label: 'Bit Bench — a batch, a mystery and readings analysed, every fold open', issue: 'born converted', seed: SEED_BB },
+  { id: 'biterrors',  label: 'Bit Errors — the lesson, and two transmitters in its calculator', issue: 'born converted', seed: SEED_BE },
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },
   { id: 'sitemap',    label: 'Site Map',        issue: 'born converted' },

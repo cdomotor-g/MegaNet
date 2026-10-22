@@ -173,6 +173,17 @@ const TABS = [
       find: 'drive survey site survey candidate repeater base station site signal strength rssi coverage gps vehicle bad packets bit flip repeater triangulate where heard receptions' },
     { id: 'flipsources', label: 'Bit-Flip Sources',       icon: '🔎',
       find: 'bit flip source sources corrupted corruption repeater suspect carrier fingerprint drift who culprit blame interference rate' },
+    // 🧪 Bit Bench (bit-bench.js) is the sixth, and the group's last room: a
+    // bench to try what each cause of corrupted bits does to a frame, filed
+    // beside Bit-Flip Sources, which finds who is doing it in the network's
+    // own data. Its find words are the effects people name ("intermodulation",
+    // "crystal drift", "bit shifting") and the arithmetic ("binary", "hex",
+    // "two's complement") — never "decoder", "packet" or "signal", which
+    // nav.mjs's probes hold for the tabs that answer them, nor "capture",
+    // "paste" or "stuck", which the Field Camera, HFEM Messages and Station
+    // Health answer to and an earlier group would take from them.
+    { id: 'bitbench',   label: 'Bit Bench',              icon: '🧪',
+      find: 'binary decimal hex hexadecimal bits bit shift shifting shifted flipping systematic sandbox simulate experiment impulse lightning electric fence reflections multipath fading echo collision intermodulation intermod crystal ppm pll key-up keyup clock baud uart tone twist pre-emphasis wiring inverted reversed gray xor complement whodunnit quiz mystery pairs' },
   ] },
   { group: 'ALERT', tabs: [
     { id: 'bitflipper', label: 'Bit Flipper',            icon: '🔀',
@@ -221,8 +232,9 @@ const TABS = [
   ] },
   // A survey is a site visit too, but its three tabs would have made that
   // group eight; filed on their own, the sheet, the level's check and the
-  // refresher sit together. The refresher stays here rather than in Knowledge
-  // base: the sheet's own notes open it mid-survey, and that group is full.
+  // refresher sit together. The refresher stays here rather than with the
+  // lessons in Field training, just below: the sheet's own notes open it
+  // mid-survey.
   { group: 'Surveying', tabs: [
     { id: 'levels',     label: 'Level Survey',           icon: '📏',
       find: 'levelling leveling level run height survey surveying rise and fall booking level book benchmark bm gauge zero datum ahd lgh assumed reduced level rl change point backsight foresight intermediate staff gauge boards orifice ctr cease to flow ctf misclose closure water check logger offset digital level lcd read reading ocr serial workbook excel xlsx' },
@@ -232,14 +244,23 @@ const TABS = [
       find: 'how to reference refresher instructions procedure steps levelling reminder booking rise fall datum benchmark two peg' },
   ] },
   // Things to learn rather than tools to work with: read before the work, or
-  // beside it when something misbehaves. 🎓 Radio Propagation (from Start here)
-  // is Flood-Net's own lesson; the five after it are Flood-Net re-tellings of Mallee HydroTech's open training
-  // tools, credited on each tab — see knowledge-base.js. Filed after the work
-  // groups and before Admin, so a lesson's find words lose a tie to the tab a
-  // job is done on.
-  { group: 'Knowledge base', tabs: [
-    { id: 'propagation', label: 'Radio Propagation',     icon: '🎓',
-      find: 'learn learning lesson teach tutorial education educational explainer course training basics physics how radio works waves wavefront rf propagation vhf uhf 150 mhz 151.5 wavelength frequency fresnel zone line of sight los multipath echo echoes reflection reflections bounce diffraction bending shadow hills ridge buildings silos trees foliage forest land cover fading null interference constructive destructive phase phasor collision collisions capture effect bit flip flipped bits ghost repeater delay delays timing aloha store and forward simulation 3d three dimensional animation animated earth curvature bulge horizon fade margin attenuator step attenuator path margin test steps decibel decibels dbm watts budget transmit power antenna gain unity collinear yagi dbd dbi' },
+  // beside it when something misbehaves. Filed after the work groups and
+  // before Admin, so a lesson's find words lose a tie to the tab a job is
+  // done on.
+  //
+  // ── Field training and the Knowledge base: one group of lessons, cut in two ─
+  // The lessons were one group of six until ⚡ Bit Errors made it seven, past
+  // nav.mjs's ceiling. HELP[id].related says where it splits, as it did for
+  // the work groups (#108): Radio Propagation and Bit Errors name radio tabs —
+  // the Bit Bench, the Bit Flipper, Bit-Flip Sources, the Reception Map — and
+  // each other; the five re-tellings of Mallee HydroTech's open training tools
+  // name the survey sheet, the two-peg test, the inspection forms and each
+  // other; nothing crosses between the two. So the five are Field training,
+  // straight after the Surveying tools they practise for, credited on each tab
+  // (knowledge-base.js, whose name is older than the split); and the Knowledge
+  // base is Flood-Net's own lessons in how a reading travels and how it goes
+  // wrong — where the Bit Bench's "in depth" buttons send people.
+  { group: 'Field training', tabs: [
     { id: 'kbstaff',    label: 'Staff Simulator',        icon: '🪧',
       find: 'staff reading levelling staff e staff e pattern crosshair central hair stadia hairs sight length dumpy heat haze shimmer wind gusts rocking rock plumb eyepiece reticle focus drill millimetre simulator' },
     { id: 'kblogbook',  label: 'Survey Logbook',         icon: '📓',
@@ -250,6 +271,17 @@ const TABS = [
       find: 'day hydrographer levelling game walkthrough foot screws bubble e-face barcode bm01 weir cross-section close loop height of collimation sdl50 practice day policy tolerance peg spacing' },
     { id: 'kbriver',    label: 'River Visit Day',        icon: '🛶',
       find: 'river site visit routine visit hydrographer staff gauge gauge plate gauge board logger offset plate correction raw head gco bubbler hs40 sensor exchange calibration certificate gauging adcp adv flowtracker rating control debris departure arrival spot check discharge' },
+  ] },
+  { group: 'Knowledge base', tabs: [
+    { id: 'propagation', label: 'Radio Propagation',     icon: '🎓',
+      find: 'learn learning lesson teach tutorial education educational explainer course training basics physics how radio works waves wavefront rf propagation vhf uhf 150 mhz 151.5 wavelength frequency fresnel zone line of sight los multipath echo echoes reflection reflections bounce diffraction bending shadow hills ridge buildings silos trees foliage forest land cover fading null interference constructive destructive phase phasor collision collisions capture effect bit flip flipped bits ghost repeater delay delays timing aloha store and forward simulation 3d three dimensional animation animated earth curvature bulge horizon fade margin attenuator step attenuator path margin test steps decibel decibels dbm watts budget transmit power antenna gain unity collinear yagi dbd dbi' },
+    // ⚡ Bit Errors (bit-errors.js): the lesson behind the Bit Bench. Its find
+    // words are the faults and the words for diagnosing them; like Radio
+    // Propagation's, none starts with "the", and none is "signal", "mobile",
+    // "network", "mount", "decode" or "guide", which nav.mjs's probes hold for
+    // other tabs.
+    { id: 'biterrors',  label: 'Bit Errors',             icon: '⚡',
+      find: 'bit errors error corrupted corrupt readings why wrong ghost ghosts cause causes symptom symptoms fingerprint diagnose diagnosis troubleshoot troubleshooting fault faults noise snr ber impulse lightning electric fence reflections multipath fading collision collisions capture aloha intermodulation intermod rusty bolt crystal ppm tcxo drift temperature pll lock key-up keyup vco clock baud uart stop bit twist pre-emphasis de-emphasis stuck wiring inverted reversed gray code crc rollover counter wrap learn lesson' },
   ] },
   // Last, so it sits at the foot of the nav: nobody's daily work, and the one
   // group whose tab the header's load buttons and the Export tab's Data source
@@ -478,8 +510,28 @@ const HELP = {
       + 'on the Stations map.',
       'A device set to reduce motion starts every drawing still, at its most telling moment; ▶ Play runs it.',
     ],
-    related: ['stations', 'bitflipper', 'reception'],
+    related: ['stations', 'bitflipper', 'reception', 'biterrors'],
     links: [{ label: 'How Flood-Net\'s fade margin was calibrated against the field', href: 'docs/network-review.md' }],
+  },
+  biterrors: {
+    summary: 'A lesson in why a station\'s readings arrive wrong, and how to tell the causes apart — the depth behind '
+           + 'the 🧪 Bit Bench. Where in the chain from sensor to database each fault lives; the three questions that '
+           + 'split most cases, and a field guide from symptom to cause; why ALERT Binary lets some flipped bits through '
+           + 'and what a CRC would have caught; then a section for each fault — <strong>weak signal, impulse noise, '
+           + 'reflections, collisions, intermodulation</strong> (with a calculator for the products of any two '
+           + 'transmitters), <strong>crystal drift, the PLL at key-up, clock drift, tone twist</strong> and the '
+           + '<strong>wiring and decoder faults</strong> — each with what it does to the bits and why, the fingerprint it '
+           + 'leaves, how to confirm it in the field and what fixes it. It ends with readings that look corrupted and are '
+           + 'not, and where each fault shows up in Flood-Net.',
+    watch: [
+      'Every figure is the Bit Bench\'s model, so the two tabs agree. The models give each fault\'s <em>shape</em> — '
+      + 'where it strikes, which way, whether it is caught — not any one radio\'s figures; the crystal and PLL curves are '
+      + 'illustrative, not a datasheet.',
+      'Each section\'s <strong>🧪 … on the bench</strong> button opens the Bit Bench on that fault, set up to show it; '
+      + 'the bench\'s <strong>in depth</strong> buttons come back to the section.',
+      'The CRC figures are worked out exhaustively, over every pattern of one to four flipped bits — not estimated.',
+    ],
+    related: ['bitbench', 'propagation', 'flipsources', 'health'],
   },
   stations: {
     summary: 'The map fills the page, and its cards sit beside it in the <strong>side panel</strong> '
@@ -1313,7 +1365,7 @@ const HELP = {
       + 'every ARRO link in the app, including the launcher\'s and the ones in map popups. A base '
       + 'that will not parse falls back to the default rather than producing a broken link.',
     ],
-    related: ['network', 'packets', 'passranges'],
+    related: ['network', 'packets', 'passranges', 'bitbench'],
   },
 
   flipsources: {
@@ -1334,7 +1386,35 @@ const HELP = {
       'Built by the server every hour from the last 7 or 30 days. Copies heard before the receivers '
       + 'measured carriers have no sender, and are weighed by pass range only.',
     ],
-    related: ['bitflipper', 'health', 'reception', 'workbench'],
+    related: ['bitflipper', 'health', 'reception', 'workbench', 'bitbench'],
+  },
+
+  bitbench: {
+    summary: 'A bench for the bits a station sends and the faults that change them. Type a number and see it as '
+           + 'decimal, binary and hex, every bit a button to flip, and the operations a fault performs — shift, rotate, '
+           + 'invert, reverse, Gray code — one press away. Build an ALERT frame and watch its 40 bits go out as tones. '
+           + 'Then pick one of fourteen faults — weak signal, impulse noise, reflections, a collision, intermodulation, '
+           + 'crystal drift, a PLL slow to lock, a fast or slow clock, tones out of balance, and five wiring and decoder '
+           + 'faults — and see it happen to the frame, bit by bit. <strong>Send a batch</strong> and the bench reads the '
+           + 'fingerprint the faults leave: where in the frame the flips land, which way they go, whether the frame was '
+           + 'thrown out or got through, and at what hours. <strong>Whodunnit?</strong> hides the fault and asks you to '
+           + 'name it from its fingerprint, and <strong>Your readings</strong> reads pairs you paste in — what should '
+           + 'have arrived, and what did — the same way.',
+    watch: [
+      '<strong>The faults are models.</strong> The frame is exact — ALERT Binary, four 10-bit words at 300 baud — and '
+      + 'so is the arithmetic (151.5 Hz to a ppm, 2f₁ − f₂, a UART reading each bit from its start edge). How a '
+      + 'receiver turns signal into bits is a textbook model, so the bench shows the <em>shape</em> of each fault\'s '
+      + 'damage, not any one radio\'s figures.',
+      'ALERT Binary has <strong>no CRC</strong>: eight fixed check bits and the start and stop bits are all that guard '
+      + 'a frame, so a flip in any of the 24 bits carrying the address and value passes. That is why ghosts exist — '
+      + 'and why a fault that strikes the ends of words (a clock) is mostly caught while one that strikes the reading '
+      + 'bits is not.',
+      'A fixed rule — every reading doubled, mirrored or scrambled the same way — is wiring or a decoder setting, '
+      + 'never radio. Radio faults are random in which bits they take; what they share is <em>where</em> and '
+      + '<em>when</em>.',
+      'A device set to reduce motion starts every drawing still, with the frame at its end; ▶ Keep sending runs it.',
+    ],
+    related: ['biterrors', 'flipsources', 'bitflipper', 'propagation'],
   },
 
   network: {
@@ -2051,7 +2131,7 @@ const HELP = {
       'Focus the crosshairs first, then the staff. The crosshairs stay focused between examples; the staff needs refocusing each time.',
       'In the wind and rocking drills any lean makes the reading higher, so book the lowest reading, seen as the staff passes upright.',
       'In the two-peg drill you must look at Staff B before the answers can be checked. Differences are entered as absolute (positive) values.',
-      'Each tab of the Knowledge base that is adapted from Mallee HydroTech ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+      'Each Field training tab is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
     ],
     related: ['levels', 'twopeg', 'surveyguide'],
   },
@@ -2062,7 +2142,7 @@ const HELP = {
       'At a change point, the foresight goes on the old set-up\'s HI and the backsight on the new one; the staff\'s foot stays put until the backsight is booked.',
       'Rise and fall compares each reading with the previous reading from the same set-up, so after a move it starts again from the new backsight.',
       'The exercise\'s misclose limit (1 + √n mm) is not the Level Survey sheet\'s default of ±3 mm. Use your site\'s figure.',
-      'Each tab of the Knowledge base that is adapted from Mallee HydroTech ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+      'Each Field training tab is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
     ],
     related: ['levels', 'surveyguide', 'kbstaff'],
   },
@@ -2073,7 +2153,7 @@ const HELP = {
       'It is learning material, not a procedure: anything tagged <em>Your workplace\'s call</em> depends on your organisation, client, equipment or jurisdiction, and the site\'s own procedure comes first.',
       'The priority answers rest on each scenario\'s stated backup and service assumptions — change an assumption and the priority can change, which is why every card has its full situation.',
       'The drawings are shortcuts: every phase and step can also be reached from the buttons and the <em>Go to a step</em> list under them. On a phone the drawings scroll sideways inside their own box.',
-      'Each tab of the Knowledge base that is adapted from Mallee HydroTech ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+      'Each Field training tab is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
     ],
     related: ['inspections', 'maintenance', 'health'],
   },
@@ -2084,7 +2164,7 @@ const HELP = {
       'Nothing here is a real survey — the site is fictional, and the figures are for practice only.',
       'The two-peg and misclose verdicts follow the policy you save in step 2; with none saved, the honest answer is <em>No tolerance recorded</em>.',
       'Your step, policy and ticks are kept only in this browser; <strong>New practice</strong> clears them.',
-      'Each tab of the Knowledge base that is adapted from Mallee HydroTech ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+      'Each Field training tab is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
     ],
     related: ['twopeg', 'levels', 'kbstaff'],
   },
@@ -2095,7 +2175,7 @@ const HELP = {
       '<strong>It is a training fixture, not a station.</strong> Station 425010 Red Gum Reach and every figure are the game\'s own, and its 1 mm, 5 minute and 2 mm limits are the game\'s design assumptions, not an operating standard.',
       '<strong>Progress stays on this device.</strong> The step, answers and plate position are kept in this browser only; <em>Start the visit again</em> clears them.',
       '<strong>The level book is Flood-Net\'s arithmetic.</strong> Step 3\'s sums come from the same code as the Level Survey sheet, so the two always agree.',
-      'Each tab of the Knowledge base that is adapted from Mallee HydroTech ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+      'Each Field training tab is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
     ],
     related: ['inspections', 'camera', 'health'],
   },

@@ -1,8 +1,9 @@
 # Mallee HydroTech training tools — credit and licence notices
 
-Five tabs in Flood-Net's **📚 Knowledge base** group are adapted from open
-training tools published by [Mallee HydroTech](https://malleehydrotech.com.au/),
-used with the owner's permission and under the licences they publish:
+Five tabs in Flood-Net's **Field training** group (the 📚 Knowledge base's
+until the lessons were split in two) are adapted from open training tools
+published by [Mallee HydroTech](https://malleehydrotech.com.au/), used with the
+owner's permission and under the licences they publish:
 
 - **Code**: MIT licence, © 2026 Mallee HydroTech — the notice is kept word for
   word in [`LICENSE-MIT.txt`](LICENSE-MIT.txt).

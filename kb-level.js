@@ -1,6 +1,6 @@
 // MegaNet — kb-level.js
 //
-//   KbLevel   the "A Day on the Level" tab in the Knowledge base: a day of
+//   KbLevel   the "A Day on the Level" tab in Field training: a day of
 //             levelling practice told one step at a time — the site and the
 //             briefing, setting your organisation's limits before you go,
 //             levelling the instrument, reading the staff, the two-peg test

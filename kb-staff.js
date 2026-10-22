@@ -1,6 +1,6 @@
 // MegaNet — kb-staff.js
 //
-//   KbStaff   📏 the Staff Simulator tab (Knowledge base): reading a levelling
+//   KbStaff   📏 the Staff Simulator tab (Field training): reading a levelling
 //             staff through the level, in seven short modules — the central
 //             hair, the stadia hairs and the distance they give, the same
 //             reading at six distances, heat haze, wind on an extended staff,

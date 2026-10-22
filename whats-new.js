@@ -25,6 +25,20 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 69, date: '2026-10-22', items: [
+      '<strong>🧪 Bit Bench</strong>, a new tab under <em>Interference</em>: a bench for the bits a station sends and the faults '
+        + 'that change them. Type a number and see it in decimal, binary and hex, every bit a button to flip, with shift, rotate, '
+        + 'invert, reverse and Gray code a press away; build an ALERT frame and watch its 40 bits go out as tones. Then pick one of '
+        + 'fourteen faults — weak signal, impulse noise, reflections, a collision, intermodulation, crystal drift, a PLL slow to lock, '
+        + 'a fast or slow clock, tones out of balance, a stuck bit and four other wiring faults — and watch it happen to the frame, '
+        + 'bit by bit. <em>Send a batch</em> and it reads the fingerprint the fault leaves: where the flips land, which way they go, '
+        + 'what was thrown out and what got through. <em>Whodunnit?</em> hides the fault for you to name, and <em>Your readings</em> '
+        + 'reads pairs you paste in — what should have arrived, and what did.',
+      '<strong>⚡ Bit Errors</strong>, a new lesson in the <em>Knowledge base</em>: each of those faults in depth — what it is, what it '
+        + 'does to the bits and why, the fingerprint it leaves, how to confirm it in the field and what fixes it — with a field guide '
+        + 'from symptom to cause and a calculator for the intermodulation products of any two transmitters. The five Mallee HydroTech '
+        + 'lessons have a group of their own now, <em>Field training</em>, straight after Surveying.',
+    ] },
     { n: 68, date: '2026-10-21', items: [
       '<strong>⏱️ Latency, on the Stations map.</strong> A new tool in the side panel, after 🔑 Legend: open it and '
         + 'every station pin is coloured by how fresh its data is — green heard in the last quarter hour, through gold, to '
