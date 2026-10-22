@@ -26,8 +26,9 @@
 // stationAlertIdTypes, focusStation, zoomToStation, switchTab and
 // dockReveal; and
 // sideways to map-draw.js (MapDraw), link-budget.js (LinkBudget,
-// lbMarginClass) and path-profile.js (PathProfile, rmSystemOf, fsplDb,
-// wattsToDbm, PATH_DEFAULT_MHZ). See path-profile.js's header for why the
+// lbMarginClass) and path-profile.js (PathProfile, fsplDb, wattsToDbm, and
+// radioKey, radioDefaults, radioVal and radioFreq — the figures the path tools
+// share). See path-profile.js's header for why the
 // mutual reference constrains nothing.
 
 // ── The backbone relation ────────────────────────────────────────────────────
@@ -268,11 +269,19 @@ const MapBackbone = (function () {
   // quotes, so the two say one number in one colour. Before the ground lands,
   // or where the profile has no figure, the budget's (budgetFor) and then a
   // plain free-space margin computed from the same primitives.
+  //
+  // Each way round as well, in this card's a → b order whichever way the line
+  // runs: the figure quoted is the worse of the two, so a TX power raised at
+  // one end moves the way out of it and leaves the headline where the way
+  // back holds it — and a card that showed only the headline read as though
+  // the change had not reached it.
   function profileFor(a, b) {
     const p = typeof PathProfile !== 'undefined' ? PathProfile.shownMargin() : null;
     if (!p) return null;
-    const same = (p.ends[0] === a.id && p.ends[1] === b.id) || (p.ends[0] === b.id && p.ends[1] === a.id);
-    return same ? { margin: p.margin, verdict: p.verdict, priced: true } : null;
+    const fwd = p.ends[0] === a.id && p.ends[1] === b.id;
+    const same = fwd || (p.ends[0] === b.id && p.ends[1] === a.id);
+    return same ? { margin: p.margin, verdict: p.verdict, priced: true,
+                    ab: fwd ? p.ab : p.ba, ba: fwd ? p.ba : p.ab } : null;
   }
 
   // The budget the link-budget card is showing, when it is showing this exact
@@ -284,21 +293,25 @@ const MapBackbone = (function () {
     return match ? LinkBudget.current() : null;
   }
 
-  // Free-space fade margin a → b from the stations' Radio Mobile systems: the
-  // same formula LinkBudget's own compute() applies, minus the terrain term it
-  // cannot have without a profile. Indicative and optimistic, and said so.
+  // Free-space fade margin a → b on the figures the path tools price with —
+  // the stations' Radio Mobile systems, with whatever has been typed over them
+  // in the link budget or the elevation profile (radioVal, path-profile.js),
+  // so a TX power changed there moves this figure too. The same formula
+  // LinkBudget's own compute() applies, minus the terrain term it cannot have
+  // without a profile: indicative and optimistic, and said so. A figure not on
+  // file is not nought (the budget's rule) — no margin, rather than one
+  // computed round a hole.
   function freeSpaceMargin(a, b) {
-    const sysA = rmSystemOf(a), sysB = rmSystemOf(b);
+    const kA = radioKey(a), kB = radioKey(b);
+    const dA = radioDefaults(a), dB = radioDefaults(b);
     const dKm = acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
-    const fMhz = (a.repeater && a.repeater.rx_mhz > 0) ? a.repeater.rx_mhz
-               : (b.repeater && b.repeater.rx_mhz > 0) ? b.repeater.rx_mhz
-               : PATH_DEFAULT_MHZ;
-    const txDbm = sysA ? wattsToDbm(sysA.tx_power_w) : null;
-    const eirp = txDbm == null ? null : txDbm + (sysA.antenna_gain_dbi || 0) - (sysA.line_loss_db || 0);
-    const rxDbm = eirp == null ? null
-      : eirp - fsplDb(dKm, fMhz) + (sysB ? sysB.antenna_gain_dbi || 0 : 0)
-        - (sysB ? sysB.line_loss_db || 0 : 0);
-    const thr = sysB ? sysB.rx_threshold_dbm : null;
+    const fMhz = radioFreq(a, b);
+    const txDbm = wattsToDbm(radioVal(kA, dA, 'tx_w'));
+    const gA = radioVal(kA, dA, 'gain_dbi'), lA = radioVal(kA, dA, 'loss_db');
+    const gB = radioVal(kB, dB, 'gain_dbi'), lB = radioVal(kB, dB, 'loss_db');
+    const thr = radioVal(kB, dB, 'rx_dbm');
+    const eirp = txDbm == null || gA == null || lA == null ? null : txDbm + gA - lA;
+    const rxDbm = eirp == null || gB == null || lB == null ? null : eirp - fsplDb(dKm, fMhz) + gB - lB;
     const margin = rxDbm == null || thr == null ? null : rxDbm - thr;
     return { dKm, fMhz, margin, an: null, fsplOnly: true };
   }
@@ -307,9 +320,9 @@ const MapBackbone = (function () {
     return `<div class="acma-row"><span>${label}</span><span>${value}</span></div>`;
   }
 
-  function marginHtml(r) {
+  function marginHtml(r, a, b) {
     if (!r || r.margin == null) {
-      return '<span class="small">no figure — TX power or RX threshold not set</span>';
+      return '<span class="small">no figure — a TX power, antenna gain, line loss or RX threshold is not set</span>';
     }
     // Coloured by the number, in the bands the profile and the budget colour it
     // in. "Obstructed" is a yes or no on the geometry — something stands above
@@ -325,8 +338,11 @@ const MapBackbone = (function () {
     const cls = guessed ? 'bad' : m.cls;
     const note = r.fsplOnly ? ' · free-space only'
       : verdict === 'obstructed' && !guessed ? ' · line of sight obstructed, priced in' : '';
-    return `<strong class="txt-${cls}">${(r.margin > 0 ? '+' : '') + r.margin.toFixed(1)} dB</strong>
-      <span class="small"> — ${guessed ? 'obstructed' : m.label.toLowerCase()}${note}</span>`;
+    const db = v => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`;
+    const ways = r.ab != null && r.ba != null && a && b
+      ? `<br><span class="small path-card-ways">${esc(a.name)} → ${esc(b.name)} ${db(r.ab)} · back ${db(r.ba)}</span>` : '';
+    return `<strong class="txt-${cls}">${db(r.margin)}</strong>
+      <span class="small"> — ${guessed ? 'obstructed' : m.label.toLowerCase()}${note}</span>${ways}`;
   }
 
   // The channel the path is on — MapFreq's pick, the one the link colouring
@@ -418,11 +434,12 @@ const MapBackbone = (function () {
         ${backbone ? backboneRows(a, b) : fieldRows(a, b)}
         ${row('Frequency', freqHtml(a, b))}
         ${row('Distance', fmtKm(km))}
-        ${row('Fade margin', marginHtml(r))}
+        ${row('Fade margin', marginHtml(r, a, b))}
       </div>
       <p class="small path-card-note">Indicative only — the margin is the elevation profile's figure,
-        the worse of the two directions (free-space until the terrain profile lands). The elevation
-        profile and link budget below are open on this exact path:
+        the worse of the two directions (free-space until the terrain profile lands), on the TX power and
+        the other figures set in the two cards below. The elevation profile and link budget below are
+        open on this exact path:
         <a href="#" onclick="MapBackbone.scrollTo('path-profile-panel');return false">elevation profile ↓</a> ·
         <a href="#" onclick="MapBackbone.scrollTo('link-budget-panel');return false">fade margin ↓</a></p>`;
   }

@@ -528,14 +528,21 @@ ok('…with both names in full on the title, where a clipped name goes',
 
 console.log('\nFlip direction');
 
-await page.evaluate(() => { state.path.aglB = null; PathProfile.setAgl('A', '7'); });
+// The heights are kept by site (state.radio), so what is read here is the
+// card's own two boxes: the figure in each and whether it says "edited".
+await page.evaluate(() => { PathProfile.setAgl('B', ''); PathProfile.setAgl('A', '7'); });
 const endsNow = () => page.evaluate(() => {
   const sh = PathProfile.target();
   const dd = document.querySelector('#path-profile-panel dd.path-ends');
+  const agl = tag => {
+    const box = document.getElementById(`path-f-${tag}-agl_m`);
+    const flag = box && box.parentElement.querySelector('.path-src');
+    return box && flag && flag.textContent.trim() === 'edited' ? Number(box.value) : null;
+  };
   return {
     pts: sh ? sh.pts.map(p => p.slice()) : null,
     names: dd ? [...dd.querySelectorAll('span')].map(s => s.textContent) : [],
-    aglA: state.path.aglA, aglB: state.path.aglB,
+    aglA: agl('A'), aglB: agl('B'),
     svg: !!document.querySelector('#path-profile-panel svg'),
     active: document.activeElement ? document.activeElement.id : null,
   };

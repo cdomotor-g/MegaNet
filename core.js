@@ -3988,14 +3988,21 @@ const state = {
     // shapes themselves deliberately are not.
     colour:     localStorage.getItem('mn-draw-colour') || '',
   },
-  // Elevation profile under the map. Only the operator's overrides live here —
-  // the terrain itself is cached in Terrain, and the profile is recomputed from
+  // The radio at each end of a path, one set for every card that prices one —
+  // the link budget, the elevation profile and the radio-path card — so a TX
+  // power typed into any of them is the figure every fade margin on the page
+  // is taken from (path-profile.js, "The radio at each end"). Only what has
+  // been typed over a site's own figures lives here, and only for the session,
+  // like the rest of the what-ifs.
+  radio: {
+    freqMhz: null,   // null = the repeater on either end, else PATH_DEFAULT_MHZ
+    ends:    {},     // radioKey → { tx_w, gain_dbi, loss_db, agl_m, rx_dbm }, overrides only
+  },
+  // Elevation profile under the map. The terrain itself is cached in Terrain,
+  // the radio at each end is state.radio's, and the profile is recomputed from
   // whichever line is current rather than stored.
   path: {
     open:    false,
-    aglA:    null,   // m AGL override; null = the station's rm_systems height
-    aglB:    null,
-    freqMhz: null,   // null = the repeater on either end, else PATH_DEFAULT_MHZ
     // Ground cover on the profile (see LandCover): trees, buildings and crops
     // sampled along the path and stood on the terrain, in the Fresnel check and
     // in the propagation model both. On by default — it is one request per
@@ -4012,9 +4019,10 @@ const state = {
   link: {
     open:    false,
     picking: false,  // map clicks are setting endpoints
-    a:       null,   // { kind:'station'|'point', …, def:{}, over:{} } — see LinkBudget
+    // { kind:'station'|'point', key, …, def:{}, over:{} } — see LinkBudget. An
+    // end's `over` is its site's object in state.radio, not a copy of it.
+    a:       null,
     b:       null,
-    freqMhz: null,
     // The propagation model's own inputs — Radio Mobile's network properties,
     // one for one, and starting from the same figures the Radio Mobile export
     // writes (RM_NET_DEFAULTS) so the two tools argue from the same premises.

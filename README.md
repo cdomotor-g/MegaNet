@@ -3550,8 +3550,9 @@ cover intrudes into it — plus a plain-English verdict, *clear / marginal /
 obstructed*, an *Obstructions* list that says whether each one is ground or
 cover, the elevation angle at each end, and the path loss the model computed. Antenna heights default
 from the station's `rm_systems[].antenna_height_m` and the frequency from the
-repeater's `rx_mhz`; both are editable, and each box says whether it is showing a
-default or an edit. The chart is inline SVG in the manner of `rfStripPlotHtml()`
+repeater's `rx_mhz`; both are editable, as is the **TX power** at each station
+end, and each box says whether it is showing a default or an edit. Those boxes
+are the link budget's figures too — see *One set of figures* below. The chart is inline SVG in the manner of `rfStripPlotHtml()`
 and `rfcChartHtml()` — no charting library, nothing fetched to draw it.
 
 Three things about how it is drawn are choices rather than defaults. The plot
@@ -3771,8 +3772,9 @@ lands on *that* end rather than on whichever happened to be empty. An armed pick
 does not also select the station into the editor below, because an operator
 building a budget asked for an endpoint, not for the form to be reloaded and the
 map flown somewhere. **Clear A**, **Clear B** and **Clear both ends** wipe one
-end, the other, or the pair — the station, its overrides and whatever is typed
-in its box.
+end, the other, or the pair — the station and whatever is typed in its box. The
+figures typed over an end stay with its site (below); **Put back the station's
+own figures**, under an end that has any, is the way back from those.
 
 > Until this existed the card said "click a station on the map" and, on the pin
 > itself, that was not true: markers are built with `bubblingMouseEvents: false`,
@@ -3788,17 +3790,39 @@ sample (EGM96, and labelled as such) where there is not — which is most statio
 since only 840 of 3,174 carry an `elevation_ahd` at all. An end whose tile cannot
 be fetched says *unavailable* rather than defaulting to sea level.
 
-**The two cards can be set to different assumptions, and the budget says when
-they are.** The elevation profile carries its own antenna heights and frequency;
-the budget carries a height per end and a frequency of its own, and computes its
-diffraction term at *those*. So the chart can show a clear path while the table
-quotes a loss from an obstructed one. Neither figure is wrong, but saying nothing
-about the gap would be, so the diffraction row names the frequency and the two
-antenna heights behind it, and a note under the table spells out what the chart
-above is drawn at whenever it differs — with a button that redraws the chart on
-the budget's figures. That is a button rather than something the budget does by
-itself: the profile's overrides apply to *every* line drawn on the map, so
-writing to them would silently re-height the next hand-drawn path too.
+**One set of figures.** Every fade margin the path tools quote — the link
+budget's, the elevation profile's, the signal run along the profile's line and
+the radio path card's at the head of them — is taken off one set of radio
+figures per site: TX power, antenna gain, line loss, antenna height and RX
+threshold, each the station's `rm_systems` figure until somebody types over it,
+plus one frequency for every card (`state.radio`, and `radioKey` … `radioChanged`
+in `path-profile.js`). It was three sets: the budget kept its overrides on its
+own two ends, the profile kept an antenna height per end of whatever line was
+drawn and a frequency of its own, and the radio path card read the radio
+systems raw — so a TX power typed into the budget moved the budget's margin and
+nothing else on the page. Now a figure typed into either card is that site's:
+the other card's box shows it, flagged *edited*, and every margin on the page
+follows. A figure is kept by site rather than by which end of a card it is at,
+so it goes with the site when a line is turned round with ⇄, and is still there
+when the station turns up at the end of another path; blanking a box, or *Put
+back the station's own figures*, is the way back. The figures are a what-if for
+the session: the fade-margin map's colours stay the network as recorded, saved
+against the settings they were computed on. A box's figure is taken once focus
+has finished leaving it (`radioCommit`), because the commit repaints both
+cards: taken mid-Tab it replaced the box the caret was going to and dropped it
+on the page, and taken mid-press it replaced the button being pressed in the
+other card, so the click never arrived.
+
+**The two cards can still disagree, and the budget says when they do.** With
+the figures shared, the settings part only where a default does: each card takes
+the frequency from the repeater at its own A end first, so a hop between two
+repeaters on different channels, drawn one way round and budgeted the other,
+starts at two. The diffraction row names the frequency and the two antenna
+heights behind it, and a note under the table spells out what the chart above is
+drawn at whenever it differs — with a button that puts the budget's frequency
+and heights into the shared figures, so both cards price at them. That is a
+button rather than something the budget does by itself: the frequency typed in
+is every card's from then on.
 
 The **ground under each end** is the third assumption the two can differ on, and
 the one that bites hardest — a different ground height is a different line of
@@ -4669,7 +4693,10 @@ one-at-a-time rule, since it is not over the map: the station card or the
 transmitter card stays open beside it. It survives a render of the tab the way
 the profile and the budget do, and closes itself once the profile moves off its
 path — another line drawn or selected, or its line deleted — because it says
-those two are open on this exact path.
+those two are open on this exact path. Its fade margin is the profile's worse
+direction, with each way round under it: a TX power raised at one end moves the
+way out of it and leaves the headline where the way back holds it, and a card
+showing the headline alone read as though the change had never reached it.
 
 **The Stations map's controls.** Everything MapChrome would put in the map's
 top-right corner lives in the strip instead, at every width — a phone's rail

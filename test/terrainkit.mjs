@@ -38,6 +38,10 @@
 //                        they are not — and the signal run along the line
 //                        under it, which has to arrive at B in the A→B
 //                        figure, be painted in its bands, and ride the cursor.
+//                        And one set of radio figures behind every margin: a
+//                        TX power typed into the link budget or the profile
+//                        moves the budget, the profile, the signal and the
+//                        radio-path card by the same decibels.
 //
 //   node --run terrain        (or: npm run terrain)
 //       npm run terrain -- -v    also print what passed
@@ -816,7 +820,10 @@ const pathCard = await page.evaluate(async ids => {
     const row = [...document.querySelectorAll('#path-card .acma-row')]
       .find(r => r.firstElementChild.textContent.trim() === 'Fade margin');
     const s = row ? row.querySelector('strong') : null;
-    return s ? { text: row.lastElementChild.textContent.replace(/\s+/g, ' ').trim(), cls: s.className } : null;
+    // The headline and its note; each way round is a line of its own under them.
+    const v = row ? row.lastElementChild.cloneNode(true) : null;
+    if (v) v.querySelectorAll('.path-card-ways').forEach(n => n.remove());
+    return s ? { text: v.textContent.replace(/\s+/g, ' ').trim(), cls: s.className } : null;
   };
   MapBackbone.open('field', ids[0], ids[1]);
   const until = Date.now() + 40000;
@@ -841,6 +848,82 @@ if (pathCard && pathCard.plain) {
      !!pathCard.blocked && pathCard.blocked.cls === 'txt-ok'
        && /^\+39\.6 dB — good · line of sight obstructed, priced in$/.test(pathCard.blocked.text),
      JSON.stringify(pathCard.blocked));
+}
+
+// One set of radio figures behind every margin on the page. A TX power typed
+// into the link budget used to be the budget's alone: the profile's margin, the
+// signal along its line and the radio-path card over them all stayed on the
+// radio systems, so the same hop read two ways a card apart. Each site now
+// keeps one set (state.radio). Four times the TX power at the budget's A is
+// +6.02 dB on the budget's margin and on the profile's one-way margin out of
+// that site, and nothing on the way back; the profile's own TX box shows it,
+// flagged edited; the radio-path card quotes the profile's new worse figure;
+// and the signal arrives at B in the new A→B figure. Typed into the profile's
+// box instead, the budget's box and margin follow. Blank puts all of it back.
+const shared = await page.evaluate(async () => {
+  const L = state.link, sh = PathProfile.target();
+  if (!L.a || !L.b || !sh || !sh.snappedTo) return null;
+  const until = Date.now() + 40000;
+  while (Date.now() < until && !PathProfile.signalState()) await new Promise(r => setTimeout(r, 200));
+  // Which of the line's ends is the budget's A (fromProfile builds them the
+  // same way round, but an earlier line may have been reused either way).
+  const tagA = L.a.key === radioKey({ id: sh.snappedTo[0] }) ? 'A' : 'B';
+  const out = tagA === 'A' ? 'ab' : 'ba', back = tagA === 'A' ? 'ba' : 'ab';
+  const flag = id => {
+    const el = document.getElementById(id);
+    const f = el && el.parentElement.querySelector('.path-src');
+    return f ? f.textContent.trim() : null;
+  };
+  const read = () => {
+    const p = PathProfile.shownMargin();
+    const row = [...document.querySelectorAll('#path-card .acma-row')]
+      .find(r => r.firstElementChild.textContent.trim() === 'Fade margin');
+    const sig = PathProfile.signalState();
+    return {
+      budget: LinkBudget.current().margin,
+      out: p ? p[out] : null, back: p ? p[back] : null, worst: p ? p.margin : null,
+      ab: p ? p.ab : null,
+      card: row ? row.lastElementChild.textContent.replace(/\s+/g, ' ').trim() : null,
+      sigEnd: sig ? sig.end : null,
+      lbTx: document.getElementById('lb-f-a-tx_w').value,
+      pathTx: (document.getElementById(`path-f-${tagA}-tx_w`) || {}).value,
+      pathFlag: flag(`path-f-${tagA}-tx_w`),
+    };
+  };
+  const base = L.a.def.tx_w;
+  const before = read();
+  LinkBudget.setField('a', 'tx_w', String(base * 4));
+  const fromBudget = read();
+  LinkBudget.setField('a', 'tx_w', '');
+  PathProfile.setRadio(tagA, 'tx_w', String(base * 2));
+  const fromProfile = read();
+  PathProfile.setRadio(tagA, 'tx_w', '');
+  return { base, tagA, before, fromBudget, fromProfile, after: read() };
+});
+ok('the budget and the profile are on the same two stations', !!shared, String(shared));
+if (shared) {
+  const { before: b0, fromBudget: fb, fromProfile: fp, after: af } = shared;
+  const q = 10 * Math.log10(4), h = 10 * Math.log10(2);
+  const near = (x, y) => x != null && y != null && Math.abs(x - y) < 0.01;
+  ok('4× the TX power in the link budget is +6.02 dB on its own margin',
+     near(fb.budget - b0.budget, q), `${b0.budget} → ${fb.budget}`);
+  ok('…and on the profile\'s margin out of that site, the way back untouched',
+     near(fb.out - b0.out, q) && near(fb.back, b0.back), JSON.stringify({ b0, fb }));
+  ok('…the profile\'s TX box shows the figure, flagged edited',
+     Number(fb.pathTx) === shared.base * 4 && fb.pathFlag === 'edited', `${fb.pathTx} · ${fb.pathFlag}`);
+  const fig = m => `${m > 0 ? '+' : ''}${m.toFixed(1)} dB`;
+  ok('…the radio-path card quotes the profile\'s new figure',
+     !!fb.card && fb.card.startsWith(fig(fb.worst)), `${fb.card} against ${fig(fb.worst)}`);
+  ok('…and each way round under it, so the way that moved is seen to',
+     !!fb.card && fb.card.includes(fig(fb.out)) && / · back /.test(fb.card) && !!b0.card && b0.card !== fb.card,
+     `${b0.card} → ${fb.card}`);
+  ok('…and the signal along the line arrives at B in the new A→B margin',
+     near(fb.sigEnd, fb.ab), `${fb.sigEnd} against ${fb.ab}`);
+  ok('2× typed into the profile\'s box is +3.01 dB on the budget, its box showing it',
+     near(fp.budget - b0.budget, h) && Number(fp.lbTx) === shared.base * 2, `${fp.lbTx} W, ${b0.budget} → ${fp.budget}`);
+  ok('blanking the box puts every card back on the station\'s own figure',
+     near(af.budget, b0.budget) && near(af.out, b0.out) && af.lbTx === b0.lbTx
+       && af.pathTx === b0.pathTx && af.pathFlag !== 'edited', JSON.stringify(af));
 }
 
 // Full screen: the same chart, drawn again at the size the window gives it,

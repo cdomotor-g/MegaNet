@@ -15,7 +15,9 @@
 // where the Stations list is from here) and for the search the whole
 // app shares — prepareSearch, stationMatchesSearch, markHits and
 // tableStations; and sideways to path-profile.js for stationAntenna, pathPropOf, PATH_DEFAULT_MHZ,
-// PATH_DEFAULT_AGL, PATH_VERDICT, fsplDb, wattsToDbm, rmSystemOf and
+// PATH_VERDICT, fsplDb, wattsToDbm, rmSystemOf, the radio at each end
+// (radioKey, radioOver, radioDefaults, radioChanged and radioCommit — the
+// figures this card shares with the profile and the radio-path card) and
 // PathProfile, to map-draw.js for MapDraw and to terrain.js for Terrain. See
 // path-profile.js's header for why the mutual reference constrains nothing.
 //
@@ -105,41 +107,57 @@ const LinkBudget = (function () {
 
   // ── endpoints ──
 
+  // An end's figures are its site's (radioDefaults, path-profile.js), and its
+  // `over` is the site's own object in state.radio rather than a copy — so a
+  // figure typed into this card is the one the elevation profile and the
+  // radio-path card price with, and one typed into the profile is in this
+  // table. Both cards write the same object; neither keeps one of its own.
   function stationEndpoint(st) {
     const sys = rmSystemOf(st);
     const rep = st.repeater || null;
     // A repeater or base stands on a mast where its system gives it a field
     // station's whip (stationAntenna, path-profile.js); the box says so.
     const ant = stationAntenna(st, sys);
+    const key = radioKey(st);
     return {
-      kind: 'station', sid: st.id, name: st.name,
+      kind: 'station', sid: st.id, key, name: st.name,
       lat: st.lat, lon: st.lon,
       ground: st.elevation_ahd != null ? st.elevation_ahd : null,
       groundSrc: st.elevation_ahd != null ? 'elevation_ahd (AHD)' : null,
       sysName: sys ? sys.name : null,
       freq: rep && rep.rx_mhz > 0 ? rep.rx_mhz : null,
       mast: ant.mast ? ant.sysAgl : null,
-      def: {
-        tx_w:     sys && sys.tx_power_w != null ? sys.tx_power_w : null,
-        loss_db:  sys && sys.line_loss_db != null ? sys.line_loss_db : null,
-        gain_dbi: sys && sys.antenna_gain_dbi != null ? sys.antenna_gain_dbi : null,
-        agl_m:    ant.agl,
-        rx_dbm:   sys && sys.rx_threshold_dbm != null ? sys.rx_threshold_dbm : null,
-      },
-      over: {},
+      def: radioDefaults(st),
+      over: radioOver(key),
     };
   }
 
   function pointEndpoint(lat, lon) {
+    const key = radioKey(null, lat, lon);
     return {
-      kind: 'point', sid: null,
+      kind: 'point', sid: null, key,
       name: `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
       lat, lon, ground: null, groundSrc: null, sysName: null, freq: null,
       // A hypothetical site has to start from something; the 1 W field station
       // is what most of this network actually is, down to its line loss.
-      def: { tx_w: 1, loss_db: LB_DEFAULT_LOSS_DB, gain_dbi: 5.15, agl_m: PATH_DEFAULT_AGL, rx_dbm: -117 },
-      over: {},
+      def: radioDefaults(null),
+      over: radioOver(key),
     };
+  }
+
+  // The defaults again, for the station ends: the mast a repeater or base is
+  // modelled at is a propagation setting, and a change to it has to reach the
+  // boxes here as it reaches the profile, or the two cards price one end at
+  // two heights.
+  function refreshDefaults() {
+    for (const e of [S().a, S().b]) {
+      if (!e || e.kind !== 'station' || !state.data) continue;
+      const st = state.data.stations.find(s => s.id === e.sid);
+      if (!st) continue;
+      const ant = stationAntenna(st, rmSystemOf(st));
+      e.def = radioDefaults(st);
+      e.mast = ant.mast ? ant.sysAgl : null;
+    }
   }
 
   // ── finding an end without hunting for its pin ───────────────────────────
@@ -523,9 +541,11 @@ const LinkBudget = (function () {
     });
   }
 
+  // radioFreq's rule, on this card's ends: the frequency typed in either card,
+  // else a repeater's channel at either end, else the network's band.
   function freqOf() {
     const S_ = S();
-    if (S_.freqMhz > 0) return S_.freqMhz;
+    if (state.radio.freqMhz > 0) return state.radio.freqMhz;
     for (const e of [S_.a, S_.b]) if (e && e.freq > 0) return e.freq;
     return PATH_DEFAULT_MHZ;
   }
@@ -608,6 +628,21 @@ const LinkBudget = (function () {
              zero, missing, fsplOnly: an == null };
   }
 
+  // One figure written to an end's site, and every card that prices from it
+  // drawn again. Blanking a box puts the default back rather than leaving a
+  // hole.
+  function writeField(e, k, v) {
+    const n = String(v).trim() === '' ? null : Number(v);
+    if (n != null && isFinite(n)) e.over[k] = n; else delete e.over[k];
+    radioChanged();
+  }
+
+  // A gain typed in dBd, as the dBi it is kept in; blank stays blank.
+  function dbdToDbi(v) {
+    const n = String(v).trim() === '' ? null : Number(v);
+    return n != null && isFinite(n) ? String(n + LB_DIPOLE_DBI) : '';
+  }
+
   // ── rendering ──
 
   function endpointCard(which, e) {
@@ -632,7 +667,7 @@ const LinkBudget = (function () {
           <input type="number" step="${step}" id="lb-f-${which}-${k}"
                  value="${shown == null ? '' : shown}"
                  placeholder="not set"
-                 onchange="LinkBudget.${dbd ? 'setGainDbd' : 'setField'}('${which}','${k}',this.value)">
+                 onchange="LinkBudget.typed('${which}','${k}',this.value)">
           <b class="lb-flag">${dbd && v != null ? `${+v.toFixed(2)} dBi · ` : ''}${over ? 'edited'
             : e.def[k] == null ? ''
             : k === 'agl_m' && e.mast != null ? `mast · system says ${e.mast} m`
@@ -665,6 +700,10 @@ const LinkBudget = (function () {
           ${f('agl_m',    'Antenna height',  '0.5',  'm AGL')}
           ${f('rx_dbm',   'RX threshold',    '0.1',  'dBm')}
         </div>
+        ${Object.keys(e.over).some(k => e.over[k] != null) ? `
+          <p class="small lb-src"><button type="button" class="lb-link" id="lb-reset-${which}"
+             onclick="LinkBudget.resetEnd('${which}')">Put back ${e.kind === 'station'
+               ? 'the station’s own figures' : 'the assumed figures'}</button></p>` : ''}
       </div>`;
   }
 
@@ -894,8 +933,11 @@ const LinkBudget = (function () {
   }
 
   // Whether the elevation profile above is drawn on the same assumptions this
-  // table is computed on. It is the same path over the same terrain, but each
-  // card carries its own frequency and antenna heights, so the chart can show a
+  // table is computed on. The two cards share their antenna heights and their
+  // frequency (state.radio), so the settings can part only where a default
+  // does: each card takes the frequency from the repeater at its own A end
+  // first, so a hop between two repeaters on different channels, drawn one way
+  // round and budgeted the other, starts at two. The chart can then show a
   // clear path while this table quotes a diffraction loss off an obstructed
   // one. Neither figure is wrong; saying nothing about the gap is.
   function divergenceHtml(r) {
@@ -1115,13 +1157,13 @@ const LinkBudget = (function () {
         <label class="draw-field">
           <span>Frequency (MHz)</span>
           <input type="number" step="0.1" min="1" id="lb-freq" value="${freqOf()}"
-                 onchange="LinkBudget.setFreq(this.value)">
+                 onchange="radioCommit(LinkBudget.setFreq, this.value)">
           <!-- The box is never blank: clearing it falls straight back to the
                repeater's channel or the network's band, which on screen is
                indistinguishable from having typed that figure in. The flag is
                what tells them apart, and it is the one the elevation profile's
                otherwise-identical box has carried all along. -->
-          <b class="lb-flag">${S_.freqMhz != null ? 'edited'
+          <b class="lb-flag">${state.radio.freqMhz != null ? 'edited'
             : (S_.a && S_.a.freq > 0) || (S_.b && S_.b.freq > 0)
               ? 'default · repeater channel' : 'default · network band'}</b>
         </label>
@@ -1133,7 +1175,9 @@ const LinkBudget = (function () {
         ? `Every value below can be overridden, whichever way an end was picked.`
         : S_.picking
           ? 'Click a station to fill it in from its Radio Mobile system, or click empty ground for a hypothetical site. Every value below can be overridden.'
-          : 'Search for either end below, or set both from a line drawn in Draw &amp; measure.'}</p>
+          : 'Search for either end below, or set both from a line drawn in Draw &amp; measure.'}
+        The figures at each end and the frequency are the elevation profile’s too: change one in either card and
+        both follow, and so does the radio path card when one is open.</p>
       <div class="lb-ends">
         ${endpointCard('a', S_.a)}
         ${endpointCard('b', S_.b)}
@@ -1198,6 +1242,7 @@ const LinkBudget = (function () {
   // they stop matching and the layer recomputes — but only when it is on, and
   // only by redrawing the lines it already has.
   function propChanged() {
+    refreshDefaults();
     rerender();
     PathProfile.rerender();
     MapBackbone.profileChanged();
@@ -1408,13 +1453,13 @@ const LinkBudget = (function () {
       if (!S().picking || state.draw.tool || !state.data) return false;
       return takeStationEnd(sid, null);
     },
+    // The frequency is one for every card (state.radio), so the profile is
+    // drawn again at it — its Fresnel zone, its loss and its margin — and the
+    // radio-path card quotes the profile's new figure.
     setFreq(v) {
       const n = Number(v);
-      S().freqMhz = isFinite(n) && n > 0 ? n : null;
-      rerender();
-      // The profile chart's curvature and cover terms do not move with the
-      // frequency, but the radio-path card above it quotes this budget.
-      MapBackbone.profileChanged();
+      state.radio.freqMhz = String(v).trim() !== '' && isFinite(n) && n > 0 ? n : null;
+      radioChanged();
     },
 
     // One propagation setting. The model validates ranges itself and says why
@@ -1454,22 +1499,41 @@ const LinkBudget = (function () {
     // The gain box, typed in dBd and kept in dBi (lbDbd). Blank, as for every
     // box, puts the default back.
     setGainDbd(which, k, v) {
-      const n = v.trim() === '' ? null : Number(v);
-      LinkBudget.setField(which, k, n != null && isFinite(n) ? String(n + LB_DIPOLE_DBI) : '');
+      LinkBudget.setField(which, k, dbdToDbi(v));
     },
+    // One figure at one end. `e.over` is the site's own object in
+    // state.radio, so this is the elevation profile's figure for the same
+    // station too, and both cards and the radio-path card follow at once.
     setField(which, k, v) {
       const e = S()[which];
-      if (!e) return;
-      const n = v.trim() === '' ? null : Number(v);
-      // Blanking a box puts the default back rather than leaving a hole.
-      e.over[k] = n != null && isFinite(n) ? n : null;
-      if (e.over[k] == null) delete e.over[k];
-      rerender();
+      if (e) writeField(e, k, v);
     },
-    // Clear one end: the endpoint, its overrides and whatever is typed in its
-    // box. An armed end stays armed — "clear this and pick another" is what the
-    // button is usually pressed for, and there is a separate control that says
-    // stop.
+    // A box's change, from the page. The end is the one the box belongs to
+    // now, and the figure goes to it once focus has finished leaving the box
+    // (radioCommit) — held by the end rather than by its letter, so a press
+    // that puts another station at this end cannot carry the figure to it.
+    typed(which, k, v) {
+      const e = S()[which];
+      if (!e) return;
+      const fig = k === 'gain_dbi' ? dbdToDbi(v) : v;
+      radioCommit(writeField, e, k, fig);
+    },
+    // Every figure at one end back to its site's own. The figures typed for a
+    // site stay with it — pick it again, or find it at the end of another
+    // path, and they are still there, flagged — so this is the way back.
+    resetEnd(which) {
+      const e = S()[which];
+      if (!e) return;
+      for (const k of Object.keys(e.over)) delete e.over[k];
+      radioChanged();
+      handFocus(`lb-f-${which}-tx_w`);
+    },
+    // Clear one end: the endpoint and whatever is typed in its box. The
+    // figures typed for it stay with its site (resetEnd is the way back from
+    // those), because the profile may still be drawn on it and is pricing with
+    // them. An armed end stays armed — "clear this and pick another" is what
+    // the button is usually pressed for, and there is a separate control that
+    // says stop.
     clearEnd(which) {
       if (which !== 'a' && which !== 'b') return;
       findQ(which);
@@ -1537,25 +1601,21 @@ const LinkBudget = (function () {
     // panel picks them up and the diffraction term can be filled in.
     profileThis() { showProfile(true); },
 
-    // The chart and this table are describing the same hop with different
-    // antenna heights or a different frequency. Put the budget's figures into
-    // the profile panel so the picture matches the numbers.
+    // The chart and this table are describing the same hop at different
+    // figures (divergenceHtml has how that can still happen). This card's
+    // frequency and heights go into the shared figures, so the picture and
+    // the numbers are on one set again.
     //
-    // A button rather than something profileThis() does silently: state.path
-    // holds one set of overrides for *every* line drawn on the map, so writing
-    // to it would quietly re-height the next hand-drawn path as well. That is
-    // the operator's call to make, once, with the divergence in front of them.
+    // A button rather than something the card does silently: the frequency
+    // typed in is every card's from then on, so it applies to the next path
+    // profiled as well. That is the operator's call to make, once, with the
+    // divergence in front of them.
     matchProfile() {
       const { a, b } = S();
       if (!a || !b) return;
-      const an = analysisFor(a, b);
-      if (!an) return;
-      const A = val(a, 'agl_m'), B = val(b, 'agl_m');
-      state.path.freqMhz = freqOf();
-      state.path.aglA = an.chartFlipped ? B : A;
-      state.path.aglB = an.chartFlipped ? A : B;
-      PathProfile.rerender();
-      rerender();
+      state.radio.freqMhz = freqOf();
+      for (const e of [a, b]) e.over.agl_m = val(e, 'agl_m');
+      radioChanged();
     },
   };
 })();

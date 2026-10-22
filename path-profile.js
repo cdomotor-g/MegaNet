@@ -10,12 +10,19 @@
 //                 link-budget.js, map-los.js, map-fade.js, map-polar.js,
 //                 map-3d.js and network-review.js, which is why they travel
 //                 with this file rather than with the budget.
+//   the radio     radioKey, radioOver, radioDefaults, radioVal, radioIsOver,
+//   at each end   radioFreq, radioChanged, radioCommit: one set of figures
+//                 per site — TX power, gain, line loss, antenna height,
+//                 threshold — and one frequency, which this card, the link
+//                 budget and the radio-path card (map-backbone.js) all price
+//                 with.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm, RM_NET_DEFAULTS and
 // FN_MODEL_DEFAULTS;
 // sideways to terrain.js for Terrain, land-cover.js for LandCover, itm.js for
-// ITM, map-draw.js for MapDraw and link-budget.js for LinkBudget and
+// ITM, map-draw.js for MapDraw, map-backbone.js for MapBackbone (radioChanged
+// repaints its card) and link-budget.js for LinkBudget, LB_DEFAULT_LOSS_DB and
 // lbMarginClass — the fade-margin row in the profile readout bands against
 // the budget card's own bands, so the two cannot disagree about one number.
 //
@@ -207,6 +214,117 @@ function pathPropOf(opt) {
     allowance: Math.max(0, num(p.allowance, F.allowance)),
     mastAgl:   Math.max(0, num(p.mastAgl, F.mastAgl)),
   };
+}
+
+// ── The radio at each end ────────────────────────────────────────────────────
+// Every fade margin the path tools quote — the link budget's, the elevation
+// profile's and the radio-path card's at the head of them — is taken off one
+// set of figures per site: its radio system's, with whatever has been typed
+// over them in either card. It was three sets. The budget kept its overrides on
+// its own two ends, the profile kept an antenna height per end of whatever line
+// was drawn and a frequency of its own, and the radio-path card read the radio
+// systems raw — so a TX power typed into the budget moved the budget's margin
+// and nothing else on the page, and the same hop was quoted two ways a card
+// apart.
+//
+// Kept by site rather than by a card's end: a figure typed for a station is
+// that station's wherever it turns up — either end of either card, or a line
+// turned round — and a point on the ground is keyed by its position, to the
+// 1e-5° a line's points are read at, so the budget's hypothetical end and the
+// line drawn to it are one site. Overrides only, in state.radio (core.js);
+// blanking a box deletes the override and the site's own figure is back.
+//
+// The fade-margin map is not one of the cards that follows: its colours are
+// the network as recorded, saved to the datastore against the settings they
+// were computed on, and a what-if typed here is not a fact about the network.
+
+function radioKey(st, lat, lon) {
+  return st ? `s:${st.id}` : `p:${Number(lat).toFixed(5)},${Number(lon).toFixed(5)}`;
+}
+
+// The overrides for one site — the very object both cards write to, made the
+// first time anything asks for it.
+function radioOver(key) {
+  const ends = state.radio.ends;
+  return ends[key] || (ends[key] = {});
+}
+
+// What a site starts from before anything is typed: its radio system's
+// figures, the antenna at the mast height at a repeater or base
+// (stationAntenna) — or, at a point on the ground, the 1 W field station most
+// of this network is, down to its line loss (LB_DEFAULT_LOSS_DB, link-budget.js,
+// read when this runs rather than when the file loads).
+function radioDefaults(st) {
+  if (!st) {
+    return { tx_w: 1, loss_db: LB_DEFAULT_LOSS_DB, gain_dbi: 5.15, agl_m: PATH_DEFAULT_AGL, rx_dbm: -117 };
+  }
+  const sys = rmSystemOf(st);
+  return {
+    tx_w:     sys && sys.tx_power_w != null ? sys.tx_power_w : null,
+    loss_db:  sys && sys.line_loss_db != null ? sys.line_loss_db : null,
+    gain_dbi: sys && sys.antenna_gain_dbi != null ? sys.antenna_gain_dbi : null,
+    agl_m:    stationAntenna(st, sys).agl,
+    rx_dbm:   sys && sys.rx_threshold_dbm != null ? sys.rx_threshold_dbm : null,
+  };
+}
+
+// One figure at a site: the override if there is one, else the default given.
+function radioVal(key, def, k) {
+  const o = state.radio.ends[key];
+  return o && o[k] != null ? o[k] : def[k];
+}
+
+// Whether a figure at a site has been typed over.
+function radioIsOver(key, k) {
+  const o = state.radio.ends[key];
+  return !!(o && o[k] != null);
+}
+
+// The frequency every card prices at: the one typed in either card's box,
+// else the repeater on either end of the path, else the network's band.
+function radioFreq(stA, stB) {
+  if (state.radio.freqMhz > 0) return state.radio.freqMhz;
+  for (const st of [stA, stB]) {
+    const r = st && st.repeater;
+    if (r && r.rx_mhz > 0) return r.rx_mhz;
+  }
+  return PATH_DEFAULT_MHZ;
+}
+
+// A figure in state.radio moved: every card that prices from it is drawn
+// again. The profile first, because the radio-path card quotes the margin the
+// profile last drew (PathProfile.shownMargin).
+function radioChanged() {
+  PathProfile.rerender();
+  LinkBudget.rerender();
+  MapBackbone.profileChanged();
+}
+
+// A box's figure, taken once focus has finished leaving it. A box commits on
+// `change`, which fires as focus is on its way out — mid-Tab, or mid-press of
+// whatever was clicked next — and a commit repaints both cards, which replaces
+// the very control focus is going to: Tab put the caret on the page rather
+// than in the next box, and a press on a button in the other card never
+// became a click. So the figure is taken a task later, once the focus has
+// landed and the repaints can put it back (keepFocus, PathProfile.rerender),
+// or — with a press still held — after its release, and a moment after that,
+// so the click lands first. Not for ever: a release the page never hears (let
+// go outside the window) is waited for for two seconds.
+function radioCommit(fn, ...args) {
+  setTimeout(() => {
+    if (!document.querySelector(':active')) { fn(...args); return; }
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener('pointerup', go, true);
+      document.removeEventListener('pointercancel', go, true);
+      setTimeout(() => fn(...args), 0);
+    };
+    document.addEventListener('pointerup', go, true);
+    document.addEventListener('pointercancel', go, true);
+    setTimeout(go, 2000);
+  }, 0);
 }
 
 // ── The ground a path is priced over ─────────────────────────────────────────
@@ -550,6 +668,7 @@ const PathProfile = (function () {
   // from painting onto the chart that replaced it.
   let hoverGeom = null;
   let refocusFlip = null;    // the id of the ⇄ that was pressed — see rerender()
+  let committed = null;      // the box whose own change is being drawn — see rerender()
   // What the chart on the card was last drawn from — the analysis, the ground
   // and the two ends — or null when bodyHtml drew no chart. The full-screen
   // view draws from it, and the radio-path card quotes its margin.
@@ -587,30 +706,31 @@ const PathProfile = (function () {
   }
 
   // What each end of the line is: a station (with its surveyed height and its
-  // radio system) or just a point on the ground.
+  // radio system) or just a point on the ground — and the site its radio
+  // figures are kept under (radioKey), which is what the budget card reads
+  // and writes for the same place.
   function endpoint(sh, end) {
     const i = end === 0 ? 0 : sh.pts.length - 1;
     const st = stationOf(sh, end);
     const sys = st ? rmSystemOf(st) : null;
+    const key = radioKey(st, sh.pts[i][0], sh.pts[i][1]);
+    const def = radioDefaults(st);
     return {
-      station: st, sys,
+      station: st, sys, key, def,
       name: st ? st.name : `${sh.pts[i][0].toFixed(4)}, ${sh.pts[i][1].toFixed(4)}`,
       isStation: !!st,
       elev: st && st.elevation_ahd != null ? st.elevation_ahd : null,
-      // A repeater's or base's mast, where its system says less (stationAntenna).
-      agl: st ? stationAntenna(st, sys).agl : PATH_DEFAULT_AGL,
+      // A repeater's or base's mast, where its system says less (stationAntenna),
+      // or whatever has been typed for this site in either card.
+      agl: radioVal(key, def, 'agl_m'),
     };
   }
 
-  // The frequency to run the Fresnel maths at: whatever repeater is on either
-  // end of this path, else the band the network lives in.
+  // The frequency to run the Fresnel maths at: the one typed in either card,
+  // else whatever repeater is on either end of this path, else the band the
+  // network lives in.
   function freqFor(a, b) {
-    if (P().freqMhz > 0) return P().freqMhz;
-    for (const e of [a, b]) {
-      const r = e.station && e.station.repeater;
-      if (r && r.rx_mhz > 0) return r.rx_mhz;
-    }
-    return PATH_DEFAULT_MHZ;
+    return radioFreq(a.station, b.station);
   }
 
   // Everything that quotes this profile follows it: the budget's terrain and
@@ -685,8 +805,7 @@ const PathProfile = (function () {
   function mainOpts(a, b) {
     return {
       elevA: a.elev, elevB: b.elev,
-      aglA: P().aglA != null ? P().aglA : a.agl,
-      aglB: P().aglB != null ? P().aglB : b.agl,
+      aglA: a.agl, aglB: b.agl,
       freqMhz: freqFor(a, b),
       ...coverFor(),
     };
@@ -1404,7 +1523,9 @@ const PathProfile = (function () {
   // after paying it" — and until now this card made them open the link budget
   // to find out. Same figure, same terms, same refusal to invent a missing one
   // (link-budget.js's rule): TX power, both antenna gains, both line losses and
-  // the RX threshold, all read off the two ends' rm_systems rows.
+  // the RX threshold, read off the two ends' rm_systems rows — and off
+  // whatever has been typed over them, here or in the budget, since the two
+  // cards keep one set of figures per site (radioVal).
   //
   // Both directions and the worse of the two, which is MapFade's view rather
   // than the budget card's: the budget is aimed A→B because an operator aimed
@@ -1416,12 +1537,11 @@ const PathProfile = (function () {
   // a margin computed around an assumed one would be this card inventing a
   // network — the link budget is where hypothetical ends live.
   function endRadio(e) {
-    const sys = e.sys;
     return {
-      txW:  sys && sys.tx_power_w != null ? sys.tx_power_w : null,
-      gain: sys && sys.antenna_gain_dbi != null ? sys.antenna_gain_dbi : null,
-      loss: sys && sys.line_loss_db != null ? sys.line_loss_db : null,
-      thr:  sys && sys.rx_threshold_dbm != null ? sys.rx_threshold_dbm : null,
+      txW:  radioVal(e.key, e.def, 'tx_w'),
+      gain: radioVal(e.key, e.def, 'gain_dbi'),
+      loss: radioVal(e.key, e.def, 'loss_db'),
+      thr:  radioVal(e.key, e.def, 'rx_dbm'),
     };
   }
 
@@ -1448,15 +1568,14 @@ const PathProfile = (function () {
 
   // { m, ab, ba } when both directions compute, else why not — one of
   // 'ends' (a point on the ground rather than a station), 'system' (a station
-  // with no rm_system on file), 'loss' (the model did not run) or a list of
-  // named terms nobody has supplied.
+  // with no rm_system on file, and nothing typed in its place), 'loss' (the
+  // model did not run) or a list of named terms nobody has supplied.
   function profileMargin(an, a, b) {
     if (!a.isStation || !b.isStation) return { m: null, why: 'ends' };
-    if (!a.sys || !b.sys) return { m: null, why: 'system' };
-    if (an.pathLoss_db == null) return { m: null, why: 'loss' };
     const ra = endRadio(a), rb = endRadio(b);
     const missing = [...missingTerms(a, ra), ...missingTerms(b, rb)];
-    if (missing.length) return { m: null, why: 'missing', missing };
+    if (missing.length) return { m: null, why: !a.sys || !b.sys ? 'system' : 'missing', missing };
+    if (an.pathLoss_db == null) return { m: null, why: 'loss' };
     const ab = marginOneWay(an, ra, rb), ba = marginOneWay(an, rb, ra);
     if (ab == null || ba == null) return { m: null, why: 'missing', missing };
     return { m: Math.min(ab, ba), ab, ba };
@@ -1927,6 +2046,17 @@ const PathProfile = (function () {
     }
   }
 
+  // One radio figure written to a site, and every card that prices from it
+  // drawn again. Blank deletes it, and the site's own figure is back.
+  function writeRadio(key, k, v) {
+    if (!['tx_w', 'gain_dbi', 'loss_db', 'agl_m', 'rx_dbm'].includes(k)) return;
+    const n = String(v).trim() === '' ? null : Number(v);
+    const o = radioOver(key);
+    if (n != null && isFinite(n)) o[k] = n; else delete o[k];
+    committed = document.activeElement;
+    radioChanged();
+  }
+
   // ── the panel ──
 
   function readoutHtml(an, a, b) {
@@ -2046,37 +2176,50 @@ const PathProfile = (function () {
       </details>`;
   }
 
+  // The radio figures this card lets you change, each one the figure its site
+  // keeps for every card (state.radio): a TX power typed here is the one the
+  // link budget below shows for the same station, and one typed there shows up
+  // here, and both margins and the radio-path card's follow. TX power at each
+  // station end, then the antenna heights and the frequency; the gains, line
+  // losses and thresholds are edited in the budget, and are in this card's
+  // margin all the same.
   function endsFormHtml(a, b, an) {
     // Where a value came from, under the box it is in — so an antenna height
     // that arrived from the station's own system says so, and one that was
-    // typed doesn't pretend to have.
-    const src = (e, over) => `<b class="path-src">${
-      over != null ? 'edited'
+    // typed (in either card) doesn't pretend to have.
+    const src = (e, k) => `<b class="path-src">${
+      radioIsOver(e.key, k) ? 'edited'
         : e.isStation && e.sys ? `default · ${esc(e.sys.name)}`
         : 'default'}</b>`;
+    const box = (tag, e, k, label, step, value) => `
+        <label class="draw-field">
+          <span>${esc(e.name)} ${label}</span>
+          <input type="number" step="${step}" min="0" id="path-f-${tag}-${k}"
+                 value="${value == null ? '' : value}" placeholder="not set"
+                 onchange="PathProfile.typed('${tag}', '${k}', this.value)">
+          ${src(e, k)}
+        </label>`;
+    // A point on the ground has no radio and no margin on this card
+    // (profileMargin), so it gets no TX power box to change nothing with.
+    const tx = (tag, e) => (e.isStation
+      ? box(tag, e, 'tx_w', 'TX power (W)', '0.1', radioVal(e.key, e.def, 'tx_w')) : '');
     return `
       <div class="path-form">
-        <label class="draw-field">
-          <span>${esc(a.name)} antenna (m AGL)</span>
-          <input type="number" step="0.5" min="0" value="${an.aglA}"
-                 onchange="PathProfile.setAgl('A', this.value)">
-          ${src(a, P().aglA)}
-        </label>
-        <label class="draw-field">
-          <span>${esc(b.name)} antenna (m AGL)</span>
-          <input type="number" step="0.5" min="0" value="${an.aglB}"
-                 onchange="PathProfile.setAgl('B', this.value)">
-          ${src(b, P().aglB)}
-        </label>
+        ${tx('A', a)}
+        ${box('A', a, 'agl_m', 'antenna (m AGL)', '0.5', an.aglA)}
+        ${tx('B', b)}
+        ${box('B', b, 'agl_m', 'antenna (m AGL)', '0.5', an.aglB)}
         <label class="draw-field">
           <span>Frequency (MHz)</span>
-          <input type="number" step="0.1" min="1" value="${an.fMhz}"
-                 onchange="PathProfile.setFreq(this.value)">
-          <b class="path-src">${P().freqMhz != null ? 'edited'
+          <input type="number" step="0.1" min="1" id="path-freq" value="${an.fMhz}"
+                 onchange="radioCommit(PathProfile.setFreq, this.value)">
+          <b class="path-src">${state.radio.freqMhz != null ? 'edited'
             : (a.station && a.station.repeater) || (b.station && b.station.repeater)
               ? 'default · repeater channel' : 'default · network band'}</b>
         </label>
       </div>
+      <p class="filter-hint">The link budget below works from these same figures: change one in either card and
+        both follow, and so does the radio path card above when one is open. Blank a box to put its default back.</p>
       <label class="filter-check">
         <input type="checkbox" id="path-cover-switch" ${P().cover ? 'checked' : ''}
                onchange="PathProfile.setCover(this.checked)">
@@ -2329,12 +2472,21 @@ const PathProfile = (function () {
     // redrawn whenever the ground or the cover arrives — so a keyboard user
     // who opened it, or was sent to it, would find themselves on the page.
     // It goes back to the same control, or failing that to the card's header.
+    //
+    // And what was in that box, if it was one: the boxes commit on `change`,
+    // so a figure half-typed when the cover landed would otherwise go back to
+    // the old one under the caret (LinkBudget's keepFocus, and its reasons).
+    // Not when the repaint is that box's own change being drawn — the box
+    // then shows the figure as it was taken, the default back for a blank.
     const f = document.activeElement;
     const back = f && f !== el && el.contains(f) ? (f.id || 'summary') : '';
+    const typed = back && f.tagName === 'INPUT' && f !== committed ? f.value : null;
+    committed = null;
     shown = null;
     el.innerHTML = sh ? panelHtml() : emptyHtml();
     if (back) {
       const to = (back !== 'summary' && document.getElementById(back)) || el.querySelector('summary');
+      if (to && typed != null && to.id === back && to.value !== typed) to.value = typed;
       if (to) to.focus({ preventScroll: true });
     }
     // The full-screen view, from what the card was just drawn from.
@@ -2424,17 +2576,29 @@ const PathProfile = (function () {
       refocusFlip = full ? 'path-full-flip' : 'path-flip';
       MapDraw.flipLine(sh.id);
     },
-    setAgl(which, v) {
-      const n = v.trim() === '' ? null : Number(v);
-      P()[which === 'A' ? 'aglA' : 'aglB'] = isFinite(n) ? n : null;
-      rerender();
-      announce();
+    // One of an end's radio figures, typed on this card. It goes to the
+    // site's own figures (state.radio) rather than to this card, so the link
+    // budget, the radio-path card and this one all price with it at once, and
+    // it stays with the site when the line is turned round. Blank deletes it,
+    // and the site's own figure is back.
+    setRadio(which, k, v) {
+      const sh = target();
+      if (sh) writeRadio(endpoint(sh, which === 'B' ? 1 : 0).key, k, v);
     },
+    // A box's change, from the page: held by the site the box is for now, and
+    // written once focus has finished leaving the box (radioCommit), so a
+    // press that moves the profile to another line cannot carry it there.
+    typed(which, k, v) {
+      const sh = target();
+      if (sh) radioCommit(writeRadio, endpoint(sh, which === 'B' ? 1 : 0).key, k, v);
+    },
+    setAgl(which, v) { PathProfile.setRadio(which, 'agl_m', v); },
+    // The frequency, which is one for every card, as the radio figures are.
     setFreq(v) {
       const n = Number(v);
-      P().freqMhz = isFinite(n) && n > 0 ? n : null;
-      rerender();
-      announce();
+      state.radio.freqMhz = String(v).trim() !== '' && isFinite(n) && n > 0 ? n : null;
+      committed = document.activeElement;
+      radioChanged();
     },
     // The ground-cover switch. Turning it on fetches for the profile in hand;
     // turning it off keeps what was fetched (it is cached anyway) and simply
@@ -2501,8 +2665,8 @@ const PathProfile = (function () {
       const g = cur.prof.terrain_m;
       const drawn = {
         fMhz: freqFor(ea, eb),
-        aglA: P().aglA != null ? P().aglA : ea.agl,
-        aglB: P().aglB != null ? P().aglB : eb.agl,
+        aglA: ea.agl,
+        aglB: eb.agl,
         groundA: ea.elev != null ? ea.elev : g[0],
         groundB: eb.elev != null ? eb.elev : g[g.length - 1],
       };

@@ -631,15 +631,14 @@ const MapDraw = (function () {
   // and "Link budget for this path →" takes A as its transmitter — so this is
   // how an operator says which end is which without redrawing the line.
   //
-  // The snaps go with their points, and so do the profile card's typed antenna
-  // heights when this is the line it is describing: a height typed for a site
-  // belongs to the site, not to whichever end of the line it happens to be.
+  // The snaps go with their points, and the figures typed for each end go
+  // with them without being moved: they are kept by site (state.radio,
+  // path-profile.js), not by which end of the line a site happens to be.
   // The new geometry changes the profile's signature, so the terrain is walked
   // again the other way round (the tiles are cached; it costs no fetch).
   function flipLine(id) {
     const sh = D().shapes.find(s => s.id === id);
     if (!sh || sh.kind !== 'line' || sh.pts.length < 2) return;
-    const wasTarget = PathProfile.target() === sh;
     sh.pts = sh.pts.slice().reverse();
     if (Array.isArray(sh.snappedTo)) {
       // A snap list is read end-first-and-last (snapLabel), so one shorter
@@ -649,10 +648,6 @@ const MapDraw = (function () {
       const full = t.length === n ? t.slice()
         : sh.pts.map((_, i) => i === 0 ? t[0] ?? null : i === n - 1 ? t[t.length - 1] ?? null : null);
       sh.snappedTo = full.reverse();
-    }
-    if (wasTarget) {
-      const P_ = state.path, a = P_.aglA;
-      P_.aglA = P_.aglB; P_.aglB = a;
     }
     D().selectedId = sh.id;
     render();
