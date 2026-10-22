@@ -28,10 +28,9 @@
 # changing the extract's layout, fails the run (GitHub emails the owner)
 # instead of quietly emptying the layer.
 #
-# If the download step starts failing: ACMA planned to retire the legacy
-# web.acma.gov.au register (announced for mid-2026). Find the new bulk
-# "Radiocomms licence data" download link on acma.gov.au and update
-# ACMA_ZIP_URL below. As a stopgap, the extract can also be attached to a
+# If the download step starts failing: ACMA retired the legacy web.acma.gov.au
+# host in October 2026. Find the new bulk "Radiocomms licence data" download
+# link on acma.gov.au and put it first in ACMA_ZIP_URLS below. As a stopgap, the extract can also be attached to a
 # GitHub Release (see the acma-data-* tags) and the URL pointed there.
 #
 # Pushes made with GITHUB_TOKEN start no other workflow, and data/acma-* is
@@ -56,7 +55,17 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  ACMA_ZIP_URL: https://web.acma.gov.au/rrl-updates/spectra_rrl.zip
+  # Tried in order; the first that answers with a valid zip wins and the log
+  # says which. web.acma.gov.au stopped resolving in October 2026 (ACMA moved
+  # the offline register to cdn.acma.gov.au), so the CDN host comes first and
+  # the legacy host stays as a fallback in case the outage was temporary. If
+  # all fail, find the current link from the "Data download" tab of
+  # https://www.acma.gov.au/register-radiocommunication-licences-rrl and put it
+  # first here.
+  ACMA_ZIP_URLS: >-
+    https://cdn.acma.gov.au/rrl-updates/spectra_rrl.zip
+    https://cdn.acma.gov.au/offline-rrl/spectra_rrl.zip
+    https://web.acma.gov.au/rrl-updates/spectra_rrl.zip
 
 jobs:
   refresh:
@@ -66,11 +75,20 @@ jobs:
 
       - name: Download ACMA extract
         run: |
-          curl -fSL --retry 3 --retry-delay 15 \
-            -A "FloodNet-flood-telemetry-interference-check (+https://github.com/${{ github.repository }})" \
-            -o /tmp/spectra_rrl.zip "$ACMA_ZIP_URL"
-          ls -l /tmp/spectra_rrl.zip
-          python3 -c "import zipfile,sys; z=zipfile.ZipFile('/tmp/spectra_rrl.zip'); bad=z.testzip(); sys.exit('corrupt member: %s' % bad if bad else 0)"
+          for url in $ACMA_ZIP_URLS; do
+            echo "Trying $url"
+            rm -f /tmp/spectra_rrl.zip
+            if curl -fSL --retry 2 --retry-delay 15 \
+                 -A "FloodNet-flood-telemetry-interference-check (+https://github.com/${{ github.repository }})" \
+                 -o /tmp/spectra_rrl.zip "$url" \
+               && python3 -c "import zipfile,sys; z=zipfile.ZipFile('/tmp/spectra_rrl.zip'); bad=z.testzip(); sys.exit('corrupt member: %s' % bad if bad else 0)"; then
+              echo "Downloaded from $url"; ls -l /tmp/spectra_rrl.zip
+              echo "Extract downloaded from $url" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done
+          echo "::error::No ACMA download URL worked. Update ACMA_ZIP_URLS in this workflow."
+          exit 1
 
       - name: Remember the last committed subset's counts
         run: cp data/acma-raw/_manifest.json /tmp/prev_manifest.json
