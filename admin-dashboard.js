@@ -27,11 +27,14 @@
 const AdminDash = (function () {
 
   const VISITOR_KEY = 'meganet.visitor';
-  // Supabase's free tier: 500 MB of database, 1 GB of file storage. The
-  // project is on it (README, "a free-tier Supabase project pauses"), so the
-  // meters are against those; a paid plan would only make them read low.
-  const DB_LIMIT      = 500 * 1024 * 1024;
-  const STORAGE_LIMIT = 1024 * 1024 * 1024;
+  // Supabase's Pro plan, which the project moved to from the free tier (and
+  // its 500 MB read-only ceiling): 8 GB of disk included per project, 100 GB
+  // of file storage across the organisation. Past 8 GB the disk grows and is
+  // billed, or goes read-only if the spend cap is on. The meter reads the
+  // database's own size, which is a little under the disk it occupies (the
+  // WAL and logs are on the disk too), so it reads slightly low.
+  const DB_LIMIT      = 8 * 1024 * 1024 * 1024;
+  const STORAGE_LIMIT = 100 * 1024 * 1024 * 1024;
   const AUTO_MS       = 60 * 1000;
 
   let data    = null;
@@ -172,7 +175,7 @@ const AdminDash = (function () {
     if (connPct >= 80) problems.push('connections near the limit');
     if (hit != null && hit < 99) problems.push('cache hit below 99%');
     if ((c.idle_in_tx || 0) > 0 && (c.longest_tx_s || 0) > 300) problems.push('a transaction open over 5 min');
-    if (pct(db.size_bytes, DB_LIMIT) >= 90) problems.push('database near 500 MB');
+    if (pct(db.size_bytes, DB_LIMIT) >= 90) problems.push('database near the 8 GB included disk');
     if (String(db.schema_version) !== String(DB_SCHEMA_VERSION)) problems.push(`schema v${db.schema_version}, app expects v${DB_SCHEMA_VERSION}`);
     const today = (v.days || [])[(v.days || []).length - 1] || { signed_in: 0, anonymous: 0, hits: 0 };
     const storageBytes = (d.storage || []).reduce((s, b) => s + Number(b.bytes || 0), 0);
@@ -185,9 +188,9 @@ const AdminDash = (function () {
              problems.length ? esc(problems.join('; ')) : `Postgres ${esc(String(db.version || '').split(' ')[0])} · up ${span(up)}`,
              problems.length ? 'warn' : 'ok')}
       ${tile('Database size', bytes(db.size_bytes),
-             `${meter(db.size_bytes, DB_LIMIT, 'Database size')}${pct(db.size_bytes, DB_LIMIT)}% of the 500 MB free tier`)}
+             `${meter(db.size_bytes, DB_LIMIT, 'Database size')}${pct(db.size_bytes, DB_LIMIT)}% of the 8 GB disk included on Pro`)}
       ${tile('File storage', bytes(storageBytes),
-             `${meter(storageBytes, STORAGE_LIMIT, 'File storage')}${num(storageObjs)} files · ${pct(storageBytes, STORAGE_LIMIT)}% of 1 GB`)}
+             `${meter(storageBytes, STORAGE_LIMIT, 'File storage')}${num(storageObjs)} files · ${pct(storageBytes, STORAGE_LIMIT)}% of the 100 GB included on Pro`)}
       ${tile('Connections', `${num(c.active)} <small>active</small>`,
              `${num(c.total)} open of ${num(db.max_connections)} · ${num(c.idle_in_tx)} idle in transaction`)}
       ${tile('Cache hit', hit == null ? '—' : `${hit}%`,
