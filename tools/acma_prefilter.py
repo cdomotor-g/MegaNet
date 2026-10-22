@@ -165,28 +165,49 @@ def to_float(v):
         return None
 
 
+def _read_anchor_file(src):
+    with open(src, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    if isinstance(data, dict) and "stations" in data:
+        out = []
+        for s in data["stations"]:
+            if "repeater" not in (s.get("roles") or []):
+                continue
+            if s.get("lat") is None or s.get("lon") is None:
+                continue
+            r = s.get("repeater") or {}
+            out.append({"id": s.get("id"), "name": s.get("name"),
+                        "lat": s["lat"], "lon": s["lon"],
+                        "rx_mhz": r.get("rx_mhz"), "tx_mhz": r.get("tx_mhz")})
+        return out
+    return data
+
+
 def load_anchors(path, bundled_path):
-    src = path or bundled_path
-    if src and os.path.exists(src):
-        with open(src, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-        if isinstance(data, dict) and "stations" in data:
-            out = []
-            for s in data["stations"]:
-                if "repeater" not in (s.get("roles") or []):
-                    continue
-                if s.get("lat") is None or s.get("lon") is None:
-                    continue
-                r = s.get("repeater") or {}
-                out.append({"id": s.get("id"), "name": s.get("name"),
-                            "lat": s["lat"], "lon": s["lon"],
-                            "rx_mhz": r.get("rx_mhz"), "tx_mhz": r.get("tx_mhz")})
-            return out
-        return data
-    raise SystemExit(
-        "No anchor list found. Pass --stations path/to/stations.json "
-        "(download it from your repo) or place anchors.json beside this script."
-    )
+    """Anchors from stations.json, UNIONED with the bundled anchors.json.
+
+    The archived monthly subsets are compared month to month, so the area they
+    cover must not shrink when somebody edits a station's roles: October 2026's
+    run read 91 repeaters from stations.json where July's had used the 178 in
+    anchors.json, and the diff reported 2,819 "removed" transmitters that had
+    simply fallen outside the smaller footprint. stations.json still wins for a
+    repeater it has (its rx/tx frequencies are the live ones); the bundled list
+    only adds the ones it is missing."""
+    if not path and not (bundled_path and os.path.exists(bundled_path)):
+        raise SystemExit(
+            "No anchor list found. Pass --stations path/to/stations.json "
+            "(download it from your repo) or place anchors.json beside this script."
+        )
+    out, seen = [], set()
+    for src in (path, bundled_path):
+        if not src or not os.path.exists(src):
+            continue
+        for a in _read_anchor_file(src):
+            if a.get("id") in seen:
+                continue
+            seen.add(a.get("id"))
+            out.append(a)
+    return out
 
 
 def build_windows(anchors, harmonics, tol_khz):

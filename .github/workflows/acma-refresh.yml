@@ -74,6 +74,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download ACMA extract
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Discover the current link too: ACMA has moved this file before, so
           # any spectra_rrl*.zip linked from its register pages (or the offline
@@ -104,7 +106,18 @@ jobs:
           PY
           )
           echo "Discovered on ACMA pages:"; echo "$found" | grep -v '^#' || true
-          for url in $ACMA_ZIP_URLS $(echo "$found" | grep -v '^#'); do
+          # Last resort, and the manual route when ACMA moves the file again:
+          # download spectra_rrl.zip by hand and attach it to a GitHub Release
+          # tagged acma-data-YYYY-MM-DD. The newest such release is used only
+          # if its extract is under 10 days old, so a stale upload never
+          # masquerades as this week's register.
+          rel=$(gh api "repos/${{ github.repository }}/releases?per_page=30" --jq '
+            [.[] | select(.tag_name|startswith("acma-data-"))
+                 | select((now - (.published_at|fromdateiso8601)) < 864000)
+                 | .assets[] | select(.name|test("spectra_rrl.*\\.zip$"))
+                 | .browser_download_url][0] // empty' 2>/dev/null || true)
+          [ -n "$rel" ] && echo "Recent release asset: $rel"
+          for url in $ACMA_ZIP_URLS $(echo "$found" | grep -v '^#') $rel; do
             echo "Trying $url"
             rm -f /tmp/spectra_rrl.zip
             if curl -fSL --retry 2 --retry-delay 15 \

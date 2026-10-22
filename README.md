@@ -5712,9 +5712,13 @@ snapshot archive + diff) and commits the result straight to `main` when anything
 changed. Weekly rather than monthly because ACMA keeps no back-catalogue: each
 month gets several chances to be captured, and the month's archive is replaced
 by each newer extract of that month. It refuses an extract that has lost more
-than 30% of the subset's devices. In sandboxed
-environments without ACMA access, attach the extract to a GitHub Release
-(see the `acma-data-*` tags) and fetch it from there instead.
+than 30% of the subset's devices. The download
+tries the configured URLs, then any `spectra_rrl*.zip` linked from ACMA's
+register pages, then a GitHub Release tagged `acma-data-YYYY-MM-DD` carrying
+the extract (used only if under 10 days old) — the manual route when ACMA moves
+the file. The prefilter's anchors are the union of `stations.json`'s repeaters
+and the bundled `tools/anchors.json`, so the archived footprint never shrinks
+when a station's roles are edited.
 
 `data/acma-licence-suggestions.csv` matches Flood-Net repeater coordinates
 against ACMA sites to help backfill `repeater.acma_licence` (only 40 of the 88
