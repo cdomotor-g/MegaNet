@@ -31,6 +31,10 @@
 // the values the chart is actually drawing, so a rainfall rollover or a removed
 // neighbour cannot make the figure beside a point disagree with the points.
 //
+// And the step buttons on the two navigators — ◀ ▶ on the strip, ▲ ▼ under
+// the vertical one: pressed where they are drawn, a fifth of the window a
+// press, stopping at the end of the record, and one step for Undo.
+//
 //   node --run adnav      (or: npm run adnav)
 
 import { startServer } from './lib/server.mjs';
@@ -876,6 +880,119 @@ try {
   ok('…Line comes back with Points still on, and Points goes off on its own',
      sty.back === 'Line+Points' && sty.end === 'Line', JSON.stringify(sty));
 
+  // ── 13. The step buttons on the navigators ────────────────────────────────
+  // ◀ ▶ on the strip and ▲ ▼ under the vertical navigator, pressed with the
+  // mouse where they are drawn: each steps a fifth of the window, stops at the
+  // end of the record, says it cannot go further, and is one step for Undo.
+  const center = id => page.evaluate(i => {
+    const b = document.getElementById(i);
+    if (!b) return null;
+    const r = b.getBoundingClientRect();
+    const x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const hit = document.elementFromPoint(x, y);
+    return { x, y, w: r.width, h: r.height, own: !!hit && (hit === b || b.contains(hit)),
+             off: b.getAttribute('aria-disabled') === 'true' };
+  }, id);
+  const press = async id => { const c = await center(id); await page.mouse.click(c.x, c.y); await page.waitForTimeout(40); };
+  const vw = () => page.evaluate(() => {
+    const ad = window.ArroData.ad;
+    const ends = ad.series.filter(s => s.n).map(s => s.t[s.n - 1]);
+    return { view: ad.view && { ...ad.view }, rec1: Math.max(...ends),
+             yMode: ad.yMode, yMin: ad.yMin, yMax: ad.yMax };
+  });
+
+  await page.evaluate(() => { window.ArroData.setChart('line'); window.ArroData.resetView(); });
+  await page.waitForTimeout(80);
+  const whole = { l: await center('ad-nav-left'), r: await center('ad-nav-right') };
+  ok('the four step buttons are on the page, each pressable where it is drawn',
+     whole.l?.own && whole.r?.own && (await center('ad-nav-up'))?.own && (await center('ad-nav-down'))?.own,
+     JSON.stringify(whole));
+  ok('…◀ and ▶ are off while the whole record is in view', whole.l.off && whole.r.off, JSON.stringify(whole));
+  const sx = await page.evaluate(() => {
+    const ov = document.getElementById('ad-ov').getBoundingClientRect();
+    const b = document.getElementById('ad-nav-right').getBoundingClientRect();
+    const vov = document.getElementById('ad-vov').getBoundingClientRect();
+    const up = document.getElementById('ad-nav-up').getBoundingClientRect();
+    return { inMargin: b.right <= ov.left + 64 && b.top >= ov.top && b.bottom <= ov.bottom,
+             under: up.top >= vov.bottom && up.left >= vov.left - 1 && up.right <= vov.right + 1 };
+  });
+  ok('…◀ ▶ sit in the strip\'s left margin, off the track', sx.inMargin, JSON.stringify(sx));
+  ok('…▲ ▼ sit under the vertical navigator', sx.under, JSON.stringify(sx));
+
+  await page.evaluate(() => {
+    const A = window.ArroData, s = A.ad.series[0];
+    const t0 = s.t[0], t1 = s.t[s.n - 1];
+    A.ad.view = { t0: t0 + (t1 - t0) * 0.4, t1: t0 + (t1 - t0) * 0.6 };
+    A.repaint();
+  });
+  await page.waitForTimeout(60);
+  const mid = await vw();
+  ok('…and on once the window is inside the record',
+     !(await center('ad-nav-left')).off && !(await center('ad-nav-right')).off);
+  await press('ad-nav-right');
+  const once = await vw();
+  const step = (mid.view.t1 - mid.view.t0) * 0.2;
+  ok('▶ moves the window a fifth of its width later',
+     Math.abs(once.view.t0 - mid.view.t0 - step) < 2 && Math.abs(once.view.t1 - mid.view.t1 - step) < 2,
+     JSON.stringify({ mid: mid.view, once: once.view }));
+  await page.evaluate(() => window.ArroData.undo());
+  const undone = await vw();
+  ok('…and Undo puts it back', JSON.stringify(undone.view) === JSON.stringify(mid.view),
+     JSON.stringify({ mid: mid.view, undone: undone.view }));
+  await press('ad-nav-left');
+  const left = await vw();
+  ok('◀ moves it a fifth earlier', Math.abs(mid.view.t0 - left.view.t0 - step) < 2,
+     JSON.stringify({ mid: mid.view, left: left.view }));
+  for (let i = 0; i < 100 && !(await center('ad-nav-right')).off; i++) await press('ad-nav-right');
+  const end = await vw();
+  const endBtn = await center('ad-nav-right');
+  ok('▶ pressed until it stops leaves the last reading at the right edge, not past it',
+     endBtn.off && end.view.t1 === end.rec1, JSON.stringify({ end: end.view, rec1: end.rec1 }));
+  await press('ad-nav-right');
+  ok('…and one more press does nothing', JSON.stringify((await vw()).view) === JSON.stringify(end.view));
+
+  // Up and down: the window back in the middle, the axis on Auto, so the box
+  // on the vertical navigator is inside the track with room either way.
+  await page.evaluate(() => {
+    const A = window.ArroData, s = A.ad.series[0];
+    const t0 = s.t[0], t1 = s.t[s.n - 1];
+    A.setY('auto');
+    A.ad.view = { t0: t0 + (t1 - t0) * 0.4, t1: t0 + (t1 - t0) * 0.6 };
+    A.repaint();
+  });
+  await page.waitForTimeout(60);
+  const yb = await page.evaluate(() => {
+    const ad = window.ArroData.ad;
+    return { yMode: ad.yMode, up: document.getElementById('ad-nav-up').getAttribute('aria-disabled'),
+             down: document.getElementById('ad-nav-down').getAttribute('aria-disabled') };
+  });
+  const upOn = yb.up === 'false', downOn = yb.down === 'false';
+  ok('▲ or ▼ is on with the window inside the record\'s range', upOn || downOn, JSON.stringify(yb));
+  const dir = upOn ? 'up' : 'down';
+  await page.focus(`#ad-nav-${dir}`);
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(60);
+  const y1 = await page.evaluate(() => {
+    const ad = window.ArroData.ad;
+    return { yMode: ad.yMode, yMin: +ad.yMin, yMax: +ad.yMax, focus: document.activeElement?.id };
+  });
+  ok(`${dir === 'up' ? '▲' : '▼'} takes the axis to Fixed and keeps the focus on the button`,
+     y1.yMode === 'manual' && y1.focus === `ad-nav-${dir}`, JSON.stringify(y1));
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(60);
+  const y2 = await page.evaluate(() => ({ yMin: +window.ArroData.ad.yMin, yMax: +window.ArroData.ad.yMax }));
+  const ystep = (y1.yMax - y1.yMin) * 0.2 * (dir === 'up' ? 1 : -1);
+  ok('…and the next press moves the range a fifth of its height that way, same height',
+     Math.abs(y2.yMin - y1.yMin - ystep) <= Math.abs(ystep) * 0.01 + 1e-3
+       && Math.abs((y2.yMax - y2.yMin) - (y1.yMax - y1.yMin)) <= (y1.yMax - y1.yMin) * 0.01,
+     JSON.stringify({ y1, y2, ystep }));
+  for (let i = 0; i < 100 && !(await center(`ad-nav-${dir}`)).off; i++) await press(`ad-nav-${dir}`);
+  ok(`…and ${dir === 'up' ? '▲' : '▼'} turns off at the end of the record's range`,
+     (await center(`ad-nav-${dir}`)).off);
+  await page.evaluate(() => window.ArroData.resetView());
+  await page.waitForTimeout(60);
+  ok('Reset puts the axis back to Auto', (await vw()).yMode === 'auto');
+
   ok('nothing threw', errors.length === 0, errors.join(' | '));
 
   await context.close();
@@ -890,5 +1007,6 @@ console.log(failures
     + '       wheel pans sideways and steps evenly, and both the balloon and the\n'
     + '       callout say what the reading did either side of itself; every mark\n'
     + '       kind has its own tick and its own cap; and the demo picker loads\n'
-    + '       Tyalgum with its preset; filters are per series; and Undo steps back.');
+    + '       Tyalgum with its preset; filters are per series; Undo steps back;\n'
+    + '       and the step buttons move each window a fifth, stopping at the ends.');
 process.exit(failures ? 1 : 0);

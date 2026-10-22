@@ -12671,7 +12671,8 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 
 /* ── The plot and its two navigators (#191) ──────────────────────────────────
    A 2×2 grid: the chart, the vertical navigator beside it, the whole-record
-   strip under it, and the corner between the two navigators left empty. The
+   strip under it, and the vertical navigator's step buttons in the corner
+   between the two. The
    grid is what makes each navigator exactly as long as the axis it steers —
    which is not a nicety: a track that is a different length from its axis puts
    the window box somewhere other than where the window is, and the whole
@@ -12752,6 +12753,38 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 }
 .ad-vov-mid  { cursor: grab; }
 .ad-vov-edge { cursor: ns-resize; }
+
+/* The navigators' step buttons. ◀ ▶ sit over the strip's left margin, the
+   64 px the chart keeps for its axis figures, above the "whole record" label —
+   off the track, where they could cover a handle parked at that end. ▲ ▼ fill
+   the corner between the two navigators, under the column they move. */
+.ad-nav-btns {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 4px;
+}
+.ad-nav-btns--x {
+  grid-column: 1; grid-row: 2;
+  align-self: start; justify-self: start;
+  margin: 5px 0 0 6px;
+}
+.ad-nav-btns--y {
+  grid-column: 2; grid-row: 2;
+  flex-direction: column;
+}
+.ad-nav-btn {
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer;
+}
+.ad-nav-btns--x .ad-nav-btn { width: 24px; height: 22px; }
+.ad-nav-btns--y .ad-nav-btn { flex: 1; width: 100%; min-height: 0; }
+.ad-nav-btn:hover:not([aria-disabled="true"]) { color: var(--accent); border-color: var(--accent); }
+.ad-nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ad-nav-btn[aria-disabled="true"] { opacity: .4; cursor: default; }
 .ad-ov-mid:active,
 .ad-vov-mid:active { cursor: grabbing; }
 
@@ -12936,11 +12969,12 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   .ad-side   { height: auto; overflow: visible; }
   .ad-stage  { height: 54dvh; }
   /* The vertical navigator is a pointer gesture in a 46 px column, which on a
-     phone is a target nobody can hit and a column the chart cannot spare. The
-     axis is still fully steerable from the toolbar's four modes and its two
-     number boxes, which is what it was before this existed. */
+     phone is a target nobody can hit and a column the chart cannot spare, and
+     its step buttons go with the column they sit in. The axis is still fully
+     steerable from the toolbar's four modes and its two number boxes, which is
+     what it was before this existed. */
   .ad-plot   { grid-template-columns: minmax(0, 1fr); }
-  .ad-vov    { display: none; }
+  .ad-vov, .ad-nav-btns--y { display: none; }
   .ad-stage-acts { right: .45rem; }
 
   /* Stacked, the rail comes first in the DOM and put about a thousand pixels of

@@ -4071,6 +4071,15 @@ const ArroData = (function () {
              aria-label="${escAttr(vOverviewName())}"></svg>
         <svg id="ad-ov" class="ad-ov" role="img"
              aria-label="${escAttr(overviewName())}"></svg>
+        <!-- The navigators' step buttons: ◀ ▶ in the strip's own left margin,
+             ▲ ▼ in the corner under the vertical navigator. Neither sits on a
+             track, so both navigators stay exactly as long as their axes. -->
+        <div class="ad-nav-btns ad-nav-btns--x" role="group" aria-label="Move the window across">
+          ${nudgeBtnHtml('left')}${nudgeBtnHtml('right')}
+        </div>
+        <div class="ad-nav-btns ad-nav-btns--y" role="group" aria-label="Move the vertical range">
+          ${nudgeBtnHtml('up')}${nudgeBtnHtml('down')}
+        </div>
       </div>
       <div id="ad-readout" class="ad-readout">${readoutHtml()}</div>
       ${linesHtml()}
@@ -6024,7 +6033,7 @@ const ArroData = (function () {
     const svg = document.getElementById('ad-ov');
     if (!svg) return;
     const ex = extent();
-    if (!ex) { svg.innerHTML = ''; return; }
+    if (!ex) { svg.innerHTML = ''; drawVov(); return; }
     const c = theme();
     const w = ad.w, h = AD_OV_H;
     svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
@@ -6152,7 +6161,7 @@ const ArroData = (function () {
     if (!svg) return;
     const ex = vExtent();
     const v = view();
-    if (!ex || !v) { svg.innerHTML = ''; return; }
+    if (!ex || !v) { svg.innerHTML = ''; syncNudge(nudgeRoom(null)); return; }
     const c = theme();
     const w = AD_VOV_W, h = ad.h;
     svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
@@ -6171,6 +6180,9 @@ const ArroData = (function () {
 
     const yr = yRange(v);
     const top = vovClampY(y(yr.hi)), bot = vovClampY(y(yr.lo));
+    // Every change to either window comes through here, so the step buttons
+    // learn here which way each can still go.
+    syncNudge(nudgeRoom(v, yr, ex));
 
     let out = `<rect x="0" y="0" width="${w}" height="${h}" fill="${c.panel}"/>
                <rect x="${trackX}" y="${PADT}" width="${trackW}" height="${ph}"
@@ -7699,6 +7711,96 @@ const ArroData = (function () {
     if (ad.full) document.getElementById('ad-stage')?.focus();
   }
 
+  // ── Step buttons on the navigators ─────────────────────────────────────────
+  // A scrollbar's arrows, for a hand that wants to shift the window rather
+  // than drag it: ◀ ▶ on the whole-record strip, ▲ ▼ under the vertical
+  // navigator. The arrow keys already stepped sideways, but only with the
+  // chart focused, and nothing stepped the vertical range at all.
+  //
+  // A step is a fifth of the window, as the arrow keys' is, and it stops at
+  // the end of the record rather than running off it. view() lets a drag carry
+  // the window a whole span past either end, which is right for a drag and
+  // wrong for a button pressed until it stops doing anything: that should
+  // leave the last of the data at the edge of the chart, not a span of blank.
+  const AD_NUDGE = 0.2;
+  const AD_NUDGE_DIRS = ['left', 'right', 'up', 'down'];
+  const AD_NUDGE_SAY = {
+    left:  ['Move the window earlier', 'M7 1.5 2.5 5 7 8.5z'],
+    right: ['Move the window later',   'M3 1.5 7.5 5 3 8.5z'],
+    up:    ['Move the vertical range up — higher values',  'M1.5 7 5 2.5 8.5 7z'],
+    down:  ['Move the vertical range down — lower values', 'M1.5 3 5 7.5 8.5 3z'],
+  };
+
+  // Drawn rather than typed: ◀ and ▶ are emoji on some phones.
+  function nudgeBtnHtml(dir) {
+    const [say, d] = AD_NUDGE_SAY[dir];
+    return `<button type="button" class="ad-nav-btn" id="ad-nav-${dir}"
+                    onclick="ArroData.nudge('${dir}')" title="${escAttr(say)}" aria-label="${escAttr(say)}"
+              ><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><path d="${d}" fill="currentColor"/></svg></button>`;
+  }
+
+  // How far the window can still move each way, in its own units — ms across,
+  // the reading's unit up and down. Less than a thousandth of the window counts
+  // as none, so the step that lands on an end leaves its button off even after
+  // commitY() has rounded the range to six figures.
+  function nudgeRoom(v, yr, vex) {
+    const ex = extent();
+    const out = { left: 0, right: 0, up: 0, down: 0 };
+    if (!ex || !v) return out;
+    const room = (r, span) => (r > span * 1e-3 ? r : 0);
+    out.left  = room(v.t0 - ex.t0, v.t1 - v.t0);
+    out.right = room(ex.t1 - v.t1, v.t1 - v.t0);
+    if (yr && vex) {
+      out.up   = room(vex.hi - yr.hi, yr.hi - yr.lo);
+      out.down = room(yr.lo - vex.lo, yr.hi - yr.lo);
+    }
+    return out;
+  }
+
+  // aria-disabled rather than disabled: a button that goes off under the hand
+  // pressing it keeps the focus, instead of dropping it on the page.
+  function syncNudge(room) {
+    for (const dir of AD_NUDGE_DIRS) {
+      const b = document.getElementById(`ad-nav-${dir}`);
+      if (b) b.setAttribute('aria-disabled', String(!room[dir]));
+    }
+  }
+
+  function nudge(dir) {
+    const v = view();
+    if (!v || !AD_NUDGE_SAY[dir]) return;
+    const yr = yRange(v);
+    const room = nudgeRoom(v, yr, vExtent())[dir];
+    if (!room) return;
+    const across = dir === 'left' || dir === 'right';
+    // Tagged, so a run of presses one way is one step for Undo, as a run of
+    // arrow keys is.
+    const mark = checkpoint(ad, across ? 'nudge-x' : 'nudge-y', across ? 'pan' : 'vertical range');
+    if (across) {
+      const d = Math.min((v.t1 - v.t0) * AD_NUDGE, room) * (dir === 'left' ? -1 : 1);
+      ad.view = { t0: v.t0 + d, t1: v.t1 + d };
+      draw(); drawOv(); renderReadout();
+      announce(`Window ${fmtFull(ad.view.t0)} to ${fmtFull(ad.view.t1)}.`);
+    } else {
+      const d = Math.min((yr.hi - yr.lo) * AD_NUDGE, room) * (dir === 'down' ? -1 : 1);
+      const wasManual = ad.yMode === 'manual';
+      const had = document.activeElement?.id === `ad-nav-${dir}`;
+      if (commitY(yr.lo + d, yr.hi + d)) {
+        // The first step takes the axis to Fixed, which the toolbar shows, so
+        // that one re-renders the pane — as the navigator's own first drag does
+        // — and hands the focus back to the button it took away.
+        if (wasManual) { draw(); drawVov(); renderReadout(); }
+        else {
+          renderMainOnly();
+          if (had) document.getElementById(`ad-nav-${dir}`)?.focus();
+        }
+        const unit = shown()[0]?.unit || '';
+        announce(`Vertical range ${ad.yMin} to ${ad.yMax} ${unit}`.trimEnd() + '.');
+      }
+    }
+    setTimeout(() => settle(mark), 0);
+  }
+
   // Escape leaves full screen — the same contract the full-screen map keeps,
   // including yielding to anything that has already claimed the key (a modal
   // opened over the chart takes it first, and the chart stays full).
@@ -7930,7 +8032,7 @@ const ArroData = (function () {
     render, init, stop, repaint, importFiles, pick, loadDemo, setDemo,
     toggle, setColor, colourToggle, setDash, setAxis, setKind, setFlood, solo, zoomTo, remove, clearAll, showStation,
     setCfg, resetCfg, setQual, setMode, setTransform, setChart, setY, setYRange, setFlag, setMark, setDrag,
-    resetView, toggleFull,
+    resetView, toggleFull, nudge,
     // Your lines: typed functions, fitted curves, drawing and rulers
     linesToggle, linesOpenFn, setFnDraft, setFnLabel, lineAddFn, setFitKind, fitPicked,
     lineToggle, lineColor, lineAxis, lineName, lineRemove, linesClear,

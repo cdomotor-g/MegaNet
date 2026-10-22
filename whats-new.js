@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 70, date: '2026-10-22', items: [
+      '<strong>◀ ▶ ▲ ▼ Step buttons on the chart\'s navigators</strong>, in <em>Plots</em> and <em>Field Data</em>. '
+        + '◀ and ▶ at the left end of the whole-record strip under the chart move the window earlier or later; ▲ and ▼ '
+        + 'under the bar down the right move the vertical range up or down. Each press shifts it a fifth of its width or '
+        + 'height, and a button goes faint when the window is already at that end of the record. Undo takes a quick run of '
+        + 'presses back in one go, and ↺ resets both.',
+    ] },
     { n: 69, date: '2026-10-22', items: [
       '<strong>🧪 Bit Bench</strong>, a new tab under <em>Interference</em>: a bench for the bits a station sends and the faults '
         + 'that change them. Type a number and see it in decimal, binary and hex, every bit a button to flip, with shift, rotate, '
