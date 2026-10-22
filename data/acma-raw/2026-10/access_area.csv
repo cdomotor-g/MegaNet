@@ -1,0 +1,29 @@
+AREA_ID,AREA_CODE,AREA_NAME,AREA_CATEGORY
+17739,1,Australia-wide,1
+17733,10,Norfolk Island,5
+17723,11,Cocos/Keeling Islands,5
+17741,12,Christmas Island,5
+17731,16,Macquarie Island,5
+17721,17,Heard Island,5
+17740,18,Australian Capital Territory,4
+17729,2,New South Wales,2
+17730,26,Coastal Areas,4
+17747,3,Victoria,2
+17720,35,Australian Waters,4
+17738,36,Lord Howe Island,5
+17728,37,Australian Aero,4
+17737,4,Queensland,2
+17727,5,South Australia,3
+17745,6,Western Australia,3
+17746,68,Brisbane/Gold Coast HD,2
+17736,69,Newcastle MD,3
+17735,7,Tasmania,4
+17726,70,Sydney/Wollongong HD,2
+17744,71,Melbourne/Geelong HD,2
+17734,72,Adelaide MD,3
+17724,73,Perth MD,3
+17742,74,Low and Remote Density Areas,4
+17732,75,Remote Density Area,5
+17722,76,Low Density Areas,4
+17725,8,Northern Territory,4
+17743,9,Antarctica,5

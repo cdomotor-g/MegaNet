@@ -1,0 +1,1246 @@
+SITE_ID,LATITUDE,LONGITUDE,NAME,STATE,LICENSING_AREA_ID,POSTCODE,SITE_PRECISION,ELEVATION,HCIS_L2,_NEAREST_ANCHOR_ID,_NEAREST_ANCHOR_NAME,_DISTANCE_KM
+10000265,-24.182717,151.236237,"Telstra Radio Tower Lake Awoonga, 4km north of Boynedale",QLD,4,,Within 10 metres,,NS7A,kroombit_repeater_al,Kroombit Repeater AL,35.715
+10000390,-27.542505,153.073407,Mount Gravatt Outlook Mount Gravatt Outlook Drive Mount Gravatt,QLD,2,,Within 10 metres,,NT9I,constitution_hill,Constitution Hill,13.674
+10000420,-19.878417,146.633056,QR Site Hervey Street MINGELA,QLD,4,,Within 10 metres,,LR2O,mingela_al,Mingela AL,0.104
+10000570,-31.457495,152.72804,69 High Street WAUCHOPE,NSW,4,,Within 10 metres,,NV2G,port_macquarie_golf,Port Macquarie (Golf,18.085
+10000571,-31.436696,152.897726,19-33 Morton Street PORT MACQUARIE,NSW,4,,Within 10 metres,,NV2H,port_macquarie_golf,Port Macquarie (Golf,5.583
+10000687,-31.444239,152.893401,Port Macquarie Fire Station 5 Central Road Port Macquarie,NSW,4,,Within 10 metres,,NV2H,port_macquarie_golf,Port Macquarie (Golf,4.958
+10000779,-28.167718,153.549191,VRA Site Point Danger Tweed Heads,NSW,2,,Within 10 metres,,NU3C,tallai_al,Tallai AL,27.24
+10000782,-28.235179,153.288503,CommSite Bilbrough Lookout Springbrook,QLD,2,,Within 10 metres,,NU3B,o_reillys_al,OReillys AL,14.985
+10001219,-18.200681,145.944401,QAS Site Lemon Tree Hill via KENNEDY,QLD,4,,Within 10 metres,,LQ7D,bilyana_al,Bilyana AL,11.607
+10002303,-27.81038,153.3146,104 Swan Rd PIMPAMA,QLD,2,,Within 10 metres,,NT9N,mt_tamborine_al,Mt Tamborine AL,20.125
+10002955,-27.222669,151.116752,Myola Kupunn Rd NANDI,QLD,4,,Within 10 metres,,NT7A,braziers_hill_al,Braziers Hill AL,55.239
+10002956,-27.274661,151.289491,743 Dalby-Cecil Plains Rd CECIL PLAINS,QLD,4,,Within 10 metres,,NT7F,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,52.862
+10002957,-27.104699,151.030027,960 Dalby-Kogan Rd MACALISTER,QLD,4,,Within 10 metres,,NT7A,braziers_hill_al,Braziers Hill AL,43.314
+10003450,-31.445,152.477,BOM Site Via Oxley Highway Long Flat,NSW,4,,Within 100 metres,,NV2F,port_macquarie_golf,Port Macquarie (Golf,41.876
+10003451,-31.664,152.3705,BOM Site 320 The Den Road Mooral Creek,NSW,4,,Within 100 metres,,NV2J,port_macquarie_golf,Port Macquarie (Golf,55.411
+10003452,-31.4621,152.3245,BOM Site Yarras Mountain,NSW,4,,Within 100 metres,,NV2F,port_macquarie_golf,Port Macquarie (Golf,56.16
+10004033,-28.797778,151.830278,BOM Site Ballandean Hill  via Bents Road Ballandean,QLD,4,,Within 100 metres,,NU1P,ballandean_al,Ballandean AL,1.766
+10004034,-28.606111,151.8175,BOM Site Amiens Knob 71 Minuti Lane Amiens,QLD,4,,Within 100 metres,,NU1L,amiens_knob_al,Amiens Knob AL,0.001
+10004035,-28.101389,151.876667,BOM Site via Yankee Gully Road Bony Mountain,QLD,4,,Within 10 metres,,NU1D,bony_mountain_al,Bony Mountain AL,0.003
+10004036,-28.226667,151.489167,"BOM Site Warahgai via Rabbit Fence Road, 8 km West of Karara",QLD,4,,Within 100 metres,,NU1B,warahgai_al,Warahgai AL,0.026
+10004934,-26.950693,150.474926,QCG/Veoloa Water Treatment Facility Vanrenes Rd 8.6km SSW of CROSSROADS,QLD,5,,Within 10 metres,,MT6N,bottle_tree_al,Bottle Tree AL,17.284
+10004936,-28.028022,153.428653,Gold Coast Convention and Exhibition Centre 2684-2690 Gold Coast Hwy Broadbeach,QLD,2,,Within 10 metres,,NU3B,tallai_al,Tallai AL,13.721
+10005203,-26.816577,153.171902,AtoN Beacon 15km SSE of Point Cartwright,QLD,4,,Within 10 metres,,NT6M,bald_knob_al,Bald Knob AL,25.811
+10005409,-22.470452,148.450536,South Site Lake Vermont Mine 16.7km NNE of DYSART,QLD,4,,Within 10 metres,,MS1F,middlemount_al,Middlemount AL,44.377
+10005605,-27.57918,151.98751,Council Reservoir Picnic Point Tourist Drive Picnic Point,QLD,4,,Within 10 metres,,NT7L,toowoomba_al,Toowoomba AL,8.384
+10005678,-25.310828,152.832031,BAI Tower Regency Avenue HERVEY BAY,QLD,4,,Within 10 metres,,NT2H,ghost_hill_al,Ghost Hill AL,0.014
+10006071,-27.384722,153.175528,Port Of Brisbane Office 3 Port Central Av Port Of Brisbane,QLD,2,,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,24.262
+10006339,-24.397889,150.508458,Broadcast site 3A Murchison St BILOELA,QLD,4,,Within 10 metres,,MS9G,banana_range_al,Banana Range AL,20.324
+10006890,-22.429318,148.407057,North Site Lake Vermont Mine 19.3km NNE of DYSART,QLD,4,,Within 10 metres,,MS1F,middlemount_al,Middlemount AL,50.629
+10007968,-25.191781,151.687783,Scrub Road Mt Perry,QLD,4,,Within 10 metres,,NT1C,mt_gayndah_al,Mt Gayndah AL,48.277
+10007970,-24.14221,148.154055,Ergon Energy Site Roddas Lookout SPRINGSURE,QLD,5,,Within 10 metres,,MS7A,roddas_lookout_al,Roddas Lookout AL,0.015
+10007972,-24.647598,151.339105,Ergon Energy Site Mt Fort William KALPOWAR,QLD,4,,Within 10 metres,,NS7J,mt_fort_william_aler,Mt Fort William AL,0.023
+10008038,-27.618217,153.311383,Australian Volunteer Coast Guard Site Redland Bay Ferry Terminal Redland Bay,QLD,2,,Within 10 metres,,NT9J,hillcrest_wine_glass,Hillcrest AL (Wine Glass),28.458
+10008332,-22.501125,148.349054,Hakea (9.5km N of Dysart) SARAJI MINE,QLD,4,,Within 10 metres,,MS1J,middlemount_al,Middlemount AL,48.092
+10008412,-19.662104,147.313255,Ergon Communications Site Kelly Mountain Warana Road Mount Kelly,QLD,4,,Within 10 metres,,LR3J,mt_kelly_al,Mt Kelly AL,0.053
+10008649,-24.901333,152.357194,Bundaberg Fire Station 65 Wyllie Street Thabeban,QLD,4,,Within 10 metres,,NS8N,takura_reservoir_ale,Takura Resevoir AL,58.988
+10008687,-27.923098,152.471461,Lot 1936 Tarome Rd TAROME,QLD,4,,Within 10 metres,,NT8N,schultz_lookout_aler,Schultz Lookout AL,31.217
+10008868,-20.408147,148.578544,Fire Station 61 Hinschen Street Proserpine,QLD,4,,Within 10 metres,,MR4G,strathdickie_al,Strathdickie AL,9.124
+10008887,-26.62164,152.9076,460 Nambour Mapleton Rd KUREELPA,QLD,4,,Within 10 metres,,NT5L,obi_lookout_al,Obi Lookout AL,12.493
+10009026,-24.393623,148.359934,MIA Site off Dawson Hwy 27km WNW ROLLESTON,QLD,5,,Within 10 metres,,MS7F,roddas_lookout_al,Roddas Lookout AL,34.879
+10009062,-16.472,145.3286,Mossman Gorge Road  (5km WSW of) MOSSMAN,QLD,4,,Within 10 metres,,LQ1F,saddle_mountain_aler,Saddle Mtn AL,52.445
+10009531,-19.662221,147.31344,Russo and Vella DGPS 14 km SW of Ayr Mount Kelly,QLD,4,,Within 10 metres,,LR3J,mt_kelly_al,Mt Kelly AL,0.076
+10010193,-27.75226,153.347,80 Cabbage tree point rd WOONGOOLBA,QLD,2,,Within 10 metres,,NT9N,mt_tamborine_al,Mt Tamborine AL,27.326
+10010312,-25.321168,152.559238,Howard Emergency Services Complex Thomas Street HOWARD,QLD,4,,Within 10 metres,,NT2G,takura_reservoir_ale,Takura Resevoir AL,14.778
+10012607,-19.662,147.3135,Radio Site via Mt Kelly Dr MOUNT KELLY,QLD,4,,Within 10 metres,,LR3J,mt_kelly_al,Mt Kelly AL,0.074
+100129,-23.476616,148.489461,Mine Site ENSHAM MINE,QLD,4,4702,Unknown,212,MS4F,emerald_al,Emerald AL,33.467
+10013217,-28.138545,151.795362,South Toolburra Farm Leyburn Cunningham Rd PRATTEN,QLD,4,,Within 10 metres,,NU1D,bony_mountain_al,Bony Mountain AL,8.983
+10013776,-27.386221,151.921267,Toowoomba Regional Council lay down yard Pipeline Road COOBY DAM,QLD,4,,Within 10 metres,,NT7H,toowoomba_al,Toowoomba AL,14.112
+10015567,-27.3636,153.1706,AIS Beacon #21 NW off Port of Brisbane Moreton Bay,QLD,2,,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,24.957
+10015568,-27.3612,153.171,AIS Beacon #19 NW off Port of Brisbane Moreton Bay,QLD,2,,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,25.13
+10015569,-27.3583,153.1729,AIS Beacon #17 NW off Port of Brisbane Moreton Bay,QLD,2,,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,25.46
+10015570,-27.357,153.1752,AIS Beacon #15 NW off Port of Brisbane Moreton Bay,QLD,2,,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,25.729
+10015887,-25.097436,152.16019,Promisedland Plantation 397 Philips Road Promisedland,QLD,4,,Within 10 metres,,NT2A,mt_goonaneman_al,Mt Goonaneman AL,36.955
+100166,-27.396575,153.114822,Rear End JUHI Admin Bldg Hakea St BRISBANE AIRPORT,QLD,2,4009,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,18.349
+10017242,-28.187409,153.53953,FRNSW Lots 387 and 405 Dry Dock Road Tweed Heads,NSW,2,,Within 10 metres,,NU3C,tallai_al,Tallai AL,27.378
+10017985,-27.629683,152.380423,SEQ Water Site Bill Gunn Dam LAIDLEY HEIGHTS,QLD,4,,Within 10 metres,,NT8J,schultz_lookout_aler,Schultz Lookout AL,5.226
+10017986,-27.509611,151.955092,SEQ Water Site Shuttleworth Crt TOOWOOMBA,QLD,4,,Within 10 metres,,NT7L,toowoomba_al,Toowoomba AL,0.039
+10017987,-26.508192,152.58317,SEQ Water Site via Yabba Creek Rd BORUMBA DAM,QLD,4,,Within 10 metres,,NT5K,coolabine_ck_aler,Coolabine Ck AL,20.783
+10017988,-26.658293,152.452485,SEQ Water Site Kilcoy Murgon Rd JIMNA,QLD,4,,Within 10 metres,,NT5J,coolabine_ck_aler,Coolabine Ck AL,32.024
+10017989,-27.536476,152.79919,SEQ Water Site Allawah Rd MT CROSBY,QLD,2,,Within 10 metres,,NT8L,bundamba_barclay_st,Bundamba (Barclay St) AL,9.691
+10017990,-28.265906,152.537218,SEQ Water Site Carneys Creek Rd WHITE SWAMP,QLD,4,,Within 10 metres,,NU2G,carrs_lookout_al,Carrs Lkt AL,12.323
+10017991,-26.714169,152.871998,SEQ Water Site Baroon Pocket Rd BAROON DAM,QLD,4,,Within 10 metres,,NT5L,obi_lookout_al,Obi Lookout AL,7.123
+10017992,-27.941906,152.959443,SEQ Water Site Bromelton Dam Brabazon Rd GLENEAGLE,QLD,2,,Within 10 metres,,NT8P,round_mountain_al,Round Mountain AL,14.678
+10017993,-26.177335,152.871877,SEQ Water Site Wolvi Mountain Rd MT WOLVI,QLD,4,,Within 10 metres,,NT5D,mt_wolvi_al,Mt Wolvi AL,0.442
+10017996,-27.935487,152.594153,SEQ Water Site Kalbar Connection Rd KALBAR WEIR,QLD,4,,Within 10 metres,,NT8O,kooralbyn_al,Kooralbyn AL,29.288
+10017997,-26.94658,152.584643,SEQ Water Site Kennedys Rd KILCOY,QLD,4,,Within 10 metres,,NT5O,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,20.196
+10018387,-19.27217,146.7557,411 Bayswater Road  GARBUTT,QLD,4,,Within 10 metres,,LR2H,castle_hill_al,Castle Hill AL,5.199
+10018864,-17.264043,145.393139,"Energy Qld site Mt Wallum, 9 km W of ATHERTON",QLD,4,,Within 10 metres,,LQ4F,bones_knob_al,Bones Knob AL,7.479
+10018986,-27.450996,153.030885,"Brisbane Exhibition Grounds, 600 Gregory Terrace Bowen Hills",QLD,2,,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,8.212
+10019343,-26.19358,149.7911,Atlas Compressor Station 20km South West of WANDOAN,QLD,5,,Within 10 metres,,MT5D,clovelly_al,Clovelly AL,42.395
+10019963,-21.424344,149.223137,Council Site Brewers Rd SARINA,QLD,4,,Within 10 metres,,MR8E,outer_harbour_tide_a,Outer Harbour Tide AL,35.143
+10020275,-22.811104,148.676103,"BoM Site, Nolan Drive MIDDLEMOUNT",QLD,4,,Unknown,,MS1O,middlemount_al,Middlemount AL,0.016
+10020277,-26.992197,152.431402,"BoM Site, Pohlmans Range Road GREGORS CREEK",QLD,4,,Within 100 metres,,NT5N,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,35.644
+10020298,-24.35954,150.16014,QGP 9481 Leichhardt Hwy BANANA,QLD,4,,Within 10 metres,,MS9E,banana_range_al,Banana Range AL,18.598
+10020301,-27.11637,150.891945,DDP 472 Grahams Road KOGAN,QLD,5,,Within 10 metres,,MT9D,braziers_hill_al,Braziers Hill AL,49.532
+10020302,-26.890255,150.353208,DDP 4839 Kogan Condamine Rd WIEAMBILLA,QLD,5,,Within 10 metres,,MT6N,bottle_tree_al,Bottle Tree AL,12.733
+10020747,-22.637148,148.44611,Ramp 59 Mine Site NORWICH PARK,QLD,4,4745,Within 10 metres,,MS1J,middlemount_al,Middlemount AL,30.49
+10021117,-27.649167,152.942222,Defence Site MTR Off Centenary Highway  GREENBANK,QLD,2,,Within 100 metres,,NT8L,hillcrest_wine_glass,Hillcrest AL (Wine Glass),9.156
+10021351,-27.20944,151.2848,6 Commodity Court DALBY,QLD,4,,Within 10 metres,,NT7B,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,47.468
+10021498,-27.448714,153.027194,"Block 21, Mental Health Centre Royal Brisbane Hospital HERSTON",QLD,2,,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,7.984
+10021577,-25.906667,152.923333,Defence Site Mt Marylin Approx. 7.2km East of Cooloola Coast Rd TIN CAN BAY,QLD,4,,Within 10 metres,,NT2P,mt_wolvi_al,Mt Wolvi AL,30.54
+10021579,-27.706111,152.977222,Defence Site Range control Approx. 200m East of Goodna Rd Greenbank,QLD,2,,Within 10 metres,,NT8L,hillcrest_wine_glass,Hillcrest AL (Wine Glass),6.164
+10021584,-28.071944,153.224444,Defence Site Canungra South Approx. 300m West of Beechmont Road LOWER BEECHMONT,QLD,2,,Within 10 metres,,NU3A,tallai_al,Tallai AL,7.042
+10021723,-19.161389,146.2025,Defence Site-Star River Mast Approx. 18 km south west of Ewan Paluma Road Dotswood,QLD,4,,Within 10 metres,,LR2A,paluma_al,Paluma AL,16.89
+10021724,-19.628056,146.315,Defence Site-Mt St Michael Appox . 2.4km North east of Dotswood Road Dotswood,QLD,4,,Within 10 metres,,LR2J,mingela_al,Mingela AL,43.358
+10021725,-19.601667,146.549444,Defence Site- Sentry Post 3 approx. 19 km North of Dotswood Road Granite Vale,QLD,4,,Within 10 metres,,LR2K,mingela_al,Mingela AL,32.021
+10021726,-19.441667,146.520556,Defence Site-High Range approx . 10 km South east of Harvey range RdH Hervey Range,QLD,4,,Within 10 metres,,LR2G,mt_stuart_al,Mt Stuart AL,29.397
+10021736,-19.342222,146.734722,Defence Site-Mt Stuart Range control Approx . 10m west of Angus smith Dr Mount Stuart,QLD,4,,Within 10 metres,,LR2G,mt_stuart_al,Mt Stuart AL,4.859
+10021738,-19.343611,146.780833,Defence Site- Mt. Stuart North Approx. 25m NW of Mount Stuart Rd Mount Stuart,QLD,4,,Within 10 metres,,LR2H,mt_stuart_al,Mt Stuart AL,0.047
+10021739,-19.377222,146.770556,Defence Site- Mt Migloo Approx. 3.2 East of Angus Smith Dr Mount Stuart,QLD,4,,Within 10 metres,,LR2H,mt_stuart_al,Mt Stuart AL,3.853
+10021778,-19.397222,146.333056,Defence Site- Ben Lomond Approx. 8.5 km NW of Hervey Range Rd Dotswood,QLD,4,,Within 10 metres,,LR2F,paluma_al,Paluma AL,44.789
+10021878,-17.796111,145.780278,Defence Site-Earls Court Approx. 12 km North of Tully Gorge Rd Walter Hill,QLD,4,,Within 10 metres,,LQ4P,marco_street_al,Marco St AL,32.561
+10021879,-17.888333,145.811111,Defence Site-Tully Range control Approx. 300m North Tully Gorge Rd Walter Hill,QLD,4,,Within 10 metres,,LQ4P,bilyana_al,Bilyana AL,26.488
+10022009,-26.672834,153.09989,Alex Headland Reservoir 56 Tantula Rd E Alexandra Headland,QLD,4,,Within 10 metres,,NT6I,bald_knob_al,Bald Knob AL,21.799
+10022010,-26.679989,153.138305,Point Cartwright Reservoir Pacific Blvd Buddina,QLD,4,,Within 10 metres,,NT6I,bald_knob_al,Bald Knob AL,24.728
+10022011,-26.656693,153.094203,Northern Corporate Centre 5-9 Maud St Maroochydore,QLD,4,,Within 10 metres,,NT6I,bald_knob_al,Bald Knob AL,22.37
+10022012,-26.667233,153.044784,Kunda Park Reservoir 70-46 Jarrah Rd Buderim,QLD,4,,Within 10 metres,,NT6I,bald_knob_al,Bald Knob AL,17.876
+10022013,-26.685225,153.080601,Mountain Creek Reservoir Mooloolaba Rd Buderim,QLD,4,,Within 10 metres,,NT6I,bald_knob_al,Bald Knob AL,19.442
+10022014,-26.675521,153.075743,Maroochydore South Reservoir Facility 33 Rim Rd Buderim,QLD,4,,Within 10 metres,,NT6I,bald_knob_al,Bald Knob AL,19.648
+10022196,-27.44929,153.0263,STARS 296 Herston Rd HERSTON,QLD,2,,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,7.876
+10022226,-17.689722,146.113056,Range control Approx 20m West of Inarlinga Rd Cowley Beach,QLD,4,,Within 10 metres,,LQ5I,marco_street_al,Marco St AL,22.38
+10022407,-24.375556,148.437139,TLO Site Dawson Hwy 21km WNW ROLLESTON,QLD,5,,Within 10 metres,,MS7F,roddas_lookout_al,Roddas Lookout AL,38.679
+10022482,-22.5954,148.4134,Far North DYSART,QLD,4,,Within 10 metres,,MS1J,middlemount_al,Middlemount AL,36.06
+10022780,-28.20692,153.270845,"BoM site, 2459 Springbrook Road Springbrook",QLD,2,,Within 10 metres,,NU3B,o_reillys_al,OReillys AL,13.528
+10023178,-18.744025,146.579918,Butler Bay Reservoir PALM ISLAND,QLD,4,,Within 10 metres,,LQ8K,paluma_al,Paluma AL,48.415
+10023646,-27.194786,152.092222,"Council Monopole Barnes Hill, Anduramba Road Anduramba",QLD,4,,Within 10 metres,,NT8A,paradise_ck_rd,Paradise Ck Rd AL,28.876
+10024573,-25.427372,152.117161,"ViaSat Earth Station, Mt Goonaneman, via Brandts Road Golden Fleece",QLD,4,,Within 100 metres,,NT2E,mt_goonaneman_al,Mt Goonaneman AL,0.015
+10025278,-22.458903,148.319014,"New Southern, Saraji Mine, 14.6km NNW of Dysart",QLD,4,,Within 10 metres,,MS1F,mt_lowe_al,Mt Lowe AL,52.557
+10025279,-22.407208,148.291228,"Central 2021, Saraji Mine, 20.8km NNW of Dysart",QLD,4,,Within 10 metres,,MS1F,mt_lowe_al,Mt Lowe AL,57.225
+10025540,-26.90154,152.850412,Swains Fire Tower Tower Hill WOODFORD,QLD,2,,Within 10 metres,,NT5P,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,13.124
+10025541,-26.956146,152.96045,HQ Plantations Office Steve Irwin Way BEERBURRUM,QLD,2,,Within 10 metres,,NT5P,bald_knob_al,Bald Knob AL,20.211
+10025542,-26.891756,152.104786,Blackbutt Forest Office 2 Pine St BLACKBUTT,QLD,4,,Within 10 metres,,NT5M,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,50.003
+10025543,-26.172966,152.462093,Fire Tower Brooyar State Forest WIDGEE,QLD,4,,Within 10 metres,,NT5B,mt_wolvi_al,Mt Wolvi AL,40.459
+10025544,-26.334082,152.620544,Cookes Tower  149 Gibson Rd MOOLOO,QLD,4,,Within 10 metres,,NT5G,black_mt_al,Black Mt AL,25.45
+10025545,-26.461772,152.370555,Mortimer Fire Tower Kandanga Creek Rd MANUMBAR,QLD,4,,Within 10 metres,,NT5F,coolabine_ck_aler,Coolabine Ck AL,42.217
+10025546,-27.314218,152.320381,Fire Tower Esk State Forest MT ARTHUR,QLD,4,,Within 10 metres,,NT8F,upper_sandy_ck_al,Upper Sandy Creek AL,19.828
+10025549,-26.460713,152.664792,HQ Plantations Office 8 Yabba Road IMBIL,QLD,4,,Within 10 metres,,NT5G,coolabine_ck_aler,Coolabine Ck AL,18.233
+10025556,-21.082078,149.120319,Repeater Site via Glendaragh Rd FARLEIGH,QLD,4,,Within 10 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,11.134
+10025607,-22.504019,148.350869,"Hakea, Saraji Mine, 9.3km North of Dysart",QLD,4,,Within 10 metres,,MS1J,middlemount_al,Middlemount AL,47.731
+10025626,-31.843391,152.752727,"Marine Rescue Site, Elizabeth Street CROWDY HEAD",NSW,4,,Within 10 metres,,NV2P,port_macquarie_golf,Port Macquarie (Golf,42.808
+10025995,-26.653699,152.098268,Marble Top Fire Tower MARBLE TOP,QLD,4,,Within 10 metres,,NT5I,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,55.871
+10025996,-26.663944,152.455643,Jimna Steel Tower Kilcoy Murgon Rd JIMNA,QLD,4,,Within 10 metres,,NT5J,coolabine_ck_aler,Coolabine Ck AL,31.858
+10026617,-27.558513,153.063093,Qld Sports and Athletics Centre Kessels Rd NATHAN,QLD,2,,Within 10 metres,,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),13.497
+10027368,-22.830194,148.649875,North Site Middlemount Mine MIDDLEMOUNT,QLD,4,,Within 10 metres,,MS1O,middlemount_al,Middlemount AL,3.424
+10027398,-27.922379,151.953296,118 Willow Springs Rd CLIFTON,QLD,4,,Within 10 metres,,NT7P,bony_mountain_al,Bony Mountain AL,21.279
+10027437,-20.3264,148.586122,QR Site Mt Lucas STRATHDICKIE,QLD,4,,Within 10 metres,,MR4G,strathdickie_al,Strathdickie AL,0.002
+10027635,-26.685385,153.129333,Marina 33-45 Parkyn Pde MOOLOOLABA,QLD,4,,Within 10 metres,,NT6I,bald_knob_al,Bald Knob AL,23.663
+10027993,-25.28756,150.29376,"Cracow Repeater, 1KM NW of Cracow Cracow",QLD,5,,Within 100 metres,,MT3F,cracow_al,Cracow AL,0.084
+10028089,-18.649512,146.162648,Fire Station Eleanor Street INGHAM,QLD,4,,Within 10 metres,,LQ8I,paluma_al,Paluma AL,40.47
+10028323,-21.108756,149.222987,Old Boat Ramp Monopole corner of Outer Harbour Road & Ken White Avenue MACKAY HARBOUR,QLD,4,,Within 10 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,0.107
+10028417,-18.47698,145.89221,Wilmar Site via Abergowrie Rd ABERGOWRIE,QLD,4,,Within 10 metres,,LQ7H,wallaman_al,Wallaman AL,16.334
+10028418,-18.49064,145.98919,Mahoneys Site via Abergowrie Rd ABERGOWRIE,QLD,4,,Within 10 metres,,LQ7H,wallaman_al,Wallaman AL,26.67
+10029151,-22.414181,148.32195,"Ramp9, 20 km north of Dysart Saraji Mine",QLD,4,,Unknown,,MS1F,middlemount_al,Middlemount AL,57.164
+10029357,-23.446752,150.44167,158 Foster Street Gracemere,QLD,4,,Within 10 metres,,MS6F,mt_hopeful_al,Mt Hopeful AL,32.859
+10030949,-23.19244,148.418824,Sojitz Gregory Mine 45 km NE of EMERALD,QLD,4,,Within 10 metres,,MS4B,mt_lowe_al,Mt Lowe AL,42.188
+10033091,-25.996604,152.833788,HQPlantations Toolara Office Tin Can Bay Rd TOOLARA FOREST,QLD,4,,Within 10 metres,,NT2P,mt_wolvi_al,Mt Wolvi AL,20.307
+10033092,-25.677494,152.793231,Tuan Steel Tower Maryborough Tuan Forest Rd TUAN,QLD,4,,Within 10 metres,,NT2L,takura_reservoir_ale,Takura Resevoir AL,39.888
+10033093,-25.436155,152.567914,Wongi Fire Tower Lenthall Dam Rd WONGI,QLD,4,,Within 10 metres,,NT2G,takura_reservoir_ale,Takura Resevoir AL,18.404
+10033094,-24.699367,151.302653,Kalpowar Hill Forest Street KALPOWAR,QLD,4,,Within 10 metres,,NS7J,mt_fort_william_aler,Mt Fort William AL,6.832
+10033347,-16.467273,145.37259,Mossman Fire Station 87-89 Front Street MOSSMAN,QLD,4,,Within 10 metres,,LQ1F,saddle_mountain_aler,Saddle Mtn AL,49.794
+10035232,-16.357395,145.415046,MRQPD Ops 5 Camelia Close WONGA BEACH,QLD,4,,Within 10 metres,,LQ1F,saddle_mountain_aler,Saddle Mtn AL,57.651
+10035614,-23.398553,150.491628,Rockhampton Zoo Curators Building  Cnr of Spencer St ROCKHAMPTON,QLD,4,,Within 10 metres,,MS6F,mt_hopeful_al,Mt Hopeful AL,37.103
+10035758,-26.855272,152.959287,Beerwah Fire Station 23A Beerwah Parade BEERWAH,QLD,2,,Within 10 metres,,NT5P,bald_knob_al,Bald Knob AL,9.548
+10035759,-27.315227,151.848481,Goombungee Fire Station 4 Anvil Court GOOMBUNGEE,QLD,4,,Within 10 metres,,NT7H,toowoomba_al,Toowoomba AL,24.024
+10035760,-27.450933,151.94727,Highfields Fire Station 49 Obrien Rd HIGHFIELDS,QLD,4,,Within 10 metres,,NT7H,toowoomba_al,Toowoomba AL,6.567
+10035787,-27.509549,151.954251,Queensland Police Site Lattice Tower Shuttlewood Ct Mount Kynoch TOOWOOMBA,QLD,4,,Within 10 metres,,NT7L,toowoomba_al,Toowoomba AL,0.044
+10036455,-27.978893,153.385679,Unit 11 19 Expo Court ASHMORE,QLD,2,,Within 10 metres,,NT9N,tallai_al,Tallai AL,13.171
+10037375,-27.43568,153.5213,Reservoir Donohue St Point Lookout NORTH STRADBROKE ISLAND,QLD,4,,Within 10 metres,,NT9G,hillcrest_wine_glass,Hillcrest AL (Wine Glass),55.332
+10037403,-23.353391,148.581014,Portable Trailer within 30km Wilton Mine Fairhill Rd LILYVALE,QLD,4,,Within 10 metres,,MS4G,emerald_al,Emerald AL,46.62
+10037786,-21.441317,148.71132,"Ergon Energy lattice tower, Mt Seaview Mount Britton",QLD,4,,Within 10 metres,,MR7G,mt_pinnacle_al,Mt Pinnacle AL,31.974
+10038455,-27.640861,151.866917,DGPS Site 416 Toowoomba Karara Rd WYREEMA,QLD,4,,Within 10 metres,,NT7L,toowoomba_al,Toowoomba AL,16.965
+10040132,-27.94108,153.192212,Little Athletics 400 Long Rd TAMBORINE MOUNTAIN,QLD,2,,Within 10 metres,,NT9M,mt_tamborine_al,Mt Tamborine AL,3.927
+10040494,-23.24019,148.628112,Trailer Site Fairhill Mine Fairhill Rd 57km NE EMERALD,QLD,4,,Within 10 metres,,MS4C,middlemount_al,Middlemount AL,47.975
+10041058,-17.120942,145.708027,Reservoir via Gallett Rd LITTLE MUSGRAVE,QLD,4,,Within 10 metres,,LQ4C,gordonvale_al,Gordonvale AL,8.925
+10041059,-17.122387,145.697693,WPS via Neilsen Rd LITTLE MUSGRAVE,QLD,4,,Within 10 metres,,LQ4C,gordonvale_al,Gordonvale AL,10.029
+10041077,-25.294584,152.865843,43 Exeter St TORQUAY,QLD,4,,Within 10 metres,,NT2H,ghost_hill_al,Ghost Hill AL,3.859
+10041517,-28.195564,153.190357,Bell Bird Clearing off Binna Burra Rd BINNA BURRA,QLD,2,,Within 10 metres,,NU3A,o_reillys_al,OReillys AL,6.683
+10041815,-22.603633,148.410321,"SKID-2 South Saraji Mine, 6.5 km E of DYSART",QLD,4,,Within 10 metres,,MS1J,middlemount_al,Middlemount AL,35.698
+10041816,-22.566999,148.383454,"SKID-1 South Saraji Mine, 4.5 km NE of DYSART",QLD,4,,Within 100 metres,,MS1J,middlemount_al,Middlemount AL,40.458
+10042690,-17.2464,145.7744,BoM Goldsborough Valley Alert Goldsborough Valley Campground GOLDSBOROUGH,QLD,4,,Within 10 metres,,LQ4D,gordonvale_al,Gordonvale AL,16.235
+10042691,-17.5047,145.9928,BoM Mcavoy Bridge Alert Creagan Rd FITZGERALD CREEK,QLD,4,,Within 10 metres,,LQ4L,marco_street_al,Marco St AL,6.899
+10042692,-28.7847,151.4122,BoM Upper Bracker Ck Alert Silver Spur Redgate Rd SILVER SPUR,QLD,4,,Within 10 metres,,NU1N,ballandean_al,Ballandean AL,39.742
+10042693,-28.3614,151.1381,BoM Woodspring Alert 6033 Millmerran Inglewood Rd INGLEWOOD,QLD,4,,Within 10 metres,,NU1E,warahgai_al,Warahgai AL,37.489
+10042694,-17.7047,145.1461,BoM Mt Garnet Alert Mount Garnet Airfield INNOT HOT SPRINGS,QLD,4,,Within 10 metres,,LQ4I,millaa_millaa_al,Millaa Millaa AL,53.283
+10042695,-27.9839,152.2909,BoM Upper Dalrymple Ck Alert 2006 Inverramsay Rd GOOMBURRA,QLD,4,,Within 10 metres,,NT8N,schultz_lookout_aler,Schultz Lookout AL,35.836
+10042696,-26.6333,151.2703,BoM Diamondy Al Mount Pipe Dodge Rd DIAMONDY,QLD,4,,Within 10 metres,,NT4J,braziers_hill_al,Braziers Hill AL,17.121
+10042697,-27.1897,151.6994,BoM Kulpi Alert 49 Oakey Cooyar Rd KULPI,QLD,4,,Within 10 metres,,NT7C,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,34.913
+10042698,-26.3642,150.2161,BoM Stillers Road Alert Greens Rd PELHAM,QLD,5,,Within 10 metres,,MT6E,clovelly_al,Clovelly AL,18.686
+10042699,-26.2514,150.7272,BoM Upper Stockyard Creek Al Kragra Barakula Rd KRAGRA,QLD,5,,Within 10 metres,,MT6G,turkey_mountain_al,Turkey Mountain AL,17.674
+10042945,-17.614435,145.800372,JHG Office via Palmerston Hwy EAST PALMERSTON,QLD,4,,Within 10 metres,,LQ4L,marco_street_al,Marco St AL,17.707
+10042946,-17.607997,145.77653,JHG Site 1 via Palmerston Hwy PALMERSTON,QLD,4,,Within 10 metres,,LQ4L,marco_street_al,Marco St AL,19.856
+10043136,-26.6555,153.216167,"Gneering Shoal Buoy, 8.1 km ENE of POINT CARTWRIGHT",QLD,4,,Unknown,,NT6I,bald_knob_al,Bald Knob AL,32.883
+10043158,-27.69642,152.812281,150 Botany Dr SOUTH RIPLEY,QLD,2,,Within 10 metres,,NT8L,bundamba_barclay_st,Bundamba (Barclay St) AL,8.573
+10044101,-27.957029,153.183816,Football Club 386-398 Main Western Rd TAMBORINE MOUNTAIN,QLD,2,,Within 10 metres,,NT9M,mt_tamborine_al,Mt Tamborine AL,3.475
+10044128,-20.27085,147.56982,Blast Site Mt Carlton Mine 74 km WSW of Bowen,QLD,4,,Within 10 metres,,LR6G,hurricane_cliff_al,Hurricane Cliff AL,24.456
+10044303,-28.61972,152.100024,CREST Liston  5438A Mt Lindesay Rd LISTON,NSW,4,,Within 10 metres,,NU2I,upper_rosenthal_aler,Upper Rosenthal AL,24.888
+100755,-25.913141,153.005043,Fire Station 25 Bream St TIN CAN BAY,QLD,4,4580,Within 100 metres,,NT3M,mt_wolvi_al,Mt Wolvi AL,32.368
+101162,-27.473667,153.004149,Vodafone Site Clough Bldg 301 Coronation Drive MILTON,QLD,2,4064,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,4.973
+101662,-18.541916,146.496754,AMSA Radar Site PELORUS ISLAND,QLD,4,4850,Unknown,,LQ8J,paluma_al,Paluma AL,59.876
+12173,-27.465485,153.025857,Sofitel Hotel 249 Turbot St BRISBANE,QLD,2,4000,Within 100 metres,,NT9E,constitution_hill,Constitution Hill,7.244
+12280,-27.47352,153.026669,Mineral House 41 George St BRISBANE,QLD,2,4000,Within 10 metres,3,NT9E,constitution_hill,Constitution Hill,7.182
+12316,-27.449234,153.028586,Block 7 Royal Brisbane Hospital Bowen Bridge Rd HERSTON,QLD,2,4006,Within 100 metres,23,NT9E,constitution_hill,Constitution Hill,8.083
+12441,-27.438385,153.07179,11 Curtin Ave EAGLE FARM,QLD,2,4009,Within 100 metres,,NT9E,constitution_hill,Constitution Hill,12.479
+12568,-27.228236,153.104227,Redcliffe Hospital Anzac Ave REDCLIFFE,QLD,2,4020,Within 10 metres,14,NT9A,constitution_hill,Constitution Hill,31.645
+12617,-27.381253,153.028165,Wheller Gardens 930 Gympie Rd CHERMSIDE,QLD,2,4032,Within 100 metres,,NT9E,constitution_hill,Constitution Hill,13.158
+12682,-27.429189,152.959578,Dept of Defence Military Site ENOGGERA HILL,QLD,2,4052,Within 100 metres,260,NT8H,constitution_hill,Constitution Hill,5.642
+12724,-27.464765,153.010171,Suncorp Stadium MILTON,QLD,2,4064,Within 100 metres,,NT9E,constitution_hill,Constitution Hill,5.766
+12744,-27.460831,152.957846,Qld Communications Site Paten Rd MOUNT COOT-THA,QLD,2,4069,Within 10 metres,208,NT8H,constitution_hill,Constitution Hill,2.129
+12747,-27.46313,152.946612,Telstra Site The Summit MOUNT COOT-THA,QLD,2,4066,Within 10 metres,,NT8H,constitution_hill,Constitution Hill,1.989
+12758,-27.433481,153.114941,Qld Transport Marine Operations Centre Macarthur Av East PINKENBA,QLD,2,4008,Within 10 metres,0,NT9E,constitution_hill,Constitution Hill,16.672
+12761,-27.471614,152.942255,TXA Q-Site Tower 632 Sir Samuel Griffith Drive MOUNT COOT-THA,QLD,2,4066,Within 10 metres,164,NT8H,constitution_hill,Constitution Hill,1.482
+12766,-27.479744,152.954043,Energex Site Constitution Hill Sir Samuel Griffith Dr MOUNT COOT-THA,QLD,2,4066,Within 10 metres,236,NT8H,constitution_hill,Constitution Hill,0.016
+12847,-27.588645,152.912303,Water Tower Basil Stafford Ctr Aveyron Rd WACOL,QLD,2,4076,Within 100 metres,26,NT8L,bundamba_barclay_st,Bundamba (Barclay St) AL,9.195
+12867,-27.601509,152.911532,Wolston Park Hospital WACOL,QLD,2,4076,Within 100 metres,,NT8L,bundamba_barclay_st,Bundamba (Barclay St) AL,8.673
+12911,-27.485437,153.027786,Mater Hospital Raymond Tce SOUTH BRISBANE,QLD,2,4101,Within 100 metres,17,NT9E,constitution_hill,Constitution Hill,7.287
+12926,-27.473924,153.036488,Admin Bldg Mt Olivet Hospital Main St KANGAROO POINT,QLD,2,4169,Within 100 metres,,NT9E,constitution_hill,Constitution Hill,8.143
+130143,-25.422865,152.118078,Axicom Site Mt Goonaneman Access Rd MT GOONANEMAN,QLD,4,4621,Within 10 metres,476,NT2E,mt_goonaneman_al,Mt Goonaneman AL,0.523
+130214,-27.610474,151.924194,Optus/Comtel Site 82 Volker St Darling Heights TOOWOOMBA,QLD,4,4350,Within 10 metres,696,NT7L,toowoomba_al,Toowoomba AL,11.61
+130220,-29.086143,151.966348,Tenterfield Council 40m Lattice Tower Mount MacKenzie Lookout Rd TENTERFIELD,NSW,4,2372,Within 10 metres,1295,NU4D,ballandean_al,Ballandean AL,36.419
+130245,-16.818246,145.662478,Optus Site Saddle Mountain Road  3 km E of Kuranda SADDLE MOUNTAIN,QLD,4,4871,Unknown,611,LQ1O,saddle_mountain_aler,Saddle Mtn AL,0.035
+13115,-27.676915,153.03047,Wineglass Water Tower Wineglass Dr HILLCREST,QLD,2,4118,Within 100 metres,43,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),0.083
+13117,-27.682334,152.983824,Defence Site GREENBANK,QLD,2,4124,Within 100 metres,,NT8L,hillcrest_wine_glass,Hillcrest AL (Wine Glass),4.596
+13137,-27.512785,153.047942,Greenslopes Private Hospital Newdegate St GREENSLOPES,QLD,2,4120,Within 100 metres,26,NT9I,constitution_hill,Constitution Hill,9.951
+131397,-21.598811,149.242474,Telstra Exchange KOUMALA,QLD,4,4738,Unknown,21,MR8I,outer_harbour_tide_a,Outer Harbour Tide AL,54.576
+13165,-27.623307,153.147217,Water Tower Karawatha St SPRINGWOOD,QLD,2,4127,Within 10 metres,65,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),12.962
+13184,-27.670527,153.1415,Logan Hospital Cnr Loganlea & Armstrong Rds MEADOWBROOK,QLD,2,4131,Within 10 metres,,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),10.999
+13203,-27.498705,153.034472,Princess Alexandra Hospital Ipswich Rd WOOLLOONGABBA,QLD,2,4102,Within 100 metres,64,NT9I,constitution_hill,Constitution Hill,8.195
+132129,-25.892845,152.194427,Defence Site WIDE BAY,QLD,4,4600,Unknown,,NT2M,mt_goonaneman_al,Mt Goonaneman AL,52.32
+13271,-27.543964,153.23152,Water Tower off Nanette Ct ALEXANDRA HILLS,QLD,2,4161,Within 10 metres,47,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),24.714
+13280,-27.528214,153.283498,Stradbroke Ferries Terminal Middle St CLEVELAND,QLD,2,4163,Within 100 metres,,NT9J,hillcrest_wine_glass,Hillcrest AL (Wine Glass),29.919
+13301,-27.620279,153.218057,ComGroup Site off Seaview Rd MOUNT COTTON,QLD,2,4165,Within 10 metres,218,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),19.543
+13303,-27.620414,153.218291,Police Site off Seaview Rd MOUNT COTTON,QLD,2,4165,Within 10 metres,218,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),19.56
+13318,-27.997423,153.18257,Telstra Radio Terminal Laheys Lookout Rd MOUNT TAMBORINE,QLD,2,4272,Within 100 metres,482,NT9M,laheys_lookout_al,Laheys Lookout AL,0.026
+133408,-26.87744,152.151394,Telstra Radio Terminal D`Aguilar Highway BENARKIN,QLD,4,4306,Within 10 metres,461,NT5M,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,54.64
+13369,-27.375381,153.172018,T4 Admin Bldg P & O Ports Container Terminal FISHERMAN ISLANDS,QLD,2,4178,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,24.428
+13390,-27.402248,153.15719,Qld Transport Control Tower Rooftop Site Port of Brisbane Operations Base Howard Smith Dr LYTTON,QLD,2,4008,Within 10 metres,0,NT9E,constitution_hill,Constitution Hill,21.805
+134534,-24.448109,150.315632,Optus Site Mount Benn Banana Holding Rd BANANA,QLD,4,4702,Within 10 metres,,MS9F,banana_range_al,Banana Range AL,0.055
+13465,-27.717787,153.23996,Air Sea Rescue Yellowwood Hill BEENLEIGH,QLD,2,4207,Within 100 metres,,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),21.18
+13476,-27.7883,153.213012,Crown Castle Site off Cliff Barons Road DARLINGTON RANGE,QLD,2,4208,Within 10 metres,275,NT9M,mt_tamborine_al,Mt Tamborine AL,20.118
+13513,-19.885975,148.075734,Qld Tspt Site ABBOT POINT,QLD,4,4805,Unknown,38,MR1M,moss_vale_al,Moss Vale AL,39.431
+135558,-25.310922,152.829933,Optus Site Hervey Bay Regency Avenue HERVEY BAY,QLD,4,4655,Within 10 metres,71,NT2H,ghost_hill_al,Ghost Hill AL,0.198
+135649,-27.45482,152.210608,Rainfall Data Repeater Site Upper Sandy Creek near Wallers Road  13.5 km NE of HELIDON,QLD,4,4343,Unknown,,NT8E,upper_sandy_ck_al,Upper Sandy Creek AL,1.219
+135801,-17.95087,146.087017,Optus Site Mission Beach South Cnr Jessie St & Campbell Tce MISSION BEACH,QLD,4,4854,Within 10 metres,66,LQ5M,south_mission_beach,South Mission Beach AL,0.102
+13586,-28.066039,153.313471,Floodalert Met Bureau Site The Panorama TALLAI,QLD,2,4213,Within 100 metres,365,NU3B,tallai_al,Tallai AL,1.718
+136029,-16.937629,145.756443,1 Rodda Street BUNGALOW,QLD,4,4870,Within 10 metres,,LQ1P,brinsmead_al,Brinsmead AL,7.301
+136147,-31.871711,152.692895,Crowdy Harrington RVCP 8-10 Beach Street HARRINGTON,NSW,4,2427,Within 10 metres,,NV2O,port_macquarie_golf,Port Macquarie (Golf,47.968
+13627,-26.178109,152.872456,Fire Tower MT WOLVI,QLD,4,4570,Within 100 metres,357,NT5D,mt_wolvi_al,Mt Wolvi AL,0.519
+136288,-17.624722,145.596932,BOM site Maalan Road access from Sutties Road TULLY,QLD,4,4872,Within 10 metres,,LQ4K,millaa_millaa_al,Millaa Millaa AL,11.99
+136330,-26.591686,152.771949,BOM site Coolabine Creek NAMBOUR,QLD,4,4574,Within 10 metres,,NT5L,coolabine_ck_aler,Coolabine Ck AL,0.731
+136331,-26.688076,152.803894,BOM Site Obi Lookout NAMBOUR,QLD,4,4552,Within 10 metres,,NT5L,obi_lookout_al,Obi Lookout AL,0.25
+136344,-24.44849,150.316206,Rebel Media Site Lot 15 Banana Holdings Rd BANANA,QLD,4,4715,Within 10 metres,,MS9F,banana_range_al,Banana Range AL,0.063
+13645,-27.987086,153.391974,74 Wardoo St ASHMORE,QLD,2,4214,Within 100 metres,,NT9N,tallai_al,Tallai AL,12.95
+13655,-27.936971,153.427013,Seaway Tower The Spit MAIN BEACH,QLD,2,4217,Within 10 metres,0,NT9N,tallai_al,Tallai AL,19.352
+136842,-27.607737,152.758403,RiverLink Shopping Complex Security Corner Pine Street and The Terrace NORTH IPSWICH,QLD,2,4305,Within 10 metres,,NT8L,bundamba_barclay_st,Bundamba (Barclay St) AL,6.815
+136852,-27.437412,153.110999,Brisbane Port Cnr Macarthur Street and Savage Street PINKENBA,QLD,2,4008,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,16.17
+13698,-25.905347,153.090907,QFS Fire Station Gympie Rd RAINBOW BEACH,QLD,4,4581,Unknown,,NT3M,mt_wolvi_al,Mt Wolvi AL,37.531
+13700,-26.594156,152.726874,QFS Fire Station Philip St KENILWORTH,QLD,4,4574,Unknown,,NT5K,coolabine_ck_aler,Coolabine Ck AL,4.02
+137187,-21.194643,149.158075,C & JC Camilleri - Paget 263 Connors Road PAGET,QLD,4,4740,Within 10 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,11.78
+137501,-25.286658,150.29525,Cracow Gold Mine Repeater  2.5 km West of CRACOW,QLD,5,4719,Unknown,458,MT3F,cracow_al,Cracow AL,0.247
+137548,-25.604648,151.540217,Broadcast Tower Council Site MT GAYNDAH,QLD,4,4625,Within 10 metres,,NT1K,mt_gayndah_al,Mt Gayndah AL,0.04
+13770,-25.332263,151.23293,Telstra Radio Terminal HOLLYWELL,QLD,4,4627,Within 100 metres,386,NT1E,hollywell_al,Hollywell AL,0.042
+13780,-27.973713,153.426598,Southport Yacht Club MacArthur Pde MAIN BEACH,QLD,2,4217,Within 100 metres,,NT9N,tallai_al,Tallai AL,16.491
+138027,-19.183062,147.015568,Cape Cleveland Lighthouse  CAPE CLEVELAND,QLD,4,4816,Within 100 metres,,LR3A,castle_hill_al,Castle Hill AL,23.837
+138049,-24.395009,148.432503,Security Gate Mine Site  ROLLESTON,QLD,5,4722,Within 10 metres,,MS7F,roddas_lookout_al,Roddas Lookout AL,39.826
+138057,-18.158336,146.303337,South Island Lighthouse 160 kms NE of Townsville  SOUTH ISLAND,QLD,4,4816,Within 100 metres,,LQ8B,south_mission_beach,South Mission Beach AL,32.573
+138388,-27.470407,153.022571,BCC Site 266 George Street Brisbane Square,QLD,2,4000,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,6.824
+138390,-27.431687,153.540559,Point Lookout Lighthouse Lucinda Cresent Point Lookout NORTH STRADBROKE ISLAND,QLD,4,4183,Within 10 metres,,NT9G,hillcrest_wine_glass,Hillcrest AL (Wine Glass),57.212
+138407,-19.881579,148.078044,Abbot Point Jetty Entrance Bowen,QLD,4,4805,Within 10 metres,,MR1M,moss_vale_al,Moss Vale AL,39.945
+138857,-23.486108,150.994997,Sea Hill  CURTIS ISLAND,QLD,4,4680,Within 10 metres,,MS6H,mt_hopeful_al,Mt Hopeful AL,54.273
+138858,-28.239003,152.486003,SE Queensland Water Corporation Site Mt Wilson THE HEAD,QLD,4,4370,Within 100 metres,,NU2B,carrs_lookout_al,Carrs Lkt AL,9.246
+139364,-25.500296,152.051688,Biggenden Reservoir BIGGENDEN,QLD,4,4621,Within 10 metres,,NT2I,mt_goonaneman_al,Mt Goonaneman AL,10.43
+139401,-24.208307,151.188926,Mt Mongrel  GLADSTONE,QLD,4,4680,Within 100 metres,,NS7A,kroombit_repeater_al,Kroombit Repeater AL,30.141
+139479,-23.687219,147.426109,Mt Mayde 130 meters SE of ACMA Site 17928 EMERALD,QLD,5,4702,Within 10 metres,,LS6J,mt_mayde_al,Mt Mayde AL,0.002
+139480,-23.549997,148.239721,Emerald Radar Site Foley Road Near Cnr of Capricorn Highway EMERALD,QLD,4,4720,Within 10 metres,,MS4I,emerald_al,Emerald AL,7.808
+139482,-24.463609,147.568055,Glen Rock 70 metres south of ACMA Site 403861 EMERALD,QLD,5,4722,Within 10 metres,,LS9G,glen_rock_al,Glen Rock AL,0.005
+139485,-23.240834,147.573884,Clermont Rubyvale Road Near ACMA Site 16081 FLORENCE VALE,QLD,5,4702,Within 10 metres,,LS6C,mt_mayde_al,Mt Mayde AL,51.872
+139487,-23.803889,147.769162,Kulumur Range Approx. 3.36 km NW of ACMA Site 17927 EMERALD AREA,QLD,5,4720,Within 10 metres,,LS6P,mt_mayde_al,Mt Mayde AL,37.25
+139505,-23.378329,150.478333,Rockhampton Airport Canoona Road ROCKHAMPTON,QLD,4,4700,Within 100 metres,,MS6F,mt_hopeful_al,Mt Hopeful AL,39.508
+139510,-24.142222,148.154162,Roddas Lookout Adjcent to ACMA Site 18056 EMERALD,QLD,5,4722,Within 10 metres,,MS7A,roddas_lookout_al,Roddas Lookout AL,0.005
+139703,-27.978814,153.353009,Molendinar WTP Jacobs Road MOLENDINAR,QLD,2,4211,Unknown,70,NT9N,tallai_al,Tallai AL,11.29
+13980,-27.91856,153.160535,Energex Site Hendersons Knob MOUNT TAMBORINE,QLD,2,4272,Within 10 metres,544,NT9M,mt_tamborine_al,Mt Tamborine AL,7.863
+14008,-27.996729,153.183113,Council Site Laheys Lookout MOUNT TAMBORINE,QLD,2,4272,Within 10 metres,491,NT9M,laheys_lookout_al,Laheys Lookout AL,0.08
+14014,-27.828759,153.02838,Telstra Exchange Mt Lindsay Hwy JIMBOOMBA,QLD,2,4280,Within 10 metres,34,NT9M,hillcrest_wine_glass,Hillcrest AL (Wine Glass),16.953
+140242,-28.538557,153.555815,Off South Beach Road BRUNSWICK HEADS,NSW,4,2483,Within 10 metres,,NU3K,o_reillys_al,OReillys AL,53.445
+140247,-31.648424,152.801782,Off Tunis Street LAURIETON,NSW,4,2443,Within 10 metres,,NV2L,port_macquarie_golf,Port Macquarie (Golf,21.212
+140248,-28.165013,153.550827,Point Danger Off Tweed Terrace COOLANGATTA,NSW,2,2485,Within 10 metres,,NU3C,tallai_al,Tallai AL,27.265
+140279,-21.193032,149.166102,Paget Depot Chrictons Road PAGET,QLD,4,4740,Within 100 metres,2,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,11.167
+140280,-21.121904,149.15497,Mt Pleasant Reservoir Northside  MT PLEASANT,QLD,4,4740,Within 10 metres,16,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,7.308
+14046,-23.079393,148.50994,Radio Hill OAKY CREEK MINE,QLD,4,4702,Within 100 metres,,MS4C,middlemount_al,Middlemount AL,34.348
+140463,-27.308506,152.077973,Council Site Reservoir Cnr Thompson Road and Grapetree Road PECHEY,QLD,4,4352,Within 10 metres,,NT8E,paradise_ck_rd,Paradise Ck Rd AL,16.201
+14047,-23.027991,148.560839,Northern Radio Site OAKY CREEK MINE,QLD,4,4702,Within 100 metres,,MS4C,middlemount_al,Middlemount AL,26.857
+140502,-25.358534,152.889192,161 River Heads Road BOORAL,QLD,4,4655,Within 10 metres,,NT2H,ghost_hill_al,Ghost Hill AL,7.831
+140835,-27.457748,153.030066,St John Ambulance 225 St Pauls Terrace FORTITUDE VALLEY,QLD,2,4006,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,7.873
+14099,-27.620251,152.825926,Ipswich City Council Site Barclay St BUNDAMBA,QLD,2,4304,Within 10 metres,,NT8L,bundamba_barclay_st,Bundamba (Barclay St) AL,0.018
+141069,-17.222369,145.447616,Sthrn Cross Austereo Site Bones Knob  off Griffin Rd TOLGA,QLD,4,4882,Within 10 metres,901,LQ4B,bones_knob_al,Bones Knob AL,0.211
+141150,-27.432472,153.009297,SES Headquarters 66 Wilston Road NEWMARKET,QLD,2,4051,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,7.559
+141151,-27.184059,153.370898,SES Base Tangalooma Bypass Rd MORETON ISLAND,QLD,4,4025,Within 10 metres,,NT9B,constitution_hill,Constitution Hill,52.678
+141191,-17.523587,146.024516,3/50 Grace St INNISFAIL,QLD,4,4860,Within 10 metres,,LQ5I,marco_street_al,Marco St AL,8.128
+14143,-27.619384,152.759492,Admin Bldg Ipswich Hospital Chelmsford Ave IPSWICH,QLD,2,4305,Within 10 metres,20,NT8L,bundamba_barclay_st,Bundamba (Barclay St) AL,6.563
+14169,-26.86319,152.182433,Sandy Fire Tower Forest R283 BENARKIN,QLD,4,4306,Within 100 metres,379,NT5M,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,55.728
+14175,-26.971085,152.173243,Telstra Customer Qualischefski via BLACKBUTT,QLD,4,4306,Within 100 metres,271,NT5M,upper_sandy_ck_al,Upper Sandy Creek AL,53.955
+14176,-26.989048,152.405177,SEQ Water S & F Repeater GREGORS CREEK,QLD,4,4515,Within 100 metres,115,NT5N,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,37.758
+14187,-27.502263,152.591633,Broadcast Site THE KNOBBY,QLD,2,4311,Within 10 metres,348,NT8K,bundamba_barclay_st,Bundamba (Barclay St) AL,26.58
+141997,-27.341976,153.0709,Brisbane Entertainment Centre  BRISBANE,QLD,2,4034,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,19.163
+142047,-18.520395,146.386057,Lucinda Bulk Sugar Terminal 2 Dungeness Rd LUCINDA,QLD,4,,Within 10 metres,,LQ8J,paluma_al,Paluma AL,57.323
+14205,-27.594195,152.60183,Mt Marrow HAIGSLEA,QLD,2,4340,Within 100 metres,,NT8K,bundamba_barclay_st,Bundamba (Barclay St) AL,22.288
+142089,-27.431242,153.115455,QLD Transport Marine Operations Centre Macarthur Ave East PINKENBA,QLD,2,4008,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,16.799
+142215,-22.559567,148.282475,Seven Queensland Site Tayglen  DYSART,QLD,4,4745,Within 10 metres,,MS1J,mt_lowe_al,Mt Lowe AL,40.753
+14242,-27.829367,152.820313,Telstra Customer 2.5 km E of MT WELCOME,QLD,2,4285,Within 100 metres,232,NT8P,bundamba_barclay_st,Bundamba (Barclay St) AL,23.254
+14265,-28.051611,152.741604,Energex/Police Site Green Hill BOONAH,QLD,4,4310,Within 10 metres,469,NU2C,kooralbyn_al,Kooralbyn AL,11.068
+14316,-27.650566,152.425248,QR Site YARONGMULU  LAIDLEY,QLD,4,4341,Within 10 metres,259,NT8J,schultz_lookout_aler,Schultz Lookout AL,7.994
+14367,-27.606435,152.54007,Meteorology Site The Bluff off Embreys Rd The Bluff,QLD,4,4340,Within 10 metres,,NT8K,schultz_lookout_aler,Schultz Lookout AL,20.226
+14404,-27.543468,151.970876,Telstra Radio Terminal Video Av Mount Lofty TOOWOOMBA,QLD,4,4350,Within 10 metres,688,NT7L,toowoomba_al,Toowoomba AL,4.088
+14507,-27.611959,151.955624,QR/Ergon/Telstra/Commex Site adj Reservoir Nelson St Middle Ridge TOOWOOMBA,QLD,4,4352,Within 10 metres,721,NT7L,toowoomba_al,Toowoomba AL,11.38
+14527,-27.413366,152.161336,Energex Site MT PERSEVERANCE,QLD,4,4352,Within 10 metres,803,NT8E,upper_sandy_ck_al,Upper Sandy Creek AL,5.964
+14541,-27.506035,151.956474,Comtel Tower Mount Kynoch  36 Hilltop Crescent BLUE MOUNTAIN HEIGHTS,QLD,4,4350,Within 10 metres,684,NT7L,toowoomba_al,Toowoomba AL,0.436
+14544,-27.509629,151.954263,State Govt Services Site Behind Water Treatment Plant Shuttlewood St Mount Kynoch TOOWOOMBA,QLD,4,4350,Within 10 metres,686,NT7L,toowoomba_al,Toowoomba AL,0.043
+14545,-27.509364,151.954974,City Council Site Water Treatment Plant Admin Bldg Rooftop Shuttlewood St Mount Kynoch TOOWOOMBA,QLD,4,4350,Within 10 metres,686,NT7L,toowoomba_al,Toowoomba AL,0.04
+14566,-28.012318,151.241518,QAS/Police Site MT DOMVILLE,QLD,4,4357,Within 100 metres,625,NU1A,warahgai_al,Warahgai AL,34.049
+14567,-28.059506,151.410651,Telstra Customer Grays Gate Snake Creek via PITTSWORTH,QLD,4,4357,Within 100 metres,439,NU1B,warahgai_al,Warahgai AL,20.144
+14590,-27.308966,152.077523,Reservoir PECHEY,QLD,4,4352,Within 100 metres,739,NT8E,paradise_ck_rd,Paradise Ck Rd AL,16.15
+14591,-27.319121,152.084312,SEQ Water S & F Repeater MT PECHEY,QLD,4,4352,Within 100 metres,696,NT8E,paradise_ck_rd,Paradise Ck Rd AL,15.03
+14592,-27.331764,152.051054,Lookout State Forest R909 PECHEY,QLD,4,4352,Within 100 metres,732,NT8E,paradise_ck_rd,Paradise Ck Rd AL,13.889
+14597,-27.715741,151.633344,Telstra Exchange PITTSWORTH,QLD,4,4356,Within 10 metres,515,NT7K,toowoomba_al,Toowoomba AL,39.087
+14631,-27.798529,151.857109,QR Site MT KENT,QLD,4,4360,Within 10 metres,669,NT7P,toowoomba_al,Toowoomba AL,33.532
+14648,-28.097655,151.872785,QR Site BONY MOUNTAIN,QLD,4,4362,Within 10 metres,574,NU1D,bony_mountain_al,Bony Mountain AL,0.566
+14691,-27.522926,151.620925,Cecil Plains Rd PURRAWUNDA,QLD,4,4401,Within 100 metres,,NT7K,toowoomba_al,Toowoomba AL,32.948
+14718,-27.179865,151.266681,Fire Station 23 New St DALBY,QLD,4,4405,Within 100 metres,340,NT7B,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,46.313
+14739,-27.632228,152.063475,QFS Site FLAGSTONE CREEK,QLD,4,4344,Within 100 metres,,NT8I,mt_petersen_al,Mt Petersen AL,13.485
+14802,-26.344704,150.869254,Council Site Turkey Mountain via CHINCHILLA,QLD,5,4413,Within 100 metres,473,MT6H,turkey_mountain_al,Turkey Mountain AL,0.124
+14809,-26.649478,150.270678,Telstra Site 8 km east of Miles via Warrego Hwy COLUMBOOLA,QLD,5,4415,Within 10 metres,409,MT6J,bottle_tree_al,Bottle Tree AL,23.184
+14842,-26.384019,149.832501,Telstra Customer Homestead HIGHLANDS,QLD,5,4425,Within 100 metres,357,MT5H,clovelly_al,Clovelly AL,26.369
+14847,-26.364266,150.244089,Telstra Customer 5077 7 km SW of GLENROWAN,QLD,5,4418,Within 100 metres,368,MT6E,clovelly_al,Clovelly AL,20.84
+14860,-25.61365,151.89021,Telstra Exchange 9 Main Street COALSTOUN LAKES,QLD,4,4625,Within 100 metres,244,NT1L,mt_goonaneman_al,Mt Goonaneman AL,30.778
+14885,-24.861151,146.948883,Telstra Site MT PLAYFAIR,QLD,5,4722,Within 100 metres,518,LS8P,mt_lindsay_al,Mt Lindsay AL,52.403
+14905,-27.278142,150.460129,Water Tower cnr Fry and Smallcombe Streets TARA,QLD,5,4421,Within 10 metres,310,MT9F,bottle_tree_al,Bottle Tree AL,53.239
+150032,-27.188631,151.268938,Council Community Centre 107 Drayton St DALBY,QLD,4,4405,Within 10 metres,339,NT7B,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,46.843
+150238,-28.093275,152.823338,Council Site adj Reservoir  200-204 Walker Drive KOORALBYN,QLD,4,4285,Within 10 metres,151,NU2D,kooralbyn_al,Kooralbyn AL,4.209
+150273,-24.1419,148.153627,Lot 75 of R326 SPRINGSURE,QLD,5,4722,Unknown,,MS7A,roddas_lookout_al,Roddas Lookout AL,0.067
+151525,-25.426931,152.117054,BAI Comms Site Mt Goonaneman Access Rd MT GOONANEMAN,QLD,4,4621,Within 10 metres,591,NT2E,mt_goonaneman_al,Mt Goonaneman AL,0.065
+151533,-25.287328,150.292981,Broadcast Site Golden Plateau via CRACOW,QLD,5,4719,Unknown,466,MT3F,cracow_al,Cracow AL,0.125
+15162,-26.212775,147.08128,Telstra Radio Terminal MT JOY,QLD,5,4468,Within 10 metres,523,LT6A,moyallen_al,Moyallen AL,0.161
+15193,-26.404474,146.244331,Water Tower Parry St CHARLEVILLE,QLD,5,4470,Within 100 metres,297,LT5E,calowrie_al,Calowrie AL,26.509
+152493,-17.699048,146.056171,Broadcast/Comm Site Cowley Hill COWLEY,QLD,4,4871,Unknown,51,LQ5I,marco_street_al,Marco St AL,19.184
+153198,-25.309794,152.808804,Broadcast Site Scrub Hill NIKENBAH,QLD,4,4655,Unknown,,NT2H,ghost_hill_al,Ghost Hill AL,2.324
+15322,-25.806309,146.588827,BA Site 1 km SE of AUGATHELLA,QLD,5,4470,Within 10 metres,,LT2O,augathella_rptr_aler,Augathella Rptr AL,0.22
+153227,-17.160882,145.746618,Broadcast Site Reservoir Golden St GOLDSBOROUGH VALLEY,QLD,4,4865,Within 10 metres,174,LQ4C,gordonvale_al,Gordonvale AL,8.053
+15327,-25.539743,146.911542,Telstra Radio Terminal 5km NE WILLARA,QLD,5,4477,Within 100 metres,482,LT2L,willara_al,Willara AL,0.185
+15333,-25.008875,146.424464,Telstra Radio Terminal IVANHOE,QLD,5,4478,Within 100 metres,468,LT2B,cooks_tank_al,Cooks Tank AL,55.478
+153365,-24.784917,150.9727,Broadcast Site Cania View MONTO,QLD,4,4630,Unknown,,MS9P,caniaview_al,Caniaview AL,0.014
+153407,-19.363935,146.708949,Broadcast Site Allambie Lane KELSO,QLD,4,4815,Within 10 metres,,LR2G,mt_stuart_al,Mt Stuart AL,7.877
+15350,-25.496598,146.307365,Telstra Radio Terminal 3 km ENE of COOKS TANK,QLD,5,4477,Within 10 metres,398,LT2F,cooks_tank_al,Cooks Tank AL,0.028
+15799,-26.829257,152.679013,Brandons Rd BELLTHORPE WEST,QLD,4,4514,Within 100 metres,619,NT5O,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,6.369
+15808,-27.036716,152.823105,Amateur Site Lot 1 Williams Rd WAMURAN,QLD,2,4512,Within 100 metres,,NT8D,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,24.053
+15810,-25.44509,152.534086,Telstra Customer Dongal Creek via STONY CREEK,QLD,4,4650,Unknown,30,NT2G,takura_reservoir_ale,Takura Resevoir AL,21.67
+15824,-26.955787,152.949121,Fire Tower Mt Beerburrum BEERBURRUM,QLD,2,4518,Within 10 metres,,NT5P,bald_knob_al,Bald Knob AL,19.953
+15829,-26.931742,152.945112,Fire Tower No 1 SF 589 MT BEERBURRUM,QLD,2,4517,Within 100 metres,,NT5P,bald_knob_al,Bald Knob AL,17.251
+15835,-27.249253,152.97016,Water Tower off Torrens Rd PETRIE,QLD,2,4502,Within 100 metres,,NT8H,constitution_hill,Constitution Hill,25.673
+15837,-27.295494,152.751301,Forestry Site TENISON WOODS MTN,QLD,2,4520,Within 10 metres,,NT8H,constitution_hill,Constitution Hill,28.65
+15843,-27.315287,152.748013,Powerlink Tower The Summit MOUNT GLORIOUS,QLD,2,4306,Within 10 metres,,NT8G,constitution_hill,Constitution Hill,27.36
+15848,-27.332206,152.78665,Commex Site End of Fahey Rd MOUNT GLORIOUS,QLD,2,4520,Within 10 metres,,NT8H,constitution_hill,Constitution Hill,23.293
+15864,-27.412484,152.877187,Ranger Signal Station Transmit Site CAMP MOUNTAIN,QLD,2,4520,Within 10 metres,,NT8H,constitution_hill,Constitution Hill,10.659
+15865,-27.421141,152.866303,Vertel Site Hill 309A D`AGUILAR RANGE,QLD,2,4306,Within 10 metres,,NT8H,constitution_hill,Constitution Hill,10.846
+15871,-27.088657,152.751154,QR Site Bootawa MOUNT MEE,QLD,2,4521,Within 100 metres,548,NT8D,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,28.495
+15877,-27.13699,152.81393,Qld Communications Site Lot 3 Townsend Rd OCEAN VIEW,QLD,2,4521,Within 10 metres,461,NT8D,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,34.578
+15890,-27.206306,152.703263,Energex Site 12 km W of Dayboro D`AGUILAR RANGE,QLD,2,4521,Within 100 metres,646,NT8C,constitution_hill,Constitution Hill,39.223
+15891,-26.778491,152.913841,Radio Rhema Site 18 Eagles Nest Court BALD KNOB,QLD,2,4553,Within 10 metres,472,NT5P,bald_knob_al,Bald Knob AL,0.152
+15897,-26.820772,153.004075,Deans Hill 4km ESE of LANDSBOROUGH,QLD,4,4550,Within 10 metres,,NT6M,bald_knob_al,Bald Knob AL,9.966
+15938,-26.690369,152.734877,Energex Site DONOVANS KNOB,QLD,4,4552,Within 100 metres,627,NT5K,obi_lookout_al,Obi Lookout AL,7.109
+15954,-26.77727,152.910371,Costigans Site WILKES KNOB,QLD,2,4552,Within 10 metres,439,NT5P,bald_knob_al,Bald Knob AL,0.522
+15955,-26.778175,152.912493,Alcorn/Vodafone/Optus Site WILKES KNOB,QLD,2,4552,Within 10 metres,459,NT5P,bald_knob_al,Bald Knob AL,0.29
+15957,-26.778175,152.913187,QR Site WILKES KNOB,QLD,2,4552,Within 10 metres,463,NT5P,bald_knob_al,Bald Knob AL,0.225
+15958,-26.778853,152.915249,Main Roads/Qld Transport Site WILKES KNOB,QLD,2,4552,Within 10 metres,464,NT5P,bald_knob_al,Bald Knob AL,0.007
+15959,-26.778944,152.91545,Energex Site WILKES KNOB,QLD,2,4552,Within 10 metres,464,NT5P,bald_knob_al,Bald Knob AL,0.016
+15960,-26.778266,152.913741,Telstra Radio Terminal WILKES KNOB,QLD,2,4552,Within 10 metres,468,NT5P,bald_knob_al,Bald Knob AL,0.17
+15961,-26.778763,152.914998,Qld Communications Site Eagles Nest Ct WILKES KNOB,QLD,2,4552,Within 10 metres,468,NT5P,bald_knob_al,Bald Knob AL,0.034
+15989,-26.694543,153.038951,Commex Site Reservoir William St BUDERIM,QLD,4,4556,Within 10 metres,175,NT6I,bald_knob_al,Bald Knob AL,15.452
+16020,-26.597585,152.945223,Met Bureau Site IMAGE FLAT,QLD,4,4560,Within 100 metres,,NT5L,obi_lookout_al,Obi Lookout AL,17.091
+16039,-26.621496,152.951982,Nambour General Hospital Hospital Rd NAMBOUR,QLD,4,4560,Within 10 metres,,NT5L,obi_lookout_al,Obi Lookout AL,16.263
+16061,-26.454531,152.957449,Met Bureau Site BALL LOOKOUT,QLD,4,4563,Within 100 metres,,NT5H,black_mt_al,Black Mt AL,10.804
+16073,-26.422157,152.85474,Police Site BLACK MOUNTAIN,QLD,4,4563,Within 10 metres,295,NT5H,black_mt_al,Black Mt AL,1.804
+16109,-26.40663,153.046746,Telstra Exchange Goodchap St NOOSAVILLE,QLD,4,4566,Within 10 metres,8,NT6E,black_mt_al,Black Mt AL,18.35
+16154,-26.184264,152.659584,Hospital 12 Henry St GYMPIE,QLD,4,4570,Within 100 metres,,NT5C,mt_wolvi_al,Mt Wolvi AL,20.764
+16186,-26.252422,152.805557,Energex/Telstra Site MT BOULDER,QLD,4,4568,Within 10 metres,495,NT5H,mt_wolvi_al,Mt Wolvi AL,10.444
+16188,-26.252528,152.805384,Qld Comm Site MT BOULDER,QLD,4,4568,Within 10 metres,490,NT5H,mt_wolvi_al,Mt Wolvi AL,10.464
+16194,-26.447278,152.575061,Comm Site Imbil SF 256 MT KANDANGA,QLD,4,4570,Within 100 metres,558,NT5G,coolabine_ck_aler,Coolabine Ck AL,25.328
+16202,-26.174945,152.868957,Rassonon Site MT WOLVI,QLD,4,4570,Within 100 metres,,NT5D,mt_wolvi_al,Mt Wolvi AL,0.243
+16239,-26.639453,152.634434,Fire Tower SF 135 Cambroon MT ALLAN,QLD,4,4515,Within 100 metres,544,NT5K,coolabine_ck_aler,Coolabine Ck AL,14.028
+16240,-26.680124,153.1385,Water Tower Point Cartwright BUDDINA,QLD,4,4575,Within 10 metres,0,NT6I,bald_knob_al,Bald Knob AL,24.738
+16274,-25.904969,153.011782,AVCG Esplanade TIN CAN BAY,QLD,4,4580,Within 100 metres,,NT3M,mt_wolvi_al,Mt Wolvi AL,33.477
+16285,-25.931074,153.190789,Comms Site DOUBLE ISLAND POINT,QLD,4,4581,Within 100 metres,90,NT3M,mt_wolvi_al,Mt Wolvi AL,42.296
+16291,-26.457956,152.459362,Kingham Station via JIMNA,QLD,4,4570,Within 100 metres,,NT5F,coolabine_ck_aler,Coolabine Ck AL,34.293
+16296,-26.173548,151.959764,Ergon Energy Site MT ENGLAND,QLD,4,4601,Within 10 metres,571,NT4D,boondooma_rptr_al,Boondooma Repeater AL,52.464
+16310,-26.24194,151.941135,62 Gore St MURGON,QLD,4,4605,Within 100 metres,,NT4D,boondooma_rptr_al,Boondooma Repeater AL,52.48
+16316,-26.319213,151.874613,McKenzie St WONDAI,QLD,4,4606,Within 100 metres,,NT4H,boondooma_rptr_al,Boondooma Repeater AL,49.913
+16351,-26.830664,151.548911,QNPWS Site MT KIANGAROW,QLD,4,4408,Within 100 metres,1118,NT4O,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,8.208
+16353,-26.888643,151.600672,Wambo Shire Council/Qld Comm Site Westside MT MOWBULLAN,QLD,4,4405,Within 10 metres,1093,NT4O,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,0.039
+16366,-26.170657,151.363093,Telstra Customer Homestead BERYLDALE,QLD,4,4613,Within 100 metres,304,NT4B,boondooma_rptr_al,Boondooma Repeater AL,11.57
+16367,-26.172534,151.451106,Telstra Customer Homestead TRENTHAM,QLD,4,4613,Within 100 metres,312,NT4B,boondooma_rptr_al,Boondooma Repeater AL,8.761
+16369,-26.26275,151.27859,Telstra Radio Terminal BOONDOOMA,QLD,4,4613,Within 100 metres,380,NT4F,boondooma_rptr_al,Boondooma Repeater AL,24.823
+16373,-26.75689,152.116016,Telstra Customer Gartshore MT MELLARA,QLD,4,4306,Within 100 metres,291,NT5M,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,53.192
+16377,-26.802606,151.909882,Main Tower Meandu Mine TARONG,QLD,4,4615,Within 10 metres,490,NT4P,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,32.13
+16378,-26.834351,151.97042,SEQ Water S & F Repeater YARRAMAN,QLD,4,4614,Within 100 metres,508,NT4P,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,37.172
+16383,-26.884518,151.9483,Forestry Tower SF 379 YARRAMAN,QLD,4,4614,Within 100 metres,532,NT4P,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,34.486
+16399,-26.783946,151.914425,Power Station TARONG,QLD,4,4615,Within 100 metres,,NT4P,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,33.229
+16406,-26.898309,151.619784,Ergon Energy Site Eastside MT MOWBULLAN,QLD,4,4405,Within 10 metres,1049,NT4O,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,2.204
+16409,-25.87583,152.258111,Telstra Radio Terminal 53 km NW of Gympie BALLUGAN,QLD,4,4570,Within 100 metres,113,NT2N,mt_goonaneman_al,Mt Goonaneman AL,51.814
+16411,-25.757872,152.316051,Telstra Customer 14 km NNE of BALLUGAN,QLD,4,4621,Unknown,84,NT2N,mt_goonaneman_al,Mt Goonaneman AL,41.799
+16413,-25.63277,152.263571,Telstra Radio Terminal BROOWEENA,QLD,4,4620,Unknown,92,NT2J,mt_goonaneman_al,Mt Goonaneman AL,27.142
+16415,-25.827685,152.496191,Telstra Exchange GUNDIAH,QLD,4,4650,Unknown,30,NT2N,mt_wolvi_al,Mt Wolvi AL,53.695
+16416,-25.816538,152.192948,Telstra Customer SPRINGVALE,QLD,4,4600,Unknown,166,NT2M,mt_goonaneman_al,Mt Goonaneman AL,43.921
+16421,-25.510223,152.04537,Telstra Exchange George St BIGGENDEN,QLD,4,4621,Within 100 metres,118,NT2I,mt_goonaneman_al,Mt Goonaneman AL,11.688
+16426,-25.427006,152.117461,Telstra Radio Terminal 60 km WNW of Maryborough MT GOONANEMAN,QLD,4,4621,Within 10 metres,591,NT2E,mt_goonaneman_al,Mt Goonaneman AL,0.061
+16427,-25.433093,152.122131,Amateur Site 60 km WNW of Maryborough MT GOONANEMAN,QLD,4,4621,Within 100 metres,525,NT2E,mt_goonaneman_al,Mt Goonaneman AL,0.795
+16428,-25.515104,152.274682,Forestry Site SEAVIEW RANGE,QLD,4,4620,Within 100 metres,254,NT2J,mt_goonaneman_al,Mt Goonaneman AL,18.569
+16429,-25.563591,151.504932,Telstra Radio Terminal BINJOUR,QLD,4,4625,Within 100 metres,358,NT1K,mt_gayndah_al,Mt Gayndah AL,5.812
+16437,-25.78804,151.969734,Telstra Customer Stockhaven via GAYNDAH,QLD,4,4601,Within 100 metres,347,NT1P,mt_goonaneman_al,Mt Goonaneman AL,42.73
+16440,-25.632384,151.611468,QAS/OPTUS Site Duke Mtn Maud St GAYNDAH,QLD,4,4625,Within 100 metres,154,NT1K,mt_gayndah_al,Mt Gayndah AL,7.758
+16447,-25.715299,150.975258,CB Repeater Site Doug McIvors Hill via MUNDUBBERA,QLD,5,4626,Unknown,,MT3L,hawkwood_range_al,Hawkwood Range AL,0.056
+16456,-25.660389,151.374547,Regional Council Site Ac Rock MUNDUBBERA,QLD,4,4626,Within 100 metres,329,NT1J,mt_gayndah_al,Mt Gayndah AL,17.722
+16457,-25.660385,151.374995,Ergon Energy Site Property AC Rock MUNDUBBERA,QLD,4,4626,Within 100 metres,329,NT1J,mt_gayndah_al,Mt Gayndah AL,17.679
+16459,-25.587314,151.294463,QAS 94 Leichhardt Street MUNDUBBERA,QLD,4,4626,Within 100 metres,122,NT1J,mt_gayndah_al,Mt Gayndah AL,24.731
+16460,-25.07063,151.325481,Telstra Customer BAYWULLA,QLD,4,4630,Unknown,230,NT1B,hollywell_al,Hollywell AL,30.512
+16466,-25.71733,150.976707,Telstra Hawkwood Radio Terminal 11 km SE of CSIRO NARAYEN,QLD,5,4626,Unknown,380,MT3L,hawkwood_range_al,Hawkwood Range AL,0.221
+16467,-25.084875,151.388736,Telstra Customer Baywulla Creek (Ahern) THE GORGE HOMESTEAD,QLD,4,4630,Unknown,257,NT1B,hollywell_al,Hollywell AL,31.632
+16479,-24.926756,151.294677,Telstra Radio Terminal CANNIINDAH,QLD,4,4630,Unknown,418,NS7N,mt_fort_william_aler,Mt Fort William AL,31.371
+16483,-24.697035,150.874402,Telstra Radio Terminal DAWES RANGE,QLD,4,4630,Within 100 metres,656,MS9L,caniaview_al,Caniaview AL,13.943
+16496,-24.647454,151.338954,Comm Site State Forest MT FORT WILLIAM,QLD,4,4630,Within 100 metres,661,NS7J,mt_fort_william_aler,Mt Fort William AL,0.007
+16500,-24.989188,151.186417,BAI Comms Site 78 Plateau Road MULGILDIE,QLD,4,4630,Within 10 metres,344,NS7M,caniaview_al,Caniaview AL,31.302
+16506,-24.356626,150.939698,Amateur Site KROOMBIT TOPS,QLD,4,4716,Within 100 metres,,MS9H,kroombit_repeater_al,Kroombit Repeater AL,0.031
+16508,-24.356592,150.940517,New Forestry Site KROOMBIT TOPS,QLD,4,4716,Within 100 metres,913,MS9H,kroombit_repeater_al,Kroombit Repeater AL,0.052
+16513,-24.272609,150.712685,Telstra Customer Seeana Stud via BILOELA,QLD,4,4680,Unknown,278,MS9G,kroombit_repeater_al,Kroombit Repeater AL,24.856
+16517,-24.198749,150.760075,Ergon Energy Site SPECIMEN HILL,QLD,4,4715,Within 10 metres,670,MS9D,kroombit_repeater_al,Kroombit Repeater AL,25.312
+16518,-25.796944,152.782593,Fire Tower BIG ANGLE,QLD,4,4650,Within 100 metres,123,NT2P,mt_wolvi_al,Mt Wolvi AL,43.071
+16520,-25.671721,152.882966,Telstra Radio Terminal Eckert Rd BOONOOROO,QLD,4,4650,Within 100 metres,0,NT2L,ghost_hill_al,Ghost Hill AL,40.459
+16522,-25.799805,152.948267,Telstra Radio Terminal KAURI CREEK,QLD,4,4580,Unknown,0,NT2P,mt_wolvi_al,Mt Wolvi AL,42.679
+16527,-25.516394,152.663212,Telstra Radio Terminal MARYBOROUGH,QLD,4,4650,Unknown,13,NT2K,takura_reservoir_ale,Takura Resevoir AL,21.441
+16538,-25.513773,152.68756,Ergon Control Centre Searle St MARYBOROUGH,QLD,4,4650,Within 10 metres,20,NT2K,takura_reservoir_ale,Takura Resevoir AL,20.796
+16543,-25.522261,152.690684,Walker St MARYBOROUGH,QLD,4,4650,Within 100 metres,,NT2K,takura_reservoir_ale,Takura Resevoir AL,21.712
+16576,-25.970642,152.862143,Fire Tower SF 1004 Toolara MT KELLY,QLD,4,4570,Within 100 metres,129,NT2P,mt_wolvi_al,Mt Wolvi AL,22.919
+16582,-25.553395,152.680798,Water Tower Tinana MARYBOROUGH,QLD,4,4650,Within 100 metres,,NT2K,takura_reservoir_ale,Takura Resevoir AL,25.247
+16589,-25.169782,153.2139,Telstra Radio Terminal Bowarrady Lake FRASER ISLAND,QLD,4,4650,Unknown,237,NT3A,ghost_hill_al,Ghost Hill AL,41.498
+16591,-25.714782,152.086983,Telstra Customer BROOKDALE,QLD,4,4621,Unknown,195,NT2I,mt_goonaneman_al,Mt Goonaneman AL,32.088
+16595,-25.145005,151.830359,Telstra Customer Gray 1 km S of DOUGHBOY CREEK,QLD,4,4671,Unknown,244,NT1D,mt_goonaneman_al,Mt Goonaneman AL,42.643
+16609,-25.788487,152.362694,Telstra Customer GLENEDEN,QLD,4,4621,Unknown,106,NT2N,mt_goonaneman_al,Mt Goonaneman AL,47.087
+16612,-25.39244,153.176015,Telstra Customer Poyungan Valley FRASER ISLAND,QLD,4,4650,Unknown,10,NT3E,ghost_hill_al,Ghost Hill AL,35.751
+16614,-25.727219,152.054989,Telstra Customer Hunter JIMMYS CREEK,QLD,4,4621,Unknown,203,NT2I,mt_goonaneman_al,Mt Goonaneman AL,33.906
+16615,-25.178863,151.888582,Telstra Customer KELLY HOMESTEAD,QLD,4,4671,Unknown,88,NT1D,mt_goonaneman_al,Mt Goonaneman AL,35.952
+16616,-25.224359,153.251224,Telstra Customer Cathedral Beach FRASER ISLAND,QLD,4,4650,Unknown,81,NT3B,ghost_hill_al,Ghost Hill AL,43.247
+16617,-25.168328,153.273933,Telstra Customer Dundubara 1 FRASER ISLAND,QLD,4,4650,Unknown,99,NT3B,ghost_hill_al,Ghost Hill AL,47.198
+16621,-25.956751,152.576328,Met/Rassonon Site MT KANIGAN,QLD,4,4570,Within 100 metres,350,NT2O,mt_wolvi_al,Mt Wolvi AL,38.0
+16624,-25.966094,152.584606,Ergon Site MT KANIGAN,QLD,4,4570,Within 10 metres,320,NT2O,mt_wolvi_al,Mt Wolvi AL,36.699
+16631,-25.063349,151.579339,Telstra Customer 5 km NW of Wolca THE TOP,QLD,4,4671,Unknown,413,NT1C,hollywell_al,Hollywell AL,45.906
+16639,-25.311176,152.831899,Telstra Radio Terminal GHOST HILL,QLD,4,4655,Within 100 metres,,NT2H,ghost_hill_al,Ghost Hill AL,0.042
+16640,-25.31086,152.8319,Nixons Site  Ghost Hill 22 Regency Ave URRAWEEN,QLD,4,4655,Within 10 metres,72,NT2H,ghost_hill_al,Ghost Hill AL,0.007
+16643,-25.310613,152.837444,Amateur Site GHOST HILL,QLD,4,4655,Within 100 metres,,NT2H,ghost_hill_al,Ghost Hill AL,0.558
+16671,-25.327597,152.706233,Council Site TAKURA HILL,QLD,4,4655,Within 100 metres,92,NT2G,takura_reservoir_ale,Takura Resevoir AL,0.017
+16673,-25.286882,152.865497,Hervey Bay Fire Station TORQUAY,QLD,4,4655,Within 100 metres,2,NT2H,ghost_hill_al,Ghost Hill AL,4.299
+16682,-25.294176,152.909554,VMR Buccaneer Ave URANGAN,QLD,4,4650,Within 100 metres,,NT2H,ghost_hill_al,Ghost Hill AL,8.022
+16686,-25.318119,152.56258,Telstra Exchange HOWARD,QLD,4,4650,Within 100 metres,17,NT2G,takura_reservoir_ale,Takura Resevoir AL,14.463
+16705,-25.235702,152.278354,Telstra Radio Terminal Crescent St CHILDERS,QLD,4,4660,Within 10 metres,96,NT2B,mt_goonaneman_al,Mt Goonaneman AL,26.78
+16715,-25.314317,152.341352,Telstra Customer Lindsay via CHILDERS,QLD,4,4660,Within 100 metres,33,NT2F,mt_goonaneman_al,Mt Goonaneman AL,25.799
+16851,-24.99573,151.956238,Telstra Radio Terminal William St GIN GIN,QLD,4,4671,Within 10 metres,69,NS7P,mt_goonaneman_al,Mt Goonaneman AL,50.668
+16853,-24.995644,151.956522,Water Tower Reservoir Hill GIN GIN,QLD,4,4671,Within 100 metres,69,NS7P,mt_goonaneman_al,Mt Goonaneman AL,50.668
+16862,-25.230913,151.540671,Telstra Customer 10 km WSW of MOUNT PERRY,QLD,4,4627,Unknown,190,NT1C,hollywell_al,Hollywell AL,32.929
+16865,-25.189236,151.627075,Telstra Radio Terminal MOUNT PERRY,QLD,4,4671,Within 10 metres,320,NT1C,hollywell_al,Hollywell AL,42.705
+16867,-25.191665,151.688005,QAS/Police Site MT PERRY,QLD,4,4671,Within 100 metres,720,NT1C,mt_gayndah_al,Mt Gayndah AL,48.296
+16870,-25.273115,151.517328,Telstra Customer REIDS CREEK,QLD,4,4627,Unknown,167,NT1G,hollywell_al,Hollywell AL,29.34
+16873,-25.208711,151.899944,Telstra Customer via GIN GIN,QLD,4,4671,Unknown,64,NT1D,mt_goonaneman_al,Mt Goonaneman AL,32.692
+16876,-25.070012,151.971517,Telstra Exchange WALLAVILLE,QLD,4,4671,Within 10 metres,33,NT1D,mt_goonaneman_al,Mt Goonaneman AL,42.365
+16888,-24.971672,151.623979,Telstra Customer Reeve 7 km W of RED MOUNTAIN,QLD,4,4671,Unknown,219,NS7O,mt_fort_william_aler,Mt Fort William AL,46.122
+16899,-24.32973,151.563785,Telstra Exchange MIRIAM VALE,QLD,4,4677,Within 100 metres,56,NS7G,mt_fort_william_aler,Mt Fort William AL,42.028
+16905,-24.311781,151.62444,Powerlink Site WESTWOOD RANGE,QLD,4,4677,Within 10 metres,228,NS7G,mt_fort_william_aler,Mt Fort William AL,47.208
+16937,-24.205564,150.912704,Telstra Customer Bocoolima Pumping Station CALLIOPE,QLD,4,4680,Unknown,154,MS9D,kroombit_repeater_al,Kroombit Repeater AL,17.021
+16943,-23.99467,151.20956,Telstra Radio Terminal CALLIOPE,QLD,4,4680,Unknown,68,NS4M,kroombit_repeater_al,Kroombit Repeater AL,48.656
+16949,-24.297258,151.36238,Telstra Site EASTERN BOYNE,QLD,4,4680,Unknown,139,NS7F,mt_fort_william_aler,Mt Fort William AL,39.018
+17074,-24.308397,150.9423,Telstra Customer Tablelands 7.5 km SE of KROOMBIT TOPS,QLD,4,4680,Within 100 metres,456,MS9H,kroombit_repeater_al,Kroombit Repeater AL,5.365
+17080,-23.934623,151.242612,Telstra Radio Terminal MAURICE HILL,QLD,4,4680,Within 10 metres,199,NS4M,kroombit_repeater_al,Kroombit Repeater AL,56.075
+17081,-24.293155,150.940783,Telstra Customer Callemondah 2 km S of MT SEAVIEW,QLD,4,4680,Within 100 metres,478,MS9H,kroombit_repeater_al,Kroombit Repeater AL,7.055
+17083,-24.376488,151.300498,Telstra Radio Terminal NAGOORIN,QLD,4,4680,Unknown,128,NS7F,mt_fort_william_aler,Mt Fort William AL,30.385
+17089,-24.152361,151.110268,Telstra Exchange WOODERSON,QLD,4,4680,Unknown,102,NS7A,kroombit_repeater_al,Kroombit Repeater AL,28.526
+17093,-23.935977,151.242554,Ergon Energy Site MAURICE HILL,QLD,4,4680,Within 10 metres,194,NS4M,kroombit_repeater_al,Kroombit Repeater AL,55.946
+17096,-23.934316,151.243412,Win Site MAURICE HILL,QLD,4,4680,Within 10 metres,191,NS4M,kroombit_repeater_al,Kroombit Repeater AL,56.148
+17103,-23.467045,151.028837,Telstra Customer SPADLEY,QLD,4,4680,Unknown,9,NS4E,mt_hopeful_al,Mt Hopeful AL,58.322
+17123,-23.735457,151.059766,Old Jones Communications Site 23 km NW of Gladstone SCRUBBY MTN,QLD,4,4680,Within 10 metres,328,NS4I,mt_hopeful_al,Mt Hopeful AL,53.563
+17134,-23.725746,150.530646,TMR RoadTek Site  MT HOPEFUL,QLD,4,4702,Within 100 metres,557,MS6K,mt_hopeful_al,Mt Hopeful AL,0.561
+17136,-23.729977,150.533851,Ergon Site 38 km S of Rockhampton MT HOPEFUL,QLD,4,4702,Within 100 metres,596,MS6K,mt_hopeful_al,Mt Hopeful AL,0.026
+17138,-23.729509,150.535625,BA Site Mount Hopeful 1046 Mount Hopeful Rd BAJOOL,QLD,4,4702,Within 10 metres,552,MS6K,mt_hopeful_al,Mt Hopeful AL,0.213
+17171,-23.317603,150.486636,Glenmore W/Treatment ROCKHAMPTON,QLD,4,4702,Unknown,11,MS6F,mt_hopeful_al,Mt Hopeful AL,46.106
+17176,-23.387308,150.49335,Police Site Agnes St ROCKHAMPTON,QLD,4,4700,Unknown,7,MS6F,mt_hopeful_al,Mt Hopeful AL,38.326
+17265,-23.389277,150.523435,94 Wharf St ROCKHAMPTON,QLD,4,4700,Unknown,,MS6G,mt_hopeful_al,Mt Hopeful AL,37.901
+17339,-24.212182,150.487398,Callide Coalfields BOUNDARY HILL MINE,QLD,4,4702,Unknown,,MS9B,banana_range_al,Banana Range AL,31.529
+17346,-23.119562,148.039709,Telstra Radio Terminal CAPELLA,QLD,4,4702,Within 100 metres,239,MS4A,mt_lowe_al,Mt Lowe AL,26.381
+17357,-24.148977,150.534683,Telstra Customers CRAIGLANDS,QLD,4,4702,Unknown,179,MS9C,banana_range_al,Banana Range AL,40.037
+17383,-23.652076,148.075265,Ergon Site FAIRBAIRN DAM,QLD,4,4720,Unknown,212,MS4I,emerald_al,Emerald AL,16.475
+17392,-23.910163,150.565935,Telstra Customer GLENGOWAN,QLD,4,4702,Unknown,232,MS6O,mt_hopeful_al,Mt Hopeful AL,20.301
+17427,-23.337255,150.576557,Council Water Reservoir MT ARCHER,QLD,4,4701,Within 10 metres,,MS6G,mt_hopeful_al,Mt Hopeful AL,43.89
+17428,-23.337163,150.576662,Powerlink/Ergon Site MT ARCHER,QLD,4,4701,Within 10 metres,594,MS6G,mt_hopeful_al,Mt Hopeful AL,43.902
+17438,-23.592842,148.658622,QR Site MT CROCKER,QLD,4,4702,Within 10 metres,292,MS4K,emerald_al,Emerald AL,50.659
+17442,-23.729651,150.536014,Broadcast Australia Site 1046 Mt Hopeful Rd MOUNT HOPEFUL,QLD,4,4702,Within 10 metres,530,MS6K,mt_hopeful_al,Mt Hopeful AL,0.249
+17452,-23.529655,147.293125,TMR RoadTek Site  MT TABLETOP,QLD,5,4702,Within 100 metres,900,LS6J,mt_pisgah_al,Mt Pisgah AL,16.036
+17465,-23.875481,150.542044,Telstra Customer POMEGRANATE,QLD,4,4702,Unknown,233,MS6O,mt_hopeful_al,Mt Hopeful AL,16.2
+17477,-24.675651,148.147618,Telstra Customer Deepdale via ROLLESTON,QLD,5,4702,Unknown,348,MS7I,roddas_lookout_al,Roddas Lookout AL,59.321
+17483,-23.528411,147.997071,Rural Fires/DPI Site State Forest 223 SELMA,QLD,5,4720,Unknown,272,LS6L,emerald_al,Emerald AL,17.264
+17486,-23.511992,150.316118,Power Station STANWELL,QLD,4,4702,Unknown,,MS6J,mt_hopeful_al,Mt Hopeful AL,32.842
+17488,-23.506629,150.319172,Power Station STANWELL,QLD,4,4702,Unknown,53,MS6J,mt_hopeful_al,Mt Hopeful AL,33.078
+17491,-23.506304,150.350254,Power Station STANWELL,QLD,4,4702,Unknown,74,MS6J,mt_hopeful_al,Mt Hopeful AL,31.107
+17500,-24.070876,150.40958,Telstra Radio Terminal TOMLIN,QLD,4,4702,Within 10 metres,294,MS9B,mt_hopeful_al,Mt Hopeful AL,39.946
+17511,-24.1448,149.50586,Telstra Radio Terminal WOORABINDA,QLD,5,4702,Unknown,196,MS8C,dawson_range_south_a,Dawson Range South AL,58.898
+17552,-24.59459,149.813349,Council Site DAWSON RANGE SOUTH,QLD,5,4718,Within 100 metres,268,MS8L,dawson_range_south_a,Dawson Range South AL,0.022
+17673,-23.151039,148.392204,Wash Plant GREGORY MINE,QLD,4,4702,Unknown,,MS4B,mt_lowe_al,Mt Lowe AL,36.937
+17674,-23.153285,148.393565,Administration Office GREGORY MINE,QLD,4,4702,Unknown,,MS4B,mt_lowe_al,Mt Lowe AL,37.215
+17687,-22.905965,148.149787,Ergon East Site MT LOWE,QLD,4,4702,Within 100 metres,457,MS1M,mt_lowe_al,Mt Lowe AL,0.108
+17700,-23.649827,150.397722,Police Site MOUNT MORGAN,QLD,4,4714,Within 10 metres,253,MS6J,mt_hopeful_al,Mt Hopeful AL,16.459
+17719,-24.39217,150.531126,Telstra Radio Terminal BILOELA,QLD,4,4715,Unknown,202,MS9G,banana_range_al,Banana Range AL,22.706
+17724,-24.327305,150.618393,DGPS Site CALLIDE MINE,QLD,4,4715,Unknown,,MS9G,kroombit_repeater_al,Kroombit Repeater AL,32.744
+17727,-24.346109,150.620228,Unit 1 Callide B Power Station CALLIDE,QLD,4,4715,Within 100 metres,,MS9G,kroombit_repeater_al,Kroombit Repeater AL,32.415
+17738,-24.44873,150.31556,CB Repeater Site BANANA RANGE,QLD,4,4715,Within 10 metres,,MS9F,banana_range_al,Banana Range AL,0.015
+17739,-24.448326,150.315667,QR Site BANANA RANGE,QLD,4,4715,Within 10 metres,579,MS9F,banana_range_al,Banana Range AL,0.031
+17740,-24.448332,150.316012,Council Site BANANA RANGE,QLD,4,4715,Within 10 metres,585,MS9F,banana_range_al,Banana Range AL,0.051
+17741,-24.448783,150.316002,Telstra Radio Terminal BANANA RANGE,QLD,4,4715,Within 10 metres,599,MS9F,banana_range_al,Banana Range AL,0.045
+17742,-24.438464,150.28085,Ergon Site MT BERTHA,QLD,4,4715,Within 100 metres,429,MS9F,banana_range_al,Banana Range AL,3.694
+17852,-25.28842,150.29395,Telstra Radio Terminal CRACOW,QLD,5,4719,Within 10 metres,474,MT3F,cracow_al,Cracow AL,0.038
+17856,-25.072273,150.173356,Ergon Site MT OX,QLD,5,4719,Within 100 metres,303,MT3A,cracow_al,Cracow AL,26.897
+17857,-25.435557,150.705101,Council Site QUAGGY MTN,QLD,5,4627,Within 100 metres,,MT3G,hawkwood_range_al,Hawkwood Range AL,41.298
+17859,-25.252939,150.728288,Telstra Radio Terminal TANDORA,QLD,5,4627,Unknown,449,MT3G,cracow_al,Cracow AL,43.886
+17890,-23.525031,148.159249,QFS 30 Egerton St EMERALD,QLD,4,4720,Within 100 metres,,MS4I,emerald_al,Emerald AL,0.895
+17897,-23.528308,148.160561,QR Microwave Site Cnr Brooks & Lorraway Streets EMERALD,QLD,4,4720,Within 100 metres,177,MS4I,emerald_al,Emerald AL,0.615
+17928,-23.686489,147.425165,Ergon Site MT MAYDE,QLD,5,4702,Within 100 metres,436,LS6J,mt_mayde_al,Mt Mayde AL,0.124
+17964,-22.894563,148.304764,Telstra Customer COOMBURRAGEE,QLD,4,4745,Unknown,331,MS1N,mt_lowe_al,Mt Lowe AL,15.926
+17966,-22.905514,148.149725,MVQ UHF TV Site MT LOWE,QLD,4,4702,Within 100 metres,445,MS1M,mt_lowe_al,Mt Lowe AL,0.057
+17984,-22.628815,148.225599,Telstra Radio Terminal COTHERSTONE,QLD,4,4745,Within 100 metres,255,MS1I,mt_lowe_al,Mt Lowe AL,31.681
+18024,-24.14217,148.153777,TMR RoadTek Site  RODDAS LOOKOUT,QLD,5,4722,Within 100 metres,599,MS7A,roddas_lookout_al,Roddas Lookout AL,0.043
+18028,-24.511478,147.847056,Telstra Customer Allambie via SPRINGSURE,QLD,5,4722,Unknown,393,LS9L,glen_rock_al,Glen Rock AL,28.726
+18029,-24.667655,147.857002,Telstra Customer Kareela Outstation via SPRINGSURE,QLD,5,4722,Unknown,579,LS9L,glen_rock_al,Glen Rock AL,36.993
+18046,-24.683556,147.162239,Telstra Customer CUNGELELLA,QLD,5,4722,Unknown,395,LS9I,glen_rock_al,Glen Rock AL,47.777
+18047,-24.788262,147.208871,Telstra Customer Salvator Rosa via CUNGELELLA,QLD,5,4722,Unknown,429,LS9M,glen_rock_al,Glen Rock AL,51.203
+18048,-24.126309,147.14294,Telstra Customer JO JO STATION,QLD,5,4722,Unknown,401,LS9A,mt_pisgah_al,Mt Pisgah AL,54.273
+18049,-24.148934,147.342483,Telstra Site ECHO HILLS,QLD,5,4722,Unknown,376,LS9B,glen_rock_al,Glen Rock AL,41.797
+18056,-24.142276,148.154053,Shire Council Site RODDAS LOOKOUT,QLD,5,4722,Within 100 metres,599,MS7A,roddas_lookout_al,Roddas Lookout AL,0.017
+18057,-24.142374,148.154222,Amateur Site RODDAS LOOKOUT,QLD,5,4722,Within 100 metres,,MS7A,roddas_lookout_al,Roddas Lookout AL,0.019
+18058,-24.142444,148.154488,OCA Site Roddas Lookout SPRINGSURE,QLD,5,4722,Within 100 metres,591,MS7A,roddas_lookout_al,Roddas Lookout AL,0.04
+18359,-21.452341,149.213059,QR Microwave Site SARINA,QLD,4,4741,Within 10 metres,110,MR8E,outer_harbour_tide_a,Outer Harbour Tide AL,38.272
+18360,-21.497521,149.16955,Hobbs Site JORDAN CREEK,QLD,4,4737,Within 100 metres,,MR8E,outer_harbour_tide_a,Outer Harbour Tide AL,43.644
+18381,-21.42158,149.226328,Sarina Shire Council Office Bruce Highway SARINA,QLD,4,4737,Within 100 metres,16,MR8E,outer_harbour_tide_a,Outer Harbour Tide AL,34.836
+18396,-21.607812,149.049718,QR Site COLSTON,QLD,4,4741,Within 100 metres,236,MR8I,outer_harbour_tide_a,Outer Harbour Tide AL,58.399
+18427,-21.116545,149.170118,Telstra Radio Terminal Pollock St Mt Oscar MACKAY,QLD,4,4740,Within 100 metres,53,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,5.654
+18429,-21.064265,149.095449,Shepherd Site The Black Mountain  13 km NW of MACKAY,QLD,4,4740,Within 10 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,14.198
+18430,-21.280938,149.287993,Sub 7 Control Room BHP Coal Premises HAY POINT,QLD,4,4740,Within 10 metres,,MR8F,outer_harbour_tide_a,Outer Harbour Tide AL,20.314
+18434,-21.164993,149.132613,Racecourse Sugar Mill Tower Peak Downs Highway MACKAY,QLD,4,4740,Within 100 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,11.374
+18438,-21.286802,149.277111,Ports Corporation Building Horyu Maru Drive HAY POINT,QLD,4,4740,Within 10 metres,57,MR8F,outer_harbour_tide_a,Outer Harbour Tide AL,20.601
+18462,-21.117173,149.217083,Bureau of Meteorology Site Mount Bassett Drive  Mount Bassett MACKAY,QLD,4,4740,Within 10 metres,8,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,1.214
+18469,-20.951215,148.975942,Farleigh Sugar Mill Miers Road Site SEAFORTH,QLD,4,4741,Within 100 metres,,MR4P,outer_harbour_tide_a,Outer Harbour Tide AL,31.103
+18569,-21.145117,149.156037,470 Bridge Road MACKAY,QLD,4,4740,Within 100 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,8.143
+18648,-21.642464,149.25815,Telstra Radio Terminal Three Sisters KOUMALA,QLD,4,4738,Within 100 metres,198,MR8J,outer_harbour_tide_a,Outer Harbour Tide AL,59.502
+18649,-21.032749,148.943279,Mackay Communications Site Mt Blackwood  28 km WNW of MACKAY,QLD,4,4741,Within 10 metres,519,MR7D,outer_harbour_tide_a,Outer Harbour Tide AL,30.305
+18651,-21.032368,148.943457,Broadcast Tower Broadcast Australia Site  Mt Blackwood  Lot 410 Mt Blackwood Access Rd KUTTABUL,QLD,4,4741,Within 10 metres,557,MR7D,outer_harbour_tide_a,Outer Harbour Tide AL,30.299
+18653,-20.676551,149.139905,Telstra Customer FARRIER ISLAND,QLD,4,4741,Unknown,0,MR5I,outer_harbour_tide_a,Outer Harbour Tide AL,48.795
+18657,-21.031638,148.943342,Old Television Stub Tower Mt Blackwood  28 km WNW of MACKAY,QLD,4,4741,Within 10 metres,586,MR7D,outer_harbour_tide_a,Outer Harbour Tide AL,30.333
+18658,-21.143245,149.039686,Pleystowe Sugar Mill Cane Inspectors Office PLEYSTOWE,QLD,4,4741,Within 100 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,19.498
+18659,-21.343022,148.939909,Telstra Radio Terminal SPENCER GAP,QLD,4,4740,Within 100 metres,250,MR7H,mt_pinnacle_al,Mt Pinnacle AL,35.949
+18665,-21.644011,149.26009,TMR RoadTek Site Three Sisters KOUMALA,QLD,4,4738,Within 10 metres,261,MR8J,outer_harbour_tide_a,Outer Harbour Tide AL,59.686
+18666,-20.805334,149.273946,Resort Site Brampton Peak BRAMPTON ISLAND,QLD,4,4741,Within 100 metres,193,MR5N,outer_harbour_tide_a,Outer Harbour Tide AL,34.087
+18674,-21.322836,148.780946,Telstra Customer Bussey Pastoral Company via MIRANI,QLD,4,4754,Unknown,84,MR7H,mt_pinnacle_al,Mt Pinnacle AL,22.448
+18716,-20.386226,148.861915,Telstra Customer Paradise Bay LONG ISLAND,QLD,4,4741,Unknown,93,MR4H,strathdickie_al,Strathdickie AL,29.513
+18762,-21.212774,147.888914,Main Repeater Site Maintenance Hut NEWLANDS MINE,QLD,5,4743,Within 100 metres,333,LR9D,the_stonewall_al,The Stonewall AL,45.942
+18763,-21.212759,147.886582,Gatehouse Newlands Mine NEWLANDS,QLD,5,4743,Within 100 metres,,LR9D,the_stonewall_al,The Stonewall AL,46.024
+18846,-22.778855,148.294767,Telstra Customer 5069 COLORADO,QLD,4,4702,Unknown,258,MS1N,mt_lowe_al,Mt Lowe AL,20.439
+18865,-22.692692,148.033559,Central Highlands Arc Site HODGSON RANGE,QLD,4,4702,Within 100 metres,,MS1I,mt_lowe_al,Mt Lowe AL,26.44
+18910,-22.932702,148.561938,Pit C GERMAN CREEK,QLD,4,4746,Unknown,212,MS1O,middlemount_al,Middlemount AL,17.88
+18914,-22.809551,148.674596,Nixon Site MIDDLEMOUNT,QLD,4,4746,Within 100 metres,281,MS1O,middlemount_al,Middlemount AL,0.216
+18915,-22.809809,148.674997,Broadcast/Comms Site Trig Station MIDDLEMOUNT,QLD,4,4745,Within 10 metres,281,MS1O,middlemount_al,Middlemount AL,0.168
+18916,-22.809729,148.675275,Broadsound Shire Site MIDDLEMOUNT,QLD,4,4746,Within 100 metres,273,MS1O,middlemount_al,Middlemount AL,0.16
+18917,-22.810872,148.676083,Ergon Energy Site MIDDLEMOUNT,QLD,4,4746,Within 100 metres,269,MS1O,middlemount_al,Middlemount AL,0.017
+18932,-21.174891,149.067889,Silingardis Road Walkerston MACKAY,QLD,4,4751,Within 100 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,17.794
+18937,-21.144314,148.941217,Sugar Bin Marian Mill MARIAN,QLD,4,4753,Within 100 metres,,MR7D,outer_harbour_tide_a,Outer Harbour Tide AL,29.592
+18947,-21.440099,148.709048,Police Site Mt Seaview NEBO,QLD,4,4742,Within 100 metres,827,MR7G,mt_pinnacle_al,Mt Pinnacle AL,31.798
+18948,-21.35232,148.35603,Telstra Radio Terminal EXE CREEK,QLD,4,4742,Unknown,390,MR7F,clarke_range_al,Clarke Range AL Repeater,36.075
+18953,-21.058098,148.578888,TMR RoadTek Site DALRYMPLE HEIGHTS,QLD,4,4757,Within 100 metres,986,MR7C,clarke_range_al,Clarke Range AL Repeater,4.309
+18957,-21.079693,148.543852,Ergon Energy (MK) Site EUNGELLA,QLD,4,4757,Within 100 metres,942,MR7C,clarke_range_al,Clarke Range AL Repeater,0.049
+18968,-20.830584,148.556047,TMR RoadTek Site  MT MACARTNEY,QLD,4,4800,Within 100 metres,840,MR4O,clarke_range_al,Clarke Range AL Repeater,27.694
+18969,-20.831108,148.555553,Ergon Energy (MK) Site 47 km S of Proserpine MT MACARTNEY,QLD,4,4800,Within 100 metres,840,MR4O,clarke_range_al,Clarke Range AL Repeater,27.634
+18971,-20.704575,148.596778,Telstra Exchange BLOOMSBURY,QLD,4,4799,Within 100 metres,52,MR4K,clarke_range_al,Clarke Range AL Repeater,42.035
+18972,-20.644254,148.712253,Telstra Exchange MIDGE POINT,QLD,4,4799,Within 100 metres,5,MR4K,strathdickie_al,Strathdickie AL,37.708
+18974,-20.749289,148.498573,Telstra Site PALM TREE,QLD,4,4800,Unknown,86,MR4N,clarke_range_al,Clarke Range AL Repeater,37.011
+18975,-20.722664,148.664916,Telstra Customer Exmoor Station Exmoor Rd 7 km SE of BLOOMSBURY,QLD,4,4799,Unknown,16,MR4K,clarke_range_al,Clarke Range AL Repeater,41.602
+18981,-20.326326,148.586061,Seven Queensland Site Staniland Drive  8.5 km N of Proserpine MT LUCAS,QLD,4,4800,Within 10 metres,280,MR4G,strathdickie_al,Strathdickie AL,0.009
+18984,-20.400904,148.580802,Telstra Radio Terminal & Exchange 11 Main St PROSERPINE,QLD,4,4800,Within 100 metres,15,MR4G,strathdickie_al,Strathdickie AL,8.303
+18995,-20.560382,148.608903,Telstra Exchange Moloneys Rd LETHEBROOK,QLD,4,4800,Within 100 metres,34,MR4K,strathdickie_al,Strathdickie AL,26.126
+19036,-20.049463,148.889454,VMR Site HAYMAN ISLAND,QLD,4,4801,Within 100 metres,222,MR4D,strathdickie_al,Strathdickie AL,44.165
+19037,-20.055874,148.881272,Resort Site HAYMAN ISLAND,QLD,4,4801,Within 100 metres,50,MR4D,strathdickie_al,Strathdickie AL,43.056
+19042,-20.271,148.703783,VMR Site Altmann Avenue CANNONVALE,QLD,4,4802,Within 100 metres,0,MR4G,strathdickie_al,Strathdickie AL,13.732
+19043,-20.249443,148.979913,Mt Robinson WHITSUNDAY ISLAND,QLD,4,4802,Within 100 metres,355,MR4H,strathdickie_al,Strathdickie AL,41.955
+19081,-20.350635,148.95547,Hamilton Repeater Site VOR Hill HAMILTON ISLAND,QLD,4,4803,Within 10 metres,184,MR4H,strathdickie_al,Strathdickie AL,38.606
+19093,-20.39749,147.866278,Telstra Radio Terminal Peter Delamothe Highway BRIABA,QLD,4,4804,Within 10 metres,439,LR6H,moss_vale_al,Moss Vale AL,24.688
+19109,-20.524149,147.83831,Burdekin Communications Site 3.3 km NNW of Collinsville MT DEVLIN,QLD,4,4804,Within 10 metres,393,LR6L,moss_vale_al,Moss Vale AL,37.623
+19110,-20.521689,147.83334,Ergon Energy Site 3.7 km NNW of Collinsville MT DEVLIN,QLD,4,4804,Within 10 metres,464,LR6L,moss_vale_al,Moss Vale AL,37.673
+19123,-20.583781,148.235008,Telstra Site Homestead NORMANBY,QLD,4,4805,Unknown,504,MR4I,the_stonewall_al,The Stonewall AL,33.551
+19134,-20.521545,147.833119,Council Site Mt Devlin SPRINGLANDS,QLD,4,4804,Within 10 metres,444,LR6L,moss_vale_al,Moss Vale AL,37.673
+19205,-20.552081,148.040992,Telstra Site Flagstone COLLINSVILLE,QLD,4,4805,Unknown,304,MR4I,the_stonewall_al,The Stonewall AL,30.314
+19207,-20.542901,148.38996,Telstra Customer AMELIA VALE,QLD,4,4800,Unknown,83,MR4J,strathdickie_al,Strathdickie AL,31.579
+19211,-20.502071,148.343577,Telstra Site Hecare Station PROSERPINE,QLD,4,4805,Unknown,131,MR4J,strathdickie_al,Strathdickie AL,31.943
+19212,-20.429155,147.395072,Telstra Customer Johnny Cake Homestead MT JOHNNY CAKE,QLD,5,4804,Unknown,70,LR6F,burdekin_dam_al,Burdekin Dam AL,36.141
+19225,-20.012342,148.247072,Telstra Exchange Herbert St BOWEN,QLD,4,4805,Within 10 metres,11,MR4A,moss_vale_al,Moss Vale AL,33.743
+19226,-20.053761,148.084635,QR Site SUMMER HILL,QLD,4,4805,Within 10 metres,221,MR4A,moss_vale_al,Moss Vale AL,21.246
+19227,-20.016154,148.257282,Air Sea Rescue Base Boat Harbour BOWEN,QLD,4,4805,Within 100 metres,,MR4B,moss_vale_al,Moss Vale AL,34.157
+19228,-20.010029,148.241941,Air Sea Rescue Standby 32 Sinclair Street BOWEN,QLD,4,4805,Within 100 metres,,MR4A,moss_vale_al,Moss Vale AL,33.582
+19230,-19.992316,148.106083,Burdekin Communications Site SPROLE CASTLE,QLD,4,4805,Within 10 metres,133,MR1M,moss_vale_al,Moss Vale AL,28.429
+19231,-19.98702,148.250361,Bowen Air Sea Rescue 1 Crofton Street QUEENS BEACH,QLD,4,4805,Within 100 metres,,MR1M,moss_vale_al,Moss Vale AL,36.105
+19234,-20.003299,148.235293,Air Sea Rescue Standby 15 Phillip Street BOWEN,QLD,4,4805,Within 10 metres,,MR4A,moss_vale_al,Moss Vale AL,33.707
+19239,-19.87746,147.6855,Telstra Exchange Bruce Highway GUMLU,QLD,4,4805,Within 100 metres,16,LR3O,hurricane_cliff_al,Hurricane Cliff AL,24.255
+19241,-19.983381,148.228228,Ergon Site 3.7 km NNW of Bowen MOUNT NUTT,QLD,4,4805,Within 10 metres,18,MR1M,moss_vale_al,Moss Vale AL,35.013
+19269,-19.998471,148.05107,Amateur Site MT ROUNDBACK,QLD,4,4805,Unknown,,MR4A,moss_vale_al,Moss Vale AL,26.727
+19276,-19.935601,147.927971,Telstra Customer Abbot Run MT CURLEWIS,QLD,4,4805,Unknown,5,LR3P,hurricane_cliff_al,Hurricane Cliff AL,28.842
+19286,-19.899564,148.081748,Gatehouse ABBOT POINT,QLD,4,4805,Within 100 metres,,MR1M,moss_vale_al,Moss Vale AL,38.013
+19298,-19.743117,147.499098,Telstra Radio Terminal 12 km SE of Home Hill MT INKERMAN,QLD,4,4806,Within 10 metres,76,LR3J,mt_kelly_al,Mt Kelly AL,21.492
+19299,-19.745665,147.495833,Burdekin Communications Site 12 km SE of Home Hill MT INKERMAN,QLD,4,4806,Within 10 metres,152,LR3J,mt_kelly_al,Mt Kelly AL,21.305
+19300,-19.745982,147.495586,QR Site 12 km SE of Home Hill MT INKERMAN,QLD,4,4806,Within 10 metres,185,LR3J,mt_kelly_al,Mt Kelly AL,21.297
+19301,-19.745972,147.496015,TMR RoadTek Site 12 km SE of Home Hill MT INKERMAN,QLD,4,4806,Within 10 metres,213,LR3J,mt_kelly_al,Mt Kelly AL,21.337
+19306,-20.04453,147.27864,Telstra Exchange Ayr Dalbeg Road MILLAROO,QLD,5,4807,Within 10 metres,41,LR6B,mt_kelly_al,Mt Kelly AL,42.696
+19307,-19.662061,147.31285,Pagex Site 14 km SW of Ayr KELLY MOUNTAIN,QLD,4,4807,Within 10 metres,156,LR3J,mt_kelly_al,Mt Kelly AL,0.019
+19308,-19.662006,147.312984,Powerlink Site 14 km SW of Ayr KELLY MOUNTAIN,QLD,4,4807,Within 10 metres,156,LR3J,mt_kelly_al,Mt Kelly AL,0.023
+19309,-19.662015,147.313184,Telstra Radio Terminal 14 km SW of Ayr KELLY MOUNTAIN,QLD,4,4807,Within 10 metres,156,LR3J,mt_kelly_al,Mt Kelly AL,0.042
+19314,-20.246175,147.303479,Telstra Exchange DALBEG,QLD,5,4807,Within 100 metres,54,LR6B,hurricane_cliff_al,Hurricane Cliff AL,45.635
+19320,-20.181496,147.425071,Ergon Energy Site  DE SALIS,QLD,5,4804,Unknown,391,LR6B,hurricane_cliff_al,Hurricane Cliff AL,31.253
+19332,-19.641608,147.400218,Inkerman Sugar Mill Premises HOME HILL,QLD,4,4806,Within 10 metres,,LR3J,mt_kelly_al,Mt Kelly AL,9.428
+19383,-19.662141,147.313461,Burdekin Communications Site 14 km SW of Ayr KELLY MOUNTAIN,QLD,4,4807,Within 10 metres,170,LR3J,mt_kelly_al,Mt Kelly AL,0.074
+19403,-19.249736,146.799679,Telstra Radio Terminal 8 Sterling Drive CASTLE HILL,QLD,4,4810,Within 10 metres,95,LR2H,castle_hill_al,Castle Hill AL,1.049
+19404,-19.25856,146.802543,Police Site Castle Hill TOWNSVILLE,QLD,4,4810,Within 10 metres,260,LR2H,castle_hill_al,Castle Hill AL,0.059
+19405,-19.261311,146.814615,Police Station Stanley Street TOWNSVILLE,QLD,4,4810,Within 10 metres,17,LR2H,castle_hill_al,Castle Hill AL,1.246
+19406,-19.258551,146.802438,Vodafone Site Castle Hill TOWNSVILLE,QLD,4,4810,Within 10 metres,245,LR2H,castle_hill_al,Castle Hill AL,0.07
+19409,-19.252381,146.831982,Port Authority Tower Lennon Dr SOUTH TOWNSVILLE,QLD,4,4810,Within 100 metres,0,LR2H,castle_hill_al,Castle Hill AL,3.11
+19413,-19.254382,146.826451,Qf 8 Boat Ramp Sir Leslie Thiess Drive TOWNSVILLE,QLD,4,4810,Within 10 metres,0,LR2H,castle_hill_al,Castle Hill AL,2.496
+19424,-19.255188,146.827906,Queensland Department of Transport Ross Street SOUTH TOWNSVILLE,QLD,4,4810,Unknown,0,LR2H,castle_hill_al,Castle Hill AL,2.631
+19476,-19.245445,146.837032,Berth 1 Fire Pump House Lennon Drive SOUTH TOWNSVILLE,QLD,4,4810,Within 10 metres,0,LR2D,castle_hill_al,Castle Hill AL,3.851
+19484,-19.343161,146.781353,Pagex Site MT STUART,QLD,4,4813,Within 10 metres,546,LR2H,mt_stuart_al,Mt Stuart AL,0.1
+19485,-19.343756,146.780343,Comms 38m Tower  Telstra Site Mount Stuart  Mount Stuart Rd MURRAY,QLD,4,4813,Within 10 metres,570,LR2H,mt_stuart_al,Mt Stuart AL,0.074
+19487,-19.346895,146.775683,QR Site MT STUART,QLD,4,4816,Within 10 metres,486,LR2H,mt_stuart_al,Mt Stuart AL,0.644
+19488,-19.344108,146.780209,Ergon Energy Site  MT STUART,QLD,4,4813,Within 10 metres,570,LR2H,mt_stuart_al,Mt Stuart AL,0.084
+19489,-19.343521,146.78021,4TTT Site MT STUART,QLD,4,4813,Within 10 metres,570,LR2H,mt_stuart_al,Mt Stuart AL,0.099
+19490,-19.342683,146.782267,"Axicom Mast 1 - 74m, Axicom Site 828 Mt Stuart Road MOUNT STUART",QLD,4,4813,Within 10 metres,523,LR2H,mt_stuart_al,Mt Stuart AL,0.198
+19492,-19.343838,146.780685,Amateur Site MT STUART,QLD,4,4813,Within 10 metres,,LR2H,mt_stuart_al,Mt Stuart AL,0.038
+19494,-19.343612,146.780448,Broadcast Australia Site Mount Stuart Road MOUNT STUART,QLD,4,4813,Within 10 metres,570,LR2H,mt_stuart_al,Mt Stuart AL,0.072
+19498,-19.343837,146.780209,TMR RoadTek Site MT STUART,QLD,4,4813,Within 10 metres,570,LR2H,mt_stuart_al,Mt Stuart AL,0.085
+19500,-19.343386,146.780829,Met Tower National Broadcast Site MT STUART,QLD,4,4813,Within 10 metres,,LR2H,mt_stuart_al,Mt Stuart AL,0.071
+19674,-19.742374,146.855018,Telstra Radio Terminal PLANT HILL CAMERON HILL,QLD,4,4816,Within 10 metres,186,LR2L,cameron_hill_al,Cameron Hill AL,0.403
+19675,-19.01152,146.357333,Telstra Radio Terminal Bruce Highway KINDURO,QLD,4,4816,Within 100 metres,195,LR2B,paluma_al,Paluma AL,14.901
+19683,-19.743823,146.858901,QR Site Plant Hill CAMERON HILL,QLD,4,4816,Within 100 metres,316,LR2L,cameron_hill_al,Cameron Hill AL,0.034
+19692,-19.595519,146.838981,Telstra Exchange 3553 Woodstock Giru Road,QLD,4,4816,Within 100 metres,57,LR2L,cameron_hill_al,Cameron Hill AL,16.605
+19701,-19.695483,146.330337,Telstra Radio Terminal MYRTLEVALE,QLD,4,4820,Unknown,367,LR2J,mingela_al,Mingela AL,37.596
+19717,-19.743678,146.85871,QAS Site Plant Hill CAMERON HILL,QLD,4,4816,Within 10 metres,316,LR2L,cameron_hill_al,Cameron Hill AL,0.012
+19720,-19.340671,146.414618,Ergon Energy  HERVEY RANGE,QLD,4,4820,Within 100 metres,661,LR2F,mt_stuart_al,Mt Stuart AL,38.442
+19722,-18.460698,145.738597,Bureau of Meteorology Site WALLAMAN,QLD,4,4850,Unknown,,LQ7G,wallaman_al,Wallaman AL,0.033
+19739,-19.426091,145.945856,Telstra Radio Terminal ELLA CREEK,QLD,5,4820,Within 100 metres,303,LR1H,paluma_al,Paluma AL,54.248
+19740,-19.354717,146.455202,Telstra Radio Terminal HERVEY RANGE,QLD,4,4818,Within 100 metres,370,LR2F,mt_stuart_al,Mt Stuart AL,34.202
+19745,-18.73731,146.57704,Telstra Radio Terminal PALM ISLAND,QLD,4,4816,Within 100 metres,34,LQ8K,paluma_al,Paluma AL,48.638
+19762,-19.791647,146.498209,Ergon Site Mt Success MINGELA,QLD,4,4816,Within 100 metres,471,LR2N,mingela_al,Mingela AL,17.046
+19763,-19.425426,146.3686,Telstra Site Homestead BYERS,QLD,4,4820,Unknown,367,LR2F,mt_stuart_al,Mt Stuart AL,44.195
+19771,-18.969174,145.988018,Telstra Radio Terminal HIDDEN VALLEY,QLD,4,4816,Within 100 metres,812,LQ7P,paluma_al,Paluma AL,24.356
+19779,-19.00721,146.212042,Telstra Radio Terminal PALUMA,QLD,4,4816,Unknown,840,LR2A,paluma_al,Paluma AL,0.486
+19816,-20.026576,146.992488,Telstra Customer Hillsborough Cottage HILLSBOROUGH,QLD,5,4816,Unknown,122,LR5D,cameron_hill_al,Cameron Hill AL,34.429
+19825,-19.764508,146.969592,Telstra Customer Glendale Homestead GLENDALE,QLD,4,4816,Unknown,45,LR2P,cameron_hill_al,Cameron Hill AL,11.844
+19826,-19.747334,146.950506,Telstra Customer Glen Kathleen Station BOUNDARY HILL,QLD,4,4816,Unknown,61,LR2L,cameron_hill_al,Cameron Hill AL,9.627
+19829,-19.727434,146.904704,Telstra Customer Limestone Station 3 km E of LIMESTONE HILLS,QLD,4,4816,Unknown,62,LR2L,cameron_hill_al,Cameron Hill AL,5.153
+19841,-19.484602,146.390764,Telstra Customer Boseeva Mine 7 km SE of MT GIBSON,QLD,4,4820,Unknown,373,LR2F,mt_stuart_al,Mt Stuart AL,43.81
+19854,-19.30162,146.244659,Telstra Customer Ponto Out Station PONTO,QLD,4,4820,Unknown,363,LR2E,paluma_al,Paluma AL,32.57
+19855,-19.197229,145.775174,Telstra Customer New Moon Station NEW MOON,QLD,5,4820,Unknown,311,LR1D,paluma_al,Paluma AL,50.744
+19858,-19.182969,147.015168,Light House CAPE CLEVELAND,QLD,4,4816,Unknown,64,LR3A,castle_hill_al,Castle Hill AL,23.802
+19863,-18.98042,146.199116,Telstra Customer CRYSTAL CREEK,QLD,4,4816,Unknown,417,LQ8M,paluma_al,Paluma AL,3.718
+19864,-18.955513,146.146236,Telstra Site Paluma Dam PALUMA,QLD,4,4816,Unknown,838,LQ8M,paluma_al,Paluma AL,9.482
+19868,-18.758155,146.570356,Telstra Customer Pencil Bay PALM ISLAND,QLD,4,4816,Unknown,12,LQ8O,paluma_al,Paluma AL,46.661
+19888,-19.414298,146.531649,Telstra Site Army Camp A2 HERVEY RANGE,QLD,4,4816,Unknown,511,LR2G,mt_stuart_al,Mt Stuart AL,27.299
+19937,-20.08887,146.252212,Ergon Site Towers Hill CHARTERS TOWERS,QLD,5,4820,Within 10 metres,413,LR5B,mingela_al,Mingela AL,46.064
+19952,-20.089106,146.252431,Comms Mast  Pagex Site Towers Hill  off Blackjack Rd CHARTERS TOWERS,QLD,5,4820,Within 10 metres,413,LR5B,mingela_al,Mingela AL,46.058
+200813,-28.394714,152.325308,RFS site ACACIA PLATEAU,NSW,4,2476,Unknown,677,NU2F,carrs_lookout_al,Carrs Lkt AL,14.23
+200908,-28.533883,153.407368,RFS Site Koonyum Range Rd via MULLUMBIMBY,NSW,4,2482,Unknown,538,NU3J,o_reillys_al,OReillys AL,42.873
+203355,-28.206128,153.537669,Unit 4/23 Corporation Cct TWEED HEADS SOUTH,NSW,2,2486,Within 100 metres,,NU3C,tallai_al,Tallai AL,28.3
+204212,-31.462772,152.324461,NSWTA 42m Lattice Tower Yarras Mountain Trail YARRAS,NSW,4,2446,Unknown,588,NV2F,port_macquarie_golf,Port Macquarie (Golf,56.16
+204403,-31.47098,152.732448,Bundaleer Gardens WAUCHOPE,NSW,4,2446,Unknown,,NV2G,port_macquarie_golf,Port Macquarie (Golf,17.48
+204807,-28.008408,153.204452,Feature 402 Canungra Military Training Area CANUNGRA,QLD,2,4272,Unknown,278,NU3A,laheys_lookout_al,Laheys Lookout AL,2.49
+20522,-18.577569,146.28642,Telstra Radio Terminal HALIFAX,QLD,4,4850,Within 10 metres,4,LQ8J,paluma_al,Paluma AL,48.659
+20523,-18.310068,146.05028,Telstra Radio Terminal CARDWELL,QLD,4,4816,Within 10 metres,136,LQ8E,bilyana_al,Bilyana AL,28.104
+20525,-18.531109,146.336761,AVCG Qf14 Patterson Parade LUCINDA,QLD,4,4850,Within 10 metres,0,LQ8J,paluma_al,Paluma AL,54.757
+20527,-18.689011,146.214387,Ergon Energy Site MT MERCER,QLD,4,4850,Within 10 metres,36,LQ8I,paluma_al,Paluma AL,35.693
+20538,-18.613051,146.240376,Skypage Site MT CORDELIA,QLD,4,4850,Unknown,97,LQ8I,paluma_al,Paluma AL,44.216
+20539,-18.749938,146.114936,CSR Site MT POVERTY,QLD,4,4850,Within 10 metres,165,LQ8M,paluma_al,Paluma AL,30.796
+20557,-18.670418,146.151465,9 Challands Street INGHAM,QLD,4,4850,Within 10 metres,,LQ8I,paluma_al,Paluma AL,38.358
+205699,-28.273314,153.526057,Bureau of Meteorology DURANBAH,NSW,2,2487,Unknown,,NU3G,tallai_al,Tallai AL,32.169
+20579,-18.526939,146.33313,Receive Station Bulk Sugar Terminal LUCINDA,QLD,4,4850,Unknown,,LQ8J,paluma_al,Paluma AL,55.121
+20584,-18.612447,146.490149,Telstra Customer Pioneer Bay ORPHEUS ISLAND,QLD,4,4816,Unknown,37,LQ8J,paluma_al,Paluma AL,52.813
+20606,-17.994685,146.071728,AVCG Site Luff St HULL HEADS,QLD,4,4854,Within 100 metres,0,LQ5M,south_mission_beach,South Mission Beach AL,5.132
+20617,-17.9463,145.975197,Common Site 5.6 km ESE of Tully MT MACKAY,QLD,4,4854,Within 100 metres,682,LQ4P,south_mission_beach,South Mission Beach AL,11.741
+20624,-18.149859,145.479696,Met Bureau Flood Warning Station MURRAY SPRINGS,QLD,4,4872,Within 100 metres,,LQ7B,murray_springs_al,Murray Springs AL,0.082
+20628,-17.945762,145.97605,B&W Site 5.7 km ESE of Tully MT MACKAY,QLD,4,4854,Within 100 metres,664,LQ4P,south_mission_beach,South Mission Beach AL,11.654
+20639,-18.149529,145.480225,Ergon Site Access via Cashmere Kirrama Rd GOSHEN,QLD,4,,Within 100 metres,841,LQ7B,murray_springs_al,Murray Springs AL,0.016
+20641,-17.766955,145.577625,Powerlink Site 41 km NW of Tully TULLY FALLS,QLD,4,4872,Within 100 metres,,LQ4O,millaa_millaa_al,Millaa Millaa AL,27.935
+20729,-17.524801,146.032507,Police Station INNISFAIL,QLD,4,4860,Within 10 metres,4,LQ5I,marco_street_al,Marco St AL,8.844
+20732,-17.383015,146.003501,Police Hut GRAHAM RANGE,QLD,4,4861,Within 10 metres,304,LQ5E,marco_street_al,Marco St AL,19.852
+20736,-17.52856,146.03434,Water Tower Mourilyan Road INNISFAIL,QLD,4,4860,Within 100 metres,15,LQ5I,marco_street_al,Marco St AL,8.873
+20804,-17.017742,145.634651,Miles Site LAMBS HEAD,QLD,4,4872,Within 10 metres,1209,LQ4C,brinsmead_al,Brinsmead AL,16.487
+20846,-16.923989,145.780098,17 Abbott Street CAIRNS,QLD,4,4870,Within 100 metres,0,LQ1P,brinsmead_al,Brinsmead AL,8.357
+20937,-16.923247,145.775409,82 Grafton Street CAIRNS,QLD,4,4870,Within 10 metres,,LQ1P,brinsmead_al,Brinsmead AL,7.88
+20967,-16.91268,145.770595,Cairns Base Hospital Abbott Street CAIRNS,QLD,4,4870,Within 10 metres,0,LQ1P,brinsmead_al,Brinsmead AL,6.902
+20995,-16.882958,145.738496,Ergon Site Lumley Hill CAIRNS,QLD,4,4870,Within 10 metres,310,LQ1O,brinsmead_al,Brinsmead AL,3.013
+21007,-16.879598,145.755086,Juhi Depot Airport CAIRNS,QLD,4,4870,Within 10 metres,,LQ1P,brinsmead_al,Brinsmead AL,4.817
+21023,-16.940521,145.763935,Palmer Street Portsmith CAIRNS,QLD,4,4870,Within 100 metres,,LQ1P,brinsmead_al,Brinsmead AL,8.08
+21077,-16.905042,145.843335,Mt Yarrabah Site Mt Yarrabah  off Pine Creek Yarrabah Rd MT YARRABAH,QLD,4,4871,Unknown,,LQ1P,brinsmead_al,Brinsmead AL,14.219
+21114,-16.480433,145.462426,MRQPD Wharf Street PORT DOUGLAS,QLD,4,4871,Within 10 metres,,LQ1F,saddle_mountain_aler,Saddle Mtn AL,43.21
+21117,-16.949557,145.864682,AVCG Site 10 km ESE of Cairns MT GORTON,QLD,4,4871,Within 100 metres,728,LQ1P,brinsmead_al,Brinsmead AL,17.718
+21158,-17.264216,145.853685,Radio Terminal 38 km SSE of Cairns MT BELLENDEN KER,QLD,4,4871,Within 10 metres,1492,LQ4H,gordonvale_al,Gordonvale AL,19.381
+21215,-16.481912,145.467117,Comms Tower Flagstaff Hill Island Point Rd PORT DOUGLAS,QLD,4,4871,Within 10 metres,69,LQ1F,saddle_mountain_aler,Saddle Mtn AL,42.822
+21228,-17.560625,145.953507,Ergon Site PIN GIN HILL,QLD,4,4860,Within 100 metres,158,LQ4L,marco_street_al,Marco St AL,0.601
+21249,-16.758965,145.972297,Green Island Reef Resort GREEN ISLAND,QLD,4,4871,Within 100 metres,2,LQ1P,brinsmead_al,Brinsmead AL,31.344
+21276,-16.904575,145.842727,SCA site Mt Yarrabah YARRABAH,QLD,4,4871,Within 10 metres,543,LQ1P,brinsmead_al,Brinsmead AL,14.148
+21349,-16.904073,145.841529,Miles Site Mt Yarrabah  7.5 km ENE of Cairns YARRABAH,QLD,4,4871,Within 10 metres,535,LQ1P,brinsmead_al,Brinsmead AL,14.015
+21530,-17.361602,144.947541,Telstra Radio Terminal PETFORD,QLD,5,4871,Within 100 metres,483,KQ6H,bones_knob_al,Bones Knob AL,55.287
+21550,-17.24008,145.779217,Telstra Radio Terminal Goldsborough State Forest GOLDSBOROUGH,QLD,4,4871,Within 100 metres,146,LQ4D,gordonvale_al,Gordonvale AL,15.492
+21551,-17.204609,145.742777,Telstra Radio Terminal Mulgrave River 13km SW of GORDONVALE,QLD,4,4871,Within 100 metres,70,LQ4C,gordonvale_al,Gordonvale AL,12.53
+21628,-17.522653,144.992801,Telstra Site Homestead GURRUMBA,QLD,5,4871,Within 100 metres,695,KQ6L,bones_knob_al,Bones Knob AL,58.74
+21638,-16.943001,145.008462,Telstra Site Homestead THORNBOROUGH,QLD,4,4871,Within 100 metres,386,LQ1M,bones_knob_al,Bones Knob AL,55.897
+21647,-16.936036,145.035757,Telstra Customer Tyrconnel Mine DIMBULAH,QLD,4,4871,Within 10 metres,480,LQ1M,bones_knob_al,Bones Knob AL,53.954
+21673,-17.455511,145.486324,Austek Site 1.5 Km NE of Cnr Kennedy Hwy and Longlands Gap Rd LONGLANDS GAP,QLD,4,4883,Within 10 metres,,LQ4F,millaa_millaa_al,Millaa Millaa AL,14.714
+21679,-17.455595,145.486435,Ergon Energy Site LONGLANDS GAP,QLD,4,4883,Within 100 metres,1218,LQ4F,millaa_millaa_al,Millaa Millaa AL,14.7
+21682,-16.947479,145.198985,Telstra Customer Glen Russell Holding DIMBULAH,QLD,4,4871,Within 100 metres,561,LQ1M,bones_knob_al,Bones Knob AL,40.208
+21695,-16.818195,145.663041,Met Bureau Hut Saddle Mountain Road  3 km E of Kuranda SADDLE MOUNTAIN,QLD,4,4871,Within 10 metres,618,LQ1O,saddle_mountain_aler,Saddle Mtn AL,0.028
+21708,-16.916101,145.252179,QAS Site HANN TABLELAND,QLD,4,4871,Within 10 metres,942,LQ1N,bones_knob_al,Bones Knob AL,39.684
+21710,-17.455522,145.486673,Qld Police Site LONGLANDS GAP,QLD,4,4883,Within 10 metres,1221,LQ4F,millaa_millaa_al,Millaa Millaa AL,14.681
+21712,-16.818168,145.663097,Met Bureau Radar Tower Saddle Mountain Road  3 km E of Kuranda SADDLE MOUNTAIN,QLD,4,4871,Within 10 metres,618,LQ1O,saddle_mountain_aler,Saddle Mtn AL,0.035
+21713,-17.456378,145.487438,Telstra Radio Terminal LONGLANDS GAP,QLD,4,4883,Within 10 metres,1223,LQ4F,millaa_millaa_al,Millaa Millaa AL,14.565
+21714,-17.68522,145.120241,Telstra Site Lot 39 Onyx St MOUNT GARNET,QLD,4,4872,Within 10 metres,774,LQ4I,millaa_millaa_al,Millaa Millaa AL,55.048
+21717,-17.540461,145.02448,Telstra Radio Terminal 56 km SW of Atherton IRON MOUNTAIN,QLD,4,4872,Within 10 metres,859,LQ4I,bones_knob_al,Bones Knob AL,57.222
+21724,-16.706007,145.195174,Telstra Customer Font Hill Station MARYFARMS,QLD,4,4871,Within 100 metres,381,LQ1I,saddle_mountain_aler,Saddle Mtn AL,51.33
+21739,-16.743499,145.575131,Telstra Customer Cadaghi Stud 15 km NW of KURANDA,QLD,4,4871,Within 100 metres,435,LQ1K,saddle_mountain_aler,Saddle Mtn AL,12.502
+21768,-16.742644,145.566631,Telstra Customer via KURANDA,QLD,4,4871,Within 100 metres,433,LQ1K,saddle_mountain_aler,Saddle Mtn AL,13.251
+21770,-16.746223,145.576987,Telstra Customer 5116 KURANDA,QLD,4,4871,Within 100 metres,436,LQ1K,saddle_mountain_aler,Saddle Mtn AL,12.153
+21772,-16.346968,145.409788,Telstra Exchange WONGA BEACH,QLD,4,4873,Within 10 metres,79,LQ1F,saddle_mountain_aler,Saddle Mtn AL,58.939
+21774,-16.669564,145.472547,Telstra Site Homestead THOMPSON,QLD,4,4871,Unknown,425,LQ1J,saddle_mountain_aler,Saddle Mtn AL,26.152
+21948,-16.818231,145.662937,Airservices Tower Saddle Mountain Road  3 km E of Kuranda SADDLE MOUNTAIN,QLD,4,4871,Within 10 metres,618,LQ1O,saddle_mountain_aler,Saddle Mtn AL,0.016
+21964,-16.985858,145.425072,21 Lloyd Street MAREEBA,QLD,4,4880,Within 100 metres,,LQ1N,bones_knob_al,Bones Knob AL,26.205
+21992,-16.581432,145.189324,Telstra Exchange MARYFARMS,QLD,4,4871,Within 100 metres,347,LQ1I,saddle_mountain_aler,Saddle Mtn AL,56.892
+22008,-17.266979,145.482662,Jack Street ATHERTON,QLD,4,4883,Within 100 metres,,LQ4F,bones_knob_al,Bones Knob AL,6.405
+22011,-17.268113,145.494071,Telstra Radio Terminal Hallorans Hill ATHERTON,QLD,4,4883,Within 10 metres,851,LQ4F,bones_knob_al,Bones Knob AL,7.281
+22020,-17.34986,145.570527,Lot 1 Carson Road MALANDA,QLD,4,4885,Within 100 metres,,LQ4G,millaa_millaa_al,Millaa Millaa AL,19.08
+22025,-17.517641,145.609143,Met Bureau Flood Warning Repeater Site MILLAA MILLAA,QLD,4,4886,Unknown,,LQ4K,millaa_millaa_al,Millaa Millaa AL,0.03
+250402,-28.801597,152.133239,NPWS Site Boonoo Boonoo NP Via TENTERFIELD,NSW,4,2372,Within 100 metres,1037,NU2M,ballandean_al,Ballandean AL,30.582
+250448,-29.252237,151.887694,Telstra Customer Peru TENTERFIELD,NSW,4,2372,Unknown,804,NU4H,ballandean_al,Ballandean AL,52.403
+280008,-28.522596,153.477844,Met Bureau Site Chincogan Mountain MULLUMBIMBY,NSW,4,2483,Unknown,,NU3J,o_reillys_al,OReillys AL,46.578
+280026,-31.426019,152.475,Telstra Site Oxley Highway Pillar LONG FLAT,NSW,4,2446,Unknown,88,NV2F,port_macquarie_golf,Port Macquarie (Golf,42.341
+280027,-31.415584,152.517141,Telstra Site Pappinbarra Rd Por 204 HOLLISDALE,NSW,4,2446,Unknown,359,NV2G,port_macquarie_golf,Port Macquarie (Golf,38.611
+280038,-28.621165,152.510042,NSWTA 50m Lattice Tower and Kyogle Council 35m Guyed Mast Haystack Mountain off Pocupar Rd YABBRA,NSW,4,2470,Unknown,796,NU2K,carrs_lookout_al,Carrs Lkt AL,37.489
+280045,-31.642164,152.796764,Boral Bayside Crescent LAURIETON,NSW,4,2443,Unknown,,NV2L,port_macquarie_golf,Port Macquarie (Golf,20.871
+280078,-28.571032,153.070907,"NSWRFS 25m Lattice Tower  Homeleigh Mountain, Whites Rd HOMELEIGH",NSW,4,2474,Within 10 metres,525,NU3I,o_reillys_al,OReillys AL,38.292
+280176,-31.08082,152.82832,Fire Station 78 Elbow Street KEMPSEY,NSW,4,2440,Unknown,,NV2D,port_macquarie_golf,Port Macquarie (Golf,45.645
+280181,-28.540638,153.552238,Fire Station Cnr The Terrace & Fingal St BRUNSWICK HEADS,NSW,4,2483,Unknown,,NU3K,o_reillys_al,OReillys AL,53.325
+280189,-28.552621,153.49955,Fire Station Dalley St MULLUMBIMBY,NSW,4,2482,Unknown,,NU3J,o_reillys_al,OReillys AL,50.431
+280190,-28.326127,153.39525,Fire Station 133 Murwillumbah St MURWILLUMBAH,NSW,2,2484,Unknown,,NU3F,o_reillys_al,OReillys AL,27.521
+280235,-29.055634,152.021195,Fire Station 125 Logan Street TENTERFIELD,NSW,4,2372,Unknown,855,NU5A,ballandean_al,Ballandean AL,35.931
+280244,-31.451959,152.899268,Port Macquarie Base Hospital Wright Street PORT MACQUARIE,NSW,4,2444,Unknown,,NV2H,port_macquarie_golf,Port Macquarie (Golf,3.945
+34718,-28.261467,153.580358,Faulks Pk KINGSCLIFF,NSW,2,2487,Unknown,,NU3G,tallai_al,Tallai AL,35.279
+34805,-31.645951,152.795648,Fire Station 33 Castle St LAURIETON,NSW,4,2443,Unknown,,NV2L,port_macquarie_golf,Port Macquarie (Golf,21.282
+35041,-28.234862,153.288859,Broadcast Site Bilbrough Lookout SPRINGBROOK,NSW,2,2484,Within 10 metres,952,NU3B,o_reillys_al,OReillys AL,15.019
+35087,-27.463175,152.947118,Community Radio Site The Summit Sir Samuel Griffith Drv MOUNT COOT-THA,QLD,2,4069,Within 10 metres,224,NT8H,constitution_hill,Constitution Hill,1.966
+35519,-28.251087,153.372903,Council Site MT TOMEWIN,NSW,2,2486,Unknown,271,NU3F,tallai_al,Tallai AL,21.814
+35836,-28.232629,153.290201,Energex Site Bilbrough Lookout SPRINGBROOK,QLD,2,4213,Within 10 metres,943,NU3B,o_reillys_al,OReillys AL,15.146
+36294,-28.177887,153.116183,Telstra Customer via CANUNGRA,QLD,2,4275,Unknown,562,NU3A,o_reillys_al,OReillys AL,6.247
+36295,-28.108561,153.030784,Telstra Exchange KERRY,QLD,2,4285,Unknown,120,NU3A,round_mountain_al,Round Mountain AL,10.995
+36319,-16.818955,145.636996,Telstra Exchange KURANDA,QLD,4,4872,Unknown,332,LQ1O,saddle_mountain_aler,Saddle Mtn AL,2.748
+36571,-25.442774,152.657539,Telstra Customer Sharpe via MARYBOROUGH,QLD,4,4650,Unknown,24,NT2G,takura_reservoir_ale,Takura Resevoir AL,13.715
+36619,-26.004253,153.152437,Telstra Customer via NOOSAVILLE,QLD,4,4581,Unknown,5,NT6A,mt_wolvi_al,Mt Wolvi AL,34.313
+36684,-31.078856,152.830347,Telstra Exchange 15 Elbow Street KEMPSEY,NSW,4,2440,Unknown,11,NV2D,port_macquarie_golf,Port Macquarie (Golf,45.825
+36702,-28.553616,153.498983,Telstra Comms Site Telstra Exchange MULLUMBIMBY,NSW,4,2482,Within 10 metres,6,NU3J,o_reillys_al,OReillys AL,50.47
+36883,-28.231127,153.136117,Telstra Site O`Reillys Guesthouse via CANUNGRA,QLD,2,4285,Unknown,897,NU3A,o_reillys_al,OReillys AL,0.059
+36978,-28.672861,152.367204,Telstra Customer Boreham via BONALBO,NSW,4,2475,Unknown,368,NU2J,carrs_lookout_al,Carrs Lkt AL,42.348
+37002,-26.344711,150.869755,Telstra Lookout Tower Turkey Mtn via CHINCHILLA,QLD,5,4413,Within 100 metres,473,MT6H,turkey_mountain_al,Turkey Mountain AL,0.102
+370251,-28.3996,153.45235,Vodafone Site Cooradilla Rd BURRINGBAR,NSW,4,2484,Unknown,223,NU3F,o_reillys_al,OReillys AL,36.211
+37146,-26.495607,151.13982,Telstra Exchange DARR CREEK,QLD,4,4410,Within 100 metres,390,NT4E,braziers_hill_al,Braziers Hill AL,25.639
+37147,-26.318996,150.963368,Telstra Site 4 km S of DURAH HOMESTEAD,QLD,5,4413,Within 100 metres,367,MT6H,turkey_mountain_al,Turkey Mountain AL,9.764
+37501,-26.178536,151.191905,Telstra Customer Perrett 9 km W of BOONDOOMA HOMESTEAD,QLD,4,4626,Within 100 metres,374,NT4A,boondooma_rptr_al,Boondooma Repeater AL,26.641
+37599,-28.535928,151.832789,Broadcast Australia Mast Television Drive PASSCHENDAELE,QLD,4,4375,Within 10 metres,983,NU1L,amiens_knob_al,Amiens Knob AL,7.944
+37733,-17.14754,145.11128,Telstra Radio Terminal DIMBULAH,QLD,4,4872,Within 10 metres,464,LQ4A,bones_knob_al,Bones Knob AL,36.567
+38169,-20.185584,147.98399,Telstra Radio Terminal KENTIA PALMS TURNOFF,QLD,4,4805,Unknown,82,LR6D,moss_vale_al,Moss Vale AL,7.633
+38582,-23.152967,148.39435,Telstra Radio Terminal GREGORY MINE,QLD,4,4702,Within 100 metres,216,MS4B,mt_lowe_al,Mt Lowe AL,37.243
+38963,-26.288237,150.19427,Telstra Downfall Radio Terminal 15km E of GULUGUBA,QLD,5,4418,Within 10 metres,401,MT6E,clovelly_al,Clovelly AL,23.992
+39080,-28.396344,153.366775,NSW VRA Site Mt Nullum via MURWILLUMBAH,NSW,4,2484,Unknown,,NU3F,o_reillys_al,OReillys AL,29.129
+39219,-28.235179,153.288503,Qld Comm Site Bilbrough Lookout SPRINGBROOK,QLD,2,4213,Within 10 metres,951,NU3B,o_reillys_al,OReillys AL,14.985
+39418,-20.056226,148.886343,Resort Security Office HAYMAN ISLAND,QLD,4,4801,Unknown,,MR4D,strathdickie_al,Strathdickie AL,43.409
+39420,-28.237476,153.268633,ComGroup Site 363 Repeater Station Rd SPRINGBROOK,QLD,2,4213,Unknown,957,NU3B,o_reillys_al,OReillys AL,13.05
+39440,-17.594824,146.125056,Hilda Hill MOURILYAN HARBOUR,QLD,4,4858,Unknown,104,LQ5I,marco_street_al,Marco St AL,18.485
+39442,-27.451907,153.190099,Boat Harbour MANLY,QLD,2,4179,Unknown,,NT9E,constitution_hill,Constitution Hill,23.479
+39443,-27.195552,153.106063,Thurecht Pde SCARBOROUGH,QLD,2,4020,Unknown,0,NT9A,constitution_hill,Constitution Hill,34.976
+39446,-26.394221,153.07359,Munna Point NOOSAVILLE,QLD,4,4566,Unknown,,NT6E,black_mt_al,Black Mt AL,21.076
+39455,-26.685103,153.125791,West of AVCG Building Parkyn Pde MOOLOOLABA,QLD,4,4557,Within 10 metres,,NT6I,bald_knob_al,Bald Knob AL,23.361
+39464,-28.234454,153.289775,Twd 2way Bilbrough Lookout SPRINGBROOK,QLD,2,4213,Within 10 metres,902,NU3B,o_reillys_al,OReillys AL,15.108
+39473,-20.326325,148.586185,Optus Site Staniland Drive  8.5 km N of Proserpine MT LUCAS,QLD,4,4800,Within 10 metres,280,MR4G,strathdickie_al,Strathdickie AL,0.012
+39483,-27.063838,153.144262,Sylvan Beach Esplanade Bellara BRIBIE ISLAND,QLD,2,4507,Unknown,,NT9A,bald_knob_al,Bald Knob AL,38.976
+39488,-27.580417,153.314937,Marine Rescue Site adjacent to Launching Ramp VICTORIA POINT,QLD,2,4165,Unknown,,NT9J,hillcrest_wine_glass,Hillcrest AL (Wine Glass),30.027
+39498,-27.060406,151.895571,SEQWB flood gauge ST AUBINS,QLD,4,4352,Unknown,616,NT7D,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,34.938
+39499,-26.977298,152.285751,SEQWB Site BOAT MTN,QLD,4,4306,Unknown,128,NT5N,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,48.124
+39500,-27.542219,152.11442,SEQWB Flood Gauge HELIDON,QLD,4,4344,Unknown,142,NT8I,paradise_ck_rd,Paradise Ck Rd AL,10.395
+39501,-26.946512,152.736437,SEQWB Site WOODFORD,QLD,4,4514,Unknown,126,NT5O,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,12.695
+39502,-26.898236,152.321885,SEQWB Site DEVON HILLS,QLD,4,4306,Unknown,108,NT5N,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,42.416
+39504,-26.873695,152.766336,SEQWB Site FERRIS KNOB,QLD,4,4514,Unknown,326,NT5P,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,5.128
+39505,-26.73997,152.137796,SEQWB Site COOYAR CREEK,QLD,4,4306,Unknown,168,NT5I,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,55.804
+39506,-27.263801,152.195949,SEQWB Site CRESSBROOK DAM,QLD,4,4352,Unknown,260,NT8E,upper_sandy_ck_al,Upper Sandy Creek AL,21.351
+39554,-20.559227,147.801405,Wash Plant Mine Site COLLINSVILLE,QLD,4,4804,Unknown,,LR6L,the_stonewall_al,The Stonewall AL,38.62
+39585,-27.1671,151.27816,Dalby Hospital Hospital Rd DALBY,QLD,4,4405,Unknown,,NT7B,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,44.51
+39587,-27.691258,151.991884,O`Roukes House 13 km SSE of TOOWOOMBA,QLD,4,4358,Within 100 metres,,NT7L,toowoomba_al,Toowoomba AL,20.527
+39598,-28.229165,152.66707,MOEC Site Waterfall Creek Rd MT MAY,QLD,4,4310,Within 10 metres,560,NU2C,carrs_lookout_al,Carrs Lkt AL,25.675
+39608,-16.536608,145.385812,Ergon Site LYONS LOOKOUT,QLD,4,4871,Unknown,485,LQ1J,saddle_mountain_aler,Saddle Mtn AL,43.03
+39610,-16.916357,145.252204,Ergon Site HANN TABLELAND,QLD,4,4871,Unknown,942,LQ1N,bones_knob_al,Bones Knob AL,39.659
+39611,-28.229045,152.416042,Forestry Site Gambubal BALD MOUNTAIN,QLD,4,4370,Unknown,1194,NU2B,carrs_lookout_al,Carrs Lkt AL,7.267
+39646,-27.514331,152.58207,Qld Communications Site MT STRADBROKE,QLD,2,4311,Within 10 metres,315,NT8K,bundamba_barclay_st,Bundamba (Barclay St) AL,26.785
+39656,-27.640565,152.43643,Range Crescent 4km ESE of LAIDLEY,QLD,4,4341,Unknown,260,NT8J,schultz_lookout_aler,Schultz Lookout AL,9.341
+39667,-21.290337,148.283227,Ergon Energy (MK) Powerlink Site MT HILLALONG,QLD,4,4742,Unknown,425,MR7F,clarke_range_al,Clarke Range AL Repeater,35.809
+39682,-28.236665,153.267816,Motorola Site Repeater Station Rd SPRINGBROOK,QLD,2,4213,Within 10 metres,927,NU3B,o_reillys_al,OReillys AL,12.966
+39719,-19.255276,146.826288,Ferry Terminal Sir Leslie Thiess Drive TOWNSVILLE,QLD,4,4810,Unknown,,LR2H,castle_hill_al,Castle Hill AL,2.462
+39736,-27.402067,153.157494,Port of Brisbane Operations Base Rooftop Howard Smith Dr LYTTON,QLD,2,4008,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,21.84
+39742,-17.610001,145.467968,QAS Site Bald Rock RAVENSHOE,QLD,4,4872,Within 10 metres,1001,LQ4J,millaa_millaa_al,Millaa Millaa AL,18.139
+39745,-27.333294,153.081427,QCYC Sinbad St SHORNCLIFFE,QLD,2,4017,Unknown,,NT9E,constitution_hill,Constitution Hill,20.561
+39773,-28.227005,151.48898,QR Site GORE,QLD,4,4352,Within 100 metres,622,NU1B,warahgai_al,Warahgai AL,0.025
+39845,-27.951781,153.42519,VMR Southport Seaworld Dr MAIN BEACH,QLD,2,4217,Within 100 metres,0,NT9N,tallai_al,Tallai AL,18.028
+39866,-27.330792,153.081928,Marine Rescue Club House SHORNCLIFFE,QLD,2,4017,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,20.812
+39889,-28.328368,153.509107,Tweed Radio Site CLOTHIERS CREEK,NSW,4,2484,Unknown,20,NU3G,tallai_al,Tallai AL,35.788
+400240,-21.078729,148.543572,Bureau of Meteorology Site CLARKE RG,QLD,4,4757,Unknown,,MR7C,clarke_range_al,Clarke Range AL Repeater,0.099
+400242,-28.437305,152.09581,Bureau of Met Repeater Site Cherrabah ELBOW VALLEY,QLD,4,4370,Unknown,,NU2E,upper_rosenthal_aler,Upper Rosenthal AL,6.803
+400243,-28.215083,152.017747,Bureau of Met Office WARWICK,QLD,4,4370,Unknown,,NU2A,bony_mountain_al,Bony Mountain AL,18.735
+400245,-19.54575,147.033446,Telstra GSM Site MT ELLIOT,QLD,4,4816,Within 10 metres,100,LR3I,cameron_hill_al,Cameron Hill AL,28.631
+400324,-27.569602,151.945461,Emma Webb Building  Base Hospital Pechey Street TOOWOOMBA,QLD,4,4350,Within 10 metres,604,NT7L,toowoomba_al,Toowoomba AL,6.731
+400326,-26.164807,151.604473,Fire Station Cnr Collingwood & Nelson Sts PROSTON,QLD,4,4613,Within 100 metres,,NT4C,boondooma_rptr_al,Boondooma Repeater AL,18.047
+400347,-28.414933,151.082778,Telstra Inglewood Exchange off Elizabeth St INGLEWOOD,QLD,4,4387,Within 10 metres,276,NU1E,warahgai_al,Warahgai AL,44.942
+400360,-26.840005,151.989571,QAS Fire Station 12 Browne St YARRAMAN,QLD,4,4614,Unknown,,NT4P,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,38.956
+400398,-25.400141,150.779308,Telstra Customer DANMORE HOMESTEAD,QLD,5,4627,Unknown,311,MT3H,hawkwood_range_al,Hawkwood Range AL,40.231
+400444,-28.703949,151.83201,Ergon Site Malachi Creek via MT STIRLING,QLD,4,4380,Within 100 metres,906,NU1L,ballandean_al,Ballandean AL,9.055
+400578,-26.789783,152.922586,488 Landsborough Maleny Rd BALD KNOB,QLD,2,4550,Within 10 metres,,NT5P,bald_knob_al,Bald Knob AL,1.41
+400628,-28.390881,151.925221,Ergon Energy Site Datum Hill BRAESIDE,QLD,4,4370,Within 10 metres,869,NU1H,upper_rosenthal_aler,Upper Rosenthal AL,11.165
+400675,-27.664031,152.82246,Remondis Services Landfill 99 Blackheath Rd SWANBANK,QLD,2,4300,Within 100 metres,,NT8L,bundamba_barclay_st,Bundamba (Barclay St) AL,4.876
+400676,-27.554503,153.00248,69 Grindle Rd ROCKLEA,QLD,2,4106,Within 10 metres,,NT9I,constitution_hill,Constitution Hill,9.584
+400688,-19.949533,147.494975,Telstra Customer LEICHHARDT CREEK,QLD,4,4806,Unknown,75,LR3N,hurricane_cliff_al,Hurricane Cliff AL,27.618
+400763,-27.178209,153.374018,Tangalooma Island Resort MORETON ISLAND,QLD,4,4025,Unknown,,NT9B,constitution_hill,Constitution Hill,53.327
+400802,-27.996121,152.681214,Fire Station Farley St BOONAH,QLD,4,4310,Unknown,,NT8O,kooralbyn_al,Kooralbyn AL,18.588
+400804,-27.715342,151.636767,Fire Station Murray St PITTSWORTH,QLD,4,4356,Unknown,,NT7K,toowoomba_al,Toowoomba AL,38.789
+400806,-26.743104,150.628929,Chinchilla Fire Station 20 Villiers St CHINCHILLA,QLD,5,4413,Within 10 metres,,MT6K,bottle_tree_al,Bottle Tree AL,20.53
+400810,-17.868129,146.104381,QES Site MISSION BEACH,QLD,4,4854,Unknown,,LQ5M,south_mission_beach,South Mission Beach AL,9.372
+400811,-17.813693,146.059835,QES Site Bingil Bay Rd EL ARISH,QLD,4,4854,Unknown,,LQ5M,south_mission_beach,South Mission Beach AL,15.475
+400812,-27.930749,151.904909,Fire Station King St CLIFTON,QLD,4,4361,Unknown,,NT7P,bony_mountain_al,Bony Mountain AL,19.177
+400813,-27.241927,152.420778,Fire Station Heap St ESK,QLD,4,4312,Unknown,,NT8B,upper_sandy_ck_al,Upper Sandy Creek AL,32.379
+400814,-27.087368,152.378707,Fire Station Cressbrook St TOOGOOLAWAH,QLD,4,4313,Unknown,,NT8B,upper_sandy_ck_al,Upper Sandy Creek AL,44.68
+400910,-26.810082,151.899286,Mine Survey Site TARONG,QLD,4,4615,Within 100 metres,,NT4P,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,30.882
+400998,-25.716202,150.975243,Ergon Energy Site  HAWKWOOD RANGE,QLD,5,4626,Within 100 metres,388,MT3L,hawkwood_range_al,Hawkwood Range AL,0.045
+401008,-28.250944,153.57133,Fire Station 152 Marine Pde KINGSCLIFF,NSW,2,2487,Within 10 metres,,NU3G,tallai_al,Tallai AL,33.866
+401223,-27.467832,153.027984,GPO Queen St BRISBANE,QLD,2,4000,Within 100 metres,,NT9E,constitution_hill,Constitution Hill,7.398
+401234,-27.527452,152.797919,Amateur Site Summit MOUNT CROSBY,QLD,2,4306,Within 100 metres,,NT8L,bundamba_barclay_st,Bundamba (Barclay St) AL,10.691
+401264,-27.145551,152.820209,Kyle Communications Amateur Repeater Site Ocean View Rd OCEAN VIEW,QLD,2,4521,Within 10 metres,,NT8D,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,35.638
+401289,-28.174966,152.652161,Maroon Outdoor Education Centre MAROON DAM,QLD,4,4310,Within 10 metres,196,NU2C,kooralbyn_al,Kooralbyn AL,23.135
+401292,-27.080701,152.963266,Caboolture Hospital Rooftop McKean St CABOOLTURE,QLD,2,4510,Within 10 metres,11,NT8D,bald_knob_al,Bald Knob AL,33.894
+401301,-27.526594,153.091706,Vodafone/Hutchison Site Block A Moreton TAFE Mt Gravatt Campus Cavendish Rd MOUNT GRAVATT EAST,QLD,2,4122,Within 10 metres,,NT9I,constitution_hill,Constitution Hill,14.53
+401378,-28.237273,152.486938,Met Bureau Site 2 km N of summit of WILSONS PEAK,QLD,4,4310,Unknown,,NU2B,carrs_lookout_al,Carrs Lkt AL,9.443
+401394,-27.968611,153.213568,Met Bureau Site Golf Course Rd opposite Golf Course MOUNT TAMBORINE,QLD,2,4272,Unknown,,NT9M,mt_tamborine_al,Mt Tamborine AL,0.286
+401398,-27.788268,153.232541,Water Tower Vennor Dr ORMEAU,QLD,2,4208,Unknown,,NT9M,mt_tamborine_al,Mt Tamborine AL,20.181
+401399,-28.044765,153.383656,Sewage Treatment Plant Boowaggan Rd MERRIMAC,QLD,2,4213,Unknown,,NU3B,tallai_al,Tallai AL,8.95
+401454,-27.391432,153.084605,Raubers Rd NORTHGATE,QLD,2,4014,Unknown,,NT9E,constitution_hill,Constitution Hill,16.185
+401547,-27.262081,152.05902,Fire Station 28 Creek St CROWS NEST,QLD,4,4352,Unknown,,NT8E,paradise_ck_rd,Paradise Ck Rd AL,21.453
+401548,-28.333179,152.294583,Fire Station Ivy St KILLARNEY,QLD,4,4373,Unknown,,NU2F,carrs_lookout_al,Carrs Lkt AL,12.607
+401549,-26.413429,151.813844,Fire Station Alexander St WOOROOLIN,QLD,4,4608,Unknown,,NT4H,boondooma_rptr_al,Boondooma Repeater AL,51.355
+401562,-28.07081,153.3764,Robina Hospital 2 Bayberry Lane ROBINA,QLD,2,4226,Within 10 metres,6,NU3B,tallai_al,Tallai AL,7.9
+401573,-25.03715,152.220691,Fire Tower No 5 ELLIOTT RIVER,QLD,4,4660,Within 100 metres,74,NT2A,mt_goonaneman_al,Mt Goonaneman AL,44.636
+401698,-26.297963,151.442692,Telstra Site THREE STONE,QLD,4,4613,Unknown,383,NT4F,boondooma_rptr_al,Boondooma Repeater AL,22.658
+401760,-26.460871,152.676531,Fire Station Yabba Rd IMBIL,QLD,4,4570,Unknown,,NT5G,coolabine_ck_aler,Coolabine Ck AL,17.592
+401761,-28.415826,151.082803,Fire Station Regent St INGLEWOOD,QLD,4,4387,Unknown,,NU1E,warahgai_al,Warahgai AL,44.986
+401848,-27.446797,153.028788,RBH/Hutchison Paging Site Block 40 Rooftop Royal Brisbane Hospital HERSTON,QLD,2,4029,Within 10 metres,18,NT9E,constitution_hill,Constitution Hill,8.218
+401897,-23.379645,150.494521,Optus/Medical Block Hospital Canning St ROCKHAMPTON,QLD,4,4700,Within 10 metres,5,MS6F,mt_hopeful_al,Mt Hopeful AL,39.161
+401931,-27.369651,152.636159,Splityard Creek Hydro Dam WIVENHOE,QLD,2,4306,Unknown,197,NT8G,bundamba_barclay_st,Bundamba (Barclay St) AL,33.583
+401932,-26.80308,152.273414,Met Site via LINVILLE,QLD,4,4306,Unknown,132,NT5N,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,46.724
+402049,-27.479789,152.953942,QR Site Constitution Hill MOUNT COOT-THA,QLD,2,4066,Within 10 metres,236,NT8H,constitution_hill,Constitution Hill,0.027
+402155,-31.599101,152.841395,RFS Site Water Tank GRANTS HEAD,NSW,4,2445,Unknown,,NV2L,port_macquarie_golf,Port Macquarie (Golf,14.587
+402171,-28.653741,151.946595,Shire Council Site Mt Marlay STANTHORPE,QLD,4,4380,Within 10 metres,,NU1L,amiens_knob_al,Amiens Knob AL,13.668
+402351,-28.600331,151.15842,Telstra Customer Lot 45 Bamblings Rd Sapalla via INGLEWOOD,QLD,4,4387,Unknown,329,NU1I,warahgai_al,Warahgai AL,52.638
+402459,-27.074395,152.780383,Commex Site Mount Mee Rd MOUNT MEE,QLD,2,4521,Unknown,,NT8D,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,27.15
+402503,-27.390373,153.023514,Bldg 3 Clinical Sciences Prince Charles Hospital Rode Rd CHERMSIDE,QLD,2,4032,Within 10 metres,38,NT9E,constitution_hill,Constitution Hill,12.06
+402541,-26.888563,151.600764,Comtel Site Westside MT MOWBULLAN,QLD,4,4405,Within 10 metres,1093,NT4O,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,0.033
+402542,-26.888552,151.600522,BOM Site Westside MT MOWBULLAN,QLD,4,4405,Within 10 metres,,NT4O,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,0.029
+402600,-26.175089,152.868547,Met Bureau Site MT WOLVI,QLD,4,4570,Unknown,,NT5D,mt_wolvi_al,Mt Wolvi AL,0.207
+402660,-27.870992,153.359962,Lions Haven for the Aged 9 Pendraat Pde HOPE ISLAND,QLD,2,4212,Within 100 metres,,NT9N,mt_tamborine_al,Mt Tamborine AL,17.838
+402673,-24.392356,150.50394,Fire Station cnr Callide & Tiamby Sts BILOELA,QLD,4,4715,Within 10 metres,178,MS9G,banana_range_al,Banana Range AL,20.068
+402714,-27.997281,153.182442,Council Tower Laheys Lookout Lot 137 Lahey Lookout Rd TAMBORINE MOUNTAIN,QLD,2,4272,Within 10 metres,488,NT9M,laheys_lookout_al,Laheys Lookout AL,0.011
+402752,-26.800586,153.119931,Caloundra Hospital West Tce CALOUNDRA,QLD,4,4551,Within 100 metres,,NT6M,bald_knob_al,Bald Knob AL,20.454
+402921,-28.629872,153.490861,John Nolan Comms Site 4km W of ST HELENA,NSW,4,2479,Unknown,,NU3J,o_reillys_al,OReillys AL,56.303
+402944,-23.393845,150.703858,Police Site FLAT TOP RANGE,QLD,4,4702,Within 100 metres,319,MS6G,mt_hopeful_al,Mt Hopeful AL,41.211
+402950,-28.228692,153.133851,Met Bureau Site O`Reillys Guesthouse via CANUNGRA,QLD,2,4275,Unknown,,NU3A,o_reillys_al,OReillys AL,0.346
+402955,-27.495009,152.990938,Aveo Taringa 1 Moore St TARINGA,QLD,2,4068,Within 100 metres,,NT8H,constitution_hill,Constitution Hill,4.004
+402956,-27.542615,153.259328,Forest Place 148 Smith St CLEVELAND,QLD,2,4163,Within 100 metres,,NT9J,hillcrest_wine_glass,Hillcrest AL (Wine Glass),27.047
+402964,-27.110517,152.785963,Lot 10 Robinson Rd MOUNT MEE,QLD,2,4521,Unknown,,NT8D,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,31.205
+402965,-26.778061,151.914682,Tarong North Power Station TARONG,QLD,4,4615,Unknown,,NT4P,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,33.488
+40305,-28.300638,153.435981,Pacific Hwy CONDONG,NSW,2,2484,Unknown,,NU3F,tallai_al,Tallai AL,29.38
+403097,-26.795456,151.899226,Meandu Mine Workshop TARONG,QLD,4,4615,Unknown,,NT4P,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,31.375
+403179,-24.44934,149.640972,Telstra Customer via Moura WALBA STATION,QLD,5,4702,Unknown,116,MS8G,dawson_range_south_a,Dawson Range South AL,23.751
+403235,-27.360943,153.010161,Aspley Court Retirement Estate 100 Albany Creek Rd ASPLEY,QLD,2,4034,Within 100 metres,,NT9E,constitution_hill,Constitution Hill,14.314
+40332,-27.518642,153.284587,Launching Ramp Raby Bay CLEVELAND,QLD,2,4163,Unknown,,NT9J,hillcrest_wine_glass,Hillcrest AL (Wine Glass),30.606
+40336,-27.495033,153.345269,Rangers Residence PEEL ISLAND,QLD,2,4184,Unknown,,NT9F,hillcrest_wine_glass,Hillcrest AL (Wine Glass),37.036
+403453,-26.655382,150.192204,Fire Station Marian St MILES,QLD,5,4415,Unknown,,MT6I,clovelly_al,Clovelly AL,22.994
+403460,-26.881757,152.104394,Fire Station Hart St BLACKBUTT,QLD,4,4306,Unknown,436,NT5M,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,49.97
+403515,-26.533988,151.843288,Fire Station Kent St KINGAROY,QLD,4,4610,Unknown,466,NT4L,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,46.187
+403516,-26.668427,151.999679,Fire Station Alfred St NANANGO,QLD,4,4615,Unknown,,NT4L,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,46.553
+403517,-18.266809,146.022213,Fire Station Roma St CARDWELL,QLD,4,4816,Unknown,,LQ8E,bilyana_al,Bilyana AL,22.541
+403518,-17.93317,145.9284,Fire Station Murray St TULLY,QLD,4,4854,Unknown,,LQ4P,south_mission_beach,South Mission Beach AL,16.795
+403519,-28.658698,151.933029,Fire Station 54 Lock St East STANTHORPE,QLD,4,4380,Unknown,798,NU1L,amiens_knob_al,Amiens Knob AL,12.702
+403573,-27.969604,153.213366,GCT Mt Tamborine Site 103m Tower Golf Course Road MOUNT TAMBORINE,QLD,2,4272,Within 10 metres,550,NT9M,mt_tamborine_al,Mt Tamborine AL,0.301
+403753,-31.579146,152.798957,Fettel Site Camp Ridge Rd  19 km SSW of Port Macquarie JOLLY NOSE HILL,NSW,4,2446,Unknown,242,NV2L,port_macquarie_golf,Port Macquarie (Golf,15.305
+403764,-22.93276,148.650157,DGPS Site German Creek East MIDDLEMOUNT,QLD,4,4746,Unknown,,MS1O,middlemount_al,Middlemount AL,13.796
+403824,-26.795991,151.898416,Mobiles within Mine Site TARONG,QLD,4,4615,Unknown,452,NT4P,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,31.28
+403861,-24.462995,147.567993,Bauhinia Shire Site 65 km WSW of SPRINGSURE,QLD,5,4722,Within 100 metres,597,LS9G,glen_rock_al,Glen Rock AL,0.068
+403867,-27.372566,153.178334,P & O Ports Container Park FISHERMAN ISLANDS,QLD,2,4178,Within 100 metres,,NT9E,constitution_hill,Constitution Hill,25.125
+403879,-24.290415,150.728567,Telstra Customer Lone Star via BILOELA,QLD,4,4715,Unknown,274,MS9G,kroombit_repeater_al,Kroombit Repeater AL,22.652
+403880,-25.737861,152.44055,Telstra Customer Eucabar via BROOWEENA,QLD,4,4650,Unknown,25,NT2J,mt_goonaneman_al,Mt Goonaneman AL,47.357
+403947,-20.268634,146.265699,Pump Station PAJINGO MINE,QLD,5,4820,Unknown,,LR5F,mingela_al,Mingela AL,57.82
+403960,-23.479718,148.519034,Admin Building ENSHAM MINE,QLD,4,4702,Unknown,202,MS4G,emerald_al,Emerald AL,36.385
+404041,-26.845551,152.891335,Met Bureau Site off Taroona Court PEACHESTER,QLD,2,4519,Unknown,,NT5P,bald_knob_al,Bald Knob AL,7.784
+404076,-21.420723,149.214029,Fire Station Anzac St SARINA,QLD,4,4737,Within 100 metres,27,MR8E,outer_harbour_tide_a,Outer Harbour Tide AL,34.755
+404193,-27.493159,153.403878,VMR Yabby St Dunwich NORTH STRADBROKE ISLAND,QLD,4,4183,Within 100 metres,,NT9F,hillcrest_wine_glass,Hillcrest AL (Wine Glass),42.1
+404204,-25.79597,146.586127,Augathella Fire Station 61 Cavanagh St AUGATHELLA,QLD,5,4477,Unknown,,LT2O,augathella_rptr_aler,Augathella Rptr AL,0.993
+404220,-24.447156,150.31584,Optus Site Banana Holding Rd BANANA RANGE,QLD,4,4715,Within 10 metres,572,MS9F,banana_range_al,Banana Range AL,0.162
+404222,-24.202426,151.60956,Telstra Customer Balacalava via MIRIAM VALE,QLD,4,4678,Unknown,109,NS7C,mt_fort_william_aler,Mt Fort William AL,56.57
+404326,-27.514124,153.286601,VMR Raby Bay William St CLEVELAND,QLD,2,4163,Within 100 metres,,NT9J,hillcrest_wine_glass,Hillcrest AL (Wine Glass),31.058
+404339,-17.599755,146.12094,Qld Transport DGPS Site MOURILYAN HARBOUR,QLD,4,4858,Within 10 metres,,LQ5I,marco_street_al,Marco St AL,18.201
+404429,-27.424123,151.719265,District Hospital cnr Fitzpatrick & Beale Sts OAKEY,QLD,4,4401,Within 10 metres,,NT7G,toowoomba_al,Toowoomba AL,25.098
+404430,-27.5667,152.27625,District Hospital Hill St GATTON,QLD,4,4343,Within 10 metres,,NT8J,mt_petersen_al,Mt Petersen AL,12.16
+404503,-25.800907,152.255188,Telstra Customer Beulah Kildare Road  22 km S of BROOWEENA,QLD,4,4621,Unknown,77,NT2N,mt_goonaneman_al,Mt Goonaneman AL,43.766
+404555,-28.215718,152.036592,Fire Station 23 Canning St WARWICK,QLD,4,4370,Within 10 metres,450,NU2A,bony_mountain_al,Bony Mountain AL,20.181
+404593,-28.016937,153.165936,Christie St CANUNGRA,QLD,2,4275,Within 10 metres,,NU3A,laheys_lookout_al,Laheys Lookout AL,2.731
+404594,-17.266923,145.475045,17 Vernon St ATHERTON,QLD,4,4883,Within 10 metres,,LQ4F,bones_knob_al,Bones Knob AL,5.955
+404597,-23.651697,146.640767,Fire Station 16 Byron St ALPHA,QLD,5,4724,Within 10 metres,,LS5K,sedgeford_al,Sedgeford AL,25.52
+404600,-27.946331,152.625716,53 George St KALBAR,QLD,4,4309,Within 10 metres,,NT8O,kooralbyn_al,Kooralbyn AL,26.002
+404601,-26.941328,152.567262,17 McCauley St KILCOY,QLD,4,4515,Within 10 metres,,NT5O,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,21.226
+404602,-27.869974,151.271183,Attleigh St MILLMERRAN,QLD,4,4357,Within 10 metres,,NT7N,warahgai_al,Warahgai AL,45.088
+404604,-27.631715,152.589653,John St ROSEWOOD,QLD,4,4340,Within 10 metres,,NT8K,bundamba_barclay_st,Bundamba (Barclay St) AL,23.329
+404620,-27.130317,150.484238,Ergon Energy Site Chinchilla Tara Rd 16 km N of TARA,QLD,5,4421,Within 100 metres,377,MT9B,bottle_tree_al,Bottle Tree AL,37.09
+404636,-27.903691,153.199123,7 Paradise Dr EAGLE HEIGHTS,QLD,2,4271,Within 100 metres,,NT9M,mt_tamborine_al,Mt Tamborine AL,7.479
+404648,-27.423131,153.148155,Cnr Lytton Rd & Pritchard St LYTTON,QLD,2,4178,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,20.146
+404702,-27.322583,152.99444,Neilsen`s Quality Gravels Johnstone Rd BRENDALE,QLD,2,4500,Within 10 metres,,NT8H,constitution_hill,Constitution Hill,17.917
+404905,-27.229091,153.09637,Cnr George St & Ashmole Rd REDCLIFFE,QLD,2,4021,Within 10 metres,,NT9A,constitution_hill,Constitution Hill,31.204
+404913,-23.193118,148.388858,Repeater Site Crinum Mine EMERALD,QLD,4,4702,Within 10 metres,,MS4B,mt_lowe_al,Mt Lowe AL,40.314
+404952,-23.915787,148.056513,Minerva Coal Mine 20 km N of SPRINGSURE,QLD,4,4722,Within 100 metres,,MS4M,roddas_lookout_al,Roddas Lookout AL,27.06
+404970,-25.216787,152.036318,Telstra Exchange BOOYAL,QLD,4,4660,Within 100 metres,83,NT2A,mt_goonaneman_al,Mt Goonaneman AL,24.801
+404971,-25.235543,151.867308,Telstra Customer Gannon via BOOYAL,QLD,4,4671,Within 100 metres,68,NT1D,mt_goonaneman_al,Mt Goonaneman AL,32.96
+404972,-25.197436,151.91007,Telstra Customer Krebs via BOOYAL,QLD,4,4671,Within 100 metres,50,NT1D,mt_goonaneman_al,Mt Goonaneman AL,32.984
+405003,-26.679664,153.13847,Beacon Lighthouse POINT CARTWRIGHT,QLD,4,4575,Within 10 metres,,NT6I,bald_knob_al,Bald Knob AL,24.759
+405054,-28.147238,153.401952,Met Bureau Site Tallebudgera Creek Rd TALLEBUDGERA VALLEY,QLD,2,4228,Unknown,,NU3B,tallai_al,Tallai AL,13.697
+405055,-26.97509,152.161767,Telstra Customer Glenhowden 12 km SSE of BLACKBUTT,QLD,4,4352,Within 10 metres,209,NT5M,upper_sandy_ck_al,Upper Sandy Creek AL,53.575
+405073,-28.534832,151.834568,Forestry Site PASSCHENDAELE,QLD,4,4352,Within 100 metres,962,NU1L,amiens_knob_al,Amiens Knob AL,8.098
+405097,-29.122237,152.197239,Telstra Customer RW Henderson Lot 152 Billarimba Rd via TENTERFIELD,NSW,4,2372,Within 100 metres,743,NU5A,ballandean_al,Ballandean AL,52.496
+405105,-29.0986,151.585171,Telstra Customer McGee `Maids Creek` Reedy Creek Rd MAIDS VALLEY,NSW,4,2372,Within 100 metres,414,NU4C,ballandean_al,Ballandean AL,41.719
+405185,-27.676103,153.030319,BOM Site Behind buildings near Wineglass Water Tower Wineglass Dr HILLCREST,QLD,2,4118,Within 10 metres,,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),0.038
+405187,-27.661203,152.284195,Gatton Shire Council site  Beins MTN,QLD,4,4343,Within 10 metres,434,NT8J,schultz_lookout_aler,Schultz Lookout AL,6.084
+40942,-16.818287,145.663247,TV tower Saddle Mountain Road SADDLE MOUNTAIN,QLD,4,4871,Unknown,,LQ1O,saddle_mountain_aler,Saddle Mtn AL,0.048
+41430,-28.136167,153.477544,Duringan St CURRUMBIN,QLD,2,4223,Unknown,,NU3B,tallai_al,Tallai AL,19.397
+440307,-17.220423,145.44719,Comms Mast  Bureau of Meteorology Site Bones Knob  off Griffin Rd TOLGA,QLD,4,4882,Unknown,,LQ4B,bones_knob_al,Bones Knob AL,0.037
+440322,-17.447083,146.015799,Babinda Sugar Mill Site GARADUNGA,QLD,4,4860,Unknown,96,LQ5E,marco_street_al,Marco St AL,13.651
+440326,-16.886487,145.714489,Met Site Whitfield Range BRINSMEAD,QLD,4,4870,Unknown,,LQ1O,brinsmead_al,Brinsmead AL,0.457
+440333,-16.945967,145.766247,26 Redden St PORTSMITH,QLD,4,4870,Unknown,,LQ1P,brinsmead_al,Brinsmead AL,8.688
+440335,-16.951417,145.772371,Harbour Master Tingara St Portsmith CAIRNS,QLD,4,4870,Within 10 metres,0,LQ1P,brinsmead_al,Brinsmead AL,9.576
+440361,-17.522231,146.024608,99 Ernest St INNISFAIL,QLD,4,4860,Unknown,,LQ5I,marco_street_al,Marco St AL,8.204
+440366,-17.380962,145.383005,Fire Station 43 Grace Street HERBERTON,QLD,4,4872,Unknown,,LQ4F,bones_knob_al,Bones Knob AL,19.078
+440448,-17.450075,145.030514,Telstra Site Mr Bidner Station EMUFORD,QLD,4,4871,Unknown,539,LQ4E,bones_knob_al,Bones Knob AL,51.034
+440532,-16.946953,145.770936,41-45 Tingara Street PORTSMITH,QLD,4,4870,Within 10 metres,,LQ1P,brinsmead_al,Brinsmead AL,9.112
+440538,-17.035972,145.81747,Greenwood Farm GREEN HILL,QLD,4,4871,Unknown,35,LQ4D,gordonvale_al,Gordonvale AL,7.833
+440539,-17.089031,145.791076,Loco Shed Mulgrave Mill GORDONVALE,QLD,4,4865,Unknown,,LQ4D,gordonvale_al,Gordonvale AL,1.354
+440569,-17.383102,146.002927,Ergon Enrgy Site TV Site GRAHAM RANGE,QLD,4,4861,Within 10 metres,286,LQ5E,marco_street_al,Marco St AL,19.827
+440602,-21.064039,149.095465,RCS Site The Black Mountain  13 km NW of MACKAY,QLD,4,4740,Within 10 metres,284,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,14.205
+440610,-16.915483,145.748373,99 Anderson St MANUNDA,QLD,4,4870,Within 10 metres,,LQ1O,brinsmead_al,Brinsmead AL,4.992
+440662,-19.342176,146.78183,Vodafone Tower  Sthrn Cross Austereo Site Mount Stuart  Mount Stuart Rd MURRAY,QLD,4,4813,Within 10 metres,494,LR2H,mt_stuart_al,Mt Stuart AL,0.221
+440687,-16.498979,145.463255,Fire Station 5 Port Douglas Road PORT DOUGLAS,QLD,4,4871,Unknown,,LQ1J,saddle_mountain_aler,Saddle Mtn AL,41.384
+440688,-17.343915,145.919685,Babinda Fire Station 44 Eastwood Street BABINDA,QLD,4,4861,Unknown,,LQ4H,marco_street_al,Marco St AL,23.845
+440689,-16.818924,145.636499,Kuranda Fire Station 10 Coondoo Street KURANDA,QLD,4,4872,Unknown,,LQ1O,saddle_mountain_aler,Saddle Mtn AL,2.8
+440690,-17.15175,145.106803,Fire Station Petford Road DIMBULAH,QLD,4,4872,Unknown,,LQ4A,bones_knob_al,Bones Knob AL,36.931
+440691,-17.17551,145.865195,Fire Station 105 Norman Street GORDONVALE,QLD,4,4871,Unknown,,LQ4D,gordonvale_al,Gordonvale AL,11.547
+440694,-20.013267,148.240575,Fire Station 44 Gordon Street BOWEN,QLD,4,4805,Within 100 metres,3,MR4A,moss_vale_al,Moss Vale AL,33.216
+440763,-19.938742,147.215256,DPI Site MT DALRYMPLE,QLD,4,4807,Unknown,,LR3M,mt_kelly_al,Mt Kelly AL,32.431
+440817,-16.995395,145.419687,Fire Station 25 Byrnes St MAREEBA,QLD,4,4880,Unknown,,LQ1N,bones_knob_al,Bones Knob AL,25.208
+440818,-17.023382,145.739297,Fire Station 84 Robert Road CENTENARY PARK,QLD,4,4869,Unknown,,LQ4C,gordonvale_al,Gordonvale AL,10.151
+440857,-16.915969,145.761607,Cnr Martyn and Grove Streets CAIRNS,QLD,4,4870,Unknown,,LQ1P,brinsmead_al,Brinsmead AL,6.203
+440918,-19.121585,146.083058,Telstra Radio Terminal TARAVALE,QLD,4,4816,Unknown,694,LR2A,paluma_al,Paluma AL,18.654
+440958,-17.259388,145.494575,Lot 42 Maunds Road ATHERTON,QLD,4,4883,Unknown,,LQ4F,bones_knob_al,Bones Knob AL,6.651
+440988,-23.301783,148.580411,Telstra Radio Terminal REDROCK,QLD,4,4702,Unknown,183,MS4G,emerald_al,Emerald AL,49.263
+440990,-18.749848,146.114974,Bureau Of Met Site MT POVERTY,QLD,4,4850,Within 10 metres,,LQ8M,paluma_al,Paluma AL,30.804
+440991,-19.000131,146.212198,Bureau Of Met Site PALUMA,QLD,4,4816,Unknown,,LR2A,paluma_al,Paluma AL,1.154
+440997,-20.237911,148.032193,Bureau Of Met Repeater Site MOSSVALE,QLD,4,4805,Unknown,,MR4A,moss_vale_al,Moss Vale AL,0.116
+441009,-17.31681,145.699415,Amateur Radio Site Land Rd BUTCHERS CREEK,QLD,4,4885,Unknown,,LQ4G,millaa_millaa_al,Millaa Millaa AL,24.294
+441052,-19.320733,146.76201,Plant Room The Townsville Hospital DOUGLAS,QLD,4,4814,Within 10 metres,,LR2H,mt_stuart_al,Mt Stuart AL,3.266
+441067,-19.744023,146.859703,Met Bureau Site Cameron Hill REID RIVER,QLD,4,4816,Unknown,,LR2L,cameron_hill_al,Cameron Hill AL,0.121
+441133,-21.106781,149.223848,Mackay Harbour Area MACKAY,QLD,4,4740,Within 10 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,0.169
+441157,-19.878997,146.632229,Bureau of Meteorology Site MINGELA,QLD,4,4816,Within 10 metres,,LR2O,mingela_al,Mingela AL,0.011
+441159,-20.822625,148.039686,Bureau Of Meteorology Site The Stonewall COLLINSVILLE,QLD,4,4804,Unknown,,MR4M,the_stonewall_al,The Stonewall AL,0.258
+441162,-18.115695,145.876089,Bureau Of Meteorology Site BILYANA,QLD,4,4854,Unknown,,LQ7D,bilyana_al,Bilyana AL,0.292
+441254,-21.121999,149.149955,Magpies Sports Club Glenella Road GLENELLA,QLD,4,4740,Unknown,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,7.82
+441270,-18.690135,145.976096,CRS Site UPPER STONE,QLD,4,4850,Unknown,,LQ7L,wallaman_al,Wallaman AL,35.772
+441311,-19.258533,146.802961,Public Toilet Block CASTLE HILL,QLD,4,4810,Unknown,,LR2H,castle_hill_al,Castle Hill AL,0.016
+441379,-18.522764,146.335609,Sugar Wharf LUCINDA,QLD,4,4850,Unknown,,LQ8J,paluma_al,Paluma AL,55.632
+441394,-16.921956,145.780253,Reef Fleet Terminal The Esplanade CAIRNS,QLD,4,4870,Unknown,0,LQ1P,brinsmead_al,Brinsmead AL,8.268
+460255,-23.687339,146.34389,QAS Site BETANGA,QLD,5,4724,Unknown,487,LS5J,betanga_al,Betanga AL,0.224
+460293,-25.311177,152.832396,New Police Site GHOST HILL,QLD,4,4655,Unknown,72,NT2H,ghost_hill_al,Ghost Hill AL,0.065
+460304,-25.611767,151.941373,Telstra Customer Plum Creek Road COALSTOUN LAKES,QLD,4,4621,Unknown,240,NT1L,mt_goonaneman_al,Mt Goonaneman AL,27.039
+460308,-25.33698,153.19743,Telstra Radio Terminal Happy Valley FRASER ISLAND,QLD,4,4650,Unknown,95,NT3E,ghost_hill_al,Ghost Hill AL,36.854
+460339,-25.41804,152.11165,Ergon Energy Site 61 km WNW of Maryborough MT GOONANEMAN,QLD,4,4621,Within 10 metres,527,NT2E,mt_goonaneman_al,Mt Goonaneman AL,1.19
+460342,-23.337258,150.576752,Dept of Education Site MT ARCHER,QLD,4,4701,Within 10 metres,594,MS6G,mt_hopeful_al,Mt Hopeful AL,43.892
+460368,-23.185551,148.350387,Repeater Station GREGORY MINE,QLD,4,4702,Unknown,195,MS4B,mt_lowe_al,Mt Lowe AL,37.348
+460390,-23.386628,150.493167,Council Site Agnes St ROCKHAMPTON,QLD,4,4700,Unknown,,MS6F,mt_hopeful_al,Mt Hopeful AL,38.403
+460403,-25.512536,152.046924,QFS Fire Station 22 George St BIGGENDEN,QLD,4,4621,Within 100 metres,,NT2I,mt_goonaneman_al,Mt Goonaneman AL,11.797
+460404,-25.371336,151.121628,QFS Fire Station 29 Golden Spur St EIDSVOLD,QLD,4,4627,Within 100 metres,,NT1E,hollywell_al,Hollywell AL,12.001
+460406,-24.866,151.12439,QFS Fire Station 15 Kelvin St MONTO,QLD,4,4630,Unknown,,NS7M,caniaview_al,Caniaview AL,17.753
+460420,-23.338784,150.799148,Coast Guard KEPPEL SANDS,QLD,4,4702,Unknown,0,MS6H,mt_hopeful_al,Mt Hopeful AL,51.237
+460424,-23.382532,150.518182,Coast Guard Base Quay St ROCKHAMPTON,QLD,4,4700,Unknown,2,MS6G,mt_hopeful_al,Mt Hopeful AL,38.669
+460462,-25.299333,152.82074,Hospital Nissen St and Urraween Rd HERVEY BAY,QLD,4,4655,Unknown,,NT2H,ghost_hill_al,Ghost Hill AL,1.698
+460518,-22.419493,148.27975,Electrical Workshop SARAJI MINE,QLD,4,4745,Unknown,,MS1F,mt_lowe_al,Mt Lowe AL,55.611
+460554,-25.235016,152.280224,Fire Station Lord St CHILDERS,QLD,4,4660,Within 10 metres,,NT2B,mt_goonaneman_al,Mt Goonaneman AL,26.955
+460555,-25.54034,152.699447,Fire Station cnr Lennox & Alice Sts MARYBOROUGH,QLD,4,4650,Unknown,4,NT2K,takura_reservoir_ale,Takura Resevoir AL,23.676
+460561,-24.302904,150.936725,Telstra Customer L.A. House Lot 6 Tablelands Rd WOODERSON,QLD,4,4680,Unknown,440,MS9H,kroombit_repeater_al,Kroombit Repeater AL,5.98
+460744,-24.448554,150.31581,Emergency Services Site BANANA RANGE,QLD,4,4715,Within 10 metres,591,MS9F,banana_range_al,Banana Range AL,0.022
+460795,-22.932253,148.651145,Capcoal German Creek East MIDDLEMOUNT,QLD,4,4746,Unknown,180,MS1O,middlemount_al,Middlemount AL,13.721
+460815,-24.327229,151.557112,Miriam Fire Station Cnr Roe and Jinke St MIRIAM VALE,QLD,4,4677,Unknown,,NS7G,mt_fort_william_aler,Mt Fort William AL,41.903
+460862,-21.110071,149.224975,Volunteer Marine Rescue Base Mackay Marina MACKAY,QLD,4,4740,Within 10 metres,0,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,0.226
+460974,-21.600646,148.967883,RCS Site Blue Mountain NEBO,QLD,4,4741,Unknown,1022,MR7L,mt_pinnacle_al,Mt Pinnacle AL,58.869
+460978,-24.929814,152.198877,Bundaberg Sugar Bingera Water Tower BINGERA,QLD,4,4670,Within 10 metres,52,NS8M,mt_goonaneman_al,Mt Goonaneman AL,55.947
+460986,-24.178111,150.915257,Telstra BOCOOLIMA,QLD,4,4680,Unknown,111,MS9D,kroombit_repeater_al,Kroombit Repeater AL,20.005
+460995,-23.737713,151.059517,New Jones Communications Site 23 km NW of Gladstone SCRUBBY MTN,QLD,4,4680,Within 100 metres,330,NS4I,mt_hopeful_al,Mt Hopeful AL,53.54
+461078,-25.726165,152.401267,Telstra Customer Glenbar Rd 19 km SE of BROOWEENA,QLD,4,4621,Within 10 metres,81,NT2J,mt_goonaneman_al,Mt Goonaneman AL,43.757
+461164,-25.01954,152.016609,Bundy Sugar Site Cloyne Hill MCILWRAITH,QLD,4,4671,Within 100 metres,93,NT2A,mt_goonaneman_al,Mt Goonaneman AL,46.478
+461184,-25.398434,152.187796,Telstra Customer MASON HOMESTEAD,QLD,4,4621,Unknown,148,NT2E,mt_goonaneman_al,Mt Goonaneman AL,7.792
+461198,-22.590051,148.348184,Fire Station Queen Elizabeth Drive DYSART,QLD,4,4745,Unknown,217,MS1J,mt_lowe_al,Mt Lowe AL,40.506
+461267,-25.717029,152.431307,Telstra Customer Rock Heart Ranch BROOWEENA,QLD,4,4621,Unknown,39,NT2J,mt_goonaneman_al,Mt Goonaneman AL,45.045
+461316,-26.401384,146.241303,Fire Station 95 Galatea St CHARLEVILLE,QLD,5,4470,Within 10 metres,,LT5E,calowrie_al,Calowrie AL,26.12
+461320,-19.513432,147.106977,Fire Station Cnr Walton & Brooke Sts GIRU,QLD,4,4809,Within 10 metres,,LR3I,mt_kelly_al,Mt Kelly AL,27.156
+461321,-24.005653,151.204897,Council Building Don Cameron Drive CALLIOPE,QLD,4,4680,Unknown,59,NS7A,kroombit_repeater_al,Kroombit Repeater AL,47.38
+461394,-19.530746,146.14034,Comm Site Paynes Lagoon Station MT BLUEY,QLD,4,4820,Unknown,550,LR2I,paluma_al,Paluma AL,58.441
+461411,-22.758147,148.474831,Central Tower Mine Site NORWICH PARK,QLD,4,4745,Within 100 metres,213,MS1N,middlemount_al,Middlemount AL,21.445
+461418,-26.77813,152.912957,24 Eagles Nest Ct WILKES KNOB,QLD,2,4553,Within 10 metres,463,NT5P,bald_knob_al,Bald Knob AL,0.248
+461481,-24.404751,148.392615,Surface Operations Main Repeater Site ROLLESTON MINE,QLD,5,4722,Within 10 metres,,MS7F,roddas_lookout_al,Roddas Lookout AL,37.899
+461489,-16.929635,145.77964,AVCG No 6 Wharf Trinity Inlet CAIRNS,QLD,4,4870,Unknown,2,LQ1P,brinsmead_al,Brinsmead AL,8.629
+461521,-23.736819,151.059435,Pietro Site 23 km NW of Gladstone SCRUBBY MTN,QLD,4,4680,Within 100 metres,330,NS4I,mt_hopeful_al,Mt Hopeful AL,53.531
+480006,-19.892456,147.266957,Louisa Mountain Burdekin via MILLAROO,QLD,4,4806,Within 100 metres,,LR3N,mt_kelly_al,Mt Kelly AL,26.082
+480210,-19.662025,147.312745,Optus Radio Terminal 14 km SW of Ayr KELLY MOUNTAIN,QLD,4,4807,Within 10 metres,156,LR3J,mt_kelly_al,Mt Kelly AL,0.015
+480225,-19.342502,146.78241,"Axicom Mast 2 - 63m, Axicom Site 828 Mt Stuart Road MT STUART",QLD,4,4813,Within 10 metres,523,LR2H,mt_stuart_al,Mt Stuart AL,0.223
+480229,-19.743869,146.859216,Bureau Met Site PLANT HILL CAMERON HILL,QLD,4,4816,Within 10 metres,,LR2L,cameron_hill_al,Cameron Hill AL,0.067
+480231,-21.110555,146.885552,Bureau of Meteorology Site HURRICANE CLIFF,QLD,5,4804,Unknown,,LR8D,scartwater_al,Scartwater AL,0.007
+480232,-20.648461,147.151089,Bureau of Meteorology Site BURDEKIN FALLS DAM,QLD,5,4816,Unknown,,LR6I,burdekin_dam_al,Burdekin Dam AL,1.458
+480233,-21.141354,148.038321,Bureau of Meteorology Site MOSS VALE,QLD,4,4804,Unknown,,MR7A,the_stonewall_al,The Stonewall AL,35.211
+480266,-18.588467,146.244418,Water Tower Managers Residence Macknade Mill MACKNADE,QLD,4,4850,Within 10 metres,3,LQ8I,paluma_al,Paluma AL,46.97
+480276,-19.390446,146.480538,Army High Range HERVEY RANGE,QLD,4,4820,Unknown,594,LR2F,mt_stuart_al,Mt Stuart AL,31.94
+480277,-21.227504,147.913468,Main Deposit NEWLANDS MINE,QLD,5,4743,Within 100 metres,,LR9D,the_stonewall_al,The Stonewall AL,46.699
+480282,-20.11899,147.934787,Telstra Site Homestead HIGHLANDS,QLD,4,4805,Unknown,145,LR6D,moss_vale_al,Moss Vale AL,16.627
+480292,-20.587135,147.999876,Telstra Site PARADA HOMESTEAD,QLD,4,4804,Within 10 metres,408,LR6L,the_stonewall_al,The Stonewall AL,26.757
+480293,-20.159077,147.464532,Telstra Site Desalis Homestead STRATHALBYN,QLD,5,4804,Unknown,61,LR6B,hurricane_cliff_al,Hurricane Cliff AL,26.588
+480313,-21.394248,149.237658,Doug Waterson Site Sarina Beach Road SARINA,QLD,4,4737,Within 10 metres,147,MR8E,outer_harbour_tide_a,Outer Harbour Tide AL,31.828
+480322,-21.108444,149.221621,Mackay Port Authority GPS Site Mackay Harbour MACKAY,QLD,4,4740,Within 100 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,0.237
+480340,-18.547791,146.216029,Pagex/Telstra Site 13 km NNE of Ingham MT CUDMORE EAST,QLD,4,4850,Within 100 metres,274,LQ8I,wallaman_al,Wallaman AL,51.299
+480381,-19.571572,147.409554,Ayr Fire Station 47-49 Soper Street AYR,QLD,4,4807,Within 10 metres,,LR3J,mt_kelly_al,Mt Kelly AL,14.268
+480382,-19.660468,147.416863,QFS 86 Eleventh Avenue HOME HILL,QLD,4,4806,Unknown,,LR3J,mt_kelly_al,Mt Kelly AL,10.898
+480424,-21.164402,149.132884,Racecourse Mill Premises Peak Downs Highway MACKAY,QLD,4,4740,Within 100 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,11.315
+480450,-20.562957,147.757755,Ramp 5A Collinsville Coal Mine COLLINSVILLE,QLD,4,4804,Within 10 metres,159,LR6L,the_stonewall_al,The Stonewall AL,41.4
+480454,-20.567516,147.73127,Ramp 11 Collinsville Coal Mine COLLINSVILLE,QLD,4,4804,Within 10 metres,162,LR6K,the_stonewall_al,The Stonewall AL,43.064
+480458,-21.200405,147.885593,Coal Prep Plant NEWLANDS MINE,QLD,5,4743,Within 10 metres,,LR9D,the_stonewall_al,The Stonewall AL,44.775
+480487,-21.135764,148.390456,Telstra Site EUNGELLA DAM,QLD,4,4757,Unknown,558,MR7B,clarke_range_al,Clarke Range AL Repeater,17.136
+480529,-18.584507,146.287993,Fire Station 5 Rosendahl St HALIFAX,QLD,4,4850,Within 10 metres,,LQ8J,paluma_al,Paluma AL,47.922
+480530,-18.707622,146.297334,Fire Station 18 Maple St FORREST BEACH,QLD,4,4850,Within 10 metres,,LQ8J,paluma_al,Paluma AL,34.705
+480543,-21.157335,148.656172,RCS Site MT PINNACLE,QLD,4,4756,Unknown,581,MR7C,mt_pinnacle_al,Mt Pinnacle AL,0.186
+480568,-19.320101,146.762011,Supp Pager Allied Health The Townsville Hospital DOUGLAS,QLD,4,4814,Unknown,,LR2H,mt_stuart_al,Mt Stuart AL,3.321
+480579,-21.440951,148.710799,Tomlinson Comms Site MT SEAVIEW,QLD,4,4742,Unknown,,MR7G,mt_pinnacle_al,Mt Pinnacle AL,31.924
+480626,-21.13047,149.166567,Mater Hospital 76 Willetts Road NORTH MACKAY,QLD,4,4740,Unknown,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,6.438
+480634,-17.021159,145.744949,Police Station 103 Bruce Highway EDMONTON,QLD,4,4869,Unknown,25,LQ4C,gordonvale_al,Gordonvale AL,10.067
+480638,-17.776323,145.561045,Kareeya Power Station Jarra Creek Road TULLY,QLD,4,4872,Unknown,,LQ4O,millaa_millaa_al,Millaa Millaa AL,29.223
+480644,-19.258235,146.802962,Car Park Summit Castle Hill TOWNSVILLE,QLD,4,4810,Unknown,245,LR2H,castle_hill_al,Castle Hill AL,0.043
+480735,-19.266911,146.771605,Qbuild 9-15 Langton Street GARBUTT,QLD,4,4814,Within 10 metres,,LR2H,castle_hill_al,Castle Hill AL,3.433
+480737,-25.290655,150.278485,Cracow Mine Site 2 km west of CRACOW,QLD,5,4719,Unknown,348,MT3F,cracow_al,Cracow AL,1.542
+48999,-27.581601,153.310129,19 Wilsons Esp VICTORIA POINT,QLD,2,4165,Unknown,,NT9J,hillcrest_wine_glass,Hillcrest AL (Wine Glass),29.538
+49752,-28.338408,153.399947,Met Bureau Site Tumbulgum Rd MURWILLUMBAH,NSW,2,2484,Unknown,4,NU3F,o_reillys_al,OReillys AL,28.488
+49762,-28.305014,153.234635,Met Bureau Site BALD MOUNTAIN,NSW,2,2484,Unknown,292,NU3E,o_reillys_al,OReillys AL,12.691
+49763,-28.465637,153.263283,Met Bureau Site KUNGHUR,NSW,4,2484,Unknown,,NU3F,o_reillys_al,OReillys AL,28.888
+49764,-28.35341,153.276066,Met Bureau Site EUNGELLA,NSW,2,2484,Unknown,25,NU3F,o_reillys_al,OReillys AL,19.319
+49765,-28.413416,153.334387,Met Bureau Site UKI,NSW,4,2484,Unknown,18,NU3F,o_reillys_al,OReillys AL,28.076
+49766,-28.338414,153.40106,Met Bureau Site MURWILLUMBAH,NSW,2,2484,Unknown,5,NU3F,o_reillys_al,OReillys AL,28.588
+49767,-28.306742,153.332727,Met Bureau Site Boat Harbour MURWILLUMBAH,NSW,2,2484,Unknown,14,NU3F,o_reillys_al,OReillys AL,21.045
+52713,-16.936583,145.777811,HMAS Cairns CAIRNS,QLD,4,4870,Unknown,,LQ1P,brinsmead_al,Brinsmead AL,8.905
+54313,-28.295391,152.416087,Telstra Radio Terminal CARRS LOOKOUT,QLD,4,4370,Within 10 metres,1085,NU2F,carrs_lookout_al,Carrs Lkt AL,0.12
+54344,-19.343829,146.780961,Optus Radio Terminal MT STUART,QLD,4,4813,Within 10 metres,578,LR2H,mt_stuart_al,Mt Stuart AL,0.019
+54398,-27.676563,153.030693,Optus/Hutchison Site Wineglass Dr HILLCREST,QLD,2,4118,Within 10 metres,43,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),0.074
+54434,-21.404667,148.63919,Telstra Customer Hanrahan MT ADDER HMSD,QLD,4,4742,Unknown,506,MR7G,mt_pinnacle_al,Mt Pinnacle AL,27.41
+55631,-25.327326,152.706333,Ergon Energy Site TAKURA HILL,QLD,4,4655,Within 10 metres,90,NT2G,takura_reservoir_ale,Takura Resevoir AL,0.03
+55674,-23.378056,150.510344,Ergon Office Alma & Fitzroy Sts ROCKHAMPTON,QLD,4,4700,Unknown,,MS6G,mt_hopeful_al,Mt Hopeful AL,39.206
+55727,-25.604752,151.54612,Radcoms Tower Council Site MT GAYNDAH,QLD,4,4625,Unknown,318,NT1K,mt_gayndah_al,Mt Gayndah AL,0.584
+6969,-28.724809,152.235243,Telstra Customer Amos/Morton via DRAKE,NSW,4,2372,Unknown,394,NU2I,upper_rosenthal_aler,Upper Rosenthal AL,40.66
+6978,-29.004753,151.541128,Telstra Exchange Barwick via TENTERFIELD,NSW,4,2372,Unknown,376,NU4C,ballandean_al,Ballandean AL,36.548
+6981,-28.750641,152.202475,Telstra Customer Johnstone DRAKE,NSW,4,2372,Unknown,532,NU2M,ballandean_al,Ballandean AL,37.472
+6986,-29.086035,151.966834,NSWPF 25m Lattice Tower Mount MacKenzie Lookout Rd TENTERFIELD,NSW,4,2372,Within 10 metres,1293,NU4D,ballandean_al,Ballandean AL,36.427
+6987,-29.086395,151.966521,Telstra Tower Mt McKenzie  via Mt McKenzie Lookout Rd TENTERFIELD,NSW,4,2372,Within 10 metres,1295,NU4D,ballandean_al,Ballandean AL,36.451
+7513,-31.647888,152.456355,Vertel Site Latimores Rd Comboyne via WINGHAM,NSW,4,2430,Within 100 metres,638,NV2J,port_macquarie_golf,Port Macquarie (Golf,47.199
+7639,-31.314788,152.97358,Telstra Customer NG & RG Radley POINT PLOMER,NSW,4,2444,Unknown,15,NV2H,port_macquarie_golf,Port Macquarie (Golf,19.633
+7654,-31.705857,152.673626,Fettells Site MIDDLE BROTHER,NSW,4,2443,Within 10 metres,504,NV2K,port_macquarie_golf,Port Macquarie (Golf,33.672
+7659,-31.705886,152.674238,Pacific Power Site MIDDLE BROTHER,NSW,4,2443,Within 10 metres,496,NV2K,port_macquarie_golf,Port Macquarie (Golf,33.635
+7660,-31.701304,152.678285,Prime TV Site MIDDLE BROTHER,NSW,4,2439,Within 10 metres,542,NV2K,port_macquarie_golf,Port Macquarie (Golf,33.001
+7685,-31.430443,152.903763,Butler Street PORT MACQUARIE,NSW,4,2444,Unknown,,NV2H,port_macquarie_golf,Port Macquarie (Golf,6.113
+7718,-31.465305,152.918778,"Port Macquarie Hasting Council Monopole Transit Hill, 25 Orr St PORT MACQUARIE",NSW,4,2444,Unknown,118,NV2H,port_macquarie_golf,Port Macquarie (Golf,2.138
+7722,-31.430292,152.920735,South End of Town Beach PORT MACQUARIE,NSW,4,2444,Unknown,,NV2H,port_macquarie_golf,Port Macquarie (Golf,6.033
+7725,-31.431434,152.914368,Telstra Exchange cnr Church & Grant Sts PORT MACQUARIE,NSW,4,2444,Within 10 metres,4,NV2H,port_macquarie_golf,Port Macquarie (Golf,5.892
+7728,-31.579137,152.799094,Translator Tower Camp Ridge Road  19 km SSW of Port Macquarie JOLLY NOSE HILL,NSW,4,2446,Within 10 metres,242,NV2L,port_macquarie_golf,Port Macquarie (Golf,15.295
+7747,-31.341013,152.682993,RMS 15m Lattice Tower Mt Cairncross Tower Trail Rd CAIRNCROSS,NSW,4,2446,Within 100 metres,495,NV2G,port_macquarie_golf,Port Macquarie (Golf,27.268
+7752,-31.462581,152.688472,Commsite ROSEWOOD,NSW,4,2446,Unknown,,NV2G,port_macquarie_golf,Port Macquarie (Golf,21.723
+7753,-31.415073,152.339989,Telstra Exchange YARRAS,NSW,4,2446,Unknown,102,NV2F,port_macquarie_golf,Port Macquarie (Golf,55.191
+7756,-31.455459,152.731019,Young Street WAUCHOPE,NSW,4,2446,Unknown,,NV2G,port_macquarie_golf,Port Macquarie (Golf,17.846
+7757,-31.341348,152.682513,Fettells Site 24 km WNW of Port Macquarie MT CAIRNCROSS,NSW,4,2446,Within 10 metres,528,NV2G,port_macquarie_golf,Port Macquarie (Golf,27.284
+7980,-31.042475,152.573389,NSWTA 30m Lattice Tower and 27m Kempsey Council Guyed Mast off Bonnangi Trail TEMAGOG,NSW,4,2440,Within 10 metres,615,NV2C,port_macquarie_golf,Port Macquarie (Golf,58.956
+8000003,-25.310924,152.832288,Storage Tank 22 Regency Avenue GHOST HILL,QLD,4,4655,Within 10 metres,72,NT2H,ghost_hill_al,Ghost Hill AL,0.041
+8238,-28.761129,152.637535,Telstra Pole  Browns Hill off Woodenbong Rd  3km SSE of BONALBO,NSW,4,2469,Within 10 metres,330,NU2O,carrs_lookout_al,Carrs Lkt AL,56.245
+8255,-28.9489,152.30699,"NSWTA 2 x 30m Lattice Towers Girard State Forest, off Tower Fire Trail SANDY HILL",NSW,4,2372,Within 10 metres,937,NU2N,ballandean_al,Ballandean AL,50.816
+8257,-28.949079,152.306979,"Fire Tower Girard State Forest, off Tower Fire Trail SANDY HILL",NSW,4,2372,Within 10 metres,950,NU2N,ballandean_al,Ballandean AL,50.822
+8281,-28.806398,152.270329,Telstra Site Boorook Trig BOOROOK,NSW,4,2372,Unknown,854,NU2N,ballandean_al,Ballandean AL,43.949
+8320,-28.620336,153.002452,Fire Station 37 Bloore Street KYOGLE,NSW,4,2474,Unknown,,NU3I,o_reillys_al,OReillys AL,45.165
+8326,-28.507862,152.840429,Roseberry Fire Tower Toonumbar National Forest TOONUMBAR,NSW,4,2474,Unknown,,NU2L,o_reillys_al,OReillys AL,42.179
+8333,-28.49643,152.87842,"NSWOEH 26m Lattice Tower Tower Rd, off Toonumbar Forest Road UPPER EDEN CREEK",NSW,4,2474,Within 10 metres,479,NU2H,o_reillys_al,OReillys AL,38.752
+8335,-28.618874,153.068842,Red Mountain Mackellar Range via Murwillumbah Rd KYOGLE,NSW,4,2474,Within 10 metres,487,NU3I,o_reillys_al,OReillys AL,43.577
+8339,-28.659528,152.359149,Telstra Customer Kelk via BONALBO,NSW,4,2475,Unknown,340,NU2J,carrs_lookout_al,Carrs Lkt AL,40.974
+8344,-28.386095,152.643634,Kyogle Council 31.2m Lattice Tower Towers Road WOODENBONG,NSW,4,2476,Within 10 metres,563,NU2G,carrs_lookout_al,Carrs Lkt AL,24.536
+8456,-28.531186,153.31495,Met Bureau Site DOON DOON,NSW,4,2484,Unknown,218,NU3J,o_reillys_al,OReillys AL,37.67
+8457,-28.67311,153.325516,Met Bureau Site DUNOON,NSW,4,2480,Unknown,,NU3J,o_reillys_al,OReillys AL,52.508
+8533,-28.545563,153.287606,Broadcast Australia Tower 30 km N of Lismore MT NARDI,NSW,4,2480,Within 10 metres,783,NU3J,o_reillys_al,OReillys AL,37.966
+8535,-28.542669,153.290154,NRN8 TV Tower 30 km N of Lismore MT NARDI,NSW,4,2480,Within 10 metres,776,NU3J,o_reillys_al,OReillys AL,37.77
+9000048,-24.570622,149.974233,Fire Station Gilchrist St MOURA,QLD,5,4718,Within 10 metres,142,MS8L,dawson_range_south_a,Dawson Range South AL,16.486
+9000100,-27.597176,152.358732,Fire Station 24 Victoria St FOREST HILL,QLD,4,4342,Within 100 metres,,NT8J,schultz_lookout_aler,Schultz Lookout AL,7.681
+9000101,-22.824016,147.639799,Fire Station Capella St CLERMONT,QLD,5,4721,Within 10 metres,,LS3O,mt_lowe_al,Mt Lowe AL,53.014
+9000103,-24.180474,149.813277,Fire Station Stopford Dr BARALABA,QLD,5,4702,Within 100 metres,,MS8D,dawson_range_south_a,Dawson Range South AL,46.027
+9000105,-27.557774,152.278537,Fire Station North St GATTON,QLD,4,4343,Within 10 metres,,NT8J,mt_petersen_al,Mt Petersen AL,13.081
+9000108,-21.352368,148.116813,Fire Station Bell Place GLENDEN,QLD,4,4743,Within 100 metres,,MR7E,clarke_range_al,Clarke Range AL Repeater,53.703
+9000109,-23.087489,148.028596,Fire Station Conran St CAPELLA,QLD,4,4702,Within 100 metres,,MS4A,mt_lowe_al,Mt Lowe AL,23.779
+9000128,-26.422623,147.113974,Fire Station Cnr Albert & Eurella Sts MORVEN,QLD,5,4468,Within 10 metres,,LT6E,moyallen_al,Moyallen AL,23.613
+9000129,-24.115039,148.091547,Fire Station Wood St SPRINGSURE,QLD,5,4722,Within 100 metres,,MS7A,roddas_lookout_al,Roddas Lookout AL,7.039
+9000131,-27.629576,152.397161,Fire Station 56 William St LAIDLEY,QLD,4,4341,Within 10 metres,,NT8J,schultz_lookout_aler,Schultz Lookout AL,6.432
+9000132,-22.810772,148.700086,Fire Station Centenary Dr MIDDLEMOUNT,QLD,4,4746,Within 100 metres,,MS1O,middlemount_al,Middlemount AL,2.469
+9000133,-26.779377,151.114953,Fire Station High St JANDOWAE,QLD,4,4410,Within 10 metres,,NT4M,braziers_hill_al,Braziers Hill AL,6.184
+9000134,-28.223644,152.854511,Fire Station Running Creek Rd RATHDOWNEY,QLD,4,4285,Within 100 metres,,NU2D,kooralbyn_al,Kooralbyn AL,17.519
+9000136,-17.508996,145.614728,Fire Station Maple St MILLAA MILLAA,QLD,4,4886,Within 100 metres,,LQ4K,millaa_millaa_al,Millaa Millaa AL,1.13
+9000156,-26.12194,149.963704,Fire Station North St WANDOAN,QLD,5,4419,Within 10 metres,,MT5D,clovelly_al,Clovelly AL,40.984
+9000157,-28.917126,151.930199,Fire Station Margetts St WALLANGARRA,QLD,4,4383,Within 10 metres,,NU1P,ballandean_al,Ballandean AL,18.221
+9000159,-24.945606,150.074068,Fire Station Fifth Ave THEODORE,QLD,4,4719,Within 10 metres,,MS9M,cracow_al,Cracow AL,44.052
+9000162,-27.27436,150.45557,Fire Station Fry St TARA,QLD,5,4421,Within 10 metres,,MT9F,bottle_tree_al,Bottle Tree AL,52.797
+9000164,-17.271253,145.585151,Fire Station 32 Eacham St YUNGABURRA,QLD,4,4872,Within 10 metres,,LQ4G,bones_knob_al,Bones Knob AL,15.725
+9000165,-23.039007,148.350181,Fire Station 2 Malvern Ave TIERI,QLD,4,4709,Within 10 metres,,MS4B,mt_lowe_al,Mt Lowe AL,25.363
+9000166,-17.353471,145.595436,Fire Station 23 James St MALANDA,QLD,4,4885,Within 10 metres,,LQ4G,millaa_millaa_al,Millaa Millaa AL,18.295
+9000205,-24.450172,148.401351,DMO Frequency 1 Mine Site  ROLLESTON,QLD,5,4722,Within 100 metres,,MS7F,roddas_lookout_al,Roddas Lookout AL,42.428
+9001276,-22.801149,148.528228,South Tower Mine Site NORWICH PARK,QLD,4,4745,Within 10 metres,202,MS1O,middlemount_al,Middlemount AL,15.186
+9001429,-18.020573,145.520205,12 Leichhardt Road Murray Upper via TULLY,QLD,4,4872,Within 10 metres,,LQ7C,murray_springs_al,Murray Springs AL,14.933
+9001706,-25.490062,152.384831,Ergon Energy Site  MUSKET FLATS,QLD,4,4620,Within 10 metres,196,NT2F,mt_goonaneman_al,Mt Goonaneman AL,27.755
+9001720,-28.566945,153.502795,McCauleys Lane 1.5km South of MULLUMBIMBY,NSW,4,2482,Within 100 metres,,NU3K,o_reillys_al,OReillys AL,51.789
+9001722,-28.448057,153.526683,240 Hulls Road MOOBALL,NSW,4,2483,Within 100 metres,,NU3G,o_reillys_al,OReillys AL,45.225
+9001756,-28.333248,153.44417,100 Reserve Creek Road MURWILLUMBAH,NSW,2,2484,Within 10 metres,,NU3F,o_reillys_al,OReillys AL,32.268
+9001759,-23.192515,148.359719,BM Chnl 3 Site  GREGORY MINE,QLD,4,4702,Within 10 metres,,MS4B,mt_lowe_al,Mt Lowe AL,38.521
+9002306,-23.372065,148.522461,Ensham Mine 40 km NE of EMERALD,QLD,4,4702,Within 10 metres,,MS4G,emerald_al,Emerald AL,40.33
+9002503,-20.27833,148.728219,Fire Station Shute Harbour Rd AIRLIE BEACH,QLD,4,4802,Within 10 metres,8,MR4G,strathdickie_al,Strathdickie AL,15.756
+9003104,-28.067252,153.377845,Telstra Skilled Park Stadium Cheltenham Dr ROBINA,QLD,2,4226,Within 10 metres,,NU3B,tallai_al,Tallai AL,8.031
+9003262,-26.389268,153.097528,QPWS Site Laguna Lookout off Viewland Dr NOOSA HEADS,QLD,4,4567,Within 10 metres,86,NT6E,black_mt_al,Black Mt AL,23.496
+9003309,-17.8318,145.60409,Dam Wall Kareeya Power Station KOOMBOOLOOMBA,QLD,4,4872,Within 10 metres,720,LQ4O,millaa_millaa_al,Millaa Millaa AL,34.952
+9003310,-17.774627,145.573791,Translator Site Kareeya Power Station KOOMBOOLOOMBA,QLD,4,4854,Within 10 metres,621,LQ4O,millaa_millaa_al,Millaa Millaa AL,28.832
+9003430,-17.876792,145.752865,Harney Farm North Davidson Road TULLY,QLD,4,4854,Within 100 metres,,LQ4P,bilyana_al,Bilyana AL,29.881
+9003431,-17.838304,145.716782,McKay Bolinda Farm Tully Gorge Road TULLY,QLD,4,4854,Within 100 metres,,LQ4O,bilyana_al,Bilyana AL,35.438
+9003432,-17.882232,145.950811,Clifford Home Farm Stuart Drive FELUGA,QLD,4,4854,Within 100 metres,,LQ4P,south_mission_beach,South Mission Beach AL,16.207
+9003433,-17.813653,146.059749,Blenner Farm Bingal Bay Road EL ARISH,QLD,4,4855,Within 100 metres,,LQ5M,south_mission_beach,South Mission Beach AL,15.481
+9003434,-18.029725,145.937868,Dore Farms Stamp Road TULLY,QLD,4,4854,Within 100 metres,,LQ7D,bilyana_al,Bilyana AL,11.734
+9003435,-18.046327,145.799287,McKay Blenner Farm Blackman Road TULLY,QLD,4,4854,Within 100 metres,,LQ7D,bilyana_al,Bilyana AL,11.468
+9003805,-26.989663,150.772912,Kogan Repeater North Kogan Road KOGAN,QLD,5,4411,Within 100 metres,366,MT6P,bottle_tree_al,Bottle Tree AL,39.829
+9004049,-22.881942,148.639854,Mine Repeater Site Middlemount Road 10km SW of MIDDLEMOUNT,QLD,4,4746,Within 10 metres,,MS1O,middlemount_al,Middlemount AL,8.715
+9004167,-27.125055,151.1489,'Uralla' Dalby-Kogan Rd 15km W of DALBY,QLD,4,4405,Within 10 metres,,NT7A,braziers_hill_al,Braziers Hill AL,44.391
+9004213,-24.116463,151.064179,Telstra RT Wooderson Pump Station Chapman Road CALLIOPE,QLD,4,4680,Within 10 metres,106,NS7A,kroombit_repeater_al,Kroombit Repeater AL,29.522
+9004214,-24.2115,150.905776,Telstra Site Bocoolima Pump Station Pump Station Road MT ALMA,QLD,4,4680,Within 10 metres,192,MS9D,kroombit_repeater_al,Kroombit Repeater AL,16.503
+9004221,-25.944116,152.172347,"Telstra Customer Tye Lot 22, 2020 Mudlo Road TANSEY",QLD,4,4600,Within 10 metres,312,NT2M,mt_goonaneman_al,Mt Goonaneman AL,57.71
+9004571,-22.495668,148.411323,Lake Vermont Mine Site 14 km NNE of DYSART,QLD,4,4745,Within 10 metres,,MS1F,middlemount_al,Middlemount AL,44.352
+9006951,-20.640293,147.955832,Sonoma Mine 15 km SE of COLLINSVILLE,QLD,4,4804,Within 10 metres,,LR6L,the_stonewall_al,The Stonewall AL,22.328
+9006975,-26.77898,150.447673,"Ergon Energy site Rywung Hubbards Road, 19 km WSW of CHINCHILLA",QLD,5,4413,Within 10 metres,387,MT6N,bottle_tree_al,Bottle Tree AL,2.797
+9006976,-26.647519,150.272346,Ergon Energy site Columboola 8 km E of MILES,QLD,5,4415,Within 10 metres,404,MT6J,bottle_tree_al,Bottle Tree AL,23.228
+9007029,-27.675086,152.221948,671 Mt Sylvia Road GATTON,QLD,4,4343,Within 10 metres,,NT8I,mt_petersen_al,Mt Petersen AL,3.471
+9007122,-26.61047,149.59743,Ergon Energy site 5 km NW of JACKSON,QLD,5,4426,Within 100 metres,387,MT5K,clovelly_al,Clovelly AL,49.923
+9007136,-22.459341,148.412306,Comms / Broadcast Mast 15km NE of Dysart LAKE VERMONT MINE,QLD,4,4745,Within 10 metres,,MS1F,middlemount_al,Middlemount AL,47.554
+9007343,-26.767107,150.945248,1911 Warra Canaga Creek Road 18km N of WARRA,QLD,5,4410,Within 10 metres,,MT6P,braziers_hill_al,Braziers Hill AL,19.174
+9007732,-27.57702,151.424004,'Perola' St Helens Rd 2 km SW of BONGEEN,QLD,4,4356,Within 10 metres,,NT7J,toowoomba_al,Toowoomba AL,52.856
+9007834,-26.820535,151.008847,286 Weirs Road JANDOWAE,QLD,4,4411,Within 10 metres,,NT4M,braziers_hill_al,Braziers Hill AL,16.177
+9008202,-27.572366,152.258494,1 Saleyards Rd GATTON,QLD,4,4343,Within 10 metres,,NT8J,mt_petersen_al,Mt Petersen AL,10.613
+9008206,-17.455556,145.026502,"Telstra Customer Emuford Battery, Lot 352 Plan 818005 IRVINEBANK",QLD,4,4871,Within 100 metres,586,LQ4E,bones_knob_al,Bones Knob AL,51.708
+9008240,-23.476341,148.489948,Within 50 km radius of Ensham Mine Site via EMERALD,QLD,4,4702,Within 10 metres,,MS4F,emerald_al,Emerald AL,33.522
+9008407,-26.843932,150.57155,484 Avenue Road CHINCHILLA,QLD,5,4413,Within 100 metres,,MT6O,bottle_tree_al,Bottle Tree AL,14.665
+9008483,-26.94942,152.777967,2366 D'Aguilar Hwy WOODFORD,QLD,4,4514,Within 10 metres,,NT5P,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,13.453
+9008485,-21.159457,149.069465,Dunn St WALKERSTON,QLD,4,4751,Within 10 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,16.998
+9008486,-28.034423,151.985682,3 Muir St ALLORA,QLD,4,4362,Within 10 metres,,NU1D,bony_mountain_al,Bony Mountain AL,13.031
+9008726,-26.936839,152.589642,Kilcoy Pastoral Company 4830 D`Aguilar Highway KILCOY,QLD,4,4515,Within 10 metres,,NT5O,bellthorpe_gap_rd,Bellthorpe (Gap Rd) AL,19.137
+9008984,-28.183802,152.926115,'Rahane' 278 Oaky Creek Rd INNISPLAIN,QLD,4,4285,Within 10 metres,,NU2D,round_mountain_al,Round Mountain AL,12.566
+9010212,-27.433047,151.722774,Fire Station Bridge St OAKEY,QLD,4,4401,Within 10 metres,,NT7G,toowoomba_al,Toowoomba AL,24.413
+9010357,-27.892625,153.00185,Water Tower Old Bluff Rd CEDAR VALE,QLD,2,4285,Within 10 metres,,NT9M,round_mountain_al,Round Mountain AL,21.125
+9010435,-16.81818,145.66275,"Telstra Site Saddle Mountain, Saddle Mountain Road KURANDA",QLD,4,4871,Within 10 metres,618,LQ1O,saddle_mountain_aler,Saddle Mtn AL,0.014
+9010881,-23.337107,150.576583,"RRC Monopole Pilbeam Drive, Mt Archer ROCKHAMPTON",QLD,4,4701,Within 10 metres,596,MS6G,mt_hopeful_al,Mt Hopeful AL,43.907
+9010896,-29.043752,152.018924,Tenterfield Hospital 1 Naas Street TENTERFIELD NSW 2372,NSW,4,2372,Within 10 metres,,NU5A,ballandean_al,Ballandean AL,34.708
+9010980,-17.517594,145.608795,Milla Milla Palmerstone Highway MILLAA MILLAA QLD 4886,QLD,4,4886,Within 10 metres,812,LQ4K,millaa_millaa_al,Millaa Millaa AL,0.015
+9011373,-27.044874,150.020903,'Myall Grove' Condamine Meandarra Rd 19 km SW of CONDAMINE,QLD,5,4416,Within 10 metres,,MT9A,bottle_tree_al,Bottle Tree AL,49.033
+9011390,-27.618021,152.099016,'Flagstone Fresh' Flagstone Creek Road FLAGSTONE,QLD,4,4344,Within 10 metres,,NT8I,mt_petersen_al,Mt Petersen AL,10.501
+9011391,-27.580022,152.149981,Mahons Road CARPENDALE,QLD,4,4347,Within 10 metres,,NT8I,mt_petersen_al,Mt Petersen AL,9.299
+9011941,-26.782543,150.256572,766 Fairymeadow Rd 15 km SE of MILES,QLD,5,4415,Within 10 metres,,MT6N,bottle_tree_al,Bottle Tree AL,17.54
+9011943,-28.227158,151.489397,Optus Site Off Rabbit Fence Rd KARARA,QLD,4,4352,Within 10 metres,619,NU1B,warahgai_al,Warahgai AL,0.035
+9012107,-20.267598,148.647454,Ergon Energy (MK) Site Riordanvale Road RIORDANVALE,QLD,4,4800,Within 10 metres,188,MR4G,strathdickie_al,Strathdickie AL,9.148
+9012109,-21.146728,149.161471,Ergon Site Ness Street Depot MACKAY,QLD,4,4740,Within 10 metres,6,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,7.758
+9012166,-23.915924,148.056317,Within 50 km radius of Mineva Coal Mine Site via SPRINGSURE,QLD,4,4722,Within 10 metres,,MS4M,roddas_lookout_al,Roddas Lookout AL,27.053
+9012208,-27.513935,151.830624,10965 Warrego Highway CHARLTON,QLD,4,4350,Within 10 metres,,NT7L,toowoomba_al,Toowoomba AL,12.245
+9012281,-23.003615,148.71065,DGPS Site Lake Lindsay Mine 21 km S of MIDDLEMOUNT,QLD,4,4746,Within 10 metres,,MS4C,middlemount_al,Middlemount AL,21.71
+9012368,-22.419757,148.280628,SR Admin  SARAJI MINE,QLD,4,4745,Within 10 metres,219,MS1F,mt_lowe_al,Mt Lowe AL,55.604
+9012369,-22.467598,148.329124,SR South  SARAJI MINE,QLD,4,4745,Within 10 metres,209,MS1F,mt_lowe_al,Mt Lowe AL,52.004
+9012370,-27.419625,153.151014,Warehouse Caltex Oil Refinery South St LYTTON,QLD,2,4178,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,20.538
+9012436,-26.645028,149.82401,Ludlow 6.5km E of DULACCA,QLD,5,4425,Within 10 metres,,MT5L,clovelly_al,Clovelly AL,31.333
+9012495,-19.905409,147.692949,Ergon Substation Tondara Road GUTHALUNGRA,QLD,4,4805,Within 100 metres,18,LR3O,hurricane_cliff_al,Hurricane Cliff AL,21.088
+9012498,-17.610043,145.467534,Ergon Energy Site Off Ascham St RAVENSHOE,QLD,4,4872,Within 10 metres,1001,LQ4J,millaa_millaa_al,Millaa Millaa AL,18.179
+9012818,-17.308038,144.892684,"Telstra Site Dover Castle Mine, 6 km NW of PETFORD",QLD,5,4871,Within 100 metres,594,KQ6H,bones_knob_al,Bones Knob AL,59.647
+9012984,-25.564233,151.504616,Ergon Energy Site Darlingtons Road BINJOUR,QLD,4,4625,Within 10 metres,357,NT1K,mt_gayndah_al,Mt Gayndah AL,5.776
+9012987,-25.332146,151.232912,Ergon Energy Site Off Hollywell Ceratodus Road EIDSVOID EAST,QLD,4,4627,Within 10 metres,386,NT1E,hollywell_al,Hollywell AL,0.03
+9013079,-28.308919,152.291378,Ergon Energy Site O'Maras Rd KILLARNEY,QLD,4,4370,Within 10 metres,787,NU2F,carrs_lookout_al,Carrs Lkt AL,12.268
+9013080,-19.743914,146.858797,"Ergon Energy Site Plant Hill, Off Fliders Hwy, 15 km S of Woodstock CAMERON HILL",QLD,4,4816,Within 10 metres,316,LR2L,cameron_hill_al,Cameron Hill AL,0.031
+9013357,-21.10321,148.854235,Mt Toby 6 km NNW of MIRANI,QLD,4,4754,Within 10 metres,,MR7D,mt_pinnacle_al,Mt Pinnacle AL,21.563
+9013358,-20.912385,148.768824,MSL Site 1.5 km SW of CALEN,QLD,4,4798,Within 10 metres,,MR4P,clarke_range_al,Clarke Range AL Repeater,29.81
+9013604,-27.296233,151.545937,'Girraween' Kummerows Road  (5km ENE of) BOWENVILLE,QLD,4,4403,Within 10 metres,,NT7G,mt_mowbullan_rptr,Mt MOWBULLAN RPTR,45.682
+9013620,-25.967781,150.051107,"Ergon Energy Site Daldowie, Nathan Road BUNGABAN",QLD,5,4419,Within 10 metres,343,MT3M,clovelly_al,Clovelly AL,56.612
+9013622,-25.598369,150.40217,"Ergon Energy Site Deearne Road, 39 km SW of EIDSVOLD WEST",QLD,5,4627,Within 10 metres,488,MT3J,cracow_al,Cracow AL,36.161
+9013868,-23.477517,148.486887,Red Hill Site Duckponds Rd 33 km E of EMERALD,QLD,4,4702,Within 10 metres,172,MS4F,emerald_al,Emerald AL,33.191
+9013870,-23.433898,148.47848,Whitehill South Site Ensham Mine 30 km ENE of EMERALD,QLD,4,4702,Within 10 metres,262,MS4F,emerald_al,Emerald AL,33.563
+9013899,-27.145019,151.019998,'Brumby' Thetan Rd 25 km W of DALBY,QLD,4,4405,Within 10 metres,,NT7A,braziers_hill_al,Braziers Hill AL,47.905
+9014001,-21.282224,149.286376,Sub 14A Coal Terminal  HAY POINT,QLD,4,4740,Within 10 metres,,MR8F,outer_harbour_tide_a,Outer Harbour Tide AL,20.395
+9014197,-27.561897,153.047711,QEII Hospital SW cnr  Kessels & Troughton Roads COOPERS PLAINS,QLD,2,4108,Within 10 metres,,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),12.84
+9015519,-22.881224,148.638539,GPS Site Dysart-Middlemount Road  (10km SW of) MIDDLEMOUNT,QLD,4,4746,Within 10 metres,,MS1O,middlemount_al,Middlemount AL,8.701
+9015615,-17.943219,145.928281,Tully Sewerage Plant Wildsoet St TULLY,QLD,4,4854,Within 10 metres,,LQ4P,south_mission_beach,South Mission Beach AL,16.715
+9015699,-31.209293,152.830912,"RFS Brigade Station Winstead Road, 50 m North of Kundabung Road KUNDABUNG",NSW,4,2441,Within 10 metres,,NV2D,port_macquarie_golf,Port Macquarie (Golf,31.642
+9016528,-27.677096,153.030015,3485-3493 Mount Lindesay Highway HILLCREST,QLD,2,4118,Within 10 metres,43,NT9I,hillcrest_wine_glass,Hillcrest AL (Wine Glass),0.089
+9017410,-28.296105,152.416247,Ergon Energy Power Pole Off Spring Creek Road THE FALLS,QLD,4,4370,Within 10 metres,1095,NU2F,carrs_lookout_al,Carrs Lkt AL,0.2
+9018061,-22.809198,148.674768,Middlemount Repeater Nolan Drive MIDDLEMOUNT,QLD,4,4745,Within 10 metres,281,MS1O,middlemount_al,Middlemount AL,0.237
+9018335,-26.717661,152.908811,Water Treatment Plant 25 McKillop Road MONTVILLE,QLD,4,4560,Within 100 metres,,NT5L,bald_knob_al,Bald Knob AL,6.84
+9018665,-24.44671,150.315603,NBN Co Site Dawson Highway BILOELA,QLD,4,4715,Within 10 metres,567,MS9F,banana_range_al,Banana Range AL,0.21
+9019455,-27.102497,151.039647,698 Dalby-Kogan Rd 24 km WNW of DALBY,QLD,4,4405,Within 10 metres,,NT7A,braziers_hill_al,Braziers Hill AL,42.86
+9019479,-26.266951,149.708608,QGC Woleebee Creek Central Processing Plant HLS Gadbys Rd WOLEEBEE,QLD,5,4419,Within 10 metres,,MT5G,clovelly_al,Clovelly AL,43.416
+9019614,-18.549869,146.025505,Ergon Energy Sub Station Abergowrie Rd LANNERCOST,QLD,4,4850,Within 10 metres,16,LQ8I,wallaman_al,Wallaman AL,31.87
+9019752,-19.258614,146.802343,GMG site Castle Hill TOWNSVILLE,QLD,4,4810,Within 10 metres,,LR2H,castle_hill_al,Castle Hill AL,0.079
+9019871,-26.635791,150.34744,Cameby Downs Mine Ryalls Road COLUMBOOLA,QLD,5,4415,Within 10 metres,,MT6J,bottle_tree_al,Bottle Tree AL,20.107
+9020034,-27.67747,152.900327,Mater Hill Hospital Main St SPRINGFIELD LAKES,QLD,2,4300,Within 10 metres,,NT8L,bundamba_barclay_st,Bundamba (Barclay St) AL,9.688
+9021291,-28.262726,152.572782,Repeater Site  2km SSW of BURNETT CREEK,QLD,4,4310,Within 10 metres,,NU2G,carrs_lookout_al,Carrs Lkt AL,15.79
+9021970,-31.430852,152.921177,8-10 William St PORT MACQUARIE,NSW,4,2444,Within 10 metres,,NV2H,port_macquarie_golf,Port Macquarie (Golf,5.974
+9022005,-25.241089,149.930436,Ergon Energy Isla Gorge 1km NW of Leichhardt Hwy ISLA GORGE,QLD,5,4719,Within 100 metres,,MT2D,cracow_al,Cracow AL,36.895
+9022341,-26.336292,152.832842,Fire Station Queen St COORAN,QLD,4,4569,Within 10 metres,,NT5H,black_mt_al,Black Mt AL,8.451
+9022342,-26.366215,152.857818,Fire Station 2 Factory St POMONA,QLD,4,4568,Within 10 metres,,NT5H,black_mt_al,Black Mt AL,4.614
+9022343,-25.281968,152.726447,Fire Station 63 Castles Rd North CRAIGNISH,QLD,4,4655,Within 10 metres,,NT2G,takura_reservoir_ale,Takura Resevoir AL,5.46
+9022344,-24.908875,152.488658,Fire Station 100 Welch St ELLIOT HEADS,QLD,4,4670,Within 10 metres,,NS8N,takura_reservoir_ale,Takura Resevoir AL,51.44
+9022630,-27.787727,152.557666,Energex Repeater Site MT WALKER,QLD,4,4340,Within 10 metres,,NT8O,schultz_lookout_aler,Schultz Lookout AL,24.904
+9022757,-27.48074,151.867452,GWN Site Hilltop Drive GOWRIE JUNCTION,QLD,4,4352,Within 10 metres,,NT7H,toowoomba_al,Toowoomba AL,9.185
+9022940,-27.95589,153.409957,Australian Volunteer Coast Guard 171 Marine Parade SOUTHPORT,QLD,2,4215,Within 10 metres,,NT9N,tallai_al,Tallai AL,16.667
+9023162,-27.461419,153.038265,505 Brunswick St FORTITUDE VALLEY,QLD,2,4006,Within 10 metres,,NT9E,constitution_hill,Constitution Hill,8.539
+9023215,-22.86253,148.651762,Repeater Site STH Middlemount Rd  (7.6km SW of) MIDDLEMOUNT,QLD,4,4746,Within 10 metres,,MS1O,middlemount_al,Middlemount AL,6.245
+9023216,-22.838376,148.633835,Repeater Site NTH Middlemount Rd  (7.5km WSW of) MIDDLEMOUNT,QLD,4,4745,Within 10 metres,,MS1O,middlemount_al,Middlemount AL,5.286
+9023320,-17.865274,146.073534,Fenby Gap Reservoir El Arish Mission Beach Road DJIRU,QLD,4,4855,Within 100 metres,,LQ5M,south_mission_beach,South Mission Beach AL,9.581
+9023870,-26.773541,150.801007,GPS Site Boonara Invern Rd 18km E of CHINCHILLA,QLD,5,4412,Within 10 metres,,MT6P,braziers_hill_al,Braziers Hill AL,33.365
+9024241,-22.841962,148.662572,Paddock Repeater Site Middlemount Road  (5.2km SW of) MIDDLEMOUNT,QLD,4,4745,Within 10 metres,,MS1O,middlemount_al,Middlemount AL,3.708
+9024789,-28.642468,153.34721,End of Rocky Creek Dam Road DORROUGHBY,NSW,4,2480,Within 10 metres,,NU3J,o_reillys_al,OReillys AL,50.174
+9026156,-26.184665,152.85959,Council Repeater Site Wolvi Mountain Rd MT WOLVI,QLD,4,4570,Within 10 metres,,NT5D,mt_wolvi_al,Mt Wolvi AL,1.186
+9026215,-28.163187,153.509126,Caltex Depot 1 Tower Road COOLANGATTA,QLD,2,4225,Within 10 metres,3,NU3C,tallai_al,Tallai AL,23.48
+9026389,-23.618524,150.368558,Pinnacle Mountain RRC Site Salsbury Rd via STANWELL,QLD,4,4714,Within 10 metres,,MS6J,mt_hopeful_al,Mt Hopeful AL,20.884
+9026477,-17.42845,145.243624,PSBA Site Dargo Range 4km E of IRVINEBANK,QLD,4,4872,Within 10 metres,,LQ4E,bones_knob_al,Bones Knob AL,31.619
+9026687,-21.106708,149.223906,"Light Pole, Tripper Bulk Sugar Terminal Ken White Ave MACKAY HARBOUR",QLD,4,4740,Within 100 metres,,MR8A,outer_harbour_tide_a,Outer Harbour Tide AL,0.177
+9027461,-26.944979,151.152541,624 Kents Road JIMBOUR,QLD,4,4410,Within 10 metres,350,NT4M,braziers_hill_al,Braziers Hill AL,24.417
+9028144,-27.612383,152.760575,117 Brisbane Street IPSWICH,QLD,2,4305,Within 10 metres,32,NT8L,bundamba_barclay_st,Bundamba (Barclay St) AL,6.516
