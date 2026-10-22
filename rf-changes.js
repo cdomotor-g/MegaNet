@@ -742,8 +742,8 @@ function rfcDiffEmptyHtml() {
       ${one ? `only one exists so far (<strong>${esc(months[0])}</strong>)`
             : months.length ? `the archived months (${months.map(esc).join(', ')}) have not been diffed — run tools/acma_diff.py`
             : 'none are archived yet — run tools/acma_diff.py --archive'}.
-      The monthly ACMA refresh (2nd of each month, ~06:15 AEST) archives the next snapshot,
-      and diffs appear here from then on — improving every month the archive grows.
+      The weekly ACMA refresh (Mondays, ~06:15 AEST) keeps the current month's snapshot up to date
+      and archives each new month, so diffs appear here from then on — improving every month the archive grows.
       Removals and prior parameter values before the first archived month are unrecoverable:
       ACMA publishes a daily snapshot, not a back-catalogue, which is why the archive under
       <code>data/acma-raw/&lt;YYYY-MM&gt;/</code> must never be pruned.

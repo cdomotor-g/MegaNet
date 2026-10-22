@@ -1,11 +1,32 @@
-# Monthly refresh of the ACMA RRL interference layer.
+# Weekly refresh of the ACMA RRL interference layer, committed straight to main.
 #
-# ACMA republishes the Register of Radiocommunications Licences extract daily
-# (~6am AEST), but licence turnover near MegaNet repeaters is a monthly-scale
-# event, so monthly is the right cadence. Runs the same two tools a human
-# would: prefilter the ~68 MB extract to the MegaNet-relevant subset, then
-# classify/score interference candidates. Opens a PR rather than pushing to
-# main — a sudden swing in threat counts is itself a signal worth eyeballing.
+# WHY WEEKLY, NOT MONTHLY. ACMA republishes the Register of Radiocommunications
+# Licences extract daily (~6am AEST) and keeps no back-catalogue: a month that
+# is not captured can never be recovered. The old monthly job lost August and
+# September 2026 that way — the download worked both times, but the step that
+# opened a pull request was refused ("GitHub Actions is not permitted to create
+# or approve pull requests"), so nothing was saved; October's run did open a
+# PR (#208), which then sat unmerged, so the app kept July's data for three
+# months. Weekly fixes both failure modes at almost no cost:
+#   * every month gets four or five chances to be captured, so one failed run
+#     (ACMA outage, a renamed download URL) no longer costs a month;
+#   * acma_diff.py --archive re-archives the current month with each newer
+#     extract, so data/acma-raw/<YYYY-MM>/ ends up holding the month's latest
+#     extract and month-to-month diffs stay what they were;
+#   * a new mast near a repeater shows up in Flood-Net within a week of ACMA
+#     registering it, which is what an interference investigation needs.
+# Daily would add commits without adding information: register changes near
+# Flood-Net repeaters run at a handful a month.
+#
+# WHY STRAIGHT TO MAIN. CLAUDE.md: patches go to main, no PRs. A data PR nobody
+# merges is worse than no refresh at all, because it looks like there is one.
+# The swing in threat counts that the PR used to surface is printed in this
+# job's summary instead, and a commit only happens when the data changed.
+#
+# SAFETY. The job refuses to commit an extract that has lost more than 30% of
+# the devices of the last committed subset — a truncated download, or ACMA
+# changing the extract's layout, fails the run (GitHub emails the owner)
+# instead of quietly emptying the layer.
 #
 # If the download step starts failing: ACMA planned to retire the legacy
 # web.acma.gov.au register (announced for mid-2026). Find the new bulk
@@ -13,19 +34,26 @@
 # ACMA_ZIP_URL below. As a stopgap, the extract can also be attached to a
 # GitHub Release (see the acma-data-* tags) and the URL pointed there.
 #
+# Pushes made with GITHUB_TOKEN start no other workflow, and data/acma-* is
+# outside the web smoke test's filter anyway; data/mobile/** is inside it but,
+# for the same reason, a push from here never launches it.
+#
 # Data licence: CC BY 4.0, attribution in README and data/acma-raw/_manifest.json.
 
 name: Refresh ACMA RRL data
 
 on:
   schedule:
-    # 20:15 UTC on the 1st = 06:15 AEST on the 2nd, just after ACMA's daily publish
-    - cron: '15 20 1 * *'
+    # 20:15 UTC Sunday = 06:15 AEST Monday, just after ACMA's daily publish
+    - cron: '15 20 * * 0'
   workflow_dispatch:
 
 permissions:
   contents: write
-  pull-requests: write
+
+concurrency:
+  group: acma-refresh
+  cancel-in-progress: false
 
 env:
   ACMA_ZIP_URL: https://web.acma.gov.au/rrl-updates/spectra_rrl.zip
@@ -42,18 +70,38 @@ jobs:
             -A "FloodNet-flood-telemetry-interference-check (+https://github.com/${{ github.repository }})" \
             -o /tmp/spectra_rrl.zip "$ACMA_ZIP_URL"
           ls -l /tmp/spectra_rrl.zip
+          python3 -c "import zipfile,sys; z=zipfile.ZipFile('/tmp/spectra_rrl.zip'); bad=z.testzip(); sys.exit('corrupt member: %s' % bad if bad else 0)"
+
+      - name: Remember the last committed subset's counts
+        run: cp data/acma-raw/_manifest.json /tmp/prev_manifest.json
 
       - name: Prefilter to Flood-Net-relevant subset
         run: python3 tools/acma_prefilter.py --zip /tmp/spectra_rrl.zip
              --stations stations.json --out data/acma-raw
 
+      - name: Refuse a shrunken extract
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          old = json.load(open('/tmp/prev_manifest.json')).get('counts', {})
+          new = json.load(open('data/acma-raw/_manifest.json')).get('counts', {})
+          print('devices %s -> %s, licences %s -> %s, sites %s -> %s' % (
+              old.get('devices'), new.get('devices'), old.get('licences'),
+              new.get('licences'), old.get('sites'), new.get('sites')))
+          for k in ('devices', 'licences', 'sites'):
+              o, n = old.get(k) or 0, new.get(k) or 0
+              if o and n < 0.7 * o:
+                  sys.exit('%s fell from %d to %d (more than 30%%): refusing to '
+                           'commit this extract. Check the download and the '
+                           'extract layout before re-running.' % (k, o, n))
+          PY
+
       - name: Classify and score interference candidates
         run: python3 tools/acma_fetch.py --suggest-licences
 
-      # Archive this month's subset under data/acma-raw/<YYYY-MM>/ and diff it
-      # against the previous month. The archive is irreplaceable: ACMA publishes
-      # a daily snapshot with no back-catalogue, so a month that is not captured
-      # can never be recovered — snapshots are kept forever, never deleted.
+      # Archive this month's subset under data/acma-raw/<YYYY-MM>/ (replacing an
+      # earlier extract of the same month) and diff it against the previous
+      # month. Archived months are kept forever, never deleted.
       - name: Archive snapshot and compute register diffs
         run: python3 tools/acma_diff.py --archive
 
@@ -66,35 +114,46 @@ jobs:
         run: python3 tools/mobile_sectors.py --zip /tmp/spectra_rrl.zip
              --mocn data/mobile/accc-mocn-sites.csv --out data/mobile
 
-      - name: Open pull request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          branch: acma-data-refresh
-          commit-message: "Refresh ACMA RRL data (monthly)"
-          title: "Monthly ACMA RRL data refresh"
-          body: |
-            Automated refresh of the ACMA interference layer from the daily
-            RRL bulk extract. Review the diff in `data/acma-threats.json` —
-            a large swing in threat counts means something changed on a mast
-            near a repeater — and the new entry in `data/acma-changes.json`,
-            which the RF Changes tab renders as added/removed/changed
-            transmitters and new same-site intermod products.
+      - name: Summarise what changed
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          m = json.load(open('data/acma-raw/_manifest.json'))
+          t = json.load(open('data/acma-threats.json'))
+          snaps = json.load(open('data/acma-snapshots.json')).get('snapshots', [])
+          ch = json.load(open('data/acma-changes.json'))
+          print('## ACMA refresh')
+          print('Extract generated %s; %s devices, %s licences, %s sites in the Flood-Net subset.' % (
+              m.get('generated', '?')[:10], m['counts'].get('devices'),
+              m['counts'].get('licences'), m['counts'].get('sites')))
+          print('')
+          print('Anchors with threats: %d; threats in total: %d.' % (
+              len(t.get('anchors', [])), sum(len(a.get('threats', [])) for a in t.get('anchors', []))))
+          print('Archived months: %s' % ', '.join(s['month'] for s in snaps))
+          pairs = ch.get('pairs', [])
+          if pairs:
+              p = pairs[-1]
+              print('')
+              print('Latest diff %s → %s: %d changed devices %s, %d new co-tenants, %d new IMD products on RX channels.' % (
+                    p.get('from'), p.get('to'), len(p.get('changes', [])), json.dumps(p.get('counts') or {}),
+                    p.get('cotenants') or 0, len(p.get('new_imd', []))))
+          PY
+          cat "$GITHUB_STEP_SUMMARY"
 
-            It also rebuilds `data/mobile/` — every mobile base station
-            sector, which the station card's mobile coverage section prices.
-            Its cells change whenever a carrier registers or moves a sector;
-            `npm run mobile` (in CI) holds their shape.
-
-            This PR also archives the month's subset under
-            `data/acma-raw/<YYYY-MM>/`. Never delete archived months: ACMA
-            publishes no back-catalogue, so they are the only record of what
-            the register looked like.
-
-            Contains ACMA Register of Radiocommunications Licences data,
-            licensed under CC BY 4.0.
-          add-paths: |
-            data/acma-raw/**
-            data/acma-*.json
-            data/acma-licence-suggestions.csv
-            data/mobile/**
-          delete-branch: true
+      - name: Commit to main if anything changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add data/acma-raw data/acma-*.json data/acma-licence-suggestions.csv data/mobile
+          if git diff --cached --quiet; then
+            echo "No change in the register near Flood-Net since the last refresh — nothing to commit."
+            exit 0
+          fi
+          git commit -m "Refresh ACMA RRL data (weekly, extract $(python3 -c "import json;print(json.load(open('data/acma-raw/_manifest.json'))['generated'][:10])"))" \
+                     -m "Contains ACMA Register of Radiocommunications Licences data, CC BY 4.0."
+          for attempt in 1 2; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            echo "Push rejected (attempt $attempt); retrying after rebase."
+            sleep 10
+          done
+          exit 1

@@ -446,7 +446,7 @@ sanity check that frequency units parsed correctly.
 Off the same ACMA extract, a different cut: every Telstra, Optus and TPG
 (Vodafone) transmitter in the 4G and 5G bands below 6 GHz, one row per sector,
 tiled into 1° cells under `data/mobile/` for the **Mobile coverage — estimated**
-section on the station and What is here cards (`site-mobile.js`). The monthly
+section on the station and What is here cards (`site-mobile.js`). The weekly
 ACMA refresh runs it; `docs/mobile-coverage.md` has what it keeps, what it drops
 and the keying errors it repairs.
 

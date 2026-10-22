@@ -611,7 +611,7 @@ device, as it always was.
 - **Files of a version come from the copy; every other file from the network.**
   A script or stylesheet with the deploy's `?v=` stamp is the same bytes for as
   long as the version lives, so the copy answers first. A file without one — the
-  ACMA data a monthly refresh changes under the same name, the layers' GeoJSON —
+  ACMA data a weekly refresh changes under the same name, the layers' GeoJSON —
   is fetched as if there were no worker, with its last copy kept for when there
   is no signal. Nothing waits on a copy being written: the first load's progress
   still counts the station list's bytes as they arrive.
@@ -5706,9 +5706,13 @@ python3 tools/acma_diff.py --archive                  # archive this month's sub
 python3 tools/acma_fetch.py --help                    # all flags (radius, tolerances, mechanisms, dry-run)
 ```
 
-A **monthly GitHub Action** (`.github/workflows/acma-refresh.yml`) downloads
-the current extract, reruns the tools (including the snapshot archive + diff)
-and opens a PR. In sandboxed
+A **weekly GitHub Action** (`.github/workflows/acma-refresh.yml`, Mondays
+06:15 AEST) downloads the current extract, reruns the tools (including the
+snapshot archive + diff) and commits the result straight to `main` when anything
+changed. Weekly rather than monthly because ACMA keeps no back-catalogue: each
+month gets several chances to be captured, and the month's archive is replaced
+by each newer extract of that month. It refuses an extract that has lost more
+than 30% of the subset's devices. In sandboxed
 environments without ACMA access, attach the extract to a GitHub Release
 (see the `acma-data-*` tags) and fetch it from there instead.
 

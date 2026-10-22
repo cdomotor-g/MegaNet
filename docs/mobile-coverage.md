@@ -180,7 +180,7 @@ reading as "marginal".
 
 ## The data
 
-`data/mobile/` is rebuilt every month by the ACMA refresh
+`data/mobile/` is rebuilt every week by the ACMA refresh
 (`.github/workflows/acma-refresh.yml`), off the same register download the
 interference layer uses:
 
@@ -267,7 +267,7 @@ second half of the year):
 2. The workflow downloads the maps, builds the tiles, also takes that year's
    list of shared Optus/TPG sites, and opens a pull request.
 3. Turn the layer on and look at places you know before merging.
-4. The next monthly ACMA refresh folds the new site list into `data/mobile/`.
+4. The next weekly ACMA refresh folds the new site list into `data/mobile/`.
 
 ## Sources
 

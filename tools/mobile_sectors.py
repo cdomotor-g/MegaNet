@@ -10,7 +10,7 @@ PIPELINE POSITION
         └─ tools/mobile_sectors.py   → data/mobile/index.json
                                         data/mobile/cells/<lat>_<lon>.json
 
-    Runs in the monthly ACMA refresh (.github/workflows/acma-refresh.yml),
+    Runs in the weekly ACMA refresh (.github/workflows/acma-refresh.yml),
     straight off the zip the interference pipeline already downloads.
     Standard library only, like the other ACMA tools.
 
