@@ -150,7 +150,7 @@ const TABS = [
   ] },
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
-      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site rain gauge exposure canopy trees buildings shed latency data age stale freshness' },
+      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site rain gauge exposure canopy trees buildings shed latency data age stale freshness message animation pulse flash landing live' },
     { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
       find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
     { id: 'passranges', label: 'Pass Ranges',            icon: '🔗',
@@ -644,7 +644,11 @@ const HELP = {
       + 'readings take to reach the database) or <em>Checks</em> (how many of its timed checks went missing) — and '
       + 'keeps its shape and the Bureau\'s outlines. Opening it turns the colouring on; it and <strong>Colour pins '
       + 'by health</strong> take turns. Its pane counts the stations in view as the map moves; pick a station and it '
-      + 'shows that station\'s checks slot by slot, its delay reading by reading and the receivers that carried it.',
+      + 'shows that station\'s checks slot by slot, its delay reading by reading and the receivers that carried it. '
+      + 'Its <strong>Messages landing</strong> card animates the map as messages land in the log — the station '
+      + 'flashes green and a green pulse runs along its links to its repeater and on to a base, as the loading '
+      + 'screen\'s logo does — on with the view, with a box of its own to turn it off; <strong>⏻ Latency view</strong> '
+      + 'at the top of the pane turns the colours and the animation off together.',
       '<strong>From zoom 17 the map offers the station\'s digital twin</strong> — the ground to '
       + '1 m where the State holds LiDAR, the aerial imagery, the station as built and the radio paths '
       + 'as this map colours them — whenever a station is under the view: the one on the card, the '

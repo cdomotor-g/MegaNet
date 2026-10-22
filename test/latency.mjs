@@ -26,6 +26,15 @@
 //      the pane its tiles, its checks slot by slot with the misses listed, its
 //      delay dot by dot and the receiver that carried it; the pane follows the
 //      card to another station and back to the summary when the card shuts.
+//   5b. **Messages landing** — the first opening ticked the animation too and
+//      the log is asked for what landed since (`received_at=gt.`, oldest
+//      first); a message landing flares its station green on the pulse canvas
+//      and runs a leg along its drawn link to its repeater, which flares as the
+//      leg ends; a typed-in reading is not played and an address no station
+//      carries is counted, not drawn; unticked, the log is not asked and the
+//      colours stay; ⏻ turns the colours and the animation off together and
+//      on again, the focus kept on it; the view turned on from all off brings
+//      the animation back.
 //   6. **One colouring at a time** — Colour pins by health turns latency off,
 //      and latency turns health off; the 🔑 legend carries whichever is on.
 //   7. **No data, honestly** — a datastore that cannot be reached: the pane
@@ -76,6 +85,7 @@ async function standIn(page) {
     if (rel !== 'reading' && rel !== 'station_health') return route.fallback();
     // The last-heard batch; a card's readings; the window's pages.
     const kind = rel === 'station_health' ? 'network'
+      : /[?&]received_at=gt\./.test(url) ? 'live'
       : /[?&]or=/.test(url) || /[?&]station_id=eq\./.test(url) ? 'card' : 'window';
     asked.push({ kind, url: decodeURIComponent(url) });
     if (MODE === 'down') return route.abort('connectionrefused');
@@ -194,6 +204,8 @@ try {
   }));
   check('off on a first visit: no pin wears a band, and no reading is fetched for it',
     off0.on === false && off0.tagged === 0 && count('window') === 0, J({ off0, window: count('window') }));
+  check('…and no message animated: the log is not watched',
+    !(await page.evaluate(() => MapLatency.anim())) && count('live') === 0, J({ live: count('live') }));
   check('⏱️ stands in the strip after 🔑, among what the map shows',
     off0.strip.indexOf('map-latency') === off0.strip.indexOf('map-legend') + 1, J(off0.strip));
 
@@ -201,6 +213,19 @@ try {
   log('\n3. Opening ⏱️ Latency\n');
   await page.click('#help-panel .dock-tab[data-dock="map-latency"]');
   check('the first opening turns the view on', await waitTrue(page, () => MapLatency.on()));
+  const anim0 = await waitTrue(page, () => MapLatency.anim() && MapLatency._live().status === 'ok' && MapLatency._live().watching);
+  const live0 = await page.evaluate(() => ({
+    box: (document.querySelector('#map-latency-panel input[data-lat-f="anim"]') || {}).checked,
+    power: (document.querySelector('#map-latency-panel .lat-power') || {}).getAttribute?.('aria-pressed'),
+    status: (document.getElementById('lat-live-status') || {}).textContent || '',
+    legend: /Flashing green/.test(document.getElementById('map-legend').textContent),
+  }));
+  check('…and the message animation with it: its box ticked, ⏻ pressed, the 🔑 legend saying what a green flash is',
+    anim0 && live0.box === true && live0.power === 'true' && live0.legend && /Asked at/.test(live0.status), J(live0));
+  check('…the log asked for what has landed since, oldest first, a page at most, with the columns a station is found by',
+    count('live') >= 1 && asked.filter(a => a.kind === 'live').every(a => /order=received_at\.asc/.test(a.url)
+      && /limit=1000/.test(a.url) && /select=addr,alert_id,.*received_at,source,path/.test(a.url)),
+    J(asked.filter(a => a.kind === 'live').map(a => a.url.replace(/^.*\?/, '')).slice(0, 2)));
   await settled(page);
   await waitTrue(page, () => state.mapMarkers.some(m => m.mnLatency));
   const steady = await pin(page, R.steady);
@@ -303,6 +328,106 @@ try {
   check('…and goes back to the summary when the card shuts',
     await page.evaluate(() => !!document.querySelector('#map-latency-panel #lat-h-sum') && MapLatency._state().sel === null));
 
+  // ── 5b. Messages landing ──────────────────────────────────────────────
+  log('\n5b. Messages landing\n');
+  // A field station with a link drawn to its repeater, an address of its own,
+  // and another station with a pin, for a reading typed in.
+  const pick = await page.evaluate(() => {
+    const idx = SensorValues.index();
+    const own = id => { const s = state.data.stations.find(x => x.id === id); return s && stationAlertIds(s).find(a => (idx.get(a) || []).length === 1); };
+    const l = state.mapLines.find(x => x.mnLinkRole === 'core' && x.mnArrowDir && own(x.mnLinkStationId) != null
+      && state.mapMarkers.some(m => m.mnStationId === x.mnLinkStationId));
+    if (!l) return null;
+    const other = state.mapMarkers.find(m => m.mnStationId !== l.mnLinkStationId && own(m.mnStationId) != null);
+    const s = state.data.stations.find(x => x.id === l.mnLinkStationId);
+    state.map.setView([s.lat, s.lon], 11, { animate: false });
+    return { id: s.id, aid: own(s.id), rpt: l.mnLinkRepeaterId, other: other.mnStationId, oaid: own(other.mnStationId) };
+  });
+  check('a field station with its own address and a link drawn to its repeater, to land a message from', !!pick, J(pick));
+  if (pick) {
+    const newest = stub.tables.reading.reduce((a, r) => (r.received_at > a ? r.received_at : a), '');
+    const at = new Date(Math.max(Date.now(), Date.parse(newest)) + 2000);
+    const row = (aid, sid, source) => Object.assign({}, W.rows[0], {
+      addr: 'a:' + aid, alert_id: aid, a2_station: null, a2_sensor: null, station_number: null, channel: '',
+      station_id: sid, reading_ts: new Date(at - 1500).toISOString(), received_at: at.toISOString(),
+      value_raw: 7, source, path: 'serial-monitor/demo-pi-sdr1', dup_count: 0, dup_paths: null,
+    });
+    stub.tables.reading.push(row(pick.aid, pick.id, 5), row(pick.oaid, pick.other, 3), row(64999, null, 5));
+    const liveBefore = count('live');
+    const got = await page.evaluate(async id => {
+      await new Promise(r => setTimeout(r, 400));   // the map settled where it was put
+      const n0 = MapLatency._live().firedN;
+      await MapLatency._askNow();
+      const t0 = performance.now();
+      while (!MapLatency._live().fired.slice(-(MapLatency._live().firedN - n0) || 1e9).includes(id) && performance.now() - t0 < 4000) {
+        await new Promise(r => setTimeout(r, 15));
+      }
+      const live = MapLatency._live();
+      const fresh = live.fired.slice(live.fired.length - (live.firedN - n0));
+      await new Promise(r => setTimeout(r, 140));     // past the flare's peak, before it fades
+      const cv = document.querySelector('.lat-pulse-canvas');
+      const s = state.data.stations.find(x => x.id === id);
+      const m = state.mapMarkers.find(x => x.mnStationId === id);
+      const p = state.map.latLngToContainerPoint([s.lat, s.lon]);
+      const dpr = window.devicePixelRatio || 1;
+      const px = (dx, dy) => Array.from(cv.getContext('2d').getImageData(Math.round((p.x + dx) * dpr), Math.round((p.y + dy) * dpr), 1, 1).data);
+      const sz = 2 * m.options.radius + 2;
+      return { fresh, batch: live.batches[live.batches.length - 1], pulses: live.pulses,
+               centre: px(0, 0), halo: px(sz, 0), route: MapLatency._route(id),
+               pane: getComputedStyle(cv.parentNode).pointerEvents, z: cv.parentNode.style.zIndex,
+               status: document.getElementById('lat-live-status').textContent.replace(/\s+/g, ' ') };
+    }, pick.id);
+    check('the log asked once more, for what landed after the newest it had seen',
+      count('live') >= liveBefore + 1 && /received_at=gt\./.test(asked.filter(a => a.kind === 'live').pop().url), J({ before: liveBefore, now: count('live') }));
+    check('the message plays: its station flares — white-hot at the core, green round it — on a canvas over the pins that takes no clicks',
+      got.fresh.includes(pick.id) && got.centre[3] > 120 && got.halo[3] > 0 && got.halo[1] > got.halo[0] + 40
+        && got.pane === 'none' && got.z === '407', J({ fresh: got.fresh, centre: got.centre, halo: got.halo, pane: got.pane, z: got.z }));
+    check('…and runs along its link to the repeater, which flares as the leg lands on it',
+      got.route && got.route.legs.length >= 1 && got.route.legs[0].to === pick.rpt && got.route.legs[0].start === 0
+        && got.route.nodes.some(n => n.id === pick.rpt && n.start === got.route.legs[0].dur) && got.route.nodes[0].id === pick.id,
+      J(got.route));
+    check('a reading typed in is not played, and an address no station carries is counted, not drawn',
+      !got.fresh.includes(pick.other) && got.batch && got.batch.n === 2 && got.batch.lost === 1, J({ fresh: got.fresh, batch: got.batch }));
+    check('the card counts what landed', /message/.test(got.status) && /not on the map/.test(got.status), got.status);
+  }
+  const liveOn = count('live');
+  const off1 = await page.evaluate(async () => {
+    MapLatency.setAnim(false);
+    await new Promise(r => setTimeout(r, 50));
+    const n = MapLatency._live();
+    await MapLatency._askNow();
+    return { anim: MapLatency.anim(), on: MapLatency.on(), watching: n.watching, status: n.status, pulses: n.pulses,
+             stored: localStorage.getItem('mn-latency-anim'),
+             legend: /Flashing green/.test(document.getElementById('map-legend').textContent),
+             card: document.getElementById('lat-live-status').textContent,
+             banded: state.mapMarkers.filter(m => m.mnLatency).length };
+  });
+  check('unticked, the log is not watched or asked, nothing runs, the legend drops it — and the pins keep their colours',
+    !off1.anim && off1.on && !off1.watching && off1.status === 'idle' && off1.pulses === 0 && off1.stored === 'off'
+      && !off1.legend && /Off/.test(off1.card) && off1.banded > 0 && count('live') === liveOn, J({ off1, liveOn, now: count('live') }));
+  await page.click('#map-latency-panel .lat-power');
+  await page.waitForTimeout(300);
+  const pw0 = await page.evaluate(() => ({ on: MapLatency.on(), anim: MapLatency.anim(),
+    banded: state.mapMarkers.filter(m => m.mnLatency).length,
+    pressed: document.querySelector('#map-latency-panel .lat-power').getAttribute('aria-pressed'),
+    focus: document.activeElement && document.activeElement.dataset && document.activeElement.dataset.latF }));
+  check('⏻ turns the whole view off — no pin wears a band, nothing animated — and keeps the focus',
+    !pw0.on && !pw0.anim && pw0.banded === 0 && pw0.pressed === 'false' && pw0.focus === 'power', J(pw0));
+  await page.click('#map-latency-panel .lat-power');
+  await waitTrue(page, () => MapLatency._live().watching);
+  const pw1 = await page.evaluate(() => ({ on: MapLatency.on(), anim: MapLatency.anim(), watching: MapLatency._live().watching,
+    pressed: document.querySelector('#map-latency-panel .lat-power').getAttribute('aria-pressed'),
+    word: document.querySelector('#map-latency-panel .lat-power-state').textContent }));
+  check('…and on again: the pins coloured and the messages animated together',
+    pw1.on && pw1.anim && pw1.watching && pw1.pressed === 'true' && pw1.word === 'On', J(pw1));
+  const back1 = await page.evaluate(() => {
+    MapLatency.setAnim(false); MapLatency.setOn(false);
+    const off = !MapLatency.on() && !MapLatency.anim();
+    MapLatency.setOn(true);
+    return { off, on: MapLatency.on(), anim: MapLatency.anim() };
+  });
+  check('the colours turned on from all off bring the animation with them', back1.off && back1.on && back1.anim, J(back1));
+
   // ── 6. One colouring at a time ────────────────────────────────────────
   log('\n6. One colouring of the pins at a time\n');
   const legOn = await page.evaluate(() => document.getElementById('map-legend').textContent);
@@ -350,10 +475,10 @@ try {
     await loaded(p);
     await toStations(p);
     await p.waitForTimeout(600);
-    const re = await p.evaluate(() => ({ showing: dockShowing(), on: MapLatency.on(),
+    const re = await p.evaluate(() => ({ showing: dockShowing(), on: MapLatency.on(), anim: MapLatency.anim(),
       pane: !!document.querySelector('#map-latency-panel #lat-h-sum') }));
     check('the side panel putting the pane back leaves a view stored off, off — only a press of ⏱️ turns it on',
-      re.showing === 'map-latency' && re.pane && re.on === false, J(re));
+      re.showing === 'map-latency' && re.pane && re.on === false && re.anim === false, J(re));
     await ctx.close();
   }
 
@@ -376,6 +501,11 @@ try {
     }));
     check('the pane says the readings could not be fetched and offers to try again; no pin claims an age',
       down.status === 'error' && /could not be fetched/.test(down.text) && down.retry && down.banded === 0, J(down));
+    await waitTrue(p, () => MapLatency._live().status === 'error');
+    const liveDown = await p.evaluate(() => ({ status: MapLatency._live().status, watching: MapLatency._live().watching,
+      text: document.getElementById('lat-live-status').textContent }));
+    check('…and the messages card that the log could not be read, asking again later',
+      liveDown.status === 'error' && liveDown.watching && /could not be read/.test(liveDown.text), J(liveDown));
     await ctx.close();
     MODE = 'ok';
   }

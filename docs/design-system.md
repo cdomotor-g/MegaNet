@@ -297,6 +297,19 @@ on turns the other off. The pane's bars and the legend take the same literals
 through `--dot`; what carries each band without the colour is its words, beside
 every swatch and on every listed station.
 
+**A message landing is the loading logo's pulse, on the network** (`map-latency.js`,
+*Messages landing*). Its station flares as the logo's nodes do — a white-hot core
+in green inside a fading halo, rising, settling and gone inside a second — and a
+short white spark with a longer, fainter green trail runs along each link it
+takes, the far node flaring as the spark lands. Literals, for the logo's reason:
+it is the logo's motif, and green-on-glow is the identity rather than a status.
+Sized up from the logo for a map: the trail 34 px, the strokes 4 px or more, the
+halo a little wider than the pin's own ring. It is drawn on a canvas in a pane of
+its own just over the arrows' (407), so it lights the pins and stays under their
+names, and it takes no clicks. Under reduced motion nothing runs or grows: the
+station and its links are lit, still, for a moment. It never replaces a pin's
+colour — a flash is an event, not a class — so it runs under any colouring.
+
 **A site feature is a plan symbol in a categorical colour** (`site-features.js`,
 `0061`): the orifice outlet a ringed dot, a pit a crossed square, a benchmark a
 triangle, a gauge board a staff, a crest gauge a diamond, and the orifice and

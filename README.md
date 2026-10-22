@@ -260,7 +260,8 @@ MegaNet/
 ├── map-latency.js          ← MapLatency — ⏱️ Latency on the Stations map: every pin
 │                             coloured by its data's age, its readings' delay to the
 │                             database or its missed checks, and a pane that sums up
-│                             the stations in view and shows one's checks slot by slot
+│                             the stations in view and shows one's checks slot by slot,
+│                             and messages played on the map as they land in the log
 ├── site-map.js             ← SiteMap   — Site Map tab (a guide to every other tab,
 │                             and the gold line from each to its button in the nav)
 ├── nav-views.js            ← NavViews  — what the left bar lists: All, Simple, Field,
@@ -1708,7 +1709,18 @@ moments most of the network missed its checks at once. Pick a station — on the
 map or in the pane — and the pane is about it: its last-heard time and next
 check, its delay and checks received, its checks slot by slot a row a day with
 the missed ones listed, its delay dot by dot on a log scale, and the receivers
-that carried it, with a door into Station Health.
+that carried it, with a door into Station Health. Its **Messages landing** card
+plays the log on the map: every 15 s it asks `reading` for what has landed since
+the last ask (`received_at=gt.`, oldest first, a page of 1,000 at most), and a
+beat later each message's station flares green and a green pulse runs along its
+links — its pass-range links to its repeaters, then the fewest backbone hops to a
+base — the loading screen's logo pulsing through the network itself, drawn on a
+canvas of its own over the pins. The way it runs is the way the map draws the
+network, not the hops the message took (the log keeps the receiver, not the
+path), and a typed-in or backfilled reading is not played. It comes on with the
+view, has its own box, stops while the tab or the page is out of sight, and is
+still under reduced motion; **⏻ Latency view** at the head of the pane turns the
+colouring and the animation off together, or both on.
 
 **The trail of stations looked at (`station-trail.js`).** Closing the card is a
 decision that holds, and nothing brought it back short of finding the pin again

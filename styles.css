@@ -3761,6 +3761,56 @@ hr {
 
 .legend-lat-h { margin-bottom: 2px; }
 
+/* ⏻ at the head of the pane: the whole view, on or off at once. A pill like
+   the chips beside it, its icon disc the state — --ok while anything here is
+   on, muted when it is all off — and the word beside it says it again. */
+.lat-power-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
+.lat-power {
+  display: inline-flex; align-items: center; gap: .4rem;
+  border: 1px solid var(--ctl-border); border-radius: 999px;
+  background: var(--panel); color: var(--text);
+  padding: .15rem .6rem .15rem .2rem; font: inherit; font-weight: 600; line-height: 1.4; cursor: pointer;
+}
+.lat-power:hover { background: var(--subtle); }
+.lat-power-ico {
+  display: inline-grid; place-items: center; flex: none;
+  width: 1.35rem; height: 1.35rem; border-radius: 50%;
+  background: var(--muted); color: var(--panel);
+}
+.lat-power-state { color: var(--muted); }
+.lat-power.is-on { border-color: var(--ok); }
+.lat-power.is-on .lat-power-ico { background: var(--ok); }
+.lat-power.is-on .lat-power-state { color: var(--ok); }
+
+/* The messages card: its own switch, what the animation means, and what the
+   log has said. The dot is the loading logo's node — a white-hot core in green
+   with its glow, literals for the logo's reason — beating while the log is
+   watched (still under reduced motion, by the blanket rule) and grey when it
+   is not; the legend uses it for the same flash on the map. */
+.lat-live {
+  display: flex; flex-direction: column; gap: var(--sp-1);
+  padding: var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--panel);
+}
+.lat-live.is-on { border-color: color-mix(in srgb, #1ee35e 55%, var(--border)); }
+.lat-live-head { display: flex; align-items: center; gap: var(--sp-2); }
+.lat-live-head .lat-h { margin: 0; }
+.lat-live-what, .lat-live-status { margin: 0; }
+.lat-live-dot {
+  display: inline-block; flex: none; vertical-align: -1px;
+  width: 11px; height: 11px; border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 22%, #8dffa9 45%, #1ee35e 80%);
+  box-shadow: 0 0 3px 1px #3dff76, 0 0 8px 2px rgba(30, 235, 95, .7);
+}
+.lat-live:not(.is-on) .lat-live-dot { background: var(--muted); box-shadow: none; }
+.lat-live.is-on .lat-live-dot { animation: lat-live-beat 2.4s ease-out infinite; }
+@keyframes lat-live-beat {
+  0%, 100% { opacity: .6; transform: none; }
+  5%       { opacity: 1; transform: scale(1.3); }
+  30%      { opacity: .6; transform: none; }
+}
+.lat-pulse-canvas { pointer-events: none; }
+
 /* Manual, as a pill. The one fact in that block that changes what a person
    does: a gauge read by hand reports nothing over the radio, so silence from it
    is not a telemetry fault to go chasing. Amber rather than red — it is a

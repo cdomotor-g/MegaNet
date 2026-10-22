@@ -80,10 +80,25 @@
 // pane is opened in a session it turns itself on: opening the tool is asking
 // for the view.
 //
+// ── Messages landing ─────────────────────────────────────────────────────────
+// The second half of the view, in a card of its own in the pane: while it is
+// on, the log is asked every LIVE_MS for what has landed since it was last
+// asked, and each message is played back on the map a beat later in the order
+// it landed — its station flaring green and a green pulse running along its
+// links, the loading screen's logo (styles.css, .load-logo) on the network
+// itself. The pulse runs the way the map draws: the station's pass-range links
+// to its repeaters, then the fewest backbone hops on to a base. That is the
+// likeliest way in, not a record of it — the log keeps the receiver, not the
+// hops through the air — and the card says so. It needs no colouring of the
+// pins, so it can run under Colour pins by health; it comes on with the view
+// (from all off) and has its own box to turn it off, and ⏻ at the head of the
+// pane turns the colouring and the animation off together. A typed-in or
+// backfilled reading was not sent by anybody just now, and is not played.
+//
 // Exposes: attach, detach, reset, shown, opened, follow, pinStyle, legendHtml,
-//          altText, noteText, on, setOn, setMode, setWin,
-//          setScope, pickBand, back, focus, refresh, yieldTo, and the rules
-//          for test/latency.mjs (classifyValue, quantile, BANDS).
+//          liveLegendHtml, altText, noteText, on, anim, setOn, setAnim, power,
+//          setMode, setWin, setScope, pickBand, back, focus, refresh, yieldTo,
+//          and the rules for test/latency.mjs (classifyValue, quantile, BANDS).
 const MapLatency = (() => {
   const SEC = 1000, MIN = 60000, HOUR = 3600000, DAY = 86400000;
 
@@ -104,6 +119,41 @@ const MapLatency = (() => {
   const WIN_TTL = 15 * MIN;
   // How many stations a band lists before saying how many more.
   const LIST_N = 12;
+
+  // Messages landing (see the header). The log asked on this clock, at most a
+  // page at a time — a full page is a backlog, and the rest is asked for at
+  // once. The first ask looks back one beat; the card counts LIVE_KEEP.
+  const LIVE_MS = 15 * SEC;
+  const LIVE_PAGE = 1000;
+  const LIVE_KEEP = 5 * MIN;
+  const LIVE_SELECT = 'addr,alert_id,a2_station,a2_sensor,station_number,channel,station_id,'
+                    + 'reading_ts,received_at,source,path';
+  // Typed in and backfilled (0006's seed): nothing was sent just now.
+  const LIVE_SKIP_SOURCE = new Set([3, 4]);
+  // A station is flashed only on a resolution that names it: not an address
+  // several stations share and nothing here tells apart, nor one far from the
+  // receiver that heard it (SensorValues.resolver).
+  const LIVE_SURE = new Set(['datastore', 'a2', 'sole', 'resolved', 'likely', 'number']);
+  // The logo's pulse, in milliseconds and screen pixels. Its node flare is the
+  // first 36% of a 2.4 s cycle — [when, opacity, scale], @keyframes ll-flare —
+  // and its spark and trail run at one speed, here a little quicker than the
+  // logo's 138 px/s for links far longer than its own, and held between a
+  // floor and a ceiling so a short hop still shows and a long one does not
+  // crawl. A repeater turns a message round before passing it on.
+  const CYCLE = 2400;
+  const FLARE = [[0, 0, 0.3], [0.04, 1, 1.15], [0.14, 0.8, 1], [0.36, 0, 0.85]];
+  const FLARE_MS = CYCLE * 0.36;
+  const SPEED = 170;
+  const LEG_MIN = 320, LEG_MAX = 1500;
+  const TRAIL_PX = 34, SPARK_PX = 9;
+  const HOLD_MS = 120;
+  const HOPS_MAX = 4, LEGS_MAX = 10, PULSES_MAX = 300;
+  // With less motion asked for: nothing runs or grows — the station and its
+  // links lit, still, for this long.
+  const STILL_MS = 1600;
+  // Just over MapArrows' pane (405), so a flare is over the pins and the
+  // arrows on the shared canvas, and under the name labels (650).
+  const PULSE_PANE = 'mnLatPulse', PULSE_Z = 407;
 
   const MODES = {
     age:    { label: 'Age',    title: 'How long since Flood-Net last heard each station',
@@ -187,10 +237,13 @@ const MapLatency = (() => {
   };
   const keep = (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* private browsing — still works this session */ } };
 
-  // The view's settings. `on` and the mode and window are remembered; the
-  // rest is the session's.
+  // The view's settings. `on`, `anim` and the mode and window are remembered;
+  // the rest is the session's. The animation is new since the colouring, so a
+  // device that has never said either way gets it with the view as it stands.
+  const onAtLoad = stored('mn-map-latency', ['on', 'off'], 'off') === 'on';
   const U = {
-    on: stored('mn-map-latency', ['on', 'off'], 'off') === 'on',
+    on: onAtLoad,
+    anim: stored('mn-latency-anim', ['on', 'off'], onAtLoad ? 'on' : 'off') === 'on',
     mode: stored('mn-latency-mode', MODE_KEYS, 'age'),
     win: stored('mn-latency-win', WINDOWS.map(w => w[0]), '1d'),
     scope: 'view',           // 'view' | 'all'
@@ -218,6 +271,20 @@ const MapLatency = (() => {
   let resizeObs = null;
   let paintedW = 0;
 
+  // The log being watched: where the last ask got to (the newest received_at
+  // it saw, as the datastore wrote it, so `gt` cannot see the same row twice),
+  // and what landed, a batch an ask, for the card's count.
+  const LV = {
+    status: 'idle', cursor: null, timer: null, seq: 0, at: 0, since: 0, error: '', fails: 0,
+    batches: [], fired: [], firedN: 0,
+  };
+  const liveTimers = new Set();  // the plays still to come from the last answer
+  let pulses = [];
+  let pcanvas = null, pctx = null, praf = null, porigin = null;
+  let graph = null, graphFor = null;
+  let pinIdx = null, pinIdxFor = null, pinIdxN = 0;
+  let visHooked = false;
+
   const now_ = () => Date.now();
   const num = n => (n == null ? '—' : Number(n).toLocaleString());
   const pct = (a, b) => (b ? Math.round(100 * a / b) : 0);
@@ -230,6 +297,8 @@ const MapLatency = (() => {
   const fmtSpan = ms => HealthAnalysis.fmtSpan(ms);
   const p2 = n => String(n).padStart(2, '0');
   const fmtHm = t => { const d = new Date(t); return `${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+  const fmtHms = t => `${fmtHm(t)}:${p2(new Date(t).getSeconds())}`;
+  const calm = () => { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; } };
   const fmtDay = t => new Date(t).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
   // A receiver as people say it, as Station Health says it.
   const hostLabel = h => String(h || '').replace(/^serial-monitor\//, '').replace(/^meganet\/v1\/([^/]+)\/logger\/reading\//, '$1 · ');
@@ -401,6 +470,10 @@ const MapLatency = (() => {
   // again (the clock has moved), and whatever the pins need is asked for.
   function reset() {
     dirty();
+    // The lines and pins a pulse runs along were all just replaced: the next
+    // one finds them again (graphNow, pinFor), and the log is watched if it
+    // should be and is not yet.
+    if (U.anim) liveSync();
     if (!U.on) return;
     if (HealthGlance.askNet) HealthGlance.askNet();
     if (U.mode !== 'age') ensureWindow(false);
@@ -411,8 +484,13 @@ const MapLatency = (() => {
   function setOn(on, opts = {}) {
     // Somebody's own choice, made once, is the session's from then on.
     if (!opts.auto) U.autoOn = true;
+    const wasOff = !U.on && !U.anim;
     U.on = !!on;
     keep('mn-map-latency', U.on ? 'on' : 'off');
+    // The view turned on from all off brings the messages animated with it —
+    // its box in the pane is the way to have the colours without them.
+    const animToo = U.on && wasOff;
+    if (animToo) { U.anim = true; keep('mn-latency-anim', 'on'); liveSync(); }
     // One colouring of the pins at a time: health gives way.
     if (U.on && state.mapHealth) {
       state.mapHealth = false;
@@ -425,12 +503,38 @@ const MapLatency = (() => {
     }
     dirty();
     if (!opts.quiet) {
-      announce(U.on ? `Pins coloured by latency — ${MODES[U.mode].long}. ${summaryText()}`
+      announce(U.on ? `Pins coloured by latency — ${MODES[U.mode].long}.${animToo ? ' Messages flash on the map as they land in the log.' : ''} ${summaryText()}`
                     : 'Pins are back in their roles’ colours.');
     }
     if (typeof refreshMapLayers === 'function' && state.map) refreshMapLayers({ skipFit: true });
     if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
     paint();
+  }
+
+  // The message animation's own box. It colours nothing, so it leaves the
+  // pins and Colour pins by health as they are.
+  function setAnim(on, opts = {}) {
+    U.anim = !!on;
+    keep('mn-latency-anim', U.anim ? 'on' : 'off');
+    liveSync();
+    if (!opts.quiet) {
+      announce(U.anim ? 'Messages flash on the map as they land in the log.' : 'Messages are no longer animated on the map.');
+    }
+    if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+    paint();
+  }
+
+  // ⏻ at the head of the pane: everything off at once — the pins' colours and
+  // the animation — or, from all off, the view on with both.
+  function power() {
+    U.autoOn = true;
+    if (!U.on && !U.anim) { setOn(true); return; }
+    U.anim = false;
+    keep('mn-latency-anim', 'off');
+    liveSync();
+    if (U.on) setOn(false, { quiet: true });
+    else { if (typeof rerenderMapLegend === 'function') rerenderMapLegend(); paint(); }
+    announce('Latency view off — the pins are back in their roles’ colours and no messages are animated.');
   }
   // Colour pins by health was turned on: this view gives way, without a word —
   // the switch that was pressed says what the pins are now.
@@ -657,9 +761,32 @@ const MapLatency = (() => {
               onclick="MapLatency.${fn}('${escAttr(k)}')">${esc(text)}</button>`).join('')}
     </span>`;
 
+  // ⏻, over everything else in the pane. Pressed while anything here is on.
+  const POWER_SVG = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">'
+    + '<path d="M5 3.4a5.6 5.6 0 1 0 6 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>'
+    + '<path d="M8 1.6v5.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+  function powerHtml() {
+    const any = U.on || U.anim;
+    const what = !any ? 'Everything here is off'
+      : U.on && U.anim ? 'Pins coloured · messages animated'
+      : U.on ? 'Pins coloured · animation off'
+      : 'Messages animated · pins in their own colours';
+    return `
+      <div class="lat-power-row">
+        <button type="button" class="lat-power${any ? ' is-on' : ''}" aria-pressed="${any}" data-lat-f="power"
+                onclick="MapLatency.power()"
+                title="${escAttr(any ? 'Turn the whole latency view off at once — the pins’ colours and the message animation'
+                                     : 'Turn the latency view on — pins coloured by latency, and messages animated as they land')}">
+          <span class="lat-power-ico">${POWER_SVG}</span>Latency view <span class="lat-power-state">${any ? 'On' : 'Off'}</span>
+        </button>
+        <span class="small txt-muted">${esc(what)}</span>
+      </div>`;
+  }
+
   function controlsHtml() {
     return `
       <div class="lat-controls">
+        ${powerHtml()}
         <label class="filter-check lat-switch"
                title="Colour every station pin by latency instead of by its role. Its shape and the Bureau's outlines stay as they are.">
           <input type="checkbox" data-lat-f="on" ${U.on ? 'checked' : ''} onchange="MapLatency.setOn(this.checked)">
@@ -693,7 +820,49 @@ const MapLatency = (() => {
 
   function paneHtml() {
     const s = U.sel ? stationById(U.sel) : null;
-    return controlsHtml() + `<div class="lat-body" id="lat-body">${s ? stationHtml(s) : summaryHtml()}</div>`;
+    return controlsHtml() + liveHtml() + `<div class="lat-body" id="lat-body">${s ? stationHtml(s) : summaryHtml()}</div>`;
+  }
+
+  // ── The messages card ──
+
+  function liveHtml() {
+    return `
+      <section class="lat-live${U.anim ? ' is-on' : ''}" aria-labelledby="lat-h-live">
+        <div class="lat-live-head"><span class="lat-live-dot" aria-hidden="true"></span>
+          <h4 class="lat-h" id="lat-h-live">Messages landing</h4></div>
+        <label class="filter-check lat-switch"
+               title="Flash each station green on the map as a message from it lands in the log, with a pulse along its links">
+          <input type="checkbox" data-lat-f="anim" ${U.anim ? 'checked' : ''} onchange="MapLatency.setAnim(this.checked)">
+          Animate messages on the map
+        </label>
+        <p class="small txt-muted lat-live-what">As a message lands in the log its station flashes green, and a green
+          pulse runs along its links — to the repeater that carries it, then on to a base. It runs the way the map draws
+          the network: the likeliest way in, not a record of the hops.</p>
+        <p class="small lat-live-status" id="lat-live-status">${liveStatusHtml()}</p>
+      </section>`;
+  }
+
+  function liveStatusHtml() {
+    if (!U.anim) return 'Off — the log is not being watched.';
+    const still = calm() ? ' Shown still: this device asks for less motion.' : '';
+    if (LV.status === 'error') {
+      return `<span class="txt-warn">The log could not be read (${esc(LV.error)})</span> — asking again shortly.${still}`;
+    }
+    if (!LV.at) return `Watching the log…${still}`;
+    const now = now_();
+    let n = 0, lost = 0;
+    const ids = new Set();
+    for (const b of LV.batches) {
+      if (now - b.at > LIVE_KEEP) continue;
+      n += b.n; lost += b.lost;
+      b.ids.forEach(id => ids.add(id));
+    }
+    const since = now - LV.since >= LIVE_KEEP ? `in the last ${esc(fmtSpan(LIVE_KEEP))}` : `since ${esc(fmtHms(LV.since))}`;
+    const head = n
+      ? `${num(n)} message${n === 1 ? '' : 's'} from ${num(ids.size)} station${ids.size === 1 ? '' : 's'} ${since}`
+        + (lost ? ` · ${num(lost)} not on the map` : '')
+      : `Nothing has landed ${since}`;
+    return `${head}. Asked at ${esc(fmtHms(LV.at))}, every ${LIVE_MS / SEC} s.${still}`;
   }
 
   // ── The summary ──
@@ -1149,6 +1318,404 @@ const MapLatency = (() => {
     if (!U.on) setOn(true, { auto: true });
   }
 
+  // ── Messages landing: the log ─────────────────────────────────────────────
+
+  // Only while somebody could see it: the box ticked, the Stations map up and
+  // the page in view.
+  const liveWanted = () => !!(U.anim && map && state.activeTab === 'stations'
+    && (typeof document === 'undefined' || document.visibilityState !== 'hidden'));
+
+  // Start watching or stop, whichever is wanted; safe to call any time.
+  // Stopping forgets where it got to, so a return looks back one beat rather
+  // than playing the whole gap.
+  function liveSync() {
+    if (liveWanted()) {
+      ensureCanvas();
+      if (!LV.since) LV.since = now_();
+      if (!LV.timer && LV.status !== 'asking') livePoll();
+    } else {
+      if (LV.timer) { clearTimeout(LV.timer); LV.timer = null; }
+      LV.seq++;
+      Object.assign(LV, { status: 'idle', cursor: null, at: 0, since: 0, error: '', fails: 0, batches: [] });
+      clearPulses();
+    }
+    paintLive();
+  }
+
+  async function livePoll() {
+    if (LV.timer) { clearTimeout(LV.timer); LV.timer = null; }
+    if (!liveWanted()) return;
+    const seq = ++LV.seq;
+    const from = LV.cursor || new Date(now_() - LIVE_MS).toISOString();
+    LV.status = 'asking';
+    let rows;
+    try {
+      rows = await dbSelect(`reading?select=${LIVE_SELECT}&received_at=gt.${encodeURIComponent(from)}`
+        + `&order=received_at.asc&limit=${LIVE_PAGE}`);
+    } catch (err) {
+      if (seq !== LV.seq) return;
+      LV.fails++;
+      Object.assign(LV, { status: 'error', error: errText(err) });
+      paintLive();
+      // Asked again later each time it fails, to two minutes apart.
+      LV.timer = setTimeout(livePoll, Math.min(8, 2 ** (LV.fails - 1)) * LIVE_MS);
+      return;
+    }
+    if (seq !== LV.seq) return;
+    Object.assign(LV, { status: 'ok', at: now_(), error: '', fails: 0 });
+    LV.cursor = rows.length ? rows[rows.length - 1].received_at : from;
+    land(rows);
+    paintLive();
+    LV.timer = setTimeout(livePoll, rows.length >= LIVE_PAGE ? SEC : LIVE_MS);
+  }
+
+  // One answer: each message to its station, and each station played once, at
+  // the first of its messages to land — a station's battery and its rain in
+  // the same second are one transmission to look at.
+  function land(rows) {
+    const list = rows.filter(r => !LIVE_SKIP_SOURCE.has(Number(r.source)));
+    const at = now_();
+    LV.batches = LV.batches.filter(b => at - b.at <= LIVE_KEEP);
+    if (!list.length) return;
+    const resolve = SensorValues.resolver(list);
+    const first = new Map();
+    const ids = new Set();
+    let lost = 0;
+    for (const r of list) {
+      const got = resolve(r);
+      const st = got && got.st && LIVE_SURE.has(got.conf) ? got.st : null;
+      if (!st || !pinFor(st.id)) { lost++; if (st) ids.add(st.id); continue; }
+      ids.add(st.id);
+      const t = Date.parse(r.received_at);
+      if (!first.has(st.id) || t < first.get(st.id)) first.set(st.id, t);
+    }
+    LV.batches.push({ at, n: list.length, ids: [...ids], lost });
+    playBack(first);
+  }
+
+  // A beat behind, in the order they landed: what landed over the last
+  // LIVE_MS plays over the next, squeezed to fit when a backlog came at once,
+  // and a base's batch posted in one instant goes a station after another
+  // rather than all at once — a sweep, not a strobe.
+  function playBack(first) {
+    if (!first.size) return;
+    const list = [...first.entries()].sort((a, b) => a[1] - b[1]);
+    const t0 = list[0][1], span = list[list.length - 1][1] - t0;
+    const room = LIVE_MS - 2500;
+    const k = span > room ? room / span : 1;
+    const beat = Math.min(90, room / list.length);
+    let prev = -Infinity;
+    for (const [id, t] of list) {
+      const d = Math.min(room, Math.max((t - t0) * k, prev + beat));
+      prev = d;
+      const h = setTimeout(() => { liveTimers.delete(h); fire(id); }, d);
+      liveTimers.add(h);
+    }
+  }
+
+  // ── Messages landing: the pulse ───────────────────────────────────────────
+
+  // Every pin on the map by its station, once per rebuild.
+  function pinFor(id) {
+    const ms = state.mapMarkers || [];
+    if (pinIdxFor !== ms || pinIdxN !== ms.length) {
+      pinIdx = new Map();
+      for (const m of ms) if (m.mnStationId) pinIdx.set(m.mnStationId, m);
+      pinIdxFor = ms; pinIdxN = ms.length;
+    }
+    return pinIdx.get(id) || null;
+  }
+
+  // The links on the map, as the way a message runs: a field station's
+  // pass-range link to each repeater, drawn station end first; a backbone path
+  // to a base, drawn repeater end first; and a repeater-to-repeater path, either
+  // way. Built off the lines refreshMapLayers drew, once per rebuild — a link
+  // the map is not drawing is not one a pulse can be seen on.
+  function graphNow() {
+    const lines = state.mapLines || [];
+    if (graph && graphFor === lines && graph.n === lines.length) return graph;
+    const field = new Map(), bb = new Map(), base = new Set();
+    const add = (m, k, e) => { if (!m.has(k)) m.set(k, []); m.get(k).push(e); };
+    for (const l of lines) {
+      if (!l.mnArrowDir || !l.getLatLngs) continue;   // the casings and the backbone's dashes
+      const ll = l.getLatLngs();
+      if (!ll || ll.length < 2) continue;
+      if (l.mnLinkRole === 'core') {
+        add(field, l.mnLinkStationId, { line: l, fromId: l.mnLinkStationId, toId: l.mnLinkRepeaterId, from: ll[0], to: ll[1] });
+      } else if (l.mnLinkRole === 'backbone') {
+        const a = l.mnLinkRepeaterId, b = l.mnLinkRepeaterId2;
+        add(bb, a, { line: l, fromId: a, toId: b, from: ll[0], to: ll[1] });
+        if (l.mnArrowDir === 'both') add(bb, b, { line: l, fromId: b, toId: a, from: ll[1], to: ll[0] });
+        else base.add(b);
+      }
+    }
+    graph = { field, bb, base, n: lines.length };
+    graphFor = lines;
+    return graph;
+  }
+
+  // The fewest backbone hops from a repeater to a base, as the edges to run.
+  function toBase(g, from) {
+    if (g.base.has(from)) return [];
+    const prev = new Map([[from, null]]);
+    let frontier = [from];
+    for (let hop = 0; hop < HOPS_MAX && frontier.length; hop++) {
+      const next = [];
+      for (const u of frontier) {
+        for (const e of g.bb.get(u) || []) {
+          if (prev.has(e.toId)) continue;
+          prev.set(e.toId, e);
+          if (g.base.has(e.toId)) {
+            const path = [];
+            for (let x = e; x; x = prev.get(x.fromId)) path.unshift(x);
+            return path;
+          }
+          next.push(e.toId);
+        }
+      }
+      frontier = next;
+    }
+    return [];
+  }
+
+  // One station's pulse: its own flare, then a leg along each of its links,
+  // each node flaring as the spark lands on it — the logo's rule. Times are
+  // from the start; the positions are lat/lngs, so a pan or a zoom mid-pulse
+  // keeps it on its links.
+  function route(id) {
+    const g = graphNow();
+    const m = pinFor(id);
+    if (!m || !map) return null;
+    const nodes = [{ id, ll: m.getLatLng(), r: m.options.radius || 6, start: 0 }];
+    const legs = [];
+    const lit = new Set();
+    const reached = new Map([[id, 0]]);
+    const leg = (e, start) => {
+      if (legs.length >= LEGS_MAX || lit.has(e.line) || !(e.line.options.opacity > 0.06)) return null;
+      lit.add(e.line);
+      const px = map.latLngToLayerPoint(e.from).distanceTo(map.latLngToLayerPoint(e.to));
+      const dur = Math.max(LEG_MIN, Math.min(LEG_MAX, 1000 * px / SPEED));
+      // The trail drains into the far node at the spark's speed — on a link
+      // shorter than the trail, no longer than the run itself.
+      legs.push({ a: e.from, b: e.to, start, dur, tail: Math.min(dur, dur * TRAIL_PX / Math.max(1, px)), to: e.toId });
+      const end = start + dur;
+      if (!reached.has(e.toId) || reached.get(e.toId) > end) {
+        reached.set(e.toId, end);
+        const mt = pinFor(e.toId);
+        nodes.push({ id: e.toId, ll: e.to, r: mt ? mt.options.radius || 6 : 6, start: end });
+      }
+      return end;
+    };
+    const via = [];
+    for (const e of g.field.get(id) || []) {
+      const end = leg(e, 0);
+      if (end != null) via.push([e.toId, end]);
+    }
+    // A repeater's own sensors start at the repeater.
+    if (!via.length && g.bb.has(id)) via.push([id, 0]);
+    for (const [rid, t0] of via) {
+      let t = t0;
+      for (const e of toBase(g, rid)) {
+        const end = leg(e, t + HOLD_MS);
+        if (end == null) break;
+        t = end;
+      }
+    }
+    // A node lands twice when two ways reach it; it flares at the first.
+    const once = new Set();
+    const kept = nodes.filter(n => n.start === reached.get(n.id) && !once.has(n.id) && once.add(n.id));
+    const still = calm();
+    const life = still ? STILL_MS
+      : Math.max(FLARE_MS, ...kept.map(n => n.start + FLARE_MS), ...legs.map(l => l.start + l.dur + l.tail));
+    return { id, nodes: kept, legs, life, still };
+  }
+
+  function fire(id) {
+    if (!pctx || !map || pulses.length >= PULSES_MAX) return;
+    const t = performance.now();
+    // Still flaring from its last message: not flared again on top of it.
+    if (pulses.some(p => p.id === id && t - p.t0 < FLARE_MS)) return;
+    const p = route(id);
+    if (!p) return;
+    p.t0 = t;
+    pulses.push(p);
+    LV.fired.push(id);
+    LV.firedN++;
+    if (LV.fired.length > 50) LV.fired.shift();
+    kick();
+  }
+
+  function clearPulses() {
+    liveTimers.forEach(h => clearTimeout(h));
+    liveTimers.clear();
+    pulses = [];
+    if (praf) { cancelAnimationFrame(praf); praf = null; }
+    drawPulses(0);
+  }
+
+  // ── Messages landing: the canvas ──────────────────────────────────────────
+  // One canvas over the view in a pane of its own, MapArrows' way: placed when
+  // the view settles, drawn in layer pixels so a drag carries it with the map,
+  // and hidden through a zoom's animation (the pulses keep their time and are
+  // back where they belong when it ends). Frames are asked for only while a
+  // pulse is running.
+
+  function ensureCanvas() {
+    if (!map || pcanvas || typeof L === 'undefined') return;
+    if (!map.getPane(PULSE_PANE)) {
+      const pane = map.createPane(PULSE_PANE);
+      pane.style.zIndex = PULSE_Z;
+      pane.style.pointerEvents = 'none';
+    }
+    pcanvas = L.DomUtil.create('canvas', 'lat-pulse-canvas', map.getPane(PULSE_PANE));
+    pcanvas.setAttribute('aria-hidden', 'true');
+    pctx = pcanvas.getContext('2d');
+    map.on('moveend zoomend resize viewreset', placeCanvas);
+    map.on('zoomstart', hideCanvas);
+    placeCanvas();
+  }
+  function dropCanvas() {
+    if (map) {
+      map.off('moveend zoomend resize viewreset', placeCanvas);
+      map.off('zoomstart', hideCanvas);
+    }
+    if (pcanvas && pcanvas.parentNode) pcanvas.parentNode.removeChild(pcanvas);
+    pcanvas = null; pctx = null; porigin = null;
+  }
+  function hideCanvas() { if (pcanvas) pcanvas.style.visibility = 'hidden'; }
+  function placeCanvas() {
+    if (!map || !pcanvas) return;
+    const size = map.getSize();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, Math.round(size.x * dpr)), h = Math.max(1, Math.round(size.y * dpr));
+    if (pcanvas.width !== w || pcanvas.height !== h) {
+      pcanvas.width = w; pcanvas.height = h;
+      pcanvas.style.width = `${size.x}px`; pcanvas.style.height = `${size.y}px`;
+    }
+    porigin = map.containerPointToLayerPoint([0, 0]);
+    L.DomUtil.setPosition(pcanvas, porigin);
+    pcanvas.style.visibility = '';
+    drawPulses(performance.now());
+  }
+
+  function kick() {
+    if (!praf && pulses.length && pctx) praf = requestAnimationFrame(frame);
+  }
+  function frame(t) {
+    praf = null;
+    drawPulses(t);
+    if (pulses.length) praf = requestAnimationFrame(frame);
+  }
+
+  // CSS's ease-out, near enough for a flare.
+  const easeOut = u => 1 - (1 - u) * (1 - u);
+  // Where a flare is, e ms in: [opacity, scale], or null once it is out.
+  function flareAt(e) {
+    const f = e / CYCLE;
+    if (f < 0 || f >= FLARE[FLARE.length - 1][0]) return null;
+    for (let i = 1; i < FLARE.length; i++) {
+      const [ta, oa, sa] = FLARE[i - 1], [tb, ob, sb] = FLARE[i];
+      if (f <= tb) {
+        const u = easeOut((f - ta) / (tb - ta));
+        return [oa + (ob - oa) * u, sa + (sb - sa) * u];
+      }
+    }
+    return null;
+  }
+
+  function drawPulses(t) {
+    if (!pctx || !map) return;
+    const size = map.getSize();
+    const dpr = window.devicePixelRatio || 1;
+    pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    pctx.clearRect(0, 0, size.x, size.y);
+    pulses = pulses.filter(p => t - p.t0 < p.life);
+    if (!pulses.length || !porigin) return;
+    const at = ll => { const q = map.latLngToLayerPoint(ll); return [q.x - porigin.x, q.y - porigin.y]; };
+    pctx.lineCap = 'round';
+    // The links first and the nodes over them, as the logo stacks them.
+    for (const p of pulses) {
+      const e0 = t - p.t0;
+      for (const l of p.legs) {
+        const e = p.still ? 0 : e0 - l.start;
+        if (e < 0 || e > l.dur + l.tail) continue;
+        const [ax, ay] = at(l.a), [bx, by] = at(l.b);
+        const len = Math.hypot(bx - ax, by - ay);
+        if (len < 1) continue;
+        if (p.still) { stroke(ax, ay, bx, by, len, 0, len, 'trail'); continue; }
+        const head = (e / l.dur) * len;        // run on past the end, so the trail drains into the node
+        stroke(ax, ay, bx, by, len, head - TRAIL_PX, head, 'trail');
+        stroke(ax, ay, bx, by, len, head - SPARK_PX, head, 'spark');
+      }
+    }
+    for (const p of pulses) {
+      const e0 = t - p.t0;
+      for (const n of p.nodes) {
+        const f = p.still ? (e0 >= 0 ? [0.9, 1] : null) : flareAt(e0 - n.start);
+        if (!f) continue;
+        const [x, y] = at(n.ll);
+        flare(x, y, n.r, f[0], f[1]);
+      }
+    }
+    pctx.globalAlpha = 1;
+    pctx.shadowBlur = 0;
+  }
+
+  // A stretch of a link, from `from` to `to` px along it (clipped to the
+  // link): the trail a fainter green, the spark white-hot, both glowing.
+  function stroke(ax, ay, bx, by, len, from, to, kind) {
+    const a = Math.max(0, from), b = Math.min(len, to);
+    if (b <= a) return;
+    const ux = (bx - ax) / len, uy = (by - ay) / len;
+    pctx.beginPath();
+    pctx.moveTo(ax + ux * a, ay + uy * a);
+    pctx.lineTo(ax + ux * b, ay + uy * b);
+    if (kind === 'spark') {
+      pctx.globalAlpha = 1; pctx.strokeStyle = '#eaffef'; pctx.lineWidth = 4.5;
+      pctx.shadowColor = '#5dff8c'; pctx.shadowBlur = 6;
+    } else {
+      pctx.globalAlpha = 0.85; pctx.strokeStyle = '#2bff6a'; pctx.lineWidth = 4;
+      pctx.shadowColor = 'rgba(30, 235, 95, .9)'; pctx.shadowBlur = 10;
+    }
+    pctx.stroke();
+  }
+
+  // A node's flare over a pin of radius r: the logo's halo and hot core
+  // (.load-logo i::before, ::after), sized to the pin as the logo sizes them to
+  // its node.
+  function flare(x, y, r, op, sc) {
+    const s = Math.max(14, 2 * r + 2);
+    const halo = 2.4 * s * sc, core = 0.62 * s * sc;
+    pctx.globalAlpha = Math.max(0, Math.min(1, op));
+    pctx.shadowBlur = 0;
+    let g = pctx.createRadialGradient(x, y, 0, x, y, halo);
+    g.addColorStop(0, 'rgba(225, 255, 232, .95)');
+    g.addColorStop(0.12, 'rgba(225, 255, 232, .95)');
+    g.addColorStop(0.24, 'rgba(70, 255, 120, .9)');
+    g.addColorStop(0.42, 'rgba(25, 230, 90, .45)');
+    g.addColorStop(0.68, 'rgba(25, 230, 90, 0)');
+    pctx.fillStyle = g;
+    pctx.beginPath(); pctx.arc(x, y, halo, 0, 2 * Math.PI); pctx.fill();
+    g = pctx.createRadialGradient(x, y, 0, x, y, core);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.22, '#ffffff');
+    g.addColorStop(0.45, '#8dffa9');
+    g.addColorStop(0.8, '#1ee35e');
+    g.addColorStop(1, '#1ee35e');
+    pctx.fillStyle = g;
+    pctx.shadowColor = 'rgba(30, 235, 95, .7)';
+    pctx.shadowBlur = 8;
+    pctx.beginPath(); pctx.arc(x, y, core, 0, 2 * Math.PI); pctx.fill();
+    pctx.shadowBlur = 0;
+  }
+
+  // The card's line again, in place — a repaint of the pane would take the
+  // focus off whatever somebody was pressing.
+  function paintLive() {
+    const el = document.getElementById('lat-live-status');
+    if (el) el.innerHTML = liveStatusHtml();
+  }
+
   // ── The legend, the map's name, Map display's note ────────────────────────
 
   function legendHtml() {
@@ -1166,6 +1733,17 @@ const MapLatency = (() => {
       <span class="legend-item legend-off">
         <span class="small txt-muted">Pins are coloured by latency, not by role${t && U.scope === 'view' ? ' — counted in view' : ''}. The worse bands are a step bigger.
           Shapes and the forecast and information outlines are as always. ⏱️ Latency in the side panel says more.</span>
+      </span>`;
+  }
+
+  // The animation's line in the 🔑 legend, while it runs — with the pins in
+  // their roles' colours, health's or latency's alike.
+  function liveLegendHtml() {
+    if (!U.anim) return '';
+    return `
+      <span class="legend-item">
+        <span class="lat-live-dot" aria-hidden="true"></span>
+        <span class="small">Flashing green: a message from it just landed in the log${calm() ? '' : ', a pulse running along its links'}</span>
       </span>`;
   }
 
@@ -1209,12 +1787,25 @@ const MapLatency = (() => {
       });
     }
     setTimeout(() => { const r = rootEl(); if (r && resizeObs) resizeObs.observe(r); }, 0);
+    // The log watched again on a map built new, if the box is ticked — after
+    // this turn, when the Stations tab is the active one; and paused while the
+    // page is out of sight.
+    if (!visHooked && typeof document !== 'undefined') {
+      visHooked = true;
+      document.addEventListener('visibilitychange', () => { if (U.anim) liveSync(); });
+    }
+    setTimeout(() => { if (map === m) liveSync(); }, 0);
   }
 
   function detach() {
     if (map) { try { map.off('moveend', onMove); } catch (_) {} }
     if (resizeObs) resizeObs.disconnect();
+    // The log stops being watched with the map gone (liveWanted), and every
+    // pulse with it.
+    dropCanvas();
     map = null;
+    liveSync();
+    graph = null; graphFor = null; pinIdx = null; pinIdxFor = null;
     root = null;
     if (paintTimer) { clearTimeout(paintTimer); paintTimer = null; }
     if (pinTimer) { clearTimeout(pinTimer); pinTimer = null; }
@@ -1222,15 +1813,25 @@ const MapLatency = (() => {
 
   return {
     attach, detach, reset, shown, opened, follow, pinStyle,
-    legendHtml, altText, noteText,
+    legendHtml, liveLegendHtml, altText, noteText,
     on: () => U.on,
+    anim: () => U.anim,
     mode: () => U.mode,
-    setOn, setMode, setWin, setScope, pickBand, back, focus, refresh, openHealth, yieldTo,
+    setOn, setAnim, power, setMode, setWin, setScope, pickBand, back, focus, refresh, openHealth, yieldTo,
     // The rules, for test/latency.mjs.
     classifyValue, quantile, BANDS, SPECIAL, fmtDelay,
     classOf: id => { const s = stationById(id); return s ? classOf(s) : null; },
-    _state: () => ({ on: U.on, mode: U.mode, win: U.win, scope: U.scope, sel: U.sel, band: U.band,
+    _state: () => ({ on: U.on, anim: U.anim, mode: U.mode, win: U.win, scope: U.scope, sel: U.sel, band: U.band,
                      window: { key: W.key, status: W.status, rows: W.rows, borrowed: W.borrowed, error: W.error } }),
+    // The log being watched, the pulses running and the way one would run,
+    // for test/latency.mjs — the canvas has nothing else to ask.
+    _live: () => ({ status: LV.status, watching: !!LV.timer, cursor: LV.cursor, fired: LV.fired.slice(), firedN: LV.firedN,
+                    pulses: pulses.length, canvas: !!pcanvas,
+                    batches: LV.batches.map(b => ({ n: b.n, ids: b.ids.length, lost: b.lost })) }),
+    _route: id => { const p = route(id); return p && { nodes: p.nodes.map(n => ({ id: n.id, start: n.start })),
+                                                       legs: p.legs.map(l => ({ to: l.to, start: l.start, dur: l.dur })), life: p.life }; },
+    _askNow: () => livePoll(),
+    _fire: id => fire(id),
   };
 })();
 

@@ -5430,6 +5430,9 @@ function mapLegendHtml() {
          its switch is on. Under health the fill is health's, so the grey row
          gives way as the role rows do. -->
     ${MapSymbols.legendHtml({ health })}
+    <!-- ⏱️ Latency's green flash as a message lands, while it is animated —
+         under any colouring of the pins (map-latency.js). -->
+    ${MapLatency.liveLegendHtml()}
     <span class="legend-item">
       <span class="legend-dot legend-dot-hit" style="--dot:${roleVar('field')}"></span>
       <span class="small">Matches filter</span>

@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 72, date: '2026-10-22', items: [
+      '<strong>Messages landing, in ⏱️ Latency on the Stations map</strong> — a new card in the Latency pane. '
+        + 'While it is on, every message that lands in the log is played on the map a few seconds later: its station '
+        + 'flashes green and a green pulse runs along its links to its repeater and on to a base, the way the logo '
+        + 'on the loading screen pulses. It comes on with the Latency view; untick <em>Animate messages on the map</em> '
+        + 'to keep the colours without it. <strong>⏻ Latency view</strong>, at the top of the pane, now turns the '
+        + 'pins\' colours and the animation off together — and back on.',
+    ] },
     { n: 71, date: '2026-10-22', items: [
       '<strong>Its checks, slot by slot, on the station card and in the station editor</strong> — the strip from '
         + '<em>Station Health</em>, a row a day and a square a check: received, received with frames lost, or not heard. '
