@@ -15012,6 +15012,33 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 
 .map3d-hud-q { bottom: calc(var(--map3d-foot, 2rem) + var(--sp-2)); }
 
+/* The 3-D map's hover label (map-3d.js, "The hover label"): what the pin or
+   path under the pointer is. Placed by a transform from the host's corner, on
+   the hint's layer, and never a target — the click goes through it to the
+   canvas, as everything over the canvas but its controls does. */
+.map3d-tip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  display: grid;
+  gap: .05rem;
+  max-width: 22rem;
+  padding: .25rem .5rem;
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+}
+
+.map3d-tip[hidden] { display: none; }
+
+.map3d-tip span { color: var(--muted); }
+
 /* What the stage says while there is nothing to draw: no station, no ground,
    no renderer. Over the canvas rather than instead of it, so the canvas the
    renderer will draw into is already there when it arrives. */

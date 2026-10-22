@@ -6,7 +6,7 @@
 //           drawn as a vertical sheet between the ray and the ground under it.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for `state`, cssVar, announce, esc, destPoint,
+// Reaches back to core.js for `state`, cssVar, announce, esc, destPoint, ROLE_LABEL,
 // acmaHaversineKm and the words for moving a 3-D view (viewMoveWords,
 // viewKeyWords); across to terrain.js for the ground profile, to
 // path-profile.js for the physics (pathAnalyse, pathPropOf, stationAntenna, earthBulge, rmSystemOf,
@@ -17,7 +17,7 @@
 // field photos' pins (MapPhotos.drawn, badgeHtml, conePath, open), to map-polar.js for the polar
 // coverage plot's image (MapPolar.drawn), to map-leader.js for the
 // station card's leader (MapLeader.sync, reveal), and to app.js for
-// showStationCard and the base-map choice. Every one of those is called from
+// showStationCard, primaryRole and the base-map choice. Every one of those is called from
 // inside this file's own functions, so its position among the modules is free.
 //
 // ── Why a second map rather than a 3-D Leaflet ───────────────────────────────
@@ -185,8 +185,15 @@ const Map3D = (function () {
   // exactly what it drew: at 70° of pitch a bare point query asks the user to
   // land on a two-pixel target that is also foreshortened. Leaflet gives its
   // polylines this tolerance for free; MapLibre has no equivalent, so the box
-  // is written out here. Pins keep the point query — see the click handler.
+  // is written out here.
   const LINK_HIT_PX = 5;
+  // And a pin's. A pin is billboarded but still shrinks with distance
+  // (`circle-pitch-scale`), so one a few kilometres up a tilted view is a dot
+  // of two or three pixels — and a near miss on it used to be a click on the
+  // path running into it, which opened the path card instead. A finger is
+  // given more. The pin the pointer is actually on still wins (stationAt).
+  const PIN_HIT_PX = 6;
+  const PIN_HIT_PX_TOUCH = 12;
 
   // The pitch the camera opens at, and the pitch the tilt button puts it back
   // to. Named because two things now depend on it being the same number: the
@@ -249,6 +256,10 @@ const Map3D = (function () {
   let liveHint  = null;  // the snap's station name, as an ml.Marker (syncDrawLive)
   let liveHintKey = null; // …and what it was built for
   let liveDot   = null;  // the profile cursor's reading, likewise
+  let tip      = null;   // the hover label naming the pin or path under the pointer (hoverNow)
+  let tipKey   = null;   // …and what it names, so a still pointer rebuilds nothing
+  let tipAt    = null;   // the pointer's last spot on the canvas
+  let tipFrame = 0;      // the frame the next look under the pointer waits for
   let dimK     = 1;      // MapSites.dimOthers(), as last applied — 1 when idle
   let lfHeld   = [];     // Leaflet's own handlers this file switched off (holdLeaflet)
   let lfMoving = false;  // the 2-D map was moved, and the camera has not followed yet
@@ -966,6 +977,150 @@ const Map3D = (function () {
         return { list, pts };
       },
     };
+  }
+
+  // ── What is under the pointer ───────────────────────────────────────────
+  // The station a click or a hover at this spot means, or null. The pin the
+  // pointer is on, if it is on one — the renderer's own answer, so two pins
+  // overlapping are settled as the picture settles them — and otherwise the
+  // nearest pin within PIN_HIT_PX of it. Nothing while the site finder has
+  // the network at nought (see the click: out of sight is out of reach).
+  function stationAt(point) {
+    if (!map || dimK === 0) return null;
+    const on = map.queryRenderedFeatures([point.x, point.y], { layers: ['mn-stations'] })[0];
+    if (on && on.properties && on.properties.id != null) return on.properties.id;
+    const pad = coarse() ? PIN_HIT_PX_TOUCH : PIN_HIT_PX;
+    const box = [[point.x - pad, point.y - pad], [point.x + pad, point.y + pad]];
+    let best = null, bestD = Infinity;
+    for (const f of map.queryRenderedFeatures(box, { layers: ['mn-stations'] })) {
+      const id = f.properties && f.properties.id;
+      if (id == null || !f.geometry) continue;
+      const p = map.project(f.geometry.coordinates);
+      const d = p && isFinite(p.x) && isFinite(p.y) ? Math.hypot(p.x - point.x, p.y - point.y) : Infinity;
+      if (best == null || d < bestD) { best = id; bestD = d; }
+    }
+    return best;
+  }
+
+  // The radio path a click or a hover at this spot means — its feature's
+  // properties (sid / rid / rid2, linkFeatures) — or null.
+  function linkAt(point) {
+    if (!map || dimK === 0) return null;
+    const pad = LINK_HIT_PX;
+    const box = [[point.x - pad, point.y - pad], [point.x + pad, point.y + pad]];
+    const f = map.queryRenderedFeatures(box, { layers: ['mn-links'] })[0];
+    return f && f.properties ? f.properties : null;
+  }
+
+  function markerStation(id) {
+    const m = (state.mapMarkers || []).find(x => x.mnStationId === id);
+    return m && m.mnStation ? m.mnStation : null;
+  }
+
+  // ── The hover label ─────────────────────────────────────────────────────
+  // What a pin or a path is, said where the pointer is, before it is clicked:
+  // the station's name and kind, or the two ends of the path. 2-D has its
+  // labels and its fanned stacks for this; a tilted view has neither, and
+  // without it the only way to learn what a pin across the valley was is to
+  // open its card. One look per frame, however fast the pointer moves, and
+  // the label is rebuilt only when what it names changes. It takes no
+  // pointer, and it is the pointer's alone — the card a click opens is the
+  // keyboard's and the screen reader's way to the same words.
+  function hoverAt(point) {
+    tipAt = point;
+    if (!tipFrame) tipFrame = requestAnimationFrame(hoverNow);
+  }
+
+  function hoverNow() {
+    tipFrame = 0;
+    if (!map || !tipAt) return;
+    const canvas = map.getCanvas();
+    // An armed tool's crosshair is syncDrawTool's, and every click is a vertex.
+    if (drawArmed()) { hideTip(); return; }
+    // The click's precedence, so the label names what a click would open.
+    const sid = stationAt(tipAt);
+    if (sid != null) {
+      canvas.style.cursor = 'pointer';
+      showTip('s:' + sid, () => stationTip(sid));
+      return;
+    }
+    const moving = typeof MapMovePin !== 'undefined' && MapMovePin.armed() && MapMovePin.onMap();
+    if (!moving) {
+      const pad = LINK_HIT_PX;
+      const box = [[tipAt.x - pad, tipAt.y - pad], [tipAt.x + pad, tipAt.y + pad]];
+      if (map.queryRenderedFeatures(box, { layers: ['mn-draw-line'] }).length) {
+        canvas.style.cursor = 'pointer';
+        hideTip();
+        return;
+      }
+      const line = linkAt(tipAt);
+      if (line) {
+        canvas.style.cursor = 'pointer';
+        showTip(`l:${line.sid}:${line.rid}:${line.rid2}`, () => linkTip(line));
+        return;
+      }
+    }
+    canvas.style.cursor = '';
+    hideTip();
+  }
+
+  function stationTip(id) {
+    const s = markerStation(id);
+    if (!s) return null;
+    const role = typeof primaryRole === 'function' && s.roles ? primaryRole(s) : null;
+    const kind = role && typeof ROLE_LABEL !== 'undefined' ? ROLE_LABEL[role] : '';
+    return { head: s.name || `Station ${id}`,
+             sub: [kind, 'click for its card'].filter(Boolean).join(' · ') };
+  }
+
+  function linkTip(p) {
+    const name = id => { const s = markerStation(id); return s && s.name ? s.name : `Station ${id}`; };
+    if (p.rid2 != null) {
+      return { head: `${name(p.rid)} ↔ ${name(p.rid2)}`, sub: 'Backbone path · click for the path card' };
+    }
+    if (p.sid != null && p.rid != null) {
+      return { head: `${name(p.sid)} → ${name(p.rid)}`, sub: 'Radio path · click for the path card' };
+    }
+    return null;
+  }
+
+  function showTip(key, words) {
+    if (!host) return;
+    if (key !== tipKey) {
+      const w = words();
+      if (!w) { hideTip(); return; }
+      if (!tip) {
+        tip = document.createElement('div');
+        tip.className = 'map3d-tip';
+        tip.setAttribute('aria-hidden', 'true');
+        host.appendChild(tip);
+      }
+      tip.replaceChildren();
+      const head = document.createElement('strong');
+      head.textContent = w.head;
+      tip.appendChild(head);
+      if (w.sub) {
+        const sub = document.createElement('span');
+        sub.textContent = w.sub;
+        tip.appendChild(sub);
+      }
+      tipKey = key;
+    }
+    tip.hidden = false;
+    // Below and right of the pointer, and turned back inside the view at its
+    // right and bottom edges.
+    const GAP = 14;
+    const W = host.clientWidth, H = host.clientHeight;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = tipAt.x + GAP, y = tipAt.y + GAP;
+    if (x + w > W - 4) x = Math.max(4, tipAt.x - GAP - w);
+    if (y + h > H - 4) y = Math.max(4, tipAt.y - GAP - h);
+    tip.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+  }
+
+  function hideTip() {
+    if (tip) tip.hidden = true;
+    tipKey = null;
   }
 
   // Everything MapDraw drew, or with `live` only what is being clicked out.
@@ -2127,9 +2282,11 @@ const Map3D = (function () {
       // draws invisibly — so the pins and paths are left out of the question
       // altogether, as the 2-D panes are (map-sites.js applyDim), and a click
       // on empty-looking ground is a click on empty ground.
+      // A pin is the one under the pointer, or the nearest within PIN_HIT_PX
+      // of it (stationAt) — a pin up a tilted view is too small a target to
+      // be asked to land on exactly.
       const hid = dimK === 0;
-      const hit = hid ? null : map.queryRenderedFeatures(e.point, { layers: ['mn-stations'] })[0];
-      const id  = hit && hit.properties ? hit.properties.id : null;
+      const id  = stationAt(e.point);
       if (id != null) { clickedStation(id, e); return; }
       // The move-pin mode, armed: anything but a pin is ground the pin is
       // being put on, with the terrain's own coordinate for it — ahead of
@@ -2165,8 +2322,8 @@ const Map3D = (function () {
       };
       const stroke = map.queryRenderedFeatures(near, { layers: ['mn-draw-line'] })[0];
       if (stroke && stroke.properties && drawn(stroke.properties.id)) return;
-      const line = hid ? null : map.queryRenderedFeatures(near, { layers: ['mn-links'] })[0];
-      if (line && line.properties) { clickedLink(line.properties, e); return; }
+      const line = hid ? null : linkAt(e.point);
+      if (line) { clickedLink(line, e); return; }
       // Then the inside of a drawn circle or box, which in 2-D is the shape's
       // too and selects it — after the paths, since a link crossing a circle
       // is the more particular thing under the pointer.
@@ -2261,20 +2418,18 @@ const Map3D = (function () {
       if (p.rid2 != null) MapBackbone.open('backbone', p.rid, p.rid2);
       else if (p.sid != null && p.rid != null) MapBackbone.open('field', p.sid, p.rid);
     }
-    // Not while a draw tool is armed: a pin is not what a click would do then,
-    // and the crosshair is (syncDrawTool).
-    const pointer = () => { if (!drawArmed()) map.getCanvas().style.cursor = 'pointer'; };
-    map.on('mouseenter', 'mn-stations', pointer);
-    map.on('mouseleave', 'mn-stations', () => { map.getCanvas().style.cursor = ''; });
-    // The lines say they are clickable too. MapLibre scopes these to the
-    // layer's own rendered geometry, with no tolerance to give them, so the
-    // pointer appears a pixel or two later than the click box would take it —
-    // the cursor is the hint, LINK_HIT_PX is the affordance.
-    map.on('mouseenter', 'mn-links', pointer);
-    map.on('mouseleave', 'mn-links', () => { map.getCanvas().style.cursor = ''; });
-    // And the drawn shapes, which a click selects.
-    map.on('mouseenter', 'mn-draw-line', pointer);
-    map.on('mouseleave', 'mn-draw-line', () => { map.getCanvas().style.cursor = ''; });
+    // Hovering: the pointer and the label say what a click here would open —
+    // a pin, a path, or a drawn shape — judged by the click's own tolerances
+    // and precedence (hoverNow), not by MapLibre's layer-scoped enter and
+    // leave, which hit-test the bare drawn pixels and so said "not clickable"
+    // over a spot a click would take. Not while a button is down: that is a
+    // drag of the camera, and the label goes until it stops.
+    map.on('mousemove', e => {
+      if (e.originalEvent && e.originalEvent.buttons) { hideTip(); return; }
+      hoverAt(e.point);
+    });
+    map.on('mouseout', () => { tipAt = null; hideTip(); });
+    map.on('movestart', hideTip);
   }
 
   function syncLeader() {
@@ -3015,6 +3170,12 @@ const Map3D = (function () {
     dropDraw();
     standing = false;   // a chain waiting on this map's next frame waits for ever
     dimK = 1;
+    // The hover label is on the host and goes with it.
+    if (tipFrame) cancelAnimationFrame(tipFrame);
+    tipFrame = 0;
+    tip = null;
+    tipKey = null;
+    tipAt = null;
     clearTimeout(hudTimer);   // the hint goes with the host it is drawn on
     hudTimer = 0;
     if (hudRo) { hudRo.disconnect(); hudRo = null; }

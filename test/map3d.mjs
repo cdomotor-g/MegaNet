@@ -998,6 +998,63 @@ if (pin) {
   await page.evaluate(() => { state.mapFocusRepeaterId = null; closeStnCard(false); });
 }
 
+// ── 7a. hovering names a pin, and a near miss still opens it ────────────────
+// A pin up a tilted view is a dot of a few pixels. Hovering one has to say
+// what it is without opening anything, and a click just off its edge has to
+// be that pin's rather than the path running into it (PIN_HIT_PX).
+console.log('\nHovering a pin in 3-D names it, and a near miss still opens it');
+if (pin) {
+  await page.evaluate((t) => Map3D._map().jumpTo({ center: [t.lng, t.lat], zoom: 12, pitch: 60, bearing: 0 }), pin);
+  await page.waitForTimeout(1200);
+  await idle3d();
+  const at = await pinOnScreen(pin);
+  await page.mouse.move(at.x - 40, at.y - 40);
+  await page.mouse.move(at.x, at.y, { steps: 4 });
+  await page.waitForTimeout(150);
+  const tip = await page.evaluate((id) => {
+    const el = document.querySelector('#map3d .map3d-tip');
+    const mk = (state.mapMarkers || []).find(m => m.mnStationId === id);
+    return { shown: !!(el && !el.hidden && el.offsetWidth > 0),
+             text: el ? el.textContent : '', name: mk && mk.mnStation ? mk.mnStation.name : null,
+             cursor: Map3D._map().getCanvas().style.cursor, card: state.stnCard.id };
+  }, at.hit);
+  ok('hovering a pin shows a label with its name', tip.shown && !!tip.name && tip.text.includes(tip.name),
+     JSON.stringify(tip));
+  ok('…and the pointer says it can be clicked, and nothing opened', tip.cursor === 'pointer' && tip.card == null,
+     JSON.stringify(tip));
+
+  // Off the drawn circle, inside the tolerance: the bare point misses and the
+  // click still lands on the pin.
+  const miss = await page.evaluate((t) => {
+    const m = Map3D._map();
+    const r = m.getCanvas().getBoundingClientRect();
+    const x0 = t.x - r.left, y0 = t.y - r.top;
+    // Outward from the centre in each direction to the first pixel the bare
+    // point misses: just past the drawn edge, well inside the tolerance.
+    for (const [ux, uy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      for (let d = 1; d <= 30; d++) {
+        const x = x0 + ux * d, y = y0 + uy * d;
+        if (!m.queryRenderedFeatures([x, y], { layers: ['mn-stations'] }).length) {
+          return { x: Math.round(r.left + x + ux), y: Math.round(r.top + y + uy), d: d + 1 };
+        }
+      }
+    }
+    return null;
+  }, at);
+  if (miss) {
+    await page.evaluate(() => { state.mapFocusRepeaterId = null; closeStnCard(false); });
+    await page.mouse.click(miss.x, miss.y);
+    await page.waitForTimeout(500);
+    const got = await page.evaluate(() => state.stnCard.id);
+    ok('a click just off a pin’s edge opens that pin’s card', got === at.hit,
+       JSON.stringify({ got, pin: at.hit, miss }));
+  } else {
+    ok('a click just off a pin’s edge opens that pin’s card', true, 'no clear near-miss spot in frame — not exercised');
+  }
+  await page.mouse.move(5, 5);
+  await page.evaluate(() => { state.mapFocusRepeaterId = null; closeStnCard(false); });
+}
+
 // ── 7b. the card's gold leader, over the canvas ─────────────────────────────
 // In 2-D a gold leader runs from the station card's top edge to a ring round
 // its pin (map-leader.js). In 3-D it was simply not there: it is drawn in a
@@ -1894,6 +1951,19 @@ if (line) {
      where.box >= where.point, `box ${where.box}, point ${where.point}`);
 
   if (where.hit) {
+    // Hovering it names both ends before anything is clicked.
+    await page.evaluate(() => closeStnCard(false));
+    await page.mouse.move(where.x - 30, where.y - 30);
+    await page.mouse.move(where.x, where.y, { steps: 4 });
+    await page.waitForTimeout(150);
+    const tip = await page.evaluate(() => {
+      const el = document.querySelector('#map3d .map3d-tip');
+      return { shown: !!(el && !el.hidden && el.offsetWidth > 0), text: el ? el.textContent : '' };
+    });
+    ok('hovering a path shows a label naming its two ends',
+       tip.shown && /[→↔]/.test(tip.text) && /path card/.test(tip.text), JSON.stringify(tip));
+    await page.mouse.move(5, 5);
+
     // While a draw tool is armed the click belongs to the drawing, exactly as
     // in 2-D. Checked first, because it must not leave a card open behind it.
     await page.evaluate(() => {
