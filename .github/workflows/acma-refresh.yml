@@ -75,7 +75,36 @@ jobs:
 
       - name: Download ACMA extract
         run: |
-          for url in $ACMA_ZIP_URLS; do
+          # Discover the current link too: ACMA has moved this file before, so
+          # any spectra_rrl*.zip linked from its register pages (or the offline
+          # register's scripts) is tried after the configured URLs.
+          found=$(python3 - <<'PY'
+          import re, urllib.request, urllib.parse
+          pages = ['https://www.acma.gov.au/register-radiocommunication-licences-rrl',
+                   'https://www.acma.gov.au/radiocomms-licence-data',
+                   'https://cdn.acma.gov.au/offline-rrl/index.html']
+          seen, out = set(), []
+          def get(u):
+              try:
+                  req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0 FloodNet-acma-refresh'})
+                  return urllib.request.urlopen(req, timeout=30).read().decode('utf-8', 'replace')
+              except Exception as e:
+                  print('#', u, e); return ''
+          queue = list(pages)
+          while queue:
+              u = queue.pop(0)
+              if u in seen or len(seen) > 40: continue
+              seen.add(u); html = get(u)
+              for m in re.findall(r'''["'(]([^"'()\s]*spectra_rrl[^"'()\s]*\.zip)''', html, re.I):
+                  z = urllib.parse.urljoin(u, m)
+                  if z not in out: out.append(z)
+              for m in re.findall(r'''(?:src|href)=["']([^"']+\.js)["']''', html, re.I):
+                  queue.append(urllib.parse.urljoin(u, m))
+          print('\n'.join(out))
+          PY
+          )
+          echo "Discovered on ACMA pages:"; echo "$found" | grep -v '^#' || true
+          for url in $ACMA_ZIP_URLS $(echo "$found" | grep -v '^#'); do
             echo "Trying $url"
             rm -f /tmp/spectra_rrl.zip
             if curl -fSL --retry 2 --retry-delay 15 \
