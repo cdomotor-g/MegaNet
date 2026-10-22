@@ -27,10 +27,11 @@ const WhatsNew = (() => {
   const ENTRIES = [
     { n: 70, date: '2026-10-22', items: [
       '<strong>◀ ▶ ▲ ▼ Step buttons on the chart\'s navigators</strong>, in <em>Plots</em> and <em>Field Data</em>. '
-        + '◀ and ▶ at the left end of the whole-record strip under the chart move the window earlier or later; ▲ and ▼ '
-        + 'under the bar down the right move the vertical range up or down. Each press shifts it a fifth of its width or '
-        + 'height, and a button goes faint when the window is already at that end of the record. Undo takes a quick run of '
-        + 'presses back in one go, and ↺ resets both.',
+        + '◀ and ▶ at the two ends of the whole-record strip under the chart move the window earlier or later; ▲ and ▼ '
+        + 'at the top and bottom of the bar down the right move the vertical range up or down — and with the chart '
+        + 'selected, the ↑ and ↓ keys do the same, as ← and → already did across. Each press shifts it a fifth of its '
+        + 'width or height, and a button goes faint when the window is already at that end of the record. Undo takes a '
+        + 'quick run of presses back in one go, and ↺ resets both. ↺ and ⛶ now sit above the plot, not on it.',
     ] },
     { n: 69, date: '2026-10-22', items: [
       '<strong>🧪 Bit Bench</strong>, a new tab under <em>Interference</em>: a bench for the bits a station sends and the faults '

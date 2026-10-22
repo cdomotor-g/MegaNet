@@ -31,9 +31,10 @@
 // the values the chart is actually drawing, so a rainfall rollover or a removed
 // neighbour cannot make the figure beside a point disagree with the points.
 //
-// And the step buttons on the two navigators — ◀ ▶ on the strip, ▲ ▼ under
-// the vertical one: pressed where they are drawn, a fifth of the window a
-// press, stopping at the end of the record, and one step for Undo.
+// And the step buttons at the ends of the two navigators — ◀ ▶ on the strip,
+// ▲ ▼ on the vertical one — and the ↑ ↓ keys that press ▲ ▼: pressed where
+// they are drawn, a fifth of the window a press, stopping at the end of the
+// record, and one step for Undo.
 //
 //   node --run adnav      (or: npm run adnav)
 
@@ -908,16 +909,43 @@ try {
      whole.l?.own && whole.r?.own && (await center('ad-nav-up'))?.own && (await center('ad-nav-down'))?.own,
      JSON.stringify(whole));
   ok('…◀ and ▶ are off while the whole record is in view', whole.l.off && whole.r.off, JSON.stringify(whole));
+  // Each at its own end of its own track, the way a scrollbar's arrows are,
+  // and none on a track. The track ends are read off the navigators as drawn:
+  // the strip's through its own viewBox (the plot's left margin is 64), the
+  // vertical one off its track rect.
   const sx = await page.evaluate(() => {
-    const ov = document.getElementById('ad-ov').getBoundingClientRect();
-    const b = document.getElementById('ad-nav-right').getBoundingClientRect();
-    const vov = document.getElementById('ad-vov').getBoundingClientRect();
-    const up = document.getElementById('ad-nav-up').getBoundingClientRect();
-    return { inMargin: b.right <= ov.left + 64 && b.top >= ov.top && b.bottom <= ov.bottom,
-             under: up.top >= vov.bottom && up.left >= vov.left - 1 && up.right <= vov.right + 1 };
+    const r = id => document.getElementById(id).getBoundingClientRect();
+    const ov = document.getElementById('ad-ov'), ovr = ov.getBoundingClientRect();
+    const m = ov.getScreenCTM();
+    const pt = ov.createSVGPoint(); pt.x = 64; pt.y = 0;
+    const trackStart = pt.matrixTransform(m).x;
+    const track = document.querySelector('#ad-vov rect[rx="3"]').getBoundingClientRect();
+    const vov = r('ad-vov');
+    const L = r('ad-nav-left'), R = r('ad-nav-right'), U = r('ad-nav-up'), D = r('ad-nav-down');
+    const inY = (b, c) => b.top >= c.top - 0.5 && b.bottom <= c.bottom + 0.5;
+    const inX = (b, c) => b.left >= c.left - 0.5 && b.right <= c.right + 0.5;
+    return {
+      left:  L.left >= ovr.left && L.right <= trackStart && inY(L, ovr),
+      right: R.left >= ovr.right && inY(R, ovr) && Math.abs((R.top + R.bottom) / 2 - (L.top + L.bottom) / 2) < 1,
+      up:    U.top >= vov.top && U.bottom <= track.top && inX(U, vov),
+      down:  D.top >= track.bottom && D.bottom <= vov.bottom && inX(D, vov),
+      // …with the track still running exactly as far as the plot does.
+      plot: (() => {
+        const svg = document.getElementById('ad-svg'), c = document.querySelector('#ad-clip rect');
+        const y0 = +c.getAttribute('y'), y1 = y0 + +c.getAttribute('height');
+        const m = svg.getScreenCTM();
+        return { top: new DOMPoint(0, y0).matrixTransform(m).y, bottom: new DOMPoint(0, y1).matrixTransform(m).y };
+      })(),
+      track: { top: track.top, bottom: track.bottom },
+    };
   });
-  ok('…◀ ▶ sit in the strip\'s left margin, off the track', sx.inMargin, JSON.stringify(sx));
-  ok('…▲ ▼ sit under the vertical navigator', sx.under, JSON.stringify(sx));
+  ok('…◀ is at the left end of the strip, before its track starts', sx.left, JSON.stringify(sx));
+  ok('…▶ is past its right end, level with ◀', sx.right, JSON.stringify(sx));
+  ok('…▲ is at the top of the vertical navigator, above its track', sx.up, JSON.stringify(sx));
+  ok('…▼ is at the bottom, below its track', sx.down, JSON.stringify(sx));
+  ok('…and the vertical track still starts and ends where the plot does',
+     Math.abs(sx.plot.top - sx.track.top) < 1.5 && Math.abs(sx.plot.bottom - sx.track.bottom) < 1.5,
+     JSON.stringify({ plot: sx.plot, track: sx.track }));
 
   await page.evaluate(() => {
     const A = window.ArroData, s = A.ad.series[0];
@@ -986,12 +1014,41 @@ try {
      Math.abs(y2.yMin - y1.yMin - ystep) <= Math.abs(ystep) * 0.01 + 1e-3
        && Math.abs((y2.yMax - y2.yMin) - (y1.yMax - y1.yMin)) <= (y1.yMax - y1.yMin) * 0.01,
      JSON.stringify({ y1, y2, ystep }));
+  // ↑ and ↓ on the chart are ▲ and ▼, focus kept on the chart. Back the way
+  // the two presses came first, where there is a whole step of room, then
+  // forward again to where they left it.
+  await page.focus('#ad-stage');
+  const k0 = await page.evaluate(() => ({ yMin: +window.ArroData.ad.yMin }));
+  await page.keyboard.press(dir === 'up' ? 'ArrowDown' : 'ArrowUp');
+  await page.waitForTimeout(60);
+  const k1 = await page.evaluate(() => ({ yMin: +window.ArroData.ad.yMin, focus: document.activeElement?.id }));
+  ok(`${dir === 'up' ? '↓' : '↑'} on the chart moves the range a step the other way`,
+     Math.abs(k0.yMin - k1.yMin - ystep) <= Math.abs(ystep) * 0.02 + 1e-3 && k1.focus === 'ad-stage',
+     JSON.stringify({ k0, k1, ystep }));
+  await page.keyboard.press(dir === 'up' ? 'ArrowUp' : 'ArrowDown');
+  await page.waitForTimeout(60);
+  const k2 = await page.evaluate(() => ({ yMin: +window.ArroData.ad.yMin }));
+  ok(`…and ${dir === 'up' ? '↑' : '↓'} brings it back`, Math.abs(k2.yMin - k0.yMin) <= Math.abs(ystep) * 0.02 + 1e-3,
+     JSON.stringify({ k0, k2 }));
   for (let i = 0; i < 100 && !(await center(`ad-nav-${dir}`)).off; i++) await press(`ad-nav-${dir}`);
   ok(`…and ${dir === 'up' ? '▲' : '▼'} turns off at the end of the record's range`,
      (await center(`ad-nav-${dir}`)).off);
   await page.evaluate(() => window.ArroData.resetView());
   await page.waitForTimeout(60);
   ok('Reset puts the axis back to Auto', (await vw()).yMode === 'auto');
+  await page.evaluate(() => {
+    const A = window.ArroData, s = A.ad.series[0];
+    const t0 = s.t[0], t1 = s.t[s.n - 1];
+    A.ad.view = { t0: t0 + (t1 - t0) * 0.4, t1: t0 + (t1 - t0) * 0.6 };
+    A.repaint();
+  });
+  await page.focus('#ad-stage');
+  await page.keyboard.press(dir === 'up' ? 'ArrowUp' : 'ArrowDown');
+  await page.waitForTimeout(60);
+  const kf = await page.evaluate(() => ({ yMode: window.ArroData.ad.yMode, focus: document.activeElement?.id }));
+  ok('…and the first arrow key from Auto takes it to Fixed with the chart still focused',
+     kf.yMode === 'manual' && kf.focus === 'ad-stage', JSON.stringify(kf));
+  await page.evaluate(() => window.ArroData.resetView());
 
   ok('nothing threw', errors.length === 0, errors.join(' | '));
 

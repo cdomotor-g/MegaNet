@@ -3983,7 +3983,8 @@ const ArroData = (function () {
     const f = chartFacts();
     const how = 'Drag to pan, scroll or + and − to zoom, Shift+scroll or a sideways wheel to pan, '
               + 'Shift+drag a box to zoom to it, '
-              + 'Alt+drag up or down to rescale the vertical axis, arrow keys to step, '
+              + 'Alt+drag up or down to rescale the vertical axis, '
+              + 'left and right arrow keys to step across, up and down to move the vertical range, '
               + '0 to reset both axes. '
               + 'Hovering a reading names the difference either side of it. '
               + 'Every value is in the readings table below the chart.';
@@ -4063,7 +4064,7 @@ const ArroData = (function () {
                   aria-label="${ad.full ? 'Exit full screen' : 'Chart full screen'}">⛶</button>
         </div>
         <div class="ad-stage${ad.dragMode === 'draw' || ad.dragMode === 'ruler' ? ' ad-stage--pen' : ''}" id="ad-stage" tabindex="0"
-             aria-label="Chart window — arrow keys to step, + and − to zoom, Shift+scroll to pan sideways, 0 to reset both axes, Escape to unpin">
+             aria-label="Chart window — left and right arrow keys to step across, up and down to move the vertical range, + and − to zoom, Shift+scroll to pan sideways, 0 to reset both axes, Escape to unpin">
           <svg id="ad-svg" role="img" aria-label="${escAttr(chartName())}"></svg>
           <div class="ad-tip" id="ad-tip" hidden></div>
         </div>
@@ -4071,15 +4072,12 @@ const ArroData = (function () {
              aria-label="${escAttr(vOverviewName())}"></svg>
         <svg id="ad-ov" class="ad-ov" role="img"
              aria-label="${escAttr(overviewName())}"></svg>
-        <!-- The navigators' step buttons: ◀ ▶ in the strip's own left margin,
-             ▲ ▼ in the corner under the vertical navigator. Neither sits on a
-             track, so both navigators stay exactly as long as their axes. -->
-        <div class="ad-nav-btns ad-nav-btns--x" role="group" aria-label="Move the window across">
-          ${nudgeBtnHtml('left')}${nudgeBtnHtml('right')}
-        </div>
-        <div class="ad-nav-btns ad-nav-btns--y" role="group" aria-label="Move the vertical range">
-          ${nudgeBtnHtml('up')}${nudgeBtnHtml('down')}
-        </div>
+        <!-- The navigators' step buttons, at the ends of each track the way a
+             scrollbar's are: ◀ in the strip's left margin and ▶ in the corner
+             past its right end; ▲ and ▼ in the vertical navigator's top and
+             bottom bands. None sits on a track, so both navigators stay
+             exactly as long as their axes. -->
+        ${AD_NUDGE_DIRS.map(nudgeBtnHtml).join('')}
       </div>
       <div id="ad-readout" class="ad-readout">${readoutHtml()}</div>
       ${linesHtml()}
@@ -5562,7 +5560,10 @@ const ArroData = (function () {
     };
   }
 
-  const PADL = 64, PADR = 18, PADT = 14, PADB = 30;
+  // PADT is the band ▲ sits in at the top of the vertical navigator, whose
+  // track has to start exactly where the plot does; ↺ and ⛶ share it, so they
+  // no longer sit on the data. PADB is the same for ▼, beside the time labels.
+  const PADL = 64, PADR = 18, PADT = 36, PADB = 30;
   // The right margin when a second axis is drawn in it — wide enough for a
   // column of tick labels, which PADR at 18 px is not (#191).
   const PADR2 = 58;
@@ -6880,6 +6881,13 @@ const ArroData = (function () {
       switch (ev.key) {
         case 'ArrowLeft':  pan(-span * 0.2); break;
         case 'ArrowRight': pan(span * 0.2);  break;
+        // Up and down are ▲ and ▼, end stop and all. Taken whether or not
+        // there is room to move: a chart that scrolled the page on ↑ only
+        // once its range reached the top would be a key that changes meaning.
+        case 'ArrowUp': case 'ArrowDown':
+          ev.preventDefault();
+          nudge(ev.key === 'ArrowUp' ? 'up' : 'down');
+          return;
         case '+': case '=': zoom(0.6); break;
         case '-': case '_': zoom(1.7); break;
         case '0':
@@ -7713,9 +7721,9 @@ const ArroData = (function () {
 
   // ── Step buttons on the navigators ─────────────────────────────────────────
   // A scrollbar's arrows, for a hand that wants to shift the window rather
-  // than drag it: ◀ ▶ on the whole-record strip, ▲ ▼ under the vertical
-  // navigator. The arrow keys already stepped sideways, but only with the
-  // chart focused, and nothing stepped the vertical range at all.
+  // than drag it: ◀ ▶ at the two ends of the whole-record strip, ▲ ▼ at the
+  // top and bottom of the vertical navigator. ← and → already stepped sideways
+  // with the chart focused; ↑ and ↓ now press ▲ and ▼.
   //
   // A step is a fifth of the window, as the arrow keys' is, and it stops at
   // the end of the record rather than running off it. view() lets a drag carry
@@ -7734,7 +7742,7 @@ const ArroData = (function () {
   // Drawn rather than typed: ◀ and ▶ are emoji on some phones.
   function nudgeBtnHtml(dir) {
     const [say, d] = AD_NUDGE_SAY[dir];
-    return `<button type="button" class="ad-nav-btn" id="ad-nav-${dir}"
+    return `<button type="button" class="ad-nav-btn ad-nav-btn--${dir}" id="ad-nav-${dir}"
                     onclick="ArroData.nudge('${dir}')" title="${escAttr(say)}" aria-label="${escAttr(say)}"
               ><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><path d="${d}" fill="currentColor"/></svg></button>`;
   }
@@ -7784,15 +7792,16 @@ const ArroData = (function () {
     } else {
       const d = Math.min((yr.hi - yr.lo) * AD_NUDGE, room) * (dir === 'down' ? -1 : 1);
       const wasManual = ad.yMode === 'manual';
-      const had = document.activeElement?.id === `ad-nav-${dir}`;
+      const had = document.activeElement?.id;
       if (commitY(yr.lo + d, yr.hi + d)) {
         // The first step takes the axis to Fixed, which the toolbar shows, so
         // that one re-renders the pane — as the navigator's own first drag does
-        // — and hands the focus back to the button it took away.
+        // — and hands the focus back to whatever had it: the button, or the
+        // chart for ↑ and ↓.
         if (wasManual) { draw(); drawVov(); renderReadout(); }
         else {
           renderMainOnly();
-          if (had) document.getElementById(`ad-nav-${dir}`)?.focus();
+          if (had === `ad-nav-${dir}` || had === 'ad-stage') document.getElementById(had)?.focus();
         }
         const unit = shown()[0]?.unit || '';
         announce(`Vertical range ${ad.yMin} to ${ad.yMax} ${unit}`.trimEnd() + '.');
