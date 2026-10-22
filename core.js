@@ -4052,6 +4052,11 @@ const state = {
     propOpen:  false,
     coverOpen: false,
     zoneOpen:  false,
+    // …and every other "more" disclosure on the path tools (pathMoreHtml,
+    // path-profile.js), by id: the explanations, sources and working behind
+    // the figures, shut until somebody opens one, and kept open across the
+    // repaints every change makes until they shut it again.
+    more:      {},
     // Which end the next station pick fills: a click on the map, or a row in
     // the Stations list under it. null is the original behaviour — A, then B,
     // then A again. Putting the caret in an end's search box arms that end,

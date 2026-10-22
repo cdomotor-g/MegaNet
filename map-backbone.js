@@ -28,7 +28,7 @@
 // sideways to map-draw.js (MapDraw), link-budget.js (LinkBudget,
 // lbMarginClass) and path-profile.js (PathProfile, fsplDb, wattsToDbm, and
 // radioKey, radioDefaults, radioVal and radioFreq — the figures the path tools
-// share). See path-profile.js's header for why the
+// share — and pathMoreHtml). See path-profile.js's header for why the
 // mutual reference constrains nothing.
 
 // ── The backbone relation ────────────────────────────────────────────────────
@@ -436,12 +436,13 @@ const MapBackbone = (function () {
         ${row('Distance', fmtKm(km))}
         ${row('Fade margin', marginHtml(r, a, b))}
       </div>
-      <p class="small path-card-note">Indicative only — the margin is the elevation profile's figure,
-        the worse of the two directions (free-space until the terrain profile lands), on the TX power and
-        the other figures set in the two cards below. The elevation profile and link budget below are
-        open on this exact path:
+      <p class="small path-card-note">Indicative only. Open below on this path:
         <a href="#" onclick="MapBackbone.scrollTo('path-profile-panel');return false">elevation profile ↓</a> ·
-        <a href="#" onclick="MapBackbone.scrollTo('link-budget-panel');return false">fade margin ↓</a></p>`;
+        <a href="#" onclick="MapBackbone.scrollTo('link-budget-panel');return false">fade margin ↓</a></p>
+      ${pathMoreHtml('path-card-about', 'How this figure is worked out', `
+        <p class="small path-card-note">The margin is the elevation profile's figure, the worse of the two
+          directions (free-space until the terrain profile lands), on the TX power and the other figures set in
+          the two cards below — change one there and this follows.</p>`)}`;
   }
 
   // Whether the profile below is still on this path. The card heads the

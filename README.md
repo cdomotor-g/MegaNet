@@ -3813,6 +3813,22 @@ cards: taken mid-Tab it replaced the box the caret was going to and dropped it
 on the page, and taken mid-press it replaced the button being pressed in the
 other card, so the click never arrived.
 
+**Shown on asking.** The three path cards — the radio path card, the
+elevation profile and the link budget — keep their figures, their controls and
+their warnings on the card and their explaining one click away, each behind a
+disclosure that says what is in it (`pathMoreHtml`, `path-profile.js`). The
+profile shows its verdict, distance, fade margin, path loss and obstructions,
+the chart and its key, and the boxes; the Fresnel clearance and elevation
+angles, how the signal's colours are worked out, why the zone is an ellipse,
+where the ground came from, what the cover layer says and the height datums
+are each a click. The link budget shows the warning in one sentence — *a model,
+not a measurement; any one path can be ±10 dB; confirm on air* — the two ends,
+and the answer: the fade margin in its band's colour, and a line saying what
+was received against what is needed, or why the figure cannot be taken at its
+word. The term-by-term table, the verdict's reasons and Radio Mobile's other
+figures are under *Show the working*, every word still there. A disclosure
+opened stays open across the repaints every change makes, until it is shut.
+
 **The two cards can still disagree, and the budget says when they do.** With
 the figures shared, the settings part only where a default does: each card takes
 the frequency from the repeater at its own A end first, so a hop between two

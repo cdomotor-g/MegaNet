@@ -16,6 +16,8 @@
 //                 threshold — and one frequency, which this card, the link
 //                 budget and the radio-path card (map-backbone.js) all price
 //                 with.
+//   pathMoreHtml  the disclosure the three cards keep their explaining in,
+//                 so the figures are what is on the card.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm, RM_NET_DEFAULTS and
@@ -325,6 +327,28 @@ function radioCommit(fn, ...args) {
     document.addEventListener('pointercancel', go, true);
     setTimeout(go, 2000);
   }, 0);
+}
+
+// ── Shown on asking ──────────────────────────────────────────────────────────
+// The path tools explain themselves at length — where each figure comes from,
+// what the model leaves out, why the picture is the shape it is — and all of
+// it was on the cards at once, so the figures somebody opened them for sat a
+// scroll apart among paragraphs most people need once. The figures, the
+// controls and the warnings stay out; the explaining is a click away, behind
+// one of these, each with a summary that says what is in it. One opened stays
+// open across the repaints every change makes (state.link.more) until it is
+// shut again.
+//
+// The toggle only writes the state, so a <details open> that Chromium toggles
+// as it is inserted (#160) writes `true` over `true` and nothing more.
+function pathMoreHtml(id, summary, body) {
+  const open = !!(state.link.more && state.link.more[id]);
+  return `
+    <details class="path-more" data-more="${escAttr(id)}" ${open ? 'open' : ''}
+             ontoggle="state.link.more[this.dataset.more] = this.open">
+      <summary>${summary}</summary>
+      <div class="path-more-body">${body}</div>
+    </details>`;
 }
 
 // ── The ground a path is priced over ─────────────────────────────────────────
@@ -954,6 +978,7 @@ const PathProfile = (function () {
     return `
       <div class="filter-note">
         <p>${headline}${res ? ` Elvis answered off ${esc(res)}.` : ''}</p>
+        ${pathMoreHtml('path-elvis', 'Where they disagree, and how they were compared', `
         <p>Worst ground disagreement <strong>${e.worstD >= 0 ? '+' : ''}${e.worstD.toFixed(1)} m</strong>${
           e.worstAt != null ? ` at ${(e.worstAt / 1000).toFixed(1)} km` : ''} — Elvis reads
           ${e.worstD >= 0 ? 'higher' : 'lower'} there. Clearance at the worst point:
@@ -965,7 +990,7 @@ const PathProfile = (function () {
         <p>Both figures above are re-analysed on those ${e.asked} points, so the difference
           between them is the elevation model and not the sampling. The verdict at the top of
           this card is the full ${SAMPLES}-point run and may differ from either.
-          ${esc(Elvis.attribution)}.</p>
+          ${esc(Elvis.attribution)}.</p>`)}
       </div>`;
   }
 
@@ -1388,20 +1413,24 @@ const PathProfile = (function () {
                     onclick="PathProfile.openFull()"
                     title="Open the chart full screen, with the figures beside it">⛶ Full screen</button>`}
         </div>
-        ${sigOn ? `<p class="filter-hint path-sig-note">The signal runs A → B (⇄ Flip direction for B → A), priced
-          the way the fade margin is: the same model over the ground from the transmitter to each point on the line, for a
-          receiver like the far end's standing on the line there. It fades with distance, drops where ${
-          an.model === 'cover' && an.coverUsed ? 'ground or cover' : 'the ground'} reaches into the Fresnel zone, stays down in the
-          shadow behind it, and reaches B in the colour of the A→B fade margin. Point at the chart, or along the
-          line on the map, for the figure at that point.${
-          an.model === 'cover' || !an.coverUsed ? ''
-            : ' Under the field model the cover is drawn but not priced along the way — its average cost is in the allowance; the land-cover model, in the link budget\'s propagation settings, prices it where it stands.'}</p>` : ''}
-        ${flat ? '' : zoneWhyHtml(an, sigOn, scale)}
-        <p class="filter-hint">${esc(prof.attribution)} · ${prof.lidar ? `~${prof.resolution_m} m tiles read every ${
-          Math.round(prof.distance_m[1] - prof.distance_m[0])} m` : `sampled every ~${prof.resolution_m} m`} at zoom ${prof.zoom} over ${prof.tiles} tile${prof.tiles === 1 ? '' : 's'}${
-          prof.capped ? ', zoom reduced to stay inside the tile budget for a path this long' : ''}.${lidarNote()}${
-          an.coverUsed && cur.cover ? ` ${esc(LandCover.attribution)}${cur.cover.year !== 'seeded' ? ` (${cur.cover.year})` : ''}, on the same sample points.${
-          an.canopyUsed ? ` ${esc(LandCover.canopyAttribution)}.` : ''}` : ''}</p>
+        <!-- What the chart is drawn from and how to read it, for whoever asks:
+             the key above is what reading it needs. -->
+        ${pathMoreHtml('path-chart', flat ? 'Where the ground comes from'
+          : `About this chart — ${sigOn ? 'the signal’s colours, ' : ''}the ellipse, where the ground comes from`, `
+          ${sigOn ? `<p class="filter-hint path-sig-note">The signal runs A → B (⇄ Flip direction for B → A), priced
+            the way the fade margin is: the same model over the ground from the transmitter to each point on the line, for a
+            receiver like the far end's standing on the line there. It fades with distance, drops where ${
+            an.model === 'cover' && an.coverUsed ? 'ground or cover' : 'the ground'} reaches into the Fresnel zone, stays down in the
+            shadow behind it, and reaches B in the colour of the A→B fade margin. Point at the chart, or along the
+            line on the map, for the figure at that point.${
+            an.model === 'cover' || !an.coverUsed ? ''
+              : ' Under the field model the cover is drawn but not priced along the way — its average cost is in the allowance; the land-cover model, in the link budget\'s propagation settings, prices it where it stands.'}</p>` : ''}
+          ${flat ? '' : zoneWhyHtml(an, sigOn, scale)}
+          <p class="filter-hint">${esc(prof.attribution)} · ${prof.lidar ? `~${prof.resolution_m} m tiles read every ${
+            Math.round(prof.distance_m[1] - prof.distance_m[0])} m` : `sampled every ~${prof.resolution_m} m`} at zoom ${prof.zoom} over ${prof.tiles} tile${prof.tiles === 1 ? '' : 's'}${
+            prof.capped ? ', zoom reduced to stay inside the tile budget for a path this long' : ''}.${lidarNote()}${
+            an.coverUsed && cur.cover ? ` ${esc(LandCover.attribution)}${cur.cover.year !== 'seeded' ? ` (${cur.cover.year})` : ''}, on the same sample points.${
+            an.canopyUsed ? ` ${esc(LandCover.canopyAttribution)}.` : ''}` : ''}</p>`)}
       </div>`;
   }
 
@@ -1598,10 +1627,12 @@ const PathProfile = (function () {
       return `<span class="txt-warn">not computed</span> <span class="small">${why}</span>`;
     }
     const cls = lbMarginClass(r.m);
-    const worst = r.ab <= r.ba ? `${esc(a.name)} → ${esc(b.name)}` : `${esc(b.name)} → ${esc(a.name)}`;
-    return `<span class="txt-${cls.cls}">${
+    // Which way round is the worse is plain from the two figures, so it is
+    // said on pointing rather than in the line.
+    const worst = r.ab <= r.ba ? `${a.name} → ${b.name}` : `${b.name} → ${a.name}`;
+    return `<span class="txt-${cls.cls}" title="${escAttr(`The worse way round, ${worst}`)}">${
       r.m > 0 ? '+' : ''}${r.m.toFixed(1)} dB</span>
-      <span class="small">${esc(cls.label.toLowerCase())} · worse way round is ${worst} ·
+      <span class="small">${esc(cls.label.toLowerCase())} ·
         ${r.ab > 0 ? '+' : ''}${r.ab.toFixed(1)} / ${r.ba > 0 ? '+' : ''}${r.ba.toFixed(1)} dB A→B / B→A</span>`;
   }
 
@@ -2081,24 +2112,29 @@ const PathProfile = (function () {
           <div><dt>Path</dt><dd class="path-ends" title="${escAttr(`${a.name} → ${b.name}`)}"><span>${
             esc(a.name)}</span><span>${esc(b.name)}</span></dd></div>
           <div><dt>Distance</dt><dd>${fmtKm(an.D / 1000)}</dd></div>
-          <div><dt>Frequency</dt><dd>${an.fMhz.toFixed(3)} MHz</dd></div>
-          <div><dt>Worst Fresnel</dt><dd>${w.clearance >= 0
-            ? `${Math.round(w.clearance)} m under the line · ${w.ratio.toFixed(2)}&nbsp;F1`
-            : `<span class="txt-bad">${worstWhat} ${Math.round(-w.clearance)} m above the line</span>`}
-            <span class="small">at ${fmtKm(w.d1 / 1000)}</span></dd></div>
-          <div><dt>Into 60% zone</dt><dd>${an.intrusion_m > 0
-            ? `${Math.round(an.intrusion_m)} m` : 'nothing'}</dd></div>
-          <div><dt>Elevation angle</dt><dd>${an.elevA_deg.toFixed(3)}° / ${an.elevB_deg.toFixed(3)}°
-            <span class="small">A→B / B→A</span></dd></div>
+          <div><dt>Fade margin</dt><dd>${marginCellHtml(an, a, b)}</dd></div>
           <div><dt>Path loss</dt><dd>${an.pathLoss_db != null
             ? `${an.pathLoss_db.toFixed(1)} dB <span class="small">${esc(itm.modeLabel.toLowerCase())}, ${(an.pathLoss_db - an.fspl_db).toFixed(1)} dB over free space</span>`
             : `<span class="txt-warn">not computed</span> <span class="small">${esc(an.itmError || '')}</span>`}</dd></div>
-          <div><dt>Fade margin</dt><dd>${marginCellHtml(an, a, b)}</dd></div>
           <div><dt>Obstructions</dt><dd>${an.obstructions.length
             ? an.obstructions.slice(0, 3).map(o => `${o.byCover ? 'cover' : 'ground'} +${Math.round(-o.peak.clearance)} m at ${fmtKm(o.peak.d1 / 1000)}`).join(', ')
               + (an.obstructions.length > 3 ? ` and ${an.obstructions.length - 3} more` : '')
             : 'none above the line'}</dd></div>
         </dl>
+        <!-- The geometry the verdict is read off, for whoever wants to see it
+             read: the verdict above already says what it came to. -->
+        ${pathMoreHtml('path-figures', 'More figures — Fresnel clearance, elevation angles, frequency', `
+          <dl class="path-stats">
+            <div><dt>Worst Fresnel</dt><dd>${w.clearance >= 0
+              ? `${Math.round(w.clearance)} m under the line · ${w.ratio.toFixed(2)}&nbsp;F1`
+              : `<span class="txt-bad">${worstWhat} ${Math.round(-w.clearance)} m above the line</span>`}
+              <span class="small">at ${fmtKm(w.d1 / 1000)}</span></dd></div>
+            <div><dt>Into 60% zone</dt><dd>${an.intrusion_m > 0
+              ? `${Math.round(an.intrusion_m)} m` : 'nothing'}</dd></div>
+            <div><dt>Elevation angle</dt><dd>${an.elevA_deg.toFixed(3)}° / ${an.elevB_deg.toFixed(3)}°
+              <span class="small">A→B / B→A</span></dd></div>
+            <div><dt>Frequency</dt><dd>${an.fMhz.toFixed(3)} MHz</dd></div>
+          </dl>`)}
       </div>`;
   }
 
@@ -2218,15 +2254,28 @@ const PathProfile = (function () {
               ? 'default · repeater channel' : 'default · network band'}</b>
         </label>
       </div>
-      <p class="filter-hint">The link budget below works from these same figures: change one in either card and
-        both follow, and so does the radio path card above when one is open. Blank a box to put its default back.</p>
+      <p class="filter-hint">Shared with the link budget — a change in either card shows in both. Blank a box for its default.</p>
       <label class="filter-check">
         <input type="checkbox" id="path-cover-switch" ${P().cover ? 'checked' : ''}
                onchange="PathProfile.setCover(this.checked)">
         Ground cover — trees, buildings and crops stood on the terrain
       </label>
-      <p class="small path-cover-note" id="path-cover-status">${coverStatusHtml(an)}</p>
-      ${P().cover ? coverTableHtml() : ''}`;
+      ${pathMoreHtml('path-cover', coverSummaryHtml(), `
+        <p class="small path-cover-note" id="path-cover-status">${coverStatusHtml(an)}</p>
+        ${P().cover ? coverTableHtml() : ''}`)}`;
+  }
+
+  // The cover layer's state in a few words — the summary of the disclosure
+  // that holds what it says in full and the heights each class stands at.
+  function coverSummaryHtml() {
+    if (!P().cover) return '<span class="txt-warn">Cover off — the chart is bare ground</span>';
+    switch (cur.coverStatus) {
+      case 'lidar':   return 'Cover not drawn on the LiDAR ground';
+      case 'loading': return 'Sampling land cover…';
+      case 'failed':  return '<span class="txt-bad">Cover unavailable — drawn bare</span>';
+      case 'ready':   return `Cover drawn${cur.cover && cur.cover.missing ? ', with gaps' : ''} — what it says, and the heights`;
+      default:        return 'Cover';
+    }
   }
 
   // What the chart needs for the signal along the line: the A→B margin, the
@@ -2283,7 +2332,7 @@ const PathProfile = (function () {
 
     const lifted = [[an.liftA_m, a], [an.liftB_m, b]].filter(([m]) => m > 0.5)
       .map(([m, e]) => `${esc(e.name)} ${m.toFixed(1)} m`);
-    const datum = (a.elev != null || b.elev != null) ? `
+    const datumText = (a.elev != null || b.elev != null) ? `
       <p class="filter-hint">Ends use the station's surveyed <code>elevation_ahd</code> (AHD);
         the ground between comes from tiles referenced to the EGM96 geoid. The two agree to
         about a metre over Australia — inside the ~${prof.resolution_m} m sampling error, but not the
@@ -2292,6 +2341,7 @@ const PathProfile = (function () {
         tiles round it are a surface, and an antenna below it would start the path in a pit.` : ''}</p>` : `
       <p class="filter-hint">All heights are sampled from tiles (EGM96 geoid, not AHD) — neither
         end is snapped to a station with a surveyed elevation.</p>`;
+    const datum = pathMoreHtml('path-heights', 'About the heights — survey and terrain datums', datumText);
 
     shown = { an, prof, a, b, flat: false, sig: signalIn(an, a, b), warn, datum };
     return `

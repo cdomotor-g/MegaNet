@@ -926,6 +926,35 @@ if (shared) {
        && af.pathTx === b0.pathTx && af.pathFlag !== 'edited', JSON.stringify(af));
 }
 
+// Shown on asking: the cards carry the answer, and the explaining behind a
+// click. The budget's answer block says the figure the corner chip says; the
+// working, the profile's geometry and the chart's notes start shut, their
+// words still in the page; and a disclosure opened stays open through the
+// repaint a changed figure causes, then shuts when asked.
+const more = await page.evaluate(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const d = id => document.querySelector(`[data-more="${id}"]`);
+  const shut = ['lb-working', 'lb-model', 'path-figures', 'path-chart', 'path-heights'].map(id => [id, d(id) ? d(id).open : null]);
+  const result = (document.querySelector('.lb-result-db') || {}).textContent;
+  const chip = (document.getElementById('lb-margin-chip') || {}).textContent;
+  const tableInPage = !!(d('lb-working') && d('lb-working').querySelector('.lb-table .lb-margin'));
+  d('lb-working').open = true;
+  await sleep(50);                         // toggle is dispatched a task later
+  LinkBudget.setField('a', 'tx_w', '3');
+  const kept = d('lb-working').open && state.link.more['lb-working'] === true;
+  d('lb-working').open = false;
+  await sleep(50);
+  LinkBudget.setField('a', 'tx_w', '');
+  return { shut, result, chip, tableInPage, kept, shutAgain: d('lb-working').open === false && !state.link.more['lb-working'] };
+});
+ok('the link budget\'s answer says the corner chip\'s figure', !!more.result && more.result === more.chip,
+   `${more.result} against ${more.chip}`);
+ok('…the working, the model note, the profile\'s geometry, the chart\'s notes and the datums start shut',
+   more.shut.every(([, open]) => open === false), JSON.stringify(more.shut));
+ok('…with the term-by-term table still in the page behind the working', more.tableInPage);
+ok('a disclosure opened stays open through a repaint, and shuts when asked',
+   more.kept && more.shutAgain, JSON.stringify(more));
+
 // Full screen: the same chart, drawn again at the size the window gives it,
 // with the readout over it — and only one chart in the page at a time, since
 // its parts are found by id.

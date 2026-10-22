@@ -17,8 +17,8 @@
 // tableStations; and sideways to path-profile.js for stationAntenna, pathPropOf, PATH_DEFAULT_MHZ,
 // PATH_VERDICT, fsplDb, wattsToDbm, rmSystemOf, the radio at each end
 // (radioKey, radioOver, radioDefaults, radioChanged and radioCommit — the
-// figures this card shares with the profile and the radio-path card) and
-// PathProfile, to map-draw.js for MapDraw and to terrain.js for Terrain. See
+// figures this card shares with the profile and the radio-path card),
+// pathMoreHtml (the explaining behind a click) and PathProfile, to map-draw.js for MapDraw and to terrain.js for Terrain. See
 // path-profile.js's header for why the mutual reference constrains nothing.
 //
 // app.js calls back in two places, and both are named here because neither is
@@ -763,7 +763,14 @@ const LinkBudget = (function () {
       if (!(db > 0)) return `${esc(e.name)} stands in ${esc(c.label.toLowerCase())}${R > 0 ? ` (${Math.round(R)} m)` : ''} — antenna at ${agl} m is ${R > 0 ? 'above it' : 'in the clear'}`;
       return `${esc(e.name)}: antenna at ${agl} m is <strong>under ${Math.round(R)} m of ${esc(c.label.toLowerCase())}</strong> — P.2108 terminal clutter`;
     };
+    // The answer and anything wrong with it stay out; the term-by-term
+    // working, the verdict's reasons and the model's other figures are behind
+    // "Show the working" (pathMoreHtml) — every word of it still there, and
+    // the table foot still saying in full what the short note here says.
     return `
+      ${resultHtml(r, { m, blockedNoModel, noPath })}
+      ${divergenceHtml(r)}
+      ${pathMoreHtml('lb-working', 'Show the working — every gain and loss, and the model’s other figures', `
       <div class="table-wrap">
       <table class="lb-table">
         <caption class="sr-only">The link budget, term by term — each gain and loss between the transmitter and the receiver, and the margin they add up to</caption>
@@ -867,8 +874,39 @@ const LinkBudget = (function () {
           ${an.model === 'field' && itm && an.coverUsed && an.verdictBare !== an.verdict
             ? `On the bare ground it is <strong>${PATH_VERDICT[an.verdictBare].label.toLowerCase()}</strong> — the ground the
                field model prices, its allowance carrying what the cover costs on average.` : ''}</p>` : ''}
-      ${readoutHtml(r)}
-      ${divergenceHtml(r)}`;
+      ${readoutHtml(r)}`)}`;
+  }
+
+  // The answer, as somebody who opened the card for it needs it: the fade
+  // margin in its band's colour and words, which way it was priced, and one
+  // line under it — what was received against what is needed, or, where the
+  // figure cannot be taken at its word, why not. The same cases, in the same
+  // order, as the table foot's own note, said shorter.
+  function resultHtml(r, { m, blockedNoModel, noPath }) {
+    const a = S().a, b = S().b;
+    const cls = blockedNoModel || noPath ? 'bad' : m ? m.cls : '';
+    const fig = r.margin == null ? '—' : `${r.margin > 0 ? '+' : ''}${r.margin.toFixed(1)} dB`;
+    const label = noPath ? 'No path' : blockedNoModel ? 'Obstructed' : m ? m.label : 'Not computed';
+    const db = v => `${v.toFixed(1)}`;
+    const note = noPath
+      ? 'Both ends are in the same place — move one of them.'
+      : r.margin == null
+        ? (r.missing.length
+            ? `No figure for ${esc(fmtList(r.missing))} — fill ${r.missing.length === 1 ? 'it' : 'them'} in above.`
+            : 'Fill in the missing figures above for a margin.')
+        : blockedNoModel
+          ? '<span class="txt-bad">The ground blocks the line of sight and the model did not run — one knife edge stands in, and it understates a blocked path badly.</span>'
+          : r.fsplOnly
+            ? `<span class="txt-warn">Free space only — the ground is not in it yet.</span>
+               <button type="button" class="lb-link" onclick="LinkBudget.profileThis()">Profile this path</button>`
+            : `${esc(m.note)} Received ${db(r.rxDbm)} dBm against a ${db(r.thr)} dBm threshold; path loss ${db(r.pathLoss)} dB.${
+                r.an && !r.itm ? ' <span class="txt-warn">The model could not run — one knife edge stands in.</span>' : ''}`;
+    return `
+      <div class="lb-result ${cls}">
+        <p class="lb-result-head"><b class="lb-result-db">${fig}</b> <strong>${esc(label)}</strong>
+          <span class="small">fade margin, ${esc(a.name)} → ${esc(b.name)}</span></p>
+        <p class="small lb-result-note">${note}</p>
+      </div>`;
   }
 
   // Microvolts into 50 Ω, in the units a receiver's data sheet uses.
@@ -1142,11 +1180,16 @@ const LinkBudget = (function () {
     const S_ = S();
     const r = compute();
     return `
+      <!-- Still never dismissed, and still saying the two things that matter
+           most in so many words — it is a model, and it can be out — so the
+           figure is never read as more than it is. What the model is and
+           leaves out is the click under it. -->
       <div class="lb-disclaimer" role="alert">
-        ⚠️ <strong>A model, not a measurement.</strong> ${pathPropOf().model === 'cover'
+        ⚠️ <strong>A model, not a measurement.</strong> ${pathPropOf().model === 'cover' ? ''
+          : 'Any one path can be ±10 dB. '}Confirm on air before building on the figure.
+        ${pathMoreHtml('lb-model', 'What it models, and what it leaves out', pathPropOf().model === 'cover'
           ? 'Longley–Rice over sampled terrain and land cover, at the reliability set below. Antenna patterns, interference and the trees the map missed are not in it.'
-          : 'Longley–Rice over sampled terrain, less an allowance fitted to path margins measured on site, at the reliability set below. Right on average across a network; any one path can be ±10 dB, and antenna patterns and interference are not in it.'}
-        Confirm on air before building on the figure.
+          : 'Longley–Rice over sampled terrain, less an allowance fitted to path margins measured on site, at the reliability set below. Right on average across a network; any one path can be ±10 dB, and antenna patterns and interference are not in it.')}
       </div>
       <div class="lb-controls">
         <label class="filter-check">
@@ -1171,19 +1214,28 @@ const LinkBudget = (function () {
                 ${S_.a || S_.b || findQ('a').trim() || findQ('b').trim() ? '' : 'disabled'}
                 >Clear both ends</button>
       </div>
-      <p class="filter-hint">${S_.target
-        ? `Every value below can be overridden, whichever way an end was picked.`
+      <!-- How to fill an end, while one is still to be filled; once both are
+           in, the boxes are what the card is for. -->
+      ${S_.a && S_.b && !S_.target && !S_.picking ? '' : `<p class="filter-hint">${S_.target
+        ? `End ${S_.target.toUpperCase()} is waiting: pick a station or a spot on the map, a row in the list, or search in its box.`
         : S_.picking
-          ? 'Click a station to fill it in from its Radio Mobile system, or click empty ground for a hypothetical site. Every value below can be overridden.'
-          : 'Search for either end below, or set both from a line drawn in Draw &amp; measure.'}
-        The figures at each end and the frequency are the elevation profile’s too: change one in either card and
-        both follow, and so does the radio path card when one is open.</p>
+          ? 'Click a station to fill it in from its Radio Mobile system, or click empty ground for a hypothetical site.'
+          : 'Search for either end below, or set both from a line drawn in Draw &amp; measure.'}</p>`}
       <div class="lb-ends">
         ${endpointCard('a', S_.a)}
         ${endpointCard('b', S_.b)}
       </div>
-      ${propHtml()}
+      ${S_.a || S_.b ? pathMoreHtml('lb-figures', 'About these figures', `
+        <p class="filter-hint">Every value can be overridden, whichever way an end was picked: <em>default</em> is the
+          station's own radio system, <em>assumed</em> a hypothetical site's starting figure, <em>edited</em> one typed in.
+          Blank a box to put its default back.</p>
+        <p class="filter-hint">The figures at each end and the frequency are the elevation profile’s too: change one in
+          either card and both follow, and so does the radio path card when one is open. A figure typed for a station stays
+          with it — at the end of another path too — until it is blanked, or <em>Put back</em> under its end is pressed.</p>`) : ''}
+      <!-- The answer under the figures it is worked from; the model's own
+           settings, which most people never change, after it. -->
       ${r ? budgetHtml(r) : '<p class="filter-note">Set both ends to see a budget.</p>'}
+      ${propHtml()}
       ${comparisonHtml()}`;
   }
 

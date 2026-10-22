@@ -6856,6 +6856,41 @@ hr {
   margin: .4rem 0 0;
 }
 
+/* "Shown on asking" (pathMoreHtml, path-profile.js): the explaining behind
+   the path tools' figures, one click away. The summary reads as a link, the
+   size of the notes it stands in for; opened, its body reads as those notes
+   always did. */
+.path-more { margin: .35rem 0; }
+.path-more > summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: .8rem;
+}
+.path-more[open] > summary { margin-bottom: .25rem; }
+.path-more-body > :first-child { margin-top: 0; }
+.lb-disclaimer .path-more { margin: .3rem 0 0; }
+
+/* The link budget's answer, above its working: the profile's verdict box,
+   with the figure in the band's colour. */
+.lb-result {
+  padding: .45rem .65rem;
+  border-radius: 5px;
+  border-left: 4px solid var(--muted);
+  background: var(--panel-sub);
+  margin: .6rem 0 .3rem;
+}
+.lb-result p { margin: 0; }
+.lb-result-head { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.lb-result-db { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.lb-result-head .small { color: var(--muted); }
+.lb-result .lb-result-note { margin-top: .2rem; color: var(--muted); }
+.lb-result.ok   { border-left-color: var(--ok);   }
+.lb-result.warn { border-left-color: var(--warn); }
+.lb-result.bad  { border-left-color: var(--bad);  }
+.lb-result.ok   .lb-result-db, .lb-result.ok   strong { color: var(--ok);   }
+.lb-result.warn .lb-result-db, .lb-result.warn strong { color: var(--warn); }
+.lb-result.bad  .lb-result-db, .lb-result.bad  strong { color: var(--bad);  }
+
 .lb-compare {
   margin-top: .7rem;
   border-top: 1px solid var(--border);
