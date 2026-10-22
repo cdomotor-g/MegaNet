@@ -2433,6 +2433,16 @@ td {
   margin-top: var(--sp-2);
 }
 
+/* Bit-Flip Sources (flip-sources.js): what a verdict means is in its title, so
+   it is underlined the way an abbreviation is; the key under the table says
+   the same to a finger, a keyboard and a screen reader. */
+.fs-verdict { text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
+.fs-key { margin-top: var(--sp-2); font-size: var(--fs-sm); }
+.fs-key summary { cursor: pointer; color: var(--muted); }
+.fs-key dl { margin: var(--sp-2) 0 0; }
+.fs-key dt { font-weight: 600; }
+.fs-key dd { margin: 0 0 var(--sp-2); }
+
 .bf-td-match { text-align: center; }
 
 /* Role and station-of-interest pills inside the map popups. The hue arrives as

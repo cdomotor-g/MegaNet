@@ -58,13 +58,41 @@ const FlipSources = (() => {
     const nr = Number(d && d.network_rate);
     return c.rate != null && nr > 0 ? Number(c.rate) / nr : null;
   }
+  // The verdicts, most suspect first, and what each means — said in the
+  // verdict's title and again in the key under the table, since a finger does
+  // not hover. `net` is the network's rate. Rank 2's word is the row's own
+  // multiple; the one here is the key's.
+  const VERDICTS = [
+    { cls: 'txt-bad', word: 'Caught by its carrier',
+      means: () => 'Five or more corrupted copies came on this repeater\'s own carrier, as strong as the clean copy: it sent the wrong bits — '
+        + 'its radio, or interference its receiver heard. The strongest evidence here; look at it first.' },
+    { cls: 'txt-warn', word: 'Seen by its carrier',
+      means: () => 'Corrupted copies came on this repeater\'s carrier, but fewer than five as strong as the clean copy. A lead, not proof: '
+        + 'one much weaker than the clean copy may be the base station mishearing it.' },
+    { cls: 'txt-warn', word: '2× the network\'s rate or more',
+      means: net => `Nothing on its carrier, but its rate is at least twice the network's ${net}, on a share of 10 or more by pass range. `
+        + 'Circumstantial, but it stands out from the repeaters around it.' },
+    { cls: '', word: 'Above the network',
+      means: net => `Nothing on its carrier; its rate is at least 1.3 times the network's ${net}, on a share of 5 or more by pass range. `
+        + 'Worth a look once the ones above it are cleared.' },
+    { cls: 'txt-muted', word: 'Within the usual',
+      means: net => `Nothing on its carrier, and its rate is close to the network's ${net} — or its share is under 5, too few to tell. `
+        + 'A big share with this verdict comes from a broad pass range, not a fault.' },
+  ];
   function verdict(c, d) {
-    if (Number(c.clear) >= 5) return { cls: 'txt-bad', word: 'Caught by its carrier', rank: 0 };
-    if (Number(c.by_carrier) > 0) return { cls: 'txt-warn', word: 'Seen by its carrier', rank: 1 };
+    const v = rank => ({ cls: VERDICTS[rank].cls, word: VERDICTS[rank].word, rank });
+    if (Number(c.clear) >= 5) return v(0);
+    if (Number(c.by_carrier) > 0) return v(1);
     const r = ratio(c, d);
-    if (r != null && r >= 2 && Number(c.blame) >= 10) return { cls: 'txt-warn', word: `${r.toFixed(1)}× the network's rate`, rank: 2 };
-    if (r != null && r >= 1.3 && Number(c.blame) >= 5) return { cls: '', word: 'Above the network', rank: 3 };
-    return { cls: 'txt-muted', word: 'Within the usual', rank: 4 };
+    if (r != null && r >= 2 && Number(c.blame) >= 10) return Object.assign(v(2), { word: `${r.toFixed(1)}× the network's rate` });
+    if (r != null && r >= 1.3 && Number(c.blame) >= 5) return v(3);
+    return v(4);
+  }
+  const means = (v, d) => VERDICTS[v.rank].means(pct(d && d.network_rate));
+  function keyHtml(d) {
+    return `<details class="fs-key"><summary>What the verdicts mean</summary>
+      <dl>${VERDICTS.map((v, i) => `<dt${v.cls ? ` class="${v.cls}"` : ''}>${esc(v.word)}</dt><dd>${esc(means({ rank: i }, d))}</dd>`).join('')}</dl>
+    </details>`;
   }
   function ranked(d) {
     return (d.candidates || []).slice().sort((a, b) => verdict(a, d).rank - verdict(b, d).rank
@@ -127,10 +155,11 @@ const FlipSources = (() => {
             <td class="num">${num(c.stations)}</td>
             <td class="num">${num(c.carried)}</td>
             <td class="num">${pct(c.rate)}${r != null ? `<br><span class="small">${r.toFixed(1)}×</span>` : ''}</td>
-            <td><span class="${v.cls}">${esc(v.word)}</span></td>
+            <td><span class="fs-verdict ${v.cls}" title="${esc(means(v, d))}">${esc(v.word)}</span></td>
           </tr>`;
         }).join('')}</tbody></table></div>
-      ${rows.length > shown.length ? `<p><button class="btn" onclick="FlipSources.showAll('suspects')">Show all ${num(rows.length)}</button></p>` : ''}`;
+      ${rows.length > shown.length ? `<p><button class="btn" onclick="FlipSources.showAll('suspects')">Show all ${num(rows.length)}</button></p>` : ''}
+      ${keyHtml(d)}`;
   }
 
   function selectedHtml(d) {
@@ -215,7 +244,8 @@ const FlipSources = (() => {
         <p class="small"><b>By carrier</b> is definite: the corrupted copy arrived on that repeater's carrier (clear ones as strong as the clean copy, so it
           sent the wrong bits). <b>Share by pass range</b> splits each corrupted copy between every repeater that passes its address — a broad range collects
           a big share just by passing many stations, so read it against <b>Carried</b> (everything heard from the addresses it passes, split the same way):
-          the <b>Rate</b> is the one to compare, against the network's ${pct(d.network_rate)}. <b>Only it could have</b> counts copies no other repeater passes.</p>
+          the <b>Rate</b> is the one to compare, against the network's ${pct(d.network_rate)}. <b>Only it could have</b> counts copies no other repeater passes.
+          The <b>Verdict</b> weighs them together: point at one for what it means, or open the key under the table.</p>
         ${suspectsHtml(d)}
       </div>
       <div class="panel">

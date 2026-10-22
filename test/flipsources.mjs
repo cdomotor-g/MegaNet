@@ -6,7 +6,8 @@
 //      period switch, a repeater picked and the tab re-entered ask nothing more.
 //   2. **The ranking** — a repeater caught by its carrier comes before one
 //      that only carries a big pass-range share; a broad repeater whose share
-//      is big but whose rate is the network's is "within the usual".
+//      is big but whose rate is the network's is "within the usual"; each
+//      verdict says what it means in its title, and a key under the table.
 //   3. **A repeater picked** — its corrupted stations listed, joined to it on
 //      the map, and picked again, let go.
 //   4. **The exports** — floodnet-named CSVs with the suspects and the readings.
@@ -105,6 +106,15 @@ try {
   ok('caught by its carrier comes first', rows[0] && rows[0].name === st.reps[0].name && rows[0].verdict === 'Caught by its carrier', JSON.stringify(rows));
   ok('twice the network\'s rate comes next', rows[1] && rows[1].name === st.reps[2].name && /2\.4× the network/.test(rows[1].verdict), JSON.stringify(rows));
   ok('the biggest share at the network\'s rate is within the usual', rows[2] && rows[2].name === st.reps[1].name && rows[2].verdict === 'Within the usual', JSON.stringify(rows));
+  const meant = await page.evaluate(() => ({
+    tips: [...document.querySelectorAll('.fs-suspects tbody td:last-child .fs-verdict')].map(s => s.getAttribute('title') || ''),
+    key: [...document.querySelectorAll('.fs-key dt')].map(dt => dt.textContent.trim()),
+    keyText: (document.querySelector('.fs-key') || {}).textContent || '',
+  }));
+  ok('each verdict says what it means when pointed at', meant.tips.length === rows.length && /as strong as the clean copy/.test(meant.tips[0])
+    && /twice the network's 1\.0%/.test(meant.tips[1]) && /broad pass range/.test(meant.tips[2]) && !meant.tips.some(t => /\\/.test(t)), JSON.stringify(meant.tips));
+  ok('…and the key under the table says it for a finger', meant.key.length === 5 && meant.key[0] === 'Caught by its carrier' && meant.key[4] === 'Within the usual'
+    && /What the verdicts mean/.test(meant.keyText), JSON.stringify(meant.key));
 
   // ── 3. a repeater picked ──────────────────────────────────────────────────
   await page.locator('.fs-suspects tbody tr').first().locator('th button').click();
