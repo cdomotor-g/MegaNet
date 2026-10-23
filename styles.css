@@ -19549,6 +19549,242 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
   .be-cv--wide { height: 230px; }
 }
 
+/* ── 📟 SWR Meter (swr-model.js, swr-meter.js) ──────────────────────────────
+   The Knowledge base's lesson on through-line power and SWR meters: a bench
+   (the line, drawn in SVG with dots for the power each way, and the meter
+   picked, drawn after the real one with its readings written on its screen),
+   then six panels. The meters are drawn in their own colours, which do not
+   change with the theme — a black meter is black in the dark too; everything
+   around them (the cables, the words, the dots) takes the theme's. */
+.swm-page h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); line-height: var(--lh-tight); }
+.swm-page h4 { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-md); }
+.swm-page p { margin: 0 0 var(--sp-3); max-width: 62rem; line-height: var(--lh-body); }
+.swm-hero { display: grid; gap: var(--sp-3); }
+.swm-title { margin: 0; font-size: var(--fs-xl); line-height: var(--lh-tight); }
+.swm-hero .swm-lede { margin: 0; font-size: var(--fs-md); }
+.swm-sec { min-width: 0; }
+.swm-muted, .swm-aside { color: var(--muted); }
+.swm-aside { font-size: var(--fs-sm); }
+.swm-page p.swm-short { color: var(--muted); font-size: var(--fs-md); }
+.swm-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--sp-2);
+}
+.swm-fact {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--sp-2);
+  align-items: baseline;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+}
+.swm-fact-icon { grid-row: span 3; font-size: 1.3rem; }
+.swm-fact-big { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.swm-fact-what { font-weight: 600; font-size: var(--fs-sm); }
+.swm-fact-why { color: var(--muted); font-size: var(--fs-sm); line-height: 1.35; }
+.swm-toc { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
+.swm-toc-btn { font-size: var(--fs-sm); }
+
+/* 1 · The bench: the meters to pick from, the drawings, the controls. */
+.swm-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.swm-pick-btn {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  column-gap: var(--sp-2);
+  align-items: center;
+  text-align: left;
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.swm-pick-btn svg { grid-row: span 2; width: 64px; height: 40px; }
+.swm-pick-btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.swm-pick-btn:hover { border-color: var(--accent); }
+.swm-pick-name { font-weight: 600; }
+.swm-pick-band { font-size: var(--fs-sm); color: var(--muted); }
+.swm-pick-btn--wrong .swm-pick-band { color: var(--bad); }
+.swm-bench-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: var(--sp-3) var(--sp-4); align-items: start; }
+.swm-stage { display: grid; gap: var(--sp-3); min-width: 0; }
+.swm-fig { margin: 0; min-width: 0; }
+.swm-line, .swm-dev { display: block; width: 100%; height: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); }
+.swm-line--tall { max-width: 420px; margin: 0 auto; }
+.swm-dev { max-width: 600px; margin: 0 auto; }
+.swm-cap { margin-top: var(--sp-1); color: var(--muted); font-size: var(--fs-sm); line-height: var(--lh-body); max-width: 62rem; }
+.swm-key { font-weight: 700; }
+.swm-key--f { color: var(--accent); }
+.swm-key--r { color: var(--bad); }
+.swm-controls { display: grid; gap: var(--sp-2); align-content: start; min-width: 0; }
+.swm-controls p { margin: 0; }
+.swm-fs { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); margin: 0; min-width: 0; display: grid; gap: var(--sp-1); }
+.swm-fs legend, .swm-cal > label { font-weight: 600; font-size: var(--fs-sm); padding: 0 .25rem; }
+.swm-radios { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); }
+.swm-radio, .swm-check { display: inline-flex; align-items: center; gap: .4rem; font-size: var(--fs-sm); min-height: 2rem; }
+.swm-src-body { display: grid; gap: var(--sp-2); }
+.swm-in { display: grid; gap: .2rem; font-size: var(--fs-sm); min-width: 0; }
+.swm-in > span:first-child { font-weight: 600; }
+.swm-in-row { display: flex; align-items: center; gap: .35rem; }
+.swm-in-row input { width: 100%; max-width: 8rem; min-width: 0; }
+.swm-in--wide select { width: 100%; }
+.swm-in select { max-width: 100%; }
+.swm-unit { color: var(--muted); white-space: nowrap; }
+.swm-in-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: var(--sp-2); }
+.swm-in-grid--2 { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.swm-hint { color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
+.swm-page p.swm-story { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.swm-page .swm-src-body p.swm-hint { margin: 0; font-size: var(--fs-sm); }
+.swm-cal-row { display: flex; align-items: center; gap: var(--sp-2); }
+.swm-cal-row input[type="range"] { flex: 1; min-width: 0; }
+.swm-sm { min-width: 2.4rem; padding: .2rem .55rem; }
+.swm-page p.swm-dev-status { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+
+/* The drawings' theme-following parts: words, cables, dots, the mast. */
+.swm-t { fill: var(--text); font-size: 15px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+.swm-t--s { fill: var(--muted); font-size: 13px; }
+.swm-t--b { font-weight: 700; }
+.swm-t--f { fill: var(--accent); font-weight: 600; font-size: 14px; }
+.swm-t--r { fill: var(--bad); font-weight: 600; font-size: 14px; }
+.swm-line--wide .swm-t { font-size: 17px; }
+.swm-line--wide .swm-t--s { font-size: 15px; }
+.swm-line--wide .swm-t--f, .swm-line--wide .swm-t--r { font-size: 16px; }
+.swm-coupler .swm-t { font-size: 19px; }
+.swm-coupler .swm-t--s { font-size: 17px; }
+.swm-coax, .swm-mcoax { stroke: color-mix(in srgb, var(--text) 78%, var(--panel)); stroke-width: 10; stroke-linecap: round; }
+.swm-coax--feed { stroke-width: 12; }
+.swm-mcoax { stroke-width: 15; stroke-linecap: butt; }
+.swm-core, .swm-mcore { stroke: var(--panel); stroke-width: 2.5; opacity: .55; }
+.swm-mcore { stroke-width: 3; }
+.swm-core--wet { stroke: #4aa3df; stroke-width: 4; stroke-dasharray: 5 4; opacity: .9; }
+.swm-radio-box { fill: color-mix(in srgb, var(--text) 7%, var(--panel)); stroke: var(--muted); stroke-width: 1.5; }
+.swm-led { fill: var(--muted); }
+.swm-led--on { fill: var(--ok); }
+.swm-ln-mbox { fill: #24262a; stroke: var(--muted); }
+.swm-ln-lcd { fill: #b8c6d3; }
+.swm-ln-lcdt { fill: #1f2a36; font: 700 13px ui-monospace, Menlo, Consolas, monospace; }
+.swm-line--wide .swm-ln-lcdt { font-size: 15px; }
+.swm-mast { stroke: var(--muted); stroke-width: 5; stroke-linecap: round; }
+.swm-mast--thin { stroke-width: 2; }
+.swm-radome { fill: color-mix(in srgb, var(--text) 14%, var(--panel)); stroke: var(--muted); stroke-width: 1.5; }
+.swm-feedpt { fill: var(--accent); }
+.swm-dummy { fill: #9aa1a8; stroke: #5d646b; stroke-width: 1.5; }
+.swm-dummy-fin { stroke: #6f767d; stroke-width: 4; stroke-linecap: round; }
+.swm-arc { fill: none; stroke: var(--accent); stroke-width: 2; }
+.swm-pf { fill: var(--accent); }
+.swm-pr { fill: var(--bad); }
+
+/* The meters, in their own colours. */
+.swm-lcd { fill: #b8c6d3; }
+.swm-lcd--hf { fill: #c4bdb4; }
+.swm-lcd--cc { fill: #c5d3de; }
+.swm-lcd--off { fill: #4d5560; }
+.swm-lcd-ink { fill: #24303c; color: #24303c; }
+.swm-cc-ink { fill: #1d2a6b; color: #1d2a6b; }
+.swm-mn-arc { fill: none; stroke: #333; stroke-width: 1.2; }
+.swm-mn-tick { stroke: #333; stroke-width: 1.2; }
+.swm-mn-lab { fill: #333; font: 9px system-ui, sans-serif; }
+.swm-mn-lab--b { font-weight: 700; font-size: 10px; }
+.swm-mn-swr { fill: #b3261e; font: 700 12px system-ui, sans-serif; }
+.swm-mn-red { fill: none; stroke: #c0392b; stroke-width: 4; }
+.swm-mn-cal { fill: #b3261e; font: 700 11px system-ui, sans-serif; }
+.swm-mn-needle { stroke: #111; stroke-width: 2.4; stroke-linecap: round; }
+.swm-hot { cursor: pointer; }
+.swm-hot:hover > :first-child { filter: brightness(1.12); }
+.swm-warnflag rect { fill: var(--bad); }
+.swm-warnflag text { fill: #fff; font: 700 13px system-ui, sans-serif; }
+
+/* The verdict: the numbers, then what they mean. */
+.swm-verdict { margin-top: var(--sp-3); }
+.swm-verdict-grid { display: grid; grid-template-columns: minmax(0, 24rem) minmax(0, 1fr); gap: var(--sp-3); align-items: start; }
+.swm-page table.swm-table { table-layout: auto; }
+.swm-table td, .swm-table th { font-variant-numeric: tabular-nums; }
+.swm-table th[scope="row"] { text-align: left; }
+.swm-table--num th[scope="row"] { white-space: nowrap; }
+.swm-table:not(.swm-table--field) td:nth-child(2) { white-space: nowrap; }
+.swm-badge { display: inline-block; padding: 0 .45rem; border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 700; color: var(--text); border: 1px solid; }
+.swm-badge--ok { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, var(--panel)); }
+.swm-badge--warn { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); }
+.swm-badge--bad { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, var(--panel)); }
+.swm-finds { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.swm-find { border: 1px solid var(--border); border-left: 5px solid var(--accent); border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); background: var(--panel); }
+.swm-find--ok { border-left-color: var(--ok); }
+.swm-find--warn { border-left-color: var(--warn); }
+.swm-find--bad { border-left-color: var(--bad); }
+.swm-find h5 { margin: 0 0 var(--sp-1); font-size: var(--fs-md); }
+.swm-page .swm-find p { margin: 0 0 var(--sp-1); font-size: var(--fs-sm); }
+.swm-page .swm-find p.swm-do-h { font-weight: 600; margin-top: var(--sp-2); }
+.swm-do { margin: 0; padding-left: 1.3rem; font-size: var(--fs-sm); line-height: var(--lh-body); }
+.swm-do li { margin-bottom: .2rem; }
+.swm-page p.swm-behind, .swm-page p.swm-note, .swm-page p.swm-case-q, .swm-key-box {
+  padding: var(--sp-2) var(--sp-3); background: var(--subtle); border-radius: var(--r-sm); border-left: 4px solid var(--accent); font-size: var(--fs-sm);
+}
+.swm-page p.swm-note, .swm-page p.swm-case-q { border-left-color: var(--warn); }
+.swm-page p.swm-case-q { font-size: var(--fs-md); }
+.swm-key-box p { margin: 0; }
+
+/* 2 · Hooking it up. */
+.swm-hook-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--sp-2) var(--sp-4); }
+.swm-steps { margin: 0 0 var(--sp-2); padding-left: 1.4rem; line-height: var(--lh-body); }
+.swm-steps li { margin-bottom: var(--sp-1); }
+.swm-list { margin: 0 0 var(--sp-2); padding-left: 1.2rem; line-height: var(--lh-body); }
+.swm-list li { margin-bottom: var(--sp-1); }
+.swm-spec { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .25rem var(--sp-3); margin: var(--sp-2) 0; font-size: var(--fs-sm); }
+.swm-spec dt { font-weight: 600; }
+.swm-spec dd { margin: 0; }
+.swm-page p.swm-src { color: var(--muted); font-size: var(--fs-xs); }
+
+/* 3 · What it measures. */
+.swm-coupler { display: block; width: 100%; max-width: 680px; height: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); }
+.swm-cp-body { fill: var(--subtle); stroke: var(--border); }
+.swm-cp-main { stroke: var(--text); stroke-width: 3; }
+.swm-cp-pick { stroke: var(--accent); stroke-width: 3; }
+.swm-cp-load { fill: var(--muted); }
+.swm-cp-diode { fill: none; stroke: var(--text); stroke-width: 2; }
+.swm-cv { display: block; width: 100%; height: 230px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); }
+.swm-cv--cliff { height: 250px; }
+.swm-sg-ctl { display: grid; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.swm-sg-ctl > label { font-weight: 600; font-size: var(--fs-sm); }
+.swm-sg-ctl input[type="range"] { width: 100%; max-width: 30rem; }
+.swm-page p.swm-sg-out, .swm-page p.swm-mc-out { margin: 0; font-weight: 600; }
+
+/* 4 · Watts and decibels. */
+.swm-two { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: var(--sp-3); margin-bottom: var(--sp-3); align-items: start; }
+.swm-mc { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); align-items: start; margin-bottom: var(--sp-2); }
+.swm-mc .swm-mc-out { flex: 1 1 18rem; }
+
+/* 5 · The field table, and 7 · the links. */
+.table-wrap table.swm-table--field { min-width: 40rem; }
+.swm-table--field th[scope="row"] { white-space: normal; min-width: 12rem; }
+.swm-table--field td { line-height: var(--lh-tight); }
+.swm-links { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: var(--sp-2); }
+.swm-links li { display: grid; gap: var(--sp-1); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
+.swm-link { justify-self: start; font-weight: 600; text-align: left; }
+
+/* The inspection form's way in, under its Antenna Tests. */
+.insp-swr { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); margin: var(--sp-2) 0; }
+
+@media (pointer: coarse) {
+  .swm-radio, .swm-check { min-height: 2.75rem; }
+  .swm-sm { min-height: 2.75rem; }
+}
+
+@media (max-width: 1100px) {
+  .swm-bench-grid, .swm-verdict-grid, .swm-hook-grid, .swm-two { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .swm-cv { height: 200px; }
+  .swm-in-grid--2 { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ── Level surveys (level-survey.js, two-peg.js, survey-guide.js) ────────────
    📏 Level Survey, 🎯 Two-Peg Test and 📖 How to Survey: built for a phone in
    a paddock — one step at a time, big targets, numbers in a monospace face so

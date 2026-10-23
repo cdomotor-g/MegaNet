@@ -38,8 +38,9 @@
 // the Interference group: then it joins this list too, as Bit-Flip Sources and
 // the 🧪 Bit Bench did (views.mjs holds the group out of Simple). Field is an
 // addition — what a site visit on a phone needs: the station and the way to
-// it, the camera and the photos, the forms, the surveys, and whether the
-// station is reporting — so a desk tool added later stays out of it. Either
+// it, the camera and the photos, the forms (and 📟 the SWR Meter, which their
+// Antenna Tests open), the surveys, and whether the station is reporting — so
+// a desk tool added later stays out of it. Either
 // becomes the account's own the first time it is changed, and Reset puts the
 // built-in back; until then it is not stored as a list at all, only as "the
 // built-in Field", so it follows the app as the app changes.
@@ -61,10 +62,10 @@ const NavViews = (function () {
     },
     field: {
       name: 'Field', icon: '🥾',
-      about: 'What a site visit needs on a phone: the nearest stations, the station and the way to it, the camera and the photos, the forms, the surveys, and whether the station is reporting.',
+      about: 'What a site visit needs on a phone: the nearest stations, the station and the way to it, the camera and the photos, the forms and the SWR meter, the surveys, and whether the station is reporting.',
       groups: [
         { name: 'Stations & networks', tabs: ['nearby', 'stations', 'lookaround'] },
-        { name: 'Site visits',         tabs: ['camera', 'photos', 'inspections', 'maintenance', 'history'] },
+        { name: 'Site visits',         tabs: ['camera', 'photos', 'inspections', 'swr', 'maintenance', 'history'] },
         { name: 'Surveying',           tabs: ['levels', 'twopeg', 'surveyguide'] },
         { name: 'Is it reporting?',    tabs: ['msglog', 'health'] },
         { name: 'Before you go',       tabs: ['offline', 'views'] },

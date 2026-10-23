@@ -151,6 +151,10 @@ const ExportMenu = (function () {
         call: ['BitBench.exportCsv', 'pairs'],
         ready: () => (typeof BitBench !== 'undefined' && BitBench.state().pairs) ? '' : 'No readings yet — paste pairs into Your readings.' },
     ],
+    swr: () => [
+      { label: 'This check, in words — TXT', sub: 'the meter, the readings, what they work out to and what to do — to paste into a report or a work order',
+        call: ['SwrMeter.exportTxt'] },
+    ],
     history: () => [
       { label: 'The records listed — CSV', sub: 'the inspection and maintenance records, as filtered', call: ['History.exportList'],
         empty: 'There are no records listed.' },

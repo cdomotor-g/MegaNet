@@ -1424,6 +1424,7 @@ const Inspections = (function () {
     else if (key === 'base_tests')     body = calibrationsHtml(cfg, key);
     else {
       body = blocksHtml(cfg, key)
+           + (key === 'radio' ? swrLinkHtml() : '')
            + (key === 'radio' && fadeMarginOn(cfg) ? fadeMarginHtml() : '')
            + calibrationsHtml(cfg, key)
            + (key === 'initial_data' || key === 'final_data' ? dataValuesHtml(key) : '')
@@ -1718,6 +1719,22 @@ const Inspections = (function () {
   }
 
   // ── Fade margin ────────────────────────────────────────────────────────────
+
+  // 📟 What the antenna readings mean: the SWR Meter tab, opened on the ones
+  // typed here — the replacement antenna's if any are, the existing one's if
+  // not. Leaving this tab flushes the draft (stop()), and coming back resumes it.
+  function swrLinkHtml() {
+    return `
+      <p class="insp-swr"><button type="button" class="btn" onclick="Inspections.swrCheck()">📟 What do these readings mean?</button>
+        <span class="small insp-muted">Opens the SWR Meter with the forward and reflected power, SWR and TX size typed here.</span></p>`;
+  }
+  function swrCheck() {
+    const v = k => get(`radio.${k}`);
+    const typed = k => v(k) != null && v(k) !== '';
+    const p = ['forward_w', 'reflected_w', 'swr'].some(k => typed(`replacement_${k}`)) ? 'replacement' : 'existing';
+    if (typeof SwrMeter === 'undefined') return;
+    SwrMeter.open({ fwd: v(`${p}_forward_w`), ref: v(`${p}_reflected_w`), swr: v(`${p}_swr`), setW: v('tx_size_w'), from: 'inspections' });
+  }
 
   function fadeMarginHtml() {
     const doc = S().doc;
@@ -2582,6 +2599,7 @@ const Inspections = (function () {
     saveDraft: () => writeDraft(true),
     open, resume, discard, retry, refresh, raiseMaintenance, step, stepTo,
     addSerial, removeSerial, addValue, removeValue, addFade, removeFade,
+    swrCheck,
     // #118: the history view renders this file's sheets without owning them.
     // #147: the station editor's telemetry pick-list reads configs() — one
     // list, from meganet.inspection_config, no second copy.

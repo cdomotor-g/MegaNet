@@ -466,6 +466,17 @@ jobs:
         working-directory: test
         run: npm run bitbench
 
+      # 📟 The SWR Meter (swr-model.js, swr-meter.js): the arithmetic against
+      # figures worked by hand and held to the inspection form's bands, the
+      # link budget card's, the Propagation bench's flutter and the Bit
+      # Bench's receiver; what a set of readings means; then the tab in
+      # Chromium — each meter's screen or needle reading what the line says,
+      # the SWR-400 calibrated by its switches, readings typed, the case, the
+      # inspection form's way in, the text saved, reduced motion and a phone.
+      - name: SWR Meter
+        working-directory: test
+        run: npm run swr
+
       # ⏱️ Latency (map-latency.js), against the demo week through the strict
       # PostgREST stub: the bands' edges; off until asked for; the first
       # opening of the pane turns it on; every pin a band or said otherwise,

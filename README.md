@@ -251,6 +251,11 @@ MegaNet/
 │                             faults, a batch's fingerprint, pasted readings; pure
 ├── bit-bench.js            ← BitBench — the 🧪 Bit Bench tab and its drawings
 ├── bit-errors.js           ← BitErrors — the ⚡ Bit Errors lesson: each fault in depth
+├── swr-model.js            ← SwrModel — the 📟 SWR Meter's arithmetic: SWR, |Γ|, return
+│                             and mismatch loss, feeders, the three meters, made-up
+│                             stations, what a set of readings means; pure
+├── swr-meter.js            ← SwrMeter — the 📟 SWR Meter tab: the line, the meters
+│                             drawn and worked, the lesson
 ├── owner-logos.js          ← OwnerLogos — each station owner's logo beside its name
 │                             on the station card and in the editor (the marks in assets/owners/)
 ├── health-glance.js        ← HealthGlance — a station's health where people already
@@ -5294,7 +5299,7 @@ tabs on a phone-sized page, a real OCR read included, and
 ### 29. Knowledge base and Field training (Lessons, and Mallee HydroTech's Training Tools)
 
 Two groups hold lessons rather than tools. **📚 Knowledge base** is Flood-Net's
-own: 🎓 Radio Propagation and ⚡ Bit Errors (§34). **Field training**, straight
+own: 🎓 Radio Propagation, ⚡ Bit Errors (§34) and 📟 the SWR Meter (§35). **Field training**, straight
 after Surveying, holds five lessons adapted
 with permission from [Mallee HydroTech](https://malleehydrotech.com.au/)'s open
 training tools (one group until Bit Errors made it seven, past the nav's six;
@@ -5562,6 +5567,36 @@ test for intermodulation among them) and what fixes it — with a calculator for
 the intermodulation products of any two transmitters, readings that look
 corrupted and are not, and where each fault shows up in Flood-Net. Every figure
 is the Bit Bench's model, and each section opens the bench on its fault.
+
+### 35. SWR Meter (Power and SWR Meters, Drawn and Worked)
+
+📟 **SWR Meter**, in the **Knowledge base** — and in the Field view, beside the
+forms — is for the through-line power and SWR meters in the field kit: the
+**Surecom SW-102**, the **Moonraker SWR-400** and the **Comm-connect 3030**
+(and the SW-102HF, which looks the same and cannot read 151.5 MHz). Pick the
+meter, then a made-up station with one fault — a healthy line, a dummy load,
+thin cable, water in the coax, a loose N-type, an open antenna, a bad jumper
+before the meter, a sagging supply, the meter in backwards — or type your own
+readings (any two of forward, reflected and SWR), and the line runs: dots for
+the power going up the feeder and coming back, fainter where it is weaker, with
+the meter at the radio or at the top of the feeder. The meter is drawn after
+the real one with its readings on its screen: the SW-102's FW, RW, VSWR and
+Trans% (its menu's VHF power offset among them), the 3030's FWD, REV, SWR or
+return loss with PEAK and HOLD, and the SWR-400's needle, worked through its
+RANGE, FUNCTION and POWER switches and CAL knob, calibration and all. On a
+station's short data bursts the meters not built for them read low and jumpy,
+as they do on site. Under the bench the readings are worked out — SWR in the
+inspection form's own bands, return and mismatch loss, the power against the
+radio's setting, what reaches the antenna and the antenna's own SWR behind a
+lossy feeder — and said in words, with what to do, and saved as text.
+
+Then: the steps for hooking up the meter picked; what a meter measures (the
+directional coupler, and a standing wave drawn as it moves); watts, decibels
+and a model of what a decibel costs a station at its fade margin; a
+symptom-to-cause table for the field; and a worked case — a station down on
+power after a remediation. The inspection form's **Antenna Tests** open the tab
+with the readings typed there. `npm run swr` holds the arithmetic to figures
+worked by hand and drives the tab in Chromium.
 
 ## Deployment Plan
 

@@ -90,6 +90,15 @@ const SiteMap = (function () {
         'Work out the intermodulation products of two transmitters near a site',
       ],
     },
+    swr: {
+      what: 'The power and SWR meters in the field kit, drawn and worked: how to put one in a station\'s antenna line, what it measures, and what its readings mean — with the power shown going up the line and coming back.',
+      use: [
+        'Type what your meter reads and see what it means, and what to do about it',
+        'Learn the SW-102, the SWR-400 or the 3030 before a site visit',
+        'See what water in the coax, a loose N-type or a bad jumper does to the readings',
+        'Work out whether a decibel lost matters, from a station\'s fade margin',
+      ],
+    },
     propagation: {
       what: 'A lesson in how radio carries a reading from a gauge to a base — waves, shadows, trees, echoes, collisions and repeater delays — in pictures that move.',
       use: [
@@ -438,7 +447,7 @@ const SiteMap = (function () {
     'Field training': { step: 'Practising the fieldwork',
       blurb: 'Practice rather than tools: re-tellings of Mallee HydroTech\'s open training tools — reading a staff, keeping a level book, the life of a site, and a day on the level and on the river.' },
     'Knowledge base': { step: 'Learning how',
-      blurb: 'Flood-Net\'s own lessons: how radio carries a reading home, and why readings arrive wrong — each fault in depth, and how to tell them apart.' },
+      blurb: 'Flood-Net\'s own lessons: how radio carries a reading home, why readings arrive wrong — each fault in depth, and how to tell them apart — and the power and SWR meters that check a station\'s antenna line.' },
     'Admin': { step: 'Keeping it running',
       blurb: 'Where the station data comes from, who may sign in, the base stations that receive it all, and the review of a network\'s design.' },
   };
@@ -474,6 +483,7 @@ const SiteMap = (function () {
     { text: 'Plan a channel\'s TDMA slots',                tab: 'tdma' },
     { text: 'Learn how radio gets a reading home',         tab: 'propagation' },
     { text: 'Learn why bits go wrong, and how to tell the causes apart', tab: 'biterrors' },
+    { text: 'Make sense of an SWR meter\'s readings',      tab: 'swr' },
     { text: 'Practise reading a levelling staff',          tab: 'kbstaff' },
     { text: 'Walk through a routine river station visit',  tab: 'kbriver' },
   ];

@@ -282,6 +282,17 @@ const TABS = [
     // other tabs.
     { id: 'biterrors',  label: 'Bit Errors',             icon: '⚡',
       find: 'bit errors error corrupted corrupt readings why wrong ghost ghosts cause causes symptom symptoms fingerprint diagnose diagnosis troubleshoot troubleshooting fault faults noise snr ber impulse lightning electric fence reflections multipath fading collision collisions capture aloha intermodulation intermod rusty bolt crystal ppm tcxo drift temperature pll lock key-up keyup vco clock baud uart stop bit twist pre-emphasis de-emphasis stuck wiring inverted reversed gray code crc rollover counter wrap learn lesson' },
+    // 📟 SWR Meter (swr-model.js, swr-meter.js): the through-line power and
+    // SWR meters in the field kit — hooking one up, what it measures and
+    // what its readings mean at a site, the three meters drawn and worked.
+    // A lesson and a field check at once; filed here because Site visits is
+    // full, and offered in the Field view beside the inspection form, whose
+    // Antenna Tests open it. Its find words are the meters by name, what is
+    // read off them and the faults they find — never "signal", "mobile",
+    // "network", "mount", "port", "guide", "install" or "theme", which
+    // nav.mjs's and palette.mjs's probes hold for other tabs.
+    { id: 'swr',        label: 'SWR Meter',              icon: '📟',
+      find: 'swr vswr standing wave ratio power meter watt meter wattmeter watts forward reflected reverse fwd ref rev return loss mismatch reflection coefficient gamma antenna test antenna tests feeder coax coaxial cable lmr-400 rg-58 rg-213 heliax connector connectors n-type so-239 pl-259 dummy load surecom sw-102 sw102 moonraker swr-400 swr400 avair diamond comm-connect 3030 through-line directional coupler tx ant input load calibrate cal knob needle bursts peak hold water ingress loose jumper adaptor low power decibel dbm fade margin' },
   ] },
   // Last, so it sits at the foot of the nav: nobody's daily work, and the one
   // group whose tab the header's load buttons and the Export tab's Data source
@@ -510,7 +521,7 @@ const HELP = {
       + 'on the Stations map.',
       'A device set to reduce motion starts every drawing still, at its most telling moment; ▶ Play runs it.',
     ],
-    related: ['stations', 'bitflipper', 'reception', 'biterrors'],
+    related: ['stations', 'bitflipper', 'reception', 'biterrors', 'swr'],
     links: [{ label: 'How Flood-Net\'s fade margin was calibrated against the field', href: 'docs/network-review.md' }],
   },
   biterrors: {
@@ -532,6 +543,29 @@ const HELP = {
       'The CRC figures are worked out exhaustively, over every pattern of one to four flipped bits — not estimated.',
     ],
     related: ['bitbench', 'propagation', 'flipsources', 'health'],
+  },
+  swr: {
+    summary: 'The through-line power and SWR meters in the field kit — the <strong>Surecom SW-102</strong>, the '
+           + '<strong>Moonraker SWR-400</strong> and the <strong>Comm-connect 3030</strong> — drawn and worked, and what '
+           + 'their readings mean at a site. Pick your meter, then a made-up station with one fault (water in the coax, a '
+           + 'loose N-type, a long run of thin cable, a bad jumper, the meter in backwards…) or <strong>your own '
+           + 'readings</strong>, and the line runs: power leaving the radio, through the meter, up the feeder and out of the '
+           + 'antenna, and whatever comes back — with the meter\'s own screen or needle showing what it would read, and '
+           + 'what to do about it. Then the steps for hooking up the meter picked; what a meter measures (the standing wave, '
+           + 'and the coupler that tells the two waves apart); watts, decibels and what a decibel costs a station\'s fade '
+           + 'margin; a symptom-to-cause table for the field; and a worked case.',
+    watch: [
+      'The radio goes to the meter\'s <strong>TX</strong> (or INPUT) socket and the antenna or a dummy load to '
+      + '<strong>ANT</strong> (or LOAD). In backwards, it reads the outgoing power as reflected.',
+      'A meter cannot see anything on its radio side: a bad jumper or adaptor there shows as less power with a good SWR. '
+      + 'And a lossy feeder weakens a reflection twice, so an SWR read at the radio looks better than the antenna\'s.',
+      'The SWR bands are the inspection form\'s own: under 1.5 Good, 1.5–2.0 Fair, over 2.0 Poor. The fade-margin curve is '
+      + 'a model, to show the shape — a decibel costs nothing at 10 dB of margin and a great deal at 2.',
+      'The meters are drawn after the real ones, not photographed; a firmware\'s screen may differ in detail. The SW-102HF '
+      + '(1.5–70 MHz) looks just like the SW-102 and cannot read a 151.5 MHz radio.',
+      'A device set to reduce motion starts every drawing still and settled; ▶ Animate runs it.',
+    ],
+    related: ['inspections', 'propagation', 'health', 'review'],
   },
   stations: {
     summary: 'The map fills the page, and its cards sit beside it in the <strong>side panel</strong> '
@@ -1931,7 +1965,7 @@ const HELP = {
     ],
     links: [{ label: 'The inspection schema, and why the form matrix earns its keep',
               href: 'db/README.md#station-inspections-and-maintenance-activities' }],
-    related: ['stations', 'maintenance', 'history', 'export'],
+    related: ['stations', 'maintenance', 'history', 'export', 'swr'],
   },
 
   maintenance: {

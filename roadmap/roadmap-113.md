@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-22** (revision 182 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-23** (revision 183 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -817,6 +817,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 183 — 2026-10-23: 📟 The SWR Meter
+
+The owner: *"useful information for the user to be able to figure out A, how to use these devices, and B, what different readings for different tests might mean, and what the user might need to do about it in the field … select which device they have, punch in some numbers … overlay on the screen of the device the different numbers … animate how the power moves through the system."* Prompted by a technical-chat thread about a remediated station reading 3.8 W at SWR 1.01 on a radio set to 5 W. **Opens and closes nothing.**
+
+- **`swr-model.js`** (`SwrModel`, pure, Node-tested): watts and decibels, SWR ↔ |Γ| ↔ return and mismatch loss, five feeders' loss at 150 MHz, the meters (bands, ranges, sockets, quirks — each from its maker's manual or listing), nine made-up stations with one fault each, the line with the meter at either end of the feeder, and `interpret()` — any two readings to a verdict and what to do, in the inspection form's own SWR bands. A model of the fade-margin cliff (the Bit Bench's receiver) says what a decibel costs at a given margin.
+- **`swr-meter.js`** — 📟 the tab, the Knowledge base's third: the meters drawn in SVG after the real ones, readings written on their screens and the SWR-400's needle worked through its switches and CAL knob; the line animated, power out and back; the steps for each meter; the coupler and a moving standing wave; watts, decibels and the fade margin; a symptom-to-cause table; a worked case. **One tab, not the two asked about:** Site visits is at the six-tab ceiling, so the field's way in is the Field view (the tab beside the inspection form) and the inspection form's Antenna Tests, which open it with the readings typed there.
+- **Checks:** `npm run swr` (new, in CI: 69); `smoke` (49 tabs), `views` (Field), `tabs` (born converted); `nav`, `help`, `exports`, `looks`, `calm` and the cheap five.
 
 ### Revision 182 — 2026-10-22: 🧪 The Bit Bench and ⚡ Bit Errors
 

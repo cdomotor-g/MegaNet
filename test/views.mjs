@@ -151,7 +151,7 @@ async function main() {
 
     await page.selectOption('#nav-view-select', 'field');
     b = await bar(page);
-    const FIELD = ['nearby', 'stations', 'lookaround', 'camera', 'photos', 'inspections', 'maintenance', 'history',
+    const FIELD = ['nearby', 'stations', 'lookaround', 'camera', 'photos', 'inspections', 'swr', 'maintenance', 'history',
                    'levels', 'twopeg', 'surveyguide', 'msglog', 'health', 'offline', 'views'];
     check('Field: the site-visit list — Nearby, Stations and Look Around first, no desk tool',
       b.view === 'field' && J(ids(b)) === J(FIELD), J(b.groups));

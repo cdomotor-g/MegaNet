@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 74, date: '2026-10-23', items: [
+      '<strong>📟 SWR Meter</strong>, a new tab in the <em>Knowledge base</em> (and in the Field view, beside the forms): the '
+        + 'power and SWR meters in the field kit — the Surecom SW-102, the Moonraker SWR-400 and the Comm-connect 3030 — drawn '
+        + 'and worked. Pick your meter, then a made-up station with one fault (water in the coax, a loose N-type, a long run of '
+        + 'thin cable, a bad jumper, the meter in backwards…) or type your own readings, and watch the power go up the line and '
+        + 'come back, with the meter\'s own screen or needle showing what it would read and what to do about it. Flick the '
+        + 'SWR-400\'s switches and turn its CAL knob as you would on site. Then: the steps for hooking up the meter you picked, '
+        + 'what a meter is really measuring, what a decibel lost costs a station at its fade margin, a symptom-to-cause table '
+        + 'for the field, and a worked case. The inspection form\'s <em>Antenna Tests</em> opens it with the readings typed there.',
+    ] },
     { n: 73, date: '2026-10-23', items: [
       '<strong>Messages landing keep a glow</strong>, in ⏱️ Latency on the Stations map. After its green flash and pulse, '
         + 'a station that just reported keeps a green ring round its pin, and its links stay lit, for a minute — '

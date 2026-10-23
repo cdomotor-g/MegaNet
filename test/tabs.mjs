@@ -759,6 +759,20 @@ const SEED_BE = `async () => {
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 }`;
 
+// 📟 The SWR Meter, born converted: your own readings typed, the SWR-400 on
+// its SWR scale, and every disclosure open. Paused, so the line holds still
+// while it is measured.
+const SEED_SWR = `async () => {
+  if (SwrMeter.state().playing) SwrMeter.play();
+  SwrMeter.source('yours');
+  SwrMeter.type('fwd', '3.8'); SwrMeter.type('ref', '0.12'); SwrMeter.type('setW', '5');
+  SwrMeter.type('cable', 'lmr400'); SwrMeter.type('m', '20');
+  SwrMeter.pick('swr400');
+  SwrMeter.dev.func('swr'); SwrMeter.dev.cal(90);
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+}`;
+
 const SEED_BS_OUT = `() => {
   if (window.__bsAuth) { Object.assign(Auth, window.__bsAuth); delete window.__bsAuth; }
   BaseStations.authChanged();
@@ -927,6 +941,8 @@ const CONVERTED = [
   { id: 'bitbench',   label: 'Bit Bench — as it opens', issue: 'born converted' },
   { id: 'bitbench',   label: 'Bit Bench — a batch, a mystery and readings analysed, every fold open', issue: 'born converted', seed: SEED_BB },
   { id: 'biterrors',  label: 'Bit Errors — the lesson, and two transmitters in its calculator', issue: 'born converted', seed: SEED_BE },
+  { id: 'swr',        label: 'SWR Meter — as it opens', issue: 'born converted' },
+  { id: 'swr',        label: 'SWR Meter — your readings, the needle meter on SWR', issue: 'born converted', seed: SEED_SWR },
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },
   { id: 'sitemap',    label: 'Site Map',        issue: 'born converted' },
