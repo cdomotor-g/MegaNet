@@ -1727,6 +1727,12 @@ jobs:
       # fingerprinted as ssh-keygen prints them, fetched only with a live token.
       - name: check_base_stations.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_base_stations.sql
+      # A base station's connection over time (0080): a gap in its check-ins a
+      # dropout, a restart or an agent restart by its uptime; a new address
+      # block, address or route an event; the full address never kept; a
+      # check-in never failed by any of it; administrators the only readers.
+      - name: check_base_station_links.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_base_station_links.sql
       # The network's health kept by the database (0059): a base station that
       # stops checking in and a receiver that runs but decodes nothing each a
       # finding on the next run, held while its station is away, cleared when
