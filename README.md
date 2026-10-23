@@ -1489,7 +1489,8 @@ canvas — see *In ⛰️ 3-D* under **Draw & measure**.
 
 **Rising water — an animation of the ground's heights, not flood modelling.**
 With the map tilted, water rises through the heights of the ground in view —
-from a metre under the lowest to a metre over the highest — holds at the top,
+from a metre under the lowest, or from sea level (0 m) wherever the view takes
+in the sea, to a metre over the highest — holds at the top,
 drains and goes round again, the digital twin's flood water over the whole view
 instead of one station's patch. It is there to show how the land lies: which
 pins, roads and lots stand above which, where the low country runs, and how a
@@ -1497,8 +1498,11 @@ valley fills before its banks. A scale up the right of the view gives the height
 (≈ m AHD) with round heights marked: ⏸ holds the water where it is and ▶ sets it
 rising again from there; press a height to stand the water at it, or drag the
 scale; the arrow keys, Page Up/Down, Home and End move it from the keyboard. It
-is on by default, and **Rising water** in the 3-D settings (🎚️) turns it off —
-which is remembered. It honours a browser that asks for reduced motion by
+is on by default, and **Rising water** in the 3-D settings — the pane ⛰️
+opens as it tilts the map — turns it off, which is remembered. The sea is drawn
+as water at every level, being under every level; the rise does not start down
+on the sea floor, which zoomed out to a coast is thousands of metres down and
+would spend most of the rise there. It honours a browser that asks for reduced motion by
 standing the water halfway rather than moving it.
 
 It says what it is not along the foot of the view, in the twin's red, for as
@@ -1647,9 +1651,13 @@ camera rather than labelled once, which is half of what they are for: a needle
 at 37° is how you *find out* the map is not facing north. Neither is offered on
 the flat map — Leaflet has no pitch and no bearing, so there is no camera to
 reset, and a button that can do nothing is not shown. In the side panel's
-strip, where there is no split button to be half of, the settings are a button
-of their own under ⛰️ and wear 🎚️ rather than a second mountain — at every
-width, a phone's rail included. While a digital twin is up the pair drive the
+strip, where there is no split button to be half of, ⛰️ is one button that
+does both: pressed, it opens the 3-D settings in the side panel and tilts the
+map; pressed again, the map is flat and the side panel is back as it found it —
+the pane that was open, or shut (a pane you chose since is left alone). It
+stands last in the **Map** section with its camera pair, a way of showing the
+map; until October 2026 it was in the rail's foot with 🧹 and ⛶, its settings a
+🎚️ beside it. While a digital twin is up the pair drive the
 twin's camera instead, over a flat map as well, so the same two buttons do the
 same two things in both views.
 
@@ -4864,13 +4872,14 @@ included, where a pane is a drawer — except ↺ reset, which is built to stay
 and is the one thing in that corner. Each panel — Layers, Legend, Draw & measure, Radio coverage,
 Repeater sites, Relocate station, the 3-D settings — moves
 its whole `.mn-mapctl` wrapper (icon, heading, pin and body) into a pane of its
-own the moment it is built, with a button in the strip; its corner icon and its
-📌 are hidden there, because a pane already stays open. Each other plain button
+own the moment it is built, with a button in the strip — but the 3-D settings,
+whose pane ⛰️ opens (`strip: false` on `MapChrome.panel`); its corner icon and
+its 📌 are hidden there, because a pane already stays open. Each other plain button
 — ℹ️, ⛰️ and its two camera buttons (hidden until 3-D is on), ⛶ — is moved
 into the strip itself, keeping the class its module finds it by. They stand in the
-rail's sections (`dockStripGroups`): the corner's `show` group is **Map**, its
-`tools` group **Tools**, and its `3d` and `screen` groups go to the foot with
-Clear the selection and Help, each a labelled group — headings that fold with
+rail's sections (`dockStripGroups`): the corner's `show` group is **Map**, with
+its `3d` group last in it, its `tools` group **Tools**, and its `screen` group
+goes to the foot with Clear the selection and Help, each a labelled group — headings that fold with
 the names on, hairlines with icons alone — and the strip scrolls, with a thin
 bar beside the buttons rather than over them, when it is taller than the
 window, the foot standing at its foot (sticky, with the strip's scroll padding

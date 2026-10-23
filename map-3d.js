@@ -2209,7 +2209,8 @@ const Map3D = (function () {
 
   // ── The rising water ───────────────────────────────────────────────────
   // Water rising through the heights of the ground in view — from a metre
-  // under the lowest to a metre over the highest — held at the top for a
+  // under the lowest, or sea level where the view reaches the sea, to a
+  // metre over the highest — held at the top for a
   // moment, let out, and round again: the digital twin's flood water
   // (digital-twin.js, "the flood water") over the whole view rather than one
   // station's patch, and for a different question. Not how high a river gets,
@@ -2317,14 +2318,23 @@ const Map3D = (function () {
   // The range read again: after the camera stops, and as terrain tiles land.
   // Rising, the water keeps its place in the cycle, so a new range moves it
   // with the scale; held, it keeps its height.
+  //
+  // Never below 0 m. Zoomed out to the coast, the lowest ground in view is the
+  // sea floor, thousands of metres down, and a rise from there spends nearly
+  // all of its time under the sea, which the ramp draws as water at every
+  // level anyway (it is below the line). So the water starts at sea level, or
+  // a metre under the lowest ground when that is higher.
   function rangeWater() {
     water.rangeTimer = 0;
     if (!waterShown() || !map.getLayer('mn-water')) return;
     const g = waterGround();
     if (!g) return;
-    let { lo, hi } = g;
-    if (hi - lo < WATER_MIN_SPAN) { const mid = (lo + hi) / 2; lo = mid - WATER_MIN_SPAN / 2; hi = mid + WATER_MIN_SPAN / 2; }
-    lo = Math.floor(lo) - 1;
+    let lo = Math.max(0, g.lo), hi = Math.max(0, g.hi);
+    if (hi - lo < WATER_MIN_SPAN) {
+      lo = Math.max(0, (lo + hi) / 2 - WATER_MIN_SPAN / 2);
+      hi = lo + WATER_MIN_SPAN;
+    }
+    lo = Math.max(0, Math.floor(lo) - 1);
     hi = Math.ceil(hi) + 1;
     if (lo === water.lo && hi === water.hi) return;
     water.lo = lo;
@@ -2568,7 +2578,7 @@ const Map3D = (function () {
     track.style.setProperty('--sw', water.colours ? water.colours.swatch : 'var(--flood-water-below)');
     const val = String(water.level);
     if (track.getAttribute('aria-valuenow') !== val) track.setAttribute('aria-valuenow', val);
-    const words = `${waterHeight(water.level)}, between the lowest ground in view at ${waterHeight(water.lo + 1)} and the highest at ${waterHeight(water.hi - 1)}`;
+    const words = `${waterHeight(water.level)}, on a scale from ${waterHeight(water.lo)} to ${waterHeight(water.hi)}`;
     if (track.getAttribute('aria-valuetext') !== words) track.setAttribute('aria-valuetext', words);
     const held = !anim && water.hold != null ? String(water.hold) : null;
     for (const el of document.querySelectorAll('#map3d-water-labels .twin-scale-label')) {

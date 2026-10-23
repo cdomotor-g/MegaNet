@@ -9690,9 +9690,9 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
   transform: translateX(.85rem);
 }
 
-/* The foot: a rule above it, and the 3-D view and its settings on one row —
-   the switch is the mode, the square beside it what it does it with, the
-   corner's split button laid on its side. */
+/* The foot: a rule above it. (The 3-D view and its 🎚️ settings shared a row
+   here, until ⛰️ went up into the Map section and its settings became the
+   pane it opens.) */
 #help-panel.rail-names .dock-group[data-group="foot"] {
   flex-flow: row wrap;
   padding-top: var(--sp-2);
@@ -9701,23 +9701,6 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
 
 #help-panel.rail-names .dock-group[data-group="foot"] > * {
   flex: 1 0 100%;
-}
-
-#help-panel.rail-names .dock-group[data-group="foot"] > .mn-map-3d {
-  flex: 1 1 0;
-  width: auto;
-  min-width: 0;
-}
-
-#help-panel.rail-names .dock-group[data-group="foot"] > [data-dock="map-3d"] {
-  flex: 0 0 2.25rem;
-  width: 2.25rem;
-  justify-content: center;
-  padding: 0;
-}
-
-#help-panel.rail-names [data-dock="map-3d"] .dock-name {
-  display: none;
 }
 
 /* Signs: the open row a black sign with yellow on it, the headings in black,

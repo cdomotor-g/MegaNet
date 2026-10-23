@@ -107,18 +107,20 @@ const PANEL_IDS = ['map-display-block', 'map-legend', 'map-latency-panel', 'map-
 // The strip, top to bottom — the Stations tab's rail (app.js, dockStripGroups):
 // the names toggle (a desktop's alone); Stations & places (📍 the cards, Find a
 // place, 〽️ the path tools, 🧊 the digital twin's pane — 🔭 the AR station
-// finder's was a fifth until it became the Look Around tab); Map and Tools,
-// the corner's `show` and `tools` groups in their declared order; and the
-// foot — 🧹 Clear the selection, the corner's `3d` and `screen` groups, and ❔
-// last. Each section leads with its heading, a button drawn only with the
-// names on ('dock-fold'). Panes are 'map-<id>', plain buttons their class.
+// finder's was a fifth until it became the Look Around tab); Map — the
+// corner's `show` group, then its `3d`: ⛰️ and its camera pair, the 3-D
+// settings a pane ⛰️ opens with no button of its own — and Tools, the
+// corner's `tools`, in their declared order; and the foot — 🧹 Clear the
+// selection, the corner's `screen` group, and ❔ last. Each section leads with
+// its heading, a button drawn only with the names on ('dock-fold'). Panes are
+// 'map-<id>', plain buttons their class.
 // Not ↺ (the reset group's one button): it is built to stay in the map's
 // corner (`corner`), and is asserted there.
 const STRIP = ['dock-names',
                'dock-fold', 'stations', 'places', 'paths', 'twin',
-               'dock-fold', 'map-display', 'map-legend', 'map-latency',
+               'dock-fold', 'map-display', 'map-legend', 'map-latency', 'mn-map-3d', 'mn-map-north', 'mn-map-tilt',
                'dock-fold', 'map-draw', 'map-polar', 'map-sites', 'map-relocate', 'mn-map-here',
-               'mn-map-clear', 'mn-map-3d', 'map-3d', 'mn-map-north', 'mn-map-tilt', 'mn-map-full',
+               'mn-map-clear', 'mn-map-full',
                'help'];
 const BUTTONS = STRIP.filter(k => k.startsWith('mn-map-'));
 // The rail's groups, top to bottom: the toggle's, the three sections, the foot.
@@ -320,7 +322,8 @@ try {
   // MapChrome's own order, less the one group that stays on the map: read off
   // MapChrome rather than copied, so a group added there is in this check.
   // MapChrome's own groups, less the one that stays on the map: `show` and
-  // `tools` are sections of their own, `3d` and `screen` are in the foot.
+  // `tools` are sections of their own, `3d` stands last in `show`'s, and
+  // `screen` is in the foot.
   const known = await page.evaluate(() => Object.keys(MapChrome.groups()));
   check('the rail\'s groups stand toggle, Stations & places, Map, Tools, foot — each but the toggle\'s a labelled group',
     JSON.stringify(groups.map(g => g.name)) === JSON.stringify(STRIP_GROUPS)
@@ -1660,9 +1663,7 @@ try {
         stored: localStorage.getItem('mn-dock-names'), folded: localStorage.getItem('mn-dock-fold'),
         toggle: (() => { const t = strip.querySelector('.dock-names'); return t && { expanded: t.getAttribute('aria-expanded'),
           shown: !!t.getClientRects().length, focus: document.activeElement === t }; })(),
-        // Not the 3-D view's settings, a square beside its switch: its name is
-        // its tooltip and its label.
-        labels: btns.filter(b => !b.classList.contains('dock-fold') && b.dataset.dock !== 'map-3d').map(b => {
+        labels: btns.filter(b => !b.classList.contains('dock-fold')).map(b => {
           const n = b.querySelector(':scope > .dock-name');
           return { k: b.dataset.dock || [...b.classList].find(c => c.startsWith('mn-map-')) || b.className,
                    name: n && n.getClientRects().length ? n.textContent.trim() : '',

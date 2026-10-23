@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 89, date: '2026-10-23', items: [
+      '<strong>⛰️ 3-D view, in the Map section.</strong> The 3-D view button has moved up the Stations side panel\'s '
+        + 'rail into <em>Map</em>, under the layers and the legend, with its compass and tilt buttons. Its settings no '
+        + 'longer have a button of their own: pressing ⛰️ opens them in the side panel as it tilts the map, and pressing '
+        + 'it again flattens the map and puts the side panel back as it was.',
+      '<strong>🌊 Rising water starts at sea level.</strong> Zoomed out to the coast, the rise no longer starts on the sea '
+        + 'floor thousands of metres down: it starts at 0 m, or a metre under the lowest ground in view where that is '
+        + 'higher, and the sea is drawn as water throughout.',
+    ] },
     { n: 88, date: '2026-10-23', items: [
       '<strong>🧪 Bit Bench: the site and the faults move together.</strong> As <em>Where faults happen</em> tours the '
         + 'faults, the <em>Faults</em> section below changes with it, so the frame there goes through the same fault the site '

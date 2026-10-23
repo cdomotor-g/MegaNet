@@ -257,6 +257,18 @@ ok('and there is no canvas over the map', beforePress.host === false);
 const btn3d = page.locator('.mn-map-3d');
 ok('the map has one ⛰️ button, in the side panel\'s strip', await btn3d.count() === 1
    && await page.evaluate(() => !!document.querySelector('.mn-map-3d').closest('#help-panel .dock-strip')));
+// …in the Map section, last, with its camera pair under it — and the 3-D
+// settings with no button of their own: ⛰️ opens them (section 2).
+const rail3d = await page.evaluate(() => {
+  const show = document.querySelector('#help-panel .dock-strip > .dock-group[data-group="show"]');
+  const keys = show ? [...show.children].map(b => b.dataset.dock || [...b.classList].find(c => c.startsWith('mn-map-')) || b.className) : [];
+  return { keys, settingsBtn: !!document.querySelector('#help-panel .dock-tab[data-dock="map-3d"]'),
+           pane: !!document.getElementById('map-3d-panel-body') && !!document.getElementById('map-3d-panel-body').closest('#help-panel .dock-pane') };
+});
+ok('…standing last in the Map section with its camera pair, the 3-D settings a pane with no button of its own',
+   JSON.stringify(rail3d.keys.slice(-3)) === JSON.stringify(['mn-map-3d', 'mn-map-north', 'mn-map-tilt'])
+     && !rail3d.settingsBtn && rail3d.pane, JSON.stringify(rail3d));
+const paneBefore = await page.evaluate(() => dockShowing());
 ok('…which reports that the mode is off',
    await btn3d.getAttribute('aria-pressed') === 'false');
 
@@ -322,6 +334,15 @@ ok('…imported as a module, leaving no global behind', cam.global === 'undefine
 // classic copy is for file:// only (section 10).
 ok('…and over http its worker is the library\u2019s own', cam.worker === '', String(cam.worker).slice(0, 40));
 ok('the mode is on',                        cam.on === true);
+// ⛰️ opens its settings as it tilts the map: the side panel on the 3-D pane.
+const settings3d = await page.evaluate(() => {
+  const body = document.getElementById('map-3d-panel-body');
+  return { showing: dockShowing(), shown: !!body && body.getClientRects().length > 0,
+           leave: (document.getElementById('map-3d-toggle') || {}).textContent || '' };
+});
+ok('…and pressing ⛰️ opened its settings beside the map, offering the way out',
+   settings3d.showing === 'map-3d' && settings3d.shown && /Leave 3-D/.test(settings3d.leave),
+   JSON.stringify({ before: paneBefore, ...settings3d }));
 ok('there is a WebGL canvas over the map',  cam.canvas && cam.hostOn);
 ok('terrain is set, from the DEM source',   !!cam.terrain && cam.terrain.source === 'mn-dem',
    JSON.stringify(cam.terrain));
@@ -756,14 +777,14 @@ const reachable = await page.evaluate(() => {
     corner:    zOf('.leaflet-top'),
     // Where the map's controls stand at this width: the side panel's strip,
     // beside the map rather than on it — ⛰️ and ⛶ as themselves, Map display
-    // and the 3-D settings as their panes' buttons. Off the map they are out of
+    // as its pane's button (the 3-D settings have none: ⛰️ opens them). Off
+    // the map they are out of
     // the canvas's reach whatever its z-index, and this still proves it: the
     // thing under the pointer where each is drawn is that control. And ↺, the
     // one control still *on* the map, in its top-right corner: the one the
     // canvas's z-index is actually standing between, and so the one that says
     // the window below the corners is right.
     probes: ['.mn-map-3d', '.mn-map-full', '#help-panel .dock-tab[data-dock="map-display"]',
-             '#help-panel .dock-tab[data-dock="map-3d"]',
              '#leaflet-map .leaflet-top.leaflet-right .mn-map-reset'].map(probe),
   };
 });
@@ -2329,8 +2350,53 @@ const wLo = Math.min(...worldHs), wHi = Math.max(...worldHs);
 const wTol = Math.max(30, 0.1 * (wHi - wLo));
 ok('…from under the lowest ground in view to over the highest, read off the ground in metres',
    WATER_GRID > 0 && W1.pts.length >= 12 && W1.w.lo != null && W1.w.lo < W1.w.hi
-     && Math.abs(W1.w.lo - wLo) <= wTol && Math.abs(W1.w.hi - wHi) <= wTol,
+     && Math.abs(W1.w.lo - Math.max(0, wLo)) <= wTol && Math.abs(W1.w.hi - wHi) <= wTol,
    JSON.stringify({ lo: W1.w.lo, hi: W1.w.hi, world: [wLo, wHi], tol: wTol, ex: W1.terrain && W1.terrain.exaggeration, pts: W1.pts.length }));
+// Never below 0 m: over ground under the sea the foot of the scale is sea
+// level, not the sea floor — zoomed out to a coast, a rise from thousands of
+// metres down spends nearly all its time under water the ramp draws anyway.
+// This file's world dips below zero where its terms line up; such a spot is
+// found by its own arithmetic, looked at from overhead, and the camera put
+// back after.
+const home3 = await page.evaluate(() => { const m = Map3D._map(), c = m.getCenter(); return { center: [c.lng, c.lat], zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing() }; });
+let sea = null;
+{
+  const mx = (home3.center[0] + 180) / 360;
+  const my = (1 - Math.log(Math.tan(Math.PI / 4 + home3.center[1] * Math.PI / 360)) / Math.PI) / 2;
+  for (let x = mx - 0.01; x <= mx + 0.01; x += 0.00002) {
+    for (let y = my - 0.01; y <= my + 0.01; y += 0.00002) {
+      const h = heightAtWorld(x, y);
+      if (!sea || h < sea.h) sea = { x, y, h };
+    }
+  }
+}
+const seaAt = [sea.x * 360 - 180, Math.atan(Math.sinh(Math.PI * (1 - 2 * sea.y))) * 180 / Math.PI];
+await page.evaluate(c => Map3D._map().jumpTo({ center: c, zoom: 12, pitch: 0, bearing: 0 }), seaAt);
+await page.waitForTimeout(600);
+await idle3d();
+const S1 = await page.evaluate(n => {
+  const m = Map3D._map(), ml = Map3D._lib(), cv = m.getCanvas(), w = Map3D._waterRange(), pts = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const ll = m.unproject([(i + 0.5) / n * cv.clientWidth, (j + 0.5) / n * cv.clientHeight]);
+      if (!ll || m.terrain.getDrawnElevationForLngLat(ll) == null) continue;
+      const mc = ml.MercatorCoordinate.fromLngLat(ll);
+      pts.push([mc.x, mc.y]);
+    }
+  }
+  return { w, pts };
+}, WATER_GRID);
+const seaHs = S1.pts.map(([x, y]) => heightAtWorld(x, y));
+ok('over ground below sea level the water starts at 0 m, not at the floor',
+   sea.h < -30 && seaHs.length >= 12 && Math.min(...seaHs) < -10 && S1.w.lo === 0 && S1.w.hi > 0
+     && (S1.w.scale ? S1.w.scale.heights.every(m => m >= 0) : true),
+   JSON.stringify({ deepest: Math.round(sea.h), inView: [Math.round(Math.min(...seaHs)), Math.round(Math.max(...seaHs))],
+                    lo: S1.w.lo, hi: S1.w.hi, heights: S1.w.scale && S1.w.scale.heights }));
+await page.evaluate(h => Map3D._map().jumpTo(h), home3);
+await page.waitForTimeout(600);
+await idle3d();
+await page.evaluate(() => Map3D._waterRange());
+
 const rampOk = r => Array.isArray(r) && r[0] === 'interpolate' && JSON.stringify(r[2]) === '["elevation"]'
   && r.length === 9 && r[3] < r[5] && r[5] < r[7];
 const alphaOf = c => { const m = /rgba\([^)]*,\s*([\d.]+)\)/.exec(String(c)); return m ? Number(m[1]) : null; };
@@ -2478,6 +2544,39 @@ ok('Rising water off takes the layer, its source, the scale and the caveat away'
 ok('…puts MapLibre’s furniture back at the foot, and is remembered', waterOff.foot <= 1 && waterOff.stored === 'off',
    JSON.stringify({ foot: waterOff.foot, stored: waterOff.stored }));
 await page.evaluate(() => Map3D._waterClock(null));
+
+// ── 9c. ⛰️ and its settings ────────────────────────────────────────────────
+// One button: pressed, the side panel opens on the 3-D settings and the map
+// tilts; pressed again, the map is flat and the side panel is back as ⛰️ found
+// it — on the pane that was open, or shut. Both, from a known start: the map
+// flat by Map3D's own toggle, which leaves the side panel alone.
+console.log('\n⛰️ opens its settings, and puts the side panel back');
+
+const flat3d = () => page.waitForFunction(() => !state.map3d && !Map3D._map(), null, { timeout: GL_TIMEOUT });
+const tilted3d = () => page.waitForFunction(() => !!Map3D._map() && Map3D._map().isStyleLoaded(), null, { timeout: GL_TIMEOUT });
+if (await page.evaluate(() => state.map3d)) { await page.evaluate(() => Map3D.toggle()); await flat3d(); }
+await page.evaluate(() => setDockTab('map-legend'));
+await btn3d.click();
+await tilted3d();
+const in1 = await page.evaluate(() => dockShowing());
+await btn3d.click();
+await flat3d();
+const out1 = await page.evaluate(() => ({ showing: dockShowing(), stored: localStorage.getItem('mn-dock-tab') }));
+ok('⛰️ from the legend: the 3-D settings while tilted, the legend again when flat',
+   in1 === 'map-3d' && out1.showing === 'map-legend' && out1.stored === 'map-legend', JSON.stringify({ in1, out1 }));
+await page.evaluate(() => shutDock());
+await btn3d.click();
+await tilted3d();
+const in2 = await page.evaluate(() => ({ showing: dockShowing(), stored: localStorage.getItem('mn-help') }));
+await btn3d.click();
+await flat3d();
+const out2 = await page.evaluate(() => dockShowing());
+ok('…from a shut side panel: opened on the 3-D settings, and shut again after — remembered as shut while it was open',
+   in2.showing === 'map-3d' && in2.stored === 'collapsed' && out2 === null, JSON.stringify({ in2, out2 }));
+// Back into 3-D for the teardown below, which is about leaving the tab with it on.
+await page.evaluate(() => setDockTab('stations'));
+await btn3d.click();
+await tilted3d();
 
 console.log('\nLeaving the tab takes the WebGL context with it');
 

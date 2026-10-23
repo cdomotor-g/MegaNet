@@ -2646,11 +2646,11 @@ function helpShowing() {
 // rail's redesign): the names toggle at the top, three sections that fold
 // under their headings when the names are on — Stations & places (the cards,
 // Find a place, the path tools, the twin), Map (what the map shows, the
-// corner's `show` group) and Tools (what is pointed at it, the corner's
-// `tools`) — and a foot that stays at the bottom of the rail whatever is
-// scrolled above it: 🧹 Clear the selection, the 3-D view and its camera
-// (the corner's `3d`), ⛶ (its `screen`), and ❔ last. Everywhere else it is ❔
-// alone. The map's controls are placed by their corner group and their place
+// corner's `show` group, and its `3d` — ⛰️ the 3-D view and its camera — last
+// in it) and Tools (what is pointed at it, the corner's `tools`) — and a foot
+// that stays at the bottom of the rail whatever is scrolled above it: 🧹 Clear
+// the selection, ⛶ (the corner's `screen`), and ❔ last. Everywhere else it is
+// ❔ alone. The map's controls are placed by their corner group and their place
 // in it — not by the order they were built, which for the polar plot and the
 // site finder is long after the rest. Each item is either a pane's button
 // ('tab', made and kept by syncDockStrip) or a plain button ('action', the
@@ -2682,19 +2682,27 @@ function dockStripGroups() {
                 label: 'Digital twin — open a station\'s twin, its scene settings, ground truth and the .glb for Blender' });
   groups.push({ name: 'places', label: 'Stations & places', fold: true, items: places });
   const sections = { show: 'Map', tools: 'Tools' };
+  // The corner's `3d` group — ⛰️ and its camera — stands last in Map rather
+  // than in the foot: the 3-D view is a way of showing the map, not a button
+  // about the screen. (The corner keeps it a group of its own, ranked after
+  // the tools, so it comes after everything else in Map.)
+  const sectionOf = group => (group === '3d' ? 'show' : group);
   // 🧹 Clear the selection heads the foot: the side panel's own button rather
   // than MapChrome's, and one an operator reaches for whatever is scrolled.
   const foot = { name: 'foot', label: 'Selection, view and help', items: [{ key: 'clear', kind: 'action', el: dockClearEl() }] };
+  // A pane another control opens (`strip: false` — the 3-D settings, which ⛰️
+  // opens) is a pane here and has no button.
   const map = [...dockMapItems.values()]
-    .filter(e => dockMapListed(e) && (e.kind === 'panel' || e.el))
+    .filter(e => dockMapListed(e) && (e.kind === 'panel' || e.el) && e.strip !== false)
     .sort((a, b) => a.rank - b.rank || a.order - b.order);
   for (const e of map) {
     const it = e.kind === 'panel'
       ? { key: e.key, kind: 'tab', icon: e.icon, label: e.label, name: e.name, entry: e }
       : { key: e.key, kind: 'action', el: e.el };
-    if (!sections[e.group]) { foot.items.push(it); continue; }
-    let g = groups.find(x => x.name === e.group);
-    if (!g) groups.push(g = { name: e.group, label: sections[e.group], fold: true, items: [] });
+    const name = sectionOf(e.group);
+    if (!sections[name]) { foot.items.push(it); continue; }
+    let g = groups.find(x => x.name === name);
+    if (!g) groups.push(g = { name, label: sections[name], fold: true, items: [] });
     g.items.push(it);
   }
   foot.items.push(help);
@@ -3187,9 +3195,13 @@ function toggleDockNames() {
 // ── Opening, shutting, switching ─────────────────────────────────────────────
 
 function dockPersist() {
+  // Not the 3-D settings: only ⛰️ opens them, as it tilts the map, and the map
+  // is flat on every visit — so what is remembered is the side panel as it was
+  // under them (toggleStations3d).
+  const under = state.dockTab === 'map-3d' && stations3dBefore;
   try {
-    localStorage.setItem('mn-help', state.dockOpen ? 'expanded' : 'collapsed');
-    localStorage.setItem('mn-dock-tab', state.dockTab);
+    localStorage.setItem('mn-help', (under ? under.open : state.dockOpen) ? 'expanded' : 'collapsed');
+    localStorage.setItem('mn-dock-tab', under ? under.tab : state.dockTab === 'map-3d' ? 'stations' : state.dockTab);
   } catch (_) { /* private browsing, a full quota — it still works this session */ }
 }
 
@@ -3460,7 +3472,7 @@ function dockAdopt(el, info) {
   // is taken out rather than left for getElementById to find first.
   if (e.el && e.el !== el) e.el.remove();
   Object.assign(e, { el, state: 'held', icon: info.icon, label: info.label, name: info.name, group: info.group,
-                     groupLabel: info.groupLabel, rank: info.rank, order: info.order });
+                     groupLabel: info.groupLabel, rank: info.rank, order: info.order, strip: info.strip !== false });
   if (e.kind === 'panel') {
     if (!e.pane) {
       e.pane = document.createElement('div');
@@ -4748,17 +4760,24 @@ function stationsMapPanels(map) {
   });
 
   // ── The 3-D view, as one cluster ───────────────────────────────────────────
-  // Two of these four were four buttons apart before #192 and read as two
-  // unrelated ⛰️s — which was the whole of the complaint that opened the issue,
-  // and a fair one: there was nothing on screen to say that the second mountain
-  // was the first mountain's settings.
+  // In a corner — which this map's controls are not in at any width now
+  // (dockInto), but which is what the side panel's arrangement is copied from —
+  // the mode is a full-height button and its panel the thin caret under it,
+  // sharing its edge, in the idiom every split button in every toolbar uses:
+  // **press the big half to do the thing, press the small half for what it
+  // does it with.** Before #192 they were four buttons apart and read as two
+  // unrelated ⛰️s.
   //
-  // They are one control now. The mode is a full-height button and the panel is
-  // the thin caret under it, sharing its edge, in the idiom every split button
-  // in every toolbar uses: **press the big half to do the thing, press the
-  // small half for what it does it with.** The caret keeps the id, the title
-  // and the pin it has always had — it is the same panel, drawn as the lower
-  // half of the button it belongs to.
+  // In the side panel the cluster stands last in the Map section
+  // (dockStripGroups): the 3-D view is a way of showing the map. And there it
+  // is one button, ⛰️, which opens its settings as it tilts the map
+  // (toggleStations3d) — the panel has no button of its own there (`strip:
+  // false`). Until October 2026 the cluster was in the foot with 🧹 and ⛶, and
+  // the settings had a 🎚️ beside ⛰️: two buttons for one thing. The panel keeps
+  // its id and its markup, so map-3d.js re-renders it in place as ever: the
+  // exaggeration, the line-of-sight sheets, the rising water and the note on
+  // what the relief is.
+  //
   //
   // The 3-D canvas covers every Leaflet pane and stops below Leaflet's control
   // container (styles.css, #map3d), so this cluster — and every panel beside
@@ -4766,23 +4785,14 @@ function stationsMapPanels(map) {
   // lets one set of controls drive both modes.
   MapChrome.button(map, {
     className: 'mn-map-3d', icon: Glyphs.rail('view3d'), name: '3-D view',
-    title: '3-D view — tilt the map and see the ground it is drawn on',
+    title: '3-D view — tilt the map and see the ground it is drawn on, with its settings beside it',
     group: '3d', order: 10, pair: '3d', pressed: Map3D.active(),
-    onClick: () => Map3D.toggle(),
+    onClick: () => toggleStations3d(),
   });
-  // The panel behind the caret is not only the mode: it carries the
-  // exaggeration slider, the line-of-sight sheet switch and the note that says
-  // what the relief is made of and what it cannot be trusted to say. The button
-  // above is the mode; this is everything about it (map-3d.js).
-  //
-  // In the side panel's strip there is no split button to be half of, so it is
-  // a button of its own under ⛰️, and wears 🎚️ — the slider and the switches it
-  // opens — rather than ⛰️ twice, which would be two buttons saying the same
-  // thing and doing different things.
   MapChrome.panel(map, {
-    id: '3d', icon: '▾', dockIcon: Glyphs.rail('set3d'), title: '3-D view', name: '3-D settings',
-    btnLabel: '3-D settings — exaggeration, line-of-sight sheets, what the relief is',
-    caret: true, pair: '3d',
+    id: '3d', icon: '▾', title: '3-D view', name: '3-D settings',
+    btnLabel: '3-D settings — exaggeration, line-of-sight sheets, rising water, what the relief is',
+    caret: true, pair: '3d', strip: false,
     group: '3d', order: 20,
     html: () => Map3D.panelHtml(),
   });
@@ -4855,6 +4865,41 @@ function stationsMapPanels(map) {
     ariaLabel: 'Reset the map',
     onClick: () => resetStationsMap(),
   });
+}
+
+// ⛰️ pressed: the 3-D view and its settings in one press. Going in opens the
+// side panel on the 3-D pane — the exaggeration, the sheets, the rising water,
+// what the relief is — and then tilts the map: the pane first, so that a side
+// panel that was shut has taken its width before the 3-D view is built, rather
+// than the canvas being resized under a camera that has just been placed.
+// Coming out flattens the map and, if the 3-D pane is still the one showing,
+// puts the side panel back as it was under it — the pane that was open, or
+// shut. A pane chosen since is left alone: that is the operator's.
+//
+// Leaving by the pane's own Leave 3-D keeps the pane, which is where the
+// operator is, and it says Enter 3-D then. On a phone the pane is a drawer
+// over the map, as every pane there is.
+let stations3dBefore = null;   // { tab, open } — the side panel as ⛰️ found it
+
+async function toggleStations3d() {
+  if (Map3D.active()) {
+    await Map3D.toggle();
+    const back = stations3dBefore;
+    stations3dBefore = null;
+    if (dockShowing() !== 'map-3d') return;
+    if (back && back.open && back.tab !== 'map-3d' && dockHas(back.tab)) setDockTab(back.tab);
+    else {
+      if (back && back.tab !== 'map-3d') state.dockTab = back.tab;
+      shutDock();
+    }
+    return;
+  }
+  const showing = dockShowing();
+  if (showing !== 'map-3d') {
+    stations3dBefore = { tab: state.dockTab, open: !!showing };
+    if (dockHas('map-3d')) setDockTab('map-3d');
+  }
+  await Map3D.toggle();
 }
 
 // ── Reset the map (#191) ─────────────────────────────────────────────────────

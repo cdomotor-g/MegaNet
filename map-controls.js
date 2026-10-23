@@ -795,6 +795,8 @@ const MapChrome = (function () {
       icon:  opts.dockIcon || opts.icon,
       group, groupLabel: GROUPS[group], rank: ORDER.indexOf(group),
       order: Number(opts.order) || 0,
+      // …and whether the host's strip gives it a button at all (see panel()).
+      strip: opts.strip !== false,
     };
   }
 
@@ -1068,11 +1070,11 @@ const MapChrome = (function () {
     //             wears beside its icon when the rail shows names; `title`
     //             when it is not given. btnLabel, or title, has to contain it
     //   dockIcon  optional, the glyph its button in the side panel wears when
-    //             it is not `icon`. The 3-D caret's icon is ▾, which says
-    //             "the half of ⛰️ that opens" beside ⛰️ and nothing at all in a
-    //             strip of its own — and ⛰️ would say the wrong thing there,
-    //             because the ⛰️ in that strip is the mode itself; so it is 🎚️,
-    //             which is what the panel mostly is: a slider and two switches
+    //             it is not `icon`
+    //   strip     false: in the side panel it is a pane with no button of its
+    //             own in the strip, opened by another control instead — the
+    //             3-D settings, which ⛰️ opens as it tilts the map (app.js,
+    //             toggleStations3d). In a corner it is drawn as ever
     //
     // Returns the wrapper element. It was the Leaflet control until the corner
     // became a bar; no caller ever used it, and there is no control of its own

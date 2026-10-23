@@ -174,8 +174,7 @@ const Glyphs = (() => {
     sites:    { hue: 'radio', emoji: '🗼', d: 'M2 20.5 8.5 11l3 4 3.5-5.5 7 11zM15 9.5V5.5M12.5 4a3.6 3.6 0 0 1 5 0' },
     relocate: { hue: 'radio', emoji: '🚚', d: 'M8 16s-5-4.4-5-8a5 5 0 0 1 10 0c0 3.6-5 8-5 8zM6.4 8a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0M11 19.5h10M18 16.5l3 3-3 3', dash: 'M3 19.5h5' },
     here:     { hue: 'radio', emoji: 'ℹ️', d: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M12 11v5.5M12 7.8h.01' },
-    view3d:   { hue: 'admin', emoji: '⛰️', d: 'M2.5 18 7 7h10l4.5 11zM7.5 15l3-4 2 2.5 1.5-1.5 2.5 3' },
-    set3d:    { hue: 'admin', emoji: '⚙️', d: 'M4 6h9M18 6h2M4 12h3M12 12h8M4 18h11M19 18h1M13.5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M7.5 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M15 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0' },
+    view3d:   { hue: 'data',  emoji: '⛰️', d: 'M2.5 18 7 7h10l4.5 11zM7.5 15l3-4 2 2.5 1.5-1.5 2.5 3' },
     full:     { hue: 'admin', emoji: '⛶',  d: 'M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6' },
   };
 

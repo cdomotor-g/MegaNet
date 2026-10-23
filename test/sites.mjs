@@ -829,6 +829,9 @@ if (!gl2) {
   ok('…with the click answered by the pin alone — not the 3-D map, not the 2-D map under it',
      leaked.lf === 0 && leaked.ml === 0 && leaked.here === null, JSON.stringify(leaked));
 
+  // ⛰️ opened the 3-D settings in the side panel as it tilted the map; the
+  // finder's pane back, as its button in the strip would bring it.
+  await page.evaluate(() => setDockTab('map-sites'));
   await page.locator('#sites-dim').fill('100');
   const s3c = await look3();
   ok('back at 100 % the network\'s opacities are its own again, and the names go',
