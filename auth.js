@@ -271,16 +271,28 @@ const Auth = (function () {
   // carries GoTrue's status and its error code (error_code in newer GoTrue,
   // error in older), and a weak password's reasons — what errorText() reads.
   async function post(path, body, opts = {}) {
-    const res = await fetch(`${AUTH_URL}/${path}`, {
-      method: opts.method || 'POST',
-      headers: {
-        apikey: DB_ANON_KEY,
-        'Content-Type': 'application/json',
-        ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
-      },
-      body: JSON.stringify(body),
-      cache: 'no-store',
-    });
+    let res;
+    try {
+      res = await fetch(`${AUTH_URL}/${path}`, {
+        method: opts.method || 'POST',
+        headers: {
+          apikey: DB_ANON_KEY,
+          'Content-Type': 'application/json',
+          ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
+        },
+        body: JSON.stringify(body),
+        cache: 'no-store',
+      });
+    } catch (_) {
+      // No answer at all — no network, or none to this site. Status 0, so
+      // errorText() says so: the browser's own words for it ("Load failed" in
+      // Safari, "Failed to fetch" in Chrome) told an iPhone user nothing.
+      const err = new Error('no answer');
+      err.status = 0;
+      err.code = '';
+      err.reasons = [];
+      throw err;
+    }
     const text = await res.text();
     let parsed = null;
     try { parsed = text ? JSON.parse(text) : null; } catch (_) { /* not JSON */ }
@@ -754,7 +766,10 @@ const Auth = (function () {
       return 'Too many emails have gone out for now. Wait a few minutes and try again.';
     }
     if (err && err.status === 429) return 'Too many attempts in a row. Wait a minute and try again.';
-    if (err && err.status === 0) return 'No answer — check the connection and try again.';
+    if (err && err.status === 0) {
+      return 'No answer from Flood-Net — this device is not reaching it. Check the connection (on a phone, try '
+           + 'mobile data instead of Wi-Fi, or the other way round) and try again.';
+    }
     return `That did not work — ${m}`;
   }
 

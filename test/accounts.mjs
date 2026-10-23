@@ -8,7 +8,8 @@
 //      automation it stays away unless a check asks for it.
 //   2. **Signing in with a password** — the form a password manager knows
 //      (username and current-password), the providers GoTrue says are on,
-//      a wrong password said plainly, the right one signing in.
+//      a wrong password said plainly, no answer at all said as that (not
+//      Safari's "Load failed"), the right one signing in.
 //   3. **Creating an account** — the address checked as it is typed (a
 //      Bureau address "approved as soon as you confirm it", any other "an
 //      administrator approves"), a short password refused before it is sent,
@@ -110,6 +111,7 @@ async function main() {
         return reply(400, { code: 400, error_code: 'validation_failed', msg: 'Unsupported provider: missing OAuth secret' });
       }
       if (path === 'token' && u.searchParams.get('grant_type') === 'password') {
+        if (body.email === 'away@bom.gov.au') return route.abort('internetdisconnected');
         if (body.email === 'late@council.example') return reply(400, { code: 400, error_code: 'email_not_confirmed', msg: 'Email not confirmed' });
         if (body.email === 'sam@bom.gov.au' && body.password === PASSWORD) return reply(200, session('tok-sam', body.email));
         return reply(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
@@ -251,6 +253,13 @@ async function main() {
     await page.waitForFunction(() => /do not match/.test(document.querySelector('#auth-modal .au-msg')?.textContent || ''));
     const typed = await page.evaluate(() => ({ email: document.getElementById('au-email').value, pw: document.getElementById('au-password').value }));
     check('a wrong password is said plainly, and nothing typed is lost', typed.email === 'sam@bom.gov.au' && typed.pw === 'not the password', J(typed));
+    await page.fill('#au-email', 'away@bom.gov.au');
+    await page.click('#auth-modal button[type="submit"]');
+    await page.waitForFunction(() => /No answer/.test(document.querySelector('#auth-modal .au-msg')?.textContent || ''));
+    const away = (await modal(page)).msg;
+    check('no answer at all is said as that, with what to try — not the browser\'s "Failed to fetch" / "Load failed"',
+      /No answer from Flood-Net/.test(away) && /mobile data/.test(away) && !/fetch|Load failed/i.test(away), away);
+    await page.fill('#au-email', 'sam@bom.gov.au');
     await page.fill('#au-password', PASSWORD);
     await page.click('#auth-modal button[type="submit"]');
     await page.waitForFunction(() => Auth.known() && /Your account/.test(document.getElementById('au-title')?.textContent || ''));
