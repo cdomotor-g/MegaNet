@@ -222,13 +222,13 @@ try {
     power: (document.querySelector('#map-latency-panel .lat-power') || {}).getAttribute?.('aria-pressed'),
     status: (document.getElementById('lat-live-status') || {}).textContent || '',
     legend: /Flashing green/.test(document.getElementById('map-legend').textContent),
-    strip: (() => { const b = document.querySelector('#help-panel .dock-tab[data-dock="map-latency"]');
-                    return { root: document.documentElement.hasAttribute('data-lat-anim'), beat: getComputedStyle(b, '::before').animationName }; })(),
+    strip: (() => { const b = document.querySelector('#help-panel .dock-tab[data-dock="map-latency"] .rail-ico');
+                    return { root: document.documentElement.hasAttribute('data-lat-anim'), beat: getComputedStyle(b, '::after').animationName }; })(),
   }));
   check('…and the message animation with it: its box ticked, ⏻ pressed, the 🔑 legend saying what a green flash is',
     anim0 && live0.box === true && live0.power === 'true' && live0.legend && /Asked at/.test(live0.status), J(live0));
-  check('…and ⏱️ in the strip beats green behind its icon while it does, the card\'s node to the same beat',
-    live0.strip.root && live0.strip.beat === 'lat-live-beat', J(live0.strip));
+  check('…and ⏱️ in the rail rings green round its picture while it does, to the card\'s node\'s beat',
+    live0.strip.root && live0.strip.beat === 'lat-rail-ring', J(live0.strip));
   check('…the log asked for what has landed since, oldest first, a page at most, with the columns a station is found by',
     count('live') >= 1 && asked.filter(a => a.kind === 'live').every(a => /order=received_at\.asc/.test(a.url)
       && /limit=1000/.test(a.url) && /select=addr,alert_id,.*received_at,source,path/.test(a.url)),
@@ -466,7 +466,7 @@ try {
     return { anim: MapLatency.anim(), on: MapLatency.on(), watching: n.watching, status: n.status, pulses: n.pulses,
              stored: localStorage.getItem('mn-latency-anim'),
              strip: document.documentElement.hasAttribute('data-lat-anim')
-               || getComputedStyle(document.querySelector('#help-panel .dock-tab[data-dock="map-latency"]'), '::before').content !== 'none',
+               || getComputedStyle(document.querySelector('#help-panel .dock-tab[data-dock="map-latency"] .rail-ico'), '::after').content !== 'none',
              legend: /Flashing green/.test(document.getElementById('map-legend').textContent),
              card: document.getElementById('lat-live-status').textContent,
              banded: state.mapMarkers.filter(m => m.mnLatency).length };

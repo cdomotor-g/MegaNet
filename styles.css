@@ -3827,19 +3827,61 @@ hr {
 }
 .lat-pulse-canvas { pointer-events: none; }
 
-/* ⏱️ in the side panel's strip while the messages are animated
-   (map-latency.js sets data-lat-anim on the root): the card's green node,
-   beating behind the icon to the same 2.4 s — still under reduced motion, by
-   the blanket rule. Behind it in the button's own stacking context, so the
-   open pane's panel fill stays under it and the icon over it. */
-html[data-lat-anim] .dock-tab[data-dock="map-latency"] { position: relative; isolation: isolate; }
-html[data-lat-anim] .dock-tab[data-dock="map-latency"]::before {
+/* ⏱️ Latency in the side panel's rail while the messages are animated
+   (map-latency.js sets data-lat-anim on the root): a green ring goes out from
+   its picture on the 2.4 s beat of the card's node, and with the names on, a
+   "Live" tag at the end of its row says the same in words. On the picture rather than behind the whole button — a glow
+   sized for a 44 px square smeared across a row with a name in it — and a ring
+   of its own, so it never takes the place of the gold or the lit tile that
+   says the pane is open. Still under reduced motion, by the blanket rule: a
+   steady ring. */
+html[data-lat-anim] .dock-tab[data-dock="map-latency"] .rail-ico {
+  position: relative;
+}
+
+html[data-lat-anim] .dock-tab[data-dock="map-latency"] .rail-ico::after {
   content: "";
-  position: absolute; inset: 12%; z-index: -1;
-  border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle, #fff 0 18%, #8dffa9 34%, rgba(30, 227, 94, .85) 48%,
-                              rgba(30, 235, 95, .35) 62%, rgba(30, 235, 95, 0) 74%);
-  animation: lat-live-beat 2.4s ease-out infinite;
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--ok);
+  border-radius: 11px;
+  pointer-events: none;
+  animation: lat-rail-ring 2.4s ease-out infinite;
+}
+
+@keyframes lat-rail-ring {
+  0%        { opacity: .95; transform: scale(.82); }
+  45%, 100% { opacity: 0; transform: scale(1.3); }
+}
+
+html[data-lat-anim] #help-panel.rail-names .dock-tab[data-dock="map-latency"]::after {
+  content: "Live";
+  flex: none;
+  order: 2;
+  padding: .1rem .45rem .1rem 1rem;
+  border-radius: 999px;
+  background: radial-gradient(circle at .5rem 50%, var(--ok) .2rem, transparent calc(.2rem + 1px)),
+              color-mix(in srgb, var(--ok) 15%, transparent);
+  color: var(--ok);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+/* The dark frame's green, light enough to read on it; and under Signs a sign
+   of its own, black on green, whichever row it is on. */
+:root[data-look="instrument"] #help-panel .dock-strip {
+  --ok: #4ade80;
+}
+
+html[data-lat-anim][data-look="signs"] .dock-tab[data-dock="map-latency"] .rail-ico::after {
+  border-color: var(--sign-ink);
+}
+
+html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-dock="map-latency"]::after {
+  background: radial-gradient(circle at .5rem 50%, var(--sign-ink) .2rem, transparent calc(.2rem + 1px)), #86efac;
+  color: var(--sign-ink);
 }
 
 /* Manual, as a pill. The one fact in that block that changes what a person
