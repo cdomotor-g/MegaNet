@@ -25,6 +25,21 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 81, date: '2026-10-23', items: [
+      '<strong>The Stations side panel names its buttons.</strong> The rail on the right of the Stations map now '
+        + 'shows each button\'s name beside its icon, in three sections — <em>Stations &amp; places</em>, <em>Map</em> '
+        + 'and <em>Tools</em> — whose headings fold them away. <strong>Collapse »</strong> at its top puts the names '
+        + 'away for icons alone, and « brings them back, the way the left bar folds; it remembers. <em>Clear the '
+        + 'selection</em>, the <em>3-D view</em>, <em>Full screen</em> and <em>Help</em> stay at the foot of the rail '
+        + 'whatever is scrolled above them, and a mode such as <em>What\'s here?</em> wears a switch that says whether it '
+        + 'is on.',
+      'The icons are drawn to match the left bar in every look: thin lines under Calm, coloured tiles under Tiles, '
+        + 'the dark frame under Instrument (the rail is part of it now), yellow signs under Signs, and emoji under '
+        + 'Classic. Under Tiles the open panel\'s tile is <strong>gilded</strong>, so you can see which one is on. Some '
+        + 'names are shorter: <em>Map display</em> is <strong>Layers</strong>, <em>Polar radio coverage</em> is '
+        + '<strong>Radio coverage</strong>, <em>Repeater site finder</em> is <strong>Repeater sites</strong> and '
+        + '<em>Station relocation finder</em> is <strong>Relocate station</strong>.',
+    ] },
     { n: 80, date: '2026-10-23', items: [
       '<strong>↩ Undo in Station details.</strong> Once you have changed something and not saved it, an <em>Undo</em> '
         + 'button appears to the left of <em>Save</em> — at the top of the card and in the unsaved-changes bar at its '

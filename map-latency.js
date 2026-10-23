@@ -1875,7 +1875,7 @@ const MapLatency = (() => {
     map = m;
     root = null;
     MapChrome.panel(m, {
-      id: 'latency', icon: '⏱️', title: 'Latency',
+      id: 'latency', icon: '⏱️', dockIcon: Glyphs.rail('latency'), title: 'Latency',
       btnLabel: 'Latency — colour the pins by how fresh each station’s data is, and see its checks slot by slot',
       group: 'show', order: 40,
       html: () => `<div class="lat-pane" id="map-latency-panel">${paneHtml()}</div>`,

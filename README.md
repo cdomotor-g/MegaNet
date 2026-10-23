@@ -1268,7 +1268,7 @@ here.
   repeater over field. Satcom terminals have no pin of their own — *Satcom* is in
   the legend and among the editor's roles, but no station in `stations.json`
   carries it
-- **Station pins say what the station is** (🗺️ Map display, *Station pins*, each
+- **Station pins say what the station is** (Layers, *Station pins*, each
   switch on by default and remembered): a **triangle** for a river height (water
   level) gauge and a **circle** for a rain gauge or anything else — a station that
   measures both is a triangle; **grey** for a gauge read by hand; **black** for
@@ -1279,7 +1279,7 @@ here.
 - Draw signal path lines between field stations and the repeaters/base stations their AlertID passes through
 - Click a station to see its full detail panel
 - Filter map display by role, sensor type, radio network, owner, region, gauge (what it measures, who reads it, the Bureau's flood warning role), basin/council or data completeness (see *Filtering & Exploration*)
-- Draw only one owner's stations — the Bureau's, Seqwater's, one council's — or everyone's but theirs (🗺️ Map display, *Owner*); the list and the filters are left alone
+- Draw only one owner's stations — the Bureau's, Seqwater's, one council's — or everyone's but theirs (Layers, *Owner*); the list and the filters are left alone
 - Pull the repeaters that carry a matched station onto the map and into the table with it (*Include related repeaters*)
 - Toggle the link lines on/off (the backbone paths have a switch of their own), fade them with a slider, and cap how long a link may be before it is dropped (*Limit link/path length*)
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
@@ -1287,7 +1287,7 @@ here.
 - **Last heard** in the station list — how long since Flood-Net heard each station (*45 min*, *3 h*, *never*), green, ⚠ amber or ⛔ red against its checks, from that same one request
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
 - Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a six-column list there (name, station number, roles, AlertID, SLS catchment, last heard) instead of the eleven the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
-- **What is here** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, the estimated mobile signal for each carrier, and the nearest station, repeater and survey mark
+- **What’s here?** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, the estimated mobile signal for each carrier, and the nearest station, repeater and survey mark
 - **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, a polar coverage plot lying on the relief, your Draw & measure sketches on the ground (and its tools drawing there), pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
 - **Mobile coverage** — each carrier's own 4G coverage map, as Telstra, Optus and TPG give it to the ACCC: where a phone works outdoors and where only with an external antenna, one carrier at a time or the best of the three
 - Elevation shading over any base map, with an opacity slider
@@ -1297,14 +1297,18 @@ here.
 - Export the whole drawing to Google Earth as a KML — the shapes in their own colours, and the stations they enclose or run between
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
-- **Repeater site finder** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve; fade everything else on the map to see them, see them on the terrain in 3-D, and take them to Google Earth as a KMZ with each candidate's paths in a folder of its own — see *Repeater site finder* under §17
-- **Station relocation finder** — pick a station that has to move and how far it may go, and the ground round it is coloured by how good a new home each spot would be: fade margin to the repeaters that hear it now first, then open sky for the rain gauge (its WMO siting class from the trees and roofs round it), clear ground and closeness; the three to five best are pinned, kept off every building the State and OpenStreetMap have mapped and out of the water — see *Station relocation finder* under §17
-- Leaflet.js, with the map's own controls in the side panel's strip beside it (§20), grouped by what they
-  are for and separated by a hairline: what the map **shows** (base map — OSM-Topo by default,
-  OpenStreetMap, Satellite or Dark — **Map display**, the **legend**), the tools you point at it
-  (**Draw & measure**, **Polar radio coverage**, **Repeater site finder**, **Station relocation finder**, **What is here**), the **3-D view**, its
-  settings (🎚️) and its camera, and how much screen the map gets (⛶ full screen). A panel opens as a pane of
-  the side panel from its button in the strip; a button does its one thing.
+- **Repeater sites** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve; fade everything else on the map to see them, see them on the terrain in 3-D, and take them to Google Earth as a KMZ with each candidate's paths in a folder of its own — see *Repeater site finder* under §17
+- **Relocate station** — pick a station that has to move and how far it may go, and the ground round it is coloured by how good a new home each spot would be: fade margin to the repeaters that hear it now first, then open sky for the rain gauge (its WMO siting class from the trees and roofs round it), clear ground and closeness; the three to five best are pinned, kept off every building the State and OpenStreetMap have mapped and out of the water — see *Station relocation finder* under §17
+- Leaflet.js, with the map's own controls in the side panel's rail beside it (§20), each named beside
+  its icon (or icons alone, by the rail's **Collapse »**, as the left bar folds), in sections whose
+  headings fold them: **Stations & places** (the cards, Find a place, the path tools, the digital
+  twin), **Map** — what the map shows (**Layers**, with the base map — OSM-Topo by default,
+  OpenStreetMap, Satellite or Dark — the **Legend**, **Latency**) — and **Tools**, what you point at it
+  (**Draw & measure**, **Radio coverage**, **Repeater sites**, **Relocate station**, **What's here?**);
+  and a foot that stays put: **Clear the selection**, the **3-D view** with its settings and camera,
+  **Full screen** and **Help**. A panel opens as a pane of the side panel from its button in the rail;
+  a button does its one thing, and a mode wears a switch. The icons are drawn in each look's own hand
+  (`Glyphs.rail`, glyphs.js); under Tiles the one that is on is gilded.
   The one control left on the map is ↺ reset, alone in its top-right corner at every width. On a phone the map
   fills the screen, and the strip is a rail down the right-hand edge that ⋮ in the banner brings out, beside the
   map rather than on it; a panel opens from it as a drawer over the page, and so do the station cards
@@ -4796,16 +4800,22 @@ showing the headline alone read as though the change had never reached it.
 top-right corner lives in the strip instead, at every width — a phone's rail
 included, where a pane is a drawer — except ↺ reset, which is built to stay
 (`corner: true` on `MapChrome.button`, so the side panel is never offered it)
-and is the one thing in that corner. Each panel — 🗺️ Map display, 🔑 Legend, ✏️ Draw & measure,
-📡 Polar radio coverage, 🗼 Repeater site finder, 🚚 Station relocation finder, 🎚️ the 3-D settings — moves
+and is the one thing in that corner. Each panel — Layers, Legend, Draw & measure, Radio coverage,
+Repeater sites, Relocate station, the 3-D settings — moves
 its whole `.mn-mapctl` wrapper (icon, heading, pin and body) into a pane of its
 own the moment it is built, with a button in the strip; its corner icon and its
 📌 are hidden there, because a pane already stays open. Each other plain button
 — ℹ️, ⛰️ and its two camera buttons (hidden until 3-D is on), ⛶ — is moved
 into the strip itself, keeping the class its module finds it by. They stand in the
-corner's groups and order (`MapChrome.groups()`), one labelled group each with a
-hairline between them, and the strip scrolls, with a thin bar beside the
-buttons rather than over them, when it is taller than the window. Building the
+rail's sections (`dockStripGroups`): the corner's `show` group is **Map**, its
+`tools` group **Tools**, and its `3d` and `screen` groups go to the foot with
+Clear the selection and Help, each a labelled group — headings that fold with
+the names on, hairlines with icons alone — and the strip scrolls, with a thin
+bar beside the buttons rather than over them, when it is taller than the
+window, the foot standing at its foot (sticky, with the strip's scroll padding
+its height, so nothing brought into view lands under it). The names are a
+desktop's (`state.dockNames`, `mn-dock-names`, `?rail=names|icons`); a phone's
+rail is always icons. Building the
 map opens nothing: which pane shows is the side panel's own preference, and a
 fresh visit still opens on 📍. The map is rebuilt on every render of the tab,
 and its new controls land in the *same* panes and strip buttons, so the pane

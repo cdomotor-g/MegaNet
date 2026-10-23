@@ -31,6 +31,9 @@
   // Route, which has to see the address as it arrived and which is the one
   // that knows whether this device is new.
   Looks.start();
+  // …and the side panel's rail, names or icons, likewise taken from an address
+  // that names it (app.js, dockNamesFromAddress).
+  dockNamesFromAddress();
   // ✨ What's new: shown if this device has something it has not seen, and a
   // device that has never been here has seen it all (whats-new.js, #222).
   WhatsNew.start();

@@ -384,7 +384,7 @@ const MapHere = (function () {
   function syncBtn() {
     for (const b of document.querySelectorAll('.mn-map-here')) {
       b.setAttribute('aria-pressed', String(armed));
-      const label = armed ? 'Click the map to say where' : 'What is here?';
+      const label = armed ? 'What’s here? — click the map to say where' : 'What’s here?';
       b.title = label;
       b.setAttribute('aria-label', label);
       b.classList.toggle('is-on', armed);

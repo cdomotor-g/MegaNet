@@ -11,7 +11,7 @@ driven to the site — mapped on the Stations map and kept in the datastore
 | **📌 Site features** on a station's card, beside *Move pin* | Arms the mode for that station: the panel bottom left of the map, its features listed, and the map taken to the site. |
 | **📌 Site features on the map** in the station editor, beside *Move pin on map* | The same. |
 | The station card's **Site features** section | What is mapped there, a row each; a row shows its feature on the map. |
-| 🗺️ **Map display → Site features (📌)** | Every station's features in view, from zoom 16. On unless switched off; remembered. |
+| 🗺️ **Layers → Site features (📌)** | Every station's features in view, from zoom 16. On unless switched off; remembered. |
 
 All of it is for **signed-in editors**. Signed out there is no pill, no section
 and nothing drawn, and nothing is asked of the database — where a benchmark is,
@@ -110,7 +110,7 @@ on with a phone are different claims:
 
 The map is only as good as its imagery: the State's aerial program is 10–20 cm
 in the towns and coarser in the country, and the topo base is not imagery at
-all. Pick **Satellite** in Map display before placing anything by eye.
+all. Pick **Satellite** in Layers before placing anything by eye.
 
 ## Two people at once
 

@@ -520,7 +520,7 @@ function addBaseLayers(map, opts = {}) {
   // every other icon in that group is a way of drawing something *over* this.
   if (opts.panel !== false) {
     MapChrome.panel(map, {
-      id: 'display', icon: '🗺️', title: 'Map display',
+      id: 'display', icon: '🗺️', title: 'Layers',
       group: 'show', order: 10,
       html, onMount: bind,
     });
@@ -790,6 +790,8 @@ const MapChrome = (function () {
       // exists because its icon is not a picture of it (the 3-D caret), and a
       // button in the host's strip is no more a picture of it than the caret.
       label: opts.btnLabel || opts.title || '',
+      // …and the short name it wears beside its icon in the host's strip.
+      name:  opts.name || opts.title || '',
       icon:  opts.dockIcon || opts.icon,
       group, groupLabel: GROUPS[group], rank: ORDER.indexOf(group),
       order: Number(opts.order) || 0,
@@ -987,6 +989,11 @@ const MapChrome = (function () {
     //   onClick   what it does, called with the button
     //   className extra classes — which is how the module that owns a button
     //             finds it again to keep it in step (`.mn-map-3d`, …)
+    //   name      optional, the short name it wears beside its icon in the
+    //             side panel's rail when the rail shows names. The accessible
+    //             name (title, ariaLabel) has to contain it
+    //   toggle    a mode whose aria-pressed its module writes later (⛶), so
+    //             that the rail draws a switch for it as it does for `pressed`
     //   pressed   this button is a *mode* rather than an action, and starts
     //             in that state. A mode has to say so from the moment it is
     //             built, not from the first time it changes: ℹ️ and ⛰️ are
@@ -1011,7 +1018,12 @@ const MapChrome = (function () {
       const b = L.DomUtil.create('button',
         `mn-mapctl-btn${opts.className ? ` ${opts.className}` : ''}`);
       b.type = 'button';
-      b.innerHTML = `<span class="mn-mapctl-ico" aria-hidden="true">${opts.icon || ''}</span>`;
+      // The name and the switch are drawn only in the side panel's rail with
+      // its names on (styles.css, .dock-name, .rail-switch): in a corner the
+      // icon is the button, as it always was.
+      b.innerHTML = `<span class="mn-mapctl-ico" aria-hidden="true">${opts.icon || ''}</span>`
+        + (opts.name ? `<span class="dock-name" aria-hidden="true">${esc(opts.name)}</span>` : '')
+        + (opts.pressed !== undefined || opts.toggle ? '<span class="rail-switch" aria-hidden="true"></span>' : '');
       if (opts.title) b.title = opts.title;
       if (opts.title || opts.ariaLabel) {
         b.setAttribute('aria-label', opts.ariaLabel || opts.title);
@@ -1052,6 +1064,9 @@ const MapChrome = (function () {
     //   onMount   optional, (bodyEl) => void, for a caller that needs real
     //             listeners rather than inline handlers
     //   pinnable  false drops the pin — a panel nobody would want kept open
+    //   name      optional, the short name its button in the side panel
+    //             wears beside its icon when the rail shows names; `title`
+    //             when it is not given. btnLabel, or title, has to contain it
     //   dockIcon  optional, the glyph its button in the side panel wears when
     //             it is not `icon`. The 3-D caret's icon is ▾, which says
     //             "the half of ⛰️ that opens" beside ⛰️ and nothing at all in a

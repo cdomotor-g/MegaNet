@@ -8,7 +8,7 @@ Whether a phone works at a place, for each of **Telstra**, **Optus** and **TPG
   external antenna on a mast, which is the question for a station's telemetry.
 - The same section on the **ℹ️ What is here** card, for any point picked on the
   map.
-- **Mobile coverage — the carriers' 4G maps**, a layer in 🗺️ **Map display** on
+- **Mobile coverage — the carriers' 4G maps**, a layer in **Layers** on
   the Stations map. It shows each carrier's own coverage map, as the carrier
   gave it to the ACCC: green where a phone works outdoors, amber where only
   with an external antenna. You can pick one carrier, or the best of the three.

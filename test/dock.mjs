@@ -104,29 +104,34 @@ const CARD_IDS = ['stations-cards', 'stations-filter-card', 'stations-list-card'
 const PANEL_IDS = ['map-display-block', 'map-legend', 'map-latency-panel', 'map-draw-panel', 'map-3d-panel-body', 'sites-run', 'polar-status',
                    'reloc-run'];
 
-// The strip, top to bottom, as the corner orders it: the side panel's own
-// six (❔, 🧹 Clear the selection, 📍 the cards, the blue 📍 Find a place, 〽️
-// the path tools, 🧊 the digital twin's pane — 🔭 the AR station finder's was
-// a seventh until it became the Look Around tab), then
-// the map's groups — show,
-// tools, 3d, screen — and within each by its declared order. Panes are
-// 'map-<id>', plain buttons their class. Not ↺ (the reset group's one button):
-// it is built to stay in the map's corner (`corner`), and is asserted there.
-const STRIP = ['help', 'mn-map-clear', 'stations', 'places', 'paths', 'twin',
-               'map-display', 'map-legend', 'map-latency',
-               'map-draw', 'map-polar', 'map-sites', 'map-relocate', 'mn-map-here',
-               'mn-map-3d', 'map-3d', 'mn-map-north', 'mn-map-tilt',
-               'mn-map-full'];
+// The strip, top to bottom — the Stations tab's rail (app.js, dockStripGroups):
+// the names toggle (a desktop's alone); Stations & places (📍 the cards, Find a
+// place, 〽️ the path tools, 🧊 the digital twin's pane — 🔭 the AR station
+// finder's was a fifth until it became the Look Around tab); Map and Tools,
+// the corner's `show` and `tools` groups in their declared order; and the
+// foot — 🧹 Clear the selection, the corner's `3d` and `screen` groups, and ❔
+// last. Each section leads with its heading, a button drawn only with the
+// names on ('dock-fold'). Panes are 'map-<id>', plain buttons their class.
+// Not ↺ (the reset group's one button): it is built to stay in the map's
+// corner (`corner`), and is asserted there.
+const STRIP = ['dock-names',
+               'dock-fold', 'stations', 'places', 'paths', 'twin',
+               'dock-fold', 'map-display', 'map-legend', 'map-latency',
+               'dock-fold', 'map-draw', 'map-polar', 'map-sites', 'map-relocate', 'mn-map-here',
+               'mn-map-clear', 'mn-map-3d', 'map-3d', 'mn-map-north', 'mn-map-tilt', 'mn-map-full',
+               'help'];
 const BUTTONS = STRIP.filter(k => k.startsWith('mn-map-'));
-// The groups of the map's own that stand in the strip: every one MapChrome
-// declares but `reset`, whose one button stays on the map.
-const STRIP_GROUPS = ['show', 'tools', '3d', 'screen'];
+// The rail's groups, top to bottom: the toggle's, the three sections, the foot.
+const STRIP_GROUPS = ['rail', 'places', 'show', 'tools', 'foot'];
 
 const server = await startServer();
 const browser = await launchBrowser();
 const errors = [];
 
 try {
+  // The rail with icons alone, as every context opens it unless it asks
+  // (lib/browser.mjs) — the strip every geometry below is written against.
+  // Its names are §9's.
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await applyNetworkPolicy(page, server.origin);
@@ -261,15 +266,19 @@ try {
       named: btns.every(b => (b.getAttribute('aria-label') || '').trim().length > 0),
       controls: [...strip.querySelectorAll('.dock-tab')].every(b => !!document.getElementById(b.getAttribute('aria-controls'))),
       square: btns.map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }),
-      firstIsHelp: btns[0] && btns[0].classList.contains('help-toggle'),
+      firstIsNames: !!btns[0] && btns[0].classList.contains('dock-names'),
+      lastIsHelp: !!btns.length && btns[btns.length - 1].classList.contains('help-toggle'),
+      names: (() => { const r = btns[0].getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })(),
       stationsH2: !!document.querySelector('#dock-pane-stations > h2'),
       pathsH2: !!document.querySelector('#dock-pane-paths > h2'),
     };
   });
   check('still one <aside> and one <nav>, and the strip is a labelled group of named buttons',
     shape.asides === 1 && shape.navs === 1 && shape.stripRole === 'group' && !!shape.stripName
-      && shape.named && shape.controls && shape.firstIsHelp, JSON.stringify(shape));
-  check('…every one of them 44 px square', shape.square.every(([w, h]) => w === 44 && h === 44), JSON.stringify(shape.square));
+      && shape.named && shape.controls && shape.firstIsNames && shape.lastIsHelp, JSON.stringify(shape));
+  check('…every one of them 44 px square but the names toggle at the top, 44 px wide and 32 tall',
+    shape.square.slice(1).every(([w, h]) => w === 44 && h === 44) && shape.names[0] === 44 && shape.names[1] === 32,
+    JSON.stringify(shape.square));
   check('…and the Stations pane has the h2 its cards\' h3s step from', shape.stationsH2);
   check('…and so does the path tools\' pane', shape.pathsH2);
 
@@ -310,21 +319,34 @@ try {
   });
   // MapChrome's own order, less the one group that stays on the map: read off
   // MapChrome rather than copied, so a group added there is in this check.
+  // MapChrome's own groups, less the one that stays on the map: `show` and
+  // `tools` are sections of their own, `3d` and `screen` are in the foot.
   const known = await page.evaluate(() => Object.keys(MapChrome.groups()));
-  const inStrip = known.filter(g => g !== 'reset');
-  const mapGroups = groups.filter(g => g.name !== 'side');
-  check('the map\'s groups stand in the order MapChrome declares, each a labelled group — all but reset\'s',
-    JSON.stringify(mapGroups.map(g => g.name)) === JSON.stringify(inStrip)
-      && JSON.stringify(inStrip) === JSON.stringify(STRIP_GROUPS)
-      && mapGroups.every(g => g.role === 'group' && /\S/.test(g.label || '')),
+  check('the rail\'s groups stand toggle, Stations & places, Map, Tools, foot — each but the toggle\'s a labelled group',
+    JSON.stringify(groups.map(g => g.name)) === JSON.stringify(STRIP_GROUPS)
+      && JSON.stringify(known) === JSON.stringify(['show', 'tools', '3d', 'screen', 'reset'])
+      && groups.slice(1).every(g => g.role === 'group' && /\S/.test(g.label || '')) && groups[0].role === null,
     JSON.stringify(groups.map(g => [g.name, g.role, g.label])));
+  // The sections, top to bottom, by their gaps; not the toggle's group, which
+  // is the rail's own and wears no hairline, nor the foot, which stands at the
+  // rail's foot whatever is above it (below).
   const inside = [], between = [];
-  const vis = groups.filter(g => g.items.length);
+  const vis = groups.filter(g => g.items.length && g.name !== 'rail' && g.name !== 'foot');
   for (const g of vis) for (let i = 1; i < g.items.length; i++) inside.push(g.items[i].top - g.items[i - 1].bottom);
   for (let i = 1; i < vis.length; i++) between.push(vis[i].items[0].top - vis[i - 1].items[vis[i - 1].items.length - 1].bottom);
   check('…with every gap between two groups wider than every gap inside one',
-    between.length === inStrip.length && Math.min(...between) > Math.max(...inside) + 6,
+    between.length === 2 && Math.min(...between) > Math.max(...inside) + 6,
     JSON.stringify({ inside, between }));
+  const footAt = await page.evaluate(() => {
+    const strip = document.querySelector('#help-panel .dock-strip');
+    const foot = strip.querySelector(':scope > .dock-group[data-group="foot"]');
+    return { foot: Math.round(foot.getBoundingClientRect().bottom), strip: Math.round(strip.getBoundingClientRect().bottom),
+             sticky: getComputedStyle(foot).position, pad: strip.style.scrollPaddingBottom,
+             h: Math.ceil(foot.getBoundingClientRect().height) };
+  });
+  check('…and the foot standing at the rail\'s foot, its height the strip\'s scroll padding',
+    Math.abs(footAt.foot - footAt.strip) <= 1 && footAt.sticky === 'sticky' && footAt.pad === `${footAt.h}px`,
+    JSON.stringify(footAt));
   const corner = await cornerNow();
   check('the map\'s top-right corner holds ↺ and nothing else, at its top right, under the pointer — no other icon, no hairline',
     resetAlone(corner), JSON.stringify(corner));
@@ -375,15 +397,15 @@ try {
       drawn: state.draw.shapes.length, path: !document.getElementById('path-card').hidden,
       card: state.stnCard.id, filters: state.filters === window.__mnFilters,
       c: state.map.getCenter(), z: state.map.getZoom(),
-      underHelp: !!side && side.dataset.group === 'side' && b.previousElementSibling
-        && b.previousElementSibling.classList.contains('help-toggle'),
+      heads: !!side && side.dataset.group === 'foot' && side.firstElementChild === b
+        && !!side.lastElementChild && side.lastElementChild.classList.contains('help-toggle'),
       focus: document.activeElement === b,
     };
   });
   const sameView = Math.abs(swept.c.lat - view0.c.lat) < 1e-9 && Math.abs(swept.c.lng - view0.c.lng) < 1e-9
     && swept.z === view0.z;
-  check('🧹 stands straight under ❔ in the side panel\'s own group',
-    swept.underHelp, JSON.stringify(swept));
+  check('🧹 heads the rail\'s foot, which ❔ ends',
+    swept.heads, JSON.stringify(swept));
   check('…and a real click on it deselects the station, the picked stations and the clicked radio path, and takes its line and the cards away',
     !!marked.sel && marked.picked === 2 && marked.drawn === 1 && marked.path && !!marked.card
       && swept.sel === null && swept.editor === null && swept.picked === 0 && swept.drawn === 0
@@ -412,18 +434,19 @@ try {
   check('…with focus still on the button that was pressed', s.active === 'help', String(s.active));
   await page.keyboard.press('ArrowDown');
   s = await look();
-  check('ArrowDown walks the strip to the next button — 🧹, straight under ❔', s.active === 'mn-map-clear', String(s.active));
-  // …through every group and every kind of button, the hidden camera pair skipped.
+  check('ArrowDown from ❔, the last button, goes round to the first — the names toggle', s.active === 'dock-names', String(s.active));
+  // …through every group and every kind of button, the hidden camera pair and
+  // the headings (drawn only with the names on) skipped.
   const walked = [];
   for (let i = 0; i < STRIP.length; i++) { await page.keyboard.press('ArrowDown'); walked.push((await look()).active); }
-  const onScreen = STRIP.filter(k => !/north|tilt/.test(k));
-  check('…and on down the map\'s controls, across the groups, skipping the hidden ones, round to ❔',
-    JSON.stringify(walked.slice(0, onScreen.length - 1)) === JSON.stringify(onScreen.slice(2).concat('help')),
+  const onScreen = STRIP.filter(k => !/north|tilt/.test(k) && k !== 'dock-fold');
+  check('…and on down the map\'s controls, across the groups, skipping the hidden ones, round to the toggle',
+    JSON.stringify(walked.slice(0, onScreen.length)) === JSON.stringify(onScreen.slice(1).concat('dock-names')),
     JSON.stringify(walked));
   await page.keyboard.press('End');
-  check('End goes to the last of them — ⛶, now that ↺ is on the map and ◫ has gone', (await look()).active === 'mn-map-full', (await look()).active);
+  check('End goes to the last of them — ❔, at the foot', (await look()).active === 'help', (await look()).active);
   await page.keyboard.press('Home');
-  await page.keyboard.press('ArrowDown');   // 🧹
+  check('…and Home to the first — the names toggle', (await look()).active === 'dock-names', (await look()).active);
   await page.keyboard.press('ArrowDown');   // 📍
   await page.keyboard.press('Enter');
   await page.waitForTimeout(300);
@@ -521,11 +544,11 @@ try {
     h.role === 'separator' && h.orient === 'vertical' && !!h.name && h.tab === 0
       && h.now === h.width && h.min <= h.now && h.now <= h.max && /\d+ pixels/.test(h.text || ''),
     JSON.stringify(h));
-  // Reached the way a keyboard reaches it — Shift+Tab from ❔, the handle being
-  // the one stop before the strip — because a focus ring is the browser's
-  // answer to *how* focus arrived, and a programmatic focus after a mouse click
-  // is correctly drawn without one.
-  await page.focus('#help-panel .help-toggle');
+  // Reached the way a keyboard reaches it — Shift+Tab from the strip's first
+  // button, the handle being the one stop before the strip — because a focus
+  // ring is the browser's answer to *how* focus arrived, and a programmatic
+  // focus after a mouse click is correctly drawn without one.
+  await page.focus('#help-panel .dock-names');
   await page.keyboard.press('Shift+Tab');
   const ring = await page.evaluate(() => {
     const cs = getComputedStyle(document.activeElement);
@@ -825,16 +848,16 @@ try {
   // the fold at `lg` puts them, and the one thing that does — the page's own
   // next stop after the map's last is the Filters card, under the full-screen
   // map, where nobody can see what has focus. The side panel is shut then (its
-  // Stations pane has gone under the map), so its first stop is ❔, the handle
-  // being hidden with the pane it sizes. Full screen is kept across the fold:
-  // it is the width that changes, not the mode.
+  // Stations pane has gone under the map), so its first stop is the rail's
+  // names toggle, the handle being hidden with the pane it sizes. Full screen
+  // is kept across the fold: it is the width that changes, not the mode.
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.waitForTimeout(600);
-  await page.focus('#help-panel .help-toggle');
+  await page.focus('#help-panel .dock-names');
   await page.keyboard.press('Shift+Tab');
   const offSide = await where();
   await page.keyboard.press('Tab');
-  const underMap = await page.evaluate(() => ({ help: !!document.activeElement?.classList.contains('help-toggle'),
+  const underMap = await page.evaluate(() => ({ help: !!document.activeElement?.classList.contains('dock-names'),
     cards: !!document.activeElement?.closest('#stations-cards'), shut: dockShowing() === null,
     under: !!document.querySelector('#stations-main > #stations-cards'),
     full: state.mapFullscreen && !!document.querySelector('.map-panel.is-full') }));
@@ -1094,9 +1117,10 @@ try {
     inStrip: !!document.activeElement?.closest('#help-panel .dock-strip') }));
   check('crossing to a phone with focus on ✏️ in the strip leaves it there, in the rail',
     toPhone.dock === 'map-draw' && toPhone.inStrip, JSON.stringify(toPhone));
-  // Every button the strip has beside a desktop's map: the cards are a pane
-  // of the side panel on a phone too, a drawer over the map.
-  const PHONE_STRIP = STRIP;
+  // Every button the strip has beside a desktop's map but the names toggle —
+  // a phone's rail is always icons: the cards are a pane of the side panel on
+  // a phone too, a drawer over the map.
+  const PHONE_STRIP = STRIP.filter(k => k !== 'dock-names');
   // The rail, the drawer and the map, in the terms the phone's assertions use.
   const phoneLook = () => page.evaluate(() => {
     const panel = document.getElementById('help-panel');
@@ -1295,15 +1319,15 @@ try {
   await page.setViewportSize({ width: 375, height: 600 });
   await page.waitForTimeout(600);
   await page.evaluate(() => scrollTo(0, 0));
-  await page.focus('#help-panel .help-toggle');
+  await page.focus('#help-panel .dock-tab[data-dock="stations"]');
   await page.keyboard.press('End');
   await page.waitForTimeout(150);
   const lastUp = await page.evaluate(() => {
     const a = document.activeElement, r = a.getBoundingClientRect();
     const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return { last: a.classList.contains('mn-map-full'), bottom: Math.round(r.bottom), winH: innerHeight, hit: !!t && (t === a || a.contains(t)) };
+    return { last: a.classList.contains('help-toggle'), bottom: Math.round(r.bottom), winH: innerHeight, hit: !!t && (t === a || a.contains(t)) };
   });
-  check('at the top of a short phone\'s page, End in the rail brings its last button (⛶) up above the fold, under a finger',
+  check('at the top of a short phone\'s page, End in the rail brings its last button (❔) up above the fold, under a finger',
     lastUp.last && lastUp.bottom <= lastUp.winH && lastUp.hit, JSON.stringify(lastUp));
   await page.evaluate(() => setDockTab('map-legend', { instant: true }));
   await page.waitForTimeout(200);
@@ -1600,16 +1624,159 @@ try {
   await browser.close();
 }
 
+// ── 9. The rail with its names ─────────────────────────────────────────────
+// The Stations tab's rail, the left bar's two states on the right: each button
+// with its name beside its icon, or icons alone, by a toggle at its top that is
+// remembered. A first visit at 1440 has the names. Under Tiles, the control
+// that is on has its tile gilded — and with icons alone that is all it has, no
+// ring or fill round the button. The foot stays at the rail's foot; a phone's
+// rail and every other tab's strip have no names at all.
+{
+  const b9 = await launchBrowser();
+  try {
+    const context = await b9.newContext({ viewport: { width: 1440, height: 900 }, look: 'tiles', rail: null });
+    const page = await context.newPage();
+    await applyNetworkPolicy(page, server.origin);
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+    await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
+    await page.evaluate(() => switchTab('stations'));
+    await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
+    await page.waitForTimeout(600);
+    const rail = () => page.evaluate(() => {
+      const panel = document.getElementById('help-panel');
+      const strip = panel.querySelector('.dock-strip');
+      const btns = [...strip.querySelectorAll('button')].filter(b => b.getClientRects().length);
+      const foot = strip.querySelector(':scope > .dock-group[data-group="foot"]');
+      const tile = sel => { const t = strip.querySelector(`${sel} .rail-ico`); if (!t) return null;
+        const cs = getComputedStyle(t); return { img: cs.backgroundImage, bg: cs.backgroundColor }; };
+      const box = sel => { const b = strip.querySelector(sel); const cs = b && getComputedStyle(b);
+        return cs ? { bg: cs.backgroundColor, shadow: cs.boxShadow, border: cs.borderTopColor } : null; };
+      const map = document.getElementById('leaflet-map');
+      return {
+        names: panel.classList.contains('rail-names'),
+        stripW: Math.round(strip.getBoundingClientRect().width),
+        mapW: Math.round(map.getBoundingClientRect().width), leafletW: state.map.getSize().x, mapClientW: map.clientWidth,
+        stored: localStorage.getItem('mn-dock-names'), folded: localStorage.getItem('mn-dock-fold'),
+        toggle: (() => { const t = strip.querySelector('.dock-names'); return t && { expanded: t.getAttribute('aria-expanded'),
+          shown: !!t.getClientRects().length, focus: document.activeElement === t }; })(),
+        // Not the 3-D view's settings, a square beside its switch: its name is
+        // its tooltip and its label.
+        labels: btns.filter(b => !b.classList.contains('dock-fold') && b.dataset.dock !== 'map-3d').map(b => {
+          const n = b.querySelector(':scope > .dock-name');
+          return { k: b.dataset.dock || [...b.classList].find(c => c.startsWith('mn-map-')) || b.className,
+                   name: n && n.getClientRects().length ? n.textContent.trim() : '',
+                   label: (b.getAttribute('aria-label') || '').toLowerCase() };
+        }),
+        heads: btns.filter(b => b.classList.contains('dock-fold')).map(b => [b.textContent.trim(), b.getAttribute('aria-expanded')]),
+        tools: [...strip.querySelectorAll('.dock-group[data-group="tools"] > :not(.dock-fold)')].filter(b => b.getClientRects().length).length,
+        footBottom: foot ? Math.round(foot.getBoundingClientRect().bottom) : null,
+        stripBottom: Math.round(strip.getBoundingClientRect().bottom),
+        pad: strip.style.scrollPaddingBottom, footH: foot ? Math.ceil(foot.getBoundingClientRect().height) : 0,
+        open: tile('.dock-tab.is-on'), shut: tile('.dock-tab[data-dock="places"]'), openBox: box('.dock-tab.is-on'),
+        here: (() => { const b = strip.querySelector('.mn-map-here'); const sw = b && b.querySelector('.rail-switch');
+          return b && { pressed: b.getAttribute('aria-pressed'), sw: !!(sw && sw.getClientRects().length),
+                        knob: sw ? getComputedStyle(sw, '::after').transform : null }; })(),
+      };
+    });
+    let r = await rail();
+    check('a first visit at 1440 has the Stations rail wearing names, as wide as --mn-rail-names',
+      r.names && r.stripW === 215 && r.toggle && r.toggle.shown && r.toggle.expanded === 'true', JSON.stringify(r));
+    check('…every button in it named beside its icon, the name a part of what it is called',
+      r.labels.length > 15 && r.labels.every(l => l.name && l.label.includes(l.name.toLowerCase()))
+        && r.labels.some(l => l.k === 'map-display' && l.name === 'Layers')
+        && r.labels.some(l => l.k === 'mn-map-clear' && l.name === 'Clear the selection'), JSON.stringify(r.labels));
+    check('…under three headings that fold, Stations & places, Map and Tools',
+      JSON.stringify(r.heads) === JSON.stringify([['Stations & places', 'true'], ['Map', 'true'], ['Tools', 'true']]),
+      JSON.stringify(r.heads));
+    check('…and the map measured to the rail it has', r.leafletW === r.mapClientW, JSON.stringify(r));
+    check('…the foot at the rail\'s foot, and the strip keeping its height as scroll padding, so nothing scrolls under it unseen',
+      Math.abs(r.footBottom - r.stripBottom) <= 1 && r.pad === `${r.footH}px`, JSON.stringify(r));
+    check('under Tiles the open pane\'s tile is gilded and its row tinted; a shut one keeps its colour',
+      /linear-gradient/.test(r.open?.img || '') && r.openBox.bg !== 'rgba(0, 0, 0, 0)'
+        && r.shut?.img === 'none' && r.shut?.bg === 'rgb(11, 92, 171)', JSON.stringify({ open: r.open, shut: r.shut, box: r.openBox }));
+    // What's here, by its switch.
+    await page.click('#help-panel .dock-strip .mn-map-here');
+    await page.waitForTimeout(250);
+    const armed = await rail();
+    await page.click('#help-panel .dock-strip .mn-map-here');
+    await page.waitForTimeout(200);
+    check('a mode wears a switch with the names on, which moves when it is armed',
+      armed.here.sw && armed.here.pressed === 'true' && armed.here.knob !== 'none' && r.here.knob === 'none', JSON.stringify({ before: r.here, armed: armed.here }));
+    // A fold: Tools away and back.
+    await page.click('#help-panel .dock-group[data-group="tools"] > .dock-fold');
+    await page.waitForTimeout(200);
+    const folded = await rail();
+    await page.click('#help-panel .dock-group[data-group="tools"] > .dock-fold');
+    await page.waitForTimeout(200);
+    const unfolded = await rail();
+    check('a heading folds its section away, and back, remembered',
+      folded.tools === 0 && folded.folded === 'tools' && folded.heads[2][1] === 'false'
+        && unfolded.tools === 5 && unfolded.folded === '' && unfolded.heads[2][1] === 'true', JSON.stringify({ folded, unfolded }));
+    // The toggle: icons alone, and back.
+    const wide = r.mapW;
+    await page.click('#help-panel .dock-names');
+    await page.waitForTimeout(500);
+    r = await rail();
+    check('the toggle puts the names away: icons alone, the map wider by the difference and measured, remembered, focus kept',
+      !r.names && r.stripW === 55 && r.mapW >= wide + 150 && r.leafletW === r.mapClientW && r.stored === 'hidden'
+        && r.toggle.expanded === 'false' && r.toggle.focus, JSON.stringify(r));
+    check('…and with icons alone the open pane is the gilded tile and nothing else — no ring, no fill round its button',
+      /linear-gradient/.test(r.open?.img || '') && r.openBox.bg === 'rgba(0, 0, 0, 0)' && r.openBox.shadow === 'none',
+      JSON.stringify({ open: r.open, box: r.openBox }));
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
+    await page.evaluate(() => switchTab('stations'));
+    await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
+    await page.waitForTimeout(500);
+    r = await rail();
+    check('…and a reload keeps them away', !r.names && r.stripW === 55, JSON.stringify(r));
+    await page.click('#help-panel .dock-names');
+    await page.waitForTimeout(500);
+    r = await rail();
+    check('…the toggle brings them back', r.names && r.stripW === 215 && r.stored === 'shown' && r.leafletW === r.mapClientW, JSON.stringify(r));
+    // Every other tab: ❔ alone, no names.
+    await page.evaluate(() => switchTab('mapgen'));
+    await page.waitForTimeout(600);
+    const other = await page.evaluate(() => ({ names: document.getElementById('help-panel').classList.contains('rail-names'),
+      strip: [...document.querySelectorAll('#help-panel .dock-strip button')].map(b => b.dataset.dock || b.className),
+      w: Math.round(document.querySelector('#help-panel .dock-strip').getBoundingClientRect().width) }));
+    check('every other tab keeps its strip ❔ alone and narrow, names or not',
+      !other.names && JSON.stringify(other.strip) === '["help"]' && other.w === 55, JSON.stringify(other));
+    // A phone: icons, and no toggle.
+    await page.evaluate(() => switchTab('stations'));
+    await page.setViewportSize({ width: 375, height: 700 });
+    await page.waitForTimeout(800);
+    const ph = await page.evaluate(() => ({ names: document.getElementById('help-panel').classList.contains('rail-names'),
+      toggle: !!document.querySelector('#help-panel .dock-names'), stored: localStorage.getItem('mn-dock-names') }));
+    check('a phone\'s rail is icons whatever is stored, with no toggle in it',
+      !ph.names && !ph.toggle && ph.stored === 'shown', JSON.stringify(ph));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(600);
+    // Instrument: the rail joins the dark frame.
+    await page.evaluate(() => Looks.set('instrument'));
+    await page.waitForTimeout(600);
+    const dark = await page.evaluate(() => getComputedStyle(document.querySelector('#help-panel .dock-strip')).backgroundColor);
+    check('under Instrument the rail is part of the dark frame', dark === 'rgb(17, 28, 51)', dark);
+    check('no pageerror in the rail with its names', errors.length === 0, errors.join(' | '));
+    await context.close();
+  } finally {
+    await b9.close();
+  }
+}
+
 // ── 8b. A strip taller than the window ─────────────────────────────────────
-// Fifteen of the map's controls and the side panel's two are ~700 px of strip,
-// and a laptop's window below the banner is less than that. In a browser that
+// Fifteen of the map's controls and the side panel's own are ~700 px of strip,
+// and a laptop's window below the banner is less than that — with the names
+// on, as a first visit at 1440 has them, and the foot standing over the
+// sections as they scroll. In a browser that
 // draws real scrollbars (Playwright's headless default hides them, which would
 // make "the bar does not cover the buttons" true of any layout at all): the
 // strip scrolls, every button in it can be reached and is the thing under the
 // pointer where it is drawn, and the bar stands beside them.
 const classic = await launchBrowser({ ignoreDefaultArgs: ['--hide-scrollbars'] });
 try {
-  const context = await classic.newContext({ viewport: { width: 1440, height: 550 } });
+  const context = await classic.newContext({ viewport: { width: 1440, height: 550 }, rail: null });
   const page = await context.newPage();
   await applyNetworkPolicy(page, server.origin);
   page.on('pageerror', (e) => errors.push(e.message));
@@ -1640,14 +1807,14 @@ try {
   check('…and the scrollbar stands beside the buttons, not over them, with nothing scrolling sideways',
     tall.out.every(o => o.clear) && !tall.sideways, JSON.stringify({ bar: tall.bar, out: tall.out.filter(o => !o.clear) }));
   // And from the keyboard, End scrolls the strip to its last button.
-  await page.focus('#help-panel .help-toggle');
+  await page.focus('#help-panel .dock-names');
   await page.keyboard.press('End');
   const end = await page.evaluate(() => {
     const strip = document.querySelector('#help-panel .dock-strip');
     const a = document.activeElement, r = a.getBoundingClientRect(), sr = strip.getBoundingClientRect();
-    return { last: a.classList.contains('mn-map-full'), inView: r.bottom <= sr.bottom + 0.5 && r.top >= sr.top - 0.5 };
+    return { last: a.classList.contains('help-toggle'), inView: r.bottom <= sr.bottom + 0.5 && r.top >= sr.top - 0.5 };
   });
-  check('…and End reaches the last of them (⛶) and scrolls it into view', end.last && end.inView, JSON.stringify(end));
+  check('…and End reaches the last of them (❔) and scrolls it into view', end.last && end.inView, JSON.stringify(end));
   check('no pageerror with real scrollbars', errors.length === 0, errors.join(' | '));
 } finally {
   await classic.close();

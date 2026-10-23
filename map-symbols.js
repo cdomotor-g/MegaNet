@@ -435,7 +435,7 @@ const MapSymbols = (function () {
   function ownerNoteShort() {
     if (!state.mapOwner) return '';
     const n = hiddenCount();
-    return ` · the map is drawing ${esc(ownerPhrase())} — <strong>${n.toLocaleString()}</strong> not drawn (🗺️ Map display)`;
+    return ` · the map is drawing ${esc(ownerPhrase())} — <strong>${n.toLocaleString()}</strong> not drawn (Layers)`;
   }
 
   function ownerOptions() {

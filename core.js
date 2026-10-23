@@ -572,39 +572,42 @@ const HELP = {
   },
   stations: {
     summary: 'The map fills the page, and its cards sit beside it in the <strong>side panel</strong> '
-           + 'on the right: press the red 📍 in the strip on its edge, under ❔ and 🧹, for the '
-           + '<strong>Stations</strong> list with its filters, and the station details, '
-           + 'one column that scrolls on its own; the blue 📍 under it for <strong>Find a place</strong>; '
-           + 'and 〽️ for the path tools — the '
+           + 'on the right. The rail on its edge names every button beside its icon — press '
+           + '<strong>Collapse »</strong> at its top for icons alone, and « for the names again, the way '
+           + 'the left bar folds. Its first section, <strong>Stations &amp; places</strong>, holds '
+           + '<strong>Stations</strong> — the list with its filters, and the station details, one column '
+           + 'that scrolls on its own — <strong>Find a place</strong>, <strong>Path tools</strong> (the '
            + '<strong>radio path</strong> you clicked, the <strong>elevation profile</strong> and the '
-           + '<strong>link budget</strong> with its fade margin — in a pane of their own; and 🧊 '
-           + 'the digital twin. (The 🔭 AR station finder is a tab of its own now, <strong>Look Around</strong>, '
-           + 'in the left bar.) Press the '
-           + 'button of the pane that is showing and the side panel shuts, giving the map the '
-           + 'width; drag its left edge (or focus it and use the arrow keys) to make it wider or '
-           + 'narrower. The map\'s own controls are in that strip too, below the side panel\'s own buttons, in groups with a '
-           + 'hairline between them: what the map <em>shows</em> (🗺️ <strong>Map display</strong>, '
-           + 'base maps first, and 🔑 the legend), the tools you point at it (✏️ <strong>Draw &amp; '
-           + 'measure</strong>, 📡 <strong>Polar radio coverage</strong>, <strong>🗼 Repeater site '
-           + 'finder</strong>, <strong>🚚 Station relocation finder</strong>, <strong>ℹ️ What is here</strong>), the <strong>3-D view</strong> (⛰️, 🎚️ '
-           + 'its settings, and its camera), and how much screen the map gets (⛶ full screen). A panel '
-           + 'among them opens as a pane of the side panel, the way 📍 does; a button does its one '
-           + 'thing. The one control left on the map is <strong>↺ Reset</strong>, alone in its '
-           + 'top-right corner: it clears the filters, the selection, every drawing and every card. '
-           + '<strong>🧹 Clear the selection</strong>, straight under ❔, is ↺ without the filters and without '
-           + 'moving the map: it deselects the station and the stations you picked off the map, lets go of '
-           + 'the radio path you clicked, puts the map\'s cards away, and takes off everything drawn on the '
-           + 'map — drawings, the link budget\'s ends, the polar plot, the site finders\' answers and the '
-           + 'blue pin — leaving the view zoomed where it was and the filters as they were. Station details '
-           + 'with changes not saved keeps its station. '
-           + '<strong>⛶ Full screen</strong> gives the map the whole window except the side panel, '
+           + '<strong>link budget</strong> with its fade margin, in a pane of their own) and the '
+           + '<strong>Digital twin</strong>. (The 🔭 AR station finder is a tab of its own now, '
+           + '<strong>Look Around</strong>, in the left bar.) Press the button of the pane that is showing '
+           + 'and the side panel shuts, giving the map the width; drag its left edge (or focus it and use '
+           + 'the arrow keys) to make it wider or narrower. The map\'s own controls follow in two more '
+           + 'sections: <strong>Map</strong>, what the map shows (<strong>Layers</strong>, base maps first, '
+           + 'the <strong>Legend</strong> and <strong>Latency</strong>), and <strong>Tools</strong>, what '
+           + 'you point at it (<strong>Draw &amp; measure</strong>, <strong>Radio coverage</strong>, '
+           + '<strong>Repeater sites</strong>, <strong>Relocate station</strong> and <strong>What\'s '
+           + 'here?</strong>). With the names showing, a section\'s heading folds it away and back. A panel '
+           + 'among them opens as a pane of the side panel, the way Stations does; a button does its one '
+           + 'thing, and a mode wears a switch that says whether it is on. The foot of the rail stays put '
+           + 'whatever is scrolled above it: <strong>Clear the selection</strong>, the <strong>3-D '
+           + 'view</strong> with its settings beside it (and its camera, once tilted), <strong>Full '
+           + 'screen</strong> and <strong>Help</strong>. The one control left on the map is <strong>↺ '
+           + 'Reset</strong>, alone in its top-right corner: it clears the filters, the selection, every '
+           + 'drawing and every card. <strong>Clear the selection</strong> (🧹 under Classic) is ↺ without '
+           + 'the filters and without moving the map: it deselects the station and the stations you picked '
+           + 'off the map, lets go of the radio path you clicked, puts the map\'s cards away, and takes off '
+           + 'everything drawn on the map — drawings, the link budget\'s ends, the polar plot, the site '
+           + 'finders\' answers and the blue pin — leaving the view zoomed where it was and the filters as '
+           + 'they were. Station details with changes not saved keeps its station. '
+           + '<strong>Full screen</strong> gives the map the whole window except the side panel, '
            + 'which stays beside it with the tools in it; Escape brings the page back. At or below '
            + '1,100 px, down to a phone\'s width, the cards are under the map in one long page and '
            + 'the side panel keeps the tools. On a phone the map fills the screen under the banner '
            + 'and the side panel is put away behind <strong>⋮</strong> at the top right: press it and '
-           + 'the strip comes out as a rail down the right-hand edge, beside the map rather than on '
-           + 'it, with ❔, 🧹, the two 📍, 〽️ and the map\'s controls in it, and press it again to put the rail '
-           + 'away. A pane opens as a drawer beside the rail — the cards and the path tools too — '
+           + 'the strip comes out as a rail of icons down the right-hand edge, beside the map rather than '
+           + 'on it, with every button of the desktop\'s rail in it, and press it again to put the rail '
+           +            + 'away. A pane opens as a drawer beside the rail — the cards and the path tools too — '
            + 'and pressing its button again, tapping the dimmed page or pressing Escape puts it '
            + 'away. The <strong>Stations</strong> card is the list and its filters in one: its head '
            + 'carries the live row count, the <strong>Filters</strong> toggle and + Propose and + New; '
@@ -674,7 +677,7 @@ const HELP = {
       + 'the <strong>Station Health</strong> tab on that station, at that part of it. Its class, OK, Watch, '
       + 'Fault or No data, is a word as well as a colour, and a datastore that cannot answer is No data, '
       + 'never OK — as is a station heard only once, or too briefly to show a rhythm, whose silence says '
-      + 'nothing yet. <strong>Colour pins by health</strong>, in 🗺️ Map display, colours every pin the same '
+      + 'nothing yet. <strong>Colour pins by health</strong>, in Layers, colours every pin the same '
       + 'way — by when Flood-Net last heard it, and by what its readings say once its card has been '
       + 'opened — for one request for the whole network. Bigger is worse, and the ring says it again: '
       + 'dashed to watch, heavy at fault, hollow for no data. The same request fills the station list\'s '
@@ -703,14 +706,14 @@ const HELP = {
       + '<em>Open the digital twin</em> hands the rectangle over. ← Map or Escape gives the map back at '
       + 'the same zoom; wheeling out steps one zoom out. <strong>🔍 Zoom to station</strong> goes all '
       + 'the way in, which is where the card appears, and <strong>🧊 Digital twin</strong> on a '
-      + 'station\'s card opens its twin in one press. The switch is in 🗺️ Map display; ⛰️ 3-D is the '
+      + 'station\'s card opens its twin in one press. The switch is in Layers; ⛰️ 3-D is the '
       + 'same idea at network scale, and offers it at the same zoom.',
-      '<strong>🧊 in the side panel\'s strip is the twin\'s pane</strong> — what the Digital Twin tab '
+      '<strong>Digital twin, in the side panel\'s rail, is the twin\'s pane</strong> — what the Digital Twin tab '
       + 'used to be: find a station and open its twin, the scene\'s settings (the patch, the '
       + 'exaggeration, the imagery, the cadastre, the horizon, the water, exploring together), the '
       + 'ground truth, the ground as numbers and the <code>.glb</code> for Blender. ⚙ Settings on the '
       + 'twin\'s own bar opens it. How the twin works is at the foot of the pane.',
-      '<strong>3-D view</strong> — ⛰️ in the side panel\'s strip, or the panel of the same name — '
+      '<strong>3-D view</strong> — its switch at the foot of the side panel\'s rail, or the panel of the same name — '
       + 'tilts the map onto the ground it is drawn on: the base map you are already on (the most opaque one, if you have blended several), draped over '
       + '~30 m terrain, with the pins and links you are already looking at on it. Drag to move, '
       + 'right-drag (or Ctrl-drag) to turn and tilt, scroll to zoom; on a touch screen pinch to zoom, '
@@ -749,16 +752,16 @@ const HELP = {
       + 'in the base-map picker paints the country by height, in the twelve bands of the Radio '
       + 'Mobile colour file, with the slopes shaded so a ridge is visible between two contours of '
       + 'the same colour; the shading can be switched off beside it. <strong>Highest ground in '
-      + 'view</strong>, in <strong>Map display</strong>, pins the three to five highest points in '
+      + 'view</strong>, in <strong>Layers</strong>, pins the three to five highest points in '
       + 'the window — hilltops, not stations, whether or not anything is on them — and lists them '
-      + 'ranked, each one a button that takes the map there. <strong>Polar radio coverage</strong> '
+      + 'ranked, each one a button that takes the map there. <strong>Radio coverage</strong> '
       + 'is Radio Mobile\'s own dialog: a centre unit, the radio at the other end, a link '
       + 'direction, a radial and azimuth range and a threshold, and it colours the ground by what '
       + 'a mobile would hear standing on it. That plot has <em>no antenna patterns, no trees and '
       + 'no terminal clutter</em>, every one of which only ever takes coverage away — so it is the '
       + 'best case, and the elevation profile card is the authority for any path you are about to '
       + 'build.',
-      '<strong>🗼 Repeater site finder</strong> works the siting question the other way round: '
+      '<strong>Repeater sites</strong> works the siting question the other way round: '
       + 'say which sites a new repeater has to serve — <em>Add the map selection</em>, '
       + '<em>Draw a circle</em> round them (Draw &amp; measure\'s own circle, so it stays on the map '
       + 'and can be typed to an exact radius), or paste a list of station numbers, names, ALERT '
@@ -778,7 +781,7 @@ const HELP = {
       + 'bare hills — a site with power, a track and a willing landholder is worth metres. '
       + '<em>Everything else on the map</em> fades the network and every other layer — down to '
       + 'nothing — so the candidates and the sites stand out, each site keeping a dot and its name; '
-      + 'the base map and the elevation keep their own sliders in Map display, and the fade only '
+      + 'the base map and the elevation keep their own sliders in Layers, and the fade only '
       + 'applies while there are sites or an answer, so Clear and ↺ put the map back. '
       + '<strong>🌏 Google Earth (KMZ)</strong> saves the whole answer for Google Earth on the '
       + 'web (earth.google.com, New → Import file to project): a folder per candidate with its '
@@ -788,7 +791,7 @@ const HELP = {
       + 'the search area, the rings, the chosen candidate\'s paths and the numbered pins stand on '
       + 'the terrain, and a pin click picks that candidate there too — and <em>Draw a circle</em> '
       + 'draws its circle on the terrain.',
-      '<strong>🚚 Station relocation finder</strong> is for one station that has to move. Pick it — '
+      '<strong>Relocate station</strong> is for one station that has to move. Pick it — '
       + '<em>Use the station on the card</em>, or find it by name or number — and the repeaters that '
       + 'carry it today come ticked, with the nearest few others offered beside them. Say how far it '
       + 'may go (500 m by default) and <em>Find new sites</em> colours every square of ground inside '
@@ -818,12 +821,12 @@ const HELP = {
       '<strong>Limit link length</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
       + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 100 km; '
-      + '🗺️ <strong>Map display</strong> (in the side panel\'s strip) says how many links were drawn and how '
+      + '<strong>Layers</strong> (in the side panel\'s rail) says how many links were drawn and how '
       + 'many were culled, so check that before concluding the path isn\'t there.',
       'The strip belongs to the box the caret is in and goes when focus leaves it — the results '
       + 'are kept, so clicking back into the box brings the same strip back without a second '
       + 'lookup.',
-      '<strong>Link colour</strong> is one radio group in <strong>Map display</strong>, not two '
+      '<strong>Link colour</strong> is one radio group in <strong>Layers</strong>, not two '
       + 'switches: <em>By frequency</em> (the default), <em>By fade margin</em> or <em>Plain</em>. '
       + 'They cannot both be on because both want the same thing — the colour of a link\'s core '
       + 'line. Frequency is the default because it is <em>recorded</em> rather than computed: it '
@@ -846,7 +849,7 @@ const HELP = {
       + 'wrong shape: picked as a base it took the localities, the roads and the watercourses '
       + 'with it, and the ground and the place names are not alternatives. The slider is what '
       + 'makes them one picture. Heights are above the EGM96 geoid at ~30 m sampling.',
-      'The <strong>ℹ️ What is here</strong> button arms a pick: click anywhere on the map and a '
+      'The <strong>What’s here?</strong> button arms a pick: click anywhere on the map and a '
       + 'card in the map\'s bottom corner says what the app knows about that point — ground height, '
       + 'land cover, wind region, drainage basin, maintenance hub, and the nearest station, '
       + 'repeater and survey mark with the distance and bearing to each. Every one of those was '
@@ -869,7 +872,7 @@ const HELP = {
       + '<strong>Full screen</strong> in its key, to draw it again the size of the window with its figures '
       + 'over it; Escape puts it back. The dashes are what says <em>backbone</em>; the colour between them says '
       + 'whatever the link colouring says.',
-      'The 🗺️ <strong>Map display</strong> panel has a <strong>Find a control</strong> box at the '
+      'The <strong>Layers</strong> panel has a <strong>Find a control</strong> box at the '
       + 'top of it. Type into it and the panel filters down to the rows that match — against the '
       + 'label, its note and its tooltip, so "wind", "dB", "contour" and "licence" all land '
       + 'somewhere. It filters what is drawn and switches nothing off; in the side panel the '
@@ -899,7 +902,7 @@ const HELP = {
       'The search box <strong>highlights rather than hides</strong>. Every station stays on the '
       + 'map; matches take an amber ring, get their names drawn, and the map zooms to fit them — '
       + 'so a pin still on screen has not necessarily matched anything. <em>Hide stations that '
-      + 'don\'t match</em>, in the map\'s <strong>Map display</strong> panel, is the subtractive '
+      + 'don\'t match</em>, in the map\'s <strong>Layers</strong> panel, is the subtractive '
       + 'behaviour if '
       + 'that is what you want: it takes the pins <em>and the link lines that run to them</em>, so '
       + 'what is left is only the subset you filtered for. Tick <strong>Include related '
@@ -917,10 +920,10 @@ const HELP = {
       + 'what a station measures, who reads it and what the Bureau does with it.',
       '<strong>Owner</strong> is in the Filters — tick the owners you want, or press '
       + '<em>only</em> beside one, with a box to find one council among a hundred — and in 🗺️ '
-      + '<strong>Map display</strong>, where <em>Owner</em> draws one owner\'s stations alone, or '
+      + '<strong>Layers</strong>, where <em>Owner</em> draws one owner\'s stations alone, or '
       + 'everyone\'s but theirs, and leaves the list alone. A station with no owner of its own '
       + 'takes the one the Bureau\'s Service Level Specification names, and a joint owner counts '
-      + 'under each party. The Map display choice lasts the session; the line under the filters '
+      + 'under each party. The Layers choice lasts the session; the line under the filters '
       + 'says how many stations it is not drawing.',
       'A name is read <strong>both ways round</strong>. This file writes the same word two ways — '
       + '243 stations say <em>Ck</em> and 218 say <em>Creek</em>, 196 say <em>Rd</em> and 63 '
@@ -992,7 +995,7 @@ const HELP = {
       + 'type over or paste a survey into. Save keeps one feature at a time, with how it was placed — on the '
       + 'map, by GPS with its ±, or typed — and a save over somebody else\'s newer change is refused with '
       + '<em>Reload</em>. <em>⬇ GeoJSON</em> takes the station\'s features to QGIS or Google Earth. From zoom '
-      + '16 the map draws every station\'s features in view (🗺️ Map display, <em>Site features</em>); each '
+      + '16 the map draws every station\'s features in view (Layers, <em>Site features</em>); each '
       + 'shape says its kind — a ringed dot the outlet, a crossed square a pit, a bullseye a benchmark, a '
       + 'staff a board — and a click says what it is. Signed-in editors only, as the levels are: where a '
       + 'benchmark is, is not for the open internet.',
@@ -1040,7 +1043,7 @@ const HELP = {
       + 'Propose</strong> under the station list opens one: a name, its <em>Station type</em> — an '
       + 'automatic or manual water level station, an automatic or manual rain gauge — the year it is '
       + 'proposed for (this year, or any year back or forward), and where it would go; '
-      + '<strong>ℹ️ What is here</strong> offers <em>Propose a station here</em> at the point it was '
+      + '<strong>What’s here?</strong> offers <em>Propose a station here</em> at the point it was '
       + 'asked about. It needs no station number. Anybody who may edit may propose one; adding a '
       + 'station outright, and establishing a proposal (unticking <em>Proposed</em>), are an '
       + 'administrator\'s. A proposal is drawn hollow in a dashed ring, and is tagged '
@@ -1093,7 +1096,7 @@ const HELP = {
       + 'pair is the primary — the one the path, fade and ACMA tools use — and <strong>+ Add '
       + 'frequency</strong> in the details card adds a row for every other channel, with its use '
       + 'and ACMA licence. The card lists them a line each.',
-      'The 🗺️ <strong>Map display</strong> panel starts with the <strong>base maps</strong>: tick '
+      'The <strong>Layers</strong> panel starts with the <strong>base maps</strong>: tick '
       + 'more than one and give each its own opacity to blend them — Satellite at 40% over '
       + 'OSM-Topo puts the contours on the real ground — and each is drawn over the ones listed '
       + 'above it; drag a row\'s ⠿ grip (or focus it and use the arrow keys) to change the order. '
@@ -1103,7 +1106,7 @@ const HELP = {
       'In the Calm look the map starts quiet: the pale <strong>Light</strong> base map (<strong>Dark</strong> '
       + 'in the dark theme), every link in one colour, and waterways, survey marks, wind regions, road '
       + 'parcels, property boundaries, the backbone paths, the arrowheads, the forecast outlines and the '
-      + 'digital twin up close all off. The top of 🗺️ Map display names whichever are still off, with '
+      + 'digital twin up close all off. The top of Layers names whichever are still off, with '
       + '<em>Turn them all on</em>; tick any one to have it back, and it stays the way you leave it.',
     ],
     figure: {
@@ -1133,7 +1136,7 @@ const HELP = {
         <text x="228" y="44" font-size="9" text-anchor="middle" fill="var(--muted)">repeater</text>
       </svg>`,
       steps: [
-        'Open <strong>Draw &amp; measure</strong> from the ✏️ in the side panel\'s strip and pick '
+        'Open <strong>Draw &amp; measure</strong> from the side panel\'s rail and pick '
         + '<em>Line</em>. The cursor becomes a crosshair and clicks pass through the pins to the '
         + 'map underneath, and the panel stays open beside the map while you work. (On a phone the '
         + '✏️ is in the rail that ⋮ at the top right brings out, and its panel is a drawer over the '
@@ -3497,6 +3500,18 @@ function themeStored() {
 // change under the reader.
 const LOOK_CHOICES = ['calm', 'tiles', 'instrument', 'signs', 'classic'];
 
+// The side panel's rail, names or icons, as the address or this device asked
+// for it — `?rail=names` or `?rail=icons`, which app.js stores and takes out of
+// the address as Looks does `?look=` (dockNamesFromAddress) — else null, for
+// state.dockNames to decide.
+function dockNamesStored() {
+  let v = null;
+  try { v = new URLSearchParams(location.search).get('rail'); } catch (_) {}
+  if (v === 'names' || v === 'icons') return v === 'names';
+  try { v = localStorage.getItem('mn-dock-names'); } catch (_) {}
+  return v === 'shown' ? true : v === 'hidden' ? false : null;
+}
+
 function lookStored() {
   let v = null;
   try { v = new URLSearchParams(location.search).get('look'); } catch (_) {}
@@ -4030,6 +4045,18 @@ const state = {
   //               phone's (dockPhoneCheck).
   dockRail:       localStorage.getItem('mn-dock-rail') === 'shown',
   dockDrawer:     false,
+  // The side panel's rail on the Stations tab, the way the left bar is: its
+  // buttons with their names beside them, or icons alone (toggleDockNames,
+  // app.js). Kept under 'mn-dock-names' (or named by the address, `?rail=`:
+  // dockNamesStored) and decided, with neither, by the same rule as the
+  // bar's — a narrow window and the Instrument look start with icons — so the
+  // two edges of the page start alike. A desktop's alone:
+  // a phone's rail is always icons, a finger's width beside its map.
+  dockNames:      dockNamesStored() ?? !(window.innerWidth < NAV_AUTO_COLLAPSE_PX || lookStored() === 'instrument'),
+  // …and which of its sections are folded away under their headings, by name
+  // ('places', 'show', 'tools'), under 'mn-dock-fold'. Only ever seen with the
+  // names on: icons alone have no headings to fold under.
+  dockFolded:     new Set((localStorage.getItem('mn-dock-fold') || '').split(',').filter(Boolean)),
   // Draw & measure overlay (Stations map). Plain geometry only — the Leaflet
   // layers are rebuilt from it whenever the map is, so a tab switch doesn't
   // throw the sketch away. Deliberately not persisted: see MapDraw.

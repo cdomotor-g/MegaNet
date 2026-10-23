@@ -248,7 +248,7 @@ const Looks = (() => {
     return `
       <div class="look-intro" role="note">
         <span>Flood-Net has a calmer look: the same tabs, filed under their groups, fewer buttons in the
-          banner, and a quieter map — 🗺️ Map display turns its layers back on. Prefer the old look?</span>
+          banner, and a quieter map — Layers, in the side panel, turns them back on. Prefer the old look?</span>
         <button type="button" class="link-btn" onclick="Looks.set('classic')">Switch back to Classic</button>
         <button type="button" class="look-intro-x" onclick="Looks.dismissIntro()"
                 aria-label="Keep the calm look and hide this note" title="Keep this look">×</button>

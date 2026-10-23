@@ -9226,6 +9226,430 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
   font-weight: 700;
 }
 
+/* …and on a phone's edge tab, with its drawer open, the tab is the drawer's
+   close button and wears ✕ (syncDockStrip, is-closing). */
+.dock-x {
+  display: none;
+}
+
+.dock-tab.help-toggle.is-closing .dock-ico {
+  display: none;
+}
+
+.dock-tab.help-toggle.is-closing .dock-x {
+  display: block;
+  font-size: 1.05rem;
+}
+
+/* ── The rail's pictures (Glyphs.rail, glyphs.js) ───────────────────────────
+   One drawing per control, every dress in the markup and the look choosing
+   one: under Calm a thin line in the strip's ink, as Calm's bar draws its
+   groups; under Classic the emoji beside it, as Classic's bar does; and under
+   the three looks in pictures the same drawing bolder, on a tile (with each
+   look, below). */
+.rail-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.rail-svg {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.rail-svg .rail-dash {
+  stroke-dasharray: 2 2.4;
+}
+
+.rail-emoji {
+  display: none;
+  line-height: 1;
+}
+
+:root[data-shell="classic"] .rail-svg {
+  display: none;
+}
+
+:root[data-shell="classic"] .rail-emoji {
+  display: block;
+}
+
+.rail-ico[data-hue="net"]   { --hue: var(--hue-net); }
+.rail-ico[data-hue="data"]  { --hue: var(--hue-data); }
+.rail-ico[data-hue="field"] { --hue: var(--hue-field); }
+.rail-ico[data-hue="radio"] { --hue: var(--hue-radio); }
+.rail-ico[data-hue="learn"] { --hue: var(--hue-learn); }
+.rail-ico[data-hue="admin"] { --hue: var(--hue-admin); }
+
+/* Tiles, Instrument and Signs: a 28 px tile with the drawing at the weight of
+   their bar's pictograms (.gl) — its group's colour under Tiles (the six
+   families glyphs.js gives the tabs: blue for the panels, teal for what the
+   map shows, purple for the tools, slate for the view, amber for help), the
+   dark frame's own ground under Instrument, a yellow sign under Signs. */
+:root[data-look="tiles"] .rail-ico,
+:root[data-look="instrument"] .rail-ico,
+:root[data-look="signs"] .rail-ico {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 8px;
+}
+
+:root[data-look="tiles"] .rail-svg,
+:root[data-look="instrument"] .rail-svg,
+:root[data-look="signs"] .rail-svg {
+  width: 62%;
+  height: 62%;
+  stroke-width: 2;
+}
+
+:root[data-look="tiles"] .rail-ico {
+  background: var(--hue);
+  color: #ffffff;
+}
+
+/* Under Tiles the control that is on — the pane that is open, the mode that
+   is armed — has its tile gilded, in the gold of the leader from a station's
+   card to its pin (--map-leader): a ramp from pale through deep, cased in the
+   leader's ink. A tile of colour lit with more colour round it did not show
+   which one was on, least of all in a column of tiles. */
+:root[data-look="tiles"] .dock-strip :is(.is-on, [aria-pressed="true"]) .rail-ico {
+  background: linear-gradient(155deg, var(--map-leader-hi) 0%, var(--map-leader) 46%, var(--map-leader-lo) 100%);
+  color: var(--map-leader-ink);
+  box-shadow: inset 0 0 0 1.5px rgba(29, 20, 2, .55), 0 0 6px 1px rgba(255, 186, 40, .7);
+}
+
+/* …and with icons alone the gold is the only mark: no ring or fill round the
+   button as well. With the names on, the open pane's row keeps its tint. */
+:root[data-look="tiles"] #help-panel:not(.rail-names) .dock-strip :is(.dock-tab.is-on, .mn-mapctl-btn.is-on) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Instrument: the drawing in the frame's ink on its ground, and the one that
+   is on on the frame's blue, as its bar lights the open group. */
+:root[data-look="instrument"] .rail-ico {
+  background: transparent;
+}
+
+:root[data-look="instrument"] .dock-strip :is(.is-on, [aria-pressed="true"]) .rail-ico {
+  background: #0b5cab;
+  color: #ffffff;
+}
+
+/* Signs: every one a yellow sign, cased in black, at the sign's heavier line. */
+:root[data-look="signs"] .rail-ico {
+  background: var(--sign);
+  color: var(--sign-ink);
+  box-shadow: inset 0 0 0 2px var(--sign-ink);
+}
+
+:root[data-look="signs"] .rail-svg {
+  stroke-width: 2.4;
+}
+
+/* ── The Stations tab's rail ─────────────────────────────────────────────────
+   On the Stations tab the strip is a rail of the map's tools (app.js,
+   dockStripGroups): a toggle at the top, three sections — Stations & places,
+   Map, Tools — and a foot that stays at the bottom of the rail whatever is
+   scrolled above it, holding 🧹 Clear the selection, the 3-D view, full
+   screen and ❔. Sticky rather than a second scroller, so the strip is still
+   the one thing that scrolls. */
+.dock-name,
+.rail-switch,
+.dock-fold {
+  display: none;
+}
+
+.dock-names {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--muted);
+  font-size: .85rem;
+  line-height: 1;
+}
+
+.dock-names:hover {
+  background: var(--subtle);
+  border-color: var(--border);
+}
+
+.dock-names-chev {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The toggle is the rail's own, not one of its groups: no hairline under it. */
+.dock-group[data-group="rail"] + .dock-group::before {
+  display: none;
+}
+
+#help-panel.has-map-tools .dock-strip {
+  padding-bottom: 0;
+}
+
+#help-panel.has-map-tools .dock-group[data-group="foot"] {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  align-self: stretch;
+  margin-top: auto;
+  padding-bottom: var(--sp-2);
+  background: var(--panel-sub);
+  /* A shadow along its top, so that a section scrolled under it reads as
+     going on underneath rather than as ending there. */
+  box-shadow: 0 -8px 8px -8px rgba(15, 23, 42, .35);
+}
+
+/* ── …with its names on ──────────────────────────────────────────────────────
+   The left bar's two states, on the right: icons alone (everything above), or
+   each button's name beside its icon, in a rail as wide as --mn-rail-names
+   (app.js counts it as the strip's width, dockRailPx). A desktop's alone. */
+:root {
+  --mn-rail-names: 216px;
+}
+
+:root[data-look="signs"] {
+  --mn-rail-names: 244px;
+}
+
+#help-panel.rail-names {
+  --mn-help-rail: var(--mn-rail-names, 216px);
+}
+
+#help-panel.rail-names .dock-strip {
+  align-items: stretch;
+  padding: var(--sp-1) var(--sp-2) 0;
+}
+
+#help-panel.rail-names .dock-group {
+  align-items: stretch;
+  gap: 2px;
+}
+
+#help-panel.rail-names .dock-group + .dock-group::before {
+  display: none;
+}
+
+#help-panel.rail-names .dock-tab,
+#help-panel.rail-names .dock-strip .mn-mapctl-btn,
+#help-panel.rail-names .dock-names {
+  width: 100%;
+  height: auto;
+  min-height: 2.25rem;
+  justify-content: flex-start;
+  gap: .65rem;
+  padding: .2rem .55rem;
+  color: var(--text);
+  font-size: .9rem;
+  line-height: 1.2;
+  text-align: left;
+}
+
+#help-panel.rail-names .rail-emoji {
+  font-size: 1.15rem;
+}
+
+#help-panel.rail-names .dock-name {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The toggle, at the top right: "Collapse »", its chevrons at the edge the
+   rail folds towards — the left bar's "« Collapse", mirrored. */
+#help-panel.rail-names .dock-names {
+  flex-direction: row-reverse;
+  min-height: 2rem;
+  color: var(--muted);
+  font-size: .85rem;
+}
+
+#help-panel.rail-names .dock-names .dock-name {
+  flex: 0 1 auto;
+}
+
+/* A section's heading, which folds it. Folded, the section keeps on show the
+   one button in it that is on, so a fold never hides what is lit. */
+#help-panel.rail-names .dock-fold {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  width: 100%;
+  margin-top: 2px;
+  padding: .3rem .55rem .15rem;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+#help-panel.rail-names .dock-fold:hover {
+  background: var(--subtle);
+  color: var(--text);
+}
+
+.dock-fold-chev {
+  display: block;
+  flex: none;
+  width: .875rem;
+  height: .875rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform .15s ease;
+}
+
+.dock-group.is-folded .dock-fold-chev {
+  transform: rotate(-90deg);
+}
+
+#help-panel.rail-names .dock-group.is-folded > :not(.dock-fold):not(.is-on):not([aria-pressed="true"]) {
+  display: none;
+}
+
+/* The pane that is open: its row tinted and its name in the accent, as the
+   left bar marks the open group. */
+#help-panel.rail-names .dock-tab.is-on {
+  background: var(--calm-soft, color-mix(in srgb, var(--accent) 14%, var(--panel-sub)));
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* A mode says it is on with its switch, so its row is not lit as well. */
+#help-panel.rail-names .dock-strip .mn-mapctl-btn.is-on,
+#help-panel.rail-names .dock-strip .mn-mapctl-btn.mn-map-3d.is-on {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+#help-panel.rail-names .rail-switch {
+  display: block;
+  position: relative;
+  flex: none;
+  margin-left: auto;
+  width: 1.9rem;
+  height: 1.05rem;
+  border-radius: 999px;
+  background: var(--muted);
+  transition: background-color .15s ease;
+}
+
+#help-panel.rail-names .rail-switch::after {
+  content: '';
+  position: absolute;
+  top: .15rem;
+  left: .15rem;
+  width: .75rem;
+  height: .75rem;
+  border-radius: 50%;
+  background: var(--panel);
+  transition: transform .15s ease;
+}
+
+#help-panel.rail-names [aria-pressed="true"] > .rail-switch {
+  background: var(--accent);
+}
+
+#help-panel.rail-names [aria-pressed="true"] > .rail-switch::after {
+  transform: translateX(.85rem);
+}
+
+/* The foot: a rule above it, and the 3-D view and its settings on one row —
+   the switch is the mode, the square beside it what it does it with, the
+   corner's split button laid on its side. */
+#help-panel.rail-names .dock-group[data-group="foot"] {
+  flex-flow: row wrap;
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+}
+
+#help-panel.rail-names .dock-group[data-group="foot"] > * {
+  flex: 1 0 100%;
+}
+
+#help-panel.rail-names .dock-group[data-group="foot"] > .mn-map-3d {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
+#help-panel.rail-names .dock-group[data-group="foot"] > [data-dock="map-3d"] {
+  flex: 0 0 2.25rem;
+  width: 2.25rem;
+  justify-content: center;
+  padding: 0;
+}
+
+#help-panel.rail-names [data-dock="map-3d"] .dock-name {
+  display: none;
+}
+
+/* Signs: the open row a black sign with yellow on it, the headings in black,
+   and a switch drawn as one — black on white off, yellow on black on. */
+:root[data-look="signs"] #help-panel.rail-names .dock-tab.is-on {
+  background: var(--sign-ink);
+  color: var(--sign);
+}
+
+:root[data-look="signs"] #help-panel.rail-names .dock-fold {
+  color: var(--text);
+  font-size: .75rem;
+}
+
+:root[data-look="signs"] #help-panel.rail-names .rail-switch {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 2px var(--sign-ink);
+}
+
+:root[data-look="signs"] #help-panel.rail-names .rail-switch::after {
+  background: var(--sign-ink);
+}
+
+:root[data-look="signs"] #help-panel.rail-names [aria-pressed="true"] > .rail-switch {
+  background: var(--sign-ink);
+}
+
+:root[data-look="signs"] #help-panel.rail-names [aria-pressed="true"] > .rail-switch::after {
+  background: var(--sign);
+}
+
 /* The handle: a 10 px hit target laid over the panel's inner edge — half over
    the page, half over the pane, so it takes no width from either — with a
    short grip drawn down the middle of it. Focusable, and it keeps the browser's
@@ -9625,6 +10049,21 @@ body.mn-dock-dragging {
 
   #help-panel.has-map-tools .dock-tab.help-toggle .dock-ico {
     font-size: 1.05rem;
+  }
+
+  /* A phone's rail is a finger's column the height of its map: its foot
+     scrolls with the rest rather than standing over a third of it. */
+  #help-panel.has-map-tools .dock-group[data-group="foot"] {
+    position: static;
+    box-shadow: none;
+  }
+
+  :root[data-look="tiles"] #help-panel.has-map-tools .rail-ico,
+  :root[data-look="instrument"] #help-panel.has-map-tools .rail-ico,
+  :root[data-look="signs"] #help-panel.has-map-tools .rail-ico {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 7px;
   }
 
   #help-panel.has-map-tools .dock-group {
@@ -21732,12 +22171,8 @@ select.kl-in { width: auto; font-family: inherit; }
   line-height: 1.6rem;
 }
 
-/* ── The side panel's strip, in the same quiet ink ── */
-:root[data-shell="calm"] .dock-strip .dock-ico { filter: grayscale(1); }
-/* …but the two pins keep theirs, because colour is all that tells them apart:
-   the red one the Stations cards, the blue one Find a place (.mn-pin-blue,
-   the same blue as the pin it drops). Greyed, they were one pin twice. */
-:root[data-shell="calm"] .dock-strip :is([data-dock="stations"], [data-dock="places"]) .dock-ico { filter: none; }
+/* (The side panel's strip is drawn in Calm's ink by its own pictures —
+   Glyphs.rail, .rail-svg — rather than greying emoji.) */
 
 /* The memory strip under the banner (#79) keeps its place and its click, but
    says nothing in colour until it has something to say: grey while the page
@@ -22279,7 +22714,8 @@ select.kl-in { width: auto; font-family: inherit; }
    draws them dark without a rule of its own. */
 :root[data-look="instrument"] header,
 :root[data-look="instrument"] #tab-nav,
-:root[data-look="instrument"] #section-bar {
+:root[data-look="instrument"] #section-bar,
+:root[data-look="instrument"] #help-panel .dock-strip {
   --panel: #0f172a;
   --panel-sub: #111c33;
   --subtle: #1e293b;

@@ -2700,6 +2700,9 @@ const Map3D = (function () {
       // The label carries the reading, because the needle does not: an operator
       // who cannot see it has no other way to be told the map is turned.
       label(el, b ? `Face north again — the ${what} is turned ${b}°` : 'Facing north already');
+      // …and the name it wears in the side panel's rail with its names on,
+      // which the label above always contains.
+      railName(el, b ? 'Face north' : 'Facing north');
     }
     for (const el of document.querySelectorAll('.mn-map-tilt')) {
       el.hidden = !on;
@@ -2712,7 +2715,13 @@ const Map3D = (function () {
       label(el, tc && tc.pov ? 'Look straight down — out of the POV, from overhead'
               : p > 1 ? `Look straight down — the camera is tilted ${p}°`
               : `Tilt back to ${home}°`);
+      railName(el, (tc && tc.pov) || p > 1 ? 'Look straight down' : 'Tilt back');
     }
+  }
+
+  function railName(el, text) {
+    const n = el.querySelector('.dock-name');
+    if (n && n.textContent !== text) n.textContent = text;
   }
 
   // The tooltip and the accessible name are the same sentence, as they are on
@@ -3021,14 +3030,14 @@ const Map3D = (function () {
             Mouse: ${esc(viewMoveWords(false))}<br>
             Touch: ${esc(viewMoveWords(true))}<br>
             Keys, once the view is clicked: ${esc(viewKeyWords())}</p>
-          <p class="filter-note">The base map is the one 🗺️ Map display has on — the most
+          <p class="filter-note">The base map is the one Layers has on — the most
             opaque of them, if several are blended — and the
             pins and links are the ones the 2-D map has drawn — the same filters, the same
             colouring, the same hidden and culled sets. So are the field photos’ 📷 — the
             ones around the middle of the view, which is where the 2-D map is: it follows
             the camera, and a photo out towards the horizon is drawn once the camera goes
             to it. Property boundaries and road parcels — the Queensland cadastre, as
-            Queensland Globe draws it — are on when their switches in Map display are, and
+            Queensland Globe draws it — are on when their switches in Layers are, and
             drawn closer in than about 1:36,000 and 1:72,000, the same as in 2-D.</p>
           <p class="filter-note" id="map-3d-note">${noteHtml()}</p>
         </div>`;

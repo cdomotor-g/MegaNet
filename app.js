@@ -2455,10 +2455,11 @@ function dockSkeleton(panel) {
            title="Drag to make the side panel wider or narrower, or use the arrow keys"
            onpointerdown="dockResizeStart(event)" onkeydown="dockResizeKey(event)"></div>
       <div class="dock-strip" role="group" aria-label="Side panel" onkeydown="dockStripKey(event)">
-        <div class="dock-group" data-group="side">
+        <div class="dock-group" data-group="foot">
           <button type="button" class="dock-tab help-toggle" data-dock="help"
                   aria-controls="${dockPaneId('help')}" aria-expanded="false"
-                  onclick="toggleHelp()"><span class="dock-ico" aria-hidden="true">?</span></button>
+                  onclick="toggleHelp()"><span class="dock-ico" aria-hidden="true">${Glyphs.rail('help')}</span><span
+                  class="dock-x" aria-hidden="true">✕</span><span class="dock-name" aria-hidden="true">Help</span></button>
         </div>
       </div>
       <div class="dock-panes">
@@ -2640,53 +2641,80 @@ function helpShowing() {
   return dockShowing() === 'help';
 }
 
-// Everything in the strip right now, as the groups it stands in: the side
-// panel's own (help, 🧹, the cards, the path tools), then the map's controls by
-// their corner group and their place in it — not by the order they were built,
-// which for the polar plot and the site finder is long after the rest. Each item is either a
-// pane's button ('tab', made and kept by syncDockStrip) or a plain button
-// ('action', the element itself): 🧹, or one of MapChrome's. A button whose map is being
-// built again has no element to stand in the strip until the new one arrives,
-// so it is simply not there for that moment; a pane's button is.
+// Everything in the strip right now, as the groups it stands in. On the
+// Stations tab that is the rail the operator reads down (Option B of the side
+// rail's redesign): the names toggle at the top, three sections that fold
+// under their headings when the names are on — Stations & places (the cards,
+// Find a place, the path tools, the twin), Map (what the map shows, the
+// corner's `show` group) and Tools (what is pointed at it, the corner's
+// `tools`) — and a foot that stays at the bottom of the rail whatever is
+// scrolled above it: 🧹 Clear the selection, the 3-D view and its camera
+// (the corner's `3d`), ⛶ (its `screen`), and ❔ last. Everywhere else it is ❔
+// alone. The map's controls are placed by their corner group and their place
+// in it — not by the order they were built, which for the polar plot and the
+// site finder is long after the rest. Each item is either a pane's button
+// ('tab', made and kept by syncDockStrip) or a plain button ('action', the
+// element itself): 🧹, the names toggle, or one of MapChrome's. A button whose
+// map is being built again has no element to stand in the strip until the new
+// one arrives, so it is simply not there for that moment; a pane's button is.
 function dockStripGroups() {
-  const side = [{ key: 'help', kind: 'tab', icon: '?', label: 'Help' }];
-  // 🧹 Clear the selection, straight under ❔ wherever the map's tools are:
-  // the side panel's own button rather than MapChrome's, so it stands at the
-  // top of the strip and not down among the map's groups.
-  if (dockHoldsMapTools()) side.push({ key: 'clear', kind: 'action', el: dockClearEl() });
+  const help = { key: 'help', kind: 'tab', icon: Glyphs.rail('help'), label: 'Help', name: 'Help' };
+  if (!dockHoldsMapTools()) return [{ name: 'foot', label: '', items: [help] }];
+  const groups = [];
+  // The names toggle, a desktop's alone: a phone's rail is always icons.
+  if (!isPhoneNav()) groups.push({ name: 'rail', label: '', items: [{ key: 'names', kind: 'action', el: dockNamesEl() }] });
   const here = dockStationsHere();
+  const places = [];
   if (here) {
-    side.push({ key: 'stations', kind: 'tab', icon: '📍',
-                label: 'Stations — filters, station list and station details' });
+    places.push({ key: 'stations', kind: 'tab', icon: Glyphs.rail('stations'), name: 'Stations',
+                  label: 'Stations — filters, station list and station details' });
   }
-  // The blue pin beside the red one: the stylesheet turns it (.mn-pin-blue).
-  if (dockHoldsMapTools()) {
-    side.push({ key: 'places', kind: 'tab', icon: '<span class="mn-pin-blue">📍</span>',
+  places.push({ key: 'places', kind: 'tab', icon: Glyphs.rail('places'), name: 'Find a place',
                 label: 'Find a place — a town, river, catchment, council area or coordinate' });
-  }
   if (here) {
-    side.push({ key: 'paths', kind: 'tab', icon: '〽️',
-                label: 'Path tools — radio path, elevation profile and link budget (fade margin)' });
+    places.push({ key: 'paths', kind: 'tab', icon: Glyphs.rail('paths'), name: 'Path tools',
+                  label: 'Path tools — radio path, elevation profile and link budget (fade margin)' });
   }
   // The digital twin's pane: what was the Digital Twin tab's left column —
   // the finder, the scene's settings, the ground truth and the .glb — beside
   // the map the twin opens in (digital-twin.js, paneHtml).
-  if (dockHoldsMapTools()) {
-    side.push({ key: 'twin', kind: 'tab', icon: '🧊',
+  places.push({ key: 'twin', kind: 'tab', icon: Glyphs.rail('twin'), name: 'Digital twin',
                 label: 'Digital twin — open a station\'s twin, its scene settings, ground truth and the .glb for Blender' });
-  }
-  const groups = [{ name: 'side', label: '', items: side }];
+  groups.push({ name: 'places', label: 'Stations & places', fold: true, items: places });
+  const sections = { show: 'Map', tools: 'Tools' };
+  // 🧹 Clear the selection heads the foot: the side panel's own button rather
+  // than MapChrome's, and one an operator reaches for whatever is scrolled.
+  const foot = { name: 'foot', label: 'Selection, view and help', items: [{ key: 'clear', kind: 'action', el: dockClearEl() }] };
   const map = [...dockMapItems.values()]
     .filter(e => dockMapListed(e) && (e.kind === 'panel' || e.el))
     .sort((a, b) => a.rank - b.rank || a.order - b.order);
   for (const e of map) {
-    let g = groups[groups.length - 1];
-    if (g.name !== e.group) groups.push(g = { name: e.group, label: `Map controls: ${e.groupLabel}`, items: [] });
-    g.items.push(e.kind === 'panel'
-      ? { key: e.key, kind: 'tab', icon: e.icon, label: e.label, entry: e }
-      : { key: e.key, kind: 'action', el: e.el });
+    const it = e.kind === 'panel'
+      ? { key: e.key, kind: 'tab', icon: e.icon, label: e.label, name: e.name, entry: e }
+      : { key: e.key, kind: 'action', el: e.el };
+    if (!sections[e.group]) { foot.items.push(it); continue; }
+    let g = groups.find(x => x.name === e.group);
+    if (!g) groups.push(g = { name: e.group, label: sections[e.group], fold: true, items: [] });
+    g.items.push(it);
   }
+  foot.items.push(help);
+  groups.push(foot);
   return groups;
+}
+
+// The rail's width in px: the names' width when they are showing, the strip's
+// own otherwise. What the side panel takes out of the row is worked out from
+// this (dockTakes, dockWidthRange), so the map is measured against the rail it
+// actually has.
+function dockRailPx() {
+  return dockNamesShown() ? dockCssPx('--mn-rail-names', 216) : dockCssPx('--mn-help-rail', 56);
+}
+
+// Whether the rail is wearing its names now: asked for, on a desktop, on the
+// one tab whose strip is a rail of the map's tools. Everywhere else the strip
+// is ❔ alone, and a column of names for one button is not worth its width.
+function dockNamesShown() {
+  return !!state.dockNames && !isPhoneNav() && dockHoldsMapTools();
 }
 
 // ── How wide ─────────────────────────────────────────────────────────────────
@@ -2713,7 +2741,7 @@ function dockWidthRange() {
   const vw = document.documentElement.clientWidth || window.innerWidth || 0;
   const navW = isPhoneNav() ? 0
     : state.navCollapsed ? dockCssPx('--mn-nav-rail', 56) : dockCssPx('--mn-nav', 236);
-  const room = Math.max(0, vw - navW - dockCssPx('--mn-help-rail', 56));
+  const room = Math.max(0, vw - navW - dockRailPx());
   const max = Math.max(0, Math.round(Math.max(room - DOCK_MAIN_MIN, room * 0.55)));
   return { min: Math.min(DOCK_MIN_W, max), max };
 }
@@ -2758,7 +2786,7 @@ function syncDockWidth() {
 // only beside a drawer is over the page with it, and on every other tab the
 // strip is a tab on the screen's edge.
 function dockTakes(showing, w) {
-  const rail = dockCssPx('--mn-help-rail', 56);
+  const rail = dockRailPx();
   if (isPhoneNav()) return dockRailPinned() ? rail : 0;
   return showing ? rail + w : rail;
 }
@@ -2800,6 +2828,9 @@ function renderDock(opts = {}) {
   if (instant) panel.classList.add('dock-instant');
 
   panel.classList.toggle('collapsed', !showing);
+  // The rail with its names beside its icons (styles.css): its width is
+  // --mn-rail-names then, which dockTakes() has just counted.
+  panel.classList.toggle('rail-names', dockNamesShown());
   // What makes a phone's strip a rail beside the map rather than a tab on the
   // screen's edge (styles.css). Set at every width, and read only below `xs`.
   panel.classList.toggle('has-map-tools', dockHoldsMapTools());
@@ -2926,6 +2957,10 @@ function dockAfterSlide(panel) {
 // A pane's button is kept on its entry for the same reason, so that a map built
 // again finds the button it had rather than a new one in its place.
 //
+// A section that folds (dockStripGroups) leads with its heading, a button of
+// its own that only the rail with its names on draws (styles.css, .dock-fold);
+// with icons alone the hairline between groups is the heading.
+//
 // The map's own buttons are MapChrome's, and are only ever *moved* here: this
 // writes nothing on them. Their modules keep them in step (their labels, their
 // aria-pressed, the camera pair's `hidden`), wherever they are standing.
@@ -2948,21 +2983,27 @@ function syncDockStrip(showing) {
       box = document.createElement('div');
       box.className = 'dock-group';
       box.dataset.group = g.name;
-      // The same labelled group the corner made of it (MapChrome), so that a
-      // screen reader is told "3-D view" where a sighted operator is shown a
-      // hairline. The side panel's own group needs no name: the strip is it.
-      if (g.label) {
-        box.setAttribute('role', 'group');
-        box.setAttribute('aria-label', g.label);
-      }
+    }
+    // A labelled group, so that a screen reader is told "Tools" where a
+    // sighted operator is shown a heading or a hairline. ❔ alone needs no
+    // name: the strip is it.
+    if (g.label) {
+      box.setAttribute('role', 'group');
+      box.setAttribute('aria-label', g.label);
+    } else {
+      box.removeAttribute('role');
+      box.removeAttribute('aria-label');
     }
     if (strip.children[gi] !== box) strip.insertBefore(box, strip.children[gi] || null);
+    const folded = !!g.fold && state.dockFolded.has(g.name);
+    box.classList.toggle('is-folded', folded);
     const els = g.items.map(it => (it.kind === 'action' ? it.el : dockTabEl(strip, it)));
+    if (g.fold) els.unshift(dockFoldEl(box, g, folded));
     for (const c of [...box.children]) if (!els.includes(c)) c.remove();
     els.forEach((el, i) => { if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null); });
-    g.items.forEach((it, i) => {
+    g.items.forEach(it => {
       if (it.kind !== 'tab') return;
-      const b = els[i];
+      const b = dockTabEl(strip, it);
       const on = showing === it.key;
       // On a phone's edge tab the open help pane is a drawer and this button
       // is the tab on its edge, so it is the drawer's close button and says
@@ -2978,18 +3019,47 @@ function syncDockStrip(showing) {
         : `${label} — press again to ${phone ? 'put it away' : 'hide the side panel'}`;
       b.setAttribute('aria-expanded', String(on));
       b.classList.toggle('is-on', on);
-      if (it.key === 'help') {
-        const ico = b.querySelector('.dock-ico');
-        if (ico) ico.textContent = closing ? '✕' : '?';
-      }
+      if (it.key === 'help') b.classList.toggle('is-closing', closing);
     });
   });
+  syncDockNamesEl();
+  dockWatchFoot(strip.querySelector(':scope > .dock-group[data-group="foot"]'));
   if (had && had !== document.activeElement && strip.contains(had)) had.focus({ preventScroll: true });
+}
+
+// The foot stays at the bottom of the rail while the sections scroll under it
+// (styles.css), and a button brought into view — by focus, or by the arrow
+// keys walking the strip — must not land under it: the strip keeps the foot's
+// height as its scroll padding, which every scroll into view respects. Kept
+// by a ResizeObserver, because the foot grows and shrinks without the side
+// panel being painted (the camera pair coming and going with the 3-D view).
+let dockFootObs = null;
+let dockFootBox = null;
+
+function dockWatchFoot(box) {
+  if (box && box !== dockFootBox && typeof ResizeObserver !== 'undefined') {
+    if (!dockFootObs) dockFootObs = new ResizeObserver(() => dockFootPad());
+    if (dockFootBox) dockFootObs.unobserve(dockFootBox);
+    dockFootObs.observe(box);
+    dockFootBox = box;
+  }
+  dockFootPad();
+}
+
+function dockFootPad() {
+  const strip = document.querySelector('#help-panel .dock-strip');
+  if (!strip) return;
+  const foot = strip.querySelector(':scope > .dock-group[data-group="foot"]');
+  const sticky = !!foot && getComputedStyle(foot).position === 'sticky';
+  const pad = sticky ? `${Math.ceil(foot.getBoundingClientRect().height)}px` : '';
+  if (strip.style.scrollPaddingBottom !== pad) strip.style.scrollPaddingBottom = pad;
 }
 
 // A pane's button: the one already in the strip, the one its map entry kept, or
 // a new one. Made here, never by MapChrome — the panel's own icon is a flyout's
 // disclosure and is hidden in the side panel, and this is the side panel's.
+// Its name is drawn beside its icon only when the rail shows names; the
+// accessible name is the label, which contains it.
 function dockTabEl(strip, it) {
   let b = it.entry ? it.entry.tab
     : strip.querySelector(`.dock-tab[data-dock="${CSS.escape(it.key)}"]`);
@@ -3000,10 +3070,37 @@ function dockTabEl(strip, it) {
     b.dataset.dock = it.key;
     b.setAttribute('aria-controls', dockPaneId(it.key));
     b.setAttribute('onclick', `toggleDockTab('${it.key}')`);
-    b.innerHTML = `<span class="dock-ico" aria-hidden="true">${it.icon}</span>`;
+    b.innerHTML = `<span class="dock-ico" aria-hidden="true">${it.icon}</span>`
+                + `<span class="dock-name" aria-hidden="true">${esc(it.name || it.label)}</span>`;
     if (it.entry) it.entry.tab = b;
   }
   return b;
+}
+
+// A section's heading, which folds it away: made once per section and kept on
+// its group, so that the heading just pressed keeps its focus. A fold leaves
+// the section's open pane and armed mode on show, so whatever is lit is never
+// folded out of sight (styles.css).
+function dockFoldEl(box, g, folded) {
+  let b = box.querySelector(':scope > .dock-fold');
+  if (!b) {
+    b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'dock-fold';
+    b.setAttribute('onclick', `toggleDockFold('${g.name}')`);
+    b.innerHTML = `<span class="dock-fold-name">${esc(g.label)}</span>`
+      + '<svg class="dock-fold-chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>';
+  }
+  b.setAttribute('aria-expanded', String(!folded));
+  b.title = folded ? `Show ${g.label}` : `Fold ${g.label} away`;
+  return b;
+}
+
+function toggleDockFold(name) {
+  if (state.dockFolded.has(name)) state.dockFolded.delete(name);
+  else state.dockFolded.add(name);
+  try { localStorage.setItem('mn-dock-fold', [...state.dockFolded].join(',')); } catch (_) {}
+  renderDock();
 }
 
 // 🧹 Clear the selection (clearStationsMapSelection): made once and kept, so
@@ -3021,8 +3118,70 @@ function dockClearEl() {
           + 'The view and the filters stay as they are';
   b.setAttribute('aria-label', 'Clear the selection');
   b.setAttribute('onclick', 'clearStationsMapSelection()');
-  b.innerHTML = '<span class="mn-mapctl-ico" aria-hidden="true">🧹</span>';
+  b.innerHTML = `<span class="mn-mapctl-ico" aria-hidden="true">${Glyphs.rail('clear')}</span>`
+              + '<span class="dock-name" aria-hidden="true">Clear the selection</span>';
   return (dockClearBtn = b);
+}
+
+// The rail's own collapse, at its top: names beside the icons, or icons alone
+// — the left bar's « Collapse, mirrored, its chevrons pointing at the edge the
+// rail folds towards. Made once and kept, for its focus.
+let dockNamesBtn = null;
+
+function dockNamesEl() {
+  if (dockNamesBtn) return dockNamesBtn;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'dock-names';
+  b.setAttribute('aria-controls', 'help-panel');
+  b.setAttribute('onclick', 'toggleDockNames()');
+  b.innerHTML = '<svg class="dock-names-chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d=""/></svg>'
+              + '<span class="dock-name" aria-hidden="true">Collapse</span>';
+  dockNamesBtn = b;
+  syncDockNamesEl();
+  return b;
+}
+
+function syncDockNamesEl() {
+  const b = dockNamesBtn;
+  if (!b) return;
+  const on = !!state.dockNames;
+  const label = on ? 'Collapse the side panel’s rail — icons only' : 'Expand the side panel’s rail — icons and names';
+  b.setAttribute('aria-expanded', String(on));
+  b.setAttribute('aria-label', label);
+  b.title = label;
+  const path = b.querySelector('path');
+  if (path) path.setAttribute('d', on ? 'M13 7l5 5-5 5M6 7l5 5-5 5' : 'M11 7l-5 5 5 5M18 7l-5 5 5 5');
+}
+
+// An address that names the rail's state (`?rail=names`, `?rail=icons`) is a
+// choice, as `?look=` is (looks.js): stored, and taken out of the address so
+// that a link copied from here on does not carry it on. core.js has already
+// read it into state.dockNames (dockNamesStored). The way the browser checks
+// open the app with icons alone (test/lib/browser.mjs). Called by init.js.
+function dockNamesFromAddress() {
+  let q = null;
+  try { q = new URLSearchParams(location.search); } catch (_) { return; }
+  if (!q.has('rail')) return;
+  const v = q.get('rail');
+  if (v === 'names' || v === 'icons') {
+    try { localStorage.setItem('mn-dock-names', v === 'names' ? 'shown' : 'hidden'); } catch (_) {}
+  }
+  q.delete('rail');
+  const rest = q.toString();
+  try {
+    history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+  } catch (_) {}
+}
+
+// The names toggled: remembered, and the rail laid out again — which moves the
+// map's edge, so renderDock() re-measures it once the width has settled. Focus
+// stays on the toggle, which is still where it was.
+function toggleDockNames() {
+  state.dockNames = !state.dockNames;
+  try { localStorage.setItem('mn-dock-names', state.dockNames ? 'shown' : 'hidden'); } catch (_) {}
+  renderDock();
+  announce(state.dockNames ? 'The side panel’s rail shows names.' : 'The side panel’s rail shows icons only.');
 }
 
 // ── Opening, shutting, switching ─────────────────────────────────────────────
@@ -3300,7 +3459,7 @@ function dockAdopt(el, info) {
   // second copy of every id on the page is the failure that says nothing, so it
   // is taken out rather than left for getElementById to find first.
   if (e.el && e.el !== el) e.el.remove();
-  Object.assign(e, { el, state: 'held', icon: info.icon, label: info.label, group: info.group,
+  Object.assign(e, { el, state: 'held', icon: info.icon, label: info.label, name: info.name, group: info.group,
                      groupLabel: info.groupLabel, rank: info.rank, order: info.order });
   if (e.kind === 'panel') {
     if (!e.pane) {
@@ -4540,7 +4699,8 @@ function stationsMapPanels(map) {
   // its listeners are bound here, on the panel body, which outlives every
   // re-render of the block inside it.
   MapChrome.panel(map, {
-    id: 'display', icon: '🗺️', title: 'Map display',
+    id: 'display', icon: '🗺️', dockIcon: Glyphs.rail('layers'), title: 'Layers',
+    btnLabel: 'Layers — base maps, overlays, link colours and labels',
     group: 'show', order: 20,
     html: () => `
       <div id="map-display-block">${mapDisplayControlsHtml()}</div>
@@ -4554,7 +4714,7 @@ function stationsMapPanels(map) {
     },
   });
   MapChrome.panel(map, {
-    id: 'legend', icon: '🔑', title: 'Legend',
+    id: 'legend', icon: '🔑', dockIcon: Glyphs.rail('legend'), title: 'Legend',
     group: 'show', order: 30,
     html: () => `<div class="map-legend" id="map-legend">${mapLegendHtml()}</div>`,
   });
@@ -4568,7 +4728,7 @@ function stationsMapPanels(map) {
   // itself. Draw wants a click to start a line, What is here wants a click to
   // ask about a point, and the polar plot wants a station to sweep from.
   MapChrome.panel(map, {
-    id: 'draw', icon: '✏️', title: 'Draw & measure',
+    id: 'draw', icon: '✏️', dockIcon: Glyphs.rail('draw'), title: 'Draw & measure',
     group: 'tools', order: 10,
     html: () => `<div id="map-draw-panel">${MapDraw.panelHtml()}</div>`,
   });
@@ -4582,7 +4742,7 @@ function stationsMapPanels(map) {
   // disclose. MapHere.syncBtn() finds it again by its class and is what puts
   // the armed dress and the "Click the map to say where" label on it.
   MapChrome.button(map, {
-    className: 'mn-map-here', icon: 'ℹ️', title: 'What is here?',
+    className: 'mn-map-here', icon: Glyphs.rail('here'), name: 'What’s here?', title: 'What’s here?',
     group: 'tools', order: 30, pressed: MapHere.armed(),
     onClick: () => MapHere.arm(),
   });
@@ -4605,7 +4765,7 @@ function stationsMapPanels(map) {
   // it — is still on screen and still working while 3-D is on. That is what
   // lets one set of controls drive both modes.
   MapChrome.button(map, {
-    className: 'mn-map-3d', icon: '⛰️',
+    className: 'mn-map-3d', icon: Glyphs.rail('view3d'), name: '3-D view',
     title: '3-D view — tilt the map and see the ground it is drawn on',
     group: '3d', order: 10, pair: '3d', pressed: Map3D.active(),
     onClick: () => Map3D.toggle(),
@@ -4620,8 +4780,8 @@ function stationsMapPanels(map) {
   // opens — rather than ⛰️ twice, which would be two buttons saying the same
   // thing and doing different things.
   MapChrome.panel(map, {
-    id: '3d', icon: '▾', dockIcon: '🎚️', title: '3-D view',
-    btnLabel: '3-D view settings — exaggeration, line-of-sight sheets, what the relief is',
+    id: '3d', icon: '▾', dockIcon: Glyphs.rail('set3d'), title: '3-D view', name: '3-D settings',
+    btnLabel: '3-D settings — exaggeration, line-of-sight sheets, what the relief is',
     caret: true, pair: '3d',
     group: '3d', order: 20,
     html: () => Map3D.panelHtml(),
@@ -4642,13 +4802,13 @@ function stationsMapPanels(map) {
   // furniture, in the renderer's corner, in with the zoom — and an operator
   // looking for a map tool on this page looks here, where the other eleven are.
   MapChrome.button(map, {
-    className: 'mn-map-north', icon: Map3D.northIcon(0),
+    className: 'mn-map-north', icon: Map3D.northIcon(0), name: 'Face north',
     title: 'Face north again', hidden: true,
     group: '3d', order: 30,
     onClick: () => Map3D.resetNorth(),
   });
   MapChrome.button(map, {
-    className: 'mn-map-tilt', icon: Map3D.tiltIcon(0),
+    className: 'mn-map-tilt', icon: Map3D.tiltIcon(0), name: 'Look straight down',
     title: 'Look straight down', hidden: true,
     group: '3d', order: 40,
     onClick: () => Map3D.resetTilt(),
@@ -4670,7 +4830,8 @@ function stationsMapPanels(map) {
   // everywhere else — the label on the button and the state it reports are
   // written in one place or they drift.
   syncMapFullBtn(MapChrome.button(map, {
-    className: 'mn-map-full', icon: '⛶', group: 'screen', order: 10,
+    className: 'mn-map-full', icon: Glyphs.rail('full'), name: 'Full screen', toggle: true,
+    group: 'screen', order: 10,
     onClick: () => toggleMapFullscreen(),
   }));
 
@@ -5407,7 +5568,7 @@ function mapLegendOffLayersHtml() {
   if (!off.length) return '';
   return `
     <span class="legend-item legend-off">
-      <span class="small txt-muted">Also available — turn on in 🗺️ Map display: ${off.join(' · ')}</span>
+      <span class="small txt-muted">Also available — turn on in Layers: ${off.join(' · ')}</span>
     </span>`;
 }
 
@@ -5584,7 +5745,7 @@ function mapLegendHtml() {
     <span class="legend-item">
       <span class="legend-sq" style="--dot:${MapElevation.colourAt(600)}"></span>
       <span class="small">Elevation shading — ground height in the Radio Mobile colour file's
-        twelve bands, keyed in full in 🗺️ Map display</span>
+        twelve bands, keyed in full in Layers</span>
     </span>` : ''}
     ${MapContours.active() ? `
     <span class="legend-item">
@@ -5595,7 +5756,7 @@ function mapLegendHtml() {
     <span class="legend-item">
       <span class="legend-sq" style="--dot:#004385"></span>
       <span class="small">Elevation data coverage — the best DEM resolution Australia holds
-        under each place, keyed in full in 🗺️ Map display. Profiles still read ~30 m terrain
+        under each place, keyed in full in Layers. Profiles still read ~30 m terrain
         everywhere (Elvis — Geoscience Australia / ICSM)</span>
     </span>` : ''}
     ${MapMobileCoverage.active() ? MapMobileCoverage.legendHtml() : ''}
@@ -5709,9 +5870,9 @@ function maybeShowMapLayersHint() {
   mapNote(isPhoneNav()
     ? 'Tip: ⋮ at the top right opens the station list, the filters and the map’s tools.'
     : lookUsesCalmShell()
-      ? 'Tip: the map starts quiet. 🗺️ in the side panel’s strip, on the right, turns layers on — '
-        + 'waterways, survey marks, wind regions, property boundaries, contours, ACMA licences — and mixes the base maps.'
-      : 'Tip: 🗺️ in the side panel’s strip, on the right, mixes the base maps and has more '
+      ? 'Tip: the map starts quiet. Layers, in the side panel’s rail on the right, turns on waterways, survey marks, '
+        + 'wind regions, property boundaries, contours and ACMA licences, and mixes the base maps.'
+      : 'Tip: Layers, in the side panel’s rail on the right, mixes the base maps and has more '
         + 'layers — survey marks, LiDAR contours, wind regions, ACMA licences, line of sight.', mapLayersHintUntil - now);
 }
 

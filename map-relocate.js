@@ -1576,7 +1576,8 @@ const MapRelocate = (function () {
       // go to serve a set of stations, this where one station should go to be
       // heard by its repeaters.
       MapChrome.panel(m, {
-        id: 'relocate', icon: '🚚', title: 'Station relocation finder',
+        id: 'relocate', icon: '🚚', dockIcon: Glyphs.rail('relocate'), title: 'Relocate station',
+        btnLabel: 'Relocate station — a new home for a station that has to move',
         group: 'tools', order: 26,
         html: () => panelHtml(),
         onMount(el) { body = el; },

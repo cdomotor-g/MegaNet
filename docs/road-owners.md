@@ -3,7 +3,7 @@
 Who manages each road and bridge in Queensland — Transport and Main Roads, the
 council, the Parks and Wildlife Service, a private landholder — in two places:
 
-- **🗺️ Map display → Road & bridge owners (Qld)**, a layer on the Stations map:
+- **Layers → Road & bridge owners (Qld)**, a layer on the Stations map:
   every road coloured by who manages it, and every bridge a pin that says whose
   it is. Click a bridge for who to call. It is `map-road-owners.js`.
 - **Road and bridge — who manages them**, a section on every station card and on

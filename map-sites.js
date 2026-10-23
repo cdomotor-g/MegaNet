@@ -1322,7 +1322,7 @@ const MapSites = (function () {
           </label>
           <p class="small txt-muted">Fades the network, its labels and every other layer — nought
             hides them — while the candidates, their paths and the sites stay at full strength. The
-            base map, its labels and the elevation colours keep their own sliders in 🗺️ Map display.
+            base map, its labels and the elevation colours keep their own sliders in Layers.
             It applies only while there are sites or an answer here; Clear and ↺ put the map back.</p>
         </fieldset>
 
@@ -1449,7 +1449,8 @@ const MapSites = (function () {
       // In among the tools you point at the map: the polar plot sweeps from a
       // station, this finds where the station should have been.
       MapChrome.panel(m, {
-        id: 'sites', icon: '🗼', title: 'Repeater site finder',
+        id: 'sites', icon: '🗼', dockIcon: Glyphs.rail('sites'), title: 'Repeater sites',
+        btnLabel: 'Repeater sites — the best places for a new repeater',
         group: 'tools', order: 25,
         html: () => panelHtml(),
         onMount(el) { body = el; },

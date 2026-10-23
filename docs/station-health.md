@@ -581,7 +581,7 @@ Tuesday.
   receivers are this tab's to weigh. A station with no readings left costs a
   second, one-row look at `meganet.station_health`, so *never heard* is only said
   when it is true.
-- **Colour pins by health**, in the Stations map's 🗺️ Map display (off by
+- **Colour pins by health**, in the Stations map's Layers (off by
   default): every pin by when the ingest last heard it — `meganet.station_health`,
   one request for the whole network a load, kept fifteen minutes — and, for a
   station whose card has been opened, by what its readings say.

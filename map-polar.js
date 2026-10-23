@@ -818,7 +818,8 @@ const MapPolar = (function () {
       // (#192): this one wants a station to sweep from, the way Draw wants a
       // click to start a line.
       MapChrome.panel(m, {
-        id: 'polar', icon: '📡', title: 'Polar radio coverage',
+        id: 'polar', icon: '📡', dockIcon: Glyphs.rail('coverage'), title: 'Radio coverage',
+        btnLabel: 'Radio coverage — what one radio would hear, all the way round',
         group: 'tools', order: 20,
         html: () => panelHtml(),
         onMount(el) { body = el; },

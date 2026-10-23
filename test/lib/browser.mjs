@@ -73,21 +73,30 @@ export async function launchBrowser(opts = {}) {
 // address, and — the reason storage would not do — a key written before the
 // app runs would make every first visit a second one (Route.newDevice), which
 // is what `npm run firstvisit` is about.
+//
+// The Stations tab's side panel rail is pinned the same way and for the same
+// reason, `?rail=icons`: the icon strip every check about the map's width and
+// its pins was written against, the names beside them being a column 160 px
+// wider (app.js, dockNamesFromAddress). A context asks for the names with
+// `{ rail: 'names' }`, or for the app's own default with `{ rail: null }` —
+// which is what `npm run dock` §9 checks.
 function pinLook(browser) {
   const newContext = browser.newContext.bind(browser);
   browser.newContext = async (opts = {}) => {
-    const { look = 'classic', ...rest } = opts || {};
+    const { look = 'classic', rail = 'icons', ...rest } = opts || {};
     const context = await newContext(rest);
-    if (look) {
-      await context.addInitScript(want => {
+    if (look || rail) {
+      await context.addInitScript(([wantLook, wantRail]) => {
         try {
           if (window.top !== window || !/^https?:$/.test(location.protocol)) return;
           const q = new URLSearchParams(location.search);
-          if (q.has('look')) return;
-          q.set('look', want);
+          let changed = false;
+          if (wantLook && !q.has('look')) { q.set('look', wantLook); changed = true; }
+          if (wantRail && !q.has('rail')) { q.set('rail', wantRail); changed = true; }
+          if (!changed) return;
           history.replaceState(history.state, '', location.pathname + '?' + q.toString() + location.hash);
         } catch (_) {}
-      }, look);
+      }, [look, rail]);
     }
     return context;
   };

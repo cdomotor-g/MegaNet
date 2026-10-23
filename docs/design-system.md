@@ -788,7 +788,7 @@ carries the meaning here is the region's name on the chip, not the hue.
 
 *(Pattern 9, added by #164.)* Seven Leaflet maps, and every one of them wants
 controls in its corners. There is one control for that: `MapChrome.panel()` in
-`map-controls.js`, which the base-map picker and the Stations map's Map display,
+`map-controls.js`, which the base-map picker and the Stations map's Layers,
 Draw & measure and legend panels are all four built out of. A tab adding a fifth
 uses it rather than writing a Leaflet control of its own.
 
@@ -1443,7 +1443,7 @@ at a glance rather than read, in pictures.
 
 | Look | Where it lives | What it is |
 |---|---|---|
-| **Calm** (default) | `looks.js`, `calm-shell.js`, the `:root[data-shell="calm"]` block near the end of `styles.css` | The groups down the side, the open group's tabs across the top (`#section-bar`), search, sign in and ⋯ in a white banner, line drawings for the groups, one accent (`--primary` is the accent blue). On a phone, a bar along the foot — Nearby, Look Around ("Look"), Map, Visits, Camera, More — and the inspection sheet a section at a time. The Stations map starts quiet: the Light base map (Dark in the dark theme), every link one slate colour, and the context layers in `CALM_MAP_OFF` (core.js) off until ticked — remembered once ticked, and *Turn them all on* at the top of Map display. |
+| **Calm** (default) | `looks.js`, `calm-shell.js`, the `:root[data-shell="calm"]` block near the end of `styles.css` | The groups down the side, the open group's tabs across the top (`#section-bar`), search, sign in and ⋯ in a white banner, line drawings for the groups, one accent (`--primary` is the accent blue). On a phone, a bar along the foot — Nearby, Look Around ("Look"), Map, Visits, Camera, More — and the inspection sheet a section at a time. The Stations map starts quiet: the Light base map (Dark in the dark theme), every link one slate colour, and the context layers in `CALM_MAP_OFF` (core.js) off until ticked — remembered once ticked, and *Turn them all on* at the top of Layers. |
 | **🔲 Tiles** | Calm's, plus `glyphs.js`, `home.js` and `:root[data-look="tiles"]` | Calm with a coloured tile for every group and tool — each a pictogram on its family's colour — pictograms for the banner's buttons, and 🏠 **Home** in the banner: the network's counts, the six tools used most as big tiles, every other tab as a small one. A phone's foot trades Camera for Home. |
 | **🎚️ Instrument** | Calm's, plus `:root[data-look="instrument"]` | A dark frame — banner, rail, row of tabs, a phone's foot — round the page in whichever theme it is in, done by restating the theme's tokens on those four. The groups a rail of pictures (collapsed to start), the OK / on watch / at fault counts across the banner (`#hdr-status`), and the Stations map on the Dark base with its pins coloured by health (`mapHealthStored`, core.js). |
 | **🪧 Signs** | Calm's, plus `:root[data-look="signs"]` | Black on yellow, thick edges and a step larger type, for full sun and a gloved thumb: every pictogram on a yellow sign, the button that acts black with yellow text (yellow on black in the dark theme), the street map, and 🏠 Home as six big signs. On a phone the inspection sheet's sections are a row of signs, each a way to its section. |
@@ -1458,6 +1458,19 @@ inspection section (`Glyphs.SECTION`). A picture is never a control's only
 name: it sits beside the label or the button carries the name. A new tab
 without a line in `Glyphs.TAB` draws its group's picture, and `npm run looks`
 fails until it has its own.
+
+**The side panel's rail** on the Stations tab is drawn in every look's own
+hand, Calm and Classic included: `Glyphs.rail(name)` writes one drawing per
+control (`Glyphs.RAIL`) with every dress in the markup, and the stylesheet
+picks one — a 1.8 line in the strip's ink under Calm, the emoji beside it
+under Classic, and under the three looks in pictures the same drawing at 2
+(2.4 under Signs) on a 28 px tile: its family's colour under Tiles, the dark
+frame's ground under Instrument (whose frame takes the rail in), a yellow sign
+under Signs. Under Tiles the control that is on has its tile gilded in the
+leader's gold (`--map-leader`), and with icons alone that is its only mark.
+The rail wears each button's name beside its icon unless its toggle puts the
+names away (`state.dockNames`), at `--mn-rail-names` wide; a phone's is always
+icons. A button's visible name is always contained in its accessible name.
 
 **🏠 Home** (`home.js`) is a tab like any other — first under Start here, in
 every look — and the front page of Tiles and Signs. Its counts are Station

@@ -167,9 +167,9 @@ const panel = await page.evaluate(() => {
     status: document.getElementById('reloc-status')?.textContent || '',
   };
 });
-ok('a 🚚 Station relocation finder is a pane of the side panel, open from its button in the strip',
+ok('a 🚚 Relocate station is a pane of the side panel, open from its button in the strip',
    panel.present && panel.docked && panel.shown && panel.showing === 'map-relocate'
-     && panel.title === 'Station relocation finder', JSON.stringify(panel));
+     && panel.title === 'Relocate station', JSON.stringify(panel));
 ok('…in the tools group, straight after the repeater site finder and straight before What is here',
    panel.group === 'tools' && panel.afterSites && panel.beforeHere, JSON.stringify(panel));
 ok('Find new sites is off with no station, and the panel says what is missing',

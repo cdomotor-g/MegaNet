@@ -477,7 +477,7 @@ badge standing up off it with the count, and **a cone for each way the cameras
 faced from there** — the two Solocator photos were taken from one spot six
 seconds apart, up the reach and down it, and are one pin with two cones.
 Photos within 3 m of each other are one spot; pins that would overlap on
-screen merge. Click one for the carousel. *🗺️ Map display → Field photos*
+screen merge. Click one for the carousel. *Layers → Field photos*
 switches the layer, and the note under it says how many are in view.
 
 The pins sit over the network's canvas and under the station pins: over the

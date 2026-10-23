@@ -3,7 +3,9 @@
 //   Glyphs   the pictograms the three looks in pictures draw with (looks.js:
 //            🔲 Tiles, 🎚️ Instrument, 🪧 Signs) — one for every tab, every
 //            group, every state a station can be in and every section of an
-//            inspection sheet — and the colour each group wears.
+//            inspection sheet — and the colour each group wears. And the side
+//            panel's rail: every control in the Stations tab's strip, in the
+//            dress of whichever look is on, Calm and Classic included.
 //
 // After core.js (TABS, esc), before calm-shell.js and home.js, which draw
 // with it. Data and pure functions only: nothing runs at load
@@ -28,8 +30,8 @@
 // radio purple, learning amber, admin slate. Each is dark enough for white on
 // it (4.5:1 and better), which is how Tiles draws them.
 //
-// Exposes: svg, has, tab, group, groupOf, section, tile, HUES, G, TAB, GROUP,
-//          SECTION.
+// Exposes: svg, has, tab, group, groupOf, section, tile, rail, HUES, G, TAB,
+//          GROUP, SECTION, RAIL.
 
 const Glyphs = (() => {
   // 24-unit drawings, stroked in currentColor (styles.css, .gl).
@@ -147,6 +149,46 @@ const Glyphs = (() => {
     base_tests: 'base', final_data: 'flag', remarks: 'message', admin_checklist: 'inspect',
   };
 
+  // ── The side panel's rail (the Stations tab's strip, app.js) ──────────────
+  // One drawing per control, on the same 24-unit grid, drawn once and dressed
+  // by the look (styles.css, .rail-ico): Calm draws it as a thin line in the
+  // strip's ink, the three looks in pictures bolder on a tile — its group's
+  // colour under Tiles, the dark frame's under Instrument, a yellow sign under
+  // Signs — and Classic wears the emoji beside it, as its bar does. `d` is the
+  // drawing and `dash` the part of it drawn dashed (a line of sight, a ring of
+  // coverage, a selection box). Every control the strip holds has one but the
+  // camera pair, whose own pictures are readouts that turn with the map
+  // (Map3D.northIcon, tiltIcon).
+  const RAIL = {
+    help:     { hue: 'learn', emoji: '?',  d: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2h.01' },
+    clear:    { hue: 'admin', emoji: '🧹', d: 'M9 9l6 6M15 9l-6 6', dash: 'M4 4h16v16H4z' },
+    stations: { hue: 'net',   emoji: '📍', d: 'M7.5 21s-5.5-5-5.5-10a5.5 5.5 0 0 1 11 0c0 5-5.5 10-5.5 10zM5.5 11a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M16 7h5M16 12h5M16 17h5' },
+    places:   { hue: 'net',   emoji: '🔎', d: 'M3.5 10.5a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M15.5 15.5 21 21M10.5 14s-3-2.6-3-5a3 3 0 0 1 6 0c0 2.4-3 5-3 5zM10.5 9h.01' },
+    paths:    { hue: 'net',   emoji: '〽️', d: 'M4 20V8M20 20V6M2 20h20M6.5 20l3.5-4.5 2.5 2 3-4 2.5 3', dash: 'M4 8 20 6' },
+    twin:     { hue: 'net',   emoji: '🧊', d: 'M12 2.5 20.5 7v10L12 21.5 3.5 17V7zM3.5 7 12 11.5 20.5 7M12 11.5v10' },
+    layers:   { hue: 'data',  emoji: '🗺️', d: 'M12 3 21 8l-9 5-9-5zM3 12.5l9 5 9-5M3 16.5l9 5 9-5' },
+    legend:   { hue: 'data',  emoji: '🔑', d: 'M3.3 5.5a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0 -4.4 0M5.5 9.8l2.4 4.2H3.1zM3.3 16.5h4.4v4.4H3.3zM11 5.5h10M11 12h10M11 18.7h10' },
+    latency:  { hue: 'data',  emoji: '⏱️', d: 'M4.5 13.5a7.5 7.5 0 1 0 15 0a7.5 7.5 0 1 0 -15 0M12 13.5V9.5M10 2.5h4M12 2.5V6M18.2 6.8l1.6-1.6' },
+    draw:     { hue: 'radio', emoji: '✏️', d: 'M14.5 4.5l5 5L9 20H4v-5zM12.5 6.5l5 5M13 20.5h8M15.5 20.5v-2M18.5 20.5v-2' },
+    coverage: { hue: 'radio', emoji: '📡', d: 'M12 5c3.2 0 6.8 2.6 6.2 6.2S15 18 11.6 17.6 5 14.6 5.5 10.8 8.8 5 12 5zM10.8 12a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0', dash: 'M2.5 12a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0' },
+    sites:    { hue: 'radio', emoji: '🗼', d: 'M2 20.5 8.5 11l3 4 3.5-5.5 7 11zM15 9.5V5.5M12.5 4a3.6 3.6 0 0 1 5 0' },
+    relocate: { hue: 'radio', emoji: '🚚', d: 'M8 16s-5-4.4-5-8a5 5 0 0 1 10 0c0 3.6-5 8-5 8zM6.4 8a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0M11 19.5h10M18 16.5l3 3-3 3', dash: 'M3 19.5h5' },
+    here:     { hue: 'radio', emoji: 'ℹ️', d: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M12 11v5.5M12 7.8h.01' },
+    view3d:   { hue: 'admin', emoji: '⛰️', d: 'M2.5 18 7 7h10l4.5 11zM7.5 15l3-4 2 2.5 1.5-1.5 2.5 3' },
+    set3d:    { hue: 'admin', emoji: '⚙️', d: 'M4 6h9M18 6h2M4 12h3M12 12h8M4 18h11M19 18h1M13.5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M7.5 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M15 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0' },
+    full:     { hue: 'admin', emoji: '⛶',  d: 'M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6' },
+  };
+
+  // A rail control's picture, in every dress at once — the look picks which
+  // one is drawn (styles.css), so a change of look needs no repaint.
+  function rail(name) {
+    const r = RAIL[name] || RAIL.help;
+    const dash = r.dash ? `<path class="rail-dash" d="${r.dash}"/>` : '';
+    return `<span class="rail-ico" data-hue="${r.hue}">`
+         + `<svg class="rail-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${r.d}"/>${dash}</svg>`
+         + `<span class="rail-emoji">${r.emoji}</span></span>`;
+  }
+
   const has = name => Object.prototype.hasOwnProperty.call(G, name);
 
   function svg(name, cls = 'gl') {
@@ -180,6 +222,6 @@ const Glyphs = (() => {
     return `<span class="gl-tile${cls ? ' ' + cls : ''}" data-hue="${esc(hue)}">${svg(name)}</span>`;
   }
 
-  return { svg, has, tab, group, groupOf, section, tile, HUES, G, TAB, GROUP, SECTION };
+  return { svg, has, tab, group, groupOf, section, tile, rail, HUES, G, TAB, GROUP, SECTION, RAIL };
 })();
 if (typeof window !== 'undefined') window.Glyphs = Glyphs;
