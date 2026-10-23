@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 82, date: '2026-10-23', items: [
+      '<strong>📶 Carrier fingerprint</strong>, on a station\'s card on the Stations map (under its ALERT IDs and '
+        + 'frequencies) and in its Station details (under its ALERT addresses). Every burst a base station\'s SDR decodes '
+        + 'comes on its transmitter\'s own carrier, and this is the station\'s — or, for a repeater, its relays\': '
+        + '<em>Offset</em>, how far it sits from the other transmitters the same base stations hear; <em>Channel</em>, '
+        + 'the channel it was heard on, checked against the TX frequency on record, with a ⚠ where they differ; and '
+        + '<em>Drift</em>, how far it has moved against the thirty days before, or what is still needed to judge that. '
+        + 'A link opens the Transmitter frequency panel in Station Health on the station.',
+    ] },
     { n: 81, date: '2026-10-23', items: [
       '<strong>The Stations side panel names its buttons.</strong> The rail on the right of the Stations map now '
         + 'shows each button\'s name beside its icon, in three sections — <em>Stations &amp; places</em>, <em>Map</em> '

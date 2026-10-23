@@ -7945,6 +7945,9 @@ function repaintStnCard() {
   // Its health (#218): one request for its readings, kept per station for a
   // few minutes, so a repaint asks nothing new (health-glance.js).
   HealthGlance.ask(s);
+  // …and its carrier fingerprint, kept per station for ten minutes, the
+  // server judging hourly (health-drift.js).
+  if (typeof HealthDrift !== 'undefined') HealthDrift.cardAsk(s);
   MapLeader.sync();
   // The trail's pill says whether its station's card is up, and its name,
   // which a save may just have changed.
@@ -8280,6 +8283,10 @@ function stnCardHtml(s) {
       <!-- Every RX/TX pair the station has, the repeater's own first, one to a
            line like the addresses above (0033, frequencies.js). -->
       ${Frequencies.cardHtml(s)}
+      <!-- Its carrier fingerprint (#217, health-drift.js): where its carrier
+           sits against the rest, the channel it was heard on against the TX
+           above, and whether it is drifting. Filled by HealthDrift.cardAsk. -->
+      ${typeof HealthDrift !== 'undefined' ? HealthDrift.cardHtml(s) : ''}
       ${acmaRepeaterPopupExtra(s)}
     </div>
     <!-- The land the station stands on: its lot, tenure, who holds that kind of

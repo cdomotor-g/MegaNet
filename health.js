@@ -1855,8 +1855,11 @@ const Health = (() => {
 
   // The rain, level and sensors parts are where a row of All stations,
   // sparklines opens its station (select).
+  // 'carrier' is the Transmitter frequency panel, where a station's carrier
+  // fingerprint opens it (health-drift.js).
   const PART_HEAD = { checks: 'hl-h-strip', battery: 'hl-h-batt', findings: 'hl-h-stnf',
-                      rain: 'hl-h-rain', level: 'hl-h-level', sensors: 'hl-h-sens', lens: 'hl-h-lens' };
+                      rain: 'hl-h-rain', level: 'hl-h-level', sensors: 'hl-h-sens', lens: 'hl-h-lens',
+                      carrier: 'hl-h-drift' };
   // The heading of the part asked for, or of the station when it has no such
   // part (no schedule learned, no battery heard, nothing found): scrolled to
   // and focused, the way select() does it.

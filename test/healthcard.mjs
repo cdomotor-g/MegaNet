@@ -52,6 +52,14 @@
 //      ago", and the card on the map's Last heard line word for word;
 //      nothing for a proposed station; repainted in place, so whatever is
 //      being typed in the form stays.
+//  10. **The carrier fingerprint** (health-drift.js, 0077) — on the card
+//      under its ALERT IDs and frequencies, and in the editor under its
+//      addresses, word for word: the offset against the rest, the channel
+//      it was heard on against the TX on record (a repeater heard on another
+//      flagged, and why), the drift or why it is too soon to judge, and a
+//      station not measured said to be so; one request a card, asked with
+//      PostgREST's logic tree, none for a repaint or for the editor; a door
+//      to the Transmitter frequency panel with the station found there.
 //
 // Why a check of its own: every failure here is a page that looks right. A pin
 // coloured green for want of an answer, a card that asks the datastore on every
@@ -101,12 +109,24 @@ const count = kind => asked.filter(a => a.kind === kind).length;
 // unreachable one does.
 let MODE = 'ok';
 let stub = null;
+let carrierStub = null;
 
 async function standIn(page) {
   await page.route('**://*.supabase.co/rest/v1/**', async route => {
     const req = route.request();
     const url = req.url();
     const rel = new URL(url).pathname.replace(/^.*\/rest\/v1\//, '');
+    // A station's carrier fingerprint (section 4d): the server's transmitter
+    // rows, their findings and the two lines, from a strict stub of their own
+    // once that section has built it — until then, nothing answers them.
+    const carrierRel = rel === 'transmitter_summary' || rel === 'app_meta'
+      || (rel === 'health_finding' && new URL(url).searchParams.get('source') === 'eq.transmitters');
+    if (carrierRel) {
+      if (!carrierStub) return route.fallback();
+      asked.push({ kind: rel === 'transmitter_summary' ? 'carrier' : rel === 'app_meta' ? 'knobs' : 'carrier-findings', url: decodeURIComponent(url) });
+      const res = await carrierStub.fetch(url, { method: req.method(), headers: req.headers() });
+      return route.fulfill({ status: res.status, contentType: 'application/json', body: await res.text() });
+    }
     if (rel !== 'reading' && rel !== 'station_health') return route.fallback();
     // The pins' batch; a card's one-row look at when the ingest last heard a
     // station with no readings left; a card's readings; the tab's week.
@@ -628,6 +648,143 @@ try {
   }, R.fading);
   check('…repainted in place when its card answers — nothing being typed is lost', kept.kept && kept.same && kept.repainted, J(kept));
 
+  // ── 4d. Its carrier fingerprint ───────────────────────────────────────
+  // The server's transmitter rows for one station (0077, health-drift.js),
+  // under its ALERT IDs and frequencies on the card and under its addresses
+  // in the editor: its offset against the rest, the channel it was heard on
+  // against the TX on record, and its drift — from a strict stub, so the
+  // logic tree it asks with is PostgREST's.
+  log('\n4d. Its carrier fingerprint, on the card and in the editor\n');
+  const CF = await page.evaluate(used => {
+    const taken = new Set(used);
+    const st = state.data.stations.filter(s => !s.proposed && s.lat != null && !taken.has(s.id));
+    const reps = st.filter(s => s.roles.includes('repeater') && s.repeater && Number(s.repeater.tx_mhz) === 151.5);
+    const field = st.filter(s => s.roles.includes('field') && !s.roles.includes('repeater') && stationAlertIds(s).length
+      && !Frequencies.pairs(s).length && s.alert2_station_id == null);
+    const pick = s => ({ id: s.id, name: s.name, ids: stationAlertIds(s) });
+    return { moved: pick(reps[0]), drifting: pick(reps[1]), off: pick(field[0]), none: pick(field[1]) };
+  }, [...new Set([...Object.values(R).filter(v => typeof v === 'string'), W.aged, W.never, W.once, W.shared.id])]);
+  {
+    const days = n => [...Array(n)].map((_, g) => new Date(Date.now() - (n - 1 - g) * DAY).toISOString().slice(0, 10));
+    const tx = (st, over) => ({ tx: `st:${st.id}`, protocol: 'alert', station_id: st.id, via: 'own', freq_mhz: 151.5, w_days: 1,
+      w_ppm: 0, w_hz: 0, b_days: 0, b_ppm: null, change_ppm: null, bursts: 10, receivers: 1, days: days(1), ppm: [0],
+      judged_at: new Date().toISOString(), ...over });
+    const finding = (st, kind, severity, title) => ({ kind, subject: `st:${st.id}`, station_id: st.id, severity, title, detail: '',
+      evidence: {}, first_seen: new Date().toISOString(), source: 'transmitters', cleared_at: null });
+    carrierStub = new PostgrestStub({
+      base: DB,
+      columns: {
+        transmitter_summary: new Set(['tx', 'protocol', 'station_id', 'via', 'freq_mhz', 'w_days', 'w_ppm', 'w_hz', 'b_days', 'b_ppm',
+          'change_ppm', 'bursts', 'receivers', 'days', 'ppm', 'judged_at']),
+        health_finding: new Set(['kind', 'subject', 'station_id', 'severity', 'title', 'detail', 'evidence', 'first_seen', 'source', 'cleared_at']),
+        app_meta: new Set(['key', 'value', 'updated_at']),
+      },
+      tables: {
+        transmitter_summary: [
+          // A repeater whose relays were heard on another channel than its TX on record, measured one day.
+          tx(CF.moved, { via: 'repeater', freq_mhz: 152.25, w_ppm: 0.23, w_hz: 35, bursts: 118 }),
+          // A repeater on its channel, moving 1.4 ppm against the thirty days before.
+          tx(CF.drifting, { via: 'repeater', w_days: 7, w_ppm: 1.5, w_hz: 227, b_days: 20, b_ppm: 0.1, change_ppm: 1.4, bursts: 900,
+            days: days(27), ppm: days(27).map((_, i) => (i < 20 ? 0.1 : 1.5)) }),
+          // A field station 3 ppm off the rest, steady, with no TX on record — and a day measured on each of three days.
+          tx(CF.off, { freq_mhz: 151.525, w_days: 3, w_ppm: -3.0, w_hz: -455, b_days: 9, b_ppm: -3.12, change_ppm: 0.12, bursts: 40,
+            days: days(3), ppm: [-3.1, -3.0, -2.9] }),
+        ],
+        health_finding: [
+          finding(CF.drifting, 'transmitter-drift', 'critical', `${CF.drifting.name}: drifted +1.4 ppm in a week`),
+          finding(CF.off, 'transmitter-off-channel', 'warn', `${CF.off.name}: transmitting -3.0 ppm off the others (-455 Hz)`),
+          { ...finding(CF.off, 'transmitter-drift', 'warn', 'cleared long ago'), cleared_at: new Date(Date.now() - 9 * DAY).toISOString() },
+        ],
+        app_meta: [{ key: 'tx_offset_warn_ppm', value: '2.5' }, { key: 'tx_drift_warn_ppm', value: '1' }],
+      },
+    });
+  }
+  const carrierOf = (sel) => page.evaluate(sel => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const flat = t => (t || '').replace(/\s+/g, ' ').trim();
+    const rows = {};
+    el.querySelectorAll('.acma-row').forEach(r => { rows[flat(r.firstElementChild.textContent)] = flat(r.lastElementChild.textContent); });
+    const cls = label => { const r = [...el.querySelectorAll('.acma-row')].find(x => flat(x.firstElementChild.textContent) === label);
+      return r ? [...r.querySelectorAll('[class*="txt-"]')].map(x => x.className).join(' ') : ''; };
+    return { rows, text: flat(el.textContent), busy: !!el.querySelector('[aria-busy="true"]'),
+             cls: { Offset: cls('Offset'), Channel: cls('Channel'), Drift: cls('Drift') },
+             spark: !!el.querySelector('svg.hl-drift-spark'), door: (el.querySelector('button[onclick^="HealthDrift.open"]') || {}).getAttribute?.('onclick') || null,
+             inIds: !!el.closest('.acma-sect') && !!el.closest('.acma-sect').querySelector('.stn-card-ids:not(.stn-card-carrier)') };
+  }, sel);
+  const carrierCard = async st => {
+    await page.evaluate(id => showStationCard(id), st.id);
+    await waitTrue(page, id => { const el = document.getElementById('mn-carrier-card-' + id); return el && !el.querySelector('[aria-busy="true"]'); }, st.id);
+    return carrierOf(`#mn-carrier-card-${st.id}`);
+  };
+  asked = asked.filter(a => !/^carrier|^knobs/.test(a.kind));
+  const cMoved = await carrierCard(CF.moved);
+  const cReq = asked.filter(a => a.kind === 'carrier');
+  check('the card has a Carrier fingerprint under its ALERT IDs and frequencies, asked for in one request of its station\'s rows',
+    cMoved && cMoved.inIds && /^Carrier fingerprint/.test(cMoved.text) && cReq.length === 1
+      && cReq[0].url.includes(`station_id.eq."${CF.moved.id}"`) && cReq[0].url.includes(`"st:${CF.moved.id}"`)
+      && CF.moved.ids.every(a => cReq[0].url.includes(`"a:${a}"`)), J({ text: cMoved && cMoved.text.slice(0, 80), asked: cReq.map(a => a.url.slice(-200)) }));
+  check('…its offset in hertz and ppm against the rest, and that it is like the rest',
+    cMoved && cMoved.rows.Offset === '+35 Hz · +0.23 ppm — like the rest', J(cMoved && cMoved.rows));
+  check('…heard on another channel than its TX on record: said, flagged, and why (its relays were heard there)',
+    cMoved && /^heard on 152\.250 MHz — ⚠ its TX on record is 151\.500 MHz/.test(cMoved.rows.Channel || '')
+      && /Its relays were heard there/.test(cMoved.rows.Channel) && /txt-warn/.test(cMoved.cls.Channel), J(cMoved && cMoved.rows));
+  check('…drift too soon to judge, with what the server still needs',
+    cMoved && /^too soon to judge/.test(cMoved.rows.Drift || '') && /it has 1 and 0/.test(cMoved.rows.Drift), J(cMoved && cMoved.rows));
+  check('…what was measured — as a repeater, its relays — and a door to the Transmitter frequency panel on it',
+    cMoved && /legacy ALERT, as a repeater — its relays · 1 day in the last week, 118 bursts, 1 base station/.test(cMoved.text)
+      && cMoved.door === `HealthDrift.open('${CF.moved.id}')` && cMoved.spark, J({ text: cMoved && cMoved.text.slice(-320), door: cMoved && cMoved.door }));
+
+  const cDrift = await carrierCard(CF.drifting);
+  check('a repeater on its own channel and drifting: ✓ its TX on record, and the server\'s critical drift said in red',
+    cDrift && /^heard on 151\.500 MHz — ✓ its TX on record$/.test(cDrift.rows.Channel || '') && /txt-ok/.test(cDrift.cls.Channel)
+      && cDrift.rows.Drift === '⚠ drifting — +1.40 ppm against the 30 days before' && /txt-bad/.test(cDrift.cls.Drift), J(cDrift && { rows: cDrift.rows, cls: cDrift.cls }));
+  const cOff = await carrierCard(CF.off);
+  check('a field station off the rest: the warning beside its offset, steady, its channel with nothing on record to check against',
+    cOff && cOff.rows.Offset === '−455 Hz · −3.00 ppm — ⚠ off the rest' && /txt-warn/.test(cOff.cls.Offset)
+      && cOff.rows.Drift === '+0.12 ppm against the 30 days before — steady'
+      && cOff.rows.Channel === 'heard on 151.525 MHz no TX on record to check it against' && !/cleared long ago/.test(cOff.text), J(cOff && { rows: cOff.rows, cls: cOff.cls }));
+  const cNone = await carrierCard(CF.none);
+  check('a station with no rows: not measured yet, and why it may not be', cNone && /not measured yet/.test(cNone.text)
+    && /heard only through its repeater/.test(cNone.text) && !cNone.spark, J(cNone && cNone.text));
+
+  const beforeRepeat = count('carrier');
+  await page.evaluate(() => { repaintStnCard(); repaintStnCard(); });
+  await carrierCard(CF.off);
+  check('one request a card, four cards; a repaint and a second look ask nothing more, and the lines are asked once',
+    beforeRepeat === 4 && count('carrier') === 4 && count('knobs') === 1, J({ beforeRepeat, after: count('carrier'), knobs: count('knobs') }));
+
+  // The editor: the same block, word for word, under the station's ALERT
+  // addresses — from the card's answer, painted in place.
+  await page.evaluate(id => { if (state.selectedId !== id) selectStation(id); }, CF.off.id);
+  await waitTrue(page, () => { const el = document.getElementById('ef-carrier'); return el && !el.querySelector('[aria-busy="true"]') && el.querySelector('.acma-row'); });
+  const eOff = await carrierOf('#ef-carrier-body');
+  const where = await page.evaluate(() => {
+    const el = document.getElementById('ef-carrier');
+    const sect = el && el.parentElement.closest('.ef-section');
+    return { inSensors: !!(sect && sect.contains(document.getElementById('ef-sensors'))),
+             head: el ? (el.querySelector('.ef-sub') || {}).textContent.trim() : null, hint: !!document.getElementById('ef-h-carrier') };
+  });
+  check('the station editor has the same Carrier fingerprint, word for word, under its ALERT IDs — no second request',
+    eOff && cOff && J(eOff.rows) === J(cOff.rows) && where.inSensors && /^Carrier fingerprint/.test(where.head || '') && where.hint
+      && count('carrier') === 4, J({ eOff: eOff && eOff.rows, where, carrier: count('carrier') }));
+  const keptCarrier = await page.evaluate(async id => {
+    const name = document.getElementById('ef-name'), el = document.getElementById('ef-carrier');
+    const was = name.value;
+    name.value = `${was} (typing)`;
+    el.querySelector('.hd-card-body').textContent = 'stale';
+    HealthDrift.retry(id);
+    const t0 = Date.now();
+    while (!el.querySelector('.acma-row') && Date.now() - t0 < 10_000) await new Promise(r => setTimeout(r, 50));
+    const out = { kept: document.getElementById('ef-name') === name && name.value === `${was} (typing)`,
+                  same: document.getElementById('ef-carrier') === el, repainted: !!el.querySelector('.acma-row') };
+    name.value = was;
+    return out;
+  }, CF.off.id);
+  check('…repainted in place when it is asked again — nothing being typed is lost', keptCarrier.kept && keptCarrier.same && keptCarrier.repainted, J(keptCarrier));
+  const noProp = await page.evaluate(() => { const s = state.data.stations.find(x => x.proposed); return s ? HealthDrift.cardHtml(s) + HealthDrift.editorHtml(s) : ''; });
+  check('a proposed station has no carrier fingerprint — nothing on the air to measure', noProp === '', noProp.slice(0, 80));
+
   // ── 5. The doors ──────────────────────────────────────────────────────
   log('\n5. Each line opens Station Health on that station\n');
   await card(page, R.falling);
@@ -702,6 +859,20 @@ try {
     onSlot && /^The network at /.test(lens.head || '') && lens.ringed.length === 1 && Math.abs(lens.ringed[0] - slotT) < 60_000, J({ slotT, lens }));
   await page.evaluate(() => Health.close());
 
+  // The carrier fingerprint's door: the tab's Transmitter frequency panel,
+  // the station found there among every transmitter, its heading focused.
+  await toStations(page);
+  await carrierCard(CF.off);
+  await press(page, `#mn-carrier-card-${CF.off.id} button[onclick^="HealthDrift.open"]`);
+  const onCarrier = await waitTrue(page, () => state.activeTab === 'health' && document.activeElement
+    && document.activeElement.id === 'hl-h-drift' && document.querySelectorAll('#hl-drift tbody tr').length === 1, null, 30_000);
+  const panel = await page.evaluate(() => ({ rows: [...document.querySelectorAll('#hl-drift tbody tr')].map(tr => tr.textContent.replace(/\s+/g, ' ').trim()),
+    q: HealthDrift.state().q, show: HealthDrift.state().show, focus: document.activeElement && document.activeElement.id, tab: state.activeTab }));
+  check('the carrier fingerprint opens Station Health at its Transmitter frequency panel, the station found there and focused',
+    onCarrier && panel.q === CF.off.name && panel.show === 'all' && panel.rows.length === 1 && panel.rows[0].startsWith(CF.off.name)
+      && /Off the rest/.test(panel.rows[0]), J(panel));
+  await page.evaluate(() => { HealthDrift.set('q', ''); HealthDrift.set('show', 'look'); Health.close(); });
+
   // ── 6. No data, honestly ──────────────────────────────────────────────
   log('\n6. A datastore that refuses, and one that is not there\n');
   {
@@ -770,7 +941,9 @@ try {
         const rel = u.pathname.replace(/^.*\/rest\/v1\//, '');
         if (rel === 'health_refresh') return route.fulfill({ status: 200, contentType: 'application/json',
           body: J([{ at: new Date(Date.now() - ranAgo).toISOString() }]) });
-        if (rel !== 'health_finding') return route.fallback();
+        // A carrier fingerprint's findings (source transmitters) are not the
+        // station analysis's: section 4d answers those.
+        if (rel !== 'health_finding' || u.searchParams.get('source') === 'eq.transmitters') return route.fallback();
         serverAsked.push(decodeURIComponent(u.search));
         const one = (u.searchParams.get('station_id') || '').replace(/^eq\./, '');
         const all = Object.values(kept()).flat();
@@ -876,6 +1049,18 @@ try {
     }, R.falling);
     check('the card’s health lines fit a 375 px screen, nothing pushed sideways',
       !narrow.missing && narrow.scroll <= narrow.client + 1 && narrow.right <= narrow.w + 1 && narrow.wide === 0, J(narrow));
+    // …and its carrier fingerprint, whose channel warning is its longest line.
+    await p.evaluate(id => showStationCard(id, { takeFocus: true }), CF.moved.id);
+    await waitTrue(p, id => { const el = document.getElementById('mn-carrier-card-' + id); return el && el.querySelector('.acma-row'); }, CF.moved.id);
+    const narrowC = await p.evaluate(id => {
+      const el = document.getElementById('mn-carrier-card-' + id);
+      if (!el || !el.querySelector('.acma-row')) return { missing: true };
+      const d = document.documentElement;
+      const wide = [...el.querySelectorAll('*')].filter(n => n.getBoundingClientRect().right > innerWidth + 1).length;
+      return { scroll: d.scrollWidth, client: d.clientWidth, right: el.getBoundingClientRect().right, w: innerWidth, wide };
+    }, CF.moved.id);
+    check('…and its carrier fingerprint, channel warning and all, fits as well',
+      !narrowC.missing && narrowC.scroll <= narrowC.client + 1 && narrowC.right <= narrowC.w + 1 && narrowC.wide === 0, J(narrowC));
     await ctx.close();
   }
 

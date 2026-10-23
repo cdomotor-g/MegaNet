@@ -7561,6 +7561,17 @@ html[data-lat-anim] .dock-tab[data-dock="map-latency"]::before {
   margin-top: var(--sp-1);
 }
 
+/* The carrier fingerprint (health-drift.js), on the card and in the station
+   editor: label/value rows a transmitter, each row's caveat on a line of its
+   own under its value, and the 37 days' line beside what it shows. A station
+   heard as two transmitters (its own carrier and an ALERT2 address) gets a
+   rule between them. */
+.hd-card-why { display: block; }
+.hd-card-body > .hd-card-why { margin-top: .3rem; }
+.hd-card-tx + .hd-card-tx { margin-top: .35rem; padding-top: .35rem; border-top: 1px dashed var(--border); }
+.hd-card-spark { display: flex; align-items: center; gap: .5rem; margin: .2rem 0; }
+.hd-card-spark .hl-drift-spark { flex: none; }
+
 /* ── The leader (map-leader.js) ──────────────────────────────────────────────
    The line from the station card to its pin, which replaced the desktop
    callout: one svg in a pane of its own over the pins and labels, redrawn in

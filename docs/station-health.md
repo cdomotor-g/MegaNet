@@ -435,6 +435,30 @@ station's name (a door to it), the last week's offset in ppm and Hz, its
 change, a line of its 37 days with the ±2.5 ppm band shaded, its days and
 bursts, and the finding.
 
+**On the station's card, and in its Station details.** The same rows, one
+station's, as its **Carrier fingerprint**: under its ALERT IDs and frequencies
+on its card on the Stations map, and under its ALERT addresses in the station
+editor, word for word (`health-drift.js`):
+
+- **Offset** — the last week's, in Hz and ppm, against the rest, and whether
+  that is like the rest, near the line or the server's off-channel finding.
+- **Channel** — the channel the base stations heard it on, checked against the
+  TX frequency the register has for it (a repeater's own pair, and any other).
+  Where they differ by more than 2 kHz it is flagged: for a repeater's relays,
+  the record is likely out of date; for a station's own bursts, either the
+  record is, or what was heard was another transmitter relaying it (a repeater
+  its pass ranges do not show). A station with no TX on record says so.
+- **Drift** — its change against the thirty days before and whether that is
+  steady, moving or drifting (the server's finding, in its colour); until there
+  is enough to judge (3 days measured in the last week, 5 in the thirty
+  before), what it still needs, and how far apart the days it has are.
+
+With its 37 days' line, what was measured (legacy ALERT, as a repeater, ALERT2,
+an address it shares), and a door to this panel with the station found in it.
+One request a station, its findings beside it, kept for ten minutes; none once
+this panel has the whole table. A station without a row says it is not
+measured yet, and why it may not be.
+
 **Limits.** A station whose own carrier sits within 30 Hz of its repeater's is put down
 to the repeater, and so not measured, about one time in ten. A day is rolled
 up again for three days (a base station's spool arriving late) and never once

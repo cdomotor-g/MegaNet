@@ -42,7 +42,9 @@
 // Configuration and a base station's own section (0033), read back and asked
 // about the same way; and to health-glance.js for HealthGlance — when the
 // station was last heard, in the header (heardHeadHtml, askNet, onHeard), and
-// its checks slot by slot at the head of Telemetry (checksHtml).
+// its checks slot by slot at the head of Telemetry (checksHtml); and to
+// health-drift.js for HealthDrift.editorHtml — the station's carrier
+// fingerprint under its ALERT addresses, as its card on the map has it.
 //
 // This file is the form, not its host. The card is rendered by the Stations
 // tab, which is frozen in app.js for the whole of #129 — so a change to where
@@ -655,6 +657,10 @@ function editorForm(s) {
           One address belongs to one station: claiming one another station holds is refused.
         </div>
         <div id="ef-a2-seen" class="small ef-note"></div>
+        <!-- Its carrier fingerprint, as its card on the map has it
+             (health-drift.js): after the addresses it sends on, because it is
+             how those sends arrive. -->
+        ${typeof HealthDrift !== 'undefined' ? HealthDrift.editorHtml(s) : ''}
         <datalist id="ef-sensor-types">
           ${['Rainfall', 'Rainfall Increment', 'Water Level', 'Water Level - AHD', 'Battery', 'Air Temperature', 'Relative Humidity', 'Wind Speed', 'Wind Gust', 'Wind Direction', 'pH', 'Conductivity', 'Dissolved Oxygen', 'Water Temperature', 'Turbidity'].map(t => `<option value="${esc(t)}">`).join('')}
         </datalist>
