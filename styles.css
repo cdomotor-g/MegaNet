@@ -19727,6 +19727,10 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
   padding: var(--sp-2) var(--sp-3); background: var(--subtle); border-radius: var(--r-sm); border-left: 4px solid var(--accent); font-size: var(--fs-sm);
 }
 .swm-page p.swm-note, .swm-page p.swm-case-q { border-left-color: var(--warn); }
+.swm-page p.swm-note--ok { border-left-color: var(--ok); }
+.swm-page p.swm-test-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); }
+.swm-testbtn { fill: #c0392b; stroke: #7f2219; }
+.swm-testbtn-t { fill: #fff; font: 700 11px system-ui, sans-serif; pointer-events: none; }
 .swm-page p.swm-case-q { font-size: var(--fs-md); }
 .swm-key-box p { margin: 0; }
 

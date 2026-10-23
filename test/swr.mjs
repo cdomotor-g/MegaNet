@@ -124,7 +124,7 @@ console.log('\nReading the readings\n');
   ok('…and what to rule out names the meter\'s position, its band and offset, the jumper, the supply and a dummy load',
     /top of the feeder/.test(up) && /VHF power offset/.test(up) && /jumper/.test(up) && /supply voltage/.test(up) && /dummy load/.test(up));
   const cb = I({ fwd: 3.8, swr: 1.01, setW: 5, where: 'radio', meter: 'sw102', steady: false });
-  ok('read on data bursts, it asks about a steady test transmission too', cb.findings[0].do.some(x => /steady test transmission/.test(x)));
+  ok('read on a TEST burst, it asks how the meter caught it, and names the 3030 with PEAK and HOLD', cb.findings[0].do.some(x => /TEST burst/.test(x) && /PEAK and HOLD/.test(x)));
   const r1 = I({ fwd: 5, ref: 0.2 }), r2 = I({ fwd: 5, swr: 1.5 }), r3 = I({ ref: 0.2, swr: 1.5 });
   ok('any two of the three make the third', near(r1.swr, 1.5, 1e-9) && near(r2.ref, 0.2, 1e-9) && near(r3.fwd, 5, 1e-9));
   const d = I({ fwd: 5, ref: 0.2, swr: 3 });
@@ -192,8 +192,13 @@ try {
   ok('seven sections, in the Knowledge base, four meters to pick from', shape.secs.length === 7 && shape.group === 'Knowledge base' && shape.picks === 4, J(shape));
   ok('every canvas and every drawing named', shape.canv.length === 2 && shape.canv.every(Boolean) && shape.svgs.length >= 3 && shape.svgs.every(Boolean), J(shape));
   ok('a device asking for reduced motion starts still, with ▶ to run it', shape.playing === false && shape.play === 'false', J(shape));
+  const opening = await page.evaluate(() => ({ tx: SwrMeter.state().tx, checked: document.querySelector('input[name="swm-tx"]:checked').value,
+    test: !document.getElementById('swm-test').disabled, note: /Read on a TEST burst/.test(document.getElementById('swm-verdict').textContent) }));
+  ok('it opens on the A2\'s TEST button, as readings are taken on site, with 📡 Press TEST ready and the burst explained',
+    opening.tx === 'test' && opening.checked === 'test' && opening.test && opening.note, J(opening));
 
-  await page.evaluate(() => SwrMeter.pick('sw102'));
+  // The A2 held on by its tones, so the screens read the whole signal.
+  await page.evaluate(() => { SwrMeter.tx('tones'); SwrMeter.pick('sw102'); });
   const sw = await page.evaluate(() => ({
     fw: document.getElementById('swm-sw-fw').textContent, rw: document.getElementById('swm-sw-rw').textContent,
     vswr: document.getElementById('swm-sw-vswr').textContent, freq: document.getElementById('swm-sw-freq').textContent,
@@ -223,9 +228,13 @@ try {
     lay: SwrMeter.state().lay, name: document.getElementById('swm-line-name').textContent }));
   ok('water, read at the antenna end: Fair, and down on what should arrive — the radios following the change',
     /Fair/.test(wa.v) && /about 4\.24 W expected/.test(wa.v) && wa.where === 'antenna' && wa.lay === 'wide' && /at the antenna end/.test(wa.name), J({ where: wa.where, lay: wa.lay }));
-  await page.evaluate(() => { SwrMeter.where('radio'); SwrMeter.scenario('healthy'); SwrMeter.tx('bursts'); });
-  ok('on data bursts, the SW-102 is said to read low and jumpy', await page.evaluate(() => /Read on data bursts/.test(document.getElementById('swm-verdict').textContent)));
-  await page.evaluate(() => SwrMeter.tx('steady'));
+  await page.evaluate(() => { SwrMeter.where('radio'); SwrMeter.scenario('healthy'); SwrMeter.tx('off'); });
+  await page.click('#swm-line [data-act="test"]');
+  const burst = await page.evaluate(() => ({ tx: SwrMeter.state().tx, checked: document.querySelector('input[name="swm-tx"]:checked').value,
+    fw: Number(document.getElementById('swm-sw-fw').textContent.replace(/[^\d.]/g, '')), v: document.getElementById('swm-verdict').textContent }));
+  ok('the TEST button drawn on the radio sends a burst: the SW-102 catches it partly — 55–100% of 4.89 W — and says to press it again',
+    burst.tx === 'test' && burst.checked === 'test' && burst.fw >= 0.55 * 4.886 - 0.01 && burst.fw <= 4.886 + 0.01 && /Press TEST several times/.test(burst.v), J({ tx: burst.tx, fw: burst.fw }));
+  await page.evaluate(() => SwrMeter.tx('tones'));
 
   // The SWR-400, by its switches.
   await page.evaluate(() => SwrMeter.pick('swr400'));
@@ -251,10 +260,16 @@ try {
   await page.evaluate(() => { SwrMeter.source('yours'); SwrMeter.type('fwd', '2'); SwrMeter.type('swr', '1.2'); SwrMeter.dev.func('cal'); SwrMeter.dev.cal(100); });
   st = await page.evaluate(() => document.getElementById('swm-mn-status').textContent);
   ok('2 W cannot reach the CAL mark even at MAX — and it says the SWR cannot be read', /not enough power to calibrate/.test(st), st);
-  await page.evaluate(() => { SwrMeter.type('fwd', ''); SwrMeter.type('swr', ''); SwrMeter.source('scenario'); });
+  await page.evaluate(() => { SwrMeter.type('fwd', ''); SwrMeter.type('swr', ''); SwrMeter.source('scenario'); SwrMeter.tx('tones'); });
 
   // The 3030.
-  await page.evaluate(() => { SwrMeter.scenario('healthy'); SwrMeter.pick('cc3030'); SwrMeter.dev.cc('rl', true); });
+  await page.evaluate(() => { SwrMeter.dev.func('cal'); SwrMeter.source('scenario'); SwrMeter.tx('test'); });
+  st = await page.evaluate(() => document.getElementById('swm-mn-status').textContent);
+  ok('on TEST bursts the SWR-400 cannot be calibrated, and it says to use the tones or another meter', /tones setting/.test(st) && /SW-102 or the 3030/.test(st), st);
+  await page.evaluate(() => { SwrMeter.dev.func('power'); SwrMeter.pick('cc3030'); SwrMeter.test(); });
+  const cct = await page.evaluate(() => ({ fwd: document.getElementById('swm-cc-fwd').textContent, v: document.getElementById('swm-verdict').textContent }));
+  ok('the 3030 with PEAK and HOLD catches a TEST burst whole — 4.89 W — and is named the meter built for it', cct.fwd === '4.89' && /built for the A2's TEST button/.test(cct.v), J(cct.fwd));
+  await page.evaluate(() => { SwrMeter.tx('tones'); SwrMeter.scenario('healthy'); SwrMeter.dev.cc('rl', true); });
   const cc = await page.evaluate(() => ({ fwd: document.getElementById('swm-cc-fwd').textContent, ru: document.getElementById('swm-cc-ru').textContent,
     rev: document.getElementById('swm-cc-rev').textContent, sl: document.getElementById('swm-cc-sl').textContent, rl: document.getElementById('swm-cc-swr').textContent }));
   ok('the 3030: FWD 4.89 W, REV 59.7 mW, and 19.1 dB of return loss', cc.fwd === '4.89' && cc.rev === '59.7' && cc.ru === 'mW' && cc.sl === 'R.L' && cc.rl === '19.1 dB', J(cc));

@@ -31,7 +31,8 @@ const WhatsNew = (() => {
         + 'and worked. Pick your meter, then a made-up station with one fault (water in the coax, a loose N-type, a long run of '
         + 'thin cable, a bad jumper, the meter in backwards…) or type your own readings, and watch the power go up the line and '
         + 'come back, with the meter\'s own screen or needle showing what it would read and what to do about it. Flick the '
-        + 'SWR-400\'s switches and turn its CAL knob as you would on site. Then: the steps for hooking up the meter you picked, '
+        + 'SWR-400\'s switches and turn its CAL knob as you would on site, and press TEST on the A2 to see what each meter makes '
+        + 'of a short burst (the 3030 with PEAK and HOLD is the one built for it). Then: the steps for hooking up the meter you picked, '
         + 'what a meter is really measuring, what a decibel lost costs a station at its fade margin, a symptom-to-cause table '
         + 'for the field, and a worked case. The inspection form\'s <em>Antenna Tests</em> opens it with the readings typed there.',
     ] },

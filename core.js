@@ -563,6 +563,9 @@ const HELP = {
       + 'a model, to show the shape — a decibel costs nothing at 10 dB of margin and a great deal at 2.',
       'The meters are drawn after the real ones, not photographed; a firmware\'s screen may differ in detail. The SW-102HF '
       + '(1.5–70 MHz) looks just like the SW-102 and cannot read a 151.5 MHz radio.',
+      'The A2 transmits a short burst for each press of its <strong>TEST</strong> button, as on site, or is held on by its '
+      + 'tones setting. A burst is hard to read: the SW-102 catches it partly and a needle never swings all the way, so go by '
+      + 'the highest reading that repeats — or the 3030 with PEAK and HOLD. Calibrating the SWR-400 needs the tones setting.',
       'A device set to reduce motion starts every drawing still and settled; ▶ Animate runs it.',
     ],
     related: ['inspections', 'propagation', 'health', 'review'],

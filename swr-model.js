@@ -116,7 +116,7 @@ const SwrModel = (function () {
       notes: [
         'Its manual: “TX: connect to radio RF output · ANT: connect to antenna or 50 Ω dummy load.”',
         'It works out its power calibration from the frequency it counts: if the frequency line does not show about 151.5 MHz, do not trust the watts (its manual says so).',
-        'Its manual warns it is “not for DMR”: it is not built to read short bursts. Read it on a steady test transmission, not on a station\'s normal data bursts.',
+        'Its manual warns it is “not for DMR”: it is not built to read short bursts, and the A2\'s TEST button sends one. Watch the screen during the burst, press TEST several times and go by the highest reading that repeats — one low reading means check again, not a fault. The A2\'s tones setting, if it will stay on, reads steadily.',
         'Reads from 0.5 W, by its manual; reviewers find it happiest above about 3 W.',
         'Its menu (blue button) holds a VHF power offset, item 4, that scales every reading by up to ±99%. It should read 0 — off, hold the red button to restore the defaults.',
       ],
@@ -146,7 +146,8 @@ const SwrModel = (function () {
         'Power is read with FUNCTION on POWER: FWD for forward, REF for reflected, with RANGE at the smallest full scale above the reading.',
         'SWR needs calibrating every time: FUNCTION to CAL, FWD, transmit, turn CAL up until the needle sits on the CAL mark, then — still transmitting — FUNCTION to SWR.',
         'It needs a few watts to reach the CAL mark at all. If CAL at MAX cannot get the needle there, there is not enough power for an SWR reading on this meter.',
-        'A needle takes a moment to swing: on a short data burst it never gets there, and reads low. Use a steady test transmission.',
+        'A needle takes a moment to swing: on the A2\'s TEST burst it never gets all the way, and reads low. PEP MONI holds the top of the burst, which helps.',
+        'Calibrating means turning the CAL knob while the radio transmits, so SWR needs the A2 held on by its tones setting. If the tones will not stay on, read SWR on the SW-102 or the 3030, which need no calibrating.',
         'The lamp wants 13.8 V DC; the readings do not.',
       ],
       source: 'Moonraker SWR-400 listing; Diamond SX-series instructions for the same controls',
@@ -161,7 +162,7 @@ const SwrModel = (function () {
       notes: [
         'INPUT to the radio, LOAD to the antenna or a dummy load — the words are printed beside the sockets.',
         'Counts the frequency and applies its calibration for it; outside the counter\'s range it can be set to a manual frequency.',
-        'PEAK and HOLD catch a short burst and keep it on the screen — the right setting for a station\'s data bursts.',
+        'PEAK and HOLD catch a short burst and keep it on the screen — the right setting for the A2\'s TEST button, and why this is the meter built for it.',
         'Can show return loss in place of SWR: 20 dB of return loss is an SWR of 1.22.',
       ],
       source: 'Comm-connect 3030 product listings',
@@ -285,8 +286,10 @@ const SwrModel = (function () {
   // ── Reading the readings ──────────────────────────────────────────────────
   // inp: { fwd, ref, swr — any two of the three, as read; setW — what the
   //        radio is set to; where — 'radio' | 'antenna'; cable, m — the
-  //        feeder, if known; meter — a METERS key; steady — read on a steady
-  //        test transmission rather than data bursts }
+  //        feeder, if known; meter — a METERS key; steady — the reading
+  //        caught the whole signal: the A2 held on by its tones, or a meter
+  //        that holds a TEST burst's peak, rather than a TEST burst caught
+  //        partly }
   //
   // Returns the numbers worked out from them and a list of findings, worst
   // first. Each finding: { id, cls ('ok' | 'warn' | 'bad' | 'info'), title,
@@ -392,8 +395,8 @@ const SwrModel = (function () {
     if (o.disagree) {
       add('disagree', 'warn', 'The SWR and the two powers do not agree',
         `The powers make it ${sTxt(o.disagree.fromPowers)}; the SWR typed is ${sTxt(o.disagree.typed)}. The powers are worked from below.`,
-        ['Read all three again, on one steady transmission.',
-          'On a needle meter, calibrate first: CAL to the mark, then SWR — an SWR read without calibrating is not a reading.']);
+        ['Read all three again off the same TEST press — the 3030 with HOLD keeps them together.',
+          'On a needle meter, calibrate first, with the A2 held on by its tones: CAL to the mark, then SWR — an SWR read without calibrating is not a reading.']);
     }
 
     // The SWR, in the form's own bands.
@@ -441,7 +444,7 @@ const SwrModel = (function () {
       const dB = o.vsSetDb;
       const lowTxt = `${wTxt(o.fwd)} against ${wTxt(o.setW)} set is ${r2(Math.abs(dB))} dB ${dB < 0 ? 'down' : 'up'} — ${Math.round(100 * o.fwd / o.setW)}% of the watts.`;
       const upstream = ['Is the meter at the radio? At the top of the feeder it reads less by the feeder\'s loss — 25 m of LMR-400 is 1.2 dB, and 3.8 W of 5.',
-        steady ? null : 'Was it read on a steady test transmission? A needle, or a meter not built for bursts, under-reads a short data burst.',
+        steady ? null : 'How did the meter catch the A2\'s TEST burst? The SW-102 and a needle under-read a short burst: press TEST several times and go by the highest reading that repeats, or use the 3030 with PEAK and HOLD.',
         'Is the meter right for the job? Check its band (an HF meter cannot read 151.5 MHz) and, on the SW-102, that menu item 4 (VHF power offset) is 0.',
         'Swap the jumper and any adaptor between the radio and the meter for a short, known-good one: the meter cannot see a bad joint on its TX side.',
         'Measure the supply voltage at the radio while it transmits, not at rest: a sagging battery or thin leads take power off the top.',

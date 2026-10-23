@@ -30,18 +30,26 @@
 // written onto its screen and its controls worked. They are close to the real
 // thing, not copies of it; a firmware's screen may differ in detail.
 //
+// The radio transmits the way it does on site: a short burst each time the
+// TEST button on the A2's front panel is pressed — the animation presses it
+// every few seconds, and 📡 Press TEST (or the button drawn on the radio)
+// presses it now — or held on by its tones setting, which can be coaxed on
+// but rarely stays on. How each meter copes with a burst is most of what goes
+// wrong with a reading, so it is modelled: the needle swings with a lag, the
+// SW-102 catches each burst late and partly, the 3030's PEAK and HOLD keep it.
+//
 // One animation loop, only while a moving drawing is on screen and the tab is
 // open; a device asking for reduced motion starts still, settled, with ▶ to
 // run it. Every control on a drawing is also a real control beside it.
 //
-// Exposes: render, init, open, set, pick, scenario, source, type, tx, where,
+// Exposes: render, init, open, set, pick, scenario, source, type, tx, test, where,
 //          dev, play, sw, go, tab, exportTxt, state.
 
 const SwrMeter = (function () {
   const M = () => SwrModel;
   const KEY = 'mn-swr-meter';
   const T_LINE = 2.6;                    // s: a particle from the radio to the antenna
-  const BURST = { period: 1.6, on: 0.22 };   // a station's data bursts, roughly
+  const BURST = { on: 0.22, every: 2.6 };     // s: a TEST burst, and how often the animation presses TEST
   const TAU = 0.3;                       // s: a needle's swing
   const HOLD_TAU = 2.2;                  // s: a PEP monitor letting go
 
@@ -51,7 +59,7 @@ const SwrMeter = (function () {
     source: 'scenario',             // 'scenario' | 'yours'
     scenario: 'healthy',
     where: 'radio',                  // 'radio' | 'antenna'
-    tx: 'steady',                    // 'off' | 'steady' | 'bursts'
+    tx: 'test',                      // 'off' | 'test' (the A2's TEST button) | 'tones' (held on)
     yours: { fwd: '', ref: '', swr: '', setW: '5', cable: '', m: '' },
     sw: { on: true, menu: false, offset: 0 },
     mn: { range: 20, func: 'power', dir: 'fwd', pep: false, cal: 0 },
@@ -100,7 +108,7 @@ const SwrMeter = (function () {
       const l = m.line({ ...sc, antSwr, where: S.where });
       return { ...l, sc, cable: sc.cable, mLen: sc.m, extraDb: sc.extraDb, ok: true };
     }
-    const r = m.interpret({ ...S.yours, where: S.where, meter: S.meter, steady: S.tx !== 'bursts' });
+    const r = m.interpret({ ...S.yours, where: S.where, meter: S.meter, steady: caught() });
     const setW = Number(S.yours.setW) > 0 ? Number(S.yours.setW) : null;
     if (!r.ok || r.fwd == null) {
       return { ok: false, r, setW, fwd: 0, ref: 0, gamma: 0, swr: null, feedDb: r.feedDb || 0, upDb: 0,
@@ -129,13 +137,22 @@ const SwrMeter = (function () {
   }
 
   function verdictInput() {
-    if (S.source === 'yours') return { ...S.yours, where: S.where, meter: S.meter, steady: S.tx !== 'bursts' };
+    if (S.source === 'yours') return { ...S.yours, where: S.where, meter: S.meter, steady: caught() };
     const t = truth();
     const b = bookable(t);
-    return { fwd: b.fwd, ref: b.ref, setW: t.setW, where: S.where, cable: t.cable, m: t.mLen, meter: S.meter, steady: S.tx !== 'bursts' };
+    return { fwd: b.fwd, ref: b.ref, setW: t.setW, where: S.where, cable: t.cable, m: t.mLen, meter: S.meter, steady: caught() };
   }
 
-  const txOn = time => (S.tx === 'steady' ? true : S.tx === 'off' ? false : ((time % BURST.period) + BURST.period) % BURST.period < BURST.on);
+  // Is the radio transmitting at this moment? Held on by its tones, never
+  // when off, and on TEST for a burst after each press.
+  function txOn(time) {
+    if (S.tx === 'tones') return true;
+    if (S.tx !== 'test' || !live) return false;
+    return live.presses.some(p => time >= p && time - p < BURST.on);
+  }
+  // Does the reading catch the whole signal? Held on, yes; on a TEST burst,
+  // only a meter built to hold one — the 3030 with PEAK on.
+  const caught = () => S.tx !== 'test' || (S.meter === 'cc3030' && S.cc.peak);
 
   // ── The facts at the top ───────────────────────────────────────────────────
 
@@ -222,7 +239,9 @@ const SwrMeter = (function () {
           </div>`}
       </div>
       ${radios('swm-where', 'Where the meter is', [['radio', 'At the radio'], ['antenna', 'At the antenna end of the feeder']], S.where, 'SwrMeter.where')}
-      ${radios('swm-tx', 'The radio', [['off', 'Not transmitting'], ['steady', 'A steady test transmission'], ['bursts', 'Its normal short data bursts']], S.tx, 'SwrMeter.tx')}`;
+      ${radios('swm-tx', 'How the A2 is transmitting', [['off', 'Not transmitting'], ['test', 'Its TEST button — a short burst each press'], ['tones', 'Its tones setting — held on, if it will stay on']], S.tx, 'SwrMeter.tx')}
+      <p class="swm-test-row"><button type="button" class="btn btn-primary" id="swm-test" onclick="SwrMeter.test()"${S.tx === 'test' ? '' : ' disabled'}>📡 Press TEST</button>
+        <span class="swm-hint">One burst, as the button on the A2's front panel sends. Watch what each meter makes of it.</span></p>`;
   }
 
   // The meter's own controls, beside its drawing: every one the drawing
@@ -299,7 +318,7 @@ const SwrMeter = (function () {
     const back = S.from === 'inspections'
       ? `<p><button type="button" class="btn" onclick="SwrMeter.tab('inspections')">← Back to the inspection</button></p>` : '';
     if (S.tx === 'off' && S.source === 'scenario') {
-      return `<h4>What it means</h4><p class="swm-muted">The radio is not transmitting, so there is nothing to read. Pick a steady test transmission.</p>${back}`;
+      return `<h4>What it means</h4><p class="swm-muted">The radio is not transmitting, so there is nothing to read. Press TEST on the A2, or hold it on with its tones setting.</p>${back}`;
     }
     if (!r.ok) {
       return `<h4>What it means</h4><p class="swm-muted">${esc(r.error || 'Type the forward power, and the reflected power or the SWR.')}</p>${back}`;
@@ -332,8 +351,7 @@ const SwrMeter = (function () {
         <p>${esc(f.text)}</p>
         ${f.do.length ? `<p class="swm-do-h">What to do</p><ol class="swm-do">${f.do.map(x => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}
       </li>`).join('');
-    const bursts = S.tx === 'bursts' && !meter.bursts && !(S.meter === 'swr400' && S.mn.pep)
-      ? `<p class="swm-note">⚠️ Read on data bursts: ${esc(meter.short)} readings taken this way jump about and read low. The numbers here are what a steady test transmission would show.</p>` : '';
+    const bursts = S.tx !== 'test' ? '' : burstNote(meter);
     return `<h4>What it means</h4>
       ${behind}${bursts}
       <div class="swm-verdict-grid">
@@ -343,6 +361,19 @@ const SwrMeter = (function () {
       </div>
       <p class="button-group"><button type="button" class="btn" onclick="SwrMeter.exportTxt()">⤓ Save this check — text</button></p>
       ${back}`;
+  }
+
+  // What a TEST burst does to a reading on the meter picked.
+  function burstNote(meter) {
+    if (S.meter === 'cc3030') {
+      return S.cc.peak
+        ? `<p class="swm-note swm-note--ok">✅ Read on a TEST burst with PEAK${S.cc.hold ? ' and HOLD' : ''}: the 3030 catches the top of the burst${S.cc.hold ? ' and keeps it on the screen' : ''}. Of the three meters, this is the one built for the A2's TEST button.</p>`
+        : `<p class="swm-note">⚠️ Read on a TEST burst without PEAK: the 3030 may catch the burst partway. Turn PEAK${S.cc.hold ? '' : ' and HOLD'} on. The numbers here are what the whole burst would show.</p>`;
+    }
+    if (S.meter === 'swr400') {
+      return `<p class="swm-note">⚠️ Read on a TEST burst: a needle cannot swing all the way in a burst that short, so it reads low${S.mn.pep ? ' — PEP MONI holds the top of it, which helps' : '; PEP MONI holds the top of it better'}. And CAL needs a signal held on while you turn the knob, so an SWR reading needs the tones setting — or the SW-102 or the 3030, which read SWR without calibrating. The numbers here are what a held signal would show.</p>`;
+    }
+    return `<p class="swm-note">⚠️ Read on a TEST burst: the ${esc(meter.short)} is not built for bursts (its manual: "not for DMR"), so each one can read low, and differently each press. Press TEST several times and go by the highest reading that repeats; one low reading means check again, not a fault. The numbers here are what the whole burst would show.</p>`;
   }
 
   // ── The line ───────────────────────────────────────────────────────────────
@@ -360,7 +391,7 @@ const SwrMeter = (function () {
     const atRadio = S.where !== 'antenna';
     if (kind === 'tall') {
       const x = 160;
-      const radio = { x: 12, y: 520, w: 124, h: 60 };
+      const radio = { x: 12, y: 506, w: 124, h: 82 };
       const start = [radio.x + radio.w, 550];
       const feedTop = 112;
       const meter = atRadio ? { cx: x, y0: 476, y1: 410 } : { cx: x, y0: 212, y1: 146 };
@@ -450,6 +481,8 @@ const SwrMeter = (function () {
         <text x="${r.x + 12}" y="${r.y + 24}" class="swm-t swm-t--b">ALERT2 radio</text>
         <text x="${r.x + 12}" y="${r.y + 44}" class="swm-t swm-t--s" id="swm-ln-set">${t.setW ? `set to ${W(t.setW)}` : 'setting not typed'}</text>
         <circle cx="${r.x + r.w - 14}" cy="${r.y + r.h - 14}" r="5" class="swm-led" id="swm-ln-led"/>
+        <g data-act="test" class="swm-hot"><rect x="${r.x + 10}" y="${r.y + r.h - 26}" width="48" height="18" rx="4" class="swm-testbtn"/>
+          <text x="${r.x + 34}" y="${r.y + r.h - 13}" class="swm-testbtn-t" text-anchor="middle">TEST</text></g>
       </g>`;
     // The meter, as a box with its two sockets named.
     let mtr;
@@ -747,6 +780,9 @@ const SwrMeter = (function () {
     const mn = S.mn;
     const t = truth();
     if (S.tx === 'off') return 'Nothing is transmitting: the needle rests on 0.';
+    if (S.tx === 'test' && mn.func !== 'power') {
+      return 'CAL and SWR need a signal held on while you turn the knob — the A2\'s tones setting. On TEST bursts the needle flicks up and falls back: read SWR on the SW-102 or the 3030 instead.';
+    }
     if (mn.func === 'power') {
       if (mn.dir === 'off') return 'POWER is at OFF: the needle reads nothing. FWD for forward power, REF for reflected.';
       const p = mn.dir === 'fwd' ? t.fwd : t.ref;
@@ -789,6 +825,10 @@ const SwrMeter = (function () {
   // One moment of the bench: the dots, the meter's face, the words.
   function draw(time, dt) {
     if (!live || !live.P) return;
+    // On TEST, somebody keeps pressing it: every few seconds, unless a real
+    // press came lately. Old presses are let go once their dots are home.
+    if (S.tx === 'test' && dt > 0 && time - live.lastPress >= BURST.every) press(time);
+    if (live.presses.length > 4) live.presses = live.presses.filter(p => time - p < 2 * T_LINE + 1);
     const m = M();
     // A loose joint's reflection, changing a few times a second.
     const sc = S.source === 'scenario' ? m.SCENARIOS[S.scenario] : null;
@@ -862,12 +902,12 @@ const SwrMeter = (function () {
       setA('swm-mn-needle', 'transform', `rotate(${mnAng(n).toFixed(2)} ${MN.px} ${MN.py})`);
       return;
     }
-    const steadyShow = present || (S.meter === 'cc3030' && S.cc.hold && live.burstAt > -1) || (S.tx === 'bursts' && sinceOff < 0.35);
+    const steadyShow = present || (S.meter === 'cc3030' && S.cc.hold && live.burstAt > -1) || (S.tx === 'test' && sinceOff < 0.35);
     // A meter not built for bursts catches each one late and partly: low,
     // and different every time.
-    if (S.tx === 'bursts' && !meter.bursts) { fwd *= live.burstF; ref *= live.burstF * live.burstJ; }
+    if (S.tx === 'test' && !meter.bursts) { fwd *= live.burstF; ref *= live.burstF * live.burstJ; }
     if (S.meter === 'cc3030') {
-      if (S.tx === 'bursts' && !S.cc.peak) { fwd *= live.burstFcc; ref *= live.burstFcc; }
+      if (S.tx === 'test' && !S.cc.peak) { fwd *= live.burstFcc; ref *= live.burstFcc; }
       const show = t.ok && S.tx !== 'off' && steadyShow;
       const [fv, fu] = show ? ccPow(fwd) : ['0.00', 'W'];
       const [rv, ru] = show ? ccPow(ref) : ['0.00', 'W'];
@@ -893,7 +933,7 @@ const SwrMeter = (function () {
     setA('swm-sw-led', 'fill', on && present ? '#3ecf5e' : '#55595e');
     if (!on) return;
     setT('swm-sw-mv4', String(S.sw.offset));
-    const show = t.ok && S.tx !== 'off' && (present || (S.tx === 'bursts' && sinceOff < 0.35));
+    const show = t.ok && S.tx !== 'off' && (present || (S.tx === 'test' && sinceOff < 0.35));
     const low = Math.max(fwd, ref) < meter.minW;
     const fw = show && !low ? fwd : 0, rw = show && !low ? ref : 0;
     setT('swm-sw-pwr', `${swFmt(fw)}W`);
@@ -923,16 +963,16 @@ const SwrMeter = (function () {
       'With nothing transmitting, the needle should rest on 0. If it does not, set it with the METER ADJUST screw.',
       `On the back panel: the radio to <strong>${pIn}</strong>, the antenna or a dummy load to <strong>${pOut}</strong>.`,
       'AVG/PEP MONI on AVG. (On FM the two read the same; PEP MONI helps a needle catch a short burst.)',
-      '<strong>Forward power:</strong> RANGE 20 W, FUNCTION POWER, POWER FWD. Start a steady test transmission and read the 20 W scale; if it reads under 5, drop RANGE to 5 W and read the 5 W scale.',
+      '<strong>Forward power:</strong> RANGE 20 W, FUNCTION POWER, POWER FWD. Press TEST on the A2 and read the 20 W scale; if it reads under 5, drop RANGE to 5 W. A burst is too short for the needle to swing all the way: switch to PEP MONI, press TEST a few times, and go by the highest swing.',
       '<strong>Reflected power:</strong> still on POWER, flick FWD to REF. A small reflection needs the 5 W range to read at all.',
-      '<strong>SWR:</strong> FUNCTION to CAL and the CAL knob right down to MIN. Transmit, and turn CAL up until the needle sits exactly on the CAL ▼ mark. Keep transmitting, switch FUNCTION to SWR, and read the SWR scale.',
+      '<strong>SWR:</strong> FUNCTION to CAL and the CAL knob right down to MIN. With the radio held on, turn CAL up until the needle sits exactly on the CAL ▼ mark; still transmitting, switch FUNCTION to SWR and read the SWR scale. That needs the A2\'s tones setting — a TEST burst is over before the knob has moved. If the tones will not stay on, read SWR on the SW-102 or the 3030.',
       'Stop transmitting. FUNCTION back to POWER, POWER to OFF.',
     ];
     if (id === 'cc3030') return [
       'Switch it on and check the battery mark on its screen.',
       `The radio to <strong>${pIn}</strong>, the antenna or a dummy load to <strong>${pOut}</strong>.`,
-      'For a station\'s short data bursts, turn on <strong>PEAK</strong> and <strong>HOLD</strong> in its MENU (▽ △ to choose, ENTER to set). For a steady test transmission they do no harm.',
-      'Transmit, and read <strong>FWD</strong>, <strong>REV</strong> and <strong>SWR</strong> (or return loss, if it is set to show that).',
+      'Turn on <strong>PEAK</strong> and <strong>HOLD</strong> in its MENU (▽ △ to choose, ENTER to set). They catch the top of the A2\'s TEST burst and keep it on the screen — this is the meter built for it.',
+      'Press TEST on the A2, and read <strong>FWD</strong>, <strong>REV</strong> and <strong>SWR</strong> (or return loss, if it is set to show that) off the held screen.',
       'Check the <strong>Frequency</strong> line reads about 151500 kHz: the meter picks its calibration from it.',
       'Stop transmitting. Clear HOLD before the next reading, or the screen keeps the last one.',
     ];
@@ -942,8 +982,8 @@ const SwrMeter = (function () {
         : 'Check the screen says 125–525 MHz. The HF model looks identical and says 1.5–70 MHz — it cannot read this radio.',
       'Hold the red POWER button to switch it on. "B" on the screen means it is on its battery, "E" on USB power; charge it the night before.',
       `The radio to <strong>${pIn}</strong>, the antenna or a dummy load to <strong>${pOut}</strong>.`,
-      'Start a <strong>steady test transmission</strong>. Its manual says it is not for DMR — short bursts — and a station\'s data bursts are just as short.',
-      'Read <strong>FW</strong> (forward watts), <strong>RW</strong> (reflected watts) and the big <strong>VSWR</strong>. Trans% is the share going on past the meter.',
+      'Press TEST on the A2 and watch the screen during the burst: <strong>FW</strong> (forward watts), <strong>RW</strong> (reflected watts) and the big <strong>VSWR</strong>. Trans% is the share going on past the meter.',
+      'Press TEST several times. Its manual says it is "not for DMR" — not built for short bursts — so a burst can read low, and differently each press: go by the highest reading that repeats. The tones setting, if it will stay on, reads steadily.',
       'Check the frequency line shows about 151.500 MHz: it works its watts out from the frequency it counts.',
       'Stop transmitting, and hold the red button to switch it off.',
     ];
@@ -957,6 +997,7 @@ const SwrMeter = (function () {
           <h4>Before you start</h4>
           <ol class="swm-steps">
             <li>Know what you expect: the power the radio is set to (its configuration, or the install report) and the feeder — type and length.</li>
+            <li>Know how you will make it transmit. The <strong>TEST</strong> button on the A2's front panel sends a short burst — the usual way. Its <strong>tones</strong> setting can hold the transmitter on, which every meter reads more easily, but it does not always stay on.</li>
             <li><strong>Never transmit into nothing.</strong> Something is always on the meter's ${d.ports[1]} side: the antenna, or a 50 Ω dummy load rated for the radio's power.</li>
             <li>Choose where it goes. <strong>At the radio</strong> it measures what the radio sends up the line, and the whole line's match. <strong>With a dummy load and no antenna</strong>, the radio alone. <strong>At the top of the feeder</strong>, the antenna alone.</li>
             <li>Undo one joint and put the meter in with short, good jumpers. Do N-types up by hand, straight on: firm, never a spanner, never cross-threaded. If one feels gritty or stops short, back it off and start it again.</li>
@@ -1227,9 +1268,9 @@ const SwrMeter = (function () {
       ['SWR over 2', 'Poor: a fault past the meter.', 'Every joint past the meter; the antenna; a dummy load at the antenna end splits cable from antenna.'],
       ['SWR off the scale, reflected near forward', 'Open or short: broken cable, a centre pin pushed back, a flooded or crushed run, the antenna gone.', 'Stop transmitting into it. Walk the line from the meter outwards.'],
       ['Reflected bigger than forward', 'The meter is in backwards.', 'Swap its cables: radio to TX / INPUT.'],
-      ['Forward low, SWR good', 'The trouble is on the radio side of the meter — or is the meter.', 'Meter position, steady transmission, meter band and offset, the jumper and adaptors, the supply under transmit, then the radio on a dummy load.'],
+      ['Forward low, SWR good', 'The trouble is on the radio side of the meter — or is the meter.', 'Meter position, how it caught the TEST burst, meter band and offset, the jumper and adaptors, the supply under transmit, then the radio on a dummy load.'],
       ['Forward low, SWR high', 'A fault past the meter, and the radio turning itself down to protect itself.', 'Find the fault first; the power usually comes back with it.'],
-      ['Readings jump about', 'Short data bursts on a meter that cannot catch them — or a loose joint.', 'Read on a steady test transmission. If it still jumps, wiggle each joint while watching the meter.'],
+      ['Readings change from one TEST press to the next', 'A meter not built for bursts catching each one partly — or a loose joint.', 'The 3030 with PEAK and HOLD, or the highest reading that repeats over several presses. If it still jumps, wiggle each joint while pressing TEST.'],
       ['SWR changes when the cable is moved', 'A bad joint or a damaged cable at that spot.', 'Remake the joint; replace the cable if the jacket is crushed or cut.'],
       ['Good when dry, poor after rain', 'Water getting in: an unsealed joint, a cracked radome, a split jacket.', 'Seal with self-amalgamating tape over the joint, and cut back past any wet cable.'],
       ['Forward more than the setting', 'The wrong range on a needle, a meter out of calibration, or the radio set higher than thought.', 'Smallest range above the reading; check the configuration and the licensed power.'],
@@ -1264,8 +1305,9 @@ const SwrMeter = (function () {
       <ol class="swm-steps">
         <li><strong>Where the meter was.</strong> At the top of the feeder it reads what is left after the feeder: about ${num(metres, 0)} m of LMR-400
           (at ${num(lmr, 1)} dB/100 m) is 1.2 dB, so 3.8 W there is a radio putting out 5 W. The photo should show which joint was undone.</li>
-        <li><strong>How it was read.</strong> The SW-102's manual says it is not for DMR — short bursts. If it was read on the station's normal
-          data bursts rather than a steady test transmission, a low and jumpy reading is the meter, not the radio.</li>
+        <li><strong>How it was read.</strong> On an A2 that is almost always the TEST button: a short burst. The SW-102's manual says it is
+          "not for DMR" — not built for short bursts — so one press reading under the set power is not proof of anything. Several presses, the
+          highest that repeats, or the 3030 with PEAK and HOLD, settle it.</li>
         <li><strong>The meter.</strong> Is it the SW-102 (125–525 MHz) and not the identical-looking SW-102HF (1.5–70 MHz)? Is its menu item 4,
           the VHF power offset, at 0? Did its frequency line read 151.5 MHz? Seller figures put it within about 5%; ±1 dB between two
           instruments is ordinary.</li>
@@ -1394,8 +1436,9 @@ const SwrMeter = (function () {
     if (S.playing && live.running) return;
     const steps = 150;
     for (let i = 0; i < steps; i++) { live.t += 1 / 50; draw(live.t, 1 / 50); }
-    // A still picture lands mid-burst, so the dots show what bursts look like.
-    if (S.tx === 'bursts') { live.t = Math.ceil(live.t / BURST.period) * BURST.period + 0.18; draw(live.t, 0); }
+    // A still picture lands a moment into a burst, so the meter shows what it
+    // made of it and the dots show what a burst looks like.
+    if (S.tx === 'test') { press(live.t); for (let i = 0; i < 9; i++) { live.t += 0.02; draw(live.t, 0.02); } }
     drawStanding(live.t);
   }
 
@@ -1425,6 +1468,7 @@ const SwrMeter = (function () {
     const d = dev;
     const cycle = (list, cur) => list[(list.indexOf(cur) + 1) % list.length];
     switch (act) {
+      case 'test': test(); break;
       case 'sw-power': d.swPower(); break;
       case 'sw-menu': d.swMenu(); break;
       case 'sw-plus': if (S.sw.menu) d.swOffset(S.sw.offset + 1); break;
@@ -1460,7 +1504,7 @@ const SwrMeter = (function () {
     unwire();
     registerTabTeardown('SwrMeter', unwire);
     if (!$('swm-page')) return;
-    live = { raf: 0, last: 0, t: 0, needle: 0, held: 0, flick: 1, flickAt: -1, wasOn: false, burstAt: -10, burstF: 1, burstJ: 1, burstFcc: 1,
+    live = { raf: 0, last: 0, t: 0, needle: 0, held: 0, flick: 1, flickAt: -1, wasOn: false, burstAt: -10, burstF: 1, burstJ: 1, burstFcc: 1, presses: [], lastPress: -10,
       vis: { bench: true, waves: false }, running: false, g: null, P: null, lay: '' };
     paintLine();
     paintMeter();
@@ -1556,10 +1600,26 @@ const SwrMeter = (function () {
   }
 
   function tx(v) {
-    if (!['off', 'steady', 'bursts'].includes(v)) return;
+    if (!['off', 'test', 'tones'].includes(v)) return;
     S.tx = v;
-    if (live) { live.held = 0; }
+    if (live) { live.held = 0; live.presses = []; live.lastPress = -10; }
+    const b = $('swm-test');
+    if (b) b.disabled = v !== 'test';
     refresh(false);
+  }
+
+  // A burst now, as the A2's TEST button sends.
+  function press(time) {
+    if (!live) return;
+    live.presses.push(time);
+    live.lastPress = time;
+  }
+  function test() {
+    if (!live) return;
+    if (S.tx !== 'test') tx('test');
+    press(live.t);
+    // Paused, the bench runs just long enough to show what the meter made of it.
+    if (!(S.playing && live.running)) { for (let i = 0; i < 9; i++) { live.t += 0.02; draw(live.t, 0.02); } }
   }
 
   function play() {
@@ -1650,7 +1710,7 @@ const SwrMeter = (function () {
     S.meter = 'sw102'; writeLS();
     S.source = 'yours';
     S.yours = { fwd: '3.8', ref: '', swr: '1.01', setW: '5', cable: '', m: '' };
-    S.where = 'radio'; S.tx = 'steady'; S.sw.offset = 0; S.sw.on = true; S.sw.menu = false;
+    S.where = 'radio'; S.tx = 'test'; S.sw.offset = 0; S.sw.on = true; S.sw.menu = false;
     if (typeof switchTab === 'function') switchTab('swr');
     go('swm-bench');
   }
@@ -1662,7 +1722,7 @@ const SwrMeter = (function () {
     if (o && (o.fwd != null || o.ref != null || o.swr != null)) {
       S.source = 'yours';
       S.yours = { ...S.yours, fwd: v(o.fwd), ref: v(o.ref), swr: v(o.swr), setW: v(o.setW) || S.yours.setW };
-      S.where = 'radio'; S.tx = 'steady';
+      S.where = 'radio'; S.tx = 'test';
     }
     S.from = o && o.from ? String(o.from) : '';
     if (typeof switchTab === 'function') switchTab('swr');
@@ -1690,7 +1750,7 @@ const SwrMeter = (function () {
     const r = m.interpret(inp);
     const lines = ['Flood-Net — SWR check', ''];
     lines.push(`Meter: ${d.name} (${d.bandMHz[0]}–${d.bandMHz[1]} MHz), ${S.where === 'radio' ? 'at the radio' : 'at the antenna end of the feeder'}`);
-    lines.push(`Read on: ${S.tx === 'bursts' ? 'the station\'s data bursts' : S.tx === 'off' ? 'nothing (not transmitting)' : 'a steady test transmission'}`);
+    lines.push(`Read on: ${S.tx === 'test' ? 'the A2\'s TEST button (a short burst)' : S.tx === 'off' ? 'nothing (not transmitting)' : 'the A2\'s tones setting (held on)'}`);
     if (S.source === 'scenario') lines.push(`Station: ${m.SCENARIOS[S.scenario].label} (a made-up example)`);
     if (r.ok) {
       lines.push('', `Forward: ${W(r.fwd)}${r.dbm != null ? ` (${num(r.dbm, 1)} dBm)` : ''}`, `Reflected: ${W(r.ref)}`, `SWR: ${sTxt(r.swr)} : 1${r.band ? ` — ${r.band.label}` : ''}`,
@@ -1715,5 +1775,5 @@ const SwrMeter = (function () {
     return { ...S, yours: { ...S.yours }, sw: { ...S.sw }, mn: { ...S.mn }, cc: { ...S.cc }, running: !!(live && live.running), needle: live ? live.needle : 0, lay: live ? live.lay : '' };
   }
 
-  return { render, init, open, set, pick, scenario, source, type, tx, where, dev, play, go, tab, loadCase, exportTxt, checkText, state };
+  return { render, init, open, set, pick, scenario, source, type, tx, test, where, dev, play, go, tab, loadCase, exportTxt, checkText, state };
 })();

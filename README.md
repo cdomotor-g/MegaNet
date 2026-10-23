@@ -5583,9 +5583,12 @@ the meter at the radio or at the top of the feeder. The meter is drawn after
 the real one with its readings on its screen: the SW-102's FW, RW, VSWR and
 Trans% (its menu's VHF power offset among them), the 3030's FWD, REV, SWR or
 return loss with PEAK and HOLD, and the SWR-400's needle, worked through its
-RANGE, FUNCTION and POWER switches and CAL knob, calibration and all. On a
-station's short data bursts the meters not built for them read low and jumpy,
-as they do on site. Under the bench the readings are worked out — SWR in the
+RANGE, FUNCTION and POWER switches and CAL knob, calibration and all. The A2
+transmits as it does on site: a short burst for each press of its TEST button
+(📡 Press TEST, or the button drawn on the radio), or held on by its tones
+setting. On a TEST burst the SW-102 catches each burst partly and the needle
+never swings all the way, while the 3030's PEAK and HOLD keep it — and the
+SWR-400 cannot be calibrated without the tones setting. Under the bench the readings are worked out — SWR in the
 inspection form's own bands, return and mismatch loss, the power against the
 radio's setting, what reaches the antenna and the antenna's own SWR behind a
 lossy feeder — and said in words, with what to do, and saved as text.
