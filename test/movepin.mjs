@@ -384,6 +384,31 @@ async function main() {
     check('arming the move disarms it, so the pin can be dragged at all',
       !exclusive.after.tool && !exclusive.after.drawing && !!exclusive.after.armed);
 
+    // A render of the tab inside it — the one that also takes the ⛰️ 3-D view
+    // down — draws the editor card while the move is still armed, and only
+    // then takes the old map, and the move with it, down. The card it drew
+    // went on saying "Moving on the map…", pressed, over a map with no pin and
+    // no panel, and pressing it cancelled nothing.
+    const rerendered = await page.evaluate(() => {
+      MapMovePin.start(state.editorId);
+      const before = !!document.querySelector('#ef-movepin.is-on');
+      renderMain();
+      const b = document.getElementById('ef-movepin');
+      return {
+        before,
+        armed: MapMovePin.armed(),
+        panel: !!document.querySelector('.mn-movepin-panel'),
+        on: !!(b && b.classList.contains('is-on')),
+        pressed: b && b.getAttribute('aria-pressed'),
+        label: b ? b.textContent.trim() : null,
+      };
+    });
+    check('a render of the tab with a move armed takes the move down',
+      rerendered.before && rerendered.armed === null && !rerendered.panel);
+    check('and the editor card it drew says so, rather than "Moving on the map…"',
+      !rerendered.on && rerendered.pressed === 'false' && /Move pin on map/.test(rerendered.label || ''),
+      JSON.stringify(rerendered));
+
     // Leaving the tab has to take the mode with it — a marker left pointing at
     // a map that has been removed is the leak `npm run registry` exists for,
     // one floor down.

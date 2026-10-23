@@ -239,10 +239,14 @@ const MapMovePin = (function () {
   // away whatever else is half-typed into the form; any callout is closed — a
   // phone's — because a popup that stays open over the pin is over the thing
   // being dragged.
-  function repaintButtons() {
+  function repaintEditorButton() {
     const s  = station() || (state.data && state.data.stations.find(x => x.id === state.editorId));
     const el = document.getElementById('ef-movepin');
     if (el && s) el.outerHTML = editorButtonHtml(s);
+  }
+
+  function repaintButtons() {
+    repaintEditorButton();
     if (map) map.closePopup();
     // The station card draws this pill (#175), and unlike a callout it is not
     // rebuilt on its next open — so it is repainted here, on every
@@ -312,6 +316,14 @@ const MapMovePin = (function () {
     saving = false;
     message = null;
     tell();
+    // The editor card's button, whoever tore the mode down. A render of the
+    // Stations tab draws the card first, while the move is still armed, and
+    // only then takes the old map down (initMap → stopStationsMap → detach) —
+    // so the card it has just drawn said "Moving on the map…", pressed, about
+    // a move that was gone: no pin, no panel, and a press that cancelled
+    // nothing. That render is also what takes the 3-D view down, so it was
+    // met on the way out of ⛰️.
+    repaintEditorButton();
   }
 
   // Where the pin can be moved from: the Stations map (onMap), or the Digital
@@ -468,6 +480,7 @@ const MapMovePin = (function () {
     const s = station();
     saving = false;
     teardown();
+    repaintButtons();
     announce(`Saved: ${(s && s.name) || 'the station'} moved${km == null ? '' : ` ${fmtKm(km)}`} to ${where}.`);
     moved(id);
   }
