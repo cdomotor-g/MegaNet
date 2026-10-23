@@ -223,9 +223,7 @@ ok('the tiles count the rows the way the bands read them',
 
 // ── one figure ───────────────────────────────────────────────────────────────
 // The link budget card, set to the same two ends, has to give the same figure
-// the cell does — the card is pointed one way and the cell is the worse of
-// two, but every station here is on one radio system, so the two directions
-// are one number.
+// the cell does — both are one way, the station transmitting to the hub.
 console.log('\nOne figure');
 const agree = await page.evaluate(async ({ hub }) => {
   const m = NetworkReview.matrix();

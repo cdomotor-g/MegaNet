@@ -1556,11 +1556,12 @@ const PathProfile = (function () {
   // whatever has been typed over them, here or in the budget, since the two
   // cards keep one set of figures per site (radioVal).
   //
-  // Both directions and the worse of the two, which is MapFade's view rather
-  // than the budget card's: the budget is aimed A→B because an operator aimed
-  // it, but this card is describing *a path*, and a hop that gets there and
-  // cannot answer is not a working link. Both one-way figures are quoted
-  // beside it so the asymmetry is visible rather than merely survived.
+  // One way, A → B: the transmitter is A and the receiver is B, as on the
+  // link budget card. That is the way the network runs — a field station
+  // reports in to its repeater and a repeater hands on to its base; nothing
+  // transmits back down — and a path opened from the map is drawn that way
+  // round (MapBackbone.open). ⇄ Flip direction is the other way, for a hop
+  // that has one.
   //
   // Stations only. A line dropped on bare ground has no radio at its end, and
   // a margin computed around an assumed one would be this card inventing a
@@ -1574,40 +1575,32 @@ const PathProfile = (function () {
     };
   }
 
-  // What this end is missing, named so the note can say which figure to go and
-  // fill in rather than shrugging at the whole row. All four at both ends,
-  // because the figure quoted is the worse of the two directions and each end
-  // is therefore both a transmitter and a receiver.
-  function missingTerms(e, r) {
+  // What the path is missing, named so the note can say which figure to go
+  // and fill in rather than shrugging at the whole row: the transmitter's
+  // power, gain and line loss at A, the receiver's gain, line loss and
+  // threshold at B.
+  function missingTerms(a, ra, b, rb) {
     const out = [];
-    if (wattsToDbm(r.txW) == null) out.push(`TX power at ${e.name}`);
-    if (r.gain == null) out.push(`antenna gain at ${e.name}`);
-    if (r.loss == null) out.push(`line loss at ${e.name}`);
-    if (r.thr == null)  out.push(`RX threshold at ${e.name}`);
+    if (wattsToDbm(ra.txW) == null) out.push(`TX power at ${a.name}`);
+    if (ra.gain == null) out.push(`antenna gain at ${a.name}`);
+    if (ra.loss == null) out.push(`line loss at ${a.name}`);
+    if (rb.gain == null) out.push(`antenna gain at ${b.name}`);
+    if (rb.loss == null) out.push(`line loss at ${b.name}`);
+    if (rb.thr == null)  out.push(`RX threshold at ${b.name}`);
     return out;
   }
 
-  function marginOneWay(an, fromR, toR) {
-    const txDbm = wattsToDbm(fromR.txW);
-    if (txDbm == null || fromR.gain == null || fromR.loss == null) return null;
-    if (toR.gain == null || toR.loss == null || toR.thr == null) return null;
-    if (an.pathLoss_db == null) return null;
-    return (txDbm + fromR.gain - fromR.loss) - an.pathLoss_db + toR.gain - toR.loss - toR.thr;
-  }
-
-  // { m, ab, ba } when both directions compute, else why not — one of
+  // { m } — the margin A → B — when it computes, else why not: one of
   // 'ends' (a point on the ground rather than a station), 'system' (a station
   // with no rm_system on file, and nothing typed in its place), 'loss' (the
   // model did not run) or a list of named terms nobody has supplied.
   function profileMargin(an, a, b) {
     if (!a.isStation || !b.isStation) return { m: null, why: 'ends' };
     const ra = endRadio(a), rb = endRadio(b);
-    const missing = [...missingTerms(a, ra), ...missingTerms(b, rb)];
+    const missing = missingTerms(a, ra, b, rb);
     if (missing.length) return { m: null, why: !a.sys || !b.sys ? 'system' : 'missing', missing };
     if (an.pathLoss_db == null) return { m: null, why: 'loss' };
-    const ab = marginOneWay(an, ra, rb), ba = marginOneWay(an, rb, ra);
-    if (ab == null || ba == null) return { m: null, why: 'missing', missing };
-    return { m: Math.min(ab, ba), ab, ba };
+    return { m: (wattsToDbm(ra.txW) + ra.gain - ra.loss) - an.pathLoss_db + rb.gain - rb.loss - rb.thr };
   }
 
   // The row itself. The band is the link budget's own (lbMarginClass), so the
@@ -1627,13 +1620,8 @@ const PathProfile = (function () {
       return `<span class="txt-warn">not computed</span> <span class="small">${why}</span>`;
     }
     const cls = lbMarginClass(r.m);
-    // Which way round is the worse is plain from the two figures, so it is
-    // said on pointing rather than in the line.
-    const worst = r.ab <= r.ba ? `${a.name} → ${b.name}` : `${b.name} → ${a.name}`;
-    return `<span class="txt-${cls.cls}" title="${escAttr(`The worse way round, ${worst}`)}">${
-      r.m > 0 ? '+' : ''}${r.m.toFixed(1)} dB</span>
-      <span class="small">${esc(cls.label.toLowerCase())} ·
-        ${r.ab > 0 ? '+' : ''}${r.ab.toFixed(1)} / ${r.ba > 0 ? '+' : ''}${r.ba.toFixed(1)} dB A→B / B→A</span>`;
+    return `<span class="txt-${cls.cls}">${r.m > 0 ? '+' : ''}${r.m.toFixed(1)} dB</span>
+      <span class="small">${esc(cls.label.toLowerCase())} · ${esc(a.name)} → ${esc(b.name)}</span>`;
   }
 
   // "a, b and c" — the budget card's fmtList, which lives inside its IIFE.
@@ -2215,9 +2203,9 @@ const PathProfile = (function () {
   // The radio figures this card lets you change, each one the figure its site
   // keeps for every card (state.radio): a TX power typed here is the one the
   // link budget below shows for the same station, and one typed there shows up
-  // here, and both margins and the radio-path card's follow. TX power at each
-  // station end, then the antenna heights and the frequency; the gains, line
-  // losses and thresholds are edited in the budget, and are in this card's
+  // here, and both margins and the radio-path card's follow. TX power at A,
+  // the transmitter, then the antenna heights and the frequency; the gains,
+  // line losses and threshold are edited in the budget, and are in this card's
   // margin all the same.
   function endsFormHtml(a, b, an) {
     // Where a value came from, under the box it is in — so an antenna height
@@ -2235,15 +2223,16 @@ const PathProfile = (function () {
                  onchange="PathProfile.typed('${tag}', '${k}', this.value)">
           ${src(e, k)}
         </label>`;
-    // A point on the ground has no radio and no margin on this card
-    // (profileMargin), so it gets no TX power box to change nothing with.
+    // The margin is A → B (profileMargin), so the TX power that moves it is
+    // A's and A's alone: B gets no box to change nothing with, and neither
+    // does a point on the ground, which has no radio at all. ⇄ Flip direction
+    // makes B the transmitter, and the box follows it.
     const tx = (tag, e) => (e.isStation
       ? box(tag, e, 'tx_w', 'TX power (W)', '0.1', radioVal(e.key, e.def, 'tx_w')) : '');
     return `
       <div class="path-form">
         ${tx('A', a)}
         ${box('A', a, 'agl_m', 'antenna (m AGL)', '0.5', an.aglA)}
-        ${tx('B', b)}
         ${box('B', b, 'agl_m', 'antenna (m AGL)', '0.5', an.aglB)}
         <label class="draw-field">
           <span>Frequency (MHz)</span>
@@ -2284,7 +2273,7 @@ const PathProfile = (function () {
   function signalIn(an, a, b) {
     const r = profileMargin(an, a, b);
     if (r.m == null) return { why: r.why };
-    return { end: r.ab, opt: mainOpts(a, b), key: signalKey(an) };
+    return { end: r.m, opt: mainOpts(a, b), key: signalKey(an) };
   }
 
   function bodyHtml() {
@@ -2352,9 +2341,10 @@ const PathProfile = (function () {
       ${datum}
       ${elvisHtml(an)}
       <div class="path-actions">
-        <!-- Which end is A decides the chart's direction, the A→B / B→A order of
-             the margins and angles, and the budget's transmitter; this swaps
-             them without redrawing the line (MapDraw.flipLine). -->
+        <!-- Which end is A decides the chart's direction, the transmitter the
+             fade margin is priced from, the A→B / B→A order of the angles, and
+             the budget's transmitter; this swaps them without redrawing the
+             line (MapDraw.flipLine). -->
         <button id="path-flip" onclick="PathProfile.flip()"
                 aria-label="Flip direction: make ${escAttr(b.name)} end A and ${escAttr(a.name)} end B"
                 title="Turn the line round — ${escAttr(b.name)} becomes A, ${escAttr(a.name)} becomes B">⇄ Flip direction</button>
@@ -2586,8 +2576,8 @@ const PathProfile = (function () {
     isFull() { return !!full; },
 
     // The fade margin the readout is quoting, for the radio-path card that
-    // heads this one: the worse of the two directions, off the path loss the
-    // chart was priced with, the obstruction already in it. Null when the card
+    // heads this one: A → B, off the path loss the chart was priced with, the
+    // obstruction already in it, and `ends` in that order. Null when the card
     // has none to quote — no single-hop profile drawn, an end that is not a
     // station, a term not on file.
     shownMargin() {
@@ -2595,7 +2585,7 @@ const PathProfile = (function () {
       if (!s || s.flat) return null;
       const r = profileMargin(s.an, s.a, s.b);
       return r.m == null ? null : {
-        margin: r.m, ab: r.ab, ba: r.ba, verdict: s.an.verdict,
+        margin: r.m, verdict: s.an.verdict,
         ends: [s.a.station.id, s.b.station.id],
       };
     },

@@ -756,8 +756,9 @@ const HELP = {
       + 'the window — hilltops, not stations, whether or not anything is on them — and lists them '
       + 'ranked, each one a button that takes the map there. <strong>Radio coverage</strong> '
       + 'is Radio Mobile\'s own dialog: a centre unit, the radio at the other end, a link '
-      + 'direction, a radial and azimuth range and a threshold, and it colours the ground by what '
-      + 'a mobile would hear standing on it. That plot has <em>no antenna patterns, no trees and '
+      + 'direction, a radial and azimuth range and a threshold, and it colours the ground by how '
+      + 'well the centre hears a station standing on it — the way a station reports in — or, with '
+      + 'the direction turned round, what that station would hear. That plot has <em>no antenna patterns, no trees and '
       + 'no terminal clutter</em>, every one of which only ever takes coverage away — so it is the '
       + 'best case, and the elevation profile card is the authority for any path you are about to '
       + 'build.',
@@ -771,7 +772,7 @@ const HELP = {
       + 'site over ~30 m terrain, then checks the best few the link budget card\'s way — 256 samples '
       + 'with the land cover on them — so the fade margin quoted for a result is the figure the card '
       + 'will show. Four sliders say what matters: <strong>elevation</strong>, <strong>line of '
-      + 'sight</strong>, <strong>fade margin</strong> (the worse of the two directions) and '
+      + 'sight</strong>, <strong>fade margin</strong> (site to repeater, the way the readings go) and '
       + '<strong>road reserve</strong>, asked of the Queensland cadastre for the finalists only — a '
       + 'mast on road reserve is rare and welcome, so it is a bonus and never a filter. Moving a '
       + 'slider re-ranks at once without re-running anything. Pick a result to draw its paths '
@@ -866,8 +867,10 @@ const HELP = {
       + 'pairs qualify, not just which are drawn. Clicking any radio path — field link or '
       + 'backbone — opens a card about that hop at the top of the path tools (〽️ in the side '
       + 'panel, or under the map), above the elevation profile and link budget it points at the '
-      + 'same hop; × or Escape closes it. Its fade margin is the elevation profile\'s own figure — the worse '
-      + 'of the two directions — in the profile\'s colour for it; a line of sight the ground cuts is named '
+      + 'same hop; × or Escape closes it. Its fade margin is the elevation profile\'s own figure — one way, '
+      + 'the way the traffic runs: field station to repeater, repeater to base, since nothing transmits '
+      + 'back down — in the profile\'s colour for it; ⇄ <strong>Flip direction</strong> on the profile '
+      + 'prices it the other way round. A line of sight the ground cuts is named '
       + 'beside the figure, since the model has already priced it. Click the profile\'s chart, or ⛶ '
       + '<strong>Full screen</strong> in its key, to draw it again the size of the window with its figures '
       + 'over it; Escape puts it back. The dashes are what says <em>backbone</em>; the colour between them says '
@@ -2363,7 +2366,7 @@ const HELP = {
            + 'register\'s own faults that skew a review — with each repeater and base checked against the LiDAR. '
            + 'Administrators only.',
     watch: [
-      '<strong>The margins are the link budget card\'s.</strong> Each cell is the worse of the two directions over the '
+      '<strong>The margins are the link budget card\'s.</strong> Each cell is one way, the station to the hub, over the '
       + 'same ground the card and the fade-margin map use, so the three can never give two figures for one link. The '
       + 'card\'s propagation settings — the model, the ground, the field allowance, the repeater mast — change all three.',
       '<strong>Field-calibrated, not physical.</strong> The default model is Longley–Rice over the bare terrain less a '

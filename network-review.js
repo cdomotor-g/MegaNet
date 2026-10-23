@@ -27,7 +27,8 @@
 // The margins are the field-calibrated model's (FN_MODEL_DEFAULTS, core.js),
 // computed exactly as the link budget card and the fade-margin map compute
 // them: the same pathAnalyse over the same 256-sample profile, each end's radio
-// as filed, the worse of the two directions. So a cell here, the card and the
+// as filed, one way — the station to the hub, the way its readings go, since
+// nothing transmits back down to a station. So a cell here, the card and the
 // map's colour for one link are one figure.
 //
 // Beside each station's best path goes what the attenuator found on its last
@@ -236,9 +237,10 @@ const NetworkReview = (function () {
 
   // ── one path ──
   // The card's arithmetic: the profile, the cover only if the model in force
-  // prices it, pathAnalyse, and each end's radio both ways round.
+  // prices it, pathAnalyse, and the station's transmitter (A) to the hub's
+  // receiver (B).
   async function pathMargin(A, B, fMhz) {
-    if ([A.txW, A.gain, A.loss, A.thr, B.txW, B.gain, B.loss, B.thr].some(v => v == null || !isFinite(v))) {
+    if ([A.txW, A.gain, A.loss, B.gain, B.loss, B.thr].some(v => v == null || !isFinite(v))) {
       return { err: 'radio' };
     }
     // The ground as pathGround decides it (path-profile.js): the tiles, or
@@ -256,11 +258,10 @@ const NetworkReview = (function () {
       cover: cov ? cov.cls : null, canopy: cov && cov.canopyOk ? cov.canopy : null,
     });
     if (!an.ok || an.pathLoss_db == null) return { err: 'model' };
-    const one = (x, y) => wattsToDbm(x.txW) + x.gain - x.loss - an.pathLoss_db + y.gain - y.loss - y.thr;
-    const ab = one(A, B), ba = one(B, A);
+    const m = wattsToDbm(A.txW) + A.gain - A.loss - an.pathLoss_db + B.gain - B.loss - B.thr;
     // The lifts are kept per end: the station's is a row's flag, the hub's
     // is the same on every row and is said once, over its column.
-    return { m: Math.min(ab, ba), ab, ba, dKm: an.D / 1000, v: an.model === 'field' ? an.verdictBare : an.verdict,
+    return { m, dKm: an.D / 1000, v: an.model === 'field' ? an.verdictBare : an.verdict,
              liftF: an.liftA_m || 0, liftH: an.liftB_m || 0 };
   }
 
@@ -479,7 +480,7 @@ const NetworkReview = (function () {
     head.push('best_margin_db', `paths_at_least_${G()}_db`, 'measured_margin_from_db', 'measured_margin_to_db', 'measured_visits', 'flags');
     const lines = [
       `# Flood-Net network review — ${matrix.model === 'cover' ? 'land-cover model' : `field-calibrated model, ${matrix.allowance} dB allowance`}, repeaters and bases on at least a ${matrix.mastAgl} m mast`,
-      `# computed ${matrix.at.toISOString()}; each cell the worse of the two directions, as the link budget card and the fade-margin map give it`,
+      `# computed ${matrix.at.toISOString()}; each cell one way, station to hub, as the link budget card and the fade-margin map give it`,
       `# measured: an attenuator steps in ${ATTEN_STEP} dB (1 dB for a reading off that grid), so a station's tests put its margin between from and to; no "to" means at least "from"`,
       head.map(q).join(','),
     ];
@@ -602,7 +603,7 @@ const NetworkReview = (function () {
       if (f == null) return `<td class="nr-num txt-muted">…</td>`;
       if (f.err) return `<td class="nr-num txt-muted" title="${escAttr({ terrain: 'terrain unreachable', cover: 'land cover unreachable', radio: 'no radio system on file', model: 'the model refused the path' }[f.err] || f.err)}">—</td>`;
       const b = bandOf(f.m);
-      return `<td class="nr-num nr-${b}" title="${escAttr(`${fmtKm(f.dKm)} · ${f.v || ''} · ${fmtDb(f.ab)} / ${fmtDb(f.ba)} dB each way`)}">${fmtDb(f.m)}<span class="small txt-muted"> ${f.dKm.toFixed(1)} km</span></td>`;
+      return `<td class="nr-num nr-${b}" title="${escAttr(`${fmtKm(f.dKm)} · ${f.v || ''}`)}">${fmtDb(f.m)}<span class="small txt-muted"> ${f.dKm.toFixed(1)} km</span></td>`;
     };
     const rows = matrix.rows.map(r => {
       const s = rowSummary(r), m = measured ? measured.get(r.id) : null;
@@ -629,7 +630,7 @@ const NetworkReview = (function () {
           <tbody>${rows}</tbody>
         </table>
       </div>
-      <p class="filter-hint">Each cell is the fade margin in dB, the worse of the two directions — the link budget card's
+      <p class="filter-hint">Each cell is the fade margin in dB, one way: the station transmitting to the hub — the link budget card's
         figure for that path, and the fade-margin map's colour. Green is ${G()} dB or better, amber ${O()}–${G()}, red
         below (the map's bands). <em>Measured</em> is the median of the station's last ${MEASURE_VISITS} attenuator tests to
         base since ${MEASURE_SINCE.slice(0, 4)}. Most attenuators step in ${ATTEN_STEP} dB, so a test that carried 24 dB
@@ -792,7 +793,7 @@ const NetworkReview = (function () {
           order (${RMrow.order} % against ${FNrow.order} %). Given the same site details, Flood-Net matches it: the gap is the
           register's, not the model's. Of ${R.misses.of} paths both modelled, both miss by more than 6 dB on
           ${R.misses.both}; Flood-Net misses ${R.misses.fnOnly} more, Radio Mobile ${R.misses.rmOnly}. Flood-Net's strengths
-          are elsewhere: it computes every link in the register, both ways round, from the register as it stands today,
+          are elsewhere: it computes every link in the register, from the register as it stands today,
           with nobody setting a path up; it is calibrated against the whole network's tests; and it says which hubs
           the field disagrees with. Where the two disagree by much on one path, check the register's position and height
           for both ends before trusting either; neither models antenna patterns, interference or the tree that grew last

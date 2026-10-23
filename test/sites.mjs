@@ -317,8 +317,9 @@ ok('every figure for a result is the refined one, with the land cover on',
    R.map(r => `${r.cover}/${r.bare}/${r.grid}/${r.failed}`).join(' '));
 
 // The card's arithmetic, done here again from its parts: the same profile,
-// the same seeded cover, pathAnalyse, and both ends' radios as filed. The
-// figure the panel quotes has to be this figure, to the last bit.
+// the same seeded cover, pathAnalyse, and both ends' radios as filed, the site
+// transmitting to the repeater. The figure the panel quotes has to be this
+// figure, to the last bit.
 const cross = await page.evaluate(async () => {
   const r = MapSites.results()[0];
   const ts = MapSites.targets();
@@ -334,7 +335,8 @@ const cross = await page.evaluate(async () => {
   });
   const one = (a, b) => wattsToDbm(a.tx_power_w) + a.antenna_gain_dbi - a.line_loss_db
     - an.pathLoss_db + b.antenna_gain_dbi - b.line_loss_db - b.rx_threshold_dbm;
-  return { quoted: r.figs[k].margin, verdict: r.figs[k].verdict, mine: Math.min(one(rep, fld), one(fld, rep)),
+  // One way, the site to the repeater: nothing transmits back down to a site.
+  return { quoted: r.figs[k].margin, verdict: r.figs[k].verdict, mine: one(fld, rep),
            mineVerdict: an.verdict, clutter: an.clutterA_db + an.clutterB_db,
            model: an.model, allow: an.allowance_db };
 });
@@ -521,8 +523,9 @@ R.forEach((r, i) => linksOf(candFolders[i]).placemarks.forEach(pm => {
 }));
 ok('every path carries its margin to the tenth, under the CSV\'s own column names', dataMiss.length === 0,
    dataMiss.slice(0, 3).join('; '));
-ok('…and says it in words too, both directions and where the figure came from',
-   allLinks.every(p => /Fade margin:/.test(p.desc) && /repeater to site/.test(p.desc) && /Figure:/.test(p.desc)));
+ok('…and says it in words too, the one way it is priced and where the figure came from',
+   allLinks.every(p => /Fade margin:/.test(p.desc) && /site to repeater/.test(p.desc)
+     && !/repeater to site/.test(p.desc) && /Figure:/.test(p.desc)));
 
 const chordFolders = candFolders.map(f => f.folders.find(x => x.name === 'Sight lines at antenna height (3-D)'));
 const rep = kmlIn.d.rep;

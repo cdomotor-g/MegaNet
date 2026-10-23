@@ -330,7 +330,8 @@ const cross = await page.evaluate(async () => {
   const f = hub.repeater && hub.repeater.rx_mhz > 0 ? hub.repeater.rx_mhz : PATH_DEFAULT_MHZ;
   const one = (an, a, b) => wattsToDbm(a.tx_power_w) + a.antenna_gain_dbi - a.line_loss_db - an.pathLoss_db
                            + b.antenna_gain_dbi - b.line_loss_db - b.rx_threshold_dbm;
-  const both = an => Math.min(one(an, sysA, sysB), one(an, sysB, sysA));
+  // One way, the station to the hub: nothing transmits back down to it.
+  const up = an => one(an, sysA, sysB);
   // The screen: 30 m samples, bare ground, the place on the tiles.
   const dKm = acmaHaversineKm(r.lat, r.lon, hub.lat, hub.lon);
   const n = Math.max(64, Math.min(1024, Math.ceil(dKm * 1000 / 30) + 1));
@@ -341,10 +342,10 @@ const cross = await page.evaluate(async () => {
                              { lat: hub.lat, lon: hub.lon, elev: hub.elevation_ahd, agl: aglB, mast: stationIsMast(hub) },
                              { samples: 256, freqMhz: f });
   const an2 = pathAnalyse(g.prof, { elevA: g.ends.a.elev, elevB: g.ends.b.elev, aglA, aglB, freqMhz: f });
-  return { screened: r.grid[0].margin, screenWant: both(an), fine: r.fine[0] && r.fine[0].margin, fineWant: both(an2),
+  return { screened: r.grid[0].margin, screenWant: up(an), fine: r.fine[0] && r.fine[0].margin, fineWant: up(an2),
            src: r.fine[0] && r.fine[0].src };
 });
-ok('a screened figure is pathAnalyse over the same 30 m path, both directions, the worse', cross.screened === cross.screenWant,
+ok('a screened figure is pathAnalyse over the same 30 m path, one way, station to hub', cross.screened === cross.screenWant,
    JSON.stringify(cross));
 ok('a result\'s quoted figure is the link budget card\'s own arithmetic, to the last bit',
    cross.src === 'card' && cross.fine === cross.fineWant, JSON.stringify(cross));

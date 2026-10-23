@@ -2545,9 +2545,15 @@ not optional in the sweep: a link whose cover cannot be fetched is a link that
 cannot be computed, and is reported as one — because a margin over bare earth
 is not a cheaper version of this figure, it is a consistently kinder one.
 
-The margin drawn is the **worse of the two directions**: path loss
-is reciprocal and the radios at either end are not, and one line can only
-honestly carry one number. Green is a signal green rather than a natural one,
+The margin drawn is **one way, the way the traffic runs**: a field station to
+the repeater that carries it, a repeater to its base (two repeaters, which have
+no up or down between them, in the order the file lists them). Nothing in the
+network transmits back down a link, so a figure for the way back would price
+traffic that never goes. Both ways are still kept on the saved row — the path
+loss is the same either way, so the second is a subtraction — and the map reads
+its figure off the way the line runs, so a row saved when the map took the worse
+of the two still paints right, and *Save* rewrites its headline figure without a
+terrain profile. Green is a signal green rather than a natural one,
 and a pixel heavier than the other two, because half the ground these links
 cross is forest or cane and a green line over a green base map is a line nobody
 can find.
@@ -3588,8 +3594,9 @@ cover intrudes into it — plus a plain-English verdict, *clear / marginal /
 obstructed*, an *Obstructions* list that says whether each one is ground or
 cover, the elevation angle at each end, and the path loss the model computed. Antenna heights default
 from the station's `rm_systems[].antenna_height_m` and the frequency from the
-repeater's `rx_mhz`; both are editable, as is the **TX power** at each station
-end, and each box says whether it is showing a default or an edit. Those boxes
+repeater's `rx_mhz`; both are editable, as is the **TX power** at A — the
+transmitter, since the fade margin is A → B — and each box says whether it is
+showing a default or an edit. Those boxes
 are the link budget's figures too — see *One set of figures* below. The chart is inline SVG in the manner of `rfStripPlotHtml()`
 and `rfcChartHtml()` — no charting library, nothing fetched to draw it.
 
@@ -3952,7 +3959,7 @@ path is opened in it. The two passes are never mixed in one ranking.
 **The score** is four figures, each 0–100, weighted by four sliders you own and
 all printed beside every result: **elevation** (across the candidates' range),
 **line of sight** (clear 1, marginal ½, obstructed 0, averaged over the sites),
-**fade margin** (the worse direction of each path, as a fraction of the map's own
+**fade margin** (site to repeater on each path, as a fraction of the map's own
 *good* band) and **road reserve** — on a Queensland road parcel scores 1, falling
 to 0 at 250 m, asked of the cadastre for the finalists only and only while its
 slider is above nought. A mast on road reserve is the rare happy case — no
@@ -4059,7 +4066,7 @@ station (**Within**, 500 m by default, 50 m–2 km):
 
 **The score** is four figures, 0–100 each, weighted by four sliders and all
 printed beside every result: **fade margin** to the worst-served repeater ticked
-(the worse direction; 0 at 6 dB under the map's *ok*, 100 at 10 dB over its
+(station to repeater; 0 at 6 dB under the map's *ok*, 100 at 10 dB over its
 *good*; weight 5 by default — the primary one), **open sky** for the rain gauge
 (the WMO siting classification for precipitation, CIMO Guide WMO-No. 8: the
 steepest tree or roof within 60 m seen from the gauge rim, class 1 at 14° or
@@ -4791,10 +4798,13 @@ one-at-a-time rule, since it is not over the map: the station card or the
 transmitter card stays open beside it. It survives a render of the tab the way
 the profile and the budget do, and closes itself once the profile moves off its
 path — another line drawn or selected, or its line deleted — because it says
-those two are open on this exact path. Its fade margin is the profile's worse
-direction, with each way round under it: a TX power raised at one end moves the
-way out of it and leaves the headline where the way back holds it, and a card
-showing the headline alone read as though the change had never reached it.
+those two are open on this exact path. Its fade margin is the profile's, one
+way — the way the traffic runs, a field station to its repeater and a repeater
+to its base — with the two ends named under it in that order. It used to be the
+worse of the two directions with each way round under it, and a TX power raised
+at the transmitter moved the way out and left the headline where the way back
+held it; nothing in the network transmits back down, so that way is gone. ⇄
+*Flip direction* on the profile prices the other way, and the card follows.
 
 **The Stations map's controls.** Everything MapChrome would put in the map's
 top-right corner lives in the strip instead, at every width — a phone's rail

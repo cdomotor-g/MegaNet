@@ -39,11 +39,13 @@
 //   · **MapFade.** A whole network coloured by fade margin, banded against two
 //     thresholds that are remembered and saved with the rows.
 //
-// What is deliberately *not* asserted: anything about a saved fade margin coming
-// back out of the datastore. `applyNetworkPolicy` aborts every off-origin
-// request, so `MapFade.classify` finds nothing saved and says so — which is the
-// honest state to test the rest against, and stubbing rows in would be testing a
-// stub. The sweep itself is left alone for the same reason: what is checked here
+// What is deliberately *not* asserted: the figures in a saved fade margin.
+// `applyNetworkPolicy` aborts every off-origin request, so `MapFade.classify`
+// finds nothing saved and says so — which is the honest state to test the rest
+// against, and stubbing figures in would be testing a stub. Two sections at the
+// foot serve rows of their own all the same, for what the module *does* with a
+// row: page through the table, and read a link's figure off the way it runs.
+// The sweep itself is left alone for the same reason: what is checked here
 // is the rule (the bands, where they are kept, the controls that set them), not
 // a few thousand Longley–Rice runs over one flat tile.
 //
@@ -1015,6 +1017,98 @@ ok('…and goes back for the next one when a page comes back full',
 ok('…and stops at the first short page', !offsets.some(o => o.off >= 2000),
    JSON.stringify(offsets.slice(0, 4)));
 await paged.close();
+
+// ── One way, read off a saved row ───────────────────────────────────────────
+// A link is priced one way: the field station to the repeater that carries it,
+// the way the traffic runs — nothing transmits back down. Until 2026-10-23 the
+// map took the worse of the two directions, and every row saved then holds that
+// in margin_db, with each way beside it in margin_ab_db (station_a → station_b,
+// the lower id first) and margin_ba_db. So a row is read by the way its line
+// runs, not by margin_db, and one whose margin_db is not that figure is counted
+// for Save — which rewrites it from the two it kept, with no terrain profile.
+// The rows are served under the signatures the module itself asks for
+// (MapFade.signature), and no terrain is served at all, so every figure painted
+// came out of a row.
+
+const oneWay = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page4 = await oneWay.newPage();
+let served = [];
+await applyNetworkPolicy(page4, server.origin);
+await page4.route(/\/link_fade_margin/, route =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(served) }));
+page4.on('pageerror', e => errors.push(String(e)));
+await page4.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+await page4.waitForFunction(() => typeof state !== 'undefined' && !!state.data,
+  null, { timeout: LOAD_TIMEOUT });
+await page4.evaluate(() => switchTab('stations'));
+await page4.waitForFunction(() => !!state.map && state.mapLines.length > 0,
+  null, { timeout: LOAD_TIMEOUT });
+// Two links whose station has the lower id, so the way in is margin_ab_db, and
+// two whose station has the higher, so it is margin_ba_db.
+const picked = await page4.evaluate(() => {
+  const byId = id => state.data.stations.find(s => s.id === id);
+  const seen = new Set(), lo = [], hi = [];
+  for (const l of state.mapLines) {
+    if (l.mnLinkRole !== 'core' || !l.mnLinkStationId || !l.mnLinkRepeaterId || l.mnLinkRepeaterId2) continue;
+    const s = byId(l.mnLinkStationId), r = byId(l.mnLinkRepeaterId);
+    if (!s || !r) continue;
+    const key = [s.id, r.id].sort().join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const to = s.id < r.id ? lo : hi;
+    if (to.length < 2) to.push({ s: s.id, r: r.id, sig: MapFade.signature(s, r) });
+    if (lo.length === 2 && hi.length === 2) break;
+  }
+  return [lo[0], hi[0], lo[1], hi[1]].filter(Boolean);
+});
+// The way in (station → repeater) is 12.3 dB, amber; the way back is 3.4, red.
+// Three rows saved under the old rule (margin_db the worse, 3.4) and one saved
+// under the new.
+served = picked.map((p, i) => {
+  const sFirst = p.s < p.r;
+  return {
+    station_a_id: sFirst ? p.s : p.r, station_b_id: sFirst ? p.r : p.s, kind: 'field',
+    margin_db: i === 3 ? 12.3 : 3.4,
+    margin_ab_db: sFirst ? 12.3 : 3.4, margin_ba_db: sFirst ? 3.4 : 12.3,
+    verdict: 'clear', signature: p.sig, good_db: 15, ok_db: 6, computed_at: '2026-01-01T00:00:00Z',
+  };
+});
+const read1 = await page4.evaluate(async ids => {
+  const note = () => (document.getElementById('map-fade-note') || {}).textContent.replace(/\s+/g, ' ');
+  MapFade.setEnabled(true);
+  // Every other link is swept and fails, with no terrain to be had; the Save
+  // button counts once that has settled (it is debounced against the sweep).
+  const until = Date.now() + 30000;
+  await new Promise(r => setTimeout(r, 1000));
+  while (Date.now() < until && /still computing/.test(note())) await new Promise(r => setTimeout(r, 250));
+  await new Promise(r => setTimeout(r, 1000));
+  const core = state.mapLines.filter(l => l.mnLinkRole === 'core' && !l.mnLinkRepeaterId2);
+  const lines = ids.map(p => core.find(l => l.mnLinkStationId === p.s && l.mnLinkRepeaterId === p.r));
+  return {
+    figs: lines.map(l => (l ? l.mnFadeMargin : null)),
+    bands: lines.map(l => (l ? l.mnFadeBand : null)),
+    // A pair can be drawn more than once — a station that is a repeater too is
+    // a backbone path as well as a field link, perhaps the other way round —
+    // and each line drawn from a row is one off the datastore.
+    drawn: state.mapLines.filter(l => (l.mnLinkRole === 'core' || l.mnLinkRole === 'backbone') && ids.some(p => {
+      const ends = [l.mnLinkStationId || l.mnLinkRepeaterId, l.mnLinkRepeaterId2 || l.mnLinkRepeaterId].sort().join('|');
+      return ends === [p.s, p.r].sort().join('|');
+    })).length,
+    save: (document.getElementById('map-fade-save') || {}).textContent || '',
+    note: note(),
+  };
+}, picked);
+ok('four field links to serve rows for, the station the lower id on two and the higher on two',
+   picked.length === 4, JSON.stringify(picked.map(p => `${p.s}→${p.r}`)));
+ok('a saved row paints its link with the way in, station to repeater, not the worse of the two — whichever end of the pair the station is',
+   read1.figs.length === 4 && read1.figs.every(f => f === 12.3) && read1.bands.every(b => b === 'ok'),
+   `${JSON.stringify(read1.figs)} · ${JSON.stringify(read1.bands)}`);
+ok('…and the rows saved under the old rule, and only those, are counted for Save',
+   /^Save 3 to the datastore$/.test(read1.save.trim()), read1.save);
+ok('…the note saying they came from the datastore',
+   read1.note.includes(`${read1.drawn} from the datastore`), `${read1.drawn} drawn · ${read1.note.slice(0, 160)}`);
+ok('…and that the figure is one way', /one way: field station to repeater/.test(read1.note), read1.note.slice(-420));
+await oneWay.close();
 
 ok('nothing threw for the whole run', errors.length === 0, errors.join('\n         '));
 

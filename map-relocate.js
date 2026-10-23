@@ -69,7 +69,7 @@
 // Four figures, each nought to one, weighted by four sliders the operator
 // owns and every one printed beside the result — map-sites.js's contract:
 //
-//   Fade margin    the worse direction to the worst-served repeater ticked,
+//   Fade margin    station to repeater, to the worst-served repeater ticked,
 //                  from 6 dB under the map's "ok" (nought) to 10 dB over its
 //                  "good" (one). The primary goal, and the heaviest default.
 //   Open sky       the rain gauge's exposure as the WMO siting classification
@@ -329,12 +329,11 @@ const MapRelocate = (function () {
     return tx + from.gain - from.loss - loss + to.gain - to.loss - to.thr;
   }
 
-  // Both directions and the worse of the two — MapFade's reading of a link as
-  // a conversation, so a figure here is the figure the map paints the link.
+  // One way, the station to the hub — the way its readings go, and MapFade's
+  // reading of a link, so a figure here is the figure the map paints it. Nothing
+  // transmits back down to a station, so there is no other way to price.
   function marginOf(an, here, hub) {
-    const up = oneWay(an.pathLoss_db, here, hub.rad), down = oneWay(an.pathLoss_db, hub.rad, here);
-    if (up == null || down == null) return null;
-    return { m: Math.min(up, down), up, down };
+    return oneWay(an.pathLoss_db, here, hub.rad);
   }
 
   // ── The lattice ─────────────────────────────────────────────────────────────
@@ -384,8 +383,7 @@ const MapRelocate = (function () {
     if (c.ground == null && prof.terrain_m[0] != null) c.ground = prof.terrain_m[0];
     const an = pathAnalyse(prof, { elevA: null, elevB: hub.elev, aglA: here.agl, aglB: hub.rad.agl, freqMhz: hub.f });
     if (!an.ok) return { dKm, failed: true, src: 'grid' };
-    const m = marginOf(an, here, hub);
-    return { dKm, verdict: an.verdict, margin: m ? m.m : null, up: m ? m.up : null, down: m ? m.down : null,
+    return { dKm, verdict: an.verdict, margin: marginOf(an, here, hub),
              partial: !!prof.partial, src: 'grid' };
   }
 
@@ -843,8 +841,7 @@ const MapRelocate = (function () {
       cover: res ? res.cls : null, canopy: res && res.canopyOk ? res.canopy : null,
     });
     if (!an.ok) return null;
-    const m = marginOf(an, here, hub);
-    return { dKm, verdict: an.verdict, margin: m ? m.m : null, up: m ? m.up : null, down: m ? m.down : null, src: 'card' };
+    return { dKm, verdict: an.verdict, margin: marginOf(an, here, hub), src: 'card' };
   }
 
   async function refine(mine) {
@@ -1371,8 +1368,7 @@ const MapRelocate = (function () {
                   <td>${fig && fig.dKm != null ? fig.dKm.toFixed(1) : '—'}</td>
                   <td class="${fig && fig.verdict === 'obstructed' ? 'txt-bad' : fig && fig.verdict === 'marginal' ? 'txt-warn' : ''}">${
                     !fig || fig.failed ? '—' : esc(fig.verdict || '—')}</td>
-                  <td><span class="sites-band sites-band-${bandOf(fig)}" title="${fig && fig.up != null
-                    ? escAttr(`station to repeater ${dbText(fig.up)}, repeater to station ${dbText(fig.down)}`) : ''}">${
+                  <td><span class="sites-band sites-band-${bandOf(fig)}">${
                     !fig || fig.failed ? '—' : dbText(fig.margin)}</span>${
                     fig && !fig.failed && fig.src !== 'card' ? '<span class="txt-muted" title="Screened only — not the card\'s figure">*</span>' : ''}</td>
                   ${rank ? `<td>${was && !was.failed ? dbText(was.margin) : '—'}</td>` : ''}

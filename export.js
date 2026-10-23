@@ -1177,8 +1177,7 @@ function sitesKmlCandidate(data, r) {
     const t = data.targets[l.k];
     const los = l.failed ? '—' : l.colo ? 'on it' : kmlEsc(l.verdict || '—');
     const m = l.failed ? 'could not be computed' : l.colo ? 'on it' : kmlEsc(sitesKmlDb(l.margin));
-    const du = l.failed || l.colo ? '' : `${kmlEsc(sitesKmlDb(l.down))} / ${kmlEsc(sitesKmlDb(l.up))}`;
-    return `<tr><td>${kmlEsc(t.name)}</td><td>${sitesKmlF(l.dKm, 1)}</td><td>${los}</td><td>${m}</td><td>${du}</td></tr>`;
+    return `<tr><td>${kmlEsc(t.name)}</td><td>${sitesKmlF(l.dKm, 1)}</td><td>${los}</td><td>${m}</td></tr>`;
   }).join('');
   const bits = [];
   if (c.cover) bits.push(`${c.cover} with the land cover on`);
@@ -1197,8 +1196,8 @@ function sitesKmlCandidate(data, r) {
     `<b>Score parts:</b> elevation ${pct(r.parts.E)} · line of sight ${pct(r.parts.L)} · fade margin ${
       pct(r.parts.F)} · road ${pct(r.parts.R)} — out of 100 each, before the weights`,
     '<table border="1" cellpadding="3" cellspacing="0"><tr><th>Site</th><th>km</th><th>Line of sight</th>'
-      + `<th>Margin</th><th>Down / up</th></tr>${rows}</table>`,
-    `<i>Figures: ${kmlEsc(bits.join(' · '))}. The margin is the worse of the two directions; down is repeater to site, up is site to repeater.</i>`,
+      + `<th>Margin</th></tr>${rows}</table>`,
+    `<i>Figures: ${kmlEsc(bits.join(' · '))}. The margin is one way, site to repeater — the way the readings go.</i>`,
   ].join('<br>');
   const pin = sitesKmlPlacemark({
     name: `#${r.rank} repeater site — ${Math.round(r.ground)} m`,
@@ -1227,8 +1226,7 @@ function sitesKmlCandidate(data, r) {
       description: [
         `<b>#${r.rank} → ${kmlEsc(t.name)}</b>, ${sitesKmlF(l.dKm, 1)} km`,
         `<b>Line of sight:</b> ${kmlEsc(l.verdict || '—')}${obs ? ' — the ground cuts this path' : ''}`,
-        `<b>Fade margin:</b> ${kmlEsc(sitesKmlDb(l.margin))}, the worse direction — ${kmlEsc(sitesKmlDb(l.down))} repeater to site, ${
-          kmlEsc(sitesKmlDb(l.up))} site to repeater`,
+        `<b>Fade margin:</b> ${kmlEsc(sitesKmlDb(l.margin))}, site to repeater`,
         `<b>Figure:</b> ${kmlEsc(sitesKmlSource(l.src, data.samples))}`,
         `<i>Coloured by fade margin: ${kmlEsc(legend)}. Drawn on the ground, not as a line of sight.</i>`,
       ].join('<br>'),
@@ -1237,8 +1235,7 @@ function sitesKmlCandidate(data, r) {
         ['rank', r.rank], ['target', t.name], ['target_number', t.number || ''],
         ['target_lat', sitesKmlF(t.lat, 6)], ['target_lon', sitesKmlF(t.lon, 6)],
         ['distance_km', sitesKmlF(l.dKm, 2)], ['los', l.verdict || ''],
-        ['margin_db', sitesKmlF(l.margin, 1)], ['margin_down_db', sitesKmlF(l.down, 1)],
-        ['margin_up_db', sitesKmlF(l.up, 1)], ['figure', l.src],
+        ['margin_db', sitesKmlF(l.margin, 1)], ['figure', l.src],
       ],
       geometry: `      <LineString>
         <tessellate>1</tessellate>
@@ -1317,7 +1314,7 @@ function sitesKml(data, { icons } = {}) {
     `<b>What matters:</b> elevation ${w.e} · line of sight ${w.l} · fade margin ${w.f} · road reserve ${w.r} (weights 0 to 5).`,
     `<b>Terrain:</b> screened over a ~${kmlEsc(data.res)} m grid; the finalists checked at ${data.samples} samples with the land cover on them, kept at least ${
       Number(data.spacingKm).toFixed(1)} km apart.`,
-    `<b>Colours:</b> each path is coloured by its fade margin, the worse of the two directions — green ${data.goodDb} dB or better, yellow ${
+    `<b>Colours:</b> each path is coloured by its fade margin, site to repeater — green ${data.goodDb} dB or better, yellow ${
       data.okDb} dB or better, red below, grey where there is no figure. A thinner, fainter line is a path the ground cuts (KML has no dashes).`,
     '<b>What is switched on:</b> every candidate, the sites and the search area, and #1\'s paths. Tick another candidate\'s '
       + '<i>Links from</i> folder to compare its paths. The <i>Sight lines at antenna height (3-D)</i> folders start off: '

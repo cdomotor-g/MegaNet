@@ -82,7 +82,7 @@
 // are already computed, and a band is a comparison. Only the margins are
 // expensive, and only they are swept.
 const MapFade = (function () {
-  const STORE       = 'mn-fade-v2';
+  const STORE       = 'mn-fade-v3';  // /3: each way in pair order, no worse-of-two
   const SAMPLES     = 256;  // PathProfile's own figure, and that is the point:
                             // this layer and the link budget card have to be
                             // answering the same question with the same
@@ -119,7 +119,7 @@ const MapFade = (function () {
   // field model's allowance in place of the cover — every saved row stale.
   const MODEL       = 'itm-p2p/3';
 
-  let mem = null;           // Map sig → { m, ab, ba, v, t }  (this session + localStorage)
+  let mem = null;           // Map sig → { ab, ba, v, t }, pair order (this session + localStorage)
   let saved = null;         // Map pairKey → row, as read from the datastore
   let savedState = 'idle';  // idle | loading | ready | failed | absent
   let savedError = '';
@@ -189,12 +189,19 @@ const MapFade = (function () {
 
   // ── the margin ──
 
-  // Both directions, and the worse of the two. A link is a conversation: the
-  // path loss is reciprocal but the radios at either end are not, and a hop
-  // that gets there and cannot answer is not a working link. Nothing else in
-  // the app takes this view — the budget card is pointed A→B because an
-  // operator aimed it — but the map is drawing one line for the pair, and one
-  // line can only honestly carry the worse number.
+  // One way: from the end that transmits to the end that listens, which is the
+  // order every line is handed over in — a field station and then the repeater
+  // that carries it, a repeater and then its base (refreshMapLayers, and
+  // allLinks below). That is how the network runs: a station reports in, a
+  // repeater hands on, and nothing transmits back down a link, so a figure for
+  // the way back would be a figure for traffic that never goes. It is the link
+  // budget card's view too, aimed the same way round.
+  //
+  // Each way is still worked out and kept, in pair order — the path loss is
+  // the same both ways, so the second costs a subtraction — because a row is
+  // stored per pair, not per direction. Two repeaters have no up or down
+  // between them and are drawn in the order the file lists them, and a pair
+  // the file turns round is then still answered without a terrain profile.
   function marginFrom(an, from, to) {
     const f = endSys(from), t = endSys(to);
     const txDbm = wattsToDbm(f.txW);
@@ -204,10 +211,19 @@ const MapFade = (function () {
     return (txDbm + f.gain - f.loss) - an.pathLoss_db + t.gain - t.loss - t.thr;
   }
 
-  function marginPair(an, a, b) {
-    const ab = marginFrom(an, a, b), ba = marginFrom(an, b, a);
-    if (ab == null || ba == null) return null;
-    return { m: Math.min(ab, ba), ab, ba };
+  // { ab, ba } in pair order — the lower id to the higher, and back, as the
+  // datastore's margin_ab_db and margin_ba_db hold them. Null when the way the
+  // line runs, `from` to `to`, does not compute; the other way may be null.
+  function marginsOf(an, from, to) {
+    const [x, y] = from.id < to.id ? [from, to] : [to, from];
+    const hit = { ab: marginFrom(an, x, y), ba: marginFrom(an, y, x) };
+    return oneWay(hit, from, to) == null ? null : hit;
+  }
+
+  // The figure a line carries: from its first end to its second.
+  function oneWay(hit, from, to) {
+    const m = from.id < to.id ? hit.ab : hit.ba;
+    return m == null || !isFinite(m) ? null : m;
   }
 
   // ── the bands ──
@@ -259,9 +275,12 @@ const MapFade = (function () {
     if (mem) return;
     mem = new Map();
     try {
+      // /2 kept the worse of the two directions, in whichever order the line
+      // ran; nothing in it can be read as one way, so it goes.
+      localStorage.removeItem('mn-fade-v2');
       const raw = JSON.parse(localStorage.getItem(STORE) || '{}');
       for (const [k, v] of Object.entries(raw)) {
-        if (v && typeof v.m === 'number') mem.set(k, v);
+        if (v && (typeof v.ab === 'number' || typeof v.ba === 'number')) mem.set(k, v);
       }
     } catch (_) {}
   }
@@ -370,17 +389,25 @@ const MapFade = (function () {
       if (seen.has(key)) continue;
       const sig = sigFor(a, b);
       const hit = mem.get(sig);
-      if (!hit) continue;
-      const row = saved && saved.get(key);
-      if (row && row.signature === sig
-          && Number(row.good_db) === G() && Number(row.ok_db) === O()) continue;
+      const m = hit ? oneWay(hit, a, b) : null;
+      if (m == null) continue;
+      // One row per pair, and its margin_db is the way the first link drawn for
+      // it runs — a field link before a backbone path, which may run the other
+      // way between the same two stations.
       seen.add(key);
+      // Already stored only if it is the same figure: a row saved when the map
+      // took the worse of the two directions holds that in margin_db (and its
+      // band), and is re-saved with the one way — off the two it kept beside
+      // it, so without a terrain profile.
+      const row = saved && saved.get(key);
+      if (row && row.signature === sig && Number(row.margin_db) === round1(m)
+          && Number(row.good_db) === G() && Number(row.ok_db) === O()) continue;
       const [x, y] = a.id < b.id ? [a, b] : [b, a];
       out.push({
         station_a_id: x.id, station_b_id: y.id, kind,
-        margin_db: round1(hit.m),
-        margin_ab_db: round1(a.id < b.id ? hit.ab : hit.ba),
-        margin_ba_db: round1(a.id < b.id ? hit.ba : hit.ab),
+        margin_db: round1(m),
+        margin_ab_db: round1(hit.ab),
+        margin_ba_db: round1(hit.ba),
         distance_km: round1(acmaHaversineKm(a.lat, a.lon, b.lat, b.lon)),
         freq_mhz: freqFor(a, b),
         verdict: hit.v || null,
@@ -482,8 +509,8 @@ const MapFade = (function () {
       cover: res ? res.cls : null, canopy: res && res.canopyOk ? res.canopy : null,
     });
     if (!an.ok) return null;
-    const m = marginPair(an, a, b);
-    return m ? { m: m.m, ab: m.ab, ba: m.ba, v: an.verdict, t: Date.now() } : null;
+    const m = marginsOf(an, a, b);
+    return m ? { ab: m.ab, ba: m.ba, v: an.verdict, t: Date.now() } : null;
   }
 
   function pump() {
@@ -493,7 +520,8 @@ const MapFade = (function () {
       computeOne(job.a, job.b).then(hit => {
         if (hit) { mem.set(job.sig, hit); persistSoon(); pendingRows = null; }
         if (job.gen === gen) {
-          if (hit) { paint(job.line, bandOf(hit.m), hit.m); note.done++; }
+          const m = hit ? oneWay(hit, job.a, job.b) : null;
+          if (m != null) { paint(job.line, bandOf(m), m); note.done++; }
           else note.failed++;
         }
       }).catch(() => {
@@ -514,7 +542,7 @@ const MapFade = (function () {
         ? 'Longley–Rice over ~30 m terrain with the land cover standing on it'
         : `Longley–Rice over ~30 m terrain, less the ${P_.allowance} dB field allowance measured on site`)
       + ', at the reliability the link budget card is set to, both ends&rsquo; filed radios (a repeater or base '
-      + `on at least a ${P_.mastAgl} m mast), the worse of the two directions. The same arithmetic the card `
+      + `on at least a ${P_.mastAgl} m mast), one way: field station to repeater, repeater to base. The same arithmetic the card `
       + 'runs, over the same 256 samples, so a colour here and a figure there cannot disagree. Indicative, '
       + 'like the card &mdash; and every bit as much a model, not a measurement.';
     if (!state.mapFade) {
@@ -569,23 +597,18 @@ const MapFade = (function () {
       const row = saved && saved.get(pairKey(a.id, b.id));
       if (row) {
         if (row.signature === sig) {
-          const m = Number(row.margin_db);
-          if (isFinite(m)) {
+          // Read off the way this line runs, not off margin_db: a row saved
+          // when the map took the worse of the two directions holds that
+          // there, and the one way beside it (see buildUnsaved).
+          const num = v => (v == null || v === '' ? null : Number(v));
+          const kept = { ab: num(row.margin_ab_db), ba: num(row.margin_ba_db), v: row.verdict || null, t: Date.now() };
+          const m = oneWay(kept, a, b);
+          if (m != null) {
             // Keep it in the session cache too, so Save can tell what is
-            // already stored and the note can stop counting it as work.
-            // The two directions come back with it, so re-saving a row after a
-            // threshold change carries them forward instead of nulling them.
-            // Stored in this line's own order, which pairKey may have flipped.
-            if (!mem.has(sig)) {
-              const flip = a.id > b.id;
-              const num = v => (v == null || v === '' ? null : Number(v));
-              mem.set(sig, {
-                m,
-                ab: num(flip ? row.margin_ba_db : row.margin_ab_db),
-                ba: num(flip ? row.margin_ab_db : row.margin_ba_db),
-                v: row.verdict || null, t: Date.now(),
-              });
-            }
+            // already stored and the note can stop counting it as work. Both
+            // ways come back with it, so re-saving a row after a threshold
+            // change carries them forward instead of nulling them.
+            if (!mem.has(sig)) mem.set(sig, kept);
             paint(line, bandOf(m), m);
             note.fromDb++;
             return;
@@ -596,9 +619,10 @@ const MapFade = (function () {
       }
 
       const hit = mem.get(sig);
-      if (hit) {
+      const m = hit ? oneWay(hit, a, b) : null;
+      if (m != null) {
         hit.t = Date.now();
-        paint(line, bandOf(hit.m), hit.m);
+        paint(line, bandOf(m), m);
         note.done++;
         return;
       }
@@ -640,6 +664,11 @@ const MapFade = (function () {
     },
 
     noteHtml,
+
+    // The signature a pair's saved row must carry to be painted, for a check
+    // that serves the module rows of its own (mapfade.mjs) — as LandCover.seed
+    // answers the cover.
+    signature: sigFor,
 
     active() { return state.mapFade; },
 

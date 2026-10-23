@@ -81,10 +81,16 @@ const MapPolar = (function () {
   const HIT_CAP     = 8;     // stations offered by the centre-unit search
   const STORE       = 'mn-polar-v1';
 
+  // One way at a time. Centre receiving first, and by default: the centre is
+  // a repeater or a base and the mobile a field station, and in this network a
+  // station reports in and nothing transmits back down to it — so that is the
+  // way a plot answers "who can this site hear". The other way is there for a
+  // centre that really does transmit to the mobile, as ⇄ Flip direction is on
+  // the profile; there is no "worst case" of the two, which priced traffic
+  // that never goes.
   const DIRS = {
-    tx:    { label: 'Centre Tx → Mobile Rx', short: 'centre transmitting' },
     rx:    { label: 'Centre Rx → Mobile Tx', short: 'centre receiving' },
-    worst: { label: 'Worst case', short: 'the worse of the two directions' },
+    tx:    { label: 'Centre Tx → Mobile Rx', short: 'centre transmitting' },
   };
 
   // Radio Mobile's rainbow, strongest first. Twelve steps because its own
@@ -113,7 +119,7 @@ const MapPolar = (function () {
       centreAgl: null,          // null = the centre system's own height
       mobileSysId: null,
       mobileAgl: null,
-      dir: 'worst',
+      dir: 'rx',
       rMinKm: 0.01, rMaxKm: 50,
       azMin: 0, azMax: 360, azStep: 1,
       unit: 'dbm',              // 'dbm' | 'margin'
@@ -127,8 +133,12 @@ const MapPolar = (function () {
 
   function load() {
     const d = defaults();
-    try { return Object.assign(d, JSON.parse(localStorage.getItem(STORE) || '{}')); }
-    catch (_) { return d; }
+    let c = d;
+    try { c = Object.assign(d, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (_) {}
+    // A direction this panel no longer offers — 'worst', remembered from
+    // before it went — is the default's.
+    if (!DIRS[c.dir]) c.dir = 'rx';
+    return c;
   }
 
   function save() {
@@ -263,9 +273,9 @@ const MapPolar = (function () {
   }
 
   // The one number every cell is coloured by. Both directions are computed
-  // whatever the setting says, because "worst case" needs them both and the
-  // other two are a choice between them — and because the margin and the
-  // received level are the same arithmetic stopped one term apart.
+  // whatever the setting says, because the setting is a choice between them
+  // that should cost no second run — and because the margin and the received
+  // level are the same arithmetic stopped one term apart.
   // The two EIRPs and the two thresholds, worked out once for the whole run
   // rather than once per cell: everything except the path loss is constant
   // across eleven thousand of them.
@@ -436,13 +446,8 @@ const MapPolar = (function () {
 
   function values() {
     if (!plot) return null;
-    if (cfg.unit === 'margin') {
-      return cfg.dir === 'tx' ? plot.mgTx : cfg.dir === 'rx' ? plot.mgRx
-           : plot.mgTx.map((v, n) => Math.min(v, plot.mgRx[n]));
-    }
-    return cfg.dir === 'rx' ? plot.lvlRx
-         : cfg.dir === 'tx' ? plot.lvlTx
-         : plot.lvlTx.map((v, n) => (plot.mgTx[n] <= plot.mgRx[n] ? v : plot.lvlRx[n]));
+    if (cfg.unit === 'margin') return cfg.dir === 'tx' ? plot.mgTx : plot.mgRx;
+    return cfg.dir === 'tx' ? plot.lvlTx : plot.lvlRx;
   }
 
   // The threshold, always low-to-high. Radio Mobile's dialog has a From box and
@@ -896,7 +901,7 @@ const MapPolar = (function () {
       const asNum = v => { const s = String(v).trim(); return s === '' ? null : (isFinite(+s) ? +s : null); };
       switch (key) {
         case 'centre':      cfg.centre = value === 'map' ? 'map' : 'station'; break;
-        case 'dir':         cfg.dir = DIRS[value] ? value : 'worst'; break;
+        case 'dir':         cfg.dir = DIRS[value] ? value : 'rx'; break;
         case 'unit':        cfg.unit = value === 'margin' ? 'margin' : 'dbm'; break;
         case 'rainbow':     cfg.rainbow = !!value; break;
         case 'opacity':     cfg.opacity = Math.max(0.15, Math.min(1, +value || 0.65)); break;

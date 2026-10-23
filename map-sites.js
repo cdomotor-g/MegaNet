@@ -69,8 +69,8 @@
 //   Elevation      the candidate's ground height across the pool's range.
 //   Line of sight  per site, 1 for clear, ½ for marginal, 0 for obstructed —
 //                  PATH_VERDICT's three words — averaged.
-//   Fade margin    per site, the worse of the two directions (a repeater that
-//                  hears a gauge and cannot be heard by it is not serving it)
+//   Fade margin    per site, one way: the site to the repeater, the way its
+//                  readings go (nothing transmits back down to a gauge)
 //                  as a fraction of the map's own "good" band, averaged. A
 //                  path with no figure counts nought, never as a pass.
 //   Road reserve   1 on a road parcel, falling to nought 250 m away. Asked of
@@ -177,7 +177,7 @@ const MapSites = (function () {
   const WEIGHTS = [
     ['wElev', 'Elevation',     'the height of the ground under the mast'],
     ['wLos',  'Line of sight', 'how many paths clear the 60% Fresnel zone'],
-    ['wFade', 'Fade margin',   'decibels to spare on each path, the worse direction'],
+    ['wFade', 'Fade margin',   'decibels to spare on each path, site to repeater'],
     ['wRoad', 'Road reserve',  'on or beside a Queensland road parcel — 0 skips the lookup'],
   ];
 
@@ -288,12 +288,11 @@ const MapSites = (function () {
     return tx + from.gain - from.loss - loss + to.gain - to.loss - to.thr;
   }
 
-  // Both directions and the worse of the two — MapFade's reading of a link as
-  // a conversation, and more so here: a repeater is both ends of one.
+  // One way, the site to the repeater — the way a gauge's readings go, and
+  // MapFade's reading of a link. Nothing transmits back down to a site, so
+  // there is no other way to price.
   function marginOf(an, rep, fld) {
-    const down = oneWay(an.pathLoss_db, rep, fld), up = oneWay(an.pathLoss_db, fld, rep);
-    if (down == null || up == null) return null;
-    return { m: Math.min(down, up), down, up };
+    return oneWay(an.pathLoss_db, fld, rep);
   }
 
   // ── The sites to serve ──────────────────────────────────────────────────────
@@ -515,9 +514,8 @@ const MapSites = (function () {
       elevB: t.elev, aglA: rep.agl, aglB: fld.agl, freqMhz: f,
     });
     if (!an.ok) return { dKm, failed: true, src: 'grid' };
-    const m = marginOf(an, rep, fld);
     return { dKm, verdict: an.verdict, ratio: an.worst.ratio, partial: holes > 0,
-             margin: m ? m.m : null, down: m ? m.down : null, up: m ? m.up : null, src: 'grid' };
+             margin: marginOf(an, rep, fld), src: 'grid' };
   }
 
   // The profile card's own figure for one path: its sample count, its tiles,
@@ -540,9 +538,8 @@ const MapSites = (function () {
       cover: cover ? res.cls : null, canopy: cover && res.canopyOk ? res.canopy : null,
     });
     if (!an.ok) return null;
-    const m = marginOf(an, rep, fld);
     return { dKm, verdict: an.verdict, ratio: an.worst.ratio,
-             margin: m ? m.m : null, down: m ? m.down : null, up: m ? m.up : null,
+             margin: marginOf(an, rep, fld),
              src: cover ? 'cover' : 'bare' };
   }
 
@@ -1418,7 +1415,7 @@ const MapSites = (function () {
       `# repeater,${q(found.rep.sysName)},${found.rep.agl} m AGL,${found.f.toFixed(3)} MHz`,
       `# weights,elevation ${w.e},line of sight ${w.l},fade margin ${w.f},road reserve ${w.r}`,
       `# terrain,~${found.res} m grid screening; finalists at ${FINE_SAMPLES} samples with land cover`,
-      'rank,site_lat,site_lon,ground_m,score,where,road_reserve,target,target_number,target_lat,target_lon,distance_km,los,margin_db,margin_down_db,margin_up_db,figure',
+      'rank,site_lat,site_lon,ground_m,score,where,road_reserve,target,target_number,target_lat,target_lon,distance_km,los,margin_db,figure',
     ];
     for (const r of results) {
       const road = roadCsv(r.c);
@@ -1428,7 +1425,7 @@ const MapSites = (function () {
           r.rank, r.c.lat.toFixed(6), r.c.lon.toFixed(6), Math.round(r.c.ground), r.s.score.toFixed(1),
           q(whereText(r.c)), q(road), q(t.name), q(t.number), t.lat.toFixed(6), t.lon.toFixed(6),
           fig.dKm != null ? fig.dKm.toFixed(2) : '', fig.failed ? '' : fig.colo ? 'co-located' : fig.verdict || '',
-          f1(fig.margin), f1(fig.down), f1(fig.up), fig.failed ? 'failed' : fig.src || '',
+          f1(fig.margin), fig.failed ? 'failed' : fig.src || '',
         ].join(','));
       });
     }
@@ -1617,7 +1614,9 @@ const MapSites = (function () {
       const r = results.find(x => x.rank === +rank);
       const t = found && found.targets[+k];
       if (!r || !t) return;
-      const pa = [r.c.lat, r.c.lon], pb = [t.lat, t.lon];
+      // The site first: it is the transmitter, as in the margin the finder
+      // priced (marginOf), so the profile and the budget price the same way.
+      const pa = [t.lat, t.lon], pb = [r.c.lat, r.c.lon];
       // The card lives with the Stations cards — in the side panel beside the
       // map, or under it — never on the map, so full screen is left first,
       // the way the station card's Edit leaves it: a profile drawn behind the
@@ -1629,7 +1628,7 @@ const MapSites = (function () {
       state.path.open = true;
       const existing = MapDraw.findLine(pa, pb);
       if (existing) MapDraw.focus(existing.id);
-      else MapDraw.addLine([pa, pb], [r.c.sid || null, t.sid || null]);
+      else MapDraw.addLine([pa, pb], [t.sid || null, r.c.sid || null]);
       // …and brought on screen. With this panel pinned into the side panel the
       // card is in another pane of it (〽️, the path tools), which a scroll alone
       // cannot reach — a hidden element does not scroll into view — so that
@@ -1704,8 +1703,6 @@ const MapSites = (function () {
               verdict: fig && !fig.failed ? fig.verdict || null : null,
               ratio: fig && fig.ratio != null ? fig.ratio : null,
               margin: fig && fig.margin != null ? fig.margin : null,
-              down: fig && fig.down != null ? fig.down : null,
-              up: fig && fig.up != null ? fig.up : null,
               src: !fig || fig.failed ? 'failed' : fig.src,
               colo: !!(fig && fig.colo), failed: !fig || !!fig.failed,
               band: b, colour: BAND[b][1],

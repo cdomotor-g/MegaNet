@@ -262,35 +262,38 @@ const MapBackbone = (function () {
 
   function cardEl() { return document.getElementById('path-card'); }
 
-  // The margin the elevation profile under this card is quoting — the worse of
-  // the two directions, priced over the terrain with the obstruction in it —
-  // when the profile is on this exact pair, which it is whenever the card is
-  // open and the ground has landed (onProfile). That is the figure the card
-  // quotes, so the two say one number in one colour. Before the ground lands,
-  // or where the profile has no figure, the budget's (budgetFor) and then a
-  // plain free-space margin computed from the same primitives.
+  // The margin the elevation profile under this card is quoting — one way,
+  // its A to its B, priced over the terrain with the obstruction in it — when
+  // the profile is on this exact pair, which it is whenever the card is open
+  // and the ground has landed (onProfile). That is the figure the card quotes,
+  // so the two say one number in one colour. Before the ground lands, or where
+  // the profile has no figure, the budget's (budgetFor) and then a plain
+  // free-space margin computed from the same primitives.
   //
-  // Each way round as well, in this card's a → b order whichever way the line
-  // runs: the figure quoted is the worse of the two, so a TX power raised at
-  // one end moves the way out of it and leaves the headline where the way
-  // back holds it — and a card that showed only the headline read as though
-  // the change had not reached it.
+  // One way only, because the network runs one way: a field station reports
+  // in to its repeater and a repeater hands on to its base, and nothing
+  // transmits back down. This card's a → b is that way round (onLineClick),
+  // and so is the line it draws for the profile — but ⇄ Flip direction turns
+  // the profile round, and then the figure is the other way, so `from` and
+  // `to` say which way it was priced.
   function profileFor(a, b) {
     const p = typeof PathProfile !== 'undefined' ? PathProfile.shownMargin() : null;
     if (!p) return null;
     const fwd = p.ends[0] === a.id && p.ends[1] === b.id;
     const same = fwd || (p.ends[0] === b.id && p.ends[1] === a.id);
     return same ? { margin: p.margin, verdict: p.verdict, priced: true,
-                    ab: fwd ? p.ab : p.ba, ba: fwd ? p.ba : p.ab } : null;
+                    from: fwd ? a : b, to: fwd ? b : a } : null;
   }
 
   // The budget the link-budget card is showing, when it is showing this exact
-  // pair, terrain term included once the profile lands.
+  // pair, terrain term included once the profile lands — priced from its own
+  // A, which may be either end.
   function budgetFor(a, b) {
     const L = state.link;
-    const match = L.a && L.b &&
-      ((L.a.sid === a.id && L.b.sid === b.id) || (L.a.sid === b.id && L.b.sid === a.id));
-    return match ? LinkBudget.current() : null;
+    const fwd = L.a && L.b && L.a.sid === a.id && L.b.sid === b.id;
+    const match = fwd || (L.a && L.b && L.a.sid === b.id && L.b.sid === a.id);
+    const r = match ? LinkBudget.current() : null;
+    return r ? { ...r, from: fwd ? a : b, to: fwd ? b : a } : null;
   }
 
   // Free-space fade margin a → b on the figures the path tools price with —
@@ -313,14 +316,14 @@ const MapBackbone = (function () {
     const eirp = txDbm == null || gA == null || lA == null ? null : txDbm + gA - lA;
     const rxDbm = eirp == null || gB == null || lB == null ? null : eirp - fsplDb(dKm, fMhz) + gB - lB;
     const margin = rxDbm == null || thr == null ? null : rxDbm - thr;
-    return { dKm, fMhz, margin, an: null, fsplOnly: true };
+    return { dKm, fMhz, margin, an: null, fsplOnly: true, from: a, to: b };
   }
 
   function row(label, value) {
     return `<div class="acma-row"><span>${label}</span><span>${value}</span></div>`;
   }
 
-  function marginHtml(r, a, b) {
+  function marginHtml(r) {
     if (!r || r.margin == null) {
       return '<span class="small">no figure — a TX power, antenna gain, line loss or RX threshold is not set</span>';
     }
@@ -339,10 +342,12 @@ const MapBackbone = (function () {
     const note = r.fsplOnly ? ' · free-space only'
       : verdict === 'obstructed' && !guessed ? ' · line of sight obstructed, priced in' : '';
     const db = v => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`;
-    const ways = r.ab != null && r.ba != null && a && b
-      ? `<br><span class="small path-card-ways">${esc(a.name)} → ${esc(b.name)} ${db(r.ab)} · back ${db(r.ba)}</span>` : '';
+    // Which way it was priced, on a line of its own: the way the traffic runs,
+    // unless the profile has been flipped to look at the other.
+    const way = r.from && r.to
+      ? `<br><span class="small path-card-way">${esc(r.from.name)} → ${esc(r.to.name)}</span>` : '';
     return `<strong class="txt-${cls}">${db(r.margin)}</strong>
-      <span class="small"> — ${guessed ? 'obstructed' : m.label.toLowerCase()}${note}</span>${ways}`;
+      <span class="small"> — ${guessed ? 'obstructed' : m.label.toLowerCase()}${note}</span>${way}`;
   }
 
   // The channel the path is on — MapFreq's pick, the one the link colouring
@@ -380,7 +385,7 @@ const MapBackbone = (function () {
     return p ? p.kind === 'base' : !b.roles.includes('repeater');
   }
 
-  // A backbone hop is repeater ⇄ repeater or repeater ⇄ base. The base end of
+  // A backbone hop is repeater → repeater or repeater → base. The base end of
   // the second kind opens no pass-range window and re-transmits nothing, so the
   // shared-address figure says what matched instead, and neither the delay row
   // nor the same-delay warning — both of them about re-transmission — is asked
@@ -426,7 +431,7 @@ const MapBackbone = (function () {
     return `
       <div class="path-card-head">
         <h3 id="path-card-title">${backbone ? backboneTitle(a, b) : 'Radio path'}</h3>
-        <span class="small">${esc(a.name)} ⇄ ${esc(b.name)}</span>
+        <span class="small">${esc(a.name)} → ${esc(b.name)}</span>
         <button type="button" class="path-card-close" onclick="MapBackbone.closeCard()"
           aria-label="Close the radio path details"><span aria-hidden="true">×</span></button>
       </div>
@@ -434,15 +439,17 @@ const MapBackbone = (function () {
         ${backbone ? backboneRows(a, b) : fieldRows(a, b)}
         ${row('Frequency', freqHtml(a, b))}
         ${row('Distance', fmtKm(km))}
-        ${row('Fade margin', marginHtml(r, a, b))}
+        ${row('Fade margin', marginHtml(r))}
       </div>
       <p class="small path-card-note">Indicative only. Open below on this path:
         <a href="#" onclick="MapBackbone.scrollTo('path-profile-panel');return false">elevation profile ↓</a> ·
         <a href="#" onclick="MapBackbone.scrollTo('link-budget-panel');return false">fade margin ↓</a></p>
       ${pathMoreHtml('path-card-about', 'How this figure is worked out', `
-        <p class="small path-card-note">The margin is the elevation profile's figure, the worse of the two
-          directions (free-space until the terrain profile lands), on the TX power and the other figures set in
-          the two cards below — change one there and this follows.</p>`)}`;
+        <p class="small path-card-note">The margin is the elevation profile's figure (free-space until the terrain
+          profile lands), one way: from the transmitter to the receiver named under it. From the map that is the way
+          the traffic runs — a field station to its repeater, a repeater to its base — since nothing in the network
+          transmits back down; ⇄ Flip direction on the profile prices it the other way round. It is worked out on the
+          TX power and the other figures set in the two cards below — change one there and this follows.</p>`)}`;
   }
 
   // Whether the profile below is still on this path. The card heads the
@@ -574,7 +581,7 @@ const MapBackbone = (function () {
       const ch = typeof MapFreq !== 'undefined' ? MapFreq.pathChannel(a, b) : null;
       return `
         <strong>${backbone ? backboneTitle(a, b) : 'Radio path'}</strong><br>
-        <span class="mn-pop-line">${esc(a.name)} ⇄ ${esc(b.name)}</span><br>
+        <span class="mn-pop-line">${esc(a.name)} → ${esc(b.name)}</span><br>
         ${backbone && p ? `<span class="mn-pop-line">${p.overlap
           ? `${p.shared.length} shared ALERT ID${p.shared.length === 1 ? '' : 's'} in use · windows overlap on ${p.overlap}`
           : 'no pass-range window at the base end — matched on distance alone'}</span><br>` : ''}

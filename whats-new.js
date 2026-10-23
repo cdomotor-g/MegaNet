@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 83, date: '2026-10-23', items: [
+      '<strong>📶 Fade margin, one way.</strong> Every fade margin is now priced the way the network runs — a field '
+        + 'station to its repeater, a repeater to its base — and nothing else, since nothing transmits back down. The '
+        + '<em>Radio path</em> card and the elevation profile quote one figure and name the two ends it runs between; the '
+        + '<em>back</em> figure and the worse-of-the-two are gone, so a TX power you change now moves the figure. The '
+        + 'profile has a TX power box only at A, the transmitter; ⇄ <em>Flip direction</em> prices the other way round. '
+        + 'The fade-margin map, the network review, the site and relocation finders and their downloads follow the same '
+        + 'rule, and <em>Radio coverage</em> starts on <em>Centre Rx</em>, with no worst case.',
+    ] },
     { n: 82, date: '2026-10-23', items: [
       '<strong>📶 Carrier fingerprint</strong>, on a station\'s card on the Stations map (under its ALERT IDs and '
         + 'frequencies) and in its Station details (under its ALERT addresses). Every burst a base station\'s SDR decodes '

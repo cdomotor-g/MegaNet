@@ -658,7 +658,8 @@ ok('…carrying a signed figure in dB', /[-+]\d+(\.\d)? dB/.test(marginRow.text 
    marginRow.text || '');
 ok('…banded with the link budget\'s own bands',
    /txt-(ok|warn|bad)/.test(marginRow.cls), marginRow.cls);
-ok('…and quoting both directions', /A→B \/ B→A/.test(marginRow.text || ''), marginRow.text || '');
+ok('…one way, naming the two ends A → B, and no way back',
+   / · \S.* → \S/.test(marginRow.text || '') && !/B→A/.test(marginRow.text || ''), marginRow.text || '');
 
 // The signal along the line. Priced after the chart is up, in slices, so it is
 // waited for; then held to the row above it, to the bands, and to moving.
@@ -669,7 +670,7 @@ const sig = await page.evaluate(async () => {
   if (!s) return null;
   const dd = [...document.querySelectorAll('#path-profile-panel .path-stats dt')]
     .find(x => x.textContent.trim() === 'Fade margin').nextElementSibling.textContent;
-  const m = dd.match(/([-+]?\d+\.\d) \/ ([-+]?\d+\.\d) dB A→B \/ B→A/);
+  const m = dd.trim().match(/^([-+]?\d+\.\d) dB/);
   // A colour as the page paints it: resolved by the cascade (the tokens, the
   // mix), then painted on a canvas and read back, because a computed mix comes
   // back as oklch() or color() rather than as three sRGB numbers.
@@ -820,9 +821,10 @@ const pathCard = await page.evaluate(async ids => {
     const row = [...document.querySelectorAll('#path-card .acma-row')]
       .find(r => r.firstElementChild.textContent.trim() === 'Fade margin');
     const s = row ? row.querySelector('strong') : null;
-    // The headline and its note; each way round is a line of its own under them.
+    // The headline and its note; the way it was priced is a line of its own
+    // under them.
     const v = row ? row.lastElementChild.cloneNode(true) : null;
-    if (v) v.querySelectorAll('.path-card-ways').forEach(n => n.remove());
+    if (v) v.querySelectorAll('.path-card-way').forEach(n => n.remove());
     return s ? { text: v.textContent.replace(/\s+/g, ' ').trim(), cls: s.className } : null;
   };
   MapBackbone.open('field', ids[0], ids[1]);
@@ -855,20 +857,21 @@ if (pathCard && pathCard.plain) {
 // signal along its line and the radio-path card over them all stayed on the
 // radio systems, so the same hop read two ways a card apart. Each site now
 // keeps one set (state.radio). Four times the TX power at the budget's A is
-// +6.02 dB on the budget's margin and on the profile's one-way margin out of
-// that site, and nothing on the way back; the profile's own TX box shows it,
-// flagged edited; the radio-path card quotes the profile's new worse figure;
-// and the signal arrives at B in the new A→B figure. Typed into the profile's
-// box instead, the budget's box and margin follow. Blank puts all of it back.
+// +6.02 dB on the budget's margin and on the profile's, which is one way, A to
+// B, the same way round; the profile's own TX box shows it, flagged edited,
+// and B — the receiver — has no TX box to change nothing with; the radio-path
+// card quotes the profile's new figure and the one way it was priced, with no
+// way back beside it; and the signal arrives at B in the new figure. Typed into
+// the profile's box instead, the budget's box and margin follow. Blank puts all
+// of it back.
 const shared = await page.evaluate(async () => {
   const L = state.link, sh = PathProfile.target();
   if (!L.a || !L.b || !sh || !sh.snappedTo) return null;
   const until = Date.now() + 40000;
   while (Date.now() < until && !PathProfile.signalState()) await new Promise(r => setTimeout(r, 200));
-  // Which of the line's ends is the budget's A (fromProfile builds them the
-  // same way round, but an earlier line may have been reused either way).
+  // Which of the line's ends is the budget's A: fromProfile builds them the
+  // same way round, and MapBackbone.open reused the line it drew above.
   const tagA = L.a.key === radioKey({ id: sh.snappedTo[0] }) ? 'A' : 'B';
-  const out = tagA === 'A' ? 'ab' : 'ba', back = tagA === 'A' ? 'ba' : 'ab';
   const flag = id => {
     const el = document.getElementById(id);
     const f = el && el.parentElement.querySelector('.path-src');
@@ -881,13 +884,13 @@ const shared = await page.evaluate(async () => {
     const sig = PathProfile.signalState();
     return {
       budget: LinkBudget.current().margin,
-      out: p ? p[out] : null, back: p ? p[back] : null, worst: p ? p.margin : null,
-      ab: p ? p.ab : null,
+      prof: p ? p.margin : null,
       card: row ? row.lastElementChild.textContent.replace(/\s+/g, ' ').trim() : null,
       sigEnd: sig ? sig.end : null,
       lbTx: document.getElementById('lb-f-a-tx_w').value,
-      pathTx: (document.getElementById(`path-f-${tagA}-tx_w`) || {}).value,
-      pathFlag: flag(`path-f-${tagA}-tx_w`),
+      pathTx: (document.getElementById('path-f-A-tx_w') || {}).value,
+      pathFlag: flag('path-f-A-tx_w'),
+      pathTxB: !!document.getElementById('path-f-B-tx_w'),
     };
   };
   const base = L.a.def.tx_w;
@@ -900,29 +903,31 @@ const shared = await page.evaluate(async () => {
   PathProfile.setRadio(tagA, 'tx_w', '');
   return { base, tagA, before, fromBudget, fromProfile, after: read() };
 });
-ok('the budget and the profile are on the same two stations', !!shared, String(shared));
-if (shared) {
+ok('the budget and the profile are on the same two stations, the same way round',
+   !!shared && shared.tagA === 'A', shared ? shared.tagA : String(shared));
+if (shared && shared.tagA === 'A') {
   const { before: b0, fromBudget: fb, fromProfile: fp, after: af } = shared;
   const q = 10 * Math.log10(4), h = 10 * Math.log10(2);
   const near = (x, y) => x != null && y != null && Math.abs(x - y) < 0.01;
   ok('4× the TX power in the link budget is +6.02 dB on its own margin',
      near(fb.budget - b0.budget, q), `${b0.budget} → ${fb.budget}`);
-  ok('…and on the profile\'s margin out of that site, the way back untouched',
-     near(fb.out - b0.out, q) && near(fb.back, b0.back), JSON.stringify({ b0, fb }));
+  ok('…and on the profile\'s one-way margin, A to B',
+     near(fb.prof - b0.prof, q), JSON.stringify({ b0, fb }));
   ok('…the profile\'s TX box shows the figure, flagged edited',
      Number(fb.pathTx) === shared.base * 4 && fb.pathFlag === 'edited', `${fb.pathTx} · ${fb.pathFlag}`);
+  ok('…and B, the receiver, has no TX power box', !b0.pathTxB && !fb.pathTxB);
   const fig = m => `${m > 0 ? '+' : ''}${m.toFixed(1)} dB`;
   ok('…the radio-path card quotes the profile\'s new figure',
-     !!fb.card && fb.card.startsWith(fig(fb.worst)), `${fb.card} against ${fig(fb.worst)}`);
-  ok('…and each way round under it, so the way that moved is seen to',
-     !!fb.card && fb.card.includes(fig(fb.out)) && / · back /.test(fb.card) && !!b0.card && b0.card !== fb.card,
-     `${b0.card} → ${fb.card}`);
-  ok('…and the signal along the line arrives at B in the new A→B margin',
-     near(fb.sigEnd, fb.ab), `${fb.sigEnd} against ${fb.ab}`);
+     !!fb.card && fb.card.startsWith(fig(fb.prof)) && !!b0.card && b0.card !== fb.card,
+     `${b0.card} → ${fb.card} against ${fig(fb.prof)}`);
+  ok('…naming the one way it was priced, with no way back beside it',
+     !!fb.card && / → /.test(fb.card) && !/ back /.test(fb.card), fb.card);
+  ok('…and the signal along the line arrives at B in the new margin',
+     near(fb.sigEnd, fb.prof), `${fb.sigEnd} against ${fb.prof}`);
   ok('2× typed into the profile\'s box is +3.01 dB on the budget, its box showing it',
      near(fp.budget - b0.budget, h) && Number(fp.lbTx) === shared.base * 2, `${fp.lbTx} W, ${b0.budget} → ${fp.budget}`);
   ok('blanking the box puts every card back on the station\'s own figure',
-     near(af.budget, b0.budget) && near(af.out, b0.out) && af.lbTx === b0.lbTx
+     near(af.budget, b0.budget) && near(af.prof, b0.prof) && af.lbTx === b0.lbTx
        && af.pathTx === b0.pathTx && af.pathFlag !== 'edited', JSON.stringify(af));
 }
 

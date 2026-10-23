@@ -1684,7 +1684,7 @@ async function radioSection(rc, doc, id, networks, rmSystems) {
         distance_km: num(l.distance_km), freq_mhz: num(l.freq_mhz), verdict: l.verdict, band: l.band, model: l.model,
         computed_at: l.computed_at,
       })),
-      note: 'Modelled in the app (Longley–Rice over sampled terrain) and saved; margin_db is the worse direction. Stale if either end has moved since computed_at.',
+      note: 'Modelled in the app (Longley–Rice over sampled terrain) and saved; margin_db is one way, the way the traffic runs (field station to repeater, repeater to base), and margin_ab_db / margin_ba_db are station_a to station_b and back. Stale if either end has moved since computed_at.',
       source: 'meganet.link_fade_margin',
     } : { status: 'not recorded', detail: 'No modelled link margin has been saved for a link to or from this station.', source: 'meganet.link_fade_margin' });
 

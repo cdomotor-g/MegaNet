@@ -30,15 +30,15 @@ longer than 150 km is left out — it is an address collision, not a radio path
 
 **Compute margins** prices every cell. Each one is:
 
-- the fade margin in dB, the **worse of the two directions** — the figure the
+- the fade margin in dB, **one way: the station transmitting to the hub** —
+  the way its readings go, since nothing transmits back down to a station; the figure the
   [link budget card](../README.md) gives for that path and the colour the
   fade-margin map paints it, computed the same way over the same ground
   (`pathGround`), so the three can never disagree about one link;
 - coloured in the fade-margin map's bands: **15 dB or better** green,
   **6–15 dB** amber, **under 6 dB** red (the map's own thresholds, if somebody
   has set different ones there);
-- with the distance, and — on hover — both directions and the verdict over the
-  bare ground.
+- with the distance, and — on hover — the verdict over the bare ground.
 
 A proposed site gets the field-station radio (what most of the network is) on
 the mast typed in, its ground from the terrain tiles, and the frequency of the
