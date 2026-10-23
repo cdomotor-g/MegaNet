@@ -200,6 +200,7 @@ const SiteMap = (function () {
       what: 'A bench for the bits a station sends: numbers as binary, a real ALERT frame, and fourteen faults — from noise and echoes to a drifting crystal or a wire on the wrong pin — each shown happening to the frame.',
       use: [
         'Work out what kind of fault could have corrupted a station\'s readings',
+        'See where each fault happens, toured on a model site in 3-D',
         'See a fault\'s fingerprint — where in the frame, which way, what got through',
         'Paste in readings that look wrong and let it name the pattern',
         'Play whodunnit: name a fault from its fingerprint alone',

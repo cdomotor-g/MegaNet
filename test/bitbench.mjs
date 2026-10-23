@@ -23,10 +23,13 @@
 // day, intermodulation patchy, each wiring fault named by its rule. And the
 // same reasoning on pasted readings.
 //
-// Chromium. Both tabs open clean; the number bench, the frame table, every
+// Chromium. Both tabs open clean, every section's heading with its picture;
+// the site in 3-D drawn, touring the faults on its own, stepped, turned by a
+// drag and following the bench; the number bench, the frame table, every
 // fault drawn and sent, a batch, a mystery, readings pasted, the CSVs; the
 // lesson's sections and drawings, its calculator, and the two tabs opening
-// each other at the right place with focus there; reduced motion; a phone.
+// each other at the right place with focus there; reduced motion (the bench
+// and the site's tour both still); a phone.
 //
 // Run:  npm run bitbench
 //       npm run bitbench -- -v    also print what passed
@@ -239,13 +242,59 @@ try {
   await page.evaluate(() => switchTab('bitbench'));
   await until(page, () => !!document.getElementById('bb-page'));
   const shape = await page.evaluate(() => ({
-    secs: ['bb-num', 'bb-frame', 'bb-fault', 'bb-mystery', 'bb-pairs', 'bb-more'].filter(id => document.getElementById(id)),
+    secs: ['bb-num', 'bb-frame', 'bb-site', 'bb-fault', 'bb-mystery', 'bb-pairs', 'bb-more'].filter(id => document.getElementById(id)),
+    tiles: [...document.querySelectorAll('#bb-page .bb-sec')].map(sec => !!sec.querySelector('h3 .gl-tile svg')),
+    hues: new Set([...document.querySelectorAll('#bb-page .bb-sec')].map(sec => getComputedStyle(sec).borderTopColor)).size,
     canv: [...document.querySelectorAll('#bb-page canvas')].map(c => !!c.getAttribute('aria-label')),
     fx: document.querySelectorAll('input[name="bb-fx"]').length,
     group: TABS.find(g => g.tabs.some(t => t.id === 'bitbench')).group,
   }));
-  ok('six sections, every canvas named', shape.secs.length === 6 && shape.canv.length >= 2 && shape.canv.every(Boolean), JSON.stringify(shape));
+  ok('seven sections, every canvas named', shape.secs.length === 7 && shape.canv.length >= 4 && shape.canv.every(Boolean), JSON.stringify(shape));
+  ok('every section\'s heading wears a picture, the panels in six colours', shape.tiles.length === 7 && shape.tiles.every(Boolean) && shape.hues === 6, JSON.stringify(shape));
   ok('fourteen faults to pick from, under Interference', shape.fx === 14 && shape.group === 'Interference', JSON.stringify(shape));
+
+  console.log('\nThe site in 3-D\n');
+  await page.evaluate(() => document.getElementById('bb-site').scrollIntoView());
+  await page.waitForTimeout(400);
+  const inked = id => {
+    const cv = document.getElementById(id);
+    const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+    const seen = new Set();
+    for (let i = 0; i < d.length; i += 4 * 211) seen.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4));
+    return seen.size;
+  };
+  const site0 = await page.evaluate(([f]) => {
+    const inked = eval(f);
+    return { st: BitBench.state().site, scene: inked('bb-site-cv'), zoom: inked('bb-site-zoom'), order: BitScene.ORDER.length,
+      named: BitScene.ORDER.every(id => BitScene.SPOTS[id].where.length > 60 && BitScene.SPOTS[id].close),
+      say: document.getElementById('bb-site-say').textContent, label: document.getElementById('bb-site-cv').getAttribute('aria-label') };
+  }, [inked.toString()]);
+  ok('the site and its close-up are drawn, touring from the first fault', site0.st.tour && site0.st.id === 'noise' && site0.scene > 40 && site0.zoom > 4,
+    JSON.stringify({ ...site0, say: undefined, label: undefined }));
+  ok('…a place and a close-up for each of the fourteen, said beside it and in the drawing\'s name', site0.order === 14 && site0.named
+    && /Weak signal/.test(site0.say) && /hiss/.test(site0.label), site0.say.slice(0, 120));
+  await page.waitForTimeout(7300);
+  const toured = await page.evaluate(() => BitBench.state().site.id);
+  ok('left alone, the tour moves on to the next fault', toured === 'impulse', toured);
+  const stepped = await page.evaluate(() => {
+    BitBench.siteStep(-1); const a = BitBench.state().site.id;
+    BitBench.siteStep(-1); const b = BitBench.state().site.id;
+    BitBench.siteShow('crystal'); const c = BitBench.state().site;
+    return { a, b, c, sel: document.getElementById('bb-site-pick').value, pressed: document.getElementById('bb-site-tour').getAttribute('aria-pressed') };
+  });
+  ok('◀ steps back round the fourteen; Show holds on the one picked', stepped.a === 'noise' && stepped.b === 'gray' && stepped.c.id === 'crystal'
+    && !stepped.c.tour && stepped.sel === 'crystal' && stepped.pressed === 'false', JSON.stringify(stepped));
+  const box = await (await page.$('#bb-site-cv')).boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 160, box.y + box.height / 2, { steps: 6 });
+  await page.mouse.up();
+  const turned = await page.evaluate(() => ({ yaw: BitBench.state().site.yaw, yaw0: BitScene.YAW0 }));
+  ok('dragged across, the site turns', typeof turned.yaw === 'number' && Math.abs(turned.yaw - turned.yaw0) > 0.3, JSON.stringify(turned));
+  const benched = await page.evaluate(() => { BitBench.siteBench(); return { fx: BitBench.state().effect, name: document.querySelector('.bb-fx-name').textContent }; });
+  ok('🧪 Try it on the bench puts the site\'s fault on the bench', benched.fx === 'crystal' && /Crystal drift/.test(benched.name), JSON.stringify(benched));
+  const follows = await page.evaluate(() => { BitBench.siteTour(); BitBench.pick('collision'); return BitBench.state().site; });
+  ok('…and a fault picked on the bench shows on the site, holding there', follows.id === 'collision' && !follows.tour, JSON.stringify(follows));
 
   await page.evaluate(() => { BitBench.width(11); BitBench.setNum('0b1010'); BitBench.flipBit(0); BitBench.op('shl'); });
   const numState = await page.evaluate(() => ({ s: BitBench.state(), dec: document.querySelector('.bb-readout dd').textContent,
@@ -351,8 +400,10 @@ try {
   await until(p2, () => typeof state !== 'undefined' && !!state.data, null, LOAD_TIMEOUT);
   await p2.evaluate(() => switchTab('bitbench'));
   await until(p2, () => !!document.getElementById('bb-play'));
-  const still = await p2.evaluate(() => ({ pressed: document.getElementById('bb-play').getAttribute('aria-pressed'), text: document.getElementById('bb-play').textContent }));
+  const still = await p2.evaluate(() => ({ pressed: document.getElementById('bb-play').getAttribute('aria-pressed'), text: document.getElementById('bb-play').textContent,
+    tour: BitBench.state().site.tour, tourText: document.getElementById('bb-site-tour').textContent }));
   ok('reduced motion: the bench starts still, with ▶ to run it', still.pressed === 'false' && /Keep sending/.test(still.text), JSON.stringify(still));
+  ok('…and the site holds on one fault, with ⏵ to tour them', still.tour === false && /Tour the faults/.test(still.tourText), JSON.stringify(still));
   await p2.waitForTimeout(300);
   const wideB = await p2.evaluate(() => document.documentElement.scrollWidth);
   await p2.evaluate(() => switchTab('biterrors'));

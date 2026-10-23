@@ -1451,7 +1451,10 @@ const HELP = {
     summary: 'A bench for the bits a station sends and the faults that change them. Type a number and see it as '
            + 'decimal, binary and hex, every bit a button to flip, and the operations a fault performs — shift, rotate, '
            + 'invert, reverse, Gray code — one press away. Build an ALERT frame and watch its 40 bits go out as tones. '
-           + 'Then pick one of fourteen faults — weak signal, impulse noise, reflections, a collision, intermodulation, '
+           + '<strong>Where faults happen</strong> is a model site in 3-D — a gauge, a repeater on the far hill, and a hill, '
+           + 'a shed, a truck, another gauge, a pager mast, a phone tower, a storm and an electric fence between them — which '
+           + 'tours the faults one at a time, lighting the place each happens with a close-up of what goes wrong there; drag it '
+           + 'sideways to turn it. Then pick one of fourteen faults — weak signal, impulse noise, reflections, a collision, intermodulation, '
            + 'crystal drift, a PLL slow to lock, a fast or slow clock, tones out of balance, and five wiring and decoder '
            + 'faults — and see it happen to the frame, bit by bit. <strong>Send a batch</strong> and the bench reads the '
            + 'fingerprint the faults leave: where in the frame the flips land, which way they go, whether the frame was '
@@ -1470,7 +1473,10 @@ const HELP = {
       'A fixed rule — every reading doubled, mirrored or scrambled the same way — is wiring or a decoder setting, '
       + 'never radio. Radio faults are random in which bits they take; what they share is <em>where</em> and '
       + '<em>when</em>.',
-      'A device set to reduce motion starts every drawing still, with the frame at its end; ▶ Keep sending runs it.',
+      'A device set to reduce motion starts every drawing still, with the frame at its end; ▶ Keep sending runs it. '
+      + 'The site holds on one fault too, still; ⏵ Tour the faults steps through them.',
+      'The site is a model, not a map: nothing in it is to scale. Its close-ups quote the bench\'s own figures, from each '
+      + 'fault\'s default settings.',
     ],
     related: ['biterrors', 'flipsources', 'bitflipper', 'propagation'],
   },

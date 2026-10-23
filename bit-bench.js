@@ -1,7 +1,7 @@
 // MegaNet — bit-bench.js
 //
 //   BitBench   the 🧪 Bit Bench tab: a bench to play with the bits a station
-//              sends, and with the faults that change them on the way. Six
+//              sends, and with the faults that change them on the way. Seven
 //              sections, each something to do:
 //
 //                1  numbers as bits — decimal, binary and hex side by side,
@@ -9,30 +9,40 @@
 //                   (flip, shift, rotate, invert, reverse, Gray) one press away
 //                2  the frame on the air — an address and a value as the 40
 //                   bits ALERT Binary sends, and the tones they go out as
-//                3  faults — fourteen of them, from noise to a wire on the
+//                3  where faults happen — one site in 3-D (bit-scene.js) with
+//                   every fault's cause somewhere in it, toured a fault at a
+//                   time: each lit where it happens, with a close-up of what
+//                   goes wrong there
+//                4  faults — fourteen of them, from noise to a wire on the
 //                   wrong pin: each drawn as it happens to a frame, one frame
 //                   at a time or five hundred, with the fingerprint the batch
 //                   leaves read out of its bits
-//                4  whodunnit — a batch from a fault the bench will not name,
+//                5  whodunnit — a batch from a fault the bench will not name,
 //                   to be told from its fingerprint alone
-//                5  your readings — pairs pasted in (what should have arrived,
+//                6  your readings — pairs pasted in (what should have arrived,
 //                   what did) read the same way
-//                6  where to read more: the ⚡ Bit Errors lesson, which takes
+//                7  where to read more: the ⚡ Bit Errors lesson, which takes
 //                   each fault in depth, and the tabs that show them in the
 //                   network's own data
 //
-// After bit-model.js (BitModel: every number, every fault, every verdict) and
-// core.js (esc, escAttr, cssVar, announce, csvEscape, dlText,
-// registerTabTeardown, state); across to app.js (switchTab), bit-flipper.js
+// Each section's heading wears a picture on a tile of its own colour
+// (glyphs.js), so the seven tell apart at a glance down a long page.
+//
+// After bit-model.js (BitModel: every number, every fault, every verdict),
+// bit-scene.js (BitScene: the site and its drawing) and core.js (esc,
+// escAttr, cssVar, announce, csvEscape, dlText, registerTabTeardown, state);
+// glyphs.js (Glyphs) for the headings' pictures; across to app.js (switchTab), bit-flipper.js
 // (openBitFlipper), bit-errors.js (BitErrors.open) and core.js's
 // buildSensorIndex — all at call time. Nothing runs at load: renderMain()
 // calls render() and init().
 //
 // ── How it is drawn ──────────────────────────────────────────────────────────
-// Three canvases (the tones, a fault at work, a rising river through a wiring
-// fault), each sized by CSS and given a backing store to match; one animation
-// loop draws whichever are on screen and stops the moment the tab is left
-// (registerTabTeardown). A device asking for reduced motion gets every drawing
+// Four canvases (the tones, the site, a fault at work, a rising river through
+// a wiring fault), each sized by CSS and given a backing store to match; one
+// animation loop draws whichever are on screen and stops the moment the tab is
+// left (registerTabTeardown). The site tours the faults on that loop's clock,
+// seven seconds each, and only while it is on screen does it keep the loop
+// running. A device asking for reduced motion gets every drawing
 // still — the frame on the bench at its end, its verdict shown — with ▶ to run
 // it. Each canvas is named with what it shows now, and what it shows is also a
 // table or a sentence beside it: the bits sent and heard, the batch's counts
@@ -42,7 +52,8 @@
 // lesson and test/bitbench.mjs cannot disagree about a number.
 //
 // Exposes: render, init, open, width, setNum, flipBit, op, setFrame,
-//          randomFrame, pick, set, sendOne, play, batch, batchSize, fixed,
+//          randomFrame, siteTour, siteStep, siteShow, siteBench,
+//          pick, set, sendOne, play, batch, batchSize, fixed,
 //          mystery, guess, pairs, pairsField, pairsExample, exportCsv, goTo,
 //          learn, tab, keepOpen, ink (the drawing kit the lesson shares), state.
 
@@ -60,6 +71,7 @@ const BitBench = (function () {
     n: 500, fixed: false, batch: null,
     mystery: null, score: { right: 0, tried: 0 },
     pairsText: '', pairsField: 'value',
+    site: { id: 'noise', tour: true, at: 0, yaw: null },
   };
 
   // ── The words for each fault ───────────────────────────────────────────────
@@ -352,6 +364,27 @@ const BitBench = (function () {
   };
   const tok = (name, fb) => (typeof cssVar === 'function' ? cssVar(name, fb) : fb);
 
+  // ── The sections ───────────────────────────────────────────────────────────
+  // Each: its id, its name, and the picture and colour its heading wears.
+  const SECS = [
+    ['bb-num',     '1 · Numbers as bits',        '1 · Numbers as bits',  'bits',      'net'],
+    ['bb-frame',   '2 · The frame on the air',   '2 · The frame',        'packet',    'data'],
+    ['bb-site',    '3 · Where faults happen',    '3 · Where it happens', 'interfere', 'field'],
+    ['bb-fault',   '4 · Faults',                 '4 · Faults',           'bolt',      'radio'],
+    ['bb-mystery', '5 · Whodunnit?',             '5 · Whodunnit?',       'search',    'learn'],
+    ['bb-pairs',   '6 · Your readings',          '6 · Your readings',    'data',      'admin'],
+    ['bb-more',    '7 · Where to read more',     '7 · Read more',        'book',      'net'],
+  ];
+  const secOf = id => SECS.find(x => x[0] === id);
+  const glyph = (name, cls) => (typeof Glyphs !== 'undefined' ? Glyphs.svg(name, cls) : '');
+  // A section's opening tag and heading: the picture on its colour's tile.
+  function secOpen(id) {
+    const [, title, , pic, hue] = secOf(id);
+    const tile = typeof Glyphs !== 'undefined' ? Glyphs.tile(pic, hue, 'bb-sec-tile') : '';
+    return `<section class="panel bb-sec" id="${id}" data-hue="${hue}" aria-labelledby="${id}-h">
+      <h3 id="${id}-h" class="bb-sec-h" tabindex="-1">${tile}<span>${esc(title)}</span></h3>`;
+  }
+
   // ── 1 · Numbers as bits ────────────────────────────────────────────────────
 
   const WIDTHS = [[8, '8 bits'], [11, '11 — a value'], [13, '13 — an address'], [16, '16 bits']];
@@ -412,8 +445,7 @@ const BitBench = (function () {
 
   function numHtml() {
     return `
-    <section class="panel bb-sec" id="bb-num" aria-labelledby="bb-num-h">
-      <h3 id="bb-num-h" tabindex="-1">1 · Numbers as bits</h3>
+    ${secOpen('bb-num')}
       <p>A reading travels as a row of bits, each worth twice the one to its right. Type a number — decimal, <code>0b…</code> for binary
         or <code>0x…</code> for hex — or press the bits themselves to flip them.</p>
       <div class="bb-num-top">
@@ -490,8 +522,7 @@ const BitBench = (function () {
   function frameHtml() {
     const M = BM();
     return `
-    <section class="panel bb-sec" id="bb-frame" aria-labelledby="bb-frame-h">
-      <h3 id="bb-frame-h" tabindex="-1">2 · The frame on the air</h3>
+    ${secOpen('bb-frame')}
       <p>An ALERT station sends a reading as four words of ten bits: a start bit, eight bits least significant first, and a stop bit.
         Thirteen carry the station's address, eleven its value — and nothing else checks them: ALERT Binary has no CRC, only eight
         fixed check bits and the start and stop bits. <strong>Flip any of the 24 that carry the reading and the frame still passes</strong>,
@@ -512,7 +543,54 @@ const BitBench = (function () {
     </section>`;
   }
 
-  // ── 3 · Faults ─────────────────────────────────────────────────────────────
+  // ── 3 · Where faults happen ────────────────────────────────────────────────
+  // The site in 3-D (bit-scene.js draws it): the fault it shows, toured or
+  // held, and the sentence under it saying where that fault happens.
+
+  const TOUR_MS = 7000;
+  const siteIds = () => (typeof BitScene !== 'undefined' ? BitScene.ORDER.filter(id => UI[id]) : ids());
+  const spot = id => (typeof BitScene !== 'undefined' && BitScene.SPOTS[id]) || { where: '', close: '' };
+
+  function siteSayHtml() {
+    const id = S.site.id, u = UI[id];
+    return `<p class="bb-site-say"><strong><span aria-hidden="true">${u.icon}</span> ${esc(u.name)}</strong> — ${esc(spot(id).where)}</p>`;
+  }
+  function siteName() {
+    const id = S.site.id;
+    return `A model of an ALERT site in 3-D — a river gauge sending, a repeater on the hill across the valley hearing it — `
+      + `showing ${UI[id].name}: ${spot(id).where} The close-up in the corner: ${spot(id).close}.`;
+  }
+  const zoomName = () => `Close-up: ${spot(S.site.id).close}.`;
+  const tourWords = () => (S.site.tour ? '⏸ Hold this one' : '⏵ Tour the faults');
+
+  function siteHtml() {
+    return `
+    ${secOpen('bb-site')}
+      <p>One made-up site with every fault's cause somewhere in it. Our gauge by the river sends; the repeater on the far hill hears;
+        and between and around them stand a hill, a shed beside the road, another gauge, a pager mast and a phone tower, a storm and an
+        electric fence. The tour lights each fault where it happens, with a close-up of what goes wrong there beside it. Drag the
+        site sideways to turn it.</p>
+      <div class="bb-site-grid">
+        <canvas class="bb-site-cv" id="bb-site-cv" role="img" aria-label="${escAttr(siteName())}"></canvas>
+        <div class="bb-site-side">
+          <canvas class="bb-site-zoom" id="bb-site-zoom" role="img" aria-label="${escAttr(zoomName())}"></canvas>
+          <div id="bb-site-say">${siteSayHtml()}</div>
+          <div class="bb-site-ctl">
+            <div class="button-group" role="group" aria-label="The tour">
+              <button type="button" class="btn" aria-label="The fault before" title="The fault before" onclick="BitBench.siteStep(-1)">◀</button>
+              <button type="button" class="btn" id="bb-site-tour" aria-pressed="${S.site.tour ? 'true' : 'false'}" onclick="BitBench.siteTour()">${tourWords()}</button>
+              <button type="button" class="btn" aria-label="The next fault" title="The next fault" onclick="BitBench.siteStep(1)">▶</button>
+            </div>
+            <label class="bb-pick" for="bb-site-pick">Show <select id="bb-site-pick" onchange="BitBench.siteShow(this.value)">${siteIds().map(id =>
+              `<option value="${id}" ${S.site.id === id ? 'selected' : ''}>${esc(UI[id].name)}</option>`).join('')}</select></label>
+            <p><button type="button" class="btn btn-primary" onclick="BitBench.siteBench()">🧪 Try it on the bench</button></p>
+          </div>
+        </div>
+      </div>
+    </section>`;
+  }
+
+  // ── 4 · Faults ─────────────────────────────────────────────────────────────
 
   function pickerHtml() {
     return FAMILIES.map(f => `
@@ -592,8 +670,7 @@ const BitBench = (function () {
 
   function faultHtml() {
     return `
-    <section class="panel bb-sec" id="bb-fault" aria-labelledby="bb-fault-h">
-      <h3 id="bb-fault-h" tabindex="-1">3 · Faults</h3>
+    ${secOpen('bb-fault')}
       <p>Pick a fault and watch the frame above go through it — the bits as sent, and as heard, with what the receiver made of them. Then
         send a batch: one frame tells you little, but five hundred leave a pattern, and the pattern is what tells one cause from another.</p>
       ${pickerHtml()}
@@ -846,8 +923,7 @@ const BitBench = (function () {
 
   function mysteryHtml() {
     return `
-    <section class="panel bb-sec" id="bb-mystery" aria-labelledby="bb-mystery-h">
-      <h3 id="bb-mystery-h" tabindex="-1">4 · Whodunnit?</h3>
+    ${secOpen('bb-mystery')}
       <p>The bench picks a fault and its settings without saying which, sends a batch through it, and shows you only what a network would:
         what arrived, and where the bits went wrong. Name the culprit. It is the same reasoning as a real case — and some faults leave
         fingerprints so alike that the bits alone cannot separate them, which is a finding too.</p>
@@ -918,8 +994,7 @@ const BitBench = (function () {
     const FIELDS = [['value', 'readings (11-bit values)'], ['address', 'ALERT addresses (13-bit)'], ['8', 'other 8-bit numbers'], ['16', 'other 16-bit numbers']];
     const EX = [['flips', 'one-bit flips'], ['stuck', 'a stuck bit'], ['double', 'doubled'], ['gray', 'Gray code'], ['lowaddr', 'ghost addresses']];
     return `
-    <section class="panel bb-sec" id="bb-pairs" aria-labelledby="bb-pairs-h">
-      <h3 id="bb-pairs-h" tabindex="-1">5 · Your readings</h3>
+    ${secOpen('bb-pairs')}
       <p>Seen something odd? Paste pairs — what should have arrived, then what did, one pair to a line (<code>1263 1295</code>,
         <code>1263 → 1295</code> and <code>1263,1295</code> all read) — and the bench reads them the way it reads a batch: which bits
         differ, which way, and whether one rule explains them all.</p>
@@ -941,8 +1016,7 @@ const BitBench = (function () {
   function moreHtml() {
     const link = (tab, icon, name, why, sec) => `<li><button type="button" class="link-btn bb-link" onclick="BitBench.tab('${tab}'${sec ? `, '${sec}'` : ''})"><span aria-hidden="true">${icon}</span> ${esc(name)}</button><span class="bb-aside">${esc(why)}</span></li>`;
     return `
-    <section class="panel bb-sec" id="bb-more" aria-labelledby="bb-more-h">
-      <h3 id="bb-more-h" tabindex="-1">6 · Where to read more</h3>
+    ${secOpen('bb-more')}
       <p>The bench shows each fault in a paragraph. The <strong>⚡ Bit Errors</strong> lesson, in the Knowledge base, takes each in depth:
         the physics, why it leaves the marks it does, how to confirm it in the field and what fixes it.</p>
       <ul class="bb-links">
@@ -968,12 +1042,12 @@ const BitBench = (function () {
           collision, a drifting crystal, a wire on the wrong pin. Every frame here is a real ALERT frame and every fault changes it the way
           the real one does, so a batch through it leaves the same marks you would find in a station's data. When a station's readings
           look wrong in a way that seems to have a pattern, this is where to work out what could have made it.</p>
-        <nav class="bb-toc" aria-label="On this page">${[['bb-num', '1 · Numbers as bits'], ['bb-frame', '2 · The frame'], ['bb-fault', '3 · Faults'],
-          ['bb-mystery', '4 · Whodunnit?'], ['bb-pairs', '5 · Your readings'], ['bb-more', '6 · Read more']].map(([id, t]) =>
-          `<button type="button" class="bb-toc-btn" onclick="BitBench.goTo('${id}')">${t}</button>`).join('')}</nav>
+        <nav class="bb-toc" aria-label="On this page">${SECS.map(([id, , t, pic]) =>
+          `<button type="button" class="bb-toc-btn" onclick="BitBench.goTo('${id}')">${glyph(pic, 'gl bb-toc-gl')}${t}</button>`).join('')}</nav>
       </div>
       ${numHtml()}
       ${frameHtml()}
+      ${siteHtml()}
       ${faultHtml()}
       ${mysteryHtml()}
       ${pairsHtml()}
@@ -1225,6 +1299,23 @@ const BitBench = (function () {
       text(ctx, cellLabel(c), xm, 50, C.muted, { font: FONT, align: 'center' });
       if (pb > 64) text(ctx, bits[j] ? `${num(M.MARK_HZ, 1)} Hz` : `${num(M.SPACE_HZ, 1)} Hz`, xm, h - 10, C.muted, { font: FONT, align: 'center' });
     }
+  }
+
+  // ── The site ───────────────────────────────────────────────────────────────
+  // BitScene draws it; the bench says which fault, how long it has been on
+  // screen, which way the site is turned and where the tour has got to.
+  const siteMoving = () => !stillPreferred();
+  const siteLive = () => onScreen.has('bb-site-cv') && (S.site.tour || siteMoving());
+  function drawSite(now) {
+    const cv = document.getElementById('bb-site-cv');
+    if (!cv || typeof BitScene === 'undefined') return;
+    const list = siteIds();
+    const o = {
+      id: S.site.id, name: UI[S.site.id].name, t: Math.max(0, now - S.site.at) / 1000, yaw: S.site.yaw, still: !siteMoving(),
+      tour: { i: list.indexOf(S.site.id), n: list.length, on: S.site.tour, frac: (now - S.site.at) / TOUR_MS },
+    };
+    BitScene.draw(cv, o);
+    BitScene.closeUp(document.getElementById('bb-site-zoom'), o);
   }
 
   // ── The fault drawings ─────────────────────────────────────────────────────
@@ -1749,14 +1840,17 @@ const BitBench = (function () {
     if (!document.getElementById('bb-page')) return;
     if (moving() && S.live && now - S.liveAt >= CYCLE) { newLive(); repaintLive(); }
     if (S.playOnce && now - S.liveAt >= CYCLE - HOLD + 300) S.playOnce = false;
+    if (S.site.tour && now - S.site.at >= TOUR_MS) siteGo(1, now);
     if (onScreen.has('bb-wave')) drawWave(now);
+    if (onScreen.has('bb-site-cv')) drawSite(now);
     if (onScreen.has('bb-cv')) drawFault(now);
-    if (moving() || S.playOnce) loop = requestAnimationFrame(tick);
+    if (moving() || S.playOnce || siteLive()) loop = requestAnimationFrame(tick);
   }
   function kick() { if (!loop && document.getElementById('bb-page')) loop = requestAnimationFrame(tick); }
   function drawAll(fresh) {
     const now = performance.now();
     drawWave(now);
+    drawSite(now);
     drawFault(now);
     drawRiver();
     if (fresh) kick();
@@ -1766,7 +1860,7 @@ const BitBench = (function () {
     if (!wired) return;
     wired.io && wired.io.disconnect();
     wired.ro && wired.ro.disconnect();
-    const list = ['bb-wave', 'bb-cv', 'bb-river'].map(id => document.getElementById(id)).filter(Boolean);
+    const list = ['bb-wave', 'bb-site-cv', 'bb-cv', 'bb-river'].map(id => document.getElementById(id)).filter(Boolean);
     onScreen = new Set(list.map(el => el.id));
     if (wired.io) list.forEach(el => wired.io.observe(el));
     if (wired.ro) list.forEach(el => wired.ro.observe(el));
@@ -1785,8 +1879,11 @@ const BitBench = (function () {
     unwire();
     registerTabTeardown('BitBench', unwire);
     if (!document.getElementById('bb-page')) return;
-    if (stillPreferred()) S.playing = false;
+    if (stillPreferred()) { S.playing = false; S.site.tour = false; }
     syncPlay();
+    syncSite();
+    S.site.at = performance.now();
+    wireSite();
     const io = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(es => {
       for (const e of es) { if (e.isIntersecting) onScreen.add(e.target.id); else onScreen.delete(e.target.id); }
       kick();
@@ -1873,9 +1970,76 @@ const BitBench = (function () {
     setFrame('addr', S.addr);
   }
 
+  // The site: turned by dragging it across (up and down still scrolls the
+  // page), a fault at a time by the tour or by hand.
+  function wireSite() {
+    const cv = document.getElementById('bb-site-cv');
+    if (!cv) return;
+    let drag = null;
+    cv.addEventListener('pointerdown', e => {
+      drag = { x: e.clientX, yaw: S.site.yaw == null ? BitScene.YAW0 : S.site.yaw };
+      try { cv.setPointerCapture(e.pointerId); } catch (_) { /* a synthetic pointer has nothing to capture */ }
+      cv.classList.add('is-turning');
+    });
+    cv.addEventListener('pointermove', e => {
+      if (!drag) return;
+      S.site.yaw = BitScene.clampYaw(drag.yaw - (e.clientX - drag.x) / 260);
+      drawSite(performance.now());
+    });
+    const end = () => { drag = null; cv.classList.remove('is-turning'); };
+    cv.addEventListener('pointerup', end);
+    cv.addEventListener('pointercancel', end);
+  }
+
+  function syncSite() {
+    const b = document.getElementById('bb-site-tour');
+    if (b) { b.setAttribute('aria-pressed', S.site.tour ? 'true' : 'false'); b.textContent = tourWords(); }
+    const sel = document.getElementById('bb-site-pick');
+    if (sel) sel.value = S.site.id;
+    paint('bb-site-say', siteSayHtml());
+    const cv = document.getElementById('bb-site-cv');
+    if (cv) cv.setAttribute('aria-label', siteName());
+    const zm = document.getElementById('bb-site-zoom');
+    if (zm) zm.setAttribute('aria-label', zoomName());
+  }
+
+  function siteSet(id, now) {
+    if (!UI[id]) return;
+    S.site.id = id;
+    S.site.at = now == null ? performance.now() : now;
+    syncSite();
+    drawSite(S.site.at);
+    kick();
+  }
+  // On by `d` faults, round and round.
+  function siteGo(d, now) {
+    const list = siteIds();
+    const i = list.indexOf(S.site.id);
+    siteSet(list[(i + d + list.length) % list.length], now);
+  }
+
+  function siteTour() {
+    S.site.tour = !S.site.tour;
+    S.site.at = performance.now();
+    syncSite();
+    kick();
+  }
+  function siteStep(d) {
+    siteGo(d < 0 ? -1 : 1);
+    announce(`${UI[S.site.id].name}: ${spot(S.site.id).where}`);
+  }
+  function siteShow(id) {
+    S.site.tour = false;
+    siteSet(id);
+  }
+  function siteBench() { pick(S.site.id, true); }
+
   function pick(id, scroll, fromMystery) {
     if (!UI[id]) return;
     S.effect = id;
+    // The site follows, and holds there: the fault on the bench is the one
+    // somebody is looking at.
+    if (S.site.id !== id || S.site.tour) { S.site.tour = false; siteSet(id); }
     if (fromMystery && S.mystery && S.mystery.id === id) S.params[id] = { ...S.mystery.params };
     const radio = document.getElementById(`bb-fx-${id}`);
     if (radio) radio.checked = true;
@@ -2064,12 +2228,14 @@ const BitBench = (function () {
   }
 
   return {
-    render, init, open, width, setNum, flipBit, op, setFrame, randomFrame, pick, set, sendOne, play, batch, batchSize, fixed,
+    render, init, open, width, setNum, flipBit, op, setFrame, randomFrame, siteTour, siteStep, siteShow, siteBench,
+    pick, set, sendOne, play, batch, batchSize, fixed,
     mystery, guess, pairs, pairsField, pairsExample, exportCsv, goTo, learn, tab, keepOpen,
     // The drawing kit, for the ⚡ Bit Errors lesson's figures: the same
     // canvases, colours and type as the bench's.
     ink: { fit, pal, text, line, alpha, caption, wrapText, FONT, FONT_B, MONO },
     state: () => ({ effect: S.effect, params: { ...params(S.effect) }, num: S.num, width: S.width, addr: S.addr, value: S.value,
+      site: { id: S.site.id, tour: S.site.tour, yaw: S.site.yaw },
       live: S.live ? { status: S.live.j.status, flips: S.live.j.flips.slice() } : null,
       batch: S.batch ? { id: S.batch.id, n: S.batch.n, counts: { ...S.batch.counts } } : null,
       pairs: parsePairs(S.pairsText).pairs.length,

@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 84, date: '2026-10-23', items: [
+      '<strong>Where faults happen</strong>, a new section on the <em>🧪 Bit Bench</em>: a model ALERT site in 3-D — a '
+        + 'river gauge sending, a repeater on the far hill hearing it, and between them a hill, a shed and a passing truck, '
+        + 'another gauge, a pager mast and a phone tower, a storm and an electric fence. It tours the fourteen faults one '
+        + 'at a time, lighting the place each one happens and drawing a close-up of what goes wrong there beside it; '
+        + '◀ ▶ step through them, <em>Hold this one</em> stops the tour, drag the site sideways to turn it, and '
+        + '<em>Try it on the bench</em> opens that fault in the Faults section. Each section of the Bit Bench now also '
+        + 'wears a picture and a colour of its own at the top, so they are easier to tell apart down the page.',
+    ] },
     { n: 83, date: '2026-10-23', items: [
       '<strong>📶 Fade margin, one way.</strong> Every fade margin is now priced the way the network runs — a field '
         + 'station to its repeater, a repeater to its base — and nothing else, since nothing transmits back down. The '

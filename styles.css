@@ -19670,13 +19670,28 @@ details.rp-more[open] > summary { margin-bottom: var(--sp-2); }
   .rp-sum { height: 190px; }
 }
 
-/* ── 🧪 Bit Bench (bit-bench.js, bit-model.js) ──────────────────────────────
-   A bench rather than a lesson: six panels, three canvases. The bits of a
+/* ── 🧪 Bit Bench (bit-bench.js, bit-model.js, bit-scene.js) ─────────────────
+   A bench rather than a lesson: seven panels, four canvases. The bits of a
    frame wear the 🎓 Radio Propagation lesson's colours (--rp-bit-*), so a
    frame looks the same on both tabs; a batch's outcomes are the app's status
    colours. Every width and height a script sets is a custom property (--w,
-   --h, --heat), never an inline style. */
+   --h, --heat), never an inline style. The site in 3-D (section 3) paints
+   the Radio Propagation scene's landscape tokens and the few of its own
+   below — a road, a solar panel, steel and a mast's red bands — the same in
+   every theme, because they are a landscape, not a surface. */
+:root {
+  --bs-road: #9d978b;
+  --bs-solar: #2c4a72;
+  --bs-steel: #6f7a85;
+  --bs-mast-red: #c8352b;
+}
 .bb-page h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); line-height: var(--lh-tight); }
+/* Each panel's heading wears its picture on a tile of its colour (Glyphs),
+   and the panel's top edge the same colour, so the seven tell apart at a
+   glance down a long page. */
+.bb-sec { border-top: 4px solid var(--hue, var(--hue-net)); }
+.bb-page h3.bb-sec-h { display: flex; align-items: center; gap: var(--sp-2); }
+.bb-sec-tile { width: 2.25rem; height: 2.25rem; border-radius: 10px; }
 .bb-page h4 { margin: var(--sp-4) 0 var(--sp-2); font-size: var(--fs-md); }
 .bb-page h5 { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-sm); }
 .bb-page p { margin: 0 0 var(--sp-3); max-width: 62rem; line-height: var(--lh-body); }
@@ -19684,7 +19699,8 @@ details.rp-more[open] > summary { margin-bottom: var(--sp-2); }
 .bb-title { margin: 0; font-size: var(--fs-xl); line-height: var(--lh-tight); }
 .bb-hero .bb-lede { margin: 0; font-size: var(--fs-md); }
 .bb-toc { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
-.bb-toc-btn { font-size: var(--fs-sm); }
+.bb-toc-btn { display: inline-flex; align-items: center; gap: .35rem; font-size: var(--fs-sm); }
+.bb-toc-btn .bb-toc-gl { width: 1rem; height: 1rem; }
 .bb-sec { min-width: 0; }
 .bb-aside { color: var(--muted); font-size: var(--fs-sm); }
 .bb-page p.bb-aside { margin-bottom: var(--sp-2); }
@@ -19784,7 +19800,19 @@ details.rp-more[open] > summary { margin-bottom: var(--sp-2); }
 .bb-frame-in { margin-bottom: var(--sp-3); }
 .bb-wave { display: block; width: 100%; height: 190px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); }
 
-/* 3 · Faults */
+/* 3 · Where faults happen: the site in 3-D, and beside it the close-up, the
+   sentence and the tour's buttons; one above the other on a narrow screen.
+   Dragged across, the site turns; up and down still scrolls the page. */
+.bb-site-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--sp-3); align-items: start; }
+.bb-site-cv { display: block; width: 100%; height: 460px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--rp-sky); cursor: grab; touch-action: pan-y; }
+.bb-site-cv.is-turning { cursor: grabbing; }
+.bb-site-side { display: grid; gap: var(--sp-3); min-width: 0; }
+.bb-site-zoom { display: block; width: 100%; height: 220px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); }
+.bb-site-ctl { display: grid; gap: var(--sp-2); justify-items: start; }
+.bb-site-ctl p { margin: 0; }
+.bb-page p.bb-site-say { margin: 0; padding: var(--sp-2) var(--sp-3); border-left: 4px solid var(--hue-field); background: var(--subtle); border-radius: var(--r-sm); min-height: 7.5rem; }
+
+/* 4 · Faults */
 .bb-fam { margin-bottom: var(--sp-2); }
 .bb-fx-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--sp-4); align-items: start; margin-top: var(--sp-3); }
 .bb-fx-name { margin-top: 0; }
@@ -19866,7 +19894,7 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .bb-tbl td { font-variant-numeric: tabular-nums; }
 .bb-tbl mark { background: color-mix(in srgb, var(--bad) 25%, transparent); color: inherit; font-weight: 700; border-radius: 2px; }
 
-/* 4 · Whodunnit, 5 · your readings, 6 · read more */
+/* 5 · Whodunnit, 6 · your readings, 7 · read more */
 .bb-guess { margin: var(--sp-3) 0; align-items: flex-end; }
 .bb-answer { padding: var(--sp-3); border-radius: var(--r-md); border: 1px solid var(--border); border-left-width: 4px; }
 .bb-answer--right { border-left-color: var(--ok); }
@@ -19888,10 +19916,12 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 }
 
 @media (max-width: 900px) {
-  .bb-batch-grid, .bb-pairs-in { grid-template-columns: minmax(0, 1fr); }
+  .bb-batch-grid, .bb-pairs-in, .bb-site-grid { grid-template-columns: minmax(0, 1fr); }
+  .bb-page p.bb-site-say { min-height: 0; }
 }
 
 @media (max-width: 560px) {
+  .bb-site-cv { height: 300px; }
   .bb-cv { height: 290px; }
   .bb-wave { height: 170px; }
   .bb-nbit { min-width: 2.4rem; }
