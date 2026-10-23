@@ -29,6 +29,11 @@
 //      the tab the accounts waiting with Approve, Approve as editor and
 //      Decline (asked first), each sent to admin_user_decide; and the switch
 //      for who may sign up, sent to admin_set_signup.
+//   7. **A refresh with no answer** — a stored session found expired on a
+//      page that opens with no network (a phone's home-screen app brought
+//      back, a laptop woken) is kept, not signed out, and refreshed once, not
+//      twice; back online, the retry signs in properly. A refresh GoTrue
+//      itself refuses still signs out.
 //
 // Why a check of its own: every failure here is a door that looks shut or
 // open when it is the other. A sign-up that never says it is waiting, a code
@@ -79,6 +84,9 @@ async function main() {
   const browser = await launchBrowser();
   const errors = [];
   const sent = [];          // every request to the stand-ins: { path, method, body, query }
+  // What the next refreshes get: `down` of them no answer at all, then a
+  // refusal if `refuse`, else a session.
+  const refreshes = { down: 0, refuse: false };
 
   async function open(url, { nudge = false, store = null, viewport = { width: 1440, height: 900 } } = {}) {
     const context = await browser.newContext({ viewport });
@@ -106,7 +114,11 @@ async function main() {
         if (body.email === 'sam@bom.gov.au' && body.password === PASSWORD) return reply(200, session('tok-sam', body.email));
         return reply(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
       }
-      if (path === 'token') return reply(200, session(String(body.refresh_token || '').replace(/^r-/, ''), null));
+      if (path === 'token') {
+        if (refreshes.down > 0) { refreshes.down--; return route.abort('internetdisconnected'); }
+        if (refreshes.refuse) return reply(400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' });
+        return reply(200, session(String(body.refresh_token || '').replace(/^r-/, ''), null));
+      }
       if (path === 'signup') return reply(200, { id: 'id-new', email: body.email, confirmation_sent_at: '2026-10-13T00:00:00Z', identities: [{}] });
       if (path === 'verify') {
         // A link from docs/accounts.md's templates: a token_hash and no address.
@@ -490,6 +502,48 @@ async function main() {
     const sw = sentTo('rpc/admin_set_signup', b6).pop();
     check('the switch for who may sign up goes to admin_set_signup', sw && sw.body.p_open === false, J(sw));
     await c6.close();
+
+    // ═══════════════════════════════════════════════════════════════════════
+    log('\n7. A refresh with no answer\n');
+    {
+      const expired = { access_token: 'tok-old', refresh_token: 'r-tok-sam', expires_at: Date.now() - 3600e3, email: 'sam@bom.gov.au' };
+      refreshes.down = 1;
+      const b7 = sent.length;
+      const { context, page } = await open(server.url('/index.html?tab=stations'), { store: expired });
+      await page.waitForFunction(() => document.getElementById('btn-auth')?.textContent.trim(), null, { timeout: 10_000 });
+      await page.waitForTimeout(1500);
+      const held = await page.evaluate(() => ({
+        in: Auth.isSignedIn(), known: Auth.known(), header: document.getElementById('btn-auth').textContent.trim(),
+        stored: !!localStorage.getItem('meganet.session'),
+      }));
+      const tries = sentTo('token', b7).length;
+      check('an expired session whose refresh gets no answer is kept — still signed in, still stored, no logout',
+        held.in && held.stored && !held.known && /sam/.test(held.header) && sentTo('logout', b7).length === 0, J(held));
+      check('…and its refresh token is sent once, not twice', tries === 1, `${tries} refreshes`);
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await page.waitForFunction(() => Auth.known(), null, { timeout: 10_000 });
+      const back = await page.evaluate(() => ({
+        in: Auth.isSignedIn(), token: Auth.accessToken(), mayWrite: Auth.mayWrite(),
+        stored: JSON.parse(localStorage.getItem('meganet.session') || 'null')?.access_token,
+      }));
+      check('back online, the retry refreshes it and asks who this is',
+        back.in && back.token === 'tok-sam' && back.stored === 'tok-sam' && back.mayWrite
+          && sentTo('rpc/whoami', b7).some(r => r.auth === 'tok-sam'), J(back));
+      await context.close();
+    }
+    {
+      const expired = { access_token: 'tok-old', refresh_token: 'r-tok-sam', expires_at: Date.now() - 3600e3, email: 'sam@bom.gov.au' };
+      refreshes.refuse = true;
+      const { context, page } = await open(server.url('/index.html?tab=stations'), { store: expired });
+      await page.waitForFunction(() => !Auth.isSignedIn(), null, { timeout: 10_000 }).catch(() => {});
+      const gone = await page.evaluate(() => ({
+        in: Auth.isSignedIn(), stored: !!localStorage.getItem('meganet.session'),
+        header: document.getElementById('btn-auth').textContent.trim(),
+      }));
+      check('a refresh GoTrue refuses still ends the session here', !gone.in && !gone.stored && /Sign in/.test(gone.header), J(gone));
+      refreshes.refuse = false;
+      await context.close();
+    }
   } finally {
     await browser.close();
     server.close();
@@ -499,7 +553,7 @@ async function main() {
   const failed = results.filter(r => !r.ok);
   log(failed.length
     ? `\nFAIL — ${failed.length} of ${results.length}:\n${failed.map(f => `  ✗ ${f.label}`).join('\n')}`
-    : `\nPASS — accounts: the visitor note, a password, a new account waiting, a reset, and an administrator deciding (${results.length} checks).`);
+    : `\nPASS — accounts: the visitor note, a password, a new account waiting, a reset, and an administrator deciding, and a refresh with no answer kept (${results.length} checks).`);
   process.exit(failed.length ? 1 : 0);
 }
 

@@ -347,4 +347,6 @@ so a stranger can cause a notification; at most one a minute reaches each device
 | A device's row says *the last one did not go: HTTP 403* | The push service refused the signature — usually a key changed since the device was turned on. Turn it on again on that device. |
 | Turned on, but no test arrives | Focus or Do Not Disturb; or iOS Settings → **Notifications → Flood-Net** is off. The device's row says *last sent* once Apple has taken it. |
 | No *Turn on* button on an iPhone | This is Safari's tab, not the home-screen app: step G 1–2. |
+| An emailed link signed Safari in, but the iPhone's home-screen app is still signed out | iOS opens a link from Mail in Safari, never in the home-screen app, and the two keep separate sign-ins. In the app, type the six-digit code from the same email; the panel says so there. |
+| Signed out of an app or tab that was asleep (a laptop's lid, an iPhone's home-screen app in the background) | Before 23 October 2026 a refresh that got no answer on waking signed the session out (auth log: a `/logout` 403 *token is expired* with no `/token` refresh before it). It now keeps the session and tries again. A refresh GoTrue itself refuses (`/token` 400) still signs out. |
 | The icon's number is out of date | It catches up when the app is opened (step G, the count). |

@@ -117,6 +117,15 @@ const Auth = (function () {
   // hour; a minute of margin covers a slow request and a clock that disagrees.
   const REFRESH_MARGIN_MS = 60 * 1000;
 
+  // A refresh that got no answer is tried again after this long, doubling each
+  // time up to the cap. No answer is not a refusal: a laptop opening its lid or
+  // an iPhone's home-screen app brought back runs the refresh that fell due
+  // while it slept before the network is back (seen in the auth log, 21 Oct
+  // 2026: a logout with an expired token and no refresh before it — the
+  // session thrown away for want of a connection).
+  const RETRY_MS = 5 * 1000;
+  const RETRY_MAX_MS = 5 * 60 * 1000;
+
   // The shortest password the form sends. GoTrue's own minimum is a dashboard
   // setting (docs/accounts.md asks for this same figure there); length is what
   // makes a password strong, so this asks for length and nothing else — no
@@ -133,6 +142,11 @@ const Auth = (function () {
   let session = null;      // { access_token, refresh_token, expires_at, email, via? }
   let who     = null;      // last meganet.whoami() answer, or null
   let timer   = null;
+  let refreshing = null;   // the refresh in flight, which every caller shares
+  let retries = 0;         // refreshes in a row that got no answer
+  // start() found the token expired and the refresh got no answer, so the rest
+  // of start() — asking who this is — waits for the retry that gets one.
+  let settleLater = false;
   // What the panel is showing and what has been typed into it. Typing is
   // mirrored here rather than left in the DOM because every state change
   // repaints the panel: a message that arrives while somebody is mid-type would
@@ -176,6 +190,7 @@ const Auth = (function () {
   // so no path can adopt half of it.
   function adopt(s) {
     session = s;
+    retries = 0;
     store(s);
     dbSetAccessToken(s ? s.access_token : null);
     scheduleRefresh();
@@ -201,15 +216,41 @@ const Auth = (function () {
     timer = setTimeout(refresh, Math.max(0, due));
   }
 
-  async function refresh() {
+  // One refresh at a time. A refresh token is single-use, and start() with an
+  // expired session used to send it twice — once from the timer adopt() set,
+  // once from start() itself — which only worked because GoTrue forgives a
+  // reuse within ten seconds.
+  function refresh() {
+    if (!refreshing) refreshing = redeem().finally(() => { refreshing = null; });
+    return refreshing;
+  }
+
+  // GoTrue itself turning the refresh token down — a status it chose and an
+  // error code in its own JSON — as against no answer at all: no network, a
+  // 5xx, the Worker's 502, a 429, or a page that is not GoTrue's.
+  function refused(err) {
+    const s = err && err.status;
+    return s >= 400 && s < 500 && s !== 408 && s !== 429 && !!err.code;
+  }
+
+  async function redeem() {
     if (!session || !session.refresh_token) return false;
     try {
       const body = await post(`token?grant_type=refresh_token`,
                               { refresh_token: session.refresh_token });
       adopt({ ...fromTokenResponse(body, session.email), ...(session.via ? { via: session.via } : {}) });
+      if (settleLater) { settleLater = false; settle(); }
       return true;
-    } catch (_) {
-      // A refresh token is single-use and expires; a failure here means the
+    } catch (err) {
+      // No answer: the session is still good, the token stays, and the refresh
+      // is tried again — sooner if the page is shown or the network comes back
+      // (wake). Signing out here is what took a session away for good.
+      if (!refused(err)) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(refresh, Math.min(RETRY_MAX_MS, RETRY_MS * 2 ** retries++));
+        return false;
+      }
+      // A refresh token is single-use and expires; a refusal here means the
       // session is over, and pretending otherwise leaves the app showing a name
       // for someone the database will refuse — or one an administrator has
       // just declined, whose refresh GoTrue now refuses. Behind the gate that
@@ -445,6 +486,7 @@ const Auth = (function () {
   // After any way in: the database asked who this is, the panel told, every tab
   // that keeps something for a session told.
   async function arrived(note) {
+    settleLater = false;
     who = await whoami();
     if (who && who.email && session && !session.email) { session.email = who.email; store(session); }
     setBusy(false);
@@ -1054,6 +1096,18 @@ const Auth = (function () {
               back as a precaution: its quarantine, or whoever looks after its email, can release it.</p>`;
   }
 
+  // What the email's link does. An iPhone opens a link from Mail in Safari,
+  // never in the home-screen app, and the two keep separate sign-ins: the link
+  // signs Safari in and leaves the app as it was. So in the app the code, typed
+  // here, is the way in. `lead` comes first either way.
+  function linkHtml(usual = '', lead = '') {
+    const app = typeof navigator !== 'undefined' && navigator.standalone === true;
+    if (!app && !usual) return '';
+    return `<p class="small">${app
+      ? `${lead}Use the code: in the home-screen app, the email’s link opens in Safari, which keeps a sign-in of its own.`
+      : usual}</p>`;
+  }
+
   function template() {
     const busy = ui.busy;
     const msg  = msgHtml();
@@ -1128,7 +1182,7 @@ const Auth = (function () {
             <input type="text" id="au-code" inputmode="numeric" autocomplete="one-time-code"
                    placeholder="123456" value="${escAttr(ui.code)}" ${busy ? 'disabled' : ''}>
           </label>
-          <p class="small">The email's link does the same job, in whichever tab it opens.</p>
+          ${linkHtml('The email\'s link does the same job, in whichever tab it opens.')}
           <div class="modal-foot">
             <button type="button" onclick="Auth.resend()" ${busy ? 'disabled' : ''}>Send it again</button>
             <button type="submit" class="primary" ${busy ? 'disabled' : ''}>Confirm</button>
@@ -1141,7 +1195,8 @@ const Auth = (function () {
       body = `
         <form class="modal-form" onsubmit="Auth.forgot(event)" novalidate>
           ${emailHtml(busy)}
-          <p class="small">We email a link and a code. Either signs you in, and then you choose a new password.</p>
+          ${linkHtml('We email a link and a code. Either signs you in, and then you choose a new password.',
+                     'We email a link and a code. ')}
           ${msg}
           <div class="modal-foot">
             <button type="button" onclick="Auth.go('signin')" ${busy ? 'disabled' : ''}>Back</button>
@@ -1158,6 +1213,7 @@ const Auth = (function () {
             <input type="text" id="au-code" inputmode="numeric" autocomplete="one-time-code"
                    placeholder="123456" value="${escAttr(ui.code)}" ${busy ? 'disabled' : ''}>
           </label>
+          ${linkHtml()}
           ${notArrivedHtml()}
           <div class="modal-foot">
             <button type="button" onclick="Auth.go('forgot')" ${busy ? 'disabled' : ''}>Send another</button>
@@ -1206,8 +1262,7 @@ const Auth = (function () {
             <input type="text" id="au-code" inputmode="numeric" autocomplete="one-time-code"
                    placeholder="123456" value="${escAttr(ui.code)}" ${busy ? 'disabled' : ''}>
           </label>
-          <p class="small">The email also contains a link. Clicking it signs you in in whichever
-             tab it opens, and you can ignore this box.</p>
+          ${linkHtml('The email also contains a link. Clicking it signs you in in whichever tab it opens, and you can ignore this box.')}
           ${msg}
           ${notArrivedHtml()}
           <div class="modal-foot">
@@ -1471,18 +1526,40 @@ const Auth = (function () {
         adopt(s);
         syncHeader();
       }
-      if (session.expires_at <= Date.now() && !await refresh()) { nudge(); return; }
-      who = await whoami();
-      // A token the database will not honour is worse than no token: the editor
-      // would offer to save and the save would be refused.
-      if (who && who.signed_in === false) { await signOut({ announce: false }); nudge(); return; }
-      if (who && who.email && session && !session.email) { session.email = who.email; store(session); }
-      syncHeader();
-      render();
-      if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
-      tabsAuthChanged();
-      sayStanding();
+      if (session.expires_at <= Date.now() && !await refresh()) {
+        // Still held means no answer yet: the retry that gets one settles.
+        if (session) settleLater = true;
+        else nudge();
+        return;
+      }
+      await settle();
     })();
+
+    window.addEventListener('online', wake);
+    document.addEventListener('visibilitychange', wake);
+  }
+
+  // The rest of start(), once the token held is one the database can be asked
+  // about.
+  async function settle() {
+    who = await whoami();
+    // A token the database will not honour is worse than no token: the editor
+    // would offer to save and the save would be refused.
+    if (who && who.signed_in === false) { await signOut({ announce: false }); nudge(); return; }
+    if (who && who.email && session && !session.email) { session.email = who.email; store(session); }
+    syncHeader();
+    render();
+    if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
+    tabsAuthChanged();
+    sayStanding();
+  }
+
+  // Back on screen, or back online: a token that fell due meanwhile is
+  // refreshed now rather than when the next retry comes round. An iPhone
+  // freezes a home-screen app's timers while it is in the background.
+  function wake() {
+    if (!session || document.visibilityState === 'hidden') return;
+    if (session.expires_at - Date.now() <= REFRESH_MARGIN_MS) refresh();
   }
 
   return {
