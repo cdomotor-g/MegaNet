@@ -94,6 +94,8 @@ MegaNet/
 ├── map-river-lines.js      ← MapRiverLines — the rivers themselves, from the BoM
 │                             Geofabric: on by default, named along their
 │                             courses, each one selectable, with its stations
+├── river-catchments.js     ← RiverCatchments — a selected river's or a gauge's
+│                             catchment, outlined and shaded by its own ground
 ├── map-spider.js           ← MapSpider — fans overlapping pins out on leader lines
 ├── map-locate.js           ← MapLocate — GPS dot, accuracy ring, compass cone
 ├── map-move-pin.js         ← MapMovePin — drag one station's pin to where the
@@ -1297,6 +1299,7 @@ here.
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
 - **Rivers and creeks** on by default — every principal named river and creek in Australia from the Bureau's Geofabric, named along its course and drawn heavier the more country drains through it; hover one for its name, click it to select it end to end and see which stations are on it
+- **Catchments** — a selected river's catchment, and the one above a station's gauge from its card, outlined from the Bureau's Geofabric and shaded by the height of its own ground
 - Light up the watercourses whose names match the filter box, drawn beneath the pins from OpenStreetMap (*Highlight matching rivers*)
 - Draw and measure over the map: pins, lines, circles, rectangles and text, placed by hand or by coordinates and km, in a colour of your choosing
 - Export the whole drawing to Google Earth as a KML — the shapes in their own colours, and the stations they enclose or run between
@@ -2301,7 +2304,12 @@ name; click it to select it — lit from its headwaters to its mouth — with a
 callout giving its drainage area and length, the network's stations on it
 (each a button to go there), *Zoom to the whole river* and *Clear selection*.
 Open map, 🧹, or *Clear* in the panel puts it down. A river picked in 📍 *Find
-a place* is selected the same way. See `docs/rivers.md`.
+a place* is selected the same way. Selecting a river also outlines its
+**catchment** — the Geofabric's sub-catchments upstream of its mouth, joined —
+and shades it by the height of its own ground, the ramp stretched over that
+catchment's own range; a station on a stream has a *Catchment* section on its
+card with the area above its gauge (the Bureau's own at a gauged node) and a
+button that shows it. See `docs/rivers.md`.
 
 **Highlighting rivers.** Half this network is named after the river it sits on,
 so typing `burdekin` into the filter box lights up the Burdekin and its named

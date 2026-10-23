@@ -3730,6 +3730,11 @@ const state = {
   // turns it off. Its 1.5 MB is read when the map first opens, not at load.
   mapRiverLines:  (() => { try { return localStorage.getItem('mn-river-lines') !== 'off'; }
                            catch (_) { return true; } })(),
+  // …and a selected river's catchment drawn with it, shaded by its own ground
+  // (see RiverCatchments). On, and remembered once turned off, on the same
+  // terms: it is read only when a river is selected.
+  mapRiverCatchment: (() => { try { return localStorage.getItem('mn-river-catchment') !== 'off'; }
+                              catch (_) { return true; } })(),
   // Survey marks & CORS sites (see MapSurvey, #120). On by default now, and
   // remembered like mapRivers: a crew standing at a site wants the benchmarks
   // beside the station without going looking for a checkbox first, and an

@@ -728,14 +728,15 @@ const MapRiverLines = (function () {
   // opens its own callout, and when one opened during this click — before
   // this handler or after it — the line under the point stands down.
   function onMapClick(e) {
-    if (!map || pointerTaken() || (!drawn.size && !selected)) return;
+    const catchment = typeof RiverCatchments !== 'undefined' && RiverCatchments.active();
+    if (!map || pointerTaken() || (!drawn.size && !selected && !catchment)) return;
     const r = riverAt(e.latlng, isTouch(e) ? HIT_TOUCH_PX : HIT_PX);
     const at = e.latlng;
     const since = (e.originalEvent && e.originalEvent.timeStamp) || performance.now();
     setTimeout(() => {
       if (!map || foreignPopupAt >= since - 1) return;
       if (r) select(r, { at, callout: true });
-      else if (selected) clearSelection();
+      else if (selected || (typeof RiverCatchments !== 'undefined' && RiverCatchments.active())) clearSelection();
     }, 0);
   }
 
@@ -765,8 +766,22 @@ const MapRiverLines = (function () {
       out.push(line(esc(`${kindWord(r.name)} · a minor watercourse in the Geofabric`
         + (r.area >= 1 ? ` · about ${fmtInt(r.area)} km² drains through the reaches drawn` : ''))));
     } else {
-      out.push(line(esc(`${kindWord(r.name)} · ${fmtInt(r.area)} km² drains through its lowest reach`)));
+      // The catchment's area when it has one: the sub-catchments upstream of
+      // its mouth, joined, which is the basin's own figure (the Burdekin's
+      // 127,000 km²). The network's figure at its lowest reach can be well
+      // short of it — 94,000 km² for the Burdekin — so it is the fallback.
+      const ci = typeof RiverCatchments !== 'undefined' ? RiverCatchments.riverInfo(r.id) : undefined;
+      if (ci) {
+        out.push(line(esc(`${kindWord(r.name)} · catchment ${fmtInt(ci.area)} km²` + (state.mapRiverCatchment
+          ? ', outlined on the map and shaded by its own ground' : ''))));
+      } else {
+        out.push(line(esc(`${kindWord(r.name)} · ${fmtInt(r.area)} km² drains through its lowest reach`)));
+      }
       out.push(line(esc(`${fmtInt(r.len)} km of channel mapped, tributaries of the same name included`), 'txt-muted'));
+      if (ci === null) {
+        out.push(line(esc('No catchment of its own here — the Geofabric\'s sub-catchments are too '
+          + 'coarse to cut one for it'), 'txt-muted'));
+      }
     }
     const on = stationsOn(r);
     if (on.length) {
@@ -833,6 +848,18 @@ const MapRiverLines = (function () {
     applyLabels();
     syncAttribution();
     if (callout) openCallout(r, at);
+    // Its catchment (river-catchments.js), shaded by its own ground, unless
+    // the switch under the rivers says not to. A minor creek has none: it is
+    // not in the rivers file the catchments were built for.
+    if (!r.minor && typeof RiverCatchments !== 'undefined') {
+      if (state.mapRiverCatchment) {
+        RiverCatchments.showRiver(r.id, r.title).then(() => {
+          if (selected === r && popup && popup.isOpen()) popup.update();
+        });
+      } else {
+        RiverCatchments.clear();
+      }
+    }
     setNote();
     rerenderMapLegend();
     announce(`${r.title} selected on the map.`);
@@ -845,6 +872,8 @@ const MapRiverLines = (function () {
   }
 
   function clearSelection() {
+    const catchment = typeof RiverCatchments !== 'undefined' && RiverCatchments.active();
+    if (catchment) RiverCatchments.clear();
     if (!selected && !popup) return;
     selected = null;
     if (popup) { popup.remove(); popup = null; }
@@ -1063,6 +1092,16 @@ const MapRiverLines = (function () {
     // The harness blocks the live service, so a check that can never fetch a
     // minor creek hands its features in here and they take the real path.
     seedMinor(features) { const n = addMinor(features); sync(); return n; },
+
+    // The switch under the rivers: a selected river's catchment shown with it.
+    setCatchment(on) {
+      state.mapRiverCatchment = !!on;
+      try { localStorage.setItem('mn-river-catchment', on ? 'on' : 'off'); } catch (_) {}
+      if (typeof RiverCatchments === 'undefined') return;
+      if (on && selected && !selected.minor) RiverCatchments.showRiver(selected.id, selected.title);
+      else if (!on && RiverCatchments.shown() && RiverCatchments.shown().kind === 'river') RiverCatchments.clear();
+      if (popup && popup.isOpen()) popup.update();
+    },
 
     setEnabled(on) {
       state.mapRiverLines = !!on;

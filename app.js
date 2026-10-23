@@ -93,7 +93,7 @@ function applyTheme({ repaint = true } = {}) {
       + '. Choose another.';
   }
   if (!repaint || was === state.theme) return;
-  if (state.map) { refreshMapLayers(); MapDraw.render(); MapRivers.repaint(); MapRiverLines.repaint(); }
+  if (state.map) { refreshMapLayers(); MapDraw.render(); MapRivers.repaint(); MapRiverLines.repaint(); RiverCatchments.repaint(); }
   // The ARRO chart writes real colour values into its SVG rather than `var(…)`,
   // so that the PNG export has something to resolve. That is the trade: the
   // chart has to be told the palette moved.
@@ -5225,6 +5225,12 @@ function mapDisplayControlsHtml() {
              onchange="MapRiverLines.setEnabled(this.checked)">
       Rivers and creeks (Geofabric, BoM)
     </label>
+    <label class="filter-check filter-sub"
+           title="Selecting a river also outlines the land that drains into it — the Bureau's Geofabric catchments, cut from a ~30 m elevation model — and shades that land by its own height, low green to pale tops. A station's card can show the catchment above its gauge whether or not this is ticked.">
+      <input type="checkbox" ${state.mapRiverCatchment ? 'checked' : ''}
+             onchange="MapRiverLines.setCatchment(this.checked);rerenderMapLegend()">
+      …with its catchment, shaded by height
+    </label>
     <p class="filter-note" id="map-river-lines-note">${MapRiverLines.noteHtml()}</p>
     <!-- Ground height as colour (#186). It was a base map until then, one radio
          beside OSM-Topo — and picked as a base it took the localities, the
@@ -5784,6 +5790,7 @@ function mapLegendHtml() {
            as you zoom, and are off out here where direction is not the question being asked`}</span>
     </span>` : ''}
     ${MapRiverLines.active() ? MapRiverLines.legendHtml() : ''}
+    ${RiverCatchments.active() ? RiverCatchments.legendHtml() : ''}
     ${MapRivers.active() ? `
     <span class="legend-item">
       <span class="legend-line legend-line-river"></span>
@@ -6021,6 +6028,7 @@ function stopStationsMap() {
   MapDraw.detach();
   LinkBudget.detach();
   MapRiverLines.detach();
+  RiverCatchments.detach();
   MapRivers.detach();
   MapCatchments.detach();
   MapHubs.detach();
@@ -6185,6 +6193,7 @@ function initMap() {
   // tick, so every point layer's click — attached before it or after — has
   // had its say before a river is selected or put down.
   MapRiverLines.attach(state.map);
+  RiverCatchments.attach(state.map);
   MapRivers.attach(state.map);
   MapCatchments.attach(state.map);
   MapHubs.attach(state.map);
@@ -7997,6 +8006,8 @@ function repaintStnCard() {
   SiteRoads.ask(`mn-roads-card-${s.id}`, s);
   // …and the mobile signal there, on the same terms (site-mobile.js).
   SiteMobile.ask(`mn-mobile-card-${s.id}`, s);
+  // …and the catchment above its gauge, from a 75 KB index read once.
+  RiverCatchments.ask(`mn-catch-card-${s.id}`, s);
   // The equipment register, for a signed-in editor, on the same terms.
   if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
   // …and its site features (site-features.js), kept per station for two
@@ -8379,6 +8390,11 @@ function stnCardHtml(s) {
          editor has added since. Its own section, like the SLS below it, and
          empty for a station none of those lists names. river-details.js. -->
     ${RiverDetails.cardHtml(s)}
+    <!-- The land that drains to the station, from the Bureau's Geofabric
+         catchments (river-catchments.js): its area, how it was found, and a
+         button that shades it on the map. Filled by RiverCatchments.ask once
+         its index is here, the way the mobile section is. -->
+    ${RiverCatchments.cardHtml(s)}
     <!-- The modelled AEP flood levels at the station (0033), its own section
          because a model is talking, not the Bureau's lists: indicative levels,
          the sheet's own confidence, and the velocity's workings. -->

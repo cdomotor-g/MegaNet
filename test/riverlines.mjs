@@ -209,7 +209,7 @@ try {
   check('a click selects the river and lights every reach of it', sel.sel && sel.sel.title === 'Burdekin River' && sel.core > 0,
     JSON.stringify({ sel: sel.sel, core: sel.core }));
   check('its callout says how much drains through it, and lists its stations as buttons',
-    /Burdekin River/.test(sel.pop) && /km² drains through its lowest reach/.test(sel.pop)
+    /Burdekin River/.test(sel.pop) && /km² drains through its lowest reach|catchment [\d,]+ km²/.test(sel.pop)
       && sel.buttons.length > 0 && sel.buttons.length === Math.min(onIt, 8) && /stations? of this network on it/.test(sel.pop),
     `${sel.buttons.length} buttons, ${onIt} on it — ${sel.pop.slice(0, 160)}`);
   check('the note and the legend say what is selected',

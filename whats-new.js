@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 90, date: '2026-10-23', items: [
+      '<strong>Catchments</strong>, on the Stations map: selecting a river now also outlines the land that drains into it '
+        + 'and shades that land by its own height — low ground green, the ranges brown, the tops pale — with the heights '
+        + 'it runs between in the legend and the catchment\'s area in the river\'s card. The boundaries are the Bureau of '
+        + 'Meteorology\'s, cut from a 30 m elevation model at every gauge and junction of the stream network. A station on a '
+        + 'stream has a new <em>Catchment</em> section on its card: the area above its gauge and a button to show it on the '
+        + 'map. Click open map, or 🧹, to put it down; untick <em>…with its catchment, shaded by height</em> in 🗺️ Map display '
+        + 'to select rivers without it.',
+    ] },
     { n: 89, date: '2026-10-23', items: [
       '<strong>⛰️ 3-D view, in the Map section.</strong> The 3-D view button has moved up the Stations side panel\'s '
         + 'rail into <em>Map</em>, under the layers and the legend, with its compass and tilt buttons. Its settings no '

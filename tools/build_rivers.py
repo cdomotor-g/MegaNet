@@ -386,9 +386,10 @@ def cut_at_tiles(line):
     return pieces
 
 
-def build(segs, min_area):
-    """(rivers, tiles): the national index with every river's big reaches, and
-    tile key → the smaller reaches that start in it."""
+def assemble(segs, min_area):
+    """The rivers, largest first — a river's place in this list is its index
+    in the file — each with its name, area, length, box, banded lines and the
+    segments it is made of (build_catchments.py reads those)."""
     by_id = {s['id']: s for s in segs if s['id'] is not None}
     river_of = systems(segs, by_id)
     groups = {}
@@ -408,10 +409,18 @@ def build(segs, min_area):
                round(max(p[0] for p in pts), 3), round(max(p[1] for p in pts), 3)]
         area = max(m['area'] for m in members)
         found.append({'name': members[0]['name'], 'area': area,
-                      'len': sum(m['len'] for m in members), 'box': box, 'lines': lines})
+                      'len': sum(m['len'] for m in members), 'box': box, 'lines': lines,
+                      'members': members})
     # Largest first: the index a tile names a river by is its place here, and
     # the order is also the order the map would label them in.
     found.sort(key=lambda r: (-r['area'], r['name']))
+    return found
+
+
+def build(segs, min_area):
+    """(rivers, tiles): the national index with every river's big reaches, and
+    tile key → the smaller reaches that start in it."""
+    found = assemble(segs, min_area)
     rivers, tiles = [], {}
     for rid, r in enumerate(found):
         core = []

@@ -78,6 +78,9 @@ on:
       - 'data/rivers-au.json'
       - 'data/rivers-au/**'
       - 'tools/build_rivers.py'
+      # …and the catchments built from the same network.
+      - 'data/catchments-au/**'
+      - 'tools/build_catchments.py'
       # The mobile transmitter extract the coverage section reads, and the
       # script that makes it monthly: `npm run mobile` holds the files' shape.
       # …and the carriers' coverage tiles and the script that makes them
@@ -168,6 +171,9 @@ on:
       - 'data/rivers-au.json'
       - 'data/rivers-au/**'
       - 'tools/build_rivers.py'
+      # …and the catchments built from the same network.
+      - 'data/catchments-au/**'
+      - 'tools/build_catchments.py'
       # The mobile transmitter extract the coverage section reads, and the
       # script that makes it monthly: `npm run mobile` holds the files' shape.
       # …and the carriers' coverage tiles and the script that makes them
@@ -565,6 +571,16 @@ jobs:
       - name: Rivers layer — on by default, named, and each river selectable
         working-directory: test
         run: npm run riverlines
+
+      # A selected river's catchment and a gauge's (river-catchments.js), from
+      # the files tools/build_catchments.py writes: read in Node against the
+      # rivers file, then drawn — outlined, shaded by its own ground over the
+      # harness's hilly terrain, clipped to the outline — named in the legend
+      # and the callout, put down with the river, switched off and on, shown
+      # from a gauged station's card, and a flat wash when the terrain is cut off.
+      - name: Catchments — a river's and a gauge's, shaded by height
+        working-directory: test
+        run: npm run rivercatchments
 
       # The road reserve, and the intersections that were missing from it. The
       # DCDB files the crossing square at a junction under its own parcel_typ

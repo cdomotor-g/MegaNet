@@ -1110,3 +1110,37 @@ The fetch is 85 pages of 2,000 segments and takes twenty to thirty minutes;
 with `--cache`, a rebuild with other bands or tolerance asks for nothing. There
 is nothing to re-run it for unless the Bureau publishes a new version of the
 Geofabric. `npm run riverlines` holds the files to their shape.
+
+## The catchments: `build_catchments.py`
+
+`build_catchments.py` writes `data/catchments-au/`, the catchments
+`river-catchments.js` shades when a river is selected or a station card asks:
+`index.json` (each river's and station's area, and which file holds its
+outline) and the outlines, 32 to a file. The source is the Bureau's Geofabric
+v3.3 *Hydrology Reporting Catchments* — 53,804 sub-catchments cut from a ~30 m
+hydrologically conditioned DEM at every significant node of the stream
+network, each draining from one node to the next, 2,699 of the nodes gauging
+stations — and the *Surface Hydrology Network*'s link from each river segment
+to its sub-catchment, all from the Digital Atlas copy (© Commonwealth of
+Australia (Bureau of Meteorology), CC BY 4.0).
+
+A river's catchment is everything upstream of the sub-catchment its lowest
+reach is in; a station's is everything above its gauging node when its AWRC
+number is one, else above the reach it stands on. Both are checked against
+the network's own drainage area at that point and left out when they are not
+within 0.6–1.6 of it — the case of a small creek inside a big river's
+sub-catchment. The sub-catchments are burnt into one national grid at
+0.0025° (~250 m), each catchment's cells are traced into an outline, and the
+outline is simplified to a tolerance that grows with its size.
+
+The one tool here that needs a package: **numpy** (`pip install numpy`), for
+a grid of 230 million cells. It also reads `build_rivers.py`'s cached pages,
+so a river's index here is its index in `rivers-au.json`.
+
+```bash
+python3 tools/build_catchments.py --cache ~/geofabric-catchments --rivers-cache ~/geofabric-rivers
+```
+
+The sub-catchment pages are about 50 MB each, 27 of them, forty-five minutes
+or so from the service; with `--cache` a rebuild asks for nothing and takes a
+few minutes. `npm run rivercatchments` holds the files to their shape.

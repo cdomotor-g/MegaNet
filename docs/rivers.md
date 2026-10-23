@@ -62,6 +62,61 @@ A river's stations are the register's stations whose `stream` names it — with
 the register's shorthands read as words (CK, R, STH, NTH) — and that stand
 inside its extent, because "Deep Creek" is several different creeks.
 
+## A river's catchment, and a gauge's
+
+Selecting a river also shows **the land that drains into it**: outlined, and
+shaded by the height of its own ground — river-flat green through the plains'
+straw and the ranges' brown to pale tops. The ramp is stretched over that
+catchment's own heights (its 2nd to 98th percentile, which the legend gives),
+so the relief of a coastal creek reads as clearly as the Great Dividing Range.
+The callout gives the catchment's area. *…with its catchment, shaded by
+height*, under the rivers switch in Map display, turns it off (remembered).
+
+A station on a stream has a **Catchment** section on its card: the area above
+its gauge, and *Show the catchment on the map*. It is the Bureau's own where
+the station's AWRC number is a gauging station of the Geofabric's network
+(the card says so); otherwise it is placed on the station's stream by name and
+position, to the nearer of the two sub-catchment boundaries round it — the one
+whose area is closer to the Geofabric's own drainage area at that reach.
+
+Either is put down with the river: a click on open map, *Clear selection*, or
+🧹.
+
+**Where the boundaries come from.** Not the elevation tiles in the browser —
+working out where water runs from raw heights needs a hydrologically
+conditioned DEM (pits filled, streams burnt in, flats given a direction) and
+a hundred million cells for one big river. The Bureau has done that for the
+whole country: the Geofabric's *Hydrology Reporting Catchments* cut the land
+from a ~30 m DEM at every significant node of the stream network — junctions,
+dams and the gauging stations themselves — into 53,804 sub-catchments, each
+draining from one node to the next. `tools/build_catchments.py` walks that
+network upstream for every river and every station on a stream, joins the
+pieces on a 250 m grid and traces the outline, simplified more for a big
+catchment than a small one (a continent-sized one is only ever looked at
+whole). The shading is the Elevation layer's terrain — the same ~30 m tiles,
+hillshaded the same way — clipped to the outline. With no terrain (offline,
+a blocked host) the catchment is a flat wash and the legend says so.
+
+| File | Holds | Read |
+|---|---|---|
+| `data/catchments-au/index.json` | every river's and station's catchment area, and which file holds its outline (~75 KB) | when a river is first selected, or a station card first asks |
+| `data/catchments-au/r<n>.json`, `s<n>.json` | the outlines, 32 rivers or stations a file | when one of them is shown |
+
+**Limits.** 2,492 of the 3,728 rivers have a catchment, and 1,122 stations —
+98 at a gauged node of the Geofabric (most of this network's gauges are the
+Bureau's flood warning gauges, and most of the Geofabric's are the States'
+water-monitoring ones), the rest placed on their stream. The outline is good to
+about 250 m; the area quoted is the Bureau's own, from its sub-catchments. It
+can be well above the network's drainage area at a river's mouth — the
+Burdekin's catchment is 127,000 km², its basin's 129,860, where the network
+gives 94,000 at its lowest reach — so a river's card leads with the
+catchment's. A pocket inside a catchment that the
+Geofabric says drains nowhere is filled. A small creek wholly inside one of a
+big river's sub-catchments has no catchment of its own here — both answers
+the network gives would be the river's — and its callout says the
+sub-catchments are too coarse to cut one; a minor creek from the live service
+has none either.
+
 ## Where it comes from
 
 The **Australian Hydrological Geospatial Fabric** (the Geofabric) v3.3,

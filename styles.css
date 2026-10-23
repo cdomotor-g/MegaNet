@@ -160,6 +160,10 @@
   --map-river-line: #1f6fd1;
   --map-river-pick: #0a2f8a;
   --map-river-glow: #00c2ff;
+  /* A selected river's catchment (river-catchments.js): a deep blue edge over
+     a white halo, and the wash inside it until (or unless) the relief comes. */
+  --map-catch-line: #0b4f8a;
+  --map-catch-wash: #4fa3d9;
   /* Survey marks & CORS sites (#120). Teal — none of the four role fills, none
      of the ACMA mechanism colours, and distinct from the river's blue and the
      draw tool's magenta, so the layer reads as its own thing at a glance. */
@@ -625,6 +629,8 @@
   --map-river-line: #2f80e0;
   --map-river-pick: #0a2f8a;
   --map-river-glow: #00d5ff;
+  --map-catch-line: #0b4f8a;
+  --map-catch-wash: #5fb4e8;
   --map-survey: #4dd0c8;
   --map-repeater: #6bb6ff;
   --map-field: #57d657;
@@ -3409,6 +3415,18 @@ hr {
 /* The rivers layer's key (map-river-lines.js): its line, and the selected
    river as the map draws it — a navy core in a white casing and a cyan glow. */
 .legend-line-river-net { border-top-color: var(--map-river-line); }
+/* A selected catchment's key: its ramp, low ground to high, inside its edge —
+   or the plain wash when there is no terrain to shade it with. */
+.legend-catch {
+  display: inline-block;
+  width: 22px;
+  height: 11px;
+  border: 2px solid var(--map-catch-line);
+  border-radius: 2px;
+  background: var(--catch-ramp, var(--map-catch-wash));
+}
+/* A switch that only means something with the one above it on. */
+.filter-check.filter-sub { margin-left: 1.5rem; }
 .legend-line-river-pick {
   border-top-color: var(--map-river-pick);
   box-shadow: 0 0 0 1px #fff, 0 0 0 3px color-mix(in srgb, var(--map-river-glow) 55%, transparent);
