@@ -7,15 +7,26 @@ on private data and the agent API.
 
 ## 1. Set up
 
-- You need two repositories side by side under `/home/user`:
-  `cdomotor-g/meganet` (read) as `/home/user/MegaNet`, and
-  `cdomotor-g/flood-net-private` (push) as `/home/user/flood-net-private`.
-  Attach any that is missing with `add_repo` and clone it shallow.
-- Read `/home/user/flood-net-private/security/scan-log.md` if it exists. Its
+- You need two repositories side by side in the same parent directory:
+  `cdomotor-g/meganet` (read) and `cdomotor-g/flood-net-private` (push).
+  Attach any that is missing with `add_repo` and clone it shallow to the path
+  `add_repo` gives you — do not assume a home directory; below, `MegaNet/` and
+  `flood-net-private/` mean wherever those clones are.
+- **If `flood-net-private` cannot be attached or cloned** (the call is refused,
+  needs an approval nobody is there to give, or the clone fails), do not stop
+  and do not look for another home for findings. Carry on with the review,
+  then put the findings only in your final summary for the owner — exact
+  `add_repo`/git error first, then each finding with the title and body you
+  would have filed. Never write findings to `cdomotor-g/meganet`, a gist, a
+  public artifact or any other repository. Skip step 4 (there is nowhere to
+  log).
+- Read `flood-net-private/security/scan-log.md` if it exists. Its
   last entry names the commit the previous run reviewed and the focus area it
   went deep on.
 - List the open issues in `cdomotor-g/flood-net-private` labelled
-  `security-scan`, so you do not file one twice.
+  `security-scan`, so you do not file one twice. GraphQL is blocked in these
+  sessions, so `gh issue list`/`gh issue create` fail: use the REST API, e.g.
+  `gh api 'repos/cdomotor-g/flood-net-private/issues?labels=security-scan&state=open'`.
 
 ## 2. Review
 
@@ -69,7 +80,10 @@ real findings beats a long list of maybes.
 ## 3. File
 
 For each finding, one issue in `cdomotor-g/flood-net-private`, label
-`security-scan` (create the label if it does not exist):
+`security-scan` (create the label if it does not exist). Use the REST API —
+`gh api repos/cdomotor-g/flood-net-private/labels -f name=security-scan -f
+color=b60205` once, then `gh api repos/cdomotor-g/flood-net-private/issues -f
+title=... -F body=@finding.md -f 'labels[]=security-scan'` per finding:
 
 - Title: `[Standalone] [<Model>/<Effort>] <severity>: <short description>` —
   severity one of `Critical`, `High`, `Medium`, `Low`, `Bug`; model and effort
@@ -94,7 +108,7 @@ Fixing is a separate session's job (`tools/security-scan/README.md`).
 
 ## 4. Log
 
-Append to `security/scan-log.md` in `flood-net-private` (create it, with a
+Append to `flood-net-private/security/scan-log.md` (create it, with a
 one-line heading, if missing):
 
 ```

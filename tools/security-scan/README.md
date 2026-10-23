@@ -16,6 +16,17 @@ the rules in `CLAUDE.md`, and checking them takes reading.
 Why findings go to the private repository: this one is public, and an issue
 describing a hole publishes it before it is fixed (`SECURITY.md`).
 
+## Approval setting — the task must not wait for a click
+
+The run attaches `flood-net-private` with push access, and attaching a
+repository with credentials can ask for approval. A scheduled run has nobody
+there to approve it, so with approvals on it stops at that point (the first
+run, 19/10/2026, ended after about a minute without a review). Keep the task
+on **Automatically approve** in its settings on claude.ai/code → Scheduled
+tasks. If it ever cannot reach the private repository anyway, the brief tells
+it to put the findings in its final summary — which only the owner sees — and
+never anywhere public.
+
 ## Changing what it looks at
 
 Edit `brief.md` and push. Each run reads it fresh from `main`, so the scheduled
