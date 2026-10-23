@@ -679,9 +679,11 @@ const HELP = {
       + 'opened — for one request for the whole network. Bigger is worse, and the ring says it again: '
       + 'dashed to watch, heavy at fault, hollow for no data. The same request fills the station list\'s '
       + '<strong>Last heard</strong> column: how long since Flood-Net heard each station — green inside two '
-      + 'of its checks, ⚠ amber from two, ⛔ red from four or a day, grey for one heard too seldom to judge, '
-      + 'and <em>never</em> for one its receivers have not heard. Hover a cell for the time. The station '
-      + 'editor says the same beside the station\'s name, with the time: <em>Last heard 14:32 today · 9 min ago</em>.',
+      + 'of its checks, ⚠ amber from two, ⛔ red from four or a day — or, where the server has looked at it lately, '
+      + 'amber or red only if the server calls it silent, as its card and its pin do — grey for one heard too seldom '
+      + 'to judge, and <em>never</em> for one its receivers have not heard. Hover a cell for the time. The station '
+      + 'editor, beside the station\'s name, and the station\'s card on the map say the same, with the time: '
+      + '<em>Last heard 14:32 today · 9 min ago</em>.',
       '<strong>⏱️ Latency</strong>, in the side panel after 🔑, colours every pin by how fresh its data is '
       + 'instead of by its role — by <em>Age</em> (how long since Flood-Net heard it), <em>Delay</em> (how long its '
       + 'readings take to reach the database) or <em>Checks</em> (how many of its timed checks went missing) — and '

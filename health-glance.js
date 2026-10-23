@@ -442,16 +442,19 @@ const HealthGlance = (() => {
       if (got.length < NET_PAGE) break;
     }
     // Every open finding the server keeps, in one request: the worst per
-    // station beside when it was last heard.
+    // station beside when it was last heard, and its silence's on its own —
+    // the colour Last heard wears where the server judges (heard(), below).
     let serverAt = null;
     try {
       await serverRan();
       if (serverFresh()) {
-        const open = await dbSelect('health_finding?select=station_id,severity&source=eq.stations&cleared_at=is.null&station_id=not.is.null&limit=5000');
+        const open = await dbSelect('health_finding?select=station_id,severity,kind&source=eq.stations&cleared_at=is.null&station_id=not.is.null&limit=5000');
         if (!alive()) return null;
         open.forEach(f => {
           const n = byId.get(f.station_id);
-          if (n) n.sev = worstSev([{ severity: n.sev }, f]);
+          if (!n) return;
+          n.sev = worstSev([{ severity: n.sev }, f]);
+          if (f.kind === 'silent') n.quiet = worstSev([{ severity: n.quiet }, f]);
         });
         serverAt = server.at;
       }
@@ -481,7 +484,12 @@ const HealthGlance = (() => {
     const fresh = srvAt != null && now_() - srvAt <= SERVER_FRESH;
     const judged = fresh && lastHeard != null && lastHeard >= srvAt - SERVER_WEEK;
     const sev = worstSev([{ severity: g ? worstSev(findingsOf(g)) : null }, { severity: fresh && !(g && g.server) && n ? n.sev : null }]);
-    return { lastHeard, firstHeard, P: g ? g.P : null, sev, judged };
+    // Where it judges, the server's verdict on the silence alone: the worst
+    // of its open "silent" findings, or null for none.
+    const quiet = !judged ? null
+      : g && g.server ? worstSev(g.server.filter(f => f.kind === 'silent'))
+      : n ? n.quiet || null : null;
+    return { lastHeard, firstHeard, P: g ? g.P : null, sev, judged, quiet };
   }
 
   // Every class at once, when an answer lands — never per pin.
@@ -590,13 +598,16 @@ const HealthGlance = (() => {
   // ── The station list's Last heard column ──────────────────────────────────
   // The same batch again, read for one thing: how long since Flood-Net heard
   // each row's station, and how that sits against its checks. The colour is
-  // the silence alone, on the bars the pins use for it — green inside two of
-  // its checks, amber from two, red from four or a day — and not the pin's
-  // whole class: a sliding battery is the card's to say, and the column is
-  // only ever about hearing. A station heard too seldom to judge stays grey
-  // whatever its age, as its pin does. Colour is never the only channel: a
-  // watch and a fault carry the card's glyph and, for a screen reader, its
-  // word.
+  // the silence alone, judged as the pin judges it: where the server has
+  // looked lately at a station heard in its week (k.judged), its verdict —
+  // red or amber for its "silent" finding, green for none — and elsewhere the
+  // bars, green inside two of its checks, amber from two, red from four or a
+  // day. So a station the server has weighed and not called silent is never
+  // red here while its pin and its card say OK. Not the pin's whole class: a
+  // sliding battery is the card's to say, and the column is only ever about
+  // hearing. A station heard too seldom to judge stays grey whatever its age,
+  // as its pin does. Colour is never the only channel: a watch and a fault
+  // carry the card's glyph and, for a screen reader, its word.
   //
   // A cell knows where its answer is: empty while the batch is on its way (as
   // the SLS column is before its file lands — "never" before anyone has asked
@@ -638,8 +649,10 @@ const HealthGlance = (() => {
       return { cls: known ? 'never' : net.status === 'error' ? 'unknown' : 'asking', lastHeard: null };
     }
     const ms = now - k.lastHeard;
-    const cls = ms >= bars(k.P).watch && briefly(k) ? 'brief' : quietClass(ms, k.P);
-    return { cls, lastHeard: k.lastHeard, firstHeard: k.firstHeard, P: k.P };
+    const cls = ms >= bars(k.P).watch && briefly(k) ? 'brief'
+      : k.judged ? (k.quiet === 'critical' ? 'fault' : k.quiet === 'warn' ? 'watch' : 'ok')
+      : quietClass(ms, k.P);
+    return { cls, lastHeard: k.lastHeard, firstHeard: k.firstHeard, P: k.P, judged: k.judged };
   }
 
   function heardCellHtml(s) {
@@ -672,6 +685,12 @@ const HealthGlance = (() => {
       const once = h.lastHeard - h.firstHeard < MIN;
       return `${when} — ${once ? 'heard once' : 'heard only briefly'}, too seldom to say when it is overdue.`;
     }
+    // The server's call, where it makes it: no bars to quote.
+    if (h.judged) {
+      return `${when}. ` + (h.P ? `It checks every ${HealthAnalysis.fmtPeriod(h.P)}. ` : '')
+        + 'Whether it is overdue is the server’s call, over every receiver’s week and whether the ones that hear it '
+        + (h.cls === 'ok' ? 'were listening: it has not called it silent.' : 'were listening: it calls it silent.');
+    }
     // The bars themselves, in hours: "four of its checks or a day" is not what
     // an assumed check does — its fault waits the whole day.
     const b = bars(h.P), span = HealthAnalysis.fmtSpan;
@@ -688,17 +707,31 @@ const HealthGlance = (() => {
     return `<span aria-hidden="true">${C.icon}</span><span class="sr-only">${esc(C.word)}:</span> `;
   }
 
-  // ── The station editor's header ───────────────────────────────────────────
+  // ── The station editor's header, and the card's Last heard line ───────────
   // The row's cell again, said in full where there is room for it: when the
   // station was last heard, as a stamp, then how long ago, coloured and marked
-  // as the cell is. The same heard(), so the header and the row it was picked
-  // from never disagree. Nothing for a draft not yet saved or a proposal —
-  // neither has anything to have heard — and "asking…" while the batch is on
-  // its way: this is one line somebody is reading, not a column of blanks.
+  // as the cell is. The same heard(), so the header, the card on the map and
+  // the row it was picked from never disagree. Nothing for a draft not yet
+  // saved or a proposal — neither has anything to have heard — and "asking…"
+  // while the batch is on its way: this is one line somebody is reading, not a
+  // column of blanks.
   //
   // The stamp is fmtWhen's — "14:32 today", "06:10 Mon 19 Oct" — with the year
   // once it is not this one, because "2 yr ago" beside a date with no year is
   // a puzzle.
+  //
+  // heardLineHtml(h, now, door) is the line itself — "06:43 yesterday · ⛔
+  // 31 h ago" — for a station with a time; the card wraps the stamp in its
+  // door into the Station Health tab (`door`).
+  function heardLineHtml(h, now, door) {
+    const ms = now - h.lastHeard;
+    const y = new Date(h.lastHeard).getFullYear();
+    const stamp = HealthAnalysis.fmtWhen(h.lastHeard, now) + (y !== new Date(now).getFullYear() ? ` ${y}` : '');
+    const time = `<time datetime="${esc(new Date(h.lastHeard).toISOString())}">${esc(stamp)}</time>`;
+    const C = CLS[h.cls];
+    return `${door ? door(time) : time} · `
+      + `<span class="${C ? C.txt : 'txt-muted'}">${heardMark(h.cls)}${ms < 90 * 1000 ? 'just now' : `${esc(agoShort(ms))} ago`}</span>`;
+  }
   function heardHeadHtml(s) {
     if (!s || !s.id || s.proposed) return '';
     const now = now_();
@@ -713,13 +746,7 @@ const HealthGlance = (() => {
     if (h.cls === 'never') {
       return `${label}<span class="txt-muted" title="Flood-Net’s receivers have not heard this station">never</span>`;
     }
-    const ms = now - h.lastHeard;
-    const y = new Date(h.lastHeard).getFullYear();
-    const stamp = HealthAnalysis.fmtWhen(h.lastHeard, now) + (y !== new Date(now).getFullYear() ? ` ${y}` : '');
-    const C = CLS[h.cls];
-    return `<span title="${esc(heardTitle(h, now))}">${label}`
-      + `<time datetime="${esc(new Date(h.lastHeard).toISOString())}">${esc(stamp)}</time> · `
-      + `<span class="${C ? C.txt : 'txt-muted'}">${heardMark(h.cls)}${ms < 90 * 1000 ? 'just now' : `${esc(agoShort(ms))} ago`}</span></span>`;
+    return `<span title="${esc(heardTitle(h, now))}">${label}${heardLineHtml(h, now)}</span>`;
   }
 
   // Told each time something new is known about when a station was heard: the
@@ -1003,9 +1030,12 @@ const HealthGlance = (() => {
     const worst = findings[0] || null;
     const name = s.name || id;
     const lines = [];
-    lines.push(row('Last heard', go(id, 'checks', esc(HealthAnalysis.fmtWhen(k.lastHeard, now)),
-        `Open the Station Health tab on ${name} — its checks, slot by slot`)
-      + ` <span class="mn-pop-note">${esc(ago(k.lastHeard, now))}${k.P ? `, checks every ${esc(HealthAnalysis.fmtPeriod(k.P))}` : ''}</span>`));
+    // The editor header's line, word for word and colour for colour (heard()),
+    // its stamp the door; the learned schedule under it.
+    const h = heard(s, now);
+    lines.push(row('Last heard', `<span title="${esc(heardTitle(h, now))}">${heardLineHtml(h, now,
+        t => go(id, 'checks', t, `Open the Station Health tab on ${name} — its checks, slot by slot`))}</span>`
+      + (k.P ? `<br><span class="mn-pop-note">checks every ${esc(HealthAnalysis.fmtPeriod(k.P))}</span>` : '')));
     if (g.battery) {
       lines.push(row('Battery', go(id, 'battery', esc(batteryText(g.battery)),
         `Open the Station Health tab on ${name} — its battery across its solar day, night lows ringed`)));

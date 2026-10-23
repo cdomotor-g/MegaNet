@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 79, date: '2026-10-23', items: [
+      '<strong>📡 Last heard reads the same on the map card and in the station editor.</strong> The card on the map '
+        + 'now says it the way the editor\'s header does — <em>06:43 yesterday · ⛔ 31 h ago</em>, coloured and marked '
+        + 'alike — and the two never disagree with the card\'s Health line. Where the server has looked at the station '
+        + 'lately, it decides whether a quiet spell is overdue: a station it has not called silent (one that often goes '
+        + 'a day or more between reports) is no longer red in the editor and the station list while its card and pin '
+        + 'say OK.',
+    ] },
     { n: 78, date: '2026-10-23', items: [
       '<strong>🧹 Clear the selection</strong>, on the Stations map: a new button in the side panel\'s strip, straight '
         + 'under ❔. It deselects the station and any link you clicked, puts the cards on the map away, and takes off '

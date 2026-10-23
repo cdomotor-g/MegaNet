@@ -36,7 +36,9 @@
 //   6. **The server's findings** (#215, 0059) — while the server's last run is
 //      fresh, the card and the pins take what it keeps: its silence in place
 //      of the card's own, the kinds it keeps from it, the rest worked out
-//      here; stale, the card's own rules again.
+//      here; Last heard coloured by its verdict on the card, in the editor
+//      and in the list alike — green for a long quiet it has not called
+//      silent; stale, the card's own rules again.
 //   7. **A phone** — the card's health lines inside a 375 px screen.
 //   8. **The station list's Last heard column** — from the same one request,
 //      the pins' switch on or off: how long since each row's station was
@@ -47,8 +49,9 @@
 //      the batch is asked again or a station's card answers.
 //   9. **The station editor's header** — the same answer beside the station's
 //      name, with the time it was heard: "Last heard 14:32 today · 9 min
-//      ago"; nothing for a proposed station; repainted in place, so whatever
-//      is being typed in the form stays.
+//      ago", and the card on the map's Last heard line word for word;
+//      nothing for a proposed station; repainted in place, so whatever is
+//      being typed in the form stays.
 //
 // Why a check of its own: every failure here is a page that looks right. A pin
 // coloured green for want of an answer, a card that asks the datastore on every
@@ -547,6 +550,11 @@ try {
   check('…heard lately, the same, as the row says it',
     hSteady.inHead && /^Last heard \d\d:\d\d today · (just now|\d+ (min|h) ago)$/.test(hSteady.text)
       && hSteady.text.endsWith(hSteady.cell === 'now' ? 'just now' : hSteady.cell), J(hSteady));
+  const cSilent = await card(page, R.silent), cSteady = await card(page, R.steady);
+  check('the card on the map says the header’s line word for word — the time, then how long ago, marked alike',
+    !!cSilent.heard && cSilent.heard.startsWith(hSilent.text.replace(/^Last heard /, ''))
+      && !!cSteady.heard && cSteady.heard.startsWith(hSteady.text.replace(/^Last heard /, '')),
+    J({ card: [cSilent.heard, cSteady.heard], head: [hSilent.text, hSteady.text] }));
   const prop = await page.evaluate(() => (state.data.stations.find(s => s.proposed) || {}).id || null);
   if (prop) {
     const hProp = await head(prop);
@@ -597,7 +605,8 @@ try {
     cStrip && cStrip.unknown === 0 && cStrip.net === 0 && cStrip.legend.join('|') === 'received|received, frames lost|not heard'
       && /\d+ received, \d+ with frames lost, \d+ not heard$/.test(cStrip.label), J(cStrip));
   const askedBefore = count('card');
-  await page.evaluate(id => selectStation(id), R.fading);
+  // Its card has already selected it (editorFollowCard): selecting again would close the editor.
+  await page.evaluate(id => { if (state.selectedId !== id) selectStation(id); }, R.fading);
   await waitTrue(page, () => !!document.querySelector('#ef-checks svg.hl-strip'));
   const eStrip = await stripOf('#ef-checks');
   check('the station editor draws the same strip at the head of Telemetry, from the card’s answer — no second request',
@@ -752,6 +761,8 @@ try {
         first_seen: new Date(Date.now() - 3600e3).toISOString() }],
     };
     const serverAsked = [];
+    let silentKept = true;             // false: the server has weighed R.silent and not called it silent
+    const kept = () => silentKept ? SERVER : { ...SERVER, [R.silent]: [] };
     const withServer = async (ctx, ranAgo) => {
       const p = await open(ctx);
       await p.route('**://*.supabase.co/rest/v1/**', route => {
@@ -762,9 +773,10 @@ try {
         if (rel !== 'health_finding') return route.fallback();
         serverAsked.push(decodeURIComponent(u.search));
         const one = (u.searchParams.get('station_id') || '').replace(/^eq\./, '');
-        const all = Object.values(SERVER).flat();
+        const all = Object.values(kept()).flat();
         return route.fulfill({ status: 200, contentType: 'application/json',
-          body: J(u.searchParams.get('station_id') === 'not.is.null' ? all.map(f => ({ station_id: f.station_id, severity: f.severity })) : (SERVER[one] || [])) });
+          body: J(u.searchParams.get('station_id') === 'not.is.null' ? all.map(f => ({ station_id: f.station_id, severity: f.severity, kind: f.kind }))
+            : (kept()[one] || [])) });
       });
       return p;
     };
@@ -795,6 +807,41 @@ try {
       && !falling2.items.some(t => /Battery low/.test(t)), J(falling2.items));
     check('…one small request a card for the station\'s own findings', serverAsked.filter(q => /station_id=eq\./.test(q)).length === 3,
       J(serverAsked));
+
+    // Its Last heard, said three ways — the card on the map, the editor's
+    // header, the list's cell — with the colour each wears.
+    const heardSay = (pg, id) => pg.evaluate(id => {
+      const flat = t => (t || '').replace(/\s+/g, ' ').trim();
+      const tone = el => { const xs = el ? [...el.querySelectorAll('[class^="txt-"]')] : []; return xs.length ? xs[xs.length - 1].className : null; };
+      const box = document.getElementById('mn-health-card-' + id);
+      const row = box && [...box.querySelectorAll('.acma-row')].find(r => r.firstElementChild.textContent.trim() === 'Last heard');
+      const cell = document.createElement('div');
+      cell.innerHTML = HealthGlance.heardCellHtml(state.data.stations.find(s => s.id === id));
+      const out = { card: row ? flat(row.lastElementChild.textContent) : null, cardCls: row ? tone(row.lastElementChild) : null,
+                    cell: flat(cell.textContent), cellCls: cell.firstElementChild ? cell.firstElementChild.className : null };
+      if (state.selectedId !== id) selectStation(id);
+      const head = document.getElementById('ef-heard');
+      Object.assign(out, { head: head ? flat(head.textContent) : null, headCls: tone(head) });
+      return out;
+    }, id);
+    await card(p, R.silent);
+    const said = await heardSay(p, R.silent);
+    check('the server’s silence in its Last heard alike on the card, in the editor and in the list: red and marked',
+      said.cardCls === 'txt-bad' && said.headCls === 'txt-bad' && said.cellCls === 'txt-bad' && /⛔/.test(said.card)
+        && !!said.head && said.card.startsWith(said.head.replace(/^Last heard /, '')), J(said));
+
+    // The server looks again and finds nothing: quiet for a day and more, but
+    // not overdue on its own terms — one that often goes that long between
+    // reports. Nothing may still paint it red while its card says OK.
+    silentKept = false;
+    await p.evaluate(id => HealthGlance.retry(id), R.silent);
+    const quiet2 = await card(p, R.silent);
+    const said2 = await heardSay(p, R.silent);
+    check('weighed by the server and not called silent: OK on the card, and its Last heard green on the card, in the editor and in the list',
+      /OK/.test(quiet2.badge || '') && quiet2.cls === 'ok' && said2.cardCls === 'txt-ok' && said2.headCls === 'txt-ok' && said2.cellCls === 'txt-ok'
+        && !/[⛔⚠]/.test(`${said2.card} ${said2.head} ${said2.cell}`) && /\d+ (h|d) ago/.test(said2.card || '')
+        && !!said2.head && said2.card.startsWith(said2.head.replace(/^Last heard /, '')),
+      J({ badge: quiet2.badge, said2 }));
     await ctx.close();
 
     // A server that has not run for two hours is not the one home for anything.
