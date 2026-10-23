@@ -846,8 +846,9 @@ const MapLatency = (() => {
         </label>
         <p class="small txt-muted lat-live-what">As a message lands in the log its station flashes green, and a green
           pulse runs along its links — to the repeater that carries it, then on to a base. Each keeps a green glow for a
-          minute after, so a station that just reported can still be picked out. It runs the way the map draws the
-          network: the likeliest way in, not a record of the hops.</p>
+          minute after, so a station that just reported can still be picked out.
+          <strong class="txt-bad lat-live-guess">It runs the way the map draws the network: the likeliest way in, not a
+          record of the hops.</strong></p>
         <p class="small lat-live-status" id="lat-live-status">${liveStatusHtml()}</p>
       </section>`;
   }

@@ -395,6 +395,15 @@ try {
     check('a reading typed in is not played, and an address no station carries is counted, not drawn',
       !got.fresh.includes(pick.other) && got.batch && got.batch.n === 2 && got.batch.lost === 1, J({ fresh: got.fresh, batch: got.batch }));
     check('the card counts what landed', /message/.test(got.status) && /not on the map/.test(got.status), got.status);
+    const guess = await page.evaluate(() => {
+      const g = document.querySelector('#map-latency-panel .lat-live-guess');
+      const bad = getComputedStyle(document.documentElement).getPropertyValue('--bad').trim();
+      const probe = document.createElement('span'); probe.style.color = bad; document.body.appendChild(probe);
+      const want = getComputedStyle(probe).color; probe.remove();
+      return g && { text: g.textContent.replace(/\s+/g, ' '), colour: getComputedStyle(g).color, want };
+    });
+    check('…and says, in the red the app warns in, that the way it runs is the likeliest, not a record',
+      guess && /likeliest way in, not a record of the hops/.test(guess.text) && guess.colour === guess.want, J(guess));
     const glow = await page.evaluate(async id => {
       const t0 = performance.now();
       while (!MapLatency._live().glowing.includes(id) && performance.now() - t0 < 6000) await new Promise(r => setTimeout(r, 25));
