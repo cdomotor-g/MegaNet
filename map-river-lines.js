@@ -779,8 +779,8 @@ const MapRiverLines = (function () {
       }
       out.push(line(esc(`${fmtInt(r.len)} km of channel mapped, tributaries of the same name included`), 'txt-muted'));
       if (ci === null) {
-        out.push(line(esc('No catchment of its own here — the Geofabric\'s sub-catchments are too '
-          + 'coarse to cut one for it'), 'txt-muted'));
+        out.push(line(esc('No catchment drawn here — the Geofabric\'s catchments and its stream network '
+          + 'disagree too much at this river to draw one'), 'txt-muted'));
       }
     }
     const on = stationsOn(r);

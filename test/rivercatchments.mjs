@@ -63,7 +63,15 @@ const gauges = Object.entries(INDEX.stations).filter(([, v]) => v[2] === 'gauge'
 check('the gauges that are also gauged nodes of the Geofabric have the Bureau\'s own catchment',
   gauges.length > 50, `${gauges.length} gauges`);
 const reach = Object.values(INDEX.stations).filter(v => v[2] === 'reach').length;
-check('…and a thousand more are placed on their stream', reach > 800, `${reach} by reach`);
+const near = Object.values(INDEX.stations).filter(v => v[2] === 'near').length;
+check('…hundreds more are traced up the fine catchments from the reach they stand on',
+  reach > 400, `${reach} by reach`);
+check('…and the rest of those on a stream are placed at the nearer sub-catchment boundary',
+  reach + near > 900, `${reach} by reach, ${near} near`);
+const covered = INDEX.rivers.filter(Boolean).length;
+check('four rivers in five have a catchment, the small creeks inside a big river\'s sub-catchment cut from the fine ones',
+  covered / INDEX.rivers.length > 0.78 && INDEX.meta.rivers_from_fine > 400,
+  `${covered} of ${INDEX.rivers.length}, ${INDEX.meta.rivers_from_fine} from the fine catchments`);
 const ratio = INDEX.meta.river_area_ratio_median;
 check('a river\'s catchment matches the area its own network says drains to its mouth, at the median',
   ratio > 0.9 && ratio < 1.1, String(ratio));
@@ -169,6 +177,17 @@ try {
   const card = await page.evaluate((id) => document.getElementById(`mn-catch-card-${id}`)?.textContent.replace(/\s+/g, ' ') || '', String(gStation.id));
   check('a gauged station\'s card gives the area above its gauge, and says it is the Bureau\'s own',
     card.includes(`${Math.round(gRow[0]).toLocaleString('en-AU')} km²`) && /gauging station/.test(card), card.slice(0, 220));
+  const [rid, rRow] = Object.entries(INDEX.stations).find(([id, v]) => v[2] === 'reach'
+    && STATIONS.some(x => String(x.id) === id && x.lat != null));
+  await page.evaluate((id) => showStationCard(id), rid);
+  await page.waitForFunction((id) => /km²/.test(document.getElementById(`mn-catch-card-${id}`)?.textContent || ''),
+    rid, { timeout: 15_000 }).catch(() => {});
+  const rCard = await page.evaluate((id) => document.getElementById(`mn-catch-card-${id}`)?.textContent.replace(/\s+/g, ' ') || '', rid);
+  check('a station traced from its reach says so on its card',
+    rCard.includes(`${Math.round(rRow[0]).toLocaleString('en-AU')} km²`) && /traced up the Geofabric's finest catchments/.test(rCard),
+    rCard.slice(0, 220));
+  await page.evaluate((id) => showStationCard(id), gStation.id);
+  await page.waitForTimeout(300);
   await page.click(`#mn-catch-card-${gStation.id} button`);
   await page.waitForFunction(() => { const s = RiverCatchments.shown(); return s && s.kind === 'station' && s.status !== 'loading'; },
     null, { timeout: 30_000 }).catch(() => {});

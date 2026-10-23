@@ -75,9 +75,12 @@ height*, under the rivers switch in Map display, turns it off (remembered).
 A station on a stream has a **Catchment** section on its card: the area above
 its gauge, and *Show the catchment on the map*. It is the Bureau's own where
 the station's AWRC number is a gauging station of the Geofabric's network
-(the card says so); otherwise it is placed on the station's stream by name and
-position, to the nearer of the two sub-catchment boundaries round it — the one
-whose area is closer to the Geofabric's own drainage area at that reach.
+(the card says so). Otherwise the station is placed on its stream by name and
+position, and its catchment traced up the Geofabric's finest catchments — one
+for every stream segment, minor creeks included — from the reach it stands
+on; where those cannot answer, it runs to the nearer of the two sub-catchment
+boundaries round it — the one whose area is closer to the Geofabric's own
+drainage area at that reach. The card says which.
 
 Either is put down with the river: a click on open map, *Clear selection*, or
 🧹.
@@ -93,7 +96,12 @@ draining from one node to the next. `tools/build_catchments.py` walks that
 network upstream for every river and every station on a stream, joins the
 pieces on a 250 m grid and traces the outline, simplified more for a big
 catchment than a small one (a continent-sized one is only ever looked at
-whole). The shading is the Elevation layer's terrain — the same ~30 m tiles,
+whole) and, for one under a few hundred kilometres across, its grid's
+staircase rounded off. A small creek can lie wholly inside one sub-catchment
+of the river it joins, so for a river's mouth or a station's reach draining
+under 2,000 km² it reads the network's own **fine catchments** as well — one
+for every stream segment, about a square kilometre each, seven million in
+all — round that reach only, and traces everything above it on a 50 m grid. The shading is the Elevation layer's terrain — the same ~30 m tiles,
 hillshaded the same way — clipped to the outline. With no terrain (offline,
 a blocked host) the catchment is a flat wash and the legend says so.
 
@@ -102,20 +110,22 @@ a blocked host) the catchment is a flat wash and the legend says so.
 | `data/catchments-au/index.json` | every river's and station's catchment area, and which file holds its outline (~75 KB) | when a river is first selected, or a station card first asks |
 | `data/catchments-au/r<n>.json`, `s<n>.json` | the outlines, 32 rivers or stations a file | when one of them is shown |
 
-**Limits.** 2,492 of the 3,728 rivers have a catchment, and 1,122 stations —
-98 at a gauged node of the Geofabric (most of this network's gauges are the
-Bureau's flood warning gauges, and most of the Geofabric's are the States'
-water-monitoring ones), the rest placed on their stream. The outline is good to
-about 250 m; the area quoted is the Bureau's own, from its sub-catchments. It
-can be well above the network's drainage area at a river's mouth — the
+**Limits.** 3,022 of the 3,728 rivers have a catchment, 531 of them cut from
+the fine catchments, and 1,145 stations — 98 at a gauged node of the Geofabric
+(most of this network's gauges are the Bureau's flood warning gauges, and most
+of the Geofabric's are the States' water-monitoring ones), 565 traced up the
+fine catchments from their reach and 482 to the nearer sub-catchment boundary.
+The outline is good to a few hundred metres; the area quoted is the Bureau's
+own, from its catchments. It can be well above the network's drainage area at a river's mouth — the
 Burdekin's catchment is 127,000 km², its basin's 129,860, where the network
 gives 94,000 at its lowest reach — so a river's card leads with the
 catchment's. A pocket inside a catchment that the
-Geofabric says drains nowhere is filled. A small creek wholly inside one of a
-big river's sub-catchments has no catchment of its own here — both answers
-the network gives would be the river's — and its callout says the
-sub-catchments are too coarse to cut one; a minor creek from the live service
-has none either.
+Geofabric says drains nowhere is filled. Every catchment is checked against
+the network's own drainage area at its reach and left out unless within 0.6
+to 1.6 of it; the 706 rivers without one are mostly short creeks of a few
+tens of square kilometres where the fine catchments and the stream network
+disagree, and their callout says so. A minor creek from the live service has
+none either.
 
 ## Where it comes from
 

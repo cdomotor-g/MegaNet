@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 91, date: '2026-10-23', items: [
+      '<strong>Catchments for small creeks.</strong> A creek that runs into a bigger river often had no catchment, '
+        + 'because the Bureau\'s sub-catchments were too big to cut one out. Flood-Net now also reads the Bureau\'s finest '
+        + 'catchments — one for every stream segment, about a square kilometre each — round those creeks, so 3,022 rivers have '
+        + 'a catchment (up from 2,492). A station\'s catchment is now traced from the reach it stands on rather than to the '
+        + 'nearest sub-catchment boundary wherever it can be, and its card says which. The outlines are smoother too.',
+    ] },
     { n: 90, date: '2026-10-23', items: [
       '<strong>Catchments</strong>, on the Stations map: selecting a river now also outlines the land that drains into it '
         + 'and shades that land by its own height — low ground green, the ranges brown, the tops pale — with the heights '

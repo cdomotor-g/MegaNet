@@ -1126,12 +1126,20 @@ Australia (Bureau of Meteorology), CC BY 4.0).
 
 A river's catchment is everything upstream of the sub-catchment its lowest
 reach is in; a station's is everything above its gauging node when its AWRC
-number is one, else above the reach it stands on. Both are checked against
-the network's own drainage area at that point and left out when they are not
-within 0.6–1.6 of it — the case of a small creek inside a big river's
-sub-catchment. The sub-catchments are burnt into one national grid at
-0.0025° (~250 m), each catchment's cells are traced into an outline, and the
-outline is simplified to a tolerance that grows with its size.
+number is one, else above the reach it stands on. A small creek can lie
+wholly inside one sub-catchment of the river it joins, where both answers the
+sub-catchments give are the river's; so for a river's mouth or a station's
+reach that drains under 2,000 km² the network's *fine* catchments are read
+too — one per stream segment, minor creeks included, 7 million in all — round
+that reach only: a box sized to its drainage area, a 0.1° tile at a time,
+links and areas first, grown while what traces above the reach falls short
+and is still growing; then rings for only the ones an answer uses (about
+2.2 million read, 93,000 used). Every answer is checked against the
+network's own drainage area at that point and left out when it is not within
+0.6–1.6 of it. The sub-catchments are burnt into one national grid at
+0.0025° (~250 m) and the fine catchments into a 0.0005° grid of their own;
+each catchment's cells are traced into an outline, simplified to a tolerance
+that grows with its size, and a small one's corners cut off.
 
 The one tool here that needs a package: **numpy** (`pip install numpy`), for
 a grid of 230 million cells. It also reads `build_rivers.py`'s cached pages,
@@ -1142,5 +1150,6 @@ python3 tools/build_catchments.py --cache ~/geofabric-catchments --rivers-cache 
 ```
 
 The sub-catchment pages are about 50 MB each, 27 of them, forty-five minutes
-or so from the service; with `--cache` a rebuild asks for nothing and takes a
-few minutes. `npm run rivercatchments` holds the files to their shape.
+or so from the service; the fine catchments some 21,000 tiles, twenty-five
+minutes at 12 requests in flight. With `--cache` a rebuild asks for nothing
+and takes a few minutes. `npm run rivercatchments` holds the files to their shape.

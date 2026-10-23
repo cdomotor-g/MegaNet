@@ -39,9 +39,11 @@
 //   data/catchments-au/s<b>.json     the stations', likewise
 //
 // A station's catchment is exact when its AWRC number is a gauged node of the
-// network (2,699 nodes carry one), and otherwise the one above the reach it
-// stands on, whichever of the two sub-catchment boundaries round it is nearer
-// the Geofabric's own drainage area there. The card says which.
+// network (2,699 nodes carry one). Otherwise it is traced up from the reach it
+// stands on through the network's fine catchments — one per stream segment, a
+// square kilometre or so each — and, failing those, it is the one above the
+// nearer of the two sub-catchment boundaries round the reach. The card says
+// which.
 //
 // ── The shading ─────────────────────────────────────────────────────────────
 // The terrain is the Elevation layer's (map-elevation.js): the same ~30 m
@@ -408,7 +410,9 @@ const RiverCatchments = (function () {
     if (row === undefined) return `${head}<div class="acma-row"><span>Above the gauge</span><span class="mn-pop-note">working it out…</span></div>`;
     const how = row[2] === 'gauge'
       ? `the Bureau's own, for gauging station ${esc(row[3])}`
-      : 'placed on its stream by name and position — to the nearest sub-catchment boundary';
+      : row[2] === 'reach'
+        ? 'traced up the Geofabric\'s finest catchments from the reach it stands on'
+        : 'placed on its stream by name and position — to the nearest sub-catchment boundary';
     return `${head}
       <div class="acma-row"><span>Above the gauge</span><span><strong>${fmtInt(row[0])} km²</strong>
         <span class="mn-pop-note">${how}</span></span></div>
