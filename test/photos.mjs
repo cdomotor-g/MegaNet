@@ -1358,6 +1358,20 @@ async function tiltedHalf(page, R, db, viewer, text) {
   ok('…the cones laid in the ground\'s plane, turned by heading from north',
     style.rot === 'map' && style.pitch === 'map' && J(style.rotate) === J(['get', 'heading']), J(style));
 
+  // The three in the middle of the view first. The map was put on the pair,
+  // and the third is ~480 m east of it — 230 px at this zoom, which on this
+  // window's 468 px of map beside the side panel is the canvas's edge, where
+  // its badge is clipped and under no pointer. A camera on their middle has
+  // all three well inside whatever width the side panel leaves.
+  await page.evaluate(pins => {
+    const lon = pins.reduce((s, p) => s + p.lon, 0) / pins.length;
+    const lat = pins.reduce((s, p) => s + p.lat, 0) / pins.length;
+    Map3D._map().jumpTo({ center: [lon, lat] });
+  }, P.pins);
+  await page.waitForTimeout(600);
+  await idle();
+  await page.waitForFunction(() => Map3D._photos().pins.length === 3, null, { timeout: BUILD_TIMEOUT });
+
   // Where the badge is on screen, against where MapLibre puts its point: the
   // badge stands up and to the right of it, 4 px each way, as in 2-D.
   const seen = await page.evaluate(() => {
