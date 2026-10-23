@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 88, date: '2026-10-23', items: [
+      '<strong>🧪 Bit Bench: the site and the faults move together.</strong> As <em>Where faults happen</em> tours the '
+        + 'faults, the <em>Faults</em> section below changes with it, so the frame there goes through the same fault the site '
+        + 'is showing. The site and its close-up now follow your settings in the Faults section — move a slider and the '
+        + 'picture changes with it. Picking a fault or moving a setting holds the tour on it; <em>Tour the faults</em> starts '
+        + 'it again. The tour is a little slower too: ten seconds a fault.',
+    ] },
     { n: 87, date: '2026-10-23', items: [
       '<strong>🛣️ Access tracks in the 3-D view.</strong> Signed in, tilt the Stations map with ⛰️ and the stations\' '
         + 'site features stay on it: each <em>Access track</em> is draped on the ground, so you can see the valley and '

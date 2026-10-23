@@ -12,11 +12,14 @@
 //              place it happens, shows what goes on there, and draws a
 //              close-up of it beside the site.
 //
-// After core.js (cssVar) and bit-model.js (BitModel, read at call time:
-// every figure a close-up quotes is the model's, from the fault's default
-// settings, so the scene and the bench below it agree); before bit-bench.js,
-// which owns the card, its buttons, the tour and the one animation loop, and
-// calls draw() with the fault to show. Nothing here runs at load.
+// After core.js (cssVar), propagation-physics.js (PropPhysics: its seeded
+// generator and keying times) and bit-model.js (BitModel), all read at call
+// time. Every figure a close-up quotes is the model's, worked from the fault's
+// settings as they stand on the bench — and where the model has a channel for
+// the fault, the close-up sends a frame through it — so the site and the bench
+// below it always agree. Before bit-bench.js, which owns the card, its buttons,
+// the tour and the one animation loop, and calls draw() and closeUp() with the
+// fault and its settings. Nothing here runs at load.
 //
 // ── How it is drawn ──────────────────────────────────────────────────────────
 // A renderer of its own on a plain 2-D canvas, as the 🎓 Radio Propagation
@@ -29,7 +32,7 @@
 // own beside it (closeUp), so it never stands in front of the site. It is a
 // model of a site, not a map: nothing is to scale, and heights least of all.
 //
-// Exposes: draw, closeUp, SPOTS, ORDER, YAW0, clampYaw.
+// Exposes: draw, closeUp, closeOf, SPOTS, ORDER, YAW0, clampYaw.
 
 const BitScene = (function () {
   const BM = () => BitModel;
@@ -72,10 +75,9 @@ const BitScene = (function () {
     cloud: { x: 44, y: 47, z: 40 },
     strike: { x: 49, y: 49 },
   };
-  const truckX = t => 1 + ((t * 9) % 114);
 
   // The points the drawings start and end at.
-  function pt(name, t) {
+  function pt(name) {
     const P = PLACE;
     switch (name) {
       case 'tx':     return up(P.mast.x, P.mast.y, P.mast.h);
@@ -88,7 +90,6 @@ const BitScene = (function () {
       case 'echo':   return up(P.shed.x + 1, P.shed.y, 4.5);
       case 'fence':  return up((P.fence.x0 + P.fence.x1) / 2, (P.fence.y0 + P.fence.y1) / 2, 1.4);
       case 'strike': return up(P.strike.x, P.strike.y, 0);
-      case 'truck':  return up(truckX(t || 0) + 2, ROAD_Y - 0.9, 2.4);
       default:       return up(60, 36, 0);
     }
   }
@@ -454,7 +455,7 @@ const BitScene = (function () {
     const P2 = p => proj(B, p);
     const K = {
       ctx, B, C, t, still,
-      p: name => pt(name, t),
+      p: name => pt(name),
       at: P2,
       // A run of signal along 3-D points: the way faint, and pulses of it
       // travelling. `col(u)` colours a pulse by how far along it is (0–1).
@@ -607,36 +608,40 @@ const BitScene = (function () {
       const bad = shown && opt.bad && opt.bad(j);
       ctx.fillStyle = bad ? C.bad : shown ? alpha(C.muted, 0.14) : alpha(C.muted, 0.05);
       ctx.fillRect(x + 1, y, cw - 2, ch);
-      if (shown && cw >= 8) text(ctx, String(bits[j]), x + cw / 2, y + ch / 2 + 0.5, bad ? C.panel : C.text, { font: MONO, align: 'center', base: 'middle' });
+      if (shown && cw >= 7) text(ctx, String(bits[j]), x + cw / 2, y + ch / 2 + 0.5, bad ? C.panel : C.text, { font: MONO, align: 'center', base: 'middle' });
     }
   }
 
-  // Wires from a sensor's eight outputs to the logger's eight inputs, by a
-  // rule: `to(i)` is the input output i lands on (−1 for none), and
-  // `broken` the one wire that is not there.
-  function wiring(ctx, b, C, t, o) {
+  // Wires from a sensor's outputs to the logger's inputs, one for each bit of
+  // the field the fault is set on (11 for a value, 13 for an address), by the
+  // fault's rule: `to(i)` is the input output i lands on (−1 for none), and
+  // `broken` the one wire that is not there. The reading rises a step at a
+  // time, and what the logger makes of it is BitModel's dataPath — the same
+  // sum the bench's batch runs.
+  function wiring(ctx, b, C, t, id, p, o) {
     const M = BM();
-    const v = Math.floor(37 + (t * 6) % 90) & 255;       // a reading, rising
-    const got = o.read(v);
-    const top = b.y + 4, rowH = (b.h - 26) / 8;
-    const lx = b.x + 4, lw = 54, rx = b.x + b.w - 58, rw = 54;
-    text(ctx, 'Sensor', lx + lw / 2, top + 8 * rowH + 13, C.muted, { font: FONT_B, align: 'center' });
-    text(ctx, 'Logger', rx + rw / 2, top + 8 * rowH + 13, C.muted, { font: FONT_B, align: 'center' });
+    const f = M.FIELDS[p.field] || M.FIELDS.value, w = f.width;
+    const base = p.field === 'address' ? 4000 : 600;
+    const v = Math.min(f.max, base + Math.floor(t * 1.6) % 160);
+    const s = M.dataPath(id, p, p.field === 'address' ? v : 4021, p.field === 'address' ? 1263 : v);
+    const got = p.field === 'address' ? s.addr : s.value;
+    const top = b.y + 2, rowH = (b.h - 30) / w;
+    const lx = b.x + 2, lw = 50, rx = b.x + b.w - 52, rw = 50;
     ctx.strokeStyle = C.border;
     ctx.lineWidth = 1;
-    ctx.strokeRect(lx, top - 2, lw, 8 * rowH + 4);
-    ctx.strokeRect(rx, top - 2, rw, 8 * rowH + 4);
-    for (let i = 7; i >= 0; i--) {
-      const yi = top + (7 - i) * rowH + rowH / 2;
+    ctx.strokeRect(lx, top - 2, lw, w * rowH + 4);
+    ctx.strokeRect(rx, top - 2, rw, w * rowH + 4);
+    for (let i = w - 1; i >= 0; i--) {
+      const yi = top + (w - 1 - i) * rowH + rowH / 2;
       const bi = (v >> i) & 1, gi = (got >> i) & 1;
-      text(ctx, `${i}`, lx + 6, yi + 0.5, C.muted, { font: MONO, base: 'middle' });
-      text(ctx, `${bi}`, lx + lw - 8, yi + 0.5, C.text, { font: MONO, base: 'middle', align: 'right' });
-      text(ctx, `${gi}`, rx + 8, yi + 0.5, gi !== bi ? C.bad : C.text, { font: MONO, base: 'middle' });
-      text(ctx, `${i}`, rx + rw - 6, yi + 0.5, C.muted, { font: MONO, base: 'middle', align: 'right' });
-      const j = o.to(i);
+      text(ctx, `${i}`, lx + 5, yi + 0.5, C.muted, { font: MONO, base: 'middle' });
+      text(ctx, `${bi}`, lx + lw - 7, yi + 0.5, C.text, { font: MONO, base: 'middle', align: 'right' });
+      text(ctx, `${gi}`, rx + 7, yi + 0.5, gi !== bi ? C.bad : C.text, { font: MONO, base: 'middle' });
+      text(ctx, `${i}`, rx + rw - 5, yi + 0.5, C.muted, { font: MONO, base: 'middle', align: 'right' });
+      const j = o.to(i, w);
       const x0 = lx + lw, x1 = rx;
-      if (j < 0) continue;
-      const yj = top + (7 - j) * rowH + rowH / 2;
+      if (j < 0 || j >= w) continue;
+      const yj = top + (w - 1 - j) * rowH + rowH / 2;
       ctx.beginPath();
       if (o.broken === i) {
         const xm = (x0 + x1) / 2;
@@ -651,23 +656,36 @@ const BitScene = (function () {
       ctx.moveTo(x0, yi);
       ctx.bezierCurveTo((x0 + x1) / 2, yi, (x0 + x1) / 2, yj, x1, yj);
       ctx.strokeStyle = j !== i || o.mark ? C.warn : C.muted;
-      ctx.lineWidth = 1.4;
+      ctx.lineWidth = 1.3;
       ctx.stroke();
       if (o.mark) {
         const xm = (x0 + x1) / 2, ym = (yi + yj) / 2;
-        ctx.beginPath(); ctx.arc(xm, ym, 3.2, 0, 2 * Math.PI); ctx.fillStyle = C.panel; ctx.fill(); ctx.strokeStyle = C.warn; ctx.stroke();
+        ctx.beginPath(); ctx.arc(xm, ym, 3, 0, 2 * Math.PI); ctx.fillStyle = C.panel; ctx.fill(); ctx.strokeStyle = C.warn; ctx.stroke();
       }
     }
-    const mid = (lx + lw + rx) / 2;
-    text(ctx, `${fmt(v)} sent`, mid, top + 8 * rowH + 2, C.text, { font: FONT_B, align: 'center' });
-    text(ctx, `${fmt(got)} read`, mid, top + 8 * rowH + 15, got !== v ? C.bad : C.ok, { font: FONT_B, align: 'center' });
-    return M;
+    const yb = top + w * rowH + 14;
+    text(ctx, 'Sensor', lx + lw / 2, yb, C.muted, { font: FONT_B, align: 'center' });
+    text(ctx, 'Logger', rx + rw / 2, yb, C.muted, { font: FONT_B, align: 'center' });
+    const mid = (lx + lw + rx) / 2, my = top + w * rowH / 2;
+    roundRect(ctx, mid - 42, my - 20, 84, 38, 6);
+    ctx.fillStyle = alpha(C.panel, 0.94); ctx.fill(); ctx.strokeStyle = C.border; ctx.lineWidth = 1; ctx.stroke();
+    text(ctx, `${fmt(v)} sent`, mid, my - 4, C.text, { font: FONT_B, align: 'center' });
+    text(ctx, `${fmt(got)} read`, mid, my + 11, got !== v ? C.bad : C.ok, { font: FONT_B, align: 'center' });
+    text(ctx, `the ${p.field === 'address' ? 'address\'s 13' : 'value\'s 11'} wires`, mid, yb, C.muted, { align: 'center' });
   }
 
   // ── The fourteen places ────────────────────────────────────────────────────
   // For each fault: where it happens (a sentence for the card), the short tag
-  // the drawing wears, what moves in the scene, and the close-up. `still` is
-  // the moment a still picture shows — one where the fault is plain to see.
+  // the drawing wears, what moves in the scene, and the close-up. Both are
+  // drawn from the fault's settings as the bench has them (K.prm in the
+  // scene, `p` in the close-up), so moving a slider moves the picture. `still`
+  // is the moment a still picture shows — one where the fault is plain to see.
+  const T_BIT = () => BM().bitMs();
+  const keying = () => (typeof PropPhysics !== 'undefined' ? PropPhysics : { LEAD_MS: 33.3, KEYING_MS: 200, CAPTURE_DB: 6 });
+  const seeded = n => (typeof PropPhysics !== 'undefined' ? PropPhysics.rng(n) : Math.random);
+  const SAMPLE = () => BM().air(4021, 1263);     // the frame the close-ups send
+  const oneIn = e => (e <= 0 ? 'never' : e >= 0.5 ? 'half the time' : `1 in ${fmt(Math.round(1 / e))}`);
+
   const SPOTS = {
     noise: {
       tag: 'too far, and grazing the hill',
@@ -676,55 +694,62 @@ const BitScene = (function () {
       close: 'At the repeater: the signal in the hiss',
       still: 1.1,
       scene(K) {
-        const a = K.p('tx'), b = K.p('rx');
+        const a = K.p('tx'), b = K.p('rx'), snr = K.prm.snr;
+        const lose = Math.max(0, Math.min(1, (16 - snr) / 14));
         K.rings(a, K.C.wave, { R: 14 });
-        K.flow([a, b], K.C.wave, { n: 8, fade: u => 1 - 0.8 * u, r: 3 });
-        K.hiss(b, 26, K.C.muted, 60);
-        K.mark(b, 'Weak at the repeater', { lift: 6 });
+        K.flow([a, b], K.C.wave, { n: 8, fade: u => 1 - 0.85 * lose * u, r: 3 });
+        K.hiss(b, 18 + 14 * lose, K.C.muted, Math.round(12 + 110 * lose));
+        K.mark(b, snr >= 14 ? 'Strong enough at the repeater' : 'Weak at the repeater', { lift: 6 });
       },
-      inset(ctx, b, C, t) {
-        const snr = BM().defaults('noise').snr, ber = BM().ber(snr);
+      inset(ctx, b, C, t, p) {
+        const snr = p.snr, ber = BM().ber(snr);
         const A = Math.min(20, b.h * 0.13), y0 = b.y + A + 6;
-        // The hiss's spread, and the tones riding barely over it.
-        const n = A * Math.sqrt(1 / (2 * Math.pow(10, snr / 10))) * 2.2;
+        // The hiss's spread, and the tones riding over it.
+        const n = Math.min(A * 1.3, A * Math.sqrt(1 / (2 * Math.pow(10, snr / 10))) * 2.2);
         ctx.fillStyle = alpha(C.muted, 0.2);
         ctx.fillRect(b.x, y0 - n, b.w, 2 * n);
         wave(ctx, b, y0, A, 7, t * 8, alpha(C.wave, 0.35), 1);
         wave(ctx, b, y0, A, 7, t * 8, C.wave, 1.6, x => n * 0.9 * hg(x * 0.9 + Math.floor(t * 20) * 13));
         text(ctx, 'faint: the tones as sent · grey: the receiver\'s own hiss', b.x, y0 + A + 16, C.muted);
-        // The cliff: bits misread against decibels over the hiss, 4 to 16.
+        // The cliff: bits misread against decibels over the hiss, 0 to 24.
         const gx = b.x + 2, gw = b.w - 4, gy = y0 + A + 44, gh = b.h - (gy - b.y) - 22;
         if (gh > 30) {
-          const X = db => gx + (db - 4) / 12 * gw, Y = db => gy + Math.min(1, -Math.log10(Math.max(1e-9, BM().ber(db))) / 7) * gh;
+          const X = db => gx + db / 24 * gw, Y = db => gy + Math.min(1, -Math.log10(Math.max(1e-9, BM().ber(db))) / 7) * gh;
           hline(ctx, gx, gx + gw, gy + gh, C.border);
           ctx.beginPath();
-          for (let db = 4; db <= 16.01; db += 0.25) { if (db > 4) ctx.lineTo(X(db), Y(db)); else ctx.moveTo(X(db), Y(db)); }
+          for (let db = 0; db <= 24.01; db += 0.25) { if (db > 0) ctx.lineTo(X(db), Y(db)); else ctx.moveTo(X(db), Y(db)); }
           ctx.strokeStyle = C.text; ctx.lineWidth = 1.4; ctx.stroke();
           ctx.beginPath(); ctx.arc(X(snr), Y(snr), 4, 0, 2 * Math.PI); ctx.fillStyle = C.bad; ctx.fill();
-          text(ctx, 'bits misread, from 4 to 16 dB: a cliff, not a slope', gx, gy - 6, C.muted);
-          text(ctx, 'here', X(snr) + 8, Y(snr) + 4, C.bad, { font: FONT_B });
+          text(ctx, 'bits misread, from 0 to 24 dB: a cliff, not a slope', gx, gy - 6, C.muted);
+          const right = X(snr) > gx + gw - 40;
+          text(ctx, 'here', X(snr) + (right ? -8 : 8), Y(snr) + (right ? -6 : 4), C.bad, { font: FONT_B, align: right ? 'right' : 'left' });
         }
-        text(ctx, `${fmt(snr)} dB over the hiss: a bit misread 1 in ${fmt(Math.round(1 / ber))}`, b.x, b.y + b.h - 2, C.text, { font: FONT_B });
+        text(ctx, `${fmt(snr, 1)} dB over the hiss: a bit misread ${oneIn(ber)}`, b.x, b.y + b.h - 2, C.text, { font: FONT_B });
       },
     },
 
     impulse: {
       tag: 'lightning and an electric fence',
-      where: 'A storm\'s lightning, the electric fence ticking once a second beside the repeater\'s hill, a car\'s ignition: short, loud '
-        + 'bursts of noise at the receiver that wipe out the few bits they land on, while the bits either side come through clean.',
-      close: 'What each burst does to the bits',
+      where: 'A storm\'s lightning, the electric fence ticking beside the repeater\'s hill, a car\'s ignition: short, loud bursts of '
+        + 'noise at the receiver that wipe out the few bits they land on, while the bits either side come through clean.',
+      close: p => `Bursts of ${fmt(p.width, 1)} ms, ${fmt(p.rate, 1)} a second${p.regular ? ', evenly' : ''}`,
       still: 0.08,
       scene(K, t) {
-        const a = K.p('tx'), b = K.p('rx'), { ctx, C } = K;
+        const a = K.p('tx'), b = K.p('rx'), { ctx, C } = K, p = K.prm;
         K.flow([a, b], C.wave, { n: 7 });
-        // The storm: a cloud, and now and then a bolt to the ground.
+        // A burst: `rate` a second (shown at no more than six), evenly for a
+        // fence, at random for a storm.
+        const r = Math.min(6, p.rate), slot = Math.floor(t * r), within = t * r - slot;
+        const at = p.regular ? 0 : hn(slot * 1.7) * 0.7;
+        const burst = within >= at && within < at + Math.min(0.5, 0.18 * r);
+        // The storm: a cloud, and the bolt when a burst comes from it.
         const cl = PLACE.cloud;
-        const bolt = (t % 2.8) < 0.22;
-        for (const [dx, dy, r] of [[-7, 0, 5], [0, 1, 6.5], [7, 0, 5], [3, -2, 4.5], [-3, -2, 4.5]]) {
-          const q = K.at([cl.x + dx, cl.y + dy, cl.z]), e = K.at([cl.x + dx + r, cl.y + dy, cl.z]);
+        const bolt = burst && !p.regular;
+        for (const [dx, dy, rr] of [[-7, 0, 5], [0, 1, 6.5], [7, 0, 5], [3, -2, 4.5], [-3, -2, 4.5]]) {
+          const q = K.at([cl.x + dx, cl.y + dy, cl.z]), e = K.at([cl.x + dx + rr, cl.y + dy, cl.z]);
           if (!q || !e) continue;
           ctx.beginPath(); ctx.arc(q[0], q[1], Math.abs(e[0] - q[0]), 0, 2 * Math.PI);
-          ctx.fillStyle = bolt ? alpha(C.panel, 0.95) : alpha(C.muted, 0.55); ctx.fill();
+          ctx.fillStyle = bolt ? alpha(C.panel, 0.95) : alpha(C.muted, p.regular ? 0.25 : 0.55); ctx.fill();
         }
         if (bolt) {
           const s = K.p('strike');
@@ -732,38 +757,52 @@ const BitScene = (function () {
           for (let k = 0; k <= 7; k++) pts.push(K.at([cl.x + (s[0] - cl.x) * k / 7 + (k % 2 ? 1.6 : -1.2), cl.y + (s[1] - cl.y) * k / 7, cl.z + (s[2] - cl.z) * k / 7]));
           if (pts.every(Boolean)) {
             ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
-            for (const p of pts.slice(1)) ctx.lineTo(p[0], p[1]);
+            for (const q of pts.slice(1)) ctx.lineTo(q[0], q[1]);
             ctx.strokeStyle = C.warn; ctx.lineWidth = 3; ctx.stroke();
           }
           K.rings(s, C.warn, { R: 40, n: 2, v: 60, a: 0.9 });
         }
-        // The fence: a tick a second.
         const f = K.p('fence');
-        if ((t % 1) < 0.16) { K.spark(f, C.warn, 10, t); K.rings(f, C.warn, { R: 22, n: 1, v: 120 }); }
-        if (bolt || (t % 1) < 0.16) K.spark(b, C.bad, 12);
-        K.mark(f, 'Fence ticking', { lift: 5 });
+        if (burst && p.regular) { K.spark(f, C.warn, 10, t); K.rings(f, C.warn, { R: 22, n: 1, v: 120 }); }
+        if (burst) K.spark(b, C.bad, 12);
+        if (p.regular) K.mark(f, 'Fence ticking', { lift: 5 });
+        else K.mark(K.p('strike'), 'Lightning', { lift: 4 });
       },
-      inset(ctx, b, C, t) {
-        const bits = Array.from({ length: 24 }, (_, j) => (hn(j * 5.3) > 0.45 ? 1 : 0));
-        const sweep = (t * 9) % 30;
-        const hits = [[6, 8], [16, 17]];
-        const inHit = j => hits.some(([s, e]) => j >= s && j <= e);
-        // The noise: quiet, then a spike where a burst lands.
-        const y0 = b.y + 32;
+      inset(ctx, b, C, t, p) {
+        // One frame every 2.5 s through BitModel's own channel: where its
+        // bursts land, and what they did.
+        const per = 2.5, k = Math.floor(t / per);
+        const tx = SAMPLE();
+        const ch = BM().channel('impulse', p, tx, seeded(k * 7919 + 17), { trace: true });
+        const hits = (ch.trace && ch.trace.hits) || [];
+        const T = T_BIT(), dur = 40 * T;
+        const upto = Math.floor(((t % per) / per) * 48);
+        const X = ms => b.x + ms / dur * b.w;
+        const y0 = b.y + 30;
+        text(ctx, 'the noise at the receiver, through one frame', b.x, b.y + 8, C.muted);
         ctx.beginPath();
         for (let x = 0; x <= b.w; x++) {
-          const j = x / b.w * 24;
-          const spike = inHit(Math.floor(j)) && Math.floor(j) <= sweep ? 14 * Math.abs(Math.sin(x * 1.7)) : 0;
-          const y = y0 - 2 * hg(x * 2) - spike * (hn(x * 0.37) > 0.4 ? 1 : -0.6);
+          const ms = x / b.w * dur;
+          const inHit = ms / T <= upto && hits.some(([s, e]) => ms >= s && ms <= e);
+          const y = y0 - 2 * hg(x * 2) - (inHit ? 13 * Math.abs(Math.sin(x * 1.7)) * (hn(x * 0.37) > 0.4 ? 1 : -0.6) : 0);
           if (x) ctx.lineTo(b.x + x, y); else ctx.moveTo(b.x + x, y);
         }
         ctx.strokeStyle = C.warn; ctx.lineWidth = 1.2; ctx.stroke();
-        text(ctx, 'the noise at the receiver', b.x, b.y + 8, C.muted);
+        for (const [s, e] of hits) {
+          if (s / T > upto) continue;
+          ctx.fillStyle = alpha(C.warn, 0.14);
+          ctx.fillRect(X(Math.max(0, s)), y0 - 16, Math.max(2, X(Math.min(dur, e)) - X(Math.max(0, s))), 92);
+        }
+        const flips = new Set();
+        if (ch.rx) for (let j = 0; j < 40; j++) if (ch.rx[j] !== tx[j]) flips.add(j);
         text(ctx, 'sent', b.x, b.y + 56, C.muted);
-        bitRow(ctx, b, b.y + 61, bits, C, { upto: Math.floor(sweep) });
+        bitRow(ctx, b, b.y + 61, Array.from(tx), C, { upto });
         text(ctx, 'heard', b.x, b.y + 92, C.muted);
-        bitRow(ctx, b, b.y + 97, bits.map((v, j) => (inHit(j) && hn(j * 2.3) > 0.3 ? 1 - v : v)), C, { upto: Math.floor(sweep), bad: j => inHit(j) && hn(j * 2.3) > 0.3 });
-        text(ctx, 'A few neighbouring bits at a time; the rest clean.', b.x, b.y + b.h - 2, C.text, { font: FONT_B });
+        bitRow(ctx, b, b.y + 97, Array.from(ch.rx || tx), C, { upto, bad: j => flips.has(j) });
+        const done = upto >= 40;
+        const hit = hits.filter(([s, e]) => e > 0 && s < dur).length;
+        text(ctx, `${fmt(p.width / T + 1, 1)} bits a burst. ${done ? (hit ? `This frame: ${hit} burst${hit > 1 ? 's' : ''}, ${flips.size} bit${flips.size === 1 ? '' : 's'} flipped.` : 'This frame: no burst — untouched.') : 'Sending…'}`,
+          b.x, b.y + b.h - 2, done && flips.size ? C.bad : C.text, { font: FONT_B });
       },
     },
 
@@ -773,14 +812,21 @@ const BitScene = (function () {
         + 'copies add or cancel; the shed holds still, but as the truck moves the signal fades in and out.',
       close: 'Two copies adding up — or cancelling',
       still: 2.3,
+      // Where the two copies stand, radians apart, at time t: swept by the
+      // truck at `rate` fades a second, or held at `place` when nothing moves.
+      phase: (t, p) => (p.rate > 0 ? 2 * Math.PI * p.rate * t : p.place * Math.PI / 180),
+      truck: (t, p) => (p.rate > 0 ? 1 + ((t * 3 * Math.min(p.rate, 5)) % 114) : 40),
       scene(K, t) {
-        const { ctx, C } = K;
-        const a = K.p('tx'), b = K.p('rx'), e = K.p('echo'), tr = K.p('truck');
+        const { ctx, C } = K, p = K.prm;
+        const a = K.p('tx'), b = K.p('rx'), e = K.p('echo');
+        const x = SPOTS.multipath.truck(t, p), y = ROAD_Y - 1.9;
+        const tr = up(x + 2, ROAD_Y - 0.9, 2.4);
         K.flow([a, b], C.wave, { n: 6 });
-        K.flow([a, e, b], C.echo, { n: 6, speed: 36 });
-        K.flow([a, tr, b], C.echo, { n: 5, speed: 34, dash: [2, 5], base: 0.3 });
-        // The truck itself, moving along the road.
-        const x = truckX(t), y = ROAD_Y - 1.9;
+        if (p.echo > 0) {
+          K.flow([a, e, b], C.echo, { n: 6, speed: 36, base: 0.2 + 0.4 * p.echo });
+          if (p.rate > 0) K.flow([a, tr, b], C.echo, { n: 5, speed: 34, dash: [2, 5], base: 0.3 * p.echo });
+        }
+        // The truck itself, on the road: moving, or parked when nothing is.
         const cs = [[x, y], [x + 4.2, y], [x + 4.2, y + 2], [x, y + 2]];
         const g = groundZ(x + 2, ROAD_Y) + 0.2;
         const lo = cs.map(([u, v]) => K.at([u, v, g])), hi = cs.map(([u, v]) => K.at([u, v, g + 2.3]));
@@ -788,23 +834,23 @@ const BitScene = (function () {
           ctx.fillStyle = shade(rgb(C.echo), 0.95);
           ctx.beginPath(); ctx.moveTo(lo[0][0], lo[0][1]); ctx.lineTo(lo[1][0], lo[1][1]); ctx.lineTo(hi[1][0], hi[1][1]); ctx.lineTo(hi[0][0], hi[0][1]); ctx.closePath(); ctx.fill();
           ctx.fillStyle = shade(rgb(C.echo), 1.2);
-          ctx.beginPath(); hi.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.fill();
+          ctx.beginPath(); hi.forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.closePath(); ctx.fill();
           ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 0.8; ctx.stroke();
         }
         // The repeater's signal meter: the sum of the two.
-        const amp = BM().fadeAmp(0.85, 2 * Math.PI * truckX(t) / 9);
+        const amp = BM().fadeAmp(p.echo, SPOTS.multipath.phase(t, p));
         const q = K.at(b);
         if (q) {
-          const H = 34, v = Math.min(1, amp / 1.85);
+          const H = 34, v = Math.min(1, amp / 2);
           ctx.fillStyle = alpha(C.panel, 0.9); ctx.fillRect(q[0] + 14, q[1] - 6, 10, H + 2);
           ctx.fillStyle = v < 0.3 ? C.bad : C.ok; ctx.fillRect(q[0] + 15, q[1] - 5 + H * (1 - v), 8, H * v);
           ctx.strokeStyle = C.border; ctx.strokeRect(q[0] + 14, q[1] - 6, 10, H + 2);
         }
-        K.mark(e, 'Echo off the shed', { lift: 4 });
+        K.mark(e, p.echo > 0 ? 'Echo off the shed' : 'No echo', { lift: 4 });
       },
-      inset(ctx, b, C, t) {
-        const ph = 2 * Math.PI * truckX(t) / 9;
-        const rho = BM().defaults('multipath').echo;
+      inset(ctx, b, C, t, p) {
+        const ph = SPOTS.multipath.phase(t, p);
+        const rho = p.echo;
         const A = Math.min(13, b.h * 0.09), y1 = b.y + A + 4, y2 = y1 + 2.6 * A + 4, y3 = y2 + 3.6 * A + 4;
         wave(ctx, b, y1, A, 5, t * 6, C.wave, 1.3);
         wave(ctx, b, y2, A * rho, 5, t * 6 + ph, C.echo, 1.3);
@@ -812,11 +858,12 @@ const BitScene = (function () {
         const sumPh = Math.atan2(rho * Math.sin(ph), 1 + rho * Math.cos(ph));
         wave(ctx, b, y3, A * amp, 5, t * 6 + sumPh, C.sum, 2.2);
         text(ctx, 'straight', b.x, y1 - A - 2, C.wave, { font: FONT_B });
-        text(ctx, 'off the truck', b.x, y2 - A - 2, C.echo, { font: FONT_B });
-        text(ctx, 'what the repeater gets', b.x, y3 - 1.85 * A - 2, C.sum, { font: FONT_B });
+        text(ctx, p.rate > 0 ? 'off the truck' : 'off the shed', b.x, y2 - A - 2, C.echo, { font: FONT_B });
+        text(ctx, 'what the repeater gets', b.x, y3 - 2 * A - 2, C.sum, { font: FONT_B });
         const db = 20 * Math.log10(Math.max(1e-3, amp));
-        const word = Math.cos(ph) > 0.4 ? 'in step — stronger' : Math.cos(ph) < -0.4 ? 'opposed — a fade' : 'between';
-        text(ctx, `The sum: ${sgn(db, 1)} dB, ${word}`, b.x, b.y + b.h - 2, Math.cos(ph) < -0.4 ? C.bad : C.text, { font: FONT_B });
+        const fade = Math.cos(ph) < -0.4 && rho > 0.3;
+        text(ctx, p.rate > 0 ? `${fmt(p.rate, 2)} fades a second — now ${sgn(db, 1)} dB` : `Still at ${fmt(p.place)}°: ${sgn(db, 1)} dB, for good`,
+          b.x, b.y + b.h - 2, fade ? C.bad : C.text, { font: FONT_B });
       },
     },
 
@@ -824,39 +871,50 @@ const BitScene = (function () {
       tag: 'another gauge keys up at once',
       where: 'Another gauge across the valley keys up while ours is still sending. Nobody listens before they talk on an ALERT '
         + 'network, so now and then two frames land on the repeater together, and where they disagree the bits flip.',
-      close: 'Two frames on the air at once',
+      close: p => `Two keyings at once: ours ${p.sir >= 0 ? `${fmt(p.sir, 1)} dB stronger` : `${fmt(-p.sir, 1)} dB weaker`}`,
       still: 0.95,
       scene(K, t) {
-        const { C } = K;
+        const { C } = K, p = K.prm, cap = keying().CAPTURE_DB;
         const a = K.p('tx'), b = K.p('rx'), c = K.p('tx2');
         const ph = t % 3.2;
+        const lost = p.sir <= -cap;
         K.rings(a, C.wave, { R: 14 });
-        K.flow([a, b], C.wave, { n: 7 });
+        K.flow([a, b], lost ? C.muted : C.wave, { n: 7 });
         if (ph > 0.6) { K.rings(c, C.echo, { R: 14 }); K.flow([c, b], C.echo, { n: 7, speed: 44 }); }
-        if (ph > 1.0 && ph < 2.9 && Math.floor(t * 6) % 2) K.spark(b, C.bad, 13, t);
-        K.mark(c, 'The other gauge', { lift: 5 });
+        if (p.sir < cap && ph > 1.0 && ph < 2.9 && Math.floor(t * 6) % 2) K.spark(b, C.bad, 13, t);
+        K.mark(c, p.copy ? 'A second repeater, same reading' : 'The other gauge', { lift: 5 });
       },
-      inset(ctx, b, C, t) {
-        const ph = (t % 3.2) / 3.2;
-        const x0 = b.x, W = b.w;
-        const ours = [0.04, 0.62], theirs = [0.36, 0.96];
-        const row = (y, [s, e], col, name) => {
-          ctx.fillStyle = col; ctx.fillRect(x0 + s * W, y, (e - s) * W, 16);
-          text(ctx, name, x0 + s * W + 4, y + 8.5, C.panel, { font: FONT_B, base: 'middle' });
+      inset(ctx, b, C, t, p) {
+        const P = keying(), T = T_BIT(), ours = 40 * T, cap = P.CAPTURE_DB;
+        const start = p.copy ? -P.LEAD_MS : p.start, len = P.KEYING_MS;
+        const lo = Math.min(0, start) - 8, hi = Math.max(ours, start + len) + 8;
+        const X = ms => b.x + (ms - lo) / (hi - lo) * b.w;
+        const per = 3.2, k = Math.floor(t / per), ph = (t % per) / per;
+        const row = (y, s, e, col, name) => {
+          ctx.fillStyle = col; ctx.fillRect(X(s), y, X(e) - X(s), 16);
+          ctx.save(); ctx.beginPath(); ctx.rect(X(s), y, X(e) - X(s), 16); ctx.clip();
+          text(ctx, name, X(s) + 4, y + 8.5, C.panel, { font: FONT_B, base: 'middle' });
+          ctx.restore();
         };
-        row(b.y + 6, ours, C.wave, 'Ours — 133 ms');
-        row(b.y + 28, theirs, C.echo, 'Theirs');
-        ctx.fillStyle = alpha(C.bad, 0.22);
-        ctx.fillRect(x0 + theirs[0] * W, b.y + 2, (ours[1] - theirs[0]) * W, 48);
-        hline(ctx, x0 + ph * W, x0 + ph * W + 0.01, b.y, C.text);
-        ctx.fillStyle = C.text; ctx.fillRect(x0 + ph * W - 1, b.y + 2, 2, 48);
-        text(ctx, 'Overlap: within 6 dB of each other, bits flip where the two differ', b.x, b.y + 66, C.bad, { font: FONT_B });
-        const bits = Array.from({ length: 20 }, (_, j) => (hn(j * 3.7) > 0.4 ? 1 : 0));
-        const lo = Math.ceil((theirs[0] - ours[0]) / (ours[1] - ours[0]) * 20);
-        const upto = Math.floor((ph - ours[0]) / (ours[1] - ours[0]) * 20);
+        row(b.y + 6, 0, ours, C.wave, `Ours — ${fmt(ours)} ms`);
+        row(b.y + 28, start, start + len, C.echo, p.copy ? 'The same reading, relayed' : 'Theirs');
+        const o0 = Math.max(0, start), o1 = Math.min(ours, start + len);
+        if (o1 > o0) { ctx.fillStyle = alpha(C.bad, 0.22); ctx.fillRect(X(o0), b.y + 2, X(o1) - X(o0), 48); }
+        ctx.fillStyle = C.text; ctx.fillRect(b.x + ph * b.w - 1, b.y + 2, 2, 48);
+        // Our frame through BitModel's own collision, a new one each pass.
+        const tx = SAMPLE();
+        const ch = BM().channel('collision', p, tx, seeded(k * 104729 + 3), { trace: true });
+        const upto = Math.floor(((ph * (hi - lo) + lo) / ours) * 40);
+        const why = o1 <= o0 ? 'No overlap: the two never meet.'
+          : p.sir >= cap ? `Ours ${fmt(p.sir, 1)} dB ahead: FM hears ours cleanly (capture).`
+          : p.sir <= -cap ? `Theirs ${fmt(-p.sir, 1)} dB ahead: the receiver locks on to it, and ours is lost.`
+          : `Within ${fmt(cap)} dB of each other: bits flip where the two differ.`;
+        text(ctx, why, b.x, b.y + 66, o1 > o0 && p.sir < cap ? C.bad : C.text, { font: FONT_B });
         text(ctx, 'ours, as heard', b.x, b.y + 84, C.muted);
-        bitRow(ctx, { x: b.x, w: b.w }, b.y + 90, bits, C, { upto, bad: j => j >= lo && hn(j * 9.1) > 0.45 });
-        text(ctx, '6 dB stronger, and FM hears only the stronger (capture).', b.x, b.y + b.h - 2, C.muted);
+        if (ch.rx) bitRow(ctx, b, b.y + 90, Array.from(ch.rx), C, { upto, bad: j => ch.rx[j] !== tx[j] });
+        else text(ctx, upto >= 0 ? 'nothing — captured by theirs' : '', b.x, b.y + 102, C.bad, { font: FONT_B });
+        text(ctx, start < 0 ? `They key up ${fmt(-start)} ms before our first bit.` : `They key up ${fmt(start)} ms after our first bit.`,
+          b.x, b.y + b.h - 2, C.muted);
       },
     },
 
@@ -866,51 +924,61 @@ const BitScene = (function () {
         + 'corroded joint on its mast — and one of the products, 2f₁ − f₂, lands on our channel whenever both are on the air.',
       close: 'Two frequencies in, a third out',
       still: 0.5,
+      inBand: p => Math.abs(BM().nearestProduct(p.f1, p.f2).offsetHz) <= BM().IF_HALF_HZ,
+      on: (t, p) => ((t % 2) / 2) < p.duty,
       scene(K, t) {
-        const { C } = K;
+        const { C } = K, p = K.prm;
         const a = K.p('tx'), b = K.p('rx'), p1 = K.p('pager'), p2 = K.p('phone');
+        const on = SPOTS.intermod.on(t, p), hit = on && SPOTS.intermod.inBand(p);
         K.flow([a, b], C.wave, { n: 6, base: 0.3 });
         K.rings(p1, C.sum, { R: 22, v: 14 });
-        K.rings(p2, C.ok, { R: 22, v: 14 });
-        K.flow([p1, b], C.sum, { n: 4, speed: 30, dash: [2, 3] });
-        K.flow([p2, b], C.ok, { n: 4, speed: 30, dash: [2, 3] });
-        K.spark(b, C.bad, 10, t * 3);
-        K.rings(b, C.bad, { R: 9, n: 2, v: 10 });
-        K.mark(b, 'Mixing at the repeater', { lift: 6 });
+        if (on) {
+          K.rings(p2, C.ok, { R: 22, v: 14 });
+          K.flow([p1, b], C.sum, { n: 4, speed: 30, dash: [2, 3] });
+          K.flow([p2, b], C.ok, { n: 4, speed: 30, dash: [2, 3] });
+        }
+        if (hit) { K.spark(b, C.bad, 10, t * 3); K.rings(b, C.bad, { R: 9, n: 2, v: 10 }); }
+        K.mark(b, hit ? 'Mixing at the repeater' : SPOTS.intermod.inBand(p) ? 'Waiting for both to key up' : 'Products miss our channel', { lift: 6 });
         const q1 = K.at(p1), q2 = K.at(p2);
-        if (q1) pill(K.ctx, 'Pager f₁', q1[0], q1[1] - 14, C, { align: 'center' });
-        if (q2) pill(K.ctx, 'Phone f₂', q2[0], q2[1] - 14, C, { align: 'center' });
+        if (q1) pill(K.ctx, `Pager f₁ ${fmt(p.f1, 3)}`, q1[0], q1[1] - 14, C, { align: 'center' });
+        if (q2) pill(K.ctx, `Phone f₂ ${fmt(p.f2, 3)}`, q2[0], q2[1] - 14, C, { align: 'center' });
       },
-      inset(ctx, b, C, t) {
-        const d = BM().defaults('intermod');
-        const pr = BM().imProducts(d.f1, d.f2);
-        const lo = 151.0, hi = 153.4;
+      inset(ctx, b, C, t, p) {
+        const pr = BM().imProducts(p.f1, p.f2);
+        const fs = [151.5, p.f1, p.f2, ...pr.map(x => x.mhz)];
+        const span = Math.max(1.2, Math.max(...fs) - Math.min(...fs));
+        const lo = Math.min(...fs) - span * 0.12, hi = Math.max(...fs) + span * 0.12;
         const X = f => b.x + (f - lo) / (hi - lo) * b.w;
-        const yb = b.y + b.h - 26;
+        const yb = b.y + b.h - 30;
         hline(ctx, b.x, b.x + b.w, yb, C.muted);
-        for (let f = 151.5; f <= hi; f += 0.5) {
-          hline(ctx, X(f), X(f) + 0.01, yb, C.muted);
-          text(ctx, f.toFixed(1), X(f), yb + 12, C.muted, { align: 'center' });
+        const step = [0.25, 0.5, 1, 2, 5, 10].find(s => (hi - lo) / s <= 6) || 10;
+        for (let f = Math.ceil(lo / step) * step; f <= hi; f += step) {
+          ctx.fillStyle = C.muted; ctx.fillRect(X(f), yb, 1, 4);
+          text(ctx, f.toFixed(step < 1 ? 2 : 0), X(f), yb + 14, C.muted, { align: 'center' });
         }
         const bar = (f, h, col, name, w) => {
           ctx.fillStyle = col; ctx.fillRect(X(f) - (w || 2) / 2, yb - h, w || 2, h);
-          text(ctx, name, X(f), yb - h - 4, col, { align: 'center', font: FONT_B });
+          if (name) text(ctx, name, X(f), yb - h - 4, col, { align: 'center', font: FONT_B });
         };
-        // Our channel, and the receiver's filter around it.
+        // Our channel, and the receiver's filter around it (drawn wider than it
+        // is, or it would be a hair at this scale).
         ctx.fillStyle = alpha(C.wave, 0.18);
-        ctx.fillRect(X(151.5 - 0.03), b.y + 12, Math.max(4, X(151.53) - X(151.47)), yb - b.y - 12);
+        ctx.fillRect(X(151.5) - 3, b.y + 12, 6, yb - b.y - 12);
         text(ctx, 'our channel', X(151.5) + 6, b.y + 20, C.wave, { font: FONT_B });
         bar(151.5, 40, C.wave, '', 3);
-        bar(d.f1, 62, C.sum, 'f₁');
-        bar(d.f2, 62, C.ok, 'f₂');
-        const pulse = 0.6 + 0.4 * Math.abs(Math.sin(t * 3));
+        bar(p.f1, 62, C.sum, 'f₁');
+        bar(p.f2, 62, C.ok, 'f₂');
+        const on = SPOTS.intermod.on(t, p);
         for (const x of pr) {
-          const h = 28 * pulse;
-          bar(x.mhz, h, C.bad, x.key === '2f1-f2' ? '' : '2f₂−f₁');
-          if (x.key === '2f1-f2') text(ctx, '2f₁−f₂', X(x.mhz) + 6, yb - 16, C.bad, { font: FONT_B });
+          const h = on ? 30 : 8;
+          bar(x.mhz, h, on ? C.bad : alpha(C.bad, 0.4), '');
+          const edge = X(x.mhz) > b.x + b.w - 44;
+          text(ctx, x.key === '2f1-f2' ? '2f₁−f₂' : '2f₂−f₁', X(x.mhz) + (edge ? -5 : 5), yb - h - 4, C.bad, { font: FONT_B, align: edge ? 'right' : 'left' });
         }
-        const near = pr.find(x => x.key === '2f1-f2');
-        text(ctx, `2 × ${fmt(d.f1, 4)} − ${fmt(d.f2, 4)} = ${fmt(near.mhz, 4)} MHz: in our channel`, b.x, b.y + b.h - 2, C.bad, { font: FONT_B });
+        const near = BM().nearestProduct(p.f1, p.f2), inside = Math.abs(near.offsetHz) <= BM().IF_HALF_HZ;
+        const off = near.offsetHz / 1000;
+        text(ctx, `${near.key === '2f1-f2' ? '2f₁ − f₂' : '2f₂ − f₁'} is ${sgn(off, 1)} kHz from ours: ${inside ? `inside the filter, ${on ? 'on now' : 'off'} (${fmt(p.duty * 100)}% of the time)` : 'outside the filter — no harm'}`,
+          b.x, b.y + b.h - 2, inside ? C.bad : C.ok, { font: FONT_B });
       },
     },
 
@@ -919,10 +987,10 @@ const BitScene = (function () {
       where: 'The gauge\'s hut bakes in the afternoon sun and chills before dawn, and its radio\'s crystal moves with it. A few parts '
         + 'per million off, and the carrier slides out of the repeater\'s filter — at one end of the day, and only for this transmitter.',
       close: 'The carrier in the repeater\'s filter, through a day',
-      still: 4.9,
-      hour: t => (6 + t * 3.4) % 24,
+      still: 3.75,
+      hour: t => (6 + t * 2.4) % 24,
       sky(K, t) {
-        const { ctx, C } = K;
+        const { ctx } = K;
         const h = SPOTS.crystal.hour(t);
         const day = Math.sin(Math.PI * (h - 6) / 12);
         const w = ctx.canvas.clientWidth, H = ctx.canvas.clientHeight;
@@ -935,11 +1003,10 @@ const BitScene = (function () {
         }
       },
       scene(K, t) {
-        const { ctx, C } = K;
-        const d = BM().defaults('crystal');
+        const { ctx, C } = K, d = K.prm;
         const h = SPOTS.crystal.hour(t);
         const off = BM().crystalHz(d, h);
-        const out = BM().edgePenaltyDb(off, false) > 0;
+        const out = BM().edgePenaltyDb(off, d.wide) > 0;
         const a = K.p('tx'), b = K.p('rx');
         K.rings(a, out ? C.bad : C.wave, { R: 14 });
         K.flow([a, b], out ? C.bad : C.wave, { n: 7, fade: u => (out ? 1 - 0.85 * u : 1) });
@@ -947,37 +1014,48 @@ const BitScene = (function () {
         const T = BM().dayTemp(h, d.tmin, d.tmax);
         const q = K.at(K.p('hut'));
         if (q) {
-          const x = Math.max(62, q[0] - 46), y = q[1] - 22, H = 30, v = (T - d.tmin) / (d.tmax - d.tmin);
+          const x = Math.max(62, q[0] - 46), y = q[1] - 22, H = 30, v = Math.max(0, Math.min(1, (T + 10) / 60));
           roundRect(ctx, x - 4, y - 4, 8, H + 8, 4); ctx.fillStyle = alpha(C.panel, 0.95); ctx.fill(); ctx.strokeStyle = C.border; ctx.stroke();
-          ctx.fillStyle = v > 0.6 ? C.bad : C.wave; ctx.fillRect(x - 2, y + H * (1 - v), 4, H * v);
+          ctx.fillStyle = T > 30 ? C.bad : C.wave; ctx.fillRect(x - 2, y + H * (1 - v), 4, H * v);
           ctx.beginPath(); ctx.arc(x, y + H + 4, 5, 0, 2 * Math.PI); ctx.fill();
-          pill(ctx, `${fmt(T)} °C`, x - 9, y + H / 2, C, { align: 'right', col: v > 0.6 ? C.bad : C.text });
+          pill(ctx, `${fmt(T)} °C`, x - 9, y + H / 2, C, { align: 'right', col: T > 30 ? C.bad : C.text });
         }
         K.mark(K.p('hut'), 'Crystal in the radio', { lift: 4 });
       },
-      inset(ctx, b, C, t) {
-        const d = BM().defaults('crystal');
+      inset(ctx, b, C, t, d) {
+        const M = BM();
         const h = SPOTS.crystal.hour(t);
-        const off = BM().crystalHz(d, h);
-        const half = BM().IF_HALF_HZ, dev = BM().DEV_HZ;
-        const span = 8000;
-        const X = hz => b.x + b.w / 2 + hz / span * b.w / 2;
-        const yb = b.y + b.h - 34;
-        // The filter: flat across ±4 kHz, falling away outside it.
+        const off = M.crystalHz(d, h);
+        const half = d.wide ? M.WIDE_HALF_HZ : M.IF_HALF_HZ, dev = d.wide ? 2 * M.DEV_HZ : M.DEV_HZ;
+        const span = Math.max(half + dev + 1500, Math.abs(off) + dev + 800);
+        const X = hz => b.x + b.w / 2 + Math.max(-1, Math.min(1, hz / span)) * b.w / 2;
+        const yb = b.y + b.h - 66;
+        // The filter: flat across its width, falling away outside it.
         ctx.beginPath();
         ctx.moveTo(X(-span), yb); ctx.lineTo(X(-half - 900), yb); ctx.lineTo(X(-half), b.y + 14); ctx.lineTo(X(half), b.y + 14);
         ctx.lineTo(X(half + 900), yb); ctx.lineTo(X(span), yb);
         ctx.fillStyle = alpha(C.wave, 0.14); ctx.fill(); ctx.strokeStyle = alpha(C.wave, 0.6); ctx.lineWidth = 1; ctx.stroke();
-        text(ctx, 'the repeater\'s filter', X(0), b.y + 10, C.muted, { align: 'center' });
-        const out = BM().edgePenaltyDb(off, false) > 0;
+        text(ctx, `the repeater's filter, ±${fmt(half / 1000)} kHz`, X(0), b.y + 10, C.muted, { align: 'center' });
+        const out = M.edgePenaltyDb(off, d.wide) > 0;
         ctx.fillStyle = alpha(out ? C.bad : C.ok, 0.85);
-        ctx.fillRect(X(off - dev), yb - 30, X(off + dev) - X(off - dev), 8);
-        ctx.fillRect(X(off) - 1, yb - 40, 2, 40);
-        text(ctx, 'our swing', X(off), yb - 44, out ? C.bad : C.ok, { align: 'center', font: FONT_B });
+        ctx.fillRect(X(off - dev), yb - 26, X(off + dev) - X(off - dev), 8);
+        ctx.fillRect(X(off) - 1, yb - 36, 2, 36);
+        text(ctx, 'our swing', X(off), yb - 40, out ? C.bad : C.ok, { align: 'center', font: FONT_B });
         hline(ctx, b.x, b.x + b.w, yb, C.muted);
-        const T = BM().dayTemp(h, d.tmin, d.tmax);
-        text(ctx, `${hh(h)} · ${fmt(T)} °C · ${sgn(off / BM().hzPerPpm(), 1)} ppm = ${sgn(off / 1000, 2)} kHz`, b.x, yb + 14, C.text, { font: FONT_B });
-        text(ctx, out ? 'Its swing is past the filter\'s edge: the signal suffers.' : 'Inside the filter: no harm yet.', b.x, b.y + b.h - 2, out ? C.bad : C.muted);
+        const T = M.dayTemp(h, d.tmin, d.tmax);
+        text(ctx, `${hh(h)} · ${fmt(T)} °C · ${sgn(off / M.hzPerPpm(), 1)} ppm = ${sgn(off / 1000, 2)} kHz`, b.x, yb + 14, C.text, { font: FONT_B });
+        // The day as a strip: the hours this crystal is past the edge, the
+        // hour now, and the hour set on the bench for a single frame.
+        const sy = yb + 24, cw = b.w / 24;
+        for (let k = 0; k < 24; k++) {
+          const bad = M.edgePenaltyDb(M.crystalHz(d, k), d.wide) > 0;
+          ctx.fillStyle = bad ? alpha(C.bad, 0.75) : alpha(C.ok, 0.3);
+          ctx.fillRect(b.x + k * cw + 0.5, sy, cw - 1, 10);
+        }
+        ctx.fillStyle = C.text; ctx.fillRect(b.x + (h / 24) * b.w - 1, sy - 3, 2, 16);
+        ctx.strokeStyle = C.accent; ctx.lineWidth = 1.5; ctx.strokeRect(b.x + d.hour * cw + 0.5, sy - 1, cw - 1, 12);
+        text(ctx, '00', b.x, sy + 22, C.muted); text(ctx, '12', b.x + b.w / 2, sy + 22, C.muted, { align: 'center' }); text(ctx, '24', b.x + b.w, sy + 22, C.muted, { align: 'right' });
+        text(ctx, out ? 'Past the edge now: the signal suffers.' : 'Inside the filter now: no harm.', b.x, b.y + b.h + 4, out ? C.bad : C.muted, { font: FONT_B });
       },
     },
 
@@ -987,43 +1065,51 @@ const BitScene = (function () {
         + 'too soon, the first bits go out off frequency, and the repeater misreads them.',
       close: 'The carrier settling after key-up',
       still: 0.35,
+      // When the loop is in the filter's reach for good, ms after key-up.
+      settle(p) {
+        const edge = BM().IF_HALF_HZ - BM().DEV_HZ;
+        let last = 0;
+        for (let ms = 0; ms <= 1500; ms += 0.5) if (Math.abs(BM().pllHz(ms, p)) > edge) last = ms;
+        return last;
+      },
       scene(K, t) {
-        const { C } = K;
+        const { C } = K, p = K.prm;
         const a = K.p('tx'), b = K.p('rx');
+        const off = Math.max(0, SPOTS.pll.settle(p) - p.lead) / (40 * T_BIT());
         const ph = t % 2.4;
         if (ph < 2.1) {
-          K.rings(a, r => (r < 0.5 ? C.bad : C.wave), { R: 16, v: 12 });
-          K.flow([a, b], u => (u > 0.55 ? C.bad : C.wave), { n: 8, speed: 46, span: [0, Math.min(1, ph / 1.2)] });
+          K.rings(a, r => (r < Math.min(0.9, off * 1.5) ? C.bad : C.wave), { R: 16, v: 12 });
+          K.flow([a, b], u => (u > 1 - Math.min(1, off) ? C.bad : C.wave), { n: 8, speed: 46, span: [0, Math.min(1, ph / 1.2)] });
         }
-        K.mark(a, 'Synthesiser locking', { lift: 3 });
+        K.mark(a, off > 0 ? 'Synthesiser still locking' : 'Locked before the data', { lift: 3 });
       },
-      inset(ctx, b, C, t) {
-        const d = BM().defaults('pll');
-        const edge = BM().IF_HALF_HZ - BM().DEV_HZ;
-        const tMax = 130;
+      inset(ctx, b, C, t, p) {
+        const M = BM();
+        const edge = M.IF_HALF_HZ - M.DEV_HZ;
+        const settle = SPOTS.pll.settle(p);
+        const tMax = Math.min(600, Math.max(70, p.lead + 40 * T_BIT() * 0.4, settle * 1.5));
         const X = ms => b.x + ms / tMax * b.w;
-        const y0 = b.y + b.h - 40, kH = 60;
-        const Y = hz => y0 - hz / (d.kick * 1000) * kH;
+        const y0 = b.y + (b.h - 30) / 2 + 10, kH = (b.h - 52) / 2;
+        const Y = hz => y0 - hz / (p.kick * 1000) * kH;
         ctx.fillStyle = alpha(C.ok, 0.13);
         ctx.fillRect(b.x, Y(edge), b.w, Y(-edge) - Y(edge));
         text(ctx, 'in the filter\'s reach', b.x + b.w - 2, Y(-edge) + 12, C.ok, { align: 'right' });
-        const cur = (t % 2.4) / 1.6 * tMax;
+        hline(ctx, b.x, b.x + b.w, y0, C.border);
+        const cur = ((t % 2.4) / 1.8) * tMax;
         ctx.beginPath();
         for (let x = 0; x <= b.w; x++) {
           const ms = x / b.w * tMax;
           if (ms > cur) break;
-          const hz = d.kick * 1000 * Math.exp(-ms / d.tau);
+          const hz = M.pllHz(ms, p);
           if (x) ctx.lineTo(b.x + x, Y(hz)); else ctx.moveTo(b.x + x, Y(hz));
         }
         ctx.strokeStyle = C.text; ctx.lineWidth = 1.6; ctx.stroke();
-        const settle = d.tau * Math.log(d.kick * 1000 / edge);
-        ctx.fillStyle = alpha(C.bad, 0.25); ctx.fillRect(X(d.lead), b.y + 8, X(settle) - X(d.lead), y0 - b.y - 8);
-        hline(ctx, X(d.lead), X(d.lead) + 0.01, y0, C.text);
-        ctx.fillStyle = C.wave; ctx.fillRect(X(d.lead) - 1, b.y + 8, 2, y0 - b.y - 8);
-        text(ctx, `data starts, ${fmt(d.lead)} ms`, X(d.lead) + 4, b.y + 16, C.wave, { font: FONT_B });
-        hline(ctx, b.x, b.x + b.w, y0, C.muted);
-        const nBits = Math.ceil((settle - d.lead) / BM().bitMs());
-        text(ctx, `Locked by ${fmt(settle)} ms: the first ${fmt(nBits)} bits go out off frequency.`, b.x, b.y + b.h - 2, C.bad, { font: FONT_B });
+        if (settle > p.lead) { ctx.fillStyle = alpha(C.bad, 0.25); ctx.fillRect(X(p.lead), b.y + 8, X(Math.min(tMax, settle)) - X(p.lead), b.h - 46); }
+        ctx.fillStyle = C.wave; ctx.fillRect(X(p.lead) - 1, b.y + 8, 2, b.h - 46);
+        text(ctx, `data starts, ${fmt(p.lead)} ms`, Math.min(X(p.lead) + 4, b.x + b.w - 110), b.y + 16, C.wave, { font: FONT_B });
+        const nBits = Math.min(40, Math.ceil((settle - p.lead) / T_BIT()));
+        text(ctx, settle > p.lead ? `Locked by ${fmt(settle)} ms: the first ${fmt(nBits)} bit${nBits > 1 ? 's go' : ' goes'} out off frequency.`
+          : `Locked by ${fmt(settle)} ms, before the data: no harm.`, b.x, b.y + b.h - 2, settle > p.lead ? C.bad : C.ok, { font: FONT_B });
       },
     },
 
@@ -1031,55 +1117,58 @@ const BitScene = (function () {
       tag: 'the logger\'s clock, in the hut',
       where: 'The logger in the gauge\'s hut sends each bit by its own clock, and the repeater reads them by its own. A clock a few '
         + 'per cent fast or slow slides each reading further from the middle of its bit, and the last bits of each word go first.',
-      close: 'Where the receiver reads each bit',
+      close: p => (p.uart ? 'Where the receiver reads each bit of a word' : 'Where the receiver reads the last word of the frame'),
       still: 2.4,
-      err: t => 8 * (0.5 - 0.5 * Math.cos(2 * Math.PI * t / 5)),
       scene(K, t) {
-        const { ctx, C } = K;
+        const { ctx, C } = K, p = K.prm;
         const a = K.p('tx'), b = K.p('rx');
         K.flow([a, b], C.wave, { n: 7 });
         const q = K.at(K.p('hut'));
         if (q) {
           const x = Math.max(16, q[0] - 50), y = q[1] - 8, r = 12;
           ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fillStyle = alpha(C.panel, 0.95); ctx.fill(); ctx.strokeStyle = C.text; ctx.lineWidth = 1.4; ctx.stroke();
-          const e = SPOTS.clock.err(t);
-          const ang = t * (2 + e * 1.2);
-          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + r * 0.8 * Math.sin(ang), y - r * 0.8 * Math.cos(ang)); ctx.strokeStyle = C.bad; ctx.lineWidth = 2; ctx.stroke();
+          const ang = t * (2 + p.err * 0.6);
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + r * 0.8 * Math.sin(ang), y - r * 0.8 * Math.cos(ang)); ctx.strokeStyle = p.err ? C.bad : C.text; ctx.lineWidth = 2; ctx.stroke();
           ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + r * 0.5 * Math.sin(ang / 12), y - r * 0.5 * Math.cos(ang / 12)); ctx.strokeStyle = C.text; ctx.stroke();
         }
-        K.mark(K.p('hut'), 'Logger\'s clock', { lift: 4 });
+        K.mark(K.p('hut'), p.err ? `Logger's clock ${fmt(Math.abs(p.err), 1)}% ${p.err > 0 ? 'fast' : 'slow'}` : 'Logger\'s clock, exact', { lift: 4 });
       },
-      inset(ctx, b, C, t) {
-        const e = SPOTS.clock.err(t) / 100;
-        const bits = [0, 1, 0, 1, 1, 0, 1, 0, 0, 1];
+      inset(ctx, b, C, t, p) {
+        // The model's sums: the sender's bit is 1 / (1 + err) of the
+        // receiver's, and the receiver reads bit k (k + ½) of its own bits
+        // after the start edge — of the word (a UART) or of the frame — give
+        // or take its jitter, which wanders afresh every 0.8 s.
+        const e = p.err / 100, j0 = p.uart ? 0 : 30;
+        const bits = Array.from(SAMPLE()).slice(j0, j0 + 10);
         const y = b.y + 18, cw = b.w / 10;
         bitRow(ctx, b, y, bits, C, { h: 18 });
         ['S', '0', '1', '2', '3', '4', '5', '6', '7', 'P'].forEach((s, j) => text(ctx, s, b.x + (j + 0.5) * cw, y - 4, C.muted, { align: 'center' }));
+        const wob = Math.floor(t / 0.8);
         let lost = -1;
         for (let k = 0; k < 10; k++) {
-          const at = (k + 0.5) * (1 + e);
+          const at = (j0 + k + 0.5) * (1 + e) - j0 + p.jitter / 100 * 0.6 * hg((k + wob * 13) * 3);
           const bad = Math.floor(at) !== k;
           if (bad && lost < 0) lost = k;
           const x = b.x + at * cw;
-          if (x > b.x + b.w + 4) continue;
+          if (x < b.x - 4 || x > b.x + b.w + 4) continue;
           ctx.fillStyle = bad ? C.bad : C.text;
           ctx.beginPath(); ctx.moveTo(x, y + 22); ctx.lineTo(x - 4, y + 30); ctx.lineTo(x + 4, y + 30); ctx.closePath(); ctx.fill();
         }
-        text(ctx, '▲ where the receiver reads, counting from the start bit', b.x, y + 44, C.muted);
+        text(ctx, `▲ where the receiver reads, counting from the ${p.uart ? 'word\'s' : 'frame\'s'} start edge`, b.x, y + 44, C.muted);
         // How far off the middle the stop bit is read: past half a bit, it is
-        // read in the next bit along.
-        const off = 9.5 * e, my = y + 72, mx = b.x + b.w / 2, half = b.w * 0.42;
+        // read in the next bit along (or the one before, for a slow clock).
+        const off = (j0 + 9.5) * e, my = y + 72, mx = b.x + b.w / 2, half = b.w * 0.36;
         ctx.fillStyle = alpha(C.ok, 0.15); ctx.fillRect(mx - half, my - 6, 2 * half, 12);
-        ctx.fillStyle = alpha(C.bad, 0.15); ctx.fillRect(mx + half, my - 6, b.w / 2 - half, 12);
-        hline(ctx, mx, mx + 0.01, my, C.text);
+        ctx.fillStyle = alpha(C.bad, 0.15); ctx.fillRect(b.x, my - 6, mx - half - b.x, 12); ctx.fillRect(mx + half, my - 6, b.x + b.w - mx - half, 12);
         ctx.fillStyle = C.muted; ctx.fillRect(mx - 0.5, my - 8, 1, 16);
-        const xo = mx + Math.min(1.15, off / 0.5) * half;
-        ctx.fillStyle = off >= 0.5 ? C.bad : C.text;
-        ctx.beginPath(); ctx.arc(Math.min(b.x + b.w - 4, xo), my, 5, 0, 2 * Math.PI); ctx.fill();
-        text(ctx, 'the stop bit read from its middle', b.x, my - 10, C.muted);
-        const right = xo > b.x + b.w - 44;
-        text(ctx, `${fmt(off * 100)}% of a bit`, right ? b.x + b.w : xo, my + 18, off >= 0.5 ? C.bad : C.text, { align: right ? 'right' : 'center', font: FONT_B });
-        text(ctx, `A clock ${fmt(e * 100, 1)}% fast: ${lost < 0 ? 'every bit read in the middle enough' : `the ${lost === 9 ? 'stop bit' : `bit after ${lost === 0 ? 'the start' : lost - 1}`} is read in the next`}.`,
+        const xo = Math.max(b.x + 4, Math.min(b.x + b.w - 4, mx + (off / 0.5) * half));
+        ctx.fillStyle = Math.abs(off) >= 0.5 ? C.bad : C.text;
+        ctx.beginPath(); ctx.arc(xo, my, 5, 0, 2 * Math.PI); ctx.fill();
+        text(ctx, 'the stop bit read from its middle (half a bit either way is safe)', b.x, my - 10, C.muted);
+        const al = xo > b.x + b.w - 44 ? 'right' : xo < b.x + 44 ? 'left' : 'center';
+        text(ctx, `${sgn(off * 100)}% of a bit`, al === 'right' ? b.x + b.w : al === 'left' ? b.x : xo, my + 18, Math.abs(off) >= 0.5 ? C.bad : C.text, { align: al, font: FONT_B });
+        const what = p.err ? `A clock ${fmt(Math.abs(p.err), 2)}% ${p.err > 0 ? 'fast' : 'slow'}` : 'An exact clock';
+        text(ctx, `${what}: ${lost < 0 ? 'every bit read in its own place.' : `${lost === 9 ? 'the stop bit' : lost === 0 ? 'the start bit' : `bit ${lost - 1}`} is read in the wrong one.`}`,
           b.x, b.y + b.h - 2, lost < 0 ? C.text : C.bad, { font: FONT_B });
       },
     },
@@ -1091,25 +1180,32 @@ const BitScene = (function () {
       close: 'The two tones, as the repeater hears them',
       still: 1.0,
       scene(K, t) {
-        const { C } = K;
+        const { C } = K, p = K.prm;
         const a = K.p('tx'), b = K.p('rx');
+        const wm = p.twist > 0 ? 2 : 3.5, ws = p.twist > 0 ? 3.5 : 2;
         K.rings(a, r => (Math.floor(r * 6) % 2 ? C.sum : C.wave), { R: 14, n: 4 });
-        K.flow([a, b], u => (Math.floor(u * 12 + t * 3) % 2 ? C.sum : C.wave), { n: 10, r: 3 });
-        K.mark(K.p('hut'), 'Radio\'s data input', { lift: 4 });
+        K.flow([a, b], u => (Math.floor(u * 12 + t * 3) % 2 ? C.sum : C.wave), { n: 10, r: (wm + ws) / 2 });
+        K.mark(K.p('hut'), Math.abs(p.twist) < 0.5 ? 'Radio\'s tones balanced' : 'Radio\'s data input', { lift: 4 });
       },
-      inset(ctx, b, C, t) {
-        const M = BM(), d = M.defaults('twist');
-        const k = Math.pow(10, d.twist / 20);
-        const yb = b.y + b.h - 32, H = b.h - 60;
-        const floor = yb - H * 0.42 - 3 * Math.abs(hg(Math.floor(t * 10) * 7));
-        const bar = (x, h, col, name) => { ctx.fillStyle = col; ctx.fillRect(x - 16, yb - h, 32, h); text(ctx, name, x, yb + 12, C.text, { align: 'center', font: FONT_B }); };
-        const xm = b.x + b.w * 0.28, xs = b.x + b.w * 0.62;
-        bar(xm, H / k, C.wave, `${fmt(M.MARK_HZ)} Hz — a 1`);
-        bar(xs, H, C.sum, `${fmt(M.SPACE_HZ)} Hz — a 0`);
-        ctx.fillStyle = alpha(C.muted, 0.25); ctx.fillRect(b.x, floor, b.w, yb - floor);
-        text(ctx, 'noise', b.x + b.w - 2, floor - 3, C.muted, { align: 'right' });
+      inset(ctx, b, C, t, p) {
+        const M = BM();
+        const g = Math.pow(10, p.snr / 10), k = Math.pow(10, p.twist / 10);
+        const m = 10 * Math.log10(g * 2 / (1 + k)), s = 10 * Math.log10(g * 2 * k / (1 + k));
+        const yb = b.y + b.h - 34, H = b.h - 64;
+        const top = Math.max(m, s), dbH = H / Math.max(12, top + 2);
+        const floorH = Math.max(2, 2 * dbH + 2 * Math.abs(hg(Math.floor(t * 10) * 7)));
+        const bar = (x, db, col, name) => {
+          const h = Math.max(2, db * dbH);
+          ctx.fillStyle = col; ctx.fillRect(x - 16, yb - h, 32, h);
+          text(ctx, name, x, yb + 12, C.text, { align: 'center', font: FONT_B });
+          text(ctx, `${fmt(db, 1)} dB`, x, yb - h - 4, col, { align: 'center', font: FONT_B });
+        };
+        bar(b.x + b.w * 0.28, m, C.wave, `${fmt(M.MARK_HZ)} Hz — a 1`);
+        bar(b.x + b.w * 0.68, s, C.sum, `${fmt(M.SPACE_HZ)} Hz — a 0`);
+        ctx.fillStyle = alpha(C.muted, 0.3); ctx.fillRect(b.x, yb - floorH, b.w, floorH);
+        text(ctx, 'noise', b.x + b.w - 2, yb - floorH - 3, C.muted, { align: 'right' });
         hline(ctx, b.x, b.x + b.w, yb, C.muted);
-        text(ctx, `${sgn(d.twist, 1)} dB apart: the 1s are misread far more often than the 0s.`, b.x, b.y + b.h - 2, C.bad, { font: FONT_B });
+        text(ctx, `A 1 misread ${oneIn(M.ber(m))}, a 0 ${oneIn(M.ber(s))}.`, b.x, b.y + b.h - 2, Math.abs(p.twist) >= 1 ? C.bad : C.text, { font: FONT_B });
       },
     },
 
@@ -1117,19 +1213,19 @@ const BitScene = (function () {
       tag: 'a broken wire in the hut',
       where: 'Inside the gauge\'s hut, one wire from the sensor to the logger is broken, or shorted, or its input has failed: that '
         + 'bit always reads the same, and every reading that needed it the other way is out by exactly its weight.',
-      close: 'Inside the hut: bit 4\'s wire',
+      close: p => `Inside the hut: bit ${p.bit}'s wire, stuck at ${p.to}`,
       still: 2.0,
       scene(K) { K.flow(K.direct(), K.C.wave, { n: 6, base: 0.3 }); K.mark(K.p('hut'), 'Inside the hut', { lift: 4 }); },
-      inset(ctx, b, C, t) { wiring(ctx, b, C, t, { to: i => i, broken: 4, read: v => v | 16 }); },
+      inset(ctx, b, C, t, p) { wiring(ctx, b, C, t, 'stuck', p, { to: i => i, broken: p.bit }); },
     },
     shift: {
       tag: 'a loom one pin over, in the hut',
       where: 'Inside the gauge\'s hut, the loom is plugged in one pin over (or the decoder is told the field starts a bit early): '
         + 'every bit lands in its neighbour\'s place, and every reading comes out doubled — or halved.',
-      close: 'Inside the hut: every wire one pin up',
+      close: p => `Inside the hut: every wire one pin ${p.left ? 'up — doubled' : 'down — halved'}`,
       still: 2.0,
       scene(K) { K.flow(K.direct(), K.C.wave, { n: 6, base: 0.3 }); K.mark(K.p('hut'), 'Inside the hut', { lift: 4 }); },
-      inset(ctx, b, C, t) { wiring(ctx, b, C, t, { to: i => (i < 7 ? i + 1 : -1), read: v => BM().shl(v, 8) }); },
+      inset(ctx, b, C, t, p) { wiring(ctx, b, C, t, 'shift', p, { to: i => (p.left ? i + 1 : i - 1) }); },
     },
     invert: {
       tag: 'logic the other way up',
@@ -1138,7 +1234,7 @@ const BitScene = (function () {
       close: 'Inside the hut: every bit turned over',
       still: 2.0,
       scene(K) { K.flow(K.direct(), K.C.wave, { n: 6, base: 0.3 }); K.mark(K.p('hut'), 'Inside the hut', { lift: 4 }); },
-      inset(ctx, b, C, t) { wiring(ctx, b, C, t, { to: i => i, mark: true, read: v => BM().invert(v, 8) }); },
+      inset(ctx, b, C, t, p) { wiring(ctx, b, C, t, 'invert', p, { to: i => i, mark: true }); },
     },
     reverse: {
       tag: 'a loom wired end for end',
@@ -1147,33 +1243,36 @@ const BitScene = (function () {
       close: 'Inside the hut: the wires crossed end for end',
       still: 2.0,
       scene(K) { K.flow(K.direct(), K.C.wave, { n: 6, base: 0.3 }); K.mark(K.p('hut'), 'Inside the hut', { lift: 4 }); },
-      inset(ctx, b, C, t) { wiring(ctx, b, C, t, { to: i => 7 - i, read: v => BM().reverse(v, 8) }); },
+      inset(ctx, b, C, t, p) { wiring(ctx, b, C, t, 'reverse', p, { to: (i, w) => w - 1 - i }); },
     },
     gray: {
       tag: 'the float\'s shaft encoder',
       where: 'The float in the stilling well turns a shaft encoder whose disc is printed in Gray code, so neighbouring steps differ in '
         + 'one bit. Read as plain binary, a river rising smoothly comes out zig-zagging.',
-      close: 'The encoder\'s disc, read as plain binary',
+      close: p => (p.way === 'ungray' ? 'A binary disc, read as Gray code' : 'The encoder\'s disc, read as plain binary'),
       still: 1.4,
       scene(K, t) {
         const { ctx, C } = K;
         K.flow(K.direct(), C.wave, { n: 6, base: 0.3 });
         // The float, rising and falling in the well.
         const w = PLACE.well;
-        const fz = groundZ(w.x, w.y) + 1.4 + 1.2 * Math.sin(t * 1.3);
+        const fz = groundZ(w.x, w.y) + 1.4 + 1.2 * Math.sin(t * 1.0);
         const q = K.at([w.x, w.y, fz]);
         if (q) { ctx.beginPath(); ctx.arc(q[0], q[1] - 2, 4, 0, 2 * Math.PI); ctx.fillStyle = C.warn; ctx.fill(); ctx.strokeStyle = C.text; ctx.lineWidth = 1; ctx.stroke(); }
         K.mark(K.p('well'), 'Float and encoder', { lift: 9 });
       },
-      inset(ctx, b, C, t) {
+      inset(ctx, b, C, t, p) {
         const M = BM();
-        const n = 16, step = Math.floor(t * 2.2) % n;
+        const gray = p.way !== 'ungray';
+        const n = 16, step = Math.floor(t * 1.5) % n;
+        const printed = s => (gray ? M.toGray(s) : s);
+        const read = s => (gray ? M.toGray(s) : M.fromGray(s)) & 15;
         const r0 = Math.min(b.h / 2 - 6, 56), cx = b.x + r0 + 4, cy = b.y + b.h / 2 - 4;
         const turn = -step / n * 2 * Math.PI - Math.PI / 2;
         for (let ring = 0; ring < 4; ring++) {
           const ro = r0 * (1 - ring * 0.2), ri = ro - r0 * 0.18;
           for (let s = 0; s < n; s++) {
-            const on = (M.toGray(s) >> (3 - ring)) & 1;
+            const on = (printed(s) >> (3 - ring)) & 1;
             const a0 = turn + s / n * 2 * Math.PI, a1 = a0 + 2 * Math.PI / n;
             ctx.beginPath(); ctx.arc(cx, cy, ro, a0, a1); ctx.arc(cx, cy, ri, a1, a0, true); ctx.closePath();
             ctx.fillStyle = on ? C.text : alpha(C.muted, 0.16); ctx.fill();
@@ -1181,13 +1280,13 @@ const BitScene = (function () {
         }
         // The read head, across the four tracks.
         hline(ctx, cx + r0 * 0.3, cx + r0 + 6, cy, C.bad, [], 2.5);
-        const g = M.toGray(step);
+        const g = read(step);
         const tx = cx + r0 + 16;
         text(ctx, `River at step ${fmt(step)}`, tx, b.y + 14, C.text, { font: FONT_B });
-        text(ctx, `the head reads ${g.toString(2).padStart(4, '0')}`, tx, cy - 4, C.muted, { font: MONO });
-        text(ctx, `as binary: ${fmt(g)}`, tx, cy + 14, g !== step ? C.bad : C.ok, { font: FONT_B });
+        text(ctx, `the head reads ${printed(step).toString(2).padStart(4, '0')}`, tx, cy - 4, C.muted, { font: MONO });
+        text(ctx, `${gray ? 'as binary' : 'as Gray code'}: ${fmt(g)}`, tx, cy + 14, g !== step ? C.bad : C.ok, { font: FONT_B });
         text(ctx, 'steps 0, 1, 2, 3, 4, 5 read as', tx, b.y + b.h - 16, C.muted);
-        text(ctx, `${[0, 1, 2, 3, 4, 5].map(s => fmt(M.toGray(s))).join(', ')} …`, tx, b.y + b.h - 2, C.bad, { font: FONT_B });
+        text(ctx, `${[0, 1, 2, 3, 4, 5].map(s => fmt(read(s))).join(', ')} …`, tx, b.y + b.h - 2, C.bad, { font: FONT_B });
       },
     },
   };
@@ -1207,9 +1306,17 @@ const BitScene = (function () {
     return { ctx: cv.getContext('2d'), w, h, dpr };
   }
   const momentOf = o => (o.still ? (SPOTS[o.id] || SPOTS.noise).still : o.t);
+  // The bench's settings for the fault, or its defaults when there are none.
+  const paramsOf = o => o.params || BM().defaults(SPOTS[o.id] ? o.id : 'noise');
+  // A close-up's title: some say what the settings are.
+  function closeOf(id, p) {
+    const sp = SPOTS[id] || SPOTS.noise;
+    return typeof sp.close === 'function' ? sp.close(p || BM().defaults(id)) : sp.close;
+  }
 
-  // The site. o: { id, name (the bench's word for the fault), t (seconds
-  // since it came on screen), yaw, still, tour: { i, n, frac, on } }
+  // The site. o: { id, name (the bench's word for the fault), params (its
+  // settings on the bench), t (seconds since it came on screen), yaw, still,
+  // tour: { i, n, frac, on } }
   function draw(cv, o) {
     const f = fit(cv);
     if (!f) return;
@@ -1223,6 +1330,7 @@ const BitScene = (function () {
     ctx.drawImage(ground(B, w, h, dpr, C, yaw), 0, 0);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const K = kit(ctx, B, C, t, !!o.still);
+    K.prm = paramsOf(o);
     if (sp.sky) sp.sky(K, t);
     // The two ends, always named, so the site reads before the fault does.
     const tq = K.at(up(PLACE.hut.x + 2, PLACE.hut.y + 2, -1.5)), rq = K.at(up(PLACE.rhut.x, PLACE.rhut.y, -1.5));
@@ -1273,12 +1381,13 @@ const BitScene = (function () {
     const sp = SPOTS[o.id] || SPOTS.noise;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    text(ctx, sp.close, 10, 17, C.text, { font: FONT_B });
+    const p = paramsOf(o);
+    text(ctx, closeOf(o.id, p), 10, 17, C.text, { font: FONT_B });
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 24, w, h - 24); ctx.clip();
-    sp.inset(ctx, { x: 10, y: 30, w: w - 20, h: h - 38 }, C, momentOf(o));
+    sp.inset(ctx, { x: 10, y: 30, w: w - 20, h: h - 38 }, C, momentOf(o), p);
     ctx.restore();
   }
 
-  return { draw, closeUp, SPOTS, ORDER, YAW0, clampYaw };
+  return { draw, closeUp, closeOf, SPOTS, ORDER, YAW0, clampYaw };
 })();

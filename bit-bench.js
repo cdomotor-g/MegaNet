@@ -71,7 +71,7 @@ const BitBench = (function () {
     n: 500, fixed: false, batch: null,
     mystery: null, score: { right: 0, tried: 0 },
     pairsText: '', pairsField: 'value',
-    site: { id: 'noise', tour: true, at: 0, yaw: null },
+    site: { tour: true, at: 0, away: 0, yaw: null },
   };
 
   // ── The words for each fault ───────────────────────────────────────────────
@@ -544,23 +544,27 @@ const BitBench = (function () {
   }
 
   // ── 3 · Where faults happen ────────────────────────────────────────────────
-  // The site in 3-D (bit-scene.js draws it): the fault it shows, toured or
-  // held, and the sentence under it saying where that fault happens.
+  // The site in 3-D (bit-scene.js draws it) and the sentence under it saying
+  // where the fault happens. Its fault is always the Faults section's —
+  // S.effect — so the two cards move together: the tour steps both, ten
+  // seconds a fault, and the site and its close-up are drawn from the
+  // fault's settings as they stand on the bench.
 
-  const TOUR_MS = 7000;
+  const TOUR_MS = 10000;
   const siteIds = () => (typeof BitScene !== 'undefined' ? BitScene.ORDER.filter(id => UI[id]) : ids());
   const spot = id => (typeof BitScene !== 'undefined' && BitScene.SPOTS[id]) || { where: '', close: '' };
 
+  const closeOf = id => (typeof BitScene !== 'undefined' ? BitScene.closeOf(id, params(id)) : '');
   function siteSayHtml() {
-    const id = S.site.id, u = UI[id];
+    const id = S.effect, u = UI[id];
     return `<p class="bb-site-say"><strong><span aria-hidden="true">${u.icon}</span> ${esc(u.name)}</strong> — ${esc(spot(id).where)}</p>`;
   }
   function siteName() {
-    const id = S.site.id;
+    const id = S.effect;
     return `A model of an ALERT site in 3-D — a river gauge sending, a repeater on the hill across the valley hearing it — `
-      + `showing ${UI[id].name}: ${spot(id).where} The close-up in the corner: ${spot(id).close}.`;
+      + `showing ${UI[id].name}: ${spot(id).where} The close-up beside it: ${closeOf(id)}.`;
   }
-  const zoomName = () => `Close-up: ${spot(S.site.id).close}.`;
+  const zoomName = () => `Close-up: ${closeOf(S.effect)}, drawn from the fault's settings in the Faults section.`;
   const tourWords = () => (S.site.tour ? '⏸ Hold this one' : '⏵ Tour the faults');
 
   function siteHtml() {
@@ -568,8 +572,9 @@ const BitBench = (function () {
     ${secOpen('bb-site')}
       <p>One made-up site with every fault's cause somewhere in it. Our gauge by the river sends; the repeater on the far hill hears;
         and between and around them stand a hill, a shed beside the road, another gauge, a pager mast and a phone tower, a storm and an
-        electric fence. The tour lights each fault where it happens, with a close-up of what goes wrong there beside it. Drag the
-        site sideways to turn it.</p>
+        electric fence. The tour lights each fault where it happens, with a close-up of what goes wrong there beside it, and the
+        Faults section below moves with it — the same fault, with the settings you give it there. Picking a fault, or moving one of
+        its settings, holds the tour on it. Drag the site sideways to turn it.</p>
       <div class="bb-site-grid">
         <canvas class="bb-site-cv" id="bb-site-cv" role="img" aria-label="${escAttr(siteName())}"></canvas>
         <div class="bb-site-side">
@@ -582,8 +587,8 @@ const BitBench = (function () {
               <button type="button" class="btn" aria-label="The next fault" title="The next fault" onclick="BitBench.siteStep(1)">▶</button>
             </div>
             <label class="bb-pick" for="bb-site-pick">Show <select id="bb-site-pick" onchange="BitBench.siteShow(this.value)">${siteIds().map(id =>
-              `<option value="${id}" ${S.site.id === id ? 'selected' : ''}>${esc(UI[id].name)}</option>`).join('')}</select></label>
-            <p><button type="button" class="btn btn-primary" onclick="BitBench.siteBench()">🧪 Try it on the bench</button></p>
+              `<option value="${id}" ${S.effect === id ? 'selected' : ''}>${esc(UI[id].name)}</option>`).join('')}</select></label>
+            <p><button type="button" class="btn btn-primary" onclick="BitBench.siteBench()">🧪 Its settings, on the bench ↓</button></p>
           </div>
         </div>
       </div>
@@ -671,7 +676,8 @@ const BitBench = (function () {
   function faultHtml() {
     return `
     ${secOpen('bb-fault')}
-      <p>Pick a fault and watch the frame above go through it — the bits as sent, and as heard, with what the receiver made of them. Then
+      <p>Pick a fault — or let the site's tour above step through them — and watch the frame go through it: the bits as sent, and as
+        heard, with what the receiver made of them. Its settings drive the site's close-up too. Then
         send a batch: one frame tells you little, but five hundred leave a pattern, and the pattern is what tells one cause from another.</p>
       ${pickerHtml()}
       <div id="bb-fault-body">${faultBody()}</div>
@@ -1305,14 +1311,16 @@ const BitBench = (function () {
   // BitScene draws it; the bench says which fault, how long it has been on
   // screen, which way the site is turned and where the tour has got to.
   const siteMoving = () => !stillPreferred();
-  const siteLive = () => onScreen.has('bb-site-cv') && (S.site.tour || siteMoving());
+  // The tour is watched while either of its cards is on screen.
+  const tourSeen = () => onScreen.has('bb-site-cv') || onScreen.has('bb-cv');
+  const siteLive = () => (S.site.tour && tourSeen()) || (siteMoving() && onScreen.has('bb-site-cv'));
   function drawSite(now) {
     const cv = document.getElementById('bb-site-cv');
     if (!cv || typeof BitScene === 'undefined') return;
-    const list = siteIds();
+    const list = siteIds(), id = S.effect;
     const o = {
-      id: S.site.id, name: UI[S.site.id].name, t: Math.max(0, now - S.site.at) / 1000, yaw: S.site.yaw, still: !siteMoving(),
-      tour: { i: list.indexOf(S.site.id), n: list.length, on: S.site.tour, frac: (now - S.site.at) / TOUR_MS },
+      id, name: UI[id].name, params: { ...params(id) }, t: Math.max(0, now - S.site.at) / 1000, yaw: S.site.yaw, still: !siteMoving(),
+      tour: { i: list.indexOf(id), n: list.length, on: S.site.tour, frac: (now - S.site.at) / TOUR_MS },
     };
     BitScene.draw(cv, o);
     BitScene.closeUp(document.getElementById('bb-site-zoom'), o);
@@ -1840,13 +1848,24 @@ const BitBench = (function () {
     if (!document.getElementById('bb-page')) return;
     if (moving() && S.live && now - S.liveAt >= CYCLE) { newLive(); repaintLive(); }
     if (S.playOnce && now - S.liveAt >= CYCLE - HOLD + 300) S.playOnce = false;
-    if (S.site.tour && now - S.site.at >= TOUR_MS) siteGo(1, now);
+    tourTick(now);
     if (onScreen.has('bb-wave')) drawWave(now);
     if (onScreen.has('bb-site-cv')) drawSite(now);
     if (onScreen.has('bb-cv')) drawFault(now);
     if (moving() || S.playOnce || siteLive()) loop = requestAnimationFrame(tick);
   }
   function kick() { if (!loop && document.getElementById('bb-page')) loop = requestAnimationFrame(tick); }
+  // The tour moves on only while somebody can see it: time with neither card
+  // on screen does not count, and nor does time spent working in the Faults
+  // section (focus inside it), which a step would repaint from under them.
+  function tourTick(now) {
+    if (!S.site.tour) return;
+    const busy = document.activeElement && document.getElementById('bb-fault-body')
+      && document.getElementById('bb-fault-body').contains(document.activeElement);
+    if (!tourSeen() || busy) { if (!S.site.away) S.site.away = now; return; }
+    if (S.site.away) { S.site.at += now - S.site.away; S.site.away = 0; }
+    if (now - S.site.at >= TOUR_MS) siteGo(1, now);
+  }
   function drawAll(fresh) {
     const now = performance.now();
     drawWave(now);
@@ -1995,7 +2014,7 @@ const BitBench = (function () {
     const b = document.getElementById('bb-site-tour');
     if (b) { b.setAttribute('aria-pressed', S.site.tour ? 'true' : 'false'); b.textContent = tourWords(); }
     const sel = document.getElementById('bb-site-pick');
-    if (sel) sel.value = S.site.id;
+    if (sel) sel.value = S.effect;
     paint('bb-site-say', siteSayHtml());
     const cv = document.getElementById('bb-site-cv');
     if (cv) cv.setAttribute('aria-label', siteName());
@@ -2003,54 +2022,64 @@ const BitBench = (function () {
     if (zm) zm.setAttribute('aria-label', zoomName());
   }
 
-  function siteSet(id, now) {
+  // One fault, on both cards: the tour, ◀ ▶, Show, a fault picked on the
+  // bench and a mystery opened there all come here.
+  function setFault(id, now) {
     if (!UI[id]) return;
-    S.site.id = id;
+    S.effect = id;
     S.site.at = now == null ? performance.now() : now;
+    S.site.away = 0;
+    const radio = document.getElementById(`bb-fx-${id}`);
+    if (radio) radio.checked = true;
+    newLive();
+    repaintFault();
     syncSite();
     drawSite(S.site.at);
     kick();
   }
+  // Somebody has chosen a fault, or is changing its settings: the tour stops
+  // on it until they start it again.
+  function hold() {
+    if (!S.site.tour) return;
+    S.site.tour = false;
+    syncSite();
+  }
   // On by `d` faults, round and round.
   function siteGo(d, now) {
     const list = siteIds();
-    const i = list.indexOf(S.site.id);
-    siteSet(list[(i + d + list.length) % list.length], now);
+    const i = list.indexOf(S.effect);
+    setFault(list[(i + d + list.length) % list.length], now);
   }
 
   function siteTour() {
     S.site.tour = !S.site.tour;
     S.site.at = performance.now();
+    S.site.away = 0;
     syncSite();
     kick();
   }
   function siteStep(d) {
     siteGo(d < 0 ? -1 : 1);
-    announce(`${UI[S.site.id].name}: ${spot(S.site.id).where}`);
+    announce(`${UI[S.effect].name}: ${spot(S.effect).where}`);
   }
   function siteShow(id) {
-    S.site.tour = false;
-    siteSet(id);
+    hold();
+    setFault(id);
   }
-  function siteBench() { pick(S.site.id, true); }
+  function siteBench() { goTo('bb-fault'); }
 
   function pick(id, scroll, fromMystery) {
     if (!UI[id]) return;
-    S.effect = id;
-    // The site follows, and holds there: the fault on the bench is the one
-    // somebody is looking at.
-    if (S.site.id !== id || S.site.tour) { S.site.tour = false; siteSet(id); }
+    hold();
     if (fromMystery && S.mystery && S.mystery.id === id) S.params[id] = { ...S.mystery.params };
-    const radio = document.getElementById(`bb-fx-${id}`);
-    if (radio) radio.checked = true;
-    newLive();
-    repaintFault();
+    setFault(id);
     if (scroll) goTo('bb-fault');
   }
 
   function set(key, raw, live) {
     const id = S.effect, d = BM().EFFECTS[id].params[key];
     if (!d) return;
+    hold();
     const p = params(id);
     const given = { ...p, [key]: raw };
     S.params[id] = BM().withDefaults(id, given);
@@ -2058,6 +2087,7 @@ const BitBench = (function () {
     const u = UI[id].params[key];
     if (out && u && u.fmt) out.textContent = u.fmt(S.params[id][key]);
     paint('bb-facts', factsHtml(id));
+    syncSite();
     if (key === 'field') {
       newLive();
       repaintFault();
@@ -2211,7 +2241,7 @@ const BitBench = (function () {
   // Open the bench on a fault — from the lesson, a link, or anything else
   // that wants to show one.
   function open(id) {
-    if (UI[id]) S.effect = id;
+    if (UI[id]) { S.effect = id; S.site.tour = false; }
     if (typeof switchTab === 'function') switchTab('bitbench');
     if (UI[id]) goTo('bb-fault');
   }
@@ -2235,7 +2265,7 @@ const BitBench = (function () {
     // canvases, colours and type as the bench's.
     ink: { fit, pal, text, line, alpha, caption, wrapText, FONT, FONT_B, MONO },
     state: () => ({ effect: S.effect, params: { ...params(S.effect) }, num: S.num, width: S.width, addr: S.addr, value: S.value,
-      site: { id: S.site.id, tour: S.site.tour, yaw: S.site.yaw },
+      site: { id: S.effect, tour: S.site.tour, yaw: S.site.yaw },
       live: S.live ? { status: S.live.j.status, flips: S.live.j.flips.slice() } : null,
       batch: S.batch ? { id: S.batch.id, n: S.batch.n, counts: { ...S.batch.counts } } : null,
       pairs: parsePairs(S.pairsText).pairs.length,

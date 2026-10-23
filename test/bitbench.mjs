@@ -24,8 +24,9 @@
 // same reasoning on pasted readings.
 //
 // Chromium. Both tabs open clean, every section's heading with its picture;
-// the site in 3-D drawn, touring the faults on its own, stepped, turned by a
-// drag and following the bench; the number bench, the frame table, every
+// the site in 3-D drawn, touring the faults on its own with the Faults
+// section moving with it, stepped, turned by a drag, held by a slider and its
+// close-up drawn from the bench's settings; the number bench, the frame table, every
 // fault drawn and sent, a batch, a mystery, readings pasted, the CSVs; the
 // lesson's sections and drawings, its calculator, and the two tabs opening
 // each other at the right place with focus there; reduced motion (the bench
@@ -273,9 +274,11 @@ try {
     JSON.stringify({ ...site0, say: undefined, label: undefined }));
   ok('…a place and a close-up for each of the fourteen, said beside it and in the drawing\'s name', site0.order === 14 && site0.named
     && /Weak signal/.test(site0.say) && /hiss/.test(site0.label), site0.say.slice(0, 120));
-  await page.waitForTimeout(7300);
-  const toured = await page.evaluate(() => BitBench.state().site.id);
-  ok('left alone, the tour moves on to the next fault', toured === 'impulse', toured);
+  await page.waitForTimeout(10300);
+  const toured = await page.evaluate(() => ({ site: BitBench.state().site.id, fx: BitBench.state().effect,
+    name: document.querySelector('.bb-fx-name').textContent, radio: document.getElementById('bb-fx-impulse').checked }));
+  ok('left alone ten seconds, the tour moves on — the Faults section with it', toured.site === 'impulse' && toured.fx === 'impulse'
+    && /Impulse noise/.test(toured.name) && toured.radio, JSON.stringify(toured));
   const stepped = await page.evaluate(() => {
     BitBench.siteStep(-1); const a = BitBench.state().site.id;
     BitBench.siteStep(-1); const b = BitBench.state().site.id;
@@ -284,6 +287,14 @@ try {
   });
   ok('◀ steps back round the fourteen; Show holds on the one picked', stepped.a === 'noise' && stepped.b === 'gray' && stepped.c.id === 'crystal'
     && !stepped.c.tour && stepped.sel === 'crystal' && stepped.pressed === 'false', JSON.stringify(stepped));
+  const slid = await page.evaluate(() => {
+    BitBench.pick('clock'); BitBench.siteTour();
+    const before = document.getElementById('bb-site-zoom').getAttribute('aria-label');
+    BitBench.set('uart', false);
+    return { before, after: document.getElementById('bb-site-zoom').getAttribute('aria-label'), st: BitBench.state() };
+  });
+  ok('moving a setting holds the tour, and the close-up follows it', slid.st.site.tour === false && slid.st.params.uart === false
+    && /of a word/.test(slid.before) && /last word of the frame/.test(slid.after), JSON.stringify({ before: slid.before, after: slid.after }));
   const box = await (await page.$('#bb-site-cv')).boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
@@ -291,8 +302,10 @@ try {
   await page.mouse.up();
   const turned = await page.evaluate(() => ({ yaw: BitBench.state().site.yaw, yaw0: BitScene.YAW0 }));
   ok('dragged across, the site turns', typeof turned.yaw === 'number' && Math.abs(turned.yaw - turned.yaw0) > 0.3, JSON.stringify(turned));
-  const benched = await page.evaluate(() => { BitBench.siteBench(); return { fx: BitBench.state().effect, name: document.querySelector('.bb-fx-name').textContent }; });
-  ok('🧪 Try it on the bench puts the site\'s fault on the bench', benched.fx === 'crystal' && /Crystal drift/.test(benched.name), JSON.stringify(benched));
+  const benched = await page.evaluate(() => { BitBench.siteShow('crystal'); BitBench.siteBench();
+    return { fx: BitBench.state().effect, name: document.querySelector('.bb-fx-name').textContent, focus: document.activeElement && document.activeElement.id }; });
+  ok('Show puts the fault on the bench too, and the button below it goes there', benched.fx === 'crystal' && /Crystal drift/.test(benched.name)
+    && benched.focus === 'bb-fault-h', JSON.stringify(benched));
   const follows = await page.evaluate(() => { BitBench.siteTour(); BitBench.pick('collision'); return BitBench.state().site; });
   ok('…and a fault picked on the bench shows on the site, holding there', follows.id === 'collision' && !follows.tour, JSON.stringify(follows));
 
