@@ -1717,6 +1717,25 @@ grants, the vocabularies against the Bureau's own, `save_station()`'s three
 cases (absent, empty, rows), its refusals, and the loader's sync and its
 `document_managed` guard.
 
+## The 2024 FldWarn KMZ
+
+The Bureau's 2024 *FldWarn Stations and paths* KMZ, checked pin by pin against
+Flood-Net on 23 October 2026. `data/fldwarn-2024/README.md` explains it in full;
+`review.json` beside it has every station's decision and reason.
+
+What it changed, through `tools/ingest/fldwarn_kmz_2024.py --sql`:
+
+- 309 positions, with modelled heights re-read and seven basins moved with them.
+- Six truncated names completed.
+- Frequencies on Tallai and Mt Tamborine.
+- Four repeaters the original repeater document listed but the first import never
+  attached.
+- Five repeaters, and Mt Glorious as Seqwater's hub, with ranges inferred and
+  said so in their notes.
+- Seven new base stations.
+
+No range Flood-Net already held was changed.
+
 ## AEP flood levels and frequencies
 
 `0033`. Two more lists on a station, on `0031`'s terms exactly: a table hanging

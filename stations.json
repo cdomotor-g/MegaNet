@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "1.2",
-    "description": "MegaNet station database. catchments[] is the Queensland drainage-basin vocabulary used by the Network Maps navigator, with each basin's drainage division; hubs[] is the Bureau's field maintenance hubs. Per-station catchment_ids and hub_id are point-in-polygon against the boundaries in data/qld-basins.geojson and data/bom-hubs.geojson (see tools/build_geo_layers.py), not against the affine-fitted basin SVG.",
+    "description": "Flood-Net station database. catchments[] is the Queensland drainage-basin vocabulary used by the Network Maps navigator, with each basin's drainage division; hubs[] is the Bureau's field maintenance hubs. Per-station catchment_ids and hub_id are point-in-polygon against the boundaries in data/qld-basins.geojson and data/bom-hubs.geojson (see tools/build_geo_layers.py), not against the affine-fitted basin SVG.",
     "updated": "2026-07-31",
     "rm_paths": {
       "map": "c:\\program files (x86)\\radio mobile 11.6.6\\networks\\meganet\\net1.map",
@@ -875,9 +875,10 @@
       "id": "loudoun_br_al",
       "name": "Loudoun Br AL",
       "station_number": "541155",
-      "lat": -27.3278,
-      "lon": 150.9218,
-      "elevation_ahd": 354.5,
+      "lat": -27.225,
+      "lon": 151.185556,
+      "elevation_ahd": 333.19,
+      "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
       ],
@@ -1023,7 +1024,7 @@
       "lon": 152.7791,
       "elevation_ahd": 524.4,
       "roles": [
-        "field"
+        "base"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -5427,9 +5428,12 @@
       "elevation_ahd": 348.06,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "charleville_met_office"
+      ],
       "catchment_ids": [
         "warrego"
       ],
@@ -5445,6 +5449,19 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 55,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 4223,
+            "high": 4225
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2221,
         "number": "44234",
@@ -5927,8 +5944,8 @@
       "id": "beaudesert_al",
       "name": "Beaudesert AL",
       "station_number": "40939",
-      "lat": -27.9681,
-      "lon": 152.9861,
+      "lat": -27.96623,
+      "lon": 152.987139,
       "elevation_ahd": 49.1,
       "roles": [
         "field"
@@ -7905,8 +7922,8 @@
       "id": "bengalla_tm",
       "name": "Bengalla TM",
       "station_number": "41506",
-      "lat": -28.6561,
-      "lon": 150.6653,
+      "lat": -28.654462,
+      "lon": 150.666613,
       "elevation_ahd": 240.2,
       "roles": [
         "field"
@@ -19304,7 +19321,7 @@
     },
     {
       "id": "charleville_bradleys",
-      "name": "Charleville(Bradleys",
+      "name": "Charleville (Bradleys Gly)",
       "station_number": "544020",
       "lat": -26.4031,
       "lon": 146.2383,
@@ -19992,8 +20009,8 @@
       "id": "chinderah_tweed_riv",
       "name": "Chinderah (Tweed River)",
       "station_number": "558010",
-      "lat": -28.231,
-      "lon": 153.555,
+      "lat": -28.225833,
+      "lon": 153.555501,
       "elevation_ahd": 4.1,
       "roles": [
         "field"
@@ -20001,7 +20018,9 @@
       "radio_network_ids": [],
       "catchment_ids": [],
       "alert_ids": {
-        "rainfall": 7177
+        "rainfall": 7174,
+        "battery": 7178,
+        "water_level": 7177
       },
       "satcom": {
         "enabled": false,
@@ -20158,8 +20177,8 @@
       "id": "churchill_al",
       "name": "Churchill AL",
       "station_number": "540248",
-      "lat": -27.6335,
-      "lon": 152.754,
+      "lat": -27.633889,
+      "lon": 152.754167,
       "elevation_ahd": 23.3,
       "roles": [
         "field"
@@ -21308,8 +21327,8 @@
       "id": "clyde_rd_al",
       "name": "Clyde Rd AL",
       "station_number": "531074",
-      "lat": -17.3247,
-      "lon": 145.9522,
+      "lat": -17.323375,
+      "lon": 145.951521,
       "elevation_ahd": 7.5,
       "roles": [
         "field"
@@ -21319,7 +21338,9 @@
         "mulgrave_russell"
       ],
       "alert_ids": {
-        "rainfall": 5114
+        "rainfall": 5113,
+        "battery": 5115,
+        "water_level": 5114
       },
       "satcom": {
         "enabled": false,
@@ -21752,8 +21773,8 @@
       "id": "condamine_al",
       "name": "Condamine AL",
       "station_number": "542019",
-      "lat": -26.9267,
-      "lon": 150.1314,
+      "lat": -26.927151,
+      "lon": 150.131339,
       "elevation_ahd": 284,
       "roles": [
         "field"
@@ -24793,8 +24814,8 @@
       "id": "coulson_crossing_ale",
       "name": "Coulson Crossing AL",
       "station_number": "540510",
-      "lat": -27.9521,
-      "lon": 152.7271,
+      "lat": -27.951111,
+      "lon": 152.726389,
       "elevation_ahd": 74.2,
       "roles": [
         "field"
@@ -28178,7 +28199,7 @@
     },
     {
       "id": "doongal_ck_old_g",
-      "name": "Doongal Ck (Old G",
+      "name": "Doongal Ck (Old Gayndah Rd)",
       "station_number": "",
       "lat": -25.501,
       "lon": 152.3893,
@@ -28242,7 +28263,7 @@
     },
     {
       "id": "doongul_ck_wongi",
-      "name": "Doongul Ck (Wongi",
+      "name": "Doongul Ck (Wongi State Forest)",
       "station_number": "140027",
       "lat": -25.4694,
       "lon": 152.4643,
@@ -30718,6 +30739,7 @@
       "id": "emu_ck_at_pierces",
       "name": "Emu Ck at Pierces",
       "station_number": "140023",
+      "station_type": "auto_water_level",
       "lat": -27.0644,
       "lon": 152.0046,
       "elevation_ahd": 367.7,
@@ -30744,7 +30766,9 @@
       "location_types": [
         "Rain Gauge",
         "Water Level"
-      ]
+      ],
+      "tower_height": 3.0,
+      "facing_deg": 217.0
     },
     {
       "id": "emu_vale_al",
@@ -33792,8 +33816,8 @@
       "id": "fords_rd_al",
       "name": "Fords Rd AL",
       "station_number": "540829",
-      "lat": -27.529,
-      "lon": 152.1928,
+      "lat": -27.529057,
+      "lon": 152.192858,
       "elevation_ahd": 163.6,
       "roles": [
         "field"
@@ -33803,7 +33827,9 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 4080
+        "rainfall": 4079,
+        "battery": 4081,
+        "water_level": 4080
       },
       "satcom": {
         "enabled": false,
@@ -33880,7 +33906,8 @@
           "slope": 0.00501,
           "slope_basis": "1% AEP water surface from here to Sandy Creek Road Alert, 6.4 km downstream: 31.94 m over 6.4 km (straight line × 1.3)"
         }
-      ]
+      ],
+      "facing_deg": 272.0
     },
     {
       "id": "fossickers_flat_sho",
@@ -35331,9 +35358,10 @@
       "id": "ghost_hill_al",
       "name": "Ghost Hill AL",
       "station_number": "540451",
-      "lat": -25.3108,
-      "lon": 152.8319,
-      "elevation_ahd": 68.4,
+      "lat": -25.311316,
+      "lon": 152.834727,
+      "elevation_ahd": 64.45,
+      "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field",
         "repeater"
@@ -36609,9 +36637,12 @@
       "elevation_ahd": 495.68,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "charleville_met_office"
+      ],
       "catchment_ids": [
         "warrego"
       ],
@@ -36623,8 +36654,21 @@
       },
       "rm_system_id": 1,
       "enabled": true,
-      "notes": "",
+      "notes": "Repeater role and pass range inferred in Oct 2026 from the paths drawn in the Bureau's 2024 FldWarn KMZ: Abbieglassie → Westcourt → Ularunda → Glengarry → Sommariva (with Maryvale) → Arabella, all on 151.500 MHz. The range is the ALERT addresses of every station upstream of this site in that chain. No repeater document lists this site; check the range against the repeater's own settings.",
       "legacy_unit_id": 408,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 1073,
+            "high": 1078
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 3407,
         "number": "544076",
@@ -40941,8 +40985,8 @@
       "id": "highfields_tm",
       "name": "Highfields TM",
       "station_number": "541172",
-      "lat": -27.4428,
-      "lon": 151.964,
+      "lat": -27.443056,
+      "lon": 151.963889,
       "elevation_ahd": 645.8,
       "roles": [
         "field"
@@ -45268,8 +45312,8 @@
       "id": "junction_view_al",
       "name": "Junction View AL",
       "station_number": "540568",
-      "lat": -27.8011,
-      "lon": 152.1875,
+      "lat": -27.801501,
+      "lon": 152.187963,
       "elevation_ahd": 253.9,
       "roles": [
         "field"
@@ -45279,7 +45323,9 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 4037
+        "rainfall": 4036,
+        "battery": 4038,
+        "water_level": 4037
       },
       "satcom": {
         "enabled": false,
@@ -46724,9 +46770,10 @@
       "id": "kerimbilla_tm",
       "name": "Kerimbilla TM",
       "station_number": "41169",
-      "lat": -28.3911,
-      "lon": 150.4825,
-      "elevation_ahd": 226.4,
+      "lat": -28.391494,
+      "lon": 150.48514,
+      "elevation_ahd": 223.09,
+      "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
       ],
@@ -46942,8 +46989,8 @@
       "id": "kilbronae_tm",
       "name": "Kilbronae TM",
       "station_number": "41124",
-      "lat": -28.2817,
-      "lon": 150.3747,
+      "lat": -28.282313,
+      "lon": 150.377256,
       "elevation_ahd": 229.5,
       "roles": [
         "field"
@@ -48553,8 +48600,8 @@
       "id": "kooralbyn_br_ale",
       "name": "Kooralbyn Bridge AL",
       "station_number": "540714",
-      "lat": -28.0925,
-      "lon": 152.8514,
+      "lat": -28.092329,
+      "lon": 152.851903,
       "elevation_ahd": 91,
       "roles": [
         "field"
@@ -53284,8 +53331,8 @@
       "id": "lumeah_al",
       "name": "Lumeah AL",
       "station_number": "40936",
-      "lat": -28.0614,
-      "lon": 153.0408,
+      "lat": -28.054102,
+      "lon": 153.045089,
       "elevation_ahd": 93.9,
       "roles": [
         "field"
@@ -54319,7 +54366,7 @@
     },
     {
       "id": "main_camp_rd_al",
-      "name": "Main Camp Ck AL",
+      "name": "Main Camp Rd AL",
       "station_number": "540717",
       "lat": -27.831873,
       "lon": 152.315606,
@@ -55312,7 +55359,7 @@
     },
     {
       "id": "mariala_national_par",
-      "name": "Mariala National Par",
+      "name": "Mariala National Park TM",
       "station_number": "544078",
       "lat": -25.9892,
       "lon": 145.0188,
@@ -57109,9 +57156,12 @@
       "elevation_ahd": 388.03,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "charleville_met_office"
+      ],
       "catchment_ids": [
         "warrego"
       ],
@@ -57127,6 +57177,31 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 633,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 1000,
+            "high": 1049
+          },
+          {
+            "low": 1068,
+            "high": 1070
+          },
+          {
+            "low": 4200,
+            "high": 4235
+          },
+          {
+            "low": 4244,
+            "high": 4249
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 3367,
         "number": "544032",
@@ -57711,8 +57786,8 @@
       "id": "millmerran_commens_s",
       "name": "Millmerran (Town Pool Commens St) TM",
       "station_number": "541173",
-      "lat": -27.8785,
-      "lon": 151.264,
+      "lat": -27.878056,
+      "lon": 151.263889,
       "elevation_ahd": 418.7,
       "roles": [
         "field"
@@ -59183,8 +59258,8 @@
       "id": "moon_rd_al",
       "name": "Moon Road AL",
       "station_number": "540567",
-      "lat": -27.6619,
-      "lon": 152.32,
+      "lat": -27.661803,
+      "lon": 152.319844,
       "elevation_ahd": 147.4,
       "roles": [
         "field"
@@ -59194,7 +59269,9 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 4034
+        "rainfall": 4033,
+        "battery": 4035,
+        "water_level": 4034
       },
       "satcom": {
         "enabled": false,
@@ -59736,10 +59813,10 @@
     },
     {
       "id": "mt_hallen_sandy",
-      "name": "Mt Hallen (Sandy",
+      "name": "Mt Hallen (Sandy Creek) AL",
       "station_number": "140844",
-      "lat": -27.317,
-      "lon": 152.3763,
+      "lat": -27.317084,
+      "lon": 152.376563,
       "elevation_ahd": 191.5,
       "roles": [
         "field"
@@ -59748,7 +59825,10 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 2195,
+        "battery": 2196
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -59758,6 +59838,20 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 660,
+      "sensors": [
+        {
+          "alert_id": 2195,
+          "type": "Rainfall",
+          "sensor_id": "mt_hallen_sandy:2195",
+          "device_id": null
+        },
+        {
+          "alert_id": 2196,
+          "type": "Battery",
+          "sensor_id": "mt_hallen_sandy:2196",
+          "device_id": null
+        }
+      ],
       "lga": "Somerset Regional",
       "basin": "Brisbane River",
       "hub_id": "brisbane",
@@ -60157,7 +60251,7 @@
     },
     {
       "id": "mountain_view_mt_la",
-      "name": "Mountain View (Mt La",
+      "name": "Mountain View (Mt Landsborough)",
       "station_number": "537019",
       "lat": -22.7175,
       "lon": 143.2982,
@@ -61869,10 +61963,14 @@
       "lat": -27.3151,
       "lon": 152.7477,
       "elevation_ahd": 764,
+      "owner": "Seqwater",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "mt_glorious_seqwater"
+      ],
       "catchment_ids": [
         "pine"
       ],
@@ -61884,9 +61982,52 @@
       },
       "rm_system_id": 1,
       "enabled": true,
-      "notes": "",
+      "notes": "Seqwater's ALERT hub. Repeater role and pass ranges are a best guess (Oct 2026), not from a configuration document: Seqwater's documented repeaters (Mt Petersen, Paradise Ck Rd, Schultz Lookout, Toowoomba, Upper Sandy Creek, all on 151.525 MHz) pass within 4000–4099 and 6500–6699, and Flood-Net's own receivers heard addresses 4000–4095 and 6526–6778 on 151.525 MHz in October 2026. Channels are Seqwater's ACMA licences at the Powerlink tower, The Summit. Confirm the ranges with Seqwater.",
       "legacy_unit_id": 684,
-      "hub_id": "brisbane"
+      "repeater": {
+        "acma_licence": "10774614/1",
+        "rx_mhz": 151.525,
+        "tx_mhz": 151.525,
+        "pass_ranges": [
+          {
+            "low": 4000,
+            "high": 4099
+          },
+          {
+            "low": 6500,
+            "high": 6799
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
+      "hub_id": "brisbane",
+      "frequencies": [
+        {
+          "rx_mhz": 152.4625,
+          "tx_mhz": 152.4625,
+          "label": "Seqwater ALERT",
+          "acma_licence": "10774616/1"
+        },
+        {
+          "rx_mhz": 151.425,
+          "tx_mhz": 151.425,
+          "label": "Seqwater data",
+          "acma_licence": "10774613/1"
+        },
+        {
+          "rx_mhz": 152.25,
+          "tx_mhz": 152.25,
+          "label": "Seqwater data",
+          "acma_licence": "10774615/1"
+        },
+        {
+          "rx_mhz": 151.5375,
+          "tx_mhz": 151.5375,
+          "label": "Link to Ipswich and Brisbane",
+          "acma_licence": "9993380/1"
+        }
+      ]
     },
     {
       "id": "mt_goonaneman_al",
@@ -64165,6 +64306,7 @@
       "id": "mulgowie_rd_al",
       "name": "Mulgowie Rd AL",
       "station_number": "540723",
+      "station_type": "auto_water_level",
       "lat": -27.7142,
       "lon": 152.3675,
       "elevation_ahd": 138,
@@ -64176,7 +64318,9 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 4066
+        "rainfall": 4065,
+        "battery": 4067,
+        "water_level": 4066
       },
       "satcom": {
         "enabled": false,
@@ -64252,7 +64396,8 @@
           "level_difference": 3,
           "confidence": 9
         }
-      ]
+      ],
+      "tower_height": 3.0
     },
     {
       "id": "mulla_crossing_cock",
@@ -70333,16 +70478,16 @@
       "id": "palen_ck_al",
       "name": "Palen Creek AL",
       "station_number": "40942",
-      "lat": -28.3222,
-      "lon": 142.7358,
-      "elevation_ahd": 103.31,
-      "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
+      "lat": -28.322215,
+      "lon": 152.769743,
+      "elevation_ahd": 212.99,
+      "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
-        "bulloo"
+        "logan_albert"
       ],
       "alert_ids": {
         "rainfall": 5330
@@ -78455,8 +78600,8 @@
       "id": "rudds_lane_al",
       "name": "Rudds Lane AL",
       "station_number": "40944",
-      "lat": -28.1692,
-      "lon": 152.9833,
+      "lat": -28.169548,
+      "lon": 152.983469,
       "elevation_ahd": 97.2,
       "roles": [
         "field"
@@ -78813,7 +78958,7 @@
     },
     {
       "id": "running_river_hidde",
-      "name": "Running River (Hidde",
+      "name": "Running River (Hidden Valley)",
       "station_number": "532155",
       "lat": -18.9803,
       "lon": 146.0248,
@@ -80097,8 +80242,8 @@
       "id": "saxby_river_ldr_tm",
       "name": "Saxby River Ldr Tm",
       "station_number": "529080",
-      "lat": -19.4823,
-      "lon": 141.2343,
+      "lat": -19.482256,
+      "lon": 141.234288,
       "elevation_ahd": 67.96,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
@@ -82114,9 +82259,12 @@
       "elevation_ahd": 406.84,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "charleville_met_office"
+      ],
       "catchment_ids": [
         "warrego"
       ],
@@ -82128,8 +82276,21 @@
       },
       "rm_system_id": 1,
       "enabled": true,
-      "notes": "",
+      "notes": "Repeater role and pass range inferred in Oct 2026 from the paths drawn in the Bureau's 2024 FldWarn KMZ: Abbieglassie → Westcourt → Ularunda → Glengarry → Sommariva (with Maryvale) → Arabella, all on 151.500 MHz. The range is the ALERT addresses of every station upstream of this site in that chain. No repeater document lists this site; check the range against the repeater's own settings.",
       "legacy_unit_id": 907,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 1073,
+            "high": 1082
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 3396,
         "number": "544063",
@@ -90656,8 +90817,8 @@
       "id": "townson_al",
       "name": "Townson AL",
       "station_number": "540716",
-      "lat": -27.5658,
-      "lon": 152.0272,
+      "lat": -27.861304,
+      "lon": 152.38375,
       "elevation_ahd": 342.5,
       "roles": [
         "field"
@@ -90667,7 +90828,8 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 4072
+        "rainfall": 4072,
+        "battery": 4073
       },
       "satcom": {
         "enabled": false,
@@ -92198,9 +92360,12 @@
       "elevation_ahd": 400.75,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "charleville_met_office"
+      ],
       "catchment_ids": [
         "balonne_condamine"
       ],
@@ -92212,8 +92377,21 @@
       },
       "rm_system_id": 1,
       "enabled": true,
-      "notes": "",
+      "notes": "Repeater role and pass range inferred in Oct 2026 from the paths drawn in the Bureau's 2024 FldWarn KMZ: Abbieglassie → Westcourt → Ularunda → Glengarry → Sommariva (with Maryvale) → Arabella, all on 151.500 MHz. The range is the ALERT addresses of every station upstream of this site in that chain. No repeater document lists this site; check the range against the repeater's own settings.",
       "legacy_unit_id": 1018,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 1073,
+            "high": 1076
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 3408,
         "number": "544077",
@@ -92349,9 +92527,12 @@
       "lon": 152.4872,
       "elevation_ahd": 883.3,
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "constitution_hill"
+      ],
       "catchment_ids": [
         "logan_albert"
       ],
@@ -92365,6 +92546,43 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 1021,
+      "repeater": {
+        "acma_licence": "1410738",
+        "rx_mhz": 151.5,
+        "tx_mhz": 152.4,
+        "pass_ranges": [
+          {
+            "low": 4500,
+            "high": 4600
+          },
+          {
+            "low": 5338,
+            "high": 5340
+          },
+          {
+            "low": 5344,
+            "high": 5354
+          },
+          {
+            "low": 5368,
+            "high": 5370
+          },
+          {
+            "low": 5383,
+            "high": 5388
+          },
+          {
+            "low": 5700,
+            "high": 5799
+          },
+          {
+            "low": 6850,
+            "high": 6899
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "hub_id": "brisbane"
     },
     {
@@ -94898,8 +95116,8 @@
       "id": "upper_sandy_ck_al",
       "name": "Upper Sandy Creek AL",
       "station_number": "540385",
-      "lat": -27.4558,
-      "lon": 152.1983,
+      "lat": -27.457312,
+      "lon": 152.200727,
       "elevation_ahd": 526.3,
       "roles": [
         "field",
@@ -94912,7 +95130,8 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 6588
+        "rainfall": 6588,
+        "battery": 6589
       },
       "satcom": {
         "enabled": false,
@@ -96214,8 +96433,8 @@
       "id": "walls_camp_pacific",
       "name": "Walls Camp AL (Pacific Haven)",
       "station_number": "540792",
-      "lat": -25.24,
-      "lon": 152.5613,
+      "lat": -25.239639,
+      "lon": 152.561171,
       "elevation_ahd": 6.9,
       "roles": [
         "field"
@@ -97936,9 +98155,12 @@
       "elevation_ahd": 341.12,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "charleville_met_office"
+      ],
       "catchment_ids": [
         "balonne_condamine"
       ],
@@ -97950,8 +98172,21 @@
       },
       "rm_system_id": 1,
       "enabled": true,
-      "notes": "",
+      "notes": "Repeater role and pass range inferred in Oct 2026 from the paths drawn in the Bureau's 2024 FldWarn KMZ: Abbieglassie → Westcourt → Ularunda → Glengarry → Sommariva (with Maryvale) → Arabella, all on 151.500 MHz. The range is the ALERT addresses of every station upstream of this site in that chain. No repeater document lists this site; check the range against the repeater's own settings.",
       "legacy_unit_id": 1944,
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 1073,
+            "high": 1074
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 3403,
         "number": "544071",
@@ -99023,7 +99258,7 @@
     },
     {
       "id": "windorah_lignum_cha",
-      "name": "Windorah (Lignum Cha",
+      "name": "Windorah (Lignum Channel) TM",
       "station_number": "538008",
       "lat": -25.44,
       "lon": 142.8079,
@@ -99104,7 +99339,7 @@
     },
     {
       "id": "windorah_long_cross",
-      "name": "Windorah (Long Cross",
+      "name": "Windorah (Long Crossing) TM",
       "station_number": "538006",
       "lat": -25.3703,
       "lon": 142.7258,
@@ -99232,7 +99467,7 @@
     },
     {
       "id": "windorah_main_chann",
-      "name": "Windorah (Main Chann",
+      "name": "Windorah (Main Channel) TM",
       "station_number": "538010",
       "lat": -25.3702,
       "lon": 142.7453,
@@ -105452,8 +105687,8 @@
       "id": "gatton_lvrc_enviromon_basestation",
       "name": "GATTON LVRC ENVIROMON BASESTATION",
       "station_number": "260122",
-      "lat": -27.5588,
-      "lon": 152.2762,
+      "lat": -27.559429,
+      "lon": 152.276993,
       "elevation_ahd": 108.39,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
@@ -110460,9 +110695,9 @@
       "id": "torbanlea_alert",
       "name": "Torbanlea AL",
       "station_number": "540449",
-      "lat": -25.3406,
-      "lon": 152.6058,
-      "elevation_ahd": 30.09,
+      "lat": -25.342192,
+      "lon": 152.60406,
+      "elevation_ahd": 28.18,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -110696,9 +110931,9 @@
       "id": "booral_road_alert",
       "name": "Booral Rd AL",
       "station_number": "540452",
-      "lat": -25.3439,
-      "lon": 152.8269,
-      "elevation_ahd": 4.53,
+      "lat": -25.342884,
+      "lon": 152.829327,
+      "elevation_ahd": 3.79,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -113816,66 +114051,6 @@
       ]
     },
     {
-      "id": "laidley_alexandre_street",
-      "name": "Laidley Alexandre Street",
-      "station_number": "900017",
-      "lat": -27.626082,
-      "lon": 152.385557,
-      "elevation_ahd": 98.64,
-      "elevation_source": "Elvis 1 m (QLD Government)",
-      "roles": [
-        "field"
-      ],
-      "radio_network_ids": [],
-      "catchment_ids": [
-        "brisbane"
-      ],
-      "alert_ids": {},
-      "satcom": {
-        "enabled": false,
-        "provider": "",
-        "terminal_id": ""
-      },
-      "rm_system_id": 1,
-      "enabled": true,
-      "notes": "",
-      "lga": "Lockyer Valley Regional",
-      "hub_id": "brisbane",
-      "location_types": [
-        "Water Level"
-      ]
-    },
-    {
-      "id": "mulgowie_western_bank",
-      "name": "Mulgowie Western Bank",
-      "station_number": "900020",
-      "lat": -27.727242,
-      "lon": 152.359386,
-      "elevation_ahd": 137.96,
-      "elevation_source": "Elvis 1 m (QLD Government)",
-      "roles": [
-        "field"
-      ],
-      "radio_network_ids": [],
-      "catchment_ids": [
-        "brisbane"
-      ],
-      "alert_ids": {},
-      "satcom": {
-        "enabled": false,
-        "provider": "",
-        "terminal_id": ""
-      },
-      "rm_system_id": 1,
-      "enabled": true,
-      "notes": "",
-      "lga": "Lockyer Valley Regional",
-      "hub_id": "brisbane",
-      "location_types": [
-        "Water Level"
-      ]
-    },
-    {
       "id": "nogo_river_at_rawbelle",
       "name": "Nogo River at Rawbelle",
       "station_number": "900021",
@@ -114694,9 +114869,12 @@
       "elevation_ahd": 369.55,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "charleville_met_office"
+      ],
       "catchment_ids": [
         "warrego"
       ],
@@ -114711,7 +114889,20 @@
       },
       "rm_system_id": 1,
       "enabled": true,
-      "notes": "",
+      "notes": "Repeater role and pass range inferred in Oct 2026 from the paths drawn in the Bureau's 2024 FldWarn KMZ: Abbieglassie → Westcourt → Ularunda → Glengarry → Sommariva (with Maryvale) → Arabella, all on 151.500 MHz. The range is the ALERT addresses of every station upstream of this site in that chain. No repeater document lists this site; check the range against the repeater's own settings.",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 1073,
+            "high": 1084
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 3366,
         "number": "544031",
@@ -116108,9 +116299,9 @@
       "id": "alligator_flats_al",
       "name": "Alligator Flats AL",
       "station_number": "539220",
-      "lat": -24.3333,
-      "lon": 151.5819,
-      "elevation_ahd": 36.86,
+      "lat": -24.345278,
+      "lon": 151.598889,
+      "elevation_ahd": 32.38,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -116529,9 +116720,9 @@
       "id": "ampthill_al",
       "name": "Ampthill AL",
       "station_number": "539133",
-      "lat": -24.702,
+      "lat": -24.701667,
       "lon": 151.855,
-      "elevation_ahd": 59.2,
+      "elevation_ahd": 59.19,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -117371,10 +117562,10 @@
       "id": "arcturus_downs_al",
       "name": "Arcturus Downs AL",
       "station_number": "535093",
-      "lat": -24.040784,
-      "lon": 148.409309,
-      "elevation_ahd": 213.0,
-      "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
+      "lat": -24.040278,
+      "lon": 148.401667,
+      "elevation_ahd": 202.67,
+      "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
       ],
@@ -117532,9 +117723,9 @@
       "id": "arthurs_lkt_al",
       "name": "Arthurs Lkt AL",
       "station_number": "542015",
-      "lat": -25.769,
-      "lon": 150.77,
-      "elevation_ahd": 306.59,
+      "lat": -25.769444,
+      "lon": 150.769722,
+      "elevation_ahd": 303.63,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -117707,9 +117898,9 @@
       "id": "aspley_stringybark_dr_al",
       "name": "Aspley (Stringybark Dr) AL",
       "station_number": "540113",
-      "lat": -27.371,
-      "lon": 153.004,
-      "elevation_ahd": 46.07,
+      "lat": -27.371389,
+      "lon": 153.003889,
+      "elevation_ahd": 48.9,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -118885,8 +119076,8 @@
       "name": "Awoonga Dam AL",
       "station_number": "539131",
       "lat": -24.07,
-      "lon": 151.322,
-      "elevation_ahd": 32.6,
+      "lon": 151.321667,
+      "elevation_ahd": 38.24,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -119498,9 +119689,9 @@
       "id": "ball_lkt_al",
       "name": "Ball Lkt AL",
       "station_number": "540084",
-      "lat": -26.456,
-      "lon": 152.956,
-      "elevation_ahd": 111.52,
+      "lat": -26.456111,
+      "lon": 152.956389,
+      "elevation_ahd": 108.45,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -119771,9 +119962,9 @@
       "id": "banksia_beach_al",
       "name": "Banksia Beach AL",
       "station_number": "540735",
-      "lat": -27.033,
-      "lon": 153.149,
-      "elevation_ahd": 6.82,
+      "lat": -27.033056,
+      "lon": 153.148611,
+      "elevation_ahd": 7.04,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -119984,9 +120175,9 @@
       "id": "bardon_detention_basin_al",
       "name": "Bardon (Detention Basin) AL",
       "station_number": "540784",
-      "lat": -27.459,
-      "lon": 152.966,
-      "elevation_ahd": 82.4,
+      "lat": -27.458611,
+      "lon": 152.966389,
+      "elevation_ahd": 73.41,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -120070,10 +120261,10 @@
       "id": "barnetts_rd_al",
       "name": "Barnetts Rd AL",
       "station_number": "539136",
-      "lat": -24.518,
-      "lon": 151.962,
-      "elevation_ahd": 6.74,
-      "elevation_source": "Elvis 1 m (QLD Government)",
+      "lat": -24.518056,
+      "lon": 151.961667,
+      "elevation_ahd": 5.52,
+      "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
       ],
@@ -120182,9 +120373,9 @@
       "id": "barneys_bore_al",
       "name": "Barneys Bore AL",
       "station_number": "535120",
-      "lat": -24.544,
-      "lon": 145.364,
-      "elevation_ahd": 313.29,
+      "lat": -24.543889,
+      "lon": 145.353611,
+      "elevation_ahd": 305.21,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -120375,9 +120566,9 @@
       "id": "baroon_pocket_dam_hw_al",
       "name": "Baroon Pocket Dam HW AL",
       "station_number": "540426",
-      "lat": -26.71,
-      "lon": 152.879,
-      "elevation_ahd": 217.11,
+      "lat": -26.711944,
+      "lon": 152.880278,
+      "elevation_ahd": 217.06,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -121118,9 +121309,9 @@
       "id": "bayes_rd_al",
       "name": "Bayes Rd AL",
       "station_number": "540674",
-      "lat": -27.698,
-      "lon": 153.107,
-      "elevation_ahd": 7.54,
+      "lat": -27.697778,
+      "lon": 153.106667,
+      "elevation_ahd": 8.04,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -121312,9 +121503,9 @@
       "id": "beachmere_st_smith_rd_al",
       "name": "Beachmere (St Smith Rd) AL",
       "station_number": "540740",
-      "lat": -27.146,
-      "lon": 153.036,
-      "elevation_ahd": 0.53,
+      "lat": -27.145556,
+      "lon": 153.036111,
+      "elevation_ahd": 2.04,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -121567,9 +121758,9 @@
       "id": "beatty_rd_al",
       "name": "Beatty Rd AL",
       "station_number": "40796",
-      "lat": -27.587,
-      "lon": 153.009,
-      "elevation_ahd": 10.92,
+      "lat": -27.5875,
+      "lon": 153.009444,
+      "elevation_ahd": 11.27,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -122028,9 +122219,9 @@
       "id": "bega_rd_quarry_al",
       "name": "Bega Rd Quarry AL",
       "station_number": "540237",
-      "lat": -27.667,
-      "lon": 153.117,
-      "elevation_ahd": 10.95,
+      "lat": -27.666667,
+      "lon": 153.116667,
+      "elevation_ahd": 9.0,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -122140,9 +122331,9 @@
       "id": "bellbird_park_eugene_st_al",
       "name": "Bellbird Park (Eugene St) AL",
       "station_number": "540728",
-      "lat": -27.633,
-      "lon": 152.906,
-      "elevation_ahd": 14.46,
+      "lat": -27.633333,
+      "lon": 152.905833,
+      "elevation_ahd": 18.36,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -124754,9 +124945,9 @@
       "id": "binna_burra_al",
       "name": "Binna Burra AL",
       "station_number": "40845",
-      "lat": -28.201,
-      "lon": 153.187,
-      "elevation_ahd": 764.23,
+      "lat": -28.200556,
+      "lon": 153.187222,
+      "elevation_ahd": 766.81,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -125297,9 +125488,9 @@
       "id": "blackbutt_al",
       "name": "Blackbutt AL",
       "station_number": "540493",
-      "lat": -26.886,
-      "lon": 152.102,
-      "elevation_ahd": 436.55,
+      "lat": -26.885833,
+      "lon": 152.101667,
+      "elevation_ahd": 435.46,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -125350,9 +125541,9 @@
       "id": "blackdown_tableland_al",
       "name": "Blackdown Tableland AL",
       "station_number": "35186",
-      "lat": -23.774,
-      "lon": 149.117,
-      "elevation_ahd": 948.64,
+      "lat": -23.774444,
+      "lon": 149.117222,
+      "elevation_ahd": 951.64,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -126839,9 +127030,9 @@
       "id": "bonogin_al",
       "name": "Bonogin AL",
       "station_number": "540352",
-      "lat": -28.109,
-      "lon": 153.364,
-      "elevation_ahd": 32.18,
+      "lat": -28.110762,
+      "lon": 153.363993,
+      "elevation_ahd": 23.29,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -126899,9 +127090,9 @@
       "id": "bonogin_ck_hardys_rd_al",
       "name": "Bonogin Ck (Hardys Rd) AL",
       "station_number": "540453",
-      "lat": -28.113,
-      "lon": 153.363,
-      "elevation_ahd": 19.67,
+      "lat": -28.112218,
+      "lon": 153.363454,
+      "elevation_ahd": 16.63,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -127002,9 +127193,9 @@
       "id": "boobegan_ck_lock_al",
       "name": "Boobegan Ck Lock AL",
       "station_number": "540253",
-      "lat": -28.0383,
-      "lon": 153.3917,
-      "elevation_ahd": 3.42,
+      "lat": -28.03556,
+      "lon": 153.392563,
+      "elevation_ahd": 4.1,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -127116,16 +127307,16 @@
       "id": "boolaroo_tops_al",
       "name": "Boolaroo Tops AL",
       "station_number": "539234",
-      "lat": -24.393,
-      "lon": 151.035,
-      "elevation_ahd": 874.05,
+      "lat": -24.3925,
+      "lon": 151.034722,
+      "elevation_ahd": 875.96,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
-        "burnett"
+        "fitzroy"
       ],
       "alert_ids": {
         "rainfall": 908,
@@ -128442,10 +128633,10 @@
       "id": "boyne_island_al",
       "name": "Boyne Island AL",
       "station_number": "539134",
-      "lat": -23.957,
-      "lon": 151.358,
-      "elevation_ahd": 1.28,
-      "elevation_source": "Elvis 1 m (QLD Government)",
+      "lat": -23.956667,
+      "lon": 151.357778,
+      "elevation_ahd": 5.28,
+      "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
       ],
@@ -128831,9 +129022,9 @@
       "id": "bribie_island_al",
       "name": "Bribie Island AL",
       "station_number": "40978",
-      "lat": -27.0786,
-      "lon": 153.1808,
-      "elevation_ahd": 5.07,
+      "lat": -27.079722,
+      "lon": 153.180278,
+      "elevation_ahd": 6.03,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -129095,9 +129286,9 @@
       "id": "brigooda_al",
       "name": "Brigooda AL",
       "station_number": "540697",
-      "lat": -26.254,
-      "lon": 151.409,
-      "elevation_ahd": 398.07,
+      "lat": -26.254444,
+      "lon": 151.408889,
+      "elevation_ahd": 399.58,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -129883,9 +130074,9 @@
       "id": "bromelton_dam_al",
       "name": "Bromelton Dam AL",
       "station_number": "540481",
-      "lat": -27.942,
-      "lon": 152.959,
-      "elevation_ahd": 43.51,
+      "lat": -27.941944,
+      "lon": 152.959444,
+      "elevation_ahd": 45.77,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -130469,9 +130660,9 @@
       "id": "browns_creek_rd_al",
       "name": "Browns Creek Rd AL",
       "station_number": "540411",
-      "lat": -27.194,
-      "lon": 152.917,
-      "elevation_ahd": 52.57,
+      "lat": -27.193889,
+      "lon": 152.9175,
+      "elevation_ahd": 51.62,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -130726,9 +130917,9 @@
       "id": "buaraba_al",
       "name": "Buaraba AL",
       "station_number": "540457",
-      "lat": -27.406,
-      "lon": 152.382,
-      "elevation_ahd": 118.88,
+      "lat": -27.406389,
+      "lon": 152.3825,
+      "elevation_ahd": 116.25,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -131321,9 +131512,9 @@
       "id": "bukkulla_rfs",
       "name": "Bukkulla (RFS)",
       "station_number": "54121",
-      "lat": -29.505,
-      "lon": 151.129,
-      "elevation_ahd": 580.5,
+      "lat": -29.504444,
+      "lon": 151.129167,
+      "elevation_ahd": 580.28,
       "elevation_source": "Elvis 5 m (NSW Government)",
       "roles": [
         "field"
@@ -131441,8 +131632,8 @@
       "name": "Bulburin AL",
       "station_number": "539139",
       "lat": -24.51,
-      "lon": 151.459,
-      "elevation_ahd": 554.47,
+      "lon": 151.459444,
+      "elevation_ahd": 558.47,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -131762,9 +131953,9 @@
       "id": "bundaberg_al",
       "name": "Bundaberg AL",
       "station_number": "39352",
-      "lat": -24.864,
-      "lon": 152.35,
-      "elevation_ahd": 9.37,
+      "lat": -24.863889,
+      "lon": 152.350278,
+      "elevation_ahd": 8.81,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -131997,9 +132188,9 @@
       "id": "bundilla_al",
       "name": "Bundilla AL",
       "station_number": "540422",
-      "lat": -26.703,
-      "lon": 153.1,
-      "elevation_ahd": 3.6,
+      "lat": -26.703611,
+      "lon": 153.100833,
+      "elevation_ahd": 4.2,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -132376,9 +132567,9 @@
       "id": "burleigh_waters_al",
       "name": "Burleigh Waters AL",
       "station_number": "40981",
-      "lat": -28.0792,
-      "lon": 153.4319,
-      "elevation_ahd": 2.45,
+      "lat": -28.078759,
+      "lon": 153.43217,
+      "elevation_ahd": 1.43,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -132562,9 +132753,9 @@
       "id": "burpengary_dale_st_al",
       "name": "Burpengary (Dale St) AL",
       "station_number": "540242",
-      "lat": -27.148,
-      "lon": 152.962,
-      "elevation_ahd": 10.71,
+      "lat": -27.149167,
+      "lon": 152.961667,
+      "elevation_ahd": 9.61,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -132736,9 +132927,9 @@
       "id": "burpengary_mathew_cr_al",
       "name": "Burpengary (Mathew Cr) AL",
       "station_number": "540619",
-      "lat": -27.165,
-      "lon": 152.941,
-      "elevation_ahd": 19.37,
+      "lat": -27.164722,
+      "lon": 152.941111,
+      "elevation_ahd": 18.89,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -133353,9 +133544,9 @@
       "id": "burtons_bridge_al",
       "name": "Burtons Bridge AL",
       "station_number": "540257",
-      "lat": -27.5,
-      "lon": 152.689,
-      "elevation_ahd": 20.52,
+      "lat": -27.500278,
+      "lon": 152.688889,
+      "elevation_ahd": 21.14,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -133691,9 +133882,9 @@
       "id": "byrnestown_al",
       "name": "Byrnestown AL",
       "station_number": "39341",
-      "lat": -25.52293,
-      "lon": 151.7609,
-      "elevation_ahd": 120.87,
+      "lat": -25.524722,
+      "lon": 151.76,
+      "elevation_ahd": 124.83,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -133921,9 +134112,9 @@
       "id": "caboolture_bribie_island_rd_al",
       "name": "Caboolture (Bribie Island Rd) AL",
       "station_number": "540627",
-      "lat": -27.075,
-      "lon": 153.011,
-      "elevation_ahd": 1.91,
+      "lat": -27.075278,
+      "lon": 153.011111,
+      "elevation_ahd": 2.29,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -134001,9 +134192,9 @@
       "id": "caboolture_bruce_hway_al",
       "name": "Caboolture (Bruce Hway) AL",
       "station_number": "540624",
-      "lat": -27.057,
-      "lon": 152.977,
-      "elevation_ahd": 5.01,
+      "lat": -27.056667,
+      "lon": 152.976944,
+      "elevation_ahd": 7.83,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -134522,9 +134713,9 @@
       "id": "caboonbah_al",
       "name": "Caboonbah AL",
       "station_number": "540155",
-      "lat": -27.146,
-      "lon": 152.49,
-      "elevation_ahd": 65.48,
+      "lat": -27.146389,
+      "lon": 152.490278,
+      "elevation_ahd": 65.46,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -134588,8 +134779,8 @@
       "name": "Calamvale AL",
       "station_number": "40784",
       "lat": -27.615,
-      "lon": 153.044,
-      "elevation_ahd": 46.92,
+      "lon": 153.044444,
+      "elevation_ahd": 48.52,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -134972,9 +135163,9 @@
       "id": "camp_hill_tarana_st_al",
       "name": "Camp Hill (Tarana St) AL",
       "station_number": "540240",
-      "lat": -27.496,
-      "lon": 153.072,
-      "elevation_ahd": 27.58,
+      "lat": -27.496389,
+      "lon": 153.0725,
+      "elevation_ahd": 31.54,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -135320,9 +135511,9 @@
       "id": "cannon_cove_al",
       "name": "Cannon Cove AL",
       "station_number": "40865",
-      "lat": -28.0396,
-      "lon": 152.7158,
-      "elevation_ahd": 183.25,
+      "lat": -28.093019,
+      "lon": 152.714293,
+      "elevation_ahd": 237.66,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -135679,9 +135870,9 @@
       "id": "capella_al",
       "name": "Capella AL",
       "station_number": "35185",
-      "lat": -23.121,
-      "lon": 148.041,
-      "elevation_ahd": 264.24,
+      "lat": -23.120556,
+      "lon": 148.040556,
+      "elevation_ahd": 264.4,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -135793,10 +135984,10 @@
       "id": "captain_ck_al",
       "name": "Captain Ck AL",
       "station_number": "539141",
-      "lat": -24.291,
-      "lon": 151.78,
-      "elevation_ahd": 32.57,
-      "elevation_source": "Elvis 1 m (QLD Government)",
+      "lat": -24.290556,
+      "lon": 151.780278,
+      "elevation_ahd": 32.97,
+      "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
       ],
@@ -136045,9 +136236,9 @@
       "id": "carindale_al",
       "name": "Carindale AL",
       "station_number": "540128",
-      "lat": -27.503,
-      "lon": 153.104,
-      "elevation_ahd": 13.09,
+      "lat": -27.502778,
+      "lon": 153.104444,
+      "elevation_ahd": 10.17,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -136285,9 +136476,9 @@
       "id": "carole_park_al",
       "name": "Carole Park AL",
       "station_number": "40785",
-      "lat": -27.602,
-      "lon": 152.951,
-      "elevation_ahd": 62.47,
+      "lat": -27.601667,
+      "lon": 152.951111,
+      "elevation_ahd": 59.21,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -136397,9 +136588,9 @@
       "id": "carrara_al",
       "name": "Carrara AL",
       "station_number": "540319",
-      "lat": -28.0064,
-      "lon": 153.3667,
-      "elevation_ahd": 4.13,
+      "lat": -28.005042,
+      "lon": 153.367918,
+      "elevation_ahd": 1.79,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -137329,9 +137520,9 @@
       "id": "cedar_pocket_dam_al",
       "name": "Cedar Pocket Dam AL",
       "station_number": "540476",
-      "lat": -26.213,
-      "lon": 152.792,
-      "elevation_ahd": 101.1,
+      "lat": -26.211389,
+      "lon": 152.792778,
+      "elevation_ahd": 103.86,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -137438,9 +137629,9 @@
       "id": "cedar_vale_al",
       "name": "Cedar Vale AL",
       "station_number": "539138",
-      "lat": -24.422,
-      "lon": 151.115,
-      "elevation_ahd": 252.89,
+      "lat": -24.421667,
+      "lon": 151.115278,
+      "elevation_ahd": 255.5,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -138150,9 +138341,9 @@
       "id": "chesterton_tm",
       "name": "Chesterton TM",
       "station_number": "44211",
-      "lat": -25.335,
+      "lat": -25.335278,
       "lon": 147.3,
-      "elevation_ahd": 536.09,
+      "elevation_ahd": 536.99,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -138619,8 +138810,8 @@
       "name": "Clagiraba Road AL",
       "station_number": "540291",
       "lat": -27.99,
-      "lon": 153.244,
-      "elevation_ahd": 40.96,
+      "lon": 153.243611,
+      "elevation_ahd": 44.19,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -138986,9 +139177,9 @@
       "id": "clear_mountain_al",
       "name": "Clear Mountain AL",
       "station_number": "540418",
-      "lat": -27.306,
-      "lon": 152.886,
-      "elevation_ahd": 225.68,
+      "lat": -27.305556,
+      "lon": 152.886111,
+      "elevation_ahd": 234.27,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -139919,9 +140110,9 @@
       "id": "collingwood_park_al",
       "name": "Collingwood Park AL",
       "station_number": "540672",
-      "lat": -27.621,
-      "lon": 152.867,
-      "elevation_ahd": 20.73,
+      "lat": -27.620556,
+      "lon": 152.866667,
+      "elevation_ahd": 20.85,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -140525,9 +140716,9 @@
       "id": "constitution_hill_al",
       "name": "Constitution Hill AL",
       "station_number": "540273",
-      "lat": -27.466,
-      "lon": 152.945,
-      "elevation_ahd": 239.94,
+      "lat": -27.479697,
+      "lon": 152.954238,
+      "elevation_ahd": 255.72,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -140639,9 +140830,9 @@
       "id": "cooby_creek_dam_al",
       "name": "Cooby Creek Dam AL",
       "station_number": "541031",
-      "lat": -27.382,
-      "lon": 151.924,
-      "elevation_ahd": 472.53,
+      "lat": -27.3825,
+      "lon": 151.924444,
+      "elevation_ahd": 487.97,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -141079,9 +141270,9 @@
       "id": "cooloolabin_dam_al",
       "name": "Cooloolabin Dam AL",
       "station_number": "540460",
-      "lat": -26.556,
-      "lon": 152.879,
-      "elevation_ahd": 287.68,
+      "lat": -26.555556,
+      "lon": 152.878611,
+      "elevation_ahd": 291.73,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -141190,9 +141381,9 @@
       "id": "coolum_al",
       "name": "Coolum AL",
       "station_number": "540221",
-      "lat": -26.544,
-      "lon": 153.091,
-      "elevation_ahd": 38.32,
+      "lat": -26.5425,
+      "lon": 153.091944,
+      "elevation_ahd": 97.74,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -141250,9 +141441,9 @@
       "id": "coolum_west_al",
       "name": "Coolum West AL",
       "station_number": "540499",
-      "lat": -26.533,
-      "lon": 153.051,
-      "elevation_ahd": 1.29,
+      "lat": -26.533056,
+      "lon": 153.050556,
+      "elevation_ahd": 0.77,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -141498,9 +141689,9 @@
       "id": "coomera_shores_al",
       "name": "Coomera Shores AL",
       "station_number": "540293",
-      "lat": -27.848,
-      "lon": 153.359,
-      "elevation_ahd": 2.88,
+      "lat": -27.847,
+      "lon": 153.359985,
+      "elevation_ahd": 1.32,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -142430,9 +142621,9 @@
       "id": "cootabinya_al",
       "name": "Cootabinya AL",
       "station_number": "535122",
-      "lat": -25.16,
-      "lon": 145.262,
-      "elevation_ahd": 361.14,
+      "lat": -25.159722,
+      "lon": 145.2625,
+      "elevation_ahd": 361.19,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -142624,9 +142815,9 @@
       "id": "coplicks_br_al",
       "name": "Coplicks Br AL",
       "station_number": "540320",
-      "lat": -28.1381,
-      "lon": 153.4244,
-      "elevation_ahd": 2.79,
+      "lat": -28.136362,
+      "lon": 153.425344,
+      "elevation_ahd": 3.3,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -143179,9 +143370,9 @@
       "id": "coronation_dve_al_u_s_flood_gate",
       "name": "Coronation Dve AL (U/S Flood Gate)",
       "station_number": "540703",
-      "lat": -27.468,
-      "lon": 153.0036,
-      "elevation_ahd": 17.32,
+      "lat": -27.474444,
+      "lon": 153.003611,
+      "elevation_ahd": 6.85,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -143750,9 +143941,9 @@
       "id": "craigmore_b_al",
       "name": "Craigmore B AL",
       "station_number": "535156",
-      "lat": -23.8647,
-      "lon": 147.7569,
-      "elevation_ahd": 224.84,
+      "lat": -23.883056,
+      "lon": 147.756944,
+      "elevation_ahd": 228.19,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -144108,9 +144299,9 @@
       "id": "cressbrook_dam_al",
       "name": "Cressbrook Dam AL",
       "station_number": "540142",
-      "lat": -27.2633,
-      "lon": 152.2089,
-      "elevation_ahd": 284.32,
+      "lat": -27.265278,
+      "lon": 152.195,
+      "elevation_ahd": 288.41,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -144806,10 +144997,10 @@
       "id": "cungelella_al",
       "name": "Cungelella AL",
       "station_number": "535157",
-      "lat": -24.683,
-      "lon": 147.164,
-      "elevation_ahd": 405.72,
-      "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
+      "lat": -24.683611,
+      "lon": 147.164167,
+      "elevation_ahd": 403.66,
+      "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
       ],
@@ -146301,9 +146492,9 @@
       "id": "deagon_al",
       "name": "Deagon AL",
       "station_number": "540124",
-      "lat": -27.336,
-      "lon": 153.058,
-      "elevation_ahd": 1.53,
+      "lat": -27.335833,
+      "lon": 153.0575,
+      "elevation_ahd": 1.44,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -146440,9 +146631,9 @@
       "id": "deception_bay_creek_rd_al",
       "name": "Deception Bay (Creek Rd) AL",
       "station_number": "540623",
-      "lat": -27.173,
-      "lon": 152.983,
-      "elevation_ahd": 11.8,
+      "lat": -27.173333,
+      "lon": 152.982778,
+      "elevation_ahd": 12.76,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -146520,9 +146711,9 @@
       "id": "deception_bay_major_st_al",
       "name": "Deception Bay (Major St) AL",
       "station_number": "540741",
-      "lat": -27.207,
-      "lon": 153.027,
-      "elevation_ahd": 4.18,
+      "lat": -27.206667,
+      "lon": 153.026389,
+      "elevation_ahd": 4.38,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -146701,9 +146892,9 @@
       "id": "devon_hills_al",
       "name": "Devon Hills AL",
       "station_number": "540188",
-      "lat": -26.9,
-      "lon": 152.321,
-      "elevation_ahd": 102.63,
+      "lat": -26.899722,
+      "lon": 152.320833,
+      "elevation_ahd": 102.08,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -146842,8 +147033,8 @@
       "name": "Diamond Valley AL",
       "station_number": "540734",
       "lat": -26.755,
-      "lon": 152.931,
-      "elevation_ahd": 48.52,
+      "lon": 152.930556,
+      "elevation_ahd": 50.4,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -146901,9 +147092,9 @@
       "id": "diddillibah_al",
       "name": "Diddillibah AL",
       "station_number": "540083",
-      "lat": -26.642,
-      "lon": 152.993,
-      "elevation_ahd": 7.93,
+      "lat": -26.640556,
+      "lon": 152.994444,
+      "elevation_ahd": 16.71,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -147334,9 +147525,9 @@
       "id": "dooloogarah_al",
       "name": "Dooloogarah AL",
       "station_number": "535165",
-      "lat": -24.865,
-      "lon": 147.713,
-      "elevation_ahd": 831.48,
+      "lat": -24.865278,
+      "lon": 147.713056,
+      "elevation_ahd": 834.22,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -148248,8 +148439,8 @@
       "id": "ducabrook_al",
       "name": "Ducabrook AL",
       "station_number": "35292",
-      "lat": -23.853,
-      "lon": 147.4,
+      "lat": -23.853333,
+      "lon": 147.399722,
       "elevation_ahd": 338.0,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
@@ -148979,9 +149170,9 @@
       "id": "dunwich_al",
       "name": "Dunwich AL",
       "station_number": "540212",
-      "lat": -27.493,
-      "lon": 153.416,
-      "elevation_ahd": 114.33,
+      "lat": -27.493333,
+      "lon": 153.415833,
+      "elevation_ahd": 118.07,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -149039,9 +149230,9 @@
       "id": "durack_king_ave_al",
       "name": "Durack (King Ave) AL",
       "station_number": "40789",
-      "lat": -27.594,
-      "lon": 152.997,
-      "elevation_ahd": 7.26,
+      "lat": -27.593611,
+      "lon": 152.996667,
+      "elevation_ahd": 7.21,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -149336,10 +149527,10 @@
       "id": "dysart_al",
       "name": "Dysart AL",
       "station_number": "534023",
-      "lat": -22.591,
-      "lon": 148.34,
-      "elevation_ahd": 220.14,
-      "elevation_source": "Elvis 1 m (QLD Government)",
+      "lat": -22.591111,
+      "lon": 148.339722,
+      "elevation_ahd": 220.7,
+      "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
       ],
@@ -149750,9 +149941,9 @@
       "id": "eatons_hill_tm",
       "name": "Eatons Hill TM",
       "station_number": "540794",
-      "lat": -27.348,
-      "lon": 152.953,
-      "elevation_ahd": 15.25,
+      "lat": -27.348611,
+      "lon": 152.953056,
+      "elevation_ahd": 15.08,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -149825,9 +150016,9 @@
       "id": "echo_hills_al",
       "name": "Echo Hills AL",
       "station_number": "535085",
-      "lat": -24.178,
-      "lon": 147.444,
-      "elevation_ahd": 366.0,
+      "lat": -24.177778,
+      "lon": 147.444444,
+      "elevation_ahd": 369.0,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -149885,9 +150076,9 @@
       "id": "eden_al",
       "name": "Eden AL",
       "station_number": "539223",
-      "lat": -24.302,
-      "lon": 151.397,
-      "elevation_ahd": 168.7,
+      "lat": -24.301667,
+      "lon": 151.396944,
+      "elevation_ahd": 171.21,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -150036,9 +150227,9 @@
       "id": "eerwah_vale_al",
       "name": "Eerwah Vale AL",
       "station_number": "540136",
-      "lat": -26.48,
-      "lon": 152.879,
-      "elevation_ahd": 129.97,
+      "lat": -26.476944,
+      "lon": 152.88,
+      "elevation_ahd": 127.73,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -150275,9 +150466,9 @@
       "id": "eight_mile_plains_al",
       "name": "Eight Mile Plains AL",
       "station_number": "540125",
-      "lat": -27.584,
-      "lon": 153.088,
-      "elevation_ahd": 45.37,
+      "lat": -27.584167,
+      "lon": 153.0875,
+      "elevation_ahd": 46.59,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -150613,8 +150804,8 @@
       "name": "Elimbah AL",
       "station_number": "540653",
       "lat": -26.97,
-      "lon": 152.9167,
-      "elevation_ahd": 53.61,
+      "lon": 152.916389,
+      "elevation_ahd": 54.05,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -150672,9 +150863,9 @@
       "id": "elsmore_danthonia",
       "name": "Elsmore (Danthonia)",
       "station_number": "56111",
-      "lat": -29.783,
-      "lon": 151.362,
-      "elevation_ahd": 774.41,
+      "lat": -29.782778,
+      "lon": 151.361667,
+      "elevation_ahd": 774.46,
       "elevation_source": "Elvis 5 m (NSW Government)",
       "roles": [
         "field"
@@ -150732,9 +150923,9 @@
       "id": "elsmore_village",
       "name": "Elsmore Village",
       "station_number": "56237",
-      "lat": -29.802,
-      "lon": 151.273,
-      "elevation_ahd": 665.06,
+      "lat": -29.8025,
+      "lon": 151.2725,
+      "elevation_ahd": 665.12,
       "elevation_source": "Elvis 5 m (NSW Government)",
       "roles": [
         "field"
@@ -150792,10 +150983,10 @@
       "id": "emerald_radar_al",
       "name": "Emerald Radar AL",
       "station_number": "35146",
-      "lat": -23.549,
-      "lon": 148.239,
-      "elevation_ahd": 185.7,
-      "elevation_source": "Elvis 1 m (QLD Government)",
+      "lat": -23.55,
+      "lon": 148.239722,
+      "elevation_ahd": 185.99,
+      "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
       ],
@@ -150852,9 +151043,9 @@
       "id": "emmaville_post_office",
       "name": "Emmaville Post Office",
       "station_number": "56009",
-      "lat": -29.445,
-      "lon": 151.599,
-      "elevation_ahd": 888.12,
+      "lat": -29.444444,
+      "lon": 151.598611,
+      "elevation_ahd": 887.05,
       "elevation_source": "Elvis 5 m (NSW Government)",
       "roles": [
         "field"
@@ -151010,9 +151201,9 @@
       "id": "enoggera_dam_al",
       "name": "Enoggera Dam AL",
       "station_number": "540119",
-      "lat": -27.447,
-      "lon": 152.926,
-      "elevation_ahd": 73.91,
+      "lat": -27.446944,
+      "lon": 152.926389,
+      "elevation_ahd": 73.9,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -151300,10 +151491,10 @@
       "id": "essendean_bridge_al",
       "name": "Essendean Bridge AL",
       "station_number": "539126",
-      "lat": -24.601,
-      "lon": 151.845,
-      "elevation_ahd": 1.2,
-      "elevation_source": "Elvis 1 m (QLD Government)",
+      "lat": -24.601389,
+      "lon": 151.845278,
+      "elevation_ahd": 5.87,
+      "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
       ],
@@ -151452,9 +151643,9 @@
       "id": "eudlo_al",
       "name": "Eudlo AL",
       "station_number": "540222",
-      "lat": -26.727,
-      "lon": 152.956,
-      "elevation_ahd": 24.46,
+      "lat": -26.725,
+      "lon": 152.956944,
+      "elevation_ahd": 25.22,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -151804,9 +151995,9 @@
       "id": "evandale_al",
       "name": "Evandale AL",
       "station_number": "540318",
-      "lat": -28.005,
-      "lon": 153.4161,
-      "elevation_ahd": 4.25,
+      "lat": -28.003455,
+      "lon": 153.417501,
+      "elevation_ahd": 2.63,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -153521,9 +153712,9 @@
       "id": "flinton",
       "name": "Flinton",
       "station_number": "42053",
-      "lat": -27.89459,
-      "lon": 149.5595,
-      "elevation_ahd": 222.69,
+      "lat": -27.896667,
+      "lon": 149.558611,
+      "elevation_ahd": 222.27,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -153719,7 +153910,8 @@
       "elevation_ahd": 411.86,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -153737,6 +153929,35 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": null,
+        "tx_mhz": null,
+        "pass_ranges": [
+          {
+            "low": 5947,
+            "high": 5949
+          },
+          {
+            "low": 5952,
+            "high": 5962
+          },
+          {
+            "low": 5968,
+            "high": 5969
+          },
+          {
+            "low": 5998,
+            "high": 5999
+          },
+          {
+            "low": 1244,
+            "high": 1250
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2448,
         "number": "535074",
@@ -153930,9 +154151,9 @@
       "id": "forest_hill_al",
       "name": "Forest Hill AL",
       "station_number": "540516",
-      "lat": -27.584,
-      "lon": 152.35,
-      "elevation_ahd": 92.91,
+      "lat": -27.583889,
+      "lon": 152.350278,
+      "elevation_ahd": 94.7,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -154585,9 +154806,9 @@
       "id": "franklyn_vale_al",
       "name": "Franklyn Vale AL",
       "station_number": "40912",
-      "lat": -27.759,
-      "lon": 152.469,
-      "elevation_ahd": 134.7,
+      "lat": -27.759722,
+      "lon": 152.47,
+      "elevation_ahd": 138.26,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -155070,9 +155291,9 @@
       "id": "gaeta_al",
       "name": "Gaeta AL",
       "station_number": "539208",
-      "lat": -24.801,
-      "lon": 151.604,
-      "elevation_ahd": 183.04,
+      "lat": -24.796389,
+      "lon": 151.603889,
+      "elevation_ahd": 172.64,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -155858,9 +156079,9 @@
       "id": "gillespie_al",
       "name": "Gillespie AL",
       "station_number": "535152",
-      "lat": -24.558,
-      "lon": 145.787,
-      "elevation_ahd": 324.02,
+      "lat": -24.5575,
+      "lon": 145.787222,
+      "elevation_ahd": 324.81,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -155993,9 +156214,9 @@
       "id": "gin_gin_al",
       "name": "Gin Gin AL",
       "station_number": "539209",
-      "lat": -24.996,
-      "lon": 151.957,
-      "elevation_ahd": 97.17,
+      "lat": -24.995833,
+      "lon": 151.956667,
+      "elevation_ahd": 100.06,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -156283,9 +156504,9 @@
       "id": "gladstone_radar_al",
       "name": "Gladstone Radar AL",
       "station_number": "539127",
-      "lat": -23.855,
-      "lon": 151.263,
-      "elevation_ahd": 62.46,
+      "lat": -23.85508,
+      "lon": 151.262558,
+      "elevation_ahd": 74.59,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -156668,9 +156889,9 @@
       "id": "glen_innes_ag_research_stn",
       "name": "Glen Innes Ag Research Stn",
       "station_number": "56013",
-      "lat": -29.695,
-      "lon": 151.694,
-      "elevation_ahd": 1065.57,
+      "lat": -29.695278,
+      "lon": 151.693611,
+      "elevation_ahd": 1065.21,
       "elevation_source": "Elvis 5 m (NSW Government)",
       "roles": [
         "field"
@@ -156725,9 +156946,9 @@
       "id": "glencoe_al",
       "name": "Glencoe AL",
       "station_number": "535104",
-      "lat": -23.717,
-      "lon": 146.173,
-      "elevation_ahd": 367.09,
+      "lat": -23.716667,
+      "lon": 146.173056,
+      "elevation_ahd": 369.96,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -156870,9 +157091,9 @@
       "id": "glencoe_rd_al",
       "name": "Glencoe Rd AL",
       "station_number": "539192",
-      "lat": -25.256,
-      "lon": 150.729,
-      "elevation_ahd": 456.53,
+      "lat": -25.255833,
+      "lon": 150.728611,
+      "elevation_ahd": 459.55,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -157404,9 +157625,9 @@
       "id": "gold_ck_res_al",
       "name": "Gold Ck Res AL",
       "station_number": "540107",
-      "lat": -27.467,
-      "lon": 152.883,
-      "elevation_ahd": 163.86,
+      "lat": -27.466667,
+      "lon": 152.883056,
+      "elevation_ahd": 146.29,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -157516,9 +157737,9 @@
       "id": "golden_beach_al",
       "name": "Golden Beach AL",
       "station_number": "540448",
-      "lat": -26.833,
-      "lon": 153.119,
-      "elevation_ahd": 1.33,
+      "lat": -26.833611,
+      "lon": 153.12,
+      "elevation_ahd": -0.74,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -157860,9 +158081,9 @@
       "id": "goodna_al",
       "name": "Goodna AL",
       "station_number": "540670",
-      "lat": -27.6,
-      "lon": 152.894,
-      "elevation_ahd": 7.53,
+      "lat": -27.600278,
+      "lon": 152.894167,
+      "elevation_ahd": 9.61,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -158095,9 +158316,9 @@
       "id": "goolman_al",
       "name": "Goolman AL",
       "station_number": "540668",
-      "lat": -27.736,
-      "lon": 152.767,
-      "elevation_ahd": 81.16,
+      "lat": -27.736111,
+      "lon": 152.766667,
+      "elevation_ahd": 80.22,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -159353,9 +159574,9 @@
       "id": "green_valley_al",
       "name": "Green Valley AL",
       "station_number": "535081",
-      "lat": -23.679,
+      "lat": -23.679444,
       "lon": 147.315,
-      "elevation_ahd": 337.05,
+      "elevation_ahd": 343.65,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -159465,9 +159686,9 @@
       "id": "greenbank_thompson_rd_al",
       "name": "Greenbank (Thompson Rd) AL",
       "station_number": "40794",
-      "lat": -27.696,
-      "lon": 152.933,
-      "elevation_ahd": 92.89,
+      "lat": -27.695556,
+      "lon": 152.933333,
+      "elevation_ahd": 92.29,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -159972,9 +160193,9 @@
       "id": "gregor_ck_al_b",
       "name": "Gregor Ck AL-B",
       "station_number": "540140",
-      "lat": -26.991,
-      "lon": 152.404,
-      "elevation_ahd": 97.17,
+      "lat": -26.990556,
+      "lon": 152.404167,
+      "elevation_ahd": 85.49,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -162136,9 +162357,9 @@
       "id": "hays_landing_al",
       "name": "Hays Landing AL",
       "station_number": "540458",
-      "lat": -27.332,
-      "lon": 152.61,
-      "elevation_ahd": 82.0,
+      "lat": -27.332222,
+      "lon": 152.610278,
+      "elevation_ahd": 83.98,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -162405,9 +162626,9 @@
       "id": "heathwood_al",
       "name": "Heathwood AL",
       "station_number": "35293",
-      "lat": -24.343,
-      "lon": 148.062,
-      "elevation_ahd": 309.69,
+      "lat": -24.343333,
+      "lon": 148.062222,
+      "elevation_ahd": 309.31,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -162465,10 +162686,10 @@
       "id": "hedlow_airfield_tm",
       "name": "Hedlow Airfield TM",
       "station_number": "33312",
-      "lat": -23.223,
+      "lat": -23.223333,
       "lon": 150.605,
-      "elevation_ahd": 34.11,
-      "elevation_source": "Elvis 1 m (QLD Government)",
+      "elevation_ahd": 34.41,
+      "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
       ],
@@ -162522,9 +162743,9 @@
       "id": "helidon_al",
       "name": "Helidon AL",
       "station_number": "540143",
-      "lat": -27.544,
-      "lon": 152.113,
-      "elevation_ahd": 145.88,
+      "lat": -27.543889,
+      "lon": 152.113333,
+      "elevation_ahd": 146.4,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -163579,9 +163800,9 @@
       "id": "hills_road_al",
       "name": "Hills Road AL",
       "station_number": "539135",
-      "lat": -24.476,
-      "lon": 151.889,
-      "elevation_ahd": 5.05,
+      "lat": -24.476389,
+      "lon": 151.889167,
+      "elevation_ahd": 5.77,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -163960,8 +164181,8 @@
       "id": "hinze_dam_hw_al",
       "name": "Hinze Dam HW AL",
       "station_number": "40847",
-      "lat": -28.052,
-      "lon": 153.282,
+      "lat": -28.052222,
+      "lon": 153.281667,
       "elevation_ahd": 82.08,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
@@ -164148,9 +164369,9 @@
       "id": "hoganthulla_xing_al",
       "name": "Hoganthulla Xing AL",
       "station_number": "544043",
-      "lat": -25.629,
-      "lon": 147.09,
-      "elevation_ahd": 459.75,
+      "lat": -25.629444,
+      "lon": 147.090278,
+      "elevation_ahd": 453.92,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -164708,9 +164929,9 @@
       "id": "hotham_creek_al",
       "name": "Hotham Creek AL",
       "station_number": "540376",
-      "lat": -27.8158,
-      "lon": 153.2819,
-      "elevation_ahd": 3.37,
+      "lat": -27.815028,
+      "lon": 153.28255,
+      "elevation_ahd": 4.41,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -165049,9 +165270,9 @@
       "id": "humboldt_al",
       "name": "Humboldt AL",
       "station_number": "535091",
-      "lat": -24.103,
-      "lon": 148.816,
-      "elevation_ahd": 235.0,
+      "lat": -24.103333,
+      "lon": 148.815556,
+      "elevation_ahd": 234.0,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -165354,9 +165575,9 @@
       "id": "imbil_al",
       "name": "Imbil AL",
       "station_number": "40777",
-      "lat": -26.457,
-      "lon": 152.68,
-      "elevation_ahd": 87.36,
+      "lat": -26.457222,
+      "lon": 152.680278,
+      "elevation_ahd": 86.63,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -166649,9 +166870,9 @@
       "id": "jericho_al",
       "name": "Jericho AL",
       "station_number": "535150",
-      "lat": -23.604,
-      "lon": 146.13,
-      "elevation_ahd": 350.15,
+      "lat": -23.603889,
+      "lon": 146.130278,
+      "elevation_ahd": 349.35,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -167037,9 +167258,9 @@
       "id": "jindalee_boat_ramp_park_al_b",
       "name": "Jindalee (Boat Ramp Park) AL-B",
       "station_number": "540682",
-      "lat": -27.538,
-      "lon": 152.929,
-      "elevation_ahd": 25.32,
+      "lat": -27.531944,
+      "lon": 152.928611,
+      "elevation_ahd": 11.69,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -167433,9 +167654,9 @@
       "id": "jingle_downs_al",
       "name": "Jingle Downs AL",
       "station_number": "40786",
-      "lat": -27.746,
-      "lon": 152.908,
-      "elevation_ahd": 95.2,
+      "lat": -27.745556,
+      "lon": 152.908056,
+      "elevation_ahd": 95.09,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -167493,9 +167714,9 @@
       "id": "jo_jo_station_al",
       "name": "Jo Jo Station AL",
       "station_number": "535172",
-      "lat": -24.073,
-      "lon": 147.249,
-      "elevation_ahd": 427.22,
+      "lat": -24.076111,
+      "lon": 147.247222,
+      "elevation_ahd": 426.79,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -167553,9 +167774,9 @@
       "id": "john_bray_park_al",
       "name": "John Bray Park AL",
       "station_number": "540413",
-      "lat": -27.283,
+      "lat": -27.296667,
       "lon": 152.985,
-      "elevation_ahd": 11.79,
+      "elevation_ahd": 11.98,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -167990,9 +168211,9 @@
       "id": "joylands_al",
       "name": "Joylands AL",
       "station_number": "544026",
-      "lat": -26.394,
-      "lon": 146.574,
-      "elevation_ahd": 388.95,
+      "lat": -26.393333,
+      "lon": 146.573889,
+      "elevation_ahd": 388.41,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -168221,9 +168442,9 @@
       "id": "kalbar_tm",
       "name": "Kalbar TM",
       "station_number": "40867",
-      "lat": -27.941,
-      "lon": 152.624,
-      "elevation_ahd": 92.14,
+      "lat": -27.940556,
+      "lon": 152.623611,
+      "elevation_ahd": 89.18,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -168278,9 +168499,9 @@
       "id": "kalbar_weir_al",
       "name": "Kalbar Weir AL",
       "station_number": "540151",
-      "lat": -27.923333,
-      "lon": 152.600833,
-      "elevation_ahd": 77.03,
+      "lat": -27.935278,
+      "lon": 152.597778,
+      "elevation_ahd": 78.97,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -170093,9 +170314,9 @@
       "id": "kiels_mtn_al",
       "name": "Kiels Mtn AL",
       "station_number": "540087",
-      "lat": -26.664,
-      "lon": 153.018,
-      "elevation_ahd": 3.48,
+      "lat": -26.661944,
+      "lon": 153.018611,
+      "elevation_ahd": 3.85,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -171515,9 +171736,9 @@
       "id": "kippa_ring_al",
       "name": "Kippa-Ring AL",
       "station_number": "540629",
-      "lat": -27.217,
-      "lon": 153.093,
-      "elevation_ahd": 1.7,
+      "lat": -27.216667,
+      "lon": 153.093333,
+      "elevation_ahd": 2.48,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -171759,9 +171980,9 @@
       "id": "koala_court_al",
       "name": "Koala Court AL",
       "station_number": "540764",
-      "lat": -26.8,
-      "lon": 153.077,
-      "elevation_ahd": 7.23,
+      "lat": -26.800278,
+      "lon": 153.0775,
+      "elevation_ahd": 4.39,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -171891,9 +172112,9 @@
       "id": "kobble_ck_al",
       "name": "Kobble Ck AL",
       "station_number": "540483",
-      "lat": -27.248,
-      "lon": 152.837,
-      "elevation_ahd": 50.79,
+      "lat": -27.2475,
+      "lon": 152.837222,
+      "elevation_ahd": 53.17,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -172181,9 +172402,9 @@
       "id": "kulumur_range_al",
       "name": "Kulumur Range AL",
       "station_number": "35294",
-      "lat": -23.814,
-      "lon": 147.752,
-      "elevation_ahd": 360.25,
+      "lat": -23.803889,
+      "lon": 147.769167,
+      "elevation_ahd": 302.0,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -172553,9 +172774,9 @@
       "id": "laceys_ck_al",
       "name": "Laceys Ck AL",
       "station_number": "540409",
-      "lat": -27.196,
-      "lon": 152.751,
-      "elevation_ahd": 104.69,
+      "lat": -27.196389,
+      "lon": 152.750556,
+      "elevation_ahd": 109.36,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -173003,9 +173224,9 @@
       "id": "lake_clarendon_dam_al",
       "name": "Lake Clarendon Dam AL",
       "station_number": "540473",
-      "lat": -27.516,
-      "lon": 152.353,
-      "elevation_ahd": 89.14,
+      "lat": -27.515556,
+      "lon": 152.353056,
+      "elevation_ahd": 87.94,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -173481,9 +173702,9 @@
       "id": "lake_macdonald_dam_al",
       "name": "Lake MacDonald Dam AL",
       "station_number": "540463",
-      "lat": -26.381,
-      "lon": 152.93,
-      "elevation_ahd": 85.27,
+      "lat": -26.381389,
+      "lon": 152.929722,
+      "elevation_ahd": 95.36,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -173701,9 +173922,9 @@
       "id": "lake_orr_al",
       "name": "Lake Orr AL",
       "station_number": "540564",
-      "lat": -28.078,
-      "lon": 153.415,
-      "elevation_ahd": 4.26,
+      "lat": -28.073926,
+      "lon": 153.419771,
+      "elevation_ahd": 1.59,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -173757,9 +173978,9 @@
       "id": "lake_orr_weir_tw_al",
       "name": "Lake Orr Weir TW AL",
       "station_number": "540565",
-      "lat": -28.073,
-      "lon": 153.421,
-      "elevation_ahd": 3.38,
+      "lat": -28.073935,
+      "lon": 153.419813,
+      "elevation_ahd": 1.53,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -174236,9 +174457,9 @@
       "id": "landsborough_al",
       "name": "Landsborough AL",
       "station_number": "540340",
-      "lat": -26.804,
-      "lon": 152.958,
-      "elevation_ahd": 41.6,
+      "lat": -26.804444,
+      "lon": 152.957778,
+      "elevation_ahd": 43.69,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -174734,9 +174955,9 @@
       "id": "lawnton_todds_rd_al",
       "name": "Lawnton (Todds Rd) AL",
       "station_number": "540562",
-      "lat": -27.282,
-      "lon": 152.969,
-      "elevation_ahd": 13.57,
+      "lat": -27.2825,
+      "lon": 152.968611,
+      "elevation_ahd": 13.78,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -174814,9 +175035,9 @@
       "id": "lawnton_al",
       "name": "Lawnton AL",
       "station_number": "540439",
-      "lat": -27.276,
-      "lon": 152.994,
-      "elevation_ahd": 1.24,
+      "lat": -27.275556,
+      "lon": 152.993611,
+      "elevation_ahd": 4.45,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -175362,9 +175583,9 @@
       "id": "lesdale_al",
       "name": "Lesdale AL",
       "station_number": "544033",
-      "lat": -26.374,
-      "lon": 146.524,
-      "elevation_ahd": 393.58,
+      "lat": -26.373056,
+      "lon": 146.524444,
+      "elevation_ahd": 392.31,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -175422,9 +175643,9 @@
       "id": "leslie_harrison_dam_al",
       "name": "Leslie Harrison Dam AL",
       "station_number": "540384",
-      "lat": -27.529,
+      "lat": -27.528611,
       "lon": 153.18,
-      "elevation_ahd": 18.32,
+      "elevation_ahd": 22.21,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -176925,9 +177146,9 @@
       "id": "loder_ck_al",
       "name": "Loder Ck AL",
       "station_number": "540238",
-      "lat": -27.97,
-      "lon": 153.3964,
-      "elevation_ahd": 6.91,
+      "lat": -27.967559,
+      "lon": 153.399713,
+      "elevation_ahd": 4.3,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -177583,9 +177804,9 @@
       "id": "lowood_al_p",
       "name": "Lowood AL-P",
       "station_number": "540182",
-      "lat": -27.471,
-      "lon": 152.594,
-      "elevation_ahd": 50.6,
+      "lat": -27.47,
+      "lon": 152.595556,
+      "elevation_ahd": 22.86,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -178001,9 +178222,9 @@
       "id": "luscombe_al",
       "name": "Luscombe AL",
       "station_number": "40345",
-      "lat": -27.806,
-      "lon": 153.207,
-      "elevation_ahd": 227.71,
+      "lat": -27.806389,
+      "lon": 153.207222,
+      "elevation_ahd": 216.14,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -178061,9 +178282,9 @@
       "id": "lyons_al",
       "name": "Lyons AL",
       "station_number": "40793",
-      "lat": -27.763,
-      "lon": 152.837,
-      "elevation_ahd": 177.6,
+      "lat": -27.763333,
+      "lon": 152.836667,
+      "elevation_ahd": 192.39,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -178170,9 +178391,9 @@
       "id": "lytton_al",
       "name": "Lytton AL",
       "station_number": "540225",
-      "lat": -27.421,
-      "lon": 153.162,
-      "elevation_ahd": 3.28,
+      "lat": -27.421111,
+      "lon": 153.1625,
+      "elevation_ahd": 4.53,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -178848,9 +179069,9 @@
       "id": "magnolia_al",
       "name": "Magnolia AL",
       "station_number": "540678",
-      "lat": -25.724,
-      "lon": 152.666,
-      "elevation_ahd": 20.65,
+      "lat": -25.723611,
+      "lon": 152.666111,
+      "elevation_ahd": 20.93,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -180133,9 +180354,9 @@
       "id": "marlua_al",
       "name": "Marlua AL",
       "station_number": "539130",
-      "lat": -24.193,
-      "lon": 151.156,
-      "elevation_ahd": 68.93,
+      "lat": -24.193333,
+      "lon": 151.155833,
+      "elevation_ahd": 69.75,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -180329,9 +180550,9 @@
       "id": "maroochydore_depot_al",
       "name": "Maroochydore Depot AL",
       "station_number": "540423",
-      "lat": -26.669,
-      "lon": 153.077,
-      "elevation_ahd": 6.27,
+      "lat": -26.670278,
+      "lon": 153.086389,
+      "elevation_ahd": 4.33,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -180540,9 +180761,9 @@
       "id": "maroon_dam_inflow_al",
       "name": "Maroon Dam Inflow AL",
       "station_number": "540712",
-      "lat": -28.2197,
-      "lon": 152.6078,
-      "elevation_ahd": 223.9,
+      "lat": -28.219613,
+      "lon": 152.608454,
+      "elevation_ahd": 226.14,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -180823,9 +181044,9 @@
       "id": "marshall_rd_al",
       "name": "Marshall Rd AL",
       "station_number": "540432",
-      "lat": -27.555,
-      "lon": 153.009,
-      "elevation_ahd": 10.89,
+      "lat": -27.555278,
+      "lon": 153.008611,
+      "elevation_ahd": 13.45,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -182188,9 +182409,9 @@
       "id": "meridan_way_al",
       "name": "Meridan Way AL",
       "station_number": "540351",
-      "lat": -26.764,
-      "lon": 153.1,
-      "elevation_ahd": 1.27,
+      "lat": -26.763611,
+      "lon": 153.099722,
+      "elevation_ahd": 2.77,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -183241,9 +183462,9 @@
       "id": "milton_al",
       "name": "Milton AL",
       "station_number": "539140",
-      "lat": -24.282,
-      "lon": 151.286,
-      "elevation_ahd": 46.09,
+      "lat": -24.2825,
+      "lon": 151.285556,
+      "elevation_ahd": 50.02,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -183931,9 +184152,9 @@
       "id": "miriam_vale_al",
       "name": "Miriam Vale AL",
       "station_number": "539124",
-      "lat": -24.328,
-      "lon": 151.569,
-      "elevation_ahd": 49.63,
+      "lat": -24.327778,
+      "lon": 151.569444,
+      "elevation_ahd": 48.61,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -184340,9 +184561,9 @@
       "id": "mitchelton_osborne_rd_al",
       "name": "Mitchelton (Osborne Rd) AL",
       "station_number": "540111",
-      "lat": -27.405,
-      "lon": 152.977,
-      "elevation_ahd": 41.96,
+      "lat": -27.404722,
+      "lon": 152.9775,
+      "elevation_ahd": 36.43,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -184774,16 +184995,16 @@
       "id": "moggill_al_p",
       "name": "Moggill AL-P",
       "station_number": "540200",
-      "lat": -27.41672,
-      "lon": 152.850111,
-      "elevation_ahd": 220.15,
+      "lat": -27.586111,
+      "lon": 152.857778,
+      "elevation_ahd": 25.48,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
-        "pine"
+        "brisbane"
       ],
       "alert_ids": {
         "rainfall": 6754,
@@ -184903,14 +185124,17 @@
       "id": "molendinar_al",
       "name": "Molendinar AL",
       "station_number": "540428",
-      "lat": -27.98,
-      "lon": 153.36,
-      "elevation_ahd": 20.74,
+      "lat": -27.978843,
+      "lon": 153.352765,
+      "elevation_ahd": 71.09,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "constitution_hill"
+      ],
       "catchment_ids": [
         "south_coast"
       ],
@@ -184926,6 +185150,19 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 2200,
+            "high": 2500
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2959,
         "number": "540428",
@@ -185263,9 +185500,9 @@
       "id": "monal_rd_al",
       "name": "Monal Rd AL",
       "station_number": "539195",
-      "lat": -24.472,
-      "lon": 151.132,
-      "elevation_ahd": 524.07,
+      "lat": -24.472222,
+      "lon": 151.131667,
+      "elevation_ahd": 527.12,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -185427,9 +185664,9 @@
       "id": "monsildale_al",
       "name": "Monsildale AL",
       "station_number": "540490",
-      "lat": -26.581,
+      "lat": -26.581389,
       "lon": 152.325,
-      "elevation_ahd": 442.44,
+      "elevation_ahd": 440.36,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -185532,9 +185769,9 @@
       "id": "monterey_keys_al",
       "name": "Monterey Keys AL",
       "station_number": "540269",
-      "lat": -27.886,
-      "lon": 153.338,
-      "elevation_ahd": 4.44,
+      "lat": -27.883737,
+      "lon": 153.339156,
+      "elevation_ahd": 1.05,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -185660,9 +185897,9 @@
       "id": "moodlu_williams_rd_al",
       "name": "Moodlu (Williams Rd) AL",
       "station_number": "540557",
-      "lat": -27.051,
-      "lon": 152.912,
-      "elevation_ahd": 19.35,
+      "lat": -27.050556,
+      "lon": 152.911667,
+      "elevation_ahd": 19.11,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -186527,8 +186764,8 @@
       "name": "Moore Park AL",
       "station_number": "539225",
       "lat": -24.715,
-      "lon": 152.24,
-      "elevation_ahd": 6.05,
+      "lon": 152.275833,
+      "elevation_ahd": 3.73,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -186821,9 +187058,9 @@
       "id": "morayfield_williamson_rd_al",
       "name": "Morayfield (Williamson Rd) AL",
       "station_number": "540654",
-      "lat": -27.145,
-      "lon": 152.911,
-      "elevation_ahd": 33.54,
+      "lat": -27.144722,
+      "lon": 152.910556,
+      "elevation_ahd": 30.71,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -189934,9 +190171,9 @@
       "id": "mountain_ck_al",
       "name": "Mountain Ck AL",
       "station_number": "540220",
-      "lat": -26.704,
-      "lon": 153.07,
-      "elevation_ahd": 10.13,
+      "lat": -26.702778,
+      "lon": 153.071389,
+      "elevation_ahd": 8.0,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -190163,9 +190400,9 @@
       "id": "mt_alford_al",
       "name": "Mt Alford AL",
       "station_number": "540456",
-      "lat": -28.059,
-      "lon": 152.57,
-      "elevation_ahd": 307.86,
+      "lat": -28.059444,
+      "lon": 152.569722,
+      "elevation_ahd": 314.85,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -190327,16 +190564,16 @@
       "id": "mt_beatrice_al",
       "name": "Mt Beatrice AL",
       "station_number": "539212",
-      "lat": -24.586,
-      "lon": 151.431,
-      "elevation_ahd": 199.01,
+      "lat": -24.593889,
+      "lon": 151.430278,
+      "elevation_ahd": 268.73,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
-        "boyne"
+        "kolan"
       ],
       "alert_ids": {
         "rainfall": 4783,
@@ -190809,9 +191046,9 @@
       "id": "mt_cotton_west_al",
       "name": "Mt Cotton West AL",
       "station_number": "540380",
-      "lat": -27.615,
-      "lon": 153.204,
-      "elevation_ahd": 125.44,
+      "lat": -27.614722,
+      "lon": 153.203889,
+      "elevation_ahd": 120.5,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -190869,9 +191106,9 @@
       "id": "mt_crosby_al",
       "name": "Mt Crosby AL",
       "station_number": "540199",
-      "lat": -27.538056,
-      "lon": 152.798056,
-      "elevation_ahd": 3.07,
+      "lat": -27.536389,
+      "lon": 152.799167,
+      "elevation_ahd": 45.05,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -191179,9 +191416,9 @@
       "id": "mt_glorious_al_p",
       "name": "Mt Glorious AL-P",
       "station_number": "540138",
-      "lat": -27.317,
-      "lon": 152.747,
-      "elevation_ahd": 689.58,
+      "lat": -27.316667,
+      "lon": 152.746944,
+      "elevation_ahd": 695.1,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -191527,12 +191764,12 @@
       "id": "mt_kanigan_al",
       "name": "Mt Kanigan AL",
       "station_number": "40892",
-      "lat": -25.959,
-      "lon": 152.575,
+      "lat": -25.956959,
+      "lon": 152.577143,
       "elevation_ahd": 347.73,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
-        "field"
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -191550,6 +191787,27 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 5608,
+            "high": 5650
+          },
+          {
+            "low": 6934,
+            "high": 6936
+          },
+          {
+            "low": 6954,
+            "high": 6958
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2129,
         "number": "40892",
@@ -191804,9 +192062,9 @@
       "id": "mt_marrow_al",
       "name": "Mt Marrow AL",
       "station_number": "540663",
-      "lat": -27.604,
-      "lon": 152.61,
-      "elevation_ahd": 144.37,
+      "lat": -27.604444,
+      "lon": 152.610556,
+      "elevation_ahd": 138.38,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -191916,9 +192174,9 @@
       "id": "mt_mee_al_b",
       "name": "Mt Mee AL-B",
       "station_number": "540246",
-      "lat": -27.07,
+      "lat": -27.069722,
       "lon": 152.78,
-      "elevation_ahd": 475.21,
+      "elevation_ahd": 480.64,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -192202,10 +192460,10 @@
       "id": "mt_mowbullan_al",
       "name": "Mt Mowbullan AL",
       "station_number": "541046",
-      "lat": -26.89,
-      "lon": 151.599,
-      "elevation_ahd": 1028.62,
-      "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
+      "lat": -26.888433,
+      "lon": 151.600373,
+      "elevation_ahd": 1100.86,
+      "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
       ],
@@ -192262,9 +192520,9 @@
       "id": "mt_nimmel_al",
       "name": "Mt Nimmel AL",
       "station_number": "540353",
-      "lat": -28.154,
-      "lon": 153.297,
-      "elevation_ahd": 482.45,
+      "lat": -28.153991,
+      "lon": 153.297358,
+      "elevation_ahd": 478.26,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -192361,9 +192619,9 @@
       "id": "mt_ogg_al",
       "name": "Mt Ogg AL",
       "station_number": "535123",
-      "lat": -24.672,
-      "lon": 148.185,
-      "elevation_ahd": 395.43,
+      "lat": -24.672222,
+      "lon": 148.184444,
+      "elevation_ahd": 391.34,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -192460,9 +192718,9 @@
       "id": "mt_pechey_al",
       "name": "Mt Pechey AL",
       "station_number": "541057",
-      "lat": -27.317,
-      "lon": 152.082,
-      "elevation_ahd": 704.6,
+      "lat": -27.316667,
+      "lon": 152.081667,
+      "elevation_ahd": 705.97,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -192729,9 +192987,9 @@
       "id": "mt_samson_rd_al",
       "name": "Mt Samson Rd AL",
       "station_number": "540447",
-      "lat": -27.249,
-      "lon": 152.838,
-      "elevation_ahd": 52.38,
+      "lat": -27.249444,
+      "lon": 152.8375,
+      "elevation_ahd": 57.63,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -193163,9 +193421,9 @@
       "id": "mt_sugarloaf_al",
       "name": "Mt Sugarloaf AL",
       "station_number": "540455",
-      "lat": -28.049,
-      "lon": 152.713,
-      "elevation_ahd": 266.17,
+      "lat": -28.048573,
+      "lon": 152.712702,
+      "elevation_ahd": 262.33,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -193275,9 +193533,9 @@
       "id": "mt_tabor_north_al",
       "name": "Mt Tabor North AL",
       "station_number": "535168",
-      "lat": -25.105,
-      "lon": 147.578,
-      "elevation_ahd": 751.14,
+      "lat": -25.105278,
+      "lon": 147.578333,
+      "elevation_ahd": 753.32,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -193335,15 +193593,17 @@
       "id": "mt_tamborine_al",
       "name": "Mt Tamborine AL",
       "station_number": "40335",
-      "lat": -27.9692,
-      "lon": 153.2164,
-      "elevation_ahd": 500.53,
+      "lat": -27.96918,
+      "lon": 153.213575,
+      "elevation_ahd": 551.43,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field",
         "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "constitution_hill"
+      ],
       "catchment_ids": [
         "south_coast"
       ],
@@ -193360,9 +193620,9 @@
       "enabled": true,
       "notes": "",
       "repeater": {
-        "acma_licence": "",
-        "rx_mhz": null,
-        "tx_mhz": null,
+        "acma_licence": "1410739",
+        "rx_mhz": 151.5,
+        "tx_mhz": 152.4,
         "pass_ranges": [
           {
             "low": 2200,
@@ -193417,9 +193677,9 @@
       "id": "mt_tinbeerwah_al",
       "name": "Mt Tinbeerwah AL",
       "station_number": "540328",
-      "lat": -26.387,
-      "lon": 152.971,
-      "elevation_ahd": 211.68,
+      "lat": -26.386944,
+      "lon": 152.971389,
+      "elevation_ahd": 212.65,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -193581,9 +193841,9 @@
       "id": "mt_watalgan_al",
       "name": "Mt Watalgan AL",
       "station_number": "539145",
-      "lat": -24.7025,
-      "lon": 151.9622,
-      "elevation_ahd": 378.78,
+      "lat": -24.701667,
+      "lon": 151.9625,
+      "elevation_ahd": 378.66,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -194227,9 +194487,9 @@
       "id": "mungungo_weir_al",
       "name": "Mungungo Weir AL",
       "station_number": "539198",
-      "lat": -24.764,
+      "lat": -24.764444,
       "lon": 151.16,
-      "elevation_ahd": 254.24,
+      "elevation_ahd": 258.77,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -194660,9 +194920,9 @@
       "id": "murrumba_downs_al",
       "name": "Murrumba Downs AL",
       "station_number": "540417",
-      "lat": -27.288,
-      "lon": 153.018,
-      "elevation_ahd": 13.14,
+      "lat": -27.288056,
+      "lon": 153.0175,
+      "elevation_ahd": 10.59,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -195061,9 +195321,9 @@
       "id": "myall_grove_al",
       "name": "Myall Grove AL",
       "station_number": "535115",
-      "lat": -24.552,
-      "lon": 146.321,
-      "elevation_ahd": 482.79,
+      "lat": -24.5525,
+      "lon": 146.321111,
+      "elevation_ahd": 485.94,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -195338,9 +195598,9 @@
       "id": "nagoorin_al",
       "name": "Nagoorin AL",
       "station_number": "539129",
-      "lat": -24.357,
-      "lon": 151.312,
-      "elevation_ahd": 62.49,
+      "lat": -24.357222,
+      "lon": 151.311667,
+      "elevation_ahd": 62.59,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -195428,9 +195688,9 @@
       "id": "nambour_al",
       "name": "Nambour AL",
       "station_number": "540137",
-      "lat": -26.63,
-      "lon": 152.958,
-      "elevation_ahd": 23.08,
+      "lat": -26.628333,
+      "lon": 152.958611,
+      "elevation_ahd": 18.56,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -195533,9 +195793,9 @@
       "id": "narangba_oakey_flat_rd_al",
       "name": "Narangba (Oakey Flat Rd) AL",
       "station_number": "540508",
-      "lat": -27.175,
-      "lon": 152.922,
-      "elevation_ahd": 26.86,
+      "lat": -27.175278,
+      "lon": 152.922222,
+      "elevation_ahd": 22.37,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -197384,9 +197644,9 @@
       "id": "nindooinbah_dam_al",
       "name": "Nindooinbah Dam AL",
       "station_number": "540480",
-      "lat": -27.996,
+      "lat": -27.995556,
       "lon": 153.03,
-      "elevation_ahd": 123.0,
+      "elevation_ahd": 122.93,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -197864,15 +198124,17 @@
       "id": "noosa_heads_al",
       "name": "Noosa Heads AL",
       "station_number": "540323",
-      "lat": -26.382,
-      "lon": 153.083,
-      "elevation_ahd": -0.26,
+      "lat": -26.381667,
+      "lon": 153.080278,
+      "elevation_ahd": 3.85,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
       ],
       "radio_network_ids": [],
-      "catchment_ids": [],
+      "catchment_ids": [
+        "noosa"
+      ],
       "alert_ids": {
         "rainfall": 6922,
         "battery": 6923
@@ -197922,9 +198184,9 @@
       "id": "normanby_way_al",
       "name": "Normanby Way AL",
       "station_number": "540414",
-      "lat": -27.306,
-      "lon": 152.997,
-      "elevation_ahd": 4.33,
+      "lat": -27.306389,
+      "lon": 152.996944,
+      "elevation_ahd": 3.72,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -198205,9 +198467,9 @@
       "id": "north_pine_dam_al",
       "name": "North Pine Dam AL",
       "station_number": "540202",
-      "lat": -27.267,
-      "lon": 152.933,
-      "elevation_ahd": 36.41,
+      "lat": -27.266667,
+      "lon": 152.933333,
+      "elevation_ahd": 36.33,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -198838,9 +199100,9 @@
       "id": "norwell_al",
       "name": "Norwell AL",
       "station_number": "540408",
-      "lat": -27.7881,
-      "lon": 153.3139,
-      "elevation_ahd": 0.49,
+      "lat": -27.786766,
+      "lon": 153.314659,
+      "elevation_ahd": 1.57,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -199228,9 +199490,9 @@
       "id": "numinbah_al",
       "name": "Numinbah AL",
       "station_number": "40882",
-      "lat": -28.165,
-      "lon": 153.216,
-      "elevation_ahd": 154.85,
+      "lat": -28.165278,
+      "lon": 153.216111,
+      "elevation_ahd": 156.67,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -199908,9 +200170,9 @@
       "id": "oak_park_xing_al",
       "name": "Oak Park Xing AL",
       "station_number": "544051",
-      "lat": -26.063,
-      "lon": 146.124,
-      "elevation_ahd": 305.72,
+      "lat": -26.064444,
+      "lon": 146.122222,
+      "elevation_ahd": 311.91,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -200286,9 +200548,9 @@
       "id": "ocean_view_al",
       "name": "Ocean View AL",
       "station_number": "540634",
-      "lat": -27.117,
-      "lon": 152.789,
-      "elevation_ahd": 467.1,
+      "lat": -27.116667,
+      "lon": 152.788611,
+      "elevation_ahd": 472.67,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -201331,9 +201593,9 @@
       "id": "oxenford_weir_al",
       "name": "Oxenford Weir AL",
       "station_number": "540292",
-      "lat": -27.88361,
-      "lon": 153.28347,
-      "elevation_ahd": 24.46,
+      "lat": -27.898985,
+      "lon": 153.293138,
+      "elevation_ahd": 3.29,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -201566,9 +201828,9 @@
       "id": "oxley_ck_mouth_al",
       "name": "Oxley Ck Mouth AL",
       "station_number": "540274",
-      "lat": -27.526,
-      "lon": 152.994,
-      "elevation_ahd": 7.86,
+      "lat": -27.526111,
+      "lon": 152.993611,
+      "elevation_ahd": 2.42,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -201678,9 +201940,9 @@
       "id": "oyster_ck_al",
       "name": "Oyster Ck AL",
       "station_number": "540252",
-      "lat": -28.1128,
-      "lon": 153.4378,
-      "elevation_ahd": 2.81,
+      "lat": -28.111014,
+      "lon": 153.438835,
+      "elevation_ahd": 2.19,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -202337,9 +202599,9 @@
       "id": "palmwoods_al",
       "name": "Palmwoods AL",
       "station_number": "540219",
-      "lat": -26.689,
-      "lon": 152.957,
-      "elevation_ahd": 28.26,
+      "lat": -26.687778,
+      "lon": 152.958056,
+      "elevation_ahd": 49.48,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -202397,9 +202659,9 @@
       "id": "palmwoods_sportsground_al",
       "name": "Palmwoods Sportsground AL",
       "station_number": "540420",
-      "lat": -26.676,
-      "lon": 152.954,
-      "elevation_ahd": 31.92,
+      "lat": -26.676111,
+      "lon": 152.954444,
+      "elevation_ahd": 30.08,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -202712,9 +202974,9 @@
       "id": "park_ridge_stoney_camp_rd_al",
       "name": "Park Ridge (Stoney Camp Rd) AL",
       "station_number": "540787",
-      "lat": -27.725,
-      "lon": 153.03,
-      "elevation_ahd": 34.21,
+      "lat": -27.725278,
+      "lon": 153.029444,
+      "elevation_ahd": 38.71,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -203341,16 +203603,16 @@
       "id": "peak_vale_al",
       "name": "Peak Vale AL",
       "station_number": "535159",
-      "lat": -23.142,
-      "lon": 147.279,
-      "elevation_ahd": 485.99,
+      "lat": -23.187222,
+      "lon": 147.260278,
+      "elevation_ahd": 418.0,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
-        "burdekin"
+        "fitzroy"
       ],
       "alert_ids": {
         "rainfall": 5998,
@@ -203512,9 +203774,9 @@
       "id": "pelican_waters_al",
       "name": "Pelican Waters AL",
       "station_number": "540738",
-      "lat": -26.823,
-      "lon": 153.111,
-      "elevation_ahd": 2.69,
+      "lat": -26.8225,
+      "lon": 153.111389,
+      "elevation_ahd": 2.77,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -204011,9 +204273,9 @@
       "id": "picnic_point_al",
       "name": "Picnic Point AL",
       "station_number": "540094",
-      "lat": -26.646,
-      "lon": 153.081,
-      "elevation_ahd": 1.65,
+      "lat": -26.644444,
+      "lon": 153.0825,
+      "elevation_ahd": 2.66,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -204921,12 +205183,13 @@
       "id": "pohlmans_range_al",
       "name": "Pohlmans Range AL",
       "station_number": "540459",
-      "lat": -26.992,
-      "lon": 152.431,
-      "elevation_ahd": 451.78,
+      "lat": -26.992222,
+      "lon": 152.431389,
+      "elevation_ahd": 452.99,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -204944,6 +205207,19 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "pass_ranges": [
+          {
+            "low": 2006,
+            "high": 2007
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 2979,
         "number": "540459",
@@ -206077,9 +206353,9 @@
       "id": "priestdale_al",
       "name": "Priestdale AL",
       "station_number": "540381",
-      "lat": -27.609,
-      "lon": 153.184,
-      "elevation_ahd": 78.54,
+      "lat": -27.608611,
+      "lon": 153.184167,
+      "elevation_ahd": 75.38,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -206189,9 +206465,9 @@
       "id": "pullen_pullen_creek_al",
       "name": "Pullen Pullen Creek AL",
       "station_number": "540296",
-      "lat": -27.561,
-      "lon": 152.893,
-      "elevation_ahd": 15.48,
+      "lat": -27.560556,
+      "lon": 152.893333,
+      "elevation_ahd": 15.92,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -206722,9 +206998,9 @@
       "id": "radar_hill_al",
       "name": "Radar Hill AL",
       "station_number": "540642",
-      "lat": -26.605,
-      "lon": 152.989,
-      "elevation_ahd": 175.3,
+      "lat": -26.605278,
+      "lon": 152.989167,
+      "elevation_ahd": 175.48,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -206936,9 +207212,9 @@
       "id": "ransome_al",
       "name": "Ransome AL",
       "station_number": "540279",
-      "lat": -27.487,
-      "lon": 153.17,
-      "elevation_ahd": 4.02,
+      "lat": -27.487222,
+      "lon": 153.170278,
+      "elevation_ahd": 3.85,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -207286,9 +207562,9 @@
       "id": "raynbird_creek_al",
       "name": "Raynbird Creek AL",
       "station_number": "540545",
-      "lat": -27.262,
-      "lon": 152.733,
-      "elevation_ahd": 287.06,
+      "lat": -27.258056,
+      "lon": 152.733056,
+      "elevation_ahd": 181.5,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -207482,9 +207758,9 @@
       "id": "redbank_al",
       "name": "Redbank AL",
       "station_number": "539199",
-      "lat": -25.485,
+      "lat": -25.484722,
       "lon": 150.605,
-      "elevation_ahd": 347.5,
+      "elevation_ahd": 350.48,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -207542,9 +207818,9 @@
       "id": "redbank_ck_al",
       "name": "Redbank Ck AL",
       "station_number": "540489",
-      "lat": -27.277,
-      "lon": 152.289,
-      "elevation_ahd": 489.56,
+      "lat": -27.276667,
+      "lon": 152.288889,
+      "elevation_ahd": 492.58,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -208639,9 +208915,9 @@
       "id": "rochedale_south_al",
       "name": "Rochedale South AL",
       "station_number": "540382",
-      "lat": -27.591,
-      "lon": 153.142,
-      "elevation_ahd": 38.38,
+      "lat": -27.591667,
+      "lon": 153.141944,
+      "elevation_ahd": 41.62,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -208751,9 +209027,9 @@
       "id": "rocky_ck_al",
       "name": "Rocky Ck AL",
       "station_number": "544045",
-      "lat": -25.719,
-      "lon": 147.04,
-      "elevation_ahd": 511.0,
+      "lat": -25.719167,
+      "lon": 147.040278,
+      "elevation_ahd": 513.0,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -208912,9 +209188,9 @@
       "id": "romani_al",
       "name": "Romani AL",
       "station_number": "40934",
-      "lat": -27.8481,
-      "lon": 152.9061,
-      "elevation_ahd": 39.78,
+      "lat": -27.846389,
+      "lon": 152.906111,
+      "elevation_ahd": 46.94,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -208972,9 +209248,9 @@
       "id": "rosalie_baroona_rd_al",
       "name": "Rosalie (Baroona Rd) AL",
       "station_number": "540785",
-      "lat": -27.465,
-      "lon": 152.991,
-      "elevation_ahd": 14.19,
+      "lat": -27.465278,
+      "lon": 152.990556,
+      "elevation_ahd": 13.08,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -209277,9 +209553,9 @@
       "id": "rosewood_al",
       "name": "Rosewood AL",
       "station_number": "540193",
-      "lat": -27.661,
-      "lon": 152.603,
-      "elevation_ahd": 42.98,
+      "lat": -27.659444,
+      "lon": 152.604444,
+      "elevation_ahd": 40.91,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -209914,9 +210190,9 @@
       "id": "round_mt_res_al",
       "name": "Round Mt Res AL",
       "station_number": "540241",
-      "lat": -27.032,
-      "lon": 152.934,
-      "elevation_ahd": 54.18,
+      "lat": -27.032778,
+      "lon": 152.934444,
+      "elevation_ahd": 71.84,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -210385,9 +210661,9 @@
       "id": "samford_al",
       "name": "Samford AL",
       "station_number": "540060",
-      "lat": -27.361,
-      "lon": 152.879,
-      "elevation_ahd": 68.32,
+      "lat": -27.360833,
+      "lon": 152.879444,
+      "elevation_ahd": 64.16,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -212993,9 +213269,9 @@
       "id": "sippy_downs_al",
       "name": "Sippy Downs AL",
       "station_number": "540339",
-      "lat": -26.726,
-      "lon": 153.051,
-      "elevation_ahd": 17.15,
+      "lat": -26.718889,
+      "lon": 153.066944,
+      "elevation_ahd": 9.15,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -213120,9 +213396,9 @@
       "id": "six_mile_ck_al",
       "name": "Six Mile Ck AL",
       "station_number": "540664",
-      "lat": -27.641,
-      "lon": 152.844,
-      "elevation_ahd": 34.01,
+      "lat": -27.640833,
+      "lon": 152.844444,
+      "elevation_ahd": 31.67,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -213734,9 +214010,9 @@
       "id": "somerset_dam_hw_al_b",
       "name": "Somerset Dam HW AL-B",
       "station_number": "540160",
-      "lat": -27.111,
-      "lon": 152.551,
-      "elevation_ahd": 195.84,
+      "lat": -27.110556,
+      "lon": 152.551389,
+      "elevation_ahd": 203.8,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -214387,9 +214663,9 @@
       "id": "south_lesdale_al",
       "name": "South Lesdale AL",
       "station_number": "544029",
-      "lat": -26.415,
-      "lon": 146.516,
-      "elevation_ahd": 381.47,
+      "lat": -26.415278,
+      "lon": 146.515833,
+      "elevation_ahd": 382.18,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -214790,9 +215066,9 @@
       "id": "south_ripley_wards_rd_al",
       "name": "South Ripley (Wards Rd) AL",
       "station_number": "540666",
-      "lat": -27.726,
-      "lon": 152.822,
-      "elevation_ahd": 70.31,
+      "lat": -27.726389,
+      "lon": 152.821944,
+      "elevation_ahd": 65.91,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -214969,10 +215245,10 @@
       "id": "splitters_ck_al",
       "name": "Splitters Ck AL",
       "station_number": "539213",
-      "lat": -24.919,
-      "lon": 152.094,
-      "elevation_ahd": 61.05,
-      "elevation_source": "Elvis 50 cm (Griffith Uni)",
+      "lat": -24.917222,
+      "lon": 152.093333,
+      "elevation_ahd": 57.69,
+      "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
       ],
@@ -215029,8 +215305,8 @@
       "id": "splityard_ck_dam_al",
       "name": "Splityard Ck Dam AL",
       "station_number": "540260",
-      "lat": -27.371111,
-      "lon": 152.627778,
+      "lat": -27.371777,
+      "lon": 152.636082,
       "elevation_ahd": 99.45,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
@@ -215130,9 +215406,9 @@
       "id": "spring_hill_al",
       "name": "Spring Hill AL",
       "station_number": "544030",
-      "lat": -26.468,
-      "lon": 146.415,
-      "elevation_ahd": 356.49,
+      "lat": -26.466944,
+      "lon": 146.415278,
+      "elevation_ahd": 355.43,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -215190,9 +215466,9 @@
       "id": "spring_mt_al",
       "name": "Spring Mt AL",
       "station_number": "540665",
-      "lat": -27.677,
-      "lon": 152.848,
-      "elevation_ahd": 71.02,
+      "lat": -27.677222,
+      "lon": 152.847778,
+      "elevation_ahd": 71.76,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -215974,9 +216250,9 @@
       "id": "springsure_creek_junction_al",
       "name": "Springsure Creek Junction AL",
       "station_number": "35276",
-      "lat": -23.856,
-      "lon": 148.504,
-      "elevation_ahd": 167.65,
+      "lat": -23.856389,
+      "lon": 148.503611,
+      "elevation_ahd": 164.64,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -216450,8 +216726,8 @@
       "id": "stannifer_rubicon",
       "name": "Stannifer (Rubicon)",
       "station_number": "556015",
-      "lat": -29.906,
-      "lon": 151.304,
+      "lat": -29.905833,
+      "lon": 151.304444,
       "elevation_ahd": 906.08,
       "elevation_source": "Elvis 5 m (NSW Government)",
       "roles": [
@@ -216510,9 +216786,9 @@
       "id": "steiglitz_wharf_al",
       "name": "Steiglitz Wharf AL",
       "station_number": "540295",
-      "lat": -27.745,
-      "lon": 153.354,
-      "elevation_ahd": -1.29,
+      "lat": -27.7451,
+      "lon": 153.353423,
+      "elevation_ahd": 1.53,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -216647,9 +216923,9 @@
       "id": "stewarts_bridge_al",
       "name": "Stewarts Bridge AL",
       "station_number": "539201",
-      "lat": -24.92,
-      "lon": 151.203,
-      "elevation_ahd": 241.51,
+      "lat": -24.919167,
+      "lon": 151.204167,
+      "elevation_ahd": 245.04,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -216736,9 +217012,9 @@
       "id": "stewarts_rd_al",
       "name": "Stewarts Rd AL",
       "station_number": "540377",
-      "lat": -27.7881,
-      "lon": 153.2689,
-      "elevation_ahd": 2.09,
+      "lat": -27.787868,
+      "lon": 153.268381,
+      "elevation_ahd": 2.65,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -217093,9 +217369,9 @@
       "id": "stoney_wharf_rd_al",
       "name": "Stoney Wharf Rd AL",
       "station_number": "540424",
-      "lat": -26.596,
-      "lon": 153.054,
-      "elevation_ahd": 1.47,
+      "lat": -26.596389,
+      "lon": 153.056667,
+      "elevation_ahd": 2.27,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -217547,9 +217823,9 @@
       "id": "storm_king_dam_inflow_al",
       "name": "Storm King Dam Inflow AL",
       "station_number": "541083",
-      "lat": -28.734,
-      "lon": 151.99,
-      "elevation_ahd": 878.37,
+      "lat": -28.734444,
+      "lon": 151.989722,
+      "elevation_ahd": 880.54,
       "elevation_source": "Elvis 50 cm (QLD Government)",
       "roles": [
         "field"
@@ -217788,9 +218064,9 @@
       "id": "strathpine_gympie_rd_al",
       "name": "Strathpine (Gympie Rd) AL",
       "station_number": "540625",
-      "lat": -27.316,
-      "lon": 153.0,
-      "elevation_ahd": 4.02,
+      "lat": -27.315556,
+      "lon": 153.000278,
+      "elevation_ahd": 3.13,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -217875,9 +218151,9 @@
       "id": "streeters_rd_al",
       "name": "Streeters Rd AL",
       "station_number": "539216",
-      "lat": -24.749,
-      "lon": 151.466,
-      "elevation_ahd": 236.04,
+      "lat": -24.749167,
+      "lon": 151.465556,
+      "elevation_ahd": 226.56,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -218744,9 +219020,9 @@
       "id": "sunny_park_al",
       "name": "Sunny Park AL",
       "station_number": "535088",
-      "lat": -22.992,
-      "lon": 147.463,
-      "elevation_ahd": 340.47,
+      "lat": -22.991667,
+      "lon": 147.463333,
+      "elevation_ahd": 341.02,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -219088,9 +219364,9 @@
       "id": "swan_vale_numeralla",
       "name": "Swan Vale (Numeralla)",
       "station_number": "56128",
-      "lat": -29.826,
-      "lon": 151.521,
-      "elevation_ahd": 967.57,
+      "lat": -29.826389,
+      "lon": 151.520833,
+      "elevation_ahd": 970.1,
       "elevation_source": "Elvis 5 m (NSW Government)",
       "roles": [
         "field"
@@ -219148,9 +219424,9 @@
       "id": "table_tops_al",
       "name": "Table Tops AL",
       "station_number": "539222",
-      "lat": -24.532,
-      "lon": 151.209,
-      "elevation_ahd": 564.26,
+      "lat": -24.532222,
+      "lon": 151.209444,
+      "elevation_ahd": 570.24,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -219513,15 +219789,17 @@
       "id": "tallai_al",
       "name": "Tallai AL",
       "station_number": "540287",
-      "lat": -28.067,
-      "lon": 153.296,
-      "elevation_ahd": 91.33,
+      "lat": -28.065844,
+      "lon": 153.313393,
+      "elevation_ahd": 368.13,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field",
         "repeater"
       ],
-      "radio_network_ids": [],
+      "radio_network_ids": [
+        "constitution_hill"
+      ],
       "catchment_ids": [
         "south_coast"
       ],
@@ -219538,9 +219816,9 @@
       "enabled": true,
       "notes": "",
       "repeater": {
-        "acma_licence": "",
-        "rx_mhz": null,
-        "tx_mhz": null,
+        "acma_licence": "433855",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
         "pass_ranges": [
           {
             "low": 2200,
@@ -219646,9 +219924,9 @@
       "id": "tallebudgera_ck_dam_al",
       "name": "Tallebudgera Ck Dam AL",
       "station_number": "540366",
-      "lat": -28.1789,
-      "lon": 153.3606,
-      "elevation_ahd": 68.69,
+      "lat": -28.17749,
+      "lon": 153.361733,
+      "elevation_ahd": 44.73,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -219784,9 +220062,9 @@
       "id": "tallebudgera_ck_mouth_al",
       "name": "Tallebudgera Ck Mouth AL",
       "station_number": "540577",
-      "lat": -28.0936,
-      "lon": 153.4603,
-      "elevation_ahd": 3.27,
+      "lat": -28.097081,
+      "lon": 153.460236,
+      "elevation_ahd": 4.64,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -220017,8 +220295,8 @@
       "name": "Tallegalla AL",
       "station_number": "40503",
       "lat": -27.6075,
-      "lon": 152.578056,
-      "elevation_ahd": 170.27,
+      "lon": 152.58,
+      "elevation_ahd": 175.65,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -220434,9 +220712,9 @@
       "id": "tanawha_al",
       "name": "Tanawha AL",
       "station_number": "540421",
-      "lat": -26.7067,
-      "lon": 153.0464,
-      "elevation_ahd": 15.84,
+      "lat": -26.7075,
+      "lon": 153.046944,
+      "elevation_ahd": 16.4,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -221448,9 +221726,9 @@
       "id": "tenthill_al",
       "name": "Tenthill AL",
       "station_number": "540152",
-      "lat": -27.636,
-      "lon": 152.214,
-      "elevation_ahd": 150.58,
+      "lat": -27.635833,
+      "lon": 152.214444,
+      "elevation_ahd": 145.22,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -222922,9 +223200,9 @@
       "id": "three_ways_al",
       "name": "Three Ways AL",
       "station_number": "540110",
-      "lat": -27.445,
-      "lon": 152.826,
-      "elevation_ahd": 335.44,
+      "lat": -27.445278,
+      "lon": 152.825833,
+      "elevation_ahd": 317.11,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -223159,10 +223437,10 @@
       "id": "tieri_al",
       "name": "Tieri AL",
       "station_number": "535089",
-      "lat": -23.046,
-      "lon": 148.369,
-      "elevation_ahd": 260.27,
-      "elevation_source": "Elvis 50 cm (Griffith Uni)",
+      "lat": -23.045833,
+      "lon": 148.369444,
+      "elevation_ahd": 259.99,
+      "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
       ],
@@ -223376,9 +223654,9 @@
       "id": "tingha_post_office",
       "name": "Tingha Post Office",
       "station_number": "56033",
-      "lat": -29.955,
-      "lon": 151.211,
-      "elevation_ahd": 784.38,
+      "lat": -29.954722,
+      "lon": 151.211111,
+      "elevation_ahd": 784.05,
       "elevation_source": "Elvis 5 m (NSW Government)",
       "roles": [
         "field"
@@ -223434,10 +223712,10 @@
       "id": "tomewin_al",
       "name": "Tomewin AL",
       "station_number": "540354",
-      "lat": -28.241,
-      "lon": 153.378,
-      "elevation_ahd": 314.16,
-      "elevation_source": "Elvis 1 m (QLD Government)",
+      "lat": -28.240608,
+      "lon": 153.377767,
+      "elevation_ahd": 336.83,
+      "elevation_source": "Elvis 1 m (NSW Government)",
       "roles": [
         "field"
       ],
@@ -223848,9 +224126,9 @@
       "id": "toorbul_donnybrook_rd_al",
       "name": "Toorbul (Donnybrook Rd) AL",
       "station_number": "540635",
-      "lat": -27.031,
-      "lon": 153.04,
-      "elevation_ahd": 1.99,
+      "lat": -27.031111,
+      "lon": 153.039722,
+      "elevation_ahd": 2.34,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -225183,9 +225461,9 @@
       "id": "tyungun_al",
       "name": "Tyungun AL",
       "station_number": "40376",
-      "lat": -28.087,
-      "lon": 153.159,
-      "elevation_ahd": 215.68,
+      "lat": -28.086667,
+      "lon": 153.159444,
+      "elevation_ahd": 213.61,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -225243,9 +225521,9 @@
       "id": "uabba_rd_al",
       "name": "Uabba Rd AL",
       "station_number": "544050",
-      "lat": -25.976,
-      "lon": 147.101,
-      "elevation_ahd": 493.0,
+      "lat": -25.975,
+      "lon": 147.099444,
+      "elevation_ahd": 495.99,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -225890,9 +226168,9 @@
       "id": "upper_caboolture_mcclure_rd_al",
       "name": "Upper Caboolture (McClure Rd) AL",
       "station_number": "540633",
-      "lat": -27.086,
+      "lat": -27.085556,
       "lon": 152.84,
-      "elevation_ahd": 162.86,
+      "elevation_ahd": 159.93,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -225950,9 +226228,9 @@
       "id": "upper_caboolture_al",
       "name": "Upper Caboolture AL",
       "station_number": "540357",
-      "lat": -27.0997,
-      "lon": 152.8911,
-      "elevation_ahd": 18.36,
+      "lat": -27.097778,
+      "lon": 152.891389,
+      "elevation_ahd": 23.16,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -226127,9 +226405,9 @@
       "id": "upper_claude_r_al",
       "name": "Upper Claude R AL",
       "station_number": "535086",
-      "lat": -24.474,
-      "lon": 146.965,
-      "elevation_ahd": 428.95,
+      "lat": -24.474167,
+      "lon": 146.964722,
+      "elevation_ahd": 431.94,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -226351,9 +226629,9 @@
       "id": "upper_doonan_al",
       "name": "Upper Doonan AL",
       "station_number": "540224",
-      "lat": -26.45,
-      "lon": 153.028,
-      "elevation_ahd": 20.32,
+      "lat": -26.450278,
+      "lon": 153.0275,
+      "elevation_ahd": 20.19,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -226561,9 +226839,9 @@
       "id": "upper_kedron_al",
       "name": "Upper Kedron AL",
       "station_number": "540466",
-      "lat": -27.41,
-      "lon": 152.923,
-      "elevation_ahd": 77.97,
+      "lat": -27.410278,
+      "lon": 152.9225,
+      "elevation_ahd": 82.68,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -226969,9 +227247,9 @@
       "id": "upper_retreat_al",
       "name": "Upper Retreat AL",
       "station_number": "535127",
-      "lat": -23.459,
-      "lon": 147.411,
-      "elevation_ahd": 457.23,
+      "lat": -23.445278,
+      "lon": 147.444167,
+      "elevation_ahd": 316.11,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -227235,10 +227513,10 @@
       "id": "upper_springbrook_al",
       "name": "Upper Springbrook AL",
       "station_number": "540400",
-      "lat": -28.23,
-      "lon": 153.28,
-      "elevation_ahd": 825.24,
-      "elevation_source": "Elvis 1 m (QLD Government)",
+      "lat": -28.231389,
+      "lon": 153.283611,
+      "elevation_ahd": 877.47,
+      "elevation_source": "Elvis 2 m (NSW Government)",
       "roles": [
         "field"
       ],
@@ -227477,9 +227755,9 @@
       "id": "upper_van_dyke_al",
       "name": "Upper Van Dyke AL",
       "station_number": "535087",
-      "lat": -24.501,
-      "lon": 147.845,
-      "elevation_ahd": 395.93,
+      "lat": -24.500833,
+      "lon": 147.844722,
+      "elevation_ahd": 394.04,
       "elevation_source": "Elvis 50 cm (Griffith Uni)",
       "roles": [
         "field"
@@ -227586,9 +227864,9 @@
       "id": "upper_warrego_al",
       "name": "Upper Warrego AL",
       "station_number": "535169",
-      "lat": -25.153,
+      "lat": -25.1525,
       "lon": 147.16,
-      "elevation_ahd": 556.41,
+      "elevation_ahd": 553.32,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -227713,9 +227991,9 @@
       "id": "upper_western_ck_al",
       "name": "Upper Western Ck AL",
       "station_number": "540667",
-      "lat": -27.681,
-      "lon": 152.434,
-      "elevation_ahd": 108.8,
+      "lat": -27.681389,
+      "lon": 152.434167,
+      "elevation_ahd": 108.62,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -228368,9 +228646,9 @@
       "id": "victoria_hill_al",
       "name": "Victoria Hill AL",
       "station_number": "541048",
-      "lat": -27.983,
-      "lon": 151.771,
-      "elevation_ahd": 417.04,
+      "lat": -27.983056,
+      "lon": 151.770556,
+      "elevation_ahd": 418.51,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -229320,8 +229598,8 @@
       "name": "Waller Rd AL",
       "station_number": "540692",
       "lat": -27.67,
-      "lon": 153.051,
-      "elevation_ahd": 23.53,
+      "lon": 153.051944,
+      "elevation_ahd": 23.38,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -229662,9 +229940,9 @@
       "id": "wamuran_eureka_ct_tm",
       "name": "Wamuran (Eureka Ct) TM",
       "station_number": "540793",
-      "lat": -27.058,
+      "lat": -27.059167,
       "lon": 152.88,
-      "elevation_ahd": 27.56,
+      "elevation_ahd": 27.85,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -229800,9 +230078,9 @@
       "id": "wamuran_al",
       "name": "Wamuran AL",
       "station_number": "540244",
-      "lat": -27.0022,
-      "lon": 152.8692,
-      "elevation_ahd": 46.14,
+      "lat": -27.047778,
+      "lon": 152.859444,
+      "elevation_ahd": 32.57,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -230026,9 +230304,9 @@
       "id": "wappa_dam_al",
       "name": "Wappa Dam AL",
       "station_number": "540462",
-      "lat": -26.57,
-      "lon": 152.922,
-      "elevation_ahd": 42.01,
+      "lat": -26.569722,
+      "lon": 152.921667,
+      "elevation_ahd": 44.88,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -230206,9 +230484,9 @@
       "id": "warana_br_al",
       "name": "Warana Br AL",
       "station_number": "540088",
-      "lat": -26.624,
-      "lon": 152.958,
-      "elevation_ahd": 13.01,
+      "lat": -26.622778,
+      "lon": 152.958333,
+      "elevation_ahd": 9.34,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -230966,9 +231244,9 @@
       "id": "washpool_al",
       "name": "Washpool AL",
       "station_number": "540195",
-      "lat": -27.829,
-      "lon": 152.755,
-      "elevation_ahd": 61.74,
+      "lat": -27.829167,
+      "lon": 152.755278,
+      "elevation_ahd": 62.31,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -231973,9 +232251,9 @@
       "id": "west_woombye_al",
       "name": "West Woombye AL",
       "station_number": "540419",
-      "lat": -26.662,
-      "lon": 152.924,
-      "elevation_ahd": 37.9,
+      "lat": -26.666944,
+      "lon": 152.918889,
+      "elevation_ahd": 35.22,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -232398,9 +232676,9 @@
       "id": "westwood_tm",
       "name": "Westwood TM",
       "station_number": "39349",
-      "lat": -23.626,
-      "lon": 150.155,
-      "elevation_ahd": 154.5,
+      "lat": -23.626389,
+      "lon": 150.154722,
+      "elevation_ahd": 153.85,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -232455,9 +232733,9 @@
       "id": "wharton_ck_al",
       "name": "Wharton Ck AL",
       "station_number": "535038",
-      "lat": -24.628,
-      "lon": 147.403,
-      "elevation_ahd": 372.76,
+      "lat": -24.628333,
+      "lon": 147.403056,
+      "elevation_ahd": 372.83,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
         "field"
@@ -233275,16 +233553,16 @@
       "id": "wilsons_peak_al",
       "name": "Wilsons Peak AL",
       "station_number": "40876",
-      "lat": -28.239,
-      "lon": 152.486,
-      "elevation_ahd": 835.45,
+      "lat": -28.237222,
+      "lon": 152.486667,
+      "elevation_ahd": 837.07,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
-        "balonne_condamine"
+        "logan_albert"
       ],
       "alert_ids": {
         "rainfall": 2194,
@@ -234033,9 +234311,9 @@
       "id": "wishart_greenwood_st_al",
       "name": "Wishart (Greenwood St) AL",
       "station_number": "540127",
-      "lat": -27.562,
-      "lon": 153.103,
-      "elevation_ahd": 21.91,
+      "lat": -27.561667,
+      "lon": 153.103056,
+      "elevation_ahd": 21.26,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -235018,9 +235296,9 @@
       "id": "wongawallan_al",
       "name": "Wongawallan AL",
       "station_number": "40341",
-      "lat": -27.879,
-      "lon": 153.214,
-      "elevation_ahd": 310.38,
+      "lat": -27.879444,
+      "lon": 153.213889,
+      "elevation_ahd": 309.99,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -235300,9 +235578,9 @@
       "id": "woodford_al_b",
       "name": "Woodford AL-B",
       "station_number": "540338",
-      "lat": -26.9383,
-      "lon": 152.76,
-      "elevation_ahd": 112.68,
+      "lat": -26.935278,
+      "lon": 152.761111,
+      "elevation_ahd": 116.18,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -236173,9 +236451,9 @@
       "id": "worongary_creek_al",
       "name": "Worongary Creek AL",
       "station_number": "540597",
-      "lat": -28.0589,
-      "lon": 153.3539,
-      "elevation_ahd": 4.19,
+      "lat": -28.059158,
+      "lon": 153.354217,
+      "elevation_ahd": 5.38,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -236689,9 +236967,9 @@
       "id": "wynnum_byrneside_tce_al",
       "name": "Wynnum (Byrneside Tce) AL",
       "station_number": "540278",
-      "lat": -27.442,
-      "lon": 153.171,
-      "elevation_ahd": 10.2,
+      "lat": -27.441667,
+      "lon": 153.170833,
+      "elevation_ahd": 9.79,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -237238,9 +237516,9 @@
       "id": "yandina_al",
       "name": "Yandina AL",
       "station_number": "540092",
-      "lat": -26.564,
-      "lon": 152.938,
-      "elevation_ahd": 15.21,
+      "lat": -26.562222,
+      "lon": 152.939167,
+      "elevation_ahd": 15.5,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -237379,9 +237657,9 @@
       "id": "yandina_ck_al",
       "name": "Yandina Ck AL",
       "station_number": "540223",
-      "lat": -26.527,
-      "lon": 153.021,
-      "elevation_ahd": 2.68,
+      "lat": -26.525556,
+      "lon": 153.021389,
+      "elevation_ahd": 5.32,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -238617,9 +238895,9 @@
       "id": "youngs_crossing_al",
       "name": "Youngs Crossing AL",
       "station_number": "540412",
-      "lat": -27.267,
-      "lon": 152.954,
-      "elevation_ahd": 17.27,
+      "lat": -27.266667,
+      "lon": 152.954167,
+      "elevation_ahd": 12.65,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -238831,9 +239109,9 @@
       "id": "zillmere_pineapple_st_al",
       "name": "Zillmere (Pineapple St) AL",
       "station_number": "540122",
-      "lat": -27.354,
-      "lon": 153.031,
-      "elevation_ahd": 16.51,
+      "lat": -27.354444,
+      "lon": 153.030833,
+      "elevation_ahd": 17.02,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
         "field"
@@ -238991,7 +239269,7 @@
       "satcom": {},
       "rm_system_id": null,
       "enabled": true,
-      "notes": "The base station at 18 Bateson and the sensors wired to its logger — a tipping bucket, two SDI-12 level sensors and the supply voltage. Not a gauging station and not network data: it is where MegaNet's ingest path is exercised live. Local channels post as station_number 999998 with a channel (s:999998/rain and so on); alert_id 8101 is the logger's ALERT2 self-test, which builds a real frame and feeds it to its own decoder. See logger/README.md and docs/live-end-to-end-test.md. No lat/lon on purpose — the site itself is on the map as 18_bateson. Not in stations.json, so document_managed is false and a stations load leaves it alone (0022). Retire with update meganet.station set deleted_at = now() where id = 'bateson_test'.",
+      "notes": "The base station at 18 Bateson and the sensors wired to its logger — a tipping bucket, two SDI-12 level sensors and the supply voltage. Not a gauging station and not network data: it is where Flood-Net's ingest path is exercised live. Local channels post as station_number 999998 with a channel (s:999998/rain and so on); alert_id 8101 is the logger's ALERT2 self-test, which builds a real frame and feeds it to its own decoder. See logger/README.md and docs/live-end-to-end-test.md. No lat/lon on purpose — the site itself is on the map as 18_bateson. Not in stations.json, so document_managed is false and a stations load leaves it alone (0022). Retire with update meganet.station set deleted_at = now() where id = 'bateson_test'.",
       "sensors": [
         {
           "alert_id": null,
@@ -244300,8 +244578,8 @@
       "id": "barongarook_tm",
       "name": "Barongarook TM",
       "station_number": "41491",
-      "lat": -28.43333,
-      "lon": 151.46667,
+      "lat": -28.431595,
+      "lon": 151.462293,
       "elevation_ahd": null,
       "roles": [
         "field"
@@ -251201,8 +251479,8 @@
       "id": "boonah_2",
       "name": "Boonah",
       "station_number": "40729",
-      "lat": -28.00333,
-      "lon": 152.68750,
+      "lat": -28.003976,
+      "lon": 152.687376,
       "elevation_ahd": null,
       "roles": [
         "field"
@@ -253822,8 +254100,8 @@
       "id": "bromelton_weir_hw_tm",
       "name": "Bromelton Weir HW TM",
       "station_number": "540270",
-      "lat": -28.00778,
-      "lon": 152.94500,
+      "lat": -28.00572,
+      "lon": 152.94523,
       "elevation_ahd": null,
       "roles": [
         "field"
@@ -253902,8 +254180,8 @@
       "id": "bromelton_weir_tw_tm",
       "name": "Bromelton Weir TW TM",
       "station_number": "540271",
-      "lat": -28.00778,
-      "lon": 152.94500,
+      "lat": -28.004338,
+      "lon": 152.945921,
       "elevation_ahd": null,
       "roles": [
         "field"
@@ -296266,8 +296544,8 @@
       "id": "kiamba_tm",
       "name": "Kiamba TM",
       "station_number": "540263",
-      "lat": -26.59944,
-      "lon": 152.90389,
+      "lat": -26.5898,
+      "lon": 152.9041,
       "elevation_ahd": null,
       "roles": [
         "field"
@@ -296284,7 +296562,7 @@
       },
       "rm_system_id": 1,
       "enabled": true,
-      "notes": "",
+      "notes": "Position from state gauge 141001A (South Maroochy River at Kiamba), this station's AWRC number, in Oct 2026. The Bureau's lists put it in a paddock 1 km south.",
       "hub_id": "brisbane",
       "awrc_number": "141001",
       "stream": "SOUTH MAROOCHY RIVER",
@@ -305473,8 +305751,8 @@
       "id": "maroon_dam_inflow_tm",
       "name": "Maroon Dam Inflow TM",
       "station_number": "540407",
-      "lat": -28.22194,
-      "lon": 152.60750,
+      "lat": -28.219643,
+      "lon": 152.608486,
       "elevation_ahd": null,
       "roles": [
         "field"
@@ -334217,8 +334495,8 @@
       "id": "tallebudgera_ck_rd_tm",
       "name": "Tallebudgera Ck Rd TM",
       "station_number": "540355",
-      "lat": -28.15222,
-      "lon": 153.40083,
+      "lat": -28.149684,
+      "lon": 153.402367,
       "elevation_ahd": null,
       "roles": [
         "field"
@@ -353453,6 +353731,535 @@
       ],
       "flood_peaks_from": "gatton",
       "flood_peaks_gauge": "40444"
+    },
+    {
+      "id": "glenore_grove_billabong_laidley_ck",
+      "name": "Glenore Grove Billabong (Laidley Ck)",
+      "station_number": "540859",
+      "station_type": "auto_water_level",
+      "lat": -27.52808,
+      "lon": 152.40297,
+      "elevation_ahd": 74.73,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "owner": "Lockyer Valley Regional Council",
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "brisbane"
+      ],
+      "alert_ids": {
+        "rainfall": 4082,
+        "battery": 4084,
+        "water_level": 4083
+      },
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Location not known — this position is a best guess on Laidley Creek at Glenore Grove. Update it when the site's coordinates are confirmed.",
+      "sensors": [
+        {
+          "alert_id": 4082,
+          "type": "Rainfall",
+          "sensor_id": "540859.0.R.4082",
+          "device_id": null
+        },
+        {
+          "alert_id": 4082,
+          "type": "Rainfall Increment",
+          "sensor_id": "540859.0.R.4082",
+          "device_id": null
+        },
+        {
+          "alert_id": 4083,
+          "type": "Water Level",
+          "sensor_id": "540859.0.H.4083",
+          "device_id": null
+        },
+        {
+          "alert_id": 4084,
+          "type": "Battery",
+          "sensor_id": "540859.0.B.4084",
+          "device_id": null
+        }
+      ],
+      "lga": "Lockyer Valley Regional",
+      "basin": "Brisbane River",
+      "hub_id": "brisbane",
+      "location_types": [
+        "Rain Gauge",
+        "Water Level"
+      ],
+      "stream": "LAIDLEY CREEK"
+    },
+    {
+      "id": "mulgowie_west_overflow_laidley_ck",
+      "name": "Mulgowie West Overflow (Laidley Ck)",
+      "station_number": "540857",
+      "station_type": "auto_water_level",
+      "lat": -27.727242,
+      "lon": 152.359386,
+      "elevation_ahd": 137.96,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "owner": "Lockyer Valley Regional Council",
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "brisbane"
+      ],
+      "alert_ids": {
+        "rainfall": 4085,
+        "battery": 4087,
+        "water_level": 4086
+      },
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Location not known — this position was carried over from an earlier placeholder for this site, on Laidley Creek's west bank at Mulgowie. Update it when the site's coordinates are confirmed.",
+      "sensors": [
+        {
+          "alert_id": 4085,
+          "type": "Rainfall",
+          "sensor_id": "540857.0.R.4085",
+          "device_id": null
+        },
+        {
+          "alert_id": 4085,
+          "type": "Rainfall Increment",
+          "sensor_id": "540857.0.R.4085",
+          "device_id": null
+        },
+        {
+          "alert_id": 4086,
+          "type": "Water Level",
+          "sensor_id": "540857.0.H.4086",
+          "device_id": null
+        },
+        {
+          "alert_id": 4087,
+          "type": "Battery",
+          "sensor_id": "540857.0.B.4087",
+          "device_id": null
+        }
+      ],
+      "lga": "Lockyer Valley Regional",
+      "basin": "Brisbane River",
+      "hub_id": "brisbane",
+      "location_types": [
+        "Rain Gauge",
+        "Water Level"
+      ],
+      "stream": "LAIDLEY CREEK"
+    },
+    {
+      "id": "pike_st_lagoon_ck_laidley_ck",
+      "name": "Pike St Lagoon Ck (Laidley Ck)",
+      "station_number": "540858",
+      "station_type": "auto_water_level",
+      "lat": -27.62777,
+      "lon": 152.3925,
+      "elevation_ahd": 98.62,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "owner": "Lockyer Valley Regional Council",
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "brisbane"
+      ],
+      "alert_ids": {
+        "rainfall": 4088,
+        "battery": 4090,
+        "water_level": 4089
+      },
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Location not known — this position is where Pike St meets Lagoon Creek on the street map. Update it when the site's coordinates are confirmed.",
+      "sensors": [
+        {
+          "alert_id": 4088,
+          "type": "Rainfall",
+          "sensor_id": "540858.0.R.4088",
+          "device_id": null
+        },
+        {
+          "alert_id": 4088,
+          "type": "Rainfall Increment",
+          "sensor_id": "540858.0.R.4088",
+          "device_id": null
+        },
+        {
+          "alert_id": 4089,
+          "type": "Water Level",
+          "sensor_id": "540858.0.H.4089",
+          "device_id": null
+        },
+        {
+          "alert_id": 4090,
+          "type": "Battery",
+          "sensor_id": "540858.0.B.4090",
+          "device_id": null
+        }
+      ],
+      "lga": "Lockyer Valley Regional",
+      "basin": "Brisbane River",
+      "hub_id": "brisbane",
+      "location_types": [
+        "Rain Gauge",
+        "Water Level"
+      ],
+      "stream": "LAIDLEY CREEK"
+    },
+    {
+      "id": "alexander_st_laidley_ck",
+      "name": "Alexander St (Laidley Ck)",
+      "station_number": "540856",
+      "station_type": "auto_water_level",
+      "lat": -27.626082,
+      "lon": 152.385557,
+      "elevation_ahd": 98.64,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "owner": "Lockyer Valley Regional Council",
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "brisbane"
+      ],
+      "alert_ids": {
+        "rainfall": 4091,
+        "battery": 4094,
+        "water_level": 4092
+      },
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Location not known — this position was carried over from an earlier placeholder for this site, where Alexander St meets Laidley Creek. Update it when the site's coordinates are confirmed.",
+      "sensors": [
+        {
+          "alert_id": 4091,
+          "type": "Rainfall",
+          "sensor_id": "540856.0.R.4091",
+          "device_id": null
+        },
+        {
+          "alert_id": 4091,
+          "type": "Rainfall Increment",
+          "sensor_id": "540856.0.R.4091",
+          "device_id": null
+        },
+        {
+          "alert_id": 4092,
+          "type": "Water Level",
+          "sensor_id": "540856.0.H.4092",
+          "device_id": null
+        },
+        {
+          "alert_id": 4094,
+          "type": "Battery",
+          "sensor_id": "540856.0.B.4094",
+          "device_id": null
+        }
+      ],
+      "lga": "Lockyer Valley Regional",
+      "basin": "Brisbane River",
+      "hub_id": "brisbane",
+      "location_types": [
+        "Rain Gauge",
+        "Water Level"
+      ],
+      "stream": "LAIDLEY CREEK"
+    },
+    {
+      "id": "alexander_st_overflow_laidley_ck",
+      "name": "Alexander St Overflow (Laidley Ck)",
+      "station_number": "540855",
+      "station_type": "auto_water_level",
+      "lat": -27.626082,
+      "lon": 152.385557,
+      "elevation_ahd": 98.64,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "owner": "Lockyer Valley Regional Council",
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "brisbane"
+      ],
+      "alert_ids": {
+        "water_level": 4093
+      },
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Location not known — shown at Alexander St (540856): it reports no battery, so it is likely on that station's logger. Update it when the site's coordinates are confirmed.",
+      "sensors": [
+        {
+          "alert_id": 4093,
+          "type": "Water Level",
+          "sensor_id": "540855.0.H.4093",
+          "device_id": null
+        }
+      ],
+      "lga": "Lockyer Valley Regional",
+      "basin": "Brisbane River",
+      "hub_id": "brisbane",
+      "location_types": [
+        "Water Level"
+      ],
+      "stream": "LAIDLEY CREEK"
+    },
+    {
+      "id": "cogcc_carrara_base",
+      "name": "CoGCC Carrara Base Station",
+      "station_number": "",
+      "lat": -28.036938,
+      "lon": 153.354441,
+      "elevation_ahd": 5.35,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "owner": "City of Gold Coast",
+      "roles": [
+        "base"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "south_coast"
+      ],
+      "alert_ids": {},
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Base station at the end of radio paths in the Bureau's 2024 FldWarn KMZ, where its pin was placed by hand. Added Oct 2026.",
+      "hub_id": "brisbane",
+      "frequencies": [
+        {
+          "rx_mhz": 151.5,
+          "label": "Heard on, per the 2024 FldWarn KMZ paths"
+        }
+      ]
+    },
+    {
+      "id": "cogcc_ashmore_base",
+      "name": "CoGCC Ashmore Base Station",
+      "station_number": "",
+      "lat": -27.982382,
+      "lon": 153.391143,
+      "elevation_ahd": 18.21,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "owner": "City of Gold Coast",
+      "roles": [
+        "base"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "south_coast"
+      ],
+      "alert_ids": {},
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Base station at the end of radio paths in the Bureau's 2024 FldWarn KMZ, where its pin was placed by hand. Added Oct 2026.",
+      "hub_id": "brisbane",
+      "frequencies": [
+        {
+          "rx_mhz": 151.5,
+          "label": "Heard on, per the 2024 FldWarn KMZ paths"
+        }
+      ]
+    },
+    {
+      "id": "cogcc_bundall_base",
+      "name": "CoGCC Bundall Base Station",
+      "station_number": "",
+      "lat": -27.999924,
+      "lon": 153.412267,
+      "elevation_ahd": 3.87,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "owner": "City of Gold Coast",
+      "roles": [
+        "base"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "south_coast"
+      ],
+      "alert_ids": {},
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Base station at the end of radio paths in the Bureau's 2024 FldWarn KMZ, where its pin was placed by hand. Added Oct 2026.",
+      "hub_id": "brisbane",
+      "frequencies": [
+        {
+          "rx_mhz": 151.5,
+          "label": "Heard on, per the 2024 FldWarn KMZ paths"
+        }
+      ]
+    },
+    {
+      "id": "mt_stapylton_base",
+      "name": "BoM Mt Stapylton Base Station",
+      "station_number": "",
+      "lat": -27.717738,
+      "lon": 153.23995,
+      "elevation_ahd": 150.21,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "roles": [
+        "base"
+      ],
+      "radio_network_ids": [
+        "mt_stapylton"
+      ],
+      "catchment_ids": [
+        "logan_albert"
+      ],
+      "alert_ids": {},
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Base station at the end of radio paths in the Bureau's 2024 FldWarn KMZ, where its pin was placed by hand. Added Oct 2026.",
+      "hub_id": "brisbane",
+      "frequencies": [
+        {
+          "rx_mhz": 151.95,
+          "label": "Heard on, per the 2024 FldWarn KMZ paths"
+        }
+      ]
+    },
+    {
+      "id": "srrc_base",
+      "name": "SRRC Base Station",
+      "station_number": "",
+      "lat": -27.987301,
+      "lon": 152.995318,
+      "elevation_ahd": 47.62,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "owner": "Scenic Rim Regional Council",
+      "roles": [
+        "base"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "logan_albert"
+      ],
+      "alert_ids": {},
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Base station at the end of radio paths in the Bureau's 2024 FldWarn KMZ, where its pin was placed by hand. Added Oct 2026.",
+      "hub_id": "brisbane",
+      "frequencies": [
+        {
+          "rx_mhz": 152.4,
+          "label": "Heard on, per the 2024 FldWarn KMZ paths"
+        }
+      ]
+    },
+    {
+      "id": "murweh_shire_base",
+      "name": "Murweh Shire Base Station",
+      "station_number": "",
+      "lat": -26.400262,
+      "lon": 146.240866,
+      "elevation_ahd": 295.22,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "owner": "Murweh Shire Council",
+      "roles": [
+        "base"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "warrego"
+      ],
+      "alert_ids": {},
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Base station at the end of radio paths in the Bureau's 2024 FldWarn KMZ, where its pin was placed by hand. Added Oct 2026.",
+      "hub_id": "brisbane",
+      "frequencies": [
+        {
+          "rx_mhz": 151.5,
+          "label": "Heard on, per the 2024 FldWarn KMZ paths"
+        }
+      ]
+    },
+    {
+      "id": "dalby_base_station",
+      "name": "Dalby Base Station",
+      "station_number": "41555",
+      "lat": -27.187778,
+      "lon": 151.269722,
+      "elevation_ahd": 342.33,
+      "elevation_source": "Elvis 1 m (QLD Government)",
+      "roles": [
+        "base"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "balonne_condamine"
+      ],
+      "alert_ids": {},
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "In the Bureau's 2024 FldWarn KMZ as DALBY BASE STATION ALERT (041555), with no type or paths. Added Oct 2026.",
+      "hub_id": "brisbane"
     }
   ]
 }
