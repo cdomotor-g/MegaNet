@@ -1495,8 +1495,9 @@ const MapLatency = (() => {
 
   // One station's pulse: its own flare, then a leg along each of its links,
   // each node flaring as the spark lands on it — the logo's rule. Times are
-  // from the start; the positions are lat/lngs, so a pan or a zoom mid-pulse
-  // keeps it on its links.
+  // from the start. Where each part is drawn is looked up again every frame
+  // (pinAt, legNow): a pan or a zoom mid-pulse keeps it on its links, and a
+  // station moved since keeps its glow.
   function route(id) {
     const g = graphNow();
     const m = pinFor(id);
@@ -1512,7 +1513,7 @@ const MapLatency = (() => {
       const dur = Math.max(LEG_MIN, Math.min(LEG_MAX, 1000 * px / SPEED));
       // The trail drains into the far node at the spark's speed — on a link
       // shorter than the trail, no longer than the run itself.
-      legs.push({ a: e.from, b: e.to, start, dur, tail: Math.min(dur, dur * TRAIL_PX / Math.max(1, px)), to: e.toId, fromId: e.fromId, key: e.line });
+      legs.push({ a: e.from, b: e.to, start, dur, tail: Math.min(dur, dur * TRAIL_PX / Math.max(1, px)), to: e.toId, fromId: e.fromId });
       const end = start + dur;
       if (!reached.has(e.toId) || reached.get(e.toId) > end) {
         reached.set(e.toId, end);
@@ -1545,6 +1546,19 @@ const MapLatency = (() => {
     legs.forEach(l => { l.end = still ? STILL_MS : l.start + l.dur + l.tail; });
     const anim = Math.max(still ? STILL_MS : FLARE_MS, ...kept.map(n => n.end), ...legs.map(l => l.end));
     return { id, nodes: kept, legs, anim, life: anim + GLOW_HOLD + GLOW_FADE, still };
+  }
+
+  // Where a pulse's station or link is drawn now, or null once it is not. A
+  // pulse keeps the ids it ran between, not only where they stood when the
+  // message landed: a rebuild since can have moved a station (Move pin) or
+  // fanned its pin out of a stack, and its ring and its links' glow belong
+  // round the pin as drawn, not on the spot it left.
+  function pinAt(id) { const m = pinFor(id); return m ? m.getLatLng() : null; }
+  function legNow(l) {
+    const g = graphNow();
+    for (const e of g.field.get(l.fromId) || []) if (e.toId === l.to) return e;
+    for (const e of g.bb.get(l.fromId) || []) if (e.toId === l.to) return e;
+    return null;
   }
 
   function fire(id) {
@@ -1667,33 +1681,36 @@ const MapLatency = (() => {
     const at = ll => { const q = map.latLngToLayerPoint(ll); return [q.x - porigin.x, q.y - porigin.y]; };
     pctx.lineCap = 'round';
     // The afterglow under everything: each link and node once, at the
-    // brightest any pulse leaves it.
+    // brightest any pulse leaves it — a link by the line drawn for it now, so
+    // one lit before a rebuild and again after it glows once.
     const legGlow = new Map(), nodeGlow = new Map();
     for (const p of pulses) {
       const e0 = t - p.t0;
       for (const l of p.legs) {
         const g = glowAt(e0 - l.end);
-        if (g > (legGlow.has(l.key) ? legGlow.get(l.key).g : 0)) legGlow.set(l.key, { l, g });
+        const e = g > 0 ? legNow(l) : null;
+        if (e && g > (legGlow.has(e.line) ? legGlow.get(e.line).g : 0)) legGlow.set(e.line, { e, g });
       }
       for (const n of p.nodes) {
         const g = glowAt(e0 - n.end);
         if (g > (nodeGlow.has(n.id) ? nodeGlow.get(n.id).g : 0)) nodeGlow.set(n.id, { n, g });
       }
     }
-    // Off the pins as they are now: a rebuild since can have hidden one (a
-    // filter) or resized it (a band), and a glow round nothing says nothing.
+    // Off the pins and links as they are now: a rebuild since can have hidden
+    // one (a filter), resized it (a band) or moved it (Move pin), and a glow
+    // round nothing, or round where a station used to stand, says nothing.
     const radius = id => { const m = pinFor(id); return m ? m.options.radius || 6 : null; };
-    legGlow.forEach(({ l, g }) => {
-      const ra = radius(l.fromId), rb = radius(l.to);
+    legGlow.forEach(({ e, g }) => {
+      const ra = radius(e.fromId), rb = radius(e.toId);
       if (ra == null || rb == null) return;
-      const [ax, ay] = at(l.a), [bx, by] = at(l.b);
+      const [ax, ay] = at(e.from), [bx, by] = at(e.to);
       const len = Math.hypot(bx - ax, by - ay);
       if (len > 1) stroke(ax, ay, bx, by, len, ra + 3, len - rb - 3, 'glow', g);
     });
     nodeGlow.forEach(({ n, g }) => {
       const r = radius(n.id);
       if (r == null) return;
-      const [x, y] = at(n.ll);
+      const [x, y] = at(pinAt(n.id));
       ring(x, y, r, g);
     });
     // The links first and the nodes over them, as the logo stacks them.
@@ -1703,7 +1720,8 @@ const MapLatency = (() => {
       for (const l of p.legs) {
         const e = p.still ? 0 : e0 - l.start;
         if (e < 0 || e > l.dur + l.tail) continue;
-        const [ax, ay] = at(l.a), [bx, by] = at(l.b);
+        const now = legNow(l);
+        const [ax, ay] = at(now ? now.from : l.a), [bx, by] = at(now ? now.to : l.b);
         const len = Math.hypot(bx - ax, by - ay);
         if (len < 1) continue;
         if (p.still) { stroke(ax, ay, bx, by, len, 0, len, 'trail'); continue; }
@@ -1717,7 +1735,7 @@ const MapLatency = (() => {
       for (const n of p.nodes) {
         const f = p.still ? (e0 >= 0 && e0 < STILL_MS ? [0.9, 1] : null) : flareAt(e0 - n.start);
         if (!f) continue;
-        const [x, y] = at(n.ll);
+        const [x, y] = at(pinAt(n.id) || n.ll);
         flare(x, y, n.r, f[0], f[1]);
       }
     }

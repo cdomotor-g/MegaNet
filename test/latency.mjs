@@ -36,7 +36,8 @@
 //      on again, the focus kept on it; the view turned on from all off brings
 //      the animation back; ⏱️ in the strip beating green behind its icon
 //      while the animation is on; and once the pulse has played, the station
-//      and its link still glowing green on the canvas, for a minute.
+//      and its link still glowing green on the canvas, for a minute — and
+//      going with the station when it is moved, the spot it left clear.
 //   6. **One colouring at a time** — Colour pins by health turns latency off,
 //      and latency turns health off; the 🔑 legend carries whichever is on.
 //   7. **No data, honestly** — a datastore that cannot be reached: the pane
@@ -425,6 +426,34 @@ try {
     const green = c => c[3] > 60 && c[1] > c[0] + 60 && c[1] > c[2];
     check('once the pulse has played, its station keeps a green ring — the pin inside it left clear — and its link a green glow',
       glow.glowing && green(glow.ring) && glow.inside[3] < 40 && green(glow.link), J(glow));
+    // Moved while it glows — Move pin's save rebuilds the map with the station
+    // somewhere else: the ring and the link's glow go with the pin, and the
+    // spot it left is clear. Across the link, so the new one misses the old spot.
+    const moved = await page.evaluate(async id => {
+      const s = state.data.stations.find(x => x.id === id);
+      const was = [s.lat, s.lon];
+      const cv = document.querySelector('.lat-pulse-canvas');
+      const dpr = window.devicePixelRatio || 1;
+      const px = (x, y) => Array.from(cv.getContext('2d').getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data);
+      const p0 = state.map.latLngToContainerPoint(was);
+      const q = state.map.latLngToContainerPoint(state.mapLines.find(x => x.mnLinkRole === 'core' && x.mnLinkStationId === id).getLatLngs()[1]);
+      const d = Math.hypot(q.x - p0.x, q.y - p0.y) || 1;
+      const to = state.map.containerPointToLatLng([p0.x - 50 * (q.y - p0.y) / d, p0.y + 50 * (q.x - p0.x) / d]);
+      s.lat = to.lat; s.lon = to.lng;
+      refreshMapLayers({ skipFit: true });
+      await new Promise(r => setTimeout(r, 400));     // a glow beat past the rebuild
+      const m = state.mapMarkers.find(x => x.mnStationId === id);
+      const p = state.map.latLngToContainerPoint([s.lat, s.lon]);
+      const R = m.options.radius + 3;
+      const f = Math.max(0.3, (R + 16) / Math.hypot(q.x - p.x, q.y - p.y));
+      const out = { ring: px(p.x + R, p.y), old: px(p0.x + R, p0.y), oldOther: px(p0.x - R, p0.y),
+                    link: px(p.x + (q.x - p.x) * f, p.y + (q.y - p.y) * f) };
+      s.lat = was[0]; s.lon = was[1];
+      refreshMapLayers({ skipFit: true });
+      return out;
+    }, pick.id);
+    check('…and a station moved while it glows takes its ring and its link\'s glow with it, leaving the old spot clear',
+      green(moved.ring) && green(moved.link) && moved.old[3] < 40 && moved.oldOther[3] < 40, J(moved));
     check('…held, then faded: a minute after the animation ends', got.route && got.route.life - got.route.anim === 60000,
       J(got.route && { anim: got.route.anim, life: got.route.life }));
   }
