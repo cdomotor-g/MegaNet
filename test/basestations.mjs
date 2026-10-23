@@ -305,7 +305,7 @@ try {
     const g = JSON.parse(JSON.stringify(f));
     g.name = 'Mt Stuart'; g.freq = '151.6250'; g.gain = 'auto';
     g['s:' + stick1] = { name: 'North stick', freq: '', format: '', gain: '', on: true };
-    g['s:' + odd] = Object.assign({}, g['s:' + odd], { freq: '' });
+    g['s:' + odd] = Object.assign({}, g['s:' + odd], { freq: '', rate: '240000' });
     const changed = B._patchFrom(cfg, g, rx);
     const bad = B._patchFrom(cfg, Object.assign({}, f, { freq: '2000' }), rx);
     return {
@@ -352,9 +352,9 @@ try {
       && Object.keys(p).sort().join() === 'name,receivers' && Object.keys(p.receivers.sdr).sort().join() === 'freqHz,gainDb',
     JSON.stringify(p));
   const devs = (p.receivers || {}).sdrDevices || [];
-  ok('…each stick\'s own settings rebuilt as the station builds them, keeping what the form does not show',
+  ok('…each stick\'s own settings rebuilt as the station builds them, keeping what the form does not show — its window too',
     devs.length === 2 && devs.some(d => d.key === STICK_1 && d.name === 'North stick' && Object.keys(d).length === 2)
-      && devs.some(d => d.key === ODD_KEY && d.name === 'Second stick' && d.ppm === 3 && d.freqHz === undefined),
+      && devs.some(d => d.key === ODD_KEY && d.name === 'Second stick' && d.ppm === 3 && d.freqHz === undefined && d.sampleRate === 240000),
     JSON.stringify(devs));
   ok('a last update run that found nothing to install says when, not the release the station saw then',
     /^nothing newer when it checked \d+ (h|min) ago$/.test(pure.lastInstall[0]) && !/0\.9\.0/.test(pure.lastInstall[0]), pure.lastInstall[0]);

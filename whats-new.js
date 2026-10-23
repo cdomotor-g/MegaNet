@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 93, date: '2026-10-23', items: [
+      'On the <strong>Base Stations</strong> tab\'s settings, each RTL-SDR stick has a <em>Window</em> — the slice of the band '
+        + 'it hears: automatic (the narrowest that holds its channels, and the lightest for the Pi) or one you choose, now with '
+        + '1.44 MHz, which holds all four ALERT channels for a fifth less work than 1.92.',
+    ] },
     { n: 92, date: '2026-10-23', items: [
       '<strong>Base station connections</strong>, on the Admin tab: how each base station\'s connection has been over the '
         + 'last week, month or quarter — its uptime, dropouts and restarts, the longest gap, how long it has been connected and '

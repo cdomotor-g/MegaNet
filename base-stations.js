@@ -68,6 +68,11 @@ const BaseStations = (function () {
 
   const LIST_MS = 30000, BUSY_MS = 3000, IDLE_MS = 15000, WATCH_MS = 60000;
   const FORMATS = { BINARY: 'ALERT Binary', ENHANCED_IFLOWS: 'Enhanced iFLOWS', ASCII: 'ALERT ASCII' };
+  // A stick's window — its sample rate — as RPi ALERT 0.15 takes them (its
+  // web/sdr-plan.js RATES): the slice of the band it hears, and its cost, since
+  // each channel's decoder works through the whole of it. Set here, exactly
+  // that one; automatic, the narrowest that holds the stick's channels.
+  const WINDOWS = [['240000', '240 kHz — the lightest'], ['960000', '960 kHz'], ['1200000', '1.2 MHz'], ['1440000', '1.44 MHz'], ['1920000', '1.92 MHz'], ['2400000', '2.4 MHz']];
   const VERBS = {
     status: 'send its whole status', log: 'show its log', 'config.set': 'change settings',
     'device.restart': 'restart a receiver', 'device.rescan': 'look for receivers', 'device.forget': 'remove an unplugged receiver',
@@ -433,7 +438,7 @@ const BaseStations = (function () {
     for (const r of rx.filter(x => x.kind === 'sdr')) {
       const e = own.find(o => o.key === r.key) || {};
       f['s:' + r.key] = { name: e.name || '', freq: e.freqHz ? (e.freqHz / 1e6).toFixed(4) : '', format: e.format || '',
-        gain: e.gainDb === undefined ? '' : e.gainDb === null ? 'auto' : String(e.gainDb), on: e.enabled !== false };
+        gain: e.gainDb === undefined ? '' : e.gainDb === null ? 'auto' : String(e.gainDb), rate: e.sampleRate === undefined ? '' : String(e.sampleRate), on: e.enabled !== false };
     }
     return f;
   }
@@ -475,11 +480,12 @@ const BaseStations = (function () {
         for (const r of sticks) {
           const v = f['s:' + r.key] || {}, before = (((cfg.receivers || {}).sdrDevices) || []).find(e => e.key === r.key) || {};
           const e = Object.assign({}, before, { key: r.key });
-          for (const k of ['name', 'freqHz', 'format', 'gainDb', 'enabled']) delete e[k];
+          for (const k of ['name', 'freqHz', 'format', 'gainDb', 'sampleRate', 'enabled']) delete e[k];
           if (v.name && v.name.trim()) e.name = v.name.trim();
           if (v.freq && v.freq.trim()) e.freqHz = Math.round(num(v.freq, r.name + ': a frequency of 24–1766 MHz', 24, 1766) * 1e6);
           if (v.format) e.format = v.format;
           if (v.gain && v.gain.trim()) e.gainDb = /^(auto|agc)$/i.test(v.gain.trim()) ? null : num(v.gain, r.name + ': a gain of 0–60 dB, or auto', 0, 60);
+          if (v.rate !== undefined && v.rate !== '') e.sampleRate = Number(v.rate);
           if (v.on === false) e.enabled = false;
           if (Object.keys(e).length > 1) listOut.push(e);
         }
@@ -529,7 +535,7 @@ const BaseStations = (function () {
         ${inp('gain', 'Gain, dB (or auto)')}
         ${inp('ppm', 'Correction, ppm', ' inputmode="numeric"')}
         ${inp('squelch', 'Squelch, dB', ' inputmode="numeric"')}
-        ${sel('rate', 'Sample rate', [['0', 'Automatic'], ['240000', '240 ksps'], ['960000', '960 ksps'], ['1200000', '1.2 Msps'], ['1920000', '1.92 Msps'], ['2400000', '2.4 Msps']])}
+        ${sel('rate', 'Window', [['0', 'Automatic — the narrowest that holds the channels']].concat(WINDOWS))}
       </div>
       ${sticks.length ? `<h4>Each stick <span class="small qs-dim">(blank: as above)</span></h4>${sticks.map(r => {
         const v = f['s:' + r.key] || {};
@@ -541,6 +547,7 @@ const BaseStations = (function () {
           <label>Frequency, MHz <input type="text" inputmode="decimal" value="${esc(v.freq)}" placeholder="${esc(f.freq)}" oninput="BaseStations.stick('${k}', 'freq', this.value)"></label>
           <label>Format <select onchange="BaseStations.stick('${k}', 'format', this.value)"><option value="">As above</option>${Object.entries(FORMATS).map(([fv, t]) => `<option value="${fv}"${v.format === fv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
           <label>Gain, dB <input type="text" value="${esc(v.gain)}" placeholder="${esc(f.gain)}" oninput="BaseStations.stick('${k}', 'gain', this.value)"></label>
+          <label>Window <select onchange="BaseStations.stick('${k}', 'rate', this.value)"><option value="">As above</option>${[['0', 'Automatic']].concat(WINDOWS).map(([wv, t]) => `<option value="${wv}"${v.rate === wv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
           <label class="ser-check"><input type="checkbox"${v.on !== false ? ' checked' : ''} onchange="BaseStations.stick('${k}', 'on', this.checked)"> Use this stick</label>
         </div></fieldset>`;
       }).join('')}` : ''}
