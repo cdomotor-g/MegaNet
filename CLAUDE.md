@@ -31,6 +31,12 @@
 - Batch related edits into one push where you can. Each push touching the app starts a ~20-minute run, and a newer push cancels the older one, so a burst of small pushes wastes both.
 - Pushes that touch only `CLAUDE.md`, `roadmap/**`, or `data/` files not listed in the smoke filter do not start the smoke test.
 
+## Version stamp — bump it with every app change
+- Every script, stylesheet and icon the pages load carries one stamp, `?v=<date><letter>` (e.g. `?v=20261022g`), and the service worker (`sw.js`) serves a stamped file from the copy it kept. A change pushed under an unchanged stamp never reaches anyone who has opened Flood-Net before, however often they refresh.
+- So every push that changes a root `*.js` (`sw.js` and `whats-new.js` included), `styles.css`, `index.html` or a stamped file under `assets/` also bumps the stamp: today's date plus `a`, or the next letter if the stamp already has today's date (`20261022g` → `20261022h`; the next day, `20261023a`). Replace every occurrence at once in `index.html`, `about.html`, `privacy.html` and `terms.html`:
+  `sed -i 's/v=20261022g/v=20261022h/g' index.html about.html privacy.html terms.html`
+- Bump it last, after `git pull --rebase origin main`, from the stamp `main` has now, because another thread may have moved it since you started. If a rejected push makes you rebase again and the stamp in the new `main` is not the one you bumped from, bump again from the new one. To check, run `grep -o 'v=20[0-9]*[a-z]*' index.html | sort | uniq -c`. It should show a single stamp, the one you set.
+
 ## Naming — the app is Flood-Net
 - In anything a person reads — labels, messages, help, page titles, exported file contents, the agent API, docs — the product is **Flood-Net**, and downloads are named `floodnet-…`. Never write "MegaNet" there.
 - The repository keeps its earlier name, MegaNet, and so do identifiers nobody reads as a name: the `meganet` schema, storage keys, MQTT topics, the Worker and R2 bucket, the Pi's service names and the Quansheng station-table tag. Code comments still say MegaNet; don't copy it into a string.

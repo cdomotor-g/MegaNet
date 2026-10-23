@@ -35,7 +35,9 @@ See [`docs/agent-api.md`](../docs/agent-api.md).
 - Process rules are in `CLAUDE.md` (summarised in `AGENTS.md`): ask the owner
   when instructions conflict; patches go straight to `main`; issue titles carry
   `[Standalone|Epic|Sub-issue of #n]` and `[Model/Effort]` or `[Human]` tags;
-  update `roadmap/roadmap-113.md` whenever issues change.
+  update `roadmap/roadmap-113.md` whenever issues change; and every app change
+  bumps the `?v=` version stamp in `index.html`, `about.html`, `privacy.html`
+  and `terms.html`, or the service worker keeps serving the old files.
 - No build step: classic scripts loaded in a fixed order by `index.html`; only
   `init.js` runs at load. Migrations in `db/migrations/` are forward-only (see
   `db/README.md`). The Worker is `worker/` and deploys with `wrangler.toml`.
