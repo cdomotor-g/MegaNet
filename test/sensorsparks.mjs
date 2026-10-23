@@ -10,7 +10,8 @@
 //   battery   133 ± 5 raw through each day — 12.8 to 13.8 V, raw ÷ 10.
 //   rain      the counter at 2040, wrapping past 2047 to 0 in a storm three
 //             days ago that tips 50 times, with one corrupted frame (a bit
-//             flipped, 1,024 tips that never fell) in the middle of it — so
+//             flipped, 1,024 tips that never fell) in the middle of it, the
+//             first of its hour so the hourly rollups never keep it — so
 //             the right answer is 10.0 mm at the assumed 0.2 mm a tip, and a
 //             line that read the counter would show neither the wrap nor the
 //             flip as rain.
@@ -64,20 +65,27 @@ try {
 
   // ── the datastore, stood in for ─────────────────────────────────────────
   await page.evaluate(() => {
-    const HOUR = 3600000, DAY = 86400000;
+    const HOUR = 3600000, DAY = 86400000, QUARTER = 15 * 60000;
     const now = Date.now();
-    const storm = now - 3 * DAY;
+    // The readings on the clock's quarter hours and the storm on the hour, so
+    // which hour a frame falls in, and whether it is the last of it, never
+    // depends on when the check runs. Laid out from `now` instead, the flipped
+    // rain frame was the last of its hour whenever this ran at :45 to :59. The
+    // hourly rollups then kept it, two hours of tips were lost across it, and
+    // the rows said 6.8 mm, not 10.
+    const storm = Math.floor((now - 3 * DAY) / HOUR) * HOUR;
     const series = {};
     // Every 15 minutes for 100 days.
-    for (let t = now - 100 * DAY; t <= now - 60000; t += 15 * 60000) {
+    for (let t = Math.ceil((now - 100 * DAY) / QUARTER) * QUARTER; t <= now - 60000; t += QUARTER) {
       const day = Math.sin(2 * Math.PI * (t % DAY) / DAY);
       (series['a:6130'] || (series['a:6130'] = [])).push({ t, raw: Math.round(133 + 5 * day) });
       const into = Math.max(0, Math.min(1, (t - storm) / (6 * HOUR)));
       (series['a:6129'] || (series['a:6129'] = [])).push({ t, raw: Math.round(300 + 120 * into) });
       // 2040 + 50 tips across the storm, wrapping at 2048.
       let c = (2040 + Math.round(50 * into)) % 2048;
-      // One frame with bit 10 flipped, mid-storm.
-      if (Math.abs(t - (storm + 3 * HOUR)) < 7 * 60000) c ^= 1024;
+      // One frame with bit 10 flipped, mid-storm: on the hour, the first of
+      // its hour, so the hourly rollups never keep it.
+      if (t === storm + 3 * HOUR) c ^= 1024;
       (series['a:6128'] || (series['a:6128'] = [])).push({ t, raw: c });
     }
     const lastOfHour = t => Math.floor(t / HOUR) * HOUR + HOUR - 1000;
