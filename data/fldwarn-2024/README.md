@@ -12,6 +12,7 @@ is*).
 | --- | --- |
 | `kmz.json` | The KMZ as written: every pin (number, what it observes, how it reports, position, whether it was placed by hand, its pushpin colour) and every path (sender, receiver, frequency, ends). `tools/ingest/fldwarn_kmz_2024.py --extract` writes it. |
 | `review.json` | What was decided, one row per station with the reason, and every value the database was given. `--sql` turns it into the SQL that was applied. |
+| `../repeater-document.json` | The original repeater document's 129 rows, each on its home station with what that station needed. `tools/ingest/repeater_document.py --sql` writes it. |
 
 ## What the KMZ is
 
@@ -93,26 +94,80 @@ already held was changed.
 Six names the Bureau's 20-character field had cut short were completed from the
 KMZ, for example "Windorah (Lignum Cha" became "Windorah (Lignum Channel) TM".
 
-## Not applied, waiting on a decision
+## Round two: the owner's answers
 
-- Flood-Net's Mt Lowe AL (535128, near Emerald) carries Lower Springbrook's
-  repeater: licence 11165505, 151.950, range 2277–2278. ACMA sites that licence
-  at 2459 Springbrook Road, where the KMZ's Lower Springbrook paths end. Moving it
-  changes an existing range.
-- Laheys Lookout's range is 5389–5382, inverted in the document and in Flood-Net
-  (`0002_stations.sql` explains why the schema keeps it). The KMZ sends Double
-  Crossing Rd (5380–5382) through Laheys.
-- Whether Flood-Net's "Fraser Coast Regiona" (260127) is the KMZ's FCRC Base
-  Station, 3.4 km away.
-- 60 numbered pins have no Flood-Net station and appear in none of the Bureau's
-  September 2026 lists. 35 are read by hand; most look closed. They are in
-  `kmz.json`.
-- Recording manual or automatic from the KMZ's network column.
-- The wider repeater-document problems. About 20 rows never became a repeater on
-  any station, and at least six landed on a neighbour: Blackdown Tableland on
-  Black Mt AL, Ballandean Hill on Ballandean AL, Emerald Radar on Emerald AL,
-  Mt Macquarie on Port Macquarie (Golf) in New South Wales, Round Mt Res probably
-  on Round Mountain AL, and Lower Springbrook above.
+The first round left six questions open. They were answered the same day and
+applied:
+
+- **Lower Springbrook.** Flood-Net's Mt Lowe AL (535128, near Emerald) carried
+  Lower Springbrook's repeater (licence 11165505, 151.950, range 2277–2278). That
+  row is now on Lower Springbrook AL, where ACMA sites the licence and the KMZ's
+  paths end. Mt Lowe AL carries its own row from the document (151.500, ranges
+  1151–1164, 5954–5956 and 5970–5977, network Emerald).
+- **Laheys Lookout** passes 5380–5382, not the inverted 5389–5382 the repeater
+  document and Flood-Net had. The KMZ sends Double Crossing Rd (5380–5382)
+  through it.
+- **FCRC Base Station** is Flood-Net's "Fraser Coast Regiona" (260127). It moved
+  3.4 km to the KMZ's hand-placed pin, became a base (Fraser Coast Regional
+  Council's), and lists 151.500 as the channel the KMZ's paths reach it on.
+- **The 60 pins Flood-Net had no station for** were all added, but not all
+  switched off. 28 are in the Bureau's December 2025 service level specification
+  (`data/sls-qld.json`), so they are current even though the September 2026
+  river height lists leave them out. Those 28 are switched on. Six of them carry
+  the SLS's newer name, for example Hattonvale Store as "Hattonvale O'Shea Rd".
+  The other 32 are in neither list and are switched off, as probably closed.
+  Each station's notes say which case it is. Nine have the Bureau's 2014 flood
+  classifications.
+- **Manual or automatic** is now recorded as the station's type (`station_type`)
+  on 4,239 stations. Only 9 had one before. The evidence is taken in this order:
+  1. the station's live sensors (a station that reports itself is automatic);
+  2. the SLS;
+  3. the KMZ's network column.
+
+  It is a water level station if its sensors or the SLS show a river gauge;
+  otherwise it is whatever the first source to say gives.
+  `review.json` has the rule (`round2.station_type_rule`) and, for each
+  station, its type and where the type came from. 666 field stations have no
+  evidence of what they are and stay blank. Where the sources disagree, the
+  newer one wins. That made 25 stations automatic that an older list calls
+  manual: 24 by the 2024 KMZ, and Cressfield by the SLS. Eidsvold Bridge and
+  Ripple Downs AL, for instance, now report automatically: Eidsvold Bridge's
+  rainfall, water level and battery come in as ALERT 773–775. The sources
+  disagree on water level against rain for another 13 stations; each has its
+  disagreement listed.
+- **The repeater document** is reconciled row by row, not just the four rows
+  round one found. See below.
+
+### The repeater document
+
+`data/repeater-document.json` puts every one of the 129 rows of
+`data/ALL_REPEATERS.csv` on the station it belongs to. It was matched by name,
+ACMA licence site and the KMZ's paths, and the evidence for each placement is
+in its notes. `tools/ingest/repeater_document.py --sql` writes it.
+
+| Outcome | Stations |
+| --- | --- |
+| Already right | 82 |
+| Repeater added to the station the row belongs to | 28 |
+| Empty channel, licence or network filled | 5 |
+| Ranges somebody had edited since the document, left as they are (Mt Kanigan, Mt Petersen, Middlemount, Florence Vale) | 4 |
+| New repeater units at the licence's ACMA site, for a site's second repeater (Mt Stuart #3/#4, Saddle Mountain #2) or a site with no station (Baroon Dam) | 3 |
+| The wrong row replaced with the station's own (Mt Lowe AL) | 1 |
+
+Five stations carried a repeater that was not theirs, put there by the first
+import's loose name match. Their repeater came off, each with a note saying
+where it went:
+
+- Black Mt AL (Blackdown Tableland's row);
+- Ballandean AL (Ballandean Hill's);
+- Emerald AL (Emerald Radar's);
+- Port Macquarie (Golf), in New South Wales (Mt Macquarie's);
+- Round Mountain AL (Round Mt Res's).
+
+These removals, and Mt Lowe's replacement, went through
+`meganet.save_station()`, the editor's own write path. That is the same as
+unticking "repeater", or editing the ranges, in the editor. The only other
+range changed is Laheys Lookout's, above, on the owner's say-so.
 
 ## Reproducing it
 
@@ -120,14 +175,24 @@ KMZ, for example "Windorah (Lignum Cha" became "Windorah (Lignum Channel) TM".
 python3 tools/ingest/fldwarn_kmz_2024.py --extract ~/Downloads/FldWarn*.kmz
 python3 tools/ingest/fldwarn_kmz_2024.py --sql \
   | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+python3 tools/ingest/repeater_document.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
 python3 tools/snapshot_stations_json.py
 ```
 
 The SQL moves a station only while it is still where the review found it. It
-adds ranges only to a repeater that has none, and fills a frequency, network or
-owner only where it is empty, so a second run changes nothing. Each write is
-stamped `fldwarn kmz 2024 (claude)`, the name the station history shows. Three
-history rows (Tallai, Mt Tamborine, Molendinar) read `postgres`: their radio
-change came after their move in the same run, and the history credits a second
-write under an unchanged stamp to the connection (`db/README.md`, *Station
-history*).
+adds ranges only to a repeater that has none, fills a frequency, network,
+owner or type only where it is empty, and adds a station only if its id is
+free, so a second run changes nothing. Each write is stamped `fldwarn kmz 2024
+(claude)`, the name the station history shows.
+
+366 history rows read `postgres` instead. The history credits a second write
+under an unchanged stamp to the connection (`db/README.md`, *Station
+history*):
+
+- Tallai, Mt Tamborine and Molendinar, whose radio change came after their
+  move in round one;
+- 18 rows from the repeater reconciliation;
+- 345 type writes on stations round one had already moved.
+
+A later pass should use a stamp of its own.

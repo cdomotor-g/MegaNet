@@ -413,11 +413,14 @@ A **proposed** station — where one is meant to go, not yet built, and usually
 with no Bureau number (0039) — carries `"proposed": true` in its record, with
 `station_type` (`auto_water_level`, `auto_rain_gauge`, `manual_water_level` or
 `manual_rain_gauge`) and `proposed_year`. An established station has no
-`proposed` key; one that was proposed keeps its type and year. The compact rows
-of `GET /api/v1/stations` carry all three too — `false`, `null` and `null` on a
-station that never was a proposal — and a dossier's `nearby_stations` marks a
-proposed neighbour with `"proposed": true`. Check them before reporting a
-station as one on the ground.
+`proposed` key; one that was proposed keeps its type and year. Most
+established stations carry a `station_type` too, saying whether they are
+manual or automatic. It comes from their sensors, the Bureau's service level
+specification and its 2024 FldWarn KMZ; it is `null` where nothing says. The
+compact rows of `GET /api/v1/stations` carry all three as well: `false`, the
+type or `null`, and `null` on a station that never was a proposal. A dossier's
+`nearby_stations` marks a proposed neighbour with `"proposed": true`. Check
+them before reporting a station as one on the ground.
 
 ### `GET /api/v1/stations/{id}/dossier`
 

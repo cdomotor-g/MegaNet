@@ -652,9 +652,11 @@ let dossier;
   const st = await get(`/api/v1/stations/${PROPOSED.id}`);
   check('…and its record carries the three keys', st.status === 200 && st.json.station.proposed === true
     && st.json.station.proposed_year === 2027);
+  // An established station has no proposal; its type is the one on record, if any.
   const est = dossier.identity;
-  check('an established station is not proposed and has neither', est.proposed === false && est.station_type === null
-    && est.proposed_year === null, JSON.stringify({ proposed: est.proposed, station_type: est.station_type }));
+  check('an established station is not proposed, has no year and only its own type', est.proposed === false
+    && est.station_type === (RICH.station_type || null) && est.proposed_year === null,
+    JSON.stringify({ proposed: est.proposed, station_type: est.station_type }));
 
   // The compact rows carry it too, now the columns are there (0039 is live):
   // found by a search, a proposal says what it is; an established row says not.
@@ -664,8 +666,8 @@ let dossier;
     && row.proposed === true && row.station_type === 'auto_rain_gauge' && row.proposed_year === 2027, JSON.stringify(row));
   const plain = await get(`/api/v1/stations?q=${encodeURIComponent(RICH.name)}`);
   const prow = plain.json && (plain.json.stations || []).find(x => x.id === RICH.id);
-  check('…and an established station\'s row is not proposed and has neither', plain.status === 200 && prow
-    && prow.proposed === false && prow.station_type === null && prow.proposed_year === null, JSON.stringify(prow && {
+  check('…and an established station\'s row is not proposed, with no year and only its own type', plain.status === 200 && prow
+    && prow.proposed === false && prow.station_type === (RICH.station_type || null) && prow.proposed_year === null, JSON.stringify(prow && {
       proposed: prow.proposed, station_type: prow.station_type, proposed_year: prow.proposed_year }));
 
   // A dossier's nearby list marks a proposed neighbour: a station with the

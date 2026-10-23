@@ -279,7 +279,66 @@ def render_sql(review):
                        f"values ({q(b['id'])}, {j}, {q(f['rx_mhz'])}, {q(f['tx_mhz'])}, {q(f['label'])}, "
                        f"{q(f['acma_licence'] or None)}, {S}) on conflict (station_id, ord) do nothing;")
     out.append('')
+    if review.get('round2'):
+        out += render_round2(review['round2'])
     return '\n'.join(out)
+
+
+def render_round2(r2):
+    """The second round, on the owner's answers: the FCRC base, the stations the
+    KMZ has and Flood-Net did not (switched off unless the Bureau's December 2025
+    SLS still lists them), every station's type, and Laheys Lookout's inverted
+    range."""
+    S = q(STAMP)
+    out = ['-- Round two.', '']
+    f = r2['fcrc']
+    note = q(f['note'])
+    out += ["-- Flood-Net's 260127 is the KMZ's FCRC Base Station.",
+            f"update meganet.station set name = {q(f['name'])}, roles = {q(f['roles'])}, owner = coalesce(owner, {q(f['owner'])}), "
+            f"lat = {q(f['to'][0])}, lon = {q(f['to'][1])}, elevation_ahd = {q(f['elevation_ahd'])}, "
+            f"elevation_source = {q(f['elevation_source'])}, catchment_ids = {q(f['catchment_ids'])}, "
+            f"notes = {append_note('notes', note)}, updated_by = {S} "
+            f"where id = {q(f['id'])} and lat = {q(f['from_'][0])} and lon = {q(f['from_'][1])};"]
+    for i, fr in enumerate(f['frequencies']):
+        out.append('insert into meganet.station_frequency (station_id, ord, rx_mhz, tx_mhz, label, acma_licence, updated_by) '
+                   f"values ({q(f['id'])}, {i}, {q(fr['rx_mhz'])}, {q(fr['tx_mhz'])}, {q(fr['label'])}, "
+                   f"{q(fr['acma_licence'])}, {S}) on conflict (station_id, ord) do nothing;")
+    out += ['', "-- Stations in the KMZ that Flood-Net did not have: switched on if the December 2025 SLS lists them, off if not.",
+            'insert into meganet.station (id, ord, name, station_number, lat, lon, elevation_ahd, elevation_source, roles, '
+            'radio_network_ids, catchment_ids, alert_ids, satcom, rm_system_id, enabled, notes, hub_id, station_type, '
+            'document_managed, updated_by)',
+            "select v.id, (select max(ord) from meganet.station) + v.n, v.name, v.num, v.lat, v.lon, v.elev, v.src, "
+            "array['field']::text[], '{}'::text[], v.catch, '{}'::jsonb, "
+            "'{\"enabled\": false, \"provider\": \"\", \"terminal_id\": \"\"}'::jsonb, 1, v.enabled, v.note, v.hub, v.stype, true, " + S,
+            'from (values',
+            values([(i, o['id'], o['name'], o['station_number'], o['lat'], o['lon'], o['elevation_ahd'], o['elevation_source'],
+                     o['catchment_ids'], o['note'], o['hub_id'], o['station_type'], o['enabled'])
+                    for i, o in enumerate(r2['old_stations'], 1)],
+                   ['int', 'text', 'text', 'text', 'numeric', 'numeric', 'numeric', 'text', 'text[]', 'text', 'text', 'text', 'boolean']),
+            ') v(n, id, name, num, lat, lon, elev, src, catch, note, hub, stype, enabled)',
+            'where not exists (select 1 from meganet.station s where s.id = v.id);']
+    fc = [(o['id'], i, c['as_at'], c.get('first_report_m'), c.get('crossing_height_m'), c.get('crossing_type'), c.get('minor_m'),
+           c.get('crops_grazing_m'), c.get('moderate_m'), c.get('towns_m'), c.get('major_m'), c.get('note'))
+          for o in r2['old_stations'] for i, c in enumerate(o['flood_classes'])]
+    if fc:
+        out += ['insert into meganet.station_flood_class (station_id, ord, as_at, first_report_m, crossing_height_m, crossing_type, '
+                'minor_m, crops_grazing_m, moderate_m, towns_m, major_m, note, updated_by)',
+                f'select v.*, {S} from (values',
+                values(fc, ['text', 'int', 'date', 'numeric', 'numeric', 'text', 'numeric', 'numeric', 'numeric', 'numeric', 'numeric', 'text']),
+                ') v(station_id, ord, as_at, first_report_m, crossing_height_m, crossing_type, minor_m, crops_grazing_m, moderate_m, towns_m, major_m, note)',
+                'where not exists (select 1 from meganet.station_flood_class c where c.station_id = v.station_id);']
+    out += ['', "-- Each station's type, only where it has none. " + r2['station_type_rule']]
+    by_type = {}
+    for t in r2['station_types']:
+        by_type.setdefault(t['station_type'], []).append(t['id'])
+    for code, ids in sorted(by_type.items()):
+        out.append(f"update meganet.station set station_type = {q(code)}, updated_by = {S} "
+                   f"where station_type is null and id in ({', '.join(q(i) for i in ids)});")
+    lh = r2['laheys']
+    out += ['', f"-- {lh['why']}",
+            f"update meganet.pass_range set lo = {lh['now'][0]}, hi = {lh['now'][1]}, updated_by = {S} "
+            f"where repeater_id = {q(lh['id'])} and kind = 'pass' and lo = {lh['was'][0]} and hi = {lh['was'][1]};", '']
+    return out
 
 
 def main(argv=None):

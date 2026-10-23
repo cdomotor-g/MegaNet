@@ -373,6 +373,25 @@ meganet.load_flood_peaks_from_url();`. Then refresh `stations.json`
 (`snapshot_stations_json.py`), whose stations now carry `flood_peaks`.
 `check_flood_peaks.sql` is the database's half.
 
+## The 2024 FldWarn KMZ and the repeater document
+
+`ingest/fldwarn_kmz_2024.py --extract` reads the Bureau's 2024 *FldWarn Stations
+and paths* KMZ into `data/fldwarn-2024/kmz.json`. `--sql` writes what was decided
+in `review.json` beside it: positions, radio, the stations Flood-Net lacked, and
+station types. `ingest/repeater_document.py --sql` puts each row of
+`data/ALL_REPEATERS.csv` on its home station, from `data/repeater-document.json`.
+Both are standard library only, and every statement they write is guarded, so a
+second run changes nothing. `data/fldwarn-2024/README.md` explains the
+decisions.
+
+```bash
+python3 tools/ingest/fldwarn_kmz_2024.py --extract ~/Downloads/FldWarn*.kmz
+python3 tools/ingest/fldwarn_kmz_2024.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+python3 tools/ingest/repeater_document.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
 ## `ingest/` — the historical inspection workbook (#122)
 
 `ingest/xlsx.py` is a read-only .xlsx reader with nothing but the standard

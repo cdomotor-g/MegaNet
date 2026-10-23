@@ -1,0 +1,5720 @@
+{
+ "source": "data/ALL_REPEATERS.csv",
+ "checked": "2026-10-23",
+ "rows": [
+  {
+   "row": "Betanga",
+   "network": "barcaldine",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4658,
+     4665
+    ]
+   ],
+   "home": "betanga_al"
+  },
+  {
+   "row": "Mt Pisgah",
+   "network": "barcaldine",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4650,
+     4699
+    ]
+   ],
+   "home": "mt_pisgah_al"
+  },
+  {
+   "row": "Sedgeford",
+   "network": "barcaldine",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4666,
+     4670
+    ]
+   ],
+   "home": "sedgeford_al"
+  },
+  {
+   "row": "Barneys Bore",
+   "network": "blackall",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4600,
+     4628
+    ]
+   ],
+   "home": "barneys_bore_al"
+  },
+  {
+   "row": "Mt Calder",
+   "network": "blackall",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4610,
+     4613
+    ]
+   ],
+   "home": "mt_calder_al"
+  },
+  {
+   "row": "Mt Macquarie",
+   "network": "blackall",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4600,
+     4607
+    ],
+    [
+     4626,
+     4628
+    ]
+   ],
+   "home": "mt_macquarie_al"
+  },
+  {
+   "row": "Wyanga",
+   "network": "blackall",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4600,
+     4603
+    ]
+   ],
+   "home": "wyanga_al"
+  },
+  {
+   "row": "Augathella",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1001,
+     1046
+    ]
+   ],
+   "home": "augathella_rptr_aler"
+  },
+  {
+   "row": "Barraden",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4223,
+     4225
+    ]
+   ],
+   "home": "barradeen_al"
+  },
+  {
+   "row": "Calowrie",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1050,
+     1067
+    ],
+    [
+     4236,
+     4243
+    ]
+   ],
+   "home": "calowrie_al"
+  },
+  {
+   "row": "Cooks Tank",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1001,
+     1005
+    ]
+   ],
+   "home": "cooks_tank_al"
+  },
+  {
+   "row": "Dunvegan",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1001,
+     1046
+    ],
+    [
+     1068,
+     1070
+    ],
+    [
+     4244,
+     4250
+    ]
+   ],
+   "home": "dunvegan_al"
+  },
+  {
+   "row": "Loddon",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1057,
+     1059
+    ]
+   ],
+   "home": "loddon_al"
+  },
+  {
+   "row": "Middle Creek",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1000,
+     1049
+    ],
+    [
+     1068,
+     1070
+    ],
+    [
+     4200,
+     4235
+    ],
+    [
+     4244,
+     4249
+    ]
+   ],
+   "home": "middle_ck_al"
+  },
+  {
+   "row": "Moyallen",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1068,
+     1070
+    ],
+    [
+     4243,
+     4247
+    ]
+   ],
+   "home": "moyallen_al"
+  },
+  {
+   "row": "Mt Lindsay",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1001,
+     1012
+    ],
+    [
+     1019,
+     1027
+    ],
+    [
+     1032,
+     1034
+    ]
+   ],
+   "home": "mt_lindsay_al"
+  },
+  {
+   "row": "Mt Tabor",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1013,
+     1031
+    ]
+   ],
+   "home": "mt_tabor_al"
+  },
+  {
+   "row": "Myendetta",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4226,
+     4235
+    ]
+   ],
+   "home": "myendetta_al"
+  },
+  {
+   "row": "Ravenscourt",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1060,
+     1067
+    ]
+   ],
+   "home": "ravenscourt_al"
+  },
+  {
+   "row": "Willara",
+   "network": "charleville_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1001,
+     1036
+    ]
+   ],
+   "home": "willara_al"
+  },
+  {
+   "row": "Amiens Knob",
+   "network": "constitution_hill",
+   "licence": "10182196/1",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4500,
+     4600
+    ],
+    [
+     5700,
+     5739
+    ],
+    [
+     5751,
+     5767
+    ]
+   ],
+   "home": "amiens_knob_al"
+  },
+  {
+   "row": "Ballandean Hill",
+   "network": "constitution_hill",
+   "licence": "10182197/1",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5732,
+     5736
+    ]
+   ],
+   "home": "ballandean_hill_aler"
+  },
+  {
+   "row": "Bony Mountain",
+   "network": "constitution_hill",
+   "licence": "10182195/1",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5737,
+     5757
+    ]
+   ],
+   "home": "bony_mountain_al"
+  },
+  {
+   "row": "Carrs Lookout",
+   "network": "constitution_hill",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     6884,
+     6890
+    ]
+   ],
+   "home": "carrs_lookout_al"
+  },
+  {
+   "row": "Constitution Hill No1",
+   "network": "constitution_hill",
+   "licence": "433726",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1900,
+     2200
+    ],
+    [
+     4100,
+     4199
+    ],
+    [
+     4800,
+     4899
+    ],
+    [
+     5304,
+     5312
+    ],
+    [
+     5500,
+     5550
+    ],
+    [
+     6200,
+     6299
+    ]
+   ],
+   "home": "constitution_hill"
+  },
+  {
+   "row": "Constitution Hill No2",
+   "network": "constitution_hill",
+   "licence": "1410740",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     2200,
+     2499
+    ],
+    [
+     4109,
+     4125
+    ],
+    [
+     4500,
+     4600
+    ],
+    [
+     5300,
+     5399
+    ],
+    [
+     5700,
+     5799
+    ],
+    [
+     6850,
+     6899
+    ]
+   ],
+   "home": "constitution_hill_al"
+  },
+  {
+   "row": "Hillcrest - Wine Glass",
+   "network": "constitution_hill",
+   "licence": "1411025",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1900,
+     2200
+    ],
+    [
+     4151,
+     4199
+    ],
+    [
+     4800,
+     4899
+    ],
+    [
+     5304,
+     5399
+    ],
+    [
+     6200,
+     6274
+    ]
+   ],
+   "home": "hillcrest_wine_glass"
+  },
+  {
+   "row": "Kooralbyn",
+   "network": "constitution_hill",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5386,
+     5388
+    ]
+   ],
+   "home": "kooralbyn_al"
+  },
+  {
+   "row": "Laheys Lookout",
+   "network": "constitution_hill",
+   "licence": "1421318",
+   "rx": 151.5,
+   "tx": 152.4,
+   "ranges": [
+    [
+     5313,
+     5327
+    ],
+    [
+     5360,
+     5365
+    ],
+    [
+     5371,
+     5379
+    ],
+    [
+     5389,
+     5382
+    ],
+    [
+     5389,
+     5390
+    ]
+   ],
+   "home": "laheys_lookout_al"
+  },
+  {
+   "row": "Lower Springbrook",
+   "network": "constitution_hill",
+   "licence": "11165505/1",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2277,
+     2278
+    ]
+   ],
+   "home": "lower_springbrook_al"
+  },
+  {
+   "row": "Molendinar",
+   "network": "constitution_hill",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2200,
+     2500
+    ]
+   ],
+   "home": "molendinar_al"
+  },
+  {
+   "row": "Mt Tamborine",
+   "network": "constitution_hill",
+   "licence": "1410739",
+   "rx": 151.5,
+   "tx": 152.4,
+   "ranges": [
+    [
+     2200,
+     2400
+    ],
+    [
+     4151,
+     4199
+    ],
+    [
+     6200,
+     6274
+    ]
+   ],
+   "home": "mt_tamborine_al"
+  },
+  {
+   "row": "O'Reillys",
+   "network": "constitution_hill",
+   "licence": "1421319",
+   "rx": 151.5,
+   "tx": 152.4,
+   "ranges": [
+    [
+     5304,
+     5307
+    ],
+    [
+     5328,
+     5343
+    ]
+   ],
+   "home": "o_reillys_al"
+  },
+  {
+   "row": "Round Mt Res",
+   "network": "constitution_hill",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1979,
+     1981
+    ],
+    [
+     1993,
+     1995
+    ],
+    [
+     4112,
+     4114
+    ],
+    [
+     4121,
+     4150
+    ],
+    [
+     5500,
+     5550
+    ],
+    [
+     6275,
+     6299
+    ]
+   ],
+   "home": "round_mt_res_al"
+  },
+  {
+   "row": "Tallai",
+   "network": "constitution_hill",
+   "licence": "433855",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2200,
+     2500
+    ]
+   ],
+   "home": "tallai_al"
+  },
+  {
+   "row": "Tallebudgera Ck Rd",
+   "network": "constitution_hill",
+   "licence": "1432827",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2200,
+     2500
+    ]
+   ],
+   "home": "tallebudgera_ck_rd_al"
+  },
+  {
+   "row": "Tomewin",
+   "network": "constitution_hill",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2415,
+     2417
+    ]
+   ],
+   "home": "tomewin_al"
+  },
+  {
+   "row": "Upper Rosenthal",
+   "network": "constitution_hill",
+   "licence": "1400233",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5737,
+     5757
+    ],
+    [
+     6850,
+     6899
+    ]
+   ],
+   "home": "upper_rosenthal_aler"
+  },
+  {
+   "row": "Warahgai",
+   "network": "constitution_hill",
+   "licence": "10182194/1",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4500,
+     4600
+    ],
+    [
+     5700,
+     5739
+    ],
+    [
+     5751,
+     5766
+    ]
+   ],
+   "home": "warahgai_al"
+  },
+  {
+   "row": "Wilsons Pk",
+   "network": "constitution_hill",
+   "licence": "1410738",
+   "rx": 151.5,
+   "tx": 152.4,
+   "ranges": [
+    [
+     4500,
+     4600
+    ],
+    [
+     5338,
+     5340
+    ],
+    [
+     5344,
+     5354
+    ],
+    [
+     5368,
+     5370
+    ],
+    [
+     5383,
+     5388
+    ],
+    [
+     5700,
+     5799
+    ],
+    [
+     6850,
+     6899
+    ]
+   ],
+   "home": "wilsons_peak"
+  },
+  {
+   "row": "Billaboo",
+   "network": "emerald",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5931,
+     5932
+    ],
+    [
+     5966,
+     5967
+    ]
+   ],
+   "home": "billaboo_al"
+  },
+  {
+   "row": "Blackdown Tableland",
+   "network": "emerald",
+   "licence": "1929335",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1169,
+     1180
+    ],
+    [
+     4400,
+     4472
+    ],
+    [
+     5907,
+     5919
+    ],
+    [
+     5970,
+     5977
+    ],
+    [
+     5989,
+     5991
+    ]
+   ],
+   "home": "blackdown_tableland_al"
+  },
+  {
+   "row": "Emerald Radar",
+   "network": "emerald",
+   "licence": "1929334",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1151,
+     1240
+    ],
+    [
+     4400,
+     4472
+    ],
+    [
+     4650,
+     4699
+    ],
+    [
+     5850,
+     5999
+    ]
+   ],
+   "home": "emerald_radar_al"
+  },
+  {
+   "row": "Florence Vale",
+   "network": "emerald",
+   "licence": "1929339",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5947,
+     5962
+    ],
+    [
+     5968,
+     5969
+    ],
+    [
+     5998,
+     5999
+    ]
+   ],
+   "home": "florence_vale_al"
+  },
+  {
+   "row": "Glen Rock",
+   "network": "emerald",
+   "licence": "1929336",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1206,
+     1211
+    ],
+    [
+     5881,
+     5905
+    ],
+    [
+     5933,
+     5934
+    ],
+    [
+     5992,
+     5994
+    ]
+   ],
+   "home": "glen_rock_al"
+  },
+  {
+   "row": "Kulumur Range",
+   "network": "emerald",
+   "licence": "1929340",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1197,
+     1199
+    ],
+    [
+     5938,
+     5943
+    ]
+   ],
+   "home": "kulumur_range_al"
+  },
+  {
+   "row": "Middlemount",
+   "network": "emerald",
+   "licence": "10964566/1",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1151,
+     1161
+    ]
+   ],
+   "home": "middlemount_al"
+  },
+  {
+   "row": "Mt Joss",
+   "network": "emerald",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1151,
+     1161
+    ]
+   ],
+   "home": "mt_joss_al"
+  },
+  {
+   "row": "Mt Lowe",
+   "network": "emerald",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1151,
+     1164
+    ],
+    [
+     5954,
+     5956
+    ],
+    [
+     5970,
+     5977
+    ]
+   ],
+   "home": "mt_lowe_al"
+  },
+  {
+   "row": "Mt Mayde",
+   "network": "emerald",
+   "licence": "1929333",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1197,
+     1202
+    ],
+    [
+     4650,
+     4699
+    ],
+    [
+     5920,
+     5949
+    ],
+    [
+     5944,
+     5946
+    ],
+    [
+     5966,
+     5967
+    ]
+   ],
+   "home": "mt_mayde_al"
+  },
+  {
+   "row": "Roddas Lookout",
+   "network": "emerald",
+   "licence": "1929337",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1165,
+     1169
+    ],
+    [
+     1171,
+     1196
+    ],
+    [
+     1206,
+     1211
+    ],
+    [
+     4400,
+     4470
+    ],
+    [
+     4650,
+     4699
+    ],
+    [
+     5856,
+     5919
+    ],
+    [
+     5933,
+     5934
+    ],
+    [
+     5970,
+     5999
+    ]
+   ],
+   "home": "roddas_lookout_al"
+  },
+  {
+   "row": "Gladstone Radar",
+   "network": "gladstone",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4300,
+     4400
+    ]
+   ],
+   "home": "gladstone_radar_al"
+  },
+  {
+   "row": "Kroombit Repeater",
+   "network": "gladstone",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     900,
+     999
+    ]
+   ],
+   "home": "kroombit_repeater_al"
+  },
+  {
+   "row": "Mt Mongrel",
+   "network": "gladstone",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4300,
+     4349
+    ]
+   ],
+   "home": "mt_mongrel_al"
+  },
+  {
+   "row": "Westwood Range",
+   "network": "gladstone",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4350,
+     4400
+    ]
+   ],
+   "home": "westwood_range_al"
+  },
+  {
+   "row": "Black Mt",
+   "network": "mackay_met_office",
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     5061,
+     5099
+    ]
+   ],
+   "home": "black_mountain_farl"
+  },
+  {
+   "row": "Clarke Range #1",
+   "network": "mackay_met_office",
+   "licence": "1400231",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5000,
+     5060
+    ],
+    [
+     5090,
+     5092
+    ],
+    [
+     6150,
+     6199
+    ]
+   ],
+   "home": "clarke_range_al"
+  },
+  {
+   "row": "Clarke Range #2",
+   "network": "mackay_met_office",
+   "licence": "1400231",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5000,
+     5060
+    ],
+    [
+     5090,
+     5092
+    ],
+    [
+     6150,
+     6199
+    ]
+   ],
+   "home": "clarke_range2_al"
+  },
+  {
+   "row": "Mt Pinnacle",
+   "network": "mackay_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5000,
+     5060
+    ],
+    [
+     5090,
+     5092
+    ],
+    [
+     6150,
+     6199
+    ]
+   ],
+   "home": "mt_pinnacle_al"
+  },
+  {
+   "row": "Outer Harbour",
+   "network": "mackay_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5038,
+     5040
+    ]
+   ],
+   "home": "outer_harbour_tide_a"
+  },
+  {
+   "row": "Pohlmans Range",
+   "network": "marburg",
+   "licence": "10954034/1",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2006,
+     2007
+    ]
+   ],
+   "home": "pohlmans_range_al"
+  },
+  {
+   "row": "Mt Petersen",
+   "network": "mt_glorious_seqwater",
+   "licence": "",
+   "rx": 151.525,
+   "tx": 151.525,
+   "ranges": [
+    [
+     4021,
+     4025
+    ],
+    [
+     4036,
+     4042
+    ],
+    [
+     4047,
+     4050
+    ]
+   ],
+   "home": "mt_petersen_al"
+  },
+  {
+   "row": "Paradise Ck Rd",
+   "network": "mt_glorious_seqwater",
+   "licence": "",
+   "rx": 151.525,
+   "tx": 151.525,
+   "ranges": [
+    [
+     4006,
+     4007
+    ]
+   ],
+   "home": "paradise_ck_rd"
+  },
+  {
+   "row": "Schultz Lookout",
+   "network": "mt_glorious_seqwater",
+   "licence": "",
+   "rx": 151.525,
+   "tx": 151.525,
+   "ranges": [
+    [
+     4009,
+     4011
+    ],
+    [
+     4028,
+     4029
+    ],
+    [
+     4033,
+     4035
+    ],
+    [
+     4054,
+     4076
+    ],
+    [
+     6615,
+     6616
+    ]
+   ],
+   "home": "schultz_lookout_aler"
+  },
+  {
+   "row": "Toowoomba",
+   "network": "mt_glorious_seqwater",
+   "licence": "",
+   "rx": 151.525,
+   "tx": 151.525,
+   "ranges": [
+    [
+     4000,
+     4099
+    ],
+    [
+     6526,
+     6527
+    ]
+   ],
+   "home": "toowoomba_al"
+  },
+  {
+   "row": "Upper Sandy Creek",
+   "network": "mt_glorious_seqwater",
+   "licence": "1149753",
+   "rx": 151.525,
+   "tx": 151.525,
+   "ranges": [
+    [
+     6585,
+     6587
+    ]
+   ],
+   "home": "upper_sandy_ck_al"
+  },
+  {
+   "row": "Bald Knob",
+   "network": "mt_kanigan",
+   "licence": "433989",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5400,
+     5600
+    ],
+    [
+     6400,
+     6499
+    ]
+   ],
+   "home": "bald_knob_al"
+  },
+  {
+   "row": "Ball Lookout",
+   "network": "mt_kanigan",
+   "licence": "433988",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5439,
+     5442
+    ],
+    [
+     6429,
+     6499
+    ]
+   ],
+   "home": "ball_lkt_al"
+  },
+  {
+   "row": "Baroon Dam",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5571,
+     5577
+    ]
+   ],
+   "home": "baroon_dam_rptr"
+  },
+  {
+   "row": "Bellthorpe(Gap Rd)",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 151.525,
+   "tx": 151.5,
+   "ranges": [
+    [
+     6607,
+     6609
+    ],
+    [
+     6668,
+     6672
+    ],
+    [
+     6713,
+     6717
+    ],
+    [
+     6774,
+     6777
+    ]
+   ],
+   "home": "bellthorpe_gap_rd"
+  },
+  {
+   "row": "Boondooma Rptr",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     800,
+     811
+    ]
+   ],
+   "home": "boondooma_rptr_al"
+  },
+  {
+   "row": "Caniaview",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     700,
+     710
+    ],
+    [
+     759,
+     760
+    ]
+   ],
+   "home": "caniaview_al"
+  },
+  {
+   "row": "Coolabine Ck",
+   "network": "mt_kanigan",
+   "licence": "1185818",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     6471,
+     6473
+    ]
+   ],
+   "home": "coolabine_ck_aler"
+  },
+  {
+   "row": "Ghost Hill",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5602,
+     5650
+    ],
+    [
+     6075,
+     6099
+    ]
+   ],
+   "home": "ghost_hill_al"
+  },
+  {
+   "row": "Hawkwood Range",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     776,
+     799
+    ],
+    [
+     800,
+     811
+    ],
+    [
+     814,
+     837
+    ]
+   ],
+   "home": "hawkwood_range_al"
+  },
+  {
+   "row": "Hollywell",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     700,
+     775
+    ],
+    [
+     4780,
+     4784
+    ]
+   ],
+   "home": "hollywell_al"
+  },
+  {
+   "row": "Hume Lane",
+   "network": "mt_kanigan",
+   "licence": "1427866",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5427,
+     5432
+    ]
+   ],
+   "home": "hume_lane_alert"
+  },
+  {
+   "row": "Mt Fort William",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     711,
+     741
+    ],
+    [
+     4780,
+     4784
+    ]
+   ],
+   "home": "mt_fort_william_aler"
+  },
+  {
+   "row": "Mt Gayndah",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 152.4,
+   "tx": 151.5,
+   "ranges": [
+    [
+     700,
+     850
+    ],
+    [
+     4780,
+     4784
+    ]
+   ],
+   "home": "mt_gayndah_al"
+  },
+  {
+   "row": "Mt Goonaneman",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     700,
+     850
+    ],
+    [
+     4700,
+     4800
+    ],
+    [
+     6075,
+     6099
+    ]
+   ],
+   "home": "mt_goonaneman_al"
+  },
+  {
+   "row": "Mt Kanigan",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5608,
+     5650
+    ]
+   ],
+   "home": "mt_kanigan_al"
+  },
+  {
+   "row": "Mt Watalgan",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4300,
+     4400
+    ],
+    [
+     4700,
+     4800
+    ]
+   ],
+   "home": "mt_watalgan_al"
+  },
+  {
+   "row": "Mt Wolvi",
+   "network": "mt_kanigan",
+   "licence": "1418797",
+   "rx": 151.5,
+   "tx": 151.95,
+   "ranges": [
+    [
+     5400,
+     5600
+    ],
+    [
+     6400,
+     6499
+    ],
+    [
+     6900,
+     6999
+    ]
+   ],
+   "home": "mt_wolvi_al"
+  },
+  {
+   "row": "Obi Lookout",
+   "network": "mt_kanigan",
+   "licence": "1185817",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5439,
+     5441
+    ],
+    [
+     6433,
+     6434
+    ],
+    [
+     6471,
+     6479
+    ],
+    [
+     6497,
+     6498
+    ]
+   ],
+   "home": "obi_lookout_al"
+  },
+  {
+   "row": "Radar Hill #1",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     5400,
+     5600
+    ],
+    [
+     6400,
+     6499
+    ],
+    [
+     6900,
+     6999
+    ]
+   ],
+   "home": "radar_hill_al"
+  },
+  {
+   "row": "Radar Hill #2",
+   "network": "mt_kanigan",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.95,
+   "ranges": [
+    [
+     5400,
+     5600
+    ],
+    [
+     6400,
+     6499
+    ],
+    [
+     6900,
+     6999
+    ]
+   ],
+   "home": "radar_hill_al"
+  },
+  {
+   "row": "Takura",
+   "network": "mt_kanigan",
+   "licence": "1463975",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5600,
+     5650
+    ],
+    [
+     6075,
+     6099
+    ]
+   ],
+   "home": "takura_reservoir_ale"
+  },
+  {
+   "row": "Lower Springbrook",
+   "network": "mt_stapylton",
+   "licence": "11165505/1",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2277,
+     2278
+    ]
+   ],
+   "home": "lower_springbrook_al"
+  },
+  {
+   "row": "Burdekin Dam",
+   "network": "mt_stuart",
+   "licence": "433844",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2906,
+     2915
+    ],
+    [
+     2959,
+     2970
+    ]
+   ],
+   "home": "burdekin_dam_al"
+  },
+  {
+   "row": "Cameron Hill",
+   "network": "mt_stuart",
+   "licence": "1447480",
+   "rx": 151.5,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2600,
+     2699
+    ],
+    [
+     2900,
+     2999
+    ],
+    [
+     6301,
+     6399
+    ]
+   ],
+   "home": "cameron_hill_al"
+  },
+  {
+   "row": "Castle Hill",
+   "network": "mt_stuart",
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     2768,
+     2769
+    ]
+   ],
+   "home": "castle_hill_al"
+  },
+  {
+   "row": "Hurricane Cliff  #1",
+   "network": "mt_stuart",
+   "licence": "433844",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2600,
+     2699
+    ],
+    [
+     2905,
+     2995
+    ]
+   ],
+   "home": "hurricane_cliff_al"
+  },
+  {
+   "row": "Hurricane Cliff  #2",
+   "network": "mt_stuart",
+   "licence": "433844",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2600,
+     2699
+    ],
+    [
+     2905,
+     2995
+    ]
+   ],
+   "home": "hurricane_cliff_al"
+  },
+  {
+   "row": "Mingela",
+   "network": "mt_stuart",
+   "licence": "1448342",
+   "rx": 152.4,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2997,
+     2999
+    ]
+   ],
+   "home": "mingela_al"
+  },
+  {
+   "row": "Moss Vale",
+   "network": "mt_stuart",
+   "licence": "1446584",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2600,
+     2699
+    ]
+   ],
+   "home": "moss_vale_al"
+  },
+  {
+   "row": "Mt Kelly",
+   "network": "mt_stuart",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2907,
+     2909
+    ],
+    [
+     2914,
+     2915
+    ],
+    [
+     2931,
+     2953
+    ],
+    [
+     2967,
+     2970
+    ],
+    [
+     2987,
+     2992
+    ],
+    [
+     6300,
+     6399
+    ]
+   ],
+   "home": "mt_kelly_al"
+  },
+  {
+   "row": "Mt Stuart #1",
+   "network": "mt_stuart",
+   "licence": "1447471",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     2700,
+     2899
+    ]
+   ],
+   "home": "mt_stuart_al"
+  },
+  {
+   "row": "Mt Stuart #2",
+   "network": "mt_stuart",
+   "licence": "1447471",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     2700,
+     2899
+    ]
+   ],
+   "home": "mt_stuart_al"
+  },
+  {
+   "row": "Mt Stuart #3",
+   "network": "mt_stuart",
+   "licence": "1447471",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2600,
+     2699
+    ],
+    [
+     2900,
+     2999
+    ],
+    [
+     5800,
+     5850
+    ],
+    [
+     6000,
+     6075
+    ],
+    [
+     6300,
+     6399
+    ]
+   ],
+   "home": "mt_stuart_3_rptr"
+  },
+  {
+   "row": "Mt Stuart #4",
+   "network": "mt_stuart",
+   "licence": "1447471",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2600,
+     2699
+    ],
+    [
+     2900,
+     2999
+    ],
+    [
+     5800,
+     5850
+    ],
+    [
+     6000,
+     6075
+    ],
+    [
+     6300,
+     6399
+    ]
+   ],
+   "home": "mt_stuart_3_rptr"
+  },
+  {
+   "row": "Murray Springs",
+   "network": "mt_stuart",
+   "licence": "433887",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5800,
+     5850
+    ],
+    [
+     6050,
+     6075
+    ]
+   ],
+   "home": "murray_springs_al"
+  },
+  {
+   "row": "Paluma",
+   "network": "mt_stuart",
+   "licence": "433892",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     2706,
+     2707
+    ],
+    [
+     2761,
+     2763
+    ]
+   ],
+   "home": "paluma_al"
+  },
+  {
+   "row": "Poverty Hill",
+   "network": "mt_stuart",
+   "licence": "1447469",
+   "rx": 151.5,
+   "tx": 151.95,
+   "ranges": [
+    [
+     5800,
+     5850
+    ],
+    [
+     6000,
+     6075
+    ]
+   ],
+   "home": "poverty_hill_al"
+  },
+  {
+   "row": "Scartwater",
+   "network": "mt_stuart",
+   "licence": "1448343",
+   "rx": 152.4,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2959,
+     2966
+    ]
+   ],
+   "home": "scartwater_al"
+  },
+  {
+   "row": "Strathdickie",
+   "network": "mt_stuart",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2642,
+     2662
+    ]
+   ],
+   "home": "strathdickie_al"
+  },
+  {
+   "row": "The Stonewall",
+   "network": "mt_stuart",
+   "licence": "1448344",
+   "rx": 152.4,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2971,
+     2978
+    ]
+   ],
+   "home": "the_stonewall_al"
+  },
+  {
+   "row": "Wallaman #1",
+   "network": "mt_stuart",
+   "licence": "433890",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5800,
+     5850
+    ],
+    [
+     6000,
+     6075
+    ]
+   ],
+   "home": "wallaman_al"
+  },
+  {
+   "row": "Wallaman #2",
+   "network": "mt_stuart",
+   "licence": "433890",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5800,
+     5850
+    ],
+    [
+     6000,
+     6075
+    ]
+   ],
+   "home": "wallaman_al"
+  },
+  {
+   "row": "Bottle Tree",
+   "network": "oakey_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     6133,
+     6143
+    ]
+   ],
+   "home": "bottle_tree_al"
+  },
+  {
+   "row": "Braziers Hill",
+   "network": "oakey_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4951,
+     4967
+    ]
+   ],
+   "home": "braziers_hill_al"
+  },
+  {
+   "row": "Clovelly",
+   "network": "oakey_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4900,
+     4999
+    ],
+    [
+     6100,
+     6149
+    ]
+   ],
+   "home": "clovelly_al"
+  },
+  {
+   "row": "Mt Mowbullan",
+   "network": "oakey_met_office",
+   "licence": "433911",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4900,
+     4999
+    ],
+    [
+     6100,
+     6149
+    ]
+   ],
+   "home": "mt_mowbullan_rptr"
+  },
+  {
+   "row": "Turkey Mt",
+   "network": "oakey_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4900,
+     4950
+    ],
+    [
+     6100,
+     6149
+    ]
+   ],
+   "home": "turkey_mountain_al"
+  },
+  {
+   "row": "Banana Range",
+   "network": "rockhampton_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 152.4,
+   "ranges": [
+    [
+     900,
+     999
+    ],
+    [
+     4318,
+     4319
+    ],
+    [
+     4400,
+     4500
+    ],
+    [
+     5989,
+     5991
+    ]
+   ],
+   "home": "banana_range_al"
+  },
+  {
+   "row": "Broadmere",
+   "network": "rockhampton_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4400,
+     4420
+    ]
+   ],
+   "home": "brdmere_al"
+  },
+  {
+   "row": "Cracow",
+   "network": "rockhampton_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4400,
+     4440
+    ]
+   ],
+   "home": "cracow_al"
+  },
+  {
+   "row": "Dawson Range South",
+   "network": "rockhampton_met_office",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1174,
+     1176
+    ],
+    [
+     4400,
+     4470
+    ],
+    [
+     5989,
+     5991
+    ]
+   ],
+   "home": "dawson_range_south_a"
+  },
+  {
+   "row": "Mt Hopeful",
+   "network": "rockhampton_met_office",
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     900,
+     999
+    ],
+    [
+     4400,
+     4500
+    ]
+   ],
+   "home": "mt_hopeful_al"
+  },
+  {
+   "row": "Bilyana",
+   "network": "saddle_mt",
+   "licence": "1448341",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5200,
+     5275
+    ]
+   ],
+   "home": "bilyana_al"
+  },
+  {
+   "row": "Bones Knob",
+   "network": "saddle_mt",
+   "licence": "1447474",
+   "rx": 151.5,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2500,
+     2599
+    ],
+    [
+     5100,
+     5120
+    ],
+    [
+     5200,
+     5299
+    ],
+    [
+     6069,
+     6072
+    ],
+    [
+     6802,
+     6819
+    ],
+    [
+     6842,
+     6843
+    ]
+   ],
+   "home": "bones_knob_al"
+  },
+  {
+   "row": "Brinsmead",
+   "network": "saddle_mt",
+   "licence": "1441013",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     6812,
+     6813
+    ],
+    [
+     6828,
+     6845
+    ]
+   ],
+   "home": "brinsmead_al"
+  },
+  {
+   "row": "Gillies Lkt",
+   "network": "saddle_mt",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5100,
+     5120
+    ]
+   ],
+   "home": "gillies_lookout_aler"
+  },
+  {
+   "row": "Gordonvale",
+   "network": "saddle_mt",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5100,
+     5120
+    ]
+   ],
+   "home": "gordonvale_al"
+  },
+  {
+   "row": "Maalan Road",
+   "network": "saddle_mt",
+   "licence": "1184704",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5200,
+     5275
+    ]
+   ],
+   "home": "maalan_rd_al"
+  },
+  {
+   "row": "Marco Street",
+   "network": "saddle_mt",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2535,
+     2599
+    ],
+    [
+     5275,
+     5299
+    ]
+   ],
+   "home": "marco_street_al"
+  },
+  {
+   "row": "Millaa Millaa",
+   "network": "saddle_mt",
+   "licence": "433870",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2500,
+     2599
+    ],
+    [
+     5275,
+     5299
+    ],
+    [
+     6069,
+     6070
+    ]
+   ],
+   "home": "millaa_millaa_al"
+  },
+  {
+   "row": "Saddle Mountain #1",
+   "network": "saddle_mt",
+   "licence": "1441014",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5119,
+     5121
+    ],
+    [
+     6804,
+     6849
+    ]
+   ],
+   "home": "saddle_mountain_aler"
+  },
+  {
+   "row": "Saddle Mountain #2",
+   "network": "saddle_mt",
+   "licence": "1447477",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2500,
+     2599
+    ],
+    [
+     5100,
+     5120
+    ],
+    [
+     5200,
+     5299
+    ],
+    [
+     6069,
+     6072
+    ],
+    [
+     6802,
+     6819
+    ],
+    [
+     6842,
+     6843
+    ]
+   ],
+   "home": "saddle_mountain_2_rptr"
+  },
+  {
+   "row": "South Mission Beach",
+   "network": "saddle_mt",
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5241,
+     5246
+    ]
+   ],
+   "home": "south_mission_beach"
+  }
+ ],
+ "plan": [
+  {
+   "home": "betanga_al",
+   "rows": [
+    "Betanga"
+   ],
+   "action": "ok",
+   "networks": [
+    "barcaldine"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4658,
+     4665
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_pisgah_al",
+   "rows": [
+    "Mt Pisgah"
+   ],
+   "action": "ok",
+   "networks": [
+    "barcaldine"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4650,
+     4699
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "sedgeford_al",
+   "rows": [
+    "Sedgeford"
+   ],
+   "action": "ok",
+   "networks": [
+    "barcaldine"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4666,
+     4670
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "barneys_bore_al",
+   "rows": [
+    "Barneys Bore"
+   ],
+   "action": "attach",
+   "networks": [
+    "blackall"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4600,
+     4628
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "mt_calder_al",
+   "rows": [
+    "Mt Calder"
+   ],
+   "action": "attach",
+   "networks": [
+    "blackall"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4610,
+     4613
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "mt_macquarie_al",
+   "rows": [
+    "Mt Macquarie"
+   ],
+   "action": "attach",
+   "networks": [
+    "blackall"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4600,
+     4607
+    ],
+    [
+     4626,
+     4628
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "wyanga_al",
+   "rows": [
+    "Wyanga"
+   ],
+   "action": "attach",
+   "networks": [
+    "blackall"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4600,
+     4603
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "augathella_rptr_aler",
+   "rows": [
+    "Augathella"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1001,
+     1046
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "barradeen_al",
+   "rows": [
+    "Barraden"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4223,
+     4225
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "calowrie_al",
+   "rows": [
+    "Calowrie"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1050,
+     1067
+    ],
+    [
+     4236,
+     4243
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "cooks_tank_al",
+   "rows": [
+    "Cooks Tank"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1001,
+     1005
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "dunvegan_al",
+   "rows": [
+    "Dunvegan"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1001,
+     1046
+    ],
+    [
+     1068,
+     1070
+    ],
+    [
+     4244,
+     4250
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "loddon_al",
+   "rows": [
+    "Loddon"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1057,
+     1059
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "middle_ck_al",
+   "rows": [
+    "Middle Creek"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1000,
+     1049
+    ],
+    [
+     1068,
+     1070
+    ],
+    [
+     4200,
+     4235
+    ],
+    [
+     4244,
+     4249
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "moyallen_al",
+   "rows": [
+    "Moyallen"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1068,
+     1070
+    ],
+    [
+     4243,
+     4247
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_lindsay_al",
+   "rows": [
+    "Mt Lindsay"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1001,
+     1012
+    ],
+    [
+     1019,
+     1027
+    ],
+    [
+     1032,
+     1034
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_tabor_al",
+   "rows": [
+    "Mt Tabor"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1013,
+     1031
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "myendetta_al",
+   "rows": [
+    "Myendetta"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4226,
+     4235
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "ravenscourt_al",
+   "rows": [
+    "Ravenscourt"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1060,
+     1067
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "willara_al",
+   "rows": [
+    "Willara"
+   ],
+   "action": "ok",
+   "networks": [
+    "charleville_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1001,
+     1036
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "amiens_knob_al",
+   "rows": [
+    "Amiens Knob"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "10182196/1",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4500,
+     4600
+    ],
+    [
+     5700,
+     5739
+    ],
+    [
+     5751,
+     5767
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "ballandean_hill_aler",
+   "rows": [
+    "Ballandean Hill"
+   ],
+   "action": "attach",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "10182197/1",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5732,
+     5736
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "bony_mountain_al",
+   "rows": [
+    "Bony Mountain"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "10182195/1",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5737,
+     5757
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "carrs_lookout_al",
+   "rows": [
+    "Carrs Lookout"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     6884,
+     6890
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "constitution_hill",
+   "rows": [
+    "Constitution Hill No1"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "433726",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1900,
+     2200
+    ],
+    [
+     4100,
+     4199
+    ],
+    [
+     4800,
+     4899
+    ],
+    [
+     5304,
+     5312
+    ],
+    [
+     5500,
+     5550
+    ],
+    [
+     6200,
+     6299
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "constitution_hill_al",
+   "rows": [
+    "Constitution Hill No2"
+   ],
+   "action": "attach",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "1410740",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     2200,
+     2499
+    ],
+    [
+     4109,
+     4125
+    ],
+    [
+     4500,
+     4600
+    ],
+    [
+     5300,
+     5399
+    ],
+    [
+     5700,
+     5799
+    ],
+    [
+     6850,
+     6899
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "hillcrest_wine_glass",
+   "rows": [
+    "Hillcrest - Wine Glass"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "1411025",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1900,
+     2200
+    ],
+    [
+     4151,
+     4199
+    ],
+    [
+     4800,
+     4899
+    ],
+    [
+     5304,
+     5399
+    ],
+    [
+     6200,
+     6274
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "kooralbyn_al",
+   "rows": [
+    "Kooralbyn"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5386,
+     5388
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "laheys_lookout_al",
+   "rows": [
+    "Laheys Lookout"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "1421318",
+   "rx": 151.5,
+   "tx": 152.4,
+   "ranges": [
+    [
+     5313,
+     5327
+    ],
+    [
+     5360,
+     5365
+    ],
+    [
+     5371,
+     5379
+    ],
+    [
+     5380,
+     5382
+    ],
+    [
+     5389,
+     5390
+    ]
+   ],
+   "frequencies": [],
+   "fills": [],
+   "corrected": "The document's 5389–5382 is inverted. It reads 5380–5382 since Oct 2026, on the owner's say-so: the KMZ sends Double Crossing Rd (5380–5382) through Laheys Lookout."
+  },
+  {
+   "home": "lower_springbrook_al",
+   "rows": [
+    "Lower Springbrook",
+    "Lower Springbrook"
+   ],
+   "action": "attach",
+   "networks": [
+    "constitution_hill",
+    "mt_stapylton"
+   ],
+   "licence": "11165505/1",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2277,
+     2278
+    ]
+   ],
+   "frequencies": [],
+   "note": "The repeater document lists Lower Springbrook twice, under the Constitution Hill and Mt Stapylton networks, with the same licence, channel and ranges; one record stands for both."
+  },
+  {
+   "home": "molendinar_al",
+   "rows": [
+    "Molendinar"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2200,
+     2500
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_tamborine_al",
+   "rows": [
+    "Mt Tamborine"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "1410739",
+   "rx": 151.5,
+   "tx": 152.4,
+   "ranges": [
+    [
+     2200,
+     2400
+    ],
+    [
+     4151,
+     4199
+    ],
+    [
+     6200,
+     6274
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "o_reillys_al",
+   "rows": [
+    "O'Reillys"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "1421319",
+   "rx": 151.5,
+   "tx": 152.4,
+   "ranges": [
+    [
+     5304,
+     5307
+    ],
+    [
+     5328,
+     5343
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "round_mt_res_al",
+   "rows": [
+    "Round Mt Res"
+   ],
+   "action": "attach",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1979,
+     1981
+    ],
+    [
+     1993,
+     1995
+    ],
+    [
+     4112,
+     4114
+    ],
+    [
+     4121,
+     4150
+    ],
+    [
+     5500,
+     5550
+    ],
+    [
+     6275,
+     6299
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "tallai_al",
+   "rows": [
+    "Tallai"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "433855",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2200,
+     2500
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "tallebudgera_ck_rd_al",
+   "rows": [
+    "Tallebudgera Ck Rd"
+   ],
+   "action": "attach",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "1432827",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2200,
+     2500
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "tomewin_al",
+   "rows": [
+    "Tomewin"
+   ],
+   "action": "attach",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2415,
+     2417
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "upper_rosenthal_aler",
+   "rows": [
+    "Upper Rosenthal"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "1400233",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5737,
+     5757
+    ],
+    [
+     6850,
+     6899
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "warahgai_al",
+   "rows": [
+    "Warahgai"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "10182194/1",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4500,
+     4600
+    ],
+    [
+     5700,
+     5739
+    ],
+    [
+     5751,
+     5766
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "wilsons_peak",
+   "rows": [
+    "Wilsons Pk"
+   ],
+   "action": "ok",
+   "networks": [
+    "constitution_hill"
+   ],
+   "licence": "1410738",
+   "rx": 151.5,
+   "tx": 152.4,
+   "ranges": [
+    [
+     4500,
+     4600
+    ],
+    [
+     5338,
+     5340
+    ],
+    [
+     5344,
+     5354
+    ],
+    [
+     5368,
+     5370
+    ],
+    [
+     5383,
+     5388
+    ],
+    [
+     5700,
+     5799
+    ],
+    [
+     6850,
+     6899
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "billaboo_al",
+   "rows": [
+    "Billaboo"
+   ],
+   "action": "attach",
+   "networks": [
+    "emerald"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5931,
+     5932
+    ],
+    [
+     5966,
+     5967
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "blackdown_tableland_al",
+   "rows": [
+    "Blackdown Tableland"
+   ],
+   "action": "attach",
+   "networks": [
+    "emerald"
+   ],
+   "licence": "1929335",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1169,
+     1180
+    ],
+    [
+     4400,
+     4472
+    ],
+    [
+     5907,
+     5919
+    ],
+    [
+     5970,
+     5977
+    ],
+    [
+     5989,
+     5991
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "emerald_radar_al",
+   "rows": [
+    "Emerald Radar"
+   ],
+   "action": "attach",
+   "networks": [
+    "emerald"
+   ],
+   "licence": "1929334",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1151,
+     1240
+    ],
+    [
+     4400,
+     4472
+    ],
+    [
+     4650,
+     4699
+    ],
+    [
+     5850,
+     5999
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "florence_vale_al",
+   "rows": [
+    "Florence Vale"
+   ],
+   "action": "keep-edited",
+   "networks": [
+    "emerald"
+   ],
+   "licence": "1929339",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5947,
+     5962
+    ],
+    [
+     5968,
+     5969
+    ],
+    [
+     5998,
+     5999
+    ]
+   ],
+   "frequencies": [],
+   "fills": [
+    "channel",
+    "licence",
+    "network"
+   ]
+  },
+  {
+   "home": "glen_rock_al",
+   "rows": [
+    "Glen Rock"
+   ],
+   "action": "ok",
+   "networks": [
+    "emerald"
+   ],
+   "licence": "1929336",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1206,
+     1211
+    ],
+    [
+     5881,
+     5905
+    ],
+    [
+     5933,
+     5934
+    ],
+    [
+     5992,
+     5994
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "kulumur_range_al",
+   "rows": [
+    "Kulumur Range"
+   ],
+   "action": "attach",
+   "networks": [
+    "emerald"
+   ],
+   "licence": "1929340",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1197,
+     1199
+    ],
+    [
+     5938,
+     5943
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "middlemount_al",
+   "rows": [
+    "Middlemount"
+   ],
+   "action": "keep-edited",
+   "networks": [
+    "emerald"
+   ],
+   "licence": "10964566/1",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1151,
+     1161
+    ]
+   ],
+   "frequencies": [],
+   "fills": [
+    "channel",
+    "licence",
+    "network"
+   ]
+  },
+  {
+   "home": "mt_joss_al",
+   "rows": [
+    "Mt Joss"
+   ],
+   "action": "attach",
+   "networks": [
+    "emerald"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1151,
+     1161
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "mt_lowe_al",
+   "rows": [
+    "Mt Lowe"
+   ],
+   "action": "replace",
+   "networks": [
+    "emerald"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1151,
+     1164
+    ],
+    [
+     5954,
+     5956
+    ],
+    [
+     5970,
+     5977
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "mt_mayde_al",
+   "rows": [
+    "Mt Mayde"
+   ],
+   "action": "ok",
+   "networks": [
+    "emerald"
+   ],
+   "licence": "1929333",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1197,
+     1202
+    ],
+    [
+     4650,
+     4699
+    ],
+    [
+     5920,
+     5949
+    ],
+    [
+     5944,
+     5946
+    ],
+    [
+     5966,
+     5967
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "roddas_lookout_al",
+   "rows": [
+    "Roddas Lookout"
+   ],
+   "action": "ok",
+   "networks": [
+    "emerald"
+   ],
+   "licence": "1929337",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1165,
+     1169
+    ],
+    [
+     1171,
+     1196
+    ],
+    [
+     1206,
+     1211
+    ],
+    [
+     4400,
+     4470
+    ],
+    [
+     4650,
+     4699
+    ],
+    [
+     5856,
+     5919
+    ],
+    [
+     5933,
+     5934
+    ],
+    [
+     5970,
+     5999
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "gladstone_radar_al",
+   "rows": [
+    "Gladstone Radar"
+   ],
+   "action": "attach",
+   "networks": [
+    "gladstone"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4300,
+     4400
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "kroombit_repeater_al",
+   "rows": [
+    "Kroombit Repeater"
+   ],
+   "action": "ok",
+   "networks": [
+    "gladstone"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     900,
+     999
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_mongrel_al",
+   "rows": [
+    "Mt Mongrel"
+   ],
+   "action": "attach",
+   "networks": [
+    "gladstone"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4300,
+     4349
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "westwood_range_al",
+   "rows": [
+    "Westwood Range"
+   ],
+   "action": "attach",
+   "networks": [
+    "gladstone"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4350,
+     4400
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "black_mountain_farl",
+   "rows": [
+    "Black Mt"
+   ],
+   "action": "attach",
+   "networks": [
+    "mackay_met_office"
+   ],
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     5061,
+     5099
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "clarke_range_al",
+   "rows": [
+    "Clarke Range #1"
+   ],
+   "action": "ok",
+   "networks": [
+    "mackay_met_office"
+   ],
+   "licence": "1400231",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5000,
+     5060
+    ],
+    [
+     5090,
+     5092
+    ],
+    [
+     6150,
+     6199
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "clarke_range2_al",
+   "rows": [
+    "Clarke Range #2"
+   ],
+   "action": "attach",
+   "networks": [
+    "mackay_met_office"
+   ],
+   "licence": "1400231",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5000,
+     5060
+    ],
+    [
+     5090,
+     5092
+    ],
+    [
+     6150,
+     6199
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "mt_pinnacle_al",
+   "rows": [
+    "Mt Pinnacle"
+   ],
+   "action": "ok",
+   "networks": [
+    "mackay_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5000,
+     5060
+    ],
+    [
+     5090,
+     5092
+    ],
+    [
+     6150,
+     6199
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "outer_harbour_tide_a",
+   "rows": [
+    "Outer Harbour"
+   ],
+   "action": "ok",
+   "networks": [
+    "mackay_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5038,
+     5040
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "pohlmans_range_al",
+   "rows": [
+    "Pohlmans Range"
+   ],
+   "action": "fill",
+   "networks": [
+    "marburg"
+   ],
+   "licence": "10954034/1",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2006,
+     2007
+    ]
+   ],
+   "frequencies": [],
+   "fills": [
+    "licence",
+    "network"
+   ]
+  },
+  {
+   "home": "mt_petersen_al",
+   "rows": [
+    "Mt Petersen"
+   ],
+   "action": "keep-edited",
+   "networks": [
+    "mt_glorious_seqwater"
+   ],
+   "licence": "",
+   "rx": 151.525,
+   "tx": 151.525,
+   "ranges": [
+    [
+     4021,
+     4025
+    ],
+    [
+     4036,
+     4042
+    ],
+    [
+     4047,
+     4050
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "paradise_ck_rd",
+   "rows": [
+    "Paradise Ck Rd"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_glorious_seqwater"
+   ],
+   "licence": "",
+   "rx": 151.525,
+   "tx": 151.525,
+   "ranges": [
+    [
+     4006,
+     4007
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "schultz_lookout_aler",
+   "rows": [
+    "Schultz Lookout"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_glorious_seqwater"
+   ],
+   "licence": "",
+   "rx": 151.525,
+   "tx": 151.525,
+   "ranges": [
+    [
+     4009,
+     4011
+    ],
+    [
+     4028,
+     4029
+    ],
+    [
+     4033,
+     4035
+    ],
+    [
+     4054,
+     4076
+    ],
+    [
+     6615,
+     6616
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "toowoomba_al",
+   "rows": [
+    "Toowoomba"
+   ],
+   "action": "fill",
+   "networks": [
+    "mt_glorious_seqwater"
+   ],
+   "licence": "",
+   "rx": 151.525,
+   "tx": 151.525,
+   "ranges": [
+    [
+     4000,
+     4099
+    ],
+    [
+     6526,
+     6527
+    ]
+   ],
+   "frequencies": [],
+   "fills": [
+    "channel",
+    "network"
+   ]
+  },
+  {
+   "home": "upper_sandy_ck_al",
+   "rows": [
+    "Upper Sandy Creek"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_glorious_seqwater"
+   ],
+   "licence": "1149753",
+   "rx": 151.525,
+   "tx": 151.525,
+   "ranges": [
+    [
+     6585,
+     6587
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "bald_knob_al",
+   "rows": [
+    "Bald Knob"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "433989",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5400,
+     5600
+    ],
+    [
+     6400,
+     6499
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "ball_lkt_al",
+   "rows": [
+    "Ball Lookout"
+   ],
+   "action": "attach",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "433988",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5439,
+     5442
+    ],
+    [
+     6429,
+     6499
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "baroon_dam_rptr",
+   "rows": [
+    "Baroon Dam"
+   ],
+   "action": "create",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5571,
+     5577
+    ]
+   ],
+   "frequencies": [],
+   "name": "Baroon Dam Repeater",
+   "lat": -26.71417,
+   "lon": 152.872,
+   "owner": "Seqwater",
+   "note": "The repeater document's Baroon Dam repeater (Mt Kanigan network, 151.500 MHz). The document gives no licence; placed at Seqwater's licensed 151.500 MHz site on Baroon Pocket Rd (ACMA 10775754/1) in Oct 2026.",
+   "catchment_ids": [
+    "mary"
+   ],
+   "hub_id": "brisbane",
+   "elevation_ahd": 226.25,
+   "elevation_source": "Elvis 1 m (QLD Government)"
+  },
+  {
+   "home": "bellthorpe_gap_rd",
+   "rows": [
+    "Bellthorpe(Gap Rd)"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 151.525,
+   "tx": 151.5,
+   "ranges": [
+    [
+     6607,
+     6609
+    ],
+    [
+     6668,
+     6672
+    ],
+    [
+     6713,
+     6717
+    ],
+    [
+     6774,
+     6777
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "boondooma_rptr_al",
+   "rows": [
+    "Boondooma Rptr"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     800,
+     811
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "caniaview_al",
+   "rows": [
+    "Caniaview"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     700,
+     710
+    ],
+    [
+     759,
+     760
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "coolabine_ck_aler",
+   "rows": [
+    "Coolabine Ck"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "1185818",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     6471,
+     6473
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "ghost_hill_al",
+   "rows": [
+    "Ghost Hill"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5602,
+     5650
+    ],
+    [
+     6075,
+     6099
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "hawkwood_range_al",
+   "rows": [
+    "Hawkwood Range"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     776,
+     799
+    ],
+    [
+     800,
+     811
+    ],
+    [
+     814,
+     837
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "hollywell_al",
+   "rows": [
+    "Hollywell"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     700,
+     775
+    ],
+    [
+     4780,
+     4784
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "hume_lane_alert",
+   "rows": [
+    "Hume Lane"
+   ],
+   "action": "attach",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "1427866",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5427,
+     5432
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "mt_fort_william_aler",
+   "rows": [
+    "Mt Fort William"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     711,
+     741
+    ],
+    [
+     4780,
+     4784
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_gayndah_al",
+   "rows": [
+    "Mt Gayndah"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 152.4,
+   "tx": 151.5,
+   "ranges": [
+    [
+     700,
+     850
+    ],
+    [
+     4780,
+     4784
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_goonaneman_al",
+   "rows": [
+    "Mt Goonaneman"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     700,
+     850
+    ],
+    [
+     4700,
+     4800
+    ],
+    [
+     6075,
+     6099
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_kanigan_al",
+   "rows": [
+    "Mt Kanigan"
+   ],
+   "action": "keep-edited",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5608,
+     5650
+    ]
+   ],
+   "frequencies": [],
+   "fills": [
+    "network"
+   ]
+  },
+  {
+   "home": "mt_watalgan_al",
+   "rows": [
+    "Mt Watalgan"
+   ],
+   "action": "attach",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4300,
+     4400
+    ],
+    [
+     4700,
+     4800
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "mt_wolvi_al",
+   "rows": [
+    "Mt Wolvi"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "1418797",
+   "rx": 151.5,
+   "tx": 151.95,
+   "ranges": [
+    [
+     5400,
+     5600
+    ],
+    [
+     6400,
+     6499
+    ],
+    [
+     6900,
+     6999
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "obi_lookout_al",
+   "rows": [
+    "Obi Lookout"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "1185817",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5439,
+     5441
+    ],
+    [
+     6433,
+     6434
+    ],
+    [
+     6471,
+     6479
+    ],
+    [
+     6497,
+     6498
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "radar_hill_al",
+   "rows": [
+    "Radar Hill #1",
+    "Radar Hill #2"
+   ],
+   "action": "attach",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     5400,
+     5600
+    ],
+    [
+     6400,
+     6499
+    ],
+    [
+     6900,
+     6999
+    ]
+   ],
+   "frequencies": [
+    {
+     "rx_mhz": 151.5,
+     "tx_mhz": 151.95,
+     "label": "Radar Hill #2 (same ranges as Radar Hill #1)",
+     "acma_licence": null
+    }
+   ],
+   "note": "The repeater document lists Radar Hill #1 (151.950 in and out) and #2 (151.500 in, 151.950 out) with the same ranges: #1 is the repeater record, #2 a second frequency."
+  },
+  {
+   "home": "takura_reservoir_ale",
+   "rows": [
+    "Takura"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_kanigan"
+   ],
+   "licence": "1463975",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5600,
+     5650
+    ],
+    [
+     6075,
+     6099
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "burdekin_dam_al",
+   "rows": [
+    "Burdekin Dam"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "433844",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2906,
+     2915
+    ],
+    [
+     2959,
+     2970
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "cameron_hill_al",
+   "rows": [
+    "Cameron Hill"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "1447480",
+   "rx": 151.5,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2600,
+     2699
+    ],
+    [
+     2900,
+     2999
+    ],
+    [
+     6301,
+     6399
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "castle_hill_al",
+   "rows": [
+    "Castle Hill"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     2768,
+     2769
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "hurricane_cliff_al",
+   "rows": [
+    "Hurricane Cliff  #1",
+    "Hurricane Cliff  #2"
+   ],
+   "action": "fill",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "433844",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2600,
+     2699
+    ],
+    [
+     2905,
+     2995
+    ]
+   ],
+   "frequencies": [],
+   "note": "The repeater document lists Hurricane Cliff #1 and Hurricane Cliff #2 with the same licence, channel and ranges; one record stands for both.",
+   "fills": [
+    "note"
+   ]
+  },
+  {
+   "home": "mingela_al",
+   "rows": [
+    "Mingela"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "1448342",
+   "rx": 152.4,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2997,
+     2999
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "moss_vale_al",
+   "rows": [
+    "Moss Vale"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "1446584",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2600,
+     2699
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_kelly_al",
+   "rows": [
+    "Mt Kelly"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2907,
+     2909
+    ],
+    [
+     2914,
+     2915
+    ],
+    [
+     2931,
+     2953
+    ],
+    [
+     2967,
+     2970
+    ],
+    [
+     2987,
+     2992
+    ],
+    [
+     6300,
+     6399
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_stuart_al",
+   "rows": [
+    "Mt Stuart #1",
+    "Mt Stuart #2"
+   ],
+   "action": "fill",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "1447471",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     2700,
+     2899
+    ]
+   ],
+   "frequencies": [],
+   "note": "The repeater document lists Mt Stuart #1 and Mt Stuart #2 with the same licence, channel and ranges; one record stands for both.",
+   "fills": [
+    "channel",
+    "licence",
+    "network",
+    "note"
+   ]
+  },
+  {
+   "home": "mt_stuart_3_rptr",
+   "rows": [
+    "Mt Stuart #3",
+    "Mt Stuart #4"
+   ],
+   "action": "create",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "1447471",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2600,
+     2699
+    ],
+    [
+     2900,
+     2999
+    ],
+    [
+     5800,
+     5850
+    ],
+    [
+     6000,
+     6075
+    ],
+    [
+     6300,
+     6399
+    ]
+   ],
+   "frequencies": [],
+   "name": "Mt Stuart #3 Repeater",
+   "lat": -19.34339,
+   "lon": 146.78083,
+   "owner": null,
+   "note": "Mt Stuart's 151.950 MHz repeaters, #3 and #4 in the repeater document (same licence 1447471, channel and ranges: one record stands for both). #1 and #2, on 152.400, are on Mt Stuart AL. Placed at the licence's ACMA site in Oct 2026.",
+   "catchment_ids": [
+    "ross"
+   ],
+   "hub_id": "cairns",
+   "elevation_ahd": 583.36,
+   "elevation_source": "Elvis 50 cm (Griffith Uni)"
+  },
+  {
+   "home": "murray_springs_al",
+   "rows": [
+    "Murray Springs"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "433887",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5800,
+     5850
+    ],
+    [
+     6050,
+     6075
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "paluma_al",
+   "rows": [
+    "Paluma"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "433892",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     2706,
+     2707
+    ],
+    [
+     2761,
+     2763
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "poverty_hill_al",
+   "rows": [
+    "Poverty Hill"
+   ],
+   "action": "attach",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "1447469",
+   "rx": 151.5,
+   "tx": 151.95,
+   "ranges": [
+    [
+     5800,
+     5850
+    ],
+    [
+     6000,
+     6075
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "scartwater_al",
+   "rows": [
+    "Scartwater"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "1448343",
+   "rx": 152.4,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2959,
+     2966
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "strathdickie_al",
+   "rows": [
+    "Strathdickie"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2642,
+     2662
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "the_stonewall_al",
+   "rows": [
+    "The Stonewall"
+   ],
+   "action": "ok",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "1448344",
+   "rx": 152.4,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2971,
+     2978
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "wallaman_al",
+   "rows": [
+    "Wallaman #1",
+    "Wallaman #2"
+   ],
+   "action": "fill",
+   "networks": [
+    "mt_stuart"
+   ],
+   "licence": "433890",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5800,
+     5850
+    ],
+    [
+     6000,
+     6075
+    ]
+   ],
+   "frequencies": [],
+   "note": "The repeater document lists Wallaman #1 and Wallaman #2 with the same licence, channel and ranges; one record stands for both.",
+   "fills": [
+    "note"
+   ]
+  },
+  {
+   "home": "bottle_tree_al",
+   "rows": [
+    "Bottle Tree"
+   ],
+   "action": "ok",
+   "networks": [
+    "oakey_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     6133,
+     6143
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "braziers_hill_al",
+   "rows": [
+    "Braziers Hill"
+   ],
+   "action": "ok",
+   "networks": [
+    "oakey_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4951,
+     4967
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "clovelly_al",
+   "rows": [
+    "Clovelly"
+   ],
+   "action": "ok",
+   "networks": [
+    "oakey_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4900,
+     4999
+    ],
+    [
+     6100,
+     6149
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_mowbullan_rptr",
+   "rows": [
+    "Mt Mowbullan"
+   ],
+   "action": "ok",
+   "networks": [
+    "oakey_met_office"
+   ],
+   "licence": "433911",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4900,
+     4999
+    ],
+    [
+     6100,
+     6149
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "turkey_mountain_al",
+   "rows": [
+    "Turkey Mt"
+   ],
+   "action": "ok",
+   "networks": [
+    "oakey_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4900,
+     4950
+    ],
+    [
+     6100,
+     6149
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "banana_range_al",
+   "rows": [
+    "Banana Range"
+   ],
+   "action": "ok",
+   "networks": [
+    "rockhampton_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 152.4,
+   "ranges": [
+    [
+     900,
+     999
+    ],
+    [
+     4318,
+     4319
+    ],
+    [
+     4400,
+     4500
+    ],
+    [
+     5989,
+     5991
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "brdmere_al",
+   "rows": [
+    "Broadmere"
+   ],
+   "action": "attach",
+   "networks": [
+    "rockhampton_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4400,
+     4420
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "cracow_al",
+   "rows": [
+    "Cracow"
+   ],
+   "action": "ok",
+   "networks": [
+    "rockhampton_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     4400,
+     4440
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "dawson_range_south_a",
+   "rows": [
+    "Dawson Range South"
+   ],
+   "action": "ok",
+   "networks": [
+    "rockhampton_met_office"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     1174,
+     1176
+    ],
+    [
+     4400,
+     4470
+    ],
+    [
+     5989,
+     5991
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "mt_hopeful_al",
+   "rows": [
+    "Mt Hopeful"
+   ],
+   "action": "ok",
+   "networks": [
+    "rockhampton_met_office"
+   ],
+   "licence": "",
+   "rx": 152.4,
+   "tx": 152.4,
+   "ranges": [
+    [
+     900,
+     999
+    ],
+    [
+     4400,
+     4500
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "bilyana_al",
+   "rows": [
+    "Bilyana"
+   ],
+   "action": "ok",
+   "networks": [
+    "saddle_mt"
+   ],
+   "licence": "1448341",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5200,
+     5275
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "bones_knob_al",
+   "rows": [
+    "Bones Knob"
+   ],
+   "action": "ok",
+   "networks": [
+    "saddle_mt"
+   ],
+   "licence": "1447474",
+   "rx": 151.5,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2500,
+     2599
+    ],
+    [
+     5100,
+     5120
+    ],
+    [
+     5200,
+     5299
+    ],
+    [
+     6069,
+     6072
+    ],
+    [
+     6802,
+     6819
+    ],
+    [
+     6842,
+     6843
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "brinsmead_al",
+   "rows": [
+    "Brinsmead"
+   ],
+   "action": "ok",
+   "networks": [
+    "saddle_mt"
+   ],
+   "licence": "1441013",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     6812,
+     6813
+    ],
+    [
+     6828,
+     6845
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "gillies_lookout_aler",
+   "rows": [
+    "Gillies Lkt"
+   ],
+   "action": "attach",
+   "networks": [
+    "saddle_mt"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5100,
+     5120
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "gordonvale_al",
+   "rows": [
+    "Gordonvale"
+   ],
+   "action": "ok",
+   "networks": [
+    "saddle_mt"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5100,
+     5120
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "maalan_rd_al",
+   "rows": [
+    "Maalan Road"
+   ],
+   "action": "attach",
+   "networks": [
+    "saddle_mt"
+   ],
+   "licence": "1184704",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5200,
+     5275
+    ]
+   ],
+   "frequencies": []
+  },
+  {
+   "home": "marco_street_al",
+   "rows": [
+    "Marco Street"
+   ],
+   "action": "ok",
+   "networks": [
+    "saddle_mt"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2535,
+     2599
+    ],
+    [
+     5275,
+     5299
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "millaa_millaa_al",
+   "rows": [
+    "Millaa Millaa"
+   ],
+   "action": "ok",
+   "networks": [
+    "saddle_mt"
+   ],
+   "licence": "433870",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     2500,
+     2599
+    ],
+    [
+     5275,
+     5299
+    ],
+    [
+     6069,
+     6070
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "saddle_mountain_aler",
+   "rows": [
+    "Saddle Mountain #1"
+   ],
+   "action": "ok",
+   "networks": [
+    "saddle_mt"
+   ],
+   "licence": "1441014",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5119,
+     5121
+    ],
+    [
+     6804,
+     6849
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  },
+  {
+   "home": "saddle_mountain_2_rptr",
+   "rows": [
+    "Saddle Mountain #2"
+   ],
+   "action": "create",
+   "networks": [
+    "saddle_mt"
+   ],
+   "licence": "1447477",
+   "rx": 151.95,
+   "tx": 151.95,
+   "ranges": [
+    [
+     2500,
+     2599
+    ],
+    [
+     5100,
+     5120
+    ],
+    [
+     5200,
+     5299
+    ],
+    [
+     6069,
+     6072
+    ],
+    [
+     6802,
+     6819
+    ],
+    [
+     6842,
+     6843
+    ]
+   ],
+   "frequencies": [],
+   "name": "Saddle Mountain #2 Repeater",
+   "lat": -16.81819,
+   "lon": 145.66304,
+   "owner": null,
+   "note": "Saddle Mountain's 151.950 MHz repeater, #2 in the repeater document (licence 1447477). #1, on 151.500, is on Saddle Mtn AL. Placed at the licence's ACMA site in Oct 2026.",
+   "catchment_ids": [
+    "barron"
+   ],
+   "hub_id": "cairns",
+   "elevation_ahd": 650.12,
+   "elevation_source": "Elvis 1 m (QLD Government)"
+  },
+  {
+   "home": "south_mission_beach",
+   "rows": [
+    "South Mission Beach"
+   ],
+   "action": "ok",
+   "networks": [
+    "saddle_mt"
+   ],
+   "licence": "",
+   "rx": 151.5,
+   "tx": 151.5,
+   "ranges": [
+    [
+     5241,
+     5246
+    ]
+   ],
+   "frequencies": [],
+   "fills": []
+  }
+ ],
+ "strip": [
+  {
+   "id": "black_mt_al",
+   "row": "Blackdown Tableland",
+   "to": "Blackdown Tableland AL",
+   "clear_networks": true,
+   "note": "Until Oct 2026 this station held the repeater document's Blackdown Tableland row, put here by the first import's loose name match. That row is now on Blackdown Tableland AL; the document has no repeater here."
+  },
+  {
+   "id": "ballandean_al",
+   "row": "Ballandean Hill",
+   "to": "Ballandean Hill AL",
+   "clear_networks": false,
+   "note": "Until Oct 2026 this station held the repeater document's Ballandean Hill row, put here by the first import's loose name match. That row is now on Ballandean Hill AL; the document has no repeater here."
+  },
+  {
+   "id": "emerald_al",
+   "row": "Emerald Radar",
+   "to": "Emerald Radar AL",
+   "clear_networks": false,
+   "note": "Until Oct 2026 this station held the repeater document's Emerald Radar row, put here by the first import's loose name match. That row is now on Emerald Radar AL; the document has no repeater here."
+  },
+  {
+   "id": "port_macquarie_golf",
+   "row": "Mt Macquarie",
+   "to": "Mt Macquarie AL",
+   "clear_networks": true,
+   "note": "Until Oct 2026 this station held the repeater document's Mt Macquarie row, put here by the first import's loose name match. That row is now on Mt Macquarie AL; the document has no repeater here."
+  },
+  {
+   "id": "round_mountain_al",
+   "row": "Round Mt Res",
+   "to": "Round Mt Res AL",
+   "clear_networks": false,
+   "note": "Until Oct 2026 this station held the repeater document's Round Mt Res row, put here by the first import's loose name match. That row is now on Round Mt Res AL; the document has no repeater here. The 2024 FldWarn KMZ draws Round Mountain sending to O'Reillys, not receiving."
+  }
+ ]
+}

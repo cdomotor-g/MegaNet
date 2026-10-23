@@ -1734,7 +1734,19 @@ What it changed, through `tools/ingest/fldwarn_kmz_2024.py --sql`:
   said so in their notes.
 - Seven new base stations.
 
-No range Flood-Net already held was changed.
+No range Flood-Net already held was changed in that first pass. The second,
+on the owner's answers, did the following:
+
+- Moved Lower Springbrook's repeater off Mt Lowe AL.
+- Corrected Laheys Lookout's inverted 5389–5382 to 5380–5382.
+- Made 260127 the FCRC Base Station.
+- Added the KMZ's 60 other stations. The 28 the December 2025 SLS still lists
+  are switched on; the other 32 are off.
+- Recorded manual or automatic (`station_type`) on 4,239 stations, from their
+  sensors, the SLS and the KMZ.
+- Put each row of the original repeater document on its own station
+  (`data/repeater-document.json`, `tools/ingest/repeater_document.py`). Five
+  stations that held a neighbour's row lost it through `save_station()`.
 
 ## AEP flood levels and frequencies
 
@@ -1923,6 +1935,12 @@ In the document the three are optional keys, as `owner` is: `proposed` only
 where it is true, and the other two absent where null — so the stations in
 `stations.json` gain nothing, and an editor that knows nothing of proposals
 carries them through a save untouched.
+
+An established station may have a type too. Since October 2026, 4,248 do: manual
+or automatic, recorded from their sensors, the SLS and the Bureau's 2024 KMZ
+(`data/fldwarn-2024/README.md`). The editor shows it as **Type**, a save keeps
+it, and the map and the digital twin take it as evidence of what the station
+is.
 
 ```sh
 psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_proposed_stations.sql

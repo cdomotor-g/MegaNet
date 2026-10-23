@@ -254,19 +254,22 @@ async function main() {
     const legend = await page.evaluate(() => mapLegendHtml());
     check('the legend explains the hollow pin', /legend-dot-proposed/.test(legend) && /Proposed — not yet established/.test(legend));
 
-    // A station that is not proposed carries none of it.
+    // A station that is not proposed carries none of it — only its type, where
+    // one is recorded (manual or automatic, since Oct 2026), and no other.
     await page.evaluate(() => selectStation('gatton'));
     await page.waitForTimeout(150);
     const plain = await page.evaluate(() => {
       const d = editorReadForm();
-      return { keys: ['proposed', 'station_type', 'proposed_year'].filter(k => k in d),
+      const own = state.data.stations.find(s => s.id === 'gatton').station_type || null;
+      return { keys: ['proposed', 'proposed_year'].filter(k => k in d)
+                 .concat(('station_type' in d) !== !!own || (own && d.station_type !== own) ? ['station_type'] : []),
                band: !document.getElementById('ef-proposal') || document.getElementById('ef-proposal').hidden,
                blank: document.querySelector('#ef-stype option[value=""]').textContent };
     });
     const gatton = await pin(page, 'gatton');
     C = await card(page);
     check('an established station: no band on the form, "not recorded" for its type', plain.band && plain.blank === '— not recorded —', J(plain));
-    check('…none of the three keys in what a save would send', plain.keys.length === 0, J(plain.keys));
+    check('…no proposal in what a save would send, and its own type or none', plain.keys.length === 0, J(plain.keys));
     check('…a solid pin, and a card with no band', gatton.fill !== '#ffffff' && !gatton.dash && C && C.band === null && !C.tag, J({ gatton, C: C && C.band }));
 
     // ── Who may ──
