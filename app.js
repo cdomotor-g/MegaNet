@@ -257,7 +257,7 @@ async function loadFromApi({ announce = true } = {}) {
     applyStationDoc(text, { kind: 'api', ms: Math.round(_dbClock() - t0), kept: res.headers.get('X-FloodNet-Offline') });
   } catch (err) {
     // Same rejection for DNS failure, CORS refusal, no network, and a project
-    // paused for inactivity — the browser deliberately does not distinguish
+    // that is down — the browser deliberately does not distinguish
     // them. Record what is known and let the caller fall back.
     state.loadError = `the datastore: ${err && err.message || err}`;
     if (announce) Toast.failed(`Could not load from the datastore: ${err && err.message || err}`);
@@ -270,10 +270,10 @@ async function loadFromApi({ announce = true } = {}) {
 
 // The datastore first, then the file — in that order, and saying which one won.
 //
-// The fallback is not defensive padding. A free-tier Supabase project pauses
-// after about a week of inactivity, and a paused project *fails* the read rather
-// than slowing it down; MegaNet is exactly the burst-shaped tool that gets
-// paused. Falling back to the committed stations.json turns that from "no data"
+// The fallback is not defensive padding. Supabase's Pro plan, which the project
+// is on, does not pause it after a week idle the way the free tier did, but an
+// outage or a maintenance window still *fails* the read rather than slowing it
+// down. Falling back to the committed stations.json turns that from "no data"
 // into "yesterday's data" — which is only acceptable because the header then
 // says so rather than letting a stale file pass for the database.
 //
@@ -609,7 +609,7 @@ function keptDate(v) {
 }
 
 // Why the kept copy is the one showing: no signal at all, or — with one — the
-// source it stands in for not answering. A paused datastore fails a request
+// source it stands in for not answering. A datastore that is down fails a request
 // exactly as no network does, and sw.js cannot tell the two apart; the page
 // can say which, so "no signal" is never said with a signal.
 const KEPT_SOURCE = { api: 'the datastore', bundled: 'this site', github: 'GitHub' };

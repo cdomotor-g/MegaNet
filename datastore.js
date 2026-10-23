@@ -62,7 +62,7 @@ async function dbPing() {
 
     if (!res.ok) {
       // PostgREST reports failures as JSON — {message, hint, code}. A proxy, or
-      // a project paused for inactivity, may answer with something else, so the
+      // a project that is down or under maintenance, may answer with something else, so the
       // status line is the fallback rather than the parse being assumed.
       let detail = `HTTP ${res.status}`;
       try {

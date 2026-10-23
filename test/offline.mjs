@@ -207,8 +207,8 @@ async function main() {
       && C.data.some(u => /\/rest\/v1\/yes_no\?/.test(u)), J(C.data.filter(u => /rest/.test(u)).length));
     let H = await header(page);
     check('online, the header says where the list came from, as ever', /from stations\.json/.test(H.stats) && !/saved copy/.test(H.stats), J(H));
-    // A kept copy on screen while there is a signal (a paused datastore fails
-    // a request as no network does) names the source that did not answer.
+    // A kept copy on screen while there is a signal (a datastore that is down
+    // fails a request as no network does) names the source that did not answer.
     const withSignal = await page.evaluate(() => {
       const was = state.dataSource.kept;
       state.dataSource.kept = new Date(Date.now() - 2 * 3600e3);

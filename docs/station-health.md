@@ -638,7 +638,8 @@ rules stay in one file and run in two places.
 hours and kept in the workflow's cache; the runs between ask only for the
 readings received since — a few hundred rows, two seconds. Read whole every
 fifteen minutes they would have been near 6 GB a month of the database's
-egress, more than the free plan allows for everything together.
+egress — more than the free plan's 5 GB for everything together, and a needless
+share of the Pro plan's 250 GB.
 
 **What is kept.** The findings about a present condition — *silent*, a repeater
 or an area whose stations went quiet together, a receiver that stopped

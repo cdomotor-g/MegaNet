@@ -173,10 +173,10 @@ export function analyse(api, rows, doc, { now, t0 }) {
 
 // ── the database ─────────────────────────────────────────────────────────────
 //
-// What a run costs the project's egress, which the free plan meters. The
-// register is 2.3 MB (870 KB compressed) and a week of readings 1.1 MB
-// compressed: read whole every fifteen minutes, that is near 6 GB a month,
-// more than the plan allows for everything. So a run given a cache directory
+// What a run costs the project's egress, which Supabase meters. The register
+// is 2.3 MB (870 KB compressed) and a week of readings 1.1 MB compressed: read
+// whole every fifteen minutes, that is near 6 GB a month — more than the free
+// plan's 5 GB for everything, and a needless share of Pro's 250 GB. So a run given a cache directory
 // (the workflow's actions/cache, one entry per six-hour slot) reads the
 // register and the whole week only when the slot is new, keeps them there, and
 // in between asks only for the readings received since — a few hundred rows.

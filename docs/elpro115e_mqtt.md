@@ -531,9 +531,10 @@ The full run is [`mqtt-provisioning.md`](mqtt-provisioning.md). What matters her
     remain as usernames whatever you do.
 
 15. **Publish cadence and volume.** No Flood-Net-side budget exists yet. HiveMQ's free tier
-    is 100 connections / 10 GB a month / 5 MB messages, and `meganet.retain()` is still
-    run by hand — the whole network at 15-minute reporting is roughly 914,000 rows a
-    day, which fills the Supabase free tier in under a week. Pick a cadence deliberately.
+    is 100 connections / 10 GB a month / 5 MB messages, and the whole network at
+    15-minute reporting is roughly 914,000 rows a day — about 120 MB, which fills the
+    8 GB of disk Supabase's Pro plan includes in about ten weeks, billed past that.
+    Pick a cadence deliberately.
 
 16. **Asset inventory and network filtering rules.** Record manufacturer, type, serial,
     firmware and location (p.65). Prepare the IP whitelist rules to hand over —

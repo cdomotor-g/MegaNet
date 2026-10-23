@@ -714,7 +714,7 @@ correct when it was made. It reports how many it skipped. A backfill older than
 the window still lands in `meganet.reading` and is queryable until the next
 `retain()`; it just does not rewrite history it can no longer see whole.
 
-**Indexes, because they are a real fraction of the free tier.** The primary key
+**Indexes, because they are a real fraction of the database's size.** The primary key
 covers `(addr, reading_ts)`. `received_at` and `reading_ts` get BRIN indexes —
 both are effectively insert-ordered, and both are only ever used for the whole-
 range scans `roll_up()` and `retain()` do, so BRIN is kilobytes where a btree

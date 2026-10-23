@@ -226,7 +226,7 @@ to the other:
   different retention, different trust.
 * **Follow is polling, not push.** Every 30 seconds while the tab is open,
   stopped the moment you leave it. It is for watching a test land, not for
-  leaving a wall-screen running against the free tier.
+  leaving a wall-screen running against the database's egress quota.
 
 The schema behind all of it — the dedup key, the address shapes, retention and
 the rollups — is `db/migrations/0006_telemetry.sql` and

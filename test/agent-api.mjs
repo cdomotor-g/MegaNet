@@ -8,8 +8,8 @@
 //     the caller's. A door that forwarded a caller's token, or reached an RPC,
 //     would still answer every question correctly;
 //   * that its limits hold — a list cap, a reading window or a rate limit that
-//     stopped holding breaks nothing anyone would see until the database is
-//     paused for egress or the Worker's allowance is gone;
+//     stopped holding breaks nothing anyone would see until the database's
+//     egress is billed past its quota or the Worker's allowance is gone;
 //   * that its queries are ones PostgREST accepts. The stub it runs against
 //     (test/lib/postgrest-stub.mjs) is strict the way the real server is —
 //     unknown column, unknown relation, private relation, bad logic tree are
@@ -693,7 +693,7 @@ let dossier;
   const r = await get(`/api/v1/stations/${RICH.id}/dossier`);
   stub.fault = null;
   check('one failed read degrades its section to "unavailable", not the dossier',
-    r.status === 200 && r.json.telemetry.health.status === 'unavailable' && /paused/.test(r.json.telemetry.health.detail),
+    r.status === 200 && r.json.telemetry.health.status === 'unavailable' && /outage/.test(r.json.telemetry.health.detail),
     r.json && r.json.telemetry && r.json.telemetry.health.status);
 }
 
@@ -1572,7 +1572,7 @@ section('Upstream failures');
   const failing = (make) => { api.resetApiState(); stub.fault = make; };
   failing(() => new TypeError('fetch failed'));
   const down = await get(`/api/v1/stations/${RICH.id}`);
-  check('an unreachable database is 502, and says a paused project is the usual cause', down.status === 502 && /pauses after 7 days/.test(down.json.detail));
+  check('an unreachable database is 502, and says what usually causes it', down.status === 502 && /outage/.test(down.json.detail));
   failing(() => Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }));
   const slow = await get('/api/v1/stations?q=creek');
   check('a timed-out read is 504', slow.status === 504 && /10 s/.test(slow.json.detail));
@@ -1585,7 +1585,7 @@ section('Upstream failures');
   failing(() => new TypeError('fetch failed'));
   const tool = await rpc('tools/call', { name: 'get_station_dossier', arguments: { id: RICH.id } });
   check('a tool call during an outage is a tool error, not a protocol error', tool.json.result && tool.json.result.isError === true
-    && /paused|reached/.test(tool.json.result.content[0].text));
+    && /outage|reached/.test(tool.json.result.content[0].text));
   stub.fault = null;
   const errorsNotCached = await get(`/api/v1/stations/${RICH.id}`);
   check('errors are not cached: the next read succeeds', errorsNotCached.status === 200);

@@ -433,11 +433,12 @@ Better to learn that now than after forty stations are flashed.
 | Persistent sessions insufficient (Part 5) | EMQX Serverless, or Mosquitto on a ~$5/mo VPS with the config in `bridge/deploy/`. |
 | An employer broker appears | Ask for a credential on it. That is the best answer if the corporate move happens. |
 
-Also worth knowing before real traffic: **`meganet.retain()` is still run by
-hand.** The whole network at 15-minute reporting is roughly 914,000 rows a day,
-which fills the Supabase free tier in under a week. That is a scheduling job that
-does not exist yet, not a thing MQTT does to you — but MQTT is what makes it
-arrive.
+Also worth knowing before real traffic: the whole network at 15-minute
+reporting is roughly 914,000 rows a day, about 120 MB, which fills the 8 GB of
+disk Supabase's Pro plan includes in about ten weeks; past that the disk grows
+and is billed. `meganet.retain()` runs daily from `pg_cron` (`0073`), but
+`reading` keeps two years, so retention does not hold the disk at 8 GB. That is
+not a thing MQTT does to you — but MQTT is what makes it arrive.
 
 ---
 

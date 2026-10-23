@@ -2,8 +2,8 @@
 #
 # Since #B3 the station editor writes to Postgres, so this file is a copy. A copy
 # nobody refreshes becomes a lie — and this one is not decoration: it is what the
-# app falls back to when the datastore cannot be reached (a free-tier Supabase
-# project pauses after about a week of inactivity), it is the offline copy, and
+# app falls back to when the datastore cannot be reached (an outage, or
+# maintenance on the Supabase project), it is the offline copy, and
 # it is what gets handed to whoever inherits this.
 #
 # So the file is refreshed on a schedule rather than marked in the README as a

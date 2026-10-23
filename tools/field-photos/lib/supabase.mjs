@@ -14,8 +14,8 @@ export class SupabaseError extends Error {
 }
 
 // The field photos' bytes live in Cloudflare R2 behind MegaNet's Worker
-// (worker/photos.js), not in Supabase Storage, which on the free plan holds
-// 1 GB. `store` is that route; without one — or while it answers that R2 is not
+// (worker/photos.js), not in Supabase Storage, which held only 1 GB on the
+// free plan the project started on. `store` is that route; without one — or while it answers that R2 is not
 // bound yet, or cannot be reached — upload and remove go to Supabase Storage as
 // they always did, and tools/field-photos/move-to-r2.mjs carries them over later.
 export const DEFAULT_PHOTO_STORE = 'https://floodwarning.net/api/photos';

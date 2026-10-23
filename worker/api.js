@@ -160,9 +160,9 @@ const ARRIVES_WITH = Object.freeze({
     meanwhile: 'one station\'s own readings are at GET /api/v1/stations/{id}/readings' }),
 });
 
-const PAUSE_HINT =
-  'Flood-Net\'s database is a Supabase free-tier project, which pauses after 7 days without activity; '
-  + 'while it is paused every read fails until the owner restores it. Try again later, and if it '
+const UNREACHABLE_HINT =
+  'Flood-Net\'s database is a Supabase Pro project, which does not pause, so this is an outage, '
+  + 'maintenance, or a fault between the database and this server. Try again in a few minutes, and if it '
   + 'persists, raise an issue at https://github.com/cdomotor-g/MegaNet/issues.';
 
 // ── Small helpers ────────────────────────────────────────────────────────────
@@ -352,7 +352,7 @@ class Upstream {
       const timedOut = err && (err.name === 'TimeoutError' || err.name === 'AbortError');
       throw new ApiError(timedOut ? 504 : 502, timedOut ? 'database timeout' : 'database unreachable',
         `${timedOut ? `The database did not answer within ${LIMITS.upstreamTimeoutMs / 1000} s.`
-                    : `The database could not be reached (${(err && err.message) || err}).`} ${PAUSE_HINT}`);
+                    : `The database could not be reached (${(err && err.message) || err}).`} ${UNREACHABLE_HINT}`);
     } finally {
       this.release();
     }
@@ -368,7 +368,7 @@ class Upstream {
         ? `${body.message || ''}${body.hint ? ` — ${body.hint}` : ''}${body.code ? ` (${body.code})` : ''}`
         : `HTTP ${res.status}`;
       if (res.status >= 500) {
-        throw new ApiError(503, 'database unavailable', `The database answered ${said}. ${PAUSE_HINT}`);
+        throw new ApiError(503, 'database unavailable', `The database answered ${said}. ${UNREACHABLE_HINT}`);
       }
       if (res.status === 404 && ARRIVES_WITH[relation]) throw notYetThere(relation);
       throw new ApiError(502, 'database refused the query',
@@ -378,7 +378,7 @@ class Upstream {
     let rows;
     try { rows = JSON.parse(text); } catch (_) { rows = null; }
     if (!Array.isArray(rows)) {
-      throw new ApiError(502, 'database answered unexpectedly', `Expected a JSON array from ${relation}. ${PAUSE_HINT}`);
+      throw new ApiError(502, 'database answered unexpectedly', `Expected a JSON array from ${relation}. ${UNREACHABLE_HINT}`);
     }
     if (cache) {
       const put = cache.put(url, new Response(text, {
@@ -2521,7 +2521,7 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
         RateLimited: { description: 'Rate limited. Wait retry_after seconds (also the Retry-After header).',
           headers: { 'Retry-After': { schema: { type: 'integer' }, description: 'Seconds to wait.' } },
           content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-        Upstream: { description: 'The database was unreachable, slow or refused; detail says which (a paused free-tier project is the usual cause).', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+        Upstream: { description: 'The database was unreachable, slow or refused; detail says which (an outage or maintenance on the database is the usual cause).', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
       },
       schemas: {
         Object: { type: 'object', additionalProperties: true },

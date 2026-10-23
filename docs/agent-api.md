@@ -248,7 +248,7 @@ a 429 and `candidates` where there is something to suggest:
 | 404 | no such station, catchment or endpoint |
 | 405 | not `GET`/`HEAD`: the API is read-only |
 | 429 | rate limited — wait `Retry-After` seconds ([Limits](#limits-and-fair-use)) |
-| 502 / 503 / 504 | the database was unreachable, answered with an error, or took over 10 s. The usual cause is the free-tier database pausing after 7 days idle; `detail` says so |
+| 502 / 503 / 504 | the database was unreachable, answered with an error, or took over 10 s. The usual cause is an outage or maintenance on the database (a Supabase Pro project, so it does not pause); `detail` says which |
 | 503 `not available yet` | the route reads a relation a database migration has still to create — `missing_relation` and `migration` name them. No `Retry-After`: waiting will not apply a migration |
 
 Numbers in the examples below are Flood-Net's real data for Abergowrie Bridge AL,
@@ -762,8 +762,8 @@ time, each with a 10-second timeout; MCP bodies up to 64 KB and batches of up to
 **Fair use.** Cache what you fetch — a station's register record changes rarely,
 and identical questions within a minute are answered from the edge cache anyway.
 Ask about the stations you need rather than walking the whole network. Give your
-client a name. The database is on a free tier whose outbound transfer is shared
-with everyone using the app.
+client a name. The database's outbound transfer is a monthly
+quota shared with everyone using the app, and what goes past it is billed.
 
 ---
 

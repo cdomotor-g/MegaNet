@@ -86,8 +86,9 @@ jobs:
       # The register (870 KB compressed) and the whole week (1.1 MB) are read
       # once per six-hour slot and kept here; the runs between ask only for the
       # readings received since. Read whole every fifteen minutes they would be
-      # near 6 GB a month of the database's egress, more than the free plan
-      # allows for everything (tools/health/report.mjs, "the database").
+      # near 6 GB a month of the database's egress: more than the free plan's
+      # 5 GB for everything when this was written, and a needless share of the
+      # Pro plan's 250 GB now (tools/health/report.mjs, "the database").
       - name: Which six hours
         if: steps.key.outputs.ok == 'true'
         id: slot

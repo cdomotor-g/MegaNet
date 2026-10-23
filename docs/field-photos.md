@@ -1055,9 +1055,11 @@ The pictures themselves are in **Cloudflare R2**, in the bucket
 Supabase, and `add_field_photo()` still decides what may be added. Only the
 bytes moved.
 
-Why: Supabase's free plan holds **1 GB** of storage for the whole organisation
-and lets **5 GB a month** out of it, and one crew's zip of site photos is 2 GB.
-R2 holds **10 GB free**, charges nothing for reading photos out (so viewing
+Why: Supabase's free plan, which the project was on then, held **1 GB** of
+storage for the whole organisation and let **5 GB a month** out of it, and one
+crew's zip of site photos is 2 GB. The Pro plan it is on now would hold them
+(100 GB stored, 250 GB out a month, billed past that), but they stay in R2,
+which holds **10 GB free**, charges nothing for reading photos out (so viewing
 them costs nothing however often), and past 10 GB is about US$0.015 per GB a
 month — 100 GB of photos is about US$1.50 a month.
 

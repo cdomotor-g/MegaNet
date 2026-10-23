@@ -1,9 +1,11 @@
 // /api/photos/* — the field photos' bytes, kept in Cloudflare R2.
 //
-// Supabase's free plan holds 1 GB of storage for the whole organisation and
-// lets 5 GB a month out of it, and a crew's zip of site photos is 2 GB on its
-// own. R2 holds 10 GB free, charges nothing to read out of, and is a binding on
-// this Worker rather than another service to sign in to. So the bytes moved;
+// Supabase's free plan, which the project was on when this was built, held 1 GB
+// of storage for the whole organisation and let 5 GB a month out of it, and a
+// crew's zip of site photos is 2 GB on its own. The Pro plan it is on now would
+// hold them (100 GB stored, 250 GB out a month, billed past that), but R2 still
+// charges nothing to read out of, holds 10 GB free, and is a binding on this
+// Worker rather than another service to sign in to. So the bytes moved;
 // everything *about* a photo — where it was taken, which station, who added it,
 // its hash — stays in meganet.field_photo, and every rule about what may be
 // added is still meganet.add_field_photo()'s. This route only carries bytes.

@@ -1,9 +1,10 @@
 # Datastore decision
 
-**Decided:** 11 August 2026 · **Ticket:** [#71](https://github.com/cdomotor-g/MegaNet/issues/71), under epic [#70](https://github.com/cdomotor-g/MegaNet/issues/70) · **Status:** in force
+**Decided:** 11 August 2026 · **Ticket:** [#71](https://github.com/cdomotor-g/MegaNet/issues/71), under epic [#70](https://github.com/cdomotor-g/MegaNet/issues/70) · **Status:** in force · **Plan:** Pro since October 2026 ([what changed](#pro-plan-from-october-2026))
 
-Flood-Net's datastore is **Postgres, hosted on Supabase**, in a **dedicated free-tier
+Flood-Net's datastore is **Postgres, hosted on Supabase**, in a **dedicated
 project** (`MegaNet`, ref `jjprlritvhdqpvphfrnu`) in **`ap-southeast-2` (Sydney)**,
+on the **Pro plan** (it was on the free tier until October 2026),
 with all schema kept as plain SQL in [`db/migrations/`](../db/migrations/) and
 applied with `psql`.
 
@@ -12,6 +13,27 @@ the same job the README's terrain and ACMA notes do. If you are about to change
 one of these, the reasoning is here; argue with it rather than around it.
 
 ## What was checked
+
+### Pro plan, from October 2026
+
+The org moved to Supabase's Pro plan in October 2026; the database was 703 MB by
+then, past the free tier's 500 MB. What that changes for Flood-Net:
+
+| | On Pro |
+| --- | --- |
+| Database size | No 500 MB read-only ceiling. **8 GB of disk is included per project**; at 90% full the disk grows by half and the extra is billed (about US$0.125 per GB a month), unless the spend cap is on, which holds it at 8 GB and goes read-only there instead. The Admin tab's meter reads against the 8 GB. |
+| Inactivity | **Pro projects do not pause.** The pause below no longer applies. |
+| Egress | **250 GB/month** uncached and 250 GB cached across the org, billed past that. |
+| File storage | **100 GB** across the org, billed past that. The field photos stay in R2 anyway ([`field-photos.md`](field-photos.md)). |
+| Active projects | No cap, but every project runs its own instance and bills compute. The plan's US$10 compute credit covers one Micro instance; each further active project adds about US$10 a month. |
+
+Sources: Supabase's [database size](https://supabase.com/docs/guides/platform/database-size),
+[disk size](https://supabase.com/docs/guides/platform/manage-your-usage/disk-size),
+[egress](https://supabase.com/docs/guides/platform/manage-your-usage/egress) and
+[compute](https://supabase.com/docs/guides/platform/manage-your-usage/compute) docs.
+
+The rest of this section is the free-tier reading the decision was made on, kept
+as it was.
 
 ### Free-tier limits, confirmed 11 Aug 2026
 
@@ -45,6 +67,9 @@ and a paused project fails the app's read rather than slowing it. Two mitigation
 neither built yet: the Data source panel makes a pause visible and named instead
 of mysterious, and #B2 onwards should keep `stations.json` working as a fallback
 so a paused database degrades to "yesterday's data" rather than "no data".
+*(October 2026: on Pro the project does not pause. Both mitigations were built
+and stay, because an outage, a maintenance window or a field laptop with no
+signal fails the read the same way.)*
 
 ### Room in the org
 
@@ -55,6 +80,9 @@ pausing one, or paying.
 
 The Singapore project was deleted outright rather than left paused, so it occupies
 neither a slot nor a restore window.
+
+*(October 2026: Pro has no two-project limit. Each active project bills its own
+compute instead; see [Pro plan](#pro-plan-from-october-2026).)*
 
 ## The decisions
 

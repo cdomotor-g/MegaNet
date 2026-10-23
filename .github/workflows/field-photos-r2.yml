@@ -1,5 +1,5 @@
 # Field photos into R2: carries the photos' bytes out of Supabase Storage (1 GB
-# on the free plan) and into Cloudflare R2 behind the Worker's /api/photos
+# on the free plan it was moved off) and into Cloudflare R2 behind the Worker's /api/photos
 # route (worker/photos.js). tools/field-photos/move-to-r2.mjs is the run;
 # docs/field-photos.md ("Where the bytes live") is the why and the setup.
 #

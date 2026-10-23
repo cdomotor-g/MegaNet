@@ -284,8 +284,8 @@ const MapFade = (function () {
 
   // Read once per page, whether or not the switch is on: the whole point of
   // saving is that the colours are there before anybody asks for them. A
-  // failure is remembered rather than retried on every repaint — the sleeping
-  // free-tier project would otherwise turn one dead read into one per render
+  // failure is remembered rather than retried on every repaint — a datastore
+  // that is down would otherwise turn one dead read into one per render
   // (station-inspections.js's sticky-failure rule).
   function loadSaved() {
     // Every state but 'idle' means the question has been asked, and asking it

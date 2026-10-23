@@ -465,9 +465,9 @@ fallback — what went wrong and a button to retry the database.
 **🛠️ Admin** tab with **Load from GitHub**, the Data source panel and the snapshot button.
 Working from a laptop with no network is a real part of this job.
 
-The fallback is not padding. A free-tier Supabase project pauses after about a
-week of inactivity, and a paused project *fails* the read rather than slowing it
-down — Flood-Net is exactly the burst-shaped tool that gets paused. Falling back
+The fallback is not padding. The project is on Supabase's Pro plan, which does
+not pause it after a week idle the way the free tier did, but an outage or a
+maintenance window still *fails* the read rather than slowing it down. Falling back
 turns that into "yesterday's data" instead of "no data", which is only acceptable
 because the header then says so.
 
@@ -602,8 +602,8 @@ yet when the page loaded), so when the worker first takes the page over, the
 list and the sheets' lists are asked for again through it: one visit with a
 signal is enough. With no network the app opens from that copy, and the header
 says so: **saved copy, 3 hours old — no signal**, never "from the datastore" (and
-with a signal but no answer from its source — a paused datastore fails the same
-way — *no answer from the datastore* instead).
+with a signal but no answer from its source — a datastore that is down fails the
+same way — *no answer from the datastore* instead).
 An inspection or maintenance sheet can be started and its draft is saved on the
 device, as it always was.
 
@@ -739,8 +739,12 @@ Four facts about this network are in the schema rather than left to be discovere
 
 ### Retention, and why it exists before the first row
 
-The whole network at 15-minute reporting is ~914,000 rows a day, which fills the
-500 MB free tier in under a week. So raw readings age out and the rollups are kept:
+The whole network at 15-minute reporting is ~914,000 rows a day — about 120 MB at
+roughly 130 bytes a row with its indexes. That filled the 500 MB free tier in
+under a week; on the Pro plan it fills the 8 GB of included disk in about ten
+weeks, and past that the disk grows and is billed (two years of it, the
+`reading` horizon below, would be about 85 GB). So raw readings age out and the
+rollups are kept:
 
 ```sql
 select meganet.retain();   -- rolls up, then deletes. In that order, always.
