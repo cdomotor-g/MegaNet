@@ -10357,6 +10357,8 @@ code {
 .a2 .a2-ambig { display: flex; gap: 14px; padding: 10px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
 .a2 .a2-ambig-id { font: 700 1rem ui-monospace, Menlo, Consolas, monospace; min-width: 90px; }
 .a2 .a2-ambig button { margin: 2px 6px 2px 0; }
+/* Where the IDs come from: a concentrator's addresses, two lists side by side where there is room. */
+.a2 .a2-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 0 18px; }
 
 @media (max-width: 700px) {
   .a2 .a2-stat { flex: 1 1 40%; min-width: 0; }

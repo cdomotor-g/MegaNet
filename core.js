@@ -4196,10 +4196,20 @@ const state = {
     // is right for everything an operator actually pastes; the explicit modes
     // exist for the case where a file holds both and only one is wanted.
     mode:      'auto',      // auto | ascii | bin
-    view:      'readings',  // readings | frames | stations | reference
+    view:      'readings',  // readings | frames | stations | origin
     frameIdx:  0,           // frame open in the anatomy panel
     onlyErrors: false,
     hideUnknown: false,     // drop records whose ALERT id matches no station
+    hideHeavy: false,       // drop records whose 1s say the legacy word was misheard
+    traceId:   null,        // ALERT address traced on the Where the IDs come from view
+    traceSrc:  null,        // concentrator (ALERT2 source address) opened there
+    // Receptions read from the datastore (meganet.reception_window, editors) in
+    // place of a pasted capture: { rows, from, to, loadedAt, capped }, the
+    // receiver (point_id) shown, and the window asked for.
+    rx:        null,
+    rxPoint:   '',
+    rxWindow:  '1h',        // 1h | 6h | 24h
+    rxNote:    '',
     eng:       true,        // show engineering values beside the raw counts
     mmPerTip:  bucketSizeMm(null).mm, // fallback only — a resolved station's TBRGbucketSize wins (see engValue)
     battDiv:   10,

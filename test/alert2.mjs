@@ -17,7 +17,15 @@
 //     carrying repeater path addresses, a destination and a PDU ID all decode;
 //   * nothing decides whether a frame or a record is clean from field 18,
 //     field 22 or a record's fourth byte — only from structure that does not
-//     add up.
+//     add up;
+//   * and where a legacy address came from: a record is the spec's three
+//     bytes and a time offset (Fig 3-3), it rebuilds to the ALERT Binary word
+//     the concentrator heard (Fig 5-5-1) — which the ALERT Packets decoder
+//     reads back to the same address and value — and a concentrator passing
+//     on misheard words, all 1s, is told from a clean one, a misheard word is
+//     matched to the clean reading another concentrator heard that second,
+//     and Flood-Net's reception log reads in as frames, its receiver's decode
+//     checked against its own bytes.
 //
 // Node only, under a second. alert2.js is a browser script with no exports, so
 // it is run in a context of its own and its codec read off the result; the
@@ -41,10 +49,20 @@ function check(name, pass, detail = '') {
 // The decoder's objects point back at their frame and report; a detail line wants the values.
 const J = x => JSON.stringify(x, (k, v) => (k === 'frame' || k === 'report' || k === 'x') ? undefined : v);
 
+// The station lookup reads the page's state and two helpers from core.js and
+// app.js; a small database of its own stands in for them.
 const ctx = vm.createContext({ console, TextDecoder, Uint8Array, DataView, Date, Math, Number, String,
-                               Array, Object, JSON, Set, Map, isFinite, parseInt });
+                               Array, Object, JSON, Set, Map, isFinite, parseInt,
+                               state: { data: { stations: [] }, a2: { picks: {} } },
+                               stationSensors: s => s.sensors || [],
+                               stationAlertIds: s => (s.sensors || []).map(x => x.alert_id),
+                               Packets: { stationName: () => null } });
 vm.runInContext(fs.readFileSync(repo('alert2.js'), 'utf8') + '\nthis.Alert2 = Alert2;', ctx, { filename: 'alert2.js' });
 const A = ctx.Alert2;
+// The ALERT Packets decoder, on its own, to read a rebuilt legacy word back.
+const pctx = vm.createContext({ console, Math });
+vm.runInContext(fs.readFileSync(repo('packets.js'), 'utf8') + '\nthis.Packets = Packets;', pctx, { filename: 'packets.js' });
+const PK = pctx.Packets;
 
 const one = line => A.parseAscii(line).frames[0];
 const hex2 = n => n.toString(16).toUpperCase().padStart(2, '0');
@@ -174,6 +192,89 @@ const f0 = bin.frames[0];
 check('00 10 70 07 27 0F: port 1, hop limit 7, 7 payload bytes, source 9999',
   f0.hdr.port === 1 && f0.hdr.hopLimit === 7 && f0.hdr.payLen === 7 && f0.hdr.source === 9999, J([f0.hdr.port, f0.hdr.hopLimit, f0.hdr.payLen, f0.hdr.source]));
 check('every frame of the USB sample decodes without a warning', bin.stats.errors === 0 && bin.frames.every(f => !f.warn.length));
+
+console.log('\nWhere a legacy address comes from\n');
+
+// Figure 3-3: byte 1 A7–A0, byte 2 D10–D8 over A12–A8, byte 3 D7–D0, byte 4 the time offset.
+// Address 0x1ABC, value 0x5A3, held 5 s, packed by hand from the figure.
+const fig33 = A.decodeRecord([0xBC, 0xBA, 0xA3, 0x05], 3);
+check('Fig 3-3: BC BA A3 05 is address 6844 (0x1ABC), value 1443 (0x5A3), held 5 s',
+  fig33.alertId === 0x1ABC && fig33.value === 0x5A3 && fig33.offset === 5, J(fig33));
+// Figure 5-5-1, ALERT Binary: 01 A5–A0 · 01 A11–A6 · 11 D4–D0 A12 · 11 D10–D5.
+const w = A.legacyWord(0x1ABC, 0x5A3);
+check('Fig 5-5-1: it was heard as the ALERT Binary word 7C 6A C7 ED', J(w.bytes) === J([0x7C, 0x6A, 0xC7, 0xED]), J(w.bytes.map(hex2)));
+const lsbFirst = bytes => bytes.map(b => [0, 1, 2, 3, 4, 5, 6, 7].map(i => (b >> i) & 1).join('')).join('');
+const abfOf = (aid, val) => PK.decodeMessage(lsbFirst(A.legacyWord(aid, val).bytes)).results.find(r => r.format === 'abf');
+const words = [[0x1ABC, 0x5A3], [7182, 3], [8191, 2047], [0, 0], [4018, 1263]];
+check('the ALERT Packets decoder reads every rebuilt word back as ABF, to the same address and value',
+  words.every(([aid, val]) => { const r = abfOf(aid, val); return r && r.valid && r.values.A === aid && r.values.D === val; }),
+  J(words.map(([aid, val]) => { const r = abfOf(aid, val); return r && [r.valid, r.values.A, r.values.D]; })));
+check('a record counts the 1s in its 24 address and value bits', fig33.ones === 8 + 6 && A.decodeRecord([0xFF, 0xFF, 0xFF, 0], 0).ones === 24);
+check('18 of 24 looks misheard; a battery reading of 132 does not',
+  A.legacyWord(7679, 1535).heavy && !A.legacyWord(2390, 132).heavy && A.BIT_HEAVY === 18);
+
+// Two concentrators, one clean and one passing on misheard words. Frames a
+// minute apart; the misheard one's second and third records are all 1s.
+const rec = (aid, val, off = 0) => [aid & 0xff, ((val >> 8) << 5) | (aid >> 8), val & 0xff, off];
+const at = i => { const t = 3600 + i * 60; return { clock: [2026, 6, 8, 13, i, '0.500'], st: [t >> 8, t & 255] }; };
+const caps = [];
+for (let i = 0; i < 30; i++) {
+  const { clock, st } = at(i);
+  caps.push(line({ clock, source: 1111, bytes: [0x74, ...st, ...rec(1000, 130 + (i % 3)), ...rec(1001, 5 + i), ...rec(1002, 300)] }));
+  caps.push(line({ clock, source: 2222, bytes: [0x74, ...st, ...rec(1500, 10), ...rec(8191, 2047 - (i % 4)), ...rec(7679, 1535)] }));
+}
+// The clean concentrator's first frame again, by another path: a second copy, not a second record.
+caps.push(line({ clock: at(0).clock, source: 1111, f13to17: [0, 0, 0, 1, 0], opt: [1, 10019], bytes: [0x74, ...at(0).st, ...rec(1000, 130), ...rec(1001, 5), ...rec(1002, 300)] }));
+// And the clean one heard the legacy station the misheard one turned into 7679 at the same second.
+caps.push(line({ clock: at(5).clock, source: 1111, bytes: [0x74, ...at(5).st, ...rec(7424, 1280)] }));
+ctx.state.data.stations = [
+  { id: 'n1', name: 'Near one', lat: -27.40, lon: 152.80, sensors: [{ alert_id: 1000, type: 'Battery' }, { alert_id: 1001, type: 'Rainfall' }, { alert_id: 1002, type: 'Water Level' }] },
+  { id: 'n2', name: 'Near two', lat: -27.45, lon: 152.90, sensors: [{ alert_id: 1500, type: 'Rainfall' }, { alert_id: 7424, type: 'Rainfall' }] },
+  { id: 'f1', name: 'Far one', lat: -33.90, lon: 151.20, sensors: [{ alert_id: 7679, type: 'Battery' }] },
+  { id: 'f2', name: 'Far two', lat: -37.80, lon: 145.00, sensors: [{ alert_id: 8191, type: 'Battery' }] },
+];
+const two = A.parseAscii(caps.join('\n'));
+const res2 = A.resolve(two);
+const conc = A.concentrators(two, res2);
+const c1 = conc.find(e => e.source === 1111), c2 = conc.find(e => e.source === 2222);
+check('the clean concentrator is clean, the one passing on 1s is mishearing',
+  c1 && c2 && c1.verdict === 'ok' && c2.verdict === 'bad' && Math.abs(c2.share - 2 / 3) < 1e-9, J(conc.map(e => [e.source, e.verdict, e.share])));
+check('a frame heard by two paths is two copies of one set of records', c1.copies === c1.records + 3 && c1.records === 91, J([c1.copies, c1.records]));
+check('the misheard addresses land far away, and say so', res2.byAlertId.get(7679).far && res2.byAlertId.get(8191).far && !res2.byAlertId.get(1000).far,
+  J([...res2.byAlertId.values()].map(r => [r.aid, r.far, r.chosen && Math.round(r.chosen.distKm)])));
+check('…and do not pull the middle of the capture towards them', res2.centre && Math.abs(res2.centre.lat + 27.4) < 0.1, J(res2.centre));
+const jam = two.records.find(r => r.alertId === 7679 && r.frame.payload.stamp === 3600 + 5 * 60);
+const tw = A.twins(two, jam);
+check('a misheard 7679:1535 is matched to the clean 7424:1280 heard that second, 16 bits forced',
+  tw && tw.length === 1 && tw[0].r.alertId === 7424 && tw[0].r.value === 1280 && tw[0].forced === 16, J(tw && tw.map(x => [x.r.alertId, x.r.value, x.forced])));
+const tr = A.traceAddress(two, res2, 7679);
+check('tracing 7679 finds it from one concentrator only, every reading of it misheard',
+  tr.bySource.length === 1 && tr.bySource[0].source === 2222 && tr.bySource[0].heavy === 30, J(tr.bySource.map(e => [e.source, e.recs.length, e.heavy])));
+
+// Flood-Net's reception log: rows as reception_window() returns them.
+const row = (o, d) => Object.assign({ protocol: 'alert2', point_id: 'pi-1', point_name: 'Pi one', heard_at: '2026-10-21T21:51:04.502Z',
+  ok: true, lat: -27.39, lon: 152.78 }, o, { detail: Object.assign({ source: 33300, path: [11056, 10019], hop_limit: 3, stamp: 35421, snr_db: 24 }, d) });
+const rows = [
+  row({ alert_id: 4018, value_raw: 1263, payload_hex: 'B28FEF3C' }, { before_s: 60 }),
+  row({ alert_id: 4030, value_raw: 1598, payload_hex: 'BECF3E37' }, { before_s: 55 }),
+  row({ alert_id: 4018, value_raw: 1263, payload_hex: 'B28FEF3C', heard_at: '2026-10-21T21:50:35.053Z' }, { before_s: 60, path: [10019], hop_limit: 4 }),
+  row({ alert_id: 4031, value_raw: 1598, payload_hex: 'BECF3E37', heard_at: '2026-10-21T21:52:00.000Z' }, { before_s: 55 }),
+  row({ protocol: 'alert', alert_id: 7, value_raw: 1 }, {}),
+];
+const rx = A.parseRx(rows);
+check('the reception log reads as frames: one per moment heard, source and path',
+  rx.mode === 'rx' && rx.frames.length === 3 && rx.frames[1].records.length === 2 && J(rx.frames[1].hdr.path) === J([11056, 10019]) && rx.frames[1].hdr.source === 33300,
+  J(rx.frames.map(f => [f.hdr.source, f.hdr.path, f.records.length])));
+check('each record decoded afresh from its bytes: B2 8F EF 3C is 4018 = 1263, held 60 s',
+  (r => r.alertId === 4018 && r.value === 1263 && r.offset === 60)(rx.frames[1].records[0]));
+check('a row whose logged address disagrees with its bytes is flagged on its frame',
+  rx.stats.mismatched === 1 && rx.frames[2].warn.some(x => /4031/.test(x) && /4030/.test(x)), J(rx.frames[2].warn));
+check('the frame is timed by its stamp against when it was heard', rx.frames[1].time && rx.frames[1].time.base !== null, J(rx.frames[1].time));
+check('the receiver\'s position comes with it, and distances are measured from there',
+  rx.receiver && rx.receiver.lat === -27.39 && (r => r.ref && r.ref.kind === 'receiver')(A.resolve(rx)), J(rx.receiver));
+const rc = A.concentrators(rx, A.resolve(rx));
+// The fourth row repeats the second's bytes under the same stamp: the same record, one more copy.
+check('two paths of the same frame count once as records', rc.length === 1 && rc[0].records === 2 && rc[0].copies === 4, J(rc.map(e => [e.records, e.copies])));
 
 const failed = results.filter(r => !r.pass);
 console.log(`\n${failed.length ? 'FAIL' : 'PASS'} — the ALERT2 decoder reads the fields, the stamp and the self-reports as the spec writes them `

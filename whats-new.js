@@ -25,6 +25,18 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 76, date: '2026-10-23', items: [
+      '<strong>Where the IDs come from</strong>, a new view on the <em>ALERT2 / ERT-A2</em> tab, for when an ALERT2 receiver '
+        + 'says it heard a legacy station that ought to be out of range. A legacy reading in an ALERT2 frame was heard by some '
+        + 'ALERT2 repeater — its <em>concentrator</em> — and legacy ALERT carries no checksum, so a word that repeater misheard '
+        + 'arrives as another station\'s address, usually one far away, with most of its bits 1. Each concentrator gets a row: '
+        + 'how much of what it sends looks misheard, how much matches no station or one over 250 km away, and a verdict. '
+        + '<em>Trace</em> any address for every copy of it by concentrator, its values, the legacy word it was rebuilt from '
+        + '(drawn on ALERT Packets), and the clean reading another concentrator heard that same second. Signed in as an editor, '
+        + '<em>From Flood-Net — reception log</em> reads what a Raspberry Pi heard straight into the tab, and checks the Pi\'s '
+        + 'decode of every record against its bytes. Readings that look misheard, and stations matched far away, are marked '
+        + 'on the other views too.',
+    ] },
     { n: 75, date: '2026-10-23', items: [
       '<strong>Fainter links on the Stations map</strong>: the pass-range and backbone lines now open at 25 % opacity, '
         + 'so the stations show through them. Move <em>Link opacity</em> in Map display to have them stronger — the '

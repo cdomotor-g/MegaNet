@@ -4417,7 +4417,7 @@ tab. The unit emits two different things on two different ports, and they do not
 carry the same information — so the tab reads both, and sniffs which one it has
 been given.
 
-#### Two ways in
+#### Two ways in (and the reception log)
 
 **1 · ALERT2 ASCII protocol — secondary RS232 port.** One comma-delimited line
 per received frame — the NHWC ALERT2 IND API's MANT PDU string (v1.1 §5.2): 24
@@ -4535,6 +4535,50 @@ against candidates 1,200 km away. The rest are reported as ambiguous with a pin
 to record the answer, because two stations 6 km apart carrying the same addresses
 cannot be told apart by anything in the frame, and guessing would be worse than
 saying so.
+
+**A third way in — the reception log.** Signed in as an editor, *From Flood-Net —
+reception log* reads the last hour, 6 hours or 24 hours of `meganet.reception`
+(`reception_window()`, at most 50,000 rows) into the tab in place of a capture:
+what a receiver sending to Flood-Net heard — a Raspberry Pi's RTL-SDR decoding
+ALERT2 off the air, or the Serial Monitor's ERT-A2 card — with each record's four
+bytes, its concentrator, its repeater path, its hop limit and stamp. One frame is
+the rows sharing a receiver, a moment heard, a source, a stamp and a path. The
+bytes are decoded again here, and any record where the receiver's own decode of
+address, value or hold disagrees with its bytes is flagged on its frame and
+counted in the summary — the check that the two decoders read ALERT2 the same way.
+Distances are then measured from the receiver's own position.
+
+**Where the IDs come from.** A legacy address in an ALERT2 frame was heard by an
+ALERT2 repeater — the **concentrator**, the frame's source address — which kept
+only the address and value of the legacy word (Application Layer v1.3 §3.3.1).
+ALERT Binary has no checksum, so a word the concentrator misheard is packed and
+sent on as faithfully as a good one, and ALERT2's error correction covers only the
+hops after it: a misheard word arrives clean, as some other station's address,
+usually far away. Its fingerprint is 1s — a real reading has about half of its 24
+address and value bits set, a misheard one 18 or more. This view gives each
+concentrator a row: records (each counted once however many paths brought it),
+addresses, how many repeat and how many were heard once, the share that look
+misheard, the share matching no station or one over 250 km away, and a verdict
+(clean under 8 %, *worth a look*, *mishearing* at a fifth or more). *Trace* takes
+one address: the stations carrying it with their distances and how many of their
+other addresses were heard, what each concentrator sent under it, and every
+reading with its record bytes, the legacy ALERT Binary word rebuilt from them
+(*Draw it on ALERT Packets* hands it to that tab's encoder) and — for a reading
+that looks misheard — the clean readings another concentrator heard within two
+seconds that it could have been made from by bits turning to 1. Readings that
+look misheard and stations matched over 250 km away are marked on the other views
+too, and the capture's middle is weighted by readings that do not look misheard,
+so a flood of one-off addresses cannot pull it interstate.
+
+> **What prompted it.** A Pi on 151.5375 MHz west of Brisbane logged 261,705
+> concentration records from 27 concentrators in 2.7 days, under 4,804 different
+> addresses — about half of them matching no station or one hundreds of
+> kilometres away. One concentrator sent 61 % of its records with 18 or more bits
+> set; every other ran 1–4 %. Its addresses matched Sydney, Wollongong, Victoria
+> and no station at all, and the same corrupted bytes arrived identical by two
+> repeater paths — so the damage was done before the ALERT2 hop. The northern NSW
+> stations the Pi also heard (the Tweed and the Richmond, 110–180 km) came mostly
+> from a clean concentrator, with values that move the way their sensors do.
 
 **Clock skew.** On an ASCII capture the header time is the receiver's own RTC and
 the payload time comes from the transmitting network, so the summary reports the

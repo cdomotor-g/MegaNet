@@ -20,7 +20,7 @@
 // executes at load.
 //
 // ⚠ This file carries one of the app's 4 literal NUL bytes — U+0000 inside a
-// string literal at line 1229, used as a compound-key separator (#129).
+// string literal at line 1449, used as a compound-key separator (#129).
 // Any tool that round-trips this file as text and normalises control characters
 // destroys that key silently. `npm run concat` in test/ is what catches it.
 //
@@ -66,6 +66,13 @@
 // System Access picker is allowed, or dragged onto the tab, which still works
 // where a policy has switched that picker off. The Serial Monitor's ERT-A2 card
 // is the same decoder fed live, from a port or from the same followed log.
+//
+// And a third way in, for an editor: Flood-Net's reception log (parseRx), what
+// a receiver sending to Flood-Net — a Raspberry Pi's RTL-SDR, the Serial
+// Monitor — heard, record by record, with each record's bytes decoded again
+// here and checked against the receiver's own decode. Its view "Where the IDs
+// come from" asks of each legacy address which concentrator heard it and
+// whether it was misheard on the way in (legacyWord, concentrators, twins).
 
 const Alert2 = (function () {
 
@@ -156,17 +163,68 @@ const Alert2 = (function () {
   // There is no status in it: whether a record is good is the frame's to say
   // (readPayload), and its fourth byte only says when the reading was taken.
   function decodeRecord(b, off) {
+    const alertId = ((b[1] & 0x1f) << 8) | b[0], value = ((b[1] >> 5) << 8) | b[2];
     return {
       off,
       bytes:   [b[0], b[1], b[2], b[3]],
-      alertId: ((b[1] & 0x1f) << 8) | b[0],
-      value:   ((b[1] >> 5) << 8) | b[2],
+      alertId,
+      value,
       offset:  b[3],
+      ones:    onesOf(alertId, value),
       ok:      true,
     };
   }
 
   const FULL_SCALE = 2047;          // 11 bits all set: over-range or a dead sensor
+
+  // ── the legacy ALERT word a record was made from ──────────────────────────────
+  //
+  // A concentration record is a legacy ALERT transmission re-packed (Application
+  // Layer v1.3 §3.3.1). Some repeater — the concentrator, which the frame names
+  // as its source address — heard a legacy station's four-byte word over the
+  // air, decoded it to its address and value, and kept only those two numbers
+  // ("information on the original type of ALERT message is not retained").
+  // Rebuilt in ALERT Binary format, the one Australian networks send (Appendix
+  // 2, Fig 5-5-1; FORMATS.abf on the ALERT Packets tab), the word was
+  //
+  //   byte 1   0 1 A5  A4  A3 A2 A1 A0
+  //   byte 2   0 1 A11 A10 A9 A8 A7 A6
+  //   byte 3   1 1 D4  D3  D2 D1 D0 A12
+  //   byte 4   1 1 D10 D9  D8 D7 D6 D5
+  //
+  // — two marker bits and six data bits a byte, and no checksum. So a word the
+  // concentrator misheard is wrapped and sent on exactly as a good one is, and
+  // ALERT2's error correction, which covers only the ALERT2 hop, delivers the
+  // damage intact: a clean ALERT2 frame vouches for the ALERT2 hop and says
+  // nothing about the legacy one before it.
+  //
+  // What a misheard word looks like, from a Pi's reception log in October
+  // 2026: 1s. A real reading has about half its 24 bits set, and a clean
+  // concentrator sent 1–4 % of its records with 18 or more; one concentrator
+  // sent 61 %, and those were nearly all of the addresses that matched no
+  // station or one hundreds of kilometres away. Bits read as 1 are what an
+  // async receiver gives when the tone it is decoding drops out under it and
+  // the line falls back to mark. BIT_HEAVY is a fingerprint, not a verdict: a
+  // real address with many 1s carrying a high value crosses it too. What
+  // settles it is the concentrator's share (concentrators()) and whether a
+  // clean concentrator heard the same transmission (twins()).
+  const BIT_HEAVY = 18;             // of the 24 address and value bits
+
+  function bits1(n) { let c = 0; while (n) { c += n & 1; n >>>= 1; } return c; }
+  function onesOf(alertId, value) { return bits1(alertId & 0x1fff) + bits1(value & 0x7ff); }
+
+  function legacyWord(alertId, value) {
+    const a = alertId & 0x1fff, v = value & 0x7ff;
+    const data = [a & 0x3f, (a >> 6) & 0x3f, ((v & 0x1f) << 1) | (a >> 12), (v >> 5) & 0x3f];
+    return {
+      data,
+      bytes: data.map((d, i) => (i < 2 ? 0x40 : 0xC0) | d),
+      ones:  data.map(bits1),
+      total: onesOf(a, v),
+      full:  data.filter(d => d === 0x3f).length,   // bytes whose six data bits all read 1
+      heavy: onesOf(a, v) >= BIT_HEAVY,
+    };
+  }
 
   // ── the frame's own time ──────────────────────────────────────────────────────
   //
@@ -981,6 +1039,121 @@ const Alert2 = (function () {
     };
   }
 
+  // ── the third way in: Flood-Net's reception log ──────────────────────────────
+  //
+  // A receiver sending to Flood-Net — a Raspberry Pi decoding ALERT2 off the
+  // air with an RTL-SDR, or the Serial Monitor's ERT-A2 card — logs every
+  // concentration record it hears to meganet.reception (0047, 0072): its four
+  // bytes, the frame's source address (the concentrator), the repeaters it came
+  // through, its hop limit and stamp, and the receiver's own decode of the
+  // address and value. Editors read a window of it with reception_window().
+  //
+  // One frame is the rows sharing a receiver, a moment heard, a source, a stamp
+  // and a path. What the log does not keep is the MANT header's other bits and
+  // the payload's control byte, so those are not drawn — but every record's
+  // bytes are, and are decoded here afresh: where the receiver's own decode of
+  // a record disagrees with its bytes, the frame says so, which is the check
+  // that Flood-Net and the receiver read ALERT2 the same way.
+  function parseRx(rows, opts) {
+    const o = opts || {};
+    const groups = new Map();
+    let other = 0;
+    (rows || []).forEach(e => {
+      if (!e || e.protocol !== 'alert2') { other++; return; }
+      const d = e.detail || {};
+      const k = [e.point_id, e.heard_at, d.source, d.stamp, (d.path || []).join('>')].join('|');
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(e);
+    });
+    const frames = [];
+    let mismatched = 0, rebuilt = 0;
+    [...groups.values()].sort((x, y) => Date.parse(x[0].heard_at) - Date.parse(y[0].heard_at)).forEach(g => {
+      const e0 = g[0], d = e0.detail || {}, t = Date.parse(e0.heard_at), seq = frames.length;
+      const stamp = d.stamp != null && Number.isFinite(Number(d.stamp)) ? Number(d.stamp) : null;
+      const f = blankFrame({ kind: 'rx', seq, lineNo: seq + 1, fields: [],
+        rx: { point: e0.point_name || e0.point_id, heardMs: t, snr: d.snr_db, fixed: d.fixed, freq: d.freq_mhz,
+              app: d.app, fmt: d.fmt, duplicate: g.some(e => (e.detail || {}).duplicate) } });
+      f.hdr = { source: d.source != null ? Number(d.source) : null, path: Array.isArray(d.path) ? d.path.map(Number) : null,
+                hopLimit: d.hop_limit != null ? Number(d.hop_limit) : null, port: d.port != null ? Number(d.port) : null,
+                decoder: null, agency: null, clockMs: Number.isFinite(t) ? t : null,
+                rssi: e0.rssi_dbm != null ? Number(e0.rssi_dbm) : null };
+      f.payload = { bytes: [], ctl: { test: false, logged: true }, stamp, hdrLen: 0, body: [] };
+      g.forEach(e => {
+        if (e.alert_id == null) {
+          if (e.ok === false) f.error = 'the receiver could not decode this frame' + (e.fault ? ' (' + e.fault + ')' : '');
+          else { f.selfReport = true; if (f.hdr.port == null) f.hdr.port = PORT_SELF; }
+          return;
+        }
+        if (f.hdr.port == null) f.hdr.port = PORT_CONC;
+        const hex = String(e.payload_hex || '');
+        let b = /^[0-9A-Fa-f]{8}$/.test(hex) ? hex.match(/../g).map(x => parseInt(x, 16)) : null;
+        const aid = Number(e.alert_id), val = Number(e.value_raw), held = (e.detail || {}).before_s;
+        if (!b) {
+          // No bytes kept: rebuilt from the receiver's decode, so there is nothing to check it against.
+          b = [aid & 0xff, ((val >> 8) << 5) | ((aid >> 8) & 0x1f), val & 0xff, Number(held) || 0];
+          rebuilt++;
+        }
+        const r = decodeRecord(b, f.records.length * REC_BYTES);
+        r.frame = f; r.idx = f.records.length; r.ok = e.ok !== false; r.logged = { alertId: aid, value: val, before: held };
+        if (r.alertId !== aid || r.value !== val || (held != null && Number(held) !== r.offset)) {
+          mismatched++;
+          f.warn.push('the receiver logged ' + aid + ' = ' + val + (held != null ? ', held ' + held + ' s' : '')
+                    + ', and its own bytes ' + b.map(hx).join(' ') + ' decode to ' + r.alertId + ' = ' + r.value + ', held ' + r.offset + ' s');
+        }
+        f.records.push(r);
+      });
+      if (g.some(e => e.alert_id != null && e.ok === false)) damage(f, 'the receiver logged this frame as not decoded cleanly');
+      if (f.damaged) f.records.forEach(r => { r.ok = false; });
+      if (stamp != null && f.hdr.clockMs) f.time = placeStamp(stamp, f.hdr.clockMs);
+      f.raw = 'heard ' + clockText(f.hdr.clockMs) + ' by ' + f.rx.point
+            + (f.hdr.source != null ? ' · source ' + f.hdr.source : '')
+            + (f.hdr.path && f.hdr.path.length ? ' · via ' + f.hdr.path.join(' → ') : ' · direct')
+            + (f.hdr.hopLimit != null ? ' · hop limit ' + f.hdr.hopLimit : '')
+            + (stamp != null ? ' · stamp ' + stamp : '')
+            + (f.rx.snr != null ? ' · SNR ' + f.rx.snr + ' dB' : '')
+            + (f.rx.fixed ? ' · ' + f.rx.fixed + ' bit' + (f.rx.fixed === 1 ? '' : 's') + ' corrected' : '')
+            + ' · ' + f.records.map(r => r.bytes.map(hx).join('')).join(' ');
+      frames.push(f);
+    });
+
+    const good = frames.filter(f => !f.error);
+    const recs = [];
+    good.forEach(f => f.records.forEach(r => recs.push(r)));
+    const bases = { local: 0, utc: 0, either: 0, none: 0 };
+    good.forEach(f => { if (f.time && !f.damaged) bases[f.time.base || 'none']++; });
+    // Where the receiver is: the reception log carries its position on every
+    // row (exact from a GPS, else the station it is filed under).
+    const lats = (rows || []).map(e => e && e.lat).filter(x => x != null && isFinite(x));
+    const lons = (rows || []).map(e => e && e.lon).filter(x => x != null && isFinite(x));
+    const clocks = good.map(f => f.hdr.clockMs).filter(x => x);
+    const ingest = [];
+    ingest.push((rows || []).length.toLocaleString() + ' reception' + ((rows || []).length === 1 ? '' : 's') + ' from Flood-Net' + (o.label ? ' — ' + String(o.label).replace(/[<>&"]/g, '') : ''));
+    if (other) ingest.push(other.toLocaleString() + ' not ALERT2, set aside');
+    ingest.push(mismatched
+      ? '<b>' + mismatched + ' record' + (mismatched === 1 ? '' : 's') + ' where the receiver\'s decode disagrees with its own bytes</b> — open the frames marked with a warning'
+      : 'every record\'s bytes decode here to the address, value and hold the receiver logged');
+    if (rebuilt) ingest.push(rebuilt + ' record' + (rebuilt === 1 ? '' : 's') + ' logged without bytes, rebuilt from the receiver\'s decode');
+    return {
+      text: '', mode: 'rx', frames, records: recs, sensors: [],
+      receiver: lats.length && lons.length ? { lat: median(lats), lon: median(lons) } : null,
+      stats: {
+        mode: 'rx', frames: frames.length, wrapped: 0, prefixed: 0,
+        errors: frames.filter(f => f.error).length,
+        warned: good.filter(f => f.warn.length).length,
+        records: recs.length, sensors: 0,
+        selfReports: good.filter(f => f.selfReport).length, tests: 0,
+        badRecords: recs.filter(r => !r.ok).length,
+        banners: 0, junk: [], ingest, mismatched, rebuilt,
+        decoders: [], agencies: [],
+        receivers: [...new Set(good.map(f => f.rx.point))],
+        sources: [...new Set(good.map(f => f.hdr.source).filter(x => x != null))],
+        firstMs: clocks.length ? Math.min(...clocks) : null,
+        lastMs: clocks.length ? Math.max(...clocks) : null,
+        skew: null, skewN: 0, skewSpread: null, bases,
+      },
+    };
+  }
+
   // Which format a capture is in. The two are unmistakable from a few bytes —
   // one starts every line with the literal word ALERT2A, the other carries the
   // same word as hex — so sniffing beats making the operator classify a paste
@@ -1023,6 +1196,24 @@ const Alert2 = (function () {
   // operator who knows the answer can record it for the rest of the capture.
 
   const GAP_KM = 100;   // how much closer the winner must be before it is called resolved
+  // How far from the receiver (or, with no position for it, from the middle of
+  // the capture) a matched station is called far. Not a radio range — an ALERT2
+  // repeater on a range carries a long way, and a concentrator can be gathering
+  // a network a state line away. It is the distance past which a match is
+  // worth a second look: on the Pi capture behind it, real stations came in
+  // from 180 km and misheard words landed from 200 km to 1,600 km.
+  const FAR_KM = 250;
+
+  // A median weighted by how much each value counts. The capture's middle is
+  // fixed by its anchors, and an anchor heard two hundred times is a station;
+  // one heard once may be a misheard word that happens to match one.
+  function wmedian(xs, ws) {
+    const order = xs.map((_, i) => i).sort((a, b) => xs[a] - xs[b]);
+    const half = ws.reduce((a, b) => a + b, 0) / 2;
+    let acc = 0;
+    for (const i of order) { acc += ws[i]; if (acc >= half) return xs[i]; }
+    return null;
+  }
 
   const idx = { src: null, byId: null, byA2: null };
   function alertIndex() {
@@ -1063,19 +1254,33 @@ const Alert2 = (function () {
 
   function resolve(parsed) {
     const byId = alertIndex();
-    const seen = new Map();
-    parsed.records.forEach(r => { if (r.ok) seen.set(r.alertId, (seen.get(r.alertId) || 0) + 1); });
+    const seen = new Map(), clean = new Map();
+    parsed.records.forEach(r => {
+      if (!r.ok) return;
+      seen.set(r.alertId, (seen.get(r.alertId) || 0) + 1);
+      const ones = r.ones != null ? r.ones : onesOf(r.alertId, r.value || 0);
+      if (ones < BIT_HEAVY) clean.set(r.alertId, (clean.get(r.alertId) || 0) + 1);
+    });
 
-    const anchors = [];
+    const anchors = [], weights = [];
     seen.forEach((n, aid) => {
-      const c = byId.get(aid);
-      if (c && c.length === 1 && c[0].station.lat != null && c[0].station.lon != null) anchors.push(c[0].station);
+      const c = byId.get(aid), w = clean.get(aid) || 0;
+      if (w && c && c.length === 1 && c[0].station.lat != null && c[0].station.lon != null) { anchors.push(c[0].station); weights.push(w); }
     });
     // Median, not mean: one station on the far side of the country would drag a
     // mean far enough to start picking the wrong candidates for everything else.
+    // Weighted by the anchor's readings that do not look misheard, because a
+    // receiver hearing a concentrator that mishears sees hundreds of one-off
+    // addresses, each matching a station somewhere in the country — counted
+    // one apiece they outvote the real network and walk the middle of the
+    // capture interstate.
     const centre = anchors.length
-      ? { lat: median(anchors.map(s => s.lat)), lon: median(anchors.map(s => s.lon)), n: anchors.length }
+      ? { lat: wmedian(anchors.map(s => s.lat), weights), lon: wmedian(anchors.map(s => s.lon), weights), n: anchors.length }
       : null;
+    // Distances are from the receiver where the capture says where it is (the
+    // reception log does), and from that middle otherwise.
+    const rx = parsed.receiver && parsed.receiver.lat != null && parsed.receiver.lon != null ? parsed.receiver : null;
+    const ref = rx ? { lat: rx.lat, lon: rx.lon, kind: 'receiver' } : centre ? { lat: centre.lat, lon: centre.lon, kind: 'capture' } : null;
 
     const out = new Map();
     seen.forEach((count, aid) => {
@@ -1084,7 +1289,7 @@ const Alert2 = (function () {
         const others = stationAlertIds(st).filter(x => x !== aid);
         return {
           station: st, types: c.types,
-          distKm: (centre && st.lat != null && st.lon != null) ? kmApart(centre.lat, centre.lon, st.lat, st.lon) : null,
+          distKm: (ref && st.lat != null && st.lon != null) ? kmApart(ref.lat, ref.lon, st.lat, st.lon) : null,
           siblings: others.filter(x => seen.has(x)).length,
           siblingsTotal: others.length,
         };
@@ -1106,6 +1311,7 @@ const Alert2 = (function () {
       }
       out.set(aid, { aid, count, cands, chosen, conf,
                      kind: chosen ? kindOf(chosen.types) : null,
+                     far: !!(chosen && chosen.distKm != null && chosen.distKm > FAR_KM),
                      // Only worth asking the bundled national address file about
                      // ids MegaNet has never heard of.
                      fileName: cands.length ? null : Packets.stationName(aid) });
@@ -1127,7 +1333,8 @@ const Alert2 = (function () {
                       conf: !sts.length ? 'unknown' : st ? 'sole' : 'ambiguous',
                       kind: kindOf(types.length ? types : [SENSOR_NAMES[x.sensor] || '']), fileName: null, a2: true });
     });
-    return { byAlertId: out, byA2, centre, anchors: anchors.length,
+    return { byAlertId: out, byA2, centre, ref, anchors: anchors.length,
+             far: [...out.values()].filter(r => r.far).length,
              ambiguous: [...out.values()].filter(r => r.conf === 'ambiguous' || r.conf === 'likely').length,
              unknown: [...out.values()].filter(r => r.conf === 'unknown').length
                     + [...byA2.values()].filter(r => r.conf === 'unknown').length };
@@ -1226,6 +1433,19 @@ const Alert2 = (function () {
   // capture — but pasting one character does re-read it.
   function current() {
     const a = state.a2;
+    // Receptions read from the datastore stand in for a capture until one is
+    // pasted: the box wins whenever it holds anything.
+    if (a.rx && !a.text.trim()) {
+      const rkey = 'rx|' + a.rx.loadedAt + '|' + a.rxPoint;
+      if (!a.parsed || a.parsedKey !== rkey) {
+        const rows = a.rxPoint ? a.rx.rows.filter(e => e.point_id === a.rxPoint) : a.rx.rows;
+        const pt = rows.length ? rows[0].point_name || rows[0].point_id : 'every receiver';
+        a.parsed = parseRx(rows, { label: pt + ', ' + clockText(a.rx.from) + ' → ' + clockText(a.rx.to)
+                                          + (a.rx.capped ? ' — the newest ' + a.rx.rows.length.toLocaleString() + ' receptions of the window' : '') });
+        a.parsedKey = rkey;
+      }
+      return a.parsed;
+    }
     const key = a.mode + ' ' + a.text;
     if (!a.parsed || a.parsedKey !== key) {
       a.parsed = a.text.trim() ? parse(a.text, a.mode) : null;
@@ -1248,6 +1468,7 @@ const Alert2 = (function () {
         const kind = info ? info.kind : null;
         if (a.onlyErrors && r.ok && !f.warn.length) return;
         if (a.hideUnknown && !st) return;
+        if (a.hideHeavy && r.ones >= BIT_HEAVY) return;
         rows.push({ r, f, info, st, kind, key: selKey(st, r.alertId), eng: engValue(kind, r.value, st) });
       });
       f.sensors.forEach(x => {
@@ -1316,8 +1537,9 @@ const Alert2 = (function () {
       f.records.forEach(r => {
         if (!r.ok) return;
         let e = by.get(r.alertId);
-        if (!e) by.set(r.alertId, e = { aid: r.alertId, n: 0, first: null, last: null, min: Infinity, max: -Infinity, lastVal: null, rssi: [] });
+        if (!e) by.set(r.alertId, e = { aid: r.alertId, n: 0, heavy: 0, first: null, last: null, min: Infinity, max: -Infinity, lastVal: null, rssi: [] });
         e.n++;
+        if (r.ones >= BIT_HEAVY) e.heavy++;
         const w = readingWhen(f, r.offset);
         if (w.sort != null && (e.first === null || w.sort < e.first.sort)) e.first = w;
         if (w.sort == null || e.last === null || w.sort >= e.last.sort) { e.last = w; e.lastVal = r.value; }
@@ -1403,7 +1625,15 @@ const Alert2 = (function () {
     }
     const c = CONF[info.conf];
     return stationLink(info.chosen.station)
-         + (info.conf === 'sole' ? '' : ' <span class="badge ' + c.badge + '" title="' + esc(c.note) + '">' + c.text + '</span>');
+         + (info.conf === 'sole' ? '' : ' <span class="badge ' + c.badge + '" title="' + esc(c.note) + '">' + c.text + '</span>')
+         + (info.far ? ' <span class="badge warn" title="' + esc('This station is ' + Math.round(info.chosen.distKm)
+             + ' km away. A match that far out is worth checking on the Where the IDs come from view: a misheard legacy word lands on whatever station happens to carry the address it turned into.')
+             + '">' + Math.round(info.chosen.distKm) + ' km</span>' : '');
+  }
+
+  // What the distances are measured from.
+  function refName(res) {
+    return res && res.ref ? (res.ref.kind === 'receiver' ? 'the receiver' : 'the middle of this capture') : 'nowhere yet';
   }
 
   // A named station is a station the operator will want to look at in full —
@@ -1429,8 +1659,10 @@ const Alert2 = (function () {
       const eng = row.eng ? '<div class="spec a2-follow" title="' + esc(row.eng.rule) + '">' + esc(row.eng.text) + '</div>' : '';
       return '<span class="val">' + esc(a2ValueText(row.x)) + '</span> <span class="spec">' + esc(row.x.type) + '</span>' + eng;
     }
-    const full = row.r.value === FULL_SCALE
-      ? ' <span class="badge warn" title="11 bits all set — over-range, or a sensor reading nothing">full scale</span>' : '';
+    const full = (row.r.value === FULL_SCALE
+      ? ' <span class="badge warn" title="11 bits all set — over-range, or a sensor reading nothing">full scale</span>' : '')
+      + (row.r.ones >= BIT_HEAVY
+      ? ' <span class="badge warn" title="' + row.r.ones + ' of its 24 address and value bits are 1 — what a legacy word misheard before it was concentrated looks like. See Where the IDs come from.">looks misheard</span>' : '');
     const eng = row.eng ? '<div class="spec a2-follow" title="' + esc(row.eng.rule) + '">' + esc(row.eng.text) + '</div>' : '';
     return '<span class="val">' + row.r.value + '</span>' + full + eng;
   }
@@ -1512,16 +1744,40 @@ const Alert2 = (function () {
     return raw;
   }
 
+  // A reception-log frame's equivalent of the header chips: what the receiver
+  // wrote down about it.
+  function rxChips(f) {
+    const h = f.hdr, x = f.rx;
+    const chip = (v, label, role, note) => '<span class="a2-chip r-' + role + '" title="' + esc(label + (note ? ' — ' + note : '')) + '">'
+      + '<b>' + esc(String(v)) + '</b><i>' + esc(label) + '</i></span>';
+    return '<div class="a2-chips">'
+      + chip(x.point, 'Receiver', 'ident', 'the Flood-Net point that heard it')
+      + chip(clockText(h.clockMs), 'Heard', 'time', 'by the receiver\'s clock')
+      + (h.source != null ? chip(h.source, 'Source address', 'addr', 'the concentrator: the ALERT2 station that heard the legacy words and wrapped them') : '')
+      + chip(h.path && h.path.length ? h.path.join(' → ') : 'direct', 'Path', 'addr', 'the repeaters the add-path service named, first to last')
+      + (h.hopLimit != null ? chip(h.hopLimit, 'Hop limit', 'status', 'repeats it may still take') : '')
+      + (f.payload.stamp != null ? chip(f.payload.stamp, 'Stamp', 'time', 'seconds since the most recent 00:00 or 12:00') : '')
+      + (x.snr != null ? chip(x.snr + ' dB', 'SNR', 'status') : '')
+      + (h.rssi != null ? chip(h.rssi + ' dBm', 'RSSI', 'status') : '')
+      + (x.fixed != null ? chip(x.fixed, 'Bits corrected', 'status', 'by ALERT2\'s error correction on the way to this receiver — the ALERT2 hop only') : '')
+      + (x.freq != null ? chip(x.freq + ' MHz', 'Frequency', 'ident') : '')
+      + (x.app ? chip(x.app, 'Decoder', 'ident') : '')
+      + '</div>';
+  }
+
   function payloadStrip(f) {
     const p = f.payload;
     const cell = (txt, lbl, cls, attrs) =>
       '<span class="a2-byte ' + cls + '"' + (attrs || '') + '><b>' + esc(txt) + '</b><i>' + esc(lbl) + '</i></span>';
     let html = '<div class="a2-bytes">';
-    html += '<span class="a2-bgroup">' + cell(hx(p.bytes[0]), 'control', 'r-ident');
-    let at = 1;
-    if (p.ctl.ext) html += cell(hx(p.bytes[at++]), 'control 2', 'r-ident');
-    if (p.ctl.ts) { html += cell(hx(p.bytes[at]), 'time hi', 'r-time') + cell(hx(p.bytes[at + 1]), 'time lo', 'r-time'); }
-    html += '</span>';
+    // The reception log keeps the records and not the bytes ahead of them.
+    if (f.kind !== 'rx') {
+      html += '<span class="a2-bgroup">' + cell(hx(p.bytes[0]), 'control', 'r-ident');
+      let at = 1;
+      if (p.ctl.ext) html += cell(hx(p.bytes[at++]), 'control 2', 'r-ident');
+      if (p.ctl.ts) { html += cell(hx(p.bytes[at]), 'time hi', 'r-time') + cell(hx(p.bytes[at + 1]), 'time lo', 'r-time'); }
+      html += '</span>';
+    }
     f.records.forEach((r, i) => {
       const at = ' data-rec="' + i + '"';
       html += '<span class="a2-bgroup" data-rec="' + i + '">'
@@ -1551,7 +1807,7 @@ const Alert2 = (function () {
       html += '</span>';
     });
     const used = p.hdrLen + f.records.length * REC_BYTES + f.reports.reduce((a, r) => a + r.bytes.length, 0);
-    if (used < p.bytes.length && (f.records.length || f.reports.length || f.damaged)) {
+    if (f.kind !== 'rx' && used < p.bytes.length && (f.records.length || f.reports.length || f.damaged)) {
       html += '<span class="a2-bgroup">';
       p.bytes.slice(used).forEach(b => { html += cell(hx(b), 'spare', 'r-bad'); });
       html += '</span>';
@@ -1578,7 +1834,7 @@ const Alert2 = (function () {
     const eng = engValue(info ? info.kind : null, r.value, st);
     const [b0, b1, b2, b3] = r.bytes;
     return '<div class="a2-rec' + (r.ok ? '' : ' bad') + '" data-rec="' + i + '">'
-      + '<div class="a2-rec-head">Reading ' + (i + 1) + ' <span class="spec">payload bytes ' + r.off + '–' + (r.off + 3)
+      + '<div class="a2-rec-head">Reading ' + (i + 1) + ' <span class="spec">' + (r.frame && r.frame.kind === 'rx' ? 'as logged' : 'payload bytes ' + r.off + '–' + (r.off + 3))
       + ' · <code>' + r.bytes.map(hx).join(' ') + '</code></span></div>'
       + '<div class="a2-rec-body">'
       +   '<div class="a2-rec-bits">' + packedBits(b1) + '<div class="spec">the packed byte</div></div>'
@@ -1594,8 +1850,51 @@ const Alert2 = (function () {
       +       '<span class="val">' + b3 + ' s</span> — held ' + b3 + ' s before the frame was exported'
       +       (recStamp(r.frame, r) != null ? ', so it was taken at <b>' + esc(readingWhen(r.frame, r.offset).text) + '</b>' : '')
       +       (r.ok ? '' : ' · <span class="txt-bad">the frame around it does not add up, so the reading is not vouched for</span>') + '</div>'
+      +     '<div><span class="swatch" style="--dot:var(--c-ident)"></span>' + wrappedText(r.frame) + '</div>'
+      +     '<div><span class="swatch" style="--dot:var(--c-hd)"></span>' + legacyText(r) + '</div>'
       +   '</div>'
       + '</div></div>';
+  }
+
+  // ── where a legacy reading came from ──────────────────────────────────────────
+
+  // The ALERT2 station a source address is, where Flood-Net knows one.
+  function a2Station(addr) {
+    alertIndex();
+    const sts = addr != null && idx.byA2 ? idx.byA2.get(Number(addr)) || [] : [];
+    return sts.length === 1 ? sts[0] : null;
+  }
+
+  // Who turned the legacy transmission into this record. The frame's source
+  // address is the concentrator — the repeater that heard the legacy station
+  // over the air (§3.1: "used primarily at forwarding repeaters") — and a
+  // receiver that concentrates what it hears itself puts its own address there,
+  // the same as field 3.
+  function wrappedText(f) {
+    const h = f.hdr;
+    if (h.source == null) return 'The frame does not say which repeater concentrated it.';
+    if (h.decoder != null && String(h.source) === String(h.decoder))
+      return 'Concentrated by <b>this receiver</b> — source address ' + esc(String(h.source)) + ' is its own (field 3), so it heard '
+           + 'the legacy ALERT transmission itself and wrapped it; no other ALERT2 station was involved.';
+    const st = a2Station(h.source);
+    return 'Concentrated by <b>ALERT2 station ' + esc(String(h.source)) + '</b>' + (st ? ' (' + stationLink(st) + ')' : ' — not an ALERT2 address Flood-Net knows')
+         + (h.path && h.path.length ? ', relayed through ' + h.path.map(x => esc(String(x))).join(' → ') : '')
+         + '. That station heard the legacy transmission; this receiver heard only its ALERT2 frame, so the reading\'s accuracy is the concentrator\'s.'
+         + ' <button type="button" class="link-btn" onclick="event.stopPropagation();Alert2.traceSource(' + Number(h.source) + ')" '
+         + 'title="Everything this concentrator sent, and how much of it looks misheard">See this concentrator ▸</button>';
+  }
+
+  // The legacy word, rebuilt (legacyWord), and what its 1s say.
+  function legacyText(r) {
+    const w = legacyWord(r.alertId, r.value);
+    const bytes = w.bytes.map((b, i) => '<code title="' + w.ones[i] + ' of its 6 data bits are 1">' + hx(b) + '</code>').join(' ');
+    return 'Rebuilt as the legacy ALERT Binary word it came from: ' + bytes + ' — <b>' + w.total + ' of 24</b> address and value bits are 1'
+      + (w.heavy ? ' <span class="badge warn" title="' + esc('A real reading has about half its bits set. ' + BIT_HEAVY + ' or more is what a word misheard before it was concentrated looks like — the tone dropped out and the bits read as 1. A real address with many 1s and a high value crosses it too; the concentrator\'s share, and a clean copy heard by another concentrator, settle it.') + '">looks misheard</span>' : '')
+      + (w.full ? ' · ' + w.full + ' byte' + (w.full === 1 ? '' : 's') + ' read all 1s' : '')
+      + '. <button type="button" class="link-btn" onclick="event.stopPropagation();Alert2.openInPackets(' + r.alertId + ',' + r.value + ')" '
+      + 'title="The ALERT Packets encoder draws the 40-bit over-the-air word, start, stop and marker bits included">Draw it on ALERT Packets ▸</button>'
+      + ' <button type="button" class="link-btn" onclick="event.stopPropagation();Alert2.trace(' + r.alertId + ')" '
+      + 'title="Every copy of this address in the capture, by concentrator">Trace ' + r.alertId + ' ▸</button>';
   }
 
   // A self-report's report: its readings by sensor, or — for a type this tab
@@ -1678,8 +1977,10 @@ const Alert2 = (function () {
     else                     badges.push('<span class="badge ok">clean</span>');
     if (f.wrapped) badges.push('<span class="badge warn">re-joined</span>');
 
-    const bin = f.kind === 'bin';
+    const bin = f.kind === 'bin', rx = f.kind === 'rx';
     if (bin) badges.push('<span class="badge ok" title="Read from the binary framing the USB port emits">USB</span>');
+    if (rx) badges.push('<span class="badge" title="From Flood-Net\'s reception log: each record\'s bytes as the receiver heard them. The header\'s other bits and the control byte are not kept.">log</span>');
+    if (rx && f.rx.duplicate) badges.push('<span class="badge" title="The receiver had already heard this frame by another path">repeat</span>');
     const self = f.hdr.port === PORT_SELF;
     if (self) badges.push('<span class="badge" title="Port 0 — an ALERT2 gauge\'s own report">self-report</span>');
     if (f.payload && f.payload.ctl.test)
@@ -1704,7 +2005,11 @@ const Alert2 = (function () {
     }
     if (f.warn.length) body += '<ul class="a2-warn">' + f.warn.map(w => '<li>' + esc(w) + '</li>').join('') + '</ul>';
     if (!f.error) {
-      if (bin) {
+      if (rx) {
+        body += '<h5 class="a2-h">Reception log</h5>' + rxChips(f);
+        body += '<div class="spec">What the receiver logged of this frame. It decoded the ALERT2 frame itself and kept each record\'s four '
+              + 'bytes, which are decoded again below; the MANT header\'s other bits and the payload\'s control byte are not kept, so they are not drawn.</div>';
+      } else if (bin) {
         body += '<h5 class="a2-h">Frame elements</h5>' + tlvChips(f);
         body += '<div class="spec">Tag, length, value — nesting shown by indent. Faded chips are elements that were '
               + 'constant across every frame cross-checked against Ranger, so their meaning is recorded but not established.</div>';
@@ -1713,8 +2018,10 @@ const Alert2 = (function () {
         body += '<div class="spec">Every field named from the ALERT2 IND API v1.1 §5.2 — hover a chip for what it says.</div>';
       }
       const what = self ? 'self-report' : f.hdr.port === PORT_CONC || f.hdr.port == null ? 'ALERT concentration' : 'port ' + f.hdr.port;
-      body += '<h5 class="a2-h">Payload — ' + what + ', ' + f.payload.bytes.length + ' bytes</h5>' + payloadStrip(f);
-      body += '<div class="spec">' + controlText(f.payload.ctl) + ' ' + stampText(f)
+      body += rx
+        ? '<h5 class="a2-h">Records — ' + what + ', ' + f.records.length + '</h5>' + (f.records.length ? payloadStrip(f) : '')
+        : '<h5 class="a2-h">Payload — ' + what + ', ' + f.payload.bytes.length + ' bytes</h5>' + payloadStrip(f);
+      body += '<div class="spec">' + (rx ? '' : controlText(f.payload.ctl) + ' ') + stampText(f)
             + (bin
                 ? ' Received at <b>' + (f.hdr.rssi != null ? f.hdr.rssi + ' dBm' : 'an unreported level')
                   + '</b>. This framing carries no receiver clock, so the payload\'s stamp is the only time in it.'
@@ -1722,14 +2029,15 @@ const Alert2 = (function () {
             + headerText(f) + '</div>';
       body += f.records.map((r, i) => recordBlock(r, i, res)).join('');
       body += f.reports.map((rep, i) => reportBlock(f, rep, i, res)).join('');
-      if (!f.records.length && !f.reports.length) body += '<p class="spec">No complete readings in this payload.</p>';
+      if (!f.records.length && !f.reports.length)
+        body += '<p class="spec">' + (f.selfReport ? 'A self-report — the reception log keeps one entry for it, not its sensors.' : 'No complete readings in this payload.') + '</p>';
     }
     // A <details>, not a div with a click handler (#140): same reasoning as the
     // ALERT Packets cards — a div's onclick is a mouse-only affordance, where
     // the summary is a disclosure a keyboard and a screen reader get for free.
     return '<details class="fmtcard"' + (open ? ' open' : '') + '>'
       + '<summary class="fmthead">'
-      + '<h4>' + (bin ? 'Frame ' + (f.seq + 1) : 'Line ' + f.lineNo) + '</h4>' + badges.join(' ')
+      + '<h4>' + (bin || rx ? 'Frame ' + (f.seq + 1) : 'Line ' + f.lineNo) + '</h4>' + badges.join(' ')
       + '<span class="caret">' + esc(summary.slice(0, 400)) + ' ▾</span></summary>'
       + '<div class="fmtbody">' + body + '</div></details>';
   }
@@ -1743,6 +2051,7 @@ const Alert2 = (function () {
   function summaryPanel(p, res) {
     const s = p.stats;
     const rssis = p.frames.filter(f => !f.error && f.hdr.rssi != null).map(f => f.hdr.rssi);
+    const heavy = p.records.filter(r => r.ok && r.ones >= BIT_HEAVY).length;
     const chips =
         statChip(s.frames - s.errors, 'frames decoded')
       + statChip(s.records + (s.sensors || 0), 'readings')
@@ -1751,12 +2060,16 @@ const Alert2 = (function () {
       + (s.tests ? statChip(s.tests, 'test frames', 'warn') : '')
       + (rssis.length ? statChip(median(rssis) + ' dBm', 'median RSSI') : '')
       + statChip(res.unknown, 'unmatched addresses', res.unknown ? 'warn' : '')
+      + (res.far ? statChip(res.far, 'matched over ' + FAR_KM + ' km away', 'warn') : '')
+      + (heavy ? statChip(heavy, 'readings that look misheard', heavy / Math.max(1, s.records) > 0.05 ? 'warn' : '') : '')
       + statChip(res.ambiguous, 'need a choice', res.ambiguous ? 'warn' : '')
       + statChip(s.errors + s.badRecords, 'errors', (s.errors + s.badRecords) ? 'bad' : '');
 
     const ingest = [];
     ingest.push(s.mode === 'bin'
       ? 'Read as the <b>binary framing</b> the ERT-A2 emits on USB'
+      : s.mode === 'rx'
+      ? 'Read from Flood-Net\'s <b>reception log</b> — every concentration record ' + esc((s.receivers || []).join(', ') || 'the receiver') + ' heard, with its four bytes, its concentrator and its path'
       : 'Read as the <b>ALERT2 ASCII protocol</b> the ERT-A2 writes to its RS232 port');
     if (p.detected === 'auto') ingest.push('detected automatically');
     if (s.banners) ingest.push(s.banners + ' PuTTY session banner' + (s.banners === 1 ? '' : 's') + ' skipped');
@@ -1770,7 +2083,7 @@ const Alert2 = (function () {
     const rssiNote = rssis.length
       ? '<div class="spec">RSSI ranges ' + Math.min(...rssis) + ' to ' + Math.max(...rssis)
         + ' dBm across ' + rssis.length + ' frame' + (rssis.length === 1 ? '' : 's') + '.</div>'
-      : (s.mode === 'bin' ? '' : '<div class="spec">This format carries no signal level. To get RSSI against each packet, '
+      : (s.mode === 'bin' || s.mode === 'rx' ? '' : '<div class="spec">This format carries no signal level. To get RSSI against each packet, '
         + 'capture the USB port instead and paste the hex — see the protocol reference above.</div>');
 
     let clock = '';
@@ -1805,10 +2118,13 @@ const Alert2 = (function () {
         + (idents ? ' ' + idents.charAt(0).toUpperCase() + idents.slice(1) : '') + '</div>'
       : (idents ? '<div class="spec">' + idents.charAt(0).toUpperCase() + idents.slice(1) + '.</div>' : '');
 
-    const anchors = res.centre
+    const anchors = res.ref && res.ref.kind === 'receiver'
+      ? '<div class="spec">Distances, and the choice between stations sharing an address, are measured from the receiver ('
+        + res.ref.lat.toFixed(3) + ', ' + res.ref.lon.toFixed(3) + ', where the reception log puts it).</div>'
+      : res.centre
       ? '<div class="spec">Ambiguous addresses were judged against the middle of this capture ('
         + res.centre.lat.toFixed(3) + ', ' + res.centre.lon.toFixed(3) + '), fixed by '
-        + res.anchors + ' address' + (res.anchors === 1 ? '' : 'es') + ' that match exactly one station.</div>'
+        + res.anchors + ' address' + (res.anchors === 1 ? '' : 'es') + ' that match exactly one station, each counted by its readings that do not look misheard.</div>'
       : (state.data ? '<div class="spec">No address in this capture matches exactly one station, so there is nothing to place it geographically — shared addresses are all reported as ambiguous.</div>' : '');
 
     return `
@@ -1879,9 +2195,9 @@ const Alert2 = (function () {
     let html = '<div class="table-wrap a2-tablewrap"><table class="fields a2-table">'
       + '<caption class="sr-only">Decoded readings — one row per reading, in capture order</caption>'
       + '<thead><tr>'
-      + '<th scope="col">FRAME TIME</th>' + (c.clock ? '<th scope="col">ERT-A2 CLOCK</th>' : '')
+      + '<th scope="col">FRAME TIME</th>' + (c.clock ? '<th scope="col">' + (p.stats.mode === 'rx' ? 'HEARD' : 'ERT-A2 CLOCK') + '</th>' : '')
       + '<th scope="col">ID</th><th scope="col">STATION</th><th scope="col">SENSOR</th><th scope="col">VALUE</th>'
-      + (c.rssi ? '<th scope="col">RSSI</th>' : '') + '<th scope="col">' + (p.stats.mode === 'bin' ? 'FRAME' : 'LINE') + '</th>'
+      + (c.rssi ? '<th scope="col">RSSI</th>' : '') + '<th scope="col">' + (p.stats.mode === 'ascii' ? 'LINE' : 'FRAME') + '</th>'
       + '</tr></thead><tbody>';
     shown.forEach(row => {
       const w = readingWhen(row.f, row.x ? 0 : row.r.offset);
@@ -1897,7 +2213,7 @@ const Alert2 = (function () {
         + (c.rssi ? '<td>' + rssiCell(row.f.hdr.rssi) + '</td>' : '')
         + '<td><button type="button" class="link-btn a2-link" onclick="event.stopPropagation();Alert2.openFrame(' + row.f.seq + ')" '
         + 'title="Open this frame in the anatomy view">'
-        + (p.stats.mode === 'bin' ? row.f.seq + 1 : row.f.lineNo) + ' ▸</button></td>'
+        + (p.stats.mode === 'ascii' ? row.f.lineNo : row.f.seq + 1) + ' ▸</button></td>'
         + '</tr>';
     });
     html += '</tbody></table></div>';
@@ -1924,10 +2240,11 @@ const Alert2 = (function () {
              + '</tr></thead><tbody>';
     roll.forEach(e => {
       html += '<tr' + rowAttrs(e.key) + '>'
-        + '<td>' + rowOpenBtn(e.key, '<b>' + esc(String(e.aid)) + '</b>') + '</td>'
+        + '<td>' + rowOpenBtn(e.key, '<b>' + esc(String(e.aid)) + '</b>')
+        + (typeof e.aid === 'number' ? ' <button type="button" class="link-btn" onclick="event.stopPropagation();Alert2.trace(' + e.aid + ')" title="Every copy of this address, by the concentrator that sent it">trace</button>' : '') + '</td>'
         + '<td>' + stationCell(e.info) + '</td>'
         + '<td>' + typeCell(e.info, e.a2) + '</td>'
-        + '<td>' + e.n + '</td>'
+        + '<td>' + e.n + (e.heavy ? ' <span class="badge warn" title="Readings with ' + BIT_HEAVY + ' or more of their 24 bits set">' + e.heavy + ' look misheard</span>' : '') + '</td>'
         + '<td><code>' + esc(e.first ? e.first.text : '—') + '</code> → <code>' + esc(e.last ? e.last.text : '—') + '</code></td>'
         + '<td><span class="spec">' + e.min + ' – ' + e.max + '</span></td>'
         + '<td><span class="val">' + e.lastVal + '</span>'
@@ -1945,6 +2262,9 @@ const Alert2 = (function () {
     const a = state.a2;
     const list = a.onlyErrors ? p.frames.filter(f => f.error || f.warn.length) : p.frames;
     const shown = list.slice(0, Math.max(1, Math.floor(a.limit / 4)));
+    // A frame opened from a trace or a reading may sit past the first page.
+    const want = p.frames.find(f => f.seq === a.frameIdx);
+    if (want && !shown.includes(want)) shown.unshift(want);
     let html = '<p class="sub">Every byte of a frame, coloured by meaning, above the readings it produced. '
              + 'Click a line to open it.</p>';
     html += shown.map(f => frameCard(f, res, f.seq === a.frameIdx)).join('');
@@ -1976,7 +2296,7 @@ const Alert2 = (function () {
         const num = c.station.station_number;
         html += '<button class="ghost' + (on ? ' on' : '') + '" onclick="Alert2.pick(' + r.aid + ',\'' + escAttr(c.station.id) + '\')">'
           + esc(c.station.name) + (sameName && num ? ' <small>· ' + esc(num) + '</small>' : '') + '</button>'
-          + '<span class="spec"> ' + (c.distKm == null ? 'no coordinates' : Math.round(c.distKm) + ' km from this capture')
+          + '<span class="spec"> ' + (c.distKm == null ? 'no coordinates' : Math.round(c.distKm) + ' km from ' + refName(res))
           + (!sameName && num ? ' · ' + esc(num) : '')
           + ' · ' + c.siblings + '/' + c.siblingsTotal + ' of its other addresses heard'
           + (c.types.length ? ' · ' + esc(c.types.join(', ')) : '') + '</span><br>';
@@ -1986,6 +2306,300 @@ const Alert2 = (function () {
     if (Object.keys(state.a2.picks).length)
       html += '<div class="pkt-block"><button class="ghost" onclick="Alert2.clearPicks()">Clear all pinned choices</button></div>';
     html += '</div>';
+    return html;
+  }
+
+  // ── where the IDs come from ───────────────────────────────────────────────────
+  //
+  // The question this answers: an ALERT2 receiver says it heard a legacy
+  // station hundreds of kilometres away — did it? The chain is
+  //
+  //   legacy station ──ALERT Binary, no checksum──▶ concentrator (an ALERT2
+  //   repeater: decodes the word, keeps address and value) ──ALERT2, error-
+  //   corrected──▶ … repeaters … ──▶ this receiver
+  //
+  // so the frame's source address names who heard the legacy word, and the
+  // only hop that can have changed the address is the first. A concentrator
+  // whose legacy receiver mishears turns one station into dozens of addresses,
+  // each landing on whatever station in the country carries it. Three things
+  // tell that apart from a real far-off network: the concentrator's share of
+  // words that look misheard (legacyWord), whether its addresses repeat as a
+  // station's do, and whether a clean concentrator heard the same transmission
+  // at the same second (twins).
+
+  // A record's identity across the copies a receiver hears of one frame (the
+  // same frame by two paths is two receptions): its concentrator, the frame's
+  // stamp and its four bytes. A frame with no stamp cannot be matched up, so
+  // each of its copies counts.
+  function recKey(f, r) {
+    return f.hdr.source + '/' + (f.payload && f.payload.stamp != null ? f.payload.stamp : '#' + f.seq) + '/' + r.bytes.join('.');
+  }
+
+  function concentrators(p, res) {
+    const by = new Map(), seen = new Set();
+    p.frames.forEach(f => {
+      if (f.error || !f.records.length) return;
+      const k = String(f.hdr.source);
+      let e = by.get(k);
+      if (!e) by.set(k, e = { source: f.hdr.source, self: f.hdr.decoder != null && String(f.hdr.source) === String(f.hdr.decoder),
+                              station: a2Station(f.hdr.source), frames: 0, copies: 0, records: 0, ids: new Map(),
+                              heavy: 0, unknown: 0, far: 0, paths: new Map() });
+      e.frames++;
+      const path = f.hdr.path && f.hdr.path.length ? f.hdr.path.join(' → ') : 'direct';
+      e.paths.set(path, (e.paths.get(path) || 0) + 1);
+      f.records.forEach(r => {
+        if (!r.ok) return;
+        e.copies++;
+        const key = recKey(f, r);
+        if (seen.has(key)) return;
+        seen.add(key);
+        e.records++;
+        e.ids.set(r.alertId, (e.ids.get(r.alertId) || 0) + 1);
+        if (r.ones >= BIT_HEAVY) e.heavy++;
+        const info = res.byAlertId.get(r.alertId);
+        if (!info || info.conf === 'unknown') e.unknown++;
+        else if (info.far) e.far++;
+      });
+    });
+    return [...by.values()].map(e => {
+      const n = [...e.ids.values()];
+      const share = e.records ? e.heavy / e.records : 0;
+      // Clean concentrators ran 1–4 % on the capture behind BIT_HEAVY, the
+      // damaged one 61 %. Twenty records is too few to say either way.
+      const verdict = e.records < 20 ? 'few' : share >= 0.2 ? 'bad' : share >= 0.08 ? 'warn' : 'ok';
+      return Object.assign(e, { nIds: e.ids.size, regular: n.filter(c => c >= 3).length, once: n.filter(c => c === 1).length, share, verdict });
+    }).sort((a, b) => b.records - a.records);
+  }
+
+  const VERDICT = {
+    ok:   { badge: 'ok',   text: 'clean',          note: 'Few of its records look misheard — about what real addresses and values with many 1s account for.' },
+    warn: { badge: 'warn', text: 'worth a look',   note: 'More of its records look misheard than a clean concentrator\'s do. Trace its far and unmatched addresses.' },
+    bad:  { badge: 'bad',  text: 'mishearing',     note: 'A fifth or more of what it concentrates looks misheard: its legacy receiver is turning stations into addresses that are not theirs. Its far matches are most likely not those stations at all.' },
+    few:  { badge: '',     text: 'too few to say', note: 'Fewer than twenty records — not enough to judge.' },
+  };
+
+  const pct = x => (x * 100 < 10 ? (x * 100).toFixed(1) : Math.round(x * 100)) + ' %';
+
+  // When a reading was taken, on one clock for the whole capture: the frame's
+  // placed stamp less the record's hold (ms), or — unplaced — its half-day
+  // count, which only compares with another unplaced one.
+  function recTime(f, r) {
+    if (f.time) return { t: (f.time.ms != null ? f.time.ms : f.time.local) - (r.offset || 0) * 1000, unit: 'ms' };
+    const s = recStamp(f, r);
+    return s == null ? null : { t: s * 1000, unit: 'hd' };
+  }
+
+  // Readings by the second they were taken, built once a parse.
+  function byTime(p) {
+    if (p._byTime) return p._byTime;
+    const m = new Map();
+    p.frames.forEach(f => {
+      if (f.error) return;
+      f.records.forEach(r => {
+        if (!r.ok) return;
+        const w = recTime(f, r);
+        if (!w) return;
+        const k = w.unit + Math.round(w.t / 1000);
+        if (!m.has(k)) m.set(k, []);
+        m.get(k).push(r);
+      });
+    });
+    return (p._byTime = m);
+  }
+
+  // The readings another concentrator heard within two seconds of this one
+  // that it could have been made from by bits turning to 1 — every 1 in theirs
+  // is a 1 in this one, address and value both. A word with nearly every bit
+  // set is consistent with almost anything, so past three candidates this
+  // says how many there were rather than pretend to choose.
+  function twins(p, r) {
+    const f = r.frame, w = recTime(f, r);
+    if (!w) return null;
+    const idx = byTime(p), base = Math.round(w.t / 1000), out = new Map();
+    for (let d = -2; d <= 2; d++) {
+      (idx.get(w.unit + (base + d)) || []).forEach(c => {
+        if (c === r || String(c.frame.hdr.source) === String(f.hdr.source) || c.ones >= BIT_HEAVY) return;
+        if ((c.alertId | r.alertId) !== r.alertId || (c.value | r.value) !== r.value) return;
+        const k = c.alertId + ':' + c.value;
+        if (!out.has(k)) out.set(k, { r: c, forced: r.ones - c.ones, dt: Math.abs(d) });
+      });
+    }
+    return [...out.values()].sort((a, b) => a.forced - b.forced || a.dt - b.dt);
+  }
+
+  function trace(p, res, aid) {
+    const info = res.byAlertId.get(aid) || null;
+    const by = new Map(), seen = new Set(), copies = [];
+    p.frames.forEach(f => {
+      if (f.error) return;
+      f.records.forEach(r => {
+        if (r.alertId !== aid) return;
+        copies.push(r);
+        const key = recKey(f, r);
+        if (seen.has(key)) return;
+        seen.add(key);
+        const k = String(f.hdr.source);
+        let e = by.get(k);
+        if (!e) by.set(k, e = { source: f.hdr.source, self: f.hdr.decoder != null && String(f.hdr.source) === String(f.hdr.decoder),
+                                recs: [], values: new Map(), heavy: 0, ones: 0 });
+        e.recs.push(r);
+        e.values.set(r.value, (e.values.get(r.value) || 0) + 1);
+        if (r.ones >= BIT_HEAVY) e.heavy++;
+        e.ones += r.ones;
+      });
+    });
+    return { aid, info, copies, bySource: [...by.values()].sort((a, b) => b.recs.length - a.recs.length) };
+  }
+
+  function sourceName(e) {
+    if (e.source == null) return '<span class="spec">not named</span>';
+    return '<b>' + esc(String(e.source)) + '</b>'
+      + (e.self ? ' <span class="spec">this receiver</span>' : e.station ? ' ' + stationLink(e.station) : '');
+  }
+
+  function originView(p, res) {
+    const a = state.a2;
+    const list = concentrators(p, res);
+    let html = '<p class="sub">An ALERT2 frame on port 1 carries <b>legacy ALERT readings</b>: some ALERT2 repeater — the '
+      + '<b>concentrator</b>, which the frame names as its source address — heard a legacy station on the legacy channel, decoded its '
+      + 'word to an address and a value, and packed the two into three bytes and a time offset (Application Layer v1.3 §3). '
+      + 'Legacy ALERT Binary carries <b>no checksum</b>, so a word the concentrator misheard is packed and sent on just as a good one is, '
+      + 'and ALERT2\'s error correction — which covers only the ALERT2 hop — delivers the damage intact. A misheard word is a different '
+      + 'address, and it lands on whichever station in the country carries that address. Its fingerprint is 1s: a real reading has about '
+      + 'half of its 24 bits set; a misheard one has most of them.</p>';
+
+    if (!list.length) return html + '<p class="spec">This capture carries no ALERT concentration records.</p>';
+
+    html += '<h4 class="a2-h">Concentrators — who heard the legacy words</h4>'
+      + '<div class="table-wrap a2-tablewrap"><table class="fields a2-table">'
+      + '<caption class="sr-only">One row per ALERT2 source address that sent concentration records</caption>'
+      + '<thead><tr><th scope="col">SOURCE</th><th scope="col">RECORDS</th><th scope="col">ADDRESSES</th>'
+      + '<th scope="col" title="Addresses heard three or more times — a station reports again and again">REPEATING</th>'
+      + '<th scope="col" title="Addresses heard once — a misheard word rarely comes out the same way twice">ONCE</th>'
+      + '<th scope="col" title="Records with ' + BIT_HEAVY + ' or more of their 24 address and value bits set">LOOK MISHEARD</th>'
+      + '<th scope="col">NO STATION</th><th scope="col">OVER ' + FAR_KM + ' KM</th><th scope="col">VERDICT</th></tr></thead><tbody>';
+    list.forEach(e => {
+      const v = VERDICT[e.verdict];
+      const on = a.traceSrc != null && String(a.traceSrc) === String(e.source);
+      html += '<tr class="a2-row' + (on ? ' sel' : '') + '" onclick="Alert2.traceSource(' + (e.source == null ? 'null' : Number(e.source)) + ')">'
+        + '<td><button type="button" class="row-open" onclick="event.stopPropagation();Alert2.traceSource(' + (e.source == null ? 'null' : Number(e.source)) + ')" '
+        + 'title="Show what this concentrator sent">' + sourceName(e) + '</button></td>'
+        + '<td>' + e.records.toLocaleString() + (e.copies > e.records ? ' <span class="spec">(' + e.copies.toLocaleString() + ' copies)</span>' : '') + '</td>'
+        + '<td>' + e.nIds.toLocaleString() + '</td><td>' + e.regular.toLocaleString() + '</td><td>' + e.once.toLocaleString() + '</td>'
+        + '<td><b>' + pct(e.share) + '</b> <span class="spec">' + e.heavy.toLocaleString() + '</span></td>'
+        + '<td>' + (e.records ? pct(e.unknown / e.records) : '—') + '</td>'
+        + '<td>' + (e.records ? pct(e.far / e.records) : '—') + '</td>'
+        + '<td><span class="badge ' + v.badge + '" title="' + esc(v.note) + '">' + v.text + '</span></td></tr>';
+    });
+    html += '</tbody></table></div>'
+      + '<div class="spec">Records count each reading once however many paths brought it here; copies are every reception. '
+      + '“No station” and “over ' + FAR_KM + ' km” are measured from ' + refName(res) + '. Click a concentrator for its addresses.</div>';
+
+    const sel = a.traceSrc !== undefined && a.traceSrc !== null ? list.find(e => String(e.source) === String(a.traceSrc)) : null;
+    if (sel) html += sourcePanel(sel, res);
+
+    html += '<h4 class="a2-h">Trace an address</h4>'
+      + '<div class="row pkt-block"><label class="a2-num">ALERT address <input id="a2-trace" type="number" min="0" max="8191" step="1" value="'
+      + (a.traceId == null ? '' : a.traceId) + '" onkeydown="if(event.key===\'Enter\')Alert2.trace(this.value)"></label>'
+      + '<div class="fit"><button class="ghost" onclick="Alert2.trace(document.getElementById(\'a2-trace\').value)">Trace</button></div></div>';
+    if (a.traceId != null) html += tracePanel(p, res, trace(p, res, a.traceId));
+    return html;
+  }
+
+  // One concentrator's addresses: the ones it sends most, and the ones that
+  // match a station far away or none — each a click from its trace.
+  function sourcePanel(e, res) {
+    const row = ([aid, n]) => {
+      const info = res.byAlertId.get(aid);
+      return '<tr><td><button type="button" class="row-open" onclick="Alert2.trace(' + aid + ')" title="Trace this address">' + aid + '</button></td>'
+        + '<td>' + n + '</td><td>' + stationCell(info) + '</td><td>' + typeCell(info) + '</td>'
+        + '<td><span class="spec">' + onesOf(aid, 0) + ' of 13</span></td></tr>';
+    };
+    const ids = [...e.ids.entries()].sort((x, y) => y[1] - x[1]);
+    const odd = ids.filter(([aid]) => { const i = res.byAlertId.get(aid); return !i || i.conf === 'unknown' || i.far; });
+    const table = (rows, cap) => '<div class="table-wrap a2-tablewrap"><table class="fields a2-table"><caption class="sr-only">' + esc(cap) + '</caption>'
+      + '<thead><tr><th scope="col">ID</th><th scope="col">RECORDS</th><th scope="col">STATION</th><th scope="col">SENSOR</th><th scope="col" title="How many of the address\'s own 13 bits are 1">ADDRESS 1s</th></tr></thead><tbody>'
+      + rows.map(row).join('') + '</tbody></table></div>';
+    const paths = [...e.paths.entries()].sort((x, y) => y[1] - x[1]).slice(0, 4).map(([k, n]) => esc(k) + ' <span class="spec">×' + n + '</span>').join(' · ');
+    return '<div class="note compact pkt-block"><b>Source ' + esc(String(e.source)) + '</b>'
+      + (e.self ? ' is this receiver itself.' : e.station ? ' is ' + stationLink(e.station) + '.' : ' is not an ALERT2 address Flood-Net knows — which station it is, and where, is the first thing to find out.')
+      + ' Its frames came in by ' + paths + '.</div>'
+      + '<div class="a2-cols"><div><h5 class="a2-h">Most sent</h5>' + table(ids.slice(0, 15), 'Addresses this concentrator sent most') + '</div>'
+      + '<div><h5 class="a2-h">No station, or over ' + FAR_KM + ' km — ' + odd.length + '</h5>'
+      + (odd.length ? table(odd.slice(0, 15), 'Addresses this concentrator sent that match no station or a far one') : '<p class="spec">None.</p>') + '</div></div>';
+  }
+
+  function tracePanel(p, res, t) {
+    const info = t.info;
+    let html = '<div class="note compact pkt-block"><b>' + t.aid + '</b> is <code>' + t.aid.toString(2).padStart(13, '0') + '</code> — '
+      + onesOf(t.aid, 0) + ' of its 13 address bits are 1. ';
+    if (!t.copies.length) return html + 'It is not in this capture.</div>';
+    html += 'Heard ' + t.copies.length + ' time' + (t.copies.length === 1 ? '' : 's') + ' from ' + t.bySource.length + ' concentrator' + (t.bySource.length === 1 ? '' : 's') + '.</div>';
+
+    // Who the database says it is.
+    const cands = info ? info.cands : [];
+    html += '<h5 class="a2-h">Stations carrying ' + t.aid + '</h5>';
+    html += cands.length
+      ? '<ul class="pkt-cheat">' + cands.map(c => '<li>' + stationLink(c.station)
+          + ' <span class="spec">' + (c.types.length ? esc(c.types.join(', ')) + ' · ' : '')
+          + (c.distKm == null ? 'no coordinates' : Math.round(c.distKm) + ' km from ' + refName(res))
+          + ' · ' + c.siblings + ' of its ' + c.siblingsTotal + ' other address' + (c.siblingsTotal === 1 ? '' : 'es') + ' heard'
+          + (info.chosen === c ? ' · <b>the one this tab chose</b> (' + esc(CONF[info.conf].text) + ')' : '') + '</span></li>').join('') + '</ul>'
+        + '<p class="spec">A station really being heard usually brings its other addresses with it; a misheard word brings only itself.</p>'
+      : '<p class="spec">No station in Flood-Net carries this address.</p>';
+
+    // By concentrator: what each sent under this address.
+    html += '<h5 class="a2-h">By concentrator</h5><div class="table-wrap a2-tablewrap"><table class="fields a2-table">'
+      + '<caption class="sr-only">This address, by the concentrator that sent it</caption>'
+      + '<thead><tr><th scope="col">SOURCE</th><th scope="col">RECORDS</th><th scope="col">VALUES</th>'
+      + '<th scope="col" title="Average of the 24 address and value bits set">MEAN 1s</th><th scope="col">LOOK MISHEARD</th></tr></thead><tbody>';
+    t.bySource.forEach(e => {
+      e.station = a2Station(e.source);
+      const vals = [...e.values.keys()].sort((x, y) => x - y);
+      const shown = vals.length > 14 ? vals.slice(0, 7).join(', ') + ' … ' + vals.slice(-5).join(', ') : vals.join(', ');
+      html += '<tr><td>' + sourceName(e) + '</td><td>' + e.recs.length + '</td>'
+        + '<td><span class="spec">' + vals.length + ' distinct:</span> <code>' + esc(shown) + '</code></td>'
+        + '<td>' + (e.ones / e.recs.length).toFixed(1) + '</td>'
+        + '<td>' + e.heavy + ' <span class="spec">' + pct(e.heavy / e.recs.length) + '</span></td></tr>';
+    });
+    html += '</tbody></table></div>'
+      + '<p class="spec">A real sensor\'s values move the way the sensor does — a rain count stepping up, a battery sitting near one number. '
+      + 'Values that scatter across the range, mostly 1s, from one concentrator while another sends the same address cleanly, are that concentrator\'s misreadings.</p>';
+
+    // The copies themselves, newest last, each with its bytes and its twins.
+    const recs = t.bySource.flatMap(e => e.recs).sort((x, y) => (recTime(x.frame, x) || { t: 0 }).t - (recTime(y.frame, y) || { t: 0 }).t);
+    const shown = recs.slice(-40);
+    html += '<h5 class="a2-h">Readings' + (recs.length > shown.length ? ' — the last ' + shown.length + ' of ' + recs.length : '') + '</h5>'
+      + '<div class="table-wrap a2-tablewrap"><table class="fields a2-table"><caption class="sr-only">Every reading of this address</caption>'
+      + '<thead><tr><th scope="col">TAKEN</th><th scope="col">SOURCE</th><th scope="col">PATH</th><th scope="col">RECORD</th>'
+      + '<th scope="col">LEGACY WORD</th><th scope="col">VALUE</th><th scope="col">1s</th>'
+      + '<th scope="col" title="Clean readings another concentrator heard within two seconds that this one could have been made from by bits turning to 1">SAME SECOND, ELSEWHERE</th>'
+      + '<th scope="col">FRAME</th></tr></thead><tbody>';
+    shown.forEach(r => {
+      const f = r.frame, w = legacyWord(r.alertId, r.value);
+      let tw = '';
+      if (r.ones >= BIT_HEAVY) {
+        const list = twins(p, r);
+        tw = !list ? '<span class="spec">no time to match on</span>'
+          : !list.length ? '<span class="spec">none heard</span>'
+          : list.length > 3 ? '<span class="spec">' + list.length + ' readings fit — too many 1s to say which</span>'
+          : list.map(x => { const i = res.byAlertId.get(x.r.alertId); const st = i && i.chosen ? i.chosen.station : null;
+              return '<b>' + x.r.alertId + '</b>:' + x.r.value + ' <span class="spec">from ' + esc(String(x.r.frame.hdr.source))
+                + (st ? ' · ' + esc(st.name) : '') + ' · ' + x.forced + ' bit' + (x.forced === 1 ? '' : 's') + ' forced</span>'; }).join('<br>');
+      }
+      html += '<tr' + (r.ones >= BIT_HEAVY ? ' class="a2-badrow"' : '') + '>'
+        + '<td><code>' + esc(readingWhen(f, r.offset).text) + '</code></td>'
+        + '<td>' + esc(String(f.hdr.source)) + '</td>'
+        + '<td><span class="spec">' + (f.hdr.path && f.hdr.path.length ? esc(f.hdr.path.join(' → ')) : 'direct') + '</span></td>'
+        + '<td><code>' + r.bytes.map(hx).join(' ') + '</code></td>'
+        + '<td><code>' + w.bytes.map(hx).join(' ') + '</code></td>'
+        + '<td>' + r.value + '</td>'
+        + '<td>' + r.ones + (r.ones >= BIT_HEAVY ? ' <span class="badge warn">looks misheard</span>' : '') + '</td>'
+        + '<td>' + tw + '</td>'
+        + '<td><button type="button" class="link-btn a2-link" onclick="Alert2.openFrame(' + f.seq + ')" title="Open this frame in the anatomy view">'
+        + (p.stats.mode === 'ascii' ? f.lineNo : f.seq + 1) + ' ▸</button></td></tr>';
+    });
+    html += '</tbody></table></div>';
     return html;
   }
 
@@ -2340,6 +2954,12 @@ const Alert2 = (function () {
               sensor transmits, which is why the ALERT Packets tab decodes one of these records to the same
               id and value under its <b>A2C</b> layout. A frame carries one reading or many, repeated to the end
               of the payload, usually the rainfall, water level and battery of one field station.</li>
+            <li><b>Who heard it.</b> The four bytes are what the <b>concentrator</b> — the ALERT2 station the frame names as
+              its source address — kept of a legacy ALERT word it heard over the air: the address and the value, the word
+              itself thrown away (§3.3.1). Legacy ALERT Binary has no checksum, so a word the concentrator misheard is kept
+              and sent on as faithfully as a good one, and ALERT2's error correction only vouches for the hops after it.
+              A misheard word is mostly 1s and usually lands on a station far away; the <b>Where the IDs come from</b> view
+              sorts that out, concentrator by concentrator.</li>
           </ul>
 
           <h4 class="a2-h">Self-reports — an ALERT2 gauge's own readings</h4>
@@ -2479,10 +3099,12 @@ const Alert2 = (function () {
     return `
       <div class="panel">
         <div class="panel-header"><h3>Capture</h3></div>
-        <p class="sub">Two things can go in here. Paste an <b>ALERT2 ASCII log</b> from the RS232 port —
+        <p class="sub">Three things can go in here. Paste an <b>ALERT2 ASCII log</b> from the RS232 port —
           session banners, wrapped lines and terminal timestamps are all handled, so paste it as it comes. Or paste
           the <b>hex from the USB port</b>, straight out of Ranger's Serial Data pane or any terminal: that one
-          carries the RSSI. Either way, pick a file instead if that is easier.</p>
+          carries the RSSI. Either way, pick a file instead if that is easier. Or, signed in as an editor, read what a
+          receiver sending to Flood-Net heard — a Raspberry Pi's RTL-SDR or the Serial Monitor — out of the
+          <b>reception log</b>.</p>
         <div class="a2-modes">
           <span class="spec">Read as</span>
           ${modeBtn('auto', 'Auto-detect', 'Look at the capture and decide — right for anything pasted whole')}
@@ -2502,11 +3124,35 @@ const Alert2 = (function () {
           <div class="fit"><button class="ghost" onclick="Alert2.loadSample('bin')">Sample — USB hex</button></div>
           <div class="fit"><button class="ghost" onclick="Alert2.clear()">Clear</button></div>
         </div>
+        ${rxRow()}
         <input type="file" id="a2-file" accept=".txt,.log,.csv,.hex,.dat,text/plain" hidden onchange="Alert2.onFile(this)">
         <div id="a2-status" class="note compact pkt-block"${a.source ? '' : ' hidden'}>${esc(a.source)}</div>
         ${a.watchErr ? '<div class="note compact warn pkt-block">' + a.watchErr + '</div>' : ''}
         ${w ? '' : '<div class="spec a2-drop-hint">To <b>watch a log as PuTTY writes it</b>, drag the file — or the folder it logs into — onto this tab from File Explorer. It is re-read as it grows, and that works even where IT has switched the browser\'s file picker off.</div>'}
       </div>`;
+  }
+
+  // Reading the reception log. A window, then — once it is loaded — which of
+  // the receivers in it to look at. The box wins while it holds a capture, so
+  // the note says so rather than leave a load looking like it did nothing.
+  const RX_WINDOWS = { '1h': { ms: 3600e3, label: 'hour' }, '6h': { ms: 6 * 3600e3, label: '6 hours' }, '24h': { ms: 86400e3, label: '24 hours' } };
+  const RX_LIMIT = 50000;   // the most reception_window() returns
+
+  function rxRow() {
+    const a = state.a2, rx = a.rx;
+    const opt = (v, label, on) => '<option value="' + escAttr(v) + '"' + (on ? ' selected' : '') + '>' + esc(label) + '</option>';
+    const pts = rx && rx.points.length > 1
+      ? '<label class="a2-num">receiver <select onchange="Alert2.setRxPoint(this.value)">'
+        + rx.points.map(x => opt(x.id, x.name + ' (' + x.n.toLocaleString() + ')', x.id === a.rxPoint)).join('')
+        + opt('', 'all of them (' + rx.rows.length.toLocaleString() + ')', a.rxPoint === '') + '</select></label>'
+      : '';
+    return '<div class="row pkt-block">'
+      + '<div class="fit"><button class="ghost" onclick="Alert2.loadReceptions()" title="Every ALERT2 concentration record a receiver sending to Flood-Net heard, with its bytes, its concentrator and its path — editors only">From Flood-Net — reception log</button></div>'
+      + '<label class="a2-num">the last <select onchange="Alert2.setRxWindow(this.value)">'
+      + Object.keys(RX_WINDOWS).map(k => opt(k, RX_WINDOWS[k].label, a.rxWindow === k)).join('') + '</select></label>'
+      + pts + '</div>'
+      + (a.rxNote ? '<div class="note compact pkt-block">' + esc(a.rxNote)
+          + (rx && a.text.trim() ? ' The capture in the box is what is shown — clear it to see the receptions.' : '') + '</div>' : '');
   }
 
   // aria-pressed, because .on is a colour: the pressed state has to reach a
@@ -2524,6 +3170,7 @@ const Alert2 = (function () {
     return '<div class="a2-opts">'
       + cb('onlyErrors', 'Only problems', 'Show just the frames and readings something is wrong with')
       + cb('hideUnknown', 'Hide unmatched addresses', 'Drop readings whose ALERT address matches no station in the database')
+      + cb('hideHeavy', 'Hide readings that look misheard', 'Drop concentration records with ' + BIT_HEAVY + ' or more of their 24 address and value bits set')
       + cb('eng', 'Engineering values', 'Convert battery and rainfall counts, using the scales below')
       // Labels, not spans: the caption beside a number box has to *be* its name,
       // or the box announces as an unlabelled spinbutton (#140).
@@ -2541,11 +3188,12 @@ const Alert2 = (function () {
     let body;
     if (a.view === 'frames')        body = framesView(p, res);
     else if (a.view === 'stations') body = stationsView(p, res);
+    else if (a.view === 'origin')   body = originView(p, res);
     else                            body = readingsView(p, res);
     return `
       <div class="panel">
         <div class="panel-header"><h3>Decoded</h3></div>
-        <div class="a2-vtabs">${tab('readings', 'Readings')}${tab('stations', 'By station')}${tab('frames', 'Frame anatomy')}
+        <div class="a2-vtabs">${tab('readings', 'Readings')}${tab('stations', 'By station')}${tab('frames', 'Frame anatomy')}${tab('origin', 'Where the IDs come from')}
           <span class="a2-vspacer"></span>
           <button class="ghost" onclick="Alert2.exportCsv()">Export CSV</button>
           <button class="ghost" onclick="Alert2.exportJson()">Export JSON</button>
@@ -2590,7 +3238,42 @@ const Alert2 = (function () {
     if (el) state.a2.text = el.value;
   }
   function decode()     { readBox(); state.a2.limit = ROW_STEP; refresh(); }
-  function clear()      { state.a2.text = ''; state.a2.parsed = null; state.a2.parsedKey = ''; state.a2.source = ''; state.a2.sel = null; state.a2.mapView = null; stopWatch(); refresh(); }
+  function clear()      { state.a2.text = ''; state.a2.parsed = null; state.a2.parsedKey = ''; state.a2.source = ''; state.a2.sel = null; state.a2.mapView = null;
+                          state.a2.rx = null; state.a2.rxNote = ''; state.a2.traceSrc = null; stopWatch(); refresh(); }
+
+  async function loadReceptions() {
+    const a = state.a2, win = RX_WINDOWS[a.rxWindow] || RX_WINDOWS['1h'];
+    if (typeof dbRpc !== 'function') { a.rxNote = 'The datastore is not loaded on this page.'; refresh(); return; }
+    a.rxNote = 'Asking Flood-Net for the last ' + win.label + ' of receptions…';
+    refresh();
+    try {
+      const to = Date.now(), from = to - win.ms;
+      const r = await dbRpc('reception_window', { p_from: new Date(from).toISOString(), p_to: new Date(to).toISOString(), p_limit: RX_LIMIT });
+      const all = Array.isArray(r) ? r : [];
+      const rows = all.filter(e => e && e.protocol === 'alert2');
+      const counts = new Map(), names = new Map();
+      rows.forEach(e => { counts.set(e.point_id, (counts.get(e.point_id) || 0) + 1); if (!names.has(e.point_id)) names.set(e.point_id, e.point_name || e.point_id); });
+      const points = [...counts.entries()].sort((x, y) => y[1] - x[1]).map(([id, n]) => ({ id, n, name: names.get(id) }));
+      a.rx = { rows, from, to, points, loadedAt: Date.now(), capped: all.length >= RX_LIMIT };
+      if (!points.some(x => x.id === a.rxPoint)) a.rxPoint = points.length ? points[0].id : '';
+      stopWatch();
+      a.text = ''; a.parsed = null; a.parsedKey = ''; a.sel = null; a.mapView = null; a.traceSrc = null; a.limit = ROW_STEP;
+      a.source = '';
+      a.rxNote = rows.length
+        ? rows.length.toLocaleString() + ' ALERT2 reception' + (rows.length === 1 ? '' : 's') + ' from ' + points.length + ' receiver' + (points.length === 1 ? '' : 's')
+          + ' in the last ' + win.label + (a.rx.capped ? ' — the newest ' + RX_LIMIT.toLocaleString() + ' receptions of every kind, which is all one request returns; a shorter window covers it whole' : '') + '.'
+        : 'No ALERT2 receptions in the last ' + win.label + (all.length ? ' — ' + all.length.toLocaleString() + ' of other kinds.' : '.');
+      if (!rows.length) a.rx = null;
+    } catch (err) {
+      a.rxNote = err.status === 404 ? 'This database does not keep receptions.'
+        : err.status === 401 || err.status === 403 || /editor/i.test(err.message) ? 'The reception log is for editors — sign in with an editor account to read it.'
+        : 'Could not read the reception log: ' + err.message;
+    }
+    refresh();
+  }
+  // A new window re-reads the log when one is already shown.
+  function setRxWindow(w) { if (!RX_WINDOWS[w]) return; state.a2.rxWindow = w; if (state.a2.rx) loadReceptions(); }
+  function setRxPoint(id) { state.a2.rxPoint = id; state.a2.sel = null; state.a2.mapView = null; state.a2.traceSrc = null; refresh(); }
   function more()       { state.a2.limit += ROW_STEP; refresh(); }
   function setView(v)   { state.a2.view = v; refresh(); }
   // Changing format changes which capture is on screen, so the selection and the
@@ -2620,13 +3303,38 @@ const Alert2 = (function () {
       const p = current(); const res = p ? resolve(p) : null;
       if (view && p && res) {
         view.innerHTML = a.view === 'frames' ? framesView(p, res)
-                       : a.view === 'stations' ? stationsView(p, res) : readingsView(p, res);
+                       : a.view === 'stations' ? stationsView(p, res)
+                       : a.view === 'origin' ? originView(p, res) : readingsView(p, res);
         attachRecHover(view);
       }
       return;
     }
     a[key] = val;
     refresh();
+  }
+
+  // An address traced, or a concentrator opened, on the Where the IDs come
+  // from view — from anywhere a reading shows its address.
+  function traceId(aid) {
+    const n = Number(aid);
+    state.a2.traceId = Number.isInteger(n) && n >= 0 && n <= 8191 ? n : null;
+    state.a2.view = 'origin';
+    refresh();
+    setTimeout(() => {
+      const el = document.getElementById('a2-trace');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 0);
+  }
+  function traceSource(src) {
+    const a = state.a2;
+    a.traceSrc = a.view === 'origin' && a.traceSrc != null && String(a.traceSrc) === String(src) ? null : src;
+    a.view = 'origin';
+    refresh();
+  }
+  // The rebuilt legacy word, drawn by the encoder that already draws them.
+  function openInPackets(aid, value) {
+    switchTab('packets');
+    if (typeof Packets !== 'undefined' && Packets.prefillEncoder) Packets.prefillEncoder('abf', aid, value);
   }
 
   function openFrame(seq) {
@@ -2808,7 +3516,7 @@ const Alert2 = (function () {
       return isoText(ms - (offset || 0) * 1000);
     };
     const common = f => ({
-      format: f.kind === 'bin' ? 'usb-binary' : 'rs232-ascii',
+      format: f.kind === 'bin' ? 'usb-binary' : f.kind === 'rx' ? 'reception-log' : 'rs232-ascii',
       line: f.lineNo,
       ert_a2_clock: isoText(f.hdr.clockMs),
       stamp_base: f.time ? (f.time.base || 'none') : '',
@@ -2844,6 +3552,9 @@ const Alert2 = (function () {
           time_offset_s: r.offset,
           ok: r.ok ? 'yes' : 'no',
           bytes: r.bytes.map(hx).join(' '),
+          ones_of_24: r.ones,
+          looks_misheard: r.ones >= BIT_HEAVY ? 'yes' : '',
+          km_away: info && info.chosen && info.chosen.distKm != null ? Math.round(info.chosen.distKm) : '',
         }));
       });
       f.sensors.forEach(x => {
@@ -2862,6 +3573,9 @@ const Alert2 = (function () {
           time_offset_s: '',
           ok: x.ok ? 'yes' : 'no',
           bytes: x.bytes.map(hx).join(' '),
+          ones_of_24: '',
+          looks_misheard: '',
+          km_away: info && info.chosen && info.chosen.distKm != null ? Math.round(info.chosen.distKm) : '',
         }));
       });
     });
@@ -2882,7 +3596,7 @@ const Alert2 = (function () {
     const rssis = p.frames.filter(f => !f.error && f.hdr.rssi != null).map(f => f.hdr.rssi);
     dlText('alert2-readings.json', JSON.stringify({
       generated: new Date().toISOString(),
-      capture: { format: p.stats.mode === 'bin' ? 'usb-binary' : 'rs232-ascii',
+      capture: { format: p.stats.mode === 'bin' ? 'usb-binary' : p.stats.mode === 'rx' ? 'reception-log' : 'rs232-ascii',
                  frames: p.stats.frames, records: p.stats.records, self_report_values: p.stats.sensors || 0,
                  errors: p.stats.errors,
                  clock_skew_seconds: p.stats.skew, stamp_bases: p.stats.bases,
@@ -2938,9 +3652,10 @@ const Alert2 = (function () {
   // form a live feed would call, and the form this is testable in. parse takes
   // the mode, so both wire formats are reachable without a page.
   return { render, init, stop, decode, clear, loadSample, more, setView, setMode, setOpt,
-           openFrame, pick, clearPicks, select,
+           openFrame, pick, clearPicks, select, trace: traceId, traceSource, openInPackets,
+           loadReceptions, setRxWindow, setRxPoint, parseRx, concentrators, twins, traceAddress: trace,
            chooseFile, onFile, watchFile, stopWatch, stopWatching, dragOver, dropFile, exportCsv, exportJson,
-           parse, parseAscii, parseBin, decodeRecord,
+           parse, parseAscii, parseBin, decodeRecord, legacyWord, onesOf, BIT_HEAVY, FAR_KM,
            // for the Serial Monitor's ERT-A2 card (serial-ert.js), which decodes
            // the same two wire formats as they arrive rather than pasted whole
            parseBinBytes, hexStream, resolve, engValue, stationCell, rssiCell,
