@@ -18,6 +18,10 @@
 //      button asks for a sign-in instead.
 //   4. **In view** — beside the map, the bar is stuck to the foot of the side
 //      panel's pane while the card runs on below it.
+//   5. **Undo** — to the left of Save in the header and in the bar, only while
+//      something is unsaved: the card drawn again as the database has it, a
+//      sensor taken away back, the draft too, nothing sent; a "+ New" form
+//      back to blank.
 //
 // The database is a stand-in for save_station() that echoes the document back,
 // or refuses it when told to.
@@ -243,6 +247,62 @@ async function main() {
     check('beside the map, the bar is stuck to the foot of the pane while the card runs on below it',
       stuck.inHelp && stuck.cardBottom > stuck.paneBottom + 100
       && stuck.barBottom <= stuck.paneBottom && stuck.barBottom >= stuck.paneBottom - 24, J(stuck));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    log('\nUndo\n');
+    const undoLook = () => page.evaluate(() => {
+      const top = document.getElementById('ef-undo'), bar = document.getElementById('ef-unsaved');
+      const order = bar && !bar.hidden ? [...bar.querySelectorAll('button:not(.link-btn)')].map(b => b.id) : [];
+      const heads = [...document.querySelectorAll('.ef-head .button-group > button')].filter(b => !b.hidden).map(b => b.id);
+      return { top: !!top && !top.hidden, order, heads };
+    });
+    let U = await undoLook();
+    check('something unsaved: Undo to the left of Save, in the header and in the bar',
+      U.top && J(U.order) === J(['ef-undo-bar', 'ef-save-bar']) && U.heads[0] === 'ef-undo' && U.heads[1] === 'ef-save', J(U));
+
+    const saved = await page.evaluate(id => {
+      const s = state.data.stations.find(x => x.id === id);
+      return { name: s.name, notes: s.notes || '', sensors: (s.sensors || []).length };
+    }, main.id);
+    await page.fill('#ef-name', `${saved.name} (again)`);
+    await page.click('#ef-sensors .sensor-row:first-child .sensor-del');
+    L = await look(page);
+    check('…three changes to undo', /^3 unsaved changes/.test(L.bar), L.bar);
+    await page.click('#ef-undo-bar');
+    await page.waitForTimeout(300);
+    L = await look(page);
+    U = await undoLook();
+    const back = await page.evaluate(() => ({
+      name: document.getElementById('ef-name').value, notes: document.getElementById('ef-notes').value,
+      sensors: document.querySelectorAll('#ef-sensors .sensor-row').length,
+      draftNotes: state.editorDraft.notes || '', focus: document.activeElement && document.activeElement.id,
+    }));
+    check('the bar’s Undo: teal again, nothing gilded, no bar, the header’s Undo gone',
+      !L.unsaved && L.panel === L.teal && !L.gilded.length && !L.bar && !U.top, J({ L, U }));
+    check('…every field as the database has it, the sensor taken away back, the draft too',
+      back.name === saved.name && back.notes === saved.notes && back.sensors === saved.sensors
+        && back.draftNotes === saved.notes, J({ back, saved }));
+    check('…the status line says what was undone, and focus is on the first field put back',
+      /^Undid 3 unsaved changes — back to what the database holds\.$/.test(L.status) && back.focus === 'ef-name',
+      J({ status: L.status, focus: back.focus }));
+
+    await page.fill('#ef-notes', 'Changed my mind');
+    await page.click('#ef-undo');
+    await page.waitForTimeout(300);
+    L = await look(page);
+    const notesBack = await page.evaluate(() => document.getElementById('ef-notes').value);
+    check('the header’s Undo the same, and nothing is sent to the database',
+      !L.unsaved && !L.bar && notesBack === saved.notes && db.saves.length === 2
+        && /^Undid 1 unsaved change — /.test(L.status), J({ L, notesBack, saves: db.saves.length }));
+
+    await page.evaluate(() => editorNew());
+    await page.fill('#ef-name', 'A station nobody has saved');
+    await page.click('#ef-undo-bar');
+    await page.waitForTimeout(300);
+    L = await look(page);
+    const blank = await page.evaluate(() => document.getElementById('ef-name').value);
+    check('a "+ New" form goes back to what it opened with', !L.unsaved && !L.bar && blank === ''
+      && /the form as it opened\.$/.test(L.status), J({ L, blank }));
 
     check('no page errors', errors.length === 0, errors.join(' | '));
   } finally {

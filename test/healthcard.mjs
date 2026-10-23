@@ -544,7 +544,7 @@ try {
              cell: read(HealthGlance.heardCellHtml(state.data.stations.find(s => s.id === id))) };
   }, id);
   const hSilent = await head(R.silent), hSteady = await head(R.steady);
-  check('in the header beside the name: the time it was heard, then the row’s own "how long ago"',
+  check('in the header under the name: the time it was heard, then the row’s own "how long ago"',
     hSilent.inHead && /^Last heard \d\d:\d\d \S/.test(hSilent.text) && hSilent.text.endsWith(` · ${hSilent.cell}`)
       && /⛔/.test(hSilent.text) && Number.isFinite(hSilent.at), J(hSilent));
   check('…heard lately, the same, as the row says it',

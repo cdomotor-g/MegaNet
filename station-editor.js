@@ -410,7 +410,7 @@ function repeaterCarriedStationsHtml(s) {
         </div>`;
 }
 
-// When Flood-Net last heard the station, beside its name: the time and how
+// When Flood-Net last heard the station, under its name: the time and how
 // long ago, from the one batch the station list's Last heard column reads
 // (HealthGlance.heardHeadHtml), so the header says what the row it was
 // picked from says. Painted in place when the batch lands or the station's
@@ -488,6 +488,11 @@ function editorForm(s) {
       <h3>${esc(s.name) || (s.proposed ? 'New Proposed Station' : 'New Station')}</h3>
       ${editorHeardHtml(s)}
       <div class="button-group">
+        <!-- Undo, only while something is unsaved (editorUnsavedRefresh shows
+             it): every change thrown away at once, the card back to what the
+             database holds. The bar at the card's foot carries one too. -->
+        <button type="button" id="ef-undo" onclick="editorUndo()" hidden
+                title="Throw away the unsaved changes — back to what the database holds">Undo</button>
         <!-- Signed out, the button is not disabled and does not fail at the
              network: it says what is missing and opens the panel that supplies
              it. A greyed-out Save with no explanation is the version of this
@@ -1438,6 +1443,7 @@ function editorUnsavedRefresh() {
   const card = document.getElementById('stations-editor-card');
   if (!card) return;
   const bar = document.getElementById('ef-unsaved');
+  const undo = document.getElementById('ef-undo');
   card.querySelectorAll('.ef-changed').forEach(el => el.classList.remove('ef-changed'));
   if (!bar) { card.classList.remove('is-unsaved'); return; }
   editorUnsavedFresh(card);
@@ -1455,6 +1461,7 @@ function editorUnsavedRefresh() {
   const n = byName.size;
   card.classList.toggle('is-unsaved', n > 0);
   bar.hidden = n === 0;
+  if (undo) { undo.hidden = n === 0; undo.disabled = state.editorBusy; }
   if (!n) { bar.innerHTML = ''; editorUnsavedTargets = []; return; }
 
   editorUnsavedTargets = [...byName.values()];
@@ -1472,6 +1479,8 @@ function editorUnsavedRefresh() {
     : 'not in the database yet';
   const html = `
     <span class="ef-unsaved-text"><strong>${n} unsaved change${n === 1 ? '' : 's'}</strong>, ${where} — ${list}.</span>
+    <button type="button" id="ef-undo-bar" onclick="editorUndo()" ${state.editorBusy ? 'disabled' : ''}
+            title="Throw away the unsaved changes — back to what the database holds">Undo</button>
     ${dbCanWrite()
       ? `<button type="button" class="primary" id="ef-save-bar" onclick="editorSave()"
                  ${state.editorBusy ? 'disabled' : ''}>Save</button>`
@@ -1499,6 +1508,29 @@ function editorUnsavedGo(i) {
 function editorUnsavedWhy() {
   const el = document.getElementById('ef-status');
   if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+// Undo, in the header and in the bar: every unsaved change thrown away at
+// once. The form is markup written from the record, so drawing the card again
+// is the undo — each field its saved value, a row taken away back, a row added
+// gone. The draft is taken from the record again first: the card is drawn from
+// the record, but a save starts from the draft (editorReadForm), and a pin
+// moved into the boxes wrote itself into the draft too (map-move-pin.js). A
+// "+ New" or "+ Propose" form has no record, and goes back to what it opened
+// with. Focus to the first field put back, not to <body>: the pressed button
+// has just gone.
+function editorUndo() {
+  const card = document.getElementById('stations-editor-card');
+  if (!card || !card.classList.contains('is-unsaved') || state.editorBusy) return;
+  const n = editorUnsavedTargets.length;
+  const first = editorUnsavedTargets.find(el => el && el.id)?.id;
+  const s = state.editorId && state.data ? state.data.stations.find(x => x.id === state.editorId) : null;
+  if (s) state.editorDraft = JSON.parse(JSON.stringify(s));
+  const back = state.editorId ? 'back to what the database holds' : 'the form as it opened';
+  state.editorMsg = { kind: 'info', text: `Undid ${n} unsaved change${n === 1 ? '' : 's'} — ${back}.` };
+  rerenderStationEditorCard();
+  document.getElementById(first || 'ef-name')?.focus({ preventScroll: true });
+  announce(state.editorMsg.text);
 }
 
 // Delete, which is a soft delete at the other end: the row, its sensors, its

@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 80, date: '2026-10-23', items: [
+      '<strong>↩ Undo in Station details.</strong> Once you have changed something and not saved it, an <em>Undo</em> '
+        + 'button appears to the left of <em>Save</em> — at the top of the card and in the unsaved-changes bar at its '
+        + 'foot. It throws away every unsaved change at once and puts the station back as the database has it (a new '
+        + 'station\'s form goes back to blank). Nothing is sent to the database. <em>Last heard</em> now sits on its own '
+        + 'line under the station\'s name, above the saved line and <em>In Flood-Net</em>.',
+    ] },
     { n: 79, date: '2026-10-23', items: [
       '<strong>📡 Last heard reads the same on the map card and in the station editor.</strong> The card on the map '
         + 'now says it the way the editor\'s header does — <em>06:43 yesterday · ⛔ 31 h ago</em>, coloured and marked '
