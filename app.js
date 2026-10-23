@@ -6951,6 +6951,7 @@ function setMapLinkColour(mode) {
 
 function setMapLinkOpacity(v) {
   state.mapLinkOpacity = v;
+  try { localStorage.setItem('mn-map-link-opacity', String(v)); } catch (_) {}
   const label = document.getElementById('link-opacity-val');
   if (label) label.textContent = `${Math.round(v * 100)}%`;
   for (const l of state.mapLines) {

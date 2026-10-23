@@ -740,7 +740,13 @@ try {
   // canvas are the backbone's. With them on, a fan of field links crosses this
   // one and their arrows land in the same few pixels — which is a true fact
   // about the picture and a useless one for this assertion.
-  await page.evaluate(() => { state.mapShowLinks = false; refreshMapLayers({ skipFit: true }); });
+  // And at full strength: this is a question about the colour, and an arrow
+  // takes its line's opacity — at the 25 % links open at, a black chevron over
+  // its white halo reads off the canvas as grey.
+  const linkOp = await page.evaluate(() => state.mapLinkOpacity);
+  await page.evaluate(() => {
+    state.mapShowLinks = false; state.mapLinkOpacity = 1; refreshMapLayers({ skipFit: true });
+  });
   await page.waitForTimeout(800);
   const black = await page.evaluate(() => {
     const hex = c => {
@@ -784,7 +790,9 @@ try {
   check('a backbone path\'s arrowheads are drawn black, not in the channel colour',
     black.found && black.any > 0 && black.dark > 0 && black.coloured === 0,
     JSON.stringify(black));
-  await page.evaluate(() => { state.mapShowLinks = true; refreshMapLayers({ skipFit: true }); });
+  await page.evaluate((op) => {
+    state.mapShowLinks = true; state.mapLinkOpacity = op; refreshMapLayers({ skipFit: true });
+  }, linkOp);
   await page.waitForTimeout(600);
 
   // ── 12. What is here ────────────────────────────────────────────────────

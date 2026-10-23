@@ -1992,7 +1992,8 @@ long, at any distance.
 Each link is drawn twice — a wide white casing underneath and the coloured line
 on top — so it stays legible over satellite imagery and topo shading, where a
 single thin orange line disappears. **Link opacity** fades the pair together
-when the lines are burying the pins they are meant to explain.
+when the lines are burying the pins they are meant to explain. It opens at
+25 % and remembers what you set it to on that device.
 
 **What the link colours mean — one radio group, not three switches.** *Link
 colour* in the same panel offers **By frequency** (the default), **By fade

@@ -3677,7 +3677,12 @@ const state = {
   // MAX_LINK_KM_CAP, and Limit link/path length off draws every path however
   // long.
   mapMaxLinkKm:   100,
-  mapLinkOpacity: 0.8,     // pass-range lines: 0.1–1.0, applied over their casing
+  // Pass-range and backbone lines: 0.1–1.0, applied over their casing. 0.25
+  // since 2026-10-23, by request (it was 0.8, session-only): at full strength
+  // the links bury the pins they are meant to explain. Remembered once
+  // somebody moves the slider, so an operator who wants them stronger keeps it.
+  mapLinkOpacity: Math.max(0.1, Math.min(1,
+                    Number(localStorage.getItem('mn-map-link-opacity')) || 0.25)),
   mapLabelMode:   'auto',  // station name labels: 'auto' (fit the viewport) | 'on' | 'off'
   mapRelated:     true,    // pull pass-range-related repeaters in with the matches
   // Light up watercourses whose name matches the filter box (see MapRivers).

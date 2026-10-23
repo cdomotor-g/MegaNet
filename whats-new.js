@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 75, date: '2026-10-23', items: [
+      '<strong>Fainter links on the Stations map</strong>: the pass-range and backbone lines now open at 25 % opacity, '
+        + 'so the stations show through them. Move <em>Link opacity</em> in Map display to have them stronger — the '
+        + 'setting you pick is now remembered on this device.',
+    ] },
     { n: 74, date: '2026-10-23', items: [
       '<strong>📟 SWR Meter</strong>, a new tab in the <em>Knowledge base</em> (and in the Field view, beside the forms): the '
         + 'power and SWR meters in the field kit — the Surecom SW-102, the Moonraker SWR-400 and the Comm-connect 3030 — drawn '
