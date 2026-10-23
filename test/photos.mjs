@@ -1312,6 +1312,9 @@ async function tiltedHalf(page, R, db, viewer, text) {
   const byFirst = list => Object.fromEntries(list.map(p => [p.ids[0], p]));
 
   const selects0 = db.selects.length;
+  // The rising water off, as map3d has it until its own section: this is about
+  // the photos' pins, and each step of the rise is a re-drape of the view.
+  await page.evaluate(() => Map3D.setWater(false));
   await page.locator('.mn-map-3d').click();
   await page.waitForFunction(() => typeof Map3D !== 'undefined' && !!Map3D._map() && Map3D._map().isStyleLoaded()
     && !!Map3D._map().getTerrain() && Map3D._photos().pins.length === 3, null, { timeout: BUILD_TIMEOUT });

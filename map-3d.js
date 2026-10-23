@@ -4,9 +4,12 @@
 //           relief, the same base map draped over it, the same pins, the same
 //           links, and — when asked for — the line of sight over each hop
 //           drawn as a vertical sheet between the ray and the ground under it.
+//           And, until turned off, water rising through the heights of the
+//           ground in view: an animation of how the land lies, not flood
+//           modelling (see "The rising water").
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for `state`, cssVar, announce, esc, destPoint, ROLE_LABEL,
+// Reaches back to core.js for `state`, cssVar, announce, esc, escAttr, destPoint, ROLE_LABEL,
 // acmaHaversineKm and the words for moving a 3-D view (viewMoveWords,
 // viewKeyWords); across to terrain.js for the ground profile, to
 // path-profile.js for the physics (pathAnalyse, pathPropOf, stationAntenna, earthBulge, rmSystemOf,
@@ -16,7 +19,8 @@
 // click3d, move3d, select, finishLine, flatAgain), to map-photos.js for the
 // field photos' pins (MapPhotos.drawn, badgeHtml, conePath, open), to map-polar.js for the polar
 // coverage plot's image (MapPolar.drawn), to map-leader.js for the
-// station card's leader (MapLeader.sync, reveal), and to app.js for
+// station card's leader (MapLeader.sync, reveal), to flood-stages.js for the
+// twin's rise (FloodStages.cycle, RISE_S, HOLD_S, DRAIN_S), and to app.js for
 // showStationCard, primaryRole and the base-map choice. Every one of those is called from
 // inside this file's own functions, so its position among the modules is free.
 //
@@ -1914,7 +1918,7 @@ const Map3D = (function () {
   // The ground's raster stack, bottom up: a layer added later goes under the
   // first of the ones above it that exists, so the order never depends on
   // which was added first.
-  const GROUND = ['mn-base', 'mn-elev', 'mn-polar', 'mn-lots', 'mn-roads', 'mn-links'];
+  const GROUND = ['mn-base', 'mn-elev', 'mn-water', 'mn-polar', 'mn-lots', 'mn-roads', 'mn-links'];
 
   function under(id) {
     const above = GROUND.slice(GROUND.indexOf(id) + 1);
@@ -1988,6 +1992,444 @@ const Map3D = (function () {
     }
     polarGen = d.gen;
     setNote();
+  }
+
+  // ── The rising water ───────────────────────────────────────────────────
+  // Water rising through the heights of the ground in view — from a metre
+  // under the lowest to a metre over the highest — held at the top for a
+  // moment, let out, and round again: the digital twin's flood water
+  // (digital-twin.js, "the flood water") over the whole view rather than one
+  // station's patch, and for a different question. Not how high a river gets,
+  // but how the land lies: which pins, roads and lots stand above which, and
+  // where the low country runs. A scale up the right of the view says the
+  // height and holds it (waterScaleHtml). On unless Rising water in the 3-D
+  // panel is turned off, and remembered when it is.
+  //
+  // It is a `color-relief` layer — MapLibre colouring the ground by its own
+  // height off a DEM source, draped on the terrain like any raster. The ramp
+  // is the water: the twin's colour at the line, darker with depth, clear
+  // above it. Moving the line is a new ramp, which re-drapes the terrain tiles
+  // in view (a style change does) and fetches nothing. So the shoreline is the
+  // ground's own contour at that height, on the same terrarium tiles the relief
+  // is built from, and runs up a valley as the valley does.
+  //
+  // On a source of its own, though the tiles are the same: MapLibre asks that
+  // a colour relief and the terrain not share one, and says so in the console
+  // when they do.
+  //
+  // What it is not is flood modelling, and it says so along the foot of the
+  // view in the twin's red for as long as it is on (waterCaveatHtml), and in
+  // the panel note. The line is level across the view, and every hollow under
+  // it is wet whether a river could reach it or not — the twin asks which
+  // ground joins the channel by its gauge; this has no channel to ask about.
+  const WATER_DEM      = 'mn-water-dem';
+  const WATER_FPS      = 15;   // the ramp at most this often — each is a re-drape of the view
+  const WATER_LINE_HZ  = 8;    // the scale's reading, at most this often
+  const WATER_GRID     = 8;    // points across the canvas, each way, read for the ground's range —
+                               // each is a read back from the GPU (MapLibre's unproject on terrain)
+  const WATER_MIN_SPAN = 10;   // m: flat ground still gets a rise worth watching
+  const WATER_LABEL_PX = 26;   // the least room between two heights named up the scale
+  const WATER_CLEAR    = ['interpolate', ['linear'], ['elevation'], 0, 'rgba(0,0,0,0)', 1, 'rgba(0,0,0,0)'];
+
+  // `lo`/`hi`, the ground's range in view in m; `level`, where the water
+  // stands. `anim` null is "as the browser prefers" — rising, unless it asks
+  // for reduced motion — and `hold` is where still water stands, in m (null:
+  // halfway). Both last the session, as the twin's do, and outlive a rebuild.
+  let water = { lo: null, hi: null, level: null, anim: null, hold: null, t0: 0,
+                lastDraw: 0, lastLine: 0, raf: 0, rangeTimer: 0, colours: null, scale: null };
+  let waterClock = null;   // the check's seam: a shorter cycle (Map3D._waterClock)
+
+  function waterShown() { return !!state.map3dWater && !!map && ready; }
+
+  function reducedMotion() {
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; }
+  }
+  function waterAnimating() { return water.anim == null ? !reducedMotion() : water.anim; }
+
+  // The twin's cycle: the rise, the hold at the top and the drain, in seconds.
+  function waterClockOpts() {
+    return waterClock || { rise: FloodStages.RISE_S, hold: FloodStages.HOLD_S, drain: FloodStages.DRAIN_S };
+  }
+
+  // The twin's water colour at the line and, below, halfway to its deepest AEP
+  // blue, as the tokens hold them — read once per build rather than once per
+  // frame. See-through at both, so the roads, lots and names under the water
+  // still read: the point is what stands where, and the water is a level.
+  function waterColours() {
+    const line = rgb(cssVar('--flood-water-below', '#3d8bfd')), navy = rgb(cssVar('--flood-water-aep-last', '#15227a'));
+    const deep = line.map((x, i) => x + (navy[i] - x) * 0.55);
+    const rgba = (c, a) => `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
+    return { line: rgba(line, 0.42), deep: rgba(deep, 0.62), clear: rgba(line, 0),
+             swatch: cssVar('--flood-water-below', '#3d8bfd') };
+  }
+
+  // The ramp for water standing at `L` m: clear above the line, the line's
+  // colour just under it, darkening to the deepest a fifth of the range down
+  // (three metres at least), so a valley floor reads deeper than its banks.
+  // The step at the line is a few centimetres of ramp: MapLibre interpolates
+  // between the stops and between the ground's own pixels, which keeps the
+  // edge sharp without a jag.
+  function waterRamp(L) {
+    const span = water.hi - water.lo, c = water.colours;
+    const deep = Math.max(3, span * 0.2), edge = Math.max(0.05, span / 4000);
+    return ['interpolate', ['linear'], ['elevation'], L - deep, c.deep, L - edge, c.line, L, c.clear];
+  }
+
+  // The lowest and highest ground in view: the terrain under a grid of points
+  // across the canvas, in metres — the terrain's reading carries the
+  // exaggeration and the ramp does not. Only ground a tile has been drawn for
+  // counts: elsewhere MapLibre answers 0, which is sea level rather than an
+  // answer, so the sky over the horizon and a tile still on its way leave no
+  // mark. Null while nothing is drawn yet.
+  function waterGround() {
+    const c = map.getCanvas(), w = c.clientWidth, h = c.clientHeight;
+    const t = map.terrain;
+    if (!w || !h || !t) return null;
+    const ex = (map.getTerrain() || {}).exaggeration || 1;
+    const read = typeof t.getDrawnElevationForLngLat === 'function'
+      ? ll => t.getDrawnElevationForLngLat(ll) : ll => map.queryTerrainElevation(ll);
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < WATER_GRID; i++) {
+      for (let j = 0; j < WATER_GRID; j++) {
+        const ll = map.unproject([(i + 0.5) / WATER_GRID * w, (j + 0.5) / WATER_GRID * h]);
+        const e = ll ? read(ll) : null;
+        if (e == null || !isFinite(e)) continue;
+        lo = Math.min(lo, e / ex);
+        hi = Math.max(hi, e / ex);
+      }
+    }
+    return isFinite(lo) ? { lo, hi } : null;
+  }
+
+  // The range read again: after the camera stops, and as terrain tiles land.
+  // Rising, the water keeps its place in the cycle, so a new range moves it
+  // with the scale; held, it keeps its height.
+  function rangeWater() {
+    water.rangeTimer = 0;
+    if (!waterShown() || !map.getLayer('mn-water')) return;
+    const g = waterGround();
+    if (!g) return;
+    let { lo, hi } = g;
+    if (hi - lo < WATER_MIN_SPAN) { const mid = (lo + hi) / 2; lo = mid - WATER_MIN_SPAN / 2; hi = mid + WATER_MIN_SPAN / 2; }
+    lo = Math.floor(lo) - 1;
+    hi = Math.ceil(hi) + 1;
+    if (lo === water.lo && hi === water.hi) return;
+    water.lo = lo;
+    water.hi = hi;
+    if (waterAnimating()) waterTick(performance.now(), true);
+    else setWaterLevel(water.hold != null ? water.hold : (lo + hi) / 2);
+    layoutWaterScale();
+  }
+
+  function queueWaterRange(ms = 300) {
+    if (!waterShown()) return;
+    clearTimeout(water.rangeTimer);
+    water.rangeTimer = setTimeout(rangeWater, ms);
+  }
+
+  // The water at `L` m, kept inside the range and to the centimetre — a finer
+  // step is a re-drape that changes nothing on screen. True when it moved.
+  function setWaterLevel(L) {
+    if (!map || !map.getLayer('mn-water') || water.lo == null) return false;
+    const v = Math.round(Math.max(water.lo, Math.min(water.hi, L)) * 100) / 100;
+    if (v === water.level) return false;
+    water.level = v;
+    map.setPaintProperty('mn-water', 'color-relief-color', waterRamp(v));
+    return true;
+  }
+
+  // One frame of the rise (`now` on the rAF clock). `force` draws whatever the
+  // frame rate says, for a range that has just changed under it.
+  function waterTick(now, force = false) {
+    if (water.lo == null) return;
+    if (!force && now - water.lastDraw < 1000 / WATER_FPS) return;
+    water.lastDraw = now;
+    const f = FloodStages.cycle(Math.max(0, (now - water.t0) / 1000), waterClockOpts());
+    setWaterLevel(water.lo + f * (water.hi - water.lo));
+    if (force || now - water.lastLine >= 1000 / WATER_LINE_HZ) { water.lastLine = now; syncWaterScale(); }
+  }
+
+  // The loop runs only while the water is rising. Under the twin, which covers
+  // this canvas, it draws nothing and its clock runs on.
+  function waterFrame(now) {
+    water.raf = 0;
+    if (!waterShown() || !waterAnimating()) return;
+    water.raf = requestAnimationFrame(waterFrame);
+    if (!twinUp()) waterTick(now);
+  }
+
+  // The clock set to where the water is now, so that a rise carries on from
+  // there rather than from the bottom.
+  function reanchorWater() {
+    const f = water.level == null || water.lo == null || water.hi === water.lo ? 0
+      : Math.max(0, Math.min(1, (water.level - water.lo) / (water.hi - water.lo)));
+    water.t0 = performance.now() - f * waterClockOpts().rise * 1000;
+    water.lastDraw = 0;
+  }
+
+  function playWater() {
+    if (water.raf || !waterShown() || !waterAnimating()) return;
+    reanchorWater();
+    water.raf = requestAnimationFrame(waterFrame);
+  }
+
+  function stopWater() {
+    if (water.raf) cancelAnimationFrame(water.raf);
+    water.raf = 0;
+  }
+
+  // Add, drop or start the water to match the switch. Called when the style
+  // loads and from the switch. The layer goes in clear: a ramp needs a range,
+  // and the range needs terrain drawn, which comes a few frames later.
+  function syncWater() {
+    if (!map || !ready) return;
+    if (!state.map3dWater) { dropWater(); return; }
+    if (!map.getSource(WATER_DEM)) {
+      map.addSource(WATER_DEM, { type: 'raster-dem', tiles: [DEM_URL], tileSize: DEM_TILE_PX,
+                                 maxzoom: DEM_MAXZOOM, encoding: 'terrarium' });
+    }
+    if (!map.getLayer('mn-water')) {
+      water.colours = waterColours();
+      water.level = null;
+      map.addLayer({ id: 'mn-water', type: 'color-relief', source: WATER_DEM,
+                     paint: { 'color-relief-color': WATER_CLEAR } }, under('mn-water'));
+    }
+    addWaterChrome();
+    // The clock first, so that the first rise starts from the foot.
+    if (waterAnimating()) playWater();
+    rangeWater();
+    syncWaterScale();
+  }
+
+  function dropWater() {
+    stopWater();
+    clearTimeout(water.rangeTimer);
+    water.rangeTimer = 0;
+    if (map) {
+      if (map.getLayer('mn-water')) map.removeLayer('mn-water');
+      if (map.getSource(WATER_DEM)) map.removeSource(WATER_DEM);
+    }
+    water.lo = water.hi = water.level = null;
+    water.scale = null;
+    dropWaterChrome();
+  }
+
+  // ── The scale and the caveat, over the view ──
+  // The twin's flood scale in its own dress (styles.css, .twin-flood-scale),
+  // stood up the right of the view under ↺ and over MapLibre's zoom and
+  // compass: ⏸ or ▶ and the height at its head, and a track from the lowest
+  // ground in view at its foot to the highest at its head, the water filling
+  // it, with round heights marked and named up its side. Press a height and
+  // the water stands there; press or drag the track and it follows the
+  // pointer; the arrow keys move it, Page Up and Page Down mark to mark, Home
+  // and End to the foot and the head. Anything but ▶ holds it still.
+  //
+  // Heights are said as m AHD, with a ≈: they are the terrain tiles' ~30 m
+  // SRTM, above the EGM96 geoid, which in Queensland is within about a metre
+  // of AHD — near enough to read the lie of the land by, and the panel note
+  // says it is not near enough for anything else.
+  function waterHeight(m) { return `≈ ${Number(m).toFixed(1)} m AHD`; }
+
+  function waterScaleHtml() {
+    return `<div class="twin-flood-scale map3d-water-scale" id="map3d-water-scale" role="group" aria-label="Rising water">
+        <div class="twin-scale-top">
+          <div class="twin-scale-head">
+            <button type="button" class="twin-scale-play" id="map3d-water-play" onclick="Map3D.toggleWaterAnim()"><span class="twin-scale-play-icon" aria-hidden="true">⏸</span><span class="sr-only">Pause the rise</span></button>
+            <span class="twin-scale-now" id="map3d-water-now"></span>
+          </div>
+        </div>
+        <div class="twin-scale-body">
+          <div class="twin-scale-track" id="map3d-water-track" role="slider" tabindex="0" aria-orientation="vertical"
+               aria-label="Water level" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"
+               title="Drag to stand the water at a height; Page Up and Page Down go mark to mark">
+            <span class="twin-scale-water" aria-hidden="true"></span>
+            <span class="twin-scale-marks" id="map3d-water-marks" aria-hidden="true"></span>
+            <span class="twin-scale-thumb" aria-hidden="true"></span>
+          </div>
+          <div class="twin-scale-labels" id="map3d-water-labels"></div>
+        </div>
+      </div>`;
+  }
+
+  // Along the foot, in the twin's red and its three lengths (styles.css picks
+  // the longest that fits), the whole of it for a screen reader. It takes no
+  // pointer, so a drag that starts on it moves the camera.
+  const WATER_CAVEAT = 'Not flood modelling. The water is one level surface rising through the heights of the ground in '
+    + 'view, filling every hollow below it whether a river could reach it or not, on ~30 m terrain whose heights are '
+    + 'within about a metre of AHD. It is an animation to read the lie of the land by — not a flood map, a flood level '
+    + 'or a forecast.';
+
+  function waterCaveatHtml() {
+    return `<div class="map3d-caveat" id="map3d-water-caveat"><p class="twin-caveat" role="note"><span class="twin-caveat-long" aria-hidden="true">⚠ Not flood modelling — an animation of the ground’s heights, not a flood map or a forecast. Indicative only.</span><span class="twin-caveat-mid" aria-hidden="true">⚠ Not flood modelling — not a flood map or a forecast.</span><span class="twin-caveat-short" aria-hidden="true">⚠ Not flood modelling</span><span class="sr-only">${esc(WATER_CAVEAT)}</span></p></div>`;
+  }
+
+  function addWaterChrome() {
+    if (!host || document.getElementById('map3d-water-scale')) return;
+    host.insertAdjacentHTML('beforeend', waterScaleHtml() + waterCaveatHtml());
+    host.classList.add('has-water');
+    const box = document.getElementById('map3d-water-scale');
+    // A click on the scale is the scale's, not the 2-D map's under the canvas
+    // (whose own click clears the focused repeater): the "?"'s reason.
+    if (typeof L !== 'undefined' && L.DomEvent) {
+      L.DomEvent.disableClickPropagation(box);
+      L.DomEvent.disableScrollPropagation(box);
+    }
+    wireWaterTrack(document.getElementById('map3d-water-track'));
+    if (hudRo) hudRo.observe(box);
+    // The credits, the scale bar, the zoom and the compass stand on the caveat
+    // now (styles.css), and the hint on them.
+    placeHud();
+    layoutWaterScale();
+  }
+
+  function dropWaterChrome() {
+    for (const id of ['map3d-water-scale', 'map3d-water-caveat']) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      if (hudRo) hudRo.unobserve(el);
+      el.remove();
+    }
+    if (host) { host.classList.remove('has-water'); placeHud(); }
+  }
+
+  // Px down the track for a height, and the height at a px down it.
+  function waterY(m, px) { return (water.hi - m) / (water.hi - water.lo) * px; }
+
+  // A round step for the named heights: 1, 2, 2.5 or 5 times a power of ten,
+  // the first that names no more than `n` of them up the range.
+  function niceStep(span, n) {
+    const raw = span / Math.max(1, n), mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    for (const k of [1, 2, 2.5, 5]) if (k * mag >= raw) return k * mag;
+    return 10 * mag;
+  }
+
+  // The marks and the names, for the range and the track's height now. Again
+  // whenever either changes — a new range, a resize of the view.
+  function layoutWaterScale() {
+    const track = document.getElementById('map3d-water-track');
+    const marks = document.getElementById('map3d-water-marks'), labels = document.getElementById('map3d-water-labels');
+    const box = document.getElementById('map3d-water-scale');
+    if (!track || !marks || !labels || !box) return;
+    const known = water.lo != null;
+    box.classList.toggle('is-waiting', !known);
+    if (!known) { marks.innerHTML = labels.innerHTML = ''; syncWaterScale(); return; }
+    const px = Math.max(0, track.clientHeight);
+    const step = niceStep(water.hi - water.lo, Math.max(1, Math.floor(px / WATER_LABEL_PX)));
+    const heights = [];
+    for (let m = Math.ceil(water.lo / step) * step; m <= water.hi + 1e-9; m += step) heights.push(Math.round(m * 100) / 100);
+    water.scale = { px, step, heights };
+    marks.innerHTML = heights.map(m => `<span class="twin-scale-mark" style="--y:${waterY(m, px).toFixed(1)}px"></span>`).join('');
+    const had = labels.contains(document.activeElement) ? document.activeElement.dataset.m : null;
+    labels.innerHTML = heights.map(m => {
+      const words = `Stand the water at ${waterHeight(m)}`;
+      return `<button type="button" class="twin-scale-label" data-m="${m}" aria-pressed="false" style="--y:${waterY(m, px).toFixed(1)}px"
+                onclick="Map3D.waterAt(${m})" title="${escAttr(words)}" aria-label="${escAttr(words)}">${esc(`${m} m`)}</button>`;
+    }).join('');
+    if (had != null) { const back = labels.querySelector(`[data-m="${CSS.escape(had)}"]`); if (back) back.focus(); }
+    track.setAttribute('aria-valuemin', String(water.lo));
+    track.setAttribute('aria-valuemax', String(water.hi));
+    syncWaterScale();
+  }
+
+  // What changes as the water moves: the water in the track, the thumb, ⏸ or
+  // ▶, the reading, which height it is held at — cheap enough for every frame.
+  function syncWaterScale() {
+    const track = document.getElementById('map3d-water-track');
+    if (!track) return;
+    const anim = waterAnimating();
+    const play = document.getElementById('map3d-water-play');
+    if (play) {
+      const verb = anim ? 'Pause the rise' : 'Play the rise';
+      const [icon, sr] = play.children;
+      if (icon && icon.textContent !== (anim ? '⏸' : '▶')) icon.textContent = anim ? '⏸' : '▶';
+      if (sr && sr.textContent !== verb) sr.textContent = verb;
+      const title = water.level == null ? verb : `${verb} — the water is at ${waterHeight(water.level)}`;
+      if (play.title !== title) play.title = title;
+    }
+    const now = document.getElementById('map3d-water-now');
+    const reading = water.level == null ? 'Reading the ground…' : waterHeight(water.level);
+    if (now && now.textContent !== reading) now.textContent = reading;
+    if (water.level == null || water.lo == null) return;
+    const f = (water.level - water.lo) / (water.hi - water.lo);
+    track.style.setProperty('--level', f.toFixed(4));
+    track.style.setProperty('--sw', water.colours ? water.colours.swatch : 'var(--flood-water-below)');
+    const val = String(water.level);
+    if (track.getAttribute('aria-valuenow') !== val) track.setAttribute('aria-valuenow', val);
+    const words = `${waterHeight(water.level)}, between the lowest ground in view at ${waterHeight(water.lo + 1)} and the highest at ${waterHeight(water.hi - 1)}`;
+    if (track.getAttribute('aria-valuetext') !== words) track.setAttribute('aria-valuetext', words);
+    const held = !anim && water.hold != null ? String(water.hold) : null;
+    for (const el of document.querySelectorAll('#map3d-water-labels .twin-scale-label')) {
+      const on = el.dataset.m === held ? 'true' : 'false';
+      if (el.getAttribute('aria-pressed') !== on) el.setAttribute('aria-pressed', on);
+    }
+  }
+
+  // What the check reads (Map3D._water).
+  function waterNow() {
+    const layer = map && map.getLayer('mn-water');
+    return { on: !!state.map3dWater, layer: !!layer, type: layer ? layer.type : null,
+             source: layer ? layer.source : null, lo: water.lo, hi: water.hi, level: water.level,
+             rising: waterAnimating(), looping: !!water.raf, hold: water.hold,
+             ramp: layer ? map.getPaintProperty('mn-water', 'color-relief-color') : null,
+             scale: water.scale ? { step: water.scale.step, heights: water.scale.heights.slice() } : null };
+  }
+
+  // The water held at `m` m: the rise stopped, the scale saying where.
+  function holdWater(m) {
+    if (water.lo == null) return;
+    water.anim = false;
+    stopWater();
+    water.hold = Math.round(Math.max(water.lo, Math.min(water.hi, m)) * 100) / 100;
+    setWaterLevel(water.hold);
+    syncWaterScale();
+  }
+
+  // The track: pressed, the water goes there; dragged, it follows; let go,
+  // it stays. The keys as the twin's: an arrow a fifth of the step between
+  // marks, Page Up and Page Down to the next mark, Home and End the foot and
+  // the head.
+  function wireWaterTrack(track) {
+    if (!track) return;
+    const at = y => {
+      const r = track.getBoundingClientRect();
+      const f = r.height ? 1 - Math.max(0, Math.min(1, (y - r.top) / r.height)) : 0;
+      return water.lo + f * (water.hi - water.lo);
+    };
+    let scrub = null;
+    track.addEventListener('pointerdown', e => {
+      if (e.button !== 0 || water.lo == null) return;
+      e.preventDefault();
+      try { track.setPointerCapture(e.pointerId); } catch (_) {}
+      track.focus({ preventScroll: true });
+      scrub = e.pointerId;
+      track.classList.add('is-dragging');
+      holdWater(at(e.clientY));
+    });
+    track.addEventListener('pointermove', e => { if (scrub === e.pointerId) holdWater(at(e.clientY)); });
+    const end = e => {
+      if (scrub !== e.pointerId) return;
+      scrub = null;
+      track.classList.remove('is-dragging');
+      announce(`Water held at ${waterHeight(water.level)}`);
+    };
+    track.addEventListener('pointerup', end);
+    track.addEventListener('pointercancel', end);
+    track.addEventListener('keydown', e => {
+      if (water.lo == null || water.level == null) return;
+      const step = water.scale ? water.scale.step : (water.hi - water.lo) / 10;
+      const marks = water.scale ? water.scale.heights : [];
+      const by = { ArrowUp: step / 5, ArrowRight: step / 5, ArrowDown: -step / 5, ArrowLeft: -step / 5 }[e.key];
+      let to = null;
+      if (by != null) to = water.level + by;
+      else if (e.key === 'PageUp') to = marks.find(m => m > water.level + 0.005) ?? water.hi;
+      else if (e.key === 'PageDown') to = [...marks].reverse().find(m => m < water.level - 0.005) ?? water.lo;
+      else if (e.key === 'Home') to = water.lo;
+      else if (e.key === 'End') to = water.hi;
+      if (to == null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      holdWater(to);
+    });
   }
 
   // Keep a click off the 2-D map underneath. The canvas is a child of the
@@ -2216,11 +2658,17 @@ const Map3D = (function () {
       syncMovePin();
       // And whatever Draw & measure has on the map, with its tool if armed.
       syncDraw();
+      // And the rising water, unless it has been turned off.
+      syncWater();
       applyDim();
       queueSheets();
       setNote();
       syncCamera();
     });
+    // The water's range is the ground in view: read again when the camera
+    // stops, and as the terrain's tiles land under it.
+    map.on('moveend', () => queueWaterRange());
+    map.on('sourcedata', e => { if (e && e.sourceId === 'mn-dem' && e.tile) queueWaterRange(); });
 
     // A DEM tile that will not come is flat ground on screen, and flat ground
     // reads as a clear path. It is counted and said out loud (see noteHtml).
@@ -2558,9 +3006,15 @@ const Map3D = (function () {
     // close to an ⓘ on the first drag; the hint sits above them either way,
     // and drops when they close.
     if (typeof ResizeObserver === 'function') {
-      hudRo = new ResizeObserver(placeHud);
-      for (const el of host.querySelectorAll('.maplibregl-ctrl-attrib, .maplibregl-ctrl-scale')) hudRo.observe(el);
+      // …and the rising water's scale stands on the zoom and compass, and is
+      // laid out for its height.
+      hudRo = new ResizeObserver(() => { placeHud(); layoutWaterScale(); });
+      for (const el of host.querySelectorAll('.maplibregl-ctrl-attrib, .maplibregl-ctrl-scale, .maplibregl-ctrl-bottom-right')) hudRo.observe(el);
       hudRo.observe(host);
+      const box = document.getElementById('map3d-water-scale');
+      if (box) hudRo.observe(box);
+      const offer = document.getElementById('map-twin-offer');
+      if (offer) hudRo.observe(offer);
     }
     placeHud();
     // Its few seconds start once there is a map to read it over: a slow
@@ -2580,6 +3034,17 @@ const Map3D = (function () {
       if (r.height) top = Math.min(top, r.top);
     }
     host.style.setProperty('--map3d-foot', `${Math.max(0, Math.round(hb.bottom - top))}px`);
+    // …and on the right, how far up the zoom and compass reach, which the
+    // rising water's scale stands on.
+    const br = host.querySelector('.maplibregl-ctrl-bottom-right');
+    const rb = br ? br.getBoundingClientRect() : null;
+    host.style.setProperty('--map3d-foot-r', `${rb && rb.height ? Math.max(0, Math.round(hb.bottom - rb.top)) : 0}px`);
+    // …and at the top, how far down the digital twin's offer reaches while it
+    // is up (map-twin.js): a card across the top of the map at close zoom,
+    // over this canvas, which the scale's head would otherwise be under.
+    const offer = document.getElementById('map-twin-offer');
+    const ob = offer && !offer.hidden ? offer.getBoundingClientRect() : null;
+    host.style.setProperty('--map3d-top', `${ob && ob.height ? Math.max(0, Math.round(ob.bottom - hb.top)) : 0}px`);
   }
 
   // `wait`: up, with no clock yet (hudTimer -1) until the map has drawn.
@@ -2781,6 +3246,14 @@ const Map3D = (function () {
       no antenna patterns, no trees and no terminal clutter — ${P_.model === 'cover'
         ? 'the best case' : 'the field model’s average, which a mast under a canopy can fall short of'}.
       The elevation profile card is the authority for any path about to be built.<br>`;
+    // The rising water's caveat, as strong here as along the foot of the view.
+    const flood = state.map3dWater ? `<span class="txt-warn"><strong>The rising water is not flood
+      modelling.</strong></span> It is one level surface rising through the heights of the ground
+      in view and round again — level across the whole view, and every hollow under it wet
+      whether a river could reach it or not. Its heights are the terrain’s, ~30 m SRTM above
+      the EGM96 geoid, within about a metre of AHD: near enough to read the lie of the land by,
+      not to read a flood level off. It is not a flood map or a forecast — a station’s flood
+      classes and the digital twin are the place for those.<br>` : '';
     const caveat = `A pin behind a hill is hidden by it — which is worth knowing both
       ways round: a station you cannot see from here has no line of sight from here,
       and a station you are looking for may be over the next ridge rather than absent.
@@ -2788,7 +3261,7 @@ const Map3D = (function () {
       Path profile tool’s own geometry — k-factor earth, filed antenna heights,
       no trees. Green clears the 60% Fresnel zone, amber is inside it, red is
       blocked. Indicative, like the profile.`;
-    return `${bits.length ? bits.join(' · ') + '<br>' : ''}${polar}${caveat}`;
+    return `${bits.length ? bits.join(' · ') + '<br>' : ''}${flood}${polar}${caveat}`;
   }
 
   return {
@@ -2868,6 +3341,43 @@ const Map3D = (function () {
       queueSheets();
       setNote();
       announce(on ? 'Line-of-sight sheets on' : 'Line-of-sight sheets off');
+    },
+
+    // The rising water (see "The rising water"). On by default and remembered
+    // when turned off: an animation somebody has said they do not want is not
+    // one to bring back every time they tilt the map.
+    setWater(on) {
+      state.map3dWater = !!on;
+      try { localStorage.setItem('mn-3d-water', on ? 'on' : 'off'); } catch (_) {}
+      syncWater();
+      setNote();
+      announce(on ? 'Rising water on — an animation of the ground’s heights, not flood modelling' : 'Rising water off');
+    },
+
+    // ⏸ and ▶ at the head of the water's scale. Paused, the water stands where
+    // it is; played, it rises on from there.
+    toggleWaterAnim() {
+      if (!waterShown()) return;
+      if (waterAnimating()) {
+        water.anim = false;
+        stopWater();
+        if (water.level != null) holdWater(water.level);
+        syncWaterScale();
+        announce(water.level != null ? `Water held at ${waterHeight(water.level)}` : 'Water held');
+      } else {
+        water.anim = true;
+        water.hold = null;
+        playWater();
+        syncWaterScale();
+        announce('Water rising');
+      }
+    },
+
+    // A height named up the scale, pressed: the water stands there.
+    waterAt(m) {
+      if (!waterShown() || !isFinite(Number(m))) return;
+      holdWater(Number(m));
+      announce(`Water held at ${waterHeight(water.level)}`);
     },
 
     // Vertical exaggeration. Remembered, because it is how this operator reads
@@ -2985,6 +3495,13 @@ const Map3D = (function () {
     // map-twin.js): the two buttons redrawn from whichever camera is showing.
     cameraChanged() { syncCamera(); },
 
+    // The twin's offer came up or went (map-twin.js): the rising water's scale
+    // stands under it while it is up, and its size is watched from now on.
+    offerChanged(el) {
+      if (el && hudRo) hudRo.observe(el);
+      placeHud();
+    },
+
     // The "?" at the foot of the view.
     toggleHud,
     // For the check: how long the hint stays up before it folds.
@@ -3015,6 +3532,13 @@ const Map3D = (function () {
                    ${on ? '' : 'disabled'}
                    onchange="Map3D.setSheets(this.checked)">
             Line-of-sight sheets
+          </label>
+          <label class="filter-check"
+                 title="Water rising through the heights of the ground in view, from the lowest to the highest and round again, with a scale up the right of the view to pause it or stand it at a height — to read how the land lies and what stands above what. An animation, not flood modelling. On until turned off, and remembered.">
+            <input type="checkbox" id="map-3d-water" ${state.map3dWater ? 'checked' : ''}
+                   ${on ? '' : 'disabled'}
+                   onchange="Map3D.setWater(this.checked)">
+            Rising water
           </label>
           <label class="filter-range${on ? '' : ' is-off'}">
             <span>Vertical exaggeration
@@ -3118,6 +3642,14 @@ const Map3D = (function () {
                          // nothing (test/map3d.mjs found this the hard way).
                          pending: sheets.queue.length + sheets.running }; },
     _sheetRows() { return sheets.rows; },
+    // For the check: the rising water as it stands — the range read off the
+    // ground, the level, whether it is rising, and the ramp MapLibre was given.
+    _water: waterNow,
+    // …with the range read again first, off the ground drawn now.
+    _waterRange() { rangeWater(); return waterNow(); },
+    // …and its seam: a shorter cycle, in seconds ({ rise, hold, drain }), or
+    // null for the twin's.
+    _waterClock(c) { waterClock = c || null; if (waterAnimating() && water.raf) reanchorWater(); },
     // The same profile the sheet is built from, computed on demand for one
     // named pair — so the check can hold the sheet against pathAnalyse's own
     // numbers rather than against a copy of them.
@@ -3188,6 +3720,13 @@ const Map3D = (function () {
     clearTimeout(hudTimer);   // the hint goes with the host it is drawn on
     hudTimer = 0;
     if (hudRo) { hudRo.disconnect(); hudRo = null; }
+    // The rising water's loop and its range go with the map; its scale and
+    // caveat with the host. Whether it rises or is held stays for the next.
+    stopWater();
+    clearTimeout(water.rangeTimer);
+    water.rangeTimer = 0;
+    water.lo = water.hi = water.level = null;
+    water.scale = null;
     if (map) { try { map.remove(); } catch (_) {} }
     map = null;
     ready = false;

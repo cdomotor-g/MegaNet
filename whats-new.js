@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 86, date: '2026-10-23', items: [
+      '<strong>🌊 Rising water in the 3-D view.</strong> Tilt the Stations map with ⛰️ and water now rises through the '
+        + 'heights of the ground in view, from the lowest to the highest, and round again — to show how the land lies '
+        + 'and which stations, roads and lots stand above which. A scale up the right of the view gives the height '
+        + '(≈ m AHD): ⏸ holds the water, ▶ sets it rising again, and pressing a height or dragging the scale stands it '
+        + 'there. <strong>It is not flood modelling</strong> — one level surface over the whole view, on ~30 m terrain — '
+        + 'and it says so along the foot of the view. Turn it off with <em>Rising water</em> in the 3-D settings; that '
+        + 'is remembered.',
+    ] },
     { n: 85, date: '2026-10-23', items: [
       '<strong>Rivers on the Stations map</strong>, on from the start: every principal named river and creek in Australia, '
         + 'from the Bureau of Meteorology\'s Geofabric, drawn under the pins with its name along it. The big rivers show '

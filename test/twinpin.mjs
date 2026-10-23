@@ -279,6 +279,9 @@ try {
     section('In ⛰️ 3-D');
 
     await page.evaluate(([lat, lon]) => { closeStnCard(false); state.map.setView([lat, lon], 14, { animate: false }); }, moved);
+    // The rising water off, as map3d has it until its own section: this is
+    // about the pin, and each step of the rise is a re-drape of the view.
+    await page.evaluate(() => Map3D.setWater(false));
     await page.click('.mn-map-3d');
     await page.waitForFunction(() => typeof Map3D !== 'undefined' && !!Map3D._map() && Map3D._map().isStyleLoaded() && !!Map3D._map().getTerrain(),
       null, { timeout: GL_TIMEOUT });

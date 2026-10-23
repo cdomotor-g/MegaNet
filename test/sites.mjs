@@ -742,6 +742,9 @@ if (!gl2) {
   console.log('  SKIP — this browser has no WebGL2, so the 3-D half cannot be checked here.');
 } else {
   await page.evaluate(() => MapSites.select(1));
+  // The rising water off, as map3d has it until its own section: this is about
+  // the finder's drawing, and each step of the rise is a re-drape of the view.
+  await page.evaluate(() => Map3D.setWater(false));
   await page.locator('.mn-map-3d').click();
   await page.waitForFunction(() => !!Map3D._map() && Map3D._map().isStyleLoaded() && !!Map3D._map().getTerrain(),
     null, { timeout: RUN_TIMEOUT });

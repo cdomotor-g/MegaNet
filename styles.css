@@ -16529,6 +16529,64 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   border-radius: var(--r-pill);
 }
 
+/* ── The rising water on the 3-D map (map-3d.js, "the scale and the caveat,
+   over the view") ────────────────────────────────────────────────────────
+   The twin's flood scale and its caveat, worn over the 3-D map. The scale
+   stands up the right of the view, under ↺ in the map's corner and on
+   MapLibre's zoom and compass — how far up those reach is the script's,
+   --map3d-foot-r — and narrower than the twin's: its names are heights, a
+   few characters each, and there are no lines out to them because each
+   stands at its own mark. The caveat runs along the foot under everything
+   MapLibre keeps there, whose credits, scale bar, zoom and compass are
+   lifted onto it while it is up; the hint stands on those, as ever. */
+#map3d { --twin-caveat-h: 1.5rem; }
+
+#map3d.has-water .maplibregl-ctrl-bottom-left,
+#map3d.has-water .maplibregl-ctrl-bottom-right { bottom: var(--twin-caveat-h); }
+
+#map3d .map3d-water-scale {
+  /* Under ↺, or under the digital twin's offer while that is up across the
+     top of the map (--map3d-top, from the script). */
+  top: max(calc(2 * var(--sp-2) + 2.4rem), calc(var(--map3d-top, 0px) + var(--sp-2)));
+  bottom: calc(var(--map3d-foot-r, 7rem) + var(--sp-2));
+  width: 10rem;
+  z-index: 2;
+}
+
+#map3d .map3d-water-scale .twin-scale-labels { right: calc(var(--scale-hit) + .25rem); }
+
+#map3d .map3d-water-scale .twin-scale-mark {
+  background: color-mix(in srgb, var(--text) 70%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--panel) 60%, transparent);
+}
+
+/* Up before the ground in view has been read: the head says so, and the
+   track has nothing to take hold of yet. */
+#map3d .map3d-water-scale.is-waiting .twin-scale-track { cursor: progress; }
+
+.map3d-caveat {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: var(--twin-caveat-h);
+  pointer-events: none;
+  /* The twin's three lengths, picked by the view's width as the twin's are
+     by its stage's. */
+  container: map3d-caveat / inline-size;
+}
+
+@container map3d-caveat (min-width: 480px) {
+  .map3d-caveat .twin-caveat-short { display: none; }
+  .map3d-caveat .twin-caveat-mid { display: inline; }
+}
+
+@container map3d-caveat (min-width: 860px) {
+  .map3d-caveat .twin-caveat-mid { display: none; }
+  .map3d-caveat .twin-caveat-long { display: inline; }
+}
+
 /* Standing at a photo spot in the POV: what Enter opens, over the stage above
    the HUD. A real button, so a pointer and a keyboard get there too. */
 .twin-photo-prompt {

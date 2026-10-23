@@ -1292,7 +1292,7 @@ here.
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
 - Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a six-column list there (name, station number, roles, AlertID, SLS catchment, last heard) instead of the eleven the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
 - **What’s here?** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, the estimated mobile signal for each carrier, and the nearest station, repeater and survey mark
-- **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, a polar coverage plot lying on the relief, your Draw & measure sketches on the ground (and its tools drawing there), pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray
+- **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, a polar coverage plot lying on the relief, your Draw & measure sketches on the ground (and its tools drawing there), pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray, and water rising through the ground's heights to show how the land lies (an animation, not flood modelling; on until turned off)
 - **Mobile coverage** — each carrier's own 4G coverage map, as Telstra, Optus and TPG give it to the ACCC: where a phone works outdoors and where only with an external antenna, one carrier at a time or the best of the three
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
@@ -1486,6 +1486,38 @@ heading kept — until it is clear, as the 2-D map pans one clear, and leaving
 **Draw & measure works here too.** The sketch lies on the terrain and its tools
 draw on it, with clicks taken off the terrain rather than the flat map under the
 canvas — see *In ⛰️ 3-D* under **Draw & measure**.
+
+**Rising water — an animation of the ground's heights, not flood modelling.**
+With the map tilted, water rises through the heights of the ground in view —
+from a metre under the lowest to a metre over the highest — holds at the top,
+drains and goes round again, the digital twin's flood water over the whole view
+instead of one station's patch. It is there to show how the land lies: which
+pins, roads and lots stand above which, where the low country runs, and how a
+valley fills before its banks. A scale up the right of the view gives the height
+(≈ m AHD) with round heights marked: ⏸ holds the water where it is and ▶ sets it
+rising again from there; press a height to stand the water at it, or drag the
+scale; the arrow keys, Page Up/Down, Home and End move it from the keyboard. It
+is on by default, and **Rising water** in the 3-D settings (🎚️) turns it off —
+which is remembered. It honours a browser that asks for reduced motion by
+standing the water halfway rather than moving it.
+
+It says what it is not along the foot of the view, in the twin's red, for as
+long as it is on — *Not flood modelling* — and again in the settings note. The
+water is one level surface across the whole view, and every hollow under it is
+wet whether a river could reach it or not (the twin asks which ground joins the
+channel by its gauge; this has no channel to ask about). Its heights are the
+terrain's own ~30 m SRTM above the EGM96 geoid, within about a metre of AHD:
+near enough to read the lie of the land by, not to read a flood level off. It is
+not a flood map or a forecast — a station's flood classes and the digital twin
+are the place for those.
+
+How it is drawn: a MapLibre `color-relief` layer colours the ground by its own
+height, on the same terrarium tiles the relief is built from (a source of its
+own, as MapLibre asks), and the ramp is the water — clear above the line, the
+twin's water colour at it, deeper blue below. Moving the line is a new ramp, so
+the rise fetches nothing; the shoreline is the ground's own contour at that
+height. Each step re-drapes the view, so the rise is drawn at 15 frames a second
+and stops drawing while the digital twin covers the map.
 
 Terrain is fetched for the view you are looking at and no further, which is what
 makes a whole-of-state network affordable to fly over; the sheets are capped at

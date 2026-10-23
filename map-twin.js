@@ -261,11 +261,20 @@ const MapTwin = (function () {
       });
     }
     el.hidden = false;
+    offerMoved();
   }
 
   function hideOffer() {
     if (offerEl) offerEl.hidden = true;
     offerId = null;
+    offerMoved();
+  }
+
+  // The 3-D view stands the rising water's scale under the offer while it is
+  // up (map-3d.js, placeHud), and watches its size from here on — its words
+  // come in late, and wrap.
+  function offerMoved() {
+    if (typeof Map3D !== 'undefined' && Map3D.offerChanged) Map3D.offerChanged(offerEl);
   }
 
   function makeHost() {

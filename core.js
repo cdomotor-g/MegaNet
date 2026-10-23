@@ -3852,6 +3852,11 @@ const state = {
   // is a taller picture of the same ground, not more of it.
   map3dExag:      Math.max(1, Math.min(3,
                     Number(localStorage.getItem('mn-3d-exag')) || 1)),
+  // The rising water in that view (Map3D, "the rising water"): an animation
+  // of the ground's heights, not flood modelling. On unless it has been turned
+  // off, and remembered when it is, for the exaggeration's reason — whether
+  // somebody wants it is how they like to read the map, not a thing of now.
+  map3dWater:     localStorage.getItem('mn-3d-water') !== 'off',
   // What the link colours mean (#186): 'freq' — the channel the hop runs on
   // (MapFreq, and the default); 'fade' — the fade margin in three bands
   // (MapFade); 'plain' — the one link colour the map drew for its whole life

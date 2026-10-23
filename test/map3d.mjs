@@ -74,6 +74,10 @@ const MAPLIBRE_VER = (fs.readFileSync(new URL('../map-3d.js', import.meta.url), 
   .match(/const LIB_VER\s*=\s*'([^']+)'/) || [])[1];
 const MAPLIBRE_DEV = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
   .devDependencies['maplibre-gl'];
+// The grid the rising water reads the ground's range off (9b), read from the
+// file for the same reason: the check reads the same points, not a copy of them.
+const WATER_GRID = Number((fs.readFileSync(new URL('../map-3d.js', import.meta.url), 'utf8')
+  .match(/const WATER_GRID\s*=\s*(\d+)/) || [])[1]) || 0;
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
 const GL_TIMEOUT   = Number(process.env.MAP3D_TIMEOUT || 45_000);
 
@@ -255,6 +259,14 @@ ok('the map has one ⛰️ button, in the side panel\'s strip', await btn3d.coun
    && await page.evaluate(() => !!document.querySelector('.mn-map-3d').closest('#help-panel .dock-strip')));
 ok('…which reports that the mode is off',
    await btn3d.getAttribute('aria-pressed') === 'false');
+
+// The rising water is on until somebody turns it off — and is turned off here,
+// before the first press, so that every section up to its own (9b) draws what
+// it always drew at the speed it always did: each step of the rise re-drapes
+// the view, and SwiftShader drawing that while a section waited on the hint's
+// .3 s fade made the fade late.
+ok('Rising water is on until it is turned off', await page.evaluate(() => state.map3dWater === true));
+await page.evaluate(() => Map3D.setWater(false));
 
 // ── 2. pressing it starts a real 3-D map ────────────────────────────────────
 console.log('\nPressing ⛰️ starts a 3-D map');
@@ -2233,6 +2245,239 @@ if (SA && SB && SC) {
   await page.waitForFunction(
     () => !!Map3D._map() && Map3D._map().isStyleLoaded(), null, { timeout: GL_TIMEOUT });
 }
+
+// ── 9b. the rising water ────────────────────────────────────────────────────
+// Water rising through the heights of the ground in view (map-3d.js, "The
+// rising water"), turned off at the top of this file and on again here, and
+// held to what it claims:
+//
+//   the layer   a colour relief, on a DEM source of its own — MapLibre asks
+//               that it not share the terrain's — over the base map (and the
+//               elevation ramp) and under the links and pins;
+//   the range   from under the lowest ground in view to over the highest,
+//               held against this file's own closed-form world rather than
+//               against the renderer, so a range read with the exaggeration
+//               left in, or off the wrong ground, is out by hundreds of metres;
+//   the ramp    clear above the level, water under it — and drawn: the same
+//               pixels of the view turn from the base map's green to the
+//               water's blue as it rises over them;
+//   the rise    the level moves by itself, through most of the range;
+//   the scale   up the right of the view, clear of the zoom and compass,
+//               naming round heights; ⏸ holds it, a height pressed stands it
+//               there, End and Home go to the head and the foot;
+//   the caveat  along the foot, saying it is not flood modelling, taking no
+//               pointer, with the credits, the scale bar, the zoom and the
+//               compass standing on it — and the panel note saying it too;
+//   the switch  off takes all of it away, and is remembered.
+console.log('\nThe rising water');
+
+if (!(await page.evaluate(() => state.map3d))) {
+  await btn3d.click();
+  await page.waitForFunction(() => !!Map3D._map() && Map3D._map().isStyleLoaded(), null, { timeout: GL_TIMEOUT });
+}
+await idle3d();
+// A short cycle, so the rise is seen to go round inside the waits below.
+await page.evaluate(() => Map3D._waterClock({ rise: 2, hold: 0.4, drain: 0.4 }));
+// The panel's own switch, as a press of it would leave it.
+const waterSwitch = on => page.evaluate(o => {
+  const cb = document.getElementById('map-3d-water');
+  if (!cb) return false;
+  cb.checked = o;
+  cb.dispatchEvent(new Event('change'));
+  return true;
+}, on);
+const switched = await waterSwitch(true);
+await page.waitForFunction(() => { const w = Map3D._water(); return w.layer && w.lo != null && w.level != null; },
+  null, { timeout: GL_TIMEOUT }).catch(() => {});
+await idle3d();
+const W1 = await page.evaluate(n => {
+  const m = Map3D._map(), st = m.getStyle(), w = Map3D._waterRange();
+  const src = st.sources[w.source] || {};
+  const ml = Map3D._lib(), cv = m.getCanvas();
+  // The ground the range is read from: the drawn terrain under a grid across
+  // the view, handed back as world coordinates for the check's own heights.
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const ll = m.unproject([(i + 0.5) / n * cv.clientWidth, (j + 0.5) / n * cv.clientHeight]);
+      if (!ll || m.terrain.getDrawnElevationForLngLat(ll) == null) continue;
+      const mc = ml.MercatorCoordinate.fromLngLat(ll);
+      pts.push([mc.x, mc.y]);
+    }
+  }
+  return { w, src: { type: src.type, tiles: src.tiles, encoding: src.encoding },
+           terrain: m.getTerrain(), order: st.layers.map(l => l.id), pts,
+           stored: localStorage.getItem('mn-3d-water') };
+}, WATER_GRID);
+const wix = id => W1.order.indexOf(id);
+ok('Rising water, switched on in the 3-D panel, draws a colour relief on the terrain',
+   switched && W1.w.on && W1.w.layer && W1.w.type === 'color-relief' && W1.stored === 'on',
+   JSON.stringify({ switched, on: W1.w.on, type: W1.w.type, stored: W1.stored }));
+ok('…on a DEM source of its own, from the terrain’s tiles',
+   W1.w.source === 'mn-water-dem' && W1.terrain && W1.terrain.source === 'mn-dem' && W1.src.type === 'raster-dem'
+     && W1.src.encoding === 'terrarium' && /elevation-tiles-prod\/terrarium/.test((W1.src.tiles || [])[0] || ''),
+   JSON.stringify({ source: W1.w.source, terrain: W1.terrain, src: W1.src }));
+ok('…over the base map and the elevation ramp, under the links and the pins',
+   wix('mn-water') > wix('mn-base') && (wix('mn-elev') < 0 || wix('mn-elev') < wix('mn-water'))
+     && wix('mn-water') < wix('mn-links') && wix('mn-water') < wix('mn-stations'),
+   W1.order.filter(id => /^mn-(base|elev|water|polar|lots|roads|links|stations)$/.test(id)).join(', '));
+const worldHs = W1.pts.map(([x, y]) => heightAtWorld(x, y));
+const wLo = Math.min(...worldHs), wHi = Math.max(...worldHs);
+// The DEM is this world sampled at a tile's pixels and interpolated between
+// them, so it is the world give or take a slope across a pixel — tens of metres
+// at most on these hills, where an exaggerated reading is out by hundreds.
+const wTol = Math.max(30, 0.1 * (wHi - wLo));
+ok('…from under the lowest ground in view to over the highest, read off the ground in metres',
+   WATER_GRID > 0 && W1.pts.length >= 12 && W1.w.lo != null && W1.w.lo < W1.w.hi
+     && Math.abs(W1.w.lo - wLo) <= wTol && Math.abs(W1.w.hi - wHi) <= wTol,
+   JSON.stringify({ lo: W1.w.lo, hi: W1.w.hi, world: [wLo, wHi], tol: wTol, ex: W1.terrain && W1.terrain.exaggeration, pts: W1.pts.length }));
+const rampOk = r => Array.isArray(r) && r[0] === 'interpolate' && JSON.stringify(r[2]) === '["elevation"]'
+  && r.length === 9 && r[3] < r[5] && r[5] < r[7];
+const alphaOf = c => { const m = /rgba\([^)]*,\s*([\d.]+)\)/.exec(String(c)); return m ? Number(m[1]) : null; };
+ok('…its ramp clear above the level and water under it',
+   rampOk(W1.w.ramp) && Math.abs(W1.w.ramp[7] - W1.w.level) < 0.011 && alphaOf(W1.w.ramp[8]) === 0
+     && alphaOf(W1.w.ramp[4]) > 0.3 && alphaOf(W1.w.ramp[6]) > 0.3,
+   JSON.stringify({ level: W1.w.level, ramp: W1.w.ramp }));
+
+// The rise: the level moves by itself, round most of the range, and never out of it.
+const seen = [];
+for (let i = 0; i < 24; i++) {
+  seen.push(await page.evaluate(() => Map3D._water().level));
+  await page.waitForTimeout(150);
+}
+const W2 = await page.evaluate(() => Map3D._water());
+const span = W2.hi - W2.lo;
+ok('the water rises by itself, through most of the ground’s range, and round again',
+   W2.rising && W2.looping && Math.max(...seen) - Math.min(...seen) >= 0.5 * span
+     && seen.every(l => l != null && l >= W2.lo - 0.01 && l <= W2.hi + 0.01),
+   JSON.stringify({ lo: W2.lo, hi: W2.hi, seen: seen.map(l => Math.round(l)) }));
+
+// The scale and the caveat, measured where they are drawn.
+const chrome = () => page.evaluate(() => {
+  const b = el => { if (!el) return null; const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }; };
+  const host = document.getElementById('map3d'), cav = document.getElementById('map3d-water-caveat');
+  const cb = b(cav);
+  const under = cb ? document.elementFromPoint((cb.left + cb.right) / 2, (cb.top + cb.bottom) / 2) : null;
+  return {
+    host: b(host), hasWater: host.classList.contains('has-water'),
+    scale: b(document.getElementById('map3d-water-scale')), track: b(document.getElementById('map3d-water-track')),
+    caveat: cb, caveatText: cav ? cav.textContent : '',
+    shownCaveat: cav ? [...cav.querySelectorAll('[aria-hidden="true"]')].filter(s => getComputedStyle(s).display !== 'none').map(s => s.textContent) : [],
+    under: under ? under.className : null,
+    nav: b(document.querySelector('#map3d .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group')),
+    attrib: b(document.querySelector('#map3d .maplibregl-ctrl-attrib')),
+    bar: b(document.querySelector('#map3d .maplibregl-ctrl-scale')),
+    labels: [...document.querySelectorAll('#map3d-water-labels .twin-scale-label')].map(x => ({ m: Number(x.dataset.m), text: x.textContent, pressed: x.getAttribute('aria-pressed') })),
+    play: (document.getElementById('map3d-water-play') || {}).textContent || '',
+    now: (document.getElementById('map3d-water-now') || {}).textContent || '',
+    note: (document.getElementById('map-3d-note') || {}).textContent || '',
+    // The digital twin's offer, across the top of the map at close zoom and
+    // over this canvas — up here, as it happens, and the scale's head was
+    // under it until the scale was told to stand below it.
+    offer: (() => { const o = document.getElementById('map-twin-offer'); return o && !o.hidden ? b(o) : null; })(),
+  };
+});
+const C1 = await chrome();
+ok('a scale stands up the right of the view, under ↺ and clear of the zoom and compass',
+   !!C1.scale && !!C1.host && !!C1.nav && C1.scale.right <= C1.host.right + 0.5 && C1.scale.left > C1.host.left + C1.host.width / 2
+     && C1.scale.top >= C1.host.top + 40 && C1.scale.bottom <= C1.nav.top + 0.5 && C1.track && C1.track.height > 60,
+   JSON.stringify({ scale: C1.scale, nav: C1.nav, track: C1.track }));
+ok('…and under the digital twin’s offer while that is up across the top of the map',
+   !C1.offer || C1.scale.top >= C1.offer.bottom - 0.5, JSON.stringify({ scale: C1.scale, offer: C1.offer }));
+const stepOk = W2.scale && C1.labels.length >= 2 && C1.labels.every((l, i) => i === 0 || Math.abs(l.m - C1.labels[i - 1].m - W2.scale.step) < 1e-6);
+ok('…naming round heights up the range, a round step apart, the reading at its head in m AHD',
+   stepOk && C1.labels.every(l => l.m >= W2.lo && l.m <= W2.hi && l.text === `${l.m} m` && Math.abs(l.m / W2.scale.step - Math.round(l.m / W2.scale.step)) < 1e-6)
+     && /^≈ -?\d+\.\d m AHD$/.test(C1.now),
+   JSON.stringify({ step: W2.scale && W2.scale.step, labels: C1.labels.map(l => l.text), now: C1.now }));
+ok('along the foot, in red and in so many words: not flood modelling',
+   !!C1.caveat && Math.abs(C1.caveat.bottom - C1.host.bottom) <= 1 && Math.abs(C1.caveat.width - C1.host.width) <= 1
+     && C1.shownCaveat.length === 1 && /^⚠ Not flood modelling/.test(C1.shownCaveat[0])
+     && /not a flood map, a flood level or a forecast/.test(C1.caveatText),
+   JSON.stringify({ caveat: C1.caveat, shown: C1.shownCaveat }));
+ok('…with MapLibre’s credits, scale bar, zoom and compass standing on it',
+   C1.hasWater && C1.nav && C1.attrib && C1.bar && C1.nav.bottom <= C1.caveat.top + 0.5
+     && C1.attrib.bottom <= C1.caveat.top + 0.5 && C1.bar.bottom <= C1.caveat.top + 0.5,
+   JSON.stringify({ caveat: C1.caveat, nav: C1.nav, attrib: C1.attrib, bar: C1.bar }));
+ok('…and taking no pointer: a drag that starts on it is a drag of the map',
+   /maplibregl-canvas/.test(C1.under || ''), String(C1.under));
+ok('the 3-D panel says it too', /rising water is not flood\s+modelling/i.test(C1.note), C1.note.replace(/\s+/g, ' ').slice(0, 160));
+
+// ⏸ holds it where it is.
+await page.click('#map3d-water-play');
+const P1 = await page.evaluate(() => Map3D._water());
+await page.waitForTimeout(500);
+const P2 = await page.evaluate(() => Map3D._water());
+const C2 = await chrome();
+ok('⏸ holds the water where it is, and turns to ▶',
+   !P1.rising && !P1.looping && P1.level != null && P2.level === P1.level && C2.play.startsWith('▶'),
+   JSON.stringify({ rising: P1.rising, looping: P1.looping, before: P1.level, after: P2.level, play: C2.play }));
+
+// A height pressed stands the water there — and it is drawn: the same pixels
+// turn from the base map's green to the water's blue as the water goes from
+// the foot of the scale to its head.
+const pixels = () => page.evaluate(() => new Promise(resolve => {
+  const m = Map3D._map(), cv = m.getCanvas();
+  m.once('render', () => {
+    const gl = cv.getContext('webgl2') || cv.getContext('webgl');
+    const out = [];
+    for (const [fx, fy] of [[0.3, 0.75], [0.5, 0.8], [0.7, 0.75], [0.4, 0.9], [0.6, 0.9]]) {
+      const px = new Uint8Array(4);
+      gl.readPixels(Math.floor(gl.drawingBufferWidth * fx), Math.floor(gl.drawingBufferHeight * (1 - fy)), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      out.push([px[0], px[1], px[2]]);
+    }
+    resolve(out);
+  });
+  m.triggerRepaint();
+}));
+const mid = C2.labels[Math.floor(C2.labels.length / 2)];
+await page.click(`#map3d-water-labels .twin-scale-label[data-m="${mid.m}"]`);
+await page.waitForTimeout(200);
+const A1 = await page.evaluate(() => Map3D._water());
+const C3 = await chrome();
+ok('a height pressed on the scale stands the water there, and says it is held there',
+   A1.level === mid.m && A1.hold === mid.m && !A1.rising && (C3.labels.find(l => l.m === mid.m) || {}).pressed === 'true',
+   JSON.stringify({ pressed: mid.m, level: A1.level, hold: A1.hold, labels: C3.labels }));
+await page.focus('#map3d-water-track');
+await page.keyboard.press('Home');
+await page.waitForTimeout(300);
+await idle3d();
+const K1 = await page.evaluate(() => Map3D._water());
+const dry = await pixels();
+await page.keyboard.press('End');
+await page.waitForTimeout(300);
+await idle3d();
+const K2 = await page.evaluate(() => Map3D._water());
+const wet = await pixels();
+ok('Home and End take it to the foot of the scale and the head', K1.level === K1.lo && K2.level === K2.hi,
+   JSON.stringify({ home: K1.level, lo: K1.lo, end: K2.level, hi: K2.hi }));
+const bluer = dry.map((d, i) => (wet[i][2] - wet[i][1]) - (d[2] - d[1]));
+ok('…and the water is drawn: under it the ground turns from the base map’s green to blue',
+   bluer.filter(x => x >= 40).length >= 3, JSON.stringify({ dry, wet }));
+
+// ▶ sets it rising again, from where it stands.
+await page.click('#map3d-water-play');
+const R1 = await page.evaluate(() => Map3D._water());
+ok('▶ sets it rising again', R1.rising && R1.looping && R1.hold == null, JSON.stringify(R1));
+
+// Off: the layer, its source, the scale and the caveat go, MapLibre's furniture
+// drops back to the foot, and the choice is remembered.
+await waterSwitch(false);
+await page.waitForTimeout(200);
+const waterOff = await page.evaluate(() => {
+  const m = Map3D._map(), host = document.getElementById('map3d');
+  const br = document.querySelector('#map3d .maplibregl-ctrl-bottom-right').getBoundingClientRect();
+  return { w: Map3D._water(), src: !!m.getSource('mn-water-dem'), scale: !!document.getElementById('map3d-water-scale'),
+           caveat: !!document.getElementById('map3d-water-caveat'), hasWater: host.classList.contains('has-water'),
+           foot: Math.abs(br.bottom - host.getBoundingClientRect().bottom), stored: localStorage.getItem('mn-3d-water'),
+           note: (document.getElementById('map-3d-note') || {}).textContent || '' };
+});
+ok('Rising water off takes the layer, its source, the scale and the caveat away',
+   !waterOff.w.on && !waterOff.w.layer && !waterOff.src && !waterOff.scale && !waterOff.caveat && !waterOff.hasWater && !waterOff.w.looping
+     && !/not flood\s+modelling/i.test(waterOff.note),
+   JSON.stringify(waterOff));
+ok('…puts MapLibre’s furniture back at the foot, and is remembered', waterOff.foot <= 1 && waterOff.stored === 'off',
+   JSON.stringify({ foot: waterOff.foot, stored: waterOff.stored }));
+await page.evaluate(() => Map3D._waterClock(null));
 
 console.log('\nLeaving the tab takes the WebGL context with it');
 
