@@ -2641,15 +2641,19 @@ function helpShowing() {
 }
 
 // Everything in the strip right now, as the groups it stands in: the side
-// panel's own (help, the cards, the path tools), then the map's controls by
+// panel's own (help, 🧹, the cards, the path tools), then the map's controls by
 // their corner group and their place in it — not by the order they were built,
 // which for the polar plot and the site finder is long after the rest. Each item is either a
-// pane's button ('tab', made and kept by syncDockStrip) or one of MapChrome's
-// own buttons ('action', the element itself). A button whose map is being
+// pane's button ('tab', made and kept by syncDockStrip) or a plain button
+// ('action', the element itself): 🧹, or one of MapChrome's. A button whose map is being
 // built again has no element to stand in the strip until the new one arrives,
 // so it is simply not there for that moment; a pane's button is.
 function dockStripGroups() {
   const side = [{ key: 'help', kind: 'tab', icon: '?', label: 'Help' }];
+  // 🧹 Clear the selection, straight under ❔ wherever the map's tools are:
+  // the side panel's own button rather than MapChrome's, so it stands at the
+  // top of the strip and not down among the map's groups.
+  if (dockHoldsMapTools()) side.push({ key: 'clear', kind: 'action', el: dockClearEl() });
   const here = dockStationsHere();
   if (here) {
     side.push({ key: 'stations', kind: 'tab', icon: '📍',
@@ -3000,6 +3004,25 @@ function dockTabEl(strip, it) {
     if (it.entry) it.entry.tab = b;
   }
   return b;
+}
+
+// 🧹 Clear the selection (clearStationsMapSelection): made once and kept, so
+// the button just pressed is the one still in the strip and keeps its focus.
+// Dressed as the map's own plain buttons are in the strip (.mn-mapctl-btn) —
+// it does one thing and opens nothing, so it carries no aria-expanded.
+let dockClearBtn = null;
+
+function dockClearEl() {
+  if (dockClearBtn) return dockClearBtn;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'mn-mapctl-btn mn-map-clear';
+  b.title = 'Clear the selection — deselects the station and any link, and takes off everything drawn on the map. '
+          + 'The view and the filters stay as they are';
+  b.setAttribute('aria-label', 'Clear the selection');
+  b.setAttribute('onclick', 'clearStationsMapSelection()');
+  b.innerHTML = '<span class="mn-mapctl-ico" aria-hidden="true">🧹</span>';
+  return (dockClearBtn = b);
 }
 
 // ── Opening, shutting, switching ─────────────────────────────────────────────
@@ -4710,7 +4733,39 @@ async function resetStationsMap() {
         + 'Layers and the base map are left as they are.',
       confirm: 'Reset the map', danger: true }))) return;
 
-  const try_ = fn => { try { fn(); } catch (_) { /* a module that is not here has nothing to clear */ } };
+  const try_ = mapTry;
+
+  // 1–4. Everything the operator put on the map but the filters.
+  clearStationsMapMarks();
+  state.selectedId = null;
+  state.stationsShowAll = false;
+
+  // 5. And the filters, which is also the refresh: clearStationFilters ends in
+  //    refreshMapLayers and rerenderStations, so everything above is repainted
+  //    by it rather than by five separate redraws. `true` re-fits the map to
+  //    the whole file — a reset that left the view zoomed into a paddock the
+  //    selection used to be in would not be one.
+  try_(() => clearStationFilters(true));
+  try_(() => rerenderMapLegend());
+  try_(() => rerenderStationEditorCard());
+
+  announce('Map reset — filters, selection, drawings and cards cleared. '
+         + 'The base map and the overlay layers are unchanged.');
+}
+
+// One call to a module that may not be on the page, and nothing if it is not.
+function mapTry(fn) {
+  try { fn(); } catch (_) { /* a module that is not here has nothing to clear */ }
+}
+
+// Steps 1–4 of ↺, which 🧹 Clear the selection shares: the armed modes, the
+// cards, everything drawn on top of the stations, and the selection with the
+// focus and the blast ring that ride on it. Not the filters, not the view, and
+// not the station in the editor — each caller says what it does with those.
+// Each module below repaints what it clears; the list under the map is the
+// caller's to redraw.
+function clearStationsMapMarks() {
+  const try_ = mapTry;
 
   // 1. The modes, first: an armed tool that answers clicks has to stop doing so
   //    before anything below re-renders under it.
@@ -4719,13 +4774,15 @@ async function resetStationsMap() {
   try_(() => LinkBudget.setPicking(false));
 
   // 2. The cards on the map, and the radio path card at the head of the path
-  //    tools. `false` on the two that take it: nothing is being closed on
-  //    purpose by a keyboard here, so focus stays where the reset button put
-  //    it rather than being thrown at a row underneath.
+  //    tools. `false` on the three that take it: nothing is being closed on
+  //    purpose by a keyboard here, so focus stays on the button that was
+  //    pressed rather than being thrown at a row underneath, or at whatever
+  //    had it when the radio path was clicked.
   try_(() => closeStnCard(false));
   try_(() => { if (state.acma.cardDeviceId) closeAcmaCard(false); });
   try_(() => MapHere.close());
-  try_(() => MapBackbone.closeCard());
+  try_(() => MapBackbone.closeCard(false));
+  try_(() => acmaClearHighlight());
 
   // 3. What is drawn on top of the stations.
   try_(() => {
@@ -4748,20 +4805,46 @@ async function resetStationsMap() {
   state.mapBlast = false;
   try_(() => clearMapFocusRepeater());
   try_(() => clearMapSelection());
-  state.selectedId = null;
-  state.stationsShowAll = false;
+}
 
-  // 5. And the filters, which is also the refresh: clearStationFilters ends in
-  //    refreshMapLayers and rerenderStations, so everything above is repainted
-  //    by it rather than by five separate redraws. `true` re-fits the map to
-  //    the whole file — a reset that left the view zoomed into a paddock the
-  //    selection used to be in would not be one.
-  try_(() => clearStationFilters(true));
-  try_(() => rerenderMapLegend());
-  try_(() => rerenderStationEditorCard());
+// ── Clear the selection ──────────────────────────────────────────────────────
+// 🧹, under ❔ in the side panel's strip: ↺ less the filters and the view. It
+// deselects the station, the stations picked off the map and the radio path
+// clicked, puts the map's cards away, and takes off everything drawn on top of
+// the stations — the drawings (a clicked link is one), the link budget's ends,
+// the polar plot, the site finders' answers, the found place's pin. The map
+// stays where it is, zoomed where it was, filtered as it was.
+//
+// The station in Station details goes the way a second click on its row puts
+// it down — unless the editor is holding something not saved, which is never
+// thrown away by a button about the map: it keeps its station and says so.
+//
+// The drawings are asked about as Draw & measure's own Clear asks: one goes
+// without a question, being one click to draw again, and a single line is what
+// clicking a link leaves behind.
+async function clearStationsMapSelection() {
+  const drawn = (state.draw && state.draw.shapes.length) || 0;
+  if (drawn > 1 && !(await confirmDialog({ title: `Remove all ${drawn} drawings?`,
+      message: 'Clearing the selection takes the drawings off the map too, and they cannot be brought back. '
+        + 'The view and the filters are left as they are.',
+      confirm: 'Clear the selection', danger: true }))) return;
 
-  announce('Map reset — filters, selection, drawings and cards cleared. '
-         + 'The base map and the overlay layers are unchanged.');
+  clearStationsMapMarks();
+  const held = state.selectedId ? editorHoldReason() : '';
+  if (state.selectedId && !held) {
+    state.selectedId  = null;
+    state.editorId    = null;
+    state.editorDraft = {};
+    state.editorMsg   = null;
+    fetchEditorStamp(null);
+  }
+  mapTry(() => rerenderStations());
+  mapTry(() => rerenderStationEditorCard());
+  mapTry(() => rerenderMapLegend());
+
+  announce(held
+    ? `Selection cleared — Station details still holds ${held}. The view and the filters are unchanged.`
+    : 'Selection cleared. The view and the filters are unchanged.');
 }
 
 // ── Map display block ────────────────────────────────────────────────────────

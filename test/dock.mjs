@@ -105,14 +105,14 @@ const PANEL_IDS = ['map-display-block', 'map-legend', 'map-latency-panel', 'map-
                    'reloc-run'];
 
 // The strip, top to bottom, as the corner orders it: the side panel's own
-// five (❔, 📍 the cards, the blue 📍 Find a place, 〽️ the path tools, 🧊 the
-// digital twin's pane — 🔭 the AR station finder's was a sixth until it became
-// the Look Around tab), then
+// six (❔, 🧹 Clear the selection, 📍 the cards, the blue 📍 Find a place, 〽️
+// the path tools, 🧊 the digital twin's pane — 🔭 the AR station finder's was
+// a seventh until it became the Look Around tab), then
 // the map's groups — show,
 // tools, 3d, screen — and within each by its declared order. Panes are
 // 'map-<id>', plain buttons their class. Not ↺ (the reset group's one button):
 // it is built to stay in the map's corner (`corner`), and is asserted there.
-const STRIP = ['help', 'stations', 'places', 'paths', 'twin',
+const STRIP = ['help', 'mn-map-clear', 'stations', 'places', 'paths', 'twin',
                'map-display', 'map-legend', 'map-latency',
                'map-draw', 'map-polar', 'map-sites', 'map-relocate', 'mn-map-here',
                'mn-map-3d', 'map-3d', 'mn-map-north', 'mn-map-tilt',
@@ -347,6 +347,50 @@ try {
   check('…and a real click on ↺ there resets the map — the selection made a moment ago gone, the side panel as it was',
     !!picked && afterReset.sel === null && afterReset.showing === 'stations', JSON.stringify({ picked, afterReset }));
 
+  // 🧹, straight under ❔: a station selected, two more picked off the map and
+  // a radio path clicked (which draws its line), then a real click on 🧹 — all
+  // of it gone, with the map where it was and the filters untouched.
+  const marked = await page.evaluate(() => {
+    const st = state.data.stations.filter(x => x.lat != null && x.lon != null);
+    selectStation(st[0].id);
+    state.mapSelection.add(st[1].id);
+    state.mapSelection.add(st[2].id);
+    mapSelectionChanged();
+    const link = state.mapLines.find(l => l.mnLinkStationId && !l.mnLinkRepeaterId2);
+    if (link) MapBackbone.open('field', link.mnLinkStationId, link.mnLinkRepeaterId);
+    window.__mnFilters = state.filters;
+    return { sel: state.selectedId, picked: state.mapSelection.size, drawn: state.draw.shapes.length,
+             path: !document.getElementById('path-card').hidden, card: state.stnCard.id };
+  });
+  await page.evaluate(() => setDockTab('stations', { instant: true }));
+  await page.waitForTimeout(600);
+  const view0 = await page.evaluate(() => ({ c: state.map.getCenter(), z: state.map.getZoom() }));
+  await page.click('#help-panel .dock-strip .mn-map-clear');
+  await page.waitForTimeout(400);
+  const swept = await page.evaluate(() => {
+    const b = document.querySelector('#help-panel .dock-strip .mn-map-clear');
+    const side = b && b.closest('.dock-group');
+    return {
+      sel: state.selectedId, editor: state.editorId, picked: state.mapSelection.size,
+      drawn: state.draw.shapes.length, path: !document.getElementById('path-card').hidden,
+      card: state.stnCard.id, filters: state.filters === window.__mnFilters,
+      c: state.map.getCenter(), z: state.map.getZoom(),
+      underHelp: !!side && side.dataset.group === 'side' && b.previousElementSibling
+        && b.previousElementSibling.classList.contains('help-toggle'),
+      focus: document.activeElement === b,
+    };
+  });
+  const sameView = Math.abs(swept.c.lat - view0.c.lat) < 1e-9 && Math.abs(swept.c.lng - view0.c.lng) < 1e-9
+    && swept.z === view0.z;
+  check('🧹 stands straight under ❔ in the side panel\'s own group',
+    swept.underHelp, JSON.stringify(swept));
+  check('…and a real click on it deselects the station, the picked stations and the clicked radio path, and takes its line and the cards away',
+    !!marked.sel && marked.picked === 2 && marked.drawn === 1 && marked.path && !!marked.card
+      && swept.sel === null && swept.editor === null && swept.picked === 0 && swept.drawn === 0
+      && !swept.path && swept.card === null, JSON.stringify({ marked, swept }));
+  check('…leaving the view where it was, the filters untouched, and focus on 🧹',
+    sameView && swept.filters && swept.focus, JSON.stringify({ view0, swept }));
+
   // Pinning from code, on this map, above a phone: nothing moves, nothing shows.
   await page.evaluate(() => MapChrome.setPinned('legend', true));
   await page.waitForTimeout(200);
@@ -368,7 +412,7 @@ try {
   check('…with focus still on the button that was pressed', s.active === 'help', String(s.active));
   await page.keyboard.press('ArrowDown');
   s = await look();
-  check('ArrowDown walks the strip to the next button', s.active === 'stations', String(s.active));
+  check('ArrowDown walks the strip to the next button — 🧹, straight under ❔', s.active === 'mn-map-clear', String(s.active));
   // …through every group and every kind of button, the hidden camera pair skipped.
   const walked = [];
   for (let i = 0; i < STRIP.length; i++) { await page.keyboard.press('ArrowDown'); walked.push((await look()).active); }
@@ -379,7 +423,8 @@ try {
   await page.keyboard.press('End');
   check('End goes to the last of them — ⛶, now that ↺ is on the map and ◫ has gone', (await look()).active === 'mn-map-full', (await look()).active);
   await page.keyboard.press('Home');
-  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');   // 🧹
+  await page.keyboard.press('ArrowDown');   // 📍
   await page.keyboard.press('Enter');
   await page.waitForTimeout(300);
   s = await look();
@@ -1097,7 +1142,7 @@ try {
   // 36 px: a step under a desktop's 44, so the rail is less of the map and
   // its column fits a phone's height — and still half as big again as the
   // 24 px WCAG 2.2 sets as a target's least.
-  check('…holding ❔, the two 📍, 〽️ and every one of the map\'s controls, in the corner\'s order, each 36 px square',
+  check('…holding ❔, 🧹, the two 📍, 〽️ and every one of the map\'s controls, in the corner\'s order, each 36 px square',
     JSON.stringify(phone.strip) === JSON.stringify(PHONE_STRIP) && phone.square.every(([w, h]) => w === 36 && h === 36)
       && phone.panels.length === 8 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
     JSON.stringify(phone));

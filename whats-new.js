@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 78, date: '2026-10-23', items: [
+      '<strong>🧹 Clear the selection</strong>, on the Stations map: a new button in the side panel\'s strip, straight '
+        + 'under ❔. It deselects the station and any link you clicked, puts the cards on the map away, and takes off '
+        + 'everything drawn on the map — your drawings, the link budget\'s ends, the polar plot, the site finders\' '
+        + 'answers and the found place\'s pin — without moving the map or touching the filters. (↺ on the map still '
+        + 'resets everything, the filters and the view included.) Station details with changes you have not saved '
+        + 'keeps its station.',
+    ] },
     { n: 77, date: '2026-10-23', items: [
       '<strong>Click a pin, get its station details</strong>, on the Stations map: clicking a station\'s pin now loads it '
         + 'into the <em>Station details</em> card as well as the card on the map, and the side panel scrolls down to it — '
