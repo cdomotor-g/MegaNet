@@ -12,8 +12,9 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state`, esc, escAttr, announce,
 // stationLatLonText, copyLatLonPillHtml and mapViewPills; across to app.js for
-// mapNote, and to map-catchments.js for the basins' geometry. All of it from
-// inside its own functions, so this file's position among the modules is free.
+// mapNote, to map-catchments.js for the basins' geometry, and to
+// map-river-lines.js to select a river pressed here. All of it from inside its
+// own functions, so this file's position among the modules is free.
 //
 // ── Why it has a box of its own now ──────────────────────────────────────────
 // It lived in the Stations filter box (#184): text that was not a station was
@@ -740,11 +741,33 @@ const Places = (function () {
         draw(hit, true);
         told(hit);
       }).catch(() => { if (typeof mapNote === 'function') mapNote('The catchment outlines could not be loaded.', 5000); });
+    } else if (isRiver(group, hit) && typeof MapRiverLines !== 'undefined') {
+      // A river: the rivers layer selects it, lit from end to end, and the map
+      // goes to the whole of it — this draws the pin and leaves the line to
+      // the layer. One the Geofabric's principal network does not hold (a
+      // minor creek, a canal) is drawn here as before.
+      const mine = shown;
+      MapRiverLines.selectNamed(hit.name, { lat: hit.lat, lon: hit.lon }).then(r => {
+        if (shown !== mine || !map) return;
+        if (r) {
+          hit.shape = null;
+          hit.bounds = r.bounds;
+          hit.maxZoom = 12;
+          hit.riverSelected = true;
+        }
+        draw(hit, true);
+        told(hit);
+      });
     } else {
       draw(hit, true);
       told(hit);
     }
     render();
+  }
+
+  // A row that is a river or a creek: the network's own, or the gazetteer's.
+  function isRiver(group, hit) {
+    return group === 'river' || (group === 'osm' && /river|creek|stream|canal/.test(hit.kind || ''));
   }
 
   function told(hit) {
@@ -889,6 +912,10 @@ const Places = (function () {
   // clears what is drawn on the map and leaves the tools' own contents).
   function clearMark() {
     if (layer) { layer.remove(); layer = null; }
+    // The river it selected goes with the pin it drew.
+    if (shown && shown.hit && shown.hit.riverSelected && typeof MapRiverLines !== 'undefined') {
+      MapRiverLines.clearSelection();
+    }
     shown = null;
     render();
   }

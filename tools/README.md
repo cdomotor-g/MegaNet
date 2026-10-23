@@ -1060,3 +1060,34 @@ python3 tools/build_geoid_grid.py --egm96 a.tif --ausgeoid b.tif
 
 There is nothing to re-run it for unless a model changes; `npm run flood` holds
 the file to the numbers above.
+
+## The rivers: `build_rivers.py`
+
+`build_rivers.py` writes `data/rivers-au.json` and the 2° tiles in
+`data/rivers-au/`, which the Stations map's *Rivers and creeks* layer draws
+(`map-river-lines.js`). The source is the Bureau of Meteorology's Geofabric
+v3.3 Surface Hydrology Network, *AHGF Network Stream – Major, Named* — the
+principal named watercourses of the 1:250,000 national series, one connected
+network, each reach with the area draining through it — read from the keyless,
+CORS-open copy Geoscience Australia's Digital Atlas of Australia hosts on
+ArcGIS Online (© Commonwealth of Australia (Bureau of Meteorology), CC BY 4.0).
+
+It joins the 168,685 segments into 3,728 rivers — a name's reaches that meet
+downstream, or across a lake, a weir pool or a reach the layer leaves out —
+cuts each into runs by drainage-area band (20,000, 5,000, 1,000, 250, 50 and
+0 km²), simplifies them to about 40 m (the source is good to about 100 m), and
+writes them as encoded polylines at 1e-4°. The national file carries every
+river's name, area, length and extent and its reaches of 1,000 km² or more
+(1.5 MB, about 860 KB compressed); the smaller reaches are in 180 tiles of up
+to 32 KB, read only once the map is close enough to draw them. Standard library
+only, like the rest of this directory.
+
+```bash
+python3 tools/build_rivers.py                                  # fetch and build
+python3 tools/build_rivers.py --cache ~/geofabric-pages        # keep the raw pages
+```
+
+The fetch is 85 pages of 2,000 segments and takes twenty to thirty minutes;
+with `--cache`, a rebuild with other bands or tolerance asks for nothing. There
+is nothing to re-run it for unless the Bureau publishes a new version of the
+Geofabric. `npm run riverlines` holds the files to their shape.

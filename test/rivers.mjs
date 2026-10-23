@@ -67,7 +67,13 @@ try {
   // A view the fixture is built around, a term in the box, the switch on.
   // The debounced run that follows can only fail (the harness blocks the
   // network) — waited out so the seed's draw is the state under test.
+  //
+  // The Geofabric rivers layer (map-river-lines.js, `npm run riverlines`) is
+  // on by default and draws the real Burdekin country under this fixture, with
+  // its own hover name and cursor. This check is the filter's highlight alone,
+  // so that layer is switched off for it.
   await page.evaluate(() => {
+    MapRiverLines.setEnabled(false);
     state.map.setView([-20.0, 147.0], 8, { animate: false });
     state.filters.searches = [{ text: 'burdekin', name: true, number: true, alert: true }];
     MapRivers.setEnabled(true);

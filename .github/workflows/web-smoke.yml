@@ -73,6 +73,11 @@ on:
       # flood` holds the file to its numbers, `npm run twin` the ground to it.
       - 'data/geoid-ahd-egm96.json'
       - 'tools/build_geoid_grid.py'
+      # …and the rivers layer's Geofabric files and the script that makes
+      # them: `npm run riverlines` reads the file as well as drawing it.
+      - 'data/rivers-au.json'
+      - 'data/rivers-au/**'
+      - 'tools/build_rivers.py'
       # The mobile transmitter extract the coverage section reads, and the
       # script that makes it monthly: `npm run mobile` holds the files' shape.
       # …and the carriers' coverage tiles and the script that makes them
@@ -158,6 +163,11 @@ on:
       # flood` holds the file to its numbers, `npm run twin` the ground to it.
       - 'data/geoid-ahd-egm96.json'
       - 'tools/build_geoid_grid.py'
+      # …and the rivers layer's Geofabric files and the script that makes
+      # them: `npm run riverlines` reads the file as well as drawing it.
+      - 'data/rivers-au.json'
+      - 'data/rivers-au/**'
+      - 'tools/build_rivers.py'
       # The mobile transmitter extract the coverage section reads, and the
       # script that makes it monthly: `npm run mobile` holds the files' shape.
       # …and the carriers' coverage tiles and the script that makes them
@@ -544,6 +554,17 @@ jobs:
       - name: Rivers — named, labelled, clickable, and reachable without a mouse
         working-directory: test
         run: npm run rivers
+
+      # The rivers themselves (map-river-lines.js), from the Geofabric file the
+      # site serves — so nothing is seeded but the minor creeks, which come
+      # from a live service the harness blocks. On for a first visit in the
+      # Calm look; named along the rivers; a real pointer hovers and selects
+      # one, its callout lists its stations, open map and 🧹 put it down, an
+      # armed pick owns the click; a button per named river for the keyboard;
+      # Find a place's river selects it; off is remembered.
+      - name: Rivers layer — on by default, named, and each river selectable
+        working-directory: test
+        run: npm run riverlines
 
       # The road reserve, and the intersections that were missing from it. The
       # DCDB files the crossing square at a junction under its own parcel_typ

@@ -29,6 +29,10 @@ road data calls that the road's owner, and so does Flood-Net. It decides who
 gives permission to work in the road corridor, who closes the road in a flood,
 and who to ring when it is damaged.
 
+The lines are thin — about half their first weight since 23 October 2026, so a
+highway never reads heavier than the river it crosses on a map whose subject is
+the rivers. Their order of weight is unchanged.
+
 | On the map | Means | From the data |
 |---|---|---|
 | **Maroon**, over a white casing, heaviest | State-controlled — Transport and Main Roads | `scr_indicator` T, or `road_owner` TMR |

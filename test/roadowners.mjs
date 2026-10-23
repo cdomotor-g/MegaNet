@@ -273,7 +273,7 @@ try {
     /IIf\(\$feature\.scr_indicator == 'T', 'TMR', \$feature\.road_owner\)/.test(top.drawingInfo.renderer.valueExpression || ''),
     top.drawingInfo.renderer.valueExpression);
   check('…TMR maroon and heaviest, the council slate, private dashed, the parks green',
-    J(infos.TMR.color) === J([142, 21, 55, 255]) && infos.TMR.width === 2.4
+    J(infos.TMR.color) === J([142, 21, 55, 255]) && infos.TMR.width === 1.2
       && J(infos.LG.color) === J([55, 71, 79, 255]) && infos.Private.style === 'esriSLSDash'
       && J(infos.QPWS.color) === J([46, 125, 50, 255]) && J(infos.Forestry.color) === J(infos.QPWS.color),
     J({ TMR: infos.TMR, LG: infos.LG, Private: infos.Private }));

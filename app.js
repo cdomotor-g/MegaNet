@@ -93,7 +93,7 @@ function applyTheme({ repaint = true } = {}) {
       + '. Choose another.';
   }
   if (!repaint || was === state.theme) return;
-  if (state.map) { refreshMapLayers(); MapDraw.render(); MapRivers.repaint(); }
+  if (state.map) { refreshMapLayers(); MapDraw.render(); MapRivers.repaint(); MapRiverLines.repaint(); }
   // The ARRO chart writes real colour values into its SVG rather than `var(…)`,
   // so that the PNG export has something to resolve. That is the trade: the
   // chart has to be told the palette moved.
@@ -4959,6 +4959,7 @@ function clearStationsMapMarks() {
   try_(() => MapRelocate.clear());
   try_(() => MapSpider.reset());
   try_(() => Places.clearMark());
+  try_(() => MapRiverLines.clearSelection());
 
   // 4. The selection, the focus and the blast ring that rides on it. The blast
   //    flag goes before the focus it reads, so applyMapFocusStyles' tail has
@@ -4970,11 +4971,12 @@ function clearStationsMapMarks() {
 
 // ── Clear the selection ──────────────────────────────────────────────────────
 // 🧹, under ❔ in the side panel's strip: ↺ less the filters and the view. It
-// deselects the station, the stations picked off the map and the radio path
-// clicked, puts the map's cards away, and takes off everything drawn on top of
-// the stations — the drawings (a clicked link is one), the link budget's ends,
-// the polar plot, the site finders' answers, the found place's pin. The map
-// stays where it is, zoomed where it was, filtered as it was.
+// deselects the station, the stations picked off the map, the radio path
+// clicked and the river selected, puts the map's cards away, and takes off
+// everything drawn on top of the stations — the drawings (a clicked link is
+// one), the link budget's ends, the polar plot, the site finders' answers, the
+// found place's pin. The map stays where it is, zoomed where it was, filtered
+// as it was.
 //
 // The station in Station details goes the way a second click on its row puts
 // it down — unless the editor is holding something not saved, which is never
@@ -5170,6 +5172,15 @@ function mapDisplayControlsHtml() {
     </div>
     <p class="filter-note" id="map-fade-note">${MapFade.noteHtml()}</p>` : ''}
     <div class="map-display-h">Overlay layers</div>
+    <!-- The rivers themselves (map-river-lines.js), first of the overlays and
+         on by default: they are what this network is about. -->
+    <label class="filter-check"
+           title="Every principal named river and creek in Australia, from the Bureau of Meteorology's Geofabric — the big rivers from the national view, their tributaries as you zoom in, the minor named creeks from zoom 12. Hover a river for its name; click it to select it and see which stations are on it.">
+      <input type="checkbox" ${state.mapRiverLines ? 'checked' : ''}
+             onchange="MapRiverLines.setEnabled(this.checked)">
+      Rivers and creeks (Geofabric, BoM)
+    </label>
+    <p class="filter-note" id="map-river-lines-note">${MapRiverLines.noteHtml()}</p>
     <!-- Ground height as colour (#186). It was a base map until then, one radio
          beside OSM-Topo — and picked as a base it took the localities, the
          roads and the watercourses with it. It is over the base now, with the
@@ -5551,6 +5562,7 @@ function mapLegendOffLayersHtml() {
     !state.mapHealth          && 'Pins coloured by health',
     !state.mapElev            && 'Elevation shading',
     !state.mapSurvey          && 'Survey marks',
+    !state.mapRiverLines      && 'Rivers and creeks',
     !state.mapRivers          && 'River highlighting',
     !state.mapContours        && 'LiDAR contours',
     !state.mapPeaks           && 'Highest ground in view',
@@ -5726,6 +5738,7 @@ function mapLegendHtml() {
         : `Arrows along the links are on, and draw from zoom ${MapArrows.minZoom} in — they grow
            as you zoom, and are off out here where direction is not the question being asked`}</span>
     </span>` : ''}
+    ${MapRiverLines.active() ? MapRiverLines.legendHtml() : ''}
     ${MapRivers.active() ? `
     <span class="legend-item">
       <span class="legend-line legend-line-river"></span>
@@ -5962,6 +5975,7 @@ function stopStationsMap() {
   MapHere.detach();
   MapDraw.detach();
   LinkBudget.detach();
+  MapRiverLines.detach();
   MapRivers.detach();
   MapCatchments.detach();
   MapHubs.detach();
@@ -6122,7 +6136,10 @@ function initMap() {
   MapDraw.attach(state.map);
   LinkBudget.attach(state.map);
   // Before the first refresh, so the fit that refresh performs is the view the
-  // first river lookup is bounded by.
+  // first river lookup is bounded by. The rivers layer's own click waits a
+  // tick, so every point layer's click — attached before it or after — has
+  // had its say before a river is selected or put down.
+  MapRiverLines.attach(state.map);
   MapRivers.attach(state.map);
   MapCatchments.attach(state.map);
   MapHubs.attach(state.map);

@@ -3723,6 +3723,12 @@ const state = {
   // The one map display switch that is remembered between visits: it is the only
   // one that costs a network request, so an operator who turns it off means it.
   mapRivers:      mapLayerStored('mn-rivers'),
+  // The rivers themselves (see MapRiverLines). On by default in every look —
+  // the one context layer the Calm look does not start without, because the
+  // rivers are what this network is about — and remembered once somebody
+  // turns it off. Its 1.5 MB is read when the map first opens, not at load.
+  mapRiverLines:  (() => { try { return localStorage.getItem('mn-river-lines') !== 'off'; }
+                           catch (_) { return true; } })(),
   // Survey marks & CORS sites (see MapSurvey, #120). On by default now, and
   // remembered like mapRivers: a crew standing at a site wants the benchmarks
   // beside the station without going looking for a checkbox first, and an

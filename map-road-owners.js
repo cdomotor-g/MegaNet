@@ -143,7 +143,11 @@ const MapRoadOwners = (function () {
   // How each class is drawn and named. Literal hexes, for map-wind.js's reason
   // — they reach the export's renderer and a pin's inline SVG, neither of which
   // takes a var() — and so the key, the image and the pins are one table.
-  // Widths are the export's points (1 pt is 1⅓ px at 96 dpi).
+  // Widths are the export's points (1 pt is 1⅓ px at 96 dpi). About half
+  // what they were until 2026-10-23, by request: at 2.4 pt a highway read
+  // heavier than any river, on a map whose subject is the rivers. The order
+  // of weight is unchanged — the State's network still heaviest and cased,
+  // the unrecorded lightest — it is the whole layer that steps back.
   //
   // The maroon is the one colour that has to carry: the State-controlled
   // network over every base map. It sits apart from the two reds already on
@@ -155,27 +159,27 @@ const MapRoadOwners = (function () {
   // unrecorded, green for the parks, brown and dashed for private, teal for
   // the other public bodies.
   const CLASSES = {
-    tmr:     { color: '#8e1537', pt: 2.4,
+    tmr:     { color: '#8e1537', pt: 1.2,
                label: 'State-controlled — Transport and Main Roads',
                key:   'Road — State-controlled (Transport and Main Roads)' },
-    council: { color: '#37474f', pt: 1.3,
+    council: { color: '#37474f', pt: 0.65,
                label: 'the council’s, as the State records it',
                key:   'Road — the council’s, as recorded' },
-    unknown: { color: '#607d8b', pt: 0.9, alpha: 0.8,
+    unknown: { color: '#607d8b', pt: 0.45, alpha: 0.75,
                label: 'not State-controlled; the council’s or private — the State has not recorded which',
                key:   'Road — not State-controlled, owner not recorded (the council’s or private)' },
-    park:    { color: '#2e7d32', pt: 1.3,
+    park:    { color: '#2e7d32', pt: 0.65,
                label: 'national park or State forest — Queensland Parks and Wildlife Service',
                key:   'Road — national park or State forest' },
-    private: { color: '#8d6e63', pt: 1.1, dash: true,
+    private: { color: '#8d6e63', pt: 0.6, dash: true,
                label: 'private — the owner of the land it crosses',
                key:   'Road — private' },
-    other:   { color: '#00838f', pt: 1.1,
+    other:   { color: '#00838f', pt: 0.6,
                label: 'another public body',
                key:   'Road — port, water or utility authority, or another public body' },
   };
   const CLASS_ORDER = ['tmr', 'council', 'unknown', 'park', 'private', 'other'];
-  const CASING_PT   = 4.2;
+  const CASING_PT   = 2.2;
 
   function classOf(scr, owner) {
     if (String(scr || '').toUpperCase() === 'T' || owner === 'TMR') return 'tmr';

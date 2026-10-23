@@ -91,6 +91,9 @@ MegaNet/
 │                             read-only, printable to A4, exportable as CSV
 │                             ↓ the ten modules #133 lifted out of it, one each
 ├── map-rivers.js           ← MapRivers — OSM watercourses under the station pins
+├── map-river-lines.js      ← MapRiverLines — the rivers themselves, from the BoM
+│                             Geofabric: on by default, named along their
+│                             courses, each one selectable, with its stations
 ├── map-spider.js           ← MapSpider — fans overlapping pins out on leader lines
 ├── map-locate.js           ← MapLocate — GPS dot, accuracy ring, compass cone
 ├── map-move-pin.js         ← MapMovePin — drag one station's pin to where the
@@ -334,6 +337,7 @@ MegaNet/
 │   ├── site-exposure.md                    (tides and soils on the station card — rows, sources, limits)
 │   ├── site-land.md                        (the land — tenure, council, address — on the station and What is here cards)
 │   ├── road-owners.md                      (who manages each road and bridge — the map layer, the card section, sources, limits, what else QLDTraffic has)
+│   ├── rivers.md                           (the rivers layer — the Geofabric, what is drawn at which zoom, selecting a river, its files, rebuilding them)
 │   ├── mobile-coverage.md                  (the mobile signal estimate on the station and What is here cards — how, the grades, how it agrees with the carriers' maps, limits)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
 │   ├── Hydrology Raw Data Filtering Program Specification.pdf  (357 filter, v2.1 2009)
@@ -1292,6 +1296,7 @@ here.
 - **Mobile coverage** — each carrier's own 4G coverage map, as Telstra, Optus and TPG give it to the ACCC: where a phone works outdoors and where only with an external antenna, one carrier at a time or the best of the three
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
+- **Rivers and creeks** on by default — every principal named river and creek in Australia from the Bureau's Geofabric, named along its course and drawn heavier the more country drains through it; hover one for its name, click it to select it end to end and see which stations are on it
 - Light up the watercourses whose names match the filter box, drawn beneath the pins from OpenStreetMap (*Highlight matching rivers*)
 - Draw and measure over the map: pins, lines, circles, rectangles and text, placed by hand or by coordinates and km, in a colour of your choosing
 - Export the whole drawing to Google Earth as a KML — the shapes in their own colours, and the stations they enclose or run between
@@ -2243,6 +2248,20 @@ box is one row down. The "centred on" line is derived rather than remembered —
 it is only shown while the saved centre still rounds to that station's position
 — so *Fit all stations*, a nudge, *Centre output here* or a typed figure all
 retire it without anything having to remember to clear it.
+
+**Rivers and creeks.** *Rivers and creeks (Geofabric, BoM)*, first of the
+overlays in the **Map display** panel, draws the rivers themselves — every
+principal named river and creek in Australia, from the Bureau of Meteorology's
+Australian Hydrological Geospatial Fabric (CC BY 4.0). It is **on by default**,
+in every look, and remembered once turned off. The national view draws the
+trunk rivers; each step in adds their tributaries, by how much country drains
+through them, and from zoom 12 the minor named creeks join them from the
+Geofabric's live service. Names run along the rivers. Hover a river for its
+name; click it to select it — lit from its headwaters to its mouth — with a
+callout giving its drainage area and length, the network's stations on it
+(each a button to go there), *Zoom to the whole river* and *Clear selection*.
+Open map, 🧹, or *Clear* in the panel puts it down. A river picked in 📍 *Find
+a place* is selected the same way. See `docs/rivers.md`.
 
 **Highlighting rivers.** Half this network is named after the river it sits on,
 so typing `burdekin` into the filter box lights up the Burdekin and its named

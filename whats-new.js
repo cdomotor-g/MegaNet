@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 85, date: '2026-10-23', items: [
+      '<strong>Rivers on the Stations map</strong>, on from the start: every principal named river and creek in Australia, '
+        + 'from the Bureau of Meteorology\'s Geofabric, drawn under the pins with its name along it. The big rivers show '
+        + 'across the country and their tributaries appear as you zoom in; from zoom 12 the small named creeks join them. '
+        + 'Hover a river for its name; <strong>click it to select it</strong> — it lights up from source to mouth, and a '
+        + 'card says how much country drains through it and which stations are on it, each a button to go there. Click '
+        + 'open map, or 🧹, to put it down. A river picked in 📍 <em>Find a place</em> is selected the same way. Turn it '
+        + 'off in 🗺️ Map display → <em>Rivers and creeks</em>.',
+      '<strong>Thinner roads</strong> in <em>Road &amp; bridge owners</em>: the roads are drawn about half as heavy as '
+        + 'before, so the rivers read first. The colours, and which roads are heaviest, are unchanged.',
+    ] },
     { n: 84, date: '2026-10-23', items: [
       '<strong>Where faults happen</strong>, a new section on the <em>🧪 Bit Bench</em>: a model ALERT site in 3-D — a '
         + 'river gauge sending, a repeater on the far hill hearing it, and between them a hill, a shed and a passing truck, '

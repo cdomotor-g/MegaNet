@@ -152,6 +152,14 @@
      pass-range link nor any station-role fill, and a deeper blue than the water
      the topo tiles already draw, so a highlighted river reads as highlighted. */
   --map-river: #0d47a1;
+  /* The rivers layer itself (map-river-lines.js): a water blue a step lighter
+     than the highlight above, so a river the filter box lit up still reads as
+     lit over the network it sits on; the selected river's navy core and the
+     cyan glow round it, which nothing else on the map is drawn in. Resolved at
+     draw time — Leaflet path options do not take var(). */
+  --map-river-line: #1f6fd1;
+  --map-river-pick: #0a2f8a;
+  --map-river-glow: #00c2ff;
   /* Survey marks & CORS sites (#120). Teal — none of the four role fills, none
      of the ACMA mechanism colours, and distinct from the river's blue and the
      draw tool's magenta, so the layer reads as its own thing at a glance. */
@@ -614,6 +622,9 @@
   --map-blast: #ff6659;
   --map-blast-ring: #ff8a80;
   --map-river: #4fc3f7;
+  --map-river-line: #2f80e0;
+  --map-river-pick: #0a2f8a;
+  --map-river-glow: #00d5ff;
   --map-survey: #4dd0c8;
   --map-repeater: #6bb6ff;
   --map-field: #57d657;
@@ -3395,6 +3406,13 @@ hr {
 }
 
 .legend-line-river { border-top-color: var(--map-river); }
+/* The rivers layer's key (map-river-lines.js): its line, and the selected
+   river as the map draws it — a navy core in a white casing and a cyan glow. */
+.legend-line-river-net { border-top-color: var(--map-river-line); }
+.legend-line-river-pick {
+  border-top-color: var(--map-river-pick);
+  box-shadow: 0 0 0 1px #fff, 0 0 0 3px color-mix(in srgb, var(--map-river-glow) 55%, transparent);
+}
 
 /* The direction arrows (MapArrows, #186). A glyph rather than a drawn chevron:
    the marks on the map are canvas strokes with no CSS to borrow, and one
@@ -3444,7 +3462,9 @@ hr {
    drawn from. A private road is dashed, as on the map; the State-controlled
    one wears the map's white casing as a ring, which also holds the maroon off
    the dark theme's panel. */
-.legend-line-owner { border-top-color: var(--road, var(--muted)); }
+/* Two pixels, not the legend's three: the roads were thinned on the map
+   (2026-10-23) to step back behind the rivers, and the key says so. */
+.legend-line-owner { border-top-color: var(--road, var(--muted)); border-top-width: 2px; }
 .legend-line-owner.is-dashed { border-top-style: dashed; }
 .legend-line-owner.is-cased { box-shadow: 0 0 0 1px #fff, 0 0 0 2px rgba(20, 20, 20, .25); }
 /* The line-of-sight verdict in the legend (#175): the obstructed-link colour,
@@ -3958,6 +3978,32 @@ html[data-lat-anim] .dock-tab[data-dock="map-latency"]::before {
 .leaflet-tooltip.mn-river-label-fixed::before {
   display: none;               /* no callout arrow — the name sits on its line */
 }
+
+/* The rivers layer's names (map-river-lines.js), along each river and turned
+   to run with it. A divIcon in a pane with pointer-events off, so a label in
+   the plainest sense; the italic blue of water on every printed map, over a
+   white halo of four offset shadows (the basin names' reason, below) so it
+   holds over imagery as well as the topo tiles. The icon is a zero-sized
+   anchor: the span is centred on it by its own transform, which also turns it. */
+.mn-rl-icon { width: 0; height: 0; }
+.mn-rl-name {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  font-size: .72rem;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: #0d47a1;
+  text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 3px #fff;
+  pointer-events: none;
+}
+.mn-rl-icon.is-picked .mn-rl-name { color: var(--map-river-pick); font-size: .8rem; font-weight: 700; }
+/* The callout's stations: real buttons, wrapped, each a press to the station. */
+.mn-rl-stations { display: flex; flex-wrap: wrap; gap: .25rem; margin: .2rem 0 .1rem; }
+.mn-rl-station { font-size: .74rem; }
+.mn-rl-picked { display: inline-flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
 
 /* #150 A4: the river list in #map-river-note — one real button per named
    river drawn, which is the keyboard and touch path to the callout. App-wide
