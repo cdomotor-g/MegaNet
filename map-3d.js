@@ -20,7 +20,9 @@
 // field photos' pins (MapPhotos.drawn, badgeHtml, conePath, open), to map-polar.js for the polar
 // coverage plot's image (MapPolar.drawn), to map-leader.js for the
 // station card's leader (MapLeader.sync, reveal), to flood-stages.js for the
-// twin's rise (FloodStages.cycle, RISE_S, HOLD_S, DRAIN_S), and to app.js for
+// twin's rise (FloodStages.cycle, RISE_S, HOLD_S, DRAIN_S), to site-features.js
+// for the stations' site features (SiteFeatures.drawn, LOOK, MIN_ZOOM,
+// glyphSvg, popupHtml, refresh; SITE_FEATURE_KINDS' dashes), and to app.js for
 // showStationCard, primaryRole and the base-map choice. Every one of those is called from
 // inside this file's own functions, so its position among the modules is free.
 //
@@ -91,6 +93,17 @@
 // and the double click that finishes a line go to MapDraw with the terrain's
 // own coordinate and a `view` of this camera (drawView), so a vertex lands
 // on the hillside under the pointer and the snap is to the pin drawn there.
+//
+// A station's site features (site-features.js) are the sixth, and the
+// photos' arrangement again: `SiteFeatures.drawn()` is every feature that
+// module put on the 2-D map — the access tracks, the orifice and cable runs,
+// the pits, benchmarks and gauge boards — read into a source of its own
+// (`mn-sitefeat`). The lines are draped, so an access track runs up the
+// valley it was driven up; the points stand on the ground as 2-D's own
+// glyphs, under the station pins as their pane is in 2-D. A hover says what
+// one is and a click opens 2-D's own popup over it. It asks the database
+// nothing; what SiteFeatures does differently while this view is up — a lower
+// zoom floor, for a camera that sees kilometres — is that file's ("Tilted").
 //
 // The Queensland cadastre — Map display's property boundaries (map-lots.js)
 // and road parcels (map-roads.js), the layers Queensland Globe draws — is
@@ -260,6 +273,10 @@ const Map3D = (function () {
   let liveHint  = null;  // the snap's station name, as an ml.Marker (syncDrawLive)
   let liveHintKey = null; // …and what it was built for
   let liveDot   = null;  // the profile cursor's reading, likewise
+  let sfKey     = null;  // what the site features' source was last built from (syncSiteFeat)
+  let sfImgs    = {};    // site feature kind → its glyph's image: 'loading', 'ready' or 'failed'
+  let sfGen     = 0;     // bumped per map, so a glyph that loads after its map has gone is dropped
+  let sfPopup   = null;  // the popup a click on a site feature opened (clickedSiteFeat)
   let tip      = null;   // the hover label naming the pin or path under the pointer (hoverNow)
   let tipKey   = null;   // …and what it names, so a still pointer rebuilds nothing
   let tipAt    = null;   // the pointer's last spot on the canvas
@@ -841,6 +858,134 @@ const Map3D = (function () {
     standOnGround();
   }
 
+  // ── A station's site features (site-features.js) ────────────────────────
+  // Whatever SiteFeatures drew, where it drew it, and nothing when it drew
+  // nothing — signed out, switched off and too far out are each that file's
+  // reason and its note's words. Two kinds of thing, as in 2-D:
+  //
+  //   * the **lines** — an access track, an orifice run, a cable run — draped
+  //     on the terrain in 2-D's colour over 2-D's dark casing, at 2-D's widths
+  //     (SiteFeatures.LOOK), dashed where 2-D dashes them, and heavier when
+  //     picked. Between the network's links and the sketches, where their
+  //     canvas puts them in 2-D. From the 3-D floor SiteFeatures keeps.
+  //   * the **points** — 2-D's own glyph for each kind, made into an image
+  //     from its markup the first time a kind is drawn (addSfImage), stood up
+  //     off the ground like the pins and under them, as their pane is under
+  //     the markers' in 2-D. Until the image is made, or if it cannot be, a
+  //     plain dot in the kind's colour stands in. Only once the camera is as
+  //     close as 2-D's own floor puts the flat map: further out a pit is a
+  //     pixel from its station's pin, and a crowd of them is a smudge on it.
+  //     A picked one is ringed amber, as 2-D's is.
+  //
+  // Each is a target for the hover label and the click (siteFeatAt), and a
+  // click opens the popup 2-D opens — the same words and the same ✏️ Edit,
+  // which leaves this view for the flat map the mode maps on.
+  //
+  // Rebuilt only when what SiteFeatures drew changed: it draws again after
+  // every pan that settles, and most find the same features.
+  const SF_LAYERS = ['mn-sitefeat-pt', 'mn-sitefeat-dot', 'mn-sitefeat-line', 'mn-sitefeat-dash'];
+  const SF_IMG_PX = 2;     // the glyph's image at twice its pixels, as the cone's is
+  const SF_GLYPH  = 20;    // …which are 2-D's: a 20 px glyph
+
+  function sfIcon(kind) { return `mn-sf:${kind}`; }
+
+  // The 2-D glyph's own markup as an image, once per kind per map. An SVG in
+  // an <img> needs its namespace, which inline markup in a page does not.
+  function addSfImage(kind) {
+    const id = sfIcon(kind);
+    if (!map || sfImgs[kind] || typeof SiteFeatures === 'undefined' || !SiteFeatures.glyphSvg) return;
+    sfImgs[kind] = 'loading';
+    const gen = sfGen;
+    const px = SF_GLYPH * SF_IMG_PX;
+    const svg = SiteFeatures.glyphSvg(kind, px).replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');
+    const img = new Image();
+    img.onload = () => {
+      if (gen !== sfGen || !map) return;
+      try {
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = px;
+        const cx = cv.getContext('2d');
+        cx.drawImage(img, 0, 0, px, px);
+        if (!map.hasImage(id)) map.addImage(id, cx.getImageData(0, 0, px, px), { pixelRatio: SF_IMG_PX });
+        sfImgs[kind] = 'ready';
+      } catch (_) { sfImgs[kind] = 'failed'; }
+      sfKey = null;      // the dot that stood in gives way to the glyph
+      syncSiteFeat();
+    };
+    img.onerror = () => { if (gen === sfGen) sfImgs[kind] = 'failed'; };
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
+
+  // GeoJSON is longitude first; SiteFeatures, like Leaflet, latitude first.
+  function siteFeatFeatures(list) {
+    return { type: 'FeatureCollection', features: list.map(d => ({
+      type: 'Feature',
+      properties: { id: d.id, station: d.station, kind: d.kind, sel: !!d.sel, colour: d.colour,
+                    dash: d.dash || '', icon: !d.line && sfImgs[d.kind] === 'ready' ? sfIcon(d.kind) : '' },
+      geometry: d.line
+        ? { type: 'LineString', coordinates: d.pts.map(p => [p[1], p[0]]) }
+        : { type: 'Point', coordinates: [d.pts[0][1], d.pts[0][0]] },
+    })) };
+  }
+
+  function sfList() {
+    return typeof SiteFeatures !== 'undefined' && SiteFeatures.drawn ? SiteFeatures.drawn() : [];
+  }
+
+  function syncSiteFeat() {
+    if (!map || !ready) return;
+    const list = sfList();
+    for (const d of list) if (!d.line) addSfImage(d.kind);
+    const key = JSON.stringify(list);
+    if (key === sfKey) return;
+    sfKey = key;
+    const src = map.getSource('mn-sitefeat');
+    if (src) src.setData(siteFeatFeatures(list));
+    // A popup about a feature no longer drawn — signed out, switched off,
+    // deleted — goes with it, rather than describing a line that is not there.
+    if (sfPopup && !list.some(d => d.id === sfPopup.mnId)) sfPopup.remove();
+  }
+
+  // The dashes 2-D draws in Leaflet's pixels, in MapLibre's unit for them —
+  // the line's own width. Every kind's dash is SITE_FEATURE_KINDS' (a kind the
+  // database adds is drawn solid), so the expression is built once, from it.
+  function sfDash() {
+    const kinds = typeof SITE_FEATURE_KINDS !== 'undefined' ? SITE_FEATURE_KINDS : [];
+    const w = sfLook().weight;
+    const dashes = [...new Set(kinds.map(k => k.dash).filter(Boolean))];
+    if (!dashes.length) return ['literal', [1, 0]];
+    return ['match', ['get', 'dash'],
+      ...dashes.flatMap(d => [d, ['literal', String(d).split(',').map(n => Number(n) / w)]]),
+      ['literal', [1, 0]]];
+  }
+
+  function sfLook() {
+    return (typeof SiteFeatures !== 'undefined' && SiteFeatures.LOOK)
+      || { weight: 3.5, weightSel: 5, casing: '#14181c', casingWeight: 7, casingWeightSel: 10,
+           casingOpacity: 0.55, casingOpacitySel: 0.8 };
+  }
+
+  // The site feature a click or a hover at this spot means — its feature's
+  // properties, with what SiteFeatures says of it — or null. The points first,
+  // as a point on a line is the more particular thing; a line with the
+  // paths' tolerance, for the paths' reason.
+  function siteFeatAt(point) {
+    if (!map || dimK === 0) return null;
+    const pad = LINK_HIT_PX;
+    const box = [[point.x - pad, point.y - pad], [point.x + pad, point.y + pad]];
+    const layers = SF_LAYERS.filter(l => map.getLayer(l));
+    if (!layers.length) return null;
+    const hits = map.queryRenderedFeatures(box, { layers });
+    const f = hits.find(h => h.geometry && h.geometry.type === 'Point') || hits[0];
+    if (!f || !f.properties) return null;
+    const d = sfList().find(x => x.id === f.properties.id);
+    return d ? { ...f.properties, title: d.title, sub: d.sub, name: d.name } : null;
+  }
+
+  function siteFeatTip(p) {
+    return { head: p.title, sub: `${p.name} · ${p.sub} · click for more` };
+  }
+
   // ── The pin being moved (map-move-pin.js) ───────────────────────────────
   // MapMovePin's marker is a Leaflet L.Marker, and this canvas covers every
   // Leaflet pane: armed in 3-D, the mode came up with its panel in the corner
@@ -1055,6 +1200,12 @@ const Map3D = (function () {
       if (map.queryRenderedFeatures(box, { layers: ['mn-draw-line'] }).length) {
         canvas.style.cursor = 'pointer';
         hideTip();
+        return;
+      }
+      const sf = siteFeatAt(tipAt);
+      if (sf) {
+        canvas.style.cursor = 'pointer';
+        showTip(`f:${sf.id}`, () => siteFeatTip(sf));
         return;
       }
       const line = linkAt(tipAt);
@@ -1328,6 +1479,16 @@ const Map3D = (function () {
       p.marker.setOpacity(String(dimK), String(PHOTO_COVERED * dimK));
       p.marker.getElement().style.pointerEvents = dimK === 0 ? 'none' : '';
     }
+    // And the site features, whose pane is above that floor too.
+    const L_ = sfLook();
+    const cop = ['case', ['get', 'sel'], L_.casingOpacitySel, L_.casingOpacity];
+    set('mn-sitefeat-casing', 'line-opacity', dimK === 1 ? cop : ['*', cop, dimK]);
+    set('mn-sitefeat-line', 'line-opacity', dimK);
+    set('mn-sitefeat-dash', 'line-opacity', dimK);
+    set('mn-sitefeat-sel', 'circle-stroke-opacity', dimK);
+    set('mn-sitefeat-dot', 'circle-opacity', dimK);
+    set('mn-sitefeat-dot', 'circle-stroke-opacity', dimK);
+    set('mn-sitefeat-pt', 'icon-opacity', dimK);
     map.triggerRepaint();              // the sheets read dimK in their own render
   }
 
@@ -1664,6 +1825,10 @@ const Map3D = (function () {
   // ── building and taking down the map ─────────────────────────────────────
   function styleSpec() {
     const base = BASES[baseName()];
+    // How 2-D draws a site feature's line, and the zoom its points start at
+    // here: 2-D's floor, less the step between the two maps' zooms (build()).
+    const L_ = sfLook();
+    const SF_PT_MIN = Math.max(0, ((typeof SiteFeatures !== 'undefined' && SiteFeatures.MIN_ZOOM) || 16) - 1);
     return {
       version: 8,
       sources: {
@@ -1687,6 +1852,8 @@ const Map3D = (function () {
         // so the one place they are built is the one place they are rebuilt.
         'mn-draw':      { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
         'mn-draw-live': { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+        // The stations' site features (syncSiteFeat), filled the same way.
+        'mn-sitefeat':  { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
       },
       layers: [
         { id: 'mn-base', type: 'raster', source: 'mn-base' },
@@ -1734,6 +1901,31 @@ const Map3D = (function () {
                    'line-opacity': ['get', 'op'],
                    'line-dasharray': ['case', ['==', ['get', 'dash'], 1],
                                       ['literal', [2.33, 2]], ['literal', [1, 0]]] } },
+        // ── A station's site features (site-features.js, syncSiteFeat) ──
+        // The lines: an access track, an orifice run, a cable run — 2-D's
+        // casing, then the run in its kind's colour, solid with round ends or
+        // dashed and squared off, as 2-D draws them. Over the network's links
+        // and the finder's paths and under the sketches, draped with them.
+        { id: 'mn-sitefeat-casing', type: 'line', source: 'mn-sitefeat',
+          filter: ['==', ['geometry-type'], 'LineString'],
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': L_.casing,
+                   'line-width': ['case', ['get', 'sel'], L_.casingWeightSel, L_.casingWeight],
+                   'line-opacity': ['case', ['get', 'sel'], L_.casingOpacitySel, L_.casingOpacity],
+                   'line-opacity-transition': { duration: 0, delay: 0 } } },
+        { id: 'mn-sitefeat-line', type: 'line', source: 'mn-sitefeat',
+          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['==', ['get', 'dash'], '']],
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': ['get', 'colour'],
+                   'line-width': ['case', ['get', 'sel'], L_.weightSel, L_.weight],
+                   'line-opacity-transition': { duration: 0, delay: 0 } } },
+        { id: 'mn-sitefeat-dash', type: 'line', source: 'mn-sitefeat',
+          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'dash'], '']],
+          layout: { 'line-cap': 'butt', 'line-join': 'round' },
+          paint: { 'line-color': ['get', 'colour'],
+                   'line-width': ['case', ['get', 'sel'], L_.weightSel, L_.weight],
+                   'line-dasharray': sfDash(),
+                   'line-opacity-transition': { duration: 0, delay: 0 } } },
         // ── Draw & measure (map-draw.js, syncDraw) ───────────────────────
         // Over the network and the finder, as a sketch is drawn over the map
         // it is about, and draped in the same block as them. 2-D's styling:
@@ -1775,6 +1967,27 @@ const Map3D = (function () {
                    'circle-stroke-color': cssVar('--photo-ink', '#3a2a00'), 'circle-stroke-width': 1.5,
                    'circle-opacity-transition':        { duration: 0, delay: 0 },
                    'circle-stroke-opacity-transition': { duration: 0, delay: 0 } } },
+        // The site features' points, over the photos and under the pins, as
+        // their pane (425) is between the photos' (420) and the markers' in
+        // 2-D: the amber ring round a picked one, then 2-D's glyph — or a dot
+        // in its colour while the glyph is made (addSfImage). Billboarded like
+        // the pins, and only as close in as 2-D draws them (see the section).
+        { id: 'mn-sitefeat-sel', type: 'circle', source: 'mn-sitefeat', minzoom: SF_PT_MIN,
+          filter: ['all', ['==', ['geometry-type'], 'Point'], ['get', 'sel']],
+          paint: { 'circle-radius': 12, 'circle-color': 'rgba(0,0,0,0)',
+                   'circle-stroke-color': '#ffc400', 'circle-stroke-width': 3,
+                   'circle-stroke-opacity-transition': { duration: 0, delay: 0 } } },
+        { id: 'mn-sitefeat-dot', type: 'circle', source: 'mn-sitefeat', minzoom: SF_PT_MIN,
+          filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'icon'], '']],
+          paint: { 'circle-radius': 5, 'circle-color': ['get', 'colour'],
+                   'circle-stroke-color': L_.casing, 'circle-stroke-width': 1.6,
+                   'circle-opacity-transition':        { duration: 0, delay: 0 },
+                   'circle-stroke-opacity-transition': { duration: 0, delay: 0 } } },
+        { id: 'mn-sitefeat-pt', type: 'symbol', source: 'mn-sitefeat', minzoom: SF_PT_MIN,
+          filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'icon'], '']],
+          layout: { 'icon-image': ['get', 'icon'],
+                    'icon-allow-overlap': true, 'icon-ignore-placement': true },
+          paint: { 'icon-opacity-transition': { duration: 0, delay: 0 } } },
         // The Bureau's forecast and information locations' outlines
         // (map-symbols.js): 2-D's pink, as a ring round the pin's own —
         // solid for a forecast location, dashed for an information one.
@@ -2658,6 +2871,10 @@ const Map3D = (function () {
       syncMovePin();
       // And whatever Draw & measure has on the map, with its tool if armed.
       syncDraw();
+      // And the stations' site features, with SiteFeatures asked to look
+      // again at the floor it keeps for this view.
+      syncSiteFeat();
+      if (typeof SiteFeatures !== 'undefined' && SiteFeatures.refresh) SiteFeatures.refresh();
       // And the rising water, unless it has been turned off.
       syncWater();
       applyDim();
@@ -2770,6 +2987,10 @@ const Map3D = (function () {
       };
       const stroke = map.queryRenderedFeatures(near, { layers: ['mn-draw-line'] })[0];
       if (stroke && stroke.properties && drawn(stroke.properties.id)) return;
+      // Then a site feature, over the paths as it is drawn over them: an
+      // access track ends at the pin a link starts from.
+      const feat = siteFeatAt(e.point);
+      if (feat) { clickedSiteFeat(feat, e); return; }
       const line = hid ? null : linkAt(e.point);
       if (line) { clickedLink(line, e); return; }
       // Then the inside of a drawn circle or box, which in 2-D is the shape's
@@ -2859,6 +3080,20 @@ const Map3D = (function () {
     // 2-D: while a tool is armed a click on a line belongs to the drawing, and
     // opening a card here would answer a question nobody asked while the map
     // was still waiting for a vertex.
+    // A site feature: 2-D's own popup, where the click landed on the
+    // terrain. One at a time, as Leaflet's are.
+    function clickedSiteFeat(p, e) {
+      stopBubbling(e);
+      const html = typeof SiteFeatures !== 'undefined' && SiteFeatures.popupHtml
+        ? SiteFeatures.popupHtml(p.station, p.id) : '';
+      if (!html) return;
+      if (sfPopup) sfPopup.remove();
+      const pop = new ml.Popup({ className: 'mn-sf-popup', maxWidth: '300px' })
+        .setLngLat(e.lngLat).setHTML(html).addTo(map);
+      pop.mnId = p.id;
+      pop.on('close', () => { if (sfPopup === pop) sfPopup = null; });
+      sfPopup = pop;
+    }
     function clickedLink(p, e) {
       if (state.draw && state.draw.tool) return;
       stopBubbling(e);
@@ -3455,6 +3690,10 @@ const Map3D = (function () {
     // only what is being clicked out moved — the ghost, the snap's ring, the
     // profile cursor. Two early returns while 3-D is shut.
     drawChanged(live) { syncDraw(!!live); },
+    // SiteFeatures drew again, or took them all down: a pan that settled, the
+    // switch, signing in or out, a feature saved or shown from the card. Two
+    // early returns while 3-D is shut.
+    siteFeaturesChanged() { syncSiteFeat(); },
 
     // Put the camera back overhead without leaving 3-D — the gesture that gets
     // somebody un-lost after a rotate, and the one thing a tilted map makes
@@ -3560,7 +3799,9 @@ const Map3D = (function () {
             colouring, the same hidden and culled sets. So are the field photos’ 📷 — the
             ones around the middle of the view, which is where the 2-D map is: it follows
             the camera, and a photo out towards the horizon is drawn once the camera goes
-            to it. Property boundaries and road parcels — the Queensland cadastre, as
+            to it. Signed in, so are the stations’ site features — access tracks, orifice
+            and cable runs draped on the ground, and closer in the pits, benchmarks and
+            boards — for the stations around the middle of the view. Property boundaries and road parcels — the Queensland cadastre, as
             Queensland Globe draws it — are on when their switches in Layers are, and
             drawn closer in than about 1:36,000 and 1:72,000, the same as in 2-D.</p>
           <p class="filter-note" id="map-3d-note">${noteHtml()}</p>
@@ -3622,6 +3863,13 @@ const Map3D = (function () {
         dblZoom: !!(map && map.doubleClickZoom.isEnabled()),
       };
     },
+    // For the check: the site features here — what the source holds, which
+    // glyphs have their image, and what the popup a click opened says.
+    _siteFeat() {
+      const src = map && map.getSource('mn-sitefeat');
+      return { source: !!src, drawn: src ? src.serialize().data : null, images: { ...sfImgs },
+               popup: sfPopup && sfPopup.isOpen() ? sfPopup.getElement().textContent : null };
+    },
     _photos() {
       const src = map && map.getSource('mn-photos');
       return {
@@ -3679,6 +3927,9 @@ const Map3D = (function () {
       holdLeaflet();
       repaintPanel();
       addHud();
+      // The site features' floor is lower while this view is up ("Tilted",
+      // site-features.js): asked to look again now, not at the next pan.
+      if (typeof SiteFeatures !== 'undefined' && SiteFeatures.refresh) SiteFeatures.refresh();
       announce(`3-D view on. ${viewMoveWords(coarse())} ${viewKeyWords()}`);
       return true;
     }).catch(() => {
@@ -3709,6 +3960,12 @@ const Map3D = (function () {
     // And Draw & measure's markers; its shapes are in state and come back
     // with the next map.
     dropDraw();
+    // The site features' source, its glyphs and its popup go with the map,
+    // and a glyph still loading for this one is dropped when it lands.
+    sfKey = null;
+    sfImgs = {};
+    sfGen++;
+    sfPopup = null;
     standing = false;   // a chain waiting on this map's next frame waits for ever
     dimK = 1;
     // The hover label is on the host and goes with it.
@@ -3747,6 +4004,8 @@ const Map3D = (function () {
       state.map3d = false;
       repaintPanel();
       announce('3-D view off');
+      // …and the site features back to the flat map's floor.
+      if (typeof SiteFeatures !== 'undefined' && SiteFeatures.refresh) SiteFeatures.refresh();
       // Leaflet's handlers are back as they were when 3-D opened; Draw &
       // measure sets its double click again for whichever tool is armed now.
       if (typeof MapDraw !== 'undefined' && MapDraw.flatAgain) MapDraw.flatAgain();

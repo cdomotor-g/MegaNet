@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 87, date: '2026-10-23', items: [
+      '<strong>🛣️ Access tracks in the 3-D view.</strong> Signed in, tilt the Stations map with ⛰️ and the stations\' '
+        + 'site features stay on it: each <em>Access track</em> is draped on the ground, so you can see the valley and '
+        + 'the ridge the way in follows, with the orifice and cable runs beside it — from further out than the flat map '
+        + 'shows them, so a whole track fits in the view. Bring the camera in close and the pits, benchmarks and gauge '
+        + 'boards appear too. Point at one to see what it is; click it for the same card as on the flat map, with '
+        + '<em>✏️ Edit on the map</em>.',
+    ] },
     { n: 86, date: '2026-10-23', items: [
       '<strong>🌊 Rising water in the 3-D view.</strong> Tilt the Stations map with ⛰️ and water now rises through the '
         + 'heights of the ground in view, from the lowest to the highest, and round again — to show how the land lies '

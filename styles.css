@@ -15685,6 +15685,32 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 
 .map3d-tip span { color: var(--muted); }
 
+/* A popup on the 3-D map — a site feature's, opened by a click on it
+   (map-3d.js, clickedSiteFeat) — in the colours of the 2-D map's Leaflet
+   popups. MapLibre's own sheet is loaded after this one and paints them white
+   with a white tip, so each rule here is scoped to the host to win; the tip is
+   a border coloured on the side facing the popup, which depends on the side
+   the popup opened to. */
+#map3d .maplibregl-popup-content {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-2);
+}
+
+#map3d .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+#map3d .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+#map3d .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: var(--panel); }
+
+#map3d .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+#map3d .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+#map3d .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: var(--panel); }
+
+#map3d .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--panel); }
+
+#map3d .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--panel); }
+
+#map3d .maplibregl-popup-close-button { color: var(--muted); }
+
 /* What the stage says while there is nothing to draw: no station, no ground,
    no renderer. Over the canvas rather than instead of it, so the canvas the
    renderer will draw into is already there when it arrives. */

@@ -12,6 +12,7 @@ driven to the site — mapped on the Stations map and kept in the datastore
 | **📌 Site features on the map** in the station editor, beside *Move pin on map* | The same. |
 | The station card's **Site features** section | What is mapped there, a row each; a row shows its feature on the map. |
 | 🗺️ **Layers → Site features (📌)** | Every station's features in view, from zoom 16. On unless switched off; remembered. |
+| ⛰️ **3-D** | The same features on the tilted map: the access tracks and runs draped on the ground from further out (the camera sees kilometres), and the points once the camera is in close. Hover one for what it is; click it for the same popup as on the flat map. |
 
 All of it is for **signed-in editors**. Signed out there is no pill, no section
 and nothing drawn, and nothing is asked of the database — where a benchmark is,
@@ -158,6 +159,26 @@ update meganet.station_feature set deleted_at = null, deleted_by = null
  where id = '<the feature''s id>';
 ```
 
+## In ⛰️ 3-D
+
+Tilt the Stations map and the site features stay on it. The 3-D view draws what
+the flat map drew — the same features, colours and widths, read off
+`SiteFeatures.drawn()` and asked of nobody — so an **access track** runs up the
+valley it was driven up, draped on the ground, and an orifice run follows the
+bank down to its outlet. Two things differ, both for a camera that sees
+kilometres of ground at once:
+
+- The features are drawn from **zoom 14** of the flat map under the canvas
+  rather than 16, so a whole track is on screen with the station it leads to.
+- The **points** — pits, benchmarks, boards — wait until the camera is in as
+  close as the flat map's zoom 16. Further out a pit is a pixel from its
+  station's pin.
+
+The pointer over a feature names it, its station and its length or distance; a
+click opens the flat map's popup, and its **✏️ Edit on the map** leaves 3-D for
+the flat map, where the mode maps. Signed out, switched off or too far out,
+there is nothing in 3-D either, and the note under the switch says which.
+
 ## Where, not how high
 
 A level survey (`0060`) records a benchmark's and a board's **level**, adopted
@@ -167,7 +188,8 @@ other.
 
 ## Not yet
 
-- The features are drawn on the flat map, not in ⛰️ 3-D or the digital twin.
+- The features are drawn on the flat map and in ⛰️ 3-D, not in the digital
+  twin; and they are mapped on the flat map only.
 - Mapping needs a signal to save: a feature drawn with none stays on screen
   until Save goes through, but is not kept on the device the way a level survey
   is.

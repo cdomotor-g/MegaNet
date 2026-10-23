@@ -19,7 +19,8 @@
 // and map-move-pin.js, to take the map's other interactive modes off before
 // this one takes its clicks — map-move-pin.js asks this the same on its way in
 // — and to map-twin.js, whose offer of the twin waits while the mode is armed,
-// and map-3d.js, whose ⛰️ view the mode leaves for the flat map it maps on.
+// and map-3d.js, whose ⛰️ view the mode leaves for the flat map it maps on,
+// and which draws what this drew there (drawn(), Map3D.siteFeaturesChanged).
 // All of it from inside its own functions, so this file's position among the
 // modules is free: the IIFE body declares nothing but constants and nulls.
 //
@@ -72,6 +73,25 @@
 // visit to another one): detach() takes its drawing off the map and keeps the
 // station and the draft, and attach() puts them back. A line clicked out over
 // ten minutes is not lost to a filter that re-rendered the tab.
+//
+// ── Tilted ───────────────────────────────────────────────────────────────────
+// The ⛰️ view (map-3d.js) draws what this drew and asks the database nothing:
+// drawn() is each feature on the map, as it was drawn, and every draw tells the
+// 3-D view so — the field photos' arrangement (map-photos.js). Its canvas is
+// over every Leaflet pane, so without that an access track was on the map and
+// out of sight the moment the map was tilted.
+//
+// One thing differs while it is up: the floor is MIN_ZOOM_3D rather than
+// MIN_ZOOM. The 2-D map under the canvas follows the camera a step closer in
+// than it, and a camera tilted at 62° sees kilometres of ground — the scale an
+// access track is drawn at, up to 10 km of it. At 16 the tracks would come and
+// go with every zoom of a view that shows the whole of one. A pit is a pixel
+// from its pin at that distance, so the 3-D view draws the lines from there
+// and holds the points back until the camera is as close as MIN_ZOOM puts the
+// flat map.
+//
+// Only the mode is flat-only: start() leaves the 3-D view, whose ground is not
+// the flat map's under a click.
 
 // The kinds 0061 seeds and the access track 0067 adds, in the vocabulary's
 // order, with the shape and colour each is drawn in. The first six columns are
@@ -119,6 +139,7 @@ const SiteFeatures = (function () {
   const EDIT_PANE = 'mnSiteFeatEdit';   // the mode's handles: over the pins, so one beside a pin can be held
   const EDIT_Z    = 650;
   const MIN_ZOOM  = 16;
+  const MIN_ZOOM_3D = 14;               // while the ⛰️ view is up — see "Tilted"
   const FRESH_MS  = 2 * 60 * 1000;
   const DEBOUNCE_MS = 250;
   const SNAP_PX   = 14;
@@ -143,6 +164,7 @@ const SiteFeatures = (function () {
   let notReady = false;      // the database answered that it has no 0061
   let note = { kind: 'off', n: 0, stations: 0, error: '' };
   let drawnKinds = [];       // for the legend
+  let shown = [];            // what draw() put on the map, for the ⛰️ view (drawn())
   let session = null;        // the mode — see start()
   let highlight = null;      // { stationId, id } shown from the card, outside the mode
   let keyHandler = null;
@@ -153,6 +175,8 @@ const SiteFeatures = (function () {
   // ── Reading the station list ───────────────────────────────────────────────
 
   function signedIn() { return typeof dbCanWrite === 'function' && dbCanWrite(); }
+  function tilted() { return typeof Map3D !== 'undefined' && !!Map3D.active && Map3D.active(); }
+  function minZoom() { return tilted() ? MIN_ZOOM_3D : MIN_ZOOM; }
   function stationById(id) { return ((state.data && state.data.stations) || []).find(s => s.id === id) || null; }
   function hasPin(s) {
     return !!s && s.lat != null && s.lon != null && s.lat !== '' && s.lon !== '' && isFinite(s.lat) && isFinite(s.lon);
@@ -412,20 +436,28 @@ const SiteFeatures = (function () {
   function shownIds() {
     if (!map || !signedIn()) return [];
     const ids = [];
-    if (state.mapSiteFeatures && map.getZoom() >= MIN_ZOOM) ids.push(...stationsInView());
+    if (state.mapSiteFeatures && map.getZoom() >= minZoom()) ids.push(...stationsInView());
     if (session) ids.push(session.stationId);
     if (highlight) ids.push(highlight.stationId);
     return [...new Set(ids)];
   }
 
-  function clearLayer() {
+  // The ⛰️ view draws what is drawn here; told whenever that changes, and
+  // nothing rebuilt there when it is what was drawn last time (map-3d.js).
+  function tell3d() {
+    if (typeof Map3D !== 'undefined' && Map3D.siteFeaturesChanged) Map3D.siteFeaturesChanged();
+  }
+
+  function clearLayer({ quiet = false } = {}) {
     if (layer) { layer.remove(); layer = null; }
     drawnKinds = [];
+    shown = [];
+    if (!quiet) tell3d();
   }
 
   function draw() {
     if (!map) return;
-    clearLayer();
+    clearLayer({ quiet: true });
     layer = L.layerGroup();
     const editing = session && session.draft && session.draft.id;
     const kindsHere = new Set();
@@ -442,20 +474,33 @@ const SiteFeatures = (function () {
     }
     layer.addTo(map);
     drawnKinds = [...kindsHere].sort((a, b) => kindOf(a).ord - kindOf(b).ord);
+    tell3d();
   }
+
+  // How a line is drawn, in Leaflet's pixels: the run, and the dark casing
+  // under it that reads over the State's imagery and the topo alike — each
+  // heavier picked. One place for the numbers, because the ⛰️ view draws the
+  // same lines with them (map-3d.js).
+  const LOOK = { weight: 3.5, weightSel: 5, casing: '#14181c', casingWeight: 7, casingWeightSel: 10,
+                 casingOpacity: 0.55, casingOpacitySel: 0.8 };
 
   function drawFeature(f, s, sel) {
     const k = kindOf(f.kind, f.geom && f.geom.type);
     const pts = ptsOf(f);
     if (!pts.length) return false;
     const title = titleOf(f);
-    if (f.geom.type === 'LineString') {
-      L.polyline(pts, { color: '#14181c', opacity: sel ? .8 : .55, weight: sel ? 10 : 7,
+    const isLine = f.geom.type === 'LineString';
+    shown.push({ id: f.id, station: f.station_id, name: (s && s.name) || f.station_id, kind: f.kind,
+                 line: isLine, pts, sel: !!sel, colour: safeColour(k.colour), dash: isLine ? (k.dash || null) : null,
+                 title, sub: measureText(f, s) });
+    if (isLine) {
+      L.polyline(pts, { color: LOOK.casing, opacity: sel ? LOOK.casingOpacitySel : LOOK.casingOpacity,
+                        weight: sel ? LOOK.casingWeightSel : LOOK.casingWeight,
                         lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(layer);
       // A dashed run squared off at its ends: Leaflet's round caps lengthen
       // every dash by half the weight each way, and close a short gap
       // (docs/design-system.md, the health pins).
-      const line = L.polyline(pts, { color: safeColour(k.colour), weight: sel ? 5 : 3.5, opacity: 1,
+      const line = L.polyline(pts, { color: safeColour(k.colour), weight: sel ? LOOK.weightSel : LOOK.weight, opacity: 1,
                                      dashArray: k.dash || null, lineCap: k.dash ? 'butt' : 'round', lineJoin: 'round',
                                      bubblingMouseEvents: false });
       line.bindTooltip(`${esc(title)} · ${esc(measureText(f, s))}`,
@@ -513,7 +558,7 @@ const SiteFeatures = (function () {
       if (notReady) setNote('not-ready');
       else if (err) setNote('fail', { error: err });
       else if (!state.mapSiteFeatures) setNote('off');
-      else if (map.getZoom() < MIN_ZOOM) setNote('zoom');
+      else if (map.getZoom() < minZoom()) setNote('zoom');
       else { const c = countDrawn(ids); setNote('ok', { n: c.n, stations: c.at }); }
       if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
     });
@@ -531,7 +576,8 @@ const SiteFeatures = (function () {
       case 'signed-out':
         return 'Site features are for signed-in editors — sign in to see where they are.';
       case 'zoom':
-        return `Zoom in (to level ${MIN_ZOOM} or closer) to see the stations’ site features.`;
+        return tilted() ? 'Bring the camera in closer to see the stations’ site features.'
+          : `Zoom in (to level ${MIN_ZOOM} or closer) to see the stations’ site features.`;
       case 'loading':
         return 'Looking for site features in view…';
       case 'not-ready':
@@ -1881,6 +1927,23 @@ const SiteFeatures = (function () {
     active() { return !!(layer && drawnKinds.length); },
     noteHtml,
     legendHtml,
+
+    // For the ⛰️ view (map-3d.js), which draws these again on the terrain:
+    // each feature drawn on the 2-D map — latitude first, as Leaflet has it —
+    // with its kind's colour and dash, whether it is the one picked, and the
+    // words its tooltip says. A copy: nothing done to it reaches the map.
+    drawn: () => shown.map(d => ({ ...d, pts: d.pts.map(p => p.slice()) })),
+    LOOK, MIN_ZOOM,
+    // A point kind's glyph, the 2-D marker's own markup, for the 3-D view to
+    // make its image from.
+    glyphSvg: (kind, size) => glyphSvg(kindOf(kind), size),
+    // What a click on a feature says, wherever it is clicked: the 2-D popup's
+    // own markup, or '' for a feature no longer in hand.
+    popupHtml(stationId, id) {
+      const c = cache[stationId];
+      const f = c && c.rows && c.rows.find(r => r.id === id);
+      return f ? popupHtml(f) : '';
+    },
 
     // On by default and remembered — it costs nothing signed out, and one small
     // query a settled view from zoom 16 signed in.

@@ -25,6 +25,12 @@
 //  10. Outside the mode: a feature's popup and its way in, a card row that
 //      shows its feature, the Map display switch, and Move pin — refused over
 //      a half-drawn feature, taking the map once nothing is.
+//  10b. The map tilted (⛰️ 3-D): an access track draped on the ground from
+//      further out than the flat map draws one, in its colour over its
+//      casing, between the links and the sketches; the points held back
+//      until the camera is close, then 2-D's glyphs under the pins; a hover
+//      naming it, a click opening 2-D's popup, the switch, leaving at the flat
+//      map's floor, and the popup's Edit leaving 3-D for the mode.
 //  11. Signing out ends the mode; a database without 0061 says so.
 //  12. A phone: the panel folds itself, taps land, and the twin's offer waits.
 //
@@ -45,6 +51,8 @@ import { repo } from './lib/paths.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
+// Building the 3-D view under SwiftShader, as photos.mjs allows for it.
+const BUILD_TIMEOUT = Number(process.env.TWIN_TIMEOUT || 90_000);
 
 const log = (...a) => console.log(...a);
 const vlog = (...a) => { if (VERBOSE) console.log(...a); };
@@ -178,6 +186,164 @@ const pinOf = page => page.evaluate(id => {
 const session = page => page.evaluate(() => SiteFeatures._session());
 const draft = async page => { const s = await session(page); return s && s.draft; };
 const lastSave = db => db.saves[db.saves.length - 1];
+
+// ── The map tilted ───────────────────────────────────────────────────────────
+// What is under test is the seam: the 3-D view draws what SiteFeatures drew,
+// with 2-D's colours and widths, and asks the database nothing of its own.
+
+async function tilted(page, db, pin) {
+  // An access track driven in from the north-west, about 1.4 km of it, ending
+  // at the station's pin — the shape 0067's tracks have.
+  const trackLL = [[0.0100, -0.0060], [0.0075, -0.0050], [0.0050, -0.0030], [0.0030, -0.0022], [0.0012, -0.0008], [0, 0]]
+    .map(([dLat, dLon]) => [pin[0] + dLat, pin[1] + dLon]);
+  const track = db.seed({ station_id: STN, kind: 'access_track', name: '',
+                          geom: { type: 'LineString', coordinates: trackLL.map(([la, lo]) => [lo, la]) } });
+  await signIn(page);    // a fresh read, with the track in it
+
+  const sf3 = () => page.evaluate(() => Map3D._siteFeat());
+  const idle = () => page.waitForFunction(() => { const m = Map3D._map(); return !!m && !m.isMoving() && m.areTilesLoaded(); },
+    null, { timeout: BUILD_TIMEOUT }).catch(() => {});
+  const lines3 = f => ((f.drawn && f.drawn.features) || []).filter(x => x.geometry.type === 'LineString');
+  const points3 = f => ((f.drawn && f.drawn.features) || []).filter(x => x.geometry.type === 'Point');
+  const hasTrack = () => page.waitForFunction(id => {
+    const f = Map3D._siteFeat();
+    return !!(f.drawn && f.drawn.features.some(x => x.properties.id === id));
+  }, track.id, { timeout: BUILD_TIMEOUT });
+  // Where a point of the track stands on the page, as MapLibre projects it.
+  const onPage = ll => page.evaluate(([lat, lon]) => {
+    const m = Map3D._map(), c = m.getCanvas().getBoundingClientRect(), p = m.project([lon, lat]);
+    return { x: c.left + p.x, y: c.top + p.y };
+  }, ll);
+  const rendered = layers => page.evaluate(ls => Map3D._map().queryRenderedFeatures({ layers: ls })
+    .map(f => f.properties.id), layers);
+
+  // The flat map at 15, where it draws no site features at all.
+  // The card from the steps before is over the map's left side: put away, so
+  // the pointer reaches the canvas.
+  await page.evaluate(() => { state.map.closePopup(); closeStnCard(false); Map3D.setWater(false); });
+  await page.evaluate(([lat, lon]) => state.map.setView([lat, lon], 15, { animate: false }), pin);
+  await page.waitForFunction(() => SiteFeatures._note().kind === 'zoom' && SiteFeatures.drawn().length === 0, null, { timeout: 10_000 });
+  check('the flat map at 15 draws none — the floor is 16', true);
+
+  await page.evaluate(() => Map3D.toggle());
+  await page.waitForFunction(() => !!Map3D._map() && Map3D._map().isStyleLoaded() && !!Map3D._map().getTerrain(), null, { timeout: BUILD_TIMEOUT });
+  await hasTrack();
+  await idle();
+  let F = await sf3();
+  const flat = await page.evaluate(() => SiteFeatures.drawn());
+  const t3 = lines3(F).find(x => x.properties.id === track.id);
+  check('tilted, with the camera where the flat map is at 15, the access track is drawn',
+    !!t3 && flat.some(d => d.id === track.id && d.line), J(F.drawn && F.drawn.features.map(x => x.properties.kind)));
+  check('…along its own points, longitude first, ending at the pin',
+    !!t3 && J(t3.geometry.coordinates) === J(track.geom.coordinates)
+      && J(t3.geometry.coordinates[t3.geometry.coordinates.length - 1]) === J([pin[1], pin[0]]), J(t3 && t3.geometry));
+  check('…in the access track\'s own green, solid',
+    !!t3 && t3.properties.colour === '#76ff03' && t3.properties.dash === '' && t3.properties.kind === 'access_track', J(t3 && t3.properties));
+  check('…and every feature the flat map drew is in the renderer\'s source, and nothing else',
+    (F.drawn.features.length === flat.length) && flat.every(d => F.drawn.features.some(x => x.properties.id === d.id)),
+    `${F.drawn.features.length} vs ${flat.length}`);
+
+  const style = await page.evaluate(() => {
+    const m = Map3D._map(), ids = m.getStyle().layers.map(l => l.id);
+    return { ids, casing: m.getPaintProperty('mn-sitefeat-casing', 'line-width'), line: m.getPaintProperty('mn-sitefeat-line', 'line-width'),
+             colour: m.getPaintProperty('mn-sitefeat-casing', 'line-color'), look: SiteFeatures.LOOK,
+             ptMin: m.getLayer('mn-sitefeat-pt').minzoom, zoom: m.getZoom() };
+  });
+  const ix = id => style.ids.indexOf(id);
+  check('the lines are draped over the links and the finder\'s paths, under the sketches — casing, then the run',
+    ix('mn-sitefeat-casing') > ix('mn-links') && ix('mn-sitefeat-casing') > ix('mn-sites-links')
+      && ix('mn-sitefeat-line') > ix('mn-sitefeat-casing') && ix('mn-sitefeat-dash') > ix('mn-sitefeat-casing')
+      && ix('mn-sitefeat-line') < ix('mn-draw-fill'), style.ids.join(', '));
+  check('…at the flat map\'s own widths, over its dark casing',
+    J(style.casing) === J(['case', ['get', 'sel'], style.look.casingWeightSel, style.look.casingWeight])
+      && J(style.line) === J(['case', ['get', 'sel'], style.look.weightSel, style.look.weight]) && style.colour === style.look.casing, J(style));
+  check('the points over the photos and under the station pins, as their pane is in 2-D',
+    ix('mn-sitefeat-pt') > ix('mn-photos-dot') && ix('mn-sitefeat-dot') > ix('mn-photos-dot')
+      && ix('mn-sitefeat-pt') < ix('mn-stations') && ix('mn-sitefeat-pt') < ix('mn-stations-outline'), style.ids.join(', '));
+  const drawnNow = await rendered(['mn-sitefeat-line']);
+  const ptsNow = await rendered(['mn-sitefeat-pt', 'mn-sitefeat-dot']);
+  check('…and held back this far out, where a pit is a pixel from its pin, while the track is drawn',
+    style.zoom < style.ptMin && ptsNow.length === 0 && drawnNow.includes(track.id) && points3(F).length > 0,
+    J({ zoom: style.zoom, ptMin: style.ptMin, pts: ptsNow.length, lines: drawnNow }));
+
+  // A hover names it; a click opens 2-D's popup over it.
+  const mid = await onPage(trackLL[2]);
+  await page.mouse.move(mid.x, mid.y);
+  await page.waitForFunction(() => { const t = document.querySelector('#map3d .map3d-tip'); return t && !t.hidden; }, null, { timeout: 5000 }).catch(() => {});
+  const tip = await page.evaluate(() => { const t = document.querySelector('#map3d .map3d-tip'); return t && !t.hidden ? t.textContent : ''; });
+  check('the pointer over the track names it, its station and its length', /^Access track/.test(tip) && /Abercorn/i.test(tip) && /long/.test(tip), tip);
+  await page.mouse.click(mid.x, mid.y);
+  await page.waitForFunction(() => !!Map3D._siteFeat().popup, null, { timeout: 5000 }).catch(() => {});
+  F = await sf3();
+  check('a click opens the flat map\'s popup for it: what it is, how long, how it was placed',
+    /Access track/.test(F.popup || '') && /long/.test(F.popup || '') && /Placed/.test(F.popup || '') && /Edit on the map/.test(F.popup || ''), F.popup);
+  const popColours = await page.evaluate(() => {
+    const c = document.querySelector('#map3d .maplibregl-popup-content');
+    return { bg: getComputedStyle(c).backgroundColor, panel: getComputedStyle(document.body).getPropertyValue('--panel').trim() };
+  });
+  check('…in the map\'s popup colours rather than MapLibre\'s white', popColours.bg !== 'rgb(255, 255, 255)' || /^#fff(fff)?$/i.test(popColours.panel), J(popColours));
+  await page.evaluate(() => document.querySelector('#map3d .maplibregl-popup-close-button').click());
+
+  // In close: the points, as 2-D's glyphs.
+  await page.evaluate(z => Map3D._map().jumpTo({ zoom: z }), style.ptMin + 1.5);
+  await page.waitForFunction(() => Object.values(Map3D._siteFeat().images).every(v => v !== 'loading'), null, { timeout: 10_000 });
+  await idle();
+  await page.waitForTimeout(300);
+  F = await sf3();
+  const glyphs = await rendered(['mn-sitefeat-pt']);
+  const kindsHere = [...new Set(points3(F).map(x => x.properties.kind))];
+  check('brought in close, the points are drawn as 2-D\'s glyphs — an image made for each kind',
+    glyphs.length > 0 && kindsHere.every(k => F.images[k] === 'ready') && points3(F).every(x => x.properties.icon === `mn-sf:${x.properties.kind}`),
+    J({ glyphs: glyphs.length, images: F.images, kinds: kindsHere }));
+
+  // The switch, tilted.
+  await page.evaluate(() => SiteFeatures.setEnabled(false));
+  await page.waitForFunction(() => { const f = Map3D._siteFeat(); return f.drawn && f.drawn.features.length === 0; }, null, { timeout: 10_000 }).catch(() => {});
+  F = await sf3();
+  check('switched off, none are drawn tilted either', F.drawn && F.drawn.features.length === 0, J(F.drawn && F.drawn.features.length));
+  await page.evaluate(() => SiteFeatures.setEnabled(true));
+  await hasTrack();
+  check('…and on again, back', true);
+
+  // Shown from the card: picked, so heavier, as in 2-D.
+  await page.evaluate(([s, id]) => SiteFeatures.show(s, id), [STN, track.id]);
+  await page.waitForFunction(id => {
+    const f = Map3D._siteFeat();
+    return !!(f.drawn && f.drawn.features.some(x => x.properties.id === id && x.properties.sel));
+  }, track.id, { timeout: 10_000 }).catch(() => {});
+  F = await sf3();
+  check('shown from the card, the track is the picked one here too', lines3(F).some(x => x.properties.id === track.id && x.properties.sel), J(lines3(F).map(x => x.properties)));
+
+  // Left, with the flat map at 15: its own floor again, so nothing on it —
+  // once the card's pick is put down, which 2-D draws at any zoom.
+  await page.evaluate(() => state.map.fire('click', { latlng: state.map.getCenter() }));
+  await page.evaluate(() => Map3D._map().jumpTo({ zoom: 14 }));
+  await idle();
+  await page.waitForTimeout(400);
+  await page.evaluate(() => Map3D.toggle());
+  await page.waitForFunction(() => !Map3D._map(), null, { timeout: BUILD_TIMEOUT });
+  await page.waitForFunction(() => SiteFeatures._note().kind !== 'loading', null, { timeout: 10_000 }).catch(() => {});
+  await page.waitForTimeout(500);
+  const left = await page.evaluate(() => ({ zoom: state.map.getZoom(), n: SiteFeatures.drawn().length, note: SiteFeatures._note().kind,
+                                            src: Map3D._siteFeat().source }));
+  check('leaving 3-D at the flat map\'s 15 takes them off it — the floor is 16 again',
+    left.zoom < 16 && left.n === 0 && left.note === 'zoom' && !left.src, J(left));
+
+  // The popup's Edit, tilted: the mode is the flat map's, so it leaves 3-D.
+  await page.evaluate(() => Map3D.toggle());
+  await page.waitForFunction(() => !!Map3D._map() && Map3D._map().isStyleLoaded(), null, { timeout: BUILD_TIMEOUT });
+  await hasTrack();
+  await idle();
+  const mid2 = await onPage(trackLL[2]);
+  await page.mouse.click(mid2.x, mid2.y);
+  await page.waitForSelector('#map3d .mn-sf-pop button', { timeout: 5000 });
+  await page.click('#map3d .mn-sf-pop button');
+  await page.waitForFunction(() => { const s = SiteFeatures._session(); return s && s.draft; }, null, { timeout: 10_000 });
+  const ed = await page.evaluate(() => ({ map3d: Map3D.active(), d: SiteFeatures._session().draft }));
+  check('the popup\'s ✏️ Edit leaves 3-D and opens the mode on the track', !ed.map3d && ed.d.id === track.id, J({ map3d: ed.map3d, id: ed.d.id }));
+  await page.evaluate(() => SiteFeatures.stop());
+  await page.waitForTimeout(200);
+}
 
 async function main() {
   const server = await startServer();
@@ -553,6 +719,12 @@ async function main() {
     await page.evaluate(() => SiteFeatures.setEnabled(true));
     await page.waitForFunction(() => document.querySelectorAll('.leaflet-mnSiteFeat-pane .mn-sf-pt').length >= 3, null, { timeout: 10_000 });
     check('…and back on, they are back', true);
+
+    // ── 10b. The map tilted ────────────────────────────────────────────────
+    log('\nThe map tilted\n');
+    const gl2 = await page.evaluate(() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch (_) { return false; } });
+    if (!gl2) log('  SKIP — this Chromium has no WebGL2; the 3-D view cannot be exercised here.');
+    else await tilted(page, db, pin);
 
     // ── 11. Signing out, and a database without 0061 ───────────────────────
     log('\nSigned out mid-mode, and a database that has not had 0061\n');
