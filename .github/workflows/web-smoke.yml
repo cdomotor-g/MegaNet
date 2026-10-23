@@ -876,6 +876,16 @@ jobs:
         working-directory: test
         run: npm run accounts
 
+      # The Admin tab's Base station connections (admin-links.js, 0080) and its
+      # layout: every table a full-width row, the cards in two columns, tables
+      # scrolling sideways on a phone; a month of 18 Bateson's connection —
+      # uptime, dropouts, the day and hour charts, the 3 am pattern in words —
+      # the log and its filters, a station offline now, a database without
+      # 0080, and an editor asking nothing.
+      - name: Admin — base station connections and the tab's layout
+        working-directory: test
+        run: npm run adminlinks
+
       # An administrator's notifications on the Admin tab (push.js, 0066)
       # against a stand-in for the push functions, with the browser's push
       # manager, permission prompt and Badging API stood in too (headless

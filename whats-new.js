@@ -25,6 +25,18 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 92, date: '2026-10-23', items: [
+      '<strong>Base station connections</strong>, on the Admin tab: how each base station\'s connection has been over the '
+        + 'last week, month or quarter — its uptime, dropouts and restarts, the longest gap, how long it has been connected and '
+        + 'the network it calls from — with a row a day showing when it dropped out and a chart of the hours the gaps start, '
+        + 'which says so when they keep coming at the same time. Under it, the <em>Connection log</em>: every dropout with when '
+        + 'it was lost and when it came back, every restart and every change of address, colour-coded and explained.',
+      'The <strong>Admin tab</strong> is tidier: the users, allowlist, tokens and roles each take the page\'s full width '
+        + 'instead of a narrow column, and on a phone the tables scroll sideways rather than breaking words.',
+      'Signing in stays signed in: an app or tab woken from sleep — an iPhone\'s home-screen app, a laptop opening its lid — '
+        + 'no longer signs you out because the network was not back yet, and a sign-in with no connection says so instead of '
+        + '"Load failed".',
+    ] },
     { n: 91, date: '2026-10-23', items: [
       '<strong>Catchments for small creeks.</strong> A creek that runs into a bigger river often had no catchment, '
         + 'because the Bureau\'s sub-catchments were too big to cut one out. Flood-Net now also reads the Bureau\'s finest '

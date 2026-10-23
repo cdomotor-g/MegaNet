@@ -925,7 +925,8 @@ const Auth = (function () {
   // twin and the map were holding was fetched for the session that just ended
   // or began. The Admin tab (admin.js) is administrators-only (0042), and
   // redraws its users and allowlist — or its "sign in" — for the same reason;
-  // so is the Base Stations tab (0049), and the Network Review tab; a station's
+  // so is the Base Stations tab (0049), the Admin tab's Base station
+  // connections (0080, admin-links.js), and the Network Review tab; a station's
   // history and the deleted stations are editors-only (0056, station-history.js),
   // and so are a station's site features (0061, site-features.js); and Station
   // Health's Ask Claude (health-agent.js) runs on Flood-Net's key for editors
@@ -947,6 +948,7 @@ const Auth = (function () {
                        typeof Admin       !== 'undefined' ? Admin       : null,
                        typeof AdminDash   !== 'undefined' ? AdminDash   : null,
                        typeof AdminTokens !== 'undefined' ? AdminTokens : null,
+                       typeof AdminLinks  !== 'undefined' ? AdminLinks  : null,
                        typeof BaseStations !== 'undefined' ? BaseStations : null,
                        typeof NetworkReview !== 'undefined' ? NetworkReview : null,
                        typeof Alert2Plan !== 'undefined' ? Alert2Plan : null,

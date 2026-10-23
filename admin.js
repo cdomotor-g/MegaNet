@@ -14,9 +14,10 @@
 // docUrl and switchTab; to datastore.js for dbRpc, dbCheck, renderDbStatusHtml,
 // reloadFromDatastore and snapshotStationsJson; to export.js for
 // exportMayDownload; to auth.js for Auth; to mem-meter.js for MemMeter; to
-// push.js for Push, whose Notifications panel it draws under the tokens; and to
-// station-history.js for StationHistory, whose Deleted stations panel it draws
-// under Station data and loads from init().
+// push.js for Push, whose Notifications panel it draws among the cards; to
+// admin-links.js for AdminLinks, whose Base station connections it draws under
+// the dashboard; and to station-history.js for StationHistory, whose Deleted
+// stations panel it draws under the cards and loads from init().
 // Nothing here runs at load. auth.js calls Admin.authChanged() on every sign-in
 // and sign-out.
 //
@@ -281,8 +282,8 @@ const Admin = (function () {
         <div class="table-wrap" role="region" tabindex="0" aria-labelledby="adm-users-h">
           <table class="adm-table">
             <caption class="sr-only">Signed-in users, their roles, and whether the allowlist lets them edit</caption>
-            <colgroup><col style="width:26%"><col style="width:18%"><col style="width:7.5rem">
-              <col style="width:6.5rem"><col style="width:4.5rem"><col style="width:16%"><col style="width:9.5rem"></colgroup>
+            <colgroup><col style="width:34%"><col style="width:15%"><col style="width:7.5rem">
+              <col style="width:6.5rem"><col style="width:4.5rem"><col style="width:13%"><col style="width:9.5rem"></colgroup>
             <thead><tr>
               <th scope="col">Email</th><th scope="col">Display name</th><th scope="col">Role</th>
               <th scope="col">Standing</th><th scope="col">May edit</th><th scope="col" class="col-optional">Last seen</th>
@@ -373,8 +374,8 @@ const Admin = (function () {
         <div class="table-wrap" role="region" tabindex="0" aria-labelledby="adm-allow-h">
           <table class="adm-table">
             <caption class="sr-only">Allowlist entries, the role each gives a first sign-in, and how many users each matches</caption>
-            <colgroup><col style="width:26%"><col style="width:6rem"><col style="width:24%">
-              <col style="width:4rem"><col style="width:20%"><col style="width:9.5rem"></colgroup>
+            <colgroup><col style="width:32%"><col style="width:6rem"><col style="width:28%">
+              <col style="width:4rem"><col style="width:14%"><col style="width:9.5rem"></colgroup>
             <thead><tr>
               <th scope="col">Entry</th><th scope="col">Initial role</th><th scope="col">Note</th>
               <th scope="col">Users</th><th scope="col" class="col-optional">Added</th>
@@ -501,29 +502,30 @@ const Admin = (function () {
 
   // ── The tab ──
 
+  // Anything with a table is a row of its own, the page's full width: the
+  // users, the allowlist, the tokens and the roles were a column beside the
+  // data cards, and an email address broke across three lines to fit. The
+  // cards with no table share two columns between them below.
   function render() {
     return `
-      <div class="page adm-page" style="--page-max:1200px">
+      <div class="page adm-page stack" style="--page-max:1200px">
         <h2 class="sr-only">Admin</h2>
         <div id="adm-dash" class="stack">${typeof AdminDash !== 'undefined' ? AdminDash.render() : ''}</div>
-        <div class="adm-grid">
-          <div class="stack">
-            ${dataHtml()}
-            ${typeof StationHistory !== 'undefined' ? StationHistory.adminHtml() : ''}
-            <div class="panel">
-              <div class="panel-header"><h2>Your access</h2></div>
-              <div id="adm-access">${accessHtml()}</div>
-            </div>
-            <div id="adm-browser">${browserHtml()}</div>
+        <div id="adm-links" class="stack">${typeof AdminLinks !== 'undefined' ? AdminLinks.render() : ''}</div>
+        <div id="adm-people" class="stack">${peopleHtml()}</div>
+        <div id="adm-tokens">${typeof AdminTokens !== 'undefined' ? AdminTokens.render() : ''}</div>
+        <div class="adm-cards">
+          ${dataHtml()}
+          <div class="panel">
+            <div class="panel-header"><h2>Your access</h2></div>
+            <div id="adm-access">${accessHtml()}</div>
           </div>
-          <div class="stack">
-            <div id="adm-people" class="stack">${peopleHtml()}</div>
-            <div id="adm-tokens">${typeof AdminTokens !== 'undefined' ? AdminTokens.render() : ''}</div>
-            <div id="adm-push">${typeof Push !== 'undefined' ? Push.render() : ''}</div>
-            ${rolesHtml()}
-            ${toolsHtml()}
-          </div>
+          <div id="adm-push">${typeof Push !== 'undefined' ? Push.render() : ''}</div>
+          <div id="adm-browser">${browserHtml()}</div>
+          ${toolsHtml()}
         </div>
+        ${typeof StationHistory !== 'undefined' ? StationHistory.adminHtml() : ''}
+        ${rolesHtml()}
       </div>`;
   }
 
@@ -534,6 +536,8 @@ const Admin = (function () {
     // every visit, since a delete anywhere since is the point of the list.
     if (typeof StationHistory !== 'undefined') StationHistory.adminLoad();
     if (typeof AdminDash !== 'undefined') AdminDash.start();
+    // How each base station's connection has been (admin-links.js, 0080).
+    if (typeof AdminLinks !== 'undefined') AdminLinks.start();
     if (typeof AdminTokens !== 'undefined' && isAdmin()) AdminTokens.load();
     // This device's notifications (push.js, 0066), and the icon's count.
     if (typeof Push !== 'undefined' && isAdmin()) Push.refresh();

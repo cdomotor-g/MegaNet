@@ -160,6 +160,41 @@ administrators can read them.
 `tools/check_health_findings.sql` proves each — opening, getting worse, held,
 cleared — against Postgres.
 
+## Its connection over time
+
+The Admin tab's **Base station connections** (`admin-links.js`, `0080`) is the
+record the findings above do not keep: when each station stopped checking in,
+when it came back, and what changed. A trigger on `base_station` compares each
+check-in with the one before it:
+
+- **A gap** — more than three idle periods and at least three minutes, the same
+  line as *quiet* above — is a **dropout** when the heartbeat's uptime (`up`)
+  spans it (the computer stayed up: the connection), a **restart** when the
+  computer started again inside it (power, or a reboot), and a **software
+  restart** when only the agent did (`agent_up`). A station that said `off` is
+  not gapped.
+- **A new address** — the network it calls from, kept only as its block
+  (`168.140.x.x`, `2406:2d40::/32`) with a fingerprint keyed with the token's
+  hash, so a new address in the same block is seen too. IPv4 and IPv6 are
+  followed apart, and an IPv6 address by its /64, whose host half a computer
+  changes daily.
+- **A new route** — through floodwarning.net's Worker, or straight to Supabase.
+
+Before `0080` the record comes from the readings: an arrival gap of five
+minutes or more with readings heard inside it, held and sent on the station's
+return, is a dropout; with none, *no readings* — nothing heard and nothing
+sent, cause unknown, and not counted against uptime.
+
+The card shows each station's uptime since it was first seen, its dropouts
+and restarts, the longest gap, how long it has been connected and its network;
+a row a day, midnight to midnight in the browser's time zone, with each gap
+where it fell; and the gaps by hour of the day, which says so in words when
+they cluster — 18 Bateson's three nine-minute dropouts at about 3 am on 17, 21
+and 24 Oct 2026 look like its Starlink dish's overnight update. The **Connection
+log** under it lists every event with when it was lost and when it came back.
+`tools/check_base_station_links.sql` proves the record against Postgres and
+`npm run adminlinks` the card.
+
 ## The team SSH keys
 
 Every base station running the reference agent has the same maintenance login,

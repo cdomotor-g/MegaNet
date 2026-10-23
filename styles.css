@@ -17533,17 +17533,20 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 
 
 /* ── Admin tab (admin.js) ────────────────────────────────────────────────────
-   Two columns on a wide screen — the data and this browser on the left, the
-   people and the reference on the right — and one below `lg`. */
-.adm-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
-  gap: var(--sp-4);
-  align-items: start;
+   One stack, full width: every panel with a table is a row of its own (the
+   users, the allowlist, the tokens, the roles — beside the data cards they
+   were squeezed to half the page and an email address broke across three
+   lines). The cards with no table flow down two columns between them, by
+   CSS columns rather than a grid so a short card does not leave a hole
+   beside a tall one; one column below 52rem. */
+.adm-cards {
+  columns: 2 24rem;
+  column-gap: var(--sp-4);
+  margin-bottom: calc(-1 * var(--sp-4));
 }
-
-@media (max-width: 1100px) {
-  .adm-grid { grid-template-columns: minmax(0, 1fr); }
+.adm-cards > * {
+  break-inside: avoid;
+  margin-bottom: var(--sp-4);
 }
 
 .adm-actions { margin: .5rem 0; }
@@ -17602,9 +17605,17 @@ button.adm-danger:hover { border-color: var(--bad); }
   .adm-kpi { padding: .5rem .55rem; }
   .adm-bars li { grid-template-columns: minmax(0, 8rem) minmax(0, 1fr) 4.5rem; }
 }
-/* The table list keeps its columns and scrolls sideways in its wrapper rather
-   than folding eight columns into a phone's width. */
-.adm-tables { min-width: 44rem; }
+/* The Admin tab's tables keep legible columns and scroll sideways in their
+   wrappers rather than folding into a phone's width ("rece/ptio/n"). Below
+   `md` the system lays wrapped tables out automatically at min-width 100%,
+   which outranked a bare `.adm-tables` — hence the `.adm-page .table-wrap`,
+   as the Base Stations tab's floors do. The people, the tokens and the roles
+   get one; the dashboard's small tables fit as they are. */
+#adm-people .table-wrap table.adm-table,
+#adm-tokens .table-wrap table.adm-table,
+.adm-page .table-wrap[aria-labelledby="adm-roles-h"] table { min-width: 34rem; }
+.adm-page .table-wrap table.adm-tables { min-width: 44rem; }
+.adm-page .table-wrap table.bl-log     { min-width: 40rem; }
 .adm-kpi {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -17700,6 +17711,123 @@ button.adm-danger:hover { border-color: var(--bad); }
 .adm-dash-grid, .adm-dash { --adm-in: #0b5cab; --adm-anon: #c7401a; }
 [data-theme="dark"] .adm-dash-grid,
 [data-theme="dark"] .adm-dash { --adm-in: #4a94e0; --adm-anon: #e46a44; }
+
+/* ── Base station connections (admin-links.js, 0080) ─────────────────────────
+   A colour per kind of event, the status tokens' own: a dropout is --bad, a
+   restart --warn, a change of address or route --accent, and the readings'
+   "nothing heard" --muted — a gap with no known cause is not an alarm. Each
+   is a mark beside words (the log's badge, the day row's text for a screen
+   reader), never the only way the kind is said. */
+.bl-k--offline, .bl-k--dropout { --bl: var(--bad); }
+.bl-k--restart, .bl-k--agent   { --bl: var(--warn); }
+.bl-k--quiet                   { --bl: color-mix(in srgb, var(--muted) 55%, var(--panel)); }
+.bl-k--address, .bl-k--route   { --bl: var(--accent); }
+
+.bl-station { padding: .6rem 0 .2rem; border-top: 1px solid var(--border); }
+.bl-station:first-of-type { border-top: 0; }
+.bl-station-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem .7rem; margin-bottom: .5rem; }
+.bl-station-head h3 { margin: 0; font-size: 1.05rem; }
+.bl-state { font-size: .8rem; font-weight: 600; padding: .1rem .5rem; border-radius: 999px;
+            background: color-mix(in srgb, var(--bs) 14%, transparent); color: var(--bs); --bs: var(--muted); }
+.bl-state::before { content: '●'; margin-right: .3rem; }
+.bl-state--online  { --bs: var(--ok); }
+.bl-state--quiet   { --bs: var(--warn); }
+.bl-state--offline { --bs: var(--bad); }
+.bl-kpis { margin-bottom: .75rem; grid-template-columns: repeat(auto-fill, minmax(min(10.5rem, 45%), 1fr)); }
+
+.bl-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 18rem);
+  gap: var(--sp-4);
+  align-items: start;
+}
+@media (max-width: 760px) { .bl-charts { grid-template-columns: minmax(0, 1fr); } }
+.bl-charts figure { margin: 0; min-width: 0; }
+.bl-charts figcaption { color: var(--muted); margin-bottom: .3rem; }
+
+/* The day rows: a label, a track midnight to midnight, the day's uptime. */
+.bl-days { --bl-row: 12px; }
+.bl-days--7  { --bl-row: 22px; }
+.bl-days--90 { --bl-row: 6px; }
+.bl-day {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 3.4rem;
+  gap: .5rem;
+  align-items: center;
+  min-height: var(--bl-row);
+  margin-bottom: 1px;
+}
+.bl-day-l { font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: hidden; line-height: 1; }
+.bl-day-r { text-align: right; color: var(--muted); line-height: 1; font-variant-numeric: tabular-nums; }
+.bl-day-r--down { color: var(--text); font-weight: 600; }
+.bl-track {
+  position: relative;
+  height: var(--bl-row);
+  background: color-mix(in srgb, var(--ok) 16%, var(--panel));
+  border-radius: 2px;
+  overflow: hidden;
+}
+.bl-first { margin: .3rem 0 0 7rem; color: var(--muted); }
+.bl-seg, .bl-tick { position: absolute; top: 0; bottom: 0; background: var(--bl); }
+.bl-seg { min-width: 2px; }
+.bl-tick { width: 2px; margin-left: -1px; }
+.bl-axis { min-height: 0; margin-bottom: .2rem; }
+.bl-ticks { height: 1rem; background: none; overflow: visible; }
+.bl-ticks span { position: absolute; top: 0; transform: translateX(-50%); font-size: .7rem; color: var(--muted); }
+.bl-ticks span:first-child { transform: none; }
+.bl-ticks span:last-child  { transform: translateX(-100%); }
+
+/* By hour of the day: 24 columns, the count printed above each. */
+.bl-hbars {
+  list-style: none;
+  margin: 0;
+  padding: 1.1rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  gap: 2px;
+  height: 8rem;
+  align-items: end;
+  border-bottom: 1px solid var(--border);
+}
+.bl-hbars li { position: relative; height: 100%; }
+.bl-hcol { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column-reverse;
+           border-radius: 2px 2px 0 0; overflow: hidden; }
+.bl-hseg { display: block; background: var(--bl); }
+.bl-hn { position: absolute; left: -2px; right: -2px; margin-bottom: 2px; text-align: center; font-size: .68rem;
+         line-height: 1; font-variant-numeric: tabular-nums; }
+.bl-hl { position: absolute; top: 100%; left: 0; font-size: .7rem; color: var(--muted); padding-top: .15rem; }
+.bl-hours { padding-bottom: 1.1rem; }
+.bl-said { margin: .6rem 0 0; padding: .45rem .6rem; border-left: 3px solid var(--warn);
+           background: color-mix(in srgb, var(--warn) 8%, transparent); }
+
+.bl-count { font-size: .78rem; font-variant-numeric: tabular-nums; opacity: .8; }
+.bl-legend { display: flex; flex-wrap: wrap; gap: .3rem 1rem; color: var(--muted); margin: .8rem 0 0; }
+.bl-sw { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; background: var(--bl); margin-right: .35rem; vertical-align: -.1rem; }
+
+/* The log: when it went and came back, what it was, how long, what it means. */
+.bl-log td { vertical-align: top; }
+.bl-row td:first-child { border-left: 4px solid var(--bl, transparent); }
+.bl-row--offline, .bl-row--dropout { --bl: var(--bad); }
+.bl-row--restart, .bl-row--agent   { --bl: var(--warn); }
+.bl-row--quiet                     { --bl: color-mix(in srgb, var(--muted) 55%, var(--panel)); }
+.bl-row--address, .bl-row--route   { --bl: var(--accent); }
+.bl-row--offline td { background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.bl-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bl-date, .bl-time { display: block; }
+.bl-date { font-weight: 600; }
+.bl-time { font-size: .82rem; color: var(--muted); }
+.bl-len { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bl-badge {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: .78rem;
+  font-weight: 600;
+  padding: .1rem .5rem;
+  border-radius: 999px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--bl) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bl) 60%, transparent);
+}
 .adm-col--in   { background: var(--adm-in); }
 .adm-col--anon { background: var(--adm-anon); }
 .adm-chart-x {
