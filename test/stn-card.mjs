@@ -2,12 +2,13 @@
 // it to its pin in place of the desktop callout (map-leader.js), driven in a
 // real browser at two widths.
 //
-//   1. **The card** — bottom-left of the map, painted by a plain pin click
-//      *without* selecting the station, by every row selection, and never by
-//      anything passive once it has been closed. It is state, not popup DOM:
-//      a filter keystroke rebuilds every marker, and the card has to still be
-//      there afterwards. Station details ↓ on it is the first thing in the app
-//      that scrolls the editor into view.
+//   1. **The card** — bottom-left of the map, painted by a plain pin click,
+//      by every row selection, and never by anything passive once it has been
+//      closed. A pin click loads the station into the station details too, and
+//      scrolls the side panel to them — but not over edits nobody has saved.
+//      It is state, not popup DOM: a filter keystroke rebuilds every marker,
+//      and the card has to still be there afterwards. Station details ↓ on it
+//      selects and scrolls the editor into view at any width.
 //   2. **The leader** — no callout on a desktop; a line out of the card's top
 //      outline onto a ring round the pin, which follows the pin through a pan,
 //      an animated zoom, a marker rebuild and a fanned-out stack, gives way
@@ -27,7 +28,8 @@
 //
 // Why a check of its own: every failure here renders a page that looks
 // entirely correct. A card that dies with a filter keystroke, a pin click that
-// quietly starts selecting, a close that hands focus to <body>, two cards drawn
+// leaves the details on another station — or loads over somebody's unsaved
+// edits — a close that hands focus to <body>, two cards drawn
 // on top of each other, a leader left pointing at where a pin was before the
 // map moved — none of them is an error in the console, and smoke sees a clean
 // tab. A phone callout wider than the map is the one the operator finds in a
@@ -127,7 +129,7 @@ async function main() {
     const { page } = await openStations(browser, server, errors,
       { viewport: { width: 1440, height: 900 } });
 
-    log('\nA pin click paints the card, and does not select\n');
+    log('\nA pin click paints the card, and loads the station into the details\n');
 
     // A real click on the marker — the same event Leaflet fires — rather than
     // showStationCard() called by hand, so the whole path from the pin is
@@ -135,6 +137,7 @@ async function main() {
     const clicked = await page.evaluate(`(() => {
       const m = ${lonePin(0)};
       const before = state.selectedId;
+      const scrollY = window.scrollY;
       const pinBefore = state.map.latLngToContainerPoint(m.getLatLng());
       m.fire('click', { originalEvent: new MouseEvent('click'), latlng: m.getLatLng() });
       const card = document.getElementById('stn-card');
@@ -147,7 +150,14 @@ async function main() {
         labelled: card && card.getAttribute('aria-labelledby'),
         tabIndex: card && card.tabIndex,
         focusIn:  card && card.contains(document.activeElement),
-        selectedUnchanged: state.selectedId === before,
+        wasOther: before !== m.mnStationId,
+        selected: state.selectedId === m.mnStationId && state.editorId === m.mnStationId,
+        editorName: (document.getElementById('ef-name') || {}).value,
+        rowLit: (() => {
+          const row = document.querySelector('#stations-table-wrap tr[data-sid="' + CSS.escape(m.mnStationId) + '"]');
+          return !row || row.classList.contains('selected');
+        })(),
+        pageStill: window.scrollY === scrollY,
         popupToo: !!document.querySelector('.leaflet-popup'),
         stateId:  state.stnCard.id,
         pinBefore: { x: pinBefore.x, y: pinBefore.y },
@@ -159,8 +169,25 @@ async function main() {
       clicked.role === 'dialog' && clicked.labelled === 'stn-card-title' && clicked.tabIndex === -1,
       `role=${clicked.role} labelledby=${clicked.labelled} tabindex=${clicked.tabIndex}`);
     check('a paint, not an open — focus is left where it was', clicked.focusIn === false);
-    check('and the selection is untouched — a plain click still does not select',
-      clicked.selectedUnchanged);
+    check('and the station is loaded into the station details — no Station details press needed',
+      clicked.wasOther && clicked.selected && clicked.editorName === clicked.name,
+      `selected=${clicked.selected} editor name="${clicked.editorName}"`);
+    check('…its row lit in the list, where the list draws it', clicked.rowLit);
+    check('…and the page itself not scrolled, so the map stays under the pointer', clicked.pageStill);
+    // Beside the map, the side panel's Stations pane scrolls to the editor —
+    // smoothly, so it is measured once it has had time to arrive.
+    await page.waitForTimeout(700);
+    const pane = await page.evaluate(() => {
+      const card = document.getElementById('stations-editor-card');
+      const p = card && card.closest('#help-panel .dock-pane');
+      if (!p) return { inPane: false, showing: dockShowing() };
+      const r = card.getBoundingClientRect(), q = p.getBoundingClientRect();
+      return { inPane: true, showing: dockShowing(), dock: p.dataset.dock,
+               top: Math.round(r.top - q.top), height: Math.round(q.height), scrolled: p.scrollTop };
+    });
+    check('beside the map, the side panel scrolls to the station details',
+      pane.inPane && pane.showing === pane.dock && pane.top >= -4 && pane.top < 60,
+      JSON.stringify(pane));
     check('no callout opens on a desktop — the card says it all', !clicked.popupToo);
 
     log('\nThe leader joins the card to its pin\n');
@@ -362,7 +389,7 @@ async function main() {
         // panel — the arrow says which, so the name is matched without it.
         hasList:    kids.some(e => /Show in the list/.test(e.textContent.trim())),
         count:      kids.length, expect: stationActionGroups(s).flatMap(g => g.pills).length,
-        footer:     /Pin clicks show this card without changing the selection/.test(text),
+        footer:     /In the station details in the side panel as well/.test(text),
         carried:    findRepeaterMatches(s).length,
         saysCarried: /Carried by \d+ repeater/.test(text),
         // The jump to Repeaters listening, by what it does: the card has other
@@ -407,10 +434,11 @@ async function main() {
     check('and the rows together are every action the station offers, no more and no less',
       rows.hasCopy && rows.hasList && rows.count === rows.expect,
       `${rows.count} vs ${rows.expect}`);
-    check('the footer says what a pin click does and does not do', rows.footer);
+    check('the footer says the station details are on this station too', rows.footer);
     check('a carried station says how many repeaters carry it',
       rows.carried === 0 || rows.saysCarried, `${rows.carried} carrier(s)`);
-    check('but offers no jump to a card that is not drawn for an unselected station', rows.noJump);
+    check('and, selected by the click, offers the jump to Repeaters listening',
+      rows.carried === 0 || !rows.noJump, `${rows.carried} carrier(s)`);
 
     log('\nIt outlives the markers\n');
 
@@ -492,6 +520,57 @@ async function main() {
     });
     check('from full screen, Edit leaves full screen first', fromFull.was === true && fromFull.now === false);
     await page.waitForTimeout(400);
+
+    log('\nThe details follow the card — but not over edits nobody has saved\n');
+
+    // An edit typed into the details, then another pin: the card goes to the
+    // new station, and the details stay where the edit is.
+    const firstId = await page.evaluate(() => state.editorId);
+    const firstName = await page.inputValue('#ef-name');
+    await page.fill('#ef-name', `${firstName} (renamed)`);
+    const held = await page.evaluate(`(() => {
+      const unsaved = document.getElementById('stations-editor-card').classList.contains('is-unsaved');
+      const m = ${lonePin(1)};
+      m.fire('click', { originalEvent: new MouseEvent('click'), latlng: m.getLatLng() });
+      return { unsaved, other: m.mnStationId, card: state.stnCard.id,
+        editor: state.editorId, selected: state.selectedId,
+        typed: document.getElementById('ef-name').value,
+        note: document.querySelector('#stn-card .acma-card-note').textContent.replace(/\\s+/g, ' ') };
+    })()`);
+    check('with an edit not saved, another pin puts the card on that station',
+      held.unsaved && held.card === held.other && held.other !== firstId, JSON.stringify(held));
+    check('…and leaves the details on the edit, typing and all',
+      held.editor === firstId && held.selected === firstId && held.typed === `${firstName} (renamed)`,
+      JSON.stringify(held));
+    check('…and the card says why, and what Station details would do about it',
+      /Not loaded in the station details .* holding unsaved changes to .*Station details .* drops it/.test(held.note),
+      held.note);
+    // Typed back to what it was, nothing is unsaved: the next click on the
+    // card's station loads it.
+    await page.fill('#ef-name', firstName);
+    const freed = await page.evaluate(id => {
+      const m = state.mapMarkers.find(x => x.mnStationId === id);
+      m.fire('click', { originalEvent: new MouseEvent('click'), latlng: m.getLatLng() });
+      return { editor: state.editorId, want: id,
+        name: document.getElementById('ef-name').value, stnName: m.mnStation.name };
+    }, held.other);
+    check('with nothing unsaved, a click on it loads it after all',
+      freed.editor === freed.want && freed.name === freed.stnName, JSON.stringify(freed));
+
+    // A link, or Back to one, shows a station without loading it (route.js).
+    const linked = await page.evaluate(() => {
+      const was = state.editorId;
+      const other = state.mapMarkers.find(x => x.mnStationId !== was && x.mnStation.lat != null).mnStationId;
+      showStationCard(other, { select: false });
+      const out = { editor: state.editorId, was, card: state.stnCard.id, other,
+        note: document.querySelector('#stn-card .acma-card-note').textContent.replace(/\s+/g, ' ') };
+      showStationCard(was);
+      return out;
+    });
+    check('a station shown by a link leaves the details where they were, and says so',
+      linked.card === linked.other && linked.editor === linked.was
+        && /Not loaded in the station details .* Station details .* loads it\./.test(linked.note),
+      JSON.stringify(linked));
 
     log('\nClosing is a decision; opening is a gesture\n');
 

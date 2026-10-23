@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 77, date: '2026-10-23', items: [
+      '<strong>Click a pin, get its station details</strong>, on the Stations map: clicking a station\'s pin now loads it '
+        + 'into the <em>Station details</em> card as well as the card on the map, and the side panel scrolls down to it — '
+        + 'no need to press <em>Station details</em> on the map card first. If the station details have changes you have '
+        + 'not saved, they stay where they are and the card on the map says so; save first, or press <em>Station '
+        + 'details</em> to load the new station anyway.',
+    ] },
     { n: 76, date: '2026-10-23', items: [
       '<strong>Where the IDs come from</strong>, a new view on the <em>ALERT2 / ERT-A2</em> tab, for when an ALERT2 receiver '
         + 'says it heard a legacy station that ought to be out of range. A legacy reading in an ALERT2 frame was heard by some '

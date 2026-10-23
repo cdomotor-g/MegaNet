@@ -263,15 +263,17 @@ const Route = (() => {
 
   // A station and a view, put on the Stations map. The station's card comes
   // up without selecting it — the address is what you were looking at, and
-  // selecting is an editing step (the card's own pills do it). A view in the
-  // address wins; without one the station is put where a picked row puts it.
+  // selecting is an editing step (the card's own pills do it) — so the station
+  // details do not follow it the way they follow a pin (select: false). A view
+  // in the address wins; without one the station is put where a picked row
+  // puts it.
   function applyStations(want) {
     if (state.activeTab !== 'stations' || !state.map || !state.data) return;
     const s = want.station ? state.data.stations.find(x => x.id === want.station) : null;
     applying++;
     try {
       if (s) {
-        if (state.stnCard.id !== s.id) showStationCard(s.id, { opener: null });
+        if (state.stnCard.id !== s.id) showStationCard(s.id, { opener: null, select: false });
       } else if (state.stnCard.id) {
         closeStnCard(false);
       }

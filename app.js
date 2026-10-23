@@ -6733,8 +6733,9 @@ function onStationPinClick(e) {
   // this pin (map-leader.js), and no callout: the card says everything the
   // callout used to, and the leader is the pointing it did. Painting the card
   // here is what makes "click a pin, read about it" cost no scrolling — a
-  // paint, not an open: a canvas click has no focus to protect, and the
-  // selection is untouched. A card opened over the pin it is about moves the
+  // paint, not an open: a canvas click has no focus to protect. The station
+  // details follow the card (editorFollowCard), so the editor beside the map
+  // is on this station too. A card opened over the pin it is about moves the
   // map off it, so the leader has somewhere to go.
   showStationCard(e.target.mnStationId);
   MapLeader.reveal();
@@ -7413,6 +7414,75 @@ function focusStation(id) {
   scrollStationRowIntoView(id);
 }
 
+// The station details follow the station card. A station brought up on the
+// map's card — a pin, a leg of a fanned stack, a phone's Details, the ⛰️ 3-D
+// view, What is here, the twin — is loaded into the editor card as well, so
+// the editor beside the map is about the station the map is pointing at
+// without Station details being pressed first. It used to be the other way
+// round: a pin click painted the card *without* selecting, on the grounds that
+// reading about a station must not drag the editor along, and the editor went
+// on talking about whatever had been selected before until the pill was found.
+//
+// A selection, less the rest of what a row pick does: the filters are never
+// moved — a pin on the map is in them already, and resetting them to give a
+// station past the row cap a row (selectStationState) would take every other
+// pin off the map the click was made on — the map is not flown anywhere, and
+// focus stays where it was. Its row lights up if the list draws one.
+//
+// The editor is not taken from somebody using it (editorHoldReason): with
+// something in it not saved, it stays on what it is showing, the card says
+// so, and Station details still loads the card's station on purpose. Nor is
+// it taken by a link or by Back (route.js passes select: false) — a link is
+// what somebody was looking at, not an edit.
+//
+// Returns true when it reloaded the editor, whose redraw repaints the card.
+function editorFollowCard(s) {
+  if (!s || state.selectedId === s.id || editorHoldReason()) return false;
+  state.selectedId  = s.id;
+  state.editorId    = s.id;
+  // Same deep copy as selectStation: fields the form doesn't expose survive a save.
+  state.editorDraft = JSON.parse(JSON.stringify(s));
+  state.editorMsg   = null;
+  fetchEditorStamp(s.id);
+  rerenderStations();
+  rerenderStationEditorCard();
+  editorScrollIntoPane();
+  return true;
+}
+
+// Why the editor will not follow the card, in words for the card's last line —
+// or '' when it will. A save in flight; a pin being moved, whose numbers go
+// into this form's boxes; a "+ New" or "+ Propose" form, which has nothing to
+// come back to; and edits the card has gilded (editorUnsavedRefresh).
+function editorHoldReason() {
+  const cur = state.editorId && state.data
+    ? state.data.stations.find(x => x.id === state.editorId) : null;
+  const name = cur ? cur.name : 'the station you are adding';
+  if (state.editorBusy) return `${name} while it saves`;
+  if (typeof MapMovePin !== 'undefined' && MapMovePin.armed()) return `the pin you are moving for ${name}`;
+  if (editorActive() && !state.editorId) {
+    return `a ${state.editorDraft.proposed ? 'proposed' : 'new'} station that is not saved yet`;
+  }
+  const card = document.getElementById('stations-editor-card');
+  return card && card.classList.contains('is-unsaved') ? `unsaved changes to ${name}` : '';
+}
+
+// Beside the map, with the side panel on its Stations pane, the pane scrolls
+// to the editor that has just been loaded — the pane alone, never the page,
+// so the map the click was made on does not move. Under the map (a tablet's
+// width) nothing scrolls: there the editor is a page below the map, and
+// Station details ↓ is the way down. A shut panel, another pane, or a phone's
+// drawer is left as it is — what the side panel shows is not a pin click's to
+// change.
+function editorScrollIntoPane() {
+  const card = document.getElementById('stations-editor-card');
+  const pane = card && card.closest('#help-panel .dock-pane');
+  if (!pane || pane.hidden || dockShowing() !== pane.dataset.dock) return;
+  const pad = parseFloat(getComputedStyle(pane).paddingTop) || 0;
+  const top = card.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop - pad;
+  pane.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
+
 // The two cards' "Show in the list". The list opens first if it is shut, as a
 // pick from it leaves it: a row in a shut list cannot be shown. From the
 // station card the station is selected as well (focusStation). In the editor
@@ -7461,11 +7531,12 @@ function goToStation(id) {
 // readable under it.
 //
 // It is driven by state.stnCard, not by the popup and not by state.selectedId.
-// A plain pin click paints it *without* selecting — reading about a station
-// must not drag the editor and the table along — while every selection path
-// (focusStationOnMap) paints it too. So it is the map's memory of what you
-// were last looking at, which is exactly what the scroll from the map to the
-// list and back was for.
+// Every selection path (focusStationOnMap) paints it, and it is followed the
+// other way: a station brought up on it is loaded into the editor as well
+// (editorFollowCard), unless the editor is holding something not saved, or
+// the card came from a link. So it is the map's memory of what you were last
+// looking at, which is exactly what the scroll from the map to the list and
+// back was for — and the editor beside it is about the same station.
 //
 // #138's dialog rules, as #acma-card keeps them: role=dialog, labelled by its
 // title, tabindex=-1, Escape closes it back to whatever opened it. Focus moves
@@ -7527,7 +7598,9 @@ function elvisCardAsk(elId, s) {
   }, () => put('<span class="txt-muted small">not surveyed</span>', ''));
 }
 
-function showStationCard(id, { takeFocus = false, opener = document.activeElement } = {}) {
+// `select: false` shows the station without the editor following it — a
+// link, and Back and Forward through them (route.js).
+function showStationCard(id, { takeFocus = false, opener = document.activeElement, select = true } = {}) {
   const s = state.data && state.data.stations.find(x => x.id === id);
   if (!s) return;
   // Recorded BEFORE the cross-closes: closing a focused sibling first would
@@ -7542,7 +7615,9 @@ function showStationCard(id, { takeFocus = false, opener = document.activeElemen
   // Looked at: to the head of the session's trail, which the pill in the
   // map's top row names and lists (station-trail.js).
   StationTrail.visit(id);
-  repaintStnCard();
+  // The editor follows it, and the editor's redraw paints the card; when the
+  // editor stays where it is, the card is painted here.
+  if (!(select && editorFollowCard(s))) repaintStnCard();
   // …and a step in the browser's history: back goes to what was up before it
   // (route.js, #211).
   if (typeof Route !== 'undefined') Route.stationShown(id);
@@ -8052,9 +8127,24 @@ function stnCardHtml(s) {
     <p class="small acma-card-note">
       ${carriers.length ? `Carried by ${carriers.length} repeater${carriers.length === 1 ? '' : 's'}${selected
         ? ` — <button type="button" class="link-btn" onclick="stnCardScrollToCarriers()">shown ${stationsCardsWhere()} ${stationsCardsArrow()}</button>` : ''}. ` : ''}
-      ${isPhoneNav() ? 'This card does not change the selection' : 'Pin clicks show this card without changing the selection'};
-      <em>Station details ${stationsCardsArrow()}</em> selects it.
+      ${stnCardEditorNote(selected)}
     </p>`;
+}
+
+// The card's last line: whether the station details are on this station too.
+// They are after a pin click (editorFollowCard); when they are not, it says
+// why — the editor is holding something not saved, or the card came from a
+// link — and what Station details does about it.
+function stnCardEditorNote(selected) {
+  const where = stationsCardsWhere();
+  const go = `<em>Station details ${stationsCardsArrow()}</em>`;
+  if (selected) return `In the station details ${where} as well — ${go} goes to them.`;
+  const held = editorHoldReason();
+  if (held) {
+    return `Not loaded in the station details ${where} — they are holding ${esc(held)}.
+      Finish that first, or ${go} loads this station there and drops it.`;
+  }
+  return `Not loaded in the station details ${where} — ${go} loads it.`;
 }
 
 // True when the editor card should show a form (an existing station is selected
@@ -8068,8 +8158,9 @@ function renderStationEditorCard() {
     return `
       <div class="panel-header"><h3>Station details</h3></div>
       <p class="small st-note-pad">
-        Select a station in the list above to view and edit it, click
-        <em>+ Propose</em> to propose one, or <em>+ New</em> to add one.
+        Select a station in the list above, or click its pin on the map, to
+        view and edit it; click <em>+ Propose</em> to propose one, or
+        <em>+ New</em> to add one.
       </p>`;
   }
   // Existing station → render from the live record; new station → from the draft.
