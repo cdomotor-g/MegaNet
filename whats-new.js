@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 73, date: '2026-10-23', items: [
+      '<strong>Messages landing keep a glow</strong>, in ⏱️ Latency on the Stations map. After its green flash and pulse, '
+        + 'a station that just reported keeps a green ring round its pin, and its links stay lit, for a minute — '
+        + 'bright for the first 20 seconds, then fading — so you can still see which stations just reported if you looked '
+        + 'away. And while the messages are animated, ⏱️ in the side panel\'s strip beats with the same green glow as the '
+        + 'card\'s dot.',
+    ] },
     { n: 72, date: '2026-10-22', items: [
       '<strong>Messages landing, in ⏱️ Latency on the Stations map</strong> — a new card in the Latency pane. '
         + 'While it is on, every message that lands in the log is played on the map a few seconds later: its station '

@@ -148,6 +148,15 @@ const MapLatency = (() => {
   const TRAIL_PX = 34, SPARK_PX = 9;
   const HOLD_MS = 120;
   const HOPS_MAX = 4, LEGS_MAX = 10, PULSES_MAX = 300;
+  // …and after it, the afterglow: each station and link the pulse lit keeps a
+  // soft green glow — a ring round the pin, the link lit along its length —
+  // so a station that just reported can still be picked out by somebody who
+  // looked away. It comes up as that part's own animation ends, holds, then
+  // fades: a minute in all. A station heard again starts its glow again, and
+  // a repeater lit by many glows once, at the brightest. While only glows are
+  // left the canvas is drawn a few times a second, not every frame.
+  const GLOW_IN = 400, GLOW_HOLD = 20 * SEC, GLOW_FADE = 40 * SEC;
+  const GLOW_TICK = 250, GLOWS_MAX = 2000;
   // With less motion asked for: nothing runs or grows — the station and its
   // links lit, still, for this long.
   const STILL_MS = 1600;
@@ -280,7 +289,7 @@ const MapLatency = (() => {
   };
   const liveTimers = new Set();  // the plays still to come from the last answer
   let pulses = [];
-  let pcanvas = null, pctx = null, praf = null, porigin = null;
+  let pcanvas = null, pctx = null, praf = null, porigin = null, glowTimer = null;
   let graph = null, graphFor = null;
   let pinIdx = null, pinIdxFor = null, pinIdxN = 0;
   let visHooked = false;
@@ -836,8 +845,9 @@ const MapLatency = (() => {
           Animate messages on the map
         </label>
         <p class="small txt-muted lat-live-what">As a message lands in the log its station flashes green, and a green
-          pulse runs along its links — to the repeater that carries it, then on to a base. It runs the way the map draws
-          the network: the likeliest way in, not a record of the hops.</p>
+          pulse runs along its links — to the repeater that carries it, then on to a base. Each keeps a green glow for a
+          minute after, so a station that just reported can still be picked out. It runs the way the map draws the
+          network: the likeliest way in, not a record of the hops.</p>
         <p class="small lat-live-status" id="lat-live-status">${liveStatusHtml()}</p>
       </section>`;
   }
@@ -1329,6 +1339,10 @@ const MapLatency = (() => {
   // Stopping forgets where it got to, so a return looks back one beat rather
   // than playing the whole gap.
   function liveSync() {
+    // ⏱️ in the side panel's strip glows while the animation is on
+    // (styles.css, html[data-lat-anim]) — on the root, because the strip's
+    // buttons are made and kept by app.js, not here.
+    if (typeof document !== 'undefined') document.documentElement.toggleAttribute('data-lat-anim', !!U.anim);
     if (liveWanted()) {
       ensureCanvas();
       if (!LV.since) LV.since = now_();
@@ -1497,7 +1511,7 @@ const MapLatency = (() => {
       const dur = Math.max(LEG_MIN, Math.min(LEG_MAX, 1000 * px / SPEED));
       // The trail drains into the far node at the spark's speed — on a link
       // shorter than the trail, no longer than the run itself.
-      legs.push({ a: e.from, b: e.to, start, dur, tail: Math.min(dur, dur * TRAIL_PX / Math.max(1, px)), to: e.toId });
+      legs.push({ a: e.from, b: e.to, start, dur, tail: Math.min(dur, dur * TRAIL_PX / Math.max(1, px)), to: e.toId, fromId: e.fromId, key: e.line });
       const end = start + dur;
       if (!reached.has(e.toId) || reached.get(e.toId) > end) {
         reached.set(e.toId, end);
@@ -1525,19 +1539,25 @@ const MapLatency = (() => {
     const once = new Set();
     const kept = nodes.filter(n => n.start === reached.get(n.id) && !once.has(n.id) && once.add(n.id));
     const still = calm();
-    const life = still ? STILL_MS
-      : Math.max(FLARE_MS, ...kept.map(n => n.start + FLARE_MS), ...legs.map(l => l.start + l.dur + l.tail));
-    return { id, nodes: kept, legs, life, still };
+    // Where each part's animation ends, and its afterglow begins.
+    kept.forEach(n => { n.end = still ? STILL_MS : n.start + FLARE_MS; });
+    legs.forEach(l => { l.end = still ? STILL_MS : l.start + l.dur + l.tail; });
+    const anim = Math.max(still ? STILL_MS : FLARE_MS, ...kept.map(n => n.end), ...legs.map(l => l.end));
+    return { id, nodes: kept, legs, anim, life: anim + GLOW_HOLD + GLOW_FADE, still };
   }
 
   function fire(id) {
-    if (!pctx || !map || pulses.length >= PULSES_MAX) return;
+    if (!pctx || !map) return;
     const t = performance.now();
+    if (pulses.filter(p => t - p.t0 < p.anim).length >= PULSES_MAX) return;
     // Still flaring from its last message: not flared again on top of it.
     if (pulses.some(p => p.id === id && t - p.t0 < FLARE_MS)) return;
     const p = route(id);
     if (!p) return;
     p.t0 = t;
+    // Its last message's glow gives way to this one's, which starts afresh.
+    pulses = pulses.filter(q => q.id !== id || t - q.t0 < q.anim);
+    if (pulses.length >= GLOWS_MAX) pulses.shift();
     pulses.push(p);
     LV.fired.push(id);
     LV.firedN++;
@@ -1550,6 +1570,7 @@ const MapLatency = (() => {
     liveTimers.clear();
     pulses = [];
     if (praf) { cancelAnimationFrame(praf); praf = null; }
+    if (glowTimer) { clearTimeout(glowTimer); glowTimer = null; }
     drawPulses(0);
   }
 
@@ -1599,12 +1620,23 @@ const MapLatency = (() => {
   }
 
   function kick() {
+    if (glowTimer) { clearTimeout(glowTimer); glowTimer = null; }
     if (!praf && pulses.length && pctx) praf = requestAnimationFrame(frame);
   }
   function frame(t) {
     praf = null;
     drawPulses(t);
-    if (pulses.length) praf = requestAnimationFrame(frame);
+    if (!pulses.length) return;
+    if (pulses.some(p => t - p.t0 < p.anim)) praf = requestAnimationFrame(frame);
+    else glowTimer = setTimeout(() => { glowTimer = null; praf = requestAnimationFrame(frame); }, GLOW_TICK);
+  }
+
+  // How bright a part's afterglow is, ms after its animation ended: up over
+  // GLOW_IN, held, then down to nothing.
+  function glowAt(e) {
+    if (e < 0 || e >= GLOW_HOLD + GLOW_FADE) return 0;
+    const up = Math.min(1, e / GLOW_IN);
+    return e < GLOW_HOLD ? up : up * (1 - (e - GLOW_HOLD) / GLOW_FADE);
   }
 
   // CSS's ease-out, near enough for a flare.
@@ -1633,9 +1665,40 @@ const MapLatency = (() => {
     if (!pulses.length || !porigin) return;
     const at = ll => { const q = map.latLngToLayerPoint(ll); return [q.x - porigin.x, q.y - porigin.y]; };
     pctx.lineCap = 'round';
+    // The afterglow under everything: each link and node once, at the
+    // brightest any pulse leaves it.
+    const legGlow = new Map(), nodeGlow = new Map();
+    for (const p of pulses) {
+      const e0 = t - p.t0;
+      for (const l of p.legs) {
+        const g = glowAt(e0 - l.end);
+        if (g > (legGlow.has(l.key) ? legGlow.get(l.key).g : 0)) legGlow.set(l.key, { l, g });
+      }
+      for (const n of p.nodes) {
+        const g = glowAt(e0 - n.end);
+        if (g > (nodeGlow.has(n.id) ? nodeGlow.get(n.id).g : 0)) nodeGlow.set(n.id, { n, g });
+      }
+    }
+    // Off the pins as they are now: a rebuild since can have hidden one (a
+    // filter) or resized it (a band), and a glow round nothing says nothing.
+    const radius = id => { const m = pinFor(id); return m ? m.options.radius || 6 : null; };
+    legGlow.forEach(({ l, g }) => {
+      const ra = radius(l.fromId), rb = radius(l.to);
+      if (ra == null || rb == null) return;
+      const [ax, ay] = at(l.a), [bx, by] = at(l.b);
+      const len = Math.hypot(bx - ax, by - ay);
+      if (len > 1) stroke(ax, ay, bx, by, len, ra + 3, len - rb - 3, 'glow', g);
+    });
+    nodeGlow.forEach(({ n, g }) => {
+      const r = radius(n.id);
+      if (r == null) return;
+      const [x, y] = at(n.ll);
+      ring(x, y, r, g);
+    });
     // The links first and the nodes over them, as the logo stacks them.
     for (const p of pulses) {
       const e0 = t - p.t0;
+      if (p.still && e0 >= STILL_MS) continue;
       for (const l of p.legs) {
         const e = p.still ? 0 : e0 - l.start;
         if (e < 0 || e > l.dur + l.tail) continue;
@@ -1651,7 +1714,7 @@ const MapLatency = (() => {
     for (const p of pulses) {
       const e0 = t - p.t0;
       for (const n of p.nodes) {
-        const f = p.still ? (e0 >= 0 ? [0.9, 1] : null) : flareAt(e0 - n.start);
+        const f = p.still ? (e0 >= 0 && e0 < STILL_MS ? [0.9, 1] : null) : flareAt(e0 - n.start);
         if (!f) continue;
         const [x, y] = at(n.ll);
         flare(x, y, n.r, f[0], f[1]);
@@ -1662,8 +1725,9 @@ const MapLatency = (() => {
   }
 
   // A stretch of a link, from `from` to `to` px along it (clipped to the
-  // link): the trail a fainter green, the spark white-hot, both glowing.
-  function stroke(ax, ay, bx, by, len, from, to, kind) {
+  // link): the trail a fainter green, the spark white-hot, both glowing; the
+  // afterglow the trail's green, softer, at `g` of its brightness.
+  function stroke(ax, ay, bx, by, len, from, to, kind, g) {
     const a = Math.max(0, from), b = Math.min(len, to);
     if (b <= a) return;
     const ux = (bx - ax) / len, uy = (by - ay) / len;
@@ -1673,6 +1737,9 @@ const MapLatency = (() => {
     if (kind === 'spark') {
       pctx.globalAlpha = 1; pctx.strokeStyle = '#eaffef'; pctx.lineWidth = 4.5;
       pctx.shadowColor = '#5dff8c'; pctx.shadowBlur = 6;
+    } else if (kind === 'glow') {
+      pctx.globalAlpha = 0.6 * g; pctx.strokeStyle = '#2bff6a'; pctx.lineWidth = 3.5;
+      pctx.shadowColor = 'rgba(30, 235, 95, .9)'; pctx.shadowBlur = 9;
     } else {
       pctx.globalAlpha = 0.85; pctx.strokeStyle = '#2bff6a'; pctx.lineWidth = 4;
       pctx.shadowColor = 'rgba(30, 235, 95, .9)'; pctx.shadowBlur = 10;
@@ -1706,6 +1773,29 @@ const MapLatency = (() => {
     pctx.shadowColor = 'rgba(30, 235, 95, .7)';
     pctx.shadowBlur = 8;
     pctx.beginPath(); pctx.arc(x, y, core, 0, 2 * Math.PI); pctx.fill();
+    pctx.shadowBlur = 0;
+  }
+
+  // A node's afterglow: a green ring round the pin with a soft halo outside
+  // it, the pin itself left clear so its own colour still reads.
+  function ring(x, y, r, g) {
+    const R = r + 3;
+    pctx.globalAlpha = g;
+    pctx.shadowBlur = 0;
+    const h = pctx.createRadialGradient(x, y, R - 1, x, y, R + 11);
+    h.addColorStop(0, 'rgba(70, 255, 120, .55)');
+    h.addColorStop(0.35, 'rgba(25, 230, 90, .3)');
+    h.addColorStop(1, 'rgba(25, 230, 90, 0)');
+    pctx.fillStyle = h;
+    pctx.beginPath();
+    pctx.arc(x, y, R + 11, 0, 2 * Math.PI);
+    pctx.arc(x, y, R - 1, 0, 2 * Math.PI, true);
+    pctx.fill();
+    pctx.strokeStyle = '#2bff6a';
+    pctx.lineWidth = 2.4;
+    pctx.shadowColor = 'rgba(30, 235, 95, .9)';
+    pctx.shadowBlur = 8;
+    pctx.beginPath(); pctx.arc(x, y, R, 0, 2 * Math.PI); pctx.stroke();
     pctx.shadowBlur = 0;
   }
 
@@ -1743,7 +1833,8 @@ const MapLatency = (() => {
     return `
       <span class="legend-item">
         <span class="lat-live-dot" aria-hidden="true"></span>
-        <span class="small">Flashing green: a message from it just landed in the log${calm() ? '' : ', a pulse running along its links'}</span>
+        <span class="small">Flashing green: a message from it just landed in the log${calm() ? '' : ', a pulse running along its links'};
+          glowing green: it reported in the last minute</span>
       </span>`;
   }
 
@@ -1827,9 +1918,11 @@ const MapLatency = (() => {
     // for test/latency.mjs — the canvas has nothing else to ask.
     _live: () => ({ status: LV.status, watching: !!LV.timer, cursor: LV.cursor, fired: LV.fired.slice(), firedN: LV.firedN,
                     pulses: pulses.length, canvas: !!pcanvas,
+                    glowing: pulses.filter(p => performance.now() - p.t0 >= p.anim).map(p => p.id),
                     batches: LV.batches.map(b => ({ n: b.n, ids: b.ids.length, lost: b.lost })) }),
     _route: id => { const p = route(id); return p && { nodes: p.nodes.map(n => ({ id: n.id, start: n.start })),
-                                                       legs: p.legs.map(l => ({ to: l.to, start: l.start, dur: l.dur })), life: p.life }; },
+                                                       legs: p.legs.map(l => ({ to: l.to, start: l.start, dur: l.dur })),
+                                                       anim: p.anim, life: p.life }; },
     _askNow: () => livePoll(),
     _fire: id => fire(id),
   };

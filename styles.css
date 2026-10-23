@@ -3811,6 +3811,21 @@ hr {
 }
 .lat-pulse-canvas { pointer-events: none; }
 
+/* ⏱️ in the side panel's strip while the messages are animated
+   (map-latency.js sets data-lat-anim on the root): the card's green node,
+   beating behind the icon to the same 2.4 s — still under reduced motion, by
+   the blanket rule. Behind it in the button's own stacking context, so the
+   open pane's panel fill stays under it and the icon over it. */
+html[data-lat-anim] .dock-tab[data-dock="map-latency"] { position: relative; isolation: isolate; }
+html[data-lat-anim] .dock-tab[data-dock="map-latency"]::before {
+  content: "";
+  position: absolute; inset: 12%; z-index: -1;
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, #fff 0 18%, #8dffa9 34%, rgba(30, 227, 94, .85) 48%,
+                              rgba(30, 235, 95, .35) 62%, rgba(30, 235, 95, 0) 74%);
+  animation: lat-live-beat 2.4s ease-out infinite;
+}
+
 /* Manual, as a pill. The one fact in that block that changes what a person
    does: a gauge read by hand reports nothing over the radio, so silence from it
    is not a telemetry fault to go chasing. Amber rather than red — it is a

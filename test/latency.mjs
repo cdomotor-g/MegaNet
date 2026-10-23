@@ -34,7 +34,9 @@
 //      carries is counted, not drawn; unticked, the log is not asked and the
 //      colours stay; ⏻ turns the colours and the animation off together and
 //      on again, the focus kept on it; the view turned on from all off brings
-//      the animation back.
+//      the animation back; ⏱️ in the strip beating green behind its icon
+//      while the animation is on; and once the pulse has played, the station
+//      and its link still glowing green on the canvas, for a minute.
 //   6. **One colouring at a time** — Colour pins by health turns latency off,
 //      and latency turns health off; the 🔑 legend carries whichever is on.
 //   7. **No data, honestly** — a datastore that cannot be reached: the pane
@@ -219,9 +221,13 @@ try {
     power: (document.querySelector('#map-latency-panel .lat-power') || {}).getAttribute?.('aria-pressed'),
     status: (document.getElementById('lat-live-status') || {}).textContent || '',
     legend: /Flashing green/.test(document.getElementById('map-legend').textContent),
+    strip: (() => { const b = document.querySelector('#help-panel .dock-tab[data-dock="map-latency"]');
+                    return { root: document.documentElement.hasAttribute('data-lat-anim'), beat: getComputedStyle(b, '::before').animationName }; })(),
   }));
   check('…and the message animation with it: its box ticked, ⏻ pressed, the 🔑 legend saying what a green flash is',
     anim0 && live0.box === true && live0.power === 'true' && live0.legend && /Asked at/.test(live0.status), J(live0));
+  check('…and ⏱️ in the strip beats green behind its icon while it does, the card\'s node to the same beat',
+    live0.strip.root && live0.strip.beat === 'lat-live-beat', J(live0.strip));
   check('…the log asked for what has landed since, oldest first, a page at most, with the columns a station is found by',
     count('live') >= 1 && asked.filter(a => a.kind === 'live').every(a => /order=received_at\.asc/.test(a.url)
       && /limit=1000/.test(a.url) && /select=addr,alert_id,.*received_at,source,path/.test(a.url)),
@@ -389,6 +395,29 @@ try {
     check('a reading typed in is not played, and an address no station carries is counted, not drawn',
       !got.fresh.includes(pick.other) && got.batch && got.batch.n === 2 && got.batch.lost === 1, J({ fresh: got.fresh, batch: got.batch }));
     check('the card counts what landed', /message/.test(got.status) && /not on the map/.test(got.status), got.status);
+    const glow = await page.evaluate(async id => {
+      const t0 = performance.now();
+      while (!MapLatency._live().glowing.includes(id) && performance.now() - t0 < 6000) await new Promise(r => setTimeout(r, 25));
+      await new Promise(r => setTimeout(r, 700));     // up past GLOW_IN, the canvas drawn at its slower beat
+      const cv = document.querySelector('.lat-pulse-canvas');
+      const dpr = window.devicePixelRatio || 1;
+      const s = state.data.stations.find(x => x.id === id);
+      const m = state.mapMarkers.find(x => x.mnStationId === id);
+      const l = state.mapLines.find(x => x.mnLinkRole === 'core' && x.mnLinkStationId === id);
+      const p = state.map.latLngToContainerPoint([s.lat, s.lon]);
+      const q = state.map.latLngToContainerPoint(l.getLatLngs()[1]);
+      const px = (x, y) => Array.from(cv.getContext('2d').getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data);
+      const R = m.options.radius + 3;
+      const f = Math.max(0.3, (R + 16) / Math.hypot(q.x - p.x, q.y - p.y));
+      return { glowing: MapLatency._live().glowing.includes(id), anim: MapLatency._live().pulses,
+               ring: px(p.x + R, p.y), inside: px(p.x, p.y),
+               link: px(p.x + (q.x - p.x) * f, p.y + (q.y - p.y) * f) };
+    }, pick.id);
+    const green = c => c[3] > 60 && c[1] > c[0] + 60 && c[1] > c[2];
+    check('once the pulse has played, its station keeps a green ring — the pin inside it left clear — and its link a green glow',
+      glow.glowing && green(glow.ring) && glow.inside[3] < 40 && green(glow.link), J(glow));
+    check('…held, then faded: a minute after the animation ends', got.route && got.route.life - got.route.anim === 60000,
+      J(got.route && { anim: got.route.anim, life: got.route.life }));
   }
   const liveOn = count('live');
   const off1 = await page.evaluate(async () => {
@@ -398,6 +427,8 @@ try {
     await MapLatency._askNow();
     return { anim: MapLatency.anim(), on: MapLatency.on(), watching: n.watching, status: n.status, pulses: n.pulses,
              stored: localStorage.getItem('mn-latency-anim'),
+             strip: document.documentElement.hasAttribute('data-lat-anim')
+               || getComputedStyle(document.querySelector('#help-panel .dock-tab[data-dock="map-latency"]'), '::before').content !== 'none',
              legend: /Flashing green/.test(document.getElementById('map-legend').textContent),
              card: document.getElementById('lat-live-status').textContent,
              banded: state.mapMarkers.filter(m => m.mnLatency).length };
@@ -405,6 +436,7 @@ try {
   check('unticked, the log is not watched or asked, nothing runs, the legend drops it — and the pins keep their colours',
     !off1.anim && off1.on && !off1.watching && off1.status === 'idle' && off1.pulses === 0 && off1.stored === 'off'
       && !off1.legend && /Off/.test(off1.card) && off1.banded > 0 && count('live') === liveOn, J({ off1, liveOn, now: count('live') }));
+  check('…and ⏱️ in the strip stops glowing', off1.strip === false, J(off1.strip));
   await page.click('#map-latency-panel .lat-power');
   await page.waitForTimeout(300);
   const pw0 = await page.evaluate(() => ({ on: MapLatency.on(), anim: MapLatency.anim(),

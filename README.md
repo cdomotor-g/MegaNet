@@ -1721,7 +1721,11 @@ links — its pass-range links to its repeaters, then the fewest backbone hops t
 base — the loading screen's logo pulsing through the network itself, drawn on a
 canvas of its own over the pins. The way it runs is the way the map draws the
 network, not the hops the message took (the log keeps the receiver, not the
-path), and a typed-in or backfilled reading is not played. It comes on with the
+path), and a typed-in or backfilled reading is not played. Once a station's
+pulse has played, the station keeps a green ring round its pin and its links stay
+lit: held for 20 s, faded over the next 40, started again if it reports again,
+and drawn a few times a second rather than every frame. While the animation is
+on, ⏱️ in the side panel's strip beats green behind its icon. It comes on with the
 view, has its own box, stops while the tab or the page is out of sight, and is
 still under reduced motion; **⏻ Latency view** at the head of the pane turns the
 colouring and the animation off together, or both on.

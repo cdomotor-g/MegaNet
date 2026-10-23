@@ -307,8 +307,13 @@ Sized up from the logo for a map: the trail 34 px, the strokes 4 px or more, the
 halo a little wider than the pin's own ring. It is drawn on a canvas in a pane of
 its own just over the arrows' (407), so it lights the pins and stays under their
 names, and it takes no clicks. Under reduced motion nothing runs or grows: the
-station and its links are lit, still, for a moment. It never replaces a pin's
-colour — a flash is an event, not a class — so it runs under any colouring.
+station and its links are lit, still, for a moment. Then an **afterglow**, so a
+flash somebody looked away from is not lost: a green ring just outside the pin,
+leaving the pin's own colour clear inside it, and the link lit along its length
+short of both pins. It is held 20 s and faded over 40, and a station heard again
+starts it again. It never replaces a pin's colour — a flash is an event, not a
+class — so it runs under any colouring. While it is on, ⏱️ in the side panel's
+strip beats behind its icon with the card's green node, to the logo's 2.4 s.
 
 **A site feature is a plan symbol in a categorical colour** (`site-features.js`,
 `0061`): the orifice outlet a ringed dot, a pit a crossed square, a benchmark a

@@ -647,7 +647,8 @@ const HELP = {
       + 'shows that station\'s checks slot by slot, its delay reading by reading and the receivers that carried it. '
       + 'Its <strong>Messages landing</strong> card animates the map as messages land in the log — the station '
       + 'flashes green and a green pulse runs along its links to its repeater and on to a base, as the loading '
-      + 'screen\'s logo does — on with the view, with a box of its own to turn it off; <strong>⏻ Latency view</strong> '
+      + 'screen\'s logo does, and the station and its links keep a green glow for a minute after; ⏱️ in the strip '
+      + 'beats green while it is on. It comes on with the view, with a box of its own to turn it off; <strong>⏻ Latency view</strong> '
       + 'at the top of the pane turns the colours and the animation off together.',
       '<strong>From zoom 17 the map offers the station\'s digital twin</strong> — the ground to '
       + '1 m where the State holds LiDAR, the aerial imagery, the station as built and the radio paths '
