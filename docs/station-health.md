@@ -63,9 +63,11 @@ the scenes, each a press away; ⏯ ⏮ ⏭, the space bar and the arrow keys on 
 stage; a station's name on the stage or beside it opens it below on this tab;
 *Read it instead* is the whole script with its stations; *Hide* folds it to its
 headline on this device. Earlier bulletins are in the list beside *Today* and
-*This week* (fourteen days and eight weeks are kept). On a phone the scene is
-drawn tall and the presenter sits beside the words; with reduced motion nothing
-moves and every scene is drawn finished. A bulletin more than a day old (a week,
+*This week* (fourteen days and eight weeks are kept). The stage takes the
+panel's full width; under it, the presenter's portrait sits at the left beside
+what they are saying, smaller on a phone, where the scene is drawn tall. A map's
+stations drawn on top of each other become one mark with a count. With reduced
+motion nothing moves and every scene is drawn finished. A bulletin more than a day old (a week,
 for the weekly) says the schedule may have stopped.
 
 **Where it lives.** `data/bulletins/<daily|weekly>/<date>.json`, listed newest

@@ -555,10 +555,10 @@
      "series": [
       1.8,
       1.9,
-      2.0,
+      2,
       1.9,
       2.1,
-      2.0,
+      2,
       2.2,
       2.4,
       2.6,
@@ -625,7 +625,7 @@
    "evidence": {
     "hz": -305,
     "n": 9,
-    "what": "9 corrupted copies, at −305 Hz"
+    "what": "8 of the 9 corrupted copies, at −305 Hz"
    },
    "verdict": "8 of the 9 corrupted copies came on Hillcrest's carrier. The corruption enters at Hillcrest — its receiver, its site, or its radio."
   },
@@ -710,31 +710,31 @@
      "baseline": 80,
      "points": [
       [
-       "Sat",
+       "Sun",
        74
       ],
       [
-       "Sun",
+       "Mon",
        76
       ],
       [
-       "Mon",
+       "Tue",
        73
       ],
       [
-       "Tue",
+       "Wed",
        71
       ],
       [
-       "Wed",
+       "Thu",
        72
       ],
       [
-       "Thu",
+       "Fri",
        75
       ],
       [
-       "Fri",
+       "Sat",
        72
       ]
      ]
@@ -744,31 +744,31 @@
      "tone": "neutral",
      "points": [
       [
-       "Sat",
+       "Sun",
        281
       ],
       [
-       "Sun",
+       "Mon",
        311
       ],
       [
-       "Mon",
+       "Tue",
        168
       ],
       [
-       "Tue",
+       "Wed",
        567
       ],
       [
-       "Wed",
+       "Thu",
        488
       ],
       [
-       "Thu",
+       "Fri",
        176
       ],
       [
-       "Fri",
+       "Sat",
        292
       ]
      ]

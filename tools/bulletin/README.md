@@ -244,15 +244,29 @@ receiver's week; what the register needs; and what got fixed.
 
 ## The scheduled tasks
 
-Two Claude Code scheduled tasks, each starting a fresh session in the owner's
-cloud environment, with the Supabase connector:
+Two Claude Code scheduled tasks, each firing into a **standing session** of its
+own in the owner's cloud environment — a session that has this repository
+attached, so it can push to `main`:
 
-- **Flood-Net daily network bulletin** — every day at 4:31 am Brisbane:
-  *“Write today's Flood-Net daily network bulletin: follow tools/bulletin/README.md
-  in cdomotor-g/MegaNet with --kind daily, publish it, and push it to main.”*
+- **Flood-Net daily network bulletin** — every day at 4:31 am Brisbane, into
+  the session *📺 Flood-Net daily network bulletin (scheduled)*: pull, re-read
+  this file, follow it with `--kind daily`, publish and push.
 - **Flood-Net weekly network bulletin** — Mondays at 3:59 am Brisbane, so the
-  two do not push at once: the same with `--kind weekly`.
+  two do not push at once, into *📺 Flood-Net weekly network bulletin
+  (scheduled)*: the same with `--kind weekly`.
 
-To change what the bulletins say or how, change this file: the tasks read it
-every run. To change when they run, edit the scheduled task (claude.ai → Code →
-scheduled tasks).
+Why standing sessions, and not a fresh one each morning: a fresh scheduled
+session starts with no repository attached. It can clone this public
+repository, write the whole bulletin and pass every check, and then have its
+push refused by the session's git proxy ("not in this session's authorized
+repositories") — which is exactly what the first test run did. A session
+created with the repository as its source is authorized to push, as the
+session that built this was.
+
+Each run continues its session's conversation, so the run's message tells it
+to pull and re-read this file first, and never to carry a number over from an
+earlier day: what is in this file is what the next run does. To change what the
+bulletins say or how, change this file. To change when they run, edit the
+scheduled task (claude.ai → Code → scheduled tasks). If a standing session is
+ever archived or deleted, make a new one with this repository as its source and
+point the scheduled task at it.

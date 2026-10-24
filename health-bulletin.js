@@ -40,8 +40,10 @@
 const HealthBulletin = (() => {
 
   const INDEX = 'data/bulletins/index.json';
-  const WIDE = { W: 1200, H: 750 }, TALL = { W: 720, H: 900 };
-  const NARROW_PX = 620;                 // the stage below this is drawn tall
+  // The stage spans the panel, 16:9 like the screen it imitates; on a phone
+  // (a stage under NARROW_PX) it is drawn tall instead.
+  const WIDE = { W: 1280, H: 720 }, TALL = { W: 720, H: 900 };
+  const NARROW_PX = 620;
   const STALE = { daily: 36 * 3600e3, weekly: 9 * 86400e3 };
 
   // The crew, from the Droggies' canon (github.com/cdomotor-g/thedroggies,
@@ -98,7 +100,7 @@ const HealthBulletin = (() => {
     speak: stored('mn-hb-speak', v => v === '1') === '1',
     speaking: false, spokenWords: 0,
     hidden: stored('mn-hb-hidden', v => v === '1') === '1',
-    narrow: null, drawnNarrow: null, ro: null,
+    narrow: null, drawnNarrow: null, stageW: null, drawnK: 1, ro: null,
     basins: null,                            // null | 'loading' | [{ bbox, rings }] | 'failed'
   };
 
@@ -213,26 +215,26 @@ const HealthBulletin = (() => {
     const stale = Date.now() - Date.parse(b.issued_at) > STALE[b.kind || 'daily'];
     return `
       <p class="small hb-issued">${esc(issuedText(b))}${stale ? ` <span class="txt-warn">— ${b.kind === 'weekly' ? 'over a week' : 'more than a day'} old: the scheduled bulletin may have stopped.</span>` : ''}</p>
-      <div class="hb-studio">
-        <div class="hb-stage${stageState()}" id="hb-stage" tabindex="0" role="group"
+      <div class="hb-stage${stageState()}" id="hb-stage" tabindex="0" role="group"
              aria-roledescription="bulletin" aria-label="${escAttr(`${b.kind === 'weekly' ? 'Weekly' : 'Daily'} network bulletin, ${sc.length} scenes. Space plays or pauses; arrow keys move between scenes.`)}"
              onkeydown="HealthBulletin.key(event)" onclick="HealthBulletin.stageClick(event)">
           <div class="hb-svgbox" id="hb-svgbox">${sceneSvg(b, B.scene)}</div>
           <div class="hb-lower" id="hb-lower">${lowerHtml(b, B.scene)}</div>
           ${!B.playing && B.t === 0 ? `<button class="hb-bigplay" onclick="event.stopPropagation(); HealthBulletin.play()">
               <span aria-hidden="true">${B.ended ? '↻' : '▶'}</span> ${B.ended ? 'Watch again' : `Play the bulletin · ${esc(fmtDur(totalSecs(b)))}`}</button>` : ''}
-        </div>
-        <aside class="hb-rail" aria-label="Presenter">
-          <figure class="hb-presenter" id="hb-presenter">${presenterHtml(b, B.scene)}</figure>
-          <div class="hb-chips" id="hb-chips">${chipsHtml(b, B.scene)}</div>
-        </aside>
       </div>
       <div class="hb-bar" id="hb-bar" role="group" aria-label="Scenes">${barHtml(b)}</div>
-      <div class="hb-caption" id="hb-caption">${captionHtml(b, B.scene)}</div>
+      <div class="hb-anchor">
+        <figure class="hb-presenter" id="hb-presenter">${presenterHtml(b, B.scene)}</figure>
+        <div class="hb-words">
+          <div class="hb-caption" id="hb-caption">${captionHtml(b, B.scene)}</div>
+          <div class="hb-chips" id="hb-chips">${chipsHtml(b, B.scene)}</div>
+        </div>
+      </div>
       <div class="hb-controls">
-        <button class="ghost hb-btn" onclick="HealthBulletin.prev()" aria-label="Previous scene" title="Previous scene (←)">⏮</button>
+        <button class="ghost hb-btn" onclick="HealthBulletin.prev()" aria-label="Previous scene" title="Previous scene (←)"><span class="hb-ico" aria-hidden="true">⏮</span></button>
         <button class="hb-btn hb-btn--main" id="hb-play" onclick="HealthBulletin.toggle()" aria-label="${B.playing ? 'Pause' : 'Play'}">${B.playing ? '⏸ Pause' : '▶ Play'}</button>
-        <button class="ghost hb-btn" onclick="HealthBulletin.next()" aria-label="Next scene" title="Next scene (→)">⏭</button>
+        <button class="ghost hb-btn" onclick="HealthBulletin.next()" aria-label="Next scene" title="Next scene (→)"><span class="hb-ico" aria-hidden="true">⏭</span></button>
         <span class="small hb-clock" id="hb-clock">${esc(clockText(b))}</span>
         ${typeof speechSynthesis !== 'undefined' ? `<button class="ghost hb-btn" onclick="HealthBulletin.toggleSpeak()" aria-pressed="${B.speak}"
             title="Read the narration aloud in this browser's own voice">${B.speak ? '🔊 Reading aloud' : '🔈 Read aloud'}</button>` : ''}
@@ -255,14 +257,16 @@ const HealthBulletin = (() => {
   function issuedText(b) {
     const d = new Date(b.issued_at);
     const when = isNaN(d) ? '' : d.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-    return `${b.kind === 'weekly' ? 'The week' : 'The last 24 hours'} — ${b.period && b.period.label ? b.period.label : ''}. Issued ${when}.`;
+    const span = (b.period && b.period.label) || (b.kind === 'weekly' ? 'The week' : 'The last 24 hours');
+    return `${span.charAt(0).toUpperCase()}${span.slice(1)}. Issued ${when.replace(/\b(AM|PM)\b/g, m => m.toLowerCase())}.`;
   }
   function footText(b, P) {
     const src = b.sources || {};
     const bits = [];
     if (src.readings) bits.push(`${Number(src.readings).toLocaleString()} readings`);
     if (src.stations_heard) bits.push(`${Number(src.stations_heard).toLocaleString()} stations heard`);
-    return `Presented by ${P.name} (from the Droggies). Written by ${b.author || 'Claude'}${bits.length ? ` from ${bits.join(' and ')}` : ''}. `
+    const others = [...new Set((b.scenes || []).map(sc => sc.presenter).filter(id => id && id !== b.presenter))].map(id => who(id).name);
+    return `Presented by ${P.name}${others.length ? `, with ${others.join(' and ')}` : ''} (from the Droggies). Written by ${b.author || 'Claude'}${bits.length ? ` from ${bits.join(' and ')}` : ''}. `
       + 'It points at what needs a look and why it might be; it does not diagnose — check the station on this tab before driving out.';
   }
   function stationLinks(ids) {
@@ -286,11 +290,12 @@ const HealthBulletin = (() => {
   function progressPct(s) { return Math.max(0, Math.min(100, 100 * B.t / (1000 * (+s.secs || 8)))); }
   function sceneOf(b, i) { return (b.scenes || [])[i] || null; }
   function speakerOf(b, s) { return (s && s.presenter) || b.presenter; }
+  // The presenter under the stage, at the left, beside what they are saying:
+  // the face here, the name with the words (captionHtml).
   function presenterHtml(b, i) {
     const id = speakerOf(b, sceneOf(b, i)), P = who(id);
     return `<img src="${escAttr(portrait(id))}" alt="${escAttr(P.alt)}" width="320" height="400" loading="lazy" decoding="async"
-        class="${B.playing ? 'is-talking' : ''}">
-      <figcaption><b>${esc(P.name)}</b><span>${esc(P.role)}</span></figcaption>`;
+        class="${B.playing ? 'is-talking' : ''}">`;
   }
   function chipsHtml(b, i) {
     const s = sceneOf(b, i), ids = (s && s.stations) || [];
@@ -310,8 +315,8 @@ const HealthBulletin = (() => {
     const id = speakerOf(b, s), P = who(id);
     const words = String(s.say || '').split(/\s+/).filter(Boolean);
     const shown = B.t === 0 && !B.playing ? words.length : revealCount(s, words.length);
-    return `<img class="hb-avatar" src="${escAttr(portrait(id))}" alt="" width="64" height="80" loading="lazy">
-      <p><span class="hb-speaker">${esc(P.name)}:</span> ${words.map((w, k) => `<span class="hb-w${k < shown ? ' is-said' : ''}">${esc(w)} </span>`).join('')}</p>`;
+    return `<p class="hb-who"><b class="hb-speaker">${esc(P.name)}</b> <span>${esc(P.role)}</span></p>
+      <p class="hb-say">${words.map((w, k) => `<span class="hb-w${k < shown ? ' is-said' : ''}">${esc(w)} </span>`).join('')}</p>`;
   }
   function revealCount(s, n) {
     if (B.speak && B.speaking) return B.spokenWords;
@@ -338,24 +343,56 @@ const HealthBulletin = (() => {
     B.drawnNarrow = narrow;
     const D = narrow ? TALL : WIDE;
     // Text sizes, in the stage's own units: big enough to read on a phone
-    // (the tall stage is about 340 px across there) and on a wall.
-    const F = narrow ? { xs: 24, s: 28, m: 34, l: 44, xl: 64, xxl: 92 } : { xs: 18, s: 22, m: 28, l: 38, xl: 56, xxl: 84 };
+    // (the tall stage is about 340 px across there) and on a wall. A wide
+    // stage shown smaller than about a thousand pixels — a laptop with the
+    // nav open, a tablet — draws its type up to a quarter larger, in steps,
+    // so it stays about the size of the page's own.
+    const k = !narrow && B.stageW ? Math.min(1.25, Math.max(1, Math.round(20 * 1000 / B.stageW) / 20)) : 1;
+    B.drawnK = k;
+    const base = narrow ? { xs: 24, s: 28, m: 34, l: 44, xl: 64, xxl: 92 } : { xs: 18, s: 22, m: 28, l: 38, xl: 56, xxl: 84 };
+    const F = Object.fromEntries(Object.entries(base).map(([n, v]) => [n, Math.round(v * k)]));
     // The lower third covers the foot of the stage; nothing that matters goes there.
     return { ...D, F, narrow, pad: narrow ? 36 : 48, foot: narrow ? 150 : 118 };
   }
+  // Where a block of the given height starts so it sits in the middle of the
+  // stage's free area — above the lower third, below the top margin.
+  const vtop = (L, blockH) => L.pad * 0.6 + Math.max(0, (L.H - L.foot - 12 - L.pad * 0.6 - blockH) / 2);
   const d = s => `style="--d:${(+s).toFixed(2)}s"`;
   const dd = (s, extra) => `style="--d:${(+s).toFixed(2)}s;${extra}"`;
   const sevC = s => C[s] || C.info;
+  // Words into lines of about so many characters. A short bracket — "(Wine
+  // Glass)" — stays on one line; a last line of a word or two is evened out
+  // with the lines above it; past maxLines, the last shown line ends "…".
   function wrap(text, chars, maxLines) {
-    const words = String(text == null ? '' : text).split(/\s+/).filter(Boolean);
-    const lines = []; let cur = '';
-    for (const w of words) {
-      if (cur && (cur + ' ' + w).length > chars) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w;
+    const words = [];
+    for (const w of String(text == null ? '' : text).split(/\s+/).filter(Boolean)) {
+      const open = words.length && /^\([^)]*$/.test(words[words.length - 1].split(' ')[0]) && !/\)/.test(words[words.length - 1]);
+      if (open && (words[words.length - 1] + ' ' + w).length <= chars * 0.6) words[words.length - 1] += ' ' + w;
+      else words.push(w);
     }
-    if (cur) lines.push(cur);
+    const lay = n => {
+      const lines = []; let cur = '';
+      for (const w of words) {
+        if (cur && (cur + ' ' + w).length > n) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w;
+      }
+      if (cur) lines.push(cur);
+      return lines;
+    };
+    let lines = lay(chars);
+    const fitsIn = !maxLines || lines.length <= maxLines;
+    if (fitsIn && lines.length > 1 && lines[lines.length - 1].length < chars * 0.35) {
+      for (let n = chars - 1; n >= Math.ceil(chars * 0.6); n--) {
+        const t = lay(n);
+        if (t.length > lines.length) break;
+        lines = t;
+        if (t[t.length - 1].length >= n * 0.5) break;
+      }
+    }
     if (maxLines && lines.length > maxLines) {
       lines.length = maxLines;
-      lines[maxLines - 1] = lines[maxLines - 1].replace(/[\s,;:.]*\S*$/, '') + '…';
+      const last = lines[maxLines - 1];
+      const cut = last.replace(/[\s,;:.—–-]*\S*$/, '');
+      lines[maxLines - 1] = (cut || last.slice(0, Math.max(1, chars - 1))) + '…';
     }
     return lines;
   }
@@ -385,19 +422,39 @@ const HealthBulletin = (() => {
     let out = '';
     out += `<g class="hb-a-fade" ${d(0.1)}>${text(pad, pad + F.s, kicker, F.s, `fill="${C.accent}" font-weight="700" letter-spacing="3"`)}`
       + text(pad, pad + F.s * 2.3, day, F.xs, `fill="${C.muted}" letter-spacing="2"`) + '</g>';
-    const gx = narrow ? W - pad - 170 : pad + 150, gy = narrow ? pad + 150 : 290, gs = narrow ? 0.8 : 1.15;
+    // The forecast under the date line — a sun's rays reach about 130 above
+    // its centre — and beside it on a phone.
+    const gs = narrow ? 0.8 : 1.1;
+    const gx = narrow ? W - pad - 170 : pad + 150, gy = narrow ? pad + 150 : Math.max(250, Math.round(pad + F.s * 2.3 + 16 + 130 * gs));
     out += `<g transform="translate(${gx} ${gy}) scale(${gs})"><g class="hb-a-pop" ${d(0.3)}>${skyGlyph(sky)}</g></g>`;
     const tx = narrow ? pad : 360, tw = W - tx - pad;
-    const ty = narrow ? 300 : 200;
+    const ty = narrow ? Math.max(280, Math.round(glyphBottom(gy, gs) + F.l * 0.85)) : 170;
     out += `<g class="hb-a-rise" ${d(0.6)}>${text(tx, ty, skyLabel(b), F.l, `fill="${sevSky(sky)}" font-weight="700"`)}</g>`;
-    const hl = wrap(b.headline, charsFor(tw, F.m), narrow ? 4 : 3);
-    out += `<g class="hb-a-rise" ${d(1.0)}>${text(tx, ty + F.l * 1.3, '', F.m, `fill="${C.text}" font-weight="600"`, hl)}</g>`;
+    // The headline whole — up to four lines, five on a phone — and the
+    // numbers under however many it took.
+    // A long headline on a phone goes a size smaller rather than to five lines.
+    let hs = F.m, hl = wrap(b.headline, charsFor(tw, hs), narrow ? 5 : 4);
+    if (narrow && hl.length > 4) { hs = F.s; hl = wrap(b.headline, charsFor(tw, hs), 5); }
+    const hy = ty + F.l * 1.25;
+    out += `<g class="hb-a-rise" ${d(1.0)}>${text(tx, hy, '', hs, `fill="${C.text}" font-weight="600"`, hl)}</g>`;
+    const hlBottom = hy + (hl.length - 1) * hs * 1.22 + hs * 0.35;
     // The numbers: four tiles across (two by two on a phone).
     const stats = (b.stats || []).slice(0, 4);
     if (stats.length) {
       const cols = narrow ? 2 : stats.length, rows = Math.ceil(stats.length / cols);
-      const gap = narrow ? 14 : 18, tileW = (W - pad * 2 - gap * (cols - 1)) / cols, tileH = narrow ? 118 : 150;
-      const top = narrow ? H - L.foot - rows * tileH - (rows - 1) * gap - 8 : H - L.foot - tileH - 26;
+      const gap = narrow ? 14 : 18, tileW = (W - pad * 2 - gap * (cols - 1)) / cols;
+      const floor = H - L.foot - 10;
+      const top = narrow ? Math.max(hlBottom + 16, floor - rows * 118 - (rows - 1) * gap) : Math.max(hlBottom + 28, glyphBottom(gy, gs) + 12);
+      // Each label whole, on two lines if it needs them.
+      // On a phone a label a little smaller rather than on two lines.
+      let ls = narrow ? F.xs : F.s, labs = stats.map(st => wrap(st.label, charsFor(tileW - 40, ls), 2));
+      if (narrow && labs.some(l => l.length > 1)) {
+        const small = Math.round(F.xs * 0.82), alt = stats.map(st => wrap(st.label, charsFor(tileW - 40, small), 2));
+        if (alt.every(l => l.length === 1)) { ls = small; labs = alt; }
+      }
+      const labY = narrow ? F.l * 1.25 + 26 + F.s * 0.6 : F.xl + 16 + F.s;
+      const needH = labY + (Math.max(...labs.map(l => l.length)) - 1) * ls * 1.22 + 16;
+      const tileH = Math.max(needH, narrow ? 96 : 110, Math.min(narrow ? 118 : 150, (floor - top - (rows - 1) * gap) / rows));
       stats.forEach((st, k) => {
         const x = pad + (k % cols) * (tileW + gap), y = top + Math.floor(k / cols) * (tileH + gap);
         const col = TONE[st.tone] || C.text;
@@ -405,13 +462,15 @@ const HealthBulletin = (() => {
         out += `<g class="hb-a-rise" ${d(1.4 + k * 0.25)}>
           <rect x="${x}" y="${y}" width="${tileW}" height="${tileH}" rx="14" fill="${C.ground}" fill-opacity=".55" stroke="${C.grid}"/>
           <text x="${x + 20}" y="${y + (narrow ? F.l + 18 : F.xl + 10)}" font-size="${narrow ? F.l * 1.25 : F.xl}" font-weight="700" fill="${col}" ${typeof st.value === 'number' ? `data-count="${st.value}"` : ''}>${esc(fmtStat(st.value))}<tspan font-size="${F.s}" fill="${C.muted}" dx="6">${esc(st.unit || '')}</tspan></text>
-          ${text(x + 20, y + (narrow ? F.l * 1.25 + 26 : F.xl + 16) + F.s * (narrow ? 0.6 : 1), st.label, narrow ? F.xs : F.s, `fill="${C.muted}"`, wrap(st.label, charsFor(tileW - 40, narrow ? F.xs : F.s), 1))}
+          ${text(x + 20, y + labY, st.label, ls, `fill="${C.muted}"`, labs[k])}
           ${delta != null && delta !== 0 ? text(x + tileW - 18, y + 36, `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta).toLocaleString()}`, F.xs, `text-anchor="end" fill="${C.faint}"`) : ''}
         </g>`;
       });
     }
     return out;
   }
+  // How far below its centre the forecast drawing reaches (rain under a cloud).
+  const glyphBottom = (gy, gs) => gy + 110 * gs;
   const fmtStat = v => (typeof v === 'number' ? (Number.isInteger(v) ? v.toLocaleString() : v.toLocaleString(undefined, { maximumFractionDigits: 1 })) : String(v));
   const sevSky = sky => ({ clear: C.ok, fair: C.ok, patchy: C.warn, unsettled: C.warn, stormy: C.critical }[sky] || C.text);
 
@@ -475,41 +534,83 @@ const HealthBulletin = (() => {
       dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${narrow ? 3 : 2.4}"/>`;
     }
     out += `<g fill="${C.dot}" fill-opacity=".38" class="hb-a-fade" ${d(0.1)}>${dots}</g>`;
-    // Where the marks will sit, so no label lands on one.
+    // Marks that would be drawn on top of one another — twenty stations
+    // behind one repeater, at this scale — become one mark with a count. A
+    // named mark keeps its name and takes in the unnamed ones on it; named
+    // marks on top of each other are eased apart, a mark's width or so.
     const order = { ok: 0, info: 1, warn: 2, critical: 3 };
-    const placed = [];
     const markR = narrow ? 16 : 13;
-    marks.forEach(m => { const x = P.x(m.lon), y = P.y(m.lat); placed.push({ x0: x - markR, y0: y - markR, x1: x + markR, y1: y + markR }); });
+    const pts = marks.map(m => ({ m, x: P.x(m.lon), y: P.y(m.lat) }));
+    const named = pts.filter(p => p.m.label);
+    for (let pass = 0; pass < 10; pass++) {
+      for (let i = 0; i < named.length; i++) for (let j = i + 1; j < named.length; j++) {
+        const a = named[i], c = named[j], dx = c.x - a.x, dy = c.y - a.y, dist = Math.hypot(dx, dy), want = markR * 2.6;
+        if (dist >= want) continue;
+        const push = (want - dist) / 2, ux = dist ? dx / dist : 0.8, uy = dist ? dy / dist : 0.6;
+        a.x -= ux * push; a.y -= uy * push; c.x += ux * push; c.y += uy * push;
+      }
+    }
+    const groups = named.map(p => ({ x: p.x, y: p.y, m: p.m, members: [p.m] }));
+    pts.filter(p => !p.m.label).sort((p, q) => (order[q.m.sev] || 0) - (order[p.m.sev] || 0)).forEach(p => {
+      let best = null, bd = markR * 2.1;
+      for (const g of groups) { const dd2 = Math.hypot(g.x - p.x, g.y - p.y); if (dd2 < bd) { best = g; bd = dd2; } }
+      if (best) best.members.push(p.m); else groups.push({ x: p.x, y: p.y, m: p.m, members: [p.m] });
+    });
+    const groupOf = new Map();
+    groups.forEach(g => g.members.forEach(m => { if (m.id) groupOf.set(m.id, g); }));
+    // Where the marks will sit, so no label lands on one.
+    const placed = [];
+    groups.forEach(g => placed.push({ x0: g.x - markR, y0: g.y - markR * (g.members.length > 1 ? 1.9 : 1), x1: g.x + markR * (g.members.length > 1 ? 1.9 : 1), y1: g.y + markR }));
     const fits = rect => rect.x0 >= 4 && rect.x1 <= W - 4 && rect.y0 >= 4 && rect.y1 <= H - L.foot
       && !placed.some(p => !(rect.x1 < p.x0 || rect.x0 > p.x1 || rect.y1 < p.y0 || rect.y0 > p.y1));
+    // Names and count badges are drawn last, over every mark and ring.
+    let labels = '', badges = '';
+    // The isobars, so a name can be put where no ring runs through it.
+    const rings = areas.map(a => ({ x: P.x(a.lon), y: P.y(a.lat), r: Math.max(28, a.km / P.kmPerUnit) }));
+    const crosses = rect => rings.some(g => [1, 0.72, 0.45].some(f => {
+      const R = g.r * f, nx = Math.max(rect.x0, Math.min(g.x, rect.x1)), ny = Math.max(rect.y0, Math.min(g.y, rect.y1));
+      const far = Math.max(...[[rect.x0, rect.y0], [rect.x1, rect.y0], [rect.x0, rect.y1], [rect.x1, rect.y1]].map(([px, py]) => Math.hypot(px - g.x, py - g.y)));
+      return Math.hypot(nx - g.x, ny - g.y) < R && far > R;
+    }));
     // Lows and highs: an area in trouble is a low, isobars round it; one all
     // checked in is a high.
     areas.forEach((a, k) => {
       const x = P.x(a.lon), y = P.y(a.lat), r = Math.max(28, a.km / P.kmPerUnit), col = sevC(a.sev);
       const low = a.sev !== 'ok';
+      // The L (or H) at the centre, unless a station's mark is there — the
+      // centre of a group is usually one of its stations — then inside the
+      // ring wherever nothing is.
+      const gl = F.l * 0.45;
+      let gx = x, gy = y;
+      for (const [fx, fy] of [[0, 0], [-0.6, 0], [0.6, 0], [0, -0.6], [0, 0.6], [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45], [-0.85, 0], [0.85, 0]]) {
+        const cx = x + fx * r, cy = y + fy * r;
+        if (fits({ x0: cx - gl, y0: cy - gl * 1.15, x1: cx + gl, y1: cy + gl * 1.15 })) { gx = cx; gy = cy; break; }
+      }
+      placed.push({ x0: gx - gl, y0: gy - gl * 1.15, x1: gx + gl, y1: gy + gl * 1.15 });
       // Its name above it, else below, else beside: wherever nothing else is.
       let lab = '';
       if (a.label) {
-        const fs = F.s, w = a.label.length * fs * 0.56 + 10;
-        for (const [ly, anchor, lx] of [[y - r - 10, 'middle', x], [y + r + fs + 4, 'middle', x], [y + fs * 0.36, 'start', x + r + 10], [y + fs * 0.36, 'end', x - r - 10]]) {
-          const x0 = anchor === 'middle' ? lx - w / 2 : anchor === 'start' ? lx : lx - w;
-          const rect = { x0, y0: ly - fs, x1: x0 + w, y1: ly + fs * 0.25 };
-          if (!fits(rect)) continue;
-          placed.push(rect);
-          lab = text(lx, ly, a.label, fs, `text-anchor="${anchor}" font-weight="700" fill="${col}" ${halo}`);
-          break;
+        const fs = F.s, w = a.label.length * fs * 0.6 + 10;
+        const spots = [[y - r - 10, 'middle', x], [y + r + fs + 4, 'middle', x], [y + fs * 0.36, 'start', x + r + 10], [y + fs * 0.36, 'end', x - r - 10]]
+          .map(([ly, anchor, lx]) => { const x0 = anchor === 'middle' ? lx - w / 2 : anchor === 'start' ? lx : lx - w; return { ly, anchor, lx, rect: { x0, y0: ly - fs, x1: x0 + w, y1: ly + fs * 0.25 } }; });
+        const inside = p => p.rect.x0 >= 4 && p.rect.x1 <= W - 4 && p.rect.y0 >= 4 && p.rect.y1 <= H - L.foot;
+        const spot = spots.find(p => fits(p.rect) && !crosses(p.rect)) || spots.find(p => fits(p.rect)) || spots.find(inside);
+        if (spot) {
+          placed.push(spot.rect);
+          lab = text(spot.lx, spot.ly, a.label, fs, `text-anchor="${spot.anchor}" font-weight="700" fill="${col}" ${halo}`);
         }
       }
-      placed.push({ x0: x - F.l * 0.4, y0: y - F.l * 0.5, x1: x + F.l * 0.4, y1: y + F.l * 0.5 });
       out += `<g class="hb-a-fade" ${d(0.5 + k * 0.4)}>${[1, 0.72, 0.45].map((f, j) =>
           `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r * f).toFixed(1)}" fill="${j === 0 ? col : 'none'}" fill-opacity="${j === 0 ? 0.08 : 0}" stroke="${col}" stroke-opacity="${0.85 - j * 0.2}" stroke-width="${j === 0 ? 2.5 : 2}" stroke-dasharray="${j === 0 ? '' : '10 8'}"/>`).join('')}
         <circle class="hb-a-pulse" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r * 0.45).toFixed(1)}" fill="none" stroke="${col}" stroke-width="3" ${d(0.9 + k * 0.4)}/>
-        ${text(x, y + F.l * 0.36, low ? 'L' : 'H', F.l, `text-anchor="middle" font-weight="800" fill="${col}" ${halo}`)}
-        ${lab}</g>`;
+        ${text(gx, gy + F.l * 0.36, low ? 'L' : 'H', F.l, `text-anchor="middle" font-weight="800" fill="${col}" ${halo}`)}</g>`;
+      if (lab) labels += `<g class="hb-a-fade" ${d(0.5 + k * 0.4)}>${lab}</g>`;
     });
     // The links: who relays whom, and where the blame points.
+    const endAt = (e, p) => { const g = typeof e === 'string' && groupOf.get(e); return g ? [g.x, g.y] : [P.x(p.lon), P.y(p.lat)]; };
     links.forEach(({ l, a, z }, k) => {
-      const x1 = P.x(a.lon), y1 = P.y(a.lat), x2 = P.x(z.lon), y2 = P.y(z.lat);
+      const [x1, y1] = endAt(l.from, a), [x2, y2] = endAt(l.to, z);
+      if (Math.hypot(x2 - x1, y2 - y1) < 2) return;
       const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
       const cx = mx - dy * 0.12, cy = my + dx * 0.12;
       const col = { relay: C.relay, blame: C.critical, path: C.neutral, clean: C.ok }[l.style] || C.relay;
@@ -518,29 +619,47 @@ const HealthBulletin = (() => {
         stroke-width="${l.style === 'blame' ? 4 : 2.5}" stroke-opacity=".9" ${dash}/>`;
     });
     // The marks, worst last so they sit on top; labels placed where they fit.
-    const sorted = marks.slice().sort((m1, m2) => (order[m1.sev] || 0) - (order[m2.sev] || 0));
-    sorted.forEach((m, k) => {
-      const x = P.x(m.lon), y = P.y(m.lat), col = sevC(m.sev), r = markR;
-      const t0 = 0.8 + k * 0.12;
+    const sorted = groups.slice().sort((g1, g2) => (order[g1.m.sev] || 0) - (order[g2.m.sev] || 0));
+    sorted.forEach((g, k) => {
+      const m = g.m, x = g.x, y = g.y, col = sevC(m.sev), r = markR, n = g.members.length;
+      const t0 = 0.8 + Math.min(k, 16) * 0.12;
+      // The count in a badge, in the colour of the worst of the ones it holds.
+      const worst = g.members.reduce((w, o) => ((order[o.sev] || 0) > (order[w] || 0) ? o.sev : w), m.sev);
+      const names = g.members.map(o => o.label || (o.id && stationName(o.id)) || o.id).filter(Boolean);
+      const badge = n > 1 ? `<g transform="translate(${(r * 0.95).toFixed(1)} ${(-r * 0.95).toFixed(1)})"><circle r="${(F.xs * 0.72).toFixed(1)}" fill="${sevC(worst)}" stroke="${C.ground}" stroke-width="3"/>
+          ${text(0, F.xs * 0.3, String(n), Math.round(F.xs * 0.8), `text-anchor="middle" font-weight="800" fill="${C.ground}"`)}</g>` : '';
+      if (badge) badges += `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><g class="hb-a-pop" ${d(t0)}>${badge}</g></g>`;
       out += `<g class="hb-mark${m.id ? ' hb-hit' : ''}" ${m.id ? `data-stn="${escAttr(m.id)}"` : ''} transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">
         ${m.sev === 'critical' || m.sev === 'warn' ? `<circle class="hb-a-pulse" r="${r}" fill="none" stroke="${col}" stroke-width="3" ${d(t0 + 0.4)}/>` : ''}
         <g class="hb-a-pop" ${d(t0)}><circle r="${r}" fill="${C.ground}" stroke="${col}" stroke-width="3.5"/>${markIcon(m.kind, col, r * 0.62)}</g>
-        ${m.id ? `<title>${esc((m.label || stationName(m.id) || m.id) + ' — open it on this tab')}</title>` : ''}</g>`;
+        ${m.id || n > 1 ? `<title>${esc(n > 1 ? `${n} here: ${names.join(', ')}` : (m.label || stationName(m.id) || m.id) + ' — open it on this tab')}</title>` : ''}</g>`;
       if (m.label) {
-        const fs = F.s, w = m.label.length * fs * 0.56 + 8, h = fs * 1.25;
-        const tries = [[r + 8, fs * 0.36, 'start'], [-r - 8, fs * 0.36, 'end'], [0, -r - 10, 'middle'], [0, r + fs + 4, 'middle'],
-                       [r + 8, -r, 'start'], [r + 8, r + fs * 0.7, 'start'], [-r - 8, -r, 'end'], [-r - 8, r + fs * 0.7, 'end']];
-        for (const [ox, oy, anchor] of tries) {
+        const fs = F.s, w = m.label.length * fs * 0.58 + 8, h = fs * 1.25;
+        const near = [[r + 8, fs * 0.36, 'start'], [-r - 8, fs * 0.36, 'end'], [0, -r - 10, 'middle'], [0, r + fs + 4, 'middle'],
+                      [r + 8, -r, 'start'], [r + 8, r + fs * 0.7, 'start'], [-r - 8, -r, 'end'], [-r - 8, r + fs * 0.7, 'end']];
+        const spot = ([ox, oy, anchor], far) => {
           const lx = x + ox, x0 = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2, y0 = y + oy - fs;
-          const rect = { x0, y0, x1: x0 + w, y1: y0 + h };
-          if (!fits(rect)) continue;
-          placed.push(rect);
-          out += `<g class="hb-a-fade" ${d(t0 + 0.3)}>${text(lx, y + oy, m.label, fs, `text-anchor="${anchor}" font-weight="600" fill="${C.text}" ${halo}`)}</g>`;
-          break;
+          return { lx, ly: y + oy, anchor, far, rect: { x0, y0, x1: x0 + w, y1: y0 + h } };
+        };
+        // Beside its mark where nothing is and no isobar runs through it;
+        // else beside it anyway; else a step further out, on a leader line;
+        // and as a last resort where it first tried — a name is never lost.
+        const nearby = near.map(t => spot(t, false));
+        const further = near.map(([ox, oy, anchor]) => spot([ox * 2.2, oy === fs * 0.36 ? oy : oy * 2, anchor], true));
+        const inStage = p => p.rect.x0 >= 4 && p.rect.x1 <= W - 4 && p.rect.y0 >= 4 && p.rect.y1 <= H - L.foot;
+        const got = nearby.find(p => fits(p.rect) && !crosses(p.rect)) || nearby.find(p => fits(p.rect)) || further.find(p => fits(p.rect))
+          || nearby.find(inStage) || nearby[0];
+        placed.push(got.rect);
+        let lead = '';
+        if (got.far) {
+          const ex = got.anchor === 'start' ? got.rect.x0 - 3 : got.anchor === 'end' ? got.rect.x1 + 3 : got.lx, ey = got.ly - fs * 0.36;
+          const dl = Math.hypot(ex - x, ey - y) || 1;
+          lead = `<line x1="${(x + (ex - x) / dl * (r + 3)).toFixed(1)}" y1="${(y + (ey - y) / dl * (r + 3)).toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${C.muted}" stroke-width="1.5"/>`;
         }
+        labels += `<g class="hb-a-fade" ${d(t0 + 0.3)}>${lead}${text(got.lx, got.ly, m.label, fs, `text-anchor="${got.anchor}" font-weight="600" fill="${C.text}" ${halo}`)}</g>`;
       }
     });
-    out += scaleBar(P, box, F);
+    out += badges + labels + scaleBar(P, box, F);
     return out;
   }
   function projector(bb, box) {
@@ -638,48 +757,54 @@ const HealthBulletin = (() => {
   function drawBattery(s, b, L) {
     const { W, H, F, pad, narrow } = L;
     const items = (s.items || []).slice(0, 5);
-    const cols = narrow ? Math.min(3, items.length) : items.length, rows = Math.ceil(items.length / cols);
-    const cellW = (W - pad * 2) / cols, cellH = (H - L.foot - pad) / rows;
-    const LO = 11.4, HI = 13.2, frac = v => Math.max(0.03, Math.min(1, (v - LO) / (HI - LO)));
+    // Across the stage; on a phone three to a row, or two and two.
+    const cols = narrow ? (items.length === 4 ? 2 : Math.min(3, items.length)) : items.length, rows = Math.ceil(items.length / cols);
+    const nameMax = narrow ? 3 : 2;
+    const cellW = (W - pad * 2) / cols;
+    // Empty at 10.5 V (a flat lead-acid battery), full at 13.2 (on charge):
+    // 9.4 V reads as empty, 11.3 as low, not the same sliver.
+    const LO = 10.5, HI = 13.2, frac = v => Math.max(0.02, Math.min(1, (v - LO) / (HI - LO)));
+    // A battery and its words under it, as tall as the stage allows, the
+    // rows of them in the middle of the stage.
+    const textH = F.l + 8 + F.s * 1.4 + nameMax * F.s * 1.22 + 4 + 3 * F.xs * 1.3;
+    const avail = H - L.foot - 12 - pad * 0.6;
+    const bh = Math.max(110, Math.min(narrow ? 210 : 290, avail / rows - textH - 34));
+    const blockH = 20 + bh + textH;
+    const top0 = vtop(L, rows * blockH);
     let out = '';
     items.forEach((it, k) => {
-      const cx = pad + (k % cols) * cellW + cellW / 2, top = pad * 0.6 + Math.floor(k / cols) * cellH;
-      const bw = Math.min(narrow ? 130 : 120, cellW * 0.42), bh = Math.min(narrow ? 210 : 250, cellH * 0.5);
+      const cx = pad + (k % cols) * cellW + cellW / 2, top = top0 + Math.floor(k / cols) * blockH;
+      const bw = Math.min(narrow ? 130 : 130, cellW * 0.42);
       const x = cx - bw / 2, y = top + 20;
       const v = +it.v, first = Array.isArray(it.nights) && it.nights.length ? +it.nights[0] : v;
       const col = v <= 11.8 ? C.critical : v <= 12.2 ? C.warn : C.ok;
       const fNow = frac(v), fWas = frac(first);
       const fillH = (bh - 12) * fNow;
       const t0 = 0.4 + k * 0.35;
-      const line = (V, c, lab) => {
-        const yy = y + 6 + (bh - 12) * (1 - frac(V));
+      // The two thresholds, dashed; their values at the first battery, the
+      // upper one above its line and the lower one under its own, so the two
+      // never sit on each other.
+      const line = (V, c, lab, below) => {
+        const yy = y + 6 + (bh - 12) * (1 - frac(V)), ls = narrow ? Math.round(F.xs * 0.75) : F.xs;
         return `<line x1="${x - 10}" y1="${yy.toFixed(1)}" x2="${x + bw + 10}" y2="${yy.toFixed(1)}" stroke="${c}" stroke-width="2" stroke-dasharray="6 5"/>`
-          + (k === 0 && lab ? text(x - 14, yy + F.xs * 0.35, lab, F.xs, `text-anchor="end" fill="${c}"`) : '');
+          + (k === 0 && lab ? text(x - 14, below ? yy + ls * 0.95 : yy - ls * 0.2, lab, ls, `text-anchor="end" fill="${c}"`) : '');
       };
       out += `<g class="hb-a-fade" ${d(t0)}>
         <rect x="${(cx - bw * 0.18).toFixed(1)}" y="${y - 14}" width="${(bw * 0.36).toFixed(1)}" height="16" rx="4" fill="${C.muted}"/>
         <rect x="${x.toFixed(1)}" y="${y}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="14" fill="${C.ground}" stroke="${C.muted}" stroke-width="4"/>
         <rect class="hb-a-fill" x="${(x + 6).toFixed(1)}" y="${(y + bh - 6 - fillH).toFixed(1)}" width="${(bw - 12).toFixed(1)}" height="${fillH.toFixed(1)}" rx="9" fill="${col}"
           ${dd(t0 + 0.4, `--from:${(fWas / fNow).toFixed(3)}`)}/>
-        ${line(12.2, C.warn, '12.2 V')}${line(11.8, C.critical, '11.8 V')}
+        ${line(12.2, C.warn, '12.2 V', false)}${line(11.8, C.critical, '11.8 V', true)}
       </g>`;
-      // The night lows, a dot a night, under the battery.
-      const n = Array.isArray(it.nights) ? it.nights.slice(-14) : [];
       const ty = y + bh + F.l + 8;
       out += `<g class="hb-a-rise" ${d(t0 + 0.7)}>${text(cx, ty, `${fmt(v)} V`, F.l, `text-anchor="middle" font-weight="700" fill="${col}"`)}`;
-      const nameLines = wrap(it.name, charsFor(cellW - 16, F.s), 2);
+      const nameLines = wrap(it.name, charsFor(cellW - 40, F.s), nameMax);
       out += text(cx, ty + F.s * 1.4, '', F.s, `text-anchor="middle" fill="${C.text}" font-weight="600"`, nameLines);
       let yy = ty + F.s * 1.4 + nameLines.length * F.s * 1.22 + 4;
       if (it.trend != null && Math.abs(it.trend) >= 0.005) { out += text(cx, yy, `${it.trend < 0 ? '↘' : '↗'} ${fmt(Math.abs(it.trend), 2)} V a night`, F.xs, `text-anchor="middle" fill="${C.muted}"`); yy += F.xs * 1.3; }
       if (it.days_to != null) { out += text(cx, yy, `≈ ${Math.round(it.days_to)} day${Math.round(it.days_to) === 1 ? '' : 's'} to 11.8 V`, F.xs, `text-anchor="middle" fill="${C.warn}"`); yy += F.xs * 1.3; }
-      if (it.note) { out += text(cx, yy, '', F.xs, `text-anchor="middle" fill="${C.muted}"`, wrap(it.note, charsFor(cellW - 16, F.xs), 2)); }
+      if (it.note) { out += text(cx, yy, '', F.xs, `text-anchor="middle" fill="${C.muted}"`, wrap(it.note, charsFor(cellW - 16, F.xs), 3)); }
       out += '</g>';
-      if (n.length > 1) {
-        const sw = Math.min(bw * 1.6, cellW - 20), sx = cx - sw / 2, sy = y + bh + 6;
-        const pts = n.map((_, j) => sx + (j / (n.length - 1)) * sw);
-        out += `<g class="hb-a-fade" ${d(t0 + 0.9)}>${pts.map((px, j) => `<circle cx="${px.toFixed(1)}" cy="${(sy + 2).toFixed(1)}" r="${narrow ? 4 : 3.2}"
-          fill="${+n[j] <= 11.8 ? C.critical : +n[j] <= 12.2 ? C.warn : C.ok}" fill-opacity="${(0.35 + 0.65 * j / (n.length - 1)).toFixed(2)}"/>`).join('')}</g>`;
-      }
     });
     return out;
   }
@@ -689,16 +814,21 @@ const HealthBulletin = (() => {
   function drawChecks(s, b, L) {
     const { W, H, F, pad, narrow } = L;
     const items = (s.items || []).slice(0, 6);
-    const legendH = F.xs * (narrow ? 3.8 : 2.2);
-    const rowH = Math.min(narrow ? 120 : 92, (H - L.foot - pad - legendH) / Math.max(1, items.length));
+    const keyW = ([, lab]) => F.xs * 1.6 + lab.length * F.xs * 0.56 + 18;
+    const inUse = new Set(items.flatMap(it => [...String(it.strip || '')]));
+    const keyLines = (() => { let lines = 1, used = 0; ['H', 'P', 'M', 'N', 'U'].filter(c => inUse.has(c) || c === 'H').forEach(c => { const w = keyW([c, SLOT[c][0]]); if (used + w > W - pad * 2 && used) { lines++; used = 0; } used += w; }); return lines; })();
+    const legendH = keyLines * F.xs * 1.6 + 22;
+    const avail = H - L.foot - 12 - pad * 0.6;
+    const rowH = Math.min(narrow ? 130 : 104, (avail - legendH) / Math.max(1, items.length));
+    const top0 = vtop(L, items.length * rowH + legendH);
     const nameW = narrow ? 0 : 330;
     let out = '';
     items.forEach((it, k) => {
-      const y = pad * 0.6 + k * rowH, t0 = 0.3 + k * 0.45;
+      const y = top0 + k * rowH, t0 = 0.3 + k * 0.45;
       const strip = String(it.strip || '');
       const sx = pad + nameW, sw = W - pad * 2 - nameW - (narrow ? 0 : 110);
       const cy = narrow ? y + F.s * 1.3 + 8 : y + 18;
-      const cw = sw / Math.max(1, strip.length), ch = Math.min(narrow ? 40 : 38, rowH - (narrow ? F.s * 1.6 : 26));
+      const cw = sw / Math.max(1, strip.length), ch = Math.min(narrow ? 44 : 46, rowH - (narrow ? F.s * 1.6 + F.xs * 2.6 : 26 + F.xs * 1.8));
       out += `<g class="hb-a-fade" ${d(t0)}>${text(pad, narrow ? y + F.s : y + 18 + ch / 2 + F.s * 0.35, '', F.s, `fill="${C.text}" font-weight="600"`,
         wrap(it.name, narrow ? charsFor(W - pad * 2 - 120, F.s) : charsFor(nameW - 16, F.s), 1))}
         ${it.rate != null ? text(W - pad, narrow ? y + F.s : y + 18 + ch / 2 + F.s * 0.35, `${Math.round(it.rate * 100)}%`, F.m, `text-anchor="end" font-weight="700" fill="${it.rate >= 0.9 ? C.ok : it.rate >= 0.7 ? C.warn : C.critical}"`) : ''}</g>`;
@@ -714,19 +844,18 @@ const HealthBulletin = (() => {
       });
       if (it.note) out += `<g class="hb-a-fade" ${d(t0 + 1.2)}>${text(sx, cy + ch + F.xs + 4, '', F.xs, `fill="${C.muted}"`, wrap(it.note, charsFor(sw, F.xs), 1))}</g>`;
     });
-    // The key.
-    // The key, on as many lines as it takes.
-    const keys = ['H', 'P', 'M', 'N', 'U'].map(c => [c, ...SLOT[c]]);
-    const kw = ([, lab]) => F.xs * 1.6 + lab.length * F.xs * 0.56 + 18;
+    // The key, under the rows, on as many lines as it takes.
+    const keys = ['H', 'P', 'M', 'N', 'U'].filter(c => inUse.has(c) || c === 'H').map(c => [c, ...SLOT[c]]);
+    const kw = keyW;
     const krows = [[]]; let used = 0;
     keys.forEach(k => { if (used + kw(k) > W - pad * 2 && krows[krows.length - 1].length) { krows.push([]); used = 0; } krows[krows.length - 1].push(k); used += kw(k); });
     out += `<g class="hb-a-fade" ${d(0.2)}>`;
     krows.forEach((row, r) => {
-      const ky = H - L.foot - 14 - (krows.length - 1 - r) * F.xs * 1.6;
+      const ky = top0 + items.length * rowH + 22 + r * F.xs * 1.6;
       let kx = pad;
       row.forEach(k => {
         const [c, lab, col] = k;
-        out += `<rect x="${kx}" y="${ky - F.xs * 0.8}" width="${F.xs * 0.9}" height="${F.xs * 0.9}" rx="3" fill="${c === 'M' ? 'none' : col}" stroke="${col}" stroke-width="2"/>`
+        out += `<rect x="${kx}" y="${ky - F.xs * 0.8}" width="${F.xs * 0.9}" height="${F.xs * 0.9}" rx="3" fill="${c === 'M' ? 'none' : col}" fill-opacity="${c === 'U' ? 0.45 : 0.9}" stroke="${col}" stroke-width="${c === 'M' ? 2 : 0}"/>`
           + text(kx + F.xs * 1.3, ky, lab, F.xs, `fill="${C.muted}"`);
         kx += kw(k);
       });
@@ -741,13 +870,20 @@ const HealthBulletin = (() => {
     const fleet = (s.fleet || []).filter(Number.isFinite);
     const band = +s.band || 2.5;
     const ext = Math.max(5, ...items.map(it => Math.abs(+it.now) || 0), ...items.map(it => Math.abs(+it.was) || 0));
-    const R = Math.min(12, Math.ceil(ext + 0.5));
-    const ax0 = pad + 20, ax1 = W - pad - 20, ay = narrow ? 300 : 250;
+    // The axis reaches the farthest of them, up to ±30 ppm; anything past
+    // that sits at the end with an arrow saying it goes on.
+    const R = Math.min(30, Math.ceil(ext + 0.5));
+    const ax0 = pad + 20, ax1 = W - pad - 20, ay = narrow ? 250 : 230;
     const X = v => ax0 + (Math.max(-R, Math.min(R, v)) + R) / (2 * R) * (ax1 - ax0);
+    // The ones this scene is about count in the fleet too, when the fleet as
+    // written leaves them out (a transmitter far off its channel can be).
+    const extra = items.filter(it => Number.isFinite(+it.now) && !fleet.some(v => Math.abs(v - it.now) < 0.06));
+    const nAll = fleet.length + extra.length;
+    const inBand = fleet.filter(v => Math.abs(v) <= band).length + extra.filter(it => Math.abs(+it.now) <= band).length;
     let out = '';
     out += `<g class="hb-a-fade" ${d(0.1)}>
       <rect x="${X(-band).toFixed(1)}" y="${ay - 60}" width="${(X(band) - X(-band)).toFixed(1)}" height="100" fill="${C.ok}" fill-opacity=".08" stroke="${C.ok}" stroke-opacity=".35" stroke-dasharray="6 6"/>
-      ${text((X(-band) + X(band)) / 2, ay + 50 + F.xs * 2.4, `like the rest of the fleet: within ±${fmt(band)} ppm`, F.xs, `text-anchor="middle" fill="${C.ok}"`)}
+      ${text((X(-band) + X(band)) / 2, ay + 50 + F.xs * 2.4, fleet.length ? `${inBand.toLocaleString()} of ${nAll.toLocaleString()} transmitters within ±${fmt(band)} ppm` : `the fleet's usual: within ±${fmt(band)} ppm`, F.xs, `text-anchor="middle" fill="${C.ok}"`)}
       <line x1="${ax0}" y1="${ay + 40}" x2="${ax1}" y2="${ay + 40}" stroke="${C.muted}" stroke-width="2"/>
       ${[-R, -band, 0, band, R].map(v => `<line x1="${X(v).toFixed(1)}" y1="${ay + 40}" x2="${X(v).toFixed(1)}" y2="${ay + 50}" stroke="${C.muted}" stroke-width="2"/>`
         + text(X(v), ay + 50 + F.xs * 1.1, v === 0 ? '0' : `${signed(v, Number.isInteger(v) ? 0 : 1)}${Math.abs(v) === R ? ' ppm' : ''}`, F.xs,
@@ -770,18 +906,27 @@ const HealthBulletin = (() => {
       while (labRows.some(r => r.row === row && !(lx0 + lw < r.x0 || lx0 > r.x1))) row++;
       labRows.push({ row, x0: lx0, x1: lx0 + lw });
       const ly = ay - 76 - row * (F.s * 1.3);
-      out += `<g>${xw != null ? `<line x1="${xw.toFixed(1)}" y1="${ay - 64}" x2="${xw.toFixed(1)}" y2="${ay + 36}" stroke="${col}" stroke-width="3" stroke-dasharray="5 5" stroke-opacity=".7" class="hb-a-fade" ${d(t0)}/>
-          <path d="M${xw.toFixed(1)} ${ay - 8} L${xn.toFixed(1)} ${ay - 8}" stroke="${col}" stroke-width="3" marker-end="url(#hb-arr${k})" class="hb-a-draw" style="--d:${(t0 + 0.4).toFixed(2)}s;--len:${Math.ceil(Math.abs(xn - xw) + 10)}"/>
+      // Where it was, dashed, and an arrow to where it is — no arrow when it
+      // has barely moved: a squashed arrowhead says nothing.
+      const moved = xw != null && Math.abs(xn - xw) >= 24;
+      out += `<g>${xw != null ? `<line x1="${xw.toFixed(1)}" y1="${ay - 64}" x2="${xw.toFixed(1)}" y2="${ay + 36}" stroke="${col}" stroke-width="3" stroke-dasharray="5 5" stroke-opacity=".7" class="hb-a-fade" ${d(t0)}/>` : ''}
+        ${moved ? `<path d="M${xw.toFixed(1)} ${ay - 8} L${(xn + (xn > xw ? -10 : 10)).toFixed(1)} ${ay - 8}" stroke="${col}" stroke-width="3" marker-end="url(#hb-arr${k})" class="hb-a-draw" style="--d:${(t0 + 0.4).toFixed(2)}s;--len:${Math.ceil(Math.abs(xn - xw) + 10)}"/>
           <defs><marker id="hb-arr${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="${col}"/></marker></defs>` : ''}
         <g class="${xw != null ? 'hb-a-slide' : 'hb-a-pop'}" ${dd(t0 + 0.4, `--dx:${xw != null ? (xw - xn).toFixed(1) : 0}px`)}>
           <line x1="${xn.toFixed(1)}" y1="${ay - 64}" x2="${xn.toFixed(1)}" y2="${ay + 40}" stroke="${col}" stroke-width="6" stroke-linecap="round"/>
-          <circle cx="${xn.toFixed(1)}" cy="${ay - 64}" r="8" fill="${col}"/></g>
-        <g class="hb-a-fade" ${d(t0 + 1.0)}>${text(Math.max(ax0, Math.min(ax1, xn)), ly, `${it.name} ${signed(+it.now)} ppm`, F.s,
-          `text-anchor="${lanchor}" font-weight="700" fill="${col}" ${halo}`)}</g></g>`;
+          <circle cx="${xn.toFixed(1)}" cy="${ay - 64}" r="8" fill="${col}"/>
+          ${Math.abs(+it.now) > R ? `<path d="M${(xn + (it.now > 0 ? 10 : -10)).toFixed(1)} ${ay - 20} l${it.now > 0 ? 14 : -14} 12 l${it.now > 0 ? -14 : 14} 12 Z" fill="${col}"/>` : ''}</g>
+        <g class="hb-a-fade" ${d(t0 + 1.0)}><line x1="${xn.toFixed(1)}" y1="${(ly + 7).toFixed(1)}" x2="${xn.toFixed(1)}" y2="${ay - 74}" stroke="${col}" stroke-width="1.5" stroke-opacity=".6"/>
+          ${text(Math.max(ax0, Math.min(ax1, xn)), ly, `${it.name} ${signed(+it.now)} ppm`, F.s, `text-anchor="${lanchor}" font-weight="700" fill="${col}" ${halo}`)}</g></g>`;
       // Its days, as a line: the band shaded, the fleet's zero dotted.
       const ser = Array.isArray(it.series) ? it.series : [];
-      const top = ay + 50 + F.xs * 4.2 + k * (narrow ? 150 : 104), sx0 = pad, sx1 = W - pad;
-      const lineW = narrow ? sx1 - sx0 : (sx1 - sx0) * 0.58, rowH = narrow ? 70 : 64;
+      // On a phone each line has its note under it: as many rows as there
+      // are items, each as tall as the stage leaves.
+      const first = ay + 50 + F.xs * 4.2, pitch = narrow ? Math.min(150, (H - L.foot - 8 - first) / items.length)
+        : Math.min(88, (H - L.foot - 6 - first - 54) / Math.max(1, items.length - 1));
+      const noteN = narrow ? (pitch >= 140 ? 2 : 1) : 3;
+      const top = first + k * pitch, sx0 = pad, sx1 = W - pad;
+      const lineW = narrow ? sx1 - sx0 : (sx1 - sx0) * 0.58, rowH = narrow ? Math.max(34, Math.min(70, pitch - F.xs * 1.4 - noteN * F.xs * 1.22 - 8)) : 54;
       const vals = ser.filter(v => v != null && Number.isFinite(+v)).map(Number);
       if (top + rowH > H - L.foot) return;
       out += `<g class="hb-a-fade" ${d(t0 + 1.2)}>`;
@@ -796,11 +941,12 @@ const HealthBulletin = (() => {
         });
         out += `<rect x="${sx0}" y="${Y(band).toFixed(1)}" width="${lineW.toFixed(1)}" height="${(Y(-band) - Y(band)).toFixed(1)}" fill="${C.ok}" fill-opacity=".07"/>
           <line x1="${sx0}" y1="${Y(0).toFixed(1)}" x2="${(sx0 + lineW).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="${C.faint}" stroke-dasharray="3 5"/>
-          <path d="${p}" fill="none" stroke="${col}" stroke-width="3"/>`;
+          <path d="${p}" fill="none" stroke="${col}" stroke-width="3" stroke-opacity=".7"/>
+          ${ser.map((v, j) => (v == null || !Number.isFinite(+v) ? '' : `<circle cx="${(sx0 + j * step).toFixed(1)}" cy="${Y(+v).toFixed(1)}" r="${narrow ? 6 : 5}" fill="${col}"/>`)).join('')}`;
       }
       const nx = narrow ? sx0 : sx0 + lineW + 24;
       const ny = narrow ? top + rowH + F.xs * 1.2 : top + F.xs;
-      out += text(nx, ny, '', F.xs, `fill="${C.muted}"`, wrap(`${it.name}${it.note ? ' — ' + it.note : ''}`, charsFor(narrow ? W - pad * 2 : sx1 - nx, F.xs), narrow ? 1 : 3));
+      out += text(nx, ny, '', F.xs, `fill="${C.muted}"`, wrap(`${it.name}${it.note ? ' — ' + it.note : ''}`, charsFor(narrow ? W - pad * 2 : sx1 - nx, F.xs), noteN));
       out += '</g>';
     });
     return out;
@@ -811,33 +957,59 @@ const HealthBulletin = (() => {
     const { W, H, F, pad, narrow } = L;
     const subj = Object.assign({}, s.subject || {}), sus = (s.suspects || []).slice(0, 4).map(x => Object.assign({}, x));
     const rx = s.receiver ? Object.assign({}, s.receiver) : { name: 'Base station' };
-    [subj, ...sus].forEach(n => { if (n.lat == null && n.id) Object.assign(n, stationAt(n.id) || {}); });
+    // Where each one is, from the register; the name stays the bulletin's.
+    [subj, ...sus].forEach(n => {
+      const st = n.lat == null && n.id ? stationAt(n.id) : null;
+      if (st) { n.lat = st.lat; n.lon = st.lon; if (!n.name) n.name = st.name; }
+    });
     // The diagram on the left (the top, on a phone); the ruler on the right.
-    const dg = narrow ? { x: pad, y: pad * 0.6, w: W - pad * 2, h: 380 } : { x: pad, y: pad * 0.6, w: W * 0.5, h: H - L.foot - pad };
-    // Placed by where they are when every one has a position, else fanned out.
+    const dg = narrow ? { x: pad, y: pad * 0.6, w: W - pad * 2, h: 350 } : { x: pad, y: pad * 0.6, w: W * 0.5, h: H - L.foot - pad };
+    const nodeR = narrow ? 24 : 22;
+    const nodeBox = n => {
+      const lines = wrap(n.name || '', charsFor(narrow ? 240 : 200, F.xs), 3);
+      return { lines, w: Math.max(...lines.map(l => l.length)) * F.xs * 0.56 + 14, h: lines.length * F.xs * 1.22 + 8 };
+    };
     const nodes = [{ ...subj, role: 'subject' }, ...sus.map(x => ({ ...x, role: 'suspect' })), { ...rx, role: 'receiver' }];
-    if (nodes.every(n => Number.isFinite(n.lat) && Number.isFinite(n.lon))) {
+    // Each one's drawing — the mark and its name under it — as a box.
+    nodes.forEach(n => { const { w, h } = nodeBox(n); n.bw = Math.max(w, 2 * nodeR) + 16; n.bh = nodeR * 2 + h + 16; });
+    const clamp = n => { n.x = Math.max(dg.x + n.bw / 2, Math.min(dg.x + dg.w - n.bw / 2, n.x)); n.y = Math.max(dg.y + nodeR + 6, Math.min(dg.y + dg.h - n.bh + nodeR, n.y)); };
+    const clash = () => nodes.some((a, i) => nodes.some((c, j) => j > i && (a.bw + c.bw) / 2 - Math.abs(c.x - a.x) > 1 && (a.bh + c.bh) / 2 - Math.abs(c.y - a.y) > 1));
+    // Placed by where they are when every one has a position and their names
+    // can be got clear of each other; else as a diagram — the station at the
+    // left, the repeaters down the middle, the receiver at the right.
+    let geo = nodes.every(n => Number.isFinite(n.lat) && Number.isFinite(n.lon));
+    if (geo) {
       const bb = nodes.reduce((o, p) => ({ s: Math.min(o.s, p.lat), n: Math.max(o.n, p.lat), w: Math.min(o.w, p.lon), e: Math.max(o.e, p.lon) }), { s: 90, n: -90, w: 180, e: -180 });
       const padL = Math.max(0.05, (bb.n - bb.s) * 0.2), padO = Math.max(0.05, (bb.e - bb.w) * 0.2);
       const P = projector({ s: bb.s - padL, n: bb.n + padL, w: bb.w - padO, e: bb.e + padO }, { x: dg.x + 30, y: dg.y + 40, w: dg.w - 60, h: dg.h - 80 });
       nodes.forEach(n => { n.x = P.x(n.lon); n.y = P.y(n.lat); });
-      // Pull apart any two drawn on top of each other — a repeater on the
-      // hill above the base station is a few kilometres from it — keeping
-      // all of them inside the diagram.
-      const gapMin = narrow ? 150 : 140;
-      for (let pass = 0; pass < 12; pass++) {
+      // Pull apart any two whose boxes overlap (a repeater on the hill above
+      // the base station is a few kilometres from it), along whichever way
+      // frees them sooner, keeping all of them inside the diagram.
+      for (let pass = 0; pass < 30; pass++) {
+        let moved = false;
         for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-          const a = nodes[i], c = nodes[j], dx = c.x - a.x, dy = c.y - a.y, dist = Math.hypot(dx, dy);
-          if (dist >= gapMin) continue;
-          const push = (gapMin - dist) / 2, ux = dist ? dx / dist : 1, uy = dist ? dy / dist : 0.3;
-          a.x -= ux * push; a.y -= uy * push; c.x += ux * push; c.y += uy * push;
+          const a = nodes[i], c = nodes[j];
+          const ox = (a.bw + c.bw) / 2 - Math.abs(c.x - a.x), oy = (a.bh + c.bh) / 2 - Math.abs(c.y - a.y);
+          if (ox <= 0 || oy <= 0) continue;
+          moved = true;
+          if (ox < oy * 1.4) { const sx = (c.x >= a.x ? 1 : -1) * ox / 2; a.x -= sx; c.x += sx; }
+          else { const sy = (c.y >= a.y ? 1 : -1) * oy / 2; a.y -= sy; c.y += sy; }
         }
-        nodes.forEach(n => { n.x = Math.max(dg.x + 70, Math.min(dg.x + dg.w - 70, n.x)); n.y = Math.max(dg.y + 30, Math.min(dg.y + dg.h - 60, n.y)); });
+        nodes.forEach(clamp);
+        if (!moved) break;
       }
-    } else {
-      nodes[0].x = dg.x + 60; nodes[0].y = dg.y + dg.h / 2;
-      sus.forEach((_, k) => { const n = nodes[k + 1]; n.x = dg.x + dg.w / 2; n.y = dg.y + 40 + (k + 0.5) * (dg.h - 80) / sus.length; });
-      const last = nodes[nodes.length - 1]; last.x = dg.x + dg.w - 90; last.y = dg.y + dg.h / 2;
+      geo = !clash();
+    }
+    if (!geo) {
+      const S0 = nodes[0], R0 = nodes[nodes.length - 1], mid = nodes.slice(1, -1);
+      S0.x = dg.x + S0.bw / 2; R0.x = dg.x + dg.w - R0.bw / 2;
+      const stackH = mid.reduce((n, o) => n + o.bh, 0), gapY = Math.max(0, (dg.h - stackH) / (mid.length + 1));
+      let yy = dg.y + gapY;
+      mid.forEach(o => { o.x = dg.x + dg.w / 2; o.y = yy + nodeR; yy += o.bh + gapY; });
+      const midY = mid.length ? (mid[0].y + mid[mid.length - 1].y) / 2 : dg.y + dg.h / 2;
+      S0.y = midY; R0.y = midY;
+      nodes.forEach(clamp);
     }
     const S = nodes[0], R = nodes[nodes.length - 1], SUS = nodes.slice(1, -1);
     const matched = SUS.find(n => n.match === true);
@@ -858,13 +1030,16 @@ const HealthBulletin = (() => {
     }
     if (matched) out += `<g class="hb-a-draw" style="--d:7.2s;--len:${Math.ceil(Math.hypot(matched.x - R.x, matched.y - R.y) + 4)}">${seg(matched, R, C.critical, 6, 'stroke-linecap="round"')}</g>`;
     const node = (n, shape, col, t) => {
-      const r = narrow ? 24 : 22;
+      const r = nodeR;
       const g = shape === 'tri' ? `<path d="M0 ${-r} L${r} ${r * 0.8} L${-r} ${r * 0.8} Z" fill="${C.ground}" stroke="${col}" stroke-width="4"/>`
         : shape === 'mast' ? `<rect x="${-r}" y="${-r}" width="${r * 2}" height="${r * 2}" rx="6" fill="${C.ground}" stroke="${col}" stroke-width="4"/>${markIcon('receiver', col, r * 0.7)}`
         : `<circle r="${r}" fill="${C.ground}" stroke="${col}" stroke-width="4"/>${markIcon('sensor', col, r * 0.55)}`;
-      const lines = wrap(n.name || '', charsFor(narrow ? 220 : 180, F.xs), 2);
+      // The name on a patch of the stage's own ground, so no line runs
+      // through it.
+      const { lines, w: lw, h: lh } = nodeBox(n);
       return `<g class="${n.id ? 'hb-hit' : ''}" ${n.id ? `data-stn="${escAttr(n.id)}"` : ''} transform="translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})"><g class="hb-a-pop" ${d(t)}>${g}
-        ${text(0, r + F.xs + 6, '', F.xs, `text-anchor="middle" font-weight="600" fill="${C.text}" ${halo}`, lines)}</g></g>`;
+        <rect x="${(-lw / 2).toFixed(1)}" y="${(r + 12).toFixed(1)}" width="${lw.toFixed(1)}" height="${lh.toFixed(1)}" rx="6" fill="${C.ground}"/>
+        ${text(0, r + 14 + F.xs, '', F.xs, `text-anchor="middle" font-weight="600" fill="${C.text}"`, lines)}</g></g>`;
     };
     out += node(S, 'dot', C.info, 0.4) + node(R, 'mast', C.accent, 0.5);
     SUS.forEach((n, k) => {
@@ -873,7 +1048,7 @@ const HealthBulletin = (() => {
         <circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="30" fill="none" stroke="${C.critical}" stroke-width="5" class="hb-a-pop" ${d(7.2)}/>`;
     });
     // The ruler: each suspect's carrier as heard here, and the copy's.
-    const rl = narrow ? { x: pad, y: 470, w: W - pad * 2 } : { x: W * 0.58, y: 200, w: W * 0.42 - pad };
+    const rl = narrow ? { x: pad + 10, y: 510, w: W - pad * 2 - 20 } : { x: W * 0.58, y: 200, w: W * 0.42 - pad };
     const hzs = SUS.map(n => +n.hz).filter(Number.isFinite);
     const ev = s.evidence || {};
     if (Number.isFinite(+ev.hz)) hzs.push(+ev.hz);
@@ -881,19 +1056,43 @@ const HealthBulletin = (() => {
       const lo = Math.min(...hzs), hi = Math.max(...hzs), span = Math.max(80, hi - lo);
       const a = lo - span * 0.25, z = hi + span * 0.25;
       const X = v => rl.x + (v - a) / (z - a) * rl.w;
-      out += `<g class="hb-a-fade" ${d(4.6)}>${text(rl.x, rl.y - 70, 'Carrier as heard here', F.s, `font-weight="700" fill="${C.text}"`)}
-        <line x1="${rl.x}" y1="${rl.y}" x2="${rl.x + rl.w}" y2="${rl.y}" stroke="${C.muted}" stroke-width="2"/>
-        ${text(rl.x, rl.y + F.xs * 1.4, `${Math.round(a)} Hz`, F.xs, `fill="${C.faint}"`)}${text(rl.x + rl.w, rl.y + F.xs * 1.4, `${Math.round(z)} Hz`, F.xs, `text-anchor="end" fill="${C.faint}"`)}</g>`;
-      SUS.forEach((n, k) => {
-        if (!Number.isFinite(+n.hz)) return;
+      // A label at its mark, kept inside the ruler: from the mark rightwards
+      // near the left end, leftwards near the right end.
+      const reach = (x, str, size, lines) => {
+        const w = Math.max(...(lines || [str]).map(l => l.length)) * size * 0.56;
+        const anchor = x - w / 2 < rl.x ? 'start' : x + w / 2 > rl.x + rl.w ? 'end' : 'middle';
+        const lx = anchor === 'start' ? Math.max(rl.x, x - 12) : anchor === 'end' ? Math.min(rl.x + rl.w, x + 12) : x;
+        return { anchor, lx, x0: anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2, x1: anchor === 'start' ? lx + w : anchor === 'end' ? lx : lx + w / 2 };
+      };
+      const atMark = (x, str, y, size, attrs, lines) => {
+        const sp = reach(x, str, size, lines);
+        return text(sp.lx, y, str, size, `text-anchor="${sp.anchor}" ${attrs}`, lines);
+      };
+      // Each suspect's name and carrier over its mark; one that would run
+      // into another's goes a line higher.
+      const hz = v => `${Math.round(v)}`.replace('-', '−');
+      const taken = [];
+      const shown = SUS.filter(n => Number.isFinite(+n.hz)).map(n => {
+        const name = `${n.name ? wrap(n.name, 26, 1)[0] : ''} · ${hz(+n.hz)} Hz`, sp = reach(X(+n.hz), name, F.xs);
+        let row = 0;
+        while (taken.some(t => t.row === row && !(sp.x1 + 10 < t.x0 || sp.x0 > t.x1 + 10))) row++;
+        taken.push({ row, x0: sp.x0, x1: sp.x1 });
+        return { n, name, row };
+      });
+      // The heading clear of however many lines the names took.
+      const rows = taken.reduce((m, t) => Math.max(m, t.row), 0);
+      out += `<g class="hb-a-fade" ${d(4.6)}>${text(rl.x, rl.y - 76 - rows * F.xs * 1.3, 'Carrier as heard here', F.s, `font-weight="700" fill="${C.text}"`)}
+        <line x1="${rl.x}" y1="${rl.y}" x2="${rl.x + rl.w}" y2="${rl.y}" stroke="${C.muted}" stroke-width="2"/></g>`;
+      shown.forEach(({ n, name, row }, k) => {
         const x = X(+n.hz), col = matched === n ? C.critical : C.neutral;
         out += `<g class="hb-a-pop" ${d(5.0 + k * 0.3)}><path d="M${x.toFixed(1)} ${rl.y} l-10 -24 h20 Z" fill="${col}"/>
-          ${text(x, rl.y - 32 - (k % 2) * (F.xs * 1.2), n.name ? wrap(n.name, 26, 1)[0] : '', F.xs, `text-anchor="middle" fill="${col}" ${halo}`)}</g>`;
+          ${row ? `<line x1="${x.toFixed(1)}" y1="${rl.y - 26}" x2="${x.toFixed(1)}" y2="${(rl.y - 30 - row * F.xs * 1.3).toFixed(1)}" stroke="${col}" stroke-width="1.5" stroke-opacity=".6"/>` : ''}
+          ${atMark(x, name, rl.y - 32 - row * F.xs * 1.3, F.xs, `fill="${col}" ${halo}`)}</g>`;
       });
       if (Number.isFinite(+ev.hz)) {
         const x = X(+ev.hz);
         out += `<g class="hb-a-rise" ${d(6.4)}><path d="M${x.toFixed(1)} ${rl.y + 4} l-12 28 h24 Z" fill="${C.critical}"/>
-          ${text(x, rl.y + 56, '', F.xs, `text-anchor="middle" font-weight="700" fill="${C.critical}" ${halo}`, wrap(ev.what || 'the corrupted copies', 22, 2))}</g>`;
+          ${atMark(x, '', rl.y + 56, F.xs, `font-weight="700" fill="${C.critical}" ${halo}`, wrap(ev.what || 'the corrupted copies', 32, 2))}</g>`;
       }
     }
     if (s.verdict) {
@@ -907,13 +1106,18 @@ const HealthBulletin = (() => {
   function drawReceivers(s, b, L) {
     const { W, H, F, pad, narrow } = L;
     const items = (s.items || []).slice(0, 5);
-    const rowH = Math.min(narrow ? 170 : 150, (H - L.foot - pad) / Math.max(1, items.length));
+    const avail = H - L.foot - 12 - pad * 0.6;
+    // A key under the rows: what each colour of hour means.
+    const key = [[C.ok, '90–100%'], [C.warn, '40–90%'], [C.critical, 'under 40%'], [C.grid, 'no data']];
+    const keyH = F.xs * 1.6 + 18;
+    const rowH = Math.min(narrow ? 180 : 165, (avail - keyH) / Math.max(1, items.length));
+    const top0 = vtop(L, items.length * rowH + keyH);
     const from = Date.parse((b.period || {}).from);
     let out = '';
     items.forEach((it, k) => {
       const up = Array.isArray(it.up) ? it.up : [];
-      const y = pad * 0.6 + k * rowH, t0 = 0.3 + k * 0.4;
-      const x0 = pad, w = W - pad * 2, ch = Math.max(30, Math.min(narrow ? 60 : 56, rowH - F.s * 1.6 - F.xs * 2.2)), cy = y + F.s * 1.5;
+      const y = top0 + k * rowH, t0 = 0.3 + k * 0.4;
+      const x0 = pad, w = W - pad * 2, ch = Math.max(30, Math.min(narrow ? 70 : 76, rowH - F.s * 1.6 - F.xs * (narrow ? 3.6 : 2.4))), cy = y + F.s * 1.5;
       const cw = w / Math.max(1, up.length);
       const known = up.filter(v => v != null && Number.isFinite(+v));
       const share = known.length ? known.reduce((n, v) => n + +v, 0) / known.length : null;
@@ -934,12 +1138,22 @@ const HealthBulletin = (() => {
           const x = x0 + j * cw;
           const lab = per === 'day' ? t.toLocaleDateString(undefined, { weekday: 'short' }) : `${String(t.getHours()).padStart(2, '0')}:00`;
           out += `<g class="hb-a-fade" ${d(t0 + 0.6)}><line x1="${x.toFixed(1)}" y1="${cy - 4}" x2="${x.toFixed(1)}" y2="${cy + ch + 4}" stroke="${C.ground}" stroke-width="2"/>
-            ${k === items.length - 1 || narrow ? text(x + 3, cy + ch + F.xs + 2, lab, F.xs, `fill="${C.faint}"`) : ''}</g>`;
+            ${k === items.length - 1 || narrow ? text(x > x0 + w - F.xs * 3 ? x - 3 : x + 3, cy + ch + F.xs + 2, lab, F.xs, `fill="${C.faint}"${x > x0 + w - F.xs * 3 ? ' text-anchor="end"' : ''}`) : ''}</g>`;
         }
       }
       // On a phone the note has a line of its own, under the hours.
       if (it.note && narrow) out += `<g class="hb-a-fade" ${d(t0 + 1)}>${text(x0, cy + ch + F.xs * 2.5, '', F.xs, `fill="${C.muted}"`, wrap(it.note, charsFor(w, F.xs), 1))}</g>`;
     });
+    if (items.length) {
+      const ky = top0 + items.length * rowH + F.xs + 8;
+      let kx = pad;
+      out += `<g class="hb-a-fade" ${d(0.2)}>` + key.map(([col, lab]) => {
+        const g = `<rect x="${kx}" y="${(ky - F.xs * 0.8).toFixed(1)}" width="${F.xs * 0.9}" height="${F.xs * 0.9}" rx="3" fill="${col}" fill-opacity="${col === C.grid ? 0.6 : 0.9}"${col === C.grid ? ` stroke="${C.faint}" stroke-width="1.5"` : ''}/>`
+          + text(kx + F.xs * 1.3, ky, lab, F.xs, `fill="${C.muted}"`);
+        kx += F.xs * 1.3 + lab.length * F.xs * 0.5 + 22;
+        return g;
+      }).join('') + '</g>';
+    }
     return out;
   }
 
@@ -971,7 +1185,11 @@ const HealthBulletin = (() => {
         p += `${pen ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; pen = true; last = [x, y];
       });
       out += `<rect x="${lx}" y="${top}" width="${lw}" height="${(bot - top).toFixed(1)}" fill="${C.ground}" fill-opacity=".45" rx="8"/>`;
-      if (se.baseline != null) out += `<line x1="${lx}" y1="${Y(+se.baseline).toFixed(1)}" x2="${lx + lw}" y2="${Y(+se.baseline).toFixed(1)}" stroke="${C.faint}" stroke-dasharray="6 6"/>`;
+      if (se.baseline != null) out += `<line x1="${lx}" y1="${Y(+se.baseline).toFixed(1)}" x2="${lx + lw}" y2="${Y(+se.baseline).toFixed(1)}" stroke="${C.faint}" stroke-dasharray="6 6"/>
+        ${text(lx + lw - 8, Y(+se.baseline) - 7, `${fmtStat(+se.baseline)}${se.unit ? ' ' + se.unit : ''}`, F.xs, `text-anchor="end" fill="${C.faint}"`)}`;
+      // The highest and lowest of the line, so its swing has a size.
+      const vmax = Math.max(...vals), vmin = Math.min(...vals);
+      out += `<g class="hb-a-fade" ${d(t0 + 0.4)}>${text(lx + 8, Y(vmax) + F.xs * 0.35, `${fmtStat(vmax)}`, F.xs, `fill="${C.muted}" ${halo}`)}${vmin !== vmax ? text(lx + 8, Y(vmin) + F.xs * 0.35, `${fmtStat(vmin)}`, F.xs, `fill="${C.muted}" ${halo}`) : ''}</g>`;
       out += `<path d="${p}" fill="none" stroke="${col}" stroke-width="4" stroke-linejoin="round" class="hb-a-draw" style="--d:${(t0 + 0.3).toFixed(2)}s;--len:${Math.ceil(len + 20)};--dur:1.8s"/>`;
       if (last) out += `<circle class="hb-a-pop" ${d(t0 + 2.1)} cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="7" fill="${col}"/>`;
       const labs = [0, Math.floor((pts.length - 1) / 2), pts.length - 1].filter((v, i, a) => a.indexOf(v) === i);
@@ -989,13 +1207,16 @@ const HealthBulletin = (() => {
     // As big as fits: shrink the type until every line of every item does.
     let fs = F.l, laid;
     for (;;) {
-      const chars = charsFor(W - pad * 2 - fs * 2.2, fs);
-      laid = items.map(it => wrap(it.text, chars, 4));
+      // Plain text runs about half an em a character; the 0.54 the rest of
+      // the stage allows for labels in bold left a third of the line empty.
+      const chars = Math.max(8, Math.floor((W - pad * 2 - fs * 1.6) / (fs * 0.53)));
+      laid = items.map(it => wrap(it.text, chars, 5));
       const need = laid.reduce((n, ls) => n + ls.length * fs * 1.22 + fs * 0.9, 0);
       if (need <= avail || fs <= F.xs) break;
       fs -= 2;
     }
-    let y = pad * 0.6 + fs, out = '';
+    const need = laid.reduce((n, ls) => n + ls.length * fs * 1.22 + fs * 0.9, 0) - fs * 0.9;
+    let y = vtop(L, need) + fs, out = '';
     items.forEach((it, k) => {
       const col = sevC(it.sev), t0 = 0.4 + k * 0.7;
       out += `<g class="hb-a-rise${it.id ? ' hb-hit' : ''}" ${it.id ? `data-stn="${escAttr(it.id)}"` : ''} ${d(t0)}>
@@ -1260,7 +1481,9 @@ const HealthBulletin = (() => {
       const w = entries[0] && entries[0].contentRect.width;
       if (!w) return;
       B.narrow = w < NARROW_PX;
-      if (B.narrow === B.drawnNarrow) return;
+      B.stageW = w;
+      const k = !B.narrow ? Math.min(1.25, Math.max(1, Math.round(20 * 1000 / w) / 20)) : 1;
+      if (B.narrow === B.drawnNarrow && k === B.drawnK) return;
       const b = current(), box = document.getElementById('hb-svgbox');
       if (!b || !box) return;
       box.innerHTML = sceneSvg(b, B.scene);
@@ -1284,7 +1507,7 @@ const HealthBulletin = (() => {
   return {
     render, init, stop, adopt, refresh: () => { B.index = null; B.indexErr = ''; B.files.clear(); resetPlay(); redraw(); loadIndex(); },
     play, pause, toggle, go, next, prev, setKind, pick, toggleHidden, toggleSpeak, key, stageClick, open,
-    ROSTER, _draw: (s, b, narrow) => { const was = B.narrow; B.narrow = !!narrow; try { return sceneSvg(Object.assign({ scenes: [s] }, b || {}), 0); } finally { B.narrow = was; } },
+    ROSTER, _draw: (s, b, narrow) => { const was = B.narrow; B.narrow = !!narrow; try { return sceneSvg(Object.assign({}, b || {}, { scenes: [s] }), 0); } finally { B.narrow = was; } },
     _state: () => ({ kind: B.kind, scene: B.scene, playing: B.playing, ended: B.ended, file: currentFile(), speak: B.speak, hidden: B.hidden }),
   };
 })();

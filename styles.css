@@ -18999,14 +18999,14 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-followup input { flex: 1 1 18rem; min-width: 0; }
 
 /* ── 📺 Network Weather (health-bulletin.js) ──────────────────────────────────
-   The bulletin at the top of Station Health: a stage, the presenter beside it,
-   the scenes as a bar under it, the narration, the controls. The stage keeps
-   its own studio colours in either theme — a weather map is the same map in a
-   light page and a dark one — and the panel round it follows the theme as
-   every panel does. The stage's height is the drawing's own (its viewBox), so
-   a phone's tall drawing and a desk's wide one need no rule here. Below `sm`
-   the presenter steps out of the rail and into the caption, as a face beside
-   the words. */
+   The bulletin at the top of Station Health: the stage across the panel, the
+   scenes as a bar under it, then the presenter — a small portrait at the left
+   — beside what they are saying, in a bubble with the scene's stations under
+   it, then the controls. The stage keeps its own studio colours in either
+   theme — a weather map is the same map in a light page and a dark one — and
+   the panel round it follows the theme as every panel does. The stage's height
+   is the drawing's own (its viewBox), so a phone's tall drawing and a desk's
+   wide one need no rule here; below `sm` the portrait is smaller. */
 .hb { --hb-ground: #0b2234; --hb-ink: #f2f7fb; --hb-accent: #5fb4ff; }
 .hb-head h2 { display: flex; align-items: center; gap: .4rem; }
 .hb-tools { align-items: center; }
@@ -19016,7 +19016,6 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hb-pick select { max-width: 13rem; }
 .hb-folded, .hb-note { margin: 0; }
 .hb-issued { margin: 0 0 var(--sp-2); color: var(--muted); }
-.hb-studio { display: grid; grid-template-columns: minmax(0, 1fr) clamp(170px, 21%, 250px); gap: var(--sp-3); align-items: end; }
 .hb-stage { position: relative; border-radius: 14px; overflow: hidden; background: var(--hb-ground); cursor: pointer;
   box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 22px rgba(5,18,30,.25); container-type: inline-size; }
 .hb-stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
@@ -19033,7 +19032,9 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hb-sev--critical { background: #ff6b6b; }
 .hb-sev--warn { background: #ffb84d; }
 .hb-sev--ok { background: #43dc9e; }
-.hb-bigplay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
+/* ▶ sits where the lower third goes — every scene keeps that corner clear —
+   so it never covers the headline or the numbers. */
+.hb-bigplay { position: absolute; left: 14px; bottom: 14px; z-index: 2;
   display: inline-flex; gap: .55rem; align-items: center; white-space: nowrap;
   padding: .8rem 1.4rem; border-radius: 999px; border: 2px solid var(--hb-accent);
   background: rgba(5,19,31,.9); color: var(--hb-ink); font-size: clamp(1rem, 2.6cqi, 1.25rem); font-weight: 700;
@@ -19041,17 +19042,20 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hb-bigplay:hover, .hb-bigplay:focus-visible { background: #0f3a59; }
 .hb-stage:has(.hb-bigplay) .hb-lower { display: none; }
 @media (max-width: 700px) {
-  .hb-bigplay { top: auto; bottom: 10px; left: 10px; transform: none; padding: .6rem 1.05rem; }
+  .hb-bigplay { bottom: 10px; left: 10px; padding: .6rem 1.05rem; }
 }
-.hb-rail { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
-.hb-presenter { margin: 0; position: relative; border-radius: 14px; overflow: hidden; background: var(--hb-ground); }
+.hb-anchor { display: flex; gap: var(--sp-3); align-items: flex-start; margin-top: var(--sp-2); }
+.hb-presenter { margin: 0; flex: none; width: 112px; border-radius: 12px; overflow: hidden; background: var(--hb-ground); }
 .hb-presenter img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; transform-origin: 50% 100%; }
 .hb-presenter img.is-talking { animation: hb-talk 2.6s ease-in-out infinite; }
-.hb-presenter figcaption { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column;
-  padding: 1.6rem .7rem .55rem; background: linear-gradient(transparent, rgba(4,16,27,.94) 55%); color: var(--hb-ink); line-height: 1.2; }
-.hb-presenter figcaption span { font-size: var(--fs-xs); color: #b9d3e6; }
-.hb-chips { display: flex; flex-wrap: wrap; gap: .25rem; align-items: center; }
-.hb-chips-k { color: var(--muted); width: 100%; }
+/* What the presenter is saying: a bubble pointing back at them. */
+.hb-words { position: relative; flex: 1 1 auto; min-width: 0; min-height: 6.4rem; box-sizing: border-box;
+  padding: .55rem .85rem .65rem; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-sub); }
+.hb-words::before { content: ""; position: absolute; left: -8px; top: 26px; width: 14px; height: 14px;
+  background: var(--panel-sub); border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); transform: rotate(45deg); }
+.hb-chips { display: flex; flex-wrap: wrap; gap: .25rem; align-items: center; margin-top: .4rem; }
+.hb-chips:empty { display: none; }
+.hb-chips-k { color: var(--muted); }
 .hb-bar { display: flex; gap: 3px; margin-top: var(--sp-2); }
 .hb-seg { position: relative; flex: var(--f, 1) 1 0; height: 22px; min-width: 8px; padding: 0; border: 0; background: none; cursor: pointer; }
 .hb-seg::before, .hb-seg-fill { content: ""; position: absolute; left: 0; top: 7px; height: 8px; border-radius: 4px; }
@@ -19059,24 +19063,27 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hb-seg-fill { width: var(--p, 0%); background: var(--accent); transition: width .12s linear; }
 .hb-seg.is-on::before { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .hb-seg:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
-.hb-caption { display: flex; gap: var(--sp-2); align-items: flex-start; min-height: 4.6em; margin-top: var(--sp-1); }
-.hb-caption p { margin: 0; font-size: 1.06rem; line-height: 1.5; max-width: 78ch; }
+.hb-caption p { margin: 0; }
+.hb-caption .hb-who { display: flex; flex-wrap: wrap; gap: 0 .5rem; align-items: baseline; margin-bottom: .15rem; }
+.hb-who span { font-size: var(--fs-xs); color: var(--muted); }
+.hb-say { font-size: 1.06rem; line-height: 1.5; max-width: 82ch; }
 .hb-speaker { font-weight: 700; color: var(--accent); }
 .hb-w { opacity: .26; transition: opacity .22s ease-out; }
 .hb-w.is-said { opacity: 1; }
-.hb-avatar { display: none; width: 52px; height: 65px; object-fit: cover; border-radius: 10px; flex: none; }
 .hb-controls { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin-top: var(--sp-2); }
 .hb-btn { min-width: 2.6rem; }
+.hb-ico { display: inline-block; font-size: 1.35em; line-height: 1; vertical-align: -0.1em; }
 .hb-btn--main { min-width: 6.5rem; }
 .hb-clock { color: var(--muted); font-variant-numeric: tabular-nums; }
 .hb-transcript { margin-top: var(--sp-2); }
 .hb-transcript ol { padding-left: 1.3rem; display: grid; gap: .35rem; max-width: 80ch; line-height: 1.45; }
 .hb-foot { color: var(--muted); margin: var(--sp-2) 0 0; }
 @media (max-width: 700px) {
-  .hb-studio { grid-template-columns: minmax(0, 1fr); }
-  .hb-presenter { display: none; }
-  .hb-avatar { display: block; }
-  .hb-caption p { font-size: 1rem; }
+  .hb-anchor { gap: var(--sp-2); }
+  .hb-presenter { width: 64px; border-radius: 10px; }
+  .hb-words { min-height: 0; padding: .45rem .65rem .55rem; }
+  .hb-words::before { top: 18px; }
+  .hb-say { font-size: 1rem; }
 }
 
 /* The stage's motion. Every element is drawn at its finished state; each

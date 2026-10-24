@@ -28,6 +28,8 @@
 //     bulletin where it is — the same stage, still playing
 //   * a station named in the scene opens on the tab below
 //   * Today and This week; Hide is remembered; no bulletin yet says so
+//   * the stage across the panel, 16:9; the presenter under it at the left,
+//     small, beside the words
 //   * a phone: drawn tall, the presenter beside the words, no sideways scroll;
 //     reduced motion: nothing moves and the scene stands complete
 //
@@ -186,6 +188,21 @@ console.log('Every scene drawn');
       bad.push(`${b.id} ${s.type}${narrow ? ' (tall)' : ''}: ${(svg.match(/NaN|undefined|could not be drawn[^<]*/) || [''])[0]}`);
   }
   ok(`every scene of ${all.length} bulletins draws, wide and tall, with no NaN or undefined in it`, !bad.length, bad.join('\n         '));
+  // Stations on top of one another on a map — twenty behind one repeater —
+  // become one mark with a count, the named one keeping its name.
+  const pile = { type: 'map', title: 'A pile', say: 'x', secs: 8, marks: [
+    ...Array.from({ length: 6 }, (_, k) => ({ lat: -27.6 + k * 0.0005, lon: 152.9, kind: 'silent', sev: 'warn' })),
+    { lat: -27.6, lon: 152.9, kind: 'repeater', sev: 'warn', label: 'The repeater' },
+    { lat: -28.4, lon: 153.4, kind: 'silent', sev: 'info', label: 'Far away' }] };
+  const map = HB._draw(pile, FIXTURE, false);
+  const drawn = (map.match(/class="hb-mark/g) || []).length;
+  ok('stations drawn on top of each other become one mark with a count', drawn === 2 && />7<\/tspan>/.test(map) && /The repeater/.test(map), `${drawn} marks`);
+  // A title tile's label is shown whole, on two lines when it needs them.
+  const title = Object.assign({}, FIXTURE.scenes.find(s => s.type === 'title'));
+  const tiles = Object.assign({}, FIXTURE, { stats: [{ label: 'quiet stations that keep a schedule', value: 26 }, ...FIXTURE.stats.slice(1)] });
+  const card = HB._draw(title, tiles, false);
+  const labLines = (card.match(/<tspan[^>]*>([^<]*)<\/tspan>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).filter(t => /quiet stations|schedule/.test(t));
+  ok('…and a title tile\'s label is whole, on two lines', labLines.length === 2 && labLines.join(' ') === 'quiet stations that keep a schedule', labLines.join(' | '));
 }
 
 // ── 6. in Chromium ──────────────────────────────────────────────────────────
@@ -237,6 +254,18 @@ try {
     return d.querySelector('parsererror') ? `${i} ${s.type}: ${d.querySelector('parsererror').textContent.slice(0, 160)}` : null;
   }).filter(Boolean), FIXTURE);
   ok('every scene\'s drawing parses as SVG', !parse.length, parse.join('\n'));
+  // The layout: the stage across the panel, drawn wide; the presenter under
+  // it at the left, small, beside the words they are saying.
+  const lay = await pg.evaluate(() => {
+    const r = sel => document.querySelector(sel).getBoundingClientRect();
+    const panel = r('#hb-panel'), stage = r('#hb-stage'), face = r('#hb-presenter'), words = r('.hb-words');
+    const pad = parseFloat(getComputedStyle(document.getElementById('hb-panel')).paddingLeft) || 0;
+    const vb = document.querySelector('#hb-stage svg').getAttribute('viewBox').split(' ').map(Number);
+    return { stageShare: stage.width / (panel.width - 2 * pad), wide: vb[2] / vb[3], faceBelow: face.top >= stage.bottom, faceLeft: Math.abs(face.left - stage.left),
+             faceW: face.width, beside: words.left >= face.right && words.top < face.bottom && words.bottom > face.top };
+  });
+  ok('the stage spans the panel, drawn 16:9', lay.stageShare > 0.97 && Math.abs(lay.wide - 16 / 9) < 0.01, JSON.stringify(lay));
+  ok('…and the presenter is under it at the left, small, beside the words', lay.faceBelow && lay.faceLeft <= 2 && lay.faceW <= 140 && lay.beside, JSON.stringify(lay));
 
   // ── play, pause, pick ──
   await pg.click('#hb-play');
@@ -256,7 +285,7 @@ try {
   ok('Pause freezes it', await pg.evaluate(() => !HealthBulletin._state().playing && document.getElementById('hb-stage').classList.contains('is-paused')));
   await pg.click('.hb-seg:nth-child(5)');
   const picked = await pg.evaluate(() => ({ scene: HealthBulletin._state().scene, still: document.getElementById('hb-stage').classList.contains('is-still'),
-    who: document.querySelector('#hb-presenter figcaption b').textContent, chips: document.getElementById('hb-chips').textContent }));
+    who: document.querySelector('#hb-caption .hb-speaker').textContent, chips: document.getElementById('hb-chips').textContent }));
   ok('a scene picked from the bar is drawn finished, with its own presenter and stations', picked.scene === 4 && picked.still && picked.who === 'Alex Chen' && /Ipswich AL/.test(picked.chips), JSON.stringify(picked));
 
   // ── a station opened ──
@@ -269,7 +298,7 @@ try {
   // ── today, this week, hide ──
   await pg.click('.hb-tools button:has-text("This week")');
   await until(pg, () => /A week of the Hillcrest repeater/.test(document.getElementById('hb-panel').textContent));
-  ok('This week shows the weekly, presented by Graham', await pg.evaluate(() => HealthBulletin._state().kind === 'weekly' && /Graham Watts/.test(document.querySelector('#hb-presenter').textContent)));
+  ok('This week shows the weekly, presented by Graham', await pg.evaluate(() => HealthBulletin._state().kind === 'weekly' && /Graham Watts/.test(document.querySelector('#hb-caption .hb-speaker').textContent)));
   await pg.click('.hb-tools button:has-text("Hide")');
   const hidden = await pg.evaluate(() => ({ body: !!document.getElementById('hb-body'), kept: localStorage.getItem('mn-hb-hidden'), folded: (document.querySelector('.hb-folded') || {}).textContent || '' }));
   ok('Hide folds it to its headline, and the device remembers', !hidden.body && hidden.kept === '1' && /A week of the Hillcrest repeater/.test(hidden.folded), JSON.stringify(hidden));
@@ -293,11 +322,11 @@ try {
     await pg.waitForTimeout(400);
     const phone = await pg.evaluate(() => {
       const svg = document.querySelector('#hb-stage svg'), vb = svg.getAttribute('viewBox').split(' ').map(Number);
-      const av = document.querySelector('#hb-caption .hb-avatar');
-      return { tall: vb[3] > vb[2], avatar: av && getComputedStyle(av).display !== 'none', rail: getComputedStyle(document.querySelector('.hb-presenter')).display,
+      const face = document.getElementById('hb-presenter').getBoundingClientRect(), words = document.querySelector('.hb-words').getBoundingClientRect();
+      return { tall: vb[3] > vb[2], faceW: face.width, beside: words.left >= face.right && words.top < face.bottom,
                wide: document.documentElement.scrollWidth - document.documentElement.clientWidth };
     });
-    ok('on a phone the scene is drawn tall and the presenter sits beside the words', phone.tall && phone.avatar && phone.rail === 'none', JSON.stringify(phone));
+    ok('on a phone the scene is drawn tall and a smaller presenter sits beside the words', phone.tall && phone.faceW <= 72 && phone.beside, JSON.stringify(phone));
     ok('…with no sideways scroll', phone.wide <= 1, `${phone.wide}px wider than the screen`);
     await pg.evaluate(() => HealthBulletin.play());
     await pg.waitForTimeout(200);

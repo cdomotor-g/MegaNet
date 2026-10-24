@@ -280,7 +280,7 @@
    "say": "Now our end. At six past ten on Saturday the base station's first stick was retuned, and it logged that it was falling behind and dropping samples. Its uploads have trailed by a minute since, not seven seconds. 152.400 was listened to only until a quarter to six. And from four this morning, every channel on stick 1 thinned at once.",
    "items": [
     {
-     "name": "Stick 1 · 151.500, Hillcrest's",
+     "name": "Stick 1 · 151.500 (Hillcrest)",
      "up": [
       1,
       0.9,
@@ -397,7 +397,7 @@
       1,
       1
      ],
-     "summary": "steady"
+     "summary": "steady from 11 am"
     }
    ]
   },
@@ -439,8 +439,8 @@
    "sub": "two transmitters 2.3–2.5 kHz high, day after day",
    "presenter": "tech-wizard",
    "sev": "info",
-   "secs": 20,
-   "say": "A fingerprint check. The whole fleet sits within a quarter of a part per million. Lake Manchester and ALERT2 source 10315 sit two and a half kilohertz high, day after day — about sixteen parts per million. No ageing crystal does that; it looks more like a radio set a step off its channel. One to check, not to drive to.",
+   "secs": 22,
+   "say": "A fingerprint check. All but one of the fleet sits within two and a half parts per million — most within a quarter. Lake Manchester and ALERT2 source 10315 sit two and a half kilohertz high, day after day — about sixteen parts per million. No ageing crystal does that; it looks more like a radio set a step off its channel. One to check, not to drive to.",
    "stations": [
     "lake_manchester_al"
    ],
@@ -881,7 +881,7 @@
       12.8,
       9.4
      ],
-     "note": "12.8 V for five nights, then 9.4"
+     "note": "12.8 V five nights running, then 9.4 V"
     },
     {
      "id": "priestdale_al",
