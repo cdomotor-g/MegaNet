@@ -209,7 +209,7 @@ const TABS = [
     { id: 'msglog',     label: 'Message Log',            icon: '📨',
       find: 'messages telemetry arrivals incoming ingest raw log fade margin ingress base pathway follow live decode calibration value volts battery converted' },
     { id: 'health',     label: 'Station Health',         icon: '🚦',
-      find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage' },
+      find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage network weather bulletin daily weekly summary animation news droggies presenter' },
   ] },
   { group: 'Site visits', tabs: [
     // 📌 Nearby (nearby.js) heads the group because it is where a visit
@@ -1866,7 +1866,10 @@ const HELP = {
 
   health: {
     summary: 'What the readings landing in the datastore say about each field station and the '
-           + 'network carrying them, ranked by what needs doing. <strong>Needs attention</strong> '
+           + 'network carrying them, ranked by what needs doing. It opens with <strong>📺 Network Weather</strong>: '
+           + 'the last 24 hours (or the week) as a short animated bulletin, presented by one of the Droggies and '
+           + 'written each morning by Claude — what went wrong, what the findings have in common, and what the '
+           + 'carrier fingerprints say about who really transmitted. <strong>Needs attention</strong> '
            + 'is the morning\'s list: stations gone silent, missed check signals rising, batteries '
            + 'sliding or not charging, rain gauges dry through their neighbours\' rain, levels that '
            + 'did not move, receivers that stopped, repeaters that a run of silences has in common — '

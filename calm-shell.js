@@ -420,7 +420,9 @@ const CalmShell = (() => {
   }
 
   function ledeOf(main) {
-    const h = main.querySelector('h2');
+    // A panel above the tab's own (Station Health's bulletin) says so with
+    // data-no-lede, and its heading is passed over.
+    const h = [...main.querySelectorAll('h2')].find(x => !x.closest('[data-no-lede]'));
     if (!h) return null;
     const box = h.closest('.panel, .page, section') || main;
     // The heading's own row — the tab's name and its buttons, an owner

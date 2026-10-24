@@ -22,6 +22,59 @@ them** goes straight to Needs attention, under the map. The paragraph explaining
 the tab is two lines deep until *More about this tab*. The Classic look shows
 the numbers without the sentence.
 
+## 📺 Network Weather
+
+At the very top of the tab, above everything worked out here, is the
+network's **bulletin**: its last 24 hours — or, on the *This week* switch, its
+last seven days — told in a minute or two of animated scenes, a weather report
+about the network rather than the sky. One of the Droggies presents it (a
+different one each day of the week; Graham Watts the weekly, with Alex Chen for
+the radio), and the narration runs under the stage word by word, or aloud in
+the browser's own voice on 🔊.
+
+It is written, not worked out here. Every morning at about five a scheduled
+Claude Code task reads the network as this tab does — the same
+`health-analysis.js` over the same readings (`tools/bulletin/gather.mjs`, through
+`tools/health/report.mjs`) — with what only the server has: the findings'
+history, every transmitter's carrier fingerprint and who sent the corrupted
+copies. Then it does what the rules cannot: looks for what the findings have in
+common (one repeater, one receiver channel, one hour), tells a receiver's own
+error from a transmitter's by the carrier, checks what changed at the base
+station, and writes the scenes — what is wrong, the evidence, and when it is
+not the obvious, the possible causes and what would tell them apart. It does
+not prescribe. Mondays at about half past four a second task writes the week:
+trends, chronic stations, recurring groups, the week's fingerprints and flips.
+`tools/bulletin/README.md` is both tasks' brief, and the way to run one by hand.
+
+**The scenes.** The forecast (clear, fair, patchy, unsettled, stormy) with the
+headline and four numbers; the **synoptic chart** — the stations on file in
+view over Queensland's river basins, the scene's stations marked, a *low*
+circled where trouble gathers and a *high* where everything checked in; the
+**batteries** that need a look, filled to last night's low and dropping from
+the first night shown; **check signals** slot by slot; the fleet's **carrier
+fingerprints** lined up as a barcode, with the ones that moved sliding from
+where they were; **whose copies** — the corrupted copies' carrier set against
+each repeater that could have sent them, until one matches; the **receivers**
+hour by hour against their usual; **trends** across the days; a **list** of
+what is worth a look and what came back; and the sign-off.
+
+**Using it.** ▶ plays it (it never starts by itself); the bar under the stage is
+the scenes, each a press away; ⏯ ⏮ ⏭, the space bar and the arrow keys on the
+stage; a station's name on the stage or beside it opens it below on this tab;
+*Read it instead* is the whole script with its stations; *Hide* folds it to its
+headline on this device. Earlier bulletins are in the list beside *Today* and
+*This week* (fourteen days and eight weeks are kept). On a phone the scene is
+drawn tall and the presenter sits beside the words; with reduced motion nothing
+moves and every scene is drawn finished. A bulletin more than a day old (a week,
+for the weekly) says the schedule may have stopped.
+
+**Where it lives.** `data/bulletins/<daily|weekly>/<date>.json`, listed newest
+first in `data/bulletins/index.json`; the shape is `tools/bulletin/validate.mjs`.
+The page fetches them fresh, and the service worker keeps the last copy for no
+signal, so a bulletin needs no version stamp. The presenters' portraits are
+cropped from the Droggies' canon art into `assets/presenters/`. `npm run
+bulletin` holds the player, the published files and the pipeline.
+
 ## Six ways in
 
 - **Needs attention** — the findings, worst first: what is wrong, the evidence,

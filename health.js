@@ -321,9 +321,21 @@ const Health = (() => {
 
   // ── rendering: the page ────────────────────────────────────────────────────
 
+  // The page: 📺 Network Weather first (health-bulletin.js), then the tab's
+  // own. The bulletin sits in a slot of its own because this page redraws
+  // itself when the week's readings land, a few seconds after it opens —
+  // rerender() redraws what follows the slot and leaves a bulletin that is
+  // playing where it is.
   function render() {
     return `
     <div class="page hl-page" style="--page-max:1400px">
+      ${typeof HealthBulletin !== 'undefined' ? `<div id="hb-slot">${HealthBulletin.render()}</div>` : ''}
+      <div id="hl-rest" class="hl-rest">${restHtml()}</div>
+    </div>`;
+  }
+
+  function restHtml() {
+    return `
       <section class="panel" aria-labelledby="hl-h">
         <div class="panel-header">
           <h2 id="hl-h">Station Health</h2>
@@ -348,8 +360,7 @@ const Health = (() => {
         <div id="hl-ownnote" class="small hl-ownnote">${ownNoteHtml()}</div>
         <div id="hl-kpis">${kpisHtml()}</div>
       </section>
-      <div id="hl-body">${bodyHtml()}</div>
-    </div>`;
+      <div id="hl-body">${bodyHtml()}</div>`;
   }
 
   function bodyHtml() {
@@ -1663,7 +1674,13 @@ const Health = (() => {
     const el = document.getElementById('main-content');
     if (!el || state.activeTab !== 'health') return;
     stopMap();
-    el.innerHTML = render();
+    const rest = document.getElementById('hl-rest');
+    if (rest && document.getElementById('hb-slot')) {
+      rest.innerHTML = restHtml();
+      // The Calm look folds the tab's introduction by watching #main-content's
+      // own children, which a redraw inside #hl-rest does not touch: told.
+      if (typeof CalmShell !== 'undefined' && CalmShell.foldLede) CalmShell.foldLede();
+    } else el.innerHTML = render();
     afterRender();
   }
   function rerenderStation() {
@@ -1892,13 +1909,17 @@ const Health = (() => {
 
   // ── lifecycle ──────────────────────────────────────────────────────────────
 
-  function stop() { stopMap(); }
+  function stop() {
+    stopMap();
+    if (typeof HealthBulletin !== 'undefined') HealthBulletin.stop();
+  }
 
   function init() {
     // Safe to repeat: the registry replaces rather than stacks (#142).
     registerTabTeardown('Health', stop);
     askOwners();
     afterRender();
+    if (typeof HealthBulletin !== 'undefined') HealthBulletin.init();
     if (H.sel) loadInspections(H.sel);
     // The first visit fetches on its own, as the Message Log's does: the tab's
     // whole point is what the readings say now. After that, the board stands

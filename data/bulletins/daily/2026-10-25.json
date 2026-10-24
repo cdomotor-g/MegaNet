@@ -1,0 +1,954 @@
+{
+ "format": "floodnet-bulletin/1",
+ "kind": "daily",
+ "id": "daily-2026-10-25",
+ "issued_at": "2026-10-24T21:55:04.156Z",
+ "period": {
+  "from": "2026-10-23T21:55:04.156Z",
+  "to": "2026-10-24T21:55:04.156Z",
+  "label": "24 hours to 7:55 am Sunday"
+ },
+ "presenter": "bean-counter",
+ "cohost": "tech-wizard",
+ "outlook": {
+  "sky": "unsettled",
+  "label": "Unsettled over Logan"
+ },
+ "headline": "Twenty-one stations behind the Hillcrest repeater went quiet — one shared path, not 21 faults — and four only because we stopped listening.",
+ "stats": [
+  {
+   "label": "stations heard",
+   "value": 1011,
+   "tone": "neutral"
+  },
+  {
+   "label": "checks received",
+   "value": 74,
+   "unit": "%",
+   "was": 72,
+   "tone": "warn"
+  },
+  {
+   "label": "quiet, keep a schedule",
+   "value": 26,
+   "tone": "warn"
+  },
+  {
+   "label": "critical findings",
+   "value": 27,
+   "tone": "bad"
+  }
+ ],
+ "author": "Claude — the first bulletin, from the facts and the receptions",
+ "sources": {
+  "readings": 28755,
+  "stations_heard": 1011,
+  "gathered_at": "2026-10-24T21:55:04.156Z",
+  "notes": [
+   "Receptions, carriers, the base station's settings and its log read through the Supabase connector."
+  ]
+ },
+ "caveats": [
+  "One base station hears all of this. Whether Hillcrest or our receiver explains the overnight drop cannot be settled from its readings alone.",
+  "The Bureau's own base stations may still be hearing the Hillcrest stations; Flood-Net cannot see them.",
+  "Kunghur and Dunbible Creek report batteries of 9.5 to 10 V and keep transmitting — more likely a different scale on file than flat batteries.",
+  "Five transmitters measured 15 to 18 ppm high only on days stick 2 ran without its frequency correction; that is the receiver's error and is left out."
+ ],
+ "scenes": [
+  {
+   "type": "title",
+   "title": "Good morning",
+   "secs": 11,
+   "say": "Good morning, and welcome to Sunday's numbers. Unsettled over Logan: twenty-one stations behind one repeater went quiet — one cause, not twenty-one site visits, which is the kind of variance I like."
+  },
+  {
+   "type": "map",
+   "title": "A low over Logan and Ipswich",
+   "sub": "21 quiet stations, every one in Hillcrest's pass ranges",
+   "sev": "warn",
+   "secs": 18,
+   "say": "Here's the system. Twenty-one stations that keep a schedule — Henderson Creek, Loamside, Beaudesert and the rest — dropped out one by one, from late Saturday morning into the small hours. Every one is in the Hillcrest repeater's pass ranges. Hillcrest itself is still on air: its own battery report came in at half past midnight, a steady 13.1 volts.",
+   "stations": [
+    "hillcrest_wine_glass",
+    "henderson_ck_al",
+    "loamside_al",
+    "beaudesert_al"
+   ],
+   "areas": [
+    {
+     "lat": -27.677,
+     "lon": 152.8667,
+     "km": 39,
+     "sev": "warn",
+     "label": "Logan–Ipswich"
+    }
+   ],
+   "marks": [
+    {
+     "id": "grey_s_plains_rd_a",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "dunwich_al",
+     "kind": "silent",
+     "sev": "info"
+    },
+    {
+     "id": "coulson_crossing_ale",
+     "kind": "silent",
+     "sev": "info"
+    },
+    {
+     "id": "south_ripley_james_ivory_br_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "bellbird_park_eugene_st_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "collingwood_park_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "colleges_xing_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "henderson_ck_al",
+     "kind": "silent",
+     "sev": "warn",
+     "label": "Henderson Ck AL"
+    },
+    {
+     "id": "lipscombe_rd_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "one_mile_br_aler",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "beaudesert_al",
+     "kind": "silent",
+     "sev": "warn",
+     "label": "Beaudesert AL"
+    },
+    {
+     "id": "underwood_millers_rd_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "loamside_al",
+     "kind": "silent",
+     "sev": "warn",
+     "label": "Loamside AL"
+    },
+    {
+     "id": "chambers_creek_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "six_mile_ck_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "springfield_lakes_ll_dam_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "upper_western_ck_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "limestone_park_dentention_basin_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "nindooinbah_dam_al",
+     "kind": "silent",
+     "sev": "info",
+     "label": "Nindooinbah Dam AL"
+    },
+    {
+     "id": "grandchester_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "lumeah_al",
+     "kind": "silent",
+     "sev": "info"
+    },
+    {
+     "id": "hillcrest_wine_glass",
+     "kind": "repeater",
+     "sev": "warn",
+     "label": "Hillcrest repeater"
+    }
+   ],
+   "links": [
+    {
+     "from": "henderson_ck_al",
+     "to": "hillcrest_wine_glass",
+     "style": "relay"
+    },
+    {
+     "from": "loamside_al",
+     "to": "hillcrest_wine_glass",
+     "style": "relay"
+    },
+    {
+     "from": "beaudesert_al",
+     "to": "hillcrest_wine_glass",
+     "style": "relay"
+    },
+    {
+     "from": "collingwood_park_al",
+     "to": "hillcrest_wine_glass",
+     "style": "relay"
+    },
+    {
+     "from": "bellbird_park_eugene_st_al",
+     "to": "hillcrest_wine_glass",
+     "style": "relay"
+    }
+   ]
+  },
+  {
+   "type": "triangulate",
+   "title": "Whose copies are they?",
+   "sub": "the carrier on the corrupted copies",
+   "presenter": "tech-wizard",
+   "sev": "warn",
+   "secs": 19,
+   "say": "Alex Chen, on the radio side. Every transmitter has a carrier of its own — a fingerprint. Lyons AL came through corrupted 41 times this week, and two repeaters pass Lyons. Of the copies with a measured carrier, eight of nine came on Hillcrest's, as strong as the clean ones. Across the week, half of what Hillcrest re-sent arrived corrupted.",
+   "stations": [
+    "lyons_al",
+    "hillcrest_wine_glass",
+    "constitution_hill"
+   ],
+   "subject": {
+    "id": "lyons_al",
+    "name": "Lyons AL"
+   },
+   "receiver": {
+    "name": "Our base station, stick 1"
+   },
+   "suspects": [
+    {
+     "id": "hillcrest_wine_glass",
+     "name": "Hillcrest repeater",
+     "hz": 158,
+     "n": 8,
+     "match": true
+    },
+    {
+     "id": "constitution_hill",
+     "name": "Constitution Hill",
+     "n": 0,
+     "match": false
+    }
+   ],
+   "evidence": {
+    "hz": 158,
+    "n": 9,
+    "what": "8 of 9 corrupted copies, at 158 Hz"
+   },
+   "verdict": "Clear copies, wrong bits: the corruption enters at Hillcrest — its receiver, or something at the site that it hears."
+  },
+  {
+   "type": "receivers",
+   "title": "Our end of the line",
+   "sub": "each channel, hour by hour, against its usual",
+   "presenter": "tech-wizard",
+   "sev": "warn",
+   "secs": 21,
+   "say": "Now our end. At six past ten on Saturday the base station's first stick was retuned, and it logged that it was falling behind and dropping samples. Its uploads have trailed by a minute since, not seven seconds. 152.400 was listened to only until a quarter to six. And from four this morning, every channel on stick 1 thinned at once.",
+   "items": [
+    {
+     "name": "Stick 1 · 151.500, Hillcrest's",
+     "up": [
+      1,
+      0.9,
+      0.99,
+      0.91,
+      0.7,
+      0.85,
+      0.76,
+      0.92,
+      0.98,
+      0.78,
+      0.76,
+      1,
+      1,
+      0.86,
+      0.88,
+      0.98,
+      0.97,
+      1,
+      1,
+      1,
+      0.65,
+      0.32,
+      0.46,
+      0.27
+     ],
+     "summary": "down from 4 am"
+    },
+    {
+     "name": "Stick 1 · 151.525",
+     "up": [
+      1,
+      0.86,
+      0.73,
+      1,
+      0.95,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0.94,
+      1,
+      1,
+      0.71,
+      1,
+      1,
+      0.78,
+      0.76,
+      0.73,
+      0.37,
+      0.46
+     ],
+     "summary": "down from 4 am"
+    },
+    {
+     "name": "Stick 1 · 152.400",
+     "up": [
+      0,
+      0,
+      0,
+      0.23,
+      0.67,
+      0.63,
+      0.7,
+      0.23,
+      0.67,
+      0.37,
+      0.13,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "summary": "10:06 to 17:47 only"
+    },
+    {
+     "name": "Stick 2",
+     "up": [
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "summary": "steady"
+    }
+   ]
+  },
+  {
+   "type": "list",
+   "title": "Two explanations",
+   "sub": "and what would tell them apart",
+   "sev": "warn",
+   "secs": 21,
+   "say": "So: four of the twenty-one reach us only on 152.400 — they're quiet because we stopped listening. For the other seventeen, two explanations, and the readings can't separate them yet. Hillcrest may be going deaf: still transmitting, passing on less of what it hears and corrupting much of it. Or our receiver is losing the weaker relays. Both may be true.",
+   "stations": [
+    "hillcrest_wine_glass",
+    "dunwich_al",
+    "coulson_crossing_ale"
+   ],
+   "items": [
+    {
+     "sev": "info",
+     "text": "Four — Dunwich, Coulson Crossing, Nindooinbah Dam, Lumeah — reach us only on 152.400 MHz, not listened to since 17:47 Saturday."
+    },
+    {
+     "sev": "warn",
+     "id": "hillcrest_wine_glass",
+     "text": "Hillcrest: what it relays thinned all Saturday and nearly stopped at 4 am; half of this week's re-sends came through corrupted."
+    },
+    {
+     "sev": "warn",
+     "text": "Our base station: uploads a minute behind since Saturday's retune, and every stick 1 channel down by two-thirds or more since 4 am."
+    },
+    {
+     "sev": "info",
+     "text": "What would tell them apart: the stations returning when stick 1 is set back as it was — or the Bureau's own base stations still hearing them."
+    }
+   ]
+  },
+  {
+   "type": "carrier",
+   "title": "Fingerprints a step off",
+   "sub": "two transmitters 2.3–2.5 kHz high, day after day",
+   "presenter": "tech-wizard",
+   "sev": "info",
+   "secs": 20,
+   "say": "A fingerprint check. The whole fleet sits within a quarter of a part per million. Lake Manchester and ALERT2 source 10315 sit two and a half kilohertz high, day after day — about sixteen parts per million. No ageing crystal does that; it looks more like a radio set a step off its channel. One to check, not to drive to.",
+   "stations": [
+    "lake_manchester_al"
+   ],
+   "fleet": [
+    0.21,
+    -0.01,
+    0.01,
+    0.14,
+    0.01,
+    -0.02,
+    0,
+    -0.03,
+    -0.02,
+    0,
+    0,
+    0,
+    0,
+    -0.01,
+    0.02,
+    0.04,
+    0.01,
+    0.01,
+    0.09,
+    -0.07,
+    0.09,
+    0.02,
+    0.04,
+    1.4,
+    -0.04,
+    -0.01,
+    0,
+    0,
+    -0.05,
+    -0.01,
+    0.01,
+    -0.02,
+    0.02,
+    -0.02,
+    0.02,
+    0.04,
+    0.04,
+    0,
+    -0.01,
+    0,
+    0,
+    -0.04,
+    -0.05,
+    0,
+    0.02,
+    0.13,
+    -0.08,
+    -0.03,
+    -0.01,
+    0,
+    0,
+    -0.01,
+    -0.04,
+    -0.01,
+    0.06,
+    0.05,
+    0.13,
+    0.03,
+    0.01,
+    -0.03,
+    -0.03,
+    0.1,
+    0.05,
+    0.01,
+    0.12,
+    0.1,
+    0.1,
+    0.02,
+    0,
+    -0.08,
+    -0.04,
+    -0.05,
+    0.13,
+    0.17,
+    0,
+    0,
+    0,
+    0.07,
+    -0.02,
+    -0.08,
+    0.02,
+    0.01,
+    -0.03,
+    -0.01,
+    0.22,
+    -0.74,
+    -2.16,
+    -1.98,
+    0.77,
+    0.74,
+    0.91,
+    0.16,
+    -0.21,
+    -0.13,
+    0.01,
+    0.15,
+    -0.03,
+    -0.01,
+    0.02,
+    -0.01,
+    -1.68,
+    -1.8,
+    0.29,
+    -0.09,
+    0,
+    0,
+    -0.95,
+    0.01,
+    0.04,
+    0.01,
+    -0.01,
+    -0.86,
+    0.02,
+    0,
+    0.05,
+    0,
+    -0.32,
+    0.12,
+    0.02,
+    0.02,
+    -0.28,
+    0.07,
+    -0.04,
+    -0.01,
+    -0.01,
+    -0.01,
+    -0.06,
+    0.02,
+    0,
+    -1.55,
+    -0.38,
+    1.07,
+    -1.63,
+    -3.66,
+    0.07,
+    -0.01,
+    0.01,
+    -0.01,
+    0.02,
+    0.04,
+    0.03,
+    -0.01,
+    -0.01,
+    0.1,
+    -0.01,
+    -0.02,
+    -0.03,
+    -0.01,
+    0,
+    -0.02,
+    -0.01,
+    0.05,
+    0.75,
+    -0.02,
+    0,
+    0.01,
+    -0.03,
+    -0.04,
+    0.01,
+    -0.04,
+    0,
+    -0.14,
+    -0.01,
+    0,
+    0.02,
+    -0.01,
+    -0.04,
+    -1.97,
+    0.14,
+    -0.07,
+    0.03,
+    -0.02,
+    0.03,
+    -0.03,
+    1.42,
+    1.41,
+    0.05,
+    -0.07,
+    0,
+    -0.12,
+    -0.01,
+    -0.23,
+    0.04,
+    -0.01,
+    -0.02,
+    -0.02,
+    -0.48,
+    -0.11,
+    1.4,
+    0.02,
+    0.05,
+    -0.02,
+    -0.01,
+    0,
+    0.01,
+    0,
+    0.01,
+    0.08,
+    0.01,
+    1.4,
+    0.04,
+    -0.01,
+    -0.02,
+    0,
+    -0.11,
+    -0.03,
+    -0.01,
+    0.04,
+    0.01,
+    -0.34,
+    1.4,
+    0,
+    -0.02,
+    0.01,
+    -0.01,
+    0.08,
+    -0.02,
+    0,
+    -0.01,
+    0.15,
+    -0.16,
+    0.06,
+    0.03,
+    2.11,
+    0.01,
+    -0.03,
+    -0.01,
+    0,
+    -0.02,
+    0,
+    -0.22,
+    -0.01,
+    0.17,
+    -0.05,
+    0.1,
+    0.03,
+    1.39,
+    0,
+    -1.66,
+    0.05,
+    -0.95,
+    0.04,
+    0,
+    -0.06,
+    0.02,
+    -0.01,
+    0.01,
+    -0.07,
+    0.02,
+    -1.62,
+    0.01,
+    0.03,
+    1.36,
+    0,
+    2.15,
+    1.49,
+    0.12,
+    0.01,
+    -1.94,
+    1.36,
+    -0.03,
+    -0.05,
+    -1.66,
+    -1.69,
+    1.07,
+    0.01,
+    -0.35,
+    -0.02,
+    0.23,
+    0,
+    0.12,
+    0.06,
+    -0.01,
+    0,
+    0,
+    -0.1,
+    0.02,
+    -0.01,
+    0.92,
+    -0.05,
+    0,
+    0.02,
+    -0.06,
+    -0.03,
+    1.38,
+    0.01,
+    0.13,
+    -1.67,
+    0.03,
+    2.16,
+    0,
+    0.09,
+    0.01,
+    -0.03,
+    0.01,
+    -0.11,
+    -0.02,
+    0,
+    0.03,
+    0,
+    0,
+    0.01,
+    -0.79,
+    0.04,
+    -0.19,
+    -1.91,
+    -0.07,
+    0,
+    -1.78,
+    0,
+    0.01,
+    0.02,
+    0.01,
+    0,
+    -0.04,
+    1.4,
+    -0.04,
+    0.01,
+    0.01,
+    -0.02,
+    -0.01,
+    -0.44,
+    1.47,
+    -0.04,
+    -0.06,
+    -0.02,
+    -0.05,
+    1.21,
+    0.13,
+    -0.02,
+    0,
+    -0.09,
+    -0.01,
+    1.12,
+    -1.59,
+    -1.63,
+    -0.19,
+    -0.01,
+    1.4,
+    0.04,
+    -0.01,
+    0.02,
+    1.39,
+    -0.01,
+    0.06,
+    0,
+    0.04,
+    0,
+    -0.1,
+    1.4,
+    0.05,
+    0.1,
+    -0.04,
+    0,
+    -0.04,
+    -0.17,
+    -0.02,
+    -1.83,
+    0,
+    0.03,
+    1.38,
+    -0.16,
+    -1.6,
+    0.9,
+    0.01,
+    0.01,
+    1.09,
+    0.03,
+    0.01,
+    -0.04,
+    0.13,
+    0.07,
+    0.12,
+    0.08
+   ],
+   "band": 2.5,
+   "items": [
+    {
+     "id": "lake_manchester_al",
+     "name": "Lake Manchester AL",
+     "kind": "station",
+     "now": 15.27,
+     "series": [
+      15.278,
+      15.187
+     ],
+     "note": "+2.3 kHz on 22 and 24 Oct"
+    },
+    {
+     "name": "ALERT2 10315",
+     "kind": "alert2",
+     "now": 16.28,
+     "series": [
+      16.288,
+      16.283,
+      16.283
+     ],
+     "note": "+2.5 kHz on three days; no station on file has it"
+    }
+   ]
+  },
+  {
+   "type": "battery",
+   "title": "Batteries",
+   "sev": "critical",
+   "secs": 19,
+   "say": "On to power. Three batteries fell off a cliff overnight: Upper Goomburra from 13.1 to 11.2 volts, Thornton School Road from 12.8 to 9.4, Priestdale to 11.3. A drop that sudden is more often a cell, a connection or the charger than a tired battery. Nindooinbah Dam is the slow one, about six days from 11.8.",
+   "stations": [
+    "upper_goomburra",
+    "thornton_school_roa",
+    "priestdale_al",
+    "nindooinbah_dam_al"
+   ],
+   "items": [
+    {
+     "id": "upper_goomburra",
+     "name": "Upper Goomburra AL",
+     "v": 11.2,
+     "nights": [
+      13.1,
+      11.2
+     ],
+     "note": "13.1 V the night before"
+    },
+    {
+     "id": "thornton_school_roa",
+     "name": "Thornton (School Rd) AL",
+     "v": 9.4,
+     "nights": [
+      12.7,
+      12.9,
+      12.9,
+      12.8,
+      12.8,
+      9.4
+     ],
+     "note": "12.8 V for five nights, then 9.4"
+    },
+    {
+     "id": "priestdale_al",
+     "name": "Priestdale AL",
+     "v": 11.3,
+     "nights": [
+      12.8,
+      12.2,
+      10.3,
+      11.3
+     ],
+     "note": "12.8 → 10.3 → 11.3 V"
+    },
+    {
+     "id": "nindooinbah_dam_al",
+     "name": "Nindooinbah Dam AL",
+     "v": 12.1,
+     "nights": [
+      12.4,
+      12.4,
+      12.4,
+      12.1
+     ],
+     "trend": -0.052,
+     "days_to": 5.7
+    }
+   ]
+  },
+  {
+   "type": "list",
+   "title": "Worth a look today",
+   "secs": 15,
+   "say": "So, worth a look today: the Hillcrest path and our stick 1, together. Upper Goomburra's battery. Lake Manchester's frequency when someone's passing. And good news: thirty-three stations the server had called silent were heard again — Cressbrook Dam, Borumba Dam and Jimna among them.",
+   "stations": [
+    "hillcrest_wine_glass",
+    "upper_goomburra",
+    "lake_manchester_al",
+    "cressbrook_dam_al"
+   ],
+   "items": [
+    {
+     "sev": "warn",
+     "id": "hillcrest_wine_glass",
+     "text": "The Hillcrest path and our stick 1 — one of them, or both, explains 17 quiet stations."
+    },
+    {
+     "sev": "critical",
+     "id": "upper_goomburra",
+     "text": "Upper Goomburra AL — battery 11.2 V last night, after 13.1 V the night before."
+    },
+    {
+     "sev": "info",
+     "id": "lake_manchester_al",
+     "text": "Lake Manchester AL — transmitting 2.3 kHz high; worth checking what its radio is set to."
+    },
+    {
+     "sev": "ok",
+     "text": "Heard again: 33 stations the server had called silent — Cressbrook Dam, Borumba Dam, Couran Point and Jimna among them."
+    }
+   ]
+  },
+  {
+   "type": "signoff",
+   "title": "That’s the network",
+   "secs": 10,
+   "line": "Every dollar has a job.",
+   "say": "That's the network this morning: one repeater, one receiver, and twenty-one stations that are probably fine where they stand. Every dollar has a job. Back tomorrow."
+  }
+ ]
+}

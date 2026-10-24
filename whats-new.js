@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 95, date: '2026-10-25', items: [
+      '<strong>📺 Network Weather</strong>, at the top of <strong>Station Health</strong>: the network\'s last 24 hours as a short '
+        + 'animated bulletin — a weather report about the network, not the sky — presented by one of the Droggies, a different one '
+        + 'each day. Claude writes it every morning from the same findings, the carrier fingerprints and the bit flips: which '
+        + 'problems share a cause, whether a change was a transmitter or our own receiver, what came back. <em>This week</em> has the '
+        + 'weekly, every Monday. Press ▶; a station named in it opens below; <em>Read it instead</em> has the whole script.',
+    ] },
     { n: 94, date: '2026-10-24', items: [
       '<strong>Channel by channel</strong>, under an open base station on the <strong>Base Stations</strong> tab: every frequency '
         + 'it heard over the last day, week or month, who it heard there, what the register expects there and who the ACMA has '

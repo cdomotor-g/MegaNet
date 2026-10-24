@@ -1,0 +1,24 @@
+{
+ "format": "floodnet-bulletin-index/1",
+ "updated_at": "2026-10-24T22:02:54.942Z",
+ "daily": [
+  {
+   "id": "daily-2026-10-25",
+   "file": "data/bulletins/daily/2026-10-25.json",
+   "issued_at": "2026-10-24T21:55:04.156Z",
+   "headline": "Twenty-one stations behind the Hillcrest repeater went quiet — one shared path, not 21 faults — and four only because we stopped listening.",
+   "sky": "unsettled",
+   "presenter": "bean-counter"
+  }
+ ],
+ "weekly": [
+  {
+   "id": "weekly-2026-10-25",
+   "file": "data/bulletins/weekly/2026-10-25.json",
+   "issued_at": "2026-10-24T21:56:59.573Z",
+   "headline": "A wet week in which our base station began hearing four times the stations — and the Hillcrest repeater, half its relays corrupted all week, faded at the end of it.",
+   "sky": "unsettled",
+   "presenter": "seasoned-hydrographer"
+  }
+ ]
+}

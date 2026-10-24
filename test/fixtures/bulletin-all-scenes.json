@@ -1,0 +1,816 @@
+{
+ "format": "floodnet-bulletin/1",
+ "kind": "daily",
+ "id": "daily-2026-10-25",
+ "issued_at": "2026-10-24T19:10:00Z",
+ "period": {
+  "from": "2026-10-23T19:00:00Z",
+  "to": "2026-10-24T19:00:00Z",
+  "label": "24 hours to 5 am Sunday"
+ },
+ "presenter": "seasoned-hydrographer",
+ "cohost": "tech-wizard",
+ "outlook": {
+  "sky": "patchy",
+  "label": "Patchy, clearing later"
+ },
+ "headline": "Ten stations around Henderson Creek went quiet together overnight — one cause, not ten faults — and one receiver briefly lost its tuning.",
+ "stats": [
+  {
+   "label": "stations heard",
+   "value": 412,
+   "was": 418,
+   "tone": "neutral"
+  },
+  {
+   "label": "checks received",
+   "value": 72,
+   "unit": "%",
+   "was": 75,
+   "tone": "warn"
+  },
+  {
+   "label": "new findings",
+   "value": 6,
+   "tone": "warn"
+  },
+  {
+   "label": "cleared",
+   "value": 3,
+   "tone": "ok"
+  }
+ ],
+ "author": "Claude (test fixture)",
+ "sources": {
+  "readings": 21500,
+  "stations_heard": 412
+ },
+ "caveats": [
+  "A fixture for the tests: every scene type once, made-up numbers on real stations."
+ ],
+ "scenes": [
+  {
+   "type": "title",
+   "title": "Good morning",
+   "say": "Good morning. Here's the network for the last 24 hours: patchy, clearing later. Ten stations around Henderson Creek went quiet together, and one receiver lost its tuning for half an hour.",
+   "secs": 12
+  },
+  {
+   "type": "map",
+   "title": "A low over Logan",
+   "sub": "10 stations quiet together — one cause",
+   "sev": "warn",
+   "say": "The big system this morning sits over Logan. Ten stations around Henderson Creek stopped within one check of each other. When that many go together, look for what they share: here, the Hillcrest repeater.",
+   "secs": 14,
+   "stations": [
+    "henderson_ck_al",
+    "hillcrest_wine_glass"
+   ],
+   "areas": [
+    {
+     "lat": -27.82,
+     "lon": 153.02,
+     "km": 14,
+     "sev": "warn",
+     "label": "Henderson Ck"
+    },
+    {
+     "lat": -27.4,
+     "lon": 152.85,
+     "km": 18,
+     "sev": "ok",
+     "label": "Pine Rivers, all in"
+    }
+   ],
+   "marks": [
+    {
+     "id": "henderson_ck_al",
+     "kind": "silent",
+     "sev": "warn",
+     "label": "Henderson Ck AL"
+    },
+    {
+     "id": "hillcrest_wine_glass",
+     "kind": "repeater",
+     "sev": "warn",
+     "label": "Hillcrest repeater"
+    },
+    {
+     "id": "bromfleet_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "logan_village_al",
+     "kind": "silent",
+     "sev": "warn",
+     "label": "Logan Village AL"
+    },
+    {
+     "id": "whiteway_rd_overflow",
+     "kind": "silent",
+     "sev": "critical",
+     "label": "Whiteway Rd"
+    },
+    {
+     "id": "constitution_hill",
+     "kind": "receiver",
+     "sev": "ok",
+     "label": "Constitution Hill"
+    }
+   ],
+   "links": [
+    {
+     "from": "henderson_ck_al",
+     "to": "hillcrest_wine_glass",
+     "style": "relay"
+    },
+    {
+     "from": "bromfleet_al",
+     "to": "hillcrest_wine_glass",
+     "style": "relay"
+    },
+    {
+     "from": "logan_village_al",
+     "to": "hillcrest_wine_glass",
+     "style": "relay"
+    },
+    {
+     "from": "hillcrest_wine_glass",
+     "to": "constitution_hill",
+     "style": "path"
+    }
+   ]
+  },
+  {
+   "type": "battery",
+   "title": "Batteries to watch",
+   "sev": "warn",
+   "say": "Two batteries are sliding. Nindooinbah Dam's night-time low has gone from 12.4 to 12.1 volts in four nights: about six days from browning out its radio at this rate.",
+   "secs": 12,
+   "stations": [
+    "nindooinbah_dam_al",
+    "logan_village_al"
+   ],
+   "items": [
+    {
+     "id": "nindooinbah_dam_al",
+     "name": "Nindooinbah Dam AL",
+     "v": 12.1,
+     "trend": -0.05,
+     "days_to": 6,
+     "nights": [
+      12.4,
+      12.4,
+      12.4,
+      12.1
+     ]
+    },
+    {
+     "id": "logan_village_al",
+     "name": "Logan Village AL",
+     "v": 12.7,
+     "trend": 0,
+     "nights": [
+      12.7,
+      12.7,
+      12.7,
+      12.7
+     ],
+     "note": "no daily charge — flat day and night"
+    },
+    {
+     "id": "bromfleet_al",
+     "name": "Bromfleet AL",
+     "v": 13.2,
+     "nights": [
+      13.2,
+      12.7,
+      13.2,
+      13.2
+     ]
+    }
+   ]
+  },
+  {
+   "type": "checks",
+   "title": "Check signals",
+   "say": "Lyons has missed one check in three since Thursday, scattered rather than in one spell: the shape of a marginal radio path rather than a dead station.",
+   "secs": 10,
+   "stations": [
+    "lyons_al"
+   ],
+   "items": [
+    {
+     "id": "lyons_al",
+     "name": "Lyons AL",
+     "strip": "HHMHHMHMHHMH",
+     "rate": 0.67,
+     "note": "misses scattered — a marginal path"
+    },
+    {
+     "id": "ipswich_al",
+     "name": "Ipswich AL",
+     "strip": "HHHHHPHHHHHH",
+     "rate": 0.92
+    },
+    {
+     "id": "henderson_ck_al",
+     "name": "Henderson Ck AL",
+     "strip": "HHHHHHHMMMMM",
+     "rate": 0.58,
+     "note": "stopped at 22:00 with its neighbours"
+    },
+    {
+     "id": "clydesdale_al",
+     "name": "Clydesdale AL",
+     "strip": "HHHUUUUHHHHM",
+     "rate": 0.88
+    }
+   ]
+  },
+  {
+   "type": "carrier",
+   "title": "Fingerprints",
+   "sub": "every radio's crystal sits a little off frequency",
+   "presenter": "tech-wizard",
+   "say": "Every transmitter's crystal sits a little off its channel — a fingerprint. Ipswich's has moved one and a half parts per million in a week. Not a fault yet; the kind of drift an ageing crystal, or a hot cabinet, shows before a station drops off.",
+   "secs": 15,
+   "stations": [
+    "ipswich_al"
+   ],
+   "fleet": [
+    0.04,
+    0.42,
+    -0.41,
+    0.32,
+    0.83,
+    0.37,
+    1.41,
+    -0.8,
+    0.06,
+    -0.63,
+    -0.71,
+    -0.17,
+    0.2,
+    0.38,
+    0.46,
+    2.01,
+    0.78,
+    -1.44,
+    0.18,
+    -0.56,
+    -0.46,
+    1.18,
+    -0.2,
+    -1.76,
+    0.28,
+    -0.26,
+    -1.06,
+    -0.83,
+    -0.56,
+    -0.02,
+    -0.38,
+    0.06,
+    1.65,
+    -0.72,
+    -0.73,
+    -0.22,
+    0.99,
+    -0.64,
+    1.29,
+    -1.18,
+    -0.93,
+    -0.05,
+    -0.78,
+    -0.56,
+    0.41,
+    0.65,
+    0.1,
+    -0.25,
+    1.21,
+    0.36,
+    -0.21,
+    1.09,
+    -0.81,
+    0.15,
+    0.59,
+    -0.01,
+    -0.52,
+    0.32,
+    -0.49,
+    -0.54,
+    -0.92,
+    1.17,
+    -0.49,
+    1.04,
+    0.34,
+    -0.23,
+    0.6,
+    0.24,
+    0.12,
+    -1.24,
+    0.06,
+    0.8,
+    0.44,
+    0.9,
+    1.34,
+    0.37,
+    1.78,
+    -1.36,
+    -0.22,
+    -2.27,
+    0.74,
+    0.08,
+    1.52,
+    -0.33,
+    -1.82,
+    1.15,
+    -1.21,
+    -1.14,
+    -0.16,
+    0.56,
+    -0.46,
+    0.17,
+    -1.69,
+    1.56,
+    -0.06,
+    0.11,
+    0.53,
+    0.15,
+    0.18,
+    -0.84,
+    -0.1,
+    0.39,
+    0.94,
+    -0.11,
+    0.08,
+    0.3,
+    0.51,
+    0.19,
+    -0.23,
+    -0.46,
+    1.01,
+    0.27,
+    0.02,
+    3.13,
+    0.79,
+    0.77,
+    0.14,
+    -0.91,
+    1.02,
+    -0.08,
+    0.05,
+    0.92,
+    0.92,
+    0.22,
+    0.02,
+    1.89,
+    0.52,
+    -0.92,
+    0.68,
+    0.14,
+    0.03,
+    0.61,
+    0.21,
+    1.8,
+    0.18,
+    0.23,
+    1.05,
+    -0.51,
+    0.91,
+    -0.05,
+    1.07,
+    -0.76,
+    0.38,
+    -1.44,
+    -0.4,
+    0.01,
+    0.45,
+    1.78,
+    1.65,
+    -1.21,
+    -0.68,
+    1.13,
+    0.4,
+    -1.23,
+    0.44,
+    -1.01,
+    -0.77,
+    -1.13,
+    -0.23,
+    2.02,
+    0.34,
+    -0.1,
+    2.26,
+    -0.42,
+    -0.13,
+    -0.24,
+    0.38,
+    -0.28,
+    1.31,
+    -0.26,
+    0.51,
+    0.2,
+    -0.77,
+    -0.88,
+    -0.05,
+    -2.06,
+    0.01,
+    0.07,
+    0.13,
+    -0.07,
+    0.32,
+    -0.31,
+    0.58,
+    -1.46,
+    0.82,
+    -0.79,
+    0.44,
+    -0.42,
+    -0.38,
+    -0.71,
+    1.21,
+    -0.98,
+    -1.08,
+    0.2,
+    0.23,
+    0.04,
+    -0.86,
+    -0.58,
+    0.81,
+    -0.93,
+    0.55,
+    0.65,
+    0.12,
+    -1.09,
+    1.71,
+    0.11,
+    0.18,
+    -0.34,
+    -0.85,
+    -0.24,
+    0.18,
+    -0.76,
+    0.11,
+    1.03,
+    0.39,
+    -0.08,
+    0.94,
+    0.83,
+    0.81,
+    -0.71,
+    -1.63,
+    0.72,
+    0.06,
+    -0.33,
+    0.44,
+    -0.4,
+    -0.55,
+    1.62,
+    -1.42,
+    0.75,
+    0.91,
+    1.59,
+    0.23,
+    0.46,
+    -0.82,
+    0.03,
+    -1.88,
+    -0.51,
+    -0.02,
+    -0.09,
+    -0.43,
+    1.05,
+    -1.42,
+    0.12,
+    -0.36,
+    0.04,
+    0.05,
+    1.74,
+    -0.95,
+    1.2,
+    1.26,
+    -0.11,
+    -0.55,
+    -1.11,
+    -0.77,
+    1.83,
+    -1.94,
+    0.41,
+    -0.62,
+    1.7,
+    0.28,
+    -1.21,
+    -0.46,
+    0.18,
+    0.11,
+    -0.85,
+    -0.25,
+    -0.41,
+    0.44,
+    0.25,
+    0.2,
+    -0.52,
+    0.71,
+    -0.5,
+    -0.74,
+    -0.38,
+    -0.29,
+    -0.27,
+    -1.73,
+    1.21,
+    0.56,
+    1.19,
+    -0.35,
+    0.67,
+    0.18,
+    0.03,
+    1.61,
+    -0.53,
+    0.52,
+    -1.55,
+    0.51,
+    -0.15,
+    -0.91,
+    -0.53,
+    -1.9,
+    -0.95,
+    0.15,
+    -2.36,
+    0.97,
+    0.88,
+    3.4,
+    -2.9,
+    0.6
+   ],
+   "band": 2.5,
+   "items": [
+    {
+     "id": "ipswich_al",
+     "name": "Ipswich AL",
+     "kind": "station",
+     "now": 3.4,
+     "was": 1.9,
+     "series": [
+      1.8,
+      1.9,
+      2.0,
+      1.9,
+      2.1,
+      2.0,
+      2.2,
+      2.4,
+      2.6,
+      2.9,
+      3.1,
+      3.3,
+      3.4
+     ],
+     "note": "moved 1.5 ppm in a week"
+    },
+    {
+     "id": "hillcrest_wine_glass",
+     "name": "Hillcrest repeater",
+     "kind": "repeater",
+     "now": -2.9,
+     "was": -2.8,
+     "series": [
+      -2.8,
+      -2.8,
+      -2.9,
+      -2.8,
+      -2.9
+     ]
+    }
+   ]
+  },
+  {
+   "type": "triangulate",
+   "title": "Whose copy was it?",
+   "sub": "the fingerprint on the corrupted copies",
+   "presenter": "tech-wizard",
+   "sev": "warn",
+   "say": "Lyons' readings keep arriving twice, the second copy with a bit flipped. Two repeaters could have carried it. The corrupted copies arrive on Hillcrest's carrier, not Constitution Hill's — so the bits flip at Hillcrest.",
+   "secs": 16,
+   "stations": [
+    "lyons_al",
+    "hillcrest_wine_glass"
+   ],
+   "subject": {
+    "id": "lyons_al",
+    "name": "Lyons AL"
+   },
+   "receiver": {
+    "name": "Base station (Brisbane)",
+    "lat": -27.47,
+    "lon": 153.02
+   },
+   "suspects": [
+    {
+     "id": "hillcrest_wine_glass",
+     "name": "Hillcrest repeater",
+     "hz": -312,
+     "n": 8,
+     "match": true
+    },
+    {
+     "id": "constitution_hill",
+     "name": "Constitution Hill",
+     "hz": 186,
+     "n": 1,
+     "match": false
+    }
+   ],
+   "evidence": {
+    "hz": -305,
+    "n": 9,
+    "what": "9 corrupted copies, at −305 Hz"
+   },
+   "verdict": "8 of the 9 corrupted copies came on Hillcrest's carrier. The corruption enters at Hillcrest — its receiver, its site, or its radio."
+  },
+  {
+   "type": "receivers",
+   "title": "Receivers",
+   "say": "The base station's second stick lost its frequency correction for twenty-eight minutes at ten past ten — every transmitter it heard jumped together, which is how we know it was the receiver.",
+   "secs": 12,
+   "items": [
+    {
+     "name": "rpi-83071968 · stick 1",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "steady"
+    },
+    {
+     "name": "rpi-83071968 · stick 2",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      0.55,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "tuning lost 10:06–10:34"
+    }
+   ]
+  },
+  {
+   "type": "trend",
+   "title": "The week so far",
+   "say": "Checks received have hovered around three quarters all week; corrupted copies peaked on Tuesday and have come down since.",
+   "secs": 11,
+   "series": [
+    {
+     "label": "Checks received",
+     "unit": "%",
+     "tone": "warn",
+     "baseline": 80,
+     "points": [
+      [
+       "Sat",
+       74
+      ],
+      [
+       "Sun",
+       76
+      ],
+      [
+       "Mon",
+       73
+      ],
+      [
+       "Tue",
+       71
+      ],
+      [
+       "Wed",
+       72
+      ],
+      [
+       "Thu",
+       75
+      ],
+      [
+       "Fri",
+       72
+      ]
+     ]
+    },
+    {
+     "label": "Corrupted copies a day",
+     "tone": "neutral",
+     "points": [
+      [
+       "Sat",
+       281
+      ],
+      [
+       "Sun",
+       311
+      ],
+      [
+       "Mon",
+       168
+      ],
+      [
+       "Tue",
+       567
+      ],
+      [
+       "Wed",
+       488
+      ],
+      [
+       "Thu",
+       176
+      ],
+      [
+       "Fri",
+       292
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "type": "list",
+   "title": "Worth a look today",
+   "say": "So, worth a look today: the Hillcrest repeater first, then Nindooinbah Dam's battery. And some good news — three stations that were quiet yesterday are back.",
+   "secs": 13,
+   "stations": [
+    "hillcrest_wine_glass",
+    "nindooinbah_dam_al"
+   ],
+   "items": [
+    {
+     "sev": "warn",
+     "text": "Hillcrest repeater — 10 stations behind it quiet since 22:00, and the corrupted copies on its carrier.",
+     "id": "hillcrest_wine_glass"
+    },
+    {
+     "sev": "warn",
+     "text": "Nindooinbah Dam AL — battery about 6 days from 11.8 V at its current slide.",
+     "id": "nindooinbah_dam_al"
+    },
+    {
+     "sev": "info",
+     "text": "Ipswich AL — carrier moved 1.5 ppm in a week; one to watch, not to drive to.",
+     "id": "ipswich_al"
+    },
+    {
+     "sev": "ok",
+     "text": "Back on air: Clydesdale, Bellbird Park and Collingwood Park."
+    }
+   ]
+  },
+  {
+   "type": "signoff",
+   "title": "That's the network",
+   "say": "That's the network for this morning. It's going to be a long day — might as well do it properly.",
+   "secs": 8
+  }
+ ]
+}

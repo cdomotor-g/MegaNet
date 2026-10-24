@@ -835,6 +835,13 @@
        runs at load. -->
   <script src="flip-sources.js?v=20261024b"></script>
   <script src="health-agent.js?v=20261024b"></script>
+  <!-- 📺 Network Weather, at the top of Station Health: the network's last day
+       or week as a short animated bulletin, presented by one of the Droggies —
+       drawn from data/bulletins/, which a scheduled Claude Code task writes
+       every morning (tools/bulletin/README.md). After health.js, whose page
+       draws its panel and whose stations its links open, read at call time;
+       nothing runs at load. -->
+  <script src="health-bulletin.js?v=20261024b"></script>
   <!-- A station's health where people already look (#218): last heard, its
        battery and its findings on its card, each a door into Station Health,
        and Colour pins by health in Map display. Reads health-analysis.js and

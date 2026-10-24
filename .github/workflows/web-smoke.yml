@@ -444,6 +444,17 @@ jobs:
         working-directory: test
         run: npm run healthreport
 
+      # 📺 Network Weather (health-bulletin.js, tools/bulletin/): every bulletin
+      # published in data/bulletins/ valid and drawable, the validator's
+      # refusals, the crew and their portraits, the pipeline on the demo week
+      # (facts → draft → publish into a scratch copy), every scene drawn wide
+      # and tall, then the tab in Chromium — the bulletin first, play, pause,
+      # a scene picked, the week landing around a playing bulletin, a station
+      # opened, This week, Hide, no bulletin yet, a phone and reduced motion.
+      - name: Network Weather — the bulletin at the top of Station Health
+        working-directory: test
+        run: npm run bulletin
+
       # Node-only and fast. The Airtime panel's reasoning on networks built
       # for it: the circle two checks share (the gcd of their periods), how a
       # logger keeps time (steady, drifting, jumped, randomised), damage

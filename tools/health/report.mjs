@@ -259,7 +259,10 @@ export async function fetchInputs(fetch, { url, key, t0, t1, retryMs, log = () =
   const head = { apikey: key, 'Accept-Profile': 'meganet', 'Content-Profile': 'meganet', 'Content-Type': 'application/json' };
   const file = cache ? path.join(cache, 'base.json') : null;
   const held = file ? readJson(file) : null;
-  const base = held && Number.isFinite(held.at) && now - held.at < BASE_MS && held.doc && Array.isArray(held.rows) ? held : null;
+  // A base made for a shorter window cannot stand in for a longer one (the
+  // bulletin's weekly reads a fortnight): it would quietly lose the days before.
+  const base = held && Number.isFinite(held.at) && now - held.at < BASE_MS && held.doc && Array.isArray(held.rows)
+    && (held.t0 == null || held.t0 <= t0 + BASE_MS) ? held : null;
   const { doc, from } = await fetchRegister(fetch, { url, key, retryMs, log, base });
 
   if (base) {
@@ -297,7 +300,7 @@ export async function fetchInputs(fetch, { url, key, t0, t1, retryMs, log = () =
   log(`${rows.length.toLocaleString()} readings, ${(doc.stations || []).length.toLocaleString()} stations${from === 'snapshot' ? ' (snapshot)' : ''}${capped ? ' — capped' : ''}`);
   // A new base for the slot — but never one made of the snapshot or of a
   // capped read, which would stand in for the real thing for six hours.
-  if (file && from === 'database' && !capped) writeJson(file, { at: now, newest: newestReceived(rows), doc, rows });
+  if (file && from === 'database' && !capped) writeJson(file, { at: now, t0, newest: newestReceived(rows), doc, rows });
   return { doc, register: from, rows, capped, read: 'whole' };
 }
 
