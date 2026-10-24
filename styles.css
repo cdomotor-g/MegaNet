@@ -17942,6 +17942,16 @@ button.adm-danger:hover { border-color: var(--bad); }
 .qs-sw.bs-sw-4 { background: var(--c-data); }
 .qs-sw.bs-sw-bad { background: var(--bad); }
 .qs-sw.bs-sw-heat { width: 42px; background: linear-gradient(90deg, #060a20, #122e82, #0e80aa, #46be78, #f0d23c, #fa7828, #fffaeb); }
+/* Channel by channel (0081): seven columns of a few lines each, so the
+   table keeps its width and scrolls sideways on a phone like the others;
+   the word on each channel gets the room, each cell reads from the top, and
+   what a cell says per protocol is set a little apart. */
+.bs-ch .panel-header { flex-wrap: wrap; gap: var(--sp-2); }
+.table-wrap table.bs-ch-t { min-width: 64rem; }
+.bs-ch-t td, .bs-ch-t th { vertical-align: top; overflow-wrap: break-word; }
+.bs-ch-t th[scope="row"] { white-space: nowrap; }
+.bs-ch-t .bs-wide { width: 28%; }
+.bs-ch-t td > div + div { margin-top: var(--sp-1); }
 
 /* ── A header's "?" (Repeaters listening) ────────────────────────────────────
    How-to text that every visit would otherwise pay for in card height, moved

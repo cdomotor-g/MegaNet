@@ -132,6 +132,36 @@ also how often its rows come — and a gap in it is a time the station was not
 checking in. Two days of rows are kept. It needs RPi ALERT 0.13.5 or later on
 the station; an older one, or a station with no SDR stick, has no waterfall.
 
+## Channel by channel
+
+Under the waterfall, **Channel by channel** (`0081`) takes the last day, week or
+month of what the station heard and sets each frequency beside two other
+sources: what Flood-Net's register puts there — the TX and RX of repeaters
+within 250 km and the other frequencies stations list — and what the ACMA has
+licensed within 100 km (the RRL extract in `data/acma-devices.json`). Each
+frequency gets a word:
+
+| | |
+|---|---|
+| **Expected** | it decoded something there, and the register has it |
+| **Licensed to …, not in the register** | decoded, the ACMA licenses it (to the licensee named), the register has nothing — a gap in the register, often another agency's network |
+| **Not expected, and no licence found** | decoded, and neither has it — unlicensed, a licence outside the extract, a mirror image or intermodulation; look into it |
+| **Bursts, but none decode** | heard, never read |
+| **Expected here, not listened to** | the register has it nearby and no stick is on it |
+| **Listened to, nothing heard** | a stick is on it and nothing came |
+| **Listed on a stick, outside its window** / **…which is not receiving** | set, but not decoded |
+
+and notes under it: IDs that are the register's stations more than 400 km away
+(another network using the same IDs — 18 Bateson hears IDs the register gives to
+Victorian gauges), IDs the register does not have, ALERT2 sources none of which
+are in the register, legacy ALERT on an ALERT2 link (each burst a wasted decode
+attempt), a channel heard earlier that no stick listens to now. Beside them:
+what was heard and decoded per protocol and on how many days, the stations
+decoded most, the register's entries, the licensees, and which stick listens
+now. Licences on frequencies the station neither hears nor lists are folded
+away beneath. It reads the hourly rollups, so the last hour may not be in yet,
+and a month comes by the day.
+
 ## Noticed with the tab closed
 
 Every five minutes the database works out, by itself (`pg_cron`,

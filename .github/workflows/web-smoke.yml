@@ -1743,6 +1743,13 @@ jobs:
       # check-in never failed by any of it; administrators the only readers.
       - name: check_base_station_links.sql
         run: psql -v ON_ERROR_STOP=1 -f tools/check_base_station_links.sql
+      # A base station's channels (0081): a frequency and a protocol a row from
+      # the reception rollups, 151.5375 kept to 0.1 kHz, IDs put down to the
+      # register's nearest station (near, far or unknown, three decodes to
+      # count), the register's pairs with their distance, a week by the hour and
+      # a month by the day; administrators the only callers.
+      - name: check_base_station_channels.sql
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_base_station_channels.sql
       # The network's health kept by the database (0059): a base station that
       # stops checking in and a receiver that runs but decodes nothing each a
       # finding on the next run, held while its station is away, cleared when

@@ -3324,7 +3324,9 @@ const DB_SCHEMA = 'meganet';
 // holds (0073, #243). 74: receptions and submissions found by time with a
 // btree, and the archive counting from the rollups (0074). Both applied by
 // hand, bumped after; neither changes a shape the app reads.
-const DB_SCHEMA_VERSION = 79;
+// 80: a base station's connection over time (0080). 81: its channels, from
+// the reception rollups (0081). Both applied from GitHub Actions.
+const DB_SCHEMA_VERSION = 81;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

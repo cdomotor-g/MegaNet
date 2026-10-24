@@ -195,6 +195,64 @@ const wfRows = [], wfBursts = [];
   }
 }
 
+// What station 11 heard over a week, channel by channel (0081), modelled on
+// what 18 Bateson heard in October 2026 and moved to Mt Stuart: a busy ALERT
+// channel the register expects, with an ALERT2 network beside it and IDs that
+// are the register's stations 2,200 km away; an ALERT2 link whose bursts the
+// legacy decoder also tries; a council's channel the register lacks but the
+// ACMA licenses; and a frequency nobody is licensed for. Then the register's
+// pairs around it, one 400 km off (beyond the panel's 250).
+const CH_LAST = ago(120);
+const chDaysOf = (n, ok) => Array.from({ length: 7 }, (_, i) => [new Date(dbNow() - (6 - i) * 86400_000).toISOString().slice(0, 10), Math.round(n / 7), Math.round(ok / 7)]);
+const chan = o => Object.assign({ undecoded: 0, snr: 11.0, snr_max: 20, first: ago(6 * 86400), last: CH_LAST, buckets: 100, points: ['rx-1'],
+  ids: { any: 0, counted: 0, near: 0, far: 0, unknown: 0, near_ok: 0, far_ok: 0, unknown_ok: 0 }, top: [], far: [], unknown: [], days: [] }, o);
+const CHANNELS = {
+  days: 7, by: 'hour', far_km: 400, min_decodes: 3, site: { lat: -19.35, lon: 146.78 },
+  channels: [
+    chan({ f: 151.335, protocol: 'alert', n: 14, ok: 12, snr: 9.1, ids: { any: 2, counted: 2, near: 0, far: 0, unknown: 2, near_ok: 0, far_ok: 0, unknown_ok: 12 },
+      top: [[777, 9, 9, CH_LAST, null, null, null, null, 0], [778, 3, 3, CH_LAST, null, null, null, null, 0]], unknown: [[777, 9, 9, CH_LAST], [778, 3, 3, CH_LAST]],
+      days: chDaysOf(14, 12).slice(-1) }),
+    chan({ f: 151.5, protocol: 'alert', n: 4000, ok: 3500, undecoded: 400, snr: 12.1, ids: { any: 120, counted: 90, near: 80, far: 3, unknown: 7, near_ok: 3000, far_ok: 400, unknown_ok: 100 },
+      top: [[2001, 900, 950, CH_LAST, 'mt_stuart_al', 'Mt Stuart AL', null, 1, 1],
+            [4846, 300, 310, CH_LAST, 'wonnangatta_river_at_crooked_river', 'Wonnangatta River at Crooked River', null, 2200, 1],
+            [2002, 250, 260, CH_LAST, 'paluma_al', 'Paluma AL', null, 60, 1]],
+      far: [[4846, 300, 310, CH_LAST, 'wonnangatta_river_at_crooked_river', 'Wonnangatta River at Crooked River', null, 2200, 1]],
+      unknown: [[357, 19, 23, CH_LAST]], days: chDaysOf(4000, 3500) }),
+    chan({ f: 151.5, protocol: 'alert2', n: 640, ok: 600, ids: { any: 5, counted: 4, near: 0, far: 0, unknown: 4, near_ok: 0, far_ok: 0, unknown_ok: 600 },
+      top: [[62726, 300, 300, CH_LAST, null, null, null, null, 0]], unknown: [[62726, 300, 300, CH_LAST]], days: chDaysOf(640, 600) }),
+    chan({ f: 151.5375, protocol: 'alert', n: 1131, ok: 96, undecoded: 1034, points: ['rx-1-151.5375'], ids: { any: 49, counted: 10, near: 7, far: 0, unknown: 3, near_ok: 70, far_ok: 0, unknown_ok: 26 },
+      top: [[2003, 8, 8, CH_LAST, 'mt_stuart_al', 'Mt Stuart AL', null, 1, 1]], days: chDaysOf(1131, 96) }),
+    chan({ f: 151.5375, protocol: 'alert2', n: 266823, ok: 265691, snr: 18.9, points: ['rx-1-151.5375'], ids: { any: 27, counted: 27, near: 0, far: 0, unknown: 27, near_ok: 0, far_ok: 0, unknown_ok: 265691 },
+      top: [[11762, 118367, 118367, CH_LAST, null, null, null, null, 0], [33300, 110768, 110768, CH_LAST, null, null, null, null, 0]], days: chDaysOf(266823, 265691) }),
+    chan({ f: 151.575, protocol: 'alert', n: 1041, ok: 918, undecoded: 18, snr: 10.4, points: ['rx-2'], ids: { any: 69, counted: 43, near: 30, far: 1, unknown: 12, near_ok: 284, far_ok: 19, unknown_ok: 615 },
+      top: [[1782, 302, 313, CH_LAST, null, null, null, null, 0], [1707, 21, 21, CH_LAST, 'kelso_al', 'Kelso AL', null, 8, 1]], days: chDaysOf(1041, 918) }),
+  ],
+  register: [
+    { f: 151.5, dir: 'rx', kind: 'repeater', station_id: 'mt_stuart_al', name: 'Mt Stuart AL', owner: null, label: null, licence: '433892', km: 1 },
+    { f: 151.5, dir: 'tx', kind: 'repeater', station_id: 'mt_stuart_al', name: 'Mt Stuart AL', owner: null, label: null, licence: '433892', km: 1 },
+    { f: 151.5375, dir: 'tx', kind: 'listed', station_id: 'mt_stuart_al', name: 'Mt Stuart AL', owner: null, label: 'Link to the coast', licence: null, km: 1 },
+    { f: 151.95, dir: 'tx', kind: 'repeater', station_id: 'far_rptr', name: 'Far Repeater', owner: null, label: null, licence: null, km: 400 },
+    { f: 152.4, dir: 'tx', kind: 'repeater', station_id: 'paluma_al', name: 'Paluma AL', owner: null, label: null, licence: '433892/1', km: 60 },
+  ],
+};
+// The ACMA's licences around Mt Stuart, as data/acma-*.json hold them: the
+// Bureau's on 151.5 and 152.4 there, a council's 151.575 at Kelso, Defence's
+// 151.2125 nearby, and one 220 km off (beyond the panel's 100).
+const ACMA_SITES = { meta: { source_date: '2026-07-23' }, sites: [
+  { id: 's1', name: 'Met Tower Mt Stuart', lat: -19.348, lon: 146.78 },
+  { id: 's2', name: 'Broadcast Site Kelso', lat: -19.39, lon: 146.72 },
+  { id: 's3', name: 'Lavarack Barracks', lat: -19.33, lon: 146.75 },
+  { id: 's4', name: 'Far Hill', lat: -20.5, lon: 148.5 } ] };
+const ACMA_DEVICES = { meta: { source_date: '2026-07-23' }, antennas: {}, texts: [],
+  devices: [
+    { id: 'd1', site_id: 's1', lic: 'L1', f_mhz: 151.5, emission: '7K50F2D' },
+    { id: 'd2', site_id: 's1', lic: 'L2', f_mhz: 152.4, emission: '7K50F2D' },
+    { id: 'd3', site_id: 's2', lic: 'L3', f_mhz: 151.575, emission: '10K1F2D' },
+    { id: 'd4', site_id: 's3', lic: 'L4', f_mhz: 151.2125, emission: '10K1F9W' },
+    { id: 'd5', site_id: 's4', lic: 'L1', f_mhz: 151.95, emission: '7K50F2D' } ],
+  licences: { L1: { client_no: 'c1', status: 'Granted' }, L2: { client_no: 'c1', status: 'Granted' }, L3: { client_no: 'c2', status: 'Granted' }, L4: { client_no: 'c3', status: 'Granted' } },
+  clients: { c1: { name: 'BUREAU OF METEOROLOGY' }, c2: { name: 'TOWNSVILLE CITY COUNCIL' }, c3: { name: 'Department of Defence' } } };
+
 const calls = [];        // every call: { fn, args }
 const sent = fn => calls.filter(c => c.fn === fn).map(c => c.args);
 let missing = false;     // answer as a database without 0049
@@ -232,6 +290,8 @@ const FNS = {
       rows: mine ? wfRows.filter(r => r.t >= from).map(r => Object.assign({}, r, { t: Math.floor(r.t / bucket) * bucket })) : [],
       bursts: mine ? wfBursts.filter(b => b[0] >= from).map(b => [Math.floor(b[0] / bucket) * bucket].concat(b.slice(1))) : [] };
   },
+  admin_base_station_channels: a => Object.assign({ now: new Date(dbNow()).toISOString(), from: ago(a.p_days * 86400), to: ago(600) },
+    a.p_id === 11 ? CHANNELS : { site: null, channels: [], register: [] }, { days: a.p_days, by: a.p_days <= 14 ? 'hour' : 'day' }),
   admin_base_station_key_add: a => {
     db.keys.unshift({ id: 6, key_type: 'ssh-ed25519', fingerprint: 'SHA256:newkeynewkeynewkeynewkeynewkeynewkeynewkeyA', owner: a.p_owner,
       comment: 'sam@desk', added_at: ago(0), added_by: 'admin@example.test', removed_at: null, removed_by: null });
@@ -284,6 +344,13 @@ try {
   await page.route('https://api.github.com/repos/cdomotor-g/RPi_ALERT/releases/latest', route => {
     releaseAsks++;
     return json(route, { tag_name: 'v0.7.0', html_url: 'https://github.com/cdomotor-g/RPi_ALERT/releases/tag/v0.7.0' });
+  });
+  // The ACMA's files, small: the panel reads licences near the station from them.
+  const ACMA_FILES = { 'acma-threats.json': { meta: { source_date: '2026-07-23' }, anchors: [] }, 'acma-sites.json': ACMA_SITES,
+    'acma-dictionaries.json': {}, 'acma-devices.json': ACMA_DEVICES };
+  await page.route('**/data/acma-*.json', route => {
+    const name = new URL(route.request().url()).pathname.split('/').pop();
+    return ACMA_FILES[name] ? json(route, ACMA_FILES[name]) : route.fulfill({ status: 404, body: '' });
   });
   page.on('pageerror', e => errors.push(e.message));
 
@@ -443,6 +510,59 @@ try {
   await until(() => spectra().some(a => a.p_hours === 6 && a.p_since === null), 'the 6 h button asks for six hours');
   ok('…and says it is the one on', await page.evaluate(() => document.querySelector('#bs-wf button[aria-pressed="true"]').textContent.trim() === '6 h'));
   await until(() => page.evaluate(() => /Heard in the last 6 h/.test(document.getElementById('bs-wf-sum').textContent)), '…and draws it');
+
+  // ── Channel by channel (0081) ────────────────────────────────────────────────
+  const chAsked = () => sent('admin_base_station_channels');
+  ok('opening it asks for a week of its channels', chAsked().some(a => a.p_id === 11 && a.p_days === 7), JSON.stringify(chAsked()));
+  await until(() => page.evaluate(() => document.querySelectorAll('#bs-ch tbody tr').length === 7), 'the channels arrive, a row a frequency');
+  await until(() => page.evaluate(() => /TOWNSVILLE CITY COUNCIL/.test((document.getElementById('bs-ch') || {}).textContent || '')), '…and the ACMA\'s licences near it after them');
+  const chRow = f => page.evaluate(f => {
+    const tr = [...document.querySelectorAll('#bs-ch tbody tr')].find(t => t.querySelector('th').textContent.replace(/\s+/g, ' ').trim() === f + ' MHz');
+    return tr ? [...tr.children].map(c => c.innerText.replace(/\s+/g, ' ').trim()) : null;
+  }, f);
+  const chSum = (await text('#bs-ch-sum')).replace(/\s+/g, ' ');
+  ok('a line says it all: decoded on four, two expected, one licensed to others, one licensed to nobody — and what is quiet',
+    /^In the last 7 days it decoded something on 4 frequencies: 2 expected, 1 licensed to others but not in the register, 1 with no licence found\. 1 expected but not listened to; 1 listened to and silent; 1 on a stick that is not receiving\./.test(chSum), chSum);
+  const c1500 = await chRow('151.50');
+  ok('151.50: expected, the register\'s repeater on it — ALERT and ALERT2 each with what decoded',
+    /^Expected — the register has it here/.test(c1500[1]) && /ALERT 3,500 decoded of 4,000/.test(c1500[2]) && /ALERT2 600 decoded of 640/.test(c1500[2])
+      && /on 7 of 7 days/.test(c1500[2]) && /TX of repeater Mt Stuart AL, 1 km/.test(c1500[4]) && /RTL-SDR 1/.test(c1500[6]), JSON.stringify(c1500));
+  ok('…who: the stations decoded most, and one 2,200 km away marked',
+    /Mt Stuart AL 900/.test(c1500[3]) && /Wonnangatta River at Crooked River \(2,200 km\) 300/.test(c1500[3]) && /90 IDs: 80 in the register here, 3 far away, 7 unknown/.test(c1500[3]), c1500[3]);
+  ok('…the IDs that are another network\'s, the ones the register lacks, and the ALERT2 sources it does not know',
+    /3 IDs belong to register stations over 400 km away — 4846 is Wonnangatta River at Crooked River, 2,200 km off, decoded 300 times: another network using the same IDs\./.test(c1500[1])
+      && /7 IDs the register does not have — most decoded 357 \(19\)\./.test(c1500[1]) && /ALERT2 from 4 sources, none of them in the register\./.test(c1500[1]), c1500[1]);
+  ok('…and the Bureau\'s licence beside it', /BUREAU OF METEOROLOGY/.test(c1500[5]) && /0 km/.test(c1500[5]), c1500[5]);
+  const c15375 = await chRow('151.5375');
+  ok('151.5375: expected (a listed link), the ALERT2 link\'s bursts read as legacy ALERT said, and not listened to now',
+    /^Expected/.test(c15375[1]) && /mostly the ALERT2 traffic read as legacy ALERT \(96 of 1,131 decode\)/.test(c15375[1]) && /Not listened to now\./.test(c15375[1])
+      && /TX of station Mt Stuart AL, 1 km · Link to the coast/.test(c15375[4]) && c15375[6] === 'no', JSON.stringify(c15375));
+  const c1575 = await chRow('151.575');
+  ok('151.575: licensed to a council the register does not have, its unknown IDs named',
+    /^Licensed to TOWNSVILLE CITY COUNCIL, not in the register/.test(c1575[1]) && /TOWNSVILLE CITY COUNCIL \d+ km/.test(c1575[5]) && /ID 1782 302/.test(c1575[3])
+      && /nothing within 250 km/.test(c1575[4]), JSON.stringify(c1575));
+  const c1335 = await chRow('151.335');
+  ok('151.335: decoded, and neither the register nor the ACMA has anything there', /^Not expected, and no licence found near here/.test(c1335[1])
+    && /none within 100 km/.test(c1335[5]), JSON.stringify(c1335));
+  ok('151.625: listened to and silent, nothing expected', /^Listened to, nothing heard — nothing expected here/.test((await chRow('151.625'))[1]));
+  const c1524 = await chRow('152.40');
+  ok('152.40: the register\'s repeater 60 km off and the Bureau\'s licence, and no stick on it', /^Expected here, not listened to/.test(c1524[1])
+    && /TX of repeater Paluma AL, 60 km/.test(c1524[4]) && /BUREAU OF METEOROLOGY/.test(c1524[5]), JSON.stringify(c1524));
+  const c16025 = await chRow('160.25');
+  ok('160.25: listed on a stick that is not receiving', /^Listed on Second stick, which is not receiving/.test(c16025[1]) && /Second stick — not receiving/.test(c16025[6]), JSON.stringify(c16025));
+  ok('…and nothing from the register beyond 250 km', !(await chRow('151.95')));
+  const more = (await text('#bs-ch details')).replace(/\s+/g, ' ');
+  ok('the licences on frequencies it does not use, folded away: Defence\'s 151.2125 and not the one 220 km off',
+    /^1 more licensed frequency near here/.test(more) && await page.evaluate(() => /151\.2125 MHz — Department of Defence/.test(document.querySelector('#bs-ch details ul').textContent)), more);
+  await page.click('#bs-ch button:has-text("30 days")');
+  await until(() => chAsked().some(a => a.p_id === 11 && a.p_days === 30), 'the 30 days button asks for thirty');
+  await until(() => page.evaluate(() => /In the last 30 days/.test(document.getElementById('bs-ch-sum').textContent)), '…and says so');
+  fail = { fn: 'admin_base_station_channels', status: 404, body: { code: 'PGRST202', message: 'Could not find the function meganet.admin_base_station_channels' } };
+  await page.click('#bs-ch button:has-text("1 day")');
+  await until(async () => /apply db\/migrations\/0081_base_station_channels\.sql/.test(await text('#bs-ch-sum')), 'a database without 0081 is told which file to apply');
+  await page.click('#bs-ch button:has-text("7 days")');
+  await until(() => page.evaluate(() => document.querySelectorAll('#bs-ch tbody tr').length === 7), '…and the week comes back when it can');
+
   const detail = (await text('#bs-detail')).replace(/\s+/g, ' ');
   ok('its health', /mt-stuart/.test(detail) && /192\.168\.1\.40/.test(detail) && /58\.4 °C/.test(detail) && /under-voltage since boot/.test(detail), detail.slice(0, 400));
   ok('a stick hearing two channels says each, with what each decoded', /151\.5000 MHz ALERT Binary \(410 decoded\), 151\.6250 MHz Enhanced iFLOWS \(2 decoded\)/.test(detail)

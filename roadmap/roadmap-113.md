@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-23** (revision 183 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-24** (revision 184 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -817,6 +817,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 184 — 2026-10-24: 📻 Channel by channel, and 18 Bateson's CPU
+
+The owner: *"optimise the settings there to get the CPU usage down … capture primarily channels with the bulk of the traffic and secondarily traffic on channels that we're not expecting … on Flood-Net aggregate this per channel … what stations are coming in on different channels, what channels we're hearing stuff we shouldn't, what ACMA says is okay in terms of licensing … we need to know what's going on first."* **Opens and closes nothing.**
+
+- **`0081`** (`admin_base_station_channels(id, days)`, `geo_km()`): a base station's channels from the reception rollups — per frequency and protocol, heard, decoded, SNR, days; its IDs put down to the register's nearest station (near / far, i.e. another network's ID / unknown, three decodes to count); the register's pairs with their distance. `tools/check_base_station_channels.sql` (21, new `db-checks` step — it caught `least()` taking a null for 1 in `geo_km`, now `strict`). **`0080` and `0081` applied** from GitHub Actions; `core.js` to 81.
+- **Base Stations → Channel by channel** (`base-stations.js`): a row a frequency with a word on each — expected; licensed to someone the register lacks; decoded with no licence found; expected but not listened to; listened to and silent — and notes for far-off IDs, unknown IDs, unknown ALERT2 sources and legacy ALERT read off an ALERT2 link; ACMA licences within 100 km from `data/acma-devices.json`. `npm run basestations` (+20).
+- **What it says about 18 Bateson (7 days):** 151.5375 is a Seqwater ALERT2 link (~100,000 receptions a day, 27 sources, none in the register); 151.500 carries a second ALERT2 network (sources 62720–62732, 10315); 151.575 and 151.550 are Brisbane City Council's (ACMA-licensed, absent from the register); IDs on 151.500 and 152.400 are the register's Victorian and NSW gauges (4846 *Wonnangatta River*, 1,235 km) — another network's IDs; 151.425, 152.250 and 152.4625 are Seqwater's listed channels.
+- **The station itself** (no repository change): two FC0013 sticks, one 9–19 dB less sensitive (152.400 went silent on it for two days) and 19 ppm off. The busy channels (151.500, 151.525, 151.5375, 152.400) went onto the good stick, 1.2 MHz; BCC's pair onto the other at 240 kHz, ppm −19. Load 4.7 → ~3.4. Most of the rest was the kiosk: **RPi ALERT 0.15.1** stops its readings table repainting every frame (a flash restarted by every reading) and draws at most every two seconds — the browser's CPU a fifth of what it was (measured against `simulate.sh`).
+- **Checks:** `npm run basestations` and the cheap five; every `db-checks` step from zero over 81 migrations with the register loaded (`check_base_stations` 60, `check_base_station_links` 27, `check_reception_rollups` 21, `check_health_findings` 39).
 
 ### Revision 183 — 2026-10-23: 📟 The SWR Meter
 

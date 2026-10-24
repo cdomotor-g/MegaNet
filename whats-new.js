@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 94, date: '2026-10-24', items: [
+      '<strong>Channel by channel</strong>, under an open base station on the <strong>Base Stations</strong> tab: every frequency '
+        + 'it heard over the last day, week or month, who it heard there, what the register expects there and who the ACMA has '
+        + 'licensed there — and a word on each: expected, licensed to someone the register does not have, heard with no licence '
+        + 'found, expected but not listened to, or listened to and silent. IDs that belong to stations hundreds of kilometres '
+        + 'away, and ALERT2 sources the register does not know, are named.',
+    ] },
     { n: 93, date: '2026-10-23', items: [
       'On the <strong>Base Stations</strong> tab\'s settings, each RTL-SDR stick has a <em>Window</em> — the slice of the band '
         + 'it hears: automatic (the narrowest that holds its channels, and the lightest for the Pi) or one you choose, now with '

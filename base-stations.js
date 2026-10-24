@@ -53,7 +53,7 @@ const BaseStations = (function () {
   let formNote = null;
   // The log a station sent back, shown until the panel closes: { id, lines }.
   let logShown = null;
-  const timers = { list: null, detail: null, watch: null, wf: null };
+  const timers = { list: null, detail: null, watch: null, wf: null, ch: null };
   let lastAsk = 0;
   // The newest RPi ALERT release, as GitHub says: what a station's "Install the
   // latest release" and its nightly timer fetch (rpi-alert-update asks the same
@@ -961,6 +961,302 @@ const BaseStations = (function () {
     loadWf(true);
   }
 
+  // ── channel by channel (0081) ────────────────────────────────────────────
+  // What the open station heard on each frequency over the last day, week or
+  // month — admin_base_station_channels(), from the reception rollups — set
+  // beside what the register says is there (its repeaters' pairs and listed
+  // frequencies near the station) and what the ACMA has licensed near it
+  // (data/acma-devices.json, app.js's loaders), with a word on each: expected;
+  // licensed to someone the register does not have; heard with no licence
+  // found; expected but not listened to; listened to and silent. The lay of
+  // the land before anything is tidied — and why each channel earns its keep
+  // on a Pi with four cores.
+
+  const CH_DAYS = [1, 7, 30];
+  const CH_MS = 300000;       // a rollup is hourly: five minutes is plenty
+  const CH_REG_KM = 250;      // the register's stations this near are "around here"
+  const CH_ACMA_KM = 100;     // the ACMA's licences this near
+  const CH_NEAR_MHZ = 0.006;  // a channel this close is the same one (151.572 typed for 151.575)
+  // { id, days, r, err } — r as the database answered.
+  let ch = null, chDays = 7, chBusy = false;
+  // The ACMA's licences near the open station: { key, list: [{ f, lic, client,
+  // site, km, emission }], err }, or { key, loading } while the files load.
+  let chAcma = null;
+
+  function chKm(lat1, lon1, lat2, lon2) {
+    const r = Math.PI / 180, a = Math.sin((lat2 - lat1) * r / 2) ** 2
+      + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin((lon2 - lon1) * r / 2) ** 2;
+    return 2 * 6371 * Math.asin(Math.sqrt(Math.min(1, a)));
+  }
+  const chMhz = f => Number(f).toFixed(4).replace(/0{1,2}$/, '');
+  const chN = n => Number(n || 0).toLocaleString('en-AU');
+
+  // Every ACMA device within CH_ACMA_KM of the station, loaded once a site.
+  function chLoadAcma(site) {
+    if (!site) return;
+    const key = site.lat.toFixed(3) + ',' + site.lon.toFixed(3);
+    if (chAcma && chAcma.key === key) return;
+    if (typeof acmaEnsureCore !== 'function' || typeof acmaEnsureDevices !== 'function') { chAcma = { key, list: [], err: 'the ACMA loaders are not on this page' }; return; }
+    chAcma = { key, loading: true, list: [] };
+    acmaEnsureCore().then(acmaEnsureDevices).then(() => {
+      const A = state.acma, list = [];
+      for (const d of Object.values(A.deviceById || {})) {
+        const s = A.siteById[d.site_id];
+        if (!s || d.f_mhz == null) continue;
+        const km = chKm(site.lat, site.lon, s.lat, s.lon);
+        if (km > CH_ACMA_KM) continue;
+        const lic = (A.licById || {})[d.lic] || {}, cl = (A.clientById || {})[lic.client_no] || {};
+        list.push({ f: Number(d.f_mhz), lic: d.lic, client: cl.name || 'licensee ' + (lic.client_no || '?'), site: s.name, km: Math.round(km),
+          emission: d.emission || '', status: lic.status || '' });
+      }
+      list.sort((a, b) => a.f - b.f || a.km - b.km);
+      if (chAcma && chAcma.key === key) chAcma = { key, list, source: A.threats && A.threats.meta && A.threats.meta.source_date };
+    }).catch(e => { if (chAcma && chAcma.key === key) chAcma = { key, list: [], err: 'the ACMA licences could not be loaded (' + e.message + ')' }; })
+      .then(paintCh);
+  }
+
+  // A stick's channels as the station said them: [{ hz, inBand, why }].
+  function chListening(s) {
+    const out = [];
+    for (const rx of receiversOf(s).filter(r => r.kind === 'sdr')) {
+      const list = Array.isArray(rx.channels) && rx.channels.length ? rx.channels : rx.freq_hz ? [{ freq_hz: rx.freq_hz, in_band: true }] : [];
+      for (const c of list) out.push({ f: c.freq_hz / 1e6, stick: rx.name, inBand: c.in_band !== false, why: c.why || null, running: rx.state === 'running' });
+    }
+    return out;
+  }
+
+  // A row a frequency: what was heard on it (a row per protocol), the sticks
+  // listening to it now, the register's entries and the ACMA's licences on
+  // it — the last two matched within CH_NEAR_MHZ. ACMA licences on no row's
+  // frequency are the `others`.
+  function chRows(r, listening, acma) {
+    const rows = [];
+    const find = f => rows.find(x => Math.abs(x.f - f) < 1e-6);
+    const near = f => rows.filter(x => Math.abs(x.f - f) <= CH_NEAR_MHZ + 1e-9).sort((a, b) => Math.abs(a.f - f) - Math.abs(b.f - f))[0] || null;
+    const get = f => find(f) || (rows.push({ f, heard: [], listen: [], reg: [], acma: [] }), rows[rows.length - 1]);
+    for (const c of r.channels || []) get(Number(c.f)).heard.push(c);
+    for (const l of listening) get(Number(l.f.toFixed(4))).listen.push(l);
+    for (const g of r.register || []) {
+      if (g.km == null || g.km > CH_REG_KM) continue;
+      (near(Number(g.f)) || get(Number(g.f))).reg.push(g);
+    }
+    const others = [];
+    for (const a of acma || []) { const x = near(a.f); if (x) x.acma.push(a); else others.push(a); }
+    rows.sort((a, b) => a.f - b.f);
+    return { rows, others };
+  }
+
+  // Who holds the licences on a row, nearest first: [{ client, n, km }].
+  function chLicensees(row) {
+    const by = new Map();
+    for (const a of row.acma) { const e = by.get(a.client) || { client: a.client, n: 0, km: a.km }; e.n++; e.km = Math.min(e.km, a.km); by.set(a.client, e); }
+    return [...by.values()].sort((a, b) => a.km - b.km);
+  }
+
+  // The word on a row: { k, text, cls } and the notes under it.
+  function chVerdict(row) {
+    const sum = k => row.heard.reduce((a, c) => a + Number(c[k] || 0), 0);
+    const decoded = sum('ok'), heard = sum('n');
+    const listening = row.listen.some(l => l.inBand && l.running);
+    const down = !listening && row.listen.find(l => l.inBand && !l.running);
+    const outside = row.listen.length && !listening && !down;
+    const lic = chLicensees(row);
+    const who = lic.length ? lic[0].client + (lic.length > 1 ? ' and ' + (lic.length - 1) + ' more' : '') : '';
+    let v;
+    if (decoded > 0) {
+      v = row.reg.length ? { k: 'expected', cls: 'txt-ok', text: 'Expected — the register has it here' }
+        : lic.length ? { k: 'gap', cls: 'txt-warn', text: 'Licensed to ' + who + ', not in the register' }
+        : { k: 'odd', cls: 'txt-bad', text: 'Not expected, and no licence found near here' };
+    } else if (heard > 0) {
+      v = { k: 'undecoded', cls: 'txt-warn', text: 'Bursts, but none decode' + (row.reg.length ? ' — the register expects ALERT here' : lic.length ? ' — licensed to ' + who : '') };
+    } else if (listening) {
+      v = row.reg.length || lic.length ? { k: 'silent', cls: 'txt-warn', text: 'Listened to, nothing heard' + (row.reg.length ? ' — the register expects it' : ' — licensed to ' + who) }
+        : { k: 'silent', cls: 'qs-dim', text: 'Listened to, nothing heard — nothing expected here' };
+    } else if (down) {
+      v = { k: 'down', cls: 'txt-warn', text: 'Listed on ' + down.stick + ', which is not receiving' };
+    } else if (outside) {
+      v = { k: 'outside', cls: 'txt-warn', text: 'Listed on ' + row.listen[0].stick + ', outside its window — not decoded' };
+    } else {
+      v = { k: 'missed', cls: 'txt-warn', text: 'Expected here, not listened to' };
+    }
+    const notes = [];
+    if (decoded > 0 && !listening) notes.push('Not listened to now' + (outside ? ': outside ' + row.listen[0].stick + '’s window' : '') + '.');
+    for (const c of row.heard) {
+      const ids = c.ids || {}, a2 = c.protocol === 'alert2';
+      if (a2 && ids.counted && !ids.near) notes.push('ALERT2 from ' + ids.counted + ' source' + (ids.counted === 1 ? '' : 's') + ', none of them in the register.');
+      if (!a2 && ids.far) {
+        const e = (c.far || [])[0];
+        notes.push(ids.far + ' ID' + (ids.far === 1 ? ' belongs' : 's belong') + ' to register stations over ' + ((ch && ch.r && ch.r.far_km) || 400) + ' km away'
+          + (e ? ' — ' + e[0] + ' is ' + (e[5] || e[4]) + ', ' + chN(e[7]) + ' km off, decoded ' + chN(e[1]) + ' times' : '') + ': another network using the same IDs.');
+      }
+      if (!a2 && ids.unknown) {
+        const u = (c.unknown || []).slice(0, 3).map(x => x[0] + ' (' + chN(x[1]) + ')').join(', ');
+        notes.push(ids.unknown + ' ID' + (ids.unknown === 1 ? '' : 's') + ' the register does not have' + (u ? ' — most decoded ' + u : '') + '.');
+      }
+      if (!a2 && Number(c.n) >= 50 && Number(c.ok) < 0.2 * Number(c.n) && row.heard.some(x => x.protocol === 'alert2' && Number(x.ok) > Number(c.n)))
+        notes.push('Its ALERT bursts are mostly the ALERT2 traffic read as legacy ALERT (' + chN(c.ok) + ' of ' + chN(c.n) + ' decode) — each costs a decode attempt.');
+    }
+    return Object.assign(v, { notes, decoded, heard, listening });
+  }
+
+  function chHeardHtml(row) {
+    if (!row.heard.length) return '<span class="qs-dim">—</span>';
+    const days = ch.r.days;
+    return row.heard.map(c => {
+      const d = (c.days || []).filter(x => Number(x[2]) > 0).length;
+      return `<div><strong>${esc(c.protocol === 'alert2' ? 'ALERT2' : 'ALERT')}</strong> ${esc(chN(c.ok))} decoded${Number(c.n) > Number(c.ok) ? ` <span class="qs-dim">of ${esc(chN(c.n))}</span>` : ''}`
+        + `<div class="qs-dim">${c.snr != null ? 'SNR ' + esc(c.snr) + ' dB · ' : ''}${days > 1 ? 'on ' + d + ' of ' + days + ' days · ' : ''}last ${esc(ago(c.last))}</div></div>`;
+    }).join('');
+  }
+
+  function chWhoHtml(row) {
+    const out = [];
+    for (const c of row.heard) {
+      const ids = c.ids || {};
+      const top = (c.top || []).filter(t => Number(t[1]) >= (ch.r.min_decodes || 3)).slice(0, 3)
+        .map(t => (t[5] ? esc(t[5]) + (t[7] != null && t[7] > (ch.r.far_km || 400) ? ` <span class="txt-warn">(${esc(chN(t[7]))} km)</span>` : '')
+          : (c.protocol === 'alert2' ? 'source ' : 'ID ') + esc(t[0])) + ` <span class="qs-dim">${esc(chN(t[1]))}</span>`);
+      if (!top.length && !ids.counted) continue;
+      out.push(`<div>${top.join(' · ')}${ids.counted > top.length ? ` <span class="qs-dim">+${esc(ids.counted - top.length)} more</span>` : ''}`
+        + `<div class="qs-dim">${esc(ids.counted || 0)} ${c.protocol === 'alert2' ? 'source' : 'ID'}${ids.counted === 1 ? '' : 's'}: ${esc(ids.near || 0)} in the register here`
+        + `${ids.far ? ', ' + esc(ids.far) + ' far away' : ''}${ids.unknown ? ', ' + esc(ids.unknown) + ' unknown' : ''}</div></div>`);
+    }
+    return out.join('') || '<span class="qs-dim">—</span>';
+  }
+
+  function chRegHtml(row) {
+    if (!row.reg.length) return '<span class="qs-dim">nothing within ' + CH_REG_KM + ' km</span>';
+    const part = (dir, word) => {
+      const g = row.reg.filter(x => x.dir === dir);
+      if (!g.length) return '';
+      const first = g[0];
+      return `<div>${word} ${g.length === 1 ? '' : esc(g.length) + ' '}${first.kind === 'repeater' ? 'repeater' + (g.length === 1 ? '' : 's') : 'station' + (g.length === 1 ? '' : 's')}`
+        + `<div class="qs-dim">${esc(first.name)}, ${esc(chN(first.km))} km${first.label ? ' · ' + esc(first.label) : ''}${g.length > 1 ? ' (nearest)' : ''}</div></div>`;
+    };
+    return part('tx', 'TX of') + part('rx', 'RX of');
+  }
+
+  function chAcmaHtml(row) {
+    if (!chAcma || chAcma.loading) return '<span class="qs-dim">loading…</span>';
+    if (chAcma.err) return '<span class="qs-dim">—</span>';
+    const lic = chLicensees(row);
+    if (!lic.length) return '<span class="qs-dim">none within ' + CH_ACMA_KM + ' km</span>';
+    return lic.slice(0, 3).map(l => `<div>${esc(l.client)}<div class="qs-dim">${l.n > 1 ? esc(l.n) + ' devices, nearest ' : ''}${esc(l.km)} km</div></div>`).join('')
+      + (lic.length > 3 ? `<div class="qs-dim">+${esc(lic.length - 3)} more licensees</div>` : '');
+  }
+
+  function chListenHtml(row) {
+    if (!row.listen.length) return '<span class="qs-dim">no</span>';
+    return row.listen.map(l => `<div>${esc(l.stick)}${!l.inBand ? ` <span class="txt-warn">— ${esc(l.why === 'mirror' ? 'beside a mirror image' : l.why === 'spike' ? 'on the DC spike' : 'outside its window')}</span>`
+      : !l.running ? ' <span class="txt-warn">— not receiving</span>' : ''}</div>`).join('');
+  }
+
+  function chShellHtml(s) {
+    return `<section class="panel bs-ch" aria-labelledby="bs-ch-h">
+      <div class="panel-header"><h2 id="bs-ch-h">Channel by channel</h2>
+        <div class="pill-row" role="group" aria-label="How far back">${CH_DAYS.map(d => `<button type="button" class="pill${d === chDays ? ' is-on' : ''}" aria-pressed="${d === chDays}" onclick="BaseStations.chWindow(${d})">${d === 1 ? '1 day' : d + ' days'}</button>`).join('')}</div></div>
+      <p class="small" id="bs-ch-sum" aria-live="polite"></p>
+      <div id="bs-ch-body"></div>
+      <p class="small qs-dim">What ${esc(s.label)} heard on each frequency — from the hourly reception rollups, so the last hour may not be in yet — beside what Flood-Net's register puts there (its repeaters' TX and RX and the other frequencies stations list, within ${CH_REG_KM} km) and what the ACMA has licensed within ${CH_ACMA_KM} km (Register of Radiocommunications Licences extract${chAcma && chAcma.source ? ' of ' + esc(chAcma.source) : ''}, CC BY 4.0). An ID counts once it has decoded ${esc((ch && ch.r && ch.r.min_decodes) || 3)} times; it is put down to the register's nearest station holding it — one more than ${esc((ch && ch.r && ch.r.far_km) || 400)} km away is another network using the same ID. A channel within ${CH_NEAR_MHZ * 1000} kHz of a licence or register entry is taken to be that one.</p>
+    </section>`;
+  }
+
+  function chSummaryHtml(rows) {
+    if (!ch || ch.id !== openId) return 'Loading…';
+    if (ch.err) return `<span class="txt-bad">${esc(ch.err)}</span>`;
+    const count = k => rows.filter(x => x.v.k === k).length;
+    const heard = rows.filter(x => x.v.decoded > 0).length;
+    if (!rows.length) return 'Nothing heard in the last ' + (ch.r.days === 1 ? 'day' : ch.r.days + ' days') + ', and nothing listed near it.';
+    const bits = [];
+    if (count('expected')) bits.push(count('expected') + ' expected');
+    if (count('gap')) bits.push(`<strong class="txt-warn">${count('gap')} licensed to others but not in the register</strong>`);
+    if (count('odd')) bits.push(`<strong class="txt-bad">${count('odd')} with no licence found</strong>`);
+    const quiet = [count('missed') && count('missed') + ' expected but not listened to', count('silent') && count('silent') + ' listened to and silent',
+      count('undecoded') && count('undecoded') + ' with bursts that do not decode', count('outside') && count('outside') + ' listed outside their stick\'s window',
+      count('down') && count('down') + ' on a stick that is not receiving'].filter(Boolean);
+    return `In the last ${ch.r.days === 1 ? 'day' : ch.r.days + ' days'} it decoded something on ${heard} frequenc${heard === 1 ? 'y' : 'ies'}: ${bits.join(', ') || 'none expected'}.`
+      + (quiet.length ? ' ' + quiet.join('; ').replace(/^./, c => c.toUpperCase()) + '.' : '')
+      + (ch.r.to ? ` <span class="qs-dim">Rolled up to ${esc(ago(ch.r.to))}.</span>` : '');
+  }
+
+  function chTableHtml(rows, others) {
+    if (!rows.length) return '';
+    const body = rows.map(x => `<tr>
+        <th scope="row">${esc(chMhz(x.f))} <span class="small qs-dim">MHz</span></th>
+        <td class="small"><strong class="${x.v.cls}">${esc(x.v.text)}</strong>${x.v.notes.map(n => `<div class="qs-dim">${esc(n)}</div>`).join('')}</td>
+        <td class="small">${chHeardHtml(x)}</td>
+        <td class="small">${chWhoHtml(x)}</td>
+        <td class="small">${chRegHtml(x)}</td>
+        <td class="small">${chAcmaHtml(x)}</td>
+        <td class="small">${chListenHtml(x)}</td>
+      </tr>`).join('');
+    const rest = new Map();
+    for (const a of others) { const k = chMhz(a.f); const e = rest.get(k) || []; e.push(a); rest.set(k, e); }
+    const lo = rows[0].f - 0.25, hi = rows[rows.length - 1].f + 0.25;
+    const near = [...rest.entries()].filter(([k]) => Number(k) >= lo && Number(k) <= hi);
+    return `<div class="table-wrap" role="region" tabindex="0" aria-labelledby="bs-ch-h"><table class="adm-table bs-ch-t">
+        <caption class="sr-only">Each frequency: what it is, what was heard, from whom, what the register and the ACMA say, and which stick listens to it</caption>
+        <thead><tr><th scope="col">Frequency</th><th scope="col" class="bs-wide">What it is</th><th scope="col">Heard</th><th scope="col">From</th><th scope="col">Register</th><th scope="col">ACMA licences</th><th scope="col">Listening now</th></tr></thead>
+        <tbody>${body}</tbody></table></div>
+      ${near.length ? `<details class="small"><summary>${near.length} more licensed frequenc${near.length === 1 ? 'y' : 'ies'} near here, between ${esc(chMhz(lo))} and ${esc(chMhz(hi))} MHz, that it does not listen to</summary>
+        <ul>${near.map(([k, list]) => { const l = [...new Set(list.map(a => a.client))]; return `<li>${esc(k)} MHz — ${esc(l.slice(0, 2).join('; '))}${l.length > 2 ? ' and ' + (l.length - 2) + ' more' : ''} <span class="qs-dim">(${esc(Math.min(...list.map(a => a.km)))} km)</span></li>`; }).join('')}</ul></details>` : ''}`;
+  }
+
+  // Into #bs-ch: the panel for the open station, built once per station and
+  // window, its rows rebuilt from what was loaded.
+  function paintCh() {
+    if (state.activeTab !== 'basestations') return;
+    const el = document.getElementById('bs-ch');
+    if (!el) return;
+    const s = stationOf();
+    if (!isAdmin() || !s) { if (el.innerHTML) { el.innerHTML = ''; el.dataset.sig = ''; } return; }
+    const sig = s.id + ':' + chDays + ':' + (chAcma && chAcma.source || '');
+    if (el.dataset.sig !== sig || !el.firstElementChild) { el.innerHTML = chShellHtml(s); el.dataset.sig = sig; }
+    let rows = [], others = [];
+    if (ch && ch.id === s.id && ch.r) {
+      ({ rows, others } = chRows(ch.r, chListening(s), chAcma && chAcma.list));
+      rows = rows.map(x => Object.assign(x, { v: chVerdict(x) }));
+    }
+    const set = (id, html) => { const e = document.getElementById(id); if (e && e.innerHTML !== html) keepFocus(e, () => { e.innerHTML = html; }); };
+    set('bs-ch-sum', chSummaryHtml(rows));
+    set('bs-ch-body', chTableHtml(rows, others));
+  }
+
+  async function loadCh() {
+    if (!isAdmin() || openId == null || chBusy) return;
+    const id = openId, days = chDays;
+    chBusy = true;
+    try {
+      const r = await dbRpc('admin_base_station_channels', { p_id: id, p_days: days });
+      if (openId !== id || chDays !== days) return;
+      setNow(r.now);
+      ch = { id, days, r, err: null };
+      chLoadAcma(r.site);
+    } catch (err) {
+      if (openId !== id || chDays !== days) return;
+      ch = { id, days, r: null, err: err.status === 404 ? 'The database does not have this yet — apply db/migrations/0081_base_station_channels.sql.'
+        : 'Could not load its channels: ' + err.message };
+    } finally {
+      chBusy = false;
+    }
+    paintCh();
+  }
+
+  function chStart() {
+    clearInterval(timers.ch);
+    timers.ch = null;
+    if (openId == null) return;
+    loadCh();
+    timers.ch = setInterval(() => { if (!document.hidden && state.activeTab === 'basestations') loadCh(); }, CH_MS);
+  }
+
+  function chWindow(days) {
+    if (!CH_DAYS.includes(days) || days === chDays) return;
+    chDays = days; ch = null;
+    paintCh();
+    loadCh();
+  }
+
   // ── team keys ────────────────────────────────────────────────────────────
 
   function keysHtml() {
@@ -1017,6 +1313,7 @@ const BaseStations = (function () {
       </div>
       <div id="bs-detail">${detailHtml()}</div>
       <div id="bs-wf"></div>
+      <div id="bs-ch"></div>
       <div id="bs-keys">${keysHtml()}</div>
       <div class="panel">
         <div class="panel-header"><h2>How a base station is reached</h2></div>
@@ -1036,6 +1333,7 @@ const BaseStations = (function () {
     // Typing in either form survives: it is mirrored, and focus is put back.
     keepFocus(el, () => { el.innerHTML = render(); });
     paintWf();
+    paintCh();
   }
 
   // A repaint must not take the keyboard's place away. Whatever had focus is
@@ -1065,6 +1363,7 @@ const BaseStations = (function () {
     set('bs-msg', msgHtml());
     set('bs-list', list ? listHtml() : '');
     paintWf();
+    paintCh();
     const d = document.getElementById('bs-detail');
     if (!d) return;
     const s = stationOf();
@@ -1169,8 +1468,8 @@ const BaseStations = (function () {
   }
 
   function stop() {
-    clearInterval(timers.list); clearTimeout(timers.detail); clearInterval(timers.watch); clearInterval(timers.wf);
-    timers.list = timers.detail = timers.watch = timers.wf = null;
+    clearInterval(timers.list); clearTimeout(timers.detail); clearInterval(timers.watch); clearInterval(timers.wf); clearInterval(timers.ch);
+    timers.list = timers.detail = timers.watch = timers.wf = timers.ch = null;
   }
 
   function init() {
@@ -1180,7 +1479,7 @@ const BaseStations = (function () {
     loadKeys();
     loadLatest();
     timers.list = setInterval(() => { if (!document.hidden && state.activeTab === 'basestations') { load(); loadLatest(); } }, LIST_MS);
-    if (openId != null) { loadDetail(); wfStart(); timers.watch = setInterval(() => { if (!document.hidden) watch(false); }, WATCH_MS); }
+    if (openId != null) { loadDetail(); wfStart(); chStart(); timers.watch = setInterval(() => { if (!document.hidden) watch(false); }, WATCH_MS); }
     if (typeof registerTabTeardown === 'function') registerTabTeardown('base-stations', stop);
   }
 
@@ -1200,13 +1499,15 @@ const BaseStations = (function () {
     loadDetail();
     wf = null; wfImg = null; wfHoverAt = null;
     wfStart();
+    ch = null;
+    chStart();
     announce('Opened ' + (s ? s.label : 'the base station') + '.');
   }
 
   function close() {
     openId = null; detail = null; askErr = null; form = null; formNote = null; logShown = null;
-    wf = null; wfImg = null; wfHoverAt = null;
-    clearInterval(timers.watch); clearTimeout(timers.detail); clearInterval(timers.wf);
+    wf = null; wfImg = null; wfHoverAt = null; ch = null;
+    clearInterval(timers.watch); clearTimeout(timers.detail); clearInterval(timers.wf); clearInterval(timers.ch);
     repaint();
   }
 
@@ -1319,15 +1620,16 @@ const BaseStations = (function () {
   // A sign-in or sign-out: everything held was the last session's.
   function authChanged() {
     list = null; error = null; detail = null; openId = null; askErr = null; keys = null; keysErr = null; keyMsg = null; form = null; formNote = null; logShown = null; note = '';
-    wf = null; wfImg = null; wfHoverAt = null;
+    wf = null; wfImg = null; wfHoverAt = null; ch = null; chAcma = null;
     stop();
     if (state.activeTab === 'basestations') { repaint(); init(); }
   }
 
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
-           keyField, addKey, removeKey, authChanged, wfWindow,
+           keyField, addKey, removeKey, authChanged, wfWindow, chWindow,
            // Pure, for test/basestations.mjs.
-           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf };
+           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
+           _chRows: chRows, _chVerdict: chVerdict };
 })();
 
 if (typeof window !== 'undefined') window.BaseStations = BaseStations;
