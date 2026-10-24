@@ -632,7 +632,7 @@
   {
    "type": "receivers",
    "title": "Receivers",
-   "say": "The base station's second stick lost its frequency correction for twenty-eight minutes at ten past ten — every transmitter it heard jumped together, which is how we know it was the receiver.",
+   "say": "The base station's second stick ran without its frequency correction until twenty-five to eleven — every transmitter it heard sat three kilohertz high together, which is how we know it was the receiver.",
    "secs": 12,
    "items": [
     {
@@ -693,7 +693,7 @@
       1,
       1
      ],
-     "note": "tuning lost 10:06–10:34"
+     "note": "uncorrected until 10:34"
     }
    ]
   },

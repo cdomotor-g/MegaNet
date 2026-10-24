@@ -102,7 +102,14 @@ scene:
    when each was listened to. A
    window widened, a channel removed, a correction lost, an hour before a group
    of silences or a lag jump, is a possible cause worth saying — and is often
-   the only one that is not a drive.
+   the only one that is not a drive. Read what a stick ran with before saying
+   what it lost: its log's `rtl_sdr … -p <ppm>` lines (no `-p` is no
+   correction) and `base_station.status -> receivers[].ppm`, and its carriers
+   over the days (`reception.cfo_hz` by `point_id`'s `sdr<n>`; the times come
+   back in UTC). A stick at 18 Bateson was first taken for one that lost a
+   −19 ppm correction at 10:06 Brisbane on 24 Oct; it had never had one — its
+   carriers measured about +2.9 kHz from 19 Oct — and the patch of 10:33
+   Brisbane (00:33 UTC) corrected it for the first time, from 10:34.
 4. **Is it new, chronic or getting better?** Compare with `series` and the
    server's history. Say what cleared: good news is news — but a finding the
    server cleared may only have rolled out of its week, so the good news is

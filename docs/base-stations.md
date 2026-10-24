@@ -67,6 +67,20 @@ lets Flood-Net do (`remote.*`) — the database refuses such a patch, and so doe
 station. Flood-Net cannot widen its own reach, and there is no power-off: a station
 on a hill that was told to shut down needs somebody to drive there.
 
+**A stick's frequency correction changes only when a patch says so.** A
+patch's `receivers.sdrDevices` replaces the station's list whole. From RPi
+ALERT 0.15.2 the station works out each stick's correction before and after —
+as it finds them: the stick's entry by key, else an RPi ALERT 0.4 entry by its
+serial, else the shared one — and refuses a patch that would change one
+without giving that stick a `ppm` (or changing the shared one it already
+followed), naming the stick and what it would have lost. A stick without its
+correction goes on decoding, so nothing else would show it, but every carrier
+it measures is off by that much, and with them the fingerprints Station Health
+tells transmitters apart by. The form here keeps each stick's correction as
+the station sent it, and carries a 0.4 entry's into the stick's own when the
+stick is changed; a patch written by hand is where this bites — give `ppm` in
+the entry of every stick with a correction of its own.
+
 **Each request is done once.** The check-in hands a request over once (it is
 `sent` from then on, and never handed over again), at most ten a check-in. A
 request not collected within **ten minutes expires** rather than running hours

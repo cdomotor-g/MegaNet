@@ -436,11 +436,18 @@ const BaseStations = (function () {
     };
     const own = (cfg.receivers || {}).sdrDevices || [];
     for (const r of rx.filter(x => x.kind === 'sdr')) {
-      const e = own.find(o => o.key === r.key) || {};
+      const e = stickEntry(own, r) || {};
       f['s:' + r.key] = { name: e.name || '', freq: e.freqHz ? (e.freqHz / 1e6).toFixed(4) : '', format: e.format || '',
         gain: e.gainDb === undefined ? '' : e.gainDb === null ? 'auto' : String(e.gainDb), rate: e.sampleRate === undefined ? '' : String(e.sampleRate), on: e.enabled !== false };
     }
     return f;
+  }
+
+  // A stick's own settings as the station finds them (RPi ALERT's sdr.js
+  // own()): its entry by key — or, as RPi ALERT 0.4 wrote them, by its serial
+  // alone, shared by every stick with that serial.
+  function stickEntry(list, r) {
+    return list.find(e => e.key === r.key) || (r.serial ? list.find(e => !e.key && e.serial && e.serial === r.serial) : null) || null;
   }
 
   // JSON with every object's keys in order, so that the same settings
@@ -478,8 +485,15 @@ const BaseStations = (function () {
         const keys = new Set(sticks.map(r => r.key));
         const listOut = (((cfg.receivers || {}).sdrDevices) || []).filter(e => !keys.has(e.key));
         for (const r of sticks) {
-          const v = f['s:' + r.key] || {}, before = (((cfg.receivers || {}).sdrDevices) || []).find(e => e.key === r.key) || {};
+          const list = ((cfg.receivers || {}).sdrDevices) || [];
+          const v = f['s:' + r.key] || {}, before = stickEntry(list, r) || {};
+          // A stick held by a 0.4 entry by serial gets one of its own by key
+          // when something of it changes, carrying the rest — its correction
+          // above all — over: an entry by key without them would hide them.
+          const bySerial = !before.key && !!before.serial;
           const e = Object.assign({}, before, { key: r.key });
+          delete e.serial;
+          const was = JSON.stringify(Object.keys(e).sort().map(k => [k, e[k]]));
           for (const k of ['name', 'freqHz', 'format', 'gainDb', 'sampleRate', 'enabled']) delete e[k];
           if (v.name && v.name.trim()) e.name = v.name.trim();
           if (v.freq && v.freq.trim()) e.freqHz = Math.round(num(v.freq, r.name + ': a frequency of 24–1766 MHz', 24, 1766) * 1e6);
@@ -487,6 +501,7 @@ const BaseStations = (function () {
           if (v.gain && v.gain.trim()) e.gainDb = /^(auto|agc)$/i.test(v.gain.trim()) ? null : num(v.gain, r.name + ': a gain of 0–60 dB, or auto', 0, 60);
           if (v.rate !== undefined && v.rate !== '') e.sampleRate = Number(v.rate);
           if (v.on === false) e.enabled = false;
+          if (bySerial && JSON.stringify(Object.keys(e).sort().map(k => [k, e[k]])) === was) continue;
           if (Object.keys(e).length > 1) listOut.push(e);
         }
         if (canon(listOut) !== canon(((cfg.receivers || {}).sdrDevices) || [])) put('receivers.sdrDevices', listOut);

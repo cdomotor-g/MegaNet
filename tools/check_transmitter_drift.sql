@@ -1,5 +1,5 @@
--- check_transmitter_drift.sql — Prove 0075 and 0077, transmitter drift as a
--- health finding (#217), against a real database.
+-- check_transmitter_drift.sql — Prove 0075, 0077 and 0082, transmitter drift
+-- as a health finding (#217), against a real database.
 --
 --   psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_transmitter_drift.sql
 --
@@ -9,8 +9,12 @@
 -- A made-up base station hears, for thirty days, a made-up network — and its
 -- own crystal wanders by up to 90 Hz a day, which must not show anywhere:
 --
---   ALERT2: six transmitters (99001–99006): four steady, one drifting +450 Hz
---   in the last week, one 600 Hz below the rest; one copy relayed by 99004.
+--   ALERT2: seven transmitters (99001–99007): four steady, one drifting +450 Hz
+--   in the last week, one 600 Hz below the rest, one 2,500 Hz above (about
+--   16.5 ppm against the rest: its title must say so, not "+#.#" — 0082); one
+--   copy relayed by 99004. And a second receiver of our own with a fleet of
+--   its own (99011–99014), so the first's is undisturbed: three steady, one
+--   moving +1,600 Hz in the last week — a drift of over 10 ppm (0082).
 --
 --   Legacy ALERT (addresses 64101–64399, stations chk_…):
 --     * chk_r1, a repeater (own sensor 64190, carrier +250) passing 64100–64120:
@@ -53,6 +57,8 @@ $$;
 insert into meganet.editor_allow (entry, note) values ('drift-editor@example.test', 'check_transmitter_drift — rolled back') on conflict (entry) do nothing;
 select meganet.create_ingest_token('_check_drift pi') is not null as minted \gset
 create temporary table _tok on commit drop as select id from meganet.ingest_token where label = '_check_drift pi';
+select meganet.create_ingest_token('_check_drift pi 2') is not null as minted2 \gset
+create temporary table _tok2 on commit drop as select id from meganet.ingest_token where label = '_check_drift pi 2';
 
 -- The receiver's own error each day (Hz), and the days.
 create temporary table _days on commit drop as
@@ -127,7 +133,7 @@ select (select id from _tok), 'check-drift-sdr', 'rtl-sdr', (d::text || ' 04:00:
 
 -- ALERT2: true offsets (Hz) and the drifter.
 create temporary table _tx (a integer primary key, hz double precision, drift double precision) on commit drop;
-insert into _tx values (99001, 0, 0), (99002, 60, 0), (99003, -40, 0), (99004, 20, 0), (99005, 30, 450), (99006, -600, 0);
+insert into _tx values (99001, 0, 0), (99002, 60, 0), (99003, -40, 0), (99004, 20, 0), (99005, 30, 450), (99006, -600, 0), (99007, 2500, 0);
 insert into meganet.reception (ingest_token_id, point_id, receiver, heard_at, protocol, alert_id, value_raw, ok, detail)
 select (select id from _tok), 'check-drift-sdr', 'rtl-sdr', (dd.d::text || ' 00:00:00+00')::timestamptz + make_interval(hours => k, mins => t.a % 60),
        'alert2', 1000 + k, 1, true,
@@ -135,6 +141,13 @@ select (select id from _tok), 'check-drift-sdr', 'rtl-sdr', (dd.d::text || ' 00:
          'cfo_hz', round(t.hz + case when dd.age < 7 then t.drift else 0 end + dd.rxe + 6 * sin(k + t.a))::integer)
   from _tx t, _days dd, generate_series(0, 23) k
  where not (t.a = 99002 and dd.age % 3 = 0);            -- one is not heard every day
+-- The second receiver's own fleet, and its drifter (99014).
+insert into meganet.reception (ingest_token_id, point_id, receiver, heard_at, protocol, alert_id, value_raw, ok, detail)
+select (select id from _tok2), 'check-drift-sdr-b', 'rtl-sdr', (dd.d::text || ' 00:00:00+00')::timestamptz + make_interval(hours => k, mins => t.a % 60),
+       'alert2', 1000 + k, 1, true,
+       jsonb_build_object('source', t.a, 'path', '[]'::jsonb, 'freq_mhz', 150.0,
+         'cfo_hz', round(t.hz + case when dd.age < 7 then t.drift else 0 end - dd.rxe + 6 * sin(k + t.a))::integer)
+  from (values (99011, 0::double precision, 0::double precision), (99012, 10, 0), (99013, -10, 0), (99014, 0, 1600)) t(a, hz, drift), _days dd, generate_series(0, 23) k;
 -- One copy over a repeater, on the repeater's carrier (99004's).
 insert into meganet.reception (ingest_token_id, point_id, receiver, heard_at, protocol, alert_id, value_raw, ok, detail)
 select (select id from _tok), 'check-drift-sdr', 'rtl-sdr', (d::text || ' 12:00:00+00')::timestamptz + make_interval(secs => k), 'alert2', 2000 + k, 1, true,
@@ -237,6 +250,20 @@ begin
   perform pg_temp.check_that('ALERT2: one 4 ppm off the rest is an off-channel warning, with its numbers',
     f.id is not null and f.severity = 'warn' and (f.evidence ->> 'offset_ppm')::numeric between -4.4 and -3.6, coalesce(f.title, '<none>'));
   select * into f from meganet.health_finding
+   where source = 'transmitters' and kind = 'transmitter-off-channel' and subject = 'a2:99007' and cleared_at is null;
+  perform pg_temp.check_that('ALERT2: one 16 ppm off is critical, and its title gives the ppm and the hertz in full — not +#.# (0082)',
+    f.id is not null and f.severity = 'critical' and (f.evidence ->> 'offset_ppm')::numeric between 15.5 and 17.5
+      and f.title ~ 'transmitting \+1[0-9]\.[0-9] ppm off the others \(\+2[0-9]{3} Hz\)$' and f.title !~ '#'
+      and f.detail ~ ' 1[0-9]\.[0-9] ppm at ', coalesce(f.title, '<none>'));
+  select * into f from meganet.health_finding
+   where source = 'transmitters' and kind = 'transmitter-drift' and subject = 'a2:99014' and cleared_at is null;
+  perform pg_temp.check_that('ALERT2: one that moved over 10 ppm in a week says how far, title and detail — not +#.# (0082)',
+    f.id is not null and f.severity = 'critical' and f.title ~ 'drifted \+1[0-9]\.[0-9] ppm in a week$'
+      and f.detail ~ 'was [+-][0-9]\.[0-9]{2} ppm over the .*, and \+1[0-9]\.[0-9]{2} ppm over the last' and f.title !~ '#' and f.detail !~ '#',
+    coalesce(f.title, '<none>') || ' | ' || coalesce(f.detail, ''));
+  perform pg_temp.check_that('…and no transmitter finding anywhere is titled with #',
+    not exists (select 1 from meganet.health_finding where source = 'transmitters' and cleared_at is null and (title ~ '[+-]#' or detail ~ '[+-]#')));
+  select * into f from meganet.health_finding
    where source = 'transmitters' and kind = 'transmitter-drift' and subject = 'st:chk_l64105' and cleared_at is null;
   perform pg_temp.check_that('legacy: a station that moved 3 ppm in a week is a critical drift finding, on its station, by name',
     f.id is not null and f.severity = 'critical' and f.station_id = 'chk_l64105' and f.title like 'Check l64105: drifted +3.0 ppm in a week',
@@ -250,7 +277,7 @@ begin
     not exists (select 1 from meganet.health_finding where source = 'transmitters' and cleared_at is null
                  and subject in ('a2:99001', 'a2:99002', 'a2:99003', 'a2:99004', 'st:chk_l64101', 'st:chk_l64107', 'st:chk_l64108', 'st:chk_r2')));
   perform pg_temp.check_that('transmitter_summary holds every transmitter judged, its line and its change',
-    (select count(*) from meganet.transmitter_summary where tx like 'st:chk\_%' or tx like 'a2:99%') = 26
+    (select count(*) from meganet.transmitter_summary where tx like 'st:chk\_%' or tx like 'a2:99%') = 31
       and (select array_length(ppm, 1) = array_length(days, 1) and array_length(days, 1) >= 28 and change_ppm between 2.7 and 3.3
              from meganet.transmitter_summary where tx = 'st:chk_l64105'),
     (select format('%s %s %s', array_length(days, 1), change_ppm, w_ppm) from meganet.transmitter_summary where tx = 'st:chk_l64105'));

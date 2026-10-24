@@ -375,7 +375,16 @@ try {
     g['s:' + odd] = Object.assign({}, g['s:' + odd], { freq: '', rate: '240000' });
     const changed = B._patchFrom(cfg, g, rx);
     const bad = B._patchFrom(cfg, Object.assign({}, f, { freq: '2000' }), rx);
+    // A stick still held by an RPi ALERT 0.4 entry by its serial (its −19 ppm with it).
+    const old = JSON.parse(JSON.stringify(cfg));
+    old.receivers.sdrDevices = [{ serial: '00000001', ppm: -19, gainDb: 40 }].concat(old.receivers.sdrDevices);
+    const rx4 = [{ key: stick1, kind: 'sdr', name: 'RTL-SDR 1', serial: '00000001' }, { key: odd, kind: 'sdr', name: 'Second stick' }];
+    const f4 = B._formFrom(old, rx4);
+    const g4 = JSON.parse(JSON.stringify(f4));
+    g4['s:' + stick1] = Object.assign({}, g4['s:' + stick1], { name: 'North stick' });
+    const serialSame = B._patchFrom(old, f4, rx4), serialRenamed = B._patchFrom(old, g4, rx4);
     return {
+      serialShown: f4['s:' + stick1].gain, serialSame, serialRenamed,
       liveness: [
         B._liveness({ managed: true, mode: 'manage', idle_s: 60, last_seen_at: t(20) }).k,
         B._liveness({ managed: true, mode: 'manage', idle_s: 60, last_seen_at: t(600) }).k,
@@ -423,6 +432,12 @@ try {
     devs.length === 2 && devs.some(d => d.key === STICK_1 && d.name === 'North stick' && Object.keys(d).length === 2)
       && devs.some(d => d.key === ODD_KEY && d.name === 'Second stick' && d.ppm === 3 && d.freqHz === undefined && d.sampleRate === 240000),
     JSON.stringify(devs));
+  const sp = (((pure.serialRenamed || {}).patch || {}).receivers || {}).sdrDevices || [];
+  ok('a stick held by a 0.4 entry by its serial is shown with it, and an untouched form sends nothing',
+    pure.serialShown === '40' && pure.serialSame.patch && Object.keys(pure.serialSame.patch).length === 0, JSON.stringify(pure.serialSame));
+  ok('…and changed, gets an entry by key that carries the serial entry\'s correction — RPi ALERT 0.15.2 refuses one that would hide it',
+    sp.some(d => d.key === STICK_1 && d.name === 'North stick' && d.ppm === -19 && d.gainDb === 40 && d.serial === undefined)
+      && sp.some(d => !d.key && d.serial === '00000001' && d.ppm === -19), JSON.stringify(sp));
   ok('a last update run that found nothing to install says when, not the release the station saw then',
     /^nothing newer when it checked \d+ (h|min) ago$/.test(pure.lastInstall[0]) && !/0\.9\.0/.test(pure.lastInstall[0]), pure.lastInstall[0]);
   ok('…one that installed something, or failed, keeps what the station said', /^ok .* ago: Version 0\.10\.0 installed\.$/.test(pure.lastInstall[1])

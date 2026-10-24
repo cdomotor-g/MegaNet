@@ -463,7 +463,7 @@
    "sub": "each channel, hour by hour, against its usual",
    "presenter": "tech-wizard",
    "secs": 21,
-   "say": "Our end, for the week. The base station's channels were rearranged several times, and you can see it: 152.400 on and off, ALERT2 from Monday. Uploads trailed by seven seconds on some settings and nearly a minute on others — it tracks how much the Pi is asked to decode. And stick 2's frequency correction came and went with its settings, which matters next.",
+   "say": "Our end, for the week. The base station's channels were rearranged several times, and you can see it: 152.400 on and off, ALERT2 from Monday. Uploads trailed by seven seconds on some settings and nearly a minute on others — it tracks how much the Pi is asked to decode. And stick 2 ran without a frequency correction until Saturday morning, which matters next.",
    "items": [
     {
      "name": "Stick 1 · 151.500",
@@ -1170,7 +1170,7 @@
    "presenter": "tech-wizard",
    "sev": "info",
    "secs": 21,
-   "say": "Fingerprints. Constitution Hill looked seventeen parts per million off on the twenty-first and two on the twenty-third. That jump isn't the repeater: on the twenty-first it was heard on stick 2, running without its correction, and everything stick 2 heard that day looked as far off. Lake Manchester and ALERT2 source 10315 are different — sixteen high, day after day, on the corrected stick.",
+   "say": "Fingerprints. Constitution Hill looked seventeen parts per million off on the twenty-first and two on the twenty-third. That jump isn't the repeater: on the twenty-first it was heard on stick 2, which had no correction yet, and everything stick 2 heard that day looked as far off. Lake Manchester and ALERT2 source 10315 are different — sixteen high, day after day, on stick 1.",
    "stations": [
     "constitution_hill",
     "lake_manchester_al"

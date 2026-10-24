@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-24** (revision 184 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-24** (revision 185 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -817,6 +817,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 185 — 2026-10-24: 📺 Network Weather, `0082`, and RPi ALERT 0.15.2
+
+The owner asked for a daily (and weekly) animated bulletin at the top of Station Health — *"animation technician meets weatherman"*, presented by the Droggies — written each morning by a scheduled Claude Code task, then for the presenter under the stage beside their words, then *"yes to bug fix and pi ppm"*. **Opens and closes nothing.**
+
+- **📺 Network Weather** (`health-bulletin.js`, `tools/bulletin/`, `data/bulletins/`, `npm run bulletin`): the bulletin player and the pipeline that feeds it — `gather.mjs` (the facts, from the same analysis Station Health runs, the carrier fingerprints and the bit flips), `draft.mjs`, `validate.mjs`, `publish.mjs` — and `tools/bulletin/README.md`, the brief the two scheduled tasks follow (daily 4:31 am, weekly Mondays 3:59 am Brisbane, each into a standing session with this repository attached, because a fresh one cannot push). Pushed at `4bcc113`, `f0a5f57`.
+- **`0082`** (`refresh_transmitter_findings()` restated with its three number patterns widened): a transmitter 10 ppm or more off was titled `+#.# ppm` — `to_char()` fills a one-digit pattern with `#` — three open findings on 25 Oct, ALERT2 10315 and Lake Manchester AL among them, at about 16 ppm. The ppm text is otherwise unchanged; the hertz loses the blank `SG9990` left after the sign under 1 kHz (`+ 460` → `+460`), so most open off-channel findings are retitled by its own run, which waits for the hourly one's lock rather than collide with it. **It refuses to go in before `0081`**: pasted first it would set `schema_version` 82 and hide `0080`–`0081` from `db-migrate` — the 0022/0023 gap again. `tools/check_transmitter_drift.sql` (42): a transmitter 16.5 ppm off and, on a second receiver with a fleet of its own, one that moved over 10 ppm in a week — both `+#.#` with 0078's function, in full with 0082's. **Not live:** the queue is now `0080`, `0081`, `0082`, in that order; then `core.js` goes to 82.
+- **RPi ALERT 0.15.2** (cdomotor-g/RPi_ALERT): a `config.set` from Flood-Net that would change a stick's frequency correction without saying so — its correction worked out before and after as the station finds it (its entry by key, else a 0.4 entry by serial, else the shared one) — is refused, naming the stick. **Base Stations → Settings** (`base-stations.js`) reads a stick held by a 0.4 entry by serial, and carries that entry's correction into the stick's own when the stick is changed, so the form is never refused for it (`npm run basestations` +2). A guard against a weakness, not a fix for something that happened: **stick 2 (revision 184's "19 ppm off") had never been corrected** — its carriers measured about +2.9 kHz from 19 Oct until revision 184's patch of 10:33 Brisbane on the 24th, in effect from 10:34, gave it −19 for the first time. The first bulletins said its correction "came and went with its settings" (weekly) and that five transmitters read high "only on days stick 2 ran without its frequency correction" (daily); both are corrected, the test fixture no longer tells it as a correction lost, and the brief says to read what a stick ran with before saying what it lost. `docs/base-stations.md` says what a hand-written patch must carry.
+- **Checks:** `npm run bulletin`, `basestations`, the cheap five, `calm`, `tabs`, `health`; every `db-checks` step from zero over 82 migrations on a local Postgres 16 (47 of 47); RPi ALERT `npm test` (169 pass, 3 skipped as on `main`). `npm run shell` fails on `.bl-charts`' 760px, as on `main` before this.
 
 ### Revision 184 — 2026-10-24: 📻 Channel by channel, and 18 Bateson's CPU
 
