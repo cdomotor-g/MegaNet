@@ -17,7 +17,7 @@ trend no one rule is looking for.
 
 | | Daily | Weekly |
 | --- | --- | --- |
-| When | every day, about 5 am Brisbane | Mondays, about 4:30 am Brisbane |
+| When | every day, 4:31 am Brisbane | Mondays, 3:59 am Brisbane |
 | Covers | the last 24 hours, against the week before | the last 7 days, against the week before that |
 | Length | 6–9 scenes, 70–120 s | 8–11 scenes, 100–160 s |
 | Presenter | the day's Droggie (`facts.presenter`) | Graham Watts, with Alex Chen for the radio |
@@ -247,11 +247,11 @@ receiver's week; what the register needs; and what got fixed.
 Two Claude Code scheduled tasks, each starting a fresh session in the owner's
 cloud environment, with the Supabase connector:
 
-- **Flood-Net daily network bulletin** — every day at about 5 am Brisbane:
+- **Flood-Net daily network bulletin** — every day at 4:31 am Brisbane:
   *“Write today's Flood-Net daily network bulletin: follow tools/bulletin/README.md
   in cdomotor-g/MegaNet with --kind daily, publish it, and push it to main.”*
-- **Flood-Net weekly network bulletin** — Mondays at about 4:30 am Brisbane:
-  the same with `--kind weekly`.
+- **Flood-Net weekly network bulletin** — Mondays at 3:59 am Brisbane, so the
+  two do not push at once: the same with `--kind weekly`.
 
 To change what the bulletins say or how, change this file: the tasks read it
 every run. To change when they run, edit the scheduled task (claude.ai → Code →

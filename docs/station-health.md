@@ -32,7 +32,7 @@ different one each day of the week; Graham Watts the weekly, with Alex Chen for
 the radio), and the narration runs under the stage word by word, or aloud in
 the browser's own voice on 🔊.
 
-It is written, not worked out here. Every morning at about five a scheduled
+It is written, not worked out here. Every morning at half past four a scheduled
 Claude Code task reads the network as this tab does — the same
 `health-analysis.js` over the same readings (`tools/bulletin/gather.mjs`, through
 `tools/health/report.mjs`) — with what only the server has: the findings'
@@ -42,7 +42,7 @@ common (one repeater, one receiver channel, one hour), tells a receiver's own
 error from a transmitter's by the carrier, checks what changed at the base
 station, and writes the scenes — what is wrong, the evidence, and when it is
 not the obvious, the possible causes and what would tell them apart. It does
-not prescribe. Mondays at about half past four a second task writes the week:
+not prescribe. Mondays at four a second task writes the week:
 trends, chronic stations, recurring groups, the week's fingerprints and flips.
 `tools/bulletin/README.md` is both tasks' brief, and the way to run one by hand.
 
