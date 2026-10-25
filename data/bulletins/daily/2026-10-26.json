@@ -1,0 +1,520 @@
+{
+ "format": "floodnet-bulletin/1",
+ "kind": "daily",
+ "id": "daily-2026-10-26",
+ "issued_at": "2026-10-25T18:32:15.217Z",
+ "period": {
+  "from": "2026-10-24T18:32:15.217Z",
+  "to": "2026-10-25T18:32:15.217Z",
+  "label": "24 hours to 4:32 am Monday"
+ },
+ "presenter": "seasoned-hydrographer",
+ "cohost": "tech-wizard",
+ "outlook": {
+  "sky": "stormy",
+  "label": "Stormy"
+ },
+ "headline": "The Toowoomba repeater has been silent since 4:23 on Sunday morning, and the Lockyer stations behind it went with it: one path, not twenty faults.",
+ "stats": [
+  {
+   "label": "stations heard",
+   "value": 765,
+   "tone": "neutral"
+  },
+  {
+   "label": "checks received",
+   "value": 64,
+   "unit": "%",
+   "was": 79,
+   "tone": "bad"
+  },
+  {
+   "label": "quiet, keep a schedule",
+   "value": 49,
+   "tone": "warn"
+  },
+  {
+   "label": "critical findings",
+   "value": 30,
+   "tone": "bad"
+  }
+ ],
+ "scenes": [
+  {
+   "type": "title",
+   "title": "Good morning",
+   "secs": 14,
+   "say": "Good morning, Graham Watts here. Stormy on the chart. Forty-nine stations that keep a schedule went quiet, but most come down to two paths, and one is a single repeater on the range."
+  },
+  {
+   "type": "map",
+   "title": "A low over the Lockyer",
+   "sub": "Toowoomba repeater quiet since 4:23 am Sunday",
+   "sev": "critical",
+   "secs": 23,
+   "say": "First, the Lockyer. The Toowoomba repeater was last heard at 4:23 on Sunday morning. Around the same hour Tenthill, Helidon, Withcott, Gatton and their neighbours went quiet too: about twenty stations whose path runs through Toowoomba and Mt Glorious. All at once, before dawn, points at the repeater or its link, not twenty sites.",
+   "stations": [
+    "toowoomba_al",
+    "mt_glorious_al_rptr",
+    "tenthill_al",
+    "bill_gunn_dam_al",
+    "upper_tenthill_al",
+    "mt_sylvia_al",
+    "helidon_al",
+    "gormans_gap_al"
+   ],
+   "marks": [
+    {
+     "id": "toowoomba_al",
+     "kind": "silent",
+     "sev": "critical",
+     "label": "Toowoomba AL"
+    },
+    {
+     "id": "mt_glorious_al_rptr",
+     "kind": "repeater",
+     "sev": "warn",
+     "label": "Mt Glorious"
+    },
+    {
+     "id": "tenthill_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "bill_gunn_dam_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "upper_tenthill_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "mt_sylvia_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "helidon_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "gormans_gap_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "withcott_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "gatton_al",
+     "kind": "silent",
+     "sev": "warn"
+    }
+   ],
+   "links": [
+    {
+     "from": "tenthill_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "bill_gunn_dam_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "upper_tenthill_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "mt_sylvia_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "helidon_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "gormans_gap_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "withcott_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "gatton_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "toowoomba_al",
+     "to": "mt_glorious_al_rptr",
+     "style": "path"
+    }
+   ],
+   "areas": [
+    {
+     "lat": -27.55,
+     "lon": 152.2,
+     "km": 30,
+     "sev": "critical",
+     "label": "Lockyer, behind Toowoomba"
+    }
+   ],
+   "focus": {
+    "lat": -27.45,
+    "lon": 152.35,
+    "km": 70
+   }
+  },
+  {
+   "type": "receivers",
+   "title": "Our end of the line",
+   "presenter": "tech-wizard",
+   "sev": "warn",
+   "secs": 25,
+   "say": "Alex Chen on the radio. Stick one's busiest channel, 151.5375, fell from about four thousand bursts an hour on Saturday to about twelve hundred on Sunday. The carriers still on it didn't shift, so our tuning didn't move: the sender stopped, not our ears. And nobody has listened on 152.400 since Saturday evening, so three stations heard only there look silent.",
+   "stations": [
+    "nindooinbah_dam_al",
+    "dunwich_al",
+    "coulson_crossing_ale"
+   ],
+   "items": [
+    {
+     "name": "rpi-83071968 stick 1",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "one channel down by two thirds from 4 am Sunday"
+    },
+    {
+     "name": "rpi-83071968 stick 2",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "steady"
+    }
+   ]
+  },
+  {
+   "type": "map",
+   "title": "Unsettled over Ipswich",
+   "sub": "one by one, behind Hillcrest and Constitution Hill",
+   "sev": "warn",
+   "secs": 25,
+   "say": "Second, Ipswich and Springfield. Twenty-six quiet stations sit behind Hillcrest and Constitution Hill, dropping out one by one through Sunday afternoon. Hillcrest itself is still on air. Many went quiet on Saturday night too and came back at midday: the pattern of a solar site that can't carry the night. If they return together this morning, it's power on the path.",
+   "stations": [
+    "hillcrest_wine_glass",
+    "constitution_hill",
+    "loamside_al",
+    "collingwood_park_al",
+    "springfield_lakes_al",
+    "mt_marrow_al",
+    "tallegalla_al",
+    "riverview_conway_st_al"
+   ],
+   "marks": [
+    {
+     "id": "hillcrest_wine_glass",
+     "kind": "repeater",
+     "sev": "warn",
+     "label": "Hillcrest"
+    },
+    {
+     "id": "constitution_hill",
+     "kind": "repeater",
+     "sev": "warn",
+     "label": "Constitution Hill"
+    },
+    {
+     "id": "loamside_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "collingwood_park_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "springfield_lakes_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "mt_marrow_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "tallegalla_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "riverview_conway_st_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "blackstone_br_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "romani_al",
+     "kind": "silent",
+     "sev": "warn"
+    }
+   ],
+   "areas": [
+    {
+     "lat": -27.65,
+     "lon": 152.85,
+     "km": 25,
+     "sev": "warn",
+     "label": "Ipswich and Springfield"
+    }
+   ],
+   "focus": {
+    "lat": -27.6,
+    "lon": 152.9,
+    "km": 45
+   }
+  },
+  {
+   "type": "battery",
+   "title": "Batteries",
+   "secs": 20,
+   "sev": "critical",
+   "say": "The New Recruit, on batteries. Thornton School Road read 9.4 volts last night after nights near 12.8. Kunghur has slid four nights to 9.5. Upper Goomburra dropped from 13.1 to 11.2. Thornton's step came the night its neighbours went quiet; tonight's low will show if it's real.",
+   "stations": [
+    "thornton_school_roa",
+    "kunghur_the_junction",
+    "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+    "upper_goomburra"
+   ],
+   "items": [
+    {
+     "id": "thornton_school_roa",
+     "name": "Thornton (School Rd) AL",
+     "v": 9.4,
+     "trend": -0.047,
+     "nights": [
+      12.7,
+      12.9,
+      12.9,
+      12.8,
+      12.8,
+      9.4
+     ],
+     "note": "Battery critical — 9.4 V"
+    },
+    {
+     "id": "kunghur_the_junction",
+     "name": "Kunghur (The Junction)",
+     "v": 9.5,
+     "trend": -0.378,
+     "nights": [
+      11.5,
+      11.4,
+      11,
+      9.5
+     ],
+     "note": "Battery critical — 9.5 V"
+    },
+    {
+     "id": "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+     "name": "Dunbible Creek at Dunbible Creek Rail Trail Bridge",
+     "v": 10,
+     "trend": -0.051,
+     "nights": [
+      10.3,
+      10.2,
+      10.1,
+      10,
+      10
+     ],
+     "note": "Battery critical — 10.0 V"
+    },
+    {
+     "id": "upper_goomburra",
+     "name": "Upper Goomburra AL",
+     "v": 11.2,
+     "nights": [
+      13.1,
+      11.2
+     ],
+     "note": "down 1.9 volts in a night"
+    }
+   ],
+   "presenter": "new-recruit"
+  },
+  {
+   "type": "checks",
+   "title": "Check signals",
+   "secs": 12,
+   "sev": "warn",
+   "say": "Turbo here. Checks received fell to sixty-four percent, from seventy-nine. Whiteway Road Overflow has missed thirty-six in a row, Spicers Peak thirty-two. Those are older than this weekend.",
+   "stations": [
+    "kilmoylar_rd_al",
+    "loamside_al",
+    "spicers_peak_al",
+    "whiteway_rd_overflow",
+    "millbrook_al"
+   ],
+   "items": [
+    {
+     "id": "kilmoylar_rd_al",
+     "name": "Kilmoylar Rd AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 12 checks"
+    },
+    {
+     "id": "loamside_al",
+     "name": "Loamside AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 9 checks"
+    },
+    {
+     "id": "spicers_peak_al",
+     "name": "Spicers Peak AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 32 checks"
+    },
+    {
+     "id": "whiteway_rd_overflow",
+     "name": "Whiteway Rd Overflow AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 36 checks"
+    },
+    {
+     "id": "millbrook_al",
+     "name": "Millbrook AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 16 checks"
+    }
+   ],
+   "presenter": "turbo"
+  },
+  {
+   "type": "list",
+   "title": "Worth a look today",
+   "secs": 16,
+   "say": "So, worth a look: the Toowoomba repeater first, then the Ipswich path this morning, and whether 152.400 should be listened to again. And good news: over a hundred and twenty stations the server had called silent were heard again.",
+   "stations": [
+    "toowoomba_al",
+    "hillcrest_wine_glass",
+    "thornton_school_roa",
+    "chambers_creek_al"
+   ],
+   "items": [
+    {
+     "sev": "critical",
+     "id": "toowoomba_al",
+     "text": "Toowoomba repeater: silent since 4:23 am Sunday; about 20 Lockyer stations behind it."
+    },
+    {
+     "sev": "warn",
+     "id": "hillcrest_wine_glass",
+     "text": "26 stations behind Hillcrest and Constitution Hill quiet since Sunday afternoon."
+    },
+    {
+     "sev": "warn",
+     "text": "152.400 not listened to since 5:47 pm Saturday: 3 stations heard only there."
+    },
+    {
+     "sev": "warn",
+     "id": "thornton_school_roa",
+     "text": "Thornton (School Rd) AL at 9.4 V; Kunghur 9.5 V and sliding."
+    },
+    {
+     "sev": "ok",
+     "id": "chambers_creek_al",
+     "text": "Heard again: 122 stations the server had called silent."
+    }
+   ]
+  },
+  {
+   "type": "signoff",
+   "title": "That’s the network",
+   "secs": 7,
+   "say": "That's the network: one quiet repeater, and an Ipswich path to watch at sunrise. Back tomorrow."
+  }
+ ],
+ "sources": {
+  "readings": 24279,
+  "stations_heard": 765,
+  "gathered_at": "2026-10-25T18:32:15.217Z"
+ },
+ "caveats": [
+  "Whether Mt Glorious itself is on air could not be confirmed: it sends no readings of its own.",
+  "The change that dropped 152.400 is not in the base station's command record; it was likely made on the Pi's own page.",
+  "Thornton's 9.4 V is one night's low; one reading cannot separate a failing battery from a bad value.",
+  "The Ipswich night-off pattern fits a solar repeater site, but no repeater battery there is on file to confirm it."
+ ],
+ "author": "Claude Code, from the bulletin draft and read-only queries"
+}

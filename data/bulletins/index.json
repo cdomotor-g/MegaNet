@@ -1,7 +1,15 @@
 {
  "format": "floodnet-bulletin-index/1",
- "updated_at": "2026-10-25T18:07:48.285Z",
+ "updated_at": "2026-10-25T18:37:27.405Z",
  "daily": [
+  {
+   "id": "daily-2026-10-26",
+   "file": "data/bulletins/daily/2026-10-26.json",
+   "issued_at": "2026-10-25T18:32:15.217Z",
+   "headline": "The Toowoomba repeater has been silent since 4:23 on Sunday morning, and the Lockyer stations behind it went with it: one path, not twenty faults.",
+   "sky": "stormy",
+   "presenter": "seasoned-hydrographer"
+  },
   {
    "id": "daily-2026-10-25",
    "file": "data/bulletins/daily/2026-10-25.json",
