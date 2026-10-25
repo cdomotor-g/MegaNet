@@ -64,15 +64,23 @@
 // or a copy during the load still carries it — and applied once by
 // afterLoad(), which renderAfterLoad() calls when the list has been drawn.
 //
+// ── Sending it to somebody ──────────────────────────────────────────────────
+// 🔗 Share in the banner hands the address for where you are to the device's
+// own share sheet (navigator.share) — Messages, mail, Teams, whatever it has —
+// and copies it where there is none, which is most desktop browsers. On a
+// phone the app is a PWA with no address bar of its own, so without this a
+// view could not leave the device at all.
+//
 // Nothing runs at load (init.js calls start()). Every write is wrapped: a
 // browser that refuses history calls (some file:// contexts, a rate limit)
 // gets an app that works and an address that does not follow it.
 //
 // Exposes: start, sync, tabChanged, stationShown, attach, afterLoad, read,
-//          href, copyLink, newDevice, firstVisit.
+//          href, here, share, copyLink, newDevice, firstVisit.
 // Requires: core.js (state, TAB_LIST, announce, copyToClipboard, pillText), app.js
-//           (switchTab, showStationCard, closeStnCard), map-leader.js, and
-//           health.js (Health.picked, Health.wantStation) — all at call time.
+//           (switchTab, showStationCard, closeStnCard), map-leader.js,
+//           health.js (Health.picked, Health.wantStation) and toast.js — all
+//           at call time.
 
 const Route = (() => {
   const TAB_KEY = 'mn-tab';           // the last tab used on this device
@@ -368,6 +376,38 @@ const Route = (() => {
     try { return new URL(path, location.href).href; } catch (_) { return path; }
   }
 
+  // An absolute link to where you are: the view on screen, even one the map
+  // is still settling on and has not written to the address yet.
+  function here() {
+    const path = urlFor();
+    try { return new URL(path, location.href).href; } catch (_) { return path; }
+  }
+
+  // 🔗 Share in the banner. The share sheet is given the step's title as its
+  // words as well as its subject, because most of what it hands the link to
+  // (a text, a chat) drops the subject, and a link that needs a sign-in shows
+  // no preview: the words are all the person at the other end sees of what
+  // it is. Backing out of the sheet is not a failure and says nothing; a sheet
+  // that will not open at all falls back to the clipboard.
+  function share() {
+    const url = here();
+    const title = titleFor() || document.title || 'Flood-Net';
+    const copy = () => copyToClipboard(url).then(ok => ok
+      ? Toast.done('Copied a link to where you are — paste it to send it')
+      : Toast.failed('Could not copy the link — copy it from the address bar instead'));
+    const data = { title, text: title, url };
+    let can = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+    if (can && typeof navigator.canShare === 'function') {
+      try { can = navigator.canShare(data); } catch (_) { can = false; }
+    }
+    if (!can) return copy();
+    try {
+      return navigator.share(data).catch(err => (err && err.name === 'AbortError' ? undefined : copy()));
+    } catch (_) {
+      return copy();
+    }
+  }
+
   // The station card's 🔗 Copy link. The label says what happened and puts
   // itself back, as Copy lat, lon's does — markup and all (pillText).
   function copyLink(btn, stationId) {
@@ -383,6 +423,6 @@ const Route = (() => {
       : flash('✗', 'Copy failed', 'Could not copy the link to the clipboard'));
   }
 
-  return { start, sync, tabChanged, stationShown, attach, afterLoad, read, href, copyLink,
+  return { start, sync, tabChanged, stationShown, attach, afterLoad, read, href, here, share, copyLink,
            newDevice: () => newDevice, firstVisit: () => firstVisit };
 })();

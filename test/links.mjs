@@ -21,7 +21,9 @@
 //   6. **The fragment's owners** — a Workbench case shared as `#wb…` still
 //      opens the Workbench, and leaving it takes the case out of the address.
 //   7. **Copy link** — the station card's pill puts a link on the clipboard
-//      that opens that station for somebody else.
+//      that opens that station for somebody else; 🔗 Share in the banner
+//      hands the same link to the device's share sheet, and copies it where
+//      there is none.
 //
 // Why a check of its own: every failure here is an address that looks fine.
 // A link that opens on the wrong tab, a back button that skips a step or
@@ -307,6 +309,34 @@ async function main() {
     check('the card\'s 🔗 Copy link copies an absolute link to this station on this view',
       !!u && u.origin === server.origin && u.searchParams.get('tab') === 'stations' && u.searchParams.get('station') === A.id
         && viewNear(u.searchParams.get('map'), -25.6, 134.3, 6), copied);
+
+    // 🔗 Share in the banner: this browser has no share sheet, so it copies.
+    await page.evaluate(() => { document.getElementById('toasts')?.replaceChildren(); return navigator.clipboard.writeText(''); });
+    await page.click('#btn-share');
+    await page.waitForFunction(() => /Copied a link/.test((document.getElementById('toasts') || {}).textContent || ''),
+      null, { timeout: 5_000 }).catch(() => {});
+    const shareCopied = await page.evaluate(() => navigator.clipboard.readText());
+    check('🔗 Share, with no share sheet, copies the same link — this station, this view — and says so',
+      shareCopied === copied && /Copied a link/.test(await page.evaluate(() => document.getElementById('toasts')?.textContent || '')),
+      shareCopied);
+    // …and with one, hands it the link and the step's name, and backing out
+    // of the sheet copies nothing and says nothing.
+    const sheet = await page.evaluate(async () => {
+      const had = navigator.share;
+      const got = [];
+      document.getElementById('toasts')?.replaceChildren();
+      await navigator.clipboard.writeText('');
+      navigator.share = d => { got.push(d); return Promise.resolve(); };
+      await Route.share();
+      navigator.share = () => Promise.reject(new DOMException('cancelled', 'AbortError'));
+      await Route.share();
+      navigator.share = had;
+      return { got, clip: await navigator.clipboard.readText(), toast: document.getElementById('toasts')?.textContent || '' };
+    });
+    const sent = sheet.got[0] || {};
+    check('…with a share sheet, it is handed the link and where it is by name, and a cancelled sheet is left alone',
+      sheet.got.length === 1 && sent.url === copied && sent.title === `${A.name} · Stations — Flood-Net` && sent.text === sent.title
+        && sheet.clip === '' && !/Copied|Could not/.test(sheet.toast), J(sheet));
     await c1.close();
 
     const c2 = await browser.newContext({ viewport: { width: 1440, height: 900 } });

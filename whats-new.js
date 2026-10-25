@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 97, date: '2026-10-25', items: [
+      '<strong>🔗 Share</strong>, in the banner: sends a link to whatever you are looking at — the tab, the station whose card '
+        + 'is open and the map where you have it — through your phone\'s share sheet (Messages, mail, Teams and the rest). Where '
+        + 'there is no share sheet, as in most desktop browsers, it copies the link instead, ready to paste. Whoever opens it '
+        + 'lands on the same view.',
+    ] },
     { n: 96, date: '2026-10-25', items: [
       '<strong>📺 Network Weather</strong> now speaks: each Droggie presents in a voice of their own — Graham\'s slow and gravelly, '
         + 'Alex\'s flat and precise, Turbo\'s flat out — with the words appearing as they are said. Press ▶ on '

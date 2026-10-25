@@ -215,7 +215,7 @@ const Home = (() => {
   // emoji swapped for its pictogram, and put back for a look without them.
   // Only the drawing changes — the label beside it, and so the button's
   // name, is the button's own (setHeaderLabel, app.js, rewrites that alone).
-  const BANNER = { 'btn-home': 'home', 'btn-palette': 'search', 'btn-auth': 'user', 'btn-more': 'more', 'btn-whatsnew': 'sparkle' };
+  const BANNER = { 'btn-home': 'home', 'btn-palette': 'search', 'btn-share': 'share', 'btn-auth': 'user', 'btn-more': 'more', 'btn-whatsnew': 'sparkle' };
   function bannerGlyphs() {
     const on = lookHasSymbols() && typeof Glyphs !== 'undefined';
     for (const [id, name] of Object.entries(BANNER)) {
