@@ -1,0 +1,35 @@
+# One-off, read-only check that the ElevenLabs key in the ELEVENLABS_API_KEY repository
+# secret works before the bulletin voice step is built on it: what plan it sees, which
+# speech models it can use, and whether each cast voice is reachable through the API.
+#
+# Only GET requests, so it spends no characters. GitHub masks the secret in the log.
+# Delete this file once the bulletin voice workflow exists and runs its own check.
+
+name: Voice key check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ask ElevenLabs what the key can see
+        env:
+          XI_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: |
+          if [ -z "${XI_KEY}" ]; then echo "ELEVENLABS_API_KEY is missing or empty"; exit 1; fi
+          get() { curl -sS -o /tmp/r.json -w '%{http_code}' -H "xi-api-key: ${XI_KEY}" "https://api.elevenlabs.io$1"; }
+          echo "== subscription: HTTP $(get /v1/user/subscription)"
+          jq -c '{tier, status, character_count, character_limit, next_character_count_reset_unix, voice_slots_used, voice_limit}' /tmp/r.json 2>/dev/null || head -c 300 /tmp/r.json
+          echo "== models: HTTP $(get /v1/models)"
+          jq -r '.[]? | select(.can_do_text_to_speech) | "\(.model_id)  \(.name)"' /tmp/r.json 2>/dev/null || head -c 300 /tmp/r.json
+          echo "== cast voices"
+          for v in YrAYvOVjAFiqVwBgB4qI M4FiuEOcSLrYgftiXoq9 sclx1MZrNqboRcmLWoDb nCU9XO4PaNXRJPa3CLUn hk6wpUusj7FFV03U5LvR MeZIM6TY8r8zEtHJpRUs abRFZIdN4pvo8ZPmGxHP tyepWYJJwJM9TTFIg5U7 aRlmTYIQo6Tlg5SlulGC; do
+            code=$(get "/v1/voices/$v")
+            echo "$v HTTP $code $(jq -r '[.name // .detail.message // "", .category // ""] | join(" | ")' /tmp/r.json 2>/dev/null)"
+          done
