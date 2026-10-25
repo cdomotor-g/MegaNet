@@ -53,7 +53,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { validate, validateIndex, validateVoice, voicePathFor, PRESENTERS, SCENES, VOICE_FORMAT } from '../tools/bulletin/validate.mjs';
-import { scriptFor, hashFor, wordTimes, pending, tempoOf } from '../tools/voice/speak.mjs';
+import { scriptFor, hashFor, wordTimes, pending, tempoOf, frequencyWords, withLexicon } from '../tools/voice/speak.mjs';
 import { buildFacts } from '../tools/bulletin/gather.mjs';
 import { draft } from '../tools/bulletin/draft.mjs';
 import { publish } from '../tools/bulletin/publish.mjs';
@@ -278,6 +278,17 @@ console.log('The voices');
   ok('…its words\' times read off the characters\', and stretched with its tempo', t1[1] === +(10 + g.offsets[1] * 0.05).toFixed(2) && Math.abs(t2[1] - (10 + g.offsets[1] * 0.05 / 1.25)) < 0.006,
     `${t1} | ${t2}`);
   ok('…a tempo is taken only if it is a sensible one', tempoOf(cast.voices.turbo) === 1.1 && tempoOf({ tempo: 7 }) === 1 && tempoOf({}) === 1);
+  const fq = scriptFor('Only on 152.400 — not 13.1 volts.', cast.voices['tech-wizard'], cast);
+  ok('a frequency is said as a technician says it, and other numbers are left to the voice',
+    frequencyWords('152.400') === 'one fifty-two point four' && frequencyWords('151.275') === 'one fifty-one point two seven five'
+      && frequencyWords('160.000') === 'one sixty' && frequencyWords('105.050') === 'one oh five point oh five' && frequencyWords('13.1') === null
+      && fq.text === 'Only on one fifty-two point four — not 13.1 volts.' && fq.text.slice(fq.offsets[4]).startsWith('not 13.1'), fq.text);
+  const tmpLex = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'lex-')), 'lexicon.json');
+  fs.writeFileSync(tmpLex, JSON.stringify([{ word: 'goomburra', say: 'Flood-Net-way' }, { word: 'Bremer', say: 'Breh-mer' }]));
+  const merged = withLexicon(cast, tmpLex).lexicon;
+  ok('Flood-Net\'s own pronunciations join the cast\'s, its own winning a word in both',
+    merged.length === 2 && merged.find(e => e.word === 'goomburra').say === 'Flood-Net-way' && withLexicon(cast, tmpLex + '.none').lexicon.length === 1, JSON.stringify(merged));
+  fs.rmSync(path.dirname(tmpLex), { recursive: true, force: true });
   const b = { id: 'daily-2026-10-25', presenter: 'seasoned-hydrographer', scenes: [{ say: 'One.' }, { say: 'Two.', presenter: 'tech-wizard' }] };
   const h = hashFor(b, cast), again = JSON.parse(JSON.stringify(cast));
   again.voices.turbo.tempo = 1.2;

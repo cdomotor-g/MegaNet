@@ -93,7 +93,7 @@ jobs:
             echo "No voice changed — nothing to commit."
             exit 0
           fi
-          git commit -m "Bulletin voices: $(git diff --cached --name-only -- 'data/bulletins/voice/*.json' | sed -E 's#data/bulletins/voice/##; s#\.json$##' | paste -sd ', ' -)" \
+          git commit -m "Bulletin voices: $(git diff --cached --name-only -- 'data/bulletins/voice/*.json' | sed -E 's#data/bulletins/voice/##; s#\.json$##' | paste -sd, - | sed 's/,/, /g')" \
                      -m "Said by the Droggies' cast (thedroggies voices/cast.json) through ElevenLabs; tools/voice/speak.mjs."
           for attempt in 1 2 3; do
             git pull --rebase origin main && git push origin HEAD:main && exit 0

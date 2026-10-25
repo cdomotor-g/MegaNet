@@ -212,8 +212,9 @@ is the one thing to remember.
 "five parts per million", "forty kilometres"), times as people say them, no
 symbols or abbreviations a voice would spell out letter by letter ("V", "ppm",
 "km", "&", "/"), and no brackets — a voice treats square brackets as stage
-directions. A station's name as it is on file is fine; the voices learn a
-place name they get wrong from the cast's lexicon, not from respelling it here.
+directions. A frequency as on file is fine ("152.400" is said "one fifty-two
+point four"), and so is a station's name as on file: the voices learn a place
+name they get wrong from the lexicon (below), not from respelling it here.
 
 **Private data.** No landholder names or contacts, no site codes, gate
 combinations or key numbers — ever (`CLAUDE.md`). The product is
@@ -271,8 +272,15 @@ each scene and word starts. The page plays it and follows it; a bulletin not
 voiced yet plays silent on its own `secs`. A bulletin rewritten the same day is
 voiced again; one let go takes its voice with it.
 
+A station name the voices get wrong goes in `tools/voice/lexicon.json`, one
+entry a name — `{ "word": "<the name as on file>", "say": "<respelt as it is
+said>", "notes": "<who says so>" }` — taken from people who know the place,
+never guessed. The voices say the respelling; the caption keeps the name as on
+file. (The Droggies' own lexicon, in their cast file, is for their world's
+words.) The bulletins a respelling changes are voiced again on the next run.
+
 Each voicing run's log says how many ElevenLabs credits it used and how many
-are left this month. To re-voice the bulletins still listed — after a recast in
+are left this month; under 6,000 it adds a warning to the run. To re-voice the bulletins still listed — after a recast in
 thedroggies, say — run the workflow by hand (Actions → *Bulletin voices* → Run
 workflow) with force `all`. To hear test lines in a voice without touching a
 bulletin, run it with `sample` set to a file like

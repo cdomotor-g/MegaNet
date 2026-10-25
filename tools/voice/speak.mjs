@@ -19,6 +19,7 @@
 //   node tools/voice/speak.mjs --sample LINES.json --out DIR
 //                                                 say casting test lines: [{ name, voice_id, model, text, settings }]
 //   --cast PATH|URL   the cast file (default: the published thedroggies one)
+//   --lexicon PATH    Flood-Net's own pronunciations, added to the cast's (default: tools/voice/lexicon.json)
 //   --dry-run         say what would be voiced and about what it costs; call nothing
 //
 // Each run says how many ElevenLabs credits it used and how many are left this
@@ -36,10 +37,14 @@ import { VOICE_FORMAT, voicePathFor } from '../bulletin/validate.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
 export const CAST_URL = 'https://cdomotor-g.github.io/thedroggies/voices/cast.json';
+const LEXICON = path.join(HERE, 'lexicon.json');
 const API = 'https://api.elevenlabs.io/v1';
 const RATE = 44100;                 // samples a second, mono, throughout
 const GAP = 0.45;                   // seconds of quiet between scenes
 const BITRATE = '48k';              // speech, mono: about 0.36 MB a minute
+// Every scene as loud as every other, whoever says it — the voices come out of
+// ElevenLabs up to 3 LU apart — at the podcast standard, peaks under -1.5 dBTP.
+const LOUD = { I: -16, TP: -1.5, LRA: 11 };
 // Models that act out bracketed directions ("[slowly]"); on the others a
 // direction would be read aloud, so it is left off.
 const TAG_MODELS = new Set(['eleven_v4', 'eleven_v4_turbo', 'eleven_v3']);
@@ -47,6 +52,7 @@ const TAG_MODELS = new Set(['eleven_v4', 'eleven_v4_turbo', 'eleven_v3']);
 // October 2026 (its character-cost header): the Turbo and Flash models half
 // the rest. For --dry-run only; a real run logs what it actually used.
 const RATE_OF = model => /turbo|flash|conversational/.test(model) ? 0.2 : 0.4;
+let spent = 0;                      // credits this run, by ElevenLabs' count for each request
 
 // ── the cast ────────────────────────────────────────────────────────────────
 
@@ -61,11 +67,37 @@ export async function readCast(src = CAST_URL) {
   return cast;
 }
 
+// Flood-Net's own words said differently from how they are spelt — station
+// names above all, which are Flood-Net's, not the Droggies' — added to the
+// cast's lexicon, a word in both taking Flood-Net's.
+export function withLexicon(cast, file = LEXICON) {
+  const own = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : [];
+  if (!Array.isArray(own)) throw new Error(`${file} is not a list of { word, say }`);
+  const words = new Set(own.map(e => String(e.word || '').toLowerCase()));
+  return { ...cast, lexicon: [...(cast.lexicon || []).filter(e => !words.has(String(e.word || '').toLowerCase())), ...own] };
+}
+
+// A radio frequency as a technician says it, not as a number: 152.400 is
+// "one fifty-two point four", never "one hundred and fifty-two point four
+// hundred". Only the register's form, three digits and three decimals.
+const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+const TEENS = ['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+export function frequencyWords(f) {
+  const m = /^([1-9])(\d\d)\.(\d{3})$/.exec(f);
+  if (!m) return null;
+  const r = +m[2];
+  const whole = `${ONES[+m[1]]} ${r === 0 ? 'hundred' : r < 10 ? `oh ${ONES[r]}` : r < 20 ? TEENS[r - 10] : TENS[Math.floor(r / 10)] + (r % 10 ? `-${ONES[r % 10]}` : '')}`;
+  const dec = m[3].replace(/0+$/, '');
+  return dec ? `${whole} point ${[...dec].map(d => (d === '0' ? 'oh' : ONES[+d])).join(' ')}` : whole;
+}
+
 // What a voice says for a scene: its direction (on models that act it), then
-// the narration word by word, each word swapped for the cast's respelling of
-// it where the lexicon has one ({ word, say }: "Goomburra" said as written in
-// "say"). Keeps where each of the narration's words starts in the text sent,
-// so the API's per-character timing can be read back per word.
+// the narration word by word, each word swapped for the lexicon's respelling
+// of it where it has one ({ word, say }: "Goomburra" said as written in
+// "say") and a frequency for the way it is said. Keeps where each of the
+// narration's words starts in the text sent, so the API's per-character
+// timing can be read back per word.
 export function scriptFor(say, voice, cast) {
   const words = String(say || '').split(/\s+/).filter(Boolean);
   const tags = TAG_MODELS.has(voice.model);
@@ -73,8 +105,9 @@ export function scriptFor(say, voice, cast) {
   let text = tags && voice.direction ? voice.direction.trim() + ' ' : '';
   const offsets = [];
   for (const w of words) {
-    const m = /^([^\p{L}\p{N}]*)([\p{L}\p{N}'’-]+)([^\p{L}\p{N}]*)$/u.exec(w);
-    const said = m && lex.has(m[2].toLowerCase()) ? m[1] + lex.get(m[2].toLowerCase()) + m[3] : w;
+    const m = /^([^\p{L}\p{N}]*)([\p{L}\p{N}'’-]+(?:\.\p{N}+)*)([^\p{L}\p{N}]*)$/u.exec(w);
+    const core = m && (lex.get(m[2].toLowerCase()) || frequencyWords(m[2]));
+    const said = core ? m[1] + core + m[3] : w;
     offsets.push(text.length);
     text += said + ' ';
   }
@@ -109,8 +142,9 @@ async function tts(voice, text, cast, { key, prevText, nextText }) {
     const res = await fetch(url, { method: 'POST', headers: { 'xi-api-key': key, 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body) });
     if (res.ok) {
       const j = await res.json();
-      return { audio: Buffer.from(j.audio_base64, 'base64'), alignment: j.alignment || j.normalized_alignment,
-        cost: +(res.headers.get('character-cost') || res.headers.get('x-character-count') || 0) || null, request: res.headers.get('request-id') };
+      const cost = +(res.headers.get('character-cost') || res.headers.get('x-character-count') || 0) || null;
+      spent += cost || text.length * RATE_OF(voice.model);
+      return { audio: Buffer.from(j.audio_base64, 'base64'), alignment: j.alignment || j.normalized_alignment, cost, request: res.headers.get('request-id') };
     }
     const detail = (await res.text()).slice(0, 400);
     if ((res.status === 429 || res.status >= 500) && attempt < 5) { await new Promise(r => setTimeout(r, 2000 * 2 ** (attempt - 1))); continue; }
@@ -145,6 +179,21 @@ const toMp3 = pcm => ffmpeg(['-f', 's16le', '-ac', '1', '-ar', String(RATE), '-i
 export const tempoOf = voice => (Number.isFinite(voice && voice.tempo) && voice.tempo >= 0.5 && voice.tempo <= 2 ? voice.tempo : 1);
 const stretch = (pcm, tempo) => (tempo === 1 ? pcm
   : ffmpeg(['-f', 's16le', '-ac', '1', '-ar', String(RATE), '-i', 'pipe:0', '-filter:a', `atempo=${tempo}`, '-f', 's16le', '-ac', '1', '-ar', String(RATE), 'pipe:1'], pcm));
+// A scene brought to LOUD: measured, then one gain for all of it (loudnorm's
+// linear mode), so the voice keeps its own rise and fall. The same length out
+// as in — loudnorm works at 192 kHz, and the way back can be a sample out.
+export function level(pcm) {
+  const input = ['-f', 's16le', '-ac', '1', '-ar', String(RATE), '-i', 'pipe:0'];
+  const target = `I=${LOUD.I}:TP=${LOUD.TP}:LRA=${LOUD.LRA}`;
+  const probe = spawnSync('ffmpeg', ['-hide_banner', '-nostats', ...input, '-af', `loudnorm=${target}:print_format=json`, '-f', 'null', '-'],
+    { input: pcm, maxBuffer: 64 * 1024 * 1024 });
+  const m = /\{[^{}]*"input_i"[^{}]*\}/.exec(String(probe.stderr || ''));
+  const j = probe.status === 0 && m ? JSON.parse(m[0]) : null;
+  if (!j || !(+j.input_i > -70)) return pcm;          // silence, or unmeasurable: as it is
+  const out = ffmpeg([...input, '-af', `loudnorm=${target}:measured_I=${j.input_i}:measured_TP=${j.input_tp}:measured_LRA=${j.input_lra}`
+    + `:measured_thresh=${j.input_thresh}:offset=${j.target_offset}:linear=true`, '-f', 's16le', '-ac', '1', '-ar', String(RATE), 'pipe:1'], pcm);
+  return out.length === pcm.length ? out : out.length > pcm.length ? out.subarray(0, pcm.length) : Buffer.concat([out, Buffer.alloc(pcm.length - out.length)]);
+}
 const round = t => Math.round(t * 100) / 100;
 
 // The time each of the narration's words starts, read off the API's timing of
@@ -182,7 +231,7 @@ export async function voiceBulletin(file, cast, { key, castSrc, repo = REPO, dry
     const next = scenes[i + 1] && speakerOf(b, scenes[i + 1]) === speakerOf(b, s) ? scenes[i + 1].say : null;
     const r = await tts(x.v, x.text, cast, { key, prevText: prev, nextText: next });
     const tempo = tempoOf(x.v);
-    const p = stretch(toPcm(r.audio), tempo);
+    const p = level(stretch(toPcm(r.audio), tempo));
     const secs = p.length / 2 / RATE;
     // Never a word after its scene ends: the stretch rounds, the timing does not.
     out.push({ speaker: speakerOf(b, s), voice: x.v.voice_name || x.v.voice_id, model: x.v.model,
@@ -239,8 +288,8 @@ async function sample(linesFile, outDir, { key, log = console.log }) {
   for (const l of lines) {
     const voice = { voice_id: l.voice_id, model: l.model, settings: l.settings, voice_name: l.name, tempo: l.tempo };
     const r = await tts(voice, l.text, { defaults: {} }, { key });
-    const tempo = tempoOf(voice), pcm = stretch(toPcm(r.audio), tempo);
-    fs.writeFileSync(path.join(outDir, `${l.name}.mp3`), tempo === 1 ? r.audio : toMp3(pcm));
+    const tempo = tempoOf(voice), pcm = level(stretch(toPcm(r.audio), tempo));
+    fs.writeFileSync(path.join(outDir, `${l.name}.mp3`), toMp3(pcm));
     fs.writeFileSync(path.join(outDir, `${l.name}.json`), JSON.stringify({ ...l, cost: r.cost, request: r.request, alignment: r.alignment }, null, 1));
     log(`  ${l.name}: ${l.model}${tempo === 1 ? '' : ` at ${tempo}×`}, ${(pcm.length / 2 / RATE).toFixed(1)} s${r.cost ? `, ${r.cost} characters` : ''}`);
   }
@@ -254,16 +303,20 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const dry = argv.includes('--dry-run');
   const key = process.env.ELEVENLABS_API_KEY || '';
   if (!dry && !key) { console.error('ELEVENLABS_API_KEY is not set — the workflow passes it from the repository secret.'); process.exit(2); }
+  // What the run spent and what is left, from the account's total as the run
+  // began and the count ElevenLabs gives each request: the account's own total
+  // catches up only a minute or so after the last request.
   const before = dry ? null : await credits(key);
   const tally = async () => {
-    const after = before && await credits(key);
-    if (after) console.log(`ElevenLabs (${after.tier}): this run used ${(after.used - before.used).toLocaleString('en-AU')} credits; `
-      + `${(after.limit - after.used).toLocaleString('en-AU')} of ${after.limit.toLocaleString('en-AU')} left this month${after.resets ? `, until ${after.resets}` : ''}.`);
+    if (!before) return;
+    const n = v => Math.round(v).toLocaleString('en-AU'), left = before.limit - before.used - spent;
+    console.log(`ElevenLabs (${before.tier}): this run used ${n(spent)} credits; about ${n(left)} of ${n(before.limit)} left this month${before.resets ? `, until ${before.resets}` : ''}.`);
+    if (left < 6000) console.log(`::warning title=ElevenLabs credits::About ${n(left)} credits left this month, and a bulletin takes about 1,200. Once they run out the bulletins play silent — upgrade or top up at elevenlabs.io.`);
   };
   try {
     if (arg('--sample')) { await sample(arg('--sample'), arg('--out') || 'voice-samples', { key }); await tally(); process.exit(0); }
     const castSrc = arg('--cast') || CAST_URL;
-    const cast = await readCast(castSrc);
+    const cast = withLexicon(await readCast(castSrc), arg('--lexicon') || LEXICON);
     console.log(`Cast: ${castSrc} (updated ${cast.updated || 'unknown'}), ${Object.keys(cast.voices).length} voices.`);
     let files;
     if (argv.includes('--pending')) {
@@ -273,7 +326,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       files = todo;
       if (!files.length) console.log('Every bulletin is voiced and up to date.');
     } else {
-      files = argv.filter(a => a.endsWith('.json') && a !== arg('--cast'));
+      files = argv.filter(a => a.endsWith('.json') && a !== arg('--cast') && a !== arg('--lexicon'));
       if (!files.length) { console.error('node tools/voice/speak.mjs (--pending | FILE.json) [--cast PATH|URL] [--dry-run] [--force]'); process.exit(2); }
     }
     let failed = 0;
