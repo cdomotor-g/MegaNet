@@ -1,0 +1,256 @@
+// tools/voice/speak.mjs — the Droggies' own voices for a network bulletin.
+//
+// Turns a published bulletin (data/bulletins/<kind>/<date>.json) into one MP3
+// and a voice file beside it in data/bulletins/voice/<kind>/: every scene said
+// by its presenter in the voice the Droggies' cast file gives them, with the
+// time each word starts, so the player (health-bulletin.js) can reveal the
+// narration as it is said.
+//
+// The cast lives with the characters, in github.com/cdomotor-g/thedroggies
+// (voices/cast.json), and is read from that repository's published site each
+// run — recasting a Droggie there recasts the next bulletin here. Speech comes
+// from the ElevenLabs API with the key held as the ELEVENLABS_API_KEY secret
+// of .github/workflows/bulletin-voice.yml, which runs this after every push of
+// a bulletin; nothing here runs in the browser.
+//
+//   node tools/voice/speak.mjs --pending          voice every bulletin whose voice is missing or out of
+//                                                 date, and let go of voices whose bulletin has gone
+//   node tools/voice/speak.mjs FILE.json          voice one bulletin (--force: even if up to date)
+//   node tools/voice/speak.mjs --sample LINES.json --out DIR
+//                                                 say casting test lines: [{ name, voice_id, model, text, settings }]
+//   --cast PATH|URL   the cast file (default: the published thedroggies one)
+//   --dry-run         say what would be voiced and how many characters it costs; call nothing
+//
+// Exits 1 if any bulletin could not be voiced; the others are still written.
+
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { VOICE_FORMAT, voicePathFor } from '../bulletin/validate.mjs';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO = path.resolve(HERE, '..', '..');
+export const CAST_URL = 'https://cdomotor-g.github.io/thedroggies/voices/cast.json';
+const API = 'https://api.elevenlabs.io/v1';
+const RATE = 44100;                 // samples a second, mono, throughout
+const GAP = 0.45;                   // seconds of quiet between scenes
+const BITRATE = '48k';              // speech, mono: about 0.36 MB a minute
+// Models that act out bracketed directions and read IPA between slashes; on
+// the others a direction would be read aloud, so it is left off.
+const TAG_MODELS = new Set(['eleven_v4', 'eleven_v4_turbo', 'eleven_v3']);
+// What a character costs per character of text, against Eleven v4 (ElevenLabs'
+// price list: v4, v3 and Multilingual v2 the full rate, the Turbo and Flash
+// models half). For --dry-run only; the API's own count is what is logged.
+const RATE_OF = model => /turbo|flash|conversational/.test(model) ? 0.5 : 1;
+
+// ── the cast ────────────────────────────────────────────────────────────────
+
+export async function readCast(src = CAST_URL) {
+  const cast = /^https?:/.test(src)
+    ? await (async () => { const r = await fetch(src, { cache: 'no-store' }); if (!r.ok) throw new Error(`${src} answered ${r.status}`); return r.json(); })()
+    : JSON.parse(fs.readFileSync(src, 'utf8'));
+  if (!cast || typeof cast.voices !== 'object') throw new Error('the cast file has no voices');
+  for (const [id, v] of Object.entries(cast.voices)) {
+    if (!v.voice_id || !v.model) throw new Error(`the cast file's ${id} has no voice_id or model`);
+  }
+  return cast;
+}
+
+// What a voice says for a scene: its direction (on models that act it), then
+// the narration word by word, each word swapped for the cast's pronunciation
+// where it has one. Keeps where each of the narration's words starts in the
+// text sent, so the API's per-character timing can be read back per word.
+export function scriptFor(say, voice, cast) {
+  const words = String(say || '').split(/\s+/).filter(Boolean);
+  const tags = TAG_MODELS.has(voice.model);
+  const lex = new Map((cast.lexicon || []).map(e => [String(e.word).toLowerCase(), e]));
+  let text = tags && voice.direction ? voice.direction.trim() + ' ' : '';
+  const offsets = [];
+  for (const w of words) {
+    const m = /^([^\p{L}\p{N}]*)([\p{L}\p{N}'’-]+)([^\p{L}\p{N}]*)$/u.exec(w);
+    const e = m && lex.get(m[2].toLowerCase());
+    const said = e ? m[1] + (tags && e.ipa ? `/${e.ipa}/` : (e.alias || m[2])) + m[3] : w;
+    offsets.push(text.length);
+    text += said + ' ';
+  }
+  return { text: text.trimEnd(), words, offsets };
+}
+
+const speakerOf = (b, s) => (s && s.presenter) || b.presenter;
+
+// Everything that changes what a bulletin sounds like: the words, who says
+// them, and the voices as cast. A voice file whose hash still matches is left.
+export function hashFor(b, cast) {
+  const used = [...new Set((b.scenes || []).map(s => speakerOf(b, s)))].sort();
+  const voices = Object.fromEntries(used.map(id => [id, cast.voices[id] || null]));
+  const body = JSON.stringify({ f: VOICE_FORMAT, scenes: (b.scenes || []).map(s => [speakerOf(b, s), s.say]),
+    voices, lexicon: cast.lexicon || [], defaults: cast.defaults || {} });
+  return crypto.createHash('sha256').update(body).digest('hex').slice(0, 32);
+}
+
+// ── ElevenLabs ──────────────────────────────────────────────────────────────
+
+async function tts(voice, text, cast, { key, prevText, nextText }) {
+  const fmt = (cast.defaults && cast.defaults.output_format) || 'mp3_44100_64';
+  const settings = Object.assign({}, (cast.defaults && cast.defaults.settings) || {}, voice.settings || {});
+  const body = { text, model_id: voice.model, voice_settings: settings };
+  if (Number.isInteger(voice.seed)) body.seed = voice.seed;
+  if (prevText) body.previous_text = prevText;
+  if (nextText) body.next_text = nextText;
+  const url = `${API}/text-to-speech/${encodeURIComponent(voice.voice_id)}/with-timestamps?output_format=${encodeURIComponent(fmt)}`;
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(url, { method: 'POST', headers: { 'xi-api-key': key, 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body) });
+    if (res.ok) {
+      const j = await res.json();
+      return { audio: Buffer.from(j.audio_base64, 'base64'), alignment: j.alignment || j.normalized_alignment,
+        cost: +(res.headers.get('character-cost') || res.headers.get('x-character-count') || 0) || null, request: res.headers.get('request-id') };
+    }
+    const detail = (await res.text()).slice(0, 400);
+    if ((res.status === 429 || res.status >= 500) && attempt < 5) { await new Promise(r => setTimeout(r, 2000 * 2 ** (attempt - 1))); continue; }
+    throw new Error(`ElevenLabs answered ${res.status} for ${voice.voice_name || voice.voice_id}: ${detail}`);
+  }
+}
+
+// ── audio ───────────────────────────────────────────────────────────────────
+
+function ffmpeg(args, input) {
+  const r = spawnSync('ffmpeg', ['-v', 'error', ...args], { input, maxBuffer: 512 * 1024 * 1024 });
+  if (r.status !== 0) throw new Error(`ffmpeg ${args.join(' ')}: ${String(r.stderr || '').slice(0, 300)}`);
+  return r.stdout;
+}
+const toPcm = mp3 => ffmpeg(['-i', 'pipe:0', '-f', 's16le', '-ac', '1', '-ar', String(RATE), 'pipe:1'], mp3);
+const toMp3 = pcm => ffmpeg(['-f', 's16le', '-ac', '1', '-ar', String(RATE), '-i', 'pipe:0', '-codec:a', 'libmp3lame', '-b:a', BITRATE, '-f', 'mp3', 'pipe:1'], pcm);
+const round = t => Math.round(t * 100) / 100;
+
+// The time each of the narration's words starts, read off the API's timing of
+// every character it was sent.
+export function wordTimes(script, alignment, offset) {
+  const starts = (alignment && alignment.character_start_times_seconds) || [];
+  return script.offsets.map((o, k) => {
+    let t = starts[o];
+    for (let j = o; t == null && j < starts.length; j++) t = starts[j];
+    if (t == null) t = starts.length ? starts[starts.length - 1] : k * 0.3;
+    return round(offset + t);
+  });
+}
+
+// ── one bulletin ────────────────────────────────────────────────────────────
+
+export async function voiceBulletin(file, cast, { key, castSrc, repo = REPO, dry = false, log = console.log } = {}) {
+  const b = JSON.parse(fs.readFileSync(path.join(repo, file), 'utf8'));
+  const scenes = b.scenes || [];
+  const missing = [...new Set(scenes.map(s => speakerOf(b, s)))].filter(id => !cast.voices[id]);
+  if (missing.length) throw new Error(`${file}: no voice cast for ${missing.join(', ')}`);
+  const scripts = scenes.map(s => { const v = cast.voices[speakerOf(b, s)]; return { v, ...scriptFor(s.say, v, cast) }; });
+  if (dry) {
+    const by = {};
+    scripts.forEach(x => { by[x.v.model] = (by[x.v.model] || 0) + x.text.length; });
+    const est = Object.entries(by).reduce((n, [m, c]) => n + c * RATE_OF(m), 0);
+    log(`  ${file}: ${scripts.length} scenes, ${Object.entries(by).map(([m, c]) => `${c} characters on ${m}`).join(', ')} — about ${Math.round(est)} credits`);
+    return { file, dry: true, credits: est };
+  }
+  const pcm = [], out = [];
+  let at = 0, cost = 0;
+  for (let i = 0; i < scripts.length; i++) {
+    const x = scripts[i], s = scenes[i];
+    const prev = scenes[i - 1] && speakerOf(b, scenes[i - 1]) === speakerOf(b, s) ? scenes[i - 1].say : null;
+    const next = scenes[i + 1] && speakerOf(b, scenes[i + 1]) === speakerOf(b, s) ? scenes[i + 1].say : null;
+    const r = await tts(x.v, x.text, cast, { key, prevText: prev, nextText: next });
+    const p = toPcm(r.audio);
+    const secs = p.length / 2 / RATE;
+    out.push({ speaker: speakerOf(b, s), voice: x.v.voice_name || x.v.voice_id, model: x.v.model,
+      start: round(at), end: round(at + secs), words: wordTimes(x, r.alignment, at) });
+    pcm.push(p);
+    at += secs;
+    if (i < scripts.length - 1) { pcm.push(Buffer.alloc(Math.round(GAP * RATE) * 2)); at += GAP; }
+    cost += r.cost || x.text.length;
+    log(`    scene ${i + 1}/${scripts.length}: ${out[i].voice}, ${secs.toFixed(1)} s${r.cost ? `, ${r.cost} characters` : ''}`);
+  }
+  const mp3 = toMp3(Buffer.concat(pcm));
+  const { json: vRel, audio: aRel } = voicePathFor(file);
+  fs.mkdirSync(path.join(repo, path.dirname(vRel)), { recursive: true });
+  fs.writeFileSync(path.join(repo, aRel), mp3);
+  const doc = { format: VOICE_FORMAT, bulletin: b.id, file, audio: aRel, bytes: mp3.length, duration: round(at),
+    hash: hashFor(b, cast), generated_at: new Date().toISOString(),
+    cast: { source: castSrc || CAST_URL, updated: cast.updated || null }, scenes: out };
+  fs.writeFileSync(path.join(repo, vRel), JSON.stringify(doc, null, 1) + '\n');
+  log(`  ${file} → ${aRel}: ${doc.duration} s, ${(mp3.length / 1e6).toFixed(2)} MB, about ${Math.round(cost)} characters`);
+  return { file, voice: vRel, audio: aRel, cost };
+}
+
+// Which bulletins need voicing, and which voices have lost their bulletin
+// (publish.mjs lets the oldest bulletins go; their voices go with them).
+export function pending(cast, { repo = REPO, force = [] } = {}) {
+  const todo = [], orphans = [];
+  for (const kind of ['daily', 'weekly']) {
+    const dir = path.join(repo, 'data', 'bulletins', kind);
+    const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort() : [];
+    for (const f of files) {
+      const rel = `data/bulletins/${kind}/${f}`;
+      const vp = path.join(repo, voicePathFor(rel).json);
+      let stale = !fs.existsSync(vp) || force.includes('all') || force.includes(rel);
+      if (!stale) {
+        try { const v = JSON.parse(fs.readFileSync(vp, 'utf8')); stale = v.hash !== hashFor(JSON.parse(fs.readFileSync(path.join(repo, rel), 'utf8')), cast); }
+        catch (_) { stale = true; }
+      }
+      if (stale) todo.push(rel);
+    }
+    const vdir = path.join(repo, 'data', 'bulletins', 'voice', kind);
+    for (const f of fs.existsSync(vdir) ? fs.readdirSync(vdir) : []) {
+      const date = f.replace(/\.(json|mp3)$/, '');
+      if (!files.includes(`${date}.json`)) orphans.push(`data/bulletins/voice/${kind}/${f}`);
+    }
+  }
+  return { todo, orphans };
+}
+
+// ── casting test lines ──────────────────────────────────────────────────────
+
+async function sample(linesFile, outDir, { key, log = console.log }) {
+  const lines = JSON.parse(fs.readFileSync(linesFile, 'utf8'));
+  fs.mkdirSync(outDir, { recursive: true });
+  for (const l of lines) {
+    const voice = { voice_id: l.voice_id, model: l.model, settings: l.settings, voice_name: l.name };
+    const r = await tts(voice, l.text, { defaults: {} }, { key });
+    fs.writeFileSync(path.join(outDir, `${l.name}.mp3`), r.audio);
+    fs.writeFileSync(path.join(outDir, `${l.name}.json`), JSON.stringify({ ...l, cost: r.cost, request: r.request, alignment: r.alignment }, null, 1));
+    log(`  ${l.name}: ${l.model}, ${(toPcm(r.audio).length / 2 / RATE).toFixed(1)} s${r.cost ? `, ${r.cost} characters` : ''}`);
+  }
+}
+
+// ── command line ────────────────────────────────────────────────────────────
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const argv = process.argv.slice(2);
+  const arg = k => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : null; };
+  const dry = argv.includes('--dry-run');
+  const key = process.env.ELEVENLABS_API_KEY || '';
+  if (!dry && !key) { console.error('ELEVENLABS_API_KEY is not set — the workflow passes it from the repository secret.'); process.exit(2); }
+  try {
+    if (arg('--sample')) { await sample(arg('--sample'), arg('--out') || 'voice-samples', { key }); process.exit(0); }
+    const castSrc = arg('--cast') || CAST_URL;
+    const cast = await readCast(castSrc);
+    console.log(`Cast: ${castSrc} (updated ${cast.updated || 'unknown'}), ${Object.keys(cast.voices).length} voices.`);
+    let files;
+    if (argv.includes('--pending')) {
+      const force = (arg('--force') || '').split(',').map(s => s.trim()).filter(Boolean);
+      const { todo, orphans } = pending(cast, { force });
+      for (const o of orphans) { if (!dry) fs.unlinkSync(path.join(REPO, o)); console.log(`  ${dry ? 'would let go of' : 'let go of'} ${o}`); }
+      files = todo;
+      if (!files.length) console.log('Every bulletin is voiced and up to date.');
+    } else {
+      files = argv.filter(a => a.endsWith('.json') && a !== arg('--cast'));
+      if (!files.length) { console.error('node tools/voice/speak.mjs (--pending | FILE.json) [--cast PATH|URL] [--dry-run] [--force]'); process.exit(2); }
+    }
+    let failed = 0;
+    for (const f of files) {
+      const rel = argv.includes('--pending') ? f : path.relative(REPO, path.resolve(f));
+      try { await voiceBulletin(rel, cast, { key, castSrc, dry }); }
+      catch (err) { failed++; console.error(`  ${f}: not voiced — ${err.message}`); }
+    }
+    process.exit(failed ? 1 : 0);
+  } catch (err) { console.error(err.message); process.exit(1); }
+}

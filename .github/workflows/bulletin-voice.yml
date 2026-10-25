@@ -1,0 +1,103 @@
+# Voice every network bulletin in the Droggies' own voices.
+#
+# The scheduled bulletin tasks push data/bulletins/<daily|weekly>/<date>.json
+# (tools/bulletin/README.md); this follows each push and turns any bulletin
+# whose voice is missing or out of date into one MP3 and a voice file in
+# data/bulletins/voice/ — every scene said by its presenter, with the time each
+# word starts — then commits them. tools/voice/speak.mjs does the work; the
+# voices themselves are cast in github.com/cdomotor-g/thedroggies
+# (voices/cast.json), read from its published site on every run, so recasting
+# a Droggie there changes the next bulletin here (and, run by hand with force
+# "all", re-voices the ones still listed).
+#
+# The ElevenLabs key is the ELEVENLABS_API_KEY repository secret; it reaches
+# speak.mjs as an environment variable and nothing else, and GitHub masks it in
+# the log. The commit is made with this workflow's own token, so it starts no
+# other workflow (no smoke test for a data-only change).
+#
+# Run by hand:
+#   force   re-voice even when up to date: "all", or bulletin files, comma-separated
+#   sample  say casting test lines instead (a JSON file in the repo, see
+#           speak.mjs --sample); the clips come back as this run's artifact
+
+name: Bulletin voices
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/bulletins/daily/*.json'
+      - 'data/bulletins/weekly/*.json'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Re-voice even if up to date: "all", or bulletin files, comma-separated'
+        required: false
+        default: ''
+      sample:
+        description: 'Say casting test lines from this JSON file instead (artifact)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bulletin-voice
+  cancel-in-progress: false
+
+jobs:
+  voice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: ffmpeg
+        run: ffmpeg -version >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+
+      - name: Say the casting test lines
+        if: ${{ inputs.sample != '' }}
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          SAMPLE: ${{ inputs.sample }}
+        run: node tools/voice/speak.mjs --sample "$SAMPLE" --out voice-samples
+
+      - name: Keep the test lines as this run's artifact
+        if: ${{ inputs.sample != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-samples
+          path: voice-samples
+          retention-days: 7
+
+      - name: Voice new or changed bulletins
+        id: voice
+        if: ${{ inputs.sample == '' || inputs.sample == null }}
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          FORCE: ${{ inputs.force }}
+        run: node tools/voice/speak.mjs --pending ${FORCE:+--force "$FORCE"}
+
+      - name: Commit the voices to main
+        if: ${{ always() && (inputs.sample == '' || inputs.sample == null) }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A data/bulletins/voice
+          if git diff --cached --quiet; then
+            echo "No voice changed — nothing to commit."
+            exit 0
+          fi
+          git commit -m "Bulletin voices: $(git diff --cached --name-only -- 'data/bulletins/voice/*.json' | sed -E 's#data/bulletins/voice/##; s#\.json$##' | paste -sd ', ' -)" \
+                     -m "Said by the Droggies' cast (thedroggies voices/cast.json) through ElevenLabs; tools/voice/speak.mjs."
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            echo "Push rejected (attempt $attempt); retrying after rebase."
+            sleep 10
+          done
+          exit 1

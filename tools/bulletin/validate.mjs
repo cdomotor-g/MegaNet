@@ -313,3 +313,59 @@ export function validateIndex(ix) {
   }
   return { errors, warnings };
 }
+
+// ── the voice of a bulletin ─────────────────────────────────────────────────
+// A bulletin said by the Droggies' own voices (tools/voice/speak.mjs, run by
+// .github/workflows/bulletin-voice.yml): one MP3 and a voice file beside it in
+// data/bulletins/voice/<kind>/, giving where each scene starts and ends in the
+// MP3 and when each word of its narration is said. The player plays it when
+// it is there and its scenes still match the bulletin's; a bulletin without
+// one plays silent, its narration revealed on the scene's seconds.
+//
+//   voicePathFor(file)   → { json, audio }   where a bulletin's voice lives
+//   validateVoice(v, b)  → { errors, warnings }
+
+export const VOICE_FORMAT = 'floodnet-bulletin-voice/1';
+
+export function voicePathFor(file) {
+  const m = /^data\/bulletins\/(daily|weekly)\/(\d{4}-\d{2}-\d{2})\.json$/.exec(String(file || ''));
+  if (!m) throw new Error(`"${file}" is not a bulletin's file`);
+  const base = `data/bulletins/voice/${m[1]}/${m[2]}`;
+  return { json: `${base}.json`, audio: `${base}.mp3` };
+}
+
+export function validateVoice(v, b) {
+  const errors = [], warnings = [];
+  const err = (where, msg) => errors.push(`${where}: ${msg}`);
+  if (!v || typeof v !== 'object') return { errors: ['the voice file is not a JSON object'], warnings };
+  if (v.format !== VOICE_FORMAT) err('format', `"${v.format}", not "${VOICE_FORMAT}"`);
+  if (!b || v.bulletin !== b.id) err('bulletin', `"${v.bulletin}" is not ${b ? `"${b.id}"` : 'a bulletin'}`);
+  let paths = null;
+  try { paths = voicePathFor(v.file); } catch (e) { err('file', e.message); }
+  if (paths && v.audio !== paths.audio) err('audio', `"${v.audio}", not "${paths.audio}"`);
+  if (!(v.duration > 0)) err('duration', 'missing');
+  if (!Number.isInteger(v.bytes) || v.bytes <= 0) err('bytes', 'missing');
+  const scenes = (b && b.scenes) || [];
+  if (!Array.isArray(v.scenes)) { err('scenes', 'not a list'); return { errors, warnings }; }
+  if (v.scenes.length !== scenes.length) err('scenes', `${v.scenes.length}, but the bulletin has ${scenes.length}`);
+  let last = 0;
+  v.scenes.forEach((s, i) => {
+    const W = `scenes[${i}]`, bs = scenes[i];
+    if (!s || typeof s !== 'object') { err(W, 'not an object'); return; }
+    if (!(s.start >= last - 0.01) || !(s.end > s.start)) err(W, `${s.start}–${s.end} s does not follow the scene before it`);
+    if (s.end > v.duration + 0.05) err(W, `ends at ${s.end} s, after the audio (${v.duration} s)`);
+    last = s.end;
+    if (!bs) return;
+    const who = bs.presenter || b.presenter;
+    if (s.speaker !== who) err(W + '.speaker', `"${s.speaker}", but the scene is ${who}'s`);
+    const n = String(bs.say || '').split(/\s+/).filter(Boolean).length;
+    if (!Array.isArray(s.words) || s.words.length !== n) { err(W + '.words', `${Array.isArray(s.words) ? s.words.length : 'no'} times for ${n} words`); return; }
+    let t = s.start - 0.01;
+    for (let k = 0; k < s.words.length; k++) {
+      const w = s.words[k];
+      if (!(w >= t) || w > s.end + 0.01) { err(W + `.words[${k}]`, `${w} s is out of order or outside the scene`); break; }
+      t = w;
+    }
+  });
+  return { errors, warnings };
+}
