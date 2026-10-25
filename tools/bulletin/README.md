@@ -199,8 +199,8 @@ on Saturday"). Stations by name as they are on file; their ids in `stations`,
 `facts.cohost` takes the radio scenes (`"presenter": "<id>"` on the scene). Their
 character is a light touch — a greeting, a catchphrase in the sign-off (`line`) —
 and the body is plain and accurate whoever reads it: the Know-It-All's bulletin is
-as right as Graham's. Never mock the profession. Only Graham and Nitto have canon
-pronouns (he/him); refer to the others by name.
+as right as Graham's. Never mock the profession. Every Droggie has canon pronouns
+(`pronouns` in their JSON): HR is she/her, the rest of the crew he/him.
 
 **Length and pace.** Narration (`say`) about 2.4 words a second of `secs`
 (5–25 s a scene); the publish step warns past 3.4. One idea a scene. The first
