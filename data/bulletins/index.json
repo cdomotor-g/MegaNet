@@ -1,6 +1,6 @@
 {
  "format": "floodnet-bulletin-index/1",
- "updated_at": "2026-10-24T22:02:54.942Z",
+ "updated_at": "2026-10-25T18:07:48.285Z",
  "daily": [
   {
    "id": "daily-2026-10-25",
@@ -12,6 +12,14 @@
   }
  ],
  "weekly": [
+  {
+   "id": "weekly-2026-10-26",
+   "file": "data/bulletins/weekly/2026-10-26.json",
+   "issued_at": "2026-10-25T18:00:39.526Z",
+   "headline": "Half the week’s trouble was at our end: 152.400 is no longer listened to, and 151.5375 was dark for two days. Five stations around Caboolture barely reach us.",
+   "sky": "stormy",
+   "presenter": "seasoned-hydrographer"
+  },
   {
    "id": "weekly-2026-10-25",
    "file": "data/bulletins/weekly/2026-10-25.json",
