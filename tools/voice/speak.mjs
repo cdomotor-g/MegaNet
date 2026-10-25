@@ -19,9 +19,11 @@
 //   node tools/voice/speak.mjs --sample LINES.json --out DIR
 //                                                 say casting test lines: [{ name, voice_id, model, text, settings }]
 //   --cast PATH|URL   the cast file (default: the published thedroggies one)
-//   --dry-run         say what would be voiced and how many characters it costs; call nothing
+//   --dry-run         say what would be voiced and about what it costs; call nothing
 //
-// Exits 1 if any bulletin could not be voiced; the others are still written.
+// Each run says how many ElevenLabs credits it used and how many are left this
+// month (the account the key belongs to). Exits 1 if any bulletin could not be
+// voiced; the others are still written.
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -38,13 +40,13 @@ const API = 'https://api.elevenlabs.io/v1';
 const RATE = 44100;                 // samples a second, mono, throughout
 const GAP = 0.45;                   // seconds of quiet between scenes
 const BITRATE = '48k';              // speech, mono: about 0.36 MB a minute
-// Models that act out bracketed directions and read IPA between slashes; on
-// the others a direction would be read aloud, so it is left off.
+// Models that act out bracketed directions ("[slowly]"); on the others a
+// direction would be read aloud, so it is left off.
 const TAG_MODELS = new Set(['eleven_v4', 'eleven_v4_turbo', 'eleven_v3']);
-// What a character costs per character of text, against Eleven v4 (ElevenLabs'
-// price list: v4, v3 and Multilingual v2 the full rate, the Turbo and Flash
-// models half). For --dry-run only; the API's own count is what is logged.
-const RATE_OF = model => /turbo|flash|conversational/.test(model) ? 0.5 : 1;
+// Credits a character of text costs on each model, as the API charged them in
+// October 2026 (its character-cost header): the Turbo and Flash models half
+// the rest. For --dry-run only; a real run logs what it actually used.
+const RATE_OF = model => /turbo|flash|conversational/.test(model) ? 0.2 : 0.4;
 
 // ── the cast ────────────────────────────────────────────────────────────────
 
@@ -60,19 +62,19 @@ export async function readCast(src = CAST_URL) {
 }
 
 // What a voice says for a scene: its direction (on models that act it), then
-// the narration word by word, each word swapped for the cast's pronunciation
-// where it has one. Keeps where each of the narration's words starts in the
-// text sent, so the API's per-character timing can be read back per word.
+// the narration word by word, each word swapped for the cast's respelling of
+// it where the lexicon has one ({ word, say }: "Goomburra" said as written in
+// "say"). Keeps where each of the narration's words starts in the text sent,
+// so the API's per-character timing can be read back per word.
 export function scriptFor(say, voice, cast) {
   const words = String(say || '').split(/\s+/).filter(Boolean);
   const tags = TAG_MODELS.has(voice.model);
-  const lex = new Map((cast.lexicon || []).map(e => [String(e.word).toLowerCase(), e]));
+  const lex = new Map((cast.lexicon || []).filter(e => e && e.word && e.say).map(e => [String(e.word).toLowerCase(), e.say]));
   let text = tags && voice.direction ? voice.direction.trim() + ' ' : '';
   const offsets = [];
   for (const w of words) {
     const m = /^([^\p{L}\p{N}]*)([\p{L}\p{N}'’-]+)([^\p{L}\p{N}]*)$/u.exec(w);
-    const e = m && lex.get(m[2].toLowerCase());
-    const said = e ? m[1] + (tags && e.ipa ? `/${e.ipa}/` : (e.alias || m[2])) + m[3] : w;
+    const said = m && lex.has(m[2].toLowerCase()) ? m[1] + lex.get(m[2].toLowerCase()) + m[3] : w;
     offsets.push(text.length);
     text += said + ' ';
   }
@@ -96,7 +98,9 @@ export function hashFor(b, cast) {
 async function tts(voice, text, cast, { key, prevText, nextText }) {
   const fmt = (cast.defaults && cast.defaults.output_format) || 'mp3_44100_64';
   const settings = Object.assign({}, (cast.defaults && cast.defaults.settings) || {}, voice.settings || {});
-  const body = { text, model_id: voice.model, voice_settings: settings };
+  // No settings: the voice's own, which is what the cast was auditioned on.
+  const body = { text, model_id: voice.model };
+  if (Object.keys(settings).length) body.voice_settings = settings;
   if (Number.isInteger(voice.seed)) body.seed = voice.seed;
   if (prevText) body.previous_text = prevText;
   if (nextText) body.next_text = nextText;
@@ -114,6 +118,18 @@ async function tts(voice, text, cast, { key, prevText, nextText }) {
   }
 }
 
+// The account's credits this month: used, allowed, and when they start again.
+// Null if the key may not see them; nothing depends on it.
+export async function credits(key) {
+  try {
+    const res = await fetch(`${API}/user/subscription`, { headers: { 'xi-api-key': key, accept: 'application/json' } });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return Number.isFinite(j.character_count) ? { used: j.character_count, limit: j.character_limit, tier: j.tier,
+      resets: j.next_character_count_reset_unix ? new Date(j.next_character_count_reset_unix * 1000).toISOString().slice(0, 10) : null } : null;
+  } catch (_) { return null; }
+}
+
 // ── audio ───────────────────────────────────────────────────────────────────
 
 function ffmpeg(args, input) {
@@ -123,17 +139,23 @@ function ffmpeg(args, input) {
 }
 const toPcm = mp3 => ffmpeg(['-i', 'pipe:0', '-f', 's16le', '-ac', '1', '-ar', String(RATE), 'pipe:1'], mp3);
 const toMp3 = pcm => ffmpeg(['-f', 's16le', '-ac', '1', '-ar', String(RATE), '-i', 'pipe:0', '-codec:a', 'libmp3lame', '-b:a', BITRATE, '-f', 'mp3', 'pipe:1'], pcm);
+// A voice the cast plays faster or slower ("tempo": 1.1 is a tenth faster),
+// stretched after it is said with its pitch kept — the model's own speed
+// setting changes the voice as well as the pace.
+export const tempoOf = voice => (Number.isFinite(voice && voice.tempo) && voice.tempo >= 0.5 && voice.tempo <= 2 ? voice.tempo : 1);
+const stretch = (pcm, tempo) => (tempo === 1 ? pcm
+  : ffmpeg(['-f', 's16le', '-ac', '1', '-ar', String(RATE), '-i', 'pipe:0', '-filter:a', `atempo=${tempo}`, '-f', 's16le', '-ac', '1', '-ar', String(RATE), 'pipe:1'], pcm));
 const round = t => Math.round(t * 100) / 100;
 
 // The time each of the narration's words starts, read off the API's timing of
-// every character it was sent.
-export function wordTimes(script, alignment, offset) {
+// every character it was sent (and a stretched voice's timing stretched too).
+export function wordTimes(script, alignment, offset, tempo = 1) {
   const starts = (alignment && alignment.character_start_times_seconds) || [];
   return script.offsets.map((o, k) => {
     let t = starts[o];
     for (let j = o; t == null && j < starts.length; j++) t = starts[j];
     if (t == null) t = starts.length ? starts[starts.length - 1] : k * 0.3;
-    return round(offset + t);
+    return round(offset + t / tempo);
   });
 }
 
@@ -159,10 +181,12 @@ export async function voiceBulletin(file, cast, { key, castSrc, repo = REPO, dry
     const prev = scenes[i - 1] && speakerOf(b, scenes[i - 1]) === speakerOf(b, s) ? scenes[i - 1].say : null;
     const next = scenes[i + 1] && speakerOf(b, scenes[i + 1]) === speakerOf(b, s) ? scenes[i + 1].say : null;
     const r = await tts(x.v, x.text, cast, { key, prevText: prev, nextText: next });
-    const p = toPcm(r.audio);
+    const tempo = tempoOf(x.v);
+    const p = stretch(toPcm(r.audio), tempo);
     const secs = p.length / 2 / RATE;
+    // Never a word after its scene ends: the stretch rounds, the timing does not.
     out.push({ speaker: speakerOf(b, s), voice: x.v.voice_name || x.v.voice_id, model: x.v.model,
-      start: round(at), end: round(at + secs), words: wordTimes(x, r.alignment, at) });
+      start: round(at), end: round(at + secs), words: wordTimes(x, r.alignment, at, tempo).map(t => Math.min(t, round(at + secs))) });
     pcm.push(p);
     at += secs;
     if (i < scripts.length - 1) { pcm.push(Buffer.alloc(Math.round(GAP * RATE) * 2)); at += GAP; }
@@ -213,11 +237,12 @@ async function sample(linesFile, outDir, { key, log = console.log }) {
   const lines = JSON.parse(fs.readFileSync(linesFile, 'utf8'));
   fs.mkdirSync(outDir, { recursive: true });
   for (const l of lines) {
-    const voice = { voice_id: l.voice_id, model: l.model, settings: l.settings, voice_name: l.name };
+    const voice = { voice_id: l.voice_id, model: l.model, settings: l.settings, voice_name: l.name, tempo: l.tempo };
     const r = await tts(voice, l.text, { defaults: {} }, { key });
-    fs.writeFileSync(path.join(outDir, `${l.name}.mp3`), r.audio);
+    const tempo = tempoOf(voice), pcm = stretch(toPcm(r.audio), tempo);
+    fs.writeFileSync(path.join(outDir, `${l.name}.mp3`), tempo === 1 ? r.audio : toMp3(pcm));
     fs.writeFileSync(path.join(outDir, `${l.name}.json`), JSON.stringify({ ...l, cost: r.cost, request: r.request, alignment: r.alignment }, null, 1));
-    log(`  ${l.name}: ${l.model}, ${(toPcm(r.audio).length / 2 / RATE).toFixed(1)} s${r.cost ? `, ${r.cost} characters` : ''}`);
+    log(`  ${l.name}: ${l.model}${tempo === 1 ? '' : ` at ${tempo}×`}, ${(pcm.length / 2 / RATE).toFixed(1)} s${r.cost ? `, ${r.cost} characters` : ''}`);
   }
 }
 
@@ -229,8 +254,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const dry = argv.includes('--dry-run');
   const key = process.env.ELEVENLABS_API_KEY || '';
   if (!dry && !key) { console.error('ELEVENLABS_API_KEY is not set — the workflow passes it from the repository secret.'); process.exit(2); }
+  const before = dry ? null : await credits(key);
+  const tally = async () => {
+    const after = before && await credits(key);
+    if (after) console.log(`ElevenLabs (${after.tier}): this run used ${(after.used - before.used).toLocaleString('en-AU')} credits; `
+      + `${(after.limit - after.used).toLocaleString('en-AU')} of ${after.limit.toLocaleString('en-AU')} left this month${after.resets ? `, until ${after.resets}` : ''}.`);
+  };
   try {
-    if (arg('--sample')) { await sample(arg('--sample'), arg('--out') || 'voice-samples', { key }); process.exit(0); }
+    if (arg('--sample')) { await sample(arg('--sample'), arg('--out') || 'voice-samples', { key }); await tally(); process.exit(0); }
     const castSrc = arg('--cast') || CAST_URL;
     const cast = await readCast(castSrc);
     console.log(`Cast: ${castSrc} (updated ${cast.updated || 'unknown'}), ${Object.keys(cast.voices).length} voices.`);
@@ -251,6 +282,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       try { await voiceBulletin(rel, cast, { key, castSrc, dry }); }
       catch (err) { failed++; console.error(`  ${f}: not voiced — ${err.message}`); }
     }
+    if (files.length) await tally();
     process.exit(failed ? 1 : 0);
   } catch (err) { console.error(err.message); process.exit(1); }
 }

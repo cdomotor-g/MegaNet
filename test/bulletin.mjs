@@ -17,6 +17,13 @@
 //     a regular silence and the sliding battery; its draft is valid; publishing
 //     it into a scratch copy writes the file and the index and lets the oldest go
 //   * every scene of every bulletin drawn, wide and tall, by the player itself
+//   * the voices: every voice file published is its bulletin's, scene for
+//     scene and word for word, with its MP3 beside it and none left without a
+//     bulletin; the validator refuses one that is not; the voicing tool
+//     (tools/voice/speak.mjs) directs only the models that act directions,
+//     respells from the lexicon without losing a word's place, stretches a
+//     voice's timing with its tempo, re-voices a bulletin when its words or
+//     its voices change and not otherwise, and lets a voice go with its bulletin
 //
 // Then Chromium:
 //
@@ -32,6 +39,11 @@
 //     small, beside the words
 //   * a phone: drawn tall, the presenter beside the words, no sideways scroll;
 //     reduced motion: nothing moves and the scene stands complete
+//   * voiced: 🔊 on the controls and the length as said; Play fetches the
+//     sound and the stage follows it — the words as they are said, the next
+//     scene when the sound gets there; pause holds the sound, a scene picked
+//     moves it; 🔇 runs the stage by the clock instead, and is remembered; a
+//     voice file that is not this bulletin's is not played
 //
 // Run:  npm run bulletin
 
@@ -40,7 +52,8 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
-import { validate, validateIndex, PRESENTERS, SCENES } from '../tools/bulletin/validate.mjs';
+import { validate, validateIndex, validateVoice, voicePathFor, PRESENTERS, SCENES, VOICE_FORMAT } from '../tools/bulletin/validate.mjs';
+import { scriptFor, hashFor, wordTimes, pending, tempoOf } from '../tools/voice/speak.mjs';
 import { buildFacts } from '../tools/bulletin/gather.mjs';
 import { draft } from '../tools/bulletin/draft.mjs';
 import { publish } from '../tools/bulletin/publish.mjs';
@@ -59,6 +72,21 @@ const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8'));
 const doc = readJson(path.join(REPO, 'stations.json'));
 const ids = new Set(doc.stations.map(s => s.id));
 const FIXTURE = readJson(path.join(HERE, 'fixtures', 'bulletin-all-scenes.json'));
+// A voice file for a bulletin, as speak.mjs writes one: each scene said in
+// `per` seconds, its words spread over the first nine-tenths, a pause between.
+const wordsOf = s => String(s.say || '').split(/\s+/).filter(Boolean);
+function voiceFor(b, file, { per = 2, gap = 0.45 } = {}) {
+  let at = 0;
+  const scenes = b.scenes.map((s, i) => {
+    const w = wordsOf(s), start = at, end = at + per;
+    at = end + (i < b.scenes.length - 1 ? gap : 0);
+    return { speaker: s.presenter || b.presenter, voice: 'Test', model: 'eleven_v4', start: +start.toFixed(2), end: +end.toFixed(2),
+      words: w.map((_, k) => +(start + per * 0.9 * k / w.length).toFixed(2)) };
+  });
+  const paths = voicePathFor(file);
+  return { format: VOICE_FORMAT, bulletin: b.id, file, audio: paths.audio, bytes: 1000, duration: +at.toFixed(2), hash: 'test',
+    generated_at: b.issued_at, cast: { source: 'test', updated: null }, scenes };
+}
 
 // ── 1. what is published ────────────────────────────────────────────────────
 console.log('Published bulletins');
@@ -84,6 +112,19 @@ if (index) {
     const onDisk = fs.existsSync(path.join(DIR, kind)) ? fs.readdirSync(path.join(DIR, kind)).filter(f => f.endsWith('.json')) : [];
     const stray = onDisk.filter(f => !listed.has(f));
     ok(`every ${kind} file is in the index`, !stray.length, stray.join(', '));
+    // Its voices: the bulletin's own, with the MP3 beside each, and none
+    // without a bulletin (speak.mjs lets a voice go with its bulletin).
+    for (const e of index[kind] || []) {
+      const vp = voicePathFor(e.file), vj = path.join(REPO, vp.json);
+      if (!fs.existsSync(vj) || !fs.existsSync(path.join(REPO, e.file))) continue;
+      const v = readJson(vj), r = validateVoice(v, readJson(path.join(REPO, e.file)));
+      ok(`${vp.json} is ${e.file}'s voice, scene for scene and word for word`, !r.errors.length, r.errors.join('; '));
+      const mp3 = path.join(REPO, vp.audio);
+      ok(`…and its MP3 is there, the size it says`, fs.existsSync(mp3) && fs.statSync(mp3).size === v.bytes, vp.audio);
+    }
+    const vdir = path.join(DIR, 'voice', kind);
+    const loose = (fs.existsSync(vdir) ? fs.readdirSync(vdir) : []).filter(f => !/^\d{4}-\d{2}-\d{2}\.(json|mp3)$/.test(f) || !listed.has(f.replace(/\.mp3$/, '.json')));
+    ok(`no ${kind} voice without its bulletin`, !loose.length, loose.join(', '));
   }
 }
 
@@ -205,7 +246,64 @@ console.log('Every scene drawn');
   ok('…and a title tile\'s label is whole, on two lines', labLines.length === 2 && labLines.join(' ') === 'quiet stations that keep a schedule', labLines.join(' | '));
 }
 
-// ── 6. in Chromium ──────────────────────────────────────────────────────────
+// ── 6. the voices ───────────────────────────────────────────────────────────
+console.log('The voices');
+{
+  const fv = voiceFor(FIXTURE, 'data/bulletins/daily/2026-10-25.json');
+  const r = validateVoice(fv, FIXTURE);
+  ok('a voice file as speak.mjs writes one is valid', !r.errors.length, r.errors.join('; '));
+  const bad = JSON.parse(JSON.stringify(fv));
+  bad.scenes[1].words.pop();
+  bad.scenes[2].start = bad.scenes[1].start;
+  bad.scenes[3].speaker = 'turbo';
+  const e = validateVoice(bad, FIXTURE).errors;
+  ok('…and one that is not this bulletin\'s word for word, in order, by its own presenter is refused',
+    e.some(x => /scenes\[1\]\.words: \d+ times for \d+ words/.test(x)) && e.some(x => /scenes\[2\]: .* does not follow/.test(x)) && e.some(x => /scenes\[3\]\.speaker: "turbo"/.test(x)), e.join('; '));
+  ok('…as is one for another bulletin', validateVoice(fv, Object.assign({}, FIXTURE, { id: 'daily-2026-10-24' })).errors.some(x => /^bulletin:/.test(x)));
+
+  // The voicing tool, without calling anyone.
+  const cast = { updated: '2026-10-25', voices: {
+    'seasoned-hydrographer': { voice_id: 'A'.repeat(20), voice_name: 'G', model: 'eleven_v4', direction: '[slowly]' },
+    'tech-wizard': { voice_id: 'B'.repeat(20), voice_name: 'A', model: 'eleven_multilingual_v2', direction: '[quickly]' },
+    turbo: { voice_id: 'C'.repeat(20), voice_name: 'T', model: 'eleven_v4', direction: '[quickly]', tempo: 1.1 },
+  }, lexicon: [{ word: 'Goomburra', say: 'Goom-burra' }] };
+  const g = scriptFor('Upper Goomburra, quiet.', cast.voices['seasoned-hydrographer'], cast);
+  const a = scriptFor('Upper Goomburra, quiet.', cast.voices['tech-wizard'], cast);
+  ok('a voice on a model that acts directions is given its own; one that would read it aloud is not',
+    g.text === '[slowly] Upper Goom-burra, quiet.' && a.text === 'Upper Goom-burra, quiet.', `${g.text} | ${a.text}`);
+  ok('…the lexicon\'s respelling is said, and every word keeps its place in what is sent',
+    g.words.length === 3 && g.offsets.every((o, k) => g.text.slice(o).startsWith(['Upper', 'Goom-burra,', 'quiet.'][k])), JSON.stringify(g));
+  const al = { character_start_times_seconds: Array.from({ length: g.text.length }, (_, k) => k * 0.05) };
+  const t1 = wordTimes(g, al, 10), t2 = wordTimes(g, al, 10, 1.25);
+  ok('…its words\' times read off the characters\', and stretched with its tempo', t1[1] === +(10 + g.offsets[1] * 0.05).toFixed(2) && Math.abs(t2[1] - (10 + g.offsets[1] * 0.05 / 1.25)) < 0.006,
+    `${t1} | ${t2}`);
+  ok('…a tempo is taken only if it is a sensible one', tempoOf(cast.voices.turbo) === 1.1 && tempoOf({ tempo: 7 }) === 1 && tempoOf({}) === 1);
+  const b = { id: 'daily-2026-10-25', presenter: 'seasoned-hydrographer', scenes: [{ say: 'One.' }, { say: 'Two.', presenter: 'tech-wizard' }] };
+  const h = hashFor(b, cast), again = JSON.parse(JSON.stringify(cast));
+  again.voices.turbo.tempo = 1.2;
+  const recast = JSON.parse(JSON.stringify(cast));
+  recast.voices['tech-wizard'].voice_id = 'D'.repeat(20);
+  ok('a bulletin is re-voiced when its words or the voices it uses change, and not for a voice it does not use',
+    hashFor(b, again) === h && hashFor(b, recast) !== h && hashFor(Object.assign({}, b, { scenes: [{ say: 'One!' }, b.scenes[1]] }), cast) !== h);
+
+  // pending(), on a scratch copy: a bulletin with no voice is voiced, one
+  // whose voice matches is left, a voice whose bulletin has gone goes.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'voice-'));
+  const put = (rel, body) => { fs.mkdirSync(path.dirname(path.join(tmp, rel)), { recursive: true }); fs.writeFileSync(path.join(tmp, rel), typeof body === 'string' ? body : JSON.stringify(body)); };
+  put('data/bulletins/daily/2026-10-24.json', Object.assign({}, b, { id: 'daily-2026-10-24' }));
+  put('data/bulletins/daily/2026-10-25.json', b);
+  put('data/bulletins/voice/daily/2026-10-24.json', { hash: hashFor(Object.assign({}, b, { id: 'daily-2026-10-24' }), cast) });
+  put('data/bulletins/voice/daily/2026-10-10.json', { hash: 'gone' });
+  put('data/bulletins/voice/daily/2026-10-10.mp3', 'x');
+  const p = pending(cast, { repo: tmp });
+  ok('what needs voicing: the unvoiced bulletin, not the voiced one; and the voice whose bulletin has gone',
+    JSON.stringify(p.todo) === '["data/bulletins/daily/2026-10-25.json"]'
+      && JSON.stringify(p.orphans.sort()) === '["data/bulletins/voice/daily/2026-10-10.json","data/bulletins/voice/daily/2026-10-10.mp3"]', JSON.stringify(p));
+  ok('…and with force "all", every bulletin', pending(cast, { repo: tmp, force: ['all'] }).todo.length === 2);
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+// ── 7. in Chromium ──────────────────────────────────────────────────────────
 console.log('In Chromium');
 const { startServer } = await import('./lib/server.mjs');
 const { launchBrowser } = await import('./lib/browser.mjs');
@@ -220,6 +318,16 @@ const week = Object.assign(JSON.parse(JSON.stringify(FIXTURE)), { kind: 'weekly'
 const fixIndex = { format: 'floodnet-bulletin-index/1', updated_at: FIXTURE.issued_at,
   daily: [{ id: FIXTURE.id, file: fixFile, issued_at: FIXTURE.issued_at, headline: FIXTURE.headline, sky: FIXTURE.outlook.sky }],
   weekly: [{ id: week.id, file: weekFile, issued_at: week.issued_at, headline: week.headline, sky: week.outlook.sky }] };
+// A quiet hum as long as the voice file says, standing in for its MP3.
+function wav(secs, rate = 8000) {
+  const n = Math.round(secs * rate), w = Buffer.alloc(44 + n);
+  w.write('RIFF', 0); w.writeUInt32LE(36 + n, 4); w.write('WAVE', 8); w.write('fmt ', 12);
+  w.writeUInt32LE(16, 16); w.writeUInt16LE(1, 20); w.writeUInt16LE(1, 22); w.writeUInt32LE(rate, 24); w.writeUInt32LE(rate, 28);
+  w.writeUInt16LE(1, 32); w.writeUInt16LE(8, 34); w.write('data', 36); w.writeUInt32LE(n, 40);
+  for (let i = 0; i < n; i++) w[44 + i] = 128 + Math.round(16 * Math.sin(2 * Math.PI * 220 * i / rate));
+  return w;
+}
+const fixVoice = voiceFor(FIXTURE, fixFile);
 async function page(opts = {}) {
   const context = await browser.newContext({ viewport: opts.viewport || { width: 1440, height: 1000 }, timezoneId: 'Australia/Brisbane', reducedMotion: opts.reduced ? 'reduce' : 'no-preference' });
   const pg = await context.newPage();
@@ -230,6 +338,14 @@ async function page(opts = {}) {
     : r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixIndex) })));
   await pg.route('**/' + fixFile, r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FIXTURE) }));
   await pg.route('**/' + weekFile, r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(week) }));
+  // Voiced only when asked for (opts.voice: the voice file to serve for the
+  // daily); otherwise not voiced yet, as a bulletin is for its first minutes.
+  await pg.route('**/data/bulletins/voice/**', r => {
+    const u = new URL(r.request().url());
+    if (opts.voice && u.pathname.endsWith(voicePathFor(fixFile).json)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(opts.voice) });
+    if (opts.voice && u.pathname.endsWith(voicePathFor(fixFile).audio)) return r.fulfill({ status: 200, contentType: 'audio/wav', body: wav(opts.voice.duration) });
+    return r.fulfill({ status: 404, body: 'not found' });
+  });
   await pg.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => typeof state !== 'undefined' && state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
   await pg.evaluate(() => switchTab('health'));
@@ -333,6 +449,67 @@ try {
     const still = await pg.evaluate(() => [...document.querySelectorAll('#hb-stage .hb-a-rise, #hb-stage .hb-a-pop')].every(el => getComputedStyle(el).animationName === 'none' && getComputedStyle(el).opacity === '1'));
     ok('reduced motion: nothing moves and the scene stands complete', still);
     ok('…and no page errors', !errors.length, errors.join('\n'));
+    await context.close();
+  }
+
+  // ── voiced ──
+  {
+    const { pg, context, errors } = await page({ voice: fixVoice });
+    await until(pg, () => !!document.querySelector('#hb-stage svg') && !!document.getElementById('hb-sound'));
+    const ready = await pg.evaluate(() => ({ sound: document.getElementById('hb-sound').textContent, pressed: document.getElementById('hb-sound').getAttribute('aria-pressed'),
+      big: document.querySelector('.hb-bigplay').textContent.replace(/\s+/g, ' ').trim(), foot: document.querySelector('.hb-foot').textContent, st: HealthBulletin._state() }));
+    ok('a voiced bulletin: 🔊 Sound on, and the length as said', /Sound on/.test(ready.sound) && ready.pressed === 'true' && /· 24 s$/.test(ready.big) && ready.st.voiced && ready.st.sound,
+      JSON.stringify(ready));
+    ok('…and says its voices are AI speech', /voices are AI speech/.test(ready.foot), ready.foot);
+    const written = FIXTURE.scenes.reduce((n, s) => n + (+s.secs || 8), 0);
+    const fmt = s => (s >= 60 ? `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')}` : `${s} s`);
+    await pg.click('#hb-sound');
+    const silent = await pg.evaluate(() => document.querySelector('.hb-bigplay').textContent.replace(/\s+/g, ' ').trim());
+    await pg.click('#hb-sound');
+    const back = await pg.evaluate(() => document.querySelector('.hb-bigplay').textContent.replace(/\s+/g, ' ').trim());
+    ok('…the length as written with the sound off, and as said again with it on', silent.endsWith(`· ${fmt(written)}`) && /· 24 s$/.test(back), `${silent} | ${back}`);
+    await pg.click('#hb-play');
+    await until(pg, () => HealthBulletin._state().audio === 'ready' && HealthBulletin._state().at > 0.6);
+    const said = await pg.evaluate(() => ({ st: HealthBulletin._state(), said: document.querySelectorAll('#hb-caption .hb-w.is-said').length, all: document.querySelectorAll('#hb-caption .hb-w').length }));
+    // The words said by now, by the voice file's own times.
+    const due = fixVoice.scenes[0].words.filter(t => t <= said.st.at + 0.05).length;
+    ok('Play fetches the sound and plays it; the caption is said as the voice says it', said.st.playing && said.st.scene === 0 && said.said > 0 && Math.abs(said.said - due) <= 2 && said.said < said.all,
+      JSON.stringify({ ...said, due }));
+    await until(pg, () => HealthBulletin._state().scene === 1, null, 8000);
+    const at1 = await pg.evaluate(() => HealthBulletin._state().at);
+    ok('…and the next scene comes when the sound gets there', at1 >= fixVoice.scenes[1].start - 0.05 && at1 < fixVoice.scenes[1].start + 1.2, `${at1} vs ${fixVoice.scenes[1].start}`);
+    await pg.click('#hb-play');
+    const p1 = await pg.evaluate(() => HealthBulletin._state().at);
+    await pg.waitForTimeout(500);
+    const p2 = await pg.evaluate(() => HealthBulletin._state());
+    ok('Pause holds the sound where it is', !p2.playing && Math.abs(p2.at - p1) < 0.05, `${p1} → ${p2.at}`);
+    await pg.click('.hb-seg:nth-child(5)');
+    const p3 = await pg.evaluate(() => HealthBulletin._state());
+    ok('…and a scene picked from the bar moves the sound to it', p3.scene === 4 && Math.abs(p3.at - fixVoice.scenes[4].start) < 0.25, JSON.stringify(p3));
+    await pg.click('#hb-sound');
+    const off = await pg.evaluate(() => ({ st: HealthBulletin._state(), label: document.getElementById('hb-sound').textContent, kept: localStorage.getItem('mn-hb-sound'),
+      clock: document.getElementById('hb-clock').textContent }));
+    ok('🔇 turns the voices off, remembered, and the scenes go back to their own seconds',
+      !off.st.sound && /Sound off/.test(off.label) && off.kept === '0' && off.clock.endsWith(`${Math.floor(written / 60)}:${String(written % 60).padStart(2, '0')}`), JSON.stringify(off));
+    await pg.click('#hb-play');
+    const q1 = await pg.evaluate(() => HealthBulletin._state());
+    await pg.waitForTimeout(900);
+    const q2 = await pg.evaluate(() => ({ st: HealthBulletin._state(), said: document.querySelectorAll('#hb-caption .hb-w.is-said').length }));
+    ok('…then Play runs the stage by the clock, the sound silent', q2.st.playing && q2.said > 0 && Math.abs(q2.st.at - q1.at) < 0.05, JSON.stringify({ q1, q2 }));
+    await pg.click('#hb-play');
+    ok('no page errors, voiced', !errors.length, errors.join('\n'));
+    await context.close();
+  }
+  {
+    // A voice file that is not this bulletin's — a scene short — is not played.
+    const wrong = JSON.parse(JSON.stringify(fixVoice));
+    wrong.scenes.pop();
+    const { pg, context, errors } = await page({ voice: wrong });
+    await until(pg, () => !!document.querySelector('#hb-stage svg'));
+    await pg.waitForTimeout(300);
+    const st = await pg.evaluate(() => ({ st: HealthBulletin._state(), button: !!document.getElementById('hb-sound') }));
+    ok('a voice file that is not this bulletin\'s is not played: no 🔊, the bulletin as written', !st.st.voiced && !st.button, JSON.stringify(st));
+    ok('…and nothing breaks', !errors.length, errors.join('\n'));
     await context.close();
   }
 } catch (err) {

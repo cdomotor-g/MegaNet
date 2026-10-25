@@ -29,8 +29,8 @@ network's **bulletin**: its last 24 hours — or, on the *This week* switch, its
 last seven days — told in a minute or two of animated scenes, a weather report
 about the network rather than the sky. One of the Droggies presents it (a
 different one each day of the week; Graham Watts the weekly, with Alex Chen for
-the radio), and the narration runs under the stage word by word, or aloud in
-the browser's own voice on 🔊.
+the radio), and says it: the narration runs under the stage word by word as
+the presenter says it, in their own voice.
 
 It is written, not worked out here. Every morning at half past four a scheduled
 Claude Code task reads the network as this tab does — the same
@@ -60,9 +60,10 @@ what is worth a look and what came back; and the sign-off.
 
 **Using it.** ▶ plays it (it never starts by itself); the bar under the stage is
 the scenes, each a press away; ⏯ ⏮ ⏭, the space bar and the arrow keys on the
-stage; a station's name on the stage or beside it opens it below on this tab;
-*Read it instead* is the whole script with its stations; *Hide* folds it to its
-headline on this device. Earlier bulletins are in the list beside *Today* and
+stage; 🔊 turns the presenters' voices off (🔇, remembered on this device) and
+the scenes then run on their own seconds; a station's name on the stage or
+beside it opens it below on this tab; *Read it instead* is the whole script with
+its stations; *Hide* folds it to its headline on this device. Earlier bulletins are in the list beside *Today* and
 *This week* (fourteen days and eight weeks are kept). The stage takes the
 panel's full width; under it, the presenter's portrait sits at the left beside
 what they are saying, smaller on a phone, where the scene is drawn tall. A map's
@@ -76,6 +77,18 @@ The page fetches them fresh, and the service worker keeps the last copy for no
 signal, so a bulletin needs no version stamp. The presenters' portraits are
 cropped from the Droggies' canon art into `assets/presenters/`. `npm run
 bulletin` holds the player, the published files and the pipeline.
+
+**The voices.** Each Droggie's voice is cast in the Droggies' own repository
+(`voices/cast.json` in cdomotor-g/thedroggies). A minute or two after a bulletin
+is pushed, the *Bulletin voices* workflow (`.github/workflows/bulletin-voice.yml`,
+running `tools/voice/speak.mjs`) has every scene said in its presenter's voice by
+ElevenLabs and commits one MP3 and a voice file beside it:
+`data/bulletins/voice/<daily|weekly>/<date>.mp3` and `.json`, the second with
+when each scene and word starts, which the page follows. Until then, or with no
+signal, the bulletin plays silent on its scenes' own seconds. The MP3 is fetched
+whole on the first ▶ (the site does not serve part of a file, which seeking
+would need) and is not kept by the service worker. The voices are AI speech,
+and the bulletin's footer says so.
 
 ## Six ways in
 

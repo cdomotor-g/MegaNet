@@ -207,6 +207,14 @@ as right as Graham's. Never mock the profession. Every Droggie has canon pronoun
 scene is the `title`, the last the `signoff`. The headline (≤170 characters)
 is the one thing to remember.
 
+**Written to be said.** Every `say` is spoken aloud in the presenter's own voice
+(below, *The voices*), so write it for the ear: units as words ("12.2 volts",
+"five parts per million", "forty kilometres"), times as people say them, no
+symbols or abbreviations a voice would spell out letter by letter ("V", "ppm",
+"km", "&", "/"), and no brackets — a voice treats square brackets as stage
+directions. A station's name as it is on file is fine; the voices learn a
+place name they get wrong from the cast's lexicon, not from respelling it here.
+
 **Private data.** No landholder names or contacts, no site codes, gate
 combinations or key numbers — ever (`CLAUDE.md`). The product is
 **Flood-Net**, never "MegaNet", in anything a person reads.
@@ -248,6 +256,27 @@ battery slopes; fingerprints against their thirty days; whose carrier the
 week's bit flips came on and the hours they keep (interference keeps hours, a
 failing radio does not); the repeaters behind most of the trouble; each
 receiver's week; what the register needs; and what got fixed.
+
+## The voices
+
+Nothing to do in the run: once the bulletin is pushed, the **Bulletin voices**
+workflow (`.github/workflows/bulletin-voice.yml`) voices it. It reads the cast —
+each Droggie's ElevenLabs voice, model and direction — from the Droggies'
+repository as published (`voices/cast.json` in
+[cdomotor-g/thedroggies](https://github.com/cdomotor-g/thedroggies/tree/main/voices)),
+has every scene said by its presenter (`tools/voice/speak.mjs`, with the key in
+the `ELEVENLABS_API_KEY` repository secret), and commits
+`data/bulletins/voice/<kind>/<date>.mp3` with a voice file beside it giving when
+each scene and word starts. The page plays it and follows it; a bulletin not
+voiced yet plays silent on its own `secs`. A bulletin rewritten the same day is
+voiced again; one let go takes its voice with it.
+
+Each voicing run's log says how many ElevenLabs credits it used and how many
+are left this month. To re-voice the bulletins still listed — after a recast in
+thedroggies, say — run the workflow by hand (Actions → *Bulletin voices* → Run
+workflow) with force `all`. To hear test lines in a voice without touching a
+bulletin, run it with `sample` set to a file like
+`tools/voice/samples/turbo-tags.json`; the clips come back as the run's artifact.
 
 ## The scheduled tasks
 

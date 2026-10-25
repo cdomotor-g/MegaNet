@@ -1,0 +1,6 @@
+[
+ {"name": "nitto-bounce", "voice_id": "M4FiuEOcSLrYgftiXoq9", "model": "eleven_v4", "tempo": 1.06,
+  "text": "[excited] [cheerfully] Righto! I got this! Good morning! Overnight, three stations on the Bremer went quiet at ten past two. All of them heard through the same repeater, so it's the repeater worth a look, not the stations. Billy's up! Tea?"},
+ {"name": "turbo-notch", "voice_id": "hk6wpUusj7FFV03U5LvR", "model": "eleven_v4", "tempo": 1.1,
+  "text": "[quickly] And it was a wet week! Thursday was the wettest, nearly four hundred gauges reporting rain. A wet week is when the stations earn their keep! Personal best! Race ya!"}
+]

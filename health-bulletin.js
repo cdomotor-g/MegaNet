@@ -20,8 +20,23 @@
 // data/bulletins/index.json. tools/bulletin/README.md is that task's brief;
 // tools/bulletin/validate.mjs is what a file may hold. This file only draws
 // it: every scene is a small SVG drawn from the scene's own numbers, the
-// narration revealed under it as the presenter "says" it (or read aloud, on
-// asking), a scene's stations a press away from their place on this tab.
+// narration revealed under it as the presenter says it — out loud, in their
+// own voice, once the bulletin has been voiced (below) — a scene's stations a
+// press away from their place on this tab.
+//
+// ── Where the voices come from ──────────────────────────────────────────────
+// Not from this page either. Each Droggie has a voice of their own, cast in
+// the Droggies' canon (github.com/cdomotor-g/thedroggies, voices/cast.json).
+// A GitHub workflow follows every bulletin pushed (bulletin-voice.yml, which
+// runs tools/voice/speak.mjs) and has each scene said in its presenter's
+// voice by ElevenLabs: one MP3 a bulletin, and beside it a voice file with
+// when each scene and each word starts — data/bulletins/voice/<kind>/<date>.
+// The page plays the MP3 and follows it, scene by scene and word by word; a
+// bulletin with no voice file yet (it lands a minute or two after the
+// bulletin) plays silent on the scenes' own seconds, as every bulletin did
+// before. The MP3 is fetched whole on the first Play, not streamed: the site
+// does not answer a request for part of a file, which an <audio> pointed at
+// it needs in order to seek (and Safari, to play at all).
 //
 // Why drawn here and not a video. A file of numbers is a few kilobytes a day,
 // works with no signal from the copy the service worker keeps, is the same
@@ -32,9 +47,10 @@
 // The title card — the network's "forecast" (clear to stormy), the headline,
 // four numbers — and ▶ Play. Playing, each scene runs its few seconds with
 // its narration under it; the bar under the stage is the scenes, each a
-// press away. ⏯ ⏮ ⏭, the space bar and the arrow keys on the stage, 🔊 for
-// the browser's own voice, *Read it instead* for the whole script. A device
-// remembers whether the panel was hidden and which bulletins it has played.
+// press away. ⏯ ⏮ ⏭, the space bar and the arrow keys on the stage, 🔊 🔇
+// for the presenters' voices, *Read it instead* for the whole script. A device
+// remembers whether the panel was hidden, whether the sound was turned off,
+// and which bulletins it has played.
 // Reduced motion: nothing plays by itself and the scenes are drawn finished.
 
 const HealthBulletin = (() => {
@@ -47,30 +63,31 @@ const HealthBulletin = (() => {
   const STALE = { daily: 36 * 3600e3, weekly: 9 * 86400e3 };
 
   // The crew, from the Droggies' canon (github.com/cdomotor-g/thedroggies,
-  // characters/json/*.json): who they are, the lines they sign off with, and
-  // the voice the browser reads them in. Their portraits are cropped from the
-  // canon art into assets/presenters/. tools/bulletin/validate.mjs PRESENTERS
-  // lists the same ids (test/bulletin.mjs holds the two together).
+  // characters/json/*.json): who they are and the lines they sign off with.
+  // Their portraits are cropped from the canon art into assets/presenters/;
+  // their voices are cast in the same canon (voices/cast.json) and come with
+  // each bulletin's voice file. tools/bulletin/validate.mjs PRESENTERS lists
+  // the same ids (test/bulletin.mjs holds the two together).
   const ROSTER = {
-    'seasoned-hydrographer': { name: 'Graham Watts', role: 'Hydrographer', voice: { pitch: 0.8, rate: 0.95 },
+    'seasoned-hydrographer': { name: 'Graham Watts', role: 'Hydrographer',
       lines: ['It’s going to be a long day.', 'Might as well do it properly.'],
       alt: 'Graham Watts, a weathered hydrographer in a wide-brim hat and faded yellow hi-vis, gesturing wryly.' },
-    'tech-wizard': { name: 'Alex Chen', role: 'Tech Wizard', voice: { pitch: 1.0, rate: 1.05 },
+    'tech-wizard': { name: 'Alex Chen', role: 'Tech Wizard',
       lines: ['That’s not a fault, that’s a symptom.', 'Polarity matters.'],
       alt: 'Alex Chen, an intense technician in orange hi-vis and glasses, probing a logger cabinet with multimeter leads.' },
-    'new-recruit': { name: 'The New Recruit', role: 'Keen but green', voice: { pitch: 1.15, rate: 1.05 },
+    'new-recruit': { name: 'The New Recruit', role: 'Keen but green',
       lines: ['Should I be writing this down?', 'Is it supposed to do that?'],
       alt: 'The New Recruit, a startled young hydrographer in box-fresh yellow hi-vis with a bulging backpack.' },
-    turbo: { name: 'Turbo', role: 'Flat out at all times', voice: { pitch: 1.05, rate: 1.15 },
+    turbo: { name: 'Turbo', role: 'Flat out at all times',
       lines: ['Personal best!', 'Race ya!'],
       alt: 'Turbo, grinning in an orange hi-vis vest and battered hat, striding forward and pointing ahead.' },
-    nitwit: { name: 'Dale “Nitto”', role: 'Field hand', voice: { pitch: 1.25, rate: 1.1 },
+    nitwit: { name: 'Dale “Nitto”', role: 'Field hand',
       lines: ['Righto! I got this!', 'Billy’s up! Tea?'],
       alt: 'Nitto, a scruffy grinning field hand in rumpled yellow hi-vis, fumbling a water-level sensor.' },
-    'know-it-all': { name: 'The Know-It-All', role: 'Claims expertise in everything', voice: { pitch: 1.0, rate: 1.1 },
+    'know-it-all': { name: 'The Know-It-All', role: 'Claims expertise in everything',
       lines: ['It’s obvious.', 'I was just about to say that.'],
       alt: 'The Know-It-All, grinning in sunglasses and a cream hat, lecturing with a raised finger.' },
-    'bean-counter': { name: 'The Bean Counter', role: 'Finance Services', voice: { pitch: 0.9, rate: 0.9 },
+    'bean-counter': { name: 'The Bean Counter', role: 'Finance Services',
       lines: ['Every dollar has a job.', 'And how does that deliver value?'],
       alt: 'The Bean Counter, a balding finance officer in glasses and a pale blue shirt, holding a Budget Review clipboard.' },
   };
@@ -96,9 +113,12 @@ const HealthBulletin = (() => {
     kind: stored('mn-hb-kind', v => v === 'daily' || v === 'weekly') || 'daily',
     pick: { daily: null, weekly: null },     // the file chosen, or the newest
     files: new Map(),                        // file → bulletin | { error }
+    voices: new Map(),                       // file → its voice file, or null: not voiced (yet)
     scene: 0, t: 0, playing: false, ended: false, last: 0, timer: null,
-    speak: stored('mn-hb-speak', v => v === '1') === '1',
-    speaking: false, spokenWords: 0,
+    // The sound, on unless this device turned it off; the one <audio> it
+    // plays through, which bulletin's MP3 that holds, and how that is going.
+    sound: stored('mn-hb-sound', v => v === '0') !== '0',
+    audio: null, audioUrl: null, audioFor: null, audioState: 'idle',   // idle | loading | ready | failed
     hidden: stored('mn-hb-hidden', v => v === '1') === '1',
     narrow: null, drawnNarrow: null, stageW: null, drawnK: 1, ro: null,
     basins: null,                            // null | 'loading' | [{ bbox, rings }] | 'failed'
@@ -146,23 +166,50 @@ const HealthBulletin = (() => {
     return B.pick[k] && l.some(e => e.file === B.pick[k]) ? B.pick[k] : (l[0] ? l[0].file : null);
   }
   function current() { const f = currentFile(); const b = f && B.files.get(f); return b && !b.error ? b : null; }
+  // The bulletin and its voice file, side by side; a bulletin not voiced yet
+  // is still a bulletin.
   async function loadCurrent() {
     const f = currentFile();
     if (f && !B.files.has(f)) {
       B.files.set(f, { loading: true });
-      try { B.files.set(f, await getJson(f)); }
-      catch (err) { B.files.set(f, { error: (err && err.message) || String(err) }); }
+      const vf = voiceFileOf(f);
+      const [b, v] = await Promise.all([
+        getJson(f).catch(err => ({ error: (err && err.message) || String(err) })),
+        vf ? getJson(vf).catch(() => null) : null,
+      ]);
+      B.files.set(f, b);
+      B.voices.set(f, !b.error && fits(v, b) ? v : null);
     }
     resetPlay();
     redraw();
   }
-  // Fixtures, for the tests and for working offline: the index and the files
-  // it names, in place of fetching them.
-  function adopt(index, files) {
+  // Fixtures, for the tests and for working offline: the index, the files it
+  // names and any voice files for them (by bulletin file), in place of
+  // fetching them.
+  function adopt(index, files, voices) {
     B.index = index; B.indexErr = '';
     B.files = new Map(Object.entries(files || {}));
+    B.voices = new Map(Object.entries(voices || {}).filter(([f, v]) => B.files.has(f) && fits(v, B.files.get(f))));
     resetPlay();
     redraw();
+  }
+  // data/bulletins/daily/2026-10-25.json → data/bulletins/voice/daily/2026-10-25.json
+  // (tools/bulletin/validate.mjs voicePathFor says the same).
+  function voiceFileOf(f) {
+    const m = /^data\/bulletins\/(daily|weekly)\/(\d{4}-\d{2}-\d{2})\.json$/.exec(f || '');
+    return m ? `data/bulletins/voice/${m[1]}/${m[2]}.json` : null;
+  }
+  // A voice file is played only if it is this bulletin's, scene for scene and
+  // word for word: one left from a bulletin rewritten the same day, before
+  // its new voice has landed, would say other words over these scenes.
+  function fits(v, b) {
+    const sc = (b && b.scenes) || [];
+    return !!v && v.format === 'floodnet-bulletin-voice/1' && v.bulletin === b.id
+      && /^data\/bulletins\/voice\/(daily|weekly)\/\d{4}-\d{2}-\d{2}\.mp3$/.test(v.audio || '')
+      && Array.isArray(v.scenes) && v.scenes.length === sc.length && sc.length > 0
+      && v.scenes.every((x, i) => x && Number.isFinite(x.start) && Number.isFinite(x.end) && x.end >= x.start
+        && (i === 0 || x.start >= v.scenes[i - 1].end)
+        && Array.isArray(x.words) && x.words.length === String(sc[i].say || '').split(/\s+/).filter(Boolean).length);
   }
 
   // ── the panel ──────────────────────────────────────────────────────────────
@@ -220,8 +267,7 @@ const HealthBulletin = (() => {
              onkeydown="HealthBulletin.key(event)" onclick="HealthBulletin.stageClick(event)">
           <div class="hb-svgbox" id="hb-svgbox">${sceneSvg(b, B.scene)}</div>
           <div class="hb-lower" id="hb-lower">${lowerHtml(b, B.scene)}</div>
-          ${!B.playing && B.t === 0 ? `<button class="hb-bigplay" onclick="event.stopPropagation(); HealthBulletin.play()">
-              <span aria-hidden="true">${B.ended ? '↻' : '▶'}</span> ${B.ended ? 'Watch again' : `Play the bulletin · ${esc(fmtDur(totalSecs(b)))}`}</button>` : ''}
+          ${!B.playing && B.t === 0 ? `<button class="hb-bigplay" onclick="event.stopPropagation(); HealthBulletin.play()">${bigPlayHtml(b)}</button>` : ''}
       </div>
       <div class="hb-bar" id="hb-bar" role="group" aria-label="Scenes">${barHtml(b)}</div>
       <div class="hb-anchor">
@@ -236,8 +282,7 @@ const HealthBulletin = (() => {
         <button class="hb-btn hb-btn--main" id="hb-play" onclick="HealthBulletin.toggle()" aria-label="${B.playing ? 'Pause' : 'Play'}">${B.playing ? '⏸ Pause' : '▶ Play'}</button>
         <button class="ghost hb-btn" onclick="HealthBulletin.next()" aria-label="Next scene" title="Next scene (→)"><span class="hb-ico" aria-hidden="true">⏭</span></button>
         <span class="small hb-clock" id="hb-clock">${esc(clockText(b))}</span>
-        ${typeof speechSynthesis !== 'undefined' ? `<button class="ghost hb-btn" onclick="HealthBulletin.toggleSpeak()" aria-pressed="${B.speak}"
-            title="Read the narration aloud in this browser's own voice">${B.speak ? '🔊 Reading aloud' : '🔈 Read aloud'}</button>` : ''}
+        <span id="hb-sound-slot">${soundButton(b)}</span>
       </div>
       <details class="hb-transcript"><summary>Read it instead</summary>
         <ol>${sc.map((s, i) => `<li><b>${esc(s.title)}.</b> ${esc(s.say)}${(s.stations || []).length ? ` <span class="small">(${stationLinks(s.stations)})</span>` : ''}
@@ -245,6 +290,11 @@ const HealthBulletin = (() => {
         ${(b.caveats || []).length ? `<p class="small"><b>What it could not tell:</b> ${b.caveats.map(esc).join(' ')}</p>` : ''}
       </details>
       <p class="small hb-foot">${esc(footText(b, P))}</p>`;
+  }
+
+  // How long it runs: as said with the sound on, as written with it off.
+  function bigPlayHtml(b) {
+    return `<span aria-hidden="true">${B.ended ? '↻' : '▶'}</span> ${B.ended ? 'Watch again' : `Play the bulletin · ${esc(fmtDur(totalSecs(b)))}`}`;
   }
 
   // Playing: the scene runs. Paused part-way: frozen where it was. Not started
@@ -267,27 +317,38 @@ const HealthBulletin = (() => {
     if (src.stations_heard) bits.push(`${Number(src.stations_heard).toLocaleString()} stations heard`);
     const others = [...new Set((b.scenes || []).map(sc => sc.presenter).filter(id => id && id !== b.presenter))].map(id => who(id).name);
     return `Presented by ${P.name}${others.length ? `, with ${others.join(' and ')}` : ''} (from the Droggies). Written by ${b.author || 'Claude'}${bits.length ? ` from ${bits.join(' and ')}` : ''}. `
+      + (voiceOf(b) ? 'The voices are AI speech (ElevenLabs), one cast for each Droggie. ' : '')
       + 'It points at what needs a look and why it might be; it does not diagnose — check the station on this tab before driving out.';
   }
   function stationLinks(ids) {
     return ids.map(id => `<button class="link-btn" onclick="HealthBulletin.open('${escAttr(id)}')">${esc(stationName(id) || id)}</button>`).join(', ');
   }
 
-  const totalSecs = b => (b.scenes || []).reduce((n, s) => n + (+s.secs || 8), 0);
+  // A scene's seconds: as said, with the sound on and the bulletin voiced —
+  // up to the next scene's start, the pause between them included — and
+  // otherwise as the bulletin gives them.
+  function secsOf(b, i) {
+    const v = voiced(b) && voiceOf(b);
+    if (v) { const x = v.scenes[i], nx = v.scenes[i + 1]; if (x) return Math.max(0.5, (nx ? nx.start : x.end) - x.start); }
+    return +((b.scenes || [])[i] || {}).secs || 8;
+  }
+  const totalSecs = b => (b.scenes || []).reduce((n, s, i) => n + secsOf(b, i), 0);
   function fmtDur(s) { s = Math.round(s); return s >= 60 ? `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')}` : `${s} s`; }
   function clockText(b) {
-    const before = (b.scenes || []).slice(0, B.scene).reduce((n, s) => n + (+s.secs || 8), 0);
-    const at = before + Math.min(B.t / 1000, +((b.scenes || [])[B.scene] || {}).secs || 8);
+    if (B.playing && voiced(b) && audioIs('loading')) return 'Fetching the voices…';
+    let before = 0;
+    for (let i = 0; i < B.scene; i++) before += secsOf(b, i);
+    const at = before + Math.min(B.t / 1000, secsOf(b, B.scene));
     const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
     return `Scene ${B.scene + 1} of ${(b.scenes || []).length} · ${mmss(at)} / ${mmss(totalSecs(b))}`;
   }
   function barHtml(b) {
     const total = totalSecs(b) || 1;
-    return (b.scenes || []).map((s, i) => `<button class="hb-seg${i === B.scene ? ' is-on' : ''}${i < B.scene ? ' is-done' : ''}" style="--f:${((+s.secs || 8) / total).toFixed(4)}"
+    return (b.scenes || []).map((s, i) => `<button class="hb-seg${i === B.scene ? ' is-on' : ''}${i < B.scene ? ' is-done' : ''}" style="--f:${(secsOf(b, i) / total).toFixed(4)}"
         onclick="HealthBulletin.go(${i})" aria-label="${escAttr(`Scene ${i + 1}: ${s.title}`)}" title="${escAttr(s.title)}"${i === B.scene ? ' aria-current="step"' : ''}>
-        <span class="hb-seg-fill" style="--p:${i < B.scene ? 100 : i === B.scene ? progressPct(s).toFixed(1) : 0}%"></span></button>`).join('');
+        <span class="hb-seg-fill" style="--p:${i < B.scene ? 100 : i === B.scene ? progressPct(b, i).toFixed(1) : 0}%"></span></button>`).join('');
   }
-  function progressPct(s) { return Math.max(0, Math.min(100, 100 * B.t / (1000 * (+s.secs || 8)))); }
+  function progressPct(b, i) { return Math.max(0, Math.min(100, 100 * B.t / (1000 * secsOf(b, i)))); }
   function sceneOf(b, i) { return (b.scenes || [])[i] || null; }
   function speakerOf(b, s) { return (s && s.presenter) || b.presenter; }
   // The presenter under the stage, at the left, beside what they are saying:
@@ -314,13 +375,17 @@ const HealthBulletin = (() => {
     if (!s) return '';
     const id = speakerOf(b, s), P = who(id);
     const words = String(s.say || '').split(/\s+/).filter(Boolean);
-    const shown = B.t === 0 && !B.playing ? words.length : revealCount(s, words.length);
+    const shown = B.t === 0 && !B.playing ? words.length : revealCount(b, i, words.length);
     return `<p class="hb-who"><b class="hb-speaker">${esc(P.name)}</b> <span>${esc(P.role)}</span></p>
       <p class="hb-say">${words.map((w, k) => `<span class="hb-w${k < shown ? ' is-said' : ''}">${esc(w)} </span>`).join('')}</p>`;
   }
-  function revealCount(s, n) {
-    if (B.speak && B.speaking) return B.spokenWords;
-    const secs = (+s.secs || 8) * 0.82;
+  // How many of a scene's words have been said: as the voice says each one,
+  // when it is playing; otherwise spread over the first four-fifths of the
+  // scene's seconds.
+  function revealCount(b, i, n) {
+    const v = voiced(b) && audioIs('ready') && voiceOf(b), x = v && v.scenes[i];
+    if (x) { const at = x.start + B.t / 1000 + 0.05; return Math.min(n, x.words.filter(t => t <= at).length); }
+    const secs = secsOf(b, i) * 0.82;
     return Math.min(n, Math.ceil(n * (B.t / 1000) / secs));
   }
 
@@ -1247,14 +1312,16 @@ const HealthBulletin = (() => {
 
   // ── playing ────────────────────────────────────────────────────────────────
 
-  function resetPlay() { stopClock(); cancelSpeech(); B.scene = 0; B.t = 0; B.playing = false; B.ended = false; }
+  function resetPlay() { stopClock(); stopAudio(); B.scene = 0; B.t = 0; B.playing = false; B.ended = false; }
   function play() {
     const b = current();
     if (!b) return;
     if (B.ended) { B.scene = 0; B.t = 0; B.ended = false; }
     B.playing = true;
     markSeen(b.id);
-    if (B.t === 0) startScene(); else { resumeSpeech(); drawControls(); }
+    // Inside the press that asked for it — a browser plays sound only then.
+    if (voiced(b)) startAudio(b);
+    if (B.t === 0) startScene(); else drawControls();
     startClock();
     const stage = document.getElementById('hb-stage');
     if (stage) { stage.classList.remove('is-paused'); stage.classList.toggle('is-still', reduced()); const svg = stage.querySelector('svg'); if (svg && svg.unpauseAnimations) svg.unpauseAnimations(); }
@@ -1264,7 +1331,7 @@ const HealthBulletin = (() => {
   function pause() {
     B.playing = false;
     stopClock();
-    cancelSpeech();
+    stopAudio();
     const stage = document.getElementById('hb-stage');
     if (stage) { stage.classList.add('is-paused'); const svg = stage.querySelector('svg'); if (svg && svg.pauseAnimations) svg.pauseAnimations(); }
     setTalking(false);
@@ -1276,8 +1343,8 @@ const HealthBulletin = (() => {
     if (!b) return;
     const n = (b.scenes || []).length;
     B.scene = Math.max(0, Math.min(n - 1, i)); B.t = 0; B.ended = false;
-    cancelSpeech();
     startScene();
+    if (voiced(b) && audioIs('ready')) seekAudio(b);
     if (!B.playing) drawCaption(true);
   }
   function next() { const b = current(); if (b && B.scene < (b.scenes || []).length - 1) go(B.scene + 1); }
@@ -1300,12 +1367,13 @@ const HealthBulletin = (() => {
     countUp(box);
     drawCaption();
     drawControls();
-    if (B.playing) { speakScene(); setTalking(true); }
+    if (B.playing) setTalking(true);
     announceScene(b);
   }
+  // Not over the presenter's own voice.
   function announceScene(b) {
     const s = sceneOf(b, B.scene);
-    if (s && typeof announce === 'function' && !B.speak) announce(`Scene ${B.scene + 1}: ${s.title}.`);
+    if (s && typeof announce === 'function' && !(B.playing && voiced(b))) announce(`Scene ${B.scene + 1}: ${s.title}.`);
   }
   // The title's numbers count up as they appear, a second and a half each.
   function countUp(box) {
@@ -1333,21 +1401,33 @@ const HealthBulletin = (() => {
   function tick() {
     const b = current();
     if (!b || !document.getElementById('hb-stage')) { stopClock(); return; }
-    const now = performance.now();
-    B.t += now - B.last; B.last = now;
-    const s = sceneOf(b, B.scene), secs = (+s.secs || 8) * 1000;
+    const now = performance.now(), dt = now - B.last;
+    B.last = now;
+    // With the voices on, the sound keeps the time: the stage waits while the
+    // MP3 comes, then follows it.
+    if (voiced(b) && audioIs('loading')) { drawProgress(); return; }
+    if (voiced(b) && audioIs('ready')) { followAudio(b); return; }
+    B.t += dt;
     drawCaption(); drawProgress();
-    // A scene ends when its time is up and its narration has been said — the
-    // browser's voice can run longer than the scene's seconds; not for ever.
-    const done = B.t >= secs && (!B.speaking || B.t >= secs * 2.5);
-    if (!done) return;
-    if (B.scene < (b.scenes || []).length - 1) { B.scene++; B.t = 0; cancelSpeech(); startScene(); }
-    else {
-      B.playing = false; B.ended = true; B.t = 0;
-      stopClock(); setTalking(false);
-      redraw();
-      if (typeof announce === 'function') announce('End of the bulletin.');
-    }
+    if (B.t < secsOf(b, B.scene) * 1000) return;
+    if (B.scene < (b.scenes || []).length - 1) { B.scene++; B.t = 0; startScene(); }
+    else finish();
+  }
+  // The scene the sound is in, and how far into it.
+  function followAudio(b) {
+    const v = voiceOf(b), a = B.audio, at = a.currentTime;
+    let i = v.scenes.length - 1;
+    while (i > 0 && at < v.scenes[i].start) i--;
+    if (i !== B.scene) { B.scene = i; B.t = 0; startScene(); }
+    B.t = Math.max(0, (at - v.scenes[i].start) * 1000);
+    drawCaption(); drawProgress();
+    if (a.ended) finish();
+  }
+  function finish() {
+    B.playing = false; B.ended = true; B.t = 0;
+    stopClock(); stopAudio(); setTalking(false);
+    redraw();
+    if (typeof announce === 'function') announce('End of the bulletin.');
   }
   function drawCaption(all) {
     const b = current(), s = b && sceneOf(b, B.scene), el = document.getElementById('hb-caption');
@@ -1357,7 +1437,7 @@ const HealthBulletin = (() => {
       el.setAttribute('data-scene', String(B.scene));
     }
     const words = el.querySelectorAll('.hb-w');
-    const n = all || !B.playing && B.t === 0 ? words.length : revealCount(s, words.length);
+    const n = all || !B.playing && B.t === 0 ? words.length : revealCount(b, B.scene, words.length);
     words.forEach((w, k) => w.classList.toggle('is-said', k < n));
   }
   function drawProgress() {
@@ -1365,11 +1445,14 @@ const HealthBulletin = (() => {
     if (!b || !bar) return;
     const segs = bar.querySelectorAll('.hb-seg');
     if (segs.length !== (b.scenes || []).length) { bar.innerHTML = barHtml(b); return; }
+    const total = totalSecs(b) || 1;
     segs.forEach((seg, i) => {
       seg.classList.toggle('is-on', i === B.scene); seg.classList.toggle('is-done', i < B.scene);
       if (i === B.scene) seg.setAttribute('aria-current', 'step'); else seg.removeAttribute('aria-current');
+      // The widths too: a scene as said is not as long as a scene as written.
+      seg.style.setProperty('--f', (secsOf(b, i) / total).toFixed(4));
       const f = seg.firstElementChild;
-      if (f) f.style.setProperty('--p', `${i < B.scene ? 100 : i === B.scene ? progressPct(b.scenes[i]).toFixed(1) : 0}%`);
+      if (f) f.style.setProperty('--p', `${i < B.scene ? 100 : i === B.scene ? progressPct(b, i).toFixed(1) : 0}%`);
     });
     const clock = document.getElementById('hb-clock'); if (clock) clock.textContent = clockText(b);
   }
@@ -1383,48 +1466,116 @@ const HealthBulletin = (() => {
     if (img) img.classList.toggle('is-talking', !!on);
   }
 
-  // ── reading aloud ──────────────────────────────────────────────────────────
-  // The browser's own voice, an Australian one where it has one, pitched and
-  // paced for whoever is presenting. Nothing is sent anywhere.
-  function voice() {
-    if (typeof speechSynthesis === 'undefined') return null;
-    const vs = speechSynthesis.getVoices() || [];
-    return vs.find(v => /en[-_]AU/i.test(v.lang)) || vs.find(v => /en[-_]GB/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+  // ── the voices ─────────────────────────────────────────────────────────────
+  // One <audio> for the page, made on the first Play, and the bulletin's MP3
+  // fetched into it whole (the header says why), then played from memory. A
+  // moment of silence played first, inside the press, is what lets it play
+  // the MP3 once that arrives: Safari plays sound only from a press, and the
+  // fetch outlasts it.
+  const SILENCE = 'data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YRAAAACAgICAgICAgICAgICAgICA';
+  const voiceOf = b => (b && b === current() && B.voices.get(currentFile())) || null;
+  const audioIs = st => B.audioFor === currentFile() && B.audioState === st;
+  const mp3In = () => !!B.audio && !!B.audioUrl && B.audio.src === B.audioUrl;
+  // The voices keep the time: the sound on, the bulletin voiced, its MP3 not
+  // failed, and a browser that plays sound.
+  const voiced = b => B.sound && !!voiceOf(b) && !audioIs('failed') && typeof Audio !== 'undefined';
+
+  function audioEl() {
+    if (B.audio || typeof Audio === 'undefined') return B.audio;
+    const a = B.audio = new Audio();
+    a.preload = 'auto';
+    a.addEventListener('ended', () => { if (B.playing && voiced(current()) && audioIs('ready') && mp3In()) finish(); });
+    // Paused by something else — a call coming in, the phone's own controls:
+    // the stage pauses with it.
+    a.addEventListener('pause', () => { if (B.playing && voiced(current()) && audioIs('ready') && mp3In() && !a.ended) pause(); });
+    return a;
   }
-  function speakScene(fromWord) {
-    if (!B.speak || typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') return;
-    const b = current(), s = b && sceneOf(b, B.scene);
-    if (!s) return;
-    const words = String(s.say || '').split(/\s+/).filter(Boolean);
-    const start = fromWord || 0;
-    const said = words.slice(start).join(' ');
-    if (!said) return;
-    const u = new SpeechSynthesisUtterance(said);
-    const v = voice(); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'en-AU';
-    const P = who(speakerOf(b, s));
-    u.pitch = P.voice.pitch; u.rate = P.voice.rate;
-    // Word boundaries move the caption along with the voice.
-    const offsets = []; let pos = 0;
-    words.slice(start).forEach(w => { offsets.push(pos); pos += w.length + 1; });
-    u.onboundary = e => { if (e.name && e.name !== 'word') return; let k = 0; while (k < offsets.length && offsets[k] <= e.charIndex) k++; B.spokenWords = start + k; };
-    u.onend = u.onerror = () => { B.speaking = false; B.spokenWords = words.length; };
-    B.speaking = true; B.spokenWords = start;
-    try { speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (_) { B.speaking = false; }
+  function startAudio(b) {
+    const a = audioEl(), v = voiceOf(b);
+    if (!a || !v) return;
+    if (audioIs('ready')) { seekAudio(b); playAudio(); return; }
+    if (audioIs('loading')) return;
+    a.src = SILENCE;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+    loadAudio(currentFile(), v);
   }
-  function resumeSpeech() { if (B.speak) speakScene(B.spokenWords || 0); }
-  function cancelSpeech() {
-    B.speaking = false;
-    if (typeof speechSynthesis !== 'undefined') { try { speechSynthesis.cancel(); } catch (_) {} }
+  async function loadAudio(f, v) {
+    B.audioFor = f; B.audioState = 'loading';
+    drawProgress();
+    try {
+      const res = await fetch(v.audio, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error(`${v.audio} answered ${res.status}`);
+      const blob = await res.blob();
+      if (B.audioFor !== f) return;                      // another bulletin since
+      if (B.audioUrl) URL.revokeObjectURL(B.audioUrl);
+      B.audioUrl = URL.createObjectURL(blob);
+      await loadInto(audioEl(), B.audioUrl);
+      if (B.audioFor !== f) return;
+      B.audioState = 'ready';
+      const b = current();
+      if (B.playing && b && voiced(b)) { seekAudio(b); playAudio(); }
+    } catch (_) {
+      if (B.audioFor === f) failAudio();
+    }
+    drawSound(); drawProgress();
   }
-  function toggleSpeak() {
-    B.speak = !B.speak;
-    keep('mn-hb-speak', B.speak ? '1' : null);
-    if (!B.speak) cancelSpeech(); else if (B.playing) speakScene(0);
-    redrawControlsOnly();
+  // The MP3 in the <audio>, far enough in to be moved about in.
+  function loadInto(a, url) {
+    return new Promise((ok, no) => {
+      const done = e => {
+        a.removeEventListener('loadedmetadata', done); a.removeEventListener('error', done);
+        if (e.type === 'error') no(new Error('the voices would not play')); else ok();
+      };
+      a.addEventListener('loadedmetadata', done); a.addEventListener('error', done);
+      a.src = url;
+    });
   }
-  function redrawControlsOnly() {
-    const btn = [...document.querySelectorAll('.hb-controls .hb-btn')].find(x => /Read aloud|Reading aloud/.test(x.textContent));
-    if (btn) { btn.textContent = B.speak ? '🔊 Reading aloud' : '🔈 Read aloud'; btn.setAttribute('aria-pressed', String(B.speak)); }
+  function playAudio() {
+    const p = B.audio.play();
+    // Refused — not from a press, or a file this browser cannot play: the
+    // bulletin goes on without the voices. (Abort is only a pause or a new
+    // file cutting in.)
+    if (p && p.catch) p.catch(err => { if (!err || err.name !== 'AbortError') failAudio(); });
+  }
+  function failAudio() {
+    B.audioState = 'failed';
+    if (B.audio && !B.audio.paused) B.audio.pause();
+    drawSound(); drawProgress();
+  }
+  // The sound to where the stage is: this scene, this far into it.
+  function seekAudio(b) {
+    const x = voiceOf(b).scenes[B.scene];
+    const want = x.start + Math.min(B.t / 1000, x.end - x.start);
+    if (Math.abs(B.audio.currentTime - want) > 0.2) B.audio.currentTime = want;
+  }
+  function stopAudio() { if (B.audio && !B.audio.paused) B.audio.pause(); }
+
+  // 🔊 / 🔇: remembered on this device. Turned on mid-scene, the voice picks
+  // up where the stage is; turned off, the stage runs on by the clock. After
+  // a failure, the same button tries again.
+  function toggleSound() {
+    if (audioIs('failed')) { B.audioState = 'idle'; B.sound = true; }
+    else B.sound = !B.sound;
+    keep('mn-hb-sound', B.sound ? null : '0');
+    const b = current();
+    if (b && B.playing) { if (voiced(b)) startAudio(b); else stopAudio(); }
+    drawSound(); drawProgress();
+    const big = document.querySelector('.hb-bigplay');
+    if (big && b) big.innerHTML = bigPlayHtml(b);
+  }
+  function soundButton(b) {
+    if (!voiceOf(b) || typeof Audio === 'undefined') return '';
+    const failed = audioIs('failed');
+    const [label, title] = failed ? ['🔇 No sound — try again', 'The voices could not be played, so the bulletin runs without them. Press to try again.']
+      : B.sound ? ['🔊 Sound on', 'The presenters say it in their own voices. Press to turn the sound off.']
+      : ['🔇 Sound off', 'Press to hear the presenters say it.'];
+    return `<button class="ghost hb-btn" id="hb-sound" onclick="HealthBulletin.toggleSound()" aria-pressed="${B.sound && !failed}"
+        title="${escAttr(title)}">${esc(label)}</button>`;
+  }
+  function drawSound() {
+    const slot = document.getElementById('hb-sound-slot');
+    if (slot) slot.innerHTML = soundButton(current());
   }
 
   // ── events ─────────────────────────────────────────────────────────────────
@@ -1505,10 +1656,13 @@ const HealthBulletin = (() => {
   }
 
   return {
-    render, init, stop, adopt, refresh: () => { B.index = null; B.indexErr = ''; B.files.clear(); resetPlay(); redraw(); loadIndex(); },
-    play, pause, toggle, go, next, prev, setKind, pick, toggleHidden, toggleSpeak, key, stageClick, open,
+    render, init, stop, adopt,
+    refresh: () => { B.index = null; B.indexErr = ''; B.files.clear(); B.voices.clear(); resetPlay(); B.audioFor = null; B.audioState = 'idle'; redraw(); loadIndex(); },
+    play, pause, toggle, go, next, prev, setKind, pick, toggleHidden, toggleSound, key, stageClick, open,
     ROSTER, _draw: (s, b, narrow) => { const was = B.narrow; B.narrow = !!narrow; try { return sceneSvg(Object.assign({}, b || {}, { scenes: [s] }), 0); } finally { B.narrow = was; } },
-    _state: () => ({ kind: B.kind, scene: B.scene, playing: B.playing, ended: B.ended, file: currentFile(), speak: B.speak, hidden: B.hidden }),
+    _state: () => ({ kind: B.kind, scene: B.scene, playing: B.playing, ended: B.ended, file: currentFile(), hidden: B.hidden,
+      sound: B.sound, voiced: !!voiceOf(current()), audio: B.audioFor === currentFile() ? B.audioState : 'idle',
+      at: audioIs('ready') && mp3In() ? B.audio.currentTime : null }),
   };
 })();
 

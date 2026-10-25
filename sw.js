@@ -53,7 +53,12 @@
 //   deploy, because ~7 MB is not something to fetch again with every stamp.
 //
 //   Nothing else. The datastore's other reads, the Worker's /api routes,
-//   sign-in, map tiles: the network's, as if this worker were not here.
+//   sign-in, map tiles: the network's, as if this worker were not here. So
+//   are the Network Weather bulletins' voices (data/bulletins/voice/*.mp3,
+//   health-bulletin.js): a megabyte or so a bulletin, fetched only when Play
+//   is pressed with the sound on — a fortnight of them is not worth keeping
+//   on every device, and with no signal the bulletin plays without them. The
+//   small voice files beside them are kept like any other file.
 //
 // And one thing that is not keeping at all: an administrator's notifications
 // (0066) arrive here, from the push service, whether or not a page is open —
@@ -85,6 +90,7 @@ const API = new URL('api/', SCOPE).pathname;
 const LEAFLET = /^https:\/\/unpkg\.com\/leaflet@[\d.]+\/dist\//;
 const OCR = /^https:\/\/unpkg\.com\/(?:tesseract\.js|tesseract\.js-core|@tesseract\.js-data\/eng)@[\d.]+\//;
 const LIBS = 'floodnet-libs';
+const VOICE_AUDIO = /\/data\/bulletins\/voice\/(?:daily|weekly)\/[^/]+\.mp3$/;
 
 const REFERENCE = new Set([
   // inspections.js — TABLES, LOOKUPS and the form itself
@@ -196,6 +202,7 @@ self.addEventListener('fetch', event => {
   if (LEAFLET.test(req.url)) { event.respondWith(versioned(event)); return; }
   if (OCR.test(req.url)) { event.respondWith(library(event)); return; }
   if (url.origin !== SCOPE.origin || url.pathname.startsWith(API) || url.pathname.startsWith('/cdn-cgi/')) return;
+  if (VOICE_AUDIO.test(url.pathname)) return;
   event.respondWith(url.searchParams.has('v') ? versioned(event) : file(event));
 });
 

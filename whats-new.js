@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 96, date: '2026-10-25', items: [
+      '<strong>📺 Network Weather</strong> now speaks: each Droggie presents in a voice of their own — Graham\'s slow and gravelly, '
+        + 'Alex\'s flat and precise, Turbo\'s flat out — with the words appearing as they are said. Press ▶ on '
+        + '<strong>Station Health</strong> with the sound up; 🔊 beside the clock turns the voices off (this device remembers). '
+        + 'The voices are AI speech, made a minute or two after each bulletin; until then it plays silent as before.',
+    ] },
     { n: 95, date: '2026-10-25', items: [
       '<strong>📺 Network Weather</strong>, at the top of <strong>Station Health</strong>: the network\'s last 24 hours as a short '
         + 'animated bulletin — a weather report about the network, not the sky — presented by one of the Droggies, a different one '
