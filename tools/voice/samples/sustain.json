@@ -1,0 +1,6 @@
+[
+ {"name": "lee-once", "voice_id": "abRFZIdN4pvo8ZPmGxHP", "model": "eleven_v4",
+  "text": "[tired] [grumpy] [slowly] The fortnight, by the numbers. Checks received ran between eighty-one and ninety-four percent a day, and the worst day was Saturday, when the Hillcrest path went quiet. Corrupted copies held steady at about two hundred a day. Twenty-one stations behind one repeater is one cause, not twenty-one site visits. That is the kind of variance I can live with. Every dollar has a job."},
+ {"name": "lee-sustained", "voice_id": "abRFZIdN4pvo8ZPmGxHP", "model": "eleven_v4",
+  "text": "[tired] [grumpy] [slowly] The fortnight, by the numbers. [tired] [grumpy] Checks received ran between eighty-one and ninety-four percent a day, and the worst day was Saturday, when the Hillcrest path went quiet. [tired] [grumpy] Corrupted copies held steady at about two hundred a day. [tired] [grumpy] Twenty-one stations behind one repeater is one cause, not twenty-one site visits. [tired] [grumpy] That is the kind of variance I can live with. [tired] [grumpy] Every dollar has a job."}
+]
