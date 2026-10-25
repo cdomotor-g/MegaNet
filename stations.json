@@ -75232,9 +75232,8 @@
       "id": "ravensbourne_al",
       "name": "Ravensbourne AL",
       "station_number": "540299",
-      "station_type": "auto_rain_gauge",
-      "lat": -27.3627,
-      "lon": 152.1589,
+      "lat": -27.362847,
+      "lon": 152.158788,
       "elevation_ahd": 624.1,
       "roles": [
         "field"
@@ -75244,7 +75243,8 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 6782
+        "rainfall": 6782,
+        "battery": 6783
       },
       "satcom": {
         "enabled": false,
