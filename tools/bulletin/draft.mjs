@@ -159,6 +159,14 @@ export function draft(F) {
 
   scenes.push({ type: 'signoff', title: 'That’s the network', secs: 7, say: weekly ? 'That’s the week on the network. Back on Monday.' : 'That’s the network this morning. Back tomorrow.' });
 
+  // The guests (facts.guests): a scene each, the first of the kinds that suit
+  // them not already somebody's. The Bean Counter takes the numbers, nothing else.
+  for (const g of F.guests || []) {
+    const kinds = g === 'bean-counter' ? ['trend'] : ['battery', 'checks', 'trend', 'list'];
+    const sc = kinds.map(k => scenes.find(x => x.type === k && !x.presenter)).find(Boolean);
+    if (sc) sc.presenter = g;
+  }
+
   // Long enough to say: about 2.4 words a second, a couple of seconds to look.
   scenes.forEach(sc => { const words = String(sc.say).split(/\s+/).length; sc.secs = Math.min(25, Math.max(sc.secs, Math.ceil(words / 2.4) + 2)); });
 

@@ -46,7 +46,15 @@ export const SCENES = {
 const LIMITS = {
   scenes: [2, 14], secs: [5, 25], total: [40, 240],
   title: 70, say: 420, headline: 170, label: 90, stat: 28, text: 160, note: 90, name: 60,
+  // Every word is said aloud, at about 2.4 a second: a daily of about two
+  // minutes, a weekly of about three (the owner, 25 Oct 2026: a touch shorter).
+  words: { daily: 340, weekly: 440 },
 };
+// The Bean Counter is one of the show's lesser figures (the owner, 25 Oct
+// 2026): he presents no bulletin and has one scene in one at most. The two
+// bulletins published before that, and voiced as they were, keep their cast.
+export const MINOR = 'bean-counter';
+const BEFORE_THE_CAST_RULES = new Set(['daily-2026-10-25', 'weekly-2026-10-25']);
 
 export function validate(b, { stationIds = null } = {}) {
   const errors = [], warnings = [];
@@ -147,6 +155,14 @@ export function validate(b, { stationIds = null } = {}) {
     for (const f of spec.fields) if (s[f] == null) err(W + '.' + f, 'missing');
     scene(W, s);
   });
+  if (scenes.length && !BEFORE_THE_CAST_RULES.has(b.id)) {
+    if (b.presenter === MINOR) err('presenter', 'the Bean Counter presents no bulletin — one scene, in the weekly, at most');
+    const his = scenes.filter(s => isObj(s) && (s.presenter || b.presenter) === MINOR).length;
+    if (his > 1) err('scenes', `the Bean Counter says ${his} scenes — one at most`);
+    const words = scenes.reduce((n, s) => n + (isObj(s) && typeof s.say === 'string' ? s.say.trim().split(/\s+/).filter(Boolean).length : 0), 0);
+    const cap = LIMITS.words[b.kind] || LIMITS.words.daily;
+    if (words > cap) err('scenes', `${words} words of narration, more than a ${b.kind || 'daily'}'s ${cap} — every word is said aloud; cut to about ${cap === LIMITS.words.daily ? 'two' : 'three'} minutes`);
+  }
   if (scenes.length) {
     if (total < LIMITS.total[0] || total > LIMITS.total[1]) err('scenes', `${total} s in all, not ${LIMITS.total[0]}…${LIMITS.total[1]}`);
     if (scenes[0] && scenes[0].type !== 'title') err('scenes[0]', 'the first scene is the title');

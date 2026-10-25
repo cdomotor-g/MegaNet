@@ -43,14 +43,26 @@ import { loadAnalysis, fetchInputs, project } from '../health/report.mjs';
 const DAY = 86400000, HOUR = 3600000, MIN = 60000;
 const TZ = 'Australia/Brisbane';
 
-// The Droggies who present, by the day of the week (Brisbane's): Sunday first.
-// The weekly is Graham's, with Alex for the radio.
-export const ROTA = ['bean-counter', 'seasoned-hydrographer', 'tech-wizard', 'new-recruit', 'turbo', 'nitwit', 'know-it-all'];
+// Who is in each bulletin. The day's Droggie presents (Brisbane's day, Sunday
+// first: the New Recruit draws the weekend shift as well as Wednesday); Alex
+// Chen takes the radio scenes (Graham on Alex's own day); and two more of the
+// crew take a scene each as guests, in turn, so the whole crew is heard. The
+// weekly is Graham's, with Alex for the radio, the Bean Counter for its numbers
+// and one guest. The Bean Counter is one of the show's lesser figures (the
+// owner, 25 Oct 2026): he never presents and is in no daily — one scene a week.
+export const ROTA = ['new-recruit', 'seasoned-hydrographer', 'tech-wizard', 'new-recruit', 'turbo', 'nitwit', 'know-it-all'];
+export const CREW = ['seasoned-hydrographer', 'tech-wizard', 'new-recruit', 'turbo', 'nitwit', 'know-it-all'];
 export function presenterFor(kind, now) {
-  if (kind === 'weekly') return { presenter: 'seasoned-hydrographer', cohost: 'tech-wizard' };
-  const wd = new Date(new Date(now).toLocaleString('en-US', { timeZone: TZ })).getDay();
-  const presenter = ROTA[wd];
-  return { presenter, cohost: presenter === 'tech-wizard' ? 'seasoned-hydrographer' : 'tech-wizard' };
+  const local = new Date(new Date(now).toLocaleString('en-US', { timeZone: TZ }));
+  const day = Math.floor(Date.UTC(local.getFullYear(), local.getMonth(), local.getDate()) / DAY);
+  if (kind === 'weekly') {
+    const pool = CREW.filter(id => id !== 'seasoned-hydrographer' && id !== 'tech-wizard');
+    return { presenter: 'seasoned-hydrographer', cohost: 'tech-wizard', guests: ['bean-counter', pool[Math.floor(day / 7) % pool.length]] };
+  }
+  const presenter = ROTA[local.getDay()];
+  const cohost = presenter === 'tech-wizard' ? 'seasoned-hydrographer' : 'tech-wizard';
+  const pool = CREW.filter(id => id !== presenter && id !== cohost);
+  return { presenter, cohost, guests: [pool[day % pool.length], pool[(day + 1) % pool.length]] };
 }
 
 // ── small helpers ────────────────────────────────────────────────────────────
@@ -512,7 +524,7 @@ export async function gather({ fetch = globalThis.fetch, kind = 'daily', now = D
 // The facts, said briefly, for the person (or the agent) reading the log.
 export function summary(f) {
   const n = f.network, L = [];
-  L.push(`${f.kind === 'weekly' ? 'Weekly' : 'Daily'} facts — ${f.period.label}. Presenter: ${f.presenter} (co-host ${f.cohost}).`);
+  L.push(`${f.kind === 'weekly' ? 'Weekly' : 'Daily'} facts — ${f.period.label}. Presenter: ${f.presenter} (co-host ${f.cohost}; guests ${(f.guests || []).join(' and ') || 'none'}).`);
   L.push(`${n.readings_in_period.toLocaleString()} readings and ${n.stations_heard_in_period} stations heard in the period; checks received ${n.received_pct_in_period}% (before: ${n.received_pct_before}%).`);
   L.push(`${n.findings_attention} findings need attention; ${f.server_findings.opened_count} opened and ${f.server_findings.cleared_count} cleared on the server in the period.`);
   L.push(`Silences: ${f.silences.regular.length} regular, ${f.silences.occasional_count} occasional (heard by luck, not missing).`);

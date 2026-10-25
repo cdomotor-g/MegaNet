@@ -26,11 +26,13 @@ the numbers without the sentence.
 
 At the very top of the tab, above everything worked out here, is the
 network's **bulletin**: its last 24 hours — or, on the *This week* switch, its
-last seven days — told in a minute or two of animated scenes, a weather report
-about the network rather than the sky. One of the Droggies presents it (a
-different one each day of the week; Graham Watts the weekly, with Alex Chen for
-the radio), and says it: the narration runs under the stage word by word as
-the presenter says it, in their own voice.
+last seven days — told in about two minutes of animated scenes (three for the
+week), a weather report about the network rather than the sky. One of the
+Droggies presents it, a different one each day of the week, with Alex Chen on
+the radio and two more of the crew dropping in for a scene each; Graham Watts
+presents the weekly, where the Bean Counter reads the numbers — his one scene of
+the week. Each says their scenes in their own voice, the narration running
+under the stage word by word as it is said.
 
 It is written, not worked out here. Every morning at half past four a scheduled
 Claude Code task reads the network as this tab does — the same

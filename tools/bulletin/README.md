@@ -1,7 +1,7 @@
 # 📺 Network Weather — the bulletin task's brief
 
 Every morning a scheduled Claude Code session reads the Flood-Net network and
-writes **the network's weather**: a one-to-two-minute animated bulletin about
+writes **the network's weather**: a two-minute animated bulletin about
 the last 24 hours, drawn at the top of the **Station Health** tab
 (`health-bulletin.js`). Every Monday a second one does the same for the week.
 This file is what those sessions follow. It is also how a person can run one
@@ -19,8 +19,8 @@ trend no one rule is looking for.
 | --- | --- | --- |
 | When | every day, 4:31 am Brisbane | Mondays, 3:59 am Brisbane |
 | Covers | the last 24 hours, against the week before | the last 7 days, against the week before that |
-| Length | 6–9 scenes, 70–120 s | 8–11 scenes, 100–160 s |
-| Presenter | the day's Droggie (`facts.presenter`) | Graham Watts, with Alex Chen for the radio |
+| Length | 6–8 scenes, about 2 minutes said: 340 words of narration at most | 8–10 scenes, about 3 minutes said: 440 words at most |
+| Who | the day's Droggie presents (`facts.presenter`), Alex Chen takes the radio (`facts.cohost`), two guests a scene each (`facts.guests`) | Graham Watts presents, Alex Chen the radio, the Bean Counter the numbers, one guest |
 | Looks for | what changed overnight | what is trending, chronic or recurring |
 
 ## The run
@@ -194,16 +194,31 @@ on Saturday"). Stations by name as they are on file; their ids in `stations`,
 `id` and `marks` so the page can link them. Put what you could not tell in
 `caveats` (up to five, short).
 
-**The presenter.** `facts.presenter` presents (the day's Droggie, from
-[the Droggies' canon](https://github.com/cdomotor-g/thedroggies) — `characters/json/`);
-`facts.cohost` takes the radio scenes (`"presenter": "<id>"` on the scene). Their
-character is a light touch — a greeting, a catchphrase in the sign-off (`line`) —
+**Who is in it.** The whole crew, not one voice for three minutes. `facts.presenter`
+presents (the day's Droggie, from [the Droggies' canon](https://github.com/cdomotor-g/thedroggies)
+— `characters/json/`): the title, the map, what's worth a look and the sign-off.
+`facts.cohost` takes the radio scenes (fingerprints, whose copy, the receivers).
+`facts.guests` drop in for **one scene each** — a field scene such as the
+batteries or the check signals suits most of them — marked `"presenter": "<id>"`
+on the scene; the draft has already placed them. Give each guest a line of their
+own character as they arrive, and get on with it.
+
+**The Bean Counter is one of the show's lesser figures** (the owner's call). He
+presents no bulletin and is in no daily. In the weekly he reads the numbers —
+the fortnight's trend — and that is his one scene; publishing refuses a bulletin
+he presents or says more than one scene of.
+
+Character is a light touch — a greeting, a catchphrase in the sign-off (`line`) —
 and the body is plain and accurate whoever reads it: the Know-It-All's bulletin is
 as right as Graham's. Never mock the profession. Every Droggie has canon pronouns
 (`pronouns` in their JSON): HR is she/her, the rest of the crew he/him.
 
-**Length and pace.** Narration (`say`) about 2.4 words a second of `secs`
-(5–25 s a scene); the publish step warns past 3.4. One idea a scene. The first
+**Length and pace.** Every word is said aloud, at about 2.4 a second, and paid
+for: a daily is **about two minutes, 340 words of narration at most**, a weekly
+about three, 440 at most — publishing refuses one longer. Cut a scene before
+you thin every scene; a short scene said well beats a long one rushed. `secs`
+is still about 2.4 words a second (5–25 s a scene), for when the bulletin plays
+without its voices; the publish step warns past 3.4. One idea a scene. The first
 scene is the `title`, the last the `signoff`. The headline (≤170 characters)
 is the one thing to remember.
 

@@ -95,34 +95,39 @@ export function frequencyWords(f) {
 // What a voice says for a scene: its direction (on models that act it), then
 // the narration word by word, each word swapped for the lexicon's respelling
 // of it where it has one ({ word, say }: "Goomburra" said as written in
-// "say") and a frequency for the way it is said. Keeps where each of the
-// narration's words starts in the text sent, so the API's per-character
-// timing can be read back per word.
+// "say") and a frequency for the way it is said. A voice that drifts out of
+// its direction over a long line has it said again ("sustain") before every
+// sentence after the first. Keeps where each of the narration's words starts
+// in the text sent, so the API's per-character timing can be read back per word.
 export function scriptFor(say, voice, cast) {
   const words = String(say || '').split(/\s+/).filter(Boolean);
   const tags = TAG_MODELS.has(voice.model);
   const lex = new Map((cast.lexicon || []).filter(e => e && e.word && e.say).map(e => [String(e.word).toLowerCase(), e.say]));
   let text = tags && voice.direction ? voice.direction.trim() + ' ' : '';
+  const sustain = tags && voice.sustain ? voice.sustain.trim() + ' ' : '';
   const offsets = [];
+  let fresh = false;                                   // the word before ended a sentence
   for (const w of words) {
+    if (fresh && sustain) text += sustain;
     const m = /^([^\p{L}\p{N}]*)([\p{L}\p{N}'’-]+(?:\.\p{N}+)*)([^\p{L}\p{N}]*)$/u.exec(w);
     const core = m && (lex.get(m[2].toLowerCase()) || frequencyWords(m[2]));
     const said = core ? m[1] + core + m[3] : w;
     offsets.push(text.length);
     text += said + ' ';
+    fresh = /[.!?…]["'’”)\]]*$/.test(w);
   }
   return { text: text.trimEnd(), words, offsets };
 }
 
 const speakerOf = (b, s) => (s && s.presenter) || b.presenter;
 
-// Everything that changes what a bulletin sounds like: the words, who says
-// them, and the voices as cast. A voice file whose hash still matches is left.
+// What a bulletin says: the words, who says them, and how the lexicon says
+// them. A voice file whose hash still matches is left as it is. A recast is
+// not in it on purpose — it reaches the next bulletin, and the ones already
+// voiced only when the workflow is run with force: re-voicing a fortnight of
+// bulletins whenever a voice changed would spend a month's credits at once.
 export function hashFor(b, cast) {
-  const used = [...new Set((b.scenes || []).map(s => speakerOf(b, s)))].sort();
-  const voices = Object.fromEntries(used.map(id => [id, cast.voices[id] || null]));
-  const body = JSON.stringify({ f: VOICE_FORMAT, scenes: (b.scenes || []).map(s => [speakerOf(b, s), s.say]),
-    voices, lexicon: cast.lexicon || [], defaults: cast.defaults || {} });
+  const body = JSON.stringify({ f: VOICE_FORMAT, scenes: (b.scenes || []).map(s => [speakerOf(b, s), s.say]), lexicon: cast.lexicon || [] });
   return crypto.createHash('sha256').update(body).digest('hex').slice(0, 32);
 }
 

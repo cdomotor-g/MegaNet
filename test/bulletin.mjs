@@ -11,7 +11,11 @@
 //     not on file, a scene that cannot be said in its seconds, a weekly that
 //     covers a day
 //   * the crew: the player's ROSTER and the validator's PRESENTERS are the same
-//     Droggies, and each has a portrait in assets/presenters/
+//     Droggies, and each has a portrait in assets/presenters/; the rota gives
+//     every daily a presenter, Alex (or Graham) for the radio and two guests,
+//     and the weekly the Bean Counter for its numbers — who presents nothing,
+//     says one scene at most, and is in no daily; a bulletin's narration is
+//     held to about two minutes (three for the weekly)
 //   * the pipeline on the demo week — the Station Health tab's own week with a
 //     fault planted per station: its facts hold the planted silent station as
 //     a regular silence and the sliding battery; its draft is valid; publishing
@@ -54,7 +58,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { validate, validateIndex, validateVoice, voicePathFor, PRESENTERS, SCENES, VOICE_FORMAT } from '../tools/bulletin/validate.mjs';
 import { scriptFor, hashFor, wordTimes, pending, tempoOf, frequencyWords, withLexicon } from '../tools/voice/speak.mjs';
-import { buildFacts } from '../tools/bulletin/gather.mjs';
+import { buildFacts, presenterFor, CREW } from '../tools/bulletin/gather.mjs';
 import { draft } from '../tools/bulletin/draft.mjs';
 import { publish } from '../tools/bulletin/publish.mjs';
 import { loadAnalysis } from '../tools/health/report.mjs';
@@ -148,6 +152,18 @@ console.log('The validator');
   ok('a kind of scene the page cannot draw is refused, and the last scene must be the sign-off', has(/scenes\[10\]\.type: "hologram"/) && has(/the last scene is the sign-off/));
   const wk = Object.assign({}, FIXTURE, { kind: 'weekly', id: 'weekly-2026-10-25' });
   ok('a weekly covering one day is refused', has(/period: 1\.0 days, not a weekly's/, validate(wk, { stationIds: ids }).errors));
+  // The cast rules, for bulletins after the first two.
+  const later = Object.assign(JSON.parse(JSON.stringify(FIXTURE)), { id: 'daily-2026-10-27' });
+  ok('a later bulletin cast as the rules say is valid', !validate(later, { stationIds: ids }).errors.length, validate(later, { stationIds: ids }).errors.join('; '));
+  const bean = Object.assign(JSON.parse(JSON.stringify(later)), { presenter: 'bean-counter' });
+  ok('…the Bean Counter presenting one is refused', has(/presenter: the Bean Counter presents no bulletin/, validate(bean, { stationIds: ids }).errors));
+  const twice = JSON.parse(JSON.stringify(later));
+  twice.scenes[2].presenter = 'bean-counter'; twice.scenes[3].presenter = 'bean-counter';
+  ok('…as is the Bean Counter saying two scenes', has(/the Bean Counter says 2 scenes — one at most/, validate(twice, { stationIds: ids }).errors));
+  const long = JSON.parse(JSON.stringify(later));
+  for (const k of [1, 2, 3]) Object.assign(long.scenes[k], { say: Array.from({ length: 80 }, () => 'word').join(' '), secs: 25 });
+  ok('…and narration past about two minutes', has(/words of narration, more than a daily's 340/, validate(long, { stationIds: ids }).errors));
+  ok('…while the two bulletins published before the rules keep their cast', !validate(Object.assign({}, bean, { id: 'daily-2026-10-25' }), { stationIds: ids }).errors.length);
 }
 
 // ── 3. the crew ─────────────────────────────────────────────────────────────
@@ -164,6 +180,17 @@ const HB = ctx.__HB;
 {
   const roster = Object.keys(HB.ROSTER).sort(), list = PRESENTERS.slice().sort();
   ok('the player and the validator know the same presenters', JSON.stringify(roster) === JSON.stringify(list), `${roster} vs ${list}`);
+  // The rota, over a fortnight of dailies and a few weeklies.
+  const days = Array.from({ length: 14 }, (_, k) => presenterFor('daily', Date.parse('2026-10-25T20:00:00Z') + k * 86400000));
+  const bad = days.filter(d => d.presenter === 'bean-counter' || d.guests.length !== 2 || d.guests.includes('bean-counter')
+    || d.guests.some(g => g === d.presenter || g === d.cohost) || d.guests[0] === d.guests[1] || d.cohost === d.presenter);
+  ok('every daily has a presenter, a radio voice and two other guests — never the Bean Counter', !bad.length, JSON.stringify(bad));
+  const heard = new Set(days.flatMap(d => [d.presenter, d.cohost, ...d.guests]));
+  ok('…and over a fortnight the whole crew is heard', CREW.every(id => heard.has(id)), [...heard].join(', '));
+  const weeks = [0, 7, 14, 21].map(k => presenterFor('weekly', Date.parse('2026-10-25T18:00:00Z') + k * 86400000));
+  ok('the weekly: Graham, Alex for the radio, the Bean Counter for its numbers and a guest',
+    weeks.every(w => w.presenter === 'seasoned-hydrographer' && w.cohost === 'tech-wizard' && w.guests[0] === 'bean-counter' && w.guests[1] && !['seasoned-hydrographer', 'tech-wizard', 'bean-counter'].includes(w.guests[1])),
+    JSON.stringify(weeks));
   const missing = PRESENTERS.filter(id => !fs.existsSync(path.join(REPO, 'assets', 'presenters', `${id}.webp`)));
   ok('every presenter has a portrait', !missing.length, missing.join(', '));
   const big = PRESENTERS.filter(id => fs.existsSync(path.join(REPO, 'assets', 'presenters', `${id}.webp`)) && fs.statSync(path.join(REPO, 'assets', 'presenters', `${id}.webp`)).size > 60000);
@@ -192,6 +219,10 @@ let demoDraft = null;
   demoDraft = draft(facts);
   const r = validate(demoDraft, { stationIds: ids });
   ok('the draft from those facts is a valid bulletin', !r.errors.length, r.errors.join('; '));
+  const speakers = demoDraft.scenes.map(s => s.presenter || demoDraft.presenter);
+  ok('…its guests a scene each, the rest the presenter\'s and the radio voice\'s',
+    facts.guests.length === 2 && facts.guests.every(g => speakers.filter(x => x === g).length === 1)
+      && speakers.every(x => x === facts.presenter || x === facts.cohost || facts.guests.includes(x)), speakers.join(' '));
   ok('…that opens with the title, names the silent station on its map, and signs off',
     demoDraft.scenes[0].type === 'title' && demoDraft.scenes.some(s => s.type === 'map' && s.marks.some(m => m.id === silent.stationId)) && demoDraft.scenes.at(-1).type === 'signoff',
     demoDraft.scenes.map(s => s.type).join(' '));
@@ -290,12 +321,18 @@ console.log('The voices');
     merged.length === 2 && merged.find(e => e.word === 'goomburra').say === 'Flood-Net-way' && withLexicon(cast, tmpLex + '.none').lexicon.length === 1, JSON.stringify(merged));
   fs.rmSync(path.dirname(tmpLex), { recursive: true, force: true });
   const b = { id: 'daily-2026-10-25', presenter: 'seasoned-hydrographer', scenes: [{ say: 'One.' }, { say: 'Two.', presenter: 'tech-wizard' }] };
-  const h = hashFor(b, cast), again = JSON.parse(JSON.stringify(cast));
-  again.voices.turbo.tempo = 1.2;
-  const recast = JSON.parse(JSON.stringify(cast));
+  const h = hashFor(b, cast), recast = JSON.parse(JSON.stringify(cast)), respelt = JSON.parse(JSON.stringify(cast));
   recast.voices['tech-wizard'].voice_id = 'D'.repeat(20);
-  ok('a bulletin is re-voiced when its words or the voices it uses change, and not for a voice it does not use',
-    hashFor(b, again) === h && hashFor(b, recast) !== h && hashFor(Object.assign({}, b, { scenes: [{ say: 'One!' }, b.scenes[1]] }), cast) !== h);
+  respelt.lexicon.push({ word: 'Two', say: 'Too' });
+  ok('a bulletin is voiced again when its words, who says them or the lexicon change — not when a voice is recast (that waits for force)',
+    hashFor(b, recast) === h && hashFor(b, respelt) !== h && hashFor(Object.assign({}, b, { scenes: [{ say: 'One!' }, b.scenes[1]] }), cast) !== h
+      && hashFor(Object.assign({}, b, { scenes: [b.scenes[0], { say: 'Two.', presenter: 'turbo' }] }), cast) !== h);
+  const grumpy = { voice_id: 'E'.repeat(20), voice_name: 'L', model: 'eleven_v4', direction: '[tired] [grumpy] [slowly]', sustain: '[tired] [grumpy]' };
+  const held = scriptFor('By the numbers. Checks ran at ninety percent. Every dollar has a job.', grumpy, cast);
+  ok('a voice that drifts has its mood said again before each later sentence, every word still in its place',
+    held.text === '[tired] [grumpy] [slowly] By the numbers. [tired] [grumpy] Checks ran at ninety percent. [tired] [grumpy] Every dollar has a job.'
+      && held.text.slice(held.offsets[3]).startsWith('Checks') && held.text.slice(held.offsets[8]).startsWith('Every')
+      && scriptFor('One. Two.', { ...grumpy, model: 'eleven_multilingual_v2' }, cast).text === 'One. Two.', held.text);
 
   // pending(), on a scratch copy: a bulletin with no voice is voiced, one
   // whose voice matches is left, a voice whose bulletin has gone goes.
