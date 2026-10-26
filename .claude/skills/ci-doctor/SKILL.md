@@ -37,7 +37,16 @@ question mid-run, so decide, act, and leave a record.
    timeout, which is labelled `cancelled` too. So if the newest Web smoke
    test run is cancelled, list its jobs (step 2). Any step that finished
    `failure` is a red check, whether or not the run was cut off.
-2. If every workflow's newest run is `success`, also check for open issues
+2. Those 100 runs cover only a few hours, because the photo syncs and Station
+   health run every 20 to 30 minutes. The weekly and daily jobs (the ACMA
+   refresh, the stations snapshot, coverage tiles, the R2 archive and the
+   bulletin voices) are usually not among them. So call `list_workflows`
+   (`mcp__github__actions_list`). For each workflow file with no run in the
+   window, call `list_workflow_runs` with that file as `resource_id`, the
+   same filter, and `perPage: 1`, and add its newest run. A workflow that has
+   never run on `main` (one only started by hand, such as `db-migrate.yml`)
+   has nothing to check.
+3. If every workflow's newest run is `success`, also check for open issues
    whose titles contain `CI doctor:` (`mcp__github__list_issues`,
    `state: OPEN`). Close each one with a one-line comment that it is green now,
    and update `roadmap/roadmap-113.md` to match. Then say "CI green on main"
