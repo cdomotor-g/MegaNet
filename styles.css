@@ -2615,6 +2615,7 @@ td {
   --bk-power: var(--ad-series-3);
   --bk-carrier: var(--ad-series-4);
   --bk-ranges: var(--ad-series-8);
+  --bk-signal: var(--ad-series-9);
 }
 .bk-c-air     { --c: var(--bk-air); }
 .bk-c-bits    { --c: var(--bk-bits); }
@@ -2622,6 +2623,7 @@ td {
 .bk-c-power   { --c: var(--bk-power); }
 .bk-c-carrier { --c: var(--bk-carrier); }
 .bk-c-ranges  { --c: var(--bk-ranges); }
+.bk-c-signal  { --c: var(--bk-signal); }
 .bk-sw { display: inline-block; flex: none; width: .75em; height: .75em; border-radius: 2px; background: var(--c, var(--muted)); margin-right: .35em; vertical-align: -1px; }
 .bk-controls { flex-wrap: wrap; gap: var(--sp-1); }
 .bk-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--sp-2); margin-top: var(--sp-3); }

@@ -45,6 +45,7 @@ when none is "only through it".
 | **Seldom heard** | Its own station "silent" but heard only a few times a week with no schedule — a repeater our receivers catch by luck from far away, not one that is missing. | A note. |
 | **Dropping out** | Spells off air that came back (its own station's, and the stations behind it going quiet together). | A warning at three spells or a day in all; else a note. Overnight spells are said: the pattern of a solar site that cannot carry the night. |
 | **Corrupted relays** | Copies of other stations' readings with a bit or two wrong, on its own carrier. As strong as the clean copy means it sent the wrong bits — its receiver, its site or its radio — not that our receiver misheard it; reaching us clean another way means the corruption entered at this repeater. Interference keeps hours; a failing radio does not. | The server's own finding (critical at 10% of what it sent); without one, a warning at 2% on five clear copies. With nothing on its carrier, a share by pass range twice the network's is a note. |
+| **Signal** | The server's `transmitter-snr-falling` on its own carrier (`0083`): everything it relays reaching the base stations 3 dB or more weaker than its own past, in a week or over three months, with the base stations' own steps taken out ([Transmitter signal](station-health.md#transmitter-signal)). The stations behind it have lost that margin too. | The finding's (critical at 6 dB when most base stations judging it agree). |
 | **Carrier** | Off the fleet (median 2.5 ppm or more over two days or more), or moving 1 ppm or more between days. One day far from every other is set aside — more often a receiver's tuning that day than the radio. | A warning off the fleet (critical at 5 ppm over three days); moving 2 ppm over three days a warning; else a note. |
 | **Power** | Its own battery finding: critical, low, falling, no daily charge. | The finding's. |
 | **Pass ranges** | The register: no ranges, or a range that runs backwards; and against the air, addresses relayed off its record. | Off its record with copies a warning; else a note. |
@@ -56,7 +57,9 @@ site's power — fits better than as many faults.
 Each section ends with **what it points to**: up to three sentences from its
 issues together — power first when an off-air repeater's battery said so; a
 failing radio when it was corrupting before it stopped; the corruption entering
-at the repeater when clean copies came another way. Said as possibilities, never
+at the repeater when clean copies came another way; its antenna or feeder when
+it is both weaker on the air and corrupting what it relays (it hears through
+them as well as sends on them). Said as possibilities, never
 as orders.
 
 ## How it is ranked
@@ -69,8 +72,8 @@ Each issue scores
 >   power; 1 for pass ranges)
 > × whether it is still going on (1; ½ once it cleared; ¾ for dropping out,
 >   which is a habit rather than an event)
-> × the kind of trouble (off air 1.2, corrupted relays 1, dropping out and
->   power 0.8, carrier 0.7, pass ranges 0.5)
+> × the kind of trouble (off air 1.2, corrupted relays 1, its signal fading
+>   0.9, dropping out and power 0.8, carrier 0.7, pass ranges 0.5)
 > × for corrupted relays, 1 to 1.5 as the copies mount (to 100 or more).
 
 A repeater's **score** is the sum of its issues', and ranks it. Its **state** is

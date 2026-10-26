@@ -22,8 +22,9 @@
 //                                silent, the stations behind it gone quiet
 //                                together (repeater-down), an area silence it
 //                                was part of, its battery — and the server's
-//                                transmitter findings (0075, 0077, 0078): off
-//                                channel, drifting, corrupting.
+//                                transmitter findings (0075, 0077, 0078, 0083):
+//                                off channel, drifting, corrupting, its signal
+//                                fading.
 //   transmitter_summary (0077)   its carrier against the fleet, day by day: the
 //                                fingerprint every burst it relays carries.
 //   recent_flips() (0078)        every corrupted copy that came on its carrier
@@ -52,8 +53,8 @@
 // in full and the rest a quarter, on a log scale) × whether it is still going
 // on (1; ½ for one that cleared in the period; ¾ for a run of dropouts, which
 // is a habit rather than an event) × what kind of trouble it is (off air 1.2,
-// corrupted relays 1, dropping out and power 0.8, carrier 0.7, pass ranges
-// 0.5) — and corrupted copies count up to half again as much as they mount.
+// corrupted relays 1, its signal fading 0.9, dropping out and power 0.8,
+// carrier 0.7, pass ranges 0.5) — and corrupted copies count up to half again as much as they mount.
 // A repeater's score is the sum of its issues', which is what ranks it; its
 // state is the worst of what is still going on. docs/backbone.md has the rest.
 //
@@ -90,12 +91,13 @@ const Backbone = (() => {
   const CATS = {
     air:     { label: 'Off air',          w: 1.2 },
     bits:    { label: 'Corrupted relays', w: 1.0 },
+    signal:  { label: 'Signal',           w: 0.9 },
     drops:   { label: 'Dropping out',     w: 0.8 },
     power:   { label: 'Power',            w: 0.8 },
     carrier: { label: 'Carrier',          w: 0.7 },
     ranges:  { label: 'Pass ranges',      w: 0.5 },
   };
-  const CAT_ORDER = ['air', 'bits', 'drops', 'power', 'carrier', 'ranges'];
+  const CAT_ORDER = ['air', 'bits', 'signal', 'drops', 'power', 'carrier', 'ranges'];
   const BATTERY = ['battery-critical', 'battery-low', 'battery-no-charge', 'battery-falling', 'battery-overcharge'];
   const NET_KINDS = ['repeater-down', 'area-silence', 'shared-spell'];
   const F_COLS = 'id,source,kind,subject,station_id,severity,title,detail,evidence,first_seen,last_seen,cleared_at';
@@ -361,7 +363,7 @@ const Backbone = (() => {
     const rows = [];
     reg.reps.forEach(R => {
       const c = Object.assign({ R, own: own.get(R.id) || [], net: net.filter(f => names(f, R.id)) }, ctxBase);
-      const issues = [offAir(c), dropouts(c), corrupt(c), carrier(c), power(c), ranges(c)].filter(Boolean);
+      const issues = [offAir(c), dropouts(c), corrupt(c), signal(c), carrier(c), power(c), ranges(c)].filter(Boolean);
       if (!issues.length) return;
       issues.forEach(i => { i.score = scoreOf(i, R); });
       issues.sort((a, b) => b.score - a.score || SEV_RANK[a.sev] - SEV_RANK[b.sev]);
@@ -421,6 +423,7 @@ const Backbone = (() => {
       else if (BATTERY.includes(f.kind)) out.push({ row: 'power', from: ms(f.first_seen), to: end(f), sev: f.severity, what: f.title });
       else if (f.kind === 'transmitter-corrupting') out.push({ row: 'bits', from: ms(f.first_seen), to: end(f), sev: f.severity, what: f.title });
       else if (f.kind === 'transmitter-off-channel' || f.kind === 'transmitter-drift') out.push({ row: 'carrier', from: ms(f.first_seen), to: end(f), sev: f.severity, what: f.title });
+      else if (f.kind === 'transmitter-snr-falling') out.push({ row: 'signal', from: ms(f.first_seen), to: end(f), sev: f.severity, what: f.title });
     });
     c.net.forEach(f => {
       const lead = f.kind !== 'repeater-down' || leadOf(f) === c.R.id;
@@ -666,6 +669,28 @@ const Backbone = (() => {
     };
   }
 
+  // Its signal (0083): the server's transmitter-snr-falling on its own carrier
+  // — everything it relays reaching the base stations that much weaker, their
+  // own steps already taken out, judged against its own past at each.
+  function signal(c) {
+    const list = c.own.filter(f => f.kind === 'transmitter-snr-falling');
+    if (!list.length) return null;
+    const open = list.filter(f => !f.cleared_at);
+    const lead = (open.length ? open : list).slice().sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity] || ms(b.last_seen) - ms(a.last_seen))[0];
+    const e = ev(lead);
+    const drop = Number(e.drop_db) || null;
+    const facts = [lead.detail].filter(Boolean);
+    facts.push('Everything it relays reaches the base stations that much weaker, so the stations behind it have lost that margin too — the weakest of them go quiet first.');
+    if (e.action) facts.push(e.action);
+    return {
+      kind: 'signal', cat: 'signal', sev: lead.severity, ongoing: !lead.cleared_at,
+      title: String(lead.title).replace(/^.*?: (?=SNR)/, '') + (lead.cleared_at ? ` — cleared ${whenShort(ms(lead.cleared_at))}` : ''),
+      short: drop ? `Signal down ${drop.toFixed(1)} dB` : 'Signal fading',
+      detail: 'How far above the base stations\' noise its own transmissions arrive, against its own past.',
+      facts, ev: { drop, window: e.window || null },
+    };
+  }
+
   function power(c) {
     const list = c.own.filter(f => BATTERY.includes(f.kind));
     if (!list.length) return null;
@@ -735,7 +760,7 @@ const Backbone = (() => {
   // What the issues together point to — said as possibilities, never orders.
   function pointsTo(issues) {
     const has = k => issues.find(i => i.kind === k) || null;
-    const off = has('offair'), bits = has('corrupt'), car = has('carrier'), pow = has('power'), drops = has('dropouts'), rng = has('ranges');
+    const off = has('offair'), bits = has('corrupt'), car = has('carrier'), pow = has('power'), drops = has('dropouts'), rng = has('ranges'), sig = has('signal');
     const out = [];
     if (off && off.ev.together) out.push(`It stopped together with ${off.ev.together.join(', ')}: look first for what they share.`);
     const bitsReal = bits && !bits.ev.circumstantial && bits.ev.clear >= 5;
@@ -748,6 +773,10 @@ const Backbone = (() => {
     else if (!off && bitsReal) out.push('It sends the wrong bits: its receiver, its site or its radio — a receiver parked beside it would tell which.');
     if (bitsReal && bits.ev.pattern === 'hours') out.push('The corrupted copies keep hours, which interference near the site does and a failing radio does not.');
     if (bitsReal && bits.ev.pattern === 'all' && !off) out.push('At all hours, which is more like equipment or a weak input than interference.');
+    // Its antenna and feeder are what it hears through as well as what it
+    // sends on: weaker out and corrupting what comes in point at both.
+    if (sig && bitsReal && !off) out.push('Weaker on the air and corrupting what it relays: its antenna, feeder or connectors, which it hears through as well as sends on, fit both.');
+    else if (sig && !off) out.push('Its own signal is weaker at the base stations that hear it: its antenna, feeder or connectors, or its transmitter\'s power.');
     if (car && bitsReal) {
       out.push(car.sev !== 'info' ? 'A carrier that is off or moving, as well as corrupted relays, points at the radio itself.'
         : `Its carrier moved ${car.ev.range.toFixed(1)} ppm across the ${plural(car.ev.nd, 'day')} it was measured${car.ev.nd < 3 ? ' — too few to lean on, but' : ', and'} a failing radio would do both.`);
@@ -936,6 +965,8 @@ const Backbone = (() => {
         });
       if (dots.length) add('carrier', 'Carrier', dots.join(''));
     }
+    const sg = spans.filter(s => s.row === 'signal' && (s.to == null || s.to >= x0)).sort((a, b) => SEV_RANK[b.sev] - SEV_RANK[a.sev]);
+    if (sg.length) add('signal', 'Signal', sg.map(s => bar(s, s.sev === 'critical' ? 'bk-span-bad' : 'bk-span-warn')).join(''));
     const pw = spans.filter(s => s.row === 'power' && (s.to == null || s.to >= x0)).sort((a, b) => SEV_RANK[b.sev] - SEV_RANK[a.sev]);
     if (pw.length) add('power', 'Power', pw.map(s => bar(s, s.sev === 'critical' ? 'bk-span-bad' : s.sev === 'warn' ? 'bk-span-warn' : 'bk-span-info')).join(''));
     if (!rows.length) return '';
@@ -957,6 +988,7 @@ const Backbone = (() => {
     const said = [];
     if (air.length) said.push(`off air ${air.map(s => `from ${when(s.from)}${s.to == null ? ', still' : ` to ${when(s.to)}`}`).join('; ')}`);
     if (flips) said.push(`${num(flips.ev.n)} corrupted copies`);
+    if (sg.length) said.push(`signal fading from ${when(sg[0].from)}`);
     if (pw.length) said.push(`power findings ${pw.length}`);
     return `<svg class="bk-timeline" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escAttr(`${r.name} over the last ${A.days} days: ${said.join('; ') || 'what was found, day by day'}`)}">
       ${ticks.join('')}${parts.join('')}<line class="bk-now" x1="${W - RP}" x2="${W - RP}" y1="0" y2="${H - 16}"/>

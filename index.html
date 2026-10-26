@@ -13,15 +13,15 @@
        docs/floodwarning-net.md. -->
   <meta name="description" content="Browser-based planning and maintenance tool for radio and satellite telemetry networks: station records, repeater pass ranges, radio path mapping, RF interference investigation, ALERT/ALERT2 packet decoding and field inspections. Open source; not an official warning service.">
   <link rel="canonical" href="https://floodwarning.net/">
-  <link rel="icon" type="image/svg+xml" href="assets/icon-small.svg?v=20261026o">
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=20261026o">
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=20261026o">
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=20261026o">
+  <link rel="icon" type="image/svg+xml" href="assets/icon-small.svg?v=20261026p">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=20261026p">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=20261026p">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=20261026p">
   <meta name="theme-color" content="#0b5cab">
   <!-- Installable, and opens with no signal on a device that has opened it
        before (#213): the manifest names it, sw.js keeps it — pwa.js says when. -->
-  <link rel="manifest" href="manifest.webmanifest?v=20261026o" crossorigin="use-credentials">
-  <link rel="stylesheet" href="styles.css?v=20261026o">
+  <link rel="manifest" href="manifest.webmanifest?v=20261026p" crossorigin="use-credentials">
+  <link rel="stylesheet" href="styles.css?v=20261026p">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
 </head>
 <body>
@@ -60,7 +60,7 @@
            storage keys, MQTT topics, the Worker and bucket names, and the
            Quansheng radio's station-table tag — because renaming those is a
            migration with a thousand edges and nothing gained on screen. -->
-      <h1><img class="header-logo" src="assets/icon-small.svg?v=20261026o" alt="" width="64" height="64">Flood-Net</h1>
+      <h1><img class="header-logo" src="assets/icon-small.svg?v=20261026p" alt="" width="64" height="64">Flood-Net</h1>
       <p class="header-sub">
         <span class="header-tag">Network Tool</span>
         <span id="hdr-stats" class="header-stats"></span>
@@ -270,8 +270,8 @@
        APP_VERSION reads it back off this very tag, and an unstamped core.js
        makes every bug report say 'dev'. -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
-  <script src="maps-data.js?v=20261026o"></script>
-  <script src="core.js?v=20261026o"></script>
+  <script src="maps-data.js?v=20261026p"></script>
+  <script src="core.js?v=20261026p"></script>
   <!-- The furniture the seven Leaflet maps share: the base-map picker, and the
        on-map panel every other control on a map is built out of (#164). Above
        app.js because that is where it reads — the first map in the list is the
@@ -282,102 +282,102 @@
        because makeBaseLayers() names it — a runtime read, like every other
        cross-module call here, so the order states the dependency rather than
        being required by it (#154). -->
-  <script src="map-elevation.js?v=20261026o"></script>
-  <script src="map-controls.js?v=20261026o"></script>
-  <script src="app.js?v=20261026o"></script>
-  <script src="rf-changes.js?v=20261026o"></script>
-  <script src="workbench.js?v=20261026o"></script>
+  <script src="map-elevation.js?v=20261026p"></script>
+  <script src="map-controls.js?v=20261026p"></script>
+  <script src="app.js?v=20261026p"></script>
+  <script src="rf-changes.js?v=20261026p"></script>
+  <script src="workbench.js?v=20261026p"></script>
   <!-- The Reception Map tab: what was heard where, and which repeater is
        sending bad copies. Reads reception-log.js at runtime only. -->
-  <script src="reception.js?v=20261026o"></script>
-  <script src="mem-meter.js?v=20261026o"></script>
-  <script src="auth.js?v=20261026o"></script>
-  <script src="map-draw.js?v=20261026o"></script>
-  <script src="path-profile.js?v=20261026o"></script>
-  <script src="link-budget.js?v=20261026o"></script>
-  <script src="pass-ranges.js?v=20261026o"></script>
-  <script src="bit-flipper.js?v=20261026o"></script>
-  <script src="network-view.js?v=20261026o"></script>
-  <script src="arro-launcher.js?v=20261026o"></script>
-  <script src="plot-lines.js?v=20261026o"></script>
-  <script src="arro-data.js?v=20261026o"></script>
-  <script src="datastore.js?v=20261026o"></script>
-  <script src="export.js?v=20261026o"></script>
-  <script src="station-editor.js?v=20261026o"></script>
+  <script src="reception.js?v=20261026p"></script>
+  <script src="mem-meter.js?v=20261026p"></script>
+  <script src="auth.js?v=20261026p"></script>
+  <script src="map-draw.js?v=20261026p"></script>
+  <script src="path-profile.js?v=20261026p"></script>
+  <script src="link-budget.js?v=20261026p"></script>
+  <script src="pass-ranges.js?v=20261026p"></script>
+  <script src="bit-flipper.js?v=20261026p"></script>
+  <script src="network-view.js?v=20261026p"></script>
+  <script src="arro-launcher.js?v=20261026p"></script>
+  <script src="plot-lines.js?v=20261026p"></script>
+  <script src="arro-data.js?v=20261026p"></script>
+  <script src="datastore.js?v=20261026p"></script>
+  <script src="export.js?v=20261026p"></script>
+  <script src="station-editor.js?v=20261026p"></script>
   <!-- A sparkline on each of the editor's sensor rows — the last seven days of
        what its address has sent — and the chart it opens, with its door onto
        Field Data. station-editor.js draws the slot and app.js asks for it to be
        filled; it reads sensor-values.js, health-analysis.js, modal.js and
        arro-data.js at call time, and nothing runs at load. -->
-  <script src="sensor-sparks.js?v=20261026o"></script>
+  <script src="sensor-sparks.js?v=20261026p"></script>
   <!-- The Inspections section at the foot of the card station-editor.js
        renders: the door into Inspection History for one station, and the chart
        of what its past visits measured. After station-editor.js because that is
        where it is called from, not because it has to be — like every other
        module here it only declares. -->
-  <script src="station-inspections.js?v=20261026o"></script>
-  <script src="attachments.js?v=20261026o"></script>
+  <script src="station-inspections.js?v=20261026p"></script>
+  <script src="attachments.js?v=20261026p"></script>
   <!-- What a field photo says about where and when it was taken — its EXIF,
        its XMP, and the overlay a field camera app printed on it, read by OCR.
        Pure, and the Dropbox sync require()s this same file under Node, so a
        photo is read one way whichever door it comes in by. Only declares (its
        CommonJS line is on npm run toplevel's list, like hfem.js's). -->
-  <script src="photo-meta.js?v=20261026o"></script>
+  <script src="photo-meta.js?v=20261026p"></script>
   <!-- A zip of photos, opened in the browser: its directory read, each photo
        unzipped (DecompressionStream) and checked when the queue reaches it.
        Pure, and required by test/photozip.mjs under Node, like photo-meta.js
        (its CommonJS line is on npm run toplevel's list). Before
        field-photos.js, its one caller — a runtime relationship. -->
-  <script src="photo-zip.js?v=20261026o"></script>
+  <script src="photo-zip.js?v=20261026p"></script>
   <!-- What a photo's equipment labels say: make, model, serial number, and the
        kind of equipment the station's register files it under, from the text
        PhotoMeta.ocrLabels reads. Pure, and required under Node by
        test/photoreview.mjs (its CommonJS line is on npm run toplevel's list).
        Before field-photos.js and photo-review.js, which call it. -->
-  <script src="photo-equipment.js?v=20261026o"></script>
+  <script src="photo-equipment.js?v=20261026p"></script>
   <!-- The stamp a photo taken in Flood-Net carries — Solocator's panel, the
        compass ribbon, the position and its ±, the height and its datum, the
        station and the time — and the same facts as the file's EXIF. Pure, and
        required under Node by test/camera.mjs (its CommonJS line is on npm run
        toplevel's list). Before field-camera.js, its one caller. -->
-  <script src="photo-stamp.js?v=20261026o"></script>
+  <script src="photo-stamp.js?v=20261026p"></script>
   <!-- The Field Photos tab and the viewer every other part of the app opens a
        photo in. After photo-meta.js, which reads the photos, and beside
        attachments.js, whose bucket-and-index shape it shares — a runtime
        relationship like every other one here (#154). -->
-  <script src="field-photos.js?v=20261026o"></script>
+  <script src="field-photos.js?v=20261026p"></script>
   <!-- The Field Photos tab's Review panel — what became of every upload, and
        the equipment suggestions an administrator approves (0036) — and the
        station card's Equipment section. After field-photos.js, whose tab
        draws it and whose queue it lists; only declares. -->
-  <script src="photo-review.js?v=20261026o"></script>
+  <script src="photo-review.js?v=20261026p"></script>
   <!-- The station card's History — who changed the station, what and when, a
        field at a time, with Restore back through station-editor.js's own
        save — and the Admin tab's Deleted stations, restored the same way
        (0056). Editors only. After photo-review.js, whose Equipment section it
        follows on the card; only declares. -->
-  <script src="station-history.js?v=20261026o"></script>
-  <script src="inspections.js?v=20261026o"></script>
-  <script src="maintenance.js?v=20261026o"></script>
-  <script src="history.js?v=20261026o"></script>
+  <script src="station-history.js?v=20261026p"></script>
+  <script src="inspections.js?v=20261026p"></script>
+  <script src="maintenance.js?v=20261026p"></script>
+  <script src="history.js?v=20261026p"></script>
   <!-- The rivers themselves, from the Bureau's Geofabric: named, drawn by the
        area that drains through them, and each one selectable. Beside
        map-rivers.js, the filter box's river highlight, because it is the
        same water; it only declares. places.js asks it for a river picked in
        Find a place, at runtime. -->
-  <script src="map-river-lines.js?v=20261026o"></script>
+  <script src="map-river-lines.js?v=20261026p"></script>
   <!-- The land that drains to a selected river or a station's gauge, from
        the Geofabric's catchments, shaded by its own ground. After
        map-river-lines.js, which shows it with a selection; reads
        map-elevation.js's terrain tiles at runtime. Only declares. -->
-  <script src="river-catchments.js?v=20261026o"></script>
-  <script src="map-rivers.js?v=20261026o"></script>
-  <script src="map-catchments.js?v=20261026o"></script>
-  <script src="map-hubs.js?v=20261026o"></script>
-  <script src="sls.js?v=20261026o"></script>
+  <script src="river-catchments.js?v=20261026p"></script>
+  <script src="map-rivers.js?v=20261026p"></script>
+  <script src="map-catchments.js?v=20261026p"></script>
+  <script src="map-hubs.js?v=20261026p"></script>
+  <script src="sls.js?v=20261026p"></script>
   <!-- Each station owner's logo, beside its name on the station card's Owner
        row (assets/owners/). app.js calls it at call time. Only declares. -->
-  <script src="owner-logos.js?v=20261026o"></script>
+  <script src="owner-logos.js?v=20261026p"></script>
   <!-- What a station's pin says beyond its role — a triangle for a river
        height gauge, grey for one read by hand, black for a TM station, the
        Bureau's solid and dashed pink outlines for its forecast and information
@@ -385,95 +385,95 @@
        stations the Stations map draws. After sls.js, whose answers it reads
        at call time; it adds its pin to Leaflet's canvas renderer the first
        time a pin is made, not at load. Only declares. -->
-  <script src="map-symbols.js?v=20261026o"></script>
+  <script src="map-symbols.js?v=20261026p"></script>
   <!-- The indicative peak flood velocity at a station, from its AEP flood
        levels (0033) by Manning's equation — pure arithmetic that
        river-details.js draws. Only declares. -->
-  <script src="flood-velocity.js?v=20261026o"></script>
+  <script src="flood-velocity.js?v=20261026p"></script>
   <!-- A station's flood levels on one ladder in m AHD — the classes through
        the gauge zero, the AEP levels, the peaks it has reached — with the
        colour the Digital Twin's water takes past each. Pure, like the file
        above, whose AEP row it reads (at call time). Only declares. -->
-  <script src="flood-stages.js?v=20261026o"></script>
+  <script src="flood-stages.js?v=20261026p"></script>
   <!-- The flood classes, crossings and gauge survey the Bureau's river height
        station lists give a station (0031, 0032), and the AEP flood levels
        (0033): a section each on the station card, and their lists in the
        station editor. Only declares, like sls.js above. -->
-  <script src="river-details.js?v=20261026o"></script>
+  <script src="river-details.js?v=20261026p"></script>
   <!-- What the water and the ground around a station are likely to do to what
        is built there — tidal water, the Water Act's downstream limits, the
        coastal hazard areas, acid sulfate soils — asked of the Queensland
        Government's map services when a station card opens: a section on the
        card beside the two above. After river-details.js because it reads the
        gauge zero rule there (at call time); only declares. -->
-  <script src="site-exposure.js?v=20261026o"></script>
+  <script src="site-exposure.js?v=20261026p"></script>
   <!-- The land a station stands on — its lot, tenure, who holds that kind of
        land, the council area, the address and the land use — asked of the
        Queensland cadastre when a station card or the What is here card opens:
        a section on each. Only declares; app.js and map-here.js call it. -->
-  <script src="site-land.js?v=20261026o"></script>
+  <script src="site-land.js?v=20261026p"></script>
   <!-- The road and the bridge at a station or a picked point, and who manages
        each — Transport and Main Roads, the council, a park, a private owner —
        with who to call: a section on the station card and the What is here
        card, under the land. Beside site-land.js because it finishes that
        section's answer; it asks map-road-owners.js (further down) for every
        answer, at runtime, so it only declares. -->
-  <script src="site-roads.js?v=20261026o"></script>
+  <script src="site-roads.js?v=20261026p"></script>
   <!-- The mobile signal at a station or a picked point, per carrier: the
        arithmetic (mobile-signal.js — the antenna, the phone and the ACMA
        standard's grades, reaching into nothing so a Node test can hold it),
        then the section on the station card and the What is here card that
        fetches the register's transmitters and prices them over terrain.js
        with itm.js, both read at runtime. Both only declare. -->
-  <script src="mobile-signal.js?v=20261026o"></script>
-  <script src="site-mobile.js?v=20261026o"></script>
+  <script src="mobile-signal.js?v=20261026p"></script>
+  <script src="site-mobile.js?v=20261026p"></script>
   <!-- A station's RX/TX frequency pairs beyond a repeater's own (0033): rows in
        the station editor and a line each on the card. Only declares. -->
-  <script src="frequencies.js?v=20261026o"></script>
-  <script src="map-survey.js?v=20261026o"></script>
-  <script src="map-contours.js?v=20261026o"></script>
+  <script src="frequencies.js?v=20261026p"></script>
+  <script src="map-survey.js?v=20261026p"></script>
+  <script src="map-contours.js?v=20261026p"></script>
   <!-- Beside the contours because it is the same kind of thing: a context
        layer over the base map with no bearing on the physics. It draws which
        DEM resolution exists where, which is the question the contours' own
        source raises and this app could not previously answer. -->
-  <script src="map-elvis-coverage.js?v=20261026o"></script>
+  <script src="map-elvis-coverage.js?v=20261026p"></script>
   <!-- The carriers' own 4G coverage maps, from the ACCC's release, as one
        tile set of all three carriers in data/coverage/ (tools/
        coverage_tiles.py). Beside the elevation coverage because it is the same
        kind of thing — a map of what exists where — and it only declares;
        site-mobile.js above reads a point off it at runtime. -->
-  <script src="map-mobile-coverage.js?v=20261026o"></script>
+  <script src="map-mobile-coverage.js?v=20261026p"></script>
   <!-- Road parcels from the Queensland cadastre. Beside the survey marks and
        the contours because it is the same kind of thing — a Qld spatial
        service drawn under the pins — not because it has to be: like every
        other module here it only declares. -->
-  <script src="map-roads.js?v=20261026o"></script>
+  <script src="map-roads.js?v=20261026p"></script>
   <!-- Every lot boundary from the same cadastre, as a server-rendered image.
        Beside map-roads.js because it is the same service; it only declares. -->
-  <script src="map-lots.js?v=20261026o"></script>
+  <script src="map-lots.js?v=20261026p"></script>
   <!-- Who manages each road and bridge: Queensland's roads coloured by their
        manager, as a server-rendered image per view, and the bridges as pins.
        Beside the road parcels and the lots because it is the same kind of
        thing — a Qld spatial service drawn under the pins — and it only
        declares. site-roads.js above reads it at runtime. -->
-  <script src="map-road-owners.js?v=20261026o"></script>
+  <script src="map-road-owners.js?v=20261026p"></script>
   <!-- The field photos on the Stations map: a pin where each was taken. After
        field-photos.js, whose photos and viewer it uses, and beside the other
        layers drawn over the base map; it only declares. -->
-  <script src="map-photos.js?v=20261026o"></script>
-  <script src="map-wind.js?v=20261026o"></script>
+  <script src="map-photos.js?v=20261026p"></script>
+  <script src="map-wind.js?v=20261026p"></script>
   <!-- The Stations map's minimap, bottom right: a second map further out, the
        main map's view outlined on it, its settings in a dialog from its own ⚙.
        After map-controls.js, whose base maps it draws, and beside the other
        things drawn over the Stations map; it only declares. -->
-  <script src="map-mini.js?v=20261026o"></script>
-  <script src="map-spider.js?v=20261026o"></script>
+  <script src="map-mini.js?v=20261026p"></script>
+  <script src="map-spider.js?v=20261026p"></script>
   <!-- The gold line from the station card to its pin, which replaced the
        desktop callout. Beside map-spider.js because it is the same kind of
        thing — a mark over the pins that follows them — and it only declares. -->
-  <script src="map-leader.js?v=20261026o"></script>
-  <script src="map-backbone.js?v=20261026o"></script>
-  <script src="map-blast.js?v=20261026o"></script>
+  <script src="map-leader.js?v=20261026p"></script>
+  <script src="map-backbone.js?v=20261026p"></script>
+  <script src="map-blast.js?v=20261026p"></script>
   <!-- 📍 Find a place, the blue pin in the side panel on the Stations tab: a
        coordinate it parses, the catchments, rivers and council areas the
        station file holds, and the towns, localities and rivers the gazetteer
@@ -482,51 +482,51 @@
        map-locate.js because it is the same kind of thing — a way of getting
        the map somewhere that is not a pin — and like every other module here
        it only declares, so its position states the dependency (#154). -->
-  <script src="places.js?v=20261026o"></script>
-  <script src="map-locate.js?v=20261026o"></script>
+  <script src="places.js?v=20261026p"></script>
+  <script src="map-locate.js?v=20261026p"></script>
   <!-- Armed from the station editor card and from the station card on the
        map, both of which are rendered elsewhere; this only declares the mode. After
        map-blast.js because it is the same kind of thing — a mode on the
        Stations map that one station at a time is in. -->
-  <script src="map-move-pin.js?v=20261026o"></script>
+  <script src="map-move-pin.js?v=20261026p"></script>
   <!-- A station's ancillary features — its orifice outlet, pits, benchmarks,
        gauge boards and orifice run (0061) — drawn on the Stations map,
        listed on its card, and placed and drawn in a mode armed from the card
        and the station editor. After map-move-pin.js because it is the same
        kind of thing, a mode one station at a time is in, and the two take the
        map from each other; it only declares. -->
-  <script src="site-features.js?v=20261026o"></script>
-  <script src="terrain.js?v=20261026o"></script>
+  <script src="site-features.js?v=20261026p"></script>
+  <script src="terrain.js?v=20261026p"></script>
   <!-- Beside terrain.js and emphatically not a replacement for it: one point
        per request, no batch, ~2.5 s a call. It answers about a place a person
        clicked, in AHD and naming the dataset — which is the one thing the
        tiles cannot do. The sweeps never reach it; its own header says why. -->
-  <script src="elvis.js?v=20261026o"></script>
+  <script src="elvis.js?v=20261026p"></script>
   <!-- The ground where a radio path is decided — round its ends and at the
        ridges near its line of sight — from Geoscience Australia's 5 m LiDAR
        grid, in shared ~1 km tiles, spliced into the tiles' profile. Only
        declares; path-profile.js's pathGround asks it, and only when the link
        budget card's Ground setting says LiDAR. -->
-  <script src="lidar-profile.js?v=20261026o"></script>
+  <script src="lidar-profile.js?v=20261026p"></script>
   <!-- How far AHD is above the EGM96 geoid at a point (AUSGeoid2020 less
        EGM96, a 0.1° grid in data/): what puts the tiles' heights into the
        datum every gauge zero and flood level is in. Only declares; the grid
        is fetched on the first ask. -->
-  <script src="geoid.js?v=20261026o"></script>
-  <script src="itm.js?v=20261026o"></script>
-  <script src="land-cover.js?v=20261026o"></script>
+  <script src="geoid.js?v=20261026p"></script>
+  <script src="itm.js?v=20261026p"></script>
+  <script src="land-cover.js?v=20261026p"></script>
   <!-- The highest ground in the current view, found in the terrain rather than
        looked up in a list. After terrain.js because Terrain.grid is what it
        reads the ground through — a runtime call, like every other cross-module
        call in this list, so the position states the dependency rather than
        being required by it (#154). -->
-  <script src="map-peaks.js?v=20261026o"></script>
+  <script src="map-peaks.js?v=20261026p"></script>
   <!-- After terrain.js because that is what it asks for tiles through, and
        after path-profile.js (further up) whose pathAnalyse and endpoint rules
        it borrows — the same physics, so the map and the profile card cannot
        argue about "obstructed". Neither executes at load, so the order only
        states the dependency (#154). -->
-  <script src="map-los.js?v=20261026o"></script>
+  <script src="map-los.js?v=20261026p"></script>
   <!-- Same dependencies as map-los.js above — terrain.js for the tiles,
        path-profile.js for the physics — plus land-cover.js, whose classes it
        stands on the profile exactly as the link budget card does (without them
@@ -534,33 +534,33 @@
        and datastore.js for the round trip that is the point of it: a whole
        network's fade margins, computed once and kept somewhere other than this
        browser. Nothing here executes at load either (#154). -->
-  <script src="map-fade.js?v=20261026o"></script>
+  <script src="map-fade.js?v=20261026p"></script>
   <!-- The other link colouring, and the one the map opens with: the channel
        each hop runs on, read straight off the repeater at its end. It asks for
        nothing but core.js — no terrain, no datastore, no network — which is why
        it can be the default where the fade margin cannot. Nothing executes at
        load, so this position states nothing but that it belongs with the other
        link colouring (#154). -->
-  <script src="map-freq.js?v=20261026o"></script>
+  <script src="map-freq.js?v=20261026p"></script>
   <!-- Direction arrowheads along the drawn links, on a canvas of their own.
        Reads the lines the Stations map has already drawn — their geometry,
        their colour and their opacity — so it depends on nothing but core.js and
        Leaflet, and is scheduled from app.js, map-los.js and map-fade.js as each
        of them repaints a line. Inert at load like the rest (#154). -->
-  <script src="map-arrows.js?v=20261026o"></script>
+  <script src="map-arrows.js?v=20261026p"></script>
   <!-- What is here: one point on the map, and everything the app already knows
        about the ground under it. It asks terrain.js, land-cover.js, map-wind.js,
        map-catchments.js, map-hubs.js and map-survey.js — every one of them at
        runtime, from a click — so this position states the dependency rather
        than being required by it (#154). -->
-  <script src="map-here.js?v=20261026o"></script>
+  <script src="map-here.js?v=20261026p"></script>
   <!-- Radio Mobile's Single polar radio coverage. Last of the terrain group
        because it stands on all of it — terrain.js for the elevation grid,
        itm.js for the model, path-profile.js for the radio-system and
        propagation rules, map-controls.js for the panel it is drawn in. All
        runtime calls, so the position states the dependencies rather than being
        required by them (#154). -->
-  <script src="map-polar.js?v=20261026o"></script>
+  <script src="map-polar.js?v=20261026p"></script>
   <!-- The repeater site finder: the sites a new repeater has to serve, and the
        three to five places nearby it would serve them best from. Beside the
        polar plot because it stands on the same things — terrain.js for the
@@ -569,7 +569,7 @@
        map-draw.js for the circle it selects with. All runtime calls, so the
        position states the dependencies rather than being required by them
        (#154). -->
-  <script src="map-sites.js?v=20261026o"></script>
+  <script src="map-sites.js?v=20261026p"></script>
   <!-- The station relocation finder: one station that has to move, a circle
        round it, and every place inside coloured by how well the repeaters
        that hear it now would hear it there, how open the sky is over its
@@ -580,7 +580,7 @@
        cover — plus the State's and OpenStreetMap's buildings, which it asks
        for itself. All runtime calls, so the position states the dependencies
        rather than being required by them (#154). -->
-  <script src="map-relocate.js?v=20261026o"></script>
+  <script src="map-relocate.js?v=20261026p"></script>
   <!-- The Stations map in three dimensions: MapLibre GL over the same terrarium
        tiles terrain.js decodes, with the same base map draped on the relief and
        the same pins and links mirrored onto it. Last of the terrain group
@@ -596,7 +596,7 @@
        here", and map-3d.js's header says why at length. MapLibre 6 ships as
        a module only, so it arrives by a dynamic import() from inside
        map-3d.js (#190); the page itself stays classic scripts. -->
-  <script src="map-3d.js?v=20261026o"></script>
+  <script src="map-3d.js?v=20261026p"></script>
   <!-- The digital twin: one station's patch of ground in three dimensions,
        at a scale the 3-D map above does not go to — the State's 1 m LiDAR, the
        aerial imagery, a 2 m pole and a figure for scale, and a camera that can
@@ -614,34 +614,34 @@
        does not open one. Like MapLibre it has no UMD build any more, so
        it arrives by a dynamic import() from inside the module; the page itself
        stays classic scripts. digital-twin.js's header says why. -->
-  <script src="digital-twin.js?v=20261026o"></script>
+  <script src="digital-twin.js?v=20261026p"></script>
   <!-- Who else is in a station's twin: a room per station on Supabase Realtime
        (presence for who is there, broadcast for where they stand), an avatar
        for each of them in the scene. After digital-twin.js, whose seams it
        drives, and before map-twin.js, which hosts the same scene. All runtime
        calls (#154); the socket is opened when a twin is built and closed with
        it. -->
-  <script src="twin-presence.js?v=20261026o"></script>
+  <script src="twin-presence.js?v=20261026p"></script>
   <!-- The Queensland cadastre on the twin's ground: every lot's boundary with
        its lot number and plan, and the road reserve outlined and named — the
        Stations map's Property boundaries and Road parcels, draped on the
        twin's own triangles. After digital-twin.js, which hands it the scene
        to draw into when a twin is built, and before map-twin.js, which hosts
        the same scene. All runtime calls (#154). -->
-  <script src="twin-cadastre.js?v=20261026o"></script>
+  <script src="twin-cadastre.js?v=20261026p"></script>
   <!-- The same twin inside the Stations map: from zoom 17 with a station under
        the view the map's rectangle hands over to it, and takes it back on the
        way out. After digital-twin.js, whose scene it hosts, and after map-3d.js,
        whose window over the map it stands one step above. All runtime calls
        (#154). -->
-  <script src="map-twin.js?v=20261026o"></script>
+  <script src="map-twin.js?v=20261026p"></script>
   <!-- The stations looked at this session, as a pill in the Stations map's top
        row: it brings a closed station card back, and drops down the trail of
        stations looked at, each a way back to it. After map-twin.js, whose
        stage it stands at the top of while the twin is up, and after app.js
        and map-leader.js, whose card and centre it uses. All runtime calls
        (#154). -->
-  <script src="station-trail.js?v=20261026o"></script>
+  <script src="station-trail.js?v=20261026p"></script>
   <!-- 🔭 The AR station finder, the Look Around tab in the left bar (it was a
        pane of the Stations side panel): a phone held up, the stations the way
        it faces pinned over the camera's picture, with the compass turned to
@@ -650,12 +650,12 @@
        station-trail.js because it is the same kind of thing — a way to a
        station that is not the list. All runtime calls (#154); the camera, the
        GPS and the compass are opened by a press and closed with the view. -->
-  <script src="station-ar.js?v=20261026o"></script>
+  <script src="station-ar.js?v=20261026p"></script>
   <!-- 📌 Nearby: the stations closest to where you stand, nearest first, and
        Start inspection, Photos and Directions for the one you pick. Reads
        app.js, inspections.js, field-camera.js and toast.js at call time;
        nothing runs at load — renderMain() draws it. -->
-  <script src="nearby.js?v=20261026o"></script>
+  <script src="nearby.js?v=20261026p"></script>
   <!-- 📸 The Field Camera tab: photos taken in the app, stamped at the shutter
        with where, which way, how high, the station and the time, kept on the
        device and uploaded into Field Photos by themselves. After station-ar.js,
@@ -663,7 +663,7 @@
        photo-stamp.js and field-photos.js, which draw the stamp and file the
        photo — all at runtime (#154). init.js calls its boot(), which sends any
        photos still waiting on the device. -->
-  <script src="field-camera.js?v=20261026o"></script>
+  <script src="field-camera.js?v=20261026p"></script>
   <!-- 📏 Level surveys (0060): a station's levels surveyed on a phone, the
        two-peg test, and a guide to both. The arithmetic first (pure —
        test/levels.mjs require()s it), the workbook writer (export.js's zipStore
@@ -671,114 +671,114 @@
        when there is a signal, the reading camera (photo-meta.js's OCR worker,
        shared), then the three tabs. All runtime calls; nothing runs at load —
        init.js calls LevelStore.boot(), which sends whatever is waiting. -->
-  <script src="levelling.js?v=20261026o"></script>
-  <script src="xlsx-write.js?v=20261026o"></script>
-  <script src="level-store.js?v=20261026o"></script>
-  <script src="level-camera.js?v=20261026o"></script>
-  <script src="level-survey.js?v=20261026o"></script>
-  <script src="two-peg.js?v=20261026o"></script>
-  <script src="survey-guide.js?v=20261026o"></script>
+  <script src="levelling.js?v=20261026p"></script>
+  <script src="xlsx-write.js?v=20261026p"></script>
+  <script src="level-store.js?v=20261026p"></script>
+  <script src="level-camera.js?v=20261026p"></script>
+  <script src="level-survey.js?v=20261026p"></script>
+  <script src="two-peg.js?v=20261026p"></script>
+  <script src="survey-guide.js?v=20261026p"></script>
   <!-- The Field training group's adapted lessons: Flood-Net re-tellings of Mallee
        HydroTech's open training tools (MIT code, CC BY 4.0 material, used with
        permission). knowledge-base.js holds where each came from and the credit
        panel each tab shows; the five tabs after it call it at render. After
        levelling.js and two-peg.js, whose arithmetic and drawing some of them
        borrow — all at runtime; nothing runs at load. -->
-  <script src="knowledge-base.js?v=20261026o"></script>
-  <script src="kb-staff.js?v=20261026o"></script>
-  <script src="kb-logbook.js?v=20261026o"></script>
-  <script src="kb-lifecycle.js?v=20261026o"></script>
-  <script src="kb-level.js?v=20261026o"></script>
-  <script src="kb-river.js?v=20261026o"></script>
-  <script src="modal.js?v=20261026o"></script>
+  <script src="knowledge-base.js?v=20261026p"></script>
+  <script src="kb-staff.js?v=20261026p"></script>
+  <script src="kb-logbook.js?v=20261026p"></script>
+  <script src="kb-lifecycle.js?v=20261026p"></script>
+  <script src="kb-level.js?v=20261026p"></script>
+  <script src="kb-river.js?v=20261026p"></script>
+  <script src="modal.js?v=20261026p"></script>
   <!-- A line at the foot of the window saying how something just went — done,
        or failed and why — in place of the browser's alert() (#223). After
        core.js (announce, esc), which it reads at call time; nothing runs at
        load. modal.js above it asks the questions confirm() and prompt() used
        to. -->
-  <script src="toast.js?v=20261026o"></script>
+  <script src="toast.js?v=20261026p"></script>
   <!-- Every title's words above the pointer, where the pointer does not cover
        them, in place of the browser's tooltip under it. Reads nothing else;
        nothing runs at load — init.js starts it. -->
-  <script src="tooltips.js?v=20261026o"></script>
+  <script src="tooltips.js?v=20261026p"></script>
   <!-- A handle on the bottom edge of every table and list a card caps the
        height of, dragged to make the card taller. Reads state (core.js) at call
        time; nothing runs at load — init.js starts it. -->
-  <script src="card-grip.js?v=20261026o"></script>
-  <script src="packets.js?v=20261026o"></script>
+  <script src="card-grip.js?v=20261026p"></script>
+  <script src="packets.js?v=20261026p"></script>
   <!-- Following a log file as it grows, for the ALERT2 tab's Watch and the
        Serial Monitor's log-file source — where the browser will not open a COM
        port, PuTTY can, and logs it. Before both files that use it; nothing in it
        runs at load. -->
-  <script src="log-follow.js?v=20261026o"></script>
-  <script src="alert2.js?v=20261026o"></script>
-  <script src="hfem.js?v=20261026o"></script>
+  <script src="log-follow.js?v=20261026p"></script>
+  <script src="alert2.js?v=20261026p"></script>
+  <script src="hfem.js?v=20261026p"></script>
   <!-- After hfem.js, which it renders the output of. Neither executes at load,
        so nothing would actually break the other way round — the order is here
        because it states the dependency, which is what this list is for (#154). -->
-  <script src="hfem-tab.js?v=20261026o"></script>
-  <script src="network-maps.js?v=20261026o"></script>
+  <script src="hfem-tab.js?v=20261026p"></script>
+  <script src="network-maps.js?v=20261026p"></script>
   <!-- The Serial Monitor's devices (#serial expansions): the codecs and the
        driver first (pure — Node requires them too), then the two device cards,
        then serial.js, which lists them. None runs at load, so the order states
        the dependency rather than enforcing one. -->
-  <script src="serial-viz.js?v=20261026o"></script>
+  <script src="serial-viz.js?v=20261026p"></script>
   <!-- A GPS receiver (NMEA) as a Serial Monitor card, and the reception log
        every receiver card writes to, with its position. Before the cards. -->
-  <script src="serial-gps.js?v=20261026o"></script>
-  <script src="reception-log.js?v=20261026o"></script>
-  <script src="quansheng.js?v=20261026o"></script>
-  <script src="alert-dsp.js?v=20261026o"></script>
-  <script src="rtlsdr.js?v=20261026o"></script>
+  <script src="serial-gps.js?v=20261026p"></script>
+  <script src="reception-log.js?v=20261026p"></script>
+  <script src="quansheng.js?v=20261026p"></script>
+  <script src="alert-dsp.js?v=20261026p"></script>
+  <script src="rtlsdr.js?v=20261026p"></script>
   <!-- The text an RTL-SDR on a Raspberry Pi prints for PuTTY (sdr-pi/relay.js
        writes it, serial-sdr.js reads it back off the log; docs/sdr-pi.md). Pure —
        the relay requires it too. Before the card that reads it. -->
-  <script src="sdr-pi.js?v=20261026o"></script>
+  <script src="sdr-pi.js?v=20261026p"></script>
   <!-- A receiver card as a base station: what it decodes, posted through
        meganet.ingest_http() with an ingest token (docs/ingest-serial-monitor.md).
        Before the three cards that call it. -->
-  <script src="serial-ingest.js?v=20261026o"></script>
-  <script src="serial-radio.js?v=20261026o"></script>
-  <script src="serial-sdr.js?v=20261026o"></script>
+  <script src="serial-ingest.js?v=20261026p"></script>
+  <script src="serial-radio.js?v=20261026p"></script>
+  <script src="serial-sdr.js?v=20261026p"></script>
   <!-- The ERT-A2 card: alert2.js's codec, live. After alert2.js, whose parser
        and station matching it calls, and before serial.js, which lists it. -->
-  <script src="serial-ert.js?v=20261026o"></script>
-  <script src="serial.js?v=20261026o"></script>
+  <script src="serial-ert.js?v=20261026p"></script>
+  <script src="serial.js?v=20261026p"></script>
   <!-- What an ALERT reading means: which station and sensor an address is,
        when it is shared, and what its count is in volts or millimetres — or
        why not. Before the Message Log and the Station Health tab, which both
        read it; nothing in it runs at load. -->
-  <script src="sensor-values.js?v=20261026o"></script>
-  <script src="message-log.js?v=20261026o"></script>
-  <script src="bug-report.js?v=20261026o"></script>
-  <script src="map-generator.js?v=20261026o"></script>
+  <script src="sensor-values.js?v=20261026p"></script>
+  <script src="message-log.js?v=20261026p"></script>
+  <script src="bug-report.js?v=20261026p"></script>
+  <script src="map-generator.js?v=20261026p"></script>
   <!-- The Admin tab's ingest tokens (0046): list, mint, revoke — instead of
        the SQL editor. Before admin.js, which draws it. -->
-  <script src="admin-tokens.js?v=20261026o"></script>
+  <script src="admin-tokens.js?v=20261026p"></script>
   <!-- The Admin tab's Base station connections (0080): uptime, dropouts and
        address changes over time, and the log. Before admin.js, which draws it. -->
-  <script src="admin-links.js?v=20261026o"></script>
-  <script src="admin.js?v=20261026o"></script>
-  <script src="admin-dashboard.js?v=20261026o"></script>
+  <script src="admin-links.js?v=20261026p"></script>
+  <script src="admin.js?v=20261026p"></script>
+  <script src="admin-dashboard.js?v=20261026p"></script>
   <!-- The Base Stations tab (0049): what checks in, and what an administrator
        asks of it. After datastore.js (dbRpc) and auth.js; runs nothing at load. -->
-  <script src="base-stations.js?v=20261026o"></script>
+  <script src="base-stations.js?v=20261026p"></script>
   <!-- The Network Review tab, administrators only: the fade margin from every
        field station to every repeater, base or proposed site, beside what the
        attenuator found on site; Flood-Net against Radio Mobile; the design
        principles and the register checks. After terrain.js, land-cover.js,
        path-profile.js, datastore.js and auth.js; runs nothing at load. -->
-  <script src="network-review.js?v=20261026o"></script>
+  <script src="network-review.js?v=20261026p"></script>
   <!-- The Network Review's check against every attenuator test on file, as a
        panel of that tab: after network-review.js, whose pricing and reading
        rules it calls. -->
-  <script src="network-history.js?v=20261026o"></script>
+  <script src="network-history.js?v=20261026p"></script>
   <!-- The ALERT2 Transition Plan tab, listed only to the people the owner
        nominates (0076; tabShown, core.js): the draft for management worked
        from the register under a scenario card. After map-backbone.js,
        sls.js, maps-data.js and auth.js, read at call time; runs nothing at
        load. -->
-  <script src="alert2-plan.js?v=20261026o"></script>
+  <script src="alert2-plan.js?v=20261026p"></script>
   <!-- The ⏱️ TDMA Planner tab, public: an ALERT2 time-slot plan for one
        channel — the protocol's air-time formula and the allocation first
        (pure, no DOM — test/tdma.mjs holds them to the sources' figures), then
@@ -786,7 +786,7 @@
        (passRelationIndex, goToStation, stationAlertIds), path-profile.js
        (stationIsMast) and map-backbone.js (backboneIndex), read at call
        time; runs nothing at load. -->
-  <script src="tdma-planner.js?v=20261026o"></script>
+  <script src="tdma-planner.js?v=20261026p"></script>
   <!-- The 🎓 Radio Propagation tab: a lesson in how a reading travels, with
        drawings that move. The physics first (pure, no DOM — test/propagation.mjs
        holds every figure to one worked by hand), then the 3-D scene, which draws
@@ -795,10 +795,10 @@
        physics), then the page around it. After core.js (cssVar, esc,
        registerTabTeardown, announce) and app.js (switchTab), read at call
        time; nothing runs at load. -->
-  <script src="propagation-physics.js?v=20261026o"></script>
-  <script src="propagation-scene.js?v=20261026o"></script>
-  <script src="propagation-fade.js?v=20261026o"></script>
-  <script src="propagation.js?v=20261026o"></script>
+  <script src="propagation-physics.js?v=20261026p"></script>
+  <script src="propagation-scene.js?v=20261026p"></script>
+  <script src="propagation-fade.js?v=20261026p"></script>
+  <script src="propagation.js?v=20261026p"></script>
   <!-- 🧪 The Bit Bench tab and ⚡ the Bit Errors lesson: the bits of a frame,
        the faults that change them and the fingerprint each leaves. The model
        first — pure, no DOM; test/bitbench.mjs holds it to the ALERT Packets
@@ -810,75 +810,75 @@
        Between the model and the bench, the site in 3-D the bench's third
        section tours the faults on — its own renderer on a plain canvas, as
        the propagation scene's is, so it needs no library and no signal. -->
-  <script src="bit-model.js?v=20261026o"></script>
-  <script src="bit-scene.js?v=20261026o"></script>
-  <script src="bit-bench.js?v=20261026o"></script>
-  <script src="bit-errors.js?v=20261026o"></script>
+  <script src="bit-model.js?v=20261026p"></script>
+  <script src="bit-scene.js?v=20261026p"></script>
+  <script src="bit-bench.js?v=20261026p"></script>
+  <script src="bit-errors.js?v=20261026p"></script>
   <!-- 📟 The SWR Meter tab: the through-line power and SWR meters in the
        field kit, drawn and worked. The arithmetic first — pure, no DOM;
        test/swr.mjs holds it to figures worked by hand and to the Bit Bench's
        receiver — then the page. After core.js (cssVar, esc, escAttr,
        announce, dlText, registerTabTeardown) and app.js (switchTab), read at
        call time; nothing runs at load. -->
-  <script src="swr-model.js?v=20261026o"></script>
-  <script src="swr-meter.js?v=20261026o"></script>
+  <script src="swr-model.js?v=20261026p"></script>
+  <script src="swr-meter.js?v=20261026p"></script>
   <!-- The Station Health tab: what the readings say about each station and
        the network carrying them. The reasoning first (pure: readings in,
        findings out — test/health.mjs holds it to a week whose answer is
        known), then the tab, then the agent that reads the tab's findings with
        Claude. After sensor-values.js and datastore.js; nothing runs at load. -->
-  <script src="health-analysis.js?v=20261026o"></script>
+  <script src="health-analysis.js?v=20261026p"></script>
   <!-- The Airtime panel's reasoning: who lands on top of whom at each
        receiver, each station's check time and how its logger keeps it, and
        the check time or repeater delay to change. Pure, after
        health-analysis.js, whose result it reads — test/airtime.mjs holds it
        to networks built for it in Node. -->
-  <script src="airtime-analysis.js?v=20261026o"></script>
-  <script src="health.js?v=20261026o"></script>
+  <script src="airtime-analysis.js?v=20261026p"></script>
+  <script src="health.js?v=20261026p"></script>
   <!-- …and the panel, drawn in Station Health's page by health.js; reads
        map-backbone.js's suggested delays at call time. -->
-  <script src="health-airtime.js?v=20261026o"></script>
+  <script src="health-airtime.js?v=20261026p"></script>
   <!-- Transmitter frequency (#217), in Station Health's page beside it: each
        ALERT2 transmitter's carrier against the rest, from
        meganet.transmitter_offsets() (0075). After datastore.js and health.js,
        read at call time; nothing runs at load. -->
-  <script src="health-drift.js?v=20261026o"></script>
+  <script src="health-drift.js?v=20261026p"></script>
   <!-- Bit flips, by who sent them (0078): each corrupted copy put down to the
        transmitter whose carrier it came on — a panel in Station Health and
        "Seen on the air" in the Bit Flipper, both drawn by health.js and
        bit-flipper.js at call time; nothing runs at load. -->
-  <script src="health-flips.js?v=20261026o"></script>
+  <script src="health-flips.js?v=20261026p"></script>
   <!-- The Bit-Flip Sources tab (0079): meganet.flip_sources, rebuilt hourly by
        the server; after app.js and bit-flipper.js, read at call time; nothing
        runs at load. -->
-  <script src="flip-sources.js?v=20261026o"></script>
+  <script src="flip-sources.js?v=20261026p"></script>
   <!-- The Signal Routes tab: each burst the receivers heard followed back to
        the transmitter that sent it by its carrier (0077's rules, run here over
        the receptions, editors only), against the pass ranges on record, and by
        protocol and frame format. After app.js (stationAlertIds,
        passRangeCoversId), read at call time; nothing runs at load. -->
-  <script src="signal-routes.js?v=20261026o"></script>
+  <script src="signal-routes.js?v=20261026p"></script>
   <!-- 🗼 Backbone, headed "State of the backbone": the repeaters ranked by
        what has gone wrong with each over a period — Station Health's
        findings, the carrier fingerprints, the corrupted copies on each
        carrier and, for editors, Signal Routes' pass ranges against the air.
        After datastore.js, app.js, health.js and signal-routes.js, all read at
        call time; nothing runs at load. -->
-  <script src="backbone.js?v=20261026o"></script>
-  <script src="health-agent.js?v=20261026o"></script>
+  <script src="backbone.js?v=20261026p"></script>
+  <script src="health-agent.js?v=20261026p"></script>
   <!-- 📺 Network Weather, at the top of Station Health: the network's last day
        or week as a short animated bulletin, presented by one of the Droggies —
        drawn from data/bulletins/, which a scheduled Claude Code task writes
        every morning (tools/bulletin/README.md). After health.js, whose page
        draws its panel and whose stations its links open, read at call time;
        nothing runs at load. -->
-  <script src="health-bulletin.js?v=20261026o"></script>
+  <script src="health-bulletin.js?v=20261026p"></script>
   <!-- A station's health where people already look (#218): last heard, its
        battery and its findings on its card, each a door into Station Health,
        and Colour pins by health in Map display. Reads health-analysis.js and
        opens health.js, both at call time; app.js calls it; nothing runs at
        load. -->
-  <script src="health-glance.js?v=20261026o"></script>
+  <script src="health-glance.js?v=20261026p"></script>
   <!-- ⏱️ Latency, in the Stations map's side panel: every pin coloured by how
        fresh its station's data is — its age, its readings' delay to the
        database, or its missed checks — and a pane that sums up the stations in
@@ -887,54 +887,54 @@
        links. Reads health-glance.js, health-analysis.js, health.js and
        sensor-values.js at call time; app.js attaches it; nothing runs at
        load. -->
-  <script src="map-latency.js?v=20261026o"></script>
+  <script src="map-latency.js?v=20261026p"></script>
   <!-- The Site Map tab: a guide to every other tab, and the gold line from
        each to its button in the nav. After app.js (switchTab, focusNavFind)
        and core.js (TABS, HELP), which it reads at call time; nothing runs at
        load. -->
-  <script src="site-map.js?v=20261026o"></script>
+  <script src="site-map.js?v=20261026p"></script>
   <!-- 🎛️ Views: what the left bar lists — All, Simple, Field, or a view an
        account makes for itself on the Views tab, kept in the database (0062).
        Beside the Site Map because both are about the nav; it reads TABS and
        calls app.js, auth.js and datastore.js at call time, and nothing runs at
        load — init.js asks it what to draw before the first renderTabs(). -->
-  <script src="nav-views.js?v=20261026o"></script>
+  <script src="nav-views.js?v=20261026p"></script>
   <!-- ⤓ Export in the banner (#227): what the open tab can save of what is
        on screen, through the writers its own buttons call — export.js,
        arro-data.js and the rest, named at call time; nothing runs at
        load. -->
-  <script src="export-menu.js?v=20261026o"></script>
+  <script src="export-menu.js?v=20261026p"></script>
   <!-- Ctrl/Cmd+K and 🔎 Search in the banner: one box for a station, a place,
        a tab or an action (#221). After app.js (the station search and the nav's
        scoring), modal.js, places.js and station-trail.js, which it reads at
        call time; nothing runs at load — init.js's chord opens it. -->
-  <script src="palette.js?v=20261026o"></script>
+  <script src="palette.js?v=20261026p"></script>
   <!-- ✨ What's new in the banner (#222): the changes since this device last
        looked, written for the people using the app. Reads route.js's
        newDevice at call time; nothing runs at load — init.js starts it. -->
-  <script src="whats-new.js?v=20261026o"></script>
+  <script src="whats-new.js?v=20261026p"></script>
   <!-- Where you are, in the address bar: the tab, the station whose card is
        up and the Stations map's view, so a view can be linked to and back and
        forward move between tabs (#211). After app.js (switchTab,
        showStationCard, closeStnCard) and map-leader.js, which it calls at call
        time; nothing runs at load — init.js starts it, first thing. -->
-  <script src="route.js?v=20261026o"></script>
+  <script src="route.js?v=20261026p"></script>
   <!-- The copy kept for opening with no signal (#213): registers sw.js for
        this page's version and offers a newer one to a page that came from
        the copy. Reads core.js's APP_VERSION at call time; nothing runs at
        load — init.js starts it. -->
-  <script src="pwa.js?v=20261026o"></script>
+  <script src="pwa.js?v=20261026p"></script>
   <!-- 📲 Offline & Install: what this device has kept for no signal, getting
        it ready in one go, and how to install Flood-Net in this browser. Reads
        pwa.js's Pwa, app.js and modal.js at call time; nothing runs at load —
        renderMain() draws it. -->
-  <script src="offline-tab.js?v=20261026o"></script>
+  <script src="offline-tab.js?v=20261026p"></script>
   <!-- 🔔 An administrator's notifications on this device (0066): the Admin
        tab's panel that turns them on and off, the count on the app's icon,
        and where a notification pressed with the app open goes (sw.js shows
        them). Reads datastore.js, auth.js, app.js, admin-tokens.js and
        offline-tab.js at call time; nothing runs at load — init.js starts it. -->
-  <script src="push.js?v=20261026o"></script>
+  <script src="push.js?v=20261026p"></script>
   <!-- The look: Calm, Tiles, Instrument, Signs or Classic, the choice and the
        switch (looks.js); the pictograms the three in pictures draw with
        (glyphs.js); 🏠 Home, their front page, and their pieces of the banner
@@ -943,10 +943,10 @@
        and a phone's bar along the foot (calm-shell.js). renderTabs() (app.js)
        hands the bar to CalmShell; init.js starts Looks. Nothing runs at load
        in any of them. -->
-  <script src="looks.js?v=20261026o"></script>
-  <script src="glyphs.js?v=20261026o"></script>
-  <script src="home.js?v=20261026o"></script>
-  <script src="calm-shell.js?v=20261026o"></script>
-  <script src="init.js?v=20261026o"></script>
+  <script src="looks.js?v=20261026p"></script>
+  <script src="glyphs.js?v=20261026p"></script>
+  <script src="home.js?v=20261026p"></script>
+  <script src="calm-shell.js?v=20261026p"></script>
+  <script src="init.js?v=20261026p"></script>
 </body>
 </html>

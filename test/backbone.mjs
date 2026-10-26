@@ -10,7 +10,7 @@
 //   R3  "silent" but heard three times a week with no schedule: seldom heard,
 //       a note, never off air;
 //   R4  its carrier 2.8 ppm off the fleet on three days, and 17 ppm out on one
-//       day — that day set aside;
+//       day — that day set aside; and its signal 4.2 dB weaker in a week (0083);
 //   R5, R6  off air six minutes apart: stopped together;
 //   R7  three evening dropouts, each back by morning.
 //
@@ -159,6 +159,9 @@ function fixture(reps, now) {
   // R4: off the fleet, with one wild day.
   tsum.push({ tx: 'st:' + R4.id, via: 'repeater', freq_mhz: 151.525, w_days: 4, w_ppm: 2.4, bursts: 900, receivers: 1,
     days: [4, 3, 2, 1].map(k => iso(now - k * DAY).slice(0, 10)), ppm: [-2.9, -2.8, 17.0, -2.7], judged_at: iso(now - HOUR) });
+  own.push(F({ source: 'transmitters', kind: 'transmitter-snr-falling', station_id: R4.id, subject: 'st:' + R4.id, severity: 'warn',
+    title: `${R4.name}: SNR down 4.2 dB in a week`, detail: 'Heard on its own carrier by 1 base station, at about 11.0 dB over the receiver\'s noise over the last 7 days.',
+    evidence: { drop_db: 4.2, window: 'week', action: 'Check its antenna, the cable and connectors.' }, first_seen: iso(now - 2 * DAY) }));
   // R5 and R6: off air six minutes apart.
   silent(R5, { severity: 'critical', title: 'Silent — missed its last 9 checks', evidence: { lastHeard: now - 9 * HOUR, periodMin: 60, trailingMisses: 9 }, first_seen: iso(now - 6 * HOUR) });
   silent(R6, { severity: 'critical', title: 'Silent — missed its last 9 checks', evidence: { lastHeard: now - 9 * HOUR + 6 * 60e3, periodMin: 60, trailingMisses: 9 }, first_seen: iso(now - 6 * HOUR) });
@@ -257,6 +260,11 @@ try {
   ok('a carrier off the fleet, its one wild day said and set aside',
     car && car.sev === 'warn' && /^Carrier −2\.8 ppm off the fleet/.test(car.title) && car.facts.some(f => /\(\+17\.0\) is far from every other day, and is left out/.test(f)),
     JSON.stringify(car));
+  const sg = r4 && r4.issues.find(i => i.kind === 'signal');
+  ok('its signal fading (0083): an issue of its own, its drop said, and what it points to',
+    sg && sg.sev === 'warn' && sg.title === 'SNR down 4.2 dB in a week'
+      && sg.facts.some(f => /the stations behind it have lost that margin too/.test(f))
+      && r4.points.some(p => /Its own signal is weaker at the base stations that hear it/.test(p)), JSON.stringify({ sg, points: r4 && r4.points }));
   const r5 = row(R5.id), r6 = row(R6.id);
   ok('two repeaters off air six minutes apart each name the other',
     r5 && r6 && r5.points[0] === `It stopped together with ${R6.name}: look first for what they share.`
