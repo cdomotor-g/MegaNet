@@ -138,6 +138,15 @@ not decoded — since the spectrum is a few short looks a second and can miss on
 and under the picture the busiest channels are listed in words. Point at it for
 the frequency, the level over the floor, and what was heard on the channel there.
 
+A stick's outer tenth either side is the **edge of its window**: the RTL2832U's
+filter rolls off there, and a signal just past one edge folds back in at the
+other, which is why the station keeps its channels out of it. Where another
+stick hears the same frequency in the middle of its own window, that is what is
+drawn; where only an edge reaches, the picture is darkened and hatched, and the
+tip says so. At 18 Bateson in October 2026, 151.575 just past the top of a
+240 kHz window showed as "packets" on 151.337 at its bottom edge — the same
+bursts, minute for minute, and no station of its own.
+
 It costs the station nothing new. Its decoders work the spectrum out anyway;
 each stick keeps the strongest every slice of its band has been since the last
 check-in and sends that row with it, 256 bytes. So the picture is a check-in

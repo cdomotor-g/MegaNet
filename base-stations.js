@@ -661,11 +661,19 @@ const BaseStations = (function () {
   // its own (#bs-wf), outside the panel a poll repaints, and polled while the
   // station is open: the last few minutes again each time, since receptions
   // can arrive a little after the row they belong beside.
+  //
+  // A stick's outer tenth either side is the edge of its window: the RTL2832U's
+  // filter rolls off there and a signal just past one edge folds back in at
+  // the other, so the station keeps its channels out of it (RPi ALERT's
+  // sdr-plan.js USABLE). Its edge fills only what no stick hears in its
+  // middle, darkened and hatched — at 18 Bateson (October 2026), 151.575 just
+  // past the top of a 240 kHz window showed as "packets" on 151.337.
 
   const WF_HOURS = [1, 6, 24];
   const WF_MS = 15000;
   const WF_CSS_H = 380, WF_LEFT = 52, WF_TOP = 34;  // CSS px: times to the left, channel labels above
   const WF_RANGE_DB = 40;                           // the palette's top, over each row's floor
+  const WF_USABLE = 0.8;                            // a stick's middle, of its window: the rest is its edge
   // A stick each: SerialViz.colors()'s key, and the token its swatch uses.
   const WF_TONES = [['accent', 'bs-sw-1'], ['ident', 'bs-sw-2'], ['crc', 'bs-sw-3'], ['data', 'bs-sw-4']];
   // { id, hours, bucket, rows: [{ t, key, center_hz, rate, floor_db, span_s, n, v: Uint8Array }],
@@ -707,19 +715,22 @@ const BaseStations = (function () {
   }
 
   // The rows as a picture, a pixel row a slice: each column the strongest any
-  // stick's bins in it were. A row covers the time back to the one before it
-  // (a minute, normally), so it fills the slices below it that no row of its
-  // own stick fills. Kept until the rows or the width change.
+  // stick's bins in it were — in the middle of its window, or where no stick's
+  // middle reaches, at an edge (then darkened and hatched, on a layer of its
+  // own). A row covers the time back to the one before it (a minute,
+  // normally), so it fills the slices below it that no row of its own stick
+  // fills. Kept until the rows or the width change.
   function wfPicture(g, cols) {
     const sig = wf.v + ':' + cols + ':' + g.top + ':' + g.lo + ':' + g.hi;
     if (wfImg && wfImg.sig === sig) return wfImg;
-    const W = cols, H = g.n, cell = new Int16Array(W * H).fill(-1), owner = new Map();
+    const W = cols, H = g.n, cell = new Int16Array(W * H).fill(-1), edge = new Int16Array(W * H).fill(-1), owner = new Map();
     const rows = wf.rows.slice().sort((a, b) => b.t - a.t);
     const paint = (r, k) => {
-      const len = r.v.length, f0 = r.center_hz - r.rate / 2, step = r.rate / len, sc = W / (g.hi - g.lo);
+      const len = r.v.length, f0 = r.center_hz - r.rate / 2, step = r.rate / len, sc = W / (g.hi - g.lo), mid = WF_USABLE * r.rate / 2;
       for (let i = 0; i < len; i++) {
         const x0 = Math.max(0, Math.floor((f0 + i * step - g.lo) * sc)), x1 = Math.min(W, Math.max(x0 + 1, Math.floor((f0 + (i + 1) * step - g.lo) * sc)));
-        for (let x = x0; x < x1; x++) if (r.v[i] > cell[k * W + x]) cell[k * W + x] = r.v[i];
+        const into = Math.abs(f0 + (i + 0.5) * step - r.center_hz) <= mid ? cell : edge;
+        for (let x = x0; x < x1; x++) if (r.v[i] > into[k * W + x]) into[k * W + x] = r.v[i];
       }
       owner.set(r.key + ':' + k, r);
     };
@@ -728,12 +739,24 @@ const BaseStations = (function () {
       const k = (g.top - r.t) / g.bucket, back = Math.min(H, Math.ceil(r.span_s / Math.max(1, r.n) / g.bucket) + k);
       for (let kk = Math.max(0, k + 1); kk < back; kk++) if (!owner.has(r.key + ':' + kk)) paint(r, kk);
     }
-    const c = document.createElement('canvas');
-    c.width = W; c.height = H;
+    const c = document.createElement('canvas'), m = document.createElement('canvas');
+    c.width = m.width = W; c.height = m.height = H;
     const x = c.getContext('2d'), img = x.createImageData(W, H), px = new Uint32Array(img.data.buffer), lut = SerialViz.heat();
-    for (let i = 0; i < cell.length; i++) if (cell[i] >= 0) px[i] = lut[Math.min(255, Math.round(cell[i] / 2 / WF_RANGE_DB * 255))];
+    const mx = m.getContext('2d'), shade = mx.createImageData(W, H), sd = shade.data;
+    let edges = 0;
+    for (let i = 0; i < cell.length; i++) {
+      const v = cell[i] >= 0 ? cell[i] : edge[i];
+      if (v < 0) continue;
+      px[i] = lut[Math.min(255, Math.round(v / 2 / WF_RANGE_DB * 255))];
+      if (cell[i] >= 0) continue;
+      // Hatched every 7 CSS pixels, whatever the picture's size.
+      const col = i % W, line = ((col * g.pw / W + (i - col) / W * g.ph / H) % 7) < 1.2;
+      sd[i * 4] = sd[i * 4 + 1] = sd[i * 4 + 2] = line ? 255 : 0; sd[i * 4 + 3] = line ? 60 : 115;
+      edges++;
+    }
     x.putImageData(img, 0, 0);
-    wfImg = { sig, canvas: c, owner };
+    if (edges) mx.putImageData(shade, 0, 0);
+    wfImg = { sig, canvas: c, edges: edges ? m : null, owner };
     return wfImg;
   }
 
@@ -775,6 +798,7 @@ const BaseStations = (function () {
     const pic = wfPicture(g, Math.max(64, Math.min(1024, Math.round(g.pw * dpr))));
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(pic.canvas, g.gx, g.gy, g.pw, g.ph);
+    if (pic.edges) ctx.drawImage(pic.edges, g.gx, g.gy, g.pw, g.ph);
     // Times down the left: every quarter hour, hour or four hours.
     const every = wf.hours <= 1 ? 900 : wf.hours <= 6 ? 3600 : 14400;
     ctx.font = '10px ui-monospace, Menlo, Consolas, monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
@@ -830,14 +854,19 @@ const BaseStations = (function () {
     const near = Math.max(0, Math.round(3 / rowH)), k0 = Math.max(0, k - near), k1 = Math.min(g.n - 1, k + near);
     const t0 = g.top - k1 * g.bucket, t1 = g.top - k0 * g.bucket + g.bucket, secs = g.bucket < 60;
     const lines = [mhz(hz) + ' MHz', hhmm(t0, secs) + '–' + hhmm(t1, secs)];
-    const owner = wfImg ? wfImg.owner : new Map();
+    const owner = wfImg ? wfImg.owner : new Map(), edgeOf = [];
+    let middle = false;
     for (const k2 of g.spans) {
       if (hz < k2.lo || hz > k2.hi) continue;
       const r = owner.get(k2.key + ':' + k);
       if (!r) { lines.push(k2.name + ': no row'); continue; }
       const i = Math.min(r.v.length - 1, Math.floor((hz - (r.center_hz - r.rate / 2)) / r.rate * r.v.length));
-      lines.push(k2.name + ': +' + (r.v[i] / 2).toFixed(1) + ' dB over its floor' + (r.floor_db != null ? ' (' + (r.floor_db + r.v[i] / 2).toFixed(1) + ' dB)' : ''));
+      const atEdge = Math.abs(hz - r.center_hz) > WF_USABLE * r.rate / 2;
+      if (atEdge) edgeOf.push(k2.name); else middle = true;
+      lines.push(k2.name + ': +' + (r.v[i] / 2).toFixed(1) + ' dB over its floor' + (r.floor_db != null ? ' (' + (r.floor_db + r.v[i] / 2).toFixed(1) + ' dB)' : '')
+        + (atEdge ? ', its window\'s edge' : ''));
     }
+    if (edgeOf.length && !middle) lines.push('The edge of ' + edgeOf.join(' and ') + '\'s window: what shows here can be a signal just beyond it, folded back in');
     // The nearest channel within 15 kHz, and what was heard on it in the slice.
     const chans = [].concat(...sticks.map(k2 => k2.chans)).filter(c => Math.abs(c.hz - hz) <= 15000).sort((a, b) => Math.abs(a.hz - hz) - Math.abs(b.hz - hz));
     if (chans.length) {
@@ -894,7 +923,8 @@ const BaseStations = (function () {
     const sticks = wfSticks(s);
     return sticks.map(k => `<span><i class="qs-sw ${k.sw}" aria-hidden="true"></i>${esc(k.name)} <span class="qs-dim">${k.lo != null ? esc(mhz(k.lo) + '–' + mhz(k.hi) + ' MHz') : 'no row yet'}</span></span>`).join('')
       + '<span><i class="qs-sw sw-ok" aria-hidden="true"></i>a burst decoded</span><span><i class="qs-sw bs-sw-bad" aria-hidden="true"></i>heard, not decoded</span>'
-      + `<span><i class="qs-sw bs-sw-heat" aria-hidden="true"></i>0–${WF_RANGE_DB} dB over the floor</span>`;
+      + `<span><i class="qs-sw bs-sw-heat" aria-hidden="true"></i>0–${WF_RANGE_DB} dB over the floor</span>`
+      + '<span><i class="qs-sw bs-sw-edge" aria-hidden="true"></i>a window\'s edge</span>';
   }
 
   function wfShellHtml(s) {
@@ -905,7 +935,7 @@ const BaseStations = (function () {
       <div class="qs-legend bs-wf-legend" id="bs-wf-legend"></div>
       <div class="bs-wf-wrap"><canvas id="bs-wf-c" class="qs-canvas bs-wf-c" role="img" aria-label="Waterfall"></canvas><div class="bs-wf-tip" id="bs-wf-tip" hidden></div></div>
       <p class="small" id="bs-wf-sum" aria-live="polite"></p>
-      <p class="small qs-dim">Each SDR stick sends a row with every check-in — a minute apart, five seconds while this station is open: the strongest every frequency was since the row before, over the stick's own noise floor. Here they are folded into ${slice < 60 ? slice + '-second' : slice / 60 + '-minute'} slices, newest at the top; a gap is a time the station was not checking in. The bursts it heard are marked on their channels, since a spectrum of a few short looks a second can miss one. Point at it for the frequency, the level and what was heard.</p>
+      <p class="small qs-dim">Each SDR stick sends a row with every check-in — a minute apart, five seconds while this station is open: the strongest every frequency was since the row before, over the stick's own noise floor. Here they are folded into ${slice < 60 ? slice + '-second' : slice / 60 + '-minute'} slices, newest at the top; a gap is a time the station was not checking in. The bursts it heard are marked on their channels, since a spectrum of a few short looks a second can miss one. Hatched: the edge of a stick's window — its outer tenth either side — where no stick's middle reaches: a signal just past one edge folds back in at the other, so what shows there need not be a station of its own. Point at it for the frequency, the level and what was heard.</p>
     </section>`;
   }
 

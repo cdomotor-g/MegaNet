@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 105, date: '2026-10-26', items: [
+      'The <strong>Base Stations</strong> waterfall hatches the <strong>edge of a stick\'s window</strong> — its outer tenth '
+        + 'either side, where a signal just past one edge folds back in at the other — so a fold is not read as a station. '
+        + 'Where another stick hears the same frequency in the middle of its window, that stick\'s picture is the one drawn.',
+    ] },
     { n: 104, date: '2026-10-26', items: [
       '<strong>📄 Copy a summary</strong>, beside 📋 Copy for a report over the elevation profile\'s chart: copies just the '
         + 'top of the report — the path\'s heading, the fade margin, the line of sight and the chart — without the tables of '

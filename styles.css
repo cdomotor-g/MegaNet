@@ -18084,6 +18084,7 @@ button.adm-danger:hover { border-color: var(--bad); }
 .qs-sw.bs-sw-4 { background: var(--c-data); }
 .qs-sw.bs-sw-bad { background: var(--bad); }
 .qs-sw.bs-sw-heat { width: 42px; background: linear-gradient(90deg, #060a20, #122e82, #0e80aa, #46be78, #f0d23c, #fa7828, #fffaeb); }
+.qs-sw.bs-sw-edge { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .35) 0 1px, transparent 1px 4px), #04060f; }
 /* Channel by channel (0081): seven columns of a few lines each, so the
    table keeps its width and scrolls sideways on a phone like the others;
    the word on each channel gets the room, each cell reads from the top, and

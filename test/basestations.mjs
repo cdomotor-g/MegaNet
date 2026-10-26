@@ -493,6 +493,7 @@ try {
   ok('…under its own heading', /What Mt Stuart base hears/.test(await text('#bs-wf h2')), await text('#bs-wf h2'));
   const legend = (await text('#bs-wf-legend')).replace(/\s+/g, ' ');
   ok('…each stick named with the span its rows cover, one that sent none saying so', /RTL-SDR 1 151\.22–152\.18 MHz/.test(legend) && /Second stick no row yet/.test(legend), legend);
+  ok('…and a window\'s edge in the key', /a window's edge/.test(legend), legend);
   const sum = (await text('#bs-wf-sum')).replace(/\s+/g, ' ');
   ok('…the busiest channel first: every burst on it, how many decoded, the best signal', /^Heard in the last 1 h: 151\.50 MHz 120 bursts, 120 decoded, best 24\.5 dB · 151\.625 MHz 12 bursts, 0 decoded, best 8\.1 dB$/.test(sum), sum);
   const pic = await page.evaluate(() => {
@@ -512,6 +513,14 @@ try {
     /^151\.5\d* MHz/.test(tip) && /RTL-SDR 1: \+\d+\.\d dB over its floor \(-\d+\.\d dB\)/.test(tip)
       && /^151\.5\d* MHz \d\d:\d\d:\d\d–\d\d:\d\d:\d\d /.test(tip)
       && /Channel 151\.50 MHz \(ALERT Binary\): (\d+) bursts, \1 decoded, best 24\.5 dB/.test(tip), tip);
+  // 151.25 MHz is in the stick's outer tenth (151.22–151.316), where nothing else reaches.
+  await page.mouse.move(box.x + 52 + (151.25e6 - WF_LO) / WF_RATE * (box.w - 60), box.y + 34 + 20);
+  await until(async () => /^151\.2[45]/.test(await text('#bs-wf-tip')), 'pointing at the edge of its window moves the tip');
+  const edgeTip = (await text('#bs-wf-tip')).replace(/\s+/g, ' ');
+  ok('…which says it is the window\'s edge, where a signal just beyond it folds back in',
+    /RTL-SDR 1: \+\d+\.\d dB over its floor \(-\d+\.\d dB\), its window's edge/.test(edgeTip)
+      && /The edge of RTL-SDR 1's window: what shows here can be a signal just beyond it, folded back in/.test(edgeTip)
+      && !/its window's edge/.test(tip), edgeTip);
   await page.mouse.move(box.x + 5, box.y + 5);
   await until(() => page.evaluate(() => document.getElementById('bs-wf-tip').hidden), '…and hides it off the picture');
   const asked = spectra().length;
