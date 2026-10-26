@@ -59,8 +59,9 @@ const WhatsNew = (() => {
         + 'path up in Radio Mobile. <em>copy</em> and <em>save as PNG</em> beside it take the chart alone.',
     ] },
     { n: 102, date: '2026-10-26', items: [
-      '<strong>Find a survey mark by its number</strong>: type <em>43906</em> or <em>PSM 43906</em> into 📍 <em>Find a place</em> '
-        + 'or <strong>Ctrl+K</strong> (🔎 Search), and the Queensland register\'s mark is listed with its AHD height and street. '
+      '<strong>Find a survey mark by its number</strong>: type <em>43906</em> into 📍 <em>Find a place</em>, or <em>PSM 43906</em> '
+        + '(or <em>BM 43906</em>) into <strong>Ctrl+K</strong> (🔎 Search) — there a bare number is taken for a station\'s — and the '
+        + 'Queensland register\'s mark is listed with its AHD height and street. '
         + 'Press it and the map goes there and opens the mark\'s callout, with its condition and the link to its report — '
         + 'even with the survey-mark layer off. A mark\'s other names work too, such as a council\'s or a railway\'s '
         + '(<em>BM 127K</em>).',

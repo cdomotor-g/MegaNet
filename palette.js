@@ -19,12 +19,15 @@
 //             parse() reads coordinates offline, and its list knows the
 //             catchments, rivers, councils and — with a request — towns. A
 //             second copy of that would be a second thing to keep right.
-//   Marks     a survey mark's number — "43906", "PSM 43906" — or another
-//             name the register keeps for it ("BM 127K"), asked of the State's
-//             survey control service through MapSurvey.find(): the lookup,
-//             and the cached answer, that 📍 Find a place makes, which is
-//             where a mark picked here is shown. It is a request, so the list
-//             says it is looking, and the marks join it when the answer lands.
+//   Marks     a survey mark's number with the letters in front — "PSM
+//             43906", "BM 43906" — or another name the register keeps for it
+//             ("BM 127K"), asked of the State's survey control service through
+//             MapSurvey.find(): the lookup, and the cached answer, that 📍 Find
+//             a place makes, which is where a mark picked here is shown. It is
+//             a request, so the list says it is looking, and the marks join it
+//             when the answer lands. A bare number is not asked about here —
+//             it is a station's as often as not — and gets a note pointing to
+//             Find a place, which takes the number alone.
 //   Tabs      the nav's own scoring (navTerms, navHaystack, navScore), so a
 //             query reaches the same tab from either box.
 //   Actions   a few things worth doing from anywhere: the Site Map, help for
@@ -125,16 +128,35 @@ const Palette = (() => {
   }
 
   // ── Survey marks ──────────────────────────────────────────────────────────
+  // Asked of the register only when the letters say a mark is meant — "PSM
+  // 43906", "BM 43906", "BM 127K". A bare number in this box is a station's
+  // number or an ALERT address as often as not, and sending every one of
+  // those to the State's service as well would be a request nobody meant.
+  // 📍 Find a place takes the number alone, so a bare number of the right
+  // shape gets a note that says both, and goes there when picked.
 
-  function markQuery(raw) {
+  function markQueryOf(raw) {
     return typeof MapSurvey !== 'undefined' && MapSurvey.markQuery ? MapSurvey.markQuery(raw) : null;
   }
 
-  // The marks an earlier lookup found for this text — MapSurvey keeps them.
+  function markQuery(raw) {
+    const mq = markQueryOf(raw);
+    return mq && (mq.word || mq.names.length) ? mq : null;
+  }
+
+  // The marks an earlier lookup found for this text — MapSurvey keeps them —
+  // or, for a bare number, the note. The note is an offer, not a match: it
+  // is not counted, and comes after anything that did match.
   function markItems(raw) {
+    const q = raw.trim();
+    const bare = markQueryOf(raw);
+    if (bare && !bare.word && !bare.names.length) {
+      return [{ kind: 'mark', offer: true, icon: '📐', label: `Look up survey mark ${q} in 📍 Find a place`,
+                sub: `To search marks here, put the letters in front: PSM ${q}, BM ${q}`,
+                run: () => findPlace(q) }];
+    }
     const have = markQuery(raw) && MapSurvey.found(raw);
     if (!have) return [];
-    const q = raw.trim();
     return have.marks.map(m => {
       const d = MapSurvey.describe(m);
       return { kind: 'mark', icon: '📐', label: d.title,
@@ -322,7 +344,7 @@ const Palette = (() => {
   function listHtml() {
     const none = !matches().length && !marks.loading
       ? `<p class="pal-none small">${query.trim()
-        ? `Nothing matches <strong>${esc(query.trim())}</strong>. A station's name, number or ALERT address; a survey mark's number; a coordinate; or a tab or an action.`
+        ? `Nothing matches <strong>${esc(query.trim())}</strong>. A station's name, number or ALERT address; a survey mark's number with PSM or BM in front; a coordinate; or a tab or an action.`
         : 'Nothing to offer yet.'}</p>`
       : '';
     // Where the survey-mark lookup has got to, under the list: not an option,

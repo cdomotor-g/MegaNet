@@ -3426,8 +3426,11 @@ already in it.
 **Ctrl/Cmd+K** from anywhere — or 🔎 **Search** in the banner — opens one box for
 everything (`palette.js`, #221): **stations** by name, station number, ALERT
 address or address window (the Stations filter's own matching, Ck/Creek and all),
-**survey marks** by number or another name (the same lookup Find a place makes,
-joining the list when it lands; Enter shows the mark through Find a place),
+**survey marks** by number with the letters in front ("PSM 43906", "BM 43906") or
+another name (the same lookup Find a place makes, joining the list when it lands;
+Enter shows the mark through Find a place — a bare number is not sent to the
+register from here, being a station's as often as not, and gets a note offering
+Find a place, which takes the number alone),
 **places** handed to 📍 Find a place (a coordinate, a town, a river, a catchment,
 a council), **tabs** by the nav's own scoring below, and a few **actions** (the
 Site Map, help for this tab, a link to where you are, a file, an export, the

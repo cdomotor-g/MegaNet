@@ -526,10 +526,13 @@ try {
   // mark number off a plaque or a level book has no reason to have turned a
   // layer on first, and the answer must not depend on it.
   const parsed = await page.evaluate(() => Object.fromEntries(
-    ['43906', 'PSM 43906', 'psm43906', 'mark no. 43906', '#043906', 'BM 127K', 'bcc12419', '12', 'Gatton', '4021-4025']
+    ['43906', 'PSM 43906', 'psm43906', 'BM 43906', 'mark no. 43906', '#043906', 'BM 127K', 'bcc12419', '12', 'Gatton', '4021-4025']
       .map((t) => [t, MapSurvey.markQuery(t)])));
-  check('a bare number, or one after PSM, "mark no." or #, is a mark number',
-    ['43906', 'PSM 43906', 'psm43906', 'mark no. 43906', '#043906'].every((t) => parsed[t] && parsed[t].number === '43906'),
+  check('a bare number, or one after PSM, BM, "mark no." or #, is a mark number',
+    ['43906', 'PSM 43906', 'psm43906', 'BM 43906', 'mark no. 43906', '#043906'].every((t) => parsed[t] && parsed[t].number === '43906'),
+    JSON.stringify(parsed));
+  check('…and says which word was in front of it — none for a bare number',
+    parsed['43906'].word === null && parsed['PSM 43906'].word === 'PSM' && parsed['BM 43906'].word === 'BM',
     JSON.stringify(parsed));
   check('a few letters and a number is one of a mark’s other names, asked spaced and run together',
     !parsed['BM 127K'].number && parsed['BM 127K'].names.join('|') === 'BM 127K|BM127K'
@@ -637,6 +640,45 @@ try {
       && Math.abs(palWent.centre.lat + 19.995) < 0.002 && Math.abs(palWent.centre.lng - 147.01) < 0.002
       && palWent.text.includes('NOT FOUND · last visited 6 Feb 1998'),
     JSON.stringify(palWent));
+  await page.click('.places-clear');
+
+  // A bare number in Ctrl+K is a station's number or an ALERT address as
+  // often as not, so it is never sent to the register from there: it gets a
+  // note — put the letters in front, or take the number to Find a place —
+  // and the note, picked, does the second.
+  await page.keyboard.press('Control+k');
+  await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'pal-q', null, { timeout: 5_000 });
+  const bareFrom = queried.length;
+  await page.fill('#pal-q', '10555');
+  await page.waitForTimeout(900);   // past the lookup's pause, had there been one
+  const bareNum = await page.evaluate(() => ({
+    labels: [...document.querySelectorAll('#pal-list .pal-label')].map((l) => l.textContent),
+    subs: [...document.querySelectorAll('#pal-list .pal-sub')].map((l) => l.textContent),
+    count: document.getElementById('pal-count').textContent,
+    list: document.getElementById('pal-list').textContent,
+  }));
+  // The layer, still on, may redraw its own view meanwhile ('1=1'); a search
+  // is anything else.
+  const bareAsked = queried.slice(bareFrom).filter((q) => q.where !== '1=1');
+  check('a bare number in Ctrl+K asks the register nothing',
+    bareAsked.length === 0 && !/Looking up survey marks/.test(bareNum.list), JSON.stringify(bareAsked));
+  const noteAt = bareNum.labels.indexOf('Look up survey mark 10555 in 📍 Find a place');
+  check('…and says how to: the letters in front here, or the number alone in Find a place',
+    noteAt >= 0 && bareNum.subs.some((t) => /PSM 10555/.test(t)) && !/survey mark/.test(bareNum.count),
+    JSON.stringify(bareNum));
+  for (let i = 0; i < noteAt; i++) await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('section[aria-labelledby="places-g-mark"] .places-hit', { timeout: 10_000 });
+  const handed = await page.evaluate(() => ({
+    open: !!document.getElementById('pal-q'), dock: dockShowing(),
+    q: (document.getElementById('places-q') || {}).value,
+    rows: [...document.querySelectorAll('section[aria-labelledby="places-g-mark"] .places-hit')]
+      .map((b) => b.textContent.replace(/\s+/g, ' ').trim()),
+  }));
+  check('picked, the note takes the number to Find a place, which looks it up',
+    !handed.open && handed.dock === 'places' && handed.q === '10555'
+      && handed.rows.length === 1 && /Mark 10555/.test(handed.rows[0]),
+    JSON.stringify(handed));
   await page.click('.places-clear');
   await page.evaluate(() => MapSurvey.setEnabled(false));
 

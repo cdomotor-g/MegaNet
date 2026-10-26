@@ -843,7 +843,8 @@ const HELP = {
       + 'keeps for a mark, such as a council\'s or a railway\'s (<em>BM 127K</em>), and it is looked up '
       + 'in the Queensland survey control register: pressed, the map goes to the mark and opens its '
       + 'callout, with the AHD height, its condition and the link to its report, whether or not the '
-      + 'survey-mark layer is on. Ctrl+K finds a mark the same way. A lookup that cannot be made says '
+      + 'survey-mark layer is on. Ctrl+K finds one too with the letters in front (<em>PSM 43906</em>, <em>BM 43906</em>) — '
+      + 'a bare number there is taken for a station\'s, and offered to Find a place. A lookup that cannot be made says '
       + 'so and leaves the rest of the list standing.',
       '<strong>Limit link length</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '

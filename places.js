@@ -887,7 +887,7 @@ const Places = (function () {
           <button type="button" class="places-clear" onclick="Places.clear(true)" title="Clear the box and the pin on the map"
                   aria-label="Clear the place">✕</button>
         </div>
-        <p class="small places-hint" id="places-hint">A town, river or creek, catchment or basin number, council area, survey mark number (PSM 43906), or a coordinate. The map goes there; the stations are left as they are.</p>
+        <p class="small places-hint" id="places-hint">A town, river or creek, catchment or basin number, council area, survey mark number (43906 or PSM 43906), or a coordinate. The map goes there; the stations are left as they are.</p>
         <div class="places-results" id="places-results"></div>
       </div>`;
   }

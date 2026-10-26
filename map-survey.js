@@ -570,20 +570,24 @@ const MapSurvey = (function () {
   const findPending = new Map();   // query key → in-flight promise
 
   // A number, bare or after the word a plaque, a level book or a plan writes
-  // in front of it: "43906", "PSM 43906", "PSM43906", "mark no. 43906",
-  // "#43906". The field holds six digits at most.
-  const NUMBER_RE = /^(?:(PSM|SSM|PM|SCM|MARK|MK|NO|#)\.?\s*(?:NO\.?\s*)?)?(\d{1,6})$/;
+  // in front of it: "43906", "PSM 43906", "PSM43906", "BM 43906", "mark no.
+  // 43906", "#43906". The field holds six digits at most.
+  const NUMBER_RE = /^(?:(PSM|SSM|PM|BM|SCM|MARK|MK|NO|#)\.?\s*(?:NO\.?\s*)?)?(\d{1,6})$/;
   // A few letters and a number, the shape of a mark's other names: "BM 127K",
   // "QR127K", "BCC12419", "GR 690".
   const NAME_RE   = /^([A-Z]{1,5}) ?(\d{1,6}[A-Z]?)$/;
   // The number words that also start other names ("PSM 101" is mark 101, and
-  // the mark a council numbered PSM 101); "mark" and "no." start none.
-  const NAME_WORD = /^(PSM|SSM|PM|SCM)$/;
+  // the mark a council numbered PSM 101; "BM 212" is mark 212, and the
+  // benchmark somebody called BM 212); "mark" and "no." start none.
+  const NAME_WORD = /^(PSM|SSM|PM|BM|SCM)$/;
 
-  // What a text means as a mark, or null: { key, number, names }. A bare
-  // number needs three digits, because one or two is a keystroke on the way
-  // to something else. A name is asked spaced and run together, because the
-  // register writes it both ways ("BM 127K", "BM127K").
+  // What a text means as a mark, or null: { key, number, names, word }. A
+  // bare number needs three digits, because one or two is a keystroke on the
+  // way to something else. A name is asked spaced and run together, because
+  // the register writes it both ways ("BM 127K", "BM127K"). `word` is the
+  // word written in front of a number, if any — Ctrl+K asks the register only
+  // when there is one, or a name, because a bare number there is a station's
+  // number or an ALERT address as often as not (palette.js).
   function markQuery(text) {
     const s = String(text || '').trim().toUpperCase().replace(/\s+/g, ' ');
     if (!s || s.length > 24) return null;
@@ -598,7 +602,7 @@ const MapSurvey = (function () {
       names = [...new Set([`${n[1]} ${n[2]}`, `${n[1]}${n[2]}`])];
     }
     if (!number && !names.length) return null;
-    return { key: `${number || ''}|${names.join('|')}`, number, names };
+    return { key: `${number || ''}|${names.join('|')}`, number, names, word: (m && m[1]) || null };
   }
 
   // Each sublayer's question. The values are digits, capitals and a space,
