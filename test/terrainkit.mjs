@@ -714,10 +714,16 @@ const sig = await page.evaluate(async () => {
   // scrolled to, as pathcursor.mjs does, because off screen it idles: the
   // wavefront moves. Looked at for longer than an arrival, its hold and the
   // breath after it last together, so some of what is seen is travel.
-  const chart = document.querySelector('svg.path-chart');
-  dockReveal(chart);
-  chart.scrollIntoView({ block: 'center', behavior: 'instant' });
+  // The card draws its chart at its column's width, and redraws it once the
+  // pane comes up and that width is known (PathProfile's fitCard) — so the
+  // chart looked at is the one drawn after that, not the one revealed.
+  const fitted = () => { const c = document.querySelector('#path-profile-panel svg.path-chart');
+    return c && Math.abs(c.getBoundingClientRect().width - c.viewBox.baseVal.width) <= 25 ? c : null; };
+  dockReveal(document.querySelector('svg.path-chart'));
+  document.querySelector('svg.path-chart').scrollIntoView({ block: 'center', behavior: 'instant' });
+  for (let k = 0; k < 40 && !fitted(); k++) await sleep(50);
   await sleep(150);
+  const chart = fitted() || document.querySelector('svg.path-chart');
   if (!s.playing) PathProfile.signalToggle();
   const seen = new Set();
   // …and the wavefront is the wave, not the Fresnel zone: mid-run it stands
@@ -970,6 +976,8 @@ const fullView = await page.evaluate(async () => {
     return dt ? dt.nextElementSibling.textContent.replace(/\s+/g, ' ').trim() : null;
   };
   const before = rowOf(document.getElementById('path-profile-panel'));
+  const cardSvg = document.querySelector('#path-profile-panel svg.path-chart');
+  const cardVbw = cardSvg ? cardSvg.viewBox.baseVal.width : 0;
   // Focused as a real click focuses it: the ⛶ pressed is the one focus has to
   // come back to, though the card's repaint replaces it as the view opens.
   const btn = document.getElementById('path-full-open');
@@ -984,6 +992,7 @@ const fullView = await page.evaluate(async () => {
     inModal: !!svg,
     away: !!document.querySelector('#path-profile-panel .path-full-away'),
     vbw: svg ? svg.viewBox.baseVal.width : 0,
+    cardVbw,
     shownW: svg ? svg.getBoundingClientRect().width : 0,
     title: (document.getElementById('app-modal-title') || {}).textContent || '',
     row: host ? rowOf(host) : null,
@@ -1004,9 +1013,9 @@ const fullView = await page.evaluate(async () => {
 ok('⛶ opens the chart full screen, the only chart in the page, the card saying where it went',
    fullView.open.full && fullView.open.inModal && fullView.open.charts === 1 && fullView.open.away,
    JSON.stringify(fullView.open));
-ok('…drawn at the width it is shown at, wider than the card\'s 920',
-   fullView.open.vbw > 920 && Math.abs(fullView.open.vbw - fullView.open.shownW) < 3,
-   `${fullView.open.vbw} drawn, ${fullView.open.shownW.toFixed(0)} shown`);
+ok('…drawn at the width it is shown at, wider than the card draws it',
+   fullView.open.vbw > fullView.open.cardVbw && Math.abs(fullView.open.vbw - fullView.open.shownW) < 3,
+   `${fullView.open.vbw} drawn, ${fullView.open.shownW.toFixed(0)} shown, ${fullView.open.cardVbw} on the card`);
 ok('…with the readout\'s figures, the signal along the line and ⇄, named for its two ends',
    fullView.open.row === fullView.before && fullView.open.sig && fullView.open.flip
      && /Beenleigh/i.test(fullView.open.title) && /Carbrook/i.test(fullView.open.title),

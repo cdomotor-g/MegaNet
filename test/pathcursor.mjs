@@ -191,8 +191,15 @@ try {
       if (el) { dockReveal(el); el.scrollIntoView({ block: 'center', behavior: 'instant' }); }
     };
   });
+  // The card draws its chart at the width of its column (PathProfile's
+  // fitCard), and that is measured again once the pane it is in comes up — so
+  // a pointer aimed by the chart's scale waits until it is the scale shown.
   const showChart = async () => {
     await page.evaluate(() => window.__scrollTo('svg.path-chart'));
+    await page.waitForFunction(() => {
+      const svg = document.querySelector('svg.path-chart');
+      return !!svg && Math.abs(svg.getBoundingClientRect().width - svg.viewBox.baseVal.width) <= 25;
+    }, null, { timeout: 10_000 });
     await page.waitForTimeout(120);
   };
   const showMap = async () => {
@@ -228,8 +235,15 @@ try {
     half.c.shown === true, JSON.stringify(half.c));
   check('and it reads the ground height there — 500 m up a 1,000 m ramp',
     /^(4[89]\d|5[01]\d) m$/.test(half.c.text || ''), String(half.c.text));
+  const wrapRight = await page.evaluate(() =>
+    document.querySelector('.path-chart-wrap').getBoundingClientRect().right);
+  check('the card draws the whole plot at the width its column gives it, with nothing to scroll to',
+    !!half.c.scale && Math.abs(half.c.scale.width - half.c.scale.vbw) <= 25
+      && half.c.scale.left + half.c.scale.width <= wrapRight + 1,
+    JSON.stringify({ ...half.c.scale, wrapRight }));
+  const cardW = half.c.scale.vbw;                          // the viewBox the card drew
   check('the dot sits halfway across the plot too',
-    Math.abs(half.c.x - (L_ + 0.5 * (920 - L_ - R_))) < 12, String(half.c.x));
+    Math.abs(half.c.x - (L_ + 0.5 * (cardW - L_ - R_))) < 12, String(half.c.x));
   check('and the same point is marked on the map, halfway along the line',
     !!half.m && Math.abs(half.m.lon - (HOP.lonA + SPAN * 0.5)) < SPAN * 0.03,
     JSON.stringify(half.m));
@@ -285,7 +299,7 @@ try {
   check('and it reads three quarters of the ramp, from the map’s side',
     /^(7[34]\d|7[56]\d) m$/.test(onLine.c.text || ''), String(onLine.c.text));
   check('the dot is three quarters across the plot',
-    Math.abs(onLine.c.x - (L_ + 0.75 * (920 - L_ - R_))) < 25, String(onLine.c.x));
+    Math.abs(onLine.c.x - (L_ + 0.75 * (cardW - L_ - R_))) < 25, String(onLine.c.x));
 
   // Well off the line — beyond the snap distance, on the same map.
   await showMap();
@@ -302,7 +316,7 @@ try {
 
   // ── Full screen: a click on the chart, and the cursor still reads ───────
   // The chart is drawn again at the size the window gives it, so the viewBox
-  // is no longer 920 wide — the fractions above are what still have to hold.
+  // is no longer the card's — the fractions above are what still have to hold.
   await showChart();
   const mid = await page.evaluate(() => {
     const r = document.querySelector('svg.path-chart').getBoundingClientRect();
@@ -317,7 +331,7 @@ try {
              n: document.querySelectorAll('svg.path-chart').length };
   });
   check('a click on the chart opens it full screen, wider than the card draws it, and only there',
-    big.n === 1 && big.vbw > 920 && Math.abs(big.width - big.vbw) < 3, JSON.stringify(big));
+    big.n === 1 && big.vbw > cardW && Math.abs(big.width - big.vbw) < 3, JSON.stringify(big));
   await page.mouse.move(big.left + (L_ + 0.5 * (big.vbw - L_ - R_)) * (big.width / big.vbw), big.top + big.height * 0.5);
   await page.waitForTimeout(120);
   const bigHalf = await page.evaluate(() => ({ c: window.__cursor(), m: window.__mapDot() }));

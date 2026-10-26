@@ -698,6 +698,8 @@ const PathProfile = (function () {
   // view draws from it, and the radio-path card quotes its margin.
   let shown = null;
   let full = null;           // { t, onResize } while the chart is full screen
+  let cardW = 0;             // the card chart's column width, last measured — see fitCard()
+  let cardWatch = null;      // { el, ro, t } watching that column — see fitCard()
 
   const P = () => state.path;
 
@@ -1073,7 +1075,12 @@ const PathProfile = (function () {
   // so its labels stay the size they were set at and a LiDAR ground keeps as
   // many of its samples as that width has room for (THIN_AT's buckets).
   function chartSvg(an, prof, flat, sig, size) {
-    const W = size ? size.W : 920, H = size ? size.H : 300;
+    // On the card, the width its column gives it (cardW, see fitCard) — or 920
+    // until that has been measured, shrunk to fit meanwhile — and a height that
+    // comes down with it, so a narrow column shows the whole path instead of
+    // its first two thirds and a scrollbar to find the rest with.
+    const W = size ? size.W : Math.max(300, cardW || 920);
+    const H = size ? size.H : Math.round(Math.min(300, Math.max(200, W * 0.45)));
     const fs = size ? 12 : 10;   // axis labels
     const L = 52, R = 14, T = 14, B = 30;
     const iw = W - L - R, ih = H - T - B;
@@ -2371,10 +2378,9 @@ const PathProfile = (function () {
   }
 
   // ── full screen ──
-  // The chart on the card is drawn 920 wide and shown at whatever width the
-  // column gives it — in the side panel about two thirds of that, which puts
-  // its labels at seven pixels and the ridges of a 13 km path a few pixels
-  // apart. A click on it, or ⛶ in its key, draws it again at the window's own
+  // The chart on the card is drawn at the width its column gives it (fitCard)
+  // — in the side panel about half of the window's, which puts the ridges of a
+  // 13 km path a few pixels apart. A click on it, or ⛶ in its key, draws it again at the window's own
   // size, in Modal's shell (Escape, the Tab walls and focus handed back are
   // Modal's): the readout over it, the key and the notes under it — everything
   // the card says about this path but the form that changes it.
@@ -2556,6 +2562,32 @@ const PathProfile = (function () {
     // The signal's losses, if this chart's are priced already; otherwise the
     // pricing chartSvg started pours them in when it finishes.
     sigFill();
+    fitCard(el);
+  }
+
+  // The card's chart is drawn at its column's width, and that is only known
+  // once the card is in the page — so a first paint, or a column that has
+  // changed width since (the pane dragged, the window turned, the cards moved
+  // under the map, the pane shown after the chart was drawn in it hidden),
+  // draws it again at the width it now has. Within 24 px it is left as it is:
+  // the SVG stretches that far without its labels visibly changing size, and
+  // a scrollbar coming and going with the chart's new height is never enough
+  // to redraw it again. The observer also fires for every change of height,
+  // which costs a measurement and nothing more.
+  function fitCard(el) {
+    if (typeof ResizeObserver !== 'undefined' && (!cardWatch || cardWatch.el !== el)) {
+      if (cardWatch) { cardWatch.ro.disconnect(); clearTimeout(cardWatch.t); }
+      const watch = { el, t: 0, ro: null };
+      watch.ro = new ResizeObserver(() => {
+        clearTimeout(watch.t);
+        watch.t = setTimeout(() => { if (el.isConnected) fitCard(el); }, 150);
+      });
+      watch.ro.observe(el);
+      cardWatch = watch;
+    }
+    const wrap = full ? null : el.querySelector('.path-chart-wrap');
+    const w = wrap ? Math.floor(wrap.clientWidth) : 0;
+    if (w && Math.abs(w - (cardW || 920)) > 24) { cardW = w; rerender(); }
   }
 
   return {

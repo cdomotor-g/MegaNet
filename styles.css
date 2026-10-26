@@ -6515,13 +6515,14 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   color: var(--muted);
 }
 
-/* the chart scrolls inside itself rather than squashing — a profile narrower
-   than about 640 px stops being readable */
-.path-chart-wrap { overflow-x: auto; }
-
+/* The whole path, in whatever width the column has. It used to scroll inside
+   itself below 620 px, because the chart was drawn 920 wide and shrinking it
+   further shrank its labels past reading — but in the side panel that hid the
+   last third of the path, B included. It is drawn at the column's own width now
+   (PathProfile's fitCard), so its labels stay their size and only the ground
+   gets narrower; width: 100% covers the moment before that is measured. */
 .path-chart {
   width: 100%;
-  min-width: 620px;
   height: auto;
   display: block;
 }
