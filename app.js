@@ -6047,6 +6047,7 @@ function stopStationsMap() {
   MapLots.detach();
   MapPhotos.detach();
   MapWind.detach();
+  MapMini.detach();
   // Not a detach — MapLos holds no layer — but the same duty: the queue is
   // for lines on the map this function is destroying, so clear it and bump
   // the generation, or four-at-a-time terrain fetches carry on for minutes
@@ -6231,6 +6232,10 @@ function initMap() {
   MapLots.attach(state.map);
   MapPhotos.attach(state.map);
   MapWind.attach(state.map);
+  // The minimap, bottom right: a second map further out, with this one's view
+  // outlined on it (map-mini.js). Before the first refresh, which re-fits this
+  // map and so moves the outline, and which asks it for its stations.
+  MapMini.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
   // show on the map that has just been rebuilt.
   PathProfile.sync();
@@ -6391,6 +6396,9 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // …and ⏱️ Latency's classes, worked out again against the clock, with
   // whatever its pins need asked for (map-latency.js).
   MapLatency.reset();
+  // The minimap's dots and paths, redrawn only if the owner choice, the pin
+  // colours or the link distance have moved (map-mini.js).
+  MapMini.refresh();
 
   // The owner choice in Map display (MapSymbols.ownerDrawn) comes first and
   // takes a station off the map entirely — its pin, its links, its place in

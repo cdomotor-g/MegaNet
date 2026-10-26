@@ -772,6 +772,15 @@ jobs:
         working-directory: test
         run: npm run trail
 
+      # The Stations map's minimap (map-mini.js): a wheel over it that zooms
+      # both maps, a drag that snaps it back, a credit left in the credit line
+      # for a base it no longer draws, a minimap still fetching tiles behind
+      # another tab — none of them throws. Driven with a real mouse at a
+      # desktop's width, and on a phone where it starts put away.
+      - name: The minimap — further out, its own wheel, and what its ⚙ sets
+        working-directory: test
+        run: npm run minimap
+
       # Where you are, in the address bar (route.js, #211), and the first load
       # saying what it is doing (#212). A link that opens on the wrong tab, a
       # back button that skips a step or replays every pan, a reload that loses

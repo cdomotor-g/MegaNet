@@ -698,6 +698,14 @@ const HELP = {
       + 'screen\'s logo does, and the station and its links keep a green glow for a minute after; ⏱️ in the strip '
       + 'beats green while it is on. It comes on with the view, with a box of its own to turn it off; <strong>⏻ Latency view</strong> '
       + 'at the top of the pane turns the colours and the animation off together.',
+      '<strong>The minimap</strong>, in the map\'s bottom-right corner, is the same map further out — four '
+      + 'zoom levels to begin with — with the map\'s view outlined on it in red. Scroll over it to zoom the '
+      + 'minimap rather than the map; that is how far out it then stays as the map moves. Drag it and the '
+      + 'map follows when you let go; click it to send the map there. <strong>⚙</strong> on it opens its '
+      + 'settings: its own base map and place names, which stations it draws, the backbone paths, the outline, '
+      + 'whether it follows the map or stays where you leave it, and its size — kept on this device. The arrow '
+      + 'beside ⚙ puts it away to one button in the corner, and that button brings it back; on a phone it '
+      + 'starts put away. It steps aside for the station card, the 3-D view and the digital twin.',
       '<strong>From zoom 17 the map offers the station\'s digital twin</strong> — the ground to '
       + '1 m where the State holds LiDAR, the aerial imagery, the station as built and the radio paths '
       + 'as this map colours them — whenever a station is under the view: the one on the card, the '

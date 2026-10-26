@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 98, date: '2026-10-26', items: [
+      '<strong>A minimap</strong> in the bottom-right corner of the <strong>Stations</strong> map: the same map further '
+        + 'out, with where you are outlined in red. Scroll over it to zoom it without touching the map; drag it or click it '
+        + 'to take the map somewhere. Its <strong>⚙</strong> sets its own base map, which stations it shows, the backbone '
+        + 'paths, how far out it sits, whether it follows the map, and its size; the arrow beside ⚙ puts it away to a '
+        + 'button. On a phone it starts put away.',
+    ] },
     { n: 97, date: '2026-10-25', items: [
       '<strong>🔗 Share</strong>, in the banner: sends a link to whatever you are looking at — the tab, the station whose card '
         + 'is open and the map where you have it — through your phone\'s share sheet (Messages, mail, Teams and the rest). Where '

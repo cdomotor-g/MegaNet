@@ -221,9 +221,12 @@ async function runtimePhase() {
     // all three were still live here and all three were being re-measured on a
     // gesture that could not affect two of them. Now every map belongs to the
     // tab you are looking at, which is what makes the count above meaningful:
-    // one live map, one call, and nothing being re-measured in absentia.
-    check('and the only live map on the Stations tab is the Stations map',
-      nav.names.length === 1 && nav.names[0] === 'Stations',
+    // one call per live map, and nothing being re-measured in absentia. The
+    // Stations tab has two since its minimap (map-mini.js), which is the
+    // Stations map's own, built and taken down with it — and none from any
+    // other tab.
+    check('and the only live maps on the Stations tab are the Stations map and its minimap',
+      nav.names.includes('Stations') && nav.names.every(n => n === 'Stations' || n === 'Minimap'),
       `live: ${nav.names.join(', ') || 'none'}`);
     await sleep(SETTLE);
 

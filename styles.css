@@ -7639,6 +7639,154 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   z-index: 760;
 }
 
+/* ── The minimap (map-mini.js) ───────────────────────────────────────────────
+   The Stations map's second map, bottom right in the stage. 680 is the whole
+   of where it goes: over the map (the map pane is z 400 in this same context)
+   and under everything drawn over the map on purpose — the station card (690),
+   the 3-D canvas (750) with its compass in this corner, the twin (755),
+   Leaflet's corners (1000) and the ACMA card (1100) — so it gives way to each
+   without being told. Positioned with a z-index, it is a stacking context of
+   its own, which keeps the panes of the map inside it inside it.
+
+   Its height is capped short of ↺ at the top of the stage and its width short
+   of the stage's sides, so a large one on a small map is as large as fits —
+   map-mini.js re-measures it when the main map changes size. */
+.mn-minimap {
+  --mmini-w: 232px;
+  --mmini-h: 174px;
+  position: absolute;
+  right: .9rem;
+  bottom: 1.2rem;
+  z-index: 680;
+  width: var(--mmini-w);
+  height: var(--mmini-h);
+  max-width: calc(100% - 1.8rem);
+  max-height: calc(100% - 5.5rem);
+  border: 2px solid var(--panel);
+  border-radius: var(--r-md, 8px);
+  /* A hairline outside the white (or, in the dark theme, near-black) frame,
+     which on its own is lost against a base of the same tone. */
+  box-shadow: 0 0 0 1px var(--border), var(--shadow-2);
+  overflow: hidden;
+  background: var(--subtle);
+}
+
+.mn-minimap[data-size="s"] { --mmini-w: 168px; --mmini-h: 126px; }
+.mn-minimap[data-size="l"] { --mmini-w: 320px; --mmini-h: 240px; }
+
+.mn-minimap-map {
+  position: absolute;
+  inset: 0;
+}
+
+/* ⚙ and fold, top right inside it — over the minimap's own panes and its own
+   Leaflet corners, which it has none of. */
+.mn-minimap-tools {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1001;
+  display: flex;
+  gap: 4px;
+}
+
+.mn-minimap-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
+}
+
+.mn-minimap-ico {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Put away, it is the one button that brings it back, the size of the
+   map's other buttons. */
+.mn-map-mini-open { display: none; }
+
+.mn-minimap.is-folded {
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  overflow: visible;
+}
+
+.mn-minimap.is-folded .mn-minimap-map,
+.mn-minimap.is-folded .mn-minimap-tools { display: none; }
+
+.mn-minimap.is-folded .mn-map-mini-open {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  box-shadow: var(--shadow-2);
+}
+
+.mn-minimap.is-folded .mn-map-mini-open .mn-minimap-ico {
+  width: 20px;
+  height: 20px;
+}
+
+/* A finger's worth on a touch screen. */
+@media (pointer: coarse) {
+  .mn-minimap-btn { width: 36px; height: 36px; }
+  .mn-minimap.is-folded .mn-map-mini-open { width: 44px; height: 44px; }
+}
+
+/* Its settings, in the dialog (MapMini.openSettings). */
+.mmini-lede { margin-top: 0; }
+.mmini-form .filter-field select { width: 100%; }
+
+.mmini-set {
+  margin: .6rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.mmini-set legend {
+  padding: 0;
+  font-size: .82rem;
+  color: var(--muted);
+}
+
+.mmini-set--row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.1rem;
+}
+
+.mmini-range {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: .6rem;
+  margin: .5rem 0;
+  font-size: .87rem;
+}
+
+.mmini-range.is-off { opacity: .5; }
+
+.mmini-val {
+  min-width: 6.5em;
+  font-size: .82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
 /* The action row is the card's last section — no rule under it. It carries no
    padding of its own either: its groups do, so the rule between two groups
    runs the full width of the card the way the section borders above it do,

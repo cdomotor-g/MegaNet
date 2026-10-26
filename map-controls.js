@@ -217,6 +217,26 @@ function makeStateImagery(opts = {}) {
   ].map(s => L.tileLayer(s.url, { maxNativeZoom: 20, maxZoom: 19, minZoom: 6, ...opts, bounds: s.bounds, attribution: s.attribution }));
 }
 
+// The place names Esri publishes for the three bases that carry none, as fresh
+// layers keyed by base name — addBaseLayers says which and why. They draw in
+// the map's `mnBaseLabels` pane, which the caller makes. Shared with the
+// Stations map's minimap (map-mini.js), which offers the same names over the
+// same bases.
+function makeBaseLabels() {
+  // The canvases' names stop where the canvases do (level 16 — makeBaseLayers)
+  // and are stretched past it with them; Satellite's go on natively.
+  const refLayer = svc => L.tileLayer(
+    `https://server.arcgisonline.com/ArcGIS/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`,
+    { pane: 'mnBaseLabels', maxZoom: 19, ...(svc.startsWith('Canvas/') ? { maxNativeZoom: 16 } : {}) }
+  );   // attribution rides on the base layer
+  return {
+    'Satellite': ['Reference/World_Boundaries_and_Places',
+                  'Reference/World_Transportation'].map(refLayer),
+    'Dark':      ['Canvas/World_Dark_Gray_Reference'].map(refLayer),
+    'Light':     ['Canvas/World_Light_Gray_Reference'].map(refLayer),
+  };
+}
+
 // Add the shared base-layer set to a map and give it the base-map controls.
 //
 // The picker was L.control.layers until #164, then a MapChrome panel of its own
@@ -278,20 +298,13 @@ function addBaseLayers(map, opts = {}) {
   if (!map.getPane('mnBaseLabels')) {
     map.createPane('mnBaseLabels').style.zIndex = 250;
   }
-  // The canvases' names stop where the canvases do (level 16 — makeBaseLayers)
-  // and are stretched past it with them; Satellite's go on natively.
-  const refLayer = svc => L.tileLayer(
-    `https://server.arcgisonline.com/ArcGIS/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`,
-    { pane: 'mnBaseLabels', maxZoom: 19, ...(svc.startsWith('Canvas/') ? { maxNativeZoom: 16 } : {}) }
-  );   // attribution rides on the base layer
   // Satellite also takes the State imagery (makeStateImagery), in the base's
   // own pane and added after it, so it paints over Esri and under the names.
+  const labels = makeBaseLabels();
   const companions = {
-    'Satellite': [...makeStateImagery(),
-                  ...['Reference/World_Boundaries_and_Places',
-                      'Reference/World_Transportation'].map(refLayer)],
-    'Dark':      ['Canvas/World_Dark_Gray_Reference'].map(refLayer),
-    'Light':     ['Canvas/World_Light_Gray_Reference'].map(refLayer),
+    'Satellite': [...makeStateImagery(), ...labels['Satellite']],
+    'Dark':      labels['Dark'],
+    'Light':     labels['Light'],
   };
   // ── What is on, and how strongly ───────────────────────────────────────────
   // { name: { on, op } }, op 0–1. The default is the one the radios had: the
@@ -375,10 +388,14 @@ function addBaseLayers(map, opts = {}) {
   function publish() {
     const was = map.mnBaseName;
     map.mnBaseName = lead();
-    // A no-op unless 3-D is actually open, and only asked when the answer
-    // moved: a slider drag is dozens of input events, and each baseChanged()
-    // replaces the 3-D view's raster source.
-    if (map.mnBaseName !== was && typeof Map3D !== 'undefined') Map3D.baseChanged();
+    // Only said when the answer moved: a slider drag is dozens of input
+    // events, and each baseChanged() replaces the 3-D view's raster source (a
+    // no-op unless 3-D is actually open).
+    if (map.mnBaseName === was) return;
+    if (typeof Map3D !== 'undefined') Map3D.baseChanged();
+    // …and to anything else drawing "the base this map is on": the Stations
+    // map's minimap, when it is set to match (map-mini.js).
+    map.fire('mnbasechange');
   }
 
   for (const n of names) sync(n);
