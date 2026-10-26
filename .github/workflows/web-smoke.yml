@@ -1190,6 +1190,16 @@ jobs:
         working-directory: test
         run: npm run tooltips
 
+      # A capped table's card made taller by the handle on its bottom edge
+      # (card-grip.js): there only while rows are hidden, taking no room, the
+      # drag, the floor, the height kept and put back on a redraw, double-click
+      # and the keyboard. Unlike the tooltips it does not stand down under
+      # automation, so every other check meets it too.
+      - name: Card handles — a capped table made taller, and its height kept
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run grip
+
       # The same drift the claim step's note describes, found again while
       # adding the one above: `mapfade` has been in `npm run all` with no step
       # here, so it has run for whoever typed it and on no push at all. A check

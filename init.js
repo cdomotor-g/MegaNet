@@ -47,6 +47,10 @@
   // A title's words above the pointer, where the pointer does not cover them,
   // in place of the browser's box under it (tooltips.js).
   Tooltips.start();
+  // A handle under every capped table and list, to make its card taller
+  // (card-grip.js). Before the first render, so the tables that render draws
+  // get theirs — and their remembered heights — before they are painted.
+  CardGrip.start();
   applyTheme({ repaint: false });
   // The views an account keeps (nav-views.js), from this device's copy of
   // them, before the bar is drawn — so a view picked here does not open on

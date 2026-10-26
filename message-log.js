@@ -1474,6 +1474,9 @@ const MessageLog = (() => {
   function setHeight(k) {
     ml.height = ML_HEIGHTS.some(h => h[0] === k) ? k : 'tall';
     try { localStorage.setItem('mn-ml-height', ml.height); } catch (_) {}
+    // A height dragged on the table's own handle (card-grip.js) gives way to
+    // the step picked here.
+    CardGrip.reset(document.querySelector('.ml-wrap .table-wrap'));
     rerender();
   }
 

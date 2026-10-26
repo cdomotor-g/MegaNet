@@ -636,6 +636,32 @@ to write it down rather than let each of them re-derive a different half.
     system reaching the element — scoped under the tab's own class so every
     other `.tall` wrapper keeps the shared cap, and with the property's
     fallback equal to the default step so a wrapper missing it looks the same.
+    Since pattern 14 the Message Log has the shared handle as well; picking a
+    step puts a dragged height back (`CardGrip.reset`).
+
+14. **Every capped scroller has a handle on its bottom edge** *(card-grip.js)*.
+    `.tall`, `.medium` and the lists that cap themselves the same way (Export's
+    networks, a Stations filter's options, the carried stations, a base
+    station's log — the list is `SCROLLERS` in the file) get a separator after
+    them that drags the cap taller or shorter, from MIN (72 px) to where the
+    rows run out. Double-click — or Enter — fills 85 % of the window, then puts
+    it back; ↓ ↑ step 40 px, PageDown and PageUp 200, End fills and Home puts
+    back. It shows only while rows are hidden (or once moved), and the height is
+    kept on the device per tab and card (`mn-grip-h`) and put back whenever the
+    tab redraws the card. Pattern 13's objection to a drag edge is met by where
+    it lies rather than by not having one: under a mouse the band is 2 px over
+    the edge and 10 under, clear of a horizontal scroll bar's thumb.
+
+    It is a **sibling after the scroller**, never inside it: what is in the
+    scroller is its module's (a log that trims its first line, a list whose
+    last row is styled as the last). It takes no room — its margins add up to
+    its height, and in a flex column `--grip-gap` takes back the extra gap — so
+    nothing about a card's layout changes. Where a sibling cannot go under the
+    scroller (a grid, a flex row) or the scroller floats over something
+    (absolutely placed), there is no handle. `data-no-grip` on the scroller or
+    any ancestor opts out. A new capped list joins by adding its selector to
+    `SCROLLERS` — not the pickers under a search box, which are a choice made
+    and gone.
 
 **An implementation note that bit #138, and will bit anything that puts a
 `.sr-only` in a table cell.** `overflow` clips a descendant only when the scroll

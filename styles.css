@@ -2382,6 +2382,83 @@ tr.selected mark.hit {
   max-height: 34vh;
 }
 
+/* Pattern 14 — a capped scroller can be made taller (card-grip.js; the
+   numbering is docs/design-system.md's, which goes past the seven above).
+   The handle CardGrip puts after `.tall`, `.medium` and the lists that cap
+   themselves the same way: a band along the scroller's bottom edge, with a
+   short notch drawn on the border line. Under a mouse the band is all but
+   entirely *below* the edge — 2 px over it, 10 under — because a horizontal
+   scroll bar is inside it, and a drag edge laid over that is the fight with
+   the scroll bar pattern 13 (docs/design-system.md) was written to avoid.
+   Under a finger the scroll bars are overlays nobody grabs, and the band is
+   bigger and further up. It takes no room:
+   the margins add up to its height, so the card is laid out exactly as it was
+   without it, and `--grip-gap` (set by CardGrip) takes back the extra gap a
+   flex column puts before it. Hidden until there is more than shows.
+   Focusable, and it keeps the browser's focus ring: a separator is a control. */
+.mn-grip {
+  --grip-in: 2px;
+  --grip-out: 10px;
+  --grip-gap: 0px;
+  position: relative;
+  z-index: 2;
+  height: calc(var(--grip-in) + var(--grip-out));
+  margin-top: calc(-1 * (var(--grip-in) + var(--grip-gap)));
+  margin-bottom: calc(-1 * var(--grip-out));
+  cursor: ns-resize;
+  touch-action: none;    /* the pointer drag is ours, not the page's scroll */
+}
+
+.mn-grip[hidden] {
+  display: none;
+}
+
+.mn-grip::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(var(--grip-in) - 2px);
+  width: 2.5rem;
+  height: 4px;
+  margin-left: -1.25rem;
+  border-radius: var(--r-pill);
+  background: var(--ctl-border);
+  /* A ring of the card's own ground, so the notch reads as something on the
+     border rather than a thicker stretch of it. */
+  box-shadow: 0 0 0 2px var(--panel);
+}
+
+.mn-grip:hover::before,
+.mn-grip:focus-visible::before,
+.mn-grip.is-dragging::before {
+  background: var(--accent);
+}
+
+/* A finger needs more than a mouse to land on. Still mostly under the edge,
+   so the last row showing keeps its own taps. */
+@media (pointer: coarse) {
+  .mn-grip {
+    --grip-in: 6px;
+    --grip-out: 16px;
+  }
+
+  .mn-grip::before {
+    width: 3rem;
+    margin-left: -1.5rem;
+  }
+}
+
+/* While a handle is dragged the pointer crosses rows, links and other cards,
+   none of which should select text or take the cursor. */
+body.mn-grip-dragging {
+  cursor: ns-resize;
+  user-select: none;
+}
+
+@media print {
+  .mn-grip { display: none !important; }
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

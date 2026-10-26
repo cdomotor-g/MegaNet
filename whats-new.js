@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 106, date: '2026-10-26', items: [
+      'A <strong>handle on the bottom edge</strong> of every table and list a card cuts short — the Stations list, Pass Ranges, '
+        + 'RF Environment, Export\'s networks, a filter\'s options and the rest. Drag it down to see more rows at once, or up '
+        + 'to see fewer; double-click it to fill the window, and again to put it back. It shows only while there are rows out '
+        + 'of sight, and each card keeps the height you leave it at on this device.',
+    ] },
     { n: 105, date: '2026-10-26', items: [
       'The <strong>Base Stations</strong> waterfall hatches the <strong>edge of a stick\'s window</strong> — its outer tenth '
         + 'either side, where a signal just past one edge folds back in at the other — so a fold is not read as a station. '
