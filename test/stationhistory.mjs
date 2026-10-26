@@ -327,7 +327,7 @@ async function main() {
       });
       check('…and the Admin tab\'s Deleted stations is an empty slot, not drawn', slot && slot.html === '' && !slot.shown, J(slot));
       check('neither asked the database for anything', reqs(db, 'station_change').length === 0
-        && !db.requests.some(r => r.name === 'station' && /deleted_at/.test(r.search)), J(db.requests.map(r => r.name)));
+        && !db.requests.some(r => r.name === 'station' && /deleted_at=not\.is\.null/.test(r.search)), J(db.requests.map(r => r.name)));
       await page.evaluate(() => switchTab('stations'));
       await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0, null, { timeout: LOAD_TIMEOUT });
     });

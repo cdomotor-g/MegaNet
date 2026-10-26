@@ -93,7 +93,7 @@ const LB_MINS = [...lift('link-budget.js', /const LB_MARGIN = \[([\s\S]*?)\];/, 
 const AGL = Number(lift('path-profile.js', /const PATH_DEFAULT_AGL = ([\d.]+);/, 'PATH_DEFAULT_AGL'));
 const NR_MAX = Number(lift('network-review.js', /const ATTEN_MAX = (\d+);/, 'ATTEN_MAX'));
 const NR_STEP = Number(lift('network-review.js', /const ATTEN_STEP = (\d+);/, 'ATTEN_STEP'));
-const PT_DEFAULT_DBI = Number(lift('link-budget.js', /def: \{ tx_w: 1, loss_db: LB_DEFAULT_LOSS_DB, gain_dbi: ([\d.]+)/, 'the point end\'s gain'));
+const PT_DEFAULT_DBI = Number(lift('path-profile.js', /return \{ tx_w: 1, loss_db: LB_DEFAULT_LOSS_DB, gain_dbi: ([\d.]+)/, 'the point end\'s gain'));
 
 console.log('\nThe physics — against figures worked by hand\n');
 ok('a wavelength at 151.5 MHz is 1.979 m', near(PH.wavelengthM(151.5), 1.9788, 0.0005), PH.wavelengthM(151.5));

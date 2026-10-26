@@ -185,7 +185,7 @@ try {
       'HEIGHT AT LOCATION': '123.4m', 'METADATA URL': '' }));
     const pick = p => (state.data.stations || []).find(p);
     const without = pick(s => s.elevation_ahd == null && s.lat != null);
-    const with_   = pick(s => s.elevation_ahd != null && s.lat != null);
+    const with_   = pick(s => s.elevation_ahd != null && !s.elevation_source && s.lat != null);
     const read = async (id) => {
       showStationCard(id);
       await new Promise(r => setTimeout(r, 700));

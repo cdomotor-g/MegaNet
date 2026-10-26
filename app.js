@@ -8172,7 +8172,9 @@ function editStationFromCard(id) {
     if (!card) return;
     dockReveal(card);
     card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    const first = card.querySelector('input:not([disabled]):not([type="hidden"]), select, textarea, button');
+    // The first control that has a box: the Undo ahead of the fields is hidden until something changes.
+    const first = [...card.querySelectorAll('input:not([disabled]):not([type="hidden"]), select, textarea, button')]
+      .find(el => el.getClientRects().length);
     if (first) first.focus({ preventScroll: true });
   });
 }

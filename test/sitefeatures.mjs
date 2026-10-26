@@ -463,6 +463,9 @@ async function main() {
 
     // ── 5. An orifice run ──────────────────────────────────────────────────
     log('\nAn orifice run, from the station through the pit\n');
+    // The minimap sits in the map's corner and takes the clicks under it (66e8c8b); the drawing below is
+    // about the main map, so it is put away.
+    await page.evaluate(() => { const m = document.querySelector('.mn-minimap'); if (m) m.hidden = true, m.style.display = 'none'; });
     await page.selectOption('#mn-sf-kind', 'orifice_run');
     await page.click('#mn-sf-add');
     await page.waitForTimeout(200);

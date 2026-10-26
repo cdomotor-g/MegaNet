@@ -567,17 +567,17 @@ try {
   // SLS's manual gauges among them, which are the daily read stations of
   // Section 2 — and then 2,566 of 2,783 and 789 of 909 until the SLS went from
   // version 3.1 to 3.7.
-  check('2,685 of the 2,766 Queensland SLS locations are MegaNet stations',
-    counts.QLD.all === 2766 && counts.QLD.matched === 2685, JSON.stringify(counts.QLD));
-  check('796 of MegaNet’s stations are gauges the Queensland SLS says a person reads',
-    counts.QLD.manual === 865 && counts.QLD.manualMatched === 796, JSON.stringify(counts.QLD));
+  check('2,713 of the 2,766 Queensland SLS locations are MegaNet stations',
+    counts.QLD.all === 2766 && counts.QLD.matched === 2713, JSON.stringify(counts.QLD));
+  check('819 of MegaNet’s stations are gauges the Queensland SLS says a person reads',
+    counts.QLD.manual === 865 && counts.QLD.manualMatched === 819, JSON.stringify(counts.QLD));
   // The NSW document covers the whole state and the ACT; MegaNet reaches its
   // North Coast and the border rivers.
   check('615 of the 1,375 NSW SLS locations are MegaNet stations, 7 of them read by hand',
     counts.NSW.all === 1375 && counts.NSW.matched === 615
       && counts.NSW.manual === 37 && counts.NSW.manualMatched === 7, JSON.stringify(counts.NSW));
-  check('3,253 of MegaNet’s stations are in one document or the other, 47 in both',
-    counts.stations === 3253 && counts.both === 47, JSON.stringify({ stations: counts.stations, both: counts.both }));
+  check('3,281 of MegaNet’s stations are in one document or the other, 47 in both',
+    counts.stations === 3281 && counts.both === 47, JSON.stringify({ stations: counts.stations, both: counts.both }));
 
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {

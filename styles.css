@@ -17960,7 +17960,7 @@ button.adm-danger:hover { border-color: var(--bad); }
   gap: var(--sp-4);
   align-items: start;
 }
-@media (max-width: 760px) { .bl-charts { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 700px) { .bl-charts { grid-template-columns: minmax(0, 1fr); } }
 .bl-charts figure { margin: 0; min-width: 0; }
 .bl-charts figcaption { color: var(--muted); margin-bottom: .3rem; }
 

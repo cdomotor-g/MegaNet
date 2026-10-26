@@ -1085,8 +1085,8 @@ async function main() {
     // …and told where it is: at this width the 🗺️ is in the side panel's
     // strip, not on the map, and a tip pointing at the map would send the
     // operator looking for a button that is not there.
-    check('a first visit is told about the 🗺️ button, where it is, once',
-      tip.shown && /🗺️/.test(tip.text) && /layers/.test(tip.text) && /side panel/.test(tip.text)
+    check('a first visit is told about Layers, where it is, once',
+      tip.shown && /Layers/.test(tip.text) && /layers/.test(tip.text) && /side panel/.test(tip.text)
         && !/on the map/.test(tip.text) && tip.seen === '1',
       `shown=${tip.shown} seen=${tip.seen} "${tip.text}"`);
     await fp.reload({ waitUntil: 'load', timeout: LOAD_TIMEOUT });
