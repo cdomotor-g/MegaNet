@@ -1796,9 +1796,16 @@ const MapLatency = (() => {
   }
 
   // A node's afterglow: a green ring round the pin with a soft halo outside
-  // it, the pin itself left clear so its own colour still reads.
+  // it, the pin itself left clear so its own colour still reads. Clipped to
+  // outside the ring's inner edge: the stroke's shadow blurs inward too, and
+  // round a radius-4 pin it washed the whole pin a quarter green.
   function ring(x, y, r, g) {
     const R = r + 3;
+    pctx.save();
+    pctx.beginPath();
+    pctx.rect(0, 0, pctx.canvas.width, pctx.canvas.height);
+    pctx.arc(x, y, R - 1.2, 0, 2 * Math.PI);
+    pctx.clip('evenodd');
     pctx.globalAlpha = g;
     pctx.shadowBlur = 0;
     const h = pctx.createRadialGradient(x, y, R - 1, x, y, R + 11);
@@ -1815,7 +1822,7 @@ const MapLatency = (() => {
     pctx.shadowColor = 'rgba(30, 235, 95, .9)';
     pctx.shadowBlur = 8;
     pctx.beginPath(); pctx.arc(x, y, R, 0, 2 * Math.PI); pctx.stroke();
-    pctx.shadowBlur = 0;
+    pctx.restore();
   }
 
   // The card's line again, in place — a repaint of the pane would take the
