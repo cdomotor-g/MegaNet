@@ -60,12 +60,23 @@ each repeater that could have sent them, until one matches; the **receivers**
 hour by hour against their usual; **trends** across the days; a **list** of
 what is worth a look and what came back; and the sign-off.
 
-**Using it.** ▶ plays it (it never starts by itself); the bar under the stage is
-the scenes, each a press away; ⏯ ⏮ ⏭, the space bar and the arrow keys on the
-stage; 🔊 turns the presenters' voices off (🔇, remembered on this device) and
-the scenes then run on their own seconds; a station's name on the stage or
-beside it opens it below on this tab; *Read it instead* is the whole script with
-its stations; *Hide* folds it to its headline on this device. Earlier bulletins are in the list beside *Today* and
+**Using it.** It works like a video player. The big ▶ in the middle of the
+title card plays it (it never starts by itself). Under the picture is the
+player's bar: a **seek slider** across the whole bulletin, a segment a scene —
+the gaps between them are the chapter marks, and pointing at one names the
+scene — pressed or dragged anywhere to go there, the scene drawn as it is at
+that moment; then ⏮ ⏯ ⏭, the sound (🔊 turns the presenters' voices off, and the
+scenes then run on their own seconds) with its **volume** beside it on a
+computer, the time, the scene playing, and the **speed**, ½× to 2× — the scenes,
+their motion and the voices together, the voices keeping their pitch. Keys on
+the player: space or K plays and pauses, ← → move between scenes, M turns the
+sound off and on, < and > change the speed; on the slider, ← → move five
+seconds, Page Up and Page Down a scene, Home and End the start and the end. A
+station's name on the stage or beside it opens it below on this tab; *Read it
+instead* is the whole script with its stations; *Hide* folds it to its headline.
+The sound, its volume, the speed and *Hide* are remembered on this device (in
+the browser's own storage — nothing on the server, and clearing the site's data
+forgets them). Earlier bulletins are in the list beside *Today* and
 *This week* (fourteen days and eight weeks are kept). The stage takes the
 panel's full width; under it, the presenter's portrait sits at the left beside
 what they are saying, smaller on a phone, where the scene is drawn tall. A map's

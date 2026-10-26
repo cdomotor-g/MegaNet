@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 110, date: '2026-10-26', items: [
+      'Station Health\'s <strong>📺 Network Weather</strong> bulletin is a <strong>video player</strong> now: a big ▶ in the middle '
+        + 'of the picture, and under it a <strong>seek bar</strong> split into the bulletin\'s scenes — point at one for its title, '
+        + 'press or drag anywhere to go there — with ⏮ ⏯ ⏭, the sound and its volume, the time, and the <strong>playback speed</strong> '
+        + '(½× to 2×, the voices keeping their pitch). Keys: space plays and pauses, ← → move a scene, M the sound, &lt; &gt; the speed. '
+        + 'The speed and volume you pick are remembered on this device.',
+    ] },
     { n: 109, date: '2026-10-26', items: [
       'Each transmitter\'s <strong>signal</strong> beside its carrier fingerprint, on its card on the Stations map and in its '
         + 'Station details: how far above the noise its <strong>own</strong> bursts arrive — never its repeater\'s relays of it — '

@@ -44,13 +44,19 @@
 // stations are links. A rendered video would be none of those.
 //
 // ── What a person sees ──────────────────────────────────────────────────────
-// The title card — the network's "forecast" (clear to stormy), the headline,
-// four numbers — and ▶ Play. Playing, each scene runs its few seconds with
-// its narration under it; the bar under the stage is the scenes, each a
-// press away. ⏯ ⏮ ⏭, the space bar and the arrow keys on the stage, 🔊 🔇
-// for the presenters' voices, *Read it instead* for the whole script. A device
-// remembers whether the panel was hidden, whether the sound was turned off,
-// and which bulletins it has played.
+// A video player. The title card — the network's "forecast" (clear to
+// stormy), the headline, four numbers — with a big ▶ in the middle of it.
+// Playing, each scene runs its few seconds with its narration under the
+// player. Under the picture, the player's own bar: a seek slider across the
+// whole bulletin, a segment a scene (the gaps are the chapter marks, and a
+// scene's title shows above the pointer), pressed or dragged anywhere; then
+// ⏮ ⏯ ⏭, the sound and its volume, the time, the scene playing, and the
+// speed (½× to 2×). Keys on the player: space or K plays and pauses, ← →
+// move between scenes, M turns the sound off and on, < > change the speed;
+// on the slider ← → move five seconds and Page Up / Down a scene. *Read it
+// instead* is the whole script. A device remembers whether the panel was
+// hidden, whether the sound was turned off, its volume, the speed, and which
+// bulletins it has played — in this browser's storage, nothing on the server.
 // Reduced motion: nothing plays by itself and the scenes are drawn finished.
 
 const HealthBulletin = (() => {
@@ -107,6 +113,22 @@ const HealthBulletin = (() => {
   const SEV_WORD = { critical: 'Critical', warn: 'Warning', info: 'Note', ok: 'Good news' };
   const TONE = { ok: C.ok, warn: C.warn, bad: C.critical, neutral: C.neutral };
   const SKY_WORD = { clear: 'Clear', fair: 'Fair', patchy: 'Patchy', unsettled: 'Unsettled', stormy: 'Stormy' };
+  // The player's speeds, and how far ← → move on the seek slider.
+  const RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+  const NUDGE_MS = 5000;
+  // The player's buttons, drawn rather than emoji so they are the same white
+  // glyphs on every platform.
+  const ICON = {
+    play: '<path d="M8 5.5v13l10.5-6.5z"/>',
+    pause: '<path d="M7 5h3.6v14H7zM13.4 5H17v14h-3.6z"/>',
+    prev: '<path d="M6 6h2.2v12H6zM9.6 12 18 6v12z"/>',
+    next: '<path d="M15.8 6H18v12h-2.2zM6 6l8.4 6L6 18z"/>',
+    replay: '<path d="M12 5V2L7.5 6 12 10V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/>',
+    sound: '<path d="M4 9.2h3.6L12 5.5v13l-4.4-3.7H4z"/><path d="M15.2 9.2a4 4 0 0 1 0 5.6M17.6 6.8a7.4 7.4 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>',
+    mute: '<path d="M4 9.2h3.6L12 5.5v13l-4.4-3.7H4z"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>',
+  };
+  const icon = k => `<svg class="hb-i" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true" focusable="false">${ICON[k]}</svg>`;
+  const rateLabel = r => `${r}×`;
 
   const B = {
     index: null, indexErr: '', loading: false,
@@ -119,6 +141,10 @@ const HealthBulletin = (() => {
     // plays through, which bulletin's MP3 that holds, and how that is going.
     sound: stored('mn-hb-sound', v => v === '0') !== '0',
     audio: null, audioUrl: null, audioFor: null, audioState: 'idle',   // idle | loading | ready | failed
+    // The speed and the volume, as this device last left them.
+    rate: +(stored('mn-hb-rate', v => RATES.includes(+v)) || 1),
+    vol: +(stored('mn-hb-vol', v => v !== '' && +v >= 0 && +v <= 1) || 1),
+    drag: false, menu: false, countTok: 0,
     hidden: stored('mn-hb-hidden', v => v === '1') === '1',
     narrow: null, drawnNarrow: null, stageW: null, drawnK: 1, ro: null,
     basins: null,                            // null | 'loading' | [{ bbox, rings }] | 'failed'
@@ -262,27 +288,34 @@ const HealthBulletin = (() => {
     const stale = Date.now() - Date.parse(b.issued_at) > STALE[b.kind || 'daily'];
     return `
       <p class="small hb-issued">${esc(issuedText(b))}${stale ? ` <span class="txt-warn">— ${b.kind === 'weekly' ? 'over a week' : 'more than a day'} old: the scheduled bulletin may have stopped.</span>` : ''}</p>
-      <div class="hb-stage${stageState()}" id="hb-stage" tabindex="0" role="group"
-             aria-roledescription="bulletin" aria-label="${escAttr(`${b.kind === 'weekly' ? 'Weekly' : 'Daily'} network bulletin, ${sc.length} scenes. Space plays or pauses; arrow keys move between scenes.`)}"
-             onkeydown="HealthBulletin.key(event)" onclick="HealthBulletin.stageClick(event)">
+      <div class="hb-player" id="hb-player" onkeydown="HealthBulletin.key(event)">
+        <div class="hb-stage${stageState()}" id="hb-stage" tabindex="0" role="group"
+             aria-roledescription="bulletin" aria-label="${escAttr(`${b.kind === 'weekly' ? 'Weekly' : 'Daily'} network bulletin, ${sc.length} scenes. Space plays or pauses; arrow keys move between scenes; M turns the sound off and on; the less-than and greater-than keys change the speed.`)}"
+             onclick="HealthBulletin.stageClick(event)">
           <div class="hb-svgbox" id="hb-svgbox">${sceneSvg(b, B.scene)}</div>
           <div class="hb-lower" id="hb-lower">${lowerHtml(b, B.scene)}</div>
-          ${!B.playing && B.t === 0 ? `<button class="hb-bigplay" onclick="event.stopPropagation(); HealthBulletin.play()">${bigPlayHtml(b)}</button>` : ''}
+          <div class="hb-flash-slot" id="hb-flash" aria-hidden="true"></div>
+          ${bigPlayShown() ? bigPlayButton(b) : ''}
+        </div>
+        <div class="hb-ctl" id="hb-ctl">
+          ${seekHtml(b)}
+          <div class="hb-ctl-row">
+            <button class="hb-cbtn" onclick="HealthBulletin.prev()" aria-label="Previous scene" title="Previous scene (←)">${icon('prev')}</button>
+            <button class="hb-cbtn hb-cbtn--main" id="hb-play" onclick="HealthBulletin.toggle()" aria-label="${B.playing ? 'Pause' : 'Play'}" title="${B.playing ? 'Pause' : 'Play'} (space)">${icon(B.playing ? 'pause' : 'play')}</button>
+            <button class="hb-cbtn" onclick="HealthBulletin.next()" aria-label="Next scene" title="Next scene (→)">${icon('next')}</button>
+            <span class="hb-volgrp" id="hb-sound-slot">${soundButton(b)}</span>
+            <span class="hb-clock" id="hb-clock">${esc(clockText(b))}</span>
+            <span class="hb-chapter" id="hb-chapter">${esc(chapterText(b))}</span>
+            <span class="hb-speed" id="hb-speed-slot">${speedHtml()}</span>
+          </div>
+        </div>
       </div>
-      <div class="hb-bar" id="hb-bar" role="group" aria-label="Scenes">${barHtml(b)}</div>
       <div class="hb-anchor">
         <figure class="hb-presenter" id="hb-presenter">${presenterHtml(b, B.scene)}</figure>
         <div class="hb-words">
           <div class="hb-caption" id="hb-caption">${captionHtml(b, B.scene)}</div>
           <div class="hb-chips" id="hb-chips">${chipsHtml(b, B.scene)}</div>
         </div>
-      </div>
-      <div class="hb-controls">
-        <button class="ghost hb-btn" onclick="HealthBulletin.prev()" aria-label="Previous scene" title="Previous scene (←)"><span class="hb-ico" aria-hidden="true">⏮</span></button>
-        <button class="hb-btn hb-btn--main" id="hb-play" onclick="HealthBulletin.toggle()" aria-label="${B.playing ? 'Pause' : 'Play'}">${B.playing ? '⏸ Pause' : '▶ Play'}</button>
-        <button class="ghost hb-btn" onclick="HealthBulletin.next()" aria-label="Next scene" title="Next scene (→)"><span class="hb-ico" aria-hidden="true">⏭</span></button>
-        <span class="small hb-clock" id="hb-clock">${esc(clockText(b))}</span>
-        <span id="hb-sound-slot">${soundButton(b)}</span>
       </div>
       <details class="hb-transcript"><summary>Read it instead</summary>
         <ol>${sc.map((s, i) => `<li><b>${esc(s.title)}.</b> ${esc(s.say)}${(s.stations || []).length ? ` <span class="small">(${stationLinks(s.stations)})</span>` : ''}
@@ -292,17 +325,40 @@ const HealthBulletin = (() => {
       <p class="small hb-foot">${esc(footText(b, P))}</p>`;
   }
 
-  // How long it runs: as said with the sound on, as written with it off.
+  // The big ▶ in the middle of the picture, on the title card before it has
+  // played and at the end — a disc and nothing more, as on any video, so it
+  // hides as little of the forecast as it can. Its name says how long it
+  // runs: as said with the sound on, as written with it off.
+  const bigPlayShown = () => !B.playing && (B.ended || (B.scene === 0 && B.t === 0));
+  const bigPlayName = b => B.ended ? 'Watch again' : `Play the bulletin · ${fmtDur(totalSecs(b))}`;
+  function bigPlayButton(b) {
+    return `<button class="hb-bigplay" title="${escAttr(bigPlayName(b))}" onclick="event.stopPropagation(); HealthBulletin.bigPlay()">${bigPlayHtml(b)}</button>`;
+  }
   function bigPlayHtml(b) {
-    return `<span aria-hidden="true">${B.ended ? '↻' : '▶'}</span> ${B.ended ? 'Watch again' : `Play the bulletin · ${esc(fmtDur(totalSecs(b)))}`}`;
+    return `<span class="hb-bigplay-disc">${icon(B.ended ? 'replay' : 'play')}</span><span class="sr-only">${esc(bigPlayName(b))}</span>`;
+  }
+  function drawBigPlay() {
+    const stage = document.getElementById('hb-stage'), big = stage && stage.querySelector('.hb-bigplay'), b = current();
+    if (!stage || !b) return;
+    if (!bigPlayShown()) { if (big) big.remove(); return; }
+    if (big) { big.innerHTML = bigPlayHtml(b); big.title = bigPlayName(b); }
+    else stage.insertAdjacentHTML('beforeend', bigPlayButton(b));
   }
 
   // Playing: the scene runs. Paused part-way: frozen where it was. Not started
-  // (or moved to while paused): drawn finished — a frozen first frame of a
-  // scene that fades in is an empty stage.
+  // (or moved to a scene's start while paused): drawn finished — a frozen
+  // first frame of a scene that fades in is an empty stage.
   // With reduced motion asked for, a playing scene is drawn finished too: the
   // scenes and the narration move on, nothing on the stage does.
-  function stageState() { return B.playing ? (reduced() ? ' is-still' : '') : B.t === 0 ? ' is-still' : ' is-paused'; }
+  const isStill = () => reduced() || (!B.playing && B.t === 0);
+  const isPaused = () => !isStill() && !B.playing;
+  function stageState() { return isStill() ? ' is-still' : isPaused() ? ' is-paused' : ''; }
+  function stagePose() {
+    const stage = document.getElementById('hb-stage');
+    if (!stage) return;
+    stage.classList.toggle('is-still', isStill());
+    stage.classList.toggle('is-paused', isPaused());
+  }
 
   function issuedText(b) {
     const d = new Date(b.issued_at);
@@ -334,21 +390,189 @@ const HealthBulletin = (() => {
   }
   const totalSecs = b => (b.scenes || []).reduce((n, s, i) => n + secsOf(b, i), 0);
   function fmtDur(s) { s = Math.round(s); return s >= 60 ? `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')}` : `${s} s`; }
+  const startOf = (b, i) => { let s = 0; for (let k = 0; k < i; k++) s += secsOf(b, k); return s; };
+  const atSecs = b => B.ended ? totalSecs(b) : startOf(b, B.scene) + Math.min(B.t / 1000, secsOf(b, B.scene));
+  // Whole seconds, rounded as fmtDur rounds the length, so the two agree.
+  const mmss = s => { s = Math.round(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
   function clockText(b) {
     if (B.playing && voiced(b) && audioIs('loading')) return 'Fetching the voices…';
-    let before = 0;
-    for (let i = 0; i < B.scene; i++) before += secsOf(b, i);
-    const at = before + Math.min(B.t / 1000, secsOf(b, B.scene));
-    const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-    return `Scene ${B.scene + 1} of ${(b.scenes || []).length} · ${mmss(at)} / ${mmss(totalSecs(b))}`;
+    return `${mmss(atSecs(b))} / ${mmss(totalSecs(b))}`;
   }
-  function barHtml(b) {
+  function chapterText(b) {
+    const s = sceneOf(b, B.scene);
+    return s ? `Scene ${B.scene + 1} of ${(b.scenes || []).length} · ${s.title}` : '';
+  }
+
+  // ── the seek slider ────────────────────────────────────────────────────────
+  // One slider across the whole bulletin, a segment a scene as long as the
+  // scene runs — the gaps between them are the chapter marks — pressed or
+  // dragged anywhere to go there, the scene under the pointer named above it.
+  function seekHtml(b) {
     const total = totalSecs(b) || 1;
-    return (b.scenes || []).map((s, i) => `<button class="hb-seg${i === B.scene ? ' is-on' : ''}${i < B.scene ? ' is-done' : ''}" style="--f:${(secsOf(b, i) / total).toFixed(4)}"
-        onclick="HealthBulletin.go(${i})" aria-label="${escAttr(`Scene ${i + 1}: ${s.title}`)}" title="${escAttr(s.title)}"${i === B.scene ? ' aria-current="step"' : ''}>
-        <span class="hb-seg-fill" style="--p:${i < B.scene ? 100 : i === B.scene ? progressPct(b, i).toFixed(1) : 0}%"></span></button>`).join('');
+    return `<div class="hb-seek" id="hb-seek" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="${Math.round(total)}"
+        ${seekAria(b)} style="${seekVars(b)}" onkeydown="HealthBulletin.seekKey(event)"
+        onpointerdown="HealthBulletin.seekDown(event)" onpointermove="HealthBulletin.seekMove(event)" onpointerup="HealthBulletin.seekUp(event)"
+        onpointercancel="HealthBulletin.seekUp(event)" onpointerleave="HealthBulletin.seekLeave()">
+        <div class="hb-segs">${(b.scenes || []).map((s, i) => `<span class="hb-seg${i === B.scene ? ' is-on' : ''}${i < B.scene ? ' is-done' : ''}" style="--f:${(secsOf(b, i) / total).toFixed(4)}">
+          <span class="hb-seg-fill" style="--p:${fillPct(b, i).toFixed(1)}%"></span></span>`).join('')}</div>
+        <span class="hb-thumb"></span>
+        <span class="hb-tip" id="hb-tip" hidden></span>
+      </div>`;
+  }
+  const seekText = b => `${mmss(atSecs(b))} of ${mmss(totalSecs(b))}, ${chapterText(b)}`;
+  function seekAria(b) { return `aria-valuenow="${Math.floor(atSecs(b))}" aria-valuetext="${escAttr(seekText(b))}"`; }
+  // Where the thumb sits: the scene it is in, and how far along the bar
+  // that is, not counting the gaps (the stylesheet adds those back). An
+  // ended bulletin's bar is full.
+  function seekVars(b) {
+    const total = totalSecs(b) || 1, n = (b.scenes || []).length, i = B.scene;
+    let f = 0;
+    for (let k = 0; k < i; k++) f += secsOf(b, k) / total;
+    f += (secsOf(b, i) / total) * fillPct(b, i) / 100;
+    return `--n:${n};--i:${i};--x:${Math.min(1, f).toFixed(4)}`;
   }
   function progressPct(b, i) { return Math.max(0, Math.min(100, 100 * B.t / (1000 * secsOf(b, i)))); }
+  const fillPct = (b, i) => B.ended || i < B.scene ? 100 : i === B.scene ? progressPct(b, i) : 0;
+  // The scene under a pointer and how far into it, a gap counting as the
+  // start of the scene after it.
+  function pointAt(x) {
+    const seek = document.getElementById('hb-seek'), b = current();
+    if (!seek || !b) return null;
+    const segs = seek.querySelectorAll('.hb-seg');
+    for (let i = 0; i < segs.length; i++) {
+      const r = segs[i].getBoundingClientRect();
+      if (x < r.right || i === segs.length - 1) {
+        const f = r.width ? Math.max(0, Math.min(1, (x - r.left) / r.width)) : 0;
+        return { i, ms: f * secsOf(b, i) * 1000 };
+      }
+    }
+    return null;
+  }
+  function seekDown(e) {
+    if (e.button) return;
+    const p = pointAt(e.clientX), el = e.currentTarget;
+    if (!p || !el) return;
+    e.preventDefault();
+    B.drag = true;
+    el.classList.add('is-drag');
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    el.focus({ preventScroll: true });
+    seekTo(p.i, p.ms);
+    showTip(e.clientX, p);
+  }
+  function seekMove(e) {
+    const p = pointAt(e.clientX);
+    if (!p) return;
+    if (B.drag) seekTo(p.i, p.ms);
+    showTip(e.clientX, p);
+  }
+  function seekUp(e) {
+    if (!B.drag) return;
+    B.drag = false;
+    const el = document.getElementById('hb-seek');
+    if (el) { el.classList.remove('is-drag'); try { el.releasePointerCapture(e.pointerId); } catch (_) {} }
+    // A finger lifted leaves nothing hovering.
+    if (e.pointerType && e.pointerType !== 'mouse') hideTip();
+  }
+  function seekLeave() { if (!B.drag) hideTip(); }
+  function seekKey(e) {
+    const b = current();
+    if (!b) return;
+    const n = (b.scenes || []).length, at = atSecs(b) * 1000;
+    const keys = {
+      ArrowLeft: () => seekToMs(at - NUDGE_MS), ArrowDown: () => seekToMs(at - NUDGE_MS),
+      ArrowRight: () => seekToMs(at + NUDGE_MS), ArrowUp: () => seekToMs(at + NUDGE_MS),
+      PageUp: () => prev(), PageDown: () => next(),
+      Home: () => go(0), End: () => seekTo(n - 1, Infinity),
+    };
+    if (!keys[e.key]) return;
+    e.preventDefault();
+    keys[e.key]();
+  }
+  // A time across the whole bulletin, to its scene and how far into it.
+  function seekToMs(ms) {
+    const b = current();
+    if (!b) return;
+    const n = (b.scenes || []).length;
+    let i = 0, before = 0;
+    while (i < n - 1 && ms >= (before + secsOf(b, i)) * 1000) { before += secsOf(b, i); i++; }
+    seekTo(i, ms - before * 1000);
+  }
+  function showTip(x, p) {
+    const seek = document.getElementById('hb-seek'), tip = document.getElementById('hb-tip'), b = current(), s = b && sceneOf(b, p.i);
+    if (!seek || !tip || !s) return;
+    tip.innerHTML = `<b>${esc(s.title)}</b><span>Scene ${p.i + 1} · ${mmss(startOf(b, p.i) + p.ms / 1000)}</span>`;
+    tip.hidden = false;
+    const r = seek.getBoundingClientRect(), half = tip.offsetWidth / 2;
+    tip.style.left = `${Math.max(half, Math.min(r.width - half, x - r.left))}px`;
+    seek.querySelectorAll('.hb-seg').forEach((seg, i) => seg.classList.toggle('is-hover', i === p.i));
+  }
+  function hideTip() {
+    const tip = document.getElementById('hb-tip');
+    if (tip) tip.hidden = true;
+    document.querySelectorAll('#hb-seek .hb-seg.is-hover').forEach(seg => seg.classList.remove('is-hover'));
+  }
+
+  // ── the speed ──────────────────────────────────────────────────────────────
+  // ½× to 2×: the scenes, their motion and the voices together (the voices
+  // keep their pitch). Remembered on this device.
+  function speedHtml() {
+    return `<button class="hb-cbtn hb-speed-btn" id="hb-speed" onclick="HealthBulletin.toggleMenu()" aria-haspopup="menu" aria-expanded="${B.menu}"
+        aria-controls="hb-speed-menu" aria-label="Playback speed, ${escAttr(rateLabel(B.rate))}" title="Playback speed (&lt; &gt;)">${esc(rateLabel(B.rate))}</button>
+      <span class="hb-speed-menu" id="hb-speed-menu" role="menu" aria-label="Playback speed" onkeydown="HealthBulletin.menuKey(event)"${B.menu ? '' : ' hidden'}>
+        <span class="hb-speed-h" aria-hidden="true">Speed</span>
+        ${RATES.slice().reverse().map(r => `<button role="menuitemradio" aria-checked="${r === B.rate}" tabindex="-1" onclick="HealthBulletin.setRate(${r})">${r === 1 ? 'Normal' : esc(rateLabel(r))}</button>`).join('')}
+      </span>`;
+  }
+  function drawSpeed() {
+    const slot = document.getElementById('hb-speed-slot');
+    if (slot) slot.innerHTML = speedHtml();
+  }
+  function setRate(r) {
+    if (!RATES.includes(+r)) return;
+    B.rate = +r;
+    keep('mn-hb-rate', B.rate === 1 ? null : String(B.rate));
+    if (B.audio) { B.audio.defaultPlaybackRate = B.rate; B.audio.playbackRate = B.rate; }
+    syncAnims(true);
+    const was = B.menu;
+    B.menu = false; watchMenu();
+    drawSpeed();
+    if (was) { const btn = document.getElementById('hb-speed'); if (btn) btn.focus(); }
+    if (typeof announce === 'function') announce(`Speed ${B.rate === 1 ? 'normal' : rateLabel(B.rate)}.`);
+  }
+  function stepRate(d) { const k = RATES.indexOf(B.rate) + d; if (k >= 0 && k < RATES.length) setRate(RATES[k]); }
+  function toggleMenu(open) {
+    B.menu = open == null ? !B.menu : !!open;
+    watchMenu();
+    drawSpeed();
+    if (B.menu) { const on = document.querySelector('#hb-speed-menu [aria-checked="true"]'); if (on) on.focus(); }
+  }
+  // Open, the menu closes on a press anywhere else.
+  function watchMenu() {
+    document.removeEventListener('pointerdown', menuAway, true);
+    if (B.menu) document.addEventListener('pointerdown', menuAway, true);
+  }
+  function menuAway(e) {
+    if (e.target && e.target.closest && e.target.closest('#hb-speed-slot')) return;
+    B.menu = false; watchMenu(); drawSpeed();
+  }
+  function menuKey(e) {
+    const items = [...document.querySelectorAll('#hb-speed-menu [role="menuitemradio"]')];
+    const k = items.indexOf(document.activeElement);
+    if (e.key === 'Escape' || e.key === 'Tab') {
+      if (e.key === 'Escape') e.preventDefault();
+      toggleMenu(false);
+      const btn = document.getElementById('hb-speed'); if (btn) btn.focus();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const to = items[(k + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length];
+      if (to) to.focus();
+    } else if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      const to = items[e.key === 'Home' ? 0 : items.length - 1];
+      if (to) to.focus();
+    }
+  }
   function sceneOf(b, i) { return (b.scenes || [])[i] || null; }
   function speakerOf(b, s) { return (s && s.presenter) || b.presenter; }
   // The presenter under the stage, at the left, beside what they are saying:
@@ -1312,7 +1536,7 @@ const HealthBulletin = (() => {
 
   // ── playing ────────────────────────────────────────────────────────────────
 
-  function resetPlay() { stopClock(); stopAudio(); B.scene = 0; B.t = 0; B.playing = false; B.ended = false; }
+  function resetPlay() { stopClock(); stopAudio(); B.scene = 0; B.t = 0; B.playing = false; B.ended = false; B.drag = false; }
   function play() {
     const b = current();
     if (!b) return;
@@ -1321,23 +1545,31 @@ const HealthBulletin = (() => {
     markSeen(b.id);
     // Inside the press that asked for it — a browser plays sound only then.
     if (voiced(b)) startAudio(b);
-    if (B.t === 0) startScene(); else drawControls();
+    if (B.t === 0) startScene(); else { stagePose(); syncAnims(); drawControls(); }
     startClock();
-    const stage = document.getElementById('hb-stage');
-    if (stage) { stage.classList.remove('is-paused'); stage.classList.toggle('is-still', reduced()); const svg = stage.querySelector('svg'); if (svg && svg.unpauseAnimations) svg.unpauseAnimations(); }
-    const big = document.querySelector('.hb-bigplay'); if (big) big.remove();
+    drawBigPlay();
     setTalking(true);
+    flash('play');
+    const box = document.getElementById('hb-svgbox'); if (box) countUp(box);
   }
   function pause() {
+    const was = B.playing;
     B.playing = false;
     stopClock();
     stopAudio();
-    const stage = document.getElementById('hb-stage');
-    if (stage) { stage.classList.add('is-paused'); const svg = stage.querySelector('svg'); if (svg && svg.pauseAnimations) svg.pauseAnimations(); }
+    stagePose(); syncAnims();
     setTalking(false);
     drawControls();
+    if (was) flash('pause');
   }
   function toggle() { if (B.playing) pause(); else play(); }
+  // The big ▶ goes as it is pressed; the keys stay on the player.
+  function bigPlay() {
+    const had = document.activeElement && document.activeElement.closest && document.activeElement.closest('.hb-bigplay');
+    play();
+    const stage = document.getElementById('hb-stage');
+    if (had && stage) stage.focus({ preventScroll: true });
+  }
   function go(i) {
     const b = current();
     if (!b) return;
@@ -1349,6 +1581,23 @@ const HealthBulletin = (() => {
   }
   function next() { const b = current(); if (b && B.scene < (b.scenes || []).length - 1) go(B.scene + 1); }
   function prev() { go(B.t > 2500 ? B.scene : B.scene - 1); }
+  // A moment of the bulletin — a scene and how far into it — from the seek
+  // slider: the scene drawn as it is at that moment, playing on from there if
+  // it was playing. Not quite to the end, so it can still play.
+  function seekTo(i, ms) {
+    const b = current();
+    if (!b) return;
+    const n = (b.scenes || []).length;
+    if (!n) return;
+    i = Math.max(0, Math.min(n - 1, i));
+    ms = Math.max(0, Math.min(+ms || 0, secsOf(b, i) * 1000 - (i === n - 1 ? 150 : 0)));
+    const moved = i !== B.scene || B.ended;
+    B.scene = i; B.t = ms; B.ended = false;
+    if (B.playing) B.last = performance.now();
+    if (moved) startScene();
+    else { stagePose(); syncAnims(); drawCaption(); drawProgress(); drawBigPlay(); }
+    if (voiced(b) && audioIs('ready')) seekAudio(b);
+  }
 
   function startScene() {
     const b = current();
@@ -1356,41 +1605,77 @@ const HealthBulletin = (() => {
     const box = document.getElementById('hb-svgbox');
     if (!box) return;
     box.innerHTML = sceneSvg(b, B.scene);
-    const stage = document.getElementById('hb-stage');
-    if (stage) { stage.classList.remove('is-paused'); stage.classList.toggle('is-still', !B.playing || reduced()); }
-    const svg = box.querySelector('svg');
-    if (svg && !B.playing && svg.pauseAnimations) svg.pauseAnimations();
+    stagePose();
+    syncAnims();
     const lower = document.getElementById('hb-lower'); if (lower) lower.innerHTML = lowerHtml(b, B.scene);
     const pres = document.getElementById('hb-presenter'); if (pres) pres.innerHTML = presenterHtml(b, B.scene);
     const chips = document.getElementById('hb-chips'); if (chips) chips.innerHTML = chipsHtml(b, B.scene);
-    const big = document.querySelector('.hb-bigplay'); if (big && (B.playing || B.scene > 0)) big.remove();
+    drawBigPlay();
     countUp(box);
     drawCaption();
     drawControls();
     if (B.playing) setTalking(true);
     announceScene(b);
   }
+  // The scene's motion to where the bulletin is — the moment it was moved to,
+  // or carried on from — at the speed it plays: its CSS animations through the
+  // Web Animations API, its SVG ones by the drawing's own clock. Only the
+  // speed, when the moment has not moved.
+  function syncAnims(rateOnly) {
+    const box = document.getElementById('hb-svgbox'), svg = box && box.querySelector('svg');
+    if (!svg) return;
+    if (!rateOnly) {
+      try {
+        if (svg.setCurrentTime) svg.setCurrentTime(B.t / 1000);
+        if (B.playing) { if (svg.unpauseAnimations) svg.unpauseAnimations(); }
+        else if (svg.pauseAnimations) svg.pauseAnimations();
+      } catch (_) {}
+      drawCounts(box, B.playing || B.t > 0 ? B.t : Infinity);
+    }
+    if (typeof svg.getAnimations !== 'function') return;
+    for (const a of svg.getAnimations({ subtree: true })) {
+      try { a.playbackRate = B.rate; if (!rateOnly) a.currentTime = B.t; } catch (_) {}
+    }
+  }
+  // ▶ or ⏸ blooming in the middle of the picture as it is pressed.
+  function flash(kind) {
+    const slot = document.getElementById('hb-flash');
+    if (!slot || reduced()) return;
+    slot.innerHTML = `<span class="hb-flash">${icon(kind)}</span>`;
+  }
   // Not over the presenter's own voice.
   function announceScene(b) {
     const s = sceneOf(b, B.scene);
     if (s && typeof announce === 'function' && !(B.playing && voiced(b))) announce(`Scene ${B.scene + 1}: ${s.title}.`);
   }
-  // The title's numbers count up as they appear, a second and a half each.
+  // The title's numbers count up as they appear, a second and a half each,
+  // on the bulletin's own time (so at its speed, and from where it was moved to).
   function countUp(box) {
     const els = box.querySelectorAll('[data-count]');
     if (!els.length || reduced() || !B.playing) return;
-    const start = performance.now();
-    const frame = now => {
-      const k = Math.min(1, (now - start - 1400) / 1500);
-      els.forEach(el => {
-        const v = +el.getAttribute('data-count'), first = el.firstChild;
-        if (first && first.nodeType === 3) first.nodeValue = fmtStat(k <= 0 ? 0 : Number.isInteger(v) ? Math.round(v * easeOut(k)) : +(v * easeOut(k)).toFixed(1));
-      });
-      if (k < 1 && document.body.contains(box)) requestAnimationFrame(frame);
+    const tok = ++B.countTok, scene = B.scene;
+    const frame = () => {
+      if (tok !== B.countTok || scene !== B.scene || !B.playing || !document.body.contains(box)) return;
+      const ms = sceneMs();
+      drawCounts(box, ms);
+      if (ms < 2900) requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
   }
+  function drawCounts(box, ms) {
+    const k = reduced() ? 1 : Math.min(1, (ms - 1400) / 1500);
+    box.querySelectorAll('[data-count]').forEach(el => {
+      const v = +el.getAttribute('data-count'), first = el.firstChild;
+      if (first && first.nodeType === 3) first.nodeValue = fmtStat(k <= 0 ? 0 : Number.isInteger(v) ? Math.round(v * easeOut(k)) : +(v * easeOut(k)).toFixed(1));
+    });
+  }
   const easeOut = k => 1 - Math.pow(1 - k, 3);
+  // How far into the scene, between the clock's ticks.
+  function sceneMs() {
+    const b = current();
+    if (!B.playing || !B.timer || (b && voiced(b) && audioIs('loading'))) return B.t;
+    return B.t + (performance.now() - B.last) * B.rate;
+  }
 
   function startClock() {
     stopClock();
@@ -1407,7 +1692,7 @@ const HealthBulletin = (() => {
     // MP3 comes, then follows it.
     if (voiced(b) && audioIs('loading')) { drawProgress(); return; }
     if (voiced(b) && audioIs('ready')) { followAudio(b); return; }
-    B.t += dt;
+    B.t += dt * B.rate;
     drawCaption(); drawProgress();
     if (B.t < secsOf(b, B.scene) * 1000) return;
     if (B.scene < (b.scenes || []).length - 1) { B.scene++; B.t = 0; startScene(); }
@@ -1441,24 +1726,36 @@ const HealthBulletin = (() => {
     words.forEach((w, k) => w.classList.toggle('is-said', k < n));
   }
   function drawProgress() {
-    const b = current(), bar = document.getElementById('hb-bar');
-    if (!b || !bar) return;
-    const segs = bar.querySelectorAll('.hb-seg');
-    if (segs.length !== (b.scenes || []).length) { bar.innerHTML = barHtml(b); return; }
+    const b = current(), seek = document.getElementById('hb-seek');
+    if (!b || !seek) return;
+    const segs = seek.querySelectorAll('.hb-seg');
+    if (segs.length !== (b.scenes || []).length) { seek.outerHTML = seekHtml(b); return; }
     const total = totalSecs(b) || 1;
     segs.forEach((seg, i) => {
       seg.classList.toggle('is-on', i === B.scene); seg.classList.toggle('is-done', i < B.scene);
-      if (i === B.scene) seg.setAttribute('aria-current', 'step'); else seg.removeAttribute('aria-current');
       // The widths too: a scene as said is not as long as a scene as written.
       seg.style.setProperty('--f', (secsOf(b, i) / total).toFixed(4));
       const f = seg.firstElementChild;
-      if (f) f.style.setProperty('--p', `${i < B.scene ? 100 : i === B.scene ? progressPct(b, i).toFixed(1) : 0}%`);
+      if (f) f.style.setProperty('--p', `${fillPct(b, i).toFixed(1)}%`);
     });
+    seek.setAttribute('style', seekVars(b));
+    seek.setAttribute('aria-valuemax', String(Math.round(total)));
+    // Said again only when the second or the scene changes.
+    const text = seekText(b);
+    if (seek.getAttribute('aria-valuetext') !== text) {
+      seek.setAttribute('aria-valuenow', String(Math.floor(atSecs(b))));
+      seek.setAttribute('aria-valuetext', text);
+    }
     const clock = document.getElementById('hb-clock'); if (clock) clock.textContent = clockText(b);
+    const ch = document.getElementById('hb-chapter'); if (ch) ch.textContent = chapterText(b);
   }
   function drawControls() {
     const btn = document.getElementById('hb-play');
-    if (btn) { btn.textContent = B.playing ? '⏸ Pause' : '▶ Play'; btn.setAttribute('aria-label', B.playing ? 'Pause' : 'Play'); }
+    if (btn) {
+      btn.innerHTML = icon(B.playing ? 'pause' : 'play');
+      btn.setAttribute('aria-label', B.playing ? 'Pause' : 'Play');
+      btn.title = `${B.playing ? 'Pause' : 'Play'} (space)`;
+    }
     drawProgress();
   }
   function setTalking(on) {
@@ -1484,6 +1781,9 @@ const HealthBulletin = (() => {
     if (B.audio || typeof Audio === 'undefined') return B.audio;
     const a = B.audio = new Audio();
     a.preload = 'auto';
+    // At this device's speed (a new file starts at the default one) and volume.
+    a.defaultPlaybackRate = a.playbackRate = B.rate;
+    a.volume = B.vol;
     a.addEventListener('ended', () => { if (B.playing && voiced(current()) && audioIs('ready') && mp3In()) finish(); });
     // Paused by something else — a call coming in, the phone's own controls:
     // the stage pauses with it.
@@ -1512,6 +1812,7 @@ const HealthBulletin = (() => {
       B.audioUrl = URL.createObjectURL(blob);
       await loadInto(audioEl(), B.audioUrl);
       if (B.audioFor !== f) return;
+      B.audio.playbackRate = B.rate;
       B.audioState = 'ready';
       const b = current();
       if (B.playing && b && voiced(b)) { seekAudio(b); playAudio(); }
@@ -1553,7 +1854,9 @@ const HealthBulletin = (() => {
 
   // 🔊 / 🔇: remembered on this device. Turned on mid-scene, the voice picks
   // up where the stage is; turned off, the stage runs on by the clock. After
-  // a failure, the same button tries again.
+  // a failure, the same button tries again. Beside it the volume, remembered
+  // too — on a pointer that hovers; a phone's own buttons are its volume
+  // (and an iPhone's page cannot set it).
   function toggleSound() {
     if (audioIs('failed')) { B.audioState = 'idle'; B.sound = true; }
     else B.sound = !B.sound;
@@ -1561,17 +1864,33 @@ const HealthBulletin = (() => {
     const b = current();
     if (b && B.playing) { if (voiced(b)) startAudio(b); else stopAudio(); }
     drawSound(); drawProgress();
-    const big = document.querySelector('.hb-bigplay');
-    if (big && b) big.innerHTML = bigPlayHtml(b);
+    drawBigPlay();
   }
   function soundButton(b) {
     if (!voiceOf(b) || typeof Audio === 'undefined') return '';
-    const failed = audioIs('failed');
-    const [label, title] = failed ? ['🔇 No sound — try again', 'The voices could not be played, so the bulletin runs without them. Press to try again.']
-      : B.sound ? ['🔊 Sound on', 'The presenters say it in their own voices. Press to turn the sound off.']
-      : ['🔇 Sound off', 'Press to hear the presenters say it.'];
-    return `<button class="ghost hb-btn" id="hb-sound" onclick="HealthBulletin.toggleSound()" aria-pressed="${B.sound && !failed}"
-        title="${escAttr(title)}">${esc(label)}</button>`;
+    const failed = audioIs('failed'), on = B.sound && !failed;
+    const [label, title] = failed ? ['No sound — try again', 'The voices could not be played, so the bulletin runs without them. Press to try again.']
+      : B.sound ? ['Sound on', 'The presenters say it in their own voices. Press to turn the sound off.']
+      : ['Sound off', 'Press to hear the presenters say it.'];
+    // A failure says so in words; otherwise the icon is the label.
+    return `<button class="hb-cbtn${failed ? ' hb-cbtn--wide' : ''}" id="hb-sound" onclick="HealthBulletin.toggleSound()" aria-pressed="${on}"
+        title="${escAttr(title)} (M)">${icon(on && B.vol > 0 ? 'sound' : 'mute')}<span class="${failed ? 'hb-cbtn-text' : 'sr-only'}">${esc(label)}</span></button>
+      <input type="range" class="hb-vol" id="hb-vol" min="0" max="1" step="0.05" value="${B.vol}" aria-label="Volume"
+        aria-valuetext="${Math.round(B.vol * 100)}%" oninput="HealthBulletin.setVolume(this.value)"${on ? '' : ' disabled'}>`;
+  }
+  function setVolume(v) {
+    v = Math.max(0, Math.min(1, +v));
+    if (!Number.isFinite(v)) return;
+    B.vol = v;
+    keep('mn-hb-vol', v === 1 ? null : String(v));
+    if (B.audio) B.audio.volume = v;
+    const el = document.getElementById('hb-vol');
+    if (el) {
+      if (+el.value !== v) el.value = String(v);
+      el.setAttribute('aria-valuetext', `${Math.round(v * 100)}%`);
+    }
+    const btn = document.getElementById('hb-sound');
+    if (btn) { const svg = btn.querySelector('svg'); if (svg) svg.outerHTML = icon(v > 0 && B.sound && !audioIs('failed') ? 'sound' : 'mute'); }
   }
   function drawSound() {
     const slot = document.getElementById('hb-sound-slot');
@@ -1600,11 +1919,18 @@ const HealthBulletin = (() => {
     if (B.hidden) pause();
     redraw();
   }
+  // Keys anywhere on the player; the seek slider, the volume and the speed
+  // menu keep their own, and a button its space and Enter.
   function key(e) {
-    if (e.target && e.target.closest && e.target.closest('button, a, select') && e.target.id !== 'hb-stage') return;
-    if (e.key === ' ' || e.key === 'k') { e.preventDefault(); toggle(); }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+    const t = e.target && e.target.closest ? e.target : null, k = e.key;
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (t && t.closest('a, select, input, [role="slider"], [role="menu"]')) return;
+    if ((k === ' ' || k === 'Enter') && t && t.closest('button')) return;
+    if (k === ' ' || k === 'k' || k === 'K') { e.preventDefault(); toggle(); }
+    else if (k === 'ArrowRight') { e.preventDefault(); next(); }
+    else if (k === 'ArrowLeft') { e.preventDefault(); prev(); }
+    else if ((k === 'm' || k === 'M') && soundButton(current())) { e.preventDefault(); toggleSound(); }
+    else if (k === '<' || k === '>') { e.preventDefault(); stepRate(k === '>' ? 1 : -1); }
   }
   function stageClick(e) {
     const hit = e.target && e.target.closest && e.target.closest('[data-stn]');
@@ -1638,9 +1964,8 @@ const HealthBulletin = (() => {
       const b = current(), box = document.getElementById('hb-svgbox');
       if (!b || !box) return;
       box.innerHTML = sceneSvg(b, B.scene);
-      // Redrawn where it was: finished, not played over from its start.
-      const stg = document.getElementById('hb-stage');
-      if (stg && B.t > 0) stg.classList.add('is-still');
+      // Redrawn where it was, not played over from its start.
+      stagePose(); syncAnims();
     });
     B.ro.observe(stage);
   }
@@ -1652,15 +1977,17 @@ const HealthBulletin = (() => {
   }
   function stop() {
     pause();
+    B.menu = false; watchMenu();
     if (B.ro) { B.ro.disconnect(); B.ro = null; }
   }
 
   return {
     render, init, stop, adopt,
     refresh: () => { B.index = null; B.indexErr = ''; B.files.clear(); B.voices.clear(); resetPlay(); B.audioFor = null; B.audioState = 'idle'; redraw(); loadIndex(); },
-    play, pause, toggle, go, next, prev, setKind, pick, toggleHidden, toggleSound, key, stageClick, open,
+    play, pause, toggle, bigPlay, go, next, prev, seekTo, setKind, pick, toggleHidden, toggleSound, setVolume, key, stageClick, open,
+    seekDown, seekMove, seekUp, seekLeave, seekKey, setRate, toggleMenu, menuKey,
     ROSTER, _draw: (s, b, narrow) => { const was = B.narrow; B.narrow = !!narrow; try { return sceneSvg(Object.assign({}, b || {}, { scenes: [s] }), 0); } finally { B.narrow = was; } },
-    _state: () => ({ kind: B.kind, scene: B.scene, playing: B.playing, ended: B.ended, file: currentFile(), hidden: B.hidden,
+    _state: () => ({ kind: B.kind, scene: B.scene, t: B.t, playing: B.playing, ended: B.ended, file: currentFile(), hidden: B.hidden, rate: B.rate, vol: B.vol,
       sound: B.sound, voiced: !!voiceOf(current()), audio: B.audioFor === currentFile() ? B.audioState : 'idle',
       at: audioIs('ready') && mp3In() ? B.audio.currentTime : null }),
   };

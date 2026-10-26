@@ -19370,12 +19370,15 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-followup input { flex: 1 1 18rem; min-width: 0; }
 
 /* ── 📺 Network Weather (health-bulletin.js) ──────────────────────────────────
-   The bulletin at the top of Station Health: the stage across the panel, the
-   scenes as a bar under it, then the presenter — a small portrait at the left
-   — beside what they are saying, in a bubble with the scene's stations under
-   it, then the controls. The stage keeps its own studio colours in either
-   theme — a weather map is the same map in a light page and a dark one — and
-   the panel round it follows the theme as every panel does. The stage's height
+   The bulletin at the top of Station Health: a video player across the panel
+   — the stage, a big ▶ in the middle of it until it plays, and under it the
+   player's bar (the seek slider, a segment a scene, then the buttons) — then
+   the presenter, a small portrait at the left, beside what they are saying in
+   a bubble with the scene's stations under it. The player keeps its own studio
+   colours in either theme — a weather map is the same map in a light page and
+   a dark one — and the panel round it follows the theme as every panel does.
+   The bar sits under the picture rather than over it, so it never covers the
+   scene or its lower third and needs no hover to be found. The stage's height
    is the drawing's own (its viewBox), so a phone's tall drawing and a desk's
    wide one need no rule here; below `sm` the portrait is smaller. */
 .hb { --hb-ground: #0b2234; --hb-ink: #f2f7fb; --hb-accent: #5fb4ff; }
@@ -19387,8 +19390,10 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hb-pick select { max-width: 13rem; }
 .hb-folded, .hb-note { margin: 0; }
 .hb-issued { margin: 0 0 var(--sp-2); color: var(--muted); }
-.hb-stage { position: relative; border-radius: 14px; overflow: hidden; background: var(--hb-ground); cursor: pointer;
-  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 22px rgba(5,18,30,.25); container-type: inline-size; }
+.hb-player { --hb-bar: #07192a; border-radius: 14px; background: var(--hb-bar); color: var(--hb-ink); container-type: inline-size;
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 22px rgba(5,18,30,.25); }
+.hb-stage { position: relative; border-radius: 14px 14px 0 0; overflow: hidden; background: var(--hb-ground); cursor: pointer;
+  container-type: inline-size; }
 .hb-stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .hb-svgbox, .hb-svg { display: block; width: 100%; height: auto; }
 .hb-svg text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif; }
@@ -19403,17 +19408,87 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hb-sev--critical { background: #ff6b6b; }
 .hb-sev--warn { background: #ffb84d; }
 .hb-sev--ok { background: #43dc9e; }
-/* ▶ sits where the lower third goes — every scene keeps that corner clear —
-   so it never covers the headline or the numbers. */
-.hb-bigplay { position: absolute; left: 14px; bottom: 14px; z-index: 2;
-  display: inline-flex; gap: .55rem; align-items: center; white-space: nowrap;
-  padding: .8rem 1.4rem; border-radius: 999px; border: 2px solid var(--hb-accent);
-  background: rgba(5,19,31,.9); color: var(--hb-ink); font-size: clamp(1rem, 2.6cqi, 1.25rem); font-weight: 700;
-  box-shadow: 0 8px 28px rgba(0,0,0,.35); }
-.hb-bigplay:hover, .hb-bigplay:focus-visible { background: #0f3a59; }
+/* The big ▶, in the middle of the picture like any video's. */
+.hb-bigplay { position: absolute; left: 50%; top: 50%; z-index: 2; transform: translate(-50%, -50%);
+  display: block; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--hb-ink); }
+.hb-bigplay-disc { display: grid; place-items: center; width: clamp(64px, 11cqi, 96px); aspect-ratio: 1; border-radius: 50%;
+  background: rgba(5,19,31,.74); border: 2px solid rgba(242,247,251,.9); box-shadow: 0 8px 28px rgba(0,0,0,.4);
+  transition: transform .15s ease, background-color .15s ease, color .15s ease; }
+.hb-bigplay-disc .hb-i { width: 48%; height: 48%; }
+.hb-bigplay:hover .hb-bigplay-disc, .hb-bigplay:focus-visible .hb-bigplay-disc { background: var(--hb-accent); color: #04121e; transform: scale(1.06); }
+.hb-bigplay:focus-visible { outline: none; }
+.hb-bigplay:focus-visible .hb-bigplay-disc { outline: 3px solid var(--hb-ink); outline-offset: 3px; }
 .hb-stage:has(.hb-bigplay) .hb-lower { display: none; }
-@media (max-width: 700px) {
-  .hb-bigplay { bottom: 10px; left: 10px; padding: .6rem 1.05rem; }
+/* ▶ or ⏸ blooming in the middle as it is pressed. */
+.hb-flash-slot { position: absolute; left: 50%; top: 50%; z-index: 1; pointer-events: none; }
+.hb-flash { display: grid; place-items: center; width: clamp(56px, 9cqi, 78px); aspect-ratio: 1; border-radius: 50%;
+  background: rgba(5,19,31,.62); color: var(--hb-ink); opacity: 0; transform: translate(-50%, -50%); animation: hb-flash .65s ease-out; }
+.hb-flash .hb-i { width: 50%; height: 50%; }
+@keyframes hb-flash { from { opacity: .95; transform: translate(-50%, -50%) scale(.85); } to { opacity: 0; transform: translate(-50%, -50%) scale(1.4); } }
+
+/* The player's bar. */
+.hb-ctl { position: relative; padding: .15rem .45rem .25rem; border-radius: 0 0 14px 14px; background: var(--hb-bar); }
+.hb-seek { position: relative; height: 22px; margin: 0 .4rem; cursor: pointer; touch-action: none; border-radius: 6px; }
+.hb-seek:focus { outline: none; }
+.hb-seek:focus-visible { box-shadow: 0 0 0 2px var(--hb-accent); }
+.hb-segs { position: absolute; inset: 0; display: flex; gap: 3px; align-items: center; }
+.hb-seg { position: relative; flex: var(--f, 1) 1 0; min-width: 3px; height: 4px; border-radius: 2px;
+  background: rgba(242,247,251,.26); transition: height .12s ease; }
+.hb-seek:hover .hb-seg, .hb-seek:focus-visible .hb-seg, .hb-seek.is-drag .hb-seg { height: 6px; }
+.hb-seek .hb-seg.is-hover { height: 9px; }
+.hb-seg-fill { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p, 0%); border-radius: inherit; background: var(--hb-accent);
+  transition: width .12s linear; }
+/* The thumb: across the scenes before it and the gaps between them. */
+.hb-thumb { position: absolute; top: 50%; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; border-radius: 50%;
+  left: calc((100% - (var(--n, 1) - 1) * 3px) * var(--x, 0) + var(--i, 0) * 3px);
+  background: var(--hb-accent); box-shadow: 0 0 0 3px rgba(95,180,255,.28); pointer-events: none;
+  transform: scale(.7); transition: transform .12s ease, left .12s linear; }
+.hb-seek:hover .hb-thumb, .hb-seek:focus-visible .hb-thumb, .hb-seek.is-drag .hb-thumb { transform: scale(1.05); }
+.hb-seek.is-drag .hb-thumb, .hb-seek.is-drag .hb-seg-fill { transition: none; }
+.hb-tip { position: absolute; bottom: calc(100% + 8px); z-index: 3; transform: translateX(-50%); display: grid; gap: .05rem;
+  max-width: min(18rem, 86cqi); padding: .3rem .6rem; border-radius: 8px; text-align: center; font-size: .82rem; line-height: 1.25;
+  background: rgba(5,19,31,.95); border: 1px solid rgba(242,247,251,.18); color: var(--hb-ink); box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  pointer-events: none; }
+.hb-tip[hidden] { display: none; }
+.hb-tip span { color: #b9d3e6; font-variant-numeric: tabular-nums; }
+.hb-ctl-row { display: flex; align-items: center; gap: .1rem; min-height: 44px; }
+.hb-cbtn { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; min-width: 40px; height: 40px; padding: 0 .4rem;
+  border: 0; border-radius: 8px; background: none; color: var(--hb-ink); font: inherit; font-weight: 700; }
+.hb-cbtn:hover { background: rgba(242,247,251,.12); }
+.hb-cbtn:focus-visible { outline: 2px solid var(--hb-accent); outline-offset: -2px; }
+.hb-i { display: block; width: 24px; height: 24px; flex: none; }
+.hb-cbtn--main .hb-i { width: 28px; height: 28px; }
+.hb-cbtn-text { font-size: .85rem; font-weight: 600; white-space: nowrap; }
+.hb-volgrp { display: inline-flex; align-items: center; }
+.hb-volgrp:empty { display: none; }
+.hb-vol { width: 0; margin: 0; padding: 0; opacity: 0; accent-color: var(--hb-accent); cursor: pointer;
+  transition: width .18s ease, opacity .18s ease, margin .18s ease; }
+.hb-vol:disabled { display: none; }
+@media (hover: hover) {
+  .hb-volgrp:hover .hb-vol, .hb-volgrp:focus-within .hb-vol { width: 76px; margin: 0 .45rem 0 .15rem; opacity: 1; }
+}
+@media (hover: none) { .hb-vol { display: none; } }
+.hb-clock { margin-left: .45rem; font-size: .88rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hb-chapter { flex: 1 1 auto; min-width: 0; margin-left: .7rem; font-size: .88rem; color: #b9d3e6;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hb-speed { position: relative; margin-left: auto; }
+.hb-speed-btn { min-width: 3.3rem; font-size: .92rem; font-variant-numeric: tabular-nums; }
+.hb-speed-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 4; display: grid; min-width: 8.5rem; padding: .3rem;
+  border-radius: 10px; background: rgba(7,25,42,.97); border: 1px solid rgba(242,247,251,.16); box-shadow: 0 10px 28px rgba(0,0,0,.45); }
+.hb-speed-menu[hidden] { display: none; }
+.hb-speed-h { padding: .15rem .55rem .3rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .07em; color: #8fb0c8; }
+.hb-speed-menu button { display: flex; align-items: center; gap: .45rem; padding: .35rem .6rem; border: 0; border-radius: 6px;
+  background: none; color: var(--hb-ink); font: inherit; font-size: .9rem; text-align: left; }
+.hb-speed-menu button::before { content: ""; width: 1rem; text-align: center; }
+.hb-speed-menu button[aria-checked="true"]::before { content: "✓"; color: var(--hb-accent); font-weight: 700; }
+.hb-speed-menu button:hover, .hb-speed-menu button:focus-visible { background: rgba(242,247,251,.12); outline: none; }
+/* A narrow player keeps the buttons and the time; the scene's title is the
+   lower third's, on the picture. */
+@container (max-width: 560px) {
+  .hb-chapter { display: none; }
+  .hb-ctl { padding: .1rem .2rem .2rem; }
+  .hb-cbtn { min-width: 36px; height: 38px; padding: 0 .25rem; }
+  .hb-clock { margin-left: .25rem; font-size: .82rem; }
 }
 .hb-anchor { display: flex; gap: var(--sp-3); align-items: flex-start; margin-top: var(--sp-2); }
 .hb-presenter { margin: 0; flex: none; width: 112px; border-radius: 12px; overflow: hidden; background: var(--hb-ground); }
@@ -19427,13 +19502,6 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hb-chips { display: flex; flex-wrap: wrap; gap: .25rem; align-items: center; margin-top: .4rem; }
 .hb-chips:empty { display: none; }
 .hb-chips-k { color: var(--muted); }
-.hb-bar { display: flex; gap: 3px; margin-top: var(--sp-2); }
-.hb-seg { position: relative; flex: var(--f, 1) 1 0; height: 22px; min-width: 8px; padding: 0; border: 0; background: none; cursor: pointer; }
-.hb-seg::before, .hb-seg-fill { content: ""; position: absolute; left: 0; top: 7px; height: 8px; border-radius: 4px; }
-.hb-seg::before { right: 0; background: color-mix(in srgb, var(--muted) 32%, transparent); }
-.hb-seg-fill { width: var(--p, 0%); background: var(--accent); transition: width .12s linear; }
-.hb-seg.is-on::before { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
-.hb-seg:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
 .hb-caption p { margin: 0; }
 .hb-caption .hb-who { display: flex; flex-wrap: wrap; gap: 0 .5rem; align-items: baseline; margin-bottom: .15rem; }
 .hb-who span { font-size: var(--fs-xs); color: var(--muted); }
@@ -19441,11 +19509,6 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hb-speaker { font-weight: 700; color: var(--accent); }
 .hb-w { opacity: .26; transition: opacity .22s ease-out; }
 .hb-w.is-said { opacity: 1; }
-.hb-controls { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin-top: var(--sp-2); }
-.hb-btn { min-width: 2.6rem; }
-.hb-ico { display: inline-block; font-size: 1.35em; line-height: 1; vertical-align: -0.1em; }
-.hb-btn--main { min-width: 6.5rem; }
-.hb-clock { color: var(--muted); font-variant-numeric: tabular-nums; }
 .hb-transcript { margin-top: var(--sp-2); }
 .hb-transcript ol { padding-left: 1.3rem; display: grid; gap: .35rem; max-width: 80ch; line-height: 1.45; }
 .hb-foot { color: var(--muted); margin: var(--sp-2) 0 0; }
@@ -19492,8 +19555,8 @@ button.adm-danger:hover { border-color: var(--bad); }
 @keyframes hb-rain { from { opacity: 1; transform: translateY(-6px); } to { opacity: 0; transform: translateY(34px); } }
 @keyframes hb-bolt { 0%, 62%, 70%, 100% { opacity: 1; } 64%, 72% { opacity: .15; } }
 @keyframes hb-talk { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.022) translateY(-2px); } }
-.hb-stage.is-paused, .hb-stage.is-paused * { animation-play-state: paused !important; }
-.hb-stage.is-still * { animation: none !important; }
+.hb-stage.is-paused .hb-svgbox * { animation-play-state: paused !important; }
+.hb-stage.is-still .hb-svgbox * { animation: none !important; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Site Map (site-map.js) — a guide to every other tab, and the gold line from

@@ -430,6 +430,22 @@ try {
   });
   ok('the stage spans the panel, drawn 16:9', lay.stageShare > 0.97 && Math.abs(lay.wide - 16 / 9) < 0.01, JSON.stringify(lay));
   ok('…and the presenter is under it at the left, small, beside the words', lay.faceBelow && lay.faceLeft <= 2 && lay.faceW <= 140 && lay.beside, JSON.stringify(lay));
+  // A video player: the big ▶ in the middle of the picture, the player's bar
+  // under it — the seek slider, a segment a scene as long as the scene runs.
+  const player = await pg.evaluate(fx => {
+    const r = sel => document.querySelector(sel).getBoundingClientRect();
+    const stage = r('#hb-stage'), big = r('.hb-bigplay .hb-bigplay-disc'), ctl = r('#hb-ctl'), seek = r('#hb-seek');
+    const segs = [...document.querySelectorAll('#hb-seek .hb-seg')].map(el => el.getBoundingClientRect().width);
+    const secs = fx.scenes.map(s => +s.secs || 8), total = secs.reduce((a, b) => a + b, 0), sum = segs.reduce((a, b) => a + b, 0);
+    return { centred: Math.abs((big.left + big.right) / 2 - (stage.left + stage.right) / 2) < 2 && Math.abs((big.top + big.bottom) / 2 - (stage.top + stage.bottom) / 2) < 2,
+             round: Math.abs(big.width - big.height) < 1 && big.width >= 60, under: ctl.top >= stage.bottom - 1 && ctl.top - stage.bottom < 2, across: seek.width / stage.width,
+             segs: segs.length, scenes: fx.scenes.length, worst: Math.max(...segs.map((w, i) => Math.abs(w / sum - secs[i] / total))),
+             clock: document.getElementById('hb-clock').textContent, slider: document.getElementById('hb-seek').getAttribute('role'), rate: document.getElementById('hb-speed').textContent };
+  }, FIXTURE);
+  ok('a video player: the big ▶ round, in the middle of the picture', player.centred && player.round, JSON.stringify(player));
+  ok('…its bar under the picture: a seek slider across it, a segment a scene as long as it runs (the gaps are the chapter marks)',
+    player.under && player.across > 0.95 && player.slider === 'slider' && player.segs === player.scenes && player.worst < 0.01, JSON.stringify(player));
+  ok('…the time from the start, and the speed at 1×', /^0:00 \/ \d+:\d\d$/.test(player.clock) && player.rate === '1×', JSON.stringify(player));
 
   // ── play, pause, pick ──
   await pg.click('#hb-play');
@@ -447,10 +463,55 @@ try {
   ok('⏭ moves to the next scene', await pg.evaluate(() => HealthBulletin._state().scene === 1 && /low over Logan/.test(document.getElementById('hb-lower').textContent)));
   await pg.click('#hb-play');
   ok('Pause freezes it', await pg.evaluate(() => !HealthBulletin._state().playing && document.getElementById('hb-stage').classList.contains('is-paused')));
+  // Pointing at a segment names its scene; pressing it goes to that moment.
+  await pg.hover('.hb-seg:nth-child(5)');
+  const tip = await pg.evaluate(() => { const t = document.getElementById('hb-tip'); return t.hidden ? '' : t.textContent; });
+  ok('pointing at the bar names the scene there and its time', tip.startsWith(FIXTURE.scenes[4].title) && /Scene 5 · \d+:\d\d$/.test(tip), tip);
   await pg.click('.hb-seg:nth-child(5)');
-  const picked = await pg.evaluate(() => ({ scene: HealthBulletin._state().scene, still: document.getElementById('hb-stage').classList.contains('is-still'),
-    who: document.querySelector('#hb-caption .hb-speaker').textContent, chips: document.getElementById('hb-chips').textContent }));
-  ok('a scene picked from the bar is drawn finished, with its own presenter and stations', picked.scene === 4 && picked.still && picked.who === 'Alex Chen' && /Ipswich AL/.test(picked.chips), JSON.stringify(picked));
+  const picked = await pg.evaluate(() => ({ st: HealthBulletin._state(), paused: document.getElementById('hb-stage').classList.contains('is-paused'),
+    who: document.querySelector('#hb-caption .hb-speaker').textContent, chips: document.getElementById('hb-chips').textContent,
+    text: document.getElementById('hb-seek').getAttribute('aria-valuetext'), chapter: document.getElementById('hb-chapter').textContent }));
+  const half = 1000 * (+FIXTURE.scenes[4].secs || 8) / 2;
+  ok('a point pressed on the bar: its scene, as at that moment, paused there, with its own presenter and stations',
+    picked.st.scene === 4 && Math.abs(picked.st.t - half) < half * 0.2 && picked.paused && !picked.st.playing && picked.who === 'Alex Chen' && /Ipswich AL/.test(picked.chips), JSON.stringify(picked));
+  ok('…and the slider and the bar say which scene', /Scene 5 of \d+/.test(picked.text) && picked.chapter.endsWith(FIXTURE.scenes[4].title), JSON.stringify(picked));
+  // The slider by keys: Page Down a scene, → five seconds, Home the start.
+  await pg.focus('#hb-seek');
+  await pg.keyboard.press('PageDown');
+  const pgdn = await pg.evaluate(() => HealthBulletin._state());
+  await pg.keyboard.press('ArrowRight');
+  const fwd = await pg.evaluate(() => HealthBulletin._state());
+  await pg.keyboard.press('Home');
+  const home = await pg.evaluate(() => HealthBulletin._state());
+  ok('the slider by keys: Page Down the next scene, → five seconds on, Home the start',
+    pgdn.scene === 5 && pgdn.t === 0 && (fwd.scene === 5 ? Math.abs(fwd.t - 5000) < 1 : fwd.scene === 6) && home.scene === 0 && home.t === 0, JSON.stringify({ pgdn, fwd, home }));
+
+  // ── the speed ──
+  await pg.click('#hb-speed');
+  const menu = await pg.evaluate(() => ({ open: !document.getElementById('hb-speed-menu').hidden, items: [...document.querySelectorAll('#hb-speed-menu [role="menuitemradio"]')].map(b => b.textContent),
+    on: (document.querySelector('#hb-speed-menu [aria-checked="true"]') || {}).textContent, focus: document.activeElement && document.activeElement.textContent }));
+  ok('the speed menu: ½× to 2×, Normal ticked and in focus', menu.open && menu.items.join(',') === '2×,1.75×,1.5×,1.25×,Normal,0.75×,0.5×' && menu.on === 'Normal' && menu.focus === 'Normal', JSON.stringify(menu));
+  await pg.click('#hb-speed-menu button:has-text("1.5×")');
+  const fast = await pg.evaluate(() => ({ st: HealthBulletin._state(), label: document.getElementById('hb-speed').textContent, kept: localStorage.getItem('mn-hb-rate'), open: !document.getElementById('hb-speed-menu').hidden }));
+  ok('…1.5× picked: the button says so, the menu closes, the device remembers', fast.st.rate === 1.5 && fast.label === '1.5×' && fast.kept === '1.5' && !fast.open, JSON.stringify(fast));
+  await pg.click('#hb-play');
+  const r0 = await pg.evaluate(() => ({ t: HealthBulletin._state().t, at: performance.now() }));
+  await pg.waitForTimeout(1200);
+  const r1 = await pg.evaluate(() => ({ t: HealthBulletin._state().t, at: performance.now(), rates: [...new Set(document.querySelector('#hb-svgbox svg').getAnimations({ subtree: true }).map(a => a.playbackRate))] }));
+  const ratio = (r1.t - r0.t) / (r1.at - r0.at);
+  ok('…and the bulletin and the scene\'s motion run at it', ratio > 1.25 && ratio < 1.75 && r1.rates.every(r => r === 1.5), JSON.stringify({ ratio, rates: r1.rates }));
+  await pg.focus('#hb-stage');
+  await pg.keyboard.press('<');
+  ok('< on the player slows it a step', await pg.evaluate(() => HealthBulletin._state().rate === 1.25 && document.getElementById('hb-speed').textContent === '1.25×'));
+  await pg.keyboard.press('Space');
+  ok('…and space pauses it', await pg.evaluate(() => !HealthBulletin._state().playing));
+  await pg.reload({ waitUntil: 'domcontentloaded' });
+  await pg.waitForFunction(() => typeof state !== 'undefined' && state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
+  await pg.evaluate(() => switchTab('health'));
+  await until(pg, () => !!document.querySelector('#hb-stage svg'));
+  ok('…the speed remembered when the page is opened again', await pg.evaluate(() => HealthBulletin._state().rate === 1.25 && document.getElementById('hb-speed').textContent === '1.25×'));
+  await pg.evaluate(() => HealthBulletin.setRate(1));
+  ok('…and back to Normal forgets it', await pg.evaluate(() => localStorage.getItem('mn-hb-rate') === null));
 
   // ── a station opened ──
   await pg.evaluate(() => HealthBulletin.go(1));
@@ -492,6 +553,8 @@ try {
     });
     ok('on a phone the scene is drawn tall and a smaller presenter sits beside the words', phone.tall && phone.faceW <= 72 && phone.beside, JSON.stringify(phone));
     ok('…with no sideways scroll', phone.wide <= 1, `${phone.wide}px wider than the screen`);
+    const row = await pg.evaluate(() => { const el = document.querySelector('.hb-ctl-row'); return { over: el.scrollWidth - el.clientWidth, speed: getComputedStyle(document.getElementById('hb-speed')).display }; });
+    ok('…and the player\'s bar fits, the speed in it', row.over <= 0 && row.speed !== 'none', JSON.stringify(row));
     await pg.evaluate(() => HealthBulletin.play());
     await pg.waitForTimeout(200);
     const still = await pg.evaluate(() => [...document.querySelectorAll('#hb-stage .hb-a-rise, #hb-stage .hb-a-pop')].every(el => getComputedStyle(el).animationName === 'none' && getComputedStyle(el).opacity === '1'));
@@ -533,7 +596,18 @@ try {
     ok('Pause holds the sound where it is', !p2.playing && Math.abs(p2.at - p1) < 0.05, `${p1} → ${p2.at}`);
     await pg.click('.hb-seg:nth-child(5)');
     const p3 = await pg.evaluate(() => HealthBulletin._state());
-    ok('…and a scene picked from the bar moves the sound to it', p3.scene === 4 && Math.abs(p3.at - fixVoice.scenes[4].start) < 0.25, JSON.stringify(p3));
+    ok('…and a point pressed on the bar moves the sound to that moment', p3.scene === 4 && p3.t > 0 && Math.abs(p3.at - (fixVoice.scenes[4].start + p3.t / 1000)) < 0.25, JSON.stringify(p3));
+    // The voices at the player's speed, and the volume remembered.
+    await pg.evaluate(() => { HealthBulletin.setRate(2); HealthBulletin.setVolume(0.4); });
+    await pg.click('#hb-play');
+    const v0 = await pg.evaluate(() => ({ at: HealthBulletin._state().at, now: performance.now() }));
+    await pg.waitForTimeout(1000);
+    const v1 = await pg.evaluate(() => ({ at: HealthBulletin._state().at, now: performance.now(), vol: HealthBulletin._state().vol, kept: localStorage.getItem('mn-hb-vol'),
+      slider: (document.getElementById('hb-vol') || {}).value }));
+    const vr = 1000 * (v1.at - v0.at) / (v1.now - v0.now);
+    ok('at 2× the voices run twice as fast; the volume set is the one heard and remembered', vr > 1.5 && vr < 2.5 && v1.vol === 0.4 && v1.kept === '0.4' && v1.slider === '0.4', JSON.stringify({ vr, v1 }));
+    await pg.click('#hb-play');
+    await pg.evaluate(() => { HealthBulletin.setRate(1); HealthBulletin.setVolume(1); });
     await pg.click('#hb-sound');
     const off = await pg.evaluate(() => ({ st: HealthBulletin._state(), label: document.getElementById('hb-sound').textContent, kept: localStorage.getItem('mn-hb-sound'),
       clock: document.getElementById('hb-clock').textContent }));
