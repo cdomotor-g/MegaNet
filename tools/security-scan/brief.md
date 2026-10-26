@@ -148,7 +148,9 @@ findings beats a long list of maybes.
 ## 3. File
 
 For each finding, open one issue in `cdomotor-g/flood-net-private` with
-`mcp__github__issue_write` and the label `security-scan`:
+`mcp__github__issue_write` and the label `security-scan`. One finding per
+issue: don't add other findings to an issue's body as extra notes, because
+step 4 closes an issue when its fix lands and anything else in it is lost.
 
 - Title: `[Standalone] [<Model>/<Effort>] <severity> (<repo>): <short
   description>`. Severity is one of `Critical`, `High`, `Medium`, `Low` or
@@ -258,5 +260,6 @@ Finish with a short summary for the owner:
 - the issues filed, fixed (with their commits) and left open, with why;
 - what needs the owner. That covers migrations to apply, keys or settings to
   change, and whether RPi_ALERT's `main` now has fixes that its latest release
-  lacks. Compare `main` with the newest `v*` tag; if it does, say the base
-  stations need a new release.
+  lacks. A shallow clone has no tags: find the newest with `git ls-remote
+  --tags origin 'v*'`, fetch it, and compare it with `main`. If `main` is
+  ahead with fixes, say the base stations need a new release.
