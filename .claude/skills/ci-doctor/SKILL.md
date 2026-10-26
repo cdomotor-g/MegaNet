@@ -33,7 +33,10 @@ question mid-run, so decide, act, and leave a record.
    `perPage: 100`. The result is too big to read, so it is saved to a file.
    Parse that file with `python3` and keep the newest run per workflow `name`
    whose `conclusion` is not `cancelled`. A cancelled run is normal: a newer
-   push stopped it.
+   push stopped it. The exception is a smoke run cut off by its 60-minute
+   timeout, which is labelled `cancelled` too. So if the newest Web smoke
+   test run is cancelled, list its jobs (step 2). Any step that finished
+   `failure` is a red check, whether or not the run was cut off.
 2. If every workflow's newest run is `success`, also check for open issues
    whose titles contain `CI doctor:` (`mcp__github__list_issues`,
    `state: OPEN`). Close each one with a one-line comment that it is green now,
@@ -43,7 +46,7 @@ question mid-run, so decide, act, and leave a record.
 
 ## 2. List the red checks
 
-For the newest failed **Web smoke test** run, call `list_workflow_jobs` with
+For the newest **Web smoke test** run with a failed step, call `list_workflow_jobs` with
 the run id and parse the saved file with `python3`. List every step whose
 conclusion is `failure`, in every job. Each check runs whether or not the one
 before it passed, so this is the full list. Only `Syntax` and the installs
