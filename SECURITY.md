@@ -40,6 +40,7 @@ you want it to be, once the fix is live.
 
 ## How this repository checks itself
 
-CodeQL and Dependabot run on GitHub, and a scheduled Claude Code review reads
-the code weekly; see `tools/security-scan/README.md`. What they find is kept
+CodeQL and Dependabot run on GitHub. A scheduled Claude Code review reads the
+code weekly, together with the RPi ALERT base stations that post to it, and
+fixes what it can; see `tools/security-scan/README.md`. What they find is kept
 out of this public repository until it is fixed.
