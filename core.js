@@ -907,9 +907,10 @@ const HELP = {
       + 'the whole network", so both buttons do both, and both are enabled by a focus even with no '
       + 'filter running.',
       '<strong>Include related repeaters</strong> widens the match itself rather than the drawing: '
-      + 'repeaters whose pass ranges cover a matched station are pulled in even though they don\'t '
-      + 'match the filter text. That is why the station count can exceed the number of rows your '
-      + 'search would explain.',
+      + 'repeaters whose pass ranges cover a matched station are pulled in on the map even though '
+      + 'they don\'t match the filter text. The list under the map leaves those repeaters out — '
+      + '<strong>Repeaters listening</strong>, below it, names them for the selected station — but '
+      + 'keeps the field stations a matched repeater carries, with a <em>via pass range</em> badge.',
       'The search box <strong>highlights rather than hides</strong>. Every station stays on the '
       + 'map; matches take an amber ring, get their names drawn, and the map zooms to fit them — '
       + 'so a pin still on screen has not necessarily matched anything. <em>Hide stations that '

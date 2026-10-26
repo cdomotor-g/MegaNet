@@ -1496,8 +1496,8 @@ function findStationMatches(repeater) {
 // usually "who carries it". So while a filter is running the result set is
 // extended with everything on the other end of a pass range: the repeaters
 // carrying a matched field station, and the field stations carried by a matched
-// repeater. The map and the table below it both read this one list, or they
-// would disagree about what is on screen.
+// repeater. The map draws all of it; the table below it lists only the second
+// half (tableRelatedStations).
 //
 // Cached on the same terms as filteredStations(), plus the identity of the
 // relation index — so an edited pass range drops it too.
@@ -1543,13 +1543,34 @@ function relatedIdSet() {
   return _relatedIdSet.ids;
 }
 
-// The list under the map: the filter's own matches, then what the pass ranges
-// pulled in behind them — unless stations have been picked off the map, which
+// The part of that list the table under the map lists: the field stations a
+// matched repeater carries. The repeaters listening to a match stay on the map
+// but are left out of the table, because the Repeaters listening card below it
+// already lists them, nearest first, for the station that is selected — and a
+// search for one gauge came back as a table mostly of repeaters.
+// Rebuilt only when the related list itself changes, like relatedIdSet.
+const _tableRelated = { list: null, rows: NO_RELATED };
+
+function tableRelatedStations() {
+  const related = relatedStations();
+  if (_tableRelated.list !== related) {
+    const carried = new Set();
+    for (const s of filteredStations()) {
+      if (s.roles.includes('repeater')) for (const f of findStationMatches(s)) carried.add(f.id);
+    }
+    _tableRelated.list = related;
+    _tableRelated.rows = carried.size ? related.filter(s => carried.has(s.id)) : NO_RELATED;
+  }
+  return _tableRelated.rows;
+}
+
+// The list under the map: the filter's own matches, then the stations a matched
+// repeater carries — unless stations have been picked off the map, which
 // overrides the lot until it is cleared (see the Map selection section).
 function tableStations() {
   if (state.mapSelection.size) return selectedStations();
   const matches = filteredStations();
-  const related = relatedStations();
+  const related = tableRelatedStations();
   return related.length ? matches.concat(related) : matches;
 }
 
@@ -7683,8 +7704,9 @@ function scrollStationRowIntoView(id) {
 // the current filter excludes would be selected into a list it isn't in; in
 // that case the filters are narrowed to the station's own name instead — the
 // table then contains it, and the search box visibly says why the list changed.
-// A repeater the pass ranges pulled in is already a row, so it counts as listed
-// even though the filter never named it.
+// A station a matched repeater carries is already a row, so it counts as listed
+// even though the filter never named it. A repeater listening to a match is on
+// the map but not in the table, so it is narrowed to like any other.
 // Returns true when the filters moved, so the caller knows the sidebar has to
 // be re-rendered and not just the table.
 function selectStationState(s) {
@@ -7708,7 +7730,7 @@ function selectStationState(s) {
     }
     return false;
   }
-  if (relatedIdSet().has(s.id)) return false;
+  if (tableRelatedStations().some(x => x.id === s.id)) return false;
   // Being in the filter result is not enough: the table only draws the first
   // STATIONS_ROW_CAP of it, so an unfiltered list contains all 3,174 stations
   // and renders 500. A station past that has no row to select or scroll to, and

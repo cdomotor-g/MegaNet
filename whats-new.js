@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 99, date: '2026-10-26', items: [
+      'The <strong>Stations</strong> list now shows what your search matched, without the repeaters that listen to it '
+        + 'tacked on underneath. Those repeaters are still ringed on the map, and <strong>Repeaters listening</strong>, under '
+        + 'the list, names them, nearest first, for the station you pick. A repeater search still lists the stations it carries.',
+    ] },
     { n: 98, date: '2026-10-26', items: [
       '<strong>A minimap</strong> in the bottom-right corner of the <strong>Stations</strong> map: the same map further '
         + 'out, with where you are outlined in red. Scroll over it to zoom it without touching the map; drag it or click it '

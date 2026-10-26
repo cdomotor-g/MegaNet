@@ -1554,10 +1554,12 @@ question; the other half is which repeaters carry it. *Include related
 repeaters* (in the map's **Map display** panel, on by default) answers both at once: filter
 for a station and every repeater whose pass ranges cover one of its ALERT
 addresses comes with it — drawn at full opacity with a **dashed cyan ring**,
-listed in the table below with a *via pass range* badge, linked to the station
-by a drawn path, and held inside the map extent so none of them is off-screen.
+linked to the station by a drawn path, and held inside the map extent so none
+of them is off-screen. They are not rows in the table below: the *Repeaters
+listening* card under it lists them, nearest first, for the selected station.
 It works the other way round too: filter for a repeater and the field stations
-it serves are pulled in the same way. The dashed ring is what separates the two
+it serves are pulled in the same way, and those *are* listed in the table, with
+a *via pass range* badge. The dashed ring is what separates the two
 kinds of result — amber means the filter named it, cyan means a pass range did.
 Untick the box for literal matches only.
 
