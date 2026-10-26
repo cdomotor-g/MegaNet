@@ -30,6 +30,8 @@
 - Several chat threads push to `main` at once, so `git pull --rebase origin main` before every push. If the push is rejected, rebase and retry once, then stop and tell me rather than looping.
 - Batch related edits into one push where you can. Each push touching the app starts a ~20-minute run, and a newer push cancels the older one, so a burst of small pushes wastes both.
 - Pushes that touch only `CLAUDE.md`, `roadmap/**`, or `data/` files not listed in the smoke filter do not start the smoke test.
+- **CI doctor.** A scheduled Claude Code task runs `.claude/skills/ci-doctor/SKILL.md` every four hours. It reads `main`'s latest completed runs, fixes what is red and pushes, and opens one `CI doctor:` issue for anything that needs a person. That is the one session whose job is to look at CI; every other thread keeps to the rules above. `/ci-doctor` runs the same steps by hand.
+- Every smoke check after `Syntax` runs even when an earlier one fails, so a red run's step list shows every failure, not just the first. In a cloud session the browser checks find the pre-installed Chromium, so "run the check for the area you touched" includes the browser ones.
 
 ## Version stamp — bump it with every app change
 - Every script, stylesheet and icon the pages load carries one stamp, `?v=<date><letter>` (e.g. `?v=20261022g`), and the service worker (`sw.js`) serves a stamped file from the copy it kept. A change pushed under an unchanged stamp never reaches anyone who has opened Flood-Net before, however often they refresh.

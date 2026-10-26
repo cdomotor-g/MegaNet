@@ -222,8 +222,17 @@ jobs:
     # fifty-two and was cut off at 15 when seven joined in one push (run 187,
     # stopped at 15:12 with every check it reached green). A limit is there to
     # stop a hang, not to budget the suite, so it sits well clear of the real
-    # run time; move it when the suite grows again.
-    timeout-minutes: 30
+    # run time; move it when the suite grows again. 30 became 40 when a red
+    # check stopped skipping the rest (below): a red run now runs all of them.
+    timeout-minutes: 40
+    # Every check after Syntax runs whether or not the one before it passed:
+    # `if: !cancelled() && steps.syntax.outcome == 'success'` on each. Without
+    # it the first red check skipped every check after it, so a run showed one
+    # failure at a time. Latency went red on 23 October 2026 and hid the
+    # hundred checks after it for twenty runs; each fix before that had only
+    # uncovered the next. Syntax stays a hard stop, as its note says — a file
+    # that does not parse fails every browser check the same way — and so do
+    # the installs above it. A cancelled run (a newer push) still stops.
     steps:
       - uses: actions/checkout@v4
 
@@ -254,16 +263,19 @@ jobs:
       # Fast pre-filter: parses in under a second and fails the job before a
       # browser is ever launched. #130 asks for this to be kept, not replaced.
       - name: Syntax
+        id: syntax
         working-directory: test
         run: npm run check
 
       - name: Duplicate top-level names
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run names
 
       # Also parse-only, also seconds: the load order in index.html is only safe
       # to add to while init.js is the only file that executes at load (#132).
       - name: Only init.js executes at load
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run toplevel
 
@@ -279,6 +291,7 @@ jobs:
       # exists is a job that goes red for the wrong reason, which is why it
       # fails here rather than twenty browser-minutes later (#183).
       - name: CI runs what `npm run all` runs
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run steps
 
@@ -288,6 +301,7 @@ jobs:
       # it back on screen. Every string literal, the two pages and the agent
       # files, held to the new name.
       - name: Nothing a person reads says MegaNet
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run brand
 
@@ -296,6 +310,7 @@ jobs:
       # capture, the spec's ten worked examples are the only oracle, and the
       # timestamp table is the trap they exist to hold shut (#153).
       - name: HFEM codec — the spec's own examples round-trip
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run hfem
 
@@ -304,6 +319,7 @@ jobs:
       # rig's General Sensor Report, an afternoon stamp keeps its own time, and
       # nothing calls a frame bad from field 18, field 22 or a record's offset.
       - name: ALERT2 decoder — the spec's examples and the capture's self-report
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run alert2
 
@@ -311,6 +327,7 @@ jobs:
       # NTIA reference library's own numbers — and 53 of them are recorded in
       # test/baseline/itm-vectors.json. A port that drifts by 1e-6 dB fails.
       - name: Longley–Rice port — the NTIA reference vectors
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run itm
 
@@ -319,6 +336,7 @@ jobs:
       # 85% shift against ITM's inverse normal, the antenna pattern, which masts
       # are priced and for whom — and data/mobile/ to the shape the card reads.
       - name: Mobile signal — the standard's grades, the pattern, the register extract
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run mobile
 
@@ -327,6 +345,7 @@ jobs:
       # the obstacles, nothing where the ground is clear), the splice and its
       # ramp, a mast stood on its top, and a dead host failing loudly.
       - name: LiDAR where it matters — the grid, the zones, the splice
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run lidar
 
@@ -334,6 +353,7 @@ jobs:
       # on the Plots chart, and the curve fits — against answers known in
       # advance, and the parser refusing anything outside its grammar.
       - name: Plots — typed functions and curve fits
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run plotlines
 
@@ -341,6 +361,7 @@ jobs:
       # Entered, readings boxed and fitted, a freehand stroke, a ruled line and
       # its slope — each reaching the chart, following a pan, and going away.
       - name: Plots — your own lines on the chart
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run plotdraw
 
@@ -352,6 +373,7 @@ jobs:
       # insert with nothing enforcing it), and that its ALERT2 self-test frame
       # decodes back to the address it was built for.
       - name: Base station program — the rig it and 0026 both name
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run logger
 
@@ -364,14 +386,17 @@ jobs:
       # from stations.json against the firmware's own lookup. The RTL-SDR
       # driver against a simulated V2, V3 and V4 — no CI runner has a dongle.
       - name: Off-air ALERT decoder — the 4078 rig's real burst
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run alertdsp
 
       - name: Quansheng ALERT receiver — the firmware document's own lines
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run quansheng
 
       - name: RTL-SDR driver — a simulated V2, V3 and V4
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run rtlsdr
 
@@ -382,6 +407,7 @@ jobs:
       # and opening the simulated V3 through rtlsdr.js — read back with the
       # Reader the card uses. No Pi, stick or PuTTY in CI.
       - name: RTL-SDR on a Raspberry Pi — the relay and its protocol
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run sdrpi
 
@@ -391,6 +417,7 @@ jobs:
       # generic card, a Quansheng radio's log, an ERT-A2's RS232 and USB logs,
       # a dropped folder, "Read it once", and the ALERT2 tab's Watch.
       - name: Log-file following — PuTTY's log instead of a port
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run logfollow
 
@@ -400,6 +427,7 @@ jobs:
       # approximate location said as such), history never stamped "now", a
       # refused token stopping, and a demo never sending.
       - name: Serial Monitor as a base station — what each card posts
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run serialingest
 
@@ -410,6 +438,7 @@ jobs:
       # patch, typing and focus surviving the poll, and nothing for a station
       # that only reports.
       - name: Base Stations tab — what each station said, and what is asked of it
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run basestations
 
@@ -420,6 +449,7 @@ jobs:
       # copy nine seconds late found, a ghost told from a look-alike by each
       # address's own reports, a storm's tips kept as reports.
       - name: Reception Map — the bad repeater named
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run reception
 
@@ -432,6 +462,7 @@ jobs:
       # scripted client; 375 px. And the Airtime panel: the demo week's one
       # planted clash found, said to hurt, its station moved, nothing else.
       - name: Station Health — every planted fault found where it was planted
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run health
 
@@ -441,6 +472,7 @@ jobs:
       # reports — the planted silent station among them, the stations left
       # alone not — to a stand-in for meganet.report_station_findings().
       - name: Station Health reported — the browser's analysis, run unattended
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run healthreport
 
@@ -452,6 +484,7 @@ jobs:
       # a scene picked, the week landing around a playing bulletin, a station
       # opened, This week, Hide, no bulletin yet, a phone and reduced motion.
       - name: Network Weather — the bulletin at the top of Station Health
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run bulletin
 
@@ -462,6 +495,7 @@ jobs:
       # moved clear of each other, a drift said before it arrives, repeater
       # pairs to stagger, and Station Health's ghosts and unfiled sensors.
       - name: Airtime — who lands on top of whom, and what to move
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run airtime
 
@@ -473,6 +507,7 @@ jobs:
       # is rebuilt, never colour alone; and no data said as no data — refused,
       # unreachable, never heard — never as OK.
       - name: A station's health on its card and its pin
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run healthcard
 
@@ -481,6 +516,7 @@ jobs:
       # network's rate, a pick joined to its stations, the CSVs, and a database
       # without 0079 said so.
       - name: Bit-Flip Sources
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run flipsources
 
@@ -490,6 +526,7 @@ jobs:
       # a batch, a mystery, the CSVs, the lesson's drawings and calculator, the
       # two opening each other, reduced motion and a phone.
       - name: Bit Bench and Bit Errors
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run bitbench
 
@@ -501,6 +538,7 @@ jobs:
       # the SWR-400 calibrated by its switches, readings typed, the case, the
       # inspection form's way in, the text saved, reduced motion and a phone.
       - name: SWR Meter
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run swr
 
@@ -511,10 +549,12 @@ jobs:
       # in its delay band, a fading one missing more checks; a picked
       # station's checks slot by slot; one colouring of the pins at a time.
       - name: Latency — pins by age, delay and missed checks
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run latency
 
       - name: Smoke — every tab, clean console
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run smoke
 
@@ -522,6 +562,7 @@ jobs:
       # registered its map or its teardown still passes. This one leaves them
       # again (#142).
       - name: Module registries — maps re-measure, teardowns run
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run registry
 
@@ -530,6 +571,7 @@ jobs:
       # from a group — or filtered permanently out of the list by the find box —
       # is green all the way through. A user has no switchTab() (#108).
       - name: Nav — every tab is in it once, and findable
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run nav
 
@@ -542,6 +584,7 @@ jobs:
       # to #136–#141 enforceable — a breakpoint outside the scale, or an
       # `outline: none` that is not on the allowlist, fails here.
       - name: Shell — landmarks, focus, contrast, and six breakpoints
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run shell
 
@@ -561,6 +604,7 @@ jobs:
       # #141 was that those literals come from tokens now. Nothing else can see
       # that; break it and two assertions here go red.
       - name: Tabs — the per-tab Definition of Done, per converted tab
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run tabs
 
@@ -569,6 +613,7 @@ jobs:
       # shipped: grouping, permanent labels, the map-delegated callout, and —
       # the assertion that matters — a real control in the DOM per named river.
       - name: Rivers — named, labelled, clickable, and reachable without a mouse
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run rivers
 
@@ -580,6 +625,7 @@ jobs:
       # armed pick owns the click; a button per named river for the keyboard;
       # Find a place's river selects it; off is remembered.
       - name: Rivers layer — on by default, named, and each river selectable
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run riverlines
 
@@ -590,6 +636,7 @@ jobs:
       # and the callout, put down with the river, switched off and on, shown
       # from a gauged station's card, and a flat wash when the terrain is cut off.
       - name: Catchments — a river's and a gauge's, shaded by height
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run rivercatchments
 
@@ -602,6 +649,7 @@ jobs:
       # junction is drawn, names the two roads that meet there, and that an
       # unlinked parcel touching no road is still refused.
       - name: Road reserve — drawn whole, intersections included
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run roads
 
@@ -615,6 +663,7 @@ jobs:
       # highway, on the council road past a closer footpath, and with the
       # lookup down.
       - name: Road and bridge owners — keyed by manager, with who to call
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run roadowners
 
@@ -626,6 +675,7 @@ jobs:
       # never "no coverage", Try again recovering it, and a real station
       # priced off the real register under its road section.
       - name: Mobile coverage section — the sum, the shared mast, the honest failures
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run mobilecard
 
@@ -637,6 +687,7 @@ jobs:
       # join-prefixed field names, and asserts the parameter stays gone, the
       # marks draw, the count is honest, and the map-delegated callout works.
       - name: Survey marks — drawn, counted honestly, reachable through the map
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run survey
 
@@ -651,6 +702,7 @@ jobs:
       # handler went unresolved, no contrast moved: a mouse leaving is the only
       # witness there is.
       - name: On-map panels — they put themselves away, and only the pin keeps one
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run mapctl
 
@@ -659,6 +711,7 @@ jobs:
       # check holds it to that: silent while off, and a note that keeps saying
       # profiles still read ~30 m ground everywhere.
       - name: Elvis coverage — where the good elevation data is, and no claim beyond it
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run elviscov
 
@@ -667,6 +720,7 @@ jobs:
       # travelling on as a real one, so the parser has its own check — and so
       # does the rule that a modelled height must never read as a surveyed one.
       - name: Elvis at a point — the parse, the datum, and the modelled/surveyed line
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run elvis
 
@@ -675,6 +729,7 @@ jobs:
       # change of verdict would be partly the sample count. Both sides are
       # analysed on the same points, and this is what says so.
       - name: Elvis second opinion — two models, one grid
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run elvisprofile
 
@@ -685,6 +740,7 @@ jobs:
       # exists, and a placeholder that shipped all render a panel that looks
       # entirely right (#105).
       - name: Help panel — every tab explains itself, every link lands
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run help
 
@@ -695,6 +751,7 @@ jobs:
       # answers the datastore out of db/migrations/0009_inspections.sql instead
       # (#116).
       - name: Inspections — the form renders what the matrix says
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run insp
 
@@ -704,6 +761,7 @@ jobs:
       # own filled example through the form and requires every value on that
       # sheet to be either on screen or named as having no column (#117).
       - name: Site Maintenance — the Council sheet, against the workbook
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run maint
 
@@ -713,6 +771,7 @@ jobs:
       # untested. This one has the app write the records itself — fill the sheet
       # in, save, read it back — so the round trip is the thing under test (#118).
       - name: Inspection History — a record reads back as the sheet it was written on
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run history
 
@@ -723,6 +782,7 @@ jobs:
       # back off the panel, cancel, save, and assert the map's other interactive
       # modes were taken off on the way in (#170).
       - name: Move pin and the station's links — the mode, the drag, and the pills
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run movepin
 
@@ -734,6 +794,7 @@ jobs:
       # looks entirely correct. This reads the clipboard back for real, and drives
       # the card shut and open through the gesture rather than by setting `open`.
       - name: Copy lat, lon and the collapsible station list
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run stationscard
 
@@ -745,6 +806,7 @@ jobs:
       # removes and adds rows, and saves through a stand-in that refuses once
       # and then accepts.
       - name: Station editor — gold and gilded until saved, the bar that says so
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run unsaved
 
@@ -757,6 +819,7 @@ jobs:
       # throws nothing. This drives the card from a real pin click at desktop
       # and phone widths, and holds the one-card-at-a-time rule shut (#175).
       - name: The station card — state, not popup DOM, at two widths
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run stncard
 
@@ -769,6 +832,7 @@ jobs:
       # station selected: none of them throws. Driven with real clicks and keys
       # at a desktop's width and a phone's, in and out of the twin.
       - name: The station trail — the pill that brings the card back and goes back to any of them
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run trail
 
@@ -778,6 +842,7 @@ jobs:
       # another tab — none of them throws. Driven with a real mouse at a
       # desktop's width, and on a phone where it starts put away.
       - name: The minimap — further out, its own wheel, and what its ⚙ sets
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run minimap
 
@@ -788,6 +853,7 @@ jobs:
       # throws. The server holds stations.json part-way through so the loading
       # card can be read, and every history call is counted.
       - name: Links and the first load — the address says where you are, and loading says so
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run links
 
@@ -797,6 +863,7 @@ jobs:
       # that leaves two history steps, a place typed into a box that is not
       # there: none of them throws.
       - name: The palette — Ctrl+K finds a station, a place, a tab or an action
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run palette
 
@@ -806,6 +873,7 @@ jobs:
       # seen. A greeting that comes back every visit, or one that vanishes when
       # the list lands, would throw nothing.
       - name: A first visit and What's new — the guide once, and only news that is news
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run firstvisit
 
@@ -815,6 +883,7 @@ jobs:
       # map's heavier lines in Sunlight, the one rule that used to ask the
       # device, and forced colours. Sunlight's contrast is `shell`'s.
       - name: Themes — System follows the device, and Sunlight for the field
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run themes
 
@@ -825,6 +894,7 @@ jobs:
       # key past; promptDialog; the toasts and the live region; the call sites
       # people meet first; and the nav's mark for a tab this browser cannot run.
       - name: Dialogs — the app's own questions and toasts, and no browser pop-ups
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run dialogs
 
@@ -834,6 +904,7 @@ jobs:
       # CSV / GeoJSON / KML, five other tabs on their own demo data, and every
       # file named floodnet-….
       - name: Exports — the banner's Export, and every file floodnet-…
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run exports
 
@@ -846,6 +917,7 @@ jobs:
       # alone; a new deploy offered, never swapped in; a page that is not the
       # app (Access's sign-in) never kept; and no worker in every other check.
       - name: Offline — opens with no signal, says how old, offers a new deploy
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run offline
 
@@ -855,6 +927,7 @@ jobs:
       # offered as a button; no signal; and, with a real worker, one visit
       # keeping the list and the sheets' lists, Start again, and Get ready.
       - name: Offline & Install tab — this device, getting it ready, installing
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run offlinetab
 
@@ -864,6 +937,7 @@ jobs:
       # changed, used, saved in the shape the database accepts, reset and
       # deleted — with whoami, my_prefs and save_my_views stood in for.
       - name: Views — what the left bar lists, and an account's own
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run views
 
@@ -875,6 +949,7 @@ jobs:
       # 📌 Nearby nearest first, Start inspection into the sheet a section at a
       # time, and every tab opened in Calm with a clean console.
       - name: Calm look — the default shell, a phone's foot, Nearby
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run calm
 
@@ -885,6 +960,7 @@ jobs:
       # black and yellow and its row of section signs on a phone, and Classic
       # untouched by any of it.
       - name: Looks in pictures — Tiles, Instrument, Signs and Home
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run looks
 
@@ -893,6 +969,7 @@ jobs:
       # its code and left waiting, a forgotten password and a reset link, an
       # address not confirmed, and an administrator approving and declining.
       - name: Accounts — sign-up, sign-in, reset, and approval
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run accounts
 
@@ -903,6 +980,7 @@ jobs:
       # the log and its filters, a station offline now, a database without
       # 0080, and an editor asking nothing.
       - name: Admin — base station connections and the tab's layout
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run adminlinks
 
@@ -915,6 +993,7 @@ jobs:
       # off, permission refused, an iPhone in Safari told the Home Screen app is
       # where they come, and a pressed notification moving the open app.
       - name: Notifications — on, tested and off; the icon's count; an iPhone told where
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run notify
 
@@ -928,6 +1007,7 @@ jobs:
       # outright is an administrator's; What is here proposing at its point;
       # and a database without 0039 not sent a proposal at all.
       - name: Proposed stations — proposed, shown for what they are, established by an administrator
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run proposed
 
@@ -941,6 +1021,7 @@ jobs:
       # words; a database without 0056 told so; and anybody but an editor
       # shown none of it.
       - name: Station history — who changed what, and the way back through the editor's own save
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run stationhistory
 
@@ -951,6 +1032,7 @@ jobs:
       # pasted lists asserted beside them are the old ones, so that "additive"
       # is something the harness holds rather than a word in a commit message.
       - name: Search — an address window selects the stations inside it
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run search
 
@@ -962,6 +1044,7 @@ jobs:
       # with `bubblingMouseEvents: false`), and a budget over a zero-length path
       # reporting +155 dB and the word "Good".
       - name: Link budget — either end, found and armed; and what it refuses
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run linkbudget
 
@@ -971,6 +1054,7 @@ jobs:
       # the land cover, so the band on the chart, the cover terms in the budget
       # and the settings that drive the model are all exercised on the real page.
       - name: Path cover — the profile, the band, the model over it
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run pathcover
 
@@ -980,6 +1064,7 @@ jobs:
       # arithmetic: a quarter of the way along, the cursor has to say 250 m.
       # Driven from both sides, because it works from both.
       - name: Path cursor — the ground under the pointer, on both pictures
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run pathcursor
 
@@ -995,6 +1080,7 @@ jobs:
       # `npm run all` without a CI step, so it ran for whoever typed it and on no
       # push at all. A check CI does not run is a check that is not there.
       - name: Catchment boundaries — drawn, out of the way, and answering where a station is
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run catchments
 
@@ -1003,6 +1089,7 @@ jobs:
       # and station_number does not, so 262 of the 1,146 matches depend on the
       # padding being stripped and nothing else in CI would notice it breaking.
       - name: Service Level Specification — the flood classes reach the card they belong on
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run sls
 
@@ -1012,6 +1099,7 @@ jobs:
       # only the lists the form changed, because an untouched list resent
       # through the browser's parse would come back with 94.50 as 94.5.
       - name: River height station details — the card says what holds now, a save sends what changed
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run riverdetails
 
@@ -1020,6 +1108,7 @@ jobs:
       # the page, and the card's velocity against the module's own — the two
       # places a number could quietly be wrong without anything looking broken.
       - name: AEP flood levels — indicative levels on the card, a velocity that is the arithmetic's
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run floodlevels
 
@@ -1027,6 +1116,7 @@ jobs:
       # stays where every path tool reads it, and a save sends exactly the rows
       # that were typed.
       - name: Frequencies — rows on repeaters and base stations, a save sends what was typed
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run frequencies
 
@@ -1037,6 +1127,7 @@ jobs:
       # invisible when it breaks: a source that did not answer is named as such,
       # never shown as "none", and a station outside Queensland is told so.
       - name: Site exposure — tides and soils on the card, a failed source named and never read as "none"
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run exposure
 
@@ -1047,10 +1138,12 @@ jobs:
       # does not publish owners), a failed source is never read as "none", and
       # the DCDB's New South Wales pseudo-parcel is never read as a lot.
       - name: Land — tenure and council on the cards, never an owner guessed or a failure read as "none"
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run land
 
       - name: Claim an address from the message that arrived on it
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run claim
 
@@ -1060,6 +1153,7 @@ jobs:
       # cannot see this: the tab renders, the axis is drawn, nothing throws, and
       # the chart is simply wrong about what it is charting.
       - name: Field series kind — a level is a level, and is offered no bucket size
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run fieldkind
 
@@ -1071,6 +1165,7 @@ jobs:
       # the station its readings are filed under rather than the one the picker
       # was showing. Invisible to smoke — the picker draws either way.
       - name: What the datastore holds — the Field Data probe, and whose readings they are
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run fieldprobe
 
@@ -1081,6 +1176,7 @@ jobs:
       # landing on Field Data with the address and the window. Smoke opens the
       # editor with the datastore aborted, so every line is a dash there.
       - name: Sensor sparklines — a week on every row, the chart, and the door to Field Data
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run sensorsparks
 
@@ -1088,6 +1184,7 @@ jobs:
       # browser's box under it where the pointer covers them. It stands down
       # under automation, so no other check meets it; this one asks for it.
       - name: Tooltips — above the pointer, timed as the browser's, everything put back
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run tooltips
 
@@ -1099,6 +1196,7 @@ jobs:
       # holds them together now — the check both these notes said was worth
       # writing.
       - name: Fade margin — the figure the map colours a link by is the card's own
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run mapfade
 
@@ -1113,6 +1211,7 @@ jobs:
       # author `display: flex` beats the browser's own `[hidden]` rule, and a
       # check reading the property would have agreed with the bug.
       - name: Map links — the colour, the arrows, the credit line and the split
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run maplinks
 
@@ -1126,6 +1225,7 @@ jobs:
       # that drags and is not re-measured, full screen burying a pinned panel.
       # Real pointers on the handle and the pins; ids counted document-wide.
       - name: Side panel — tabbed, resizable, and nothing left behind
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run dock
 
@@ -1138,6 +1238,7 @@ jobs:
       # sphere rather than on the screen, and the station list checked against
       # a haversine that is not the app's.
       - name: Drawing KML — the shapes, the stations, and the right planet
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run drawkml
 
@@ -1149,6 +1250,7 @@ jobs:
       # of the five are meaningless over `pathcover`'s one flat tile, which is
       # why this has a fixture of its own.
       - name: Terrain kit — the ramp, the peaks, the plot, the coordinate, the margin
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run terrain
 
@@ -1159,6 +1261,7 @@ jobs:
       # rather than a re-run, the road asked only when it is wanted, the circle
       # armed and landed with a real pointer, and reset taking all of it away.
       - name: Repeater site finder — sites in, three to five places out
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run sites
 
@@ -1170,6 +1273,7 @@ jobs:
       # last bit, a weight a re-rank with the screen kept, a pin a real click
       # picks, Overpass down said in words, and reset taking all of it away.
       - name: Station relocation finder — one station, the ground round it
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run relocate
 
@@ -1181,6 +1285,7 @@ jobs:
       # WebGL2, which Playwright's Chromium has through SwiftShader; the check
       # skips rather than fails if it is ever absent.
       - name: The 3-D view — the mirror, the sheet geometry, the teardown
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run map3d
 
@@ -1199,6 +1304,7 @@ jobs:
       # WebGL2 through SwiftShader, like map3d; skips rather than fails
       # without it.
       - name: The Digital Twin — the ground, the pole and the figure on it, the .glb, the teardown
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run twin
 
@@ -1216,6 +1322,7 @@ jobs:
       # files built byte by byte. The twin half needs WebGL2 and skips
       # without it; tools/check_field_photos.sql holds 0035's own rules.
       - name: Field photos — read, placed, uploaded, and shown on the tab, the map and the twin
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run photos
 
@@ -1226,6 +1333,7 @@ jobs:
       # zips built byte by byte, every refusal with its sentence; then a zip
       # dropped with loose photos goes in exactly as they do.
       - name: Zip packs — a zip of photos opens in the browser, and its photos go in as photos
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run photozip
 
@@ -1237,6 +1345,7 @@ jobs:
       # editor who may not decide, and an administrator who corrects,
       # approves and rejects. tools/check_photo_review.sql holds 0036's rules.
       - name: Review — what came in, and what the labels say, waiting for an administrator
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run photoreview
 
@@ -1253,6 +1362,7 @@ jobs:
       # The rise is read against its own clock, not the wall's: SwiftShader
       # draws a handful of frames a second. Skips without WebGL2, like twin.
       - name: Flood water in the twin — the levels, where the water goes, the rise and its off switch
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run flood
 
@@ -1270,6 +1380,7 @@ jobs:
       # after their delay, and the map offering the twin at zoom 17 rather than
       # handing itself over. Skips without WebGL2, like twin.
       - name: The twin's site — the station as built, its neighbours, the bridge, borrowed levels, the offer
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run twinsite
 
@@ -1282,6 +1393,7 @@ jobs:
       # place, read back to the centimetre, and saved as the database's current
       # copy of the station with only its position changed. Skips without WebGL2.
       - name: Move pin in the twin and in 3-D — the pin on the ground, the coordinate each view hands back
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run twinpin
 
@@ -1297,6 +1409,7 @@ jobs:
       # segment, the words, the labels, and the boundary over the drape read
       # off two screenshots. Skips without WebGL2, like twin.
       - name: The cadastre in the twin — lot boundaries and numbers, the road reserve, on the ground exactly
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run twincadastre
 
@@ -1309,6 +1422,7 @@ jobs:
       # two apart. Also the wheel, which shares that mapping, and the deltas the
       # pinned callout quotes either side of a reading.
       - name: Arrow navigators — the handles, the wheel and the callout's deltas
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run adnav
 
@@ -1319,6 +1433,7 @@ jobs:
       # though it had not been. Nothing throws and every other check here is
       # green while it is true; the chart is simply wrong about what survived.
       - name: Arrow quality codes — the exporting system's verdict decides something
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run adqual
 
@@ -1333,6 +1448,7 @@ jobs:
       # cannot be placed are asserted absent, and the PNG export is decoded and
       # read pixel by pixel for them.
       - name: Flood lines on the Arrow chart — each in the series' datum, and in the PNG
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run floodlines
 
@@ -1341,6 +1457,7 @@ jobs:
       # converted to decimal degrees. A paste handler that stops matching the
       # boxes throws nothing — the pair just lands whole in one box.
       - name: Coordinate paste — a pair splits across the lat and lon boxes
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run coordpaste
 
@@ -1356,6 +1473,7 @@ jobs:
       # the slider and the types, and the camera, the GPS and the compass all
       # let go when it shuts.
       - name: AR station finder — true north, the directions, the pins, and nothing left running
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run ar
 
@@ -1370,6 +1488,7 @@ jobs:
       # there); and a photo stripped of its EXIF read back by the real OCR
       # engine into the same place, heading, height and time.
       - name: Field Camera — the stamp, the station on it, kept on the device and sent by itself
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run camera
 
@@ -1382,6 +1501,7 @@ jobs:
       # are read with nought as "not tested" and 30 dB as "at least", and the
       # CSV carries the model it was computed on.
       - name: Network Review — the matrix, the card's figures, the field beside them
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run review
 
@@ -1390,12 +1510,14 @@ jobs:
       # to its parts, every slider and switch moves it the way the card says,
       # and the workbook and CSV are floodnet-….
       - name: ALERT2 Transition Plan — the inventory, the plan's sums, the card
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run a2plan
 
       # Node, then Chromium. The TDMA Planner tab (tdma-planner.js): the AirLink
       # air-time formula and the two worked frames against the sources' figures, then the tab, its card and its CSVs.
       - name: TDMA Planner — the air-time formula, the two worked examples, the card
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run tdma
 
@@ -1406,6 +1528,7 @@ jobs:
       # and sliders saying what happened, taken down on the way out, and still
       # at the outcome for a device that asks for reduced motion.
       - name: Radio Propagation — the lesson's physics, frames and stories
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run propagation
 
@@ -1420,6 +1543,7 @@ jobs:
       # sent in order (and held, not lost, when Flood-Net is not ready or the
       # phone is offline), and an administrator's apply panel.
       - name: Level surveys — the arithmetic, the camera's readings, the sheet on a phone
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run levels
 
@@ -1430,6 +1554,7 @@ jobs:
       # point dragged, a stale save refused with Reload, typed coordinates, a
       # GPS fix, delete, the GeoJSON, a database without 0061, and a phone.
       - name: Site features — placed, drawn, refused when stale, on a phone
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run sitefeatures
 
@@ -1442,6 +1567,7 @@ jobs:
       # (one owner, or everyone's but theirs, gone after a reload), the three
       # switches remembered, and the SLS file neither waited for nor missed.
       - name: Station pins — shapes, outlines, grey, owners, and the filters that agree
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run pins
 
@@ -1453,6 +1579,7 @@ jobs:
       # and works, which is the problem. Keys are generated in-process, so this
       # needs no network and no real team (#173).
       - name: The gate's door check — the Access verifier refuses what it must
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run gate
 
@@ -1465,6 +1592,7 @@ jobs:
       # origin, and a header allow-list that leaks the Access cookie breaks
       # nothing anyone would see. Offline, no network.
       - name: The database proxy carries only what it should, and strips the rest
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run dbproxy
 
@@ -1474,6 +1602,7 @@ jobs:
       # and in silence if wrong, because the app works either way. Offline: R2
       # is a Map and the project's answers are a stand-in.
       - name: The photo store admits editors and signed URLs, and nothing else
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run photostore
 
@@ -1482,6 +1611,7 @@ jobs:
       # overwritten, and a day is recorded only once it reads back the same —
       # the thing the nightly retain() trusts before it deletes. Offline.
       - name: The data archive writes once, reads back the same, and records only then
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run archivestore
 
@@ -1495,6 +1625,7 @@ jobs:
       # Offline: Anthropic, Access's keys and the database are stand-ins, the
       # ledger the real Durable Object class over a Map.
       - name: Ask Claude on Flood-Net's key — editors only, the briefing only, a ceiling on the day
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run briefing
 
@@ -1506,6 +1637,7 @@ jobs:
       # database's, and sw.js to what it shows, counts and opens. Offline: the
       # push services and the database are stand-ins on fetch.
       - name: Notifications' sender — RFC 8291 byte for byte, signed, sent and reported
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run push
 
@@ -1516,6 +1648,7 @@ jobs:
       # the token's name — because a report still arrives. Offline: GitHub,
       # Resend and the bucket are stand-ins.
       - name: The bug reporter's Send — Flood-Net's pages only, a few a minute, a ceiling on the day
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run report
 
@@ -1525,6 +1658,7 @@ jobs:
       # anything, stop holding a limit — so each is asserted against a strict
       # in-memory PostgREST built from stations.json. Offline, no network.
       - name: The agent API reads only public relations, and holds its limits
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run agentapi
 
@@ -1532,6 +1666,7 @@ jobs:
       # each agent reads only its own; this holds them, docs/agent-api.md and
       # wrangler.toml's [[ratelimits]] to what worker/api.js does.
       - name: The agent docs say what the agent API does
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run agentdocs
 
@@ -1549,6 +1684,7 @@ jobs:
       # Parsed loosely either becomes a float in a dataset, so the parsing has
       # its own check rather than riding on a run that needs the network.
       - name: Elvis station elevations — the parsing, including "No Data" and 0 m
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         run: python3 tools/elvis_station_elevations.py --check
 
       # The SLS extraction, on the same footing as the three above: data/
@@ -1559,8 +1695,10 @@ jobs:
       # here rather than pinned into the repo, because it is read once per SLS
       # revision and never by the app.
       - name: Install pdfplumber for the SLS check
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         run: pip install --quiet pdfplumber
       - name: Service Level Specification — the extraction still matches the document
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         run: python3 tools/ingest/sls.py --check
 
       # The Bureau's flood warning station lists, on the same footing: data/
@@ -1569,12 +1707,14 @@ jobs:
       # tab-aligned ones and an HTML page — and the readers that put them back
       # together are the part worth re-running. Standard library only.
       - name: River height station lists — the extraction still matches the reports
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         run: python3 tools/ingest/river_height_stations.py --check
 
       # The AEP flood level sheets (0032), on the same footing: data/aep-levels
       # .json is read out of two workbooks in archive/ and carries a slope
       # worked out between stations, which is the part worth re-running.
       - name: AEP flood levels — the extraction still matches the sheets
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         run: python3 tools/ingest/aep_levels.py --check
 
       # HDB's peak flood heights (0037), on the same footing: data/flood-peaks
@@ -1583,6 +1723,7 @@ jobs:
       # over there — and the reader that tells a row from a header is the part
       # worth re-running.
       - name: HDB flood peaks — the extraction still matches the extract
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         run: python3 tools/ingest/flood_peaks.py --check
 
 # concat-verify.mjs is deliberately not run here. It compares the app's bytes
@@ -1668,6 +1809,10 @@ jobs:
       PGUSER: postgres
       PGPASSWORD: meganet
       PGDATABASE: postgres
+    # As in smoke: every check after the load runs whether or not the one
+    # before it passed, so a run names every red check, not just the first.
+    # The scaffold, the migrations, the buckets and the load stay hard stops;
+    # nothing after them means anything without them.
     steps:
       - uses: actions/checkout@v4
       - name: Scaffold the Supabase-shaped surface
@@ -1688,38 +1833,47 @@ jobs:
           psql -v ON_ERROR_STOP=1 -q -f tools/storage_bucket.sql
           psql -v ON_ERROR_STOP=1 -q -f tools/storage_bucket.sql
       - name: Load stations.json
+        id: load
         run: python3 tools/import_stations_json.py | psql -v ON_ERROR_STOP=1 --single-transaction -q
       - name: check_ingest.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest.sql
       - name: check_mqtt.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_mqtt.sql
       # The receivers behind an ingest token (0045): token-checked, refusing a
       # bad report by name, a change a new row and a repeat not, editors only —
       # and nothing but a GPS fix ever stored as an exact location.
       - name: check_ingest_points.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest_points.sql
       # Ingest tokens from the Admin tab (0046): administrators only, a token
       # shown once and kept as its hash, labels unique among live tokens, and a
       # revoke that shuts the door at once.
       - name: check_ingest_token_admin.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest_token_admin.sql
       # Receptions (0047): every frame a receiver heard, good or bad, kept —
       # token-checked, a retry stored once, editors only, GPS the only exact.
       - name: check_receptions.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_receptions.sql
       # Reception rollups (0071, #241): by the hour and the day, sums not
       # means, idempotent, late copies rebuilt, never past the horizon.
       - name: check_reception_rollups.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_reception_rollups.sql
       # A reception's detail as typed columns (0072, #242): every key posted
       # comes back exactly, what a column cannot take stays in detail, the
       # readers see the whole object, and the backfill splits an old row.
       - name: check_reception_detail.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_reception_detail.sql
       # The data archive and retain() (0073, #243): a day is due until it is
       # archived at its count; retain() deletes only days past their horizon,
       # archived and rolled up at their count — never one that is not, however old.
       - name: check_archive.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_archive.sql
       # Transmitter drift (0075, 0077, #217): a receiver's own crystal taken out, each
       # transmitter against the fleet, a relayed copy on its repeater's
@@ -1727,28 +1881,33 @@ jobs:
       # whose shared carrier they sit on — drift and off-channel findings
       # opened and cleared.
       - name: check_transmitter_drift.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_transmitter_drift.sql
       # Who corrupts (0078): flipped copies found and decided — a ghost
       # address, a value off its series — real pairs left alone, and each
       # corrupted copy put down to the transmitter whose carrier it came on,
       # not split between the repeaters that could have carried it.
       - name: check_flip_fingerprints.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_flip_fingerprints.sql
       # A reading's frequency and signal (0050): stored from the reading or
       # its envelope, readable by anon like the rest of it, the first copy's
       # kept on a duplicate — and a bad one stored as null, never a refusal.
       - name: check_reading_signal.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_reading_signal.sql
       # The newest reading of every address (0057), which the agent API's
       # /api/v1/readings/latest reads: one row per address, by the device's
       # own time and the later received of a tie, agreeing with DISTINCT ON —
       # and read by anon exactly as an editor reads it.
       - name: check_reading_latest.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_reading_latest.sql
       # A base station asking for its token (0048): anon may ask, only the hash
       # of the device's own token is kept, only an administrator approves —
       # and the approved token opens the door with nothing to collect.
       - name: check_ingest_token_requests.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_ingest_token_requests.sql
       # Base stations checking in (0049): token-checked check-ins, a fixed list
       # of requests handed over once and expired after ten minutes, settings
@@ -1756,12 +1915,14 @@ jobs:
       # station that only reports refused, and the team keys — public keys,
       # fingerprinted as ssh-keygen prints them, fetched only with a live token.
       - name: check_base_stations.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_base_stations.sql
       # A base station's connection over time (0080): a gap in its check-ins a
       # dropout, a restart or an agent restart by its uptime; a new address
       # block, address or route an event; the full address never kept; a
       # check-in never failed by any of it; administrators the only readers.
       - name: check_base_station_links.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_base_station_links.sql
       # A base station's channels (0081): a frequency and a protocol a row from
       # the reception rollups, 151.5375 kept to 0.1 kHz, IDs put down to the
@@ -1769,6 +1930,7 @@ jobs:
       # count), the register's pairs with their distance, a week by the hour and
       # a month by the day; administrators the only callers.
       - name: check_base_station_channels.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_base_station_channels.sql
       # The network's health kept by the database (0059): a base station that
       # stops checking in and a receiver that runs but decodes nothing each a
@@ -1777,14 +1939,19 @@ jobs:
       # when stale and cleared only when complete; a base station's findings
       # for administrators only.
       - name: check_health_findings.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_health_findings.sql
       - name: check_inspections.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspections.sql
       - name: check_inspection_history.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspection_history.sql
       - name: check_river_height_details.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_river_height_details.sql
       - name: check_bureau_station_lists.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_bureau_station_lists.sql
       # The SQL river_height_stations.py prints is what writes the Bureau's lists
       # into the live database, and nothing else ever runs it — so a migration
@@ -1792,10 +1959,12 @@ jobs:
       # fed it a new edition. Run here against the database stations.json just
       # built, in a transaction that rolls back.
       - name: The Bureau lists' SQL still fits the schema
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: |
           { echo 'begin;'; python3 tools/ingest/river_height_stations.py --sql; echo 'rollback;'; } \
             | psql -v ON_ERROR_STOP=1 -q
       - name: check_aep_levels_and_frequencies.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_aep_levels_and_frequencies.sql
       # The field photo door (0035): the path and type rules a private bucket's
       # privacy rests on, one live photo per SHA-256, one row per Dropbox file
@@ -1803,6 +1972,7 @@ jobs:
       # station within a kilometre, and who may read what — signed in as an
       # editor, as a stranger, as anon and as the sync's service_role.
       - name: check_field_photos.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_field_photos.sql
       # The upload log, the administrator and the equipment register (0036):
       # an outcome per file from every way in, is_admin() for exactly the
@@ -1810,18 +1980,21 @@ jobs:
       # through an administrator's decision — signed up through 0005's own
       # triggers as an administrator, an editor and a stranger.
       - name: check_photo_review.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_photo_review.sql
       # Level surveys and two-peg tests (0060): editors file them, the database
       # works out a test's error and a survey's misclose for itself, pictures
       # are filed where they belong, and only an administrator applies a survey
       # to its station — or changes a station's gauge zero in the editor.
       - name: check_level_surveys.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_level_surveys.sql
       # A station's site features (0061): what a geometry may be, each kind's
       # shape held by a foreign key, editors adding, changing and deleting
       # with the stamp they read, a point on the wrong station's map refused,
       # and nobody signed out reading any of it.
       - name: check_station_features.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_station_features.sql
       # Proposed stations (0039): what a proposal has to say, the station
       # document gaining nothing for a station that is not one, and who may
@@ -1829,13 +2002,16 @@ jobs:
       # triggers as an editor and an administrator — with the whole register
       # back through load_stations_doc() carrying a proposal.
       - name: check_proposed_stations.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_proposed_stations.sql
       # A tower's platform height (0040): 3.0 or 4.5 m and nothing else, the
       # document gaining nothing until one is recorded, and only an editor
       # recording it — through save_station() and load_stations_doc() alike.
       - name: check_tower_height.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_tower_height.sql
       - name: check_station_facing.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_station_facing.sql
       # The station history (0056): a change to a station's own fields
       # recorded once, with only what moved, and nothing for a save or a sync
@@ -1845,10 +2021,12 @@ jobs:
       # a deleted station through restore_station(), each refused in words
       # where an ordinary save would be.
       - name: check_station_history.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_station_history.sql
       # The Admin tab's user management (0042): administrators only, the role
       # a first sign-in arrives with, and the guards against locking everybody out.
       - name: check_user_admin.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_user_admin.sql
       # Accounts for anybody (0062): sign-up open or closed to the allowlist, a
       # member approved automatically or by an administrator, a decline that
@@ -1856,6 +2034,7 @@ jobs:
       # views kept in the shape the app sends, and the grants a stranger with
       # an account must not have.
       - name: check_accounts.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_accounts.sql
       # An administrator's notifications (0066): only an administrator turns a
       # device on, only at one of the four push services and with the server's
@@ -1864,10 +2043,12 @@ jobs:
       # administrator's devices hear nothing; and what a push service says
       # comes back, a gone subscription going with it.
       - name: check_push.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_push.sql
       # The Admin tab's dashboard (0043): administrators only, and the visit
       # log's anonymous write held to one row a visitor a day, 5,000 a day.
       - name: check_admin_dashboard.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_admin_dashboard.sql
       # The ALERT2 Transition Plan's shared stores (0065) and its list (0076):
       # seen by the people nominated to it and nobody else — an administrator
@@ -1875,10 +2056,12 @@ jobs:
       # one; site conditions for everybody on it, and scenarios private to
       # their author until shared — read, changed and removed by nobody else.
       - name: check_alert2_plan.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_alert2_plan.sql
       # …and the same for the AEP sheets' SQL (0033): it attaches rows by
       # number and by position into columns only it and the editor write.
       - name: The AEP levels' SQL still fits the schema
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: |
           { echo 'begin;'; python3 tools/ingest/aep_levels.py --sql; echo 'rollback;'; } \
             | psql -v ON_ERROR_STOP=1 -q
@@ -1890,13 +2073,16 @@ jobs:
       # check runs without the load too (it says `skip`), but only with it
       # does it read the real Gatton, Ipswich and Little Nerang Dam.
       - name: Load the HDB flood peaks
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: python3 tools/ingest/flood_peaks.py --sql | psql -v ON_ERROR_STOP=1 --single-transaction -q
       - name: check_flood_peaks.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_flood_peaks.sql
       # A station taking its flood history from another (0041): Gatton's floods
       # on a station beside it, through Gatton's zero, following Gatton's changes,
       # and a gauge of its own winning — after the peaks are loaded, above.
       - name: check_flood_peaks_from.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_flood_peaks_from.sql
       # The station document kept rather than built on every load (0069): the
       # copy is the document to the byte after every committed load above
@@ -1905,6 +2091,7 @@ jobs:
       # changes in a row and a rolled-back one, and the watch putting back a
       # dropped trigger. Last of the loads, so the copy has been through them all.
       - name: check_stations_doc_cache.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_stations_doc_cache.sql
       # The SLS's merge rule is written twice — in tools/ingest/sls.py for the
       # file the app reads off disk, and in meganet.sls_location for anything
@@ -1915,4 +2102,5 @@ jobs:
       # rows load into the schema, and that one document's load leaves the
       # other's rows alone.
       - name: The SLS loads, and the database merges it as the app's file does
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: python3 tools/check_sls_merge.py

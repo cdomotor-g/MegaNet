@@ -29,7 +29,11 @@ function findChromium() {
       .sort((a, b) => (a.includes('headless') - b.includes('headless'))
                    || b.localeCompare(a, 'en', { numeric: true }));
     for (const dir of dirs) {
-      for (const exe of ['chrome-linux/chrome', 'chrome-linux/headless_shell',
+      // chrome-linux64/ is the layout newer Playwright builds unpack to (the
+      // Claude Code cloud image's chromium-1243 is one); chrome-linux/ the older.
+      for (const exe of ['chrome-linux64/chrome', 'chrome-linux/chrome',
+                         'chrome-headless-shell-linux64/chrome-headless-shell',
+                         'chrome-linux/headless_shell',
                          'chrome-mac/Chromium.app/Contents/MacOS/Chromium',
                          'chrome-win/chrome.exe']) {
         const p = path.join(root, dir, exe);

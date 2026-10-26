@@ -105,7 +105,9 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   pull request. Never create branches unless explicitly asked.
 - **CI:** do not poll or wait for CI after pushing; the smoke test takes ~20
   minutes and a newer push cancels it, so "cancelled" is normal. Look at a run
-  only when the owner says one failed. Before pushing app changes run
+  only when the owner says one failed. A scheduled CI doctor
+  (`.claude/skills/ci-doctor/SKILL.md`, every four hours) is the one session
+  that reads `main`'s CI and fixes what is red. Before pushing app changes run
   `cd test && npm run check && npm run names && npm run toplevel && npm run steps && npm run brand`
   (seconds, no browser), and `git pull --rebase origin main` first — several
   threads push to `main`. If a push is rejected, rebase and retry once, then
