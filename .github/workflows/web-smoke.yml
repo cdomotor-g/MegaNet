@@ -522,6 +522,17 @@ jobs:
         working-directory: test
         run: npm run flipsources
 
+      # 🛤️ Signal Routes (signal-routes.js): signed out it asks nothing; the
+      # demo draws every panel; read signed in, the receptions chunked and
+      # paged, eight stations put down to a repeater's carrier, one in its
+      # range heard only direct, one relayed off its record (copies), a relay
+      # nobody explains, an Enhanced iFLOWS frame, ALERT2 by path, the CSVs and
+      # a phone.
+      - name: Signal Routes
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run signalroutes
+
       # 🧪 The Bit Bench and ⚡ Bit Errors (bit-model.js, bit-bench.js,
       # bit-errors.js): the frame read back by three decoders, the arithmetic,
       # each fault's fingerprint, pasted readings, then both tabs in Chromium —

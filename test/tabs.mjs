@@ -308,6 +308,18 @@ const SEED_FLIPSOURCES = `async () => {
   await new Promise(r => setTimeout(r, 300));
 }`;
 
+// Signal Routes draws its four panels only once receptions are in, which this
+// harness never gives it; the demo is the module's own door to the same
+// drawing. A repeater picked, so Pass ranges' detail is measured too, and
+// every fold opened, because a closed <details> is display:none.
+const SEED_SIGNALROUTES = `async () => {
+  SignalRoutes.demo();
+  const A = SignalRoutes.state().A;
+  if (A && A.reps.length) SignalRoutes.pickRep(A.reps[0].rid);
+  document.querySelectorAll('#main-content details').forEach(d => { d.open = true; });
+  await new Promise(r => setTimeout(r, 300));
+}`;
+
 const SEED_BITFLIPPER = `async () => {
   const addr = String(state.data.stations
     .flatMap(s => (s.sensors || []).map(x => x.alert_id))
@@ -904,6 +916,8 @@ const CONVERTED = [
   { id: 'mapgen',     label: 'Map Generator',   issue: 'new with the tab' },
   { id: 'bitflipper', label: 'Bit Flipper',     issue: '#139', seed: SEED_BITFLIPPER },
   { id: 'flipsources', label: 'Bit-Flip Sources', issue: '#244', seed: SEED_FLIPSOURCES },
+  { id: 'signalroutes', label: 'Signal Routes — signed out', issue: 'born converted' },
+  { id: 'signalroutes', label: 'Signal Routes — the demo, a repeater picked, every fold open', issue: 'born converted', seed: SEED_SIGNALROUTES },
   { id: 'workbench',  label: 'Interference Workbench — intro',       issue: '#139' },
   { id: 'workbench',  label: 'Interference Workbench — worked case', issue: '#139', seed: SEED_WORKBENCH },
   { id: 'packets',    label: 'ALERT Packets',   issue: '#140', seed: SEED_PACKETS },

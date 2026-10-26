@@ -5795,6 +5795,26 @@ power after a remediation. The inspection form's **Antenna Tests** open the tab
 with the readings typed there. `npm run swr` holds the arithmetic to figures
 worked by hand and drives the tab in Chromium.
 
+### 36. Signal Routes (What Comes In From Where, by Its Carrier)
+
+🛤️ **Signal Routes**, in the **Data** group, follows every burst the base
+stations' receivers heard over today, three days or seven back to the
+transmitter that put it on the air — the field station itself, or the repeater
+whose **carrier** it came on, since a repeater sends everything it relays on its
+own carrier — by the server's own rules (`0077`), run again in the browser over
+the receptions, so it is **editors only** (with a demo for anybody). Four views:
+a **flow** from each station through what the receiver heard to the channel
+that decoded it, ALERT2 drawn by the path its PDUs name; the same **on the
+map**; each repeater's **pass ranges on record against the air** — the
+addresses confirmed on its carrier, those in its ranges only ever heard another
+way, those relayed though no range on record says so, and copies gathered on a
+carrier no repeater on record explains, put down to the repeater found at that
+carrier on another day; and the **protocols** — ALERT2 or legacy, ALERT Binary
+or Enhanced iFLOWS channel by channel, and which stations arrive both ways
+through an ALERT2 concentrator. Both tables download as CSV
+([docs/signal-routes.md](docs/signal-routes.md)). `npm run signalroutes` holds
+it to a fixture on the real station file.
+
 ## Deployment Plan
 
 The plan the consolidation was built to, kept as the record of it. **Every

@@ -137,6 +137,14 @@ const ExportMenu = (function () {
         call: ['HealthAgent.downloadPack'],
         empty: 'There are no findings yet — the week is still being read.' },
     ],
+    signalroutes: () => [
+      { label: 'The routes — CSV', sub: 'each station and address, the way it came in — direct, the repeater whose carrier it came on, or an ALERT2 path — the receiver and how many',
+        call: ['SignalRoutes.exportRoutesCsv'],
+        ready: () => (typeof SignalRoutes !== 'undefined' && SignalRoutes.state().A) ? '' : 'Nothing read yet — read the receptions, or show the demo.' },
+      { label: 'Pass ranges against the air — CSV', sub: 'each repeater whose carrier was found, and every address on its carrier, in its ranges but heard another way, or off its record',
+        call: ['SignalRoutes.exportPassCsv'],
+        ready: () => { const A = typeof SignalRoutes !== 'undefined' && SignalRoutes.state().A; return !A ? 'Nothing read yet — read the receptions, or show the demo.' : A.reps.length ? '' : 'No repeater\'s carrier was found in this period.'; } },
+    ],
     flipsources: () => [
       { label: 'The suspects — CSV', sub: 'every repeater that could have corrupted a reading, with its carrier evidence, pass-range share and rate',
         call: ['FlipSources.exportCsv'], empty: 'There is no bit-flip evidence for this period yet.' },

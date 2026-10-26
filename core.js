@@ -210,6 +210,16 @@ const TABS = [
       find: 'messages telemetry arrivals incoming ingest raw log fade margin ingress base pathway follow live decode calibration value volts battery converted' },
     { id: 'health',     label: 'Station Health',         icon: '🚦',
       find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage network weather bulletin daily weekly summary animation news droggies presenter' },
+    // 🛤️ Signal Routes (signal-routes.js) is the sixth, and the group's last:
+    // what came in from where — each burst the base stations heard followed
+    // back to the transmitter that sent it, by its carrier, set against the
+    // pass ranges on record, and split by protocol and frame format. Its find
+    // words are the questions it answers ("which repeater", "came in",
+    // "iflows") — none starting "no", so "no signal" still finds Offline &
+    // Install on its two words, and never "network", "decode" or "packet",
+    // which nav.mjs's probes hold for other tabs.
+    { id: 'signalroutes', label: 'Signal Routes',        icon: '🛤️',
+      find: 'routes route came in from where which repeater relayed relay relays carrier offset fingerprint heard via direct hop hops path paths pass range record off record unexplained copies concentrator concentration alert2 legacy binary iflows enhanced ascii format formats protocol protocols sankey flow diagram' },
   ] },
   { group: 'Site visits', tabs: [
     // 📌 Nearby (nearby.js) heads the group because it is where a visit
@@ -1944,6 +1954,40 @@ const HELP = {
         href: 'docs/station-health.md' },
     ],
     related: ['msglog', 'reception', 'basestations', 'field', 'stations'],
+  },
+
+  signalroutes: {
+    summary: 'What comes in from where. Every burst the base stations\' receivers heard over the last day, '
+           + 'three or seven, followed back to the transmitter that put it on the air: the field station itself, '
+           + 'or the repeater whose <strong>carrier</strong> it came on — a repeater sends everything it relays on its '
+           + 'own carrier, a few hundred hertz from the next transmitter\'s, so the carrier says who relayed it. Drawn '
+           + 'four ways: a <strong>flow</strong> from each station through what the receiver heard to the channel that '
+           + 'decoded it (ALERT2 by the path it names); the same <strong>on the map</strong>; each repeater\'s '
+           + '<strong>pass ranges on record against the air</strong> — confirmed, in a range but heard another way, and '
+           + 'relayed though no range on record says so; and the <strong>protocols</strong> — ALERT2 or legacy, ALERT '
+           + 'Binary or Enhanced iFLOWS, channel by channel, and which stations arrive both ways.',
+    watch: [
+      '<strong>Editors only.</strong> It reads the receptions — every frame each receiver heard, carrier and all — '
+      + 'which name the base stations, so sign in as an editor; <em>Show a demo</em> works for anybody, on made-up '
+      + 'receptions over the real station file.',
+      'A repeater\'s carrier is found each day from the addresses its pass ranges hold — 4 or more of them heard on '
+      + 'one carrier, and half of those heard from its range — the server\'s own rule (Station Health, Transmitter '
+      + 'frequency). One with too few heard that day, or one the register does not have, is not found: its relays '
+      + 'count as direct, or as copies no repeater explains, which <em>Relays no repeater on record explains</em> '
+      + 'gathers by carrier and puts down to a repeater found at that carrier on another day.',
+      '<strong>"Off its record" with copies is strong; "possible" is not.</strong> A copy a second after its '
+      + 'original, on a repeater\'s carrier, is that repeater relaying it. Every burst of a station sitting on a '
+      + 'repeater\'s carrier with no copy is also what a station whose own carrier happens to sit within 30 Hz does — '
+      + 'about one in ten.',
+      'Each SDR channel is decoded in one format: an Enhanced iFLOWS station on a channel set to ALERT Binary shows '
+      + 'as bursts heard and not decoded, not as iFLOWS. A Quansheng radio decodes both and says which. Only RPi '
+      + 'ALERT 0.14 or later measures carriers; a Quansheng or ERT-A2 measures none.',
+    ],
+    links: [
+      { label: 'Signal Routes — how each burst is followed back, and what each view shows',
+        href: 'docs/signal-routes.md' },
+    ],
+    related: ['health', 'passranges', 'flipsources', 'reception', 'basestations'],
   },
 
   mapgen: {

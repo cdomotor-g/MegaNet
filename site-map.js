@@ -189,6 +189,14 @@ const SiteMap = (function () {
         'Open it straight from a sensor row\'s Flip link in the station editor',
       ],
     },
+    signalroutes: {
+      what: 'What comes in from where: every burst the base stations heard followed back to the field station or repeater that sent it, by its carrier, against the pass ranges on record and by protocol.',
+      use: [
+        'See which field stations come in through which repeaters',
+        'Check a repeater\'s pass ranges on record against what it actually relays',
+        'See what arrives on ALERT2 and what on legacy ALERT — and whether anything is Enhanced iFLOWS',
+      ],
+    },
     flipsources: {
       what: 'Who is corrupting the network\'s ALERT readings: every corrupted copy put down to the repeater that sent it, by its carrier or its pass range.',
       use: [
@@ -466,6 +474,7 @@ const SiteMap = (function () {
     { text: 'Decode an ALERT message',                     tab: 'packets' },
     { text: 'Explain a reading on an address nobody owns', tab: 'bitflipper' },
     { text: 'Find the repeater that is corrupting readings', tab: 'flipsources' },
+    { text: 'See which repeater each station comes in through', tab: 'signalroutes' },
     { text: 'Work out what could have corrupted a station\'s readings', tab: 'bitbench' },
     { text: 'Work out what is interfering with a repeater', tab: 'workbench' },
     { text: 'Listen to ALERT off the air',                 tab: 'serial' },

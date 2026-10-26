@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 107, date: '2026-10-26', items: [
+      'New: <strong>🛤️ Signal Routes</strong>, in the Data group — what comes in from where. Every burst the base stations '
+        + 'heard, followed back to the field station or the repeater that sent it by its <strong>carrier</strong>, drawn as a '
+        + 'flow from station to repeater to receiver and on the map; each repeater\'s <strong>pass ranges on record set against '
+        + 'the air</strong> — confirmed, in a range but heard another way, and relayed though no range says so; and '
+        + '<strong>ALERT2 or legacy, ALERT Binary or Enhanced iFLOWS</strong>, channel by channel. For editors; '
+        + '<em>Show a demo</em> works for anybody.',
+    ] },
     { n: 106, date: '2026-10-26', items: [
       'A <strong>handle on the bottom edge</strong> of every table and list a card cuts short — the Stations list, Pass Ranges, '
         + 'RF Environment, Export\'s networks, a filter\'s options and the rest. Drag it down to see more rows at once, or up '

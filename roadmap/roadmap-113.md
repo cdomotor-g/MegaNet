@@ -818,6 +818,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 186 — 2026-10-26: 🛤️ Signal Routes
+
+The owner: *"explore graphically what's coming in from where … use the fingerprinting of the carrier signals … what field stations are coming in through what repeaters … if that correlates to the pass range settings that we have on record … what's coming in on ALERT2 and what's coming in on legacy, and whether anything is coming in on iFLOWS or just legacy ALERT binary."* **Opens and closes nothing.**
+
+- **`signal-routes.js`** — a new tab, the Data group's sixth: each burst followed back to its transmitter by its carrier, drawn four ways — a flow (station → what the receiver heard → receiver channel; ALERT2 by path), a map, **pass ranges against the air** (on its carrier / in its range, heard another way / off its record with copies or possible / in range, not heard, and an address-space strip per repeater), and **protocols and formats** (an iFLOWS verdict, receivers by format, stations legacy-only / both / ALERT2-only through a concentrator). Unexplained copies are gathered by carrier and put down to the repeater found at that carrier on another day. Two CSVs.
+- **No migration.** `carrier_daily` keeps a row per transmitter, not which addresses a repeater relayed, and is the service key's; and the queue `0080`–`0082` is still waiting on `db-migrate`'s secret. So `0077`'s rules are run again in the browser over the receptions (editors only, read in six-hour chunks), step for step. Checked against the server on 25 Oct, 18 Bateson's 151.525: both find Mt Glorious AL RPTR at +338 Hz and Toowoomba AL at +101/+102, three unexplained copies; the counts differ by the 25 corrupted copies `0078` sets aside first and this does not. A server-side version (a public, receiver-free summary like `flip_sources`) is the follow-up if the tab earns it.
+- **First look at the live data** (Supabase, read-only): in the last 30 days the receivers decoded only ALERT Binary and ALERT2 — no Enhanced iFLOWS frame at all; ALERT2 PDUs carried ~1,500 legacy addresses in a day, about 1,000 of them from source 11762 (through 11056 → 10019), the rest from 10115, 10083, 11099 and others; on 22 Oct 527 copies were unexplained on 151.525, clustered at about +545 Hz (where Mt Glorious's carrier sat on the 21st and 23rd) and +310 Hz (no repeater found there).
+- **Checks:** `npm run signalroutes` (new, 30, in CI), `tabs` (two entries), `help`, `exports`, `looks`, `nav`, the cheap five.
+
 ### Revision 185 — 2026-10-24: 📺 Network Weather, `0082`, and RPi ALERT 0.15.2
 
 The owner asked for a daily (and weekly) animated bulletin at the top of Station Health — *"animation technician meets weatherman"*, presented by the Droggies — written each morning by a scheduled Claude Code task, then for the presenter under the stage beside their words, then *"yes to bug fix and pi ppm"*. **Opens and closes nothing.**
