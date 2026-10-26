@@ -97,7 +97,7 @@ function check(name, pass, detail = '') {
 // Every id the Stations cards are found by. Each must be on the page exactly
 // once on the Stations tab and not at all anywhere else.
 const CARD_IDS = ['stations-cards', 'stations-filter-card', 'stations-list-card', 'stations-table-wrap',
-                  'stations-path-cards', 'path-card', 'path-profile-panel', 'link-budget-panel', 'stations-carriers-card',
+                  'stations-path-cards', 'path-profile-panel', 'link-budget-panel', 'stations-carriers-card',
                   'blast-card', 'stations-editor-card'];
 
 // …and every id the map's panels are found by, for the same rule.
@@ -385,7 +385,7 @@ try {
     if (link) MapBackbone.open('field', link.mnLinkStationId, link.mnLinkRepeaterId);
     window.__mnFilters = state.filters;
     return { sel: state.selectedId, picked: state.mapSelection.size, drawn: state.draw.shapes.length,
-             path: !document.getElementById('path-card').hidden, card: state.stnCard.id };
+             path: !!MapBackbone.current(), card: state.stnCard.id };
   });
   await page.evaluate(() => setDockTab('stations', { instant: true }));
   await page.waitForTimeout(600);
@@ -397,7 +397,7 @@ try {
     const side = b && b.closest('.dock-group');
     return {
       sel: state.selectedId, editor: state.editorId, picked: state.mapSelection.size,
-      drawn: state.draw.shapes.length, path: !document.getElementById('path-card').hidden,
+      drawn: state.draw.shapes.length, path: !!MapBackbone.current(),
       card: state.stnCard.id, filters: state.filters === window.__mnFilters,
       c: state.map.getCenter(), z: state.map.getZoom(),
       heads: !!side && side.dataset.group === 'foot' && side.firstElementChild === b
@@ -967,12 +967,14 @@ try {
   await page.evaluate(() => { MapDraw.setTool(''); state.draw.shapes = []; state.draw.selectedId = null; MapDraw.render(); MapDraw.rerenderPanel(); });
   await page.waitForTimeout(200);
 
-  // A radio path clicked on the map: its card is the first of the path tools,
-  // not a card over the map. The click brings 〽️ up whatever was showing, puts
-  // focus on the card, and leaves the station card — which it used to close —
-  // open on the map. Escape shuts it back to what opened it; a render of the
-  // tab paints it back, as the profile and budget under it come back; and once
-  // the profile moves to another line it goes.
+  // A radio path clicked on the map: the profile card — the first of the path
+  // tools, not a card over the map — becomes the path's card, titled for it.
+  // The click brings 〽️ up whatever was showing, puts focus on the card, and
+  // leaves the station card — which it used to close — open on the map.
+  // Escape hands focus back to what opened it and leaves the card as it is; a
+  // render of the tab paints the path back on it, as the profile and budget
+  // come back; and once the profile moves to another line the card is that
+  // line's elevation profile again.
   await page.evaluate(() => setDockTab('stations', { instant: true }));
   await page.waitForTimeout(250);
   const pathPair = await page.evaluate(() => {
@@ -986,21 +988,25 @@ try {
   check('the file has a field station and a repeater to open a radio path between', !!pathPair);
   if (pathPair) {
     const pathCard = () => page.evaluate(() => {
-      const el = document.getElementById('path-card');
+      const el = document.getElementById('path-profile-panel');
       const wrap = document.getElementById('stations-path-cards');
       const a = document.activeElement;
+      const title = document.getElementById('path-card-title');
       return {
         showing: dockShowing(),
-        hidden: !el || el.hidden,
+        path: !!MapBackbone.current(),
+        rows: !!(el && el.querySelector('.path-card-rows')),
         visible: !!el && el.checkVisibility(),
         inPane: !!(el && el.closest('#dock-pane-paths')),
         first: !!(el && wrap && wrap.firstElementChild === el),
-        onMap: !!document.querySelector('.mn-map-stage #path-card'),
+        onMap: !!document.querySelector('.mn-map-stage #path-profile-panel, .mn-map-stage .path-card-rows'),
         focusIn: !!(el && el.contains(a)),
         focusTag: a ? (a.id || a.tagName) : null,
-        title: document.getElementById('path-card-title')?.textContent || '',
+        title: title?.textContent || '',
+        titled: !!(el && title && el.contains(title) && el.getAttribute('aria-labelledby') === 'path-card-title'),
         stn: !document.getElementById('stn-card')?.hidden,
-        n: document.querySelectorAll('#path-card').length,
+        n: document.querySelectorAll('#path-profile-panel').length,
+        old: document.querySelectorAll('#path-card').length,
       };
     });
     await page.evaluate(([f]) => showStationCard(f), pathPair);
@@ -1008,15 +1014,16 @@ try {
     await page.evaluate(([f, r]) => MapBackbone.open('field', f, r), pathPair);
     await page.waitForTimeout(400);
     const pc = await pathCard();
-    check('a radio path opens its card at the head of the path tools, in the 〽️ pane, not over the map',
-      pc.showing === 'paths' && !pc.hidden && pc.visible && pc.inPane && pc.first && !pc.onMap && pc.title === 'Radio path',
+    check('a radio path makes the profile card, at the head of the path tools in the 〽️ pane, the path\'s card — one card, not over the map',
+      pc.showing === 'paths' && pc.path && pc.rows && pc.visible && pc.inPane && pc.first && !pc.onMap
+        && pc.title === 'Radio path' && pc.titled && pc.old === 0,
       JSON.stringify(pc));
     check('…with focus on the card, and the station card left open on the map', pc.focusIn && pc.stn, JSON.stringify(pc));
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
     const esc = await pathCard();
-    check('Escape closes the radio path card, focus back on what opened it',
-      esc.hidden && esc.focusTag !== 'BODY' && await page.evaluate(() =>
+    check('Escape hands focus back to what opened the path, and leaves the card as it is',
+      esc.path && esc.rows && esc.title === 'Radio path' && esc.focusTag !== 'BODY' && await page.evaluate(() =>
         document.activeElement?.matches('#help-panel .dock-tab[data-dock="stations"]')),
       JSON.stringify(esc));
     await page.evaluate(([f, r]) => MapBackbone.open('field', f, r), pathPair);
@@ -1025,8 +1032,8 @@ try {
     await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
     await page.waitForTimeout(400);
     const again = await pathCard();
-    check('a render of the tab paints the radio path card back, in its pane',
-      !again.hidden && again.inPane && again.first && again.n === 1, JSON.stringify(again));
+    check('a render of the tab paints the radio path back on the card, in its pane',
+      again.path && again.rows && again.title === 'Radio path' && again.inPane && again.first && again.n === 1, JSON.stringify(again));
     await page.evaluate(() => {
       const r = document.getElementById('leaflet-map').getBoundingClientRect();
       const a = state.map.containerPointToLatLng([r.width * 0.3, r.height * 0.3]);
@@ -1036,7 +1043,8 @@ try {
     });
     await page.waitForTimeout(200);
     const moved = await pathCard();
-    check('once the profile is on another line, the radio path card closes', moved.hidden, JSON.stringify(moved));
+    check('once the profile is on another line, the card is that line\'s elevation profile again',
+      !moved.path && !moved.rows && moved.title === 'Elevation profile', JSON.stringify(moved));
     await page.evaluate(() => { closeStnCard(false); state.draw.shapes = []; state.draw.selectedId = null; MapDraw.render(); MapDraw.rerenderPanel(); });
     await page.waitForTimeout(200);
   }

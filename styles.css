@@ -6206,7 +6206,11 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 }
 
 .path-panel > summary span,
-.lb-panel > summary span { color: var(--muted); }
+.lb-panel > summary span {
+  color: var(--muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 
 /* The elevation profile with no path to profile (PathProfile's empty state).
    Not a <details> — there is nothing to open — so its head is drawn to line up
@@ -6233,41 +6237,11 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   margin: .4rem 0 0;
 }
 
-/* The radio path card (MapBackbone), at the head of the path tools. It was a
-   card over the map in .acma-card's dress until it moved here; now it is a
-   panel in the same column as the profile and the budget, so its head is drawn
-   the way the profile's empty state is — same heading size, the muted note
-   beside it — to line up with the summaries under it, with × pushed to the far
-   end. Not a <details>: it is there because a path was clicked, and × is how
-   it goes. The rows keep the map cards' label/value grammar (.acma-row), at
-   their size. */
-.path-card-head {
-  display: flex;
-  align-items: baseline;
-  gap: .5rem;
-  padding: .1rem 0;
-}
-
-.path-card-head h3 {
-  margin: 0;
-  font-size: .95rem;
-  white-space: nowrap;
-}
-
-.path-card-head .small {
-  color: var(--muted);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.path-card-close {
-  margin-left: auto;
-  align-self: center;
-  padding: 0 .45rem;
-  font-size: 1rem;
-  line-height: 1.4;
-}
-
+/* A clicked radio path's rows on the profile card (MapBackbone.section): who
+   is at each end, the addresses and the channel, at the head of the card's
+   body. They were a card of their own over the profile until it said the same
+   distance and fade margin twice; they keep the map cards' label/value grammar
+   (.acma-row), at their size. */
 .path-card-rows {
   margin-top: var(--sp-2);
   font-size: .88rem;
@@ -6284,6 +6258,18 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   color: var(--muted);
   margin: var(--sp-2) 0 0;
 }
+
+/* 📋 Copy for a report, over the chart, with the chart-alone choices beside
+   it. Wraps under it in a narrow column rather than squeezing either. */
+.path-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-2);
+  margin: var(--sp-2) 0;
+}
+
+.path-copy .small { color: var(--muted); }
 
 .path-body,
 .lb-body { padding-top: .5rem; }
@@ -7985,8 +7971,7 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   .leaflet-container .leaflet-popup-content {
     margin-right: 2.9rem;
   }
-  .acma-card-head button,
-  .path-card-close {
+  .acma-card-head button {
     min-width: 2.75rem;
     min-height: 2.75rem;
   }

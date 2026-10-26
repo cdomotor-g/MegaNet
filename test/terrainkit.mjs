@@ -40,8 +40,11 @@
 //                        figure, be painted in its bands, and ride the cursor.
 //                        And one set of radio figures behind every margin: a
 //                        TX power typed into the link budget or the profile
-//                        moves the budget, the profile, the signal and the
-//                        radio-path card by the same decibels.
+//                        moves the budget, the profile and the signal by the
+//                        same decibels. A clicked radio path makes the card
+//                        the path's, its figures said once; 📋 copies the
+//                        chart and every figure behind the margin, and the
+//                        clipboard is read back.
 //
 //   node --run terrain        (or: npm run terrain)
 //       npm run terrain -- -v    also print what passed
@@ -140,6 +143,8 @@ const errors  = [];
 let tileHits = 0;
 
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+// 📋 Copy for a report is read back off the clipboard (section 4).
+await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: server.origin });
 const page    = await context.newPage();
 await applyNetworkPolicy(page, server.origin);
 // Registered after the policy, so it is asked first — the terrain server is
@@ -816,58 +821,88 @@ if (sig) {
      `${sig.stored}; ${sig.heldW} of ${sig.iw}; "${sig.tag}"; ${sig.btn}`);
 }
 
-// The radio-path card that heads the profile quotes the profile's own fade
-// margin, in the profile's colour. And an obstruction the model has priced is
-// said beside the figure rather than painted over it: the card read red on a
-// path the profile called +39.6 dB good, because something stood above the
-// line of sight — a yes or no on the geometry, where the margin is the model's
-// answer with the obstruction already in it.
+// A clicked radio path makes the profile card the path's card. It was a card
+// of its own heading the profile, and said the distance and the fade margin
+// the readout under it said again, in a second box under a second heading. So
+// now: the title says it is a radio path, the rows at the head of the card
+// name the ends, the addresses and the channel, and the distance and the fade
+// margin are said once — by the readout, which drops its Path row because the
+// rows above it name the ends already. An obstruction the model has priced is
+// said beside the figure rather than painted over it: a yes or no on the
+// geometry, where the margin is the model's answer with the obstruction in it.
 const pathCard = await page.evaluate(async ids => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const el = document.getElementById('path-profile-panel');
   const read = () => {
-    const row = [...document.querySelectorAll('#path-card .acma-row')]
-      .find(r => r.firstElementChild.textContent.trim() === 'Fade margin');
-    const s = row ? row.querySelector('strong') : null;
-    // The headline and its note; the way it was priced is a line of its own
-    // under them.
-    const v = row ? row.lastElementChild.cloneNode(true) : null;
-    if (v) v.querySelectorAll('.path-card-way').forEach(n => n.remove());
-    return s ? { text: v.textContent.replace(/\s+/g, ' ').trim(), cls: s.className } : null;
+    const dt = [...el.querySelectorAll('.path-readout > .path-stats > div > dt')].find(x => x.textContent.trim() === 'Fade margin');
+    const v = dt ? dt.nextElementSibling : null;
+    const p = PathProfile.shownMargin();
+    return {
+      verdict: p ? p.verdict : null,
+      fig: p ? `${p.margin > 0 ? '+' : ''}${p.margin.toFixed(1)} dB` : null,
+      want: p ? `txt-${lbMarginClass(p.margin).cls}` : null,
+      text: v ? v.textContent.replace(/\s+/g, ' ').trim() : null,
+      cls: v && v.querySelector('span') ? v.querySelector('span').className : '',
+    };
   };
   MapBackbone.open('field', ids[0], ids[1]);
   const until = Date.now() + 40000;
-  while (Date.now() < until && !(PathProfile.shownMargin() && read())) await new Promise(r => setTimeout(r, 200));
-  const p = PathProfile.shownMargin();
-  if (!p) return null;
-  const plain = read();
-  const real = PathProfile.shownMargin;
-  PathProfile.shownMargin = () => ({ ...real(), margin: 39.6, verdict: 'obstructed' });
-  MapBackbone.repaint();
-  const blocked = read();
-  PathProfile.shownMargin = real;
-  MapBackbone.repaint();
-  return { fig: `${p.margin > 0 ? '+' : ''}${p.margin.toFixed(1)} dB`, want: `txt-${lbMarginClass(p.margin).cls}`, plain, blocked };
+  while (Date.now() < until && !(PathProfile.shownMargin() && read().text)) await sleep(200);
+  if (!PathProfile.shownMargin()) return null;
+  const labels = sel => [...el.querySelectorAll(sel)].map(n => n.textContent.trim());
+  const out = {
+    title: (document.getElementById('path-card-title') || {}).textContent || '',
+    inCard: !!el.querySelector('#path-card-title'),
+    cards: document.querySelectorAll('#path-card').length,
+    open: MapBackbone.current(),
+    rows: labels('.path-card-rows .acma-row > span:first-child'),
+    stats: labels('.path-readout > .path-stats > div > dt'),
+    plain: read(),
+  };
+  // Low masts, for a path the ground cuts: the model prices the cut, and the
+  // figure has to say it was priced in beside it rather than turn red.
+  PathProfile.setRadio('A', 'agl_m', '0.5');
+  PathProfile.setRadio('B', 'agl_m', '0.5');
+  await sleep(100);
+  out.low = read();
+  PathProfile.setRadio('A', 'agl_m', '');
+  PathProfile.setRadio('B', 'agl_m', '');
+  await sleep(100);
+  return out;
 }, PAIR);
-ok('the radio-path card quotes the profile\'s fade margin', !!pathCard && !!pathCard.plain
-   && pathCard.plain.text.startsWith(pathCard.fig), JSON.stringify(pathCard));
-if (pathCard && pathCard.plain) {
-  ok('…in the profile\'s colour for it', pathCard.plain.cls === pathCard.want && pathCard.want === marginRow.cls,
-     `${pathCard.plain.cls}, the band ${pathCard.want}, the profile ${marginRow.cls}`);
-  ok('…and an obstruction the model priced is named beside a good figure, not painted red over it',
-     !!pathCard.blocked && pathCard.blocked.cls === 'txt-ok'
-       && /^\+39\.6 dB — good · line of sight obstructed, priced in$/.test(pathCard.blocked.text),
-     JSON.stringify(pathCard.blocked));
+ok('a radio path makes the profile card the path\'s card, with no card of its own over it',
+   !!pathCard && pathCard.title === 'Radio path' && pathCard.inCard && pathCard.cards === 0 && !!pathCard.open,
+   JSON.stringify(pathCard && { title: pathCard.title, cards: pathCard.cards, open: pathCard.open }));
+if (pathCard) {
+  ok('…the ends, the addresses and the channel at its head',
+     ['Field station', 'Repeater', 'Frequency'].every(l => pathCard.rows.includes(l))
+       && pathCard.rows.some(l => /^ALERT ID/.test(l)), pathCard.rows.join(', '));
+  ok('…the distance and the fade margin said once, by the readout, with no Path row under the ends',
+     !pathCard.rows.includes('Distance') && !pathCard.rows.includes('Fade margin')
+       && pathCard.stats.includes('Distance') && pathCard.stats.includes('Fade margin') && !pathCard.stats.includes('Path'),
+     JSON.stringify({ rows: pathCard.rows, stats: pathCard.stats }));
+  ok('…the profile\'s own figure, in the band\'s colour',
+     !!pathCard.plain.text && pathCard.plain.text.startsWith(pathCard.plain.fig) && pathCard.plain.cls === pathCard.plain.want
+       && pathCard.plain.want === marginRow.cls,
+     JSON.stringify(pathCard.plain));
+  const named = r => !!r.text && (r.verdict === 'obstructed') === / · line of sight obstructed, priced in · /.test(r.text)
+    && r.cls === r.want;
+  ok('…and an obstruction the model priced named beside the figure, in the figure\'s colour, not painted over it',
+     named(pathCard.plain) && named(pathCard.low) && pathCard.low.verdict === 'obstructed',
+     JSON.stringify({ plain: pathCard.plain, low: pathCard.low }));
 }
 
 // One set of radio figures behind every margin on the page. A TX power typed
 // into the link budget used to be the budget's alone: the profile's margin, the
-// signal along its line and the radio-path card over them all stayed on the
-// radio systems, so the same hop read two ways a card apart. Each site now
+// signal along its line and the radio-path card over them (since folded into
+// the profile card) all stayed on the radio systems, so the same hop read two
+// ways a card apart. Each site now
 // keeps one set (state.radio). Four times the TX power at the budget's A is
 // +6.02 dB on the budget's margin and on the profile's, which is one way, A to
 // B, the same way round; the profile's own TX box shows it, flagged edited,
-// and B — the receiver — has no TX box to change nothing with; the radio-path
-// card quotes the profile's new figure and the one way it was priced, with no
-// way back beside it; and the signal arrives at B in the new figure. Typed into
+// and B — the receiver — has no TX box to change nothing with; the card's
+// readout quotes the new figure and the one way it was priced, with no way
+// back beside it; and the signal arrives at B in the new figure. Typed into
 // the profile's box instead, the budget's box and margin follow. Blank puts all
 // of it back.
 const shared = await page.evaluate(async () => {
@@ -885,13 +920,13 @@ const shared = await page.evaluate(async () => {
   };
   const read = () => {
     const p = PathProfile.shownMargin();
-    const row = [...document.querySelectorAll('#path-card .acma-row')]
-      .find(r => r.firstElementChild.textContent.trim() === 'Fade margin');
+    const dt = [...document.querySelectorAll('#path-profile-panel .path-readout > .path-stats > div > dt')]
+      .find(x => x.textContent.trim() === 'Fade margin');
     const sig = PathProfile.signalState();
     return {
       budget: LinkBudget.current().margin,
       prof: p ? p.margin : null,
-      card: row ? row.lastElementChild.textContent.replace(/\s+/g, ' ').trim() : null,
+      card: dt ? dt.nextElementSibling.textContent.replace(/\s+/g, ' ').trim() : null,
       sigEnd: sig ? sig.end : null,
       lbTx: document.getElementById('lb-f-a-tx_w').value,
       pathTx: (document.getElementById('path-f-A-tx_w') || {}).value,
@@ -923,7 +958,7 @@ if (shared && shared.tagA === 'A') {
      Number(fb.pathTx) === shared.base * 4 && fb.pathFlag === 'edited', `${fb.pathTx} · ${fb.pathFlag}`);
   ok('…and B, the receiver, has no TX power box', !b0.pathTxB && !fb.pathTxB);
   const fig = m => `${m > 0 ? '+' : ''}${m.toFixed(1)} dB`;
-  ok('…the radio-path card quotes the profile\'s new figure',
+  ok('…the card\'s readout quotes the new figure',
      !!fb.card && fb.card.startsWith(fig(fb.prof)) && !!b0.card && b0.card !== fb.card,
      `${b0.card} → ${fb.card} against ${fig(fb.prof)}`);
   ok('…naming the one way it was priced, with no way back beside it',
@@ -935,6 +970,92 @@ if (shared && shared.tagA === 'A') {
   ok('blanking the box puts every card back on the station\'s own figure',
      near(af.budget, b0.budget) && near(af.prof, b0.prof) && af.lbTx === b0.lbTx
        && af.pathTx === b0.pathTx && af.pathFlag !== 'edited', JSON.stringify(af));
+}
+
+// 📋 Copy for a report. What it carries is written from one list of rows, so
+// it is held as rows: the fade margin the card quotes, a budget column that
+// adds up to it term by term, the two ends where they are, every setting
+// Radio Mobile asks for, and a picture for paper with no theme token left
+// unresolved in it. Then the real press, read back off the clipboard: a
+// document with the chart inside it as a picture, the same report as plain
+// text, and the picture on its own.
+const report = await page.evaluate(ids => {
+  const r = PathProfile.report();
+  const p = PathProfile.shownMargin();
+  if (!r || !p) return null;
+  const st = id => state.data.stations.find(s => s.id === id);
+  const sh = PathProfile.target();
+  const a = st(sh.snappedTo[0]), b = st(sh.snappedTo[sh.snappedTo.length - 1]);
+  const terms = r.rows.budget.filter(x => !x[4] && x[0] !== 'RX threshold');
+  const thr = r.rows.budget.find(x => x[0] === 'RX threshold');
+  const pos = r.rows.ends.find(x => x[0] === 'Position (WGS84, decimal)');
+  return {
+    margin: p.margin, rowsMargin: r.rows.margin,
+    sum: terms.reduce((t, x) => t + x[1], 0) - thr[1],
+    result: r.rows.budget[r.rows.budget.length - 1],
+    textFig: r.text.includes(`Fade margin: ${p.margin > 0 ? '+' : ''}${p.margin.toFixed(1)} dB`),
+    heads: ['THE TWO ENDS', 'THE PATH', 'PROPAGATION MODEL AND SETTINGS', 'LINK BUDGET'].filter(h => !r.text.includes(h)),
+    settings: ['Surface refractivity (N0)', 'Ground conductivity', 'Ground relative permittivity', 'Climate',
+               'Polarization', 'Mode of variability', '% of time / locations / situations', 'Propagation mode']
+      .filter(l => !r.rows.model.some(m => m[0] === l)),
+    pos, wantA: `${a.lat.toFixed(6)}°, ${a.lon.toFixed(6)}°`, wantB: `${b.lat.toFixed(6)}°, ${b.lon.toFixed(6)}°`,
+    radio: r.rows.radio.map(x => x[0]),
+    svgVar: /var\(--/.test(r.svg || 'var(--'),
+    svgNames: !!r.svg && r.svg.includes(esc(a.name)) && r.svg.includes(esc(b.name)),
+    svgCursor: !!r.svg && /path-cursor|onmousemove/.test(r.svg),
+    stillHover: (() => { PathProfile.hoverAt(100); return !!document.querySelector('#path-profile-panel #path-cursor:not([style*="none"])'); })(),
+    file: r.rows.file,
+  };
+}, PAIR);
+ok('📋 the report quotes the card\'s fade margin', !!report && report.textFig && report.rowsMargin === report.margin,
+   JSON.stringify(report && { margin: report.margin, rows: report.rowsMargin }));
+if (report) {
+  ok('…with a budget whose terms add up to it, term by term',
+     Math.abs(report.sum - report.margin) < 0.01 && report.result[0] === 'Fade margin' && report.result[1] === report.margin,
+     `${report.sum} against ${report.margin}`);
+  ok('…the ends where they are, the radio path\'s rows, and every section',
+     !!report.pos && report.pos[1] === report.wantA && report.pos[2] === report.wantB
+       && report.radio.includes('Field station') && !report.heads.length,
+     JSON.stringify({ pos: report.pos, radio: report.radio, missing: report.heads }));
+  ok('…every propagation setting Radio Mobile asks for', !report.settings.length, `missing ${report.settings.join(', ')}`);
+  ok('…a picture for paper in plain colours, the ends named on it, nothing of the screen\'s cursor in it',
+     !report.svgVar && report.svgNames && !report.svgCursor, JSON.stringify(report));
+  ok('…drawn without taking the cursor away from the chart on the card', report.stillHover);
+  ok('…and a file name that says Flood-Net', /^floodnet-path-/.test(report.file), report.file);
+}
+await page.evaluate(() => PathProfile.hoverOff());
+await page.click('#path-copy');
+const pasted = await page.evaluate(async () => {
+  const until = Date.now() + 15000;
+  let items = [];
+  while (Date.now() < until) {
+    try { items = await navigator.clipboard.read(); } catch (_) { items = []; }
+    if (items.length && items[0].types.includes('text/html')) break;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  const it = items[0];
+  if (!it) return null;
+  const out = { types: it.types.slice() };
+  if (it.types.includes('text/html')) {
+    const h = await (await it.getType('text/html')).text();
+    out.img = /<img[^>]+src="data:image\/png;base64,/.test(h);
+    out.budget = /Link budget — how the fade margin is worked out/.test(h);
+  }
+  if (it.types.includes('text/plain')) out.text = (await (await it.getType('text/plain')).text()) === PathProfile.report().text;
+  if (it.types.includes('image/png')) {
+    const bmp = await createImageBitmap(await it.getType('image/png'));
+    out.png = [bmp.width, bmp.height];
+  }
+  out.toast = [...document.querySelectorAll('.toast-text')].map(t => t.textContent).pop() || '';
+  return out;
+});
+ok('the press puts a document, plain text and a picture on the clipboard',
+   !!pasted && ['text/html', 'text/plain', 'image/png'].every(t => pasted.types.includes(t)), JSON.stringify(pasted));
+if (pasted) {
+  ok('…the document carrying the chart as a picture and the budget under it', pasted.img && pasted.budget, JSON.stringify(pasted));
+  ok('…the text the report\'s own, and the picture drawn at twice its size',
+     pasted.text && !!pasted.png && pasted.png[0] === 2400 && pasted.png[1] > 900, JSON.stringify(pasted));
+  ok('…and says it did', /^Copied/.test(pasted.toast), pasted.toast);
 }
 
 // Shown on asking: the cards carry the answer, and the explaining behind a

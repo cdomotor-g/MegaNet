@@ -2218,8 +2218,8 @@ function invalidateMapSizes(delay) {
 //                  pin blue, so that the place found is never mistaken for a
 //                  station. On that tab at every width, since it is a tool for
 //                  the map rather than one of the cards.
-//   〽️ Path tools  the radio path card (while a path is open), the elevation
-//                  profile and the link budget (its fade margin), under the
+//   〽️ Path tools  the elevation profile (a clicked radio path's card while
+//                  one is open) and the link budget (its fade margin), under the
 //                  same condition. A pane of their own
 //                  rather than two more cards at the foot of 📍's column: they
 //                  answer "what is between these two points", a question
@@ -4063,20 +4063,23 @@ function renderStationsHtml() {
             </div>
           </div>
         </div>
-        <!-- The path tools: the clicked radio path, the ground under it (or
-             under a drawn line), and the link budget over it. A wrapper of
-             their own inside the cards, because beside the map they are not in
-             📍's column but in a pane of their own (〽️) — syncStationsCardsHome
+        <!-- The path tools: the ground under a clicked radio path (or under a
+             drawn line), and the link budget over it. A wrapper of their own
+             inside the cards, because beside the map they are not in 📍's
+             column but in a pane of their own (〽️) — syncStationsCardsHome
              moves this whole, and puts it back here, before the carriers card,
              when the cards go under the map. The profile is always a card, and
              with no line it says how to draw one (PathProfile's empty state) —
-             painted by PathProfile.sync() from initMap(). The radio path card
-             is only there while a path is open (MapBackbone), and heads the
-             two cards it quotes rather than sitting over the map it was
-             clicked on. -->
+             painted by PathProfile.sync() from initMap(). A clicked radio path
+             makes it the path's card (MapBackbone.section): the ends, the
+             addresses and the channel at its head, over the profile's own
+             figures. A region named by its title, which is what focus
+             announces when a click on the map sends it here; Escape hands
+             focus back. -->
         <div class="stn-cards" id="stations-path-cards">
-          <div class="panel path-card card-kind card-kind-links" id="path-card" hidden></div>
-          <div class="panel card-kind card-kind-links" id="path-profile-panel"></div>
+          <div class="panel card-kind card-kind-links" id="path-profile-panel"
+               role="region" aria-labelledby="path-card-title" tabindex="-1"
+               onkeydown="MapBackbone.onKey(event)"></div>
           <div class="panel card-kind card-kind-links" id="link-budget-panel">${LinkBudget.panelHtml()}</div>
         </div>
         <div class="panel card-kind card-kind-links" id="stations-carriers-card" ${carriers ? '' : 'hidden'}>
@@ -5000,11 +5003,11 @@ function clearStationsMapMarks() {
   try_(() => { if (MapMovePin.armed()) MapMovePin.cancel(); });
   try_(() => LinkBudget.setPicking(false));
 
-  // 2. The cards on the map, and the radio path card at the head of the path
-  //    tools. `false` on the three that take it: nothing is being closed on
-  //    purpose by a keyboard here, so focus stays on the button that was
-  //    pressed rather than being thrown at a row underneath, or at whatever
-  //    had it when the radio path was clicked.
+  // 2. The cards on the map, and the radio path on the profile card at the
+  //    head of the path tools. `false` on the three that take it: nothing is
+  //    being closed on purpose by a keyboard here, so focus stays on the
+  //    button that was pressed rather than being thrown at a row underneath,
+  //    or at whatever had it when the radio path was clicked.
   try_(() => closeStnCard(false));
   try_(() => { if (state.acma.cardDeviceId) closeAcmaCard(false); });
   try_(() => MapHere.close());
@@ -6286,9 +6289,10 @@ function initMap() {
   // empty and hidden — so it is painted back here, on every render of the tab
   // (#175). The ACMA card accepts dying with a full render; a card that is the
   // map's own memory of what you were looking at must not. Nor must the radio
-  // path card: it heads the profile and the budget, which both come back from
-  // a render on the same path, and a column that kept those and lost their
-  // heading would be describing a path nobody could say the name of.
+  // path on the profile card: the profile and the budget both come back from a
+  // render on the same path, and a card that kept its chart and lost its rows
+  // would be describing a path nobody could say the name of. The profile card
+  // paints them back itself; MapBackbone only lets go of a path it has left.
   repaintStnCard();
   MapBackbone.repaint();
   maybeShowMapLayersHint();

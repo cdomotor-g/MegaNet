@@ -4846,13 +4846,13 @@ settled rather than during the slide. Where it differs:
 
 #### The side panel as a dock
 
-**The Stations cards.** The filters, the station list, the radio path card,
-the elevation profile, the link budget, *Repeaters listening*, the blast radius
+**The Stations cards.** The filters, the station list, the elevation profile
+(a clicked radio path's card), the link budget, *Repeaters listening*, the blast radius
 and the station editor are one wrapper (`#stations-cards`), emitted under the
 map by the tab's render and *moved* — never re-rendered — into the side panel's
 Stations pane while the window is wider than 1,100 px, or a phone's, where
-the pane is a drawer over a map that fills the screen. The radio
-path card, the elevation profile and the link budget are a wrapper of their own
+the pane is a drawer over a map that fills the screen. The elevation
+profile and the link budget are a wrapper of their own
 inside it (`#stations-path-cards`), and
 beside the map that goes to a pane of its own, 〽️ *Path tools*, under 📍: they
 answer a question asked of the map rather than of the list, and they are the
@@ -4867,7 +4867,7 @@ decides. Every card is re-rendered in place by its own id, so
 none of them knows it has moved; leaving the tab takes the wrapper out of the
 side panel (a registered tab teardown), because a great deal of the app reads
 "no `#stations-table-wrap`" as "not on the Stations tab". Everything that jumps
-to a card — *Show in the list*, *Station details*, the radio path card's links,
+to a card — *Show in the list*, *Station details*, the radio path's links,
 *Link budget for this path*, *Finish line*, the site finder's *Profile the worst
 path* — opens the side panel on the pane holding that card first (`dockReveal`),
 because a scroll to an element in a hidden pane does nothing at all — on a
@@ -4876,25 +4876,52 @@ press came from, and brings the rail out beside it if ⋮ had put it away. The e
 how to get one.
 
 **The radio path card.** Clicking a radio path on the map — a field link or a
-backbone path, in 2-D or 3-D — opens a card about that hop (the two ends, the
-ALERT IDs on it, its frequency, distance and fade margin) at the top of the
-path tools, above the profile and the budget it points at the same hop. It used
-to sit over the map in the ACMA card's rectangle, which covered the map it had
-been clicked on and left it a pane away from the two cards it summarises. The
-click opens 〽️ (or scrolls the column under the map, leaving a full-screen map
-first if the column is behind it) and puts focus on the card; × or Escape
-closes it back to whatever opened it. It no longer joins the map cards'
-one-at-a-time rule, since it is not over the map: the station card or the
-transmitter card stays open beside it. It survives a render of the tab the way
-the profile and the budget do, and closes itself once the profile moves off its
-path — another line drawn or selected, or its line deleted — because it says
-those two are open on this exact path. Its fade margin is the profile's, one
+backbone path, in 2-D or 3-D — makes the elevation profile card that hop's card:
+its title says *Radio path* (or which kind of backbone path), and the rows at
+its head name the two ends (each a link to its station), the ALERT IDs on it
+and its frequency, over the profile's own verdict, distance, fade margin, path
+loss and chart. It was a card of its own above the profile, and before that a
+card over the map in the ACMA card's rectangle; as a card of its own it said the
+distance and the fade margin the readout under it said again, so the rows moved
+into the profile card (`MapBackbone.section`, laid out by `PathProfile`) and the
+figures are said once — the readout drops its *Path* row, since the rows above it
+name the ends. Until the ground lands the rows carry the distance and an interim
+fade margin (the budget's, or free space, and labelled as such). The click
+opens 〽️ (or scrolls the column under the map, leaving a full-screen map first
+if the column is behind it) and puts focus on the card; Escape hands focus back
+to whatever opened it. It is not one of the map cards' one-at-a-time set, since
+it is not over the map: the station card or the transmitter card stays open
+beside it. The path survives a render of the tab, and is let go once the profile
+moves off it — another line drawn or selected, or its line deleted — when the
+card goes back to being that line's elevation profile. Its fade margin is one
 way — the way the traffic runs, a field station to its repeater and a repeater
-to its base — with the two ends named under it in that order. It used to be the
-worse of the two directions with each way round under it, and a TX power raised
-at the transmitter moved the way out and left the headline where the way back
-held it; nothing in the network transmits back down, so that way is gone. ⇄
-*Flip direction* on the profile prices the other way, and the card follows.
+to its base — with the two ends named beside it in that order, and an
+obstruction the model has priced is said beside the figure (*line of sight
+obstructed, priced in*) rather than painted over it. ⇄ *Flip direction* prices
+the other way.
+
+**📋 Copy for a report**, over the chart, puts the path on the clipboard for
+Word, an email or a report, three ways at once — a document (HTML with inline
+styles, the chart inside it as a PNG data URL), the same report as plain text
+(tabs between columns), and the chart alone as a PNG — and whatever it is
+pasted into takes the richest it can. The report is the fade margin and the
+verdict; the chart, drawn again for paper (1,200 px at 2×, in the light theme's
+colours whatever the screen wears, the two ends named over it and the key and
+the source under it, without the animated signal); the radio path's rows; both
+ends' positions (decimal and DMS), ground heights and their datum, antenna
+heights and where they came from, radio systems, TX power, gain, line loss and
+threshold, azimuths and elevation angles; the path's distance, Fresnel
+clearance, obstructions, earth curvature, terrain and land cover; every
+Longley–Rice setting Radio Mobile asks for (refractivity, conductivity,
+permittivity, climate, polarization, mode of variability, the three
+percentages) and the model's own intermediates; and the budget term by term down
+to the margin, with the sum written out and what Radio Mobile's *Rx relative*
+should read for the same settings (it applies neither the field allowance nor
+the obstruction floor). All of it is written from one list of rows
+(`reportOf` in `path-profile.js`), so the document and the text cannot differ.
+Where the browser refuses the clipboard it falls back to a copy event, and then
+to saving the document as a file; *copy* and *save as PNG* beside it take the
+chart alone.
 
 **The Stations map's controls.** Everything MapChrome would put in the map's
 top-right corner lives in the strip instead, at every width — a phone's rail

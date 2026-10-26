@@ -2017,13 +2017,16 @@ if (line) {
     });
     await page.mouse.click(where.x, where.y);
     await page.waitForTimeout(700);
+    // The path card is the profile card, carrying the path's rows.
     const card = await page.evaluate(() => {
-      const el = document.getElementById('path-card');
+      const el = document.getElementById('path-profile-panel');
       const r  = el ? el.getBoundingClientRect() : null;
-      return { open: state.path.open, box: !!(r && r.width > 0 && r.height > 0) };
+      return { open: state.path.open, path: typeof MapBackbone !== 'undefined' && !!MapBackbone.current(),
+               rows: !!(el && el.querySelector('.path-card-rows')),
+               box: !!(r && r.width > 0 && r.height > 0) };
     });
     ok('clicking a path in 3-D opens the path card',
-       card.open === true && card.box, JSON.stringify(card));
+       card.open === true && card.path && card.rows && card.box, JSON.stringify(card));
   }
 }
 

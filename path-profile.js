@@ -13,9 +13,9 @@
 //   the radio     radioKey, radioOver, radioDefaults, radioVal, radioIsOver,
 //   at each end   radioFreq, radioChanged, radioCommit: one set of figures
 //                 per site — TX power, gain, line loss, antenna height,
-//                 threshold — and one frequency, which this card, the link
-//                 budget and the radio-path card (map-backbone.js) all price
-//                 with.
+//                 threshold — and one frequency, which this card (a
+//                 clicked radio path's, map-backbone.js) and the link
+//                 budget both price with.
 //   pathMoreHtml  the disclosure the three cards keep their explaining in,
 //                 so the figures are what is on the card.
 //
@@ -294,8 +294,8 @@ function radioFreq(stA, stB) {
 }
 
 // A figure in state.radio moved: every card that prices from it is drawn
-// again. The profile first, because the radio-path card quotes the margin the
-// profile last drew (PathProfile.shownMargin).
+// again — the profile (a clicked radio path's card, its rows included), the
+// budget, and MapBackbone's check that the path is still the profile's.
 function radioChanged() {
   PathProfile.rerender();
   LinkBudget.rerender();
@@ -695,7 +695,7 @@ const PathProfile = (function () {
   let committed = null;      // the box whose own change is being drawn — see rerender()
   // What the chart on the card was last drawn from — the analysis, the ground
   // and the two ends — or null when bodyHtml drew no chart. The full-screen
-  // view draws from it, and the radio-path card quotes its margin.
+  // view and 📋 Copy for a report draw from it.
   let shown = null;
   let full = null;           // { t, onResize } while the chart is full screen
   let cardW = 0;             // the card chart's column width, last measured — see fitCard()
@@ -760,8 +760,8 @@ const PathProfile = (function () {
   }
 
   // Everything that quotes this profile follows it: the budget's terrain and
-  // cover terms, and the radio-path card that quotes its fade margin
-  // (shownMargin) — called after a rerender, so that figure is the new one.
+  // cover terms, and MapBackbone, which lets go of a clicked path the profile
+  // has left — called after a rerender, so what they read is the new one.
   function announce() {
     LinkBudget.profileChanged();
     MapBackbone.profileChanged();
@@ -1638,9 +1638,16 @@ const PathProfile = (function () {
             : `no figure on file for ${esc(fmtTermList(r.missing))}`;
       return `<span class="txt-warn">not computed</span> <span class="small">${why}</span>`;
     }
+    // "Obstructed" is a yes or no on the geometry and the margin is what the
+    // model says is left after paying for it, so a figure that survives an
+    // obstruction says so beside it rather than being painted red over it —
+    // the verdict over the readout and a green figure under it would otherwise
+    // read as a contradiction. (The radio-path card said this when it was a
+    // card of its own; the rows are on this card now, and so is this.)
     const cls = lbMarginClass(r.m);
     return `<span class="txt-${cls.cls}">${r.m > 0 ? '+' : ''}${r.m.toFixed(1)} dB</span>
-      <span class="small">${esc(cls.label.toLowerCase())} · ${esc(a.name)} → ${esc(b.name)}</span>`;
+      <span class="small">${esc(cls.label.toLowerCase())}${an.verdict === 'obstructed' && an.itm
+        ? ' · line of sight obstructed, priced in' : ''} · ${esc(a.name)} → ${esc(b.name)}</span>`;
   }
 
   // "a, b and c" — the budget card's fmtList, which lives inside its IIFE.
@@ -2097,7 +2104,9 @@ const PathProfile = (function () {
 
   // ── the panel ──
 
-  function readoutHtml(an, a, b) {
+  // `ends` false leaves the Path row out: on a radio path the rows over the
+  // readout name the two ends already, each a link to its station.
+  function readoutHtml(an, a, b, ends = true) {
     const v = PATH_VERDICT[an.verdict];
     const w = an.worst;
     const worstWhat = w.clearance < 0 ? (w.cover != null && w.los - w.bulged >= 0 ? 'cover' : 'ground') : null;
@@ -2116,8 +2125,8 @@ const PathProfile = (function () {
                information in a box whose size does not depend on its contents;
                a name too long for the column is clipped rather than allowed to
                push the layout about, and the title attribute has it in full. -->
-          <div><dt>Path</dt><dd class="path-ends" title="${escAttr(`${a.name} → ${b.name}`)}"><span>${
-            esc(a.name)}</span><span>${esc(b.name)}</span></dd></div>
+          ${ends ? `<div><dt>Path</dt><dd class="path-ends" title="${escAttr(`${a.name} → ${b.name}`)}"><span>${
+            esc(a.name)}</span><span>${esc(b.name)}</span></dd></div>` : ''}
           <div><dt>Distance</dt><dd>${fmtKm(an.D / 1000)}</dd></div>
           <div><dt>Fade margin</dt><dd>${marginCellHtml(an, a, b)}</dd></div>
           <div><dt>Path loss</dt><dd>${an.pathLoss_db != null
@@ -2295,17 +2304,24 @@ const PathProfile = (function () {
     return { end: r.m, opt: mainOpts(a, b), key: signalKey(an) };
   }
 
-  function bodyHtml() {
+  // `rp` is the radio path's part of the card (MapBackbone.section) when the
+  // line is a path clicked on the map: its rows go at the head of the body,
+  // and until the readout is there to say the distance and the fade margin,
+  // its interim rows say them — the budget's figure or a free-space one, and
+  // labelled as such.
+  function bodyHtml(rp) {
     const sh = target();
     if (!sh) return '';
     const a = endpoint(sh, 0), b = endpoint(sh, 1);
     const multi = sh.pts.length > 2;
+    const head = rp ? rp.rows : '';
+    const interim = () => (rp ? rp.interim() + rp.note : '');
 
     if (cur.status === 'loading') {
-      return `<p class="filter-note">Sampling terrain along ${fmtKm(MapDraw.lineKm(sh.pts))} of path…</p>`;
+      return `${head}${interim()}<p class="filter-note">Sampling terrain along ${fmtKm(MapDraw.lineKm(sh.pts))} of path…</p>`;
     }
     if (cur.status === 'failed') {
-      return `
+      return `${head}${interim()}
         <div class="path-fail">
           <strong>Terrain data unavailable.</strong>
           <span class="small">${esc(cur.error)}</span>
@@ -2313,7 +2329,7 @@ const PathProfile = (function () {
           <button onclick="PathProfile.refresh()">Try again</button>
         </div>`;
     }
-    if (cur.status !== 'ready' || !cur.prof) return '';
+    if (cur.status !== 'ready' || !cur.prof) return head + interim();
 
     const prof = cur.prof;
     const warn = prof.partial ? `
@@ -2331,12 +2347,12 @@ const PathProfile = (function () {
           A dog-leg is not a radio path. Draw a two-point line to analyse a hop.</p>
         ${warn}`;
       if (an.ok) shown = { an, prof, a, b, flat: true, sig: null, warn: legs, datum: '' };
-      return `${legs}
+      return `${head}${legs}
         ${an.ok ? chartHere() : `<p class="filter-note">${esc(an.error)}</p>`}`;
     }
 
     const an = pathAnalyse(prof, mainOpts(a, b));
-    if (!an.ok) return `<p class="filter-note">${esc(an.error)}</p>`;
+    if (!an.ok) return `${head}${interim()}<p class="filter-note">${esc(an.error)}</p>`;
 
     const lifted = [[an.liftA_m, a], [an.liftB_m, b]].filter(([m]) => m > 0.5)
       .map(([m, e]) => `${esc(e.name)} ${m.toFixed(1)} m`);
@@ -2353,7 +2369,10 @@ const PathProfile = (function () {
 
     shown = { an, prof, a, b, flat: false, sig: signalIn(an, a, b), warn, datum };
     return `
-      ${readoutHtml(an, a, b)}
+      ${head}
+      ${readoutHtml(an, a, b, !rp)}
+      ${rp ? rp.note : ''}
+      ${copyHtml()}
       ${warn}
       ${chartHere()}
       ${endsFormHtml(a, b, an)}
@@ -2479,17 +2498,575 @@ const PathProfile = (function () {
     if (btn && (!f || f === document.body)) btn.focus({ preventScroll: true });
   }
 
+  // ── copy for a report ──
+  // The path as somebody writing it up needs it: the chart with the line of
+  // sight drawn on it, and every figure that goes into the fade margin — where
+  // the two ends are, how high, what radio each carries, the model and every
+  // setting it ran on, and the budget term by term down to the margin — so the
+  // figure can be justified on paper, and the same path set up in Radio Mobile
+  // (or anything else that runs Longley–Rice) to come out the same. One press
+  // puts it on the clipboard three ways — a document (HTML, with the chart in
+  // it as a picture), plain text, and the picture alone — and whatever it is
+  // pasted into takes the richest one it can: Word and the mail programs the
+  // document, a plain editor the text, a paint program the picture.
+  //
+  // The picture is drawn again for paper rather than lifted off the card: at
+  // one size whatever the column is, in the light theme's colours whatever the
+  // screen is wearing (a dark chart on a white page is a black box), with the
+  // two ends named over it and the key and the source under it — none of which
+  // the card's chart carries inside its SVG. And without the signal running
+  // along the line: that is a moment of an animation, and the line of sight and
+  // the Fresnel zone it runs over say more on paper.
+  //
+  // Everything is written from one list of rows (reportOf), so the document
+  // and the plain text cannot say different things.
+
+  const PAPER = { W: 1200, H: 440, head: 100 };
+
+  // The light theme's colours, read off the stylesheet's own :root rules. The
+  // page may be wearing another theme, and swapping the attribute to read them
+  // would repaint everything that watches it.
+  function paperTokens() {
+    const map = {};
+    for (const sheet of document.styleSheets) {
+      let rules;
+      try { rules = sheet.cssRules; } catch (_) { continue; }
+      for (const r of rules || []) {
+        if (!r.style || !r.selectorText || !r.selectorText.split(',').some(t => t.trim() === ':root')) continue;
+        for (let i = 0; i < r.style.length; i++) {
+          const k = r.style[i];
+          if (k.startsWith('--')) map[k] = r.style.getPropertyValue(k).trim();
+        }
+      }
+    }
+    return map;
+  }
+
+  // Every var(--token) in a piece of markup as the colour it stands for — an
+  // SVG drawn as a picture has no stylesheet to look them up in.
+  function paperColours(markup, tokens) {
+    const re = /var\((--[\w-]+)(?:\s*,\s*([^()]*))?\)/g;
+    const look = (name, fb, depth) => {
+      const v = tokens[name] != null ? tokens[name] : cssVar(name, '');
+      const out = depth > 6 ? v : v.replace(re, (_, n, f) => look(n, f, depth + 1));
+      return out || String(fb || '').trim();
+    };
+    return markup.replace(re, (_, n, f) => look(n, f, 0) || '#000000');
+  }
+
+  // Markup the card already writes (the radio path's rows, the cover's status,
+  // the LiDAR note), as text. Parsed inert: nothing in it loads or runs.
+  function plainOf(html) {
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+    doc.querySelectorAll('br').forEach(n => n.replaceWith('; '));
+    return doc.body.textContent.replace(/\s+/g, ' ').trim();
+  }
+
+  // The label/value rows (.acma-row) of the radio path's part of the card,
+  // and a warning among them (two repeaters on one delay) as a row of its own.
+  function pairsOf(html) {
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+    doc.querySelectorAll('br').forEach(n => n.replaceWith('; '));
+    const text = n => n.textContent.replace(/\s+/g, ' ').trim();
+    return [...doc.querySelectorAll('.acma-row, .mn-pop-warn')]
+      .map(r => (r.classList.contains('mn-pop-warn') ? ['Warning', text(r).replace(/^⚠️\s*/, '')] : [...r.children].map(text)))
+      .filter(r => r.length >= 2 && r[0]);
+  }
+
+  const signed = (v, dp) => (v == null || !isFinite(v) ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(dp)}`);
+  const microvolts = dbm => {
+    if (dbm == null || !isFinite(dbm)) return '';
+    const uv = Math.pow(10, (dbm + 107) / 20);
+    return `${uv < 1 ? Number(uv.toPrecision(2)) : uv < 10 ? uv.toFixed(2) : uv.toFixed(1)} µV into 50 Ω`;
+  };
+  // 24° 07' 24.40" S — the form Radio Mobile's unit properties take it in.
+  function dmsOf(v, pos, neg) {
+    const x = Math.abs(v);
+    let d = Math.floor(x), m = Math.floor((x - d) * 60), s = ((x - d) * 60 - m) * 60;
+    if (s >= 59.995) { s = 0; m++; }
+    if (m >= 60) { m = 0; d++; }
+    return `${d}° ${String(m).padStart(2, '0')}' ${s.toFixed(2).padStart(5, '0')}" ${v < 0 ? neg : pos}`;
+  }
+  const slugOf = t => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'end';
+
+  // Everything the report says, as rows of plain text. Null with no single-hop
+  // profile drawn — there is nothing to report until the ground has landed.
+  function reportOf() {
+    const s = shown;
+    const sh = target();
+    if (!s || s.flat || !sh) return null;
+    const { an, prof, a, b } = s;
+    const itm = an.itm;
+    const P_ = an.prop;
+    const rp = typeof MapBackbone !== 'undefined' ? MapBackbone.section() : null;
+    const ra = endRadio(a), rb = endRadio(b);
+    const pm = profileMargin(an, a, b);
+    const tokens = paperTokens();
+
+    // Where each end is: the line's own point, or — on the LiDAR ground — where
+    // a mast was stood on the highest ground within its position's rounding.
+    const posOf = end => {
+      const e = cur.ends && cur.ends[end === 0 ? 'a' : 'b'];
+      const p = sh.pts[end === 0 ? 0 : sh.pts.length - 1];
+      return e && e.lat != null ? { lat: e.lat, lon: e.lon, stood: e.stood_m || 0 } : { lat: p[0], lon: p[1], stood: 0 };
+    };
+    const pa = posOf(0), pb = posOf(1);
+    const azAB = bearingDeg(pa.lat, pa.lon, pb.lat, pb.lon), azBA = bearingDeg(pb.lat, pb.lon, pa.lat, pa.lon);
+    const deg3 = v => `${String(Math.floor(v)).padStart(3, '0')}${(v % 1).toFixed(1).slice(1)}°`;
+
+    const edited = (e, k) => (radioIsOver(e.key, k) ? ' — edited on the card' : '');
+    const groundOf = (e, ground, lift) => `${ground.toFixed(1)} m — ${e.elev == null
+      ? 'terrain tile (EGM96 geoid)'
+      : lift > 0.5 ? `terrain tile: the survey (${e.elev.toFixed(1)} m AHD) is ${lift.toFixed(1)} m under it, so the end stands on the tile`
+      : 'surveyed elevation (AHD)'}`;
+    const aglOf = (e, agl) => `${agl.toFixed(1)} m AGL — ${radioIsOver(e.key, 'agl_m') ? 'edited on the card'
+      : e.station && stationAntenna(e.station, e.sys).mast ? `the repeater/base mast minimum (its radio system says ${stationAntenna(e.station, e.sys).sysAgl} m)`
+      : e.sys ? 'its radio system' : 'default'}`;
+    const coverAt = (cls, R, agl, db) => {
+      if (cls == null) return 'unclassified';
+      const c = LandCover.CLASSES[cls];
+      return `${c.label}${R > 0 ? `, ${Math.round(R)} m` : ''}${db > 0 ? ` — the ${agl} m antenna is under it: ${db.toFixed(1)} dB terminal clutter (ITU-R P.2108)` : ''}`;
+    };
+    const endCol = (e, r, p, ground, lift, agl, z, az, elev) => [
+      `${e.name}${e.station && e.station.station_number ? ` (station ${e.station.station_number})` : ''}`,
+      e.station ? (e.station.roles || []).join(', ') || 'station' : 'a point on the ground — no station',
+      `${p.lat.toFixed(6)}°, ${p.lon.toFixed(6)}°${p.stood > 1 ? ` (stood ${p.stood.toFixed(0)} m from its registered position, on the highest LiDAR ground within its rounding)` : ''}`,
+      `${dmsOf(p.lat, 'N', 'S')}, ${dmsOf(p.lon, 'E', 'W')}`,
+      groundOf(e, ground, lift),
+      aglOf(e, agl),
+      `${z.toFixed(1)} m`,
+      e.sys ? `${e.sys.name}${e.sys.antenna_type ? ` (${e.sys.antenna_type})` : ''}` : (e.isStation ? 'none on file' : '—'),
+      r.txW != null ? `${r.txW} W (${wattsToDbm(r.txW).toFixed(2)} dBm)${edited(e, 'tx_w')}` : 'not on file',
+      r.gain != null ? `${+r.gain.toFixed(2)} dBi (${lbDbd(r.gain)} dBd)${edited(e, 'gain_dbi')}` : 'not on file',
+      r.loss != null ? `${+r.loss.toFixed(2)} dB${edited(e, 'loss_db')}` : 'not on file',
+      r.thr != null ? `${+r.thr.toFixed(3)} dBm (${microvolts(r.thr)})${edited(e, 'rx_dbm')}` : 'not on file',
+      `${deg3(az)} true`,
+      `${elev.toFixed(3)}°`,
+    ];
+    const endLabels = ['Station', 'Role', 'Position (WGS84, decimal)', 'Position (WGS84, DMS)', 'Ground elevation',
+      'Antenna height', 'Antenna height above datum', 'Radio system', 'TX power', 'Antenna gain', 'Line loss',
+      'RX threshold', 'Azimuth to the other end', 'Elevation angle to the other end'];
+    const colA = endCol(a, ra, pa, an.groundA, an.liftA_m, an.aglA, an.txZ, azAB, an.elevA_deg);
+    const colB = endCol(b, rb, pb, an.groundB, an.liftB_m, an.aglB, an.rxZ, azBA, an.elevB_deg);
+    const ends = endLabels.map((l, i) => [l, colA[i], colB[i]]);
+    if (an.coverUsed) {
+      ends.push(['Land cover at the antenna', coverAt(an.coverA, an.R_A, an.aglA, an.clutterA_db), coverAt(an.coverB, an.R_B, an.aglB, an.clutterB_db)]);
+    }
+
+    const v = PATH_VERDICT[an.verdict];
+    const w = an.worst;
+    const worstWhat = w.clearance < 0 ? (w.cover != null && w.los - w.bulged >= 0 ? 'cover' : 'ground') : null;
+    const sag = an.pts.reduce((mx, p) => (p.bulge > mx ? p.bulge : mx), 0);
+    const freqSrc = state.radio.freqMhz != null ? 'edited on the card'
+      : (a.station && a.station.repeater) || (b.station && b.station.repeater) ? 'the repeater’s channel' : 'the network’s band';
+    const step = prof.distance_m.length > 1 ? prof.distance_m[1] - prof.distance_m[0] : 0;
+    const path = [
+      ['Distance', `${(an.D / 1000).toFixed(3)} km`],
+      ['Azimuth', `${deg3(azAB)} A → B, ${deg3(azBA)} B → A (true)`],
+      ['Frequency', `${an.fMhz.toFixed(3)} MHz — ${freqSrc}`],
+      ['Line of sight', `${v.label} — ${v.note}`],
+      ['Worst Fresnel clearance', w.clearance >= 0
+        ? `${Math.round(w.clearance)} m under the line (${w.ratio.toFixed(2)} F1) at ${fmtKm(w.d1 / 1000)} from A`
+        : `${worstWhat} ${Math.round(-w.clearance)} m above the line (${w.ratio.toFixed(2)} F1) at ${fmtKm(w.d1 / 1000)} from A`],
+      ['Into the 60% Fresnel zone', an.intrusion_m > 0 ? `${Math.round(an.intrusion_m)} m` : 'nothing'],
+      ['Obstructions above the line', an.obstructions.length
+        ? an.obstructions.map(o => `${o.byCover ? 'cover' : 'ground'} +${Math.round(-o.peak.clearance)} m at ${fmtKm(o.peak.d1 / 1000)}${
+            fmtKm(o.from / 1000) !== fmtKm(o.to / 1000) ? ` (${fmtKm(o.from / 1000)}–${fmtKm(o.to / 1000)})` : ''}`).join('; ')
+        : 'none'],
+      ['Earth curvature', `k = ${an.k.toFixed(3)} — surface refractivity ${Math.round(an.N_s)} N-units at the path’s mean height of ${Math.round(an.hSys)} m; the earth bulges ${sag.toFixed(1)} m at mid-path`],
+      ['Terrain', `${prof.attribution} — ${prof.terrain_m.length} samples, every ${step.toFixed(1)} m, ~${prof.resolution_m} m tiles at zoom ${prof.zoom}${
+        prof.partial ? `; ${prof.missing} samples had no tile and were bridged for the model` : ''}.${plainOf(lidarNote()) ? ` ${plainOf(lidarNote())}` : ''}`],
+      ['Land cover', plainOf(coverStatusHtml(an)) || 'not used'],
+    ];
+
+    const pct = `${P_.mdvar === 0 ? '' : `${P_.time}% of time, `}${P_.mdvar === 3 ? `${P_.location}% of locations, ` : ''}${P_.situation}% of situations`;
+    const model = [
+      ['Propagation model', 'Longley–Rice (ITS Irregular Terrain Model), point-to-point — NTIA’s reference code v1.3, functionally Hufford’s v1.2.2, the model Radio Mobile runs'],
+      ['How Flood-Net prices it', an.model === 'field'
+        ? `Field model — Longley–Rice over the bare terrain, less a ${an.allowance_db} dB field allowance calibrated against path margins measured on site`
+        : 'Land-cover model — the land cover stood on the profile, and ITU-R P.2108 terminal clutter at each end'],
+      ['Ground', P_.ground === 'lidar' ? '5 m LiDAR at the ends and the obstacles, ~30 m terrain tiles between' : '~30 m terrain tiles'],
+      ['Surface refractivity (N0)', `${P_.N0} N-units`],
+      ['Ground conductivity', `${P_.sigma} S/m`],
+      ['Ground relative permittivity', `${P_.epsilon}`],
+      ['Climate', `${P_.climate} — ${ITM.CLIMATE[P_.climate] || ''}`],
+      ['Polarization', P_.pol === 1 ? 'Vertical' : 'Horizontal'],
+      ['Mode of variability', `${P_.mdvar} — ${ITM.MDVAR[P_.mdvar % 10] || ''}`],
+      ['% of time / locations / situations', `${P_.time} / ${P_.location} / ${P_.situation}`],
+      ['Repeater and base mast minimum', `${P_.mastAgl} m`],
+    ];
+    if (itm) {
+      model.push(
+        ['Propagation mode', itm.modeLabel],
+        ['Terrain irregularity (Δh)', `${itm.delta_h_m.toFixed(1)} m`],
+        ['Effective antenna heights', `${itm.h_e_m[0].toFixed(1)} m at A, ${itm.h_e_m[1].toFixed(1)} m at B`],
+        ['Horizon distances', `${(itm.d_hzn_m[0] / 1000).toFixed(2)} km from A, ${(itm.d_hzn_m[1] / 1000).toFixed(2)} km from B`],
+        ['Model warnings', itm.warnings.length ? itm.warnings.join('; ') : 'none'],
+      );
+    } else {
+      model.push(['Model', `did not run${an.itmError ? ` — ${an.itmError}` : ''}`]);
+    }
+
+    // The budget, term by term: the link budget card's own rows, off this
+    // card's analysis, so the column adds up to the margin the card quotes.
+    const txDbm = wattsToDbm(ra.txW);
+    const eirp = txDbm == null || ra.gain == null || ra.loss == null ? null : txDbm + ra.gain - ra.loss;
+    const rx = eirp == null || an.pathLoss_db == null || rb.gain == null || rb.loss == null ? null
+      : eirp - an.pathLoss_db + rb.gain - rb.loss;
+    const knife = an.model === 'field' ? an.diffractionBare_db : an.diffraction_db;
+    const budget = [
+      ['TX power', txDbm, 'dBm', ra.txW != null ? `${ra.txW} W at ${a.name}` : 'not on file'],
+      ['TX antenna gain', ra.gain, 'dBi', ra.gain != null ? `${lbDbd(ra.gain)} dBd` : 'not on file'],
+      ['TX line loss', ra.loss == null ? null : -ra.loss, 'dB', ''],
+      ['= EIRP', eirp, 'dBm', '', 'sub'],
+    ];
+    if (itm) {
+      budget.push(
+        ['Free-space loss', -itm.A_fs_db, 'dB', `${an.fMhz.toFixed(3)} MHz over ${(itm.d_m / 1000).toFixed(2)} km`],
+        ['Terrain', -itm.A_ref_db, 'dB', `Longley–Rice reference attenuation, ${itm.modeLabel.toLowerCase()} regime, Δh ${Math.round(itm.delta_h_m)} m${
+          an.model === 'field' ? ', over the bare terrain' : an.coverUsed ? ', cover stood on the profile' : ', bare ground'}`],
+        ['Statistics', -itm.A_var_db, 'dB', `Longley–Rice variability — ${ITM.CLIMATE[P_.climate] || ''} climate, ${ITM.MDVAR[P_.mdvar % 10] || ''} mode, ${pct}`],
+      );
+      if (an.floor_db > 0.05) {
+        budget.push(['Obstruction floor', -an.floor_db, 'dB', `the line is cut, and one knife edge over the worst obstruction${
+          an.v != null && an.model !== 'field' ? ` (v = ${an.v.toFixed(2)})` : ''} costs ${knife.toFixed(1)} dB — more than the model’s regime prices it at, so the loss is held to it`]);
+      }
+      if (an.model === 'field') {
+        budget.push(['Field allowance', -an.allowance_db, 'dB', 'what Longley–Rice over bare terrain was found to read above path margins measured on site']);
+      } else if (an.coverUsed) {
+        budget.push(['Ground cover at A', -an.clutterA_db, 'dB', `ITU-R P.2108 terminal clutter at ${a.name}`],
+                    ['Ground cover at B', -an.clutterB_db, 'dB', `ITU-R P.2108 terminal clutter at ${b.name}`]);
+      }
+      budget.push(['= Path loss', -an.pathLoss_db, 'dB', `${(an.pathLoss_db - itm.A_fs_db).toFixed(1)} dB over free space`, 'sub']);
+    } else {
+      budget.push(['= Path loss', null, 'dB', `not computed — the model did not run${an.itmError ? `: ${an.itmError}` : ''}`, 'sub']);
+    }
+    budget.push(
+      ['RX antenna gain', rb.gain, 'dBi', rb.gain != null ? `${lbDbd(rb.gain)} dBd` : 'not on file'],
+      ['RX line loss', rb.loss == null ? null : -rb.loss, 'dB', ''],
+      ['= Received signal', rx, 'dBm', rx != null ? `at ${b.name} — ${microvolts(rx)}` : '', 'sub'],
+      ['RX threshold', rb.thr, 'dBm', `receiver sensitivity at ${b.name}`],
+    );
+    const band = pm.m == null ? null : lbMarginClass(pm.m);
+    const why = pm.m != null ? '' : pm.why === 'ends' ? 'both ends have to be stations — a point on the ground has no radio on it'
+      : pm.why === 'system' ? 'no radio system on file at one end'
+      : pm.why === 'loss' ? `no path loss to take it off — the model did not run${an.itmError ? `: ${an.itmError}` : ''}`
+      : `no figure on file for ${fmtTermList(pm.missing)}`;
+    budget.push(['Fade margin', pm.m, 'dB', band ? `${band.label} — the received signal less the RX threshold, at ${pct}` : `not computed — ${why}`, 'result']);
+
+    const notes = [];
+    if (pm.m != null) {
+      const n = x => (x < 0 ? `(${x.toFixed(2)})` : x.toFixed(2));
+      notes.push(`Fade margin = (TX power + TX gain − TX line loss) − path loss + RX gain − RX line loss − RX threshold = (${n(txDbm)} + ${n(ra.gain)} − ${
+        n(ra.loss)}) − ${n(an.pathLoss_db)} + ${n(rb.gain)} − ${n(rb.loss)} − ${n(rb.thr)} = ${signed(pm.m, 1)} dB.`);
+      // What Radio Mobile leaves out, so the figure it shows can be held
+      // against this one: it runs Longley–Rice and nothing else.
+      const extra = [];
+      if (an.model === 'field' && an.allowance_db > 0) extra.push(['the field allowance', an.allowance_db]);
+      if (an.floor_db > 0.05) extra.push(['the obstruction floor', an.floor_db]);
+      if (an.model !== 'field' && an.clutterA_db > 0) extra.push([`the ground cover at ${a.name}`, an.clutterA_db]);
+      if (an.model !== 'field' && an.clutterB_db > 0) extra.push([`the ground cover at ${b.name}`, an.clutterB_db]);
+      const add = extra.reduce((t, [, x]) => t + x, 0);
+      notes.push(extra.length
+        ? `Radio Mobile runs Longley–Rice alone, without ${fmtTermList(extra.map(([l, x]) => `${l} (${x.toFixed(1)} dB)`))}: set up with the figures above, its “Rx relative” for this path should read about ${
+            signed(pm.m + add, 1)} dB. Differences of a few dB beyond that come from the terrain data itself.`
+        : `Radio Mobile runs the same Longley–Rice: set up with the figures above, its “Rx relative” for this path should read about ${signed(pm.m, 1)} dB, give or take what its own terrain data differs by.`);
+    }
+    notes.push(`Bands: ${LB_MARGIN.map(m => (isFinite(m.min) ? `${m.label} ${m.min} dB or more` : `${m.label} below that`)).join(', ')} — at the reliability asked for.`);
+    notes.push('Indicative only. The ends are surveyed heights (AHD) where the register has them and the ground between is terrain tiles on the EGM96 geoid — the two agree to about a metre over Australia. Antenna patterns are not modelled.');
+
+    const stamp = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
+    const title = rp ? rp.title : 'Elevation profile';
+    return {
+      title, heading: `${title} — ${a.name} → ${b.name}`,
+      sub: `${fmtKm(an.D / 1000)} @ ${String(Math.round(azAB) % 360).padStart(3, '0')}° · ${an.fMhz.toFixed(3)} MHz · Flood-Net, ${stamp}`,
+      stamp, a, b, an, prof, tokens,
+      margin: pm.m, band, why, pct,
+      verdict: v,
+      radio: rp ? pairsOf(rp.rows) : [],
+      ends, path, model, budget, notes,
+      file: `floodnet-path-${slugOf(a.name)}-to-${slugOf(b.name)}`,
+    };
+  }
+
+  // The chart for paper, as SVG markup, with the ends named over it and the
+  // key and the source under it. chartSvg() is the card's own drawing; it
+  // leaves the cursor's scales behind, which belong to the chart on screen and
+  // are put back.
+  function paperSvg(rep) {
+    const s = shown;
+    const { W, H, head } = PAPER;
+    const keep = hoverGeom;
+    let chart;
+    try { chart = chartSvg(s.an, s.prof, false, null, { W, H }); } finally { hoverGeom = keep; }
+    const m = /<svg[\s\S]*?<\/svg>/.exec(chart || '');
+    if (!m) return null;
+    const inner = m[0]
+      .replace(/<g id="path-cursor"[\s\S]*?<\/g>/, '')
+      .replace(/<rect[^>]*fill="transparent"[^>]*\/>/, '')
+      .replace(/^<svg /, `<svg x="0" y="${head}" width="${W}" height="${H}" `);
+    const an = rep.an, a = rep.a, b = rep.b;
+    const T = rep.tokens;
+    const ink = 'var(--text)', muted = 'var(--muted)';
+    const fit = (t, px, size) => {
+      const max = Math.max(4, Math.floor(px / (size * 0.56)));
+      return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+    };
+    const endText = (e, ground, agl, role, x, anchor) => `
+      <text x="${x}" y="76" font-size="13" font-weight="700" text-anchor="${anchor}" fill="${ink}">${esc(fit(`${role} · ${e.name}`, W / 2 - 70, 13))}</text>
+      <text x="${x}" y="93" font-size="12" text-anchor="${anchor}" fill="${muted}">${esc(`ground ${ground.toFixed(1)} m · antenna ${agl.toFixed(1)} m AGL`)}</text>`;
+    // The key, wrapped to the width: a swatch drawn as the chart draws the thing.
+    const items = [
+      ['los', 'Line of sight, A → B'], ['fres', '60% Fresnel zone'], ['gnd', `Ground (earth curvature included, k = ${an.k.toFixed(2)})`],
+      ['earth', 'Earth curvature'], ['obs', 'Inside the Fresnel zone'], ['mast', 'Antennas'],
+    ];
+    if (an.worst && an.worst.ratio < 0.6) items.push(['worst', 'Worst point']);
+    if (rep.prof.lidar && rep.prof.lidar.some(Boolean)) items.push(['lidar', '5 m LiDAR']);
+    if (an.coverUsed) {
+      const seen = [];
+      for (const p of an.pts) if (p.cls != null && !seen.includes(p.cls)) seen.push(p.cls);
+      for (const c of seen) items.push([`cover:${c}`, LandCover.CLASSES[c].label]);
+    }
+    const swatch = (k, x, y) => {
+      if (k === 'los')   return `<line x1="${x}" y1="${y}" x2="${x + 22}" y2="${y}" stroke="var(--accent)" stroke-width="2"/>`;
+      if (k === 'fres')  return `<line x1="${x}" y1="${y}" x2="${x + 22}" y2="${y}" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+      if (k === 'gnd')   return `<rect x="${x}" y="${y - 6}" width="22" height="12" fill="var(--terrain-fill)" stroke="var(--terrain-line)"/>`;
+      if (k === 'earth') return `<rect x="${x}" y="${y - 6}" width="22" height="12" fill="var(--profile-earth)" stroke="var(--profile-earth-line)"/>`;
+      if (k === 'obs')   return `<line x1="${x}" y1="${y}" x2="${x + 22}" y2="${y}" stroke="var(--bad)" stroke-width="2.5"/>`;
+      if (k === 'mast')  return `<line x1="${x + 11}" y1="${y - 7}" x2="${x + 11}" y2="${y + 7}" stroke="var(--map-repeater)" stroke-width="2.5"/>`;
+      if (k === 'worst') return `<circle cx="${x + 11}" cy="${y}" r="4" fill="var(--bad)"/>`;
+      if (k === 'lidar') return `<line x1="${x}" y1="${y}" x2="${x + 22}" y2="${y}" stroke="var(--profile-lidar)" stroke-width="2.5"/>`;
+      return `<rect x="${x}" y="${y - 6}" width="22" height="12" fill="${LandCover.colourVar(Number(k.slice(6)))}" opacity=".85"/>`;
+    };
+    let kx = 52, ky = head + H + 20;
+    const key = items.map(([k, label]) => {
+      const w = 30 + label.length * 12 * 0.52 + 22;
+      if (kx + w > W - 14) { kx = 52; ky += 22; }
+      const out = `${swatch(k, kx, ky)}<text x="${kx + 30}" y="${ky + 4}" font-size="12" fill="${ink}">${esc(label)}</text>`;
+      kx += w;
+      return out;
+    }).join('');
+    const stretch = (/Heights drawn ×([\d.]+)/.exec(chart) || [])[1];
+    const foot = [
+      stretch ? `Heights drawn ×${stretch} against distances` : '',
+      rep.prof.attribution,
+      an.coverUsed ? LandCover.attribution : '',
+      `Flood-Net, ${rep.stamp}`,
+    ].filter(Boolean).join(' · ');
+    const total = ky + 40;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${total}" width="${W}" height="${total}"
+      font-family="Segoe UI, Calibri, Arial, Helvetica, sans-serif">
+      <rect x="0" y="0" width="${W}" height="${total}" fill="#ffffff"/>
+      <text x="16" y="28" font-size="19" font-weight="700" fill="${ink}">${esc(fit(rep.heading, W - 32, 19))}</text>
+      <text x="16" y="50" font-size="13" fill="${muted}">${esc(fit(rep.sub, W - 32, 13))}</text>
+      ${endText(a, an.groundA, an.aglA, 'A, transmitter', 52, 'start')}
+      ${endText(b, an.groundB, an.aglB, 'B, receiver', W - 14, 'end')}
+      ${inner}
+      ${key}
+      <text x="16" y="${total - 10}" font-size="11" fill="${muted}">${esc(fit(foot, W - 32, 11))}</text>
+    </svg>`;
+    return { svg: paperColours(svg, T), W, H: total };
+  }
+
+  // The paper chart as a PNG, at twice its size so it prints sharp:
+  // { blob, url, w, h } — the blob for the clipboard and a download, the data
+  // URL for the document, which carries the picture inside it.
+  function paperPicture(rep) {
+    return new Promise((resolve, reject) => {
+      const p = paperSvg(rep);
+      if (!p) { reject(new Error('There is no chart to copy.')); return; }
+      const img = new Image();
+      img.onload = () => {
+        const k = 2;
+        const c = document.createElement('canvas');
+        c.width = p.W * k; c.height = p.H * k;
+        const g = c.getContext('2d');
+        if (!g) { reject(new Error('This browser cannot draw the chart as a picture.')); return; }
+        g.fillStyle = '#ffffff';
+        g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        let url;
+        try { url = c.toDataURL('image/png'); } catch (e) { reject(e); return; }
+        c.toBlob(blob => (blob ? resolve({ blob, url, w: p.W, h: p.H })
+          : reject(new Error('This browser cannot draw the chart as a picture.'))), 'image/png');
+      };
+      img.onerror = () => reject(new Error('This browser cannot draw the chart as a picture.'));
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(p.svg)}`;
+    });
+  }
+
+  // The report as a document: inline styles only, because that is all Word
+  // and the mail programs keep of a pasted page. `pic` may be null — the
+  // figures go without the chart rather than not at all.
+  function reportHtml(rep, pic) {
+    const T = rep.tokens;
+    const tone = { ok: T['--ok'] || '#107c10', warn: T['--warn'] || '#9e5e00', bad: T['--bad'] || '#c7401a' };
+    const font = 'font-family:Calibri,Arial,Helvetica,sans-serif;';
+    const cell = 'border:1px solid #c8d1db;padding:3pt 6pt;vertical-align:top;text-align:left;';
+    const headCell = `${cell}background:#eef3f8;font-weight:bold;`;
+    const h = t => `<h3 style="${font}font-size:12pt;color:#0b5cab;margin:14pt 0 4pt">${esc(t)}</h3>`;
+    const pairs = rows => `<table style="border-collapse:collapse;${font}font-size:9.5pt" width="100%">${
+      rows.map(([l, val]) => `<tr><th style="${headCell}width:32%">${esc(l)}</th><td style="${cell}">${esc(val)}</td></tr>`).join('')}</table>`;
+    const ends = `<table style="border-collapse:collapse;${font}font-size:9.5pt" width="100%">
+      <tr><th style="${headCell}width:24%"></th><th style="${headCell}">A — transmitter</th><th style="${headCell}">B — receiver</th></tr>
+      ${rep.ends.map(([l, x, y]) => `<tr><th style="${headCell}">${esc(l)}</th><td style="${cell}">${esc(x)}</td><td style="${cell}">${esc(y)}</td></tr>`).join('')}
+    </table>`;
+    const budget = `<table style="border-collapse:collapse;${font}font-size:9.5pt" width="100%">
+      <tr><th style="${headCell}">Term</th><th style="${headCell}text-align:right">Value</th><th style="${headCell}">Unit</th><th style="${headCell}">Note</th></tr>
+      ${rep.budget.map(([l, val, unit, note, kind]) => {
+        const strong = kind ? 'font-weight:bold;' : '';
+        const bg = kind === 'result' ? 'background:#f4f7fa;' : '';
+        const col = kind === 'result' && rep.band ? `color:${tone[rep.band.cls]};` : '';
+        return `<tr><th style="${cell}${strong}${bg}">${esc(l)}</th><td style="${cell}${strong}${bg}${col}text-align:right;white-space:nowrap">${
+          esc(kind === 'result' ? signed(val, 1) : signed(val, 2))}</td><td style="${cell}${bg}">${esc(unit)}</td><td style="${cell}${bg}">${esc(note)}</td></tr>`;
+      }).join('')}
+    </table>`;
+    const fig = rep.margin == null ? 'not computed' : `${signed(rep.margin, 1)} dB`;
+    // 600 px is 6.25 in at Word's 96 dpi: inside the text width of an A4 or a
+    // Letter page at its default margins, so it pastes without being rescaled.
+    const imgW = 600, imgH = pic ? Math.round(pic.h * imgW / pic.w) : 0;
+    return `<div style="${font}font-size:10.5pt;color:#16202a">
+      <h2 style="${font}font-size:15pt;margin:0 0 2pt">${esc(rep.heading)}</h2>
+      <p style="${font}font-size:9.5pt;color:#4f6478;margin:0 0 8pt">${esc(rep.sub)}</p>
+      <p style="${font}font-size:12pt;margin:0 0 2pt"><b>Fade margin:</b>
+        <b style="color:${rep.band ? tone[rep.band.cls] : tone.warn}">${esc(fig)}</b>
+        ${esc(rep.band ? `— ${rep.band.label}, ${rep.a.name} → ${rep.b.name}, at ${rep.pct}` : `— ${rep.why}`)}</p>
+      <p style="${font}font-size:10.5pt;margin:0 0 8pt"><b>Line of sight:</b>
+        <b style="color:${tone[rep.verdict.cls] || tone.warn}">${esc(rep.verdict.label)}</b> — ${esc(rep.verdict.note)}${
+          rep.an.verdict === 'obstructed' && rep.margin != null ? ' The model has priced the obstruction; the margin is what is left after it.' : ''}</p>
+      ${pic ? `<p style="margin:0 0 6pt"><img src="${pic.url}" width="${imgW}" height="${imgH}" alt="${escAttr(`Elevation profile, ${rep.a.name} to ${rep.b.name}, with the line of sight and the 60% Fresnel zone`)}"></p>` : ''}
+      ${rep.radio.length ? h(rep.title) + pairs(rep.radio) : ''}
+      ${h('The two ends')}${ends}
+      ${h('The path')}${pairs(rep.path)}
+      ${h('Propagation model and settings')}${pairs(rep.model)}
+      ${h('Link budget — how the fade margin is worked out')}${budget}
+      ${rep.notes.map(n => `<p style="${font}font-size:9.5pt;margin:6pt 0 0">${esc(n)}</p>`).join('')}
+    </div>`;
+  }
+
+  // The same, as plain text: tab between columns, so a table pasted into a
+  // spreadsheet lands in cells.
+  function reportText(rep) {
+    const L = [];
+    const sec = t => { L.push('', t.toUpperCase()); };
+    L.push(rep.heading, rep.sub, '');
+    L.push(`Fade margin: ${rep.margin == null ? `not computed — ${rep.why}` : `${signed(rep.margin, 1)} dB — ${rep.band.label}, ${rep.a.name} → ${rep.b.name}, at ${rep.pct}`}`);
+    L.push(`Line of sight: ${rep.verdict.label} — ${rep.verdict.note}`);
+    if (rep.radio.length) { sec(rep.title); rep.radio.forEach(([l, v]) => L.push(`${l}\t${v}`)); }
+    sec('The two ends');
+    L.push('\tA — transmitter\tB — receiver');
+    rep.ends.forEach(([l, x, y]) => L.push(`${l}\t${x}\t${y}`));
+    sec('The path');
+    rep.path.forEach(([l, v]) => L.push(`${l}\t${v}`));
+    sec('Propagation model and settings');
+    rep.model.forEach(([l, v]) => L.push(`${l}\t${v}`));
+    sec('Link budget — how the fade margin is worked out');
+    rep.budget.forEach(([l, v, unit, note, kind]) => L.push(`${l}\t${kind === 'result' ? signed(v, 1) : signed(v, 2)}\t${unit}\t${note}`));
+    L.push('');
+    rep.notes.forEach(n => L.push(n));
+    return L.join('\n');
+  }
+
+  // A file, saved — the fallback when the clipboard is refused.
+  function saveFile(blob, name) {
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: floodnetName(name) });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  // The clipboard, the old way: a copy event that writes what it is given.
+  // For a browser without the asynchronous clipboard, or one that refused it.
+  function copyByEvent(html, text) {
+    const put = e => {
+      e.clipboardData.setData('text/html', html);
+      e.clipboardData.setData('text/plain', text);
+      e.preventDefault();
+    };
+    document.addEventListener('copy', put, true);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+    document.removeEventListener('copy', put, true);
+    return ok;
+  }
+
+  // Built while the press is still the page's gesture: the item takes the
+  // picture as a promise, so drawing it does not use the gesture up first.
+  function clipboardWrite(parts) {
+    if (!(navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined')) {
+      return Promise.reject(new Error('no asynchronous clipboard'));
+    }
+    try { return navigator.clipboard.write([new ClipboardItem(parts)]); } catch (e) { return Promise.reject(e); }
+  }
+
+  function copyReport() {
+    const rep = reportOf();
+    if (!rep) { Toast.show('Nothing to copy yet — the profile is still being drawn.'); return; }
+    const pic = paperPicture(rep);
+    const text = reportText(rep);
+    const html = pic.then(p => reportHtml(rep, p), () => reportHtml(rep, null));
+    const done = () => Toast.show('Copied: the chart and every figure behind the fade margin. Paste it into Word or an email.', { kind: 'done' });
+    clipboardWrite({
+      'text/html': html.then(h => new Blob([h], { type: 'text/html' })),
+      'text/plain': new Blob([text], { type: 'text/plain' }),
+      'image/png': pic.then(p => p.blob),
+    }).then(done, () => html.then(h => {
+      if (copyByEvent(h, text)) { done(); return; }
+      // Neither way was allowed: the same document, saved, opens in Word.
+      saveFile(new Blob([`<!doctype html><meta charset="utf-8"><title>${esc(rep.heading)}</title>${h}`], { type: 'text/html' }), `${rep.file}.html`);
+      Toast.show('The browser would not copy, so the report was saved as a file instead — it opens in Word.', { kind: 'note' });
+    }));
+  }
+
+  function copyChart() {
+    const rep = reportOf();
+    if (!rep) { Toast.show('Nothing to copy yet — the profile is still being drawn.'); return; }
+    const pic = paperPicture(rep);
+    clipboardWrite({ 'image/png': pic.then(p => p.blob) }).then(
+      () => Toast.show('Copied the chart. Paste it into Word or an email.', { kind: 'done' }),
+      () => pic.then(p => {
+        saveFile(p.blob, `${rep.file}.png`);
+        Toast.show('The browser would not copy a picture, so the chart was saved as a file instead.', { kind: 'note' });
+      }, e => Toast.show(e.message, { kind: 'failed' })));
+  }
+
+  function downloadChart() {
+    const rep = reportOf();
+    if (!rep) { Toast.show('Nothing to save yet — the profile is still being drawn.'); return; }
+    paperPicture(rep).then(p => saveFile(p.blob, `${rep.file}.png`), e => Toast.show(e.message, { kind: 'failed' }));
+  }
+
+  // The press that starts it, over the chart: the one thing on the card that
+  // hands the path on to somebody else.
+  function copyHtml() {
+    return `
+      <div class="path-copy">
+        <button type="button" id="path-copy" onclick="PathProfile.copyReport()"
+                title="Copy the elevation profile with the link drawn on it and every figure behind the fade margin — the two ends, their radios, the model's settings and the budget term by term — ready to paste into Word or an email">📋 Copy for a report</button>
+        <span class="small">The chart and the figures behind the fade margin, to paste into Word. The chart alone:
+          <button type="button" class="lb-link" onclick="PathProfile.copyChart()">copy</button> ·
+          <button type="button" class="lb-link" onclick="PathProfile.downloadChart()">save as PNG</button></span>
+      </div>`;
+  }
+
+  // The card is the radio path's when the line is a path clicked on the map
+  // (MapBackbone.section): its title says which kind of path, and the note
+  // beside it names the two ends — the way round the profile is drawn now,
+  // which ⇄ may have turned from the way it was clicked.
   function panelHtml() {
     const sh = target();
     if (!sh) return '';
+    const rp = typeof MapBackbone !== 'undefined' ? MapBackbone.section() : null;
+    const ends = rp ? `${esc(endpoint(sh, 0).name)} → ${esc(endpoint(sh, 1).name)} · ` : '';
     return `
       <details class="path-panel" ${P().open ? 'open' : ''}
                ontoggle="PathProfile.setOpen(this.open)">
         <summary>
-          <h3>Elevation profile</h3>
-          <span class="small">${esc(MapDraw.measure(sh))}</span>
+          <h3 id="path-card-title">${rp ? esc(rp.title) : 'Elevation profile'}</h3>
+          <span class="small">${ends}${esc(MapDraw.measure(sh))}</span>
         </summary>
-        <div class="path-body">${bodyHtml()}</div>
+        <div class="path-body">${bodyHtml(rp)}</div>
       </details>`;
   }
 
@@ -2504,7 +3081,7 @@ const PathProfile = (function () {
   function emptyHtml() {
     return `
       <div class="path-empty-head">
-        <h3>Elevation profile</h3>
+        <h3 id="path-card-title">Elevation profile</h3>
         <span class="small">No path yet</span>
       </div>
       <p class="small path-empty">
@@ -2619,8 +3196,21 @@ const PathProfile = (function () {
     openFull,
     isFull() { return !!full; },
 
-    // The fade margin the readout is quoting, for the radio-path card that
-    // heads this one: A → B, off the path loss the chart was priced with, the
+    // The path for a report (see "copy for a report"): all of it, the chart
+    // alone, or the chart saved as a file.
+    copyReport, copyChart, downloadChart,
+    // What a copy would carry, for anything that wants to check it: the plain
+    // text, the document without its picture, the rows both are written from,
+    // and the paper chart's SVG. Null with no single-hop profile drawn.
+    report() {
+      const r = reportOf();
+      if (!r) return null;
+      const p = paperSvg(r);
+      return { text: reportText(r), html: reportHtml(r, null), rows: r, svg: p ? p.svg : null };
+    },
+
+    // The fade margin the readout is quoting, for anything that wants to
+    // check it: A → B, off the path loss the chart was priced with, the
     // obstruction already in it, and `ends` in that order. Null when the card
     // has none to quote — no single-hop profile drawn, an end that is not a
     // station, a term not on file.

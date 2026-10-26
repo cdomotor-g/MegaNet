@@ -671,14 +671,18 @@ async function main() {
       })();
       if (pair) {
         showStationCard(s.id);
+        // The radio path is shown on the profile card, at the head of the
+        // path tools: open while MapBackbone has it and the card carries its
+        // rows.
+        const pathOpen = () => !!MapBackbone.current() && !!el('path-profile-panel').querySelector('.path-card-rows');
         MapBackbone.open('field', pair[0].id, pair[1].id);
-        out.pathOffMap = !document.querySelector('.mn-map-stage #path-card')
-          && !!el('path-card').closest('#stations-path-cards');
-        out.pathKeepsStn = !el('stn-card').hidden && !el('path-card').hidden;
+        out.pathOffMap = !document.querySelector('.mn-map-stage .path-card-rows')
+          && !!el('path-profile-panel').closest('#stations-path-cards') && pathOpen();
+        out.pathKeepsStn = !el('stn-card').hidden && pathOpen();
         showAcmaCard('no-such-device');
-        out.acmaKeepsPath = !el('path-card').hidden && !el('acma-card').hidden;
+        out.acmaKeepsPath = pathOpen() && !el('acma-card').hidden;
         MapBackbone.open('field', pair[0].id, pair[1].id);
-        out.pathKeepsAcma = !el('acma-card').hidden && !el('path-card').hidden;
+        out.pathKeepsAcma = !el('acma-card').hidden && pathOpen();
         MapBackbone.closeCard();
       } else {
         out.pathOffMap = out.pathKeepsStn = out.acmaKeepsPath = out.pathKeepsAcma = 'no pair';
@@ -688,7 +692,7 @@ async function main() {
     });
     check('the ACMA card closes the station card on its way open', excl.acmaHidesStn);
     check('and the station card closes the ACMA card', excl.stnHidesAcma);
-    check('the radio path card is in the path tools, not over the map', excl.pathOffMap === true,
+    check('a radio path is shown on the profile card in the path tools, not over the map', excl.pathOffMap === true,
       String(excl.pathOffMap));
     check('…so opening it leaves the station card open', excl.pathKeepsStn === true, String(excl.pathKeepsStn));
     check('…and it and the ACMA card no longer close each other',

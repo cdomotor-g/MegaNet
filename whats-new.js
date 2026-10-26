@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 103, date: '2026-10-26', items: [
+      'A radio path clicked on the <strong>Stations</strong> map no longer opens a card of its own over the elevation profile: '
+        + 'the <strong>profile card becomes the path\'s card</strong>, with the two ends, the ALERT IDs and the frequency at its '
+        + 'head and the distance and fade margin said once, under them.',
+      '<strong>📋 Copy for a report</strong>, over the elevation profile\'s chart: copies the chart with the line of sight drawn '
+        + 'on it and everything behind the fade margin — both ends\' positions, heights and radios, every Longley–Rice setting, '
+        + 'and the link budget term by term down to the margin — ready to paste into Word or an email, or to set the same '
+        + 'path up in Radio Mobile. <em>copy</em> and <em>save as PNG</em> beside it take the chart alone.',
+    ] },
     { n: 102, date: '2026-10-26', items: [
       '<strong>Find a survey mark by its number</strong>: type <em>43906</em> or <em>PSM 43906</em> into 📍 <em>Find a place</em> '
         + 'or <strong>Ctrl+K</strong> (🔎 Search), and the Queensland register\'s mark is listed with its AHD height and street. '
