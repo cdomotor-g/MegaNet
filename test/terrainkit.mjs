@@ -1005,6 +1005,11 @@ const report = await page.evaluate(ids => {
     svgCursor: !!r.svg && /path-cursor|onmousemove/.test(r.svg),
     stillHover: (() => { PathProfile.hoverAt(100); return !!document.querySelector('#path-profile-panel #path-cursor:not([style*="none"])'); })(),
     file: r.rows.file,
+    brief: {
+      top: r.text.startsWith(r.brief.text),
+      tables: /THE TWO ENDS|LINK BUDGET/.test(r.brief.text) || /<table|Link budget/.test(r.brief.html),
+      margin: r.brief.html.includes('Fade margin:') && r.brief.html.includes('Line of sight:'),
+    },
   };
 }, PAIR);
 ok('📋 the report quotes the card\'s fade margin', !!report && report.textFig && report.rowsMargin === report.margin,
@@ -1022,6 +1027,8 @@ if (report) {
      !report.svgVar && report.svgNames && !report.svgCursor, JSON.stringify(report));
   ok('…drawn without taking the cursor away from the chart on the card', report.stillHover);
   ok('…and a file name that says Flood-Net', /^floodnet-path-/.test(report.file), report.file);
+  ok('📄 the summary is the report\'s top — the margin and the verdict, none of the tables',
+     report.brief.top && report.brief.margin && !report.brief.tables, JSON.stringify(report.brief));
 }
 await page.evaluate(() => PathProfile.hoverOff());
 await page.click('#path-copy');
@@ -1056,6 +1063,34 @@ if (pasted) {
   ok('…the text the report\'s own, and the picture drawn at twice its size',
      pasted.text && !!pasted.png && pasted.png[0] === 2400 && pasted.png[1] > 900, JSON.stringify(pasted));
   ok('…and says it did', /^Copied/.test(pasted.toast), pasted.toast);
+}
+// 📄 Copy a summary: the same three ways, the document stopping at the chart.
+await page.click('#path-copy-brief');
+const brief = await page.evaluate(async () => {
+  const want = PathProfile.report().brief.text;
+  const until = Date.now() + 15000;
+  let it = null, text = '';
+  while (Date.now() < until) {
+    try { [it] = await navigator.clipboard.read(); } catch (_) { it = null; }
+    text = it && it.types.includes('text/plain') ? await (await it.getType('text/plain')).text() : '';
+    if (text === want && it.types.includes('text/html')) break;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  if (!it) return null;
+  const out = { types: it.types.slice(), text: text === want };
+  if (it.types.includes('text/html')) {
+    const h = await (await it.getType('text/html')).text();
+    out.img = /<img[^>]+src="data:image\/png;base64,/.test(h);
+    out.tables = /<table|Link budget/.test(h);
+  }
+  out.toast = [...document.querySelectorAll('.toast-text')].map(t => t.textContent).pop() || '';
+  return out;
+});
+ok('📄 the summary press puts the summary\'s text, a document and the picture on the clipboard',
+   !!brief && brief.text && ['text/html', 'text/plain', 'image/png'].every(t => brief.types.includes(t)), JSON.stringify(brief));
+if (brief) {
+  ok('…the document carrying the chart and no table under it', brief.img && !brief.tables, JSON.stringify(brief));
+  ok('…and says what it copied', /^Copied: the fade margin/.test(brief.toast), brief.toast);
 }
 
 // Shown on asking: the cards carry the answer, and the explaining behind a

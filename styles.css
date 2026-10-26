@@ -6259,8 +6259,9 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   margin: var(--sp-2) 0 0;
 }
 
-/* 📋 Copy for a report, over the chart, with the chart-alone choices beside
-   it. Wraps under it in a narrow column rather than squeezing either. */
+/* 📄 Copy a summary and 📋 Copy for a report, over the chart, with the
+   chart-alone choices beside them. Wraps under them in a narrow column rather
+   than squeezing any. */
 .path-copy {
   display: flex;
   flex-wrap: wrap;

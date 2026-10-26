@@ -4921,7 +4921,10 @@ the obstruction floor). All of it is written from one list of rows
 (`reportOf` in `path-profile.js`), so the document and the text cannot differ.
 Where the browser refuses the clipboard it falls back to a copy event, and then
 to saving the document as a file; *copy* and *save as PNG* beside it take the
-chart alone.
+chart alone. **📄 Copy a summary**, beside it, copies the same three ways but
+only the report's top — the heading, the fade margin, the line-of-sight verdict
+and the chart — without the tables under it, for a page that wants the answer
+rather than the working.
 
 **The Stations map's controls.** Everything MapChrome would put in the map's
 top-right corner lives in the strip instead, at every width — a phone's rail

@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 104, date: '2026-10-26', items: [
+      '<strong>📄 Copy a summary</strong>, beside 📋 Copy for a report over the elevation profile\'s chart: copies just the '
+        + 'top of the report — the path\'s heading, the fade margin, the line of sight and the chart — without the tables of '
+        + 'figures under it, for a page in Word or an email that wants the answer rather than the working.',
+    ] },
     { n: 103, date: '2026-10-26', items: [
       'A radio path clicked on the <strong>Stations</strong> map no longer opens a card of its own over the elevation profile: '
         + 'the <strong>profile card becomes the path\'s card</strong>, with the two ends, the ALERT IDs and the frequency at its '

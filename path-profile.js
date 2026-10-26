@@ -2509,6 +2509,9 @@ const PathProfile = (function () {
   // it as a picture), plain text, and the picture alone — and whatever it is
   // pasted into takes the richest one it can: Word and the mail programs the
   // document, a plain editor the text, a paint program the picture.
+  // 📄 Copy a summary beside it puts the same top on the clipboard — the
+  // heading, the margin, the verdict and the chart — without the tables, for a
+  // page that wants the answer rather than the working.
   //
   // The picture is drawn again for paper rather than lifted off the card: at
   // one size whatever the column is, in the light theme's colours whatever the
@@ -2897,8 +2900,10 @@ const PathProfile = (function () {
 
   // The report as a document: inline styles only, because that is all Word
   // and the mail programs keep of a pasted page. `pic` may be null — the
-  // figures go without the chart rather than not at all.
-  function reportHtml(rep, pic) {
+  // figures go without the chart rather than not at all. `brief` stops after
+  // the chart: the heading, the margin, the verdict and the picture, which is
+  // what 📄 Copy a summary carries.
+  function reportHtml(rep, pic, brief) {
     const T = rep.tokens;
     const tone = { ok: T['--ok'] || '#107c10', warn: T['--warn'] || '#9e5e00', bad: T['--bad'] || '#c7401a' };
     const font = 'font-family:Calibri,Arial,Helvetica,sans-serif;';
@@ -2935,23 +2940,24 @@ const PathProfile = (function () {
         <b style="color:${tone[rep.verdict.cls] || tone.warn}">${esc(rep.verdict.label)}</b> — ${esc(rep.verdict.note)}${
           rep.an.verdict === 'obstructed' && rep.margin != null ? ' The model has priced the obstruction; the margin is what is left after it.' : ''}</p>
       ${pic ? `<p style="margin:0 0 6pt"><img src="${pic.url}" width="${imgW}" height="${imgH}" alt="${escAttr(`Elevation profile, ${rep.a.name} to ${rep.b.name}, with the line of sight and the 60% Fresnel zone`)}"></p>` : ''}
-      ${rep.radio.length ? h(rep.title) + pairs(rep.radio) : ''}
+      ${brief ? '' : `${rep.radio.length ? h(rep.title) + pairs(rep.radio) : ''}
       ${h('The two ends')}${ends}
       ${h('The path')}${pairs(rep.path)}
       ${h('Propagation model and settings')}${pairs(rep.model)}
       ${h('Link budget — how the fade margin is worked out')}${budget}
-      ${rep.notes.map(n => `<p style="${font}font-size:9.5pt;margin:6pt 0 0">${esc(n)}</p>`).join('')}
+      ${rep.notes.map(n => `<p style="${font}font-size:9.5pt;margin:6pt 0 0">${esc(n)}</p>`).join('')}`}
     </div>`;
   }
 
   // The same, as plain text: tab between columns, so a table pasted into a
-  // spreadsheet lands in cells.
-  function reportText(rep) {
+  // spreadsheet lands in cells. `brief` as for the document.
+  function reportText(rep, brief) {
     const L = [];
     const sec = t => { L.push('', t.toUpperCase()); };
     L.push(rep.heading, rep.sub, '');
     L.push(`Fade margin: ${rep.margin == null ? `not computed — ${rep.why}` : `${signed(rep.margin, 1)} dB — ${rep.band.label}, ${rep.a.name} → ${rep.b.name}, at ${rep.pct}`}`);
     L.push(`Line of sight: ${rep.verdict.label} — ${rep.verdict.note}`);
+    if (brief) return L.join('\n');
     if (rep.radio.length) { sec(rep.title); rep.radio.forEach(([l, v]) => L.push(`${l}\t${v}`)); }
     sec('The two ends');
     L.push('\tA — transmitter\tB — receiver');
@@ -3000,13 +3006,17 @@ const PathProfile = (function () {
     try { return navigator.clipboard.write([new ClipboardItem(parts)]); } catch (e) { return Promise.reject(e); }
   }
 
-  function copyReport() {
+  // All of it, or with `brief` the top of it: the margin, the verdict and the
+  // chart, without the tables under them.
+  function copyReport(brief) {
     const rep = reportOf();
     if (!rep) { Toast.show('Nothing to copy yet — the profile is still being drawn.'); return; }
     const pic = paperPicture(rep);
-    const text = reportText(rep);
-    const html = pic.then(p => reportHtml(rep, p), () => reportHtml(rep, null));
-    const done = () => Toast.show('Copied: the chart and every figure behind the fade margin. Paste it into Word or an email.', { kind: 'done' });
+    const text = reportText(rep, brief);
+    const html = pic.then(p => reportHtml(rep, p, brief), () => reportHtml(rep, null, brief));
+    const done = () => Toast.show(brief
+      ? 'Copied: the fade margin, the line of sight and the chart. Paste it into Word or an email.'
+      : 'Copied: the chart and every figure behind the fade margin. Paste it into Word or an email.', { kind: 'done' });
     clipboardWrite({
       'text/html': html.then(h => new Blob([h], { type: 'text/html' })),
       'text/plain': new Blob([text], { type: 'text/plain' }),
@@ -3014,10 +3024,12 @@ const PathProfile = (function () {
     }).then(done, () => html.then(h => {
       if (copyByEvent(h, text)) { done(); return; }
       // Neither way was allowed: the same document, saved, opens in Word.
-      saveFile(new Blob([`<!doctype html><meta charset="utf-8"><title>${esc(rep.heading)}</title>${h}`], { type: 'text/html' }), `${rep.file}.html`);
-      Toast.show('The browser would not copy, so the report was saved as a file instead — it opens in Word.', { kind: 'note' });
+      saveFile(new Blob([`<!doctype html><meta charset="utf-8"><title>${esc(rep.heading)}</title>${h}`], { type: 'text/html' }), `${rep.file}${brief ? '-summary' : ''}.html`);
+      Toast.show(`The browser would not copy, so the ${brief ? 'summary' : 'report'} was saved as a file instead — it opens in Word.`, { kind: 'note' });
     }));
   }
+
+  function copySummary() { copyReport(true); }
 
   function copyChart() {
     const rep = reportOf();
@@ -3037,14 +3049,18 @@ const PathProfile = (function () {
     paperPicture(rep).then(p => saveFile(p.blob, `${rep.file}.png`), e => Toast.show(e.message, { kind: 'failed' }));
   }
 
-  // The press that starts it, over the chart: the one thing on the card that
-  // hands the path on to somebody else.
+  // The presses that start it, over the chart: the one thing on the card that
+  // hands the path on to somebody else. The summary is the report's top — the
+  // margin, the verdict and the chart — for a page that wants the answer and
+  // not the working.
   function copyHtml() {
     return `
       <div class="path-copy">
+        <button type="button" id="path-copy-brief" onclick="PathProfile.copySummary()"
+                title="Copy the heading, the fade margin, the line of sight and the elevation profile with the link drawn on it — the top of the report, without the tables — ready to paste into Word or an email">📄 Copy a summary</button>
         <button type="button" id="path-copy" onclick="PathProfile.copyReport()"
                 title="Copy the elevation profile with the link drawn on it and every figure behind the fade margin — the two ends, their radios, the model's settings and the budget term by term — ready to paste into Word or an email">📋 Copy for a report</button>
-        <span class="small">The chart and the figures behind the fade margin, to paste into Word. The chart alone:
+        <span class="small">To paste into Word: the summary is the fade margin, the line of sight and the chart; the report adds every figure behind the margin. The chart alone:
           <button type="button" class="lb-link" onclick="PathProfile.copyChart()">copy</button> ·
           <button type="button" class="lb-link" onclick="PathProfile.downloadChart()">save as PNG</button></span>
       </div>`;
@@ -3196,17 +3212,20 @@ const PathProfile = (function () {
     openFull,
     isFull() { return !!full; },
 
-    // The path for a report (see "copy for a report"): all of it, the chart
-    // alone, or the chart saved as a file.
-    copyReport, copyChart, downloadChart,
+    // The path for a report (see "copy for a report"): all of it, its top
+    // (the summary), the chart alone, or the chart saved as a file.
+    copyReport, copySummary, copyChart, downloadChart,
     // What a copy would carry, for anything that wants to check it: the plain
-    // text, the document without its picture, the rows both are written from,
-    // and the paper chart's SVG. Null with no single-hop profile drawn.
+    // text, the document without its picture, the same two for the summary,
+    // the rows all are written from, and the paper chart's SVG. Null with no
+    // single-hop profile drawn.
     report() {
       const r = reportOf();
       if (!r) return null;
       const p = paperSvg(r);
-      return { text: reportText(r), html: reportHtml(r, null), rows: r, svg: p ? p.svg : null };
+      return { text: reportText(r), html: reportHtml(r, null),
+               brief: { text: reportText(r, true), html: reportHtml(r, null, true) },
+               rows: r, svg: p ? p.svg : null };
     },
 
     // The fade margin the readout is quoting, for anything that wants to
