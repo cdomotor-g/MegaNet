@@ -93,6 +93,25 @@ function allowedOrigin(request, url) {
   return origin && (origin === url.origin || OTHER_ORIGINS.includes(origin)) ? origin : null;
 }
 
+// The body, refusing to read past `cap` bytes.
+async function readCapped(request, cap) {
+  if (!request.body) return new Uint8Array(0);
+  const reader = request.body.getReader();
+  const parts = [];
+  let n = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    n += value.byteLength;
+    if (n > cap) { try { await reader.cancel(); } catch (_) { /* gone */ } return null; }
+    parts.push(value);
+  }
+  const out = new Uint8Array(n);
+  let at = 0;
+  for (const part of parts) { out.set(part, at); at += part.byteLength; }
+  return out;
+}
+
 function json(body, status, headers = {}) {
   return new Response(JSON.stringify(body), {
     status,
@@ -143,8 +162,9 @@ async function filedToday(env) {
 // the #: it draws as nothing, and GitHub no longer reads either as a link.
 export function defuse(text) {
   return String(text).split(/(```[\s\S]*?```)/g).map((part, i) => (i % 2 ? part : part
-    .replace(/(^|[^\w`])@(?=[A-Za-z0-9])/g, '$1@⁠')
-    .replace(/\b([\w.-]+\/[\w.-]+)#(?=\d)/g, '$1#⁠'))).join('');
+    .replace(/(^|[^\w])@(?=[A-Za-z0-9])/g, '$1@⁠')
+    .replace(/\b([\w.-]+\/[\w.-]+)#(?=\d)/g, '$1#⁠')
+    .replace(/(github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/)(?=\d)/gi, '$1⁠'))).join('');
 }
 
 function cut(text) {
@@ -251,7 +271,9 @@ export async function handleReport(request, env) {
   if (Number(request.headers.get('Content-Length') || 0) > MAX.request) {
     return reply({ error: `over ${MAX.request / 1024} KB` }, 413);
   }
-  const text = await request.text();
+  const bytes = await readCapped(request, MAX.request);
+  if (!bytes) return reply({ error: `over ${MAX.request / 1024} KB` }, 413);
+  const text = new TextDecoder().decode(bytes);
   if (text.length > MAX.request) return reply({ error: `over ${MAX.request / 1024} KB` }, 413);
   let input;
   try { input = JSON.parse(text); } catch (_) { return reply({ error: 'expected a JSON body' }, 400); }

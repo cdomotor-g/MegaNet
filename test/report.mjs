@@ -135,6 +135,18 @@ const ENV = () => ({ GITHUB_ISSUES_TOKEN: 'github_pat_x', PHOTOS: bucket() });
   check('… while this repository\'s #34, an email address and a code block are left exactly as they were',
     d.includes(' #34;') && d.includes('a@b.com') && d.includes('```\nat f@https://x/y.js:1\n@inside other/repo#9\n```'), J(d));
 }
+{
+  const d = defuse('stray `@victim and https://github.com/other/repo/issues/7 and `@a` end');
+  check('an @mention after a lone backtick, and another repository\'s issue URL, are defused too',
+    d.includes('`@⁠victim') && d.includes('/issues/⁠7'), J(d));
+}
+{
+  const chunks = [new Uint8Array(MAX.request), new Uint8Array(10)];
+  const req = new Request(URL_, { method: 'POST', headers: { Origin: ORIGIN, 'Content-Type': 'application/json' },
+    body: new ReadableStream({ pull(c) { const v = chunks.shift(); v ? c.enqueue(v) : c.close(); } }), duplex: 'half' });
+  const res = await handleReport(req, ENV(), { waitUntil() {} });
+  check('a chunked body over the cap is refused with 413 without being read whole', res.status === 413, String(res.status));
+}
 
 // ── Filed ─────────────────────────────────────────────────────────────────────
 {
