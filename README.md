@@ -2868,6 +2868,14 @@ pin, with no network at all. Type a name and it lists, grouped:
 - **Catchments** — the 77 Queensland drainage basins the file carries, by name
   or basin number ("fitzroy", "130"); pressed, the basin is drawn in outline
   from `data/qld-basins.geojson` and the map fitted to it.
+- **Survey marks** — a permanent survey mark, benchmark or CORS site in the
+  Queensland register, by its number ("43906", "PSM 43906", "mark no. 43906")
+  or another name the register keeps for it ("BM 127K", a council's
+  "BCC12419"), asked of the State's SurveyControl service through
+  `MapSurvey.find()` with the callout's fields in the answer; pressed, the map
+  goes to the mark and opens the survey layer's own callout — AHD height,
+  condition, report link — pinned, so it opens and stays with the layer off.
+  A mark number is never sent to Nominatim.
 - **Rivers and creeks this network is on** — the register's `stream` values,
   with how many stations each has (a creek written *CK* and *CREEK* is one
   creek); pressed, the map goes to the stretch its stations span, drawn along
@@ -3418,6 +3426,8 @@ already in it.
 **Ctrl/Cmd+K** from anywhere — or 🔎 **Search** in the banner — opens one box for
 everything (`palette.js`, #221): **stations** by name, station number, ALERT
 address or address window (the Stations filter's own matching, Ck/Creek and all),
+**survey marks** by number or another name (the same lookup Find a place makes,
+joining the list when it lands; Enter shows the mark through Find a place),
 **places** handed to 📍 Find a place (a coordinate, a town, a river, a catchment,
 a council), **tabs** by the nav's own scoring below, and a few **actions** (the
 Site Map, help for this tab, a link to where you are, a file, an export, the

@@ -179,11 +179,28 @@ function project(f, outFields, withGeometry) {
   return withGeometry ? { attributes, geometry: f.geometry } : { attributes };
 }
 
-// `where` is either the viewport's '1=1' or one mark, named by the very field
-// the app read out of /layers.
+// `where` is the viewport's '1=1', one mark named by the very field the app
+// read out of /layers, or a search (find(), for Find a place and Ctrl+K):
+// clauses joined by OR — the mark number, and the alternate names compared
+// in capitals, whole or by LIKE. A clause the stub cannot read finds nothing,
+// so a search that changed shape fails here rather than passing on '1=1'.
+const escRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function whereFilter(rows, where) {
-  const m = /^(\S+)='(\d+)'$/.exec(where || '');
-  return m ? rows.filter((f) => String(f.attributes[m[1]]) === m[2]) : rows;
+  if (!where || where === '1=1') return rows;
+  const tests = where.split(' OR ').map((c) => {
+    let m = /^(\S+)='([^']*)'$/.exec(c);
+    if (m) return (a) => String(a[m[1]] ?? '') === m[2];
+    m = /^UPPER\((\S+)\)='([^']*)'$/.exec(c);
+    if (m) return (a) => String(a[m[1]] ?? '').toUpperCase() === m[2];
+    m = /^UPPER\((\S+)\) LIKE '([^']*)'$/.exec(c);
+    if (m) {
+      const re = new RegExp(`^${m[2].split('%').map(escRe).join('.*')}$`);
+      return (a) => a[m[1]] != null && re.test(String(a[m[1]]).toUpperCase());
+    }
+    return null;
+  });
+  if (tests.some((t) => !t)) return [];
+  return rows.filter((f) => tests.some((t) => t(f.attributes)));
 }
 
 const server = await startServer();
@@ -504,6 +521,125 @@ try {
   check('the off switch removes marks, callout and count together',
     off.icons === 0 && off.popups === 0 && /hidden/i.test(off.note), JSON.stringify(off));
 
+  // ── Finding a mark by its number: Find a place and Ctrl+K ─────────────────
+  // The layer is off now, which is the case that matters: somebody with a
+  // mark number off a plaque or a level book has no reason to have turned a
+  // layer on first, and the answer must not depend on it.
+  const parsed = await page.evaluate(() => Object.fromEntries(
+    ['43906', 'PSM 43906', 'psm43906', 'mark no. 43906', '#043906', 'BM 127K', 'bcc12419', '12', 'Gatton', '4021-4025']
+      .map((t) => [t, MapSurvey.markQuery(t)])));
+  check('a bare number, or one after PSM, "mark no." or #, is a mark number',
+    ['43906', 'PSM 43906', 'psm43906', 'mark no. 43906', '#043906'].every((t) => parsed[t] && parsed[t].number === '43906'),
+    JSON.stringify(parsed));
+  check('a few letters and a number is one of a mark’s other names, asked spaced and run together',
+    !parsed['BM 127K'].number && parsed['BM 127K'].names.join('|') === 'BM 127K|BM127K'
+      && parsed.bcc12419.names.includes('BCC12419') && parsed['PSM 43906'].names.includes('PSM 43906'),
+    JSON.stringify(parsed));
+  check('two digits, a name and an address window are not marks',
+    parsed['12'] === null && parsed.Gatton === null && parsed['4021-4025'] === null, JSON.stringify(parsed));
+
+  const findFrom = queried.length;
+  await page.evaluate(() => setDockTab('places'));
+  await page.fill('#places-q', '10552');
+  await page.waitForSelector('#places-g-mark ~ .places-list .places-hit, section[aria-labelledby="places-g-mark"] .places-hit',
+    { timeout: 10_000 });
+  const listed = await page.evaluate(() => ({
+    rows: [...document.querySelectorAll('section[aria-labelledby="places-g-mark"] .places-hit')]
+      .map((b) => b.textContent.replace(/\s+/g, ' ').trim()),
+    credit: (document.querySelector('section[aria-labelledby="places-g-mark"] .places-credit') || {}).textContent || '',
+  }));
+  check('Find a place lists the mark under Survey marks: its number, what it is, its height and street',
+    listed.rows.length === 1 && /Mark 10552/.test(listed.rows[0]) && /Benchmark/.test(listed.rows[0])
+      && /52\.38 m AHD/.test(listed.rows[0]) && /QUEEN ST\/EIGHTH AVE-HOME HILL/.test(listed.rows[0])
+      && /Queensland/.test(listed.credit),
+    JSON.stringify(listed));
+  const asked = queried.slice(findFrom);
+  check('the search asks each sublayer the layer draws from, for that mark number, with the callout’s fields',
+    asked.length === 4 && [...new Set(asked.map((q) => q.id))].sort((a, b) => a - b).join(',') === '0,3,4,16'
+      && asked.every((q) => q.where === `${PFX}mrk_id='10552'` && !q.hasRC && q.outFields.includes(PFX + 'mrktype_de')),
+    JSON.stringify(asked));
+
+  await page.click('section[aria-labelledby="places-g-mark"] .places-hit');
+  await page.waitForFunction(() => /Mark 10552/.test(window.__popupText() || ''), null, { timeout: 10_000 });
+  const went = await page.evaluate(() => ({
+    centre: state.map.getCenter(), zoom: state.map.getZoom(),
+    pin: document.querySelectorAll('.mn-place-icon').length,
+    text: window.__popupText(), pills: window.__popupPills(),
+  }));
+  check('pressed, the map goes to the mark, close in, with the blue pin',
+    Math.abs(went.centre.lat + 20.0) < 0.002 && Math.abs(went.centre.lng - 147.0) < 0.002 && went.zoom >= 16 && went.pin === 1,
+    JSON.stringify(went));
+  check('…and opens the mark’s own callout, complete — the search brought its details',
+    went.text.includes('Benchmark · STAND') && went.text.includes('52.38 m AHD · Class C / 3rd ORDER')
+      && !/Looking up mark details/.test(went.text)
+      && went.pills.some((a) => a.href === 'https://qspatial.information.qld.gov.au/SurveyReport/SCR010552.pdf'),
+    JSON.stringify(went));
+  check('nothing more is asked to open it', queried.length === findFrom + 4, JSON.stringify(queried.slice(findFrom)));
+
+  await page.waitForTimeout(700);   // the moveend, and the layer's run() with the layer off
+  check('with the layer off, the callout stays open after the map settles',
+    /Mark 10552/.test(await page.evaluate(() => window.__popupText() || '')));
+  await page.evaluate(() => MapSurvey.setEnabled(true));
+  await page.waitForFunction(() => /marks? in view/.test(document.getElementById('map-survey-note').textContent),
+    null, { timeout: 15_000 });
+  await page.waitForTimeout(300);
+  check('…and through the layer drawing the marks round it when it is switched on',
+    /Mark 10552/.test(await page.evaluate(() => window.__popupText() || '')));
+
+  await page.click('.places-clear');
+  await page.waitForTimeout(200);
+  const cleared = await page.evaluate(() => ({ popup: window.__popupText(), pin: document.querySelectorAll('.mn-place-icon').length }));
+  check('✕ in Find a place takes the pin and the mark’s callout away together',
+    cleared.popup === null && cleared.pin === 0, JSON.stringify(cleared));
+
+  await page.fill('#places-q', 'bcc12419');
+  await page.waitForSelector('section[aria-labelledby="places-g-mark"] .places-hit', { timeout: 10_000 });
+  const byName = await page.evaluate(() => [...document.querySelectorAll('section[aria-labelledby="places-g-mark"] .places-hit')]
+    .map((b) => b.textContent.replace(/\s+/g, ' ').trim()));
+  check('one of a mark’s other names finds it, and says which name it was',
+    byName.length === 1 && /Mark 10552/.test(byName[0]) && /also BCC12419 BCC 66\/103/.test(byName[0]), JSON.stringify(byName));
+
+  await page.fill('#places-q', '99999');
+  await page.waitForFunction(() => /No survey mark by that number/.test(
+    (document.querySelector('section[aria-labelledby="places-g-mark"]') || {}).textContent || ''), null, { timeout: 10_000 })
+    .then(() => check('a number the register does not hold says so', true),
+      () => check('a number the register does not hold says so', false));
+  await page.click('.places-clear');
+
+  // Ctrl+K: the same lookup, the marks joining the list when it lands, and
+  // Enter on one taking the map there through Find a place.
+  await page.keyboard.press('Control+k');
+  await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'pal-q', null, { timeout: 5_000 });
+  await page.fill('#pal-q', 'PSM 10553');
+  await page.waitForFunction(() => [...document.querySelectorAll('#pal-list .pal-label')].some((l) => l.textContent === 'Mark 10553'),
+    null, { timeout: 10_000 });
+  const pal = await page.evaluate(() => ({
+    groups: [...document.querySelectorAll('#pal-list .pal-group-title')].map((g) => g.textContent.trim()),
+    labels: [...document.querySelectorAll('#pal-list .pal-label')].map((l) => l.textContent),
+    subs: [...document.querySelectorAll('#pal-list .pal-sub')].map((l) => l.textContent),
+    count: document.getElementById('pal-count').textContent,
+  }));
+  check('Ctrl+K lists the mark under Survey marks, with what it is, and counts it',
+    pal.groups.includes('Survey marks') && pal.subs.some((t) => /Permanent survey mark/.test(t) && /INKERMAN RD/.test(t))
+      && /1 survey mark/.test(pal.count) && !pal.labels.some((l) => /as a place/.test(l)),
+    JSON.stringify(pal));
+  const markAt = pal.labels.indexOf('Mark 10553');
+  for (let i = 0; i < markAt; i++) await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => /Mark 10553/.test(window.__popupText() || ''), null, { timeout: 10_000 });
+  const palWent = await page.evaluate(() => ({
+    open: !!document.getElementById('pal-q'), dock: dockShowing(),
+    q: (document.getElementById('places-q') || {}).value, centre: state.map.getCenter(),
+    text: window.__popupText(),
+  }));
+  check('Enter on it goes there through Find a place, and opens the mark’s callout',
+    !palWent.open && palWent.dock === 'places' && palWent.q === 'PSM 10553'
+      && Math.abs(palWent.centre.lat + 19.995) < 0.002 && Math.abs(palWent.centre.lng - 147.01) < 0.002
+      && palWent.text.includes('NOT FOUND · last visited 6 Feb 1998'),
+    JSON.stringify(palWent));
+  await page.click('.places-clear');
+  await page.evaluate(() => MapSurvey.setEnabled(false));
+
   check('no pageerror', errors.length === 0, errors.join(' | '));
 
   // ── The fallback service's path ───────────────────────────────────────────
@@ -523,19 +659,22 @@ try {
       // the fallback in the first place.
       return route.fulfill({ status: 503, contentType: 'text/plain', body: 'Service Unavailable' });
     }
-    fbQueried.push({ path: url.pathname, outFields: url.searchParams.get('outFields') });
-    const rows = whereFilter(FIXTURE[3], url.searchParams.get('where'));
+    fbQueried.push({ path: url.pathname, outFields: url.searchParams.get('outFields'),
+                     where: url.searchParams.get('where') });
+    // The fallback layer publishes the same field names minus the joined
+    // report link, and unprefixed — which is why the app matches on a key's
+    // last segment and not on the prefix it saw first. Filtered after, so a
+    // search there names the unprefixed fields too.
+    const flat = FIXTURE[3].map((f) => ({
+      geometry: f.geometry,
+      attributes: Object.fromEntries(Object.entries(f.attributes)
+        .filter(([k]) => k !== RPT)
+        .map(([k, v]) => [k.split('.').pop(), v])),
+    }));
+    const rows = whereFilter(flat, url.searchParams.get('where'));
     return route.fulfill({
       status: 200, contentType: 'application/json',
-      // The fallback layer publishes the same field names minus the joined
-      // report link, and unprefixed — which is why the app matches on a key's
-      // last segment and not on the prefix it saw first.
-      body: JSON.stringify({ features: rows.map((f) => ({
-        geometry: f.geometry,
-        attributes: Object.fromEntries(Object.entries(f.attributes)
-          .filter(([k]) => k !== RPT)
-          .map(([k, v]) => [k.split('.').pop(), v])),
-      })) }),
+      body: JSON.stringify({ features: rows }),
     });
   });
   await fbPage.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
@@ -576,6 +715,18 @@ try {
     fbQueried.length === 1 && fbQueried[0].outFields === '*'
       && fbQueried[0].path.includes('FoundationData/FeatureServer/8'),
     JSON.stringify(fbQueried));
+
+  // A search on the fallback service names its unprefixed fields, asks for
+  // the whole row, and so finds a mark whose callout needs nothing more.
+  const fbFound = await fbPage.evaluate(() => MapSurvey.find('PSM 10552').then((r) => ({
+    ok: r.ok, marks: r.marks.map((m) => ({ register: m.register, type: m.detail && m.detail.markType })),
+  })));
+  const fbFind = fbQueried.slice(1);
+  check('on the fallback service a mark is found by its number, its row complete',
+    fbFound.ok && fbFound.marks.length === 1 && fbFound.marks[0].register === '10552'
+      && fbFound.marks[0].type === 'STAND'
+      && fbFind.length === 1 && fbFind[0].outFields === '*' && fbFind[0].where.startsWith("mrk_id='10552'"),
+    JSON.stringify({ fbFound, fbFind }));
 
   check('no pageerror on the fallback path', errors.length === 0, errors.join(' | '));
 } finally {

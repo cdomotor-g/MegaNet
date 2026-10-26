@@ -1,13 +1,13 @@
 // MegaNet — palette.js
 //
 // Palette — Ctrl/Cmd+K, and 🔎 Search in the banner: one box that finds a
-// station, a place, a tab or an action, from any tab (#221).
+// station, a survey mark, a place, a tab or an action, from any tab (#221).
 //
 // Until this, Ctrl+K focused the nav's find box, which filters the tab list by
 // label and find words and nothing else. Somebody who knows a station's name
 // or number still had to go to Stations, then to its search box, then to the
 // row; somebody with a coordinate or a town had to know that 📍 Find a place
-// is a pane of the side panel. Here the four answers sit in one list:
+// is a pane of the side panel. Here the answers sit in one list:
 //
 //   Stations  name, station number, ALERT address or address window, through
 //             the Stations filter's own machinery (prepareSearch,
@@ -19,6 +19,12 @@
 //             parse() reads coordinates offline, and its list knows the
 //             catchments, rivers, councils and — with a request — towns. A
 //             second copy of that would be a second thing to keep right.
+//   Marks     a survey mark's number — "43906", "PSM 43906" — or another
+//             name the register keeps for it ("BM 127K"), asked of the State's
+//             survey control service through MapSurvey.find(): the lookup,
+//             and the cached answer, that 📍 Find a place makes, which is
+//             where a mark picked here is shown. It is a request, so the list
+//             says it is looking, and the marks join it when the answer lands.
 //   Tabs      the nav's own scoring (navTerms, navHaystack, navScore), so a
 //             query reaches the same tab from either box.
 //   Actions   a few things worth doing from anywhere: the Site Map, help for
@@ -42,16 +48,19 @@
 //           app.js (prepareSearch, stationMatchesSearch, stationAlertIds,
 //           goToStation, switchTab, setDockTab, navTerms, navHaystack,
 //           navScore, resetStationFilters, newSearchRow, renderMain,
-//           toggleTheme), modal.js, places.js, station-trail.js, route.js,
-//           bug-report.js, looks.js.
+//           toggleTheme), modal.js, places.js, map-survey.js,
+//           station-trail.js, route.js, bug-report.js, looks.js.
 
 const Palette = (() => {
   const MAX_STATIONS = 8;
   const MAX_TABS = 5;
+  const MARK_DEBOUNCE_MS = 400;   // a pause before the survey register is asked
 
   let query = '';
   let items = [];        // the options on screen, in order
   let active = 0;        // index into items of the one Enter opens
+  let marks = { key: '', loading: false, error: '' };   // the survey-mark lookup for the text
+  let markTimer = 0;
 
   const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
@@ -115,6 +124,52 @@ const Palette = (() => {
     else switchTab('stations');
   }
 
+  // ── Survey marks ──────────────────────────────────────────────────────────
+
+  function markQuery(raw) {
+    return typeof MapSurvey !== 'undefined' && MapSurvey.markQuery ? MapSurvey.markQuery(raw) : null;
+  }
+
+  // The marks an earlier lookup found for this text — MapSurvey keeps them.
+  function markItems(raw) {
+    const have = markQuery(raw) && MapSurvey.found(raw);
+    if (!have) return [];
+    const q = raw.trim();
+    return have.marks.map(m => {
+      const d = MapSurvey.describe(m);
+      return { kind: 'mark', icon: '📐', label: d.title,
+               sub: [d.kind, d.height, d.aka && `also ${d.aka}`, d.where].filter(Boolean).join(' · '),
+               run: () => goToMark(q, m) };
+    });
+  }
+
+  // Asked after a pause, and only when what is asked changes. When the answer
+  // lands on a dialog still showing the same text, the list is drawn again
+  // with the marks in it — and the option Enter opens stays the one it was.
+  function noteMarks(raw) {
+    const mq = markQuery(raw);
+    if (mq && mq.key === marks.key) return;
+    clearTimeout(markTimer);
+    marks = { key: mq ? mq.key : '', loading: false, error: '' };
+    if (!mq || MapSurvey.found(raw)) return;
+    marks.loading = true;
+    markTimer = setTimeout(() => {
+      MapSurvey.find(raw).then(res => {
+        if (marks.key !== mq.key) return;
+        marks = { key: mq.key, loading: false, error: res.ok ? '' : res.error };
+        if (document.getElementById('pal-q')) refresh();
+      });
+    }, MARK_DEBOUNCE_MS);
+  }
+
+  // The Stations tab and 📍 Find a place with the text in its box — its list
+  // has the same marks, from the same lookup — and the mark picked gone to:
+  // the blue pin, the map on it, and the mark's own callout.
+  function goToMark(q, m) {
+    findPlace(q);
+    Places.goMark(m);
+  }
+
   // ── Places ────────────────────────────────────────────────────────────────
 
   function placeItems(raw) {
@@ -130,6 +185,9 @@ const Palette = (() => {
     // offered rather than answered: whether it is a place is Find a place's to
     // say, so it is not counted as a match, and it comes last.
     if (/^[\d\s.,-]+$/.test(q)) return [];
+    // Nor is a survey mark's number, which has a group of its own.
+    const mq = markQuery(q);
+    if (mq && mq.number) return [];
     return [{ kind: 'place', offer: true, icon: '🧭', label: `Find “${q}” as a place`,
               sub: 'Towns, rivers and creeks, catchments and council areas — in 📍 Find a place',
               run: () => findPlace(q) }];
@@ -223,11 +281,14 @@ const Palette = (() => {
   // Places last: a coordinate is the only thing a coordinate matches, so it
   // still comes first when it is typed, and a name offered to Find a place
   // must never be what Enter opens over a station, a tab or an action that
-  // really did match.
+  // really did match. Survey marks just before them: they arrive after the
+  // rest, and arriving below what is already listed moves nothing a finger
+  // might be on its way to.
   const GROUPS = [
     { key: 'station', title: 'Stations' },
     { key: 'tab',     title: 'Tabs' },
     { key: 'action',  title: 'Actions' },
+    { key: 'mark',    title: 'Survey marks' },
     { key: 'place',   title: 'Places' },
   ];
 
@@ -239,6 +300,7 @@ const Palette = (() => {
       ...st.list,
       ...tabItems(q),
       ...actionItems(q),
+      ...markItems(raw),
       ...placeItems(raw),
     ];
   }
@@ -250,6 +312,7 @@ const Palette = (() => {
 
   function countText() {
     const found = matches();
+    if (!found.length && marks.loading) return 'Looking up survey marks…';
     if (!found.length) return query.trim() ? `Nothing matches “${query.trim()}”` : '';
     const by = GROUPS.map(g => [g.title, found.filter(i => i.kind === g.key).length])
       .filter(([, k]) => k).map(([t, k]) => `${k} ${k === 1 ? t.toLowerCase().replace(/s$/, '') : t.toLowerCase()}`);
@@ -257,11 +320,17 @@ const Palette = (() => {
   }
 
   function listHtml() {
-    const none = !matches().length
+    const none = !matches().length && !marks.loading
       ? `<p class="pal-none small">${query.trim()
-        ? `Nothing matches <strong>${esc(query.trim())}</strong>. A station's name, number or ALERT address; a coordinate; or a tab or an action.`
+        ? `Nothing matches <strong>${esc(query.trim())}</strong>. A station's name, number or ALERT address; a survey mark's number; a coordinate; or a tab or an action.`
         : 'Nothing to offer yet.'}</p>`
       : '';
+    // Where the survey-mark lookup has got to, under the list: not an option,
+    // so not counted and never what Enter opens. A failure is only worth a
+    // line when nothing else answered — offline, a station number typed here
+    // is found without it.
+    const looking = marks.loading ? '<p class="pal-none small txt-muted">Looking up survey marks…</p>'
+      : marks.error && !matches().length ? `<p class="pal-none small txt-muted">Survey marks unavailable — ${esc(marks.error)}.</p>` : '';
     let i = 0;
     return none + GROUPS.map(g => {
       const mine = items.filter(it => it.kind === g.key);
@@ -280,7 +349,7 @@ const Palette = (() => {
           </div>`;
         }).join('')}
       </div>`;
-    }).join('');
+    }).join('') + looking;
   }
 
   // The list in place of the last one, the box untouched — typing must not
@@ -320,8 +389,19 @@ const Palette = (() => {
 
   function input(text) {
     query = String(text || '');
+    noteMarks(query);
     items = results(query);
     active = 0;
+    paint();
+  }
+
+  // The list again for the same text, after an answer landed: the option
+  // marked stays marked, wherever it is now.
+  function refresh() {
+    const was = items[active];
+    items = results(query);
+    const at = was ? items.findIndex(i => i.kind === was.kind && i.label === was.label) : -1;
+    active = at >= 0 ? at : 0;
     paint();
   }
 
@@ -366,8 +446,8 @@ const Palette = (() => {
         <div class="pal">
           <input id="pal-q" class="pal-q" type="search" autocomplete="off" spellcheck="false"
                  role="combobox" aria-autocomplete="list" aria-controls="pal-list" aria-expanded="false"
-                 aria-label="A station, a place, a tab or an action"
-                 placeholder="A station, a place, a tab or an action…"
+                 aria-label="A station, a survey mark, a place, a tab or an action"
+                 placeholder="A station, a survey mark, a place, a tab or an action…"
                  oninput="Palette.input(this.value)" onkeydown="Palette.key(event)">
           <div id="pal-list" class="pal-list" role="listbox" aria-label="Results"></div>
           <p id="pal-count" class="pal-count small txt-muted" role="status" aria-live="polite"></p>

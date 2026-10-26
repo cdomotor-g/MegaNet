@@ -5,7 +5,9 @@
 //            a town, a river, a catchment or a council area, or a coordinate,
 //            and lists what it means on the ground — and a press on one takes
 //            the map there, with a blue pin and, for anything bigger than a
-//            point, its outline. And, through the same parse(), a coordinate
+//            point, its outline. A survey mark's number ("43906", "PSM 43906")
+//            is looked up in the State's register, and pressed opens the
+//            mark's own callout. And, through the same parse(), a coordinate
 //            pair pasted into any latitude or longitude box in the app lands
 //            half in each (bindCoordPaste, from init.js).
 //
@@ -36,6 +38,9 @@
 //   Coordinate   what the text parses as — answered on the spot, offline
 //   Catchments   the 77 Queensland drainage basins the file carries, by name
 //                or basin number; drawn from data/qld-basins.geojson
+//   Survey marks a permanent survey mark, benchmark or CORS site by its
+//                number or another name the register keeps for it — asked of
+//                the State's survey control service through MapSurvey.find()
 //   Rivers       the rivers and creeks this network's stations stand on (the
 //                register's `stream`), with how many; the map goes to them
 //   Councils     the local government areas its stations are in, likewise
@@ -44,7 +49,8 @@
 //                boundaries — each with its outline or its course where OSM
 //                has one
 //
-// The first four are the file's own and cost nothing; the last is a request.
+// Catchments, rivers and councils are the file's own and cost nothing; the
+// survey marks and the gazetteer are requests.
 //
 // ── Coordinates are parsed here, never looked up ─────────────────────────────
 // A coordinate is not a search. It is already the answer, and sending it to a
@@ -71,6 +77,16 @@
 // Failure is quiet and says so: no network, a blocked host or a rate limit
 // leaves the file's own answers standing and puts one line in the list.
 //
+// ── Survey marks ────────────────────────────────────────────────────────────
+// A mark's number is what a crew has in hand — off a plaque, a level book, a
+// plan — long before they know where the mark is, so a number is looked up
+// rather than left to the gazetteer, which knows nothing of it. map-survey.js
+// knows the service and keeps the answers; this lists them. A mark pressed
+// goes like any place, the blue pin and the map there, and opens the survey
+// layer's own callout rather than a place's: its report link and its AHD
+// height are why anybody looks a mark up. A mark number is never sent to
+// Nominatim, by the same rule as a station number.
+//
 // The same service answers the other way round for the Field Camera
 // (field-camera.js): locality() names the town or locality a point is in, for
 // the corner of a photo's stamp — through the same throttle, a few hundred
@@ -88,6 +104,8 @@ const Places = (function () {
   const MIN_CHARS   = 3;
   const CACHE_MAX   = 120;
   const LOCAL_CAP   = 6;      // rows shown per group of the file's own
+  const MARK_DEBOUNCE_MS = 400; // a pause before the survey register is asked
+  const MARK_ZOOM   = 16;     // close enough to read the streets round a mark
   const SHAPE_DEG   = 0.001;  // the gazetteer's outlines, simplified to ~100 m
 
   // What counts as a place worth offering. Nominatim's `category` is the OSM
@@ -138,10 +156,11 @@ const Places = (function () {
   let coord = null;             // what it parses as, if anything
   let local = null;             // the file's own answers: { catchments, rivers, councils }
   let gaz = { text: '', list: null, loading: false, error: '', asked: false };
+  let marks = { key: '', list: null, loading: false, error: '' };   // survey marks for the text
   let shown = null;             // the result the map is showing: { group, n, hit, q }
   let flownTo = null;           // the coordinate the map was last moved to, so a
                                 // second settle of the same text does not move it
-  let lookupTimer = 0, coordTimer = 0;
+  let lookupTimer = 0, coordTimer = 0, markTimer = 0;
   let index = null;             // rivers and councils from the file, built once per file
 
   // ── Coordinates ─────────────────────────────────────────────────────────────
@@ -479,6 +498,8 @@ const Places = (function () {
     if (s.includes('\n')) return false;          // a pasted column, not a name
     if (!/[a-z]{3}/i.test(s)) return false;      // no word in it
     if (/^\d+\s*-\s*\d+$/.test(s)) return false; // an address window
+    const mq = markQ(s);
+    if (mq && mq.number) return false;           // a survey mark's number
     return true;
   }
 
@@ -561,6 +582,59 @@ const Places = (function () {
       gaz = { text, list: res.list, loading: false, error: res.ok ? '' : res.error, asked: true };
       render();
     });
+  }
+
+  // ── Survey marks ────────────────────────────────────────────────────────────
+
+  // What the text means as a survey mark, or null — map-survey.js's rule.
+  function markQ(s) {
+    return typeof MapSurvey !== 'undefined' && MapSurvey.markQuery ? MapSurvey.markQuery(s) : null;
+  }
+
+  // Kept up to date from input(): the marks already looked up for this text —
+  // here, or by Ctrl+K handing the same text over — or a lookup after a
+  // pause. Only a change of what is asked starts one: a space typed after
+  // the number is the same question.
+  function noteMarks(s) {
+    const mq = coord ? null : markQ(s);
+    const have = mq ? MapSurvey.found(s) : null;
+    if (mq && mq.key === marks.key && (marks.list || !have)) return;
+    clearTimeout(markTimer);
+    if (have) { marks = { key: mq.key, list: have.marks, loading: false, error: '' }; return; }
+    marks = { key: mq ? mq.key : '', list: null, loading: !!mq, error: '' };
+    if (!mq) return;
+    markTimer = setTimeout(() => {
+      MapSurvey.find(s).then(res => {
+        if (marks.key !== mq.key) return;   // the box moved on while we asked
+        marks = { key: mq.key, list: res.marks, loading: false, error: res.ok ? '' : res.error };
+        render();
+      });
+    }, MARK_DEBOUNCE_MS);
+  }
+
+  // A mark's row: what it is, its height, the other name it was found by, and
+  // the street it is on.
+  function markKind(m) {
+    const d = MapSurvey.describe(m);
+    return [d.kind, d.height, d.aka && `also ${d.aka}`, d.where].filter(Boolean).join(' · ');
+  }
+
+  // The group. A number that turns out to be a basin number and no mark says
+  // nothing here — the catchment above is the answer — but anything else says
+  // what happened, because a mark the register does not hold is itself worth
+  // knowing before driving out to look for it.
+  function marksHtml() {
+    if (!marks.key) return '';
+    let body;
+    if (marks.loading) body = '<p class="small txt-muted places-status">Looking up the survey mark…</p>';
+    else if (marks.error) body = `<p class="small txt-warn places-status">Survey mark lookup unavailable — ${esc(marks.error)}.</p>`;
+    else if (marks.list && marks.list.length) {
+      body = `<ul class="places-list">${marks.list.map((m, i) => rowHtml('mark', i, MapSurvey.describe(m).title, markKind(m))).join('')}</ul>
+          <p class="small txt-muted places-credit">${esc(MapSurvey.ATTRIBUTION)}</p>`;
+    } else if (local && local.catchments.length) return '';
+    else body = '<p class="small txt-muted places-status">No survey mark by that number or name in the Queensland register.</p>';
+    return `<section class="places-group" aria-labelledby="places-g-mark">
+          <h3 class="places-group-h" id="places-g-mark">Survey marks</h3>${body}</section>`;
   }
 
   // ── The other way round: the name of where a point is ──────────────────────
@@ -655,8 +729,11 @@ const Places = (function () {
                        fillColor: c, fillOpacity: /Polygon/.test(f.geometry.type) ? 0.08 : 0 }),
       }).addTo(layer);
     }
+    // A survey mark's pin opens the mark's own callout — its report, its
+    // height, its condition — rather than a place's.
+    const mark = hit.mark && typeof MapSurvey !== 'undefined' ? hit.mark : null;
     if (hit.lat != null && hit.lon != null) {
-      L.marker([hit.lat, hit.lon], {
+      const pin = L.marker([hit.lat, hit.lon], {
         title: hit.name || hit.text,
         icon: L.divIcon({
           className: 'mn-place-icon',
@@ -664,16 +741,22 @@ const Places = (function () {
           iconSize: [0, 0], iconAnchor: [0, 0],
         }),
         zIndexOffset: 1500,
-      }).bindPopup(() => markerHtml(hit), { maxWidth: 320 }).addTo(layer);
+      });
+      if (mark) pin.on('click', () => MapSurvey.reveal(mark));
+      else pin.bindPopup(() => markerHtml(hit), { maxWidth: 320 });
+      pin.addTo(layer);
     }
     if (move) {
       const b = hit.bounds;
       if (b && (b[1] - b[0] > 1e-4 || b[3] - b[2] > 1e-4)) {
         map.fitBounds([[b[0], b[2]], [b[1], b[3]]], { padding: [28, 28], maxZoom: hit.maxZoom || 14 });
       } else if (hit.lat != null) {
-        map.setView([hit.lat, hit.lon], Math.max(map.getZoom(), hit.zoom || 12));
+        // A mark's callout opens straight after, and its pan to fit would
+        // stop an animated move part-way, short of the mark.
+        map.setView([hit.lat, hit.lon], Math.max(map.getZoom(), hit.zoom || 12), mark ? { animate: false } : undefined);
       }
-      if (hit.lat != null && !hit.shape) layer.eachLayer(l => { if (l.openPopup) l.openPopup(); });
+      if (mark) MapSurvey.reveal(mark);
+      else if (hit.lat != null && !hit.shape) layer.eachLayer(l => { if (l.openPopup) l.openPopup(); });
     }
     return layer;
   }
@@ -706,6 +789,12 @@ const Places = (function () {
         bounds: osm && osm.bbox ? osm.bbox : [g.s, g.north, g.w, g.e], shape: osm ? osm.shape : null, maxZoom: 13,
         credit: osm ? ATTRIB : 'Where this network\'s stations on it are — from the station register.',
       };
+    }
+    if (group === 'mark') {
+      const m = marks.list && marks.list[n];
+      if (!m) return null;
+      return { name: MapSurvey.describe(m).title, kind: markKind(m), where: '', lat: m.lat, lon: m.lon,
+               zoom: MARK_ZOOM, mark: m, credit: MapSurvey.ATTRIBUTION };
     }
     if (group === 'osm') {
       const h = gaz.list && gaz.list[n];
@@ -793,12 +882,12 @@ const Places = (function () {
         <div class="places-box">
           <input type="search" id="places-q" class="places-q" autocomplete="off" spellcheck="false"
                  aria-labelledby="places-h" aria-describedby="places-hint" aria-controls="places-results"
-                 placeholder="Town, river, catchment or lat, lon"
+                 placeholder="Town, river, catchment, survey mark or lat, lon"
                  oninput="Places.input(this.value)" onkeydown="Places.key(event)">
           <button type="button" class="places-clear" onclick="Places.clear(true)" title="Clear the box and the pin on the map"
                   aria-label="Clear the place">✕</button>
         </div>
-        <p class="small places-hint" id="places-hint">A town, river or creek, catchment or basin number, council area, or a coordinate. The map goes there; the stations are left as they are.</p>
+        <p class="small places-hint" id="places-hint">A town, river or creek, catchment or basin number, council area, survey mark number (PSM 43906), or a coordinate. The map goes there; the stations are left as they are.</p>
         <div class="places-results" id="places-results"></div>
       </div>`;
   }
@@ -830,6 +919,7 @@ const Places = (function () {
     const cap = (list, f) => list.slice(0, LOCAL_CAP).map(f);
     out.push(groupHtml('catchment', 'Catchments', cap(L0.catchments, (c, i) =>
       rowHtml('catchment', i, c.name, `basin ${c.basin_no || '—'}${c.division ? ` · ${c.division}` : ''}`)), L0.catchments.length - LOCAL_CAP));
+    out.push(marksHtml());
     out.push(groupHtml('river', 'Rivers and creeks this network is on', cap(L0.rivers, (g, i) =>
       rowHtml('river', i, g.name, `${g.n} station${g.n === 1 ? '' : 's'}`)), L0.rivers.length - LOCAL_CAP));
     out.push(groupHtml('council', 'Council areas with stations in them', cap(L0.councils, (g, i) =>
@@ -876,6 +966,7 @@ const Places = (function () {
     if (!s) { clear(false); return; }
     coord = parse(s);
     local = localFor(s);
+    noteMarks(s);
     if (coord) {
       render();
       // The list says so at once — the parse is arithmetic and costs nothing —
@@ -916,6 +1007,10 @@ const Places = (function () {
     if (shown && shown.hit && shown.hit.riverSelected && typeof MapRiverLines !== 'undefined') {
       MapRiverLines.clearSelection();
     }
+    // …and a survey mark's callout with the pin that opened it.
+    if (shown && shown.hit && shown.hit.mark && typeof MapSurvey !== 'undefined') {
+      MapSurvey.closeCallout(shown.hit.mark);
+    }
     shown = null;
     render();
   }
@@ -925,8 +1020,10 @@ const Places = (function () {
   function clear(box) {
     clearTimeout(lookupTimer);
     clearTimeout(coordTimer);
+    clearTimeout(markTimer);
     query = ''; coord = null; local = null; flownTo = null;
     gaz = { text: '', list: null, loading: false, error: '', asked: false };
+    marks = { key: '', list: null, loading: false, error: '' };
     if (box) {
       const q = document.getElementById('places-q');
       if (q) { q.value = ''; q.focus({ preventScroll: true }); }
@@ -950,6 +1047,14 @@ const Places = (function () {
     go,
     clear,
     clearMark,
+
+    // From Ctrl+K (palette.js): a mark it found for the text now in this
+    // tool's box — the same answer, so the same object — gone to as if
+    // pressed here.
+    goMark(mark) {
+      const n = marks.list && mark ? marks.list.findIndex(m => m === mark || (!!m.register && m.register === mark.register)) : -1;
+      if (n >= 0) go('mark', n);
+    },
 
     // The Stations map, as it is built — the place shown is drawn on it again
     // where it was, without moving it: a render of the tab is not somebody
@@ -975,6 +1080,7 @@ const Places = (function () {
         query, coord, flownTo,
         local: local ? { catchments: local.catchments.map(c => c.name), rivers: local.rivers.map(g => g.name), councils: local.councils.map(g => g.name) } : null,
         gaz: { text: gaz.text, loading: gaz.loading, error: gaz.error, n: gaz.list ? gaz.list.length : null },
+        marks: { key: marks.key, loading: marks.loading, error: marks.error, list: marks.list ? marks.list.map(m => m.register) : null },
         shown: shown ? { group: shown.group, n: shown.n, name: shown.hit.name || shown.hit.text, shape: !!shown.hit.shape } : null,
         drawn: layer ? layer.getLayers().length : 0,
       };

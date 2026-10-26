@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 102, date: '2026-10-26', items: [
+      '<strong>Find a survey mark by its number</strong>: type <em>43906</em> or <em>PSM 43906</em> into 📍 <em>Find a place</em> '
+        + 'or <strong>Ctrl+K</strong> (🔎 Search), and the Queensland register\'s mark is listed with its AHD height and street. '
+        + 'Press it and the map goes there and opens the mark\'s callout, with its condition and the link to its report — '
+        + 'even with the survey-mark layer off. A mark\'s other names work too, such as a council\'s or a railway\'s '
+        + '(<em>BM 127K</em>).',
+    ] },
     { n: 101, date: '2026-10-26', items: [
       'A station\'s card on the <strong>Stations</strong> map now says what it transmits on, under its AlertIDs, even where '
         + 'no frequency is on record: <strong>Assumed</strong> — the channel the repeaters likely to hear it directly listen '

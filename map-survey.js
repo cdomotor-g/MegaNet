@@ -50,6 +50,13 @@
 // show data for the single mark anybody clicks. So the layer query stays as
 // lean as #120 left it and the callout pays for itself.
 //
+// A mark can also be found by its number, without first finding where it is:
+// 📍 Find a place and Ctrl+K both ask find() for "43906", "PSM 43906" or one of
+// the other names the register keeps for a mark ("BM 127K"), and a mark picked
+// there opens this layer's own callout through reveal() — pinned, so the
+// layer's redraws and its zoom-out clear leave it standing, and so it opens
+// with the layer switched off. See "Finding a mark by its number" below.
+//
 // Pointer interaction is delegated through the map's own click and mousemove,
 // hit-tested against the drawn points, for the reason MapRivers' pointer-
 // conventions header records as a discovered fact: the shared pins-and-links
@@ -125,6 +132,7 @@ const MapSurvey = (function () {
   let hoverTip = null, cursorSet = false, moveRaf = null;
   let popup = null;          // the open callout, if any — ours to close on clear
   let popupMark = null;      // which mark that callout is about
+  let popupPinned = false;   // opened by search (reveal), so the layer's clears leave it
   const cache = new Map();   // 's,w,n,e' → { points, capped, total }
   // Per-mark detail, keyed by mark number so the same mark costs one lookup no
   // matter which sublayer it was drawn from (a mark with a datum GDA lineage
@@ -181,6 +189,9 @@ const MapSurvey = (function () {
     ahdOrder:  /(^|\.)ahdacc_de$/i,       // '4th ORDER'
     notes:     /(^|\.)relinfo_de$/i,      // visit history, obstructions, what it looks like
   };
+  // The four other names the register keeps for a mark — alt1_nm, which the
+  // callout prints as "Also …", and three more — for find() to ask of.
+  const ALT_KEY = /(^|\.)alt\d_nm$/i;
 
   function pickField(attrs, patterns) {
     if (!attrs) return null;
@@ -240,7 +251,7 @@ const MapSurvey = (function () {
     resolving = askJson(SERVICE_URL + '/layers?f=json')
       .then(json => {
         const layers = (json && json.layers) || [];
-        const mark = [], cors = [], fields = {}, detailFields = {}, idFields = {};
+        const mark = [], cors = [], fields = {}, detailFields = {}, idFields = {}, altFields = {};
         for (const l of layers) {
           const name = l.name || '';
           // Only real feature layers are worth asking. The service also lists
@@ -275,9 +286,12 @@ const MapSurvey = (function () {
           // the reason the sublayer ids are probed rather than guessed.
           const idField = names.find(n => REGISTER_KEYS[0].test(n));
           if (idField) idFields[l.id] = idField;
+          // …and the other names a mark goes by, which find() asks of as well.
+          const alts = names.filter(n => ALT_KEY.test(n));
+          if (alts.length) altFields[l.id] = alts;
         }
         if (!mark.length && !cors.length) throw new Error('no recognisable sublayer names');
-        resolved = { mode: 'probed', mark, cors, fields, detailFields, idFields };
+        resolved = { mode: 'probed', mark, cors, fields, detailFields, idFields, altFields };
         return resolved;
       })
       .catch(() => {
@@ -363,9 +377,13 @@ const MapSurvey = (function () {
   // Attribution is added only while marks are actually on the map, not merely
   // while the toggle is — the same "claim it while you're using it" reading
   // the legend entry already applies via active().
+  //
+  // A callout opened by search stays: the layer reaching a new view, or the
+  // map zooming out past MIN_ZOOM, is no reason to take away the answer to a
+  // mark somebody asked for by number. The off switch and leaving the tab
+  // close it as well (closePopup).
   function clearLayer() {
-    if (popup) { popup.remove(); popup = null; }
-    popupMark = null;
+    if (!popupPinned) closePopup();
     clearHover();
     drawnKey = null;
     drawnPoints = [];
@@ -530,6 +548,167 @@ const MapSurvey = (function () {
     return t.length > NOTE_CHARS ? `${t.slice(0, NOTE_CHARS - 1).trimEnd()}…` : t;
   }
 
+  // ── Finding a mark by its number ─────────────────────────────────────────
+  // 📍 Find a place and Ctrl+K (places.js, palette.js) both ask this, so a
+  // mark somebody has the number of — off a plaque, a level book, a plan — is
+  // found without first finding where it is. The number is the register's
+  // own (its "Permanent mark" field, the report's "Mark Number"), which is
+  // what a PSM's plaque carries. The register keeps up to four other names
+  // for a mark as well — a council's ("BCC12419"), a railway's ("BM 127K"),
+  // an older survey's ("PSM 101") — and a few letters and a number is asked
+  // of those.
+  //
+  // One question per sublayer the layer itself draws from (CORS and the GDA
+  // marks), naming the fields resolveLayers() read off the service's own
+  // metadata, so search finds what the map would draw there. Each answer
+  // carries the callout's fields: a mark found by its number is a mark about
+  // to be looked at, and one row is a few hundred bytes. Answers are kept by
+  // what was asked; a failure is not, so asking again retries.
+  const FIND_MAX  = 8;
+  const FOUND_MAX = 40;
+  const found = new Map();         // query key → { ok, marks }
+  const findPending = new Map();   // query key → in-flight promise
+
+  // A number, bare or after the word a plaque, a level book or a plan writes
+  // in front of it: "43906", "PSM 43906", "PSM43906", "mark no. 43906",
+  // "#43906". The field holds six digits at most.
+  const NUMBER_RE = /^(?:(PSM|SSM|PM|SCM|MARK|MK|NO|#)\.?\s*(?:NO\.?\s*)?)?(\d{1,6})$/;
+  // A few letters and a number, the shape of a mark's other names: "BM 127K",
+  // "QR127K", "BCC12419", "GR 690".
+  const NAME_RE   = /^([A-Z]{1,5}) ?(\d{1,6}[A-Z]?)$/;
+  // The number words that also start other names ("PSM 101" is mark 101, and
+  // the mark a council numbered PSM 101); "mark" and "no." start none.
+  const NAME_WORD = /^(PSM|SSM|PM|SCM)$/;
+
+  // What a text means as a mark, or null: { key, number, names }. A bare
+  // number needs three digits, because one or two is a keystroke on the way
+  // to something else. A name is asked spaced and run together, because the
+  // register writes it both ways ("BM 127K", "BM127K").
+  function markQuery(text) {
+    const s = String(text || '').trim().toUpperCase().replace(/\s+/g, ' ');
+    if (!s || s.length > 24) return null;
+    let number = null, names = [];
+    const m = NUMBER_RE.exec(s);
+    if (m) {
+      if (!m[1] && m[2].length < 3) return null;
+      number = String(Number(m[2]));
+    }
+    const n = NAME_RE.exec(s);
+    if (n && (!m || NAME_WORD.test(n[1])) && (n[1] + n[2]).length >= 3) {
+      names = [...new Set([`${n[1]} ${n[2]}`, `${n[1]}${n[2]}`])];
+    }
+    if (!number && !names.length) return null;
+    return { key: `${number || ''}|${names.join('|')}`, number, names };
+  }
+
+  // Each sublayer's question. The values are digits, capitals and a space,
+  // checked by the patterns above, so there is no quoting question to get
+  // wrong. A name matches a whole word of an alternate name — "BM 1" is the
+  // mark called BM 1, not every BM 1-something in the State.
+  function findQueries(layers, q) {
+    const ask = (base, id, idField, alts, outFields, category) => {
+      const where = [];
+      if (q.number && idField) where.push(`${idField}='${q.number}'`);
+      for (const f of q.names.length ? alts : []) {
+        for (const v of q.names) {
+          where.push(`UPPER(${f})='${v}'`, `UPPER(${f}) LIKE '${v} %'`,
+                     `UPPER(${f}) LIKE '% ${v}'`, `UPPER(${f}) LIKE '% ${v} %'`);
+        }
+      }
+      if (!where.length) return null;
+      const params = new URLSearchParams({
+        f: 'json', where: where.join(' OR '), outFields,
+        returnGeometry: 'true', outSR: '4326', geometryPrecision: '5',
+      });
+      return { url: `${id == null ? base : `${base}/${id}`}/query?${params}`, category, id };
+    };
+    if (layers.mode === 'fallback') {
+      // The flat layer's names are the same, unprefixed (see the header).
+      return [ask(FALLBACK_URL, null, 'mrk_id', ['alt1_nm', 'alt2_nm', 'alt3_nm', 'alt4_nm'], '*', 'mark')]
+        .filter(Boolean);
+    }
+    const one = (id, category) => {
+      const alts = (layers.altFields && layers.altFields[id]) || [];
+      const base = layers.detailFields && layers.detailFields[id];
+      const outFields = base ? [...new Set(base.split(',').concat(alts))].join(',') : '*';
+      return ask(SERVICE_URL, id, layers.idFields && layers.idFields[id], alts, outFields, category);
+    };
+    return [...layers.mark.map(id => one(id, 'mark')), ...layers.cors.map(id => one(id, 'cors'))]
+      .filter(Boolean);
+  }
+
+  // A sublayer's answer as points draw() and the callout take, each with the
+  // other name it was found by, if it was — shown beside the number.
+  function foundFrom(json, query, q) {
+    const out = [];
+    for (const f of (json && json.features) || []) {
+      const g = f.geometry;
+      if (!g || g.x == null || g.y == null) continue;
+      const a = f.attributes || {};
+      const aka = q.names.length
+        ? Object.keys(a).filter(k => ALT_KEY.test(k)).map(k => a[k]).find(v => v
+            && q.names.some(n => ` ${String(v).toUpperCase().replace(/\s+/g, ' ')} `.includes(` ${n} `)))
+        : null;
+      out.push({
+        lat: g.y, lon: g.x, category: query.category, layerId: query.id,
+        register: pickField(a, REGISTER_KEYS),
+        ahd:      pickNumericField(a, AHD_KEYS),
+        detail:   hasDetail(a) ? detailFrom(a) : null,
+        aka:      aka ? String(aka) : null,
+      });
+    }
+    return out;
+  }
+
+  // One row per mark — a CORS site is in a GDA sublayer too, and is the CORS
+  // site it is drawn as — the mark with the number asked for first.
+  function rankFound(all, q) {
+    const by = new Map();
+    for (const p of all) {
+      const k = p.register || `${p.lat},${p.lon}`;
+      const had = by.get(k);
+      if (!had) by.set(k, p);
+      else if (p.category === 'cors' && had.category !== 'cors') by.set(k, { ...p, aka: p.aka || had.aka });
+    }
+    const exact = p => (q.number && p.register === q.number ? 0 : 1);
+    return [...by.values()]
+      .sort((a, b) => exact(a) - exact(b) || Number(a.register) - Number(b.register))
+      .slice(0, FIND_MAX);
+  }
+
+  // Resolves to { ok, marks } — never rejects: a failed lookup is a line in
+  // whichever list asked, with `error` saying what happened.
+  function find(text) {
+    const q = markQuery(text);
+    if (!q) return Promise.resolve({ ok: true, marks: [] });
+    if (found.has(q.key)) {
+      const v = found.get(q.key);
+      found.delete(q.key);
+      found.set(q.key, v);
+      return Promise.resolve(v);
+    }
+    if (findPending.has(q.key)) return findPending.get(q.key);
+    const job = resolveLayers()
+      .then(layers => {
+        const queries = findQueries(layers, q);
+        if (!queries.length) throw new Error('nothing to ask');
+        return Promise.all(queries.map(x =>
+          askJson(x.url).then(json => foundFrom(json, x, q)).catch(() => null)));
+      })
+      .then(results => {
+        if (results.every(r => r === null)) throw new Error('every sublayer query failed');
+        const v = { ok: true, marks: rankFound(results.filter(Boolean).flat(), q) };
+        found.set(q.key, v);
+        while (found.size > FOUND_MAX) found.delete(found.keys().next().value);
+        return v;
+      })
+      .catch(() => ({ ok: false, marks: [],
+                      error: 'the Queensland survey control service could not be reached' }))
+      .then(v => { findPending.delete(q.key); return v; });
+    findPending.set(q.key, job);
+    return job;
+  }
+
   function draw(points, key) {
     clearLayer();
     drawnKey = key || null;
@@ -650,18 +829,35 @@ const MapSurvey = (function () {
     return out.join('\n');
   }
 
-  function openCallout(p) {
-    if (popup) { popup.remove(); popup = null; }
+  function closePopup() {
+    if (popup) popup.remove();
+    popup = null;
+    popupMark = null;
+    popupPinned = false;
+  }
+
+  // `pinned` for a mark found by search (reveal): see clearLayer().
+  function openCallout(p, pinned) {
+    closePopup();
     popupMark = p;
+    popupPinned = !!pinned;
     let status = markDetail(p) ? 'ok' : 'loading';
     // Content as a function, not a string: when the lookup lands, Leaflet's
     // own popup.update() calls it again and re-lays-out and re-positions the
     // callout in one step. Writing into the open popup's DOM instead would be
     // undone by the next update() Leaflet does for its own reasons.
-    popup = L.popup({ maxWidth: 300, minWidth: 240 })
+    const mine = popup = L.popup({ maxWidth: 300, minWidth: 240 })
       .setLatLng([p.lat, p.lon])
       .setContent(() => calloutHtml(p, status))
       .openOn(map);
+    // Shut by its ✕, a click on the map or another popup: no longer the open
+    // callout, so a pinned one stops holding its place.
+    mine.on('remove', () => {
+      if (popup !== mine) return;
+      popup = null;
+      popupMark = null;
+      popupPinned = false;
+    });
     if (status === 'ok') return;
     loadDetail(p).then(d => {
       // Only if this is still the callout that asked. A second click before
@@ -820,6 +1016,7 @@ const MapSurvey = (function () {
         map.off('mousemove', onMapMove);
         map.off('zoomend', reproject);
       }
+      closePopup();
       clearLayer();
       map = null;
       seq++;
@@ -862,6 +1059,48 @@ const MapSurvey = (function () {
       openCallout(mark);
     },
 
+    // Finding a mark by its number or another name — for 📍 Find a place and
+    // Ctrl+K. markQuery says whether a text is worth asking about at all,
+    // find asks (a promise of { ok, marks }), and found is what an earlier
+    // find answered for the same text, or null — so a list can be drawn with
+    // the marks already in it rather than looking for them again.
+    markQuery,
+    find,
+    found(text) {
+      const q = markQuery(text);
+      return q && found.has(q.key) ? found.get(q.key) : null;
+    },
+
+    // What a list row says about a mark: the callout's own heading and the
+    // legend's word for its symbol, its AHD height, the other name it was
+    // found by, and the street it is on.
+    describe(p) {
+      const d = markDetail(p) || {};
+      return {
+        title:  calloutTitle(p),
+        kind:   KIND_WORD[markKind(p)],
+        height: p.ahd != null ? `${p.ahd} m AHD` : '',
+        aka:    p.aka || '',
+        where:  d.locality || d.town || '',
+      };
+    },
+
+    // A mark found by search: its callout, pinned (see clearLayer) — it may be
+    // nowhere near what is drawn, or drawn by nothing, with the layer off or
+    // the map zoomed out. The caller has already taken the map there.
+    reveal(mark) {
+      if (!map || !mark) return;
+      openCallout(mark, true);
+    },
+
+    // …and shut again, when the place that showed it is cleared — only if it
+    // is still the callout open.
+    closeCallout(mark) {
+      if (popup && (!mark || popupMark === mark)) closePopup();
+    },
+
+    ATTRIBUTION,
+
     noteHtml,
 
     // Remembered between visits, the way MapRivers is. This layer was
@@ -878,7 +1117,7 @@ const MapSurvey = (function () {
     setEnabled(on) {
       state.mapSurvey = on;
       try { localStorage.setItem('mn-survey', on ? 'on' : 'off'); } catch (_) {}
-      if (!on) { clearTimeout(timer); clearLayer(); setNote('off'); return; }
+      if (!on) { clearTimeout(timer); closePopup(); clearLayer(); setNote('off'); return; }
       setNote(map && map.getZoom() >= MIN_ZOOM ? 'loading' : 'zoom');
       sync();
     },

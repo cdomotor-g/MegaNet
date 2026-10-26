@@ -2691,7 +2691,7 @@ function dockStripGroups() {
                   label: 'Stations — filters, station list and station details' });
   }
   places.push({ key: 'places', kind: 'tab', icon: Glyphs.rail('places'), name: 'Find a place',
-                label: 'Find a place — a town, river, catchment, council area or coordinate' });
+                label: 'Find a place — a town, river, catchment, council area, survey mark or coordinate' });
   if (here) {
     places.push({ key: 'paths', kind: 'tab', icon: Glyphs.rail('paths'), name: 'Path tools',
                   label: 'Path tools — radio path, elevation profile and link budget (fade margin)' });
