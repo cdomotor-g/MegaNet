@@ -1,6 +1,8 @@
 # Apply the migrations the live database has not had yet — by hand (Actions →
 # db-migrate → Run workflow) or by an agent session (`gh workflow run
-# db-migrate.yml`), never on its own: nothing here runs on a push.
+# db-migrate.yml --ref main`), never on its own: nothing here runs on a push.
+# The `--ref main` matters: without it gh asks GraphQL for the default branch,
+# and a cloud session's proxy refuses GraphQL, so the bare command fails there.
 #
 # Why it exists: the Supabase connector an agent session talks to asks for a
 # person's confirmation before any statement that drops or deletes — every
@@ -22,9 +24,10 @@
 #                     transaction pooler (6543) cannot hold a migration's
 #                     transaction together.
 #
-# Without it the run says so and does nothing. A secret is never given to a
-# workflow started from a fork, and only someone who can push here can start
-# this one.
+# Without it the run fails, naming the secret, and applies nothing. It used to
+# pass instead, and four green runs went by that applied nothing. A secret is
+# never given to a workflow started from a fork, and only someone who can push
+# here can start this one.
 
 name: db-migrate
 
@@ -58,17 +61,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: The database's connection string
-        id: have
         run: |
           if [ -z "$DATABASE_URL" ]; then
-            echo "::notice::SUPABASE_DB_URL is not set — nothing applied. db/README.md ('Applying') has the steps."
-            echo "ok=" >> "$GITHUB_OUTPUT"
-          else
-            echo "ok=1" >> "$GITHUB_OUTPUT"
+            echo "::error::SUPABASE_DB_URL is not set — nothing applied. It must be a repository Actions secret with exactly that name; db/README.md ('Applying') has the steps."
+            exit 1
           fi
       - name: psql
-        if: steps.have.outputs.ok
         run: command -v psql >/dev/null || (sudo apt-get update -q && sudo apt-get install -y -q postgresql-client)
       - name: Apply what is pending
-        if: steps.have.outputs.ok
         run: tools/ci/apply-pending-migrations.sh

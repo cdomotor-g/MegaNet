@@ -79,7 +79,7 @@
 - If a change touches several issues at once, make one edit to #113 covering all of them rather than several small edits.
 
 ## Applying migrations to the live database
-- Run `gh workflow run db-migrate.yml` (or `-f dry_run=true` first): it applies every pending `db/migrations` file in order and stops at the first that fails. Check the result with a read-only `select value from meganet.app_meta where key = 'schema_version'` through the Supabase connector, then bump `core.js` `DB_SCHEMA_VERSION` to match.
+- Run `gh workflow run db-migrate.yml --ref main` (or add `-f dry_run=true` first): it applies every pending `db/migrations` file in order and stops at the first that fails. Keep the `--ref main`: without it gh looks up the default branch over GraphQL, which a cloud session's proxy refuses. Read the run's log (`gh run view <id> --log`) for what it applied; a run without the `SUPABASE_DB_URL` secret fails and applies nothing, and only the owner can set that secret. Check the result with a read-only `select value from meganet.app_meta where key = 'schema_version'` through the Supabase connector, then bump `core.js` `DB_SCHEMA_VERSION` to match.
 - Don't use the Supabase connector's `apply_migration`/`execute_sql` for migrations: it cancels any statement containing drop or delete text, asking for a confirmation nobody can see. Don't work around that check (for example by having the database fetch and run the file). `db/README.md` ("Applying") explains.
 
 ## Agent API and MCP server (`worker/api.js`)

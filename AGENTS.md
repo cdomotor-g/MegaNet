@@ -133,11 +133,14 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   summary and one more than the last marker after that — so the owner can find
   it by scrolling; then **What changed**, **Checks run**, **What you need to
   do**, **Open questions** (skip empty ones).
-- **Migrations to the live database:** run `gh workflow run db-migrate.yml`
-  (`-f dry_run=true` to list first); it applies every pending
-  `db/migrations` file in order. Do not apply them through the Supabase
-  connector, which cancels any statement containing drop or delete text, and
-  do not route around that check. Then bump `core.js` `DB_SCHEMA_VERSION`.
+- **Migrations to the live database:** run `gh workflow run db-migrate.yml
+  --ref main` (`-f dry_run=true` to list first; without `--ref` gh asks
+  GraphQL for the default branch, which cloud sessions refuse); it applies
+  every pending `db/migrations` file in order, and fails without its
+  `SUPABASE_DB_URL` secret, which only the owner can set. Do not apply them
+  through the Supabase connector, which cancels any statement containing drop
+  or delete text, and do not route around that check. Then bump `core.js`
+  `DB_SCHEMA_VERSION`.
 - **Leftover human work:** if human tasks remain or fall out of scope at the end,
   ask whether to open a `[Human]` issue with explicit, click-by-click steps.
 - **Closing issues:** when your work closes an issue, close it with a comment

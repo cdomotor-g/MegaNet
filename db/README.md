@@ -46,8 +46,10 @@ whatever is pending — every file numbered above `meganet.app_meta`'s
 `schema_version`, in order, each in one transaction, stopping at the first that
 fails or does not set its own number (`tools/ci/apply-pending-migrations.sh`).
 Start it from **Actions → db-migrate → Run workflow** (tick *dry run* to see the
-list first), or from an agent session with `gh workflow run db-migrate.yml`. It
-never runs on a push. It needs one repository secret, **`SUPABASE_DB_URL`**:
+list first), or from an agent session with `gh workflow run db-migrate.yml
+--ref main` (the `--ref` keeps gh off GraphQL, which a cloud session's proxy
+refuses). It never runs on a push. It needs one repository Actions secret,
+**`SUPABASE_DB_URL`**, and fails without it:
 Supabase → the project → **Connect** → **Session pooler** → the URI, with the
 database password in it. The session pooler, because GitHub's runners have no
 IPv6 for the direct connection and the transaction pooler cannot hold a
