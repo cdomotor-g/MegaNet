@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 100, date: '2026-10-26', items: [
+      'The tag under the pointer on <strong>〽️ the elevation profile</strong> now gives the height of what stands on the '
+        + 'ground there — trees, crops, buildings — between the ground height and the signal: <em>531 m · 18 m trees · '
+        + '+32.5 dB</em>. Tree heights come from a canopy map, so a figure that looks too tall to be true is worth a bug report.',
+    ] },
     { n: 99, date: '2026-10-26', items: [
       'The <strong>Stations</strong> list now shows what your search matched, without the repeaters that listen to it '
         + 'tacked on underneath. Those repeaters are still ringed on the map, and <strong>Repeaters listening</strong>, under '

@@ -1466,12 +1466,21 @@ const PathProfile = (function () {
   // the guarantee that this has a number to print.
   function heightLabel(p) { return `${Math.round(p.ground)} m`; }
 
+  // What stands on the ground there, as the profile stands it — the measured
+  // canopy where the map has one, the class table's figure otherwise — or ''
+  // over bare ground and with the cover off. On the chart's tag as well as the
+  // map's marker, so a canopy reading that has run away shows under the
+  // pointer rather than only as a spike in the band.
+  function coverLabel(p) {
+    if (!(p.cover > 0)) return '';
+    const cls = p.cls != null && LandCover.CLASSES[p.cls] ? LandCover.CLASSES[p.cls].label : 'cover';
+    return `${Math.round(p.cover)} m ${cls.toLowerCase()}`;
+  }
+
   function groundLabel(p) {
     const bits = [`${heightLabel(p)} ground`];
-    if (p.cover > 0) {
-      const cls = p.cls != null && LandCover.CLASSES[p.cls] ? LandCover.CLASSES[p.cls].label : 'cover';
-      bits.push(`${Math.round(p.cover)} m ${cls.toLowerCase()} on it`);
-    }
+    const cv = coverLabel(p);
+    if (cv) bits.push(`${cv} on it`);
     // The signal on the line over this point, as the chart's tag has it — with
     // room here to say what the figure is over.
     const m = sigAt(p.d1);
@@ -1519,8 +1528,11 @@ const PathProfile = (function () {
     dot.setAttribute('cx', p.x.toFixed(1));
     dot.setAttribute('cy', p.y.toFixed(1));
 
-    // The height, and once the line is priced the signal there, in its colour.
+    // The height, what stands on it, and once the line is priced the signal
+    // there, in its colour.
     txt.textContent = heightLabel(p);
+    const cv = coverLabel(p);
+    if (cv) txt.textContent += ` · ${cv}`;
     const m = sigAt(p.d1);
     if (m != null) {
       const db = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');

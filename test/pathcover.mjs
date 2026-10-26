@@ -193,6 +193,20 @@ ok('…and a legend chip for each class on the path',
 ok('the status line names the source', /Sentinel-2/.test(s.status), s.status.slice(0, 120));
 ok('…and says the canopy map could not be had here, rather than nothing', /Canopy map unavailable/.test(s.status));
 
+// The cursor's tag says what stands on the ground under it, so a height that
+// has run away can be read off the chart: the trees mid-path at the table's
+// 15 m (there is no canopy map here), the rangeland beside them at 1 m.
+const tagAt = t => page.evaluate(t => {
+  PathProfile.hoverAt(LinkBudget.current().an.D * t);
+  const txt = document.getElementById('path-cursor-text');
+  const out = txt ? txt.textContent : null;
+  PathProfile.hoverAt(-5);
+  return out;
+}, t);
+const tagTrees = await tagAt(0.5), tagRange = await tagAt(0.15);
+ok('the cursor\'s tag gives the height of the cover under it — the trees mid-path', /^\d+ m · 15 m trees( · |$)/.test(tagTrees || ''), tagTrees);
+ok('…and the rangeland beside them', /^\d+ m · 1 m rangeland( · |$)/.test(tagRange || ''), tagRange);
+
 console.log('\nThe budget that prices it');
 
 const label = (rows, re) => rows.find(r => re.test(r.label));
@@ -226,6 +240,8 @@ ok('…and nothing is above the line', s.obstructions.length === 0);
 ok('…the chart draws no band', s.bands.length === 0);
 ok('…the status says off, in warning colour', /Off/.test(s.status) && await page.evaluate(() => !!document.querySelector('#path-cover-status .txt-warn')));
 ok('…and the budget says the cover is switched off rather than showing nought', s.rows.some(r => /Ground cover/.test(r.label) && r.value === '—'));
+const tagOff = await tagAt(0.5);
+ok('…and the cursor\'s tag no longer names any', /^\d+ m( · [+−-]?\d+\.\d dB)?$/.test(tagOff || ''), tagOff);
 const bare = s;
 // The two figures differ, and the model is allowed to say which way: over
 // flat ground two low masts sit in a two-ray null that rough ground relieves,
